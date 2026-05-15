@@ -17,7 +17,7 @@ defineProps<{
     :type="type === 'adjustment' ? 'primary' : 'success'"
     class="linkage-badge"
   >
-    <el-tag size="small" :type="type === 'adjustment' ? '' : 'success'" effect="plain">
+    <el-tag size="small" :type="type === 'adjustment' ? undefined : 'success'" effect="plain">
       {{ type === 'adjustment' ? '分录' : '底稿' }}
     </el-tag>
   </el-badge>

@@ -281,6 +281,8 @@ export const workpapers = {
   detail: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}`,
   download: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/download`,
   downloadPack: (pid: string) => `/api/projects/${pid}/working-papers/download-pack`,
+  templateDownload: (pid: string, wpCode: string) => `/api/projects/${pid}/wp-templates/${wpCode}/download`,
+  templateDownloadAll: (pid: string) => `/api/projects/${pid}/wp-templates/download-all`,
   upload: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/upload`,
   uploadFile: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/upload-file`,
   onlineSession: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/online-session`,
@@ -323,6 +325,21 @@ export const workpapers = {
   recalc: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/recalc`,
   remind: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/remind`,
   escalateToPartner: (pid: string) => `/api/projects/${pid}/workpapers/escalate-to-partner`,
+  // 程序管理
+  procedures: {
+    list: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/procedures`,
+    complete: (pid: string, wpId: string, procId: string) => `/api/projects/${pid}/workpapers/${wpId}/procedures/${procId}/complete`,
+    trim: (pid: string, wpId: string, procId: string) => `/api/projects/${pid}/workpapers/${wpId}/procedures/${procId}/trim`,
+    custom: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/procedures/custom`,
+    copyFromPrior: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/procedures/copy-from-prior`,
+  },
+  // 跨科目校验
+  crossCheck: {
+    execute: (pid: string) => `/api/projects/${pid}/cross-check/execute`,
+    results: (pid: string) => `/api/projects/${pid}/cross-check/results`,
+    rules: (pid: string) => `/api/projects/${pid}/cross-check/rules`,
+    customRule: (pid: string) => `/api/projects/${pid}/cross-check/rules/custom`,
+  },
 } as const
 
 // ─── 底稿复核批注 ───────────────────────────────────────────────────────────

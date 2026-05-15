@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="gt-wp-list gt-fade-in">
     <!-- 页面横幅 [R7-S3-01] -->
-    <GtPageHeader title="底稿管理" @back="$router.push('/projects')">
+    <GtPageHeader :title="projectName ? `${projectName} — 底稿管理` : '底稿管理'" @back="$router.push('/projects')" variant="compact">
       <template #actions>
         <GtToolbar :show-import="true" import-label="Excel导入" @import="showWpImport = true">
           <template #left>
@@ -14,8 +14,8 @@
           </template>
           <template #right>
             <el-button @click="fetchData" :loading="loading" size="small">刷新</el-button>
-            <el-button type="primary" size="small" :disabled="selectedWpIds.length === 0" @click="onBatchDownload" :loading="downloadLoading">
-              批量下载 ({{ selectedWpIds.length }})
+            <el-button type="primary" size="small" @click="onBatchDownload" :loading="downloadLoading">
+              批量下载 ({{ selectedWpIds.length || '全部' }})
             </el-button>
             <el-button type="warning" size="small" :disabled="selectedWpIds.length === 0" @click="showBatchAssign = true">
               批量委派 ({{ selectedWpIds.length }})
@@ -24,9 +24,6 @@
         </GtToolbar>
       </template>
     </GtPageHeader>
-
-    <!-- 工作流进度条 -->
-    <WorkflowProgress :project-id="projectId" :year="Number(route.query.year) || 2025" />
 
     <!-- 筛选栏（独立行，内容多不塞进 GtToolbar） -->
     <div v-if="treeData.length > 0" class="gt-wp-filter-bar">
@@ -67,6 +64,7 @@
       ref="kanbanRef"
       :project-id="projectId"
       :audit-cycle="filterCycle"
+      style="flex: 1; min-height: 0"
       @select="onKanbanSelect"
       @assign="onKanbanAssign"
     />
@@ -536,7 +534,6 @@ import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
 import SoDConflictDialog from '@/components/gate/SoDConflictDialog.vue'
 import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
-import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
@@ -551,6 +548,8 @@ import {
 import {
   downloadWorkpaper,
   downloadWorkpaperPack,
+  downloadTemplate,
+  downloadAllTemplates,
   uploadWorkpaperFile,
   listWorkpapers, runQCCheck, getQCResults,
   getWpIndex, updateReviewStatus, parseWorkpaper,
@@ -563,6 +562,7 @@ const route = useRoute()
 const router = useRouter()
 const dictStore = useDictStore()
 const projectId = computed(() => route.params.projectId as string)
+const projectName = ref('')
 
 const loading = ref(false)
 const showWpImport = ref(false)
@@ -1070,7 +1070,7 @@ async function selectWorkpaperById(wpId: string) {
   }
 }
 
-async function onNodeClick(data: TreeNode) {
+async function onNodeClick(data: TreeNode, _node: any, _event: any) {
   if (!data.wpId) return
   await selectWorkpaperById(data.wpId)
 }
@@ -1081,12 +1081,13 @@ const wpCtxX = ref(0)
 const wpCtxY = ref(0)
 let wpCtxNodeData: TreeNode | null = null
 
-function onWpNodeContextMenu(event: MouseEvent, data: TreeNode) {
+function onWpNodeContextMenu(event: Event, data: TreeNode, _node?: any) {
   if (!data.wpId) return // 只对叶子节点（底稿）显示菜单
-  event.preventDefault()
+  const e = event as MouseEvent
+  e.preventDefault()
   wpCtxNodeData = data
-  wpCtxX.value = event.clientX
-  wpCtxY.value = event.clientY
+  wpCtxX.value = e.clientX
+  wpCtxY.value = e.clientY
   wpCtxVisible.value = true
 
   const closeHandler = () => {
@@ -1120,9 +1121,9 @@ function onOnlineEdit() {
 async function onDownload() {
   if (!selectedWp.value) return
   try {
-    await downloadWorkpaper(projectId.value, selectedWp.value.id)
+    await downloadTemplate(projectId.value, selectedWp.value.wp_code)
   } catch (e: any) {
-    handleApiError(e, '下载')
+    handleApiError(e, '下载模板')
   }
 }
 
@@ -1226,13 +1227,12 @@ async function doUpload(forceOverwrite: boolean) {
 }
 
 async function onBatchDownload() {
-  if (selectedWpIds.value.length === 0) return
   downloadLoading.value = true
   try {
-    await downloadWorkpaperPack(projectId.value, selectedWpIds.value, true)
-    ElMessage.success(`已下载 ${selectedWpIds.value.length} 个底稿`)
+    await downloadAllTemplates(projectId.value)
+    ElMessage.success('全部底稿模板下载完成')
   } catch (e: any) {
-    handleApiError(e, '批量下载')
+    handleApiError(e, '批量下载模板')
   } finally {
     downloadLoading.value = false
   }
@@ -1467,6 +1467,13 @@ async function handleUploadRedirect() {
 watch([filterCycle, filterStatus, filterAssignee], () => fetchData())
 onMounted(async () => {
   await fetchData()
+  // 加载项目名称
+  try {
+    const { default: http } = await import('@/utils/http')
+    const resp = await http.get(`/api/projects/${projectId.value}`)
+    const proj = resp.data
+    projectName.value = proj?.name || proj?.project_name || ''
+  } catch { /* 静默 */ }
   // 任务 8.17.1：加载用户列表，同时赋值 userOptions 和 userNameMap
   try {
     const users = await listUsers()

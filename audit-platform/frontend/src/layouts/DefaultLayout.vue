@@ -101,7 +101,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import ThreeColumnLayout from './ThreeColumnLayout.vue'
 import MiddleProjectList from '@/components/layout/MiddleProjectList.vue'
 import MiddlePlaceholder from '@/components/layout/MiddlePlaceholder.vue'
@@ -113,12 +113,15 @@ import LinkageStatusBar from '@/components/common/LinkageStatusBar.vue'
 import ConsolMiddleNav from '@/components/consolidation/ConsolMiddleNav.vue'
 import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
 import NotificationCenter from '@/components/collaboration/NotificationCenter.vue'
+import { initGlobalBackspace } from '@/composables/useNavigationStack'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
 import { getProject } from '@/services/auditPlatformApi'
 import { getGlobalReviewInbox } from '@/services/pmApi'
 
 const route = useRoute()
+const router = useRouter()
+initGlobalBackspace(router)
 const roleStore = useRoleContextStore()
 const projectStore = useProjectStore()
 const selectedProject = ref<any>(null)

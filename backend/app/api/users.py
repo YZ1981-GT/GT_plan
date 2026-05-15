@@ -15,6 +15,28 @@ from app.services import auth_service
 router = APIRouter(tags=["用户"])
 
 
+@router.get("/")
+async def list_users(
+    db: AsyncSession = Depends(get_db),
+):
+    """获取用户列表（用于底稿分配、复核人选择等下拉框）"""
+    from sqlalchemy import select
+    result = await db.execute(
+        select(User).where(User.is_deleted == False).order_by(User.username)  # noqa: E712
+    )
+    users = result.scalars().all()
+    return [
+        {
+            "id": str(u.id),
+            "username": u.username,
+            "full_name": u.full_name if hasattr(u, 'full_name') else u.username,
+            "email": u.email if hasattr(u, 'email') else None,
+            "role": u.role if hasattr(u, 'role') else "auditor",
+        }
+        for u in users
+    ]
+
+
 @router.post("/", response_model=UserResponse)
 async def create_user(
     body: UserCreate,

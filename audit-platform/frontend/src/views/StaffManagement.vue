@@ -1,19 +1,18 @@
 <template>
   <div class="gt-staff-page gt-fade-in">
-    <div class="gt-staff-header">
-      <GtPageHeader title="人员库管理" :show-back="false">
-        <template #actions>
-          <el-input v-model="searchQuery" placeholder="搜索姓名/工号" clearable style="width: 220px"
-            @input="debouncedSearch" />
-          <el-select v-model="filterDept" placeholder="部门" clearable style="width: 150px" @change="loadStaff">
-            <el-option label="审计一部" value="审计一部" />
-            <el-option label="审计二部" value="审计二部" />
-            <el-option label="审计三部" value="审计三部" />
-          </el-select>
-          <el-button type="primary" @click="showCreateDialog = true">新增人员</el-button>
-          <el-button @click="showStaffImport = true">Excel导入</el-button>
-        </template>
-      </GtPageHeader>
+    <div class="gt-staff-toolbar">
+      <h2 class="gt-staff-toolbar__title">人员档案</h2>
+      <div class="gt-staff-toolbar__actions">
+        <el-input v-model="searchQuery" placeholder="搜索姓名/工号" clearable style="width: 200px"
+          @input="debouncedSearch" />
+        <el-select v-model="filterDept" placeholder="部门" clearable style="width: 130px" @change="loadStaff">
+          <el-option label="审计一部" value="审计一部" />
+          <el-option label="审计二部" value="审计二部" />
+          <el-option label="审计三部" value="审计三部" />
+        </el-select>
+        <el-button type="primary" @click="showCreateDialog = true">新增人员</el-button>
+        <el-button @click="showStaffImport = true">Excel导入</el-button>
+      </div>
     </div>
 
     <el-table :data="staffList" v-loading="loading" border stripe style="width: 100%">
@@ -398,9 +397,28 @@ onMounted(loadStaff)
 </script>
 
 <style scoped>
-.gt-staff-page { padding: var(--gt-space-4); }
-.gt-staff-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); flex-wrap: wrap; gap: var(--gt-space-2); }
-.gt-staff-header .gt-page-title { font-size: 14px; }
-.gt-staff-actions { display: flex; gap: var(--gt-space-2); align-items: center; }
+.gt-staff-page { padding: 16px 20px; }
+
+.gt-staff-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+
+.gt-staff-toolbar__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.gt-staff-toolbar__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .gt-handover-preview { margin-top: 16px; }
 </style>

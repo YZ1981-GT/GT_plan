@@ -117,6 +117,9 @@ async function markComplete(row: any) {
   } catch (e) {
     handleApiError(e, '标记完成')
   }
+}
+
+async function executeArchive() {
   if (!allComplete.value) {
     ElMessage.warning('请先完成所有检查项')
     return

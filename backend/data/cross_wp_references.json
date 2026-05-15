@@ -1,0 +1,274 @@
+{
+  "description": "跨底稿引用规则（=WP() 公式映射）",
+  "version": "2025-R1",
+  "usage_guide": {
+    "说明": "本文件定义底稿间的数据引用关系，系统据此自动建立 =WP() 公式、stale 传播链路和依赖图。",
+    "如何扩展": "在 references 数组中新增条目即可，系统热加载无需重启。每条规则需指定 source（数据来源底稿）和 targets（引用该数据的目标底稿）。",
+    "字段说明": {
+      "ref_id": "唯一标识，建议格式 CW-NNN",
+      "description": "中文描述，说明这条引用的业务含义",
+      "source_wp": "数据来源底稿编码（如 H1）",
+      "source_sheet": "来源 sheet 名称（如 '折旧分配分析表H1-13'）",
+      "source_cell": "来源单元格或区域（如 'C8' 或 '本期折旧合计'）",
+      "targets": "引用该数据的目标底稿列表，每个含 wp_code/sheet/cell/formula",
+      "category": "分类：depreciation(折旧)/salary(薪酬)/impairment(减值)/tax(税金)/profit(利润)/interest(利息)/cost(成本)/other",
+      "severity": "引用断裂时的严重程度：blocking(阻断签字)/warning(警告)/info(提示)"
+    },
+    "扩展示例": "如需新增'研发费用资本化→无形资产'引用，添加: {ref_id:'CW-20', source_wp:'I6', source_sheet:'审定表', source_cell:'资本化金额', targets:[{wp_code:'I2', sheet:'审定表', cell:'本期增加'}], category:'other', severity:'warning'}"
+  },
+  "references": [
+    {
+      "ref_id": "CW-01",
+      "description": "折旧分摊到销售费用",
+      "source_wp": "H1",
+      "source_sheet": "折旧分配分析表H1-13",
+      "source_cell": "销售费用折旧",
+      "targets": [
+        {"wp_code": "K8", "sheet": "审定表", "cell": "折旧行", "formula": "=WP('H1','折旧分配分析表H1-13','销售费用折旧')"}
+      ],
+      "category": "depreciation",
+      "severity": "blocking"
+    },
+    {
+      "ref_id": "CW-02",
+      "description": "折旧分摊到管理费用",
+      "source_wp": "H1",
+      "source_sheet": "折旧分配分析表H1-13",
+      "source_cell": "管理费用折旧",
+      "targets": [
+        {"wp_code": "K9", "sheet": "审定表", "cell": "折旧行", "formula": "=WP('H1','折旧分配分析表H1-13','管理费用折旧')"}
+      ],
+      "category": "depreciation",
+      "severity": "blocking"
+    },
+    {
+      "ref_id": "CW-03",
+      "description": "折旧分摊到生产成本",
+      "source_wp": "H1",
+      "source_sheet": "折旧分配分析表H1-13",
+      "source_cell": "生产成本折旧",
+      "targets": [
+        {"wp_code": "F5", "sheet": "审定表", "cell": "折旧行", "formula": "=WP('H1','折旧分配分析表H1-13','生产成本折旧')"}
+      ],
+      "category": "depreciation",
+      "severity": "blocking"
+    },
+    {
+      "ref_id": "CW-04",
+      "description": "薪酬分摊到销售费用",
+      "source_wp": "J1",
+      "source_sheet": "审定表",
+      "source_cell": "销售人员薪酬",
+      "targets": [
+        {"wp_code": "K8", "sheet": "审定表", "cell": "薪酬行", "formula": "=WP('J1','审定表','销售人员薪酬')"}
+      ],
+      "category": "salary",
+      "severity": "blocking"
+    },
+    {
+      "ref_id": "CW-05",
+      "description": "薪酬分摊到管理费用",
+      "source_wp": "J1",
+      "source_sheet": "审定表",
+      "source_cell": "管理人员薪酬",
+      "targets": [
+        {"wp_code": "K9", "sheet": "审定表", "cell": "薪酬行", "formula": "=WP('J1','审定表','管理人员薪酬')"}
+      ],
+      "category": "salary",
+      "severity": "blocking"
+    },
+    {
+      "ref_id": "CW-06",
+      "description": "薪酬分摊到生产成本",
+      "source_wp": "J1",
+      "source_sheet": "审定表",
+      "source_cell": "生产人员薪酬",
+      "targets": [
+        {"wp_code": "F5", "sheet": "审定表", "cell": "薪酬行", "formula": "=WP('J1','审定表','生产人员薪酬')"}
+      ],
+      "category": "salary",
+      "severity": "blocking"
+    },
+    {
+      "ref_id": "CW-07",
+      "description": "应收坏账计提到信用减值损失",
+      "source_wp": "D2",
+      "source_sheet": "坏账准备明细表D2-3",
+      "source_cell": "本期计提合计",
+      "targets": [
+        {"wp_code": "G14", "sheet": "审定表", "cell": "应收账款减值行", "formula": "=WP('D2','坏账准备明细表D2-3','本期计提合计')"}
+      ],
+      "category": "impairment",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-08",
+      "description": "其他应收坏账到信用减值损失",
+      "source_wp": "K1",
+      "source_sheet": "坏账准备明细表",
+      "source_cell": "本期计提合计",
+      "targets": [
+        {"wp_code": "G14", "sheet": "审定表", "cell": "其他应收减值行", "formula": "=WP('K1','坏账准备明细表','本期计提合计')"}
+      ],
+      "category": "impairment",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-09",
+      "description": "短期借款利息到财务费用",
+      "source_wp": "L1",
+      "source_sheet": "审定表",
+      "source_cell": "利息支出",
+      "targets": [
+        {"wp_code": "L8", "sheet": "审定表", "cell": "利息支出行", "formula": "=WP('L1','审定表','利息支出')"}
+      ],
+      "category": "interest",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-10",
+      "description": "长期借款利息到财务费用",
+      "source_wp": "L3",
+      "source_sheet": "审定表",
+      "source_cell": "利息支出",
+      "targets": [
+        {"wp_code": "L8", "sheet": "审定表", "cell": "利息支出行", "formula": "=WP('L3','审定表','利息支出')"}
+      ],
+      "category": "interest",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-11",
+      "description": "净利润到未分配利润",
+      "source_wp": "IS",
+      "source_sheet": "利润表",
+      "source_cell": "净利润",
+      "targets": [
+        {"wp_code": "M6", "sheet": "审定表", "cell": "本年净利润行", "formula": "=TB_SUM('5001~6999','审定数')"}
+      ],
+      "category": "profit",
+      "severity": "blocking"
+    },
+    {
+      "ref_id": "CW-12",
+      "description": "无形资产摊销到管理费用",
+      "source_wp": "I1",
+      "source_sheet": "审定表",
+      "source_cell": "本期摊销",
+      "targets": [
+        {"wp_code": "K9", "sheet": "审定表", "cell": "摊销行", "formula": "=WP('I1','审定表','本期摊销')"}
+      ],
+      "category": "depreciation",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-13",
+      "description": "使用权资产折旧到管理费用",
+      "source_wp": "H8",
+      "source_sheet": "审定表",
+      "source_cell": "本期折旧",
+      "targets": [
+        {"wp_code": "K9", "sheet": "审定表", "cell": "使用权资产折旧行", "formula": "=WP('H8','审定表','本期折旧')"}
+      ],
+      "category": "depreciation",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-14",
+      "description": "租赁负债利息到财务费用",
+      "source_wp": "H9",
+      "source_sheet": "审定表",
+      "source_cell": "本期利息",
+      "targets": [
+        {"wp_code": "L8", "sheet": "审定表", "cell": "租赁利息行", "formula": "=WP('H9','审定表','本期利息')"}
+      ],
+      "category": "interest",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-15",
+      "description": "各投资底稿收益汇总到投资收益",
+      "source_wp": "G7",
+      "source_sheet": "审定表",
+      "source_cell": "投资收益",
+      "targets": [
+        {"wp_code": "G11", "sheet": "审定表", "cell": "长期股权投资收益行", "formula": "=WP('G7','审定表','投资收益')"}
+      ],
+      "category": "other",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-16",
+      "description": "递延所得税资产变动到所得税费用",
+      "source_wp": "N1",
+      "source_sheet": "审定表",
+      "source_cell": "期末余额",
+      "targets": [
+        {"wp_code": "N5", "sheet": "审定表", "cell": "递延所得税资产变动行", "formula": "=WP('N1','审定表','期末') - WP('N1','审定表','期初')"}
+      ],
+      "category": "tax",
+      "severity": "blocking"
+    },
+    {
+      "ref_id": "CW-17",
+      "description": "递延所得税负债变动到所得税费用",
+      "source_wp": "N3",
+      "source_sheet": "审定表",
+      "source_cell": "期末余额",
+      "targets": [
+        {"wp_code": "N5", "sheet": "审定表", "cell": "递延所得税负债变动行", "formula": "=WP('N3','审定表','期初') - WP('N3','审定表','期末')"}
+      ],
+      "category": "tax",
+      "severity": "blocking"
+    },
+    {
+      "ref_id": "CW-18",
+      "description": "盈余公积提取到未分配利润",
+      "source_wp": "M5",
+      "source_sheet": "审定表",
+      "source_cell": "本期提取",
+      "targets": [
+        {"wp_code": "M6", "sheet": "审定表", "cell": "盈余公积提取行", "formula": "=WP('M5','审定表','本期提取')"}
+      ],
+      "category": "profit",
+      "severity": "blocking"
+    },
+    {
+      "ref_id": "CW-19",
+      "description": "应付股利分配到未分配利润",
+      "source_wp": "M1",
+      "source_sheet": "审定表",
+      "source_cell": "本期分配",
+      "targets": [
+        {"wp_code": "M6", "sheet": "审定表", "cell": "利润分配行", "formula": "=WP('M1','审定表','本期分配')"}
+      ],
+      "category": "profit",
+      "severity": "blocking"
+    },
+    {
+      "ref_id": "CW-20",
+      "description": "存货跌价准备到资产减值损失",
+      "source_wp": "F2",
+      "source_sheet": "审定表",
+      "source_cell": "本期计提跌价",
+      "targets": [
+        {"wp_code": "K11", "sheet": "审定表", "cell": "存货跌价行", "formula": "=WP('F2','审定表','本期计提跌价')"}
+      ],
+      "category": "impairment",
+      "severity": "warning"
+    }
+  ],
+  "stats": {
+    "total_references": 20,
+    "by_category": {
+      "depreciation": 5,
+      "salary": 3,
+      "impairment": 3,
+      "interest": 3,
+      "profit": 3,
+      "tax": 2,
+      "other": 1
+    },
+    "coverage_note": "当前覆盖 20 条核心跨底稿引用。致同 2025 模板实际有 50+ 条跨底稿数据流向，请根据项目实际需要持续扩展。扩展方法见 usage_guide。"
+  }
+}

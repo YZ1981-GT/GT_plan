@@ -1,5 +1,18 @@
 <template>
-  <div class="gt-wp-editor gt-fade-in">
+  <!-- 路由分发：非 univer 类型使用对应子编辑器 -->
+  <component
+    v-if="componentType && componentType !== 'univer'"
+    :is="editorComponent"
+    :project-id="projectId"
+    :wp-id="wpId"
+    :wp-detail="wpDetail"
+    @show-versions="onShowVersions"
+    @toggle-panel="showSidePanel = !showSidePanel"
+    @saved="onChildSaved"
+  />
+
+  <!-- 默认 Univer 编辑器（component_type='univer' 或未配置时） -->
+  <div v-else class="gt-wp-editor gt-fade-in">
     <!-- 编辑锁提示 -->
     <el-alert v-if="editLock.locked.value && !editLock.isMine.value" type="warning" :closable="false" style="margin-bottom: 8px">
       {{ editLock.lockedBy.value || '其他用户' }} 正在编辑，当前为只读模式
@@ -41,6 +54,7 @@
           :disabled="dirty"
         >📨 提交复核</el-button>
         <el-button size="small" @click="onSyncStructure" :loading="syncLoading">🔄 同步公式</el-button>
+        <el-button size="small" @click="onRefreshPrefill" :loading="prefillLoading" title="从试算表重新取数填入底稿">📊 刷新取数</el-button>
         <el-button size="small" @click="onShowVersions">📋 版本历史</el-button>
         <el-button size="small" @click="onDownload">📥 下载</el-button>
         <el-button size="small" @click="onExportPdf" :loading="exportingPdf" v-permission="'workpaper:export'">📄 导出 PDF</el-button>
@@ -132,10 +146,28 @@
       />
     </el-drawer>
   </div>
+
+  <!-- 非 Univer 编辑器的侧面板（共享） -->
+  <el-drawer
+    v-if="componentType && componentType !== 'univer'"
+    v-model="showSidePanel"
+    direction="rtl"
+    size="400px"
+    :with-header="false"
+    :modal="false"
+    append-to-body
+  >
+    <WorkpaperSidePanel
+      :project-id="projectId"
+      :wp-id="wpId"
+      :wp-code="wpDetail?.wp_code"
+      @finecheck-update="fineCheckFailCount = $event"
+    />
+  </el-drawer>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { onBeforeRouteLeave } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -162,6 +194,21 @@ import WorkpaperSidePanel from '@/components/workpaper/WorkpaperSidePanel.vue'
 import { WP_STATUS } from '@/constants/statusEnum'
 import { handleApiError } from '@/utils/errorHandler'
 
+// ─── 动态编辑器组件（按 component_type 路由分发） ───────────────────────────
+
+const WorkpaperFormEditor = defineAsyncComponent(() => import('./WorkpaperFormEditor.vue'))
+const WorkpaperWordEditor = defineAsyncComponent(() => import('./WorkpaperWordEditor.vue'))
+const WorkpaperTableEditor = defineAsyncComponent(() => import('./WorkpaperTableEditor.vue'))
+const WorkpaperHybridEditor = defineAsyncComponent(() => import('./WorkpaperHybridEditor.vue'))
+
+const EDITOR_MAP: Record<string, any> = {
+  form: WorkpaperFormEditor,
+  word: WorkpaperWordEditor,
+  table: WorkpaperTableEditor,
+  hybrid: WorkpaperHybridEditor,
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const DIRTY_COMMAND_PATTERNS = [
   'set-range-values', 'set-cell',
   'set-formula', 'formula.', 'array-formula',
@@ -175,6 +222,33 @@ const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
+
+// ─── component_type 路由逻辑 ─────────────────────────────────────────────────
+const componentType = ref<string>('univer')
+const editorComponent = computed(() => EDITOR_MAP[componentType.value] || null)
+
+/** 从后端获取 component_type（wp_template_metadata 或底稿详情） */
+async function fetchComponentType() {
+  try {
+    const detail = await httpApi.get(P_wp.detail(projectId.value, wpId.value))
+    // component_type 可能来自 detail 本身或 template_metadata
+    const ct = detail?.component_type || detail?.template_metadata?.component_type || 'univer'
+    componentType.value = ct
+    // 同时缓存 wpDetail 供子编辑器使用
+    if (detail) wpDetail.value = detail
+  } catch {
+    componentType.value = 'univer'
+  }
+}
+
+/** 子编辑器保存后的回调 */
+function onChildSaved() {
+  eventBus.emit('workpaper:saved', {
+    projectId: projectId.value,
+    wpId: wpId.value,
+  } as WorkpaperSavedPayload)
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 const editLock = useEditingLock({
   resourceId: computed(() => wpId.value || ''),
@@ -218,6 +292,7 @@ const loading = ref(true)
 const saving = ref(false)
 const submitting = ref(false)
 const syncLoading = ref(false)
+const prefillLoading = ref(false)
 const dirty = ref(false)
 const showSidePanel = ref(false)
 // R8-S2-02：自检未通过项数（由 WorkpaperSidePanel @finecheck-update 同步）
@@ -271,6 +346,11 @@ let univerAPI: any = null
 const smartTip = ref<any>(null)
 const showSmartTipDetail = ref(false)
 
+// P0-2/P0-3: Track whether workpaper was loaded from xlsx (component scope for onSave access)
+let loadedFromXlsx = false
+// P2-2: 记录文件打开时间戳（用于 xlsx 保存冲突检测）
+let fileOpenedAt = 0
+
 function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     not_started: 'info', in_progress: 'warning', draft: 'warning',
@@ -307,16 +387,39 @@ async function initUniver() {
     return
   }
 
-  // 2. 从后端加载完整的 Univer 数据（含所有 Sheet、样式、公式）
+  // 2. 优先尝试从 xlsx 模板文件加载（致同 2025 模板）
   let workbookData: any = null
+  loadedFromXlsx = false
   try {
-    const data = await httpApi.get(
-      P_wp.univerData(projectId.value, wpId.value),
-      { validateStatus: (s: number) => s < 600 },
+    const xlsxResp = await fetch(
+      `/api/projects/${projectId.value}/workpapers/${wpId.value}/template-file`,
+      { headers: { Authorization: `Bearer ${sessionStorage.getItem('token') || localStorage.getItem('token') || ''}` } },
     )
-    workbookData = data
+    if (xlsxResp.ok && xlsxResp.headers.get('content-type')?.includes('spreadsheet')) {
+      const blob = await xlsxResp.blob()
+      if (blob.size > 100) {
+        // 有 xlsx 模板文件，使用 importXLSX 加载
+        loadedFromXlsx = true
+        fileOpenedAt = Date.now() / 1000  // P2-2: 记录打开时间（秒级 Unix 时间戳）
+        // Univer 需要先初始化再导入，标记后续处理
+        workbookData = { _xlsxBlob: blob }
+      }
+    }
   } catch {
-    workbookData = null
+    // xlsx 端点不可用，降级到 JSON 模式
+  }
+
+  // 2b. 降级：从后端加载 Univer JSON 数据
+  if (!loadedFromXlsx) {
+    try {
+      const data = await httpApi.get(
+        P_wp.univerData(projectId.value, wpId.value),
+        { validateStatus: (s: number) => s < 600 },
+      )
+      workbookData = data
+    } catch {
+      workbookData = null
+    }
   }
 
   if (!workbookData || !workbookData.sheets) {
@@ -338,6 +441,18 @@ async function initUniver() {
   }
 
   // 3. 初始化 Univer
+  // Advanced Preset 需要 Univer Server（:3010），当前未部署，跳过
+  // 如需启用：部署 Univer Server 后取消下方注释
+  const extraPresets: any[] = []
+  // try {
+  //   const { UniverSheetsDrawingPreset } = await import('@univerjs/preset-sheets-drawing')
+  //   const { UniverSheetsAdvancedPreset } = await import('@univerjs/preset-sheets-advanced')
+  //   extraPresets.push(UniverSheetsDrawingPreset())
+  //   extraPresets.push(UniverSheetsAdvancedPreset({
+  //     universerEndpoint: window.location.origin.replace(/:\d+$/, ':3010'),
+  //   }))
+  // } catch { /* Advanced Preset 不可用 */ }
+
   const { univerAPI: api, univer } = createUniver({
     locale: LocaleType.ZH_CN,
     locales: {
@@ -347,14 +462,71 @@ async function initUniver() {
       UniverSheetsCorePreset({
         container: univerContainer.value,
       }),
+      ...extraPresets,
     ],
   })
 
   univerInstance = univer
   univerAPI = api
 
-  // 4. 创建工作簿
-  univerAPI.createWorkbook(workbookData)
+  // 4. 创建工作簿（支持 xlsx 导入或 JSON 创建）
+  if (loadedFromXlsx && workbookData?._xlsxBlob) {
+    // P0-2: Try Univer native xlsx import (requires @univerjs/preset-sheets-advanced)
+    const blob = workbookData._xlsxBlob
+    let imported = false
+
+    // Strategy 1: importXLSXToSnapshotAsync (Univer 0.21.x with advanced preset)
+    if (typeof univerAPI.importXLSXToSnapshotAsync === 'function') {
+      try {
+        const file = new File([blob], 'workpaper.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+        const snapshot = await univerAPI.importXLSXToSnapshotAsync(file)
+        univerAPI.createWorkbook(snapshot)
+        imported = true
+      } catch (e: any) {
+        console.warn('importXLSXToSnapshotAsync failed:', e)
+      }
+    }
+
+    // Strategy 2: importXLSXToWorkbook (alternative API name)
+    if (!imported && typeof univerAPI.importXLSXToWorkbook === 'function') {
+      try {
+        await univerAPI.importXLSXToWorkbook(blob)
+        imported = true
+      } catch (e: any) {
+        console.warn('importXLSXToWorkbook failed:', e)
+      }
+    }
+
+    // Strategy 3: Fallback - request backend to convert xlsx to Univer JSON
+    if (!imported) {
+      try {
+        const formData = new FormData()
+        formData.append('file', blob, 'workpaper.xlsx')
+        const jsonData = await httpApi.post(
+          `/api/projects/${projectId.value}/workpapers/${wpId.value}/template-file/to-json`,
+          formData,
+        )
+        if (jsonData && jsonData.sheets) {
+          univerAPI.createWorkbook(jsonData)
+          imported = true
+        }
+      } catch (e: any) {
+        console.warn('Backend xlsx-to-json fallback failed:', e)
+      }
+    }
+
+    // Final fallback: empty workbook
+    if (!imported) {
+      univerAPI.createWorkbook({
+        id: wpDetail.value.wp_code || 'wp',
+        name: `${wpDetail.value.wp_code} ${wpDetail.value.wp_name}`,
+        sheetOrder: ['sheet0'],
+        sheets: { sheet0: { id: 'sheet0', name: 'Sheet1', rowCount: 100, columnCount: 20, cellData: {} } },
+      })
+    }
+  } else {
+    univerAPI.createWorkbook(workbookData)
+  }
 
   // 5. 监听数据变化
   univerAPI.onCommandExecuted((command: any) => {
@@ -369,6 +541,15 @@ async function initUniver() {
   // 6. 非阻塞加载智能提示和用户名映射
   loadSmartTips()
   loadUserMap()
+
+  // ─── Sprint 6 Task 6.4: Univer 右键菜单证据链入口 ─────────────────────────
+  // TODO: 完整 Univer 右键菜单集成需要 @univerjs/ui 的 IMenuService
+  // 注册位置：在 univerAPI 就绪后，通过 IMenuService.addMenuItem 注册以下三项：
+  //   1. "引用附件" — 打开附件选择器，选中后调用 useEvidenceLink.createLink
+  //   2. "上传并引用" — 打开上传对话框，上传完成后自动建立 link
+  //   3. "查看引用的附件" — 读取当前单元格 cellRef，展示该单元格所有 evidence links
+  // 当前为占位注释，完整集成在 Univer 插件体系稳定后实施。
+  // ──────────────────────────────────────────────────────────────────────────
 
   // 7. R1 需求 2：加载复核意见红点（失败不阻断底稿）
   loadReviewMarkers()
@@ -412,6 +593,41 @@ async function onSave(): Promise<boolean> {
     if (!workbook) throw new Error('无法获取工作簿数据')
 
     const snapshot = workbook.getSnapshot()
+
+    // 如果底稿从 xlsx 模板加载，同时导出 xlsx 回写到后端
+    if (loadedFromXlsx) {
+      try {
+        let xlsxBlob: Blob | null = null
+
+        // P0-3: Try exportXLSXBySnapshotAsync (Univer 0.21.x with advanced preset)
+        if (typeof univerAPI.exportXLSXBySnapshotAsync === 'function') {
+          xlsxBlob = await univerAPI.exportXLSXBySnapshotAsync(snapshot)
+        }
+        // Fallback: try exportWorkbookToXLSX
+        else if (typeof univerAPI.exportWorkbookToXLSX === 'function') {
+          xlsxBlob = await univerAPI.exportWorkbookToXLSX()
+        }
+
+        if (xlsxBlob && xlsxBlob.size > 0) {
+          const formData = new FormData()
+          formData.append('file', xlsxBlob, `${wpId.value}.xlsx`)
+          await fetch(
+            `/api/projects/${projectId.value}/workpapers/${wpId.value}/template-file/upload-xlsx`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+                'X-File-Opened-At': String(fileOpenedAt),
+              },
+              body: formData,
+            },
+          )
+        }
+        // If no export API available, just save the JSON snapshot (existing behavior below)
+      } catch (e) {
+        console.warn('xlsx export failed (non-blocking):', e)
+      }
+    }
 
     // 调用完整保存 API（xlsx 回写 + structure.json + 审计留痕 + 事件发布）
     // 需求 45.1：携带 expected_version 触发后端并发冲突检测
@@ -516,6 +732,34 @@ async function onSyncStructure() {
   }
 }
 
+async function onRefreshPrefill() {
+  prefillLoading.value = true
+  try {
+    // 先保存当前编辑
+    if (dirty.value) {
+      const saveOk = await onSave()
+      if (!saveOk) return
+    }
+    // 调用后端重新初始化（强制从模板复制+prefill）
+    await httpApi.post(
+      `/api/projects/${projectId.value}/workpapers/${wpId.value}/template-file/init`,
+    )
+    // 重新加载 Univer
+    if (univerInstance) {
+      try { univerInstance.dispose() } catch { /* ignore */ }
+      univerInstance = null
+      univerAPI = null
+    }
+    loading.value = true
+    await initUniver()
+    ElMessage.success('取数刷新完成，已从试算表重新填入最新数据')
+  } catch (e: any) {
+    handleApiError(e, '刷新取数')
+  } finally {
+    prefillLoading.value = false
+  }
+}
+
 async function onDownload() {
   try {
     await downloadWorkpaper(projectId.value, wpId.value)
@@ -600,7 +844,12 @@ onBeforeRouteLeave(async (_to, _from, next) => {
 })
 
 onMounted(() => {
-  initUniver()
+  // 先获取 component_type 决定路由，再初始化对应编辑器
+  fetchComponentType().then(() => {
+    if (componentType.value === 'univer' || !componentType.value) {
+      initUniver()
+    }
+  })
   // R8-S2-02：订阅 workpaper:locate-cell 事件，定位到 Univer 单元格
   eventBus.on('workpaper:locate-cell', onLocateCell)
   // R8-S2-14：关闭浏览器/刷新前警告

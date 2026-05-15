@@ -1,7 +1,7 @@
 <!--
   WorkpaperSidePanel — 底稿/报表编辑器统一右栏面板 [R7-S3-05 Task 24 / R8-S2-01]
 
-  9 Tab 容器：AI / 附件 / 版本 / 批注 / 程序要求 / 依赖 / 一致性 / 自检 / 提示
+  10 Tab 容器：AI / 附件 / 版本 / 批注 / 程序 / 程序要求 / 依赖 / 一致性 / 自检 / 提示
   所有编辑器（WorkpaperEditor/WorkpaperWorkbench/DisclosureEditor/AuditReportEditor/ReportConfigEditor）
   统一使用此组件作为右栏，禁止各自自建独立面板。
 
@@ -25,12 +25,33 @@
       </el-tab-pane>
       <el-tab-pane label="版本" name="versions" lazy>
         <slot name="versions">
-          <div class="gt-wp-side-placeholder">版本历史（待接入）</div>
+          <SnapshotCompare
+            v-if="wpId"
+            :snapshots="[]"
+            :changes="[]"
+          />
+          <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
         </slot>
       </el-tab-pane>
       <el-tab-pane label="批注" name="annotations" lazy>
         <slot name="annotations">
-          <div class="gt-wp-side-placeholder">批注列表（待接入）</div>
+          <CellAnnotationPanel
+            v-if="wpId"
+            :project-id="projectId"
+            :wp-id="wpId"
+          />
+          <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
+        </slot>
+      </el-tab-pane>
+      <el-tab-pane label="程序" name="procedures" lazy>
+        <slot name="procedures">
+          <ProcedurePanel
+            v-if="wpId"
+            :project-id="projectId"
+            :wp-id="wpId"
+            @completion-change="onProcedureCompletionChange"
+          />
+          <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
         </slot>
       </el-tab-pane>
       <el-tab-pane label="程序要求" name="requirements" lazy>
@@ -47,8 +68,31 @@
       </el-tab-pane>
       <el-tab-pane label="一致性" name="consistency" lazy>
         <slot name="consistency">
-          <div class="gt-wp-side-placeholder">一致性监控（由父组件通过 slot 注入）</div>
+          <CrossCheckPanel
+            v-if="wpId"
+            :project-id="projectId"
+            :year="currentYear"
+          />
+          <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
         </slot>
+      </el-tab-pane>
+      <!-- 公式状态 Tab -->
+      <el-tab-pane label="公式" name="formulas" lazy>
+        <FormulaStatusPanel
+          v-if="wpId"
+          :project-id="projectId"
+          :wp-id="wpId"
+        />
+        <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
+      </el-tab-pane>
+      <!-- 证据链 Tab -->
+      <el-tab-pane label="证据" name="evidence" lazy>
+        <EvidenceLinkPanel
+          v-if="wpId"
+          :project-id="projectId"
+          :wp-id="wpId"
+        />
+        <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
       </el-tab-pane>
       <!-- R8-S2-02：自检 Tab（失败项可定位到 Univer 单元格） -->
       <el-tab-pane name="finecheck" lazy>
@@ -104,7 +148,11 @@
       </el-tab-pane>
       <el-tab-pane label="提示" name="tips" lazy>
         <slot name="tips">
-          <div class="gt-wp-side-placeholder">智能提示（由父组件通过 slot 注入）</div>
+          <QualityScoreBadge
+            v-if="wpId"
+            :score="0"
+          />
+          <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
         </slot>
       </el-tab-pane>
     </el-tabs>
@@ -116,7 +164,14 @@ import { ref, watch, computed } from 'vue'
 import AiAssistantSidebar from '@/components/workpaper/AiAssistantSidebar.vue'
 import AttachmentDropZone from '@/components/workpaper/AttachmentDropZone.vue'
 import ProgramRequirementsSidebar from '@/components/workpaper/ProgramRequirementsSidebar.vue'
+import ProcedurePanel from '@/components/workpaper/ProcedurePanel.vue'
 import DependencyGraph from '@/components/workpaper/DependencyGraph.vue'
+import CellAnnotationPanel from '@/components/workpaper/CellAnnotationPanel.vue'
+import CrossCheckPanel from '@/components/workpaper/CrossCheckPanel.vue'
+import FormulaStatusPanel from '@/components/workpaper/FormulaStatusPanel.vue'
+import EvidenceLinkPanel from '@/components/workpaper/EvidenceLinkPanel.vue'
+import SnapshotCompare from '@/components/workpaper/SnapshotCompare.vue'
+import QualityScoreBadge from '@/components/workpaper/QualityScoreBadge.vue'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 
@@ -140,9 +195,16 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'finecheck-update', count: number): void
+  (e: 'procedure-completion-change', rate: number): void
 }>()
 
 const activeTab = ref('ai')
+const currentYear = computed(() => new Date().getFullYear())
+
+// ─── 程序完成率联动 ──────────────────────────────
+function onProcedureCompletionChange(rate: number) {
+  emit('procedure-completion-change', rate)
+}
 
 // ─── 自检 Tab ──────────────────────────────
 const fineChecks = ref<FineCheckResult[]>([])

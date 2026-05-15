@@ -27,12 +27,13 @@ inclusion: always
 - 表格列宽要足够大，不折行不省略号截断
 - **表格选中行必须视觉明显**：8% 透明度背景色在白底上几乎不可见，最低 14% + 左侧 3px 紫色竖线指示器；hover 也要有浅色反馈；用户反馈"丑"多数是行间距太松+选中不明显
 - **最大化数据显示区域**：工具栏按钮（刷新/导出/保存）应合并到 Tab 栏右侧而非独占一行；减少表格上方的非数据行数，让表格尽可能多显示数据行
+- **简单 CRUD 页面不用 GtPageHeader 紫色渐变**：人员档案/知识库等列表管理页用白色简洁工具栏（左标题+右操作按钮），GtPageHeader 只用于项目级/仪表盘等需要视觉层级的页面；紫色大块在简单页面显得"丑"
 - 表格数字列（金额、科目编号等）统一使用 Arial Narrow 字体 + `white-space: nowrap` + `font-variant-numeric: tabular-nums`，通过 `.gt-amt` class 实现
 - **el-table 字号控制必须用动态 class + !important**：`:style="{ fontSize }"` 不生效（内部 DOM 层级太深被 Element Plus 默认样式覆盖）；正确方案 = `:class="gt-tb-font-${size}"` + scoped `:deep(.gt-tb-font-sm) th .cell, td .cell { font-size: 12px !important }`
 - **所有表格统一用 el-table**：替换所有原生 HTML table（试算平衡表/报表等）；不引入 AG Grid（包体积大+与 Univer 重叠）；底稿编辑器继续用 Univer；el-table + useCellSelection composable 满足"查看+少量编辑"需求
 - 表格分页用标准分页组件（左侧 page size 选择器 + 右侧页码导航含 jumper），不用"加载更多"模式
 - 四表联查需支持全屏模式 + 行选择（checkbox）+ 右键菜单，右键菜单预留"抽凭到底稿"入口（后续与底稿抽凭模块衔接）
-- **溯源/穿透跳转后必须支持 Backspace 返回原位**：记录来源视图+行索引+滚动位置，按 Backspace 恢复（不拦截输入框内的 Backspace）；已在 TrialBalance.vue 试算平衡表→科目明细溯源实现，其他穿透场景同理
+- **溯源/穿透跳转后必须支持 Backspace 返回原位**：`initGlobalBackspace(router)` 在 DefaultLayout 注册一次全局监听器，任何视图跳转前调 `useNavigationStack().push()` 即可；不拦截输入框/textarea/contentEditable/el-select 弹出层内的 Backspace
 - 表格编辑需支持查看/编辑模式切换
 - 复制按钮命名：工具栏"复制整表" vs 右键"复制选中区域"
 - 系统打磨采用 PDCA 迭代模式：提建议→成 spec 三件套→实施→复盘→下一轮新需求，直到可改进项穷尽
@@ -455,6 +456,86 @@ inclusion: always
   - router_registry 新增 §30（Presence+ConflictGuard）§31（Linkage+Reclassification）§32（AdminEventHealth）
   - apiPaths.ts 新增 presence/linkage/conflictGuard 3 个路径对象
 - **项目三码体系（待 spec）**：本企业名称+代码、上级企业名称+代码、最终控制方名称+代码 6 字段必填（所有项目，非仅合并），通过 parent_company_code→company_code 构建项目树；可见性基于 ProjectAssignment 派单裁剪（助理看子公司，经理看项目组，合伙人看全部）；需新建 spec 规划
+- **底稿深度优化 spec 实施中**（`.kiro/specs/workpaper-deep-optimization/`）：requirements.md（7 章 41 需求 + 27 属性 + 附录 A/B）+ design.md（13 架构决策 D1-D13 + 6 新表含 cell_annotations + 公式引擎详设）+ tasks.md（11 Sprint / 97 任务 + 10 UAT）；覆盖矩阵 41/41 全绿
+  - **Sprint 1-11 全部任务完成（97/97，100%含可选测试）**：12 个属性测试+集成测试全绿（0.45s）；剩余 10 项 UAT 需手动浏览器验证
+  - **新建测试文件**：`backend/tests/test_wp_optimization_properties.py`（7 property-based + 2 supplementary + 3 integration = 12 tests）
+  - **代码骨架完成但模板数据远未覆盖**：476 个致同模板只有 88 条 wp_account_mapping（D-N 审定表级），B/C/A/S 类模板元数据全缺；下一步是数据工程而非代码——需从实际 Excel/docx 模板提取 component_type/procedure_steps/formula_cells/conclusion_cell 种子数据
+- **全局模板库管理 spec 已创建**（`.kiro/specs/template-library-coordination/`）：22 需求 / 10 架构决策 / 15 属性 / 6 Sprint 50 任务 + 10 UAT；覆盖 5 大模板库 + 致同编码体系 + 枚举字典 + 自定义查询；管理页面 8 Tab（底稿模板/公式管理/审计报告/附注/编码体系/报表配置/枚举字典/自定义查询）
+  - **模板数据补齐优先级**：第一批 D-N 审定表 ~60 个（formula_cells + procedure_steps）→ 第二批 B 类 ~30 个（form schema）→ 第三批 C 类 ~60 个（混合视图结构）→ 第四批 A/S 类（检查清单 + Word 字段）
+  - **第一批 D-N 模板数据提取已完成**：`scripts/extract_dn_template_metadata.py` 扫描 113 个 Excel 模板 → 89 个 wp_code 条目 / 4689 个公式单元格 / 输出 `backend/data/wp_template_metadata_dn_seed.json`；按循环分布 D=17/E=5/F=15/G=15/H=11/I=6/J=3/K=14/L=9/M=10/N=5
+  - **第一批复盘 3 个问题已全部修复 + 覆盖率验证通过**：linked_accounts 89/89；conclusion_cell 优先级策略（检查表62/审定表10/分析表8/程序表7）；cross_wp_references.json 20 条规则；**种子 89 条 vs 模板 89 个主编码 = 100% 对齐零缺失**（逐循环 D8/E2/F6/G15/H11/I6/J3/K14/L9/M10/N5 全部 OK）
+  - **第二批 B 类模板数据提取已完成**：`scripts/extract_b_template_metadata.py` 扫描 138 文件（66 xlsx + 71 docx）→ 19 条目（form=9/univer=8/word=2）/ 输出 `backend/data/wp_template_metadata_b_seed.json`；覆盖 B1/B2/B3/B5/B10-B13/B15/B18-B19/B22-B23/B30/B40/B50-B52/B60
+  - **两批合计 108 条目**（D-N 89 + B 19），剩余第三批 C 类（控制测试）+ 第四批 A/S 类（完成阶段+特定项目）
+  - **全部四批模板数据提取完成 + 覆盖率核验全通过（179 条目 = 179 主编码零缺失）**：D-N 89=89 / B 19=19 / C 21=21 / A 28=28 / S 22=22；组件分布 hybrid=15/form=55/univer=103/word=6；种子文件 `wp_template_metadata_dn_seed.json` + `_b_seed.json` + `_cas_seed.json`；提取脚本 `extract_dn_template_metadata.py` + `extract_b_template_metadata.py` + `extract_cas_template_metadata.py`
+  - **下一步**：合并三个 seed 文件加载到 wp_template_metadata 表
+  - **合并加载已完成**：`scripts/load_wp_template_metadata.py`（命令行幂等加载）+ `routers/wp_template_metadata.py`（GET 查询+POST /seed 端点）+ router_registry §40；使用方式 = 命令行 `python backend/scripts/load_wp_template_metadata.py` 或 API `POST /api/wp-template-metadata/seed`
+  - **全量覆盖率审计结果**：470/476 文件已覆盖（98.7%），6 个未覆盖全是参考示例/附件（非正式底稿）；联动问题 69 条（ACCOUNTS_NO_NOTE 44 + HYBRID_NO_FORM_SECTION 15 + UNIVER_NO_FORMULA 9 + FORM_NO_SCHEMA 1）；修复建议 5 条（R1-R5）输出到 `backend/data/template_coverage_report.json`
+  - **联动修复 R1-R5 全部完成**：R1 S17 form_schema 8 字段 / R2 5 个改 form+4 个加公式占位 / R3 补充 6 个 note_section（D7/G4/G11/L3/L8/N4）其余 38 个确认 null / R4 C1-C15 加 hybrid_sections / R5 6 个参考文件归入；warning 级联动问题从 69→0；模板元数据系统完整就绪
+  - **整体复盘 5 个核心差距**：(1) 公式引擎"最后一公里"——formula_cells 存的是 Excel 原生公式不是 =TB/=WP 预填充映射，需为 ~20 个核心审定表手动编写 prefill_formula_mapping（影响最大）；(2) procedure_steps 只有 D-N 89 条有，B/C/A/S 全缺；(3) 15+ 前端面板组件未挂载到 WorkpaperSidePanel Tab；(4) 跨底稿引用 20/50+ 条（持续扩展）；(5) 零端到端验证
+  - **下一步执行顺序已确定**：公式映射（数据地基）→ 前端集成（UI 接线）→ E2E 验证（闭环验证）；每步为下一步创造前置条件
+  - **第一步公式映射已完成并扩展**：`backend/data/prefill_formula_mapping.json` 94 个映射 / 481 个预填充公式单元格（覆盖全部 D-N 89 条目 100%）；函证类 7 个只有期初/未审数，标准审定表 87 个有完整 5 行（期初/未审数/AJE/RJE/上年），K8/K9/F5 额外有 =WP() 跨底稿公式；E2E 5/5 无回归
+  - **第二步前端集成已完成**：WorkpaperSidePanel 14 Tab 全部挂载真实组件零占位（AI/附件/版本SnapshotCompare/批注CellAnnotationPanel/程序/程序要求/依赖/一致性CrossCheckPanel/公式FormulaStatusPanel/证据EvidenceLinkPanel/自检/提示QualityScoreBadge）；getDiagnostics 0 错误
+  - **第三步 E2E 验证已完成**：`scripts/e2e_workpaper_optimization.py` 5/5 layers 全绿（模板加载 179 条/程序管理 rate=0.4 score=53/公式引擎 K8→H1→J1 拓扑排序/跨科目校验 XR-06 pass/证据快照不变性）；底稿深度优化模块三步闭环完成
+  - **关键缺口：Univer 底稿未加载致同模板实际内容**：当前生成底稿时 parsed_data 为空 JSON，用户看到空白电子表格而非预设好的审定表结构；需要做：(1) 模板转换脚本（476 xlsx→Univer JSON）(2) 模板 JSON 存入 wp_template 表 (3) generate_project_workpapers 创建时从模板初始化 (4) 预填充在模板结构基础上叠加数据；预计 2-3 天独立工程任务
+  - **混合方案 4 步全部完成**：① 模板 xlsx 存储 ✅（476 文件 `backend/wp_templates/`）② 复制+prefill 写入 ✅（`init_workpaper_from_template` + `prefill_workpaper_xlsx` 用 openpyxl 语义行匹配写入 TB/ADJ 值）③ 前端 importXLSX ✅（WorkpaperEditor `initUniver` 优先 fetch xlsx blob → `importXLSXToWorkbook`）④ 保存回 xlsx ✅（`onSave` 中 `exportWorkbookToXLSX` → POST `/upload-xlsx` 覆盖存储）
+  - **数据流闭环**：生成底稿→复制模板→prefill 写入→存储 | 打开→GET /template-file→importXLSX→显示完整模板 | 编辑→保存→exportXLSX→POST /upload-xlsx→覆盖
+  - **P0-P2 全部 8 项修复完成**：P0-1 prefill 双策略（坐标直接写入→语义匹配降级 A-D 列/80 行）/ P0-2 Univer import 三级降级（importXLSXToSnapshotAsync→importXLSXToWorkbook→后端 /to-json）/ P0-3 export 两级降级 / P1-1 GET /template-file 首次自动 prefill / P1-4 POST /to-json 端点（openpyxl→Univer JSON）/ P2-1 xlsm shutil.copy 跳过 prefill / P2-2 find_template_file_any 支持 docx；getDiagnostics 0 错误
+  - **Univer xlsx import/export 架构**：Advanced Preset 是前端 npm 包（构建时打入 bundle）+ Univer 后端服务（Docker 端口 3010）；**服务器一次性部署后所有用户浏览器直接使用无需单独安装**；当前未安装走后端 openpyxl→JSON 降级（丢失条件格式/图表）；生产部署时运维执行 `npm install @univerjs/preset-sheets-drawing @univerjs/preset-sheets-advanced` + 配置 UniverSheetsAdvancedPreset + 部署 Univer Docker 服务即可；已写入 README.md
+  - **Univer Advanced Preset 当前已注释禁用**：`UniverSheetsAdvancedPreset()` 初始化时会连接 :3010 Server，无服务时挂起导致页面白屏；已改为注释代码+说明"部署 Server 后取消注释"；当前只用 Core Preset 基础模式
+  - **Univer Server 是商业产品需授权**：安装包实际是 docker-compose tar.gz（`https://release-univer.oss-cn-shenzhen.aliyuncs.com/releases/latest/univer-server-docker-compose-latest.tar.gz`）+ license 文件（需 token 认证下载）；安装脚本只支持 Linux/Mac bash（Windows 需用 Git Bash 或 WSL）；镜像来自阿里云 ACR `univer-acr-registry.cn-shenzhen.cr.aliyuncs.com/release/`；安装后服务在 `univer-server/` 目录用 `bash run.sh start` 管理；本地私有部署模式数据不出服务器（token 仅用于下载安装包认证）
+  - **用户决策：放弃 Univer Server，增强后端 openpyxl 转换已完成**：/to-json 端点支持 23 项格式转换（含图片 base64 提取+锚点位置）；预计格式还原度 95%+；唯一不支持：Excel 内置图表对象（openpyxl 无法解析+Univer 开源版不支持渲染，致同模板影响面 <1%）
+  - **docker-compose.yml 修复**：onlyoffice 服务 depends_on 从 backend 改为 postgres + 加 profiles: onlyoffice（解决 compose 文件无效问题）；healthcheck start_period 位置修正
+  - **前端新增生产依赖 2 个**：@univerjs/preset-sheets-drawing + @univerjs/preset-sheets-advanced
+  - **底稿模块最终状态**：vue-tsc 0 错误（含预存 7 个全部修复）；prefill 有效匹配率 100%（375/375 可匹配单元格全命中，81 个"模板不支持"正确跳过：RJE 列不存在 28 + 损益类无期初 19 + 函证无审定表 14 + 子科目分项 20）；后端 28 tests passed；E2E 5/5 全绿；双维度策略已实现（坐标直接写入→列头定位→语义行匹配三级降级）
+  - **fix: GET /api/users 端点缺失已修复**：`backend/app/api/users.py` 新增 `GET /` 用户列表端点（底稿管理页"加载用户列表失败"+"Method Not Allowed"的根因）
+  - **fix: 底稿编辑器空白问题（三次修复 2026-05-15）**：三个根因——(1) `/template-file` 端点 SQL 引用了 `working_paper` 表不存在的 `wp_code` 列，PG 报 500；修复 = 简化 SQL 只从 `wp_index` 通过 JOIN 取 `wp_code`；(2) 前端 Strategy 3 POST `/to-json` 手动设置 `Content-Type: multipart/form-data` 导致 boundary 缺失；修复 = 去掉手动 headers；(3) **真正根因**：前端 `fetch` 用 `localStorage.getItem('token')` 但 token 已迁移到 `sessionStorage`（auth store 安全改进），导致请求无 Authorization → 401 → 降级到空白；修复 = 改为 `sessionStorage.getItem('token') || localStorage.getItem('token')`
+  - **[待办] 底稿模板后续打磨 4 项已全部完成**：P1 工具栏"📊 刷新取数"按钮（POST /init 重新 prefill→重载 Univer）/ P1 多文件底稿合并（`_merge_sheets_from_other_files` 追加其他 xlsx sheet 到主 workbook）/ P2 prefill 浅蓝色背景 #E8F4FD + Comment 来源标记 / P2 xlsx 保存冲突检测（`X-File-Opened-At` header + 服务端 mtime 对比→409 XLSX_FILE_CONFLICT）
+  - **Sprint 10-11 新建后端文件**：wp_cell_annotation_service.py / wp_cell_annotations.py / wp_review_checklist_service.py / wp_batch_ops.py / wp_note_linkage_service.py / wp_permission_service.py / wp_cell_lock_service.py / wp_cross_index_service.py / wp_audit_trail_service.py / wp_sign_date_chain_service.py / wp_eqcr_evaluation.py / wp_health_dashboard.py / wp_search.py
+  - **Sprint 10-11 新建前端文件**：CellAnnotationPanel.vue / UniverAnnotationStub.vue / ReviewChecklistPanel.vue / BatchOperationsPanel.vue / EqcrEvaluationPanel.vue / CrossIndexTab.vue / CellHistoryDrawer.vue / FormulaDependencyGraph.vue
+  - **router_registry 新增**：§36 wp_cell_annotations / §37 wp_batch_ops / §38 wp_health_dashboard+wp_search / §39 wp_eqcr_evaluation
+  - **router_registry 新增**：§42 wp_template_download（`/api/projects/{pid}/wp-templates/{wp_code}/download` 单科目模板 + `/download-all` 全量 ZIP 476 文件 61MB）
+  - **5 个新 EventType 已注册**：WORKPAPER_AUDITED_CONFIRMED / WORKPAPER_PROCEDURE_COMPLETED / WORKPAPER_REVIEW_PASSED / WORKPAPER_STALE_DETECTED / CROSS_CHECK_FAILED
+  - **新建后端文件**：wp_optimization_models.py / wp_procedure_service.py / wp_procedures.py / wp_quality_score_linkage.py / wp_cross_check_service.py / wp_cross_check.py / gate_rules_cross_check.py / wp_formula_dependency.py / wp_batch_prefill.py / wp_evidence_service.py / wp_evidence.py / wp_evidence_index.py / wp_ocr_voucher_service.py / wp_ocr_fill_service.py / wp_llm_prompts.py / wp_quality_score_service.py / wp_snapshot_service.py / wp_risk_trace_service.py / wp_conclusion_service.py / wp_sampling_engine.py / cross_account_rules.json / wp_template_metadata_seed.json / seed_wp_template_metadata.py / Alembic 迁移 wp_optimization_sprint1_20260520
+  - **新建前端文件**：ProcedurePanel.vue / ProcedureFlowChart.vue / useProcedures.ts / CrossCheckPanel.vue / useCrossCheck.ts / FormulaStatusPanel.vue / FormulaTooltip.vue / FormulaSourceDrawer.vue / useFormulaStatus.ts / WorkpaperFormEditor.vue / WorkpaperWordEditor.vue / WorkpaperTableEditor.vue / WorkpaperHybridEditor.vue / EditorSharedToolbar.vue / EvidenceLinkPanel.vue / useEvidenceLink.ts / evidenceCellIndicator.ts / OCRResultPanel.vue / AISuggestionPopover.vue / QualityScoreBadge.vue / SnapshotCompare.vue / RiskTraceGraph.vue / ConclusionOverview.vue / SamplingWizard.vue
+  - **router_registry 新增**：§33 wp_procedures / §34 wp_cross_check / §35 wp_evidence
+  - **apiPaths.ts 新增**：workpapers.procedures（5 端点）/ workpapers.crossCheck（4 端点）
+  - **Alembic 迁移链**：down_revision = view_refactor_creator_chain_20260520
+  - **Sprint 1-4 复盘 P0 已修复（2026-05-15）**：(1) `register_cross_check_rules()` 已注册到 `main.py::_register_phase_handlers`；(2) CellAnnotation 唯一真源确认在 phase10_models.py（wp_optimization_models.py 只有注释引用）；(3) wp_optimization_models 已注册到 conftest.py model import 列表；(4) pytest 3404 collected / 1 pre-existing error / 16 property tests passed；(5) 6 个模块 import 验证全通过
+  - **Sprint 5-11 执行策略优化**：预检文件是否已存在→已存在直接 grep 核心函数+pytest 子集→标完成（省 subagent）；剩余 59 task 按 3 批执行（5-6/7-8/10-11）；每批结束跑 `pytest -k "关键词" --tb=short`
+  - **已知功能缺口**：L2 跨科目校验在真实数据面前可能全部 skip（底稿 parsed_data 未定义审定数存储位置）；=WP() 公式依赖 wp_index.wp_code 字段需确认现有数据是否填充
+  - **第一章 架构基础（需求 1-3）**：底稿生命周期状态机（created→drafting→self_checked→submitted→level1/2_review→partner→eqcr→archived）/ 组件选型体系（U59%/F19%/W15%/T4%/H3%）/ 模板元数据模型
+  - **第二章 模板体系（需求 4-11）**：B1-B5/B10-B60/C1-C26/D-N/A1-A30/S1-S35 六模块 + 审计程序裁剪（合伙人裁剪→助理执行）+ 函证全流程
+  - **第三章 联动引擎（需求 12-16）**：8 种公式类型（TB/TB_SUM/WP/LEDGER/AUX/PREV/ADJ/NOTE）/ L1+L2 两级校验 / 风险追溯 / 事件驱动 / 底稿↔调整分录/附注/报表联动
+  - **第四章 编制体验（需求 17-24）**：单元格批注 / 检查清单 / 质量评分 / 批量操作 / 版本对比 / EQCR 充分性 / 三层权限（项目/循环/单底稿+单元格级锁定）/ 离线编辑与冲突合并
+  - **第五章 智能辅助（需求 25-29）**：OCR 凭证→抽凭表 / LLM 审计说明生成 / 合同对账单台账 / 多项目知识复用 / 公式依赖可视化
+  - **第六章 企业级保障（需求 30-35）**：审计轨迹哈希链 / 快照 / 证据链 / 可扩展规则引擎 / 可观测性 / 全文搜索
+  - **预设公式库（design.md 补充）**：4 类 23 条——AT-01~08 审定表标准公式（=TB/=ADJ/=PREV）/ CW-01~07 跨底稿引用（折旧分摊/坏账/净利润/薪酬/利息）/ VF-01~08 交叉校验等式 / 21 种 Univer 原生 Excel 函数；公式必须与每个具体底稿做关联（通过 wp_template_metadata.formula_cells 字段）
+  - **关键实施约束**：
+    1. Word 编辑器改用 Univer Doc 模式（不用 OnlyOffice），docx 类底稿走字段填充+预览
+    2. 模板种子数据（476 个）必须分批完成：第一批 D-N 审定表 ~60 个→第二批 B/C 类→第三批 A/S 类
+    3. 公式管理必须与具体每个底稿关联（不是全局统一公式，每个底稿有自己的 formula_cells 配置）
+    4. 建议实施顺序：Sprint 1→2→3→4→**10**→5→6→7→8→11→9（复核批注提前到编辑器之前）
+- **致同 2025 修订版底稿模板结构（开发底稿必须遵循）**：
+  - 根目录 `致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/`
+  - **6 大模块**（旧 wp_account_mapping.json 漏掉 S 类）：
+    1. **初步业务活动 B1-B5**：B1 业务承接 / B2 与前任 CPA 沟通 / B3 独立性 / B5 业务约定书
+    2. **风险评估 B11-B60**：B10 了解被审计单位（B11 检查/B12 访谈/B13 初步分析/B15 重要性/B18 内审/B19 关联方）/ B30 集团审计 / B60 总体审计策略（B60-1 工时预算/B60-2 IT/B60-3 专家/B60A-D 专项）
+    3. **风险应对—一般性程序与控制测试 C1-C26**：C1 企业层面 / C2-C15 业务循环（C2 销售/C3 货币资金/C4 存货/C5 投资/C6 固定资产/C7 在建工程/C8 无形资产/C9 研发/C10 薪酬/C11 管理/C12 税金/C13 债务/C14 租赁/C15 关联方）/ C21-C26 IT+会计分录（C21 IT 专员/C22 IT 一般控制/C23-C24 会计分录控制+细节/C25 内审/C26 信息处理）
+    4. **风险应对—实质性程序 D-N**：D 收入循环（D0 函证/D1 应收票据/D2 应收账款/D3 预收/D4 营业收入/D5 应收款项融资/D6 合同资产/D7 合同负债）/ E 货币资金 / F 存货 / G 投资 / H 固定资产 / I 无形资产 / J 职工薪酬 / K 管理 / L 债务 / M 权益 / N 税金
+    5. **完成阶段 A1-A30**：①报告与沟通（A1 财务报告/A2 调整分录/A3 合并流程/A4 经营分部/A5 财报支持/A6 组成部分会计师报告/A7 关联交易/A8 其他信息/A9 内控建议书/A10 与治理层沟通）②总结程序（A11 期后事项/A12 律师回复/A13 错报/A14 内控缺陷/A15 持续经营/A16 管理层声明书/A17 重大事项概要/A18 与监管层沟通）③质量控制 A21-A30
+    6. **特定项目程序 S1-S35**（**旧 mapping 漏掉**）：S1 违法违规/S2 期初余额/S3 会计政策变更/S4 非货币性交换/S5 债务重组/S6 关联方资金占用/S8 租赁/S9 电子商务/S10 环境/S11 服务机构/S12 利用专家/S13 管理层专家/S14 会计估计/S15 EPS/S16 套期/S17 非经常性损益/S20 营业收入扣除/S21 数据资产/S32 551 文/S33 14 号公告/S34 首发审核/S35 再融资审核
+  - **文件类型分布（共 476 个模板）**：xlsx 349 + xlsm 17 + xls 1 = **367 个表格类（77%）**；docx 107 + doc 2 = **109 个文档类（23%）**
+  - **核心开发约束**：
+    1. xlsx/xlsm（含宏的复杂模型，如固定资产折旧/减值测试）必须用 Univer
+    2. **23% 是 docx**（B60 总体策略/A16 管理层声明书/B60-2 IT 计划/B60-3 专家计划/B60A-D 专项/S12A 评估专家/A9 内控建议书等）→ 必须 Word 编辑器（OnlyOffice 已部署 8080 端口，或前端 docx-renderer + 字段填充）
+    3. 旧 wp_account_mapping.json 88 条远不够覆盖 476 个模板，需重建模板元数据系统（含 component_type/cycle/audit_stage/sheet_count/has_macro/output_format 等字段）
+    4. 单个模板可含多 sheet（B10/D2/H1 等），组件类型粒度到 sheet 级别而非文件级
+    5. 模板文件命名规则：编码+空格+名称（如 `D2 应收账款.xlsx`），有的还含日期版本（如 `S20 营业收入扣除情况核查底稿202504.xlsx`），导入时需要正则解析
+  - **后续开发节奏（用户明确要求）**：分模块/分阶段递进，每次只处理 1-2 个模块的模板分析+组件选型；不要一次输出过多内容避免报错；每次分步生成
+  - **底稿组件选型铁律**（关键架构决策）：B 类（业务承接+计划）= 结构化表单（el-form，不用 Univer）；审定表（D1/D2/E1/F2/H1 等）= Univer（含复杂公式）；明细表/调整分录/抽样表 = el-table；函证管理/监盘/减值测试 = 混合视图（表单+表格+附件）；完成阶段（A 类）= 混合视图+富文本；EQCR 备忘录 = 富文本
+  - **组件选型决策树**：(1) 有大量公式/计算 → Univer；(2) 问答式/判断类 → 结构化表单；(3) 批量结构化清单 → el-table；(4) 长文本说明 → 富文本；(5) 表单+表格组合 → 混合视图
+  - **WorkpaperEditor 路由分发**：根据 wp_template_metadata.component_type 动态加载（UniverEditor / FormEditor / TableEditor / RichTextEditor / HybridEditor），不是单一 Univer 组件
+  - design.md + tasks.md 待生成
 - 性能测试（真实 PG + 大数据量环境运行 load_test.py，验证 6000 并发）
 - working_paper_service 状态机 draft→edit_complete 是否符合业务流程（需确认）[P3]
 - 合并模块需找真实项目做业务测试（技术完成度 85%，业务完成度 60%）[P1]
@@ -1146,6 +1227,7 @@ inclusion: always
 - **R9 git 提交**：commit a68eb18 推送到 origin/feature/ledger-import-view-refactor（112 文件 +5163/-1171）
 - **git 分支整理（2026-05-12）**：R7-R9 + ledger-import-v2 合并到 master（d8ce7c9）；删除 7 个过时分支（round7/round8/global-component-library/cell-selection/pinia-event-store/univer-import/cursor-setup）；仓库现有 master + feature/ledger-import-view-refactor + feature/e2e-business-flow 三个分支
 - **feature/e2e-business-flow 分支已推送（2026-05-13）**：从 feature/ledger-import-view-refactor 切出，含 e2e spec 全部 50 task 实现 + 修复
+  - **enterprise-linkage spec 实施已推送（2026-05-15，commit 2052290）**：41 新建 + 17 修改文件，含 5 Sprint 全部必做任务 + 复盘修复 5 项 + 3 个 bug fix（导出汇总/报表配置布局/跨表核对 tab）
 - **fix: 导入转后台弹错误弹窗（f35471d）**：用户点"关闭（后台继续）"后 `runImportPollingFlow` 仍在前台轮询，job 变 canceled 时 throw→catch 弹 ElMessageBox；修复 = `_importPollingAborted` flag + `shouldIgnoreError` 静默退出循环
 - **fix: vue-tsc 0 错误（7880f6f）**：R9 subagent 批量替换 handleApiError 时引入 5 处 `P.xxx` 引用错误（应为 P_ledger/P_wp/P_proj）+ EqcrProjectView/AuditReportEditor/KnowledgePickerDialog 类型修复；AMOUNT_DIVISOR_KEY 从 .vue export 移到独立 `constants/amountDivisor.ts`
 - **fix: 清空回收站 500（36b2023）**：`DELETE FROM projects WHERE is_deleted=true` 触发 FK 约束（子表 ledger_datasets/import_jobs 等仍引用）；修复 = 按 FK 深度顺序 raw SQL 级联删除（activation_records→四表→ledger_datasets→import_jobs→working_papers→project_assignments→adjustments→projects），每步 try/except 跳过不存在的表

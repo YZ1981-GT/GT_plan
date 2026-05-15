@@ -34,8 +34,11 @@ backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/
 backend/logs/
 backend/uploads/
 backend/storage/
+backend/wp_storage/
 *.xlsx
 !2025人员情况.xlsx
+!backend/wp_templates/**/*.xlsx
+!backend/wp_templates/**/*.xlsm
 !backend/data/**/*.xlsx
 !audit-platform/frontend/public/**/*.xlsx
 desktop.ini

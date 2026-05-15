@@ -429,3 +429,51 @@ def register_all_routers(app: FastAPI) -> None:
     # 路由内部已声明 prefix="/api/admin/event-health"，注册时不加额外前缀。
     from app.routers.admin_event_health import router as admin_event_health_router
     app.include_router(admin_event_health_router, tags=["admin-event-health"])
+
+    # ═══ 33. 底稿深度优化：程序管理与裁剪 ═══
+    # 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.wp_procedures import router as wp_procedures_router
+    app.include_router(wp_procedures_router, tags=["workpaper-procedures"])
+
+    # ═══ 34. 底稿深度优化：跨科目校验 ═══
+    from app.routers.wp_cross_check import router as wp_cross_check_router
+    app.include_router(wp_cross_check_router, tags=["cross-check"])
+
+    # ═══ 35. 底稿深度优化：证据链管理 ═══
+    # 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.wp_evidence import router as wp_evidence_router
+    app.include_router(wp_evidence_router, tags=["workpaper-evidence"])
+
+    # ═══ 36. Sprint 10：底稿复核批注 ═══
+    # 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.wp_cell_annotations import router as wp_annotations_router
+    app.include_router(wp_annotations_router, tags=["cell-annotations"])
+
+    # ═══ 37. Sprint 10：底稿批量操作 ═══
+    # 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.wp_batch_ops import router as wp_batch_ops_router
+    app.include_router(wp_batch_ops_router, tags=["batch-ops"])
+
+    # ═══ 38. Sprint 11：底稿健康监控 + 全文搜索 ═══
+    # 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.wp_health_dashboard import router as wp_health_router
+    from app.routers.wp_search import router as wp_search_router
+    app.include_router(wp_health_router, tags=["workpaper-health"])
+    app.include_router(wp_search_router, tags=["workpaper-search"])
+
+    # ═══ 39. Sprint 11：EQCR 充分性评价 ═══
+    # 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.wp_eqcr_evaluation import router as wp_eqcr_eval_router
+    app.include_router(wp_eqcr_eval_router, tags=["eqcr-evaluation"])
+
+    # ═══ 40. 底稿模板元数据 ═══
+    from app.routers.wp_template_metadata import router as wp_tmpl_meta_router
+    app.include_router(wp_tmpl_meta_router, tags=["wp-template-metadata"])
+
+    # ═══ 41. 底稿模板文件（xlsx 加载） ═══
+    from app.routers.wp_template_files import router as wp_tmpl_files_router
+    app.include_router(wp_tmpl_files_router, tags=["wp-template-files"])
+
+    # ═══ 42. 底稿模板下载（原始模板文件） ═══
+    from app.routers.wp_template_download import router as wp_tmpl_dl_router
+    app.include_router(wp_tmpl_dl_router, tags=["wp-template-download"])

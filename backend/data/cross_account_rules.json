@@ -1,0 +1,86 @@
+{
+  "description": "跨科目校验规则库（8 条内置规则）",
+  "version": "2025-R1",
+  "rules": [
+    {
+      "rule_id": "XR-01",
+      "description": "折旧分摊一致性",
+      "formula": "WP('H1','审定表','本期折旧') == WP('K8','审定表','折旧') + WP('K9','审定表','折旧') + WP('F5','审定表','折旧')",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "applicable_stages": ["completion"],
+      "applicable_cycles": ["H", "K", "F"],
+      "enabled": true
+    },
+    {
+      "rule_id": "XR-02",
+      "description": "薪酬分摊一致性",
+      "formula": "WP('J1','审定表','本期计提') == WP('K8','审定表','薪酬') + WP('K9','审定表','薪酬') + WP('F5','审定表','薪酬')",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "applicable_stages": ["completion"],
+      "applicable_cycles": ["J", "K", "F"],
+      "enabled": true
+    },
+    {
+      "rule_id": "XR-03",
+      "description": "信用减值损失一致性",
+      "formula": "WP('G14','审定表','合计') == WP('D2','坏账','本期计提') + WP('K1','坏账','本期计提')",
+      "tolerance": 0.01,
+      "severity": "warning",
+      "applicable_stages": ["completion"],
+      "applicable_cycles": ["G", "D", "K"],
+      "enabled": true
+    },
+    {
+      "rule_id": "XR-04",
+      "description": "所得税费用等式",
+      "formula": "WP('N5','审定表','合计') == WP('N2','审定表','当期所得税') + (WP('N1','审定表','期末') - WP('N1','审定表','期初')) + (WP('N3','审定表','期初') - WP('N3','审定表','期末'))",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "applicable_stages": ["completion"],
+      "applicable_cycles": ["N"],
+      "enabled": true
+    },
+    {
+      "rule_id": "XR-05",
+      "description": "未分配利润等式",
+      "formula": "WP('M6','审定表','期末') == WP('M6','审定表','期初') + TB_SUM('5001~6999','审定数') - WP('M5','审定表','本期提取') - WP('M1','审定表','本期分配')",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "applicable_stages": ["completion"],
+      "applicable_cycles": ["M"],
+      "enabled": true
+    },
+    {
+      "rule_id": "XR-06",
+      "description": "借贷平衡",
+      "formula": "SUM_TB('1001~1999','审定数') == SUM_TB('2001~3999','审定数') + SUM_TB('4001~4999','审定数')",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "applicable_stages": ["completion"],
+      "applicable_cycles": [],
+      "enabled": true
+    },
+    {
+      "rule_id": "XR-07",
+      "description": "审定数合计一致",
+      "formula": "TB('{account}','审定数') == TB('{account}','未审数') + ADJ('{account}','aje_net') + ADJ('{account}','rje_net')",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "applicable_stages": ["completion"],
+      "applicable_cycles": [],
+      "enabled": true
+    },
+    {
+      "rule_id": "XR-08",
+      "description": "利息收支合理性",
+      "formula": "ABS(WP('E1','审定表','利息收入') / ((WP('E1','审定表','期初') + WP('E1','审定表','期末')) / 2) - 0.02) < 0.03",
+      "tolerance": 0.03,
+      "severity": "warning",
+      "applicable_stages": ["completion"],
+      "applicable_cycles": ["E", "L"],
+      "enabled": true
+    }
+  ]
+}

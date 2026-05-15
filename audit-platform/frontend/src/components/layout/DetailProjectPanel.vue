@@ -91,7 +91,7 @@
                 </div>
               </el-tooltip>
               <el-tooltip content="查看和编辑审计底稿（需先生成底稿）" placement="top">
-                <div class="gt-quick-btn" @click="goTo('workpapers')">
+                <div class="gt-quick-btn" @click="goTo('workpaper-bench')">
                   <el-icon :size="20" color="var(--gt-color-primary-light)"><Document /></el-icon>
                   <span>底稿</span>
                 </div>

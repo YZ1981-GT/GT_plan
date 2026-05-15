@@ -1,0 +1,3814 @@
+{
+  "description": "底稿模板文件索引（从致同 2025 修订版复制）",
+  "total_files": 476,
+  "files": [
+    {
+      "wp_code": "A1",
+      "filename": "A1 财务报告程序表.xlsx",
+      "relative_path": "A\\A1 财务报告程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 27.2,
+      "category": "A"
+    },
+    {
+      "wp_code": "A1",
+      "filename": "A1-11 业务报告签发流转控制表+业务报告文号规则.xlsx",
+      "relative_path": "A\\A1-11 业务报告签发流转控制表+业务报告文号规则.xlsx",
+      "format": "xlsx",
+      "size_kb": 194.5,
+      "category": "A"
+    },
+    {
+      "wp_code": "A1",
+      "filename": "A1-12 重大事项决定程序的履行情况核查表1105.docx",
+      "relative_path": "A\\A1-12 重大事项决定程序的履行情况核查表1105.docx",
+      "format": "docx",
+      "size_kb": 21.6,
+      "category": "A"
+    },
+    {
+      "wp_code": "A1",
+      "filename": "A1-13 完成阶段分析性复核（母公司）.xlsx",
+      "relative_path": "A\\A1-13 完成阶段分析性复核（母公司）.xlsx",
+      "format": "xlsx",
+      "size_kb": 481.5,
+      "category": "A"
+    },
+    {
+      "wp_code": "A1",
+      "filename": "A1-14 完成阶段分析性复核（合并）.xlsx",
+      "relative_path": "A\\A1-14 完成阶段分析性复核（合并）.xlsx",
+      "format": "xlsx",
+      "size_kb": 482.5,
+      "category": "A"
+    },
+    {
+      "wp_code": "A1",
+      "filename": "A1-15 企业会计准则有关财务报表列报及披露核对表20141021.docx",
+      "relative_path": "A\\A1-15 企业会计准则有关财务报表列报及披露核对表20141021.docx",
+      "format": "docx",
+      "size_kb": 139.1,
+      "category": "A"
+    },
+    {
+      "wp_code": "A1",
+      "filename": "A1-16 上市公司财务报表额外披露要求核对表（A股）201503.docx",
+      "relative_path": "A\\A1-16 上市公司财务报表额外披露要求核对表（A股）201503.docx",
+      "format": "docx",
+      "size_kb": 127.6,
+      "category": "A"
+    },
+    {
+      "wp_code": "A1",
+      "filename": "A1-17 对应数据.xlsx",
+      "relative_path": "A\\A1-17 对应数据.xlsx",
+      "format": "xlsx",
+      "size_kb": 20.8,
+      "category": "A"
+    },
+    {
+      "wp_code": "A1",
+      "filename": "A1-18 采用新金融工具准则衔接影响数核对 N.xlsx",
+      "relative_path": "A\\A1-18 采用新金融工具准则衔接影响数核对 N.xlsx",
+      "format": "xlsx",
+      "size_kb": 31.5,
+      "category": "A"
+    },
+    {
+      "wp_code": "A10",
+      "filename": "A10 与治理层沟通程序表.xlsx",
+      "relative_path": "A\\A10 与治理层沟通程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 65.2,
+      "category": "A"
+    },
+    {
+      "wp_code": "A10",
+      "filename": "A10-1 与治理层沟通函.docx",
+      "relative_path": "A\\A10-1 与治理层沟通函.docx",
+      "format": "docx",
+      "size_kb": 47.1,
+      "category": "A"
+    },
+    {
+      "wp_code": "A10",
+      "filename": "A10-2 与治理层的沟通记录（通用）.xlsx",
+      "relative_path": "A\\A10-2 与治理层的沟通记录（通用）.xlsx",
+      "format": "xlsx",
+      "size_kb": 67.0,
+      "category": "A"
+    },
+    {
+      "wp_code": "A11",
+      "filename": "A11 期后事项程序表.xlsx",
+      "relative_path": "A\\A11 期后事项程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 247.9,
+      "category": "A"
+    },
+    {
+      "wp_code": "A11",
+      "filename": "A11-1 期后事项问询函.docx",
+      "relative_path": "A\\A11-1 期后事项问询函.docx",
+      "format": "docx",
+      "size_kb": 36.8,
+      "category": "A"
+    },
+    {
+      "wp_code": "A12",
+      "filename": "A12 律师回复程序表.xlsx",
+      "relative_path": "A\\A12 律师回复程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 55.8,
+      "category": "A"
+    },
+    {
+      "wp_code": "A12",
+      "filename": "A12-1 法律事务确认函及律师回复函.docx",
+      "relative_path": "A\\A12-1 法律事务确认函及律师回复函.docx",
+      "format": "docx",
+      "size_kb": 32.7,
+      "category": "A"
+    },
+    {
+      "wp_code": "A13",
+      "filename": "A13 错报（程序表及底稿）.xlsx",
+      "relative_path": "A\\A13 错报（程序表及底稿）.xlsx",
+      "format": "xlsx",
+      "size_kb": 41.1,
+      "category": "A"
+    },
+    {
+      "wp_code": "A14",
+      "filename": "A14 内部控制缺陷程序表.xlsx",
+      "relative_path": "A\\A14 内部控制缺陷程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 76.1,
+      "category": "A"
+    },
+    {
+      "wp_code": "A14",
+      "filename": "A14-1  内部控制缺陷汇总表.xlsx",
+      "relative_path": "A\\A14-1  内部控制缺陷汇总表.xlsx",
+      "format": "xlsx",
+      "size_kb": 16.0,
+      "category": "A"
+    },
+    {
+      "wp_code": "A14",
+      "filename": "A14-2 企业层面控制缺陷评价.xlsx",
+      "relative_path": "A\\A14-2 企业层面控制缺陷评价.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.8,
+      "category": "A"
+    },
+    {
+      "wp_code": "A14",
+      "filename": "A14-3  IT缺陷汇总及评价.xlsx",
+      "relative_path": "A\\A14-3  IT缺陷汇总及评价.xlsx",
+      "format": "xlsx",
+      "size_kb": 142.9,
+      "category": "A"
+    },
+    {
+      "wp_code": "A14",
+      "filename": "A14-4 业务流程层面控制缺陷评价.xlsx",
+      "relative_path": "A\\A14-4 业务流程层面控制缺陷评价.xlsx",
+      "format": "xlsx",
+      "size_kb": 48.6,
+      "category": "A"
+    },
+    {
+      "wp_code": "A14",
+      "filename": "A14-5 与其他缺陷一同进行评价.xlsx",
+      "relative_path": "A\\A14-5 与其他缺陷一同进行评价.xlsx",
+      "format": "xlsx",
+      "size_kb": 23.5,
+      "category": "A"
+    },
+    {
+      "wp_code": "A14",
+      "filename": "A14-6 非财务报告内部控制缺陷评价.xlsx",
+      "relative_path": "A\\A14-6 非财务报告内部控制缺陷评价.xlsx",
+      "format": "xlsx",
+      "size_kb": 15.2,
+      "category": "A"
+    },
+    {
+      "wp_code": "A15",
+      "filename": "A15 持续经营假设的考虑程序表.xlsx",
+      "relative_path": "A\\A15 持续经营假设的考虑程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 185.9,
+      "category": "A"
+    },
+    {
+      "wp_code": "A15",
+      "filename": "A15-1 持续经营调查表.xlsx",
+      "relative_path": "A\\A15-1 持续经营调查表.xlsx",
+      "format": "xlsx",
+      "size_kb": 38.7,
+      "category": "A"
+    },
+    {
+      "wp_code": "A16",
+      "filename": "A16  管理层声明书程序表.xlsx",
+      "relative_path": "A\\A16  管理层声明书程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 79.4,
+      "category": "A"
+    },
+    {
+      "wp_code": "A16",
+      "filename": "A16-1 管理层声明书-财务报表审计（企业会计准则）.docx",
+      "relative_path": "A\\A16-1 管理层声明书-财务报表审计（企业会计准则）.docx",
+      "format": "docx",
+      "size_kb": 45.7,
+      "category": "A"
+    },
+    {
+      "wp_code": "A16",
+      "filename": "A16-2 管理层声明书-整合审计.docx",
+      "relative_path": "A\\A16-2 管理层声明书-整合审计.docx",
+      "format": "docx",
+      "size_kb": 52.3,
+      "category": "A"
+    },
+    {
+      "wp_code": "A16",
+      "filename": "A16-3 管理层声明书-财务报表审计（IPO申报报表审计）.docx",
+      "relative_path": "A\\A16-3 管理层声明书-财务报表审计（IPO申报报表审计）.docx",
+      "format": "docx",
+      "size_kb": 47.1,
+      "category": "A"
+    },
+    {
+      "wp_code": "A16",
+      "filename": "A16-4 管理层声明书（IPO季度财务报表审阅）20170206.docx",
+      "relative_path": "A\\A16-4 管理层声明书（IPO季度财务报表审阅）20170206.docx",
+      "format": "docx",
+      "size_kb": 28.8,
+      "category": "A"
+    },
+    {
+      "wp_code": "A16",
+      "filename": "A16-5 管理层声明书-财务报表审计（新三板申报报表审计）.docx",
+      "relative_path": "A\\A16-5 管理层声明书-财务报表审计（新三板申报报表审计）.docx",
+      "format": "docx",
+      "size_kb": 44.2,
+      "category": "A"
+    },
+    {
+      "wp_code": "A16",
+      "filename": "A16-6 管理层声明书-财务报表审计（企业债：会计准则）.docx",
+      "relative_path": "A\\A16-6 管理层声明书-财务报表审计（企业债：会计准则）.docx",
+      "format": "docx",
+      "size_kb": 43.3,
+      "category": "A"
+    },
+    {
+      "wp_code": "A16",
+      "filename": "A16-7 管理层关联交易声明书201910.docx",
+      "relative_path": "A\\A16-7 管理层关联交易声明书201910.docx",
+      "format": "docx",
+      "size_kb": 38.5,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17  重大事项概要程序表.xlsx",
+      "relative_path": "A\\A17  重大事项概要程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 78.7,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17-1 重大事项概要汇总.docx",
+      "relative_path": "A\\A17-1 重大事项概要汇总.docx",
+      "format": "docx",
+      "size_kb": 179.2,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17-2-1 重大事项概要—关键审计事项.docx",
+      "relative_path": "A\\A17-2-1 重大事项概要—关键审计事项.docx",
+      "format": "docx",
+      "size_kb": 36.5,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17-3 业务咨询记录-XX公司-XXX事项.docx",
+      "relative_path": "A\\A17-3 业务咨询记录-XX公司-XXX事项.docx",
+      "format": "docx",
+      "size_kb": 28.9,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17-3-1 业务咨询结果执行情况记录.docx",
+      "relative_path": "A\\A17-3-1 业务咨询结果执行情况记录.docx",
+      "format": "docx",
+      "size_kb": 19.3,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17-4 重大专业分歧事项记录.docx",
+      "relative_path": "A\\A17-4 重大专业分歧事项记录.docx",
+      "format": "docx",
+      "size_kb": 16.8,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17-5-1 审计工作完成核对表（适用于财报审计）.xlsx",
+      "relative_path": "A\\A17-5-1 审计工作完成核对表（适用于财报审计）.xlsx",
+      "format": "xlsx",
+      "size_kb": 21.4,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17-5-2 审计工作完成核对表（适用于内控审计）.xlsx",
+      "relative_path": "A\\A17-5-2 审计工作完成核对表（适用于内控审计）.xlsx",
+      "format": "xlsx",
+      "size_kb": 18.8,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17-5-3  审计工作完成核对表（IPO业务特别程序）.xlsx",
+      "relative_path": "A\\A17-5-3  审计工作完成核对表（IPO业务特别程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 17.7,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17-5-4  审计工作完成核对表（新三板挂牌业务特别程序）.xlsx",
+      "relative_path": "A\\A17-5-4  审计工作完成核对表（新三板挂牌业务特别程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 33.0,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17-5-5  审计工作完成核对表（函证程序）.xlsx",
+      "relative_path": "A\\A17-5-5  审计工作完成核对表（函证程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 15.8,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17-6  总结会会议记要.docx",
+      "relative_path": "A\\A17-6  总结会会议记要.docx",
+      "format": "docx",
+      "size_kb": 18.6,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17-7 审计项目团队成员独立性声明书（适用于中国及国际审计准则）.doc",
+      "relative_path": "A\\A17-7 审计项目团队成员独立性声明书（适用于中国及国际审计准则）.doc",
+      "format": "doc",
+      "size_kb": 80.0,
+      "category": "A"
+    },
+    {
+      "wp_code": "A17",
+      "filename": "A17-7A审计项目团队成员独立性声明书（适用于中国及国际审计准则）-专业技术委员会审核委员适用.doc",
+      "relative_path": "A\\A17-7A审计项目团队成员独立性声明书（适用于中国及国际审计准则）-专业技术委员会审核委员适用.doc",
+      "format": "doc",
+      "size_kb": 70.5,
+      "category": "A"
+    },
+    {
+      "wp_code": "A18",
+      "filename": "A18-1 向监管部门报送审计小结的函.docx",
+      "relative_path": "A\\A18-1 向监管部门报送审计小结的函.docx",
+      "format": "docx",
+      "size_kb": 134.6,
+      "category": "A"
+    },
+    {
+      "wp_code": "A18",
+      "filename": "A18-2 与监管层沟通函 (通用)2019.docx",
+      "relative_path": "A\\A18-2 与监管层沟通函 (通用)2019.docx",
+      "format": "docx",
+      "size_kb": 21.3,
+      "category": "A"
+    },
+    {
+      "wp_code": "A2",
+      "filename": "A2 调整分录程序表.xlsx",
+      "relative_path": "A\\A2 调整分录程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 20.1,
+      "category": "A"
+    },
+    {
+      "wp_code": "A2",
+      "filename": "A2-1、A2-2单体报表试算.xlsx",
+      "relative_path": "A\\A2-1、A2-2单体报表试算.xlsx",
+      "format": "xlsx",
+      "size_kb": 664.4,
+      "category": "A"
+    },
+    {
+      "wp_code": "A21",
+      "filename": "A21-1 项目现场负责人复核表及复核记录（适用于财报审计）.xlsx",
+      "relative_path": "A\\A21-1 项目现场负责人复核表及复核记录（适用于财报审计）.xlsx",
+      "format": "xlsx",
+      "size_kb": 25.0,
+      "category": "A"
+    },
+    {
+      "wp_code": "A21",
+      "filename": "A21-2 项目现场负责人复核表及复核记录（适用于内控审计）.xlsx",
+      "relative_path": "A\\A21-2 项目现场负责人复核表及复核记录（适用于内控审计）.xlsx",
+      "format": "xlsx",
+      "size_kb": 25.6,
+      "category": "A"
+    },
+    {
+      "wp_code": "A22",
+      "filename": "A22-1 项目负责经理复核(适用于财报审计).xlsx",
+      "relative_path": "A\\A22-1 项目负责经理复核(适用于财报审计).xlsx",
+      "format": "xlsx",
+      "size_kb": 34.4,
+      "category": "A"
+    },
+    {
+      "wp_code": "A22",
+      "filename": "A22-2 项目负责经理复核表（适用于内控审计）.xlsx",
+      "relative_path": "A\\A22-2 项目负责经理复核表（适用于内控审计）.xlsx",
+      "format": "xlsx",
+      "size_kb": 26.5,
+      "category": "A"
+    },
+    {
+      "wp_code": "A23",
+      "filename": "A23-1 项目合伙人复核(适用于财报审计).xlsx",
+      "relative_path": "A\\A23-1 项目合伙人复核(适用于财报审计).xlsx",
+      "format": "xlsx",
+      "size_kb": 34.3,
+      "category": "A"
+    },
+    {
+      "wp_code": "A23",
+      "filename": "A23-2 项目合伙人复核表（适用于内控审计）.xlsx",
+      "relative_path": "A\\A23-2 项目合伙人复核表（适用于内控审计）.xlsx",
+      "format": "xlsx",
+      "size_kb": 27.4,
+      "category": "A"
+    },
+    {
+      "wp_code": "A24",
+      "filename": "A24-1  项目质量复核合伙人复核表及记录（财务报表审计-适用非大型国企）.xlsx",
+      "relative_path": "A\\A24-1  项目质量复核合伙人复核表及记录（财务报表审计-适用非大型国企）.xlsx",
+      "format": "xlsx",
+      "size_kb": 23.7,
+      "category": "A"
+    },
+    {
+      "wp_code": "A24",
+      "filename": "A24-1 项目质量复核合伙人复核表及记录（财务报表审计-适用大型国企）.xlsx",
+      "relative_path": "A\\A24-1 项目质量复核合伙人复核表及记录（财务报表审计-适用大型国企）.xlsx",
+      "format": "xlsx",
+      "size_kb": 24.9,
+      "category": "A"
+    },
+    {
+      "wp_code": "A24",
+      "filename": "A24-2 项目质量复核合伙人复核(适用于内控审计).xlsx",
+      "relative_path": "A\\A24-2 项目质量复核合伙人复核(适用于内控审计).xlsx",
+      "format": "xlsx",
+      "size_kb": 26.3,
+      "category": "A"
+    },
+    {
+      "wp_code": "A25",
+      "filename": "A25-1 质量控制复核人复核表及复核记录(适用于财报审计-适用大型国企).xlsx",
+      "relative_path": "A\\A25-1 质量控制复核人复核表及复核记录(适用于财报审计-适用大型国企).xlsx",
+      "format": "xlsx",
+      "size_kb": 25.3,
+      "category": "A"
+    },
+    {
+      "wp_code": "A25",
+      "filename": "A25-1 质量控制复核表及复核记录(适用于财报审计-适用非大型国企).xlsx",
+      "relative_path": "A\\A25-1 质量控制复核表及复核记录(适用于财报审计-适用非大型国企).xlsx",
+      "format": "xlsx",
+      "size_kb": 27.8,
+      "category": "A"
+    },
+    {
+      "wp_code": "A25",
+      "filename": "A25-2 质量控制复核表及复核记录(适用于内控审计).xlsx",
+      "relative_path": "A\\A25-2 质量控制复核表及复核记录(适用于内控审计).xlsx",
+      "format": "xlsx",
+      "size_kb": 30.1,
+      "category": "A"
+    },
+    {
+      "wp_code": "A26",
+      "filename": "A26-1 专业技术委员会业务报告审核提交资料清单.docx",
+      "relative_path": "A\\A26-1 专业技术委员会业务报告审核提交资料清单.docx",
+      "format": "docx",
+      "size_kb": 64.7,
+      "category": "A"
+    },
+    {
+      "wp_code": "A26",
+      "filename": "A26-2 专业技术委员会委员审核记录.docx",
+      "relative_path": "A\\A26-2 专业技术委员会委员审核记录.docx",
+      "format": "docx",
+      "size_kb": 54.0,
+      "category": "A"
+    },
+    {
+      "wp_code": "A26",
+      "filename": "A26-3 专业技术委员会会议记录.docx",
+      "relative_path": "A\\A26-3 专业技术委员会会议记录.docx",
+      "format": "docx",
+      "size_kb": 57.9,
+      "category": "A"
+    },
+    {
+      "wp_code": "A26",
+      "filename": "A26-4 专业技术委员会重大业务咨询意见或分歧会议记录.docx",
+      "relative_path": "A\\A26-4 专业技术委员会重大业务咨询意见或分歧会议记录.docx",
+      "format": "docx",
+      "size_kb": 57.7,
+      "category": "A"
+    },
+    {
+      "wp_code": "A27",
+      "filename": "A27-1 IT审计总结备忘录.docx",
+      "relative_path": "A\\A27-1 IT审计总结备忘录.docx",
+      "format": "docx",
+      "size_kb": 30.8,
+      "category": "A"
+    },
+    {
+      "wp_code": "A28",
+      "filename": "A28 税务专家复核.xlsx",
+      "relative_path": "A\\A28 税务专家复核.xlsx",
+      "format": "xlsx",
+      "size_kb": 13.2,
+      "category": "A"
+    },
+    {
+      "wp_code": "A3",
+      "filename": "A3 合并流程程序表.xlsx",
+      "relative_path": "A\\A3 合并流程程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 25.6,
+      "category": "A"
+    },
+    {
+      "wp_code": "A3",
+      "filename": "A3-1、-2 合并报表试算-2019.xlsx",
+      "relative_path": "A\\A3-1、-2 合并报表试算-2019.xlsx",
+      "format": "xlsx",
+      "size_kb": 1030.9,
+      "category": "A"
+    },
+    {
+      "wp_code": "A3",
+      "filename": "A3-3 结构化主体纳入合并范围的判断.xlsx",
+      "relative_path": "A\\A3-3 结构化主体纳入合并范围的判断.xlsx",
+      "format": "xlsx",
+      "size_kb": 210.4,
+      "category": "A"
+    },
+    {
+      "wp_code": "A3",
+      "filename": "A3-4 合并报表试算（含金融企业报表项目）-清洁版-2019.xlsx",
+      "relative_path": "A\\A3-4 合并报表试算（含金融企业报表项目）-清洁版-2019.xlsx",
+      "format": "xlsx",
+      "size_kb": 1152.3,
+      "category": "A"
+    },
+    {
+      "wp_code": "A3",
+      "filename": "A3-5 合并附注汇总-2019.xlsx",
+      "relative_path": "A\\A3-5 合并附注汇总-2019.xlsx",
+      "format": "xlsx",
+      "size_kb": 819.2,
+      "category": "A"
+    },
+    {
+      "wp_code": "A3",
+      "filename": "A3-6 母公司附注汇总-2019.xlsx",
+      "relative_path": "A\\A3-6 母公司附注汇总-2019.xlsx",
+      "format": "xlsx",
+      "size_kb": 824.3,
+      "category": "A"
+    },
+    {
+      "wp_code": "A3",
+      "filename": "A3-7内部往来核对表、A3-8商誉减值测试.xlsx",
+      "relative_path": "A\\A3-7内部往来核对表、A3-8商誉减值测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 425.9,
+      "category": "A"
+    },
+    {
+      "wp_code": "A30",
+      "filename": "A30 电子底稿归档检查表.xlsx",
+      "relative_path": "A\\A30 电子底稿归档检查表.xlsx",
+      "format": "xlsx",
+      "size_kb": 50.0,
+      "category": "A"
+    },
+    {
+      "wp_code": "A31",
+      "filename": "A31 审计标识一览表.xlsx",
+      "relative_path": "A\\A31 审计标识一览表.xlsx",
+      "format": "xlsx",
+      "size_kb": 12.3,
+      "category": "A"
+    },
+    {
+      "wp_code": "A4",
+      "filename": "A4 经营分部程序表.xlsx",
+      "relative_path": "A\\A4 经营分部程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 52.7,
+      "category": "A"
+    },
+    {
+      "wp_code": "A4",
+      "filename": "A4-1 经营分部列报信息2019.xlsx",
+      "relative_path": "A\\A4-1 经营分部列报信息2019.xlsx",
+      "format": "xlsx",
+      "size_kb": 58.0,
+      "category": "A"
+    },
+    {
+      "wp_code": "A5",
+      "filename": "A5 财务报表支持程序表.xlsx",
+      "relative_path": "A\\A5 财务报表支持程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 20.1,
+      "category": "A"
+    },
+    {
+      "wp_code": "A5",
+      "filename": "A5-1 现金流量表审计.xlsx",
+      "relative_path": "A\\A5-1 现金流量表审计.xlsx",
+      "format": "xlsx",
+      "size_kb": 59.5,
+      "category": "A"
+    },
+    {
+      "wp_code": "A5",
+      "filename": "A5-2 承诺事项.xlsx",
+      "relative_path": "A\\A5-2 承诺事项.xlsx",
+      "format": "xlsx",
+      "size_kb": 30.6,
+      "category": "A"
+    },
+    {
+      "wp_code": "A5",
+      "filename": "A5-3 或有事项.xlsx",
+      "relative_path": "A\\A5-3 或有事项.xlsx",
+      "format": "xlsx",
+      "size_kb": 74.4,
+      "category": "A"
+    },
+    {
+      "wp_code": "A5",
+      "filename": "A5-4 持续经营净利润和终止经营净利润.xlsx",
+      "relative_path": "A\\A5-4 持续经营净利润和终止经营净利润.xlsx",
+      "format": "xlsx",
+      "size_kb": 101.2,
+      "category": "A"
+    },
+    {
+      "wp_code": "A6",
+      "filename": "A6 组成部分会计师报告（集团审计）程序程序表.xlsx",
+      "relative_path": "A\\A6 组成部分会计师报告（集团审计）程序程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 20.1,
+      "category": "A"
+    },
+    {
+      "wp_code": "A6",
+      "filename": "A6-1 财务报告文件包（含经审计的财务报表及附注等）.xlsx",
+      "relative_path": "A\\A6-1 财务报告文件包（含经审计的财务报表及附注等）.xlsx",
+      "format": "xlsx",
+      "size_kb": 503.6,
+      "category": "A"
+    },
+    {
+      "wp_code": "A7",
+      "filename": "A7 关联交易程序表.xlsx",
+      "relative_path": "A\\A7 关联交易程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 62.3,
+      "category": "A"
+    },
+    {
+      "wp_code": "A7",
+      "filename": "A7-1 汇总关联方交易及关联往来.xlsx",
+      "relative_path": "A\\A7-1 汇总关联方交易及关联往来.xlsx",
+      "format": "xlsx",
+      "size_kb": 58.7,
+      "category": "A"
+    },
+    {
+      "wp_code": "A7",
+      "filename": "A7-2 关联方交易附注披露信息.xlsx",
+      "relative_path": "A\\A7-2 关联方交易附注披露信息.xlsx",
+      "format": "xlsx",
+      "size_kb": 58.5,
+      "category": "A"
+    },
+    {
+      "wp_code": "A8",
+      "filename": "A8 其他信息程序表20170720.xlsx",
+      "relative_path": "A\\A8 其他信息程序表20170720.xlsx",
+      "format": "xlsx",
+      "size_kb": 65.7,
+      "category": "A"
+    },
+    {
+      "wp_code": "A8",
+      "filename": "A8-1 管理层对审计报告日后公布其他信息的书面声明201707.docx",
+      "relative_path": "A\\A8-1 管理层对审计报告日后公布其他信息的书面声明201707.docx",
+      "format": "docx",
+      "size_kb": 33.4,
+      "category": "A"
+    },
+    {
+      "wp_code": "A8",
+      "filename": "A8-2 其他信息比对记录20170725.docx",
+      "relative_path": "A\\A8-2 其他信息比对记录20170725.docx",
+      "format": "docx",
+      "size_kb": 37.4,
+      "category": "A"
+    },
+    {
+      "wp_code": "A9",
+      "filename": "A9 内部控制建议程序表.xlsx",
+      "relative_path": "A\\A9 内部控制建议程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 57.3,
+      "category": "A"
+    },
+    {
+      "wp_code": "A9",
+      "filename": "A9-1向管理层通报内部控制缺陷-沟通函.docx",
+      "relative_path": "A\\A9-1向管理层通报内部控制缺陷-沟通函.docx",
+      "format": "docx",
+      "size_kb": 23.7,
+      "category": "A"
+    },
+    {
+      "wp_code": "A9",
+      "filename": "A9-2向治理层通报内部控制缺陷-沟通函.docx",
+      "relative_path": "A\\A9-2向治理层通报内部控制缺陷-沟通函.docx",
+      "format": "docx",
+      "size_kb": 22.8,
+      "category": "A"
+    },
+    {
+      "wp_code": "B1",
+      "filename": "B1-1 风险评估表（适用于承接）.xlsx",
+      "relative_path": "B\\B1-1 风险评估表（适用于承接）.xlsx",
+      "format": "xlsx",
+      "size_kb": 24.7,
+      "category": "B"
+    },
+    {
+      "wp_code": "B1",
+      "filename": "B1-2 风险评估表（适用于保持）.xlsx",
+      "relative_path": "B\\B1-2 风险评估表（适用于保持）.xlsx",
+      "format": "xlsx",
+      "size_kb": 18.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B1",
+      "filename": "B1-3 业务评价表.docx",
+      "relative_path": "B\\B1-3 业务评价表.docx",
+      "format": "docx",
+      "size_kb": 37.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B1",
+      "filename": "B1-4 业务承接阶段尽职调查（预备调查）报告（标准版）.docx",
+      "relative_path": "B\\B1-4 业务承接阶段尽职调查（预备调查）报告（标准版）.docx",
+      "format": "docx",
+      "size_kb": 230.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B1",
+      "filename": "B1-4 业务承接阶段尽职调查（预备调查）报告（简化版）.docx",
+      "relative_path": "B\\B1-4 业务承接阶段尽职调查（预备调查）报告（简化版）.docx",
+      "format": "docx",
+      "size_kb": 189.5,
+      "category": "B"
+    },
+    {
+      "wp_code": "B1",
+      "filename": "B1-5 KAA检查程序表.xlsx",
+      "relative_path": "B\\B1-5 KAA检查程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 20.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B1",
+      "filename": "B1-7 质量控制委员会会议记录.docx",
+      "relative_path": "B\\B1-7 质量控制委员会会议记录.docx",
+      "format": "docx",
+      "size_kb": 17.7,
+      "category": "B"
+    },
+    {
+      "wp_code": "B10",
+      "filename": "B10 了解被审计单位及其环境和适用的财务报告编制基础.xlsx",
+      "relative_path": "B\\B10 了解被审计单位及其环境和适用的财务报告编制基础.xlsx",
+      "format": "xlsx",
+      "size_kb": 84.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B11",
+      "filename": "B11 检查相关信息或文件记录程序表.xlsx",
+      "relative_path": "B\\B11 检查相关信息或文件记录程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 42.7,
+      "category": "B"
+    },
+    {
+      "wp_code": "B12",
+      "filename": "B12 与相关人员访谈程序及记录.xlsx",
+      "relative_path": "B\\B12 与相关人员访谈程序及记录.xlsx",
+      "format": "xlsx",
+      "size_kb": 45.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B13",
+      "filename": "B13 初步分析程序表.xlsx",
+      "relative_path": "B\\B13 初步分析程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 12.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B13",
+      "filename": "B13-2~5未审报表初步分析.xlsx",
+      "relative_path": "B\\B13-2~5未审报表初步分析.xlsx",
+      "format": "xlsx",
+      "size_kb": 93.1,
+      "category": "B"
+    },
+    {
+      "wp_code": "B15",
+      "filename": "B15 重要性计算表.xlsx",
+      "relative_path": "B\\B15 重要性计算表.xlsx",
+      "format": "xlsx",
+      "size_kb": 44.7,
+      "category": "B"
+    },
+    {
+      "wp_code": "B18",
+      "filename": "B18 了解内部审计程序表.xlsx",
+      "relative_path": "B\\B18 了解内部审计程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 193.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B18",
+      "filename": "B18-3-1 利用内部审计人员为审计提供直接协助的书面协议（适用于企业设立内部审计部门或职能岗位）.docx",
+      "relative_path": "B\\B18-3-1 利用内部审计人员为审计提供直接协助的书面协议（适用于企业设立内部审计部门或职能岗位）.docx",
+      "format": "docx",
+      "size_kb": 46.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B18",
+      "filename": "B18-3-2 利用内部审计人员为审计提供直接协助的书面协议（适用于内部审计职能外包）.docx",
+      "relative_path": "B\\B18-3-2 利用内部审计人员为审计提供直接协助的书面协议（适用于内部审计职能外包）.docx",
+      "format": "docx",
+      "size_kb": 48.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B19",
+      "filename": "B19 识别关联方程序表.xlsx",
+      "relative_path": "B\\B19 识别关联方程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 187.7,
+      "category": "B"
+    },
+    {
+      "wp_code": "B19",
+      "filename": "B19-1 识别未披露的关联方关系及异常关联交易.xlsx",
+      "relative_path": "B\\B19-1 识别未披露的关联方关系及异常关联交易.xlsx",
+      "format": "xlsx",
+      "size_kb": 16.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B1",
+      "filename": "B1A 业务承接程序表（适用于首次承接）.xlsx",
+      "relative_path": "B\\B1A 业务承接程序表（适用于首次承接）.xlsx",
+      "format": "xlsx",
+      "size_kb": 15.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B1",
+      "filename": "B1B 业务保持程序表.xlsx",
+      "relative_path": "B\\B1B 业务保持程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 14.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B2",
+      "filename": "B2 与前任注册会计师的沟通程序表.xlsx",
+      "relative_path": "B\\B2 与前任注册会计师的沟通程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 15.9,
+      "category": "B"
+    },
+    {
+      "wp_code": "B2",
+      "filename": "B2-1 向被审计单位发出的沟通函副本（就业务承接事项）.docx",
+      "relative_path": "B\\B2-1 向被审计单位发出的沟通函副本（就业务承接事项）.docx",
+      "format": "docx",
+      "size_kb": 20.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B2",
+      "filename": "B2-11 与前任注册会计师的沟通函（就沪深交易所涉及复核时的重要事项）.docx",
+      "relative_path": "B\\B2-11 与前任注册会计师的沟通函（就沪深交易所涉及复核时的重要事项）.docx",
+      "format": "docx",
+      "size_kb": 21.7,
+      "category": "B"
+    },
+    {
+      "wp_code": "B2",
+      "filename": "B2-12 对前任注册会计师的评价底稿.docx",
+      "relative_path": "B\\B2-12 对前任注册会计师的评价底稿.docx",
+      "format": "docx",
+      "size_kb": 52.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B2",
+      "filename": "B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第一封沟通函）.docx",
+      "relative_path": "B\\B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第一封沟通函）.docx",
+      "format": "docx",
+      "size_kb": 22.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B2",
+      "filename": "B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第二封沟通函）.docx",
+      "relative_path": "B\\B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第二封沟通函）.docx",
+      "format": "docx",
+      "size_kb": 20.8,
+      "category": "B"
+    },
+    {
+      "wp_code": "B2",
+      "filename": "B2-5 与前任注册会计师沟通后的评价（就业务承接事项）.xlsx",
+      "relative_path": "B\\B2-5 与前任注册会计师沟通后的评价（就业务承接事项）.xlsx",
+      "format": "xlsx",
+      "size_kb": 138.8,
+      "category": "B"
+    },
+    {
+      "wp_code": "B2",
+      "filename": "B2-6 向被审计单位发出的沟通函副本（就底稿使用事项）.docx",
+      "relative_path": "B\\B2-6 向被审计单位发出的沟通函副本（就底稿使用事项）.docx",
+      "format": "docx",
+      "size_kb": 20.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B2",
+      "filename": "B2-8 与前任注册会计师的沟通函副本（就底稿查阅事项）.docx",
+      "relative_path": "B\\B2-8 与前任注册会计师的沟通函副本（就底稿查阅事项）.docx",
+      "format": "docx",
+      "size_kb": 19.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B22",
+      "filename": "B22A-1 了解企业层面控制 - 控制环境.xlsx",
+      "relative_path": "B\\B22A-1 了解企业层面控制 - 控制环境.xlsx",
+      "format": "xlsx",
+      "size_kb": 23.5,
+      "category": "B"
+    },
+    {
+      "wp_code": "B22",
+      "filename": "B22A-2 了解企业层面控制 - 管理层凌驾于控制之上.xlsx",
+      "relative_path": "B\\B22A-2 了解企业层面控制 - 管理层凌驾于控制之上.xlsx",
+      "format": "xlsx",
+      "size_kb": 11.8,
+      "category": "B"
+    },
+    {
+      "wp_code": "B22",
+      "filename": "B22A-3 了解企业层面控制 - 风险评估.xlsx",
+      "relative_path": "B\\B22A-3 了解企业层面控制 - 风险评估.xlsx",
+      "format": "xlsx",
+      "size_kb": 25.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B22",
+      "filename": "B22A-4 了解企业层面控制 - 信息与沟通.xlsx",
+      "relative_path": "B\\B22A-4 了解企业层面控制 - 信息与沟通.xlsx",
+      "format": "xlsx",
+      "size_kb": 25.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B22",
+      "filename": "B22A-4-1 IT概要.xlsx",
+      "relative_path": "B\\B22A-4-1 IT概要.xlsx",
+      "format": "xlsx",
+      "size_kb": 36.5,
+      "category": "B"
+    },
+    {
+      "wp_code": "B22",
+      "filename": "B22A-4-2 重大业务流程涉及的信息系统.xlsx",
+      "relative_path": "B\\B22A-4-2 重大业务流程涉及的信息系统.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B22",
+      "filename": "B22A-4-3 了解IT环境.xlsm",
+      "relative_path": "B\\B22A-4-3 了解IT环境.xlsm",
+      "format": "xlsm",
+      "size_kb": 80.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B22",
+      "filename": "B22A-4-4-1 了解IT一般控制.xlsx",
+      "relative_path": "B\\B22A-4-4-1 了解IT一般控制.xlsx",
+      "format": "xlsx",
+      "size_kb": 34.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B22",
+      "filename": "B22A-4-4-2 IT一般控制职责分离分析.xlsx",
+      "relative_path": "B\\B22A-4-4-2 IT一般控制职责分离分析.xlsx",
+      "format": "xlsx",
+      "size_kb": 37.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B22",
+      "filename": "B22A-4-5 财务报告过程.xlsx",
+      "relative_path": "B\\B22A-4-5 财务报告过程.xlsx",
+      "format": "xlsx",
+      "size_kb": 30.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B22",
+      "filename": "B22A-5 了解企业层面控制 - 监督.xlsx",
+      "relative_path": "B\\B22A-5 了解企业层面控制 - 监督.xlsx",
+      "format": "xlsx",
+      "size_kb": 20.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B22",
+      "filename": "B22B 了解企业层面控制 - 控制矩阵.xlsx",
+      "relative_path": "B\\B22B 了解企业层面控制 - 控制矩阵.xlsx",
+      "format": "xlsx",
+      "size_kb": 25.8,
+      "category": "B"
+    },
+    {
+      "wp_code": "B22",
+      "filename": "B22C 评价设计有效性 - 企业层面.xlsx",
+      "relative_path": "B\\B22C 评价设计有效性 - 企业层面.xlsx",
+      "format": "xlsx",
+      "size_kb": 47.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-1 了解、评价并测试销售循环业务层面控制.xlsm",
+      "relative_path": "B\\B23-1 了解、评价并测试销售循环业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 348.8,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-1-2 销售循环业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-1-2 销售循环业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 22.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-10 了解、评价并测试管理循环业务层面控制.xlsm",
+      "relative_path": "B\\B23-10 了解、评价并测试管理循环业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 966.7,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-10-2 管理循环业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-10-2 管理循环业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 70.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-11 了解、评价并测试税金循环业务层面控制.xlsm",
+      "relative_path": "B\\B23-11 了解、评价并测试税金循环业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 68.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-11-2 税金循环业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-11-2 税金循环业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 69.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-12 了解、评价并测试债务循环业务层面控制.xlsm",
+      "relative_path": "B\\B23-12 了解、评价并测试债务循环业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 966.5,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-12-2 债务循环业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-12-2 债务循环业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 78.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-13 了解、评价并测试租赁循环业务层面控制.xlsm",
+      "relative_path": "B\\B23-13 了解、评价并测试租赁循环业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 68.9,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-13-2 租赁循环业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-13-2 租赁循环业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 56.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-14 了解、评价并测试关联方及交易业务层面控制.xlsm",
+      "relative_path": "B\\B23-14 了解、评价并测试关联方及交易业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 68.9,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-14-2 关联方及交易业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-14-2 关联方及交易业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 70.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-15 了解信息处理控制.xlsx",
+      "relative_path": "B\\B23-15 了解信息处理控制.xlsx",
+      "format": "xlsx",
+      "size_kb": 29.9,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-2 了解、评价并测试货币资金循环业务层面控制.xlsm",
+      "relative_path": "B\\B23-2 了解、评价并测试货币资金循环业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 965.5,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-2-2 货币资金循环业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-2-2 货币资金循环业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 19.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-3 了解、评价并测试存货循环业务层面控制.xlsm",
+      "relative_path": "B\\B23-3 了解、评价并测试存货循环业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 353.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-3-2 存货循环业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-3-2 存货循环业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 21.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-4 了解、评价并测试投资循环业务层面控制.xlsm",
+      "relative_path": "B\\B23-4 了解、评价并测试投资循环业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 962.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-4-2 投资循环业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-4-2 投资循环业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 70.7,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-5 了解、评价并测试固定资产循环业务层面控制.xlsm",
+      "relative_path": "B\\B23-5 了解、评价并测试固定资产循环业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 353.5,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-5-2 固定资产循环业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-5-2 固定资产循环业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 183.9,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-6 了解、评价并测试在建工程循环业务层面控制.xlsm",
+      "relative_path": "B\\B23-6 了解、评价并测试在建工程循环业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 353.4,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-6-2 在建工程循环业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-6-2 在建工程循环业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 24.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-7 了解、评价并测试无形资产及其他长期资产循环流程业务层面控制.xlsm",
+      "relative_path": "B\\B23-7 了解、评价并测试无形资产及其他长期资产循环流程业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 348.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-7-2 无形资产及其他长期资产循环业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-7-2 无形资产及其他长期资产循环业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 73.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-8 了解、评价并测试研发循环业务层面控制.xlsm",
+      "relative_path": "B\\B23-8 了解、评价并测试研发循环业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 348.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-8-2 研发循环业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-8-2 研发循环业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 19.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-9 了解、评价并测试职工薪酬循环业务层面控制.xlsm",
+      "relative_path": "B\\B23-9 了解、评价并测试职工薪酬循环业务层面控制.xlsm",
+      "format": "xlsm",
+      "size_kb": 348.7,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-9-2 职工薪酬循环业务层面控制 - 流程图及描述.docx",
+      "relative_path": "B\\B23-9-2 职工薪酬循环业务层面控制 - 流程图及描述.docx",
+      "format": "docx",
+      "size_kb": 99.9,
+      "category": "B"
+    },
+    {
+      "wp_code": "B23",
+      "filename": "B23-XX-5 职责分离 - 通用模板.xlsx",
+      "relative_path": "B\\B23-XX-5 职责分离 - 通用模板.xlsx",
+      "format": "xlsx",
+      "size_kb": 38.9,
+      "category": "B"
+    },
+    {
+      "wp_code": "B3",
+      "filename": "B3 独立性确认程序表.xlsx",
+      "relative_path": "B\\B3 独立性确认程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 18.4,
+      "category": "B"
+    },
+    {
+      "wp_code": "B3",
+      "filename": "B3-1 审计项目团队成员独立性声明书（适用于中国及国际审计准则）.docx",
+      "relative_path": "B\\B3-1 审计项目团队成员独立性声明书（适用于中国及国际审计准则）.docx",
+      "format": "docx",
+      "size_kb": 35.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30 集团审计程序表.xlsx",
+      "relative_path": "B\\B30 集团审计程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 15.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-1 了解组成部分（2021年6月）.xlsx",
+      "relative_path": "B\\B30-1 了解组成部分（2021年6月）.xlsx",
+      "format": "xlsx",
+      "size_kb": 34.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-1-2-1 特别风险记录模板.xlsx",
+      "relative_path": "B\\B30-1-2-1 特别风险记录模板.xlsx",
+      "format": "xlsx",
+      "size_kb": 47.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-10 复核组成部分注册会计师工作底稿（2021年6月）.docx",
+      "relative_path": "B\\B30-10 复核组成部分注册会计师工作底稿（2021年6月）.docx",
+      "format": "docx",
+      "size_kb": 100.1,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-11 审计完成备忘录（2023年6月）.docx",
+      "relative_path": "B\\B30-11 审计完成备忘录（2023年6月）.docx",
+      "format": "docx",
+      "size_kb": 93.8,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-11-1 重大问题发现及解决汇总.docx",
+      "relative_path": "B\\B30-11-1 重大问题发现及解决汇总.docx",
+      "format": "docx",
+      "size_kb": 29.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-11-2 内部控制缺陷汇总与评估.docx",
+      "relative_path": "B\\B30-11-2 内部控制缺陷汇总与评估.docx",
+      "format": "docx",
+      "size_kb": 25.1,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-11-3 新增关联方信息.docx",
+      "relative_path": "B\\B30-11-3 新增关联方信息.docx",
+      "format": "docx",
+      "size_kb": 24.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-12 组成部分已识别错报汇总表（2021年6月）.xlsx",
+      "relative_path": "B\\B30-12 组成部分已识别错报汇总表（2021年6月）.xlsx",
+      "format": "xlsx",
+      "size_kb": 40.4,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-13 致集团项目组的报告示例（2018年11月）.docx",
+      "relative_path": "B\\B30-13 致集团项目组的报告示例（2018年11月）.docx",
+      "format": "docx",
+      "size_kb": 62.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-13-1 财务报告文件包（含经审计的财务报表及附注等）.xlsx",
+      "relative_path": "B\\B30-13-1 财务报告文件包（含经审计的财务报表及附注等）.xlsx",
+      "format": "xlsx",
+      "size_kb": 475.5,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-14 期后事项备忘录（2021年6月）.docx",
+      "relative_path": "B\\B30-14 期后事项备忘录（2021年6月）.docx",
+      "format": "docx",
+      "size_kb": 70.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-15 组成部分预算和实际收费信息（2021年6月）.xlsx",
+      "relative_path": "B\\B30-15 组成部分预算和实际收费信息（2021年6月）.xlsx",
+      "format": "xlsx",
+      "size_kb": 29.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-2A 组成部分重要性及审计范围（2021年6月）.xlsm",
+      "relative_path": "B\\B30-2A 组成部分重要性及审计范围（2021年6月）.xlsm",
+      "format": "xlsm",
+      "size_kb": 169.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-2B 组成部分重要性水平（2021年6月）.xlsm",
+      "relative_path": "B\\B30-2B 组成部分重要性水平（2021年6月）.xlsm",
+      "format": "xlsm",
+      "size_kb": 61.1,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-3 集团审计指令（2023年6月）.docx",
+      "relative_path": "B\\B30-3 集团审计指令（2023年6月）.docx",
+      "format": "docx",
+      "size_kb": 100.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-3-1 集团主要会计政策和会计估计.docx",
+      "relative_path": "B\\B30-3-1 集团主要会计政策和会计估计.docx",
+      "format": "docx",
+      "size_kb": 80.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-3-2 集团项目组就关联方事项致组成部分注册会计师询证函.docx",
+      "relative_path": "B\\B30-3-2 集团项目组就关联方事项致组成部分注册会计师询证函.docx",
+      "format": "docx",
+      "size_kb": 18.1,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-4 组成部分注册会计师执行的工作（2021年6月）.docx",
+      "relative_path": "B\\B30-4 组成部分注册会计师执行的工作（2021年6月）.docx",
+      "format": "docx",
+      "size_kb": 123.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-4-1 组成部分注册会计师 - 特定审计程序模板.docx",
+      "relative_path": "B\\B30-4-1 组成部分注册会计师 - 特定审计程序模板.docx",
+      "format": "docx",
+      "size_kb": 125.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-5 集团审计 - 服务协议（2023年3月）.docx",
+      "relative_path": "B\\B30-5 集团审计 - 服务协议（2023年3月）.docx",
+      "format": "docx",
+      "size_kb": 47.1,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-6 集团审计会议议程（2021年6月）.docx",
+      "relative_path": "B\\B30-6 集团审计会议议程（2021年6月）.docx",
+      "format": "docx",
+      "size_kb": 68.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-7 集团审计指令确认函（2023年6月）.docx",
+      "relative_path": "B\\B30-7 集团审计指令确认函（2023年6月）.docx",
+      "format": "docx",
+      "size_kb": 88.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-8 了解组成部分注册会计师（2023年6月）.xlsx",
+      "relative_path": "B\\B30-8 了解组成部分注册会计师（2023年6月）.xlsx",
+      "format": "xlsx",
+      "size_kb": 36.4,
+      "category": "B"
+    },
+    {
+      "wp_code": "B30",
+      "filename": "B30-9 集团审计备忘录（2023年6月）.docx",
+      "relative_path": "B\\B30-9 集团审计备忘录（2023年6月）.docx",
+      "format": "docx",
+      "size_kb": 73.1,
+      "category": "B"
+    },
+    {
+      "wp_code": "B40",
+      "filename": "B40 项目组讨论程序表.xlsx",
+      "relative_path": "B\\B40 项目组讨论程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 16.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B40",
+      "filename": "B40-1 项目组讨论备忘录.docx",
+      "relative_path": "B\\B40-1 项目组讨论备忘录.docx",
+      "format": "docx",
+      "size_kb": 46.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B40",
+      "filename": "B40-2 对SCOT+的完整性进行再评估.docx",
+      "relative_path": "B\\B40-2 对SCOT+的完整性进行再评估.docx",
+      "format": "docx",
+      "size_kb": 45.7,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5 业务约定书控制表.docx",
+      "relative_path": "B\\B5 业务约定书控制表.docx",
+      "format": "docx",
+      "size_kb": 21.4,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5-1 财务报表审计业务约定书（通用、 总分所共同签署）.docx",
+      "relative_path": "B\\B5-1 财务报表审计业务约定书（通用、 总分所共同签署）.docx",
+      "format": "docx",
+      "size_kb": 51.5,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5-1 财务报表审计业务约定书（通用）.docx",
+      "relative_path": "B\\B5-1 财务报表审计业务约定书（通用）.docx",
+      "format": "docx",
+      "size_kb": 50.1,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5-2 财务报表审计业务约定书（适用于上市公司审计、总分所共同签署）.docx",
+      "relative_path": "B\\B5-2 财务报表审计业务约定书（适用于上市公司审计、总分所共同签署）.docx",
+      "format": "docx",
+      "size_kb": 58.0,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5-2 财务报表审计业务约定书（适用于上市公司审计）.docx",
+      "relative_path": "B\\B5-2 财务报表审计业务约定书（适用于上市公司审计）.docx",
+      "format": "docx",
+      "size_kb": 55.9,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5-3 财务报表审计业务约定书（适用于国有企业审计）.docx",
+      "relative_path": "B\\B5-3 财务报表审计业务约定书（适用于国有企业审计）.docx",
+      "format": "docx",
+      "size_kb": 48.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5-4 财务报表审计业务约定书（适用于IPO审计）.docx",
+      "relative_path": "B\\B5-4 财务报表审计业务约定书（适用于IPO审计）.docx",
+      "format": "docx",
+      "size_kb": 56.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5-5 内部控制审计业务约定书.docx",
+      "relative_path": "B\\B5-5 内部控制审计业务约定书.docx",
+      "format": "docx",
+      "size_kb": 40.8,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5-6 IPO季度财务报表审阅业务约定书.docx",
+      "relative_path": "B\\B5-6 IPO季度财务报表审阅业务约定书.docx",
+      "format": "docx",
+      "size_kb": 31.9,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5-7 审计及专项报告等其他鉴证业务约定书（新三板）.docx",
+      "relative_path": "B\\B5-7 审计及专项报告等其他鉴证业务约定书（新三板）.docx",
+      "format": "docx",
+      "size_kb": 54.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5-8-1 审计及专项报告等其他鉴证业务约定书（企业债：会计准则）.docx",
+      "relative_path": "B\\B5-8-1 审计及专项报告等其他鉴证业务约定书（企业债：会计准则）.docx",
+      "format": "docx",
+      "size_kb": 49.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5-8-2 审计及专项报告等其他鉴证业务约定书（企业债：会计制度）.docx",
+      "relative_path": "B\\B5-8-2 审计及专项报告等其他鉴证业务约定书（企业债：会计制度）.docx",
+      "format": "docx",
+      "size_kb": 49.5,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5-9-1 医院审计业务约定书（被审计医院直接委托）.docx",
+      "relative_path": "B\\B5-9-1 医院审计业务约定书（被审计医院直接委托）.docx",
+      "format": "docx",
+      "size_kb": 39.5,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5-9-2 医院审计业务约定书（第三方委托）.docx",
+      "relative_path": "B\\B5-9-2 医院审计业务约定书（第三方委托）.docx",
+      "format": "docx",
+      "size_kb": 40.4,
+      "category": "B"
+    },
+    {
+      "wp_code": "B50",
+      "filename": "B50 汇总风险评估结果程序表.xlsx",
+      "relative_path": "B\\B50 汇总风险评估结果程序表.xlsx",
+      "format": "xlsx",
+      "size_kb": 15.1,
+      "category": "B"
+    },
+    {
+      "wp_code": "B50",
+      "filename": "B50-1 汇总识别的风险因素.xlsx",
+      "relative_path": "B\\B50-1 汇总识别的风险因素.xlsx",
+      "format": "xlsx",
+      "size_kb": 20.3,
+      "category": "B"
+    },
+    {
+      "wp_code": "B50",
+      "filename": "B50-2 财务报表层次风险（含财务报表层次特别风险）.xlsx",
+      "relative_path": "B\\B50-2 财务报表层次风险（含财务报表层次特别风险）.xlsx",
+      "format": "xlsx",
+      "size_kb": 553.6,
+      "category": "B"
+    },
+    {
+      "wp_code": "B50",
+      "filename": "B50-3 认定层次重大错报风险.xlsx",
+      "relative_path": "B\\B50-3 认定层次重大错报风险.xlsx",
+      "format": "xlsx",
+      "size_kb": 1720.1,
+      "category": "B"
+    },
+    {
+      "wp_code": "B50",
+      "filename": "B50-4 汇总认定层次特别风险.xlsx",
+      "relative_path": "B\\B50-4 汇总认定层次特别风险.xlsx",
+      "format": "xlsx",
+      "size_kb": 309.4,
+      "category": "B"
+    },
+    {
+      "wp_code": "B51",
+      "filename": "B51 舞弊风险因素（三因素分析）.xlsx",
+      "relative_path": "B\\B51 舞弊风险因素（三因素分析）.xlsx",
+      "format": "xlsx",
+      "size_kb": 937.7,
+      "category": "B"
+    },
+    {
+      "wp_code": "B51",
+      "filename": "B51-3 识别对货币资金需保持警觉的情形程序.xlsx",
+      "relative_path": "B\\B51-3 识别对货币资金需保持警觉的情形程序.xlsx",
+      "format": "xlsx",
+      "size_kb": 15.4,
+      "category": "B"
+    },
+    {
+      "wp_code": "B51",
+      "filename": "B51-5 识别收入确认方面可能存在舞弊风险的迹象程序.xlsx",
+      "relative_path": "B\\B51-5 识别收入确认方面可能存在舞弊风险的迹象程序.xlsx",
+      "format": "xlsx",
+      "size_kb": 18.8,
+      "category": "B"
+    },
+    {
+      "wp_code": "B52",
+      "filename": "B52 舞弊 - 管理层凌驾于控制之上的风险.xlsx",
+      "relative_path": "B\\B52 舞弊 - 管理层凌驾于控制之上的风险.xlsx",
+      "format": "xlsx",
+      "size_kb": 202.9,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5附件：数据分级确认函-双语版.docx",
+      "relative_path": "B\\B5附件：数据分级确认函-双语版.docx",
+      "format": "docx",
+      "size_kb": 23.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B5",
+      "filename": "B5附件：数据分级确认函.docx",
+      "relative_path": "B\\B5附件：数据分级确认函.docx",
+      "format": "docx",
+      "size_kb": 20.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B60",
+      "filename": "B60 总体审计策略及具体审计计划.docx",
+      "relative_path": "B\\B60 总体审计策略及具体审计计划.docx",
+      "format": "docx",
+      "size_kb": 237.4,
+      "category": "B"
+    },
+    {
+      "wp_code": "B60",
+      "filename": "B60-1 审计项目工时预算与控制表.xlsx",
+      "relative_path": "B\\B60-1 审计项目工时预算与控制表.xlsx",
+      "format": "xlsx",
+      "size_kb": 25.4,
+      "category": "B"
+    },
+    {
+      "wp_code": "B60",
+      "filename": "B60-2-1 IT复杂性判断表.docx",
+      "relative_path": "B\\B60-2-1 IT复杂性判断表.docx",
+      "format": "docx",
+      "size_kb": 33.7,
+      "category": "B"
+    },
+    {
+      "wp_code": "B60",
+      "filename": "B60-2-2 IT审计进场前通知表.docx",
+      "relative_path": "B\\B60-2-2 IT审计进场前通知表.docx",
+      "format": "docx",
+      "size_kb": 40.9,
+      "category": "B"
+    },
+    {
+      "wp_code": "B60",
+      "filename": "B60-2-3 IT审计计划备忘录.docx",
+      "relative_path": "B\\B60-2-3 IT审计计划备忘录.docx",
+      "format": "docx",
+      "size_kb": 33.9,
+      "category": "B"
+    },
+    {
+      "wp_code": "B60",
+      "filename": "B60-3 评估专家工作计划.docx",
+      "relative_path": "B\\B60-3 评估专家工作计划.docx",
+      "format": "docx",
+      "size_kb": 46.1,
+      "category": "B"
+    },
+    {
+      "wp_code": "B60",
+      "filename": "B60A 对内控审计的特殊考虑.docx",
+      "relative_path": "B\\B60A 对内控审计的特殊考虑.docx",
+      "format": "docx",
+      "size_kb": 135.2,
+      "category": "B"
+    },
+    {
+      "wp_code": "B60",
+      "filename": "B60B 对IPO申报财务报表审计的特殊考虑.docx",
+      "relative_path": "B\\B60B 对IPO申报财务报表审计的特殊考虑.docx",
+      "format": "docx",
+      "size_kb": 134.7,
+      "category": "B"
+    },
+    {
+      "wp_code": "B60",
+      "filename": "B60C 对国有企业年度财务报表审计的特殊考虑.docx",
+      "relative_path": "B\\B60C 对国有企业年度财务报表审计的特殊考虑.docx",
+      "format": "docx",
+      "size_kb": 129.9,
+      "category": "B"
+    },
+    {
+      "wp_code": "B60",
+      "filename": "B60D 向监管机构报送总体审计策略和具体审计计划的函副本.docx",
+      "relative_path": "B\\B60D 向监管机构报送总体审计策略和具体审计计划的函副本.docx",
+      "format": "docx",
+      "size_kb": 27.4,
+      "category": "B"
+    },
+    {
+      "wp_code": "C1",
+      "filename": "C1 企业层面控制测试.xlsx",
+      "relative_path": "C\\C1 企业层面控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 69.9,
+      "category": "C"
+    },
+    {
+      "wp_code": "C10",
+      "filename": "C10 职工薪酬循环控制测试.xlsx",
+      "relative_path": "C\\C10 职工薪酬循环控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.1,
+      "category": "C"
+    },
+    {
+      "wp_code": "C10",
+      "filename": "C10-2 职工薪酬循环评价控制偏差.xlsx",
+      "relative_path": "C\\C10-2 职工薪酬循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 214.7,
+      "category": "C"
+    },
+    {
+      "wp_code": "C11",
+      "filename": "C11 管理循环控制测试.xlsx",
+      "relative_path": "C\\C11 管理循环控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.1,
+      "category": "C"
+    },
+    {
+      "wp_code": "C11",
+      "filename": "C11-2 管理循环评价控制偏差.xlsx",
+      "relative_path": "C\\C11-2 管理循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 214.7,
+      "category": "C"
+    },
+    {
+      "wp_code": "C12",
+      "filename": "C12 税金循环控制测试.xlsx",
+      "relative_path": "C\\C12 税金循环控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.2,
+      "category": "C"
+    },
+    {
+      "wp_code": "C12",
+      "filename": "C12-2 税金循环评价控制偏差.xlsx",
+      "relative_path": "C\\C12-2 税金循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 212.2,
+      "category": "C"
+    },
+    {
+      "wp_code": "C13",
+      "filename": "C13 债务循环业务层面控制测试.xlsx",
+      "relative_path": "C\\C13 债务循环业务层面控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.7,
+      "category": "C"
+    },
+    {
+      "wp_code": "C13",
+      "filename": "C13-2 债务循环评价控制偏差.xlsx",
+      "relative_path": "C\\C13-2 债务循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 212.2,
+      "category": "C"
+    },
+    {
+      "wp_code": "C14",
+      "filename": "C14 租赁循环控制测试.xlsx",
+      "relative_path": "C\\C14 租赁循环控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.2,
+      "category": "C"
+    },
+    {
+      "wp_code": "C14",
+      "filename": "C14-2 租赁循环评价控制偏差.xlsx",
+      "relative_path": "C\\C14-2 租赁循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 212.2,
+      "category": "C"
+    },
+    {
+      "wp_code": "C15",
+      "filename": "C15 关联方循环控制测试.xlsx",
+      "relative_path": "C\\C15 关联方循环控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.1,
+      "category": "C"
+    },
+    {
+      "wp_code": "C15",
+      "filename": "C15-2 关联方循环评价控制偏差.xlsx",
+      "relative_path": "C\\C15-2 关联方循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 212.2,
+      "category": "C"
+    },
+    {
+      "wp_code": "C2",
+      "filename": "C2 销售循环控制测试.xlsx",
+      "relative_path": "C\\C2 销售循环控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.5,
+      "category": "C"
+    },
+    {
+      "wp_code": "C2",
+      "filename": "C2-2 销售循环评价控制偏差.xlsx",
+      "relative_path": "C\\C2-2 销售循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 212.1,
+      "category": "C"
+    },
+    {
+      "wp_code": "C21",
+      "filename": "C21 具有信息技术专业技能的项目组成员.xlsx",
+      "relative_path": "C\\C21 具有信息技术专业技能的项目组成员.xlsx",
+      "format": "xlsx",
+      "size_kb": 47.0,
+      "category": "C"
+    },
+    {
+      "wp_code": "C21",
+      "filename": "C21-1  IT审计发现汇总表.xlsx",
+      "relative_path": "C\\C21-1  IT审计发现汇总表.xlsx",
+      "format": "xlsx",
+      "size_kb": 17.1,
+      "category": "C"
+    },
+    {
+      "wp_code": "C22",
+      "filename": "C22 IT一般控制测试.xlsx",
+      "relative_path": "C\\C22 IT一般控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 158.6,
+      "category": "C"
+    },
+    {
+      "wp_code": "C23",
+      "filename": "C23 会计分录 - 控制测试.xlsx",
+      "relative_path": "C\\C23 会计分录 - 控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 29.6,
+      "category": "C"
+    },
+    {
+      "wp_code": "C24",
+      "filename": "C24 会计分录 - 细节测试.xlsx",
+      "relative_path": "C\\C24 会计分录 - 细节测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 1261.3,
+      "category": "C"
+    },
+    {
+      "wp_code": "C25",
+      "filename": "C25 利用内审工作.xlsx",
+      "relative_path": "C\\C25 利用内审工作.xlsx",
+      "format": "xlsx",
+      "size_kb": 33.4,
+      "category": "C"
+    },
+    {
+      "wp_code": "C26",
+      "filename": "C26 信息处理控制测试.xlsx",
+      "relative_path": "C\\C26 信息处理控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 24.6,
+      "category": "C"
+    },
+    {
+      "wp_code": "C3",
+      "filename": "C3 货币资金循环业务层面控制测试.xlsx",
+      "relative_path": "C\\C3 货币资金循环业务层面控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.6,
+      "category": "C"
+    },
+    {
+      "wp_code": "C3",
+      "filename": "C3-2 货币资金循环评价控制偏差.xlsx",
+      "relative_path": "C\\C3-2 货币资金循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 212.1,
+      "category": "C"
+    },
+    {
+      "wp_code": "C4",
+      "filename": "C4 存货循环控制测试.xlsx",
+      "relative_path": "C\\C4 存货循环控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.1,
+      "category": "C"
+    },
+    {
+      "wp_code": "C4",
+      "filename": "C4-2 存货循环评价控制偏差.xlsx",
+      "relative_path": "C\\C4-2 存货循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 212.1,
+      "category": "C"
+    },
+    {
+      "wp_code": "C5",
+      "filename": "C5 投资循环控制测试.xlsx",
+      "relative_path": "C\\C5 投资循环控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.0,
+      "category": "C"
+    },
+    {
+      "wp_code": "C5",
+      "filename": "C5-2 投资循环评价控制偏差.xlsx",
+      "relative_path": "C\\C5-2 投资循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 212.2,
+      "category": "C"
+    },
+    {
+      "wp_code": "C6",
+      "filename": "C6 固定资产循环控制测试.xlsx",
+      "relative_path": "C\\C6 固定资产循环控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 26.0,
+      "category": "C"
+    },
+    {
+      "wp_code": "C6",
+      "filename": "C6-2 固定资产循环评价控制偏差.xlsx",
+      "relative_path": "C\\C6-2 固定资产循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 211.8,
+      "category": "C"
+    },
+    {
+      "wp_code": "C7",
+      "filename": "C7 在建工程循环控制测试.xlsx",
+      "relative_path": "C\\C7 在建工程循环控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 26.0,
+      "category": "C"
+    },
+    {
+      "wp_code": "C7",
+      "filename": "C7-2 在建工程循环评价控制偏差.xlsx",
+      "relative_path": "C\\C7-2 在建工程循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 211.7,
+      "category": "C"
+    },
+    {
+      "wp_code": "C8",
+      "filename": "C8 无形资产及其他长期资产循环控制测试.xlsx",
+      "relative_path": "C\\C8 无形资产及其他长期资产循环控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.4,
+      "category": "C"
+    },
+    {
+      "wp_code": "C8",
+      "filename": "C8-2 无形资产及其他长期资产循环评价控制偏差.xlsx",
+      "relative_path": "C\\C8-2 无形资产及其他长期资产循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 212.1,
+      "category": "C"
+    },
+    {
+      "wp_code": "C9",
+      "filename": "C9 研发循环控制测试.xlsx",
+      "relative_path": "C\\C9 研发循环控制测试.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.2,
+      "category": "C"
+    },
+    {
+      "wp_code": "C9",
+      "filename": "C9-2 研发循环评价控制偏差.xlsx",
+      "relative_path": "C\\C9-2 研发循环评价控制偏差.xlsx",
+      "format": "xlsx",
+      "size_kb": 212.2,
+      "category": "C"
+    },
+    {
+      "wp_code": "D0",
+      "filename": "D0 收入循环函证.xlsx",
+      "relative_path": "D\\D0 收入循环函证.xlsx",
+      "format": "xlsx",
+      "size_kb": 150.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D1",
+      "filename": "D1 应收票据.xlsx",
+      "relative_path": "D\\D1 应收票据.xlsx",
+      "format": "xlsx",
+      "size_kb": 134.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D2",
+      "filename": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+      "relative_path": "D\\D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 120.3,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D2",
+      "filename": "D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+      "relative_path": "D\\D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 100.6,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D2",
+      "filename": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+      "relative_path": "D\\D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+      "format": "xlsx",
+      "size_kb": 348.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D3",
+      "filename": "D3 预收账款.xlsx",
+      "relative_path": "D\\D3 预收账款.xlsx",
+      "format": "xlsx",
+      "size_kb": 130.0,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D4",
+      "filename": "D4-12 营业收入-合同检查（Leap-常规程序）.xlsx",
+      "relative_path": "D\\D4-12 营业收入-合同检查（Leap-常规程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 65.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D4",
+      "filename": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+      "relative_path": "D\\D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+      "format": "xlsx",
+      "size_kb": 112.6,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D4",
+      "filename": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+      "relative_path": "D\\D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 164.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D4",
+      "filename": "D4-21营业收入-关联方检查（Leap-常规程序）.xlsx",
+      "relative_path": "D\\D4-21营业收入-关联方检查（Leap-常规程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 77.5,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D4",
+      "filename": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "relative_path": "D\\D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "format": "xlsx",
+      "size_kb": 148.5,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D4",
+      "filename": "D4-33至D4-36 其他业务收入.xlsx",
+      "relative_path": "D\\D4-33至D4-36 其他业务收入.xlsx",
+      "format": "xlsx",
+      "size_kb": 82.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D4",
+      "filename": "D4-5 营业收入-会计政策（Leap-常规程序）.xlsx",
+      "relative_path": "D\\D4-5 营业收入-会计政策（Leap-常规程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 16.5,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D4",
+      "filename": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+      "relative_path": "D\\D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 48.6,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D5",
+      "filename": "D5 应收款项融资.xlsx",
+      "relative_path": "D\\D5 应收款项融资.xlsx",
+      "format": "xlsx",
+      "size_kb": 110.6,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D6",
+      "filename": "D6 合同资产.xlsx",
+      "relative_path": "D\\D6 合同资产.xlsx",
+      "format": "xlsx",
+      "size_kb": 411.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "D7",
+      "filename": "D7 合同负债.xlsx",
+      "relative_path": "D\\D7 合同负债.xlsx",
+      "format": "xlsx",
+      "size_kb": 370.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "E0",
+      "filename": "E0 货币资金 - 函证（Leap应对措施-函证）.xlsx",
+      "relative_path": "E\\E0 货币资金 - 函证（Leap应对措施-函证）.xlsx",
+      "format": "xlsx",
+      "size_kb": 987.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "E1",
+      "filename": "E1-14至E1-15  货币资金 -分析程序（Leap应对措施-分析程序）.xlsx",
+      "relative_path": "E\\E1-14至E1-15  货币资金 -分析程序（Leap应对措施-分析程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 37.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "E1",
+      "filename": "E1-18至E1-23  货币资金 -检查（Leap应对措施-检查）.xlsx",
+      "relative_path": "E\\E1-18至E1-23  货币资金 -检查（Leap应对措施-检查）.xlsx",
+      "format": "xlsx",
+      "size_kb": 198.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "E1",
+      "filename": "E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+      "relative_path": "E\\E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 142.0,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "E1",
+      "filename": "E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "relative_path": "E\\E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "format": "xlsx",
+      "size_kb": 114.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F0",
+      "filename": "F0 存货循环函证.xlsx",
+      "relative_path": "F\\F0 存货循环函证.xlsx",
+      "format": "xlsx",
+      "size_kb": 893.9,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F1",
+      "filename": "F1 预付账款.xlsx",
+      "relative_path": "F\\F1 预付账款.xlsx",
+      "format": "xlsx",
+      "size_kb": 255.5,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F2",
+      "filename": "F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx",
+      "relative_path": "F\\F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 14.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F2",
+      "filename": "F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx",
+      "relative_path": "F\\F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 56.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F2",
+      "filename": "F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+      "relative_path": "F\\F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 176.4,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F2",
+      "filename": "F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+      "relative_path": "F\\F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+      "format": "xlsx",
+      "size_kb": 79.5,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F2",
+      "filename": "F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx",
+      "relative_path": "F\\F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx",
+      "format": "xlsx",
+      "size_kb": 62.0,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F2",
+      "filename": "F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+      "relative_path": "F\\F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 112.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F2",
+      "filename": "F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx",
+      "relative_path": "F\\F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx",
+      "format": "xlsx",
+      "size_kb": 433.0,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F2",
+      "filename": "F2-52 存货及跌价准备 -关联交易（Leap-常规程序）.xlsx",
+      "relative_path": "F\\F2-52 存货及跌价准备 -关联交易（Leap-常规程序）.xlsx",
+      "format": "xlsx",
+      "size_kb": 101.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F2",
+      "filename": "F2-55至F2-58 合同履约成本.xlsx",
+      "relative_path": "F\\F2-55至F2-58 合同履约成本.xlsx",
+      "format": "xlsx",
+      "size_kb": 98.1,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F2",
+      "filename": "F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "relative_path": "F\\F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "format": "xlsx",
+      "size_kb": 178.6,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F3",
+      "filename": "F3 应付票据.xlsx",
+      "relative_path": "F\\F3 应付票据.xlsx",
+      "format": "xlsx",
+      "size_kb": 77.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F4",
+      "filename": "F4 应付账款.xlsx",
+      "relative_path": "F\\F4 应付账款.xlsx",
+      "format": "xlsx",
+      "size_kb": 105.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "F5",
+      "filename": "F5 营业成本.xlsx",
+      "relative_path": "F\\F5 营业成本.xlsx",
+      "format": "xlsx",
+      "size_kb": 183.3,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G0",
+      "filename": "G0 投资循环函证.xlsx",
+      "relative_path": "G\\G0 投资循环函证.xlsx",
+      "format": "xlsx",
+      "size_kb": 878.3,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G1",
+      "filename": "G1 交易性金融资产.xlsx",
+      "relative_path": "G\\G1 交易性金融资产.xlsx",
+      "format": "xlsx",
+      "size_kb": 153.6,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G10",
+      "filename": "G10 交易性金融负债.xlsx",
+      "relative_path": "G\\G10 交易性金融负债.xlsx",
+      "format": "xlsx",
+      "size_kb": 97.1,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G11",
+      "filename": "G11 投资收益.xlsx",
+      "relative_path": "G\\G11 投资收益.xlsx",
+      "format": "xlsx",
+      "size_kb": 73.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G12",
+      "filename": "G12 净敞口套期收益.xlsx",
+      "relative_path": "G\\G12 净敞口套期收益.xlsx",
+      "format": "xlsx",
+      "size_kb": 78.1,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G13",
+      "filename": "G13 公允价值变动收益.xlsx",
+      "relative_path": "G\\G13 公允价值变动收益.xlsx",
+      "format": "xlsx",
+      "size_kb": 57.3,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G14",
+      "filename": "G14 信用减值损失.xlsx",
+      "relative_path": "G\\G14 信用减值损失.xlsx",
+      "format": "xlsx",
+      "size_kb": 58.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G2",
+      "filename": "G2 应收利息.xlsx",
+      "relative_path": "G\\G2 应收利息.xlsx",
+      "format": "xlsx",
+      "size_kb": 97.1,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G3",
+      "filename": "G3 应收股利.xlsx",
+      "relative_path": "G\\G3 应收股利.xlsx",
+      "format": "xlsx",
+      "size_kb": 469.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G4",
+      "filename": "G4 债权投资.xlsx",
+      "relative_path": "G\\G4 债权投资.xlsx",
+      "format": "xlsx",
+      "size_kb": 1022.9,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G5",
+      "filename": "G5 长期应收款.xlsx",
+      "relative_path": "G\\G5 长期应收款.xlsx",
+      "format": "xlsx",
+      "size_kb": 409.4,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G6",
+      "filename": "G6 其他债权投资.xlsx",
+      "relative_path": "G\\G6 其他债权投资.xlsx",
+      "format": "xlsx",
+      "size_kb": 1011.4,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G7",
+      "filename": "G7 长期股权投资.xlsx",
+      "relative_path": "G\\G7 长期股权投资.xlsx",
+      "format": "xlsx",
+      "size_kb": 244.4,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G8",
+      "filename": "G8 其他权益工具投资.xlsx",
+      "relative_path": "G\\G8 其他权益工具投资.xlsx",
+      "format": "xlsx",
+      "size_kb": 439.5,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "G9",
+      "filename": "G9 其他非流动金融资产.xlsx",
+      "relative_path": "G\\G9 其他非流动金融资产.xlsx",
+      "format": "xlsx",
+      "size_kb": 86.6,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "H0",
+      "filename": "H0 固定资产循环函证.xlsx",
+      "relative_path": "H\\H0 固定资产循环函证.xlsx",
+      "format": "xlsx",
+      "size_kb": 79.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "H1",
+      "filename": "H1 固定资产.xlsx",
+      "relative_path": "H\\H1 固定资产.xlsx",
+      "format": "xlsx",
+      "size_kb": 244.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "H10",
+      "filename": "H10 资产处置损益.xlsx",
+      "relative_path": "H\\H10 资产处置损益.xlsx",
+      "format": "xlsx",
+      "size_kb": 58.3,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "H2",
+      "filename": "H2 在建工程.xlsx",
+      "relative_path": "H\\H2 在建工程.xlsx",
+      "format": "xlsx",
+      "size_kb": 174.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "H3",
+      "filename": "H3 投资性房地产.xlsx",
+      "relative_path": "H\\H3 投资性房地产.xlsx",
+      "format": "xlsx",
+      "size_kb": 712.3,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "H4",
+      "filename": "H4 工程物资.xlsx",
+      "relative_path": "H\\H4 工程物资.xlsx",
+      "format": "xlsx",
+      "size_kb": 110.3,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "H5",
+      "filename": "H5 油气资产.xlsx",
+      "relative_path": "H\\H5 油气资产.xlsx",
+      "format": "xlsx",
+      "size_kb": 190.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "H6",
+      "filename": "H6 固定资产清理.xlsx",
+      "relative_path": "H\\H6 固定资产清理.xlsx",
+      "format": "xlsx",
+      "size_kb": 47.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "H7",
+      "filename": "H7 生产性生物资产.xlsx",
+      "relative_path": "H\\H7 生产性生物资产.xlsx",
+      "format": "xlsx",
+      "size_kb": 220.4,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "H8",
+      "filename": "H8 使用权资产.xlsx",
+      "relative_path": "H\\H8 使用权资产.xlsx",
+      "format": "xlsx",
+      "size_kb": 491.0,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "H9",
+      "filename": "H9 租赁负债.xlsx",
+      "relative_path": "H\\H9 租赁负债.xlsx",
+      "format": "xlsx",
+      "size_kb": 66.1,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "I1",
+      "filename": "I1 无形资产、累计摊销及减值准备.xlsx",
+      "relative_path": "I\\I1 无形资产、累计摊销及减值准备.xlsx",
+      "format": "xlsx",
+      "size_kb": 133.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "I2",
+      "filename": "I2 开发支出.xlsx",
+      "relative_path": "I\\I2 开发支出.xlsx",
+      "format": "xlsx",
+      "size_kb": 134.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "I3",
+      "filename": "I3 商誉.xlsx",
+      "relative_path": "I\\I3 商誉.xlsx",
+      "format": "xlsx",
+      "size_kb": 207.6,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "I4",
+      "filename": "I4 长期待摊费用.xlsx",
+      "relative_path": "I\\I4 长期待摊费用.xlsx",
+      "format": "xlsx",
+      "size_kb": 305.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "I5",
+      "filename": "I5 其他非流动资产.xlsx",
+      "relative_path": "I\\I5 其他非流动资产.xlsx",
+      "format": "xlsx",
+      "size_kb": 299.1,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "I6",
+      "filename": "I6 研发费用.xlsx",
+      "relative_path": "I\\I6 研发费用.xlsx",
+      "format": "xlsx",
+      "size_kb": 85.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "J1",
+      "filename": "J1 应付职工薪酬.xlsx",
+      "relative_path": "J\\J1 应付职工薪酬.xlsx",
+      "format": "xlsx",
+      "size_kb": 192.1,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "J2",
+      "filename": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx",
+      "relative_path": "J\\J2 长期应付职工薪酬-设定受益计划净资产.xlsx",
+      "format": "xlsx",
+      "size_kb": 104.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "J3",
+      "filename": "J3 股份支付.xlsx",
+      "relative_path": "J\\J3 股份支付.xlsx",
+      "format": "xlsx",
+      "size_kb": 49.0,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K0",
+      "filename": "K0 管理循环函证.xlsx",
+      "relative_path": "K\\K0 管理循环函证.xlsx",
+      "format": "xlsx",
+      "size_kb": 106.4,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K1",
+      "filename": "K1 其他应收款.xlsx",
+      "relative_path": "K\\K1 其他应收款.xlsx",
+      "format": "xlsx",
+      "size_kb": 169.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K10",
+      "filename": "K10 其他收益.xlsx",
+      "relative_path": "K\\K10 其他收益.xlsx",
+      "format": "xlsx",
+      "size_kb": 143.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K11",
+      "filename": "K11 资产减值损失.xlsx",
+      "relative_path": "K\\K11 资产减值损失.xlsx",
+      "format": "xlsx",
+      "size_kb": 56.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K12",
+      "filename": "K12 营业外收入.xlsx",
+      "relative_path": "K\\K12 营业外收入.xlsx",
+      "format": "xlsx",
+      "size_kb": 58.3,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K13",
+      "filename": "K13 营业外支出.xlsx",
+      "relative_path": "K\\K13 营业外支出.xlsx",
+      "format": "xlsx",
+      "size_kb": 57.4,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K2",
+      "filename": "K2 其他流动资产.xlsx",
+      "relative_path": "K\\K2 其他流动资产.xlsx",
+      "format": "xlsx",
+      "size_kb": 185.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K3",
+      "filename": "K3 其他应付款.xlsx",
+      "relative_path": "K\\K3 其他应付款.xlsx",
+      "format": "xlsx",
+      "size_kb": 90.4,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K4",
+      "filename": "K4 其他流动负债.xlsx",
+      "relative_path": "K\\K4 其他流动负债.xlsx",
+      "format": "xlsx",
+      "size_kb": 166.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K5",
+      "filename": "K5 预计负债.xlsx",
+      "relative_path": "K\\K5 预计负债.xlsx",
+      "format": "xlsx",
+      "size_kb": 79.5,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K6",
+      "filename": "K6 持有待售资产和负债.xlsx",
+      "relative_path": "K\\K6 持有待售资产和负债.xlsx",
+      "format": "xlsx",
+      "size_kb": 115.5,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K7",
+      "filename": "K7 递延收益.xlsx",
+      "relative_path": "K\\K7 递延收益.xlsx",
+      "format": "xlsx",
+      "size_kb": 73.9,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K8",
+      "filename": "K8 销售费用.xlsx",
+      "relative_path": "K\\K8 销售费用.xlsx",
+      "format": "xlsx",
+      "size_kb": 87.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "K9",
+      "filename": "K9 管理费用.xlsx",
+      "relative_path": "K\\K9 管理费用.xlsx",
+      "format": "xlsx",
+      "size_kb": 92.1,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "L0",
+      "filename": "L0 债务循环函证.xlsx",
+      "relative_path": "L\\L0 债务循环函证.xlsx",
+      "format": "xlsx",
+      "size_kb": 99.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "L1",
+      "filename": "L1 短期借款.xlsx",
+      "relative_path": "L\\L1 短期借款.xlsx",
+      "format": "xlsx",
+      "size_kb": 84.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "L2",
+      "filename": "L2 应付利息.xlsx",
+      "relative_path": "L\\L2 应付利息.xlsx",
+      "format": "xlsx",
+      "size_kb": 53.6,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "L3",
+      "filename": "L3 长期借款.xlsx",
+      "relative_path": "L\\L3 长期借款.xlsx",
+      "format": "xlsx",
+      "size_kb": 85.4,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "L4",
+      "filename": "L4 应付债券.xlsx",
+      "relative_path": "L\\L4 应付债券.xlsx",
+      "format": "xlsx",
+      "size_kb": 119.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "L5",
+      "filename": "L5 长期应付款.xlsx",
+      "relative_path": "L\\L5 长期应付款.xlsx",
+      "format": "xlsx",
+      "size_kb": 91.1,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "L6",
+      "filename": "L6 专项应付款.xlsx",
+      "relative_path": "L\\L6 专项应付款.xlsx",
+      "format": "xlsx",
+      "size_kb": 54.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "L7",
+      "filename": "L7 其他非流动负债.xlsx",
+      "relative_path": "L\\L7 其他非流动负债.xlsx",
+      "format": "xlsx",
+      "size_kb": 46.0,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "L8",
+      "filename": "L8 财务费用.xlsx",
+      "relative_path": "L\\L8 财务费用.xlsx",
+      "format": "xlsx",
+      "size_kb": 74.3,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "M1",
+      "filename": "M1 应付股利（利润）.xlsx",
+      "relative_path": "M\\M1 应付股利（利润）.xlsx",
+      "format": "xlsx",
+      "size_kb": 295.4,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "M10",
+      "filename": "M10 其他权益工具.xlsx",
+      "relative_path": "M\\M10 其他权益工具.xlsx",
+      "format": "xlsx",
+      "size_kb": 136.0,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "M2",
+      "filename": "M2 实收资本（股本）.xlsx",
+      "relative_path": "M\\M2 实收资本（股本）.xlsx",
+      "format": "xlsx",
+      "size_kb": 117.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "M3",
+      "filename": "M3 库存股.xlsx",
+      "relative_path": "M\\M3 库存股.xlsx",
+      "format": "xlsx",
+      "size_kb": 107.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "M4",
+      "filename": "M4 资本公积.xlsx",
+      "relative_path": "M\\M4 资本公积.xlsx",
+      "format": "xlsx",
+      "size_kb": 103.4,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "M5",
+      "filename": "M5 盈余公积.xlsx",
+      "relative_path": "M\\M5 盈余公积.xlsx",
+      "format": "xlsx",
+      "size_kb": 106.5,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "M6",
+      "filename": "M6 未分配利润.xlsx",
+      "relative_path": "M\\M6 未分配利润.xlsx",
+      "format": "xlsx",
+      "size_kb": 111.9,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "M7",
+      "filename": "M7 专项储备.xlsx",
+      "relative_path": "M\\M7 专项储备.xlsx",
+      "format": "xlsx",
+      "size_kb": 106.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "M8",
+      "filename": "M8 一般风险准备.xlsx",
+      "relative_path": "M\\M8 一般风险准备.xlsx",
+      "format": "xlsx",
+      "size_kb": 111.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "M9",
+      "filename": "M9 其他综合收益.xlsx",
+      "relative_path": "M\\M9 其他综合收益.xlsx",
+      "format": "xlsx",
+      "size_kb": 442.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "N1",
+      "filename": "N1 递延所得税资产.xlsx",
+      "relative_path": "N\\N1 递延所得税资产.xlsx",
+      "format": "xlsx",
+      "size_kb": 122.2,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "N2",
+      "filename": "N2 应交税费.xlsx",
+      "relative_path": "N\\N2 应交税费.xlsx",
+      "format": "xlsx",
+      "size_kb": 155.7,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "N3",
+      "filename": "N3 递延所得税负债.xlsx",
+      "relative_path": "N\\N3 递延所得税负债.xlsx",
+      "format": "xlsx",
+      "size_kb": 87.6,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "N4",
+      "filename": "N4 税金及附加.xlsx",
+      "relative_path": "N\\N4 税金及附加.xlsx",
+      "format": "xlsx",
+      "size_kb": 54.6,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "N5",
+      "filename": "N5 所得税费用.xlsx",
+      "relative_path": "N\\N5 所得税费用.xlsx",
+      "format": "xlsx",
+      "size_kb": 121.5,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "S1",
+      "filename": "S1 对被审计单位违反法规行为的考虑2019.xlsx",
+      "relative_path": "S\\S1 对被审计单位违反法规行为的考虑2019.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.7,
+      "category": "S"
+    },
+    {
+      "wp_code": "S10",
+      "filename": "S10 对环境事项的考虑.xlsx",
+      "relative_path": "S\\S10 对环境事项的考虑.xlsx",
+      "format": "xlsx",
+      "size_kb": 54.0,
+      "category": "S"
+    },
+    {
+      "wp_code": "S11",
+      "filename": "S11 利用服务机构活动.xlsx",
+      "relative_path": "S\\S11 利用服务机构活动.xlsx",
+      "format": "xlsx",
+      "size_kb": 74.7,
+      "category": "S"
+    },
+    {
+      "wp_code": "S12",
+      "filename": "S12 利用专家（注册会计师的专家）的工作.xlsx",
+      "relative_path": "S\\S12 利用专家（注册会计师的专家）的工作.xlsx",
+      "format": "xlsx",
+      "size_kb": 129.7,
+      "category": "S"
+    },
+    {
+      "wp_code": "S12",
+      "filename": "S12A 评估专家工作报告（或评估专家工作总结）.docx",
+      "relative_path": "S\\S12A 评估专家工作报告（或评估专家工作总结）.docx",
+      "format": "docx",
+      "size_kb": 49.7,
+      "category": "S"
+    },
+    {
+      "wp_code": "S13",
+      "filename": "S13 利用管理层的专家编制的信息形成审计证据.xlsx",
+      "relative_path": "S\\S13 利用管理层的专家编制的信息形成审计证据.xlsx",
+      "format": "xlsx",
+      "size_kb": 117.0,
+      "category": "S"
+    },
+    {
+      "wp_code": "S14",
+      "filename": "S14 会计估计和相关披露.xlsx",
+      "relative_path": "S\\S14 会计估计和相关披露.xlsx",
+      "format": "xlsx",
+      "size_kb": 43.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S15",
+      "filename": "S15 每股收益和净资产收益率.xlsx",
+      "relative_path": "S\\S15 每股收益和净资产收益率.xlsx",
+      "format": "xlsx",
+      "size_kb": 53.3,
+      "category": "S"
+    },
+    {
+      "wp_code": "S16",
+      "filename": "S16 套期活动.xlsx",
+      "relative_path": "S\\S16 套期活动.xlsx",
+      "format": "xlsx",
+      "size_kb": 49.5,
+      "category": "S"
+    },
+    {
+      "wp_code": "S17",
+      "filename": "S17 非经常性损益.xls",
+      "relative_path": "S\\S17 非经常性损益.xls",
+      "format": "xls",
+      "size_kb": 225.0,
+      "category": "S"
+    },
+    {
+      "wp_code": "S2",
+      "filename": "S2 首次接受委托时对期初余额的审计2019.xlsx",
+      "relative_path": "S\\S2 首次接受委托时对期初余额的审计2019.xlsx",
+      "format": "xlsx",
+      "size_kb": 15.4,
+      "category": "S"
+    },
+    {
+      "wp_code": "S20",
+      "filename": "S20 营业收入扣除情况核查底稿202504.xlsx",
+      "relative_path": "S\\S20 营业收入扣除情况核查底稿202504.xlsx",
+      "format": "xlsx",
+      "size_kb": 259.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S21",
+      "filename": "S21 数据资产.xlsx",
+      "relative_path": "S\\S21 数据资产.xlsx",
+      "format": "xlsx",
+      "size_kb": 244.7,
+      "category": "S"
+    },
+    {
+      "wp_code": "S3",
+      "filename": "S3 会计政策变更、前期差错会计、估计变更2020.xlsx",
+      "relative_path": "S\\S3 会计政策变更、前期差错会计、估计变更2020.xlsx",
+      "format": "xlsx",
+      "size_kb": 166.1,
+      "category": "S"
+    },
+    {
+      "wp_code": "S32",
+      "filename": "S32-10专项核查-资产减值估计不足的情形.xlsx",
+      "relative_path": "S\\S32-10专项核查-资产减值估计不足的情形.xlsx",
+      "format": "xlsx",
+      "size_kb": 46.8,
+      "category": "S"
+    },
+    {
+      "wp_code": "S32",
+      "filename": "S32-11专项核查-延迟资产转固减少折旧的情形.xlsx",
+      "relative_path": "S\\S32-11专项核查-延迟资产转固减少折旧的情形.xlsx",
+      "format": "xlsx",
+      "size_kb": 34.0,
+      "category": "S"
+    },
+    {
+      "wp_code": "S32",
+      "filename": "S32-12专项核查-其他粉饰业绩或财务造假的情形.xlsx",
+      "relative_path": "S\\S32-12专项核查-其他粉饰业绩或财务造假的情形.xlsx",
+      "format": "xlsx",
+      "size_kb": 31.8,
+      "category": "S"
+    },
+    {
+      "wp_code": "S32",
+      "filename": "S32-13 专项核查-期后业绩下滑情形.xlsx",
+      "relative_path": "S\\S32-13 专项核查-期后业绩下滑情形.xlsx",
+      "format": "xlsx",
+      "size_kb": 32.8,
+      "category": "S"
+    },
+    {
+      "wp_code": "S32",
+      "filename": "S32-1专项核查-自我交易虚增利润的情形.xlsx",
+      "relative_path": "S\\S32-1专项核查-自我交易虚增利润的情形.xlsx",
+      "format": "xlsx",
+      "size_kb": 34.5,
+      "category": "S"
+    },
+    {
+      "wp_code": "S32",
+      "filename": "S32-2专项核查-与客户或供应商恶意串通提前确认收入虚假增长的情形.xlsx",
+      "relative_path": "S\\S32-2专项核查-与客户或供应商恶意串通提前确认收入虚假增长的情形.xlsx",
+      "format": "xlsx",
+      "size_kb": 39.9,
+      "category": "S"
+    },
+    {
+      "wp_code": "S32",
+      "filename": "S32-3专项核查-关联方代为支付成本费用的情形.xlsx",
+      "relative_path": "S\\S32-3专项核查-关联方代为支付成本费用的情形.xlsx",
+      "format": "xlsx",
+      "size_kb": 37.4,
+      "category": "S"
+    },
+    {
+      "wp_code": "S32",
+      "filename": "S32-4专项检查-保荐机构、PE及其关联方进行利益输送的情形.xlsx",
+      "relative_path": "S\\S32-4专项检查-保荐机构、PE及其关联方进行利益输送的情形.xlsx",
+      "format": "xlsx",
+      "size_kb": 141.2,
+      "category": "S"
+    },
+    {
+      "wp_code": "S32",
+      "filename": "S32-5 专项核查-体外资金支付货款承担成本的情形.xlsx",
+      "relative_path": "S\\S32-5 专项核查-体外资金支付货款承担成本的情形.xlsx",
+      "format": "xlsx",
+      "size_kb": 167.7,
+      "category": "S"
+    },
+    {
+      "wp_code": "S32",
+      "filename": "S32-6专项核查-互联网造假虚增收入的情形.xlsx",
+      "relative_path": "S\\S32-6专项核查-互联网造假虚增收入的情形.xlsx",
+      "format": "xlsx",
+      "size_kb": 48.9,
+      "category": "S"
+    },
+    {
+      "wp_code": "S32",
+      "filename": "S32-7专项核查-成本费用资本化的情形.xlsx",
+      "relative_path": "S\\S32-7专项核查-成本费用资本化的情形.xlsx",
+      "format": "xlsx",
+      "size_kb": 41.0,
+      "category": "S"
+    },
+    {
+      "wp_code": "S32",
+      "filename": "S32-8 专项核查-压缩员工薪金的情形.xlsx",
+      "relative_path": "S\\S32-8 专项核查-压缩员工薪金的情形.xlsx",
+      "format": "xlsx",
+      "size_kb": 34.5,
+      "category": "S"
+    },
+    {
+      "wp_code": "S32",
+      "filename": "S32-9专项核查-延迟成本费用增加利润的情形.xlsx",
+      "relative_path": "S\\S32-9专项核查-延迟成本费用增加利润的情形.xlsx",
+      "format": "xlsx",
+      "size_kb": 49.2,
+      "category": "S"
+    },
+    {
+      "wp_code": "S33",
+      "filename": "S33-1程序修订说明.docx",
+      "relative_path": "S\\S33-1程序修订说明.docx",
+      "format": "docx",
+      "size_kb": 14.4,
+      "category": "S"
+    },
+    {
+      "wp_code": "S33",
+      "filename": "S33-1财务报告内部控制制度.xlsx",
+      "relative_path": "S\\S33-1财务报告内部控制制度.xlsx",
+      "format": "xlsx",
+      "size_kb": 36.8,
+      "category": "S"
+    },
+    {
+      "wp_code": "S33",
+      "filename": "S33-2财务与非财务信息印证.xlsx",
+      "relative_path": "S\\S33-2财务与非财务信息印证.xlsx",
+      "format": "xlsx",
+      "size_kb": 34.5,
+      "category": "S"
+    },
+    {
+      "wp_code": "S33",
+      "filename": "S33-3盈利异常增长和异常交易.xlsx",
+      "relative_path": "S\\S33-3盈利异常增长和异常交易.xlsx",
+      "format": "xlsx",
+      "size_kb": 38.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S33",
+      "filename": "S33-4关联方关系及其交易.xlsx",
+      "relative_path": "S\\S33-4关联方关系及其交易.xlsx",
+      "format": "xlsx",
+      "size_kb": 170.3,
+      "category": "S"
+    },
+    {
+      "wp_code": "S33",
+      "filename": "S33-5收入及毛利率.xlsx",
+      "relative_path": "S\\S33-5收入及毛利率.xlsx",
+      "format": "xlsx",
+      "size_kb": 31.4,
+      "category": "S"
+    },
+    {
+      "wp_code": "S33",
+      "filename": "S33-6主要客户和供应商.xlsx",
+      "relative_path": "S\\S33-6主要客户和供应商.xlsx",
+      "format": "xlsx",
+      "size_kb": 44.7,
+      "category": "S"
+    },
+    {
+      "wp_code": "S33",
+      "filename": "S33-7存货及其他资产.xlsx",
+      "relative_path": "S\\S33-7存货及其他资产.xlsx",
+      "format": "xlsx",
+      "size_kb": 42.8,
+      "category": "S"
+    },
+    {
+      "wp_code": "S33",
+      "filename": "S33-8现金收付交易.xlsx",
+      "relative_path": "S\\S33-8现金收付交易.xlsx",
+      "format": "xlsx",
+      "size_kb": 22.5,
+      "category": "S"
+    },
+    {
+      "wp_code": "S33",
+      "filename": "S33-9财务异常信息.xlsx",
+      "relative_path": "S\\S33-9财务异常信息.xlsx",
+      "format": "xlsx",
+      "size_kb": 38.2,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34 -0证监会及沪深北证券交易所需会计师核查事项清单.xlsx",
+      "relative_path": "S\\S34 -0证监会及沪深北证券交易所需会计师核查事项清单.xlsx",
+      "format": "xlsx",
+      "size_kb": 31.8,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-1 军工等涉秘业务企业信息披露豁免.xlsx",
+      "relative_path": "S\\S34-1 军工等涉秘业务企业信息披露豁免.xlsx",
+      "format": "xlsx",
+      "size_kb": 18.4,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-1-1 信息披露豁免申请的专项核查意见.docx",
+      "relative_path": "S\\S34-1-1 信息披露豁免申请的专项核查意见.docx",
+      "format": "docx",
+      "size_kb": 54.2,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-10 财务性投资.xlsx",
+      "relative_path": "S\\S34-10 财务性投资.xlsx",
+      "format": "xlsx",
+      "size_kb": 17.2,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-11 业务重组.xlsx",
+      "relative_path": "S\\S34-11 业务重组.xlsx",
+      "format": "xlsx",
+      "size_kb": 25.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-12 经营业绩下滑.xlsx",
+      "relative_path": "S\\S34-12 经营业绩下滑.xlsx",
+      "format": "xlsx",
+      "size_kb": 17.3,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-13 持续经营能力.xlsx",
+      "relative_path": "S\\S34-13 持续经营能力.xlsx",
+      "format": "xlsx",
+      "size_kb": 17.7,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-14 财务内控.xlsx",
+      "relative_path": "S\\S34-14 财务内控.xlsx",
+      "format": "xlsx",
+      "size_kb": 19.1,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-15 现金交易.xlsx",
+      "relative_path": "S\\S34-15 现金交易.xlsx",
+      "format": "xlsx",
+      "size_kb": 20.3,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-16 第三方回款.xlsx",
+      "relative_path": "S\\S34-16 第三方回款.xlsx",
+      "format": "xlsx",
+      "size_kb": 27.7,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-17 会计政策、会计估计变更和差错更正.xlsx",
+      "relative_path": "S\\S34-17 会计政策、会计估计变更和差错更正.xlsx",
+      "format": "xlsx",
+      "size_kb": 21.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-18 引用第三方数据.xlsx",
+      "relative_path": "S\\S34-18 引用第三方数据.xlsx",
+      "format": "xlsx",
+      "size_kb": 21.5,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-19 经销商模式.xlsx",
+      "relative_path": "S\\S34-19 经销商模式.xlsx",
+      "format": "xlsx",
+      "size_kb": 19.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-2 期权激励计划.xlsx",
+      "relative_path": "S\\S34-2 期权激励计划.xlsx",
+      "format": "xlsx",
+      "size_kb": 26.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-20 劳务外包.xlsx",
+      "relative_path": "S\\S34-20 劳务外包.xlsx",
+      "format": "xlsx",
+      "size_kb": 698.2,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-21 委外加工.xlsx",
+      "relative_path": "S\\S34-21 委外加工.xlsx",
+      "format": "xlsx",
+      "size_kb": 700.8,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-22 股权集中企业的公司治理有效性、内控规范性与独立性.xlsx",
+      "relative_path": "S\\S34-22 股权集中企业的公司治理有效性、内控规范性与独立性.xlsx",
+      "format": "xlsx",
+      "size_kb": 701.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-23 通过互联网开展业务相关信息系统核查.xlsx",
+      "relative_path": "S\\S34-23 通过互联网开展业务相关信息系统核查.xlsx",
+      "format": "xlsx",
+      "size_kb": 21.3,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-24 信息系统专项核查.xlsx",
+      "relative_path": "S\\S34-24 信息系统专项核查.xlsx",
+      "format": "xlsx",
+      "size_kb": 24.4,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-25 资金流水核查.xlsx",
+      "relative_path": "S\\S34-25 资金流水核查.xlsx",
+      "format": "xlsx",
+      "size_kb": 32.0,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-26 尚未盈利或最近一期存在累计未弥补亏损.xlsx",
+      "relative_path": "S\\S34-26 尚未盈利或最近一期存在累计未弥补亏损.xlsx",
+      "format": "xlsx",
+      "size_kb": 17.2,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-27 研发投入的认定及内控.xlsx",
+      "relative_path": "S\\S34-27 研发投入的认定及内控.xlsx",
+      "format": "xlsx",
+      "size_kb": 24.7,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-28 研发支出资本化.xlsx",
+      "relative_path": "S\\S34-28 研发支出资本化.xlsx",
+      "format": "xlsx",
+      "size_kb": 18.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-29 科研项目相关政府补助的会计处理.xlsx",
+      "relative_path": "S\\S34-29 科研项目相关政府补助的会计处理.xlsx",
+      "format": "xlsx",
+      "size_kb": 18.5,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-3 股份支付.xlsx",
+      "relative_path": "S\\S34-3 股份支付.xlsx",
+      "format": "xlsx",
+      "size_kb": 23.9,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-30 对赌协议.xlsx",
+      "relative_path": "S\\S34-30 对赌协议.xlsx",
+      "format": "xlsx",
+      "size_kb": 21.0,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-31 存货.xlsx",
+      "relative_path": "S\\S34-31 存货.xlsx",
+      "format": "xlsx",
+      "size_kb": 746.2,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-32 期间费用核查.xlsx",
+      "relative_path": "S\\S34-32 期间费用核查.xlsx",
+      "format": "xlsx",
+      "size_kb": 16.9,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-33 商誉减值核查.xlsx",
+      "relative_path": "S\\S34-33 商誉减值核查.xlsx",
+      "format": "xlsx",
+      "size_kb": 18.0,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-34 涉农企业.xlsx",
+      "relative_path": "S\\S34-34 涉农企业.xlsx",
+      "format": "xlsx",
+      "size_kb": 27.4,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-35 收入核查.xlsx",
+      "relative_path": "S\\S34-35 收入核查.xlsx",
+      "format": "xlsx",
+      "size_kb": 27.8,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-36 投资收益占比.xlsx",
+      "relative_path": "S\\S34-36 投资收益占比.xlsx",
+      "format": "xlsx",
+      "size_kb": 17.7,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-37 现金流异常.xlsx",
+      "relative_path": "S\\S34-37 现金流异常.xlsx",
+      "format": "xlsx",
+      "size_kb": 723.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-38 估值调整协议.xlsx",
+      "relative_path": "S\\S34-38 估值调整协议.xlsx",
+      "format": "xlsx",
+      "size_kb": 702.5,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-39 应收票据和应收款项融资.xlsx",
+      "relative_path": "S\\S34-39 应收票据和应收款项融资.xlsx",
+      "format": "xlsx",
+      "size_kb": 16.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-4 关联交易.xlsx",
+      "relative_path": "S\\S34-4 关联交易.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.2,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-40 在建工程核查.xlsx",
+      "relative_path": "S\\S34-40 在建工程核查.xlsx",
+      "format": "xlsx",
+      "size_kb": 16.9,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-41 主要客户和供应商核查.xlsx",
+      "relative_path": "S\\S34-41 主要客户和供应商核查.xlsx",
+      "format": "xlsx",
+      "size_kb": 18.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-5 应收账款减值.xlsx",
+      "relative_path": "S\\S34-5 应收账款减值.xlsx",
+      "format": "xlsx",
+      "size_kb": 17.8,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-6 固定资产使用及减值.xlsx",
+      "relative_path": "S\\S34-6 固定资产使用及减值.xlsx",
+      "format": "xlsx",
+      "size_kb": 17.7,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-7 税收优惠.xlsx",
+      "relative_path": "S\\S34-7 税收优惠.xlsx",
+      "format": "xlsx",
+      "size_kb": 17.9,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-8 合并中无形资产认定与客户关系.xlsx",
+      "relative_path": "S\\S34-8 合并中无形资产认定与客户关系.xlsx",
+      "format": "xlsx",
+      "size_kb": 28.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S34",
+      "filename": "S34-9 共同投资.xlsx",
+      "relative_path": "S\\S34-9 共同投资.xlsx",
+      "format": "xlsx",
+      "size_kb": 21.9,
+      "category": "S"
+    },
+    {
+      "wp_code": "S35",
+      "filename": "S35-1 关联交易.xlsx",
+      "relative_path": "S\\S35-1 关联交易.xlsx",
+      "format": "xlsx",
+      "size_kb": 23.4,
+      "category": "S"
+    },
+    {
+      "wp_code": "S35",
+      "filename": "S35-2 财务性投资核查.xlsx",
+      "relative_path": "S\\S35-2 财务性投资核查.xlsx",
+      "format": "xlsx",
+      "size_kb": 20.4,
+      "category": "S"
+    },
+    {
+      "wp_code": "S35",
+      "filename": "S35-3 现金分红核查.xlsx",
+      "relative_path": "S\\S35-3 现金分红核查.xlsx",
+      "format": "xlsx",
+      "size_kb": 19.4,
+      "category": "S"
+    },
+    {
+      "wp_code": "S35",
+      "filename": "S35-4 商誉减值.xlsx",
+      "relative_path": "S\\S35-4 商誉减值.xlsx",
+      "format": "xlsx",
+      "size_kb": 17.4,
+      "category": "S"
+    },
+    {
+      "wp_code": "S35",
+      "filename": "S35-5 募集资金涉及收购核查要点.xlsx",
+      "relative_path": "S\\S35-5 募集资金涉及收购核查要点.xlsx",
+      "format": "xlsx",
+      "size_kb": 17.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S4",
+      "filename": "S4 非货币性资产交换202401.xlsx",
+      "relative_path": "S\\S4 非货币性资产交换202401.xlsx",
+      "format": "xlsx",
+      "size_kb": 38.4,
+      "category": "S"
+    },
+    {
+      "wp_code": "S5",
+      "filename": "S5 债务重组202401.xlsx",
+      "relative_path": "S\\S5 债务重组202401.xlsx",
+      "format": "xlsx",
+      "size_kb": 39.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "S6",
+      "filename": "S6 对大股东及关联方资金占用和违规担保情况审核程序.xlsx",
+      "relative_path": "S\\S6 对大股东及关联方资金占用和违规担保情况审核程序.xlsx",
+      "format": "xlsx",
+      "size_kb": 55.5,
+      "category": "S"
+    },
+    {
+      "wp_code": "S8",
+      "filename": "S8 租赁.xlsx",
+      "relative_path": "S\\S8 租赁.xlsx",
+      "format": "xlsx",
+      "size_kb": 30.2,
+      "category": "S"
+    },
+    {
+      "wp_code": "S9",
+      "filename": "S9 对电子商务的考虑.xlsx",
+      "relative_path": "S\\S9 对电子商务的考虑.xlsx",
+      "format": "xlsx",
+      "size_kb": 46.6,
+      "category": "S"
+    },
+    {
+      "wp_code": "_ref",
+      "filename": "参考-审计指引第21号-管理建议书.docx",
+      "relative_path": "_reference\\参考-审计指引第21号-管理建议书.docx",
+      "format": "docx",
+      "size_kb": 56.0,
+      "category": "A"
+    },
+    {
+      "wp_code": "_ref",
+      "filename": "因素分析法毛利分析、工程施工、合同项目、贸易等特殊行业底稿参考示例.xlsx",
+      "relative_path": "_reference\\因素分析法毛利分析、工程施工、合同项目、贸易等特殊行业底稿参考示例.xlsx",
+      "format": "xlsx",
+      "size_kb": 70.6,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "_ref",
+      "filename": "应收账款预期信用损失计提及保理合同分析参考示例.xlsx",
+      "relative_path": "_reference\\应收账款预期信用损失计提及保理合同分析参考示例.xlsx",
+      "format": "xlsx",
+      "size_kb": 339.6,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "_ref",
+      "filename": "营业收入五步法、主要责任人代理人、知识产权分析参考示例.xlsx",
+      "relative_path": "_reference\\营业收入五步法、主要责任人代理人、知识产权分析参考示例.xlsx",
+      "format": "xlsx",
+      "size_kb": 256.8,
+      "category": "D-N"
+    },
+    {
+      "wp_code": "_ref",
+      "filename": "质量控制委员会会议记录.docx",
+      "relative_path": "_reference\\质量控制委员会会议记录.docx",
+      "format": "docx",
+      "size_kb": 16.8,
+      "category": "B"
+    },
+    {
+      "wp_code": "_ref",
+      "filename": "项目质量复核合伙人复核提交资料清单.docx",
+      "relative_path": "_reference\\项目质量复核合伙人复核提交资料清单.docx",
+      "format": "docx",
+      "size_kb": 40.0,
+      "category": "A"
+    }
+  ]
+}

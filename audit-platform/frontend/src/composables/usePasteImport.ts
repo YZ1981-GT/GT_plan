@@ -21,8 +21,8 @@ export interface PasteImportColumn {
 }
 
 export interface PasteImportOptions {
-  /** 表格容器 ref（监听 paste 事件） */
-  containerRef: Ref<HTMLElement | null>
+  /** 表格容器 ref（监听 paste 事件，支持原生 DOM 或 Vue 组件实例） */
+  containerRef: Ref<any>
   /** 列定义（key + label），用于映射粘贴列 */
   columns: PasteImportColumn[]
   /** 粘贴后回调：接收解析后的行数据 */

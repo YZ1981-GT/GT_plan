@@ -1,0 +1,2007 @@
+{
+  "description": "wp_template_metadata 种子数据（从 wp_account_mapping.json 自动生成）",
+  "version": "2025-R1",
+  "entries": [
+    {
+      "wp_code": "E1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "E",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1001",
+        "1002",
+        "1012"
+      ],
+      "note_section": "五、1",
+      "conclusion_cell": null,
+      "audit_objective": "验证货币资金相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "E1-1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "E",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1001",
+        "1002",
+        "1012"
+      ],
+      "note_section": "五、1",
+      "conclusion_cell": null,
+      "audit_objective": "验证货币资金审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "E1-2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "E",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1001"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证现金明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "E1-3",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "E",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1002",
+        "1012"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证银行存款明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1121"
+      ],
+      "note_section": "五、2",
+      "conclusion_cell": null,
+      "audit_objective": "验证应收票据审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1122"
+      ],
+      "note_section": "五、3",
+      "conclusion_cell": null,
+      "audit_objective": "验证应收账款审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D3",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2203"
+      ],
+      "note_section": "五、18",
+      "conclusion_cell": null,
+      "audit_objective": "验证预收账款审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D4",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6001",
+        "6051"
+      ],
+      "note_section": "五、29",
+      "conclusion_cell": null,
+      "audit_objective": "验证营业收入审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D5",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1141"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证合同资产审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D6",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2205"
+      ],
+      "note_section": "五、18",
+      "conclusion_cell": null,
+      "audit_objective": "验证合同负债审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "F1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "F",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1123"
+      ],
+      "note_section": "五、4",
+      "conclusion_cell": null,
+      "audit_objective": "验证预付账款审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "F2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "F",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1401",
+        "1402",
+        "1403",
+        "1405",
+        "1408",
+        "1461"
+      ],
+      "note_section": "五、6",
+      "conclusion_cell": null,
+      "audit_objective": "验证存货及跌价准备审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "F3",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "F",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2201"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证应付票据审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "F4",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "F",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2202"
+      ],
+      "note_section": "五、17",
+      "conclusion_cell": null,
+      "audit_objective": "验证应付账款审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "F5",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "F",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6401",
+        "6402"
+      ],
+      "note_section": "五、29",
+      "conclusion_cell": null,
+      "audit_objective": "验证营业成本审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "G1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "G",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1511"
+      ],
+      "note_section": "五、7",
+      "conclusion_cell": null,
+      "audit_objective": "验证长期股权投资审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "G2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "G",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1521"
+      ],
+      "note_section": "五、8",
+      "conclusion_cell": null,
+      "audit_objective": "验证投资性房地产审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "G3",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "G",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1101"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证交易性金融资产审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "H1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "H",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1601",
+        "1602"
+      ],
+      "note_section": "五、9",
+      "conclusion_cell": null,
+      "audit_objective": "验证固定资产审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "H2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "H",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1604"
+      ],
+      "note_section": "五、10",
+      "conclusion_cell": null,
+      "audit_objective": "验证在建工程审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "I1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "I",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1701",
+        "1702"
+      ],
+      "note_section": "五、12",
+      "conclusion_cell": null,
+      "audit_objective": "验证无形资产审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "I2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "I",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1711"
+      ],
+      "note_section": "五、13",
+      "conclusion_cell": null,
+      "audit_objective": "验证商誉审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "I3",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "I",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1801"
+      ],
+      "note_section": "五、14",
+      "conclusion_cell": null,
+      "audit_objective": "验证长期待摊费用审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "J1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "J",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2211"
+      ],
+      "note_section": "五、19",
+      "conclusion_cell": null,
+      "audit_objective": "验证应付职工薪酬审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1221"
+      ],
+      "note_section": "五、5",
+      "conclusion_cell": null,
+      "audit_objective": "验证其他应收款审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6601"
+      ],
+      "note_section": "五、31",
+      "conclusion_cell": null,
+      "audit_objective": "验证销售费用审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K3",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6603"
+      ],
+      "note_section": "五、33",
+      "conclusion_cell": null,
+      "audit_objective": "验证财务费用审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K4",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6604"
+      ],
+      "note_section": "五、34",
+      "conclusion_cell": null,
+      "audit_objective": "验证研发费用审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K5",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6403"
+      ],
+      "note_section": "五、30",
+      "conclusion_cell": null,
+      "audit_objective": "验证税金及附加审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K6",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1481",
+        "2331"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证持有待售资产和负债审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K7",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1123"
+      ],
+      "note_section": "五、4",
+      "conclusion_cell": null,
+      "audit_objective": "验证预付款项审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K8",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2241"
+      ],
+      "note_section": "五、21",
+      "conclusion_cell": null,
+      "audit_objective": "验证其他应付款审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K9",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6602"
+      ],
+      "note_section": "五、32",
+      "conclusion_cell": null,
+      "audit_objective": "验证管理费用审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "L1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "L",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2001"
+      ],
+      "note_section": "五、16",
+      "conclusion_cell": null,
+      "audit_objective": "验证短期借款审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "L2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "L",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2501"
+      ],
+      "note_section": "五、22",
+      "conclusion_cell": null,
+      "audit_objective": "验证长期借款审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "M1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "M",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "4001"
+      ],
+      "note_section": "五、24",
+      "conclusion_cell": null,
+      "audit_objective": "验证实收资本审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "M2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "M",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "4002"
+      ],
+      "note_section": "五、25",
+      "conclusion_cell": null,
+      "audit_objective": "验证资本公积审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "M3",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "M",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "4101"
+      ],
+      "note_section": "五、27",
+      "conclusion_cell": null,
+      "audit_objective": "验证盈余公积审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "M4",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "M",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "4104"
+      ],
+      "note_section": "五、28",
+      "conclusion_cell": null,
+      "audit_objective": "验证未分配利润审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "N1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "N",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1811"
+      ],
+      "note_section": "五、15",
+      "conclusion_cell": null,
+      "audit_objective": "验证递延所得税资产审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "N2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "N",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2221"
+      ],
+      "note_section": "五、20",
+      "conclusion_cell": null,
+      "audit_objective": "验证应交税费审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "N3",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "N",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6801"
+      ],
+      "note_section": "五、35",
+      "conclusion_cell": null,
+      "audit_objective": "验证所得税费用审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "G4",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "G",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1504",
+        "1505",
+        "1506",
+        "1507"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证债权投资审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "G5",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "G",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1503"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证其他权益工具投资审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "H3",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "H",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1641",
+        "1642",
+        "1643"
+      ],
+      "note_section": "五、11",
+      "conclusion_cell": null,
+      "audit_objective": "验证使用权资产审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "L4",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "L",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2601"
+      ],
+      "note_section": "五、23",
+      "conclusion_cell": null,
+      "audit_objective": "验证租赁负债审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "L5",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "L",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2502"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证应付债券审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D7",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1124"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证应收款项融资审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "M5",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "M",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "3102"
+      ],
+      "note_section": "五、26",
+      "conclusion_cell": null,
+      "audit_objective": "验证其他综合收益审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "M6",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "M",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "4003"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证库存股审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K10",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6301"
+      ],
+      "note_section": "五、36",
+      "conclusion_cell": null,
+      "audit_objective": "验证营业外收入审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K11",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6711"
+      ],
+      "note_section": "五、37",
+      "conclusion_cell": null,
+      "audit_objective": "验证营业外支出审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "G6",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "G",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1510"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证其他非流动金融资产审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "I4",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "I",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1703"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证开发支出审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "L6",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "L",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2701"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证长期应付款审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K12",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6701"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证信用减值损失审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K13",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6702"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证资产减值损失审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K14",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6115"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证资产处置收益审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K15",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6117"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证其他收益审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D0",
+      "component_type": "table",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1121",
+        "1122"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证收入循环函证相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "E0",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "E",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1002"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证银行询证函相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D5-1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1124"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证应收款项融资审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D6-1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1141"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证合同资产明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D7-1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2205"
+      ],
+      "note_section": "五、18",
+      "conclusion_cell": null,
+      "audit_objective": "验证合同负债明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "F1-2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "F",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1401",
+        "1402",
+        "1403"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证存货明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "F1-3",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "F",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1461"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证存货跌价准备相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "G1-2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "G",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1511"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证长期股权投资明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "G1-3",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "G",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1511"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证权益法核算表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "H1-2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "H",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1601"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证固定资产明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "H1-12",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "H",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1602"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证折旧测算表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "H1-14",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "H",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1603"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证固定资产减值测试相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "I1-2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "I",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1701"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证无形资产明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "I2-1",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "I",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1711"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证商誉减值测试相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "J1-2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "J",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2211"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证应付职工薪酬明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "L1-2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "L",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2001"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证短期借款明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "L2-2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "L",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2501"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证长期借款明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "L7",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "L",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2801"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证预计负债审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K16",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6111"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证投资收益审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K17",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "6101"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证公允价值变动收益审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K18",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2401"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证递延收益审定表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D2-2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1122"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证应收账款明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D2-3",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1122"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证应收账款坏账准备明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "D2-4",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "D",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1122"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证应收账款调整分录汇总表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K1-2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1221"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证其他应收款明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "K1-3",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "K",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "1221"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证其他应收款坏账准备明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    },
+    {
+      "wp_code": "F4-2",
+      "component_type": "univer",
+      "audit_stage": "substantive",
+      "cycle": "F",
+      "file_format": "xlsx",
+      "procedure_steps": [],
+      "guidance_text": null,
+      "formula_cells": [],
+      "required_regions": [],
+      "linked_accounts": [
+        "2202"
+      ],
+      "note_section": null,
+      "conclusion_cell": null,
+      "audit_objective": "验证应付账款明细表相关科目余额的真实性和完整性",
+      "related_assertions": [
+        "existence",
+        "completeness",
+        "valuation"
+      ],
+      "procedure_flow_config": null
+    }
+  ]
+}

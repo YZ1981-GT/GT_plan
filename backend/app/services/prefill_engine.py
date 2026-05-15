@@ -31,9 +31,20 @@ _logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _FORMULA_RE = re.compile(
-    r'=(TB|WP|AUX|PREV|SUM_TB)\s*\(([^)]*)\)',
+    r'=(TB|WP|AUX|PREV|SUM_TB|LEDGER|ADJ|NOTE)\s*\(([^)]*)\)',
     re.IGNORECASE,
 )
+
+# ---------------------------------------------------------------------------
+# 扩展公式正则（D4：6 种新公式类型）
+# ---------------------------------------------------------------------------
+
+_WP_FORMULA_RE = re.compile(r"WP\('([^']+)',\s*'([^']+)',\s*'([^']+)'\)")
+_LEDGER_FORMULA_RE = re.compile(r"LEDGER\('([^']+)',\s*'([^']+)',\s*'([^']+)'\)")
+_AUX_FORMULA_RE = re.compile(r"AUX\('([^']+)',\s*'([^']+)',\s*'([^']+)',\s*'([^']+)'\)")
+_PREV_FORMULA_RE = re.compile(r"PREV\('([^']+)',\s*'([^']+)',\s*'([^']+)'\)")
+_ADJ_FORMULA_RE = re.compile(r"ADJ\('([^']+)',\s*'([^']+)'\)")
+_NOTE_FORMULA_RE = re.compile(r"NOTE\('([^']+)',\s*'([^']+)',\s*'([^']+)'\)")
 
 
 class FormulaCell:
@@ -65,6 +76,202 @@ def _parse_args(raw: str) -> list[str]:
     if current:
         args.append(''.join(current).strip().strip('"').strip("'"))
     return args
+
+
+# ---------------------------------------------------------------------------
+# 6 种新公式解析器（Task 3.1）
+# ---------------------------------------------------------------------------
+
+
+async def _resolve_wp_formula(
+    db: AsyncSession, project_id: UUID, year: int, args: list[str]
+) -> Decimal | None:
+    """=WP('wp_code', 'sheet', 'cell') → 从其他底稿 parsed_data 取值"""
+    if len(args) < 3:
+        return None
+    wp_code, sheet_name, cell_ref = args[0], args[1], args[2]
+    from app.models.wp_optimization_models import WpTemplateMetadata
+    # 通过 wp_code 找到对应底稿
+    result = await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == False,  # noqa: E712
+        )
+    )
+    workpapers = result.scalars().all()
+    # 匹配 wp_code（从 wp_index 或 template_metadata）
+    for wp in workpapers:
+        if wp.parsed_data and wp.parsed_data.get("wp_code") == wp_code:
+            cell_data = wp.parsed_data.get("cells", {}).get(f"{sheet_name}!{cell_ref}")
+            if cell_data is not None:
+                try:
+                    return Decimal(str(cell_data))
+                except Exception:
+                    return None
+    return None
+
+
+async def _resolve_ledger_formula(
+    db: AsyncSession, project_id: UUID, year: int, args: list[str]
+) -> Decimal | None:
+    """=LEDGER('code', 'direction', 'period') → 从 tb_ledger 表取发生额"""
+    if len(args) < 3:
+        return None
+    account_code, direction, period = args[0], args[1], args[2]
+    from app.models.dataset_models import TbLedger
+    from app.services.dataset_query import get_active_filter
+
+    active_filter = await get_active_filter(db, TbLedger, project_id, year)
+    col = TbLedger.debit_amount if direction.lower() in ("debit", "借") else TbLedger.credit_amount
+    q = sa.select(sa.func.coalesce(sa.func.sum(col), 0)).where(
+        active_filter,
+        TbLedger.account_code == account_code,
+    )
+    if period and period != "全年":
+        q = q.where(TbLedger.accounting_period == period)
+    result = await db.execute(q)
+    val = result.scalar()
+    return Decimal(str(val)) if val is not None else Decimal("0")
+
+
+async def _resolve_aux_formula(
+    db: AsyncSession, project_id: UUID, year: int, args: list[str]
+) -> Decimal | None:
+    """=AUX('code', 'aux_type', 'aux_code', 'column') → 从 tb_aux_balance 取值"""
+    if len(args) < 4:
+        return None
+    account_code, aux_type, aux_code, column = args[0], args[1], args[2], args[3]
+    from app.models.dataset_models import TbAuxBalance
+    from app.services.dataset_query import get_active_filter
+
+    active_filter = await get_active_filter(db, TbAuxBalance, project_id, year)
+    # 映射列名到 ORM 字段
+    col_map = {
+        "期末余额": TbAuxBalance.closing_balance,
+        "期初余额": TbAuxBalance.opening_balance,
+        "借方发生额": TbAuxBalance.debit_amount,
+        "贷方发生额": TbAuxBalance.credit_amount,
+    }
+    col_attr = col_map.get(column, TbAuxBalance.closing_balance)
+    q = sa.select(sa.func.coalesce(sa.func.sum(col_attr), 0)).where(
+        active_filter,
+        TbAuxBalance.account_code == account_code,
+        TbAuxBalance.aux_type == aux_type,
+        TbAuxBalance.aux_code == aux_code,
+    )
+    result = await db.execute(q)
+    val = result.scalar()
+    return Decimal(str(val)) if val is not None else Decimal("0")
+
+
+async def _resolve_prev_formula(
+    db: AsyncSession, project_id: UUID, year: int, args: list[str]
+) -> Decimal | None:
+    """=PREV('wp_code', 'sheet', 'cell') → 从上年底稿取值"""
+    if len(args) < 3:
+        return None
+    wp_code, sheet_name, cell_ref = args[0], args[1], args[2]
+    # 查上年底稿（同项目 year-1）
+    result = await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == False,  # noqa: E712
+        )
+    )
+    workpapers = result.scalars().all()
+    for wp in workpapers:
+        if wp.parsed_data and wp.parsed_data.get("wp_code") == wp_code:
+            # 尝试从 parsed_data.cells 取值
+            cell_data = wp.parsed_data.get("cells", {}).get(f"{sheet_name}!{cell_ref}")
+            if cell_data is not None:
+                try:
+                    return Decimal(str(cell_data))
+                except Exception:
+                    return None
+    return None
+
+
+async def _resolve_adj_formula(
+    db: AsyncSession, project_id: UUID, year: int, args: list[str]
+) -> Decimal | None:
+    """=ADJ('code', 'type') → 从 adjustments 表取调整金额"""
+    if len(args) < 2:
+        return None
+    account_code, adj_type = args[0], args[1]
+    from app.models.phase10_models import Adjustment, AdjustmentEntry
+
+    # adj_type: AJE / RJE
+    q = sa.select(
+        sa.func.coalesce(
+            sa.func.sum(AdjustmentEntry.debit_amount - AdjustmentEntry.credit_amount), 0
+        )
+    ).join(Adjustment, AdjustmentEntry.adjustment_id == Adjustment.id).where(
+        Adjustment.project_id == project_id,
+        Adjustment.year == year,
+        Adjustment.is_deleted == False,  # noqa: E712
+        AdjustmentEntry.account_code == account_code,
+    )
+    if adj_type.upper() in ("AJE", "审计调整"):
+        q = q.where(Adjustment.adjustment_type == "aje")
+    elif adj_type.upper() in ("RJE", "重分类"):
+        q = q.where(Adjustment.adjustment_type == "rje")
+    result = await db.execute(q)
+    val = result.scalar()
+    return Decimal(str(val)) if val is not None else Decimal("0")
+
+
+async def _resolve_note_formula(
+    db: AsyncSession, project_id: UUID, year: int, args: list[str]
+) -> Decimal | None:
+    """=NOTE('section', 'row', 'col') → 从 disclosure_notes 取值"""
+    if len(args) < 3:
+        return None
+    section, row_key, col_key = args[0], args[1], args[2]
+    from app.models.phase15_models import DisclosureNote
+
+    result = await db.execute(
+        sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.section_code == section,
+        )
+    )
+    note = result.scalar_one_or_none()
+    if note and note.content_data:
+        # content_data 是 JSONB，按 row/col 索引取值
+        rows = note.content_data.get("rows", [])
+        for r in rows:
+            if str(r.get("key", "")) == row_key or str(r.get("label", "")) == row_key:
+                val = r.get("values", {}).get(col_key)
+                if val is not None:
+                    try:
+                        return Decimal(str(val))
+                    except Exception:
+                        return None
+    return None
+
+
+# 公式类型 → 解析器映射
+_FORMULA_RESOLVERS = {
+    "WP": _resolve_wp_formula,
+    "LEDGER": _resolve_ledger_formula,
+    "AUX": _resolve_aux_formula,
+    "PREV": _resolve_prev_formula,
+    "ADJ": _resolve_adj_formula,
+    "NOTE": _resolve_note_formula,
+}
+
+
+async def resolve_extended_formula(
+    db: AsyncSession, project_id: UUID, year: int,
+    formula_type: str, raw_args: str,
+) -> Decimal | None:
+    """统一入口：解析并执行扩展公式"""
+    resolver = _FORMULA_RESOLVERS.get(formula_type.upper())
+    if resolver is None:
+        return None
+    args = _parse_args(raw_args)
+    return await resolver(db, project_id, year, args)
 
 
 async def prefill_workpaper_real(
@@ -506,22 +713,121 @@ class PrefillService:
         return await prefill_workpaper_real(db, project_id, year, wp_id)
 
     async def batch_prefill(self, db: AsyncSession, project_id: UUID, year: int, wp_ids: list[UUID]) -> dict:
-        import asyncio
-        tasks = [self.prefill_workpaper(db, project_id, year, wid) for wid in wp_ids]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        success, errors = {}, {}
-        for wid, r in zip(wp_ids, results):
-            if isinstance(r, Exception):
-                errors[str(wid)] = str(r)
-            else:
-                success[str(wid)] = r
-        return {"total": len(wp_ids), "success_count": len(success), "error_count": len(errors), "results": success, "errors": errors}
+        return await batch_prefill_ordered(db, project_id, year, wp_ids)
 
     async def _get_cached_prefill(self, wp_id: UUID) -> dict | None:
         return None
 
     async def _set_cached_prefill(self, wp_id: UUID, data: dict) -> None:
         pass
+
+
+# ---------------------------------------------------------------------------
+# 批量预填充（按依赖顺序处理多底稿）— Task 3.8
+# ---------------------------------------------------------------------------
+
+
+async def batch_prefill_ordered(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    wp_ids: list[UUID],
+) -> dict[str, Any]:
+    """按依赖顺序批量预填充多底稿
+
+    流程：
+    1. 收集所有底稿的公式
+    2. 构建依赖图
+    3. 拓扑排序确定执行顺序
+    4. 按顺序逐个执行预填充
+    """
+    from app.services.wp_formula_dependency import (
+        build_dependency_graph,
+        topological_sort,
+        detect_cycles,
+    )
+
+    # 获取底稿信息
+    result = await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.id.in_(wp_ids),
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == False,  # noqa: E712
+        )
+    )
+    workpapers = result.scalars().all()
+    wp_map: dict[str, WorkingPaper] = {}
+    for wp in workpapers:
+        wp_code = (wp.parsed_data or {}).get("wp_code", str(wp.id))
+        wp_map[wp_code] = wp
+
+    # 收集公式构建依赖图
+    all_formulas: list[dict] = []
+    for wp_code, wp in wp_map.items():
+        if wp.parsed_data and wp.parsed_data.get("cell_provenance"):
+            for cell_ref, prov in wp.parsed_data["cell_provenance"].items():
+                all_formulas.append({
+                    "wp_code": wp_code,
+                    "sheet": cell_ref.split("!")[0] if "!" in cell_ref else "",
+                    "cell_ref": cell_ref.split("!")[-1] if "!" in cell_ref else cell_ref,
+                    "formula_type": prov.get("formula_type", ""),
+                    "raw_args": prov.get("raw_args", ""),
+                })
+
+    # 构建依赖图
+    graph = build_dependency_graph(all_formulas)
+
+    # 检测循环
+    cycles = detect_cycles(graph)
+    if cycles:
+        return {
+            "total": len(wp_ids),
+            "success_count": 0,
+            "error_count": len(wp_ids),
+            "errors": {"circular_reference": f"检测到循环引用: {cycles[0]}"},
+            "results": {},
+        }
+
+    # 拓扑排序
+    try:
+        order = topological_sort(graph)
+    except ValueError as e:
+        return {
+            "total": len(wp_ids),
+            "success_count": 0,
+            "error_count": len(wp_ids),
+            "errors": {"topological_sort": str(e)},
+            "results": {},
+        }
+
+    # 按拓扑顺序执行（只处理请求的 wp_ids）
+    requested_codes = set(wp_map.keys())
+    ordered_codes = [c for c in order if c in requested_codes]
+    # 补充不在依赖图中的底稿（无公式依赖的）
+    remaining = requested_codes - set(ordered_codes)
+    execution_order = list(remaining) + ordered_codes
+
+    success: dict[str, Any] = {}
+    errors: dict[str, str] = {}
+
+    for wp_code in execution_order:
+        wp = wp_map.get(wp_code)
+        if wp is None:
+            continue
+        try:
+            r = await prefill_workpaper_real(db, project_id, year, wp.id)
+            success[str(wp.id)] = r
+        except Exception as e:
+            errors[str(wp.id)] = str(e)
+
+    return {
+        "total": len(wp_ids),
+        "success_count": len(success),
+        "error_count": len(errors),
+        "results": success,
+        "errors": errors,
+        "execution_order": execution_order,
+    }
 
 
 class ParseService:
@@ -543,9 +849,12 @@ PREFILL_SERVICE_VERSION = "prefill_v1.2"
 _FORMULA_TYPE_TO_SOURCE: dict[str, str] = {
     "TB": "trial_balance",
     "SUM_TB": "trial_balance",
-    "AUX": "ledger",
+    "AUX": "aux_balance",
     "PREV": "prior_year",
-    "WP": "formula",
+    "WP": "workpaper_ref",
+    "LEDGER": "ledger",
+    "ADJ": "adjustment",
+    "NOTE": "disclosure_note",
 }
 
 
@@ -578,6 +887,13 @@ def _build_source_ref(
         return f"{account}:{dimension}:{value}:{column}"
 
     elif ft == "PREV":
+        # =PREV('wp_code', 'sheet', 'cell')
+        wp_code = params.get("wp_code", "")
+        sheet = params.get("sheet", "")
+        cell = params.get("cell_ref", "")
+        if wp_code:
+            return f"prev:{wp_code}!{sheet}!{cell}"
+        # 兼容旧格式
         inner_type = params.get("formula_type", "")
         account = params.get("account_code", "")
         if not inner_type:
@@ -586,10 +902,34 @@ def _build_source_ref(
 
     elif ft == "WP":
         wp_code = params.get("wp_code", "")
+        sheet = params.get("sheet", "")
         cell_ref = params.get("cell_ref", "")
         if not wp_code:
             return None
-        return f"{wp_code}!{cell_ref}"
+        return f"{wp_code}!{sheet}!{cell_ref}"
+
+    elif ft == "LEDGER":
+        account = params.get("account_code", "")
+        direction = params.get("direction", "")
+        period = params.get("period", "")
+        if not account:
+            return None
+        return f"ledger:{account}:{direction}:{period}"
+
+    elif ft == "ADJ":
+        account = params.get("account_code", "")
+        adj_type = params.get("adj_type", "")
+        if not account:
+            return None
+        return f"adj:{account}:{adj_type}"
+
+    elif ft == "NOTE":
+        section = params.get("section", "")
+        row = params.get("row", "")
+        col = params.get("col", "")
+        if not section:
+            return None
+        return f"note:{section}:{row}:{col}"
 
     return None
 

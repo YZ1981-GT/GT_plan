@@ -682,7 +682,7 @@ onDatasetActivated(() => fetchData())
 onDatasetRolledBack(() => fetchData())
 
 // ─── 联动徽章 [enterprise-linkage 3.6] ─────────────────────────────────────────
-const linkageProjectId = computed(() => projectId)
+const linkageProjectId = projectId
 const linkageYear = computed(() => selectedYear.value ?? 2025)
 const { getAdjustments, getWorkpapers } = useLinkageIndicator(linkageProjectId, linkageYear)
 
@@ -2033,7 +2033,7 @@ function onTbCtxFormula() {
       formulaDesc += `\n用于与"资产 小计"校对（应相等）`
     } else {
       const cat = row.account_category || ''
-      const catLabel = { asset: '资产', liability: '负债', equity: '权益' }[cat] || cat
+      const catLabel = ({ asset: '资产', liability: '负债', equity: '权益' } as Record<string, string>)[cat] || cat
       formulaDesc += `= Σ ${catLabel}类各科目（按方向加减）\n\n`
       formulaDesc += `规则：同方向科目取绝对值相加，反方向科目取绝对值相减\n`
       formulaDesc += `（如资产类中贷方科目为减项）`

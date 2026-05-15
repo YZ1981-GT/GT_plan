@@ -430,7 +430,7 @@ const summary = ref<AdjustmentSummary | null>(null)
 const selectedRows = ref<any[]>([])
 
 // ─── Impact Preview [enterprise-linkage 3.8] ─────────────────────────────────
-const impactProjectId = computed(() => projectId)
+const impactProjectId = projectId
 const impactYear = computed(() => selectedYear.value ?? 2025)
 const { preview: impactPreview, loading: impactLoading, fetchPreview } = useImpactPreview(impactProjectId, impactYear)
 

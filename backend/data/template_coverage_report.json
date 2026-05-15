@@ -1,0 +1,539 @@
+{
+  "stats": {
+    "by_component_type": {
+      "univer": 103,
+      "form": 55,
+      "word": 6,
+      "hybrid": 15
+    },
+    "by_audit_stage": {
+      "substantive": 89,
+      "planning": 19,
+      "completion": 28,
+      "risk_response": 21,
+      "special": 22
+    },
+    "by_file_format": {
+      "xlsx": 155,
+      "docx": 23,
+      "xlsm": 1
+    },
+    "sheets_distribution": {
+      "1-3": 26,
+      "4-10": 79,
+      "11-20": 50,
+      "20+": 24
+    },
+    "formula_density": {
+      "none": 58,
+      "low(1-5)": 3,
+      "medium(6-20)": 118,
+      "high(20+)": 0
+    },
+    "has_conclusion_cell": 89,
+    "has_procedure_steps": 89,
+    "has_form_schema": 54,
+    "has_linked_accounts": 89,
+    "has_cross_wp_refs": 0,
+    "multi_file_entries": 61
+  },
+  "linkage_issues": [
+    {
+      "wp_code": "D0",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "D5",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "D7",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "E0",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "F0",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "F3",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "G0",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "G10",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "G12",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "G13",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "G14",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "G3",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "G4",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "G5",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "G6",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "G8",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "G9",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "H0",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "H10",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "H4",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "H5",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "H6",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "H7",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "H8",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "H9",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "I4",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "I5",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "I6",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "J2",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "J3",
+      "issue": "UNIVER_NO_FORMULA",
+      "severity": "warning",
+      "message": "组件类型为 univer 但未检测到公式，可能需要手动配置 formula_cells"
+    },
+    {
+      "wp_code": "J3",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "K0",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "K12",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "K13",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "K6",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "L0",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "L5",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "L6",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "L7",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "M10",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "M6",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "M7",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "M8",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "M9",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "N5",
+      "issue": "ACCOUNTS_NO_NOTE",
+      "severity": "info",
+      "message": "有关联科目但无附注章节映射，底稿↔附注联动不可用"
+    },
+    {
+      "wp_code": "B1",
+      "issue": "UNIVER_NO_FORMULA",
+      "severity": "warning",
+      "message": "组件类型为 univer 但未检测到公式，可能需要手动配置 formula_cells"
+    },
+    {
+      "wp_code": "B51",
+      "issue": "UNIVER_NO_FORMULA",
+      "severity": "warning",
+      "message": "组件类型为 univer 但未检测到公式，可能需要手动配置 formula_cells"
+    },
+    {
+      "wp_code": "B52",
+      "issue": "UNIVER_NO_FORMULA",
+      "severity": "warning",
+      "message": "组件类型为 univer 但未检测到公式，可能需要手动配置 formula_cells"
+    },
+    {
+      "wp_code": "C1",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C2",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C3",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C4",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C5",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C6",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C7",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C8",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C9",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C10",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C11",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C12",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C13",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C14",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C15",
+      "issue": "HYBRID_NO_FORM_SECTION",
+      "severity": "info",
+      "message": "混合视图但无表单区域定义，HybridEditor 表单区将为空"
+    },
+    {
+      "wp_code": "C21",
+      "issue": "UNIVER_NO_FORMULA",
+      "severity": "warning",
+      "message": "组件类型为 univer 但未检测到公式，可能需要手动配置 formula_cells"
+    },
+    {
+      "wp_code": "C22",
+      "issue": "UNIVER_NO_FORMULA",
+      "severity": "warning",
+      "message": "组件类型为 univer 但未检测到公式，可能需要手动配置 formula_cells"
+    },
+    {
+      "wp_code": "C23",
+      "issue": "UNIVER_NO_FORMULA",
+      "severity": "warning",
+      "message": "组件类型为 univer 但未检测到公式，可能需要手动配置 formula_cells"
+    },
+    {
+      "wp_code": "C25",
+      "issue": "UNIVER_NO_FORMULA",
+      "severity": "warning",
+      "message": "组件类型为 univer 但未检测到公式，可能需要手动配置 formula_cells"
+    },
+    {
+      "wp_code": "C26",
+      "issue": "UNIVER_NO_FORMULA",
+      "severity": "warning",
+      "message": "组件类型为 univer 但未检测到公式，可能需要手动配置 formula_cells"
+    },
+    {
+      "wp_code": "S17",
+      "issue": "FORM_NO_SCHEMA",
+      "severity": "warning",
+      "message": "组件类型为 form 但无 form_schema，WorkpaperFormEditor 将显示空白"
+    }
+  ],
+  "uncovered_files": [
+    "参考-审计指引第21号-管理建议书.docx",
+    "因素分析法毛利分析...参考示例.xlsx",
+    "应收账款预期信用损失...参考示例.xlsx",
+    "营业收入五步法...参考示例.xlsx",
+    "质量控制委员会会议记录.docx",
+    "项目质量复核合伙人复核提交资料清单.docx"
+  ],
+  "recommendations": [
+    {
+      "id": "R1",
+      "priority": "P1",
+      "title": "补充 form 类型底稿的 form_schema",
+      "description": "1 个 form 类型底稿缺少 form_schema，WorkpaperFormEditor 无法渲染。需要从 Excel 模板的第一列提取标签生成 schema。",
+      "affected_codes": [
+        "S17"
+      ],
+      "fix": "改进 extract 脚本的 form_schema 提取逻辑，或手动为关键底稿（B10/B11/B12/B40/B50）编写 schema"
+    },
+    {
+      "id": "R2",
+      "priority": "P2",
+      "title": "为 univer 类型底稿配置预填充公式",
+      "description": "9 个 univer 类型底稿未检测到公式。这些底稿的公式可能在第50行之后（脚本只扫前50行），或需要手动配置 =TB/=WP 公式映射。",
+      "affected_codes": [
+        "J3",
+        "B1",
+        "B51",
+        "B52",
+        "C21",
+        "C22",
+        "C23",
+        "C25",
+        "C26"
+      ],
+      "fix": "扩大扫描行数到100行，或为核心审定表（D2/E1/H1等）手动配置 formula_cells"
+    },
+    {
+      "id": "R3",
+      "priority": "P2",
+      "title": "补充底稿→附注章节映射",
+      "description": "44 个底稿有关联科目但无附注章节映射，底稿↔附注联动不可用。",
+      "affected_codes": [
+        "D0",
+        "D5",
+        "D7",
+        "E0",
+        "F0",
+        "F3",
+        "G0",
+        "G10",
+        "G12",
+        "G13"
+      ],
+      "fix": "参考 requirements.md 附录 B 的底稿→附注映射全表，补充 note_section 字段"
+    },
+    {
+      "id": "R4",
+      "priority": "P3",
+      "title": "为 hybrid 类型底稿定义表单区域",
+      "description": "15 个混合视图底稿缺少表单区域定义。",
+      "affected_codes": [
+        "C1",
+        "C2",
+        "C3",
+        "C4",
+        "C5",
+        "C6",
+        "C7",
+        "C8",
+        "C9",
+        "C10"
+      ],
+      "fix": "为 C 类控制测试底稿定义三段式结构（穿行测试表单+控制矩阵表格+偏差评价结论）"
+    },
+    {
+      "id": "R5",
+      "priority": "P3",
+      "title": "将6个未覆盖的参考文件归入对应条目",
+      "description": "6个文件名不以标准编码开头的参考示例/附件，需归入对应的 wp_code 条目的 template_files 列表",
+      "fix": "在种子数据中为 D2/D4/B5/A24/A10 条目的 template_files 追加这些文件名"
+    }
+  ]
+}

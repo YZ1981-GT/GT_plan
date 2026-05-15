@@ -782,6 +782,13 @@ class EventType(str, enum.Enum):
     ADJUSTMENT_BATCH_COMMITTED = "adjustment.batch_committed"
     LINKAGE_CASCADE_DEGRADED = "linkage.cascade_degraded"
 
+    # Sprint 10: 底稿深度优化事件
+    WORKPAPER_AUDITED_CONFIRMED = "workpaper.audited_confirmed"
+    WORKPAPER_PROCEDURE_COMPLETED = "workpaper.procedure_completed"
+    WORKPAPER_REVIEW_PASSED = "workpaper.review_passed"
+    WORKPAPER_STALE_DETECTED = "workpaper.stale_detected"
+    CROSS_CHECK_FAILED = "cross_check.failed"
+
 
 class EventPayload(BaseModel):
     """事件载荷"""

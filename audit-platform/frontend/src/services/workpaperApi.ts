@@ -237,6 +237,16 @@ export async function downloadWorkpaperPack(projectId: string, wpIds: string[], 
   })
 }
 
+/** 下载单个科目的原始模板文件（从 wp_templates/ 目录） */
+export async function downloadTemplate(projectId: string, wpCode: string) {
+  return downloadFile(P_wp.templateDownload(projectId, wpCode))
+}
+
+/** 批量下载全部底稿模板（ZIP） */
+export async function downloadAllTemplates(projectId: string) {
+  return downloadFile(P_wp.templateDownloadAll(projectId), { fileName: '底稿模板全量.zip' })
+}
+
 export async function uploadWorkpaper(projectId: string, wpId: string, recordedVersion: number) {
   const { data } = await http.post(P_wp.upload(projectId, wpId), {
     recorded_version: recordedVersion,

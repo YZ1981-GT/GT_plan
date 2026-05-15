@@ -3,18 +3,16 @@
     <!-- 页面横幅 -->
     <div class="gt-wpb-banner">
       <div class="gt-wpb-banner-text">
-        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="router.push('/projects')">← 返回</el-button>
-        <div>
+        <div style="display: flex; align-items: center; gap: 8px">
+          <el-button text style="color: #fff; font-size: 13px; padding: 0" @click="router.push('/projects')">← 返回</el-button>
           <h2>底稿工作台</h2>
-          <p>{{ mappings.length }} 个底稿映射，覆盖试算表与附注</p>
         </div>
+        <p>{{ projectName || '' }} · {{ mappings.length }} 个底稿映射</p>
       </div>
       <div class="gt-wpb-banner-actions">
         <el-button size="small" @click="refreshAll" :loading="loading" round>刷新</el-button>
         <el-button size="small" @click="onBatchPrefill" :loading="prefillLoading" round>批量预填充</el-button>
-        <el-button size="small" @click="onSmartRecommend" :loading="recommendLoading" round>
-          智能推荐底稿
-        </el-button>
+        <el-button size="small" @click="onSmartRecommend" :loading="recommendLoading" round>智能推荐底稿</el-button>
       </div>
     </div>
     <!-- 推荐面板 -->
@@ -50,6 +48,7 @@
         <div class="gt-wpb-tree-header">
           <el-input v-model="searchText" placeholder="搜索底稿..." size="small" clearable />
           <div class="gt-wpb-tree-filters">
+            <el-checkbox v-model="onlyWithData" size="small">仅有数据</el-checkbox>
             <el-checkbox v-model="onlyMine" size="small">仅我的</el-checkbox>
             <el-select v-model="filterStatus" size="small" placeholder="状态" clearable style="width: 80px">
               <el-option label="待编" value="pending" />
@@ -128,6 +127,16 @@
               <span>归档</span>
             </div>
           </div>
+          <!-- 操作按钮（紧跟标题） -->
+          <div class="gt-wpb-actions">
+            <el-button type="primary" @click="onOpenWorkpaper" round>
+              <el-icon style="margin-right: 4px"><EditPen /></el-icon>编辑底稿
+            </el-button>
+            <el-button @click="showAssignDialog = true" round>分配委派</el-button>
+            <el-button @click="onGoTrialBalance" round>查看试算表</el-button>
+            <el-button v-if="selectedMapping.note_section" @click="onGoNote" round>查看附注</el-button>
+            <el-button @click="onGoLedger" round>查看序时账</el-button>
+          </div>
           <!-- 科目指标卡片 -->
           <div class="gt-wpb-data-section">
             <h4 class="gt-wpb-section-title">试算表数据</h4>
@@ -152,27 +161,45 @@
             <el-skeleton v-else-if="prefillLoading" :rows="2" animated />
             <!-- 科目明细表 -->
             <el-table v-if="prefillData?.accounts?.length" :data="prefillData.accounts" size="small" border stripe style="margin-top: 12px" class="gt-wpb-acct-table">
-              <el-table-column prop="code" label="科目编码" width="90" />
-              <el-table-column prop="name" label="科目名称" min-width="120" show-overflow-tooltip />
-              <el-table-column label="期初余额" width="110" align="right">
+              <el-table-column prop="code" label="科目编码" width="100" />
+              <el-table-column prop="name" label="科目名称" min-width="130" show-overflow-tooltip />
+              <el-table-column label="期初余额" width="130" align="right">
                 <template #default="{ row }">{{ fmtAmt(row.opening) }}</template>
               </el-table-column>
-              <el-table-column label="未审数" width="110" align="right">
+              <el-table-column label="未审数" width="130" align="right">
                 <template #default="{ row }">{{ fmtAmt(row.unadjusted) }}</template>
               </el-table-column>
-              <el-table-column label="调整额" width="90" align="right">
+              <el-table-column label="调整额" width="110" align="right">
                 <template #default="{ row }">
-                  <span :style="{ color: adjVal(row) !== 0 ? '#FF5149' : '#999' }">{{ fmtAmt(adjVal(row)) }}</span>
+                  <span
+                    class="gt-wpb-adj-cell"
+                    :class="{ 'gt-wpb-adj-cell--active': adjVal(row) !== 0 }"
+                    @dblclick="adjVal(row) !== 0 && onDrillToAdjustment(row)"
+                    :title="adjVal(row) !== 0 ? '双击查看调整分录' : ''">{{ fmtAmt(adjVal(row)) }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="审定数" width="110" align="right">
+              <el-table-column label="审定数" width="130" align="right">
                 <template #default="{ row }">
-                  <span style="font-weight: 700; color: var(--gt-color-primary); cursor: pointer; text-decoration: underline dotted"
-                    @dblclick="onDrillToAdjustment(row)"
-                    title="双击查看调整分录">{{ fmtAmt(row.audited) }}</span>
+                  <span style="font-weight: 700; color: var(--gt-color-primary)">{{ fmtAmt(row.audited) }}</span>
                 </template>
               </el-table-column>
             </el-table>
+          </div>
+          <!-- 上年数据参照 -->
+          <div class="gt-wpb-data-section" v-if="priorYearData">
+            <h4 class="gt-wpb-section-title">上年数据参照</h4>
+            <div class="gt-wpb-prior-cards">
+              <div class="gt-wpb-prior-card">
+                <span class="gt-wpb-prior-label">{{ year - 1 }}年审定数</span>
+                <span class="gt-wpb-prior-value">{{ fmtAmt(priorYearData.total_audited) }}</span>
+              </div>
+              <div class="gt-wpb-prior-card">
+                <span class="gt-wpb-prior-label">同比变动</span>
+                <span class="gt-wpb-prior-value" :class="{ 'gt-wpb-prior-diff': yoyChange !== 0 }">
+                  {{ yoyChange > 0 ? '+' : '' }}{{ fmtAmt(yoyChange) }}
+                </span>
+              </div>
+            </div>
           </div>
           <!-- 附件区域 -->
           <div class="gt-wpb-data-section">
@@ -208,16 +235,6 @@
               <el-button size="small" @click="onManageAttachments" round>管理全部附件</el-button>
             </div>
           </div>
-          <!-- 操作按钮 -->
-          <div class="gt-wpb-actions">
-            <el-button type="primary" @click="onOpenWorkpaper" round>
-              <el-icon style="margin-right: 4px"><EditPen /></el-icon>编辑底稿
-            </el-button>
-            <el-button @click="showAssignDialog = true" round>分配委派</el-button>
-            <el-button @click="onGoTrialBalance" round>查看试算表</el-button>
-            <el-button v-if="selectedMapping.note_section" @click="onGoNote" round>查看附注</el-button>
-            <el-button @click="onGoLedger" round>查看序时账</el-button>
-          </div>
           <!-- 底稿委派弹窗 -->
           <el-dialog v-model="showAssignDialog" title="底稿委派" width="420" append-to-body>
             <el-form label-width="70px">
@@ -237,22 +254,6 @@
               <el-button type="primary" @click="onConfirmAssign" :loading="assignLoading">确认分配</el-button>
             </template>
           </el-dialog>
-          <!-- 上年数据参照 -->
-          <div class="gt-wpb-data-section" v-if="priorYearData">
-            <h4 class="gt-wpb-section-title">上年数据参照</h4>
-            <div class="gt-wpb-prior-cards">
-              <div class="gt-wpb-prior-card">
-                <span class="gt-wpb-prior-label">{{ year - 1 }}年审定数</span>
-                <span class="gt-wpb-prior-value">{{ fmtAmt(priorYearData.total_audited) }}</span>
-              </div>
-              <div class="gt-wpb-prior-card">
-                <span class="gt-wpb-prior-label">同比变动</span>
-                <span class="gt-wpb-prior-value" :class="{ 'gt-wpb-prior-diff': yoyChange !== 0 }">
-                  {{ yoyChange > 0 ? '+' : '' }}{{ fmtAmt(yoyChange) }}
-                </span>
-              </div>
-            </div>
-          </div>
         </template>
         <div v-else class="gt-wpb-empty-state">
           <div class="gt-wpb-empty-icon">📋</div>
@@ -320,15 +321,18 @@ import { MagicStick, EditPen, Paperclip, WarningFilled } from '@element-plus/ico
 import { getAllWpMappings, getWpPrefillData, getWpRecommendations, type WpAccountMapping, type WpPrefillData, type WpRecommendation } from '@/services/workpaperApi'
 import { getProjectAuditYear } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
-import { workpapers as P_wp, attachments as P_att, wpAI as P_wpai, staff as P_staff } from '@/services/apiPaths'
+import { workpapers as P_wp, attachments as P_att, wpAI as P_wpai, staff as P_staff, trialBalance as P_tb } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
 import OcrStatusBadge from '@/components/common/OcrStatusBadge.vue'
 import { handleApiError } from '@/utils/errorHandler'
+import { useNavigationStack } from '@/composables/useNavigationStack'
 
 const route = useRoute()
 const router = useRouter()
+const { push: navPush } = useNavigationStack()
 const projectId = computed(() => route.params.projectId as string)
 const year = ref(new Date().getFullYear())
+const projectName = ref('')
 
 const loading = ref(false)
 const prefillLoading = ref(false)
@@ -338,6 +342,8 @@ const prefillData = ref<WpPrefillData | null>(null)
 const searchText = ref('')
 const treeRef = ref<any>(null)
 const aiQuestion = ref('')
+const onlyWithData = ref(true)  // 默认只显示有数据的科目
+const accountsWithData = ref<Set<string>>(new Set())
 const onlyMine = ref(false)
 const filterStatus = ref('')
 const attachments = ref<any[]>([])
@@ -461,6 +467,22 @@ const treeData = computed<TreeNode[]>(() => {
     L: 'L 负债', M: 'M 权益', N: 'N 税项',
   }
   for (const m of mappings.value) {
+    // 仅有数据模式：跳过没有余额数据的科目
+    if (onlyWithData.value && accountsWithData.value.size > 0) {
+      const codes = (m.account_codes || []) as string[]
+      if (codes.length > 0) {
+        // 检查 mapping 的任何科目编码是否在有数据集合中（含前缀匹配）
+        const hasData = codes.some(c => {
+          if (accountsWithData.value.has(c)) return true
+          // 前缀匹配：mapping 编码 1122 匹配余额表中的 112201
+          for (const existing of accountsWithData.value) {
+            if (existing.startsWith(c) || c.startsWith(existing)) return true
+          }
+          return false
+        })
+        if (!hasData) continue
+      }
+    }
     const key = m.cycle
     if (!groups[key]) {
       groups[key] = { id: `g-${key}`, label: CYCLE_NAMES[key] || `${key}循环`, children: [] }
@@ -471,12 +493,15 @@ const treeData = computed<TreeNode[]>(() => {
       assignee: wpStatusMap.value[m.wp_code]?.assigned_to || undefined,
     })
   }
-  // 统计每组数量
+  // 统计每组数量，过滤空组
+  const result: TreeNode[] = []
   for (const g of Object.values(groups)) {
     const total = g.children?.length || 0
+    if (total === 0) continue
     g.label = `${g.label}（${total}）`
+    result.push(g)
   }
-  return Object.values(groups).sort((a, b) => a.label.localeCompare(b.label))
+  return result.sort((a, b) => a.label.localeCompare(b.label))
 })
 
 function filterNode(value: string, data: any, node: any) {
@@ -549,6 +574,28 @@ async function refreshAll() {
   try {
     const y = await getProjectAuditYear(projectId.value)
     if (y) year.value = y
+  } catch { /* 静默 */ }
+  // 加载项目名称
+  try {
+    const proj = await api.get(`/api/projects/${projectId.value}`)
+    projectName.value = proj?.name || proj?.project_name || ''
+  } catch { /* 静默 */ }
+  // 加载有数据的科目编码集合（用于树形过滤）
+  try {
+    const balanceData = await api.get(`/api/projects/${projectId.value}/ledger/balance`, { params: { year: year.value } })
+    const rows = Array.isArray(balanceData) ? balanceData : (balanceData?.items || balanceData?.rows || [])
+    const codes = new Set<string>()
+    for (const r of rows) {
+      const code = r.account_code || r.standard_account_code || ''
+      if (code) {
+        codes.add(code)
+        // 加入所有前缀层级
+        for (let i = 1; i <= code.length; i++) {
+          codes.add(code.substring(0, i))
+        }
+      }
+    }
+    accountsWithData.value = codes
   } catch { /* 静默 */ }
   loading.value = false
 }
@@ -682,16 +729,28 @@ async function generateSingleWorkpaper(wpCode: string) {
 }
 
 function onGoTrialBalance() {
+  navPush({
+    source_view: route.fullPath,
+    query: { wp_code: selectedMapping.value?.wp_code || '' },
+  })
   router.push(`/projects/${projectId.value}/trial-balance`)
 }
 
 function onGoNote() {
   if (!selectedMapping.value?.note_section) return
+  navPush({
+    source_view: route.fullPath,
+    query: { wp_code: selectedMapping.value?.wp_code || '' },
+  })
   router.push(`/projects/${projectId.value}/disclosure-notes`)
 }
 
 function onGoLedger() {
   if (!selectedMapping.value) return
+  navPush({
+    source_view: route.fullPath,
+    query: { wp_code: selectedMapping.value?.wp_code || '' },
+  })
   router.push(`/projects/${projectId.value}/ledger`)
 }
 
@@ -745,6 +804,17 @@ onMounted(async () => {
     const data = await api.get(P_staff.list)
     staffList.value = Array.isArray(data) ? data : (data?.items || [])
   } catch { /* 静默 */ }
+  // Backspace 返回时自动选中之前的科目
+  const qWpCode = route.query.wp_code as string
+  if (qWpCode && mappings.value.length) {
+    const target = mappings.value.find(m => m.wp_code === qWpCode)
+    if (target) {
+      selectedMapping.value = target
+      loadPrefillData(target)
+      loadAttachments(target.wp_code)
+      loadAiAnalysis(target)
+    }
+  }
 })
 </script>
 
@@ -753,34 +823,31 @@ onMounted(async () => {
 /* 横幅 */
 .gt-wpb-banner {
   display: flex; justify-content: space-between; align-items: center;
-  padding: var(--gt-space-5) var(--gt-space-6); margin-bottom: var(--gt-space-4);
-  background: var(--gt-gradient-primary); border-radius: var(--gt-radius-lg); color: #fff;
+  padding: 12px 24px; margin-bottom: 12px;
+  background: var(--gt-gradient-primary); border-radius: var(--gt-radius-md); color: #fff;
   position: relative; overflow: hidden;
-  background-image: var(--gt-gradient-primary),
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 100% 100%, 20px 20px, 20px 20px;
 }
 .gt-wpb-banner::before {
   content: ''; position: absolute; top: -40%; right: -10%; width: 45%; height: 180%;
   background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%); pointer-events: none;
 }
 .gt-wpb-banner-text { position: relative; z-index: 1; }
-.gt-wpb-banner-text h2 { margin: 0; font-size: var(--gt-font-size-xl); font-weight: 700; }
-.gt-wpb-banner-text p { margin: 4px 0 0; font-size: var(--gt-font-size-sm); opacity: 0.85; }
+.gt-wpb-banner-text h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.gt-wpb-banner-text p { margin: 2px 0 0; font-size: 12px; opacity: 0.85; }
 .gt-wpb-banner-actions { display: flex; gap: var(--gt-space-2); position: relative; z-index: 1; }
 .gt-wpb-banner-actions .el-button {
   background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff;
 }
 .gt-wpb-banner-actions .el-button:hover { background: rgba(255,255,255,0.25); }
-/* 推荐面板 */
+/* 推荐面板 — 全屏覆盖 */
 .gt-wpb-recommend-panel {
-  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
-  padding: var(--gt-space-4); margin-bottom: var(--gt-space-4); box-shadow: var(--gt-shadow-sm);
-  border: 1px solid rgba(75, 45, 119, 0.06);
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 100;
+  background: var(--gt-color-bg-white);
+  padding: 20px 32px; overflow-y: auto;
+  box-shadow: 0 0 40px rgba(0,0,0,0.15);
 }
-.gt-wpb-recommend-header { display: flex; align-items: center; gap: var(--gt-space-3); margin-bottom: var(--gt-space-3); }
-.gt-wpb-recommend-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--gt-space-2); }
+.gt-wpb-recommend-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; position: sticky; top: 0; background: var(--gt-color-bg-white); padding-bottom: 12px; border-bottom: 1px solid var(--gt-color-border-light); z-index: 1; }
+.gt-wpb-recommend-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
 .gt-wpb-recommend-item {
   display: flex; justify-content: space-between; align-items: center;
   padding: var(--gt-space-2) var(--gt-space-3); background: var(--gt-color-bg);
@@ -845,9 +912,13 @@ onMounted(async () => {
 .gt-wpb-prefill-card--teal { border-left-color: var(--gt-color-teal); background: var(--gt-color-teal-light); }
 .gt-wpb-prefill-card--success { border-left-color: var(--gt-color-success); background: var(--gt-color-success-light); }
 .gt-wpb-pf-label { font-size: 11px; color: var(--gt-color-text-secondary); }
-.gt-wpb-pf-value { font-size: var(--gt-font-size-lg); font-weight: 700; color: var(--gt-color-text); font-variant-numeric: tabular-nums; }
+.gt-wpb-pf-value { font-size: var(--gt-font-size-lg); font-weight: 700; color: var(--gt-color-text); font-family: 'Arial Narrow', Arial, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gt-wpb-pf-value--diff { color: var(--gt-color-coral); }
-.gt-wpb-acct-table :deep(th) { font-size: 11px !important; }
+.gt-wpb-acct-table :deep(th) { font-size: 11px !important; white-space: nowrap; background: #f0edf5 !important; color: #4b2d77 !important; }
+.gt-wpb-acct-table :deep(td .cell) { font-family: 'Arial Narrow', Arial, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gt-wpb-adj-cell { color: #999; }
+.gt-wpb-adj-cell--active { color: #FF5149; cursor: pointer; }
+.gt-wpb-adj-cell--active:hover { text-decoration: underline; }
 /* 附件 */
 .gt-wpb-attach-list { display: flex; flex-direction: column; gap: var(--gt-space-2); margin-bottom: var(--gt-space-3); }
 .gt-wpb-attach-item {
@@ -863,7 +934,8 @@ onMounted(async () => {
 .gt-wpb-attach-empty { text-align: center; padding: var(--gt-space-4); color: var(--gt-color-text-tertiary); font-size: 13px; }
 .gt-wpb-attach-actions { display: flex; gap: var(--gt-space-2); }
 /* 操作按钮 */
-.gt-wpb-actions { display: flex; flex-wrap: wrap; gap: var(--gt-space-2); margin-top: var(--gt-space-4); padding-top: var(--gt-space-4); border-top: 1px solid var(--gt-color-border-light); }
+.gt-wpb-actions { display: flex; flex-wrap: nowrap; gap: 8px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--gt-color-border-light); white-space: nowrap; }
+.gt-wpb-actions :deep(.el-button) { height: 28px; font-size: 12px; padding: 0 14px; }
 /* 上年数据 */
 .gt-wpb-prior-cards { display: flex; gap: var(--gt-space-3); }
 .gt-wpb-prior-card {
@@ -872,7 +944,7 @@ onMounted(async () => {
   border: 1px dashed var(--gt-color-border); display: flex; flex-direction: column; gap: 2px;
 }
 .gt-wpb-prior-label { font-size: 11px; color: var(--gt-color-text-tertiary); }
-.gt-wpb-prior-value { font-size: var(--gt-font-size-md); font-weight: 600; font-variant-numeric: tabular-nums; }
+.gt-wpb-prior-value { font-size: var(--gt-font-size-md); font-weight: 600; font-family: 'Arial Narrow', Arial, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gt-wpb-prior-diff { color: var(--gt-color-coral); }
 /* 空状态 */
 .gt-wpb-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--gt-color-text-tertiary); }

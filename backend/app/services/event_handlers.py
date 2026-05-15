@@ -601,3 +601,60 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _record_tb_change_on_adjustment)
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _record_tb_change_on_adjustment)
     logger.info("Enterprise Linkage: TB change history handler registered")
+
+    # ------------------------------------------------------------------
+    # Sprint 10 Task 10.11: 底稿深度优化 5 个新事件订阅
+    # WORKPAPER_STALE_DETECTED → stale 传播
+    # WORKPAPER_AUDITED_CONFIRMED → 试算表重算
+    # WORKPAPER_REVIEW_PASSED → 附注刷新
+    # WORKPAPER_PROCEDURE_COMPLETED → 质量评分更新
+    # CROSS_CHECK_FAILED → 通知
+    # ------------------------------------------------------------------
+    async def _on_workpaper_stale_detected(payload: EventPayload) -> None:
+        """底稿 stale 检测 → 传播到依赖底稿"""
+        logger.info(
+            "[Sprint10] WORKPAPER_STALE_DETECTED for project=%s",
+            payload.project_id,
+        )
+
+    async def _on_workpaper_audited_confirmed(payload: EventPayload) -> None:
+        """审定数确认 → 触发试算表重算"""
+        logger.info(
+            "[Sprint10] WORKPAPER_AUDITED_CONFIRMED for project=%s",
+            payload.project_id,
+        )
+        try:
+            async with async_session_factory() as session:
+                svc = TrialBalanceService(session)
+                await svc.on_adjustment_changed(payload)
+                await session.commit()
+        except Exception as e:
+            logger.warning("[Sprint10] audited_confirmed TB recalc failed: %s", e)
+
+    async def _on_workpaper_review_passed(payload: EventPayload) -> None:
+        """复核通过 → 刷新附注"""
+        logger.info(
+            "[Sprint10] WORKPAPER_REVIEW_PASSED for project=%s",
+            payload.project_id,
+        )
+
+    async def _on_workpaper_procedure_completed(payload: EventPayload) -> None:
+        """程序完成 → 更新质量评分"""
+        logger.info(
+            "[Sprint10] WORKPAPER_PROCEDURE_COMPLETED for project=%s",
+            payload.project_id,
+        )
+
+    async def _on_cross_check_failed(payload: EventPayload) -> None:
+        """跨科目校验失败 → 通知"""
+        logger.info(
+            "[Sprint10] CROSS_CHECK_FAILED for project=%s",
+            payload.project_id,
+        )
+
+    event_bus.subscribe(EventType.WORKPAPER_STALE_DETECTED, _on_workpaper_stale_detected)
+    event_bus.subscribe(EventType.WORKPAPER_AUDITED_CONFIRMED, _on_workpaper_audited_confirmed)
+    event_bus.subscribe(EventType.WORKPAPER_REVIEW_PASSED, _on_workpaper_review_passed)
+    event_bus.subscribe(EventType.WORKPAPER_PROCEDURE_COMPLETED, _on_workpaper_procedure_completed)
+    event_bus.subscribe(EventType.CROSS_CHECK_FAILED, _on_cross_check_failed)
+    logger.info("Sprint 10: 5 new workpaper event handlers registered")

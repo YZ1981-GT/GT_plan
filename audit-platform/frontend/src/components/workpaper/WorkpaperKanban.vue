@@ -158,7 +158,7 @@ defineExpose({ refresh: loadKanban })
   background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
 }
 .column-title { font-size: 14px; font-weight: 700; color: #1a1a2e; letter-spacing: 0.5px; }
-.column-body { flex: 1; padding: 10px; overflow-y: auto; max-height: 500px; }
+.column-body { flex: 1; padding: 10px; overflow-y: auto; }
 .column-empty { text-align: center; color: #c0c4cc; font-size: 12px; padding: 30px 0; font-style: italic; }
 
 /* 卡片 — 动感交互 */

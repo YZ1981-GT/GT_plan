@@ -213,6 +213,17 @@ services:
 
   # ----------------------------------------------------------
 
+  # Univer Server（xlsx 完整导入导出 + 协作 + 打印）
+  # 部署方式：官方安装脚本（需要 Univer 账号授权）
+  #   bash -c "$(curl -fsSL https://get.univer.ai)"
+  # 安装后服务默认监听 3010 端口
+  # 文档：https://docs.univer.ai/guides/pro/server
+  # 注意：Univer Server 是商业产品，免费版有功能限制
+  # 前端代码已配置好 Advanced Preset，服务就绪后自动走原生 xlsx 导入路径
+  #
+  # 如果已通过官方脚本安装，无需在此 compose 文件中配置
+  # univer-server 会独立运行在 univer-server/ 目录中
+
   onlyoffice:
 
     image: onlyoffice/documentserver:8.2
@@ -237,7 +248,7 @@ services:
 
     depends_on:
 
-      backend:
+      postgres:
 
         condition: service_healthy
 
@@ -252,6 +263,9 @@ services:
       retries: 5
 
       start_period: 60s
+
+    profiles:
+      - onlyoffice
 
 
 

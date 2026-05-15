@@ -51,6 +51,7 @@ import app.models.qc_case_library_models  # noqa: E402, F401
 import app.models.qc_inspection_models  # noqa: E402, F401
 import app.models.qc_rule_models  # noqa: E402, F401  — Round 6
 import app.models.workpaper_editing_lock_models  # noqa: E402, F401  — Round 4
+import app.models.wp_optimization_models  # noqa: E402, F401  — 底稿深度优化
 
 # Stub for 'workpapers' table referenced by AI models FK
 import sqlalchemy as _sa

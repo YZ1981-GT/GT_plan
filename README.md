@@ -41,6 +41,43 @@
 - **迁移**: Alembic（001-034 版本）
 - **AI**: PaddleOCR、Tesseract、MinerU（可选）
 - **文档编辑**: Univer 纯前端表格编辑器（原 ONLYOFFICE 已迁移）
+- **底稿模板**: 致同 2025 修订版 476 个模板文件（xlsx/xlsm/docx），存储在 `backend/wp_templates/`
+
+> **Univer xlsx 导入导出说明**
+>
+> 当前安装的是 Univer 开源版（`@univerjs/preset-sheets-core`），底稿模板通过后端 openpyxl 转换为 Univer JSON 格式加载。如需完整还原 xlsx 格式（条件格式/图表/数据验证），需安装 Univer Advanced Preset。
+>
+> **部署方式**：服务器一次性配置，所有用户通过浏览器直接使用（无需客户端安装）。
+>
+> ```bash
+> # 1. 前端安装（构建时打入 bundle）
+> cd audit-platform/frontend
+> npm install @univerjs/preset-sheets-drawing @univerjs/preset-sheets-advanced
+> ```
+>
+> 2. 在 WorkpaperEditor.vue 的 `createUniver` 中添加：
+> ```typescript
+> import { UniverSheetsDrawingPreset } from '@univerjs/preset-sheets-drawing'
+> import { UniverSheetsAdvancedPreset } from '@univerjs/preset-sheets-advanced'
+>
+> presets: [
+>   UniverSheetsCorePreset({ container }),
+>   UniverSheetsDrawingPreset(),
+>   UniverSheetsAdvancedPreset({ universerEndpoint: 'http://localhost:3010' }),
+> ]
+> ```
+>
+> 3. 部署 Univer 后端服务（提供 xlsx 解析能力）：
+> ```yaml
+> # docker-compose.yml 新增
+> univer-server:
+>   image: univer-server:latest
+>   ports:
+>     - "3010:3010"
+> ```
+> 详见 [Univer 官方部署文档](https://docs.univer.ai/guides/pro/deploy)。
+>
+> **不安装时**系统仍可正常使用（走后端 openpyxl 转换降级路径，丢失部分高级格式但数据完整）。
 - **附件管理**: Paperless-ngx
 - **性能监控**: Prometheus + prometheus-client
 - **数据校验**: pandas
