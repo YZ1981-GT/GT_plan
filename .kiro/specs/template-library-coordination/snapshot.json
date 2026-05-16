@@ -1,0 +1,141 @@
+{
+  "spec_id": "template-library-coordination",
+  "snapshot_taken_at": "2026-05-16",
+  "description": "运行时基准值快照 — 由 Sprint 0.1 verifier 核验。spec narrative 引用的 N_* 数字以本文件为单一真源。",
+  "tolerance_percent": 5,
+
+  "json_sources": {
+    "wp_templates_index": {
+      "path": "backend/wp_templates/_index.json",
+      "structure": "dict",
+      "key": "files",
+      "expected_count": 476,
+      "var_name": "N_files"
+    },
+    "wp_account_mapping": {
+      "path": "backend/data/wp_account_mapping.json",
+      "structure": "dict",
+      "key": "mappings",
+      "expected_count": 206,
+      "var_name": "N_account_mappings",
+      "readonly": true
+    },
+    "wp_template_metadata_dn": {
+      "path": "backend/data/wp_template_metadata_dn_seed.json",
+      "structure": "dict",
+      "key": "entries",
+      "expected_count": 89
+    },
+    "wp_template_metadata_b": {
+      "path": "backend/data/wp_template_metadata_b_seed.json",
+      "structure": "dict",
+      "key": "entries",
+      "expected_count": 19
+    },
+    "wp_template_metadata_cas": {
+      "path": "backend/data/wp_template_metadata_cas_seed.json",
+      "structure": "dict",
+      "key": "entries",
+      "expected_count": 71
+    },
+    "prefill_formula_mapping": {
+      "path": "backend/data/prefill_formula_mapping.json",
+      "structure": "dict",
+      "key": "mappings",
+      "expected_count": 94,
+      "var_name": "N_prefill_mappings",
+      "readonly": true
+    },
+    "cross_wp_references": {
+      "path": "backend/data/cross_wp_references.json",
+      "structure": "dict",
+      "key": "references",
+      "expected_count": 20,
+      "var_name": "N_xref",
+      "readonly": true
+    },
+    "audit_report_templates": {
+      "path": "backend/data/audit_report_templates_seed.json",
+      "structure": "dict",
+      "key": "templates",
+      "expected_count": 8,
+      "var_name": "N_opinion_types",
+      "readonly": true
+    },
+    "note_template_soe": {
+      "path": "backend/data/note_template_soe.json",
+      "structure": "dict",
+      "key": "sections",
+      "expected_count": 173,
+      "var_name": "N_note_soe"
+    },
+    "note_template_listed": {
+      "path": "backend/data/note_template_listed.json",
+      "structure": "dict",
+      "key": "sections",
+      "expected_count": 187,
+      "var_name": "N_note_listed"
+    }
+  },
+
+  "computed_values": {
+    "N_primary": {
+      "description": "DN+B+CAS seed entries 之和 = 主编码总数",
+      "formula": "wp_template_metadata_dn + wp_template_metadata_b + wp_template_metadata_cas",
+      "expected_count": 179
+    }
+  },
+
+  "db_tables": {
+    "gt_wp_coding": {
+      "expected_count": 48,
+      "var_name": "N_gt_codes",
+      "query": "SELECT COUNT(*) FROM gt_wp_coding"
+    },
+    "report_config": {
+      "expected_count": 1191,
+      "var_name": "N_report_rows",
+      "query": "SELECT COUNT(*) FROM report_config"
+    },
+    "report_config_with_formula": {
+      "expected_count_min": 318,
+      "var_name": "N_report_with_formula",
+      "query": "SELECT COUNT(*) FROM report_config WHERE formula IS NOT NULL AND formula <> ''"
+    },
+    "report_config_distinct_standards": {
+      "expected_count": 4,
+      "var_name": "N_standards",
+      "query": "SELECT COUNT(DISTINCT applicable_standard) FROM report_config"
+    }
+  },
+
+  "missing_files": {
+    "comment": "spec 旧版假设存在但实测不存在 — 任何新 spec 引用前必须重新 grep",
+    "files": [
+      "backend/data/accounting_standards_seed.json",
+      "backend/data/template_sets_seed.json"
+    ]
+  },
+
+  "router_assertions": {
+    "section_54": {
+      "file": "backend/app/router_registry.py",
+      "expected_handler": "template_library_mgmt",
+      "comment": "§43-§53 已被 audit-chain-generation 占用，本 spec 使用 §54"
+    }
+  },
+
+  "orm_assertions": {
+    "WpTemplateMetadata": {
+      "file": "backend/app/models/wp_optimization_models.py",
+      "must_not_have_field": "subtable_codes",
+      "comment": "D14 ADR 显式排除：子表收敛靠 wp_code.split('-')[0] 运行时计算"
+    }
+  },
+
+  "alembic_assertions": {
+    "leaf_revision": "custom_query_templates_20260518",
+    "predecessor": "template_library_seed_history_20260517",
+    "comment": "Sprint 1 + Sprint 6 两次迁移已落地。本 spec 实施前叶子=audit_chain_sprint10_tables_20260516；实施后链路 = audit_chain_sprint10_tables_20260516 → template_library_seed_history_20260517 → custom_query_templates_20260518"
+  }
+}

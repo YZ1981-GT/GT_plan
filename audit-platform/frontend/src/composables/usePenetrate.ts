@@ -78,5 +78,39 @@ export function usePenetrate() {
         path: `/projects/${pid()}/workpapers/${wpId}/edit`,
       })
     },
+
+    // ─── Sprint 11: 全链路穿透扩展 (Requirements: 28.1-28.6) ───
+
+    /** 报表行次 → 附注章节（正向穿透） */
+    toNoteFromReport(rowCode: string) {
+      router.push({
+        path: `/projects/${pid()}/disclosure-notes`,
+        query: { fromReport: rowCode, year: String(year()) },
+      })
+    },
+
+    /** 附注 → 报表行次（反向穿透） */
+    toReportFromNote(sectionCode: string) {
+      router.push({
+        path: `/projects/${pid()}/reports`,
+        query: { fromNote: sectionCode, year: String(year()) },
+      })
+    },
+
+    /** 报表行次 → 底稿审定表 → 调整分录 */
+    toWorkpaperFromReport(rowCode: string) {
+      router.push({
+        path: `/projects/${pid()}/workpapers`,
+        query: { fromReport: rowCode, year: String(year()) },
+      })
+    },
+
+    /** 调整分录 → 影响范围分析 */
+    toImpactAnalysis(adjustmentId: string) {
+      router.push({
+        path: `/projects/${pid()}/adjustments`,
+        query: { impact: adjustmentId, year: String(year()) },
+      })
+    },
   }
 }

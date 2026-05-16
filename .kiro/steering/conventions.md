@@ -323,3 +323,53 @@ WHERE l.project_id = :pid AND l.year = :yr
 - 端到端目标受 IO/网络/PG 物理限制，不能无限压缩
 - 目标超标时区分"架构问题"和"物理限制"：前者必须修，后者记录为已知限制
 - 示例：YG2101 activate 从 127s→<1s 是架构收益；total 660s 是 PG COPY 物理限制（~5000 rows/s）
+
+
+## Subagent 调用约束（spec 工作流，三轮复盘 2026-05-16 沉淀）
+
+每次 invokeSubAgent 的 prompt 必须包含以下 4 类边界子句，避免 subagent 自作主张越权：
+
+1. **范围锁定**：明确列出"本任务做什么"和"本任务不做什么"。如果发现 spec 范围扩张需求（如测试期望反推 production 加权限守卫），**只报告不实施**——由 orchestrator 决定是否在新任务里处理。
+
+2. **Bug 处理边界**：如发现 production bug 阻碍当前任务推进：
+   - **必须独立报告**（在返回值的 "production_bugs_found" 字段列出）
+   - **不在当前 commit 修复**（避免 git log 看不到独立事件 + 测试改动与 bug 修复混淆）
+   - 由 orchestrator 决定是否在新任务里修
+
+3. **状态变更可审计**：TD 项 / UAT 状态 / spec 章节措辞变更必须附 commit-style note：日期 / 触发任务编号 / 测试结果摘要。禁止单方面声明"已重新完成"而无审计痕迹。
+
+4. **结构化返回**：禁止大段总结，强制返回 JSON-style 字段：
+   ```
+   {
+     "files_created": [...],
+     "files_modified": [...],
+     "tests_run": "X passed / Y failed",
+     "vue_tsc_status": "exit 0 / errors",
+     "production_bugs_found": [...],   // 不修，仅列出
+     "scope_expansion_requests": [...], // 测试中发现的 spec 扩张需求
+     "td_status_changes": [...]        // 含 commit-style note
+   }
+   ```
+
+**反例**（template-library-coordination 三轮复盘踩坑）：
+- subagent 给 `gt_coding.py` mutation 端点加 `require_role` 守卫（任务只要求"核实端点存在性"，是范围扩张）
+- subagent 修复 `gt_coding_service.delete_custom_coding` 的 `soft_delete()` bug 与测试改动混在同一 commit
+- subagent 划掉 tasks.md 的 TD 项 + 改 UAT-9 措辞，无审计痕迹
+
+## PBT 反模式识别清单（三轮复盘 2026-05-16 沉淀）
+
+很多 hypothesis 测试不是真 property-based，而是"参数化用例"。评审 PBT 时用 3 问清单：
+
+1. **输入 strategy 是否故意包含违反约束的 case？** — 真 PBT 会 fuzz 出"非法输入"让 production 拒绝；反模式是 strategy 已强制满足约束，测试永真
+2. **测试是否会因 production 代码修改而失败？** — 真 PBT 改算法会触发反例；反模式是 reimplement 算法 + 喂同一算法 + 断言一致（同义反复）
+3. **算法实现和测试断言是否独立来源？** — 真 PBT 用独立简化版作 oracle；反模式是直接调 production 函数自己当 oracle
+
+**已知反模式样本**（template-library-coordination）：
+- `test_property_3_cycle_sort_order`：先 `sorted(groups, key=...)` 再断言已排序 — 永真命题
+- `test_property_2_template_list_field_presence`：strategy 强制生成必有字段的 dict，测试不可能失败
+- `test_property_5/12/13`：reimplement 算法 + 喂给同一算法 + 断言一致 — 同义反复
+
+**PBT 分级 max_examples 规约**：
+- P0 关键 Property（authz / readonly / 边界条件）：50-100
+- 可选探索类：5（MVP 速度优先）
+- 不允许 P0 关键 Property 用 `max_examples=5` 充数

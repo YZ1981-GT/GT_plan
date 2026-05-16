@@ -7,7 +7,7 @@
           <el-button text style="color: #fff; font-size: 13px; padding: 0" @click="router.push('/projects')">← 返回</el-button>
           <h2>底稿工作台</h2>
         </div>
-        <p>{{ projectName || '' }} · {{ mappings.length }} 个底稿映射</p>
+        <p>{{ projectName || '' }} · {{ templates.length }} 个主编码模板</p>
       </div>
       <div class="gt-wpb-banner-actions">
         <el-button size="small" @click="refreshAll" :loading="loading" round>刷新</el-button>
@@ -48,7 +48,12 @@
         <div class="gt-wpb-tree-header">
           <el-input v-model="searchText" placeholder="搜索底稿..." size="small" clearable />
           <div class="gt-wpb-tree-filters">
-            <el-checkbox v-model="onlyWithData" size="small">仅有数据</el-checkbox>
+            <el-tooltip
+              :content="!balanceLoaded ? '需先导入账套' : '隐藏所有 linked_accounts 在试算表中余额为零的模板（B/C/A/S 类无 linked_accounts 始终显示）'"
+              placement="bottom"
+            >
+              <el-checkbox v-model="onlyWithData" size="small">仅有数据</el-checkbox>
+            </el-tooltip>
             <el-checkbox v-model="onlyMine" size="small">仅我的</el-checkbox>
             <el-select v-model="filterStatus" size="small" placeholder="状态" clearable style="width: 80px">
               <el-option label="待编" value="pending" />
@@ -57,12 +62,12 @@
               <el-option label="已通过" value="passed" />
             </el-select>
           </div>
-          <!-- 进度概览 -->
+          <!-- 进度概览 (template-library-coordination Sprint 2.1)：已生成主编码数 / 主编码总数 -->
           <div class="gt-wpb-tree-progress">
-            <span class="gt-wpb-prog-item gt-wpb-prog--done">{{ doneCount }}</span>
+            <span class="gt-wpb-prog-item gt-wpb-prog--done">{{ generatedCount }}</span>
             <span class="gt-wpb-prog-sep">/</span>
-            <span class="gt-wpb-prog-item">{{ totalCount }}</span>
-            <el-progress :percentage="progressPct" :stroke-width="4" :show-text="false" style="flex:1; margin-left: 8px" />
+            <span class="gt-wpb-prog-item">{{ totalPrimaryCount }}</span>
+            <el-progress :percentage="generatedPct" :stroke-width="4" :show-text="false" style="flex:1; margin-left: 8px" />
           </div>
         </div>
         <el-tree
@@ -76,9 +81,17 @@
           @node-click="onNodeClick"
         >
           <template #default="{ data }">
-            <div class="gt-wpb-node">
+            <div class="gt-wpb-node" :class="{
+              'gt-tree-cycle': data.isCycle,
+              [data.cycleProgressClass]: data.isCycle && data.cycleProgressClass,
+              'gt-tree-ungenerated': !data.isCycle && data.generated === false,
+            }">
               <span class="gt-wpb-node-icon" v-if="data.statusIcon">{{ data.statusIcon }}</span>
               <span class="gt-wpb-node-label">{{ data.label }}</span>
+              <span v-if="data.sheetCount && data.sheetCount > 1" class="gt-wpb-node-sheets">
+                ({{ data.sheetCount }} sheets)
+              </span>
+              <span v-if="data.hasFormula" class="gt-wpb-node-formula" title="含预填充公式">ƒ</span>
               <span v-if="data.assignee" class="gt-wpb-node-assignee">{{ data.assignee }}</span>
             </div>
           </template>
@@ -314,7 +327,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, reactive } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { MagicStick, EditPen, Paperclip, WarningFilled } from '@element-plus/icons-vue'
@@ -326,6 +339,7 @@ import { fmtAmount } from '@/utils/formatters'
 import OcrStatusBadge from '@/components/common/OcrStatusBadge.vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { useNavigationStack } from '@/composables/useNavigationStack'
+import { eventBus } from '@/utils/eventBus'
 
 const route = useRoute()
 const router = useRouter()
@@ -344,6 +358,7 @@ const treeRef = ref<any>(null)
 const aiQuestion = ref('')
 const onlyWithData = ref(true)  // 默认只显示有数据的科目
 const accountsWithData = ref<Set<string>>(new Set())
+const balanceLoaded = ref(false)  // 试算表是否已加载（用于"仅有数据"筛选器）
 const onlyMine = ref(false)
 const filterStatus = ref('')
 const attachments = ref<any[]>([])
@@ -355,6 +370,27 @@ const priorYearData = ref<WpPrefillData | null>(null)
 const recommendations = ref<WpRecommendation[]>([])
 const recommendLoading = ref(false)
 const generatingWps = ref(false)
+
+// [template-library-coordination Sprint 2.1] 模板列表（来自 /api/projects/{pid}/wp-templates/list）
+// 替代旧的 mappings 作为树形数据源 — 包含全部主编码模板（B/C/D-N/A/S 全 6 模块）
+interface TemplateListItem {
+  wp_code: string
+  wp_name: string
+  cycle: string
+  cycle_name: string
+  filename: string
+  format: string
+  component_type: string | null
+  audit_stage: string | null
+  linked_accounts: string[]
+  procedure_steps: any[]
+  has_formula: boolean
+  source_file_count: number
+  sheet_count: number
+  generated: boolean
+  sort_order: number | null
+}
+const templates = ref<TemplateListItem[]>([])
 
 // 底稿委派
 const showAssignDialog = ref(false)
@@ -369,6 +405,16 @@ const yoyChange = computed(() => {
 
 // 从底稿列表获取实际状态
 const wpStatusMap = ref<Record<string, { status: string; review_status: string; assigned_to?: string }>>({})
+
+// [template-library-coordination Sprint 2.1] 进度统计基于 templates 而非 mappings
+const totalPrimaryCount = computed(() => templates.value.length)
+const generatedCount = computed(() => templates.value.filter(t => t.generated).length)
+const generatedPct = computed(() => totalPrimaryCount.value > 0
+  ? Math.round((generatedCount.value / totalPrimaryCount.value) * 100)
+  : 0
+)
+
+// 旧字段保留兼容（暂未删除引用处）
 const totalCount = computed(() => mappings.value.length)
 const doneCount = computed(() => {
   return Object.values(wpStatusMap.value).filter(
@@ -447,6 +493,13 @@ interface TreeNode {
   id: string; label: string; children?: TreeNode[]
   wpCode?: string; stale?: boolean; consistent?: boolean | null
   statusIcon?: string; assignee?: string
+  // [Sprint 2.1+2.2] 树形扩展字段
+  isCycle?: boolean
+  cycleProgressClass?: string  // 进度颜色：done(green) / partial(blue) / empty(grey)
+  generated?: boolean          // 模板是否已生成（未生成显示灰色）
+  sheetCount?: number
+  hasFormula?: boolean
+  componentType?: string | null
 }
 
 function _wpStatusIcon(wp?: { status: string; review_status: string }): string {
@@ -459,22 +512,31 @@ function _wpStatusIcon(wp?: { status: string; review_status: string }): string {
   return '⬜'
 }
 
+// [template-library-coordination Sprint 2.1+2.2+2.3]
+// treeData 数据源从 mappings 改为 templates（来自 /api/projects/{pid}/wp-templates/list）
+// - 按 cycle 分组（用 cycle_name 作为分组节点名）
+// - 循环节点旁显示模板数量（动态从 API 计算）+ 进度（已完成/总数）
+// - 未生成底稿（generated=false）的节点 class="gt-tree-ungenerated" 灰色
+// - "仅有数据"筛选：linked_accounts 中所有科目余额为零时隐藏；无 linked_accounts（B/C/A/S）始终显示
 const treeData = computed<TreeNode[]>(() => {
-  const groups: Record<string, TreeNode> = {}
-  const CYCLE_NAMES: Record<string, string> = {
-    D: 'D 销售循环', E: 'E 货币资金', F: 'F 存货', G: 'G 投资',
-    H: 'H 固定资产', I: 'I 无形资产', J: 'J 薪酬', K: 'K 费用',
-    L: 'L 负债', M: 'M 权益', N: 'N 税项',
-  }
-  for (const m of mappings.value) {
-    // 仅有数据模式：跳过没有余额数据的科目
-    if (onlyWithData.value && accountsWithData.value.size > 0) {
-      const codes = (m.account_codes || []) as string[]
-      if (codes.length > 0) {
-        // 检查 mapping 的任何科目编码是否在有数据集合中（含前缀匹配）
-        const hasData = codes.some(c => {
+  const groups = new Map<string, {
+    cycle: string
+    cycleName: string
+    sortOrder: number
+    items: TemplateListItem[]
+  }>()
+
+  for (const t of templates.value) {
+    // 仅有数据筛选（D11 ADR：树节点维度按主编码）
+    // 必须满足：(a) 试算表已加载 + (b) 模板有 linked_accounts + (c) 所有 linked_accounts 余额为零 → 才隐藏
+    // 无 linked_accounts（B/C/A/S 类）始终显示
+    if (onlyWithData.value && balanceLoaded.value) {
+      const linked = (t.linked_accounts || []) as string[]
+      if (linked.length > 0) {
+        const hasData = linked.some(c => {
+          if (!c) return false
           if (accountsWithData.value.has(c)) return true
-          // 前缀匹配：mapping 编码 1122 匹配余额表中的 112201
+          // 前缀匹配：模板编码 1122 匹配余额表中的 112201
           for (const existing of accountsWithData.value) {
             if (existing.startsWith(c) || c.startsWith(existing)) return true
           }
@@ -483,25 +545,63 @@ const treeData = computed<TreeNode[]>(() => {
         if (!hasData) continue
       }
     }
-    const key = m.cycle
-    if (!groups[key]) {
-      groups[key] = { id: `g-${key}`, label: CYCLE_NAMES[key] || `${key}循环`, children: [] }
+
+    const key = t.cycle || '?'
+    if (!groups.has(key)) {
+      groups.set(key, {
+        cycle: key,
+        cycleName: t.cycle_name || `${key} 循环`,
+        sortOrder: t.sort_order ?? 999999,
+        items: [],
+      })
     }
-    groups[key].children!.push({
-      id: m.wp_code, label: `${m.wp_code} ${m.wp_name}`, wpCode: m.wp_code,
-      statusIcon: _wpStatusIcon(wpStatusMap.value[m.wp_code]),
-      assignee: wpStatusMap.value[m.wp_code]?.assigned_to || undefined,
+    groups.get(key)!.items.push(t)
+  }
+
+  // 按 sort_order 升序（gt_wp_coding 真源），后端已传该字段
+  const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+    const ga = groups.get(a)!
+    const gb = groups.get(b)!
+    if (ga.sortOrder !== gb.sortOrder) return ga.sortOrder - gb.sortOrder
+    return a.localeCompare(b)
+  })
+
+  const result: TreeNode[] = []
+  for (const key of sortedKeys) {
+    const g = groups.get(key)!
+    const total = g.items.length
+    if (total === 0) continue
+
+    // [Sprint 2.2] 循环进度统计（基于 generated 字段）
+    const done = g.items.filter(it => it.generated).length
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0
+    let progressClass = 'gt-cycle-progress--empty'  // grey <50%
+    if (pct === 100) progressClass = 'gt-cycle-progress--done'
+    else if (pct >= 50) progressClass = 'gt-cycle-progress--partial'
+
+    const children: TreeNode[] = g.items
+      .sort((a, b) => (a.wp_code || '').localeCompare(b.wp_code || ''))
+      .map(t => ({
+        id: t.wp_code,
+        label: `${t.wp_code} ${t.wp_name}`,
+        wpCode: t.wp_code,
+        statusIcon: _wpStatusIcon(wpStatusMap.value[t.wp_code]),
+        assignee: wpStatusMap.value[t.wp_code]?.assigned_to || undefined,
+        generated: t.generated,
+        sheetCount: t.sheet_count || 1,
+        hasFormula: t.has_formula,
+        componentType: t.component_type,
+      }))
+
+    result.push({
+      id: `cycle-${key}`,
+      label: `${g.cycleName}（${done}/${total}）`,
+      isCycle: true,
+      cycleProgressClass: progressClass,
+      children,
     })
   }
-  // 统计每组数量，过滤空组
-  const result: TreeNode[] = []
-  for (const g of Object.values(groups)) {
-    const total = g.children?.length || 0
-    if (total === 0) continue
-    g.label = `${g.label}（${total}）`
-    result.push(g)
-  }
-  return result.sort((a, b) => a.label.localeCompare(b.label))
+  return result
 })
 
 function filterNode(value: string, data: any, node: any) {
@@ -516,7 +616,22 @@ watch(searchText, (val) => {
 
 function onNodeClick(data: TreeNode) {
   if (!data.wpCode) return
-  const m = mappings.value.find(x => x.wp_code === data.wpCode)
+  // 优先从 mappings 找（含 account_codes/account_name），找不到则降级用 templates 构造最小 mapping 占位
+  let m = mappings.value.find(x => x.wp_code === data.wpCode)
+  if (!m) {
+    const t = templates.value.find(x => x.wp_code === data.wpCode)
+    if (t) {
+      m = {
+        wp_code: t.wp_code,
+        cycle: t.cycle,
+        wp_name: t.wp_name,
+        account_codes: t.linked_accounts || [],
+        account_name: (t.linked_accounts || [])[0] || t.wp_name,
+        report_row: null,
+        note_section: null,
+      } as WpAccountMapping
+    }
+  }
   if (m) {
     selectedMapping.value = m
     loadPrefillData(m)
@@ -554,10 +669,20 @@ function getOcrStatus(att: any): 'ok' | 'processing' | 'failed' | 'pending' {
 // ── 数据加载 ──
 async function refreshAll() {
   loading.value = true
+
+  // [Sprint 2.1] 加载模板列表（来自 /list 端点 — 全部主编码模板含 generated 字段）
+  try {
+    const data = await api.get(P_wp.templateList(projectId.value))
+    const list = Array.isArray(data) ? data : (data?.items || [])
+    templates.value = list as TemplateListItem[]
+  } catch {
+    templates.value = []
+  }
+
+  // 加载科目映射（保留兼容，详情面板仍依赖）
   try {
     mappings.value = await getAllWpMappings(projectId.value)
   } catch {
-    // 映射数据不存在时静默（新项目无映射）
     mappings.value = []
   }
   // 加载底稿状态（非关键，静默）
@@ -596,7 +721,10 @@ async function refreshAll() {
       }
     }
     accountsWithData.value = codes
-  } catch { /* 静默 */ }
+    balanceLoaded.value = codes.size > 0
+  } catch {
+    balanceLoaded.value = false
+  }
   loading.value = false
 }
 
@@ -797,7 +925,27 @@ async function onConfirmAssign() {
 }
 
 // ── 初始化 ──
+// [Sprint 2.2] 监听底稿保存事件，实时刷新进度统计
+let _unsubscribers: Array<() => void> = []
+
+function _setupEventListeners() {
+  // 底稿保存后刷新进度（generated 字段会变化）
+  const off1 = eventBus.on('workpaper:saved', (payload) => {
+    if (payload?.projectId === projectId.value) {
+      // 仅重新拉取 templates 列表（最轻量）
+      api.get(P_wp.templateList(projectId.value))
+        .then((data: any) => {
+          const list = Array.isArray(data) ? data : (data?.items || [])
+          templates.value = list as TemplateListItem[]
+        })
+        .catch(() => { /* 静默 */ })
+    }
+  })
+  _unsubscribers.push(off1 as any)
+}
+
 onMounted(async () => {
+  _setupEventListeners()
   await refreshAll()
   // 加载人员列表
   try {
@@ -815,6 +963,13 @@ onMounted(async () => {
       loadAiAnalysis(target)
     }
   }
+})
+
+onBeforeUnmount(() => {
+  for (const off of _unsubscribers) {
+    try { off() } catch { /* ignore */ }
+  }
+  _unsubscribers = []
 })
 </script>
 
@@ -878,6 +1033,27 @@ onMounted(async () => {
 .gt-wpb-node-icon { font-size: 14px; flex-shrink: 0; }
 .gt-wpb-node-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-wpb-node-assignee { font-size: 10px; color: var(--gt-color-text-tertiary); background: var(--gt-color-bg); padding: 1px 4px; border-radius: 3px; }
+/* [template-library-coordination Sprint 2.1+2.2+2.3] 树形扩展样式 */
+.gt-tree-ungenerated { color: #c0c4cc; }
+.gt-tree-ungenerated .gt-wpb-node-label { color: #c0c4cc; }
+.gt-tree-cycle { font-weight: 600; }
+.gt-cycle-progress--done .gt-wpb-node-label { color: #67c23a; }
+.gt-cycle-progress--partial .gt-wpb-node-label { color: #409eff; }
+.gt-cycle-progress--empty .gt-wpb-node-label { color: #909399; }
+.gt-wpb-node-sheets {
+  font-size: 11px;
+  color: #909399;
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  margin-left: 4px;
+}
+.gt-wpb-node-formula {
+  font-family: 'Times New Roman', serif;
+  font-style: italic;
+  color: #67c23a;
+  font-size: 12px;
+  margin-left: 2px;
+}
 /* 中栏：详情 */
 .gt-wpb-detail {
   flex: 1; min-width: 0; background: var(--gt-color-bg-white);

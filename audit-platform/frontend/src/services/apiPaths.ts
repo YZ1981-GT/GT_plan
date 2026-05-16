@@ -161,6 +161,7 @@ export const disclosureNotes = {
   exportWord: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/export-word`,
   priorYear: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/prior-year`,
   relatedWorkpapers: (pid: string, year: number, section: string, rowCode: string) => `/api/notes/${pid}/${year}/${encodeURIComponent(section)}/row/${encodeURIComponent(rowCode)}/related-workpapers`,
+  templateStructure: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/template-structure`,
   ai: {
     generatePolicy: (pid: string) => `/api/disclosure-notes/${pid}/ai/generate-policy`,
     generateAnalysis: (pid: string) => `/api/disclosure-notes/${pid}/ai/generate-analysis`,
@@ -168,6 +169,17 @@ export const disclosureNotes = {
     complete: (pid: string) => `/api/disclosure-notes/${pid}/ai/complete`,
     checkCompleteness: (pid: string) => `/api/disclosure-notes/${pid}/ai/check-completeness`,
   },
+  conversion: {
+    preview: (pid: string) => `/api/projects/${pid}/notes/conversion/preview`,
+    execute: (pid: string) => `/api/projects/${pid}/notes/conversion/execute`,
+    rollback: (pid: string) => `/api/projects/${pid}/notes/conversion/rollback`,
+  },
+  // Sprint 9: 高级附注功能
+  importPriorYear: (pid: string) => `/api/projects/${pid}/notes/import-prior-year`,
+  inheritPriorYear: (pid: string) => `/api/projects/${pid}/notes/inherit-prior-year`,
+  crossReferences: (pid: string, year: number) => `/api/projects/${pid}/notes/cross-references?year=${year}`,
+  crossReferencesUpdate: (pid: string, year: number) => `/api/projects/${pid}/notes/cross-references/update?year=${year}`,
+  generateVariationAnalysis: (pid: string, year: number) => `/api/projects/${pid}/notes/generate-variation-analysis?year=${year}`,
 } as const
 
 // ─── 审计报告 ───────────────────────────────────────────────────────────────
@@ -283,6 +295,7 @@ export const workpapers = {
   downloadPack: (pid: string) => `/api/projects/${pid}/working-papers/download-pack`,
   templateDownload: (pid: string, wpCode: string) => `/api/projects/${pid}/wp-templates/${wpCode}/download`,
   templateDownloadAll: (pid: string) => `/api/projects/${pid}/wp-templates/download-all`,
+  templateList: (pid: string) => `/api/projects/${pid}/wp-templates/list`,
   upload: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/upload`,
   uploadFile: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/upload-file`,
   onlineSession: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/online-session`,
@@ -1379,6 +1392,94 @@ export const conflictGuard = {
   unlock: (pid: string, entryGroupId: string) => `/api/projects/${pid}/adjustments/${entryGroupId}/lock`,
 } as const
 
+// ─── 全链路工作流（Chain Workflow） ──────────────────────────────────────────
+
+export const chainWorkflow = {
+  executeFullChain: (pid: string) => `/api/projects/${pid}/workflow/execute-full-chain`,
+  progress: (pid: string, executionId: string) => `/api/projects/${pid}/workflow/progress/${executionId}`,
+  executions: (pid: string) => `/api/projects/${pid}/workflow/executions`,
+  retry: (pid: string, executionId: string) => `/api/projects/${pid}/workflow/retry/${executionId}`,
+  consistencyCheck: (pid: string) => `/api/projects/${pid}/workflow/consistency-check`,
+  compare: (pid: string, executionId: string) => `/api/projects/${pid}/workflow/compare/${executionId}`,
+  dataHealth: (pid: string) => `/api/projects/${pid}/workflow/data-health`,
+  notesSyncFromReport: (pid: string) => `/api/projects/${pid}/workflow/notes/sync-from-report`,
+  notesTrimAndSort: (pid: string) => `/api/projects/${pid}/workflow/notes/trim-and-sort`,
+  batchExecute: '/api/workflow/batch-execute',
+} as const
+
+// ─── 项目配置中心 ────────────────────────────────────────────────────────────
+
+export const projectConfig = {
+  get: (pid: string) => `/api/projects/${pid}/config`,
+  update: (pid: string) => `/api/projects/${pid}/config`,
+} as const
+
+// ─── 附注协作与锁定 ─────────────────────────────────────────────────────────
+
+export const noteLocks = {
+  acquire: (pid: string) => `/api/projects/${pid}/notes/locks/acquire`,
+  release: (pid: string) => `/api/projects/${pid}/notes/locks/release`,
+  forceRelease: (pid: string) => `/api/projects/${pid}/notes/locks/force-release`,
+  heartbeat: (pid: string) => `/api/projects/${pid}/notes/locks/heartbeat`,
+  active: (pid: string) => `/api/projects/${pid}/notes/locks/active`,
+} as const
+
+// ─── 数据锁定与快照 ─────────────────────────────────────────────────────────
+
+export const dataLock = {
+  lock: (pid: string) => `/api/projects/${pid}/data-lock/lock`,
+  unlock: (pid: string) => `/api/projects/${pid}/data-lock/unlock`,
+  snapshot: (pid: string) => `/api/projects/${pid}/data-lock/snapshot`,
+  snapshots: (pid: string) => `/api/projects/${pid}/data-lock/snapshots`,
+  status: (pid: string) => `/api/projects/${pid}/data-lock/status`,
+} as const
+
+// ─── 集团模板 ───────────────────────────────────────────────────────────────
+
+export const noteGroupTemplate = {
+  save: (pid: string) => `/api/projects/${pid}/notes/group-template/save`,
+  distribute: (pid: string) => `/api/projects/${pid}/notes/group-template/distribute`,
+  detach: (pid: string) => `/api/projects/${pid}/notes/group-template/detach`,
+  list: (pid: string) => `/api/projects/${pid}/notes/group-template/list`,
+} as const
+
+// ─── 自定义章节 ─────────────────────────────────────────────────────────────
+
+export const noteCustomSections = {
+  create: (pid: string) => `/api/projects/${pid}/notes/custom-sections/create`,
+  saveAsTemplate: (pid: string) => `/api/projects/${pid}/notes/custom-sections/save-as-template`,
+  applyTemplate: (pid: string) => `/api/projects/${pid}/notes/custom-sections/apply-template`,
+  templates: (pid: string) => `/api/projects/${pid}/notes/custom-sections/templates`,
+} as const
+
+// ─── 模板库管理 [template-library-coordination Sprint 2.7] ─────────────────
+// 后端路由 prefix="/api/template-library-mgmt"（router_registry §54）
+
+export const templateLibraryMgmt = {
+  formulaCoverage: '/api/template-library-mgmt/formula-coverage',
+  prefillFormulas: '/api/template-library-mgmt/prefill-formulas',
+  crossWpReferences: '/api/template-library-mgmt/cross-wp-references',
+  seedStatus: '/api/template-library-mgmt/seed-status',
+  seedAll: '/api/template-library-mgmt/seed-all',
+  versionInfo: '/api/template-library-mgmt/version-info',
+} as const
+
+// ─── 自定义查询 [template-library-coordination Sprint 6 Tasks 6.4-6.6] ────
+export const customQuery = {
+  indicators: '/api/custom-query/indicators',
+  execute: '/api/custom-query/execute',
+  templates: '/api/custom-query/templates',
+  templateDetail: (id: string) => `/api/custom-query/templates/${id}`,
+} as const
+
+// ─── 系统枚举字典 [template-library-coordination Sprint 6 Tasks 6.1-6.3] ──
+export const systemDicts = {
+  list: '/api/system/dicts',
+  usageCount: (key: string) => `/api/system/dicts/${key}/usage-count`,
+  items: (key: string) => `/api/system/dicts/${key}/items`,
+  itemDetail: (key: string, value: string) => `/api/system/dicts/${key}/items/${value}`,
+} as const
+
 // ─── 聚合导出（便于 import { API } from '@/services/apiPaths'） ─────────────
 
 export const API = {
@@ -1401,7 +1502,10 @@ export const API = {
   admin, my, partner, qcDashboard, qcRules, qcInspections, qcCases,
   qcAnnualReports, qcAuditLogCompliance, qcArchiveReadiness,
   jobs, governance, eqcr, signatures, rotation,
-  presence, linkage, conflictGuard,
+  presence, linkage, conflictGuard, chainWorkflow, projectConfig,
+  noteLocks, dataLock, noteGroupTemplate, noteCustomSections,
+  templateLibraryMgmt,
+  customQuery, systemDicts,
 } as const
 
 export default API

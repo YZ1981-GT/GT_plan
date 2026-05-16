@@ -168,7 +168,7 @@ class TestDisclosureProperty:
 
     def test_note_validation_engine(self):
         from app.services.note_validation_engine import NoteValidationEngine
-        assert hasattr(NoteValidationEngine, 'validate_all')
+        assert hasattr(NoteValidationEngine, 'execute_all')
 
 
 class TestAuditReportProperty:

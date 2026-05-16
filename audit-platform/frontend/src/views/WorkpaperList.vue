@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="gt-wp-list gt-fade-in">
     <!-- 页面横幅 [R7-S3-01] -->
-    <GtPageHeader :title="projectName ? `${projectName} — 底稿管理` : '底稿管理'" @back="$router.push('/projects')" variant="compact">
+    <GtPageHeader :title="projectName ? `${projectName} — 底稿管理` : '底稿管理'" @back="$router.push('/projects')" variant="default">
       <template #actions>
         <GtToolbar :show-import="true" import-label="Excel导入" @import="showWpImport = true">
           <template #left>
@@ -1120,8 +1120,13 @@ function onOnlineEdit() {
 
 async function onDownload() {
   if (!selectedWp.value) return
+  const code = selectedWp.value.wp_code || ''
+  if (!code) {
+    ElMessage.warning('当前底稿未绑定模板编码')
+    return
+  }
   try {
-    await downloadTemplate(projectId.value, selectedWp.value.wp_code)
+    await downloadTemplate(projectId.value, code)
   } catch (e: any) {
     handleApiError(e, '下载模板')
   }

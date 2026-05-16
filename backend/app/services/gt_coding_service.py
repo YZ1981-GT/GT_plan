@@ -279,7 +279,8 @@ class GTCodingService:
         if not coding:
             raise ValueError("编码不存在")
 
-        coding.soft_delete()
+        # GTWpCoding 不继承 SoftDeleteMixin，直接设置 is_deleted 字段
+        coding.is_deleted = True
         await db.flush()
         return {"id": str(coding_id), "deleted": True}
 

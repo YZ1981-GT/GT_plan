@@ -477,3 +477,64 @@ def register_all_routers(app: FastAPI) -> None:
     # ═══ 42. 底稿模板下载（原始模板文件） ═══
     from app.routers.wp_template_download import router as wp_tmpl_dl_router
     app.include_router(wp_tmpl_dl_router, tags=["wp-template-download"])
+
+    # ═══ 43. 全链路工作流编排（chain_workflow） ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/workflow"，注册时不加额外前缀。
+    from app.routers.chain_workflow import router as chain_workflow_router
+    app.include_router(chain_workflow_router, tags=["chain-workflow"])
+
+    # ═══ 44. 报表 Excel 导出（report_export） ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/reports"，注册时不加额外前缀。
+    from app.routers.report_export import router as report_export_router
+    app.include_router(report_export_router, tags=["report-export"])
+
+    # ═══ 45. 附注 Word 导出（note_export） ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/notes"，注册时不加额外前缀。
+    from app.routers.note_export import router as note_export_router
+    app.include_router(note_export_router, tags=["note-export"])
+
+    # ═══ 46. 附注国企版↔上市版互转（note_conversion） ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/notes/conversion"，注册时不加额外前缀。
+    from app.routers.note_conversion import router as note_conversion_router
+    app.include_router(note_conversion_router, tags=["note-conversion"])
+
+    # ═══ 47. 附注高级功能（上年导入/交叉引用/变动分析） ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/notes"，注册时不加额外前缀。
+    from app.routers.note_advanced import router as note_advanced_router
+    app.include_router(note_advanced_router, tags=["note-advanced"])
+
+    # ═══ 48. Sprint 10：集团模板继承与下发 ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/notes/group-template"，注册时不加额外前缀。
+    from app.routers.note_group_template import router as note_group_template_router
+    app.include_router(note_group_template_router, tags=["note-group-template"])
+
+    # ═══ 49. Sprint 10：附注章节锁定（多人协作） ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/notes/locks"，注册时不加额外前缀。
+    from app.routers.note_section_lock import router as note_section_lock_router
+    app.include_router(note_section_lock_router, tags=["note-section-lock"])
+
+    # ═══ 50. Sprint 10：报表附注数据锁定与版本快照 ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/data-lock"，注册时不加额外前缀。
+    from app.routers.note_data_lock import router as note_data_lock_router
+    app.include_router(note_data_lock_router, tags=["note-data-lock"])
+
+    # ═══ 51. Sprint 10：批量项目操作 ═══
+    # batch_router 内部已声明 prefix="/api/workflow"，注册时不加额外前缀。
+    from app.routers.chain_workflow import batch_router as chain_batch_router
+    app.include_router(chain_batch_router, tags=["chain-workflow-batch"])
+
+    # ═══ 52. Sprint 10：附注章节模板可扩展性 ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/notes/custom-sections"，注册时不加额外前缀。
+    from app.routers.note_custom_section import router as note_custom_section_router
+    app.include_router(note_custom_section_router, tags=["note-custom-section"])
+
+    # ═══ 53. Sprint 11：项目级配置中心 ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/config"，注册时不加额外前缀。
+    from app.routers.project_config import router as project_config_router
+    app.include_router(project_config_router, tags=["project-config"])
+
+    # ═══ 54. template-library-coordination：模板库管理（Sprint 1） ═══
+    # 路由内部已声明 prefix="/api/template-library-mgmt"，注册时不加额外前缀。
+    # §43-§53 已被 audit-chain-generation 占用，本路由使用 §54。
+    from app.routers.template_library_mgmt import router as template_library_mgmt_router
+    app.include_router(template_library_mgmt_router, tags=["template-library-mgmt"])

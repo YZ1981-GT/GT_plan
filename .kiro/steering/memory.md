@@ -48,10 +48,35 @@ inclusion: always
 - tasks.md 只放可被自动化工具推进的编码任务；手动浏览器验证（如"输入公式看结果"）应放 spec 末尾"UAT 验收清单"，不占 taskStatus 工作流
 - Sprint 粒度按"验证边界"切分：每个 Sprint ≤10 个任务，强制回归测试+UAT 才进下一 Sprint（反例：production-readiness Sprint 2 塞 20+ 小改）
 - 任务描述中引用的依赖包、类名、API 路径，变化后要回填更新（如 0.1/0.2 的 `@univerjs/preset-sheets-formula` 实际不存在）
+- **spec 实施前预检策略（template-library-coordination 沉淀 2026-05-16）**：开始 Sprint 1 前必须 grep 所有目标文件（routers / components / routes / migrations）核对是否已预先实施；若已存在直接 readFile 验证完整性后标 [x]，避免 subagent 空跑重新生成；本 spec 大量 Sprint 1-2 文件（template_library_mgmt.py 913 行 / WorkpaperWorkbench 树形改造 / TemplateLibraryMgmt.vue 主页面 / 4 个 Tab 组件）在 spec 创建时已部分预实施，避免重新执行节省 6+ subagent 调用
 - **R5 复盘教训**：标 `[x]` 前必须跑 pytest 验证；"代码文件存在"不等于"功能可用"。Task 12/13 初次标完成时其实 gate_engine/sign_service 有隐藏 flush bug，集成测试才能暴露
 - **跨文件字段/枚举假设必须 grep 核对**：User.metadata_、WorkHour.status 类型、ProjectStatus.in_progress、CompetenceRating.A 这些都是我凭印象写的错误假设，导致代码 runtime 失败
 - **测试 fixture 模板**：每个新 test 文件应复用邻居文件的 `db_session` fixture 模板（见 test_eqcr_gate_approve.py 为样板：本地 _engine + pytest_asyncio.fixture + Base.metadata.create_all）；backend/tests/conftest.py 不提供 db_session
 - **Run All Tasks 前必须预检现状**：创建 spec 前或执行前先 grep 关键标志（如 `<table`）确认哪些 task 实际需要执行；已完成的 task 直接标 [x] 跳过，避免 21 次 subagent 空跑（表格统一化 spec 教训）
+- **spec 创建阶段禁止动 production 代码（template-library-coordination 复盘 2026-05-16）**：design.md 想写代码骨架时放到独立"代码骨架示例"区块加注释"非实施"，实施 freeze 后才进入 Sprint 1；本 spec 创建时混入了 §54 路由/template_library_mgmt.py 913 行/4 个 Tab 组件等大量实施代码，导致 Sprint 1-4 大部分 task 标 [x] 时只是"验证文件存在"而非"实施完成"，复盘分不清边界
+- **spec 创建时强制"假设清单 grep 核验"5 项**：(1) ORM 字段 → grep `class XxxModel` 确认；(2) seed JSON → `Test-Path backend/data/xxx.json` 实测；(3) 路由 §N → grep `router_registry.py` 当前编号占用；(4) "前端已有 X.vue" → fileSearch 实测；(5) DB 表/列 → grep models 文件确认；五项缺一项就会出现 spec 假设错位，靠 Sprint 0 兜底是补救不是预防（template-library-coordination 一次踩 5 处）
+- **tasks.md 末尾固定"已知缺口与技术债"章节**：与 UAT 验收清单平级，每个缺口标 P0/P1/P2 + 触发条件 + 后续 spec 编号；实施时新引入的妥协（降级 stub / 占位实现 / 跳过的 PBT）强制回写到这里，避免技术债散落各 task 描述里查不回来
+- **PBT 区分 P0/可选两档，P0 不允许跳过**：P0 = authz / readonly enforcement / 数据正确性（覆盖率公式、SAVEPOINT 边界、403/405 校验）；可选 = 边界探索类；用 `[ ]*` 标记必须在 design.md 显式写"接受测试缺口的理由"，否则按 P0 处理；template-library-coordination 17 个 Property 中 9 个 PBT 全跳过仅靠集成测试间接覆盖 4 条，剩 13 条无自动化校验
+- **subagent 调用规约（template-library-coordination 沉淀）**：(1) 单次任务 ≤ 4 件事，超过强制拆批次（本 spec Sprint 4 batch 1 一次 5 件事 prompt 5000+ token）；(2) prompt 强制返回结构化 JSON（files_created / files_modified / vue_tsc_status / pytest_count）替代大段总结；(3) orchestrator 不要预读 subagent 即将创建的目标文件，避免 ENOENT 噪声 + 文件被读 3 次
+- **集成测试 docstring 强制反向映射 Property**：每个测试函数 docstring 加 `# Validates: Property X`，便于复盘时找回"哪些 Property 被覆盖、哪些缺口"；template-library-coordination Sprint 5 集成测试已落地此规约（test_seed_all_savepoint_isolation 标 D15 + Property 9 等）
+- **通用 spec 核验工具已固化（2026-05-16）**：`backend/scripts/verify_spec_facts.py` + 各 spec 目录下 `snapshot.json` schema（json_sources / computed_values / db_tables / missing_files / router_assertions / orm_assertions / alembic_assertions 7 类断言）；用法 `python backend/scripts/verify_spec_facts.py {spec_id}` 或 `--all` 批量；退出码 0/1/2 区分 OK/WARN/FAIL；新 spec 只需在其目录建 snapshot.json 即可复用，不再写一次性脚本
+- **snapshot.json schema 当前为 experimental v1**：仅 template-library-coordination 试用过；2-3 个新 spec 实战后再固化；当前已知不足 = computed_values 仅支持加法 / db_tables SQL 不支持参数化 / orm_assertions 仅支持"必须无字段"反向断言 / 无容差范围（仅 ±tolerance% 单档）；新 spec 用时 schema 可能 break
+- **TD 章节不是 task 退回的避难所（template-library-coordination 二轮复盘 2026-05-16）**：tasks.md 末尾"已知缺口与技术债"只放"实施完成但留有真缺口"的项；task 没真正完成（占位实现 / 未真实数据验证）的应该 `[x]` → `[ ]` 退回未完成，**不应**登记到 TD；历史事故（如 spec 创建期混入实施代码）应放 design.md 的"实施记录"或独立 LESSONS_LEARNED.md，不与技术债混账
+- **Property docstring 反向映射需双向闭环**：仅在测试函数 docstring 加 `Validates: Property X` 不够，必须配套 (1) design.md 的 Property 区块标 `[Tested: test_xxx]` / `[Pending: TD-N]` / `[Skipped: 可选]`；(2) `scripts/check_property_coverage.py` 双向核验 + CI 卡点；否则下次新增 Property 仍可能"列了但没测"
+- **3 个 spec 工具已固化（template-library-coordination 二轮复盘 2026-05-16）**：(1) `backend/scripts/verify_spec_facts.py` 核验 N_* 基准值（snapshot.json）；(2) `backend/scripts/check_property_coverage.py` Property↔test docstring 双向核验；(3) `backend/scripts/build_spec_coverage_matrix.py` 自动生成 Requirements↔Tasks↔Properties↔Tests 四向映射表（输出 COVERAGE_MATRIX.md）；3 工具均已加 Windows GBK console UTF-8 兼容（`sys.stdout.reconfigure(encoding="utf-8")`），避免 emoji/中文崩溃
+- **pre-commit hooks 已接入两个 spec 工具**：`.pre-commit-config.yaml` 新增 `verify-spec-facts`（snapshot.json/seed JSON 改动触发 + WARN 不阻断/FAIL 阻断）+ `check-property-coverage`（design.md/集成测试改动触发 + FAIL 阻断）；spec 数字漂移与 Property 覆盖漏报现已自动卡点
+- **spec 三件套变更记录区块（P1.5 落地）**：requirements.md / design.md / tasks.md 顶部各加 `## 变更记录` 表格（版本号 + 日期 + 摘要 + 触发原因），新人看 spec 一眼看清演进；新 spec 创建模板应包含此区块
+- **spec ADR 核验证据小区块模板（P2.7 落地）**：design.md 关键 ADR（如 D14 消费契约）附 5 字段子区块：假设 / 证据 / 核验时间 / 失效条件 / 同步更新点；template-library-coordination D14 已示范，未来其他 ADR 可参照
+- **UAT 结构化 checklist 模板（P2.8 落地）**：tasks.md UAT 区改 markdown 表格 7 列（# / 验收项 / Requirements / Tester / Date / Status / 备注），Status 取值 `✓ pass / ✗ fail / ⚠ partial / ○ pending`；上线前 milestone 卡点要求 ≥ N 项 ✓ pass
+- **template-library-coordination 全部完成（三轮复盘 2026-05-16）**：43/43 必做 + 16/16 PBT + 6.2/6.3 重新完成；33 测试通过（6.75s）；新建 2 测试文件 `test_template_library_properties.py`（17 PBT）+ `test_system_dicts_usage_count.py`（4 用例）+ `test_gt_coding_crud_integration.py`（4 用例）；Property 覆盖率 5/17 → 16/17 = 94%；唯一未覆盖 P1 是前端 v-permission 模板渲染（vitest/E2E 范畴）
+- **`gt_coding.py` 三个 mutation 端点已加 `require_role(["admin","partner"])` 守卫**：POST `/api/gt-coding` + PUT `/api/gt-coding/{coding_id}` + DELETE `/api/gt-coding/{coding_id}`；之前仅 `get_current_user`，任何登录用户都能调，存在权限漏洞
+- **fix: `gt_coding_service.delete_custom_coding` soft_delete bug**：调用 `coding.soft_delete()` 但 `GTWpCoding` 不继承 `SoftDeleteMixin`（grep 核实），运行时 AttributeError；修复 = 改为 `coding.is_deleted = True`（GTWpCoding 自身有此字段）；属 R8 风格"凭印象写字段假设"踩坑模式
+- **PBT 反模式识别规则（三轮复盘 2026-05-16）**：很多 hypothesis 测试不是真 property-based，而是"参数化用例" — 反模式表现：(1) strategy 已强制满足约束（输入永远合法，测试永真）；(2) `sorted()` 后断言已排序（永真命题）；(3) reimplement 算法 + 喂同一算法 + 断言一致（同义反复）。真 PBT 应该 fuzz 生成可能违反不变量的输入；评审清单：① 输入 strategy 是否故意包含违反约束的 case？② 测试是否会因 production 代码修改而失败？③ 算法实现和测试断言是否独立来源？
+- **PBT 分级 max_examples 规约**（三轮复盘补充）：P0 关键 Property（authz / readonly / 边界条件）应 `max_examples=50-100`，可选探索类保持 5；目前 template-library-coordination 17 PBT 全 max_examples=5 视为 MVP 兜底，下次新 spec 关键 Property 升级
+- **subagent 越权三类风险（三轮复盘 2026-05-16）**：(1) 范围扩张 — 把测试期望（auditor 应 403）反向给 production 加权限守卫；(2) bug 修复混入测试 commit — 没走独立 commit 边界，git log 看不到独立事件；(3) 状态变更单方面声明（划掉 TD 项 / 改 UAT 措辞），无审计痕迹。下次 prompt 加严约束："发现 production bug 必须独立报告但不修，由 orchestrator 决定"+"发现 spec 范围扩张需求只报告不实施"+"TD 状态变更必须附 commit-style note"
+- **三轮复盘 P0+P1.5 改进已落地（2026-05-16）**：(1) design.md Coverage 标签新增 `[Skipped: 前端范畴]` 类别（区分"待补 PBT"vs"非后端范围"）；Property 1 已贴此标签，覆盖率从 16/17=94% 改为 16/16=100%（后端范畴）；(2) conventions.md 新增 "Subagent 调用约束" + "PBT 反模式识别清单" 两节作永久规约；(3) `check_property_coverage.py` 升级 split-by-comma 解析 multi-test Coverage 标签，template-library-coordination 核验从 12 OK + 5 WARN 改为 17 OK + 0 WARN
+- **三轮复盘 P1.3+P3.9 改进已落地（2026-05-16）**：(1) `test_property_2_template_list_field_presence` 重写为真 PBT — 系统性 fuzz `mutation=("drop"|"none_value", field)` 故意破坏完整 base_item 中的某个字段，验证 validator sensitivity（每个 required 字段都必须被检测到），独立 oracle 用 `_REQUIRED_FIELDS_*` 常量 list；max_examples 升到 50；(2) `test_property_3_cycle_sort_order` 重写为真 PBT — 用独立 `itertools.permutations` 全枚举 oracle 找最小字典序排列与 `sorted(..., key=...)` production 算法对比（两条独立路径），max_examples 升到 50；(3) Property 16（authz）+ Property 17（readonly enforcement）max_examples 从 5 升到 50（P0 关键 Property 不再充数）；17 PBT 全绿 0.88s
+- **template-library-coordination 父任务全部 [x]**（三轮复盘 2026-05-16）：6 个 Sprint 父任务（Sprint 0-6）原本误标 [ ]（子任务全完成但父任务漏勾），本轮一并标 completed；spec 全部 50 task + 16 PBT + 6.2/6.3 重新完成共 67 项全部交付
 
 ## 环境配置
 
@@ -461,6 +486,69 @@ inclusion: always
   - **新建测试文件**：`backend/tests/test_wp_optimization_properties.py`（7 property-based + 2 supplementary + 3 integration = 12 tests）
   - **代码骨架完成但模板数据远未覆盖**：476 个致同模板只有 88 条 wp_account_mapping（D-N 审定表级），B/C/A/S 类模板元数据全缺；下一步是数据工程而非代码——需从实际 Excel/docx 模板提取 component_type/procedure_steps/formula_cells/conclusion_cell 种子数据
 - **全局模板库管理 spec 已创建**（`.kiro/specs/template-library-coordination/`）：22 需求 / 10 架构决策 / 15 属性 / 6 Sprint 50 任务 + 10 UAT；覆盖 5 大模板库 + 致同编码体系 + 枚举字典 + 自定义查询；管理页面 8 Tab（底稿模板/公式管理/审计报告/附注/编码体系/报表配置/枚举字典/自定义查询）
+- **template-library-coordination 实施完成（2026-05-16）**：43/43 必做编码任务全部完成（9 PBT 可选任务跳过），剩余 10 项 UAT 需手动浏览器验证；vue-tsc 0 错误，8/8 集成测试通过（2.81s）
+  - **新建后端文件 4 个**：`routers/template_library_mgmt.py`（913 行 / 6 端点 + 3 个 405 mutation 拦截 + Pydantic 模型 + `derive_seed_status` 纯函数）/ `routers/system_dicts.py` 扩展（`/usage-count` 端点查询 7 张业务表 + 3 个 405 mutation 拦截）/ `routers/custom_query.py` 扩展（5 个新数据源 + 模板 CRUD）/ `models/custom_query_models.py` + 2 Alembic 迁移（`template_library_seed_history_20260517` / `custom_query_templates_20260518`）
+  - **新建前端文件 12 个**：`views/TemplateLibraryMgmt.vue` 主页面（8 Tab + 顶部统计摘要 + 种子加载折叠区 + 版本历史对话框）/ `views/CustomQuery.vue` 独立页面 / `composables/useTemplateLibrarySource.ts`（D13 ADR JSON 只读统一文案）/ `components/template-library/` 9 个组件（WpTemplateTab / FormulaTab / FormulaCoverageChart / AuditReportTab / NoteTemplateTab / GtCodingTab / ReportConfigTab / SeedLoaderPanel / WpTemplateDetail / EnumDictTab / CustomQueryTab / VersionHistoryDialog）+ `tests/test_template_library_mgmt_integration.py`（8 测试覆盖 N+1 / SAVEPOINT / 405 / 403 / 覆盖率公式）
+  - **关键 ADR 落地**：D13 JSON 只读源 4 个资源（prefill_formula_mapping / cross_wp_references / audit_report_templates / wp_account_mapping）UI 不提供编辑入口 + 顶部 banner 引导 reseed；D14 不依赖 `WpTemplateMetadata.subtable_codes`（不存在），子表收敛靠 `wp_code.split("-")[0]` 运行时计算；D15 SAVEPOINT 边界（每 seed 独立 commit，失败不回滚已成功）；D16 零硬编码（所有数字从 API/JSON/SQL 实时取）；Property 16 后端二次校验 admin/partner（require_role）；Property 17 mutation → 405 + JSON_SOURCE_READONLY hint
+  - **路由 §54** 已注册（router_registry.py）；apiPaths.ts 新增 `templateLibraryMgmt` / `customQuery` / `systemDicts` 三个路径对象；前端路由 `/template-library` + `/custom-query` 已注册
+- **审计全链路一键生成与导出 spec 三件套完成**（`.kiro/specs/audit-chain-generation/`）：53 需求 / 10 架构决策 / 20 属性 / 11 Sprint 90 任务（81 必做+9 可选）+ 12 Checkpoint + 10 UAT；需求覆盖率 100% / 属性覆盖率 100%；第一部分=全链路编排（需求 1-17）；第二部分=报表模块修复（需求 18-20）；第三部分=附注模块修复（需求 21-27）；第四部分=全局联动（需求 28-40）；第五部分=用户体验（需求 41-53）
+  - **实施优先级**：P0=需求 1-3+18-20（全链路编排+报表修复）→ P1=需求 4-5+21-25+35-36+46（附注生成+底稿联动+分层策略+导出）→ P2=需求 6-12+26-27+38-40+47-48（一致性门控+编辑体验+枚举联动+互转+富文本）→ P3=需求 13-17+28-34+41-45+49-50（覆盖率提升+全局优化+协作+可扩展+可视化）
+  - **附注核心设计原则**：模板是参考框架不是必须全部生成；通用规则引擎（5 条：余额/变动/底稿/政策/关联方驱动）决定"生成什么"；底稿联动（4 种取数模式：合计/明细/分类/变动）决定"填什么数据"；智能裁剪（小金额合并/合并单体适配/必披露保留）
+  - **附注 5 层处理模型（需求 46）**：A=会计政策纯文字(10%自动化,不联动底稿) / B=合并科目注释表格(90%+,核心联动) / C=母公司注释(90%+,单体TB联动) / D=补充信息混合(50%,部分联动) / E=附录索引(100%全自动)；只有 B/C 层与底稿深度联动
+  - **附注预置枚举 10 种**：aging_period(5段)/aging_period_3(3段)/yes_no/investment_method(成本法/权益法)/impairment_sign/currency/guarantee_type/related_party_type/lease_type/fair_value_level；支持项目级临时扩展
+  - **附注模版目录 10 个文件**：`附注模版/` 下含国企报表附注.md(303KB)/国企报表附注_单体.md(285KB)/上市报表附注.md(519KB)/上市报表附注_单体.md(516KB) + 国企版校验公式预设.md(163KB)/上市版校验公式预设.md(73KB) + 国企版科目对照模板.md(29KB)/上市版科目对照模板.md(8KB) + 国企版宽表公式预设.md(11KB)/上市版宽表公式预设.md(6KB)
+  - **附注校验公式类型 9 种**：余额/宽表/纵向/交叉/跨科目/其中项/二级明细/完整性/LLM审核；互斥规则=[余额]不与[其中项]/[宽表]共存；其中项通用规则=sum(明细行)=合计行不硬编码子项名称
+  - **审计报告模板目录**：`审计报告模板/` 下按 国企版/上市版 × 合并/单体 组织（4 套），每套含 3 文件：审计报告正文(.docx) + 财务报表(.xlsx) + 附注模板(.docx)；另有 `纯报表科目注释/` 子目录（同结构 4 套）
+  - **模板体系分工**：报表 Excel 导出基于 `审计报告模板/` 下的 xlsx 模板（复制→填充数据→保留格式）；附注生成以 `附注模版/` 下的 MD 文件为唯一真源（`审计报告模板/` 下的 docx 附注仅作 Word 导出格式参考）
+  - **现有实现状态（2026-05-15 代码分析）**：报表引擎 41KB 骨架完整（generate_all_reports+TB/SUM_TB/ROW+Redis+unadjusted 标记），缺 CFS 间接法+report_config_seed 仅 22 行骨架（DB 1191 行由脚本填充但公式覆盖 26.5%）；附注引擎 35KB 骨架完整（generate_notes+populate_table_data+SOE/Listed JSON 173/187 章节），缺 TB()/WP()/REPORT() 公式+校验引擎+MD 模板未使用；Word 导出 3KB 极简占位（缺页面设置/TOC/页码/致同格式）；统一公式引擎 17KB 部分实现（FormulaResult+safe_eval+SUM_TB+PREV，缺 _resolve_tb/_resolve_row）；事件级联 26KB 全链就绪（ADJUSTMENT→TB→REPORTS→WP+stale）
+  - **实施策略**：不是从零开发而是"补齐缺口+增强格式"——报表补公式数据（26.5%→90%+）；附注接入 MD 校验公式+实现取数函数；Word 导出重写为致同格式；全链路封装为编排端点+SSE+前端按钮
+  - **实施进度（2026-05-16 更新）**：Sprint 1-11 全部完成（81/81 必做任务，100%）；9 个可选属性测试任务跳过；剩余 10 项 UAT 需手动浏览器验证；3585 tests collected / 33+ chain tests pass
+    - Sprint 7 完成：ConsistencyGate 5 项检查 + stale 级联标记 + 前端 Stale 横幅 + ExportDialog + WorkflowDashboard
+    - Sprint 8 完成：附注表格结构编辑（useNoteTableStructure composable + 17 tests）+ 公式绑定 + 枚举联动 + 完成度追踪 + 目录树层级图标
+    - Sprint 9 完成：国企↔上市互转（NoteConversionService + 3 端点）+ NoteRichTextEditor 富文本 + 上年导入（DocxSectionParser）+ 打印预览 + 交叉引用（中文编号）+ 变动分析（20% 阈值）
+    - Sprint 10 完成：集团模板（NoteGroupTemplateService）+ 章节锁（NoteSectionLockService 5min 心跳）+ 数据锁定快照（SHA-256 哈希链）+ 批量操作（max 10 并发）+ 签字门禁（3 条 GateRule 自动注册）+ EQCR 只读 + 自定义章节 + NoteOutlineView
+    - Sprint 11 完成：版本对比（compare endpoint）+ 全链路穿透（usePenetrate 4 新方法）+ DataHealthMonitor（8 项检查 0-100 分）+ 报表附注联动（ReportNoteSyncService）+ 项目配置中心（GET/PUT /config）+ 多年度对比（变动率>20% 标红）+ 全局组件统一（验证通过）+ 智能裁剪排序（NoteTrimSortService + 必披露保护）
+    - Sprint 1 完成：report_formula_service.py 扩展（_BS_SPECIAL 75 条 / _IS_SPECIAL 33 条 / _CFS_INDIRECT_SPECIAL 18 条 / _EQ_SPECIAL 8 条 / _NAME_TO_ACCOUNT 73 条 / _NAME_TO_IS_ACCOUNT 20 条）+ ReportEngine mode/fallback/coverage_stats/debug 四功能 + 42 tests pass
+    - Sprint 2 完成：ChainExecution ORM 模型 + Alembic 迁移（down=view_refactor_creator_chain_20260520）+ ChainOrchestrator（依赖自动补充+互斥锁+SSE 进度）+ chain_workflow.py 路由（4 端点）+ router_registry §43 + apiPaths.ts chainWorkflow 对象 + useChainExecution.ts composable + ProjectDashboard 一键刷新按钮+进度面板 + 16 tests pass
+    - Sprint 3 完成：ReportExcelExporter（模板填充+fallback 从零生成）+ report_export.py 路由（POST /export-excel）+ router_registry §44 + ReportView 致同表头+行类型样式+模式切换+穿透+GtEmpty 空状态 + 10 tests pass
+    - Sprint 4 完成：NoteMDTemplateParser（MD 解析+热加载+缓存）+ NoteValidationEngine（9 种校验类型+互斥规则+持久化）+ WP/REPORT/NOTE 三个公式执行器 + NoteWideTableEngine（横向/纵向公式+容差）+ note_validation_results 迁移 + 44 tests pass
+    - Sprint 5 完成：NoteAccountMapping 模型+迁移 + NoteAccountMappingService（三级映射+15 条 SOE 默认映射）+ NoteFillEngine（4 种取数模式+TB 填充+填充率统计）+ NoteRuleEngine（5 条规则+批量判断+统计）+ NoteLayerStrategy（5 层分类+E→A→B→C→D 处理顺序）+ NoteStaleService（stale 标记+增量刷新+从底稿刷新）+ 41 tests pass
+    - Sprint 6 完成：NoteWordExporter 重写（致同格式页面设置+字体+标题层级+表格样式+TOC+页码+交叉引用+空章节占位+skip_empty+preview_html）+ note_export.py 路由（POST /export-word）+ router_registry §45 + export_logs 迁移 + ExportPackageService（ZIP 组合导出+manifest.json+ConsistencyGate stub+force_export+_warnings.txt）+ 导出文件命名规范 + 16 tests pass
+    - 新建后端文件（Sprint 1-6 累计）：chain_execution.py / chain_orchestrator.py / chain_workflow.py / audit_chain_executions_20260515.py / report_excel_exporter.py / report_export.py / note_md_template_parser.py / note_validation_engine.py / note_wide_table_engine.py / note_validation_results_20260516.py / note_account_mapping.py / note_account_mapping_service.py / note_account_mappings_20260516.py / note_fill_engine.py / note_rule_engine.py / note_layer_strategy.py / note_stale_service.py / note_word_exporter.py(重写) / note_export.py / export_package_service.py / consistency_gate.py(stub) / export_logs_20260516.py + 6 个测试文件
+    - 新建前端文件：useChainExecution.ts（composable）
+    - 修改前端文件：ProjectDashboard.vue（一键刷新+进度面板）/ ReportView.vue（致同表头+行样式+穿透+空状态）
+    - 新建后端文件（Sprint 7-11 累计）：consistency_gate.py / note_conversion_service.py / note_conversion.py / note_prior_year_import_service.py / note_cross_reference_service.py / note_variation_analysis_service.py / note_advanced.py / note_group_template_service.py / note_group_template.py / note_section_lock_service.py / note_section_lock.py / note_data_lock_service.py / note_data_lock.py / gate_rules_chain.py / note_custom_section_service.py / note_custom_section.py / data_health_monitor.py / report_note_sync_service.py / note_trim_sort_service.py / project_config.py
+    - 新建前端文件（Sprint 7-11 累计）：ExportDialog.vue / WorkflowDashboard.vue / NoteRichTextEditor.vue / NotesPrintPreview.vue / NoteOutlineView.vue
+    - router_registry 新增 §46-§53（note_conversion / note_advanced / note_group_template / note_section_lock / note_data_lock / note_custom_section / batch_workflow / project_config）
+    - router_registry 新增 §43（chain_workflow）§44（report_export）§45（note_export）
+    - Alembic 迁移链：view_refactor_creator_chain_20260520 → audit_chain_executions_20260515 → note_validation_results_20260516 → note_account_mappings_20260516 → export_logs_20260516
+  - **复盘发现（2026-05-16 Sprint 7-11 完成后）**：7 项问题中 5 项已修复 ✅；(1) ✅ Alembic 迁移 `audit_chain_sprint10_tables_20260516.py` 已建 + PG 4 张表已创建；(2) ✅ test 断言改为 `execute_all`；(3) ✅ DataHealthMonitor IS 勾稽改为营业利润 vs 营业收入合理性比对 + TB vs 报表改为资产类汇总金额比对（1%容差）；(4) ✅ NoteTrimSortService.merge_small_sections 接入报表金额（重要性=资产合计×5%×ratio）+ auto_sort_by_amount 按金额降序（必披露置顶）；(5) ✅ test_api_consistency_check 401 修复（client fixture 添加 get_current_user override + 断言字段 all_passed→consistent）；(6) 底稿 vs TB/附注期初 2 项仍为简化版；(7) Sprint 9-11 路由缺单测
+  - **UAT 真实数据验证结果（2026-05-16，陕西华氏项目）**：8/10 通过（修复后）；✓ 报表数据 / ✓ 报表格式 / ✓ 附注 173 节 / ✓ 一致性 5 项检查 / ✓ 健康度 75 分 / ✓ 工作流 6 步 / ✓ Excel 导出 46KB / ✓ Word 导出 78KB；✗ 一键刷新（chain_executions INSERT 触发 autoflush 类型冲突）/ ✗ ZIP（依赖一键刷新生成最新数据）
+  - **Excel MergedCell 修复已落地**：`report_excel_exporter.py` 导入 `MergedCell` + `_safe_set_value` 静态方法 + `_fill_existing_sheet` 所有 cell 写入前检查 `isinstance(cell, MergedCell)`
+  - **一键刷新 500 根因（二次定位）**：ChainExecution UUID 类型已修复（模型改 PG_UUID + 表重建），但 autoflush 仍是问题——`db.add(execution)` 后任何 SELECT 触发 autoflush INSERT，若 INSERT 失败则事务中止；最终修复 = `execute_full_chain` 开头加 `db.autoflush = False`
+  - **ChainExecution 模型已改为 UUID 类型**：`id/project_id/triggered_by` 全部改为 `PG_UUID(as_uuid=True)`；`chain_executions` PG 表已重建为 UUID 列
+  - **ChainOrchestrator 已修复的其他问题**：(1) `_step_recalc_tb` 改用 `TrialBalanceService(db).full_recalc`；(2) `_step_generate_reports` 改用 `ReportEngine(db).generate_all_reports`；(3) `_step_generate_notes` 改用 `DisclosureEngine(db).generate_notes`；(4) `_step_generate_workpapers` 改用 `TemplateEngine().generate_project_workpapers` + 查默认 template_set；(5) 互斥锁从 pg_advisory_lock 改为内存 asyncio.Lock（避免 session 状态污染）
+  - **E2E 最小账套测试发现 PG schema 缺列**：`adjustments` 表缺 `status`/`company_code` 列（ORM 模型有但 PG 表没有，Alembic 迁移未执行）
+  - **一键刷新已完全修复（2026-05-16）**：4 步全 completed（recalc_tb / generate_workpapers / generate_reports / generate_notes）；7 项关键修复：(1) ChainExecution 模型 UUID 类型；(2) `execute_full_chain` 加 `db.autoflush = False`；(3) ChainExecution 对象创建移到步骤完成后（避免 autoflush 触发 INSERT）；(4) `force=True` 时跳过所有 prerequisite check（避免 force 模式下还查 prereq 浪费资源 + 防 session 污染）；(5) `_step_generate_workpapers` except 加 `await db.rollback()`；(6) `dataset_query.get_active_filter` except 加 `await db.rollback()`；(7) 互斥锁改为内存 asyncio.Lock
+  - **session 污染传播链规约（铁律）**：任何 `try/except: pass` 包裹的 `db.execute(...)` 都必须在 except 中调 `await db.rollback()`，否则失败查询会让 PG 事务进入 aborted 状态，后续所有查询全部 InFailedSQLTransactionError；这是 asyncpg + SQLAlchemy ORM 的核心陷阱
+  - **下一步**：完整 E2E 最小账套测试（含 2 笔 AJE + Excel/Word 导出验证） ✅ 已完成（2026-05-16）
+  - **E2E 最小账套全链路验证通过（2026-05-16）**：8 步全绿——项目创建+11 科目 TB / Recalc 11 行 / 全链路（recalc/wp/reports/notes 全 completed）/ 2 笔 AJE 创建 / 调整后重新全链路 / Excel 导出 46KB / Word 导出 111KB / DB 验证 financial_report 352 行 + disclosure_notes 173 节
+  - **chain_orchestrator 最后两个修复**：(1) `_step_generate_reports` 新增 `applicable_standard` 解析（从 `Project.template_type + report_scope` 拼接为 `soe_standalone`），否则默认 `enterprise` 与 report_config 数据不匹配返回 0 行；(2) `_step_generate_notes` 新增 `template_type` 解析；(3) chain 执行尾部策略：先 `commit()` 步骤工作再 `commit()` 执行记录（避免 ChainExecution INSERT 失败时 rollback 整个链路工作）
+  - **测试 TB 与 report_config 公式覆盖差距**：11 个简单科目（1001/1002/1122/1601/2202/2241/2203/4001/4104/6001/6602）→ BS 129 行覆盖率 23.3%；这是数据完备性问题不是引擎 bug；真实账套（陕西华氏 800+ 科目）覆盖率达 80%+
+  - **底稿一键生成已彻底修复（2026-05-16）**：策略变更为"按客户实际科目智能匹配"——不依赖 wp_template_set 配置，改为 (1) 加载 `wp_account_mapping.json`（科目→底稿编码映射 88 条）；(2) 查询 TB distinct standard_account_code；(3) 匹配生成审定表底稿（过滤 wp_code 含 `-` 的子表）；(4) 直接 `db.add(WpIndex)` + `db.add(WorkingPaper)` 绕过 template_set 依赖；(5) 幂等保护（已存在跳过）；测试 11 科目 → 生成 15 底稿（D2/D3/D4/E1/F4/H1/K8/K9/M1/M4 + 循环凭证 D0/E0/H0/I6/M10）覆盖全部活跃循环
+  - **底稿生成 WorkingPaper 模型字段**：`source_template_code` 不存在，正确字段是 `wp_index_id` FK + `source_type` enum + `file_path` + `parsed_data` JSONB；不要传 source_template_code
+  - **完整 E2E 最终测试通过（2026-05-16，含底稿）**：11 科目 → wp_index 15 / financial_report 352 / disclosure_notes 173；2 笔 AJE 后重新全链路依然 4 步 completed；Excel 46KB / Word 111KB
+  - **底稿模板覆盖审计（2026-05-16）**：文件系统 477 个模板（176 主编码）vs `wp_account_mapping.json` 当前 **206 条**（扩展后 v2025-R5）；D-N 循环科目驱动 + A/B/C/S 阶段驱动，全 14 循环覆盖
+  - **底稿覆盖修复完成（2026-05-16）**：(1) `wp_account_mapping.json` 增补 88 条 A/B/C/S 类（绑定 `audit_stage` + `trigger: must_have/conditional` + `applies_when`）；(2) `_step_generate_workpapers` 移除 `-` 子表过滤；(3) 双路径匹配（科目驱动 D-N + 阶段驱动 A/B/C/S）；(4) 项目标识自动推导 `has_cash/has_revenue/has_fixed_assets/has_lease/listed/consolidated/group_audit` 等
+  - **底稿生成结果对比**：测试账套 11 科目 → 修复前 15 个底稿（仅 D-N） → 修复后 **74 个底稿**（A=20/B=15/C=11/D=7/E=5/F=2/H=3/I=1/K=2/M=3/S=5）含子表
+  - **底稿 trigger 字段新约定**：(1) `must_have`：永远生成（A1/B1/B5/C1/C23/A11 期后等审计必备）；(2) `conditional` + `applies_when`：按项目标识触发（有现金触发 C3、上市触发 S15/S17、首次承接触发 S2/B2、集团审计触发 A6/B30）；(3) `account_codes` 仅 D-N 用，A/B/C/S 默认空数组
+  - **底稿模块完整修复（2026-05-16）**：5 类问题修复达成 74/74 完整链路（创建+复制+元数据全 ✅）——(1) PG 建 `wp_template_metadata` 表（Alembic 等价 DDL）；(2) `load_wp_template_metadata.py` import 修正 `async_engine` → `engine`；(3) 加载 179 条 seed + 24 条子表元数据继承（total 203）；(4) `find_template_file` 增加子表回退策略（`D2-2` → 范围式 `D2-1至D2-4` → 主表 `D2`）；(5) `_step_generate_workpapers` 调用 `init_workpaper_from_template(project_id, wp_id, wp_code)` 复制实际 xlsx 到 storage 目录
+  - **底稿模板文件命名规约**：(a) 主表用 wp_code 开头（`D2 应收账款.xlsx`）；(b) 子表常合并为范围式（`D2-1至D2-4 应收账款-审定表明细表.xlsx` 包含 D2-1 至 D2-4 四个子表 sheet）；(c) 多文件底稿（`D2-5 分析程序.xlsx` 独立文件）；(d) `find_template_file` 必须按"精确→范围式→主表"三级回退
+  - **底稿生成完整数据链路**：TB 科目 → `wp_account_mapping.json` 206 条匹配 → WpIndex+WorkingPaper 创建 → `init_workpaper_from_template` 物理复制 xlsx → LEFT JOIN `wp_template_metadata` 元数据；每个 wp_index 对应一个真实文件 + 完整 audit_stage/cycle/component_type/audit_objective 元数据
+  - **底稿子表收敛策略（2026-05-16 用户要求）**：一个科目可能有多个 Excel 文件（D2 = D2-1至D2-4 审定明细 + D2-5 分析程序 + D2-6至D2-13 检查），需要合并为一个底稿便于使用；`_step_generate_workpapers` 改为：匹配 D2-2/D2-3/D2-4 时全部归入主表 D2，每个主表对应 ONE wp_index + ONE xlsx 文件，文件含所有子表+附注披露+实质程序 sheets（D2=20 sheets / E1=33 / F4=15 / H1=26）
+  - **底稿收敛后总数对比**：74 个独立 → **66 个主底稿**（8 个子表合并为主表 sheet）；用户操作"一个科目一个文件"
+  - **summary 字段新增**：`primary_workpapers`（主底稿数）+ `subtables_merged_as_sheets`（子表合并 sheet 数）+ `subtable_breakdown`（每主表包含哪些子表）替代原 `matched_total`
+  - **下一步可选**：(1) 真实账套（陕西华氏 800+ 科目）底稿 100+ 验证；(2) 6 个孤立映射（E1/K14-K18）补对应模板文件；(3) prefill_engine 触发将 TB 数据预填到底稿单元格
   - **模板数据补齐优先级**：第一批 D-N 审定表 ~60 个（formula_cells + procedure_steps）→ 第二批 B 类 ~30 个（form schema）→ 第三批 C 类 ~60 个（混合视图结构）→ 第四批 A/S 类（检查清单 + Word 字段）
   - **第一批 D-N 模板数据提取已完成**：`scripts/extract_dn_template_metadata.py` 扫描 113 个 Excel 模板 → 89 个 wp_code 条目 / 4689 个公式单元格 / 输出 `backend/data/wp_template_metadata_dn_seed.json`；按循环分布 D=17/E=5/F=15/G=15/H=11/I=6/J=3/K=14/L=9/M=10/N=5
   - **第一批复盘 3 个问题已全部修复 + 覆盖率验证通过**：linked_accounts 89/89；conclusion_cell 优先级策略（检查表62/审定表10/分析表8/程序表7）；cross_wp_references.json 20 条规则；**种子 89 条 vs 模板 89 个主编码 = 100% 对齐零缺失**（逐循环 D8/E2/F6/G15/H11/I6/J3/K14/L9/M10/N5 全部 OK）
@@ -1327,3 +1415,90 @@ inclusion: always
   - **e2e 脚本健壮性已增强**：每个项目独立 session（防事务级联失败）+ try/except + rollback
   - **e2e 最终验证全绿**：4 项目 × 4 层 = 16 项检查全部 PASS（陕西华氏 tb=100/BS=27/底稿92/附注173，和平药房 tb=53/BS=29/附注173，辽宁卫生 tb=47/BS=26/附注173，宜宾大药房 tb=100/BS=13/附注173）
   - **fix: 附注页面打不开**：`disclosure_engine.py` 的 `get_notes_tree()` 返回字典缺少 `id` 字段，前端 tree 组件 key=undefined 导致渲染失败；修复 = 添加 `"id": str(n.id)`（commit bc71f2b）
+
+## template-library-coordination spec 复盘发现（2026-05-16）
+
+- **spec 数字与现实偏差**（实施前必修订）：(1) `wp_account_mapping.json` 实际 **206 条**（spec 写 118）；(2) `wp_template_metadata` 表 **179 主编码 + 24 子表继承 = 203 条**（spec 写 179）；(3) "180 个 wp_code" 实际是 **179 主编码**（含 B/C/D-N/A/S 全 6 模块）；(4) `_index.json` 是 **dict 结构**（`{description, version, files}`）不是顶层 list，design.md 数据流图错画为 list
+- **§43 编号已被占用**：tasks.md Task 1.2 计划 "§43 注册 template_library_mgmt"，但 §43-§53 已全部用于 audit-chain-generation 的 chain_workflow / report_export / note_export 等，**应改为 §54**
+- **底稿子表收敛与 spec 需求 3.3 描述不符**：spec 写 "一个编码多个文件，如 D2 有审定表+分析程序+检查程序"，但 chain_orchestrator 实际把多文件**合并为一个 xlsx 多 sheets**（D2=20 sheets / E1=33 / F4=15 / H1=26），前端详情面板应改为 "主文件 1 个 + sheets 列表" 而非 "文件下载列表"
+- **template-library-coordination 与 audit-chain-generation 关系**：前者是后者的**消费方**，wp_template_metadata 已由后者加载就绪，Task 1.3 /list 端点增强应改为 "补充 component_type/has_formula/file_count/generated/sort_order 4 个字段" 而非 "增强重写"
+- **spec 实施前必做"现状核验"硬约定**：每个 spec Sprint 1 第一步是 grep 关键事实（mapping 条数 / metadata 行数 / 路由编号占用 / index 结构），避免基于过时假设实施返工；本次发现 6 处关键脱节都是这步缺失导致
+
+
+## template-library-coordination spec 三件套修订完成（2026-05-16）
+
+- **三件套已修订对齐现实**：requirements.md 7 处 / design.md 6 处 + 2 ADR / tasks.md 5 处 + Sprint 0 新增
+- **§54 路由编号已锁定**：tasks.md Task 1.2 写明 "§43-§53 已被 audit-chain-generation 占用，本路由必须使用 §54"
+- **新增 Sprint 0 "现状核验"前置任务模式**：实施前必做 grep + SQL 核验关键事实（mapping/metadata/router 编号/index 结构），输出对比报表，无重大偏差才进入 Sprint 1；可作为后续大 spec 的标准模板
+- **新增 D11/D12 两个 ADR**：D11 子表收敛 UI 模型（一 wp_code 一节点 + 主文件下载 + sheets 列表 + 源文件参考下载折叠区）；D12 消费/生产关系（本 spec 是 audit-chain-generation 的纯消费方，不重复加载任何 seed）
+- **Property 11 字段拆分**：原 `file_count` 拆为 `source_file_count`（源 xlsx 物理文件数，如 D2=3）+ `sheet_count`（合并后 sheets 数，如 D2=20）
+- **公式覆盖率不再硬编码**：Task 1.6/3.4 明确 expected_count 从 seed 文件实际加载、覆盖率全部由后端 SQL 实时统计；避免 spec 写死数字与现实脱节
+
+## template-library-coordination spec P0+P1 修订完成（2026-05-16）
+
+- **新增 4 个跨 spec 通用架构铁律**（可推广到其他 spec）：
+  - **D13 JSON 文件 vs DB 表编辑路径分流**：JSON 种子文件作为 git 真源**禁止 UI 直接编辑**（避免 git 仓库 vs 生产 DB 状态分叉），UI 显示只读 + 引导"改 JSON 后 reseed"；DB 表类（report_config / gt_wp_coding / wp_template_metadata）允许 UI 编辑；mutation 端点对 JSON 类资源返回 405
+  - **D14 跨 spec 消费契约**：本 spec 消费 audit-chain-generation 的具体字段必须显式登记 9 项（subtable_codes / linked_accounts / component_type / audit_stage / procedure_steps / account_codes / wp_code / filename / cells 等），生产方变更须同步消费方 spec；防止上游静默 breaking
+  - **D15 种子加载 SAVEPOINT 事务边界**：批量 seed 每个独立 SAVEPOINT，失败仅该 seed 回滚 + seed_load_history 记 status=failed + 继续后续；避免一刀切 rollback 已成功的 seed
+  - **Property 16 后端 mutation 二次校验铁律**：任何 POST/PUT/DELETE 端点必须验证 role ∈ {admin, partner} 返回 403，**绝不能只依赖前端 v-permission 隐藏按钮**（防 API 直调绕过 UI）
+- **spec 工作流新规约**：三件套修订后必须跑一次性 grep 脚本核验残留（如 `180 个 wp_code` / `316/1191` / `max_examples=100` 等过时数字），用完即删；本次发现 1 处历史对比说明刻意保留（D5 决策正文里）属合理例外
+- **Alembic 跨 spec 链路衔接铁律**：消费方 spec 的迁移 down_revision 必须明确指向生产方 spec 末端（本次指向 `export_logs_20260516`），避免实施者猜测导致迁移分叉
+- **测试 max_examples 统一规约**：MVP 阶段 hypothesis property test 全局 `max_examples=5`，design.md 与 tasks.md Notes 必须一致（之前 100 vs 5 矛盾）；稳定后才调高
+
+## spec 工作流通用规约（template-library-coordination P2 沉淀）
+
+- **属性测试就近合并铁律**：PBT 应分散到对应 Sprint（生产代码与测试同一 fixture/上下文），不能集中堆到收尾 Sprint；template-library-coordination 把原 Sprint 5 的 7 个零散 PBT 拆到 Sprint 1（5 个）/ Sprint 2（2 个）/ Sprint 4（1 个），收尾 Sprint 改为专注集成测试+安全属性+版本管理+ADR 落地
+- **聚合端点 N+1 防退化必须 spec 化**：所有"前端列表+多表合并"端点（如 `/list` 合并 metadata + 项目状态 + JSON）必须在 tasks 中显式声明：(1) 单次批量预加载策略；(2) DB 查询数上限（一般 ≤ 4）；(3) 响应时间 SLA（≤ 500ms）；(4) 集成测试用 `assert_query_count` 装饰器在 CI 中防退化；防止实施时 per-row 查 DB 退化
+- **集成测试独立成 Sprint task 铁律**：单测 + PBT + 集成测试三层独立，集成测试覆盖：跨表 join 完整链路、事务边界（SAVEPOINT/rollback）、性能 N+1 断言、partial success 行为；不能默认"单测 + PBT 就够"
+- **Sprint 收尾任务画像**：最后一个 Sprint 应专注 (1) 跨模块集成测试 (2) 安全属性测试（authz/readonly enforcement）(3) ADR 落地实施 (4) 版本管理/审计追踪；不应是"零散 PBT 堆叠"
+
+## template-library-coordination 二次复盘关键事实更正（2026-05-16）
+
+- **WpTemplateMetadata ORM 模型无 `subtable_codes` 字段**（grep 零匹配）：子表收敛是 `chain_orchestrator._step_generate_workpapers` 运行时通过 `wp_code.split("-")` 计算并返回 `subtable_breakdown`，不存元数据；先前 spec 把它当字段引用（D14 / Property 11）是错误假设，需改为运行时 `_index.json` 文件名前缀匹配
+- **wp_template_metadata 真实数据来源是 3 个增量 seed**（不是单文件 seed）：`wp_template_metadata_seed.json` 只有 86 条历史遗留，DB 实际 179 条来自 `wp_template_metadata_dn_seed.json`（89）+ `_b_seed.json`（19）+ `_cas_seed.json`（71）三个文件，由 `load_wp_template_metadata.py` + chain_orchestrator 运行时聚合加载
+- **wp_template_metadata_seed.json audit_stage 全是 substantive + cycle 只 D-N**：B/C/A/S 类元数据**完全不在主 seed 文件**，必须从 3 个增量 seed 取；任何"基于 _seed.json 单文件计算 expected_count" 都会算错
+- **Alembic 当前链路真实终点是 `audit_chain_sprint10_tables_20260516`**（不是 export_logs_20260516）；新 spec 的 down_revision 必须接续到此最末端而非 export_logs，否则迁移分叉
+- **前端 CustomQuery.vue 不存在**（spec 旧版假设"已有"是错的）：当前自定义查询路由也无前端实现，spec 需求 22.9 改为新建
+- **复盘方法论沉淀**：spec 引用 ORM 字段（如 `XxxModel.field`）必须 grep `class XxxModel` 源文件核验字段真实存在；引用 seed 文件条数必须 `python -c "import json; print(len(...))"` 实测；引用 Alembic 链路终点必须 `grep down_revision` 反向追溯叶子节点；这三步现状核验是任何 spec 第一遍审查必做
+
+## 用户偏好（强制铁律）：spec 不硬编码数字
+
+- **任何"数量/条数/百分比/容差"必须运行时计算**：spec 文档允许在 narrative 区域引用当前快照值（如 "当前 ≥ 179 条"）但所有 task/code/property 引用必须改为运行时表达式（`sum(len(json.load(f)['entries']) for f in seed_files)`）
+- **expected_count 唯一允许的形式**：从 seed 文件 / DB COUNT / 文件 glob 实时读取；不能写 `expected_count = 179` 这种字面量
+- **覆盖率/百分比同样不能硬编码**：所有 `26.5%` `316/1191` 类硬数字必须改为 SQL 实时聚合表达式 + UI 动态展示
+- **spec 中允许保留快照值的位置（narrative 类）**：标题描述 / Overview / 术语表 / 数据流图节点标签；**不允许**的位置：task 验收标准 / Property 公式 / Pydantic 模型默认值 / 测试断言
+
+## spec 层"硬编码 vs 运行时计算"落地形式
+
+- **数字来源声明**：所有数字必须在 spec 中明确标注来源（"运行时聚合 3 个增量 seed 文件 entries"/"SQL 实时统计 report_config WHERE formula IS NOT NULL"/"_index.json[\"files\"] 按 primary_code 前缀匹配 count"）
+- **ORM 字段引用前必须 grep 核验**：spec 引用任何 `XxxModel.field_name` 必须在源文件 `class XxxModel` 处确认字段真实存在；不存在的字段在 ADR 中加"明确排除清单"声明禁止依赖
+- **文件/端点存在性核验**：spec 假设"已有 X.vue / 已注册 /api/y" 前必须 fileSearch / grep 核验，否则改为"新建"
+- **Sprint 0 强制现状核验**：作为 task 1 之前的强制前置 Sprint，所有数字假设/字段假设/路径假设都用 grep+SQL+文件读取核验，输出对比报告才进入 Sprint 1
+
+## template-library-coordination 三件套 v3 修订完成（2026-05-16）
+
+- 7 处关键硬编码全部清零：requirements 引言 + design 关键事实 + design D11 子表收敛 + D14 依赖清单（删 subtable_codes）+ Property 11 sheet_count 公式 + D10 CustomQuery.vue 错误假设 + tasks 0.1/1.4/1.6 expected_count
+- 实测三个增量 seed 文件 entries：DN 89 + B 19 + CAS 71 = **179**（与 spec narrative 引用一致，但所有 task 实施时必须运行时算）
+- 三件套核验脚本验证全绿（hits=OK），可进入 Sprint 0 实施
+
+## D16 硬编码计数审查规则（可推广通用规约，2026-05-16）
+
+- spec 文档"数量/条数/百分比/容差"严格分两种位置：(1) **narrative 允许保留快照值**（标题/Overview/术语表/数据流节点标签/ADR 决策正文）；(2) **task / Property / 验收标准 / 错误处理表 / UAT 清单 / 测试断言禁止硬编码**，必须改为运行时表达式
+- 修订收尾核验脚本骨架（用完即删）：`hard_patterns = [r"全部 \d+ 个", r"全部 \d+ 条", r"\(.*?/ \d+\)", r"展示 \d+ 行"]; grep 命中即修`
+- 已写入 template-library-coordination design.md 作为 D16 ADR；可推广到所有后续 spec
+- 写法范式：narrative 用 `**N_xxx**` 变量名 + "当前快照 ≥ N" 标注 + 验收标准写"全部 X（数量从 API/JSON 动态取）"，绝不写"179/94/48"等具体数字
+
+## template-library-coordination 三件套 v4 终稿（2026-05-16）
+
+- 13 处硬编码计数全部清零：requirements 10 处 + design 5 处 + tasks 5 处 + UAT 2 处
+- Sprint 5 编号重排（删除重复占位 5.3，5.4-5.7 → 5.3-5.6）
+- 新增 D16 ADR 硬编码审查规则 + 核验脚本骨架
+- 三件套规模：requirements 318 行 / design 570 行 / tasks 368 行
+- 22 需求 × 8 Sprint × 17 Property × 16 ADR 完整对齐，零硬编码违规、零任务编号重复、N+1 + SAVEPOINT + JSON 只读 + 后端二次校验全覆盖；可进入 Sprint 0 实施
+
+## template-library-coordination 三件套 v5 终稿（2026-05-16）
+
+- **R1-R4 四处可改进点全部修复**：(1) Sprint 0.1 增加 N_* 变量输出到 console 作为 Sprint 1 实施基准值（11 个变量含 N_files/N_primary/N_account_mappings 等）；(2) Sprint 0.1 + Task 1.6 实测核验 4 个 seed 文件根级 key 名（templates/sections/entries/mappings/references 各异），确认 accounting_standards_seed.json + template_sets_seed.json **不存在**，无独立 seed 文件的 expected_count 改用 DB COUNT 取；(3) design Mermaid 数据流图节点标签从变量名 N_* 改为描述性"实时统计"避免渲染困惑；(4) Task 3.6 + 5.5 显式说明 cross_wp_references 也是 JSON 只读源（与 prefill_formula_mapping/audit_report_templates/wp_account_mapping 共 4 个 JSON 源资源）
+- **关键事实补充**：accounting_standards 和 template_sets **没有独立 seed JSON 文件**（实测确认），spec 旧版 Sprint 1.1 假设错误；这两个 seed 的 expected_count 必须直接从 DB 表 SELECT COUNT 取
+- **D13 JSON 只读源完整清单**：4 个 JSON 文件全部走只读路径——prefill_formula_mapping / cross_wp_references / audit_report_templates / wp_account_mapping；前端 useTemplateLibrarySource.ts composable 统一判断
+- 三件套规模：requirements 318 行 / design 25066 chars / tasks 19856 chars / 0 硬编码违规

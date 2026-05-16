@@ -1,21 +1,35 @@
 # 需求文档：全局模板库管理系统
 
+## 变更记录
+
+| 版本 | 日期 | 摘要 | 触发原因 |
+|------|------|------|----------|
+| v1 | 2026-05-15 | 初版：22 需求 / 5 大模板库 + 编码体系覆盖 | spec 创建 |
+| v2 | 2026-05-16 | 关键事实核验后修订：mappings 数量 118→206 / index 结构 list→dict / 8 ADR 增至 12 | 实施前 grep 核验 |
+| v3 | 2026-05-16 | 7 处硬编码计数清零 | D16 ADR 落地 |
+| v4 | 2026-05-16 | 13 处硬编码二次扫除 | 收尾自检 |
+| v5 | 2026-05-16 | R1-R4 4 处可改进点：Sprint 0 N_* 输出 / seed key 实测核验 / Mermaid 节点描述化 / cross_wp_references 只读源声明 | 一致性审查 |
+| v6 | 2026-05-16 | 二轮复盘：未提及修订；本轮聚焦 design.md / tasks.md 流程改进 | 二轮复盘 |
+
 ## 引言
 
 致同审计作业平台包含 5 大模板库 + 1 套编码体系，当前各自独立管理、缺乏统一入口。管理员无法在一个界面总览全部模板资源，审计助理无法快速了解公式覆盖情况，项目经理无法查看模板与项目的关联状态。
 
-本功能建立"模板库管理"统一页面，整合底稿模板库（476 文件/180 编码）、公式管理库（94 映射/481 单元格 + 316 行报表公式）、审计报告模板库（8 种意见类型）、附注模板库（SOE/Listed 双标准）、致同编码体系（48 条）、报表行次配置（1191 行/4 标准），提供浏览、编辑、种子加载、版本管理、覆盖率统计等能力。
+本功能建立"模板库管理"统一页面，整合底稿模板库（**N_files** 物理文件 / **N_primary** 主编码 / **N_account_mappings** 科目映射）、公式管理库（**N_prefill_mappings** 预填充映射 / **N_prefill_cells** 单元格 / 报表公式动态统计）、审计报告模板库（**N_opinion_types** 种意见类型）、附注模板库（SOE/Listed 双标准）、致同编码体系（**N_gt_codes** 条）、报表行次配置（**N_report_rows** 行 / **N_standards** 标准），提供浏览、编辑、种子加载、版本管理、覆盖率统计等能力。所有 N_* 数字均为**运行时从 seed/DB 实时计算**，narrative 引用快照值仅作可读性参考（当前快照：files=476 / primary≥179 / account_mappings=206 / prefill_mappings=94 / prefill_cells=481 / opinion_types=8 / gt_codes=48 / report_rows=1191 / standards=4）。
+
+**与 audit-chain-generation spec 的协同关系**：本 spec 是 audit-chain-generation 的**消费方**——后者已通过 `chain_orchestrator._step_generate_workpapers` + `load_wp_template_metadata.py` 完成 `wp_template_metadata` 表加载（运行时聚合 3 个增量 seed 文件 entries 之和，当前 ≥ 179 条）和 `wp_account_mapping.json` 扩展（206 条），本 spec 直接消费这些数据，不重复建设。
 
 ## 术语表
 
 - **Template_Library_Page**：模板库管理页面，侧栏入口"模板库管理"，admin/partner 可编辑，其他角色只读
-- **WP_Template_Library**：底稿模板库，`backend/wp_templates/` 目录 476 文件 + `_index.json` 索引 + 三个 seed 文件（179 条元数据）
-- **Formula_Library**：公式管理库，含预填充公式（`prefill_formula_mapping.json` 94 映射/481 单元格）和报表公式（`report_config.formula` 列 316/1191 行有公式）
-- **Cross_WP_References**：跨底稿引用规则，`cross_wp_references.json` 20 条
-- **Audit_Report_Templates**：审计报告模板库，`audit_report_templates_seed.json` 含 8 种意见类型段落模板
+- **WP_Template_Library**：底稿模板库，`backend/wp_templates/` 目录（**N_files** 物理文件） + `_index.json` 索引（dict 结构含 description/version/files 三个 key） + 三个增量 seed 文件（`{dn,b,cas}_seed.json` 的 entries 之和 = 主编码总数 N_primary，**运行时聚合**） + `wp_account_mapping.json`（**N_account_mappings** 条科目映射）
+- **Subtable_Convergence**：子表收敛策略（来自 audit-chain-generation 落地）—— 一个 wp_code 对应一个 wp_index 一个 xlsx 文件，多源文件（如 D2 审定表 + 分析程序 + 检查程序）自动合并为同一 xlsx 的多个 sheets（合并后 sheets 数由 `init_workpaper_from_template._merge_sheets_from_other_files` 运行时产生，spec 层不持久化精确值）
+- **Formula_Library**：公式管理库，含预填充公式（`prefill_formula_mapping.json` 的 mappings + cells，**N_prefill_mappings/N_prefill_cells 实时读取**）和报表公式（`report_config.formula` 列动态统计，覆盖率通过 SQL 实时计算）
+- **Cross_WP_References**：跨底稿引用规则，从 `cross_wp_references.json["references"]` **运行时读取**
+- **Audit_Report_Templates**：审计报告模板库，`audit_report_templates_seed.json` 含**全部意见类型**段落模板（数量 N_opinion_types 实时读取）
 - **Note_Templates**：附注模板库，通过 note_templates 路由加载，分 SOE（国企版）和 Listed（上市版）两套标准
-- **GT_Coding**：致同编码体系，`gt_wp_coding` 表 48 条记录，定义循环编码 B/C/D-N/A/S/T/Z
-- **Report_Config**：报表行次配置，`report_config` 表 1191 行，覆盖 soe_consolidated/soe_standalone/listed_consolidated/listed_standalone 四种标准
+- **GT_Coding**：致同编码体系，`gt_wp_coding` 表（**N_gt_codes** 条记录由 SELECT COUNT(*) 实时值），定义循环编码 B/C/D-N/A/S/T/Z
+- **Report_Config**：报表行次配置，`report_config` 表（**N_report_rows** 行 / **N_standards** 标准均由 SQL 实时统计，覆盖 soe_consolidated/soe_standalone/listed_consolidated/listed_standalone 四种标准）
 - **Seed_Loader**：种子数据加载器，一键将 `backend/data/` 目录下的 JSON 种子文件写入数据库
 - **Formula_Coverage**：公式覆盖率，指有公式定义的底稿/行次占总数的百分比
 - **Template_Version**：模板版本，当前为"致同 2025 修订版"
@@ -36,15 +50,15 @@
 
 ### 需求 2：底稿模板库浏览
 
-**User Story:** 作为审计助理，我想浏览全部 180 个底稿模板的完整列表，以便了解可用底稿清单。
+**User Story:** 作为审计助理，我想浏览全部主编码模板的完整列表，以便了解可用底稿清单。
 
 #### 验收标准
 
-1. THE WP_Template_Library SHALL 以树形结构展示全部 180 个唯一 wp_code 的模板，按循环分组
+1. THE WP_Template_Library SHALL 以树形结构展示**全部主编码模板**（数量 = 当前 wp_template_metadata 表中 distinct primary_code 的实际值），按循环分组
 2. THE WP_Template_Library SHALL 使用 GT_Coding 的 cycle_name 作为树形分组的显示名称
 3. WHEN 展开循环节点时，THE WP_Template_Library SHALL 显示该循环下所有模板的 wp_code、wp_name、format、component_type
 4. THE WP_Template_Library SHALL 按 GT_Coding 的 sort_order 对循环进行排序
-5. THE WP_Template_Library SHALL 在每个循环节点旁显示模板数量（如"D 销售循环 (17)"）
+5. THE WP_Template_Library SHALL 在每个循环节点旁**动态计算**模板数量并展示（如"D 销售循环 (N)"，N = 该循环下的主编码计数）
 6. THE WP_Template_Library SHALL 对每个模板节点显示格式图标（xlsx 用表格图标、docx 用文档图标、xlsm 用宏图标）
 7. WHEN 模板在 wp_template_metadata 中有记录时，THE WP_Template_Library SHALL 显示 component_type 标签（univer/form/word/hybrid）
 
@@ -56,19 +70,20 @@
 
 1. WHEN 用户点击模板节点时，THE WP_Template_Library SHALL 在右侧面板显示模板详情
 2. THE WP_Template_Library SHALL 在详情面板显示：wp_code、wp_name、cycle_name、format、component_type、linked_accounts、note_section、procedure_steps
-3. THE WP_Template_Library SHALL 显示该 wp_code 对应的所有模板文件列表（一个编码可能有多个文件，如 D2 有审定表+分析程序+检查程序）
-4. WHEN 用户点击文件名时，THE WP_Template_Library SHALL 提供下载该文件的功能
-5. THE WP_Template_Library SHALL 显示该模板的预填充公式配置（从 prefill_formula_mapping 读取）
-6. WHEN 模板有 cross_wp_references 引用时，THE WP_Template_Library SHALL 显示跨底稿引用关系图
+3. THE WP_Template_Library SHALL 显示该 wp_code 对应的源文件清单（如 D2 含 D2-1 至 D2-4 审定表 + D2-5 分析程序 + D2-6 至 D2-13 检查程序，**实际生成时合并为同一 xlsx 多 sheets**）
+4. WHEN 用户点击源文件名时，THE WP_Template_Library SHALL 提供下载该文件的功能（保留对原始模板的访问，便于参考）
+5. THE WP_Template_Library SHALL 显示该模板已合并 sheets 的清单（如 D2 显示 20 个 sheets 的列表）
+6. THE WP_Template_Library SHALL 显示该模板的预填充公式配置（从 prefill_formula_mapping 读取）
+7. WHEN 模板有 cross_wp_references 引用时，THE WP_Template_Library SHALL 显示跨底稿引用关系图
 
 ### 需求 4：底稿模板树形完善（WorkpaperWorkbench 集成）
 
-**User Story:** 作为审计助理，我想在底稿工作台看到全部 180 个模板而非仅 118 条映射，以便了解完整的底稿清单。
+**User Story:** 作为审计助理，我想在底稿工作台看到全部主编码模板（覆盖 B/C/D-N/A/S 全 6 模块），以便了解完整的底稿清单。
 
 #### 验收标准
 
-1. THE Workbench_Tree SHALL 使用 `GET /api/projects/{pid}/wp-templates/list` 作为数据源，返回全部 180 个唯一 wp_code
-2. THE Workbench_Tree SHALL 按循环分组展示模板，每个循环节点显示循环名称和该循环下的模板数量
+1. THE Workbench_Tree SHALL 使用 `GET /api/projects/{pid}/wp-templates/list` 作为数据源，返回**全部主编码模板**（数量动态从端点取）
+2. THE Workbench_Tree SHALL 按循环分组展示模板，每个循环节点显示循环名称和该循环下的模板数量（按主编码计数）
 3. WHEN wp_code 首字母为 B 时，THE Workbench_Tree SHALL 根据编码范围区分初步业务活动（B1-B5）和风险评估（B10-B60）
 4. WHEN wp_code 首字母为 C 时，THE Workbench_Tree SHALL 将其归类为控制测试
 5. WHEN wp_code 首字母为 D/E/F/G/H/I/J/K/L/M/N 时，THE Workbench_Tree SHALL 将其归类为实质性程序
@@ -76,7 +91,7 @@
 7. WHEN wp_code 首字母为 S 时，THE Workbench_Tree SHALL 将其归类为特定项目程序
 8. WHEN 模板已在当前项目生成底稿时，THE Workbench_Tree SHALL 在节点上显示状态标记（已生成/编制中/已复核等）
 9. WHEN 模板未在当前项目生成底稿时，THE Workbench_Tree SHALL 以灰色文字显示该节点
-10. THE Workbench_Tree SHALL 在树形顶部显示全局进度条（已生成底稿数/180）
+10. THE Workbench_Tree SHALL 在树形顶部显示全局进度条（已生成主编码数 / 主编码总数，分母从 `/list` 端点动态取）
 
 ### 需求 5：底稿模板搜索与筛选
 
@@ -91,18 +106,18 @@
 5. THE WP_Template_Library SHALL 提供按循环筛选（B/C/D-N/A/S/全部）
 6. THE WP_Template_Library SHALL 提供"仅有数据"筛选器，隐藏 linked_accounts 中所有科目在试算表中余额为零的模板
 
-### 需求 6：预填充公式管理
+### 需求 6：预填充公式查看（D13 ADR：JSON 源只读）
 
-**User Story:** 作为管理员，我想查看和编辑底稿预填充公式配置，以便维护取数规则。
+**User Story:** 作为管理员，我想查看底稿预填充公式配置，以便理解取数规则；如需修改请通过编辑 JSON 文件后重新加载种子的方式（git → seed → DB 单向流动）。
 
 #### 验收标准
 
-1. THE Formula_Library SHALL 以表格形式展示全部 94 个预填充映射，列包含：wp_code、wp_name、sheet、cells 数量
+1. THE Formula_Library SHALL 以表格形式展示**全部预填充映射**（数量从 `prefill_formula_mapping.json["mappings"]` 实时读取），列包含：wp_code、wp_name、sheet、cells 数量
 2. WHEN 用户展开某个映射时，THE Formula_Library SHALL 显示该映射下所有 cells 的详情（cell_ref、formula、formula_type、description）
 3. THE Formula_Library SHALL 按 formula_type 分组统计：TB/TB_SUM/ADJ/PREV/WP 各有多少个单元格
 4. THE Formula_Library SHALL 显示公式类型说明文档（TB 从试算表取数、TB_SUM 范围汇总、ADJ 调整分录、PREV 上年数据、WP 跨底稿引用）
-5. WHEN admin 用户编辑公式时，THE Formula_Library SHALL 提供公式语法校验（检查引号配对、科目编码格式、列名有效性）
-6. THE Formula_Library SHALL 显示跨底稿引用关系（cross_wp_references.json 的 20 条规则），以有向图或表格形式展示源底稿→目标底稿的引用链
+5. WHEN 用户尝试编辑公式时，THE Formula_Library SHALL **以只读模式展示** + 提示"如需修改请编辑 backend/data/prefill_formula_mapping.json 后调用 reseed 端点"（D13 JSON 源只读铁律）
+6. THE Formula_Library SHALL 显示**全部跨底稿引用关系**（从 `cross_wp_references.json["references"]` 实时读取），以有向图或表格形式展示源底稿→目标底稿的引用链
 
 ### 需求 7：报表公式管理
 
@@ -110,11 +125,11 @@
 
 #### 验收标准
 
-1. THE Formula_Library SHALL 以表格形式展示 report_config 中有公式的行（316/1191 行），列包含：applicable_standard、report_type、row_code、row_name、formula
+1. THE Formula_Library SHALL 以表格形式展示 report_config 中有公式的行（实际数量通过 SQL 实时统计），列包含：applicable_standard、report_type、row_code、row_name、formula
 2. THE Formula_Library SHALL 按 applicable_standard 分 Tab 展示（soe_consolidated/soe_standalone/listed_consolidated/listed_standalone）
 3. THE Formula_Library SHALL 按 report_type 分组（balance_sheet/income_statement/cash_flow_statement/equity_changes）
 4. WHEN admin 用户编辑公式时，THE Formula_Library SHALL 提供公式语法校验（支持 TB/TB_SUM/ROW/SUM_ROW/SUM_TB/LEDGER/AUX/PREV/ADJ/NOTE 类型）
-5. THE Formula_Library SHALL 显示公式覆盖率统计：每种 report_type 下有公式行数/总行数/覆盖率百分比
+5. THE Formula_Library SHALL 显示公式覆盖率统计：每种 report_type 下有公式行数/总行数/覆盖率百分比（动态查询）
 6. WHEN 公式引用了不存在的 row_code 时，THE Formula_Library SHALL 以红色标记该公式并提示"引用目标不存在"
 
 ### 需求 8：公式覆盖率统计仪表盘
@@ -123,22 +138,22 @@
 
 #### 验收标准
 
-1. THE Formula_Library SHALL 在顶部显示覆盖率仪表盘，包含：预填充覆盖率（有公式的底稿数/180）、报表公式覆盖率（有公式行数/总行数）
-2. THE Formula_Library SHALL 按循环展示预填充覆盖率（如 D 循环 17/17=100%、B 循环 0/19=0%）
-3. THE Formula_Library SHALL 按报表类型展示公式覆盖率（如 BS 55/129=43%、IS 16/78=21%）
+1. THE Formula_Library SHALL 在顶部显示覆盖率仪表盘，包含：预填充覆盖率（有公式的主编码数 / 主编码总数，动态查询）、报表公式覆盖率（有公式行数 / 总行数，动态计算）
+2. THE Formula_Library SHALL 按循环展示预填充覆盖率（如 D 循环 N_with_formula/N_total = 百分比）
+3. THE Formula_Library SHALL 按报表类型展示公式覆盖率（如 BS 有公式行数 / 总行数 = 百分比）
 4. THE Formula_Library SHALL 用颜色编码标识覆盖率等级（绿色 ≥80%、黄色 40-79%、红色 <40%）
 5. THE Formula_Library SHALL 列出"无公式底稿"清单，标注原因（B/C/A/S 类无审定表、函证类仅期初/未审数）
 
-### 需求 9：审计报告模板管理
+### 需求 9：审计报告模板查看（D13 ADR：JSON 源只读）
 
-**User Story:** 作为管理员，我想查看和编辑审计报告段落模板，以便维护不同意见类型的报告措辞。
+**User Story:** 作为管理员，我想查看审计报告段落模板，以便理解不同意见类型的报告措辞；如需修改请通过编辑 JSON 文件后重新加载种子的方式。
 
 #### 验收标准
 
-1. THE Audit_Report_Templates SHALL 以卡片形式展示 8 种意见类型（unqualified/qualified/adverse/disclaimer × non_listed/listed）
+1. THE Audit_Report_Templates SHALL 以卡片形式展示**全部意见类型**（数量从 `audit_report_templates_seed.json["templates"]` 实时读取，覆盖 unqualified/qualified/adverse/disclaimer × non_listed/listed 等组合）
 2. WHEN 用户点击某种意见类型时，THE Audit_Report_Templates SHALL 展示该类型下所有段落（审计意见段、形成基础段、关键审计事项段、其他信息段、管理层责任段、治理层责任段、CPA 责任段）
 3. THE Audit_Report_Templates SHALL 显示每个段落的占位符列表（{entity_name}、{audit_period} 等）及其说明
-4. WHEN admin 用户编辑段落模板时，THE Audit_Report_Templates SHALL 提供富文本编辑器（支持段落格式、占位符高亮）
+4. WHEN 用户尝试编辑段落模板时，THE Audit_Report_Templates SHALL **以只读模式展示** + 提示"如需修改请编辑 backend/data/audit_report_templates_seed.json 后调用 reseed 端点"（D13 JSON 源只读铁律）
 5. THE Audit_Report_Templates SHALL 显示每种意见类型的段落完整性（必填段落是否全部配置）
 6. IF 必填段落缺失模板文本，THEN THE Audit_Report_Templates SHALL 以红色警告标记该段落
 
@@ -160,7 +175,7 @@
 
 #### 验收标准
 
-1. THE GT_Coding SHALL 以表格形式展示全部 48 条编码记录，列包含：code_prefix、cycle_name、wp_type、description、sort_order
+1. THE GT_Coding SHALL 以表格形式展示**全部编码记录**（数量 = `gt_wp_coding` 表 SELECT COUNT(*) 实时值），列包含：code_prefix、cycle_name、wp_type、description、sort_order
 2. THE GT_Coding SHALL 按 wp_type 分组展示（初步业务活动/风险评估/控制测试/实质性程序/完成阶段/特定项目）
 3. THE GT_Coding SHALL 在每个编码旁显示该编码下的模板数量（从 WP_Template_Library 统计）
 4. WHEN 用户角色非 admin 时，THE GT_Coding SHALL 以只读模式展示（无编辑按钮）
@@ -172,7 +187,7 @@
 
 #### 验收标准
 
-1. THE Report_Config SHALL 以表格形式展示 1191 行配置，按 applicable_standard 分 Tab
+1. THE Report_Config SHALL 以表格形式展示**全部行配置**（数量 = `report_config` 表 SELECT COUNT(*) 实时值），按 applicable_standard 分 Tab
 2. THE Report_Config SHALL 在每个 Tab 内按 report_type 分组（资产负债表/利润表/现金流量表/权益变动表）
 3. THE Report_Config SHALL 显示每行的：row_code、row_name、indent_level、is_total_row、formula、sort_order
 4. THE Report_Config SHALL 用缩进可视化 indent_level（每级 24px padding-left）
@@ -228,12 +243,13 @@
 
 #### 验收标准
 
-1. THE `GET /api/projects/{pid}/wp-templates/list` SHALL 返回全部 180 个唯一 wp_code 的模板条目
+1. THE `GET /api/projects/{pid}/wp-templates/list` SHALL 返回**全部主编码模板条目**（数量 = wp_template_metadata 表中 distinct primary_code 的实际值）
 2. WHEN 请求模板列表时，THE API SHALL 返回每条记录包含 wp_code、wp_name、cycle、cycle_name、format、component_type、linked_accounts、has_formula 字段
 3. THE API SHALL 按 gt_wp_coding 的 sort_order 对循环进行排序
 4. WHEN 模板在 wp_template_metadata 中有记录时，THE API SHALL 合并 component_type、audit_stage、linked_accounts、procedure_steps 字段到返回结果
 5. THE API SHALL 在每条记录中包含 generated 布尔字段，标识该模板是否已在当前项目中生成底稿
-6. THE API SHALL 在每条记录中包含 file_count 字段，标识该 wp_code 对应的模板文件数量
+6. THE API SHALL 在每条记录中包含 source_file_count 字段，标识该 wp_code 对应的源 xlsx 物理文件数量（合并前的源文件数，如 D2 有 3 个源文件）
+7. THE API SHALL 在每条记录中包含 sheet_count 字段，标识合并后的 sheet 总数（如 D2 = 20 sheets）
 
 ### 需求 17：公式管理全局 API
 
@@ -245,8 +261,8 @@
 2. THE API SHALL 返回按循环分组的预填充覆盖率（cycle、total_templates、templates_with_formula、coverage_percent）
 3. THE API SHALL 返回按报表类型分组的报表公式覆盖率（report_type、total_rows、rows_with_formula、coverage_percent）
 4. THE API SHALL 返回公式类型分布统计（formula_type、count）
-5. THE `GET /api/template-library/prefill-formulas` SHALL 返回全部 94 个预填充映射的详情
-6. THE `GET /api/template-library/cross-wp-references` SHALL 返回全部 20 条跨底稿引用规则
+5. THE `GET /api/template-library/prefill-formulas` SHALL 返回**全部预填充映射详情**（数量从 `prefill_formula_mapping.json["mappings"]` 实时读取）
+6. THE `GET /api/template-library/cross-wp-references` SHALL 返回**全部跨底稿引用规则**（数量从 `cross_wp_references.json["references"]` 实时读取）
 
 ### 需求 18：种子数据状态 API
 
@@ -269,7 +285,7 @@
 
 1. WHEN "仅有数据"勾选时，THE Workbench_Tree SHALL 隐藏 linked_accounts 中所有科目在试算表中余额为零的模板
 2. WHEN "仅有数据"勾选时，THE Workbench_Tree SHALL 始终显示无 linked_accounts 的模板（B/C/A/S 类）
-3. WHEN "仅有数据"取消勾选时，THE Workbench_Tree SHALL 显示全部 180 个模板
+3. WHEN "仅有数据"取消勾选时，THE Workbench_Tree SHALL 显示全部主编码模板（不施加 linked_accounts 过滤）
 4. IF 试算表数据尚未加载，THEN THE Workbench_Tree SHALL 显示全部模板并在筛选器旁提示"需先导入账套"
 
 ### 需求 20：循环进度统计
@@ -278,8 +294,8 @@
 
 #### 验收标准
 
-1. THE Workbench_Tree SHALL 在每个循环节点旁显示进度（已完成数/总数）
-2. THE Workbench_Tree SHALL 在树形顶部显示全局进度条（已生成底稿数/180）
+1. THE Workbench_Tree SHALL 在每个循环节点旁显示进度（已完成主编码数 / 该循环总主编码数）
+2. THE Workbench_Tree SHALL 在树形顶部显示全局进度条（已生成主编码数 / 主编码总数，分母从 `/list` 端点动态取）
 3. WHEN 底稿状态变更时，THE Workbench_Tree SHALL 实时更新进度统计
 4. THE Workbench_Tree SHALL 用颜色区分进度等级（绿色 100%、蓝色 50-99%、灰色 <50%）
 
@@ -310,4 +326,4 @@
 6. THE 自定义查询 SHALL 支持结果导出为 Excel
 7. THE 自定义查询 SHALL 支持保存查询模板（命名保存，下次直接调用）
 8. WHEN 用户保存查询模板时，THE 自定义查询 SHALL 支持设置为"全局共享"或"仅自己可见"
-9. THE 自定义查询 SHALL 在侧栏"自定义查询"入口也可独立访问（已有路由 `/custom-query`）
+9. THE 自定义查询 SHALL 在侧栏"自定义查询"入口也可独立访问（**前端 CustomQuery.vue 当前不存在，需新建**；后端 `/api/custom-query` 端点已存在）

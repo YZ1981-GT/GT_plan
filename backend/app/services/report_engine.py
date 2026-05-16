@@ -453,17 +453,31 @@ class ReportEngine:
         project_id: UUID,
         year: int,
         applicable_standard: str = "enterprise",
-    ) -> dict[str, list[dict]]:
-        """生成四张报表，返回 {report_type: [row_dicts]}
+        mode: str = "audited",
+        debug: bool = False,
+    ) -> dict[str, Any]:
+        """生成四张报表，返回 {report_type: [row_dicts], coverage_stats: {...}, debug_info: {...}}
 
-        Validates: Requirements 2.1, 2.2, 2.5
+        Args:
+            project_id: 项目ID
+            year: 年度
+            applicable_standard: 报表标准
+            mode: "audited"(审定) 或 "unadjusted"(未审)
+            debug: 是否返回调试信息（公式文本+代入值+计算过程）
+
+        Validates: Requirements 2.1, 2.2, 2.5, 18.1, 18.2, 18.3, 13.6, 18.9, 20.5, 20.6
         """
         configs = await self._load_report_configs(applicable_standard)
-        results: dict[str, list[dict]] = {}
+        results: dict[str, Any] = {}
 
         # We need a global row_cache across report types for cross-report ROW() refs
         # (e.g. equity statement references IS-019 from income statement)
         global_row_cache: dict[str, Decimal] = {}
+
+        # Coverage stats tracking
+        coverage_stats: dict[str, dict[str, int]] = {}
+        # Debug info tracking
+        debug_info: dict[str, list[dict]] = {} if debug else {}
 
         # Process in a specific order to support cross-report references
         type_order = [
@@ -482,14 +496,34 @@ class ReportEngine:
             if not config_rows:
                 continue
 
-            report_rows = await self._generate_report(
+            report_rows, type_coverage, type_debug = await self._generate_report(
                 project_id, year, report_type, config_rows,
                 global_row_cache, now,
+                mode=mode,
+                debug=debug,
             )
             results[report_type.value] = report_rows
+            coverage_stats[report_type.value] = type_coverage
+            if debug and type_debug:
+                debug_info[report_type.value] = type_debug
 
             # 写入缓存
             await self._set_cached_report(project_id, report_type.value, report_rows)
+
+        # Add coverage_stats to results
+        # Calculate overall coverage
+        total_rows = sum(s.get("total_rows", 0) for s in coverage_stats.values())
+        rows_with_data = sum(s.get("rows_with_data", 0) for s in coverage_stats.values())
+        coverage_pct = round(rows_with_data / max(total_rows, 1) * 100, 1)
+        results["coverage_stats"] = {
+            "by_type": coverage_stats,
+            "total_rows": total_rows,
+            "rows_with_data": rows_with_data,
+            "coverage_pct": coverage_pct,
+        }
+
+        if debug:
+            results["debug_info"] = debug_info
 
         # ── Phase 16: 版本链写入（每种报表类型写一个版本戳） ──
         try:
@@ -521,27 +555,112 @@ class ReportEngine:
         config_rows: list[ReportConfig],
         global_row_cache: dict[str, Decimal],
         generated_at: datetime,
-    ) -> list[dict]:
-        """执行每行公式，生成报表数据并写入 financial_report 表"""
+        mode: str = "audited",
+        debug: bool = False,
+    ) -> tuple[list[dict], dict[str, int], list[dict] | None]:
+        """执行每行公式，生成报表数据并写入 financial_report 表。
+
+        Args:
+            mode: "audited" 或 "unadjusted"
+            debug: 是否收集调试信息
+
+        Returns:
+            (report_rows, coverage_stats, debug_rows)
+            - coverage_stats: {total_rows, rows_with_data, coverage_pct}
+            - debug_rows: 调试信息列表（debug=True 时）
+
+        Validates: Requirements 18.1, 18.2, 18.3, 18.8, 20.1, 13.6, 18.9, 20.5, 20.6
+        """
         parser_current = ReportFormulaParser(self.db, project_id, year)
         parser_prior = ReportFormulaParser(self.db, project_id, year - 1)
 
+        # Task 1.4: 设置未审/审定模式
+        if mode == "unadjusted":
+            parser_current._use_unadjusted = True
+            parser_prior._use_unadjusted = True
+
         report_rows = []
+        # Task 1.6: 覆盖率统计
+        total_rows = 0
+        rows_with_data = 0
+        # Task 1.7: 调试信息
+        debug_rows: list[dict] = [] if debug else []
+        # Task 1.5: fallback 警告收集
+        warnings: list[dict] = []
+
         for config in sorted(config_rows, key=lambda r: r.row_number):
-            # Execute formula for current period
-            current_amount = await parser_current.execute(
-                config.formula, global_row_cache,
-            )
+            total_rows += 1
+            fallback_applied = False
+            formula_error: str | None = None
+            debug_trace: dict | None = None
+
+            # Task 1.7: 公式执行容错 + 调试模式
+            try:
+                # Execute formula for current period
+                current_amount = await parser_current.execute(
+                    config.formula, global_row_cache,
+                )
+            except Exception as e:
+                # Task 1.7: 公式执行失败记录 warning 而非抛异常
+                formula_error = str(e)
+                current_amount = Decimal("0")
+                logger.warning(
+                    "Formula execution failed for %s (%s): %s",
+                    config.row_code, config.row_name, e,
+                )
+
+            # Task 1.5: 公式 fallback 取数机制
+            # 当公式计算结果为 0 但 TB 中该科目有余额时，使用 TB 余额作为 fallback
+            if current_amount == Decimal("0") and config.formula:
+                tb_fallback_value = await self._check_tb_fallback(
+                    parser_current, config.formula, mode,
+                )
+                if tb_fallback_value is not None and tb_fallback_value != Decimal("0"):
+                    current_amount = tb_fallback_value
+                    fallback_applied = True
+                    warnings.append({
+                        "row_code": config.row_code,
+                        "row_name": config.row_name,
+                        "type": "fallback_applied",
+                        "message": f"公式结果为0但TB有余额({tb_fallback_value})，已使用TB余额",
+                    })
+
             # Execute formula for prior period (year - 1)
-            prior_amount = await parser_prior.execute(
-                config.formula, {},  # prior period doesn't use row_cache cross-refs
-            )
+            try:
+                prior_amount = await parser_prior.execute(
+                    config.formula, {},  # prior period doesn't use row_cache cross-refs
+                )
+            except Exception:
+                prior_amount = Decimal("0")
 
             # Update global row_cache for ROW() references
             global_row_cache[config.row_code] = current_amount
 
             # Extract source accounts
             source_accounts = parser_current.extract_account_codes(config.formula)
+
+            # Task 1.6: 统计有数据的行
+            if current_amount != Decimal("0") or (config.formula and not formula_error):
+                rows_with_data += 1
+
+            # Task 1.7: 收集调试信息
+            if debug:
+                debug_trace = {
+                    "row_code": config.row_code,
+                    "row_name": config.row_name,
+                    "formula": config.formula,
+                    "substituted_expression": None,
+                    "result": str(current_amount),
+                    "fallback_applied": fallback_applied,
+                    "error": formula_error,
+                    "source_accounts": source_accounts,
+                }
+                # 获取代入值的表达式（通过重新执行获取中间状态）
+                if config.formula:
+                    debug_trace["substituted_expression"] = await self._get_substituted_expression(
+                        parser_current, config.formula, global_row_cache,
+                    )
+                debug_rows.append(debug_trace)
 
             # Upsert into financial_report table
             existing = await self.db.execute(
@@ -580,7 +699,7 @@ class ReportEngine:
                 )
                 self.db.add(row)
 
-            report_rows.append({
+            row_dict = {
                 "row_code": config.row_code,
                 "row_name": config.row_name,
                 "current_period_amount": str(current_amount),
@@ -589,10 +708,110 @@ class ReportEngine:
                 "is_total_row": config.is_total_row,
                 "formula_used": config.formula,
                 "source_accounts": source_accounts,
-            })
+                "fallback_applied": fallback_applied,
+            }
+            report_rows.append(row_dict)
 
         await self.db.flush()
-        return report_rows
+
+        # Task 1.6: 构建覆盖率统计
+        coverage_pct = round(rows_with_data / max(total_rows, 1) * 100, 1)
+        type_coverage = {
+            "total_rows": total_rows,
+            "rows_with_data": rows_with_data,
+            "coverage_pct": coverage_pct,
+        }
+        if warnings:
+            type_coverage["warnings"] = warnings
+
+        return report_rows, type_coverage, debug_rows if debug else None
+
+    # ------------------------------------------------------------------
+    # Task 1.5: Fallback 取数辅助方法
+    # ------------------------------------------------------------------
+    async def _check_tb_fallback(
+        self,
+        parser: ReportFormulaParser,
+        formula: str,
+        mode: str,
+    ) -> Decimal | None:
+        """检查公式引用的 TB 科目是否有非零余额，用于 fallback。
+
+        当公式结果为 0 时，检查公式中引用的第一个 TB 科目是否有余额。
+        如果有，返回该余额作为 fallback 值。
+        """
+        # 提取公式中的第一个 TB 引用
+        tb_match = _TB_PATTERN.search(formula)
+        if not tb_match:
+            return None
+
+        account_code = tb_match.group(1)
+        tb_row = await parser._get_tb_row(account_code)
+        if tb_row is None:
+            return None
+
+        # 根据模式选择取数字段
+        if mode == "unadjusted":
+            value = tb_row.unadjusted_amount
+        else:
+            value = tb_row.audited_amount
+
+        return value if value and value != Decimal("0") else None
+
+    # ------------------------------------------------------------------
+    # Task 1.7: 调试模式辅助方法
+    # ------------------------------------------------------------------
+    async def _get_substituted_expression(
+        self,
+        parser: ReportFormulaParser,
+        formula: str,
+        row_cache: dict[str, Decimal],
+    ) -> str:
+        """获取公式代入值后的表达式字符串（用于调试）。
+
+        将 TB()/SUM_TB()/ROW() 替换为实际数值，返回可读的表达式。
+        """
+        if not formula:
+            return ""
+
+        expression = formula
+
+        # Replace SUM_TB tokens
+        for match in _SUM_TB_PATTERN.finditer(formula):
+            code_range, col = match.group(1), match.group(2)
+            val = await parser._resolve_sum_tb(code_range, col)
+            expression = expression.replace(
+                match.group(0), f"{val}/*SUM_TB('{code_range}')*/", 1
+            )
+
+        # Replace TB tokens
+        for match in _TB_PATTERN.finditer(formula):
+            account_code, col = match.group(1), match.group(2)
+            val = await parser._resolve_tb(account_code, col)
+            expression = expression.replace(
+                match.group(0), f"{val}/*TB('{account_code}')*/", 1
+            )
+
+        # Replace ROW tokens
+        for match in _ROW_PATTERN.finditer(formula):
+            row_code = match.group(1)
+            val = row_cache.get(row_code, Decimal("0"))
+            expression = expression.replace(
+                match.group(0), f"{val}/*ROW('{row_code}')*/", 1
+            )
+
+        # Replace SUM_ROW tokens
+        for match in _SUM_ROW_PATTERN.finditer(formula):
+            start_code, end_code = match.group(1), match.group(2)
+            total = Decimal("0")
+            for code, val in row_cache.items():
+                if start_code <= code <= end_code:
+                    total += val
+            expression = expression.replace(
+                match.group(0), f"{total}/*SUM_ROW('{start_code}','{end_code}')*/", 1
+            )
+
+        return expression
 
     # ------------------------------------------------------------------
     # 增量更新

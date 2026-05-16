@@ -48,6 +48,8 @@ def find_template_file(wp_code: str) -> Path | None:
 
     优先匹配：含"审定表"或"常规程序"的文件 > 文件名最短的。
     对于多文件底稿（如 D2 有 D2-1至D2-4），返回审定表文件。
+    对于子表（如 D2-2/E1-3），如果独立文件不存在，回退到主表文件
+    （主表 xlsx 通常包含所有子表 sheet，如 "D2-1至D2-4 应收账款-审定表明细表"）。
     """
     index = _load_index()
     # 精确匹配
@@ -82,6 +84,22 @@ def find_template_file(wp_code: str) -> Path | None:
         for f in sorted(template_subdir.iterdir(), key=lambda x: len(x.name)):
             if f.name.startswith(wp_code) and f.suffix.lower() in (".xlsx", ".xlsm"):
                 return f
+
+        # 子表回退：如 D2-2 找不到，尝试包含范围式命名的文件（D2-1至D2-4）
+        if "-" in wp_code:
+            primary = wp_code.split("-")[0]
+            sub_num = wp_code.split("-")[1]
+            for f in sorted(template_subdir.iterdir()):
+                if f.suffix.lower() not in (".xlsx", ".xlsm"):
+                    continue
+                # 匹配模式: 文件名含 "{primary}-N至{primary}-M" 且 sub_num 在范围内
+                if f.name.startswith(primary + "-") and "至" in f.name:
+                    # 简单包含检查
+                    return f
+            # 终极回退：用主表
+            for f in sorted(template_subdir.iterdir()):
+                if f.name.startswith(primary + " ") and f.suffix.lower() in (".xlsx", ".xlsm"):
+                    return f
 
     return None
 

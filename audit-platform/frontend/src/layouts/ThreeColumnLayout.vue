@@ -363,6 +363,7 @@ const FALLBACK_NAV = [
   { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'developing', roles: null },
   { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
   { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor'] },
+  { key: 'template-library', label: '模板库', icon: Document, path: '/template-library', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
   { key: 'users', label: '账号权限', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
 ]
 

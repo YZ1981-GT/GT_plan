@@ -480,6 +480,26 @@ class DisclosureEngine:
     # ------------------------------------------------------------------
     # 生成附注
     # ------------------------------------------------------------------
+    @staticmethod
+    def select_md_template(template_type: str, report_scope: str) -> tuple[str, str]:
+        """根据项目 template_type 和 report_scope 自动选择 MD 模板。
+
+        Returns (template_type, scope) tuple for NoteMDTemplateParser.
+
+        Requirements: 21.3
+        """
+        # Normalize inputs
+        t = (template_type or "soe").lower().strip()
+        s = (report_scope or "standalone").lower().strip()
+
+        # Map to valid values
+        if t not in ("soe", "listed"):
+            t = "soe"
+        if s not in ("consolidated", "standalone"):
+            s = "standalone"
+
+        return (t, s)
+
     async def generate_notes(
         self,
         project_id: UUID,
@@ -488,7 +508,7 @@ class DisclosureEngine:
     ) -> list[dict]:
         """根据模版生成附注初稿，写入 disclosure_notes 表。
 
-        Validates: Requirements 4.2, 4.3, 4.8, 4.9
+        Validates: Requirements 4.2, 4.3, 4.8, 4.9, 21.3
         """
         templates = await self._load_templates(project_id, template_type)
         source_template = self._persist_source_template(template_type)
@@ -796,6 +816,84 @@ class DisclosureEngine:
                 logger.warning("auto rebuild table_data failed for %s: %s", note_section, e)
 
         return note
+
+    async def get_template_structure(
+        self,
+        project_id: UUID,
+        year: int,
+        note_section: str,
+    ) -> dict | None:
+        """获取附注章节的原始模板表格结构。
+
+        返回模板定义的 headers 和 rows（仅结构，不含项目实际数据），
+        用于前端"恢复模板结构"操作。
+
+        Validates: Requirements 38.5, 38.6
+        """
+        # 确定模板类型
+        template_type = await self._get_active_template_type(project_id)
+
+        # 加载模板
+        templates = await self._load_templates(project_id, template_type)
+        tmpl = next((t for t in templates if t.get("note_section") == note_section), None)
+        if not tmpl:
+            return None
+
+        # 从模板提取表格结构
+        tables_list = tmpl.get("tables", [])
+        if tables_list:
+            # 多表格模板：返回第一个表格的结构（与 get_note_detail 一致）
+            tbl = tables_list[0]
+            headers = tbl.get("headers", [])
+            template_rows = tbl.get("rows", [])
+            # 构建标准化行结构
+            rows = []
+            for row_def in template_rows:
+                if isinstance(row_def, dict):
+                    rows.append({
+                        "label": row_def.get("label", ""),
+                        "values": [None] * max(0, len(headers) - 1),
+                        "is_total": row_def.get("is_total", False),
+                    })
+                elif isinstance(row_def, list) and len(row_def) > 0:
+                    rows.append({
+                        "label": str(row_def[0]),
+                        "values": [None] * max(0, len(headers) - 1),
+                        "is_total": False,
+                    })
+            return {
+                "headers": headers,
+                "rows": rows,
+                "name": tbl.get("name", ""),
+            }
+
+        # 单表格模板（旧格式）
+        table_template = tmpl.get("table_template", {})
+        if table_template:
+            headers = table_template.get("headers", [])
+            template_rows = table_template.get("rows", [])
+            rows = []
+            for row_def in template_rows:
+                if isinstance(row_def, dict):
+                    rows.append({
+                        "label": row_def.get("label", ""),
+                        "values": [None] * max(0, len(headers) - 1),
+                        "is_total": row_def.get("is_total", False),
+                    })
+                elif isinstance(row_def, list) and len(row_def) > 0:
+                    rows.append({
+                        "label": str(row_def[0]),
+                        "values": [None] * max(0, len(headers) - 1),
+                        "is_total": False,
+                    })
+            if headers:
+                return {
+                    "headers": headers,
+                    "rows": rows,
+                    "name": "",
+                }
+
+        return None
 
     async def update_note(
         self,

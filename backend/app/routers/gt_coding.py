@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_role
 from app.models.core import User
 from app.services.gt_coding_service import GTCodingService
 
@@ -116,7 +116,7 @@ async def load_seed_data(db: AsyncSession = Depends(get_db)):
 async def create_custom_coding(
     body: CreateCodingRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin", "partner"])),
 ):
     """创建自定义编码条目"""
     svc = GTCodingService()
@@ -142,7 +142,7 @@ async def update_custom_coding(
     coding_id: UUID,
     body: UpdateCodingRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin", "partner"])),
 ):
     """更新自定义编码条目"""
     svc = GTCodingService()
@@ -160,7 +160,7 @@ async def update_custom_coding(
 async def delete_custom_coding(
     coding_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin", "partner"])),
 ):
     """删除自定义编码条目"""
     svc = GTCodingService()

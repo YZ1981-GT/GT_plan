@@ -13,3 +13,23 @@ repos:
         language: system
         pass_filenames: false
         files: ^backend/data/.*\.json$
+
+      # 二轮复盘 P1.4：spec snapshot.json 或对应 seed 文件改动时核验 N_* 基准值
+      # 任何 seed JSON / .kiro/specs/*/snapshot.json 改动都触发 verify_spec_facts.py --all
+      # 退出码 1 (WARN) 不阻断提交（容忍 ±5% 数据漂移）；退出码 2 (FAIL) 阻断（spec 假设错位）
+      - id: verify-spec-facts
+        name: verify-spec-facts
+        entry: bash -c 'python backend/scripts/verify_spec_facts.py --all || ([ $? -eq 1 ] && echo "WARN: spec narrative 数字与实测有偏差，建议更新 snapshot.json 或修订三件套" && exit 0) || exit $?'
+        language: system
+        pass_filenames: false
+        files: ^(backend/data/.*\.json|\.kiro/specs/.*/snapshot\.json)$
+
+      # 二轮复盘 P1.3：Property 覆盖率双向核验
+      # design.md 或集成测试 docstring 改动时检查 Property X ↔ test_xxx 双向映射
+      # 退出码 1 阻断提交（FAIL = Property 编号错位 / design.md 声称已测但 docstring 缺引用）
+      - id: check-property-coverage
+        name: check-property-coverage
+        entry: python backend/scripts/check_property_coverage.py --all
+        language: system
+        pass_filenames: false
+        files: ^(\.kiro/specs/.*/design\.md|backend/tests/test_.*_integration\.py)$

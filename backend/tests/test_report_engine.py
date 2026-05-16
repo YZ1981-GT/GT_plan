@@ -494,12 +494,27 @@ async def test_drilldown_nonexistent(db_session: AsyncSession, seeded_db):
 async def client(db_session: AsyncSession, seeded_db):
     """创建测试 HTTP 客户端"""
     from app.core.database import get_db
+    from app.deps import get_current_user
     from app.main import app
+    from app.models.core import User
 
     async def override_get_db():
         yield db_session
 
+    # Create a fake user for auth override
+    fake_user = User(
+        id=FAKE_USER_ID,
+        username="test_user",
+        email="test@example.com",
+        hashed_password="fake",
+        is_active=True,
+    )
+
+    async def override_get_current_user():
+        return fake_user
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
@@ -581,7 +596,7 @@ async def test_api_consistency_check(client: AsyncClient):
     assert resp.status_code == 200
     data = resp.json()
     result = data.get("data", data)
-    assert "all_passed" in result
+    assert "consistent" in result
     assert "checks" in result
 
 

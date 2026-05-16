@@ -471,6 +471,143 @@ class PREVExecutor:
     pass
 
 
+class WPExecutor:
+    """WP 函数执行器：从底稿 parsed_data 取数
+
+    语法: WP('E1','审定数')
+    从 WorkingPaper 的 parsed_data 中按 wp_code 和列名取数。
+
+    Requirements: 39.1
+    """
+
+    @staticmethod
+    async def execute(db, project_id, wp_code: str, column: str = "审定数"):
+        """Fetch value from workpaper parsed_data."""
+        from decimal import Decimal as D
+
+        try:
+            from app.models.workpaper_models import WorkingPaper, WpIndex
+
+            result = await db.execute(
+                sa.select(WorkingPaper.parsed_data)
+                .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+                .where(
+                    WorkingPaper.project_id == project_id,
+                    WpIndex.wp_code == wp_code,
+                    WorkingPaper.is_deleted == sa.false(),
+                )
+                .limit(1)
+            )
+            row = result.scalar_one_or_none()
+            if row is None:
+                return D("0")
+
+            parsed_data = row or {}
+            col_map = {
+                "审定数": "audited_amount",
+                "未审数": "unadjusted_amount",
+                "期初余额": "opening_balance",
+                "期末余额": "audited_amount",
+            }
+            key = col_map.get(column, column)
+            value = parsed_data.get(key, 0)
+            return D(str(value)) if value is not None else D("0")
+        except Exception:
+            return D("0")
+
+
+class REPORTExecutor:
+    """REPORT 函数执行器：从 financial_report 取数
+
+    语法: REPORT('BS','BS-001')
+    从已生成的报表数据中按报表类型和行次编码取数。
+
+    Requirements: 39.1
+    """
+
+    @staticmethod
+    async def execute(db, project_id, year: int, report_type: str, row_code: str):
+        """Fetch value from financial_report."""
+        from decimal import Decimal as D
+
+        try:
+            result = await db.execute(
+                sa.text("""
+                    SELECT current_period_amount
+                    FROM financial_report
+                    WHERE project_id = :pid
+                      AND year = :year
+                      AND report_type = :rtype
+                      AND row_code = :rcode
+                      AND is_deleted = false
+                    LIMIT 1
+                """),
+                {
+                    "pid": str(project_id),
+                    "year": year,
+                    "rtype": report_type,
+                    "rcode": row_code,
+                },
+            )
+            row = result.fetchone()
+            if row and row[0] is not None:
+                return D(str(row[0]))
+            return D("0")
+        except Exception:
+            return D("0")
+
+
+class NOTEExecutor:
+    """NOTE 函数执行器：从其他附注章节取数（交叉引用）
+
+    语法: NOTE('五、（一）1','合计')
+    从已生成的附注数据中按章节编码取数。
+
+    Requirements: 39.1
+    """
+
+    @staticmethod
+    async def execute(db, project_id, year: int, section_code: str, field_name: str = "合计"):
+        """Fetch value from another note section (cross-reference)."""
+        from decimal import Decimal as D
+
+        try:
+            result = await db.execute(
+                sa.text("""
+                    SELECT table_data
+                    FROM disclosure_notes
+                    WHERE project_id = :pid
+                      AND year = :year
+                      AND note_section = :section
+                      AND is_deleted = false
+                    LIMIT 1
+                """),
+                {
+                    "pid": str(project_id),
+                    "year": year,
+                    "section": section_code,
+                },
+            )
+            row = result.fetchone()
+            if row and row[0]:
+                table_data = row[0]
+                rows = table_data.get("rows", []) if isinstance(table_data, dict) else []
+                for r in rows:
+                    if isinstance(r, dict) and r.get("is_total"):
+                        values = r.get("values", [])
+                        if values and values[0] is not None:
+                            return D(str(values[0]))
+                if rows:
+                    last_row = rows[-1]
+                    if isinstance(last_row, dict):
+                        values = last_row.get("values", [])
+                        if values and values[0] is not None:
+                            return D(str(values[0]))
+            return D("0")
+        except Exception:
+            return D("0")
+
+
 def _validate_custom_expression(expression: str) -> bool:
     """校验自定义公式表达式是否安全合法。
 

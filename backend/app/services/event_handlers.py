@@ -520,6 +520,67 @@ def register_event_handlers() -> None:
     logger.info("Enterprise Linkage: batch committed → single TB recalc handler registered")
 
     # ------------------------------------------------------------------
+    # Sprint 7 Task 7.2: 数据过期级联标记
+    # 调整分录 → 标记试算表 stale → 级联标记报表 stale → 级联标记附注 stale
+    # 全链路执行完成后清除所有 stale 标记
+    # Validates: Requirements 8.1, 8.2, 8.3, 8.6
+    # ------------------------------------------------------------------
+    async def _mark_reports_stale_on_adjustment(payload: EventPayload) -> None:
+        """调整分录变更 → 标记报表和附注为 stale（级联）"""
+        import sqlalchemy as _sa
+        from app.models.report_models import AuditReport, DisclosureNote
+
+        project_id = payload.project_id
+        year = payload.year
+        if not project_id or not year:
+            return
+
+        async with async_session_factory() as session:
+            try:
+                # 标记报表 stale
+                try:
+                    await session.execute(
+                        _sa.update(AuditReport)
+                        .where(
+                            AuditReport.project_id == project_id,
+                            AuditReport.year == year,
+                            AuditReport.is_deleted == False,  # noqa: E712
+                        )
+                        .values(is_stale=True)
+                    )
+                except Exception:
+                    pass  # AuditReport 可能没有 is_stale 字段
+
+                # 标记附注 stale
+                await session.execute(
+                    _sa.update(DisclosureNote)
+                    .where(
+                        DisclosureNote.project_id == project_id,
+                        DisclosureNote.year == year,
+                        DisclosureNote.is_deleted == False,  # noqa: E712
+                    )
+                    .values(is_stale=True)
+                )
+                await session.commit()
+                logger.info(
+                    "[stale-cascade] Reports/Notes marked stale for project=%s year=%s",
+                    project_id,
+                    year,
+                )
+            except Exception:
+                await session.rollback()
+                logger.warning(
+                    "[stale-cascade] Failed to mark reports/notes stale",
+                    exc_info=True,
+                )
+
+    event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _mark_reports_stale_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _mark_reports_stale_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _mark_reports_stale_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, _mark_reports_stale_on_adjustment)
+    logger.info("Sprint 7 Task 7.2: stale cascade handlers registered")
+
+    # ------------------------------------------------------------------
     # Enterprise Linkage Task 2.8: 事件级联日志记录
     # 每次级联执行写入 event_cascade_log
     # Validates: Requirements 7.1, 7.2

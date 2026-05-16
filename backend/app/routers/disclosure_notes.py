@@ -247,6 +247,30 @@ async def upload_history(
     }
 
 
+@router.get("/{project_id}/{year}/{note_section}/template-structure")
+async def get_template_structure(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """获取附注章节的原始模板表格结构（用于"恢复模板结构"操作）。
+
+    从附注模板种子数据中获取该章节的默认表格结构（headers + rows），
+    不包含项目实际数据，仅返回模板定义的列名和行标签。
+    Requirements: 38.5, 38.6
+    """
+    engine = DisclosureEngine(db)
+    template = await engine.get_template_structure(project_id, year, note_section)
+    if template is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"未找到章节 {note_section} 的模板结构"
+        )
+    return template
+
+
 @router.post("/{project_id}/{year}/{note_section}/clear-formulas")
 async def clear_formulas(
     project_id: UUID,

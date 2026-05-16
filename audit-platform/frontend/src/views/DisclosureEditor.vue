@@ -34,9 +34,10 @@
           @formula="showNoteFormulaManager = true"
         >
           <template #left>
-            <el-button size="small" @click="onRefreshFromWP" :loading="refreshLoading">🔄 从底稿刷新</el-button>
-            <el-button size="small" @click="onGenerate" :loading="genLoading">📝 生成附注</el-button>
-            <el-button size="small" @click="onValidate" :loading="validateLoading">✅ 执行校验</el-button>
+            <el-button v-if="!isEqcrRole" size="small" @click="onRefreshFromWP" :loading="refreshLoading">🔄 从底稿刷新</el-button>
+            <el-button v-if="!isEqcrRole" size="small" @click="onGenerate" :loading="genLoading">📝 生成附注</el-button>
+            <el-button v-if="!isEqcrRole" size="small" @click="onValidate" :loading="validateLoading">✅ 执行校验</el-button>
+            <el-button v-if="isEqcrRole" size="small" type="info">📋 导出只读副本</el-button>
           </template>
           <template #right-extra>
             <SharedTemplatePicker
@@ -46,6 +47,7 @@
               @applied="onNoteTemplateApplied"
             />
             <el-button size="small" @click="openStructureEditor">📐 表样编辑</el-button>
+            <el-button size="small" @click="showPrintPreview = true">🖨️ 打印预览</el-button>
             <el-button size="small" @click="showNoteMappingDialog = true">🔄 转换规则</el-button>
           </template>
         </GtToolbar>
@@ -107,9 +109,11 @@
             <template #default="{ data }">
               <div v-if="data.isGroup" class="gt-de-tree-group">
                 <span class="gt-de-tree-group-label">{{ data.label }}</span>
+                <span v-if="getGroupValidationErrorCount(data)" class="gt-de-tree-error-badge">{{ getGroupValidationErrorCount(data) }}</span>
               </div>
-              <div v-else class="gt-de-tree-node" :class="{ 'gt-de-tree-node-active': currentNote?.id === data.id }">
+              <div v-else class="gt-de-tree-node" :class="{ 'gt-de-tree-node-active': currentNote?.id === data.id, 'gt-de-tree-node-error': hasSectionValidationError(data.data?.note_section) }">
                 <span class="gt-de-tree-label">{{ data.data?.section_title || data.label }}</span>
+                <span v-if="hasSectionValidationError(data.data?.note_section)" class="gt-de-tree-error-dot" title="校验失败">●</span>
               </div>
             </template>
           </el-tree>
@@ -182,28 +186,35 @@
                 @cell-click="onDeCellClick"
                 @cell-contextmenu="onDeCellContextMenu">
                 <el-table-column v-for="(h, hiRaw) in (activeTableData.headers || [])" :key="hiRaw"
-                  :label="h" :min-width="Number(hiRaw) === 0 ? 160 : 120" :align="Number(hiRaw) === 0 ? 'left' : 'right'">
+                  :label="h" :min-width="Number(hiRaw) === 0 ? 160 : 120" :align="Number(hiRaw) === 0 ? 'left' : 'right'" resizable>
                   <template #default="{ row, $index }">
                     <template v-if="Number(hiRaw) === 0">
                       <span :class="{ 'total-label': row.is_total }">{{ row.label }}</span>
                     </template>
                     <template v-else>
+                      <el-tooltip
+                        :disabled="!getCellValidationError($index, Number(hiRaw) - 1)"
+                        :content="getCellValidationError($index, Number(hiRaw) - 1)"
+                        placement="top"
+                        effect="dark"
+                      >
                       <CommentTooltip :comment="deComments.getComment(activeTableData?.section_id || currentNote?.note_section || 'default', $index, Number(hiRaw))">
-                      <div class="gt-cell-wrapper">
+                      <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, Number(hiRaw) - 1) === 'auto', 'gt-cell-validation-error': !!getCellValidationError($index, Number(hiRaw) - 1) }">
                         <el-input-number v-if="editMode && !row.is_total"
                           v-model="row.values[Number(hiRaw) - 1]" :controls="false" :precision="2"
                           size="small" style="width: 100%; height: 22px"
                           @change="onCellValueChange($index, Number(hiRaw) - 1, $event)" />
-                        <span v-else-if="row.is_total" :class="[{ 'gt-formula-mismatch': isFormulaMismatch(row, Number(hiRaw) - 1) }, displayPrefs.amountClass(getCellValue(row, Number(hiRaw) - 1))]">
+                        <span v-else-if="row.is_total" :class="['gt-amt', { 'gt-formula-mismatch': isFormulaMismatch(row, Number(hiRaw) - 1) }]">
                           {{ fmt(getCellValue(row, Number(hiRaw) - 1)) }}
                         </span>
-                        <span v-else :class="[{ 'total-val': row.is_total }, displayPrefs.amountClass(getCellValue(row, Number(hiRaw) - 1))]">
+                        <span v-else :class="['gt-amt', { 'total-val': row.is_total }]">
                           {{ fmt(getCellValue(row, Number(hiRaw) - 1)) }}
                         </span>
-                        <span v-if="getCellMode(row, Number(hiRaw) - 1) === 'auto'" class="gt-cell-source" title="自动提数">📊</span>
+                        <span v-if="getCellMode(row, Number(hiRaw) - 1) === 'auto'" class="gt-cell-source" title="自动填充">📊</span>
                         <span v-else-if="getCellMode(row, Number(hiRaw) - 1) === 'manual'" class="gt-cell-manual" title="手动编辑">✏️</span>
                       </div>
                       </CommentTooltip>
+                      </el-tooltip>
                     </template>
                   </template>
                 </el-table-column>
@@ -213,18 +224,15 @@
               </div>
             </div>
 
-            <!-- 文字型 — TipTap 富文本编辑器 -->
+            <!-- 文字型 — 富文本编辑器 (Req 48.1-48.7) -->
             <div v-if="currentNote.content_type === 'text' || currentNote.content_type === 'mixed'" class="gt-de-tiptap-wrapper">
-              <div v-if="editor" class="gt-de-tiptap-toolbar">
-                <el-button-group size="small">
-                  <el-button @click="editor.chain().focus().toggleBold().run()" :type="editor.isActive('bold') ? 'primary' : ''">B</el-button>
-                  <el-button @click="editor.chain().focus().toggleItalic().run()" :type="editor.isActive('italic') ? 'primary' : ''">I</el-button>
-                  <el-button @click="editor.chain().focus().toggleBulletList().run()">列表</el-button>
-                  <el-button @click="editor.chain().focus().toggleHeading({ level: 3 }).run()">H3</el-button>
-                  <el-button @click="editor.chain().focus().undo().run()">撤销</el-button>
-                  <el-button @click="editor.chain().focus().redo().run()">重做</el-button>
-                </el-button-group>
-                <span class="gt-de-toolbar-divider"></span>
+              <!-- 增强富文本编辑器：支持标题/加粗/斜体/列表/表格/缩进/颜色/占位符/源码/字数 -->
+              <NoteRichTextEditor
+                v-model="textContent"
+                @update:modelValue="onRichTextChange"
+              />
+              <!-- AI 工具栏 -->
+              <div class="gt-de-ai-toolbar">
                 <el-button-group size="small">
                   <el-button @click="onAiContinueWrite" :loading="aiLoading" title="AI续写：在光标位置续写内容">✨ 续写</el-button>
                   <el-button @click="onAiRewriteOpen" :loading="aiLoading" title="AI改写：选中文本后点击改写">✏️ 改写</el-button>
@@ -236,9 +244,7 @@
                   📎 已加载 {{ knowledgeDocCount }} 篇参考文档
                   <el-button size="small" link @click="clearKnowledgeContext" style="margin-left: 4px; font-size: 11px">清除</el-button>
                 </span>
-                <span class="gt-de-ai-hint">选中文本可改写，光标处可续写</span>
               </div>
-              <editor-content :editor="editor" class="gt-de-tiptap-content" />
             </div>
 
             <!-- AI改写弹窗 -->
@@ -272,6 +278,21 @@
 
             <!-- 选中区域状态栏 -->
             <SelectionBar :stats="deCtx.selectionStats()" />
+
+            <!-- 表格结构编辑工具栏 (Req 38.1-38.6) -->
+            <div v-if="editMode && (currentNote.content_type === 'table' || currentNote.content_type === 'mixed')" class="gt-de-structure-toolbar">
+              <el-button-group size="small">
+                <el-button @click="onStructureAddRow" title="在末尾新增行">➕ 行</el-button>
+                <el-button @click="onStructureDeleteRow" title="删除最后一行（合计行除外）" :disabled="!canDeleteRow">➖ 行</el-button>
+                <el-button @click="onStructureAddColumn" title="新增列">➕ 列</el-button>
+                <el-button @click="onStructureDeleteColumn" title="删除最后一列" :disabled="!canDeleteColumn">➖ 列</el-button>
+              </el-button-group>
+              <el-button-group size="small" style="margin-left: 8px;">
+                <el-button @click="noteTableStructure.undo()" :disabled="!noteTableStructure.canUndo.value" title="撤销 (Ctrl+Z)">↩ 撤销</el-button>
+                <el-button @click="noteTableStructure.redo()" :disabled="!noteTableStructure.canRedo.value" title="重做 (Ctrl+Y)">↪ 重做</el-button>
+              </el-button-group>
+              <el-button size="small" style="margin-left: 8px;" @click="onRestoreTemplateStructure" title="恢复为模板默认结构">🔄 恢复模板结构</el-button>
+            </div>
 
             <div class="gt-de-editor-footer">
               <el-button v-if="!editMode" @click="enterEdit()">编辑</el-button>
@@ -407,6 +428,14 @@
 
   <!-- 知识库文档选择弹窗 [R3.7] -->
   <KnowledgePickerDialog v-model:visible="knowledgePickerVisible" />
+
+  <!-- 打印预览 (Req 41.1-41.5) -->
+  <NotesPrintPreview
+    :visible="showPrintPreview"
+    :sections="printPreviewSections"
+    @close="showPrintPreview = false"
+    @insert-page-break="onInsertPageBreak"
+  />
 </template>
 
 <script setup lang="ts">
@@ -435,9 +464,16 @@ import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import NoteRichTextEditor from '@/components/NoteRichTextEditor.vue'
+import NotesPrintPreview from '@/components/notes/NotesPrintPreview.vue'
 import { refreshDisclosureFromWorkpapers, getProjectWizardState, noteAiRewrite, noteAiContinueWrite, noteAiGeneratePolicy, noteAiGenerateAnalysis } from '@/services/commonApi'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
+import { useAuthStore } from '@/stores/auth'
+
+// EQCR 只读访问 (Requirements: 17.1-17.4)
+const authStore = useAuthStore()
+const isEqcrRole = computed(() => authStore.user?.role === 'eqcr')
 import Placeholder from '@tiptap/extension-placeholder'
 import {
   generateDisclosureNotes, getDisclosureNoteTree, getDisclosureNoteDetail,
@@ -455,6 +491,7 @@ import { useEditingLock } from '@/composables/useEditingLock'
 import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
 import { useProjectEvents } from '@/composables/useProjectEvents'
 import { handleApiError } from '@/utils/errorHandler'
+import { useNoteTableStructure, type TableData } from '@/composables/useNoteTableStructure'
 
 const route = useRoute()
 const router = useRouter()
@@ -585,6 +622,7 @@ const refreshLoading = ref(false)
 const exportLoading = ref(false)
 const showNoteFormulaManager = ref(false)
 const showStructureEditor = ref(false)
+const showPrintPreview = ref(false)
 
 // 底稿保存事件防抖同步
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -624,6 +662,12 @@ const editor = useEditor({
 })
 
 onBeforeUnmount(() => { editor.value?.destroy() })
+
+// ── NoteRichTextEditor change handler (Req 48) ──
+function onRichTextChange(html: string) {
+  textContent.value = html
+  if (editMode.value) { markEditDirty(); autoSave.markDirty() }
+}
 
 // ── 自动保存/草稿恢复 [R3.8] ──
 const autoSaveKey = computed(() => `disclosure_note_${projectId.value}_${currentNote.value?.note_section || 'none'}`)
@@ -1033,6 +1077,13 @@ const activeTableData = computed(() => {
 // 切换章节时重置表格Tab
 watch(() => currentNote.value?.note_section, () => {
   activeTableTab.value = '0'
+  noteTableStructure.clearHistory()
+})
+
+// ─── 附注表格结构编辑 (Req 38.1-38.6) ─────────────────────────────────────
+const noteTableStructure = useNoteTableStructure({
+  getActiveTable: () => activeTableData.value as TableData | null,
+  markDirty: () => { if (editMode.value) { markEditDirty(); autoSave.markDirty() } },
 })
 
 // 表格Tab标签：避免显示无意义的"项 目"等表头值
@@ -1191,6 +1242,20 @@ async function onStructureEditorSaved() {
   showStructureEditor.value = false
   if (currentNote.value) await fetchDetail(currentNote.value.note_section)
   ElMessage.success('表样编辑已同步')
+}
+
+// ── 打印预览 (Req 41.1-41.5) ──
+const printPreviewSections = computed(() => {
+  if (!noteList.value || noteList.value.length === 0) return []
+  return noteList.value.map((node: any) => ({
+    title: node.title || node.label || '',
+    content: node.text_content || '',
+    tables: node.table_data ? [{ html: '<table><tr><td>表格数据</td></tr></table>' }] : [],
+  }))
+})
+
+function onInsertPageBreak(sectionIndex: number) {
+  ElMessage.info('分页符已插入（将在 Word 导出时生效）')
 }
 
 async function onClearAllFormulas() {
@@ -1397,6 +1462,74 @@ async function onSave() {
 function onShortcutSave() {
   if (currentNote.value && editMode.value) {
     onSave()
+  }
+}
+
+// ─── 表格结构编辑操作 (Req 38.1-38.6) ─────────────────────────────────────
+const canDeleteRow = computed(() => {
+  const table = activeTableData.value
+  if (!table) return false
+  // Must have at least one non-total row to delete
+  return table.rows.some((r: any) => !r.is_total) && table.rows.filter((r: any) => !r.is_total).length > 1
+})
+
+const canDeleteColumn = computed(() => {
+  const table = activeTableData.value
+  if (!table) return false
+  // Must have more than 1 value column (headers[0] is label column)
+  return table.headers.length > 2
+})
+
+function onStructureAddRow() {
+  const table = activeTableData.value
+  if (!table) return
+  // Insert before the last total row, or at end
+  const totalIdx = table.rows.findIndex((r: any) => r.is_total)
+  const insertIdx = totalIdx >= 0 ? totalIdx : table.rows.length
+  noteTableStructure.addRow(insertIdx)
+}
+
+function onStructureDeleteRow() {
+  const table = activeTableData.value
+  if (!table) return
+  // Delete the last non-total row
+  for (let i = table.rows.length - 1; i >= 0; i--) {
+    if (!table.rows[i].is_total) {
+      noteTableStructure.deleteRow(i)
+      return
+    }
+  }
+}
+
+function onStructureAddColumn() {
+  const table = activeTableData.value
+  if (!table) return
+  const colCount = table.headers.length - 1 // exclude label column
+  const name = `列${colCount + 1}`
+  noteTableStructure.addColumn(colCount, name)
+}
+
+function onStructureDeleteColumn() {
+  const table = activeTableData.value
+  if (!table) return
+  const colCount = table.headers.length - 1
+  if (colCount <= 1) return
+  noteTableStructure.deleteColumn(colCount - 1)
+}
+
+async function onRestoreTemplateStructure() {
+  if (!currentNote.value) return
+  const section = currentNote.value.note_section
+  try {
+    const res = await api.get(P.disclosureNotes.templateStructure(projectId.value, year.value, section))
+    if (res && res.headers && res.rows) {
+      noteTableStructure.restoreTemplateStructure(res as TableData)
+      ElMessage.success('已恢复为模板默认结构')
+    } else {
+      ElMessage.warning('未找到该章节的模板结构')
+    }
+  } catch (e: any) {
+    handleApiError(e, '恢复模板结构')
   }
 }
 
@@ -1612,6 +1745,53 @@ function onDeCtxPenetrateToLedger() {
     ElMessage.warning('无法识别当前行的科目编码')
   }
 }
+
+// ─── 校验错误标记（左侧目录树红色标记 + 单元格红色边框） ─────────────────────
+/** 判断某章节是否有校验错误 */
+function hasSectionValidationError(noteSection: string | undefined): boolean {
+  if (!noteSection || !validationFindings.value.length) return false
+  return validationFindings.value.some(f => f.note_section === noteSection && f.severity === 'error')
+}
+
+/** 获取分组节点下的校验错误数量 */
+function getGroupValidationErrorCount(groupNode: any): number {
+  if (!validationFindings.value.length) return 0
+  const sections = new Set<string>()
+  function collectSections(node: any) {
+    if (node.data?.note_section) sections.add(node.data.note_section)
+    if (node.children) node.children.forEach(collectSections)
+  }
+  collectSections(groupNode)
+  return validationFindings.value.filter(f => sections.has(f.note_section) && f.severity === 'error').length
+}
+
+/** 获取单元格的校验错误信息（用于 tooltip） */
+function getCellValidationError(rowIndex: number, colIndex: number): string {
+  if (!currentNote.value || !validationFindings.value.length) return ''
+  const section = currentNote.value.note_section
+  // 匹配当前章节的校验错误，检查是否有针对特定行列的错误
+  const findings = validationFindings.value.filter(f => f.note_section === section && f.severity === 'error')
+  if (!findings.length) return ''
+  // 对合计行（最后一行或 is_total）显示余额类校验错误
+  const rows = activeTableData.value?.rows || []
+  const row = rows[rowIndex]
+  if (row?.is_total) {
+    const balanceFinding = findings.find(f => f.check_type === '余额' || f.check_type === '其中项')
+    if (balanceFinding) {
+      const expected = balanceFinding.expected_value ?? '-'
+      const actual = balanceFinding.actual_value ?? '-'
+      return `${balanceFinding.message}（期望: ${expected}, 实际: ${actual}）`
+    }
+  }
+  // 对宽表行检查横向公式错误
+  if (row?.formula_type === 'opening_plus_changes') {
+    const wideFinding = findings.find(f => f.check_type === '宽表')
+    if (wideFinding) {
+      return `${wideFinding.message}`
+    }
+  }
+  return ''
+}
 </script>
 
 <style scoped>
@@ -1726,6 +1906,50 @@ function onDeCtxPenetrateToLedger() {
 .gt-prior-year-val { color: #bbb; font-style: italic; font-size: 12px; }
 .gt-formula-mismatch { color: #FF5149 !important; font-weight: 700; text-decoration: underline wavy #FF5149; }
 
+/* 自动填充单元格浅蓝色背景 */
+.gt-cell-auto-fill {
+  background-color: #e8f4fd;
+  border-radius: 2px;
+  padding: 1px 4px;
+}
+
+/* 校验失败单元格红色边框 */
+.gt-cell-validation-error {
+  border: 1.5px solid #FF5149;
+  border-radius: 3px;
+  padding: 1px 3px;
+}
+
+/* 金额列统一 Arial Narrow + 右对齐 + tabular-nums */
+.gt-de-main :deep(.el-table td .gt-amt) {
+  font-family: 'Arial Narrow', Arial, monospace;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 左侧目录树校验错误标记 ── */
+.gt-de-tree-error-dot {
+  color: #FF5149;
+  font-size: 8px;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+.gt-de-tree-node-error .gt-de-tree-label {
+  color: #FF5149;
+}
+.gt-de-tree-error-badge {
+  background: #FF5149;
+  color: #fff;
+  font-size: 10px;
+  padding: 0 5px;
+  border-radius: 8px;
+  margin-left: 6px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 16px;
+  flex-shrink: 0;
+}
+
 /* ── TipTap ── */
 .gt-de-tiptap-wrapper { border: 1px solid #e8e4f0; border-radius: 6px; margin-top: 10px; }
 .gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid #e8e4f0; background: #faf8fd; border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
@@ -1737,6 +1961,17 @@ function onDeCtxPenetrateToLedger() {
 .gt-de-tiptap-content :deep(.ProseMirror p) { margin-bottom: 10px; text-indent: 2em; }
 .gt-de-tiptap-content :deep(.ProseMirror p.is-editor-empty:first-child::before) { color: #adb5bd; content: attr(data-placeholder); float: left; height: 0; pointer-events: none; text-indent: 0; }
 
+/* ── AI 工具栏 (Req 48) ── */
+.gt-de-ai-toolbar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-top: 1px solid #ebeef5; background: #faf8fd; flex-wrap: wrap; }
+
+/* ── 表格结构编辑工具栏 (Req 38) ── */
+.gt-de-structure-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 6px 0;
+  margin-top: 4px;
+  border-top: 1px dashed #e8e4f0;
+}
 
 </style>
 

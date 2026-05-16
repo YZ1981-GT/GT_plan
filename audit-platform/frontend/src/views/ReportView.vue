@@ -46,7 +46,7 @@
           >
             <template #left>
               <el-tooltip content="根据试算表审定数重新计算报表（需先导入数据+科目映射）" placement="bottom">
-                <el-button size="small" @click="onGenerate" :loading="genLoading">🔄 刷新数据</el-button>
+                <el-button v-if="!isEqcrRole" size="small" @click="onGenerate" :loading="genLoading">🔄 刷新数据</el-button>
               </el-tooltip>
               <el-tooltip content="执行逻辑审核和合理性检查（需先生成报表）" placement="bottom">
                 <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 审核</el-button>
@@ -100,20 +100,26 @@
     <!-- 可滚动的表格区域 -->
     <div class="gt-rv-table-area">
 
-    <!-- 空数据引导提示 -->
-    <el-alert
-      v-if="!loading && rows.length === 0 && !isTracing"
-      type="info"
-      show-icon
-      :closable="false"
-      style="margin: 12px 0"
-    >
-      <template #title>报表暂无数据</template>
-      <div style="font-size: 12px; line-height: 1.6; margin-top: 4px">
-        请先完成以下步骤：① 导入账套数据 → ② 科目映射 → ③ 点击上方"🔄 刷新数据"生成报表。
-        当前显示的是预设报表结构（行次和项目名称），金额列为空。
+    <!-- 致同标准表头（公司名称/报表期间/金额单位） -->
+    <div v-if="rows.length > 0 && activeTab !== 'cross_check'" class="gt-rv-gt-header">
+      <div class="gt-rv-gt-header__company">{{ projectName || '—' }}</div>
+      <div class="gt-rv-gt-header__title">{{ activeTabLabel }}</div>
+      <div class="gt-rv-gt-header__meta">
+        <span>{{ year }}年度</span>
+        <span class="gt-rv-gt-header__unit">金额单位：人民币{{ displayPrefs.unitSuffix }}</span>
       </div>
-    </el-alert>
+    </div>
+
+    <!-- 空数据引导提示 -->
+    <GtEmpty
+      v-if="!loading && rows.length === 0 && !isTracing"
+      title="报表暂无数据"
+      description="请先导入账套数据并执行刷新"
+      icon="📊"
+      action-text="去导入"
+      style="margin: 40px 0"
+      @action="router.push(`/projects/${projectId}/ledger`)"
+    />
 
     <!-- 溯源返回浮动条 -->
     <div v-if="isTracing" class="gt-rv-trace-bar">
@@ -228,7 +234,8 @@
       <el-table-column label="项目" min-width="300" :resizable="true" fixed>
         <template #default="{ row }">
           <span :class="['report-row-name', `report-indent-${Math.min(row.indent_level || 0, 2)}`]"
-                :style="{ paddingLeft: (row.indent_level || 0) * 24 + 8 + 'px', fontWeight: row.is_total_row || getRowType(row) === 'header' ? 700 : 400, fontSize: '13px' }">
+                :style="{ paddingLeft: (row.indent_level || 0) * 24 + 8 + 'px', fontWeight: row.is_total_row || getRowType(row) === 'header' ? 700 : 400, fontSize: '13px', cursor: row.row_code && !row.is_total_row && getRowType(row) !== 'header' ? 'pointer' : 'default' }"
+                @click="onRowNameClick(row)">
             {{ row.row_name }}
             <el-button v-if="getNoteSection(row.row_code)" size="small" text type="primary"
               style="font-size:10px;padding:0 2px;margin-left:4px" title="查看附注"
@@ -264,11 +271,11 @@
             <span class="report-amount" style="color: #bbb;">—</span>
           </template>
           <template v-else>
-            <CommentTooltip :comment="rvComments.getComment(`report_${activeTab}`, $index, 3)">
-              <span class="report-amount" :class="{ 'report-amount--negative': parseFloat(row.prior_period_amount || '0') < 0 }">
-                {{ formatReportAmount(row.prior_period_amount).text }}
-              </span>
-            </CommentTooltip>
+            <GtAmountCell
+              :value="row.prior_period_amount"
+              :clickable="false"
+              :comment="rvComments.getComment(`report_${activeTab}`, $index, 3)"
+            />
           </template>
         </template>
       </el-table-column>
@@ -285,7 +292,8 @@
       </el-table-column>
       <el-table-column label="项目" min-width="250" :resizable="true">
         <template #default="{ row }">
-          <span :style="{ paddingLeft: (row.indent_level || 0) * 18 + 'px', fontWeight: row.is_total_row ? 700 : 400, fontSize: '13px' }">{{ row.row_name }}</span>
+          <span :style="{ paddingLeft: (row.indent_level || 0) * 24 + 8 + 'px', fontWeight: row.is_total_row || getRowType(row) === 'header' ? 700 : 400, fontSize: '13px', cursor: row.row_code && !row.is_total_row && getRowType(row) !== 'header' ? 'pointer' : 'default' }"
+                @click="onRowNameClick(row)">{{ row.row_name }}</span>
         </template>
       </el-table-column>
       <el-table-column label="未审金额" min-width="130" align="right" header-align="center" :resizable="true">
@@ -307,6 +315,23 @@
       <el-table-column label="上年审定数" min-width="130" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
           <span class="gt-rv-amount-cell-readonly" style="color: #666;">{{ fmt(row.prior_period_amount) }}</span>
+        </template>
+      </el-table-column>
+      <!-- Sprint 11 Task 11.6：变动额+变动率列（需求 33.2/33.3） -->
+      <el-table-column label="变动额" min-width="120" align="right" header-align="center" :resizable="true">
+        <template #default="{ row }">
+          <span :class="['gt-rv-amount-cell-readonly', { 'gt-rv-change-negative': (row.audited_amount || 0) - (row.prior_period_amount || 0) < 0 }]">
+            {{ fmt((row.audited_amount || 0) - (row.prior_period_amount || 0)) }}
+          </span>
+        </template>
+      </el-table-column>
+      <el-table-column label="变动率" width="90" align="right" header-align="center" :resizable="true">
+        <template #default="{ row }">
+          <span v-if="row.prior_period_amount && row.prior_period_amount !== 0"
+                :class="['gt-rv-change-rate', { 'gt-rv-change-rate--alert': Math.abs(((row.audited_amount || 0) - row.prior_period_amount) / Math.abs(row.prior_period_amount) * 100) > 20 }]">
+            {{ (((row.audited_amount || 0) - row.prior_period_amount) / Math.abs(row.prior_period_amount) * 100).toFixed(1) }}%
+          </span>
+          <span v-else style="color: #ccc;">-</span>
         </template>
       </el-table-column>
     </el-table>
@@ -620,6 +645,7 @@ import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import GtEmpty from '@/components/common/GtEmpty.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
@@ -636,9 +662,14 @@ import {
   getReportExcelUrl,
   type ReportRow, type ReportDrilldownData, type ReportConsistencyCheck,
 } from '@/services/auditPlatformApi'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+
+// EQCR 只读访问 (Requirements: 17.1-17.4)
+const authStore = useAuthStore()
+const isEqcrRole = computed(() => authStore.user?.role === 'eqcr')
 const projectStore = useProjectStore()
 
 const projectId = computed(() => projectStore.projectId)
@@ -1370,6 +1401,15 @@ async function onDrilldown(row: ReportRow) {
   }
 }
 
+/** 行名点击穿透到试算表对应科目（需求 19.8） */
+function onRowNameClick(row: ReportRow) {
+  if (!row.row_code || row.is_total_row || getRowType(row) === 'header') return
+  router.push({
+    path: `/projects/${projectId.value}/trial-balance`,
+    query: { highlight_row: row.row_code, year: String(year.value) },
+  })
+}
+
 function openWorkpaper(wpId: string) {
   router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId } })
 }
@@ -1809,6 +1849,11 @@ function copyReportTable() {
 /* 对比视图差异行 */
 :deep(.diff-row) { background: #fffbf5 !important; }
 
+/* Sprint 11: 变动率 >20% 标红 */
+.gt-rv-change-rate { font-size: 12px; color: #666; }
+.gt-rv-change-rate--alert { color: var(--el-color-danger) !important; font-weight: 600; }
+.gt-rv-change-negative { color: var(--el-color-danger); }
+
 /* 审核失败行 */
 :deep(.gt-rv-audit-fail-row) { background: #fef5f5 !important; }
 
@@ -1932,11 +1977,12 @@ function copyReportTable() {
 /* ── F27/D9: 报表行类型样式（6 种） ── */
 :deep(.report-row--header) {
   font-weight: 700 !important;
-  background: #f5f7fa !important;
+  background: #f0edf5 !important;
 }
 :deep(.report-row--header td) {
   font-weight: 700;
   color: #333;
+  background: #f0edf5 !important;
 }
 :deep(.report-row--data) {
   /* 正常数据行 */
@@ -1950,7 +1996,10 @@ function copyReportTable() {
   font-weight: 700;
 }
 :deep(.report-row--zero) {
-  opacity: 0.5;
+  color: #aaa !important;
+}
+:deep(.report-row--zero td) {
+  color: #aaa !important;
 }
 :deep(.report-row--special) {
   font-style: italic;
@@ -1978,6 +2027,37 @@ function copyReportTable() {
 .report-indent-0 { padding-left: 8px; }
 .report-indent-1 { padding-left: 32px; }
 .report-indent-2 { padding-left: 56px; }
+
+/* ── 致同标准表头（需求 19.7） ── */
+.gt-rv-gt-header {
+  text-align: center;
+  padding: 12px 16px 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #e8e4f0;
+}
+.gt-rv-gt-header__company {
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  letter-spacing: 1px;
+}
+.gt-rv-gt-header__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+  margin-top: 2px;
+}
+.gt-rv-gt-header__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #888;
+}
+.gt-rv-gt-header__unit {
+  text-align: right;
+}
 
 /* ── F28: 覆盖率摘要 ── */
 .gt-rv-coverage-summary {

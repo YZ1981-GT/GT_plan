@@ -7,6 +7,63 @@
         </template>
       </GtPageHeader>
     </div>
+
+    <!-- 工作流进度条 + 一键刷新按钮 -->
+    <div class="gt-pd-workflow-bar">
+      <WorkflowProgress :project-id="projectId" :year="projectYear" @step-action="onStepAction" />
+      <el-button
+        type="primary"
+        :loading="chainExec.executing.value"
+        :disabled="chainExec.executing.value"
+        @click="onRefreshAll"
+        class="gt-pd-refresh-all-btn"
+      >
+        <template v-if="chainExec.executing.value">执行中...</template>
+        <template v-else>🔄 一键刷新全部</template>
+      </el-button>
+    </div>
+
+    <!-- 全链路执行进度面板 -->
+    <div v-if="chainExec.executing.value || showChainProgress" class="gt-pd-chain-progress">
+      <div class="gt-chain-steps">
+        <div
+          v-for="step in chainExec.stepStates.value"
+          :key="step.key"
+          class="gt-chain-step"
+          :class="`gt-chain-step--${step.status}`"
+        >
+          <span class="gt-chain-step__icon">
+            <template v-if="step.status === 'pending'">○</template>
+            <template v-else-if="step.status === 'running'">
+              <i class="el-icon-loading" style="animation: spin 1s linear infinite;">⟳</i>
+            </template>
+            <template v-else-if="step.status === 'completed'">✓</template>
+            <template v-else-if="step.status === 'failed'">✗</template>
+            <template v-else-if="step.status === 'skipped'">⊘</template>
+          </span>
+          <span class="gt-chain-step__label">{{ step.label }}</span>
+          <el-tooltip
+            v-if="step.status === 'failed' && step.error"
+            :content="step.error"
+            placement="top"
+          >
+            <span class="gt-chain-step__error-hint">⚠</span>
+          </el-tooltip>
+          <span v-if="step.durationMs" class="gt-chain-step__duration">
+            {{ (step.durationMs / 1000).toFixed(1) }}s
+          </span>
+        </div>
+      </div>
+      <el-button
+        v-if="!chainExec.executing.value && showChainProgress"
+        size="small"
+        text
+        @click="showChainProgress = false"
+      >
+        收起
+      </el-button>
+    </div>
+
     <el-row :gutter="16">
       <el-col :span="8">
         <div class="gt-pd-card">
@@ -101,7 +158,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as P from '@/services/apiPaths'
 import { useRoute } from 'vue-router'
 import { use } from 'echarts/core'
@@ -109,7 +166,7 @@ import { PieChart, BarChart } from 'echarts/charts'
 import { TitleComponent, TooltipComponent, GridComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmEscalate } from '@/utils/confirm'
 import {
   getWorkpaperProgress, getOverdueWorkpapers,
@@ -118,11 +175,50 @@ import {
 import http from '@/utils/http'
 import StaffSelectDialog from '@/components/assignment/StaffSelectDialog.vue'
 import { handleApiError } from '@/utils/errorHandler'
+import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
+import { useChainExecution } from '@/composables/useChainExecution'
+import { useProjectStore } from '@/stores/project'
 
 use([PieChart, BarChart, TitleComponent, TooltipComponent, GridComponent, CanvasRenderer])
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
+const projectStore = useProjectStore()
+const projectYear = computed(() => projectStore.year || new Date().getFullYear() - 1)
+
+// ── 全链路执行 ──
+const chainExec = useChainExecution(projectId)
+const showChainProgress = ref(false)
+
+/** 一键刷新全部按钮点击 */
+async function onRefreshAll() {
+  try {
+    await ElMessageBox.confirm(
+      '将依次执行以下步骤：\n1. 重算试算表\n2. 生成底稿\n3. 生成报表\n4. 生成附注\n\n确认执行？',
+      '一键刷新全部',
+      {
+        confirmButtonText: '确认执行',
+        cancelButtonText: '取消',
+        type: 'info',
+      },
+    )
+  } catch {
+    return // 用户取消
+  }
+
+  showChainProgress.value = true
+  await chainExec.executeFullChain(projectYear.value)
+}
+
+/** 工作流步骤动作回调 */
+function onStepAction(action: string) {
+  // 由 WorkflowProgress 组件 emit，可扩展处理
+}
+
+// 清理 SSE 连接
+onUnmounted(() => {
+  chainExec.cleanup()
+})
 const loading = ref(false)
 const wpProgress = ref<any>(null)
 const overdue = ref<any[]>([])
@@ -280,4 +376,101 @@ onMounted(refresh)
 .gt-pd-card { background: white; border-radius: var(--gt-radius-md); padding: 16px; box-shadow: var(--gt-shadow-sm); min-height: 240px; }
 .gt-pd-card h4 { margin: 0 0 12px; font-size: 14px; color: #333; }
 .gt-pd-remind-tip { margin-top: 8px; }
+
+/* ── 工作流进度条 + 一键刷新按钮 ── */
+.gt-pd-workflow-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.gt-pd-workflow-bar > :first-child {
+  flex: 1;
+}
+.gt-pd-refresh-all-btn {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+/* ── 全链路执行进度面板 ── */
+.gt-pd-chain-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.gt-chain-steps {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.gt-chain-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+.gt-chain-step__icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.gt-chain-step__label {
+  font-size: 13px;
+}
+.gt-chain-step__duration {
+  font-size: 11px;
+  color: #999;
+  margin-left: 4px;
+}
+.gt-chain-step__error-hint {
+  color: #f56c6c;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* 步骤状态样式 */
+.gt-chain-step--pending .gt-chain-step__icon { color: #c0c4cc; }
+.gt-chain-step--pending .gt-chain-step__label { color: #909399; }
+
+.gt-chain-step--running {
+  background: rgba(64, 158, 255, 0.08);
+}
+.gt-chain-step--running .gt-chain-step__icon { color: #409eff; }
+.gt-chain-step--running .gt-chain-step__label { color: #409eff; font-weight: 500; }
+
+.gt-chain-step--completed {
+  background: rgba(103, 194, 58, 0.08);
+}
+.gt-chain-step--completed .gt-chain-step__icon { color: #67c23a; }
+.gt-chain-step--completed .gt-chain-step__label { color: #67c23a; font-weight: 500; }
+
+.gt-chain-step--failed {
+  background: rgba(245, 108, 108, 0.08);
+}
+.gt-chain-step--failed .gt-chain-step__icon { color: #f56c6c; }
+.gt-chain-step--failed .gt-chain-step__label { color: #f56c6c; font-weight: 500; }
+
+.gt-chain-step--skipped .gt-chain-step__icon { color: #e6a23c; }
+.gt-chain-step--skipped .gt-chain-step__label { color: #e6a23c; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 </style>

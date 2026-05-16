@@ -151,24 +151,18 @@
     </el-alert>
 
     <!-- 数据新鲜度提示（有未重算的调整分录时） -->
-    <el-alert
-      v-if="isStale && rows.length > 0"
-      :type="isFrozen ? 'info' : 'warning'"
-      :closable="false"
-      show-icon
-      style="margin-bottom: 12px"
-    >
-      <template #title>
-        <span v-if="isFrozen">🔒 已锁定，不会自动重算</span>
-        <span v-else>检测到新调整分录，试算表数据可能已过时</span>
-        <el-button v-if="!isFrozen" type="warning" size="small" plain style="margin-left: 12px" @click="onRecalc" :loading="recalcLoading">
-          立即重算 →
-        </el-button>
-      </template>
-      <div style="font-size: 12px; color: #909399; margin-top: 4px">
-        上次重算：{{ freshnessText }} · 最新调整分录：{{ latestAdjustmentAt ? new Date(latestAdjustmentAt).toLocaleString('zh-CN') : '—' }}
+    <div v-if="isStale && rows.length > 0" class="gt-stale-banner">
+      <span class="gt-stale-icon">⚠️</span>
+      <span class="gt-stale-text">
+        {{ isFrozen ? '试算表已锁定，不会自动重算' : '数据已过期，请刷新（检测到新调整分录）' }}
+      </span>
+      <el-button v-if="!isFrozen" size="small" type="primary" :loading="recalcLoading" @click="onRecalc">
+        立即刷新
+      </el-button>
+      <div v-if="latestAdjustmentAt" style="font-size: 11px; color: #909399; margin-left: 12px">
+        最新调整：{{ new Date(latestAdjustmentAt).toLocaleString('zh-CN') }}
       </div>
-    </el-alert>
+    </div>
 
     <!-- 空数据引导：只在 setup-guide 前简要说明（不重复步骤） -->
     <el-alert

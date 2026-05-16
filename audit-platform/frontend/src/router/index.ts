@@ -521,6 +521,20 @@ const router = createRouter({
           component: () => import('@/views/admin/EventDLQ.vue'),
           meta: { permission: 'admin' },
         },
+        // ── 模板库管理 [template-library-coordination Sprint 2.6] ──
+        {
+          path: 'template-library',
+          name: 'TemplateLibraryMgmt',
+          component: () => import('@/views/TemplateLibraryMgmt.vue'),
+          meta: { roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
+        },
+        // ── 自定义查询独立页面 [template-library-coordination Sprint 6 Task 6.4] ──
+        {
+          path: 'custom-query',
+          name: 'CustomQuery',
+          component: () => import('@/views/CustomQuery.vue'),
+          meta: { roles: ['admin', 'partner', 'manager', 'auditor', 'qc', 'eqcr'] },
+        },
       ],
     },
     {

@@ -48,7 +48,7 @@ def load_all_entries() -> list[dict]:
 
 async def load_to_database(entries: list[dict]) -> dict:
     """将条目写入 wp_template_metadata 表（幂等：存在则更新）"""
-    from app.core.database import async_engine
+    from app.core.database import engine as async_engine
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 

@@ -97,7 +97,11 @@ async def get_active_filter(
                 table.c.is_deleted == sa.false(),
             )
     except Exception:
-        pass  # ledger_datasets 表可能不存在，降级到 is_deleted 过滤
+        # ledger_datasets 表可能不存在或查询失败，需要 rollback 恢复事务
+        try:
+            await db.rollback()
+        except Exception:
+            pass
 
     return base_filter
 
