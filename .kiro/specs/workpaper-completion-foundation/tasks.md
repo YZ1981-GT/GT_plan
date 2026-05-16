@@ -18,7 +18,7 @@
 ## Tasks
 
 - [ ] 1. Sprint 1：后端 + Composables + 属性测试
-  - [ ] 1.0 验证底稿模板完整加载链路（Requirement 0 关键前置）
+  - [x] 1.0 验证底稿模板完整加载链路（Requirement 0 关键前置）
     - 确认后端 GET /xlsx-to-json 对陕西华氏 D2 返回 20 sheets / 13024+ cells / 含 mergeData + columnData + freeze
     - 确认前端 WorkpaperEditor Strategy 3 调用 GET /xlsx-to-json 成功（非 POST FormData）
     - 确认 `univerAPI.createWorkbook(jsonData)` 后 Univer 渲染全部 20 sheet tabs

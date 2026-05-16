@@ -259,7 +259,53 @@ _FORMULA_RESOLVERS = {
     "PREV": _resolve_prev_formula,
     "ADJ": _resolve_adj_formula,
     "NOTE": _resolve_note_formula,
+    "TB_AUX": None,  # handled separately below
 }
+
+
+async def _resolve_tb_aux(
+    db: AsyncSession, project_id: UUID, year: int,
+    account_code: str, aux_type: str, column: str,
+) -> list[dict[str, Any]]:
+    """=TB_AUX('account_code', 'aux_type', 'column') → 从 tb_aux_balance 表查询辅助余额明细
+
+    返回 [{aux_code, aux_name, value}, ...] 列表。
+    """
+    from app.models.dataset_models import TbAuxBalance
+    from app.services.dataset_query import get_active_filter
+
+    active_filter = await get_active_filter(db, TbAuxBalance, project_id, year)
+
+    # 映射列名到 ORM 字段
+    col_map = {
+        "期末余额": TbAuxBalance.closing_balance,
+        "期初余额": TbAuxBalance.opening_balance,
+        "借方发生额": TbAuxBalance.debit_amount,
+        "贷方发生额": TbAuxBalance.credit_amount,
+    }
+    col_attr = col_map.get(column, TbAuxBalance.closing_balance)
+
+    q = sa.select(
+        TbAuxBalance.aux_code,
+        TbAuxBalance.aux_name,
+        col_attr.label("value"),
+    ).where(
+        active_filter,
+        TbAuxBalance.account_code == account_code,
+        TbAuxBalance.aux_type == aux_type,
+    ).order_by(TbAuxBalance.aux_code)
+
+    result = await db.execute(q)
+    rows = result.all()
+
+    return [
+        {
+            "aux_code": r.aux_code or "",
+            "aux_name": r.aux_name or "",
+            "value": float(r.value) if r.value is not None else 0.0,
+        }
+        for r in rows
+    ]
 
 
 async def resolve_extended_formula(
@@ -267,7 +313,19 @@ async def resolve_extended_formula(
     formula_type: str, raw_args: str,
 ) -> Decimal | None:
     """统一入口：解析并执行扩展公式"""
-    resolver = _FORMULA_RESOLVERS.get(formula_type.upper())
+    ft = formula_type.upper()
+
+    # TB_AUX 返回列表而非单值，调用方需特殊处理
+    if ft == "TB_AUX":
+        args = _parse_args(raw_args)
+        if len(args) >= 3:
+            results = await _resolve_tb_aux(db, project_id, year, args[0], args[1], args[2])
+            # 返回合计值作为 Decimal（调用方如需明细列表应直接调 _resolve_tb_aux）
+            total = sum(r["value"] for r in results)
+            return Decimal(str(total))
+        return None
+
+    resolver = _FORMULA_RESOLVERS.get(ft)
     if resolver is None:
         return None
     args = _parse_args(raw_args)

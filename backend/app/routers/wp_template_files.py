@@ -501,6 +501,74 @@ async def convert_xlsx_storage_to_json(
 
         wb.close()
 
+        # ── Foundation Task 1.2: 注入 prefill_source 元数据到 cellData ──
+        # 读取 prefill_formula_mapping.json，按 wp_code 匹配当前底稿
+        try:
+            _wp_code_row = (await db.execute(text("""
+                SELECT i.wp_code FROM working_paper w
+                LEFT JOIN wp_index i ON w.wp_index_id = i.id
+                WHERE w.id = :wid
+            """), {"wid": wp_id})).first()
+            _current_wp_code = _wp_code_row[0] if _wp_code_row else None
+
+            if _current_wp_code:
+                import json as _json
+                _mapping_path = Path(__file__).resolve().parent.parent.parent / "data" / "prefill_formula_mapping.json"
+                if _mapping_path.exists():
+                    with open(_mapping_path, "r", encoding="utf-8") as _mf:
+                        _mapping_data = _json.load(_mf)
+
+                    # 颜色映射：formula_type → 背景色
+                    _SOURCE_COLOR_MAP = {
+                        "TB": "#E3F2FD",
+                        "TB_SUM": "#E3F2FD",
+                        "TB_AUX": "#E3F2FD",
+                        "AJE": "#E8F5E9",
+                        "ADJ": "#E8F5E9",
+                        "PREV": "#F3E5F5",
+                        "WP": "#E0F7FA",
+                    }
+
+                    # 找到当前 wp_code 的所有 mapping 条目
+                    for _mapping in _mapping_data.get("mappings", []):
+                        if _mapping.get("wp_code") != _current_wp_code:
+                            continue
+                        _target_sheet = _mapping.get("sheet", "")
+                        # 找到对应的 sheet_id
+                        _target_sheet_id = None
+                        for _sid, _sobj in sheets.items():
+                            if _sobj.get("name") == _target_sheet:
+                                _target_sheet_id = _sid
+                                break
+                        if not _target_sheet_id:
+                            continue
+
+                        _sheet_cell_data = sheets[_target_sheet_id].get("cellData", {})
+                        for _cell_mapping in _mapping.get("cells", []):
+                            _cell_ref = _cell_mapping.get("cell_ref", "")
+                            _formula = _cell_mapping.get("formula", "")
+                            _formula_type = _cell_mapping.get("formula_type", "")
+
+                            # 跳过语义名称（非坐标），只处理有 Excel 坐标的 cell_ref
+                            # 当前 mapping 使用语义名称（如"期初余额"），不是坐标
+                            # 按设计文档：对有坐标的注入，语义名称跳过（future sprint）
+                            # 但我们仍然注入 custom 元数据到 sheet 级别供前端 composable 使用
+                            _bg_color = _SOURCE_COLOR_MAP.get(_formula_type, "#E3F2FD")
+
+                            # 将 prefill 元数据存到 sheet 级别的 custom 字段
+                            if "custom" not in sheets[_target_sheet_id]:
+                                sheets[_target_sheet_id]["custom"] = {}
+                            if "prefill_mappings" not in sheets[_target_sheet_id]["custom"]:
+                                sheets[_target_sheet_id]["custom"]["prefill_mappings"] = []
+                            sheets[_target_sheet_id]["custom"]["prefill_mappings"].append({
+                                "cell_ref": _cell_ref,
+                                "formula": _formula,
+                                "formula_type": _formula_type,
+                                "bg_color": _bg_color,
+                            })
+        except Exception as _prefill_err:
+            logger.warning("prefill metadata injection failed (non-blocking): %s", _prefill_err)
+
         return JSONResponse(content={
             "id": f"wp-{wp_id[:8]}",
             "name": storage_path.stem,

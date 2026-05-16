@@ -121,16 +121,11 @@ inclusion: always
 - **复盘补齐 3 个关键缺口（commit 74d87f2）**：(1) Foundation 新增 Requirement 0"底稿模板完整加载保障"（8 条验收标准覆盖全 sheet/合并/冻结/格式/固定文字/错误提示）；(2) Foundation 新增 Task 1.0"验证底稿模板完整加载链路"作为 Sprint 1 第一个任务（不通过不进后续）；(3) Foundation 新增 Task 1.2b"prefill_engine 新增 TB_AUX formula_type 支持"（Cycle-D 只产出数据不改引擎，引擎扩展由 Foundation 承担）
 - **底稿在线编辑空白问题深入分析（2026-05-16 Playwright 实测）**：
   - **后端 100% 正常**：GET /xlsx-to-json 返回 200 + 20 sheets 完整数据（浏览器内 fetch 实测确认）
-  - **前端加载链路断裂**：WorkpaperEditor initUniver() 三级降级全失败 → 走 final fallback 创建空白 workbook
-    - Strategy 1 `importXLSXToSnapshotAsync`：需要 @univerjs/preset-sheets-advanced + Univer Server :3010（未部署，代码已注释）
-    - Strategy 2 `importXLSXToWorkbook`：同上
-    - Strategy 3 POST `/to-json` + FormData：axios httpApi 封装下 FormData multipart 被错误处理，上传静默失败
-    - **已修复**：Strategy 3 改为 GET `/xlsx-to-json`（一行 httpApi.get 替代 POST FormData）
-  - **修复后仍空白的原因**：Vite dev server HMR 未拾取 WorkpaperEditor.vue 改动（浏览器缓存旧 JS bundle），performance entries 里完全没有 /xlsx-to-json 请求
-  - **解决方案**：需要硬刷新浏览器（Ctrl+Shift+R）或重启前端 npm run dev
-  - **验证方法**：Playwright evaluate 直接调 GET /xlsx-to-json 返回 200 + 20 sheets 确认后端链路无问题
-  - **Task 1.0 铁律**：Foundation Sprint 1 第一个任务必须用 Playwright 截图验证"≥ 3 sheet tab 可见 + 审定表有数据行"，不通过不进后续任务（避免在空白底稿上做无用功）
-  - **根因总结**：不是后端问题也不是模板问题，是前端 Univer 加载策略的 Strategy 3 实现 bug（POST FormData 在 axios 封装下静默失败）+ 修复后需要重启前端 dev server 才能生效
+  - **前端加载链路断裂真因（第三次定位才找到）**：不是 FormData bug，是 **Univer Core Preset 的 importXLSX API "假成功"**——`importXLSXToSnapshotAsync` / `importXLSXToWorkbook` 函数存在（typeof 通过）但只创建 1 个空白 sheet，前端标记 `imported=true` 后 Strategy 3 永远不执行
+  - **最终修复方案（commit 80cf992，Playwright 实测验证通过）**：完全跳过 xlsx blob 下载 + importXLSX 尝试，步骤 2 直接调 `GET /xlsx-to-json` 拿完整 Univer JSON → 步骤 4 `createWorkbook(jsonData)`；简单粗暴但 100% 可靠
+  - **验证结果**：Univer 渲染 6+ sheet tabs（底稿目录/实质性程序表/审定表D2/附注披露/明细表/坏账准备），不再走 empty workbook fallback
+  - **Task 1.0 验证通过**：Foundation Sprint 1 第一个任务完成，可进入后续任务
+  - **教训沉淀**：(1) typeof 检查通过 ≠ 功能正常（Univer Core Preset 暴露了 Advanced Preset 的 API 签名但内部实现为空/创建空白）；(2) "看似成功实则空白"的静默失败比"直接报错"更难排查——应在 createWorkbook 后验证 sheet 数量；(3) 三次定位才找到真因（第一次以为是 FormData bug / 第二次以为是 HMR 未生效 / 第三次才发现是 importXLSX 假成功）
 - **三轮复盘 P1.3+P3.9 改进已落地（2026-05-16）**：(1) `test_property_2_template_list_field_presence` 重写为真 PBT — 系统性 fuzz `mutation=("drop"|"none_value", field)` 故意破坏完整 base_item 中的某个字段，验证 validator sensitivity（每个 required 字段都必须被检测到），独立 oracle 用 `_REQUIRED_FIELDS_*` 常量 list；max_examples 升到 50；(2) `test_property_3_cycle_sort_order` 重写为真 PBT — 用独立 `itertools.permutations` 全枚举 oracle 找最小字典序排列与 `sorted(..., key=...)` production 算法对比（两条独立路径），max_examples 升到 50；(3) Property 16（authz）+ Property 17（readonly enforcement）max_examples 从 5 升到 50（P0 关键 Property 不再充数）；17 PBT 全绿 0.88s
 - **template-library-coordination 父任务全部 [x]**（三轮复盘 2026-05-16）：6 个 Sprint 父任务（Sprint 0-6）原本误标 [ ]（子任务全完成但父任务漏勾），本轮一并标 completed；spec 全部 50 task + 16 PBT + 6.2/6.3 重新完成共 67 项全部交付
 

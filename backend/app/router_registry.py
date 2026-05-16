@@ -543,3 +543,8 @@ def register_all_routers(app: FastAPI) -> None:
     # 路由内部已声明 prefix="/api/projects/{project_id}/event-cascade"，注册时不加额外前缀。
     from app.routers.event_cascade_health import router as event_cascade_health_router
     app.include_router(event_cascade_health_router, tags=["event-cascade"])
+
+    # ═══ 56. workpaper-completion-foundation：复核状态聚合端点 ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/workpapers"，注册时不加额外前缀。
+    from app.routers.wp_review_status import router as wp_review_status_router
+    app.include_router(wp_review_status_router, tags=["workpaper-review-status"])

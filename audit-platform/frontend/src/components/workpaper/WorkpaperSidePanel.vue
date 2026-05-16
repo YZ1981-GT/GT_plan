@@ -96,6 +96,57 @@
         />
         <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
       </el-tab-pane>
+      <!-- Task 2.5: 复核标记 Tab -->
+      <el-tab-pane name="review-marks" lazy>
+        <template #label>
+          <span>
+            复核标记
+            <el-badge
+              v-if="reviewMarkCount > 0"
+              :value="reviewMarkCount"
+              :max="99"
+              class="gt-wp-side-badge"
+            />
+          </span>
+        </template>
+        <div v-if="!wpId" class="gt-wp-side-placeholder">请先选择底稿</div>
+        <div v-else-if="reviewMarksLoading" v-loading="true" style="min-height: 120px" />
+        <div v-else>
+          <!-- 状态筛选 -->
+          <div class="gt-wp-review-filter">
+            <el-radio-group v-model="reviewFilterStatus" size="small">
+              <el-radio-button value="">全部</el-radio-button>
+              <el-radio-button value="reviewed">已复核</el-radio-button>
+              <el-radio-button value="pending">待确认</el-radio-button>
+              <el-radio-button value="questioned">有疑问</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div v-if="filteredReviewMarks.length === 0" class="gt-wp-side-placeholder">暂无复核标记</div>
+          <div v-else class="gt-wp-review-list">
+            <div
+              v-for="mark in filteredReviewMarks"
+              :key="mark.id"
+              class="gt-wp-review-item"
+              @click="onLocateReviewMark(mark)"
+            >
+              <div class="gt-wp-review-item-header">
+                <span class="gt-wp-review-cell-ref">{{ mark.sheet_name }}!{{ mark.cell_ref }}</span>
+                <el-tag
+                  :type="mark.status === 'reviewed' ? 'success' : mark.status === 'questioned' ? 'warning' : 'info'"
+                  size="small"
+                  round
+                >
+                  {{ mark.status === 'reviewed' ? '已复核' : mark.status === 'questioned' ? '有疑问' : '待确认' }}
+                </el-tag>
+              </div>
+              <div v-if="mark.content" class="gt-wp-review-item-content">{{ mark.content }}</div>
+              <div class="gt-wp-review-item-meta">
+                {{ mark.author_name || '未知' }} · {{ mark.created_at?.slice(0, 16) }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </el-tab-pane>
       <!-- R8-S2-02：自检 Tab（失败项可定位到 Univer 单元格） -->
       <el-tab-pane name="finecheck" lazy>
         <template #label>
@@ -186,6 +237,16 @@ interface FineCheckResult {
   sheet_name?: string
 }
 
+interface ReviewMarkItem {
+  id: string
+  sheet_name: string
+  cell_ref: string
+  status: string
+  content: string
+  author_name?: string
+  created_at: string
+}
+
 const props = defineProps<{
   /** 项目 ID */
   projectId: string
@@ -251,6 +312,7 @@ watch(fineCheckFailCount, (n) => emit('finecheck-update', n))
 // Tab 切到自检时按需加载
 watch(activeTab, (tab) => {
   if (tab === 'finecheck') loadFineChecks()
+  if (tab === 'review-marks') loadReviewMarks()
 })
 
 // wpId 变化时清空缓存
@@ -258,8 +320,62 @@ watch(
   () => props.wpId,
   () => {
     fineChecks.value = []
+    reviewMarks.value = []
   },
 )
+
+// ─── Task 2.5: Review Marks Tab ──────────────────────────────
+const reviewMarks = ref<ReviewMarkItem[]>([])
+const reviewMarksLoading = ref(false)
+const reviewFilterStatus = ref('')
+
+const reviewMarkCount = computed(() => reviewMarks.value.length)
+
+const filteredReviewMarks = computed(() => {
+  if (!reviewFilterStatus.value) return reviewMarks.value
+  return reviewMarks.value.filter(m => m.status === reviewFilterStatus.value)
+})
+
+async function loadReviewMarks() {
+  if (!props.wpId || !props.projectId) return
+  reviewMarksLoading.value = true
+  try {
+    const data: any = await api.get(
+      `/api/projects/${props.projectId}/cell-annotations`,
+      { params: { object_id: props.wpId, annotation_type: 'review_mark' } },
+    )
+    const items = data?.items || data || []
+    reviewMarks.value = items.map((item: any) => ({
+      id: item.id,
+      sheet_name: item.sheet_name || '',
+      cell_ref: item.cell_ref || '',
+      status: item.status || 'pending',
+      content: item.content || '',
+      author_name: item.author_name,
+      created_at: item.created_at || '',
+    }))
+  } catch {
+    reviewMarks.value = []
+  } finally {
+    reviewMarksLoading.value = false
+  }
+}
+
+function onLocateReviewMark(mark: ReviewMarkItem) {
+  if (!mark.cell_ref) return
+  eventBus.emit('workpaper:locate-cell', {
+    wpId: props.wpId || '',
+    sheetName: mark.sheet_name || '',
+    cellRef: mark.cell_ref,
+  })
+}
+
+// Subscribe to review-mark:changed event for refresh
+eventBus.on('review-mark:changed', (payload: any) => {
+  if (payload?.wpId === props.wpId) {
+    loadReviewMarks()
+  }
+})
 </script>
 
 <style scoped>
@@ -360,5 +476,47 @@ watch(
   text-align: center;
   border-top: 1px dashed var(--gt-color-border-light);
   padding-top: var(--gt-space-2);
+}
+
+/* ─── Task 2.5: Review Marks Tab ─── */
+.gt-wp-review-filter {
+  margin-bottom: var(--gt-space-3);
+}
+.gt-wp-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gt-space-2);
+}
+.gt-wp-review-item {
+  padding: var(--gt-space-2) var(--gt-space-3);
+  border-radius: var(--gt-radius-sm);
+  border: 1px solid var(--gt-color-border-light);
+  background: var(--gt-color-bg-elevated);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.gt-wp-review-item:hover {
+  background: var(--gt-color-primary-bg);
+}
+.gt-wp-review-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.gt-wp-review-cell-ref {
+  font-family: monospace;
+  font-size: var(--gt-font-size-xs);
+  font-weight: 600;
+  color: var(--gt-color-primary);
+}
+.gt-wp-review-item-content {
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text);
+  margin-bottom: 4px;
+}
+.gt-wp-review-item-meta {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
 }
 </style>

@@ -135,6 +135,16 @@
   --gt-marker-audited-border: #28A745;                /* 审定数边框（成功绿） */
   --gt-marker-formula-bg: #e6f7fa;                    /* 取数公式底色 */
   --gt-marker-manual-bg: #ffffff;                     /* 人工填写区底色（白色） */
+
+  /* ══ Foundation Spec — 预填充来源标记色（按 source type 区分） ══ */
+  --gt-marker-prefill-tb: #E3F2FD;                    /* TB 取数底色（浅蓝） */
+  --gt-marker-prefill-aje: #E8F5E9;                   /* AJE/RJE 调整底色（浅绿） */
+  --gt-marker-prefill-prev: #F3E5F5;                  /* 上年数据底色（浅紫） */
+  --gt-marker-prefill-wp: #E0F7FA;                    /* 跨底稿引用底色（浅青） */
+  --gt-marker-prefill-error: #FF5149;                 /* 取数失败边框色（珊瑚红） */
+  --gt-marker-override-bg: #FFF8E1;                   /* 用户手动覆盖底色（浅黄） */
+  --gt-marker-review-mark-ok: #28A745;                /* 复核通过标记色（绿） */
+  --gt-marker-review-mark-question: #FFC23D;          /* 复核有疑问标记色（橙） */
 }
 
 /* ══ 10.10 暗色模式 CSS 变量映射（预留） ══ */

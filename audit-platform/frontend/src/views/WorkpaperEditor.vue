@@ -54,7 +54,7 @@
           :disabled="dirty"
         >📨 提交复核</el-button>
         <el-button size="small" @click="onSyncStructure" :loading="syncLoading">🔄 同步公式</el-button>
-        <el-button size="small" @click="onRefreshPrefill" :loading="prefillLoading" title="从试算表重新取数填入底稿">📊 刷新取数</el-button>
+        <el-button size="small" @click="onRefreshPrefill" :loading="prefillLoading" :disabled="!hasPrefillMapping" :title="hasPrefillMapping ? '从试算表重新取数填入底稿' : '当前底稿无预设公式配置'">📊 一键填充</el-button>
         <el-button size="small" @click="onShowVersions">📋 版本历史</el-button>
         <el-button size="small" @click="onDownload">📥 下载</el-button>
         <el-button size="small" @click="onExportPdf" :loading="exportingPdf" v-permission="'workpaper:export'">📄 导出 PDF</el-button>
@@ -100,7 +100,59 @@
         <p>正在加载底稿...</p>
       </div>
       <div v-show="!loading" ref="univerContainer" class="gt-wp-editor-univer"></div>
+
+      <!-- Task 2.2: Prefill cell hover tooltip (floating div for canvas-based Univer) -->
+      <div
+        v-if="prefillTooltip.visible"
+        class="gt-wp-prefill-tooltip"
+        :style="{ left: prefillTooltip.x + 'px', top: prefillTooltip.y + 'px' }"
+      >
+        {{ prefillTooltip.text }}
+      </div>
+
+      <!-- Task 2.3: Cross-module reference overlay -->
+      <div class="gt-cross-ref-overlay" v-if="crossRefTags.length > 0">
+        <div
+          v-for="tag in crossRefTags"
+          :key="tag.id"
+          class="gt-cross-ref-tag"
+          :style="{ left: tag.x + 'px', top: tag.y + 'px', backgroundColor: tag.color }"
+          @click="router.push(tag.route)"
+          :title="tag.label"
+        >
+          {{ tag.label }}
+        </div>
+      </div>
     </div>
+
+    <!-- Task 2.2: Formula bar showing prefill source when cell selected -->
+    <div v-if="formulaBarText" class="gt-wp-formula-bar">
+      <span class="gt-wp-formula-bar-label">ƒ</span>
+      <span class="gt-wp-formula-bar-text">{{ formulaBarText }}</span>
+    </div>
+
+    <!-- Task 2.4: Review mark dialog -->
+    <el-dialog v-model="showReviewDialog" title="✓ 标记复核" width="400" append-to-body>
+      <el-form label-width="70px">
+        <el-form-item label="单元格">
+          <span>{{ reviewDialogCell.sheet }}!{{ reviewDialogCell.cellRef }}</span>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-radio-group v-model="reviewDialogStatus">
+            <el-radio value="reviewed">已复核</el-radio>
+            <el-radio value="pending">待确认</el-radio>
+            <el-radio value="questioned">有疑问</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="reviewDialogComment" type="textarea" :rows="3" placeholder="可选：输入复核意见" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showReviewDialog = false">取消</el-button>
+        <el-button type="primary" @click="onMarkReview">确认标记</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 底部状态栏 -->
     <div class="gt-wp-editor-statusbar" v-if="wpDetail">
@@ -190,6 +242,10 @@ import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
 import { useWorkpaperReviewMarkers, type ReviewMarkerTicket } from '@/composables/useWorkpaperReviewMarkers'
 import { useEditingLock } from '@/composables/useEditingLock'
 import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
+import { usePrefillMarkers } from '@/composables/usePrefillMarkers'
+import { useCrossModuleRefs, TARGET_COLOR_MAP } from '@/composables/useCrossModuleRefs'
+import { useReviewMarks, type ReviewStatus } from '@/composables/useReviewMarks'
+import { useUserOverrides } from '@/composables/useUserOverrides'
 import WorkpaperSidePanel from '@/components/workpaper/WorkpaperSidePanel.vue'
 import { WP_STATUS } from '@/constants/statusEnum'
 import { handleApiError } from '@/utils/errorHandler'
@@ -298,6 +354,37 @@ const showSidePanel = ref(false)
 // R8-S2-02：自检未通过项数（由 WorkpaperSidePanel @finecheck-update 同步）
 const fineCheckFailCount = ref(0)
 const univerContainer = ref<HTMLElement | null>(null)
+
+// ─── Sprint 2: Foundation composables ─────────────────────────────────────────
+const prefillMarkers = usePrefillMarkers()
+const crossModuleRefs = useCrossModuleRefs(
+  computed(() => wpDetail.value?.wp_code || ''),
+  projectId,
+)
+const reviewMarksComposable = useReviewMarks(projectId)
+const userOverrides = useUserOverrides()
+
+// Sprint 2.1: Track whether prefill mapping exists for current workpaper
+const hasPrefillMapping = ref(true)
+
+// Sprint 2.2: Prefill tooltip state
+const prefillTooltip = ref<{ visible: boolean; text: string; x: number; y: number }>({
+  visible: false, text: '', x: 0, y: 0,
+})
+const formulaBarText = ref('')
+
+// Sprint 2.3: Cross-module refs overlay
+const crossRefTags = ref<Array<{ id: string; label: string; color: string; x: number; y: number; route: string }>>([])
+
+// Sprint 2.4: Review mark dialog
+const showReviewDialog = ref(false)
+const reviewDialogCell = ref<{ sheet: string; cellRef: string }>({ sheet: '', cellRef: '' })
+const reviewDialogComment = ref('')
+const reviewDialogStatus = ref<ReviewStatus>('reviewed')
+
+// Sprint 2.6: User override indicators
+const overrideIndicators = ref<Array<{ cellRef: string; sheet: string }>>([])
+
 
 // 任务 8.18.1：用户名映射（UUID → 显示名）
 const userNameMap = ref<Map<string, string>>(new Map())
@@ -484,6 +571,11 @@ async function initUniver() {
     if (DIRTY_COMMAND_PATTERNS.some(p => command.id?.includes(p))) {
       dirty.value = true
       autoSave.markDirty()
+
+      // Task 2.6: Detect user override on prefilled cells
+      if (command.id?.includes('set-range-values') && command.params) {
+        _detectUserOverride(command)
+      }
     }
   })
 
@@ -492,6 +584,36 @@ async function initUniver() {
   // 6. 非阻塞加载智能提示和用户名映射
   loadSmartTips()
   loadUserMap()
+
+  // ─── Sprint 2: Post-load integrations ─────────────────────────────────────
+  // Task 2.2: Load prefill markers from workbook data
+  if (workbookData?.sheets) {
+    prefillMarkers.loadFromWorkbook(workbookData.sheets)
+    hasPrefillMapping.value = prefillMarkers.totalPrefillCells.value > 0
+  }
+
+  // Task 2.3: Load cross-module references
+  try {
+    const refsData = await httpApi.get(
+      `/api/projects/${projectId.value}/workpapers/${wpId.value}/cross-references`,
+      { validateStatus: (s: number) => s < 600 },
+    )
+    if (refsData?.references) {
+      crossModuleRefs.loadFromJson(refsData)
+    }
+  } catch { /* cross refs not available, non-blocking */ }
+
+  // Task 2.8: Load user overrides from parsed_data on workbook load
+  if (wpDetail.value?.parsed_data) {
+    userOverrides.loadOverrides(wpDetail.value.parsed_data)
+  }
+
+  // Task 2.2: Listen for cell selection changes to show formula bar text
+  univerAPI.onCommandExecuted((cmd: any) => {
+    if (cmd.id?.includes('set-selections') || cmd.id?.includes('set-select')) {
+      _updatePrefillTooltipOnSelection()
+    }
+  })
 
   // ─── Sprint 6 Task 6.4: Univer 右键菜单证据链入口 ─────────────────────────
   // TODO: 完整 Univer 右键菜单集成需要 @univerjs/ui 的 IMenuService
@@ -582,9 +704,14 @@ async function onSave(): Promise<boolean> {
 
     // 调用完整保存 API（xlsx 回写 + structure.json + 审计留痕 + 事件发布）
     // 需求 45.1：携带 expected_version 触发后端并发冲突检测
+    // Task 2.8: Include user_overrides in save payload
     const data = await httpApi.post(
       P_wp.univerSave(projectId.value, wpId.value),
-      { snapshot, expected_version: wpDetail.value.file_version },
+      {
+        snapshot,
+        expected_version: wpDetail.value.file_version,
+        parsed_data_patch: { user_overrides: userOverrides.serializeOverrides() },
+      },
       { validateStatus: (s: number) => s < 600 },
     )
 
@@ -684,6 +811,7 @@ async function onSyncStructure() {
 }
 
 async function onRefreshPrefill() {
+  if (!hasPrefillMapping.value) return
   prefillLoading.value = true
   try {
     // 先保存当前编辑
@@ -691,9 +819,14 @@ async function onRefreshPrefill() {
       const saveOk = await onSave()
       if (!saveOk) return
     }
-    // 调用后端重新初始化（强制从模板复制+prefill）
-    await httpApi.post(
+    // Task 2.7: Pass user_overrides to backend so it skips those cells
+    const overrides = userOverrides.serializeOverrides()
+    const overrideCount = userOverrides.overrideCount.value
+
+    // 调用后端重新初始化（强制从模板复制+prefill），传递 user_overrides
+    const result = await httpApi.post(
       `/api/projects/${projectId.value}/workpapers/${wpId.value}/template-file/init`,
+      { user_overrides: overrides },
     )
     // 重新加载 Univer
     if (univerInstance) {
@@ -703,7 +836,15 @@ async function onRefreshPrefill() {
     }
     loading.value = true
     await initUniver()
-    ElMessage.success('取数刷新完成，已从试算表重新填入最新数据')
+
+    // Task 2.1 + 2.7: Show summary toast with filled count and skipped count
+    const filledCount = result?.filled_count ?? result?.prefill_count ?? 0
+    const skippedCount = overrideCount
+    if (filledCount > 0 || skippedCount > 0) {
+      ElMessage.success(`已刷新 ${filledCount} 个单元格，跳过 ${skippedCount} 个手动修改的单元格`)
+    } else {
+      ElMessage.success('取数刷新完成，已从试算表重新填入最新数据')
+    }
   } catch (e: any) {
     handleApiError(e, '刷新取数')
   } finally {
@@ -782,6 +923,94 @@ async function loadSmartTips() {
       }
     }
   } catch { /* ignore */ }
+}
+
+// ─── Sprint 2 Helper Functions ─────────────────────────────────────────────────
+
+/** Task 2.6: Detect if edited cell has prefill_source → mark as override */
+function _detectUserOverride(command: any) {
+  if (!univerAPI) return
+  try {
+    const workbook = univerAPI.getActiveWorkbook()
+    if (!workbook) return
+    const activeSheet = workbook.getActiveSheet?.()
+    if (!activeSheet) return
+    const sheetName = activeSheet.getSheetName?.() || activeSheet.getName?.() || 'Sheet1'
+
+    // Extract cell coordinates from command params
+    const rangeData = command.params?.range || command.params?.cellValue
+    if (!rangeData) return
+
+    const row = rangeData.startRow ?? rangeData.row ?? 0
+    const col = rangeData.startColumn ?? rangeData.col ?? 0
+    const cellRef = _colToLetter(col) + (row + 1)
+
+    // Check if this cell has prefill source
+    if (prefillMarkers.hasPrefill(sheetName, cellRef)) {
+      userOverrides.markAsOverride(sheetName, cellRef)
+    }
+  } catch { /* ignore detection errors */ }
+}
+
+/** Task 2.2: Update formula bar text when cell selection changes */
+function _updatePrefillTooltipOnSelection() {
+  if (!univerAPI) return
+  try {
+    const workbook = univerAPI.getActiveWorkbook()
+    if (!workbook) return
+    const activeSheet = workbook.getActiveSheet?.()
+    if (!activeSheet) return
+    const sheetName = activeSheet.getSheetName?.() || activeSheet.getName?.() || 'Sheet1'
+
+    const selection = activeSheet.getActiveRange?.()
+    if (!selection) { formulaBarText.value = ''; return }
+
+    const row = selection.getRow?.() ?? 0
+    const col = selection.getColumn?.() ?? 0
+    const cellRef = _colToLetter(col) + (row + 1)
+
+    formulaBarText.value = prefillMarkers.getFormulaBarText(sheetName, cellRef)
+  } catch {
+    formulaBarText.value = ''
+  }
+}
+
+/** Task 2.4: Handle right-click "标记复核" */
+async function onMarkReview() {
+  if (!showReviewDialog.value) return
+  const { sheet, cellRef } = reviewDialogCell.value
+  if (!sheet || !cellRef || !wpId.value) return
+
+  const mark = await reviewMarksComposable.createReviewMark(
+    wpId.value,
+    sheet,
+    cellRef,
+    reviewDialogStatus.value,
+    reviewDialogComment.value,
+  )
+  if (mark) {
+    ElMessage.success('复核标记已保存')
+    eventBus.emit('review-mark:changed', { projectId: projectId.value, wpId: wpId.value })
+  }
+  showReviewDialog.value = false
+  reviewDialogComment.value = ''
+}
+
+/** Task 2.6: Right-click "恢复预填充" */
+async function onRestorePrefill(sheet: string, cellRef: string) {
+  userOverrides.removeOverride(sheet, cellRef)
+  ElMessage.success(`已恢复 ${cellRef} 的预填充值，下次刷新取数时将重新填入`)
+}
+
+/** Column number to letter (0-based) */
+function _colToLetter(col: number): string {
+  let result = ''
+  let c = col
+  while (c >= 0) {
+    result = String.fromCharCode(65 + (c % 26)) + result
+    c = Math.floor(c / 26) - 1
+  }
+  return result
 }
 
 onBeforeRouteLeave(async (_to, _from, next) => {
@@ -909,6 +1138,70 @@ function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: stri
   font-size: var(--gt-font-size-xs);
   font-weight: 500;
 }
+
+/* ─── Sprint 2: Prefill tooltip ─── */
+.gt-wp-prefill-tooltip {
+  position: absolute;
+  z-index: 100;
+  background: var(--gt-color-bg-white);
+  border: 1px solid var(--gt-color-border-purple);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text);
+  box-shadow: var(--gt-shadow-md);
+  white-space: pre-line;
+  max-width: 320px;
+  pointer-events: none;
+}
+
+/* ─── Sprint 2: Formula bar ─── */
+.gt-wp-formula-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px var(--gt-space-4);
+  background: var(--gt-color-bg-elevated);
+  border-bottom: 1px solid var(--gt-color-border-light);
+  font-size: var(--gt-font-size-xs);
+}
+.gt-wp-formula-bar-label {
+  font-weight: 700;
+  color: var(--gt-color-primary);
+  font-style: italic;
+}
+.gt-wp-formula-bar-text {
+  color: var(--gt-color-text-secondary);
+  font-family: monospace;
+}
+
+/* ─── Sprint 2: Cross-module reference overlay ─── */
+.gt-cross-ref-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+.gt-cross-ref-tag {
+  position: absolute;
+  pointer-events: auto;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  opacity: 0.9;
+  transition: opacity 0.15s;
+}
+.gt-cross-ref-tag:hover {
+  opacity: 1;
+  box-shadow: var(--gt-shadow-sm);
+}
+
 </style>
 
 <!-- R1 需求 2：复核红点样式需全局生效（Univer overlay 在 Vue scope 外渲染） -->

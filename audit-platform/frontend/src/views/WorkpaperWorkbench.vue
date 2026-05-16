@@ -88,6 +88,22 @@
             }">
               <span class="gt-wpb-node-icon" v-if="data.statusIcon">{{ data.statusIcon }}</span>
               <span class="gt-wpb-node-label">{{ data.label }}</span>
+              <!-- Task 2.9: Cycle review badge -->
+              <span
+                v-if="data.isCycle && data.cycleCode && cycleReviewStatus[data.cycleCode]"
+                class="gt-wpb-review-badge"
+                :class="{
+                  'gt-wpb-review-badge--done': cycleReviewStatus[data.cycleCode].reviewed === cycleReviewStatus[data.cycleCode].total && cycleReviewStatus[data.cycleCode].total > 0,
+                  'gt-wpb-review-badge--empty': cycleReviewStatus[data.cycleCode].reviewed === 0,
+                }"
+              >
+                <template v-if="cycleReviewStatus[data.cycleCode].reviewed === cycleReviewStatus[data.cycleCode].total && cycleReviewStatus[data.cycleCode].total > 0">
+                  ✓ 全部完成
+                </template>
+                <template v-else>
+                  {{ cycleReviewStatus[data.cycleCode].reviewed }}/{{ cycleReviewStatus[data.cycleCode].total }} 已复核
+                </template>
+              </span>
               <span v-if="data.sheetCount && data.sheetCount > 1" class="gt-wpb-node-sheets">
                 ({{ data.sheetCount }} sheets)
               </span>
@@ -379,6 +395,28 @@ import { useNavigationStack } from '@/composables/useNavigationStack'
 import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
 import { eventBus } from '@/utils/eventBus'
 
+// ─── Task 2.9: Cycle review status badge ─────────────────────────────────────
+const cycleReviewStatus = ref<Record<string, { reviewed: number; total: number }>>({})
+
+async function loadCycleReviewStatus() {
+  try {
+    const data = await api.get(
+      `/api/projects/${projectId.value}/workpapers/review-status`,
+      { validateStatus: (s: number) => s < 600 },
+    )
+    const cycles = data?.cycles || []
+    const statusMap: Record<string, { reviewed: number; total: number }> = {}
+    for (const c of cycles) {
+      statusMap[c.cycle_code] = {
+        reviewed: c.reviewed_workpapers || 0,
+        total: c.total_workpapers || 0,
+      }
+    }
+    cycleReviewStatus.value = statusMap
+  } catch { /* non-blocking */ }
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 const route = useRoute()
 const router = useRouter()
 const { push: navPush } = useNavigationStack()
@@ -547,6 +585,7 @@ interface TreeNode {
   statusIcon?: string; assignee?: string
   // [Sprint 2.1+2.2] 树形扩展字段
   isCycle?: boolean
+  cycleCode?: string             // 循环编码（用于 review badge 查找）
   cycleProgressClass?: string  // 进度颜色：done(green) / partial(blue) / empty(grey)
   generated?: boolean          // 模板是否已生成（未生成显示灰色）
   sheetCount?: number
@@ -650,6 +689,7 @@ const treeData = computed<TreeNode[]>(() => {
       label: `${g.cycleName}（${done}/${total}）`,
       isCycle: true,
       cycleProgressClass: progressClass,
+      cycleCode: key,
       children,
     })
   }
@@ -1028,6 +1068,12 @@ function _setupEventListeners() {
 onMounted(async () => {
   _setupEventListeners()
   await refreshAll()
+  // Task 2.9: Load cycle review status on mount
+  loadCycleReviewStatus()
+  // Task 2.9: Subscribe to review-mark:changed for refresh
+  eventBus.on('review-mark:changed', () => {
+    setTimeout(() => loadCycleReviewStatus(), 1000)
+  })
   // 加载人员列表
   try {
     const data = await api.get(P_staff.list)
@@ -1114,6 +1160,25 @@ onBeforeUnmount(() => {
 .gt-wpb-node-icon { font-size: var(--gt-font-size-sm); flex-shrink: 0; }
 .gt-wpb-node-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-wpb-node-assignee { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); background: var(--gt-color-bg); padding: 1px 4px; border-radius: 3px; }
+/* Task 2.9: Cycle review badge */
+.gt-wpb-review-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--gt-color-info-light, #e8eaed);
+  color: var(--gt-color-text-secondary);
+  margin-left: 6px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.gt-wpb-review-badge--done {
+  background: var(--gt-color-success-light, #e8f5e9);
+  color: var(--gt-color-success);
+}
+.gt-wpb-review-badge--empty {
+  background: var(--gt-color-bg);
+  color: var(--gt-color-text-placeholder);
+}
 /* [template-library-coordination Sprint 2.1+2.2+2.3] 树形扩展样式 */
 .gt-tree-ungenerated { color: var(--gt-color-text-placeholder); }
 .gt-tree-ungenerated .gt-wpb-node-label { color: var(--gt-color-text-placeholder); }
