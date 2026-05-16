@@ -42,6 +42,21 @@
 
 ## Requirements
 
+### Requirement 0: 底稿模板完整加载保障
+
+**User Story:** As a 审计师, I want 打开任何底稿时 Univer 编辑器完整显示模板的全部内容（所有 sheet / 表头 / 固定文字 / 合并单元格 / 边框 / 底色 / 冻结窗格）, so that 我看到的是致同标准模板的完整结构而非空白电子表格。
+
+#### Acceptance Criteria
+
+1. WHEN the user opens a workpaper in WorkpaperEditor, THE Univer editor SHALL display ALL sheets from the template xlsx file (e.g. D2 has 20 sheets, all 20 must appear as tabs)
+2. WHEN the template xlsx contains merged cells, THE Univer editor SHALL render them as merged (not split into individual cells)
+3. WHEN the template xlsx contains frozen panes, THE Univer editor SHALL apply the same freeze position
+4. WHEN the template xlsx contains cell formatting (bold/italic/font-size/background-color/borders/number-format), THE Univer editor SHALL preserve and render all formatting
+5. WHEN the template xlsx contains fixed text content (e.g. "审计程序：1. 获取明细表..."), THE Univer editor SHALL display that text exactly as in the original template
+6. THE GET /xlsx-to-json endpoint SHALL return a complete IWorkbookData JSON containing all sheets, all cellData (values + styles + formulas), mergeData, columnData, rowData, and freeze settings
+7. THE WorkpaperEditor frontend SHALL successfully call GET /xlsx-to-json and pass the returned JSON to `univerAPI.createWorkbook()` without falling through to the empty workbook fallback
+8. WHEN the xlsx-to-json conversion encounters an error, THE WorkpaperEditor SHALL display an error message (not silently show empty workbook)
+
 ### Requirement 1: 预填充视觉指示器
 
 **User Story:** As a 审计师, I want 打开底稿时能一眼区分"系统自动填充的数据"和"空白待填写的单元格", so that 我知道哪些数据已由系统从 TB/AJE/上年取数完成，无需重复手工录入。

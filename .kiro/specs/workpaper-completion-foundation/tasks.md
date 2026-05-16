@@ -18,6 +18,16 @@
 ## Tasks
 
 - [ ] 1. Sprint 1：后端 + Composables + 属性测试
+  - [ ] 1.0 验证底稿模板完整加载链路（Requirement 0 关键前置）
+    - 确认后端 GET /xlsx-to-json 对陕西华氏 D2 返回 20 sheets / 13024+ cells / 含 mergeData + columnData + freeze
+    - 确认前端 WorkpaperEditor Strategy 3 调用 GET /xlsx-to-json 成功（非 POST FormData）
+    - 确认 `univerAPI.createWorkbook(jsonData)` 后 Univer 渲染全部 20 sheet tabs
+    - 确认不走 final fallback（空白 workbook）——如走了则定位并修复
+    - 确认合并单元格 / 冻结窗格 / 格式（粗体/底色/边框）在 Univer 中正确渲染
+    - 如有问题则在此 task 内修复（不能带着"空白"问题进入后续 task）
+    - **验收标准**：用 Playwright 截图 D2 底稿编辑器，确认 ≥ 3 个 sheet tab 可见 + 审定表有数据行
+    - _Requirements: 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8_
+
   - [ ] 1.1 新增 gt-tokens.css 预填充标记 token
     - 在 `audit-platform/frontend/src/styles/gt-tokens.css` 新增 4 个 CSS 变量：`--gt-marker-prefill-tb: #E3F2FD` / `--gt-marker-prefill-aje: #E8F5E9` / `--gt-marker-prefill-prev: #F3E5F5` / `--gt-marker-prefill-wp: #E0F7FA`
     - 新增 `--gt-marker-prefill-error` border 色 `#FF5149`
@@ -30,6 +40,14 @@
     - 按 source type 设置 `cellData[row][col].s.bg.rgb` 对应颜色
     - prefill 失败的 cell 写入 `custom.prefill_source = "ERROR"` + `custom.prefill_error` + 红色 border style
     - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.6_
+
+  - [ ] 1.2b 后端 prefill_engine 新增 TB_AUX formula_type 支持
+    - 修改 `backend/app/services/prefill_engine.py`
+    - 新增 `_resolve_tb_aux(account_code, aux_type, column)` 方法：从 tb_aux_balance 表按 (project_id, year, account_code, aux_type) 查询，返回明细行数组
+    - 在 prefill 主循环中识别 formula_type="TB_AUX" 条目，调用 _resolve_tb_aux 取数
+    - TB_AUX 返回多行时写入连续 cell（从 mapping 指定的起始行向下填充）
+    - 辅助维度不存在时 cell 留空 + prefill_source="AUX_UNAVAILABLE" + logger.warning
+    - _Requirements: Cycle-D R2.2, R2.3（Foundation 承担引擎扩展，Cycle-D 只产出数据）_
 
   - [ ] 1.3 Alembic 迁移：cell_annotations 新增 annotation_type + sheet_name
     - 新建 `backend/alembic/versions/workpaper_completion_cell_annotations_20260517.py`

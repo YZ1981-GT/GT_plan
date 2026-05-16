@@ -91,6 +91,8 @@ graph TD
 - 现有 `TB`/`TB_SUM` 只能取科目级汇总，无法按维度拆分
 - `TB_AUX` 由 `prefill_engine.py` 从 `tb_aux_balance` 表取数（该表已有数据）
 
+**引擎支持**：TB_AUX formula_type 的 prefill_engine 代码扩展由 `workpaper-completion-foundation` spec Task 1.2b 承担。本 spec 只产出 JSON 数据条目。
+
 **条目结构**：
 ```json
 {
