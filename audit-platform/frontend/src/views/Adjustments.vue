@@ -143,6 +143,14 @@
       <template #col-created_at="{ row }">{{ row.created_at?.slice(0, 10) }}</template>
       <template #col-review_status="{ row }">
         <GtStatusTag dict-key="adjustment_status" :value="row.review_status" />
+        <!-- Spec A R1：已转错报但错报阈值变化时显示 stale 标志 -->
+        <el-tooltip
+          v-if="row.converted_to_misstatement_id && missStaleIdSet.has(row.converted_to_misstatement_id)"
+          content="错报阈值已变更，建议重新评估"
+          placement="top"
+        >
+          <span style="margin-left: 4px; cursor: help">🟡</span>
+        </el-tooltip>
       </template>
       <template #extra-columns>
         <el-table-column label="操作" width="180" fixed="right">
@@ -371,6 +379,8 @@ import { parseApiError } from '@/composables/useApiError'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useEditMode } from '@/composables/useEditMode'
+// Spec A R1：跨视图 stale 摘要
+import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
 import { handleApiError } from '@/utils/errorHandler'
 import * as P from '@/services/apiPaths'
 import { ADJUSTMENT_STATUS, ADJUSTMENT_TYPE } from '@/constants/statusEnum'
@@ -420,6 +430,11 @@ const routeYear = computed(() => {
 })
 const projectYear = ref<number | null>(null)
 const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear())
+
+// Spec A R1：跨视图 stale 摘要（错报阈值变化时显示标志）
+const projectIdRef = computed(() => projectId.value || '')
+const { misstatements: missStaleSummary } = useStaleSummaryFull(projectIdRef, year)
+const missStaleIdSet = computed(() => new Set(missStaleSummary.value.items.map((it: any) => it.id)))
 
 const loading = ref(false)
 const showImportDialog = ref(false)

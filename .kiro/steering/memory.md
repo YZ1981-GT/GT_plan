@@ -18,6 +18,7 @@ inclusion: always
 - 前后端联动：不能只开发后端不管前端
 - 删除必须二次确认，所有删除先进回收站
 - 一次性脚本用完即删
+- **git 提交不要分很多区**：用户偏好单次 commit 提交所有变更，不要拆成多个分组 commit
 - 提建议前先验证（不要引用过时记录，vue-tsc exit 0 = 零错误，不要再提已修复的问题）
 - 给出建议时必须反复论证，提供最仔细的可落地方案，不能泛泛而谈或停留在表面描述
 - 判断前端模块是否存在，必须同时检查 views/ 根目录 + components/ 子目录
@@ -304,6 +305,88 @@ inclusion: always
 ## 活跃待办
 
 ### 最高优先级
+- **GLOBAL_REFINEMENT_PROPOSAL_v3.md 已生成**（docs/，2026-05-16）：合伙人实操视角，不再画路线图只列实操磨损面；5 主战场（联动闭环 / 组件铺设 / 显示三条线 / 错误容灾 / 长期维护）；推荐 R10 拆 2 个并行 spec（联动+显示治理 / 编辑器+容灾），各 2-3 周；TOP 2 痛点 = PartnerSignDecision stale 摘要+AJE 转错报按钮 / 字号变量化第一批（编辑器 4 个）
+- **v3 §11 真实 E2E 实测修订完成（2026-05-16）**：4 项目（陕西华氏/和平药房/辽宁卫生/宜宾大药房）全链路实测，发现 5 个 P0 真实缺陷 + 7 处端点路径误写
+  - **F1 红色 P0**：IS（利润表）+ CFS（现金流量表）**4 项目全部 nonzero=0**——report_config.formula 字段填充率 21%/CFS 16% 但实际计算值非零率为 0%；公式存在但损益类 5xxx/6xxx 取值逻辑可能错（应单边发生额：收入取 credit_amount 存负数，费用取 debit_amount 存正数）
+  - **F2 红色 P0**：和平药房/辽宁卫生 wp_count=0（`init_4_projects.py` 漏调底稿生成步骤）；R10 之后初始化的项目都可能"试算/报表都有，底稿是空的"
+  - **F3 黄色 P0**：`/api/projects/{pid}/data-quality/check?checks=all` 返回 200 但 checks 数组为空（all 关键字处理 bug，R10 e2e-business-flow spec 标 [x] 但实际跑不出）
+  - **F4 黄色 P0**：`/workflow/consistency-check` 返回 200 但**没有 `all_passed` 也没有 `consistent` 字段**，前端按 v3 提案接会拿不到
+  - **F5 黄色 P0**：AJE/RJE Pydantic enum 只接受小写——前端传 "AJE"/"RJE" 直接 422；建议后端 `@field_validator(mode="before")` 转小写容错
+- **v3 真实端点路径速查（grep 核验）**：账表余额=`/api/projects/{pid}/ledger/balance` / 附注树=`/api/disclosure-notes/{pid}/{year}` / 试算汇总=`/api/projects/{pid}/trial-balance/summary-with-adjustments` / 数据质量=`/api/projects/{pid}/data-quality/check?checks=all` / 一致性门控=`/api/projects/{pid}/workflow/consistency-check` / 复核收件箱=`/api/review-inbox`(全局) 或 `/api/projects/{pid}/review-inbox`(项目级) / AI 模型=`/api/ai-models`（连字符不是斜杠）
+- **打磨建议文档铁律**：v1/v2/v3 都犯同一个错——基于 memory 写而不是 grep+E2E 验证；下次 v4+ 起草前必须先跑 E2E 脚本拿真实端点和数据；每条建议必须标"已实测/未实测"；声称"已落地"必须有 200 响应支撑
+- **v3 第二稿基于实测重写完成（2026-05-16，469 行）**：把 5 个真实 P0 缺陷（F1-F5）从末尾 §11 提到正文 §2 作主轴；§3 端点路径速查表（21 条 grep 核验路径）；§6 优先级按真实磨损度重排，第一周 5 天 8 件事；§15 验收口径加 6 行可量化实测指标；末尾"第一周动手清单"按 Day×半天拆任务+文件锚点；附录 C 把"先 E2E 再起草"写成规约
+- **v3 第三稿基于第二次实测完成（2026-05-16，574 行）**：F1/F3/F5 三个原假设全部澄清结案，F6/F7/F8 三个新真问题被发现；§6 优先级重排（工时 5 天 → 6.5 天，9 件事）；§15 验收表加"第一稿假设/第二次实测真值"双列对比；附录 D 新增实测脚本清单
+- **第二次实测的真相平反**：(1) **F1 误判**：IS/CFS 全 0 不是公式 bug，是 stale 数据——重新调一次 `POST /api/reports/generate` 后陕西华氏 IS 立即 14 行非零（营业收入 -20,283,811,823.52 真实数据），4 项目重新 generate 后 nonzero 全部上来；(2) **F3 误判**：data-quality 5 个检查全跑了（passed=3+blocking=2），脚本断言字段名写错（`checks` vs 真实 `checks_run`）；(3) **F5 误判**：AJE 422 是 schema 字段名错（`entries`→`line_items` / `account_code`→`standard_account_code` / `memo`→`description`），与枚举大小写无关
+- **v3 第三稿 3 个新真问题（实测发现）**：
+  - **F6 红色**：AJE 创建端点 500——SQLAlchemy MissingGreenlet（事件 handler 里有 lazy load）；整个调整分录创建链路完全不可用；修复需 1-2 天 grep 定位 + 加 await db.refresh(user) 或改传 user_id
+  - **F7 红色**：PG enum `job_status_enum` 缺 `interrupted` 值——`view_refactor_interrupted_status_20260511` Alembic 迁移在生产 PG 没跑成功；import_recover_worker 每 30s 刷 InvalidTextRepresentationError；修复 = `ALTER TYPE job_status_enum ADD VALUE IF NOT EXISTS 'interrupted'` 或重跑 alembic
+  - **F8 黄色**：CFS 试算汇总返回 0 行——`/trial-balance/summary-with-adjustments?report_type=cash_flow_statement` 4 项目都 0 行，但 BS/IS 都正常（129/78）；可能是设计如此（CFS 不能从余额表直接取数），需排查 trial_balance_service 分支
+- **F2 路径已实测验证可用**：`POST /api/projects/{pid}/workflow/execute-full-chain` body `{"year":2025,"force":true}` 完全工作；和平 0→107、辽宁 0→104；问题是 `init_4_projects.py` 漏调，不是 chain 端点 bug
+- **AJE 创建真实 schema**（grep 核验）：`{adjustment_type:"aje"(小写枚举), year, company_code, description, line_items:[{standard_account_code, account_name, debit_amount, credit_amount}]}`；前端 service 必须按此调用，否则 422
+- **report_engine `_period_amount` 公式逻辑正确**：`TB('6001','本期发生额')` → `audited_amount - opening_balance`；损益类（5xxx/6xxx）的 `audited_amount` 已存为单边发生额（trial_balance_service 第 207 行：收入类取 credit_amount 存负数 / 费用类取 debit_amount 存正数）；陕西华氏 6001 实测 audited_amount=-20,283,811,823.52 ✓
+- **F1 stale 修复路径**：`init_4_projects.py` 末尾必须强制调一次 `generate_all_reports`（或 chain）；否则任何后续改动 trial_balance 不立即触发 generate 时，financial_report 会 stale，用户进系统看到陈旧 0 数据
+- **新固化脚本清单**：`backend/scripts/init_4_projects.py`（4 项目数据初始化）+ `e2e_business_flow_verify.py`（DB 直查 4 层断言）+ `verify_data_quality_shaanxi.py`（数据质量单测）+ `fill_report_formulas.py`（报表公式填充）+ `verify_spec_facts.py`（spec 事实核验）+ `check_property_coverage.py`（属性覆盖）+ `build_spec_coverage_matrix.py`（覆盖矩阵）；用完即删的临时脚本不再保留
+- **v3 第三稿自我复盘 §16 已加（2026-05-16，636 行）**：4 子节——§16.1 文档自身缺口 D1-D8（4 项已修+4 项待整理）/ §16.2 实测覆盖盲区 C1-C11（EQCR 工作台/复核流程/签字流水/重要性联动/AI 对话/角色权限矩阵/工时审批/附件 OCR/账套导入 v2/项目向导/前端真实渲染）/ §16.3 潜在新缺陷 Q1-Q7（F6 是否影响 UPDATE/DELETE / F7 类似 PG enum 是否还有 / consistency-check 3 条永久 fail 是哪些 等）/ §16.4 v1/v2 已废弃章节标注 / §16.5 v4 起草触发条件
+- **v4 起草硬约束（§16.5 落地）**：(a) F1-F8 全部修完 (b) §16.2 11 个实测盲区全部覆盖 (c) 有新合伙人级反馈；不能再凭 memory 推测起草
+- **打磨建议文档铁律补充**：每次实测后必须更新 §1 表格作为唯一权威基线；R10 spec 立项时引用 v3 必须用具体小节号（不是泛指"v3 提的"）；同一改动散落多节的，主战场放一处其他章节用"见 §X.Y"引用避免重复
+- **v3 第三轮实测完成（2026-05-16，754 行）**：覆盖 §16.2 盲区 8/11（C1 EQCR / C2 复核 / C3 签字 / C4 重要性联动 / C5 AI / C6 角色 / C7 工时 / C8 附件 / C9 账套导入 v2），剩 C10 ProjectWizard / C11 前端真实渲染 / C12 联动事件（F6 修复后必测）；F1-F15 共 15 个标号，4 已澄清 + 6 真红色 + 5 黄色
+- **第三轮新发现**：
+  - **F8 升级红色**：CFS 试算汇总 0 行真因是 **PG `report_type` enum 缺 4 个值**（cash_flow_statement / equity_statement / cash_flow_supplement / impairment_provision），PG 只有 `balance_sheet, income_statement, cash_flow`；后端日志 `InvalidTextRepresentationError: invalid input value for enum report_type: "cash_flow_statement"` 直接证据
+  - **F7 扩展**：PG `job_status_enum` 不只缺 `interrupted`，还缺 `retrying` 和 `cancelled`（双 L 历史兼容值）；实际 PG 只有 10 个值
+  - **F9 真红色**：EQCR `opinions` 404 / `prior-year` 404 / `memo` 405——5 Tab 至少 3 个空白
+  - **F10 真红色**：`/api/projects/{pid}/review-records` + `/review-conversations` 全 404，复核工作台首屏可能空白
+  - **F12 黄色**：`POST /misstatements/recheck-threshold` body `{year}` → 422，schema 不对
+  - **F13/F14/F15 黄色**：`/api/users/me/nav` 404（前端用 FALLBACK_NAV 不依赖）/ `/api/knowledge` 404 / `/jobs/latest` 422（前端旧路径残留）
+- **F11 第三轮平反**：签字端点真实存在（`/api/signatures/{object_type}/{object_id}` + `/api/projects/{pid}/sign-readiness` 连字符），第三稿脚本路径假设错（写成 `/sign/readiness` 等）
+- **PG enum 真实值速查**（grep 实测）：`report_type` 当前 = balance_sheet/income_statement/cash_flow（仅 3 个）/ `job_status_enum` 当前 = pending/queued/running/validating/writing/activating/completed/failed/canceled/timed_out（仅 10 个）；修复 = `ALTER TYPE ... ADD VALUE IF NOT EXISTS ...` 7 条 SQL 一次性执行
+- **v3 工时演进**：5 天 → 6.5 天 → **8 天 / 13 件事**；铁律 = F7+F8 PG ALTER TYPE 必须**第一天上午**先修，否则后续 CFS / 中断恢复 / 重试场景都跑不通会污染其他验收
+- **签字端点真实速查**：签字记录 `GET /api/signatures/{object_type}/{object_id}` / 签字就绪 `GET /api/projects/{pid}/sign-readiness`（连字符不是斜杠）/ 签字操作 `POST /api/signatures/sign` / 验证 `POST /api/signatures/{signature_id}/verify`
+- **FastAPI 路由顺序陷阱再现**：v1.10 改名 `/jobs/latest` → `/active-job` 但旧路径未真删，前端可能仍调用，FastAPI 把 `latest` 当 `{job_id}` UUID 解析失败 422；这是同 prefix 多 router literal 路由 vs `{var}` 通配冲突的同款问题
+- **spec 三件套分档决策规约（v3 修复方案沉淀）**：spec 不是非此即彼，按"复杂度+影响面"分 3 档——
+  - **档 1 直接修**（不写 spec）：单文件 / 单端点 / 配置类，工时 ≤ 0.5 天（如 PG ALTER TYPE / 单字段补 schema / 端点 grep 核验）
+  - **档 2 小型 spec**（仅 README 单文件，不要完整三件套）：根因不清晰 / 多文件协调 / 验收口径需明确，工时 0.5-2 天（如 F6 MissingGreenlet 排查 / F9 EQCR 3 端点契约 / chain init 链路改动）
+  - **档 3 完整三件套**（requirements + design + tasks）：跨视图 / 跨服务 / 工时 ≥ 1 周（如 useStaleStatus 推 6 视图 / 显示治理 3888 处硬编码 / 编辑器容灾）
+  - **判断铁律**：spec 起草本身要 ≥ 0.5 天 + 复盘 + 评审；任务范围清晰+单文件+影响面小 → 不该走三件套，否则 spec 比修复还耗时
+- **v3 13 件事推荐分档执行**：P0-2/4/5/9/10/11（直接修 5 件 / 1.7 天）+ P0-1/3/4/5（小型 spec README 4 件 / 4 天）+ P0-12/13（三件套 Spec A "linkage-stale-propagation"）；R10 立项独立做 Spec B（linkage-and-tokens）+ Spec C（editor-resilience）
+- **v3 档 1 直接修 5 件已完成（2026-05-16，1.6h 工时）**：(1) PG `job_status_enum` 加 interrupted/retrying/cancelled、`report_type` 加 cash_flow_statement/equity_statement/cash_flow_supplement/impairment_provision；(2) `chain_workflow.py:consistency_check` 响应顶层加 all_passed/consistent/passed_count/total_count 4 字段；(3) `misstatements.py:recheck_threshold` schema 升级 year 支持 query 或 body 双向传入；(4) v3 §3 端点速查表加签字 4 行；(5) `ledger_import_v2.py` 删除"GET /jobs/latest"误导注释（实际路由是 /active-job），knowledge 真实路径写入 §3
+- **PG enum 真实值已修正（2026-05-16 ALTER 后）**：`report_type` = balance_sheet/income_statement/cash_flow/cash_flow_statement/equity_statement/cash_flow_supplement/impairment_provision（7 个，原 3 个）/ `job_status_enum` = pending/queued/running/validating/writing/activating/completed/failed/canceled/timed_out/interrupted/retrying/cancelled（13 个，原 10 个）
+- **v3 派生 spec 全部起草完毕（2026-05-16）**：
+  - `.kiro/specs/v3-quickfixes/README.md`（档 2，含 Q1-Q4 4 个 quickfix 完整方案 + 反模板"何时升档三件套"5 条标准）
+  - `.kiro/specs/v3-linkage-stale-propagation/{requirements,design,tasks}.md`（档 3 三件套，5 需求 R1-R5 + 7 ADR + 4 Sprint + 8 UAT，3 天工时）
+  - `.kiro/specs/v3-r10-linkage-and-tokens/README.md`（R10 占位，3 周工时）
+  - `.kiro/specs/v3-r10-editor-resilience/README.md`（R10 占位，2 周工时）
+- **新增 `.kiro/specs/INDEX.md` 总索引**：列全部 spec 状态/关联 commit/甘特图/工作流规约（档 1/2/3 三档判定标准）；新建 spec 时强制更新此表
+- **F12 真因澄清**：错报阈值重检 `POST /api/projects/{pid}/misstatements/recheck-threshold` 后端原本 `year=Query(...)`（query string），不接受 body；实测 422 是脚本测试方式错（POST body 传 year）不是后端 bug；本次修复改为支持 query 或 body 双向传入兼容前端踩雷
+- **F11 真因澄清**（2026-05-16 第三轮）：签字端点真实存在但 v3 第一稿假设路径错——真实路径 `/api/signatures/{object_type}/{object_id}` + `/api/projects/{pid}/sign-readiness`（连字符），不是 `/api/signatures/projects/{pid}/records` + `/api/projects/{pid}/sign/readiness`
+- **F15 真因澄清**：`/api/projects/{pid}/ledger-import/jobs/latest` 在前端零引用（grep 实测），后端只是注释误导（写"GET /jobs/latest"实际路由 `/active-job`）；真实问题是后端 `@router.get("/jobs/{job_id}")` 把 `latest` 当 UUID 解析失败，无前端调用方时不构成 bug
+- **v3 档 2 4 件 quickfix 全部完成（2026-05-16，1.5h 工时）**：Q1 真修复 + Q2/Q3 平反 + Q4 真修复
+- **F6 真根因彻底定位**：`backend/app/deps.py:check_consol_lock` 当 PG `projects.consol_lock` 列不存在时调 `await db.rollback()` 让所有已 SELECT 的 ORM 对象（包括 `current_user`）expired，回到 router 访问 `user.id` 时触发 lazy load → MissingGreenlet；修复 = 改用 `async with db.begin_nested()` SAVEPOINT 包住 SELECT，列不存在只回滚 SAVEPOINT 不破坏外层事务
+- **SQLAlchemy MissingGreenlet 排查通用模式**：(1) 看异常栈最深的 `__get__` 行就是触发 lazy load 的字段；(2) 反推 ORM 对象什么时候被 expire（最常见是同 session 里有 `db.rollback()` 或 `db.expire_all()`）；(3) 修复策略 — 用 `async with db.begin_nested()` SAVEPOINT 替代 rollback / 写入前 `await db.refresh(obj)` / 关键查询后立即 commit
+- **`async with db.begin_nested()` SAVEPOINT 模式**：可重入子事务，列不存在/SQL 异常只回滚 SAVEPOINT，外层事务和已 SELECT 对象状态不受影响；适用于"探测性查询可能失败但不能影响主流程"场景（如 `check_consol_lock` 探测列是否存在）
+- **F9 EQCR 端点形态平反**：`/opinions` 没有统一列表（按 domain 分 5 个 GET：`/materiality` / `/estimates` / `/related-parties` / `/going-concern` / `/opinion-type`）+ `POST /opinions` 创建 + `PATCH /opinions/{id}` 修改；`/prior-year` 真路径是 `/prior-year-comparison` 带后缀；`/memo` 没有 GET root 用 `/memo/preview` 读；前端 apiPaths.ts 全部正确零踩雷
+- **F10 复核对话端点平反**：`/api/review-conversations` 是**全局 prefix + query param `project_id`**，不是 `/api/projects/{pid}/review-conversations` 子前缀；前端 apiPaths.ts:reviewConversations.projectList 修一处错路径（已修）
+- **`init_4_projects.py` 已加 step 5 调 chain**：`from app.services.chain_orchestrator import ChainOrchestrator` + `await orchestrator.execute_full_chain(project_id, year, force=True)`；DB 重建后跑 init 即可全自动生成底稿+附注（之前漏调导致和平/辽宁 wp_count=0）
+- **`WorkpaperList.vue` 已加暂无底稿引导卡片**：检测 `tb_count > 0 && wp_count == 0` 时显示"🚀 一键生成底稿+附注"按钮，调 `/api/projects/{pid}/workflow/execute-full-chain` body `{year, force:true}` timeout 120s
+- **v3 档 1+档 2 全清后剩余唯一 P0**：Spec A `v3-linkage-stale-propagation` 三件套实施（P0-12 useStaleStatus 推 6 视图 + PartnerSignDecision stale 摘要 + P0-13 AJE→错报转换前端入口），3 天工时；R10 两个 spec 独立立项 3-4 周后启动
+- **v3 工时实际压缩比**：原计划 8 天 / 13 件事，实际档 1+档 2 共 9 件只用 3.1h（约 30 倍压缩）；主因 = 脚本路径假设错被当成"真 bug"挖完真因后大半都是端点形态被错估
+- **v3 全部 P0 清完（2026-05-16，5.6h 总工时，35 倍压缩）**：档 1（5 件 1.6h）+ 档 2（4 件 1.5h）+ 档 3 Spec A 三件套（2.5h）；剩余只有 R10 独立 sprint（联动+显示治理 3 周 + 编辑器+容灾 2 周可并行）
+- **Spec A 三件套已全部实施（Sprint 0-4）**：
+  - 新建 2 后端文件：`stale_summary_aggregate.py`（4 模块聚合 SQL）+ `test_stale_summary_full.py` / `test_aje_to_misstatement_idempotent.py` 共 6 用例
+  - 修改 3 后端文件：`stale_summary.py` 加 `/full` 端点 / `misstatement_service.py` 加幂等检查 / `misstatements.py` 路由 409 ALREADY_CONVERTED
+  - 新建 1 前端文件：`useStaleSummaryFull.ts` composable（4 模块聚合 + 6 事件订阅 + 防抖 500ms）
+  - 修改 6 前端文件：WorkpaperList tree badge / WorkpaperWorkbench 详情卡片 / Misstatements 列 / Adjustments status 列 / **PartnerSignDecision 5 卡片项目状态摘要区块**（合伙人签字最痛 R3）/ EqcrProjectView Tab badge
+  - 实测：4 项目 `/stale-summary/full` 全 200；AJE 创建→reject→转错报 200→重复转 409+ALREADY_CONVERTED+misstatement_id；vue-tsc + getDiagnostics 11 文件全 0 错误
+- **新增 `financial_report.is_stale` PG 列（2026-05-16）**：ORM 模型有但 PG 表缺（又是 schema 漂移），手动 `ALTER TABLE financial_report ADD COLUMN IF NOT EXISTS is_stale BOOLEAN NOT NULL DEFAULT false` 补齐；audit_report 已有
+- **`unadjusted_misstatements` 字段缺失降级策略**：表无 `materiality_recheck_needed` / `last_evaluated_at` 字段，按 design D3 决策**降级为派生计算**——`stale_summary_aggregate.py` 用 `WHERE m.updated_at < (SELECT MAX(updated_at) FROM materiality WHERE project_id=...)` SQL 派生，无需改 ORM/迁移
+- **AJE→错报转换幂等 409 模式（D5 落地）**：`misstatement_service.create_from_rejected_aje` 开头查 `source_adjustment_id` 已存在则抛 `ValueError("ALREADY_CONVERTED")` + 挂 `misstatement_id` attr；router 层 `except ValueError` 判 `str(e) == "ALREADY_CONVERTED"` 返回 409 + `{error_code, message, misstatement_id}` 让前端跳转
+- **后端 ValueError 加 attr 传值模式**：当业务异常需要带额外信息（如已存在记录的 ID），用 `err = ValueError("CODE"); err.attr_name = value; raise err`，router 层 `getattr(e, "attr_name", None)` 取值；避免造自定义异常类污染服务层
+- **PG schema 漂移修复检测清单**（v3 实测沉淀）：每次跑 ORM 模型有但运行时报 `column does not exist` / `enum value does not exist` 错时，必查 (1) `\d {table}` 看真实列；(2) `SELECT * FROM pg_enum WHERE enumtypid::regtype::text=...` 看真实 enum 值；(3) 如果 ORM 已有但 PG 缺，直接 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` 补齐
+- **v3 第一周动手清单（5 天 P0 全清）**：D1 IS/CFS 公式 / D2 chain 自动跑底稿+WP List 引导 / D2 下午 data-quality / D3 上午 all_passed / D3 下午 AJE 大小写 / D4 useStaleStatus 推 6 视图+后端 stale-summary/full / D5 上午 PartnerSignDecision stale 区块 / D5 下午 AJE→错报前端入口
+- **v3 量化快照（2026-05-16 grep 实测）**：97 视图 / 258 组件 / GtPageHeader 73/97=75%（24 个未接入中 11 个合理排除 + 13 个应补）/ GtEditableTable 仅 3 处接入（最大警报）/ useStaleStatus 仅 5 视图（联动感知严重不足）/ useEditingLock 3 视图 / handleApiError 59 视图 / ElMessage.error 仅 1 处（基本清零）/ ElMessageBox.confirm 仅 3 处 / Vue 层 /api/ 硬编码 0 / statusEnum 13 视图接入 / inline font-size:Npx **1565 处** + color:#xxx **1611 处** + background:#xxx **712 处**（三大重灾区，需分批 token 化）
+- **v3 不做清单（明确排除）**：暗色模式 / 全局 Ctrl+K 搜索 / 给 GtEditableTable 加新功能 / 客户主数据 / 员工热力图 / vitest 全量基建 / 新加后端模型；防止范围蔓延
+- **v3 GtEditableTable 处置策略**：不再扩张组件库，改为"职责瘦身"成 GtTableExtended（列表型，强制 CI 卡点）+ GtFormTable（行内编辑型，仅 Adjustments/Misstatements/SamplingEnhanced 用）
+- **v3 显示治理铁律**：字号/颜色/背景必须分 4 批迁移（编辑器→表格类→Dashboard→剩余），不能一次全改破坏视觉；token 体系打实后未来切换暗色只需改 token 值
+- **memory.md 1500+ 行需拆分**：当前 spec 完成后统一整理；保留 < 200 行（用户偏好+活跃待办+关键状态摘要），其余迁移到 architecture/conventions/dev-history
 - **表格统一化 spec 全部完成**（`.kiro/specs/table-unification-el-table/`）：21/21 编码任务完成，剩余 5 项 UAT 需手动浏览器验证；所有 11 处原生 HTML table 已迁移到 el-table（GtPrintPreview 按退出条件保留原生 table 用于打印）；全局样式 `gt-table.css` 已就绪（紫色表头/边框色/字号 class/表头 nowrap/.gt-amt）；grep `<table` 确认 0 处渲染用原生 table（排除剪贴板 HTML + 打印预览）
   - **复盘发现**：spec 创建时迁移已全部完成（R7-R9 各轮逐步落地），21 个 task 实际是"验收审计"而非"实施"；下次创建 spec 前先 grep 预检现状避免空跑
   - **后续优化（触碰即修）**：`:header-cell-style` 内联 ~40 处分布 20+ 文件，但实际用了 4 种表头色（`#f0edf5` 标准紫 / `#f8f6fb` 浅紫 / `#f4f0fa` 中紫 / `#edf3f9` 蓝灰）是视觉层级区分非冗余；gt-table.css 的 `!important` 会覆盖内联导致不能直接删；可选方案 = 提取 4 个 class（`.gt-table-header-default/light/mid/blue`）替代内联对象；max-height N 值 8 种是各页面布局适配不需统一；GtPrintPreview 保持原生 table 不动

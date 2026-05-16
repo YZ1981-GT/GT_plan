@@ -113,6 +113,31 @@ async def init_project(db: AsyncSession, project_id: UUID, name: str, year: int)
         print(f"FAIL: {str(e)[:80]}")
         return False
 
+    # 5. Execute chain to generate workpapers + notes (F2 修复 / v3 P0-5 / Q4)
+    print(f"  [5] 生成底稿+附注（chain）...", end=" ")
+    try:
+        from app.services.chain_orchestrator import ChainOrchestrator
+        orchestrator = ChainOrchestrator(db)
+        # force=True 跳过 stale check 强制重跑全链路
+        chain_result = await orchestrator.execute_full_chain(
+            project_id=project_id, year=year, triggered_by=None, force=True,
+        )
+        await db.commit()
+        # 再查 wp + note count
+        wp_q = await db.execute(sa.text(
+            "SELECT COUNT(*) FROM working_paper WHERE project_id = :pid AND is_deleted = false"
+        ), {"pid": project_id})
+        nt_q = await db.execute(sa.text(
+            "SELECT COUNT(*) FROM disclosure_notes WHERE project_id = :pid AND year = :yr AND is_deleted = false"
+        ), {"pid": project_id, "yr": year})
+        wp_count = wp_q.scalar() or 0
+        nt_count = nt_q.scalar() or 0
+        print(f"OK (wp={wp_count}, notes={nt_count})")
+    except Exception as e:
+        await db.rollback()
+        # 不阻塞返回 True：底稿生成失败不算项目初始化失败
+        print(f"WARN: {str(e)[:80]}")
+
     return True
 
 

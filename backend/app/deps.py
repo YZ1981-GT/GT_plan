@@ -252,21 +252,27 @@ async def check_consol_lock(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    """检查项目是否被合并锁定，锁定时返回 423。"""
+    """检查项目是否被合并锁定，锁定时返回 423。
+
+    F6 修复（v3 P0-1 / Q1）：用 SAVEPOINT 包住 SELECT，列不存在时
+    回滚 SAVEPOINT 不破坏外层事务（避免下游 user 对象 expired 引发 MissingGreenlet）。
+    """
     from sqlalchemy import text as sa_text
     try:
-        result = await db.execute(
-            sa_text("SELECT consol_lock FROM projects WHERE id = :pid"),
-            {"pid": str(project_id)},
-        )
-        row = result.first()
-        if row and row[0]:
-            raise HTTPException(status_code=423, detail="项目已被合并锁定，请等待合并完成后再操作")
+        async with db.begin_nested():  # SAVEPOINT
+            result = await db.execute(
+                sa_text("SELECT consol_lock FROM projects WHERE id = :pid"),
+                {"pid": str(project_id)},
+            )
+            row = result.first()
+            if row and row[0]:
+                raise HTTPException(status_code=423, detail="项目已被合并锁定，请等待合并完成后再操作")
     except HTTPException:
         raise
     except Exception:
-        # Column may not exist — rollback the failed transaction to recover
-        await db.rollback()
+        # Column may not exist — SAVEPOINT 已自动回滚，外层事务无影响
+        # 不再 await db.rollback()（这是 F6 根因：让所有已 SELECT 对象 expired）
+        pass
 
 
 # ---------------------------------------------------------------------------

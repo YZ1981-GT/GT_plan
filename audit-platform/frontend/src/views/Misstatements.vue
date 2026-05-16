@@ -98,6 +98,19 @@
           <GtAmountCell :value="row.misstatement_amount" :clickable="true" @click="penetrate.toLedger(row.affected_account_code)" />
         </template>
       </el-table-column>
+      <!-- Spec A R1：重要性变更时未重评估的错报标 stale -->
+      <el-table-column label="新鲜度" width="80" align="center">
+        <template #default="{ row }">
+          <el-tooltip
+            v-if="staleMissIdSet.has(row.id)"
+            content="重要性已变更，建议重新评估"
+            placement="top"
+          >
+            <el-tag type="warning" size="small" round>🟡</el-tag>
+          </el-tooltip>
+          <span v-else style="color: var(--gt-color-success); font-size: 12px">✓</span>
+        </template>
+      </el-table-column>
       <el-table-column label="结转" width="70" align="center">
         <template #default="{ row }">
           <el-tag v-if="row.is_carried_forward" type="info" size="small">结转</el-tag>
@@ -161,6 +174,8 @@ import { confirmDelete } from '@/utils/confirm'
 import { usePasteImport } from '@/composables/usePasteImport'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useFullscreen } from '@/composables/useFullscreen'
+// Spec A R1：跨视图 stale 摘要（错报阈值变化时显示标志）
+import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
@@ -185,6 +200,10 @@ const {
   projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
   onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
 } = useProjectSelector('misstatements')
+
+// Spec A R1：跨视图 stale 摘要（misstatements 模块）
+const { misstatements: missStaleSummary } = useStaleSummaryFull(projectId, year)
+const staleMissIdSet = computed(() => new Set(missStaleSummary.value.items.map((it: any) => it.id)))
 
 const loading = ref(false)
 const submitLoading = ref(false)

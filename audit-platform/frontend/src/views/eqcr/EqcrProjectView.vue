@@ -70,7 +70,11 @@
 
     <!-- 5 Tab -->
     <el-tabs v-model="activeTab" class="eqcr-tabs">
-      <el-tab-pane label="重要性" name="materiality">
+      <el-tab-pane name="materiality">
+        <template #label>
+          <span>重要性</span>
+          <el-badge v-if="eqcrTabBadges.materiality > 0" :value="eqcrTabBadges.materiality" type="warning" class="eqcr-tab-badge" />
+        </template>
         <EqcrMateriality v-if="activeTab === 'materiality'" :project-id="projectId" />
         <ShadowCompareRow v-if="activeTab === 'materiality' && shadowData.materiality.length" :rows="shadowData.materiality" @verdict="onShadowVerdict" />
       </el-tab-pane>
@@ -213,6 +217,33 @@ const route = useRoute()
 const router = useRouter()
 
 const projectId = computed(() => String(route.params.projectId ?? ''))
+
+// Spec A R1：EQCR Tab badge（聚合 stale 摘要 → 按 Tab 类型派生）
+import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
+const eqcrYear = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
+const { workpapers: eqcrWp, reports: eqcrRpt, notes: eqcrNotes, misstatements: eqcrMiss }
+  = useStaleSummaryFull(projectId, eqcrYear)
+// 简化：所有 Tab 共享一个"项目级"badge — 显示总 stale 数；如需精确按 Tab 类型分组，
+// 需要后端返回更细粒度数据（暂作 TD-3 / 见 tasks.md 已知缺口）
+const _projectStaleCount = computed(() =>
+  (eqcrWp.value.stale ?? 0)
+  + (eqcrRpt.value.stale ?? 0)
+  + (eqcrNotes.value.stale ?? 0)
+  + (eqcrMiss.value.recheck_needed ?? 0)
+)
+const eqcrTabBadges = computed(() => ({
+  materiality: eqcrMiss.value.recheck_needed ?? 0,
+  estimate: 0,
+  related_party: 0,
+  going_concern: 0,
+  opinion_type: 0,
+  shadow_compute: 0,
+  review_notes: 0,
+  prior_year: 0,
+  memo: 0,
+  component_auditor: 0,
+  key_findings_summary: _projectStaleCount.value,
+}))
 
 const loading = ref(false)
 const overview = ref<EqcrProjectOverview | null>(null)
@@ -519,6 +550,14 @@ function reportStatusType(
 
 .eqcr-tabs {
   margin-top: 16px;
+}
+/* Spec A R1：Tab badge 微调（el-badge 默认偏右上角，调到与文字基线对齐） */
+.eqcr-tab-badge {
+  margin-left: 4px;
+  vertical-align: text-top;
+}
+.eqcr-tab-badge :deep(.el-badge__content) {
+  height: 16px; line-height: 14px; padding: 0 4px;
 }
 
 /* 关键发现摘要 [R9 F7-EQCR Task 25] */

@@ -33,6 +33,61 @@
 
       <!-- 中栏：报告预览（降级 HTML） -->
       <div class="gt-psd-center">
+        <!-- Spec A R3：项目状态摘要（5 个指标卡片） -->
+        <div class="gt-psd-stale-summary" v-if="staleSummaryReady">
+          <div class="gt-psd-stale-title">
+            项目状态摘要
+            <el-tag v-if="!anyStale" type="success" size="small" round>✅ 项目状态健康</el-tag>
+          </div>
+          <div class="gt-psd-stale-cards">
+            <div
+              class="gt-psd-stale-card"
+              :class="{ 'gt-psd-stale-card--warn': (wpStale.stale ?? 0) + (wpStale.inconsistent ?? 0) > 0 }"
+              @click="goToWpList"
+            >
+              <div class="gt-psd-stale-card-label">底稿 stale</div>
+              <div class="gt-psd-stale-card-value">{{ (wpStale.stale ?? 0) + (wpStale.inconsistent ?? 0) }}</div>
+              <div class="gt-psd-stale-card-sub">/ 共 {{ wpStale.total }}</div>
+            </div>
+            <div
+              class="gt-psd-stale-card"
+              :class="{ 'gt-psd-stale-card--warn': (rptStale.stale ?? 0) > 0 }"
+              @click="goToReportView"
+            >
+              <div class="gt-psd-stale-card-label">报表行 stale</div>
+              <div class="gt-psd-stale-card-value">{{ rptStale.stale ?? 0 }}</div>
+              <div class="gt-psd-stale-card-sub">/ 共 {{ rptStale.total }}</div>
+            </div>
+            <div
+              class="gt-psd-stale-card"
+              :class="{ 'gt-psd-stale-card--warn': (notesStale.stale ?? 0) > 0 }"
+              @click="goToNotes"
+            >
+              <div class="gt-psd-stale-card-label">附注节 stale</div>
+              <div class="gt-psd-stale-card-value">{{ notesStale.stale ?? 0 }}</div>
+              <div class="gt-psd-stale-card-sub">/ 共 {{ notesStale.total }}</div>
+            </div>
+            <div
+              class="gt-psd-stale-card"
+              :class="{ 'gt-psd-stale-card--warn': (missStale.recheck_needed ?? 0) > 0 }"
+              @click="goToMisstatements"
+            >
+              <div class="gt-psd-stale-card-label">错报待评估</div>
+              <div class="gt-psd-stale-card-value">{{ missStale.recheck_needed ?? 0 }}</div>
+              <div class="gt-psd-stale-card-sub">/ 共 {{ missStale.total }}</div>
+            </div>
+            <div
+              class="gt-psd-stale-card"
+              :class="{ 'gt-psd-stale-card--warn': consistencyPassed < consistencyTotal }"
+              @click="onShowConsistency"
+            >
+              <div class="gt-psd-stale-card-label">一致性</div>
+              <div class="gt-psd-stale-card-value">{{ consistencyPassed }}/{{ consistencyTotal }}</div>
+              <div class="gt-psd-stale-card-sub">通过</div>
+            </div>
+          </div>
+        </div>
+
         <div class="gt-psd-section-title">
           审计报告预览
           <el-tag v-if="reportStatus" size="small" :type="reportStatusTagType">{{ reportStatusLabel }}</el-tag>
@@ -158,6 +213,8 @@ import { feedback } from '@/utils/feedback'
 import { handleApiError } from '@/utils/errorHandler'
 import { fmtAmount as fmtAmt } from '@/utils/formatters'
 import { useAuthStore } from '@/stores/auth'
+// Spec A R3：项目状态摘要区块（5 个指标卡片）
+import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
 
 interface RiskSummaryData {
   high_findings: Array<{ id: string; title: string; severity: string; status: string; category: string; created_at: string | null }>
@@ -181,6 +238,21 @@ const authStore = useAuthStore()
 
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.params.year) || new Date().getFullYear() - 1)
+
+// Spec A R3：项目状态摘要数据
+const {
+  workpapers: wpStale,
+  reports: rptStale,
+  notes: notesStale,
+  misstatements: missStale,
+  anyStale,
+} = useStaleSummaryFull(projectId, year)
+
+// 一致性 5 项数据（独立调 chain consistency-check）
+const consistencyChecks = ref<any[]>([])
+const consistencyPassed = computed(() => consistencyChecks.value.filter((c: any) => c.passed).length)
+const consistencyTotal = computed(() => consistencyChecks.value.length)
+const staleSummaryReady = computed(() => wpStale.value.total > 0 || consistencyTotal.value > 0)
 
 // ── 数据状态 ──
 const clientName = ref('')
@@ -329,11 +401,51 @@ async function onSign() {
   }
 }
 
+// Spec A R3：加载一致性 5 项 + 跳转动作
+async function loadConsistencyChecks() {
+  try {
+    const data: any = await api.get(
+      `/api/projects/${projectId.value}/workflow/consistency-check?year=${year.value}`,
+      { validateStatus: (s: number) => s < 600 },
+    )
+    consistencyChecks.value = (data?.checks || []) as any[]
+  } catch { /* ignore */ }
+}
+
+function goToWpList() {
+  router.push({ name: 'WorkpaperList', params: { projectId: projectId.value }, query: { year: String(year.value), filter: 'stale' } })
+}
+function goToReportView() {
+  router.push({ name: 'ReportView', params: { projectId: projectId.value }, query: { year: String(year.value) } })
+}
+function goToNotes() {
+  router.push({ name: 'DisclosureEditor', params: { projectId: projectId.value }, query: { year: String(year.value) } })
+}
+function goToMisstatements() {
+  router.push({ name: 'Misstatements', params: { projectId: projectId.value }, query: { year: String(year.value) } })
+}
+function onShowConsistency() {
+  if (!consistencyChecks.value.length) {
+    ElMessage.info('一致性检查暂无数据')
+    return
+  }
+  const lines = consistencyChecks.value.map((c: any) =>
+    `${c.passed ? '✓' : '✗'} ${c.check_name}: ${c.details?.message || ''}`
+  ).join('\n')
+  ElMessage({
+    message: lines,
+    type: 'info',
+    duration: 8000,
+    showClose: true,
+  })
+}
+
 onMounted(() => {
   loadProject()
   loadReadiness()
   loadReport()
   loadRiskSummary()
+  loadConsistencyChecks()
 })
 </script>
 
@@ -364,6 +476,62 @@ onMounted(() => {
   padding-bottom: var(--gt-space-2);
   border-bottom: 2px solid var(--gt-color-primary);
   display: flex; align-items: center; gap: var(--gt-space-2);
+}
+
+/* Spec A R3：项目状态摘要区块 */
+.gt-psd-stale-summary {
+  margin-bottom: var(--gt-space-3);
+  padding: var(--gt-space-3);
+  background: var(--gt-color-bg-subtle, #fafafa);
+  border-radius: var(--gt-radius-sm);
+  border: 1px solid var(--gt-color-border-light);
+}
+.gt-psd-stale-title {
+  font-size: var(--gt-font-size-sm);
+  font-weight: 600;
+  color: var(--gt-color-text-secondary);
+  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.gt-psd-stale-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.gt-psd-stale-card {
+  padding: 8px 10px;
+  background: white;
+  border: 1px solid var(--gt-color-border-light);
+  border-radius: var(--gt-radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.gt-psd-stale-card:hover {
+  border-color: var(--gt-color-primary);
+  transform: translateY(-1px);
+}
+.gt-psd-stale-card--warn {
+  border-color: var(--gt-color-warning, #e6a23c);
+  background: #fef9e7;
+}
+.gt-psd-stale-card-label {
+  font-size: 11px;
+  color: var(--gt-color-text-tertiary);
+  margin-bottom: 4px;
+}
+.gt-psd-stale-card-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gt-color-primary);
+  font-variant-numeric: tabular-nums;
+}
+.gt-psd-stale-card--warn .gt-psd-stale-card-value {
+  color: var(--gt-color-warning, #e6a23c);
+}
+.gt-psd-stale-card-sub {
+  font-size: 10px;
+  color: var(--gt-color-text-tertiary);
 }
 
 /* 报告预览 */

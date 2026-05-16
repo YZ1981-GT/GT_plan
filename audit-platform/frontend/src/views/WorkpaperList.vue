@@ -74,8 +74,24 @@
       <div class="gt-wp-intro-half">
         <div class="gt-wp-intro-icon">📋</div>
         <div class="gt-wp-intro-title">暂无底稿</div>
-        <div class="gt-wp-intro-desc">前往底稿工作台生成项目底稿</div>
-        <el-button type="primary" @click="goToWorkbench" style="margin-top: 20px">前往底稿工作台</el-button>
+        <div class="gt-wp-intro-desc">
+          <span v-if="hasTrialBalance">检测到试算表已就绪，建议一键生成底稿+附注</span>
+          <span v-else>请先完成账套导入和试算表生成</span>
+        </div>
+        <!-- F2 修复 / v3 P0-5 / Q4：检测到 tb 已就绪但 wp=0 时显示一键生成 -->
+        <el-button
+          v-if="hasTrialBalance"
+          type="primary"
+          :loading="chainLoading"
+          @click="onGenerateChain"
+          style="margin-top: 20px"
+        >
+          🚀 一键生成底稿+附注（chain）
+        </el-button>
+        <el-button
+          @click="goToWorkbench"
+          style="margin-top: 12px"
+        >前往底稿工作台</el-button>
       </div>
 
       <!-- 右栏：审计程序总览（简洁列表，点击跳转） -->
@@ -132,6 +148,14 @@
             <div class="gt-wp-tree-node">
               <span class="gt-wp-tree-node-label">{{ data.label }}</span>
               <GtStatusTag v-if="data.status" dict-key="wp_status" :value="data.status" class="gt-wp-tree-node-tag" />
+              <!-- Spec A R1：stale 角标（显示在节点最右） -->
+              <el-tooltip
+                v-if="data.id && staleWpIdSet.has(data.id)"
+                content="底稿已过期，建议重新生成"
+                placement="top"
+              >
+                <span class="gt-wp-tree-stale-badge">🟡</span>
+              </el-tooltip>
             </div>
           </template>
         </el-tree>
@@ -557,11 +581,18 @@ import {
   type WorkpaperDetail, type WpIndexItem, type QCResult,
 } from '@/services/workpaperApi'
 import { handleApiError } from '@/utils/errorHandler'
+// Spec A R1 / R3：跨视图 stale 摘要（推到 6 视图之一）
+import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
 
 const route = useRoute()
 const router = useRouter()
 const dictStore = useDictStore()
 const projectId = computed(() => route.params.projectId as string)
+// Spec A: 当前年度（以 route.query.year 为唯一真源）
+const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear())
+const { workpapers: wpStaleSummary } = useStaleSummaryFull(projectId, currentYear)
+// stale wp_id Set，用于 tree 节点判定
+const staleWpIdSet = computed(() => new Set(wpStaleSummary.value.items.map((it: any) => it.id)))
 const projectName = ref('')
 
 const loading = ref(false)
@@ -890,6 +921,44 @@ function goToWorkbench() {
   router.push(`/projects/${projectId.value}/workpaper-bench`)
 }
 
+// F2 修复 / v3 P0-5 / Q4：一键生成底稿（chain 端点）
+const hasTrialBalance = ref(false)
+const chainLoading = ref(false)
+
+function _resolveYear(): number {
+  return Number(route.query.year) || new Date().getFullYear()
+}
+
+async function checkTrialBalanceReady() {
+  try {
+    const r: any = await api.get(
+      `/api/projects/${projectId.value}/trial-balance?year=${_resolveYear()}`,
+      { validateStatus: (s: number) => s < 600 },
+    )
+    const rows = (r?.rows || r?.items || (Array.isArray(r) ? r : [])) as any[]
+    hasTrialBalance.value = rows.length > 0
+  } catch {
+    hasTrialBalance.value = false
+  }
+}
+
+async function onGenerateChain() {
+  chainLoading.value = true
+  try {
+    await api.post(
+      `/api/projects/${projectId.value}/workflow/execute-full-chain`,
+      { year: _resolveYear(), force: true },
+      { timeout: 120000 },
+    )
+    ElMessage.success('已生成底稿+附注，正在刷新...')
+    await fetchData()
+  } catch (e: any) {
+    handleApiError(e, '一键生成 chain')
+  } finally {
+    chainLoading.value = false
+  }
+}
+
 function _goToTemplates() {
   router.push(`/projects/${projectId.value}/templates`)
 }
@@ -947,6 +1016,10 @@ async function fetchData() {
     })
   } finally {
     loading.value = false
+  }
+  // F2 / Q4: 加载完底稿列表后检查是否有 TB 但无底稿（用于显示一键生成按钮）
+  if (wpIndex.value.length === 0) {
+    checkTrialBalanceReady()
   }
 }
 
@@ -1515,6 +1588,7 @@ onMounted(async () => {
 .gt-wp-tree-node { display: flex; align-items: center; gap: 6px; width: 100%; }
 .gt-wp-tree-node-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-wp-tree-node-tag { flex-shrink: 0; }
+.gt-wp-tree-stale-badge { flex-shrink: 0; font-size: 11px; opacity: 0.85; cursor: help; }
 .gt-wp-detail-card { }
 .gt-wp-detail-title { margin: 0 0 var(--gt-space-4); color: var(--gt-color-primary); font-size: var(--gt-font-size-xl); }
 .gt-wp-detail-actions { display: flex; gap: var(--gt-space-2); margin-top: var(--gt-space-4); flex-wrap: wrap; }

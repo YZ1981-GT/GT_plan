@@ -106,6 +106,14 @@
               <el-tag :type="selectedMapping.note_section ? 'success' : 'info'" size="small" effect="plain" round>
                 {{ selectedMapping.account_name }}
               </el-tag>
+              <!-- Spec A R1：stale 标志 -->
+              <el-tooltip
+                v-if="isCurrentWpStale"
+                content="底稿已过期，建议重新生成"
+                placement="top"
+              >
+                <el-tag type="warning" size="small" round style="cursor: help">🟡 stale</el-tag>
+              </el-tooltip>
             </div>
             <div class="gt-wpb-detail-tags">
               <el-tag size="small" round>{{ selectedMapping.cycle }}循环</el-tag>
@@ -339,6 +347,8 @@ import { fmtAmount } from '@/utils/formatters'
 import OcrStatusBadge from '@/components/common/OcrStatusBadge.vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { useNavigationStack } from '@/composables/useNavigationStack'
+// Spec A R1：跨视图 stale 摘要
+import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
 import { eventBus } from '@/utils/eventBus'
 
 const route = useRoute()
@@ -347,6 +357,19 @@ const { push: navPush } = useNavigationStack()
 const projectId = computed(() => route.params.projectId as string)
 const year = ref(new Date().getFullYear())
 const projectName = ref('')
+
+// Spec A: 跨视图 stale 摘要
+const yearRef = computed(() => year.value)
+const { workpapers: wpStaleSummary } = useStaleSummaryFull(projectId, yearRef)
+const staleWpCodeSet = computed(() => {
+  // wpStaleSummary.items 是 [{id, wp_code, wp_name}, ...]
+  return new Set(wpStaleSummary.value.items.map((it: any) => it.wp_code).filter(Boolean))
+})
+// 当前选中的 mapping 是否 stale（按 wp_code 匹配）
+const isCurrentWpStale = computed(() => {
+  const code = selectedMapping.value?.wp_code
+  return code ? staleWpCodeSet.value.has(code) : false
+})
 
 const loading = ref(false)
 const prefillLoading = ref(false)

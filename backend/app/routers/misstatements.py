@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -67,7 +67,10 @@ async def create_from_aje(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """从被拒绝AJE创建未更正错报"""
+    """从被拒绝AJE创建未更正错报
+
+    Spec A R4 / D5：幂等支持 — 同一笔 AJE 重复转换返回 409。
+    """
     svc = UnadjustedMisstatementService(db)
     try:
         result = await svc.create_from_rejected_aje(
@@ -76,6 +79,17 @@ async def create_from_aje(
         await db.commit()
         return result.model_dump()
     except ValueError as e:
+        # Spec A D5：幂等冲突 → 409 + misstatement_id 让前端跳转
+        if str(e) == "ALREADY_CONVERTED":
+            existing_id = getattr(e, "misstatement_id", None)
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error_code": "ALREADY_CONVERTED",
+                    "message": "该 AJE 已转换为错报",
+                    "misstatement_id": existing_id,
+                },
+            )
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -130,7 +144,8 @@ async def get_summary(
 @router.post("/recheck-threshold")
 async def recheck_threshold(
     project_id: UUID,
-    year: int = Query(...),
+    year: int | None = Query(None, description="年度（query 或 body 任选其一）"),
+    body: dict | None = Body(None, description="可选 body：{year: int}"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -142,7 +157,15 @@ async def recheck_threshold(
     3. 返回更新后的 summary
 
     前端在 materiality:changed 事件触发后调用。
+
+    F12 (v3 §2): year 支持 query 或 body 两种传入方式，避免前端踩雷。
     """
+    # year 解析：query 优先，body 兜底
+    if year is None and isinstance(body, dict):
+        year = body.get("year")
+    if not isinstance(year, int):
+        raise HTTPException(status_code=422, detail="year 必填（query ?year=2025 或 body {\"year\":2025}）")
+
     svc = UnadjustedMisstatementService(db)
     # 简化实现：直接返回最新 summary（summary 内部已基于最新 materiality 计算）
     result = await svc.get_summary(project_id, year)

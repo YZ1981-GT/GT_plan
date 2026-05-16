@@ -1,11 +1,11 @@
-"""Stale 底稿汇总端点 [R7-S2-09]
+"""Stale 底稿汇总端点 [R7-S2-09 + Spec A R2]
 
-GET /api/projects/{project_id}/stale-summary
-返回当前项目中 prefill_stale=True 的底稿列表。
+GET /api/projects/{project_id}/stale-summary       — 仅底稿粒度（向后兼容）
+GET /api/projects/{project_id}/stale-summary/full  — Spec A 多模块聚合
 """
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -52,3 +52,22 @@ async def get_stale_summary(
             for wp, wp_code, wp_name in rows
         ],
     }
+
+
+@router.get("/stale-summary/full")
+async def get_stale_summary_full(
+    project_id: UUID,
+    year: int = Query(..., description="年度"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Spec A R2: 多模块聚合 stale 摘要
+
+    返回 4 个模块（workpapers / reports / notes / misstatements）
+    的 stale 计数 + 至多 30 条 items 摘要 + last_event_at。
+
+    供 PartnerSignDecision / EqcrProjectView / WorkpaperList 使用。
+    """
+    from app.services.stale_summary_aggregate import get_full_summary
+
+    return await get_full_summary(db, project_id, year)

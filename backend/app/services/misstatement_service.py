@@ -89,8 +89,38 @@ class UnadjustedMisstatementService:
         year: int,
         created_by: UUID | None = None,
     ) -> MisstatementResponse:
-        """从被拒绝AJE预填充创建未更正错报"""
+        """从被拒绝AJE预填充创建未更正错报
+
+        Spec A R4 / D5：幂等检查 — 同一笔 AJE 只能转一次错报。
+        若 source_adjustment_id 已存在，抛 ValueError("ALREADY_CONVERTED")
+        让 router 转 409，前端提示"已转换过，跳转查看"。
+        """
         adj = Adjustment.__table__
+        # 1. 取分录组首行 id 作为幂等键
+        first_id_q = sa.select(adj.c.id).where(
+            adj.c.project_id == project_id,
+            adj.c.entry_group_id == entry_group_id,
+            adj.c.is_deleted == sa.false(),
+        ).order_by(adj.c.id).limit(1)
+        first_id_row = (await self.db.execute(first_id_q)).first()
+        if first_id_row is None:
+            raise ValueError("调整分录不存在")
+        first_adj_id = first_id_row.id
+
+        # 2. 幂等检查：source_adjustment_id 已存在则拒绝（D5）
+        from app.models.audit_platform_models import UnadjustedMisstatement as _UM
+        existing_q = sa.select(_UM).where(
+            _UM.project_id == project_id,
+            _UM.source_adjustment_id == first_adj_id,
+            _UM.is_deleted == sa.false(),
+        )
+        existing = (await self.db.execute(existing_q)).scalar_one_or_none()
+        if existing is not None:
+            err = ValueError("ALREADY_CONVERTED")
+            err.misstatement_id = str(existing.id)  # type: ignore[attr-defined]
+            raise err
+
+        # 3. 重新查询完整字段创建记录
         q = (
             sa.select(
                 adj.c.id,

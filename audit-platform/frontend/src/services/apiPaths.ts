@@ -748,7 +748,8 @@ export const reviewConversations = {
   messages: (id: string) => `/api/review-conversations/${id}/messages`,
   close: (id: string) => `/api/review-conversations/${id}/close`,
   export: (id: string) => `/api/review-conversations/${id}/export`,
-  projectList: (pid: string) => `/api/projects/${pid}/review-conversations`,
+  // F10 (v3 §2): 项目级列表用 query param 不是子前缀（后端 prefix 是全局 /api/review-conversations）
+  projectList: (pid: string) => `/api/review-conversations?project_id=${pid}`,
 } as const
 
 // ─── 论坛 ───────────────────────────────────────────────────────────────────
