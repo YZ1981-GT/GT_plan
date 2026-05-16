@@ -8,6 +8,17 @@
 
 ---
 
+## 依赖矩阵
+
+| 依赖类型 | 上游 spec / commit | 字段/产出 | fallback 策略 |
+|---------|------------------|---------|--------------|
+| 已完成依赖 | Spec A `v3-linkage-stale-propagation` | useStaleStatus / PartnerSignDecision stale 摘要 / AJE→错报转换 | 已交付（commit `b4cda44`），不重复实施 |
+| 上游 spec | v3 P0 13 项 | 全部 ✓ pass | v3 §6 表 |
+| 并行 spec | Spec C `v3-r10-editor-resilience` | 共享 `gt-tokens.css` 6 级背景 token | 双向：Spec B Sprint 0 完成补 token，Spec C Sprint 1.4.3 临时硬编码 fallback |
+| 下游 spec | （未来）Spec D 暗色模式 | 消费本 spec 全 token 化成果 | — |
+
+---
+
 ## 变更记录
 
 | 版本 | 日期 | 摘要 | 触发原因 |

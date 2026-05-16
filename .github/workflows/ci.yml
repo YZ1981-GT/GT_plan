@@ -257,13 +257,21 @@ jobs:
       - name: Display token guard (R10 Spec B / F10)
         # baseline 来自 .github/workflows/baselines.json，由 Sprint 0 实测填入
         # 4 道 grep 卡点：font-size / color / background / 裸 el-table
+        # R10 二轮复盘 S6：字段命名统一为 {property}-prop-{format}-vue-files；旧字段保留为 deprecated alias
         run: |
           if [ ! -f "../../.github/workflows/baselines.json" ]; then
             echo "::warning::baselines.json missing, skipping display token guard"
             exit 0
           fi
+          # 读取新字段；缺失则回退到 _deprecated_aliases；都缺则失败
+          read_baseline() {
+            local key=$1
+            local v=$(jq -r --arg k "$key" '. | .[$k] // ._deprecated_aliases[$k] // empty' ../../.github/workflows/baselines.json)
+            echo "$v"
+          }
           # font-size:Npx baseline（Sprint 1 末尾应达到 0）
-          FONT_BASELINE=$(jq -r '."font-size-px-vue-files"' ../../.github/workflows/baselines.json)
+          FONT_BASELINE=$(read_baseline "font-size-prop-px-vue-files")
+          [ -z "$FONT_BASELINE" ] && FONT_BASELINE=$(read_baseline "font-size-px-vue-files")
           FONT_COUNT=$(grep -rE "font-size:\s*[0-9]+px" src --include="*.vue" | wc -l)
           echo "font-size:Npx in Vue files: $FONT_COUNT (baseline: $FONT_BASELINE)"
           if [ "$FONT_COUNT" -gt "$FONT_BASELINE" ]; then
@@ -271,7 +279,8 @@ jobs:
             exit 1
           fi
           # color:#xxx baseline（Sprint 2 末尾目标 < 50）
-          COLOR_BASELINE=$(jq -r '."color-hex-vue-files"' ../../.github/workflows/baselines.json)
+          COLOR_BASELINE=$(read_baseline "color-prop-hex-vue-files")
+          [ -z "$COLOR_BASELINE" ] && COLOR_BASELINE=$(read_baseline "color-hex-vue-files")
           COLOR_COUNT=$(grep -rE "color:\s*#[0-9a-fA-F]{3,6}" src --include="*.vue" | wc -l)
           echo "color:#xxx in Vue files: $COLOR_COUNT (baseline: $COLOR_BASELINE)"
           if [ "$COLOR_COUNT" -gt "$COLOR_BASELINE" ]; then
@@ -279,7 +288,8 @@ jobs:
             exit 1
           fi
           # background:#xxx baseline（Sprint 2 末尾目标 < 30）
-          BG_BASELINE=$(jq -r '."background-hex-vue-files"' ../../.github/workflows/baselines.json)
+          BG_BASELINE=$(read_baseline "background-prop-hex-vue-files")
+          [ -z "$BG_BASELINE" ] && BG_BASELINE=$(read_baseline "background-hex-vue-files")
           BG_COUNT=$(grep -rE "background(-color)?:\s*#[0-9a-fA-F]{3,6}" src --include="*.vue" | wc -l)
           echo "background:#xxx in Vue files: $BG_COUNT (baseline: $BG_BASELINE)"
           if [ "$BG_COUNT" -gt "$BG_BASELINE" ]; then
@@ -287,7 +297,7 @@ jobs:
             exit 1
           fi
           # border-*-color:#xxx + border shorthand baseline（R10 复盘 G1：419 处全部清零，应保持 0）
-          BORDER_BASELINE=$(jq -r '."border-color-prop-hex-vue-files"' ../../.github/workflows/baselines.json)
+          BORDER_BASELINE=$(read_baseline "border-color-prop-hex-vue-files")
           BORDER_COUNT=$(grep -rE "(border(-(top|right|bottom|left))?(-color)?:\s*([0-9]+(\.[0-9]+)?px\s+(solid|dashed|dotted|double)\s+)?|--el-table-(border|row-hover-bg)-color:\s*)#[0-9a-fA-F]{3,6}" src --include="*.vue" | wc -l)
           echo "border hex (incl shorthand) in Vue files: $BORDER_COUNT (baseline: $BORDER_BASELINE)"
           if [ "$BORDER_COUNT" -gt "$BORDER_BASELINE" ]; then
@@ -314,6 +324,28 @@ jobs:
           else
             echo "::warning::stylelint not configured yet, skipping"
           fi
+        working-directory: audit-platform/frontend
+
+      - name: Doc backlink guard (R10 二轮复盘 S8)
+        # 每个 docs/*_GUIDE.md 必须在源码（前端 vue/ts + 后端 py）至少有 1 处 @docs 反向引用
+        # 规则：grep "@docs ../docs/{filename}" 或 "@docs docs/{filename}" 跨 src + backend
+        run: |
+          fail=0
+          for guide in ../../docs/*_GUIDE.md; do
+            [ -f "$guide" ] || continue
+            fname=$(basename "$guide")
+            # 反向引用必须在 frontend/src 或 backend/app 出现 ≥ 1 次
+            count=$(
+              { grep -rE "@docs[[:space:]]+.*${fname}" src --include="*.vue" --include="*.ts" 2>/dev/null;
+                grep -rE "@docs[[:space:]]+.*${fname}" ../../backend/app --include="*.py" 2>/dev/null; } | wc -l
+            )
+            echo "${fname}: ${count} backlinks"
+            if [ "$count" -eq 0 ]; then
+              echo "::error::Doc ${fname} has no @docs backlink in source code. Add @docs reference at top of related component/service."
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] || exit 1
         working-directory: audit-platform/frontend
 
       - name: Build

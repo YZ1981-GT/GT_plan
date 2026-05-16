@@ -1,5 +1,7 @@
 """Spec C R10 Sprint 1.2 — 事件级联健康度聚合服务
 
+@docs docs/EVENT_CASCADE_HEALTH_GUIDE.md
+
 聚合 4 个数据源（design D2/D3/D7）：
 - outbox lag：MIN(created_at) of pending/processing events
 - stuck handlers：status='processing' 且 30 分钟未更新

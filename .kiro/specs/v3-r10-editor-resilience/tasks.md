@@ -18,12 +18,22 @@
 
 ## 任务总览
 
-| Sprint | 工时 | 范围 |
-|--------|------|------|
-| Sprint 0 | 0.5 天 | 启动条件核验 + 基线快照 |
-| Sprint 1 | 1 周 | 后端事件级联健康度 + 前端 5xx 监控 + DegradedBanner 三档 |
-| Sprint 2 | 1 周 | 危险操作二次确认补漏 + 文档化 + F8 可选实施 |
-| Sprint 3 (UAT) | 0.5 天 | 上线前全量 UAT 跑 10 项验收 |
+| Sprint | 估算工时 | 实测工时 | 压缩比 | 范围 |
+|--------|---------|---------|-------|------|
+| Sprint 0 | 0.5 天 | ~5min | 48× | 启动条件核验 + 基线快照 |
+| Sprint 1 | 1 周（5 天） | ~50min | ~50× | 后端事件级联健康度 + 前端 5xx 监控 + DegradedBanner 三档 |
+| Sprint 2 | 1 周（5 天） | ~50min | ~50× | 危险操作二次确认补漏 + 文档化 + F8 可选实施 |
+| Sprint 3 (UAT) | 0.5 天 | ○ pending-uat | — | 上线前全量 UAT 跑 10 项验收 |
+| **G3 复盘修复** | — | ~10min | — | F8 `/memo/versions` 端点接入前端 |
+| **总计** | **11 天** | **~2h** | **~130×** | ⚠ 压缩比 > 5× 警戒线，原因见下 |
+
+### 工时压缩比分析（> 5× 触发 review）
+
+- **真因 1：subagent 并行处理**：单次任务一次处理整个 Sprint（worker 心跳 4 个一起加 / 5 签字组件一起改）
+- **真因 2：基础设施已存在**：DegradedBanner / confirm.ts / outbox 等 80% 就绪，本 spec 是补缺而非从零建
+- **真因 3：估算偏保守**：原计划"每个签字组件单独 review + 测试"未必要，集中改完一次集成测试就过
+- **风险**：F8 `/memo/versions` 端点存在但 UI 未接入是"半成品"案例，G3 修复后才完整
+- **结论**：本次压缩比合理，但凡真"全新系统"应不会 > 10×；下次估算应区分"补缺 spec"vs"从零 spec"分档
 
 ---
 
@@ -226,34 +236,49 @@
 
 ### UAT 验收清单
 
+**状态枚举**（R10 复盘 S1 规约）：
+- `✓ pass` 真人测试通过
+- `○ pending-uat` 代码已交付 + 单测过 + 等真人执行
+- `⚠ partial` 功能仅部分完成（代码层有缺口）
+- `✗ fail` 真人测试不通过
+
 | # | 验收项 | Tester | Date | Status |
 |---|--------|--------|------|--------|
 | 1 | `/event-cascade/health` 端点返回正确 schema（admin） | 后端工程师 | 2026-05-16 | ✓ pass（test_event_cascade_health.py 8 用例全过） |
 | 2 | 普通用户访问只看 status 字段 | 后端工程师 | 2026-05-16 | ✓ pass（router 层 D3 隔离已实施） |
-| 3 | 4 worker 心跳每 30s 写入 Redis | DevOps | 2026-05-16 | ⚠ partial（test_worker_heartbeat.py 4 用例过；真实 Redis 验证需运维） |
+| 3 | 4 worker 心跳每 30s 写入 Redis | DevOps | 2026-05-16 | ○ pending-uat（test_worker_heartbeat.py 4 用例过；真实 Redis 验证需运维） |
 | 4 | http.ts 5xx 环形缓冲区计算正确 | 前端工程师 | 2026-05-16 | ✓ pass（http.spec.ts 5 用例全过） |
-| 5 | DegradedBanner 三档切换（手动 kill 后端验证） | 测试 | 2026-05-16 | ⚠ partial（degraded_banner.spec.ts 3 用例过；真实 kill 验证需运维） |
-| 6 | LedgerDataManager 清理账套必须二次确认 | 审计助理 | 2026-05-16 | ⚠ partial（confirmDangerous + 项目名输入校验已实施） |
-| 7 | EqcrMemoEditor 定稿必须二次确认 | EQCR 合伙人 | 2026-05-16 | ⚠ partial（confirmDangerous 已替换原 dialog） |
-| 8 | 5 个签字组件全部经过 confirmSign | 各角色用户 | 2026-05-16 | ⚠ partial（SignatureManagement / PartnerSignDecision / EqcrProjectView 全接入） |
+| 5 | DegradedBanner 三档切换（手动 kill 后端验证） | 测试 | 2026-05-16 | ○ pending-uat（degraded_banner.spec.ts 3 用例过；真实 kill 验证需运维） |
+| 6 | LedgerDataManager 清理账套必须二次确认 | 审计助理 | 2026-05-16 | ○ pending-uat（confirmDangerous + 项目名输入校验已实施） |
+| 7 | EqcrMemoEditor 定稿必须二次确认 | EQCR 合伙人 | 2026-05-16 | ○ pending-uat（confirmDangerous 已替换原 dialog） |
+| 8 | 5 个签字组件全部经过 confirmSign | 各角色用户 | 2026-05-16 | ○ pending-uat（SignatureManagement / PartnerSignDecision / EqcrProjectView 全接入） |
 | 9 | EQCR 备忘录版本对比（如已实施 F8） | EQCR 合伙人 | 2026-05-16 | ✓ pass（/memo/versions 端点 + 前端 UI 已实施，wizard_state.history 5 版本） |
 | 10 | 文档可读且新加入开发者可上手 | 新加入开发者 | 2026-05-16 | ✓ pass（WORKPAPER_SIDE_PANEL_GUIDE.md + EVENT_CASCADE_HEALTH_GUIDE.md 完成） |
 
 **上线门槛**：≥ 8 项 ✓ pass（关键项 1/2/5/6/7/8 必须 pass）
 
-**当前状态**：5/10 ✓ pass + 5/10 ⚠ partial（代码全部交付 + 单测全过；真实 Redis/网络故障/各角色 UI 验证需真人执行）
+**当前状态**：5/10 ✓ pass + 5/10 ○ pending-uat（代码全部交付 + 单测全过；真实 Redis/网络故障/各角色 UI 验证需真人执行）
+
+**真人 UAT 触发清单**：见 `.kiro/uat-pending/v3-r10-editor-resilience.md`（S2 沉淀）
 
 ---
 
 ## 已知缺口与技术债
 
+> **R10 复盘 S3 规约**：TD 章节只列**未解决**的项；已落地项搬到下方"实施记录"表。
+
 | ID | 缺口 | 优先级 | 触发条件 | 后续 spec |
 |----|------|-------|---------|-----------|
-| TD-1 | F8 EQCR 版本对比 UI 未接入新端点（旧用 wizard_state.history JSON 键） | P2 | 实施时已修复 | 已落地 |
 | TD-2 | 全栈 APM 监控未引入 | P3 | 应用层 Banner 不足以发现深层问题 | Spec E 评估 Sentry/Prometheus |
 | TD-3 | worker 自愈机制未做 | P3 | 监控发现告警后仍需运维手动介入 | 运维范围，Spec F 评估 |
-| TD-4 | DegradedBanner 不支持用户手动 dismiss | P2 | 用户反馈横幅占屏 | 已落地（sessionStorage dismiss 5min 记忆） |
 | TD-5 | 真实 Redis 心跳 + 真实网络故障三档切换需运维真人验证 | P1 | 上线前 1 天 | 真人 UAT 不算技术债，列此为提醒 |
+
+### 实施记录（已落地项）
+
+| 实施项 | 落地时间 | 落地方式 |
+|-------|---------|---------|
+| F8 EQCR 备忘录版本对比 UI 接入 | 2026-05-16 | `loadMemo` 单独调 `P_eqcr.memoVersions(pid)` 端点（端点失败时降级为 preview.history） |
+| DegradedBanner 用户手动 dismiss | 2026-05-16 | sessionStorage dismiss 5min 记忆 |
 
 ### R10 复盘修复项（已落地）
 

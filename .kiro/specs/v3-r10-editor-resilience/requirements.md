@@ -8,6 +8,17 @@
 
 ---
 
+## 依赖矩阵
+
+| 依赖类型 | 上游 spec / commit | 字段/产出 | fallback 策略 |
+|---------|------------------|---------|--------------|
+| 已完成依赖 | R8 / R9 / Spec A | confirmLeave 三编辑器 / WorkpaperSidePanel 10 Tab / DegradedBanner 已挂载 | 已交付，不重复实施 |
+| 上游 spec | v3 P0 13 项 | 全部 ✓ pass | v3 §6 表 |
+| 并行 spec | Spec B `v3-r10-linkage-and-tokens` | 共享 `gt-tokens.css` 6 级背景 token（F4 DegradedBanner 三档样式用） | 1.4.3 fallback：Spec B 未完成时临时硬编码 `#fdf6ec` / `#fef0f0` + TODO 注释 |
+| 下游 spec | （未来）Spec E APM 监控 | 消费本 spec event_cascade health 数据源接 Sentry/Prometheus | — |
+
+---
+
 ## 变更记录
 
 | 版本 | 日期 | 摘要 | 触发原因 |

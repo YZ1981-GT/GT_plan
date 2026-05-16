@@ -2,6 +2,8 @@
 /**
  * DegradedBanner — 系统降级横幅（R10 Spec C / Sprint 1.4）
  *
+ * @docs ../../docs/EVENT_CASCADE_HEALTH_GUIDE.md
+ *
  * 三档扩展（design D2/D5）：
  * - hidden: 健康
  * - degraded: SSE 重连中 / 5xx 率 > 30% / outbox lag > 60s / 1 worker miss

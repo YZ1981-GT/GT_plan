@@ -2,6 +2,9 @@
   <!--
     GtFormTable — 行内编辑型表格（R10 Spec B / Sprint 3.1.2）
 
+    @docs ../../../docs/COMPONENT_USAGE_GUIDE.md
+    @see GtTableExtended / GtEditableTable
+
     定位：
     - 所有"行内编辑 + dirty 标记 + 校验 + 撤销"场景的统一封装
     - 内部基于 GtEditableTable，强制 editable=true，简化 props

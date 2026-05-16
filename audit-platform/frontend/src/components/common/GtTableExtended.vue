@@ -2,6 +2,9 @@
   <!--
     GtTableExtended — 列表展示型表格（R10 Spec B / Sprint 3.1.1）
 
+    @docs ../../../docs/COMPONENT_USAGE_GUIDE.md
+    @see GtFormTable / GtEditableTable
+
     定位：
     - 所有"列表展示"场景的统一封装（只读为主）
     - 紫色表头 + 字号 class + 千分位 + 空状态 + 复制粘贴右键菜单

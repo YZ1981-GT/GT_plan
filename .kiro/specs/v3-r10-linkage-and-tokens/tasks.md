@@ -17,13 +17,23 @@
 
 ## 任务总览
 
-| Sprint | 工时 | 范围 |
-|--------|------|------|
-| Sprint 0 | 0.5 天 | 启动条件核验 + gt-tokens.css 补完 + stylelint 装机 |
-| Sprint 1 | 1 周 | 字号 token 化 4 批 + stylelint 转 error |
-| Sprint 2 | 1 周 | 颜色 token 化 4 批 + 背景 token 化 4 批 |
-| Sprint 3 | 1 周 | GtEditableTable 拆分 + 右键穿透补完 + CI baseline |
-| Sprint 4 (UAT) | 0.5 天 | 上线前全量 UAT 跑 10 项验收 |
+| Sprint | 估算工时 | 实测工时 | 压缩比 | 范围 |
+|--------|---------|---------|-------|------|
+| Sprint 0 | 0.5 天 | ~10min | 24× | 启动条件核验 + gt-tokens.css 补完 + stylelint 装机 |
+| Sprint 1 | 1 周（5 天） | ~45min | ~50× | 字号 token 化 4 批 + stylelint 转 error |
+| Sprint 2 | 1 周（5 天） | ~60min | ~40× | 颜色 token 化 4 批 + 背景 token 化 4 批 |
+| Sprint 3 | 1 周（5 天） | ~50min | ~50× | GtEditableTable 拆分 + 右键穿透补完 + CI baseline |
+| Sprint 4 (UAT) | 0.5 天 | ○ pending-uat | — | 上线前全量 UAT 跑 10 项验收 |
+| **G1-G6 复盘修复** | — | ~60min | — | border-color hex 419 处清零 + G2/G3/G6 |
+| **总计** | **22 天** | **~3.5h** | **~180×** | ⚠ 压缩比 > 5× 警戒线，原因见下 |
+
+### 工时压缩比分析（> 5× 触发 review）
+
+- **真因 1：subagent 并行处理**：单次任务一次处理整个 Sprint 4 批次（如 Sprint 1 批 2/3/4），相当于 4 个开发者并行
+- **真因 2：批量替换脚本**：颜色/背景/字号/边框 hex token 化全部用 Python 脚本一次性扫描 360 文件
+- **真因 3：估算偏保守**：v3-quickfixes 立项时假设单人手动迁移 3888 处，未计算批量脚本可行性
+- **风险**：有遗漏（G1 漏 border-color 419 处即此模式），需独立 grep 复核才能信任 raw=0 声明
+- **结论**：本次压缩比不算"高效"，更接近"工具加杠杆 + 一遍漏一些"，已在 G1-G6 修复阶段补全
 
 ---
 
@@ -223,20 +233,20 @@
 
 | # | 验收项 | Tester | Date | Status |
 |---|--------|--------|------|--------|
-| 1 | 编辑器 5 视图字号 token 化无视觉差异 | 设计师/合伙人 | 2026-05-16 | ⚠ partial（代码已交付，需真人截图对比） |
-| 2 | 表格类 6 视图字号 token 化无视觉差异 | 设计师 | 2026-05-16 | ⚠ partial（代码已交付） |
-| 3 | Dashboard 系列 6 视图字号 token 化无视觉差异 | 项目经理 | 2026-05-16 | ⚠ partial（代码已交付） |
-| 4 | 颜色 token 化全量验收 | 设计师 | 2026-05-16 | ⚠ partial（代码已交付，1611→0 raw） |
-| 5 | 背景 token 化全量验收 | 设计师 | 2026-05-16 | ⚠ partial（代码已交付，712→0 raw） |
-| 6 | GtEditableTable 拆分后 Adjustments 行为零回归 | 审计助理 | 2026-05-16 | ⚠ partial（兼容 wrapper，单测全过） |
-| 7 | Misstatements 右键 "查看关联底稿" 跳转正确 | 审计助理 | 2026-05-16 | ⚠ partial（前后端全通） |
-| 8 | Adjustments 右键 "查看关联底稿" 跳转正确 | 审计助理 | 2026-05-16 | ⚠ partial（前后端全通） |
+| 1 | 编辑器 5 视图字号 token 化无视觉差异 | 设计师/合伙人 | 2026-05-16 | ○ pending-uat（代码已交付，需真人截图对比） |
+| 2 | 表格类 6 视图字号 token 化无视觉差异 | 设计师 | 2026-05-16 | ○ pending-uat（代码已交付） |
+| 3 | Dashboard 系列 6 视图字号 token 化无视觉差异 | 项目经理 | 2026-05-16 | ○ pending-uat（代码已交付） |
+| 4 | 颜色 token 化全量验收 | 设计师 | 2026-05-16 | ○ pending-uat（代码已交付，1611→0 raw） |
+| 5 | 背景 token 化全量验收 | 设计师 | 2026-05-16 | ○ pending-uat（代码已交付，712→0 raw） |
+| 6 | GtEditableTable 拆分后 Adjustments 行为零回归 | 审计助理 | 2026-05-16 | ○ pending-uat（兼容 wrapper，单测全过） |
+| 7 | Misstatements 右键 "查看关联底稿" 跳转正确 | 审计助理 | 2026-05-16 | ○ pending-uat（前后端全通） |
+| 8 | Adjustments 右键 "查看关联底稿" 跳转正确 | 审计助理 | 2026-05-16 | ○ pending-uat（前后端全通） |
 | 9 | CI baseline 4 道卡点全绿 | DevOps | 2026-05-16 | ✓ pass（baselines.json + ci.yml + stylelint 全部就位） |
 | 10 | stylelint 转 error 后 PR 不能合入新硬编码 | 代码审查者 | 2026-05-16 | ✓ pass（font-size/color/background 三规则均 error 级别） |
 
 **上线门槛**：≥ 8 项 ✓ pass（关键项 6/7/8/9 必须 pass）
 
-**当前状态**：1/10 ✓ pass + 9/10 ⚠ partial（待真人 UAT 验收 1-8 项目截图对比 / 行为验证）；上线前必须由设计师/审计助理逐项确认。
+**当前状态**：1/10 ✓ pass + 9/10 ○ pending-uat（待真人 UAT 验收 1-8 项目截图对比 / 行为验证）；上线前必须由设计师/审计助理逐项确认。
 
 ---
 
