@@ -37,7 +37,7 @@
       </el-table-column>
       <el-table-column prop="total" label="合计" width="120" align="right">
         <template #default="{ row }">
-          <span class="ws-auto-cell" style="display:block;text-align:right;padding:2px 8px;color:#4b2d77;font-weight:500;font-size:12px"
+          <span class="ws-auto-cell" style="display:block;text-align:right;padding:2px 8px;color: var(--gt-color-primary);font-weight:500;font-size: var(--gt-font-size-xs)"
             :class="{ 'ws-bold': row.bold }">
             {{ fmt(calcCapitalTotal(row)) }}
           </span>
@@ -60,7 +60,7 @@
         <template #header>
           <div style="text-align:center;line-height:1.3">
             <div style="font-weight:600">{{ c.name }}</div>
-            <div style="color:#4b2d77;font-size:10px">{{ c.ratio }}%</div>
+            <div style="color: var(--gt-color-primary);font-size: var(--gt-font-size-xs)">{{ c.ratio }}%</div>
           </div>
         </template>
         <template #default="{ row }">
@@ -75,13 +75,13 @@
       <div class="ws-check-row">
         <span>期末合并报表金额:</span>
         <el-input-number v-model="consolReportAmount" size="small" :precision="2" :controls="false" style="width:160px" />
-        <small style="color:#999">取自合并后财务报表期末数</small>
+        <small style="color: var(--gt-color-text-tertiary)">取自合并后财务报表期末数</small>
       </div>
       <div class="ws-check-row" :class="{ 'ws-diff-warn': diffAmount !== 0 }">
         <span>差异:</span>
         <span class="ws-computed ws-bold">{{ fmt(diffAmount) }}</span>
-        <span v-if="diffAmount === 0" style="color:#67c23a">✓ 无差异</span>
-        <span v-else style="color:#e6a23c">⚠ 存在差异，请核查</span>
+        <span v-if="diffAmount === 0" style="color: var(--gt-color-success)">✓ 无差异</span>
+        <span v-else style="color: var(--gt-color-wheat)">⚠ 存在差异，请核查</span>
       </div>
     </div>
 
@@ -361,19 +361,19 @@ async function onFileSelected(e: Event) {
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; white-space: nowrap; }
+.ws-sheet-header h3 { margin: 0; font-size: var(--gt-font-size-base); color: var(--gt-color-text-primary); white-space: nowrap; }
 .ws-sheet-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 8px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
-.ws-tip b { color: #4b2d77; }
-.ws-section-title { font-size: 13px; font-weight: 600; color: #4b2d77; margin-bottom: 6px; padding: 6px 10px; background: #f8f6fb; border-radius: 4px; }
-.ws-computed { color: #4b2d77; font-weight: 500; }
+.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 8px; background: var(--gt-color-bg); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
+.ws-tip b { color: var(--gt-color-primary); }
+.ws-section-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary); margin-bottom: 6px; padding: 6px 10px; background: var(--gt-color-primary-bg); border-radius: 4px; }
+.ws-computed { color: var(--gt-color-primary); font-weight: 500; }
 .ws-bold { font-weight: 700; }
-.ws-check-area { margin-top: 12px; padding: 10px 14px; background: #fafafa; border-radius: 6px; border: 1px solid #eee; }
-.ws-check-row { display: flex; gap: 12px; align-items: center; padding: 4px 0; font-size: 13px; }
-.ws-diff-warn { color: #e6a23c; font-weight: 600; }
+.ws-check-area { margin-top: 12px; padding: 10px 14px; background: var(--gt-color-bg); border-radius: 6px; border: 1px solid #eee; }
+.ws-check-row { display: flex; gap: 12px; align-items: center; padding: 4px 0; font-size: var(--gt-font-size-sm); }
+.ws-diff-warn { color: var(--gt-color-wheat); font-weight: 600; }
 .ws-adj-section { margin-top: 16px; }
 .ws-table :deep(.el-input__inner) { text-align: right; }
 .ws-table :deep(.ws-row-bold td) { font-weight: 600; }
-.ws-table :deep(.ws-row-diff td) { background: #fdf6ec !important; }
-.ws-auto-cell { background: #faf8fd; }
+.ws-table :deep(.ws-row-diff td) { background: var(--gt-bg-warning) !important; }
+.ws-auto-cell { background: var(--gt-color-primary-bg); }
 </style>

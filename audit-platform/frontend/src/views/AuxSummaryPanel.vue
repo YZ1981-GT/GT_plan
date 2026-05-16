@@ -53,5 +53,5 @@ onMounted(fetch)
 <style scoped>
 .gt-aux-summary { padding: var(--gt-space-4); }
 .gt-summary-stats { margin-top: var(--gt-space-2); font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
-:deep(.gt-row-mismatch) { background-color: #fff1f0 !important; }
+:deep(.gt-row-mismatch) { background-color: var(--gt-bg-danger) !important; }
 </style>

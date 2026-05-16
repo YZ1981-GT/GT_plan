@@ -184,6 +184,6 @@ onMounted(fetchData)
 }
 .eqcr-component-auditors__header h4 { margin: 0; font-weight: 600; }
 :deep(.highlight-row) {
-  background-color: #fef0f0 !important;
+  background-color: var(--gt-bg-danger) !important;
 }
 </style>

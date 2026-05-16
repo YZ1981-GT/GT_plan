@@ -61,14 +61,14 @@
         </template>
       </el-table-column>
       <el-table-column label="→" width="36" align="center">
-        <template #default><span style="color:#c0c4cc">→</span></template>
+        <template #default><span style="color: var(--gt-color-text-placeholder)">→</span></template>
       </el-table-column>
       <el-table-column label="报表项目" min-width="220">
         <template #default="{ row }">
           <div v-if="row.mapped && !row._editing" style="display:flex;align-items:center;gap:4px">
             <el-tag size="small" type="info" style="flex-shrink:0">{{ row.report_line_code }}</el-tag>
             <span style="font-weight:500">{{ row.report_line_name }}</span>
-            <el-button link size="small" style="margin-left:auto;color:#909399" @click="row._editing = true">✏️</el-button>
+            <el-button link size="small" style="margin-left:auto;color: var(--gt-color-info)" @click="row._editing = true">✏️</el-button>
           </div>
           <el-select
             v-else
@@ -93,7 +93,7 @@
       <el-table-column label="报表类型" width="110">
         <template #default="{ row }">
           <el-tag v-if="row.report_type" size="small" :type="reportTypeTag(row.report_type)">{{ reportTypeLabel(row.report_type) }}</el-tag>
-          <span v-else style="color:#c0c4cc">—</span>
+          <span v-else style="color: var(--gt-color-text-placeholder)">—</span>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="76" align="center">
@@ -114,9 +114,9 @@
     <!-- 底部统计 -->
     <div class="rlm-footer">
       <span>一级科目共 <b>{{ allLevel1Accounts.length }}</b> 个</span>
-      <span style="margin-left:16px;color:#67c23a">✓ 已映射 {{ matchedCount }}</span>
-      <span style="margin-left:16px;color:#f56c6c;font-weight:600">✗ 未映射 {{ unmatchedCount }}</span>
-      <span style="margin-left:16px;color:#909399">已确认 {{ confirmedCount }}</span>
+      <span style="margin-left:16px;color: var(--gt-color-success)">✓ 已映射 {{ matchedCount }}</span>
+      <span style="margin-left:16px;color: var(--gt-color-coral);font-weight:600">✗ 未映射 {{ unmatchedCount }}</span>
+      <span style="margin-left:16px;color: var(--gt-color-info)">已确认 {{ confirmedCount }}</span>
     </div>
 
     <!-- 参照其他单位弹窗 -->
@@ -128,7 +128,7 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <div style="font-size:12px;color:#909399;line-height:1.6">
+          <div style="font-size: var(--gt-font-size-xs);color: var(--gt-color-info);line-height:1.6">
             将选中单位的映射规则复制到当前项目。已有映射不会被覆盖，仅补充缺失的映射关系。
           </div>
         </el-form-item>
@@ -521,16 +521,16 @@ function reportTypeTag(t: string) {
 
 <style scoped>
 .rlm-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.rlm-footer { margin-top: 12px; font-size: 12px; color: #606266; }
+.rlm-footer { margin-top: 12px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); }
 .rlm-code { font-family: 'Arial Narrow', Arial, sans-serif; font-variant-numeric: tabular-nums; }
 
 /* 未映射行高亮（红色左边框 + 浅红背景） */
-:deep(.rlm-row-unmatched) { background: #fef0f0 !important; }
+:deep(.rlm-row-unmatched) { background: var(--gt-bg-danger) !important; }
 :deep(.rlm-row-unmatched td:first-child) { border-left: 3px solid #f56c6c !important; }
-.rlm-unmatched-name { color: #f56c6c; font-weight: 600; }
-.rlm-unmatched-label { color: #f56c6c; font-size: 11px; font-style: italic; }
+.rlm-unmatched-name { color: var(--gt-color-coral); font-weight: 600; }
+.rlm-unmatched-label { color: var(--gt-color-coral); font-size: var(--gt-font-size-xs); font-style: italic; }
 
 /* 表格字号 */
-:deep(.el-table) { font-size: 12px; }
-:deep(.el-table th .cell), :deep(.el-table td .cell) { font-size: 12px; }
+:deep(.el-table) { font-size: var(--gt-font-size-xs); }
+:deep(.el-table th .cell), :deep(.el-table td .cell) { font-size: var(--gt-font-size-xs); }
 </style>

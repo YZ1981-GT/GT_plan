@@ -39,14 +39,14 @@ defineEmits<{ (e: 'select', node: any): void }>()
 .org-card--selected { border-color: #4b2d77; box-shadow: 0 0 0 3px rgba(75,45,119,0.2); }
 .org-card--root { min-width: 160px; }
 .org-card-header { padding: 6px 10px; text-align: center; }
-.org-card-name { font-size: 12px; font-weight: 600; line-height: 1.3; }
+.org-card-name { font-size: var(--gt-font-size-xs); font-weight: 600; line-height: 1.3; }
 .org-card-body {
-  padding: 4px 8px; background: #fff; display: flex; gap: 6px;
+  padding: 4px 8px; background: var(--gt-color-bg-white); display: flex; gap: 6px;
   justify-content: center; align-items: center; flex-wrap: wrap;
 }
-.org-card-code { font-size: 10px; color: #999; }
-.org-card-ratio { font-size: 10px; color: #4b2d77; font-weight: 600; background: #f0edf5; padding: 1px 4px; border-radius: 3px; }
-.org-card-count { font-size: 10px; color: #67c23a; }
+.org-card-code { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.org-card-ratio { font-size: var(--gt-font-size-xs); color: var(--gt-color-primary); font-weight: 600; background: var(--gt-color-primary-bg); padding: 1px 4px; border-radius: 3px; }
+.org-card-count { font-size: var(--gt-font-size-xs); color: var(--gt-color-success); }
 
 /* 子节点容器 + 连接线 */
 .org-children {
@@ -55,17 +55,17 @@ defineEmits<{ (e: 'select', node: any): void }>()
 /* 垂直连接线（父→子） */
 .org-children::before {
   content: ''; position: absolute; top: 0; left: 50%; width: 2px; height: 24px;
-  background: #d8d0e8; transform: translateX(-50%);
+  background: var(--gt-color-primary-lighter); transform: translateX(-50%);
 }
 /* 水平连接线（兄弟之间） */
 .org-children::after {
-  content: ''; position: absolute; top: 24px; height: 2px; background: #d8d0e8;
+  content: ''; position: absolute; top: 24px; height: 2px; background: var(--gt-color-primary-lighter);
   left: calc(50% / var(--child-count, 1)); right: calc(50% / var(--child-count, 1));
 }
 /* 每个子节点的垂直连接线 */
 .org-node-wrap::before {
   content: ''; position: absolute; top: -24px; left: 50%; width: 2px; height: 24px;
-  background: #d8d0e8; transform: translateX(-50%);
+  background: var(--gt-color-primary-lighter); transform: translateX(-50%);
 }
 /* 根节点不需要上方连接线 */
 .org-node-wrap:first-child:last-child::before,

@@ -2,7 +2,7 @@
   <div class="client-quality-trend">
     <GtPageHeader title="客户质量趋势" :show-back="false">
       <template #actions>
-        <span style="margin-right: 8px; font-size: 13px;">年数：</span>
+        <span style="margin-right: 8px; font-size: var(--gt-font-size-sm);">年数：</span>
         <el-select v-model="years" size="small" style="width: 80px;" @change="loadTrend">
           <el-option v-for="y in 10" :key="y" :label="`${y}`" :value="y" />
         </el-select>
@@ -203,7 +203,7 @@ onMounted(() => {
 }
 
 .no-data {
-  color: #c0c4cc;
+  color: var(--gt-color-text-placeholder);
 }
 
 .amount-bar {
@@ -213,9 +213,9 @@ onMounted(() => {
 }
 
 .amount-value {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   white-space: nowrap;
-  color: #606266;
+  color: var(--gt-color-text-regular);
 }
 
 .trend-visual {
@@ -225,7 +225,7 @@ onMounted(() => {
 
 .trend-visual h4 {
   margin: 0 0 12px 0;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 
 .bar-chart {
@@ -242,14 +242,14 @@ onMounted(() => {
 }
 
 .bar-label {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   margin-top: 4px;
 }
 
 .bar-value {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 </style>

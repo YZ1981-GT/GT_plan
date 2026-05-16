@@ -207,22 +207,22 @@ onMounted(() => {
 
 .panel-header h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--gt-font-size-base);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 
 .text-danger {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
   font-weight: 600;
 }
 
 .text-warning {
-  color: #e6a23c;
+  color: var(--gt-color-wheat);
   font-weight: 500;
 }
 
 .text-muted {
-  color: #909399;
+  color: var(--gt-color-info);
 }
 </style>

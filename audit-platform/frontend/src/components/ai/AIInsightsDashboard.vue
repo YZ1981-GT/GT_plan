@@ -46,8 +46,8 @@ onMounted(loadInsights)
 <style scoped>
 .gt-ai-insights-dashboard { padding: 16px; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.panel-header h3 { margin: 0; font-size: 16px; }
-.btn-refresh { background: none; border: none; cursor: pointer; font-size: 16px; }
+.panel-header h3 { margin: 0; font-size: var(--gt-font-size-md); }
+.btn-refresh { background: none; border: none; cursor: pointer; font-size: var(--gt-font-size-md); }
 .insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .insight-card { border: 1px solid #eee; border-radius: 8px; padding: 12px; cursor: pointer; transition: transform 0.2s; }
 .insight-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
@@ -55,13 +55,13 @@ onMounted(loadInsights)
 .insight-card.risk-medium { border-left: 3px solid #faad14; }
 .insight-card.risk-low { border-left: 3px solid #52c41a; }
 .insight-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.insight-type { font-size: 11px; color: #999; text-transform: uppercase; }
+.insight-type { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); text-transform: uppercase; }
 .risk-dot { width: 8px; height: 8px; border-radius: 50%; }
-.risk-dot.high { background: #ff4d4f; }
-.risk-dot.medium { background: #faad14; }
-.risk-dot.low { background: #52c41a; }
-.insight-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; color: #333; }
-.insight-desc { font-size: 12px; color: #666; line-height: 1.4; margin-bottom: 6px; }
-.insight-meta { font-size: 11px; color: #999; }
-.empty { grid-column: 1/-1; text-align: center; padding: 20px; color: #999; }
+.risk-dot.high { background: var(--gt-color-coral); }
+.risk-dot.medium { background: var(--gt-color-wheat); }
+.risk-dot.low { background: var(--gt-color-success); }
+.insight-title { font-weight: 600; font-size: var(--gt-font-size-sm); margin-bottom: 4px; color: var(--gt-color-text-primary); }
+.insight-desc { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.4; margin-bottom: 6px; }
+.insight-meta { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.empty { grid-column: 1/-1; text-align: center; padding: 20px; color: var(--gt-color-text-tertiary); }
 </style>

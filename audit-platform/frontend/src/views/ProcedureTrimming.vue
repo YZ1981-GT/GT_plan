@@ -13,10 +13,10 @@
     <div class="gt-proc-progress">
       <div class="gt-proc-progress-stats">
         <span>总计 <b>{{ progressStats.total }}</b></span>
-        <span style="color: #67c23a">已完成 <b>{{ progressStats.completed }}</b></span>
-        <span style="color: #e6a23c">进行中 <b>{{ progressStats.in_progress }}</b></span>
-        <span style="color: #909399">未开始 <b>{{ progressStats.pending }}</b></span>
-        <span style="color: #f56c6c">跳过 <b>{{ progressStats.skipped }}</b></span>
+        <span style="color: var(--gt-color-success)">已完成 <b>{{ progressStats.completed }}</b></span>
+        <span style="color: var(--gt-color-wheat)">进行中 <b>{{ progressStats.in_progress }}</b></span>
+        <span style="color: var(--gt-color-info)">未开始 <b>{{ progressStats.pending }}</b></span>
+        <span style="color: var(--gt-color-coral)">跳过 <b>{{ progressStats.skipped }}</b></span>
       </div>
       <el-progress
         :percentage="progressStats.total > 0 ? Math.round(progressStats.completed / progressStats.total * 100) : 0"
@@ -195,10 +195,10 @@ onMounted(async () => {
 .gt-proc-actions { display: flex; gap: var(--gt-space-2); }
 .gt-proc-progress {
   margin-bottom: var(--gt-space-3); padding: 12px 16px;
-  background: #f8f5fc; border-radius: var(--gt-radius-md, 8px);
+  background: var(--gt-color-primary-bg); border-radius: var(--gt-radius-md, 8px);
   border: 1px solid #e0d4f0;
 }
-.gt-proc-progress-stats { display: flex; gap: 16px; font-size: 13px; color: #666; }
-.gt-proc-progress-stats b { font-size: 15px; }
-.gt-text-muted { color: #ccc; }
+.gt-proc-progress-stats { display: flex; gap: 16px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
+.gt-proc-progress-stats b { font-size: var(--gt-font-size-base); }
+.gt-text-muted { color: var(--gt-color-text-placeholder); }
 </style>

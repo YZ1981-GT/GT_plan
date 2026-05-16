@@ -370,12 +370,12 @@ defineExpose({ validate })
 .step-title {
   color: var(--gt-color-primary);
   margin-bottom: var(--gt-space-1);
-  font-size: 20px;
+  font-size: 20px /* allow-px: special */;
 }
 .step-desc {
-  color: #999;
+  color: var(--gt-color-text-tertiary);
   margin-bottom: var(--gt-space-6);
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 .materiality-form {
   padding: var(--gt-space-4) 0;
@@ -383,11 +383,11 @@ defineExpose({ validate })
 .result-panel {
   margin-top: var(--gt-space-6);
   padding: var(--gt-space-4);
-  background: #f8f9fa;
+  background: var(--gt-color-bg);
   border-radius: var(--gt-radius-md);
 }
 .result-title {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   color: var(--gt-color-primary);
   margin-bottom: var(--gt-space-4);
 }
@@ -398,7 +398,7 @@ defineExpose({ validate })
   margin-bottom: var(--gt-space-4);
 }
 .result-card {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: var(--gt-radius-sm);
   padding: var(--gt-space-4);
   text-align: center;
@@ -406,15 +406,15 @@ defineExpose({ validate })
 }
 .result-label {
   display: block;
-  font-size: 13px;
-  color: #999;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-tertiary);
   margin-bottom: var(--gt-space-2);
 }
 .result-value {
   display: block;
-  font-size: 20px;
+  font-size: 20px /* allow-px: special */;
   font-weight: 600;
-  color: #333;
+  color: var(--gt-color-text-primary);
 }
 .result-value.primary {
   color: var(--gt-color-primary);

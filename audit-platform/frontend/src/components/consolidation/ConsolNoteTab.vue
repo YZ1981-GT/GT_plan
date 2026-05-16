@@ -74,9 +74,9 @@
                 删除{{ noteSelectedRows.length ? `(${noteSelectedRows.length})` : '' }}
               </el-button>
             </template>
-            <span v-else style="font-size:11px;color:#999">💡 查看模式下可选中复制，粘贴到 Word/Excel 保持格式</span>
+            <span v-else style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">💡 查看模式下可选中复制，粘贴到 Word/Excel 保持格式</span>
             <span style="flex:1" />
-            <span style="font-size:11px;color:#999">共 {{ selectedNoteSection.editRows?.length || 0 }} 行</span>
+            <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">共 {{ selectedNoteSection.editRows?.length || 0 }} 行</span>
           </div>
 
           <!-- 选中区域状态栏 -->
@@ -178,7 +178,7 @@
             </el-button>
           </template>
           <span style="flex:1" />
-          <span style="font-size:11px;color:#999">共 {{ selectedNoteSection.editRows?.length || 0 }} 行 · ESC 退出全屏</span>
+          <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">共 {{ selectedNoteSection.editRows?.length || 0 }} 行 · ESC 退出全屏</span>
         </div>
       </div>
     </div>
@@ -207,34 +207,34 @@
   <!-- 批量导入导出弹窗 -->
   <el-dialog v-model="showNoteBatchDialog" title="附注导入导出与批量操作" width="520px" append-to-body>
     <div style="display:flex;flex-direction:column;gap:10px">
-      <p style="font-size:12px;color:#666;margin:0 0 4px;font-weight:600">当前表格操作</p>
+      <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin:0 0 4px;font-weight:600">当前表格操作</p>
       <div style="display:flex;gap:8px">
         <el-button size="small" @click="exportNoteTemplate" :disabled="!selectedNoteSection">📥 导出当前模板</el-button>
         <el-button size="small" @click="exportNoteData" :disabled="!selectedNoteSection">📤 导出当前数据</el-button>
         <el-button size="small" @click="noteFileRef?.click()" :disabled="!selectedNoteSection">📤 导入当前表格</el-button>
       </div>
       <el-divider style="margin:6px 0" />
-      <p style="font-size:12px;color:#666;margin:0 0 4px;font-weight:600">全部附注批量操作</p>
+      <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin:0 0 4px;font-weight:600">全部附注批量操作</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <el-button size="small" @click="batchExportAllTemplates" :loading="noteBatchLoading">📥 一键导出全部模板</el-button>
         <el-button size="small" @click="batchExportAllData" :loading="noteBatchLoading">📤 一键导出全部数据</el-button>
         <el-button size="small" type="primary" @click="noteBatchFileRef?.click()" :loading="noteBatchLoading">📤 一键导入全部数据</el-button>
       </div>
       <el-divider style="margin:6px 0" />
-      <p style="font-size:12px;color:#666;margin:0 0 4px;font-weight:600">公式审核</p>
+      <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin:0 0 4px;font-weight:600">公式审核</p>
       <div style="display:flex;gap:8px">
         <el-button size="small" @click="() => { auditCurrentNote(); showNoteBatchDialog = false }" :disabled="!selectedNoteSection" :loading="noteSingleAuditLoading">✅ 审核当前表格</el-button>
         <el-button size="small" @click="() => { onNoteAuditAll(); showNoteBatchDialog = false }">✅ 全部附注审核</el-button>
       </div>
       <el-divider style="margin:6px 0" />
-      <p style="font-size:12px;color:#666;margin:0 0 4px;font-weight:600">公式管理</p>
+      <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin:0 0 4px;font-weight:600">公式管理</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <el-button size="small" @click="() => { openNoteFormula(); showNoteBatchDialog = false }">ƒx 打开公式管理</el-button>
         <el-button size="small" @click="exportNoteFormulas" :loading="noteBatchLoading">📥 导出公式模板</el-button>
         <el-button size="small" @click="noteFormulaFileRef?.click()" :loading="noteBatchLoading">📤 导入公式</el-button>
         <el-button size="small" type="primary" @click="applyAllNoteFormulas" :loading="noteBatchLoading">▶ 一键取数计算</el-button>
       </div>
-      <p style="font-size:11px;color:#999;margin:4px 0 0">
+      <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);margin:4px 0 0">
         导出 Excel 每个表格一个 Sheet（编号+标题），导入按 Sheet 名自动匹配。
       </p>
     </div>
@@ -246,15 +246,15 @@
   <!-- 附注全审结果弹窗 -->
   <el-dialog v-model="showNoteAuditDialog" title="附注公式审核结果" width="80%" top="4vh" append-to-body destroy-on-close :z-index="10000">
     <div v-if="noteAuditLoading" style="text-align:center;padding:40px">
-      <span class="is-loading" style="font-size:24px;display:inline-block">⏳</span>
-      <p style="color:#999;margin-top:8px">正在审核所有附注表格...</p>
+      <span class="is-loading" style="font-size: 24px /* allow-px: special */;display:inline-block">⏳</span>
+      <p style="color: var(--gt-color-text-tertiary);margin-top:8px">正在审核所有附注表格...</p>
     </div>
     <div v-else>
       <div style="display:flex;gap:12px;margin-bottom:12px;align-items:center">
         <el-tag :type="noteAuditSummary.errorCount ? 'danger' : 'success'" size="large">
           {{ noteAuditSummary.errorCount ? `${noteAuditSummary.errorCount} 项异常` : '全部通过' }}
         </el-tag>
-        <span style="font-size:12px;color:#999">
+        <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">
           共审核 {{ noteAuditSummary.totalSections }} 个章节 · {{ noteAuditSummary.totalChecks }} 条规则 ·
           通过 {{ noteAuditSummary.passCount }} · 异常 {{ noteAuditSummary.errorCount }} · 警告 {{ noteAuditSummary.warnCount }}
         </span>
@@ -319,7 +319,7 @@
     <div class="gt-comment-info" style="margin-bottom:16px">
       <div class="gt-comment-info-item" style="flex:2">
         <span class="gt-comment-info-label">目标单元格</span>
-        <span class="gt-comment-info-value" style="font-size:14px">{{ aggTarget.itemName }} / {{ aggTarget.colName }}</span>
+        <span class="gt-comment-info-value" style="font-size: var(--gt-font-size-sm)">{{ aggTarget.itemName }} / {{ aggTarget.colName }}</span>
       </div>
       <div class="gt-comment-info-item">
         <span class="gt-comment-info-label">当前值</span>
@@ -335,30 +335,30 @@
       <el-radio value="direct" style="display:flex;align-items:flex-start;margin-bottom:12px;width:100%">
         <div>
           <b>直接下级汇总</b>
-          <p style="margin:2px 0 0;font-size:12px;color:#999">汇总当前合并节点的直接下级企业，取同表同行同列数据求和</p>
+          <p style="margin:2px 0 0;font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">汇总当前合并节点的直接下级企业，取同表同行同列数据求和</p>
         </div>
       </el-radio>
       <el-radio value="custom" style="display:flex;align-items:flex-start;width:100%">
         <div>
           <b>自定义汇总</b>
-          <p style="margin:2px 0 0;font-size:12px;color:#999">自由选择单位、数据表、坐标位置</p>
+          <p style="margin:2px 0 0;font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">自由选择单位、数据表、坐标位置</p>
         </div>
       </el-radio>
     </el-radio-group>
 
     <!-- 自定义汇总详细设置 -->
-    <div v-if="aggTarget.mode === 'custom'" style="border:1px solid #e8e4f0;border-radius:8px;padding:14px;background:#faf9fc">
+    <div v-if="aggTarget.mode === 'custom'" style="border:1px solid #e8e4f0;border-radius:8px;padding:14px;background: var(--gt-color-primary-bg)">
       <div style="display:flex;gap:16px">
         <!-- 左侧：选择单位 -->
         <div style="flex:1;min-width:0">
-          <p style="font-size:12px;color:#666;margin:0 0 6px;font-weight:600">① 选择汇总单位</p>
-          <div style="border:1px solid #e8e4f0;border-radius:6px;padding:6px;max-height:200px;overflow-y:auto;background:#fff">
+          <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin:0 0 6px;font-weight:600">① 选择汇总单位</p>
+          <div style="border:1px solid #e8e4f0;border-radius:6px;padding:6px;max-height:200px;overflow-y:auto;background: var(--gt-color-bg-white)">
             <el-tree :data="aggTreeData" :props="{ label: 'label', children: 'children' }"
               show-checkbox node-key="key" ref="aggTreeRef"
               default-expand-all>
               <template #default="{ data }">
-                <span style="font-size:12px">{{ data.icon }} {{ data.label }}
-                  <el-tag v-if="data.ratio" size="small" type="info" style="margin-left:4px;font-size:10px">{{ data.ratio }}%</el-tag>
+                <span style="font-size: var(--gt-font-size-xs)">{{ data.icon }} {{ data.label }}
+                  <el-tag v-if="data.ratio" size="small" type="info" style="margin-left:4px;font-size: var(--gt-font-size-xs)">{{ data.ratio }}%</el-tag>
                 </span>
               </template>
             </el-tree>
@@ -366,7 +366,7 @@
         </div>
         <!-- 右侧：选择数据来源和坐标 -->
         <div style="width:280px;flex-shrink:0">
-          <p style="font-size:12px;color:#666;margin:0 0 6px;font-weight:600">② 数据来源</p>
+          <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin:0 0 6px;font-weight:600">② 数据来源</p>
           <el-radio-group v-model="aggTarget.source" size="small" style="margin-bottom:10px">
             <el-radio-button value="same">当前表格</el-radio-button>
             <el-radio-button value="report">报表</el-radio-button>
@@ -391,25 +391,25 @@
             </el-select>
           </div>
 
-          <p style="font-size:12px;color:#666;margin:10px 0 6px;font-weight:600">③ 坐标位置（可选）</p>
+          <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin:10px 0 6px;font-weight:600">③ 坐标位置（可选）</p>
           <div style="display:flex;gap:8px">
             <div style="flex:1">
-              <div style="font-size:10px;color:#999;margin-bottom:2px">行（项目名）</div>
+              <div style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);margin-bottom:2px">行（项目名）</div>
               <el-input v-model="aggTarget.rowName" size="small" placeholder="留空=整表" clearable />
             </div>
             <div style="flex:1">
-              <div style="font-size:10px;color:#999;margin-bottom:2px">列（表头名）</div>
+              <div style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);margin-bottom:2px">列（表头名）</div>
               <el-input v-model="aggTarget.colHeader" size="small" placeholder="留空=整表" clearable />
             </div>
           </div>
-          <p style="font-size:10px;color:#bbb;margin:4px 0 0">留空则汇总整张表格所有数据，填写则只汇总指定行列交叉位置</p>
+          <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-placeholder);margin:4px 0 0">留空则汇总整张表格所有数据，填写则只汇总指定行列交叉位置</p>
         </div>
       </div>
     </div>
 
     <!-- 操作提示 -->
-    <div style="margin-top:14px;padding:10px 14px;background:#f8f6fb;border-radius:6px;font-size:13px;color:#666;line-height:1.6">
-      <b style="color:#4b2d77">💡 操作提示：</b>
+    <div style="margin-top:14px;padding:10px 14px;background: var(--gt-color-primary-bg);border-radius:6px;font-size: var(--gt-font-size-sm);color: var(--gt-color-text-secondary);line-height:1.6">
+      <b style="color: var(--gt-color-primary)">💡 操作提示：</b>
       <span v-if="aggTarget.mode === 'direct'">点击"执行汇总"后，系统将自动获取直接下级企业的数据并求和，结果填充到当前选中的单元格。执行前会弹出确认框。</span>
       <span v-else>选择企业和数据来源后点击"执行汇总"，系统会弹出确认框显示汇总范围。坐标留空=汇总整表数据，填写=只汇总指定位置。</span>
     </div>
@@ -423,7 +423,7 @@
   <!-- 附注公式管理弹窗 -->
   <el-dialog v-model="showNoteFormulaDialog" :title="`公式管理 — ${selectedNoteSection?.title || ''}`" width="85%" top="4vh" append-to-body destroy-on-close :z-index="10000">
     <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
-      <span style="font-size:12px;color:#999">共 {{ noteFormulaRules.length }} 条公式规则，点击"执行取数"从试算表自动填充数据</span>
+      <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">共 {{ noteFormulaRules.length }} 条公式规则，点击"执行取数"从试算表自动填充数据</span>
       <span style="flex:1" />
       <el-button size="small" @click="addNoteFormulaRule">+ 新增规则</el-button>
       <el-button size="small" type="primary" @click="applyNoteFormulaRules" :loading="noteRefreshing">▶ 执行取数</el-button>
@@ -461,12 +461,12 @@
       </el-table-column>
       <el-table-column prop="source" label="数据来源" width="90">
         <template #default="{ row }">
-          <span style="font-size:11px;color:#999">{{ row.source }}</span>
+          <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">{{ row.source }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="currentValue" label="当前值" width="100" align="right">
         <template #default="{ row }">
-          <span style="font-size:11px">{{ row.currentValue || '-' }}</span>
+          <span style="font-size: var(--gt-font-size-xs)">{{ row.currentValue || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="50" align="center">
@@ -475,7 +475,7 @@
         </template>
       </el-table-column>
     </el-table>
-    <div style="margin-top:10px;padding:8px;background:#f8f6fb;border-radius:6px;font-size:11px;color:#666;line-height:1.6">
+    <div style="margin-top:10px;padding:8px;background: var(--gt-color-primary-bg);border-radius:6px;font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);line-height:1.6">
       <b>公式类型说明：</b><br/>
       · <b>TB_REF</b>（试算表取数）：从项目试算表按科目名匹配，提取期末/期初余额。格式：=TB("科目名","期末余额")<br/>
       · <b>SUM</b>（自动求和）：合计行自动汇总上方明细行数据<br/>
@@ -1502,7 +1502,7 @@ defineExpose({
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 8px; gap: 8px; flex-wrap: wrap;
 }
-.gt-note-section-title { margin: 0; font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; }
+.gt-note-section-title { margin: 0; font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary); white-space: nowrap; }
 .gt-note-actions { display: flex; gap: 4px; flex-wrap: wrap; }
 .gt-note-table-wrap { flex: 1; min-height: 0; }
 .gt-note-table-footer {
@@ -1515,7 +1515,7 @@ defineExpose({
   padding: 24px 20px 16px; gap: 16px;
 }
 .gt-note-empty-hero { text-align: center; }
-.gt-note-empty-hero p { margin: 0 0 12px; font-size: 13px; color: #999; }
+.gt-note-empty-hero p { margin: 0 0 12px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary); }
 .gt-note-empty-actions { display: flex; gap: 8px; justify-content: center; }
 .gt-note-empty-steps {
   display: flex; gap: 12px; width: 100%;
@@ -1523,24 +1523,24 @@ defineExpose({
 .gt-note-step {
   flex: 1; min-width: 0;
   display: flex; gap: 8px; align-items: flex-start;
-  padding: 12px; background: #f8f6fb; border-radius: 8px; border: 1px solid #ebe7f2;
+  padding: 12px; background: var(--gt-color-primary-bg); border-radius: 8px; border: 1px solid #ebe7f2;
 }
 .gt-note-step-icon {
-  font-size: 16px; font-weight: 700; color: #4b2d77; flex-shrink: 0; line-height: 1;
+  font-size: var(--gt-font-size-md); font-weight: 700; color: var(--gt-color-primary); flex-shrink: 0; line-height: 1;
 }
-.gt-note-step-text { font-size: 12px; color: #666; line-height: 1.6; }
-.gt-note-step-text b { color: #333; font-size: 12px; display: block; margin-bottom: 2px; }
+.gt-note-step-text { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.6; }
+.gt-note-step-text b { color: var(--gt-color-text-primary); font-size: var(--gt-font-size-xs); display: block; margin-bottom: 2px; }
 .gt-note-step-text p { margin: 0; }
 .gt-note-empty-info {
-  font-size: 11px; color: #bbb; text-align: center;
+  font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); text-align: center;
 }
 
 /* 审核结果行样式 */
-:deep(.gt-audit-row-error td) { background: #fef0f0 !important; }
-:deep(.gt-audit-row-warn td) { background: #fdf6ec !important; }
+:deep(.gt-audit-row-error td) { background: var(--gt-bg-danger) !important; }
+:deep(.gt-audit-row-warn td) { background: var(--gt-bg-warning) !important; }
 
 .gt-note-cell-text {
-  display: block; padding: 2px 2px; font-size: 13px; min-height: 20px;
+  display: block; padding: 2px 2px; font-size: var(--gt-font-size-sm); min-height: 20px;
   user-select: text; cursor: pointer; white-space: nowrap;
 }
 .gt-note-cell-editable {
@@ -1556,24 +1556,24 @@ defineExpose({
   background: linear-gradient(135deg, #4b2d77, #7c5caa); padding: 14px 20px;
   border-radius: 8px 8px 0 0;
 }
-:deep(.gt-comment-dialog .el-dialog__title) { color: #fff; font-size: 15px; }
+:deep(.gt-comment-dialog .el-dialog__title) { color: var(--gt-color-text-inverse); font-size: var(--gt-font-size-base); }
 :deep(.gt-comment-dialog .el-dialog__headerbtn .el-dialog__close) { color: rgba(255,255,255,0.8); }
 :deep(.gt-comment-dialog .el-dialog__body) { padding: 16px 20px; }
 .gt-comment-info {
   display: flex; gap: 0; margin-bottom: 14px;
-  background: #f8f6fb; border-radius: 6px; overflow: hidden;
+  background: var(--gt-color-primary-bg); border-radius: 6px; overflow: hidden;
 }
 .gt-comment-info-item {
   flex: 1; padding: 10px 14px; border-right: 1px solid #ebe7f2;
   display: flex; flex-direction: column; gap: 2px;
 }
 .gt-comment-info-item:last-child { border-right: none; }
-.gt-comment-info-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
-.gt-comment-info-value { font-size: 13px; font-weight: 600; color: #333; }
-.gt-comment-info-value--primary { color: #4b2d77; }
+.gt-comment-info-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
+.gt-comment-info-value { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary); }
+.gt-comment-info-value--primary { color: var(--gt-color-primary); }
 :deep(.gt-comment-textarea .el-textarea__inner) {
   border: none; border-bottom: 1.5px solid #e8e4f0; border-radius: 0;
-  font-size: 13px; line-height: 1.6; padding: 10px 4px; resize: none;
+  font-size: var(--gt-font-size-sm); line-height: 1.6; padding: 10px 4px; resize: none;
 }
 :deep(.gt-comment-textarea .el-textarea__inner:focus) {
   border-color: #4b2d77; box-shadow: none;
@@ -1582,5 +1582,5 @@ defineExpose({
 /* 紧凑行高 */
 .gt-note-compact-table :deep(.el-table__row td) { height: 32px; }
 .gt-note-compact-table :deep(.el-table__header th) { height: 34px; }
-.gt-note-compact-table :deep(.el-input__inner) { height: 28px; font-size: 13px; }
+.gt-note-compact-table :deep(.el-input__inner) { height: 28px; font-size: var(--gt-font-size-sm); }
 </style>

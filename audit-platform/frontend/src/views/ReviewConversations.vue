@@ -169,6 +169,6 @@ onMounted(fetchConversations)
 .gt-msg-item { padding: var(--gt-space-2); background: var(--el-fill-color-light); border-radius: var(--gt-radius-sm); }
 .gt-msg-sender { font-size: var(--gt-font-size-sm); color: var(--gt-color-primary); font-weight: 600; }
 .gt-msg-content { margin: 4px 0; }
-.gt-msg-time { font-size: 11px; color: var(--gt-color-text-secondary); text-align: right; }
+.gt-msg-time { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); text-align: right; }
 .gt-msg-input { padding: var(--gt-space-2) var(--gt-space-3); border-top: 1px solid var(--el-border-color); display: flex; gap: var(--gt-space-2); }
 </style>

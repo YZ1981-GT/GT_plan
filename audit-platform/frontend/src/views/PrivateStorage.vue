@@ -163,8 +163,8 @@ onMounted(async () => {
 <style scoped>
 .gt-private-storage { padding: 20px; }
 .gt-ps-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.gt-ps-header h2 { margin: 0; font-size: 20px; color: #333; }
+.gt-ps-header h2 { margin: 0; font-size: 20px /* allow-px: special */; color: var(--gt-color-text-primary); }
 .gt-ps-quota { display: flex; align-items: center; gap: 10px; }
-.gt-ps-quota-text { font-size: 13px; color: #999; }
+.gt-ps-quota-text { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary); }
 .gt-ps-actions { display: flex; gap: 8px; margin-bottom: 16px; }
 </style>

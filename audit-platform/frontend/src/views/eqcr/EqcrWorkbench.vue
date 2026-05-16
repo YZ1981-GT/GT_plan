@@ -24,7 +24,7 @@
       style="margin-top: 48px"
     >
       <template #image>
-        <div style="font-size: 48px">🕊️</div>
+        <div style="font-size: 48px /* allow-px: special */">🕊️</div>
       </template>
     </el-empty>
 

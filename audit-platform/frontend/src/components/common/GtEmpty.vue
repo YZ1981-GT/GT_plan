@@ -46,7 +46,7 @@ defineEmits<{ (e: 'action'): void }>()
   padding: var(--gt-space-8) var(--gt-space-4);
 }
 .gt-empty__icon {
-  font-size: 48px;
+  font-size: 48px /* allow-px: special */;
   line-height: 1;
 }
 .gt-empty__title {

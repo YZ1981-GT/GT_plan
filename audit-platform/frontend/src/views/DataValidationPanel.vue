@@ -81,5 +81,5 @@ async function exportFindings() {
 .panel-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .panel-header h3 { flex: 1; margin: 0; }
 .summary-bar { display: flex; gap: 8px; align-items: center; margin-top: 16px; }
-.total { color: #666; font-size: 13px; }
+.total { color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm); }
 </style>

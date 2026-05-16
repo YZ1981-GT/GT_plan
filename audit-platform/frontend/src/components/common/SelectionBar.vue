@@ -47,8 +47,8 @@ defineProps<{
 .gt-slide-up-leave-to { opacity: 0; transform: translateY(4px); }
 .gt-selection-bar-hint {
   margin-left: auto;
-  font-size: 11px;
-  color: #b0a4c8;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-primary-lighter);
   white-space: nowrap;
 }
 </style>

@@ -32,18 +32,18 @@
                 <el-button size="small" @click="openRefPicker(row)">引用</el-button>
               </template>
             </el-input>
-            <code v-else style="font-size: 11px">{{ row.formula }}</code>
+            <code v-else style="font-size: var(--gt-font-size-xs)">{{ row.formula }}</code>
           </template>
         </el-table-column>
         <el-table-column label="说明" width="160">
           <template #default="{ row }">
             <el-input v-if="row._editing" v-model="row.description" size="small" />
-            <span v-else style="font-size: 12px; color: #888">{{ row.description }}</span>
+            <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary)">{{ row.description }}</span>
           </template>
         </el-table-column>
         <el-table-column label="来源" width="100">
           <template #default="{ row }">
-            <span style="font-size: 11px; color: #aaa">{{ row.source }}</span>
+            <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary)">{{ row.source }}</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="80" align="center">
@@ -174,6 +174,6 @@ async function onApply() {
 </script>
 
 <style scoped>
-.gt-nf-empty { text-align: center; padding: 40px; color: #999; }
+.gt-nf-empty { text-align: center; padding: 40px; color: var(--gt-color-text-tertiary); }
 .gt-nf-header { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 </style>

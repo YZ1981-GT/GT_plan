@@ -68,8 +68,8 @@
           </el-table-column>
           <el-table-column prop="error_message" label="错误信息" min-width="200" show-overflow-tooltip>
             <template #default="{ row }">
-              <span v-if="row.error_message" style="color: #f56c6c">{{ row.error_message }}</span>
-              <span v-else style="color: #999">—</span>
+              <span v-if="row.error_message" style="color: var(--gt-color-coral)">{{ row.error_message }}</span>
+              <span v-else style="color: var(--gt-color-text-tertiary)">—</span>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="140" fixed="right">
@@ -290,7 +290,7 @@ onMounted(loadAll)
 }
 .gt-ih-header__left h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--gt-font-size-xl);
   font-weight: 600;
   color: var(--gt-color-primary-dark, #4b2d77);
 }
@@ -308,25 +308,25 @@ onMounted(loadAll)
 .gt-ih-card {
   flex: 1;
   padding: 12px 16px;
-  background: #f8f7fc;
+  background: var(--gt-color-primary-bg);
   border: 1px solid #e8e4f0;
   border-radius: 8px;
 }
 .gt-ih-card__label {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   margin-bottom: 4px;
 }
 .gt-ih-card__value {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .gt-ih-card__value--ok {
-  color: #67c23a;
+  color: var(--gt-color-success);
 }
 .gt-ih-card__value--small {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .gt-amt {
@@ -336,6 +336,6 @@ onMounted(loadAll)
 }
 
 :deep(.el-table .el-table__cell) {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 </style>

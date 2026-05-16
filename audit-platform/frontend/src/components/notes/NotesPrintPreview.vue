@@ -61,7 +61,7 @@ const CONTENT_HEIGHT = PAGE_HEIGHT_PX - MARGIN_TOP - MARGIN_BOTTOM
 // Paginate content into A4 pages
 const pages = computed<PageContent[]>(() => {
   if (!props.sections || props.sections.length === 0) {
-    return [{ html: '<p style="color: #999; text-align: center;">暂无附注内容</p>' }]
+    return [{ html: '<p style="color: var(--gt-color-text-tertiary); text-align: center;">暂无附注内容</p>' }]
   }
 
   const result: PageContent[] = []
@@ -136,7 +136,7 @@ function insertPageBreak() {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background: #e8e8e8;
+  background: var(--gt-color-border-light);
   overflow-y: auto;
 }
 
@@ -152,15 +152,15 @@ function insertPageBreak() {
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-bottom: 1px solid #dcdfe6;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .npp-title {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 
 .npp-actions {
@@ -179,7 +179,7 @@ function insertPageBreak() {
 .npp-page {
   width: 794px;
   min-height: 1123px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   padding: 121px 120px 96px 113px; /* top right bottom left (3.2cm/3.18cm/2.54cm/3cm) */
   position: relative;
@@ -192,8 +192,8 @@ function insertPageBreak() {
   left: 113px;
   right: 120px;
   text-align: right;
-  font-size: 10px;
-  color: #999;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
 }
 
 .npp-page-footer {
@@ -202,8 +202,8 @@ function insertPageBreak() {
   left: 113px;
   right: 120px;
   text-align: center;
-  font-size: 10px;
-  color: #666;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
 }
 
 .npp-page-content {

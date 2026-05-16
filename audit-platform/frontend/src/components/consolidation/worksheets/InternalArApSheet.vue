@@ -25,14 +25,14 @@
 
     <!-- 账龄段选择 -->
     <div class="ws-aging-bar" v-show="!isFullscreen">
-      <span style="font-size:12px;color:#666;margin-right:8px">账龄段：</span>
+      <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin-right:8px">账龄段：</span>
       <el-radio-group v-model="agingPreset" size="small">
         <el-radio-button value="3year">3年段</el-radio-button>
         <el-radio-button value="5year">5年段</el-radio-button>
         <el-radio-button value="custom">自定义</el-radio-button>
       </el-radio-group>
       <el-button v-if="agingPreset === 'custom'" size="small" style="margin-left:8px" @click="showAgingDialog = true">✏️ 编辑账龄段</el-button>
-      <span style="font-size:11px;color:#999;margin-left:8px">{{ agingSegments.map(a => a.name).join(' / ') }}</span>
+      <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);margin-left:8px">{{ agingSegments.map(a => a.name).join(' / ') }}</span>
     </div>
 
     <!-- 主表格 -->
@@ -71,14 +71,14 @@
           <template #default="{ row }"><el-input-number v-model="row.localAmounts[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
         <el-table-column label="原值合计" width="110" align="right">
-          <template #default="{ row }"><span class="ws-auto-cell" style="color:#4b2d77;font-weight:600">{{ fmt(sumArr(row.localAmounts)) }}</span></template>
+          <template #default="{ row }"><span class="ws-auto-cell" style="color: var(--gt-color-primary);font-weight:600">{{ fmt(sumArr(row.localAmounts)) }}</span></template>
         </el-table-column>
         <!-- 本方坏账按账龄 -->
         <el-table-column v-for="(ag, ai) in agingSegments" :key="'li'+ai" :label="'坏账-'+ag.name" width="90" align="right">
           <template #default="{ row }"><el-input-number v-model="row.localImpairments[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
         <el-table-column label="坏账合计" width="100" align="right">
-          <template #default="{ row }"><span class="ws-auto-cell" style="color:#e6a23c;font-weight:600">{{ fmt(sumArr(row.localImpairments)) }}</span></template>
+          <template #default="{ row }"><span class="ws-auto-cell" style="color: var(--gt-color-wheat);font-weight:600">{{ fmt(sumArr(row.localImpairments)) }}</span></template>
         </el-table-column>
       </el-table-column>
       <!-- 对方基本信息 -->
@@ -108,13 +108,13 @@
           <template #default="{ row }"><el-input-number v-model="row.remoteAmounts[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
         <el-table-column label="原值合计" width="110" align="right">
-          <template #default="{ row }"><span class="ws-auto-cell" style="color:#4b2d77;font-weight:600">{{ fmt(sumArr(row.remoteAmounts)) }}</span></template>
+          <template #default="{ row }"><span class="ws-auto-cell" style="color: var(--gt-color-primary);font-weight:600">{{ fmt(sumArr(row.remoteAmounts)) }}</span></template>
         </el-table-column>
         <el-table-column v-for="(ag, ai) in agingSegments" :key="'ri'+ai" :label="'坏账-'+ag.name" width="90" align="right">
           <template #default="{ row }"><el-input-number v-model="row.remoteImpairments[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
         <el-table-column label="坏账合计" width="100" align="right">
-          <template #default="{ row }"><span class="ws-auto-cell" style="color:#e6a23c;font-weight:600">{{ fmt(sumArr(row.remoteImpairments)) }}</span></template>
+          <template #default="{ row }"><span class="ws-auto-cell" style="color: var(--gt-color-wheat);font-weight:600">{{ fmt(sumArr(row.remoteImpairments)) }}</span></template>
         </el-table-column>
       </el-table-column>
       <!-- 差异 -->
@@ -134,7 +134,7 @@
           <el-tooltip v-else-if="row._reconcileStatus === 'diff'" :content="`差异: ${fmt(row._reconcileDiff)}${row._impairmentDiff ? '，坏账差异: ' + fmt(row._impairmentDiff) : ''}`" placement="left">
             <el-tag type="warning" size="small" effect="plain">≠</el-tag>
           </el-tooltip>
-          <span v-else style="color:#ccc">—</span>
+          <span v-else style="color: var(--gt-color-text-placeholder)">—</span>
         </template>
       </el-table-column>
     </el-table>
@@ -160,11 +160,11 @@
     <!-- 核对结果摘要 -->
     <div v-if="showReconcileResult" class="ws-section" style="margin-top:8px">
       <div class="ws-section-title">🔍 逐笔核对结果</div>
-      <div style="display:flex;gap:16px;padding:8px 12px;font-size:13px;background:#f8f7fc;border-radius:6px">
+      <div style="display:flex;gap:16px;padding:8px 12px;font-size: var(--gt-font-size-sm);background: var(--gt-color-primary-bg);border-radius:6px">
         <span>总笔数：<b>{{ reconcileStats.total }}</b></span>
-        <span style="color:#28a745">一致：<b>{{ reconcileStats.matched }}</b></span>
-        <span style="color:#e6a23c">有差异：<b>{{ reconcileStats.diffCount }}</b></span>
-        <span v-if="reconcileStats.total > 0" style="color:#999">
+        <span style="color: var(--gt-color-success)">一致：<b>{{ reconcileStats.matched }}</b></span>
+        <span style="color: var(--gt-color-wheat)">有差异：<b>{{ reconcileStats.diffCount }}</b></span>
+        <span v-if="reconcileStats.total > 0" style="color: var(--gt-color-text-tertiary)">
           核对率：<b>{{ Math.round(reconcileStats.matched / reconcileStats.total * 100) }}%</b>
         </span>
       </div>
@@ -506,16 +506,16 @@ async function onFileSelected(e: Event) {
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
+.ws-sheet-header h3 { margin: 0; font-size: var(--gt-font-size-base); color: var(--gt-color-text-primary); }
 .ws-sheet-actions { display: flex; gap: 8px; }
-.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 8px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
+.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 8px; background: var(--gt-color-bg); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
 .ws-aging-bar { display: flex; align-items: center; margin-bottom: 10px; }
 .ws-section { margin-bottom: 16px; }
-.ws-section-title { font-size: 13px; font-weight: 600; color: #4b2d77; margin-bottom: 6px; padding: 6px 10px; background: #f8f6fb; border-radius: 4px; }
-.ws-computed { color: #4b2d77; font-weight: 500; }
+.ws-section-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary); margin-bottom: 6px; padding: 6px 10px; background: var(--gt-color-primary-bg); border-radius: 4px; }
+.ws-computed { color: var(--gt-color-primary); font-weight: 500; }
 .ws-bold { font-weight: 700; }
-.ws-diff-warn { color: #e6a23c !important; font-weight: 700 !important; }
-.ws-auto-cell { background: #faf8fd; padding: 2px 4px; border-radius: 2px; }
-.ws-table :deep(.el-input__inner) { text-align: right; font-size: 11px; }
+.ws-diff-warn { color: var(--gt-color-wheat) !important; font-weight: 700 !important; }
+.ws-auto-cell { background: var(--gt-color-primary-bg); padding: 2px 4px; border-radius: 2px; }
+.ws-table :deep(.el-input__inner) { text-align: right; font-size: var(--gt-font-size-xs); }
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
 </style>

@@ -263,7 +263,7 @@ onMounted(async () => {
   border-radius: var(--gt-radius-lg);
   padding: 20px 28px;
   margin-bottom: var(--gt-space-5);
-  color: #fff;
+  color: var(--gt-color-text-inverse);
   position: relative; overflow: hidden;
   box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
   background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
@@ -276,17 +276,17 @@ onMounted(async () => {
   background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
   pointer-events: none;
 }
-.gt-mat-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
-.gt-mat-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+.gt-mat-banner-text h2 { margin: 0 0 2px; font-size: var(--gt-font-size-xl); font-weight: 700; }
+.gt-mat-banner-text p { margin: 0; font-size: var(--gt-font-size-xs); opacity: 0.75; }
 .gt-mat-banner-row1 {
   display: flex; align-items: center; gap: 16px;
   position: relative; z-index: 1;
 }
-.gt-mat-title { margin: 0; font-size: 18px; font-weight: 700; white-space: nowrap; }
+.gt-mat-title { margin: 0; font-size: var(--gt-font-size-xl); font-weight: 700; white-space: nowrap; }
 .gt-mat-info-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .gt-mat-info-item { display: flex; align-items: center; gap: 4px; }
-.gt-mat-info-label { font-size: 11px; opacity: 0.8; white-space: nowrap; }
-.gt-mat-info-badge { font-size: 11px; background: rgba(255,255,255,0.18); padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
+.gt-mat-info-label { font-size: var(--gt-font-size-xs); opacity: 0.8; white-space: nowrap; }
+.gt-mat-info-badge { font-size: var(--gt-font-size-xs); background: rgba(255,255,255,0.18); padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
 .gt-mat-info-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.25); }
 .gt-mat-unit-select, .gt-mat-year-select { width: 160px; }
 .gt-mat-unit-select :deep(.el-input__wrapper),
@@ -296,7 +296,7 @@ onMounted(async () => {
   box-shadow: none !important;
 }
 .gt-mat-unit-select :deep(.el-input__inner),
-.gt-mat-year-select :deep(.el-input__inner) { color: #fff !important; font-size: 12px; }
+.gt-mat-year-select :deep(.el-input__inner) { color: var(--gt-color-text-inverse) !important; font-size: var(--gt-font-size-xs); }
 .gt-mat-unit-select :deep(.el-input__suffix),
 .gt-mat-year-select :deep(.el-input__suffix) { color: rgba(255,255,255,0.7) !important; }
 

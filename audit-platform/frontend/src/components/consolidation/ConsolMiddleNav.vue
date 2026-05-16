@@ -19,7 +19,7 @@
           <span class="cm-tree-node" :class="{ 'cm-tree-node--diff': data.isDiff, 'cm-tree-node--report': data.isReport }">
             <span class="cm-tree-icon">{{ data.icon }}</span>
             <span class="cm-tree-label">{{ data.label }}</span>
-            <el-tag v-if="data.ratio" size="small" type="info" style="margin-left:4px;font-size:10px">{{ data.ratio }}%</el-tag>
+            <el-tag v-if="data.ratio" size="small" type="info" style="margin-left:4px;font-size: var(--gt-font-size-xs)">{{ data.ratio }}%</el-tag>
             <!-- 企业节点刷新按钮（hover 显示） -->
             <el-button v-if="data.companyCode && !data.isDiff" size="small" link class="cm-refresh-btn"
               @click.stop="openRefreshDialog(data)" title="刷新该单位数据">
@@ -82,7 +82,7 @@
 
     <!-- 刷新范围选择弹窗 -->
     <el-dialog v-model="showRefreshDialog" :title="`刷新 — ${refreshTarget.name}`" width="420px" append-to-body>
-      <p style="font-size:13px;color:#666;margin-bottom:12px">
+      <p style="font-size: var(--gt-font-size-sm);color: var(--gt-color-text-secondary);margin-bottom:12px">
         选择要从项目数据中刷新的内容（从子企业单体数据重新汇总）：
       </p>
       <div class="cm-refresh-options">
@@ -454,14 +454,14 @@ onUnmounted(() => {
   padding: 10px 12px; border-bottom: 1px solid var(--gt-color-border-light, #e8e4f0);
   display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
 }
-.cm-nav-title { font-size: 14px; font-weight: 700; color: #4b2d77; }
+.cm-nav-title { font-size: var(--gt-font-size-sm); font-weight: 700; color: var(--gt-color-primary); }
 .cm-tree { flex: 1; overflow-y: auto; padding: 6px; }
-.cm-tree-node { display: flex; align-items: center; font-size: 12px; gap: 4px; }
-.cm-tree-icon { font-size: 14px; }
+.cm-tree-node { display: flex; align-items: center; font-size: var(--gt-font-size-xs); gap: 4px; }
+.cm-tree-icon { font-size: var(--gt-font-size-sm); }
 .cm-tree-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cm-tree-node--diff { color: #e6a23c; font-style: italic; }
-.cm-tree-node--diff .cm-tree-label { color: #e6a23c; }
-.cm-refresh-btn { opacity: 0; transition: opacity 0.15s; margin-left: auto; font-size: 11px; padding: 0 2px; }
+.cm-tree-node--diff { color: var(--gt-color-wheat); font-style: italic; }
+.cm-tree-node--diff .cm-tree-label { color: var(--gt-color-wheat); }
+.cm-refresh-btn { opacity: 0; transition: opacity 0.15s; margin-left: auto; font-size: var(--gt-font-size-xs); padding: 0 2px; }
 .cm-tree-node:hover .cm-refresh-btn { opacity: 1; }
 .cm-refresh-options { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
 .cm-refresh-sub { padding-left: 24px; display: flex; flex-direction: column; gap: 4px; }
@@ -469,17 +469,17 @@ onUnmounted(() => {
 
 /* 树形右键菜单 */
 .cm-context-menu {
-  position: fixed; z-index: 10001; background: #fff;
+  position: fixed; z-index: 10001; background: var(--gt-color-bg-white);
   border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.15); padding: 6px 0; min-width: 180px;
   border: 1px solid #e8e4f0;
 }
-.cm-ctx-header { padding: 6px 14px; font-size: 11px; color: #999; }
-.cm-ctx-divider { height: 1px; background: #f0edf5; margin: 2px 0; }
+.cm-ctx-header { padding: 6px 14px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.cm-ctx-divider { height: 1px; background: var(--gt-color-primary-bg); margin: 2px 0; }
 .cm-ctx-item {
-  padding: 8px 14px; font-size: 13px; cursor: pointer; color: #333;
+  padding: 8px 14px; font-size: var(--gt-font-size-sm); cursor: pointer; color: var(--gt-color-text-primary);
   display: flex; align-items: center; gap: 6px; transition: background 0.1s;
 }
-.cm-ctx-item:hover { background: #f0edf5; color: #4b2d77; }
+.cm-ctx-item:hover { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
 .cm-ctx-icon { width: 18px; text-align: center; }
 .cm-ctx-fade-enter-active { transition: opacity 0.1s, transform 0.1s; }
 .cm-ctx-fade-leave-active { transition: opacity 0.08s; }

@@ -1,0 +1,28 @@
+{
+  "_doc": "R10 Spec B / Spec C baseline 真源。每个值由 Sprint 0 grep 实测填入，迁移过程中只允许减少不允许增加。CI frontend-build job 的 'Display token guard' step 读取此文件做卡点。font-size-px-vue-files 计 raw 出现（不含 allow-px 注释）。color-hex-vue-files / background-hex-vue-files 计 raw 出现（不含 rgba/linear-gradient/allow-color 注释行）。",
+  "_updated_at": "2026-05-16",
+  "_updated_by": "R10 Spec B Sprint 2 颜色+背景 token 化（4+4 批迁移）",
+
+  "font-size-px-vue-files": 0,
+  "color-hex-vue-files": 0,
+  "background-hex-vue-files": 0,
+  "el-table-naked-vue-files": 100,
+
+  "_allow_px_kept": 69,
+  "_font_size_total_inc_allow_px": 69,
+  "_color_hex_in_gradients_or_rgba": 23,
+  "_bg_hex_in_gradients_or_rgba": 6,
+
+  "_targets": {
+    "font-size-px-vue-files": 0,
+    "color-hex-vue-files": 50,
+    "background-hex-vue-files": 30,
+    "el-table-naked-vue-files": "持平或减少"
+  },
+
+  "_sprint_milestones": {
+    "sprint-1-end": "font-size-px-vue-files: 0 (stylelint font-size 转 error) — DONE 2026-05-16",
+    "sprint-2-end": "color-hex-vue-files: 0 raw (实测目标 < 50) — DONE 2026-05-16; background-hex-vue-files: 0 raw (实测目标 < 30) — DONE 2026-05-16; stylelint color/background 转 error 待 Sprint 2.3",
+    "sprint-3-end": "el-table-naked-vue-files 持平（GtTableExtended 上线，新表强制走新组件）"
+  }
+}

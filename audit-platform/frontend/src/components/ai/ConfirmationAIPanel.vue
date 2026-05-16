@@ -485,7 +485,7 @@ onMounted(async () => {
 }
 
 .panel-title {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 600;
 }
 
@@ -503,8 +503,8 @@ onMounted(async () => {
 
 .section-header h4 {
   margin: 0;
-  font-size: 14px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
 }
 
 .reply-results {
@@ -525,7 +525,7 @@ onMounted(async () => {
 
 .reply-unit {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .reply-actions {
@@ -536,11 +536,11 @@ onMounted(async () => {
 
 .amount-value {
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 
 .negative {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
   font-weight: 600;
 }
 </style>
@@ -564,7 +564,7 @@ onMounted(async () => {
 }
 
 .panel-title {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 600;
 }
 
@@ -582,8 +582,8 @@ onMounted(async () => {
 
 .section-header h4 {
   margin: 0;
-  font-size: 14px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
 }
 
 .reply-results {
@@ -604,7 +604,7 @@ onMounted(async () => {
 
 .reply-unit {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .reply-actions {
@@ -615,11 +615,11 @@ onMounted(async () => {
 
 .amount-value {
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 
 .negative {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
   font-weight: 600;
 }
 </style>

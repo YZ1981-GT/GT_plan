@@ -90,8 +90,8 @@ defineProps<{
 .impact-unmapped {
   text-align: center;
   padding: 16px;
-  font-size: 13px;
-  color: #909399;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-info);
 }
 .impact-loading {
   display: flex;
@@ -112,16 +112,16 @@ defineProps<{
   overflow-y: auto;
 }
 .impact-col-title {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
   margin-bottom: 6px;
   padding-bottom: 4px;
   border-bottom: 1px solid #ebeef5;
 }
 .impact-col-empty {
-  font-size: 12px;
-  color: #c0c4cc;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-placeholder);
   text-align: center;
   padding: 8px 0;
 }
@@ -130,15 +130,15 @@ defineProps<{
   align-items: center;
   gap: 6px;
   padding: 3px 0;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .impact-row-code {
-  color: #409eff;
+  color: var(--gt-color-teal);
   font-family: 'Arial Narrow', Arial, sans-serif;
   white-space: nowrap;
 }
 .impact-row-name {
-  color: #606266;
+  color: var(--gt-color-text-regular);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

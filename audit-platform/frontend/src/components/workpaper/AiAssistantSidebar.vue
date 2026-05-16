@@ -330,8 +330,8 @@ onUnmounted(() => {
   justify-content: center;
   cursor: pointer;
   border-radius: 4px;
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   transition: background 0.2s;
 }
 
@@ -359,7 +359,7 @@ onUnmounted(() => {
 
 .sidebar-title {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   color: var(--el-text-color-primary, #303133);
 }
@@ -374,7 +374,7 @@ onUnmounted(() => {
 }
 
 .quick-prompts .el-button {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   padding: 4px 10px;
 }
 
@@ -405,9 +405,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   flex-shrink: 0;
-  background: #f0f0f0;
+  background: var(--gt-color-border-lighter);
 }
 
 .chat-message.assistant .message-role {
@@ -422,7 +422,7 @@ onUnmounted(() => {
   max-width: 80%;
   padding: 6px 10px;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   line-height: 1.5;
 }
 
@@ -432,7 +432,7 @@ onUnmounted(() => {
 }
 
 .chat-message.assistant .message-content {
-  background: #f5f5f5;
+  background: var(--gt-color-bg);
   border-radius: 4px 10px 10px 10px;
 }
 
@@ -452,14 +452,14 @@ onUnmounted(() => {
 }
 
 .insert-action .el-button {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 
 /* 输入区域 */
 .chat-input-area {
   padding: 8px 12px;
   border-top: 1px solid var(--el-border-color-lighter, #ebeef5);
-  background: #fff;
+  background: var(--gt-color-bg-white);
 }
 
 .chat-input {
@@ -468,7 +468,7 @@ onUnmounted(() => {
   border: 1px solid var(--el-border-color, #dcdfe6);
   border-radius: 6px;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   resize: none;
   font-family: inherit;
   outline: none;
@@ -487,8 +487,8 @@ onUnmounted(() => {
 }
 
 .context-hint {
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   background: var(--el-fill-color-lighter, #fafafa);
   padding: 2px 6px;
   border-radius: 4px;
@@ -496,18 +496,18 @@ onUnmounted(() => {
 
 /* Markdown 内容样式 */
 .markdown-content :deep(pre) {
-  background: #f5f5f5;
+  background: var(--gt-color-bg);
   padding: 6px;
   border-radius: 4px;
   overflow-x: auto;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .markdown-content :deep(code) {
-  background: #f0f0f0;
+  background: var(--gt-color-border-lighter);
   padding: 1px 3px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .markdown-content :deep(strong) {
@@ -518,6 +518,6 @@ onUnmounted(() => {
 .markdown-content :deep(h2),
 .markdown-content :deep(h3) {
   margin: 4px 0;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 </style>

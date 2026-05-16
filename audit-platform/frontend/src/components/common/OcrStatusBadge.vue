@@ -32,14 +32,14 @@ const label = computed(() => {
 
 <style scoped>
 .gt-ocr-badge {
-  font-size: 10px;
+  font-size: var(--gt-font-size-xs);
   padding: 1px 4px;
   border-radius: 3px;
   font-weight: 600;
   display: inline-block;
 }
 .gt-ocr-badge--ok { background: var(--gt-color-success-light); color: var(--gt-color-success); }
-.gt-ocr-badge--processing { background: var(--gt-color-wheat-light); color: #b88a00; }
+.gt-ocr-badge--processing { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); }
 .gt-ocr-badge--failed { background: var(--gt-color-coral-light); color: var(--gt-color-coral); }
 .gt-ocr-badge--pending { background: var(--gt-color-bg); color: var(--gt-color-text-tertiary); }
 </style>

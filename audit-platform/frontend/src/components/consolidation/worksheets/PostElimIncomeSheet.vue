@@ -42,10 +42,10 @@
         <template #default="{ row }"><span class="ws-computed">{{ fmt(row.simInvestIncome) }}</span></template>
       </el-table-column>
       <el-table-column prop="dividendReverse" label="还原分红" width="100" align="right">
-        <template #default="{ row }"><span style="color:#e6a23c">{{ fmt(row.dividendReverse) }}</span></template>
+        <template #default="{ row }"><span style="color: var(--gt-color-wheat)">{{ fmt(row.dividendReverse) }}</span></template>
       </el-table-column>
       <el-table-column prop="elimInvestIncome" label="抵消投资收益" width="110" align="right">
-        <template #default="{ row }"><span style="color:#e6a23c">{{ fmt(row.elimInvestIncome) }}</span></template>
+        <template #default="{ row }"><span style="color: var(--gt-color-wheat)">{{ fmt(row.elimInvestIncome) }}</span></template>
       </el-table-column>
       <el-table-column prop="postElimIncome" label="抵消后投资收益" width="130" align="right">
         <template #default="{ row }">
@@ -54,8 +54,8 @@
       </el-table-column>
       <el-table-column prop="checkResult" label="校验" width="50" align="center">
         <template #default="{ row }">
-          <span v-if="n(row.postElimIncome) === 0" style="color:#67c23a">✓</span>
-          <span v-else style="color:#e6a23c">⚠</span>
+          <span v-if="n(row.postElimIncome) === 0" style="color: var(--gt-color-success)">✓</span>
+          <span v-else style="color: var(--gt-color-wheat)">⚠</span>
         </template>
       </el-table-column>
     </el-table>
@@ -178,16 +178,16 @@ function getSummary({ columns, data }: any) {
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
+.ws-sheet-header h3 { margin: 0; font-size: var(--gt-font-size-base); color: var(--gt-color-text-primary); }
 .ws-sheet-actions { display: flex; gap: 8px; }
-.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
-.ws-computed { color: #4b2d77; font-weight: 500; }
+.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: var(--gt-color-bg); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
+.ws-computed { color: var(--gt-color-primary); font-weight: 500; }
 .ws-bold { font-weight: 700; }
-.ws-diff-warn { color: #e6a23c !important; font-weight: 700 !important; }
-.ws-table :deep(.el-table__footer-wrapper td) { background: #f8f6fb !important; font-weight: 700; color: #4b2d77; }
+.ws-diff-warn { color: var(--gt-color-wheat) !important; font-weight: 700 !important; }
+.ws-table :deep(.el-table__footer-wrapper td) { background: var(--gt-color-primary-bg) !important; font-weight: 700; color: var(--gt-color-primary); }
 </style>
 
 <style>
-.ws-link { color: #4b2d77; cursor: pointer; text-decoration: underline; font-weight: 500; }
-.ws-link:hover { color: #7c5caa; }
+.ws-link { color: var(--gt-color-primary); cursor: pointer; text-decoration: underline; font-weight: 500; }
+.ws-link:hover { color: var(--gt-color-primary); }
 </style>

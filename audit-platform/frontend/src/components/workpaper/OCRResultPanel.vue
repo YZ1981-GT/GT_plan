@@ -167,16 +167,16 @@ function batchConfirmAll() {
 }
 .panel-header h4 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 .entry-line {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   line-height: 1.8;
 }
 .entry-line .acct {
-  color: #606266;
+  color: var(--gt-color-text-regular);
 }
 .entry-line .amt {
   font-family: 'Arial Narrow', Arial, sans-serif;

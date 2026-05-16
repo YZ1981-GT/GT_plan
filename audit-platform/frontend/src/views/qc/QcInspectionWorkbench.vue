@@ -63,7 +63,7 @@
               >
                 <el-table-column label="底稿编号" prop="wp_code" width="120">
                   <template #default="{ row }">
-                    <span style="font-family: monospace; color: #409eff;">{{ row.wp_code }}</span>
+                    <span style="font-family: monospace; color: var(--gt-color-teal);">{{ row.wp_code }}</span>
                   </template>
                 </el-table-column>
                 <el-table-column label="底稿名称" prop="wp_name" min-width="200" />
@@ -153,7 +153,7 @@
                 >
                   标记已处理
                 </el-button>
-                <span v-else style="color: #67c23a; font-size: 12px;">✓ 已处理</span>
+                <span v-else style="color: var(--gt-color-success); font-size: var(--gt-font-size-xs);">✓ 已处理</span>
               </template>
             </el-table-column>
           </el-table>
@@ -605,8 +605,8 @@ onMounted(() => {
 }
 
 .audit-log-count {
-  color: #909399;
-  font-size: 13px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-sm);
   margin-left: 8px;
 }
 </style>

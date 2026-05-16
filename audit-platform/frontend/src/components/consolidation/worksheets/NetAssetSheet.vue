@@ -48,7 +48,7 @@
       <!-- 合计 -->
       <el-table-column prop="total" label="合计" width="120" align="right">
         <template #default="{ row }">
-          <span v-if="!row.isHeader" class="ws-auto-cell" style="display:block;text-align:right;padding:2px 8px;color:#4b2d77;font-weight:500;font-size:12px">
+          <span v-if="!row.isHeader" class="ws-auto-cell" style="display:block;text-align:right;padding:2px 8px;color: var(--gt-color-primary);font-weight:500;font-size: var(--gt-font-size-xs)">
             {{ fmt(calcRowTotal(row)) }}
           </span>
         </template>
@@ -65,7 +65,7 @@
         <template #header>
           <div style="text-align:center;line-height:1.3">
             <div style="font-weight:600">{{ comp.name }}</div>
-            <div style="color:#4b2d77;font-size:11px">持股比例 {{ comp.ratio }}%</div>
+            <div style="color: var(--gt-color-primary);font-size: var(--gt-font-size-xs)">持股比例 {{ comp.ratio }}%</div>
           </div>
         </template>
         <template #default="{ row }">
@@ -82,7 +82,7 @@
         <template #title><span>请使用"导出模板"填写。系统自动读取<b>"数据填写"</b>工作表，按行名匹配填入对应单元格。请勿修改sheet名称和项目列。</span></template>
       </el-alert>
       <div v-if="importStats">
-        <p style="font-size:13px;color:#666">解析结果：匹配 <b style="color:#4b2d77">{{ importStats.matched }}</b> 行，跳过 {{ importStats.skipped }} 行</p>
+        <p style="font-size: var(--gt-font-size-sm);color: var(--gt-color-text-secondary)">解析结果：匹配 <b style="color: var(--gt-color-primary)">{{ importStats.matched }}</b> 行，跳过 {{ importStats.skipped }} 行</p>
         <el-table :data="importPreviewRows" border size="small" max-height="300">
           <el-table-column prop="item" label="项目" width="200" />
           <el-table-column prop="total" label="合计" width="100" align="right" />
@@ -350,15 +350,15 @@ function confirmImport() {
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
+.ws-sheet-header h3 { margin: 0; font-size: var(--gt-font-size-base); color: var(--gt-color-text-primary); }
 .ws-sheet-actions { display: flex; gap: 8px; }
-.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
-.ws-computed { color: #4b2d77; font-weight: 500; }
-.ws-zero { color: #c0c4cc !important; font-weight: 400 !important; }
+.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: var(--gt-color-bg); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
+.ws-computed { color: var(--gt-color-primary); font-weight: 500; }
+.ws-zero { color: var(--gt-color-text-placeholder) !important; font-weight: 400 !important; }
 .ws-table :deep(.el-input__inner) { text-align: right; }
-.ws-table :deep(.ws-auto-cell .el-input__inner) { color: #4b2d77; font-weight: 500; background: #faf8fd; }
+.ws-table :deep(.ws-auto-cell .el-input__inner) { color: var(--gt-color-primary); font-weight: 500; background: var(--gt-color-primary-bg); }
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
-.ws-table :deep(.ws-row-header td) { background: #f8f6fb !important; font-weight: 600; }
+.ws-table :deep(.ws-row-header td) { background: var(--gt-color-primary-bg) !important; font-weight: 600; }
 .ws-table :deep(.ws-row-bold td) { font-weight: 600; }
-.ws-btn-sep { width: 1px; height: 18px; background: #ddd; margin: 0 2px; flex-shrink: 0; }
+.ws-btn-sep { width: 1px; height: 18px; background: var(--gt-color-border-light); margin: 0 2px; flex-shrink: 0; }
 </style>

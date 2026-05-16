@@ -7,7 +7,7 @@
       </el-form-item>
       <el-form-item label="超时时间">
         <el-input-number v-model="form.timeout" :min="1" :max="300" :step="5" />
-        <span style="margin-left: 8px; color: var(--gt-color-text-secondary); font-size: 13px">秒</span>
+        <span style="margin-left: 8px; color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm)">秒</span>
       </el-form-item>
       <el-form-item label="API Key">
         <el-input v-model="form.api_key" type="password" show-password placeholder="输入API密钥" />

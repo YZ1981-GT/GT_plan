@@ -78,11 +78,19 @@
       type="info" show-icon :closable="false" style="margin-bottom: 12px"
     >
       <template #title>暂无未更正错报</template>
-      <div style="font-size: 12px; line-height: 1.6">
+      <div style="font-size: var(--gt-font-size-xs); line-height: 1.6">
         点击"新增"手动录入，或在调整分录页面驳回 AJE 时自动生成。累计金额超过重要性水平时系统会预警。
       </div>
     </el-alert>
-    <el-table ref="msTableRef" :data="items" v-loading="loading" border stripe style="width: 100%">
+    <el-table
+      ref="msTableRef"
+      :data="items"
+      v-loading="loading"
+      border
+      stripe
+      style="width: 100%"
+      @cell-contextmenu="onCellContextMenu"
+    >
       <el-table-column prop="misstatement_description" label="错报描述" min-width="200" show-overflow-tooltip />
       <el-table-column label="类型" width="100">
         <template #default="{ row }">
@@ -108,7 +116,7 @@
           >
             <el-tag type="warning" size="small" round>🟡</el-tag>
           </el-tooltip>
-          <span v-else style="color: var(--gt-color-success); font-size: 12px">✓</span>
+          <span v-else style="color: var(--gt-color-success); font-size: var(--gt-font-size-xs)">✓</span>
         </template>
       </el-table-column>
       <el-table-column label="结转" width="70" align="center">
@@ -125,6 +133,18 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- R10 Spec B / F7：错报右键菜单 - 查看关联底稿 -->
+    <CellContextMenu
+      :visible="msCtx.contextMenu.visible"
+      :x="msCtx.contextMenu.x"
+      :y="msCtx.contextMenu.y"
+      :item-name="msCtx.contextMenu.itemName"
+    >
+      <div class="gt-ucell-ctx-item" @click="onCtxRelatedWp">
+        <span class="gt-ucell-ctx-icon">📝</span> 查看关联底稿
+      </div>
+    </CellContextMenu>
 
     <!-- 新建/编辑弹窗 -->
     <el-dialog append-to-body v-model="formVisible" :title="isEditing ? '编辑错报' : '新增错报'" width="600px" destroy-on-close>
@@ -174,6 +194,10 @@ import { confirmDelete } from '@/utils/confirm'
 import { usePasteImport } from '@/composables/usePasteImport'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useFullscreen } from '@/composables/useFullscreen'
+// R10 Spec B / F7：错报右键菜单
+import { useCellSelection } from '@/composables/useCellSelection'
+import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import { handleApiError } from '@/utils/errorHandler'
 // Spec A R1：跨视图 stale 摘要（错报阈值变化时显示标志）
 import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
@@ -195,6 +219,41 @@ const router = useRouter()
 const penetrate = usePenetrate()
 const { isFullscreen, toggleFullscreen } = useFullscreen()
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+
+// R10 Spec B / F7：错报单元格选中 + 右键菜单
+const msCtx = useCellSelection()
+let _ctxRow: any = null
+function onCellContextMenu(row: any, _column: any, _cell: HTMLElement, event: MouseEvent) {
+  _ctxRow = row
+  msCtx.contextMenu.itemName = row.affected_account_name || row.misstatement_description || '错报'
+  msCtx.openContextMenu(event, msCtx.contextMenu.itemName, row)
+}
+async function onCtxRelatedWp() {
+  msCtx.closeContextMenu()
+  const m = _ctxRow
+  if (!m) return
+  try {
+    const data: any = await api.get(
+      `/api/projects/${projectId.value}/misstatements/${m.id}/related-workpapers`,
+    )
+    const wps = data?.workpapers || []
+    if (!wps.length) {
+      ElMessage.info('该错报暂无关联底稿')
+      return
+    }
+    if (wps.length === 1) {
+      router.push({
+        name: 'WorkpaperEditor',
+        params: { projectId: projectId.value, wpId: wps[0].id },
+      })
+      return
+    }
+    const list = wps.map((w: any) => `${w.wp_code} ${w.wp_name}`).join('\n')
+    ElMessage.info(`该错报关联 ${wps.length} 张底稿：\n${list}`)
+  } catch (e: any) {
+    handleApiError(e, '查看关联底稿')
+  }
+}
 
 const {
   projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
@@ -371,7 +430,7 @@ async function onMaterialityChanged(payload: { projectId: string; year?: number 
   border-radius: var(--gt-radius-lg);
   padding: 18px 28px;
   margin-bottom: var(--gt-space-5);
-  color: #fff;
+  color: var(--gt-color-text-inverse);
   position: relative; overflow: hidden;
   box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
   background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
@@ -388,11 +447,11 @@ async function onMaterialityChanged(payload: { projectId: string; year?: number 
   display: flex; align-items: center; gap: 16px;
   position: relative; z-index: 1;
 }
-.gt-ms-title { margin: 0; font-size: 18px; font-weight: 700; white-space: nowrap; }
+.gt-ms-title { margin: 0; font-size: var(--gt-font-size-xl); font-weight: 700; white-space: nowrap; }
 .gt-ms-info-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .gt-ms-info-item { display: flex; align-items: center; gap: 4px; }
-.gt-ms-info-label { font-size: 11px; opacity: 0.8; white-space: nowrap; }
-.gt-ms-info-badge { font-size: 11px; background: rgba(255,255,255,0.18); padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
+.gt-ms-info-label { font-size: var(--gt-font-size-xs); opacity: 0.8; white-space: nowrap; }
+.gt-ms-info-badge { font-size: var(--gt-font-size-xs); background: rgba(255,255,255,0.18); padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
 .gt-ms-info-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.25); }
 .gt-ms-unit-select, .gt-ms-year-select { width: 160px; }
 .gt-ms-unit-select :deep(.el-input__wrapper),
@@ -402,7 +461,7 @@ async function onMaterialityChanged(payload: { projectId: string; year?: number 
   box-shadow: none !important;
 }
 .gt-ms-unit-select :deep(.el-input__inner),
-.gt-ms-year-select :deep(.el-input__inner) { color: #fff !important; font-size: 12px; }
+.gt-ms-year-select :deep(.el-input__inner) { color: var(--gt-color-text-inverse) !important; font-size: var(--gt-font-size-xs); }
 .gt-ms-unit-select :deep(.el-input__suffix),
 .gt-ms-year-select :deep(.el-input__suffix) { color: rgba(255,255,255,0.7) !important; }
 .gt-ms-banner-row2 {

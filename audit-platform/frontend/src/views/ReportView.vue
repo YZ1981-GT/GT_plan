@@ -22,7 +22,7 @@
         >
           <div class="gt-info-bar__sep" />
           <div class="gt-info-bar__item">
-            <span class="gt-info-bar__label" style="font-size:10px;color:rgba(255,255,255,0.55)">模式</span>
+            <span class="gt-info-bar__label" style="font-size: var(--gt-font-size-xs);color:rgba(255,255,255,0.55)">模式</span>
             <el-radio-group v-model="reportMode" size="small" @change="fetchReport" class="gt-rv-mode-radio">
               <el-radio-button value="audited">已审</el-radio-button>
               <el-radio-button value="unadjusted">未审</el-radio-button>
@@ -168,7 +168,7 @@
         <el-table-column label="上年金额">
           <el-table-column v-for="col in eqColumns" :key="'pv-' + col.key" :label="col.label" width="110" align="right" :resizable="true">
             <template #default="{ row }">
-              <span class="gt-amt" style="color: #999">
+              <span class="gt-amt" style="color: var(--gt-color-text-tertiary)">
                 <template v-if="col.key === 'total'">{{ fmt(row.prior_period_amount) }}</template>
                 <template v-else>{{ fmt(0) }}</template>
               </span>
@@ -228,7 +228,7 @@
       @cell-contextmenu="onRvCellContextMenu">
       <el-table-column label="序号" width="70" align="center" :resizable="true">
         <template #default="{ $index }">
-          <span style="color: #999;">{{ $index + 1 }}</span>
+          <span style="color: var(--gt-color-text-tertiary);">{{ $index + 1 }}</span>
         </template>
       </el-table-column>
       <el-table-column label="项目" min-width="300" :resizable="true" fixed>
@@ -238,7 +238,7 @@
                 @click="onRowNameClick(row)">
             {{ row.row_name }}
             <el-button v-if="getNoteSection(row.row_code)" size="small" text type="primary"
-              style="font-size:10px;padding:0 2px;margin-left:4px" title="查看附注"
+              style="font-size: var(--gt-font-size-xs);padding:0 2px;margin-left:4px" title="查看附注"
               @click.stop="goToNote(row.row_code)">📝</el-button>
           </span>
         </template>
@@ -249,7 +249,7 @@
             <span class="report-amount">&nbsp;</span>
           </template>
           <template v-else-if="getRowType(row) === 'manual'">
-            <span class="report-amount" style="color: #bbb;">—</span>
+            <span class="report-amount" style="color: var(--gt-color-text-placeholder);">—</span>
           </template>
           <template v-else>
             <GtAmountCell
@@ -268,7 +268,7 @@
             <span class="report-amount">&nbsp;</span>
           </template>
           <template v-else-if="getRowType(row) === 'manual'">
-            <span class="report-amount" style="color: #bbb;">—</span>
+            <span class="report-amount" style="color: var(--gt-color-text-placeholder);">—</span>
           </template>
           <template v-else>
             <GtAmountCell
@@ -287,7 +287,7 @@
       :row-class-name="compareRowClassName" border size="small" :max-height="tableMaxHeight">
       <el-table-column label="序号" width="70" align="center" :resizable="true">
         <template #default="{ $index }">
-          <span style="color: #999;">{{ $index + 1 }}</span>
+          <span style="color: var(--gt-color-text-tertiary);">{{ $index + 1 }}</span>
         </template>
       </el-table-column>
       <el-table-column label="项目" min-width="250" :resizable="true">
@@ -314,7 +314,7 @@
       <!-- 任务 12.7.1：对比视图新增"上年审定数"列（需求 24.1/24.2） -->
       <el-table-column label="上年审定数" min-width="130" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
-          <span class="gt-rv-amount-cell-readonly" style="color: #666;">{{ fmt(row.prior_period_amount) }}</span>
+          <span class="gt-rv-amount-cell-readonly" style="color: var(--gt-color-text-secondary);">{{ fmt(row.prior_period_amount) }}</span>
         </template>
       </el-table-column>
       <!-- Sprint 11 Task 11.6：变动额+变动率列（需求 33.2/33.3） -->
@@ -331,7 +331,7 @@
                 :class="['gt-rv-change-rate', { 'gt-rv-change-rate--alert': Math.abs(((row.audited_amount || 0) - row.prior_period_amount) / Math.abs(row.prior_period_amount) * 100) > 20 }]">
             {{ (((row.audited_amount || 0) - row.prior_period_amount) / Math.abs(row.prior_period_amount) * 100).toFixed(1) }}%
           </span>
-          <span v-else style="color: #ccc;">-</span>
+          <span v-else style="color: var(--gt-color-text-placeholder);">-</span>
         </template>
       </el-table-column>
     </el-table>
@@ -395,7 +395,7 @@
             <template #default="{ row }">
               <el-button v-if="row.wp_id" link type="primary" size="small"
                 @click="openWorkpaper(row.wp_id)">打开底稿</el-button>
-              <span v-else style="color: #ccc">—</span>
+              <span v-else style="color: var(--gt-color-text-placeholder)">—</span>
             </template>
           </el-table-column>
         </el-table>
@@ -416,7 +416,7 @@
     <!-- 转换规则弹窗 -->
     <el-dialog append-to-body v-model="showMappingDialog" title="国企版 ↔ 上市版 转换规则" width="950px" top="3vh">
       <div class="gt-rv-mapping-dialog">
-        <p style="color: #888; font-size: 12px; margin: 0 0 10px;">
+        <p style="color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-xs); margin: 0 0 10px;">
           配置国企版与上市版各报表项目的映射关系。确认后系统将按规则自动转换，转换结果缓存到数据库。
         </p>
         <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center; flex-wrap: wrap;">
@@ -429,7 +429,7 @@
             @applied="onMappingTemplateApplied"
           />
           <span style="flex:1" />
-          <span style="color: #999; font-size: 11px; line-height: 28px;">
+          <span style="color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); line-height: 28px;">
             总计已映射 {{ totalMappedCount }} / {{ totalRuleCount }} 项
           </span>
         </div>
@@ -444,29 +444,29 @@
           </el-table-column>
           <el-table-column label="编码" width="110" align="center">
             <template #default="{ row }">
-              <span style="color: #aaa; font-size: 11px;">{{ row.soe_row_code }}</span>
+              <span style="color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs);">{{ row.soe_row_code }}</span>
             </template>
           </el-table-column>
           <el-table-column label="→" width="30" align="center">
-            <template #default><span style="color: #ccc;">→</span></template>
+            <template #default><span style="color: var(--gt-color-text-placeholder);">→</span></template>
           </el-table-column>
           <el-table-column label="上市版项目" min-width="220">
             <template #default="{ row }">
               <el-select v-model="row.listed_row_code" size="small" filterable clearable placeholder="选择" style="width: 100%;">
                 <el-option v-for="opt in currentListedOptions" :key="opt.code" :label="opt.name" :value="opt.code">
-                  <span style="font-size: 11px;">{{ opt.code }} {{ opt.name }}</span>
+                  <span style="font-size: var(--gt-font-size-xs);">{{ opt.code }} {{ opt.name }}</span>
                 </el-option>
               </el-select>
             </template>
           </el-table-column>
           <el-table-column label="状态" width="70" align="center">
             <template #default="{ row }">
-              <span v-if="row.listed_row_code" style="color: #1e8a38; font-size: 11px;">✓</span>
-              <span v-else style="color: #d94840; font-size: 11px;">—</span>
+              <span v-if="row.listed_row_code" style="color: var(--gt-color-success); font-size: var(--gt-font-size-xs);">✓</span>
+              <span v-else style="color: var(--gt-color-coral); font-size: var(--gt-font-size-xs);">—</span>
             </template>
           </el-table-column>
         </el-table>
-        <div style="margin-top: 8px; text-align: right; color: #999; font-size: 11px;">
+        <div style="margin-top: 8px; text-align: right; color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs);">
           {{ mappingTabLabel }} 已映射 {{ currentMappingRules.filter(r => r.listed_row_code).length }} / {{ currentMappingRules.length }} 项
         </div>
       </div>
@@ -514,8 +514,8 @@
           :row-class-name="({ row }: any) => row.passed ? '' : 'gt-rv-audit-fail-row'">
           <el-table-column label="结果" width="80" align="center">
             <template #default="{ row }">
-              <span v-if="row.passed" style="color: #1e8a38; font-size: 16px;">✓</span>
-              <span v-else style="color: #d94840; font-size: 16px;">✗</span>
+              <span v-if="row.passed" style="color: var(--gt-color-success); font-size: var(--gt-font-size-md);">✓</span>
+              <span v-else style="color: var(--gt-color-coral); font-size: var(--gt-font-size-md);">✗</span>
             </template>
           </el-table-column>
           <el-table-column label="审核项目" min-width="200">
@@ -542,51 +542,51 @@
           </el-table-column>
           <el-table-column label="类型" width="100" align="center">
             <template #default="{ row }">
-              <span style="font-size: 11px;">{{ row.category_label }}</span>
+              <span style="font-size: var(--gt-font-size-xs);">{{ row.category_label }}</span>
             </template>
           </el-table-column>
           <el-table-column label="公式/来源" min-width="160">
             <template #default="{ row }">
-              <code v-if="row.formula" style="font-size: 10px; color: #888; word-break: break-all; white-space: normal;">{{ row.formula }}</code>
-              <span v-else style="font-size: 10px; color: #ccc;">{{ row.source || '—' }}</span>
+              <code v-if="row.formula" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); word-break: break-all; white-space: normal;">{{ row.formula }}</code>
+              <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder);">{{ row.source || '—' }}</span>
             </template>
           </el-table-column>
           <el-table-column label="溯源定位" min-width="180">
             <template #default="{ row }">
               <div v-if="row.source || row.formula" style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
                 <template v-for="loc in parseTraceLocations(row)" :key="loc.label">
-                  <el-button size="small" link type="primary" @click="onTraceJump(loc)" style="font-size: 11px;">
+                  <el-button size="small" link type="primary" @click="onTraceJump(loc)" style="font-size: var(--gt-font-size-xs);">
                     📍 {{ loc.label }}
                   </el-button>
                 </template>
-                <span v-if="!parseTraceLocations(row).length" style="color: #ccc; font-size: 11px;">—</span>
+                <span v-if="!parseTraceLocations(row).length" style="color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs);">—</span>
               </div>
-              <span v-else style="color: #ccc; font-size: 11px;">—</span>
+              <span v-else style="color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs);">—</span>
             </template>
           </el-table-column>
         </el-table>
 
         <!-- 底部操作栏 -->
         <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-size: 11px; color: #999;">
+          <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">
             共 {{ filteredAuditChecks.length }} 条审核项
           </span>
           <el-button size="small" @click="onExportAuditExcel" round>📥 导出审核报告</el-button>
         </div>
       </div>
-      <div v-else style="text-align: center; padding: 40px; color: #999;">
+      <div v-else style="text-align: center; padding: 40px; color: var(--gt-color-text-tertiary);">
         暂无审核数据，请先点击"✅ 审核"按钮
       </div>
     </el-dialog>
 
     <!-- 溯源定位选择弹窗（多个定位时） -->
     <el-dialog append-to-body v-model="showTraceSelectDialog" title="选择溯源定位" width="500px">
-      <p style="color: #888; font-size: 12px; margin: 0 0 12px;">
+      <p style="color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-xs); margin: 0 0 12px;">
         该审核项涉及多个报表位置，请选择要查看的定位：
       </p>
-      <div v-if="traceSelectCheck" style="margin-bottom: 12px; padding: 8px 12px; background: #f8f6fb; border-radius: 8px; font-size: 12px;">
+      <div v-if="traceSelectCheck" style="margin-bottom: 12px; padding: 8px 12px; background: var(--gt-color-primary-bg); border-radius: 8px; font-size: var(--gt-font-size-xs);">
         <span style="font-weight: 600;">{{ traceSelectCheck.name }}</span>
-        <code v-if="traceSelectCheck.formula" style="display: block; margin-top: 4px; font-size: 10px; color: #888;">{{ traceSelectCheck.formula }}</code>
+        <code v-if="traceSelectCheck.formula" style="display: block; margin-top: 4px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ traceSelectCheck.formula }}</code>
       </div>
       <div style="display: flex; flex-direction: column; gap: 8px;">
         <el-button v-for="loc in traceSelectOptions" :key="loc.rowCode || loc.label"
@@ -1167,15 +1167,15 @@ async function onGenerate() {
   const ok = await showGuide(
     'report_generate',
     '📊 刷新报表数据',
-    `<div style="line-height:1.8;font-size:13px">
+    `<div style="line-height:1.8;font-size: var(--gt-font-size-sm)">
       <p>将根据试算表审定数重新计算生成六张财务报表。</p>
-      <p style="color:#909399;font-size:12px;margin-top:6px">请确认以下准备工作已完成：</p>
+      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">请确认以下准备工作已完成：</p>
       <ul style="padding-left:18px;margin:4px 0">
-        <li><span style="color:#e6a23c">⚠</span> 已完成账套数据导入（科目余额表、序时账）</li>
-        <li><span style="color:#e6a23c">⚠</span> 已完成科目映射（客户科目 → 标准科目）</li>
-        <li><span style="color:#e6a23c">⚠</span> 调整分录已录入并审批（如有）</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 已完成账套数据导入（科目余额表、序时账）</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 已完成科目映射（客户科目 → 标准科目）</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 调整分录已录入并审批（如有）</li>
       </ul>
-      <p style="color:#909399;font-size:12px;margin-top:6px">💡 如果试算表数据为空，报表金额将全部为零</p>
+      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">💡 如果试算表数据为空，报表金额将全部为零</p>
     </div>`,
     '开始生成',
   )
@@ -1219,12 +1219,12 @@ async function onConsistencyCheck() {
   const ok = await showGuide(
     'report_audit',
     '✅ 报表审核校验',
-    `<div style="line-height:1.8;font-size:13px">
+    `<div style="line-height:1.8;font-size: var(--gt-font-size-sm)">
       <p>将对报表执行逻辑审核和合理性检查。</p>
       <ul style="padding-left:18px;margin:4px 0">
-        <li><span style="color:#e6a23c">⚠</span> 请先确认报表数据已生成（点击"刷新数据"）</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 请先确认报表数据已生成（点击"刷新数据"）</li>
       </ul>
-      <p style="color:#67c23a;font-size:12px;margin-top:6px">✓ 校验结果将按公式分类展示，可点击溯源跳转到具体位置</p>
+      <p style="color: var(--gt-color-success);font-size: var(--gt-font-size-xs);margin-top:6px">✓ 校验结果将按公式分类展示，可点击溯源跳转到具体位置</p>
     </div>`,
     '开始审核',
   )
@@ -1743,13 +1743,13 @@ function copyReportTable() {
   background: rgba(255,255,255,0.1);
   border-color: rgba(255,255,255,0.2);
   color: rgba(255,255,255,0.8);
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   padding: 4px 10px;
   height: 24px;
 }
 .gt-rv-mode-radio :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
   background: rgba(255,255,255,0.25);
-  color: #fff;
+  color: var(--gt-color-text-inverse);
   font-weight: 600;
 }
 
@@ -1757,7 +1757,7 @@ function copyReportTable() {
 :deep(.el-table) {
   --el-table-border-color: #e8e4f0;
   --el-table-row-hover-bg-color: #faf8fd;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   border-top: 2px solid var(--gt-color-primary);
 }
 :deep(.el-table--border .el-table__cell) {
@@ -1771,7 +1771,7 @@ function copyReportTable() {
   transition: background 0.15s ease;
 }
 :deep(.el-table--enable-row-hover .el-table__body tr:hover > td) {
-  background: #faf8fd;
+  background: var(--gt-color-primary-bg);
 }
 /* 序号列样式 */
 :deep(.el-table .el-table__cell .cell) {
@@ -1781,10 +1781,10 @@ function copyReportTable() {
 
 /* 表头统一 */
 :deep(.el-table th.el-table__cell) {
-  background: #f8f6fb !important;
-  color: #333;
+  background: var(--gt-color-primary-bg) !important;
+  color: var(--gt-color-text-primary);
   font-weight: 600;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   padding: 6px 0;
   white-space: nowrap;
 }
@@ -1792,21 +1792,21 @@ function copyReportTable() {
 /* 数据行统一 */
 :deep(.el-table td.el-table__cell) {
   padding: 4px 0;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   line-height: 1.5;
 }
 
 /* 序号列 */
 :deep(.el-table__column--index .cell) {
-  color: #bbb;
-  font-size: 11px;
+  color: var(--gt-color-text-placeholder);
+  font-size: var(--gt-font-size-xs);
 }
 
 /* 分类标题行（如"流动资产："） */
 .gt-rv-category {
   color: var(--gt-color-primary);
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 /* 金额单元格 — 统一数字字体 */
@@ -1815,14 +1815,14 @@ function copyReportTable() {
 .gt-rv-adjustment {
   font-variant-numeric: tabular-nums;
   font-family: 'Arial Narrow', Arial, sans-serif;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   padding: 2px 8px;
 }
 
 /* 金额单元格 — 可点击穿透 */
 .gt-rv-amount-cell {
   cursor: pointer;
-  color: #333;
+  color: var(--gt-color-text-primary);
   font-weight: 500;
   transition: all 0.15s ease;
   border-radius: var(--gt-radius-sm);
@@ -1834,28 +1834,28 @@ function copyReportTable() {
 
 /* 金额单元格 — 只读 */
 .gt-rv-amount-cell-readonly {
-  color: #555;
+  color: var(--gt-color-text-regular);
 }
 
 /* 调整影响列 */
 .gt-rv-adjustment {
-  color: #999;
+  color: var(--gt-color-text-tertiary);
 }
 .gt-rv-adjustment.has-diff {
-  color: #d94840;
+  color: var(--gt-color-coral);
   font-weight: 600;
 }
 
 /* 对比视图差异行 */
-:deep(.diff-row) { background: #fffbf5 !important; }
+:deep(.diff-row) { background: var(--gt-color-wheat-light) !important; }
 
 /* Sprint 11: 变动率 >20% 标红 */
-.gt-rv-change-rate { font-size: 12px; color: #666; }
+.gt-rv-change-rate { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); }
 .gt-rv-change-rate--alert { color: var(--el-color-danger) !important; font-weight: 600; }
 .gt-rv-change-negative { color: var(--el-color-danger); }
 
 /* 审核失败行 */
-:deep(.gt-rv-audit-fail-row) { background: #fef5f5 !important; }
+:deep(.gt-rv-audit-fail-row) { background: var(--gt-color-coral-light) !important; }
 
 /* 一致性校验 */
 .gt-rv-check-item {
@@ -1876,7 +1876,7 @@ function copyReportTable() {
 }
 
 /* Tab 样式 */
-:deep(.el-tabs__item) { font-size: 14px; }
+:deep(.el-tabs__item) { font-size: var(--gt-font-size-sm); }
 :deep(.el-tabs__item.is-active) { font-weight: 600; }
 :deep(.el-tabs__active-bar) { height: 3px; border-radius: 2px; }
 
@@ -1890,7 +1890,7 @@ function copyReportTable() {
 }
 /* 合计行样式 */
 :deep(.gt-rv-eq-total-row td) {
-  background: #f3eff8 !important;
+  background: var(--gt-color-primary-bg) !important;
   font-weight: 700;
   border-top: 2px solid #d8d0e8 !important;
 }
@@ -1898,13 +1898,13 @@ function copyReportTable() {
 :deep(.gt-rv-eq-category td) {
   color: var(--gt-color-primary);
   font-weight: 600;
-  background: #fcfbfe !important;
+  background: var(--gt-color-primary-bg) !important;
 }
 /* 提示文字 */
 .gt-rv-eq-hint {
   margin-top: var(--gt-space-3);
-  font-size: 11px;
-  color: #bbb;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-placeholder);
   text-align: center;
 }
 
@@ -1919,36 +1919,36 @@ function copyReportTable() {
   text-align: center;
   padding: 10px 8px;
   border-radius: var(--gt-radius-md);
-  background: #f8f6fb;
+  background: var(--gt-color-primary-bg);
   border: 1px solid #ece8f3;
 }
 .gt-rv-audit-stat-num {
   display: block;
-  font-size: 22px;
+  font-size: var(--gt-font-size-2xl);
   font-weight: 700;
-  color: #333;
+  color: var(--gt-color-text-primary);
 }
 .gt-rv-audit-stat-label {
-  font-size: 11px;
-  color: #888;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
   margin-top: 2px;
 }
 .gt-rv-audit-stat-pass {
-  background: #f0faf2;
+  background: var(--gt-color-success-light);
   border-color: #c8e6c9;
 }
-.gt-rv-audit-stat-pass .gt-rv-audit-stat-num { color: #1e8a38; }
+.gt-rv-audit-stat-pass .gt-rv-audit-stat-num { color: var(--gt-color-success); }
 .gt-rv-audit-stat-fail {
-  background: #fef5f5;
+  background: var(--gt-color-coral-light);
   border-color: #f5c6c6;
 }
-.gt-rv-audit-stat-fail .gt-rv-audit-stat-num { color: #d94840; }
+.gt-rv-audit-stat-fail .gt-rv-audit-stat-num { color: var(--gt-color-coral); }
 :deep(.gt-rv-audit-fail-row) {
-  background: #fff8f7 !important;
+  background: var(--gt-color-coral-light) !important;
 }
 /* 审核弹窗 Tab 美化 */
 .gt-rv-audit-dialog :deep(.el-tabs--card > .el-tabs__header .el-tabs__item) {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   padding: 0 16px;
 }
 .gt-rv-audit-dialog :deep(.el-tabs--card > .el-tabs__header .el-tabs__item.is-active) {
@@ -1965,8 +1965,8 @@ function copyReportTable() {
   border: 1px solid #ffe0b2;
   border-radius: var(--gt-radius-md);
   margin-bottom: 8px;
-  font-size: 12px;
-  color: #e65100;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-wheat);
   animation: gt-trace-pulse 2s ease-in-out infinite;
 }
 @keyframes gt-trace-pulse {
@@ -1977,29 +1977,29 @@ function copyReportTable() {
 /* ── F27/D9: 报表行类型样式（6 种） ── */
 :deep(.report-row--header) {
   font-weight: 700 !important;
-  background: #f0edf5 !important;
+  background: var(--gt-color-primary-bg) !important;
 }
 :deep(.report-row--header td) {
   font-weight: 700;
-  color: #333;
-  background: #f0edf5 !important;
+  color: var(--gt-color-text-primary);
+  background: var(--gt-color-primary-bg) !important;
 }
 :deep(.report-row--data) {
   /* 正常数据行 */
 }
 :deep(.report-row--total) {
   font-weight: 700 !important;
-  background: #f3eff8 !important;
+  background: var(--gt-color-primary-bg) !important;
 }
 :deep(.report-row--total td) {
   border-top: 1.5px solid #dcdfe6 !important;
   font-weight: 700;
 }
 :deep(.report-row--zero) {
-  color: #aaa !important;
+  color: var(--gt-color-text-tertiary) !important;
 }
 :deep(.report-row--zero td) {
-  color: #aaa !important;
+  color: var(--gt-color-text-tertiary) !important;
 }
 :deep(.report-row--special) {
   font-style: italic;
@@ -2015,12 +2015,12 @@ function copyReportTable() {
   font-family: 'Arial Narrow', Arial, monospace;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   display: inline-block;
   min-width: 80px;
 }
 .report-amount--negative {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
 }
 
 /* ── F27: 缩进可视化 ── */
@@ -2036,15 +2036,15 @@ function copyReportTable() {
   border-bottom: 1px solid #e8e4f0;
 }
 .gt-rv-gt-header__company {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 700;
-  color: #333;
+  color: var(--gt-color-text-primary);
   letter-spacing: 1px;
 }
 .gt-rv-gt-header__title {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #555;
+  color: var(--gt-color-text-regular);
   margin-top: 2px;
 }
 .gt-rv-gt-header__meta {
@@ -2052,8 +2052,8 @@ function copyReportTable() {
   justify-content: space-between;
   align-items: center;
   margin-top: 4px;
-  font-size: 12px;
-  color: #888;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
 }
 .gt-rv-gt-header__unit {
   text-align: right;
@@ -2066,14 +2066,14 @@ function copyReportTable() {
   gap: 8px;
   padding: 8px 16px;
   margin-top: 8px;
-  background: #f8f9fa;
+  background: var(--gt-color-bg);
   border: 1px solid #ebeef5;
   border-radius: var(--gt-radius-md, 6px);
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
 }
 .gt-rv-coverage-icon {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 .gt-rv-coverage-text {
   font-variant-numeric: tabular-nums;

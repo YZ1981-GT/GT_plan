@@ -317,7 +317,7 @@ function showResult(message, type) {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1.5px solid #ddd;
   border-radius: 24px;
   padding: 8px 12px;
@@ -328,35 +328,35 @@ function showResult(message, type) {
   box-shadow: 0 0 0 2px rgba(75, 45, 119, 0.1);
 }
 
-.input-icon { font-size: 18px; flex-shrink: 0; }
+.input-icon { font-size: var(--gt-font-size-xl); flex-shrink: 0; }
 
 .command-input {
   flex: 1;
   border: none;
   outline: none;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   background: transparent;
-  color: #333;
+  color: var(--gt-color-text-primary);
 }
-.command-input::placeholder { color: #bbb; }
+.command-input::placeholder { color: var(--gt-color-text-placeholder); }
 
 .btn-submit {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: #4b2d77;
-  color: #fff;
+  background: var(--gt-color-primary);
+  color: var(--gt-color-text-inverse);
   border: none;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   transition: background 0.2s;
 }
-.btn-submit:disabled { background: #ccc; cursor: not-allowed; }
-.btn-submit:hover:not(:disabled) { background: #3d2066; }
+.btn-submit:disabled { background: var(--gt-color-border); cursor: not-allowed; }
+.btn-submit:hover:not(:disabled) { background: var(--gt-color-primary-dark); }
 
 .loading-dots { animation: pulse 1s infinite; }
 @keyframes pulse {
@@ -366,7 +366,7 @@ function showResult(message, type) {
 
 /* Examples panel */
 .examples-panel {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #eee;
   border-radius: 8px;
   padding: 10px 12px;
@@ -381,16 +381,16 @@ function showResult(message, type) {
 }
 
 .examples-title {
-  font-size: 12px;
-  color: #999;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
 }
 
 .btn-close-examples {
   background: none;
   border: none;
   cursor: pointer;
-  color: #999;
-  font-size: 16px;
+  color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-md);
   padding: 0 4px;
 }
 
@@ -401,12 +401,12 @@ function showResult(message, type) {
 }
 
 .example-item {
-  background: #f5f5f5;
+  background: var(--gt-color-bg);
   padding: 4px 10px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   cursor: pointer;
-  color: #4b2d77;
+  color: var(--gt-color-primary);
   border: 1px solid transparent;
   transition: all 0.2s;
 }
@@ -427,7 +427,7 @@ function showResult(message, type) {
 }
 
 .command-confirm-wrapper {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 10px;
   width: 440px;
   max-width: 90vw;
@@ -440,25 +440,25 @@ function showResult(message, type) {
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background: #fffbe6;
+  background: var(--gt-color-wheat-light);
   border-bottom: 1px solid #ffe58f;
 }
 
-.confirm-icon { font-size: 18px; }
+.confirm-icon { font-size: var(--gt-font-size-xl); }
 
 .confirm-title {
   flex: 1;
   font-weight: 600;
-  font-size: 14px;
-  color: #d48806;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-wheat);
 }
 
 .btn-close-confirm {
   background: none;
   border: none;
   cursor: pointer;
-  color: #999;
-  font-size: 20px;
+  color: var(--gt-color-text-tertiary);
+  font-size: 20px /* allow-px: special */;
   padding: 0 4px;
 }
 
@@ -473,18 +473,18 @@ function showResult(message, type) {
   align-items: center;
 }
 
-.action-label { color: #888; font-size: 13px; }
+.action-label { color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm); }
 .action-value {
   font-weight: 600;
-  font-size: 14px;
-  color: #4b2d77;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-primary);
   background: rgba(75, 45, 119, 0.08);
   padding: 2px 10px;
   border-radius: 4px;
 }
 
 .params-preview {
-  background: #fafafa;
+  background: var(--gt-color-bg);
   border-radius: 6px;
   padding: 10px 12px;
   border: 1px solid #eee;
@@ -494,18 +494,18 @@ function showResult(message, type) {
   display: flex;
   gap: 8px;
   padding: 4px 0;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .param-row:not(:last-child) { border-bottom: 1px solid #f0f0f0; }
 
-.param-key { color: #888; min-width: 80px; }
-.param-value { color: #333; font-weight: 500; }
+.param-key { color: var(--gt-color-text-secondary); min-width: 80px; }
+.param-value { color: var(--gt-color-text-primary); font-weight: 500; }
 
 .confirm-actions {
   display: flex;
   gap: 10px;
   padding: 12px 16px;
-  background: #f9f9f9;
+  background: var(--gt-color-bg);
   border-top: 1px solid #eee;
   justify-content: flex-end;
 }
@@ -514,19 +514,19 @@ function showResult(message, type) {
   padding: 6px 18px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   border: none;
 }
 .btn-confirm-execute {
-  background: #52c41a;
-  color: #fff;
+  background: var(--gt-color-success);
+  color: var(--gt-color-text-inverse);
 }
-.btn-confirm-execute:hover { background: #389e0d; }
+.btn-confirm-execute:hover { background: var(--gt-color-success); }
 .btn-cancel-execute {
-  background: #f0f0f0;
-  color: #666;
+  background: var(--gt-color-border-lighter);
+  color: var(--gt-color-text-secondary);
 }
-.btn-cancel-execute:hover { background: #e0e0e0; }
+.btn-cancel-execute:hover { background: var(--gt-color-border-light); }
 
 /* Result toast */
 .result-toast {
@@ -536,17 +536,17 @@ function showResult(message, type) {
   transform: translateX(-50%);
   padding: 10px 20px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   display: flex;
   align-items: center;
   gap: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   z-index: 300;
 }
-.result-toast.success { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
-.result-toast.error { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; }
+.result-toast.success { background: var(--gt-bg-success); color: var(--gt-color-success); border: 1px solid #b7eb8f; }
+.result-toast.error { background: var(--gt-bg-danger); color: var(--gt-color-coral); border: 1px solid #ffccc7; }
 
-.result-icon { font-size: 16px; }
+.result-icon { font-size: var(--gt-font-size-md); }
 
 /* Transition */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.3s, transform 0.3s; }

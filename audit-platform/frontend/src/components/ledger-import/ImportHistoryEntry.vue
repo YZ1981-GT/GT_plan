@@ -229,7 +229,7 @@ function getStatusLabel(status: string): string {
 }
 
 .entry-date {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
 }
 
@@ -237,7 +237,7 @@ function getStatusLabel(status: string): string {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .entry-status {
@@ -250,7 +250,7 @@ function getStatusLabel(status: string): string {
 
 .entry-meta {
   color: var(--el-text-color-secondary);
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .entry-actions {

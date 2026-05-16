@@ -375,7 +375,7 @@ loadItems()
 }
 .panel-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 600;
 }
 .header-actions {
@@ -383,25 +383,25 @@ loadItems()
   gap: 8px;
 }
 .letter-table {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .summary-stats {
   margin-top: 16px;
 }
 .stat-card {
-  background: #f5f7fa;
+  background: var(--gt-bg-subtle);
   border-radius: 8px;
   padding: 16px;
   text-align: center;
 }
 .stat-value {
-  font-size: 24px;
+  font-size: 24px /* allow-px: special */;
   font-weight: 700;
-  color: #409EFF;
+  color: var(--gt-color-teal);
 }
 .stat-label {
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
   margin-top: 4px;
 }
 </style>

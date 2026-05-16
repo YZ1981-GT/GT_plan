@@ -88,7 +88,7 @@
               :value="wp.id"
             >
               <span style="float: left">{{ wp.wp_code }}</span>
-              <span style="float: right; color: var(--gt-color-text-secondary); font-size: 12px">{{ wp.wp_name }}</span>
+              <span style="float: right; color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-xs)">{{ wp.wp_name }}</span>
             </el-option>
           </el-select>
         </el-form-item>

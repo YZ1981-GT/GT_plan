@@ -115,20 +115,20 @@ onMounted(loadGraph)
 <style scoped>
 .formula-dependency-graph { padding: 12px; }
 .graph-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.title { font-weight: 600; font-size: 14px; }
+.title { font-weight: 600; font-size: var(--gt-font-size-sm); }
 .graph-container { display: flex; gap: 16px; }
 .nodes-panel { flex: 1; }
 .graph-node { padding: 8px 12px; border: 1px solid #e4e7ed; border-radius: 4px; margin-bottom: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
 .graph-node:hover { border-color: #4b2d77; }
-.graph-node.stale { background: #fdf6ec; border-color: #e6a23c; }
-.graph-node.selected { border-color: #4b2d77; background: #f8f7fc; }
-.node-code { font-weight: 600; font-size: 12px; }
-.node-name { font-size: 13px; color: #606266; }
-.order-panel { width: 200px; padding: 8px; background: #f5f7fa; border-radius: 4px; }
-.order-title { font-size: 12px; font-weight: 600; margin-bottom: 8px; }
-.order-list { font-size: 12px; padding-left: 16px; }
-.node-detail { margin-top: 12px; padding: 8px; background: #f5f7fa; border-radius: 4px; }
-.node-detail h4 { margin: 0 0 8px; font-size: 13px; }
-.edges-list { font-size: 12px; }
-.empty-tip { text-align: center; padding: 24px; color: #909399; }
+.graph-node.stale { background: var(--gt-bg-warning); border-color: #e6a23c; }
+.graph-node.selected { border-color: #4b2d77; background: var(--gt-color-primary-bg); }
+.node-code { font-weight: 600; font-size: var(--gt-font-size-xs); }
+.node-name { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-regular); }
+.order-panel { width: 200px; padding: 8px; background: var(--gt-bg-subtle); border-radius: 4px; }
+.order-title { font-size: var(--gt-font-size-xs); font-weight: 600; margin-bottom: 8px; }
+.order-list { font-size: var(--gt-font-size-xs); padding-left: 16px; }
+.node-detail { margin-top: 12px; padding: 8px; background: var(--gt-bg-subtle); border-radius: 4px; }
+.node-detail h4 { margin: 0 0 8px; font-size: var(--gt-font-size-sm); }
+.edges-list { font-size: var(--gt-font-size-xs); }
+.empty-tip { text-align: center; padding: 24px; color: var(--gt-color-info); }
 </style>

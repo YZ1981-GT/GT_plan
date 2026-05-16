@@ -162,7 +162,7 @@ onMounted(fetchLinks)
 }
 .panel-header .title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   display: flex;
   align-items: center;
   gap: 4px;

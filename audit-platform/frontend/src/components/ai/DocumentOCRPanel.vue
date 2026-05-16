@@ -314,18 +314,18 @@ function formatCurrency(val) {
 .gt-document-ocr-panel { padding: 16px; }
 
 .panel-header { margin-bottom: 16px; }
-.panel-header h3 { margin: 0 0 12px; font-size: 16px; }
+.panel-header h3 { margin: 0 0 12px; font-size: var(--gt-font-size-md); }
 
 .tab-nav { display: flex; flex-wrap: wrap; gap: 4px; }
 .tab-btn {
   padding: 4px 10px;
   border: 1px solid #ddd;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 4px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
-.tab-btn.active { background: #4b2d77; color: #fff; border-color: #4b2d77; }
+.tab-btn.active { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border-color: #4b2d77; }
 
 .upload-zone {
   border: 2px dashed #ccc;
@@ -337,20 +337,20 @@ function formatCurrency(val) {
 }
 .upload-zone:hover { border-color: #4b2d77; }
 .upload-hint { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.upload-icon { font-size: 28px; }
-.upload-types { font-size: 11px; color: #999; }
+.upload-icon { font-size: var(--gt-font-size-3xl); }
+.upload-types { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 
 .progress-bar-wrap {
   position: relative;
   height: 24px;
-  background: #f0f0f0;
+  background: var(--gt-color-border-lighter);
   border-radius: 4px;
   margin-bottom: 16px;
   overflow: hidden;
 }
 .progress-bar {
   height: 100%;
-  background: #4b2d77;
+  background: var(--gt-color-primary);
   transition: width 0.3s;
 }
 .progress-text {
@@ -359,8 +359,8 @@ function formatCurrency(val) {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  color: #fff;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-inverse);
 }
 
 .results-header {
@@ -372,21 +372,21 @@ function formatCurrency(val) {
 }
 
 :deep(.low-confidence) { background: rgba(255,0,0,0.06) !important; }
-.conf-low { color: #ff4d4f; }
-.conf-medium { color: #faad14; }
-.conf-high { color: #52c41a; }
+.conf-low { color: var(--gt-color-coral); }
+.conf-medium { color: var(--gt-color-wheat); }
+.conf-high { color: var(--gt-color-success); }
 
 .status-badge {
   display: inline-block;
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
-.status-badge.pending { background: #fff7e6; color: #fa8c16; }
-.status-badge.confirmed { background: #f6ffed; color: #52c41a; }
-.status-badge.matched { background: #f6ffed; color: #52c41a; }
-.status-badge.mismatched { background: #fff7e6; color: #fa8c16; }
-.status-badge.unmatched { background: #fff2f0; color: #ff4d4f; }
+.status-badge.pending { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); }
+.status-badge.confirmed { background: var(--gt-bg-success); color: var(--gt-color-success); }
+.status-badge.matched { background: var(--gt-bg-success); color: var(--gt-color-success); }
+.status-badge.mismatched { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); }
+.status-badge.unmatched { background: var(--gt-bg-danger); color: var(--gt-color-coral); }
 
 :deep(.row-warning) { background: rgba(255,173,0,0.08) !important; }
 :deep(.row-error) { background: rgba(255,77,79,0.06) !important; }
@@ -395,32 +395,32 @@ function formatCurrency(val) {
   border: 1px solid #4b2d77;
   border-radius: 4px;
   padding: 2px 6px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   width: 100%;
 }
 
 .btn-sm {
   padding: 2px 6px;
   border: 1px solid #ddd;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 4px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
-.btn-sm:hover { background: #f0f0f0; }
-.btn-primary { background: #4b2d77; color: #fff; border-color: #4b2d77; }
+.btn-sm:hover { background: var(--gt-color-border-lighter); }
+.btn-primary { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border-color: #4b2d77; }
 
 .btn-link-ledger {
   padding: 4px 12px;
-  background: #4b2d77;
-  color: #fff;
+  background: var(--gt-color-primary);
+  color: var(--gt-color-text-inverse);
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
-.btn-link-ledger:disabled { background: #ccc; cursor: not-allowed; }
+.btn-link-ledger:disabled { background: var(--gt-color-border); cursor: not-allowed; }
 
 .match-results { margin-top: 16px; }
-.match-results h4 { margin-bottom: 8px; font-size: 14px; }
+.match-results h4 { margin-bottom: 8px; font-size: var(--gt-font-size-sm); }
 </style>

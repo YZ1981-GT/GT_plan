@@ -251,7 +251,7 @@ function updateToolbarState() {
   gap: 4px;
   padding: 4px 8px;
   border-bottom: 1px solid #ebeef5;
-  background: #fafafa;
+  background: var(--gt-color-bg);
   flex-wrap: wrap;
 }
 
@@ -272,12 +272,12 @@ function updateToolbarState() {
 }
 
 .nrte-toolbar .el-button.active {
-  background: #e6e8eb;
+  background: var(--gt-color-border-light);
 }
 
 .nrte-word-count {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   margin-left: 8px;
 }
 
@@ -292,13 +292,13 @@ function updateToolbarState() {
   min-height: 200px;
   outline: none;
   font-family: '仿宋_GB2312', '仿宋', FangSong, serif;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   line-height: 1.8;
 }
 
 .nrte-content:empty::before {
   content: attr(data-placeholder);
-  color: #c0c4cc;
+  color: var(--gt-color-text-placeholder);
 }
 
 .nrte-source-wrapper {
@@ -312,7 +312,7 @@ function updateToolbarState() {
   border: none;
   outline: none;
   font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   line-height: 1.5;
   resize: vertical;
 }
@@ -320,12 +320,12 @@ function updateToolbarState() {
 /* Placeholder tag style */
 :deep(.nrte-placeholder) {
   display: inline-block;
-  background: #e6f7ff;
-  color: #1890ff;
+  background: var(--gt-bg-info);
+  color: var(--gt-color-teal);
   border: 1px solid #91d5ff;
   border-radius: 3px;
   padding: 0 6px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   line-height: 20px;
   cursor: default;
   user-select: none;
@@ -346,7 +346,7 @@ function updateToolbarState() {
 }
 
 :deep(.nrte-table th) {
-  background: #f5f7fa;
+  background: var(--gt-bg-subtle);
   font-weight: bold;
 }
 </style>

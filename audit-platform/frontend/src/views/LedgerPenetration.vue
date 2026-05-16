@@ -9,7 +9,7 @@
     <!-- 账套信息栏 -->
     <div class="gt-ledger-header">
       <div class="gt-ledger-title">
-        <el-tag size="large" type="warning" effect="dark" style="font-size: 18px; padding: 8px 20px; font-weight: 600">{{ currentProject?.name || currentProject?.client_name || '—' }}</el-tag>
+        <el-tag size="large" type="warning" effect="dark" style="font-size: var(--gt-font-size-xl); padding: 8px 20px; font-weight: 600">{{ currentProject?.name || currentProject?.client_name || '—' }}</el-tag>
       </div>
       <div class="gt-ledger-switches">
         <el-select
@@ -127,14 +127,14 @@
       <!-- 空状态 -->
       <div v-if="balanceTab === 'account' && !loading && balanceData.length === 0" class="gt-empty-state">
         <template v-if="isImportActive">
-          <div style="font-size: 32px; margin-bottom: 12px">⏳</div>
-          <p style="font-size: 15px; color: #4b2d77; font-weight: 500">数据处理中...</p>
-          <p style="font-size: 13px; color: #909399">后台正在导入账套数据，完成后此处将自动显示。可在顶栏查看进度。</p>
+          <div style="font-size: 32px /* allow-px: special */; margin-bottom: 12px">⏳</div>
+          <p style="font-size: var(--gt-font-size-base); color: var(--gt-color-primary); font-weight: 500">数据处理中...</p>
+          <p style="font-size: var(--gt-font-size-sm); color: var(--gt-color-info)">后台正在导入账套数据，完成后此处将自动显示。可在顶栏查看进度。</p>
           <el-button size="small" style="margin-top: 12px" @click="refresh">刷新查看</el-button>
         </template>
         <template v-else>
-          <p style="font-size: 15px; color: #999">暂无科目余额数据</p>
-          <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」上传包含余额表的 Excel/CSV 文件</p>
+          <p style="font-size: var(--gt-font-size-base); color: var(--gt-color-text-tertiary)">暂无科目余额数据</p>
+          <p style="font-size: var(--gt-font-size-sm); color: var(--gt-color-text-placeholder)">请点击右上角「导入数据」上传包含余额表的 Excel/CSV 文件</p>
         </template>
       </div>
 
@@ -248,14 +248,14 @@
         <!-- 空状态 -->
         <div v-if="!loading && auxSummaryData.length === 0 && auxPagedRows.length === 0 && treeAuxBalance.length === 0" class="gt-empty-state">
           <template v-if="isImportActive">
-            <div style="font-size: 32px; margin-bottom: 12px">⏳</div>
-            <p style="font-size: 15px; color: #4b2d77; font-weight: 500">数据处理中...</p>
-            <p style="font-size: 13px; color: #909399">后台正在导入账套数据，完成后此处将自动显示。</p>
+            <div style="font-size: 32px /* allow-px: special */; margin-bottom: 12px">⏳</div>
+            <p style="font-size: var(--gt-font-size-base); color: var(--gt-color-primary); font-weight: 500">数据处理中...</p>
+            <p style="font-size: var(--gt-font-size-sm); color: var(--gt-color-info)">后台正在导入账套数据，完成后此处将自动显示。</p>
             <el-button size="small" style="margin-top: 12px" @click="loadAllAuxBalance">刷新查看</el-button>
           </template>
           <template v-else>
-            <p style="font-size: 15px; color: #999">暂无辅助余额数据</p>
-            <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」重新上传包含辅助账的 Excel/CSV 文件</p>
+            <p style="font-size: var(--gt-font-size-base); color: var(--gt-color-text-tertiary)">暂无辅助余额数据</p>
+            <p style="font-size: var(--gt-font-size-sm); color: var(--gt-color-text-placeholder)">请点击右上角「导入数据」重新上传包含辅助账的 Excel/CSV 文件</p>
           </template>
         </div>
 
@@ -281,12 +281,12 @@
         >
           <template #empty>
             <div v-if="isImportActive" style="padding: 40px 0; text-align: center">
-              <div style="font-size: 32px; margin-bottom: 12px">⏳</div>
-              <p style="font-size: 15px; color: #4b2d77; font-weight: 500; margin: 0">数据处理中...</p>
-              <p style="font-size: 13px; color: #909399; margin: 8px 0 12px">后台正在导入账套数据，完成后此处将自动显示。</p>
+              <div style="font-size: 32px /* allow-px: special */; margin-bottom: 12px">⏳</div>
+              <p style="font-size: var(--gt-font-size-base); color: var(--gt-color-primary); font-weight: 500; margin: 0">数据处理中...</p>
+              <p style="font-size: var(--gt-font-size-sm); color: var(--gt-color-info); margin: 8px 0 12px">后台正在导入账套数据，完成后此处将自动显示。</p>
               <el-button size="small" @click="loadAllAuxBalance">刷新查看</el-button>
             </div>
-            <div v-else style="padding: 40px 0; text-align: center; color: #999">
+            <div v-else style="padding: 40px 0; text-align: center; color: var(--gt-color-text-tertiary)">
               暂无数据
             </div>
           </template>
@@ -307,12 +307,12 @@
           <el-table-column prop="aux_name" label="辅助名称" min-width="160" show-overflow-tooltip>
             <template #default="{ row }">
               <span v-if="!row._isGroup" class="gt-link" @click.stop="drillToAuxLedgerFromBalance(row)">{{ row.aux_name }}</span>
-              <span v-else style="font-weight: 600; color: #4b2d77">{{ row.aux_name }}</span>
+              <span v-else style="font-weight: 600; color: var(--gt-color-primary)">{{ row.aux_name }}</span>
             </template>
           </el-table-column>
           <el-table-column label="关联维度" min-width="200" show-overflow-tooltip>
             <template #default="{ row }">
-              <span v-if="!row._isGroup && row.aux_dimensions_raw" style="color: #999">
+              <span v-if="!row._isGroup && row.aux_dimensions_raw" style="color: var(--gt-color-text-tertiary)">
                 {{ formatOtherDims(row.aux_dimensions_raw, row.aux_type || auxSelectedDimType) }}
               </span>
             </template>
@@ -587,7 +587,7 @@
   >
     <!-- 进度条放在 dialog 顶部（header 下方，不被 v-loading 遮罩覆盖） -->
     <template #header>
-      <span style="font-size: 16px; font-weight: 600">账套导入</span>
+      <span style="font-size: var(--gt-font-size-md); font-weight: 600">账套导入</span>
       <el-progress
         v-if="previewing || importing"
         :percentage="Math.round(importProgressPct)"
@@ -612,16 +612,16 @@
         accept=".xlsx,.csv"
         :on-change="onImportFileChange"
       >
-        <el-icon style="font-size: 40px; color: #c0c4cc"><Upload /></el-icon>
-        <div style="margin-top: 8px; color: #666">拖拽文件到此处，或点击选择</div>
-        <div style="font-size: 12px; color: #999; margin-top: 4px">
+        <el-icon style="font-size: 40px /* allow-px: special */; color: var(--gt-color-text-placeholder)"><Upload /></el-icon>
+        <div style="margin-top: 8px; color: var(--gt-color-text-secondary)">拖拽文件到此处，或点击选择</div>
+        <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 4px">
           支持多个文件（如余额表 + 多个序时账），自动识别合并
         </div>
       </el-upload>
       <div style="margin-top: 12px">
-        <span style="font-size: 13px; color: #666">年度：</span>
+        <span style="font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary)">年度：</span>
         <el-input-number v-model="importYear" :min="2000" :max="2099" size="small" style="width: 120px" />
-        <span style="font-size: 12px; color: #999; margin-left: 8px">不填则自动从文件内容提取</span>
+        <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-left: 8px">不填则自动从文件内容提取</span>
       </div>
 
       <!-- P2-1.3 + P2: 耗时预估 + 关注事项 -->
@@ -636,7 +636,7 @@
           <b>预计耗时 {{ importEstimateText }}</b>
           <span v-if="importIsLargeFile"> · 建议上传后使用"关闭（后台继续）"</span>
         </template>
-        <div style="font-size: 12px; line-height: 1.8; margin-top: 4px">
+        <div style="font-size: var(--gt-font-size-xs); line-height: 1.8; margin-top: 4px">
           <div>• 总大小 <b>{{ formatFileSize(importTotalBytes) }}</b>，共 {{ importFiles.length }} 个文件</div>
           <div>• 耗时 = 上传 + 识别 + 入库（按网速 20Mbps 估算，实际可能有波动）</div>
           <div>• 损益类科目期末结转后 opening/closing 为空属正常；辅助维度按单一类型聚合应等于主表</div>
@@ -648,7 +648,7 @@
       <!-- FAQ 折叠面板 -->
       <el-collapse style="margin-top: 12px">
         <el-collapse-item title="常见问题" name="faq">
-          <div style="font-size: 12px; line-height: 1.8; color: #606266">
+          <div style="font-size: var(--gt-font-size-xs); line-height: 1.8; color: var(--gt-color-text-regular)">
             <p><b>Q：为什么损益类科目 opening_balance 为空？</b><br/>
             A：会计准则规定损益类期末结转到本年利润，opening/closing 天然为 NULL，只有 debit/credit 有值。余额树形"有金额"过滤器已按此差异化处理。</p>
             <p><b>Q：辅助维度为什么同一笔金额出现在多行？</b><br/>
@@ -686,14 +686,14 @@
           <b>列映射完成率：{{ mappingCoverage.mapped }}/{{ mappingCoverage.total }} ({{ mappingCoverage.rate }}%)</b>
           <span v-if="mappingCoverage.isWarning"> · 建议检查下方未识别列</span>
         </template>
-        <div style="font-size: 12px; line-height: 1.8; margin-top: 4px">
+        <div style="font-size: var(--gt-font-size-xs); line-height: 1.8; margin-top: 4px">
           <div v-for="(info, idx) in mappingCoverage.sheets" :key="idx">
             • {{ info.sheet }} ({{ info.data_type }}): {{ info.mapped }}/{{ info.total }} ({{ info.rate }}%)
-            <span v-if="info.unmapped.length > 0" style="color: #909399">
+            <span v-if="info.unmapped.length > 0" style="color: var(--gt-color-info)">
               未识别 {{ info.unmapped.length }} 列：{{ info.unmapped.slice(0, 5).join('、') }}{{ info.unmapped.length > 5 ? '…' : '' }}
             </span>
           </div>
-          <div style="color: #909399; margin-top: 4px">
+          <div style="color: var(--gt-color-info); margin-top: 4px">
             未识别列将不被写入四表，如有需要请在下方"列映射调整"中手动设置。
           </div>
         </div>
@@ -709,26 +709,26 @@
 
       <!-- 文件诊断 -->
       <div style="margin-bottom: 8px">
-        <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px">文件解析诊断</div>
+        <div style="font-weight: 600; margin-bottom: 6px; font-size: var(--gt-font-size-sm)">文件解析诊断</div>
         <div v-for="(d, i) in previewResult?.diagnostics" :key="i"
-             style="font-size: 12px; padding: 3px 0; color: #666">
+             style="font-size: var(--gt-font-size-xs); padding: 3px 0; color: var(--gt-color-text-secondary)">
           <el-tag :type="d.status === 'ok' ? 'success' : d.status === 'error' ? 'danger' : 'info'" size="small" style="margin-right: 4px">
             {{ d.data_type || '?' }}
           </el-tag>
           {{ d.file }} / {{ d.sheet }} — {{ d.row_count?.toLocaleString() || 0 }} 行
-          <span v-if="d.company_code" style="color: #67c23a; margin-left: 4px">{{ d.company_code }}</span>
-          <span v-if="d.year" style="color: #67c23a; margin-left: 2px">{{ d.year }}年</span>
-          <span v-if="d.balance_count_est != null" style="color: #409eff">（估算余额 {{ d.balance_count_est.toLocaleString() }}）</span>
-          <span v-if="d.ledger_count_est != null" style="color: #409eff">（估算序时账 {{ d.ledger_count_est.toLocaleString() }}）</span>
-          <span v-if="d.balance_count != null" style="color: #409eff">（余额{{ d.balance_count }}, 辅助{{ d.aux_balance_count }}）</span>
-          <span v-if="d.ledger_count != null" style="color: #409eff">（序时账{{ d.ledger_count?.toLocaleString() }}, 辅助{{ d.aux_ledger_count?.toLocaleString() }}）</span>
+          <span v-if="d.company_code" style="color: var(--gt-color-success); margin-left: 4px">{{ d.company_code }}</span>
+          <span v-if="d.year" style="color: var(--gt-color-success); margin-left: 2px">{{ d.year }}年</span>
+          <span v-if="d.balance_count_est != null" style="color: var(--gt-color-teal)">（估算余额 {{ d.balance_count_est.toLocaleString() }}）</span>
+          <span v-if="d.ledger_count_est != null" style="color: var(--gt-color-teal)">（估算序时账 {{ d.ledger_count_est.toLocaleString() }}）</span>
+          <span v-if="d.balance_count != null" style="color: var(--gt-color-teal)">（余额{{ d.balance_count }}, 辅助{{ d.aux_balance_count }}）</span>
+          <span v-if="d.ledger_count != null" style="color: var(--gt-color-teal)">（序时账{{ d.ledger_count?.toLocaleString() }}, 辅助{{ d.aux_ledger_count?.toLocaleString() }}）</span>
           <el-tag v-if="d.wide_table_detected" size="small" type="warning" style="margin-left: 4px">宽表格式</el-tag>
         </div>
       </div>
 
       <!-- 列映射手动调整 -->
       <div v-for="(d, i) in previewResult?.diagnostics" :key="`map-${i}`" style="margin-bottom: 12px">
-        <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px">
+        <div style="font-weight: 600; margin-bottom: 6px; font-size: var(--gt-font-size-sm)">
           列映射调整 — {{ d.file }}
           <el-tag v-if="d.wide_table_detected" size="small" type="warning" style="margin-left: 4px">检测到宽表格式（前数据后列名）</el-tag>
         </div>
@@ -770,10 +770,10 @@
 
     <!-- 步骤3：导入中 -->
     <div v-if="importStep === 'importing'" style="text-align: center; padding: 40px 0">
-      <el-icon class="is-loading" style="font-size: 32px; color: #409eff"><Loading /></el-icon>
-      <div style="margin-top: 12px; color: #666">
+      <el-icon class="is-loading" style="font-size: 32px /* allow-px: special */; color: var(--gt-color-teal)"><Loading /></el-icon>
+      <div style="margin-top: 12px; color: var(--gt-color-text-secondary)">
         正在后台写入数据库，可关闭弹窗继续操作…<br>
-        <span style="font-size: 12px; color: #999">{{ bgImportMessage }}</span>
+        <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary)">{{ bgImportMessage }}</span>
       </div>
     </div>
 
@@ -836,36 +836,36 @@
       <div v-if="validateResult">
         <!-- 概览卡片 -->
         <div style="display: flex; gap: 12px; margin-bottom: 16px">
-          <div style="flex: 1; padding: 12px; background: #f8f7fc; border-radius: 8px; text-align: center">
-            <div style="font-size: 20px; font-weight: 600; color: #4b2d77">{{ validateResult.summary?.balance_count || 0 }}</div>
-            <div style="font-size: 12px; color: #909399">余额表科目</div>
+          <div style="flex: 1; padding: 12px; background: var(--gt-color-primary-bg); border-radius: 8px; text-align: center">
+            <div style="font-size: 20px /* allow-px: special */; font-weight: 600; color: var(--gt-color-primary)">{{ validateResult.summary?.balance_count || 0 }}</div>
+            <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-info)">余额表科目</div>
           </div>
-          <div style="flex: 1; padding: 12px; background: #f8f7fc; border-radius: 8px; text-align: center">
-            <div style="font-size: 20px; font-weight: 600; color: #4b2d77">{{ validateResult.summary?.aux_account_count || 0 }}</div>
-            <div style="font-size: 12px; color: #909399">辅助核算科目</div>
+          <div style="flex: 1; padding: 12px; background: var(--gt-color-primary-bg); border-radius: 8px; text-align: center">
+            <div style="font-size: 20px /* allow-px: special */; font-weight: 600; color: var(--gt-color-primary)">{{ validateResult.summary?.aux_account_count || 0 }}</div>
+            <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-info)">辅助核算科目</div>
           </div>
-          <div style="flex: 1; padding: 12px; background: #f8f7fc; border-radius: 8px; text-align: center">
-            <div style="font-size: 20px; font-weight: 600; color: #4b2d77">{{ validateResult.summary?.ledger_account_count || 0 }}</div>
-            <div style="font-size: 12px; color: #909399">序时账科目</div>
+          <div style="flex: 1; padding: 12px; background: var(--gt-color-primary-bg); border-radius: 8px; text-align: center">
+            <div style="font-size: 20px /* allow-px: special */; font-weight: 600; color: var(--gt-color-primary)">{{ validateResult.summary?.ledger_account_count || 0 }}</div>
+            <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-info)">序时账科目</div>
           </div>
         </div>
 
         <!-- 校验结果 -->
         <div v-for="(f, idx) in validateResult.findings" :key="idx"
-          style="margin-bottom: 8px; padding: 8px 12px; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 8px"
+          style="margin-bottom: 8px; padding: 8px 12px; border-radius: 6px; font-size: var(--gt-font-size-sm); display: flex; align-items: center; gap: 8px"
           :style="{
             background: f.level === 'error' ? '#fef0f0' : f.level === 'warning' ? '#fdf6ec' : '#f0f9eb',
             border: `1px solid ${f.level === 'error' ? '#fbc4c4' : f.level === 'warning' ? '#f5dab1' : '#c2e7b0'}`,
           }"
         >
-          <span style="font-size: 16px; flex-shrink: 0">{{ f.level === 'error' ? '❌' : f.level === 'warning' ? '⚠️' : '✅' }}</span>
-          <span style="font-weight: 500; min-width: 120px; flex-shrink: 0; color: #606266">{{ f.category }}</span>
-          <span style="color: #303133">{{ f.message }}</span>
+          <span style="font-size: var(--gt-font-size-md); flex-shrink: 0">{{ f.level === 'error' ? '❌' : f.level === 'warning' ? '⚠️' : '✅' }}</span>
+          <span style="font-weight: 500; min-width: 120px; flex-shrink: 0; color: var(--gt-color-text-regular)">{{ f.category }}</span>
+          <span style="color: var(--gt-color-text-primary)">{{ f.message }}</span>
         </div>
 
         <!-- 全部通过 -->
         <div v-if="validateResult.summary?.errors === 0 && validateResult.summary?.warnings === 0"
-          style="text-align: center; padding: 20px; color: #67c23a; font-size: 15px; font-weight: 500">
+          style="text-align: center; padding: 20px; color: var(--gt-color-success); font-size: var(--gt-font-size-base); font-weight: 500">
           🎉 数据一致性校验全部通过
         </div>
       </div>
@@ -905,8 +905,8 @@
             </el-table-column>
             <el-table-column prop="error_message" label="错误" min-width="180" show-overflow-tooltip>
               <template #default="{ row }">
-                <span v-if="row.error_message" style="color: #f56c6c">{{ row.error_message }}</span>
-                <span v-else style="color: #999">—</span>
+                <span v-if="row.error_message" style="color: var(--gt-color-coral)">{{ row.error_message }}</span>
+                <span v-else style="color: var(--gt-color-text-tertiary)">—</span>
               </template>
             </el-table-column>
           </el-table>
@@ -3158,7 +3158,7 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   padding: var(--gt-space-4);
   overflow-y: auto;
 }
@@ -3167,8 +3167,8 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 8px 16px;
   background: var(--gt-color-primary-dark, #4b2d77);
-  color: #fff;
-  font-size: 14px;
+  color: var(--gt-color-text-inverse);
+  font-size: var(--gt-font-size-sm);
   font-weight: 500;
   border-radius: var(--gt-radius-md);
   margin-bottom: var(--gt-space-3);
@@ -3178,7 +3178,7 @@ onBeforeUnmount(() => {
 .gt-context-menu {
   position: fixed;
   z-index: 9999;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #e4e7ed;
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
@@ -3187,9 +3187,9 @@ onBeforeUnmount(() => {
 }
 .gt-context-menu__item {
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   cursor: pointer;
-  color: #303133;
+  color: var(--gt-color-text-primary);
   transition: background 0.15s;
 }
 .gt-context-menu__item:hover {
@@ -3198,14 +3198,14 @@ onBeforeUnmount(() => {
 }
 .gt-context-menu__divider {
   height: 1px;
-  background: #e4e7ed;
+  background: var(--gt-color-border-light);
   margin: 4px 0;
   padding: 0;
   cursor: default;
 }
 .gt-context-menu__divider:hover {
-  background: #e4e7ed;
-  color: #303133;
+  background: var(--gt-color-border-light);
+  color: var(--gt-color-text-primary);
 }
 
 .gt-ledger-header {
@@ -3216,7 +3216,7 @@ onBeforeUnmount(() => {
 }
 .gt-ledger-title { display: flex; align-items: center; }
 .gt-ledger-company {
-  font-size: 16px; font-weight: 600; color: var(--gt-color-primary-dark);
+  font-size: var(--gt-font-size-md); font-weight: 600; color: var(--gt-color-primary-dark);
 }
 .gt-ledger-switches { display: flex; align-items: center; gap: 8px; }
 
@@ -3225,8 +3225,8 @@ onBeforeUnmount(() => {
   border-bottom: 2px solid #e8e8e8;
 }
 .gt-balance-tab {
-  padding: 8px 20px; cursor: pointer; font-size: 14px; font-weight: 500;
-  color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px;
+  padding: 8px 20px; cursor: pointer; font-size: var(--gt-font-size-sm); font-weight: 500;
+  color: var(--gt-color-text-secondary); border-bottom: 2px solid transparent; margin-bottom: -2px;
   transition: all 0.2s;
 }
 .gt-balance-tab:hover { color: var(--gt-color-primary); }
@@ -3265,10 +3265,10 @@ onBeforeUnmount(() => {
 
 /* 表格单元格字号统一 13px */
 :deep(.el-table .el-table__cell) {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 :deep(.el-table .el-table__header-wrapper th) {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .gt-pagination { margin-top: var(--gt-space-3); display: flex; justify-content: flex-end; }
@@ -3276,41 +3276,41 @@ onBeforeUnmount(() => {
 .gt-empty-state {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   min-height: 300px; border: 1px dashed #e0e0e0; border-radius: var(--gt-radius-md);
-  background: #fafafa;
+  background: var(--gt-color-bg);
 }
 
 /* 序时账特殊行样式 */
 :deep(.gt-ledger-opening) {
-  background: #f0ecf7 !important;
+  background: var(--gt-color-primary-bg) !important;
   font-weight: 600;
   font-style: italic;
 }
 :deep(.gt-ledger-subtotal) {
-  background: #fef6e6 !important;
+  background: var(--gt-bg-warning) !important;
   font-weight: 600;
   border-top: 1px solid #e6a23c;
 }
 
 /* 任务 12.8.1：异常凭证视觉标记（需求 25） */
 :deep(.gt-ledger-row--over-materiality) {
-  background: #fef0e6 !important;
+  background: var(--gt-bg-warning) !important;
 }
 :deep(.gt-ledger-row--over-materiality) td:first-child::before {
   content: '⚠️';
   margin-right: 4px;
 }
 :deep(.gt-ledger-row--period-end) {
-  background: #fff8e8 !important;
+  background: var(--gt-color-wheat-light) !important;
 }
 :deep(.gt-ledger-row--period-end) td:first-child::after {
   content: '  截止';
-  color: #e6a23c;
-  font-size: 11px;
+  color: var(--gt-color-wheat);
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
   margin-left: 4px;
 }
 :deep(.gt-ledger-row--red-reversal) td {
-  color: #f56c6c !important;
+  color: var(--gt-color-coral) !important;
 }
 
 /* 辅助余额表维度标签 */
@@ -3320,18 +3320,18 @@ onBeforeUnmount(() => {
 
 /* 选中行样式：浅蓝背景，无左边框竖线 */
 :deep(.el-table__body tr.current-row > td.el-table__cell) {
-  background: #e8f4fd !important;
+  background: var(--gt-bg-info) !important;
   border-left: none !important;
 }
 
 /* hover 行样式：更浅的蓝灰色 */
 :deep(.el-table__body tr:hover > td.el-table__cell) {
-  background: #f5f8fc !important;
+  background: var(--gt-color-primary-bg) !important;
 }
 
 /* 选中行 + hover 同时生效 */
 :deep(.el-table__body tr.current-row:hover > td.el-table__cell) {
-  background: #dceefb !important;
+  background: var(--gt-bg-info) !important;
 }
 
 /* 去掉 el-table 默认的选中行左边框效果 */
@@ -3348,9 +3348,9 @@ onBeforeUnmount(() => {
 }
 .gt-dim-tab {
   display: inline-flex; align-items: center;
-  padding: 4px 12px; font-size: 13px; cursor: pointer;
+  padding: 4px 12px; font-size: var(--gt-font-size-sm); cursor: pointer;
   border-radius: var(--gt-radius-sm); border: 1px solid #e8e8e8;
-  color: #666; background: #fafafa; transition: all 0.15s;
+  color: var(--gt-color-text-secondary); background: var(--gt-color-bg); transition: all 0.15s;
 }
 .gt-dim-tab:hover { border-color: var(--gt-color-primary-lighter); color: var(--gt-color-primary); }
 .gt-dim-tab--active {
@@ -3367,8 +3367,8 @@ onBeforeUnmount(() => {
   border-top: 1px dashed #e0dde5;
 }
 .gt-completion-guide .guide-title {
-  font-size: 13px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
   margin-bottom: 12px;
   font-weight: 500;
 }
@@ -3384,7 +3384,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   text-align: center;
   transition: all 0.15s ease;
-  background: #fff;
+  background: var(--gt-color-bg-white);
 }
 .gt-completion-guide .guide-card:hover {
   border-color: var(--gt-color-primary);
@@ -3392,18 +3392,18 @@ onBeforeUnmount(() => {
   transform: translateY(-2px);
 }
 .gt-completion-guide .guide-card-icon {
-  font-size: 24px;
+  font-size: 24px /* allow-px: special */;
   margin-bottom: 6px;
 }
 .gt-completion-guide .guide-card-title {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
   margin-bottom: 4px;
 }
 .gt-completion-guide .guide-card-desc {
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   line-height: 1.5;
 }
 </style>

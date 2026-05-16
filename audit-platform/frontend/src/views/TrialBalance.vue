@@ -88,7 +88,7 @@
           <div style="max-width: 280px; line-height: 1.6">
             <b>科目明细</b><br>
             按科目编码逐行展示期初、AJE调整、RJE重分类、审定数。<br>
-            <span style="color: #e6a23c">适用：逐科目核对数据、录入调整分录</span>
+            <span style="color: var(--gt-color-wheat)">适用：逐科目核对数据、录入调整分录</span>
           </div>
         </template>
         <span class="gt-tb-view-tag" :class="{ 'gt-tb-view-tag--active': tbViewMode === 'detail' }" @click="tbViewMode = 'detail'">科目明细</span>
@@ -98,7 +98,7 @@
           <div style="max-width: 280px; line-height: 1.6">
             <b>试算平衡表</b><br>
             按报表行次（资产负债表/利润表）汇总展示，对应审计报告附表格式。<br>
-            <span style="color: #e6a23c">适用：出具报表前核对借贷平衡、查看审定后报表数</span>
+            <span style="color: var(--gt-color-wheat)">适用：出具报表前核对借贷平衡、查看审定后报表数</span>
           </div>
         </template>
         <span class="gt-tb-view-tag" :class="{ 'gt-tb-view-tag--active': tbViewMode === 'summary' }" @click="tbViewMode = 'summary'; loadTbSummary()">试算平衡表</span>
@@ -124,7 +124,7 @@
         <el-button size="small" @click="triggerTbSumImport">📥 导入</el-button>
         <input ref="tbSumImportInput" type="file" accept=".xlsx,.xls" style="display:none" @change="onTbSumImportFile" />
         <el-button size="small" @click="saveTbSummary">💾 保存</el-button>
-        <span style="font-size:11px;color:#999;margin-left:12px">{{ tbSummaryRows.length }} 行</span>
+        <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);margin-left:12px">{{ tbSummaryRows.length }} 行</span>
       </template>
     </div>
 
@@ -140,11 +140,11 @@
       show-icon
       style="margin-bottom: 12px"
     >
-      <div v-if="!consistencyResult.consistent && consistencyResult.issues.length > 0" style="font-size: 12px; line-height: 1.8; margin-top: 4px">
+      <div v-if="!consistencyResult.consistent && consistencyResult.issues.length > 0" style="font-size: var(--gt-font-size-xs); line-height: 1.8; margin-top: 4px">
         <div v-for="(issue, idx) in consistencyResult.issues.slice(0, 5)" :key="idx" style="padding: 2px 0">
           · {{ (issue as any).message || (issue as any).description || JSON.stringify(issue) }}
         </div>
-        <div v-if="consistencyResult.issues.length > 5" style="color: #909399; margin-top: 4px">
+        <div v-if="consistencyResult.issues.length > 5" style="color: var(--gt-color-info); margin-top: 4px">
           还有 {{ consistencyResult.issues.length - 5 }} 项未显示
         </div>
       </div>
@@ -159,7 +159,7 @@
       <el-button v-if="!isFrozen" size="small" type="primary" :loading="recalcLoading" @click="onRecalc">
         立即刷新
       </el-button>
-      <div v-if="latestAdjustmentAt" style="font-size: 11px; color: #909399; margin-left: 12px">
+      <div v-if="latestAdjustmentAt" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-info); margin-left: 12px">
         最新调整：{{ new Date(latestAdjustmentAt).toLocaleString('zh-CN') }}
       </div>
     </div>
@@ -193,7 +193,7 @@
         <el-button v-else-if="setupCurrentStep === 2" type="primary" @click="onRecalc">
           生成试算表
         </el-button>
-        <div v-if="setupCurrentStep === 1" style="margin-top: 8px; font-size: 12px; color: #909399">
+        <div v-if="setupCurrentStep === 1" style="margin-top: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-info)">
           系统将从已导入的余额表中读取一级科目，按编码规则自动匹配到标准分类（1xxx=资产、2xxx=负债...）
         </div>
       </div>
@@ -228,7 +228,7 @@
         <!-- 无数据：引导去导入 -->
         <div v-else-if="!checkingData">
           <el-empty description="当前项目暂无账套数据" :image-size="80">
-            <div style="font-size: 13px; color: #909399; margin-bottom: 12px">
+            <div style="font-size: var(--gt-font-size-sm); color: var(--gt-color-info); margin-bottom: 12px">
               请先在「查账」页面导入科目余额表和序时账
             </div>
             <el-button type="primary" @click="goToLedgerImport">
@@ -256,8 +256,8 @@
     />
 
     <!-- 试算表主表（科目明细视图） -->
-    <div v-if="tbViewMode === 'detail' && staleAccountCodes.size > 0" style="margin-bottom: 6px; font-size: 12px; color: #909399; display: flex; align-items: center; gap: 6px">
-      <span style="display: inline-block; width: 14px; height: 14px; background: #fef9e7; border-left: 3px solid #f0c040; border-radius: 2px"></span>
+    <div v-if="tbViewMode === 'detail' && staleAccountCodes.size > 0" style="margin-bottom: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-info); display: flex; align-items: center; gap: 6px">
+      <span style="display: inline-block; width: 14px; height: 14px; background: var(--gt-bg-warning); border-left: 3px solid #f0c040; border-radius: 2px"></span>
       <span>黄底行 = 有新调整分录待重算</span>
     </div>
     <el-table
@@ -282,7 +282,7 @@
             class="clickable" @click="onOpenWorkpaper(row.standard_account_code)"
             :title="'打开底稿 ' + getLinkedWp(row.standard_account_code)?.wp_name">
             {{ row.standard_account_code }}
-            <el-icon style="margin-left:2px; font-size:11px; vertical-align:middle"><Link /></el-icon>
+            <el-icon style="margin-left:2px; font-size: var(--gt-font-size-xs); vertical-align:middle"><Link /></el-icon>
           </span>
           <span v-else>{{ row.standard_account_code }}</span>
         </template>
@@ -355,15 +355,15 @@
       <el-table-column label="底稿状态" width="120" align="center" :header-cell-style="{ whiteSpace: 'nowrap' }">
         <template #default="{ row }">
           <el-tooltip v-if="row.wp_consistency?.status === 'consistent'" content="底稿审定数一致" placement="top">
-            <span style="color: #28a745; cursor: pointer" @dblclick="openWorkpaper(row)">✅</span>
+            <span style="color: var(--gt-color-success); cursor: pointer" @dblclick="openWorkpaper(row)">✅</span>
           </el-tooltip>
           <el-tooltip v-else-if="row.wp_consistency?.status === 'stale'" content="上游数据已变更，点击重算">
             <span style="color: var(--gt-color-teal, #009688); cursor: pointer" @click="onRecalcWp(row)">🔄</span>
           </el-tooltip>
           <el-tooltip v-else-if="row.wp_consistency?.status === 'inconsistent'" :content="`差异 ${row.wp_consistency.diff_amount}`" placement="top">
-            <span style="color: #FF5149; cursor: pointer" @dblclick="openWorkpaper(row)">⚠️</span>
+            <span style="color: var(--gt-color-coral); cursor: pointer" @dblclick="openWorkpaper(row)">⚠️</span>
           </el-tooltip>
-          <span v-else style="color: #ccc">—</span>
+          <span v-else style="color: var(--gt-color-text-placeholder)">—</span>
         </template>
       </el-table-column>
     </el-table>
@@ -376,7 +376,7 @@
           <el-radio-button value="ending">期末试算</el-radio-button>
           <el-radio-button value="opening">期初试算</el-radio-button>
         </el-radio-group>
-        <span v-if="tbSumPeriod === 'opening'" style="font-size:11px;color:#e6a23c">
+        <span v-if="tbSumPeriod === 'opening'" style="font-size: var(--gt-font-size-xs);color: var(--gt-color-wheat)">
           {{ tbSumOpeningSource === 'prior_year' ? '📎 数据来源：上年审定数' : '✏️ 首次承接：手动填写' }}
         </span>
       </div>
@@ -393,7 +393,7 @@
           @click="tbSumEditMode = !tbSumEditMode"
         >{{ tbSumEditMode ? '✏️ 编辑中' : '✏️ 编辑' }}</el-button>
         <span style="flex:1" />
-        <span style="font-size:11px;color:#999;align-self:center">审计调整从调整分录自动汇总 · 审定数=未审数+调整借-贷+重分类借-贷</span>
+        <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);align-self:center">审计调整从调整分录自动汇总 · 审定数=未审数+调整借-贷+重分类借-贷</span>
       </div>
       <div :class="`gt-tb-font-${displayPrefs.fontSize}`">
         <el-table
@@ -412,7 +412,7 @@
         >
           <el-table-column prop="row_code" label="行次" width="110" align="center">
             <template #default="{ row }">
-              <span style="color:#999;font-size:11px;white-space:nowrap">{{ row.row_code }}</span>
+              <span style="color: var(--gt-color-text-tertiary);font-size: var(--gt-font-size-xs);white-space:nowrap">{{ row.row_code }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="row_name" label="项目" min-width="200">
@@ -484,7 +484,7 @@
           </el-table-column>
           <el-table-column prop="audited" label="审定数" width="140" align="right" class-name="gt-tb-sum-audited-col">
             <template #default="{ row }">
-              <span class="gt-amt" style="font-weight:700;color:#4b2d77">{{ fmt(row.audited) }}</span>
+              <span class="gt-amt" style="font-weight:700;color: var(--gt-color-primary)">{{ fmt(row.audited) }}</span>
             </template>
           </el-table-column>
         </el-table>
@@ -549,13 +549,13 @@
       <div style="display: flex; flex-direction: column; gap: 16px; padding: 8px 0">
         <div style="display: flex; align-items: center; gap: 12px">
           <el-badge :value="mappingResult.matched" type="success" />
-          <span style="font-size: 14px">匹配成功</span>
+          <span style="font-size: var(--gt-font-size-sm)">匹配成功</span>
         </div>
         <div style="display: flex; align-items: center; gap: 12px">
           <el-badge :value="mappingResult.needConfirm" type="warning" />
-          <span style="font-size: 14px">需手动确认</span>
+          <span style="font-size: var(--gt-font-size-sm)">需手动确认</span>
         </div>
-        <div style="font-size: 12px; color: #909399; margin-top: 4px">
+        <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-info); margin-top: 4px">
           共 {{ mappingResult.total }} 个客户科目，完成率 {{ mappingResult.rate }}%
         </div>
         <el-alert v-if="mappingResult.needConfirm > 0" type="info" :closable="false" show-icon style="margin-top: 8px">
@@ -2468,14 +2468,14 @@ async function onTbSumImportFile(e: Event) {
     text-align: center;
     padding: 2px 0;
     cursor: pointer;
-    font-size: 11px;
-    color: #909399;
+    font-size: var(--gt-font-size-xs);
+    color: var(--gt-color-info);
     border-bottom: 1px solid #f0edf5;
     margin-bottom: 6px;
     user-select: none;
     transition: color 0.15s;
   }
-  .gt-header-toggle:hover { color: #4b2d77; }
+  .gt-header-toggle:hover { color: var(--gt-color-primary); }
 
   /* ── 金额列统一字体（Arial Narrow + tabular-nums + 不折行） ── */
   .gt-amt {
@@ -2492,22 +2492,22 @@ async function onTbSumImportFile(e: Event) {
   :deep(.gt-tb-font-xs),
   :deep(.gt-tb-font-xs) th .cell,
   :deep(.gt-tb-font-xs) td .cell,
-  :deep(.gt-tb-font-xs) .el-table__body { font-size: 11px !important; }
+  :deep(.gt-tb-font-xs) .el-table__body { font-size: var(--gt-font-size-xs) !important; }
 
   :deep(.gt-tb-font-sm),
   :deep(.gt-tb-font-sm) th .cell,
   :deep(.gt-tb-font-sm) td .cell,
-  :deep(.gt-tb-font-sm) .el-table__body { font-size: 12px !important; }
+  :deep(.gt-tb-font-sm) .el-table__body { font-size: var(--gt-font-size-xs) !important; }
 
   :deep(.gt-tb-font-md),
   :deep(.gt-tb-font-md) th .cell,
   :deep(.gt-tb-font-md) td .cell,
-  :deep(.gt-tb-font-md) .el-table__body { font-size: 13px !important; }
+  :deep(.gt-tb-font-md) .el-table__body { font-size: var(--gt-font-size-sm) !important; }
 
   :deep(.gt-tb-font-lg),
   :deep(.gt-tb-font-lg) th .cell,
   :deep(.gt-tb-font-lg) td .cell,
-  :deep(.gt-tb-font-lg) .el-table__body { font-size: 14px !important; }
+  :deep(.gt-tb-font-lg) .el-table__body { font-size: var(--gt-font-size-sm) !important; }
 
   :deep(.el-table th .cell) {
     font-weight: 600;
@@ -2519,8 +2519,8 @@ async function onTbSumImportFile(e: Event) {
 
   /* ── 科目明细表样式统一（与试算平衡表风格一致） ── */
   :deep(.el-table thead th) {
-    background: #f0edf5 !important;
-    color: #303133;
+    background: var(--gt-color-primary-bg) !important;
+    color: var(--gt-color-text-primary);
     border-bottom: 1px solid #e8e4f0 !important;
   }
   :deep(.el-table--border td) {
@@ -2543,10 +2543,10 @@ async function onTbSumImportFile(e: Event) {
   .subtotal-val { font-weight: 700; }
 
   /* 方向列样式 */
-  .gt-dir-debit { color: #303133; font-size: 11px; }
-  .gt-dir-credit { color: #e6a23c; font-size: 11px; font-weight: 600; }
+  .gt-dir-debit { color: var(--gt-color-text-primary); font-size: var(--gt-font-size-xs); }
+  .gt-dir-credit { color: var(--gt-color-wheat); font-size: var(--gt-font-size-xs); font-weight: 600; }
   .gt-dir-toggle { cursor: pointer; user-select: none; padding: 2px 6px; border-radius: 3px; }
-  .gt-dir-toggle:hover { background: #f0edf5; }
+  .gt-dir-toggle:hover { background: var(--gt-color-primary-bg); }
 
   .gt-tb-balance-indicator {
     margin-top: var(--gt-space-4); text-align: right;
@@ -2579,7 +2579,7 @@ async function onTbSumImportFile(e: Event) {
     background: linear-gradient(90deg, #fffbf0, var(--gt-color-wheat-light)) !important;
   }
   :deep(.stale-row) {
-    background: #fef9e7 !important;
+    background: var(--gt-bg-warning) !important;
     border-left: 3px solid #f0c040;
   }
 
@@ -2588,32 +2588,32 @@ async function onTbSumImportFile(e: Event) {
 /* 视图切换标签 */
 
 .gt-tb-view-tag {
-  padding: 6px 16px; font-size: 13px; cursor: pointer; color: #999;
+  padding: 6px 16px; font-size: var(--gt-font-size-sm); cursor: pointer; color: var(--gt-color-text-tertiary);
   border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; user-select: none;
 }
-.gt-tb-view-tag:hover { color: #4b2d77; }
-.gt-tb-view-tag--active { color: #4b2d77; font-weight: 600; border-bottom-color: #4b2d77; }
+.gt-tb-view-tag:hover { color: var(--gt-color-primary); }
+.gt-tb-view-tag--active { color: var(--gt-color-primary); font-weight: 600; border-bottom-color: #4b2d77; }
 
 .gt-mapping-rule-btn {
   margin-left: 16px;
   border-color: #d9d2e8;
-  color: #4b2d77;
-  font-size: 12px;
+  color: var(--gt-color-primary);
+  font-size: var(--gt-font-size-xs);
 }
 .gt-mapping-rule-btn:hover {
   border-color: #4b2d77;
-  background: #f8f5fd;
+  background: var(--gt-color-primary-bg);
 }
 
 /* 试算平衡表 el-table 样式 */
 :deep(.gt-tb-sum-unadj-col) { background: rgba(75,45,119,0.03); }
-:deep(.gt-tb-sum-audited-col .cell) { font-weight: 700; color: #4b2d77; }
+:deep(.gt-tb-sum-audited-col .cell) { font-weight: 700; color: var(--gt-color-primary); }
 :deep(.gt-tb-sum-audited-col) { background: rgba(75,45,119,0.06); }
 .gt-tb-editable { cursor: text; border-bottom: 1px dashed #e5e5ea; padding: 2px 4px; border-radius: 2px; display: inline-block; min-width: 60px; text-align: right; }
-.gt-tb-editable:hover { background: #f4f0fa; }
-.gt-tb-readonly { display: inline-block; min-width: 60px; text-align: right; padding: 2px 4px; color: #606266; }
-:deep(.gt-tb-sum-total td) { font-weight: 700 !important; background: #f8f6fb !important; }
-:deep(.gt-tb-sum-category td) { font-weight: 600 !important; color: #4b2d77 !important; }
+.gt-tb-editable:hover { background: var(--gt-color-primary-bg); }
+.gt-tb-readonly { display: inline-block; min-width: 60px; text-align: right; padding: 2px 4px; color: var(--gt-color-text-regular); }
+:deep(.gt-tb-sum-total td) { font-weight: 700 !important; background: var(--gt-color-primary-bg) !important; }
+:deep(.gt-tb-sum-category td) { font-weight: 600 !important; color: var(--gt-color-primary) !important; }
 :deep(.gt-tb-sum-selected td) { background: rgba(75, 45, 119, 0.14) !important; border-left: 3px solid #4b2d77 !important; }
 :deep(.gt-tb-sum-selected td:first-child) { border-left: 3px solid #4b2d77 !important; }
 :deep(.gt-tb-sum-selected td:not(:first-child)) { border-left: none !important; }
@@ -2626,20 +2626,20 @@ async function onTbSumImportFile(e: Event) {
 .gt-tb-sum-ctx {
   position: fixed;
   z-index: 10001;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
   padding: 6px 0;
   min-width: 160px;
 }
-.gt-ucell-ctx-divider { height: 1px; background: #e8e4f0; margin: 4px 8px; }
-.gt-tb-detached-icon { font-size: 10px; margin-right: 2px; opacity: 0.7; }
-:deep(.gt-tb-sum-detached td) { background: #fffdf5 !important; border-left: 2px solid #f0c040 !important; }
+.gt-ucell-ctx-divider { height: 1px; background: var(--gt-color-border-light); margin: 4px 8px; }
+.gt-tb-detached-icon { font-size: var(--gt-font-size-xs); margin-right: 2px; opacity: 0.7; }
+:deep(.gt-tb-sum-detached td) { background: var(--gt-color-wheat-light) !important; border-left: 2px solid #f0c040 !important; }
 
 /* 步骤引导 */
 .gt-setup-guide {
   padding: 24px 32px;
-  background: #faf8fd;
+  background: var(--gt-color-primary-bg);
   border: 1px solid #e8e0f0;
   border-radius: var(--gt-radius-lg, 8px);
   margin-bottom: 16px;

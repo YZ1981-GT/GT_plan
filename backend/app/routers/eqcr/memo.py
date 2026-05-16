@@ -143,3 +143,48 @@ async def export_eqcr_memo(
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/projects/{project_id}/memo/versions")
+async def list_eqcr_memo_versions(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """R10 Spec C / F8：列出 EQCR 备忘录历史版本（最多 5 版）。
+
+    数据来源：``Project.wizard_state.eqcr_memo.history``
+    （save_memo 已自动维护，无需新建表）。
+    """
+    svc_eqcr = EqcrService(db)
+    is_eqcr = await svc_eqcr._is_user_eqcr_on(current_user.id, project_id)
+    if not is_eqcr:
+        raise HTTPException(status_code=403, detail="非本项目 EQCR，无权查看历史版本")
+
+    proj_q = select(Project).where(
+        Project.id == project_id,
+        Project.is_deleted == False,  # noqa: E712
+    )
+    proj = (await db.execute(proj_q)).scalar_one_or_none()
+    if proj is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    wizard = proj.wizard_state or {}
+    memo = wizard.get("eqcr_memo") or {}
+    history = memo.get("history") or []
+    return {
+        "current": {
+            "version": "current",
+            "updated_at": memo.get("updated_at"),
+            "status": memo.get("status", "draft"),
+            "sections": memo.get("sections") or {},
+        },
+        "versions": [
+            {
+                "version": h.get("version"),
+                "saved_at": h.get("saved_at"),
+                "sections_snapshot": h.get("sections_snapshot"),
+            }
+            for h in history
+        ],
+    }

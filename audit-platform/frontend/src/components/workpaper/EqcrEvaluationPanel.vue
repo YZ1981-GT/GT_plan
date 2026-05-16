@@ -98,6 +98,6 @@ onMounted(loadWorkpapers)
 <style scoped>
 .eqcr-evaluation-panel { padding: 12px; }
 .panel-header { margin-bottom: 12px; }
-.title { font-weight: 600; font-size: 14px; }
+.title { font-weight: 600; font-size: var(--gt-font-size-sm); }
 .verdict-actions { display: flex; gap: 4px; }
 </style>

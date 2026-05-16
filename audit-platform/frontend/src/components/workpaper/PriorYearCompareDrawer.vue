@@ -241,7 +241,7 @@ defineExpose({ open })
   justify-content: center;
   height: 300px;
   gap: 12px;
-  color: #999;
+  color: var(--gt-color-text-tertiary);
 }
 
 .drawer-error {
@@ -278,7 +278,7 @@ defineExpose({ open })
   padding: 10px 14px;
   background: var(--el-fill-color-lighter);
   border-bottom: 1px solid var(--el-border-color-lighter);
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 500;
 }
 
@@ -305,13 +305,13 @@ defineExpose({ open })
 }
 
 .data-row label {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
   font-weight: 500;
 }
 
 .data-value {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   color: var(--el-text-color-primary);
   line-height: 1.6;
 }
@@ -335,7 +335,7 @@ defineExpose({ open })
 }
 
 .action-hint {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
 }
 </style>

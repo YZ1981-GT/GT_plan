@@ -38,8 +38,8 @@
     <div v-loading="loading" class="ch-body">
       <el-empty v-if="!loading && projects.length === 0" description="暂无合并项目" :image-size="120">
         <template #description>
-          <p style="color:#999;font-size:14px">还没有合并报表项目</p>
-          <p style="color:#bbb;font-size:12px">请先在项目管理中创建报表范围为"合并"的项目</p>
+          <p style="color: var(--gt-color-text-tertiary);font-size: var(--gt-font-size-sm)">还没有合并报表项目</p>
+          <p style="color: var(--gt-color-text-placeholder);font-size: var(--gt-font-size-xs)">请先在项目管理中创建报表范围为"合并"的项目</p>
         </template>
         <el-button type="primary" @click="$router.push('/projects/new')">
           <el-icon style="margin-right:4px"><Plus /></el-icon>新建合并项目
@@ -151,11 +151,11 @@ onMounted(async () => {
 .ch-banner-icon {
   width: 64px; height: 64px; border-radius: 16px;
   background: rgba(255,255,255,0.15); backdrop-filter: blur(8px);
-  display: flex; align-items: center; justify-content: center; color: #fff;
+  display: flex; align-items: center; justify-content: center; color: var(--gt-color-text-inverse);
   flex-shrink: 0;
 }
-.ch-banner-title { margin: 0; font-size: 24px; font-weight: 700; color: #fff; }
-.ch-banner-desc { margin: 6px 0 0; font-size: 14px; color: rgba(255,255,255,0.8); }
+.ch-banner-title { margin: 0; font-size: 24px /* allow-px: special */; font-weight: 700; color: var(--gt-color-text-inverse); }
+.ch-banner-desc { margin: 6px 0 0; font-size: var(--gt-font-size-sm); color: rgba(255,255,255,0.8); }
 
 /* ── 统计 ── */
 .ch-stats {
@@ -168,8 +168,8 @@ onMounted(async () => {
   padding: 16px 12px; border-right: 1px solid #f0edf5;
 }
 .ch-stat-item:last-child { border-right: none; }
-.ch-stat-num { font-size: 28px; font-weight: 700; color: #4b2d77; line-height: 1.2; }
-.ch-stat-label { font-size: 12px; color: #999; margin-top: 4px; }
+.ch-stat-num { font-size: var(--gt-font-size-3xl); font-weight: 700; color: var(--gt-color-primary); line-height: 1.2; }
+.ch-stat-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 4px; }
 
 /* ── 主体 ── */
 .ch-body { padding: 24px 32px 32px; }
@@ -184,10 +184,10 @@ onMounted(async () => {
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px;
 }
 .ch-grid--sparse .ch-card-body { padding: 20px; }
-.ch-grid--sparse .ch-card-name { font-size: 16px; }
-.ch-grid--sparse .ch-card-avatar { width: 42px; height: 42px; font-size: 18px; border-radius: 10px; }
-.ch-grid--sparse .ch-card-info-item { font-size: 13px; }
-.ch-grid--sparse .ch-card-enter { font-size: 13px; }
+.ch-grid--sparse .ch-card-name { font-size: var(--gt-font-size-md); }
+.ch-grid--sparse .ch-card-avatar { width: 42px; height: 42px; font-size: var(--gt-font-size-xl); border-radius: 10px; }
+.ch-grid--sparse .ch-card-info-item { font-size: var(--gt-font-size-sm); }
+.ch-grid--sparse .ch-card-enter { font-size: var(--gt-font-size-sm); }
 
 /* 3-6个项目：标准 */
 .ch-grid--normal {
@@ -199,13 +199,13 @@ onMounted(async () => {
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px;
 }
 .ch-grid--compact .ch-card-body { padding: 14px; }
-.ch-grid--compact .ch-card-name { font-size: 15px; margin-bottom: 8px; }
-.ch-grid--compact .ch-card-avatar { width: 32px; height: 32px; font-size: 14px; border-radius: 8px; }
+.ch-grid--compact .ch-card-name { font-size: var(--gt-font-size-base); margin-bottom: 8px; }
+.ch-grid--compact .ch-card-avatar { width: 32px; height: 32px; font-size: var(--gt-font-size-sm); border-radius: 8px; }
 .ch-grid--compact .ch-card-header { margin-bottom: 8px; }
 .ch-grid--compact .ch-card-info { gap: 4px; margin-bottom: 10px; }
-.ch-grid--compact .ch-card-info-item { font-size: 12px; }
+.ch-grid--compact .ch-card-info-item { font-size: var(--gt-font-size-xs); }
 .ch-grid--compact .ch-card-footer { padding-top: 8px; }
-.ch-grid--compact .ch-card-enter { font-size: 12px; }
+.ch-grid--compact .ch-card-enter { font-size: var(--gt-font-size-xs); }
 
 /* 16+个项目：密集列表式 */
 .ch-grid--dense {
@@ -215,17 +215,17 @@ onMounted(async () => {
 .ch-grid--dense .ch-card-stripe { height: 3px; }
 .ch-grid--dense .ch-card-body { padding: 10px 12px; }
 .ch-grid--dense .ch-card-header { margin-bottom: 6px; }
-.ch-grid--dense .ch-card-avatar { width: 28px; height: 28px; font-size: 12px; border-radius: 6px; }
-.ch-grid--dense .ch-card-name { font-size: 13px; margin-bottom: 6px; line-height: 1.3; }
+.ch-grid--dense .ch-card-avatar { width: 28px; height: 28px; font-size: var(--gt-font-size-xs); border-radius: 6px; }
+.ch-grid--dense .ch-card-name { font-size: var(--gt-font-size-sm); margin-bottom: 6px; line-height: 1.3; }
 .ch-grid--dense .ch-card-info { gap: 2px; margin-bottom: 6px; }
-.ch-grid--dense .ch-card-info-item { font-size: 11px; }
+.ch-grid--dense .ch-card-info-item { font-size: var(--gt-font-size-xs); }
 .ch-grid--dense .ch-card-progress { margin-bottom: 6px; }
 .ch-grid--dense .ch-card-progress-bar { height: 4px; }
 .ch-grid--dense .ch-card-footer { padding-top: 6px; }
-.ch-grid--dense .ch-card-enter { font-size: 11px; }
+.ch-grid--dense .ch-card-enter { font-size: var(--gt-font-size-xs); }
 
 .ch-card {
-  background: #fff; border-radius: 12px; overflow: hidden; cursor: pointer;
+  background: var(--gt-color-bg-white); border-radius: 12px; overflow: hidden; cursor: pointer;
   border: 1px solid #f0edf5; transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgba(0,0,0,0.03);
 }
@@ -249,38 +249,38 @@ onMounted(async () => {
   width: 40px; height: 40px; border-radius: 10px;
   background: linear-gradient(135deg, #4b2d77, #7c5caa);
   display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 18px; font-weight: 700;
+  color: var(--gt-color-text-inverse); font-size: var(--gt-font-size-xl); font-weight: 700;
 }
 
 .ch-card-name {
-  margin: 0 0 10px; font-size: 15px; font-weight: 600; color: #1a1a2e;
+  margin: 0 0 10px; font-size: var(--gt-font-size-base); font-weight: 600; color: var(--gt-color-text);
   line-height: 1.4;
 }
 
 .ch-card-info { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .ch-card-info-item {
   display: flex; align-items: center; gap: 6px;
-  font-size: 13px; color: #666;
+  font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary);
 }
-.ch-card-info-item .el-icon { color: #999; }
+.ch-card-info-item .el-icon { color: var(--gt-color-text-tertiary); }
 
 /* 进度条 */
 .ch-card-progress { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .ch-card-progress-bar {
-  flex: 1; height: 6px; background: #f0edf5; border-radius: 3px; overflow: hidden;
+  flex: 1; height: 6px; background: var(--gt-color-primary-bg); border-radius: 3px; overflow: hidden;
 }
 .ch-card-progress-fill {
   height: 100%; border-radius: 3px;
   background: linear-gradient(90deg, #4b2d77, #7c5caa);
   transition: width 0.3s ease;
 }
-.ch-card-progress-text { font-size: 12px; color: #4b2d77; font-weight: 600; min-width: 32px; }
+.ch-card-progress-text { font-size: var(--gt-font-size-xs); color: var(--gt-color-primary); font-weight: 600; min-width: 32px; }
 
 .ch-card-footer {
   padding-top: 12px; border-top: 1px solid #f5f3f8;
 }
 .ch-card-enter {
-  font-size: 13px; color: #4b2d77; font-weight: 500;
+  font-size: var(--gt-font-size-sm); color: var(--gt-color-primary); font-weight: 500;
   opacity: 0.6; transition: opacity 0.15s;
 }
 .ch-card:hover .ch-card-enter { opacity: 1; }

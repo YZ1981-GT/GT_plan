@@ -5,7 +5,7 @@
       <div class="cw-nav-header">
         <span class="cw-nav-title">合并工作底稿</span>
         <el-tooltip content="合并流程：基础数据→净资产归集→权益法模拟→抵消分录→汇总核查" placement="right">
-          <span style="cursor:help;font-size:12px;color:#999">ⓘ</span>
+          <span style="cursor:help;font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">ⓘ</span>
         </el-tooltip>
       </div>
       <div class="cw-nav-list">
@@ -621,13 +621,13 @@ function onOpenFormula(sheetKey: string) {
 <style scoped>
 .cw-layout { display: flex; height: calc(100vh - 120px); overflow: hidden; margin: -16px; }
 .cw-nav {
-  flex-shrink: 0; background: #fafafa; border-right: 1px solid var(--gt-color-border-light, #e8e4f0);
+  flex-shrink: 0; background: var(--gt-color-bg); border-right: 1px solid var(--gt-color-border-light, #e8e4f0);
   display: flex; flex-direction: column; overflow: hidden;
 }
 .cw-nav-header {
   padding: 16px 16px 12px; border-bottom: 1px solid var(--gt-color-border-light, #e8e4f0); flex-shrink: 0;
 }
-.cw-nav-title { font-size: 15px; font-weight: 700; color: #333; }
+.cw-nav-title { font-size: var(--gt-font-size-base); font-weight: 700; color: var(--gt-color-text-primary); }
 .cw-nav-list { flex: 1; overflow-y: auto; padding: 8px; }
 .cw-nav-item {
   display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px 8px 18px; margin: 1px 6px;
@@ -640,8 +640,8 @@ function onOpenFormula(sheetKey: string) {
 }
 .cw-nav-item--active .cw-nav-item-label { color: var(--gt-color-primary, #4b2d77); font-weight: 600; }
 .cw-nav-item-text { flex: 1; min-width: 0; }
-.cw-nav-item-label { display: block; font-size: 13px; color: #333; line-height: 1.4; }
-.cw-nav-item-desc { display: block; font-size: 11px; color: #999; margin-top: 2px; }
+.cw-nav-item-label { display: block; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-primary); line-height: 1.4; }
+.cw-nav-item-desc { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px; }
 .cw-nav-group {
   display: flex; align-items: center; justify-content: space-between;
   padding: 6px 10px; margin: 6px 6px 2px; cursor: pointer;
@@ -652,18 +652,18 @@ function onOpenFormula(sheetKey: string) {
 .cw-nav-group:first-child { margin-top: 2px; }
 .cw-nav-group-left { display: flex; align-items: center; gap: 8px; }
 .cw-nav-group-num {
-  width: 20px; height: 20px; border-radius: 50%; background: #4b2d77; color: #fff;
-  font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%; background: var(--gt-color-primary); color: var(--gt-color-text-inverse);
+  font-size: var(--gt-font-size-xs); font-weight: 700; display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.cw-nav-group-label { font-size: 12px; font-weight: 600; color: #333; }
+.cw-nav-group-label { font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-text-primary); }
 .cw-nav-group-right { display: flex; align-items: center; gap: 6px; }
-.cw-nav-group-count { font-size: 10px; color: #999; }
-.cw-nav-group-arrow { font-size: 14px; color: #999; font-weight: 700; transition: transform 0.15s; }
+.cw-nav-group-count { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.cw-nav-group-arrow { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary); font-weight: 700; transition: transform 0.15s; }
 .cw-resizer {
   width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0;
   transition: background 0.15s;
 }
 .cw-resizer:hover, .cw-resizer:active { background: var(--gt-color-primary-lighter, #d8d0e8); }
-.cw-content { flex: 1; min-width: 0; overflow: auto; padding: 16px; background: #fff; }
+.cw-content { flex: 1; min-width: 0; overflow: auto; padding: 16px; background: var(--gt-color-bg-white); }
 </style>

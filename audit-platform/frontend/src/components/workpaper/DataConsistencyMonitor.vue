@@ -55,5 +55,5 @@ const fmt = fmtAmount
 <style scoped>
 .consistency-monitor { padding: 12px; }
 .text-danger { color: var(--el-color-danger); font-weight: 600; }
-.summary { margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary); }
+.summary { margin-top: 8px; font-size: var(--gt-font-size-xs); color: var(--el-text-color-secondary); }
 </style>

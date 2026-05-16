@@ -21,8 +21,8 @@
 | `v3-quickfixes/` Q3 F10 | 档 2 | P0-4 | ✅ 已澄清+修 2026-05-16（review-conversations 路径改一处，commit b4cda44） | 0.3h |
 | `v3-quickfixes/` Q4 F2 | 档 2 | P0-5 | ✅ 已完成 2026-05-16（init_4_projects step 5 + WP List 引导卡片，commit b4cda44） | 0.5h |
 | `v3-linkage-stale-propagation/` | 档 3 | P0-12/P0-13 | ✅ 已完成 2026-05-16（Sprint 0-4 全跑通，2.5h） | 2.5h |
-| `v3-r10-linkage-and-tokens/` | 档 3 (R10) | v3 §7.6/§8/§9 | 🟢 三件套已起草 2026-05-16，待启动条件满足后实施 | 22 天 |
-| `v3-r10-editor-resilience/` | 档 3 (R10) | v3 §10/§7.4 | 🟢 三件套已起草 2026-05-16，待启动条件满足后实施 | 11 天 |
+| `v3-r10-linkage-and-tokens/` | 档 3 (R10) | v3 §7.6/§8/§9 | ✅ 编码任务全部完成 2026-05-16（Sprint 0-3 全跑通，含可选；UAT 待真人验收） | 22 天 |
+| `v3-r10-editor-resilience/` | 档 3 (R10) | v3 §10/§7.4 | ✅ 编码任务全部完成 2026-05-16（Sprint 0-2 全跑通，含 F8 可选；UAT 待真人验收） | 11 天 |
 
 ---
 

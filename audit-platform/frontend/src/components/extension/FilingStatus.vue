@@ -45,5 +45,5 @@ function fmtTime(d: string) {
 <style scoped>
 .gt-filing-status { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .gt-filing-times { display: flex; flex-direction: column; gap: 1px; }
-.gt-time { font-size: 11px; color: var(--gt-color-text-tertiary); }
+.gt-time { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 </style>

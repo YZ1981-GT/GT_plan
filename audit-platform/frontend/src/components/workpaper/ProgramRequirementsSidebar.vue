@@ -298,8 +298,8 @@ watch(() => props.wpId, (newVal) => {
   justify-content: center;
   cursor: pointer;
   border-radius: 4px;
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   transition: background 0.2s;
 }
 
@@ -324,14 +324,14 @@ watch(() => props.wpId, (newVal) => {
 
 .sidebar-title {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   color: var(--el-text-color-primary, #303133);
 }
 
 /* 操作手册 */
 .manual-content {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   line-height: 1.6;
   color: var(--el-text-color-regular, #606266);
   white-space: pre-wrap;
@@ -371,13 +371,13 @@ watch(() => props.wpId, (newVal) => {
 }
 
 .proc-code {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
   color: var(--el-text-color-primary, #303133);
 }
 
 .proc-name {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-regular, #606266);
   margin-bottom: 6px;
   line-height: 1.4;
@@ -390,7 +390,7 @@ watch(() => props.wpId, (newVal) => {
 
 /* 上年结论 */
 .prior-year-card {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .prior-year-meta {
@@ -401,8 +401,8 @@ watch(() => props.wpId, (newVal) => {
 }
 
 .meta-label {
-  color: #909399;
-  font-size: 12px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-xs);
   flex-shrink: 0;
 }
 
@@ -415,7 +415,7 @@ watch(() => props.wpId, (newVal) => {
   padding: 8px;
   background: var(--el-fill-color-lighter, #fafafa);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   line-height: 1.5;
   color: var(--el-text-color-regular, #606266);
   max-height: 150px;
@@ -423,8 +423,8 @@ watch(() => props.wpId, (newVal) => {
 }
 
 .empty-hint {
-  font-size: 12px;
-  color: #c0c4cc;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-placeholder);
   text-align: center;
   padding: 12px 0;
 }
@@ -435,7 +435,7 @@ watch(() => props.wpId, (newVal) => {
 }
 
 :deep(.el-collapse-item__header) {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 500;
   height: 36px;
   line-height: 36px;

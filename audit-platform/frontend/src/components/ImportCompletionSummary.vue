@@ -1,6 +1,6 @@
 <template>
   <div :style="containerStyle">
-    <el-icon v-if="showSuccessIcon" style="font-size: 40px; color: #67c23a"><CircleCheck /></el-icon>
+    <el-icon v-if="showSuccessIcon" style="font-size: 40px /* allow-px: special */; color: var(--gt-color-success)"><CircleCheck /></el-icon>
     <div :style="titleStyle">{{ title }}</div>
     <div v-if="summaryEntries.length" :style="summaryStyle">
       <span v-for="item in summaryEntries" :key="item.key" style="margin-right: 12px">
@@ -51,8 +51,8 @@ withDefaults(defineProps<{
   summaryEntries: () => [],
   showSuccessIcon: false,
   containerStyle: '',
-  titleStyle: 'margin-top: 12px; font-size: 15px',
-  summaryStyle: 'margin-top: 8px; font-size: 13px; color: #666',
+  titleStyle: 'margin-top: 12px; font-size: var(--gt-font-size-base)',
+  summaryStyle: 'margin-top: 8px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary)',
   validationPanelStyle: 'margin-top: 16px; text-align: left',
 })
 </script>

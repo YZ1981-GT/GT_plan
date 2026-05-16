@@ -77,7 +77,7 @@
         </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="140" align="center">
           <template #default="{ row }">
-            <span class="gt-text-secondary" style="font-size: 13px">{{ formatDate(row.created_at) }}</span>
+            <span class="gt-text-secondary" style="font-size: var(--gt-font-size-sm)">{{ formatDate(row.created_at) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="220" align="center" fixed="right">

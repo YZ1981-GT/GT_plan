@@ -212,7 +212,7 @@ function goToRule(code: string) {
 
 .error-code {
   font-family: monospace;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   cursor: pointer;
 }
 
@@ -221,7 +221,7 @@ function goToRule(code: string) {
 }
 
 .error-message {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   line-height: 1.5;
   margin-bottom: 6px;
 }
@@ -230,7 +230,7 @@ function goToRule(code: string) {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
   margin-bottom: 4px;
 }
@@ -239,7 +239,7 @@ function goToRule(code: string) {
   display: flex;
   align-items: flex-start;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-color-primary);
   margin-top: 4px;
 }
@@ -256,20 +256,20 @@ function goToRule(code: string) {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   margin-bottom: 4px;
   color: var(--el-text-color-primary);
 }
 
 .hint-description {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-regular);
   line-height: 1.5;
   margin-bottom: 6px;
 }
 
 .hint-suggestions {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .hint-suggestions-label {

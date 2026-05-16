@@ -61,7 +61,7 @@ function getColor(userId: string): string {
 }
 .presence-avatars .el-avatar {
   cursor: default;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
@@ -69,8 +69,8 @@ function getColor(userId: string): string {
   margin-left: -8px;
 }
 .presence-count {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   margin-left: 6px;
 }
 </style>

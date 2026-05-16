@@ -220,7 +220,7 @@ onMounted(() => {
   margin-bottom: var(--gt-space-4);
 }
 .ai-title {
-  font-size: 18px;
+  font-size: var(--gt-font-size-xl);
   font-weight: 600;
   color: var(--gt-color-text);
   margin: 0;
@@ -242,7 +242,7 @@ onMounted(() => {
   border-radius: var(--gt-radius-md);
   background: var(--gt-color-bg);
   border: 1px solid var(--gt-color-border-light);
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .health-card.ok { border-color: #67c23a; }
 .health-card.err { border-color: #f56c6c; }
@@ -251,8 +251,8 @@ onMounted(() => {
   height: 8px;
   border-radius: 50%;
 }
-.health-card.ok .health-dot { background: #67c23a; }
-.health-card.err .health-dot { background: #f56c6c; }
+.health-card.ok .health-dot { background: var(--gt-color-success); }
+.health-card.err .health-dot { background: var(--gt-color-coral); }
 .health-label {
   font-weight: 500;
   color: var(--gt-color-text);

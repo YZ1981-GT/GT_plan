@@ -247,15 +247,15 @@ onMounted(async () => {
 
 /* 审批 Tab 样式 */
 .gt-stats-row { display: flex; gap: 16px; margin-bottom: 20px; }
-.gt-stat-card { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid var(--gt-color-border-light); border-radius: var(--gt-radius-md); padding: 16px 24px; min-width: 200px; box-shadow: var(--gt-shadow-sm); }
-.gt-stat-icon { font-size: 28px; }
+.gt-stat-card { display: flex; align-items: center; gap: 12px; background: var(--gt-color-bg-white); border: 1px solid var(--gt-color-border-light); border-radius: var(--gt-radius-md); padding: 16px 24px; min-width: 200px; box-shadow: var(--gt-shadow-sm); }
+.gt-stat-icon { font-size: var(--gt-font-size-3xl); }
 .gt-stat-info { display: flex; flex-direction: column; }
-.gt-stat-value { font-size: 24px; font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
+.gt-stat-value { font-size: 24px /* allow-px: special */; font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
 .gt-stat-approved .gt-stat-value { color: var(--el-color-success, #67c23a); }
 .gt-stat-pending .gt-stat-value { color: var(--el-color-warning, #e6a23c); }
-.gt-stat-label { font-size: 12px; color: var(--gt-color-text-secondary); margin-top: 2px; }
+.gt-stat-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); margin-top: 2px; }
 .gt-filter-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
-.gt-batch-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 10px 16px; background: #f0f9eb; border: 1px solid #e1f3d8; border-radius: var(--gt-radius-md); }
-.gt-batch-info { font-size: 13px; color: var(--gt-color-text); font-weight: 500; }
+.gt-batch-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 10px 16px; background: var(--gt-bg-success); border: 1px solid #e1f3d8; border-radius: var(--gt-radius-md); }
+.gt-batch-info { font-size: var(--gt-font-size-sm); color: var(--gt-color-text); font-weight: 500; }
 .gt-status-done { color: var(--gt-color-text-tertiary); }
 </style>

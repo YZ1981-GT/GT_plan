@@ -30,20 +30,20 @@ const router = useRouter()
 }
 
 .developing-icon {
-  font-size: 64px;
+  font-size: 64px /* allow-px: emoji-icon */;
   margin-bottom: 16px;
 }
 
 .developing-title {
-  font-size: 24px;
+  font-size: 24px /* allow-px: special */;
   font-weight: 600;
-  color: #333;
+  color: var(--gt-color-text-primary);
   margin: 0 0 8px;
 }
 
 .developing-desc {
-  font-size: 14px;
-  color: #999;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-tertiary);
   margin: 0 0 24px;
 }
 </style>

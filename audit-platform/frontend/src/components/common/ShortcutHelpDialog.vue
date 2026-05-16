@@ -52,7 +52,7 @@ const filteredGroups = computed(() => {
 .gt-shortcut-group { margin-bottom: 16px; }
 .gt-shortcut-scope {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   color: var(--gt-color-primary);
 }
@@ -70,11 +70,11 @@ const filteredGroups = computed(() => {
   border: 1px solid var(--gt-color-border);
   border-radius: var(--gt-radius-sm);
   font-family: monospace;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   text-align: center;
 }
 .gt-shortcut-desc {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary);
 }
 .gt-shortcut-empty {

@@ -38,7 +38,7 @@
     <!-- 添加成员弹窗：勾选模式 -->
     <el-dialog append-to-body v-model="showAddDialog" width="700px" :close-on-click-modal="false">
       <template #header>
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; color: var(--gt-color-primary)">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: var(--gt-font-size-md); font-weight: 600; color: var(--gt-color-primary)">
           <el-icon><User /></el-icon> 从人员库选择成员
         </div>
       </template>
@@ -80,7 +80,7 @@
         </el-table-column>
       </el-table>
 
-      <div style="margin-top: 8px; font-size: 13px; color: #888">
+      <div style="margin-top: 8px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary)">
         已选 <span style="color: var(--gt-color-primary); font-weight: 600">{{ selectedStaffIds.length }}</span> 人
         <el-button link type="primary" size="small" @click="showQuickCreate = true" style="margin-left: 16px">搜不到？快速创建</el-button>
       </div>
@@ -283,5 +283,5 @@ onMounted(async () => {
 <style scoped>
 .gt-team-step { padding: var(--gt-space-2) 0; }
 .gt-team-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-3); }
-.gt-team-title { font-size: 16px; font-weight: 600; color: var(--gt-color-primary); }
+.gt-team-title { font-size: var(--gt-font-size-md); font-weight: 600; color: var(--gt-color-primary); }
 </style>

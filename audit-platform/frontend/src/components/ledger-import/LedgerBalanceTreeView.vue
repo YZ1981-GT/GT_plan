@@ -164,7 +164,7 @@ Expose:
           <!-- 第 1 层：父科目 -->
           <span v-else>
             <b>{{ row.account_code }}</b>
-            <span style="color: #606266; margin-left: 8px">
+            <span style="color: var(--gt-color-text-regular); margin-left: 8px">
               {{ row.account_name }}
             </span>
             <el-tooltip
@@ -524,42 +524,42 @@ defineExpose({ refresh: fetchData })
 }
 .group-meta {
   margin-left: 8px;
-  color: #909399;
-  font-size: 12px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-xs);
 }
 .aux-label {
   padding-left: 12px;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .aux-code {
   font-family: monospace;
-  color: #606266;
+  color: var(--gt-color-text-regular);
 }
 .aux-name {
   margin-left: 8px;
 }
 .dim-types {
   margin-left: 10px;
-  color: #909399;
-  font-size: 12px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-xs);
 }
 .negative {
   color: var(--el-color-danger);
 }
 :deep(.group-row) {
-  background-color: #f4f4f5;
+  background-color: var(--gt-color-bg);
 }
 :deep(.mismatch-group-row) {
-  background-color: #fef0f0;
+  background-color: var(--gt-bg-danger);
 }
 :deep(.aux-row) {
   background-color: var(--el-fill-color-lighter) !important;
 }
 :deep(.aggregated-row) {
-  background-color: #f0f9eb;
+  background-color: var(--gt-bg-success);
 }
 :deep(.mismatch-row) {
-  background-color: #fef0f0;
+  background-color: var(--gt-bg-danger);
 }
 :deep(.el-table__expand-icon) {
   color: var(--el-color-primary);

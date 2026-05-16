@@ -140,7 +140,7 @@ onMounted(() => { if (props.wpId) loadData() })
 .gt-word-content-section { max-width: 800px; margin: 0 auto; }
 .gt-word-textarea :deep(textarea) {
   font-family: 'SimSun', serif;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   line-height: 1.8;
 }
 </style>

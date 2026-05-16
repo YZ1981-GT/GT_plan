@@ -46,7 +46,7 @@
               style="margin-top: 10px"
             >
               <template #title>请设置报表模板类型</template>
-              <div style="font-size: 12px; line-height: 1.6">
+              <div style="font-size: var(--gt-font-size-xs); line-height: 1.6">
                 当前项目未设置模板类型（国企版/上市版），报表和附注生成将使用默认配置。
                 <el-button type="primary" text size="small" @click="editProject">前往设置 →</el-button>
               </div>
@@ -241,7 +241,7 @@
           <div class="gt-ledger-entry">
             <el-icon :size="40" color="var(--gt-color-primary)"><Search /></el-icon>
             <h4 style="margin: 12px 0 8px; color: var(--gt-color-text)">账证联动查询</h4>
-            <p style="color: var(--gt-color-text-secondary); font-size: 13px; margin-bottom: 16px; text-align: center">
+            <p style="color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm); margin-bottom: 16px; text-align: center">
               建项后可先独立导入账套数据，再从科目余额表逐级穿透到序时账、凭证、辅助账
             </p>
             <el-button type="primary" @click="goToLedgerImport()">
@@ -378,15 +378,15 @@ async function goToLedgerImport() {
   const ok = await showGuide(
     'ledger_import',
     '📥 账套数据导入',
-    `<div style="line-height:1.8;font-size:13px">
+    `<div style="line-height:1.8;font-size: var(--gt-font-size-sm)">
       <p>将导入企业财务数据到当前项目。</p>
-      <p style="color:#909399;font-size:12px;margin-top:6px">请确认以下准备工作：</p>
+      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">请确认以下准备工作：</p>
       <ul style="padding-left:18px;margin:4px 0">
-        <li><span style="color:#e6a23c">⚠</span> 已准备好企业导出的 Excel 或 CSV 文件</li>
-        <li><span style="color:#e6a23c">⚠</span> 文件应包含：科目余额表（必需）、序时账（建议）</li>
-        <li><span style="color:#e6a23c">⚠</span> 确认文件中的年度与当前项目年度一致</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 已准备好企业导出的 Excel 或 CSV 文件</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 文件应包含：科目余额表（必需）、序时账（建议）</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 确认文件中的年度与当前项目年度一致</li>
       </ul>
-      <p style="color:#909399;font-size:12px;margin-top:6px">💡 支持多 Sheet 的 Excel 文件，系统会自动识别各表类型</p>
+      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">💡 支持多 Sheet 的 Excel 文件，系统会自动识别各表类型</p>
     </div>`,
     '前往导入',
   )
@@ -498,7 +498,7 @@ function formatSize(bytes: number) {
 }
 
 .gt-status-hint {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
   margin-left: 4px;
 }
@@ -509,15 +509,15 @@ function formatSize(bytes: number) {
 .gt-workflow-hint {
   display: flex; align-items: center; gap: 4px; margin-bottom: 8px;
   padding: 6px 10px; background: linear-gradient(135deg, #f5f0ff 0%, #faf8fd 100%);
-  border-radius: 6px; font-size: 11px; color: #8b7aab; flex-wrap: wrap;
+  border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-primary-light); flex-wrap: wrap;
 }
-.gt-workflow-hint-label { font-weight: 600; color: #6b5b8a; margin-right: 2px; }
-.gt-workflow-step { background: #fff; padding: 1px 6px; border-radius: 4px; border: 1px solid #e8e4f0; white-space: nowrap; }
-.gt-workflow-arrow { color: #c4b8d9; font-size: 10px; }
+.gt-workflow-hint-label { font-weight: 600; color: var(--gt-color-primary-dark); margin-right: 2px; }
+.gt-workflow-step { background: var(--gt-color-bg-white); padding: 1px 6px; border-radius: 4px; border: 1px solid #e8e4f0; white-space: nowrap; }
+.gt-workflow-arrow { color: var(--gt-color-primary-lighter); font-size: var(--gt-font-size-xs); }
 .gt-quick-tip {
-  font-size: 11px; color: #909399; line-height: 1.5;
+  font-size: var(--gt-font-size-xs); color: var(--gt-color-info); line-height: 1.5;
   padding: 6px 10px; margin-bottom: 10px;
-  background: #fafafa; border-radius: 6px; border-left: 3px solid #4b2d77;
+  background: var(--gt-color-bg); border-radius: 6px; border-left: 3px solid #4b2d77;
 }
 .gt-quick-btn {
   display: flex; flex-direction: column; align-items: center; gap: 4px;

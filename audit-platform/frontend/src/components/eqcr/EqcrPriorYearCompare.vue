@@ -227,8 +227,8 @@ onMounted(fetchComparison)
 }
 .eqcr-prior-year__header h4 { margin: 0; font-weight: 600; }
 .diff-highlight { border: 2px solid #e6a23c !important; }
-.diff-marker { color: #e6a23c; font-size: 16px; }
+.diff-marker { color: var(--gt-color-wheat); font-size: var(--gt-font-size-md); }
 .diff-reason-item { margin-bottom: 12px; }
-.diff-reason-label { font-size: 13px; color: #606266; margin-bottom: 4px; }
+.diff-reason-label { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-regular); margin-bottom: 4px; }
 .eqcr-prior-year__reasons { border-top: 1px solid #ebeef5; padding-top: 8px; }
 </style>

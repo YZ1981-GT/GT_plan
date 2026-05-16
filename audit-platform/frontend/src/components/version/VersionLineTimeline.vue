@@ -64,8 +64,8 @@ watch(() => [props.projectId, props.objectType, props.objectId], loadData)
 <style scoped>
 .version-timeline { padding: 16px; }
 .stamp-card { display: flex; align-items: center; gap: 8px; }
-.stamp-icon { font-size: 16px; }
-.stamp-type { font-size: 13px; color: #666; }
-.stamp-id { font-size: 12px; color: #999; font-family: monospace; }
-.stamp-trace { font-size: 11px; color: #bbb; margin-top: 2px; }
+.stamp-icon { font-size: var(--gt-font-size-md); }
+.stamp-type { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
+.stamp-id { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); font-family: monospace; }
+.stamp-trace { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); margin-top: 2px; }
 </style>

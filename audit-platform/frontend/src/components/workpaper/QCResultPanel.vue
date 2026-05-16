@@ -109,26 +109,26 @@ const hasBlocking = computed(() => blockingFindings.value.length > 0)
 
 <style scoped>
 .qc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.qc-time { font-size: 12px; color: #999; }
+.qc-time { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 .finding-group { margin-bottom: 16px; }
 .group-header {
-  font-weight: 600; font-size: 14px; padding: 6px 10px;
+  font-weight: 600; font-size: var(--gt-font-size-sm); padding: 6px 10px;
   border-radius: var(--gt-radius-sm); margin-bottom: 8px;
 }
-.group-header.blocking { background: #fef0f0; color: #f56c6c; }
-.group-header.warning { background: #fdf6ec; color: #e6a23c; }
-.group-header.info { background: #f4f4f5; color: #909399; }
+.group-header.blocking { background: var(--gt-bg-danger); color: var(--gt-color-coral); }
+.group-header.warning { background: var(--gt-bg-warning); color: var(--gt-color-wheat); }
+.group-header.info { background: var(--gt-color-bg); color: var(--gt-color-info); }
 .finding-item {
   padding: 8px 12px; border-left: 3px solid; margin-bottom: 4px;
   border-radius: 0 var(--gt-radius-sm) var(--gt-radius-sm) 0;
-  background: #fafafa;
+  background: var(--gt-color-bg);
 }
 .finding-item.blocking { border-color: #f56c6c; }
 .finding-item.warning { border-color: #e6a23c; }
 .finding-item.info { border-color: #c0c4cc; }
 .finding-main { display: flex; align-items: center; gap: 8px; }
-.finding-msg { font-size: 13px; }
-.finding-detail { margin-top: 4px; font-size: 12px; color: #888; display: flex; gap: 12px; }
+.finding-msg { font-size: var(--gt-font-size-sm); }
+.finding-detail { margin-top: 4px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); display: flex; gap: 12px; }
 .cell-ref { cursor: pointer; color: var(--gt-color-teal); }
 .cell-ref:hover { text-decoration: underline; }
 </style>

@@ -17,6 +17,52 @@ let _lastTraceId = ''
 /** 获取最近一次请求的 trace id（X-Request-ID 响应头） */
 export function getLastTraceId(): string { return _lastTraceId }
 
+// ── R10 Spec C / Sprint 1.3：5xx 环形缓冲区监控 ─────────
+// design D4：last100Requests 不暴露给业务代码，只通过 recent5xxRate / getRecentNetworkStats 访问
+const _last100Requests: { status: number; ts: number }[] = []
+const _MAX_BUFFER = 100
+const _WINDOW_MS = 60_000
+const _MIN_SAMPLES = 10
+
+function _trackResponse(status: number) {
+  _last100Requests.push({ status, ts: Date.now() })
+  if (_last100Requests.length > _MAX_BUFFER) {
+    _last100Requests.shift()
+  }
+}
+
+/** 最近 1 分钟内 5xx 比率（< 10 次请求时返回 0） */
+export function recent5xxRate(): number {
+  const now = Date.now()
+  const recent = _last100Requests.filter((r) => now - r.ts < _WINDOW_MS)
+  if (recent.length < _MIN_SAMPLES) return 0
+  const xx5 = recent.filter((r) => r.status >= 500 && r.status < 600).length
+  return xx5 / recent.length
+}
+
+/** 网络状态详情（仅 DegradedBanner 内部使用，不暴露原始数组） */
+export function getRecentNetworkStats(): {
+  total: number
+  xx5_count: number
+  xx5_rate: number
+  last_5xx_at: number | null
+} {
+  const now = Date.now()
+  const recent = _last100Requests.filter((r) => now - r.ts < _WINDOW_MS)
+  const xx5 = recent.filter((r) => r.status >= 500 && r.status < 600)
+  return {
+    total: recent.length,
+    xx5_count: xx5.length,
+    xx5_rate: recent.length >= _MIN_SAMPLES ? xx5.length / recent.length : 0,
+    last_5xx_at: xx5.length > 0 ? xx5[xx5.length - 1].ts : null,
+  }
+}
+
+/** 测试钩子：清空缓冲区 */
+export function _resetNetworkStats() {
+  _last100Requests.length = 0
+}
+
 const http = axios.create({
   baseURL: '/',
   timeout: 120000,
@@ -142,6 +188,8 @@ http.interceptors.response.use(
     removePending(response.config as InternalAxiosRequestConfig)
     // R7-S2-11: 存储 trace id
     _lastTraceId = response.headers?.['x-request-id'] || ''
+    // R10 Spec C: 5xx 环形缓冲区记录响应
+    _trackResponse(response.status)
     // NProgress：所有请求完成后结束进度条
     activeRequests = Math.max(0, activeRequests - 1)
     if (activeRequests === 0) NProgress.done()
@@ -173,6 +221,8 @@ http.interceptors.response.use(
     if (error.config) removePending(error.config as InternalAxiosRequestConfig)
     // R7-S2-11: 存储 trace id（错误响应）
     _lastTraceId = (error.response?.headers as any)?.['x-request-id'] || ''
+    // R10 Spec C: 5xx 环形缓冲区记录错误响应
+    _trackResponse(error.response?.status ?? 0)
     // NProgress：错误时也递减计数
     activeRequests = Math.max(0, activeRequests - 1)
     if (activeRequests === 0) NProgress.done()

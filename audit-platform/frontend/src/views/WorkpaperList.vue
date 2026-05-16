@@ -124,7 +124,7 @@
 
     <!-- 加载中 -->
     <div v-else-if="loading" class="gt-wp-empty-full">
-      <el-icon class="is-loading" style="font-size: 28px; color: var(--gt-color-primary)"><Loading /></el-icon>
+      <el-icon class="is-loading" style="font-size: var(--gt-font-size-3xl); color: var(--gt-color-primary)"><Loading /></el-icon>
       <div style="margin-top: 12px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary)">加载中...</div>
     </div>
 
@@ -241,7 +241,7 @@
             <!-- 精细化审计检查结果 -->
             <div v-if="fineCheckResults.length" class="gt-wp-fine-checks" style="margin-top: 12px">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                <span style="font-size:13px;font-weight:600;color:#333">审计检查</span>
+                <span style="font-size: var(--gt-font-size-sm);font-weight:600;color: var(--gt-color-text-primary)">审计检查</span>
                 <el-tag size="small" :type="fineChecksPassed ? 'success' : 'warning'">
                   {{ fineChecksPassedCount }}/{{ fineCheckResults.length }} 通过
                 </el-tag>
@@ -252,28 +252,28 @@
                 <span class="gt-fine-check-code">{{ chk.code }}</span>
                 <span class="gt-fine-check-desc">{{ chk.description }}</span>
                 <span v-if="chk.passed === true" class="gt-fine-check-status">✓</span>
-                <span v-else-if="chk.passed === false" class="gt-fine-check-status" style="color:#e6a23c">
+                <span v-else-if="chk.passed === false" class="gt-fine-check-status" style="color: var(--gt-color-wheat)">
                   ✗ {{ chk.message }}
-                  <el-button size="small" text type="primary" style="margin-left:4px;font-size:11px" @click="onCheckJump(chk)">定位</el-button>
+                  <el-button size="small" text type="primary" style="margin-left:4px;font-size: var(--gt-font-size-xs)" @click="onCheckJump(chk)">定位</el-button>
                 </span>
-                <span v-else class="gt-fine-check-status" style="color:#999">待验证</span>
+                <span v-else class="gt-fine-check-status" style="color: var(--gt-color-text-tertiary)">待验证</span>
               </div>
             </div>
 
             <!-- 复核人操作区：仅在底稿处于待复核状态时显示 -->
             <div v-if="isReviewable" class="gt-wp-reviewer-actions" style="margin-top: 16px">
-              <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--gt-color-text)">复核操作</h4>
+              <h4 style="margin: 0 0 8px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text)">复核操作</h4>
 
               <!-- TSJ复核提示词清单 -->
               <div v-if="tsjReviewData" class="gt-tsj-review-panel" style="margin-bottom: 12px">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-                  <span style="font-size:12px;font-weight:600;color:#4b2d77">📋 复核要点（{{ tsjReviewData.account_name }}）</span>
+                  <span style="font-size: var(--gt-font-size-xs);font-weight:600;color: var(--gt-color-primary)">📋 复核要点（{{ tsjReviewData.account_name }}）</span>
                   <el-button size="small" text @click="showTsjDetail = !showTsjDetail">{{ showTsjDetail ? '收起' : '展开' }}</el-button>
                 </div>
                 <!-- 风险领域 -->
                 <div v-if="tsjReviewData.risk_areas?.length" style="margin-bottom:6px">
                   <div v-for="(area, i) in tsjReviewData.risk_areas.slice(0, showTsjDetail ? 99 : 3)" :key="i"
-                    style="font-size:11px;color:#666;padding:2px 0">
+                    style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);padding:2px 0">
                     <el-tag :type="area.includes('高风险') ? 'danger' : area.includes('中风险') ? 'warning' : 'info'" size="small" style="margin-right:4px">
                       {{ area.includes('高风险') ? '高' : area.includes('中风险') ? '中' : '低' }}
                     </el-tag>
@@ -282,9 +282,9 @@
                 </div>
                 <!-- 复核清单 -->
                 <div v-if="showTsjDetail && tsjReviewData.checklist?.length" style="margin-top:8px">
-                  <div style="font-size:11px;font-weight:600;color:#333;margin-bottom:4px">复核清单：</div>
+                  <div style="font-size: var(--gt-font-size-xs);font-weight:600;color: var(--gt-color-text-primary);margin-bottom:4px">复核清单：</div>
                   <div v-for="(item, i) in tsjReviewData.checklist" :key="i"
-                    style="font-size:11px;color:#555;padding:1px 0;display:flex;align-items:flex-start;gap:4px">
+                    style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-regular);padding:1px 0;display:flex;align-items:flex-start;gap:4px">
                     <el-checkbox size="small" style="flex-shrink:0" />
                     <span>{{ item }}</span>
                   </div>
@@ -314,7 +314,7 @@
             <!-- 复核批注面板 -->
             <div class="gt-wp-review-section" style="margin-top: 16px">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
-                <h4 style="margin: 0; font-size: 14px; color: var(--gt-color-text)">
+                <h4 style="margin: 0; font-size: var(--gt-font-size-sm); color: var(--gt-color-text)">
                   复核意见
                   <el-badge v-if="unresolvedCount > 0" :value="unresolvedCount" type="danger" style="margin-left: 8px" />
                 </h4>
@@ -337,8 +337,8 @@
                 <el-table-column prop="content" label="内容" min-width="200">
                   <template #default="{ row }">
                     <div>
-                      <span style="font-size:12px">{{ row.content }}</span>
-                      <div v-if="row.reply_content" style="margin-top:4px;padding:4px 8px;background:#f0f9eb;border-radius:4px;font-size:11px;color:#67c23a">
+                      <span style="font-size: var(--gt-font-size-xs)">{{ row.content }}</span>
+                      <div v-if="row.reply_content" style="margin-top:4px;padding:4px 8px;background: var(--gt-bg-success);border-radius:4px;font-size: var(--gt-font-size-xs);color: var(--gt-color-success)">
                         ↳ 回复：{{ row.reply_content }}
                       </div>
                     </div>
@@ -360,7 +360,7 @@
                 </el-table-column>
                 <el-table-column label="时间" width="70">
                   <template #default="{ row }">
-                    <span style="font-size:10px;color:#999">{{ row.created_at?.slice(5, 16) }}</span>
+                    <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">{{ row.created_at?.slice(5, 16) }}</span>
                   </template>
                 </el-table-column>
                 <el-table-column label="操作" width="120">
@@ -419,7 +419,7 @@
           accept=".xlsx,.xls"
           :on-change="onUploadFileChange"
         >
-          <el-icon style="font-size: 40px; color: var(--gt-color-primary)"><Upload /></el-icon>
+          <el-icon style="font-size: 40px; /* allow-px: emoji-icon (上传图标) */ color: var(--gt-color-primary)"><Upload /></el-icon>
           <div>拖拽文件到此处，或点击选择</div>
         </el-upload>
       </template>
@@ -503,7 +503,7 @@
       width="420px"
       append-to-body
     >
-      <div v-if="assigningItem" style="margin-bottom: 12px; color: #606266; font-size: 13px;">
+      <div v-if="assigningItem" style="margin-bottom: 12px; color: var(--gt-color-text-regular); font-size: var(--gt-font-size-sm);">
         底稿：<strong>{{ assigningItem.wp_code }} {{ assigningItem.wp_name }}</strong>
       </div>
       <el-form :model="assignForm" label-width="70px">
@@ -1342,16 +1342,16 @@ async function onSubmitReview() {
   const ok = await showGuide(
     'submit_review',
     '📤 提交复核',
-    `<div style="line-height:1.8;font-size:13px">
+    `<div style="line-height:1.8;font-size: var(--gt-font-size-sm)">
       <p>将底稿 <b>${selectedWp.value.wp_code || ''}</b> 提交给复核人审阅。</p>
-      <p style="color:#909399;font-size:12px;margin-top:6px">请确认以下条件已满足：</p>
+      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">请确认以下条件已满足：</p>
       <ul style="padding-left:18px;margin:4px 0">
-        <li><span style="color:#e6a23c">⚠</span> 底稿内容已编制完成</li>
-        <li><span style="color:#e6a23c">⚠</span> 已分配复核人</li>
-        <li><span style="color:#e6a23c">⚠</span> 质量自检（QC）无阻断级问题</li>
-        <li><span style="color:#e6a23c">⚠</span> 所有未解决的复核意见已回复</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 底稿内容已编制完成</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 已分配复核人</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 质量自检（QC）无阻断级问题</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 所有未解决的复核意见已回复</li>
       </ul>
-      <p style="color:#909399;font-size:12px;margin-top:6px">💡 不满足条件时系统会自动阻断并提示具体原因</p>
+      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">💡 不满足条件时系统会自动阻断并提示具体原因</p>
     </div>`,
     '提交复核',
   )
@@ -1588,7 +1588,7 @@ onMounted(async () => {
 .gt-wp-tree-node { display: flex; align-items: center; gap: 6px; width: 100%; }
 .gt-wp-tree-node-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-wp-tree-node-tag { flex-shrink: 0; }
-.gt-wp-tree-stale-badge { flex-shrink: 0; font-size: 11px; opacity: 0.85; cursor: help; }
+.gt-wp-tree-stale-badge { flex-shrink: 0; font-size: var(--gt-font-size-xs); opacity: 0.85; cursor: help; }
 .gt-wp-detail-card { }
 .gt-wp-detail-title { margin: 0 0 var(--gt-space-4); color: var(--gt-color-primary); font-size: var(--gt-font-size-xl); }
 .gt-wp-detail-actions { display: flex; gap: var(--gt-space-2); margin-top: var(--gt-space-4); flex-wrap: wrap; }
@@ -1608,25 +1608,25 @@ onMounted(async () => {
   background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
   box-shadow: var(--gt-shadow-sm); min-height: 300px;
 }
-.gt-wp-empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.7; }
-.gt-wp-empty-title { font-size: 18px; font-weight: 600; color: #444; margin-bottom: 6px; }
-.gt-wp-empty-desc { font-size: 14px; color: #999; }
+.gt-wp-empty-icon { font-size: 48px; /* allow-px: emoji-icon (空状态大图标) */ margin-bottom: 12px; opacity: 0.7; }
+.gt-wp-empty-title { font-size: var(--gt-font-size-xl); font-weight: 600; color: var(--gt-color-text-regular); margin-bottom: 6px; }
+.gt-wp-empty-desc { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary); }
 /* 精细化审计检查 */
 .gt-fine-check-item {
   display: flex; align-items: center; gap: 8px; padding: 4px 8px;
-  font-size: 12px; border-radius: 4px; margin-bottom: 2px;
+  font-size: var(--gt-font-size-xs); border-radius: 4px; margin-bottom: 2px;
 }
-.gt-fine-check-pass { background: #f0f9eb; }
-.gt-fine-check-fail { background: #fdf6ec; }
-.gt-fine-check-pending { background: #f5f5f5; }
-.gt-fine-check-code { font-weight: 600; color: #666; min-width: 70px; }
-.gt-fine-check-desc { flex: 1; color: #333; }
-.gt-fine-check-status { font-size: 11px; white-space: nowrap; }
-:deep(.gt-ann-row-urgent) { background: #fef0f0 !important; }
+.gt-fine-check-pass { background: var(--gt-bg-success); }
+.gt-fine-check-fail { background: var(--gt-bg-warning); }
+.gt-fine-check-pending { background: var(--gt-color-bg); }
+.gt-fine-check-code { font-weight: 600; color: var(--gt-color-text-secondary); min-width: 70px; }
+.gt-fine-check-desc { flex: 1; color: var(--gt-color-text-primary); }
+.gt-fine-check-status { font-size: var(--gt-font-size-xs); white-space: nowrap; }
+:deep(.gt-ann-row-urgent) { background: var(--gt-bg-danger) !important; }
 
 /* 解析预览数值样式 */
 .gt-parsed-value { color: var(--gt-color-primary); font-weight: 600; }
-.gt-parsed-empty { color: #999; font-style: italic; }
+.gt-parsed-empty { color: var(--gt-color-text-tertiary); font-style: italic; }
 .gt-parsed-diff { color: var(--gt-color-coral); font-weight: 600; }
 
 /* ── 两栏引导布局 ── */
@@ -1641,24 +1641,24 @@ onMounted(async () => {
 .gt-wp-intro-half--guide {
   align-items: stretch; justify-content: flex-start; overflow-y: auto;
 }
-.gt-wp-intro-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.7; }
-.gt-wp-intro-title { font-size: 18px; font-weight: 600; color: #444; margin-bottom: 6px; }
-.gt-wp-intro-desc { font-size: 13px; color: #999; text-align: center; }
+.gt-wp-intro-icon { font-size: 48px; /* allow-px: emoji-icon (引导页大图标) */ margin-bottom: 12px; opacity: 0.7; }
+.gt-wp-intro-title { font-size: var(--gt-font-size-xl); font-weight: 600; color: var(--gt-color-text-regular); margin-bottom: 6px; }
+.gt-wp-intro-desc { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary); text-align: center; }
 
 .gt-wp-guide-title {
-  margin: 0 0 12px; font-size: 16px; font-weight: 600; color: var(--gt-color-primary);
+  margin: 0 0 12px; font-size: var(--gt-font-size-md); font-weight: 600; color: var(--gt-color-primary);
 }
 
 /* 流程横条 */
 .gt-wp-guide-flow {
   display: flex; align-items: center; gap: 6px; margin-bottom: 16px;
-  padding: 10px 12px; background: #f8f5fd; border-radius: 8px; flex-wrap: wrap;
+  padding: 10px 12px; background: var(--gt-color-primary-bg); border-radius: 8px; flex-wrap: wrap;
 }
 .gt-wp-flow-tag {
   display: inline-block; padding: 3px 10px; border-radius: 10px;
-  font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap;
+  font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-text-inverse); white-space: nowrap;
 }
-.gt-wp-flow-arrow { color: #bbb; font-size: 13px; }
+.gt-wp-flow-arrow { color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-sm); }
 
 /* 循环列表 */
 .gt-wp-guide-list { display: flex; flex-direction: column; }
@@ -1667,22 +1667,22 @@ onMounted(async () => {
   border-bottom: 1px solid #f5f5f5; cursor: pointer; border-radius: 6px;
   transition: background 0.15s;
 }
-.gt-wp-guide-row:hover { background: #f8f5fd; }
+.gt-wp-guide-row:hover { background: var(--gt-color-primary-bg); }
 .gt-wp-guide-row:last-child { border-bottom: none; }
 .gt-wp-guide-badge {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 26px; height: 22px; padding: 0 7px;
-  border-radius: 11px; font-size: 11px; font-weight: 700; color: #fff;
+  border-radius: 11px; font-size: var(--gt-font-size-xs); font-weight: 700; color: var(--gt-color-text-inverse);
 }
-.gt-wp-guide-name { flex: 1; font-size: 13px; color: #333; }
-.gt-wp-guide-count { font-size: 12px; color: #aaa; white-space: nowrap; }
-.gt-wp-guide-arrow { font-size: 16px; color: #ccc; font-weight: 300; }
+.gt-wp-guide-name { flex: 1; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-primary); }
+.gt-wp-guide-count { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); white-space: nowrap; }
+.gt-wp-guide-arrow { font-size: var(--gt-font-size-md); color: var(--gt-color-text-placeholder); font-weight: 300; }
 
 /* 进度条区域 */
 .gt-wp-progress-bar {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   padding: 8px 12px; margin-bottom: var(--gt-space-3);
   background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
-  box-shadow: var(--gt-shadow-sm); font-size: 13px; color: var(--gt-color-text-secondary);
+  box-shadow: var(--gt-shadow-sm); font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary);
 }
 </style>

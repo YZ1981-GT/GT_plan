@@ -81,7 +81,7 @@
               <el-progress :percentage="v.total ? Math.round((v.prepared + (v.reviewed||0) + (v.archived||0)) / v.total * 100) : 0"
                 :stroke-width="12" style="flex: 1" />
             </div>
-            <div style="margin-top: 12px; font-size: 13px; color: #666">整体完成率：{{ wpProgress.rate }}%</div>
+            <div style="margin-top: 12px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary)">整体完成率：{{ wpProgress.rate }}%</div>
           </div>
           <el-empty v-else :image-size="60" description="暂无底稿数据" />
         </div>
@@ -374,7 +374,7 @@ onMounted(refresh)
 .gt-proj-dash { padding: var(--gt-space-4); }
 .gt-pd-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
 .gt-pd-card { background: white; border-radius: var(--gt-radius-md); padding: 16px; box-shadow: var(--gt-shadow-sm); min-height: 240px; }
-.gt-pd-card h4 { margin: 0 0 12px; font-size: 14px; color: #333; }
+.gt-pd-card h4 { margin: 0 0 12px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-primary); }
 .gt-pd-remind-tip { margin-top: 8px; }
 
 /* ── 工作流进度条 + 一键刷新按钮 ── */
@@ -398,7 +398,7 @@ onMounted(refresh)
   align-items: center;
   gap: 12px;
   padding: 12px 20px;
-  background: #fafafa;
+  background: var(--gt-color-bg);
   border: 1px solid #eee;
   border-radius: 8px;
   margin-bottom: 12px;
@@ -414,7 +414,7 @@ onMounted(refresh)
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   padding: 4px 10px;
   border-radius: 12px;
   transition: all 0.2s;
@@ -426,48 +426,48 @@ onMounted(refresh)
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
   flex-shrink: 0;
 }
 .gt-chain-step__label {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .gt-chain-step__duration {
-  font-size: 11px;
-  color: #999;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
   margin-left: 4px;
 }
 .gt-chain-step__error-hint {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 /* 步骤状态样式 */
-.gt-chain-step--pending .gt-chain-step__icon { color: #c0c4cc; }
-.gt-chain-step--pending .gt-chain-step__label { color: #909399; }
+.gt-chain-step--pending .gt-chain-step__icon { color: var(--gt-color-text-placeholder); }
+.gt-chain-step--pending .gt-chain-step__label { color: var(--gt-color-info); }
 
 .gt-chain-step--running {
   background: rgba(64, 158, 255, 0.08);
 }
-.gt-chain-step--running .gt-chain-step__icon { color: #409eff; }
-.gt-chain-step--running .gt-chain-step__label { color: #409eff; font-weight: 500; }
+.gt-chain-step--running .gt-chain-step__icon { color: var(--gt-color-teal); }
+.gt-chain-step--running .gt-chain-step__label { color: var(--gt-color-teal); font-weight: 500; }
 
 .gt-chain-step--completed {
   background: rgba(103, 194, 58, 0.08);
 }
-.gt-chain-step--completed .gt-chain-step__icon { color: #67c23a; }
-.gt-chain-step--completed .gt-chain-step__label { color: #67c23a; font-weight: 500; }
+.gt-chain-step--completed .gt-chain-step__icon { color: var(--gt-color-success); }
+.gt-chain-step--completed .gt-chain-step__label { color: var(--gt-color-success); font-weight: 500; }
 
 .gt-chain-step--failed {
   background: rgba(245, 108, 108, 0.08);
 }
-.gt-chain-step--failed .gt-chain-step__icon { color: #f56c6c; }
-.gt-chain-step--failed .gt-chain-step__label { color: #f56c6c; font-weight: 500; }
+.gt-chain-step--failed .gt-chain-step__icon { color: var(--gt-color-coral); }
+.gt-chain-step--failed .gt-chain-step__label { color: var(--gt-color-coral); font-weight: 500; }
 
-.gt-chain-step--skipped .gt-chain-step__icon { color: #e6a23c; }
-.gt-chain-step--skipped .gt-chain-step__label { color: #e6a23c; }
+.gt-chain-step--skipped .gt-chain-step__icon { color: var(--gt-color-wheat); }
+.gt-chain-step--skipped .gt-chain-step__label { color: var(--gt-color-wheat); }
 
 @keyframes spin {
   from { transform: rotate(0deg); }

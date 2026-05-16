@@ -73,9 +73,9 @@ function handleClick() {
 .gt-amount-cell {
   font-variant-numeric: tabular-nums;
   font-family: 'Arial Narrow', Arial, sans-serif;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   padding: 2px 8px;
-  color: #555;
+  color: var(--gt-color-text-regular);
   display: inline-block;
   border-radius: var(--gt-radius-sm, 4px);
   transition: all 0.15s ease;
@@ -83,7 +83,7 @@ function handleClick() {
 
 .gt-amount-cell--clickable {
   cursor: pointer;
-  color: #333;
+  color: var(--gt-color-text-primary);
   font-weight: 500;
 }
 
@@ -96,11 +96,11 @@ function handleClick() {
 <style>
 /* 非 scoped：条件格式类名由 displayPrefs.amountClass() 动态返回 */
 .gt-amount--negative {
-  color: #d94840 !important;
+  color: var(--gt-color-coral) !important;
 }
 
 .gt-amount--highlight {
-  background: #fff8e1 !important;
+  background: var(--gt-color-wheat-light) !important;
   border-radius: 3px;
 }
 </style>

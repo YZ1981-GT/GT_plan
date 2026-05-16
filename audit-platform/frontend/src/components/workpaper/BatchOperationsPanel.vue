@@ -101,8 +101,8 @@ async function batchSubmit() {
     <el-dialog v-model="resultVisible" title="操作结果" width="400px">
       <div class="result-summary">
         <p>总计：{{ resultData.total }}</p>
-        <p style="color: #67c23a;">成功：{{ resultData.success }}</p>
-        <p v-if="resultData.failed > 0" style="color: #f56c6c;">失败/跳过：{{ resultData.failed }}</p>
+        <p style="color: var(--gt-color-success);">成功：{{ resultData.success }}</p>
+        <p v-if="resultData.failed > 0" style="color: var(--gt-color-coral);">失败/跳过：{{ resultData.failed }}</p>
       </div>
       <div v-if="resultData.details.length > 0" class="result-details">
         <div v-for="(d, i) in resultData.details" :key="i" class="detail-item">
@@ -116,8 +116,8 @@ async function batchSubmit() {
 <style scoped>
 .batch-operations-panel { padding: 8px 0; }
 .toolbar { display: flex; align-items: center; gap: 8px; }
-.selection-count { font-size: 12px; color: #909399; margin-left: 8px; }
+.selection-count { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); margin-left: 8px; }
 .result-summary p { margin: 4px 0; }
 .result-details { margin-top: 12px; max-height: 200px; overflow-y: auto; }
-.detail-item { font-size: 12px; padding: 2px 0; color: #606266; }
+.detail-item { font-size: var(--gt-font-size-xs); padding: 2px 0; color: var(--gt-color-text-regular); }
 </style>

@@ -153,7 +153,7 @@ function goToLogin() {
 .gt-register-title {
   text-align: center;
   margin-bottom: var(--gt-space-6);
-  font-size: 24px;
+  font-size: 24px /* allow-px: special */;
 }
 
 .gt-register-footer {
@@ -161,7 +161,7 @@ function goToLogin() {
   justify-content: center;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary);
 }
 </style>

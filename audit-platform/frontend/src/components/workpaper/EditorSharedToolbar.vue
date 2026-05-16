@@ -84,7 +84,7 @@ function statusLabel(s: string) {
 }
 .gt-editor-toolbar-left { display: flex; align-items: center; gap: 10px; }
 .gt-editor-toolbar-right { display: flex; align-items: center; gap: 6px; }
-.gt-editor-code { font-weight: 600; color: var(--gt-color-primary, #4b2d77); font-size: 14px; }
-.gt-editor-name { color: var(--gt-color-text, #333); font-size: 14px; }
-.gt-dirty-indicator { color: var(--gt-color-wheat, #e6a23c); font-size: 12px; font-weight: 500; }
+.gt-editor-code { font-weight: 600; color: var(--gt-color-primary, #4b2d77); font-size: var(--gt-font-size-sm); }
+.gt-editor-name { color: var(--gt-color-text, #333); font-size: var(--gt-font-size-sm); }
+.gt-dirty-indicator { color: var(--gt-color-wheat, #e6a23c); font-size: var(--gt-font-size-xs); font-weight: 500; }
 </style>

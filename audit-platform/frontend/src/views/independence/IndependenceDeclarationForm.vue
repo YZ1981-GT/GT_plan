@@ -322,7 +322,7 @@ onMounted(loadData)
 }
 
 .group-title {
-  font-size: 15px;
+  font-size: var(--gt-font-size-base);
   font-weight: 600;
   color: var(--gt-color-text, #303133);
   margin: 0 0 16px 0;

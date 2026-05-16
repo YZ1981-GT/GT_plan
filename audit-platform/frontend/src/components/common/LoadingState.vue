@@ -37,5 +37,5 @@ withDefaults(defineProps<{
 
 <style scoped>
 .spinner-wrap { display: flex; flex-direction: column; align-items: center; padding: 32px; gap: 8px; }
-.loading-text { color: #999; font-size: 13px; }
+.loading-text { color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-sm); }
 </style>

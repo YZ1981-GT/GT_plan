@@ -219,13 +219,13 @@ function statusLabel(status: string): string {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   color: var(--el-text-color-regular);
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .note-outline-summary {
   margin-top: 4px;
   padding-left: 22px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
   line-height: 1.4;
   overflow: hidden;

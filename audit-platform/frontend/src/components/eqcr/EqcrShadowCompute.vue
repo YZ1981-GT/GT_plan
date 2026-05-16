@@ -348,7 +348,7 @@ onMounted(loadHistory)
   background: var(--el-fill-color-lighter, #f5f7fa);
   border-radius: 4px;
   padding: 10px 12px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   line-height: 1.5;
   overflow-x: auto;
   white-space: pre-wrap;

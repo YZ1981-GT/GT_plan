@@ -18,7 +18,7 @@
       </el-tab-pane>
 
       <el-tab-pane label="工时管理" name="workhours">
-        <p style="color: #999; padding: 20px">项目级工时视图 — 复用工时管理页面，按当前项目筛选</p>
+        <p style="color: var(--gt-color-text-tertiary); padding: 20px">项目级工时视图 — 复用工时管理页面，按当前项目筛选</p>
         <el-button type="primary" @click="$router.push('/work-hours')">前往工时管理</el-button>
       </el-tab-pane>
 

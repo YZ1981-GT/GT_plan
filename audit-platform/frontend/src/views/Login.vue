@@ -26,7 +26,7 @@
             <el-input v-model="form.password" type="password" placeholder="密码" size="large" show-password :prefix-icon="Lock" />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" size="large" :loading="loading" native-type="submit" style="width: 100%; height: 44px; font-size: 15px">
+            <el-button type="primary" size="large" :loading="loading" native-type="submit" style="width: 100%; height: 44px; font-size: var(--gt-font-size-base)">
               登录
             </el-button>
           </el-form-item>
@@ -132,7 +132,7 @@ async function handleLogin() {
 .brand-content {
   text-align: center;
   z-index: 1;
-  color: #fff;
+  color: var(--gt-color-text-inverse);
 }
 
 .brand-logo {
@@ -144,7 +144,7 @@ async function handleLogin() {
 }
 
 .brand-title {
-  font-size: 28px;
+  font-size: var(--gt-font-size-3xl);
   font-weight: 700;
   letter-spacing: 2px;
   margin-bottom: var(--gt-space-2);
@@ -152,7 +152,7 @@ async function handleLogin() {
 }
 
 .brand-desc {
-  font-size: 15px;
+  font-size: var(--gt-font-size-base);
   opacity: 0.75;
 }
 

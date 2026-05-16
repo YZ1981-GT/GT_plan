@@ -537,7 +537,7 @@ function locationSummary(finding: GateReadinessFinding): string {
 }
 
 .gt-gate-summary {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary, #606266);
 }
 
@@ -545,24 +545,24 @@ function locationSummary(finding: GateReadinessFinding): string {
   font-weight: 600;
 }
 
-.gt-gate-sev-count.sev-blocking { color: #f56c6c; }
-.gt-gate-sev-count.sev-warning  { color: #e6a23c; }
-.gt-gate-sev-count.sev-pass     { color: #67c23a; }
+.gt-gate-sev-count.sev-blocking { color: var(--gt-color-coral); }
+.gt-gate-sev-count.sev-warning  { color: var(--gt-color-wheat); }
+.gt-gate-sev-count.sev-pass     { color: var(--gt-color-success); }
 
 .gt-gate-countdown {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary, #606266);
   min-width: 64px;
   text-align: right;
 }
 
 .gt-gate-countdown-warn {
-  color: #e6a23c;
+  color: var(--gt-color-wheat);
   font-weight: 600;
 }
 
 .gt-gate-countdown-expired {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
   font-weight: 600;
 }
 
@@ -572,10 +572,10 @@ function locationSummary(finding: GateReadinessFinding): string {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #fef0f0;
-  color: #f56c6c;
+  background: var(--gt-bg-danger);
+  color: var(--gt-color-coral);
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 /* ── collapse ── */
@@ -590,12 +590,12 @@ function locationSummary(finding: GateReadinessFinding): string {
 }
 
 .gt-gate-group-name {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-primary, #303133);
 }
 
 .gt-gate-group-count {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary, #909399);
 }
 
@@ -613,10 +613,10 @@ function locationSummary(finding: GateReadinessFinding): string {
   border-radius: 4px;
 }
 
-.gt-gate-finding.sev-blocking { border-left-color: #f56c6c; background: #fef0f0; }
-.gt-gate-finding.sev-warning  { border-left-color: #e6a23c; background: #fdf6ec; }
+.gt-gate-finding.sev-blocking { border-left-color: #f56c6c; background: var(--gt-bg-danger); }
+.gt-gate-finding.sev-warning  { border-left-color: #e6a23c; background: var(--gt-bg-warning); }
 .gt-gate-finding.sev-info     { border-left-color: #909399; }
-.gt-gate-finding.sev-pass     { border-left-color: #67c23a; background: #f0f9eb; }
+.gt-gate-finding.sev-pass     { border-left-color: #67c23a; background: var(--gt-bg-success); }
 
 .gt-gate-finding-head {
   display: flex;
@@ -627,13 +627,13 @@ function locationSummary(finding: GateReadinessFinding): string {
 
 .gt-gate-rule-code {
   font-family: var(--gt-font-family-mono, Consolas, monospace);
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary, #909399);
 }
 
 .gt-gate-finding-msg {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-primary, #303133);
   word-break: break-word;
 }
@@ -647,20 +647,20 @@ function locationSummary(finding: GateReadinessFinding): string {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary, #606266);
 }
 
 .gt-gate-finding-loc {
   margin-top: 4px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary, #909399);
   font-family: var(--gt-font-family-mono, Consolas, monospace);
 }
 
 .gt-gate-empty {
   padding: 8px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary, #909399);
 }
 
@@ -669,7 +669,7 @@ function locationSummary(finding: GateReadinessFinding): string {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary, #909399);
 }
 

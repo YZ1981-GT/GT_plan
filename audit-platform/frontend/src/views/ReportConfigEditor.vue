@@ -99,8 +99,8 @@
       <el-table-column label="合计行" width="100" align="center">
         <template #default="{ row }">
           <el-checkbox v-if="isEditing" v-model="row.is_total_row" />
-          <span v-else-if="row.is_total_row" style="color: #67c23a;">✓</span>
-          <span v-else style="color: #dcdfe6;">—</span>
+          <span v-else-if="row.is_total_row" style="color: var(--gt-color-success);">✓</span>
+          <span v-else style="color: var(--gt-color-border);">—</span>
         </template>
       </el-table-column>
       <el-table-column v-if="isEditing" label="操作" width="80" align="center">
@@ -298,20 +298,20 @@ onMounted(loadConfig)
 
 /* 编辑模式提示条 */
 .rce-edit-ribbon {
-  background: #fdf6ec;
+  background: var(--gt-bg-warning);
   border: 1px solid #faecd8;
   border-radius: 6px;
   padding: 8px 16px;
   margin-bottom: 12px;
-  font-size: 13px;
-  color: #e6a23c;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-wheat);
 }
 
 /* 表格单元格 */
 .rce-code {
   font-family: 'Arial Narrow', Arial, sans-serif;
   font-variant-numeric: tabular-nums;
-  color: #409eff;
+  color: var(--gt-color-teal);
   white-space: nowrap;
 }
 .rce-name-cell {
@@ -324,17 +324,17 @@ onMounted(loadConfig)
   line-height: 1.5;
 }
 .rce-indent {
-  color: #909399;
-  font-size: 12px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-xs);
 }
 
 /* 行样式 */
 :deep(.gt-total-row) {
   font-weight: 700;
-  background-color: #fafafa !important;
+  background-color: var(--gt-color-bg) !important;
 }
 :deep(.gt-section-row) {
-  background-color: #f8f5fd !important;
+  background-color: var(--gt-color-primary-bg) !important;
   font-weight: 600;
 }
 :deep(.gt-section-row td) {

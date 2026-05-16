@@ -436,11 +436,11 @@ watch(showImportMappingDialog, async (visible) => {
 }
 
 .section-icon {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
 }
 
 .section-title {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .mapping-rows {
@@ -465,7 +465,7 @@ watch(showImportMappingDialog, async (visible) => {
 
 .original-col {
   min-width: 120px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 500;
 }
 
@@ -482,7 +482,7 @@ watch(showImportMappingDialog, async (visible) => {
 }
 
 .extra-hint {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
   margin-bottom: 8px;
 }
@@ -499,7 +499,7 @@ watch(showImportMappingDialog, async (visible) => {
 }
 
 .history-badge {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .history-apply-bar {

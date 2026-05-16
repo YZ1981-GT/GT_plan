@@ -366,7 +366,7 @@ defineExpose({ open })
   justify-content: center;
   height: 300px;
   gap: 12px;
-  color: #999;
+  color: var(--gt-color-text-tertiary);
 }
 
 .drawer-error {
@@ -383,7 +383,7 @@ defineExpose({ open })
 }
 
 .empty-hint {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--el-text-color-secondary);
   margin-bottom: 8px;
 }
@@ -401,7 +401,7 @@ defineExpose({ open })
   padding: 8px 12px;
   background: var(--el-fill-color-lighter);
   border-radius: 6px;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .strategy-collapse {
@@ -415,7 +415,7 @@ defineExpose({ open })
 }
 
 .strategy-count {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
 }
 </style>

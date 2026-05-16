@@ -459,17 +459,17 @@ function formatCellValue(v: any): string {
   align-items: center;
   gap: 16px;
   padding: 8px 12px;
-  background: #faf9fc;
+  background: var(--gt-color-primary-bg);
   border-radius: 6px;
   border-left: 3px solid #4b2d77;
   flex-shrink: 0;
 }
 .gt-ntt-stats-item {
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
 }
 .gt-ntt-stats-formula {
-  color: #409eff;
+  color: var(--gt-color-teal);
 }
 .gt-amt {
   font-family: 'Arial Narrow', Arial, sans-serif;
@@ -493,14 +493,14 @@ function formatCellValue(v: any): string {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #ebeef5;
   border-radius: 8px;
   padding: 12px;
 }
 .gt-ntt-left-title {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   font-weight: 600;
   margin-bottom: 4px;
 }
@@ -512,7 +512,7 @@ function formatCellValue(v: any): string {
 .gt-ntt-radio {
   margin-right: 0 !important;
   padding: 8px 12px;
-  background: #fafafa;
+  background: var(--gt-color-bg);
   border-radius: 6px;
   width: 100%;
   height: auto !important;
@@ -526,17 +526,17 @@ function formatCellValue(v: any): string {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   line-height: 1.4;
 }
 .gt-ntt-radio-sub {
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 .gt-ntt-radio-count {
   margin-top: 4px;
-  color: #4b2d77;
-  font-size: 11px;
+  color: var(--gt-color-primary);
+  font-size: var(--gt-font-size-xs);
 }
 
 .gt-ntt-left-search { margin-top: 8px; }
@@ -551,7 +551,7 @@ function formatCellValue(v: any): string {
 /* 右栏树 */
 .gt-ntt-right {
   flex: 1;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #ebeef5;
   border-radius: 8px;
   padding: 8px 4px;
@@ -565,45 +565,45 @@ function formatCellValue(v: any): string {
   height: 32px;
 }
 .gt-ntt-tree :deep(.el-tree-node__content:hover) {
-  background-color: #faf9fc;
+  background-color: var(--gt-color-primary-bg);
 }
 
 .gt-ntt-node {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   flex: 1;
   min-width: 0;
 }
 .gt-ntt-node--group {
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .gt-ntt-group-label {
   white-space: nowrap;
 }
 .gt-ntt-group-count {
-  color: #909399;
-  font-size: 11px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-xs);
 }
 
 .gt-ntt-section-no {
-  color: #909399;
-  font-size: 11px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-xs);
   flex-shrink: 0;
 }
 .gt-ntt-section-title {
-  color: #303133;
+  color: var(--gt-color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
   min-width: 0;
 }
-.gt-ntt-ct--text { background: #f0f2f5; color: #606266; }
-.gt-ntt-ct--mixed { background: #e1f3ff; color: #1d72b8; }
-.gt-ntt-ct--table { background: #f0e6ff; color: #6a39c4; }
+.gt-ntt-ct--text { background: var(--gt-color-bg); color: var(--gt-color-text-regular); }
+.gt-ntt-ct--mixed { background: var(--gt-bg-info); color: var(--gt-color-teal); }
+.gt-ntt-ct--table { background: var(--gt-color-primary-bg); color: var(--gt-color-primary-light); }
 
 /* ─── 详情抽屉 ─── */
 .gt-ntt-detail {
@@ -617,10 +617,10 @@ function formatCellValue(v: any): string {
   flex-wrap: wrap;
   gap: 12px;
   padding: 8px 12px;
-  background: #faf9fc;
+  background: var(--gt-color-primary-bg);
   border-radius: 6px;
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
 }
 .gt-ntt-detail-meta-item {
   display: inline-flex;
@@ -630,8 +630,8 @@ function formatCellValue(v: any): string {
 
 .gt-ntt-h4 {
   margin: 0 0 8px 0;
-  font-size: 13px;
-  color: #4b2d77;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-primary);
   font-weight: 600;
   border-left: 3px solid #4b2d77;
   padding-left: 8px;
@@ -644,26 +644,26 @@ function formatCellValue(v: any): string {
 }
 
 .gt-ntt-tbl-card {
-  background: #fafafa;
+  background: var(--gt-color-bg);
   border-radius: 6px;
   padding: 10px;
   margin-bottom: 12px;
 }
 .gt-ntt-tbl-name {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   margin-bottom: 6px;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 
 .gt-ntt-text-block {
-  background: #fafafa;
+  background: var(--gt-color-bg);
   padding: 10px 12px;
   border-radius: 4px;
   border-left: 3px solid #4b2d77;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   line-height: 1.6;
-  color: #303133;
+  color: var(--gt-color-text-primary);
   white-space: pre-wrap;
   margin-bottom: 8px;
 }

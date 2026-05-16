@@ -17,6 +17,7 @@ import random
 import time as _time
 
 from app.core.config import settings
+from app.workers.worker_helpers import write_heartbeat
 
 logger = logging.getLogger("import_outbox")
 
@@ -40,6 +41,9 @@ async def run(stop_event: asyncio.Event) -> None:
     consecutive_failures = 0
 
     while not stop_event.is_set():
+        # R10 Spec C 1.1.4：每轮先写心跳
+        await write_heartbeat("outbox_replay_worker")
+
         try:
             from app.core.database import async_session
             from app.services.import_event_consumption_service import ImportEventConsumptionService

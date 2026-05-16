@@ -92,10 +92,10 @@ function close() {
 </template>
 
 <style scoped>
-.cell-ref-label { font-size: 13px; color: #606266; margin-bottom: 12px; padding: 4px 8px; background: #f5f7fa; border-radius: 4px; }
+.cell-ref-label { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-regular); margin-bottom: 12px; padding: 4px 8px; background: var(--gt-bg-subtle); border-radius: 4px; }
 .history-entry { display: flex; flex-direction: column; gap: 4px; }
-.change-detail { font-size: 12px; }
-.old-val { color: #f56c6c; text-decoration: line-through; }
-.new-val { color: #67c23a; }
-.empty-tip { text-align: center; padding: 24px; color: #909399; }
+.change-detail { font-size: var(--gt-font-size-xs); }
+.old-val { color: var(--gt-color-coral); text-decoration: line-through; }
+.new-val { color: var(--gt-color-success); }
+.empty-tip { text-align: center; padding: 24px; color: var(--gt-color-info); }
 </style>

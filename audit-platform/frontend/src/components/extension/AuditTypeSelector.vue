@@ -78,7 +78,7 @@ async function onChange(val: string) {
 <style scoped>
 .gt-audit-type-selector { display: flex; flex-direction: column; gap: var(--gt-space-2); }
 .gt-type-option { display: flex; align-items: center; justify-content: space-between; width: 100%; }
-.gt-type-info { color: var(--gt-color-text-tertiary); margin-left: 8px; font-size: 14px; }
+.gt-type-info { color: var(--gt-color-text-tertiary); margin-left: 8px; font-size: var(--gt-font-size-sm); }
 .gt-type-recommendation {
   display: flex; align-items: flex-start; gap: 6px;
   padding: var(--gt-space-2) var(--gt-space-3);

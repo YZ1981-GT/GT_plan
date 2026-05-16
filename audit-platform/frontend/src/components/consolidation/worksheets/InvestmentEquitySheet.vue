@@ -297,16 +297,16 @@ function onImportConfirm(data: Record<string, any>[]) {
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
+.ws-sheet-header h3 { margin: 0; font-size: var(--gt-font-size-base); color: var(--gt-color-text-primary); }
 .ws-sheet-actions { display: flex; gap: 8px; }
-.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
-.ws-tip b { color: #4b2d77; }
-.ws-computed { color: #4b2d77; font-weight: 500; }
-.ws-zero { color: #c0c4cc !important; font-weight: 400 !important; }
+.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: var(--gt-color-bg); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
+.ws-tip b { color: var(--gt-color-primary); }
+.ws-computed { color: var(--gt-color-primary); font-weight: 500; }
+.ws-zero { color: var(--gt-color-text-placeholder) !important; font-weight: 400 !important; }
 .ws-bold { font-weight: 700; }
 .ws-table :deep(.el-input__inner) { text-align: right; }
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
-.ws-table :deep(.ws-row-summary td) { background: #f8f6fb !important; font-weight: 700; color: #4b2d77; }
-.ws-summary-label { font-weight: 700; color: #4b2d77; font-size: 13px; }
-.ws-btn-sep { width: 1px; height: 18px; background: #ddd; margin: 0 2px; flex-shrink: 0; }
+.ws-table :deep(.ws-row-summary td) { background: var(--gt-color-primary-bg) !important; font-weight: 700; color: var(--gt-color-primary); }
+.ws-summary-label { font-weight: 700; color: var(--gt-color-primary); font-size: var(--gt-font-size-sm); }
+.ws-btn-sep { width: 1px; height: 18px; background: var(--gt-color-border-light); margin: 0 2px; flex-shrink: 0; }
 </style>

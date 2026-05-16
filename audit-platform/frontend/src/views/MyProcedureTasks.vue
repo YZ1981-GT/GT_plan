@@ -11,7 +11,7 @@
     <el-empty v-if="!tasks.length && !loading" description="暂无被委派的审计程序，请联系项目经理分配" />
 
     <div v-for="(group, cycle) in groupedTasks" :key="cycle" style="margin-bottom: 20px">
-      <h3 style="font-size: 15px; color: var(--gt-color-primary); margin-bottom: 8px">
+      <h3 style="font-size: var(--gt-font-size-base); color: var(--gt-color-primary); margin-bottom: 8px">
         {{ cycleName(cycle as string) }}
         <el-tag size="small" style="margin-left: 8px">{{ group.length }} 项</el-tag>
       </h3>
@@ -22,7 +22,7 @@
           <template #default="{ row }">
             <el-button v-if="row.wp_code && row.project_id" link type="primary" size="small"
               @click="openWP(row)">{{ row.wp_code }}</el-button>
-            <span v-else style="color: #ccc">—</span>
+            <span v-else style="color: var(--gt-color-text-placeholder)">—</span>
           </template>
         </el-table-column>
         <el-table-column label="执行状态" width="130" align="center">
@@ -118,8 +118,8 @@ onMounted(loadMyTasks)
   display: flex; justify-content: space-between; align-items: center;
   padding: 20px 24px; margin-bottom: 16px;
   background: linear-gradient(135deg, var(--gt-color-primary, #4b2d77) 0%, #6b4d97 100%);
-  border-radius: 8px; color: #fff;
+  border-radius: 8px; color: var(--gt-color-text-inverse);
 }
-.gt-page-banner h2 { margin: 0; font-size: 18px; font-weight: 600; }
-.gt-banner-sub { font-size: 13px; opacity: 0.85; margin-top: 4px; display: block; }
+.gt-page-banner h2 { margin: 0; font-size: var(--gt-font-size-xl); font-weight: 600; }
+.gt-banner-sub { font-size: var(--gt-font-size-sm); opacity: 0.85; margin-top: 4px; display: block; }
 </style>

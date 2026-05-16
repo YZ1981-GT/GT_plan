@@ -12,7 +12,7 @@
         <el-tree :data="indicatorTree" :props="{ label: 'label', children: 'children' }" node-key="key"
           highlight-current :expand-on-click-node="false" default-expand-all @node-click="onIndicatorClick">
           <template #default="{ data }">
-            <span style="font-size:12px">{{ data.icon || '' }} {{ data.label }}</span>
+            <span style="font-size: var(--gt-font-size-xs)">{{ data.icon || '' }} {{ data.label }}</span>
           </template>
         </el-tree>
       </div>
@@ -58,7 +58,7 @@
           </el-table>
         </div>
         <div class="gt-cq-footer">
-          <span style="font-size:11px;color:#999">{{ resultRows.length }} 行 × {{ resultColumns.length }} 列{{ filterText ? `（过滤后 ${filteredRows.length} 行）` : '' }}</span>
+          <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">{{ resultRows.length }} 行 × {{ resultColumns.length }} 列{{ filterText ? `（过滤后 ${filteredRows.length} 行）` : '' }}</span>
         </div>
       </div>
     </div>
@@ -214,7 +214,7 @@ loadIndicators()
 <style scoped>
 .gt-cq-container { display: flex; gap: 12px; height: calc(100vh - 140px); }
 .gt-cq-sidebar { width: 200px; flex-shrink: 0; border-right: 1px solid #e8e4f0; padding-right: 8px; overflow-y: auto; }
-.gt-cq-sidebar-title { font-size: 13px; font-weight: 600; color: #4b2d77; margin-bottom: 8px; }
+.gt-cq-sidebar-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary); margin-bottom: 8px; }
 .gt-cq-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .gt-cq-filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .gt-cq-footer { padding: 6px 0; }

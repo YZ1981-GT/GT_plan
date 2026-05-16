@@ -295,12 +295,12 @@ onMounted(() => {
 }
 
 .evidence-key {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   min-width: 180px;
 }
 
 .evidence-value {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
   word-break: break-all;
 }
@@ -315,7 +315,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .error-compact .code-link {
@@ -334,7 +334,7 @@ onMounted(() => {
 
 .history-message {
   color: var(--el-text-color-secondary);
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .loading-overlay {
@@ -345,7 +345,7 @@ onMounted(() => {
   justify-content: center;
   gap: 8px;
   background: rgba(255, 255, 255, 0.8);
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .drill-down-content {
@@ -354,7 +354,7 @@ onMounted(() => {
 
 .drill-info {
   margin: 0 0 12px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--el-text-color-secondary);
 }
 </style>

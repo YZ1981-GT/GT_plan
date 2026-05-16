@@ -79,23 +79,23 @@ function fillExample(text) {
 
 <style scoped>
 .gt-nl-command-input { width: 100%; }
-.input-wrapper { display: flex; align-items: center; gap: 8px; background: #fff; border: 1.5px solid #ddd; border-radius: 24px; padding: 8px 12px; transition: border-color 0.2s; }
+.input-wrapper { display: flex; align-items: center; gap: 8px; background: var(--gt-color-bg-white); border: 1.5px solid #ddd; border-radius: 24px; padding: 8px 12px; transition: border-color 0.2s; }
 .input-wrapper:focus-within { border-color: #4b2d77; }
-.nl-icon { font-size: 18px; }
-.nl-input { flex: 1; border: none; outline: none; font-size: 13px; background: transparent; }
-.btn-execute { background: #4b2d77; color: #fff; border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; }
-.btn-execute:disabled { background: #ccc; cursor: not-allowed; }
+.nl-icon { font-size: var(--gt-font-size-xl); }
+.nl-input { flex: 1; border: none; outline: none; font-size: var(--gt-font-size-sm); background: transparent; }
+.btn-execute { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: var(--gt-font-size-xs); display: flex; align-items: center; justify-content: center; }
+.btn-execute:disabled { background: var(--gt-color-border); cursor: not-allowed; }
 
 .help-panel { background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-top: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-.help-title { font-size: 12px; color: #999; margin-bottom: 8px; }
+.help-title { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-bottom: 8px; }
 .help-items { display: flex; flex-wrap: wrap; gap: 6px; }
-.help-item { background: #f5f5f5; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; color: #4b2d77; }
+.help-item { background: var(--gt-color-bg); padding: 4px 10px; border-radius: 4px; font-size: var(--gt-font-size-xs); cursor: pointer; color: var(--gt-color-primary); }
 .help-item:hover { background: rgba(75,45,119,0.1); }
 
-.result-panel { margin-top: 8px; padding: 10px 12px; background: #f9f9f9; border-radius: 8px; font-size: 13px; }
+.result-panel { margin-top: 8px; padding: 10px 12px; background: var(--gt-color-bg); border-radius: 8px; font-size: var(--gt-font-size-sm); }
 .result-action { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
-.status-badge { padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-.status-badge.success { background: #f6ffed; color: #52c41a; }
-.status-badge.action_required { background: #fff7e6; color: #fa8c16; }
-.status-badge.error { background: #fff2f0; color: #ff4d4f; }
+.status-badge { padding: 2px 8px; border-radius: 4px; font-size: var(--gt-font-size-xs); }
+.status-badge.success { background: var(--gt-bg-success); color: var(--gt-color-success); }
+.status-badge.action_required { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); }
+.status-badge.error { background: var(--gt-bg-danger); color: var(--gt-color-coral); }
 </style>

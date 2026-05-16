@@ -36,7 +36,7 @@
         <template #default="{ row }"><span>{{ row.parentRatio }}%</span></template>
       </el-table-column>
       <el-table-column prop="minorityRatio" label="少数股东比例" width="100" align="right">
-        <template #default="{ row }"><span style="color:#4b2d77;font-weight:600">{{ row.minorityRatio }}%</span></template>
+        <template #default="{ row }"><span style="color: var(--gt-color-primary);font-weight:600">{{ row.minorityRatio }}%</span></template>
       </el-table-column>
       <el-table-column label="少数股东权益" align="center">
         <el-table-column prop="endNetAsset" label="期末净资产" width="120" align="right">
@@ -46,7 +46,7 @@
           <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.minorityEquity) }}</span></template>
         </el-table-column>
         <el-table-column prop="elimMinorityEquity" label="抵消分录数" width="110" align="right">
-          <template #default="{ row }"><span style="color:#e6a23c">{{ fmt(row.elimMinorityEquity) }}</span></template>
+          <template #default="{ row }"><span style="color: var(--gt-color-wheat)">{{ fmt(row.elimMinorityEquity) }}</span></template>
         </el-table-column>
         <el-table-column prop="equityDiff" label="差异" width="90" align="right">
           <template #default="{ row }">
@@ -62,7 +62,7 @@
           <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.minorityProfit) }}</span></template>
         </el-table-column>
         <el-table-column prop="elimMinorityProfit" label="抵消分录数" width="110" align="right">
-          <template #default="{ row }"><span style="color:#e6a23c">{{ fmt(row.elimMinorityProfit) }}</span></template>
+          <template #default="{ row }"><span style="color: var(--gt-color-wheat)">{{ fmt(row.elimMinorityProfit) }}</span></template>
         </el-table-column>
         <el-table-column prop="profitDiff" label="差异" width="90" align="right">
           <template #default="{ row }">
@@ -73,7 +73,7 @@
       <el-table-column label="超额亏损" width="80" align="center">
         <template #default="{ row }">
           <el-tag v-if="row.isExcessLoss" type="danger" size="small">超额</el-tag>
-          <span v-else style="color:#67c23a">—</span>
+          <span v-else style="color: var(--gt-color-success)">—</span>
         </template>
       </el-table-column>
     </el-table>
@@ -220,16 +220,16 @@ function getSummary({ columns, data }: any) {
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
+.ws-sheet-header h3 { margin: 0; font-size: var(--gt-font-size-base); color: var(--gt-color-text-primary); }
 .ws-sheet-actions { display: flex; gap: 8px; }
-.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
-.ws-computed { color: #4b2d77; font-weight: 500; }
+.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: var(--gt-color-bg); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
+.ws-computed { color: var(--gt-color-primary); font-weight: 500; }
 .ws-bold { font-weight: 700; }
-.ws-diff-warn { color: #e6a23c !important; font-weight: 700 !important; }
-.ws-table :deep(.el-table__footer-wrapper td) { background: #f8f6fb !important; font-weight: 700; color: #4b2d77; }
+.ws-diff-warn { color: var(--gt-color-wheat) !important; font-weight: 700 !important; }
+.ws-table :deep(.el-table__footer-wrapper td) { background: var(--gt-color-primary-bg) !important; font-weight: 700; color: var(--gt-color-primary); }
 </style>
 
 <style>
-.ws-link { color: #4b2d77; cursor: pointer; text-decoration: underline; font-weight: 500; }
-.ws-link:hover { color: #7c5caa; }
+.ws-link { color: var(--gt-color-primary); cursor: pointer; text-decoration: underline; font-weight: 500; }
+.ws-link:hover { color: var(--gt-color-primary); }
 </style>

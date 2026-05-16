@@ -128,7 +128,7 @@
         <div v-if="currentCellInfo" class="help-section" style="border-top: 1px solid #e8e4f0; padding-top: 10px;">
           <div class="help-subtitle">📍 当前选中</div>
           <div class="help-item">地址：<code>{{ currentCellInfo.address }}</code></div>
-          <div class="help-item" v-if="currentCellInfo.formula">公式：<code style="color: #4b2d77;">{{ currentCellInfo.formula }}</code></div>
+          <div class="help-item" v-if="currentCellInfo.formula">公式：<code style="color: var(--gt-color-primary);">{{ currentCellInfo.formula }}</code></div>
           <div class="help-item">值：<b>{{ formatValue(currentCellInfo.value) || '-' }}</b></div>
           <div class="help-item" v-if="currentCellInfo.is_merged">合并范围：{{ currentCellInfo.merge?.range }}</div>
           <div class="help-item" v-if="currentCellInfo.fetch_rule_id">
@@ -170,9 +170,9 @@
           <template #label>📋 已有公式 ({{ localFormulas.length }})</template>
           <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
             <el-button size="small" @click="fmTab = 'edit'">+ 新增公式</el-button>
-            <el-button v-if="fmSelectedRows.length > 0" size="small" style="color: #999;" @click="onFmBatchDelete">删除选中 ({{ fmSelectedRows.length }})</el-button>
+            <el-button v-if="fmSelectedRows.length > 0" size="small" style="color: var(--gt-color-text-tertiary);" @click="onFmBatchDelete">删除选中 ({{ fmSelectedRows.length }})</el-button>
             <span style="flex: 1;" />
-            <span style="font-size: 11px; color: #999;">共 {{ localFormulas.length }} 条</span>
+            <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">共 {{ localFormulas.length }} 条</span>
           </div>
           <el-table :data="localFormulas" size="small" border max-height="50vh" style="width: 100%;"
             :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', whiteSpace: 'nowrap' }"
@@ -182,13 +182,13 @@
             <el-table-column type="selection" width="40" />
             <el-table-column label="目标" width="100">
               <template #default="{ row }">
-                <code style="font-size: 10px; color: #4b2d77; background: #f0ecf5; padding: 1px 5px; border-radius: 3px;">{{ row.target }}</code>
+                <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-primary); background: var(--gt-color-primary-bg); padding: 1px 5px; border-radius: 3px;">{{ row.target }}</code>
               </template>
             </el-table-column>
             <el-table-column label="公式" min-width="260">
               <template #default="{ row }">
                 <el-input v-if="row._editing" v-model="row.formula" size="small" />
-                <code v-else style="font-size: 10px; color: #555; cursor: pointer;" @dblclick="row._editing = true">{{ row.formula || '（双击编辑）' }}</code>
+                <code v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); cursor: pointer;" @dblclick="row._editing = true">{{ row.formula || '（双击编辑）' }}</code>
               </template>
             </el-table-column>
             <el-table-column label="分类" width="90">
@@ -198,20 +198,20 @@
                   <el-option label="逻辑" value="logic_check" />
                   <el-option label="合理" value="reasonability" />
                 </el-select>
-                <span v-else style="font-size: 10px;">{{ ({ auto_calc: '⚡', logic_check: '🔍', reasonability: '💡' } as Record<string,string>)[row.category] || '' }}{{ ({ auto_calc: '自动', logic_check: '逻辑', reasonability: '合理' } as Record<string,string>)[row.category] || row.category }}</span>
+                <span v-else style="font-size: var(--gt-font-size-xs);">{{ ({ auto_calc: '⚡', logic_check: '🔍', reasonability: '💡' } as Record<string,string>)[row.category] || '' }}{{ ({ auto_calc: '自动', logic_check: '逻辑', reasonability: '合理' } as Record<string,string>)[row.category] || row.category }}</span>
               </template>
             </el-table-column>
             <el-table-column label="说明" min-width="140">
               <template #default="{ row }">
                 <el-input v-if="row._editing" v-model="row.description" size="small" />
-                <span v-else style="font-size: 10px; color: #999;">{{ row.description }}</span>
+                <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">{{ row.description }}</span>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="90" align="center">
               <template #default="{ row, $index }">
                 <el-button v-if="!row._editing" size="small" link type="primary" @click="row._editing = true">编辑</el-button>
-                <el-button v-else size="small" link style="color: #1e8a38;" @click="row._editing = false">完成</el-button>
-                <el-button size="small" link style="color: #999;" @click="localFormulas.splice($index, 1)">删除</el-button>
+                <el-button v-else size="small" link style="color: var(--gt-color-success);" @click="row._editing = false">完成</el-button>
+                <el-button size="small" link style="color: var(--gt-color-text-tertiary);" @click="localFormulas.splice($index, 1)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -225,7 +225,7 @@
             <div class="fm-edit-row">
               <span class="fm-edit-label">📍 写入目标：</span>
               <el-input v-model="editTarget" size="small" placeholder="如 B2 或 C5" style="width: 120px;" />
-              <span style="font-size: 10px; color: #999; margin-left: 4px;">（当前选中：{{ currentCellInfo?.address || '--' }}）</span>
+              <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-left: 4px;">（当前选中：{{ currentCellInfo?.address || '--' }}）</span>
             </div>
             <!-- 公式输入 -->
             <div class="fm-edit-row">
@@ -950,16 +950,16 @@ async function loadSelectorData() {
 </script>
 
 <style scoped>
-.structure-editor { display: flex; flex-direction: column; height: 100%; background: #f5f3f8; overflow: hidden; }
+.structure-editor { display: flex; flex-direction: column; height: 100%; background: var(--gt-color-primary-bg); overflow: hidden; }
 
 .sheet-tabs {
   flex-shrink: 0;
   padding: 0 8px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-bottom: 1px solid #e8e4f0;
 }
 .sheet-tabs :deep(.el-tabs__header) { margin: 0; }
-.sheet-tabs :deep(.el-tabs__item) { font-size: 11px; height: 28px; line-height: 28px; padding: 0 12px; }
+.sheet-tabs :deep(.el-tabs__item) { font-size: var(--gt-font-size-xs); height: 28px; line-height: 28px; padding: 0 12px; }
 
 /* 顶部固定区域 — 不随表格滚动 */
 .structure-editor > :deep(.gt-formula-bar) { flex-shrink: 0; }
@@ -970,13 +970,13 @@ async function loadSelectorData() {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 16px;
   background: linear-gradient(135deg, #4b2d77 0%, #6b4a9e 100%);
-  color: #fff;
+  color: var(--gt-color-text-inverse);
 }
 .se-header-left { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.se-title { margin: 0; font-size: 15px; font-weight: 700; }
+.se-title { margin: 0; font-size: var(--gt-font-size-base); font-weight: 700; }
 .se-info-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .se-tag {
-  font-size: 11px; padding: 2px 10px; border-radius: 10px; font-weight: 500;
+  font-size: var(--gt-font-size-xs); padding: 2px 10px; border-radius: 10px; font-weight: 500;
   background: rgba(255,255,255,0.15); color: #fff; white-space: nowrap;
 }
 .se-tag-unit { background: rgba(255,255,255,0.2); }
@@ -990,7 +990,7 @@ async function loadSelectorData() {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 16px;
   border-bottom: 1px solid #e8e4f0;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   flex-wrap: wrap;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   position: sticky; top: 0; z-index: 10;
@@ -998,87 +998,87 @@ async function loadSelectorData() {
 
 /* 左右分栏布局 */
 .editor-body { display: flex; flex: 1; min-height: 0; overflow: hidden; gap: 0; }
-.table-area { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
+.table-area { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--gt-color-bg-white); }
 .table-container { flex: 1; overflow: auto; padding: 8px; }
 
 /* 表格美化 */
 .table-container { flex: 1; overflow: auto; padding: 8px; }
 .table-container :deep(table) {
-  border-collapse: collapse; width: 100%; font-size: 12px;
+  border-collapse: collapse; width: 100%; font-size: var(--gt-font-size-xs);
 }
 .table-container :deep(td) {
-  border: 1px solid #e8e4f0; padding: 5px 8px; font-size: 12px;
+  border: 1px solid #e8e4f0; padding: 5px 8px; font-size: var(--gt-font-size-xs);
 }
-.table-container :deep(tr:hover td) { background: #faf8fd; }
+.table-container :deep(tr:hover td) { background: var(--gt-color-primary-bg); }
 .table-container :deep(.gt-row-header) {
-  background: #faf8fd !important; color: #999; font-size: 10px; text-align: center; width: 30px;
+  background: var(--gt-color-primary-bg) !important; color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); text-align: center; width: 30px;
 }
 .table-container :deep(tr.gt-col-header-row td) {
-  background: #ece6f5; font-size: 10px; color: #666; text-align: center;
+  background: var(--gt-color-primary-bg); font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); text-align: center;
 }
 .table-container :deep(tr.gt-data-header-row td) {
-  background: #f5f3f8 !important; font-weight: 600; color: #333;
+  background: var(--gt-color-primary-bg) !important; font-weight: 600; color: var(--gt-color-text-primary);
   border-bottom: 2px solid #d0c8e0;
 }
 .table-container :deep(td.gt-row-header) {
-  background: #faf8fd !important; color: #999; font-size: 10px; text-align: center;
+  background: var(--gt-color-primary-bg) !important; color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); text-align: center;
   position: sticky; left: 0; z-index: 2;
 }
-.table-container :deep(td.gt-selected) { outline: 2px solid #4b2d77 !important; background: #f0ecf5 !important; }
-.table-container :deep(td.gt-dep-highlight) { outline: 1px dashed #e6a23c !important; background: #fdf6ec !important; }
-.table-container :deep(td.gt-formula-error) { background: #fef0f0 !important; border: 1px solid #f56c6c !important; cursor: help; }
+.table-container :deep(td.gt-selected) { outline: 2px solid #4b2d77 !important; background: var(--gt-color-primary-bg) !important; }
+.table-container :deep(td.gt-dep-highlight) { outline: 1px dashed #e6a23c !important; background: var(--gt-bg-warning) !important; }
+.table-container :deep(td.gt-formula-error) { background: var(--gt-bg-danger) !important; border: 1px solid #f56c6c !important; cursor: help; }
 
 /* 可视化维度：显示公式 */
 .table-container.show-formulas :deep(td[data-formula])::after {
   content: attr(data-formula);
-  display: block; font-size: 9px; color: #b7791f; font-family: monospace;
+  display: block; font-size: 9px /* allow-px: special */; color: var(--gt-color-wheat); font-family: monospace;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; opacity: 0.7;
 }
 /* 可视化维度：显示数据源 */
 .table-container.show-sources :deep(td[data-fetch-rule])::before {
-  content: "🔗"; position: absolute; top: 1px; left: 2px; font-size: 10px;
+  content: "🔗"; position: absolute; top: 1px; left: 2px; font-size: var(--gt-font-size-xs);
 }
 /* 可视化维度：显示状态 */
 .table-container.show-status :deep(td[data-formula]) { border-left: 3px solid #e6a23c !important; }
 .table-container.show-status :deep(td[data-fetch-rule]) { border-left: 3px solid #0094b3 !important; }
 
 /* 分页控件 */
-.pagination-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-top: 1px solid #e8e4f0; background: #faf8fd; }
-.page-info { font-size: 12px; color: #909399; }
+.pagination-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-top: 1px solid #e8e4f0; background: var(--gt-color-primary-bg); }
+.page-info { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); }
 
 /* 公式编辑面板 */
 .fm-edit-panel { padding: 4px 0; }
 .fm-edit-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.fm-edit-label { font-size: 12px; color: #666; white-space: nowrap; min-width: 70px; }
+.fm-edit-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); white-space: nowrap; min-width: 70px; }
 .fm-edit-section { margin-bottom: 8px; }
-.fm-edit-section-title { font-size: 11px; font-weight: 600; color: #555; margin-bottom: 4px; }
+.fm-edit-section-title { font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-text-regular); margin-bottom: 4px; }
 .fm-edit-btns { display: flex; gap: 4px; flex-wrap: wrap; }
-.fm-edit-btns .el-button { font-size: 10px; padding: 2px 8px; font-family: monospace; height: 24px; }
+.fm-edit-btns .el-button { font-size: var(--gt-font-size-xs); padding: 2px 8px; font-family: monospace; height: 24px; }
 
 /* 右侧操作说明 */
 .help-area {
   width: 260px; flex-shrink: 0;
   border-left: 1px solid #e8e4f0;
-  background: #faf8fd;
+  background: var(--gt-color-primary-bg);
   overflow-y: auto;
   padding: 14px;
 }
 .help-title {
-  font-size: 13px; font-weight: 700; color: #4b2d77; margin-bottom: 14px;
+  font-size: var(--gt-font-size-sm); font-weight: 700; color: var(--gt-color-primary); margin-bottom: 14px;
   padding-bottom: 8px; border-bottom: 2px solid #ece6f5;
 }
 .help-section { margin-bottom: 14px; }
 .help-subtitle {
-  font-size: 11px; font-weight: 600; color: #4b2d77; margin-bottom: 6px;
-  padding: 3px 8px; background: #ece6f5; border-radius: 4px; display: inline-block;
+  font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-primary); margin-bottom: 6px;
+  padding: 3px 8px; background: var(--gt-color-primary-bg); border-radius: 4px; display: inline-block;
 }
-.help-item { font-size: 11px; color: #555; line-height: 1.9; padding-left: 6px; }
-.help-item b { color: #333; }
+.help-item { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); line-height: 1.9; padding-left: 6px; }
+.help-item b { color: var(--gt-color-text-primary); }
 .help-item code {
-  font-size: 10px; background: #f0ecf5; padding: 1px 5px; border-radius: 3px; color: #4b2d77;
+  font-size: var(--gt-font-size-xs); background: var(--gt-color-primary-bg); padding: 1px 5px; border-radius: 3px; color: var(--gt-color-primary);
   font-family: 'Cascadia Code', 'Fira Code', monospace;
 }
-.help-badge { font-size: 9px; padding: 1px 6px; border-radius: 8px; font-weight: 600; }
-.help-badge.auto { background: #e8f5e9; color: #2e7d32; }
-.help-badge.manual { background: #fff3e0; color: #e65100; }
+.help-badge { font-size: 9px /* allow-px: special */; padding: 1px 6px; border-radius: 8px; font-weight: 600; }
+.help-badge.auto { background: var(--gt-color-success-light); color: var(--gt-color-success); }
+.help-badge.manual { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); }
 </style>

@@ -350,12 +350,12 @@ onMounted(loadNotes)
 
 .eqcr-notes__item-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text, #303133);
 }
 
 .eqcr-notes__item-content {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary, #606266);
   line-height: 1.6;
   white-space: pre-wrap;
@@ -375,7 +375,7 @@ onMounted(loadNotes)
 }
 
 .eqcr-notes__item-time {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary, #909399);
 }
 

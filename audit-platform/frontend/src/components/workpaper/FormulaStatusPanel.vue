@@ -128,7 +128,7 @@ onMounted(loadFormulas)
 
 .summary-badge {
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   padding: 2px 6px;
   border-radius: 4px;
   transition: background 0.2s;
@@ -166,19 +166,19 @@ onMounted(loadFormulas)
   gap: 6px;
 }
 
-.formula-icon { font-size: 12px; }
-.formula-cell { font-weight: 500; font-size: 13px; }
+.formula-icon { font-size: var(--gt-font-size-xs); }
+.formula-cell { font-weight: 500; font-size: var(--gt-font-size-sm); }
 
 .formula-detail {
   margin-top: 2px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
   font-family: 'Consolas', monospace;
 }
 
 .formula-value {
   margin-top: 2px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-color-primary);
   font-family: 'Arial Narrow', sans-serif;
   font-variant-numeric: tabular-nums;
@@ -186,7 +186,7 @@ onMounted(loadFormulas)
 
 .formula-error {
   margin-top: 2px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-color-danger);
 }
 </style>

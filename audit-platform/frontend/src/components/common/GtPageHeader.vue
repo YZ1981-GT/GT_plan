@@ -150,7 +150,7 @@ onUnmounted(() => {
   border-radius: var(--gt-radius-lg);
   padding: 16px 24px;
   margin-bottom: var(--gt-space-5);
-  color: #fff;
+  color: var(--gt-color-text-inverse);
   position: relative;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
@@ -184,15 +184,15 @@ onUnmounted(() => {
 }
 
 .gt-page-header__back {
-  color: #fff !important;
-  font-size: 13px;
+  color: var(--gt-color-text-inverse) !important;
+  font-size: var(--gt-font-size-sm);
   padding: 0;
   margin-right: 8px;
 }
 
 .gt-page-header__title {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--gt-font-size-xl);
   font-weight: 700;
   white-space: nowrap;
   flex-shrink: 0;
@@ -208,7 +208,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   padding: 3px 10px;
   border-radius: 12px;
   cursor: default;
@@ -217,7 +217,7 @@ onUnmounted(() => {
 
 .gt-sync-dot--ok {
   background: rgba(103, 194, 58, 0.2);
-  color: #b8f0a0;
+  color: var(--gt-color-success-light);
 }
 
 .gt-sync-dot--syncing {
@@ -228,7 +228,7 @@ onUnmounted(() => {
 
 .gt-sync-dot--stale {
   background: rgba(230, 162, 60, 0.25);
-  color: #ffd080;
+  color: var(--gt-color-wheat);
 }
 
 @keyframes gt-sync-pulse {
@@ -242,16 +242,16 @@ onUnmounted(() => {
 }
 
 .gt-page-header--banner .gt-page-header__title {
-  font-size: 22px;
+  font-size: var(--gt-font-size-2xl);
 }
 
 .gt-page-header__icon {
-  font-size: 28px;
+  font-size: var(--gt-font-size-3xl);
   flex-shrink: 0;
 }
 
 .gt-page-header__subtitle {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   opacity: 0.85;
   margin-top: -4px;
   padding-left: 0;

@@ -360,6 +360,11 @@ inclusion: always
 - **F11 真因澄清**（2026-05-16 第三轮）：签字端点真实存在但 v3 第一稿假设路径错——真实路径 `/api/signatures/{object_type}/{object_id}` + `/api/projects/{pid}/sign-readiness`（连字符），不是 `/api/signatures/projects/{pid}/records` + `/api/projects/{pid}/sign/readiness`
 - **F15 真因澄清**：`/api/projects/{pid}/ledger-import/jobs/latest` 在前端零引用（grep 实测），后端只是注释误导（写"GET /jobs/latest"实际路由 `/active-job`）；真实问题是后端 `@router.get("/jobs/{job_id}")` 把 `latest` 当 UUID 解析失败，无前端调用方时不构成 bug
 - **v3 档 2 4 件 quickfix 全部完成（2026-05-16，1.5h 工时）**：Q1 真修复 + Q2/Q3 平反 + Q4 真修复
+- **R10 两套三件套已起草并修复（2026-05-16，commit c5d46d5+f995905）**：v3-r10-linkage-and-tokens（22 天 / 4 Sprint / 10 F）+ v3-r10-editor-resilience（11 天 / 3 Sprint / 10 F）；起草后做静态复盘核验识别 14 处偏差，🟡 中等 6 处 + X1 跨 spec 协调缺漏共 7 处一次性修复（v1.1 版本）；启动条件 = v3 P0 全清 ✅ + Spec A 上线 ≥ 7 天稳定（≥ 2026-05-23）
+- **三件套静态复盘方法论沉淀**：起草后必须做"覆盖矩阵 + 跨文件一致性 + 跨 spec 协调"三维核验——(1) 每个需求 F-N 在 requirements/design/tasks 都要找到对应章节；(2) 跨文件 schema/字段命名/数字统一（baselines.json 字段名漂移最常见）；(3) 跨 spec 共享文件（如 Adjustments.vue / DegradedBanner.vue / gt-tokens.css）依赖方向必须双向声明；问题分级 🔴 阻塞 / 🟡 中等 / 🟢 打磨；🟡 必修 🟢 可选
+- **跨 spec 协调铁律**：A spec 任务依赖 B spec 产出（如 token / 端点）时，A 必须在启动条件核验列出 B 的完成度 + 标注 fallback 策略（单独启动时如何降级）；不能假设并行 spec 一定先完成
+- **CI baseline 字段命名规约**：`.github/workflows/baselines.json` 字段统一格式 `{property}-{format}-{scope}`（如 `font-size-px-vue-files` / `el-table-naked-vue-files`）；占位值（待 Sprint 0 实测填入）必须在 design 显式标注，避免被当字面量误用
+- **签字组件类改造前置任务规约**：5 签字组件之类有"现状不一致"的批量改造（部分已有 confirm / 部分用 ElMessageBox / 部分裸调），tasks 必须先安排 N.0 grep 现状差异表任务（输出"组件 / 当前包装 / 文案 / 改动差异"四列），再分别接入；避免无差异化 task 描述破坏现有 confirm 链路
 - **F6 真根因彻底定位**：`backend/app/deps.py:check_consol_lock` 当 PG `projects.consol_lock` 列不存在时调 `await db.rollback()` 让所有已 SELECT 的 ORM 对象（包括 `current_user`）expired，回到 router 访问 `user.id` 时触发 lazy load → MissingGreenlet；修复 = 改用 `async with db.begin_nested()` SAVEPOINT 包住 SELECT，列不存在只回滚 SAVEPOINT 不破坏外层事务
 - **SQLAlchemy MissingGreenlet 排查通用模式**：(1) 看异常栈最深的 `__get__` 行就是触发 lazy load 的字段；(2) 反推 ORM 对象什么时候被 expire（最常见是同 session 里有 `db.rollback()` 或 `db.expire_all()`）；(3) 修复策略 — 用 `async with db.begin_nested()` SAVEPOINT 替代 rollback / 写入前 `await db.refresh(obj)` / 关键查询后立即 commit
 - **`async with db.begin_nested()` SAVEPOINT 模式**：可重入子事务，列不存在/SQL 异常只回滚 SAVEPOINT，外层事务和已 SELECT 对象状态不受影响；适用于"探测性查询可能失败但不能影响主流程"场景（如 `check_consol_lock` 探测列是否存在）

@@ -125,7 +125,7 @@ const completeness = computed(() => {
 }
 .trace-header h4 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 .chain-flow {
   display: flex;
@@ -145,11 +145,11 @@ const completeness = computed(() => {
 .connector-line {
   width: 20px;
   height: 2px;
-  background: #dcdfe6;
+  background: var(--gt-color-border);
 }
 .connector-arrow {
-  color: #909399;
-  font-size: 16px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-md);
   margin-left: -4px;
 }
 .stage-card {
@@ -161,15 +161,15 @@ const completeness = computed(() => {
   transition: box-shadow 0.2s;
 }
 .stage-card.has-coverage {
-  background: #f0f9eb;
+  background: var(--gt-bg-success);
 }
 .stage-card.no-coverage {
-  background: #fef0f0;
+  background: var(--gt-bg-danger);
   border-style: dashed;
 }
 .stage-label {
   font-weight: 600;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   margin-bottom: 8px;
 }
 .wp-list {

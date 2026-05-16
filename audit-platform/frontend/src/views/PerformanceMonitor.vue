@@ -41,7 +41,7 @@
       <template #header>
         <span>性能瓶颈分析</span>
       </template>
-      <div v-if="bottlenecks.length === 0" style="text-align: center; padding: 20px; color: #999">
+      <div v-if="bottlenecks.length === 0" style="text-align: center; padding: 20px; color: var(--gt-color-text-tertiary)">
         暂无瓶颈数据
       </div>
       <div v-else>
@@ -503,7 +503,7 @@ onUnmounted(() => {
 
 <style scoped>
 .performance-monitor { padding: 16px; }
-.stat-value { font-size: 28px; font-weight: 600; color: var(--gt-primary, #4b2d77); }
-.stat-label { font-size: 12px; color: #999; margin-top: 4px; }
-.bottleneck-section h4 { color: #333; font-size: 14px; }
+.stat-value { font-size: var(--gt-font-size-3xl); font-weight: 600; color: var(--gt-primary, #4b2d77); }
+.stat-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 4px; }
+.bottleneck-section h4 { color: var(--gt-color-text-primary); font-size: var(--gt-font-size-sm); }
 </style>

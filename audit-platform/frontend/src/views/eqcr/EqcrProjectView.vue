@@ -212,6 +212,9 @@ import ShadowCompareRow from '@/components/eqcr/ShadowCompareRow.vue'
 import type { ShadowCompareItem } from '@/components/eqcr/ShadowCompareRow.vue'
 import { feedback } from '@/utils/feedback'
 import { handleApiError } from '@/utils/errorHandler'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 
 const route = useRoute()
 const router = useRouter()
@@ -372,6 +375,18 @@ async function onApproveClick() {
       activeTab.value = 'prior_year'
       return
     }
+  }
+
+  // R10 Spec C / F7：先用 confirmSign 展示操作+用户+项目+不可撤销摘要
+  try {
+    const { confirmSign } = await import('@/utils/confirm')
+    await confirmSign('EQCR 独立复核签字（审定意见）', {
+      userName: authStore.user?.full_name || authStore.user?.username || '当前用户',
+      projectName: overview.value?.project?.name || projectId.value || '当前项目',
+      objectName: 'EQCR 复核审批 — 审批后审计报告将进入 eqcr_approved 状态',
+    })
+  } catch {
+    return
   }
 
   const { value: comment } = await ElMessageBox.prompt(
@@ -573,7 +588,7 @@ function reportStatusType(
   min-height: 100px;
 }
 .eqcr-finding-content {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary);
   line-height: 1.6;
 }

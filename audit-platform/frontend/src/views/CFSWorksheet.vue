@@ -19,7 +19,7 @@
       type="info" show-icon :closable="false" style="margin-bottom: 12px"
     >
       <template #title>工作底稿暂无数据</template>
-      <div style="font-size: 12px; line-height: 1.6">请先点击"生成工作底稿"按钮，系统将从试算表自动生成现金流量表工作底稿。</div>
+      <div style="font-size: var(--gt-font-size-xs); line-height: 1.6">请先点击"生成工作底稿"按钮，系统将从试算表自动生成现金流量表工作底稿。</div>
     </el-alert>
     <h3 class="gt-section-title">工作底稿</h3>
     <el-table :data="worksheetRows" v-loading="loading" border stripe size="small" style="width: 100%; margin-bottom: 20px">
@@ -293,7 +293,7 @@ onMounted(() => {
   border-radius: var(--gt-radius-lg);
   padding: 18px 28px;
   margin-bottom: var(--gt-space-5);
-  color: #fff;
+  color: var(--gt-color-text-inverse);
   position: relative; overflow: hidden;
   box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
   background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
@@ -306,17 +306,17 @@ onMounted(() => {
   background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
   pointer-events: none;
 }
-.gt-cfs-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
-.gt-cfs-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+.gt-cfs-banner-text h2 { margin: 0 0 2px; font-size: var(--gt-font-size-xl); font-weight: 700; }
+.gt-cfs-banner-text p { margin: 0; font-size: var(--gt-font-size-xs); opacity: 0.75; }
 .gt-cfs-banner-row1 {
   display: flex; align-items: center; gap: 16px;
   position: relative; z-index: 1;
 }
-.gt-cfs-title { margin: 0; font-size: 18px; font-weight: 700; white-space: nowrap; }
+.gt-cfs-title { margin: 0; font-size: var(--gt-font-size-xl); font-weight: 700; white-space: nowrap; }
 .gt-cfs-info-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .gt-cfs-info-item { display: flex; align-items: center; gap: 4px; }
-.gt-cfs-info-label { font-size: 11px; opacity: 0.8; white-space: nowrap; }
-.gt-cfs-info-badge { font-size: 11px; background: rgba(255,255,255,0.18); padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
+.gt-cfs-info-label { font-size: var(--gt-font-size-xs); opacity: 0.8; white-space: nowrap; }
+.gt-cfs-info-badge { font-size: var(--gt-font-size-xs); background: rgba(255,255,255,0.18); padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
 .gt-cfs-info-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.25); }
 .gt-cfs-unit-select, .gt-cfs-year-select { width: 160px; }
 .gt-cfs-unit-select :deep(.el-input__wrapper),
@@ -326,7 +326,7 @@ onMounted(() => {
   box-shadow: none !important;
 }
 .gt-cfs-unit-select :deep(.el-input__inner),
-.gt-cfs-year-select :deep(.el-input__inner) { color: #fff !important; font-size: 12px; }
+.gt-cfs-year-select :deep(.el-input__inner) { color: var(--gt-color-text-inverse) !important; font-size: var(--gt-font-size-xs); }
 .gt-cfs-unit-select :deep(.el-input__suffix),
 .gt-cfs-year-select :deep(.el-input__suffix) { color: rgba(255,255,255,0.7) !important; }
 .gt-cfs-banner-row2 {

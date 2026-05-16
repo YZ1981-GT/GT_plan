@@ -109,7 +109,7 @@ async function handleSave() {
 <style scoped>
 .el-upload__tip {
   margin-top: 4px;
-  color: #999;
-  font-size: 12px;
+  color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-xs);
 }
 </style>

@@ -85,7 +85,7 @@
             <div v-if="v.note || v.description" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); margin-top: 4px">
               {{ v.note || v.description }}
             </div>
-            <div v-if="v.created_by_name || v.created_by" style="font-size: 12px; color: #999; margin-top: 2px">
+            <div v-if="v.created_by_name || v.created_by" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px">
               {{ v.created_by_name || v.created_by }}
             </div>
           </el-timeline-item>
@@ -118,7 +118,7 @@
     <!-- 智能提示详情 -->
     <div v-if="showSmartTipDetail && smartTip" class="gt-wp-smart-tip-detail">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-weight:600;font-size:13px">💡 审计关注点</span>
+        <span style="font-weight:600;font-size: var(--gt-font-size-sm)">💡 审计关注点</span>
         <el-button size="small" text @click="showSmartTipDetail = false">收起</el-button>
       </div>
       <div v-if="smartTip.warnings?.length" style="margin-bottom:6px">
@@ -937,7 +937,7 @@ function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: stri
 .gt-wp-editor-univer { width: 100%; height: 100%; }
 .gt-wp-editor-loading {
   display: flex; flex-direction: column; align-items: center;
-  justify-content: center; height: 100%; gap: 12px; color: #999;
+  justify-content: center; height: 100%; gap: 12px; color: var(--gt-color-text-tertiary);
 }
 .gt-wp-editor-statusbar {
   display: flex; gap: var(--gt-space-5); padding: 6px var(--gt-space-4);
@@ -945,11 +945,11 @@ function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: stri
   font-size: var(--gt-font-size-xs);
 }
 .gt-wp-smart-tip {
-  margin-left: auto; cursor: pointer; color: #ffd700; font-weight: 500;
+  margin-left: auto; cursor: pointer; color: var(--gt-color-wheat); font-weight: 500;
 }
 .gt-wp-smart-tip-detail {
   position: absolute; bottom: 30px; right: 12px; left: 12px;
-  background: #fff; border: 1px solid #e8e4f0; border-radius: 8px;
+  background: var(--gt-color-bg-white); border: 1px solid #e8e4f0; border-radius: 8px;
   padding: 12px 16px; box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
   z-index: 20; max-height: 300px; overflow-y: auto;
 }
@@ -966,7 +966,7 @@ function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: stri
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #e6443e;
+  background: var(--gt-color-coral);
   box-shadow: 0 0 0 2px rgba(230, 68, 62, 0.18), 0 1px 3px rgba(0, 0, 0, 0.15);
   cursor: pointer;
   transition: transform 0.15s ease;

@@ -215,10 +215,10 @@ onMounted(() => {
 <style scoped>
 .gt-wh-approval-tab { padding: var(--gt-space-2) 0; }
 .gt-stats-row { display: flex; gap: 16px; margin-bottom: 20px; }
-.gt-stat-card { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid var(--gt-color-border-light); border-radius: var(--gt-radius-md); padding: 16px 24px; min-width: 200px; }
-.gt-stat-icon { font-size: 28px; }
+.gt-stat-card { display: flex; align-items: center; gap: 12px; background: var(--gt-color-bg-white); border: 1px solid var(--gt-color-border-light); border-radius: var(--gt-radius-md); padding: 16px 24px; min-width: 200px; }
+.gt-stat-icon { font-size: var(--gt-font-size-3xl); }
 .gt-stat-info { display: flex; flex-direction: column; }
-.gt-stat-value { font-size: 24px; font-weight: 700; color: var(--gt-color-primary); }
+.gt-stat-value { font-size: 24px /* allow-px: special */; font-weight: 700; color: var(--gt-color-primary); }
 .gt-stat-approved .gt-stat-value { color: var(--gt-color-success); }
 .gt-stat-pending .gt-stat-value { color: var(--gt-color-wheat); }
 .gt-stat-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); margin-top: 2px; }

@@ -16,7 +16,7 @@
       style="margin-bottom: 16px"
     >
       <template #title>异议率不是负面指标</template>
-      <div style="font-size: 12px">
+      <div style="font-size: var(--gt-font-size-xs)">
         较高的异议率说明 EQCR 独立性强、敢于提出不同意见。异议率为 0% 需审查是否走过场。
       </div>
     </el-alert>
@@ -42,8 +42,8 @@
               {{ row.disagreement_rate }}%
             </el-tag>
           </el-tooltip>
-          <span v-if="row.disagreement_rate > 20" style="margin-left: 4px; font-size: 11px; color: #67c23a">独立性强</span>
-          <span v-else-if="row.disagreement_rate === 0" style="margin-left: 4px; font-size: 11px; color: #e6a23c">需审查</span>
+          <span v-if="row.disagreement_rate > 20" style="margin-left: 4px; font-size: var(--gt-font-size-xs); color: var(--gt-color-success)">独立性强</span>
+          <span v-else-if="row.disagreement_rate === 0" style="margin-left: 4px; font-size: var(--gt-font-size-xs); color: var(--gt-color-wheat)">需审查</span>
         </template>
       </el-table-column>
       <el-table-column prop="material_findings_count" label="未解决发现" width="100" align="center">

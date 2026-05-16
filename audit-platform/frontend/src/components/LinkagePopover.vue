@@ -58,16 +58,16 @@ function onItemClick(item: LinkageItem) {
   min-width: 200px;
 }
 .linkage-popover-title {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
   margin-bottom: 8px;
   padding-bottom: 6px;
   border-bottom: 1px solid #ebeef5;
 }
 .linkage-empty {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   text-align: center;
   padding: 12px 0;
 }
@@ -78,25 +78,25 @@ function onItemClick(item: LinkageItem) {
   padding: 6px 4px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   transition: background 0.15s;
 }
 .linkage-item:hover {
-  background: #f5f7fa;
+  background: var(--gt-bg-subtle);
 }
 .linkage-item-label {
-  color: #409eff;
+  color: var(--gt-color-teal);
   font-weight: 500;
 }
 .linkage-item-sub {
-  color: #606266;
+  color: var(--gt-color-text-regular);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .linkage-item-amount {
-  color: #303133;
+  color: var(--gt-color-text-primary);
   font-family: 'Arial Narrow', Arial, sans-serif;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

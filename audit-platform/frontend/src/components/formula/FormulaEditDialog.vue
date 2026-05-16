@@ -28,18 +28,18 @@
           <div class="gt-fe-formula-header">
             <el-checkbox v-model="f._checked" size="small" @click.stop style="margin-right: 2px;" />
             <span class="gt-fe-drag-handle" title="拖拽排序">⠿</span>
-            <span style="font-size: 11px; color: #bbb; min-width: 20px;">{{ idx + 1 }}.</span>
+            <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); min-width: 20px;">{{ idx + 1 }}.</span>
             <el-select v-model="f.category" size="small" style="width: 120px;">
               <el-option label="⚡ 自动运算" value="auto_calc" />
               <el-option label="🔍 逻辑审核" value="logic_check" />
               <el-option label="💡 合理性" value="reasonability" />
             </el-select>
             <el-input v-model="f.description" size="small" placeholder="公式说明（如：流动资产合计）" style="flex: 1;" />
-            <el-button size="small" link style="color: #999;" @click="removeFormula(idx)" v-if="formulas.length > 1">删除</el-button>
+            <el-button size="small" link style="color: var(--gt-color-text-tertiary);" @click="removeFormula(idx)" v-if="formulas.length > 1">删除</el-button>
           </div>
           <!-- 目标定位 -->
           <div class="gt-fe-target-bar">
-            <span style="font-size: 11px; color: #999; white-space: nowrap;">📍 写入目标：</span>
+            <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); white-space: nowrap;">📍 写入目标：</span>
             <el-button size="small" @click="openTargetPicker(idx)">🎯 点击定位</el-button>
             <el-input
               v-model="f.target_cell"
@@ -334,11 +334,11 @@
       <el-table-column prop="formula" label="公式" min-width="200" show-overflow-tooltip />
       <el-table-column label="将插入引用" width="240">
         <template #default="{ row }">
-          <code style="font-size: 11px; color: #4b2d77; background: #f0ecf5; padding: 1px 6px; border-radius: 4px;">{{ row._ref }}</code>
+          <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-primary); background: var(--gt-color-primary-bg); padding: 1px 6px; border-radius: 4px;">{{ row._ref }}</code>
         </template>
       </el-table-column>
     </el-table>
-    <div style="margin-top: 8px; font-size: 11px; color: #999;">
+    <div style="margin-top: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">
       💡 点击任意行即可将引用插入到当前公式中
     </div>
   </el-dialog>
@@ -374,10 +374,10 @@
   >
     <div v-if="targetPickerLoading" style="text-align: center; padding: 40px;">
       <el-icon class="is-loading" :size="24"><Loading /></el-icon>
-      <div style="margin-top: 8px; color: #999; font-size: 12px;">加载表格数据...</div>
+      <div style="margin-top: 8px; color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs);">加载表格数据...</div>
     </div>
     <div v-else>
-      <div style="margin-bottom: 8px; font-size: 12px; color: #666;">
+      <div style="margin-bottom: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">
         💡 点击表格中的单元格，将其设为公式的写入目标位置
       </div>
       <el-table
@@ -390,17 +390,17 @@
       >
         <el-table-column label="#" width="50" align="center">
           <template #default="{ $index }">
-            <span style="color: #bbb; font-size: 10px;">{{ $index + 1 }}</span>
+            <span style="color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs);">{{ $index + 1 }}</span>
           </template>
         </el-table-column>
         <el-table-column label="行次" width="100">
           <template #default="{ row }">
-            <span style="font-size: 11px; color: #999; white-space: nowrap;">{{ row[0] }}</span>
+            <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); white-space: nowrap;">{{ row[0] }}</span>
           </template>
         </el-table-column>
         <el-table-column label="项目名称" min-width="200">
           <template #default="{ row }">
-            <span style="font-size: 12px;">{{ row[1] }}</span>
+            <span style="font-size: var(--gt-font-size-xs);">{{ row[1] }}</span>
           </template>
         </el-table-column>
         <el-table-column label="期末金额" width="120" align="center">
@@ -410,8 +410,8 @@
               :class="{ 'gt-fe-target-cell-selected': targetSelectedCell === `R${$index}C2` }"
               @click="onTargetCellClick($index, 2, row[2])"
             >
-              <span v-if="targetSelectedCell === `R${$index}C2`" style="color: #4b2d77;">✓ 期末</span>
-              <span v-else style="color: #ccc; font-size: 11px;">点击选择</span>
+              <span v-if="targetSelectedCell === `R${$index}C2`" style="color: var(--gt-color-primary);">✓ 期末</span>
+              <span v-else style="color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs);">点击选择</span>
             </div>
           </template>
         </el-table-column>
@@ -422,14 +422,14 @@
               :class="{ 'gt-fe-target-cell-selected': targetSelectedCell === `R${$index}C3` }"
               @click="onTargetCellClick($index, 3, row[3])"
             >
-              <span v-if="targetSelectedCell === `R${$index}C3`" style="color: #4b2d77;">✓ 期初</span>
-              <span v-else style="color: #ccc; font-size: 11px;">点击选择</span>
+              <span v-if="targetSelectedCell === `R${$index}C3`" style="color: var(--gt-color-primary);">✓ 期初</span>
+              <span v-else style="color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs);">点击选择</span>
             </div>
           </template>
         </el-table-column>
       </el-table>
-      <div v-if="targetSelectedCell" style="margin-top: 8px; font-size: 12px;">
-        已选中：<code style="color: #4b2d77; background: #f0ecf5; padding: 2px 8px; border-radius: 4px;">{{ targetSelectedLabel }}</code>
+      <div v-if="targetSelectedCell" style="margin-top: 8px; font-size: var(--gt-font-size-xs);">
+        已选中：<code style="color: var(--gt-color-primary); background: var(--gt-color-primary-bg); padding: 2px 8px; border-radius: 4px;">{{ targetSelectedLabel }}</code>
       </div>
     </div>
     <template #footer>
@@ -978,9 +978,9 @@ function confirmTargetCell() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
-  color: #555;
+  color: var(--gt-color-text-regular);
   padding: 6px 8px;
   border-radius: 4px;
   cursor: pointer;
@@ -988,12 +988,12 @@ function confirmTargetCell() {
   transition: background 0.12s;
 }
 .gt-fe-ref-group-title:hover {
-  background: #f0ecf5;
+  background: var(--gt-color-primary-bg);
 }
 .gt-fe-ref-count {
-  font-size: 10px;
-  color: #999;
-  background: #f0ecf5;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
+  background: var(--gt-color-primary-bg);
   padding: 1px 6px;
   border-radius: 8px;
 }
@@ -1006,24 +1006,24 @@ function confirmTargetCell() {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   padding: 4px 8px;
   border-radius: 4px;
   cursor: pointer;
-  color: #444;
+  color: var(--gt-color-text-regular);
   transition: all 0.12s;
 }
 .gt-fe-ref-row:hover {
-  background: #f0ecf5;
-  color: #4b2d77;
+  background: var(--gt-color-primary-bg);
+  color: var(--gt-color-primary);
 }
 .gt-fe-ref-code {
   display: inline-block;
   min-width: 32px;
-  font-size: 10px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 700;
-  color: #4b2d77;
-  background: #f0ecf5;
+  color: var(--gt-color-primary);
+  background: var(--gt-color-primary-bg);
   padding: 1px 5px;
   border-radius: 3px;
   text-align: center;
@@ -1033,9 +1033,9 @@ function confirmTargetCell() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #333;
+  color: var(--gt-color-text-primary);
   margin-bottom: 10px;
 }
 .gt-fe-formula-item {
@@ -1043,7 +1043,7 @@ function confirmTargetCell() {
   border-radius: 6px;
   padding: 6px 8px;
   margin-bottom: 6px;
-  background: #faf8fd;
+  background: var(--gt-color-primary-bg);
   cursor: pointer;
   transition: border-color 0.15s;
 }
@@ -1053,18 +1053,18 @@ function confirmTargetCell() {
 }
 .gt-fe-drag-handle {
   cursor: grab;
-  color: #ccc;
-  font-size: 14px;
+  color: var(--gt-color-text-placeholder);
+  font-size: var(--gt-font-size-sm);
   user-select: none;
   padding: 0 2px;
 }
-.gt-fe-drag-handle:hover { color: #999; }
+.gt-fe-drag-handle:hover { color: var(--gt-color-text-tertiary); }
 .gt-fe-formula-header {
   display: flex;
   gap: 4px;
   align-items: center;
   margin-bottom: 4px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-fe-formula-input {
   display: flex;
@@ -1079,15 +1079,15 @@ function confirmTargetCell() {
   margin-top: 3px;
 }
 .gt-fe-quick-btns .el-button {
-  font-size: 10px;
+  font-size: var(--gt-font-size-xs);
   padding: 2px 6px;
   font-family: 'Cascadia Code', 'Fira Code', monospace;
   height: 22px;
   line-height: 1;
 }
 .gt-fe-btn-label {
-  font-size: 9px;
-  color: #999;
+  font-size: 9px /* allow-px: special */;
+  color: var(--gt-color-text-tertiary);
   margin-right: 2px;
   white-space: nowrap;
   min-width: 28px;
@@ -1098,36 +1098,36 @@ function confirmTargetCell() {
   gap: 8px;
 }
 .gt-fe-help-item {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   line-height: 1.5;
 }
 .gt-fe-help-item code {
   display: inline-block;
-  background: #f0ecf5;
+  background: var(--gt-color-primary-bg);
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 11px;
-  color: #4b2d77;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-primary);
   margin-bottom: 2px;
 }
 .gt-fe-help-item span {
   display: block;
-  color: #888;
-  font-size: 11px;
+  color: var(--gt-color-text-secondary);
+  font-size: var(--gt-font-size-xs);
 }
 .gt-fe-help-group {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
-  color: #555;
+  color: var(--gt-color-text-regular);
   margin-top: 8px;
   margin-bottom: 4px;
   padding-bottom: 2px;
   border-bottom: 1px solid #f0ecf5;
 }
 .gt-fe-help-tip {
-  font-size: 11px;
-  color: #4b2d77;
-  background: #f8f5fd;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-primary);
+  background: var(--gt-color-primary-bg);
   border: 1px solid #e8e0f5;
   border-radius: 6px;
   padding: 6px 10px;
@@ -1138,13 +1138,13 @@ function confirmTargetCell() {
   cursor: pointer;
 }
 .gt-fe-help-link:hover {
-  background: #e0d8f0 !important;
+  background: var(--gt-color-primary-lighter) !important;
 }
 .gt-fe-link {
   color: var(--gt-color-primary);
   cursor: pointer;
   text-decoration: none;
-  font-size: 10px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-fe-link:hover {
   text-decoration: underline;
@@ -1154,11 +1154,11 @@ function confirmTargetCell() {
   border: 1px solid #e8e4f0;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   transition: all 0.15s;
 }
 .gt-fe-report-type-item:hover {
-  background: #f0ecf5;
+  background: var(--gt-color-primary-bg);
   border-color: var(--gt-color-primary);
   transform: translateX(4px);
 }
@@ -1174,7 +1174,7 @@ function confirmTargetCell() {
   transition: background 0.1s;
 }
 .gt-fe-target-cell:hover {
-  background: #f0ecf5;
+  background: var(--gt-color-primary-bg);
 }
 .gt-fe-target-cell-selected {
   background: var(--gt-color-primary-bg, #f4f0fa) !important;

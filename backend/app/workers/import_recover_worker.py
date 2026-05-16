@@ -2,6 +2,8 @@
 
 需求 10.1/10.3/10.5：从 main.py lifespan 中拆出 `_import_recover_loop`。
 受 `settings.LEDGER_IMPORT_IN_PROCESS_RUNNER_ENABLED` 控制；未启用时直接返回。
+
+R10 Spec C Sprint 1.1.3：每轮写心跳到 Redis。
 """
 
 from __future__ import annotations
@@ -10,6 +12,7 @@ import asyncio
 import logging
 
 from app.core.config import settings
+from app.workers.worker_helpers import write_heartbeat
 
 logger = logging.getLogger("import_recover")
 
@@ -23,6 +26,9 @@ async def run(stop_event: asyncio.Event) -> None:
         return
 
     while not stop_event.is_set():
+        # 每轮先写心跳
+        await write_heartbeat("import_recover_worker")
+
         try:
             from app.services.import_job_runner import ImportJobRunner
             await ImportJobRunner.recover_jobs()

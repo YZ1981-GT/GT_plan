@@ -298,21 +298,21 @@ watch(
   grid-column: span 3;
 }
 .gt-vhd-meta-label {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 .gt-vhd-meta-value {
-  font-size: 14px;
-  color: #303133;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-primary);
   font-weight: 600;
 }
 .gt-vhd-meta-version {
-  color: #4b2d77;
+  color: var(--gt-color-primary);
 }
 .gt-vhd-meta-summary {
   font-weight: 400;
-  color: #606266;
-  font-size: 13px;
+  color: var(--gt-color-text-regular);
+  font-size: var(--gt-font-size-sm);
 }
 
 /* ── 历史列表 ── */
@@ -328,27 +328,27 @@ watch(
 }
 .gt-vhd-history-title {
   margin: 0;
-  font-size: 14px;
-  color: #4b2d77;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-primary);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
 }
 
 .gt-vhd-table :deep(.el-table__row:hover > td) {
-  background-color: #faf9fc !important;
+  background-color: var(--gt-color-primary-bg) !important;
 }
 .gt-vhd-seed-name {
   font-weight: 500;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .gt-vhd-operator {
   font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
 }
 .gt-vhd-divider {
-  color: #c0c4cc;
+  color: var(--gt-color-text-placeholder);
   margin: 0 2px;
 }
 

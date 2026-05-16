@@ -86,7 +86,7 @@
           <el-table-column label="分配" prop="total" width="60" align="center" />
           <el-table-column label="已通过" width="70" align="center">
             <template #default="{ row }">
-              <span style="color: #67c23a; font-weight: 600">{{ row.passed }}</span>
+              <span style="color: var(--gt-color-success); font-weight: 600">{{ row.passed }}</span>
             </template>
           </el-table-column>
           <el-table-column label="待复核" prop="pending_review" width="70" align="center" />
@@ -141,10 +141,10 @@
             <span class="gt-check-score">{{ archiveResult.passed_count }}/{{ archiveResult.total_checks }} 通过</span>
           </div>
           <div style="display: flex; align-items: center; justify-content: space-between; margin: 8px 0 12px">
-            <span v-if="archiveResult.checked_at" style="font-size: 12px; color: #909399">
+            <span v-if="archiveResult.checked_at" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-info)">
               上次检查时间：{{ new Date(archiveResult.checked_at).toLocaleString('zh-CN') }}
             </span>
-            <span v-else style="font-size: 12px; color: #909399">上次检查时间：未知</span>
+            <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-info)">上次检查时间：未知</span>
             <el-button size="small" type="primary" @click="loadArchive" :loading="archiveLoading">重新检查</el-button>
           </div>
           <div class="gt-check-list">
@@ -375,13 +375,13 @@ onMounted(loadAll)
 
 /* Rating badge */
 .rating-panel { display: flex; align-items: center; gap: 24px; padding: 24px; }
-.rating-badge { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 700; color: #fff; }
-.rating-badge--a { background: #67c23a; }
-.rating-badge--b { background: #409eff; }
-.rating-badge--c { background: #e6a23c; }
-.rating-badge--d { background: #f56c6c; }
-.rating-badge--n { background: #c0c4cc; }
-.rating-details { font-size: 14px; color: #606266; line-height: 2; }
+.rating-badge { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 36px /* allow-px: special */; font-weight: 700; color: var(--gt-color-text-inverse); }
+.rating-badge--a { background: var(--gt-color-success); }
+.rating-badge--b { background: var(--gt-color-teal); }
+.rating-badge--c { background: var(--gt-color-wheat); }
+.rating-badge--d { background: var(--gt-color-coral); }
+.rating-badge--n { background: var(--gt-color-text-placeholder); }
+.rating-details { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-regular); line-height: 2; }
 
 /* 本年抽查覆盖率卡片 [R9 F7-QC Task 23] */
 .gt-stat-card--coverage {
@@ -391,8 +391,8 @@ onMounted(loadAll)
   align-items: flex-start;
 }
 .gt-stat-sub {
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   margin-top: 4px;
 }
 </style>

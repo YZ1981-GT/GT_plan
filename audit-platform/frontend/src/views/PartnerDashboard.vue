@@ -25,7 +25,7 @@
       <template #title>
         ⚠️ {{ overview.risk_alert_count }} 个项目存在风险预警
       </template>
-      <div v-for="a in overview.risk_alerts" :key="a.id" style="margin-top: 4px; font-size: 13px">
+      <div v-for="a in overview.risk_alerts" :key="a.id" style="margin-top: 4px; font-size: var(--gt-font-size-sm)">
         <span style="font-weight: 600">{{ a.client_name || a.name }}</span>：{{ a.risk_reasons.join('、') }}
       </div>
     </el-alert>
@@ -34,7 +34,7 @@
     <el-card v-if="pendingIndependenceProjects.projects.length" class="independence-reminder-card" shadow="hover" style="margin-bottom: 16px">
       <template #header>
         <div style="display: flex; align-items: center; gap: 8px">
-          <span style="font-size: 16px">📋</span>
+          <span style="font-size: var(--gt-font-size-md)">📋</span>
           <span style="font-weight: 600">独立性待声明</span>
           <el-badge :value="pendingIndependenceProjects.total" type="warning" />
         </div>
@@ -64,7 +64,7 @@
     <el-card v-if="rotationWarnings.length" class="rotation-warning-card" shadow="hover" style="margin-bottom: 16px">
       <template #header>
         <div style="display: flex; align-items: center; gap: 8px">
-          <span style="font-size: 16px">🔄</span>
+          <span style="font-size: var(--gt-font-size-md)">🔄</span>
           <span style="font-weight: 600">轮换预警</span>
           <el-badge :value="rotationWarnings.length" type="danger" />
         </div>
@@ -232,8 +232,8 @@
           </el-button>
           <div v-if="!canSign && readinessData" class="gt-sign-hint">
             <template v-if="!readinessData.ready">
-              <div style="color: #f56c6c; font-weight: 600; margin-bottom: 4px">就绪检查未通过，无法签字</div>
-              <div v-if="readinessData.groups?.length" style="font-size: 12px; color: #909399">
+              <div style="color: var(--gt-color-coral); font-weight: 600; margin-bottom: 4px">就绪检查未通过，无法签字</div>
+              <div v-if="readinessData.groups?.length" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-info)">
                 <template v-for="group in readinessData.groups" :key="group.id">
                   <div v-for="finding in group.findings" :key="finding.rule_code || finding.message" style="padding: 2px 0">
                     ❌ {{ finding.rule_code ? `[${finding.rule_code}]` : '' }} {{ finding.message }}
@@ -718,14 +718,14 @@ onMounted(loadAll)
   gap: 12px;
 }
 .gt-sign-hint {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary, #909399);
 }
 
 /* 独立性待声明提醒卡 */
 .independence-reminder-card :deep(.el-card__header) {
   padding: 12px 16px;
-  background: #fdf6ec;
+  background: var(--gt-bg-warning);
 }
 .independence-reminder-list {
   display: flex;
@@ -739,7 +739,7 @@ onMounted(loadAll)
   padding: 6px 0;
 }
 .independence-reminder-name {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text, #303133);
 }
 .independence-reminder-footer {
@@ -752,7 +752,7 @@ onMounted(loadAll)
 /* 轮换预警卡片 */
 .rotation-warning-card :deep(.el-card__header) {
   padding: 12px 16px;
-  background: #fef0f0;
+  background: var(--gt-bg-danger);
 }
 .rotation-warning-list {
   display: flex;
@@ -776,7 +776,7 @@ onMounted(loadAll)
   flex-wrap: wrap;
 }
 .rotation-warning-name {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   color: var(--gt-color-text, #303133);
 }
@@ -785,14 +785,14 @@ onMounted(loadAll)
   margin: 0 4px;
 }
 .rotation-warning-client {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text, #303133);
 }
 .rotation-warning-actions {
   flex-shrink: 0;
 }
 .rotation-warning-hint {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-color-warning, #e6a23c);
 }
 
@@ -804,7 +804,7 @@ onMounted(loadAll)
   border-radius: 6px;
 }
 .override-sign-title {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   color: var(--gt-color-text, #303133);
   margin-bottom: 8px;
@@ -814,7 +814,7 @@ onMounted(loadAll)
   justify-content: space-between;
   align-items: center;
   padding: 6px 0;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary, #606266);
 }
 </style>

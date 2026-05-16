@@ -35,7 +35,7 @@
       style="margin-top: 12px"
     >
       <template #default>
-        <p style="margin: 4px 0 0; font-size: 12px; color: var(--el-text-color-secondary)">
+        <p style="margin: 4px 0 0; font-size: var(--gt-font-size-xs); color: var(--el-text-color-secondary)">
           检测到数据规模异常，请确认后继续
         </p>
       </template>
@@ -116,7 +116,7 @@
           >
             {{ getSkipReason(row) }}
           </el-tag>
-          <span v-else-if="row.table_type !== 'unknown'" style="color: var(--el-color-success); font-size: 12px">
+          <span v-else-if="row.table_type !== 'unknown'" style="color: var(--el-color-success); font-size: var(--gt-font-size-xs)">
             ✓ 已识别
           </span>
         </template>
@@ -202,7 +202,7 @@
           {{ detectionResult?.year_confidence || 0 }}%
         </el-descriptions-item>
       </el-descriptions>
-      <p style="color: var(--el-color-warning); font-size: 13px">
+      <p style="color: var(--el-color-warning); font-size: var(--gt-font-size-sm)">
         请确认是否继续使用识别的年度，或在提交时手动修改。
       </p>
       <template #footer>
@@ -391,7 +391,7 @@ function doConfirm(forceSubmit: boolean) {
 }
 
 .confidence-text {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
 }
 

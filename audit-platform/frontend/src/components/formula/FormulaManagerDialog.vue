@@ -42,8 +42,8 @@
               <el-option label="国企版" value="soe" />
               <el-option label="上市版" value="listed" />
             </el-select>
-            <span style="color: #ccc;">|</span>
-            <span style="color: #999; font-size: 12px;">{{ selectedPath }}</span>
+            <span style="color: var(--gt-color-text-placeholder);">|</span>
+            <span style="color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs);">{{ selectedPath }}</span>
           </div>
           <div style="display: flex; gap: 6px; align-items: center;">
             <el-button size="small" @click="showFormulaDashboard = true">📊 公式看板</el-button>
@@ -82,12 +82,12 @@
 
         <!-- 批量操作栏 -->
         <div v-if="selectedRows.length > 0 && !isCrossCheckMode" class="gt-fm-batch-bar">
-          <span style="font-size: 12px; color: #666;">已选 <b>{{ selectedRows.length }}</b> 条</span>
+          <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">已选 <b>{{ selectedRows.length }}</b> 条</span>
           <el-button size="small" @click="onBatchApplyCategory('auto_calc')">⚡ 标记为自动运算</el-button>
           <el-button size="small" @click="onBatchApplyCategory('logic_check')">🔍 标记为逻辑审核</el-button>
           <el-button size="small" @click="onBatchApplyCategory('reasonability')">💡 标记为合理性</el-button>
-          <el-button size="small" style="color: #999;" @click="onBatchClearFormula">清除公式</el-button>
-          <el-button size="small" style="color: #999;" @click="selectedRows = []">取消选择</el-button>
+          <el-button size="small" style="color: var(--gt-color-text-tertiary);" @click="onBatchClearFormula">清除公式</el-button>
+          <el-button size="small" style="color: var(--gt-color-text-tertiary);" @click="selectedRows = []">取消选择</el-button>
         </div>
 
         <!-- 公式表格（报表/附注/底稿） -->
@@ -100,15 +100,15 @@
           <el-table-column type="selection" width="40" />
           <el-table-column prop="row_code" label="行次" width="90">
             <template #default="{ row }">
-              <span style="font-size: 11px; color: #999; white-space: nowrap;">{{ row.row_code }}</span>
+              <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); white-space: nowrap;">{{ row.row_code }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="row_name" label="项目" min-width="180" show-overflow-tooltip />
           <el-table-column label="公式" min-width="260">
             <template #default="{ row }">
               <el-input v-if="editingId === row.id" v-model="editFormula" size="small" placeholder="如 TB('1001','期末余额') 或 ROW('BS-001')+ROW('BS-002')" />
-              <code v-else-if="row.formula" @dblclick="startEdit(row)" style="font-size: 11px; color: #555; word-break: break-all; cursor: pointer;" :title="'双击编辑公式'">{{ row.formula }}</code>
-              <span v-else @click="startEdit(row)" style="color: #bbb; cursor: pointer; font-size: 11px; border: 1px dashed #ddd; padding: 2px 8px; border-radius: 4px;" title="点击添加公式">
+              <code v-else-if="row.formula" @dblclick="startEdit(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); word-break: break-all; cursor: pointer;" :title="'双击编辑公式'">{{ row.formula }}</code>
+              <span v-else @click="startEdit(row)" style="color: var(--gt-color-text-placeholder); cursor: pointer; font-size: var(--gt-font-size-xs); border: 1px dashed #ddd; padding: 2px 8px; border-radius: 4px;" title="点击添加公式">
                 + 点击添加公式
               </span>
             </template>
@@ -128,49 +128,49 @@
           <el-table-column label="说明" min-width="140" show-overflow-tooltip>
             <template #default="{ row }">
               <el-input v-if="editingId === row.id" v-model="editDescription" size="small" />
-              <span v-else style="font-size: 12px; color: #888">{{ row.formula_description || '' }}</span>
+              <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary)">{{ row.formula_description || '' }}</span>
             </template>
           </el-table-column>
           <el-table-column label="计算值" width="110" align="right">
             <template #default="{ row }">
               <el-tooltip v-if="formulaResults[row.row_code || row.id]?.trace?.length" placement="left" :show-after="300">
                 <template #content>
-                  <div style="max-width:400px;font-size:11px;line-height:1.6">
+                  <div style="max-width:400px;font-size: var(--gt-font-size-xs);line-height:1.6">
                     <div v-for="(t, ti) in formulaResults[row.row_code || row.id]?.trace" :key="ti" style="border-bottom:1px solid rgba(255,255,255,0.1);padding:2px 0">
                       <span v-if="t.type">{{ t.type }}({{ t.name || t.code || t.range || '' }}) = {{ t.value || t.error }}</span>
                       <span v-else-if="t.op">{{ t.left }} {{ t.op }} {{ t.right }} = {{ t.result }}</span>
                     </div>
                   </div>
                 </template>
-                <span style="font-size:12px;color:#4b2d77;font-weight:600;cursor:help">
+                <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-primary);font-weight:600;cursor:help">
                   {{ typeof formulaResults[row.row_code || row.id]?.value === 'number' ? fmtAmount(formulaResults[row.row_code || row.id]!.value!) : '-' }}
                 </span>
               </el-tooltip>
-              <span v-else style="font-size:12px;color:#ccc">—</span>
+              <span v-else style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-placeholder)">—</span>
             </template>
           </el-table-column>
           <el-table-column label="来源" width="70" align="center">
             <template #default="{ row }">
-              <span v-if="isPresetFormula(row)" style="font-size: 10px; color: #1a3a5c; background: #dce6f0; padding: 1px 6px; border-radius: 3px;">预设</span>
-              <span v-else-if="row.formula" style="font-size: 10px; color: #999;">自定义</span>
+              <span v-if="isPresetFormula(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-teal); background: var(--gt-bg-info); padding: 1px 6px; border-radius: 3px;">预设</span>
+              <span v-else-if="row.formula" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">自定义</span>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="80" align="center">
             <template #default="{ row }">
               <el-button v-if="editingId !== row.id" size="small" link type="primary" @click.stop="startEdit(row)">编辑</el-button>
-              <el-button v-else size="small" link @click.stop="saveEdit(row)" style="color: #1e8a38;">保存</el-button>
+              <el-button v-else size="small" link @click.stop="saveEdit(row)" style="color: var(--gt-color-success);">保存</el-button>
             </template>
           </el-table-column>
         </el-table>
 
         <div class="gt-fm-footer">
-          <span style="font-size: 11px; color: #999;">共 {{ currentRows.length }} 行，{{ currentRows.filter(r => r.formula).length }} 个公式{{ Object.values(formulaResults).filter(r => r.value != null).length ? `，${Object.values(formulaResults).filter(r => r.value != null).length} 个已计算` : '' }}</span>
+          <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">共 {{ currentRows.length }} 行，{{ currentRows.filter(r => r.formula).length }} 个公式{{ Object.values(formulaResults).filter(r => r.value != null).length ? `，${Object.values(formulaResults).filter(r => r.value != null).length} 个已计算` : '' }}</span>
         </div>
 
         <!-- 表间审核模式 -->
         <div v-if="isCrossCheckMode" style="flex: 1;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <span style="font-size: 13px; font-weight: 600; color: #333;">{{ selectedPath }}</span>
+            <span style="font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary);">{{ selectedPath }}</span>
             <el-button size="small" type="primary" @click="onAddCrossRule">+ 新增规则</el-button>
           </div>
           <el-table :data="crossCheckRulesForCurrent" size="small" border style="width: 100%;"
@@ -180,22 +180,22 @@
             <el-table-column label="规则名称" min-width="200">
               <template #default="{ row }">
                 <el-input v-if="row._editing" v-model="row.label" size="small" />
-                <span v-else style="font-size: 12px;">{{ row.label }}</span>
+                <span v-else style="font-size: var(--gt-font-size-xs);">{{ row.label }}</span>
               </template>
             </el-table-column>
             <el-table-column label="左侧（源）" min-width="180">
               <template #default="{ row }">
                 <el-input v-if="row._editing" v-model="row.left_ref" size="small" placeholder="如 BS-002 或 NOTE('货币资金','合计')" />
-                <code v-else style="font-size: 11px; color: #666;">{{ row.left_ref || '—' }}</code>
+                <code v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ row.left_ref || '—' }}</code>
               </template>
             </el-table-column>
             <el-table-column label="关系" width="60" align="center">
-              <template #default><span style="font-size: 14px;">=</span></template>
+              <template #default><span style="font-size: var(--gt-font-size-sm);">=</span></template>
             </el-table-column>
             <el-table-column label="右侧（目标）" min-width="180">
               <template #default="{ row }">
                 <el-input v-if="row._editing" v-model="row.right_ref" size="small" placeholder="如 E1-1.审定数 或 NOTE('货币资金','期末')" />
-                <code v-else style="font-size: 11px; color: #666;">{{ row.right_ref || '—' }}</code>
+                <code v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ row.right_ref || '—' }}</code>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="100" align="center">
@@ -203,12 +203,12 @@
                 <div style="display: flex; gap: 4px; justify-content: center;">
                   <el-button v-if="!row._editing" size="small" link type="primary" @click="row._editing = true">编辑</el-button>
                   <el-button v-if="row._editing" size="small" link type="success" @click="row._editing = false">完成</el-button>
-                  <el-button size="small" link style="color: #999;" @click="onRemoveCrossRule($index)">删除</el-button>
+                  <el-button size="small" link style="color: var(--gt-color-text-tertiary);" @click="onRemoveCrossRule($index)">删除</el-button>
                 </div>
               </template>
             </el-table-column>
           </el-table>
-          <div style="margin-top: 8px; text-align: right; font-size: 11px; color: #999;">
+          <div style="margin-top: 8px; text-align: right; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">
             {{ crossCheckRulesForCurrent.length }} 条规则
           </div>
         </div>
@@ -241,7 +241,7 @@
           <el-option label="逻辑审核" value="logic_check" />
           <el-option label="合理性" value="reasonability" />
         </el-select>
-        <span style="font-size: 11px; color: #999; margin-left: auto;">
+        <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-left: auto;">
           共 {{ dashboardFilteredRows.length }} 条公式
         </span>
       </div>
@@ -251,7 +251,7 @@
         <div v-for="group in dashboardGroupedData" :key="group.key" style="margin-bottom: 12px;">
           <div class="gt-fm-dash-group-title" @click="group._open = !group._open">
             {{ group._open ? '▼' : '▶' }} {{ group.label }}
-            <span style="font-size: 10px; color: #999; margin-left: 6px;">{{ group.rows.length }} 条</span>
+            <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-left: 6px;">{{ group.rows.length }} 条</span>
           </div>
           <el-table v-show="group._open" :data="group.rows" size="small" border style="width: 100%;"
             :header-cell-style="{ background: '#edf3f9', fontSize: '11px', whiteSpace: 'nowrap' }">
@@ -259,7 +259,7 @@
             <el-table-column prop="row_name" label="项目" min-width="150" show-overflow-tooltip />
             <el-table-column prop="formula" label="公式" min-width="240" show-overflow-tooltip>
               <template #default="{ row }">
-                <code style="font-size: 10px; color: #555;">{{ row.formula }}</code>
+                <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular);">{{ row.formula }}</code>
               </template>
             </el-table-column>
             <el-table-column label="分类" width="90" align="center">
@@ -270,7 +270,7 @@
             <el-table-column prop="formula_description" label="说明" min-width="140" show-overflow-tooltip />
             <el-table-column label="来源" width="80" align="center">
               <template #default="{ row }">
-                <span style="font-size: 10px; color: #999;">{{ row._source_type || '报表' }}</span>
+                <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">{{ row._source_type || '报表' }}</span>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="60" align="center">
@@ -289,7 +289,7 @@
         <el-table-column prop="row_name" label="项目" min-width="150" show-overflow-tooltip />
         <el-table-column prop="formula" label="公式" min-width="240" show-overflow-tooltip>
           <template #default="{ row }">
-            <code style="font-size: 10px; color: #555;">{{ row.formula }}</code>
+            <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular);">{{ row.formula }}</code>
           </template>
         </el-table-column>
         <el-table-column label="分类" width="90" align="center">
@@ -1470,13 +1470,13 @@ watch(showFormulaDashboard, async (v) => {
   border: 1px solid #dce6f0;
   border-radius: 8px;
   overflow-y: auto;
-  background: #f5f8fb;
+  background: var(--gt-color-primary-bg);
 }
 .gt-fm-sidebar-title {
   padding: 10px 14px 6px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
-  color: #666;
+  color: var(--gt-color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -1486,12 +1486,12 @@ watch(showFormulaDashboard, async (v) => {
 }
 .gt-fm-tree :deep(.el-tree-node__content) {
   height: 30px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-fm-tree :deep(.el-tree-node.is-current > .el-tree-node__content) {
-  background: #d6e6f5;
+  background: var(--gt-bg-info);
   font-weight: 600;
-  color: #1a3a5c;
+  color: var(--gt-color-teal);
 }
 .gt-fm-tree-node {
   display: flex;
@@ -1527,21 +1527,21 @@ watch(showFormulaDashboard, async (v) => {
   margin-bottom: 6px;
 }
 /* 行样式 */
-:deep(.gt-fm-row-auto) { background: #fafff8 !important; }
-:deep(.gt-fm-row-logic) { background: #fffdf5 !important; }
-:deep(.gt-fm-row-reason) { background: #f8fbff !important; }
+:deep(.gt-fm-row-auto) { background: var(--gt-color-success-light) !important; }
+:deep(.gt-fm-row-logic) { background: var(--gt-color-wheat-light) !important; }
+:deep(.gt-fm-row-reason) { background: var(--gt-bg-info) !important; }
 :deep(.gt-fm-row-empty) { opacity: 0.7; }
 :deep(.el-table__row:hover .gt-fm-row-auto),
 :deep(.el-table__row:hover .gt-fm-row-logic),
 :deep(.el-table__row:hover .gt-fm-row-reason) {
-  background: #e8f0f8 !important;
+  background: var(--gt-bg-info) !important;
 }
 .gt-fm-dash-group-title {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #444;
+  color: var(--gt-color-text-regular);
   padding: 8px 10px;
-  background: #f5f8fb;
+  background: var(--gt-color-primary-bg);
   border: 1px solid #dce6f0;
   border-radius: 6px;
   margin-bottom: 4px;
@@ -1550,7 +1550,7 @@ watch(showFormulaDashboard, async (v) => {
   transition: background 0.12s;
 }
 .gt-fm-dash-group-title:hover {
-  background: #e8f0f8;
+  background: var(--gt-bg-info);
 }
 </style>
 
@@ -1563,8 +1563,8 @@ watch(showFormulaDashboard, async (v) => {
   border-radius: 8px 8px 0 0;
 }
 .gt-fm-dialog .el-dialog__title {
-  color: #fff !important;
-  font-size: 16px;
+  color: var(--gt-color-text-inverse) !important;
+  font-size: var(--gt-font-size-md);
   font-weight: 700;
   letter-spacing: 0.5px;
 }
@@ -1572,26 +1572,26 @@ watch(showFormulaDashboard, async (v) => {
   color: rgba(255,255,255,0.7);
 }
 .gt-fm-dialog .el-dialog__headerbtn:hover .el-dialog__close {
-  color: #fff;
+  color: var(--gt-color-text-inverse);
 }
 .gt-fm-dialog .el-dialog__body {
   border-top: 3px solid #2d5a87;
 }
 .gt-fm-dialog .el-dialog__footer {
-  background: #f5f8fb;
+  background: var(--gt-color-primary-bg);
   border-top: 1px solid #dce6f0;
 }
 /* 应用自动运算按钮蓝色 */
 .gt-fm-dialog .gt-fm-apply-btn {
   background: linear-gradient(135deg, #2d5a87, #3a7cb8) !important;
   border-color: #2d5a87 !important;
-  color: #fff !important;
+  color: var(--gt-color-text-inverse) !important;
 }
 .gt-fm-dialog .gt-fm-apply-btn:hover {
   background: linear-gradient(135deg, #1a3a5c, #2d5a87) !important;
 }
 /* 表头行蓝色系 */
 .gt-fm-dialog :deep(.el-table th.el-table__cell) {
-  background: #edf3f9 !important;
+  background: var(--gt-bg-info) !important;
 }
 </style>

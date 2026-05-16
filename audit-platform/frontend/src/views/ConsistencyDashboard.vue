@@ -79,11 +79,11 @@ onMounted(async () => {
 }
 .gt-check-pass { border-top-color: #28a745; }
 .gt-check-fail { border-top-color: #FF5149; }
-.gt-check-icon { font-size: 28px; margin-bottom: 8px; }
-.gt-check-name { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 4px; }
-.gt-check-detail { font-size: 13px; color: #666; }
-.gt-check-count { font-size: 12px; color: #999; margin-top: 4px; }
+.gt-check-icon { font-size: var(--gt-font-size-3xl); margin-bottom: 8px; }
+.gt-check-name { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary); margin-bottom: 4px; }
+.gt-check-detail { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
+.gt-check-count { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 4px; }
 .gt-check-failures { margin-top: 8px; text-align: left; }
-.gt-failure-item { font-size: 12px; color: #FF5149; padding: 2px 0; }
-.gt-cons-footer { margin-top: 16px; font-size: 12px; color: #999; text-align: right; }
+.gt-failure-item { font-size: var(--gt-font-size-xs); color: var(--gt-color-coral); padding: 2px 0; }
+.gt-cons-footer { margin-top: 16px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); text-align: right; }
 </style>

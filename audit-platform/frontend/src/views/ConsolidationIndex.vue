@@ -54,7 +54,7 @@
               <el-button size="small" @click="orgZoom = 1">1:1</el-button>
             </div>
             <div class="gt-ctb-toolbar-right">
-              <span style="font-size:12px;color:#666">{{ orgNodeCount }} 个节点 · 最大 {{ orgMaxDepth }} 层</span>
+              <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary)">{{ orgNodeCount }} 个节点 · 最大 {{ orgMaxDepth }} 层</span>
             </div>
           </div>
 
@@ -92,10 +92,10 @@
 
           <!-- 选中节点信息卡（组织图模式） -->
           <div v-if="orgViewMode === 'chart' && selectedNode" class="org-detail-card">
-            <h4 style="margin:0 0 8px;color:#4b2d77">{{ selectedNode.company_name }}</h4>
-            <p style="font-size:12px;color:#666;margin:4px 0">代码：{{ selectedNode.company_code || '—' }}</p>
-            <p v-if="selectedNode.shareholding" style="font-size:12px;color:#666;margin:4px 0">持股：{{ selectedNode.shareholding }}%</p>
-            <p v-if="selectedNode.children?.length" style="font-size:12px;color:#999;margin:4px 0">下级：{{ selectedNode.children.length }} 家</p>
+            <h4 style="margin:0 0 8px;color: var(--gt-color-primary)">{{ selectedNode.company_name }}</h4>
+            <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin:4px 0">代码：{{ selectedNode.company_code || '—' }}</p>
+            <p v-if="selectedNode.shareholding" style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin:4px 0">持股：{{ selectedNode.shareholding }}%</p>
+            <p v-if="selectedNode.children?.length" style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);margin:4px 0">下级：{{ selectedNode.children.length }} 家</p>
             <el-button type="primary" size="small" style="margin-top:8px" @click="goToProject(selectedNode)">查看合并</el-button>
           </div>
         </div>
@@ -131,7 +131,7 @@
           <!-- 工具栏 -->
           <div class="gt-ctb-toolbar" style="margin-top:8px">
             <div class="gt-ctb-toolbar-left">
-              <span style="font-size:12px;color:#666">{{ consolReportRows.length }} 行 · {{ currentReportLabel }}</span>
+              <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary)">{{ consolReportRows.length }} 行 · {{ currentReportLabel }}</span>
             </div>
             <div class="gt-ctb-toolbar-right">
               <el-button size="small" type="primary" @click="loadConsolReport(true)" :loading="consolReportLoading">🔄 刷新</el-button>
@@ -275,7 +275,7 @@
     <!-- 报表转换规则弹窗 -->
     <el-dialog v-model="showConsolConversion" title="国企/上市报表转换规则" width="80%" top="4vh" append-to-body destroy-on-close>
       <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">
-        <span style="font-size:12px;color:#999">{{ consolReportTemplateType === 'soe' ? '国企版 → 上市版' : '上市版 → 国企版' }}</span>
+        <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">{{ consolReportTemplateType === 'soe' ? '国企版 → 上市版' : '上市版 → 国企版' }}</span>
         <el-button size="small" @click="loadConsolMappingPreset" :loading="consolMappingLoading">一键加载预设</el-button>
         <el-button size="small" type="primary" @click="applyConsolConversion" :loading="consolMappingLoading">应用转换</el-button>
       </div>
@@ -295,7 +295,7 @@
 
     <!-- 附注转换弹窗（由顶部栏准则切换驱动） -->
     <el-dialog v-model="showConsolNoteConversion" title="国企/上市附注模板切换" width="400px" append-to-body>
-      <p style="font-size:13px;color:#666;margin-bottom:16px">
+      <p style="font-size: var(--gt-font-size-sm);color: var(--gt-color-text-secondary);margin-bottom:16px">
         请使用顶部栏的准则选择器（国企版/上市版）切换模板，附注章节结构会自动更新。
       </p>
       <template #footer>
@@ -308,7 +308,7 @@
       <div style="display:flex;gap:10px;margin-bottom:10px;align-items:center">
         <el-tag type="info" size="small">{{ drillDownCell.itemName }}</el-tag>
         <el-tag size="small">{{ drillDownCell.colName }}</el-tag>
-        <span style="font-size:14px;font-weight:700;color:#4b2d77">合计：{{ fmtAmt(drillDownCell.totalValue) }}</span>
+        <span style="font-size: var(--gt-font-size-sm);font-weight:700;color: var(--gt-color-primary)">合计：{{ fmtAmt(drillDownCell.totalValue) }}</span>
         <span style="flex:1" />
         <el-switch v-model="drillDownTransposed" active-text="转置" size="small" style="margin-right:6px" />
         <el-radio-group v-model="drillDownLevel" size="small">
@@ -1312,7 +1312,7 @@ watch(activeTab, (tab) => {
 .org-chart { display: flex; justify-content: center; }
 .org-detail-card {
   position: fixed; bottom: 20px; right: 20px; z-index: 100;
-  background: #fff; border: 1px solid #e8e4f0; border-radius: 10px;
+  background: var(--gt-color-bg-white); border: 1px solid #e8e4f0; border-radius: 10px;
   padding: 14px 18px; box-shadow: 0 4px 20px rgba(75,45,119,0.12);
   min-width: 200px; max-width: 280px;
 }
@@ -1320,7 +1320,7 @@ watch(activeTab, (tab) => {
 /* ── 合并报表左右布局 ── */
 .gt-report-layout { display: flex; gap: 0; height: calc(100vh - 200px); margin: -12px 0; }
 .gt-report-nav {
-  width: 240px; flex-shrink: 0; background: #fafafa; border-right: 1px solid #e8e4f0;
+  width: 240px; flex-shrink: 0; background: var(--gt-color-bg); border-right: 1px solid #e8e4f0;
   display: flex; flex-direction: column; overflow: hidden;
 }
 .gt-report-nav-header {
@@ -1328,20 +1328,20 @@ watch(activeTab, (tab) => {
   justify-content: space-between; align-items: center; flex-shrink: 0;
 }
 .gt-report-tree { flex: 1; overflow-y: auto; padding: 6px; }
-.gt-report-tree-node { display: flex; align-items: center; font-size: 12px; }
-.gt-report-tree-node--diff { color: #e6a23c; font-style: italic; }
+.gt-report-tree-node { display: flex; align-items: center; font-size: var(--gt-font-size-xs); }
+.gt-report-tree-node--diff { color: var(--gt-color-wheat); font-style: italic; }
 
 /* 报表类型切换栏（底部） */
 .gt-report-type-bar {
   display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-top: 1px solid #e8e4f0;
-  background: #f5f3f8; flex-shrink: 0;
+  background: var(--gt-color-primary-bg); flex-shrink: 0;
 }
 .gt-report-type-item {
   display: flex; align-items: center; gap: 3px; padding: 4px 8px; border-radius: 4px;
-  cursor: pointer; font-size: 11px; color: #666; transition: all 0.15s;
+  cursor: pointer; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); transition: all 0.15s;
 }
 .gt-report-type-item:hover { background: rgba(75,45,119,0.06); }
-.gt-report-type-item--active { background: #4b2d77; color: #fff; }
+.gt-report-type-item--active { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); }
 
 .gt-report-nav-list { flex: 1; overflow-y: auto; padding: 8px; }
 .gt-report-content { flex: 1; min-width: 0; padding: 12px 16px; overflow: auto; }
@@ -1352,7 +1352,7 @@ watch(activeTab, (tab) => {
   margin-bottom: 10px; gap: 8px;
 }
 .gt-report-title {
-  margin: 0; font-size: 14px; font-weight: 600; color: #333;
+  margin: 0; font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .gt-report-actions { display: flex; gap: 6px; flex-shrink: 0; }
@@ -1361,7 +1361,7 @@ watch(activeTab, (tab) => {
 .gt-entity-badge {
   display: inline-block; padding: 2px 8px; margin-right: 6px;
   background: linear-gradient(135deg, #4b2d77, #7c5caa); color: #fff;
-  border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;
+  border-radius: 4px; font-size: var(--gt-font-size-xs); font-weight: 600; white-space: nowrap;
   vertical-align: middle;
 }
 
@@ -1374,14 +1374,14 @@ watch(activeTab, (tab) => {
   display: flex; gap: 0;
 }
 .gt-report-type-tag {
-  padding: 8px 20px; font-size: 14px; color: #666; cursor: pointer;
+  padding: 8px 20px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); cursor: pointer;
   border-bottom: 2px solid transparent; margin-bottom: -2px;
   transition: all 0.15s; white-space: nowrap; user-select: none;
   letter-spacing: 0.5px;
 }
 .gt-report-type-tag:hover { color: #4b2d77; background: rgba(75,45,119,0.04); border-radius: 6px 6px 0 0; }
 .gt-report-type-tag--active {
-  color: #4b2d77; font-weight: 600;
+  color: var(--gt-color-primary); font-weight: 600;
   border-bottom-color: #4b2d77;
   background: rgba(75,45,119,0.03); border-radius: 6px 6px 0 0;
 }
@@ -1395,15 +1395,15 @@ watch(activeTab, (tab) => {
 }
 
 /* ── 合并报表 el-table 行样式 ── */
-:deep(.gt-cm-total-row td) { font-weight: 700; background: #f0edf5 !important; }
-:deep(.gt-cm-category td) { font-weight: 600; color: #4b2d77; }
+:deep(.gt-cm-total-row td) { font-weight: 700; background: var(--gt-color-primary-bg) !important; }
+:deep(.gt-cm-category td) { font-weight: 600; color: var(--gt-color-primary); }
 .gt-tb-editable { cursor: text; border-bottom: 1px dashed var(--gt-color-border, #e5e5ea); padding: 2px 6px; border-radius: 2px; display: inline-block; min-width: 70px; text-align: right; }
 .gt-tb-editable:hover { background: var(--gt-color-primary-bg, #f4f0fa); }
 .gt-tb-audited { font-weight: 700; color: #4b2d77; background: rgba(75,45,119,0.06); }
 
 /* 审核结果行样式 */
-:deep(.gt-audit-row-error td) { background: #fef0f0 !important; }
-:deep(.gt-audit-row-warn td) { background: #fdf6ec !important; }
+:deep(.gt-audit-row-error td) { background: var(--gt-bg-danger) !important; }
+:deep(.gt-audit-row-warn td) { background: var(--gt-bg-warning) !important; }
 
 
 </style>

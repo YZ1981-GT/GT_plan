@@ -16,7 +16,7 @@
           @click="$router.push(`/projects/${p.id}/attachments`)"
         >
           <div class="gt-hub-card-top">
-            <el-icon :size="24" style="color: #e6a23c"><Paperclip /></el-icon>
+            <el-icon :size="24" style="color: var(--gt-color-wheat)"><Paperclip /></el-icon>
             <el-tag :type="(statusType(p.status)) || undefined" size="small">{{ statusLabel(p.status) }}</el-tag>
           </div>
           <div class="gt-hub-card-name">{{ p.client_name || p.name }}</div>
@@ -60,15 +60,15 @@ onMounted(async () => {
 <style scoped>
 .gt-hub { padding: 20px; }
 .gt-hub-header { margin-bottom: 8px; }
-.gt-hub-header h2 { margin: 0; font-size: 20px; color: #333; }
-.gt-hub-desc { color: #888; font-size: 13px; margin-bottom: 20px; }
+.gt-hub-header h2 { margin: 0; font-size: 20px /* allow-px: special */; color: var(--gt-color-text-primary); }
+.gt-hub-desc { color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm); margin-bottom: 20px; }
 .gt-hub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
 .gt-hub-card {
-  padding: 20px; border: 1px solid #eee; border-radius: 8px; background: #fff;
+  padding: 20px; border: 1px solid #eee; border-radius: 8px; background: var(--gt-color-bg-white);
   cursor: pointer; transition: all 0.2s;
 }
 .gt-hub-card:hover { border-color: #e6a23c; box-shadow: 0 4px 12px rgba(230,162,60,0.15); transform: translateY(-2px); }
 .gt-hub-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.gt-hub-card-name { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 6px; }
-.gt-hub-card-meta { font-size: 13px; color: #999; display: flex; gap: 12px; }
+.gt-hub-card-name { font-size: var(--gt-font-size-md); font-weight: 600; color: var(--gt-color-text-primary); margin-bottom: 6px; }
+.gt-hub-card-meta { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary); display: flex; gap: 12px; }
 </style>

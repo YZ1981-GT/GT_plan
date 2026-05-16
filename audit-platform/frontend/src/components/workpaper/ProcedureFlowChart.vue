@@ -69,8 +69,8 @@ function buildMermaidDef(procs: Procedure[]): string {
   }
 
   // 样式定义
-  lines.push('  classDef completed fill:#d4edda,stroke:#28a745,color:#155724')
-  lines.push('  classDef pending fill:#fff3cd,stroke:#ffc107,color:#856404')
+  lines.push('  classDef completed fill:#d4edda,stroke:#28a745,color: var(--gt-color-success)')
+  lines.push('  classDef pending fill:#fff3cd,stroke:#ffc107,color: var(--gt-color-wheat)')
 
   return lines.join('\n')
 }
@@ -131,7 +131,7 @@ watch(() => props.procedures, renderChart, { deep: true })
   text-align: center;
   padding: 24px;
   color: var(--gt-color-text-tertiary, #ccc);
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .gt-flowchart-container {
   min-height: 100px;
@@ -150,20 +150,20 @@ watch(() => props.procedures, renderChart, { deep: true })
   padding: 8px 16px;
   border: 1px solid #e0e0e0;
   border-radius: 6px;
-  background: #fff3cd;
-  font-size: 12px;
+  background: var(--gt-color-wheat-light);
+  font-size: var(--gt-font-size-xs);
   min-width: 200px;
 }
 .gt-flowchart-container :deep(.gt-flow-done) {
-  background: #d4edda;
+  background: var(--gt-color-success-light);
   border-color: #28a745;
 }
 .gt-flowchart-container :deep(.gt-flow-arrow) {
-  color: #999;
-  font-size: 16px;
+  color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-md);
 }
 .gt-flowchart-container :deep(.gt-flow-icon) {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 .gt-flowchart-container :deep(.gt-flow-label) {
   flex: 1;

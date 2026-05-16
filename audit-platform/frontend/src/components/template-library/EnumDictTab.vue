@@ -338,11 +338,11 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 6px;
   border: 1px solid #ebeef5;
 }
-.gt-edt-stats-item { font-size: 13px; color: #606266; }
+.gt-edt-stats-item { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-regular); }
 .gt-edt-spacer { flex: 1; }
 .gt-edt-search { width: 280px; }
 .gt-amt {
@@ -351,7 +351,7 @@ onMounted(() => {
   white-space: nowrap;
   font-weight: 600;
 }
-.gt-edt-em { color: #c0c4cc; font-weight: 400; }
+.gt-edt-em { color: var(--gt-color-text-placeholder); font-weight: 400; }
 
 .gt-edt-banner {
   margin: 0;
@@ -360,43 +360,43 @@ onMounted(() => {
   background: rgba(75, 45, 119, 0.08);
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 12px;
-  color: #4b2d77;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-primary);
 }
-.gt-edt-banner-body { font-size: 12px; color: #606266; }
+.gt-edt-banner-body { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); }
 
 .gt-edt-body { flex: 1; min-height: 0; overflow: auto; }
 .gt-edt-collapse { border: none; }
 .gt-edt-collapse :deep(.el-collapse-item__header) {
   padding: 0 12px;
-  background: #fafafa;
+  background: var(--gt-color-bg);
   border-bottom: 1px solid #ebeef5;
 }
 .gt-edt-dict-title {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .gt-edt-dict-key {
   font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
-  background: #f0edf5;
+  background: var(--gt-color-primary-bg);
   padding: 2px 8px;
   border-radius: 4px;
-  color: #4b2d77;
+  color: var(--gt-color-primary);
   font-weight: 600;
 }
-.gt-edt-dict-label { color: #303133; }
+.gt-edt-dict-label { color: var(--gt-color-text-primary); }
 
 .gt-edt-table { margin: 0 0 8px 0; }
 .gt-edt-value {
   font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
-  font-size: 12px;
-  color: #303133;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-primary);
 }
 .gt-edt-color {
   font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 </style>

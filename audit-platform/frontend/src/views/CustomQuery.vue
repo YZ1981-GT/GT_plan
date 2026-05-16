@@ -37,18 +37,18 @@ import CustomQueryTab from '@/components/template-library/CustomQueryTab.vue'
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 8px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   margin-bottom: 12px;
 }
 .gt-cq-title-block { display: flex; align-items: baseline; gap: 12px; }
-.gt-cq-title { margin: 0; font-size: 16px; font-weight: 700; color: #4b2d77; }
-.gt-cq-subtitle { font-size: 12px; color: #909399; }
+.gt-cq-title { margin: 0; font-size: var(--gt-font-size-md); font-weight: 700; color: var(--gt-color-primary); }
+.gt-cq-subtitle { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); }
 .gt-cq-body {
   flex: 1;
   display: flex;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 8px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   padding: 12px;

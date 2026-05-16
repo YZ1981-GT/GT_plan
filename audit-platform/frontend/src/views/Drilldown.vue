@@ -52,7 +52,7 @@
         type="info" show-icon :closable="false" style="margin-bottom: 12px"
       >
         <template #title>暂无穿透数据</template>
-        <div style="font-size: 12px; line-height: 1.6">
+        <div style="font-size: var(--gt-font-size-xs); line-height: 1.6">
           请先在项目中导入账套数据（科目余额表+序时账），导入后此处将自动显示科目余额。
         </div>
       </el-alert>

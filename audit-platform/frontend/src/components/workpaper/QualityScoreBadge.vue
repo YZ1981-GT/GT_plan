@@ -123,7 +123,7 @@ const dimensionWeights: Record<string, number> = {
   font-variant-numeric: tabular-nums;
 }
 .score-label {
-  font-size: 9px;
+  font-size: 9px /* allow-px: special */;
   margin-top: 1px;
 }
 .score-tooltip {
@@ -132,14 +132,14 @@ const dimensionWeights: Record<string, number> = {
 .tooltip-title {
   font-weight: 600;
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .dim-row {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 4px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .dim-label {
   width: 110px;

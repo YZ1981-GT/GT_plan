@@ -7,7 +7,7 @@
         <span class="gt-kb-upload-bar-text">
           <template v-if="bgUploading">
             📤 上传中 {{ bgUploadDone }}/{{ bgUploadTotal }}
-            <span v-if="bgUploadError > 0" style="color: #e6553a">（{{ bgUploadError }} 失败）</span>
+            <span v-if="bgUploadError > 0" style="color: var(--gt-color-coral)">（{{ bgUploadError }} 失败）</span>
           </template>
           <template v-else>
             ✅ 上传完成 {{ bgUploadDone - bgUploadError }}/{{ bgUploadTotal }}
@@ -132,9 +132,9 @@
                 <!-- Office 文件预览（通过后端转换或提示下载） -->
                 <div v-else-if="isOfficeFile(previewDoc)" class="gt-kb-preview-office">
                   <div style="text-align: center; padding: 40px 20px">
-                    <div style="font-size: 36px; margin-bottom: 12px">{{ getFileEmoji(previewDoc) }}</div>
-                    <div style="font-size: 14px; color: #666; margin-bottom: 8px">{{ previewDoc.name }}</div>
-                    <div style="font-size: 12px; color: #999; margin-bottom: 16px">{{ formatSize(previewDoc.file_size) }}</div>
+                    <div style="font-size: 36px /* allow-px: special */; margin-bottom: 12px">{{ getFileEmoji(previewDoc) }}</div>
+                    <div style="font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-bottom: 8px">{{ previewDoc.name }}</div>
+                    <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-bottom: 16px">{{ formatSize(previewDoc.file_size) }}</div>
                     <el-button type="primary" size="small" @click="onDownloadDoc(previewDoc)">下载查看</el-button>
                   </div>
                 </div>
@@ -143,7 +143,7 @@
                 <!-- 其他 -->
                 <div v-else class="gt-kb-preview-office">
                   <div style="text-align: center; padding: 40px">
-                    <div style="font-size: 13px; color: #999">不支持预览此文件类型</div>
+                    <div style="font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary)">不支持预览此文件类型</div>
                     <el-button type="primary" size="small" style="margin-top: 12px" @click="onDownloadDoc(previewDoc)">下载</el-button>
                   </div>
                 </div>
@@ -205,10 +205,10 @@
         v-model:file-list="uploadFiles"
         accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.pptx"
       >
-        <el-icon style="font-size: 40px; color: #c0c4cc"><Upload /></el-icon>
+        <el-icon style="font-size: 40px /* allow-px: special */; color: var(--gt-color-text-placeholder)"><Upload /></el-icon>
         <div>拖拽文件到此处，或点击选择</div>
         <template #tip>
-          <div style="color: #999; font-size: 12px">支持 PDF/Word/Excel/TXT/Markdown</div>
+          <div style="color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs)">支持 PDF/Word/Excel/TXT/Markdown</div>
         </template>
       </el-upload>
       <!-- 文件夹上传 -->
@@ -219,9 +219,9 @@
           @dragover.prevent
           @drop.prevent="onFolderDrop"
         >
-          <el-icon style="font-size: 40px; color: #c0c4cc; margin-bottom: 8px"><FolderOpened /></el-icon>
+          <el-icon style="font-size: 40px /* allow-px: special */; color: var(--gt-color-text-placeholder); margin-bottom: 8px"><FolderOpened /></el-icon>
           <div>点击选择文件夹，或拖拽文件夹到此处</div>
-          <div style="color: #999; font-size: 12px; margin-top: 4px">将自动按子文件夹结构创建目录</div>
+          <div style="color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); margin-top: 4px">将自动按子文件夹结构创建目录</div>
         </div>
         <input
           ref="folderInputRef"
@@ -233,7 +233,7 @@
         />
         <div v-if="folderFiles.length" style="margin-top: 12px">
           <el-tag size="small" type="info">{{ folderFiles.length }} 个文件</el-tag>
-          <span style="font-size: 12px; color: #999; margin-left: 8px">
+          <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-left: 8px">
             {{ folderSubDirs.length }} 个子文件夹
           </span>
         </div>
@@ -821,16 +821,16 @@ onMounted(async () => {
     await showGuide(
       'knowledge_first_use',
       '📚 知识库使用指南',
-      `<div style="line-height:1.8;font-size:13px">
+      `<div style="line-height:1.8;font-size: var(--gt-font-size-sm)">
         <p>知识库用于存储和管理审计参考资料，支持 AI 智能检索。</p>
-        <p style="color:#909399;font-size:12px;margin-top:8px">建议上传以下资料：</p>
+        <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:8px">建议上传以下资料：</p>
         <ul style="padding-left:18px;margin:4px 0">
           <li>📄 上年审计报告和附注（供 AI 参照生成当年内容）</li>
           <li>📋 底稿模板（致同标准模板已预置）</li>
           <li>📖 会计准则、监管规定等参考文献</li>
           <li>📝 项目专属的工作记录和备忘</li>
         </ul>
-        <p style="color:#909399;font-size:12px;margin-top:8px">💡 点击"初始化预设文件夹"可快速创建标准分类目录</p>
+        <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:8px">💡 点击"初始化预设文件夹"可快速创建标准分类目录</p>
       </div>`,
       '知道了',
     )
@@ -851,23 +851,23 @@ onBeforeUnmount(() => {
   display: flex; justify-content: space-between; align-items: center;
   background: var(--gt-gradient-primary);
   border-radius: var(--gt-radius-lg);
-  padding: 16px 24px; margin-bottom: 16px; color: #fff;
+  padding: 16px 24px; margin-bottom: 16px; color: var(--gt-color-text-inverse);
   position: relative; overflow: hidden;
 }
-.gt-kb-banner-text h2 { margin: 0 0 2px; font-size: 18px; }
-.gt-kb-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+.gt-kb-banner-text h2 { margin: 0 0 2px; font-size: var(--gt-font-size-xl); }
+.gt-kb-banner-text p { margin: 0; font-size: var(--gt-font-size-xs); opacity: 0.75; }
 .gt-kb-banner-actions { display: flex; gap: 8px; }
 .gt-kb-banner-actions .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
 .gt-kb-body { min-height: 500px; }
-.gt-kb-panel { background: #fff; border-radius: var(--gt-radius-md); border: 1px solid #f0f0f0; padding: 16px; height: 100%; }
+.gt-kb-panel { background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md); border: 1px solid #f0f0f0; padding: 16px; height: 100%; }
 .gt-kb-doc-panel { display: flex; flex-direction: column; }
-.gt-kb-panel-title { margin: 0 0 12px; font-size: 14px; color: var(--gt-color-text); }
-.gt-kb-tree-node { display: flex; align-items: center; gap: 4px; font-size: 13px; }
-.gt-kb-doc-count { font-size: 11px; color: #999; margin-left: 2px; }
+.gt-kb-panel-title { margin: 0 0 12px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text); }
+.gt-kb-tree-node { display: flex; align-items: center; gap: 4px; font-size: var(--gt-font-size-sm); }
+.gt-kb-doc-count { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-left: 2px; }
 .gt-kb-doc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.gt-kb-doc-header h4 { margin: 0; font-size: 14px; }
+.gt-kb-doc-header h4 { margin: 0; font-size: var(--gt-font-size-sm); }
 .gt-kb-doc-header-actions { display: flex; gap: 8px; }
-.gt-kb-placeholder { text-align: center; padding: 60px 0; color: #999; }
+.gt-kb-placeholder { text-align: center; padding: 60px 0; color: var(--gt-color-text-tertiary); }
 
 /* 文档列表 + 预览分栏 */
 .gt-kb-doc-body { display: flex; gap: 12px; flex: 1; min-height: 0; overflow: hidden; }
@@ -876,20 +876,20 @@ onBeforeUnmount(() => {
 
 /* 预览面板 */
 .gt-kb-preview-panel {
-  width: 45%; min-width: 300px; background: #fafafa; border: 1px solid #f0f0f0;
+  width: 45%; min-width: 300px; background: var(--gt-color-bg); border: 1px solid #f0f0f0;
   border-radius: var(--gt-radius-md); display: flex; flex-direction: column; overflow: hidden;
 }
 .gt-kb-preview-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 12px; border-bottom: 1px solid #f0f0f0; background: #fff;
+  padding: 8px 12px; border-bottom: 1px solid #f0f0f0; background: var(--gt-color-bg-white);
 }
-.gt-kb-preview-title { font-size: 13px; font-weight: 600; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gt-kb-preview-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-kb-preview-body { flex: 1; overflow: auto; padding: 0; }
 .gt-kb-preview-img { max-width: 100%; height: auto; display: block; margin: 12px auto; }
 .gt-kb-preview-iframe { width: 100%; height: 100%; border: none; }
 .gt-kb-preview-text {
-  margin: 0; padding: 12px 16px; font-size: 12px; line-height: 1.6;
-  white-space: pre-wrap; word-break: break-all; color: #333; font-family: monospace;
+  margin: 0; padding: 12px 16px; font-size: var(--gt-font-size-xs); line-height: 1.6;
+  white-space: pre-wrap; word-break: break-all; color: var(--gt-color-text-primary); font-family: monospace;
 }
 .gt-kb-preview-office { display: flex; align-items: center; justify-content: center; height: 100%; }
 
@@ -899,7 +899,7 @@ onBeforeUnmount(() => {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 40px 20px; border: 2px dashed #dcdfe6; border-radius: 8px;
   cursor: pointer; transition: border-color 0.2s;
-  color: #606266; font-size: 14px;
+  color: var(--gt-color-text-regular); font-size: var(--gt-font-size-sm);
 }
 .gt-kb-folder-drop:hover { border-color: var(--gt-color-primary); }
 
@@ -908,14 +908,14 @@ onBeforeUnmount(() => {
 .gt-kb-tree-node-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-kb-tree-actions { display: none; margin-left: auto; flex-shrink: 0; }
 .gt-kb-tree-node:hover .gt-kb-tree-actions { display: inline-flex; gap: 2px; }
-.gt-kb-tree-actions .el-button { padding: 0 2px; font-size: 12px; }
+.gt-kb-tree-actions .el-button { padding: 0 2px; font-size: var(--gt-font-size-xs); }
 
 /* 后台上传进度条 */
 .gt-kb-upload-bar {
   display: flex; align-items: center; gap: 12px;
   padding: 8px 16px; margin-bottom: 8px;
-  background: #fff; border-radius: var(--gt-radius-md);
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
   border: 1px solid #e8e0f0; box-shadow: var(--gt-shadow-sm);
 }
-.gt-kb-upload-bar-text { font-size: 12px; color: #555; white-space: nowrap; }
+.gt-kb-upload-bar-text { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); white-space: nowrap; }
 </style>

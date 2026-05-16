@@ -195,8 +195,18 @@ async function onSave() {
   }
 }
 
-function onFinalize() {
-  showFinalizeConfirm.value = true
+async function onFinalize() {
+  // R10 Spec C / F6：定稿二次确认（用 confirmDangerous 加强文案）
+  try {
+    const { confirmDangerous } = await import('@/utils/confirm')
+    await confirmDangerous(
+      '⚠ 定稿后备忘录将不可修改，将自动通知签字合伙人，PDF 版本将在归档包导出时自动生成。\n\n是否继续定稿？',
+      'EQCR 备忘录定稿',
+    )
+  } catch {
+    return
+  }
+  await doFinalize()
 }
 
 async function doFinalize() {
@@ -254,7 +264,7 @@ onMounted(loadMemo)
 .eqcr-memo-editor__actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .eqcr-memo-editor__sections { display: flex; flex-direction: column; gap: 16px; }
 .eqcr-memo-section__title {
-  font-size: 14px; font-weight: 600; margin-bottom: 6px;
+  font-size: var(--gt-font-size-sm); font-weight: 600; margin-bottom: 6px;
   color: var(--gt-color-primary, #4b2d77);
   padding-left: 8px;
   border-left: 3px solid var(--gt-color-primary, #4b2d77);

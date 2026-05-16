@@ -93,14 +93,14 @@ function emitChange() {
 }
 
 .commitments-label {
-  font-size: 13px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
   font-weight: 500;
 }
 
 .commitments-empty {
-  color: #999;
-  font-size: 12px;
+  color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-xs);
   padding: 8px 0;
 }
 

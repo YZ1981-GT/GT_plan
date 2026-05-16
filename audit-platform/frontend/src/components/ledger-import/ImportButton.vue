@@ -65,7 +65,7 @@ function formatRemaining(seconds: number): string {
 <style scoped>
 .lock-tooltip-content p {
   margin: 2px 0;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   line-height: 1.5;
 }
 </style>

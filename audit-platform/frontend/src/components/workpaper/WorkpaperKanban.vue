@@ -135,9 +135,9 @@ defineExpose({ refresh: loadKanban })
   flex-wrap: wrap;
 }
 .stat-item { text-align: center; min-width: 60px; }
-.stat-num { display: block; font-size: 22px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.15); }
-.stat-label { font-size: 11px; color: rgba(255,255,255,0.85); letter-spacing: 0.5px; }
-.stat-progress .stat-num { color: #ffd700; font-size: 24px; }
+.stat-num { display: block; font-size: var(--gt-font-size-2xl); font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+.stat-label { font-size: var(--gt-font-size-xs); color: rgba(255,255,255,0.85); letter-spacing: 0.5px; }
+.stat-progress .stat-num { color: var(--gt-color-wheat); font-size: 24px /* allow-px: special */; }
 
 /* 看板列 */
 .kanban-columns {
@@ -146,7 +146,7 @@ defineExpose({ refresh: loadKanban })
 }
 
 .kanban-column {
-  background: #fff; border-radius: 12px; display: flex; flex-direction: column;
+  background: var(--gt-color-bg-white); border-radius: 12px; display: flex; flex-direction: column;
   min-height: 200px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -157,13 +157,13 @@ defineExpose({ refresh: loadKanban })
   border-top: 4px solid #909399; border-radius: 12px 12px 0 0;
   background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
 }
-.column-title { font-size: 14px; font-weight: 700; color: #1a1a2e; letter-spacing: 0.5px; }
+.column-title { font-size: var(--gt-font-size-sm); font-weight: 700; color: var(--gt-color-text); letter-spacing: 0.5px; }
 .column-body { flex: 1; padding: 10px; overflow-y: auto; }
-.column-empty { text-align: center; color: #c0c4cc; font-size: 12px; padding: 30px 0; font-style: italic; }
+.column-empty { text-align: center; color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs); padding: 30px 0; font-style: italic; }
 
 /* 卡片 — 动感交互 */
 .kanban-card {
-  background: #fff; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;
+  background: var(--gt-color-bg-white); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;
   border: 1px solid #f0ebf8; cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative; overflow: hidden;
@@ -180,13 +180,13 @@ defineExpose({ refresh: loadKanban })
 .kanban-card:hover::before { opacity: 1; }
 
 .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.card-code { font-weight: 700; font-size: 14px; color: #4b2d77; }
+.card-code { font-weight: 700; font-size: var(--gt-font-size-sm); color: var(--gt-color-primary); }
 .card-cycle-badge {
-  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+  font-size: var(--gt-font-size-xs); font-weight: 600; padding: 2px 8px; border-radius: 10px;
   background: linear-gradient(135deg, #f0e6ff, #e8d9f8); color: #4b2d77;
 }
-.card-name { font-size: 13px; color: #1a1a2e; line-height: 1.5; font-weight: 500; }
-.card-footer { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; color: #909399; }
+.card-name { font-size: var(--gt-font-size-sm); color: var(--gt-color-text); line-height: 1.5; font-weight: 500; }
+.card-footer { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-info); }
 .card-actions { justify-content: flex-end; }
-.card-assignee { color: #606266; font-weight: 500; }
+.card-assignee { color: var(--gt-color-text-regular); font-weight: 500; }
 </style>

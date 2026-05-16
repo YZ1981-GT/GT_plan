@@ -169,7 +169,7 @@ function onStepClick(_step: typeof steps[0], index: number) {
 <style scoped>
 .gt-project-status-bar {
   padding: 16px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 4px;
 }
 
@@ -181,9 +181,9 @@ function onStepClick(_step: typeof steps[0], index: number) {
 }
 
 .status-title {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 
 .el-steps {

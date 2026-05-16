@@ -103,7 +103,7 @@ const diffRows = computed<DiffRow[]>(() => {
   gap: 8px;
   padding: 6px 10px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .diff-row.added {
@@ -155,7 +155,7 @@ const diffRows = computed<DiffRow[]>(() => {
 
 .change-arrow {
   color: var(--el-text-color-placeholder);
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .new-value {
@@ -166,7 +166,7 @@ const diffRows = computed<DiffRow[]>(() => {
   margin-top: 16px;
   display: flex;
   gap: 16px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
 }
 

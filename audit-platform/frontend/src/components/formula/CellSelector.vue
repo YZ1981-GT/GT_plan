@@ -320,11 +320,11 @@ function onClose() {
 <style scoped>
 .cell-selector { min-height: 400px; }
 .source-tabs { margin-bottom: 12px; }
-.selected-cells { margin-bottom: 12px; padding: 8px 12px; background: #f9f7fc; border-radius: 6px; }
-.selected-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 13px; color: #606266; }
+.selected-cells { margin-bottom: 12px; padding: 8px 12px; background: var(--gt-color-primary-bg); border-radius: 6px; }
+.selected-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-regular); }
 .cell-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .source-panel { min-height: 200px; }
-.hint { font-size: 12px; color: #909399; margin: 4px 0; }
+.hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); margin: 4px 0; }
 .aux-form { display: flex; gap: 8px; align-items: center; }
 .desc-input { margin-top: 12px; }
 </style>

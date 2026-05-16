@@ -151,34 +151,34 @@ function onClose() {
 }
 .ai-confirm-model,
 .ai-confirm-confidence {
-  font-size: 12px;
-  color: #666;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
 }
 .ai-confirm-target {
-  font-size: 13px;
-  color: #333;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-primary);
   margin-bottom: 8px;
 }
 .ai-confirm-target code {
-  background: #f5f5f5;
+  background: var(--gt-color-bg);
   padding: 2px 6px;
   border-radius: 3px;
   font-family: monospace;
 }
 .ai-confirm-content label {
   display: block;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   margin-bottom: 4px;
-  color: #333;
+  color: var(--gt-color-text-primary);
 }
 .ai-confirm-content-text {
-  background: #faf8ff;
+  background: var(--gt-color-primary-bg);
   border: 1px dashed #9b59b6;
   border-radius: 6px;
   padding: 10px 12px;
-  font-size: 13px;
-  color: #444;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
   max-height: 150px;
   overflow-y: auto;
   white-space: pre-wrap;
@@ -188,10 +188,10 @@ function onClose() {
 }
 .ai-confirm-revise label {
   display: block;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   margin-bottom: 4px;
-  color: #333;
+  color: var(--gt-color-text-primary);
 }
 .ai-confirm-actions {
   display: flex;

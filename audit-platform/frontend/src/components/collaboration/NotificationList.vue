@@ -51,9 +51,9 @@ async function markAllRead() {
   cursor: pointer;
   transition: background 0.2s;
 }
-.notif-item:hover { background: #f9f9f9; }
-.notif-item.unread { background: #f0f7ff; }
-.notif-title { font-weight: 600; font-size: 14px; }
-.notif-content { color: #666; font-size: 13px; margin-top: 4px; }
-.notif-time { color: #999; font-size: 12px; margin-top: 4px; }
+.notif-item:hover { background: var(--gt-color-bg); }
+.notif-item.unread { background: var(--gt-bg-info); }
+.notif-title { font-weight: 600; font-size: var(--gt-font-size-sm); }
+.notif-content { color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm); margin-top: 4px; }
+.notif-time { color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); margin-top: 4px; }
 </style>

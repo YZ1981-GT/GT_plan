@@ -48,6 +48,26 @@
   --gt-color-focus: #A06DFF;
   --gt-focus-ring: 0 0 0 2px rgba(160, 109, 255, 0.5);
 
+  /* ══ R10 Spec B / Sprint 0 — 灰度 9 阶（追加 design D1：扩充不重命名） ══ */
+  /* 文字色梯度（与既有 --gt-color-text/secondary/tertiary 共存，新加更细分级） */
+  --gt-color-text-primary: #303133;          /* 标题/强调文字 */
+  --gt-color-text-regular: #606266;          /* 正文 */
+  --gt-color-text-placeholder: #c0c4cc;      /* 占位符 */
+  --gt-color-text-disabled: #c0c4cc;         /* 禁用 */
+  --gt-color-text-inverse: #ffffff;          /* R10 Sprint 2：反白文字（用于深色背景上的文字） */
+  --gt-color-text-on-dark: #ffffff;          /* R10 Sprint 2：等价于 inverse，语义化别名 */
+  --gt-color-info: #909399;                  /* R10 Sprint 2：信息灰（中性提示） */
+  /* 边框梯度（与既有 --gt-color-border/border-light 共存） */
+  --gt-color-border-lighter: #ebeef5;        /* 最浅边框：表格行间 */
+
+  /* ══ R10 Spec B / Sprint 0 — 6 级背景 token（追加 design §3.3） ══ */
+  --gt-bg-default: #ffffff;                  /* 默认底（卡片/弹层） */
+  --gt-bg-subtle: #f5f7fa;                   /* 微调底（hover/分组） */
+  --gt-bg-info: #ecf5ff;                     /* 信息底（蓝） */
+  --gt-bg-warning: #fdf6ec;                  /* 警告底（黄） */
+  --gt-bg-success: #f0f9eb;                  /* 成功底（绿） */
+  --gt-bg-danger: #fef0f0;                   /* 危险底（红） */
+
   /* ══ 10.3 间距系统（4px 网格，主节奏 8px） ══ */
   --gt-space-1: 4px;
   --gt-space-2: 8px;

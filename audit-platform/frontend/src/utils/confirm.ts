@@ -250,3 +250,46 @@ export async function confirmForcePass(reason: string): Promise<{ confirmed: boo
   )
   return { confirmed: true, note: value }
 }
+
+// ══ R10 Spec C / Sprint 2.1：签字操作专用确认 ══════════════════════════
+
+/**
+ * 签字操作确认弹窗（R10 Spec C / F7）
+ *
+ * 与 confirmSignature 不同：
+ * - confirmSignature：要求输入客户名全称二次确认（仅最终签字定稿）
+ * - confirmSign：所有签字步骤通用（操作类型 + 用户 + 项目 + 不可撤销提示）
+ *
+ * @param action 操作类型，如 "一级复核签字" / "EQCR 审定" / "归档签字"
+ * @param ctx { userName, projectName, objectName? }
+ */
+export async function confirmSign(
+  action: string,
+  ctx: { userName: string; projectName: string; objectName?: string },
+): Promise<void> {
+  const safeAction = escapeHtml(action)
+  const safeUser = escapeHtml(ctx.userName)
+  const safeProject = escapeHtml(ctx.projectName)
+  const objectLine = ctx.objectName
+    ? `<p><b>对象：</b>${escapeHtml(ctx.objectName)}</p>`
+    : ''
+  const html = `
+    <div style="line-height: 1.8">
+      <p><b>操作：</b>${safeAction}</p>
+      <p><b>用户：</b>${safeUser}</p>
+      <p><b>项目：</b>${safeProject}</p>
+      ${objectLine}
+      <p style="color: var(--gt-color-coral, #e6443e); font-weight: 600; margin-top: 8px">
+        ⚠ 签字操作不可撤销，请确认信息无误。
+      </p>
+    </div>
+  `
+  await ElMessageBox.confirm(html, '请确认签字', {
+    type: 'warning',
+    dangerouslyUseHTMLString: true,
+    confirmButtonText: '确认签字',
+    cancelButtonText: '取消',
+    confirmButtonClass: 'el-button--danger',
+    customClass: 'gt-confirm-sign',
+  })
+}

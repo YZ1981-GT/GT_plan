@@ -171,8 +171,8 @@ onMounted(loadData)
 .tree-left { flex: 1; min-width: 300px; border: 1px solid #eee; border-radius: 8px; padding: 12px; max-height: 600px; overflow-y: auto; }
 .tree-right { width: 360px; border: 1px solid #eee; border-radius: 8px; padding: 16px; }
 .tree-node { display: flex; align-items: center; gap: 6px; }
-.node-status { font-size: 10px; }
-.node-status.pending { color: #999; }
+.node-status { font-size: var(--gt-font-size-xs); }
+.node-status.pending { color: var(--gt-color-text-tertiary); }
 .node-status.in_progress { color: var(--el-color-primary); }
 .node-status.blocked { color: var(--el-color-danger); }
 .node-status.done { color: var(--el-color-success); }

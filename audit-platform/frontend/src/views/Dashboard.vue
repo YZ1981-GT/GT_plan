@@ -301,15 +301,15 @@ onMounted(async () => {
 .my-wp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 .my-wp-card { background: white; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); cursor: pointer; transition: box-shadow 0.2s; }
 .my-wp-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
-.my-wp-code { font-size: 12px; color: #909399; font-family: monospace; }
-.my-wp-name { font-size: 13px; font-weight: 500; margin: 4px 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.my-wp-code { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); font-family: monospace; }
+.my-wp-name { font-size: var(--gt-font-size-sm); font-weight: 500; margin: 4px 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── 欢迎横幅 ── */
 .welcome-banner {
   background: linear-gradient(135deg, #4b2d77 0%, #6b42a8 50%, #A06DFF 100%);
   border-radius: var(--gt-radius-lg);
   padding: var(--gt-space-8) var(--gt-space-8);
-  color: #fff;
+  color: var(--gt-color-text-inverse);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -318,9 +318,9 @@ onMounted(async () => {
   overflow: hidden;
 }
 .welcome-text { position: relative; z-index: 1; }
-.welcome-title { font-size: 24px; font-weight: 700; margin: 0 0 6px; }
-.welcome-date { font-size: 14px; opacity: 0.85; margin: 0 0 4px; }
-.welcome-motto { font-size: 13px; opacity: 0.7; margin: 0; font-style: italic; }
+.welcome-title { font-size: 24px /* allow-px: special */; font-weight: 700; margin: 0 0 6px; }
+.welcome-date { font-size: var(--gt-font-size-sm); opacity: 0.85; margin: 0 0 4px; }
+.welcome-motto { font-size: var(--gt-font-size-sm); opacity: 0.7; margin: 0; font-style: italic; }
 .welcome-deco { opacity: 0.5; flex-shrink: 0; }
 
 /* ── 统计卡片 ── */
@@ -358,7 +358,7 @@ onMounted(async () => {
 .stat-card--success .stat-icon-wrap { background: var(--gt-color-success-light); color: var(--gt-color-success); }
 
 .stat-trend {
-  font-size: 12px; font-weight: 600; padding: 2px 6px;
+  font-size: var(--gt-font-size-xs); font-weight: 600; padding: 2px 6px;
   border-radius: var(--gt-radius-full);
 }
 .trend-up { color: var(--gt-color-success); background: var(--gt-color-success-light); }
@@ -384,8 +384,8 @@ onMounted(async () => {
 .project-link:hover { text-decoration: underline; }
 
 .gt-compact-table :deep(.el-table__row td) { padding: 8px 0; }
-.gt-compact-table :deep(.el-table__body .cell) { font-size: 13px !important; }
-.gt-compact-table :deep(.el-table__header .cell) { font-size: 13px !important; }
+.gt-compact-table :deep(.el-table__body .cell) { font-size: var(--gt-font-size-sm) !important; }
+.gt-compact-table :deep(.el-table__header .cell) { font-size: var(--gt-font-size-sm) !important; }
 
 /* ── 今日日程 ── */
 .schedule-card { min-height: 240px; }

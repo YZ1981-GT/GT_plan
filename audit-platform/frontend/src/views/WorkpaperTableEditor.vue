@@ -188,5 +188,5 @@ onMounted(() => { if (props.wpId) loadData() })
 .gt-table-editor-actions {
   display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
 }
-.gt-table-editor-table :deep(.el-input__inner) { font-size: 13px; }
+.gt-table-editor-table :deep(.el-input__inner) { font-size: var(--gt-font-size-sm); }
 </style>

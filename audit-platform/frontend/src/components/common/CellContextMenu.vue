@@ -5,7 +5,7 @@
         :style="menuStyle" @contextmenu.prevent>
         <div class="gt-ucell-ctx-header">
           <span>{{ itemName }}</span>
-          <span v-if="value != null" style="color:#4b2d77;font-weight:600">{{ formattedValue }}</span>
+          <span v-if="value != null" style="color: var(--gt-color-primary);font-weight:600">{{ formattedValue }}</span>
         </div>
         <div class="gt-ucell-ctx-divider" />
         <!-- 复制操作 -->
@@ -19,7 +19,7 @@
         <template v-if="multiCount > 1">
           <div class="gt-ucell-ctx-divider" />
           <div class="gt-ucell-ctx-item" @click="$emit('sum')">
-            <span class="gt-ucell-ctx-icon">Σ</span> 求和 <b style="color:#4b2d77;margin-left:4px">{{ multiCount }} 格</b>
+            <span class="gt-ucell-ctx-icon">Σ</span> 求和 <b style="color: var(--gt-color-primary);margin-left:4px">{{ multiCount }} 格</b>
           </div>
           <div class="gt-ucell-ctx-item" @click="$emit('compare')">
             <span class="gt-ucell-ctx-icon">⇄</span> 对比差异
@@ -134,18 +134,18 @@ const formattedValue = computed(() => {
   backdrop-filter: blur(8px);
 }
 .gt-ucell-ctx-header {
-  padding: 8px 16px; font-size: 12px; color: var(--gt-color-text-tertiary, #999);
+  padding: 8px 16px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary, #999);
   display: flex; justify-content: space-between; align-items: center; gap: 8px;
 }
 .gt-ucell-ctx-header span:last-child {
-  color: var(--gt-color-primary, #4b2d77); font-weight: 600; font-size: 13px;
+  color: var(--gt-color-primary, #4b2d77); font-weight: 600; font-size: var(--gt-font-size-sm);
 }
 .gt-ucell-ctx-divider {
   height: 1px; margin: 4px 12px;
   background: linear-gradient(90deg, transparent, var(--gt-color-border, #e5e5ea), transparent);
 }
 .gt-ucell-ctx-item {
-  padding: 9px 16px; font-size: 14px; cursor: pointer;
+  padding: 9px 16px; font-size: var(--gt-font-size-sm); cursor: pointer;
   color: var(--gt-color-text, #1d1d1f);
   display: flex; align-items: center; gap: 8px;
   transition: all var(--gt-transition-fast, 0.15s);
@@ -161,7 +161,7 @@ const formattedValue = computed(() => {
   background: rgba(75, 45, 119, 0.12);
 }
 .gt-ucell-ctx-icon {
-  width: 20px; text-align: center; font-size: 14px;
+  width: 20px; text-align: center; font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary, #6e6e73);
 }
 .gt-ucell-ctx-item:hover .gt-ucell-ctx-icon {
@@ -197,8 +197,8 @@ const formattedValue = computed(() => {
   position: absolute;
   right: 3px; top: 1px;
   width: 14px; height: 14px;
-  font-size: 10px; line-height: 14px; text-align: center;
-  color: #fff;
+  font-size: var(--gt-font-size-xs); line-height: 14px; text-align: center;
+  color: var(--gt-color-text-inverse);
   background: var(--gt-color-success, #28A745);
   border-radius: 50%;
   z-index: 2;

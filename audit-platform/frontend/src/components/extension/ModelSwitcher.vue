@@ -58,5 +58,5 @@ function onChange(val: string) {
 
 <style scoped>
 .gt-model-option { display: flex; justify-content: space-between; width: 100%; }
-.gt-model-ctx { font-size: 12px; color: var(--gt-color-text-tertiary); }
+.gt-model-ctx { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 </style>

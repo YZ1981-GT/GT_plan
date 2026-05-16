@@ -43,18 +43,18 @@
                       {{ period }}月: {{ cnt }}
                     </el-tag>
                   </div>
-                  <span v-else style="color: #999">—</span>
+                  <span v-else style="color: var(--gt-color-text-tertiary)">—</span>
                 </template>
               </el-table-column>
               <el-table-column label="日期范围" width="200">
                 <template #default="{ row }">
-                  <span v-if="row.dateRange" style="font-size: 12px">
+                  <span v-if="row.dateRange" style="font-size: var(--gt-font-size-xs)">
                     {{ row.dateRange }}
                   </span>
                 </template>
               </el-table-column>
             </el-table>
-            <div v-if="summaryRows.length === 0" style="text-align: center; padding: 40px; color: #999">
+            <div v-if="summaryRows.length === 0" style="text-align: center; padding: 40px; color: var(--gt-color-text-tertiary)">
               暂无已导入数据
             </div>
           </div>
@@ -80,7 +80,7 @@
                 <el-checkbox value="tb_ledger">序时账</el-checkbox>
                 <el-checkbox value="tb_aux_ledger">辅助序时账</el-checkbox>
               </el-checkbox-group>
-              <div style="font-size: 12px; color: #999; margin-top: 4px">
+              <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 4px">
                 不选 = 删除全部四张表
               </div>
             </el-form-item>
@@ -88,7 +88,7 @@
               <el-checkbox-group v-model="deleteForm.periods">
                 <el-checkbox v-for="m in 12" :key="m" :value="m">{{ m }}月</el-checkbox>
               </el-checkbox-group>
-              <div style="font-size: 12px; color: #999; margin-top: 4px">
+              <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 4px">
                 仅对序时账/辅助序时账生效；不选 = 删整个年度
               </div>
             </el-form-item>
@@ -133,7 +133,7 @@
                 >
                   {{ p }}月
                 </el-tag>
-                <span v-if="getExistingPeriods(incrementalForm.year).length === 0" style="color: #999">
+                <span v-if="getExistingPeriods(incrementalForm.year).length === 0" style="color: var(--gt-color-text-tertiary)">
                   暂无序时账数据
                 </span>
               </div>
@@ -141,9 +141,9 @@
 
             <!-- 预检结果展示 -->
             <el-form-item v-if="incrementalDiff" label="检测结果">
-              <div style="font-size: 13px; line-height: 1.8">
+              <div style="font-size: var(--gt-font-size-sm); line-height: 1.8">
                 <div>
-                  <span style="color: #67c23a; font-weight: 600">新增月份：</span>
+                  <span style="color: var(--gt-color-success); font-weight: 600">新增月份：</span>
                   <el-tag
                     v-for="p in incrementalDiff.diff.new"
                     :key="`new-${p}`"
@@ -153,10 +153,10 @@
                   >
                     {{ p }}月
                   </el-tag>
-                  <span v-if="incrementalDiff.diff.new.length === 0" style="color: #999">无</span>
+                  <span v-if="incrementalDiff.diff.new.length === 0" style="color: var(--gt-color-text-tertiary)">无</span>
                 </div>
                 <div>
-                  <span style="color: #e6a23c; font-weight: 600">重叠月份：</span>
+                  <span style="color: var(--gt-color-wheat); font-weight: 600">重叠月份：</span>
                   <el-tag
                     v-for="p in incrementalDiff.diff.overlap"
                     :key="`ov-${p}`"
@@ -166,7 +166,7 @@
                   >
                     {{ p }}月
                   </el-tag>
-                  <span v-if="incrementalDiff.diff.overlap.length === 0" style="color: #999">无</span>
+                  <span v-if="incrementalDiff.diff.overlap.length === 0" style="color: var(--gt-color-text-tertiary)">无</span>
                 </div>
                 <div v-if="incrementalDiff.diff.overlap.length > 0" style="margin-top: 8px">
                   <el-radio-group v-model="overlapStrategy">
@@ -185,7 +185,7 @@
             >
               <template #title>操作步骤</template>
               <template #default>
-                <ol style="margin: 4px 0 0 16px; padding: 0; font-size: 13px; line-height: 1.8">
+                <ol style="margin: 4px 0 0 16px; padding: 0; font-size: var(--gt-font-size-sm); line-height: 1.8">
                   <li>选择年度（上方）</li>
                   <li>点击"检测"输入文件将要导入的月份</li>
                   <li>确认重叠策略（跳过/覆盖）</li>
@@ -193,7 +193,7 @@
                 </ol>
               </template>
             </el-alert>
-            <div style="display: flex; gap: 8px; align-items: center; padding: 12px; background: #f8f7fc; border-radius: 8px; border: 1px solid #e8e4f0">
+            <div style="display: flex; gap: 8px; align-items: center; padding: 12px; background: var(--gt-color-primary-bg); border-radius: 8px; border: 1px solid #e8e4f0">
               <el-input
                 v-model="filePeriodsInput"
                 placeholder="文件包含的月份，逗号分隔如: 11,12"
@@ -237,6 +237,7 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger } from '@/services/apiPaths'
+import { useProjectStore } from '@/stores/project'
 
 const props = defineProps<{
   modelValue: boolean
@@ -343,18 +344,43 @@ async function onDelete() {
     ? `${deleteForm.value.periods.sort((a, b) => a - b).join(',')} 月`
     : '整年'
 
-  try {
-    await ElMessageBox.confirm(
-      `即将删除 ${deleteForm.value.year} 年 ${periodsLabel} 的 ${tablesLabel} 数据，此操作不可恢复，是否继续？`,
-      '删除确认',
-      {
-        confirmButtonText: '确认删除',
-        cancelButtonText: '取消',
-        type: 'warning',
-      },
-    )
-  } catch {
-    return
+  // R10 Spec C / F5：清理账套必须输入项目名称二次确认
+  const projectStore = useProjectStore()
+  const projectName = projectStore.clientName || ''
+  if (projectName) {
+    try {
+      const { value } = await ElMessageBox.prompt(
+        `⚠ 即将删除 ${deleteForm.value.year} 年 ${periodsLabel} 的 ${tablesLabel} 数据。\n\n此操作不可恢复，将永久删除当前账套相关数据。\n\n请输入项目完整名称【${projectName}】确认：`,
+        '清理账套数据 — 危险操作',
+        {
+          confirmButtonText: '确认清理',
+          cancelButtonText: '取消',
+          type: 'warning',
+          confirmButtonClass: 'el-button--danger',
+          inputPlaceholder: '请输入项目完整名称',
+          inputValidator: (v: string) => v === projectName || '名称不匹配，请输入完整项目名称',
+        },
+      )
+      if (value !== projectName) return
+    } catch {
+      return
+    }
+  } else {
+    // fallback：无项目名时退化为简单二次确认
+    try {
+      await ElMessageBox.confirm(
+        `即将删除 ${deleteForm.value.year} 年 ${periodsLabel} 的 ${tablesLabel} 数据，此操作不可恢复，是否继续？`,
+        '清理账套数据',
+        {
+          confirmButtonText: '确认清理',
+          cancelButtonText: '取消',
+          type: 'warning',
+          confirmButtonClass: 'el-button--danger',
+        },
+      )
+    } catch {
+      return
+    }
   }
 
   loading.value = true

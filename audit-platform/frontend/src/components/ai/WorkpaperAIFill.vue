@@ -207,51 +207,51 @@ function confidenceClass(c) {
 <style scoped>
 .gt-workpaper-ai-fill { padding: 16px; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.panel-header h3 { margin: 0; font-size: 16px; }
+.panel-header h3 { margin: 0; font-size: var(--gt-font-size-md); }
 .fill-controls { display: flex; gap: 8px; align-items: center; }
 
-.mode-select { padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; }
-.btn-primary { padding: 6px 16px; background: #4b2d77; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
-.btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+.mode-select { padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: var(--gt-font-size-xs); }
+.btn-primary { padding: 6px 16px; background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border: none; border-radius: 6px; cursor: pointer; font-size: var(--gt-font-size-sm); }
+.btn-primary:disabled { background: var(--gt-color-border); cursor: not-allowed; }
 
 .fill-progress { margin-bottom: 16px; }
-.progress-header { display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 6px; }
-.progress-bar-wrap { height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; }
+.progress-header { display: flex; justify-content: space-between; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-bottom: 6px; }
+.progress-bar-wrap { height: 8px; background: var(--gt-color-border-lighter); border-radius: 4px; overflow: hidden; }
 .progress-bar { height: 100%; background: linear-gradient(90deg, #4b2d77, #7c3aed); transition: width 0.4s; }
 .progress-steps { display: flex; gap: 8px; margin-top: 8px; }
-.step { font-size: 12px; padding: 2px 8px; border-radius: 4px; }
-.step.done { color: #52c41a; }
+.step { font-size: var(--gt-font-size-xs); padding: 2px 8px; border-radius: 4px; }
+.step.done { color: var(--gt-color-success); }
 .step.active { color: #4b2d77; background: rgba(75,45,119,0.1); }
-.step.pending { color: #999; }
+.step.pending { color: var(--gt-color-text-tertiary); }
 
 .results-summary { display: flex; gap: 8px; margin-bottom: 12px; }
-.summary-badge { padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; }
-.summary-badge.success { background: #f6ffed; color: #52c41a; }
-.summary-badge.warning { background: #fff7e6; color: #fa8c16; }
-.summary-badge.error { background: #fff2f0; color: #ff4d4f; }
+.summary-badge { padding: 3px 10px; border-radius: 4px; font-size: var(--gt-font-size-xs); font-weight: 600; }
+.summary-badge.success { background: var(--gt-bg-success); color: var(--gt-color-success); }
+.summary-badge.warning { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); }
+.summary-badge.error { background: var(--gt-bg-danger); color: var(--gt-color-coral); }
 
 .result-card { border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
-.result-card.pending { border-color: #faad14; background: #fffbe6; }
-.result-card.accepted { border-color: #52c41a; background: #f6ffed; }
-.result-card.rejected { border-color: #ff4d4f; background: #fff2f0; opacity: 0.7; }
+.result-card.pending { border-color: #faad14; background: var(--gt-color-wheat-light); }
+.result-card.accepted { border-color: #52c41a; background: var(--gt-bg-success); }
+.result-card.rejected { border-color: #ff4d4f; background: var(--gt-bg-danger); opacity: 0.7; }
 
 .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.result-label { font-weight: 600; font-size: 13px; }
-.status-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; }
-.status-badge.pending { background: #fff7e6; color: #fa8c16; }
-.status-badge.accepted { background: #f6ffed; color: #52c41a; }
-.status-badge.rejected { background: #fff2f0; color: #ff4d4f; }
+.result-label { font-weight: 600; font-size: var(--gt-font-size-sm); }
+.status-badge { font-size: var(--gt-font-size-xs); padding: 2px 6px; border-radius: 4px; }
+.status-badge.pending { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); }
+.status-badge.accepted { background: var(--gt-bg-success); color: var(--gt-color-success); }
+.status-badge.rejected { background: var(--gt-bg-danger); color: var(--gt-color-coral); }
 
 .result-content { display: flex; gap: 16px; margin-bottom: 6px; }
-.content-label { font-size: 12px; color: #888; }
-.content-value { font-size: 13px; font-weight: 500; }
-.content-value.old { text-decoration: line-through; color: #999; }
-.content-value.new { color: #4b2d77; }
+.content-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); }
+.content-value { font-size: var(--gt-font-size-sm); font-weight: 500; }
+.content-value.old { text-decoration: line-through; color: var(--gt-color-text-tertiary); }
+.content-value.new { color: var(--gt-color-primary); }
 
-.result-meta { display: flex; gap: 12px; font-size: 11px; color: #999; margin-bottom: 8px; }
-.confidence.low { color: #ff4d4f; }
-.confidence.medium { color: #fa8c16; }
-.confidence.high { color: #52c41a; }
+.result-meta { display: flex; gap: 12px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-bottom: 8px; }
+.confidence.low { color: var(--gt-color-coral); }
+.confidence.medium { color: var(--gt-color-wheat); }
+.confidence.high { color: var(--gt-color-success); }
 
 .result-actions { display: flex; gap: 6px; }
 .btn-accept, .btn-reject, .btn-edit {
@@ -259,24 +259,24 @@ function confidenceClass(c) {
   border-radius: 4px;
   border: none;
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
-.btn-accept { background: #52c41a; color: #fff; }
-.btn-reject { background: #f5f5f5; color: #666; }
-.btn-edit { background: #fff; border: 1px solid #ddd; }
+.btn-accept { background: var(--gt-color-success); color: var(--gt-color-text-inverse); }
+.btn-reject { background: var(--gt-color-bg); color: var(--gt-color-text-secondary); }
+.btn-edit { background: var(--gt-color-bg-white); border: 1px solid #ddd; }
 
 .edit-area { margin-top: 8px; }
-.edit-textarea { width: 100%; padding: 6px 8px; border: 1px solid #4b2d77; border-radius: 6px; font-size: 13px; resize: vertical; }
+.edit-textarea { width: 100%; padding: 6px 8px; border: 1px solid #4b2d77; border-radius: 6px; font-size: var(--gt-font-size-sm); resize: vertical; }
 .edit-actions { display: flex; gap: 6px; margin-top: 6px; justify-content: flex-end; }
-.btn-save, .btn-cancel { padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; }
-.btn-save { background: #4b2d77; color: #fff; border: none; }
-.btn-cancel { background: #f5f5f5; color: #666; border: 1px solid #ddd; }
+.btn-save, .btn-cancel { padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: var(--gt-font-size-xs); }
+.btn-save { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border: none; }
+.btn-cancel { background: var(--gt-color-bg); color: var(--gt-color-text-secondary); border: 1px solid #ddd; }
 
 .batch-actions { display: flex; gap: 8px; margin-top: 12px; }
-.btn-batch-accept { padding: 6px 16px; background: #52c41a; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
-.btn-regenerate { padding: 6px 16px; background: #fff; color: #4b2d77; border: 1px solid #4b2d77; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.btn-batch-accept { padding: 6px 16px; background: var(--gt-color-success); color: var(--gt-color-text-inverse); border: none; border-radius: 6px; cursor: pointer; font-size: var(--gt-font-size-xs); }
+.btn-regenerate { padding: 6px 16px; background: var(--gt-color-bg-white); color: var(--gt-color-primary); border: 1px solid #4b2d77; border-radius: 6px; cursor: pointer; font-size: var(--gt-font-size-xs); }
 
-.empty-state { text-align: center; padding: 40px 20px; color: #666; }
-.empty-icon { font-size: 40px; margin-bottom: 12px; }
-.empty-hint { font-size: 12px; color: #999; margin-top: 8px; }
+.empty-state { text-align: center; padding: 40px 20px; color: var(--gt-color-text-secondary); }
+.empty-icon { font-size: 40px /* allow-px: special */; margin-bottom: 12px; }
+.empty-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 8px; }
 </style>

@@ -253,18 +253,18 @@ function getFileExtension(filename: string): string {
 }
 
 .gt-attachment-dropzone-icon {
-  font-size: 32px;
+  font-size: 32px /* allow-px: special */;
 }
 
 .gt-attachment-dropzone-text {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 500;
   color: var(--el-color-primary, #409eff);
 }
 
 .gt-attachment-dropzone-hint {
-  font-size: 12px;
-  color: #999;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
 }
 
 .gt-attachment-dropzone-uploading {
@@ -279,7 +279,7 @@ function getFileExtension(filename: string): string {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 6px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--el-color-primary, #409eff);
 }
 

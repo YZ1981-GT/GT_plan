@@ -64,5 +64,5 @@ onMounted(async () => {
 .gt-page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-3); }
 .gt-header-actions { display: flex; gap: var(--gt-space-2); }
 .gt-trace-result { display: flex; flex-direction: column; gap: var(--gt-space-3); }
-.gt-trace-json { font-size: 12px; max-height: 200px; overflow: auto; background: var(--el-fill-color-light); padding: var(--gt-space-2); border-radius: var(--gt-radius-sm); }
+.gt-trace-json { font-size: var(--gt-font-size-xs); max-height: 200px; overflow: auto; background: var(--el-fill-color-light); padding: var(--gt-space-2); border-radius: var(--gt-radius-sm); }
 </style>

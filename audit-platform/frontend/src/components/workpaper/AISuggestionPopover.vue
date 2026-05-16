@@ -167,7 +167,7 @@ function cancelEdit() {
 }
 .title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 .suggestion-body {
   margin-bottom: 12px;
@@ -175,17 +175,17 @@ function cancelEdit() {
 .suggestion-text {
   margin: 0 0 8px;
   padding: 8px 12px;
-  background: #f0f7ff;
+  background: var(--gt-bg-info);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   line-height: 1.6;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .meta {
   display: flex;
   gap: 12px;
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 .suggestion-edit {
   margin-bottom: 12px;

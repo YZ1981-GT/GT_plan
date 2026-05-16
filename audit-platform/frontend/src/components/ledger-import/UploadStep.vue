@@ -223,14 +223,14 @@ async function startDetect() {
 
 .file-name {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .file-size {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
   min-width: 60px;
   text-align: right;
@@ -243,7 +243,7 @@ async function startDetect() {
 
 .tips-list {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   line-height: 1.8;
   color: var(--el-text-color-regular);
 }

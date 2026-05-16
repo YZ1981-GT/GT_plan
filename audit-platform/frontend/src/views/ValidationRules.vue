@@ -120,12 +120,12 @@ onMounted(() => {
 
 .page-header h2 {
   margin: 0 0 8px;
-  font-size: 18px;
+  font-size: var(--gt-font-size-xl);
 }
 
 .page-desc {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--el-text-color-secondary);
 }
 
@@ -133,11 +133,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .formula-text {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   background: var(--el-fill-color-lighter);
   padding: 2px 6px;
   border-radius: 3px;

@@ -25,13 +25,13 @@
     <el-card shadow="never" class="gt-sig-actions-card" v-if="objectId">
       <template #header><span>签名操作</span></template>
       <div class="gt-sig-btns">
-        <el-button type="primary" @click="showLevel1 = true">
+        <el-button type="primary" @click="onClickLevel1">
           <el-icon><Lock /></el-icon> 密码确认签名
         </el-button>
-        <el-button type="success" @click="showLevel2 = true">
+        <el-button type="success" @click="onClickLevel2">
           <el-icon><EditPen /></el-icon> 手写签名
         </el-button>
-        <el-button type="warning" @click="showLevel3 = true">
+        <el-button type="warning" @click="onClickLevel3">
           <el-icon><Key /></el-icon> CA证书签名
         </el-button>
       </div>
@@ -57,6 +57,12 @@ import SignatureLevel1 from '@/components/extension/SignatureLevel1.vue'
 import SignatureLevel2 from '@/components/extension/SignatureLevel2.vue'
 import SignatureLevel3 from '@/components/extension/SignatureLevel3.vue'
 import SignatureHistory from '@/components/extension/SignatureHistory.vue'
+import { confirmSign } from '@/utils/confirm'
+import { useAuthStore } from '@/stores/auth'
+import { useProjectStore } from '@/stores/project'
+
+const authStore = useAuthStore()
+const projectStore = useProjectStore()
 
 const objectType = ref('working_paper')
 const objectId = ref('')
@@ -64,6 +70,32 @@ const showLevel1 = ref(false)
 const showLevel2 = ref(false)
 const showLevel3 = ref(false)
 const historyRef = ref<InstanceType<typeof SignatureHistory>>()
+
+const objectTypeLabel: Record<string, string> = {
+  working_paper: '工作底稿',
+  adjustment: '调整分录',
+  audit_report: '审计报告',
+}
+
+async function _confirmAndOpen(level: 1 | 2 | 3) {
+  const action = level === 1 ? '密码确认签名' : level === 2 ? '手写签名' : 'CA 证书签名'
+  try {
+    await confirmSign(action, {
+      userName: authStore.user?.full_name || authStore.user?.username || '当前用户',
+      projectName: projectStore.clientName || projectStore.projectId || '当前项目',
+      objectName: `${objectTypeLabel[objectType.value] || objectType.value} ${objectId.value}`,
+    })
+  } catch {
+    return
+  }
+  if (level === 1) showLevel1.value = true
+  else if (level === 2) showLevel2.value = true
+  else showLevel3.value = true
+}
+
+function onClickLevel1() { _confirmAndOpen(1) }
+function onClickLevel2() { _confirmAndOpen(2) }
+function onClickLevel3() { _confirmAndOpen(3) }
 
 function loadHistory() {
   // SignatureHistory watches props, triggers automatically

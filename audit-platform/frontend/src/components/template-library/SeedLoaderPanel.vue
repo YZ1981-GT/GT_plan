@@ -509,22 +509,22 @@ defineExpose({ refreshStatus })
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #ebeef5;
   border-radius: 6px;
   margin-bottom: 12px;
 }
 .gt-slp-title {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #4b2d77;
+  color: var(--gt-color-primary);
 }
-.gt-slp-summary { font-size: 12px; color: #909399; }
+.gt-slp-summary { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); }
 .gt-slp-spacer { flex: 1; }
 
 /* 进度条 */
 .gt-slp-progress {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #ebeef5;
   border-radius: 6px;
   padding: 12px 16px;
@@ -535,39 +535,39 @@ defineExpose({ refreshStatus })
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
-  font-size: 13px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
 }
 .gt-slp-progress-label { font-weight: 500; }
 
 /* 表格 */
 .gt-slp-table {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 6px;
   overflow: hidden;
 }
 .gt-slp-seed-name { font-weight: 500; }
 .gt-slp-seed-key {
   font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   margin-top: 2px;
 }
 .gt-slp-readonly-tag { margin-left: 6px; }
-.gt-slp-time { font-size: 12px; color: #606266; }
-.gt-slp-time-empty { font-size: 12px; color: #c0c4cc; }
-.gt-slp-disabled { font-size: 12px; color: #c0c4cc; }
+.gt-slp-time { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); }
+.gt-slp-time-empty { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); }
+.gt-slp-disabled { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); }
 
 /* 结果汇总 */
 .gt-slp-results {
   margin-top: 12px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #ebeef5;
   border-radius: 6px;
 }
 .gt-slp-results :deep(.el-collapse-item__header) {
   padding: 0 16px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
 }
 .gt-slp-results-title {
@@ -578,17 +578,17 @@ defineExpose({ refreshStatus })
 .gt-slp-error-list {
   max-height: 240px;
   overflow-y: auto;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-slp-error-item {
   margin-bottom: 6px;
   padding: 4px 6px;
-  background: #fef0f0;
+  background: var(--gt-bg-danger);
   border-radius: 3px;
   word-break: break-all;
 }
-.gt-slp-error-item code { font-size: 11px; color: #f56c6c; }
-.gt-slp-error-more { color: #909399; font-size: 11px; padding: 4px 0; }
-.gt-slp-no-error { color: #c0c4cc; }
-.gt-slp-fatal-error { color: #f56c6c; font-size: 12px; }
+.gt-slp-error-item code { font-size: var(--gt-font-size-xs); color: var(--gt-color-coral); }
+.gt-slp-error-more { color: var(--gt-color-info); font-size: var(--gt-font-size-xs); padding: 4px 0; }
+.gt-slp-no-error { color: var(--gt-color-text-placeholder); }
+.gt-slp-fatal-error { color: var(--gt-color-coral); font-size: var(--gt-font-size-xs); }
 </style>

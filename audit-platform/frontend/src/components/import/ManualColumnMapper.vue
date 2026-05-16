@@ -310,13 +310,13 @@ onMounted(() => {
 
 <style scoped>
 .manual-column-mapper { padding: 12px 0; }
-.mapper-header h4 { margin: 0 0 4px; font-size: 15px; }
-.mapper-desc { font-size: 13px; color: #606266; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+.mapper-header h4 { margin: 0 0 4px; font-size: var(--gt-font-size-base); }
+.mapper-desc { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-regular); margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
 .required-status { margin-bottom: 12px; }
-.required-status .hint { font-size: 12px; color: #909399; }
+.required-status .hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); }
 .original-header { font-weight: 500; }
-.sample-tag { margin-left: 6px; font-size: 11px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.sample-tag { margin-left: 6px; font-size: var(--gt-font-size-xs); max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
 .suggestion { margin-top: 4px; }
-.used-hint { font-size: 11px; color: #c0c4cc; margin-left: 4px; }
+.used-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); margin-left: 4px; }
 .mapper-actions { margin-top: 12px; display: flex; align-items: center; gap: 8px; }
 </style>

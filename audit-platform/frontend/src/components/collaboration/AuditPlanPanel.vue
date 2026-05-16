@@ -328,9 +328,9 @@ onMounted(() => {
 }
 
 .panel-title {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 
 .header-actions {
@@ -344,14 +344,14 @@ onMounted(() => {
 }
 
 .section-title {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #606266;
+  color: var(--gt-color-text-regular);
   margin-bottom: 8px;
 }
 
 .strategy-text {
-  color: #303133;
+  color: var(--gt-color-text-primary);
   line-height: 1.6;
   white-space: pre-wrap;
   margin: 0;
@@ -372,8 +372,8 @@ onMounted(() => {
 }
 
 .no-data {
-  color: #909399;
-  font-size: 13px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-sm);
 }
 
 .team-edit-table {

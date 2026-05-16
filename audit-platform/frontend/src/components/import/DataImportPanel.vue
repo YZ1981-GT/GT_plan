@@ -77,7 +77,7 @@
         <span style="margin-left: 12px">
           已处理 {{ currentProgress.records_processed }} 条记录
         </span>
-        <span style="margin-left: 12px; color: #999">
+        <span style="margin-left: 12px; color: var(--gt-color-text-tertiary)">
           耗时 {{ currentProgress.elapsed_seconds.toFixed(1) }}s
         </span>
       </div>

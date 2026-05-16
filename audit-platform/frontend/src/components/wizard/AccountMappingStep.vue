@@ -83,7 +83,7 @@
       <el-table-column label="客户科目名称" prop="account_name" min-width="160" show-overflow-tooltip />
       <el-table-column label="" width="50" align="center">
         <template #default>
-          <el-icon style="color: #999"><Right /></el-icon>
+          <el-icon style="color: var(--gt-color-text-tertiary)"><Right /></el-icon>
         </template>
       </el-table-column>
       <el-table-column label="标准科目" min-width="220">
@@ -123,7 +123,7 @@
           <span v-if="row.confidence" :style="{ color: confidenceColor(row.confidence) }">
             {{ (row.confidence * 100).toFixed(0) }}%
           </span>
-          <span v-else style="color: #ccc">—</span>
+          <span v-else style="color: var(--gt-color-text-placeholder)">—</span>
         </template>
       </el-table-column>
     </el-table>
@@ -515,13 +515,13 @@ defineExpose({ validate })
 .step-title {
   color: var(--gt-color-primary);
   margin-bottom: var(--gt-space-1);
-  font-size: 20px;
+  font-size: 20px /* allow-px: special */;
 }
 
 .step-desc {
-  color: #999;
+  color: var(--gt-color-text-tertiary);
   margin-bottom: var(--gt-space-4);
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .toolbar {
@@ -530,7 +530,7 @@ defineExpose({ validate })
   gap: 12px;
   margin-bottom: 16px;
   padding: 12px 16px;
-  background: #fafafa;
+  background: var(--gt-color-bg);
   border-radius: var(--gt-radius-md);
 }
 
@@ -545,14 +545,14 @@ defineExpose({ validate })
 }
 
 .rate-label {
-  font-size: 13px;
-  color: #666;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-secondary);
   white-space: nowrap;
 }
 
 .rate-text {
-  font-size: 13px;
-  color: #999;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-tertiary);
   white-space: nowrap;
 }
 
@@ -564,8 +564,8 @@ defineExpose({ validate })
 }
 
 .unmapped-item {
-  font-size: 13px;
-  background: #fff3e0;
+  font-size: var(--gt-font-size-sm);
+  background: var(--gt-color-wheat-light);
   padding: 2px 8px;
   border-radius: 4px;
 }
@@ -581,7 +581,7 @@ defineExpose({ validate })
   gap: 12px;
   padding: 8px 0;
   border-bottom: 1px solid #f0f0f0;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .unmatched-name {
@@ -594,8 +594,8 @@ defineExpose({ validate })
 
 .empty-hint {
   text-align: center;
-  color: #ccc;
+  color: var(--gt-color-text-placeholder);
   padding: 40px 16px;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 </style>

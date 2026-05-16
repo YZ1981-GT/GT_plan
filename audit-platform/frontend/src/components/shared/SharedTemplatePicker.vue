@@ -26,11 +26,11 @@
         </el-radio-group>
       </el-form-item>
       <el-form-item v-if="saveOwnerType === 'group'" label="所属集团">
-        <span style="font-size: 12px; color: #666;">{{ projectName || '当前项目' }}</span>
+        <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ projectName || '当前项目' }}</span>
       </el-form-item>
       <el-form-item label="公开">
         <el-switch v-model="savePublic" />
-        <span style="font-size: 11px; color: #999; margin-left: 8px;">公开后所有人可见</span>
+        <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-left: 8px;">公开后所有人可见</span>
       </el-form-item>
     </el-form>
     <template #footer>
@@ -43,9 +43,9 @@
   <el-dialog v-model="showPickDialog" title="引用共享模板" width="700px" append-to-body destroy-on-close>
     <div v-if="loadingTemplates" style="text-align: center; padding: 30px;">
       <el-icon class="is-loading" :size="20"><Loading /></el-icon>
-      <span style="margin-left: 8px; color: #999;">加载模板列表...</span>
+      <span style="margin-left: 8px; color: var(--gt-color-text-tertiary);">加载模板列表...</span>
     </div>
-    <div v-else-if="templates.length === 0" style="text-align: center; padding: 30px; color: #999;">
+    <div v-else-if="templates.length === 0" style="text-align: center; padding: 30px; color: var(--gt-color-text-tertiary);">
       暂无可用模板
     </div>
     <div v-else>
@@ -55,7 +55,7 @@
         :row-class-name="({ row }: any) => selectedTemplate?.id === row.id ? 'gt-stp-selected' : ''">
         <el-table-column label="来源" width="120">
           <template #default="{ row }">
-            <span style="font-size: 11px;">{{ getOwnerLabel(row.owner_type) }}</span>
+            <span style="font-size: var(--gt-font-size-xs);">{{ getOwnerLabel(row.owner_type) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="name" label="模板名称" min-width="180" />
@@ -198,6 +198,6 @@ async function onApply() {
   gap: 6px;
 }
 :deep(.gt-stp-selected) {
-  background-color: #f0ecf5 !important;
+  background-color: var(--gt-color-primary-bg) !important;
 }
 </style>

@@ -203,9 +203,9 @@ onMounted(() => {
 
 .panel-header h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--gt-font-size-base);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 
 .pbc-summary {
@@ -215,11 +215,11 @@ onMounted(() => {
 }
 
 .form-text {
-  font-size: 14px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
 }
 
 .text-muted {
-  color: #909399;
+  color: var(--gt-color-info);
 }
 </style>

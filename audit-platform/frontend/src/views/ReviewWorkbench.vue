@@ -789,7 +789,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   margin-bottom: 8px;
   padding-bottom: 6px;
   border-bottom: 1px solid var(--el-border-color-lighter);
@@ -819,10 +819,10 @@ onUnmounted(() => {
 }
 .wp-code {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .wp-name {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-regular);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -832,7 +832,7 @@ onUnmounted(() => {
 .wp-meta {
   display: flex;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
   flex-wrap: wrap;
 }
@@ -859,7 +859,7 @@ onUnmounted(() => {
 .meta-row {
   display: flex;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   margin-bottom: 6px;
   align-items: center;
 }
@@ -877,7 +877,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .ai-issues {
@@ -891,18 +891,18 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .ai-issue.blocking {
-  background: #fef0f0;
+  background: var(--gt-bg-danger);
   color: var(--el-color-danger);
 }
 .ai-issue.warning {
-  background: #fff8e6;
+  background: var(--gt-color-wheat-light);
   color: var(--el-color-warning);
 }
 .ai-issue.info {
-  background: #f4f4f5;
+  background: var(--gt-color-bg);
   color: var(--el-text-color-regular);
 }
 .ai-issue-body {
@@ -914,7 +914,7 @@ onUnmounted(() => {
 .ai-issue small {
   display: block;
   color: var(--el-text-color-secondary);
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   margin-top: 2px;
 }
 
@@ -925,7 +925,7 @@ onUnmounted(() => {
 }
 .shortcut-hint {
   margin-top: 8px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
   text-align: center;
 }

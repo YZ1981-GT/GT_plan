@@ -310,22 +310,22 @@ onMounted(() => {
 }
 
 .detail-category {
-  color: #606266;
-  font-size: 14px;
+  color: var(--gt-color-text-regular);
+  font-size: var(--gt-font-size-sm);
 }
 
 .detail-date {
-  color: #909399;
-  font-size: 13px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-sm);
 }
 
 .detail-text {
-  color: #303133;
+  color: var(--gt-color-text-primary);
   line-height: 1.7;
   white-space: pre-wrap;
 }
 
 .no-data {
-  color: #c0c4cc;
+  color: var(--gt-color-text-placeholder);
 }
 </style>

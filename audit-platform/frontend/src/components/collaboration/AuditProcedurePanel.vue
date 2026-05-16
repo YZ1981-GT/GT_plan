@@ -382,9 +382,9 @@ onMounted(() => {
 }
 
 .panel-title {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 
 .header-actions {

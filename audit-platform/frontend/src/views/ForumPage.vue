@@ -147,7 +147,7 @@ onMounted(fetchPosts)
 .gt-post-card { cursor: default; }
 .gt-post-header { display: flex; align-items: center; gap: var(--gt-space-2); margin-bottom: var(--gt-space-1); }
 .gt-post-author, .gt-post-time { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
-.gt-post-title { margin: var(--gt-space-1) 0; font-size: 16px; }
+.gt-post-title { margin: var(--gt-space-1) 0; font-size: var(--gt-font-size-md); }
 .gt-post-content { color: var(--gt-color-text-secondary); margin-bottom: var(--gt-space-2); }
 .gt-post-actions { display: flex; gap: var(--gt-space-2); }
 .gt-comments { margin-top: var(--gt-space-2); padding-top: var(--gt-space-2); border-top: 1px solid var(--el-border-color); }
@@ -158,7 +158,7 @@ onMounted(fetchPosts)
 /* 弹窗头部 */
 .gt-dialog-header {
   display: flex; align-items: center; gap: 8px;
-  font-size: 17px; font-weight: 600; color: var(--gt-color-primary, #4b2d77);
+  font-size: var(--gt-font-size-lg); font-weight: 600; color: var(--gt-color-primary, #4b2d77);
 }
 
 /* 去掉弹窗灰色遮罩 */

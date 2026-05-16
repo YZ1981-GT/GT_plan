@@ -231,23 +231,23 @@
         <template #default>
           <div style="margin-top: 6px">
             <div v-for="(d, idx) in importResult.sheet_diagnostics" :key="`${d.sheet_name}_${idx}`"
-              style="font-size: 13px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px"
+              style="font-size: var(--gt-font-size-sm); margin-bottom: 4px; display: flex; align-items: center; gap: 6px"
             >
-              <el-icon v-if="isSheetOk(d)" style="color: #67c23a"><CircleCheck /></el-icon>
-              <el-icon v-else-if="d.missing_cols.length" style="color: #f56c6c"><CircleClose /></el-icon>
-              <el-icon v-else style="color: #909399"><InfoFilled /></el-icon>
+              <el-icon v-if="isSheetOk(d)" style="color: var(--gt-color-success)"><CircleCheck /></el-icon>
+              <el-icon v-else-if="d.missing_cols.length" style="color: var(--gt-color-coral)"><CircleClose /></el-icon>
+              <el-icon v-else style="color: var(--gt-color-info)"><InfoFilled /></el-icon>
               <span>{{ d.sheet_name }}</span>
               <el-tag :type="(sheetTagType(d.guessed_type)) || undefined" size="small">{{ typeLabel(d.guessed_type) }}</el-tag>
-              <span style="color: #999">{{ d.row_count }} 行</span>
-              <span v-if="d.missing_cols.length" style="color: #f56c6c; font-size: 12px">
+              <span style="color: var(--gt-color-text-tertiary)">{{ d.row_count }} 行</span>
+              <span v-if="d.missing_cols.length" style="color: var(--gt-color-coral); font-size: var(--gt-font-size-xs)">
                 缺少必需列：{{ d.missing_cols.map(colLabel).join('、') }}
               </span>
-              <span v-if="d.missing_recommended?.length" style="color: #e6a23c; font-size: 12px">
+              <span v-if="d.missing_recommended?.length" style="color: var(--gt-color-wheat); font-size: var(--gt-font-size-xs)">
                 {{ d.missing_cols.length ? '，' : '' }}建议补充：{{ d.missing_recommended.map(colLabel).join('、') }}
               </span>
             </div>
           </div>
-          <div style="font-size: 12px; color: #999; margin-top: 8px; border-top: 1px solid #eee; padding-top: 6px">
+          <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 8px; border-top: 1px solid #eee; padding-top: 6px">
             必需列（红色）：余额表（科目编码）、凭证表（科目编码+凭证日期+凭证号）、辅助余额（科目编码+辅助类型）、辅助明细（科目编码）<br/>
             建议列（橙色）：余额表（期初余额+借方发生额+贷方发生额+期末余额）、凭证表（借方金额+贷方金额+摘要）、辅助余额（期初余额+期末余额+辅助编码+辅助名称）
           </div>
@@ -1758,13 +1758,13 @@ defineExpose({
 .step-title {
   color: var(--gt-color-primary);
   margin-bottom: var(--gt-space-1);
-  font-size: 20px;
+  font-size: 20px /* allow-px: special */;
 }
 
 .step-desc {
-  color: #999;
+  color: var(--gt-color-text-tertiary);
   margin-bottom: var(--gt-space-6);
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .upload-section {
@@ -1779,7 +1779,7 @@ defineExpose({
 .sheet-tabs { margin-bottom: var(--gt-space-3); }
 .sheet-tab-label { display: inline-flex; align-items: center; gap: 6px; }
 .sheet-badge { margin-left: 2px; }
-.sheet-badge :deep(.el-badge__content) { font-size: 10px; padding: 0 4px; height: 16px; line-height: 16px; }
+.sheet-badge :deep(.el-badge__content) { font-size: var(--gt-font-size-xs); padding: 0 4px; height: 16px; line-height: 16px; }
 .file-type-bar {
   display: flex;
   align-items: center;
@@ -1788,8 +1788,8 @@ defineExpose({
 }
 
 .row-count {
-  color: #999;
-  font-size: 13px;
+  color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-sm);
 }
 
 .preview-table-wrapper {
@@ -1813,35 +1813,35 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
-  color: #666;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
 }
 
 .matched-icon {
-  color: #67c23a;
-  font-size: 14px;
+  color: var(--gt-color-success);
+  font-size: var(--gt-font-size-sm);
 }
 .key-matched-icon {
-  color: #409eff;
-  font-size: 14px;
+  color: var(--gt-color-teal);
+  font-size: var(--gt-font-size-sm);
 }
 .important-matched-icon {
-  color: #67c23a;
-  font-size: 14px;
+  color: var(--gt-color-success);
+  font-size: var(--gt-font-size-sm);
 }
 
 .unmatched-icon {
-  color: #e6a23c;
-  font-size: 14px;
+  color: var(--gt-color-wheat);
+  font-size: var(--gt-font-size-sm);
 }
 
 /* 关键列高亮 */
-.col-key-matched { background: #ecf5ff !important; }
-.col-important-matched { background: #f0f9eb !important; }
-.col-other-matched { background: #fafafa !important; }
+.col-key-matched { background: var(--gt-bg-info) !important; }
+.col-important-matched { background: var(--gt-bg-success) !important; }
+.col-other-matched { background: var(--gt-color-bg) !important; }
 
-:deep(.col-key-matched) { background: #ecf5ff !important; }
-:deep(.col-important-matched) { background: #f0f9eb !important; }
+:deep(.col-key-matched) { background: var(--gt-bg-info) !important; }
+:deep(.col-important-matched) { background: var(--gt-bg-success) !important; }
 
 .column-mapping-header.col-key-matched {
   border-bottom: 2px solid #409eff;
@@ -1878,7 +1878,7 @@ defineExpose({
 .tree-actions { display: flex; gap: var(--gt-space-2); }
 
 .section-title {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   color: var(--gt-color-primary);
   margin: 0;
 }
@@ -1892,7 +1892,7 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   width: 100%;
 }
 .tree-node--editing { background: var(--gt-color-primary-bg); border-radius: 4px; padding: 2px 4px; }
@@ -1903,9 +1903,9 @@ defineExpose({
   min-width: 80px;
   flex-shrink: 0;
 }
-.node-name { color: #333; flex: 1; min-width: 0; }
+.node-name { color: var(--gt-color-text-primary); flex: 1; min-width: 0; }
 .node-name--edited { color: var(--gt-color-primary); font-weight: 600; }
-.node-level { color: #bbb; font-size: 11px; flex-shrink: 0; }
+.node-level { color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs); flex-shrink: 0; }
 .node-edit-btn { opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
 .tree-node:hover .node-edit-btn { opacity: 1; }
 </style>

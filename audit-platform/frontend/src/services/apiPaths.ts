@@ -1332,6 +1332,8 @@ export const eqcr = {
   memoSave: (pid: string) => `/api/eqcr/projects/${pid}/memo`,
   memoFinalize: (pid: string) => `/api/eqcr/projects/${pid}/memo/finalize`,
   memoExport: (pid: string, format = 'docx') => `/api/eqcr/projects/${pid}/memo/export?format=${format}`,
+  // R10 Spec C / F8：备忘录历史版本（最多 5 版）
+  memoVersions: (pid: string) => `/api/eqcr/projects/${pid}/memo/versions`,
   // 任务 13：工时/审批/解锁
   timeSummary: (pid: string) => `/api/eqcr/projects/${pid}/time-summary`,
   approve: (pid: string) => `/api/eqcr/projects/${pid}/approve`,

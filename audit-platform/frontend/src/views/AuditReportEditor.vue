@@ -47,7 +47,7 @@
       style="margin-bottom: 12px"
     >
       <template #title>⚠️ 未更正错报累计金额已超过整体重要性水平</template>
-      <div style="font-size: 12px; margin-top: 4px">
+      <div style="font-size: var(--gt-font-size-xs); margin-top: 4px">
         请在未更正错报汇总表中更正错报或说明不更正原因，否则无法签字定稿
       </div>
     </el-alert>
@@ -94,12 +94,12 @@
           <div class="gt-ar-edit-hint" v-if="!isLocked">
             直接编辑下方文本，修改单位名称、简称、关键审计事项等内容后点击保存
           </div>
-          <div class="gt-ar-edit-hint" v-else-if="report.status === 'eqcr_approved'" style="background: #fff3e0; color: #e65100;">
+          <div class="gt-ar-edit-hint" v-else-if="report.status === 'eqcr_approved'" style="background: var(--gt-color-wheat-light); color: var(--gt-color-wheat);">
             🔒 EQCR 已锁定审计意见，如需修改请联系独立复核合伙人解锁
           </div>
-          <div v-if="knowledgeContextText" class="gt-ar-edit-hint" style="background: #e8f5e9; color: #2e7d32; margin-bottom: 8px;">
+          <div v-if="knowledgeContextText" class="gt-ar-edit-hint" style="background: var(--gt-color-success-light); color: var(--gt-color-success); margin-bottom: 8px;">
             📎 已加载 {{ knowledgeDocCount }} 篇知识库参考文档
-            <el-button size="small" link @click="clearKnowledgeContext" style="margin-left: 8px; color: #2e7d32;">清除</el-button>
+            <el-button size="small" link @click="clearKnowledgeContext" style="margin-left: 8px; color: var(--gt-color-success);">清除</el-button>
           </div>
           <el-input v-model="sectionContent" type="textarea" :rows="20"
             :disabled="isLocked" placeholder="段落内容"
@@ -142,7 +142,7 @@
             <el-option label="否定意见" value="adverse" />
             <el-option label="无法表示意见" value="disclaimer" />
           </el-select>
-          <div v-if="report?.status === 'eqcr_approved'" style="font-size: 12px; color: #e65100; margin-top: 4px">
+          <div v-if="report?.status === 'eqcr_approved'" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-wheat); margin-top: 4px">
             🔒 EQCR 已锁定，意见类型不可修改
           </div>
         </el-form-item>
@@ -160,7 +160,7 @@
         </el-form-item>
         <el-form-item label="单位简称">
           <el-input v-model="genForm.entity_short_name" placeholder="如 XX公司，留空则用全称" />
-          <div style="font-size: 12px; color: #999; margin-top: 4px">
+          <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 4px">
             生成后正文中的简称可随时修改
           </div>
         </el-form-item>

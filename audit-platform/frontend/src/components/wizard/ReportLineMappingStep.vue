@@ -444,13 +444,13 @@ onMounted(() => {
 .page-title {
   color: var(--gt-color-primary);
   margin-bottom: var(--gt-space-1);
-  font-size: 20px;
+  font-size: 20px /* allow-px: special */;
 }
 
 .page-desc {
-  color: #999;
+  color: var(--gt-color-text-tertiary);
   margin-bottom: var(--gt-space-4);
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .toolbar {
@@ -459,7 +459,7 @@ onMounted(() => {
   gap: 12px;
   margin-bottom: var(--gt-space-4);
   padding: 12px 16px;
-  background: #fafafa;
+  background: var(--gt-color-bg);
   border-radius: var(--gt-radius-md);
 }
 

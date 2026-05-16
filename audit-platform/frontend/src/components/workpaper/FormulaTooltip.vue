@@ -86,7 +86,7 @@ function getSourceLabel(formulaType: string): string {
   padding: 8px 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   max-width: 320px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   pointer-events: none;
 }
 
@@ -103,7 +103,7 @@ function getSourceLabel(formulaType: string): string {
 }
 
 .tooltip-source {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
   background: var(--el-fill-color-light);
   padding: 1px 6px;
@@ -129,18 +129,18 @@ function getSourceLabel(formulaType: string): string {
 
 .tooltip-ref {
   color: var(--el-text-color-secondary);
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   margin-top: 2px;
 }
 
 .tooltip-time {
   color: var(--el-text-color-placeholder);
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .tooltip-error {
   color: var(--el-color-danger);
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   margin-top: 2px;
 }
 </style>

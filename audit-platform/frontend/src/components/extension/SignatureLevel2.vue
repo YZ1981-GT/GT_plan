@@ -146,7 +146,7 @@ function onClose() {
   border: 1px solid var(--gt-color-border);
   border-radius: var(--gt-radius-md);
   cursor: crosshair;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   touch-action: none;
 }
 .gt-sig-actions { display: flex; gap: var(--gt-space-2); }

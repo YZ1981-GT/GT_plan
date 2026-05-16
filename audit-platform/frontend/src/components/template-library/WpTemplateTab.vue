@@ -383,7 +383,7 @@ function highlightedName(name: string): string {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #fafafa;
+  background: var(--gt-color-bg);
   border-bottom: 1px solid #ebeef5;
   flex-shrink: 0;
 }
@@ -391,15 +391,15 @@ function highlightedName(name: string): string {
 .gt-wptt-select { width: 140px; }
 .gt-wptt-spacer { flex: 1; }
 .gt-wptt-count {
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
   white-space: nowrap;
 }
 .gt-amt {
   font-family: 'Arial Narrow', Arial, sans-serif;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: #4b2d77;
+  color: var(--gt-color-primary);
 }
 
 /* ─── 主体 ─── */
@@ -418,7 +418,7 @@ function highlightedName(name: string): string {
   padding-right: 8px;
 }
 .gt-wptt-tree :deep(.el-tree-node__content:hover) {
-  background-color: #f5f3fa;
+  background-color: var(--gt-color-primary-bg);
 }
 
 /* ─── 节点样式 ─── */
@@ -426,24 +426,24 @@ function highlightedName(name: string): string {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   flex: 1;
   min-width: 0;
 }
 .gt-wptt-node--cycle {
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .gt-wptt-cycle-icon {
-  color: #4b2d77;
-  font-size: 14px;
+  color: var(--gt-color-primary);
+  font-size: var(--gt-font-size-sm);
 }
 .gt-wptt-cycle-label {
   white-space: nowrap;
 }
 
 .gt-wptt-format-icon {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   flex-shrink: 0;
 }
 .gt-wptt-node-label {
@@ -455,11 +455,11 @@ function highlightedName(name: string): string {
 .gt-wptt-code {
   font-family: 'Arial Narrow', Arial, sans-serif;
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
   white-space: nowrap;
 }
 .gt-wptt-name {
-  color: #606266;
+  color: var(--gt-color-text-regular);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -467,45 +467,45 @@ function highlightedName(name: string): string {
 
 /* 高亮匹配 */
 .gt-wptt-node :deep(.gt-wptt-hl) {
-  background-color: #fff3a3;
-  color: #b54708;
+  background-color: var(--gt-color-wheat-light);
+  color: var(--gt-color-wheat);
   border-radius: 2px;
   padding: 0 1px;
 }
 
 /* 公式标记 */
 .gt-wptt-formula-mark {
-  color: #409eff;
-  font-size: 12px;
+  color: var(--gt-color-teal);
+  font-size: var(--gt-font-size-xs);
   flex-shrink: 0;
 }
 
 /* 组件类型标签 */
 .gt-wptt-comp-tag {
-  font-size: 10px;
+  font-size: var(--gt-font-size-xs);
   padding: 1px 6px;
   border-radius: 8px;
-  background: #f0f2f5;
-  color: #606266;
+  background: var(--gt-color-bg);
+  color: var(--gt-color-text-regular);
   flex-shrink: 0;
   line-height: 1.4;
 }
-.gt-wptt-comp--univer { background: #e1f3ff; color: #1d72b8; }
-.gt-wptt-comp--form { background: #f0e6ff; color: #6a39c4; }
-.gt-wptt-comp--word { background: #ffe9d6; color: #b54708; }
-.gt-wptt-comp--hybrid { background: #e6f7e6; color: #2e7d32; }
+.gt-wptt-comp--univer { background: var(--gt-bg-info); color: var(--gt-color-teal); }
+.gt-wptt-comp--form { background: var(--gt-color-primary-bg); color: var(--gt-color-primary-light); }
+.gt-wptt-comp--word { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); }
+.gt-wptt-comp--hybrid { background: var(--gt-color-success-light); color: var(--gt-color-success); }
 
 /* sheet 数量提示 */
 .gt-wptt-sheets {
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   flex-shrink: 0;
 }
 
 /* 未生成模板灰色显示 */
 .gt-tree-ungenerated .gt-wptt-code,
 .gt-tree-ungenerated .gt-wptt-name {
-  color: #c0c4cc;
+  color: var(--gt-color-text-placeholder);
 }
 .gt-tree-ungenerated .gt-wptt-format-icon {
   opacity: 0.5;

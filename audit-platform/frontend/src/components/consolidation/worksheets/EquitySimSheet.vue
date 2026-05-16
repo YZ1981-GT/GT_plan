@@ -48,7 +48,7 @@
         </el-table-column>
         <el-table-column prop="subject" label="项目" width="160" show-overflow-tooltip>
           <template #default="{ row }">
-            <span v-if="row._isRatioRow" style="font-weight:600;color:#4b2d77">期末持股比例</span>
+            <span v-if="row._isRatioRow" style="font-weight:600;color: var(--gt-color-primary)">期末持股比例</span>
             <span v-else>{{ row.subject }}</span>
           </template>
         </el-table-column>
@@ -56,7 +56,7 @@
         <el-table-column prop="total" label="合计" width="120" align="right">
           <template #default="{ row }">
             <span v-if="row._isRatioRow"></span>
-            <span v-else-if="!row.isStep" class="ws-auto-cell" style="display:block;text-align:right;padding:0 4px;font-size:11px;color:#4b2d77;font-weight:500">
+            <span v-else-if="!row.isStep" class="ws-auto-cell" style="display:block;text-align:right;padding:0 4px;font-size: var(--gt-font-size-xs);color: var(--gt-color-primary);font-weight:500">
               {{ fmt(rowTotal(row)) }}
             </span>
           </template>
@@ -66,11 +66,11 @@
           <template #header>
             <div style="text-align:center;line-height:1.3">
               <div style="font-weight:600">{{ c.name }}</div>
-              <div style="color:#4b2d77;font-size:10px">持股比例 {{ c.ratio }}%</div>
+              <div style="color: var(--gt-color-primary);font-size: var(--gt-font-size-xs)">持股比例 {{ c.ratio }}%</div>
             </div>
           </template>
           <template #default="{ row }">
-            <span v-if="row._isRatioRow" style="font-weight:600;color:#4b2d77;font-size:12px">{{ c.ratio }}%</span>
+            <span v-if="row._isRatioRow" style="font-weight:600;color: var(--gt-color-primary);font-size: var(--gt-font-size-xs)">{{ c.ratio }}%</span>
             <el-input-number v-else-if="!row.isStep && row.values"
               v-model="row.values[ci]" size="small" :precision="2" :controls="false"
               style="width:100%" :class="{ 'ws-auto-cell': row.isComputed }" />
@@ -93,11 +93,11 @@
           <template #header>
             <div style="text-align:center;line-height:1.3">
               <div style="font-weight:600">{{ c.name }}</div>
-              <div style="color:#4b2d77;font-size:10px">{{ c.ratio }}%</div>
+              <div style="color: var(--gt-color-primary);font-size: var(--gt-font-size-xs)">{{ c.ratio }}%</div>
             </div>
           </template>
           <template #default="{ row }">
-            <span v-if="row.key === 'ratio'" style="font-weight:600;color:#4b2d77">{{ c.ratio }}%</span>
+            <span v-if="row.key === 'ratio'" style="font-weight:600;color: var(--gt-color-primary)">{{ c.ratio }}%</span>
             <span v-else-if="row.key === 'diff'" :class="n(row.values?.[ci]) !== 0 ? 'ws-diff-warn' : 'ws-computed'">{{ fmt(row.values?.[ci]) }}</span>
             <span v-else-if="row.key === 'reason'">
               <el-input v-model="diffReasons[ci]" size="small" placeholder="差异原因" />
@@ -111,7 +111,7 @@
 
     <!-- 2. 间接/交叉持股 -->
     <div v-for="(section, si) in indirectSections" :key="si" class="ws-section">
-      <div class="ws-section-title">2. 间接持股权益法模拟 — {{ section.companyName }} <small style="color:#999;margin-left:8px">间接 {{ section.ratio }}%{{ section.indirectHolder ? '（通过' + section.indirectHolder + '）' : '' }}</small></div>
+      <div class="ws-section-title">2. 间接持股权益法模拟 — {{ section.companyName }} <small style="color: var(--gt-color-text-tertiary);margin-left:8px">间接 {{ section.ratio }}%{{ section.indirectHolder ? '（通过' + section.indirectHolder + '）' : '' }}</small></div>
       <el-table :data="section.rows" border size="small" class="ws-table" max-height="400"
         :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
         :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="rowClassName">
@@ -128,7 +128,7 @@
           <template #header>
             <div style="text-align:center;line-height:1.3">
               <div style="font-weight:600">{{ section.companyName }}</div>
-              <div style="color:#1a5fb4;font-size:10px">间接 {{ section.ratio }}%</div>
+              <div style="color: var(--gt-color-teal);font-size: var(--gt-font-size-xs)">间接 {{ section.ratio }}%</div>
             </div>
           </template>
           <template #default="{ row }">
@@ -138,9 +138,9 @@
         </el-table-column>
       </el-table>
       <!-- 间接持股比对区 -->
-      <div style="margin-top:8px;font-size:12px;color:#999;padding:4px 8px;background:#f0f7ff;border-radius:4px;border:1px solid #d0e3f5">
-        🔗 模拟后长投小计: <b style="color:#1a5fb4">{{ fmt(section.endLongInvest) }}</b>
-        &nbsp;|&nbsp; 按比例享有净资产: <b style="color:#1a5fb4">{{ fmt(section.endNetAssetShare) }}</b>
+      <div style="margin-top:8px;font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);padding:4px 8px;background: var(--gt-bg-info);border-radius:4px;border:1px solid #d0e3f5">
+        🔗 模拟后长投小计: <b style="color: var(--gt-color-teal)">{{ fmt(section.endLongInvest) }}</b>
+        &nbsp;|&nbsp; 按比例享有净资产: <b style="color: var(--gt-color-teal)">{{ fmt(section.endNetAssetShare) }}</b>
         &nbsp;|&nbsp; 差异: <b :style="{ color: section.difference !== 0 ? '#e6a23c' : '#67c23a' }">{{ fmt(section.difference) }}</b>
       </div>
     </div>
@@ -150,7 +150,7 @@
       <el-alert type="warning" :closable="false" style="margin-bottom:12px">
         <template #title><span>按"项目+二级明细"匹配导入，读取<b>"数据填写"</b>工作表。</span></template>
       </el-alert>
-      <p v-if="importCount > 0" style="font-size:13px;color:#666">匹配到 <b style="color:#4b2d77">{{ importCount }}</b> 行</p>
+      <p v-if="importCount > 0" style="font-size: var(--gt-font-size-sm);color: var(--gt-color-text-secondary)">匹配到 <b style="color: var(--gt-color-primary)">{{ importCount }}</b> 行</p>
       <el-empty v-else description="未解析到有效数据" :image-size="60" />
       <template #footer>
         <el-button @click="importVisible = false">取消</el-button>
@@ -428,23 +428,23 @@ function confirmImport() {
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
+.ws-sheet-header h3 { margin: 0; font-size: var(--gt-font-size-base); color: var(--gt-color-text-primary); }
 .ws-sheet-actions { display: flex; gap: 8px; }
-.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
-.ws-tip b { color: #4b2d77; }
+.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: var(--gt-color-bg); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
+.ws-tip b { color: var(--gt-color-primary); }
 .ws-section { margin-bottom: 20px; }
-.ws-section-title { font-size: 13px; font-weight: 600; color: #4b2d77; margin-bottom: 6px; padding: 6px 10px; background: #f8f6fb; border-radius: 4px; }
-.ws-computed { color: #4b2d77; font-weight: 500; }
-.ws-zero { color: #c0c4cc !important; font-weight: 400 !important; }
-.ws-diff-warn { color: #e6a23c !important; font-weight: 700 !important; }
-.ws-table :deep(.el-input__inner) { text-align: right; font-size: 11px; }
-.ws-table :deep(.ws-auto-cell .el-input__inner) { color: #4b2d77; font-weight: 500; background: #faf8fd; }
+.ws-section-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary); margin-bottom: 6px; padding: 6px 10px; background: var(--gt-color-primary-bg); border-radius: 4px; }
+.ws-computed { color: var(--gt-color-primary); font-weight: 500; }
+.ws-zero { color: var(--gt-color-text-placeholder) !important; font-weight: 400 !important; }
+.ws-diff-warn { color: var(--gt-color-wheat) !important; font-weight: 700 !important; }
+.ws-table :deep(.el-input__inner) { text-align: right; font-size: var(--gt-font-size-xs); }
+.ws-table :deep(.ws-auto-cell .el-input__inner) { color: var(--gt-color-primary); font-weight: 500; background: var(--gt-color-primary-bg); }
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
-.ws-table :deep(.ws-row-step td) { background: #f8f6fb !important; font-weight: 600; }
-.ws-table :deep(.ws-row-ratio td) { background: #f0edf5 !important; font-weight: 600; }
+.ws-table :deep(.ws-row-step td) { background: var(--gt-color-primary-bg) !important; font-weight: 600; }
+.ws-table :deep(.ws-row-ratio td) { background: var(--gt-color-primary-bg) !important; font-weight: 600; }
 .ws-empty-hint {
-  padding: 16px 20px; background: #fdf6ec; border: 1px solid #faecd8; border-radius: 6px;
-  font-size: 13px; color: #8a6d3b; text-align: center;
+  padding: 16px 20px; background: var(--gt-bg-warning); border: 1px solid #faecd8; border-radius: 6px;
+  font-size: var(--gt-font-size-sm); color: var(--gt-color-wheat); text-align: center;
 }
-.ws-btn-sep { width: 1px; height: 18px; background: #ddd; margin: 0 2px; flex-shrink: 0; }
+.ws-btn-sep { width: 1px; height: 18px; background: var(--gt-color-border-light); margin: 0 2px; flex-shrink: 0; }
 </style>

@@ -241,7 +241,7 @@ function renderMarkdown(text) {
   top: 0;
   bottom: 0;
   width: 380px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-left: 1px solid #e8e8e8;
   display: flex;
   flex-direction: column;
@@ -266,13 +266,13 @@ function renderMarkdown(text) {
 
 .panel-title {
   font-weight: 600;
-  color: #4b2d77;
-  font-size: 15px;
+  color: var(--gt-color-primary);
+  font-size: var(--gt-font-size-base);
 }
 
 .collapse-icon {
-  color: #999;
-  font-size: 12px;
+  color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-xs);
 }
 
 .panel-body {
@@ -284,14 +284,14 @@ function renderMarkdown(text) {
 
 .project-context {
   padding: 8px 16px;
-  background: #f9f7fb;
+  background: var(--gt-color-primary-bg);
   border-bottom: 1px solid #eee;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 
-.context-label { color: #666; }
-.context-value { font-weight: 600; color: #4b2d77; }
-.context-year { color: #999; margin-left: 8px; }
+.context-label { color: var(--gt-color-text-secondary); }
+.context-value { font-weight: 600; color: var(--gt-color-primary); }
+.context-year { color: var(--gt-color-text-tertiary); margin-left: 8px; }
 
 .chat-history {
   flex: 1;
@@ -315,11 +315,11 @@ function renderMarkdown(text) {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: #f0f0f0;
+  background: var(--gt-color-border-lighter);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   flex-shrink: 0;
 }
 
@@ -330,7 +330,7 @@ function renderMarkdown(text) {
   max-width: 75%;
   padding: 8px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   line-height: 1.5;
 }
 
@@ -340,7 +340,7 @@ function renderMarkdown(text) {
 }
 
 .chat-message.assistant .message-content {
-  background: #f5f5f5;
+  background: var(--gt-color-bg);
   border-radius: 4px 12px 12px 12px;
 }
 
@@ -355,14 +355,14 @@ function renderMarkdown(text) {
   align-items: center;
 }
 
-.sources-label { font-size: 11px; color: #999; }
+.sources-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 
 .source-tag {
   background: rgba(75,45,119,0.1);
-  color: #4b2d77;
+  color: var(--gt-color-primary);
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   cursor: pointer;
 }
 
@@ -378,12 +378,12 @@ function renderMarkdown(text) {
 }
 
 .file-upload-area:hover { border-color: #4b2d77; }
-.upload-hint { font-size: 12px; color: #999; }
+.upload-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 
 .chat-input-area {
   padding: 12px;
   border-top: 1px solid #eee;
-  background: #fff;
+  background: var(--gt-color-bg-white);
 }
 
 .chat-input {
@@ -392,7 +392,7 @@ function renderMarkdown(text) {
   border: 1px solid #ddd;
   border-radius: 8px;
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   resize: none;
   font-family: inherit;
   outline: none;
@@ -410,23 +410,23 @@ function renderMarkdown(text) {
 .btn-attach {
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: var(--gt-font-size-xl);
   cursor: pointer;
   padding: 4px 8px;
 }
 
 .btn-send {
-  background: #4b2d77;
-  color: #fff;
+  background: var(--gt-color-primary);
+  color: var(--gt-color-text-inverse);
   border: none;
   padding: 6px 20px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
-.btn-send:disabled { background: #ccc; cursor: not-allowed; }
-.btn-send:hover:not(:disabled) { background: #3d2066; }
+.btn-send:disabled { background: var(--gt-color-border); cursor: not-allowed; }
+.btn-send:hover:not(:disabled) { background: var(--gt-color-primary-dark); }
 
 .markdown-content :deep(h1),
 .markdown-content :deep(h2) {
@@ -435,11 +435,11 @@ function renderMarkdown(text) {
   margin: 8px 0;
 }
 
-.markdown-content :deep(h1) { font-size: 16px; }
-.markdown-content :deep(h2) { font-size: 14px; }
+.markdown-content :deep(h1) { font-size: var(--gt-font-size-md); }
+.markdown-content :deep(h2) { font-size: var(--gt-font-size-sm); }
 .markdown-content :deep(p) { margin: 4px 0; }
 .markdown-content :deep(ul), .markdown-content :deep(ol) { margin: 4px 0; padding-left: 16px; }
 .markdown-content :deep(li) { margin: 2px 0; }
-.markdown-content :deep(pre) { background: #f5f5f5; padding: 8px; border-radius: 4px; overflow-x: auto; }
-.markdown-content :deep(code) { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+.markdown-content :deep(pre) { background: var(--gt-color-bg); padding: 8px; border-radius: 4px; overflow-x: auto; }
+.markdown-content :deep(code) { background: var(--gt-color-border-lighter); padding: 1px 4px; border-radius: 3px; font-size: var(--gt-font-size-xs); }
 </style>

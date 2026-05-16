@@ -300,9 +300,9 @@ onMounted(() => {
 }
 
 .panel-title {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 
 .review-table {
@@ -314,34 +314,34 @@ onMounted(() => {
 }
 
 .section-title {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #606266;
+  color: var(--gt-color-text-regular);
   margin-bottom: 12px;
 }
 
 .timeline-level {
   font-weight: 600;
   margin: 0 0 4px;
-  color: #409eff;
+  color: var(--gt-color-teal);
 }
 
 .timeline-status {
   margin: 0 0 4px;
-  color: #909399;
-  font-size: 12px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-xs);
 }
 
 .timeline-comment {
   margin: 4px 0 0;
-  color: #606266;
-  font-size: 13px;
+  color: var(--gt-color-text-regular);
+  font-size: var(--gt-font-size-sm);
 }
 
 .timeline-reply {
   margin: 8px 0 0;
-  color: #67c23a;
-  font-size: 13px;
+  color: var(--gt-color-success);
+  font-size: var(--gt-font-size-sm);
 }
 
 .reply-section {
@@ -349,13 +349,13 @@ onMounted(() => {
 }
 
 .reply-label {
-  font-size: 13px;
-  color: #909399;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-info);
   margin: 0 0 8px;
 }
 
 .reply-content {
-  color: #303133;
+  color: var(--gt-color-text-primary);
   margin: 0 0 12px;
   line-height: 1.6;
 }

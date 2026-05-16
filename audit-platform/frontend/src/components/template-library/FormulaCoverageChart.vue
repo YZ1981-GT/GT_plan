@@ -357,14 +357,14 @@ onMounted(() => {
   flex-direction: column;
   gap: 12px;
   padding: 16px 20px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 8px;
   border: 1px solid #ebeef5;
   border-left: 3px solid #4b2d77;
 }
 .gt-fcc-card-label {
-  font-size: 13px;
-  color: #909399;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-info);
   font-weight: 500;
 }
 .gt-fcc-card-main {
@@ -374,13 +374,13 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 .gt-fcc-pct {
-  font-size: 32px;
+  font-size: 32px /* allow-px: special */;
   font-weight: 700;
   line-height: 1;
 }
 .gt-fcc-card-sub {
-  font-size: 13px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
 }
 .gt-amt {
   font-family: 'Arial Narrow', Arial, sans-serif;
@@ -389,17 +389,17 @@ onMounted(() => {
 }
 
 /* ─── 颜色编码 ─── */
-.gt-fcc-c--green { color: #67c23a; }
-.gt-fcc-c--yellow { color: #e6a23c; }
-.gt-fcc-c--red { color: #f56c6c; }
+.gt-fcc-c--green { color: var(--gt-color-success); }
+.gt-fcc-c--yellow { color: var(--gt-color-wheat); }
+.gt-fcc-c--red { color: var(--gt-color-coral); }
 
 /* ─── 图例 ─── */
 .gt-fcc-legend {
   display: flex;
   gap: 24px;
   padding: 0 4px;
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
 }
 .gt-fcc-legend-item {
   display: inline-flex;
@@ -412,13 +412,13 @@ onMounted(() => {
   height: 10px;
   border-radius: 50%;
 }
-.gt-fcc-dot.gt-fcc-c--green { background: #67c23a; }
-.gt-fcc-dot.gt-fcc-c--yellow { background: #e6a23c; }
-.gt-fcc-dot.gt-fcc-c--red { background: #f56c6c; }
+.gt-fcc-dot.gt-fcc-c--green { background: var(--gt-color-success); }
+.gt-fcc-dot.gt-fcc-c--yellow { background: var(--gt-color-wheat); }
+.gt-fcc-dot.gt-fcc-c--red { background: var(--gt-color-coral); }
 
 /* ─── 分组段落 ─── */
 .gt-fcc-section {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 8px;
   border: 1px solid #ebeef5;
   padding: 12px 16px;
@@ -431,18 +431,18 @@ onMounted(() => {
 }
 .gt-fcc-section-title {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .gt-fcc-section-meta {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 
 /* ─── 表格 ─── */
 .gt-fcc-table :deep(.el-table__row:hover > td) {
-  background-color: #faf9fc !important;
+  background-color: var(--gt-color-primary-bg) !important;
 }
 
 .gt-fcc-coverage-cell {
@@ -465,9 +465,9 @@ onMounted(() => {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 4px;
-  background: #f0edf5;
-  color: #4b2d77;
-  font-size: 12px;
+  background: var(--gt-color-primary-bg);
+  color: var(--gt-color-primary);
+  font-size: var(--gt-font-size-xs);
   font-weight: 500;
 }
 
@@ -476,12 +476,12 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .gt-fcc-warn-icon {
-  color: #e6a23c;
+  color: var(--gt-color-wheat);
 }
 
 /* ─── 无公式清单网格 ─── */
@@ -496,10 +496,10 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: #fff7e6;
+  background: var(--gt-color-wheat-light);
   border-radius: 4px;
   border-left: 3px solid #e6a23c;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .gt-fcc-no-formula-cycle {
   display: inline-block;
@@ -508,20 +508,20 @@ onMounted(() => {
   line-height: 22px;
   text-align: center;
   border-radius: 50%;
-  background: #4b2d77;
-  color: #fff;
-  font-size: 11px;
+  background: var(--gt-color-primary);
+  color: var(--gt-color-text-inverse);
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
   flex-shrink: 0;
 }
 .gt-fcc-no-formula-code {
   font-family: 'Arial Narrow', Arial, sans-serif;
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .gt-fcc-no-formula-name {
-  color: #606266;
-  font-size: 12px;
+  color: var(--gt-color-text-regular);
+  font-size: var(--gt-font-size-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

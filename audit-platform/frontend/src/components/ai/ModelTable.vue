@@ -91,6 +91,6 @@ function providerTag(p: AIProvider): '' | 'success' | 'warning' | 'info' | 'dang
 }
 .endpoint-text {
   color: var(--gt-color-text-secondary);
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 </style>

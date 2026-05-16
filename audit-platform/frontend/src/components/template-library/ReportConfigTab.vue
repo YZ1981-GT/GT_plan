@@ -506,22 +506,22 @@ function onEditFormula(row: ReportConfigRow) {
   flex-wrap: wrap;
   gap: 16px;
   padding: 8px 12px;
-  background: #faf9fc;
+  background: var(--gt-color-primary-bg);
   border-radius: 6px;
   border-left: 3px solid #4b2d77;
   flex-shrink: 0;
 }
 .gt-rct-stats-item {
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
 }
 .gt-rct-stats-pct {
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
-.gt-rct-stats-formula { color: #409eff; }
-.gt-rct-stats-total { color: #e6a23c; }
-.gt-rct-stats-warn { color: #f56c6c; }
+.gt-rct-stats-formula { color: var(--gt-color-teal); }
+.gt-rct-stats-total { color: var(--gt-color-wheat); }
+.gt-rct-stats-warn { color: var(--gt-color-coral); }
 
 .gt-amt {
   font-family: 'Arial Narrow', Arial, sans-serif;
@@ -545,7 +545,7 @@ function onEditFormula(row: ReportConfigRow) {
 .gt-rct-tab-label {
   display: inline-flex;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 /* ─── Pane ─── */
@@ -564,13 +564,13 @@ function onEditFormula(row: ReportConfigRow) {
 .gt-rct-search { width: 280px; }
 .gt-rct-spacer { flex: 1; min-width: 8px; }
 .gt-rct-filtered {
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
 }
 
 /* ─── 分组 ─── */
 .gt-rct-group {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #ebeef5;
   border-radius: 8px;
   overflow: hidden;
@@ -580,18 +580,18 @@ function onEditFormula(row: ReportConfigRow) {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  background: #faf9fc;
+  background: var(--gt-color-primary-bg);
   border-bottom: 1px solid #ebeef5;
   border-left: 3px solid #4b2d77;
 }
 .gt-rct-group-title {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 700;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .gt-rct-group-stats {
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
 }
 
 /* ─── 表格 ─── */
@@ -602,18 +602,18 @@ function onEditFormula(row: ReportConfigRow) {
 .gt-rct-table :deep(.el-table__row.gt-rct-row--total > td) {
   font-weight: 700 !important;
   border-top: 2px solid #4b2d77 !important;
-  background-color: #faf9fc !important;
+  background-color: var(--gt-color-primary-bg) !important;
 }
 /* 有公式行：浅蓝背景 */
 .gt-rct-table :deep(.el-table__row.gt-rct-row--has-formula > td) {
   background-color: rgba(64, 158, 255, 0.04) !important;
 }
 .gt-rct-table :deep(.el-table__row.gt-rct-row--total.gt-rct-row--has-formula > td) {
-  background-color: #faf9fc !important;
+  background-color: var(--gt-color-primary-bg) !important;
 }
 /* 无效引用行：浅红 */
 .gt-rct-table :deep(.el-table__row.gt-rct-row--invalid > td) {
-  background-color: #fef2f2 !important;
+  background-color: var(--gt-bg-danger) !important;
   border-left: 3px solid #f56c6c;
 }
 
@@ -621,38 +621,38 @@ function onEditFormula(row: ReportConfigRow) {
 .gt-rct-row-code {
   display: inline-block;
   font-family: 'Consolas', 'Courier New', monospace;
-  background: #f5f5f7;
+  background: var(--gt-color-bg);
   padding: 1px 6px;
   border-radius: 3px;
-  font-size: 11px;
-  color: #4b2d77;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-primary);
 }
 
 .gt-rct-row-name {
   display: inline-block;
-  font-size: 13px;
-  color: #303133;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-primary);
 }
 .gt-rct-row-name--total {
   font-weight: 700;
-  color: #4b2d77;
+  color: var(--gt-color-primary);
 }
 .gt-rct-total-mark {
   display: inline-block;
   margin-right: 4px;
-  color: #e6a23c;
+  color: var(--gt-color-wheat);
   font-weight: 700;
 }
 
 .gt-rct-formula {
   display: inline-block;
   padding: 2px 6px;
-  background: #f5f5f7;
+  background: var(--gt-color-bg);
   border: 1px solid #e0e0e0;
   border-radius: 3px;
   font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 11px;
-  color: #1d72b8;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-teal);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -666,25 +666,25 @@ function onEditFormula(row: ReportConfigRow) {
   margin: 2px 0;
 }
 .gt-rct-em {
-  color: #c0c4cc;
-  font-size: 12px;
+  color: var(--gt-color-text-placeholder);
+  font-size: var(--gt-font-size-xs);
 }
 
 /* 公式类别 */
-.gt-rct-cat--auto_calc { background: #e1f3ff; color: #1d72b8; }
-.gt-rct-cat--logic_check { background: #ffe9d6; color: #b54708; }
-.gt-rct-cat--reasonability { background: #f0e6ff; color: #6a39c4; }
+.gt-rct-cat--auto_calc { background: var(--gt-bg-info); color: var(--gt-color-teal); }
+.gt-rct-cat--logic_check { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); }
+.gt-rct-cat--reasonability { background: var(--gt-color-primary-bg); color: var(--gt-color-primary-light); }
 
 /* 编辑公式对话框 */
 .gt-rct-edit-info {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .gt-rct-edit-info > div {
   padding: 8px 12px;
-  background: #faf9fc;
+  background: var(--gt-color-primary-bg);
   border-radius: 4px;
 }
 </style>

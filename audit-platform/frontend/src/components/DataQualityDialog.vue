@@ -9,7 +9,7 @@
     <!-- Loading -->
     <div v-if="loading" style="text-align: center; padding: 40px 0">
       <el-icon class="is-loading" :size="32"><Loading /></el-icon>
-      <p style="margin-top: 12px; color: #909399">正在执行数据质量检查...</p>
+      <p style="margin-top: 12px; color: var(--gt-color-info)">正在执行数据质量检查...</p>
     </div>
 
     <!-- Results -->
@@ -72,7 +72,7 @@
                   <el-table-column prop="expected_closing" label="预期期末" width="120" align="right" />
                   <el-table-column prop="difference" label="差异" width="100" align="right">
                     <template #default="{ row }">
-                      <span style="color: #f56c6c; font-weight: 600">{{ row.difference }}</span>
+                      <span style="color: var(--gt-color-coral); font-weight: 600">{{ row.difference }}</span>
                     </template>
                   </el-table-column>
                 </el-table>
@@ -98,7 +98,7 @@
 
     <!-- Error state -->
     <div v-else-if="error" style="text-align: center; padding: 40px 0">
-      <p style="color: #f56c6c">{{ error }}</p>
+      <p style="color: var(--gt-color-coral)">{{ error }}</p>
     </div>
 
     <template #footer>
@@ -198,20 +198,20 @@ function getTagType(status: string): 'success' | 'warning' | 'danger' | 'info' {
   align-items: center;
   gap: 16px;
   padding: 12px 16px;
-  background: #f5f7fa;
+  background: var(--gt-bg-subtle);
   border-radius: 8px;
   margin-bottom: 16px;
 }
 
 .dq-summary__item {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 500;
 }
 
 .dq-summary__total {
   margin-left: auto;
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 
 .dq-checks {
@@ -233,12 +233,12 @@ function getTagType(status: string): 'success' | 'warning' | 'danger' | 'info' {
 
 .dq-check-item--warning {
   border-left: 3px solid #e6a23c;
-  background: #fdf6ec;
+  background: var(--gt-bg-warning);
 }
 
 .dq-check-item--blocking {
   border-left: 3px solid #f56c6c;
-  background: #fef0f0;
+  background: var(--gt-bg-danger);
 }
 
 .dq-check-header {
@@ -248,19 +248,19 @@ function getTagType(status: string): 'success' | 'warning' | 'danger' | 'info' {
 }
 
 .dq-check-icon {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
 }
 
 .dq-check-title {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 500;
   flex: 1;
 }
 
 .dq-check-message {
   margin-top: 6px;
-  font-size: 13px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
   padding-left: 24px;
 }
 

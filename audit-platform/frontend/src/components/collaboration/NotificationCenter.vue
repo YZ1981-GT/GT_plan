@@ -19,7 +19,7 @@
 
       <div class="notif-header">
         <span class="notif-title">通知中心</span>
-        <el-button size="small" text @click="markAllRead" style="font-size:11px;color:#4b2d77">全部已读</el-button>
+        <el-button size="small" text @click="markAllRead" style="font-size: var(--gt-font-size-xs);color: var(--gt-color-primary)">全部已读</el-button>
       </div>
 
       <!-- 分类 Tab -->
@@ -203,7 +203,7 @@ function formatTime(iso: string) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff !important;
+  color: var(--gt-color-text-inverse) !important;
   border-radius: 8px;
   transition: background 0.15s;
 }
@@ -215,7 +215,7 @@ function formatTime(iso: string) {
   align-items: center;
   margin-bottom: 8px;
 }
-.notif-title { font-weight: 600; font-size: 13px; color: #303133; }
+.notif-title { font-weight: 600; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-primary); }
 .notif-divider { margin: 0 0 8px; }
 .notif-empty { padding: 16px 0; text-align: center; }
 .notif-list { max-height: 320px; overflow-y: auto; }
@@ -229,25 +229,25 @@ function formatTime(iso: string) {
   transition: background 0.15s;
   margin-bottom: 2px;
 }
-.notif-item:hover { background: #f5f3f8; }
-.notif-item.unread { background: #f0ecf7; }
+.notif-item:hover { background: var(--gt-color-primary-bg); }
+.notif-item.unread { background: var(--gt-color-primary-bg); }
 .notif-icon-wrap { padding-top: 1px; flex-shrink: 0; }
 .notif-body { flex: 1; min-width: 0; }
-.notif-item-title { font-size: 12px; font-weight: 500; color: #303133; line-height: 1.4; }
+.notif-item-title { font-size: var(--gt-font-size-xs); font-weight: 500; color: var(--gt-color-text-primary); line-height: 1.4; }
 .notif-item-content {
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.notif-time { font-size: 10px; color: #c0c4cc; margin-top: 3px; }
+.notif-time { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); margin-top: 3px; }
 .unread-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #4b2d77;
+  background: var(--gt-color-primary);
   flex-shrink: 0;
   margin-top: 4px;
 }
@@ -258,6 +258,6 @@ function formatTime(iso: string) {
   border-top: 1px solid #f0edf5;
 }
 .notif-tabs :deep(.el-tabs__header) { margin-bottom: 8px; }
-.notif-tabs :deep(.el-tabs__item) { font-size: 12px; padding: 0 10px; height: 28px; line-height: 28px; }
+.notif-tabs :deep(.el-tabs__item) { font-size: var(--gt-font-size-xs); padding: 0 10px; height: 28px; line-height: 28px; }
 .notif-tabs :deep(.el-tabs__nav-wrap::after) { height: 1px; }
 </style>

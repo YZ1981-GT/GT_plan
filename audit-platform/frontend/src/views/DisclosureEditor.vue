@@ -126,7 +126,7 @@
               @click="onFlatItemClick(note)"
             >
               <span class="gt-de-flat-item-title">{{ note.section_title }}</span>
-              <el-tag v-if="(note as any).scope === 'consolidated_only'" size="small" type="warning" style="font-size: 10px">合并</el-tag>
+              <el-tag v-if="(note as any).scope === 'consolidated_only'" size="small" type="warning" style="font-size: var(--gt-font-size-xs)">合并</el-tag>
             </div>
           </div>
           <div v-if="!filteredTreeData.length && !treeLoading" class="gt-de-empty-hint">
@@ -219,7 +219,7 @@
                   </template>
                 </el-table-column>
               </el-table>
-              <div v-else-if="activeTableData?.headers?.length" style="font-size: 12px; color: #999; padding: 10px; text-align: center; border: 1px dashed #e8e4f0; border-radius: 6px;">
+              <div v-else-if="activeTableData?.headers?.length" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); padding: 10px; text-align: center; border: 1px dashed #e8e4f0; border-radius: 6px;">
                 该表格暂无数据行（可在编辑模式下添加）
               </div>
             </div>
@@ -242,7 +242,7 @@
                 </el-button-group>
                 <span v-if="knowledgeContextText" class="gt-de-ai-hint" style="color: var(--gt-color-teal, #36b37e)">
                   📎 已加载 {{ knowledgeDocCount }} 篇参考文档
-                  <el-button size="small" link @click="clearKnowledgeContext" style="margin-left: 4px; font-size: 11px">清除</el-button>
+                  <el-button size="small" link @click="clearKnowledgeContext" style="margin-left: 4px; font-size: var(--gt-font-size-xs)">清除</el-button>
                 </span>
               </div>
             </div>
@@ -250,8 +250,8 @@
             <!-- AI改写弹窗 -->
             <el-dialog v-model="aiRewriteDialogVisible" title="AI 改写" width="520px" append-to-body>
               <div style="margin-bottom: 12px;">
-                <div style="font-size: 12px; color: #999; margin-bottom: 6px;">选中的文本：</div>
-                <div style="background: #f9f7fd; padding: 10px; border-radius: 6px; font-size: 13px; line-height: 1.6; max-height: 120px; overflow-y: auto;">{{ aiSelectedText }}</div>
+                <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-bottom: 6px;">选中的文本：</div>
+                <div style="background: var(--gt-color-primary-bg); padding: 10px; border-radius: 6px; font-size: var(--gt-font-size-sm); line-height: 1.6; max-height: 120px; overflow-y: auto;">{{ aiSelectedText }}</div>
               </div>
               <el-input v-model="aiRewriteInstruction" type="textarea" :rows="2" placeholder="改写指令，如：使其更加专业规范 / 简化表述 / 补充细节" />
               <template #footer>
@@ -353,7 +353,7 @@
 
     <!-- 附注转换规则弹窗（国企↔上市） -->
     <el-dialog v-model="showNoteMappingDialog" title="附注 国企版 ↔ 上市版 转换规则" width="75%" top="5vh" append-to-body destroy-on-close>
-      <p style="font-size: 12px; color: #888; margin-bottom: 10px;">
+      <p style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); margin-bottom: 10px;">
         配置国企版与上市版附注章节的映射关系。切换模板类型时，系统将按此规则自动转换附注内容。
       </p>
       <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;">
@@ -366,28 +366,28 @@
           @applied="onNoteMappingApplied"
         />
         <span style="flex: 1;" />
-        <span style="font-size: 11px; color: #999;">{{ noteMappingRules.length }} 条规则</span>
+        <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">{{ noteMappingRules.length }} 条规则</span>
       </div>
       <el-table :data="noteMappingRules" size="small" border max-height="55vh"
         :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', whiteSpace: 'nowrap' }">
         <el-table-column label="国企版章节" min-width="200">
           <template #default="{ row }">
-            <span style="font-size: 12px;">{{ row.soe_section }}</span>
+            <span style="font-size: var(--gt-font-size-xs);">{{ row.soe_section }}</span>
           </template>
         </el-table-column>
         <el-table-column label="→" width="40" align="center">
-          <template #default><span style="color: #ccc;">→</span></template>
+          <template #default><span style="color: var(--gt-color-text-placeholder);">→</span></template>
         </el-table-column>
         <el-table-column label="上市版章节" min-width="200">
           <template #default="{ row }">
             <el-input v-if="row._editing" v-model="row.listed_section" size="small" />
-            <span v-else style="font-size: 12px;">{{ row.listed_section || '—' }}</span>
+            <span v-else style="font-size: var(--gt-font-size-xs);">{{ row.listed_section || '—' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="60" align="center">
           <template #default="{ row }">
-            <span v-if="row.listed_section" style="color: #1e8a38;">✓</span>
-            <span v-else style="color: #ccc;">—</span>
+            <span v-if="row.listed_section" style="color: var(--gt-color-success);">✓</span>
+            <span v-else style="color: var(--gt-color-text-placeholder);">—</span>
           </template>
         </el-table-column>
       </el-table>
@@ -1395,16 +1395,16 @@ async function onGenerate() {
   const ok = await showGuide(
     'note_generate',
     '📝 生成附注',
-    `<div style="line-height:1.8;font-size:13px">
+    `<div style="line-height:1.8;font-size: var(--gt-font-size-sm)">
       <p>将根据 <b>${tplLabel}</b> 模板生成全部附注章节。</p>
-      <p style="color:#909399;font-size:12px;margin-top:6px">请确认以下准备工作已完成：</p>
+      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">请确认以下准备工作已完成：</p>
       <ul style="padding-left:18px;margin:4px 0">
-        <li><span style="color:#e6a23c">⚠</span> 已选择正确的模板类型（当前：${tplLabel}）</li>
-        <li><span style="color:#e6a23c">⚠</span> 建议先完成报表生成，附注表格将自动从试算表取数</li>
-        <li><span style="color:#e6a23c">⚠</span> 如有上年附注，建议先上传到知识库供 AI 参照</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 已选择正确的模板类型（当前：${tplLabel}）</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 建议先完成报表生成，附注表格将自动从试算表取数</li>
+        <li><span style="color: var(--gt-color-wheat)">⚠</span> 如有上年附注，建议先上传到知识库供 AI 参照</li>
       </ul>
-      <p style="color:#67c23a;font-size:12px;margin-top:6px">✓ 将生成 170+ 个附注章节（含表格和正文），已有数据将被重新生成</p>
-      <p style="color:#909399;font-size:12px">💡 生成后可使用 AI 续写/改写功能辅助编写会计政策等文字内容</p>
+      <p style="color: var(--gt-color-success);font-size: var(--gt-font-size-xs);margin-top:6px">✓ 将生成 170+ 个附注章节（含表格和正文），已有数据将被重新生成</p>
+      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs)">💡 生成后可使用 AI 续写/改写功能辅助编写会计政策等文字内容</p>
     </div>`,
     '开始生成',
   )
@@ -1809,7 +1809,7 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
   display: flex; flex-direction: column; overflow: hidden;
 }
 .gt-de-sidebar-title {
-  padding: 10px 14px 6px; font-size: 12px; font-weight: 600; color: #666;
+  padding: 10px 14px 6px; font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-text-secondary);
   text-transform: uppercase; letter-spacing: 1px;
 }
 
@@ -1818,7 +1818,7 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
   padding: 8px 12px; border-bottom: 1px solid #f0f0f0;
 }
 .gt-de-unit-name {
-  font-size: 13px; font-weight: 600; color: var(--gt-color-primary);
+  font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;
 }
 
@@ -1827,36 +1827,36 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
   display: flex; align-items: center; gap: 6px; padding: 6px 10px;
 }
 .gt-de-view-toggle .el-radio-group { flex-shrink: 0; }
-.gt-de-view-toggle .el-button { font-size: 11px; padding: 0 4px; }
+.gt-de-view-toggle .el-button { font-size: var(--gt-font-size-xs); padding: 0 4px; }
 
 /* 平铺视图 */
 .gt-de-flat-list { flex: 1; overflow-y: auto; padding: 0 4px 8px; }
 .gt-de-flat-item {
   display: flex; align-items: center; gap: 6px;
-  padding: 6px 10px; font-size: 12px; cursor: pointer;
+  padding: 6px 10px; font-size: var(--gt-font-size-xs); cursor: pointer;
   border-radius: 4px; color: var(--gt-color-text);
   transition: background 0.15s;
 }
-.gt-de-flat-item:hover { background: #f5f0ff; }
-.gt-de-flat-item--active { background: #ece6f5; font-weight: 600; color: var(--gt-color-primary); }
+.gt-de-flat-item:hover { background: var(--gt-color-primary-bg); }
+.gt-de-flat-item--active { background: var(--gt-color-primary-bg); font-weight: 600; color: var(--gt-color-primary); }
 .gt-de-flat-item-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-de-tree-search { margin: 0 10px 8px; width: calc(100% - 20px); }
 .gt-de-tree-wrap { flex: 1; overflow-y: auto; padding: 0 4px 8px; }
 .gt-de-tree-wrap :deep(.el-tree) { background: transparent; --el-tree-node-hover-bg-color: #f5f0ff; }
 .gt-de-tree-wrap :deep(.el-tree-node__content) { height: 32px; border-radius: 4px; }
-.gt-de-tree-wrap :deep(.el-tree-node.is-current > .el-tree-node__content) { background: #ece6f5; }
+.gt-de-tree-wrap :deep(.el-tree-node.is-current > .el-tree-node__content) { background: var(--gt-color-primary-bg); }
 .gt-de-tree-node {
-  display: flex; align-items: center; gap: 6px; width: 100%; font-size: 12px; padding: 0 4px;
+  display: flex; align-items: center; gap: 6px; width: 100%; font-size: var(--gt-font-size-xs); padding: 0 4px;
 }
 .gt-de-tree-num {
-  font-size: 10px; color: #4b2d77; background: #f0ecf5; padding: 1px 5px;
+  font-size: var(--gt-font-size-xs); color: var(--gt-color-primary); background: var(--gt-color-primary-bg); padding: 1px 5px;
   border-radius: 3px; font-weight: 600; min-width: 36px; text-align: center; white-space: nowrap;
 }
-.gt-de-tree-label { color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gt-de-tree-node-active .gt-de-tree-num { background: #4b2d77; color: #fff; }
-.gt-de-tree-node-active .gt-de-tree-label { color: #4b2d77; font-weight: 600; }
+.gt-de-tree-label { color: var(--gt-color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gt-de-tree-node-active .gt-de-tree-num { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); }
+.gt-de-tree-node-active .gt-de-tree-label { color: var(--gt-color-primary); font-weight: 600; }
 .gt-de-tree-group {
-  font-size: 12px; font-weight: 600; color: #555; padding: 2px 0;
+  font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-text-regular); padding: 2px 0;
 }
 .gt-de-tree-group-label { white-space: nowrap; }
 .gt-de-tree-wrap :deep(.el-tree-node__children) { padding-left: 2px; }
@@ -1871,8 +1871,8 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
   display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;
   padding-bottom: 10px; border-bottom: 1px solid #f0ecf5;
 }
-.gt-de-section-title { margin: 0; font-size: 15px; font-weight: 600; color: #333; }
-.gt-de-section-account { font-size: 11px; color: #999; margin-top: 2px; display: block; }
+.gt-de-section-title { margin: 0; font-size: var(--gt-font-size-base); font-weight: 600; color: var(--gt-color-text-primary); }
+.gt-de-section-account { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px; display: block; }
 .gt-de-editor-footer { margin-top: 12px; text-align: right; padding-top: 10px; border-top: 1px solid #f0ecf5; }
 
 /* ── 右侧校验 ── */
@@ -1881,34 +1881,34 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
   background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   overflow-y: auto; padding-bottom: 8px;
 }
-.gt-de-empty-hint { color: #bbb; font-size: 12px; text-align: center; padding: 30px 10px; }
-.gt-de-finding-item { padding: 8px 12px; border-bottom: 1px solid #f5f3f8; font-size: 12px; }
+.gt-de-empty-hint { color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs); text-align: center; padding: 30px 10px; }
+.gt-de-finding-item { padding: 8px 12px; border-bottom: 1px solid #f5f3f8; font-size: var(--gt-font-size-xs); }
 .gt-de-finding-item.gt-de-severity-error { border-left: 3px solid #FF5149; }
 .gt-de-finding-item.gt-de-severity-warning { border-left: 3px solid #e6a23c; }
 .gt-de-finding-item.gt-de-severity-info { border-left: 3px solid #bbb; }
 .gt-de-finding-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.gt-de-finding-type { font-size: 10px; color: #999; }
-.gt-de-finding-section { font-size: 10px; color: #bbb; }
-.gt-de-finding-msg { font-size: 12px; color: #555; margin-top: 2px; }
-.gt-de-finding-values { font-size: 10px; color: #999; margin-top: 2px; }
+.gt-de-finding-type { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.gt-de-finding-section { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); }
+.gt-de-finding-msg { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); margin-top: 2px; }
+.gt-de-finding-values { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px; }
 
 /* ── 表格 ── */
 .gt-de-main :deep(.el-table) { --el-table-border-color: #e8e4f0; }
 .gt-de-main :deep(.el-table th.el-table__cell) {
-  background: #f8f6fb !important; font-size: 12px; font-weight: 600; color: #555; white-space: nowrap;
+  background: var(--gt-color-primary-bg) !important; font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-text-regular); white-space: nowrap;
 }
-.gt-de-main :deep(.el-table td.el-table__cell) { font-size: 12px; padding: 6px 0; }
+.gt-de-main :deep(.el-table td.el-table__cell) { font-size: var(--gt-font-size-xs); padding: 6px 0; }
 .total-label { font-weight: 700; }
 .total-val { font-weight: 700; }
 .gt-cell-wrapper { display: flex; align-items: center; gap: 4px; }
-.gt-cell-source { font-size: 10px; cursor: help; }
-.gt-cell-manual { font-size: 10px; cursor: help; }
-.gt-prior-year-val { color: #bbb; font-style: italic; font-size: 12px; }
-.gt-formula-mismatch { color: #FF5149 !important; font-weight: 700; text-decoration: underline wavy #FF5149; }
+.gt-cell-source { font-size: var(--gt-font-size-xs); cursor: help; }
+.gt-cell-manual { font-size: var(--gt-font-size-xs); cursor: help; }
+.gt-prior-year-val { color: var(--gt-color-text-placeholder); font-style: italic; font-size: var(--gt-font-size-xs); }
+.gt-formula-mismatch { color: var(--gt-color-coral) !important; font-weight: 700; text-decoration: underline wavy #FF5149; }
 
 /* 自动填充单元格浅蓝色背景 */
 .gt-cell-auto-fill {
-  background-color: #e8f4fd;
+  background-color: var(--gt-bg-info);
   border-radius: 2px;
   padding: 1px 4px;
 }
@@ -1929,18 +1929,18 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
 
 /* ── 左侧目录树校验错误标记 ── */
 .gt-de-tree-error-dot {
-  color: #FF5149;
-  font-size: 8px;
+  color: var(--gt-color-coral);
+  font-size: 8px; /* allow-px: special (tree-error-dot 装饰圆点，小于最小 token 12px) */
   margin-left: 4px;
   flex-shrink: 0;
 }
 .gt-de-tree-node-error .gt-de-tree-label {
-  color: #FF5149;
+  color: var(--gt-color-coral);
 }
 .gt-de-tree-error-badge {
-  background: #FF5149;
-  color: #fff;
-  font-size: 10px;
+  background: var(--gt-color-coral);
+  color: var(--gt-color-text-inverse);
+  font-size: var(--gt-font-size-xs);
   padding: 0 5px;
   border-radius: 8px;
   margin-left: 6px;
@@ -1952,17 +1952,17 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
 
 /* ── TipTap ── */
 .gt-de-tiptap-wrapper { border: 1px solid #e8e4f0; border-radius: 6px; margin-top: 10px; }
-.gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid #e8e4f0; background: #faf8fd; border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.gt-de-toolbar-divider { width: 1px; height: 20px; background: #d8d0e8; margin: 0 6px; }
-.gt-de-ai-hint { font-size: 11px; color: #b0a4c8; margin-left: 8px; white-space: nowrap; }
-.gt-de-saved-badge { font-size: 11px; color: #67c23a; font-weight: 400; margin-left: 8px; background: #f0f9eb; padding: 1px 8px; border-radius: 10px; }
-.gt-de-tiptap-content { padding: 12px; min-height: 200px; font-size: 13px; line-height: 1.8; }
+.gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid #e8e4f0; background: var(--gt-color-primary-bg); border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.gt-de-toolbar-divider { width: 1px; height: 20px; background: var(--gt-color-primary-lighter); margin: 0 6px; }
+.gt-de-ai-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-primary-lighter); margin-left: 8px; white-space: nowrap; }
+.gt-de-saved-badge { font-size: var(--gt-font-size-xs); color: var(--gt-color-success); font-weight: 400; margin-left: 8px; background: var(--gt-bg-success); padding: 1px 8px; border-radius: 10px; }
+.gt-de-tiptap-content { padding: 12px; min-height: 200px; font-size: var(--gt-font-size-sm); line-height: 1.8; }
 .gt-de-tiptap-content :deep(.ProseMirror) { outline: none; min-height: 180px; }
 .gt-de-tiptap-content :deep(.ProseMirror p) { margin-bottom: 10px; text-indent: 2em; }
-.gt-de-tiptap-content :deep(.ProseMirror p.is-editor-empty:first-child::before) { color: #adb5bd; content: attr(data-placeholder); float: left; height: 0; pointer-events: none; text-indent: 0; }
+.gt-de-tiptap-content :deep(.ProseMirror p.is-editor-empty:first-child::before) { color: var(--gt-color-text-placeholder); content: attr(data-placeholder); float: left; height: 0; pointer-events: none; text-indent: 0; }
 
 /* ── AI 工具栏 (Req 48) ── */
-.gt-de-ai-toolbar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-top: 1px solid #ebeef5; background: #faf8fd; flex-wrap: wrap; }
+.gt-de-ai-toolbar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-top: 1px solid #ebeef5; background: var(--gt-color-primary-bg); flex-wrap: wrap; }
 
 /* ── 表格结构编辑工具栏 (Req 38) ── */
 .gt-de-structure-toolbar {

@@ -167,7 +167,7 @@
                 <el-col :span="12">
                   <div class="sub-card">
                     <h4 class="sub-card-title">📅 未来一周安排</h4>
-                    <div v-if="staffDetail.next_week_projects.length === 0" style="color: #ccc; text-align: center; padding: 40px 0">暂无安排，可委派新任务</div>
+                    <div v-if="staffDetail.next_week_projects.length === 0" style="color: var(--gt-color-text-placeholder); text-align: center; padding: 40px 0">暂无安排，可委派新任务</div>
                     <div v-for="(np, i) in staffDetail.next_week_projects" :key="i" class="schedule-item">
                       <div class="schedule-dot" :style="{ background: ['#4b2d77','#0094B3','#FF5149','#F5A623','#28a745'][i % 5] }" />
                       <div class="schedule-text">
@@ -206,7 +206,7 @@
               </el-table-column>
               <el-table-column prop="available_hours" label="可用工时" width="120" align="right">
                 <template #default="{ row }">
-                  <span style="color: var(--gt-color-success, #28a745); font-weight: 700; font-size: 15px">{{ row.available_hours }}h</span>
+                  <span style="color: var(--gt-color-success, #28a745); font-weight: 700; font-size: var(--gt-font-size-base)">{{ row.available_hours }}h</span>
                 </template>
               </el-table-column>
             </el-table>
@@ -523,7 +523,7 @@ async function loadAvailableStaff() {
   border-radius: var(--gt-radius-lg);
   padding: 28px 36px;
   margin-bottom: var(--gt-space-6);
-  color: #fff;
+  color: var(--gt-color-text-inverse);
   position: relative; overflow: hidden;
   box-shadow: 0 8px 32px rgba(75, 45, 119, 0.25);
   /* 网格纹理 */
@@ -561,8 +561,8 @@ async function loadAvailableStaff() {
   0%, 100% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-12px) scale(1.05); }
 }
-.gt-mgmt-title { font-size: 22px; font-weight: 700; margin: 0 0 4px; text-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-.gt-mgmt-subtitle { font-size: 13px; opacity: 0.8; margin: 0; }
+.gt-mgmt-title { font-size: var(--gt-font-size-2xl); font-weight: 700; margin: 0 0 4px; text-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.gt-mgmt-subtitle { font-size: var(--gt-font-size-sm); opacity: 0.8; margin: 0; }
 .gt-mgmt-banner-actions { position: relative; z-index: 1; }
 .gt-mgmt-banner-actions .el-button { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; }
 .gt-mgmt-banner-actions .el-button:hover { background: rgba(255,255,255,0.3); }
@@ -605,17 +605,17 @@ async function loadAvailableStaff() {
   display: flex; align-items: center; justify-content: center;
 }
 .kpi-trend {
-  font-size: 11px; font-weight: 600; padding: 3px 8px;
+  font-size: var(--gt-font-size-xs); font-weight: 600; padding: 3px 8px;
   border-radius: var(--gt-radius-full);
 }
 .trend-up { color: var(--gt-color-success); background: var(--gt-color-success-light); }
 .trend-down { color: var(--gt-color-coral); background: var(--gt-color-coral-light); }
 .kpi-value {
-  font-size: 32px; font-weight: 800; line-height: 1.1; letter-spacing: -1px;
+  font-size: 32px /* allow-px: special */; font-weight: 800; line-height: 1.1; letter-spacing: -1px;
   color: var(--kpi-accent, var(--gt-color-text));
   font-variant-numeric: tabular-nums;
 }
-.kpi-suffix { font-size: 16px; font-weight: 500; color: var(--gt-color-text-secondary); margin-left: 2px; }
+.kpi-suffix { font-size: var(--gt-font-size-md); font-weight: 500; color: var(--gt-color-text-secondary); margin-left: 2px; }
 .kpi-label { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-top: 4px; font-weight: 500; }
 
 /* ── 图表卡片 ── */
@@ -680,9 +680,9 @@ async function loadAvailableStaff() {
   padding: 14px 18px; background: linear-gradient(135deg, #faf9fd 0%, #f4f0fa 100%); border-radius: var(--gt-radius-md);
   border: 1px solid rgba(75, 45, 119, 0.06);
 }
-.query-hint { font-size: 14px; color: #666; }
+.query-hint { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
 .query-table { border-radius: 8px; overflow: hidden; }
-.query-table :deep(.el-table__header th) { background: #f8f6fb !important; color: #4b2d77; font-weight: 600; }
+.query-table :deep(.el-table__header th) { background: var(--gt-color-primary-bg) !important; color: var(--gt-color-primary); font-weight: 600; }
 
 /* 人员详情面板 */
 .staff-detail-panel { animation: fadeIn 0.3s ease; }
@@ -697,22 +697,22 @@ async function loadAvailableStaff() {
 .staff-avatar {
   width: 52px; height: 52px; border-radius: 50%;
   background: var(--gt-gradient-primary);
-  color: #fff; font-size: 22px; font-weight: 700;
+  color: var(--gt-color-text-inverse); font-size: var(--gt-font-size-2xl); font-weight: 700;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   box-shadow: 0 4px 12px rgba(75, 45, 119, 0.25);
 }
 .staff-info-text { flex: 1; }
-.staff-info-name { font-size: 18px; font-weight: 700; color: #333; }
-.staff-info-meta { font-size: 13px; color: #888; margin-top: 2px; }
+.staff-info-name { font-size: var(--gt-font-size-xl); font-weight: 700; color: var(--gt-color-text-primary); }
+.staff-info-meta { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-top: 2px; }
 .staff-info-stat { text-align: center; padding: 0 16px; border-left: 1px solid #e0d8ec; }
-.staff-info-stat-value { font-size: 24px; font-weight: 800; color: var(--gt-color-primary, #4b2d77); letter-spacing: -0.5px; }
-.staff-info-stat-label { font-size: 12px; color: #999; margin-top: 2px; }
+.staff-info-stat-value { font-size: 24px /* allow-px: special */; font-weight: 800; color: var(--gt-color-primary, #4b2d77); letter-spacing: -0.5px; }
+.staff-info-stat-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px; }
 
 .sub-card {
-  background: #fafbfc; border-radius: 8px; padding: 14px;
+  background: var(--gt-color-bg); border-radius: 8px; padding: 14px;
   border: 1px solid #f0f0f5; min-height: 240px;
 }
-.sub-card-title { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: #333; }
+.sub-card-title { margin: 0 0 10px; font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary); }
 
 .schedule-item {
   display: flex; align-items: center; gap: 10px;
@@ -720,7 +720,7 @@ async function loadAvailableStaff() {
 }
 .schedule-item:last-child { border-bottom: none; }
 .schedule-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.schedule-project { font-size: 14px; font-weight: 500; color: #333; }
+.schedule-project { font-size: var(--gt-font-size-sm); font-weight: 500; color: var(--gt-color-text-primary); }
 
 /* ── 响应式 ── */
 @media (max-width: 1200px) {

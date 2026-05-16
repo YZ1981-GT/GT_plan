@@ -85,7 +85,7 @@
       <el-table-column prop="name" label="名称" min-width="200" show-overflow-tooltip />
       <el-table-column label="将插入" width="240">
         <template #default="{ row }">
-          <code style="font-size: 10px; color: #4b2d77; background: #f0ecf5; padding: 1px 6px; border-radius: 4px;">{{ row._ref }}</code>
+          <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-primary); background: var(--gt-color-primary-bg); padding: 1px 6px; border-radius: 4px;">{{ row._ref }}</code>
         </template>
       </el-table-column>
     </el-table>
@@ -312,7 +312,7 @@ function onSourceRowClick(row: any) {
   background: linear-gradient(180deg, #faf8fd 0%, #f5f3f8 100%);
   border-bottom: 1px solid #e8e4f0;
   min-height: 36px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   box-shadow: 0 1px 2px rgba(75, 45, 119, 0.04);
 }
 .addr-box {
@@ -321,13 +321,13 @@ function onSourceRowClick(row: any) {
   gap: 4px;
   min-width: 80px;
   padding: 4px 10px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #e0dae8;
   border-radius: 6px;
   font-family: 'Cascadia Code', 'Fira Code', monospace;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 700;
-  color: #4b2d77;
+  color: var(--gt-color-primary);
   box-shadow: inset 0 1px 2px rgba(75, 45, 119, 0.06);
 }
 .formula-box {
@@ -335,7 +335,7 @@ function onSourceRowClick(row: any) {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #e0dae8;
   border-radius: 6px;
   padding: 4px 10px;
@@ -349,8 +349,8 @@ function onSourceRowClick(row: any) {
 .fx-icon {
   font-style: italic;
   font-weight: bold;
-  color: #4b2d77;
-  font-size: 13px;
+  color: var(--gt-color-primary);
+  font-size: var(--gt-font-size-sm);
   user-select: none;
   opacity: 0.6;
 }
@@ -359,12 +359,12 @@ function onSourceRowClick(row: any) {
   border: none;
   outline: none;
   font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   background: transparent;
-  color: #333;
+  color: var(--gt-color-text-primary);
 }
 .formula-input:focus {
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .formula-actions {
   display: flex;
@@ -376,14 +376,14 @@ function onSourceRowClick(row: any) {
   gap: 4px;
   flex-shrink: 0;
 }
-.fx-has-formula { color: #4b2d77; opacity: 1; }
+.fx-has-formula { color: var(--gt-color-primary); opacity: 1; }
 
 /* 快捷选择面板 */
 .qp-panel { padding: 4px 0; }
-.qp-title { font-size: 12px; font-weight: 600; color: #333; margin-bottom: 8px; }
+.qp-title { font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-text-primary); margin-bottom: 8px; }
 .qp-section { margin-bottom: 8px; }
-.qp-label { font-size: 10px; color: #999; margin-bottom: 4px; }
+.qp-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-bottom: 4px; }
 .qp-btns { display: flex; gap: 4px; flex-wrap: wrap; }
-.qp-btns .el-button { font-size: 10px; padding: 2px 8px; font-family: monospace; }
-.qp-hint { font-size: 10px; color: #bbb; margin-top: 4px; }
+.qp-btns .el-button { font-size: var(--gt-font-size-xs); padding: 2px 8px; font-family: monospace; }
+.qp-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); margin-top: 4px; }
 </style>

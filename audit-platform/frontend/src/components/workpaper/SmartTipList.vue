@@ -120,8 +120,8 @@ function onFindingClick(item: SmartTipFinding) {
   padding: 2px 8px;
   border-radius: 10px;
   background: rgba(230, 162, 60, 0.15);
-  color: #e6a23c;
-  font-size: 12px;
+  color: var(--gt-color-wheat);
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease;
@@ -149,8 +149,8 @@ function onFindingClick(item: SmartTipFinding) {
 
 .gt-smart-tip-dropdown-title {
   font-weight: 600;
-  font-size: 13px;
-  color: #303133;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-primary);
 }
 
 .gt-smart-tip-dropdown-body {
@@ -207,24 +207,24 @@ function onFindingClick(item: SmartTipFinding) {
 
 .gt-smart-tip-item-severity {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   line-height: 1.4;
 }
 
 .gt-smart-tip-item-cell {
   flex-shrink: 0;
   font-family: 'Courier New', monospace;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
-  color: #606266;
+  color: var(--gt-color-text-regular);
   background: rgba(0, 0, 0, 0.04);
   padding: 1px 5px;
   border-radius: 3px;
 }
 
 .gt-smart-tip-item-message {
-  font-size: 12px;
-  color: #303133;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-primary);
   line-height: 1.4;
   word-break: break-word;
 }

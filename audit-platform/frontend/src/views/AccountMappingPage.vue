@@ -216,7 +216,7 @@ onMounted(() => {
 .gt-mapping-summary {
   margin: 12px 0;
   padding: 12px 16px;
-  background: #f8f9fa;
+  background: var(--gt-color-bg);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -230,14 +230,14 @@ onMounted(() => {
 
 .gt-mapping-summary__label {
   font-weight: 600;
-  font-size: 14px;
-  color: #303133;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-primary);
   white-space: nowrap;
 }
 
 .gt-mapping-summary__stats {
-  font-size: 13px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
   white-space: nowrap;
 }
 </style>

@@ -209,7 +209,7 @@ onUnmounted(stopPolling)
   border-radius: var(--gt-radius-lg);
   padding: 20px 28px;
   margin-bottom: var(--gt-space-5);
-  color: #fff;
+  color: var(--gt-color-text-inverse);
   position: relative; overflow: hidden;
   box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
   background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
@@ -222,8 +222,8 @@ onUnmounted(stopPolling)
   background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
   pointer-events: none;
 }
-.gt-pe-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
-.gt-pe-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+.gt-pe-banner-text h2 { margin: 0 0 2px; font-size: var(--gt-font-size-xl); font-weight: 700; }
+.gt-pe-banner-text p { margin: 0; font-size: var(--gt-font-size-xs); opacity: 0.75; }
 
 .gt-pe-panel {
   background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);

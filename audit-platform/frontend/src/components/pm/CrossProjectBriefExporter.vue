@@ -203,7 +203,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .cross-brief-exporter {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid var(--gt-color-border-light, #ebeef5);
   border-radius: var(--gt-radius-md, 8px);
   padding: 16px;
@@ -217,7 +217,7 @@ onBeforeUnmount(() => {
 }
 
 .exporter-title {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   color: var(--gt-color-text, #303133);
 }
@@ -259,7 +259,7 @@ onBeforeUnmount(() => {
 }
 
 .progress-text {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary, #909399);
 }
 

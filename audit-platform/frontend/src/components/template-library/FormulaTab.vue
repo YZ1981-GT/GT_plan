@@ -772,7 +772,7 @@ onMounted(async () => {
 
 /* ─── 子 Tab 区 ─── */
 .gt-ftab-body {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 8px;
   border: 1px solid #ebeef5;
   flex: 1;
@@ -789,7 +789,7 @@ onMounted(async () => {
 .gt-ftab-tabs :deep(.el-tabs__header) {
   margin: 0;
   padding: 0 12px;
-  background: #fafafa;
+  background: var(--gt-color-bg);
   border-bottom: 1px solid #ebeef5;
   flex-shrink: 0;
 }
@@ -805,7 +805,7 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 /* ─── 提示横幅 ─── */
@@ -814,10 +814,10 @@ onMounted(async () => {
 }
 .gt-ftab-alert-title code {
   background: rgba(75, 45, 119, 0.08);
-  color: #4b2d77;
+  color: var(--gt-color-primary);
   padding: 1px 6px;
   border-radius: 3px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 
 /* ─── 顶部统计 ─── */
@@ -828,20 +828,20 @@ onMounted(async () => {
   flex-wrap: wrap;
   margin-bottom: 12px;
   padding: 8px 12px;
-  background: #faf9fc;
+  background: var(--gt-color-primary-bg);
   border-radius: 6px;
   border-left: 3px solid #4b2d77;
 }
 .gt-ftab-stats-label {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   font-weight: 500;
   margin-right: 4px;
 }
 .gt-ftab-stats-summary {
   margin-left: auto;
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
 }
 .gt-ftab-type-tag {
   border: 1px solid transparent;
@@ -850,11 +850,11 @@ onMounted(async () => {
   margin-left: 4px;
   font-weight: 700;
 }
-.gt-ftab-type--tb { background: #e1f3ff; color: #1d72b8; border-color: #b3d9f0; }
-.gt-ftab-type--tb_sum { background: #d6ecff; color: #1565c0; border-color: #98c8eb; }
-.gt-ftab-type--adj { background: #ffe9d6; color: #b54708; border-color: #f0c898; }
-.gt-ftab-type--prev { background: #e6f7e6; color: #2e7d32; border-color: #b8d8b8; }
-.gt-ftab-type--wp { background: #f0e6ff; color: #6a39c4; border-color: #d4bff0; }
+.gt-ftab-type--tb { background: var(--gt-bg-info); color: var(--gt-color-teal); border-color: #b3d9f0; }
+.gt-ftab-type--tb_sum { background: var(--gt-bg-info); color: var(--gt-color-teal); border-color: #98c8eb; }
+.gt-ftab-type--adj { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); border-color: #f0c898; }
+.gt-ftab-type--prev { background: var(--gt-color-success-light); color: var(--gt-color-success); border-color: #b8d8b8; }
+.gt-ftab-type--wp { background: var(--gt-color-primary-bg); color: var(--gt-color-primary-light); border-color: #d4bff0; }
 
 /* ─── 工具栏 ─── */
 .gt-ftab-toolbar {
@@ -867,8 +867,8 @@ onMounted(async () => {
 .gt-ftab-select { width: 160px; }
 .gt-ftab-spacer { flex: 1; }
 .gt-ftab-filtered {
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
   white-space: nowrap;
 }
 
@@ -881,27 +881,27 @@ onMounted(async () => {
 
 /* ─── 表格 ─── */
 .gt-ftab-table :deep(.el-table__row:hover > td) {
-  background-color: #faf9fc !important;
+  background-color: var(--gt-color-primary-bg) !important;
 }
 .gt-ftab-table :deep(.el-table__row.gt-ftab-row-invalid > td) {
-  background-color: #fef2f2 !important;
+  background-color: var(--gt-bg-danger) !important;
   border-left: 3px solid #f56c6c;
 }
 
 .gt-ftab-expand {
   padding: 8px 24px 8px 32px;
-  background: #fafafa;
+  background: var(--gt-color-bg);
 }
 
 .gt-ftab-formula-code {
   display: inline-block;
   padding: 2px 8px;
-  background: #f5f5f7;
+  background: var(--gt-color-bg);
   border: 1px solid #e0e0e0;
   border-radius: 3px;
   font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 12px;
-  color: #4b2d77;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-primary);
 }
 
 .gt-ftab-invalid-tag {
@@ -925,7 +925,7 @@ onMounted(async () => {
   gap: 16px;
 }
 .gt-ftab-rt-group {
-  background: #fafafa;
+  background: var(--gt-color-bg);
   border-radius: 6px;
   padding: 12px;
 }
@@ -937,17 +937,17 @@ onMounted(async () => {
   padding: 0 4px;
 }
 .gt-ftab-rt-title {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #4b2d77;
+  color: var(--gt-color-primary);
 }
 .gt-ftab-rt-coverage {
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
 }
-.gt-fcc-c--green { color: #67c23a; }
-.gt-fcc-c--yellow { color: #e6a23c; }
-.gt-fcc-c--red { color: #f56c6c; }
+.gt-fcc-c--green { color: var(--gt-color-success); }
+.gt-fcc-c--yellow { color: var(--gt-color-wheat); }
+.gt-fcc-c--red { color: var(--gt-color-coral); }
 
 .gt-ftab-rt-table {
   border-radius: 4px;
@@ -958,28 +958,28 @@ onMounted(async () => {
 .gt-ftab-doc {
   margin-top: 16px;
   padding: 12px 16px;
-  background: #faf9fc;
+  background: var(--gt-color-primary-bg);
   border-left: 3px solid #4b2d77;
   border-radius: 4px;
 }
 .gt-ftab-doc-title {
   margin: 0 0 8px 0;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #4b2d77;
+  color: var(--gt-color-primary);
 }
 .gt-ftab-doc-list {
   margin: 0;
   padding-left: 20px;
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
   line-height: 1.8;
 }
 .gt-ftab-doc-list code {
   background: rgba(75, 45, 119, 0.08);
-  color: #4b2d77;
+  color: var(--gt-color-primary);
   padding: 1px 6px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 </style>

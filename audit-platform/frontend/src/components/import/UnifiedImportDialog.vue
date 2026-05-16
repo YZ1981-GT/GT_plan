@@ -19,9 +19,9 @@
       <div class="gt-import-tip">
         <el-alert type="info" :closable="false" show-icon>
           <template #title>导入说明</template>
-          <div style="font-size: 12px; line-height: 1.8">
+          <div style="font-size: var(--gt-font-size-xs); line-height: 1.8">
             <p>请先下载标准模板，按模板格式填写数据后上传。</p>
-            <p>带 <span style="color: #e6a23c; font-weight: 600">*</span> 的列为必填项，黄色底色标记。</p>
+            <p>带 <span style="color: var(--gt-color-wheat); font-weight: 600">*</span> 的列为必填项，黄色底色标记。</p>
             <p>第 2 行为示例数据，导入时会自动跳过。</p>
           </div>
         </el-alert>
@@ -59,7 +59,7 @@
     <div v-if="step === 1" class="gt-import-step">
       <div v-if="validating" style="text-align: center; padding: 40px">
         <el-icon class="is-loading" :size="32" color="var(--gt-color-primary)"><Loading /></el-icon>
-        <p style="margin-top: 12px; color: #999">正在校验文件格式...</p>
+        <p style="margin-top: 12px; color: var(--gt-color-text-tertiary)">正在校验文件格式...</p>
       </div>
 
       <template v-else-if="validationResult">
@@ -83,7 +83,7 @@
             <el-icon color="#f56c6c"><CircleClose /></el-icon>
             <span>{{ err.message }}</span>
           </div>
-          <div v-if="validationResult.errors.length > 20" style="color: #999; font-size: 12px; padding: 4px 0">
+          <div v-if="validationResult.errors.length > 20" style="color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); padding: 4px 0">
             ... 还有 {{ validationResult.errors.length - 20 }} 个错误
           </div>
         </div>
@@ -96,7 +96,7 @@
         </div>
 
         <div v-if="validationResult.preview_rows?.length" style="margin-top: 12px">
-          <h4 style="font-size: 13px; color: #666; margin-bottom: 8px">数据预览（前 10 行）</h4>
+          <h4 style="font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-bottom: 8px">数据预览（前 10 行）</h4>
           <el-table :data="validationResult.preview_rows" size="small" stripe max-height="250" border>
             <el-table-column
               v-for="col in previewColumns"
@@ -115,7 +115,7 @@
     <div v-if="step === 2" class="gt-import-step">
       <div v-if="importing" style="text-align: center; padding: 40px">
         <el-icon class="is-loading" :size="32" color="var(--gt-color-primary)"><Loading /></el-icon>
-        <p style="margin-top: 12px; color: #999">正在导入数据...</p>
+        <p style="margin-top: 12px; color: var(--gt-color-text-tertiary)">正在导入数据...</p>
       </div>
 
       <template v-else-if="importResult">
@@ -125,10 +125,10 @@
           :title="importResult.message"
         >
           <template #sub-title>
-            <div style="font-size: 13px; color: #666">
+            <div style="font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary)">
               <span>成功 {{ importResult.imported_count }} 条</span>
               <span v-if="importResult.skipped_count"> · 跳过 {{ importResult.skipped_count }} 条</span>
-              <span v-if="importResult.failed_count" style="color: #f56c6c"> · 失败 {{ importResult.failed_count }} 条</span>
+              <span v-if="importResult.failed_count" style="color: var(--gt-color-coral)"> · 失败 {{ importResult.failed_count }} 条</span>
             </div>
           </template>
         </el-result>
@@ -140,7 +140,7 @@
 
         <!-- 失败行详情 -->
         <div v-if="importResult.failed_rows?.length" class="gt-import-errors" style="margin-top: 8px">
-          <h4 style="font-size: 12px; color: #999; margin-bottom: 6px">失败行详情：</h4>
+          <h4 style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-bottom: 6px">失败行详情：</h4>
           <div v-for="(fr, i) in importResult.failed_rows.slice(0, 20)" :key="i" class="gt-import-error-item">
             <el-icon color="#f56c6c"><CircleClose /></el-icon>
             <span>第 {{ fr.row }} 行: {{ fr.error }}</span>
@@ -351,9 +351,9 @@ async function doImport() {
 .gt-import-errors, .gt-import-warnings { margin-top: 8px; max-height: 150px; overflow-y: auto; }
 .gt-import-error-item, .gt-import-warning-item {
   display: flex; align-items: center; gap: 6px;
-  padding: 4px 8px; font-size: 12px; line-height: 1.6;
+  padding: 4px 8px; font-size: var(--gt-font-size-xs); line-height: 1.6;
 }
-.gt-import-error-item { color: #f56c6c; }
-.gt-import-warning-item { color: #e6a23c; }
+.gt-import-error-item { color: var(--gt-color-coral); }
+.gt-import-warning-item { color: var(--gt-color-wheat); }
 .gt-import-footer { display: flex; align-items: center; width: 100%; }
 </style>

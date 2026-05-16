@@ -202,7 +202,7 @@ function onColorChange(color: string | null) {
 function insertTable() {
   editorRef.value?.focus()
   const html = `<table style="border-collapse:collapse;width:100%;margin:8px 0;">
-    <tr><th style="border:1px solid #ddd;padding:4px 8px;background:#f5f5f5;">列1</th><th style="border:1px solid #ddd;padding:4px 8px;background:#f5f5f5;">列2</th><th style="border:1px solid #ddd;padding:4px 8px;background:#f5f5f5;">列3</th></tr>
+    <tr><th style="border:1px solid #ddd;padding:4px 8px;background: var(--gt-color-bg);">列1</th><th style="border:1px solid #ddd;padding:4px 8px;background: var(--gt-color-bg);">列2</th><th style="border:1px solid #ddd;padding:4px 8px;background: var(--gt-color-bg);">列3</th></tr>
     <tr><td style="border:1px solid #ddd;padding:4px 8px;">&nbsp;</td><td style="border:1px solid #ddd;padding:4px 8px;">&nbsp;</td><td style="border:1px solid #ddd;padding:4px 8px;">&nbsp;</td></tr>
     <tr><td style="border:1px solid #ddd;padding:4px 8px;">&nbsp;</td><td style="border:1px solid #ddd;padding:4px 8px;">&nbsp;</td><td style="border:1px solid #ddd;padding:4px 8px;">&nbsp;</td></tr>
   </table>`
@@ -313,7 +313,7 @@ function onKeydown(e: KeyboardEvent) {
 .gt-note-rte {
   border: 1px solid #e4e7ed;
   border-radius: 6px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   overflow: hidden;
 }
 
@@ -323,21 +323,21 @@ function onKeydown(e: KeyboardEvent) {
   gap: 4px;
   padding: 6px 10px;
   border-bottom: 1px solid #ebeef5;
-  background: #fafafa;
+  background: var(--gt-color-bg);
   flex-wrap: wrap;
 }
 
 .gt-note-rte-btn {
   min-width: 32px;
   padding: 4px 8px !important;
-  font-size: 12px !important;
+  font-size: var(--gt-font-size-xs) !important;
 }
 
 .gt-note-rte-divider {
   display: inline-block;
   width: 1px;
   height: 18px;
-  background: #dcdfe6;
+  background: var(--gt-color-border);
   margin: 0 4px;
 }
 
@@ -351,28 +351,28 @@ function onKeydown(e: KeyboardEvent) {
   min-height: 200px;
   padding: 12px 16px;
   font-family: '仿宋', 'FangSong', serif;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   line-height: 1.8;
   outline: none;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 
 .gt-note-rte-editor:empty::before {
   content: '请输入附注文字内容...';
-  color: #c0c4cc;
+  color: var(--gt-color-text-placeholder);
   pointer-events: none;
 }
 
 /* Placeholder tag styling */
 .gt-note-rte-editor :deep(.gt-note-placeholder) {
   display: inline-block;
-  background: #ecf5ff;
-  color: #409eff;
+  background: var(--gt-bg-info);
+  color: var(--gt-color-teal);
   border: 1px solid #b3d8ff;
   border-radius: 3px;
   padding: 0 6px;
   margin: 0 2px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   line-height: 20px;
   cursor: default;
   user-select: none;
@@ -394,26 +394,26 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 .gt-note-rte-editor :deep(th) {
-  background: #f5f5f5;
+  background: var(--gt-color-bg);
   font-weight: bold;
   text-align: center;
 }
 
 /* Heading styles */
 .gt-note-rte-editor :deep(h1) {
-  font-size: 18px;
+  font-size: var(--gt-font-size-xl);
   font-weight: bold;
   margin: 12px 0 8px;
 }
 
 .gt-note-rte-editor :deep(h2) {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: bold;
   margin: 10px 0 6px;
 }
 
 .gt-note-rte-editor :deep(h3) {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: bold;
   margin: 8px 0 4px;
 }
@@ -433,10 +433,10 @@ function onKeydown(e: KeyboardEvent) {
   outline: none;
   resize: vertical;
   font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   line-height: 1.6;
-  color: #303133;
-  background: #fafcff;
+  color: var(--gt-color-text-primary);
+  background: var(--gt-bg-info);
   box-sizing: border-box;
 }
 
@@ -447,11 +447,11 @@ function onKeydown(e: KeyboardEvent) {
   justify-content: flex-end;
   padding: 4px 12px;
   border-top: 1px solid #ebeef5;
-  background: #fafafa;
+  background: var(--gt-color-bg);
 }
 
 .gt-note-rte-wordcount {
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 </style>

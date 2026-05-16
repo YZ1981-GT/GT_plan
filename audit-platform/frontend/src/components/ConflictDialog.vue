@@ -66,7 +66,7 @@ function onRefresh() {
 }
 .conflict-hint {
   margin-top: 12px;
-  font-size: 13px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
 }
 </style>

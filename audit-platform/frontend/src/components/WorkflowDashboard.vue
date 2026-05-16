@@ -162,7 +162,7 @@ watch(() => chain.isAllDone.value, (done) => {
 <style scoped>
 .gt-workflow-dashboard {
   padding: 12px 16px;
-  background: #f8f7fc;
+  background: var(--gt-color-primary-bg);
   border-radius: 8px;
   margin-bottom: 12px;
 }
@@ -190,43 +190,43 @@ watch(() => chain.isAllDone.value, (done) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   border: 2px solid #dcdfe6;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   margin-bottom: 4px;
 }
 
 .gt-wf-step--completed .gt-wf-step__icon {
   border-color: #67c23a;
-  background: #f0f9eb;
-  color: #67c23a;
+  background: var(--gt-bg-success);
+  color: var(--gt-color-success);
 }
 
 .gt-wf-step--in_progress .gt-wf-step__icon {
   border-color: #409eff;
-  background: #ecf5ff;
-  color: #409eff;
+  background: var(--gt-bg-info);
+  color: var(--gt-color-teal);
 }
 
 .gt-wf-step--needs_refresh .gt-wf-step__icon {
   border-color: #e6a23c;
-  background: #fdf6ec;
-  color: #e6a23c;
+  background: var(--gt-bg-warning);
+  color: var(--gt-color-wheat);
 }
 
 .gt-wf-step__label {
-  font-size: 11px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
   white-space: nowrap;
 }
 
 .gt-wf-step--completed .gt-wf-step__label {
-  color: #67c23a;
+  color: var(--gt-color-success);
 }
 
 .gt-wf-step--needs_refresh .gt-wf-step__label {
-  color: #e6a23c;
+  color: var(--gt-color-wheat);
 }
 
 .gt-wf-step__connector {
@@ -235,15 +235,15 @@ watch(() => chain.isAllDone.value, (done) => {
   left: calc(50% + 14px);
   width: calc(100% - 28px);
   height: 2px;
-  background: #dcdfe6;
+  background: var(--gt-color-border);
 }
 
 .gt-wf-step__connector--completed {
-  background: #67c23a;
+  background: var(--gt-color-success);
 }
 
 .gt-wf-step__connector--in_progress {
-  background: #409eff;
+  background: var(--gt-color-teal);
 }
 
 .gt-wf-step__spinner {

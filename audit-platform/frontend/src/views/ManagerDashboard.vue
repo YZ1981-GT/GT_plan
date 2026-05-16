@@ -863,11 +863,11 @@ onBeforeUnmount(() => {
 }
 .gt-banner-content h2 {
   margin: 0 0 4px;
-  font-size: 20px;
+  font-size: 20px /* allow-px: special */;
   color: var(--gt-color-primary, #4b2d77);
 }
 .gt-banner-sub {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary);
 }
 .gt-banner-actions {
@@ -876,7 +876,7 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 .gt-last-update {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary);
 }
 
@@ -885,7 +885,7 @@ onBeforeUnmount(() => {
   margin-bottom: 28px;
 }
 .gt-section-title {
-  font-size: 15px;
+  font-size: var(--gt-font-size-base);
   font-weight: 600;
   margin: 0 0 12px;
   color: var(--gt-color-text);
@@ -898,7 +898,7 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 .gt-project-card {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid var(--gt-color-border-light);
   border-radius: var(--gt-radius-md);
   padding: 16px;
@@ -918,7 +918,7 @@ onBeforeUnmount(() => {
   margin-bottom: 12px;
 }
 .gt-card-name {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   color: var(--gt-color-text);
   overflow: hidden;
@@ -937,7 +937,7 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 .gt-stat-label {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary);
   white-space: nowrap;
 }
@@ -957,16 +957,16 @@ onBeforeUnmount(() => {
   flex: 1;
 }
 .gt-cost-text {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary);
   white-space: nowrap;
 }
 .gt-cost-warning {
-  color: #e6a23c;
+  color: var(--gt-color-wheat);
   font-weight: 600;
 }
 .gt-cost-danger {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
   font-weight: 700;
 }
 .gt-cost-blink {
@@ -989,7 +989,7 @@ onBeforeUnmount(() => {
   background: var(--gt-color-primary-bg, #f8f6fb);
 }
 .gt-metric-value {
-  font-size: 18px;
+  font-size: var(--gt-font-size-xl);
   font-weight: 700;
   color: var(--gt-color-primary, #4b2d77);
 }
@@ -997,7 +997,7 @@ onBeforeUnmount(() => {
   color: var(--el-color-danger, #f56c6c);
 }
 .gt-metric-label {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary);
 }
 
@@ -1011,7 +1011,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid var(--gt-color-border-light);
   border-radius: var(--gt-radius-md);
   padding: 16px;
@@ -1023,25 +1023,25 @@ onBeforeUnmount(() => {
   box-shadow: 0 2px 8px rgba(75, 45, 119, 0.08);
 }
 .gt-todo-icon {
-  font-size: 24px;
+  font-size: 24px /* allow-px: special */;
 }
 .gt-todo-info {
   display: flex;
   flex-direction: column;
 }
 .gt-todo-count {
-  font-size: 22px;
+  font-size: var(--gt-font-size-2xl);
   font-weight: 700;
   color: var(--gt-color-primary, #4b2d77);
 }
 .gt-todo-label {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary);
 }
 
 /* 本周关键动作 */
 .gt-actions-list {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid var(--gt-color-border-light);
   border-radius: var(--gt-radius-md);
   overflow: hidden;
@@ -1065,13 +1065,13 @@ onBeforeUnmount(() => {
   background: var(--gt-color-primary-bg, #f8f6fb);
   color: var(--gt-color-primary, #4b2d77);
   border-radius: 50%;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
   flex-shrink: 0;
 }
 .gt-action-text {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text);
 }
 
@@ -1108,7 +1108,7 @@ onBeforeUnmount(() => {
   border-left: 4px solid var(--gt-color-teal);
 }
 .gt-alert-icon {
-  font-size: 18px;
+  font-size: var(--gt-font-size-xl);
   flex-shrink: 0;
 }
 .gt-alert-content {
@@ -1135,11 +1135,11 @@ onBeforeUnmount(() => {
 /* 近期委派状态 */
 .gt-status-read {
   color: var(--el-color-success, #67c23a);
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .gt-status-unread {
   color: var(--el-color-primary, #409eff);
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 500;
 }
 .gt-overdue-tag {
@@ -1147,7 +1147,7 @@ onBeforeUnmount(() => {
 }
 .gt-status-normal {
   color: var(--gt-color-text-tertiary);
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 /* 跨项目待办 Tabs */
@@ -1161,7 +1161,7 @@ onBeforeUnmount(() => {
   margin-left: 6px;
 }
 .gt-commitment-badge :deep(.el-badge__content) {
-  font-size: 10px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-overdue-text {
   color: var(--el-color-danger, #f56c6c);
@@ -1171,7 +1171,7 @@ onBeforeUnmount(() => {
   text-align: center;
   padding: 24px;
   color: var(--gt-color-text-tertiary);
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 /* 待审批工时聚合卡片 [R9 F7-PM Task 22] */
@@ -1190,12 +1190,12 @@ onBeforeUnmount(() => {
   box-shadow: 0 4px 12px rgba(234, 179, 8, 0.15);
   transform: translateY(-1px);
 }
-.gt-pwh-icon { font-size: 32px; }
+.gt-pwh-icon { font-size: 32px /* allow-px: special */; }
 .gt-pwh-info { display: flex; flex-direction: column; }
-.gt-pwh-count { font-size: 28px; font-weight: 700; color: #d97706; }
-.gt-pwh-label { font-size: 13px; color: #92400e; }
+.gt-pwh-count { font-size: var(--gt-font-size-3xl); font-weight: 700; color: var(--gt-color-wheat); }
+.gt-pwh-label { font-size: var(--gt-font-size-sm); color: var(--gt-color-wheat); }
 .gt-pwh-detail { display: flex; flex-direction: column; margin-left: auto; text-align: right; }
-.gt-pwh-hours { font-size: 16px; font-weight: 600; color: #b45309; }
-.gt-pwh-sub { font-size: 12px; color: #92400e; }
+.gt-pwh-hours { font-size: var(--gt-font-size-md); font-weight: 600; color: var(--gt-color-wheat); }
+.gt-pwh-sub { font-size: var(--gt-font-size-xs); color: var(--gt-color-wheat); }
 .gt-pwh-action { margin-left: 16px; }
 </style>

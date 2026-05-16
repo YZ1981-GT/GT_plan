@@ -207,7 +207,7 @@ async function copyTrace() {
 }
 .rule-message {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .rule-action {
   display: flex;
@@ -215,12 +215,12 @@ async function copyTrace() {
   gap: 4px;
   margin-top: 4px;
   padding-left: 60px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary, #999);
 }
 .gate-trace {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary, #999);
 }
 .trace-label {

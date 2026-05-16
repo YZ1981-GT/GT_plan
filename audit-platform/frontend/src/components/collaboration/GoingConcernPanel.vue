@@ -227,14 +227,14 @@ async function handleCreateEval() {
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
-  color: #606266;
-  font-size: 14px;
+  color: var(--gt-color-text-regular);
+  font-size: var(--gt-font-size-sm);
 }
 .indicator-group { margin-bottom: 20px; }
 .group-title {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
   margin-bottom: 8px;
   border-left: 3px solid #409EFF;
   padding-left: 8px;

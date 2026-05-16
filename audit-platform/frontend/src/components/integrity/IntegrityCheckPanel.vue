@@ -69,9 +69,9 @@ async function loadData() {
 <style scoped>
 .integrity-panel { padding: 16px; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.manifest-hash { font-size: 12px; color: #666; }
+.manifest-hash { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); }
 .hash-label { margin-right: 4px; }
-.hash-short { font-size: 11px; color: #999; }
-.status-passed { color: var(--el-color-success); font-size: 16px; font-weight: 600; }
-.status-failed { color: var(--el-color-danger); font-size: 16px; font-weight: 600; }
+.hash-short { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.status-passed { color: var(--el-color-success); font-size: var(--gt-font-size-md); font-weight: 600; }
+.status-failed { color: var(--el-color-danger); font-size: var(--gt-font-size-md); font-weight: 600; }
 </style>

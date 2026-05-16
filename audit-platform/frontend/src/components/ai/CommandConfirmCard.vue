@@ -107,7 +107,7 @@ async function handleConfirm() {
 .gt-command-confirm-card {
   border: 1.5px solid #faad14;
   border-radius: 8px;
-  background: #fffbe6;
+  background: var(--gt-color-wheat-light);
   padding: 10px;
   margin-top: 8px;
   max-width: 100%;
@@ -120,18 +120,18 @@ async function handleConfirm() {
   margin-bottom: 6px;
 }
 
-.card-icon { font-size: 16px; }
+.card-icon { font-size: var(--gt-font-size-md); }
 
 .card-title {
   font-weight: 600;
-  font-size: 13px;
-  color: #d48806;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-wheat);
 }
 
-.card-body { font-size: 12px; }
+.card-body { font-size: var(--gt-font-size-xs); }
 
 .command-description {
-  color: #555;
+  color: var(--gt-color-text-regular);
   margin-bottom: 6px;
   line-height: 1.5;
 }
@@ -143,8 +143,8 @@ async function handleConfirm() {
 }
 
 .param-item { margin: 2px 0; display: flex; gap: 4px; }
-.param-key { color: #888; }
-.param-value { color: #333; font-weight: 500; word-break: break-all; }
+.param-key { color: var(--gt-color-text-secondary); }
+.param-value { color: var(--gt-color-text-primary); font-weight: 500; word-break: break-all; }
 
 .card-actions {
   display: flex;
@@ -158,22 +158,22 @@ async function handleConfirm() {
   border-radius: 4px;
   border: none;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   transition: background 0.2s;
 }
 
 .btn-confirm {
-  background: #52c41a;
-  color: #fff;
+  background: var(--gt-color-success);
+  color: var(--gt-color-text-inverse);
 }
 
-.btn-confirm:hover:not(:disabled) { background: #389e0d; }
-.btn-confirm:disabled { background: #a3d99f; cursor: not-allowed; }
+.btn-confirm:hover:not(:disabled) { background: var(--gt-color-success); }
+.btn-confirm:disabled { background: var(--gt-color-success-light); cursor: not-allowed; }
 
 .btn-cancel {
-  background: #f5f5f5;
-  color: #666;
+  background: var(--gt-color-bg);
+  color: var(--gt-color-text-secondary);
 }
 
-.btn-cancel:hover { background: #e8e8e8; }
+.btn-cancel:hover { background: var(--gt-color-border-light); }
 </style>

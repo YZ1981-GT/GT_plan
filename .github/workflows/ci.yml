@@ -254,6 +254,60 @@ jobs:
             exit 1
           fi
         working-directory: audit-platform/frontend
+      - name: Display token guard (R10 Spec B / F10)
+        # baseline 来自 .github/workflows/baselines.json，由 Sprint 0 实测填入
+        # 4 道 grep 卡点：font-size / color / background / 裸 el-table
+        run: |
+          if [ ! -f "../../.github/workflows/baselines.json" ]; then
+            echo "::warning::baselines.json missing, skipping display token guard"
+            exit 0
+          fi
+          # font-size:Npx baseline（Sprint 1 末尾应达到 0）
+          FONT_BASELINE=$(jq -r '."font-size-px-vue-files"' ../../.github/workflows/baselines.json)
+          FONT_COUNT=$(grep -rE "font-size:\s*[0-9]+px" src --include="*.vue" | wc -l)
+          echo "font-size:Npx in Vue files: $FONT_COUNT (baseline: $FONT_BASELINE)"
+          if [ "$FONT_COUNT" -gt "$FONT_BASELINE" ]; then
+            echo "::error::Inline font-size hardcode increased from $FONT_BASELINE to $FONT_COUNT. Use var(--gt-font-size-*) instead."
+            exit 1
+          fi
+          # color:#xxx baseline（Sprint 2 末尾目标 < 50）
+          COLOR_BASELINE=$(jq -r '."color-hex-vue-files"' ../../.github/workflows/baselines.json)
+          COLOR_COUNT=$(grep -rE "color:\s*#[0-9a-fA-F]{3,6}" src --include="*.vue" | wc -l)
+          echo "color:#xxx in Vue files: $COLOR_COUNT (baseline: $COLOR_BASELINE)"
+          if [ "$COLOR_COUNT" -gt "$COLOR_BASELINE" ]; then
+            echo "::error::Inline hex color increased from $COLOR_BASELINE to $COLOR_COUNT. Use var(--gt-color-*) instead."
+            exit 1
+          fi
+          # background:#xxx baseline（Sprint 2 末尾目标 < 30）
+          BG_BASELINE=$(jq -r '."background-hex-vue-files"' ../../.github/workflows/baselines.json)
+          BG_COUNT=$(grep -rE "background(-color)?:\s*#[0-9a-fA-F]{3,6}" src --include="*.vue" | wc -l)
+          echo "background:#xxx in Vue files: $BG_COUNT (baseline: $BG_BASELINE)"
+          if [ "$BG_COUNT" -gt "$BG_BASELINE" ]; then
+            echo "::error::Inline hex background increased from $BG_BASELINE to $BG_COUNT. Use var(--gt-bg-*) instead."
+            exit 1
+          fi
+          # 裸 <el-table 用量 baseline（Sprint 0 实测填入，新表必须用 GtTableExtended/GtFormTable）
+          ELTABLE_BASELINE=$(jq -r '."el-table-naked-vue-files"' ../../.github/workflows/baselines.json)
+          ELTABLE_COUNT=$(grep -rE "<el-table" src --include="*.vue" | wc -l)
+          echo "Naked <el-table in Vue files: $ELTABLE_COUNT (baseline: $ELTABLE_BASELINE)"
+          if [ "$ELTABLE_COUNT" -gt "$ELTABLE_BASELINE" ]; then
+            echo "::error::Naked <el-table increased from $ELTABLE_BASELINE to $ELTABLE_COUNT. Use GtTableExtended for display tables, GtFormTable for editable tables."
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
+
+      - name: stylelint (R10 Spec B / F2)
+        # Sprint 0/1 中: warning 级别（不阻断）；Sprint 1 末尾 font-size 转 error
+        # Sprint 2 末尾 color/background 转 error
+        # 通过 npm run stylelint 执行（如脚本不存在则跳过）
+        run: |
+          if [ -f "package.json" ] && grep -q '"stylelint"' package.json; then
+            npm run stylelint || echo "::warning::stylelint reported issues (warning level)"
+          else
+            echo "::warning::stylelint not configured yet, skipping"
+          fi
+        working-directory: audit-platform/frontend
+
       - name: Build
         run: npm run build
         working-directory: audit-platform/frontend

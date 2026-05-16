@@ -16,7 +16,7 @@
     <div class="ws-tip" v-show="!isFullscreen">
       <span>📋 共 <b>{{ companies.length }}</b> 家企业发生{{ changeTimes }}次股比变动。
         每家展示三栏：❶净资产变动（变动前→变动后）❷直接持股权益法模拟 ❸间接持股权益法模拟。
-        模拟后长投小计将<b style="color:#e6a23c">自动回填</b>到模拟权益法主表。</span>
+        模拟后长投小计将<b style="color: var(--gt-color-wheat)">自动回填</b>到模拟权益法主表。</span>
     </div>
 
     <!-- 每家企业独立区块 -->
@@ -27,8 +27,8 @@
         <el-tag size="small" effect="plain" round>持股 {{ comp.ratio }}%</el-tag>
         <el-tag v-if="comp.accountSubject" size="small" type="info" effect="plain" round>{{ comp.accountSubject }}</el-tag>
         <span style="flex:1" />
-        <span style="font-size:11px;color:#999">模拟后长投小计：</span>
-        <span style="font-size:14px;font-weight:700;color:#4b2d77">{{ fmt(getEndInvest(ci)) }}</span>
+        <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">模拟后长投小计：</span>
+        <span style="font-size: var(--gt-font-size-sm);font-weight:700;color: var(--gt-color-primary)">{{ fmt(getEndInvest(ci)) }}</span>
       </div>
 
       <div class="sc-three-col">
@@ -83,7 +83,7 @@
                 <template #default="{ row }">
                   <span v-if="row.isSection" />
                   <span v-else-if="row.isRatio" class="sc-ratio-val">
-                    <el-input-number v-model="row.dc[0]" size="small" :precision="6" :controls="false" style="width:80px" /><span style="color:#999;font-size:10px">%</span>
+                    <el-input-number v-model="row.dc[0]" size="small" :precision="6" :controls="false" style="width:80px" /><span style="color: var(--gt-color-text-tertiary);font-size: var(--gt-font-size-xs)">%</span>
                   </span>
                   <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmt(row.dc[0]) }}</span>
                   <el-input-number v-else v-model="row.dc[0]" size="small" :precision="2" :controls="false" style="width:100%" />
@@ -103,7 +103,7 @@
                 <template #default="{ row }">
                   <span v-if="row.isSection" />
                   <span v-else-if="row.isRatio" class="sc-ratio-val">
-                    <el-input-number v-model="row.dc[t * 2]" size="small" :precision="6" :controls="false" style="width:80px" /><span style="color:#999;font-size:10px">%</span>
+                    <el-input-number v-model="row.dc[t * 2]" size="small" :precision="6" :controls="false" style="width:80px" /><span style="color: var(--gt-color-text-tertiary);font-size: var(--gt-font-size-xs)">%</span>
                   </span>
                   <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmt(row.dc[t * 2]) }}</span>
                   <el-input-number v-else v-model="row.dc[t * 2]" size="small" :precision="2" :controls="false" style="width:100%" />
@@ -142,7 +142,7 @@
                 <template #default="{ row }">
                   <span v-if="row.isSection" />
                   <span v-else-if="row.isRatio" class="sc-ratio-val">
-                    <el-input-number v-model="row.dc[0]" size="small" :precision="6" :controls="false" style="width:80px" /><span style="color:#999;font-size:10px">%</span>
+                    <el-input-number v-model="row.dc[0]" size="small" :precision="6" :controls="false" style="width:80px" /><span style="color: var(--gt-color-text-tertiary);font-size: var(--gt-font-size-xs)">%</span>
                   </span>
                   <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmt(row.dc[0]) }}</span>
                   <el-input-number v-else v-model="row.dc[0]" size="small" :precision="2" :controls="false" style="width:100%" />
@@ -162,7 +162,7 @@
                 <template #default="{ row }">
                   <span v-if="row.isSection" />
                   <span v-else-if="row.isRatio" class="sc-ratio-val">
-                    <el-input-number v-model="row.dc[t * 2]" size="small" :precision="6" :controls="false" style="width:80px" /><span style="color:#999;font-size:10px">%</span>
+                    <el-input-number v-model="row.dc[t * 2]" size="small" :precision="6" :controls="false" style="width:80px" /><span style="color: var(--gt-color-text-tertiary);font-size: var(--gt-font-size-xs)">%</span>
                   </span>
                   <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmt(row.dc[t * 2]) }}</span>
                   <el-input-number v-else v-model="row.dc[t * 2]" size="small" :precision="2" :controls="false" style="width:100%" />
@@ -568,18 +568,18 @@ function simRowClass({ row }: any) {
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
-.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; white-space: nowrap; }
+.ws-sheet-header h3 { margin: 0; font-size: var(--gt-font-size-base); color: var(--gt-color-text-primary); white-space: nowrap; }
 .ws-sheet-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
-.ws-tip b { color: #4b2d77; }
+.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: var(--gt-color-bg); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
+.ws-tip b { color: var(--gt-color-primary); }
 
 .sc-company-block { margin-bottom: 20px; border: 1px solid #e8e4f0; border-radius: 8px; overflow: hidden; }
 .sc-company-header {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 14px; background: linear-gradient(135deg, #4b2d77 0%, #7c5caa 100%);
 }
-.sc-company-idx { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.2); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-.sc-company-name { font-size: 14px; font-weight: 700; color: #fff; }
+.sc-company-idx { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.2); color: #fff; font-size: var(--gt-font-size-xs); font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.sc-company-name { font-size: var(--gt-font-size-sm); font-weight: 700; color: var(--gt-color-text-inverse); }
 .sc-company-header :deep(.el-tag) { border-color: rgba(255,255,255,0.3); color: #fff; background: rgba(255,255,255,0.15); }
 
 .sc-three-col { display: flex; gap: 0; overflow-x: auto; padding: 12px; }
@@ -594,19 +594,19 @@ function simRowClass({ row }: any) {
 }
 .sc-resizer:hover { background: rgba(75,45,119,0.06); }
 .sc-resizer-bar {
-  width: 3px; height: 40px; background: #d8d0e8; border-radius: 2px; transition: all 0.2s;
+  width: 3px; height: 40px; background: var(--gt-color-primary-lighter); border-radius: 2px; transition: all 0.2s;
 }
-.sc-resizer:hover .sc-resizer-bar { height: 80px; background: #4b2d77; }
-.sc-col-title { font-size: 12px; font-weight: 600; color: #4b2d77; margin-bottom: 6px; padding: 5px 10px; background: #f8f6fb; border-radius: 4px; }
-.sc-col-title--indirect { background: #edf3fb; color: #1a5fb4; }
+.sc-resizer:hover .sc-resizer-bar { height: 80px; background: var(--gt-color-primary); }
+.sc-col-title { font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-primary); margin-bottom: 6px; padding: 5px 10px; background: var(--gt-color-primary-bg); border-radius: 4px; }
+.sc-col-title--indirect { background: var(--gt-bg-info); color: var(--gt-color-teal); }
 
-.sc-computed { color: #4b2d77; font-weight: 500; }
-.sc-auto-val { display: block; text-align: right; padding: 0 4px; color: #4b2d77; font-weight: 600; font-size: 11px; background: #faf8fd; border-radius: 2px; }
-.sc-ratio-val { display: flex; align-items: center; justify-content: center; color: #4b2d77; font-weight: 700; font-size: 12px; }
-.sc-table :deep(.el-input__inner) { text-align: right; font-size: 11px; }
-.sc-table :deep(.sc-row-header td) { background: #f8f6fb !important; font-weight: 600; }
+.sc-computed { color: var(--gt-color-primary); font-weight: 500; }
+.sc-auto-val { display: block; text-align: right; padding: 0 4px; color: var(--gt-color-primary); font-weight: 600; font-size: var(--gt-font-size-xs); background: var(--gt-color-primary-bg); border-radius: 2px; }
+.sc-ratio-val { display: flex; align-items: center; justify-content: center; color: var(--gt-color-primary); font-weight: 700; font-size: var(--gt-font-size-xs); }
+.sc-table :deep(.el-input__inner) { text-align: right; font-size: var(--gt-font-size-xs); }
+.sc-table :deep(.sc-row-header td) { background: var(--gt-color-primary-bg) !important; font-weight: 600; }
 .sc-table :deep(.sc-row-bold td) { font-weight: 600; }
-.sc-table :deep(.sc-row-section td) { background: #f0edf5 !important; font-weight: 600; color: #4b2d77; }
-.sc-table :deep(.sc-row-subtotal td) { background: #faf8fd !important; font-weight: 600; }
-.sc-table :deep(.sc-row-ratio td) { background: #f8f6fb !important; font-weight: 600; color: #4b2d77; }
+.sc-table :deep(.sc-row-section td) { background: var(--gt-color-primary-bg) !important; font-weight: 600; color: var(--gt-color-primary); }
+.sc-table :deep(.sc-row-subtotal td) { background: var(--gt-color-primary-bg) !important; font-weight: 600; }
+.sc-table :deep(.sc-row-ratio td) { background: var(--gt-color-primary-bg) !important; font-weight: 600; color: var(--gt-color-primary); }
 </style>

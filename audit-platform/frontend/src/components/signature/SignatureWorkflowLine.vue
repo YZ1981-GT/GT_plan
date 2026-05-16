@@ -101,7 +101,7 @@ function formatTime(ts: string | null | undefined): string {
 }
 
 .gt-sig-workflow-title {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   color: var(--gt-color-text-primary, #303133);
   margin-bottom: 12px;
@@ -143,24 +143,24 @@ function formatTime(ts: string | null | undefined): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
 }
 
 .gt-sig-icon--signed {
-  background: #67c23a;
-  color: #fff;
+  background: var(--gt-color-success);
+  color: var(--gt-color-text-inverse);
 }
 
 .gt-sig-icon--ready {
-  background: #409eff;
-  color: #fff;
+  background: var(--gt-color-teal);
+  color: var(--gt-color-text-inverse);
   animation: pulse-ready 1.5s ease-in-out infinite;
 }
 
 .gt-sig-icon--waiting {
-  background: #e4e7ed;
-  color: #909399;
+  background: var(--gt-color-border-light);
+  color: var(--gt-color-info);
 }
 
 @keyframes pulse-ready {
@@ -178,7 +178,7 @@ function formatTime(ts: string | null | undefined): string {
 }
 
 .gt-sig-step--signed .gt-sig-step-connector {
-  background: #67c23a;
+  background: var(--gt-color-success);
 }
 
 .gt-sig-step--ready .gt-sig-step-connector {
@@ -186,7 +186,7 @@ function formatTime(ts: string | null | undefined): string {
 }
 
 .gt-sig-step--waiting .gt-sig-step-connector {
-  background: #e4e7ed;
+  background: var(--gt-color-border-light);
 }
 
 .gt-sig-step-content {
@@ -201,13 +201,13 @@ function formatTime(ts: string | null | undefined): string {
 }
 
 .gt-sig-step-order {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   color: var(--gt-color-text-primary, #303133);
 }
 
 .gt-sig-step-role {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary, #606266);
 }
 
@@ -216,7 +216,7 @@ function formatTime(ts: string | null | undefined): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .gt-sig-step-signer {
@@ -229,7 +229,7 @@ function formatTime(ts: string | null | undefined): string {
 
 /* ready step 高亮 */
 .gt-sig-step--ready .gt-sig-step-order {
-  color: #409eff;
+  color: var(--gt-color-teal);
 }
 
 .gt-sig-step--ready .gt-sig-step-content {

@@ -88,10 +88,10 @@ async function runReplay() {
 .layer-node.consistent { border-left: 3px solid var(--el-color-success); }
 .layer-node.inconsistent { border-left: 3px solid var(--el-color-danger); }
 .layer-header { display: flex; align-items: center; gap: 8px; }
-.layer-icon { font-size: 16px; }
-.layer-label { flex: 1; font-size: 14px; }
+.layer-icon { font-size: var(--gt-font-size-md); }
+.layer-label { flex: 1; font-size: var(--gt-font-size-sm); }
 .layer-diffs { margin-top: 8px; }
 .diff-blocking { color: var(--el-color-danger); font-weight: 600; }
 .diff-warning { color: var(--el-color-warning); }
-.trace-info { margin-top: 12px; font-size: 12px; color: #999; }
+.trace-info { margin-top: 12px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 </style>

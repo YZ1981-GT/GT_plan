@@ -78,29 +78,29 @@ function onStepClick(idx: number) {
 }
 
 .gt-consol-wizard :deep(.el-step__title) {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .gt-consol-wizard :deep(.el-step__description) {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .gt-consol-wizard :deep(.el-step__head.is-success) {
-  color: #4b2d77;
+  color: var(--gt-color-primary);
   border-color: #4b2d77;
 }
 
 .gt-consol-wizard :deep(.el-step__title.is-success) {
-  color: #4b2d77;
+  color: var(--gt-color-primary);
 }
 
 .gt-consol-wizard :deep(.el-step__head.is-process) {
-  color: #4b2d77;
+  color: var(--gt-color-primary);
   border-color: #4b2d77;
 }
 
 .gt-consol-wizard :deep(.el-step__title.is-process) {
-  color: #4b2d77;
+  color: var(--gt-color-primary);
   font-weight: 600;
 }
 </style>

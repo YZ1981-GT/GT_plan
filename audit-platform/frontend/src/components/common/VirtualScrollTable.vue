@@ -157,9 +157,9 @@ watch(() => props.data.length, () => {
   align-items: center;
 }
 
-.gt-vt-row:hover { background: #f0ecf7; }
+.gt-vt-row:hover { background: var(--gt-color-primary-bg); }
 .gt-vt-row--active { background: var(--gt-color-primary-bg) !important; }
-.gt-vt-row--stripe { background: #faf9fc; }
+.gt-vt-row--stripe { background: var(--gt-color-primary-bg); }
 
 .gt-vt-cell {
   padding: 0 12px;
@@ -176,7 +176,7 @@ watch(() => props.data.length, () => {
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary);
   border-top: 1px solid var(--gt-color-border-light);
-  background: #fafafa;
+  background: var(--gt-color-bg);
 }
 
 .gt-vt-hint { color: var(--gt-color-teal); }

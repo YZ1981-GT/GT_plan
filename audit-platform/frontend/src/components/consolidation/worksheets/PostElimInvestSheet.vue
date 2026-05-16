@@ -60,7 +60,7 @@
       </el-table-column>
       <el-table-column label="合并抵消" align="center">
         <el-table-column prop="elimCost" label="投资成本" width="110" align="right">
-          <template #default="{ row }"><el-input-number :model-value="row.elimCost" size="small" :precision="2" :controls="false" style="width:100%;color:#e6a23c" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'elimCost', v)" /></template>
+          <template #default="{ row }"><el-input-number :model-value="row.elimCost" size="small" :precision="2" :controls="false" style="width:100%;color: var(--gt-color-wheat)" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'elimCost', v)" /></template>
         </el-table-column>
         <el-table-column prop="elimIncomeAdj" label="损益调整" width="100" align="right">
           <template #default="{ row }"><el-input-number :model-value="row.elimIncomeAdj" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'elimIncomeAdj', v)" /></template>
@@ -69,7 +69,7 @@
           <template #default="{ row }"><el-input-number :model-value="row.elimOtherEquity" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'elimOtherEquity', v)" /></template>
         </el-table-column>
         <el-table-column prop="elimTotal" label="抵消合计" width="110" align="right">
-          <template #default="{ row }"><span style="color:#e6a23c;font-weight:600">{{ fmt(row.elimTotal) }}</span></template>
+          <template #default="{ row }"><span style="color: var(--gt-color-wheat);font-weight:600">{{ fmt(row.elimTotal) }}</span></template>
         </el-table-column>
       </el-table-column>
       <el-table-column label="抵消后" align="center">
@@ -80,8 +80,8 @@
         </el-table-column>
         <el-table-column prop="checkResult" label="校验" width="60" align="center">
           <template #default="{ row }">
-            <span v-if="n(row.postElimTotal) === 0" style="color:#67c23a">✓</span>
-            <span v-else style="color:#e6a23c">⚠</span>
+            <span v-if="n(row.postElimTotal) === 0" style="color: var(--gt-color-success)">✓</span>
+            <span v-else style="color: var(--gt-color-wheat)">⚠</span>
           </template>
         </el-table-column>
       </el-table-column>
@@ -265,16 +265,16 @@ function getSummary({ columns, data }: any) {
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
+.ws-sheet-header h3 { margin: 0; font-size: var(--gt-font-size-base); color: var(--gt-color-text-primary); }
 .ws-sheet-actions { display: flex; gap: 8px; }
-.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
-.ws-computed { color: #4b2d77; font-weight: 500; }
-.ws-zero { color: #c0c4cc !important; font-weight: 400 !important; }
+.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: var(--gt-color-bg); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
+.ws-computed { color: var(--gt-color-primary); font-weight: 500; }
+.ws-zero { color: var(--gt-color-text-placeholder) !important; font-weight: 400 !important; }
 .ws-bold { font-weight: 700; }
-.ws-diff-warn { color: #e6a23c !important; font-weight: 700 !important; }
-.ws-table :deep(.ws-row-warn td) { background: #fdf6ec !important; }
-.ws-table :deep(.el-table__footer-wrapper td) { background: #f8f6fb !important; font-weight: 700; color: #4b2d77; }
-.ws-table :deep(.ws-auto-cell .el-input__inner) { color: #4b2d77; background: #faf8fd; }
-.ws-link { color: #4b2d77; cursor: pointer; text-decoration: underline; font-weight: 500; }
-.ws-link:hover { color: #7c5caa; }
+.ws-diff-warn { color: var(--gt-color-wheat) !important; font-weight: 700 !important; }
+.ws-table :deep(.ws-row-warn td) { background: var(--gt-bg-warning) !important; }
+.ws-table :deep(.el-table__footer-wrapper td) { background: var(--gt-color-primary-bg) !important; font-weight: 700; color: var(--gt-color-primary); }
+.ws-table :deep(.ws-auto-cell .el-input__inner) { color: var(--gt-color-primary); background: var(--gt-color-primary-bg); }
+.ws-link { color: var(--gt-color-primary); cursor: pointer; text-decoration: underline; font-weight: 500; }
+.ws-link:hover { color: var(--gt-color-primary); }
 </style>

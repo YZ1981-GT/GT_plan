@@ -10,7 +10,7 @@
   >
     <el-alert type="warning" :closable="false" show-icon style="margin-bottom: 16px">
       <template #title>请完成 {{ currentYear }} 年度独立性声明</template>
-      <div style="font-size: 12px">
+      <div style="font-size: var(--gt-font-size-xs)">
         根据事务所质量管理要求，EQCR/签字合伙人/质控合伙人须每年度提交独立性声明后方可访问 EQCR 工作台。
       </div>
     </el-alert>
@@ -126,7 +126,7 @@ onMounted(() => {
 .declaration-questions { max-height: 400px; overflow-y: auto; }
 .question-group { margin-bottom: 16px; }
 .question-group__title {
-  font-size: 14px; font-weight: 600; margin: 0 0 8px;
+  font-size: var(--gt-font-size-sm); font-weight: 600; margin: 0 0 8px;
   color: var(--gt-color-primary, #4b2d77);
   padding-left: 8px;
   border-left: 3px solid var(--gt-color-primary, #4b2d77);
@@ -136,10 +136,10 @@ onMounted(() => {
   padding: 8px 12px; border-radius: 4px;
   margin-bottom: 4px;
 }
-.question-item:hover { background: #f5f7fa; }
-.question-item__text { flex: 1; font-size: 13px; margin-right: 16px; }
+.question-item:hover { background: var(--gt-bg-subtle); }
+.question-item__text { flex: 1; font-size: var(--gt-font-size-sm); margin-right: 16px; }
 .declaration-footer {
   display: flex; justify-content: space-between; align-items: center; width: 100%;
 }
-.declaration-footer__progress { font-size: 13px; color: #909399; }
+.declaration-footer__progress { font-size: var(--gt-font-size-sm); color: var(--gt-color-info); }
 </style>

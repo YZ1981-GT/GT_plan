@@ -210,11 +210,11 @@ eventBus.on('sse:sync-failed', onSyncFailed)
   color: rgba(255, 255, 255, 0.85);
 }
 .gt-sync-btn--syncing {
-  color: #fff;
+  color: var(--gt-color-text-inverse);
   background: rgba(255, 255, 255, 0.15);
 }
 .gt-sync-btn--failed {
-  color: #ff6b6b;
+  color: var(--gt-color-coral);
   background: rgba(255, 100, 100, 0.15);
 }
 .gt-sync-btn--failed:hover {
@@ -227,7 +227,7 @@ eventBus.on('sse:sync-failed', onSyncFailed)
   right: -6px;
 }
 .gt-sync-badge :deep(.el-badge__content) {
-  font-size: 10px;
+  font-size: var(--gt-font-size-xs);
   height: 16px;
   line-height: 16px;
   padding: 0 4px;
@@ -240,11 +240,11 @@ eventBus.on('sse:sync-failed', onSyncFailed)
   align-items: center;
   justify-content: center;
   padding: 60px 0;
-  color: #909399;
+  color: var(--gt-color-info);
 }
 .gt-sync-empty p {
   margin-top: 12px;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .gt-sync-list {
@@ -260,7 +260,7 @@ eventBus.on('sse:sync-failed', onSyncFailed)
 }
 .gt-sync-item--failed {
   border-color: #fbc4c4;
-  background: #fef0f0;
+  background: var(--gt-bg-danger);
 }
 
 .gt-sync-item-header {
@@ -271,12 +271,12 @@ eventBus.on('sse:sync-failed', onSyncFailed)
 }
 .gt-sync-item-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   flex: 1;
 }
 .gt-sync-item-time {
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 
 .gt-sync-item-body {
@@ -288,18 +288,18 @@ eventBus.on('sse:sync-failed', onSyncFailed)
 .gt-sync-detail-row {
   display: flex;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-sync-label {
-  color: #909399;
+  color: var(--gt-color-info);
   min-width: 56px;
   flex-shrink: 0;
 }
 .gt-sync-value {
-  color: #303133;
+  color: var(--gt-color-text-primary);
   word-break: break-all;
 }
 .gt-sync-error {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
 }
 </style>

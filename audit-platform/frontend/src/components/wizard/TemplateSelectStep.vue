@@ -207,11 +207,11 @@ onMounted(async () => {
 }
 .step-header h3 {
   margin: 0 0 4px;
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
 }
 .step-desc {
-  color: #909399;
-  font-size: 13px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-sm);
   margin: 0 0 16px;
 }
 .type-tabs {
@@ -220,12 +220,12 @@ onMounted(async () => {
 .selected-section {
   margin-bottom: 20px;
   padding: 12px;
-  background: #f9f7fc;
+  background: var(--gt-color-primary-bg);
   border-radius: 8px;
 }
 .selected-section h4 {
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-primary, #4b2d77);
 }
 .available-section {
@@ -239,7 +239,7 @@ onMounted(async () => {
 }
 .section-header h4 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 .action-bar {
   margin-top: 12px;
@@ -249,7 +249,7 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
 }
 </style>

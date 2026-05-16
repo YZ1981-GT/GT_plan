@@ -501,14 +501,14 @@ async function onDelete(row: GtCoding) {
   gap: 8px;
   flex-wrap: wrap;
   padding: 8px 12px;
-  background: #faf9fc;
+  background: var(--gt-color-primary-bg);
   border-radius: 6px;
   border-left: 3px solid #4b2d77;
   flex-shrink: 0;
 }
 .gt-gtc-stats-item {
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
   margin-right: 8px;
 }
 .gt-gtc-stats-tag-num {
@@ -527,13 +527,13 @@ async function onDelete(row: GtCoding) {
 }
 
 /* 类型标签颜色 */
-.gt-gtc-type--preliminary { background: #e1f3ff; color: #1d72b8; border-color: #b3d9f0; }
-.gt-gtc-type--risk_assessment { background: #ffe9d6; color: #b54708; border-color: #f0c898; }
-.gt-gtc-type--control_test { background: #fff3a3; color: #8a6d00; border-color: #ebe18a; }
-.gt-gtc-type--substantive { background: #f0e6ff; color: #6a39c4; border-color: #d4bff0; }
-.gt-gtc-type--completion { background: #e6f7e6; color: #2e7d32; border-color: #b8d8b8; }
-.gt-gtc-type--specific { background: #ffe1e1; color: #c92a2a; border-color: #f5b7b7; }
-.gt-gtc-type--general { background: #f0f2f5; color: #606266; border-color: #d9dadc; }
+.gt-gtc-type--preliminary { background: var(--gt-bg-info); color: var(--gt-color-teal); border-color: #b3d9f0; }
+.gt-gtc-type--risk_assessment { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); border-color: #f0c898; }
+.gt-gtc-type--control_test { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); border-color: #ebe18a; }
+.gt-gtc-type--substantive { background: var(--gt-color-primary-bg); color: var(--gt-color-primary-light); border-color: #d4bff0; }
+.gt-gtc-type--completion { background: var(--gt-color-success-light); color: var(--gt-color-success); border-color: #b8d8b8; }
+.gt-gtc-type--specific { background: var(--gt-color-coral-light); color: var(--gt-color-coral); border-color: #f5b7b7; }
+.gt-gtc-type--general { background: var(--gt-color-bg); color: var(--gt-color-text-regular); border-color: #d9dadc; }
 
 /* ─── 主体 ─── */
 .gt-gtc-body {
@@ -546,7 +546,7 @@ async function onDelete(row: GtCoding) {
 }
 
 .gt-gtc-group {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #ebeef5;
   border-radius: 8px;
   overflow: hidden;
@@ -556,19 +556,19 @@ async function onDelete(row: GtCoding) {
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: #faf9fc;
+  background: var(--gt-color-primary-bg);
   border-bottom: 1px solid #ebeef5;
   border-left: 3px solid #4b2d77;
 }
 .gt-gtc-group-title {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 700;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .gt-gtc-group-count {
-  font-size: 12px;
-  color: #4b2d77;
-  background: #fff;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-primary);
+  background: var(--gt-color-bg-white);
   padding: 1px 8px;
   border-radius: 10px;
   border: 1px solid #d4bff0;
@@ -580,25 +580,25 @@ async function onDelete(row: GtCoding) {
 
 .gt-gtc-prefix {
   display: inline-block;
-  background: #4b2d77;
-  color: #fff;
+  background: var(--gt-color-primary);
+  color: var(--gt-color-text-inverse);
   border-radius: 4px;
   padding: 2px 8px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-gtc-range {
   font-family: 'Consolas', 'Courier New', monospace;
-  background: #f5f5f7;
+  background: var(--gt-color-bg);
   padding: 1px 6px;
   border-radius: 3px;
-  font-size: 12px;
-  color: #4b2d77;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-primary);
 }
 .gt-gtc-em {
-  color: #c0c4cc;
-  font-size: 12px;
+  color: var(--gt-color-text-placeholder);
+  font-size: var(--gt-font-size-xs);
 }
 .gt-gtc-tmpl-count {
-  color: #4b2d77;
+  color: var(--gt-color-primary);
 }
 </style>

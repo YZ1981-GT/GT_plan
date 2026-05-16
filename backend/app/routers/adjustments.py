@@ -521,3 +521,53 @@ def _write_adj_sheet(ws, entries, adj_type: str):
     ws.column_dimensions["D"].width = 20
     ws.column_dimensions["E"].width = 16
     ws.column_dimensions["F"].width = 16
+
+
+# R10 Spec B / Sprint 3.2.3 — 调整分录组关联底稿
+@router.get("/{entry_group_id}/related-workpapers")
+async def get_adjustment_related_workpapers(
+    project_id: UUID,
+    entry_group_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """R10 Spec B / F8：根据调整分录组中所有 line_items 的科目反查关联底稿。"""
+    from app.models.adjustment_models import Adjustment, AdjustmentEntry
+    from app.services.workpaper_query import find_workpapers_by_account_codes
+
+    # 找该 group_id 的所有分录行
+    stmt = (
+        sa.select(Adjustment)
+        .where(
+            Adjustment.entry_group_id == entry_group_id,
+            Adjustment.project_id == project_id,
+            Adjustment.is_deleted == False,  # noqa: E712
+        )
+    )
+    adjustments = (await db.execute(stmt)).scalars().all()
+    if not adjustments:
+        raise HTTPException(status_code=404, detail="调整分录组不存在")
+
+    # 收集所有 line_items 的科目编码
+    codes: set[str] = set()
+    for adj in adjustments:
+        # AdjustmentEntry 关联的 line_items
+        entries_stmt = sa.select(AdjustmentEntry).where(
+            AdjustmentEntry.adjustment_id == adj.id,
+            AdjustmentEntry.is_deleted == False,  # noqa: E712
+        )
+        try:
+            entries = (await db.execute(entries_stmt)).scalars().all()
+            for e in entries:
+                code = getattr(e, "standard_account_code", None) or getattr(e, "account_code", None)
+                if code:
+                    codes.add(str(code))
+        except Exception:
+            pass
+
+    workpapers = await find_workpapers_by_account_codes(db, project_id, list(codes))
+    return {
+        "entry_group_id": entry_group_id,
+        "account_codes": list(codes),
+        "workpapers": workpapers,
+    }

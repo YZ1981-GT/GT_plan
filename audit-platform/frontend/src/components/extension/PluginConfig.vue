@@ -83,6 +83,6 @@ async function onSave() {
 <style scoped>
 .gt-config-editor :deep(textarea) {
   font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 </style>

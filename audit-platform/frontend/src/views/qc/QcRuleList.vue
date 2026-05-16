@@ -138,11 +138,11 @@ onMounted(() => {
 .rule-code {
   font-family: 'Courier New', monospace;
   font-weight: 600;
-  color: #409eff;
+  color: var(--gt-color-teal);
 }
 
 .no-ref {
-  color: #c0c4cc;
+  color: var(--gt-color-text-placeholder);
 }
 
 .enabled-dot {
@@ -155,10 +155,10 @@ onMounted(() => {
 }
 
 .enabled-dot--on {
-  background-color: #67c23a;
+  background-color: var(--gt-color-success);
 }
 
 .enabled-dot--off {
-  background-color: #c0c4cc;
+  background-color: var(--gt-color-text-placeholder);
 }
 </style>

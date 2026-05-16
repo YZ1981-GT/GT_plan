@@ -264,13 +264,13 @@ function isStepCompleted(step: string): boolean {
 .step-title {
   color: var(--gt-color-primary);
   margin-bottom: var(--gt-space-1);
-  font-size: 20px;
+  font-size: 20px /* allow-px: special */;
 }
 
 .step-desc {
-  color: #999;
+  color: var(--gt-color-text-tertiary);
   margin-bottom: var(--gt-space-6);
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .summary-cards {
@@ -285,7 +285,7 @@ function isStepCompleted(step: string): boolean {
 
 .card-title {
   color: var(--gt-color-primary);
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   margin-bottom: var(--gt-space-3);
   padding-bottom: var(--gt-space-2);
   border-bottom: 1px solid #eee;
@@ -301,15 +301,15 @@ function isStepCompleted(step: string): boolean {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .info-label {
-  color: #999;
+  color: var(--gt-color-text-tertiary);
 }
 
 .info-value {
-  color: #333;
+  color: var(--gt-color-text-primary);
   font-weight: 500;
 }
 </style>

@@ -141,7 +141,7 @@ watch(() => [props.projectId, props.year], fetchStatus)
   padding: 6px 12px;
   border-radius: 16px;
   transition: all 0.2s;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   user-select: none;
   white-space: nowrap;
 }
@@ -154,37 +154,37 @@ watch(() => [props.projectId, props.year], fetchStatus)
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
   flex-shrink: 0;
   transition: all 0.2s;
 }
 
-.wf-step--done .wf-step__icon { background: #e8f5e9; color: #4caf50; }
-.wf-step--done .wf-step__label { color: #4caf50; font-weight: 500; }
-.wf-step--done:hover .wf-step__icon { background: #c8e6c9; }
+.wf-step--done .wf-step__icon { background: var(--gt-color-success-light); color: var(--gt-color-success); }
+.wf-step--done .wf-step__label { color: var(--gt-color-success); font-weight: 500; }
+.wf-step--done:hover .wf-step__icon { background: var(--gt-color-success-light); }
 
 .wf-step--active .wf-step__icon { background: #4b2d77; color: #fff; box-shadow: 0 2px 6px rgba(75,45,119,0.3); }
-.wf-step--active .wf-step__label { color: #4b2d77; font-weight: 600; }
+.wf-step--active .wf-step__label { color: var(--gt-color-primary); font-weight: 600; }
 .wf-step--active { background: rgba(75, 45, 119, 0.06); }
 
-.wf-step--future .wf-step__icon { background: #f0edf5; color: #b0a4c0; border: 1px solid #e0dce8; }
-.wf-step--future .wf-step__label { color: #b0a4c0; }
-.wf-step--future:hover .wf-step__icon { background: #e8e0f0; color: #8b7ba8; }
-.wf-step--future:hover .wf-step__label { color: #8b7ba8; }
+.wf-step--future .wf-step__icon { background: var(--gt-color-primary-bg); color: var(--gt-color-primary-lighter); border: 1px solid #e0dce8; }
+.wf-step--future .wf-step__label { color: var(--gt-color-primary-lighter); }
+.wf-step--future:hover .wf-step__icon { background: var(--gt-color-border-light); color: var(--gt-color-primary-light); }
+.wf-step--future:hover .wf-step__label { color: var(--gt-color-primary-light); }
 
 .wf-step__label {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   letter-spacing: 0.3px;
 }
 
 .wf-step__connector {
   width: 24px;
   height: 1px;
-  background: #d9d2e8;
+  background: var(--gt-color-primary-lighter);
   margin: 0 2px;
   flex-shrink: 0;
 }
 .wf-step--done + .wf-step__connector,
-.wf-connector--done { background: #4caf50; }
+.wf-connector--done { background: var(--gt-color-success); }
 </style>

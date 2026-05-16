@@ -175,8 +175,8 @@ defineExpose({ open, close })
   margin-bottom: 8px;
 }
 
-.source-icon { font-size: 16px; }
-.source-label { font-weight: 500; font-size: 14px; }
+.source-icon { font-size: var(--gt-font-size-md); }
+.source-label { font-weight: 500; font-size: var(--gt-font-size-sm); }
 
 .source-detail {
   display: flex;
@@ -188,7 +188,7 @@ defineExpose({ open, close })
   display: flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .detail-label {
@@ -204,7 +204,7 @@ defineExpose({ open, close })
 
 .detail-value.mono {
   font-family: 'Consolas', monospace;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .detail-value.amount {
@@ -215,7 +215,7 @@ defineExpose({ open, close })
 }
 
 .detail-value.time {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-placeholder);
 }
 </style>

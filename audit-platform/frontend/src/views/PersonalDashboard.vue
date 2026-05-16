@@ -13,7 +13,7 @@
             </div>
             <div style="display: flex; gap: 4px; align-items: center">
               <el-tag size="small" type="info">{{ roleLabel(p.role) }}</el-tag>
-              <span v-if="p.assigned_cycles?.length" style="font-size: 11px; color: #999">{{ p.assigned_cycles.join('/') }}</span>
+              <span v-if="p.assigned_cycles?.length" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary)">{{ p.assigned_cycles.join('/') }}</span>
             </div>
           </div>
           <el-empty v-if="!myProjects.length" :image-size="50" description="暂无委派项目" />
@@ -93,10 +93,10 @@ onMounted(async () => {
 <style scoped>
 .gt-personal { padding: var(--gt-space-4); }
 .gt-p-card { background: white; border-radius: var(--gt-radius-md); padding: 16px; box-shadow: var(--gt-shadow-sm); min-height: 280px; }
-.gt-p-card h4 { margin: 0 0 12px; font-size: 14px; color: var(--gt-color-primary, #4b2d77); }
+.gt-p-card h4 { margin: 0 0 12px; font-size: var(--gt-font-size-sm); color: var(--gt-color-primary, #4b2d77); }
 .gt-p-project-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
-.gt-p-project-item:hover { background: #f8f6fb; }
-.gt-p-proj-name { font-size: 13px; }
-.gt-p-todo-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
-.gt-p-hour-item { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+.gt-p-project-item:hover { background: var(--gt-color-primary-bg); }
+.gt-p-proj-name { font-size: var(--gt-font-size-sm); }
+.gt-p-todo-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: var(--gt-font-size-sm); }
+.gt-p-hour-item { display: flex; justify-content: space-between; padding: 4px 0; font-size: var(--gt-font-size-sm); }
 </style>

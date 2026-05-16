@@ -96,12 +96,12 @@ onMounted(loadAnnotations)
 <style scoped>
 .cell-annotation-panel { padding: 12px; }
 .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.title { font-weight: 600; font-size: 14px; }
+.title { font-weight: 600; font-size: var(--gt-font-size-sm); }
 .annotation-item { padding: 8px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
-.annotation-item:hover { background: #f8f7fc; }
+.annotation-item:hover { background: var(--gt-color-primary-bg); }
 .item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.cell-ref { font-size: 12px; color: #909399; }
-.item-content { font-size: 13px; line-height: 1.4; }
-.item-time { font-size: 11px; color: #c0c4cc; margin-top: 4px; }
-.loading-tip, .empty-tip { text-align: center; padding: 24px; color: #909399; }
+.cell-ref { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); }
+.item-content { font-size: var(--gt-font-size-sm); line-height: 1.4; }
+.item-time { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); margin-top: 4px; }
+.loading-tip, .empty-tip { text-align: center; padding: 24px; color: var(--gt-color-info); }
 </style>

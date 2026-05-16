@@ -120,13 +120,13 @@ function handlePrint() {
       <title>${props.title || '打印预览'}</title>
       <style>
         @page { size: ${orientation}; margin: 15mm; }
-        body { font-family: 'Microsoft YaHei', sans-serif; font-size: 12px; }
-        .gt-print-title { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 8px; }
-        .gt-print-subtitle { text-align: center; font-size: 13px; color: #666; margin-bottom: 12px; }
+        body { font-family: 'Microsoft YaHei', sans-serif; font-size: var(--gt-font-size-xs); }
+        .gt-print-title { text-align: center; font-size: var(--gt-font-size-xl); font-weight: bold; margin-bottom: 8px; }
+        .gt-print-subtitle { text-align: center; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-bottom: 12px; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #333; padding: 4px 8px; font-size: 11px; }
-        th { background: #f0f0f0; font-weight: bold; }
-        .gt-print-footer { display: flex; justify-content: space-between; margin-top: 12px; font-size: 10px; color: #999; }
+        th, td { border: 1px solid #333; padding: 4px 8px; font-size: var(--gt-font-size-xs); }
+        th { background: var(--gt-color-border-lighter); font-weight: bold; }
+        .gt-print-footer { display: flex; justify-content: space-between; margin-top: 12px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
         ${!showGridLines.value ? 'th, td { border: none; }' : ''}
       </style>
     </head>
@@ -149,7 +149,7 @@ function handlePrint() {
   gap: 12px;
   margin-bottom: 12px;
   padding: 8px 12px;
-  background: #f5f5f5;
+  background: var(--gt-color-bg);
   border-radius: 4px;
 }
 
@@ -168,22 +168,22 @@ function handlePrint() {
 
 .gt-print-title {
   text-align: center;
-  font-size: 18px;
+  font-size: var(--gt-font-size-xl);
   font-weight: bold;
   margin-bottom: 8px;
 }
 
 .gt-print-subtitle {
   text-align: center;
-  font-size: 13px;
-  color: #666;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-secondary);
   margin-bottom: 12px;
 }
 
 .gt-print-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .gt-print-table th,
@@ -193,9 +193,9 @@ function handlePrint() {
 }
 
 .gt-print-table th {
-  background: #f0f0f0;
+  background: var(--gt-color-border-lighter);
   font-weight: bold;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .no-grid .gt-print-table th,
@@ -208,7 +208,7 @@ function handlePrint() {
   display: flex;
   justify-content: space-between;
   margin-top: 12px;
-  font-size: 10px;
-  color: #999;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
 }
 </style>

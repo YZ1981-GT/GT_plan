@@ -181,8 +181,14 @@
 </template>
 
 <script setup lang="ts">
-/** GtEditableTable — 高阶可编辑表格组件 [R5.2] */
-import { ref, computed, watch } from 'vue'
+/** GtEditableTable — 高阶可编辑表格组件 [R5.2]
+ *
+ * R10 Spec B / Sprint 3.1.3 兼容 wrapper：
+ * - 本组件保持原有所有功能不变（避免 breaking 改动）
+ * - 新代码请按场景使用 GtTableExtended（列表型）或 GtFormTable（编辑型）
+ * - 60 天观察期后无新增引用即可删除
+ */
+import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useCellSelection } from '@/composables/useCellSelection'
 import { useLazyEdit } from '@/composables/useLazyEdit'
@@ -481,6 +487,25 @@ function getCellComment(rowIdx: number, colIdx: number): any { return props.getC
 // ── Watch & Expose ────────────────────────────────────────────────────────────
 watch(() => editMode.isDirty.value, (v) => emit('dirty-change', v))
 
+// R10 Spec B / Sprint 3.1.3：兼容 wrapper console.warn
+// 60 天观察期后无新增引用即可删除（监控 console.warn 频率）
+let _migrationWarnedAt = 0
+onMounted(() => {
+  // 节流：5 分钟内同一会话最多警告一次
+  const now = Date.now()
+  if (now - _migrationWarnedAt > 5 * 60 * 1000) {
+    _migrationWarnedAt = now
+    // 仅 dev 模式警告，避免生产 console 噪声
+    if (import.meta.env.DEV) {
+      console.warn(
+        '[GtEditableTable] 已拆分为 GtTableExtended（列表型）+ GtFormTable（编辑型）。\n'
+        + '请按场景迁移：列表展示用 GtTableExtended，行内编辑用 GtFormTable。\n'
+        + '本 wrapper 60 天观察期后将删除。详见 docs/COMPONENT_USAGE_GUIDE.md',
+      )
+    }
+  }
+})
+
 defineExpose({ editMode, fullscreen, cellSelection, toolbar, lazyEditState, tableRef })
 </script>
 
@@ -507,18 +532,18 @@ defineExpose({ editMode, fullscreen, cellSelection, toolbar, lazyEditState, tabl
 }
 
 .gt-et-cell-locked {
-  color: #999;
+  color: var(--gt-color-text-tertiary);
   cursor: not-allowed;
 }
 
 :deep(.gt-et-group-header-row) {
-  background: #f8f6fc !important;
+  background: var(--gt-color-primary-bg) !important;
   font-weight: 600;
   cursor: pointer;
 }
 
 :deep(.gt-et-group-header-row td) {
-  background: #f8f6fc !important;
+  background: var(--gt-color-primary-bg) !important;
 }
 
 .gt-et-footer {
@@ -529,7 +554,7 @@ defineExpose({ editMode, fullscreen, cellSelection, toolbar, lazyEditState, tabl
 }
 
 .gt-et-footer-info {
-  font-size: 11px;
-  color: #999;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
 }
 </style>

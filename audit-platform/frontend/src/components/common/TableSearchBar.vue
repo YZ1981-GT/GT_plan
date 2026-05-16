@@ -18,10 +18,10 @@
         <span v-if="keyword" class="gt-search-info">{{ matchInfo }}</span>
         <el-button-group size="small" class="gt-search-nav">
           <el-button @click="$emit('prev')" :disabled="!hasMatches" title="上一个 (Shift+Enter)">
-            <span style="font-size:12px">▲</span>
+            <span style="font-size: var(--gt-font-size-xs)">▲</span>
           </el-button>
           <el-button @click="$emit('next')" :disabled="!hasMatches" title="下一个 (Enter)">
-            <span style="font-size:12px">▼</span>
+            <span style="font-size: var(--gt-font-size-xs)">▼</span>
           </el-button>
         </el-button-group>
         <el-checkbox :model-value="caseSensitive" @update:model-value="$emit('update:caseSensitive', !!$event); $emit('search')" size="small" class="gt-search-case">Aa</el-checkbox>
@@ -99,7 +99,7 @@ watch(() => props.isVisible, (v) => {
   gap: 8px;
 }
 .gt-search-bar-icon {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   flex-shrink: 0;
   width: 24px;
   text-align: center;
@@ -111,16 +111,16 @@ watch(() => props.isVisible, (v) => {
 .gt-search-input :deep(.el-input__wrapper) {
   border-radius: 6px;
   box-shadow: 0 0 0 1px #d0c4e4 inset;
-  background: #fff;
+  background: var(--gt-color-bg-white);
 }
 .gt-search-input :deep(.el-input__wrapper:focus-within) {
   box-shadow: 0 0 0 2px var(--gt-color-primary, #4b2d77) inset;
 }
 .gt-search-input :deep(.el-input__inner) {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .gt-search-info {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-primary, #4b2d77);
   font-weight: 600;
   min-width: 60px;
@@ -133,30 +133,30 @@ watch(() => props.isVisible, (v) => {
   padding: 4px 8px;
   background: rgba(75, 45, 119, 0.06);
   border-color: #d0c4e4;
-  color: #4b2d77;
+  color: var(--gt-color-primary);
 }
 .gt-search-nav :deep(.el-button:hover) {
   background: rgba(75, 45, 119, 0.12);
 }
 .gt-search-case {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-search-case :deep(.el-checkbox__label) {
-  font-size: 11px;
-  color: #666;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
   padding-left: 4px;
 }
 .gt-search-replace-btn {
   background: transparent;
   border-color: #d0c4e4;
-  color: #4b2d77;
-  font-size: 12px;
+  color: var(--gt-color-primary);
+  font-size: var(--gt-font-size-xs);
 }
 .gt-search-action-btn {
   background: var(--gt-color-primary, #4b2d77);
   border-color: var(--gt-color-primary, #4b2d77);
-  color: #fff;
-  font-size: 12px;
+  color: var(--gt-color-text-inverse);
+  font-size: var(--gt-font-size-xs);
 }
 .gt-search-close {
   cursor: pointer;
@@ -166,14 +166,14 @@ watch(() => props.isVisible, (v) => {
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  color: #999;
-  font-size: 14px;
+  color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-sm);
   transition: all 0.15s;
   flex-shrink: 0;
 }
 .gt-search-close:hover {
   background: rgba(75, 45, 119, 0.1);
-  color: #4b2d77;
+  color: var(--gt-color-primary);
 }
 .gt-slide-down-enter-active { transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
 .gt-slide-down-leave-active { transition: all 0.15s ease; }

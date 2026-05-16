@@ -78,7 +78,7 @@
       <el-table-column prop="desc" label="说明" min-width="180">
         <template #default="{ row }">
           <el-input v-if="row._custom" v-model="row.desc" size="small" placeholder="说明" />
-          <span v-else style="font-size:11px;color:#999">{{ row.desc || '' }}</span>
+          <span v-else style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">{{ row.desc || '' }}</span>
         </template>
       </el-table-column>
     </el-table>
@@ -89,8 +89,8 @@
       <span style="margin:0 12px">贷方合计: <b class="ws-computed">{{ fmt(totalCredit) }}</b></span>
       <span :class="totalDebit - totalCredit !== 0 ? 'ws-diff-warn' : ''" style="font-weight:600">
         差额: {{ fmt(totalDebit - totalCredit) }}
-        <span v-if="totalDebit - totalCredit === 0" style="color:#67c23a;margin-left:4px">✓ 平衡</span>
-        <span v-else style="color:#e6a23c;margin-left:4px">⚠ 不平衡</span>
+        <span v-if="totalDebit - totalCredit === 0" style="color: var(--gt-color-success);margin-left:4px">✓ 平衡</span>
+        <span v-else style="color: var(--gt-color-wheat);margin-left:4px">⚠ 不平衡</span>
       </span>
     </div>
     <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
@@ -356,22 +356,22 @@ function entryRowClass({ row }: any) { return row._custom ? '' : 'ws-row-auto' }
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
-.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
+.ws-sheet-header h3 { margin: 0; font-size: var(--gt-font-size-base); color: var(--gt-color-text-primary); }
 .ws-sheet-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
-.ws-tip b { color: #4b2d77; }
-.ws-link { color: #4b2d77; cursor: pointer; text-decoration: underline; font-weight: 500; }
-.ws-link:hover { color: #7c5caa; }
-.ws-computed { color: #4b2d77; font-weight: 500; }
+.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: var(--gt-color-bg); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
+.ws-tip b { color: var(--gt-color-primary); }
+.ws-link { color: var(--gt-color-primary); cursor: pointer; text-decoration: underline; font-weight: 500; }
+.ws-link:hover { color: var(--gt-color-primary); }
+.ws-computed { color: var(--gt-color-primary); font-weight: 500; }
 .ws-bold { font-weight: 700; }
-.ws-diff-warn { color: #e6a23c !important; font-weight: 700 !important; }
+.ws-diff-warn { color: var(--gt-color-wheat) !important; font-weight: 700 !important; }
 .ws-balance-check {
-  margin-top: 10px; padding: 8px 14px; background: #fafafa; border-radius: 6px;
-  border: 1px solid #eee; font-size: 13px; display: flex; align-items: center;
+  margin-top: 10px; padding: 8px 14px; background: var(--gt-color-bg); border-radius: 6px;
+  border: 1px solid #eee; font-size: var(--gt-font-size-sm); display: flex; align-items: center;
 }
-.ws-table :deep(.el-input__inner) { text-align: right; font-size: 11px; }
+.ws-table :deep(.el-input__inner) { text-align: right; font-size: var(--gt-font-size-xs); }
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
-.ws-table :deep(.ws-row-auto td) { background: #f9f9f9 !important; }
+.ws-table :deep(.ws-row-auto td) { background: var(--gt-color-bg) !important; }
 </style>
 
 <style>
@@ -381,13 +381,13 @@ function entryRowClass({ row }: any) { return row._custom ? '' : 'ws-row-auto' }
 }
 .ws-subject-popper .el-tree-node__content {
   height: 26px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .ws-subject-popper .el-tree-node__label {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .ws-subject-popper .el-tree-node__expand-icon {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 /* 父节点（disabled）灰色斜体，仅作分类标题 */
 .ws-subject-popper .el-tree-node.is-disabled > .el-tree-node__content {
@@ -395,15 +395,15 @@ function entryRowClass({ row }: any) { return row._custom ? '' : 'ws-row-auto' }
   opacity: 1;
 }
 .ws-subject-popper .el-tree-node.is-disabled > .el-tree-node__content .el-tree-node__label {
-  color: #999;
+  color: var(--gt-color-text-tertiary);
   font-weight: 600;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 /* 叶子节点正常可选 */
 .ws-subject-popper .el-tree-node:not(.is-disabled) > .el-tree-node__content:hover {
-  background: #f0edf5;
+  background: var(--gt-color-primary-bg);
 }
 .ws-subject-popper .el-tree-node:not(.is-disabled) > .el-tree-node__content .el-tree-node__label {
-  color: #333;
+  color: var(--gt-color-text-primary);
 }
 </style>

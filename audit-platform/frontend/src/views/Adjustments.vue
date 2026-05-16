@@ -87,7 +87,7 @@
       style="margin-bottom: 12px"
     >
       <template #title>暂无{{ activeTab === 'aje' ? '审计' : '重分类' }}调整分录</template>
-      <div style="font-size: 12px; line-height: 1.6; margin-top: 4px">
+      <div style="font-size: var(--gt-font-size-xs); line-height: 1.6; margin-top: 4px">
         点击上方"新增"按钮创建调整分录。调整分录将自动更新试算表审定数和报表数据。
       </div>
     </el-alert>
@@ -182,6 +182,12 @@
           </template>
         </el-table-column>
       </template>
+      <!-- R10 Spec B / F8：调整分录右键菜单 - 查看关联底稿 -->
+      <template #context-menu="{ selectedCells }">
+        <div class="gt-ucell-ctx-item" @click="onCtxRelatedWp(selectedCells)">
+          <span class="gt-ucell-ctx-icon">📝</span> 查看关联底稿
+        </div>
+      </template>
     </GtEditableTable>
 
     <!-- 批量复核操作 -->
@@ -195,7 +201,7 @@
     <transition name="el-fade-in">
       <div v-if="batchMode && batchPendingCount > 0" class="gt-adj-batch-float-bar">
         <span>📦 批量模式：{{ batchPendingCount }} 笔待提交</span>
-        <span style="font-size:11px;color:#909399">提交后将一次性触发试算表重算</span>
+        <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-info)">提交后将一次性触发试算表重算</span>
         <span style="flex:1" />
         <el-button size="small" @click="batchMode = false; batchPendingCount = 0">取消全部</el-button>
         <el-button size="small" type="success" :loading="batchCommitting" @click="onBatchCommit">
@@ -382,6 +388,7 @@ import { useEditMode } from '@/composables/useEditMode'
 // Spec A R1：跨视图 stale 摘要
 import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
 import { handleApiError } from '@/utils/errorHandler'
+import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
 import { ADJUSTMENT_STATUS, ADJUSTMENT_TYPE } from '@/constants/statusEnum'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
@@ -451,6 +458,38 @@ const { preview: impactPreview, loading: impactLoading, fetchPreview } = useImpa
 
 // R7-S3-08 Task 41 + R9 F10 Task 33：粘贴多行分录
 const adjTableRef = ref<HTMLElement | null>(null)
+
+// R10 Spec B / F8：右键查看关联底稿
+async function onCtxRelatedWp(selectedCells: any[]) {
+  // 从选中单元格找到对应的分录行（通过 GtEditableTable 内部 cellSelection.contextMenu.row）
+  const ctxMenu = (adjTableRef.value as any)?.cellSelection?.contextMenu
+  const row = ctxMenu?.row
+  if (!row || !row.entry_group_id) {
+    ElMessage.warning('请右键点击具体分录行')
+    return
+  }
+  try {
+    const data: any = await api.get(
+      `/api/projects/${projectId.value}/adjustments/${row.entry_group_id}/related-workpapers`,
+    )
+    const wps = data?.workpapers || []
+    if (!wps.length) {
+      ElMessage.info('该分录暂无关联底稿')
+      return
+    }
+    if (wps.length === 1) {
+      router.push({
+        name: 'WorkpaperEditor',
+        params: { projectId: projectId.value, wpId: wps[0].id },
+      })
+      return
+    }
+    const list = wps.map((w: any) => `${w.wp_code} ${w.wp_name}`).join('\n')
+    ElMessage.info(`该分录关联 ${wps.length} 张底稿：\n${list}`)
+  } catch (e: any) {
+    handleApiError(e, '查看关联底稿')
+  }
+}
 usePasteImport({
   containerRef: adjTableRef,
   columns: [
@@ -904,7 +943,7 @@ watch(
 .gt-adj-batch-toggle {
   display: flex; align-items: center; gap: 10px;
 }
-.gt-adj-batch-toggle :deep(.el-switch__label) { color: rgba(255,255,255,0.85); font-size: 12px; }
+.gt-adj-batch-toggle :deep(.el-switch__label) { color: rgba(255,255,255,0.85); font-size: var(--gt-font-size-xs); }
 .gt-adj-batch-toggle :deep(.el-switch.is-checked .el-switch__core) { background-color: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.5); }
 .gt-adj-batch-badge :deep(.el-badge__content) { z-index: 2; }
 .gt-adj-batch-toggle .el-button--success { background: rgba(103, 194, 58, 0.85); border-color: rgba(103, 194, 58, 0.6); color: #fff; }
@@ -930,7 +969,7 @@ watch(
 .gt-summary-card:hover::after { opacity: 1; }
 .gt-summary-label { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
 .gt-summary-value { display: block; font-size: var(--gt-font-size-2xl); font-weight: 800; color: var(--gt-color-primary); margin: 4px 0; letter-spacing: -0.5px; }
-.gt-summary-sub { display: block; font-size: 11px; color: var(--gt-color-text-tertiary); margin-top: 2px; }
+.gt-summary-sub { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px; }
 
 /* 批量操作 */
 .gt-adj-batch-actions {
@@ -971,15 +1010,15 @@ watch(
 /* 展开行明细 */
 .gt-adj-expand-detail {
   padding: 8px 16px 8px 48px;
-  background: #faf8fd;
+  background: var(--gt-color-primary-bg);
 }
 .gt-adj-line-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-adj-line-table th {
-  background: #f0edf5;
+  background: var(--gt-color-primary-bg);
   padding: 4px 8px;
   font-weight: 600;
   text-align: left;
@@ -993,13 +1032,13 @@ watch(
   display: flex;
   gap: 16px;
   margin-top: 6px;
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
-.gt-adj-expand-desc { color: #606266; }
-.gt-adj-expand-impact { color: #4b2d77; font-weight: 500; }
-.gt-adj-dir-dr { color: #f56c6c; font-weight: 600; }
-.gt-adj-dir-cr { color: #409eff; font-weight: 600; }
+.gt-adj-expand-desc { color: var(--gt-color-text-regular); }
+.gt-adj-expand-impact { color: var(--gt-color-primary); font-weight: 500; }
+.gt-adj-dir-dr { color: var(--gt-color-coral); font-weight: 600; }
+.gt-adj-dir-cr { color: var(--gt-color-teal); font-weight: 600; }
 
 /* 批量模式浮动提交栏 */
 .gt-adj-batch-float-bar {
@@ -1015,9 +1054,9 @@ watch(
   background: linear-gradient(135deg, #f8f6fb, #ece4f5);
   border-top: 2px solid #4b2d77;
   box-shadow: 0 -4px 12px rgba(75, 45, 119, 0.1);
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #4b2d77;
+  color: var(--gt-color-primary);
 }
 
 :deep(.el-tabs__item.is-active) { font-weight: 600; }

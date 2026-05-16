@@ -274,13 +274,13 @@ function getSummary({ columns: cols, data }: any) {
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet-title { margin: 0; font-size: 15px; color: #333; }
-.ws-tip { font-size: 12px; color: #666; line-height: 1.5; }
+.ws-sheet-title { margin: 0; font-size: var(--gt-font-size-base); color: var(--gt-color-text-primary); }
+.ws-tip { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
 .ws-section { margin-bottom: 16px; }
-.ws-section-title { font-size: 13px; font-weight: 600; color: #4b2d77; margin-bottom: 6px; padding: 6px 10px; background: #f8f6fb; border-radius: 4px; }
-.ws-computed { color: #4b2d77; font-weight: 500; }
+.ws-section-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary); margin-bottom: 6px; padding: 6px 10px; background: var(--gt-color-primary-bg); border-radius: 4px; }
+.ws-computed { color: var(--gt-color-primary); font-weight: 500; }
 .ws-bold { font-weight: 700; }
-.ws-diff-warn { color: #e6a23c !important; font-weight: 700 !important; }
-.ws-table :deep(.el-input__inner) { text-align: right; font-size: 11px; }
-.ws-table :deep(.el-table__footer-wrapper td) { background: #f8f6fb !important; font-weight: 700; color: #4b2d77; }
+.ws-diff-warn { color: var(--gt-color-wheat) !important; font-weight: 700 !important; }
+.ws-table :deep(.el-input__inner) { text-align: right; font-size: var(--gt-font-size-xs); }
+.ws-table :deep(.el-table__footer-wrapper td) { background: var(--gt-color-primary-bg) !important; font-weight: 700; color: var(--gt-color-primary); }
 </style>

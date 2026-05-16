@@ -8,7 +8,7 @@
       </div>
       <el-tooltip content="刷新数据" placement="bottom">
         <el-button size="small" circle @click="refreshAll" :loading="refreshing" style="flex-shrink:0">
-          <span style="font-size:12px">🔄</span>
+          <span style="font-size: var(--gt-font-size-xs)">🔄</span>
         </el-button>
       </el-tooltip>
     </div>
@@ -36,7 +36,7 @@
           <template #default="{ data }">
             <span class="cc-tree-node">
               <span class="cc-tree-node-label">{{ data.label }}</span>
-              <el-tag v-if="data.table_count" size="small" type="info" style="margin-left:4px;font-size:10px">{{ data.table_count }}表</el-tag>
+              <el-tag v-if="data.table_count" size="small" type="info" style="margin-left:4px;font-size: var(--gt-font-size-xs)">{{ data.table_count }}表</el-tag>
             </span>
           </template>
         </el-tree>
@@ -191,15 +191,15 @@ async function _auditAllNotes() {
 }
 .cc-tab-btns { display: flex; gap: 0; }
 .cc-tab-btn {
-  padding: 4px 12px; font-size: 13px; cursor: pointer; color: #999;
+  padding: 4px 12px; font-size: var(--gt-font-size-sm); cursor: pointer; color: var(--gt-color-text-tertiary);
   border-bottom: 2px solid transparent; transition: all 0.15s; user-select: none;
 }
-.cc-tab-btn:hover { color: #4b2d77; }
-.cc-tab-btn--active { color: #4b2d77; font-weight: 600; border-bottom-color: #4b2d77; }
+.cc-tab-btn:hover { color: var(--gt-color-primary); }
+.cc-tab-btn--active { color: var(--gt-color-primary); font-weight: 600; border-bottom-color: #4b2d77; }
 .cc-content { flex: 1; overflow-y: auto; min-height: 0; }
 .cc-tree { padding: 6px; }
-.cc-tree-node { display: flex; align-items: center; font-size: 12px; width: 100%; }
+.cc-tree-node { display: flex; align-items: center; font-size: var(--gt-font-size-xs); width: 100%; }
 .cc-tree-node-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
-.cc-refresh-btn { opacity: 0; transition: opacity 0.15s; margin-left: auto; font-size: 11px; padding: 0 4px; }
+.cc-refresh-btn { opacity: 0; transition: opacity 0.15s; margin-left: auto; font-size: var(--gt-font-size-xs); padding: 0 4px; }
 .cc-tree-node:hover .cc-refresh-btn { opacity: 1; }
 </style>

@@ -20,6 +20,6 @@
 }
 
 .gt-not-found h1 {
-  font-size: 72px;
+  font-size: 72px /* allow-px: special */;
 }
 </style>

@@ -251,7 +251,7 @@ onUnmounted(() => {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background-color: #e6a23c;
+  background-color: var(--gt-color-wheat);
   margin-left: 6px;
   animation: pulse 1.2s infinite;
 }
@@ -262,11 +262,11 @@ onUnmounted(() => {
 }
 
 .status-hint {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 
 .status-hint--error {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
 }
 </style>

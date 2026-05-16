@@ -86,10 +86,10 @@ onMounted(loadRefs)
 <style scoped>
 .cross-index-tab { padding: 12px; }
 .ref-item { padding: 8px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; gap: 8px; align-items: center; }
-.ref-item:hover { background: #f8f7fc; }
-.ref-code { font-weight: 600; color: #4b2d77; }
-.ref-page { font-size: 12px; color: #909399; }
-.ref-name { font-size: 13px; color: #606266; }
-.ref-cell { font-size: 12px; color: #909399; }
-.empty-tip { text-align: center; padding: 24px; color: #909399; }
+.ref-item:hover { background: var(--gt-color-primary-bg); }
+.ref-code { font-weight: 600; color: var(--gt-color-primary); }
+.ref-page { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); }
+.ref-name { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-regular); }
+.ref-cell { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); }
+.empty-tip { text-align: center; padding: 24px; color: var(--gt-color-info); }
 </style>

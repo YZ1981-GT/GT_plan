@@ -16,11 +16,11 @@
       </div>
 
       <div v-if="groupedItems.fatal.length" style="margin-top: 10px">
-        <div style="font-size: 12px; font-weight: 600; color: #f56c6c; margin-bottom: 6px">fatal</div>
+        <div style="font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-coral); margin-bottom: 6px">fatal</div>
         <div
           v-for="(item, idx) in groupedItems.fatal"
           :key="`fatal_${item.rule_code}_${idx}`"
-          style="font-size: 13px; margin-bottom: 6px; color: #f56c6c"
+          style="font-size: var(--gt-font-size-sm); margin-bottom: 6px; color: var(--gt-color-coral)"
         >
           <strong>{{ item.file || '当前文件' }}</strong>
           <span v-if="item.sheet"> / {{ item.sheet }}</span>
@@ -29,11 +29,11 @@
       </div>
 
       <div v-if="groupedItems.error.length" style="margin-top: 10px">
-        <div style="font-size: 12px; font-weight: 600; color: #f56c6c; margin-bottom: 6px">error</div>
+        <div style="font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-coral); margin-bottom: 6px">error</div>
         <div
           v-for="(item, idx) in groupedItems.error"
           :key="`error_${item.rule_code}_${idx}`"
-          style="font-size: 13px; margin-bottom: 6px; color: #f56c6c"
+          style="font-size: var(--gt-font-size-sm); margin-bottom: 6px; color: var(--gt-color-coral)"
         >
           <strong>{{ item.file || '当前文件' }}</strong>
           <span v-if="item.sheet"> / {{ item.sheet }}</span>
@@ -42,11 +42,11 @@
       </div>
 
       <div v-if="groupedItems.warning.length" style="margin-top: 10px">
-        <div style="font-size: 12px; font-weight: 600; color: #e6a23c; margin-bottom: 6px">warning</div>
+        <div style="font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-wheat); margin-bottom: 6px">warning</div>
         <div
           v-for="(item, idx) in groupedItems.warning"
           :key="`warning_${item.rule_code}_${idx}`"
-          style="font-size: 13px; margin-bottom: 6px; color: #e6a23c"
+          style="font-size: var(--gt-font-size-sm); margin-bottom: 6px; color: var(--gt-color-wheat)"
         >
           <strong>{{ item.file || '当前文件' }}</strong>
           <span v-if="item.sheet"> / {{ item.sheet }}</span>
@@ -55,11 +55,11 @@
       </div>
 
       <div v-if="groupedItems.info.length" style="margin-top: 10px">
-        <div style="font-size: 12px; font-weight: 600; color: #909399; margin-bottom: 6px">info</div>
+        <div style="font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-info); margin-bottom: 6px">info</div>
         <div
           v-for="(item, idx) in groupedItems.info"
           :key="`info_${item.rule_code}_${idx}`"
-          style="font-size: 13px; margin-bottom: 6px; color: #909399"
+          style="font-size: var(--gt-font-size-sm); margin-bottom: 6px; color: var(--gt-color-info)"
         >
           <strong>{{ item.file || '当前文件' }}</strong>
           <span v-if="item.sheet"> / {{ item.sheet }}</span>

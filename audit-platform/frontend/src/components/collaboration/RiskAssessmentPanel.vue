@@ -37,9 +37,9 @@
           </el-table-column>
         </el-table>
         <div class="heatmap-legend">
-          <span class="legend-item"><span class="color-box" style="background:#F56C6C"></span> 高风险</span>
-          <span class="legend-item"><span class="color-box" style="background:#E6A23C"></span> 中风险</span>
-          <span class="legend-item"><span class="color-box" style="background:#67C23A"></span> 低风险</span>
+          <span class="legend-item"><span class="color-box" style="background: var(--gt-color-coral)"></span> 高风险</span>
+          <span class="legend-item"><span class="color-box" style="background: var(--gt-color-wheat)"></span> 中风险</span>
+          <span class="legend-item"><span class="color-box" style="background: var(--gt-color-success)"></span> 低风险</span>
         </div>
       </div>
     </div>
@@ -322,19 +322,19 @@ loadRisks()
 }
 .panel-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 600;
 }
 .risk-heatmap {
   margin-bottom: 20px;
-  background: #f9f9f9;
+  background: var(--gt-color-bg);
   border-radius: 8px;
   padding: 16px;
 }
 .risk-heatmap h4 {
   margin: 0 0 12px;
-  font-size: 14px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
 }
 .heatmap-container {
   display: flex;
@@ -346,14 +346,14 @@ loadRisks()
 }
 .heatmap-el-table .cell-count {
   font-weight: 700;
-  font-size: 18px;
-  color: #fff;
+  font-size: var(--gt-font-size-xl);
+  color: var(--gt-color-text-inverse);
 }
 .heatmap-legend {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .legend-item {
   display: flex;
@@ -367,12 +367,12 @@ loadRisks()
   border-radius: 3px;
 }
 .risk-table {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .combined-risk {
   font-weight: 700;
 }
 .text-muted {
-  color: #909399;
+  color: var(--gt-color-info);
 }
 </style>

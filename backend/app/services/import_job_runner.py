@@ -245,6 +245,12 @@ class ImportJobRunner:
                     logger.info("ImportJob worker stop_event received, exiting loop")
                     return
                 try:
+                    # R10 Spec C 1.1.5：每轮先写心跳到 Redis（失败不阻断）
+                    try:
+                        from app.workers.worker_helpers import write_heartbeat
+                        await write_heartbeat("import_worker")
+                    except Exception:  # pragma: no cover
+                        pass
                     await cls.recover_jobs()
                     await cls.run_worker_once(limit=limit)
                     # F44: 可中断睡眠 —— stop_event.set 时立即醒来并退出下一轮

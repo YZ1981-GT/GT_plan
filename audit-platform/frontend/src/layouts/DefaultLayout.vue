@@ -296,9 +296,9 @@ function onCatalogSelect(item: any) {
   align-items: center;
   padding: 4px 10px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 500;
-  color: #fff;
+  color: var(--gt-color-text-inverse);
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s;

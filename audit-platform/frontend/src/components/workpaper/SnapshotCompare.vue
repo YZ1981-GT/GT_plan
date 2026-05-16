@@ -70,7 +70,7 @@ function hasChanged(change: Change): boolean {
             :label="`${triggerLabels[s.trigger_event] || s.trigger_event} - ${s.created_at?.slice(0, 16)}`"
           >
             <span>{{ triggerLabels[s.trigger_event] || s.trigger_event }}</span>
-            <span style="float: right; color: #909399; font-size: 12px">
+            <span style="float: right; color: var(--gt-color-info); font-size: var(--gt-font-size-xs)">
               {{ s.created_at?.slice(0, 16) }}
             </span>
           </el-option>
@@ -148,19 +148,19 @@ function hasChanged(change: Change): boolean {
   gap: 6px;
 }
 .selector-item .label {
-  font-size: 13px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
   white-space: nowrap;
 }
 .diff-table {
   margin-top: 8px;
 }
 .diff-old {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
   text-decoration: line-through;
 }
 .diff-new {
-  color: #67c23a;
+  color: var(--gt-color-success);
   font-weight: 600;
 }
 </style>

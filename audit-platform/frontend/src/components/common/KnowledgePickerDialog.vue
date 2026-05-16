@@ -65,7 +65,7 @@
       </div>
 
       <div v-if="searching" class="gt-kp-loading">
-        <el-icon class="is-loading" style="font-size: 20px; margin-right: 8px"><Loading /></el-icon>
+        <el-icon class="is-loading" style="font-size: 20px /* allow-px: special */; margin-right: 8px"><Loading /></el-icon>
         搜索中...
       </div>
     </div>
@@ -172,8 +172,8 @@ watch(visible, (v) => {
 }
 .gt-kp-hint {
   text-align: center;
-  color: #999;
-  font-size: 13px;
+  color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-sm);
   padding: 40px 0;
 }
 .gt-kp-loading {
@@ -181,16 +181,16 @@ watch(visible, (v) => {
   align-items: center;
   justify-content: center;
   padding: 40px 0;
-  color: #666;
-  font-size: 13px;
+  color: var(--gt-color-text-secondary);
+  font-size: var(--gt-font-size-sm);
 }
 .gt-kp-snippet {
-  font-size: 12px;
-  color: #999;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
 }
 .gt-kp-selected-info {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-primary, #6b4c9a);
   font-weight: 500;
 }

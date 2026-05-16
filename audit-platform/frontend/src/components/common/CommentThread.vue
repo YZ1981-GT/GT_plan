@@ -166,19 +166,19 @@ function formatTime(time?: string): string {
 
 .gt-ct-author {
   font-weight: 600;
-  font-size: 12px;
-  color: #4b2d77;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-primary);
 }
 
 .gt-ct-time {
-  font-size: 11px;
-  color: #999;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
 }
 
 .gt-ct-content {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   line-height: 1.5;
-  color: #333;
+  color: var(--gt-color-text-primary);
 }
 
 .gt-ct-replies {
@@ -194,19 +194,19 @@ function formatTime(time?: string): string {
 
 .gt-ct-reply-author {
   font-weight: 600;
-  font-size: 11px;
-  color: #666;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
 }
 
 .gt-ct-reply-time {
-  font-size: 10px;
-  color: #bbb;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-placeholder);
   margin-left: 6px;
 }
 
 .gt-ct-reply-content {
-  font-size: 12px;
-  color: #555;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
   margin-top: 2px;
 }
 

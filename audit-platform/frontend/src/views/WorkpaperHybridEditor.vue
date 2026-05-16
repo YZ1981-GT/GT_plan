@@ -183,7 +183,7 @@ onMounted(() => { if (props.wpId) loadData() })
 .gt-hybrid-editor { display: flex; flex-direction: column; height: 100%; }
 .gt-hybrid-editor-body { flex: 1; overflow-y: auto; padding: 20px 28px; }
 .gt-hybrid-section { margin-bottom: 8px; }
-.gt-hybrid-section-title { margin-bottom: 12px; color: var(--gt-color-text, #333); font-size: 15px; }
+.gt-hybrid-section-title { margin-bottom: 12px; color: var(--gt-color-text, #333); font-size: var(--gt-font-size-base); }
 .gt-hybrid-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .gt-hybrid-form { max-width: 700px; }
 .gt-hybrid-attachments { display: flex; flex-direction: column; gap: 6px; }

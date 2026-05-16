@@ -29,6 +29,6 @@ defineProps<{
   margin: 0 2px;
 }
 .linkage-badge :deep(.el-badge__content) {
-  font-size: 10px;
+  font-size: var(--gt-font-size-xs);
 }
 </style>

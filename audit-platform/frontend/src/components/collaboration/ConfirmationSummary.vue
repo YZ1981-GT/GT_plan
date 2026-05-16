@@ -207,27 +207,27 @@ onMounted(async () => {
   margin-bottom: 20px;
 }
 .summary-card {
-  background: #f5f7fa;
+  background: var(--gt-bg-subtle);
   border-radius: 8px;
   padding: 16px;
   text-align: center;
 }
 .card-label {
-  color: #909399;
-  font-size: 13px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-sm);
   margin-bottom: 6px;
 }
 .card-value {
-  font-size: 22px;
+  font-size: var(--gt-font-size-2xl);
   font-weight: 700;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .chart-section {
   margin-bottom: 20px;
 }
 .chart-section h4 {
   margin-bottom: 12px;
-  font-size: 15px;
+  font-size: var(--gt-font-size-base);
 }
 .pie-chart-wrapper {
   display: flex;
@@ -249,7 +249,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .legend-dot {
   width: 12px;
@@ -260,6 +260,6 @@ onMounted(async () => {
 .detail-table {
   margin-top: 12px;
 }
-.text-danger { color: #F56C6C; }
-.text-warning { color: #E6A23C; }
+.text-danger { color: var(--gt-color-coral); }
+.text-warning { color: var(--gt-color-wheat); }
 </style>

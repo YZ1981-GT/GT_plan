@@ -246,7 +246,7 @@ watch(() => props.projectId, () => runChecks(), { immediate: true })
 .gt-export-options {
   margin-bottom: 16px;
   padding: 12px;
-  background: #f8f7fc;
+  background: var(--gt-color-primary-bg);
   border-radius: 6px;
   display: flex;
   gap: 16px;
@@ -265,7 +265,7 @@ watch(() => props.projectId, () => runChecks(), { immediate: true })
   align-items: center;
   margin-bottom: 8px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .gt-export-checks__list {
@@ -280,19 +280,19 @@ watch(() => props.projectId, () => runChecks(), { immediate: true })
   gap: 8px;
   padding: 6px 8px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .gt-export-check-item--pass {
-  background: #f0f9eb;
+  background: var(--gt-bg-success);
 }
 
 .gt-export-check-item--fail-blocking {
-  background: #fef0f0;
+  background: var(--gt-bg-danger);
 }
 
 .gt-export-check-item--fail-warning {
-  background: #fdf6ec;
+  background: var(--gt-bg-warning);
 }
 
 .gt-export-check-item__icon {
@@ -305,8 +305,8 @@ watch(() => props.projectId, () => runChecks(), { immediate: true })
 }
 
 .gt-export-check-item__details {
-  color: #909399;
-  font-size: 12px;
+  color: var(--gt-color-info);
+  font-size: var(--gt-font-size-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -315,7 +315,7 @@ watch(() => props.projectId, () => runChecks(), { immediate: true })
 .gt-export-force {
   margin-bottom: 16px;
   padding: 8px 12px;
-  background: #fef0f0;
+  background: var(--gt-bg-danger);
   border-radius: 4px;
   border: 1px solid #fde2e2;
 }
@@ -327,8 +327,8 @@ watch(() => props.projectId, () => runChecks(), { immediate: true })
 .gt-export-progress__text {
   display: block;
   text-align: center;
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
   margin-top: 4px;
 }
 </style>

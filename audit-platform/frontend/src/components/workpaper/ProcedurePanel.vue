@@ -190,18 +190,18 @@ watch(() => props.wpId, () => fetchProcedures(true))
   border-bottom: 1px solid var(--gt-color-border-light, #eee);
 }
 .gt-procedure-rate {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary, #666);
 }
 .gt-procedure-rate strong {
   color: var(--gt-color-primary, #4b2d77);
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
 }
 .gt-procedure-group {
   margin-bottom: 12px;
 }
 .gt-procedure-group-title {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
   color: var(--gt-color-text-secondary, #999);
   margin-bottom: 6px;
@@ -234,12 +234,12 @@ watch(() => props.wpId, () => fetchProcedures(true))
 }
 .gt-procedure-id {
   font-family: monospace;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary, #aaa);
   min-width: 60px;
 }
 .gt-procedure-desc {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text, #333);
   line-height: 1.4;
 }
@@ -250,6 +250,6 @@ watch(() => props.wpId, () => fetchProcedures(true))
   text-align: center;
   padding: 24px;
   color: var(--gt-color-text-tertiary, #ccc);
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 </style>

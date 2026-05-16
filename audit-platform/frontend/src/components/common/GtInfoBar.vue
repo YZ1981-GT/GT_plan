@@ -206,7 +206,7 @@ const templateOptions = computed((): TemplateOption[] => {
 }
 
 .gt-info-bar__label {
-  font-size: 10px;
+  font-size: var(--gt-font-size-xs);
   color: rgba(255, 255, 255, 0.55);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -216,10 +216,10 @@ const templateOptions = computed((): TemplateOption[] => {
   display: inline-block;
   padding: 1px 8px;
   border-radius: 10px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
   background: rgba(255, 255, 255, 0.15);
-  color: #fff;
+  color: var(--gt-color-text-inverse);
 }
 
 .gt-info-bar__sep {
@@ -244,8 +244,8 @@ const templateOptions = computed((): TemplateOption[] => {
 }
 
 .gt-info-bar__select :deep(.el-input__inner) {
-  color: #fff !important;
-  font-size: 12px !important;
+  color: var(--gt-color-text-inverse) !important;
+  font-size: var(--gt-font-size-xs) !important;
   font-weight: 600 !important;
 }
 

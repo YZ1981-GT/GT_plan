@@ -198,7 +198,7 @@ onMounted(fetchHistory)
 
 .timeline-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 500;
 }
 
@@ -228,7 +228,7 @@ onMounted(fetchHistory)
 }
 
 .card-user {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
 }
 
@@ -242,7 +242,7 @@ onMounted(fetchHistory)
   display: flex;
   align-items: baseline;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .card-label {

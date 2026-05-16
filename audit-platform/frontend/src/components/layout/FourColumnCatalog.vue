@@ -12,7 +12,7 @@
           <template v-for="group in projectGroups" :key="group.parentId || 'standalone'">
             <!-- 集团父项目 -->
             <div v-if="group.parent" class="gt-catalog-unit-group-parent">
-              <el-icon :size="12" style="color: #999"><Connection /></el-icon>
+              <el-icon :size="12" style="color: var(--gt-color-text-tertiary)"><Connection /></el-icon>
               <span>{{ group.parent.name || group.parent.client_name }}</span>
             </div>
             <!-- 项目列表 -->
@@ -25,10 +25,10 @@
             >
               <span class="gt-catalog-unit-related-dot" :style="{ background: rp.id === project?.id ? 'var(--gt-color-primary)' : '#ccc' }"></span>
               <span class="gt-catalog-unit-related-name">{{ rp.name || rp.client_name }}</span>
-              <el-tag v-if="rp.report_scope === 'consolidated'" size="small" type="warning" style="margin-left: auto; font-size: 10px;">合并</el-tag>
+              <el-tag v-if="rp.report_scope === 'consolidated'" size="small" type="warning" style="margin-left: auto; font-size: var(--gt-font-size-xs);">合并</el-tag>
             </div>
           </template>
-          <div v-if="!relatedProjects.length" style="padding: 8px; font-size: 12px; color: #999; text-align: center;">暂无项目</div>
+          <div v-if="!relatedProjects.length" style="padding: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); text-align: center;">暂无项目</div>
         </div>
       </div>
     </div>
@@ -333,28 +333,28 @@ watch(() => props.project?.id, async (pid) => {
 .gt-catalog-unit-current {
   display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
 }
-.gt-catalog-unit-icon { font-size: 24px; }
+.gt-catalog-unit-icon { font-size: 24px /* allow-px: special */; }
 .gt-catalog-unit-info { flex: 1; min-width: 0; }
 .gt-catalog-unit-name {
-  font-size: 13px; font-weight: 600; color: var(--gt-color-text);
+  font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .gt-catalog-unit-meta { display: flex; gap: 4px; margin-top: 2px; }
 .gt-catalog-unit-group-title {
   display: flex; align-items: center; gap: 4px;
-  padding: 4px 0; font-size: 11px; color: #999; cursor: pointer;
+  padding: 4px 0; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); cursor: pointer;
 }
 .gt-catalog-unit-group-title:hover { color: var(--gt-color-primary); }
 .gt-catalog-unit-group-parent {
   display: flex; align-items: center; gap: 4px;
-  padding: 4px 6px; font-size: 11px; color: #999;
+  padding: 4px 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);
 }
 .gt-catalog-unit-related-name {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
 }
 .gt-catalog-unit-related {
   display: flex; align-items: center; gap: 6px;
-  padding: 3px 6px; font-size: 12px; cursor: pointer; border-radius: 4px;
+  padding: 3px 6px; font-size: var(--gt-font-size-xs); cursor: pointer; border-radius: 4px;
   color: var(--gt-color-text-secondary);
 }
 .gt-catalog-unit-related:hover { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
@@ -370,29 +370,29 @@ watch(() => props.project?.id, async (pid) => {
 .gt-catalog-tab {
   display: flex; align-items: center; gap: 4px;
   padding: 4px 8px; border-radius: var(--gt-radius-sm);
-  font-size: 12px; cursor: pointer; color: var(--gt-color-text-secondary);
+  font-size: var(--gt-font-size-xs); cursor: pointer; color: var(--gt-color-text-secondary);
   transition: all var(--gt-transition-fast);
 }
 .gt-catalog-tab:hover { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
-.gt-catalog-tab--active { background: var(--gt-color-primary); color: #fff; }
+.gt-catalog-tab--active { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); }
 .gt-catalog-list { flex: 1; overflow-y: auto; padding: var(--gt-space-1); }
 .gt-catalog-group { margin-bottom: 2px; }
 .gt-catalog-group-title {
   display: flex; align-items: center; gap: 4px;
-  padding: 6px 8px; font-size: 12px; font-weight: 600;
+  padding: 6px 8px; font-size: var(--gt-font-size-xs); font-weight: 600;
   color: var(--gt-color-text-secondary); cursor: pointer;
   border-radius: var(--gt-radius-sm);
 }
-.gt-catalog-group-title:hover { background: #f5f7fa; }
+.gt-catalog-group-title:hover { background: var(--gt-bg-subtle); }
 .gt-catalog-group-items { padding-left: 12px; }
 .gt-catalog-item {
-  padding: 5px 8px; font-size: 12px; cursor: pointer;
+  padding: 5px 8px; font-size: var(--gt-font-size-xs); cursor: pointer;
   border-radius: var(--gt-radius-sm); color: var(--gt-color-text);
   transition: all var(--gt-transition-fast); white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
 .gt-catalog-item:hover { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
 .gt-catalog-item--active {
-  background: var(--gt-color-primary) !important; color: #fff !important;
+  background: var(--gt-color-primary) !important; color: var(--gt-color-text-inverse) !important;
 }
 </style>

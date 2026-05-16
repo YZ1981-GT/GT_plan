@@ -409,7 +409,7 @@ onMounted(loadStaff)
 
 .gt-staff-toolbar__title {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 600;
   color: var(--el-text-color-primary);
 }

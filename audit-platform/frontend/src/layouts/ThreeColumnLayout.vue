@@ -858,7 +858,7 @@ onUnmounted(() => {
 .gt-topbar-center { flex: 1; padding: 0 var(--gt-space-4); }
 .gt-topbar-center :deep(.el-breadcrumb__inner),
 .gt-topbar-center :deep(.el-breadcrumb__separator) { color: rgba(255, 255, 255, 0.7); }
-.gt-topbar-center :deep(.el-breadcrumb__inner.is-link) { color: #fff; }
+.gt-topbar-center :deep(.el-breadcrumb__inner.is-link) { color: var(--gt-color-text-inverse); }
 .gt-topbar-right { display: flex; align-items: center; gap: 4px; }
 .gt-topbar-right > * { display: inline-flex; align-items: center; }
 
@@ -874,9 +874,9 @@ onUnmounted(() => {
 .gt-logo:hover { background: rgba(255, 255, 255, 0.1); }
 .gt-logo-img { height: 40px; width: auto; }
 .gt-logo-text {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 700;
-  color: #fff;
+  color: var(--gt-color-text-inverse);
   white-space: nowrap;
 }
 
@@ -889,12 +889,12 @@ onUnmounted(() => {
   justify-content: center;
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   transition: background 0.15s ease;
 }
 .gt-topbar-btn:hover { background: rgba(255, 255, 255, 0.12); }
 .gt-topbar-text-icon {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   line-height: 1;
 }
@@ -904,7 +904,7 @@ onUnmounted(() => {
 .gt-topbar-right :deep(.el-button--text:hover) { color: #fff; background: rgba(255, 255, 255, 0.1); }
 .gt-topbar-right :deep(.el-icon) { color: rgba(255, 255, 255, 0.9); }
 .gt-topbar-right :deep(.el-icon svg) { fill: currentColor; }
-.gt-topbar-right :deep(.el-dropdown) { color: #fff; }
+.gt-topbar-right :deep(.el-dropdown) { color: var(--gt-color-text-inverse); }
 
 .gt-topbar-divider {
   width: 1px;
@@ -932,7 +932,7 @@ onUnmounted(() => {
   flex: 0 0 22px;
 }
 .gt-import-label {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
   font-family: "Arial Narrow", Arial, sans-serif;
   font-variant-numeric: tabular-nums;
@@ -951,15 +951,15 @@ onUnmounted(() => {
 .gt-user-info:hover { background: rgba(255, 255, 255, 0.15); }
 .gt-avatar {
   background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  color: var(--gt-color-text-inverse);
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 .gt-username {
   font-size: var(--gt-font-size-sm);
   font-weight: 500;
-  color: #fff;
+  color: var(--gt-color-text-inverse);
 }
 
 /* ── 三栏主体 ── */
@@ -974,7 +974,7 @@ onUnmounted(() => {
 .gt-sidebar {
   display: flex;
   flex-direction: column;
-  background: #f8f7fc;
+  background: var(--gt-color-primary-bg);
   border-right: 1px solid var(--gt-color-border-light);
   transition: width var(--gt-transition-base);
   overflow: hidden;
@@ -1008,17 +1008,17 @@ onUnmounted(() => {
 }
 .gt-nav-item--active {
   background: var(--gt-color-primary) !important;
-  color: #fff !important;
+  color: var(--gt-color-text-inverse) !important;
   box-shadow: 0 2px 8px rgba(75, 45, 119, 0.3);
 }
 .gt-nav-label { font-weight: 500; }
 .gt-maturity-badge {
-  font-size: 10px; font-weight: 600; padding: 1px 4px; border-radius: 3px;
+  font-size: var(--gt-font-size-xs); font-weight: 600; padding: 1px 4px; border-radius: 3px;
   margin-left: 4px; vertical-align: middle; line-height: 1;
 }
-.gt-maturity-pilot { background: #fef0e6; color: #e6a23c; }
-.gt-maturity-exp { background: #fde2e2; color: #f56c6c; }
-.gt-maturity-dev { background: #e8eaed; color: #909399; }
+.gt-maturity-pilot { background: var(--gt-bg-warning); color: var(--gt-color-wheat); }
+.gt-maturity-exp { background: var(--gt-color-coral-light); color: var(--gt-color-coral); }
+.gt-maturity-dev { background: var(--gt-color-border-light); color: var(--gt-color-info); }
 
 .gt-sidebar-bottom {
   border-top: 1px solid var(--gt-color-border-light);
@@ -1030,13 +1030,13 @@ onUnmounted(() => {
 
 /* 工具簇（侧栏底部） */
 .gt-sidebar-tools-title {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary, #909399);
   padding: 8px 14px 4px;
   letter-spacing: 0.5px;
 }
 .gt-nav-item--tool {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary, #606266);
 }
 .gt-nav-item--tool:hover {
@@ -1049,7 +1049,7 @@ onUnmounted(() => {
   justify-content: center;
   width: 18px;
   height: 18px;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   line-height: 1;
 }
 
@@ -1099,7 +1099,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  background: #f5f7fa;
+  background: var(--gt-bg-subtle);
   border-right: 1px solid var(--gt-color-border-light);
   cursor: pointer;
   color: var(--gt-color-text-tertiary);
@@ -1146,7 +1146,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  background: #f5f7fa;
+  background: var(--gt-bg-subtle);
   border-right: 1px solid var(--gt-color-border-light);
   cursor: pointer;
   color: var(--gt-color-text-tertiary);
@@ -1220,11 +1220,11 @@ onUnmounted(() => {
   .gt-sidebar .gt-nav-item {
     padding: 8px 12px;
     flex-direction: column;
-    font-size: 11px;
+    font-size: var(--gt-font-size-xs);
   }
   .gt-sidebar .gt-nav-label {
     display: block;
-    font-size: 10px;
+    font-size: var(--gt-font-size-xs);
   }
   .gt-middle {
     display: none !important;
@@ -1237,7 +1237,7 @@ onUnmounted(() => {
     width: 100%;
   }
   .gt-topbar {
-    font-size: 14px;
+    font-size: var(--gt-font-size-sm);
   }
   .gt-topbar .gt-logo-text {
     display: none;
@@ -1265,13 +1265,13 @@ onUnmounted(() => {
   gap: 8px;
 }
 .gt-dp-label {
-  font-size: 12px;
-  color: #666;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
   min-width: 56px;
   flex-shrink: 0;
 }
 .gt-dp-row :deep(.el-radio-button__inner) {
   padding: 4px 10px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 </style>

@@ -448,7 +448,7 @@ defineExpose({ open, hasAttachments })
 }
 
 .ocr-step-hint {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--el-text-color-secondary);
   margin-bottom: 12px;
 }
@@ -460,11 +460,11 @@ defineExpose({ open, hasAttachments })
   justify-content: center;
   height: 200px;
   gap: 12px;
-  color: #999;
+  color: var(--gt-color-text-tertiary);
 }
 
 .ocr-loading-hint {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
 }
 
@@ -484,7 +484,7 @@ defineExpose({ open, hasAttachments })
 
 .ocr-fields-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 /* 差异预览 */
@@ -501,7 +501,7 @@ defineExpose({ open, hasAttachments })
   display: flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .ocr-diff-label {

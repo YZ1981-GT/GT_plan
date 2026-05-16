@@ -154,7 +154,7 @@ const completionRate = computed(() => {
   align-items: center;
   margin-bottom: 16px;
   padding: 12px;
-  background: #fafafa;
+  background: var(--gt-color-bg);
   border-radius: 8px;
 }
 .stat-item {
@@ -164,16 +164,16 @@ const completionRate = computed(() => {
   gap: 4px;
 }
 .stat-value {
-  font-size: 20px;
+  font-size: 20px /* allow-px: special */;
   font-weight: 700;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .stat-value.danger {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
 }
 .stat-label {
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 .cycle-grid {
   display: grid;
@@ -193,17 +193,17 @@ const completionRate = computed(() => {
 }
 .cycle-code {
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   color: var(--el-color-primary);
 }
 .cycle-name {
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
 }
 .cycle-count {
   margin-left: auto;
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 .cycle-types {
   display: flex;

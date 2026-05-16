@@ -163,19 +163,19 @@ onMounted(() => {
 
 .page-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--gt-font-size-xl);
 }
 
 .page-desc {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--el-text-color-secondary);
   flex: 1;
 }
 
 .mono-text {
   font-family: monospace;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .truncate-text {

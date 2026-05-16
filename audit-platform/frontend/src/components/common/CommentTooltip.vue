@@ -41,13 +41,13 @@ const tooltipContent = computed(() => {
 /* 非 scoped，因为 popper 渲染在 body 上 */
 .gt-comment-tooltip {
   max-width: 300px !important;
-  font-size: 12px !important;
+  font-size: var(--gt-font-size-xs) !important;
   line-height: 1.6 !important;
   border: 1px solid #FFC23D !important;
-  background: #FFFDF5 !important;
+  background: var(--gt-color-wheat-light) !important;
 }
 .gt-comment-tooltip .el-tooltip__arrow::before {
   border-color: #FFC23D !important;
-  background: #FFFDF5 !important;
+  background: var(--gt-color-wheat-light) !important;
 }
 </style>

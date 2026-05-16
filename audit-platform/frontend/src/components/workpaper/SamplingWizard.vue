@@ -177,16 +177,16 @@ defineExpose({ setResult })
 }
 .section h4 {
   margin: 0 0 10px;
-  font-size: 14px;
-  color: #303133;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-primary);
 }
 .method-desc {
   margin: 6px 0 0;
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 .result-section {
-  background: #f5f7fa;
+  background: var(--gt-bg-subtle);
   border-radius: 8px;
   padding: 14px;
 }
@@ -200,25 +200,25 @@ defineExpose({ setResult })
   gap: 4px;
 }
 .result-label {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 .result-value {
-  font-size: 32px;
+  font-size: 32px /* allow-px: special */;
   font-weight: 700;
   color: var(--el-color-primary);
   font-variant-numeric: tabular-nums;
 }
 .result-detail {
   margin-top: 8px;
-  font-size: 13px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
 }
 .result-formula {
   margin-top: 8px;
   padding: 6px 10px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 </style>

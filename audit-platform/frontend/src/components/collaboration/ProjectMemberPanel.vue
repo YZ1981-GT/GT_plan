@@ -149,5 +149,5 @@ onMounted(loadMembers)
 <style scoped>
 .gt-project-member-panel { padding: 8px 0; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.title { font-weight: 600; font-size: 14px; }
+.title { font-weight: 600; font-size: var(--gt-font-size-sm); }
 </style>

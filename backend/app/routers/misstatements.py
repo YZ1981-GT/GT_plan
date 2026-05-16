@@ -16,6 +16,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -172,4 +173,39 @@ async def recheck_threshold(
     return {
         "rechecked": True,
         "summary": result.model_dump(),
+    }
+
+
+# R10 Spec B / Sprint 3.2.2 — 错报关联底稿
+@router.get("/{misstatement_id}/related-workpapers")
+async def get_misstatement_related_workpapers(
+    project_id: UUID,
+    misstatement_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """R10 Spec B / F7：根据错报关联的科目编码反查底稿。
+
+    简化实现：从错报记录读 standard_account_code，调 workpaper_query helper。
+    """
+    from app.models.misstatement_models import UnadjustedMisstatement
+    from app.services.workpaper_query import find_workpapers_by_account_codes
+
+    stmt = select(UnadjustedMisstatement).where(
+        UnadjustedMisstatement.id == misstatement_id,
+        UnadjustedMisstatement.project_id == project_id,
+        UnadjustedMisstatement.is_deleted == False,  # noqa: E712
+    )
+    misstatement = (await db.execute(stmt)).scalar_one_or_none()
+    if misstatement is None:
+        raise HTTPException(status_code=404, detail="错报记录不存在")
+
+    code = getattr(misstatement, "standard_account_code", None) or getattr(misstatement, "account_code", None)
+    codes = [code] if code else []
+
+    workpapers = await find_workpapers_by_account_codes(db, project_id, codes)
+    return {
+        "misstatement_id": str(misstatement_id),
+        "account_code": code,
+        "workpapers": workpapers,
     }

@@ -223,12 +223,12 @@ function onJump() {
 }
 
 .gt-provenance-icon {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
 }
 
 .gt-provenance-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--el-text-color-primary, #303133);
 }
 
@@ -242,7 +242,7 @@ function onJump() {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .gt-provenance-label {
@@ -258,7 +258,7 @@ function onJump() {
 
 .gt-provenance-version {
   font-family: monospace;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary, #909399);
 }
 

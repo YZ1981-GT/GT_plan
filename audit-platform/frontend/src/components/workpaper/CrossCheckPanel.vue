@@ -199,16 +199,16 @@ function getRuleDescription(ruleId: string): string {
 }
 
 .panel-title {
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 
 .summary-bar {
   display: flex;
   gap: 16px;
   padding: 8px 12px;
-  background: #f5f7fa;
+  background: var(--gt-bg-subtle);
   border-radius: 6px;
   margin-bottom: 12px;
 }
@@ -220,18 +220,18 @@ function getRuleDescription(ruleId: string): string {
 }
 
 .summary-num {
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.summary-num.success { color: #67c23a; }
-.summary-num.danger { color: #f56c6c; }
-.summary-num.info { color: #909399; }
+.summary-num.success { color: var(--gt-color-success); }
+.summary-num.danger { color: var(--gt-color-coral); }
+.summary-num.info { color: var(--gt-color-info); }
 
 .summary-label {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 
 .results-list {
@@ -275,15 +275,15 @@ function getRuleDescription(ruleId: string): string {
 }
 
 .result-desc {
-  font-size: 13px;
-  color: #606266;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .severity-tag {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
 }
 
 .result-right {
@@ -294,13 +294,13 @@ function getRuleDescription(ruleId: string): string {
 }
 
 .diff-amount {
-  font-size: 12px;
-  color: #f56c6c;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-coral);
   font-variant-numeric: tabular-nums;
 }
 
 .expand-icon {
-  color: #c0c4cc;
+  color: var(--gt-color-text-placeholder);
   transition: transform 0.2s;
 }
 
@@ -311,7 +311,7 @@ function getRuleDescription(ruleId: string): string {
 .result-detail {
   padding: 12px;
   border-top: 1px solid #ebeef5;
-  background: #fafafa;
+  background: var(--gt-color-bg);
 }
 
 .detail-grid {
@@ -328,32 +328,32 @@ function getRuleDescription(ruleId: string): string {
 }
 
 .detail-label {
-  font-size: 11px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
 
 .detail-value {
-  font-size: 13px;
-  color: #303133;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-primary);
   font-variant-numeric: tabular-nums;
 }
 
 .text-danger {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
   font-weight: 600;
 }
 
 .detail-formula {
   margin-top: 8px;
   padding: 6px 8px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 4px;
   border: 1px solid #ebeef5;
 }
 
 .detail-formula code {
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-regular);
   word-break: break-all;
 }
 

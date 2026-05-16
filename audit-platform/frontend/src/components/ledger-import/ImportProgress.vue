@@ -301,7 +301,7 @@ onUnmounted(() => {
 }
 
 .phase-segment .phase-label {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
   margin-bottom: 6px;
 }
@@ -325,12 +325,12 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .current-file {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
 }
 
@@ -349,7 +349,7 @@ onUnmounted(() => {
 .tips-list {
   margin: 6px 0 0;
   padding-left: 20px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   line-height: 1.8;
   color: var(--el-text-color-regular);
 }

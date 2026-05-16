@@ -654,7 +654,7 @@ watch(
 }
 
 .gt-wpd-card {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #ebeef5;
   border-radius: 6px;
   padding: 12px 16px;
@@ -664,9 +664,9 @@ watch(
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #4b2d77;
+  color: var(--gt-color-primary);
   margin-bottom: 12px;
 }
 .gt-wpd-card-title--inline { margin-bottom: 0; }
@@ -681,45 +681,45 @@ watch(
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .gt-wpd-meta-label {
-  color: #909399;
+  color: var(--gt-color-info);
   min-width: 80px;
   flex-shrink: 0;
 }
 .gt-wpd-meta-value {
-  color: #303133;
+  color: var(--gt-color-text-primary);
   font-weight: 500;
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
 }
-.gt-wpd-empty { color: #c0c4cc; }
+.gt-wpd-empty { color: var(--gt-color-text-placeholder); }
 .gt-wpd-code {
   font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #4b2d77;
-  background: #f0edf5;
+  color: var(--gt-color-primary);
+  background: var(--gt-color-primary-bg);
   padding: 2px 8px;
   border-radius: 3px;
 }
 .gt-wpd-code-small {
   font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 12px;
-  color: #4b2d77;
-  background: #f0edf5;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-primary);
+  background: var(--gt-color-primary-bg);
   padding: 1px 6px;
   border-radius: 3px;
 }
-.gt-wpd-format-icon { font-size: 16px; margin-right: 2px; }
+.gt-wpd-format-icon { font-size: var(--gt-font-size-md); margin-right: 2px; }
 .gt-wpd-acc-tag { margin-right: 4px; margin-bottom: 4px; }
-.gt-wpd-comp--univer { background: #e8f0fe; color: #1967d2; border-color: #c2dafc; }
-.gt-wpd-comp--form { background: #e6f7e6; color: #2d8a2d; border-color: #b6e3b6; }
-.gt-wpd-comp--word { background: #fef4e6; color: #b67213; border-color: #f5d4a8; }
-.gt-wpd-comp--hybrid { background: #f3e8fc; color: #7b3fbf; border-color: #d8b8ee; }
+.gt-wpd-comp--univer { background: var(--gt-bg-info); color: var(--gt-color-teal); border-color: #c2dafc; }
+.gt-wpd-comp--form { background: var(--gt-color-success-light); color: var(--gt-color-success); border-color: #b6e3b6; }
+.gt-wpd-comp--word { background: var(--gt-bg-warning); color: var(--gt-color-wheat); border-color: #f5d4a8; }
+.gt-wpd-comp--hybrid { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); border-color: #d8b8ee; }
 
 /* 主文件下载区 */
 .gt-wpd-main-file {
@@ -727,7 +727,7 @@ watch(
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: #f8f6fb;
+  background: var(--gt-color-primary-bg);
   border: 1px solid #e0d7ed;
   border-radius: 6px;
 }
@@ -736,32 +736,32 @@ watch(
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
-  color: #303133;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-primary);
 }
 .gt-wpd-main-file-meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
 }
-.gt-wpd-divider { color: #c0c4cc; }
+.gt-wpd-divider { color: var(--gt-color-text-placeholder); }
 
 /* 公式 */
 .gt-wpd-formula {
   font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 12px;
-  background: #f5f5f7;
+  font-size: var(--gt-font-size-xs);
+  background: var(--gt-color-bg);
   padding: 1px 6px;
   border-radius: 3px;
-  color: #4b2d77;
+  color: var(--gt-color-primary);
 }
-.gt-wpd-fmtype--tb { background: #e8f0fe; color: #1967d2; }
-.gt-wpd-fmtype--tb_sum { background: #d2e3fc; color: #1967d2; }
-.gt-wpd-fmtype--adj { background: #fef4e6; color: #b67213; }
-.gt-wpd-fmtype--prev { background: #e6f7e6; color: #2d8a2d; }
-.gt-wpd-fmtype--wp { background: #f3e8fc; color: #7b3fbf; }
+.gt-wpd-fmtype--tb { background: var(--gt-bg-info); color: var(--gt-color-teal); }
+.gt-wpd-fmtype--tb_sum { background: var(--gt-bg-info); color: var(--gt-color-teal); }
+.gt-wpd-fmtype--adj { background: var(--gt-bg-warning); color: var(--gt-color-wheat); }
+.gt-wpd-fmtype--prev { background: var(--gt-color-success-light); color: var(--gt-color-success); }
+.gt-wpd-fmtype--wp { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
 
 /* 跨底稿引用 */
 .gt-wpd-xref-section {
@@ -769,9 +769,9 @@ watch(
 }
 .gt-wpd-xref-section:first-of-type { margin-top: 0; }
 .gt-wpd-xref-section-title {
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 600;
-  color: #606266;
+  color: var(--gt-color-text-regular);
   margin-bottom: 6px;
 }
 .gt-wpd-xref-list {
@@ -783,22 +783,22 @@ watch(
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   padding: 4px 8px;
-  background: #fafafa;
+  background: var(--gt-color-bg);
   border-radius: 3px;
 }
-.gt-wpd-xref-arrow { color: #909399; }
+.gt-wpd-xref-arrow { color: var(--gt-color-info); }
 .gt-wpd-xref-target { display: inline-flex; gap: 2px; }
-.gt-wpd-xref-desc { color: #606266; margin-left: 4px; }
+.gt-wpd-xref-desc { color: var(--gt-color-text-regular); margin-left: 4px; }
 
 /* 源文件提示 */
 .gt-wpd-source-hint {
   margin-top: 8px;
   padding: 6px 10px;
-  background: #fdf6ec;
-  color: #b67213;
-  font-size: 11px;
+  background: var(--gt-bg-warning);
+  color: var(--gt-color-wheat);
+  font-size: var(--gt-font-size-xs);
   border-radius: 3px;
   border-left: 3px solid #e6a23c;
 }
@@ -813,12 +813,12 @@ watch(
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
-.gt-wpd-usage-label { color: #909399; }
+.gt-wpd-usage-label { color: var(--gt-color-info); }
 .gt-wpd-usage-note {
-  font-size: 11px;
-  color: #c0c4cc;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-placeholder);
   font-style: italic;
 }
 </style>

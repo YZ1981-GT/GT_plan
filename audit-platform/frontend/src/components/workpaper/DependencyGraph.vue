@@ -164,21 +164,21 @@ onMounted(loadGraph)
 <style scoped>
 .gt-dep-graph { padding: 12px; }
 .gt-dep-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.gt-dep-title { font-size: 14px; font-weight: 600; color: #333; }
+.gt-dep-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary); }
 .gt-dep-flow { display: flex; align-items: flex-start; gap: 8px; }
 .gt-dep-column { flex: 1; min-width: 160px; }
-.gt-dep-col-title { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; text-align: center; }
-.gt-dep-arrow { font-size: 24px; color: #ccc; padding-top: 30px; flex-shrink: 0; }
-.gt-dep-node { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; font-size: 12px; border: 1px solid #e8e4f0; background: #faf8fd; transition: all 0.15s; }
+.gt-dep-col-title { font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-text-tertiary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; text-align: center; }
+.gt-dep-arrow { font-size: 24px /* allow-px: special */; color: var(--gt-color-text-placeholder); padding-top: 30px; flex-shrink: 0; }
+.gt-dep-node { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; font-size: var(--gt-font-size-xs); border: 1px solid #e8e4f0; background: var(--gt-color-primary-bg); transition: all 0.15s; }
 .gt-dep-node:hover { box-shadow: 0 2px 8px rgba(75,45,119,0.1); }
-.gt-dep-node--done { background: #f0f9eb; border-color: #c6e7b8; }
-.gt-dep-node--wip { background: #fdf6ec; border-color: #f5dab1; }
+.gt-dep-node--done { background: var(--gt-bg-success); border-color: #c6e7b8; }
+.gt-dep-node--wip { background: var(--gt-bg-warning); border-color: #f5dab1; }
 .gt-dep-node--b { border-left: 3px solid #909399; }
 .gt-dep-node--c { border-left: 3px solid #e6a23c; }
 .gt-dep-node--d { border-left: 3px solid #4b2d77; }
-.gt-dep-node-icon { font-size: 14px; }
+.gt-dep-node-icon { font-size: var(--gt-font-size-sm); }
 .gt-dep-node-label { flex: 1; }
-.gt-dep-empty { font-size: 11px; color: #ccc; text-align: center; padding: 12px; }
-.gt-dep-impact { margin-top: 8px; padding: 8px; background: #f5f3f8; border-radius: 6px; }
-.gt-dep-impact-text { font-size: 11px; color: #666; display: block; margin-top: 4px; }
+.gt-dep-empty { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); text-align: center; padding: 12px; }
+.gt-dep-impact { margin-top: 8px; padding: 8px; background: var(--gt-color-primary-bg); border-radius: 6px; }
+.gt-dep-impact-text { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); display: block; margin-top: 4px; }
 </style>

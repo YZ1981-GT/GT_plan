@@ -65,7 +65,7 @@
               <el-option label="上市公司" value="listed" />
               <el-option label="自定义" value="custom" />
             </el-select>
-            <span style="margin-left: 8px; font-size: 12px; color: #909399">
+            <span style="margin-left: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-info)">
               决定报表行次和附注模板
             </span>
           </el-form-item>
@@ -319,13 +319,13 @@ defineExpose({ validate })
 .gt-step-title {
   color: var(--gt-color-primary);
   margin-bottom: 4px;
-  font-size: 18px;
+  font-size: var(--gt-font-size-xl);
   font-weight: 700;
 }
 .gt-step-desc {
   color: var(--gt-color-text-tertiary);
   margin-bottom: 20px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 /* 两栏布局 */
@@ -336,7 +336,7 @@ defineExpose({ validate })
 }
 
 .gt-form-col {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 10px;
   padding: 20px 24px;
   border: 1px solid #f0edf5;
@@ -344,7 +344,7 @@ defineExpose({ validate })
 }
 
 .gt-form-section-title {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
   color: var(--gt-color-primary);
   margin-bottom: 14px;

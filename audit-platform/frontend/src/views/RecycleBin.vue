@@ -15,7 +15,7 @@
     <!-- 轻量标题栏 -->
     <div class="gt-rb-header">
       <div class="gt-rb-title">
-        <el-icon :size="20" style="color: #909399"><Delete /></el-icon>
+        <el-icon :size="20" style="color: var(--gt-color-info)"><Delete /></el-icon>
         <h2>回收站</h2>
         <el-tag v-if="stats.total > 0" size="small" type="info" round>{{ stats.total }}</el-tag>
       </div>
@@ -286,15 +286,15 @@ onMounted(async () => {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   padding: 8px 0 4px;
   margin: -20px -24px 12px;
   padding: 8px 24px 6px;
   border-bottom: 1px solid #f0f0f0;
 }
 .gt-rb-progress-text {
-  font-size: 12px;
-  color: #f56c6c;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-coral);
   margin-top: 4px;
   display: block;
 }
@@ -312,7 +312,7 @@ onMounted(async () => {
 }
 .gt-rb-title h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--gt-font-size-xl);
   font-weight: 600;
   color: var(--gt-color-text, #303133);
 }
@@ -333,19 +333,19 @@ onMounted(async () => {
 }
 
 .gt-rb-retention--danger {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
   font-weight: 600;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-rb-retention--warning {
-  color: #e6a23c;
-  font-size: 12px;
+  color: var(--gt-color-wheat);
+  font-size: var(--gt-font-size-xs);
 }
 
 :deep(.gt-rb-row--expiring) {
-  background: #fef8f8 !important;
+  background: var(--gt-color-coral-light) !important;
 }
 :deep(.gt-rb-row--expiring:hover > td) {
-  background: #fef0f0 !important;
+  background: var(--gt-bg-danger) !important;
 }
 </style>

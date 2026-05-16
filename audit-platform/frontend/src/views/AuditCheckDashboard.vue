@@ -69,7 +69,7 @@
 
     <!-- 依赖关系图 -->
     <div style="margin-top:24px">
-      <h3 style="font-size:15px;font-weight:600;color:#333;margin-bottom:12px">B→C→D 依赖关系</h3>
+      <h3 style="font-size: var(--gt-font-size-base);font-weight:600;color: var(--gt-color-text-primary);margin-bottom:12px">B→C→D 依赖关系</h3>
       <DependencyGraph :project-id="projectId" :cycle="selectedGraphCycle" />
       <div style="margin-top:8px">
         <el-radio-group v-model="selectedGraphCycle" size="small">
@@ -186,33 +186,33 @@ onMounted(loadDashboard)
 .gt-ack-dashboard { padding: var(--gt-space-4); }
 .gt-ack-summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
 .gt-ack-card {
-  background: #fff; border-radius: 8px; padding: 16px 24px; text-align: center;
+  background: var(--gt-color-bg-white); border-radius: 8px; padding: 16px 24px; text-align: center;
   border: 1px solid #e8e4f0; min-width: 100px; flex: 1;
 }
 .gt-ack-card--pass { border-left: 3px solid #67c23a; }
 .gt-ack-card--fail { border-left: 3px solid #e6a23c; }
 .gt-ack-card--pending { border-left: 3px solid #909399; }
-.gt-ack-card-value { display: block; font-size: 28px; font-weight: 800; color: #4b2d77; }
-.gt-ack-card-label { display: block; font-size: 11px; color: #999; margin-top: 4px; }
+.gt-ack-card-value { display: block; font-size: var(--gt-font-size-3xl); font-weight: 800; color: var(--gt-color-primary); }
+.gt-ack-card-label { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 4px; }
 .gt-ack-cycle-group { margin-bottom: 12px; border: 1px solid #e8e4f0; border-radius: 8px; overflow: hidden; }
 .gt-ack-cycle-header {
   display: flex; align-items: center; gap: 12px; padding: 10px 16px;
-  background: #faf8fd; cursor: pointer; user-select: none;
+  background: var(--gt-color-primary-bg); cursor: pointer; user-select: none;
 }
-.gt-ack-cycle-header:hover { background: #f0ecf5; }
-.gt-ack-cycle-name { font-size: 14px; font-weight: 600; color: #333; min-width: 120px; }
-.gt-ack-cycle-count { font-size: 12px; color: #999; }
+.gt-ack-cycle-header:hover { background: var(--gt-color-primary-bg); }
+.gt-ack-cycle-name { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary); min-width: 120px; }
+.gt-ack-cycle-count { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 .gt-ack-cycle-body { padding: 8px 16px; }
 .gt-ack-wp-section { margin-bottom: 8px; }
-.gt-ack-wp-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+.gt-ack-wp-title { display: flex; align-items: center; gap: 8px; font-size: var(--gt-font-size-sm); font-weight: 500; margin-bottom: 4px; }
 .gt-ack-check-row {
-  display: flex; align-items: center; gap: 8px; padding: 3px 8px; font-size: 12px;
+  display: flex; align-items: center; gap: 8px; padding: 3px 8px; font-size: var(--gt-font-size-xs);
   border-radius: 4px; margin-bottom: 2px;
 }
-.gt-ack-check--pass { background: #f0f9eb; }
-.gt-ack-check--fail { background: #fdf6ec; }
-.gt-ack-check-code { font-weight: 600; color: #666; min-width: 80px; }
-.gt-ack-check-desc { flex: 1; color: #333; }
+.gt-ack-check--pass { background: var(--gt-bg-success); }
+.gt-ack-check--fail { background: var(--gt-bg-warning); }
+.gt-ack-check-code { font-weight: 600; color: var(--gt-color-text-secondary); min-width: 80px; }
+.gt-ack-check-desc { flex: 1; color: var(--gt-color-text-primary); }
 .gt-ack-check-severity { min-width: 60px; }
 .gt-ack-check-result { min-width: 20px; text-align: center; }
 </style>

@@ -93,7 +93,7 @@ onMounted(loadChecklist)
 <style scoped>
 .review-checklist-panel { padding: 12px; }
 .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.title { font-weight: 600; font-size: 14px; }
+.title { font-weight: 600; font-size: var(--gt-font-size-sm); }
 .check-item { padding: 6px 0; }
 .panel-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
 </style>

@@ -130,7 +130,7 @@
           </div>
         </div>
         <div v-else class="gt-help-empty">
-          <el-icon :size="40" style="color: #ddd"><InfoFilled /></el-icon>
+          <el-icon :size="40" style="color: var(--gt-color-border-light)"><InfoFilled /></el-icon>
           <p>点击左侧配置项查看说明</p>
         </div>
       </div>
@@ -138,7 +138,7 @@
 
     <div v-else style="text-align: center; padding: 60px">
       <el-icon class="is-loading" :size="32"><Loading /></el-icon>
-      <p style="color: #999; margin-top: 12px">加载配置中...</p>
+      <p style="color: var(--gt-color-text-tertiary); margin-top: 12px">加载配置中...</p>
     </div>
   </div>
 </template>
@@ -506,18 +506,18 @@ onMounted(loadSettings)
 .gt-settings-header {
   display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
 }
-.gt-settings-header h2 { margin: 0; font-size: 20px; color: #333; }
+.gt-settings-header h2 { margin: 0; font-size: 20px /* allow-px: special */; color: var(--gt-color-text-primary); }
 .gt-settings-actions { display: flex; gap: 8px; }
 
 .gt-health-bar {
   display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
-  padding: 12px 16px; background: #fafafa; border-radius: 8px; border: 1px solid #eee;
+  padding: 12px 16px; background: var(--gt-color-bg); border-radius: 8px; border: 1px solid #eee;
 }
-.gt-health-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #666; }
+.gt-health-item { display: flex; align-items: center; gap: 6px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
 .gt-health-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.gt-health-ok .gt-health-dot { background: #67c23a; }
-.gt-health-err .gt-health-dot { background: #f56c6c; }
-.gt-health-err { color: #f56c6c; }
+.gt-health-ok .gt-health-dot { background: var(--gt-color-success); }
+.gt-health-err .gt-health-dot { background: var(--gt-color-coral); }
+.gt-health-err { color: var(--gt-color-coral); }
 
 /* 双栏布局 */
 .gt-settings-body { display: flex; gap: 20px; align-items: flex-start; }
@@ -532,17 +532,17 @@ onMounted(loadSettings)
   border-bottom: 1px solid #f5f5f5; cursor: pointer; border-radius: 4px;
   transition: background 0.15s;
 }
-.gt-settings-row:hover { background: #fafafa; }
-.gt-settings-row--active { background: #f5f0ff !important; border-left: 3px solid var(--gt-color-primary, #4b2d77); }
-.gt-settings-row--active .gt-value-text { color: #222; }
-.gt-settings-row--active .gt-editable-tag { background: #fff !important; }
+.gt-settings-row:hover { background: var(--gt-color-bg); }
+.gt-settings-row--active { background: var(--gt-color-primary-bg) !important; border-left: 3px solid var(--gt-color-primary, #4b2d77); }
+.gt-settings-row--active .gt-value-text { color: var(--gt-color-text); }
+.gt-settings-row--active .gt-editable-tag { background: var(--gt-color-bg-white) !important; }
 
 /* 编辑按钮：白底+深色文字+边框，任何背景下都清晰 */
 .gt-edit-btn {
-  background: #fff !important;
-  color: #333 !important;
+  background: var(--gt-color-bg-white) !important;
+  color: var(--gt-color-text-primary) !important;
   border: 1px solid #ccc !important;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-edit-btn:hover {
   color: var(--gt-color-primary, #4b2d77) !important;
@@ -550,47 +550,47 @@ onMounted(loadSettings)
 }
 .gt-settings-row:last-child { border-bottom: none; }
 .gt-settings-key {
-  width: 280px; flex-shrink: 0; font-size: 13px; color: #555;
+  width: 280px; flex-shrink: 0; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-regular);
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
 }
-.gt-key-name { font-weight: 500; color: #333; }
-.gt-key-code { font-size: 11px; color: #999; font-family: 'Consolas', 'Monaco', monospace; }
-.gt-group-count { font-size: 12px; color: #999; margin-left: 8px; font-weight: 400; }
-.gt-settings-value { flex: 1; font-size: 13px; display: flex; align-items: center; gap: 8px; }
-.gt-value-text { color: #333; word-break: break-all; }
-.gt-value-masked { color: #999; font-style: italic; }
+.gt-key-name { font-weight: 500; color: var(--gt-color-text-primary); }
+.gt-key-code { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); font-family: 'Consolas', 'Monaco', monospace; }
+.gt-group-count { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-left: 8px; font-weight: 400; }
+.gt-settings-value { flex: 1; font-size: var(--gt-font-size-sm); display: flex; align-items: center; gap: 8px; }
+.gt-value-text { color: var(--gt-color-text-primary); word-break: break-all; }
+.gt-value-masked { color: var(--gt-color-text-tertiary); font-style: italic; }
 .gt-editable-tag { transform: scale(0.8); }
 
 /* 右侧说明面板 */
 .gt-help-panel {
-  background: #fafbfc; border: 1px solid #e8e8e8; border-radius: 8px;
-  padding: 20px; font-size: 13px; line-height: 1.8;
+  background: var(--gt-color-bg); border: 1px solid #e8e8e8; border-radius: 8px;
+  padding: 20px; font-size: var(--gt-font-size-sm); line-height: 1.8;
 }
 .gt-help-title {
   display: flex; align-items: center; gap: 8px;
-  font-size: 14px; font-weight: 600; color: var(--gt-color-primary, #4b2d77);
+  font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary, #4b2d77);
   font-family: 'Consolas', 'Monaco', monospace;
   margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #eee;
 }
-.gt-help-desc { color: #333; margin-bottom: 14px; }
+.gt-help-desc { color: var(--gt-color-text-primary); margin-bottom: 14px; }
 .gt-help-section { margin-bottom: 10px; }
 .gt-help-label {
-  display: inline-block; font-weight: 600; color: #666; margin-right: 8px;
+  display: inline-block; font-weight: 600; color: var(--gt-color-text-secondary); margin-right: 8px;
   min-width: 56px;
 }
 .gt-help-section code {
-  background: #f0f0f0; padding: 2px 6px; border-radius: 3px;
-  font-size: 12px; color: #c7254e; word-break: break-all;
+  background: var(--gt-color-border-lighter); padding: 2px 6px; border-radius: 3px;
+  font-size: var(--gt-font-size-xs); color: var(--gt-color-coral); word-break: break-all;
 }
-.gt-help-warning { color: #e6a23c; background: #fef8e8; padding: 8px 10px; border-radius: 4px; }
+.gt-help-warning { color: var(--gt-color-wheat); background: var(--gt-bg-warning); padding: 8px 10px; border-radius: 4px; }
 .gt-help-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  height: 200px; color: #ccc; font-size: 14px; gap: 12px;
-  background: #fafbfc; border: 1px dashed #e0e0e0; border-radius: 8px;
+  height: 200px; color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-sm); gap: 12px;
+  background: var(--gt-color-bg); border: 1px dashed #e0e0e0; border-radius: 8px;
 }
 .gt-help-empty p { margin: 0; }
 
 :deep(.el-collapse-item__header) {
-  font-size: 15px; font-weight: 600; color: var(--gt-color-primary, #4b2d77);
+  font-size: var(--gt-font-size-base); font-weight: 600; color: var(--gt-color-primary, #4b2d77);
 }
 </style>

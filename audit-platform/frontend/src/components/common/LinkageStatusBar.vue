@@ -44,13 +44,13 @@ const dismissed = ref(false)
   background: linear-gradient(90deg, #fff8e6 0%, #fff3cd 100%);
   border-bottom: 1px solid #ffc107;
   font-size: var(--gt-font-size-xs);
-  color: #856404;
+  color: var(--gt-color-wheat);
 }
-.gt-linkage-bar__icon { font-size: 14px; }
+.gt-linkage-bar__icon { font-size: var(--gt-font-size-sm); }
 .gt-linkage-bar__text { flex: 1; }
 .gt-linkage-bar__close {
   padding: 2px 6px;
   min-width: auto;
-  color: #856404;
+  color: var(--gt-color-wheat);
 }
 </style>

@@ -400,8 +400,8 @@ watch(visible, (val) => {
 .gt-batch-no-candidates {
   padding: 20px;
   text-align: center;
-  color: #999;
-  font-size: 13px;
+  color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-sm);
 }
 
 .gt-batch-step1-info {
@@ -421,9 +421,9 @@ watch(visible, (val) => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #333;
+  color: var(--gt-color-text-primary);
 }
 
 .gt-batch-footer {

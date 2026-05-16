@@ -80,22 +80,22 @@ async function copyTrace() {
   flex: 1;
 }
 .sod-type {
-  font-size: 15px;
+  font-size: var(--gt-font-size-base);
   font-weight: 600;
   margin-bottom: 8px;
 }
 .sod-policy {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary, #999);
   margin-bottom: 8px;
 }
 .sod-suggestion {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-primary, #333);
 }
 .sod-trace {
   margin-top: 12px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary, #999);
 }
 </style>

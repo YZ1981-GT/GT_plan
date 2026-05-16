@@ -1,0 +1,34 @@
+{
+  "extends": ["stylelint-config-recommended-vue"],
+  "rules": {
+    "declaration-property-value-disallowed-list": [
+      {
+        "/^font-size$/": ["/^\\d+px$/"],
+        "/^color$/": ["/^#[0-9a-fA-F]{3,8}$/"],
+        "/^background$/": ["/^#[0-9a-fA-F]{3,8}$/"],
+        "/^background-color$/": ["/^#[0-9a-fA-F]{3,8}$/"]
+      },
+      {
+        "severity": "error",
+        "message": "Use design tokens (var(--gt-*)) instead of inline literals. R10 Spec B / D2: font-size 已转 error（Sprint 1 末尾），color/background 也已转 error（Sprint 2 末尾）。装饰图标/大字号场景加 /* allow-px: emoji-icon|special|minor */ 注释；rgba/gradient 内的颜色不在卡点范围内。"
+      }
+    ],
+    "no-empty-source": null,
+    "selector-pseudo-class-no-unknown": [
+      true,
+      { "ignorePseudoClasses": ["deep", "global"] }
+    ],
+    "selector-pseudo-element-no-unknown": [
+      true,
+      { "ignorePseudoElements": ["v-deep"] }
+    ]
+  },
+  "ignoreFiles": [
+    "**/*.js",
+    "**/*.ts",
+    "**/*.json",
+    "node_modules/**",
+    "dist/**",
+    "src/styles/gt-tokens.css"
+  ]
+}

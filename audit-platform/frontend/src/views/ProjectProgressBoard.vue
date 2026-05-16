@@ -135,13 +135,13 @@
               </div>
             </template>
             <span v-else-if="typeof row.commitments === 'string' && row.commitments">{{ row.commitments }}</span>
-            <span v-else style="color: #999">-</span>
+            <span v-else style="color: var(--gt-color-text-tertiary)">-</span>
           </template>
         </el-table-column>
         <el-table-column label="关联底稿" width="120">
           <template #default="{ row }">
             <span v-if="row.related_wp_codes?.length">{{ row.related_wp_codes.join(', ') }}</span>
-            <span v-else style="color: #999">-</span>
+            <span v-else style="color: var(--gt-color-text-tertiary)">-</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="60">
@@ -385,31 +385,31 @@ onMounted(async () => {
   display: flex; justify-content: space-between; align-items: center;
   padding: 20px 24px; margin-bottom: 16px;
   background: linear-gradient(135deg, var(--gt-color-primary, #4b2d77) 0%, #6b4d97 100%);
-  border-radius: 8px; color: #fff;
+  border-radius: 8px; color: var(--gt-color-text-inverse);
 }
-.gt-page-banner h2 { margin: 0; font-size: 18px; font-weight: 600; }
-.gt-banner-sub { font-size: 13px; opacity: 0.85; margin-top: 4px; display: block; }
+.gt-page-banner h2 { margin: 0; font-size: var(--gt-font-size-xl); font-weight: 600; }
+.gt-banner-sub { font-size: var(--gt-font-size-sm); opacity: 0.85; margin-top: 4px; display: block; }
 .gt-banner-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .stat-cards {
   display: flex; gap: 12px; margin-bottom: 20px;
 }
 .stat-card {
-  flex: 1; padding: 16px 20px; background: #fff; border-radius: 8px;
+  flex: 1; padding: 16px 20px; background: var(--gt-color-bg-white); border-radius: 8px;
   border-left: 4px solid #ccc; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-.stat-num { font-size: 28px; font-weight: 700; color: #1a1a2e; }
-.stat-label { font-size: 13px; color: #666; margin-top: 4px; }
+.stat-num { font-size: var(--gt-font-size-3xl); font-weight: 700; color: var(--gt-color-text); }
+.stat-label { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-top: 4px; }
 
 .board-container {
   display: flex; gap: 12px; min-height: 400px;
 }
 .board-column {
-  flex: 1; background: #fafafa; border-radius: 8px; overflow: hidden;
+  flex: 1; background: var(--gt-color-bg); border-radius: 8px; overflow: hidden;
   display: flex; flex-direction: column;
 }
 .board-col-header {
-  padding: 10px 14px; font-weight: 600; font-size: 14px;
+  padding: 10px 14px; font-weight: 600; font-size: var(--gt-font-size-sm);
   display: flex; justify-content: space-between; align-items: center;
 }
 .board-col-body {
@@ -417,20 +417,20 @@ onMounted(async () => {
   display: flex; flex-direction: column; gap: 6px;
 }
 .board-card {
-  background: #fff; border-radius: 6px; padding: 10px 12px;
+  background: var(--gt-color-bg-white); border-radius: 6px; padding: 10px 12px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08); cursor: pointer;
   transition: box-shadow 0.15s;
 }
 .board-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
-.card-code { font-size: 12px; color: #999; font-family: monospace; }
-.card-name { font-size: 13px; margin-top: 2px; color: #333; }
+.card-code { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); font-family: monospace; }
+.card-name { font-size: var(--gt-font-size-sm); margin-top: 2px; color: var(--gt-color-text-primary); }
 .card-meta { margin-top: 6px; }
-.board-empty { text-align: center; color: #ccc; padding: 20px; font-size: 13px; }
+.board-empty { text-align: center; color: var(--gt-color-text-placeholder); padding: 20px; font-size: var(--gt-font-size-sm); }
 
-.brief-container { padding: 20px; background: #fff; border-radius: 8px; min-height: 300px; }
+.brief-container { padding: 20px; background: var(--gt-color-bg-white); border-radius: 8px; min-height: 300px; }
 .brief-content { line-height: 1.8; }
-.brief-content :deep(h2) { font-size: 18px; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
-.brief-content :deep(h3) { font-size: 15px; margin-top: 16px; }
+.brief-content :deep(h2) { font-size: var(--gt-font-size-xl); margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+.brief-content :deep(h3) { font-size: var(--gt-font-size-base); margin-top: 16px; }
 .brief-content :deep(ul) { padding-left: 20px; }
 .brief-content :deep(li) { margin-bottom: 4px; }
 .brief-content :deep(strong) { color: var(--gt-color-primary, #4b2d77); }
@@ -438,13 +438,13 @@ onMounted(async () => {
 .table-container { margin-bottom: 20px; }
 
 .comm-section {
-  margin-top: 24px; padding: 16px 20px; background: #fff; border-radius: 8px;
+  margin-top: 24px; padding: 16px 20px; background: var(--gt-color-bg-white); border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 .comm-header {
   display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
 }
-.comm-header h3 { margin: 0; font-size: 15px; }
+.comm-header h3 { margin: 0; font-size: var(--gt-font-size-base); }
 
 .commitment-cell {
   display: flex;

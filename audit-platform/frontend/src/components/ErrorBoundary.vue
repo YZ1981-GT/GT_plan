@@ -42,7 +42,7 @@ function goHome() {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   min-height: 300px; padding: var(--gt-space-10); text-align: center;
 }
-.gt-error-icon { font-size: 48px; margin-bottom: var(--gt-space-4); }
+.gt-error-icon { font-size: 48px /* allow-px: special */; margin-bottom: var(--gt-space-4); }
 .gt-error-boundary h3 { font-size: var(--gt-font-size-xl); color: var(--gt-color-text); margin-bottom: var(--gt-space-2); }
 .gt-error-msg { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary); margin-bottom: var(--gt-space-5); max-width: 400px; }
 .gt-error-actions { display: flex; gap: var(--gt-space-2); }

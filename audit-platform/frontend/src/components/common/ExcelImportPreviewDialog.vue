@@ -311,9 +311,9 @@ defineExpose({ selectFile, open })
   gap: 12px;
   padding: 8px 12px;
   margin-bottom: 12px;
-  background: #f5f7fa;
+  background: var(--gt-bg-subtle);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 .stat-item {
   display: flex;
@@ -321,34 +321,34 @@ defineExpose({ selectFile, open })
   gap: 6px;
 }
 .stat-label {
-  color: #909399;
+  color: var(--gt-color-info);
 }
 .stat-value {
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .stat-valid {
-  color: #67c23a;
+  color: var(--gt-color-success);
 }
 .stat-error {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
 }
 .stat-sep {
   width: 1px;
   height: 16px;
-  background: #dcdfe6;
+  background: var(--gt-color-border);
 }
 .import-preview {
   margin-bottom: 8px;
 }
 .cell-error {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
   font-weight: 600;
 }
 :deep(.import-row-error) {
-  background-color: #fef0f0 !important;
+  background-color: var(--gt-bg-danger) !important;
 }
 :deep(.import-row-error:hover > td) {
-  background-color: #fde2e2 !important;
+  background-color: var(--gt-color-coral-light) !important;
 }
 </style>

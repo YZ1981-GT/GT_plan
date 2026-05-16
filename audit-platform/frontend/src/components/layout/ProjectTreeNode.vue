@@ -136,7 +136,7 @@ function statusLabel(s: string) {
 }
 .gt-node-row:hover {
   border-color: rgba(75, 45, 119, 0.1);
-  background: #faf8fd;
+  background: var(--gt-color-primary-bg);
   box-shadow: 0 1px 4px rgba(75, 45, 119, 0.06);
 }
 .gt-node-row--active {
@@ -154,7 +154,7 @@ function statusLabel(s: string) {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   font-weight: 700;
   color: var(--gt-color-text-secondary);
   cursor: pointer;
@@ -189,7 +189,7 @@ function statusLabel(s: string) {
   justify-content: space-between;
   align-items: center;
   margin-top: 1px;
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary);
   word-break: break-all;
 }

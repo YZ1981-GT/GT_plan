@@ -208,7 +208,7 @@ import type { GateReadinessData } from '@/components/gate/GateReadinessPanel.vue
 import { getSignReadinessV2, signDocument } from '@/services/signatureApi'
 import { api } from '@/services/apiProxy'
 import { REPORT_STATUS } from '@/constants/statusEnum'
-import { confirmSignature } from '@/utils/confirm'
+import { confirmSignature, confirmSign } from '@/utils/confirm'
 import { feedback } from '@/utils/feedback'
 import { handleApiError } from '@/utils/errorHandler'
 import { fmtAmount as fmtAmt } from '@/utils/formatters'
@@ -361,7 +361,17 @@ async function onSign() {
     ElMessage.warning('存在阻塞项，无法签字')
     return
   }
-  // 必须输入客户名匹配才能确认
+  // R10 Spec C / F7：先用 confirmSign 展示操作+用户+项目+不可撤销摘要
+  try {
+    await confirmSign('合伙人签字定稿', {
+      userName: authStore.user?.full_name || authStore.user?.username || '当前用户',
+      projectName: clientName.value || '当前项目',
+      objectName: `${year.value} 年度审计报告`,
+    })
+  } catch {
+    return
+  }
+  // 然后必须输入客户名匹配才能最终确认（R8 已有的强校验）
   try {
     const confirmed = await confirmSignature(clientName.value, '年度审计报告')
     if (!confirmed) return
@@ -513,15 +523,15 @@ onMounted(() => {
 }
 .gt-psd-stale-card--warn {
   border-color: var(--gt-color-warning, #e6a23c);
-  background: #fef9e7;
+  background: var(--gt-bg-warning);
 }
 .gt-psd-stale-card-label {
-  font-size: 11px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary);
   margin-bottom: 4px;
 }
 .gt-psd-stale-card-value {
-  font-size: 18px;
+  font-size: var(--gt-font-size-xl);
   font-weight: 700;
   color: var(--gt-color-primary);
   font-variant-numeric: tabular-nums;
@@ -530,7 +540,7 @@ onMounted(() => {
   color: var(--gt-color-warning, #e6a23c);
 }
 .gt-psd-stale-card-sub {
-  font-size: 10px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary);
 }
 

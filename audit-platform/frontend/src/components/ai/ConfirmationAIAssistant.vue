@@ -101,11 +101,11 @@ function riskLabel(r) {
 <style scoped>
 .confirmation-ai { padding: 16px; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.panel-header h3 { margin: 0; font-size: 16px; }
+.panel-header h3 { margin: 0; font-size: var(--gt-font-size-md); }
 .header-actions { display: flex; gap: 8px; }
-.check-select { padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; }
-.btn-primary { padding: 6px 14px; background: #4b2d77; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
-.btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+.check-select { padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: var(--gt-font-size-xs); }
+.btn-primary { padding: 6px 14px; background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border: none; border-radius: 6px; cursor: pointer; font-size: var(--gt-font-size-xs); }
+.btn-primary:disabled { background: var(--gt-color-border); cursor: not-allowed; }
 
 .check-results { display: flex; flex-direction: column; gap: 8px; max-height: 500px; overflow-y: auto; }
 .check-card { border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; }
@@ -115,24 +115,24 @@ function riskLabel(r) {
 .check-card.risk-pass { border-color: rgba(82,196,26,0.3); }
 
 .check-header { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
-.check-type-badge { background: rgba(75,45,119,0.1); color: #4b2d77; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
-.risk-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; }
-.risk-badge.high { background: #fff2f0; color: #ff4d4f; }
-.risk-badge.medium { background: #fff7e6; color: #fa8c16; }
-.risk-badge.low { background: #f6ffed; color: #52c41a; }
-.risk-badge.pass { background: #f6ffed; color: #52c41a; }
+.check-type-badge { background: rgba(75,45,119,0.1); color: #4b2d77; padding: 2px 6px; border-radius: 4px; font-size: var(--gt-font-size-xs); }
+.risk-badge { font-size: var(--gt-font-size-xs); padding: 2px 6px; border-radius: 4px; }
+.risk-badge.high { background: var(--gt-bg-danger); color: var(--gt-color-coral); }
+.risk-badge.medium { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); }
+.risk-badge.low { background: var(--gt-bg-success); color: var(--gt-color-success); }
+.risk-badge.pass { background: var(--gt-bg-success); color: var(--gt-color-success); }
 
 .check-details { margin-bottom: 6px; }
-.detail-item { display: flex; gap: 6px; font-size: 12px; padding: 2px 0; }
-.detail-key { color: #888; min-width: 80px; }
-.detail-val { color: #333; font-weight: 500; }
+.detail-item { display: flex; gap: 6px; font-size: var(--gt-font-size-xs); padding: 2px 0; }
+.detail-key { color: var(--gt-color-text-secondary); min-width: 80px; }
+.detail-val { color: var(--gt-color-text-primary); font-weight: 500; }
 
 .check-footer { display: flex; justify-content: space-between; align-items: center; }
-.confirm-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; }
-.confirm-badge.pending { background: #fff7e6; color: #fa8c16; }
-.confirm-badge.confirmed { background: #f6ffed; color: #52c41a; }
+.confirm-badge { font-size: var(--gt-font-size-xs); padding: 2px 6px; border-radius: 4px; }
+.confirm-badge.pending { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); }
+.confirm-badge.confirmed { background: var(--gt-bg-success); color: var(--gt-color-success); }
 .footer-actions { display: flex; gap: 4px; }
-.btn-sm { padding: 2px 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 11px; }
-.btn-reject { border-color: #ff4d4f; color: #ff4d4f; }
-.empty-state { text-align: center; padding: 20px; color: #999; font-size: 13px; }
+.btn-sm { padding: 2px 8px; border: 1px solid #ddd; background: var(--gt-color-bg-white); border-radius: 4px; cursor: pointer; font-size: var(--gt-font-size-xs); }
+.btn-reject { border-color: #ff4d4f; color: var(--gt-color-coral); }
+.empty-state { text-align: center; padding: 20px; color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-sm); }
 </style>

@@ -90,6 +90,6 @@ function onNodeClick(item: any) {
 
 <style scoped>
 .gt-tree-node { display: flex; align-items: center; gap: 6px; font-size: var(--gt-font-size-sm); }
-.gt-tree-icon { font-size: 16px; flex-shrink: 0; }
+.gt-tree-icon { font-size: var(--gt-font-size-md); flex-shrink: 0; }
 .gt-tree-code { font-weight: 600; color: var(--gt-color-primary); margin-right: 4px; }
 </style>

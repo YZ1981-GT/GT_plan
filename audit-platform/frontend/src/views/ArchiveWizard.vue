@@ -401,7 +401,7 @@ onBeforeUnmount(() => {
 .gt-archive-wizard-header h2 {
   text-align: center;
   margin-bottom: 24px;
-  font-size: 20px;
+  font-size: 20px /* allow-px: special */;
   color: var(--gt-color-text-primary, #303133);
 }
 
@@ -415,9 +415,9 @@ onBeforeUnmount(() => {
   gap: 8px;
   margin-bottom: 20px;
   padding: 12px 16px;
-  background: #f4f4f5;
+  background: var(--gt-color-bg);
   border-radius: 6px;
-  font-size: 14px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary, #606266);
 }
 
@@ -438,7 +438,7 @@ onBeforeUnmount(() => {
 
 .gt-archive-option-hint {
   margin-left: 12px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary, #909399);
 }
 
@@ -450,7 +450,7 @@ onBeforeUnmount(() => {
 
 .gt-archive-eval-id {
   margin-left: 8px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary, #909399);
   font-family: var(--gt-font-family-mono, Consolas, monospace);
 }
@@ -475,14 +475,14 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
+  font-size: var(--gt-font-size-md);
   font-weight: 500;
   color: var(--gt-color-text-primary, #303133);
 }
 
 .gt-archive-current-section {
   text-align: center;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary, #606266);
 }
 
@@ -492,7 +492,7 @@ onBeforeUnmount(() => {
   gap: 8px;
   margin-top: 12px;
   padding: 12px;
-  background: #fafafa;
+  background: var(--gt-color-bg);
   border-radius: 6px;
 }
 
@@ -502,30 +502,30 @@ onBeforeUnmount(() => {
   gap: 8px;
   padding: 6px 8px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
 }
 
 .gt-archive-section-item.section-succeeded {
-  color: #67c23a;
+  color: var(--gt-color-success);
 }
 
 .gt-archive-section-item.section-running {
-  color: #409eff;
+  color: var(--gt-color-teal);
   font-weight: 500;
 }
 
 .gt-archive-section-item.section-failed {
-  color: #f56c6c;
+  color: var(--gt-color-coral);
 }
 
 .gt-archive-section-item.section-pending,
 .gt-archive-section-item.section-skipped {
-  color: #909399;
+  color: var(--gt-color-info);
 }
 
 .gt-archive-section-order {
   font-family: var(--gt-font-family-mono, Consolas, monospace);
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   min-width: 24px;
 }
 
@@ -546,7 +546,7 @@ onBeforeUnmount(() => {
 
 .gt-archive-fail-detail p {
   margin: 4px 0;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary, #606266);
 }
 </style>

@@ -538,3 +538,8 @@ def register_all_routers(app: FastAPI) -> None:
     # §43-§53 已被 audit-chain-generation 占用，本路由使用 §54。
     from app.routers.template_library_mgmt import router as template_library_mgmt_router
     app.include_router(template_library_mgmt_router, tags=["template-library-mgmt"])
+
+    # ═══ 55. R10 Spec C：事件级联健康度（event-cascade/health） ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/event-cascade"，注册时不加额外前缀。
+    from app.routers.event_cascade_health import router as event_cascade_health_router
+    app.include_router(event_cascade_health_router, tags=["event-cascade"])

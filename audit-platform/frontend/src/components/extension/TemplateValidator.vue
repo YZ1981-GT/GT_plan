@@ -65,8 +65,8 @@ const checks = computed(() => {
 .gt-validator-title { font-weight: 600; }
 .gt-check-list { display: flex; flex-direction: column; gap: var(--gt-space-3); }
 .gt-check-item { display: flex; align-items: flex-start; gap: var(--gt-space-2); }
-.gt-check-pass { color: var(--gt-color-success); font-size: 18px; flex-shrink: 0; }
-.gt-check-fail { color: var(--gt-color-coral); font-size: 18px; flex-shrink: 0; }
+.gt-check-pass { color: var(--gt-color-success); font-size: var(--gt-font-size-xl); flex-shrink: 0; }
+.gt-check-fail { color: var(--gt-color-coral); font-size: var(--gt-font-size-xl); flex-shrink: 0; }
 .gt-check-content { display: flex; flex-direction: column; }
 .gt-check-label { font-size: var(--gt-font-size-base); }
 .gt-check-msg { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-top: 2px; }

@@ -739,14 +739,14 @@ onMounted(() => {
   justify-content: space-between;
   gap: 12px;
   padding: 8px 12px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: 6px;
   border: 1px solid #ebeef5;
 }
 .gt-cqt-ctx-form { margin-bottom: 0; flex: 1; }
 .gt-cqt-ctx-form :deep(.el-form-item) { margin-bottom: 0; margin-right: 12px; }
 .gt-cqt-top-actions { display: flex; gap: 8px; flex-shrink: 0; }
-.gt-cqt-em { color: #909399; font-size: 12px; }
+.gt-cqt-em { color: var(--gt-color-info); font-size: var(--gt-font-size-xs); }
 
 .gt-cqt-main {
   flex: 1;
@@ -763,7 +763,7 @@ onMounted(() => {
 }
 
 .gt-cqt-panel {
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #ebeef5;
   border-radius: 6px;
   padding: 12px;
@@ -772,9 +772,9 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
   margin-bottom: 12px;
 }
 
@@ -811,32 +811,32 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #ebeef5;
   border-radius: 6px;
 }
 .gt-cqt-result-title {
-  font-size: 13px;
+  font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  color: #303133;
+  color: var(--gt-color-text-primary);
 }
 .gt-cqt-result-actions { display: flex; gap: 8px; }
 .gt-cqt-result-body {
   flex: 1;
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border: 1px solid #ebeef5;
   border-radius: 6px;
   padding: 8px;
   min-height: 0;
   overflow: auto;
 }
-.gt-cqt-table { font-size: 12px; }
+.gt-cqt-table { font-size: var(--gt-font-size-xs); }
 .gt-cqt-error {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
   font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
   white-space: pre-wrap;
-  color: #f56c6c;
+  color: var(--gt-color-coral);
 }
 .gt-amt {
   font-family: 'Arial Narrow', Arial, sans-serif;

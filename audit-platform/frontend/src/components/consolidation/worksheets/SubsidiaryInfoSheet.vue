@@ -24,7 +24,7 @@
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <el-icon :size="14" style="color:#e6a23c;flex-shrink:0;margin-top:1px"><WarningFilled /></el-icon>
+      <el-icon :size="14" style="color: var(--gt-color-wheat);flex-shrink:0;margin-top:1px"><WarningFilled /></el-icon>
       <span>填写"持股比例变动"为<b>是</b>并设置<b>变动次数（1~3）</b>后，将自动弹出对应的股比变动明细表。核算科目决定投资明细归属哪张表。支持导出模板填写后导入，导入时自动读取<b>"数据填写"</b>工作表，请勿修改sheet名称。</span>
     </div>
 
@@ -54,7 +54,7 @@
       <!-- 上级单位代码 -->
       <el-table-column prop="parent_code" label="上级单位代码" width="120">
         <template #header>
-          <span>上级单位代码<br/><small style="color:#999">（构建树形）</small></span>
+          <span>上级单位代码<br/><small style="color: var(--gt-color-text-tertiary)">（构建树形）</small></span>
         </template>
         <template #default="{ row }">
           <div @click.stop @mousedown.stop>
@@ -82,7 +82,7 @@
       <!-- 核算科目 -->
       <el-table-column prop="account_subject" label="核算科目" width="140">
         <template #header>
-          <span>核算科目<br/><small style="color:#999">（长投、可供、交易性等）</small></span>
+          <span>核算科目<br/><small style="color: var(--gt-color-text-tertiary)">（长投、可供、交易性等）</small></span>
         </template>
         <template #default="{ row }">
           <div @click.stop @mousedown.stop>
@@ -96,7 +96,7 @@
       <!-- 核算方式 -->
       <el-table-column prop="accounting_method" label="核算方式" width="100">
         <template #header>
-          <span>核算方式<br/><small style="color:#999">（成本法、权益法）</small></span>
+          <span>核算方式<br/><small style="color: var(--gt-color-text-tertiary)">（成本法、权益法）</small></span>
         </template>
         <template #default="{ row }">
           <div @click.stop @mousedown.stop>
@@ -110,7 +110,7 @@
       <!-- 持股类型 -->
       <el-table-column prop="holding_type" label="持股类型" width="90" align="center">
         <template #header>
-          <span>持股类型<br/><small style="color:#999">（直接/间接）</small></span>
+          <span>持股类型<br/><small style="color: var(--gt-color-text-tertiary)">（直接/间接）</small></span>
         </template>
         <template #default="{ row }">
           <div @click.stop @mousedown.stop>
@@ -125,7 +125,7 @@
       <!-- 间接持股方 -->
       <el-table-column prop="indirect_holder" label="间接持股方" width="130">
         <template #header>
-          <span>间接持股方<br/><small style="color:#999">（通过谁持有）</small></span>
+          <span>间接持股方<br/><small style="color: var(--gt-color-text-tertiary)">（通过谁持有）</small></span>
         </template>
         <template #default="{ row }">
           <div v-if="row.holding_type === '间接'" @click.stop @mousedown.stop>
@@ -133,7 +133,7 @@
               <el-option v-for="c in getOtherCompanies(row)" :key="c" :label="c" :value="c" />
             </el-select>
           </div>
-          <span v-else style="color:#ccc;font-size:11px">—</span>
+          <span v-else style="color: var(--gt-color-text-placeholder);font-size: var(--gt-font-size-xs)">—</span>
         </template>
       </el-table-column>
 
@@ -591,17 +591,17 @@ const { isFullscreen, toggleFullscreen } = useFullscreen()
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 8px; padding: 4px 0; flex-wrap: wrap; gap: 6px;
 }
-.ws-sheet-header h3 { margin: 0; font-size: 14px; color: #333; white-space: nowrap; }
+.ws-sheet-header h3 { margin: 0; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-primary); white-space: nowrap; }
 .ws-sheet-actions { display: flex; gap: 8px; }
 .ws-tip {
   display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px;
-  background: #fdf6ec; border-radius: 6px; font-size: 12px; color: #8a6d3b; line-height: 1.5;
+  background: var(--gt-bg-warning); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-wheat); line-height: 1.5;
   border: 1px solid #faecd8;
 }
-.ws-tip b { color: #e6a23c; }
+.ws-tip b { color: var(--gt-color-wheat); }
 .ws-table :deep(.el-input__inner) { text-align: right; }
 .ws-table :deep(.el-input-number) { width: 100%; }
 .ws-table :deep(.el-input-number .el-input__inner) { text-align: right; }
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
-.ws-btn-sep { width: 1px; height: 18px; background: #ddd; margin: 0 2px; flex-shrink: 0; }
+.ws-btn-sep { width: 1px; height: 18px; background: var(--gt-color-border-light); margin: 0 2px; flex-shrink: 0; }
 </style>
