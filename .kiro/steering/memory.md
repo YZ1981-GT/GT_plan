@@ -118,6 +118,19 @@ inclusion: always
   - `workpaper-completion-foundation`（5 天 / 3 Sprint / 27 任务）：预填充视觉指示器 / 一键填充按钮（编辑器内）/ 跨模块跳转标签 / 单元格复核标记 / 循环级复核徽章 / Playwright E2E / 覆盖保护；5 ADR（D1 prefill_meta 嵌入 cellData.custom / D2 User_Override 存 parsed_data / D3 跨模块标签 overlay div / D4 循环复核实时查询 / D5 复核标记复用 cell_annotations）；15 正确性属性
   - `workpaper-cycle-d-revenue`（3 天 / 2 Sprint / 27 任务）：D0-D7 分析程序公式 / 明细表公式（新 TB_AUX 类型）/ 18 条跨引用（4 内部 + 7 附注 + 7 报表）/ 21 条校验规则（balance_check/tb_consistency/note_consistency/detail_total_check）/ 8 底稿审计程序清单；纯数据 spec（只产出 JSON + 测试，不改引擎代码或前端 UI）；10 正确性属性
   - 执行顺序：先 Foundation（基础设施 UI 机制）→ 再 Cycle-D（具体数据填充）；两者解耦——Cycle-D 只产出 JSON 数据文件不依赖 Foundation UI 就绪即可独立实施
+- **复盘补齐 3 个关键缺口（commit 74d87f2）**：(1) Foundation 新增 Requirement 0"底稿模板完整加载保障"（8 条验收标准覆盖全 sheet/合并/冻结/格式/固定文字/错误提示）；(2) Foundation 新增 Task 1.0"验证底稿模板完整加载链路"作为 Sprint 1 第一个任务（不通过不进后续）；(3) Foundation 新增 Task 1.2b"prefill_engine 新增 TB_AUX formula_type 支持"（Cycle-D 只产出数据不改引擎，引擎扩展由 Foundation 承担）
+- **底稿在线编辑空白问题深入分析（2026-05-16 Playwright 实测）**：
+  - **后端 100% 正常**：GET /xlsx-to-json 返回 200 + 20 sheets 完整数据（浏览器内 fetch 实测确认）
+  - **前端加载链路断裂**：WorkpaperEditor initUniver() 三级降级全失败 → 走 final fallback 创建空白 workbook
+    - Strategy 1 `importXLSXToSnapshotAsync`：需要 @univerjs/preset-sheets-advanced + Univer Server :3010（未部署，代码已注释）
+    - Strategy 2 `importXLSXToWorkbook`：同上
+    - Strategy 3 POST `/to-json` + FormData：axios httpApi 封装下 FormData multipart 被错误处理，上传静默失败
+    - **已修复**：Strategy 3 改为 GET `/xlsx-to-json`（一行 httpApi.get 替代 POST FormData）
+  - **修复后仍空白的原因**：Vite dev server HMR 未拾取 WorkpaperEditor.vue 改动（浏览器缓存旧 JS bundle），performance entries 里完全没有 /xlsx-to-json 请求
+  - **解决方案**：需要硬刷新浏览器（Ctrl+Shift+R）或重启前端 npm run dev
+  - **验证方法**：Playwright evaluate 直接调 GET /xlsx-to-json 返回 200 + 20 sheets 确认后端链路无问题
+  - **Task 1.0 铁律**：Foundation Sprint 1 第一个任务必须用 Playwright 截图验证"≥ 3 sheet tab 可见 + 审定表有数据行"，不通过不进后续任务（避免在空白底稿上做无用功）
+  - **根因总结**：不是后端问题也不是模板问题，是前端 Univer 加载策略的 Strategy 3 实现 bug（POST FormData 在 axios 封装下静默失败）+ 修复后需要重启前端 dev server 才能生效
 - **三轮复盘 P1.3+P3.9 改进已落地（2026-05-16）**：(1) `test_property_2_template_list_field_presence` 重写为真 PBT — 系统性 fuzz `mutation=("drop"|"none_value", field)` 故意破坏完整 base_item 中的某个字段，验证 validator sensitivity（每个 required 字段都必须被检测到），独立 oracle 用 `_REQUIRED_FIELDS_*` 常量 list；max_examples 升到 50；(2) `test_property_3_cycle_sort_order` 重写为真 PBT — 用独立 `itertools.permutations` 全枚举 oracle 找最小字典序排列与 `sorted(..., key=...)` production 算法对比（两条独立路径），max_examples 升到 50；(3) Property 16（authz）+ Property 17（readonly enforcement）max_examples 从 5 升到 50（P0 关键 Property 不再充数）；17 PBT 全绿 0.88s
 - **template-library-coordination 父任务全部 [x]**（三轮复盘 2026-05-16）：6 个 Sprint 父任务（Sprint 0-6）原本误标 [ ]（子任务全完成但父任务漏勾），本轮一并标 completed；spec 全部 50 task + 16 PBT + 6.2/6.3 重新完成共 67 项全部交付
 

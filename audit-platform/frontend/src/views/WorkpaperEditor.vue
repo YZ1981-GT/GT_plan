@@ -387,30 +387,26 @@ async function initUniver() {
     return
   }
 
-  // 2. 优先尝试从 xlsx 模板文件加载（致同 2025 模板）
+  // 2. 直接从后端 GET /xlsx-to-json 加载完整 Univer JSON（D2 PoC 最终方案）
+  // 不再下载 xlsx blob 尝试 importXLSX（Core Preset 不支持，会静默创建空白 workbook）
   let workbookData: any = null
   loadedFromXlsx = false
   try {
-    const xlsxResp = await fetch(
-      `/api/projects/${projectId.value}/workpapers/${wpId.value}/template-file`,
-      { headers: { Authorization: `Bearer ${sessionStorage.getItem('token') || localStorage.getItem('token') || ''}` } },
+    const jsonData = await httpApi.get(
+      `/api/projects/${projectId.value}/workpapers/${wpId.value}/template-file/xlsx-to-json`,
     )
-    if (xlsxResp.ok && xlsxResp.headers.get('content-type')?.includes('spreadsheet')) {
-      const blob = await xlsxResp.blob()
-      if (blob.size > 100) {
-        // 有 xlsx 模板文件，使用 importXLSX 加载
-        loadedFromXlsx = true
-        fileOpenedAt = Date.now() / 1000  // P2-2: 记录打开时间（秒级 Unix 时间戳）
-        // Univer 需要先初始化再导入，标记后续处理
-        workbookData = { _xlsxBlob: blob }
-      }
+    if (jsonData && jsonData.sheets && Object.keys(jsonData.sheets).length > 0) {
+      workbookData = jsonData
+      loadedFromXlsx = true
+      fileOpenedAt = Date.now() / 1000
+      console.info(`[WorkpaperEditor] xlsx-to-json loaded: ${Object.keys(jsonData.sheets).length} sheets`)
     }
-  } catch {
-    // xlsx 端点不可用，降级到 JSON 模式
+  } catch (e: any) {
+    console.warn('[WorkpaperEditor] xlsx-to-json failed, trying univerData fallback:', e?.message || e)
   }
 
-  // 2b. 降级：从后端加载 Univer JSON 数据
-  if (!loadedFromXlsx) {
+  // 2b. 降级：从后端加载 Univer JSON 数据（parsed_data 存储的 snapshot）
+  if (!workbookData) {
     try {
       const data = await httpApi.get(
         P_wp.univerData(projectId.value, wpId.value),
@@ -469,62 +465,18 @@ async function initUniver() {
   univerInstance = univer
   univerAPI = api
 
-  // 4. 创建工作簿（支持 xlsx 导入或 JSON 创建）
-  if (loadedFromXlsx && workbookData?._xlsxBlob) {
-    // P0-2: Try Univer native xlsx import (requires @univerjs/preset-sheets-advanced)
-    const blob = workbookData._xlsxBlob
-    let imported = false
-
-    // Strategy 1: importXLSXToSnapshotAsync (Univer 0.21.x with advanced preset)
-    if (typeof univerAPI.importXLSXToSnapshotAsync === 'function') {
-      try {
-        const file = new File([blob], 'workpaper.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-        const snapshot = await univerAPI.importXLSXToSnapshotAsync(file)
-        univerAPI.createWorkbook(snapshot)
-        imported = true
-      } catch (e: any) {
-        console.warn('importXLSXToSnapshotAsync failed:', e)
-      }
-    }
-
-    // Strategy 2: importXLSXToWorkbook (alternative API name)
-    if (!imported && typeof univerAPI.importXLSXToWorkbook === 'function') {
-      try {
-        await univerAPI.importXLSXToWorkbook(blob)
-        imported = true
-      } catch (e: any) {
-        console.warn('importXLSXToWorkbook failed:', e)
-      }
-    }
-
-    // Strategy 3: Fallback - GET 后端已有的 storage 文件转 Univer JSON（无需上传）
-    // D2 PoC 修复：原本走 POST /to-json + FormData 上传，但同 wp_id 文件已在 storage 里，
-    // 没必要重传一次。新端点 GET /xlsx-to-json 直接读 storage 文件返回完整 Univer JSON。
-    if (!imported) {
-      try {
-        const jsonData = await httpApi.get(
-          `/api/projects/${projectId.value}/workpapers/${wpId.value}/template-file/xlsx-to-json`,
-        )
-        if (jsonData && jsonData.sheets) {
-          univerAPI.createWorkbook(jsonData)
-          imported = true
-        }
-      } catch (e: any) {
-        console.warn('Backend xlsx-to-json fallback failed:', e)
-      }
-    }
-
-    // Final fallback: empty workbook
-    if (!imported) {
-      univerAPI.createWorkbook({
-        id: wpDetail.value.wp_code || 'wp',
-        name: `${wpDetail.value.wp_code} ${wpDetail.value.wp_name}`,
-        sheetOrder: ['sheet0'],
-        sheets: { sheet0: { id: 'sheet0', name: 'Sheet1', rowCount: 100, columnCount: 20, cellData: {} } },
-      })
-    }
-  } else {
+  // 4. 创建工作簿
+  if (workbookData && workbookData.sheets && Object.keys(workbookData.sheets).length > 0) {
     univerAPI.createWorkbook(workbookData)
+  } else {
+    // Final fallback: empty workbook（仅当后端也失败时）
+    console.error('[WorkpaperEditor] No workbook data available, creating empty workbook')
+    univerAPI.createWorkbook({
+      id: wpDetail.value.wp_code || 'wp',
+      name: `${wpDetail.value.wp_code} ${wpDetail.value.wp_name}`,
+      sheetOrder: ['sheet0'],
+      sheets: { sheet0: { id: 'sheet0', name: 'Sheet1', rowCount: 100, columnCount: 20, cellData: {} } },
+    })
   }
 
   // 5. 监听数据变化
