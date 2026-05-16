@@ -497,14 +497,13 @@ async function initUniver() {
       }
     }
 
-    // Strategy 3: Fallback - request backend to convert xlsx to Univer JSON
+    // Strategy 3: Fallback - GET 后端已有的 storage 文件转 Univer JSON（无需上传）
+    // D2 PoC 修复：原本走 POST /to-json + FormData 上传，但同 wp_id 文件已在 storage 里，
+    // 没必要重传一次。新端点 GET /xlsx-to-json 直接读 storage 文件返回完整 Univer JSON。
     if (!imported) {
       try {
-        const formData = new FormData()
-        formData.append('file', blob, 'workpaper.xlsx')
-        const jsonData = await httpApi.post(
-          `/api/projects/${projectId.value}/workpapers/${wpId.value}/template-file/to-json`,
-          formData,
+        const jsonData = await httpApi.get(
+          `/api/projects/${projectId.value}/workpapers/${wpId.value}/template-file/xlsx-to-json`,
         )
         if (jsonData && jsonData.sheets) {
           univerAPI.createWorkbook(jsonData)

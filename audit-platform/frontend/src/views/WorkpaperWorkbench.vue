@@ -153,28 +153,51 @@
             <el-button type="primary" @click="onOpenWorkpaper" round>
               <el-icon style="margin-right: 4px"><EditPen /></el-icon>编辑底稿
             </el-button>
+            <!-- D2 PoC：单底稿一键填充入口（与顶部"批量预填充"区分） -->
+            <el-button type="success" @click="onSinglePrefill" :loading="singlePrefillLoading" round>
+              📊 一键填充
+            </el-button>
             <el-button @click="showAssignDialog = true" round>分配委派</el-button>
             <el-button @click="onGoTrialBalance" round>查看试算表</el-button>
-            <el-button v-if="selectedMapping.note_section" @click="onGoNote" round>查看附注</el-button>
+            <el-button v-if="selectedMapping.note_section" @click="onGoNote" round>
+              📝 跳转附注 {{ selectedMapping.note_section }}
+            </el-button>
+            <el-button v-if="selectedMapping.report_row" @click="onGoReport" round>
+              📈 跳转报表 {{ selectedMapping.report_row }}
+            </el-button>
             <el-button @click="onGoLedger" round>查看序时账</el-button>
           </div>
           <!-- 科目指标卡片 -->
           <div class="gt-wpb-data-section">
-            <h4 class="gt-wpb-section-title">试算表数据</h4>
+            <h4 class="gt-wpb-section-title">
+              试算表数据
+              <!-- D2 PoC：数据来源 + 流向标签（让用户看清"这格从哪来 流向哪") -->
+              <span v-if="prefillData" class="gt-wpb-source-tags">
+                <el-tag size="small" type="info" effect="plain" round>← 来自试算表</el-tag>
+                <el-tag v-if="totalAdj !== '0'" size="small" type="warning" effect="plain" round>+ AJE/RJE 调整</el-tag>
+                <el-tag v-if="priorYearData" size="small" type="info" effect="plain" round>← 上年审定数</el-tag>
+                <el-tag v-if="selectedMapping.note_section" size="small" type="success" effect="plain" round>
+                  → 附注 {{ selectedMapping.note_section }}
+                </el-tag>
+                <el-tag v-if="selectedMapping.report_row" size="small" type="success" effect="plain" round>
+                  → 报表 {{ selectedMapping.report_row }}
+                </el-tag>
+              </span>
+            </h4>
             <div v-if="prefillData" class="gt-wpb-prefill-cards gt-stagger">
-              <div class="gt-wpb-prefill-card gt-wpb-prefill-card--muted">
+              <div class="gt-wpb-prefill-card gt-wpb-prefill-card--muted" data-prefill="tb" title="数据来源：试算表 期初余额">
                 <span class="gt-wpb-pf-label">期初余额</span>
                 <span class="gt-wpb-pf-value">{{ fmtAmt(totalOpening) }}</span>
               </div>
-              <div class="gt-wpb-prefill-card gt-wpb-prefill-card--primary">
+              <div class="gt-wpb-prefill-card gt-wpb-prefill-card--primary" data-prefill="tb" title="数据来源：试算表 未审数">
                 <span class="gt-wpb-pf-label">未审数</span>
                 <span class="gt-wpb-pf-value">{{ fmtAmt(prefillData.total_unadjusted) }}</span>
               </div>
-              <div class="gt-wpb-prefill-card gt-wpb-prefill-card--teal">
+              <div class="gt-wpb-prefill-card gt-wpb-prefill-card--teal" data-prefill="aje" title="数据来源：调整分录（AJE+RJE）">
                 <span class="gt-wpb-pf-label">调整影响</span>
                 <span class="gt-wpb-pf-value" :class="{ 'gt-wpb-pf-value--diff': totalAdj !== '0' }">{{ fmtAmt(totalAdj) }}</span>
               </div>
-              <div class="gt-wpb-prefill-card gt-wpb-prefill-card--success">
+              <div class="gt-wpb-prefill-card gt-wpb-prefill-card--success" data-prefill="computed" title="审定数 = 未审数 + 调整影响">
                 <span class="gt-wpb-pf-label">审定数</span>
                 <span class="gt-wpb-pf-value">{{ fmtAmt(prefillData.total_audited) }}</span>
               </div>
@@ -185,10 +208,15 @@
               <el-table-column prop="code" label="科目编码" width="100" />
               <el-table-column prop="name" label="科目名称" min-width="130" show-overflow-tooltip />
               <el-table-column label="期初余额" width="130" align="right">
-                <template #default="{ row }">{{ fmtAmt(row.opening) }}</template>
+                <template #default="{ row }">
+                  <!-- D2 PoC：prefill 单元格视觉标识（浅蓝底）+ 来源 tooltip -->
+                  <span class="gt-wpb-prefill-cell" title="来源：试算表 期初余额">{{ fmtAmt(row.opening) }}</span>
+                </template>
               </el-table-column>
               <el-table-column label="未审数" width="130" align="right">
-                <template #default="{ row }">{{ fmtAmt(row.unadjusted) }}</template>
+                <template #default="{ row }">
+                  <span class="gt-wpb-prefill-cell" title="来源：试算表 未审数">{{ fmtAmt(row.unadjusted) }}</span>
+                </template>
               </el-table-column>
               <el-table-column label="调整额" width="110" align="right">
                 <template #default="{ row }">
@@ -373,6 +401,7 @@ const isCurrentWpStale = computed(() => {
 
 const loading = ref(false)
 const prefillLoading = ref(false)
+const singlePrefillLoading = ref(false)
 const mappings = ref<WpAccountMapping[]>([])
 const selectedMapping = ref<WpAccountMapping | null>(null)
 const prefillData = ref<WpPrefillData | null>(null)
@@ -896,6 +925,35 @@ function onGoNote() {
   router.push(`/projects/${projectId.value}/disclosure-notes`)
 }
 
+// D2 PoC：跳转报表行（如 BS-005）— 与 onGoNote 平行
+function onGoReport() {
+  if (!selectedMapping.value?.report_row) return
+  navPush({
+    source_view: route.fullPath,
+    query: { wp_code: selectedMapping.value?.wp_code || '', row_code: selectedMapping.value.report_row },
+  })
+  router.push(`/projects/${projectId.value}/report-view`)
+}
+
+// D2 PoC：单底稿一键填充（区别于顶部批量预填充）
+async function onSinglePrefill() {
+  if (!selectedMapping.value) return
+  singlePrefillLoading.value = true
+  try {
+    // 复用现有 prefill 端点（POST batchPrefill 接受 wp_codes 数组单元素即可）
+    await api.post(P_wp.batchPrefill(projectId.value), {
+      wp_codes: [selectedMapping.value.wp_code],
+      year: year.value,
+    })
+    ElMessage.success(`${selectedMapping.value.wp_code} 一键填充完成`)
+    // 重新加载预填数据
+    await loadPrefillData(selectedMapping.value)
+  } catch (e: any) {
+    ElMessage.warning(e?.message || '一键填充失败')
+  }
+  singlePrefillLoading.value = false
+}
+
 function onGoLedger() {
   if (!selectedMapping.value) return
   navPush({
@@ -1115,6 +1173,23 @@ onBeforeUnmount(() => {
 .gt-wpb-pf-value--diff { color: var(--gt-color-coral); }
 .gt-wpb-acct-table :deep(th) { font-size: var(--gt-font-size-xs) !important; white-space: nowrap; background: var(--gt-color-primary-bg) !important; color: var(--gt-color-primary) !important; }
 .gt-wpb-acct-table :deep(td .cell) { font-family: 'Arial Narrow', Arial, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* D2 PoC：prefill 单元格视觉标识（浅蓝底 + 左侧蓝条） */
+.gt-wpb-prefill-cell {
+  display: inline-block;
+  padding: 1px 4px;
+  background: var(--gt-marker-formula-bg);
+  border-left: 2px solid var(--gt-color-teal);
+  border-radius: 2px;
+  cursor: help;
+}
+/* D2 PoC：数据来源标签（"试算表 → 附注"） */
+.gt-wpb-source-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: 12px;
+  font-weight: 400;
+}
 .gt-wpb-adj-cell { color: var(--gt-color-text-tertiary); }
 .gt-wpb-adj-cell--active { color: var(--gt-color-coral); cursor: pointer; }
 .gt-wpb-adj-cell--active:hover { text-decoration: underline; }

@@ -346,6 +346,173 @@ async def convert_xlsx_to_json(
         raise HTTPException(status_code=500, detail=f"xlsx 转换失败: {str(e)}")
 
 
+@router.get("/xlsx-to-json")
+async def convert_xlsx_storage_to_json(
+    project_id: str,
+    wp_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """直接读 storage 中的 xlsx 文件转 Univer JSON。
+
+    PoC D2 修复：前端原本走 POST /to-json + FormData 上传，但同 wp_id 文件已在
+    storage 里，没必要再传一次。前端调用 GET /xlsx-to-json 即可拿到 Univer
+    workbook JSON（含完整 cellData/合并/列宽/样式/公式/图片/数据验证/条件格式）。
+
+    流程：
+    1. 找 storage/{project_id}/{wp_id}.xlsx；不存在则 init_workpaper_from_template
+    2. openpyxl 读取 + _has_style + _extract_cell_style + _extract_conditional_formatting + _extract_data_validations + _extract_images
+    3. 返回 Univer 的 IWorkbookData JSON snapshot
+    """
+    from io import BytesIO
+
+    pid = UUID(project_id)
+    wid = UUID(wp_id)
+
+    # 1. 找 storage 文件，不存在则从模板初始化
+    storage_path = get_workpaper_file(pid, wid)
+    if not storage_path:
+        # 查 wp_code
+        row = (await db.execute(text("""
+            SELECT i.wp_code FROM working_paper w
+            LEFT JOIN wp_index i ON w.wp_index_id = i.id
+            WHERE w.id = :wid
+        """), {"wid": wp_id})).first()
+        if not row or not row[0]:
+            raise HTTPException(status_code=404, detail="底稿不存在或无编码")
+        result = init_workpaper_from_template(pid, wid, row[0])
+        if not result:
+            raise HTTPException(status_code=404, detail=f"模板文件不存在: {row[0]}")
+        storage_path = result
+
+    if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"非 xlsx 类底稿: {storage_path.name}（docx 走 /docx-to-json）",
+        )
+
+    # 2. 读取文件并复用 POST /to-json 的转换逻辑
+    try:
+        content = storage_path.read_bytes()
+        from openpyxl import load_workbook
+        wb = load_workbook(BytesIO(content), read_only=False, data_only=False)
+        sheets: dict = {}
+        sheet_order: list[str] = []
+
+        for idx, sheet_name in enumerate(wb.sheetnames):
+            ws = wb[sheet_name]
+            sheet_id = f"sheet{idx}"
+            sheet_order.append(sheet_id)
+            cell_data: dict = {}
+            merge_data: list = []
+            column_data: dict = {}
+            row_data_map: dict = {}
+
+            for merged_range in ws.merged_cells.ranges:
+                merge_data.append({
+                    "startRow": merged_range.min_row - 1,
+                    "endRow": merged_range.max_row - 1,
+                    "startColumn": merged_range.min_col - 1,
+                    "endColumn": merged_range.max_col - 1,
+                })
+
+            for col_letter, dim in ws.column_dimensions.items():
+                if dim.width and dim.width != 8.43:
+                    col_idx = ord(col_letter.upper()) - 65 if len(col_letter) == 1 else (ord(col_letter[0].upper()) - 64) * 26 + ord(col_letter[1].upper()) - 65
+                    column_data[col_idx] = {"w": int(dim.width * 7.5)}
+
+            for row_num, dim in ws.row_dimensions.items():
+                if dim.height and dim.height != 15:
+                    row_data_map[row_num - 1] = {"h": int(dim.height * 1.33)}
+
+            row_count = 0
+            col_count = 0
+            for row in ws.iter_rows():
+                for cell in row:
+                    row_idx = cell.row - 1
+                    col_idx = cell.column - 1
+                    row_count = max(row_count, row_idx + 1)
+                    col_count = max(col_count, col_idx + 1)
+
+                    if cell.value is None and not _has_style(cell):
+                        continue
+
+                    cell_obj: dict = {}
+                    if cell.value is not None:
+                        val = cell.value
+                        if isinstance(val, str) and val.startswith("="):
+                            cell_obj["f"] = val
+                        elif isinstance(val, (int, float)):
+                            cell_obj["v"] = val
+                        else:
+                            cell_obj["v"] = str(val)
+                    style = _extract_cell_style(cell)
+                    if style:
+                        cell_obj["s"] = style
+                    if cell_obj:
+                        if row_idx not in cell_data:
+                            cell_data[row_idx] = {}
+                        cell_data[row_idx][col_idx] = cell_obj
+
+            sheet_obj: dict = {
+                "id": sheet_id,
+                "name": sheet_name,
+                "rowCount": max(row_count, 100),
+                "columnCount": max(col_count, 26),
+                "cellData": cell_data,
+            }
+            if merge_data:
+                sheet_obj["mergeData"] = merge_data
+            if column_data:
+                sheet_obj["columnData"] = column_data
+            if row_data_map:
+                sheet_obj["rowData"] = row_data_map
+
+            if ws.freeze_panes:
+                freeze_cell = str(ws.freeze_panes)
+                import re as _re
+                m = _re.match(r"([A-Z]+)(\d+)", freeze_cell)
+                if m:
+                    freeze_col = 0
+                    for ch in m.group(1):
+                        freeze_col = freeze_col * 26 + (ord(ch) - 64)
+                    freeze_col -= 1
+                    freeze_row = int(m.group(2)) - 1
+                    if freeze_row > 0 or freeze_col > 0:
+                        sheet_obj["freeze"] = {
+                            "startRow": freeze_row,
+                            "startColumn": freeze_col,
+                            "xSplit": freeze_col,
+                            "ySplit": freeze_row,
+                        }
+
+            cf_rules = _extract_conditional_formatting(ws)
+            if cf_rules:
+                sheet_obj["conditionalFormattingRules"] = cf_rules
+
+            dv_rules = _extract_data_validations(ws)
+            if dv_rules:
+                sheet_obj["dataValidations"] = dv_rules
+
+            images = _extract_images(ws)
+            if images:
+                sheet_obj["drawings"] = images
+
+            sheets[sheet_id] = sheet_obj
+
+        wb.close()
+
+        return JSONResponse(content={
+            "id": f"wp-{wp_id[:8]}",
+            "name": storage_path.stem,
+            "sheetOrder": sheet_order,
+            "sheets": sheets,
+        })
+
+    except Exception as e:
+        logger.error("xlsx storage-to-json conversion failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"xlsx 转换失败: {str(e)}")
+
+
 @router.get("/docx-to-json")
 async def convert_docx_to_univer_doc(
     project_id: str,

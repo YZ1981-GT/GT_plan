@@ -100,3 +100,9 @@ backend_dev.log
 frontend_dev.log
 backend_log.txt
 start-dev-log.bat
+
+
+# Playwright MCP 截图输出
+.playwright-mcp/
+page-current-state.png
+page-*.png
