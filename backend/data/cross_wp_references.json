@@ -24,7 +24,12 @@
       "source_sheet": "折旧分配分析表H1-13",
       "source_cell": "销售费用折旧",
       "targets": [
-        {"wp_code": "K8", "sheet": "审定表", "cell": "折旧行", "formula": "=WP('H1','折旧分配分析表H1-13','销售费用折旧')"}
+        {
+          "wp_code": "K8",
+          "sheet": "审定表",
+          "cell": "折旧行",
+          "formula": "=WP('H1','折旧分配分析表H1-13','销售费用折旧')"
+        }
       ],
       "category": "depreciation",
       "severity": "blocking"
@@ -36,7 +41,12 @@
       "source_sheet": "折旧分配分析表H1-13",
       "source_cell": "管理费用折旧",
       "targets": [
-        {"wp_code": "K9", "sheet": "审定表", "cell": "折旧行", "formula": "=WP('H1','折旧分配分析表H1-13','管理费用折旧')"}
+        {
+          "wp_code": "K9",
+          "sheet": "审定表",
+          "cell": "折旧行",
+          "formula": "=WP('H1','折旧分配分析表H1-13','管理费用折旧')"
+        }
       ],
       "category": "depreciation",
       "severity": "blocking"
@@ -48,7 +58,12 @@
       "source_sheet": "折旧分配分析表H1-13",
       "source_cell": "生产成本折旧",
       "targets": [
-        {"wp_code": "F5", "sheet": "审定表", "cell": "折旧行", "formula": "=WP('H1','折旧分配分析表H1-13','生产成本折旧')"}
+        {
+          "wp_code": "F5",
+          "sheet": "审定表",
+          "cell": "折旧行",
+          "formula": "=WP('H1','折旧分配分析表H1-13','生产成本折旧')"
+        }
       ],
       "category": "depreciation",
       "severity": "blocking"
@@ -60,7 +75,12 @@
       "source_sheet": "审定表",
       "source_cell": "销售人员薪酬",
       "targets": [
-        {"wp_code": "K8", "sheet": "审定表", "cell": "薪酬行", "formula": "=WP('J1','审定表','销售人员薪酬')"}
+        {
+          "wp_code": "K8",
+          "sheet": "审定表",
+          "cell": "薪酬行",
+          "formula": "=WP('J1','审定表','销售人员薪酬')"
+        }
       ],
       "category": "salary",
       "severity": "blocking"
@@ -72,7 +92,12 @@
       "source_sheet": "审定表",
       "source_cell": "管理人员薪酬",
       "targets": [
-        {"wp_code": "K9", "sheet": "审定表", "cell": "薪酬行", "formula": "=WP('J1','审定表','管理人员薪酬')"}
+        {
+          "wp_code": "K9",
+          "sheet": "审定表",
+          "cell": "薪酬行",
+          "formula": "=WP('J1','审定表','管理人员薪酬')"
+        }
       ],
       "category": "salary",
       "severity": "blocking"
@@ -84,7 +109,12 @@
       "source_sheet": "审定表",
       "source_cell": "生产人员薪酬",
       "targets": [
-        {"wp_code": "F5", "sheet": "审定表", "cell": "薪酬行", "formula": "=WP('J1','审定表','生产人员薪酬')"}
+        {
+          "wp_code": "F5",
+          "sheet": "审定表",
+          "cell": "薪酬行",
+          "formula": "=WP('J1','审定表','生产人员薪酬')"
+        }
       ],
       "category": "salary",
       "severity": "blocking"
@@ -96,7 +126,12 @@
       "source_sheet": "坏账准备明细表D2-3",
       "source_cell": "本期计提合计",
       "targets": [
-        {"wp_code": "G14", "sheet": "审定表", "cell": "应收账款减值行", "formula": "=WP('D2','坏账准备明细表D2-3','本期计提合计')"}
+        {
+          "wp_code": "G14",
+          "sheet": "审定表",
+          "cell": "应收账款减值行",
+          "formula": "=WP('D2','坏账准备明细表D2-3','本期计提合计')"
+        }
       ],
       "category": "impairment",
       "severity": "warning"
@@ -108,7 +143,12 @@
       "source_sheet": "坏账准备明细表",
       "source_cell": "本期计提合计",
       "targets": [
-        {"wp_code": "G14", "sheet": "审定表", "cell": "其他应收减值行", "formula": "=WP('K1','坏账准备明细表','本期计提合计')"}
+        {
+          "wp_code": "G14",
+          "sheet": "审定表",
+          "cell": "其他应收减值行",
+          "formula": "=WP('K1','坏账准备明细表','本期计提合计')"
+        }
       ],
       "category": "impairment",
       "severity": "warning"
@@ -120,7 +160,12 @@
       "source_sheet": "审定表",
       "source_cell": "利息支出",
       "targets": [
-        {"wp_code": "L8", "sheet": "审定表", "cell": "利息支出行", "formula": "=WP('L1','审定表','利息支出')"}
+        {
+          "wp_code": "L8",
+          "sheet": "审定表",
+          "cell": "利息支出行",
+          "formula": "=WP('L1','审定表','利息支出')"
+        }
       ],
       "category": "interest",
       "severity": "warning"
@@ -132,7 +177,12 @@
       "source_sheet": "审定表",
       "source_cell": "利息支出",
       "targets": [
-        {"wp_code": "L8", "sheet": "审定表", "cell": "利息支出行", "formula": "=WP('L3','审定表','利息支出')"}
+        {
+          "wp_code": "L8",
+          "sheet": "审定表",
+          "cell": "利息支出行",
+          "formula": "=WP('L3','审定表','利息支出')"
+        }
       ],
       "category": "interest",
       "severity": "warning"
@@ -144,7 +194,12 @@
       "source_sheet": "利润表",
       "source_cell": "净利润",
       "targets": [
-        {"wp_code": "M6", "sheet": "审定表", "cell": "本年净利润行", "formula": "=TB_SUM('5001~6999','审定数')"}
+        {
+          "wp_code": "M6",
+          "sheet": "审定表",
+          "cell": "本年净利润行",
+          "formula": "=TB_SUM('5001~6999','审定数')"
+        }
       ],
       "category": "profit",
       "severity": "blocking"
@@ -156,7 +211,12 @@
       "source_sheet": "审定表",
       "source_cell": "本期摊销",
       "targets": [
-        {"wp_code": "K9", "sheet": "审定表", "cell": "摊销行", "formula": "=WP('I1','审定表','本期摊销')"}
+        {
+          "wp_code": "K9",
+          "sheet": "审定表",
+          "cell": "摊销行",
+          "formula": "=WP('I1','审定表','本期摊销')"
+        }
       ],
       "category": "depreciation",
       "severity": "warning"
@@ -168,7 +228,12 @@
       "source_sheet": "审定表",
       "source_cell": "本期折旧",
       "targets": [
-        {"wp_code": "K9", "sheet": "审定表", "cell": "使用权资产折旧行", "formula": "=WP('H8','审定表','本期折旧')"}
+        {
+          "wp_code": "K9",
+          "sheet": "审定表",
+          "cell": "使用权资产折旧行",
+          "formula": "=WP('H8','审定表','本期折旧')"
+        }
       ],
       "category": "depreciation",
       "severity": "warning"
@@ -180,7 +245,12 @@
       "source_sheet": "审定表",
       "source_cell": "本期利息",
       "targets": [
-        {"wp_code": "L8", "sheet": "审定表", "cell": "租赁利息行", "formula": "=WP('H9','审定表','本期利息')"}
+        {
+          "wp_code": "L8",
+          "sheet": "审定表",
+          "cell": "租赁利息行",
+          "formula": "=WP('H9','审定表','本期利息')"
+        }
       ],
       "category": "interest",
       "severity": "warning"
@@ -192,7 +262,12 @@
       "source_sheet": "审定表",
       "source_cell": "投资收益",
       "targets": [
-        {"wp_code": "G11", "sheet": "审定表", "cell": "长期股权投资收益行", "formula": "=WP('G7','审定表','投资收益')"}
+        {
+          "wp_code": "G11",
+          "sheet": "审定表",
+          "cell": "长期股权投资收益行",
+          "formula": "=WP('G7','审定表','投资收益')"
+        }
       ],
       "category": "other",
       "severity": "warning"
@@ -204,7 +279,12 @@
       "source_sheet": "审定表",
       "source_cell": "期末余额",
       "targets": [
-        {"wp_code": "N5", "sheet": "审定表", "cell": "递延所得税资产变动行", "formula": "=WP('N1','审定表','期末') - WP('N1','审定表','期初')"}
+        {
+          "wp_code": "N5",
+          "sheet": "审定表",
+          "cell": "递延所得税资产变动行",
+          "formula": "=WP('N1','审定表','期末') - WP('N1','审定表','期初')"
+        }
       ],
       "category": "tax",
       "severity": "blocking"
@@ -216,7 +296,12 @@
       "source_sheet": "审定表",
       "source_cell": "期末余额",
       "targets": [
-        {"wp_code": "N5", "sheet": "审定表", "cell": "递延所得税负债变动行", "formula": "=WP('N3','审定表','期初') - WP('N3','审定表','期末')"}
+        {
+          "wp_code": "N5",
+          "sheet": "审定表",
+          "cell": "递延所得税负债变动行",
+          "formula": "=WP('N3','审定表','期初') - WP('N3','审定表','期末')"
+        }
       ],
       "category": "tax",
       "severity": "blocking"
@@ -228,7 +313,12 @@
       "source_sheet": "审定表",
       "source_cell": "本期提取",
       "targets": [
-        {"wp_code": "M6", "sheet": "审定表", "cell": "盈余公积提取行", "formula": "=WP('M5','审定表','本期提取')"}
+        {
+          "wp_code": "M6",
+          "sheet": "审定表",
+          "cell": "盈余公积提取行",
+          "formula": "=WP('M5','审定表','本期提取')"
+        }
       ],
       "category": "profit",
       "severity": "blocking"
@@ -240,7 +330,12 @@
       "source_sheet": "审定表",
       "source_cell": "本期分配",
       "targets": [
-        {"wp_code": "M6", "sheet": "审定表", "cell": "利润分配行", "formula": "=WP('M1','审定表','本期分配')"}
+        {
+          "wp_code": "M6",
+          "sheet": "审定表",
+          "cell": "利润分配行",
+          "formula": "=WP('M1','审定表','本期分配')"
+        }
       ],
       "category": "profit",
       "severity": "blocking"
@@ -252,10 +347,377 @@
       "source_sheet": "审定表",
       "source_cell": "本期计提跌价",
       "targets": [
-        {"wp_code": "K11", "sheet": "审定表", "cell": "存货跌价行", "formula": "=WP('F2','审定表','本期计提跌价')"}
+        {
+          "wp_code": "K11",
+          "sheet": "审定表",
+          "cell": "存货跌价行",
+          "formula": "=WP('F2','审定表','本期计提跌价')"
+        }
       ],
       "category": "impairment",
       "severity": "warning"
+    },
+    {
+      "ref_id": "CW-21",
+      "description": "应收账款审定数→函证确认金额",
+      "source_wp": "D2",
+      "source_sheet": "审定表D2-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "D0",
+          "sheet": "函证汇总表D0-2",
+          "cell": "应收账款审定数",
+          "formula": "=WP('D2','审定表D2-1','审定数')"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-22",
+      "description": "营业收入审定数→应收周转率分析",
+      "source_wp": "D4",
+      "source_sheet": "营业收入审定表D4-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "D2",
+          "sheet": "分析程序D2-5",
+          "cell": "营业收入",
+          "formula": "=WP('D4','营业收入审定表D4-1','审定数')"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-23",
+      "description": "预收款项变动→收入确认分析",
+      "source_wp": "D3",
+      "source_sheet": "审定表D3-1",
+      "source_cell": "变动额",
+      "targets": [
+        {
+          "wp_code": "D4",
+          "sheet": "分析程序D4-3",
+          "cell": "预收款项变动",
+          "formula": "=WP('D3','审定表D3-1','变动额')"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-24",
+      "description": "应收账款坏账准备→应收款项融资减值",
+      "source_wp": "D2",
+      "source_sheet": "坏账准备计算表D2-8",
+      "source_cell": "坏账准备余额",
+      "targets": [
+        {
+          "wp_code": "D5",
+          "sheet": "审定表D5-1",
+          "cell": "减值参考",
+          "formula": "=WP('D2','坏账准备计算表D2-8','坏账准备余额')"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-25",
+      "description": "应收账款审定数→附注 5.7",
+      "source_wp": "D2",
+      "source_sheet": "审定表D2-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.7 应收账款合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.7 应收账款",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.7",
+          "note_section_code": "5.7"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-26",
+      "description": "营业收入审定数→附注 5.14",
+      "source_wp": "D4",
+      "source_sheet": "营业收入审定表D4-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.14 营业收入合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.14 营业收入",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.14",
+          "note_section_code": "5.14"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-27",
+      "description": "应收票据审定数→附注 5.3",
+      "source_wp": "D1",
+      "source_sheet": "审定表D1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.3 应收票据合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.3 应收票据",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.3",
+          "note_section_code": "5.3"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-28",
+      "description": "预收款项审定数→附注 5.15",
+      "source_wp": "D3",
+      "source_sheet": "审定表D3-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.15 合同负债/预收款项合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.15 合同负债/预收款项",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.15",
+          "note_section_code": "5.15"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-29",
+      "description": "应收款项融资审定数→附注 5.5",
+      "source_wp": "D5",
+      "source_sheet": "审定表D5-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.5 应收款项融资合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.5 应收款项融资",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.5",
+          "note_section_code": "5.5"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-30",
+      "description": "合同资产审定数→附注 5.6",
+      "source_wp": "D6",
+      "source_sheet": "审定表D6-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.6 合同资产合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.6 合同资产",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.6",
+          "note_section_code": "5.6"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-31",
+      "description": "合同负债审定数→附注 5.15",
+      "source_wp": "D7",
+      "source_sheet": "审定表D7-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.15 合同负债合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.15 合同负债",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.15",
+          "note_section_code": "5.15"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-32",
+      "description": "应收账款审定数→报表 BS-005",
+      "source_wp": "D2",
+      "source_sheet": "审定表D2-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "应收账款行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-005 应收账款",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-005",
+          "report_row_code": "BS-005"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-33",
+      "description": "营业收入审定数→报表 IS-001",
+      "source_wp": "D4",
+      "source_sheet": "营业收入审定表D4-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "利润表",
+          "cell": "营业收入行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 IS-001 营业收入",
+          "target_route": "/projects/{pid}/reports?type=income_statement&row=IS-001",
+          "report_row_code": "IS-001"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-34",
+      "description": "应收票据审定数→报表 BS-003",
+      "source_wp": "D1",
+      "source_sheet": "审定表D1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "应收票据行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-003 应收票据",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-003",
+          "report_row_code": "BS-003"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-35",
+      "description": "预收款项审定数→报表 BS-034",
+      "source_wp": "D3",
+      "source_sheet": "审定表D3-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "预收款项行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-034 预收款项",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-034",
+          "report_row_code": "BS-034"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-36",
+      "description": "应收款项融资审定数→报表 BS-006",
+      "source_wp": "D5",
+      "source_sheet": "审定表D5-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "应收款项融资行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-006 应收款项融资",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-006",
+          "report_row_code": "BS-006"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-37",
+      "description": "合同资产审定数→报表 BS-007",
+      "source_wp": "D6",
+      "source_sheet": "审定表D6-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "合同资产行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-007 合同资产",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-007",
+          "report_row_code": "BS-007"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-38",
+      "description": "合同负债审定数→报表 BS-035",
+      "source_wp": "D7",
+      "source_sheet": "审定表D7-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "合同负债行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-035 合同负债",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-035",
+          "report_row_code": "BS-035"
+        }
+      ],
+      "category": "revenue_cycle",
+      "severity": "info"
     }
   ],
   "stats": {

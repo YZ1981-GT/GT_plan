@@ -1,0 +1,482 @@
+{
+  "description": "D 收入循环校验规则定义",
+  "version": "2025-R1",
+  "rules": [
+    {
+      "rule_id": "DV-001",
+      "rule_type": "balance_check",
+      "wp_code": "D0",
+      "description": "收入循环函证审定数 = 未审数 + AJE + RJE",
+      "formula": "audited == unaudited + aje + rje",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "scope": "all_lines",
+      "cells": {
+        "audited": {
+          "sheet": "审定表D0-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表D0-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表D0-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表D0-1",
+          "column": "RJE调整"
+        }
+      },
+      "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-002",
+      "rule_type": "balance_check",
+      "wp_code": "D1",
+      "description": "应收票据审定数 = 未审数 + AJE + RJE",
+      "formula": "audited == unaudited + aje + rje",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "scope": "all_lines",
+      "cells": {
+        "audited": {
+          "sheet": "审定表D1-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表D1-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表D1-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表D1-1",
+          "column": "RJE调整"
+        }
+      },
+      "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-003",
+      "rule_type": "balance_check",
+      "wp_code": "D2",
+      "description": "应收账款审定数 = 未审数 + AJE + RJE",
+      "formula": "audited == unaudited + aje + rje",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "scope": "all_lines",
+      "cells": {
+        "audited": {
+          "sheet": "审定表D2-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表D2-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表D2-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表D2-1",
+          "column": "RJE调整"
+        }
+      },
+      "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-004",
+      "rule_type": "balance_check",
+      "wp_code": "D3",
+      "description": "预收款项审定数 = 未审数 + AJE + RJE",
+      "formula": "audited == unaudited + aje + rje",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "scope": "all_lines",
+      "cells": {
+        "audited": {
+          "sheet": "审定表D3-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表D3-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表D3-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表D3-1",
+          "column": "RJE调整"
+        }
+      },
+      "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-005",
+      "rule_type": "balance_check",
+      "wp_code": "D4",
+      "description": "营业收入审定数 = 未审数 + AJE + RJE",
+      "formula": "audited == unaudited + aje + rje",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "scope": "all_lines",
+      "cells": {
+        "audited": {
+          "sheet": "营业收入审定表D4-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "营业收入审定表D4-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "营业收入审定表D4-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "营业收入审定表D4-1",
+          "column": "RJE调整"
+        }
+      },
+      "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-006",
+      "rule_type": "balance_check",
+      "wp_code": "D5",
+      "description": "应收款项融资审定数 = 未审数 + AJE + RJE",
+      "formula": "audited == unaudited + aje + rje",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "scope": "all_lines",
+      "cells": {
+        "audited": {
+          "sheet": "审定表D5-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表D5-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表D5-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表D5-1",
+          "column": "RJE调整"
+        }
+      },
+      "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-007",
+      "rule_type": "balance_check",
+      "wp_code": "D6",
+      "description": "合同资产审定数 = 未审数 + AJE + RJE",
+      "formula": "audited == unaudited + aje + rje",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "scope": "all_lines",
+      "cells": {
+        "audited": {
+          "sheet": "审定表D6-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表D6-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表D6-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表D6-1",
+          "column": "RJE调整"
+        }
+      },
+      "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-008",
+      "rule_type": "balance_check",
+      "wp_code": "D7",
+      "description": "合同负债审定数 = 未审数 + AJE + RJE",
+      "formula": "audited == unaudited + aje + rje",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "scope": "all_lines",
+      "cells": {
+        "audited": {
+          "sheet": "审定表D7-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表D7-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表D7-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表D7-1",
+          "column": "RJE调整"
+        }
+      },
+      "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-009",
+      "rule_type": "tb_consistency",
+      "wp_code": "D0",
+      "description": "收入循环函证审定数与试算表一致",
+      "account_codes": [
+        "1122"
+      ],
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "cells": {
+        "wp_amount": {
+          "sheet": "审定表D0-1",
+          "column": "审定数",
+          "row": "total"
+        }
+      },
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-010",
+      "rule_type": "tb_consistency",
+      "wp_code": "D1",
+      "description": "应收票据审定数与试算表一致",
+      "account_codes": [
+        "1131"
+      ],
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "cells": {
+        "wp_amount": {
+          "sheet": "审定表D1-1",
+          "column": "审定数",
+          "row": "total"
+        }
+      },
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-011",
+      "rule_type": "tb_consistency",
+      "wp_code": "D2",
+      "description": "应收账款审定数与试算表一致",
+      "account_codes": [
+        "1122"
+      ],
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "cells": {
+        "wp_amount": {
+          "sheet": "审定表D2-1",
+          "column": "审定数",
+          "row": "total"
+        }
+      },
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-012",
+      "rule_type": "tb_consistency",
+      "wp_code": "D3",
+      "description": "预收款项审定数与试算表一致",
+      "account_codes": [
+        "2203"
+      ],
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "cells": {
+        "wp_amount": {
+          "sheet": "审定表D3-1",
+          "column": "审定数",
+          "row": "total"
+        }
+      },
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-013",
+      "rule_type": "tb_consistency",
+      "wp_code": "D4",
+      "description": "营业收入审定数与试算表一致",
+      "account_codes": [
+        "6001",
+        "6051"
+      ],
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "cells": {
+        "wp_amount": {
+          "sheet": "营业收入审定表D4-1",
+          "column": "审定数",
+          "row": "total"
+        }
+      },
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-014",
+      "rule_type": "tb_consistency",
+      "wp_code": "D5",
+      "description": "应收款项融资审定数与试算表一致",
+      "account_codes": [
+        "1124"
+      ],
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "cells": {
+        "wp_amount": {
+          "sheet": "审定表D5-1",
+          "column": "审定数",
+          "row": "total"
+        }
+      },
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-015",
+      "rule_type": "tb_consistency",
+      "wp_code": "D6",
+      "description": "合同资产审定数与试算表一致",
+      "account_codes": [
+        "1401"
+      ],
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "cells": {
+        "wp_amount": {
+          "sheet": "审定表D6-1",
+          "column": "审定数",
+          "row": "total"
+        }
+      },
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-016",
+      "rule_type": "tb_consistency",
+      "wp_code": "D7",
+      "description": "合同负债审定数与试算表一致",
+      "account_codes": [
+        "2205"
+      ],
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "cells": {
+        "wp_amount": {
+          "sheet": "审定表D7-1",
+          "column": "审定数",
+          "row": "total"
+        }
+      },
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-017",
+      "rule_type": "note_consistency",
+      "wp_code": "D2",
+      "description": "应收账款审定数与附注 5.7 一致",
+      "note_section_code": "5.7",
+      "tolerance": 0.01,
+      "severity": "warning",
+      "cells": {
+        "wp_amount": {
+          "sheet": "审定表D2-1",
+          "column": "审定数",
+          "row": "total"
+        }
+      },
+      "message_template": "与附注不一致: 底稿审定数({wp_amount}) ≠ 附注合计({note_amount}), 差异={diff}",
+      "skip_if_missing": true,
+      "skip_message": "附注章节未生成，跳过一致性校验"
+    },
+    {
+      "rule_id": "DV-018",
+      "rule_type": "note_consistency",
+      "wp_code": "D4",
+      "description": "营业收入审定数与附注 5.14 一致",
+      "note_section_code": "5.14",
+      "tolerance": 0.01,
+      "severity": "warning",
+      "cells": {
+        "wp_amount": {
+          "sheet": "营业收入审定表D4-1",
+          "column": "审定数",
+          "row": "total"
+        }
+      },
+      "message_template": "与附注不一致: 底稿审定数({wp_amount}) ≠ 附注合计({note_amount}), 差异={diff}",
+      "skip_if_missing": true,
+      "skip_message": "附注章节未生成，跳过一致性校验"
+    },
+    {
+      "rule_id": "DV-019",
+      "rule_type": "note_consistency",
+      "wp_code": "D1",
+      "description": "应收票据审定数与附注 5.3 一致",
+      "note_section_code": "5.3",
+      "tolerance": 0.01,
+      "severity": "warning",
+      "cells": {
+        "wp_amount": {
+          "sheet": "审定表D1-1",
+          "column": "审定数",
+          "row": "total"
+        }
+      },
+      "message_template": "与附注不一致: 底稿审定数({wp_amount}) ≠ 附注合计({note_amount}), 差异={diff}",
+      "skip_if_missing": true,
+      "skip_message": "附注章节未生成，跳过一致性校验"
+    },
+    {
+      "rule_id": "DV-020",
+      "rule_type": "detail_total_check",
+      "wp_code": "D2",
+      "description": "客户明细表合计 = 审定数",
+      "detail_sheet": "客户明细表D2-6",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "cells": {
+        "audited": {
+          "sheet": "审定表D2-1",
+          "column": "审定数",
+          "row": "total"
+        }
+      },
+      "message_template": "明细表合计({detail_sum}) ≠ 审定数({audited}), 差异={diff}"
+    },
+    {
+      "rule_id": "DV-021",
+      "rule_type": "detail_total_check",
+      "wp_code": "D2",
+      "description": "账龄分析表合计 = 审定数",
+      "detail_sheet": "账龄分析表D2-7",
+      "tolerance": 0.01,
+      "severity": "blocking",
+      "cells": {
+        "audited": {
+          "sheet": "审定表D2-1",
+          "column": "审定数",
+          "row": "total"
+        }
+      },
+      "message_template": "明细表合计({detail_sum}) ≠ 审定数({audited}), 差异={diff}"
+    }
+  ]
+}

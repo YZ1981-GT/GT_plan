@@ -3869,6 +3869,314 @@
           "description": "上年同底稿审定数"
         }
       ]
+    },
+    {
+      "wp_code": "D0",
+      "wp_name": "收入循环函证分析程序",
+      "sheet": "分析程序D0-3",
+      "account_codes": [
+        "1122"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('D0','审定表D0-1','审定数')",
+          "formula_type": "PREV",
+          "description": "从上年底稿取函证审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB('1122','期末余额')",
+          "formula_type": "TB",
+          "description": "从试算表取应收账款期末余额（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "D1",
+      "wp_name": "应收票据分析程序",
+      "sheet": "分析程序D1-3",
+      "account_codes": [
+        "1131"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('D1','审定表D1-1','审定数')",
+          "formula_type": "PREV",
+          "description": "从上年底稿取应收票据审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB('1131','期末余额')",
+          "formula_type": "TB",
+          "description": "从试算表取应收票据期末余额（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "D2",
+      "wp_name": "应收账款分析程序",
+      "sheet": "分析程序D2-5",
+      "account_codes": [
+        "1122"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('D2','审定表D2-1','审定数')",
+          "formula_type": "PREV",
+          "description": "从上年底稿取应收账款审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB('1122','期末余额')",
+          "formula_type": "TB",
+          "description": "从试算表取应收账款期末余额（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "D3",
+      "wp_name": "预收款项分析程序",
+      "sheet": "分析程序D3-3",
+      "account_codes": [
+        "2203"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('D3','审定表D3-1','审定数')",
+          "formula_type": "PREV",
+          "description": "从上年底稿取预收款项审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB('2203','期末余额')",
+          "formula_type": "TB",
+          "description": "从试算表取预收款项期末余额（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "D4",
+      "wp_name": "营业收入分析程序",
+      "sheet": "分析程序D4-3",
+      "account_codes": [
+        "6001",
+        "6051"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('D4','营业收入审定表D4-1','审定数')",
+          "formula_type": "PREV",
+          "description": "从上年底稿取营业收入审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB_SUM('6001~6051','期末余额')",
+          "formula_type": "TB_SUM",
+          "description": "从试算表取营业收入期末余额合计（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "D5",
+      "wp_name": "应收款项融资分析程序",
+      "sheet": "分析程序D5-3",
+      "account_codes": [
+        "1124"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('D5','审定表D5-1','审定数')",
+          "formula_type": "PREV",
+          "description": "从上年底稿取应收款项融资审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB('1124','期末余额')",
+          "formula_type": "TB",
+          "description": "从试算表取应收款项融资期末余额（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "D6",
+      "wp_name": "合同资产分析程序",
+      "sheet": "分析程序D6-3",
+      "account_codes": [
+        "1401"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('D6','审定表D6-1','审定数')",
+          "formula_type": "PREV",
+          "description": "从上年底稿取合同资产审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB('1401','期末余额')",
+          "formula_type": "TB",
+          "description": "从试算表取合同资产期末余额（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "D7",
+      "wp_name": "合同负债分析程序",
+      "sheet": "分析程序D7-3",
+      "account_codes": [
+        "2205"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('D7','审定表D7-1','审定数')",
+          "formula_type": "PREV",
+          "description": "从上年底稿取合同负债审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB('2205','期末余额')",
+          "formula_type": "TB",
+          "description": "从试算表取合同负债期末余额（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "D2",
+      "wp_name": "应收账款客户明细表",
+      "sheet": "客户明细表D2-6",
+      "account_codes": [
+        "1122"
+      ],
+      "cells": [
+        {
+          "cell_ref": "客户余额",
+          "formula": "=TB_AUX('1122','客户','期末余额')",
+          "formula_type": "TB_AUX",
+          "description": "从辅助余额表按客户维度取应收账款期末余额"
+        }
+      ]
+    },
+    {
+      "wp_code": "D2",
+      "wp_name": "应收账款账龄分析表",
+      "sheet": "账龄分析表D2-7",
+      "account_codes": [
+        "1122"
+      ],
+      "cells": [
+        {
+          "cell_ref": "账龄余额",
+          "formula": "=TB_AUX('1122','账龄','期末余额')",
+          "formula_type": "TB_AUX",
+          "description": "从辅助余额表按账龄维度取应收账款期末余额"
+        }
+      ]
+    },
+    {
+      "wp_code": "D2",
+      "wp_name": "应收账款坏账准备计算表",
+      "sheet": "坏账准备计算表D2-8",
+      "account_codes": [
+        "1122"
+      ],
+      "cells": [
+        {
+          "cell_ref": "应收账款余额",
+          "formula": "=TB('1122','期末余额')",
+          "formula_type": "TB",
+          "description": "从试算表取应收账款期末余额作为坏账计提基数"
+        },
+        {
+          "cell_ref": "上年坏账准备",
+          "formula": "=PREV('D2','坏账准备计算表D2-8','坏账准备余额')",
+          "formula_type": "PREV",
+          "description": "从上年底稿取坏账准备余额"
+        }
+      ]
+    },
+    {
+      "wp_code": "D1",
+      "wp_name": "应收票据明细表",
+      "sheet": "票据明细表D1-4",
+      "account_codes": [
+        "1131"
+      ],
+      "cells": [
+        {
+          "cell_ref": "票据余额",
+          "formula": "=TB_AUX('1131','票据类型','期末余额')",
+          "formula_type": "TB_AUX",
+          "description": "从辅助余额表按票据类型维度取应收票据期末余额"
+        }
+      ]
+    },
+    {
+      "wp_code": "D4",
+      "wp_name": "营业收入明细表",
+      "sheet": "收入明细表D4-4",
+      "account_codes": [
+        "6001",
+        "6051"
+      ],
+      "cells": [
+        {
+          "cell_ref": "收入明细",
+          "formula": "=TB_AUX('6001','客户','期末余额')",
+          "formula_type": "TB_AUX",
+          "description": "从辅助余额表按客户维度取主营业务收入明细"
+        }
+      ]
+    },
+    {
+      "wp_code": "D5",
+      "wp_name": "应收款项融资子科目明细",
+      "sheet": "审定表D5-1",
+      "account_codes": [
+        "1124"
+      ],
+      "cells": [
+        {
+          "cell_ref": "票据类_期末余额",
+          "formula": "=TB('112401','期末余额')",
+          "formula_type": "TB",
+          "description": "应收款项融资-票据类子科目期末余额"
+        },
+        {
+          "cell_ref": "应收账款类_期末余额",
+          "formula": "=TB('112402','期末余额')",
+          "formula_type": "TB",
+          "description": "应收款项融资-应收账款类子科目期末余额"
+        }
+      ]
+    },
+    {
+      "wp_code": "D0",
+      "wp_name": "函证覆盖率计算",
+      "sheet": "函证汇总表D0-2",
+      "account_codes": [
+        "1122"
+      ],
+      "cells": [
+        {
+          "cell_ref": "应收账款审定数",
+          "formula": "=WP('D2','审定表D2-1','审定数')",
+          "formula_type": "WP",
+          "description": "从应收账款底稿取审定数用于计算函证覆盖率"
+        },
+        {
+          "cell_ref": "函证金额合计",
+          "formula": "=TB_AUX('1122','客户','期末余额')",
+          "formula_type": "TB_AUX",
+          "description": "函证明细合计金额（从辅助余额表取客户维度汇总）"
+        }
+      ]
     }
   ]
 }

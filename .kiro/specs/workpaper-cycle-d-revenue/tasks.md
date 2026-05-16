@@ -18,7 +18,7 @@
 ## Tasks
 
 - [ ] 1. Sprint 1：JSON 数据文件创建与扩展
-  - [ ] 1.1 扩展 prefill_formula_mapping.json——Analysis_Sheet 公式（8 条）
+  - [-] 1.1 扩展 prefill_formula_mapping.json——Analysis_Sheet 公式（8 条）
     - 在 `backend/data/prefill_formula_mapping.json` 的 mappings 数组中为 D0-D7 各新增 1 条 Analysis_Sheet 条目
     - 每条包含 `sheet` 为分析程序 sheet 名（如"分析程序D2-5"）、`cells` 含"上年审定数"（formula_type=PREV）和"本年未审数"（formula_type=TB 或 TB_SUM）
     - D4 等多科目底稿（account_codes 含 6001+6051）使用 `=TB_SUM('6001~6051','期末余额')` 聚合

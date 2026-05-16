@@ -1,0 +1,451 @@
+{
+  "description": "D 收入循环审计程序清单（致同 2025 修订版）",
+  "version": "2025-R1",
+  "procedures": {
+    "D2": {
+      "wp_name": "应收账款",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "获取并核对明细",
+          "description": "获取应收账款明细表，核对与总账余额一致",
+          "is_required": true,
+          "related_sheet": "客户明细表D2-6",
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核对总账",
+          "description": "核对应收账款总账余额与试算平衡表一致",
+          "is_required": true,
+          "related_sheet": "审定表D2-1",
+          "category": "substantive",
+          "evidence_type": "reconciliation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "函证",
+          "description": "对重要客户发函确认应收账款余额",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "confirmation",
+          "evidence_type": "external_confirmation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "替代程序",
+          "description": "对未回函客户执行替代审计程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "坏账准备",
+          "description": "复核坏账准备计提的合理性和充分性",
+          "is_required": true,
+          "related_sheet": "坏账准备计算表D2-8",
+          "category": "substantive",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 6,
+          "step_name": "截止测试",
+          "description": "检查期末前后收入确认和应收账款入账的截止是否正确",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 7,
+          "step_name": "结论",
+          "description": "汇总审计发现，形成应收账款审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "D4": {
+      "wp_name": "营业收入",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "获取收入明细",
+          "description": "获取营业收入明细表，核对与总账余额一致",
+          "is_required": true,
+          "related_sheet": "收入明细表D4-4",
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "分析程序",
+          "description": "执行收入分析程序，比较本期与上期收入变动",
+          "is_required": true,
+          "related_sheet": "分析程序D4-3",
+          "category": "substantive",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "截止测试",
+          "description": "检查收入确认的截止是否正确",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "收入确认",
+          "description": "检查收入确认是否符合会计准则要求",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "关联方交易",
+          "description": "识别并检查关联方收入交易的合理性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "汇总审计发现，形成营业收入审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "D0": {
+      "wp_name": "函证",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "确定函证范围",
+          "description": "确定需要函证的客户范围和金额标准",
+          "is_required": true,
+          "related_sheet": "函证汇总表D0-2",
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "编制函证",
+          "description": "编制询证函，确认函证内容和格式",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "发函",
+          "description": "控制询证函的发出过程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "confirmation",
+          "evidence_type": "external_confirmation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "回函统计",
+          "description": "统计回函情况，计算回函率和确认率",
+          "is_required": true,
+          "related_sheet": "函证汇总表D0-2",
+          "category": "confirmation",
+          "evidence_type": "reconciliation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "替代程序",
+          "description": "对未回函客户执行替代审计程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "差异调查",
+          "description": "调查函证差异原因并评估影响",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 7,
+          "step_name": "结论",
+          "description": "汇总函证结果，形成函证审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "D1": {
+      "wp_name": "应收票据",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "获取明细",
+          "description": "获取应收票据明细表，核对与总账余额一致",
+          "is_required": true,
+          "related_sheet": "票据明细表D1-4",
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核对总账",
+          "description": "核对应收票据总账余额与试算平衡表一致",
+          "is_required": true,
+          "related_sheet": "审定表D1-1",
+          "category": "substantive",
+          "evidence_type": "reconciliation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "检查票据",
+          "description": "检查票据的真实性、到期日和背书情况",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "减值评估",
+          "description": "评估应收票据是否存在减值迹象",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "汇总审计发现，形成应收票据审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "D3": {
+      "wp_name": "预收款项",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "获取明细",
+          "description": "获取预收款项明细表，核对与总账余额一致",
+          "is_required": true,
+          "related_sheet": "审定表D3-1",
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核对总账",
+          "description": "核对预收款项总账余额与试算平衡表一致",
+          "is_required": true,
+          "related_sheet": "审定表D3-1",
+          "category": "substantive",
+          "evidence_type": "reconciliation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "分析变动",
+          "description": "分析预收款项变动原因及合理性",
+          "is_required": true,
+          "related_sheet": "分析程序D3-3",
+          "category": "substantive",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "截止测试",
+          "description": "检查预收款项确认和转收入的截止是否正确",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "汇总审计发现，形成预收款项审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "D5": {
+      "wp_name": "应收款项融资",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "获取明细",
+          "description": "获取应收款项融资明细表，核对与总账余额一致",
+          "is_required": true,
+          "related_sheet": "审定表D5-1",
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核对总账",
+          "description": "核对应收款项融资总账余额与试算平衡表一致",
+          "is_required": true,
+          "related_sheet": "审定表D5-1",
+          "category": "substantive",
+          "evidence_type": "reconciliation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "分类检查",
+          "description": "检查金融资产分类是否恰当（FVOCI vs AC）",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "减值评估",
+          "description": "评估应收款项融资预期信用损失",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "汇总审计发现，形成应收款项融资审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "D6": {
+      "wp_name": "合同资产",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "获取明细",
+          "description": "获取合同资产明细表，核对与总账余额一致",
+          "is_required": true,
+          "related_sheet": "审定表D6-1",
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核对总账",
+          "description": "核对合同资产总账余额与试算平衡表一致",
+          "is_required": true,
+          "related_sheet": "审定表D6-1",
+          "category": "substantive",
+          "evidence_type": "reconciliation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "履约进度",
+          "description": "检查履约进度计量方法及合同资产确认的合理性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "减值评估",
+          "description": "评估合同资产是否存在减值迹象",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "汇总审计发现，形成合同资产审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "D7": {
+      "wp_name": "合同负债",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "获取明细",
+          "description": "获取合同负债明细表，核对与总账余额一致",
+          "is_required": true,
+          "related_sheet": "审定表D7-1",
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核对总账",
+          "description": "核对合同负债总账余额与试算平衡表一致",
+          "is_required": true,
+          "related_sheet": "审定表D7-1",
+          "category": "substantive",
+          "evidence_type": "reconciliation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "分析变动",
+          "description": "分析合同负债变动原因及合理性",
+          "is_required": true,
+          "related_sheet": "分析程序D7-3",
+          "category": "substantive",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "截止测试",
+          "description": "检查合同负债确认和转收入的截止是否正确",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "汇总审计发现，形成合同负债审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    }
+  }
+}
