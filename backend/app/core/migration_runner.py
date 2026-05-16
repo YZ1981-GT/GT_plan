@@ -235,10 +235,26 @@ class MigrationRunner:
         in_dollar_quote = False    # 是否在 $tag$ 块内
         dollar_tag = ""            # 当前美元引号标签，如 $$ 或 $body$
         in_block_comment = False   # 是否在 /* */ 块注释内
+        in_line_comment = False    # 是否在 -- 单行注释内（R10 修复：之前缺，注释内 ; 会破坏分句）
         i = 0
         n = len(sql_content)
 
         while i < n:
+            # 检测 -- 单行注释开始（不在美元引号块/块注释内）
+            if not in_dollar_quote and not in_block_comment and not in_line_comment and sql_content[i:i+2] == '--':
+                in_line_comment = True
+                current.append('--')
+                i += 2
+                continue
+
+            # 在单行注释内，遇换行结束
+            if in_line_comment:
+                if sql_content[i] == '\n':
+                    in_line_comment = False
+                current.append(sql_content[i])
+                i += 1
+                continue
+
             # 检测 /* 块注释开始（不在美元引号块内）
             if not in_dollar_quote and not in_block_comment and sql_content[i:i+2] == '/*':
                 in_block_comment = True

@@ -286,10 +286,11 @@ def register_event_handlers() -> None:
             await engine.invalidate_cache(
                 project_id=payload.project_id,
                 year=payload.year,
-                affected_accounts=payload.account_codes,
+                account_codes=payload.account_codes,  # R10 修复：参数名 account_codes 不是 affected_accounts
             )
-        except Exception:
-            logger.warning("Formula cache invalidation failed (Redis unavailable)")
+        except Exception as e:
+            # R10 修复：记录真实异常类型而非误称 "Redis unavailable"
+            logger.warning("Formula cache invalidation failed: %s: %s", type(e).__name__, e)
 
     async def _invalidate_formula_cache_all(payload: EventPayload) -> None:
         """数据导入 → 失效全部公式缓存"""
@@ -303,8 +304,9 @@ def register_event_handlers() -> None:
                 project_id=payload.project_id,
                 year=payload.year,
             )
-        except Exception:
-            logger.warning("Formula cache invalidation failed (Redis unavailable)")
+        except Exception as e:
+            # R10 修复：记录真实异常类型而非误称 "Redis unavailable"
+            logger.warning("Formula cache invalidation failed: %s: %s", type(e).__name__, e)
 
     event_bus.subscribe(
         EventType.ADJUSTMENT_CREATED,
