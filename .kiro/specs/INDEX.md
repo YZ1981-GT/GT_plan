@@ -21,8 +21,8 @@
 | `v3-quickfixes/` Q3 F10 | 档 2 | P0-4 | ✅ 已澄清+修 2026-05-16（review-conversations 路径改一处，commit b4cda44） | 0.3h |
 | `v3-quickfixes/` Q4 F2 | 档 2 | P0-5 | ✅ 已完成 2026-05-16（init_4_projects step 5 + WP List 引导卡片，commit b4cda44） | 0.5h |
 | `v3-linkage-stale-propagation/` | 档 3 | P0-12/P0-13 | ✅ 已完成 2026-05-16（Sprint 0-4 全跑通，2.5h） | 2.5h |
-| `v3-r10-linkage-and-tokens/` | 档 3 (R10) | v3 §7/§8 完整 | 🟢 README 占位，待 P0 完成后起草 | 22 天 |
-| `v3-r10-editor-resilience/` | 档 3 (R10) | v3 §10 完整 | 🟢 README 占位，待 P0 完成后起草 | 11 天 |
+| `v3-r10-linkage-and-tokens/` | 档 3 (R10) | v3 §7.6/§8/§9 | 🟡 立项规划完成 2026-05-16（commit 待提交，Sprint 0 后升级三件套） | 22 天 |
+| `v3-r10-editor-resilience/` | 档 3 (R10) | v3 §10/§7.4 | 🟡 立项规划完成 2026-05-16（commit 待提交，Sprint 0 后升级三件套） | 11 天 |
 
 ---
 
