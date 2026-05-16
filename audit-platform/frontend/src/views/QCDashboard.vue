@@ -385,7 +385,7 @@ onMounted(loadAll)
 
 /* 本年抽查覆盖率卡片 [R9 F7-QC Task 23] */
 .gt-stat-card--coverage {
-  border-left: 4px solid #409eff;
+  border-left: 4px solid var(--gt-color-teal);
   display: flex;
   flex-direction: column;
   align-items: flex-start;

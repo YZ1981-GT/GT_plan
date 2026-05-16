@@ -286,6 +286,14 @@ jobs:
             echo "::error::Inline hex background increased from $BG_BASELINE to $BG_COUNT. Use var(--gt-bg-*) instead."
             exit 1
           fi
+          # border-*-color:#xxx + border shorthand baseline（R10 复盘 G1：419 处全部清零，应保持 0）
+          BORDER_BASELINE=$(jq -r '."border-color-prop-hex-vue-files"' ../../.github/workflows/baselines.json)
+          BORDER_COUNT=$(grep -rE "(border(-(top|right|bottom|left))?(-color)?:\s*([0-9]+(\.[0-9]+)?px\s+(solid|dashed|dotted|double)\s+)?|--el-table-(border|row-hover-bg)-color:\s*)#[0-9a-fA-F]{3,6}" src --include="*.vue" | wc -l)
+          echo "border hex (incl shorthand) in Vue files: $BORDER_COUNT (baseline: $BORDER_BASELINE)"
+          if [ "$BORDER_COUNT" -gt "$BORDER_BASELINE" ]; then
+            echo "::error::Inline border hex increased from $BORDER_BASELINE to $BORDER_COUNT. Use var(--gt-color-border-*) instead."
+            exit 1
+          fi
           # 裸 <el-table 用量 baseline（Sprint 0 实测填入，新表必须用 GtTableExtended/GtFormTable）
           ELTABLE_BASELINE=$(jq -r '."el-table-naked-vue-files"' ../../.github/workflows/baselines.json)
           ELTABLE_COUNT=$(grep -rE "<el-table" src --include="*.vue" | wc -l)

@@ -105,7 +105,7 @@ defineProps<{
   gap: 12px;
 }
 .impact-col {
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
   padding: 8px;
   max-height: 200px;
@@ -117,7 +117,7 @@ defineProps<{
   color: var(--gt-color-text-primary);
   margin-bottom: 6px;
   padding-bottom: 4px;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
 }
 .impact-col-empty {
   font-size: var(--gt-font-size-xs);

@@ -181,7 +181,7 @@ const completionRate = computed(() => {
   gap: 8px;
 }
 .cycle-card {
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
   padding: 8px 10px;
 }

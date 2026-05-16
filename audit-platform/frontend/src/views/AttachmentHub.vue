@@ -64,10 +64,10 @@ onMounted(async () => {
 .gt-hub-desc { color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm); margin-bottom: 20px; }
 .gt-hub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
 .gt-hub-card {
-  padding: 20px; border: 1px solid #eee; border-radius: 8px; background: var(--gt-color-bg-white);
+  padding: 20px; border: 1px solid var(--gt-color-border-light); border-radius: 8px; background: var(--gt-color-bg-white);
   cursor: pointer; transition: all 0.2s;
 }
-.gt-hub-card:hover { border-color: #e6a23c; box-shadow: 0 4px 12px rgba(230,162,60,0.15); transform: translateY(-2px); }
+.gt-hub-card:hover { border-color: var(--gt-color-wheat); box-shadow: 0 4px 12px rgba(230,162,60,0.15); transform: translateY(-2px); }
 .gt-hub-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .gt-hub-card-name { font-size: var(--gt-font-size-md); font-weight: 600; color: var(--gt-color-text-primary); margin-bottom: 6px; }
 .gt-hub-card-meta { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary); display: flex; gap: 12px; }

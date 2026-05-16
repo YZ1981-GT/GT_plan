@@ -94,9 +94,9 @@ onMounted(async () => {
 .gt-personal { padding: var(--gt-space-4); }
 .gt-p-card { background: white; border-radius: var(--gt-radius-md); padding: 16px; box-shadow: var(--gt-shadow-sm); min-height: 280px; }
 .gt-p-card h4 { margin: 0 0 12px; font-size: var(--gt-font-size-sm); color: var(--gt-color-primary, #4b2d77); }
-.gt-p-project-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+.gt-p-project-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--gt-color-border-light); cursor: pointer; }
 .gt-p-project-item:hover { background: var(--gt-color-primary-bg); }
 .gt-p-proj-name { font-size: var(--gt-font-size-sm); }
-.gt-p-todo-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: var(--gt-font-size-sm); }
+.gt-p-todo-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--gt-color-border-light); font-size: var(--gt-font-size-sm); }
 .gt-p-hour-item { display: flex; justify-content: space-between; padding: 4px 0; font-size: var(--gt-font-size-sm); }
 </style>

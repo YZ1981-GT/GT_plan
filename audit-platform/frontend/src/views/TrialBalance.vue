@@ -82,7 +82,7 @@
     </div>
 
     <!-- 视图切换：科目明细 / 试算平衡表 / 映射规则 -->
-    <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #f0edf5;align-items:center">
+    <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid var(--gt-color-border-purple);align-items:center">
       <el-tooltip placement="bottom" :show-after="500">
         <template #content>
           <div style="max-width: 280px; line-height: 1.6">
@@ -257,7 +257,7 @@
 
     <!-- 试算表主表（科目明细视图） -->
     <div v-if="tbViewMode === 'detail' && staleAccountCodes.size > 0" style="margin-bottom: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-info); display: flex; align-items: center; gap: 6px">
-      <span style="display: inline-block; width: 14px; height: 14px; background: var(--gt-bg-warning); border-left: 3px solid #f0c040; border-radius: 2px"></span>
+      <span style="display: inline-block; width: 14px; height: 14px; background: var(--gt-bg-warning); border-left: 3px solid var(--gt-color-wheat); border-radius: 2px"></span>
       <span>黄底行 = 有新调整分录待重算</span>
     </div>
     <el-table
@@ -381,7 +381,7 @@
         </span>
       </div>
       <!-- 报表类型切换 -->
-      <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #f0edf5">
+      <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid var(--gt-color-border-purple)">
         <span v-for="rt in tbSummaryTypes" :key="rt.key"
           class="gt-tb-view-tag" :class="{ 'gt-tb-view-tag--active': tbSummaryType === rt.key }"
           @click="tbSummaryType = rt.key; loadTbSummary()">{{ rt.label }}</span>
@@ -2470,7 +2470,7 @@ async function onTbSumImportFile(e: Event) {
     cursor: pointer;
     font-size: var(--gt-font-size-xs);
     color: var(--gt-color-info);
-    border-bottom: 1px solid #f0edf5;
+    border-bottom: 1px solid var(--gt-color-border-purple);
     margin-bottom: 6px;
     user-select: none;
     transition: color 0.15s;
@@ -2521,13 +2521,13 @@ async function onTbSumImportFile(e: Event) {
   :deep(.el-table thead th) {
     background: var(--gt-color-primary-bg) !important;
     color: var(--gt-color-text-primary);
-    border-bottom: 1px solid #e8e4f0 !important;
+    border-bottom: 1px solid var(--gt-color-border-purple) !important;
   }
   :deep(.el-table--border td) {
-    border-color: #e8e4f0 !important;
+    border-color: var(--gt-color-border-purple) !important;
   }
   :deep(.el-table--border th) {
-    border-color: #e8e4f0 !important;
+    border-color: var(--gt-color-border-purple) !important;
   }
   :deep(.el-table__row td) {
     padding: 4px 0;
@@ -2580,7 +2580,7 @@ async function onTbSumImportFile(e: Event) {
   }
   :deep(.stale-row) {
     background: var(--gt-bg-warning) !important;
-    border-left: 3px solid #f0c040;
+    border-left: 3px solid var(--gt-color-wheat);
   }
 
   :deep(.el-tabs__item.is-active) { font-weight: 600; }
@@ -2592,16 +2592,16 @@ async function onTbSumImportFile(e: Event) {
   border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; user-select: none;
 }
 .gt-tb-view-tag:hover { color: var(--gt-color-primary); }
-.gt-tb-view-tag--active { color: var(--gt-color-primary); font-weight: 600; border-bottom-color: #4b2d77; }
+.gt-tb-view-tag--active { color: var(--gt-color-primary); font-weight: 600; border-bottom-color: var(--gt-color-primary); }
 
 .gt-mapping-rule-btn {
   margin-left: 16px;
-  border-color: #d9d2e8;
+  border-color: var(--gt-color-border-purple-mid);
   color: var(--gt-color-primary);
   font-size: var(--gt-font-size-xs);
 }
 .gt-mapping-rule-btn:hover {
-  border-color: #4b2d77;
+  border-color: var(--gt-color-primary);
   background: var(--gt-color-primary-bg);
 }
 
@@ -2609,13 +2609,13 @@ async function onTbSumImportFile(e: Event) {
 :deep(.gt-tb-sum-unadj-col) { background: rgba(75,45,119,0.03); }
 :deep(.gt-tb-sum-audited-col .cell) { font-weight: 700; color: var(--gt-color-primary); }
 :deep(.gt-tb-sum-audited-col) { background: rgba(75,45,119,0.06); }
-.gt-tb-editable { cursor: text; border-bottom: 1px dashed #e5e5ea; padding: 2px 4px; border-radius: 2px; display: inline-block; min-width: 60px; text-align: right; }
+.gt-tb-editable { cursor: text; border-bottom: 1px dashed var(--gt-color-border); padding: 2px 4px; border-radius: 2px; display: inline-block; min-width: 60px; text-align: right; }
 .gt-tb-editable:hover { background: var(--gt-color-primary-bg); }
 .gt-tb-readonly { display: inline-block; min-width: 60px; text-align: right; padding: 2px 4px; color: var(--gt-color-text-regular); }
 :deep(.gt-tb-sum-total td) { font-weight: 700 !important; background: var(--gt-color-primary-bg) !important; }
 :deep(.gt-tb-sum-category td) { font-weight: 600 !important; color: var(--gt-color-primary) !important; }
-:deep(.gt-tb-sum-selected td) { background: rgba(75, 45, 119, 0.14) !important; border-left: 3px solid #4b2d77 !important; }
-:deep(.gt-tb-sum-selected td:first-child) { border-left: 3px solid #4b2d77 !important; }
+:deep(.gt-tb-sum-selected td) { background: rgba(75, 45, 119, 0.14) !important; border-left: 3px solid var(--gt-color-primary) !important; }
+:deep(.gt-tb-sum-selected td:first-child) { border-left: 3px solid var(--gt-color-primary) !important; }
 :deep(.gt-tb-sum-selected td:not(:first-child)) { border-left: none !important; }
 
 /* 试算平衡表 hover 效果 */
@@ -2634,13 +2634,13 @@ async function onTbSumImportFile(e: Event) {
 }
 .gt-ucell-ctx-divider { height: 1px; background: var(--gt-color-border-light); margin: 4px 8px; }
 .gt-tb-detached-icon { font-size: var(--gt-font-size-xs); margin-right: 2px; opacity: 0.7; }
-:deep(.gt-tb-sum-detached td) { background: var(--gt-color-wheat-light) !important; border-left: 2px solid #f0c040 !important; }
+:deep(.gt-tb-sum-detached td) { background: var(--gt-color-wheat-light) !important; border-left: 2px solid var(--gt-color-wheat) !important; }
 
 /* 步骤引导 */
 .gt-setup-guide {
   padding: 24px 32px;
   background: var(--gt-color-primary-bg);
-  border: 1px solid #e8e0f0;
+  border: 1px solid var(--gt-color-border-purple);
   border-radius: var(--gt-radius-lg, 8px);
   margin-bottom: 16px;
 }

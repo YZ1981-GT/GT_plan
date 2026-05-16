@@ -319,23 +319,23 @@ function formatCurrency(val) {
 .tab-nav { display: flex; flex-wrap: wrap; gap: 4px; }
 .tab-btn {
   padding: 4px 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   background: var(--gt-color-bg-white);
   border-radius: 4px;
   cursor: pointer;
   font-size: var(--gt-font-size-xs);
 }
-.tab-btn.active { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border-color: #4b2d77; }
+.tab-btn.active { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border-color: var(--gt-color-primary); }
 
 .upload-zone {
-  border: 2px dashed #ccc;
+  border: 2px dashed var(--gt-color-border-light);
   border-radius: 8px;
   padding: 24px;
   text-align: center;
   cursor: pointer;
   margin-bottom: 16px;
 }
-.upload-zone:hover { border-color: #4b2d77; }
+.upload-zone:hover { border-color: var(--gt-color-primary); }
 .upload-hint { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .upload-icon { font-size: var(--gt-font-size-3xl); }
 .upload-types { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
@@ -392,7 +392,7 @@ function formatCurrency(val) {
 :deep(.row-error) { background: rgba(255,77,79,0.06) !important; }
 
 .field-edit-input {
-  border: 1px solid #4b2d77;
+  border: 1px solid var(--gt-color-primary);
   border-radius: 4px;
   padding: 2px 6px;
   font-size: var(--gt-font-size-xs);
@@ -401,14 +401,14 @@ function formatCurrency(val) {
 
 .btn-sm {
   padding: 2px 6px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   background: var(--gt-color-bg-white);
   border-radius: 4px;
   cursor: pointer;
   font-size: var(--gt-font-size-xs);
 }
 .btn-sm:hover { background: var(--gt-color-border-lighter); }
-.btn-primary { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border-color: #4b2d77; }
+.btn-primary { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border-color: var(--gt-color-primary); }
 
 .btn-link-ledger {
   padding: 4px 12px;

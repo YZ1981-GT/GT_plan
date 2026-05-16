@@ -117,7 +117,7 @@ watch(() => [props.projectId, props.year], fetchStatus)
   gap: 12px;
   padding: 10px 20px;
   background: linear-gradient(135deg, #f8f7fc 0%, #f0edf5 100%);
-  border: 1px solid #e8e0f0;
+  border: 1px solid var(--gt-color-border-purple);
   border-radius: 8px;
   margin-bottom: 12px;
 }
@@ -168,7 +168,7 @@ watch(() => [props.projectId, props.year], fetchStatus)
 .wf-step--active .wf-step__label { color: var(--gt-color-primary); font-weight: 600; }
 .wf-step--active { background: rgba(75, 45, 119, 0.06); }
 
-.wf-step--future .wf-step__icon { background: var(--gt-color-primary-bg); color: var(--gt-color-primary-lighter); border: 1px solid #e0dce8; }
+.wf-step--future .wf-step__icon { background: var(--gt-color-primary-bg); color: var(--gt-color-primary-lighter); border: 1px solid var(--gt-color-border-purple-light); }
 .wf-step--future .wf-step__label { color: var(--gt-color-primary-lighter); }
 .wf-step--future:hover .wf-step__icon { background: var(--gt-color-border-light); color: var(--gt-color-primary-light); }
 .wf-step--future:hover .wf-step__label { color: var(--gt-color-primary-light); }

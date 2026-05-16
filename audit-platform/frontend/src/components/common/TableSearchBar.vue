@@ -88,7 +88,7 @@ watch(() => props.isVisible, (v) => {
   gap: 4px;
   padding: 8px 16px;
   background: linear-gradient(135deg, #f5f0ff 0%, #ece6f5 100%);
-  border: 1px solid #d8d0e8;
+  border: 1px solid var(--gt-color-border-purple-mid);
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(75, 45, 119, 0.12);
   margin-bottom: 10px;
@@ -132,7 +132,7 @@ watch(() => props.isVisible, (v) => {
 .gt-search-nav :deep(.el-button) {
   padding: 4px 8px;
   background: rgba(75, 45, 119, 0.06);
-  border-color: #d0c4e4;
+  border-color: var(--gt-color-border-purple-mid);
   color: var(--gt-color-primary);
 }
 .gt-search-nav :deep(.el-button:hover) {
@@ -148,7 +148,7 @@ watch(() => props.isVisible, (v) => {
 }
 .gt-search-replace-btn {
   background: transparent;
-  border-color: #d0c4e4;
+  border-color: var(--gt-color-border-purple-mid);
   color: var(--gt-color-primary);
   font-size: var(--gt-font-size-xs);
 }

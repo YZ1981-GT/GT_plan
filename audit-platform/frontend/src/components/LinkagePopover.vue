@@ -63,7 +63,7 @@ function onItemClick(item: LinkageItem) {
   color: var(--gt-color-text-primary);
   margin-bottom: 8px;
   padding-bottom: 6px;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
 }
 .linkage-empty {
   font-size: var(--gt-font-size-xs);

@@ -168,8 +168,8 @@ onMounted(loadData)
 .task-tree-view { padding: 16px; }
 .tree-toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
 .tree-content { display: flex; gap: 16px; }
-.tree-left { flex: 1; min-width: 300px; border: 1px solid #eee; border-radius: 8px; padding: 12px; max-height: 600px; overflow-y: auto; }
-.tree-right { width: 360px; border: 1px solid #eee; border-radius: 8px; padding: 16px; }
+.tree-left { flex: 1; min-width: 300px; border: 1px solid var(--gt-color-border-light); border-radius: 8px; padding: 12px; max-height: 600px; overflow-y: auto; }
+.tree-right { width: 360px; border: 1px solid var(--gt-color-border-light); border-radius: 8px; padding: 16px; }
 .tree-node { display: flex; align-items: center; gap: 6px; }
 .node-status { font-size: var(--gt-font-size-xs); }
 .node-status.pending { color: var(--gt-color-text-tertiary); }

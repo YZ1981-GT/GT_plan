@@ -143,7 +143,7 @@ function onFindingClick(item: SmartTipFinding) {
   justify-content: space-between;
   align-items: center;
   padding-bottom: 8px;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
   margin-bottom: 8px;
 }
 
@@ -180,7 +180,7 @@ function onFindingClick(item: SmartTipFinding) {
 /* Severity 染色 */
 .gt-severity-blocking {
   background: rgba(245, 108, 108, 0.1);
-  border-left: 3px solid #f56c6c;
+  border-left: 3px solid var(--gt-color-coral);
 }
 
 .gt-severity-blocking:hover {
@@ -189,7 +189,7 @@ function onFindingClick(item: SmartTipFinding) {
 
 .gt-severity-warning {
   background: rgba(230, 162, 60, 0.1);
-  border-left: 3px solid #e6a23c;
+  border-left: 3px solid var(--gt-color-wheat);
 }
 
 .gt-severity-warning:hover {
@@ -198,7 +198,7 @@ function onFindingClick(item: SmartTipFinding) {
 
 .gt-severity-info {
   background: rgba(64, 158, 255, 0.08);
-  border-left: 3px solid #409eff;
+  border-left: 3px solid var(--gt-color-teal);
 }
 
 .gt-severity-info:hover {

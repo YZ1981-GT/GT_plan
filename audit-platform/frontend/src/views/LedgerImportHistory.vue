@@ -309,7 +309,7 @@ onMounted(loadAll)
   flex: 1;
   padding: 12px 16px;
   background: var(--gt-color-primary-bg);
-  border: 1px solid #e8e4f0;
+  border: 1px solid var(--gt-color-border-purple);
   border-radius: 8px;
 }
 .gt-ih-card__label {

@@ -415,11 +415,11 @@ onMounted(() => {
 .search-input {
   flex: 1;
   padding: 10px 14px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 6px;
   font-size: var(--gt-font-size-sm);
 }
-.search-input:focus { outline: none; border-color: #4b2d77; }
+.search-input:focus { outline: none; border-color: var(--gt-color-primary); }
 
 .btn-search {
   padding: 10px 16px;
@@ -446,14 +446,14 @@ onMounted(() => {
 }
 .topk-select {
   padding: 4px 8px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 4px;
   font-size: var(--gt-font-size-xs);
 }
 
 .results-section {
   background: var(--gt-color-bg-white);
-  border: 1px solid #eee;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
@@ -469,7 +469,7 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   padding: 12px;
-  border: 1px solid #eee;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.2s;
@@ -515,7 +515,7 @@ onMounted(() => {
 
 .docs-section {
   background: var(--gt-color-bg-white);
-  border: 1px solid #eee;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 8px;
   padding: 16px;
 }
@@ -574,7 +574,7 @@ onMounted(() => {
 .btn-icon {
   padding: 4px 8px;
   background: none;
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 4px;
   cursor: pointer;
   font-size: var(--gt-font-size-sm);
@@ -583,7 +583,7 @@ onMounted(() => {
 
 .btn-sm {
   padding: 6px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   background: var(--gt-color-bg-white);
   border-radius: 4px;
   cursor: pointer;
@@ -615,7 +615,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--gt-color-border-light);
 }
 .modal-header h4 { margin: 0; font-size: var(--gt-font-size-md); }
 .btn-close {
@@ -628,7 +628,7 @@ onMounted(() => {
 .modal-body { padding: 20px; max-height: 60vh; overflow-y: auto; }
 .modal-footer {
   padding: 16px 20px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--gt-color-border-light);
   display: flex;
   justify-content: flex-end;
   gap: 12px;
@@ -639,13 +639,13 @@ onMounted(() => {
 .form-input, .form-select, .form-textarea {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 4px;
   font-size: var(--gt-font-size-sm);
 }
 .form-input:focus, .form-select:focus, .form-textarea:focus {
   outline: none;
-  border-color: #4b2d77;
+  border-color: var(--gt-color-primary);
 }
 .form-textarea { resize: vertical; font-family: inherit; }
 
@@ -657,7 +657,7 @@ onMounted(() => {
 }
 .btn-primary { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border: none; }
 .btn-primary:disabled { background: var(--gt-color-border); cursor: not-allowed; }
-.btn-secondary { background: var(--gt-color-bg-white); border: 1px solid #ddd; }
+.btn-secondary { background: var(--gt-color-bg-white); border: 1px solid var(--gt-color-border-light); }
 
 .detail-meta { margin-bottom: 16px; }
 .detail-content {

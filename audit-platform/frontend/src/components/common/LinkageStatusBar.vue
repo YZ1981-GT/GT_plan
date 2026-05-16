@@ -42,7 +42,7 @@ const dismissed = ref(false)
   gap: 8px;
   padding: 6px 16px;
   background: linear-gradient(90deg, #fff8e6 0%, #fff3cd 100%);
-  border-bottom: 1px solid #ffc107;
+  border-bottom: 1px solid var(--gt-color-wheat);
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-wheat);
 }

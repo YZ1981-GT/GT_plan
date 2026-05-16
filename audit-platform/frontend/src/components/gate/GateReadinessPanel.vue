@@ -613,10 +613,10 @@ function locationSummary(finding: GateReadinessFinding): string {
   border-radius: 4px;
 }
 
-.gt-gate-finding.sev-blocking { border-left-color: #f56c6c; background: var(--gt-bg-danger); }
-.gt-gate-finding.sev-warning  { border-left-color: #e6a23c; background: var(--gt-bg-warning); }
-.gt-gate-finding.sev-info     { border-left-color: #909399; }
-.gt-gate-finding.sev-pass     { border-left-color: #67c23a; background: var(--gt-bg-success); }
+.gt-gate-finding.sev-blocking { border-left-color: var(--gt-color-coral); background: var(--gt-bg-danger); }
+.gt-gate-finding.sev-warning  { border-left-color: var(--gt-color-wheat); background: var(--gt-bg-warning); }
+.gt-gate-finding.sev-info     { border-left-color: var(--gt-color-info); }
+.gt-gate-finding.sev-pass     { border-left-color: var(--gt-color-success); background: var(--gt-bg-success); }
 
 .gt-gate-finding-head {
   display: flex;

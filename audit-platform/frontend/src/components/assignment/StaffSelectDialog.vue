@@ -150,6 +150,6 @@ watch(visible, (val) => {
 .gt-staff-select-info {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--gt-color-border-light);
 }
 </style>

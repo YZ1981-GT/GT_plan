@@ -405,7 +405,7 @@ function getPlaceholders(text: string): string[] {
   padding: 8px 12px;
   background: var(--gt-color-primary-bg);
   border-radius: 6px;
-  border-left: 3px solid #4b2d77;
+  border-left: 3px solid var(--gt-color-primary);
   flex-shrink: 0;
 }
 .gt-art-stats-item {
@@ -432,7 +432,7 @@ function getPlaceholders(text: string): string[] {
 }
 .gt-art-card {
   background: var(--gt-color-bg-white);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 8px;
   padding: 12px 14px;
   cursor: pointer;
@@ -442,13 +442,13 @@ function getPlaceholders(text: string): string[] {
   gap: 8px;
 }
 .gt-art-card:hover {
-  border-color: #4b2d77;
+  border-color: var(--gt-color-primary);
   box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12);
   transform: translateY(-1px);
 }
 .gt-art-card--selected {
   background: rgba(75, 45, 119, 0.06);
-  border-left: 3px solid #4b2d77;
+  border-left: 3px solid var(--gt-color-primary);
   padding-left: 11px;
 }
 .gt-art-card--missing {
@@ -457,7 +457,7 @@ function getPlaceholders(text: string): string[] {
   opacity: 0.7;
 }
 .gt-art-card--incomplete {
-  border-color: #f0c898;
+  border-color: var(--gt-color-border-warning);
 }
 .gt-art-card-header {
   display: flex;
@@ -528,7 +528,7 @@ function getPlaceholders(text: string): string[] {
 }
 
 .gt-art-sections {
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid var(--gt-color-border-lighter);
 }
 .gt-art-section-title {
   display: inline-flex;
@@ -554,7 +554,7 @@ function getPlaceholders(text: string): string[] {
   background: var(--gt-color-bg);
   padding: 12px;
   border-radius: 4px;
-  border-left: 3px solid #4b2d77;
+  border-left: 3px solid var(--gt-color-primary);
   font-size: var(--gt-font-size-sm);
   line-height: 1.6;
   color: var(--gt-color-text-primary);
@@ -563,7 +563,7 @@ function getPlaceholders(text: string): string[] {
 
 /* ─── 占位符标签 ─── */
 .gt-art-placeholders {
-  border-top: 1px dashed #ebeef5;
+  border-top: 1px dashed var(--gt-color-border-lighter);
   padding-top: 8px;
 }
 .gt-art-placeholders-title {
@@ -590,7 +590,7 @@ function getPlaceholders(text: string): string[] {
 /* ─── 缺失提示 ─── */
 .gt-art-missing {
   background: var(--gt-bg-danger);
-  border-left: 3px solid #f56c6c;
+  border-left: 3px solid var(--gt-color-coral);
   border-radius: 4px;
   padding: 12px 16px;
 }

@@ -774,7 +774,7 @@ onMounted(async () => {
 .gt-ftab-body {
   background: var(--gt-color-bg-white);
   border-radius: 8px;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -790,7 +790,7 @@ onMounted(async () => {
   margin: 0;
   padding: 0 12px;
   background: var(--gt-color-bg);
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
   flex-shrink: 0;
 }
 .gt-ftab-tabs :deep(.el-tabs__nav) {
@@ -830,7 +830,7 @@ onMounted(async () => {
   padding: 8px 12px;
   background: var(--gt-color-primary-bg);
   border-radius: 6px;
-  border-left: 3px solid #4b2d77;
+  border-left: 3px solid var(--gt-color-primary);
 }
 .gt-ftab-stats-label {
   font-size: var(--gt-font-size-xs);
@@ -850,11 +850,11 @@ onMounted(async () => {
   margin-left: 4px;
   font-weight: 700;
 }
-.gt-ftab-type--tb { background: var(--gt-bg-info); color: var(--gt-color-teal); border-color: #b3d9f0; }
-.gt-ftab-type--tb_sum { background: var(--gt-bg-info); color: var(--gt-color-teal); border-color: #98c8eb; }
-.gt-ftab-type--adj { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); border-color: #f0c898; }
-.gt-ftab-type--prev { background: var(--gt-color-success-light); color: var(--gt-color-success); border-color: #b8d8b8; }
-.gt-ftab-type--wp { background: var(--gt-color-primary-bg); color: var(--gt-color-primary-light); border-color: #d4bff0; }
+.gt-ftab-type--tb { background: var(--gt-bg-info); color: var(--gt-color-teal); border-color: var(--gt-color-border-info); }
+.gt-ftab-type--tb_sum { background: var(--gt-bg-info); color: var(--gt-color-teal); border-color: var(--gt-color-border-info); }
+.gt-ftab-type--adj { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); border-color: var(--gt-color-border-warning); }
+.gt-ftab-type--prev { background: var(--gt-color-success-light); color: var(--gt-color-success); border-color: var(--gt-color-border-success); }
+.gt-ftab-type--wp { background: var(--gt-color-primary-bg); color: var(--gt-color-primary-light); border-color: var(--gt-color-border-purple-light); }
 
 /* ─── 工具栏 ─── */
 .gt-ftab-toolbar {
@@ -885,7 +885,7 @@ onMounted(async () => {
 }
 .gt-ftab-table :deep(.el-table__row.gt-ftab-row-invalid > td) {
   background-color: var(--gt-bg-danger) !important;
-  border-left: 3px solid #f56c6c;
+  border-left: 3px solid var(--gt-color-coral);
 }
 
 .gt-ftab-expand {
@@ -897,7 +897,7 @@ onMounted(async () => {
   display: inline-block;
   padding: 2px 8px;
   background: var(--gt-color-bg);
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 3px;
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: var(--gt-font-size-xs);
@@ -917,7 +917,7 @@ onMounted(async () => {
 .gt-ftab-std-tabs :deep(.el-tabs__header) {
   margin-bottom: 8px;
   background: transparent;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
 }
 .gt-ftab-std-body {
   display: flex;
@@ -959,7 +959,7 @@ onMounted(async () => {
   margin-top: 16px;
   padding: 12px 16px;
   background: var(--gt-color-primary-bg);
-  border-left: 3px solid #4b2d77;
+  border-left: 3px solid var(--gt-color-primary);
   border-radius: 4px;
 }
 .gt-ftab-doc-title {

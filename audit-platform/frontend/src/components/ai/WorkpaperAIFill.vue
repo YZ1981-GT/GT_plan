@@ -210,7 +210,7 @@ function confidenceClass(c) {
 .panel-header h3 { margin: 0; font-size: var(--gt-font-size-md); }
 .fill-controls { display: flex; gap: 8px; align-items: center; }
 
-.mode-select { padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: var(--gt-font-size-xs); }
+.mode-select { padding: 5px 10px; border: 1px solid var(--gt-color-border-light); border-radius: 6px; font-size: var(--gt-font-size-xs); }
 .btn-primary { padding: 6px 16px; background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border: none; border-radius: 6px; cursor: pointer; font-size: var(--gt-font-size-sm); }
 .btn-primary:disabled { background: var(--gt-color-border); cursor: not-allowed; }
 
@@ -230,10 +230,10 @@ function confidenceClass(c) {
 .summary-badge.warning { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); }
 .summary-badge.error { background: var(--gt-bg-danger); color: var(--gt-color-coral); }
 
-.result-card { border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
-.result-card.pending { border-color: #faad14; background: var(--gt-color-wheat-light); }
-.result-card.accepted { border-color: #52c41a; background: var(--gt-bg-success); }
-.result-card.rejected { border-color: #ff4d4f; background: var(--gt-bg-danger); opacity: 0.7; }
+.result-card { border: 1px solid var(--gt-color-border-light); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+.result-card.pending { border-color: var(--gt-color-wheat); background: var(--gt-color-wheat-light); }
+.result-card.accepted { border-color: var(--gt-color-success); background: var(--gt-bg-success); }
+.result-card.rejected { border-color: var(--gt-color-coral); background: var(--gt-bg-danger); opacity: 0.7; }
 
 .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .result-label { font-weight: 600; font-size: var(--gt-font-size-sm); }
@@ -263,18 +263,18 @@ function confidenceClass(c) {
 }
 .btn-accept { background: var(--gt-color-success); color: var(--gt-color-text-inverse); }
 .btn-reject { background: var(--gt-color-bg); color: var(--gt-color-text-secondary); }
-.btn-edit { background: var(--gt-color-bg-white); border: 1px solid #ddd; }
+.btn-edit { background: var(--gt-color-bg-white); border: 1px solid var(--gt-color-border-light); }
 
 .edit-area { margin-top: 8px; }
-.edit-textarea { width: 100%; padding: 6px 8px; border: 1px solid #4b2d77; border-radius: 6px; font-size: var(--gt-font-size-sm); resize: vertical; }
+.edit-textarea { width: 100%; padding: 6px 8px; border: 1px solid var(--gt-color-primary); border-radius: 6px; font-size: var(--gt-font-size-sm); resize: vertical; }
 .edit-actions { display: flex; gap: 6px; margin-top: 6px; justify-content: flex-end; }
 .btn-save, .btn-cancel { padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: var(--gt-font-size-xs); }
 .btn-save { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border: none; }
-.btn-cancel { background: var(--gt-color-bg); color: var(--gt-color-text-secondary); border: 1px solid #ddd; }
+.btn-cancel { background: var(--gt-color-bg); color: var(--gt-color-text-secondary); border: 1px solid var(--gt-color-border-light); }
 
 .batch-actions { display: flex; gap: 8px; margin-top: 12px; }
 .btn-batch-accept { padding: 6px 16px; background: var(--gt-color-success); color: var(--gt-color-text-inverse); border: none; border-radius: 6px; cursor: pointer; font-size: var(--gt-font-size-xs); }
-.btn-regenerate { padding: 6px 16px; background: var(--gt-color-bg-white); color: var(--gt-color-primary); border: 1px solid #4b2d77; border-radius: 6px; cursor: pointer; font-size: var(--gt-font-size-xs); }
+.btn-regenerate { padding: 6px 16px; background: var(--gt-color-bg-white); color: var(--gt-color-primary); border: 1px solid var(--gt-color-primary); border-radius: 6px; cursor: pointer; font-size: var(--gt-font-size-xs); }
 
 .empty-state { text-align: center; padding: 40px 20px; color: var(--gt-color-text-secondary); }
 .empty-icon { font-size: 40px /* allow-px: special */; margin-bottom: 12px; }

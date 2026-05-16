@@ -511,7 +511,7 @@ onMounted(loadSettings)
 
 .gt-health-bar {
   display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
-  padding: 12px 16px; background: var(--gt-color-bg); border-radius: 8px; border: 1px solid #eee;
+  padding: 12px 16px; background: var(--gt-color-bg); border-radius: 8px; border: 1px solid var(--gt-color-border-light);
 }
 .gt-health-item { display: flex; align-items: center; gap: 6px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
 .gt-health-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -529,7 +529,7 @@ onMounted(loadSettings)
 .gt-settings-table { display: flex; flex-direction: column; }
 .gt-settings-row {
   display: flex; align-items: center; padding: 10px 8px;
-  border-bottom: 1px solid #f5f5f5; cursor: pointer; border-radius: 4px;
+  border-bottom: 1px solid var(--gt-color-border-light); cursor: pointer; border-radius: 4px;
   transition: background 0.15s;
 }
 .gt-settings-row:hover { background: var(--gt-color-bg); }
@@ -541,7 +541,7 @@ onMounted(loadSettings)
 .gt-edit-btn {
   background: var(--gt-color-bg-white) !important;
   color: var(--gt-color-text-primary) !important;
-  border: 1px solid #ccc !important;
+  border: 1px solid var(--gt-color-border-light) !important;
   font-size: var(--gt-font-size-xs);
 }
 .gt-edit-btn:hover {
@@ -563,14 +563,14 @@ onMounted(loadSettings)
 
 /* 右侧说明面板 */
 .gt-help-panel {
-  background: var(--gt-color-bg); border: 1px solid #e8e8e8; border-radius: 8px;
+  background: var(--gt-color-bg); border: 1px solid var(--gt-color-border-light); border-radius: 8px;
   padding: 20px; font-size: var(--gt-font-size-sm); line-height: 1.8;
 }
 .gt-help-title {
   display: flex; align-items: center; gap: 8px;
   font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary, #4b2d77);
   font-family: 'Consolas', 'Monaco', monospace;
-  margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #eee;
+  margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--gt-color-border-light);
 }
 .gt-help-desc { color: var(--gt-color-text-primary); margin-bottom: 14px; }
 .gt-help-section { margin-bottom: 10px; }
@@ -586,7 +586,7 @@ onMounted(loadSettings)
 .gt-help-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   height: 200px; color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-sm); gap: 12px;
-  background: var(--gt-color-bg); border: 1px dashed #e0e0e0; border-radius: 8px;
+  background: var(--gt-color-bg); border: 1px dashed var(--gt-color-border-light); border-radius: 8px;
 }
 .gt-help-empty p { margin: 0; }
 

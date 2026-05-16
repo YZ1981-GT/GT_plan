@@ -384,7 +384,7 @@ function highlightedName(name: string): string {
   gap: 8px;
   padding: 8px 12px;
   background: var(--gt-color-bg);
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
   flex-shrink: 0;
 }
 .gt-wptt-search { width: 240px; }
@@ -514,7 +514,7 @@ function highlightedName(name: string): string {
 /* 选中行：14% 紫色背景 + 3px 紫色左边框 */
 .gt-tree-selected {
   background-color: rgba(75, 45, 119, 0.14);
-  border-left: 3px solid #4b2d77;
+  border-left: 3px solid var(--gt-color-primary);
   padding-left: 5px !important;
   margin-left: -8px;
 }

@@ -148,8 +148,16 @@ async function loadMemo() {
     }
     // 使用默认章节顺序
     sectionOrder.value = Object.keys(sections)
-    // R7-S3-04：加载版本历史
-    historyVersions.value = data.history || []
+    // R10 Spec C / F8：版本历史走专用端点（最多 5 版，基于 wizard_state.history）
+    try {
+      const versionsData = await api.get<{ versions: typeof historyVersions.value }>(
+        P_eqcr.memoVersions(props.projectId),
+      )
+      historyVersions.value = versionsData?.versions || data.history || []
+    } catch {
+      // 端点失败时降级为 preview 响应里的 history
+      historyVersions.value = data.history || []
+    }
     viewingVersion.value = 0
   } catch (e: any) {
     if (e?.response?.status === 404) {

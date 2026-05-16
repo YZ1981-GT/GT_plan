@@ -389,7 +389,7 @@ onMounted(() => {
 .filter-bar { display: flex; gap: 8px; }
 .filter-select {
   padding: 6px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 4px;
   font-size: var(--gt-font-size-sm);
   cursor: pointer;
@@ -438,7 +438,7 @@ onMounted(() => {
 .content-list { display: flex; flex-direction: column; gap: 16px; }
 
 .workpaper-group {
-  border: 1px solid #eee;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -448,7 +448,7 @@ onMounted(() => {
   align-items: center;
   padding: 12px 16px;
   background: var(--gt-color-bg);
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--gt-color-border-light);
 }
 .group-title { font-weight: 600; font-size: var(--gt-font-size-sm); }
 .group-count { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
@@ -460,7 +460,7 @@ onMounted(() => {
   align-items: flex-start;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--gt-color-border-light);
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -537,7 +537,7 @@ onMounted(() => {
 .btn-icon {
   padding: 4px 8px;
   background: none;
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 4px;
   cursor: pointer;
   font-size: var(--gt-font-size-sm);
@@ -546,15 +546,15 @@ onMounted(() => {
 
 .btn-sm {
   padding: 6px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   background: var(--gt-color-bg-white);
   border-radius: 4px;
   cursor: pointer;
   font-size: var(--gt-font-size-xs);
 }
 .btn-sm:hover { background: var(--gt-color-border-lighter); }
-.btn-sm.btn-success { background: var(--gt-bg-success); color: var(--gt-color-success); border-color: #52c41a; }
-.btn-sm.btn-danger { background: var(--gt-bg-danger); color: var(--gt-color-coral); border-color: #ff4d4f; }
+.btn-sm.btn-success { background: var(--gt-bg-success); color: var(--gt-color-success); border-color: var(--gt-color-success); }
+.btn-sm.btn-danger { background: var(--gt-bg-danger); color: var(--gt-color-coral); border-color: var(--gt-color-coral); }
 
 .empty-state {
   padding: 48px;
@@ -586,7 +586,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--gt-color-border-light);
 }
 .modal-header h4 { margin: 0; font-size: var(--gt-font-size-md); }
 .btn-close {
@@ -599,7 +599,7 @@ onMounted(() => {
 .modal-body { padding: 20px; max-height: 60vh; overflow-y: auto; }
 .modal-footer {
   padding: 16px 20px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--gt-color-border-light);
   display: flex;
   justify-content: flex-end;
   gap: 12px;
@@ -620,7 +620,7 @@ onMounted(() => {
 }
 .btn-secondary {
   padding: 8px 20px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   background: var(--gt-color-bg-white);
   border-radius: 4px;
   cursor: pointer;

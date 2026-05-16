@@ -202,9 +202,9 @@ function onColorChange(color: string | null) {
 function insertTable() {
   editorRef.value?.focus()
   const html = `<table style="border-collapse:collapse;width:100%;margin:8px 0;">
-    <tr><th style="border:1px solid #ddd;padding:4px 8px;background: var(--gt-color-bg);">列1</th><th style="border:1px solid #ddd;padding:4px 8px;background: var(--gt-color-bg);">列2</th><th style="border:1px solid #ddd;padding:4px 8px;background: var(--gt-color-bg);">列3</th></tr>
-    <tr><td style="border:1px solid #ddd;padding:4px 8px;">&nbsp;</td><td style="border:1px solid #ddd;padding:4px 8px;">&nbsp;</td><td style="border:1px solid #ddd;padding:4px 8px;">&nbsp;</td></tr>
-    <tr><td style="border:1px solid #ddd;padding:4px 8px;">&nbsp;</td><td style="border:1px solid #ddd;padding:4px 8px;">&nbsp;</td><td style="border:1px solid #ddd;padding:4px 8px;">&nbsp;</td></tr>
+    <tr><th style="border:1px solid var(--gt-color-border-light);padding:4px 8px;background: var(--gt-color-bg);">列1</th><th style="border:1px solid var(--gt-color-border-light);padding:4px 8px;background: var(--gt-color-bg);">列2</th><th style="border:1px solid var(--gt-color-border-light);padding:4px 8px;background: var(--gt-color-bg);">列3</th></tr>
+    <tr><td style="border:1px solid var(--gt-color-border-light);padding:4px 8px;">&nbsp;</td><td style="border:1px solid var(--gt-color-border-light);padding:4px 8px;">&nbsp;</td><td style="border:1px solid var(--gt-color-border-light);padding:4px 8px;">&nbsp;</td></tr>
+    <tr><td style="border:1px solid var(--gt-color-border-light);padding:4px 8px;">&nbsp;</td><td style="border:1px solid var(--gt-color-border-light);padding:4px 8px;">&nbsp;</td><td style="border:1px solid var(--gt-color-border-light);padding:4px 8px;">&nbsp;</td></tr>
   </table>`
   document.execCommand('insertHTML', false, html)
   onInput()
@@ -311,7 +311,7 @@ function onKeydown(e: KeyboardEvent) {
 
 <style scoped>
 .gt-note-rte {
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
   background: var(--gt-color-bg-white);
   overflow: hidden;
@@ -322,7 +322,7 @@ function onKeydown(e: KeyboardEvent) {
   align-items: center;
   gap: 4px;
   padding: 6px 10px;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
   background: var(--gt-color-bg);
   flex-wrap: wrap;
 }
@@ -368,7 +368,7 @@ function onKeydown(e: KeyboardEvent) {
   display: inline-block;
   background: var(--gt-bg-info);
   color: var(--gt-color-teal);
-  border: 1px solid #b3d8ff;
+  border: 1px solid var(--gt-color-border-info);
   border-radius: 3px;
   padding: 0 6px;
   margin: 0 2px;
@@ -388,7 +388,7 @@ function onKeydown(e: KeyboardEvent) {
 
 .gt-note-rte-editor :deep(th),
 .gt-note-rte-editor :deep(td) {
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   padding: 4px 8px;
   min-width: 60px;
 }
@@ -446,7 +446,7 @@ function onKeydown(e: KeyboardEvent) {
   align-items: center;
   justify-content: flex-end;
   padding: 4px 12px;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid var(--gt-color-border-lighter);
   background: var(--gt-color-bg);
 }
 

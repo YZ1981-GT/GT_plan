@@ -85,7 +85,7 @@ onMounted(loadRefs)
 
 <style scoped>
 .cross-index-tab { padding: 12px; }
-.ref-item { padding: 8px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; gap: 8px; align-items: center; }
+.ref-item { padding: 8px; border-bottom: 1px solid var(--gt-color-border-light); cursor: pointer; display: flex; gap: 8px; align-items: center; }
 .ref-item:hover { background: var(--gt-color-primary-bg); }
 .ref-code { font-weight: 600; color: var(--gt-color-primary); }
 .ref-page { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); }

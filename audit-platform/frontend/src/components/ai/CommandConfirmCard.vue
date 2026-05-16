@@ -105,7 +105,7 @@ async function handleConfirm() {
 
 <style scoped>
 .gt-command-confirm-card {
-  border: 1.5px solid #faad14;
+  border: 1.5px solid var(--gt-color-wheat);
   border-radius: 8px;
   background: var(--gt-color-wheat-light);
   padding: 10px;

@@ -236,7 +236,7 @@ async function handleCreateEval() {
   font-weight: 600;
   color: var(--gt-color-text-primary);
   margin-bottom: 8px;
-  border-left: 3px solid #409EFF;
+  border-left: 3px solid var(--gt-color-teal);
   padding-left: 8px;
 }
 .eval-actions { margin-bottom: 12px; }

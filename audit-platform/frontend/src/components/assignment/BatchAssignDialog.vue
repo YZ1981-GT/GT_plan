@@ -409,7 +409,7 @@ watch(visible, (val) => {
   gap: 8px;
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--gt-color-border-light);
 }
 
 .gt-batch-assign-step2 {

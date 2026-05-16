@@ -174,7 +174,7 @@ function onClose() {
 }
 .ai-confirm-content-text {
   background: var(--gt-color-primary-bg);
-  border: 1px dashed #9b59b6;
+  border: 1px dashed var(--gt-color-primary-light);
   border-radius: 6px;
   padding: 10px 12px;
   font-size: var(--gt-font-size-sm);

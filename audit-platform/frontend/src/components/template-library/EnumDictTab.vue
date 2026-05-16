@@ -340,7 +340,7 @@ onMounted(() => {
   padding: 8px 12px;
   background: var(--gt-color-bg-white);
   border-radius: 6px;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
 }
 .gt-edt-stats-item { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-regular); }
 .gt-edt-spacer { flex: 1; }
@@ -370,7 +370,7 @@ onMounted(() => {
 .gt-edt-collapse :deep(.el-collapse-item__header) {
   padding: 0 12px;
   background: var(--gt-color-bg);
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
 }
 .gt-edt-dict-title {
   display: inline-flex;

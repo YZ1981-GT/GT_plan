@@ -1306,13 +1306,13 @@ watch(activeTab, (tab) => {
 .org-chart-wrapper {
   overflow: auto; padding: 20px; min-height: 300px;
   background: linear-gradient(135deg, #fafafa 0%, #f5f3f8 100%);
-  border: 1px solid #e8e4f0; border-radius: 10px;
+  border: 1px solid var(--gt-color-border-purple); border-radius: 10px;
   transition: transform 0.2s ease;
 }
 .org-chart { display: flex; justify-content: center; }
 .org-detail-card {
   position: fixed; bottom: 20px; right: 20px; z-index: 100;
-  background: var(--gt-color-bg-white); border: 1px solid #e8e4f0; border-radius: 10px;
+  background: var(--gt-color-bg-white); border: 1px solid var(--gt-color-border-purple); border-radius: 10px;
   padding: 14px 18px; box-shadow: 0 4px 20px rgba(75,45,119,0.12);
   min-width: 200px; max-width: 280px;
 }
@@ -1320,11 +1320,11 @@ watch(activeTab, (tab) => {
 /* ── 合并报表左右布局 ── */
 .gt-report-layout { display: flex; gap: 0; height: calc(100vh - 200px); margin: -12px 0; }
 .gt-report-nav {
-  width: 240px; flex-shrink: 0; background: var(--gt-color-bg); border-right: 1px solid #e8e4f0;
+  width: 240px; flex-shrink: 0; background: var(--gt-color-bg); border-right: 1px solid var(--gt-color-border-purple);
   display: flex; flex-direction: column; overflow: hidden;
 }
 .gt-report-nav-header {
-  padding: 10px 12px; border-bottom: 1px solid #e8e4f0; display: flex;
+  padding: 10px 12px; border-bottom: 1px solid var(--gt-color-border-purple); display: flex;
   justify-content: space-between; align-items: center; flex-shrink: 0;
 }
 .gt-report-tree { flex: 1; overflow-y: auto; padding: 6px; }
@@ -1333,7 +1333,7 @@ watch(activeTab, (tab) => {
 
 /* 报表类型切换栏（底部） */
 .gt-report-type-bar {
-  display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-top: 1px solid #e8e4f0;
+  display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-top: 1px solid var(--gt-color-border-purple);
   background: var(--gt-color-primary-bg); flex-shrink: 0;
 }
 .gt-report-type-item {
@@ -1368,7 +1368,7 @@ watch(activeTab, (tab) => {
 /* 报表类型标签切换（紧凑） */
 .gt-report-type-tabs {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 10px; border-bottom: 2px solid #f0edf5;
+  margin-bottom: 10px; border-bottom: 2px solid var(--gt-color-border-purple);
 }
 .gt-report-type-tabs-left {
   display: flex; gap: 0;
@@ -1382,7 +1382,7 @@ watch(activeTab, (tab) => {
 .gt-report-type-tag:hover { color: #4b2d77; background: rgba(75,45,119,0.04); border-radius: 6px 6px 0 0; }
 .gt-report-type-tag--active {
   color: var(--gt-color-primary); font-weight: 600;
-  border-bottom-color: #4b2d77;
+  border-bottom-color: var(--gt-color-primary);
   background: rgba(75,45,119,0.03); border-radius: 6px 6px 0 0;
 }
 

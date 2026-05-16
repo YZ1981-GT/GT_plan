@@ -401,7 +401,7 @@ onMounted(() => {
   background: var(--gt-color-bg-white);
   border-radius: 8px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  border-left: 3px solid #4b2d77;
+  border-left: 3px solid var(--gt-color-primary);
 }
 .gt-tlm-stat-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); }
 .gt-tlm-stat-value { font-size: 20px /* allow-px: special */; font-weight: 700; color: var(--gt-color-text-primary); }
@@ -435,7 +435,7 @@ onMounted(() => {
 .gt-tlm-tabs :deep(.el-tabs__header) {
   width: 160px;
   flex-shrink: 0;
-  border-right: 1px solid #e4e7ed;
+  border-right: 1px solid var(--gt-color-border-lighter);
   background: var(--gt-color-bg);
   margin: 0;
 }
@@ -479,7 +479,7 @@ onMounted(() => {
 .gt-tlm-seed-collapse :deep(.el-collapse-item__header) {
   padding: 0 16px;
   background: var(--gt-color-bg-white);
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
   font-weight: 600;
 }
 .gt-tlm-seed-collapse :deep(.el-collapse-item__wrap) {

@@ -471,7 +471,7 @@ onUnmounted(() => {
 .cm-context-menu {
   position: fixed; z-index: 10001; background: var(--gt-color-bg-white);
   border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.15); padding: 6px 0; min-width: 180px;
-  border: 1px solid #e8e4f0;
+  border: 1px solid var(--gt-color-border-purple);
 }
 .cm-ctx-header { padding: 6px 14px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 .cm-ctx-divider { height: 1px; background: var(--gt-color-primary-bg); margin: 2px 0; }

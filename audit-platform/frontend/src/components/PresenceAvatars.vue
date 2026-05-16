@@ -62,7 +62,7 @@ function getColor(userId: string): string {
 .presence-avatars .el-avatar {
   cursor: default;
   font-size: var(--gt-font-size-xs);
-  border: 2px solid #fff;
+  border: 2px solid var(--gt-color-text-inverse);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 .presence-avatars .el-avatar + .el-avatar {

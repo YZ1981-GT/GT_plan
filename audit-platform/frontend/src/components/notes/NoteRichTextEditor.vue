@@ -240,7 +240,7 @@ function updateToolbarState() {
 
 <style scoped>
 .note-rich-text-editor {
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -250,7 +250,7 @@ function updateToolbarState() {
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
   background: var(--gt-color-bg);
   flex-wrap: wrap;
 }
@@ -260,7 +260,7 @@ function updateToolbarState() {
   align-items: center;
   gap: 2px;
   padding-right: 8px;
-  border-right: 1px solid #ebeef5;
+  border-right: 1px solid var(--gt-color-border-lighter);
 }
 
 .nrte-toolbar-group:last-child {
@@ -322,7 +322,7 @@ function updateToolbarState() {
   display: inline-block;
   background: var(--gt-bg-info);
   color: var(--gt-color-teal);
-  border: 1px solid #91d5ff;
+  border: 1px solid var(--gt-color-border-info);
   border-radius: 3px;
   padding: 0 6px;
   font-size: var(--gt-font-size-xs);
@@ -340,7 +340,7 @@ function updateToolbarState() {
 
 :deep(.nrte-table th),
 :deep(.nrte-table td) {
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--gt-color-border-lighter);
   padding: 6px 8px;
   text-align: left;
 }

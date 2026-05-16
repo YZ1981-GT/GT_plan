@@ -859,7 +859,7 @@ onBeforeUnmount(() => {
 .gt-kb-banner-actions { display: flex; gap: 8px; }
 .gt-kb-banner-actions .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
 .gt-kb-body { min-height: 500px; }
-.gt-kb-panel { background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md); border: 1px solid #f0f0f0; padding: 16px; height: 100%; }
+.gt-kb-panel { background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md); border: 1px solid var(--gt-color-border-light); padding: 16px; height: 100%; }
 .gt-kb-doc-panel { display: flex; flex-direction: column; }
 .gt-kb-panel-title { margin: 0 0 12px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text); }
 .gt-kb-tree-node { display: flex; align-items: center; gap: 4px; font-size: var(--gt-font-size-sm); }
@@ -876,12 +876,12 @@ onBeforeUnmount(() => {
 
 /* 预览面板 */
 .gt-kb-preview-panel {
-  width: 45%; min-width: 300px; background: var(--gt-color-bg); border: 1px solid #f0f0f0;
+  width: 45%; min-width: 300px; background: var(--gt-color-bg); border: 1px solid var(--gt-color-border-light);
   border-radius: var(--gt-radius-md); display: flex; flex-direction: column; overflow: hidden;
 }
 .gt-kb-preview-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 12px; border-bottom: 1px solid #f0f0f0; background: var(--gt-color-bg-white);
+  padding: 8px 12px; border-bottom: 1px solid var(--gt-color-border-light); background: var(--gt-color-bg-white);
 }
 .gt-kb-preview-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-kb-preview-body { flex: 1; overflow: auto; padding: 0; }
@@ -897,7 +897,7 @@ onBeforeUnmount(() => {
 .gt-kb-folder-upload { }
 .gt-kb-folder-drop {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 40px 20px; border: 2px dashed #dcdfe6; border-radius: 8px;
+  padding: 40px 20px; border: 2px dashed var(--gt-color-border-lighter); border-radius: 8px;
   cursor: pointer; transition: border-color 0.2s;
   color: var(--gt-color-text-regular); font-size: var(--gt-font-size-sm);
 }
@@ -915,7 +915,7 @@ onBeforeUnmount(() => {
   display: flex; align-items: center; gap: 12px;
   padding: 8px 16px; margin-bottom: 8px;
   background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
-  border: 1px solid #e8e0f0; box-shadow: var(--gt-shadow-sm);
+  border: 1px solid var(--gt-color-border-purple); box-shadow: var(--gt-shadow-sm);
 }
 .gt-kb-upload-bar-text { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); white-space: nowrap; }
 </style>

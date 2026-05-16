@@ -103,12 +103,12 @@ function riskLabel(r) {
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .panel-header h3 { margin: 0; font-size: var(--gt-font-size-md); }
 .header-actions { display: flex; gap: 8px; }
-.check-select { padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: var(--gt-font-size-xs); }
+.check-select { padding: 5px 10px; border: 1px solid var(--gt-color-border-light); border-radius: 6px; font-size: var(--gt-font-size-xs); }
 .btn-primary { padding: 6px 14px; background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border: none; border-radius: 6px; cursor: pointer; font-size: var(--gt-font-size-xs); }
 .btn-primary:disabled { background: var(--gt-color-border); cursor: not-allowed; }
 
 .check-results { display: flex; flex-direction: column; gap: 8px; max-height: 500px; overflow-y: auto; }
-.check-card { border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; }
+.check-card { border: 1px solid var(--gt-color-border-light); border-radius: 8px; padding: 10px 12px; }
 .check-card.risk-high { border-color: rgba(255,77,79,0.3); }
 .check-card.risk-medium { border-color: rgba(255,173,0,0.3); }
 .check-card.risk-low { border-color: rgba(82,196,26,0.3); }
@@ -132,7 +132,7 @@ function riskLabel(r) {
 .confirm-badge.pending { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); }
 .confirm-badge.confirmed { background: var(--gt-bg-success); color: var(--gt-color-success); }
 .footer-actions { display: flex; gap: 4px; }
-.btn-sm { padding: 2px 8px; border: 1px solid #ddd; background: var(--gt-color-bg-white); border-radius: 4px; cursor: pointer; font-size: var(--gt-font-size-xs); }
-.btn-reject { border-color: #ff4d4f; color: var(--gt-color-coral); }
+.btn-sm { padding: 2px 8px; border: 1px solid var(--gt-color-border-light); background: var(--gt-color-bg-white); border-radius: 4px; cursor: pointer; font-size: var(--gt-font-size-xs); }
+.btn-reject { border-color: var(--gt-color-coral); color: var(--gt-color-coral); }
 .empty-state { text-align: center; padding: 20px; color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-sm); }
 </style>

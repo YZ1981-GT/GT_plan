@@ -195,7 +195,7 @@ async function _auditAllNotes() {
   border-bottom: 2px solid transparent; transition: all 0.15s; user-select: none;
 }
 .cc-tab-btn:hover { color: var(--gt-color-primary); }
-.cc-tab-btn--active { color: var(--gt-color-primary); font-weight: 600; border-bottom-color: #4b2d77; }
+.cc-tab-btn--active { color: var(--gt-color-primary); font-weight: 600; border-bottom-color: var(--gt-color-primary); }
 .cc-content { flex: 1; overflow-y: auto; min-height: 0; }
 .cc-tree { padding: 6px; }
 .cc-tree-node { display: flex; align-items: center; font-size: var(--gt-font-size-xs); width: 100%; }

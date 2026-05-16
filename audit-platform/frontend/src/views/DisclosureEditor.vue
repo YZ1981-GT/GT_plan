@@ -219,7 +219,7 @@
                   </template>
                 </el-table-column>
               </el-table>
-              <div v-else-if="activeTableData?.headers?.length" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); padding: 10px; text-align: center; border: 1px dashed #e8e4f0; border-radius: 6px;">
+              <div v-else-if="activeTableData?.headers?.length" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); padding: 10px; text-align: center; border: 1px dashed var(--gt-color-border-purple); border-radius: 6px;">
                 该表格暂无数据行（可在编辑模式下添加）
               </div>
             </div>
@@ -1805,7 +1805,7 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
 }
 .gt-de-sidebar {
   width: 220px; flex-shrink: 0;
-  background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  background: var(--gt-color-bg-white); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   display: flex; flex-direction: column; overflow: hidden;
 }
 .gt-de-sidebar-title {
@@ -1815,7 +1815,7 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
 
 /* 单位切换栏 */
 .gt-de-unit-bar {
-  padding: 8px 12px; border-bottom: 1px solid #f0f0f0;
+  padding: 8px 12px; border-bottom: 1px solid var(--gt-color-border-light);
 }
 .gt-de-unit-name {
   font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary);
@@ -1864,28 +1864,28 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
 /* ── 中间编辑区 ── */
 .gt-de-main {
   flex: 1; min-width: 0;
-  background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  background: var(--gt-color-bg-white); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   padding: 16px; overflow-y: auto;
 }
 .gt-de-editor-header {
   display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;
-  padding-bottom: 10px; border-bottom: 1px solid #f0ecf5;
+  padding-bottom: 10px; border-bottom: 1px solid var(--gt-color-border-purple);
 }
 .gt-de-section-title { margin: 0; font-size: var(--gt-font-size-base); font-weight: 600; color: var(--gt-color-text-primary); }
 .gt-de-section-account { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px; display: block; }
-.gt-de-editor-footer { margin-top: 12px; text-align: right; padding-top: 10px; border-top: 1px solid #f0ecf5; }
+.gt-de-editor-footer { margin-top: 12px; text-align: right; padding-top: 10px; border-top: 1px solid var(--gt-color-border-purple); }
 
 /* ── 右侧校验 ── */
 .gt-de-validation {
   width: 240px; flex-shrink: 0;
-  background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  background: var(--gt-color-bg-white); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   overflow-y: auto; padding-bottom: 8px;
 }
 .gt-de-empty-hint { color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs); text-align: center; padding: 30px 10px; }
-.gt-de-finding-item { padding: 8px 12px; border-bottom: 1px solid #f5f3f8; font-size: var(--gt-font-size-xs); }
-.gt-de-finding-item.gt-de-severity-error { border-left: 3px solid #FF5149; }
-.gt-de-finding-item.gt-de-severity-warning { border-left: 3px solid #e6a23c; }
-.gt-de-finding-item.gt-de-severity-info { border-left: 3px solid #bbb; }
+.gt-de-finding-item { padding: 8px 12px; border-bottom: 1px solid var(--gt-color-border-purple); font-size: var(--gt-font-size-xs); }
+.gt-de-finding-item.gt-de-severity-error { border-left: 3px solid var(--gt-color-coral); }
+.gt-de-finding-item.gt-de-severity-warning { border-left: 3px solid var(--gt-color-wheat); }
+.gt-de-finding-item.gt-de-severity-info { border-left: 3px solid var(--gt-color-border-light); }
 .gt-de-finding-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .gt-de-finding-type { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 .gt-de-finding-section { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); }
@@ -1893,7 +1893,7 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
 .gt-de-finding-values { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px; }
 
 /* ── 表格 ── */
-.gt-de-main :deep(.el-table) { --el-table-border-color: #e8e4f0; }
+.gt-de-main :deep(.el-table) { --el-table-border-color: var(--gt-color-border-purple); }
 .gt-de-main :deep(.el-table th.el-table__cell) {
   background: var(--gt-color-primary-bg) !important; font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-text-regular); white-space: nowrap;
 }
@@ -1915,7 +1915,7 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
 
 /* 校验失败单元格红色边框 */
 .gt-cell-validation-error {
-  border: 1.5px solid #FF5149;
+  border: 1.5px solid var(--gt-color-coral);
   border-radius: 3px;
   padding: 1px 3px;
 }
@@ -1951,8 +1951,8 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
 }
 
 /* ── TipTap ── */
-.gt-de-tiptap-wrapper { border: 1px solid #e8e4f0; border-radius: 6px; margin-top: 10px; }
-.gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid #e8e4f0; background: var(--gt-color-primary-bg); border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.gt-de-tiptap-wrapper { border: 1px solid var(--gt-color-border-purple); border-radius: 6px; margin-top: 10px; }
+.gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid var(--gt-color-border-purple); background: var(--gt-color-primary-bg); border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .gt-de-toolbar-divider { width: 1px; height: 20px; background: var(--gt-color-primary-lighter); margin: 0 6px; }
 .gt-de-ai-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-primary-lighter); margin-left: 8px; white-space: nowrap; }
 .gt-de-saved-badge { font-size: var(--gt-font-size-xs); color: var(--gt-color-success); font-weight: 400; margin-left: 8px; background: var(--gt-bg-success); padding: 1px 8px; border-radius: 10px; }
@@ -1962,7 +1962,7 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
 .gt-de-tiptap-content :deep(.ProseMirror p.is-editor-empty:first-child::before) { color: var(--gt-color-text-placeholder); content: attr(data-placeholder); float: left; height: 0; pointer-events: none; text-indent: 0; }
 
 /* ── AI 工具栏 (Req 48) ── */
-.gt-de-ai-toolbar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-top: 1px solid #ebeef5; background: var(--gt-color-primary-bg); flex-wrap: wrap; }
+.gt-de-ai-toolbar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-top: 1px solid var(--gt-color-border-lighter); background: var(--gt-color-primary-bg); flex-wrap: wrap; }
 
 /* ── 表格结构编辑工具栏 (Req 38) ── */
 .gt-de-structure-toolbar {
@@ -1970,7 +1970,7 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
   align-items: center;
   padding: 6px 0;
   margin-top: 4px;
-  border-top: 1px dashed #e8e4f0;
+  border-top: 1px dashed var(--gt-color-border-purple);
 }
 
 </style>

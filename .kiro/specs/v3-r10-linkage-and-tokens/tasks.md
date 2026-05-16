@@ -247,6 +247,16 @@
 | TD-1 | GtEditableTable wrapper 60 天后未删除 | P2 | 60 天后无 console.warn | Spec D 评估删除时间 |
 | TD-2 | 透明度场景 `rgba(...)` 未 token 化 | P3 | CSS color-mix() 兼容性达 95% | Spec D（暗色模式） |
 | TD-3 | 字号迁移期间允许 `// stylelint-disable-next-line` 临时豁免 | P2 | Sprint 1 末尾扫描清零 | 本 Sprint 1 末尾扫尾 |
+| TD-4 | el-table baseline=176 较高，目标渐进迁移到 GtTableExtended/GtFormTable | P2 | 触碰即迁移 | Spec D / 触碰即修 |
+| TD-5 | UAT 1-8 仍需真人验收（截图对比/行为验证） | P1 | 上线前 1 天 | 真人 UAT 不算技术债，列此为提醒 |
+
+### R10 复盘修复项（已落地）
+
+| ID | 缺口 | 修复时间 | 修复方式 |
+|----|------|---------|---------|
+| G1 | border-color/border-shorthand hex 残留（subagent 漏 ~419 处派生属性） | 2026-05-16 | `scripts/_fix_g1_border_hex.py` 批量替换 + CI 加 border-color baseline 卡点 |
+| G2 | DisclosureEditor.vue 3 处 `background: #fff` 漏掉 | 2026-05-16 | 替换为 `var(--gt-color-bg-white)` |
+| G6 | el-table baseline=100 偏低（实测 176） | 2026-05-16 | 校准为实测值 + 注释说明渐进迁移目标 |
 
 ---
 

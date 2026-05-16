@@ -949,7 +949,7 @@ function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: stri
 }
 .gt-wp-smart-tip-detail {
   position: absolute; bottom: 30px; right: 12px; left: 12px;
-  background: var(--gt-color-bg-white); border: 1px solid #e8e4f0; border-radius: 8px;
+  background: var(--gt-color-bg-white); border: 1px solid var(--gt-color-border-purple); border-radius: 8px;
   padding: 12px 16px; box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
   z-index: 20; max-height: 300px; overflow-y: auto;
 }

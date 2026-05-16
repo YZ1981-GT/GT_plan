@@ -255,7 +255,7 @@ function formatTime(iso: string) {
   text-align: center;
   padding-top: 8px;
   margin-top: 4px;
-  border-top: 1px solid #f0edf5;
+  border-top: 1px solid var(--gt-color-border-purple);
 }
 .notif-tabs :deep(.el-tabs__header) { margin-bottom: 8px; }
 .notif-tabs :deep(.el-tabs__item) { font-size: var(--gt-font-size-xs); padding: 0 10px; height: 28px; line-height: 28px; }

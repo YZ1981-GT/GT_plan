@@ -288,7 +288,7 @@ function isStepCompleted(step: string): boolean {
   font-size: var(--gt-font-size-md);
   margin-bottom: var(--gt-space-3);
   padding-bottom: var(--gt-space-2);
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--gt-color-border-light);
 }
 
 .card-body {

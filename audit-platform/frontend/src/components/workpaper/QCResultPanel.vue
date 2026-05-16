@@ -123,9 +123,9 @@ const hasBlocking = computed(() => blockingFindings.value.length > 0)
   border-radius: 0 var(--gt-radius-sm) var(--gt-radius-sm) 0;
   background: var(--gt-color-bg);
 }
-.finding-item.blocking { border-color: #f56c6c; }
-.finding-item.warning { border-color: #e6a23c; }
-.finding-item.info { border-color: #c0c4cc; }
+.finding-item.blocking { border-color: var(--gt-color-coral); }
+.finding-item.warning { border-color: var(--gt-color-wheat); }
+.finding-item.info { border-color: var(--gt-color-text-placeholder); }
 .finding-main { display: flex; align-items: center; gap: 8px; }
 .finding-msg { font-size: var(--gt-font-size-sm); }
 .finding-detail { margin-top: 4px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); display: flex; gap: 12px; }

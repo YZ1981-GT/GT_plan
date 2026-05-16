@@ -236,9 +236,9 @@ onUnmounted(() => { if (slaTimer) clearInterval(slaTimer) })
 
 /* Q 整改单红左边框 */
 :deep(.q-source-row) {
-  border-left: 3px solid #f56c6c !important;
+  border-left: 3px solid var(--gt-color-coral) !important;
 }
 :deep(.q-source-row td:first-child) {
-  border-left: 3px solid #f56c6c;
+  border-left: 3px solid var(--gt-color-coral);
 }
 </style>

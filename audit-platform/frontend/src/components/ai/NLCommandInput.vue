@@ -79,14 +79,14 @@ function fillExample(text) {
 
 <style scoped>
 .gt-nl-command-input { width: 100%; }
-.input-wrapper { display: flex; align-items: center; gap: 8px; background: var(--gt-color-bg-white); border: 1.5px solid #ddd; border-radius: 24px; padding: 8px 12px; transition: border-color 0.2s; }
-.input-wrapper:focus-within { border-color: #4b2d77; }
+.input-wrapper { display: flex; align-items: center; gap: 8px; background: var(--gt-color-bg-white); border: 1.5px solid var(--gt-color-border-light); border-radius: 24px; padding: 8px 12px; transition: border-color 0.2s; }
+.input-wrapper:focus-within { border-color: var(--gt-color-primary); }
 .nl-icon { font-size: var(--gt-font-size-xl); }
 .nl-input { flex: 1; border: none; outline: none; font-size: var(--gt-font-size-sm); background: transparent; }
 .btn-execute { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: var(--gt-font-size-xs); display: flex; align-items: center; justify-content: center; }
 .btn-execute:disabled { background: var(--gt-color-border); cursor: not-allowed; }
 
-.help-panel { background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-top: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.help-panel { background: #fff; border: 1px solid var(--gt-color-border-light); border-radius: 8px; padding: 12px; margin-top: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 .help-title { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-bottom: 8px; }
 .help-items { display: flex; flex-wrap: wrap; gap: 6px; }
 .help-item { background: var(--gt-color-bg); padding: 4px 10px; border-radius: 4px; font-size: var(--gt-font-size-xs); cursor: pointer; color: var(--gt-color-primary); }

@@ -165,7 +165,7 @@ onMounted(async () => {
 }
 .ch-stat-item {
   flex: 1; display: flex; flex-direction: column; align-items: center;
-  padding: 16px 12px; border-right: 1px solid #f0edf5;
+  padding: 16px 12px; border-right: 1px solid var(--gt-color-border-purple);
 }
 .ch-stat-item:last-child { border-right: none; }
 .ch-stat-num { font-size: var(--gt-font-size-3xl); font-weight: 700; color: var(--gt-color-primary); line-height: 1.2; }
@@ -226,11 +226,11 @@ onMounted(async () => {
 
 .ch-card {
   background: var(--gt-color-bg-white); border-radius: 12px; overflow: hidden; cursor: pointer;
-  border: 1px solid #f0edf5; transition: all 0.2s ease;
+  border: 1px solid var(--gt-color-border-purple); transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgba(0,0,0,0.03);
 }
 .ch-card:hover {
-  border-color: #4b2d77; box-shadow: 0 8px 24px rgba(75,45,119,0.12);
+  border-color: var(--gt-color-primary); box-shadow: 0 8px 24px rgba(75,45,119,0.12);
   transform: translateY(-3px);
 }
 
@@ -277,7 +277,7 @@ onMounted(async () => {
 .ch-card-progress-text { font-size: var(--gt-font-size-xs); color: var(--gt-color-primary); font-weight: 600; min-width: 32px; }
 
 .ch-card-footer {
-  padding-top: 12px; border-top: 1px solid #f5f3f8;
+  padding-top: 12px; border-top: 1px solid var(--gt-color-border-purple);
 }
 .ch-card-enter {
   font-size: var(--gt-font-size-sm); color: var(--gt-color-primary); font-weight: 500;

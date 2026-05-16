@@ -213,7 +213,7 @@ loadIndicators()
 
 <style scoped>
 .gt-cq-container { display: flex; gap: 12px; height: calc(100vh - 140px); }
-.gt-cq-sidebar { width: 200px; flex-shrink: 0; border-right: 1px solid #e8e4f0; padding-right: 8px; overflow-y: auto; }
+.gt-cq-sidebar { width: 200px; flex-shrink: 0; border-right: 1px solid var(--gt-color-border-purple); padding-right: 8px; overflow-y: auto; }
 .gt-cq-sidebar-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary); margin-bottom: 8px; }
 .gt-cq-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .gt-cq-filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }

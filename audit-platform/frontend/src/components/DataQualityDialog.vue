@@ -223,21 +223,21 @@ function getTagType(status: string): 'success' | 'warning' | 'danger' | 'info' {
 .dq-check-item {
   padding: 12px 16px;
   border-radius: 8px;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   transition: border-color 0.2s;
 }
 
 .dq-check-item--passed {
-  border-left: 3px solid #67c23a;
+  border-left: 3px solid var(--gt-color-success);
 }
 
 .dq-check-item--warning {
-  border-left: 3px solid #e6a23c;
+  border-left: 3px solid var(--gt-color-wheat);
   background: var(--gt-bg-warning);
 }
 
 .dq-check-item--blocking {
-  border-left: 3px solid #f56c6c;
+  border-left: 3px solid var(--gt-color-coral);
   background: var(--gt-bg-danger);
 }
 

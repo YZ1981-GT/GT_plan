@@ -655,7 +655,7 @@ watch(
 
 .gt-wpd-card {
   background: var(--gt-color-bg-white);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
   padding: 12px 16px;
 }
@@ -716,10 +716,10 @@ watch(
 }
 .gt-wpd-format-icon { font-size: var(--gt-font-size-md); margin-right: 2px; }
 .gt-wpd-acc-tag { margin-right: 4px; margin-bottom: 4px; }
-.gt-wpd-comp--univer { background: var(--gt-bg-info); color: var(--gt-color-teal); border-color: #c2dafc; }
-.gt-wpd-comp--form { background: var(--gt-color-success-light); color: var(--gt-color-success); border-color: #b6e3b6; }
-.gt-wpd-comp--word { background: var(--gt-bg-warning); color: var(--gt-color-wheat); border-color: #f5d4a8; }
-.gt-wpd-comp--hybrid { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); border-color: #d8b8ee; }
+.gt-wpd-comp--univer { background: var(--gt-bg-info); color: var(--gt-color-teal); border-color: var(--gt-color-border-info); }
+.gt-wpd-comp--form { background: var(--gt-color-success-light); color: var(--gt-color-success); border-color: var(--gt-color-border-success); }
+.gt-wpd-comp--word { background: var(--gt-bg-warning); color: var(--gt-color-wheat); border-color: var(--gt-color-border-warning); }
+.gt-wpd-comp--hybrid { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); border-color: var(--gt-color-border-purple-light); }
 
 /* 主文件下载区 */
 .gt-wpd-main-file {
@@ -728,7 +728,7 @@ watch(
   justify-content: space-between;
   padding: 12px 16px;
   background: var(--gt-color-primary-bg);
-  border: 1px solid #e0d7ed;
+  border: 1px solid var(--gt-color-border-purple);
   border-radius: 6px;
 }
 .gt-wpd-main-file-info { display: flex; flex-direction: column; gap: 6px; }
@@ -800,7 +800,7 @@ watch(
   color: var(--gt-color-wheat);
   font-size: var(--gt-font-size-xs);
   border-radius: 3px;
-  border-left: 3px solid #e6a23c;
+  border-left: 3px solid var(--gt-color-wheat);
 }
 
 /* 项目使用 */

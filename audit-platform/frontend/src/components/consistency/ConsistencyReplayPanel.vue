@@ -83,7 +83,7 @@ async function runReplay() {
 .consistency-panel { padding: 16px; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .layer-flow { display: flex; flex-direction: column; gap: 8px; }
-.layer-node { border: 1px solid #eee; border-radius: 8px; padding: 12px; cursor: pointer; transition: all 0.2s; }
+.layer-node { border: 1px solid var(--gt-color-border-light); border-radius: 8px; padding: 12px; cursor: pointer; transition: all 0.2s; }
 .layer-node:hover { border-color: var(--el-color-primary-light-5); }
 .layer-node.consistent { border-left: 3px solid var(--el-color-success); }
 .layer-node.inconsistent { border-left: 3px solid var(--el-color-danger); }

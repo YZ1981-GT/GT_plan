@@ -396,7 +396,7 @@ onMounted(async () => {
 }
 .stat-card {
   flex: 1; padding: 16px 20px; background: var(--gt-color-bg-white); border-radius: 8px;
-  border-left: 4px solid #ccc; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  border-left: 4px solid var(--gt-color-border-light); box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 .stat-num { font-size: var(--gt-font-size-3xl); font-weight: 700; color: var(--gt-color-text); }
 .stat-label { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-top: 4px; }
@@ -429,7 +429,7 @@ onMounted(async () => {
 
 .brief-container { padding: 20px; background: var(--gt-color-bg-white); border-radius: 8px; min-height: 300px; }
 .brief-content { line-height: 1.8; }
-.brief-content :deep(h2) { font-size: var(--gt-font-size-xl); margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+.brief-content :deep(h2) { font-size: var(--gt-font-size-xl); margin-bottom: 12px; border-bottom: 1px solid var(--gt-color-border-light); padding-bottom: 8px; }
 .brief-content :deep(h3) { font-size: var(--gt-font-size-base); margin-top: 16px; }
 .brief-content :deep(ul) { padding-left: 20px; }
 .brief-content :deep(li) { margin-bottom: 4px; }

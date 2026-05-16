@@ -359,8 +359,8 @@ onMounted(() => {
   padding: 16px 20px;
   background: var(--gt-color-bg-white);
   border-radius: 8px;
-  border: 1px solid #ebeef5;
-  border-left: 3px solid #4b2d77;
+  border: 1px solid var(--gt-color-border-lighter);
+  border-left: 3px solid var(--gt-color-primary);
 }
 .gt-fcc-card-label {
   font-size: var(--gt-font-size-sm);
@@ -420,7 +420,7 @@ onMounted(() => {
 .gt-fcc-section {
   background: var(--gt-color-bg-white);
   border-radius: 8px;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   padding: 12px 16px;
 }
 .gt-fcc-section-header {
@@ -498,7 +498,7 @@ onMounted(() => {
   padding: 6px 12px;
   background: var(--gt-color-wheat-light);
   border-radius: 4px;
-  border-left: 3px solid #e6a23c;
+  border-left: 3px solid var(--gt-color-wheat);
   font-size: var(--gt-font-size-sm);
 }
 .gt-fcc-no-formula-cycle {

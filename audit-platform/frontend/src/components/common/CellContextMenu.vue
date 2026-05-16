@@ -119,7 +119,7 @@ const formattedValue = computed(() => {
   right: -2px; bottom: -2px;
   width: 6px; height: 6px;
   background: var(--gt-color-primary, #4b2d77);
-  border: 1px solid #fff;
+  border: 1px solid var(--gt-color-text-inverse);
   z-index: 3;
 }
 

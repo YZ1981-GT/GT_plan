@@ -247,7 +247,7 @@
               </span>
             </div>
           </div>
-          <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 8px; border-top: 1px solid #eee; padding-top: 6px">
+          <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 8px; border-top: 1px solid var(--gt-color-border-light); padding-top: 6px">
             必需列（红色）：余额表（科目编码）、凭证表（科目编码+凭证日期+凭证号）、辅助余额（科目编码+辅助类型）、辅助明细（科目编码）<br/>
             建议列（橙色）：余额表（期初余额+借方发生额+贷方发生额+期末余额）、凭证表（借方金额+贷方金额+摘要）、辅助余额（期初余额+期末余额+辅助编码+辅助名称）
           </div>
@@ -1794,7 +1794,7 @@ defineExpose({
 
 .preview-table-wrapper {
   margin-bottom: var(--gt-space-4);
-  border: 1px solid #eee;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: var(--gt-radius-md);
   overflow: hidden;
 }
@@ -1844,10 +1844,10 @@ defineExpose({
 :deep(.col-important-matched) { background: var(--gt-bg-success) !important; }
 
 .column-mapping-header.col-key-matched {
-  border-bottom: 2px solid #409eff;
+  border-bottom: 2px solid var(--gt-color-teal);
 }
 .column-mapping-header.col-important-matched {
-  border-bottom: 2px solid #67c23a;
+  border-bottom: 2px solid var(--gt-color-success);
 }
 
 .preview-actions {

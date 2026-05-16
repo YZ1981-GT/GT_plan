@@ -1755,16 +1755,16 @@ function copyReportTable() {
 
 /* ── 报表表格 — 专业财务报表风格 ── */
 :deep(.el-table) {
-  --el-table-border-color: #e8e4f0;
-  --el-table-row-hover-bg-color: #faf8fd;
+  --el-table-border-color: var(--gt-color-border-purple);
+  --el-table-row-hover-bg-color: var(--gt-color-bg-purple-hover);
   font-size: var(--gt-font-size-xs);
   border-top: 2px solid var(--gt-color-primary);
 }
 :deep(.el-table--border .el-table__cell) {
-  border-color: #e8e4f0;
+  border-color: var(--gt-color-border-purple);
 }
 :deep(.el-table th.el-table__cell) {
-  border-bottom: 2px solid #d8d0e8;
+  border-bottom: 2px solid var(--gt-color-border-purple-mid);
 }
 :deep(.el-table td.el-table__cell) {
   padding: 5px 0;
@@ -1892,7 +1892,7 @@ function copyReportTable() {
 :deep(.gt-rv-eq-total-row td) {
   background: var(--gt-color-primary-bg) !important;
   font-weight: 700;
-  border-top: 2px solid #d8d0e8 !important;
+  border-top: 2px solid var(--gt-color-border-purple-mid) !important;
 }
 /* 分类标题行 */
 :deep(.gt-rv-eq-category td) {
@@ -1920,7 +1920,7 @@ function copyReportTable() {
   padding: 10px 8px;
   border-radius: var(--gt-radius-md);
   background: var(--gt-color-primary-bg);
-  border: 1px solid #ece8f3;
+  border: 1px solid var(--gt-color-border-purple);
 }
 .gt-rv-audit-stat-num {
   display: block;
@@ -1935,12 +1935,12 @@ function copyReportTable() {
 }
 .gt-rv-audit-stat-pass {
   background: var(--gt-color-success-light);
-  border-color: #c8e6c9;
+  border-color: var(--gt-color-border-success);
 }
 .gt-rv-audit-stat-pass .gt-rv-audit-stat-num { color: var(--gt-color-success); }
 .gt-rv-audit-stat-fail {
   background: var(--gt-color-coral-light);
-  border-color: #f5c6c6;
+  border-color: var(--gt-color-border-danger);
 }
 .gt-rv-audit-stat-fail .gt-rv-audit-stat-num { color: var(--gt-color-coral); }
 :deep(.gt-rv-audit-fail-row) {
@@ -1962,7 +1962,7 @@ function copyReportTable() {
   justify-content: space-between;
   padding: 6px 16px;
   background: linear-gradient(90deg, #fff3e0, #fff8f0);
-  border: 1px solid #ffe0b2;
+  border: 1px solid var(--gt-color-border-warning);
   border-radius: var(--gt-radius-md);
   margin-bottom: 8px;
   font-size: var(--gt-font-size-xs);
@@ -1992,7 +1992,7 @@ function copyReportTable() {
   background: var(--gt-color-primary-bg) !important;
 }
 :deep(.report-row--total td) {
-  border-top: 1.5px solid #dcdfe6 !important;
+  border-top: 1.5px solid var(--gt-color-border-lighter) !important;
   font-weight: 700;
 }
 :deep(.report-row--zero) {
@@ -2033,7 +2033,7 @@ function copyReportTable() {
   text-align: center;
   padding: 12px 16px 8px;
   margin-bottom: 4px;
-  border-bottom: 1px solid #e8e4f0;
+  border-bottom: 1px solid var(--gt-color-border-purple);
 }
 .gt-rv-gt-header__company {
   font-size: var(--gt-font-size-md);
@@ -2067,7 +2067,7 @@ function copyReportTable() {
   padding: 8px 16px;
   margin-top: 8px;
   background: var(--gt-color-bg);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: var(--gt-radius-md, 6px);
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-regular);

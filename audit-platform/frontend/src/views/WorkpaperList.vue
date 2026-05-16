@@ -1664,7 +1664,7 @@ onMounted(async () => {
 .gt-wp-guide-list { display: flex; flex-direction: column; }
 .gt-wp-guide-row {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-  border-bottom: 1px solid #f5f5f5; cursor: pointer; border-radius: 6px;
+  border-bottom: 1px solid var(--gt-color-border-light); cursor: pointer; border-radius: 6px;
   transition: background 0.15s;
 }
 .gt-wp-guide-row:hover { background: var(--gt-color-primary-bg); }

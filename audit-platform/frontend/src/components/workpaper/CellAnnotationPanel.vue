@@ -97,7 +97,7 @@ onMounted(loadAnnotations)
 .cell-annotation-panel { padding: 12px; }
 .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .title { font-weight: 600; font-size: var(--gt-font-size-sm); }
-.annotation-item { padding: 8px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+.annotation-item { padding: 8px; border-bottom: 1px solid var(--gt-color-border-light); cursor: pointer; }
 .annotation-item:hover { background: var(--gt-color-primary-bg); }
 .item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .cell-ref { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); }

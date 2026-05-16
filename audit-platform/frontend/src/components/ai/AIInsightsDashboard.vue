@@ -49,11 +49,11 @@ onMounted(loadInsights)
 .panel-header h3 { margin: 0; font-size: var(--gt-font-size-md); }
 .btn-refresh { background: none; border: none; cursor: pointer; font-size: var(--gt-font-size-md); }
 .insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.insight-card { border: 1px solid #eee; border-radius: 8px; padding: 12px; cursor: pointer; transition: transform 0.2s; }
+.insight-card { border: 1px solid var(--gt-color-border-light); border-radius: 8px; padding: 12px; cursor: pointer; transition: transform 0.2s; }
 .insight-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-.insight-card.risk-high { border-left: 3px solid #ff4d4f; }
-.insight-card.risk-medium { border-left: 3px solid #faad14; }
-.insight-card.risk-low { border-left: 3px solid #52c41a; }
+.insight-card.risk-high { border-left: 3px solid var(--gt-color-coral); }
+.insight-card.risk-medium { border-left: 3px solid var(--gt-color-wheat); }
+.insight-card.risk-low { border-left: 3px solid var(--gt-color-success); }
 .insight-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .insight-type { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); text-transform: uppercase; }
 .risk-dot { width: 8px; height: 8px; border-radius: 50%; }

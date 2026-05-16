@@ -242,7 +242,7 @@ function renderMarkdown(text) {
   bottom: 0;
   width: 380px;
   background: var(--gt-color-bg-white);
-  border-left: 1px solid #e8e8e8;
+  border-left: 1px solid var(--gt-color-border-light);
   display: flex;
   flex-direction: column;
   z-index: 100;
@@ -285,7 +285,7 @@ function renderMarkdown(text) {
 .project-context {
   padding: 8px 16px;
   background: var(--gt-color-primary-bg);
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--gt-color-border-light);
   font-size: var(--gt-font-size-xs);
 }
 
@@ -371,25 +371,25 @@ function renderMarkdown(text) {
 .file-upload-area {
   margin-top: 8px;
   padding: 12px;
-  border: 2px dashed #ccc;
+  border: 2px dashed var(--gt-color-border-light);
   border-radius: 8px;
   text-align: center;
   cursor: pointer;
 }
 
-.file-upload-area:hover { border-color: #4b2d77; }
+.file-upload-area:hover { border-color: var(--gt-color-primary); }
 .upload-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 
 .chat-input-area {
   padding: 12px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--gt-color-border-light);
   background: var(--gt-color-bg-white);
 }
 
 .chat-input {
   width: 100%;
   min-height: 64px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 8px;
   padding: 8px 12px;
   font-size: var(--gt-font-size-sm);
@@ -398,7 +398,7 @@ function renderMarkdown(text) {
   outline: none;
 }
 
-.chat-input:focus { border-color: #4b2d77; }
+.chat-input:focus { border-color: var(--gt-color-primary); }
 
 .input-actions {
   display: flex;
@@ -430,7 +430,7 @@ function renderMarkdown(text) {
 
 .markdown-content :deep(h1),
 .markdown-content :deep(h2) {
-  border-bottom: 1px solid #e8e8e8;
+  border-bottom: 1px solid var(--gt-color-border-light);
   padding-bottom: 4px;
   margin: 8px 0;
 }

@@ -427,7 +427,7 @@ onBeforeUnmount(() => {
   gap: 12px;
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid var(--gt-color-border-lighter);
 }
 
 /* ── 选项表单 ── */

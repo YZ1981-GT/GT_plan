@@ -155,10 +155,10 @@ onMounted(loadFormulas)
   background: var(--el-fill-color-lighter);
 }
 
-.item-filled { border-left-color: #67c23a; }
-.item-stale { border-left-color: #e6a23c; }
-.item-error { border-left-color: #f56c6c; }
-.item-waiting { border-left-color: #909399; }
+.item-filled { border-left-color: var(--gt-color-success); }
+.item-stale { border-left-color: var(--gt-color-wheat); }
+.item-error { border-left-color: var(--gt-color-coral); }
+.item-waiting { border-left-color: var(--gt-color-info); }
 
 .formula-header {
   display: flex;

@@ -503,7 +503,7 @@ async function onDelete(row: GtCoding) {
   padding: 8px 12px;
   background: var(--gt-color-primary-bg);
   border-radius: 6px;
-  border-left: 3px solid #4b2d77;
+  border-left: 3px solid var(--gt-color-primary);
   flex-shrink: 0;
 }
 .gt-gtc-stats-item {
@@ -527,13 +527,13 @@ async function onDelete(row: GtCoding) {
 }
 
 /* 类型标签颜色 */
-.gt-gtc-type--preliminary { background: var(--gt-bg-info); color: var(--gt-color-teal); border-color: #b3d9f0; }
-.gt-gtc-type--risk_assessment { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); border-color: #f0c898; }
-.gt-gtc-type--control_test { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); border-color: #ebe18a; }
-.gt-gtc-type--substantive { background: var(--gt-color-primary-bg); color: var(--gt-color-primary-light); border-color: #d4bff0; }
-.gt-gtc-type--completion { background: var(--gt-color-success-light); color: var(--gt-color-success); border-color: #b8d8b8; }
-.gt-gtc-type--specific { background: var(--gt-color-coral-light); color: var(--gt-color-coral); border-color: #f5b7b7; }
-.gt-gtc-type--general { background: var(--gt-color-bg); color: var(--gt-color-text-regular); border-color: #d9dadc; }
+.gt-gtc-type--preliminary { background: var(--gt-bg-info); color: var(--gt-color-teal); border-color: var(--gt-color-border-info); }
+.gt-gtc-type--risk_assessment { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); border-color: var(--gt-color-border-warning); }
+.gt-gtc-type--control_test { background: var(--gt-color-wheat-light); color: var(--gt-color-wheat); border-color: var(--gt-color-border-warning); }
+.gt-gtc-type--substantive { background: var(--gt-color-primary-bg); color: var(--gt-color-primary-light); border-color: var(--gt-color-border-purple-light); }
+.gt-gtc-type--completion { background: var(--gt-color-success-light); color: var(--gt-color-success); border-color: var(--gt-color-border-success); }
+.gt-gtc-type--specific { background: var(--gt-color-coral-light); color: var(--gt-color-coral); border-color: var(--gt-color-border-danger); }
+.gt-gtc-type--general { background: var(--gt-color-bg); color: var(--gt-color-text-regular); border-color: var(--gt-color-border-light); }
 
 /* ─── 主体 ─── */
 .gt-gtc-body {
@@ -547,7 +547,7 @@ async function onDelete(row: GtCoding) {
 
 .gt-gtc-group {
   background: var(--gt-color-bg-white);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -557,8 +557,8 @@ async function onDelete(row: GtCoding) {
   gap: 8px;
   padding: 10px 16px;
   background: var(--gt-color-primary-bg);
-  border-bottom: 1px solid #ebeef5;
-  border-left: 3px solid #4b2d77;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
+  border-left: 3px solid var(--gt-color-primary);
 }
 .gt-gtc-group-title {
   font-size: var(--gt-font-size-sm);
@@ -571,7 +571,7 @@ async function onDelete(row: GtCoding) {
   background: var(--gt-color-bg-white);
   padding: 1px 8px;
   border-radius: 10px;
-  border: 1px solid #d4bff0;
+  border: 1px solid var(--gt-color-border-purple-light);
 }
 
 .gt-gtc-table :deep(.el-table__row:hover > td) {

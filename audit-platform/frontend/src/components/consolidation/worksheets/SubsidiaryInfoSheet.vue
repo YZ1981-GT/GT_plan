@@ -142,7 +142,7 @@
         <el-table-column prop="share_changed" label="是否变动" width="90" align="center">
           <template #header>
             <el-tooltip content="选择'是'后可设置变动次数，触发股比变动明细表弹窗" placement="top">
-              <span style="cursor:help;border-bottom:1px dashed #999">是否变动</span>
+              <span style="cursor:help;border-bottom:1px dashed var(--gt-color-info)">是否变动</span>
             </el-tooltip>
           </template>
           <template #default="{ row }">
@@ -158,7 +158,7 @@
         <el-table-column prop="change_times" label="变动次数" width="90" align="center">
           <template #header>
             <el-tooltip content="设置1~3次，将弹出对应的股比变动明细表" placement="top">
-              <span style="cursor:help;border-bottom:1px dashed #999">变动次数</span>
+              <span style="cursor:help;border-bottom:1px dashed var(--gt-color-info)">变动次数</span>
             </el-tooltip>
           </template>
           <template #default="{ row }">
@@ -596,7 +596,7 @@ const { isFullscreen, toggleFullscreen } = useFullscreen()
 .ws-tip {
   display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px;
   background: var(--gt-bg-warning); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-wheat); line-height: 1.5;
-  border: 1px solid #faecd8;
+  border: 1px solid var(--gt-color-border-warning);
 }
 .ws-tip b { color: var(--gt-color-wheat); }
 .ws-table :deep(.el-input__inner) { text-align: right; }

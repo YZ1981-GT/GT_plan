@@ -287,7 +287,7 @@ watch(
   padding: 14px 16px;
   background: linear-gradient(135deg, #faf9fc 0%, #f0edf5 100%);
   border-radius: 8px;
-  border-left: 3px solid #4b2d77;
+  border-left: 3px solid var(--gt-color-primary);
 }
 .gt-vhd-meta-item {
   display: flex;

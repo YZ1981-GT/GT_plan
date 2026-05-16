@@ -138,7 +138,7 @@
         </el-table-column>
       </el-table>
       <!-- 间接持股比对区 -->
-      <div style="margin-top:8px;font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);padding:4px 8px;background: var(--gt-bg-info);border-radius:4px;border:1px solid #d0e3f5">
+      <div style="margin-top:8px;font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);padding:4px 8px;background: var(--gt-bg-info);border-radius:4px;border:1px solid var(--gt-color-border-info)">
         🔗 模拟后长投小计: <b style="color: var(--gt-color-teal)">{{ fmt(section.endLongInvest) }}</b>
         &nbsp;|&nbsp; 按比例享有净资产: <b style="color: var(--gt-color-teal)">{{ fmt(section.endNetAssetShare) }}</b>
         &nbsp;|&nbsp; 差异: <b :style="{ color: section.difference !== 0 ? '#e6a23c' : '#67c23a' }">{{ fmt(section.difference) }}</b>
@@ -443,7 +443,7 @@ function confirmImport() {
 .ws-table :deep(.ws-row-step td) { background: var(--gt-color-primary-bg) !important; font-weight: 600; }
 .ws-table :deep(.ws-row-ratio td) { background: var(--gt-color-primary-bg) !important; font-weight: 600; }
 .ws-empty-hint {
-  padding: 16px 20px; background: var(--gt-bg-warning); border: 1px solid #faecd8; border-radius: 6px;
+  padding: 16px 20px; background: var(--gt-bg-warning); border: 1px solid var(--gt-color-border-warning); border-radius: 6px;
   font-size: var(--gt-font-size-sm); color: var(--gt-color-wheat); text-align: center;
 }
 .ws-btn-sep { width: 1px; height: 18px; background: var(--gt-color-border-light); margin: 0 2px; flex-shrink: 0; }

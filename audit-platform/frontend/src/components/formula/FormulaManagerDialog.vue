@@ -108,7 +108,7 @@
             <template #default="{ row }">
               <el-input v-if="editingId === row.id" v-model="editFormula" size="small" placeholder="如 TB('1001','期末余额') 或 ROW('BS-001')+ROW('BS-002')" />
               <code v-else-if="row.formula" @dblclick="startEdit(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); word-break: break-all; cursor: pointer;" :title="'双击编辑公式'">{{ row.formula }}</code>
-              <span v-else @click="startEdit(row)" style="color: var(--gt-color-text-placeholder); cursor: pointer; font-size: var(--gt-font-size-xs); border: 1px dashed #ddd; padding: 2px 8px; border-radius: 4px;" title="点击添加公式">
+              <span v-else @click="startEdit(row)" style="color: var(--gt-color-text-placeholder); cursor: pointer; font-size: var(--gt-font-size-xs); border: 1px dashed var(--gt-color-border-light); padding: 2px 8px; border-radius: 4px;" title="点击添加公式">
                 + 点击添加公式
               </span>
             </template>
@@ -1467,7 +1467,7 @@ watch(showFormulaDashboard, async (v) => {
 .gt-fm-sidebar {
   width: 220px;
   flex-shrink: 0;
-  border: 1px solid #dce6f0;
+  border: 1px solid var(--gt-color-border-info);
   border-radius: 8px;
   overflow-y: auto;
   background: var(--gt-color-primary-bg);
@@ -1522,7 +1522,7 @@ watch(showFormulaDashboard, async (v) => {
   gap: 8px;
   padding: 6px 12px;
   background: linear-gradient(135deg, #edf3f9 0%, #d6e6f5 100%);
-  border: 1px solid #c4d8ea;
+  border: 1px solid var(--gt-color-border-info);
   border-radius: 6px;
   margin-bottom: 6px;
 }
@@ -1542,7 +1542,7 @@ watch(showFormulaDashboard, async (v) => {
   color: var(--gt-color-text-regular);
   padding: 8px 10px;
   background: var(--gt-color-primary-bg);
-  border: 1px solid #dce6f0;
+  border: 1px solid var(--gt-color-border-info);
   border-radius: 6px;
   margin-bottom: 4px;
   cursor: pointer;
@@ -1575,16 +1575,16 @@ watch(showFormulaDashboard, async (v) => {
   color: var(--gt-color-text-inverse);
 }
 .gt-fm-dialog .el-dialog__body {
-  border-top: 3px solid #2d5a87;
+  border-top: 3px solid var(--gt-color-teal);
 }
 .gt-fm-dialog .el-dialog__footer {
   background: var(--gt-color-primary-bg);
-  border-top: 1px solid #dce6f0;
+  border-top: 1px solid var(--gt-color-border-info);
 }
 /* 应用自动运算按钮蓝色 */
 .gt-fm-dialog .gt-fm-apply-btn {
   background: linear-gradient(135deg, #2d5a87, #3a7cb8) !important;
-  border-color: #2d5a87 !important;
+  border-color: var(--gt-color-teal) !important;
   color: var(--gt-color-text-inverse) !important;
 }
 .gt-fm-dialog .gt-fm-apply-btn:hover {

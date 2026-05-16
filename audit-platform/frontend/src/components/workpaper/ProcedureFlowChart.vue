@@ -148,7 +148,7 @@ watch(() => props.procedures, renderChart, { deep: true })
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 6px;
   background: var(--gt-color-wheat-light);
   font-size: var(--gt-font-size-xs);
@@ -156,7 +156,7 @@ watch(() => props.procedures, renderChart, { deep: true })
 }
 .gt-flowchart-container :deep(.gt-flow-done) {
   background: var(--gt-color-success-light);
-  border-color: #28a745;
+  border-color: var(--gt-color-success);
 }
 .gt-flowchart-container :deep(.gt-flow-arrow) {
   color: var(--gt-color-text-tertiary);

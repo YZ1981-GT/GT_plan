@@ -399,7 +399,7 @@ onMounted(refresh)
   gap: 12px;
   padding: 12px 20px;
   background: var(--gt-color-bg);
-  border: 1px solid #eee;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 8px;
   margin-bottom: 12px;
 }

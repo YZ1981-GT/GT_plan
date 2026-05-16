@@ -339,7 +339,7 @@ defineExpose({ validate })
   background: var(--gt-color-bg-white);
   border-radius: 10px;
   padding: 20px 24px;
-  border: 1px solid #f0edf5;
+  border: 1px solid var(--gt-color-border-purple);
   box-shadow: 0 1px 4px rgba(0,0,0,0.03);
 }
 

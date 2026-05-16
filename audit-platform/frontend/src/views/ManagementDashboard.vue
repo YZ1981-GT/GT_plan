@@ -704,19 +704,19 @@ async function loadAvailableStaff() {
 .staff-info-text { flex: 1; }
 .staff-info-name { font-size: var(--gt-font-size-xl); font-weight: 700; color: var(--gt-color-text-primary); }
 .staff-info-meta { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-top: 2px; }
-.staff-info-stat { text-align: center; padding: 0 16px; border-left: 1px solid #e0d8ec; }
+.staff-info-stat { text-align: center; padding: 0 16px; border-left: 1px solid var(--gt-color-border-purple-light); }
 .staff-info-stat-value { font-size: 24px /* allow-px: special */; font-weight: 800; color: var(--gt-color-primary, #4b2d77); letter-spacing: -0.5px; }
 .staff-info-stat-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px; }
 
 .sub-card {
   background: var(--gt-color-bg); border-radius: 8px; padding: 14px;
-  border: 1px solid #f0f0f5; min-height: 240px;
+  border: 1px solid var(--gt-color-border-light); min-height: 240px;
 }
 .sub-card-title { margin: 0 0 10px; font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary); }
 
 .schedule-item {
   display: flex; align-items: center; gap: 10px;
-  padding: 10px 0; border-bottom: 1px solid #f0f0f5;
+  padding: 10px 0; border-bottom: 1px solid var(--gt-color-border-light);
 }
 .schedule-item:last-child { border-bottom: none; }
 .schedule-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }

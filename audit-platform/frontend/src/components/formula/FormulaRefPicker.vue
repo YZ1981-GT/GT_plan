@@ -220,7 +220,7 @@ function onConfirm() {
 .gt-ref-filter { display: flex; gap: 8px; margin-bottom: 8px; }
 .gt-ref-preview {
   margin-top: 16px; padding: 12px; background: var(--gt-color-primary-bg);
-  border-radius: 8px; border: 1px solid #e8e0f0;
+  border-radius: 8px; border: 1px solid var(--gt-color-border-purple);
 }
 .gt-ref-preview-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); margin-bottom: 4px; }
 .gt-ref-preview-formula { display: flex; align-items: center; }

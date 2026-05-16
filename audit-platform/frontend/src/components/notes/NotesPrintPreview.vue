@@ -153,7 +153,7 @@ function insertPageBreak() {
   justify-content: space-between;
   padding: 8px 16px;
   background: var(--gt-color-bg-white);
-  border-bottom: 1px solid #dcdfe6;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
@@ -237,7 +237,7 @@ function insertPageBreak() {
 
 :deep(.npp-table-wrapper th),
 :deep(.npp-table-wrapper td) {
-  border: 1px solid #333;
+  border: 1px solid var(--gt-color-text-primary);
   padding: 4px 6px;
 }
 

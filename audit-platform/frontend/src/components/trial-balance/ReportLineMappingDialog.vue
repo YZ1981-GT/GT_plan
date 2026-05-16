@@ -526,7 +526,7 @@ function reportTypeTag(t: string) {
 
 /* 未映射行高亮（红色左边框 + 浅红背景） */
 :deep(.rlm-row-unmatched) { background: var(--gt-bg-danger) !important; }
-:deep(.rlm-row-unmatched td:first-child) { border-left: 3px solid #f56c6c !important; }
+:deep(.rlm-row-unmatched td:first-child) { border-left: 3px solid var(--gt-color-coral) !important; }
 .rlm-unmatched-name { color: var(--gt-color-coral); font-weight: 600; }
 .rlm-unmatched-label { color: var(--gt-color-coral); font-size: var(--gt-font-size-xs); font-style: italic; }
 

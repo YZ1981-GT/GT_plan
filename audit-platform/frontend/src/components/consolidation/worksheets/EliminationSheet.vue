@@ -367,7 +367,7 @@ function entryRowClass({ row }: any) { return row._custom ? '' : 'ws-row-auto' }
 .ws-diff-warn { color: var(--gt-color-wheat) !important; font-weight: 700 !important; }
 .ws-balance-check {
   margin-top: 10px; padding: 8px 14px; background: var(--gt-color-bg); border-radius: 6px;
-  border: 1px solid #eee; font-size: var(--gt-font-size-sm); display: flex; align-items: center;
+  border: 1px solid var(--gt-color-border-light); font-size: var(--gt-font-size-sm); display: flex; align-items: center;
 }
 .ws-table :deep(.el-input__inner) { text-align: right; font-size: var(--gt-font-size-xs); }
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }

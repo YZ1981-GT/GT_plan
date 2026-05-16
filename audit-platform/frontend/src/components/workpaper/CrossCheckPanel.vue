@@ -244,7 +244,7 @@ function getRuleDescription(ruleId: string): string {
 }
 
 .result-item {
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
   margin-bottom: 8px;
   cursor: pointer;
@@ -252,11 +252,11 @@ function getRuleDescription(ruleId: string): string {
 }
 
 .result-item:hover {
-  border-color: #c0c4cc;
+  border-color: var(--gt-color-text-placeholder);
 }
 
 .result-item.expanded {
-  border-color: #409eff;
+  border-color: var(--gt-color-teal);
 }
 
 .result-row {
@@ -310,7 +310,7 @@ function getRuleDescription(ruleId: string): string {
 
 .result-detail {
   padding: 12px;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid var(--gt-color-border-lighter);
   background: var(--gt-color-bg);
 }
 
@@ -348,7 +348,7 @@ function getRuleDescription(ruleId: string): string {
   padding: 6px 8px;
   background: var(--gt-color-bg-white);
   border-radius: 4px;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
 }
 
 .detail-formula code {

@@ -59,6 +59,14 @@
   --gt-color-info: #909399;                  /* R10 Sprint 2：信息灰（中性提示） */
   /* 边框梯度（与既有 --gt-color-border/border-light 共存） */
   --gt-color-border-lighter: #ebeef5;        /* 最浅边框：表格行间 */
+  --gt-color-border-purple: #e8e4f0;         /* R10 G1：紫色系浅边框（el-table--border） */
+  --gt-color-border-purple-mid: #d9d2e8;     /* R10 G1：紫色系中边框 */
+  --gt-color-border-purple-light: #d8b8ee;   /* R10 G1：浅紫边框（template tag） */
+  --gt-color-border-success: #b8d8b8;        /* R10 G1：成功色派生边框 */
+  --gt-color-border-warning: #f5d4a8;        /* R10 G1：警告色派生边框 */
+  --gt-color-border-danger: #f5c6c6;         /* R10 G1：错误色派生边框 */
+  --gt-color-border-info: #b3d9f0;           /* R10 G1：信息色派生边框 */
+  --gt-color-bg-purple-hover: #faf8fd;       /* R10 G1：el-table 行 hover 浅紫底 */
 
   /* ══ R10 Spec B / Sprint 0 — 6 级背景 token（追加 design §3.3） ══ */
   --gt-bg-default: #ffffff;                  /* 默认底（卡片/弹层） */

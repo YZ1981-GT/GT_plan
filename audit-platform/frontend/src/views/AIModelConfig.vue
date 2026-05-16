@@ -244,8 +244,8 @@ onMounted(() => {
   border: 1px solid var(--gt-color-border-light);
   font-size: var(--gt-font-size-sm);
 }
-.health-card.ok { border-color: #67c23a; }
-.health-card.err { border-color: #f56c6c; }
+.health-card.ok { border-color: var(--gt-color-success); }
+.health-card.err { border-color: var(--gt-color-coral); }
 .health-dot {
   width: 8px;
   height: 8px;

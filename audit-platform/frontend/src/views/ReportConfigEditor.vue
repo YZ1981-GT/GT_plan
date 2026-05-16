@@ -283,7 +283,7 @@ onMounted(loadConfig)
   align-items: center;
   padding: 10px 0;
   margin-bottom: 8px;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
 }
 .rce-toolbar-left {
   display: flex;
@@ -299,7 +299,7 @@ onMounted(loadConfig)
 /* 编辑模式提示条 */
 .rce-edit-ribbon {
   background: var(--gt-bg-warning);
-  border: 1px solid #faecd8;
+  border: 1px solid var(--gt-color-border-warning);
   border-radius: 6px;
   padding: 8px 16px;
   margin-bottom: 12px;
@@ -338,6 +338,6 @@ onMounted(loadConfig)
   font-weight: 600;
 }
 :deep(.gt-section-row td) {
-  border-bottom: 1px solid #e8e0f5 !important;
+  border-bottom: 1px solid var(--gt-color-border-purple-light) !important;
 }
 </style>

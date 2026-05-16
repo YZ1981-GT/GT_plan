@@ -75,10 +75,10 @@ onMounted(async () => {
 .gt-cons-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
 .gt-check-card {
   background: white; border-radius: var(--gt-radius-md); padding: 20px; text-align: center;
-  box-shadow: var(--gt-shadow-sm); border-top: 3px solid #ddd; min-height: 140px;
+  box-shadow: var(--gt-shadow-sm); border-top: 3px solid var(--gt-color-border-light); min-height: 140px;
 }
-.gt-check-pass { border-top-color: #28a745; }
-.gt-check-fail { border-top-color: #FF5149; }
+.gt-check-pass { border-top-color: var(--gt-color-success); }
+.gt-check-fail { border-top-color: var(--gt-color-coral); }
 .gt-check-icon { font-size: var(--gt-font-size-3xl); margin-bottom: 8px; }
 .gt-check-name { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary); margin-bottom: 4px; }
 .gt-check-detail { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }

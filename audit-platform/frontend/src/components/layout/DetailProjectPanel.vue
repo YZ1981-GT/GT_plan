@@ -512,12 +512,12 @@ function formatSize(bytes: number) {
   border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-primary-light); flex-wrap: wrap;
 }
 .gt-workflow-hint-label { font-weight: 600; color: var(--gt-color-primary-dark); margin-right: 2px; }
-.gt-workflow-step { background: var(--gt-color-bg-white); padding: 1px 6px; border-radius: 4px; border: 1px solid #e8e4f0; white-space: nowrap; }
+.gt-workflow-step { background: var(--gt-color-bg-white); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--gt-color-border-purple); white-space: nowrap; }
 .gt-workflow-arrow { color: var(--gt-color-primary-lighter); font-size: var(--gt-font-size-xs); }
 .gt-quick-tip {
   font-size: var(--gt-font-size-xs); color: var(--gt-color-info); line-height: 1.5;
   padding: 6px 10px; margin-bottom: 10px;
-  background: var(--gt-color-bg); border-radius: 6px; border-left: 3px solid #4b2d77;
+  background: var(--gt-color-bg); border-radius: 6px; border-left: 3px solid var(--gt-color-primary);
 }
 .gt-quick-btn {
   display: flex; flex-direction: column; align-items: center; gap: 4px;

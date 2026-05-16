@@ -223,6 +223,6 @@ onMounted(() => {
 .gt-stat-pending .gt-stat-value { color: var(--gt-color-wheat); }
 .gt-stat-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); margin-top: 2px; }
 .gt-filter-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
-.gt-batch-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 10px 16px; background: var(--gt-color-success-light); border: 1px solid #e1f3d8; border-radius: var(--gt-radius-md); }
+.gt-batch-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 10px 16px; background: var(--gt-color-success-light); border: 1px solid var(--gt-color-border-success); border-radius: var(--gt-radius-md); }
 .gt-batch-info { font-size: var(--gt-font-size-sm); color: var(--gt-color-text); font-weight: 500; }
 </style>

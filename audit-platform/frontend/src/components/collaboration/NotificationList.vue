@@ -47,7 +47,7 @@ async function markAllRead() {
 .notif-items {}
 .notif-item {
   padding: 12px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--gt-color-border-light);
   cursor: pointer;
   transition: background 0.2s;
 }

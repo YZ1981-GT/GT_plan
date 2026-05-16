@@ -127,12 +127,12 @@ onMounted(loadData)
 <style scoped>
 .conflict-workbench { padding: 16px; }
 .conflict-layout { display: flex; gap: 16px; }
-.conflict-left { width: 240px; border: 1px solid #eee; border-radius: 8px; padding: 12px; max-height: 600px; overflow-y: auto; }
-.conflict-item { padding: 8px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.conflict-left { width: 240px; border: 1px solid var(--gt-color-border-light); border-radius: 8px; padding: 12px; max-height: 600px; overflow-y: auto; }
+.conflict-item { padding: 8px; border-bottom: 1px solid var(--gt-color-border-light); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
 .conflict-item.active { background: var(--gt-color-primary-bg); }
 .conflict-item.open .field-name { color: var(--el-color-danger); }
 .conflict-item.resolved .field-name { color: var(--el-color-success); }
-.conflict-center { flex: 1; border: 1px solid #eee; border-radius: 8px; padding: 16px; }
+.conflict-center { flex: 1; border: 1px solid var(--gt-color-border-light); border-radius: 8px; padding: 16px; }
 .diff-compare { display: flex; gap: 12px; align-items: flex-start; }
 .diff-side { flex: 1; }
 .diff-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-bottom: 4px; }
@@ -140,6 +140,6 @@ onMounted(loadData)
 .diff-side.remote .diff-label { color: var(--el-color-warning); }
 .diff-value { background: var(--gt-color-bg); padding: 8px; border-radius: 4px; font-size: var(--gt-font-size-xs); max-height: 200px; overflow-y: auto; white-space: pre-wrap; }
 .diff-arrow { font-size: 20px /* allow-px: special */; color: var(--gt-color-text-placeholder); padding-top: 20px; }
-.conflict-right { width: 280px; border: 1px solid #eee; border-radius: 8px; padding: 16px; }
+.conflict-right { width: 280px; border: 1px solid var(--gt-color-border-light); border-radius: 8px; padding: 16px; }
 .resolution-group { display: flex; flex-direction: column; gap: 8px; }
 </style>

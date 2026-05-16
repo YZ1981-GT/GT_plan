@@ -118,10 +118,10 @@ onMounted(loadGraph)
 .title { font-weight: 600; font-size: var(--gt-font-size-sm); }
 .graph-container { display: flex; gap: 16px; }
 .nodes-panel { flex: 1; }
-.graph-node { padding: 8px 12px; border: 1px solid #e4e7ed; border-radius: 4px; margin-bottom: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
-.graph-node:hover { border-color: #4b2d77; }
-.graph-node.stale { background: var(--gt-bg-warning); border-color: #e6a23c; }
-.graph-node.selected { border-color: #4b2d77; background: var(--gt-color-primary-bg); }
+.graph-node { padding: 8px 12px; border: 1px solid var(--gt-color-border-lighter); border-radius: 4px; margin-bottom: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.graph-node:hover { border-color: var(--gt-color-primary); }
+.graph-node.stale { background: var(--gt-bg-warning); border-color: var(--gt-color-wheat); }
+.graph-node.selected { border-color: var(--gt-color-primary); background: var(--gt-color-primary-bg); }
 .node-code { font-weight: 600; font-size: var(--gt-font-size-xs); }
 .node-name { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-regular); }
 .order-panel { width: 200px; padding: 8px; background: var(--gt-bg-subtle); border-radius: 4px; }

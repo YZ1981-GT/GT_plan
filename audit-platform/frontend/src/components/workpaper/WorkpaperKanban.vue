@@ -154,7 +154,7 @@ defineExpose({ refresh: loadKanban })
 
 .column-header {
   padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;
-  border-top: 4px solid #909399; border-radius: 12px 12px 0 0;
+  border-top: 4px solid var(--gt-color-info); border-radius: 12px 12px 0 0;
   background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
 }
 .column-title { font-size: var(--gt-font-size-sm); font-weight: 700; color: var(--gt-color-text); letter-spacing: 0.5px; }
@@ -164,7 +164,7 @@ defineExpose({ refresh: loadKanban })
 /* 卡片 — 动感交互 */
 .kanban-card {
   background: var(--gt-color-bg-white); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;
-  border: 1px solid #f0ebf8; cursor: pointer;
+  border: 1px solid var(--gt-color-border-purple); cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative; overflow: hidden;
 }
@@ -175,7 +175,7 @@ defineExpose({ refresh: loadKanban })
 }
 .kanban-card:hover {
   box-shadow: 0 4px 12px rgba(75, 45, 119, 0.12);
-  border-color: #d0c4e8; transform: translateX(3px);
+  border-color: var(--gt-color-border-purple-light); transform: translateX(3px);
 }
 .kanban-card:hover::before { opacity: 1; }
 

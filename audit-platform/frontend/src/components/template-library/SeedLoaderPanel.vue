@@ -510,7 +510,7 @@ defineExpose({ refreshStatus })
   gap: 12px;
   padding: 8px 12px;
   background: var(--gt-color-bg-white);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
   margin-bottom: 12px;
 }
@@ -525,7 +525,7 @@ defineExpose({ refreshStatus })
 /* 进度条 */
 .gt-slp-progress {
   background: var(--gt-color-bg-white);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
   padding: 12px 16px;
   margin-bottom: 12px;
@@ -562,7 +562,7 @@ defineExpose({ refreshStatus })
 .gt-slp-results {
   margin-top: 12px;
   background: var(--gt-color-bg-white);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
 }
 .gt-slp-results :deep(.el-collapse-item__header) {

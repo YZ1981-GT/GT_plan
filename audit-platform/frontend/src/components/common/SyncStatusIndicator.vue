@@ -254,12 +254,12 @@ eventBus.on('sse:sync-failed', onSyncFailed)
 }
 
 .gt-sync-item {
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 8px;
   padding: 12px;
 }
 .gt-sync-item--failed {
-  border-color: #fbc4c4;
+  border-color: var(--gt-color-border-danger);
   background: var(--gt-bg-danger);
 }
 

@@ -36,7 +36,7 @@ defineEmits<{ (e: 'select', node: any): void }>()
   transition: all 0.2s ease; border: 2px solid transparent;
 }
 .org-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(75,45,119,0.15); }
-.org-card--selected { border-color: #4b2d77; box-shadow: 0 0 0 3px rgba(75,45,119,0.2); }
+.org-card--selected { border-color: var(--gt-color-primary); box-shadow: 0 0 0 3px rgba(75,45,119,0.2); }
 .org-card--root { min-width: 160px; }
 .org-card-header { padding: 6px 10px; text-align: center; }
 .org-card-name { font-size: var(--gt-font-size-xs); font-weight: 600; line-height: 1.3; }

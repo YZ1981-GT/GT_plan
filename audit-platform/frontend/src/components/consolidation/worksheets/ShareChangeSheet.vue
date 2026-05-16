@@ -573,7 +573,7 @@ function simRowClass({ row }: any) {
 .ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: var(--gt-color-bg); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
 .ws-tip b { color: var(--gt-color-primary); }
 
-.sc-company-block { margin-bottom: 20px; border: 1px solid #e8e4f0; border-radius: 8px; overflow: hidden; }
+.sc-company-block { margin-bottom: 20px; border: 1px solid var(--gt-color-border-purple); border-radius: 8px; overflow: hidden; }
 .sc-company-header {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 14px; background: linear-gradient(135deg, #4b2d77 0%, #7c5caa 100%);

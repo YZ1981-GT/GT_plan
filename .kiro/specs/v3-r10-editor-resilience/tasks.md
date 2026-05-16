@@ -249,10 +249,17 @@
 
 | ID | 缺口 | 优先级 | 触发条件 | 后续 spec |
 |----|------|-------|---------|-----------|
-| TD-1 | F8 EQCR 版本对比未实施 | P2 | Sprint 2 工时不够 | Spec D 评估 |
+| TD-1 | F8 EQCR 版本对比 UI 未接入新端点（旧用 wizard_state.history JSON 键） | P2 | 实施时已修复 | 已落地 |
 | TD-2 | 全栈 APM 监控未引入 | P3 | 应用层 Banner 不足以发现深层问题 | Spec E 评估 Sentry/Prometheus |
 | TD-3 | worker 自愈机制未做 | P3 | 监控发现告警后仍需运维手动介入 | 运维范围，Spec F 评估 |
-| TD-4 | DegradedBanner 不支持用户手动 dismiss | P2 | 用户反馈横幅占屏 | 加 dismiss button + sessionStorage 记忆 |
+| TD-4 | DegradedBanner 不支持用户手动 dismiss | P2 | 用户反馈横幅占屏 | 已落地（sessionStorage dismiss 5min 记忆） |
+| TD-5 | 真实 Redis 心跳 + 真实网络故障三档切换需运维真人验证 | P1 | 上线前 1 天 | 真人 UAT 不算技术债，列此为提醒 |
+
+### R10 复盘修复项（已落地）
+
+| ID | 缺口 | 修复时间 | 修复方式 |
+|----|------|---------|---------|
+| G3 | F8 `/memo/versions` 端点存在但 EqcrMemoEditor.vue UI 未接入新端点 | 2026-05-16 | `loadMemo` 单独调 `P_eqcr.memoVersions(pid)` 端点（端点失败时降级为 preview.history） |
 
 ---
 

@@ -290,7 +290,7 @@ onMounted(async () => {
   padding: 8px 0 4px;
   margin: -20px -24px 12px;
   padding: 8px 24px 6px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--gt-color-border-light);
 }
 .gt-rb-progress-text {
   font-size: var(--gt-font-size-xs);

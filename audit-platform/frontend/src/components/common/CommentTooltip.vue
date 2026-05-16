@@ -43,11 +43,11 @@ const tooltipContent = computed(() => {
   max-width: 300px !important;
   font-size: var(--gt-font-size-xs) !important;
   line-height: 1.6 !important;
-  border: 1px solid #FFC23D !important;
+  border: 1px solid var(--gt-color-wheat) !important;
   background: var(--gt-color-wheat-light) !important;
 }
 .gt-comment-tooltip .el-tooltip__arrow::before {
-  border-color: #FFC23D !important;
+  border-color: var(--gt-color-wheat) !important;
   background: var(--gt-color-wheat-light) !important;
 }
 </style>

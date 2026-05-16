@@ -461,7 +461,7 @@ function formatCellValue(v: any): string {
   padding: 8px 12px;
   background: var(--gt-color-primary-bg);
   border-radius: 6px;
-  border-left: 3px solid #4b2d77;
+  border-left: 3px solid var(--gt-color-primary);
   flex-shrink: 0;
 }
 .gt-ntt-stats-item {
@@ -494,7 +494,7 @@ function formatCellValue(v: any): string {
   flex-direction: column;
   gap: 12px;
   background: var(--gt-color-bg-white);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 8px;
   padding: 12px;
 }
@@ -545,14 +545,14 @@ function formatCellValue(v: any): string {
   flex-direction: column;
   gap: 4px;
   padding-top: 4px;
-  border-top: 1px dashed #ebeef5;
+  border-top: 1px dashed var(--gt-color-border-lighter);
 }
 
 /* 右栏树 */
 .gt-ntt-right {
   flex: 1;
   background: var(--gt-color-bg-white);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 8px;
   padding: 8px 4px;
   overflow: auto;
@@ -633,7 +633,7 @@ function formatCellValue(v: any): string {
   font-size: var(--gt-font-size-sm);
   color: var(--gt-color-primary);
   font-weight: 600;
-  border-left: 3px solid #4b2d77;
+  border-left: 3px solid var(--gt-color-primary);
   padding-left: 8px;
 }
 
@@ -660,7 +660,7 @@ function formatCellValue(v: any): string {
   background: var(--gt-color-bg);
   padding: 10px 12px;
   border-radius: 4px;
-  border-left: 3px solid #4b2d77;
+  border-left: 3px solid var(--gt-color-primary);
   font-size: var(--gt-font-size-sm);
   line-height: 1.6;
   color: var(--gt-color-text-primary);

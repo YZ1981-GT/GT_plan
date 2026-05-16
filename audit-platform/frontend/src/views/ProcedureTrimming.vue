@@ -196,7 +196,7 @@ onMounted(async () => {
 .gt-proc-progress {
   margin-bottom: var(--gt-space-3); padding: 12px 16px;
   background: var(--gt-color-primary-bg); border-radius: var(--gt-radius-md, 8px);
-  border: 1px solid #e0d4f0;
+  border: 1px solid var(--gt-color-border-purple-light);
 }
 .gt-proc-progress-stats { display: flex; gap: 16px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
 .gt-proc-progress-stats b { font-size: var(--gt-font-size-base); }

@@ -957,8 +957,8 @@ function confirmTargetCell() {
 .gt-fe-sources {
   width: 280px;
   flex-shrink: 0;
-  border-left: 1px solid #e8e4f0;
-  border-right: 1px solid #e8e4f0;
+  border-left: 1px solid var(--gt-color-border-purple);
+  border-right: 1px solid var(--gt-color-border-purple);
   padding: 0 12px;
   overflow-y: auto;
 }
@@ -1039,7 +1039,7 @@ function confirmTargetCell() {
   margin-bottom: 10px;
 }
 .gt-fe-formula-item {
-  border: 1px solid #e8e4f0;
+  border: 1px solid var(--gt-color-border-purple);
   border-radius: 6px;
   padding: 6px 8px;
   margin-bottom: 6px;
@@ -1122,13 +1122,13 @@ function confirmTargetCell() {
   margin-top: 8px;
   margin-bottom: 4px;
   padding-bottom: 2px;
-  border-bottom: 1px solid #f0ecf5;
+  border-bottom: 1px solid var(--gt-color-border-purple);
 }
 .gt-fe-help-tip {
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-primary);
   background: var(--gt-color-primary-bg);
-  border: 1px solid #e8e0f5;
+  border: 1px solid var(--gt-color-border-purple-light);
   border-radius: 6px;
   padding: 6px 10px;
   margin-bottom: 8px;
@@ -1151,7 +1151,7 @@ function confirmTargetCell() {
 }
 .gt-fe-report-type-item {
   padding: 10px 16px;
-  border: 1px solid #e8e4f0;
+  border: 1px solid var(--gt-color-border-purple);
   border-radius: 8px;
   cursor: pointer;
   font-size: var(--gt-font-size-sm);

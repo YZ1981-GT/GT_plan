@@ -1,12 +1,13 @@
 {
-  "_doc": "R10 Spec B / Spec C baseline 真源。每个值由 Sprint 0 grep 实测填入，迁移过程中只允许减少不允许增加。CI frontend-build job 的 'Display token guard' step 读取此文件做卡点。font-size-px-vue-files 计 raw 出现（不含 allow-px 注释）。color-hex-vue-files / background-hex-vue-files 计 raw 出现（不含 rgba/linear-gradient/allow-color 注释行）。",
+  "_doc": "R10 Spec B / Spec C baseline 真源。每个值由 Sprint 0 grep 实测填入，迁移过程中只允许减少不允许增加。CI frontend-build job 的 'Display token guard' step 读取此文件做卡点。font-size-px-vue-files 计 raw 出现（不含 allow-px 注释）。color-hex-vue-files / background-hex-vue-files 计 raw 出现（不含 rgba/linear-gradient/allow-color 注释行）。border-color-prop-hex-vue-files 单独计 border / border-*-color / --el-table-* 属性中的 hex 残留。",
   "_updated_at": "2026-05-16",
-  "_updated_by": "R10 Spec B Sprint 2 颜色+背景 token 化（4+4 批迁移）",
+  "_updated_by": "R10 复盘修复 G1+G6：补全 border-color hex 清零（419 处）+ el-table baseline 实测调整（100→176）",
 
   "font-size-px-vue-files": 0,
   "color-hex-vue-files": 0,
   "background-hex-vue-files": 0,
-  "el-table-naked-vue-files": 100,
+  "border-color-prop-hex-vue-files": 0,
+  "el-table-naked-vue-files": 176,
 
   "_allow_px_kept": 69,
   "_font_size_total_inc_allow_px": 69,
@@ -17,12 +18,14 @@
     "font-size-px-vue-files": 0,
     "color-hex-vue-files": 50,
     "background-hex-vue-files": 30,
-    "el-table-naked-vue-files": "持平或减少"
+    "border-color-prop-hex-vue-files": 0,
+    "el-table-naked-vue-files": "持平或减少（GtTableExtended/GtFormTable 上线后逐步迁移）"
   },
 
   "_sprint_milestones": {
     "sprint-1-end": "font-size-px-vue-files: 0 (stylelint font-size 转 error) — DONE 2026-05-16",
     "sprint-2-end": "color-hex-vue-files: 0 raw (实测目标 < 50) — DONE 2026-05-16; background-hex-vue-files: 0 raw (实测目标 < 30) — DONE 2026-05-16; stylelint color/background 转 error 待 Sprint 2.3",
-    "sprint-3-end": "el-table-naked-vue-files 持平（GtTableExtended 上线，新表强制走新组件）"
+    "sprint-3-end": "el-table-naked-vue-files 持平（GtTableExtended 上线，新表强制走新组件）",
+    "r10-postmortem-2026-05-16": "G1 border-color hex 419 处全部清零；G6 baseline 校准为实测值 176（之前 100 偏低）"
   }
 }

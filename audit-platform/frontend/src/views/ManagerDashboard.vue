@@ -1051,7 +1051,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--gt-color-border-light);
 }
 .gt-action-item:last-child {
   border-bottom: none;
@@ -1181,7 +1181,7 @@ onBeforeUnmount(() => {
   gap: 16px;
   padding: 16px 24px;
   background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
-  border: 1px solid #fde68a;
+  border: 1px solid var(--gt-color-border-warning);
   border-radius: var(--gt-radius-md);
   cursor: pointer;
   transition: all var(--gt-transition-fast);

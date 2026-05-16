@@ -3179,7 +3179,7 @@ onBeforeUnmount(() => {
   position: fixed;
   z-index: 9999;
   background: var(--gt-color-bg-white);
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   padding: 4px 0;
@@ -3222,7 +3222,7 @@ onBeforeUnmount(() => {
 
 .gt-balance-tabs {
   display: flex; gap: 0; margin-bottom: var(--gt-space-2);
-  border-bottom: 2px solid #e8e8e8;
+  border-bottom: 2px solid var(--gt-color-border-light);
 }
 .gt-balance-tab {
   padding: 8px 20px; cursor: pointer; font-size: var(--gt-font-size-sm); font-weight: 500;
@@ -3275,7 +3275,7 @@ onBeforeUnmount(() => {
 
 .gt-empty-state {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  min-height: 300px; border: 1px dashed #e0e0e0; border-radius: var(--gt-radius-md);
+  min-height: 300px; border: 1px dashed var(--gt-color-border-light); border-radius: var(--gt-radius-md);
   background: var(--gt-color-bg);
 }
 
@@ -3288,7 +3288,7 @@ onBeforeUnmount(() => {
 :deep(.gt-ledger-subtotal) {
   background: var(--gt-bg-warning) !important;
   font-weight: 600;
-  border-top: 1px solid #e6a23c;
+  border-top: 1px solid var(--gt-color-wheat);
 }
 
 /* 任务 12.8.1：异常凭证视觉标记（需求 25） */
@@ -3349,7 +3349,7 @@ onBeforeUnmount(() => {
 .gt-dim-tab {
   display: inline-flex; align-items: center;
   padding: 4px 12px; font-size: var(--gt-font-size-sm); cursor: pointer;
-  border-radius: var(--gt-radius-sm); border: 1px solid #e8e8e8;
+  border-radius: var(--gt-radius-sm); border: 1px solid var(--gt-color-border-light);
   color: var(--gt-color-text-secondary); background: var(--gt-color-bg); transition: all 0.15s;
 }
 .gt-dim-tab:hover { border-color: var(--gt-color-primary-lighter); color: var(--gt-color-primary); }
@@ -3364,7 +3364,7 @@ onBeforeUnmount(() => {
 .gt-completion-guide {
   margin-top: 24px;
   padding-top: 20px;
-  border-top: 1px dashed #e0dde5;
+  border-top: 1px dashed var(--gt-color-border-purple-light);
 }
 .gt-completion-guide .guide-title {
   font-size: var(--gt-font-size-sm);
@@ -3379,7 +3379,7 @@ onBeforeUnmount(() => {
 }
 .gt-completion-guide .guide-card {
   padding: 14px 12px;
-  border: 1px solid #e0dde5;
+  border: 1px solid var(--gt-color-border-purple-light);
   border-radius: 6px;
   cursor: pointer;
   text-align: center;

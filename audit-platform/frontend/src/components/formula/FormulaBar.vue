@@ -310,7 +310,7 @@ function onSourceRowClick(row: any) {
   gap: 8px;
   padding: 6px 14px;
   background: linear-gradient(180deg, #faf8fd 0%, #f5f3f8 100%);
-  border-bottom: 1px solid #e8e4f0;
+  border-bottom: 1px solid var(--gt-color-border-purple);
   min-height: 36px;
   font-size: var(--gt-font-size-sm);
   box-shadow: 0 1px 2px rgba(75, 45, 119, 0.04);
@@ -322,7 +322,7 @@ function onSourceRowClick(row: any) {
   min-width: 80px;
   padding: 4px 10px;
   background: var(--gt-color-bg-white);
-  border: 1px solid #e0dae8;
+  border: 1px solid var(--gt-color-border-purple-light);
   border-radius: 6px;
   font-family: 'Cascadia Code', 'Fira Code', monospace;
   font-size: var(--gt-font-size-xs);
@@ -336,14 +336,14 @@ function onSourceRowClick(row: any) {
   align-items: center;
   gap: 6px;
   background: var(--gt-color-bg-white);
-  border: 1px solid #e0dae8;
+  border: 1px solid var(--gt-color-border-purple-light);
   border-radius: 6px;
   padding: 4px 10px;
   box-shadow: inset 0 1px 2px rgba(75, 45, 119, 0.04);
   transition: border-color 0.15s;
 }
 .formula-box:focus-within {
-  border-color: #4b2d77;
+  border-color: var(--gt-color-primary);
   box-shadow: 0 0 0 2px rgba(75, 45, 119, 0.08);
 }
 .fx-icon {

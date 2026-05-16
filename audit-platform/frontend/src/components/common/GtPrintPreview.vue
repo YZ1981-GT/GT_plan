@@ -124,7 +124,7 @@ function handlePrint() {
         .gt-print-title { text-align: center; font-size: var(--gt-font-size-xl); font-weight: bold; margin-bottom: 8px; }
         .gt-print-subtitle { text-align: center; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-bottom: 12px; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #333; padding: 4px 8px; font-size: var(--gt-font-size-xs); }
+        th, td { border: 1px solid var(--gt-color-text-primary); padding: 4px 8px; font-size: var(--gt-font-size-xs); }
         th { background: var(--gt-color-border-lighter); font-weight: bold; }
         .gt-print-footer { display: flex; justify-content: space-between; margin-top: 12px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
         ${!showGridLines.value ? 'th, td { border: none; }' : ''}
@@ -154,7 +154,7 @@ function handlePrint() {
 }
 
 .gt-print-area {
-  border: 1px solid #ddd;
+  border: 1px solid var(--gt-color-border-light);
   padding: 20px;
   background: white;
   min-height: 400px;
@@ -188,7 +188,7 @@ function handlePrint() {
 
 .gt-print-table th,
 .gt-print-table td {
-  border: 1px solid #333;
+  border: 1px solid var(--gt-color-text-primary);
   padding: 4px 8px;
 }
 
@@ -201,7 +201,7 @@ function handlePrint() {
 .no-grid .gt-print-table th,
 .no-grid .gt-print-table td {
   border: none;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--gt-color-border-light);
 }
 
 .gt-print-footer {

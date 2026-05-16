@@ -87,7 +87,7 @@ function onStepClick(idx: number) {
 
 .gt-consol-wizard :deep(.el-step__head.is-success) {
   color: var(--gt-color-primary);
-  border-color: #4b2d77;
+  border-color: var(--gt-color-primary);
 }
 
 .gt-consol-wizard :deep(.el-step__title.is-success) {
@@ -96,7 +96,7 @@ function onStepClick(idx: number) {
 
 .gt-consol-wizard :deep(.el-step__head.is-process) {
   color: var(--gt-color-primary);
-  border-color: #4b2d77;
+  border-color: var(--gt-color-primary);
 }
 
 .gt-consol-wizard :deep(.el-step__title.is-process) {

@@ -193,7 +193,7 @@
                 </ol>
               </template>
             </el-alert>
-            <div style="display: flex; gap: 8px; align-items: center; padding: 12px; background: var(--gt-color-primary-bg); border-radius: 8px; border: 1px solid #e8e4f0">
+            <div style="display: flex; gap: 8px; align-items: center; padding: 12px; background: var(--gt-color-primary-bg); border-radius: 8px; border: 1px solid var(--gt-color-border-purple)">
               <el-input
                 v-model="filePeriodsInput"
                 placeholder="文件包含的月份，逗号分隔如: 11,12"

@@ -150,7 +150,7 @@ function formatTime(time?: string): string {
 
 .gt-ct-item {
   padding: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--gt-color-border-light);
 }
 
 .gt-ct-item--resolved {
@@ -184,7 +184,7 @@ function formatTime(time?: string): string {
 .gt-ct-replies {
   margin-left: 16px;
   margin-top: 6px;
-  border-left: 2px solid #e8e0f0;
+  border-left: 2px solid var(--gt-color-border-purple);
   padding-left: 8px;
 }
 
@@ -230,6 +230,6 @@ function formatTime(time?: string): string {
 .gt-ct-new {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--gt-color-border-light);
 }
 </style>

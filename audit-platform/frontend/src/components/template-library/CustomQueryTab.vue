@@ -741,7 +741,7 @@ onMounted(() => {
   padding: 8px 12px;
   background: var(--gt-color-bg-white);
   border-radius: 6px;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
 }
 .gt-cqt-ctx-form { margin-bottom: 0; flex: 1; }
 .gt-cqt-ctx-form :deep(.el-form-item) { margin-bottom: 0; margin-right: 12px; }
@@ -764,7 +764,7 @@ onMounted(() => {
 
 .gt-cqt-panel {
   background: var(--gt-color-bg-white);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
   padding: 12px;
 }
@@ -812,7 +812,7 @@ onMounted(() => {
   justify-content: space-between;
   padding: 8px 12px;
   background: var(--gt-color-bg-white);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
 }
 .gt-cqt-result-title {
@@ -824,7 +824,7 @@ onMounted(() => {
 .gt-cqt-result-body {
   flex: 1;
   background: var(--gt-color-bg-white);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
   padding: 8px;
   min-height: 0;

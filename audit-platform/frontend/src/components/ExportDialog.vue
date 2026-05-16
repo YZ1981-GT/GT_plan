@@ -254,7 +254,7 @@ watch(() => props.projectId, () => runChecks(), { immediate: true })
 
 .gt-export-checks {
   margin-bottom: 16px;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
   padding: 12px;
 }
@@ -317,7 +317,7 @@ watch(() => props.projectId, () => runChecks(), { immediate: true })
   padding: 8px 12px;
   background: var(--gt-bg-danger);
   border-radius: 4px;
-  border: 1px solid #fde2e2;
+  border: 1px solid var(--gt-color-border-danger);
 }
 
 .gt-export-progress {

@@ -368,7 +368,7 @@ async function onFileSelected(e: Event) {
 .ws-section-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary); margin-bottom: 6px; padding: 6px 10px; background: var(--gt-color-primary-bg); border-radius: 4px; }
 .ws-computed { color: var(--gt-color-primary); font-weight: 500; }
 .ws-bold { font-weight: 700; }
-.ws-check-area { margin-top: 12px; padding: 10px 14px; background: var(--gt-color-bg); border-radius: 6px; border: 1px solid #eee; }
+.ws-check-area { margin-top: 12px; padding: 10px 14px; background: var(--gt-color-bg); border-radius: 6px; border: 1px solid var(--gt-color-border-light); }
 .ws-check-row { display: flex; gap: 12px; align-items: center; padding: 4px 0; font-size: var(--gt-font-size-sm); }
 .ws-diff-warn { color: var(--gt-color-wheat); font-weight: 600; }
 .ws-adj-section { margin-top: 16px; }

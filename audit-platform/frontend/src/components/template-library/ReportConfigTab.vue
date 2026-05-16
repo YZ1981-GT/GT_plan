@@ -508,7 +508,7 @@ function onEditFormula(row: ReportConfigRow) {
   padding: 8px 12px;
   background: var(--gt-color-primary-bg);
   border-radius: 6px;
-  border-left: 3px solid #4b2d77;
+  border-left: 3px solid var(--gt-color-primary);
   flex-shrink: 0;
 }
 .gt-rct-stats-item {
@@ -571,7 +571,7 @@ function onEditFormula(row: ReportConfigRow) {
 /* ─── 分组 ─── */
 .gt-rct-group {
   background: var(--gt-color-bg-white);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--gt-color-border-lighter);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -581,8 +581,8 @@ function onEditFormula(row: ReportConfigRow) {
   justify-content: space-between;
   padding: 10px 16px;
   background: var(--gt-color-primary-bg);
-  border-bottom: 1px solid #ebeef5;
-  border-left: 3px solid #4b2d77;
+  border-bottom: 1px solid var(--gt-color-border-lighter);
+  border-left: 3px solid var(--gt-color-primary);
 }
 .gt-rct-group-title {
   font-size: var(--gt-font-size-sm);
@@ -601,7 +601,7 @@ function onEditFormula(row: ReportConfigRow) {
 /* 合计行：加粗 + 上边框 */
 .gt-rct-table :deep(.el-table__row.gt-rct-row--total > td) {
   font-weight: 700 !important;
-  border-top: 2px solid #4b2d77 !important;
+  border-top: 2px solid var(--gt-color-primary) !important;
   background-color: var(--gt-color-primary-bg) !important;
 }
 /* 有公式行：浅蓝背景 */
@@ -614,7 +614,7 @@ function onEditFormula(row: ReportConfigRow) {
 /* 无效引用行：浅红 */
 .gt-rct-table :deep(.el-table__row.gt-rct-row--invalid > td) {
   background-color: var(--gt-bg-danger) !important;
-  border-left: 3px solid #f56c6c;
+  border-left: 3px solid var(--gt-color-coral);
 }
 
 /* row_code monospace */
@@ -648,7 +648,7 @@ function onEditFormula(row: ReportConfigRow) {
   display: inline-block;
   padding: 2px 6px;
   background: var(--gt-color-bg);
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--gt-color-border-light);
   border-radius: 3px;
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: var(--gt-font-size-xs);

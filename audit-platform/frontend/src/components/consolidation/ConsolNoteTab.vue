@@ -347,12 +347,12 @@
     </el-radio-group>
 
     <!-- 自定义汇总详细设置 -->
-    <div v-if="aggTarget.mode === 'custom'" style="border:1px solid #e8e4f0;border-radius:8px;padding:14px;background: var(--gt-color-primary-bg)">
+    <div v-if="aggTarget.mode === 'custom'" style="border:1px solid var(--gt-color-border-purple);border-radius:8px;padding:14px;background: var(--gt-color-primary-bg)">
       <div style="display:flex;gap:16px">
         <!-- 左侧：选择单位 -->
         <div style="flex:1;min-width:0">
           <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin:0 0 6px;font-weight:600">① 选择汇总单位</p>
-          <div style="border:1px solid #e8e4f0;border-radius:6px;padding:6px;max-height:200px;overflow-y:auto;background: var(--gt-color-bg-white)">
+          <div style="border:1px solid var(--gt-color-border-purple);border-radius:6px;padding:6px;max-height:200px;overflow-y:auto;background: var(--gt-color-bg-white)">
             <el-tree :data="aggTreeData" :props="{ label: 'label', children: 'children' }"
               show-checkbox node-key="key" ref="aggTreeRef"
               default-expand-all>
@@ -1506,7 +1506,7 @@ defineExpose({
 .gt-note-actions { display: flex; gap: 4px; flex-wrap: wrap; }
 .gt-note-table-wrap { flex: 1; min-height: 0; }
 .gt-note-table-footer {
-  display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid #e8e4f0; margin-top: 4px;
+  display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--gt-color-border-purple); margin-top: 4px;
 }
 
 /* 附注空状态引导 */
@@ -1523,7 +1523,7 @@ defineExpose({
 .gt-note-step {
   flex: 1; min-width: 0;
   display: flex; gap: 8px; align-items: flex-start;
-  padding: 12px; background: var(--gt-color-primary-bg); border-radius: 8px; border: 1px solid #ebe7f2;
+  padding: 12px; background: var(--gt-color-primary-bg); border-radius: 8px; border: 1px solid var(--gt-color-border-purple);
 }
 .gt-note-step-icon {
   font-size: var(--gt-font-size-md); font-weight: 700; color: var(--gt-color-primary); flex-shrink: 0; line-height: 1;
@@ -1564,7 +1564,7 @@ defineExpose({
   background: var(--gt-color-primary-bg); border-radius: 6px; overflow: hidden;
 }
 .gt-comment-info-item {
-  flex: 1; padding: 10px 14px; border-right: 1px solid #ebe7f2;
+  flex: 1; padding: 10px 14px; border-right: 1px solid var(--gt-color-border-purple);
   display: flex; flex-direction: column; gap: 2px;
 }
 .gt-comment-info-item:last-child { border-right: none; }
@@ -1572,11 +1572,11 @@ defineExpose({
 .gt-comment-info-value { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary); }
 .gt-comment-info-value--primary { color: var(--gt-color-primary); }
 :deep(.gt-comment-textarea .el-textarea__inner) {
-  border: none; border-bottom: 1.5px solid #e8e4f0; border-radius: 0;
+  border: none; border-bottom: 1.5px solid var(--gt-color-border-purple); border-radius: 0;
   font-size: var(--gt-font-size-sm); line-height: 1.6; padding: 10px 4px; resize: none;
 }
 :deep(.gt-comment-textarea .el-textarea__inner:focus) {
-  border-color: #4b2d77; box-shadow: none;
+  border-color: var(--gt-color-primary); box-shadow: none;
 }
 
 /* 紧凑行高 */

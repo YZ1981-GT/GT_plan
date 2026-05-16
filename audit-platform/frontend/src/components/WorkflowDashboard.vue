@@ -192,25 +192,25 @@ watch(() => chain.isAllDone.value, (done) => {
   justify-content: center;
   font-size: var(--gt-font-size-sm);
   font-weight: 600;
-  border: 2px solid #dcdfe6;
+  border: 2px solid var(--gt-color-border-lighter);
   background: var(--gt-color-bg-white);
   margin-bottom: 4px;
 }
 
 .gt-wf-step--completed .gt-wf-step__icon {
-  border-color: #67c23a;
+  border-color: var(--gt-color-success);
   background: var(--gt-bg-success);
   color: var(--gt-color-success);
 }
 
 .gt-wf-step--in_progress .gt-wf-step__icon {
-  border-color: #409eff;
+  border-color: var(--gt-color-teal);
   background: var(--gt-bg-info);
   color: var(--gt-color-teal);
 }
 
 .gt-wf-step--needs_refresh .gt-wf-step__icon {
-  border-color: #e6a23c;
+  border-color: var(--gt-color-wheat);
   background: var(--gt-bg-warning);
   color: var(--gt-color-wheat);
 }

@@ -125,7 +125,7 @@
         </div>
 
         <!-- 当前选中单元格信息 -->
-        <div v-if="currentCellInfo" class="help-section" style="border-top: 1px solid #e8e4f0; padding-top: 10px;">
+        <div v-if="currentCellInfo" class="help-section" style="border-top: 1px solid var(--gt-color-border-purple); padding-top: 10px;">
           <div class="help-subtitle">📍 当前选中</div>
           <div class="help-item">地址：<code>{{ currentCellInfo.address }}</code></div>
           <div class="help-item" v-if="currentCellInfo.formula">公式：<code style="color: var(--gt-color-primary);">{{ currentCellInfo.formula }}</code></div>
@@ -956,7 +956,7 @@ async function loadSelectorData() {
   flex-shrink: 0;
   padding: 0 8px;
   background: var(--gt-color-bg-white);
-  border-bottom: 1px solid #e8e4f0;
+  border-bottom: 1px solid var(--gt-color-border-purple);
 }
 .sheet-tabs :deep(.el-tabs__header) { margin: 0; }
 .sheet-tabs :deep(.el-tabs__item) { font-size: var(--gt-font-size-xs); height: 28px; line-height: 28px; padding: 0 12px; }
@@ -989,7 +989,7 @@ async function loadSelectorData() {
   flex-shrink: 0;
   display: flex; align-items: center; gap: 8px;
   padding: 8px 16px;
-  border-bottom: 1px solid #e8e4f0;
+  border-bottom: 1px solid var(--gt-color-border-purple);
   background: var(--gt-color-bg-white);
   flex-wrap: wrap;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
@@ -1007,7 +1007,7 @@ async function loadSelectorData() {
   border-collapse: collapse; width: 100%; font-size: var(--gt-font-size-xs);
 }
 .table-container :deep(td) {
-  border: 1px solid #e8e4f0; padding: 5px 8px; font-size: var(--gt-font-size-xs);
+  border: 1px solid var(--gt-color-border-purple); padding: 5px 8px; font-size: var(--gt-font-size-xs);
 }
 .table-container :deep(tr:hover td) { background: var(--gt-color-primary-bg); }
 .table-container :deep(.gt-row-header) {
@@ -1018,7 +1018,7 @@ async function loadSelectorData() {
 }
 .table-container :deep(tr.gt-data-header-row td) {
   background: var(--gt-color-primary-bg) !important; font-weight: 600; color: var(--gt-color-text-primary);
-  border-bottom: 2px solid #d0c8e0;
+  border-bottom: 2px solid var(--gt-color-border-purple-mid);
 }
 .table-container :deep(td.gt-row-header) {
   background: var(--gt-color-primary-bg) !important; color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); text-align: center;
@@ -1026,7 +1026,7 @@ async function loadSelectorData() {
 }
 .table-container :deep(td.gt-selected) { outline: 2px solid #4b2d77 !important; background: var(--gt-color-primary-bg) !important; }
 .table-container :deep(td.gt-dep-highlight) { outline: 1px dashed #e6a23c !important; background: var(--gt-bg-warning) !important; }
-.table-container :deep(td.gt-formula-error) { background: var(--gt-bg-danger) !important; border: 1px solid #f56c6c !important; cursor: help; }
+.table-container :deep(td.gt-formula-error) { background: var(--gt-bg-danger) !important; border: 1px solid var(--gt-color-coral) !important; cursor: help; }
 
 /* 可视化维度：显示公式 */
 .table-container.show-formulas :deep(td[data-formula])::after {
@@ -1039,11 +1039,11 @@ async function loadSelectorData() {
   content: "🔗"; position: absolute; top: 1px; left: 2px; font-size: var(--gt-font-size-xs);
 }
 /* 可视化维度：显示状态 */
-.table-container.show-status :deep(td[data-formula]) { border-left: 3px solid #e6a23c !important; }
-.table-container.show-status :deep(td[data-fetch-rule]) { border-left: 3px solid #0094b3 !important; }
+.table-container.show-status :deep(td[data-formula]) { border-left: 3px solid var(--gt-color-wheat) !important; }
+.table-container.show-status :deep(td[data-fetch-rule]) { border-left: 3px solid var(--gt-color-teal) !important; }
 
 /* 分页控件 */
-.pagination-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-top: 1px solid #e8e4f0; background: var(--gt-color-primary-bg); }
+.pagination-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-top: 1px solid var(--gt-color-border-purple); background: var(--gt-color-primary-bg); }
 .page-info { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); }
 
 /* 公式编辑面板 */
@@ -1058,14 +1058,14 @@ async function loadSelectorData() {
 /* 右侧操作说明 */
 .help-area {
   width: 260px; flex-shrink: 0;
-  border-left: 1px solid #e8e4f0;
+  border-left: 1px solid var(--gt-color-border-purple);
   background: var(--gt-color-primary-bg);
   overflow-y: auto;
   padding: 14px;
 }
 .help-title {
   font-size: var(--gt-font-size-sm); font-weight: 700; color: var(--gt-color-primary); margin-bottom: 14px;
-  padding-bottom: 8px; border-bottom: 2px solid #ece6f5;
+  padding-bottom: 8px; border-bottom: 2px solid var(--gt-color-border-purple);
 }
 .help-section { margin-bottom: 14px; }
 .help-subtitle {

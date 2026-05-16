@@ -187,14 +187,14 @@ onMounted(loadDashboard)
 .gt-ack-summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
 .gt-ack-card {
   background: var(--gt-color-bg-white); border-radius: 8px; padding: 16px 24px; text-align: center;
-  border: 1px solid #e8e4f0; min-width: 100px; flex: 1;
+  border: 1px solid var(--gt-color-border-purple); min-width: 100px; flex: 1;
 }
-.gt-ack-card--pass { border-left: 3px solid #67c23a; }
-.gt-ack-card--fail { border-left: 3px solid #e6a23c; }
-.gt-ack-card--pending { border-left: 3px solid #909399; }
+.gt-ack-card--pass { border-left: 3px solid var(--gt-color-success); }
+.gt-ack-card--fail { border-left: 3px solid var(--gt-color-wheat); }
+.gt-ack-card--pending { border-left: 3px solid var(--gt-color-info); }
 .gt-ack-card-value { display: block; font-size: var(--gt-font-size-3xl); font-weight: 800; color: var(--gt-color-primary); }
 .gt-ack-card-label { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 4px; }
-.gt-ack-cycle-group { margin-bottom: 12px; border: 1px solid #e8e4f0; border-radius: 8px; overflow: hidden; }
+.gt-ack-cycle-group { margin-bottom: 12px; border: 1px solid var(--gt-color-border-purple); border-radius: 8px; overflow: hidden; }
 .gt-ack-cycle-header {
   display: flex; align-items: center; gap: 12px; padding: 10px 16px;
   background: var(--gt-color-primary-bg); cursor: pointer; user-select: none;

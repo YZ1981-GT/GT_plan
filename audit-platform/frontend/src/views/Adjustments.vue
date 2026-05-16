@@ -1022,11 +1022,11 @@ watch(
   padding: 4px 8px;
   font-weight: 600;
   text-align: left;
-  border-bottom: 1px solid #e8e4f0;
+  border-bottom: 1px solid var(--gt-color-border-purple);
 }
 .gt-adj-line-table td {
   padding: 4px 8px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--gt-color-border-light);
 }
 .gt-adj-expand-footer {
   display: flex;
@@ -1052,7 +1052,7 @@ watch(
   gap: 12px;
   padding: 10px 24px;
   background: linear-gradient(135deg, #f8f6fb, #ece4f5);
-  border-top: 2px solid #4b2d77;
+  border-top: 2px solid var(--gt-color-primary);
   box-shadow: 0 -4px 12px rgba(75, 45, 119, 0.1);
   font-size: var(--gt-font-size-sm);
   font-weight: 600;

@@ -580,7 +580,7 @@ defineExpose({ validate })
   align-items: center;
   gap: 12px;
   padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--gt-color-border-light);
   font-size: var(--gt-font-size-sm);
 }
 
