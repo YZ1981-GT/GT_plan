@@ -16,10 +16,10 @@
 | **(直接修)** P0-7 misstatements recheck-threshold | 档 1 | F12 | ✅ 已完成 2026-05-16 | 0.3h |
 | **(直接修)** P0-9 v3 §3 速查表 | 档 1 | F11 | ✅ 已完成 2026-05-16 | 0.2h |
 | **(直接修)** P0-10 端点核验 | 档 1 | F13/F14/F15 | ✅ 已完成 2026-05-16 | 0.5h |
-| `v3-quickfixes/` Q1 F6 | 档 2 | P0-1 | ✅ 已完成 2026-05-16（SAVEPOINT 修复 check_consol_lock） | 0.5h |
-| `v3-quickfixes/` Q2 F9 | 档 2 | P0-3 | ✅ 已澄清 2026-05-16（EQCR 端点路径假设错） | 0.3h |
-| `v3-quickfixes/` Q3 F10 | 档 2 | P0-4 | ✅ 已澄清+修 2026-05-16（apiPaths 改一处） | 0.3h |
-| `v3-quickfixes/` Q4 F2 | 档 2 | P0-5 | ✅ 已完成 2026-05-16（init 加 chain + WP List 引导卡片） | 0.5h |
+| `v3-quickfixes/` Q1 F6 | 档 2 | P0-1 | ✅ 已完成 2026-05-16（SAVEPOINT 修复 check_consol_lock，commit b4cda44） | 0.4h |
+| `v3-quickfixes/` Q2 F9 | 档 2 | P0-3 | ✅ 已澄清 2026-05-16（EQCR 端点路径假设错，前端 apiPaths 已正确） | 0.3h |
+| `v3-quickfixes/` Q3 F10 | 档 2 | P0-4 | ✅ 已澄清+修 2026-05-16（review-conversations 路径改一处，commit b4cda44） | 0.3h |
+| `v3-quickfixes/` Q4 F2 | 档 2 | P0-5 | ✅ 已完成 2026-05-16（init_4_projects step 5 + WP List 引导卡片，commit b4cda44） | 0.5h |
 | `v3-linkage-stale-propagation/` | 档 3 | P0-12/P0-13 | ✅ 已完成 2026-05-16（Sprint 0-4 全跑通，2.5h） | 2.5h |
 | `v3-r10-linkage-and-tokens/` | 档 3 (R10) | v3 §7/§8 完整 | 🟢 README 占位，待 P0 完成后起草 | 22 天 |
 | `v3-r10-editor-resilience/` | 档 3 (R10) | v3 §10 完整 | 🟢 README 占位，待 P0 完成后起草 | 11 天 |
