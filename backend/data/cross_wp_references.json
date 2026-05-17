@@ -1623,6 +1623,341 @@
       ],
       "category": "cross_module",
       "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-89",
+      "description": "D0 函证回函→D2 应收账款确认",
+      "source_wp": "D0",
+      "source_sheet": "函证汇总表D0-2",
+      "source_cell": "回函确认金额",
+      "targets": [
+        {
+          "wp_code": "D2",
+          "sheet": "审定表D2-1",
+          "cell": "函证确认金额",
+          "formula": "=WP('D0','函证汇总表D0-2','回函确认金额')"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-90",
+      "description": "D2 坏账准备→A13 错报汇总",
+      "source_wp": "D2",
+      "source_sheet": "坏账准备计算表D2-8",
+      "source_cell": "坏账差异金额",
+      "targets": [
+        {
+          "wp_code": "A13",
+          "sheet": "错报汇总表",
+          "cell": "应收账款坏账差异",
+          "formula": "=WP('D2','坏账准备计算表D2-8','坏账差异金额')"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-91",
+      "description": "D4 收入截止测试→A11 期后事项",
+      "source_wp": "D4",
+      "source_sheet": "截止测试工作表",
+      "source_cell": "跨期收入金额",
+      "targets": [
+        {
+          "wp_code": "A11",
+          "sheet": "期后事项检查表",
+          "cell": "收入截止跨期",
+          "formula": "=WP('D4','截止测试工作表','跨期收入金额')"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-92",
+      "description": "E1 银行对账单→E1 银行余额调节表",
+      "source_wp": "E1",
+      "source_sheet": "银行对账单",
+      "source_cell": "银行余额",
+      "targets": [
+        {
+          "wp_code": "E1",
+          "sheet": "银行余额调节表E1-3",
+          "cell": "银行对账单余额",
+          "formula": "=WP('E1','银行对账单','银行余额')"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-93",
+      "description": "F2 存货监盘→F2 存货审定表",
+      "source_wp": "F2",
+      "source_sheet": "监盘记录表",
+      "source_cell": "监盘数量",
+      "targets": [
+        {
+          "wp_code": "F2",
+          "sheet": "审定表F2-1",
+          "cell": "监盘确认数量",
+          "formula": "=WP('F2','监盘记录表','监盘数量')"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-94",
+      "description": "F2 存货跌价→A13 错报汇总",
+      "source_wp": "F2",
+      "source_sheet": "审定表F2-1",
+      "source_cell": "跌价准备差异",
+      "targets": [
+        {
+          "wp_code": "A13",
+          "sheet": "错报汇总表",
+          "cell": "存货跌价差异",
+          "formula": "=WP('F2','审定表F2-1','跌价准备差异')"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-95",
+      "description": "G1 投资收益→IS 利润表投资收益行",
+      "source_wp": "G1",
+      "source_sheet": "审定表G1-1",
+      "source_cell": "投资收益",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "利润表",
+          "cell": "投资收益行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 IS-009 投资收益",
+          "target_route": "/projects/{pid}/reports?type=income_statement&row=IS-009",
+          "report_row_code": "IS-009"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-96",
+      "description": "H1 折旧政策→B60 总体审计策略",
+      "source_wp": "H1",
+      "source_sheet": "审定表H1-1",
+      "source_cell": "折旧政策说明",
+      "targets": [
+        {
+          "wp_code": "B60",
+          "sheet": "总体审计策略",
+          "cell": "固定资产折旧政策",
+          "formula": null
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-97",
+      "description": "I1 摊销政策→B60 总体审计策略",
+      "source_wp": "I1",
+      "source_sheet": "审定表I1-1",
+      "source_cell": "摊销政策说明",
+      "targets": [
+        {
+          "wp_code": "B60",
+          "sheet": "总体审计策略",
+          "cell": "无形资产摊销政策",
+          "formula": null
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-98",
+      "description": "J1 社保公积金→N1 应交税费",
+      "source_wp": "J1",
+      "source_sheet": "审定表J1-1",
+      "source_cell": "社保公积金计提",
+      "targets": [
+        {
+          "wp_code": "N1",
+          "sheet": "审定表N1-1",
+          "cell": "社保公积金应缴",
+          "formula": "=WP('J1','审定表J1-1','社保公积金计提')"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-99",
+      "description": "K8 管理费用明细→各科目底稿",
+      "source_wp": "K8",
+      "source_sheet": "审定表K8-1",
+      "source_cell": "费用分配合计",
+      "targets": [
+        {
+          "wp_code": "H1",
+          "sheet": "折旧分配分析表H1-13",
+          "cell": "管理费用折旧",
+          "formula": "=WP('K8','审定表K8-1','折旧费')"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-100",
+      "description": "K9 销售费用明细→D4 营业收入配比",
+      "source_wp": "K9",
+      "source_sheet": "审定表K9-1",
+      "source_cell": "销售费用合计",
+      "targets": [
+        {
+          "wp_code": "D4",
+          "sheet": "分析程序D4-3",
+          "cell": "销售费用率",
+          "formula": "=WP('K9','审定表K9-1','销售费用合计') / WP('D4','营业收入审定表D4-1','审定数')"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-101",
+      "description": "L1 借款利率→L8 财务费用利息",
+      "source_wp": "L1",
+      "source_sheet": "审定表L1-1",
+      "source_cell": "加权平均利率",
+      "targets": [
+        {
+          "wp_code": "L8",
+          "sheet": "审定表",
+          "cell": "利息重算依据",
+          "formula": "=WP('L1','审定表L1-1','加权平均利率')"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-102",
+      "description": "M1 股东变更→B19 关联方",
+      "source_wp": "M1",
+      "source_sheet": "审定表M1-1",
+      "source_cell": "股东变更记录",
+      "targets": [
+        {
+          "wp_code": "B19",
+          "sheet": "关联方识别表",
+          "cell": "股东变更信息",
+          "formula": null
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-103",
+      "description": "N1 所得税计算→IS 利润表所得税行",
+      "source_wp": "N1",
+      "source_sheet": "审定表N1-1",
+      "source_cell": "当期所得税费用",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "利润表",
+          "cell": "所得税费用行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 IS-013 所得税费用",
+          "target_route": "/projects/{pid}/reports?type=income_statement&row=IS-013",
+          "report_row_code": "IS-013"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-104",
+      "description": "N3 递延所得税→BS 资产负债表递延税项",
+      "source_wp": "N3",
+      "source_sheet": "审定表N3-1",
+      "source_cell": "递延所得税资产",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "递延所得税资产行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-015 递延所得税资产",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-015",
+          "report_row_code": "BS-015"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-105",
+      "description": "D0 函证发函数→D2 应收账款确认覆盖率",
+      "source_wp": "D0",
+      "source_sheet": "函证汇总表D0-2",
+      "source_cell": "发函覆盖率",
+      "targets": [
+        {
+          "wp_code": "D2",
+          "sheet": "审定表D2-1",
+          "cell": "函证覆盖率",
+          "formula": "=WP('D0','函证汇总表D0-2','发函覆盖率')"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-106",
+      "description": "D0 函证回函率→A17 重大事项概要",
+      "source_wp": "D0",
+      "source_sheet": "函证汇总表D0-2",
+      "source_cell": "回函率",
+      "targets": [
+        {
+          "wp_code": "A17",
+          "sheet": "重大事项概要",
+          "cell": "函证回函率",
+          "formula": "=WP('D0','函证汇总表D0-2','回函率')"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-107",
+      "description": "D0 函证差异→A13 错报汇总",
+      "source_wp": "D0",
+      "source_sheet": "函证汇总表D0-2",
+      "source_cell": "函证差异金额",
+      "targets": [
+        {
+          "wp_code": "A13",
+          "sheet": "错报汇总表",
+          "cell": "函证差异",
+          "formula": "=WP('D0','函证汇总表D0-2','函证差异金额')"
+        }
+      ],
+      "category": "internal",
+      "severity": "warning"
     }
   ],
   "stats": {

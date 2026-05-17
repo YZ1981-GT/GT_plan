@@ -12,10 +12,22 @@
       "severity": "blocking",
       "scope": "all_lines",
       "cells": {
-        "audited": {"sheet": "审定表E1-1", "column": "审定数"},
-        "unaudited": {"sheet": "审定表E1-1", "column": "未审数"},
-        "aje": {"sheet": "审定表E1-1", "column": "AJE调整"},
-        "rje": {"sheet": "审定表E1-1", "column": "RJE调整"}
+        "audited": {
+          "sheet": "审定表E1-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表E1-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表E1-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表E1-1",
+          "column": "RJE调整"
+        }
       },
       "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
     },
@@ -29,8 +41,14 @@
       "severity": "warning",
       "scope": "total_line",
       "cells": {
-        "audited": {"sheet": "审定表E1-1", "column": "审定数"},
-        "tb_amount": {"sheet": "TB", "column": "审定数"}
+        "audited": {
+          "sheet": "审定表E1-1",
+          "column": "审定数"
+        },
+        "tb_amount": {
+          "sheet": "TB",
+          "column": "审定数"
+        }
       },
       "message_template": "审定数({audited})与试算平衡表({tb_amount})不一致, 差异={diff}"
     },
@@ -44,10 +62,22 @@
       "severity": "blocking",
       "scope": "all_lines",
       "cells": {
-        "audited": {"sheet": "审定表F2-1", "column": "审定数"},
-        "unaudited": {"sheet": "审定表F2-1", "column": "未审数"},
-        "aje": {"sheet": "审定表F2-1", "column": "AJE调整"},
-        "rje": {"sheet": "审定表F2-1", "column": "RJE调整"}
+        "audited": {
+          "sheet": "审定表F2-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表F2-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表F2-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表F2-1",
+          "column": "RJE调整"
+        }
       },
       "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
     },
@@ -61,8 +91,14 @@
       "severity": "warning",
       "scope": "total_line",
       "cells": {
-        "audited": {"sheet": "审定表F2-1", "column": "审定数"},
-        "tb_amount": {"sheet": "TB", "column": "审定数"}
+        "audited": {
+          "sheet": "审定表F2-1",
+          "column": "审定数"
+        },
+        "tb_amount": {
+          "sheet": "TB",
+          "column": "审定数"
+        }
       },
       "message_template": "审定数({audited})与试算平衡表({tb_amount})不一致, 差异={diff}"
     },
@@ -76,10 +112,22 @@
       "severity": "blocking",
       "scope": "all_lines",
       "cells": {
-        "audited": {"sheet": "审定表G1-1", "column": "审定数"},
-        "unaudited": {"sheet": "审定表G1-1", "column": "未审数"},
-        "aje": {"sheet": "审定表G1-1", "column": "AJE调整"},
-        "rje": {"sheet": "审定表G1-1", "column": "RJE调整"}
+        "audited": {
+          "sheet": "审定表G1-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表G1-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表G1-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表G1-1",
+          "column": "RJE调整"
+        }
       },
       "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
     },
@@ -93,8 +141,14 @@
       "severity": "warning",
       "scope": "total_line",
       "cells": {
-        "audited": {"sheet": "审定表G1-1", "column": "审定数"},
-        "tb_amount": {"sheet": "TB", "column": "审定数"}
+        "audited": {
+          "sheet": "审定表G1-1",
+          "column": "审定数"
+        },
+        "tb_amount": {
+          "sheet": "TB",
+          "column": "审定数"
+        }
       },
       "message_template": "审定数({audited})与试算平衡表({tb_amount})不一致, 差异={diff}"
     },
@@ -108,10 +162,22 @@
       "severity": "blocking",
       "scope": "all_lines",
       "cells": {
-        "audited": {"sheet": "审定表H1-1", "column": "审定数"},
-        "unaudited": {"sheet": "审定表H1-1", "column": "未审数"},
-        "aje": {"sheet": "审定表H1-1", "column": "AJE调整"},
-        "rje": {"sheet": "审定表H1-1", "column": "RJE调整"}
+        "audited": {
+          "sheet": "审定表H1-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表H1-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表H1-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表H1-1",
+          "column": "RJE调整"
+        }
       },
       "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
     },
@@ -125,8 +191,14 @@
       "severity": "warning",
       "scope": "total_line",
       "cells": {
-        "audited": {"sheet": "审定表H1-1", "column": "审定数"},
-        "tb_amount": {"sheet": "TB", "column": "审定数"}
+        "audited": {
+          "sheet": "审定表H1-1",
+          "column": "审定数"
+        },
+        "tb_amount": {
+          "sheet": "TB",
+          "column": "审定数"
+        }
       },
       "message_template": "审定数({audited})与试算平衡表({tb_amount})不一致, 差异={diff}"
     },
@@ -140,10 +212,22 @@
       "severity": "blocking",
       "scope": "all_lines",
       "cells": {
-        "audited": {"sheet": "审定表I1-1", "column": "审定数"},
-        "unaudited": {"sheet": "审定表I1-1", "column": "未审数"},
-        "aje": {"sheet": "审定表I1-1", "column": "AJE调整"},
-        "rje": {"sheet": "审定表I1-1", "column": "RJE调整"}
+        "audited": {
+          "sheet": "审定表I1-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表I1-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表I1-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表I1-1",
+          "column": "RJE调整"
+        }
       },
       "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
     },
@@ -157,8 +241,14 @@
       "severity": "warning",
       "scope": "total_line",
       "cells": {
-        "audited": {"sheet": "审定表I1-1", "column": "审定数"},
-        "tb_amount": {"sheet": "TB", "column": "审定数"}
+        "audited": {
+          "sheet": "审定表I1-1",
+          "column": "审定数"
+        },
+        "tb_amount": {
+          "sheet": "TB",
+          "column": "审定数"
+        }
       },
       "message_template": "审定数({audited})与试算平衡表({tb_amount})不一致, 差异={diff}"
     },
@@ -172,10 +262,22 @@
       "severity": "blocking",
       "scope": "all_lines",
       "cells": {
-        "audited": {"sheet": "审定表J1-1", "column": "审定数"},
-        "unaudited": {"sheet": "审定表J1-1", "column": "未审数"},
-        "aje": {"sheet": "审定表J1-1", "column": "AJE调整"},
-        "rje": {"sheet": "审定表J1-1", "column": "RJE调整"}
+        "audited": {
+          "sheet": "审定表J1-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表J1-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表J1-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表J1-1",
+          "column": "RJE调整"
+        }
       },
       "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
     },
@@ -189,8 +291,14 @@
       "severity": "warning",
       "scope": "total_line",
       "cells": {
-        "audited": {"sheet": "审定表J1-1", "column": "审定数"},
-        "tb_amount": {"sheet": "TB", "column": "审定数"}
+        "audited": {
+          "sheet": "审定表J1-1",
+          "column": "审定数"
+        },
+        "tb_amount": {
+          "sheet": "TB",
+          "column": "审定数"
+        }
       },
       "message_template": "审定数({audited})与试算平衡表({tb_amount})不一致, 差异={diff}"
     },
@@ -204,10 +312,22 @@
       "severity": "blocking",
       "scope": "all_lines",
       "cells": {
-        "audited": {"sheet": "审定表K8-1", "column": "审定数"},
-        "unaudited": {"sheet": "审定表K8-1", "column": "未审数"},
-        "aje": {"sheet": "审定表K8-1", "column": "AJE调整"},
-        "rje": {"sheet": "审定表K8-1", "column": "RJE调整"}
+        "audited": {
+          "sheet": "审定表K8-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表K8-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表K8-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表K8-1",
+          "column": "RJE调整"
+        }
       },
       "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
     },
@@ -221,8 +341,14 @@
       "severity": "warning",
       "scope": "total_line",
       "cells": {
-        "audited": {"sheet": "审定表K8-1", "column": "审定数"},
-        "tb_amount": {"sheet": "TB", "column": "审定数"}
+        "audited": {
+          "sheet": "审定表K8-1",
+          "column": "审定数"
+        },
+        "tb_amount": {
+          "sheet": "TB",
+          "column": "审定数"
+        }
       },
       "message_template": "审定数({audited})与试算平衡表({tb_amount})不一致, 差异={diff}"
     },
@@ -236,10 +362,22 @@
       "severity": "blocking",
       "scope": "all_lines",
       "cells": {
-        "audited": {"sheet": "审定表L1-1", "column": "审定数"},
-        "unaudited": {"sheet": "审定表L1-1", "column": "未审数"},
-        "aje": {"sheet": "审定表L1-1", "column": "AJE调整"},
-        "rje": {"sheet": "审定表L1-1", "column": "RJE调整"}
+        "audited": {
+          "sheet": "审定表L1-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表L1-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表L1-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表L1-1",
+          "column": "RJE调整"
+        }
       },
       "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
     },
@@ -253,8 +391,14 @@
       "severity": "warning",
       "scope": "total_line",
       "cells": {
-        "audited": {"sheet": "审定表L1-1", "column": "审定数"},
-        "tb_amount": {"sheet": "TB", "column": "审定数"}
+        "audited": {
+          "sheet": "审定表L1-1",
+          "column": "审定数"
+        },
+        "tb_amount": {
+          "sheet": "TB",
+          "column": "审定数"
+        }
       },
       "message_template": "审定数({audited})与试算平衡表({tb_amount})不一致, 差异={diff}"
     },
@@ -268,10 +412,22 @@
       "severity": "blocking",
       "scope": "all_lines",
       "cells": {
-        "audited": {"sheet": "审定表M1-1", "column": "审定数"},
-        "unaudited": {"sheet": "审定表M1-1", "column": "未审数"},
-        "aje": {"sheet": "审定表M1-1", "column": "AJE调整"},
-        "rje": {"sheet": "审定表M1-1", "column": "RJE调整"}
+        "audited": {
+          "sheet": "审定表M1-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表M1-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表M1-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表M1-1",
+          "column": "RJE调整"
+        }
       },
       "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
     },
@@ -285,8 +441,14 @@
       "severity": "warning",
       "scope": "total_line",
       "cells": {
-        "audited": {"sheet": "审定表M1-1", "column": "审定数"},
-        "tb_amount": {"sheet": "TB", "column": "审定数"}
+        "audited": {
+          "sheet": "审定表M1-1",
+          "column": "审定数"
+        },
+        "tb_amount": {
+          "sheet": "TB",
+          "column": "审定数"
+        }
       },
       "message_template": "审定数({audited})与试算平衡表({tb_amount})不一致, 差异={diff}"
     },
@@ -300,10 +462,22 @@
       "severity": "blocking",
       "scope": "all_lines",
       "cells": {
-        "audited": {"sheet": "审定表N1-1", "column": "审定数"},
-        "unaudited": {"sheet": "审定表N1-1", "column": "未审数"},
-        "aje": {"sheet": "审定表N1-1", "column": "AJE调整"},
-        "rje": {"sheet": "审定表N1-1", "column": "RJE调整"}
+        "audited": {
+          "sheet": "审定表N1-1",
+          "column": "审定数"
+        },
+        "unaudited": {
+          "sheet": "审定表N1-1",
+          "column": "未审数"
+        },
+        "aje": {
+          "sheet": "审定表N1-1",
+          "column": "AJE调整"
+        },
+        "rje": {
+          "sheet": "审定表N1-1",
+          "column": "RJE调整"
+        }
       },
       "message_template": "借贷不平衡: 审定数({audited}) ≠ 未审数({unaudited}) + AJE({aje}) + RJE({rje}), 差异={diff}"
     },
@@ -317,10 +491,176 @@
       "severity": "warning",
       "scope": "total_line",
       "cells": {
-        "audited": {"sheet": "审定表N1-1", "column": "审定数"},
-        "tb_amount": {"sheet": "TB", "column": "审定数"}
+        "audited": {
+          "sheet": "审定表N1-1",
+          "column": "审定数"
+        },
+        "tb_amount": {
+          "sheet": "TB",
+          "column": "审定数"
+        }
       },
       "message_template": "审定数({audited})与试算平衡表({tb_amount})不一致, 差异={diff}"
+    },
+    {
+      "rule_id": "DV-121",
+      "wp_code": "E1",
+      "rule_name": "余额调节差异",
+      "rule_type": "balance_check",
+      "formula": "abs(bank_statement_balance - (book_balance + outstanding_deposits - outstanding_checks)) == 0",
+      "description": "银行余额调节表调节后差异必须为零",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "DV-122",
+      "wp_code": "E1",
+      "rule_name": "受限资金披露",
+      "rule_type": "completeness_check",
+      "formula": "if restricted_cash > 0 then disclosure_exists == true",
+      "description": "存在受限货币资金时必须在附注中披露",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "DV-123",
+      "wp_code": "F2",
+      "rule_name": "监盘差异率",
+      "rule_type": "threshold_check",
+      "formula": "abs(count_quantity - book_quantity) / book_quantity < materiality * 0.05",
+      "description": "存货监盘差异不得超过重要性水平的5%",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "DV-124",
+      "wp_code": "F2",
+      "rule_name": "库龄跌价计提",
+      "rule_type": "completeness_check",
+      "formula": "if aging_days > 365 then provision_amount > 0",
+      "description": "库龄超过1年的存货必须计提跌价准备",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "DV-125",
+      "wp_code": "G1",
+      "rule_name": "权益法一致性",
+      "rule_type": "consistency_check",
+      "formula": "if holding_ratio >= 0.2 then method == 'equity_method'",
+      "description": "持股比例≥20%应采用权益法核算",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "DV-126",
+      "wp_code": "G1",
+      "rule_name": "投资收益核对",
+      "rule_type": "recalculation_check",
+      "formula": "abs(investment_income - investee_net_profit * holding_ratio) / abs(investee_net_profit * holding_ratio) < 0.01",
+      "description": "投资收益应等于被投资方净利润乘以持股比例",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "DV-127",
+      "wp_code": "H1",
+      "rule_name": "折旧重算差异",
+      "rule_type": "recalculation_check",
+      "formula": "abs(recalc_depreciation - book_depreciation) / abs(book_depreciation) < 0.01",
+      "description": "折旧重新计算差异不得超过1%",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "DV-128",
+      "wp_code": "H1",
+      "rule_name": "处置损益核对",
+      "rule_type": "recalculation_check",
+      "formula": "disposal_gain_loss == disposal_proceeds - book_value - disposal_tax",
+      "description": "处置损益应等于处置收入减去账面价值减去相关税费",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "DV-129",
+      "wp_code": "I1",
+      "rule_name": "摊销重算差异",
+      "rule_type": "recalculation_check",
+      "formula": "abs(recalc_amortization - book_amortization) / abs(book_amortization) < 0.01",
+      "description": "无形资产摊销重新计算差异不得超过1%",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "DV-130",
+      "wp_code": "J1",
+      "rule_name": "五险一金完整性",
+      "rule_type": "completeness_check",
+      "formula": "pension + medical + unemployment + injury + maternity + housing_fund > 0",
+      "description": "五险一金各项计提必须完整，不得遗漏",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "DV-131",
+      "wp_code": "J1",
+      "rule_name": "薪酬合同一致",
+      "rule_type": "consistency_check",
+      "formula": "actual_salary <= contract_salary",
+      "description": "实际发放薪酬不得超过劳动合同约定金额",
+      "severity": "warning",
+      "auto_check": false
+    },
+    {
+      "rule_id": "DV-132",
+      "wp_code": "K8",
+      "rule_name": "费用预算对比",
+      "rule_type": "threshold_check",
+      "formula": "actual_expense <= budget_amount * 1.2",
+      "description": "管理费用实际发生额不得超过预算的120%",
+      "severity": "warning",
+      "auto_check": false
+    },
+    {
+      "rule_id": "DV-133",
+      "wp_code": "L1",
+      "rule_name": "利息重算核对",
+      "rule_type": "recalculation_check",
+      "formula": "abs(recalc_interest - book_interest) / abs(book_interest) < 0.01 where recalc_interest = principal * rate * days / 365",
+      "description": "利息费用重算应等于本金×利率×天数÷365，差异不超过1%",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "DV-134",
+      "wp_code": "L1",
+      "rule_name": "到期重分类",
+      "rule_type": "completeness_check",
+      "formula": "if maturity_days <= 365 then classified_as_current == true",
+      "description": "一年内到期的长期借款必须重分类为流动负债",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "DV-135",
+      "wp_code": "M1",
+      "rule_name": "实收资本验资",
+      "rule_type": "consistency_check",
+      "formula": "paid_in_capital == capital_verification_amount",
+      "description": "实收资本金额应与验资报告确认金额一致",
+      "severity": "blocking",
+      "auto_check": false
+    },
+    {
+      "rule_id": "DV-136",
+      "wp_code": "N1",
+      "rule_name": "税率一致性",
+      "rule_type": "consistency_check",
+      "formula": "applied_tax_rate == registered_tax_rate",
+      "description": "适用税率应与税务登记的税率一致",
+      "severity": "warning",
+      "auto_check": true
     }
   ]
 }

@@ -220,8 +220,8 @@
         },
         {
           "step_order": 3,
-          "step_name": "检查票据",
-          "description": "检查票据的真实性、到期日和背书情况",
+          "step_name": "票据验真",
+          "description": "检查票据的真实性，核实出票人、承兑人及票面信息",
           "is_required": true,
           "related_sheet": null,
           "category": "substantive",
@@ -229,15 +229,42 @@
         },
         {
           "step_order": 4,
+          "step_name": "到期分析",
+          "description": "分析票据到期日分布，识别逾期未兑付票据",
+          "is_required": true,
+          "related_sheet": "票据明细表D1-4",
+          "category": "analytical",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "背书贴现",
+          "description": "检查票据背书转让和贴现的会计处理是否正确",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
           "step_name": "减值评估",
-          "description": "评估应收票据是否存在减值迹象",
+          "description": "评估应收票据预期信用损失，复核减值准备计提",
           "is_required": true,
           "related_sheet": null,
           "category": "substantive",
           "evidence_type": "calculation"
         },
         {
-          "step_order": 5,
+          "step_order": 7,
+          "step_name": "披露检查",
+          "description": "检查应收票据相关披露是否完整准确",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "documentation",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 8,
           "step_name": "结论",
           "description": "汇总审计发现，形成应收票据审计结论",
           "is_required": true,
@@ -253,7 +280,7 @@
         {
           "step_order": 1,
           "step_name": "获取明细",
-          "description": "获取预收款项明细表，核对与总账余额一致",
+          "description": "获取预收款项/合同负债明细表，核对与总账余额一致",
           "is_required": true,
           "related_sheet": "审定表D3-1",
           "category": "substantive",
@@ -270,17 +297,17 @@
         },
         {
           "step_order": 3,
-          "step_name": "分析变动",
-          "description": "分析预收款项变动原因及合理性",
+          "step_name": "合同审阅",
+          "description": "审阅重大合同条款，确认预收款项性质和义务",
           "is_required": true,
-          "related_sheet": "分析程序D3-3",
+          "related_sheet": null,
           "category": "substantive",
-          "evidence_type": "calculation"
+          "evidence_type": "document"
         },
         {
           "step_order": 4,
-          "step_name": "截止测试",
-          "description": "检查预收款项确认和转收入的截止是否正确",
+          "step_name": "收入时点",
+          "description": "判断收入确认时点，检查预收转收入的依据是否充分",
           "is_required": true,
           "related_sheet": null,
           "category": "substantive",
@@ -288,8 +315,35 @@
         },
         {
           "step_order": 5,
+          "step_name": "账龄分析",
+          "description": "分析预收款项账龄分布，识别长期挂账异常项目",
+          "is_required": true,
+          "related_sheet": "分析程序D3-3",
+          "category": "analytical",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 6,
+          "step_name": "截止测试",
+          "description": "检查期末前后预收款项确认和转收入的截止是否正确",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 7,
+          "step_name": "披露检查",
+          "description": "检查合同负债相关披露是否符合准则要求",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "documentation",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 8,
           "step_name": "结论",
-          "description": "汇总审计发现，形成预收款项审计结论",
+          "description": "汇总审计发现，形成预收款项/合同负债审计结论",
           "is_required": true,
           "related_sheet": null,
           "category": "conclusion",
@@ -320,8 +374,8 @@
         },
         {
           "step_order": 3,
-          "step_name": "分类检查",
-          "description": "检查金融资产分类是否恰当（FVOCI vs AC）",
+          "step_name": "分类评估",
+          "description": "评估金融资产分类是否恰当，检查业务模式和合同现金流特征",
           "is_required": true,
           "related_sheet": null,
           "category": "substantive",
@@ -329,8 +383,8 @@
         },
         {
           "step_order": 4,
-          "step_name": "减值评估",
-          "description": "评估应收款项融资预期信用损失",
+          "step_name": "公允计量",
+          "description": "复核以公允价值计量的应收款项融资估值方法和输入值",
           "is_required": true,
           "related_sheet": null,
           "category": "substantive",
@@ -338,6 +392,33 @@
         },
         {
           "step_order": 5,
+          "step_name": "终止确认",
+          "description": "检查已终止确认的应收款项融资是否满足终止确认条件",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "减值测试",
+          "description": "评估应收款项融资预期信用损失，复核减值准备计提",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 7,
+          "step_name": "披露检查",
+          "description": "检查应收款项融资相关披露是否完整准确",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "documentation",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 8,
           "step_name": "结论",
           "description": "汇总审计发现，形成应收款项融资审计结论",
           "is_required": true,
@@ -370,8 +451,8 @@
         },
         {
           "step_order": 3,
-          "step_name": "履约进度",
-          "description": "检查履约进度计量方法及合同资产确认的合理性",
+          "step_name": "合同识别",
+          "description": "识别合同并检查合同资产确认条件是否满足",
           "is_required": true,
           "related_sheet": null,
           "category": "substantive",
@@ -379,15 +460,42 @@
         },
         {
           "step_order": 4,
-          "step_name": "减值评估",
-          "description": "评估合同资产是否存在减值迹象",
+          "step_name": "履约分析",
+          "description": "分析履约义务的识别和分摊是否恰当",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "可变对价",
+          "description": "评估可变对价估计的合理性及约束条件",
           "is_required": true,
           "related_sheet": null,
           "category": "substantive",
           "evidence_type": "calculation"
         },
         {
-          "step_order": 5,
+          "step_order": 6,
+          "step_name": "进度计量",
+          "description": "检查履约进度计量方法及合同资产确认金额的合理性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 7,
+          "step_name": "减值评估",
+          "description": "评估合同资产是否存在减值迹象并复核减值准备",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 8,
           "step_name": "结论",
           "description": "汇总审计发现，形成合同资产审计结论",
           "is_required": true,
@@ -420,24 +528,51 @@
         },
         {
           "step_order": 3,
-          "step_name": "分析变动",
-          "description": "分析合同负债变动原因及合理性",
-          "is_required": true,
-          "related_sheet": "分析程序D7-3",
-          "category": "substantive",
-          "evidence_type": "calculation"
-        },
-        {
-          "step_order": 4,
-          "step_name": "截止测试",
-          "description": "检查合同负债确认和转收入的截止是否正确",
+          "step_name": "预收验证",
+          "description": "验证预收款项的真实性，核实收款凭证和合同依据",
           "is_required": true,
           "related_sheet": null,
           "category": "substantive",
           "evidence_type": "document"
         },
         {
+          "step_order": 4,
+          "step_name": "履约进度",
+          "description": "检查履约进度计量方法，评估合同负债转收入的时点",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "calculation"
+        },
+        {
           "step_order": 5,
+          "step_name": "收入时点",
+          "description": "判断收入确认时点，检查合同负债转收入的依据是否充分",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "截止测试",
+          "description": "检查期末前后合同负债确认和转收入的截止是否正确",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 7,
+          "step_name": "披露检查",
+          "description": "检查合同负债相关披露是否完整，包括重大合同条款",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "documentation",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 8,
           "step_name": "结论",
           "description": "汇总审计发现，形成合同负债审计结论",
           "is_required": true,
