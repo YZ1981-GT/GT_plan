@@ -1,0 +1,46 @@
+{
+  "description": "B/C/A/S 计划/控制/完成/特定项目审计程序清单（致同 2025 修订版）",
+  "version": "2025-R1",
+  "procedures": {
+    "B1": {
+      "wp_name": "计划阶段",
+      "steps": [
+        {"step_order": 1, "step_name": "了解客户", "description": "了解被审计单位及其环境，识别重大错报风险", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "风险评估", "description": "评估重大错报风险，确定风险应对策略", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
+        {"step_order": 3, "step_name": "重要性", "description": "确定计划重要性水平和实际执行的重要性", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "calculation"},
+        {"step_order": 4, "step_name": "审计策略", "description": "制定总体审计策略和具体审计计划", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
+        {"step_order": 5, "step_name": "结论", "description": "完成计划阶段工作，形成审计计划结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    },
+    "C1": {
+      "wp_name": "控制测试",
+      "steps": [
+        {"step_order": 1, "step_name": "识别控制", "description": "识别与审计相关的内部控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "设计测试", "description": "设计控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"},
+        {"step_order": 3, "step_name": "执行测试", "description": "执行控制测试，获取控制有效性证据", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"},
+        {"step_order": 4, "step_name": "评价结果", "description": "评价控制测试结果，确定控制偏差影响", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"},
+        {"step_order": 5, "step_name": "结论", "description": "形成控制测试结论，确定对实质性程序的影响", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    },
+    "A1": {
+      "wp_name": "完成阶段",
+      "steps": [
+        {"step_order": 1, "step_name": "期后事项", "description": "检查资产负债表日后事项", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "持续经营", "description": "评估被审计单位持续经营能力", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
+        {"step_order": 3, "step_name": "管理层声明", "description": "获取管理层声明书", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
+        {"step_order": 4, "step_name": "汇总错报", "description": "汇总未更正错报并评估影响", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "calculation"},
+        {"step_order": 5, "step_name": "出具报告", "description": "形成审计意见并出具审计报告", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    },
+    "S1": {
+      "wp_name": "特定项目",
+      "steps": [
+        {"step_order": 1, "step_name": "识别事项", "description": "识别需要特别关注的事项", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "评估影响", "description": "评估特定事项对财务报表的影响", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"},
+        {"step_order": 3, "step_name": "执行程序", "description": "针对特定事项执行审计程序", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"},
+        {"step_order": 4, "step_name": "形成结论", "description": "对特定事项形成审计结论", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"},
+        {"step_order": 5, "step_name": "记录", "description": "完整记录特定项目审计过程和结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    }
+  }
+}

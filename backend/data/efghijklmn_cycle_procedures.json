@@ -1,0 +1,126 @@
+{
+  "description": "E-N 实质性程序循环审计程序清单（致同 2025 修订版）",
+  "version": "2025-R1",
+  "procedures": {
+    "E1": {
+      "wp_name": "货币资金",
+      "steps": [
+        {"step_order": 1, "step_name": "获取明细", "description": "获取货币资金明细表，核对与总账余额一致", "is_required": true, "related_sheet": "审定表E1-1", "category": "substantive", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "核对总账", "description": "核对货币资金总账余额与试算平衡表一致", "is_required": true, "related_sheet": "审定表E1-1", "category": "substantive", "evidence_type": "reconciliation"},
+        {"step_order": 3, "step_name": "分析程序", "description": "执行货币资金分析程序，比较本期与上期变动", "is_required": true, "related_sheet": "分析程序E1-3", "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 4, "step_name": "银行函证", "description": "向银行发函确认存款余额及借款信息", "is_required": true, "related_sheet": null, "category": "confirmation", "evidence_type": "external_confirmation"},
+        {"step_order": 5, "step_name": "现金盘点", "description": "对库存现金进行突击盘点并编制盘点表", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "observation"},
+        {"step_order": 6, "step_name": "实质性测试", "description": "检查大额收支及银行对账单调节表", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 7, "step_name": "结论", "description": "汇总审计发现，形成货币资金审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    },
+    "F2": {
+      "wp_name": "存货",
+      "steps": [
+        {"step_order": 1, "step_name": "获取明细", "description": "获取存货明细表，核对与总账余额一致", "is_required": true, "related_sheet": "审定表F2-1", "category": "substantive", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "核对总账", "description": "核对存货总账余额与试算平衡表一致", "is_required": true, "related_sheet": "审定表F2-1", "category": "substantive", "evidence_type": "reconciliation"},
+        {"step_order": 3, "step_name": "分析程序", "description": "执行存货分析程序，分析周转率及库龄", "is_required": true, "related_sheet": "分析程序F2-3", "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 4, "step_name": "存货盘点", "description": "监盘存货并核对盘点结果与账面记录", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "observation"},
+        {"step_order": 5, "step_name": "跌价准备", "description": "复核存货跌价准备计提的合理性", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 6, "step_name": "实质性测试", "description": "检查存货计价及截止", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 7, "step_name": "结论", "description": "汇总审计发现，形成存货审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    },
+    "G1": {
+      "wp_name": "长期股权投资",
+      "steps": [
+        {"step_order": 1, "step_name": "获取明细", "description": "获取长期股权投资明细表，核对与总账余额一致", "is_required": true, "related_sheet": "审定表G1-1", "category": "substantive", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "核对总账", "description": "核对长期股权投资总账余额与试算平衡表一致", "is_required": true, "related_sheet": "审定表G1-1", "category": "substantive", "evidence_type": "reconciliation"},
+        {"step_order": 3, "step_name": "分析程序", "description": "执行投资分析程序，分析投资收益率变动", "is_required": true, "related_sheet": "分析程序G1-3", "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 4, "step_name": "投资收益", "description": "复核投资收益确认的准确性和完整性", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 5, "step_name": "减值测试", "description": "评估长期股权投资是否存在减值迹象", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 6, "step_name": "实质性测试", "description": "检查投资协议及权益变动", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 7, "step_name": "结论", "description": "汇总审计发现，形成投资审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    },
+    "H1": {
+      "wp_name": "固定资产",
+      "steps": [
+        {"step_order": 1, "step_name": "获取明细", "description": "获取固定资产明细表，核对与总账余额一致", "is_required": true, "related_sheet": "审定表H1-1", "category": "substantive", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "核对总账", "description": "核对固定资产总账余额与试算平衡表一致", "is_required": true, "related_sheet": "审定表H1-1", "category": "substantive", "evidence_type": "reconciliation"},
+        {"step_order": 3, "step_name": "分析程序", "description": "执行固定资产分析程序，分析折旧率及成新率", "is_required": true, "related_sheet": "分析程序H1-3", "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 4, "step_name": "折旧计算", "description": "复核折旧计算的准确性及折旧政策一致性", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 5, "step_name": "减值测试", "description": "评估固定资产是否存在减值迹象", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 6, "step_name": "实质性测试", "description": "检查大额购置及处置的合规性", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 7, "step_name": "结论", "description": "汇总审计发现，形成固定资产审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    },
+    "I1": {
+      "wp_name": "无形资产",
+      "steps": [
+        {"step_order": 1, "step_name": "获取明细", "description": "获取无形资产明细表，核对与总账余额一致", "is_required": true, "related_sheet": "审定表I1-1", "category": "substantive", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "核对总账", "description": "核对无形资产总账余额与试算平衡表一致", "is_required": true, "related_sheet": "审定表I1-1", "category": "substantive", "evidence_type": "reconciliation"},
+        {"step_order": 3, "step_name": "分析程序", "description": "执行无形资产分析程序，分析摊销及剩余年限", "is_required": true, "related_sheet": "分析程序I1-3", "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 4, "step_name": "摊销计算", "description": "复核摊销计算的准确性及摊销政策一致性", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 5, "step_name": "减值测试", "description": "评估无形资产是否存在减值迹象", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 6, "step_name": "实质性测试", "description": "检查无形资产取得及处置的合规性", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 7, "step_name": "结论", "description": "汇总审计发现，形成无形资产审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    },
+    "J1": {
+      "wp_name": "应付职工薪酬",
+      "steps": [
+        {"step_order": 1, "step_name": "获取明细", "description": "获取应付职工薪酬明细表，核对与总账余额一致", "is_required": true, "related_sheet": "审定表J1-1", "category": "substantive", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "核对总账", "description": "核对应付职工薪酬总账余额与试算平衡表一致", "is_required": true, "related_sheet": "审定表J1-1", "category": "substantive", "evidence_type": "reconciliation"},
+        {"step_order": 3, "step_name": "分析程序", "description": "执行薪酬分析程序，比较人均薪酬变动", "is_required": true, "related_sheet": "分析程序J1-3", "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 4, "step_name": "薪酬计提", "description": "复核薪酬计提的完整性和准确性", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 5, "step_name": "社保核对", "description": "核对社保公积金缴纳与计提的一致性", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "reconciliation"},
+        {"step_order": 6, "step_name": "实质性测试", "description": "抽查工资发放记录及个税申报", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 7, "step_name": "结论", "description": "汇总审计发现，形成职工薪酬审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    },
+    "K8": {
+      "wp_name": "管理费用",
+      "steps": [
+        {"step_order": 1, "step_name": "获取明细", "description": "获取管理费用明细表，核对与总账余额一致", "is_required": true, "related_sheet": "审定表K8-1", "category": "substantive", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "核对总账", "description": "核对管理费用总账余额与试算平衡表一致", "is_required": true, "related_sheet": "审定表K8-1", "category": "substantive", "evidence_type": "reconciliation"},
+        {"step_order": 3, "step_name": "分析程序", "description": "执行费用分析程序，比较各月及同期变动", "is_required": true, "related_sheet": "分析程序K8-3", "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 4, "step_name": "费用分类", "description": "检查费用分类的正确性及合理性", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 5, "step_name": "截止测试", "description": "检查期末前后费用入账的截止是否正确", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 6, "step_name": "实质性测试", "description": "抽查大额费用凭证及审批", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 7, "step_name": "结论", "description": "汇总审计发现，形成管理费用审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    },
+    "L1": {
+      "wp_name": "短期借款",
+      "steps": [
+        {"step_order": 1, "step_name": "获取明细", "description": "获取短期借款明细表，核对与总账余额一致", "is_required": true, "related_sheet": "审定表L1-1", "category": "substantive", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "核对总账", "description": "核对短期借款总账余额与试算平衡表一致", "is_required": true, "related_sheet": "审定表L1-1", "category": "substantive", "evidence_type": "reconciliation"},
+        {"step_order": 3, "step_name": "分析程序", "description": "执行借款分析程序，分析利率及期限结构", "is_required": true, "related_sheet": "分析程序L1-3", "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 4, "step_name": "利息计算", "description": "复核利息计算的准确性及计提完整性", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 5, "step_name": "到期分析", "description": "分析借款到期日及续贷安排", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 6, "step_name": "实质性测试", "description": "检查借款合同及银行函证", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 7, "step_name": "结论", "description": "汇总审计发现，形成短期借款审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    },
+    "M1": {
+      "wp_name": "实收资本",
+      "steps": [
+        {"step_order": 1, "step_name": "获取明细", "description": "获取实收资本明细表，核对与总账余额一致", "is_required": true, "related_sheet": "审定表M1-1", "category": "substantive", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "核对总账", "description": "核对实收资本总账余额与试算平衡表一致", "is_required": true, "related_sheet": "审定表M1-1", "category": "substantive", "evidence_type": "reconciliation"},
+        {"step_order": 3, "step_name": "分析程序", "description": "执行权益分析程序，分析股权结构变动", "is_required": true, "related_sheet": "分析程序M1-3", "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 4, "step_name": "股东变更", "description": "检查股东变更的合法性及工商登记", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 5, "step_name": "利润分配", "description": "复核利润分配方案及决议程序", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 6, "step_name": "实质性测试", "description": "检查验资报告及出资证明", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 7, "step_name": "结论", "description": "汇总审计发现，形成权益审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    },
+    "N1": {
+      "wp_name": "应交税费",
+      "steps": [
+        {"step_order": 1, "step_name": "获取明细", "description": "获取应交税费明细表，核对与总账余额一致", "is_required": true, "related_sheet": "审定表N1-1", "category": "substantive", "evidence_type": "document"},
+        {"step_order": 2, "step_name": "核对总账", "description": "核对应交税费总账余额与试算平衡表一致", "is_required": true, "related_sheet": "审定表N1-1", "category": "substantive", "evidence_type": "reconciliation"},
+        {"step_order": 3, "step_name": "分析程序", "description": "执行税费分析程序，分析税负率变动", "is_required": true, "related_sheet": "分析程序N1-3", "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 4, "step_name": "税费计算", "description": "复核各税种计算的准确性", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "calculation"},
+        {"step_order": 5, "step_name": "纳税申报核对", "description": "核对纳税申报表与账面数据的一致性", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "reconciliation"},
+        {"step_order": 6, "step_name": "实质性测试", "description": "检查税务优惠及递延所得税", "is_required": true, "related_sheet": null, "category": "substantive", "evidence_type": "document"},
+        {"step_order": 7, "step_name": "结论", "description": "汇总审计发现，形成税金审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+      ]
+    }
+  }
+}

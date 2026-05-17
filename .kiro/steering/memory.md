@@ -123,6 +123,7 @@ inclusion: always
   - Cycle-D Sprint 1 ✅（Task 1.1-1.14）= 50% 完成；剩余 Sprint 2（属性测试 10 个）
   - 核心功能代码全部就绪，剩余全是测试任务
   - 新建文件：4 composables（usePrefillMarkers/useCrossModuleRefs/useReviewMarks/useUserOverrides）+ wp_review_status.py 端点 + Alembic 迁移 + 2 新 JSON（d_cycle_validation_rules / d_cycle_procedures）+ prefill_formula_mapping 扩展 15 条 + cross_wp_references 扩展 18 条
+- **两个三件套全部任务 100% 完成（2026-05-17，commit aba873b）**：Foundation 23 tasks + Cycle-D 27 tasks = 50 tasks 全部 [x]；26 属性测试 passed（0.53s）+ 4 Playwright E2E specs 就绪；复盘无进一步改进建议；剩余仅真人 UAT 验收
 - **复盘补齐 3 个关键缺口（commit 74d87f2）**：(1) Foundation 新增 Requirement 0"底稿模板完整加载保障"（8 条验收标准覆盖全 sheet/合并/冻结/格式/固定文字/错误提示）；(2) Foundation 新增 Task 1.0"验证底稿模板完整加载链路"作为 Sprint 1 第一个任务（不通过不进后续）；(3) Foundation 新增 Task 1.2b"prefill_engine 新增 TB_AUX formula_type 支持"（Cycle-D 只产出数据不改引擎，引擎扩展由 Foundation 承担）
 - **底稿在线编辑空白问题深入分析（2026-05-16 Playwright 实测）**：
   - **后端 100% 正常**：GET /xlsx-to-json 返回 200 + 20 sheets 完整数据（浏览器内 fetch 实测确认）

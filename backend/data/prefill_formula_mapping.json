@@ -4177,6 +4177,246 @@
           "description": "函证明细合计金额（从辅助余额表取客户维度汇总）"
         }
       ]
+    },
+    {
+      "wp_code": "E1",
+      "wp_name": "货币资金分析程序",
+      "sheet": "分析程序E1-3",
+      "account_codes": [
+        "1001",
+        "1002",
+        "1012"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('E1','分析程序E1-3','审定数')",
+          "formula_type": "PREV",
+          "description": "上年同底稿分析程序审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB_SUM('1001~1012','期末余额')",
+          "formula_type": "TB_SUM",
+          "description": "从试算表取货币资金期末余额合计（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "F2",
+      "wp_name": "存货分析程序",
+      "sheet": "分析程序F2-3",
+      "account_codes": [
+        "1401",
+        "1402",
+        "1403",
+        "1405"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('F2','分析程序F2-3','审定数')",
+          "formula_type": "PREV",
+          "description": "上年同底稿分析程序审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB_SUM('1401~1405','期末余额')",
+          "formula_type": "TB_SUM",
+          "description": "从试算表取存货期末余额合计（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "G1",
+      "wp_name": "投资分析程序",
+      "sheet": "分析程序G1-3",
+      "account_codes": [
+        "1501",
+        "1511",
+        "1521",
+        "1531"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('G1','分析程序G1-3','审定数')",
+          "formula_type": "PREV",
+          "description": "上年同底稿分析程序审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB_SUM('1501~1531','期末余额')",
+          "formula_type": "TB_SUM",
+          "description": "从试算表取投资期末余额合计（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "H1",
+      "wp_name": "固定资产分析程序",
+      "sheet": "分析程序H1-3",
+      "account_codes": [
+        "1601",
+        "1602",
+        "1604"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('H1','分析程序H1-3','审定数')",
+          "formula_type": "PREV",
+          "description": "上年同底稿分析程序审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB_SUM('1601~1604','期末余额')",
+          "formula_type": "TB_SUM",
+          "description": "从试算表取固定资产期末余额合计（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "I1",
+      "wp_name": "无形资产分析程序",
+      "sheet": "分析程序I1-3",
+      "account_codes": [
+        "1701",
+        "1702"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('I1','分析程序I1-3','审定数')",
+          "formula_type": "PREV",
+          "description": "上年同底稿分析程序审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB_SUM('1701~1702','期末余额')",
+          "formula_type": "TB_SUM",
+          "description": "从试算表取无形资产期末余额合计（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "J1",
+      "wp_name": "职工薪酬分析程序",
+      "sheet": "分析程序J1-3",
+      "account_codes": [
+        "2211"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('J1','分析程序J1-3','审定数')",
+          "formula_type": "PREV",
+          "description": "上年同底稿分析程序审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB('2211','期末余额')",
+          "formula_type": "TB",
+          "description": "从试算表取应付职工薪酬期末余额（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "K8",
+      "wp_name": "管理费用分析程序",
+      "sheet": "分析程序K8-3",
+      "account_codes": [
+        "6601",
+        "6602",
+        "6603"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('K8','分析程序K8-3','审定数')",
+          "formula_type": "PREV",
+          "description": "上年同底稿分析程序审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB_SUM('6601~6603','期末余额')",
+          "formula_type": "TB_SUM",
+          "description": "从试算表取管理费用期末余额合计（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "L1",
+      "wp_name": "债务分析程序",
+      "sheet": "分析程序L1-3",
+      "account_codes": [
+        "2001",
+        "2201",
+        "2501"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('L1','分析程序L1-3','审定数')",
+          "formula_type": "PREV",
+          "description": "上年同底稿分析程序审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB_SUM('2001~2501','期末余额')",
+          "formula_type": "TB_SUM",
+          "description": "从试算表取债务期末余额合计（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "M1",
+      "wp_name": "权益分析程序",
+      "sheet": "分析程序M1-3",
+      "account_codes": [
+        "4001",
+        "4101",
+        "4103",
+        "4104"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('M1','分析程序M1-3','审定数')",
+          "formula_type": "PREV",
+          "description": "上年同底稿分析程序审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB_SUM('4001~4104','期末余额')",
+          "formula_type": "TB_SUM",
+          "description": "从试算表取权益期末余额合计（未审）"
+        }
+      ]
+    },
+    {
+      "wp_code": "N1",
+      "wp_name": "税金分析程序",
+      "sheet": "分析程序N1-3",
+      "account_codes": [
+        "2221",
+        "6401",
+        "6403"
+      ],
+      "cells": [
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('N1','分析程序N1-3','审定数')",
+          "formula_type": "PREV",
+          "description": "上年同底稿分析程序审定数"
+        },
+        {
+          "cell_ref": "本年未审数",
+          "formula": "=TB_SUM('2221~6403','期末余额')",
+          "formula_type": "TB_SUM",
+          "description": "从试算表取税金相关科目期末余额合计（未审）"
+        }
+      ]
     }
   ]
 }

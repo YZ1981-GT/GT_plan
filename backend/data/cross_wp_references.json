@@ -718,6 +718,426 @@
       ],
       "category": "revenue_cycle",
       "severity": "info"
+    },
+    {
+      "ref_id": "CW-39",
+      "description": "货币资金审定数→附注 5.1",
+      "source_wp": "E1",
+      "source_sheet": "审定表E1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.1 货币资金合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.1 货币资金",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.1",
+          "note_section_code": "5.1"
+        }
+      ],
+      "category": "cash_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-40",
+      "description": "货币资金审定数→报表 BS-001",
+      "source_wp": "E1",
+      "source_sheet": "审定表E1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "货币资金行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-001 货币资金",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-001",
+          "report_row_code": "BS-001"
+        }
+      ],
+      "category": "cash_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-41",
+      "description": "存货审定数→附注 5.8",
+      "source_wp": "F2",
+      "source_sheet": "审定表F2-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.8 存货合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.8 存货",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.8",
+          "note_section_code": "5.8"
+        }
+      ],
+      "category": "inventory_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-42",
+      "description": "存货审定数→报表 BS-008",
+      "source_wp": "F2",
+      "source_sheet": "审定表F2-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "存货行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-008 存货",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-008",
+          "report_row_code": "BS-008"
+        }
+      ],
+      "category": "inventory_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-43",
+      "description": "长期股权投资审定数→附注 5.9",
+      "source_wp": "G1",
+      "source_sheet": "审定表G1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.9 长期股权投资合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.9 长期股权投资",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.9",
+          "note_section_code": "5.9"
+        }
+      ],
+      "category": "investment_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-44",
+      "description": "长期股权投资审定数→报表 BS-009",
+      "source_wp": "G1",
+      "source_sheet": "审定表G1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "长期股权投资行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-009 长期股权投资",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-009",
+          "report_row_code": "BS-009"
+        }
+      ],
+      "category": "investment_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-45",
+      "description": "固定资产审定数→附注 5.10",
+      "source_wp": "H1",
+      "source_sheet": "审定表H1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.10 固定资产合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.10 固定资产",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.10",
+          "note_section_code": "5.10"
+        }
+      ],
+      "category": "fixed_asset_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-46",
+      "description": "固定资产审定数→报表 BS-010",
+      "source_wp": "H1",
+      "source_sheet": "审定表H1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "固定资产行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-010 固定资产",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-010",
+          "report_row_code": "BS-010"
+        }
+      ],
+      "category": "fixed_asset_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-47",
+      "description": "无形资产审定数→附注 5.11",
+      "source_wp": "I1",
+      "source_sheet": "审定表I1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.11 无形资产合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.11 无形资产",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.11",
+          "note_section_code": "5.11"
+        }
+      ],
+      "category": "intangible_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-48",
+      "description": "无形资产审定数→报表 BS-011",
+      "source_wp": "I1",
+      "source_sheet": "审定表I1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "无形资产行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-011 无形资产",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-011",
+          "report_row_code": "BS-011"
+        }
+      ],
+      "category": "intangible_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-49",
+      "description": "应付职工薪酬审定数→附注 5.12",
+      "source_wp": "J1",
+      "source_sheet": "审定表J1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.12 应付职工薪酬合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.12 应付职工薪酬",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.12",
+          "note_section_code": "5.12"
+        }
+      ],
+      "category": "payroll_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-50",
+      "description": "应付职工薪酬审定数→报表 BS-030",
+      "source_wp": "J1",
+      "source_sheet": "审定表J1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "应付职工薪酬行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-030 应付职工薪酬",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-030",
+          "report_row_code": "BS-030"
+        }
+      ],
+      "category": "payroll_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-51",
+      "description": "管理费用审定数→附注 5.16",
+      "source_wp": "K8",
+      "source_sheet": "审定表K8-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.16 管理费用合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.16 管理费用",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.16",
+          "note_section_code": "5.16"
+        }
+      ],
+      "category": "expense_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-52",
+      "description": "管理费用审定数→报表 IS-005",
+      "source_wp": "K8",
+      "source_sheet": "审定表K8-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "利润表",
+          "cell": "管理费用行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 IS-005 管理费用",
+          "target_route": "/projects/{pid}/reports?type=income_statement&row=IS-005",
+          "report_row_code": "IS-005"
+        }
+      ],
+      "category": "expense_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-53",
+      "description": "短期借款审定数→附注 5.13",
+      "source_wp": "L1",
+      "source_sheet": "审定表L1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.13 短期借款合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.13 短期借款",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.13",
+          "note_section_code": "5.13"
+        }
+      ],
+      "category": "debt_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-54",
+      "description": "短期借款审定数→报表 BS-020",
+      "source_wp": "L1",
+      "source_sheet": "审定表L1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "短期借款行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-020 短期借款",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-020",
+          "report_row_code": "BS-020"
+        }
+      ],
+      "category": "debt_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-55",
+      "description": "实收资本审定数→附注 5.17",
+      "source_wp": "M1",
+      "source_sheet": "审定表M1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.17 实收资本合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.17 实收资本",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.17",
+          "note_section_code": "5.17"
+        }
+      ],
+      "category": "equity_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-56",
+      "description": "实收资本审定数→报表 BS-040",
+      "source_wp": "M1",
+      "source_sheet": "审定表M1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "实收资本行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-040 实收资本",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-040",
+          "report_row_code": "BS-040"
+        }
+      ],
+      "category": "equity_cycle",
+      "severity": "info"
+    },
+    {
+      "ref_id": "CW-57",
+      "description": "应交税费审定数→附注 5.18",
+      "source_wp": "N1",
+      "source_sheet": "审定表N1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "5.18 应交税费合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 5.18 应交税费",
+          "target_route": "/projects/{pid}/disclosure-notes?section=5.18",
+          "note_section_code": "5.18"
+        }
+      ],
+      "category": "tax_cycle",
+      "severity": "warning"
+    },
+    {
+      "ref_id": "CW-58",
+      "description": "应交税费审定数→报表 BS-025",
+      "source_wp": "N1",
+      "source_sheet": "审定表N1-1",
+      "source_cell": "审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "应交税费行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-025 应交税费",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-025",
+          "report_row_code": "BS-025"
+        }
+      ],
+      "category": "tax_cycle",
+      "severity": "info"
     }
   ],
   "stats": {
