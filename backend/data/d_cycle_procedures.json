@@ -3,7 +3,7 @@
   "version": "2025-R1",
   "procedures": {
     "D2": {
-      "wp_name": "应收账款",
+      "wp_name": "应收账款审定表",
       "steps": [
         {
           "step_order": 1,
@@ -71,7 +71,7 @@
       ]
     },
     "D4": {
-      "wp_name": "营业收入",
+      "wp_name": "营业收入审定表",
       "steps": [
         {
           "step_order": 1,
@@ -130,7 +130,7 @@
       ]
     },
     "D0": {
-      "wp_name": "函证",
+      "wp_name": "收入循环函证",
       "steps": [
         {
           "step_order": 1,
@@ -198,7 +198,7 @@
       ]
     },
     "D1": {
-      "wp_name": "应收票据",
+      "wp_name": "应收票据审定表",
       "steps": [
         {
           "step_order": 1,
@@ -275,7 +275,7 @@
       ]
     },
     "D3": {
-      "wp_name": "预收款项",
+      "wp_name": "预收账款审定表",
       "steps": [
         {
           "step_order": 1,
@@ -352,7 +352,7 @@
       ]
     },
     "D5": {
-      "wp_name": "应收款项融资",
+      "wp_name": "合同资产审定表",
       "steps": [
         {
           "step_order": 1,
@@ -429,7 +429,7 @@
       ]
     },
     "D6": {
-      "wp_name": "合同资产",
+      "wp_name": "合同负债审定表",
       "steps": [
         {
           "step_order": 1,
@@ -506,7 +506,7 @@
       ]
     },
     "D7": {
-      "wp_name": "合同负债",
+      "wp_name": "应收款项融资审定表",
       "steps": [
         {
           "step_order": 1,

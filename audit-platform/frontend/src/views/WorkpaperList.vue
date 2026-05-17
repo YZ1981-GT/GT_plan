@@ -9,6 +9,7 @@
               <el-radio-group v-model="viewMode" size="small">
                 <el-radio-button value="list">列表</el-radio-button>
                 <el-radio-button value="kanban">看板</el-radio-button>
+                <el-radio-button value="workbench">工作台</el-radio-button>
               </el-radio-group>
             </div>
           </template>
@@ -68,6 +69,45 @@
       @select="onKanbanSelect"
       @assign="onKanbanAssign"
     />
+    <!-- 工作台视图：按循环分组 + 进度追踪 + 批量操作 -->
+    <div v-else-if="viewMode === 'workbench'" class="gt-wp-workbench-view">
+      <div class="gt-wpb-progress-summary">
+        <div class="gt-wpb-prog-card" v-for="cycle in cycleSummary" :key="cycle.code">
+          <div class="gt-wpb-prog-card__header">
+            <span class="gt-wpb-prog-card__code">{{ cycle.code }}</span>
+            <span class="gt-wpb-prog-card__name">{{ cycle.name }}</span>
+          </div>
+          <el-progress :percentage="cycle.percent" :stroke-width="6" :color="cycle.percent === 100 ? '#67c23a' : '#4b2d77'" />
+          <div class="gt-wpb-prog-card__detail">
+            {{ cycle.completed }}/{{ cycle.total }} 完成
+          </div>
+        </div>
+      </div>
+      <div class="gt-wpb-workbench-list">
+        <el-table :data="workbenchTableData" stripe style="width: 100%" max-height="calc(100vh - 320px)" @row-click="onWorkbenchRowClick">
+          <el-table-column prop="wp_code" label="编码" width="90" sortable />
+          <el-table-column prop="wp_name" label="底稿名称" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="cycle_name" label="循环" width="100" />
+          <el-table-column prop="status_label" label="状态" width="90">
+            <template #default="{ row }">
+              <el-tag :type="row.status_type" size="small">{{ row.status_label }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="assignee_name" label="编制人" width="100" />
+          <el-table-column prop="step_progress" label="步骤进度" width="120">
+            <template #default="{ row }">
+              <span v-if="row.total_steps">{{ row.completed_steps || 0 }}/{{ row.total_steps }}</span>
+              <span v-else class="gt-text-tertiary">—</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="100" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" type="primary" link @click.stop="openEditor(row)">编辑</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </div>
     <!-- 无底稿时：两栏布局（左操作入口 + 右审计程序总览） -->
     <div v-else-if="!loading && treeData.length === 0" class="gt-wp-intro-layout">
       <!-- 左栏：操作入口 -->
@@ -701,6 +741,91 @@ const hasFilter = computed(() => {
   return !!(filterCycle.value || filterStatus.value || filterAssignee.value || searchKeyword.value)
 })
 
+// ════════════════════════════════════════════════════════════════════
+// 工作台视图（合并自 WorkpaperWorkbench）：循环进度+底稿表格
+// ════════════════════════════════════════════════════════════════════
+
+const cycleNameMap: Record<string, string> = {
+  A: '完成阶段',
+  B: '计划阶段',
+  C: '控制测试',
+  D: '收入循环',
+  E: '货币资金',
+  F: '存货',
+  G: '投资',
+  H: '固定资产',
+  I: '无形资产',
+  J: '职工薪酬',
+  K: '管理/费用',
+  L: '债务',
+  M: '权益',
+  N: '税金',
+  S: '特定项目',
+}
+
+const cycleSummary = computed(() => {
+  const groups: Record<string, { total: number; completed: number }> = {}
+  for (const w of wpList.value) {
+    const idx = wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    const code = idx?.wp_code || ''
+    const cycleKey = code[0] || '?'
+    if (!groups[cycleKey]) groups[cycleKey] = { total: 0, completed: 0 }
+    groups[cycleKey].total += 1
+    if (COMPLETED_STATUSES.has(w.status)) groups[cycleKey].completed += 1
+  }
+  return Object.entries(groups)
+    .map(([code, g]) => ({
+      code,
+      name: cycleNameMap[code] || code,
+      total: g.total,
+      completed: g.completed,
+      percent: g.total > 0 ? Math.round((g.completed / g.total) * 100) : 0,
+    }))
+    .sort((a, b) => a.code.localeCompare(b.code))
+})
+
+const STATUS_LABELS: Record<string, { label: string; type: string }> = {
+  draft: { label: '待编', type: 'info' },
+  in_progress: { label: '编制中', type: 'warning' },
+  edit_complete: { label: '已完成', type: 'primary' },
+  pending_review: { label: '待复核', type: 'warning' },
+  reviewed: { label: '已复核', type: 'success' },
+  approved: { label: '已通过', type: 'success' },
+}
+
+const workbenchTableData = computed(() => {
+  return filteredWpList.value.map((w: WorkpaperDetail) => {
+    const idx = wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    const code = idx?.wp_code || ''
+    const cycleKey = code[0] || '?'
+    const statusInfo = STATUS_LABELS[w.status] || { label: w.status, type: 'info' }
+    return {
+      id: w.id,
+      wp_code: code,
+      wp_name: idx?.wp_name || '',
+      cycle_name: cycleNameMap[cycleKey] || cycleKey,
+      status: w.status,
+      status_label: statusInfo.label,
+      status_type: statusInfo.type,
+      assignee_name: (w as any).assignee_name || '',
+      total_steps: (w as any).total_steps || 0,
+      completed_steps: (w as any).completed_steps || 0,
+    }
+  })
+})
+
+function onWorkbenchRowClick(row: any) {
+  if (row.id) {
+    router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: row.id } })
+  }
+}
+
+function openEditor(row: any) {
+  if (row.id) {
+    router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: row.id } })
+  }
+}
+
 // 精细化审计检查
 const fineCheckResults = ref<any[]>([])
 const fineChecksLoading = ref(false)
@@ -772,19 +897,21 @@ const filterStatus = ref('')
 const filterAssignee = ref('')
 
 const cycleOptions = [
-  { value: 'B', label: 'B类 穿行测试' },
+  { value: 'B', label: 'B类 计划阶段' },
   { value: 'C', label: 'C类 控制测试' },
-  { value: 'D', label: 'D类 货币资金' },
-  { value: 'E', label: 'E类 应收账款' },
+  { value: 'D', label: 'D类 收入循环' },
+  { value: 'E', label: 'E类 货币资金' },
   { value: 'F', label: 'F类 存货' },
-  { value: 'G', label: 'G类 固定资产' },
-  { value: 'H', label: 'H类 无形资产' },
-  { value: 'I', label: 'I类 投资' },
-  { value: 'J', label: 'J类 负债' },
-  { value: 'K', label: 'K类 收入' },
-  { value: 'L', label: 'L类 成本费用' },
+  { value: 'G', label: 'G类 投资' },
+  { value: 'H', label: 'H类 固定资产' },
+  { value: 'I', label: 'I类 无形资产' },
+  { value: 'J', label: 'J类 职工薪酬' },
+  { value: 'K', label: 'K类 管理/费用' },
+  { value: 'L', label: 'L类 债务' },
   { value: 'M', label: 'M类 权益' },
-  { value: 'N', label: 'N类 其他' },
+  { value: 'N', label: 'N类 税金' },
+  { value: 'A', label: 'A类 完成阶段' },
+  { value: 'S', label: 'S类 特定项目' },
 ]
 
 const statusOptions = [
@@ -918,7 +1045,8 @@ async function onConfirmAssign() {
 }
 
 function goToWorkbench() {
-  router.push(`/projects/${projectId.value}/workpaper-bench`)
+  // 本地切换到工作台视图（不再跳转独立页面）
+  viewMode.value = 'workbench'
 }
 
 // F2 修复 / v3 P0-5 / Q4：一键生成底稿（chain 端点）
@@ -985,8 +1113,9 @@ const auditCycleGuide = [
 ]
 
 function onGuideClick(cycle: string) {
-  // 跳转到底稿工作台，按循环筛选
-  router.push({ path: `/projects/${projectId.value}/workpaper-bench`, query: { cycle } })
+  // 切换到工作台视图，按循环筛选
+  viewMode.value = 'workbench'
+  filterCycle.value = cycle
 }
 
 function onWpImported() {
@@ -1544,6 +1673,11 @@ async function handleUploadRedirect() {
 
 watch([filterCycle, filterStatus, filterAssignee], () => fetchData())
 onMounted(async () => {
+  // 从 URL query 读取视图模式（用于 /workpaper-bench 重定向兼容）
+  const queryView = route.query.view as string
+  if (queryView && ['list', 'kanban', 'workbench'].includes(queryView)) {
+    viewMode.value = queryView
+  }
   await fetchData()
   // 加载项目名称
   try {
@@ -1685,4 +1819,35 @@ onMounted(async () => {
   background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
   box-shadow: var(--gt-shadow-sm); font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary);
 }
+
+/* 工作台视图（合并自 WorkpaperWorkbench） */
+.gt-wp-workbench-view {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--gt-space-3);
+}
+.gt-wpb-progress-summary {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;
+  padding: 12px; background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  box-shadow: var(--gt-shadow-sm);
+}
+.gt-wpb-prog-card {
+  padding: 10px 12px; background: var(--gt-color-bg-light, #f8f7fc);
+  border-radius: var(--gt-radius-sm); border: 1px solid var(--gt-color-border, #e8e5f0);
+}
+.gt-wpb-prog-card__header {
+  display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px;
+}
+.gt-wpb-prog-card__code {
+  font-size: 14px; font-weight: 700; color: var(--gt-color-primary);
+}
+.gt-wpb-prog-card__name {
+  font-size: 12px; color: var(--gt-color-text-secondary);
+}
+.gt-wpb-prog-card__detail {
+  font-size: 11px; color: var(--gt-color-text-tertiary); margin-top: 4px;
+}
+.gt-wpb-workbench-list {
+  flex: 1; min-height: 0; background: var(--gt-color-bg-white);
+  border-radius: var(--gt-radius-md); padding: 12px; box-shadow: var(--gt-shadow-sm);
+}
+.gt-text-tertiary { color: var(--gt-color-text-tertiary, #999); }
 </style>

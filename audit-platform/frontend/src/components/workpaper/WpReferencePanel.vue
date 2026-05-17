@@ -5,7 +5,7 @@
     <el-collapse v-else v-model="activeNames">
       <!-- 上游依赖 -->
       <el-collapse-item name="incoming" :title="`上游依赖 (${data.incoming.length})`">
-        <div v-for="item in data.incoming" :key="item.ref_id" class="gt-ref-item" @click="$emit('navigate', item.source_wp)">
+        <div v-for="item in data.incoming" :key="item.ref_id" class="gt-ref-item" @click="$emit('navigate', item.source_wp || '')">
           <div class="gt-ref-item__header">
             <el-tag :type="severityType(item.severity)" size="small">{{ item.severity }}</el-tag>
             <span class="gt-ref-item__wp">{{ item.source_wp }}</span>
@@ -17,7 +17,7 @@
 
       <!-- 下游影响 -->
       <el-collapse-item name="outgoing" :title="`下游影响 (${data.outgoing.length})`">
-        <div v-for="item in data.outgoing" :key="item.ref_id" class="gt-ref-item" @click="$emit('navigate', item.target_wp)">
+        <div v-for="item in data.outgoing" :key="item.ref_id" class="gt-ref-item" @click="$emit('navigate', item.target_wp || '')">
           <div class="gt-ref-item__header">
             <el-tag :type="severityType(item.severity)" size="small">{{ item.severity }}</el-tag>
             <span class="gt-ref-item__wp">→ {{ item.target_wp }}</span>

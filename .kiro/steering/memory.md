@@ -134,7 +134,9 @@ inclusion: always
 - **声明式映射规则引擎完成（2026-05-17，commit 6f1e161）**：`sheet_mapping_rules.json` 5 级匹配（exact_rules→custom_rules→naming_patterns 45 条→description→category_defaults→auto_fallback）+ `new_workpaper_defaults` 8 种底稿模板支持用户自定义新增；`step_sheet_mapping.json` V4 = **1040/1040 步 100% 映射**（exact 71 / pattern 533 / description 100 / category 243 / auto_fallback 93）；`template_content_map.json` 366 文件 / 2737 sheets 完整结构数据；6 个无模板 Word 类底稿（A18/A26/A27/B5/B22/S17）待 docx 扫描补充
 - **用户自定义底稿流程设计**：上传模板→自动扫描 sheet→按 new_workpaper_defaults 生成默认步骤→naming_patterns 自动匹配→未匹配的前端手动指定→写入 custom_rules→下次同类复用
 - **底稿关联关系全景（2026-05-17 分析）**：核心枢纽 = REPORT(20入)/NOTE(17入)/D2(9)/H1(7)/J1(6)/F2(6)/D4(6)；9 条关键数据流链路（TB→报表→附注 / D2→坏账→减值 / H1→折旧三向分摊 / J1→薪酬三向分摊 / L1/L3→利息→L8 / N1→N3→N5 / B15→全部 / C→D-N / A→报告）；系统模块联动 = disclosure_notes←10底稿 / audit_report←3 / trial_balance←2 / adjustments←1 / misstatements←1 / consolidation←1
-- **底稿数据体系下一步优先级**：P0 前端接入 step_sheet_mapping（1天）→ P1 跨模块引用可视化（2天）→ P2 校验规则实时检查（2天）→ P3 stale 传播链（已有基础设施）→ P4 B/C/A/S 预填充项目信息（1天）；核心洞察 = 数据层已完备，瓶颈在前端呈现层
+- **底稿数据体系下一步优先级**：~~P0 前端接入 step_sheet_mapping（1天）→ P1 跨模块引用可视化（2天）→ P2 校验规则实时检查（2天）→ P3 stale 传播链（已有基础设施）→ P4 B/C/A/S 预填充项目信息（1天）~~；核心洞察 = 数据层已完备，瓶颈在前端呈现层
+- **P0-P4 全部完成（2026-05-17，commit 239e970）**：新建 `wp_step_mapping.py`（6 端点：step-mapping/mapping-rules/custom/references/validation-rules/stale-chain）+ `wp_prefill_context.py`（1 端点）+ `useStepMapping.ts` composable + `WpReferencePanel.vue` 组件 + WorkpaperEditor 步骤导航栏；router_registry §57+§58 注册；apiPaths 新增 8 条路径
+- **底稿模块 3 个前端界面关系梳理**：WorkpaperList（树形列表/项目经理视角/管理入口）→ WorkpaperEditor（Univer 编辑器/审计助理/具体工作）← WorkpaperWorkbench（循环看板/进度追踪/批量操作）；List 和 Workbench 功能重叠（都展示列表+跳转 Editor），建议未来合并为一个界面用 Tab 切换视图模式（树形/看板/进度），当前保持现状不大改
 - **复盘补齐 3 个关键缺口（commit 74d87f2）**：(1) Foundation 新增 Requirement 0"底稿模板完整加载保障"（8 条验收标准覆盖全 sheet/合并/冻结/格式/固定文字/错误提示）；(2) Foundation 新增 Task 1.0"验证底稿模板完整加载链路"作为 Sprint 1 第一个任务（不通过不进后续）；(3) Foundation 新增 Task 1.2b"prefill_engine 新增 TB_AUX formula_type 支持"（Cycle-D 只产出数据不改引擎，引擎扩展由 Foundation 承担）
 - **底稿在线编辑空白问题深入分析（2026-05-16 Playwright 实测）**：
   - **后端 100% 正常**：GET /xlsx-to-json 返回 200 + 20 sheets 完整数据（浏览器内 fetch 实测确认）

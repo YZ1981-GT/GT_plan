@@ -19,7 +19,7 @@
   },
   "mappings": {
     "D2": {
-      "wp_name": "应收账款",
+      "wp_name": "应收账款审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -104,7 +104,7 @@
       ]
     },
     "D4": {
-      "wp_name": "营业收入",
+      "wp_name": "营业收入审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -207,7 +207,7 @@
       ]
     },
     "D0": {
-      "wp_name": "函证",
+      "wp_name": "收入循环函证",
       "has_template": true,
       "available_sheets": [
         "函证差异检查表（示例）",
@@ -283,7 +283,7 @@
       ]
     },
     "D1": {
-      "wp_name": "应收票据",
+      "wp_name": "应收票据审定表",
       "has_template": true,
       "available_sheets": [
         "关联方关系及交易检查表D1-11",
@@ -379,7 +379,7 @@
       ]
     },
     "D3": {
-      "wp_name": "预收款项",
+      "wp_name": "预收账款审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -466,7 +466,7 @@
       ]
     },
     "D5": {
-      "wp_name": "应收款项融资",
+      "wp_name": "合同资产审定表",
       "has_template": true,
       "available_sheets": [
         "审定表D5",
@@ -547,7 +547,7 @@
       ]
     },
     "D6": {
-      "wp_name": "合同资产",
+      "wp_name": "合同负债审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -639,7 +639,7 @@
       ]
     },
     "D7": {
-      "wp_name": "合同负债",
+      "wp_name": "应收款项融资审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -831,7 +831,7 @@
       ]
     },
     "F2": {
-      "wp_name": "存货",
+      "wp_name": "存货及跌价准备审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -982,7 +982,7 @@
       ]
     },
     "G1": {
-      "wp_name": "长期股权投资",
+      "wp_name": "长期股权投资审定表",
       "has_template": true,
       "available_sheets": [
         "业务模式分析G1-8",
@@ -1065,7 +1065,7 @@
       ]
     },
     "H1": {
-      "wp_name": "固定资产",
+      "wp_name": "固定资产审定表",
       "has_template": true,
       "available_sheets": [
         "会计政策估计检查表H1-5",
@@ -1158,7 +1158,7 @@
       ]
     },
     "I1": {
-      "wp_name": "无形资产",
+      "wp_name": "无形资产审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -1244,7 +1244,7 @@
       ]
     },
     "J1": {
-      "wp_name": "应付职工薪酬",
+      "wp_name": "应付职工薪酬审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -1336,7 +1336,7 @@
       ]
     },
     "K8": {
-      "wp_name": "管理费用",
+      "wp_name": "其他应付款审定表",
       "has_template": true,
       "available_sheets": [
         "合同检查表K8-5",
@@ -1414,7 +1414,7 @@
       ]
     },
     "L1": {
-      "wp_name": "短期借款",
+      "wp_name": "短期借款审定表",
       "has_template": true,
       "available_sheets": [
         " 短期借款实质性程序表L1A",
@@ -1493,7 +1493,7 @@
       ]
     },
     "M1": {
-      "wp_name": "实收资本",
+      "wp_name": "实收资本审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -1568,7 +1568,7 @@
       ]
     },
     "N1": {
-      "wp_name": "应交税费",
+      "wp_name": "递延所得税资产审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -1642,7 +1642,7 @@
       ]
     },
     "E0": {
-      "wp_name": "货币资金函证",
+      "wp_name": "银行询证函",
       "has_template": true,
       "available_sheets": [
         "借款发函记录表E0-4",
@@ -1729,7 +1729,7 @@
       ]
     },
     "F0": {
-      "wp_name": "存货函证",
+      "wp_name": "存货循环函证",
       "has_template": true,
       "available_sheets": [
         "函证差异检查表（示例）",
@@ -1810,7 +1810,7 @@
       ]
     },
     "F1": {
-      "wp_name": "原材料",
+      "wp_name": "预付账款审定表",
       "has_template": true,
       "available_sheets": [
         "关联方及交易检查表F1-6",
@@ -1887,7 +1887,7 @@
       ]
     },
     "F3": {
-      "wp_name": "库存商品",
+      "wp_name": "应付票据审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -1972,7 +1972,7 @@
       ]
     },
     "F4": {
-      "wp_name": "在产品/半成品",
+      "wp_name": "应付账款审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -2051,7 +2051,7 @@
       ]
     },
     "F5": {
-      "wp_name": "生产成本",
+      "wp_name": "营业成本审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -2126,7 +2126,7 @@
       ]
     },
     "G0": {
-      "wp_name": "投资函证",
+      "wp_name": "投资循环函证",
       "has_template": true,
       "available_sheets": [
         "函证差异核对表G0-3（证券投资）",
@@ -2205,7 +2205,7 @@
       ]
     },
     "G2": {
-      "wp_name": "交易性金融资产",
+      "wp_name": "投资性房地产审定表",
       "has_template": true,
       "available_sheets": [
         "凭证检查表G2-8",
@@ -2283,7 +2283,7 @@
       ]
     },
     "G3": {
-      "wp_name": "债权投资",
+      "wp_name": "交易性金融资产审定表",
       "has_template": true,
       "available_sheets": [
         "审定表G3-1",
@@ -2356,7 +2356,7 @@
       ]
     },
     "G4": {
-      "wp_name": "其他债权投资",
+      "wp_name": "债权投资审定表",
       "has_template": true,
       "available_sheets": [
         "业务模式分析G4-5",
@@ -2442,7 +2442,7 @@
       ]
     },
     "G5": {
-      "wp_name": "其他权益工具投资",
+      "wp_name": "其他权益工具投资审定表",
       "has_template": true,
       "available_sheets": [
         "余额明细表G5-2",
@@ -2524,7 +2524,7 @@
       ]
     },
     "G6": {
-      "wp_name": "其他非流动金融资产",
+      "wp_name": "其他非流动金融资产审定表",
       "has_template": true,
       "available_sheets": [
         "业务模式分析G6-7",
@@ -2613,7 +2613,7 @@
       ]
     },
     "G7": {
-      "wp_name": "投资性房地产",
+      "wp_name": "长期股权投资审定表",
       "has_template": true,
       "available_sheets": [
         "减值测试表G7-17",
@@ -2700,7 +2700,7 @@
       ]
     },
     "G8": {
-      "wp_name": "可供出售金融资产",
+      "wp_name": "其他权益工具投资审定表",
       "has_template": true,
       "available_sheets": [
         "公允价值测试表G8-4",
@@ -2777,7 +2777,7 @@
       ]
     },
     "G9": {
-      "wp_name": "持有至到期投资",
+      "wp_name": "其他非流动金融资产审定表",
       "has_template": true,
       "available_sheets": [
         "公允价值测试表G9-4",
@@ -2852,7 +2852,7 @@
       ]
     },
     "G10": {
-      "wp_name": "商誉",
+      "wp_name": "交易性金融负债审定表",
       "has_template": true,
       "available_sheets": [
         "交易性金融负债实质性程序表G10A",
@@ -2929,7 +2929,7 @@
       ]
     },
     "G11": {
-      "wp_name": "长期待摊费用",
+      "wp_name": "投资收益审定表",
       "has_template": true,
       "available_sheets": [
         "凭证检查表G11-5",
@@ -3004,7 +3004,7 @@
       ]
     },
     "G12": {
-      "wp_name": "其他资产",
+      "wp_name": "净敞口套期收益审定表",
       "has_template": true,
       "available_sheets": [
         "公允价值测试表G12-4",
@@ -3081,7 +3081,7 @@
       ]
     },
     "G13": {
-      "wp_name": "金融资产减值",
+      "wp_name": "公允价值变动收益审定表",
       "has_template": true,
       "available_sheets": [
         "公允价值变动收益审计程序表G13A",
@@ -3154,7 +3154,7 @@
       ]
     },
     "G14": {
-      "wp_name": "信用减值损失",
+      "wp_name": "信用减值损失审定表",
       "has_template": true,
       "available_sheets": [
         "信用减值损失审计程序表G14A",
@@ -3227,7 +3227,7 @@
       ]
     },
     "H0": {
-      "wp_name": "固定资产函证",
+      "wp_name": "固定资产循环函证",
       "has_template": true,
       "available_sheets": [
         "函证程序舞弊风险评价表H0-7",
@@ -3304,7 +3304,7 @@
       ]
     },
     "H2": {
-      "wp_name": "累计折旧",
+      "wp_name": "在建工程审定表",
       "has_template": true,
       "available_sheets": [
         "关联交易检查表H2-17",
@@ -3390,7 +3390,7 @@
       ]
     },
     "H3": {
-      "wp_name": "固定资产减值准备",
+      "wp_name": "使用权资产审定表",
       "has_template": true,
       "available_sheets": [
         "互转审核表H3-6",
@@ -3484,7 +3484,7 @@
       ]
     },
     "H4": {
-      "wp_name": "固定资产清理",
+      "wp_name": "工程物资审定表",
       "has_template": true,
       "available_sheets": [
         "关联交易检查表H4-9",
@@ -3561,7 +3561,7 @@
       ]
     },
     "H5": {
-      "wp_name": "生产性生物资产",
+      "wp_name": "油气资产审定表",
       "has_template": true,
       "available_sheets": [
         "会计政策会计估计检查表H5-5",
@@ -3652,7 +3652,7 @@
       ]
     },
     "H6": {
-      "wp_name": "油气资产",
+      "wp_name": "固定资产清理审定表",
       "has_template": true,
       "available_sheets": [
         "固定资产清理实质性程序表H6A",
@@ -3725,7 +3725,7 @@
       ]
     },
     "H7": {
-      "wp_name": "投资性房地产(成本模式)",
+      "wp_name": "生产性生物资产审定表",
       "has_template": true,
       "available_sheets": [
         "互转审核表H7-14",
@@ -3820,7 +3820,7 @@
       ]
     },
     "H8": {
-      "wp_name": "在建工程",
+      "wp_name": "使用权资产审定表",
       "has_template": true,
       "available_sheets": [
         "使用权资产 租赁负责初始及后续计量（按年）H8-6",
@@ -3904,7 +3904,7 @@
       ]
     },
     "H9": {
-      "wp_name": "使用权资产",
+      "wp_name": "租赁负债审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -3978,7 +3978,7 @@
       ]
     },
     "H10": {
-      "wp_name": "工程物资",
+      "wp_name": "资产处置损益审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -4052,7 +4052,7 @@
       ]
     },
     "I2": {
-      "wp_name": "累计摊销",
+      "wp_name": "商誉审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -4138,7 +4138,7 @@
       ]
     },
     "I3": {
-      "wp_name": "无形资产减值准备",
+      "wp_name": "长期待摊费用审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -4218,7 +4218,7 @@
       ]
     },
     "I4": {
-      "wp_name": "开发支出",
+      "wp_name": "开发支出审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -4294,7 +4294,7 @@
       ]
     },
     "I5": {
-      "wp_name": "商誉减值",
+      "wp_name": "其他非流动资产审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -4368,7 +4368,7 @@
       ]
     },
     "I6": {
-      "wp_name": "研发费用",
+      "wp_name": "研发费用审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -4445,7 +4445,7 @@
       ]
     },
     "J2": {
-      "wp_name": "应付福利费",
+      "wp_name": "长期应付职工薪酬审定表",
       "has_template": true,
       "available_sheets": [
         "审定表J2-1",
@@ -4520,7 +4520,7 @@
       ]
     },
     "J3": {
-      "wp_name": "离职后福利",
+      "wp_name": "股份支付审定表",
       "has_template": true,
       "available_sheets": [
         "IPO企业股权激励工具关注的审计重点",
@@ -4590,7 +4590,7 @@
       ]
     },
     "K0": {
-      "wp_name": "费用函证",
+      "wp_name": "管理循环函证",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -4670,7 +4670,7 @@
       ]
     },
     "K1": {
-      "wp_name": "其他应收款",
+      "wp_name": "其他应收款审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -4752,7 +4752,7 @@
       ]
     },
     "K2": {
-      "wp_name": "预付账款",
+      "wp_name": "销售费用审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -4828,7 +4828,7 @@
       ]
     },
     "K3": {
-      "wp_name": "其他流动资产",
+      "wp_name": "财务费用审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -4907,7 +4907,7 @@
       ]
     },
     "K4": {
-      "wp_name": "应付账款",
+      "wp_name": "研发费用审定表",
       "has_template": true,
       "available_sheets": [
         "其他流动负债检查表 K4-4",
@@ -4980,7 +4980,7 @@
       ]
     },
     "K5": {
-      "wp_name": "其他应付款",
+      "wp_name": "税金及附加审定表",
       "has_template": true,
       "available_sheets": [
         "产品质量保修检查表 K5-4",
@@ -5056,7 +5056,7 @@
       ]
     },
     "K6": {
-      "wp_name": "预提费用",
+      "wp_name": "持有待售资产和负债审定表",
       "has_template": true,
       "available_sheets": [
         "减值准备测试表（后续计量） K6-5",
@@ -5132,7 +5132,7 @@
       ]
     },
     "K7": {
-      "wp_name": "销售费用",
+      "wp_name": "预付款项审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -5208,7 +5208,7 @@
       ]
     },
     "K9": {
-      "wp_name": "管理费用明细",
+      "wp_name": "管理费用审定表",
       "has_template": true,
       "available_sheets": [
         "合同检查表K9-5",
@@ -5286,7 +5286,7 @@
       ]
     },
     "K10": {
-      "wp_name": "研发费用",
+      "wp_name": "营业外收入审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -5363,7 +5363,7 @@
       ]
     },
     "K11": {
-      "wp_name": "资产减值损失",
+      "wp_name": "营业外支出审定表",
       "has_template": true,
       "available_sheets": [
         "实质性程序表 K11A",
@@ -5435,7 +5435,7 @@
       ]
     },
     "K12": {
-      "wp_name": "信用减值损失",
+      "wp_name": "信用减值损失审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -5509,7 +5509,7 @@
       ]
     },
     "K13": {
-      "wp_name": "营业外收支",
+      "wp_name": "资产减值损失审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -5583,7 +5583,7 @@
       ]
     },
     "L0": {
-      "wp_name": "借款函证",
+      "wp_name": "债务循环函证",
       "has_template": true,
       "available_sheets": [
         "函证差异检查表（示例）",
@@ -5662,7 +5662,7 @@
       ]
     },
     "L2": {
-      "wp_name": "应付票据",
+      "wp_name": "长期借款审定表",
       "has_template": true,
       "available_sheets": [
         "审定表L2-1",
@@ -5735,7 +5735,7 @@
       ]
     },
     "L3": {
-      "wp_name": "长期借款",
+      "wp_name": "长期借款审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -5813,7 +5813,7 @@
       ]
     },
     "L4": {
-      "wp_name": "应付债券",
+      "wp_name": "租赁负债审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -5894,7 +5894,7 @@
       ]
     },
     "L5": {
-      "wp_name": "长期应付款",
+      "wp_name": "应付债券审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -5971,7 +5971,7 @@
       ]
     },
     "L6": {
-      "wp_name": "租赁负债",
+      "wp_name": "长期应付款审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -6044,7 +6044,7 @@
       ]
     },
     "L7": {
-      "wp_name": "预计负债",
+      "wp_name": "预计负债审定表",
       "has_template": true,
       "available_sheets": [
         "其他非流动负债实质性程序表L7A",
@@ -6117,7 +6117,7 @@
       ]
     },
     "L8": {
-      "wp_name": "财务费用",
+      "wp_name": "财务费用审定表",
       "has_template": true,
       "available_sheets": [
         "实质性程序表L8A",
@@ -6192,7 +6192,7 @@
       ]
     },
     "M2": {
-      "wp_name": "资本公积",
+      "wp_name": "资本公积审定表",
       "has_template": true,
       "available_sheets": [
         " 实收资本实质性程序表 M2A",
@@ -6268,7 +6268,7 @@
       ]
     },
     "M3": {
-      "wp_name": "其他综合收益",
+      "wp_name": "盈余公积审定表",
       "has_template": true,
       "available_sheets": [
         " 库存股实质性程序表 M3A",
@@ -6342,7 +6342,7 @@
       ]
     },
     "M4": {
-      "wp_name": "库存股",
+      "wp_name": "未分配利润审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -6416,7 +6416,7 @@
       ]
     },
     "M5": {
-      "wp_name": "盈余公积",
+      "wp_name": "其他综合收益审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -6491,7 +6491,7 @@
       ]
     },
     "M6": {
-      "wp_name": "未分配利润",
+      "wp_name": "库存股审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -6567,7 +6567,7 @@
       ]
     },
     "M7": {
-      "wp_name": "少数股东权益",
+      "wp_name": "专项储备审定表",
       "has_template": true,
       "available_sheets": [
         " 专项储备实质性程序表 M7A ",
@@ -6642,7 +6642,7 @@
       ]
     },
     "M8": {
-      "wp_name": "股份支付",
+      "wp_name": "一般风险准备审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -6718,7 +6718,7 @@
       ]
     },
     "M9": {
-      "wp_name": "利润分配",
+      "wp_name": "其他综合收益审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -6792,7 +6792,7 @@
       ]
     },
     "M10": {
-      "wp_name": "营业外收入",
+      "wp_name": "其他权益工具审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -6869,7 +6869,7 @@
       ]
     },
     "N2": {
-      "wp_name": "递延所得税资产",
+      "wp_name": "应交税费审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -6951,7 +6951,7 @@
       ]
     },
     "N3": {
-      "wp_name": "递延所得税负债",
+      "wp_name": "所得税费用审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -7023,7 +7023,7 @@
       ]
     },
     "N4": {
-      "wp_name": "所得税费用",
+      "wp_name": "税金及附加审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -7106,7 +7106,7 @@
       ]
     },
     "N5": {
-      "wp_name": "税金及附加",
+      "wp_name": "所得税费用审定表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -7187,7 +7187,7 @@
       ]
     },
     "B1": {
-      "wp_name": "计划阶段",
+      "wp_name": "风险评估表",
       "has_template": true,
       "available_sheets": [
         " B1-5 KAA检查表-业务承接",
@@ -7239,7 +7239,7 @@
       ]
     },
     "C1": {
-      "wp_name": "企业层面控制",
+      "wp_name": "企业层面控制测试",
       "has_template": true,
       "available_sheets": [
         "C1 企业层面控制测试程序表",
@@ -7339,7 +7339,7 @@
       ]
     },
     "A1": {
-      "wp_name": "完成阶段",
+      "wp_name": "财务报告程序表",
       "has_template": true,
       "available_sheets": [
         "1.文号规则",
@@ -7411,7 +7411,7 @@
       ]
     },
     "S1": {
-      "wp_name": "特定项目",
+      "wp_name": "对被审计单位违反法规行为的考虑",
       "has_template": true,
       "available_sheets": [
         "S1-1对法律法规的考虑记录表",
@@ -7465,7 +7465,7 @@
       ]
     },
     "A2": {
-      "wp_name": "调整分录汇总",
+      "wp_name": "调整分录程序表",
       "has_template": true,
       "available_sheets": [
         " ",
@@ -7561,7 +7561,7 @@
       ]
     },
     "A3": {
-      "wp_name": "合并流程",
+      "wp_name": "合并流程程序表",
       "has_template": true,
       "available_sheets": [
         " ",
@@ -7752,7 +7752,7 @@
       ]
     },
     "A4": {
-      "wp_name": "经营分部",
+      "wp_name": "经营分部程序表",
       "has_template": true,
       "available_sheets": [
         "A4 经营分部程序表",
@@ -7795,7 +7795,7 @@
       ]
     },
     "A5": {
-      "wp_name": "财务报表支持",
+      "wp_name": "财务报表支持程序表",
       "has_template": true,
       "available_sheets": [
         "A5 财务报表支持程序表",
@@ -7859,7 +7859,7 @@
       ]
     },
     "A6": {
-      "wp_name": "组成部分会计师报告",
+      "wp_name": "组成部分会计师报告（集团审计）程序程序表",
       "has_template": true,
       "available_sheets": [
         "A6 组成部分会计师报告程序表",
@@ -8014,7 +8014,7 @@
       ]
     },
     "A7": {
-      "wp_name": "关联交易",
+      "wp_name": "关联交易程序表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -8058,7 +8058,7 @@
       ]
     },
     "A8": {
-      "wp_name": "其他信息",
+      "wp_name": "其他信息程序表20",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -8101,7 +8101,7 @@
       ]
     },
     "A9": {
-      "wp_name": "内部控制建议",
+      "wp_name": "内部控制建议程序表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -8151,7 +8151,7 @@
       ]
     },
     "A10": {
-      "wp_name": "与治理层沟通",
+      "wp_name": "与治理层沟通程序表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -8203,7 +8203,7 @@
       ]
     },
     "A11": {
-      "wp_name": "期后事项",
+      "wp_name": "期后事项程序表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -8278,7 +8278,7 @@
       ]
     },
     "A12": {
-      "wp_name": "律师回复",
+      "wp_name": "律师回复程序表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -8328,7 +8328,7 @@
       ]
     },
     "A13": {
-      "wp_name": "错报汇总",
+      "wp_name": "错报（程序表及底稿）",
       "has_template": true,
       "available_sheets": [
         "A13-1 未更正错报汇总表",
@@ -8402,7 +8402,7 @@
       ]
     },
     "A14": {
-      "wp_name": "内部控制缺陷",
+      "wp_name": "内部控制缺陷程序表",
       "has_template": true,
       "available_sheets": [
         "A14-1控制缺陷汇总表",
@@ -8477,7 +8477,7 @@
       ]
     },
     "A15": {
-      "wp_name": "持续经营",
+      "wp_name": "持续经营假设的考虑程序表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -8551,7 +8551,7 @@
       ]
     },
     "A16": {
-      "wp_name": "管理层声明书",
+      "wp_name": "管理层声明书程序表",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -8617,7 +8617,7 @@
       ]
     },
     "A17": {
-      "wp_name": "重大事项概要",
+      "wp_name": "重大事项概要程序表",
       "has_template": true,
       "available_sheets": [
         "A17 重大事项概要程序表",
@@ -8663,7 +8663,7 @@
       ]
     },
     "A18": {
-      "wp_name": "向监管部门报送",
+      "wp_name": "向监管部门报送审计小结的函",
       "has_template": false,
       "steps": [
         {
@@ -8699,7 +8699,7 @@
       ]
     },
     "A21": {
-      "wp_name": "现场负责人复核",
+      "wp_name": "项目现场负责人复核表及复核记录（适用于财报审计）",
       "has_template": true,
       "available_sheets": [
         "复核记录",
@@ -8752,7 +8752,7 @@
       ]
     },
     "A22": {
-      "wp_name": "项目负责经理复核",
+      "wp_name": "项目负责经理复核(适用于财报审计)",
       "has_template": true,
       "available_sheets": [
         " A22-1-1 复核记录",
@@ -8805,7 +8805,7 @@
       ]
     },
     "A23": {
-      "wp_name": "项目合伙人复核",
+      "wp_name": "项目合伙人复核(适用于财报审计)",
       "has_template": true,
       "available_sheets": [
         "A23-1 项目合伙人复核（适用于财报审计）",
@@ -8849,7 +8849,7 @@
       ]
     },
     "A24": {
-      "wp_name": "质量复核合伙人",
+      "wp_name": "项目质量复核合伙人复核表及记录（财务报表审计-适用非大型国企）",
       "has_template": true,
       "available_sheets": [
         "复核记录参考模板A24-2-1",
@@ -8904,7 +8904,7 @@
       ]
     },
     "A25": {
-      "wp_name": "质量控制复核人",
+      "wp_name": "质量控制复核人复核表及复核记录(适用于财报审计-适用大型国企)",
       "has_template": true,
       "available_sheets": [
         "Sheet1",
@@ -8956,7 +8956,7 @@
       ]
     },
     "A26": {
-      "wp_name": "专业技术委员会",
+      "wp_name": "专业技术委员会业务报告审核提交资料清单",
       "has_template": false,
       "steps": [
         {
@@ -8992,7 +8992,7 @@
       ]
     },
     "A27": {
-      "wp_name": "IT审计总结",
+      "wp_name": "IT审计总结备忘录",
       "has_template": false,
       "steps": [
         {
@@ -9064,7 +9064,7 @@
       ]
     },
     "A30": {
-      "wp_name": "电子底稿归档",
+      "wp_name": "电子底稿归档检查表",
       "has_template": true,
       "available_sheets": [
         "电子底稿归档检查表"
@@ -9105,7 +9105,7 @@
       ]
     },
     "A31": {
-      "wp_name": "审计标识",
+      "wp_name": "审计标识一览表",
       "has_template": true,
       "available_sheets": [
         "审计标识A31"
@@ -9138,7 +9138,7 @@
       ]
     },
     "B2": {
-      "wp_name": "与前任CPA沟通",
+      "wp_name": "与前任注册会计师的沟通程序表",
       "has_template": true,
       "available_sheets": [
         "B2 与前任注册会计师的沟通",
@@ -9189,7 +9189,7 @@
       ]
     },
     "B3": {
-      "wp_name": "独立性声明",
+      "wp_name": "独立性确认程序表",
       "has_template": true,
       "available_sheets": [
         "B3 独立性确认表"
@@ -9222,7 +9222,7 @@
       ]
     },
     "B5": {
-      "wp_name": "业务约定书",
+      "wp_name": "业务约定书控制表",
       "has_template": false,
       "steps": [
         {
@@ -9252,7 +9252,7 @@
       ]
     },
     "B10": {
-      "wp_name": "了解被审计单位",
+      "wp_name": "了解被审计单位及其环境和适用的财务报告编制基础",
       "has_template": true,
       "available_sheets": [
         "B10 了解被审计单位及其所处环境和适用的财务报告编制基程序表",
@@ -9312,7 +9312,7 @@
       ]
     },
     "B11": {
-      "wp_name": "检查程序",
+      "wp_name": "检查相关信息或文件记录程序表",
       "has_template": true,
       "available_sheets": [
         "B11-1股东大会、董事会等会议记录的摘录",
@@ -9358,7 +9358,7 @@
       ]
     },
     "B12": {
-      "wp_name": "访谈程序",
+      "wp_name": "与相关人员访谈程序及记录",
       "has_template": true,
       "available_sheets": [
         "B12A 与管理层访谈程序",
@@ -9418,7 +9418,7 @@
       ]
     },
     "B13": {
-      "wp_name": "初步分析程序",
+      "wp_name": "初步分析程序表",
       "has_template": true,
       "available_sheets": [
         "B13 初步分析程序表",
@@ -9475,7 +9475,7 @@
       ]
     },
     "B15": {
-      "wp_name": "重要性",
+      "wp_name": "重要性计算表",
       "has_template": true,
       "available_sheets": [
         "B15 重要性计算表",
@@ -9551,7 +9551,7 @@
       ]
     },
     "B18": {
-      "wp_name": "内部审计",
+      "wp_name": "了解内部审计程序表",
       "has_template": true,
       "available_sheets": [
         "B18 了解内部审计程序表",
@@ -9595,7 +9595,7 @@
       ]
     },
     "B19": {
-      "wp_name": "关联方",
+      "wp_name": "识别关联方程序表",
       "has_template": true,
       "available_sheets": [
         "B19-1 识别未披露关联方",
@@ -9639,7 +9639,7 @@
       ]
     },
     "B22": {
-      "wp_name": "审计抽样",
+      "wp_name": "了解企业层面控制 - 控制环境",
       "has_template": false,
       "steps": [
         {
@@ -9675,7 +9675,7 @@
       ]
     },
     "B23": {
-      "wp_name": "业务循环控制",
+      "wp_name": "了解、评价并测试销售循环业务层面控制",
       "has_template": true,
       "available_sheets": [
         "B23-15 了解信息处理控制",
@@ -9774,7 +9774,7 @@
       ]
     },
     "B30": {
-      "wp_name": "集团审计",
+      "wp_name": "集团审计程序表",
       "has_template": true,
       "available_sheets": [
         " B30-8-1 组成部分注册会计师 A",
@@ -9968,7 +9968,7 @@
       ]
     },
     "B40": {
-      "wp_name": "项目组讨论",
+      "wp_name": "项目组讨论程序表",
       "has_template": true,
       "available_sheets": [
         "B40 审计项目组的讨论程序表"
@@ -10009,7 +10009,7 @@
       ]
     },
     "B50": {
-      "wp_name": "审计策略",
+      "wp_name": "汇总风险评估结果程序表",
       "has_template": true,
       "available_sheets": [
         "B50 汇总风险评估结果",
@@ -10061,7 +10061,7 @@
       ]
     },
     "B51": {
-      "wp_name": "审计计划",
+      "wp_name": "舞弊风险因素",
       "has_template": true,
       "available_sheets": [
         "B51-1 识别舞弊风险因素（虚假报告）",
@@ -10119,7 +10119,7 @@
       ]
     },
     "B52": {
-      "wp_name": "工时预算",
+      "wp_name": "舞弊 - 管理层凌驾于控制之上的风险",
       "has_template": true,
       "available_sheets": [
         "B52 管理层凌驾"
@@ -10160,7 +10160,7 @@
       ]
     },
     "B60": {
-      "wp_name": "总体审计策略",
+      "wp_name": "总体审计策略及具体审计计划",
       "has_template": true,
       "available_sheets": [
         "B61-1工时预算与控制板（按阶段）",
@@ -10244,7 +10244,7 @@
       ]
     },
     "C2": {
-      "wp_name": "销售循环控制",
+      "wp_name": "销售循环控制测试",
       "has_template": true,
       "available_sheets": [
         "C2-1-X控制测试",
@@ -10308,7 +10308,7 @@
       ]
     },
     "C3": {
-      "wp_name": "货币资金控制",
+      "wp_name": "货币资金循环业务层面控制测试",
       "has_template": true,
       "available_sheets": [
         "C3-1-X控制测试",
@@ -10372,7 +10372,7 @@
       ]
     },
     "C4": {
-      "wp_name": "存货控制",
+      "wp_name": "存货循环控制测试",
       "has_template": true,
       "available_sheets": [
         "C4-1-X控制测试",
@@ -10435,7 +10435,7 @@
       ]
     },
     "C5": {
-      "wp_name": "投资控制",
+      "wp_name": "投资循环控制测试",
       "has_template": true,
       "available_sheets": [
         "C5-1-X控制测试",
@@ -10498,7 +10498,7 @@
       ]
     },
     "C6": {
-      "wp_name": "固定资产控制",
+      "wp_name": "固定资产循环控制测试",
       "has_template": true,
       "available_sheets": [
         "C6-1-X控制测试",
@@ -10561,7 +10561,7 @@
       ]
     },
     "C7": {
-      "wp_name": "在建工程控制",
+      "wp_name": "在建工程循环控制测试",
       "has_template": true,
       "available_sheets": [
         "C7-1-X控制测试",
@@ -10624,7 +10624,7 @@
       ]
     },
     "C8": {
-      "wp_name": "无形资产控制",
+      "wp_name": "无形资产及其他长期资产循环控制测试",
       "has_template": true,
       "available_sheets": [
         "C2-2评价控制偏差",
@@ -10688,7 +10688,7 @@
       ]
     },
     "C9": {
-      "wp_name": "研发控制",
+      "wp_name": "研发循环控制测试",
       "has_template": true,
       "available_sheets": [
         "C9-1-X控制测试",
@@ -10751,7 +10751,7 @@
       ]
     },
     "C10": {
-      "wp_name": "薪酬控制",
+      "wp_name": "职工薪酬循环控制测试",
       "has_template": true,
       "available_sheets": [
         "C10-1-X控制测试",
@@ -10814,7 +10814,7 @@
       ]
     },
     "C11": {
-      "wp_name": "管理费用控制",
+      "wp_name": "管理循环控制测试",
       "has_template": true,
       "available_sheets": [
         "C11-1-X控制测试",
@@ -10878,7 +10878,7 @@
       ]
     },
     "C12": {
-      "wp_name": "税金控制",
+      "wp_name": "税金循环控制测试",
       "has_template": true,
       "available_sheets": [
         "C11-2评价控制偏差",
@@ -10941,7 +10941,7 @@
       ]
     },
     "C13": {
-      "wp_name": "债务控制",
+      "wp_name": "债务循环业务层面控制测试",
       "has_template": true,
       "available_sheets": [
         "C13-2评价控制偏差",
@@ -11004,7 +11004,7 @@
       ]
     },
     "C14": {
-      "wp_name": "租赁控制",
+      "wp_name": "租赁循环控制测试",
       "has_template": true,
       "available_sheets": [
         "C14-1-X控制测试",
@@ -11067,7 +11067,7 @@
       ]
     },
     "C15": {
-      "wp_name": "关联方控制",
+      "wp_name": "关联方循环控制测试",
       "has_template": true,
       "available_sheets": [
         "C15-1-X控制测试",
@@ -11131,7 +11131,7 @@
       ]
     },
     "C21": {
-      "wp_name": "IT专员",
+      "wp_name": "具有信息技术专业技能的项目组成员",
       "has_template": true,
       "available_sheets": [
         "C21 具有信息技术专业技能的项目组成员",
@@ -11187,7 +11187,7 @@
       ]
     },
     "C22": {
-      "wp_name": "IT一般控制",
+      "wp_name": "IT一般控制测试",
       "has_template": true,
       "available_sheets": [
         "C22 IT一般控制测试",
@@ -11269,7 +11269,7 @@
       ]
     },
     "C23": {
-      "wp_name": "会计分录控制",
+      "wp_name": "会计分录 - 控制测试",
       "has_template": true,
       "available_sheets": [
         "C23A 会计分录控制测试程序表",
@@ -11322,7 +11322,7 @@
       ]
     },
     "C24": {
-      "wp_name": "会计分录细节",
+      "wp_name": "会计分录 - 细节测试",
       "has_template": true,
       "available_sheets": [
         "2025假期清单",
@@ -11386,7 +11386,7 @@
       ]
     },
     "C25": {
-      "wp_name": "内部审计",
+      "wp_name": "利用内审工作",
       "has_template": true,
       "available_sheets": [
         "C25利用内部审计工作",
@@ -11428,7 +11428,7 @@
       ]
     },
     "C26": {
-      "wp_name": "信息处理",
+      "wp_name": "信息处理控制测试",
       "has_template": true,
       "available_sheets": [
         "C26 信息处理控制测试"
@@ -11477,7 +11477,7 @@
       ]
     },
     "S2": {
-      "wp_name": "期初余额",
+      "wp_name": "首次接受委托时对期初余额的审计",
       "has_template": true,
       "available_sheets": [
         "表头（请先填写）",
@@ -11519,7 +11519,7 @@
       ]
     },
     "S3": {
-      "wp_name": "会计政策变更",
+      "wp_name": "会计政策变更、前期差错会计、估计变更",
       "has_template": true,
       "available_sheets": [
         "会计估计变更审计程序S3-2",
@@ -11570,7 +11570,7 @@
       ]
     },
     "S4": {
-      "wp_name": "非货币性交换",
+      "wp_name": "非货币性资产交换",
       "has_template": true,
       "available_sheets": [
         "商业实质的判断S4-2",
@@ -11663,7 +11663,7 @@
       ]
     },
     "S6": {
-      "wp_name": "关联方资金占用",
+      "wp_name": "对大股东及关联方资金占用和违规担保情况审核程序",
       "has_template": true,
       "available_sheets": [
         "Sheet2",
@@ -11764,7 +11764,7 @@
       ]
     },
     "S9": {
-      "wp_name": "电子商务",
+      "wp_name": "对电子商务的考虑",
       "has_template": true,
       "available_sheets": [
         "内部控制调查表S9-2",
@@ -11812,7 +11812,7 @@
       ]
     },
     "S10": {
-      "wp_name": "环境事项",
+      "wp_name": "对环境事项的考虑",
       "has_template": true,
       "available_sheets": [
         "审定表S10-1",
@@ -11862,7 +11862,7 @@
       ]
     },
     "S11": {
-      "wp_name": "服务机构",
+      "wp_name": "利用服务机构活动",
       "has_template": true,
       "available_sheets": [
         "对被审计单位使用服务机构的考虑S11",
@@ -11904,7 +11904,7 @@
       ]
     },
     "S12": {
-      "wp_name": "利用专家",
+      "wp_name": "利用专家（注册会计师的专家）的工作",
       "has_template": true,
       "available_sheets": [
         "S12 利用专家的工作程序表",
@@ -11953,7 +11953,7 @@
       ]
     },
     "S13": {
-      "wp_name": "管理层专家",
+      "wp_name": "利用管理层的专家编制的信息形成审计证据",
       "has_template": true,
       "available_sheets": [
         "S13 利用管理层的专家形成审计证据程序表",
@@ -12001,7 +12001,7 @@
       ]
     },
     "S14": {
-      "wp_name": "会计估计",
+      "wp_name": "会计估计和相关披露",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -12055,7 +12055,7 @@
       ]
     },
     "S15": {
-      "wp_name": "每股收益",
+      "wp_name": "每股收益和净资产收益率",
       "has_template": true,
       "available_sheets": [
         "净资产收益率计算S15-4",
@@ -12103,7 +12103,7 @@
       ]
     },
     "S16": {
-      "wp_name": "套期",
+      "wp_name": "套期活动",
       "has_template": true,
       "available_sheets": [
         "套期活动S16",
@@ -12183,7 +12183,7 @@
       ]
     },
     "S20": {
-      "wp_name": "营业收入扣除",
+      "wp_name": "营业收入扣除情况核查底稿",
       "has_template": true,
       "available_sheets": [
         "营业收入扣除情况核查"
@@ -12271,7 +12271,7 @@
       ]
     },
     "S32": {
-      "wp_name": "551文",
+      "wp_name": "专项核查-资产减值估计不足的情形",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -12339,7 +12339,7 @@
       ]
     },
     "S33": {
-      "wp_name": "14号公告",
+      "wp_name": "程序修订说明",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -12399,7 +12399,7 @@
       ]
     },
     "S34": {
-      "wp_name": "首发审核",
+      "wp_name": "-0证监会及沪深北证券交易所需会计师核查事项清单",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",
@@ -12522,7 +12522,7 @@
       ]
     },
     "S35": {
-      "wp_name": "再融资审核",
+      "wp_name": "关联交易",
       "has_template": true,
       "available_sheets": [
         "GT_Custom",

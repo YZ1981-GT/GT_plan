@@ -113,7 +113,11 @@ const router = createRouter({
         {
           path: 'projects/:projectId/workpaper-bench',
           name: 'WorkpaperWorkbench',
-          component: () => import('@/views/WorkpaperWorkbench.vue'),
+          redirect: (to) => ({
+            name: 'WorkpaperList',
+            params: { projectId: to.params.projectId },
+            query: { view: 'workbench' },
+          }),
         },
         {
           path: 'projects/:projectId/review-inbox',
