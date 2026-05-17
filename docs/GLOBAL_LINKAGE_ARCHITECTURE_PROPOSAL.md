@@ -792,7 +792,173 @@ class FormulaReverseIndex:
 
 ---
 
-## 八、验收标准
+## 八、补充设计（复盘后 6 项改进）
+
+### 8.1 科目表（AccountMapping）联动
+
+**现状缺口**：科目映射改了（如 1122 从"应收账款"改映射到"其他应收款"），整个 TB→报表→底稿→附注链路全部错位，但当前方案没覆盖。
+
+**补充设计**：
+```
+触发：account_mapping 表 INSERT/UPDATE/DELETE
+事件：ACCOUNT_MAPPING_CHANGED
+payload：{project_id, year, old_mapping, new_mapping, affected_account_codes}
+
+影响范围（最大范围 stale 触发）：
+  1. TB:affected_codes::* → 试算表该科目行 stale
+  2. 所有 prefill_formula_mapping 中引用 affected_codes 的底稿 → prefill_stale=True
+  3. 所有 report_config 中 formula 含 TB('affected_code',...) 的报表行 → is_stale=True
+  4. 所有 note_account_mapping 中关联 affected_codes 的附注章节 → is_stale=True
+
+URI 格式：MAPPING:1122::standard_account_code
+
+代码改动：
+  - backend/app/routers/account_chart.py: POST/PUT/DELETE 追加事件发布
+  - backend/app/services/event_handlers.py: 新增 ACCOUNT_MAPPING_CHANGED handler
+  - 统一引擎 FormulaReverseIndex 增加 MAPPING → TB/WP/REPORT/NOTE 边
+```
+
+### 8.2 报表行编辑反向触发
+
+**现状缺口**：方案只说了"报表改→底稿 stale"，但没说具体哪个端点触发。
+
+**补充设计**：
+```
+触发点：ReportEngine.on_trial_balance_updated 执行完后
+逻辑：对比新旧 financial_report 行值，变化的 row_code 列表
+事件：REPORT_ROW_CHANGED
+payload：{project_id, year, changed_row_codes: ["BS-005", "IS-001"]}
+
+影响范围：
+  - 从 cross_wp_references 反查：哪些底稿的 target 是 REPORT:changed_row_code
+  - 从 prefill_formula_mapping 反查：哪些底稿公式引用了 ROW('changed_row_code')
+  - 标记这些底稿 prefill_stale=True
+
+代码改动：
+  - backend/app/services/report_engine.py: generate_all_reports 末尾对比新旧值
+  - 新增 _detect_changed_rows(old_values, new_values) → list[str]
+  - 发布 REPORT_ROW_CHANGED 事件
+```
+
+### 8.3 多项目隔离 + 权限
+
+**设计原则**：
+```
+依赖图结构：全局共享（模板级，所有项目用同一套模板结构）
+stale 传播：按项目隔离（project_id 参数强制过滤）
+公式管理中心：按项目过滤引用方列表（同一模板在不同项目有不同实例）
+
+权限矩阵：
+  address_label_overrides.json 修改 → admin/partner only
+  header_rules 修改 → admin/partner only
+  公式管理中心查看 → all roles
+  公式管理中心编辑 → admin/partner only
+  单元格右键"查看公式详情" → all roles
+  单元格右键"标记此单元格为[label]" → admin/partner/manager
+
+API 层面：
+  StalePropagationEngine.on_change(uri, project_id, year)
+    → project_id 参数确保只标记当前项目的 WorkingPaper/FinancialReport/DisclosureNote
+  GET /api/linkage/formula-usage?formula=...&project_id=...
+    → 按 project_id 过滤引用方实例
+  GET /api/linkage/cell-detail?uri=...&project_id=...
+    → 按 project_id 过滤 last_value/last_computed_at
+```
+
+### 8.4 性能设计细节
+
+```
+依赖图加载：
+  - 启动时一次性从 5 个 JSON 文件构建内存图（~5000 条有效边，<1MB）
+  - 热加载：JSON 文件变更时自动重建（inotify/polling 30s）
+  - 不存 DB（避免 N+1 查询），纯内存 dict
+
+BFS 性能：
+  - 5000 边 + max_depth=5，最坏情况 <10ms
+  - 平均情况（单底稿变更）：3-5 个下游节点，<1ms
+  - 全量 stale（账表导入）：遍历全图 ~50ms，可接受
+
+label→物理坐标解析缓存：
+  - Redis key：resolve:{project_id}:{wp_code}:{sheet_name}:{label}
+  - TTL：24h（模板结构不频繁变化）
+  - 清除时机：
+    a. 底稿保存时：SCAN resolve:{project_id}:WP:{wp_code}:* → DEL
+    b. 公式管理改配置时：清全部 resolve:* 缓存（低频操作）
+    c. address_label_overrides 修改时：清对应 URI 的缓存
+
+并发安全：
+  - BFS 传播是只读操作（读内存图），无锁
+  - mark_stale 写 DB 用 bulk UPDATE（单条 SQL），无并发冲突
+  - Redis 缓存用 SET NX + TTL，无竞态
+```
+
+### 8.5 审计日志
+
+```
+目的：排查"为什么我的底稿突然变 stale 了"
+
+数据模型：
+  linkage_audit_log 表（或 JSONB 字段追加到 audit_log_entries）
+  {
+    id, timestamp, project_id, year,
+    triggered_by_user_id,
+    source_uri,           -- 变更源（如 "WP:H1:折旧分配分析表H1-13:销售费用折旧"）
+    trigger_event,        -- 触发事件（如 "WORKPAPER_SAVED"）
+    affected_count,       -- 影响对象数
+    affected_uris,        -- 前 20 个受影响 URI（JSONB 数组）
+    propagation_depth,    -- BFS 最大深度
+    duration_ms,          -- 传播耗时
+  }
+
+前端展示：
+  - 单元格公式详情弹窗（CellFormulaDetail.vue）增加"变更历史"Tab
+  - 显示该 URI 最近 10 次被 stale 的记录：时间 + 触发源 + 触发人
+  - 底稿详情卡片增加"stale 原因"提示：点击展开最近一次 stale 的完整传播链
+
+API：
+  GET /api/linkage/audit-log?uri=WP:D2:审定表D2-1:未审数&limit=10
+  → 返回 [{timestamp, source_uri, trigger_event, triggered_by}]
+```
+
+### 8.6 降级策略
+
+```
+场景：统一引擎不可用（Redis 断连 / 依赖图加载失败 / 内存不足）
+
+降级方案：
+  后端：
+    - StalePropagationEngine 初始化失败 → 设 _degraded=True
+    - on_change() 在 _degraded 模式下：
+      a. 不做 BFS（跳过精确传播）
+      b. 回退到 event_handlers 的粗粒度 mark_stale（按 project_id 全量标）
+      c. 日志 WARNING "linkage engine degraded, falling back to event_handlers"
+    - /api/linkage/impact 返回 503 + {"degraded": true, "fallback": "event_handlers"}
+
+  前端：
+    - useStaleImpact 收到 503 → 静默降级（不显示黄条，不阻断保存）
+    - 公式详情弹窗收到 503 → 显示"联动引擎暂不可用，数据可能不是最新"
+    - 不影响核心编辑/保存流程（联动是增强功能，不是阻断功能）
+
+  健康检查：
+    GET /api/linkage/health
+    → {
+        status: "healthy" | "degraded" | "unavailable",
+        graph_loaded: true/false,
+        graph_edge_count: 5000,
+        redis_connected: true/false,
+        last_propagation_ts: "2026-05-17T10:30:00Z",
+        last_error: null | "Redis connection refused"
+      }
+
+  恢复：
+    - Redis 重连后自动恢复（下次 on_change 调用时检测）
+    - 依赖图加载失败后每 60s 重试一次
+    - 恢复后自动清除 _degraded 标记
+```
+
+---
+
+## 九、验收标准
 
 | # | 验收项 | 量化指标 |
 |---|--------|---------|
@@ -807,7 +973,7 @@ class FormulaReverseIndex:
 
 ---
 
-## 九、风险与缓解
+## 十、风险与缓解
 
 | 风险 | 缓解 |
 |------|------|
