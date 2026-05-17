@@ -137,19 +137,19 @@ formula_unified.py
 │  │           Dependency Graph（统一依赖图）                   │     │
 │  │                                                          │     │
 │  │  节点 = 任何可寻址对象：                                    │     │
-│  │    WP:D2:审定表D2-1:C10  （底稿单元格）                    │     │
-│  │    REPORT:BS-005          （报表行次）                     │     │
-│  │    NOTE:5.7:row3:col2     （附注表格单元格）               │     │
-│  │    ADJ:1122:aje_net       （调整分录科目净额）             │     │
-│  │    TB:1122:closing        （试算表科目余额）               │     │
-│  │    FORMULA:BS-005         （公式配置行）                   │     │
+│  │    WP:D2:审定表D2-1:未审数  （底稿单元格）                  │     │
+│  │    REPORT:BS-005::当期金额  （报表行次）                   │     │
+│  │    NOTE:5.7:应收账款:期末余额 （附注表格单元格）           │     │
+│  │    ADJ:1122::aje_net        （调整分录科目净额）           │     │
+│  │    TB:1122::期末余额        （试算表科目余额）             │     │
+│  │    FORMULA:BS-005::公式定义  （公式配置行）                │     │
 │  │                                                          │     │
 │  │  边 = 数据依赖关系：                                       │     │
-│  │    TB:1122 → WP:D2:审定表:未审数  （TB 供数给底稿）        │     │
-│  │    WP:D2:审定表:审定数 → REPORT:BS-005 （底稿供数给报表）  │     │
-│  │    WP:D2:审定表:审定数 → NOTE:5.7:row1 （底稿供数给附注）  │     │
-│  │    ADJ:1122:aje → WP:D2:审定表:AJE调整 （调整供数给底稿）  │     │
-│  │    FORMULA:BS-005 → REPORT:BS-005 （公式定义→报表行）      │     │
+│  │    TB:1122::期末余额 → WP:D2:审定表D2-1:未审数            │     │
+│  │    WP:D2:审定表D2-1:审定数 → REPORT:BS-005::当期金额      │     │
+│  │    WP:D2:审定表D2-1:审定数 → NOTE:5.7:应收账款:期末余额   │     │
+│  │    ADJ:1122::aje_net → WP:D2:审定表D2-1:AJE调整           │     │
+│  │    FORMULA:BS-005::公式定义 → REPORT:BS-005::当期金额      │     │
 │  │                                                          │     │
 │  └─────────────────────────────────────────────────────────┘     │
 │        │                                                          │
@@ -541,7 +541,15 @@ class StalePropagationEngine:
 **迁移策略**：
 - 保留 event_handlers.py 现有逻辑（向后兼容）
 - 在每个 handler 末尾追加 `await stale_engine.on_change(uri, ...)`
-- 前端 useStaleImpact 改调统一端点
+- 前端 useStaleImpact 改调统一端点 `/api/linkage/impact`（替代 `/v2/notify-cell-change`）
+- `/v2/notify-cell-change` 保留但标记 deprecated（过渡期 30 天后删除）
+- 统一引擎 `on_change` 一次调用同时完成：BFS 传播 + 写 DB stale + SSE 推送前端
+
+**合并后效果**：
+- 机制 A 的持久化能力（写 DB）✓
+- 机制 B 的即时可视化能力（返回前端 tag 列表）✓
+- 一个入口、一次 BFS、两个输出
+- 不再有"后端标了 stale 但前端不知道"或"前端算了影响但后端不标"的断裂
 
 ### Sprint 3：反向联动 + 公式管理联动（2 天）
 
