@@ -118,6 +118,11 @@ inclusion: always
   - `workpaper-completion-foundation`（5 天 / 3 Sprint / 27 任务）：预填充视觉指示器 / 一键填充按钮（编辑器内）/ 跨模块跳转标签 / 单元格复核标记 / 循环级复核徽章 / Playwright E2E / 覆盖保护；5 ADR（D1 prefill_meta 嵌入 cellData.custom / D2 User_Override 存 parsed_data / D3 跨模块标签 overlay div / D4 循环复核实时查询 / D5 复核标记复用 cell_annotations）；15 正确性属性
   - `workpaper-cycle-d-revenue`（3 天 / 2 Sprint / 27 任务）：D0-D7 分析程序公式 / 明细表公式（新 TB_AUX 类型）/ 18 条跨引用（4 内部 + 7 附注 + 7 报表）/ 21 条校验规则（balance_check/tb_consistency/note_consistency/detail_total_check）/ 8 底稿审计程序清单；纯数据 spec（只产出 JSON + 测试，不改引擎代码或前端 UI）；10 正确性属性
   - 执行顺序：先 Foundation（基础设施 UI 机制）→ 再 Cycle-D（具体数据填充）；两者解耦——Cycle-D 只产出 JSON 数据文件不依赖 Foundation UI 就绪即可独立实施
+- **两个三件套实施进度（2026-05-17，commit c1679bf）**：
+  - Foundation Sprint 1 ✅（Task 1.0-1.8）+ Sprint 2 ✅（Task 2.1-2.9）= 90% 完成；剩余 Sprint 3（Playwright E2E 4 用例）
+  - Cycle-D Sprint 1 ✅（Task 1.1-1.14）= 50% 完成；剩余 Sprint 2（属性测试 10 个）
+  - 核心功能代码全部就绪，剩余全是测试任务
+  - 新建文件：4 composables（usePrefillMarkers/useCrossModuleRefs/useReviewMarks/useUserOverrides）+ wp_review_status.py 端点 + Alembic 迁移 + 2 新 JSON（d_cycle_validation_rules / d_cycle_procedures）+ prefill_formula_mapping 扩展 15 条 + cross_wp_references 扩展 18 条
 - **复盘补齐 3 个关键缺口（commit 74d87f2）**：(1) Foundation 新增 Requirement 0"底稿模板完整加载保障"（8 条验收标准覆盖全 sheet/合并/冻结/格式/固定文字/错误提示）；(2) Foundation 新增 Task 1.0"验证底稿模板完整加载链路"作为 Sprint 1 第一个任务（不通过不进后续）；(3) Foundation 新增 Task 1.2b"prefill_engine 新增 TB_AUX formula_type 支持"（Cycle-D 只产出数据不改引擎，引擎扩展由 Foundation 承担）
 - **底稿在线编辑空白问题深入分析（2026-05-16 Playwright 实测）**：
   - **后端 100% 正常**：GET /xlsx-to-json 返回 200 + 20 sheets 完整数据（浏览器内 fetch 实测确认）
