@@ -548,3 +548,13 @@ def register_all_routers(app: FastAPI) -> None:
     # 路由内部已声明 prefix="/api/projects/{project_id}/workpapers"，注册时不加额外前缀。
     from app.routers.wp_review_status import router as wp_review_status_router
     app.include_router(wp_review_status_router, tags=["workpaper-review-status"])
+
+    # ═══ 57. 底稿程序步骤→Sheet映射 + 跨模块引用 + 校验规则 + stale传播链 ═══
+    # 路由内部已声明 prefix="/api/workpapers"，注册时不加额外前缀。
+    from app.routers.wp_step_mapping import router as wp_step_mapping_router
+    app.include_router(wp_step_mapping_router, tags=["workpaper-step-mapping"])
+
+    # ═══ 58. 项目信息预填充上下文（B/C/A/S类底稿） ═══
+    # 路由内部已声明 prefix="/api/projects"，注册时不加额外前缀。
+    from app.routers.wp_prefill_context import router as wp_prefill_context_router
+    app.include_router(wp_prefill_context_router, tags=["workpaper-prefill"])

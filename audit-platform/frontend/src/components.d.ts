@@ -331,6 +331,7 @@ declare module 'vue' {
     WorkpaperReview: typeof import('./components/collaboration/WorkpaperReview.vue')['default']
     WorkpaperSidePanel: typeof import('./components/workpaper/WorkpaperSidePanel.vue')['default']
     WPIndexGenerator: typeof import('./components/extension/WPIndexGenerator.vue')['default']
+    WpReferencePanel: typeof import('./components/workpaper/WpReferencePanel.vue')['default']
     WpTemplateDetail: typeof import('./components/template-library/WpTemplateDetail.vue')['default']
     WpTemplateTab: typeof import('./components/template-library/WpTemplateTab.vue')['default']
   }

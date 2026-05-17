@@ -385,6 +385,15 @@ export const wpAI = {
   generateLedgerAnalysis: (pid: string) => `/api/workpapers/projects/${pid}/ai/generate-ledger-analysis`,
   recommendWorkpapers: (pid: string) => `/api/projects/${pid}/ai/recommend-workpapers`,
   annualDiffReport: (pid: string) => `/api/projects/${pid}/ai/annual-diff-report`,
+  // P0-P3: 程序步骤映射 + 跨模块引用 + 校验规则 + stale传播链
+  stepMapping: (wpId: string) => `/api/workpapers/${wpId}/step-mapping`,
+  mappingRules: '/api/workpapers/mapping-rules',
+  mappingRulesCustom: '/api/workpapers/mapping-rules/custom',
+  references: (wpId: string) => `/api/workpapers/${wpId}/references`,
+  validationRules: (wpId: string) => `/api/workpapers/${wpId}/validation-rules`,
+  staleChain: (wpId: string) => `/api/workpapers/${wpId}/stale-chain`,
+  // P4: 项目信息预填充上下文
+  prefillContext: (pid: string) => `/api/projects/${pid}/workpapers/prefill-context`,
 } as const
 
 // ─── 底稿精细化规则 ─────────────────────────────────────────────────────────

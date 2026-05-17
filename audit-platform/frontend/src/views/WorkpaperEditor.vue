@@ -65,6 +65,23 @@
       </div>
     </div>
 
+    <!-- Step Navigation Bar (P0: step_sheet_mapping) -->
+    <div v-if="stepMapping.data.value?.steps?.length" class="gt-step-nav">
+      <div class="gt-step-nav__progress">
+        <span class="gt-step-nav__label">
+          步骤 {{ stepMapping.currentStepIndex.value + 1 }}/{{ stepMapping.totalSteps.value }}
+        </span>
+        <span class="gt-step-nav__name">{{ stepMapping.currentStep.value?.step_name }}</span>
+        <span v-if="stepMapping.currentTargetSheets.value?.length" class="gt-step-nav__sheet">
+          → {{ stepMapping.currentTargetSheets.value[0] }}
+        </span>
+      </div>
+      <div class="gt-step-nav__actions">
+        <el-button size="small" :disabled="stepMapping.currentStepIndex.value === 0" @click="stepMapping.prevStep()">上一步</el-button>
+        <el-button size="small" type="primary" :disabled="stepMapping.currentStepIndex.value >= stepMapping.totalSteps.value - 1" @click="stepMapping.nextStep()">下一步</el-button>
+      </div>
+    </div>
+
     <!-- 版本历史抽屉（任务 8.19.1） -->
     <el-drawer
       v-model="showVersionDrawer"
@@ -246,6 +263,7 @@ import { usePrefillMarkers } from '@/composables/usePrefillMarkers'
 import { useCrossModuleRefs, TARGET_COLOR_MAP } from '@/composables/useCrossModuleRefs'
 import { useReviewMarks, type ReviewStatus } from '@/composables/useReviewMarks'
 import { useUserOverrides } from '@/composables/useUserOverrides'
+import { useStepMapping } from '@/composables/useStepMapping'
 import WorkpaperSidePanel from '@/components/workpaper/WorkpaperSidePanel.vue'
 import { WP_STATUS } from '@/constants/statusEnum'
 import { handleApiError } from '@/utils/errorHandler'
@@ -310,6 +328,9 @@ const editLock = useEditingLock({
   resourceId: computed(() => wpId.value || ''),
   // WorkpaperEditor 天然编辑模式，mount 时即 acquire
 })
+
+// P0: 程序步骤→Sheet映射导航
+const stepMapping = useStepMapping(wpId.value || '')
 
 // R7-S2-05：统一自动保存（60s 间隔，合并原 30s UI 反馈 + 120s 后端保存）
 const autoSave = useWorkpaperAutoSave(async () => {
@@ -1030,6 +1051,8 @@ onMounted(() => {
       initUniver()
     }
   })
+  // P0: 加载程序步骤映射
+  stepMapping.loadMapping()
   // R8-S2-02：订阅 workpaper:locate-cell 事件，定位到 Univer 单元格
   eventBus.on('workpaper:locate-cell', onLocateCell)
   // R8-S2-14：关闭浏览器/刷新前警告
@@ -1103,6 +1126,37 @@ function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: stri
 .gt-wp-editor {
   display: flex; flex-direction: column; height: 100vh;
   background: var(--gt-color-bg);
+}
+.gt-step-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--gt-color-bg-light, #f8f7fc);
+  border-bottom: 1px solid var(--gt-color-border, #e8e5f0);
+  font-size: 13px;
+}
+.gt-step-nav__progress {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.gt-step-nav__label {
+  color: var(--gt-color-text-secondary);
+  margin-right: 8px;
+}
+.gt-step-nav__name {
+  font-weight: 600;
+  color: var(--gt-color-primary);
+}
+.gt-step-nav__sheet {
+  color: var(--gt-color-text-tertiary);
+  margin-left: 8px;
+  font-size: 12px;
+}
+.gt-step-nav__actions {
+  display: flex;
+  gap: 8px;
 }
 .gt-wp-editor-toolbar {
   display: flex; justify-content: space-between; align-items: center;
