@@ -148,6 +148,9 @@ inclusion: always
 - **委派矩阵实现**：成员×循环 el-table 网格 + 智能单元格行为（已分配→改派/未分配→委派）+ 未分配 dashed border 警告 + 底部按循环未分配 tag
 - **底稿地址坐标映射诊断（2026-05-17）**：当前数据底盘 70% 完成；✅ sheet 名称全覆盖 / ✅ 步骤→sheet 映射 100% / ✅ 底稿间引用 107 条（语义级）；❌ **单元格级物理坐标映射完全缺失**（cross_wp_references 的 source_cell 是中文描述如"销售费用折旧"而非 `H1!分配表!E15`）/ ❌ 109 个 docx 类底稿完全未扫描 / ❌ 用户改单元格触发 stale 链路断裂
 - **Address Registry 三级解析架构待落地**：Level 1 物理地址（cell+row+col）/ Level 2 语义地址（anchor+row_label+col_label）/ Level 3 业务地址（entity+code+field）；后端已有 address_registry router 但实际写入逻辑未确认；构建需扫描 477 模板单元格+解析行列表头，工程量 3-5 天，半自动+人工校对；做完才能让 stale 传播链真正闭环
+- **Address Registry V2 落地完成（2026-05-17，commit 53e2f34）**：4 个数据文件（L1 物理 33MB / L2 语义 19MB / L3 依赖 10MB / Resolved 88KB）+ 后端 6 端点（router_registry §59）+ 前端 useStaleImpact composable；L1 压缩策略 = **交叉引用感知白名单**（公式+L2锚点+L3依赖+行列表头）；多策略匹配 6 级（exact_anchor → row_label → col_label → contains → sheet_only_fallback → wp_only_fallback）；覆盖率 = L1 关键单元格 97.8% / CWR 解析率 99.1% / 跨工作表公式依赖 42163 条
+- **L1 压缩教训**：简单压缩（只留公式+L3 依赖）丢非公式单元格 31 万个，覆盖率只 25.9%；正确策略 = 必须把 L2 锚点单元格全部纳入白名单（cross_wp_references 引用的"审定数"/"销售费用折旧"等都是纯数字非公式格），否则反向查"H1.E15 改了影响谁"找不到对应描述
+- **stale 传播链端到端打通**：用户改 H1!E15 → useStaleImpact.notify → POST /v2/notify-cell-change → 后端查 resolved_refs+L3 → BFS 3 层下游 → 返回 stale_targets[]；下一步待办 = 接入 WorkpaperEditor 单元格保存事件（onCellChange）让链路真正运行
 - **复盘补齐 3 个关键缺口（commit 74d87f2）**：(1) Foundation 新增 Requirement 0"底稿模板完整加载保障"（8 条验收标准覆盖全 sheet/合并/冻结/格式/固定文字/错误提示）；(2) Foundation 新增 Task 1.0"验证底稿模板完整加载链路"作为 Sprint 1 第一个任务（不通过不进后续）；(3) Foundation 新增 Task 1.2b"prefill_engine 新增 TB_AUX formula_type 支持"（Cycle-D 只产出数据不改引擎，引擎扩展由 Foundation 承担）
 - **底稿在线编辑空白问题深入分析（2026-05-16 Playwright 实测）**：
   - **后端 100% 正常**：GET /xlsx-to-json 返回 200 + 20 sheets 完整数据（浏览器内 fetch 实测确认）

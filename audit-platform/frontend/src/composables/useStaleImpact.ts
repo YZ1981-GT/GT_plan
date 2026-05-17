@@ -2,6 +2,7 @@
  * useStaleImpact — 单元格变更影响范围 + stale 传播链路
  *
  * 用法：
+ *   const wpCode = computed(() => wpDetail.value?.wp_code || '')
  *   const { affected, notify, refresh } = useStaleImpact(wpCode)
  *
  *   // 编辑器单元格变更时
@@ -9,7 +10,7 @@
  *
  *   // affected.value 是受影响的下游底稿/单元格列表
  */
-import { ref } from 'vue'
+import { ref, computed, isRef, type Ref, type ComputedRef } from 'vue'
 import http from '@/utils/http'
 import { addressRegistry } from '@/services/apiPaths'
 
@@ -32,19 +33,29 @@ export interface StaleAffectedItem {
   report_row_code?: string
 }
 
-export function useStaleImpact(wpCode: string) {
+type WpCodeSource = string | Ref<string> | ComputedRef<string>
+
+function unref(src: WpCodeSource): string {
+  if (typeof src === 'string') return src
+  return (src as any).value || ''
+}
+
+export function useStaleImpact(wpCodeSource: WpCodeSource) {
   const affected = ref<StaleAffectedItem[]>([])
   const totalAffected = ref(0)
   const loading = ref(false)
   const lastNotifyTs = ref(0)
 
+  const wpCode = computed(() => unref(wpCodeSource))
+
   /** 通知单元格变更，获取下游影响 */
   async function notify(payload: { sheet?: string; cell?: string; max_depth?: number }) {
-    if (!wpCode) return
+    const code = wpCode.value
+    if (!code) return
     loading.value = true
     try {
       const res: any = await http.post(addressRegistry.v2.notifyCellChange, {
-        wp_code: wpCode,
+        wp_code: code,
         sheet: payload.sheet || '',
         cell: payload.cell || '',
         max_depth: payload.max_depth || 3,
@@ -52,8 +63,10 @@ export function useStaleImpact(wpCode: string) {
       affected.value = res.data?.stale_targets || []
       totalAffected.value = res.data?.total_affected || 0
       lastNotifyTs.value = Date.now()
+      return res.data
     } catch (e) {
       console.warn('[useStaleImpact] notify failed:', e)
+      return null
     } finally {
       loading.value = false
     }
@@ -61,12 +74,13 @@ export function useStaleImpact(wpCode: string) {
 
   /** 仅查询不通知（GET） */
   async function refresh(payload: { sheet?: string; cell?: string; max_depth?: number } = {}) {
-    if (!wpCode) return
+    const code = wpCode.value
+    if (!code) return
     loading.value = true
     try {
       const res: any = await http.get(addressRegistry.v2.staleImpact, {
         params: {
-          wp_code: wpCode,
+          wp_code: code,
           sheet: payload.sheet || '',
           cell: payload.cell || '',
           max_depth: payload.max_depth || 3,
@@ -74,19 +88,30 @@ export function useStaleImpact(wpCode: string) {
       })
       affected.value = res.data?.affected || []
       totalAffected.value = res.data?.total_affected || 0
+      return res.data
     } catch (e) {
       console.warn('[useStaleImpact] refresh failed:', e)
+      return null
     } finally {
       loading.value = false
     }
   }
 
+  /** 清空当前已加载的影响列表 */
+  function clear() {
+    affected.value = []
+    totalAffected.value = 0
+    lastNotifyTs.value = 0
+  }
+
   return {
+    wpCode,
     affected,
     totalAffected,
     loading,
     notify,
     refresh,
+    clear,
     lastNotifyTs,
   }
 }

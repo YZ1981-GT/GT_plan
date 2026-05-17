@@ -82,6 +82,31 @@
       </div>
     </div>
 
+    <!-- Stale 影响范围横条（保存后显示，自动收起） -->
+    <div v-if="showStaleImpactPanel && staleImpact.totalAffected.value > 0" class="gt-stale-impact-bar">
+      <div class="gt-stale-impact-bar__head">
+        <span class="gt-stale-impact-bar__title">
+          ⚠ 本次保存影响 <strong>{{ staleImpact.totalAffected.value }}</strong> 个下游对象
+        </span>
+        <el-button text size="small" @click="showStaleImpactPanel = false">收起</el-button>
+      </div>
+      <div class="gt-stale-impact-bar__list">
+        <el-tag
+          v-for="(item, idx) in staleImpact.affected.value.slice(0, 12)"
+          :key="`stale-${idx}`"
+          size="small"
+          :type="staleImpactTagType(item)"
+          class="gt-stale-impact-bar__tag"
+          @click="onStaleItemClick(item)"
+        >
+          {{ formatStaleItem(item) }}
+        </el-tag>
+        <span v-if="staleImpact.affected.value.length > 12" class="gt-stale-impact-bar__more">
+          +{{ staleImpact.affected.value.length - 12 }} 个
+        </span>
+      </div>
+    </div>
+
     <!-- 版本历史抽屉（任务 8.19.1） -->
     <el-drawer
       v-model="showVersionDrawer"
@@ -264,6 +289,7 @@ import { useCrossModuleRefs, TARGET_COLOR_MAP } from '@/composables/useCrossModu
 import { useReviewMarks, type ReviewStatus } from '@/composables/useReviewMarks'
 import { useUserOverrides } from '@/composables/useUserOverrides'
 import { useStepMapping } from '@/composables/useStepMapping'
+import { useStaleImpact, type StaleAffectedItem } from '@/composables/useStaleImpact'
 import WorkpaperSidePanel from '@/components/workpaper/WorkpaperSidePanel.vue'
 import { WP_STATUS } from '@/constants/statusEnum'
 import { handleApiError } from '@/utils/errorHandler'
@@ -331,6 +357,56 @@ const editLock = useEditingLock({
 
 // P0: 程序步骤→Sheet映射导航
 const stepMapping = useStepMapping(wpId.value || '')
+
+// Address Registry V2: 单元格变更影响范围（stale 传播链）
+const staleImpact = useStaleImpact(computed(() => wpDetail.value?.wp_code?.split('-')[0] || ''))
+const showStaleImpactPanel = ref(false)
+
+function formatStaleItem(item: StaleAffectedItem): string {
+  if (item.target_module) {
+    const code = item.note_section_code || item.report_row_code || ''
+    const moduleName = item.target_module === 'disclosure_notes' ? '附注'
+      : item.target_module === 'audit_report' ? '审计报告'
+      : item.target_module === 'financial_report' ? '财务报表'
+      : item.target_module === 'trial_balance' ? '试算表'
+      : item.target_module === 'adjustments' ? '调整分录'
+      : item.target_module === 'misstatements' ? '错报'
+      : item.target_module
+    return code ? `${moduleName}.${code}` : moduleName
+  }
+  const wp = item.wp_code || '?'
+  const cell = item.cell ? `.${item.cell}` : ''
+  const sheet = item.sheet ? `[${item.sheet.slice(0, 12)}]` : ''
+  return `${wp}${sheet}${cell}`
+}
+
+function staleImpactTagType(item: StaleAffectedItem): 'success' | 'warning' | 'danger' | 'info' {
+  if (item.severity === 'blocking' || item.severity === 'required') return 'danger'
+  if (item.severity === 'warning') return 'warning'
+  if (item.severity === 'info') return 'info'
+  return 'warning'
+}
+
+function onStaleItemClick(item: StaleAffectedItem) {
+  if (item.target_module === 'disclosure_notes' && item.note_section_code) {
+    router.push(`/projects/${projectId.value}/disclosure-notes?section=${item.note_section_code}`)
+  } else if (item.target_module === 'audit_report') {
+    router.push(`/projects/${projectId.value}/audit-report`)
+  } else if (item.target_module === 'financial_report' && item.report_row_code) {
+    router.push(`/projects/${projectId.value}/reports?row=${item.report_row_code}`)
+  } else if (item.target_module === 'trial_balance') {
+    router.push(`/projects/${projectId.value}/trial-balance`)
+  } else if (item.target_module === 'adjustments') {
+    router.push(`/projects/${projectId.value}/adjustments`)
+  } else if (item.wp_code) {
+    // 跳转到列表视图按 wp_code 筛选
+    router.push({
+      name: 'WorkpaperList',
+      params: { projectId: projectId.value },
+      query: { highlight: item.wp_code },
+    })
+  }
+}
 
 // R7-S2-05：统一自动保存（60s 间隔，合并原 30s UI 反馈 + 120s 后端保存）
 const autoSave = useWorkpaperAutoSave(async () => {
@@ -776,6 +852,23 @@ async function onSave(): Promise<boolean> {
       wpId: wpId.value,
     } as WorkpaperSavedPayload)
 
+    // Address Registry V2: 通知单元格变更，计算下游 stale 影响
+    // 取当前活动 sheet（不传 cell，按 sheet 级触发 stale 传播）
+    try {
+      const activeSheet = workbook.getActiveSheet?.()
+      const sheetName = activeSheet?.getSheetName?.() || activeSheet?.getName?.() || ''
+      const impactResp = await staleImpact.notify({ sheet: sheetName, max_depth: 3 })
+      if (impactResp && impactResp.total_affected > 0) {
+        ElMessage.info({
+          message: `已识别 ${impactResp.total_affected} 个下游影响点（点击右侧"影响范围"查看）`,
+          duration: 4000,
+        })
+        showStaleImpactPanel.value = true
+      }
+    } catch (e) {
+      console.warn('[stale-impact] notify failed (non-blocking):', e)
+    }
+
     // 刷新版本信息
     wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
     return true
@@ -1157,6 +1250,49 @@ function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: stri
 .gt-step-nav__actions {
   display: flex;
   gap: 8px;
+}
+
+/* Stale 影响范围横条（保存后展示） */
+.gt-stale-impact-bar {
+  background: var(--gt-bg-warning, #fff8e6);
+  border-bottom: 1px solid var(--gt-color-coral, #f5a700);
+  padding: 8px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+.gt-stale-impact-bar__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.gt-stale-impact-bar__title {
+  color: var(--gt-color-coral, #d49500);
+  font-weight: 600;
+}
+.gt-stale-impact-bar__title strong {
+  color: var(--gt-color-primary);
+  font-size: 14px;
+  margin: 0 2px;
+}
+.gt-stale-impact-bar__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.gt-stale-impact-bar__tag {
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.gt-stale-impact-bar__tag:hover {
+  opacity: 0.7;
+}
+.gt-stale-impact-bar__more {
+  font-size: 12px;
+  color: var(--gt-color-text-tertiary);
+  margin-left: 4px;
 }
 .gt-wp-editor-toolbar {
   display: flex; justify-content: space-between; align-items: center;
