@@ -5,501 +5,4394 @@
     "B1": {
       "wp_name": "计划阶段",
       "steps": [
-        {"step_order": 1, "step_name": "了解客户", "description": "了解被审计单位及其环境，识别重大错报风险", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "风险评估", "description": "评估重大错报风险，确定风险应对策略", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "重要性", "description": "确定计划重要性水平和实际执行的重要性", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "calculation"},
-        {"step_order": 4, "step_name": "审计策略", "description": "制定总体审计策略和具体审计计划", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "结论", "description": "完成计划阶段工作，形成审计计划结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "了解客户",
+          "description": "了解被审计单位及其环境，识别重大错报风险",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "风险评估",
+          "description": "评估重大错报风险，确定风险应对策略",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "重要性",
+          "description": "确定计划重要性水平和实际执行的重要性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "审计策略",
+          "description": "制定总体审计策略和具体审计计划",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "完成计划阶段工作，形成审计计划结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "C1": {
-      "wp_name": "控制测试",
+      "wp_name": "企业层面控制",
       "steps": [
-        {"step_order": 1, "step_name": "识别控制", "description": "识别与审计相关的内部控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "设计测试", "description": "设计控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "执行测试", "description": "执行控制测试，获取控制有效性证据", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "评价结果", "description": "评价控制测试结果，确定控制偏差影响", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "结论", "description": "形成控制测试结论，确定对实质性程序的影响", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "控制环境评价",
+          "description": "评价管理层诚信和道德价值观、治理层监督、组织结构和权责分配",
+          "is_required": true,
+          "related_sheet": "企业层面控制",
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "风险评估过程",
+          "description": "了解和评价被审计单位的风险评估过程是否有效识别经营风险",
+          "is_required": true,
+          "related_sheet": "企业层面控制",
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "信息系统评价",
+          "description": "评价与财务报告相关的信息系统和沟通机制的有效性",
+          "is_required": true,
+          "related_sheet": "企业层面控制",
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "控制活动评价",
+          "description": "评价与审计相关的控制活动的设计和执行情况",
+          "is_required": true,
+          "related_sheet": "企业层面控制",
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "监督活动评价",
+          "description": "评价管理层对内部控制的持续监督和定期评价机制",
+          "is_required": true,
+          "related_sheet": "企业层面控制",
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "缺陷识别",
+          "description": "识别企业层面控制中存在的设计缺陷或运行缺陷",
+          "is_required": true,
+          "related_sheet": "企业层面控制",
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 7,
+          "step_name": "影响评估",
+          "description": "评估企业层面控制缺陷对业务流程层面控制和审计策略的影响",
+          "is_required": true,
+          "related_sheet": "企业层面控制",
+          "category": "risk_assessment",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 8,
+          "step_name": "结论与记录",
+          "description": "形成企业层面控制评价结论，记录对审计计划的影响",
+          "is_required": true,
+          "related_sheet": "企业层面控制",
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A1": {
       "wp_name": "完成阶段",
       "steps": [
-        {"step_order": 1, "step_name": "期后事项", "description": "检查资产负债表日后事项", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "持续经营", "description": "评估被审计单位持续经营能力", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "管理层声明", "description": "获取管理层声明书", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "汇总错报", "description": "汇总未更正错报并评估影响", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "calculation"},
-        {"step_order": 5, "step_name": "出具报告", "description": "形成审计意见并出具审计报告", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "期后事项",
+          "description": "检查资产负债表日后事项",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "持续经营",
+          "description": "评估被审计单位持续经营能力",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "管理层声明",
+          "description": "获取管理层声明书",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "汇总错报",
+          "description": "汇总未更正错报并评估影响",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "出具报告",
+          "description": "形成审计意见并出具审计报告",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "S1": {
       "wp_name": "特定项目",
       "steps": [
-        {"step_order": 1, "step_name": "识别事项", "description": "识别需要特别关注的事项", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "评估影响", "description": "评估特定事项对财务报表的影响", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"},
-        {"step_order": 3, "step_name": "执行程序", "description": "针对特定事项执行审计程序", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "形成结论", "description": "对特定事项形成审计结论", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "记录", "description": "完整记录特定项目审计过程和结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "识别事项",
+          "description": "识别需要特别关注的事项",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估影响",
+          "description": "评估特定事项对财务报表的影响",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "执行程序",
+          "description": "针对特定事项执行审计程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "形成结论",
+          "description": "对特定事项形成审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "记录",
+          "description": "完整记录特定项目审计过程和结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A2": {
-      "wp_name": "调整分录",
+      "wp_name": "调整分录汇总",
       "steps": [
-        {"step_order": 1, "step_name": "汇总调整", "description": "汇总所有审计调整分录和重分类分录", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "calculation"},
-        {"step_order": 2, "step_name": "分类", "description": "按性质和影响对调整分录进行分类整理", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "评估影响", "description": "评估调整分录对财务报表整体的影响", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "calculation"},
-        {"step_order": 4, "step_name": "沟通管理层", "description": "就调整事项与管理层进行沟通确认", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "记录", "description": "完整记录调整分录处理过程和结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "收集调整",
+          "description": "从各循环底稿收集所有建议的审计调整分录（AJE）和重分类分录（RJE）",
+          "is_required": true,
+          "related_sheet": "调整分录汇总表",
+          "category": "completion",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 2,
+          "step_name": "分类整理",
+          "description": "按调整性质（AJE/RJE）、影响科目和金额大小进行分类整理",
+          "is_required": true,
+          "related_sheet": "调整分录汇总表",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "影响计算",
+          "description": "计算各调整分录对资产负债表和利润表各项目的影响金额",
+          "is_required": true,
+          "related_sheet": "调整分录汇总表",
+          "category": "completion",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "重要性比较",
+          "description": "将调整分录汇总金额与重要性水平进行比较，评估整体影响",
+          "is_required": true,
+          "related_sheet": "调整分录汇总表",
+          "category": "completion",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "客户沟通",
+          "description": "与被审计单位管理层沟通调整事项，确认是否接受调整",
+          "is_required": true,
+          "related_sheet": "调整分录汇总表",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "最终审批",
+          "description": "项目合伙人审批最终调整分录清单",
+          "is_required": true,
+          "related_sheet": "调整分录汇总表",
+          "category": "completion",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 7,
+          "step_name": "过账验证",
+          "description": "验证被审计单位已正确过账所有已接受的调整分录",
+          "is_required": true,
+          "related_sheet": "调整分录汇总表",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 8,
+          "step_name": "归档记录",
+          "description": "完整记录调整分录处理过程、管理层回复和最终结论",
+          "is_required": true,
+          "related_sheet": "调整分录汇总表",
+          "category": "documentation",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A3": {
       "wp_name": "合并流程",
       "steps": [
-        {"step_order": 1, "step_name": "确认范围", "description": "确认合并范围及纳入合并的组成部分", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "编制抵消", "description": "编制合并抵消分录并核对内部交易", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "calculation"},
-        {"step_order": 3, "step_name": "核对", "description": "核对合并报表数据的完整性和准确性", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "calculation"},
-        {"step_order": 4, "step_name": "结论", "description": "形成合并流程审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "确认范围",
+          "description": "确认合并范围及纳入合并的组成部分",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "编制抵消",
+          "description": "编制合并抵消分录并核对内部交易",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "核对",
+          "description": "核对合并报表数据的完整性和准确性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成合并流程审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A4": {
       "wp_name": "经营分部",
       "steps": [
-        {"step_order": 1, "step_name": "识别分部", "description": "识别被审计单位的经营分部和报告分部", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "核对数据", "description": "核对分部信息与财务报表数据的一致性", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "calculation"},
-        {"step_order": 3, "step_name": "评估披露", "description": "评估分部信息披露的充分性和适当性", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "结论", "description": "形成经营分部审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "识别分部",
+          "description": "识别被审计单位的经营分部和报告分部",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核对数据",
+          "description": "核对分部信息与财务报表数据的一致性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "评估披露",
+          "description": "评估分部信息披露的充分性和适当性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成经营分部审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A5": {
       "wp_name": "财务报表支持",
       "steps": [
-        {"step_order": 1, "step_name": "核对报表", "description": "核对财务报表各项目与底稿数据的一致性", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "calculation"},
-        {"step_order": 2, "step_name": "检查格式", "description": "检查财务报表格式是否符合准则要求", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "验证勾稽", "description": "验证报表间勾稽关系的正确性", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "calculation"},
-        {"step_order": 4, "step_name": "结论", "description": "形成财务报表支持工作结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "核对报表",
+          "description": "核对财务报表各项目与底稿数据的一致性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 2,
+          "step_name": "检查格式",
+          "description": "检查财务报表格式是否符合准则要求",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "验证勾稽",
+          "description": "验证报表间勾稽关系的正确性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成财务报表支持工作结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A6": {
       "wp_name": "组成部分会计师报告",
       "steps": [
-        {"step_order": 1, "step_name": "评估资质", "description": "评估组成部分注册会计师的胜任能力和独立性", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "复核工作", "description": "复核组成部分注册会计师的审计工作", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "沟通", "description": "与组成部分注册会计师进行必要沟通", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "结论", "description": "形成对组成部分审计工作的评价结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "评估资质",
+          "description": "评估组成部分注册会计师的胜任能力和独立性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "复核工作",
+          "description": "复核组成部分注册会计师的审计工作",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "沟通",
+          "description": "与组成部分注册会计师进行必要沟通",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成对组成部分审计工作的评价结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A7": {
       "wp_name": "关联交易",
       "steps": [
-        {"step_order": 1, "step_name": "识别关联方", "description": "识别被审计单位的关联方及关联交易", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "核实交易", "description": "核实关联交易的真实性和定价公允性", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "评估披露", "description": "评估关联方关系及交易披露的充分性", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "结论", "description": "形成关联交易审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "识别关联方",
+          "description": "识别被审计单位的关联方及关联交易",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核实交易",
+          "description": "核实关联交易的真实性和定价公允性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "评估披露",
+          "description": "评估关联方关系及交易披露的充分性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成关联交易审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A8": {
       "wp_name": "其他信息",
       "steps": [
-        {"step_order": 1, "step_name": "获取信息", "description": "获取含有已审计财务报表的文件中的其他信息", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "阅读核对", "description": "阅读其他信息并与财务报表进行核对", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "评估一致性", "description": "评估其他信息与财务报表是否存在重大不一致", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "结论", "description": "形成其他信息审阅结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "获取信息",
+          "description": "获取含有已审计财务报表的文件中的其他信息",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "阅读核对",
+          "description": "阅读其他信息并与财务报表进行核对",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "评估一致性",
+          "description": "评估其他信息与财务报表是否存在重大不一致",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成其他信息审阅结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A9": {
       "wp_name": "内部控制建议",
       "steps": [
-        {"step_order": 1, "step_name": "汇总缺陷", "description": "汇总审计过程中发现的内部控制缺陷", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "分类评级", "description": "对内部控制缺陷进行分类和严重程度评级", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "编制建议书", "description": "编制管理建议书提出改进建议", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "memo"},
-        {"step_order": 4, "step_name": "沟通", "description": "与管理层和治理层沟通内部控制缺陷", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "结论", "description": "完成内部控制建议书并归档", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "汇总缺陷",
+          "description": "汇总审计过程中发现的内部控制缺陷",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "分类评级",
+          "description": "对内部控制缺陷进行分类和严重程度评级",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "编制建议书",
+          "description": "编制管理建议书提出改进建议",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 4,
+          "step_name": "沟通",
+          "description": "与管理层和治理层沟通内部控制缺陷",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "完成内部控制建议书并归档",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A10": {
       "wp_name": "与治理层沟通",
       "steps": [
-        {"step_order": 1, "step_name": "确定事项", "description": "确定需要与治理层沟通的审计事项", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "编制沟通函", "description": "编制致治理层的沟通函件", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "memo"},
-        {"step_order": 3, "step_name": "发送", "description": "向治理层发送沟通函件", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "记录回复", "description": "记录治理层的回复和反馈意见", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "结论", "description": "完成与治理层沟通工作并归档", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "确定事项",
+          "description": "确定需要与治理层沟通的审计事项",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "编制沟通函",
+          "description": "编制致治理层的沟通函件",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 3,
+          "step_name": "发送",
+          "description": "向治理层发送沟通函件",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "记录回复",
+          "description": "记录治理层的回复和反馈意见",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "完成与治理层沟通工作并归档",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A11": {
       "wp_name": "期后事项",
       "steps": [
-        {"step_order": 1, "step_name": "询问管理层", "description": "询问管理层是否存在影响财务报表的期后事项", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "检查记录", "description": "检查期后期间的会计记录和会议纪要", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "评估影响", "description": "评估期后事项对财务报表的影响", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "结论", "description": "形成期后事项审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "识别期后事项",
+          "description": "通过检查会计记录、会议纪要和合同识别资产负债表日后发生的事项",
+          "is_required": true,
+          "related_sheet": "期后事项检查表",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "管理层询问",
+          "description": "询问管理层是否知悉可能影响财务报表的期后事项",
+          "is_required": true,
+          "related_sheet": "期后事项检查表",
+          "category": "completion",
+          "evidence_type": "inquiry"
+        },
+        {
+          "step_order": 3,
+          "step_name": "法律确认",
+          "description": "获取律师关于诉讼和索赔事项的最新确认",
+          "is_required": true,
+          "related_sheet": "期后事项检查表",
+          "category": "completion",
+          "evidence_type": "confirmation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "评估分类",
+          "description": "将期后事项分为调整事项和非调整事项，评估对报表的影响",
+          "is_required": true,
+          "related_sheet": "期后事项检查表",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "披露评估",
+          "description": "评估非调整事项是否需要在附注中披露及披露是否充分",
+          "is_required": true,
+          "related_sheet": "期后事项检查表",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "截止测试",
+          "description": "对期后期间的重大交易执行截止测试，确认归属期间正确",
+          "is_required": true,
+          "related_sheet": "期后事项检查表",
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 7,
+          "step_name": "结论",
+          "description": "形成期后事项审计结论，确认对审计意见的影响",
+          "is_required": true,
+          "related_sheet": "期后事项检查表",
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A12": {
       "wp_name": "律师回复",
       "steps": [
-        {"step_order": 1, "step_name": "编制询证函", "description": "编制致被审计单位律师的询证函", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "发送", "description": "向律师发送询证函并跟踪回函", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "获取回复", "description": "获取律师回复函并核对内容", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "评估", "description": "评估诉讼和索赔事项对财务报表的影响", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "结论", "description": "形成律师回复审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "编制询证函",
+          "description": "编制致被审计单位律师的询证函",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "发送",
+          "description": "向律师发送询证函并跟踪回函",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "获取回复",
+          "description": "获取律师回复函并核对内容",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "评估",
+          "description": "评估诉讼和索赔事项对财务报表的影响",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成律师回复审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A13": {
       "wp_name": "错报汇总",
       "steps": [
-        {"step_order": 1, "step_name": "汇总错报", "description": "汇总审计过程中识别的所有错报", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "calculation"},
-        {"step_order": 2, "step_name": "分类", "description": "将错报按性质分为已更正和未更正错报", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "评估重要性", "description": "评估未更正错报单独或汇总是否重大", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "calculation"},
-        {"step_order": 4, "step_name": "沟通", "description": "与管理层沟通未更正错报及其影响", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "结论", "description": "形成错报汇总审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "错报汇集",
+          "description": "从各循环底稿汇集所有已识别的错报（含已更正和未更正）",
+          "is_required": true,
+          "related_sheet": "错报汇总表",
+          "category": "completion",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 2,
+          "step_name": "重要性比较",
+          "description": "将未更正错报汇总金额与整体重要性和实际执行重要性进行比较",
+          "is_required": true,
+          "related_sheet": "错报汇总表",
+          "category": "completion",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "定性评估",
+          "description": "对未更正错报进行定性评估（是否涉及舞弊、是否影响趋势等）",
+          "is_required": true,
+          "related_sheet": "错报汇总表",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "推断错报",
+          "description": "评估抽样推断的错报和判断性错报对总体的影响",
+          "is_required": true,
+          "related_sheet": "错报汇总表",
+          "category": "completion",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "管理层沟通",
+          "description": "将未更正错报清单提交管理层，要求更正或获取不更正的书面说明",
+          "is_required": true,
+          "related_sheet": "错报汇总表",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成错报汇总结论，评估未更正错报对审计意见的影响",
+          "is_required": true,
+          "related_sheet": "错报汇总表",
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A14": {
       "wp_name": "内部控制缺陷",
       "steps": [
-        {"step_order": 1, "step_name": "识别缺陷", "description": "识别审计中发现的内部控制缺陷", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "分类评级", "description": "将缺陷分为重大缺陷、重要缺陷和一般缺陷", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "评估影响", "description": "评估内部控制缺陷对审计策略的影响", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "沟通", "description": "以书面形式向治理层和管理层报告缺陷", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "结论", "description": "形成内部控制缺陷评价结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "识别缺陷",
+          "description": "识别审计中发现的内部控制缺陷",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "分类评级",
+          "description": "将缺陷分为重大缺陷、重要缺陷和一般缺陷",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "评估影响",
+          "description": "评估内部控制缺陷对审计策略的影响",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "沟通",
+          "description": "以书面形式向治理层和管理层报告缺陷",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成内部控制缺陷评价结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A15": {
       "wp_name": "持续经营",
       "steps": [
-        {"step_order": 1, "step_name": "评估迹象", "description": "评估是否存在对持续经营能力产生重大疑虑的事项", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "分析能力", "description": "分析管理层对持续经营能力的评估", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "评估披露", "description": "评估持续经营相关披露的充分性和适当性", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "结论", "description": "形成持续经营审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "迹象识别",
+          "description": "识别可能导致对持续经营能力产生重大疑虑的事项或情况",
+          "is_required": true,
+          "related_sheet": "持续经营评估",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "管理层评估复核",
+          "description": "复核管理层对持续经营能力的评估，评估其合理性和完整性",
+          "is_required": true,
+          "related_sheet": "持续经营评估",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "现金流分析",
+          "description": "分析未来12个月的现金流量预测，评估企业偿债能力",
+          "is_required": true,
+          "related_sheet": "持续经营评估",
+          "category": "completion",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "缓解因素评估",
+          "description": "评估管理层拟采取的应对措施是否可行且能有效缓解疑虑",
+          "is_required": true,
+          "related_sheet": "持续经营评估",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "额外程序",
+          "description": "执行额外审计程序获取充分适当的审计证据（如银行确认、合同检查）",
+          "is_required": false,
+          "related_sheet": "持续经营评估",
+          "category": "substantive",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "披露充分性",
+          "description": "评估财务报表中持续经营相关披露是否充分适当",
+          "is_required": true,
+          "related_sheet": "持续经营评估",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 7,
+          "step_name": "结论",
+          "description": "形成持续经营审计结论，确定对审计报告的影响（无保留/强调事项/保留/否定/无法表示）",
+          "is_required": true,
+          "related_sheet": "持续经营评估",
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A16": {
-      "wp_name": "管理层声明",
+      "wp_name": "管理层声明书",
       "steps": [
-        {"step_order": 1, "step_name": "编制声明书", "description": "编制管理层书面声明书", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "确认内容", "description": "确认声明书涵盖所有必要事项", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "获取签署", "description": "获取管理层签署的书面声明", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "归档", "description": "将签署的声明书归入审计档案", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "草拟声明书",
+          "description": "根据审计准则要求和项目具体情况草拟管理层书面声明书",
+          "is_required": true,
+          "related_sheet": "管理层声明书",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "通用声明",
+          "description": "确认声明书包含通用声明事项（编制责任、完整性、内控责任等）",
+          "is_required": true,
+          "related_sheet": "管理层声明书",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "特定声明",
+          "description": "根据审计中发现的特定事项增加针对性声明（关联方、诉讼、估计等）",
+          "is_required": true,
+          "related_sheet": "管理层声明书",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "日期确认",
+          "description": "确认声明书日期与审计报告日期一致（不早于审计报告日）",
+          "is_required": true,
+          "related_sheet": "管理层声明书",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "签署人确认",
+          "description": "确认声明书由对财务报表负有责任的适当管理层签署",
+          "is_required": true,
+          "related_sheet": "管理层声明书",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "获取签署",
+          "description": "获取管理层正式签署的书面声明书原件",
+          "is_required": true,
+          "related_sheet": "管理层声明书",
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 7,
+          "step_name": "归档",
+          "description": "将签署的声明书归入审计档案永久卷",
+          "is_required": true,
+          "related_sheet": "管理层声明书",
+          "category": "documentation",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A17": {
       "wp_name": "重大事项概要",
       "steps": [
-        {"step_order": 1, "step_name": "汇总事项", "description": "汇总审计过程中遇到的所有重大事项", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "评估影响", "description": "评估重大事项对审计意见的影响", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "形成意见", "description": "基于重大事项形成审计意见类型判断", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "memo"},
-        {"step_order": 4, "step_name": "记录", "description": "完整记录重大事项概要及处理结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "汇总事项",
+          "description": "汇总审计过程中遇到的所有重大事项",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估影响",
+          "description": "评估重大事项对审计意见的影响",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "形成意见",
+          "description": "基于重大事项形成审计意见类型判断",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 4,
+          "step_name": "记录",
+          "description": "完整记录重大事项概要及处理结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A18": {
       "wp_name": "向监管部门报送",
       "steps": [
-        {"step_order": 1, "step_name": "确认要求", "description": "确认适用的监管报送要求和时限", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "编制报告", "description": "按监管要求编制报送材料", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "复核", "description": "复核报送材料的完整性和准确性", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "报送", "description": "按时向监管部门报送相关材料", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "归档", "description": "保留报送记录和回执并归档", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "确认要求",
+          "description": "确认适用的监管报送要求和时限",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "编制报告",
+          "description": "按监管要求编制报送材料",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "复核",
+          "description": "复核报送材料的完整性和准确性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "报送",
+          "description": "按时向监管部门报送相关材料",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "归档",
+          "description": "保留报送记录和回执并归档",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A21": {
       "wp_name": "现场负责人复核",
       "steps": [
-        {"step_order": 1, "step_name": "复核底稿", "description": "复核审计工作底稿的完整性和质量", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "记录意见", "description": "记录复核意见和需要补充完善的事项", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "memo"},
-        {"step_order": 3, "step_name": "跟踪整改", "description": "跟踪复核意见的整改落实情况", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "签字", "description": "确认整改完成后签字确认", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "复核底稿",
+          "description": "复核审计工作底稿的完整性和质量",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "记录意见",
+          "description": "记录复核意见和需要补充完善的事项",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 3,
+          "step_name": "跟踪整改",
+          "description": "跟踪复核意见的整改落实情况",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "签字",
+          "description": "确认整改完成后签字确认",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A22": {
       "wp_name": "项目负责经理复核",
       "steps": [
-        {"step_order": 1, "step_name": "复核关键事项", "description": "复核审计中的关键事项和重大判断", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "评估风险", "description": "评估剩余审计风险是否已充分应对", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "记录意见", "description": "记录项目经理复核意见", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "memo"},
-        {"step_order": 4, "step_name": "签字", "description": "确认复核完成后签字确认", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "复核关键事项",
+          "description": "复核审计中的关键事项和重大判断",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估风险",
+          "description": "评估剩余审计风险是否已充分应对",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "记录意见",
+          "description": "记录项目经理复核意见",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 4,
+          "step_name": "签字",
+          "description": "确认复核完成后签字确认",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A23": {
       "wp_name": "项目合伙人复核",
       "steps": [
-        {"step_order": 1, "step_name": "复核重大判断", "description": "复核审计中涉及的重大判断和估计", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "评估意见", "description": "评估拟出具的审计意见类型是否适当", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "memo"},
-        {"step_order": 3, "step_name": "签字", "description": "确认复核完成后签字确认", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "复核重大判断",
+          "description": "复核审计中涉及的重大判断和估计",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估意见",
+          "description": "评估拟出具的审计意见类型是否适当",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 3,
+          "step_name": "签字",
+          "description": "确认复核完成后签字确认",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A24": {
       "wp_name": "质量复核合伙人",
       "steps": [
-        {"step_order": 1, "step_name": "独立复核", "description": "独立复核审计工作的关键领域和重大判断", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "评估重大判断", "description": "评估项目组在重大事项上的判断是否适当", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "记录意见", "description": "记录质量复核意见和建议", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "memo"},
-        {"step_order": 4, "step_name": "签字", "description": "确认质量复核完成后签字确认", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "独立复核",
+          "description": "独立复核审计工作的关键领域和重大判断",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估重大判断",
+          "description": "评估项目组在重大事项上的判断是否适当",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "记录意见",
+          "description": "记录质量复核意见和建议",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 4,
+          "step_name": "签字",
+          "description": "确认质量复核完成后签字确认",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A25": {
       "wp_name": "质量控制复核人",
       "steps": [
-        {"step_order": 1, "step_name": "复核关键领域", "description": "复核审计中的关键领域和高风险事项", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "评估独立性", "description": "评估项目组的独立性是否得到维护", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "记录", "description": "记录质量控制复核的发现和结论", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "memo"},
-        {"step_order": 4, "step_name": "签字", "description": "确认质量控制复核完成后签字确认", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "复核关键领域",
+          "description": "复核审计中的关键领域和高风险事项",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估独立性",
+          "description": "评估项目组的独立性是否得到维护",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "记录",
+          "description": "记录质量控制复核的发现和结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 4,
+          "step_name": "签字",
+          "description": "确认质量控制复核完成后签字确认",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A26": {
       "wp_name": "专业技术委员会",
       "steps": [
-        {"step_order": 1, "step_name": "准备材料", "description": "准备提交专业技术委员会审核的材料", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "提交审核", "description": "向专业技术委员会提交审核申请", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "获取意见", "description": "获取专业技术委员会的审核意见", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "执行", "description": "按照委员会意见执行相应工作", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "归档", "description": "将委员会意见和执行记录归档", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "准备材料",
+          "description": "准备提交专业技术委员会审核的材料",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "提交审核",
+          "description": "向专业技术委员会提交审核申请",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "获取意见",
+          "description": "获取专业技术委员会的审核意见",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "按照委员会意见执行相应工作",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "归档",
+          "description": "将委员会意见和执行记录归档",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A27": {
       "wp_name": "IT审计总结",
       "steps": [
-        {"step_order": 1, "step_name": "汇总发现", "description": "汇总IT审计过程中的所有发现", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "评估影响", "description": "评估IT控制缺陷对财务报表审计的影响", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "形成结论", "description": "形成IT审计总结结论", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "memo"},
-        {"step_order": 4, "step_name": "记录", "description": "完整记录IT审计总结并归档", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "汇总发现",
+          "description": "汇总IT审计过程中的所有发现",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估影响",
+          "description": "评估IT控制缺陷对财务报表审计的影响",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "形成结论",
+          "description": "形成IT审计总结结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 4,
+          "step_name": "记录",
+          "description": "完整记录IT审计总结并归档",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A28": {
       "wp_name": "税务专家复核",
       "steps": [
-        {"step_order": 1, "step_name": "提交资料", "description": "向税务专家提交需要复核的税务相关资料", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "获取意见", "description": "获取税务专家的专业意见和建议", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "评估影响", "description": "评估税务事项对财务报表的影响", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "记录", "description": "记录税务专家复核结论并归档", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "提交资料",
+          "description": "向税务专家提交需要复核的税务相关资料",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "获取意见",
+          "description": "获取税务专家的专业意见和建议",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "评估影响",
+          "description": "评估税务事项对财务报表的影响",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "记录",
+          "description": "记录税务专家复核结论并归档",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A30": {
       "wp_name": "电子底稿归档",
       "steps": [
-        {"step_order": 1, "step_name": "检查完整性", "description": "检查电子审计底稿的完整性", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "核对清单", "description": "按归档清单逐项核对底稿文件", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "锁定", "description": "锁定电子底稿防止后续修改", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "归档", "description": "完成电子底稿归档并生成归档记录", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "检查完整性",
+          "description": "检查电子审计底稿的完整性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核对清单",
+          "description": "按归档清单逐项核对底稿文件",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "锁定",
+          "description": "锁定电子底稿防止后续修改",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "归档",
+          "description": "完成电子底稿归档并生成归档记录",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "A31": {
       "wp_name": "审计标识",
       "steps": [
-        {"step_order": 1, "step_name": "确认标识", "description": "确认审计底稿中使用的审计标识含义", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "核对使用", "description": "核对审计标识在底稿中的使用是否一致", "is_required": true, "related_sheet": null, "category": "completion", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "归档", "description": "将审计标识说明归入底稿首页", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "确认标识",
+          "description": "确认审计底稿中使用的审计标识含义",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核对使用",
+          "description": "核对审计标识在底稿中的使用是否一致",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "completion",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "归档",
+          "description": "将审计标识说明归入底稿首页",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B2": {
       "wp_name": "与前任CPA沟通",
       "steps": [
-        {"step_order": 1, "step_name": "编制沟通函", "description": "编制致前任注册会计师的沟通函", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "发送", "description": "向前任注册会计师发送沟通函", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "获取回复", "description": "获取前任注册会计师的回复", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "评估", "description": "评估前任注册会计师提供的信息", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "记录", "description": "记录沟通结果和对业务承接的影响", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "编制沟通函",
+          "description": "编制致前任注册会计师的沟通函",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "发送",
+          "description": "向前任注册会计师发送沟通函",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "获取回复",
+          "description": "获取前任注册会计师的回复",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "评估",
+          "description": "评估前任注册会计师提供的信息",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "记录",
+          "description": "记录沟通结果和对业务承接的影响",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B3": {
       "wp_name": "独立性声明",
       "steps": [
-        {"step_order": 1, "step_name": "评估独立性", "description": "评估项目组成员的独立性是否满足要求", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "签署声明", "description": "项目组成员签署独立性声明书", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "归档", "description": "将独立性声明书归入审计档案", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "评估独立性",
+          "description": "评估项目组成员的独立性是否满足要求",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "签署声明",
+          "description": "项目组成员签署独立性声明书",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "归档",
+          "description": "将独立性声明书归入审计档案",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B5": {
       "wp_name": "业务约定书",
       "steps": [
-        {"step_order": 1, "step_name": "编制约定书", "description": "编制审计业务约定书", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "确认条款", "description": "与被审计单位确认约定书条款内容", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "签署", "description": "双方签署审计业务约定书", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "归档", "description": "将签署的约定书归入审计档案", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "编制约定书",
+          "description": "编制审计业务约定书",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "确认条款",
+          "description": "与被审计单位确认约定书条款内容",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "签署",
+          "description": "双方签署审计业务约定书",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "归档",
+          "description": "将签署的约定书归入审计档案",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B10": {
       "wp_name": "了解被审计单位",
       "steps": [
-        {"step_order": 1, "step_name": "收集信息", "description": "收集被审计单位及其环境的相关信息", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "访谈", "description": "与管理层和相关人员进行访谈", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "分析", "description": "分析行业状况、监管环境和内部因素", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "记录", "description": "记录对被审计单位的了解和风险识别", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "结论", "description": "形成了解被审计单位的工作结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "收集信息",
+          "description": "收集被审计单位及其环境的相关信息",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "访谈",
+          "description": "与管理层和相关人员进行访谈",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "分析",
+          "description": "分析行业状况、监管环境和内部因素",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "记录",
+          "description": "记录对被审计单位的了解和风险识别",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成了解被审计单位的工作结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B11": {
       "wp_name": "检查程序",
       "steps": [
-        {"step_order": 1, "step_name": "设计程序", "description": "设计风险评估阶段的检查程序", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "执行", "description": "执行检查程序获取审计证据", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "记录发现", "description": "记录检查程序的发现和异常事项", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "结论", "description": "形成检查程序工作结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "设计程序",
+          "description": "设计风险评估阶段的检查程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "执行",
+          "description": "执行检查程序获取审计证据",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "记录发现",
+          "description": "记录检查程序的发现和异常事项",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成检查程序工作结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B12": {
       "wp_name": "访谈程序",
       "steps": [
-        {"step_order": 1, "step_name": "确定对象", "description": "确定访谈对象和访谈目的", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "编制提纲", "description": "编制访谈提纲和问题清单", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "执行", "description": "执行访谈并记录关键信息", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "记录", "description": "整理访谈记录并确认关键事项", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "结论", "description": "形成访谈程序工作结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "确定对象",
+          "description": "确定访谈对象和访谈目的",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "编制提纲",
+          "description": "编制访谈提纲和问题清单",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "执行",
+          "description": "执行访谈并记录关键信息",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "记录",
+          "description": "整理访谈记录并确认关键事项",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成访谈程序工作结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B13": {
       "wp_name": "初步分析程序",
       "steps": [
-        {"step_order": 1, "step_name": "选择指标", "description": "选择适当的财务和非财务分析指标", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "计算", "description": "计算分析指标并与预期值比较", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "calculation"},
-        {"step_order": 3, "step_name": "分析异常", "description": "分析异常波动和不一致情况", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "记录", "description": "记录分析结果和识别的风险领域", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "结论", "description": "形成初步分析程序工作结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "选择指标",
+          "description": "选择适当的财务和非财务分析指标",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "计算",
+          "description": "计算分析指标并与预期值比较",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "分析异常",
+          "description": "分析异常波动和不一致情况",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "记录",
+          "description": "记录分析结果和识别的风险领域",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成初步分析程序工作结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B15": {
       "wp_name": "重要性",
       "steps": [
-        {"step_order": 1, "step_name": "确定基准", "description": "确定计算重要性水平的基准和百分比", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "calculation"},
-        {"step_order": 2, "step_name": "计算水平", "description": "计算整体重要性和实际执行的重要性", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "calculation"},
-        {"step_order": 3, "step_name": "记录判断", "description": "记录重要性水平确定的判断依据", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "memo"},
-        {"step_order": 4, "step_name": "结论", "description": "形成重要性水平确定结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "选择基准",
+          "description": "根据被审计单位性质选择适当的重要性基准（总资产/营业收入/净利润/净资产等）",
+          "is_required": true,
+          "related_sheet": "重要性计算",
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 2,
+          "step_name": "确定百分比",
+          "description": "根据风险评估结果和职业判断确定适用的百分比区间",
+          "is_required": true,
+          "related_sheet": "重要性计算",
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "计算整体重要性",
+          "description": "计算财务报表整体重要性水平并记录计算过程",
+          "is_required": true,
+          "related_sheet": "重要性计算",
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "确定实际执行重要性",
+          "description": "确定实际执行的重要性（通常为整体重要性的50%-75%）",
+          "is_required": true,
+          "related_sheet": "重要性计算",
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "确定明显微小阈值",
+          "description": "确定明显微小错报的临界值（通常不超过整体重要性的5%）",
+          "is_required": true,
+          "related_sheet": "重要性计算",
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 6,
+          "step_name": "特定类别重要性",
+          "description": "评估是否需要对特定交易类别、账户余额或披露确定较低的重要性水平",
+          "is_required": false,
+          "related_sheet": "重要性计算",
+          "category": "planning",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 7,
+          "step_name": "修正评估",
+          "description": "审计过程中如发现新信息，重新评估并修正重要性水平",
+          "is_required": false,
+          "related_sheet": "重要性计算",
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 8,
+          "step_name": "记录与审批",
+          "description": "完整记录重要性确定的依据和判断过程，提交项目合伙人审批",
+          "is_required": true,
+          "related_sheet": "重要性计算",
+          "category": "documentation",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B18": {
       "wp_name": "内部审计",
       "steps": [
-        {"step_order": 1, "step_name": "评估能力", "description": "评估内部审计人员的胜任能力和客观性", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "确定利用", "description": "确定是否以及在多大程度上利用内部审计工作", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "复核工作", "description": "复核拟利用的内部审计工作", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "结论", "description": "形成利用内部审计工作的结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "评估能力",
+          "description": "评估内部审计人员的胜任能力和客观性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "确定利用",
+          "description": "确定是否以及在多大程度上利用内部审计工作",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "复核工作",
+          "description": "复核拟利用的内部审计工作",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成利用内部审计工作的结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B19": {
       "wp_name": "关联方",
       "steps": [
-        {"step_order": 1, "step_name": "识别关联方", "description": "识别被审计单位的关联方", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "核实关系", "description": "核实关联方关系的性质和范围", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "评估交易", "description": "评估关联方交易的商业合理性", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "记录", "description": "记录关联方识别和评估结果", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "识别关联方",
+          "description": "识别被审计单位的关联方",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核实关系",
+          "description": "核实关联方关系的性质和范围",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "评估交易",
+          "description": "评估关联方交易的商业合理性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "记录",
+          "description": "记录关联方识别和评估结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B22": {
       "wp_name": "审计抽样",
       "steps": [
-        {"step_order": 1, "step_name": "确定方法", "description": "确定抽样方法和抽样总体", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "计算样本", "description": "计算样本量并选取样本", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "calculation"},
-        {"step_order": 3, "step_name": "执行", "description": "对选取的样本执行审计程序", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "评价", "description": "评价抽样结果并推断总体", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "calculation"},
-        {"step_order": 5, "step_name": "结论", "description": "形成审计抽样工作结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "确定方法",
+          "description": "确定抽样方法和抽样总体",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "计算样本",
+          "description": "计算样本量并选取样本",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "执行",
+          "description": "对选取的样本执行审计程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "评价",
+          "description": "评价抽样结果并推断总体",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成审计抽样工作结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B23": {
       "wp_name": "业务循环控制",
       "steps": [
-        {"step_order": 1, "step_name": "了解流程", "description": "了解各业务循环的流程和关键环节", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "识别控制", "description": "识别各业务循环中的关键控制活动", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "评估设计", "description": "评估控制设计的有效性", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "记录", "description": "记录业务循环控制了解和评估结果", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解各业务循环的流程和关键环节",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别各业务循环中的关键控制活动",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "评估设计",
+          "description": "评估控制设计的有效性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "记录",
+          "description": "记录业务循环控制了解和评估结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B30": {
       "wp_name": "集团审计",
       "steps": [
-        {"step_order": 1, "step_name": "确定组成部分", "description": "确定集团审计中的重要组成部分", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "评估重要性", "description": "评估各组成部分的重要性水平", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "calculation"},
-        {"step_order": 3, "step_name": "沟通", "description": "与组成部分注册会计师进行沟通", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "复核", "description": "复核组成部分注册会计师的工作", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "结论", "description": "形成集团审计计划结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "确定组成部分",
+          "description": "确定集团审计中的重要组成部分",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估重要性",
+          "description": "评估各组成部分的重要性水平",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "沟通",
+          "description": "与组成部分注册会计师进行沟通",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "复核",
+          "description": "复核组成部分注册会计师的工作",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成集团审计计划结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B40": {
       "wp_name": "项目组讨论",
       "steps": [
-        {"step_order": 1, "step_name": "组织讨论", "description": "组织项目组成员进行风险讨论", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "记录要点", "description": "记录讨论的关键要点和风险识别结果", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "memo"},
-        {"step_order": 3, "step_name": "分配任务", "description": "根据讨论结果分配后续审计任务", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "归档", "description": "将讨论记录归入审计档案", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "组织讨论",
+          "description": "组织项目组成员进行风险讨论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "记录要点",
+          "description": "记录讨论的关键要点和风险识别结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 3,
+          "step_name": "分配任务",
+          "description": "根据讨论结果分配后续审计任务",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "归档",
+          "description": "将讨论记录归入审计档案",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B50": {
       "wp_name": "审计策略",
       "steps": [
-        {"step_order": 1, "step_name": "制定策略", "description": "制定总体审计策略确定审计方向", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "确定方向", "description": "确定审计工作的范围、时间和方向", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "分配资源", "description": "分配审计资源和确定项目组构成", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "记录", "description": "记录审计策略并获得合伙人批准", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "制定策略",
+          "description": "制定总体审计策略确定审计方向",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "确定方向",
+          "description": "确定审计工作的范围、时间和方向",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "分配资源",
+          "description": "分配审计资源和确定项目组构成",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "记录",
+          "description": "记录审计策略并获得合伙人批准",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B51": {
       "wp_name": "审计计划",
       "steps": [
-        {"step_order": 1, "step_name": "编制计划", "description": "编制具体审计计划", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "确定程序", "description": "确定各领域的具体审计程序", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "分配任务", "description": "将审计任务分配给项目组成员", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "审批", "description": "提交审计计划获得合伙人审批", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "归档", "description": "将审批后的审计计划归档", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "编制计划",
+          "description": "编制具体审计计划",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "确定程序",
+          "description": "确定各领域的具体审计程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "分配任务",
+          "description": "将审计任务分配给项目组成员",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "审批",
+          "description": "提交审计计划获得合伙人审批",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "归档",
+          "description": "将审批后的审计计划归档",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B52": {
       "wp_name": "工时预算",
       "steps": [
-        {"step_order": 1, "step_name": "估算工时", "description": "估算各审计领域所需工时", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "calculation"},
-        {"step_order": 2, "step_name": "分配人员", "description": "按专业能力分配人员到各领域", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "编制预算", "description": "编制项目工时预算表", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "calculation"},
-        {"step_order": 4, "step_name": "审批", "description": "提交工时预算获得审批", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "估算工时",
+          "description": "估算各审计领域所需工时",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 2,
+          "step_name": "分配人员",
+          "description": "按专业能力分配人员到各领域",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "编制预算",
+          "description": "编制项目工时预算表",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "审批",
+          "description": "提交工时预算获得审批",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
     "B60": {
       "wp_name": "总体审计策略",
       "steps": [
-        {"step_order": 1, "step_name": "确定范围", "description": "确定审计的范围和报告目标", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 2, "step_name": "评估风险", "description": "评估重大错报风险确定重点领域", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 3, "step_name": "制定策略", "description": "制定总体审计策略和时间安排", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 4, "step_name": "审批", "description": "提交总体审计策略获得合伙人审批", "is_required": true, "related_sheet": null, "category": "planning", "evidence_type": "document"},
-        {"step_order": 5, "step_name": "归档", "description": "将审批后的总体审计策略归档", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}
+        {
+          "step_order": 1,
+          "step_name": "风险评估汇总",
+          "description": "汇总风险评估阶段识别的重大错报风险，确定高风险领域",
+          "is_required": true,
+          "related_sheet": "总体审计策略",
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "资源分配",
+          "description": "根据风险评估结果分配审计资源（人员、时间、预算）到各循环",
+          "is_required": true,
+          "related_sheet": "工时预算B60-1",
+          "category": "planning",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "时间安排",
+          "description": "制定审计时间表，确定预审/终审/报告各阶段的起止日期",
+          "is_required": true,
+          "related_sheet": "总体审计策略",
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "团队分工",
+          "description": "确定项目组成员分工，明确各成员负责的循环和底稿",
+          "is_required": true,
+          "related_sheet": "总体审计策略",
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "专家需求",
+          "description": "评估是否需要利用专家工作（IT审计/评估/税务/精算等）",
+          "is_required": true,
+          "related_sheet": "利用专家B60-3",
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "IT审计考虑",
+          "description": "评估信息技术对审计的影响，确定IT审计范围和方法",
+          "is_required": true,
+          "related_sheet": "IT计划B60-2",
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 7,
+          "step_name": "沟通计划",
+          "description": "制定与管理层、治理层及组成部分审计师的沟通计划",
+          "is_required": true,
+          "related_sheet": "总体审计策略",
+          "category": "planning",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 8,
+          "step_name": "审批与下达",
+          "description": "项目合伙人审批总体审计策略并向项目组下达",
+          "is_required": true,
+          "related_sheet": "总体审计策略",
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
       ]
     },
-    "C2": {"wp_name": "销售循环控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解销售循环的业务流程和关键环节", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别销售循环中的关键内部控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计销售循环控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行销售循环控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价销售循环控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成销售循环控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C3": {"wp_name": "货币资金控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解货币资金管理的业务流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别货币资金管理中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计货币资金控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行货币资金控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价货币资金控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成货币资金控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C4": {"wp_name": "存货控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解存货管理的业务流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别存货管理中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计存货控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行存货控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价存货控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成存货控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C5": {"wp_name": "投资控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解投资管理的业务流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别投资管理中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计投资控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行投资控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价投资控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成投资控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C6": {"wp_name": "固定资产控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解固定资产管理的业务流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别固定资产管理中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计固定资产控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行固定资产控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价固定资产控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成固定资产控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C7": {"wp_name": "在建工程控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解在建工程管理的业务流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别在建工程管理中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计在建工程控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行在建工程控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价在建工程控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成在建工程控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C8": {"wp_name": "无形资产控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解无形资产管理的业务流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别无形资产管理中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计无形资产控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行无形资产控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价无形资产控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成无形资产控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C9": {"wp_name": "研发控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解研发活动管理的业务流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别研发管理中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计研发控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行研发控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价研发控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成研发控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C10": {"wp_name": "薪酬控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解薪酬管理的业务流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别薪酬管理中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计薪酬控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行薪酬控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价薪酬控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成薪酬控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C11": {"wp_name": "管理费用控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解管理费用的业务流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别管理费用中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计管理费用控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行管理费用控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价管理费用控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成管理费用控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C12": {"wp_name": "税金控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解税金管理的业务流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别税金管理中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计税金控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行税金控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价税金控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成税金控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C13": {"wp_name": "债务控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解债务管理的业务流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别债务管理中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计债务控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行债务控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价债务控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成债务控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C14": {"wp_name": "租赁控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解租赁管理的业务流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别租赁管理中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计租赁控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行租赁控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价租赁控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成租赁控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C15": {"wp_name": "关联方控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解关联方交易管理的业务流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别关联方交易管理中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计关联方控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行关联方控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "评价", "description": "评价关联方控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 6, "step_name": "结论", "description": "形成关联方控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C21": {"wp_name": "IT专员", "steps": [{"step_order": 1, "step_name": "评估IT环境", "description": "评估被审计单位的IT环境和基础设施", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别风险", "description": "识别IT相关的风险和控制薄弱环节", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计IT控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行IT控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "结论", "description": "形成IT专员工作结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C22": {"wp_name": "IT一般控制", "steps": [{"step_order": 1, "step_name": "了解IT环境", "description": "了解IT一般控制环境和治理结构", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别IT一般控制的关键控制点", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "测试", "description": "测试IT一般控制的运行有效性", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 4, "step_name": "评价", "description": "评价IT一般控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 5, "step_name": "结论", "description": "形成IT一般控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C23": {"wp_name": "会计分录控制", "steps": [{"step_order": 1, "step_name": "了解流程", "description": "了解会计分录编制和审批的流程", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别会计分录处理中的关键控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "设计测试", "description": "设计会计分录控制测试程序", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "执行", "description": "执行会计分录控制测试", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 5, "step_name": "结论", "description": "形成会计分录控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C24": {"wp_name": "会计分录细节", "steps": [{"step_order": 1, "step_name": "选择样本", "description": "选择需要测试的会计分录样本", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "检查", "description": "检查会计分录的编制依据和审批", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "评价", "description": "评价会计分录的适当性和准确性", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "记录", "description": "记录会计分录细节测试的发现", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 5, "step_name": "结论", "description": "形成会计分录细节测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C25": {"wp_name": "内部审计", "steps": [{"step_order": 1, "step_name": "评估能力", "description": "评估内部审计部门的胜任能力", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "复核工作", "description": "复核内部审计的工作成果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "评价", "description": "评价内部审计工作的质量和可靠性", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 4, "step_name": "结论", "description": "形成利用内部审计工作的结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "C26": {"wp_name": "信息处理", "steps": [{"step_order": 1, "step_name": "了解系统", "description": "了解信息系统的处理流程和数据流", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 2, "step_name": "识别控制", "description": "识别信息处理中的关键应用控制", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 3, "step_name": "测试", "description": "测试信息处理控制的运行有效性", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "observation"}, {"step_order": 4, "step_name": "评价", "description": "评价信息处理控制测试结果", "is_required": true, "related_sheet": null, "category": "control_test", "evidence_type": "document"}, {"step_order": 5, "step_name": "结论", "description": "形成信息处理控制测试结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S2": {"wp_name": "期初余额", "steps": [{"step_order": 1, "step_name": "获取数据", "description": "获取期初余额相关数据和上年审计资料", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "核对", "description": "核对期初余额与上年审定数的一致性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"}, {"step_order": 3, "step_name": "评估", "description": "评估期初余额对本期财务报表的影响", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "结论", "description": "形成期初余额审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S3": {"wp_name": "会计政策变更", "steps": [{"step_order": 1, "step_name": "识别变更", "description": "识别本期发生的会计政策变更事项", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "评估合理性", "description": "评估会计政策变更的合理性和适当性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 3, "step_name": "检查披露", "description": "检查会计政策变更的披露是否充分", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "结论", "description": "形成会计政策变更审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S4": {"wp_name": "非货币性交换", "steps": [{"step_order": 1, "step_name": "识别交易", "description": "识别本期发生的非货币性资产交换", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "评估计量", "description": "评估非货币性交换的计量方法是否适当", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"}, {"step_order": 3, "step_name": "检查披露", "description": "检查非货币性交换的披露是否充分", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "结论", "description": "形成非货币性交换审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S5": {"wp_name": "债务重组", "steps": [{"step_order": 1, "step_name": "识别事项", "description": "识别本期发生的债务重组事项", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "评估处理", "description": "评估债务重组的会计处理是否正确", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"}, {"step_order": 3, "step_name": "检查披露", "description": "检查债务重组的披露是否充分", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "结论", "description": "形成债务重组审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S6": {"wp_name": "关联方资金占用", "steps": [{"step_order": 1, "step_name": "识别占用", "description": "识别关联方资金占用情况", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "核实金额", "description": "核实关联方资金占用的金额和期限", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"}, {"step_order": 3, "step_name": "评估影响", "description": "评估关联方资金占用对财务报表的影响", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "结论", "description": "形成关联方资金占用审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S8": {"wp_name": "租赁", "steps": [{"step_order": 1, "step_name": "识别租赁", "description": "识别被审计单位的租赁合同和安排", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "分类判断", "description": "判断租赁的分类是否正确", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 3, "step_name": "计量检查", "description": "检查使用权资产和租赁负债的计量", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"}, {"step_order": 4, "step_name": "披露检查", "description": "检查租赁相关披露的充分性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 5, "step_name": "结论", "description": "形成租赁审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S9": {"wp_name": "电子商务", "steps": [{"step_order": 1, "step_name": "了解模式", "description": "了解被审计单位的电子商务业务模式", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "评估风险", "description": "评估电子商务相关的特殊风险", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 3, "step_name": "执行程序", "description": "针对电子商务执行专项审计程序", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "结论", "description": "形成电子商务审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S10": {"wp_name": "环境事项", "steps": [{"step_order": 1, "step_name": "识别事项", "description": "识别与环境相关的重大事项和义务", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "评估影响", "description": "评估环境事项对财务报表的影响", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 3, "step_name": "检查披露", "description": "检查环境事项相关披露的充分性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "结论", "description": "形成环境事项审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S11": {"wp_name": "服务机构", "steps": [{"step_order": 1, "step_name": "获取报告", "description": "获取服务机构的控制报告", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "评估", "description": "评估服务机构控制报告的适用性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 3, "step_name": "确定影响", "description": "确定服务机构对审计策略的影响", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "结论", "description": "形成服务机构审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S12": {"wp_name": "利用专家", "steps": [{"step_order": 1, "step_name": "评估资质", "description": "评估注册会计师专家的胜任能力和客观性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "复核工作", "description": "复核专家的工作范围和方法", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 3, "step_name": "评估结论", "description": "评估专家结论的适当性和可靠性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "记录", "description": "记录利用专家工作的过程和结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S13": {"wp_name": "管理层专家", "steps": [{"step_order": 1, "step_name": "评估资质", "description": "评估管理层专家的胜任能力和客观性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "复核假设", "description": "复核管理层专家使用的假设和方法", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 3, "step_name": "评估结论", "description": "评估管理层专家结论的合理性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "记录", "description": "记录对管理层专家工作的评价结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S14": {"wp_name": "会计估计", "steps": [{"step_order": 1, "step_name": "识别估计", "description": "识别财务报表中涉及的重大会计估计", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "评估方法", "description": "评估管理层使用的估计方法是否适当", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 3, "step_name": "测试数据", "description": "测试会计估计所依据的数据和假设", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"}, {"step_order": 4, "step_name": "评估合理性", "description": "评估会计估计结果的合理性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"}, {"step_order": 5, "step_name": "结论", "description": "形成会计估计审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S15": {"wp_name": "每股收益", "steps": [{"step_order": 1, "step_name": "获取数据", "description": "获取每股收益计算所需的基础数据", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "验证计算", "description": "验证基本和稀释每股收益的计算过程", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"}, {"step_order": 3, "step_name": "检查披露", "description": "检查每股收益披露的完整性和准确性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "结论", "description": "形成每股收益审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S16": {"wp_name": "套期", "steps": [{"step_order": 1, "step_name": "识别关系", "description": "识别被审计单位的套期关系和策略", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "评估有效性", "description": "评估套期关系的有效性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"}, {"step_order": 3, "step_name": "检查计量", "description": "检查套期工具和被套期项目的计量", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"}, {"step_order": 4, "step_name": "检查披露", "description": "检查套期相关披露的充分性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 5, "step_name": "结论", "description": "形成套期审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S17": {"wp_name": "非经常性损益", "steps": [{"step_order": 1, "step_name": "识别项目", "description": "识别本期发生的非经常性损益项目", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "核实金额", "description": "核实非经常性损益项目的金额", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"}, {"step_order": 3, "step_name": "检查披露", "description": "检查非经常性损益的披露是否完整", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "结论", "description": "形成非经常性损益审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S20": {"wp_name": "营业收入扣除", "steps": [{"step_order": 1, "step_name": "获取数据", "description": "获取营业收入扣除项目的明细数据", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "核对计算", "description": "核对营业收入扣除金额的计算过程", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "calculation"}, {"step_order": 3, "step_name": "检查披露", "description": "检查营业收入扣除的披露是否充分", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "结论", "description": "形成营业收入扣除审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S21": {"wp_name": "数据资产", "steps": [{"step_order": 1, "step_name": "识别资产", "description": "识别被审计单位的数据资产", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "评估计量", "description": "评估数据资产的确认和计量方法", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 3, "step_name": "检查披露", "description": "检查数据资产相关披露的充分性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 4, "step_name": "结论", "description": "形成数据资产审计结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S32": {"wp_name": "551文", "steps": [{"step_order": 1, "step_name": "确认适用", "description": "确认551文的适用范围和要求", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "执行程序", "description": "按551文要求执行专项审计程序", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 3, "step_name": "编制报告", "description": "编制551文要求的专项报告", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "memo"}, {"step_order": 4, "step_name": "结论", "description": "形成551文专项工作结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S33": {"wp_name": "14号公告", "steps": [{"step_order": 1, "step_name": "确认适用", "description": "确认14号公告的适用范围和要求", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "执行程序", "description": "按14号公告要求执行专项程序", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 3, "step_name": "编制报告", "description": "编制14号公告要求的专项报告", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "memo"}, {"step_order": 4, "step_name": "结论", "description": "形成14号公告专项工作结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S34": {"wp_name": "首发审核", "steps": [{"step_order": 1, "step_name": "确认要求", "description": "确认首次公开发行的审核要求", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "执行程序", "description": "按首发审核要求执行专项审计程序", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 3, "step_name": "编制意见", "description": "编制首发审核相关的专业意见", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "memo"}, {"step_order": 4, "step_name": "复核", "description": "复核首发审核工作的完整性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 5, "step_name": "结论", "description": "形成首发审核专项工作结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]},
-    "S35": {"wp_name": "再融资审核", "steps": [{"step_order": 1, "step_name": "确认要求", "description": "确认再融资审核的具体要求", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 2, "step_name": "执行程序", "description": "按再融资审核要求执行专项程序", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 3, "step_name": "编制意见", "description": "编制再融资审核相关的专业意见", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "memo"}, {"step_order": 4, "step_name": "复核", "description": "复核再融资审核工作的完整性", "is_required": true, "related_sheet": null, "category": "special", "evidence_type": "document"}, {"step_order": 5, "step_name": "结论", "description": "形成再融资审核专项工作结论", "is_required": true, "related_sheet": null, "category": "conclusion", "evidence_type": "memo"}]}
+    "C2": {
+      "wp_name": "销售循环控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解销售循环的业务流程和关键环节",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别销售循环中的关键内部控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计销售循环控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行销售循环控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价销售循环控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成销售循环控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C3": {
+      "wp_name": "货币资金控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解货币资金管理的业务流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别货币资金管理中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计货币资金控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行货币资金控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价货币资金控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成货币资金控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C4": {
+      "wp_name": "存货控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解存货管理的业务流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别存货管理中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计存货控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行存货控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价存货控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成存货控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C5": {
+      "wp_name": "投资控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解投资管理的业务流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别投资管理中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计投资控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行投资控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价投资控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成投资控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C6": {
+      "wp_name": "固定资产控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解固定资产管理的业务流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别固定资产管理中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计固定资产控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行固定资产控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价固定资产控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成固定资产控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C7": {
+      "wp_name": "在建工程控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解在建工程管理的业务流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别在建工程管理中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计在建工程控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行在建工程控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价在建工程控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成在建工程控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C8": {
+      "wp_name": "无形资产控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解无形资产管理的业务流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别无形资产管理中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计无形资产控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行无形资产控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价无形资产控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成无形资产控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C9": {
+      "wp_name": "研发控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解研发活动管理的业务流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别研发管理中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计研发控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行研发控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价研发控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成研发控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C10": {
+      "wp_name": "薪酬控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解薪酬管理的业务流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别薪酬管理中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计薪酬控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行薪酬控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价薪酬控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成薪酬控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C11": {
+      "wp_name": "管理费用控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解管理费用的业务流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别管理费用中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计管理费用控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行管理费用控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价管理费用控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成管理费用控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C12": {
+      "wp_name": "税金控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解税金管理的业务流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别税金管理中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计税金控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行税金控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价税金控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成税金控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C13": {
+      "wp_name": "债务控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解债务管理的业务流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别债务管理中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计债务控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行债务控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价债务控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成债务控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C14": {
+      "wp_name": "租赁控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解租赁管理的业务流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别租赁管理中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计租赁控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行租赁控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价租赁控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成租赁控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C15": {
+      "wp_name": "关联方控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解关联方交易管理的业务流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别关联方交易管理中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计关联方控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行关联方控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "评价",
+          "description": "评价关联方控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 6,
+          "step_name": "结论",
+          "description": "形成关联方控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C21": {
+      "wp_name": "IT专员",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "评估IT环境",
+          "description": "评估被审计单位的IT环境和基础设施",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别风险",
+          "description": "识别IT相关的风险和控制薄弱环节",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计IT控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行IT控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成IT专员工作结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C22": {
+      "wp_name": "IT一般控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解IT环境",
+          "description": "了解IT一般控制环境和治理结构",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别IT一般控制的关键控制点",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "测试",
+          "description": "测试IT一般控制的运行有效性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "评价",
+          "description": "评价IT一般控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成IT一般控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C23": {
+      "wp_name": "会计分录控制",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解流程",
+          "description": "了解会计分录编制和审批的流程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别会计分录处理中的关键控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "设计测试",
+          "description": "设计会计分录控制测试程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "执行",
+          "description": "执行会计分录控制测试",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成会计分录控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C24": {
+      "wp_name": "会计分录细节",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "选择样本",
+          "description": "选择需要测试的会计分录样本",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "检查",
+          "description": "检查会计分录的编制依据和审批",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "评价",
+          "description": "评价会计分录的适当性和准确性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "记录",
+          "description": "记录会计分录细节测试的发现",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成会计分录细节测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C25": {
+      "wp_name": "内部审计",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "评估能力",
+          "description": "评估内部审计部门的胜任能力",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "复核工作",
+          "description": "复核内部审计的工作成果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "评价",
+          "description": "评价内部审计工作的质量和可靠性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成利用内部审计工作的结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "C26": {
+      "wp_name": "信息处理",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解系统",
+          "description": "了解信息系统的处理流程和数据流",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "识别控制",
+          "description": "识别信息处理中的关键应用控制",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "测试",
+          "description": "测试信息处理控制的运行有效性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "observation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "评价",
+          "description": "评价信息处理控制测试结果",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "control_test",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成信息处理控制测试结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S2": {
+      "wp_name": "期初余额",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "获取数据",
+          "description": "获取期初余额相关数据和上年审计资料",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核对",
+          "description": "核对期初余额与上年审定数的一致性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "评估",
+          "description": "评估期初余额对本期财务报表的影响",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成期初余额审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S3": {
+      "wp_name": "会计政策变更",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "识别变更",
+          "description": "识别本期发生的会计政策变更事项",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估合理性",
+          "description": "评估会计政策变更的合理性和适当性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "检查披露",
+          "description": "检查会计政策变更的披露是否充分",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成会计政策变更审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S4": {
+      "wp_name": "非货币性交换",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "识别交易",
+          "description": "识别本期发生的非货币性资产交换",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估计量",
+          "description": "评估非货币性交换的计量方法是否适当",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "检查披露",
+          "description": "检查非货币性交换的披露是否充分",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成非货币性交换审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S5": {
+      "wp_name": "债务重组",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "识别事项",
+          "description": "识别本期发生的债务重组事项",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估处理",
+          "description": "评估债务重组的会计处理是否正确",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "检查披露",
+          "description": "检查债务重组的披露是否充分",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成债务重组审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S6": {
+      "wp_name": "关联方资金占用",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "识别占用",
+          "description": "识别关联方资金占用情况",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核实金额",
+          "description": "核实关联方资金占用的金额和期限",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "评估影响",
+          "description": "评估关联方资金占用对财务报表的影响",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成关联方资金占用审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S8": {
+      "wp_name": "租赁",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "识别租赁",
+          "description": "识别被审计单位的租赁合同和安排",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "分类判断",
+          "description": "判断租赁的分类是否正确",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "计量检查",
+          "description": "检查使用权资产和租赁负债的计量",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "披露检查",
+          "description": "检查租赁相关披露的充分性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成租赁审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S9": {
+      "wp_name": "电子商务",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "了解模式",
+          "description": "了解被审计单位的电子商务业务模式",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估风险",
+          "description": "评估电子商务相关的特殊风险",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "执行程序",
+          "description": "针对电子商务执行专项审计程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成电子商务审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S10": {
+      "wp_name": "环境事项",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "识别事项",
+          "description": "识别与环境相关的重大事项和义务",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估影响",
+          "description": "评估环境事项对财务报表的影响",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "检查披露",
+          "description": "检查环境事项相关披露的充分性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成环境事项审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S11": {
+      "wp_name": "服务机构",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "获取报告",
+          "description": "获取服务机构的控制报告",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估",
+          "description": "评估服务机构控制报告的适用性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "确定影响",
+          "description": "确定服务机构对审计策略的影响",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成服务机构审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S12": {
+      "wp_name": "利用专家",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "评估资质",
+          "description": "评估注册会计师专家的胜任能力和客观性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "复核工作",
+          "description": "复核专家的工作范围和方法",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "评估结论",
+          "description": "评估专家结论的适当性和可靠性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "记录",
+          "description": "记录利用专家工作的过程和结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S13": {
+      "wp_name": "管理层专家",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "评估资质",
+          "description": "评估管理层专家的胜任能力和客观性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "复核假设",
+          "description": "复核管理层专家使用的假设和方法",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "评估结论",
+          "description": "评估管理层专家结论的合理性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "记录",
+          "description": "记录对管理层专家工作的评价结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S14": {
+      "wp_name": "会计估计",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "识别估计",
+          "description": "识别财务报表中涉及的重大会计估计",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估方法",
+          "description": "评估管理层使用的估计方法是否适当",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "测试数据",
+          "description": "测试会计估计所依据的数据和假设",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "评估合理性",
+          "description": "评估会计估计结果的合理性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成会计估计审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S15": {
+      "wp_name": "每股收益",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "获取数据",
+          "description": "获取每股收益计算所需的基础数据",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "验证计算",
+          "description": "验证基本和稀释每股收益的计算过程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "检查披露",
+          "description": "检查每股收益披露的完整性和准确性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成每股收益审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S16": {
+      "wp_name": "套期",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "识别关系",
+          "description": "识别被审计单位的套期关系和策略",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估有效性",
+          "description": "评估套期关系的有效性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "检查计量",
+          "description": "检查套期工具和被套期项目的计量",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 4,
+          "step_name": "检查披露",
+          "description": "检查套期相关披露的充分性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成套期审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S17": {
+      "wp_name": "非经常性损益",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "识别项目",
+          "description": "识别本期发生的非经常性损益项目",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核实金额",
+          "description": "核实非经常性损益项目的金额",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "检查披露",
+          "description": "检查非经常性损益的披露是否完整",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成非经常性损益审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S20": {
+      "wp_name": "营业收入扣除",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "获取数据",
+          "description": "获取营业收入扣除项目的明细数据",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "核对计算",
+          "description": "核对营业收入扣除金额的计算过程",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "calculation"
+        },
+        {
+          "step_order": 3,
+          "step_name": "检查披露",
+          "description": "检查营业收入扣除的披露是否充分",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成营业收入扣除审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S21": {
+      "wp_name": "数据资产",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "识别资产",
+          "description": "识别被审计单位的数据资产",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "评估计量",
+          "description": "评估数据资产的确认和计量方法",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "检查披露",
+          "description": "检查数据资产相关披露的充分性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成数据资产审计结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S32": {
+      "wp_name": "551文",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "确认适用",
+          "description": "确认551文的适用范围和要求",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "执行程序",
+          "description": "按551文要求执行专项审计程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "编制报告",
+          "description": "编制551文要求的专项报告",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成551文专项工作结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S33": {
+      "wp_name": "14号公告",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "确认适用",
+          "description": "确认14号公告的适用范围和要求",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "执行程序",
+          "description": "按14号公告要求执行专项程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "编制报告",
+          "description": "编制14号公告要求的专项报告",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 4,
+          "step_name": "结论",
+          "description": "形成14号公告专项工作结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S34": {
+      "wp_name": "首发审核",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "确认要求",
+          "description": "确认首次公开发行的审核要求",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "执行程序",
+          "description": "按首发审核要求执行专项审计程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "编制意见",
+          "description": "编制首发审核相关的专业意见",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 4,
+          "step_name": "复核",
+          "description": "复核首发审核工作的完整性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成首发审核专项工作结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    },
+    "S35": {
+      "wp_name": "再融资审核",
+      "steps": [
+        {
+          "step_order": 1,
+          "step_name": "确认要求",
+          "description": "确认再融资审核的具体要求",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 2,
+          "step_name": "执行程序",
+          "description": "按再融资审核要求执行专项程序",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 3,
+          "step_name": "编制意见",
+          "description": "编制再融资审核相关的专业意见",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "memo"
+        },
+        {
+          "step_order": 4,
+          "step_name": "复核",
+          "description": "复核再融资审核工作的完整性",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "special",
+          "evidence_type": "document"
+        },
+        {
+          "step_order": 5,
+          "step_name": "结论",
+          "description": "形成再融资审核专项工作结论",
+          "is_required": true,
+          "related_sheet": null,
+          "category": "conclusion",
+          "evidence_type": "memo"
+        }
+      ]
+    }
   }
 }

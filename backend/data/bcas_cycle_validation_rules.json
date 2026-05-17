@@ -1,0 +1,256 @@
+{
+  "description": "B/C/A/S 计划/控制/完成/特定项目校验规则",
+  "version": "2025-R1",
+  "rules": [
+    {
+      "rule_id": "BCAS-VR-01",
+      "wp_code": "B15",
+      "rule_name": "重要性水平一致性",
+      "rule_type": "consistency_check",
+      "formula": "materiality_level == trial_balance.materiality",
+      "description": "重要性水平应与试算平衡表设定一致",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-02",
+      "wp_code": "B60",
+      "rule_name": "审计工时预算与实际对比",
+      "rule_type": "threshold_check",
+      "formula": "abs(actual_hours - budget_hours) / budget_hours <= 0.2",
+      "description": "实际审计工时与预算偏差不应超过20%",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-03",
+      "wp_code": "C2",
+      "rule_name": "销售循环控制结论一致性",
+      "rule_type": "consistency_check",
+      "formula": "control_effective == True implies substantive_reduced == True",
+      "description": "控制测试有效时应相应减少实质性程序范围",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-04",
+      "wp_code": "C3",
+      "rule_name": "货币资金控制结论一致性",
+      "rule_type": "consistency_check",
+      "formula": "control_effective == True implies substantive_reduced == True",
+      "description": "货币资金控制有效时应相应减少实质性程序范围",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-05",
+      "wp_code": "C4",
+      "rule_name": "存货控制结论一致性",
+      "rule_type": "consistency_check",
+      "formula": "control_effective == True implies substantive_reduced == True",
+      "description": "存货控制有效时应相应减少实质性程序范围",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-06",
+      "wp_code": "C5",
+      "rule_name": "投资控制结论一致性",
+      "rule_type": "consistency_check",
+      "formula": "control_effective == True implies substantive_reduced == True",
+      "description": "投资控制有效时应相应减少实质性程序范围",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-07",
+      "wp_code": "C6",
+      "rule_name": "固定资产控制结论一致性",
+      "rule_type": "consistency_check",
+      "formula": "control_effective == True implies substantive_reduced == True",
+      "description": "固定资产控制有效时应相应减少实质性程序范围",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-08",
+      "wp_code": "C10",
+      "rule_name": "薪酬控制结论一致性",
+      "rule_type": "consistency_check",
+      "formula": "control_effective == True implies substantive_reduced == True",
+      "description": "薪酬控制有效时应相应减少实质性程序范围",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-09",
+      "wp_code": "C12",
+      "rule_name": "税金控制结论一致性",
+      "rule_type": "consistency_check",
+      "formula": "control_effective == True implies substantive_reduced == True",
+      "description": "税金控制有效时应相应减少实质性程序范围",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-10",
+      "wp_code": "C13",
+      "rule_name": "债务控制结论一致性",
+      "rule_type": "consistency_check",
+      "formula": "control_effective == True implies substantive_reduced == True",
+      "description": "债务控制有效时应相应减少实质性程序范围",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-11",
+      "wp_code": "A2",
+      "rule_name": "调整分录合计校验",
+      "rule_type": "balance_check",
+      "formula": "total_aje == sum(individual_aje_amounts)",
+      "description": "调整分录汇总金额应等于各单笔调整分录之和",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-12",
+      "wp_code": "A13",
+      "rule_name": "错报汇总合计校验",
+      "rule_type": "balance_check",
+      "formula": "total_misstatements == sum(individual_misstatement_amounts)",
+      "description": "错报汇总金额应等于各单笔错报之和",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-13",
+      "wp_code": "A13",
+      "rule_name": "未更正错报低于重要性",
+      "rule_type": "threshold_check",
+      "formula": "total_uncorrected_misstatements < materiality_level",
+      "description": "未更正错报汇总金额应低于重要性水平",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-14",
+      "wp_code": "A15",
+      "rule_name": "持续经营结论一致性",
+      "rule_type": "consistency_check",
+      "formula": "going_concern_doubt == True implies disclosure_adequate == True",
+      "description": "存在持续经营重大疑虑时应确保披露充分",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-15",
+      "wp_code": "A11",
+      "rule_name": "期后事项截止日期检查",
+      "rule_type": "date_check",
+      "formula": "subsequent_events_cutoff_date >= report_date",
+      "description": "期后事项检查截止日期不应早于审计报告日",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-16",
+      "wp_code": "S2",
+      "rule_name": "期初余额等于上年期末",
+      "rule_type": "balance_check",
+      "formula": "opening_balance == prior_year_closing_balance",
+      "description": "期初余额应等于上年审定期末余额",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-17",
+      "wp_code": "S14",
+      "rule_name": "会计估计披露完整性",
+      "rule_type": "completeness_check",
+      "formula": "all_significant_estimates_disclosed == True",
+      "description": "所有重大会计估计均应在附注中充分披露",
+      "severity": "warning",
+      "auto_check": false
+    },
+    {
+      "rule_id": "BCAS-VR-18",
+      "wp_code": "A1",
+      "rule_name": "财务报告日期一致性",
+      "rule_type": "date_check",
+      "formula": "report_date == audit_report_date",
+      "description": "财务报告批准日期应与审计报告日期一致",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-19",
+      "wp_code": "A3",
+      "rule_name": "合并抵消分录借贷平衡",
+      "rule_type": "balance_check",
+      "formula": "sum(elimination_debits) == sum(elimination_credits)",
+      "description": "合并抵消分录借方合计应等于贷方合计",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-20",
+      "wp_code": "B15",
+      "rule_name": "实际执行重要性计算",
+      "rule_type": "threshold_check",
+      "formula": "performance_materiality >= materiality_level * 0.5 and performance_materiality <= materiality_level * 0.75",
+      "description": "实际执行的重要性通常为重要性水平的50%-75%",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-21",
+      "wp_code": "B15",
+      "rule_name": "明显微小错报阈值",
+      "rule_type": "threshold_check",
+      "formula": "clearly_trivial_threshold <= materiality_level * 0.05",
+      "description": "明显微小错报阈值通常不超过重要性水平的5%",
+      "severity": "warning",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-22",
+      "wp_code": "C1",
+      "rule_name": "企业层面控制评价完整性",
+      "rule_type": "completeness_check",
+      "formula": "all_coso_components_evaluated == True",
+      "description": "应对COSO五要素全部进行评价（控制环境、风险评估、控制活动、信息与沟通、监督）",
+      "severity": "warning",
+      "auto_check": false
+    },
+    {
+      "rule_id": "BCAS-VR-23",
+      "wp_code": "A16",
+      "rule_name": "管理层声明书日期检查",
+      "rule_type": "date_check",
+      "formula": "representation_letter_date == audit_report_date",
+      "description": "管理层声明书日期应与审计报告日期相同",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-24",
+      "wp_code": "A2",
+      "rule_name": "调整分录借贷平衡",
+      "rule_type": "balance_check",
+      "formula": "sum(aje_debits) == sum(aje_credits)",
+      "description": "每笔调整分录借方合计应等于贷方合计",
+      "severity": "blocking",
+      "auto_check": true
+    },
+    {
+      "rule_id": "BCAS-VR-25",
+      "wp_code": "A15",
+      "rule_name": "持续经营评估期间检查",
+      "rule_type": "date_check",
+      "formula": "going_concern_assessment_period >= 12",
+      "description": "管理层持续经营评估期间应至少覆盖自报告日起12个月",
+      "severity": "warning",
+      "auto_check": true
+    }
+  ]
+}

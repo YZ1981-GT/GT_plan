@@ -1138,10 +1138,495 @@
       ],
       "category": "tax_cycle",
       "severity": "info"
+    },
+    {
+      "ref_id": "CW-59",
+      "description": "B15 重要性水平→试算平衡表重要性设定",
+      "source_wp": "B15",
+      "source_sheet": "重要性计算",
+      "source_cell": "E10",
+      "targets": [
+        {
+          "target_module": "trial_balance",
+          "target_field": "materiality_level",
+          "link_type": "data_source"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-60",
+      "description": "B60 总体审计策略→所有D-N实质性程序底稿",
+      "source_wp": "B60",
+      "source_sheet": "总体审计策略",
+      "source_cell": "审计计划摘要",
+      "targets": [
+        {
+          "target_module": "audit_plan",
+          "target_field": "strategy_reference",
+          "link_type": "data_source"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-61",
+      "description": "C2 销售循环控制测试→D4 营业收入实质性程序",
+      "source_wp": "C2",
+      "source_sheet": "销售循环控制测试",
+      "source_cell": "控制有效性结论",
+      "targets": [
+        {
+          "target_module": "D4",
+          "target_field": "control_reliance_level",
+          "link_type": "control_reliance"
+        }
+      ],
+      "category": "internal",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-62",
+      "description": "C3 货币资金控制测试→E1 货币资金实质性程序",
+      "source_wp": "C3",
+      "source_sheet": "货币资金控制测试",
+      "source_cell": "控制有效性结论",
+      "targets": [
+        {
+          "target_module": "E1",
+          "target_field": "control_reliance_level",
+          "link_type": "control_reliance"
+        }
+      ],
+      "category": "internal",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-63",
+      "description": "C4 存货控制测试→F2 存货实质性程序",
+      "source_wp": "C4",
+      "source_sheet": "存货控制测试",
+      "source_cell": "控制有效性结论",
+      "targets": [
+        {
+          "target_module": "F2",
+          "target_field": "control_reliance_level",
+          "link_type": "control_reliance"
+        }
+      ],
+      "category": "internal",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-64",
+      "description": "C5 投资控制测试→G1 长期股权投资实质性程序",
+      "source_wp": "C5",
+      "source_sheet": "投资控制测试",
+      "source_cell": "控制有效性结论",
+      "targets": [
+        {
+          "target_module": "G1",
+          "target_field": "control_reliance_level",
+          "link_type": "control_reliance"
+        }
+      ],
+      "category": "internal",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-65",
+      "description": "C6 固定资产控制测试→H1 固定资产实质性程序",
+      "source_wp": "C6",
+      "source_sheet": "固定资产控制测试",
+      "source_cell": "控制有效性结论",
+      "targets": [
+        {
+          "target_module": "H1",
+          "target_field": "control_reliance_level",
+          "link_type": "control_reliance"
+        }
+      ],
+      "category": "internal",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-66",
+      "description": "C7 在建工程控制测试→H8 在建工程实质性程序",
+      "source_wp": "C7",
+      "source_sheet": "在建工程控制测试",
+      "source_cell": "控制有效性结论",
+      "targets": [
+        {
+          "target_module": "H8",
+          "target_field": "control_reliance_level",
+          "link_type": "control_reliance"
+        }
+      ],
+      "category": "internal",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-67",
+      "description": "C8 无形资产控制测试→I1 无形资产实质性程序",
+      "source_wp": "C8",
+      "source_sheet": "无形资产控制测试",
+      "source_cell": "控制有效性结论",
+      "targets": [
+        {
+          "target_module": "I1",
+          "target_field": "control_reliance_level",
+          "link_type": "control_reliance"
+        }
+      ],
+      "category": "internal",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-68",
+      "description": "C10 薪酬控制测试→J1 职工薪酬实质性程序",
+      "source_wp": "C10",
+      "source_sheet": "薪酬控制测试",
+      "source_cell": "控制有效性结论",
+      "targets": [
+        {
+          "target_module": "J1",
+          "target_field": "control_reliance_level",
+          "link_type": "control_reliance"
+        }
+      ],
+      "category": "internal",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-69",
+      "description": "C12 税金控制测试→N1 应交税费实质性程序",
+      "source_wp": "C12",
+      "source_sheet": "税金控制测试",
+      "source_cell": "控制有效性结论",
+      "targets": [
+        {
+          "target_module": "N1",
+          "target_field": "control_reliance_level",
+          "link_type": "control_reliance"
+        }
+      ],
+      "category": "internal",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-70",
+      "description": "C13 债务控制测试→L1 短期借款实质性程序",
+      "source_wp": "C13",
+      "source_sheet": "债务控制测试",
+      "source_cell": "控制有效性结论",
+      "targets": [
+        {
+          "target_module": "L1",
+          "target_field": "control_reliance_level",
+          "link_type": "control_reliance"
+        }
+      ],
+      "category": "internal",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-71",
+      "description": "A2 调整分录汇总→调整分录模块",
+      "source_wp": "A2",
+      "source_sheet": "调整分录汇总表",
+      "source_cell": "调整分录合计",
+      "targets": [
+        {
+          "target_module": "adjustments",
+          "target_field": "total_adjustments",
+          "link_type": "data_output"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "required"
+    },
+    {
+      "ref_id": "CW-72",
+      "description": "A11 期后事项→附注披露",
+      "source_wp": "A11",
+      "source_sheet": "期后事项检查表",
+      "source_cell": "期后事项结论",
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_field": "subsequent_events_section",
+          "link_type": "note_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "required"
+    },
+    {
+      "ref_id": "CW-73",
+      "description": "A13 错报汇总→错报管理模块",
+      "source_wp": "A13",
+      "source_sheet": "错报汇总表",
+      "source_cell": "未更正错报合计",
+      "targets": [
+        {
+          "target_module": "misstatements",
+          "target_field": "total_uncorrected",
+          "link_type": "data_output"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "required"
+    },
+    {
+      "ref_id": "CW-74",
+      "description": "A14 内控缺陷→附注披露",
+      "source_wp": "A14",
+      "source_sheet": "内控缺陷汇总",
+      "source_cell": "重大缺陷结论",
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_field": "internal_control_section",
+          "link_type": "note_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "required"
+    },
+    {
+      "ref_id": "CW-75",
+      "description": "A15 持续经营→附注披露及审计报告",
+      "source_wp": "A15",
+      "source_sheet": "持续经营评估",
+      "source_cell": "持续经营结论",
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_field": "going_concern_section",
+          "link_type": "note_linkage"
+        },
+        {
+          "target_module": "audit_report",
+          "target_field": "going_concern_paragraph",
+          "link_type": "report_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "required"
+    },
+    {
+      "ref_id": "CW-76",
+      "description": "A16 管理层声明书→审计报告",
+      "source_wp": "A16",
+      "source_sheet": "管理层声明书",
+      "source_cell": "声明书签署日期",
+      "targets": [
+        {
+          "target_module": "audit_report",
+          "target_field": "representation_letter_date",
+          "link_type": "report_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "required"
+    },
+    {
+      "ref_id": "CW-77",
+      "description": "A17 重大事项概要→审计报告",
+      "source_wp": "A17",
+      "source_sheet": "重大事项概要",
+      "source_cell": "审计意见类型",
+      "targets": [
+        {
+          "target_module": "audit_report",
+          "target_field": "opinion_type_basis",
+          "link_type": "report_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "required"
+    },
+    {
+      "ref_id": "CW-78",
+      "description": "S2 期初余额→试算平衡表",
+      "source_wp": "S2",
+      "source_sheet": "期初余额审计",
+      "source_cell": "期初余额确认",
+      "targets": [
+        {
+          "target_module": "trial_balance",
+          "target_field": "opening_balance_verified",
+          "link_type": "data_source"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-79",
+      "description": "S14 会计估计→附注披露",
+      "source_wp": "S14",
+      "source_sheet": "会计估计审计",
+      "source_cell": "估计合理性结论",
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_field": "accounting_estimates_section",
+          "link_type": "note_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-80",
+      "description": "S15 每股收益→财务报告",
+      "source_wp": "S15",
+      "source_sheet": "每股收益计算",
+      "source_cell": "基本每股收益",
+      "targets": [
+        {
+          "target_module": "financial_report",
+          "target_field": "earnings_per_share",
+          "link_type": "report_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-81",
+      "description": "B19 关联方识别→附注披露",
+      "source_wp": "B19",
+      "source_sheet": "关联方清单",
+      "source_cell": "关联方汇总",
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_field": "related_parties_section",
+          "link_type": "note_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-82",
+      "description": "A7 关联交易→附注披露",
+      "source_wp": "A7",
+      "source_sheet": "关联交易汇总",
+      "source_cell": "关联交易合计",
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_field": "related_party_transactions_section",
+          "link_type": "note_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "required"
+    },
+    {
+      "ref_id": "CW-83",
+      "description": "C14 租赁控制测试→附注披露",
+      "source_wp": "C14",
+      "source_sheet": "租赁控制测试",
+      "source_cell": "租赁分类结论",
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_field": "lease_section",
+          "link_type": "note_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-84",
+      "description": "A1 财务报告→财务报告模块",
+      "source_wp": "A1",
+      "source_sheet": "财务报告审阅",
+      "source_cell": "报告审阅结论",
+      "targets": [
+        {
+          "target_module": "financial_report",
+          "target_field": "report_review_status",
+          "link_type": "report_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "required"
+    },
+    {
+      "ref_id": "CW-85",
+      "description": "A3 合并流程→合并模块",
+      "source_wp": "A3",
+      "source_sheet": "合并抵消分录",
+      "source_cell": "合并抵消合计",
+      "targets": [
+        {
+          "target_module": "consolidation",
+          "target_field": "elimination_entries",
+          "link_type": "data_output"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "required"
+    },
+    {
+      "ref_id": "CW-86",
+      "description": "A4 经营分部→附注披露",
+      "source_wp": "A4",
+      "source_sheet": "经营分部分析",
+      "source_cell": "分部信息汇总",
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_field": "segment_reporting_section",
+          "link_type": "note_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "required"
+    },
+    {
+      "ref_id": "CW-87",
+      "description": "S1 违法违规→附注披露",
+      "source_wp": "S1",
+      "source_sheet": "违法违规检查",
+      "source_cell": "违法违规结论",
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_field": "non_compliance_section",
+          "link_type": "note_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "recommended"
+    },
+    {
+      "ref_id": "CW-88",
+      "description": "S3 会计政策变更→附注披露",
+      "source_wp": "S3",
+      "source_sheet": "会计政策变更分析",
+      "source_cell": "政策变更影响",
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_field": "accounting_policy_changes_section",
+          "link_type": "note_linkage"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "recommended"
     }
   ],
   "stats": {
-    "total_references": 20,
+    "total_references": 88,
     "by_category": {
       "depreciation": 5,
       "salary": 3,
@@ -1151,6 +1636,6 @@
       "tax": 2,
       "other": 1
     },
-    "coverage_note": "当前覆盖 20 条核心跨底稿引用。致同 2025 模板实际有 50+ 条跨底稿数据流向，请根据项目实际需要持续扩展。扩展方法见 usage_guide。"
+    "coverage_note": "覆盖 D-N 实质性程序（CW-01~CW-58）+ B/C/A/S 计划/控制/完成/特定项目跨模块引用（CW-59~CW-88）共 88 条。"
   }
 }
