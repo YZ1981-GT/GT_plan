@@ -558,3 +558,8 @@ def register_all_routers(app: FastAPI) -> None:
     # 路由内部已声明 prefix="/api/projects"，注册时不加额外前缀。
     from app.routers.wp_prefill_context import router as wp_prefill_context_router
     app.include_router(wp_prefill_context_router, tags=["workpaper-prefill"])
+
+    # ═══ 59. Address Registry V2：三级地址解析 + stale 传播链路 ═══
+    # 路由内部已声明 prefix="/api/address-registry/v2"，注册时不加额外前缀。
+    from app.routers.address_registry_v2 import router as address_registry_v2_router
+    app.include_router(address_registry_v2_router, tags=["address-registry-v2"])

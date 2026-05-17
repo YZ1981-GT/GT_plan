@@ -1107,6 +1107,15 @@ export const addressRegistry = {
   validate: '/api/address-registry/validate',
   jump: '/api/address-registry/jump',
   invalidate: '/api/address-registry/invalidate',
+  // V2: 三级地址解析 + stale 传播链路
+  v2: {
+    stats: '/api/address-registry/v2/stats',
+    resolve: '/api/address-registry/v2/resolve',
+    anchors: '/api/address-registry/v2/anchors',
+    staleImpact: '/api/address-registry/v2/stale-impact',
+    dependencies: '/api/address-registry/v2/dependencies',
+    notifyCellChange: '/api/address-registry/v2/notify-cell-change',
+  },
 } as const
 
 // ─── 工时 ───────────────────────────────────────────────────────────────────

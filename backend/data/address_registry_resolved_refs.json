@@ -1,0 +1,2734 @@
+{
+  "description": "cross_wp_references 语义→物理坐标解析结果（V2 多策略匹配）",
+  "version": "2025-R2",
+  "stats": {
+    "total_refs": 107,
+    "resolved": 106,
+    "unmatched": 1,
+    "match_rate": "99.1%",
+    "source_breakdown": {
+      "sheet_only_fallback": 40,
+      "contains": 37,
+      "row_label": 1,
+      "wp_only_fallback": 25,
+      "direct_coord": 1,
+      "exact_anchor": 2
+    },
+    "target_breakdown": {
+      "sheet_only_fallback": 26,
+      "contains": 7,
+      "wp_only_fallback": 5,
+      "unmatched": 37,
+      "module": 31,
+      "exact_anchor": 1
+    }
+  },
+  "resolved": [
+    {
+      "ref_id": "CW-01",
+      "description": "折旧分摊到销售费用",
+      "severity": "blocking",
+      "category": "depreciation",
+      "source": {
+        "wp_code": "H1",
+        "file": "H1 固定资产.xlsx",
+        "sheet": "折旧分配分析表H1-13",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "折旧分配分析表H1-13",
+        "description_cell": "销售费用折旧"
+      },
+      "targets": [
+        {
+          "wp_code": "K8",
+          "file": "K8 销售费用.xlsx",
+          "sheet": "审定表K8-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "折旧行",
+          "formula": "=WP('H1','折旧分配分析表H1-13','销售费用折旧')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-02",
+      "description": "折旧分摊到管理费用",
+      "severity": "blocking",
+      "category": "depreciation",
+      "source": {
+        "wp_code": "H1",
+        "file": "H1 固定资产.xlsx",
+        "sheet": "折旧分配分析表H1-13",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "折旧分配分析表H1-13",
+        "description_cell": "管理费用折旧"
+      },
+      "targets": [
+        {
+          "wp_code": "K9",
+          "file": "K9 管理费用.xlsx",
+          "sheet": "审定表K9-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "折旧行",
+          "formula": "=WP('H1','折旧分配分析表H1-13','管理费用折旧')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-03",
+      "description": "折旧分摊到生产成本",
+      "severity": "blocking",
+      "category": "depreciation",
+      "source": {
+        "wp_code": "H1",
+        "file": "H1 固定资产.xlsx",
+        "sheet": "折旧分配分析表H1-13",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "折旧分配分析表H1-13",
+        "description_cell": "生产成本折旧"
+      },
+      "targets": [
+        {
+          "wp_code": "F5",
+          "file": "F5 营业成本.xlsx",
+          "sheet": "营业务成本审定表F5-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "折旧行",
+          "formula": "=WP('H1','折旧分配分析表H1-13','生产成本折旧')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-04",
+      "description": "薪酬分摊到销售费用",
+      "severity": "blocking",
+      "category": "salary",
+      "source": {
+        "wp_code": "J1",
+        "file": "J1 应付职工薪酬.xlsx",
+        "sheet": "与同行业对比分析表J1-5",
+        "cell": "A17",
+        "matched_anchor": "销售人员",
+        "match_type": "contains",
+        "description_sheet": "审定表",
+        "description_cell": "销售人员薪酬"
+      },
+      "targets": [
+        {
+          "wp_code": "K8",
+          "file": "K8 销售费用.xlsx",
+          "sheet": "审定表K8-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "薪酬行",
+          "formula": "=WP('J1','审定表','销售人员薪酬')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-05",
+      "description": "薪酬分摊到管理费用",
+      "severity": "blocking",
+      "category": "salary",
+      "source": {
+        "wp_code": "J1",
+        "file": "J1 应付职工薪酬.xlsx",
+        "sheet": "应付职工薪酬实质性程序表 J1A",
+        "cell": "A32",
+        "matched_anchor": "取得关键管理人员薪酬明细表，分析薪酬结构是否合理、是否存在重大波动，对比与市场平均水平、公司内部其他岗位薪酬是否存在异常，评估是否符合行业惯例和公司薪酬政策，检.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表",
+        "description_cell": "管理人员薪酬"
+      },
+      "targets": [
+        {
+          "wp_code": "K9",
+          "file": "K9 管理费用.xlsx",
+          "sheet": "审定表K9-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "薪酬行",
+          "formula": "=WP('J1','审定表','管理人员薪酬')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-06",
+      "description": "薪酬分摊到生产成本",
+      "severity": "blocking",
+      "category": "salary",
+      "source": {
+        "wp_code": "J1",
+        "file": "J1 应付职工薪酬.xlsx",
+        "sheet": "与同行业对比分析表J1-5",
+        "cell": "A15",
+        "matched_anchor": "生产人员",
+        "match_type": "contains",
+        "description_sheet": "审定表",
+        "description_cell": "生产人员薪酬"
+      },
+      "targets": [
+        {
+          "wp_code": "F5",
+          "file": "F5 营业成本.xlsx",
+          "sheet": "营业务成本审定表F5-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "薪酬行",
+          "formula": "=WP('J1','审定表','生产人员薪酬')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-07",
+      "description": "应收坏账计提到信用减值损失",
+      "severity": "warning",
+      "category": "impairment",
+      "source": {
+        "wp_code": "D2",
+        "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+        "sheet": "坏账准备明细表D2-3",
+        "cell": "A22",
+        "matched_anchor": "合计",
+        "match_type": "contains",
+        "description_sheet": "坏账准备明细表D2-3",
+        "description_cell": "本期计提合计"
+      },
+      "targets": [
+        {
+          "wp_code": "G14",
+          "file": "G14 信用减值损失.xlsx",
+          "sheet": "审定表G14-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "应收账款减值行",
+          "formula": "=WP('D2','坏账准备明细表D2-3','本期计提合计')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-08",
+      "description": "其他应收坏账到信用减值损失",
+      "severity": "warning",
+      "category": "impairment",
+      "source": {
+        "wp_code": "K1",
+        "file": "K1 其他应收款.xlsx",
+        "sheet": "坏账准备明细表K1-3",
+        "cell": "A22",
+        "matched_anchor": "合计",
+        "match_type": "contains",
+        "description_sheet": "坏账准备明细表",
+        "description_cell": "本期计提合计"
+      },
+      "targets": [
+        {
+          "wp_code": "G14",
+          "file": "G14 信用减值损失.xlsx",
+          "sheet": "审定表G14-1",
+          "cell": "A15",
+          "matched_anchor": "其他",
+          "match_type": "contains",
+          "description_cell": "其他应收减值行",
+          "formula": "=WP('K1','坏账准备明细表','本期计提合计')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-09",
+      "description": "短期借款利息到财务费用",
+      "severity": "warning",
+      "category": "interest",
+      "source": {
+        "wp_code": "L1",
+        "file": "L1 短期借款.xlsx",
+        "sheet": "利息测算表L1-5",
+        "cell": "A22",
+        "matched_anchor": "财务费用——利息支出：.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表",
+        "description_cell": "利息支出"
+      },
+      "targets": [
+        {
+          "wp_code": "L8",
+          "file": "L8 财务费用.xlsx",
+          "sheet": "审定表L8-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "利息支出行",
+          "formula": "=WP('L1','审定表','利息支出')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-10",
+      "description": "长期借款利息到财务费用",
+      "severity": "warning",
+      "category": "interest",
+      "source": {
+        "wp_code": "L3",
+        "file": "L3 长期借款.xlsx",
+        "sheet": "利息测算表L3-5",
+        "cell": "A22",
+        "matched_anchor": "财务费用——利息支出：.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表",
+        "description_cell": "利息支出"
+      },
+      "targets": [
+        {
+          "wp_code": "L8",
+          "file": "L8 财务费用.xlsx",
+          "sheet": "审定表L8-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "利息支出行",
+          "formula": "=WP('L3','审定表','利息支出')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-12",
+      "description": "无形资产摊销到管理费用",
+      "severity": "warning",
+      "category": "depreciation",
+      "source": {
+        "wp_code": "I1",
+        "file": "I1 无形资产、累计摊销及减值准备.xlsx",
+        "sheet": "无形资产实质性程序 I1A",
+        "cell": "A23",
+        "matched_anchor": "对于使用寿命有限的无形资产的本期摊销，执行以下程序：\n（1）获取或编制使用寿命有限的无形资产的累计摊销明细表，复核加计正确，并与总账数和明细账合计数核对相符。\n.会计期间：202X年",
+        "match_type": "contains",
+        "description_sheet": "审定表",
+        "description_cell": "本期摊销"
+      },
+      "targets": [
+        {
+          "wp_code": "K9",
+          "file": "K9 管理费用.xlsx",
+          "sheet": "审定表K9-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "摊销行",
+          "formula": "=WP('I1','审定表','本期摊销')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-13",
+      "description": "使用权资产折旧到管理费用",
+      "severity": "warning",
+      "category": "depreciation",
+      "source": {
+        "wp_code": "H8",
+        "file": "H8 使用权资产.xlsx",
+        "sheet": "审定表H8-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表",
+        "description_cell": "本期折旧"
+      },
+      "targets": [
+        {
+          "wp_code": "K9",
+          "file": "K9 管理费用.xlsx",
+          "sheet": "审定表K9-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "使用权资产折旧行",
+          "formula": "=WP('H8','审定表','本期折旧')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-14",
+      "description": "租赁负债利息到财务费用",
+      "severity": "warning",
+      "category": "interest",
+      "source": {
+        "wp_code": "H9",
+        "file": "H9 租赁负债.xlsx",
+        "sheet": "审定表H9-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表",
+        "description_cell": "本期利息"
+      },
+      "targets": [
+        {
+          "wp_code": "L8",
+          "file": "L8 财务费用.xlsx",
+          "sheet": "审定表L8-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "租赁利息行",
+          "formula": "=WP('H9','审定表','本期利息')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-15",
+      "description": "各投资底稿收益汇总到投资收益",
+      "severity": "warning",
+      "category": "other",
+      "source": {
+        "wp_code": "G7",
+        "file": "G7 长期股权投资.xlsx",
+        "sheet": "权益法未实现内部交易抵销测算表G7-15",
+        "cell": "L35",
+        "matched_anchor": "投资收益.=底稿目录!F21",
+        "match_type": "row_label",
+        "description_sheet": "审定表",
+        "description_cell": "投资收益"
+      },
+      "targets": [
+        {
+          "wp_code": "G11",
+          "file": "G11 投资收益.xlsx",
+          "sheet": "投资收益实质性程序表G11A",
+          "cell": "A6",
+          "matched_anchor": "投资收益",
+          "match_type": "contains",
+          "description_cell": "长期股权投资收益行",
+          "formula": "=WP('G7','审定表','投资收益')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-16",
+      "description": "递延所得税资产变动到所得税费用",
+      "severity": "blocking",
+      "category": "tax",
+      "source": {
+        "wp_code": "N1",
+        "file": "N1 递延所得税资产.xlsx",
+        "sheet": "递延所得税资产审定表N1-1",
+        "cell": "A20",
+        "matched_anchor": "（1）期末余额较期初余额增加（负数为减少）：.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表",
+        "description_cell": "期末余额"
+      },
+      "targets": [
+        {
+          "wp_code": "N5",
+          "file": "N5 所得税费用.xlsx",
+          "sheet": "所得税费用审定表N5-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "递延所得税资产变动行",
+          "formula": "=WP('N1','审定表','期末') - WP('N1','审定表','期初')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-17",
+      "description": "递延所得税负债变动到所得税费用",
+      "severity": "blocking",
+      "category": "tax",
+      "source": {
+        "wp_code": "N3",
+        "file": "N3 递延所得税负债.xlsx",
+        "sheet": "递延所得税负债审定表N3-1",
+        "cell": "A17",
+        "matched_anchor": "（1）期末余额较期初余额增加（负数为减少）：.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表",
+        "description_cell": "期末余额"
+      },
+      "targets": [
+        {
+          "wp_code": "N5",
+          "file": "N5 所得税费用.xlsx",
+          "sheet": "所得税费用审定表N5-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "递延所得税负债变动行",
+          "formula": "=WP('N3','审定表','期初') - WP('N3','审定表','期末')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-18",
+      "description": "盈余公积提取到未分配利润",
+      "severity": "blocking",
+      "category": "profit",
+      "source": {
+        "wp_code": "M5",
+        "file": "M5 盈余公积.xlsx",
+        "sheet": "审定表M5-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表",
+        "description_cell": "本期提取"
+      },
+      "targets": [
+        {
+          "wp_code": "M6",
+          "file": "M6 未分配利润.xlsx",
+          "sheet": "审定表M6-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "盈余公积提取行",
+          "formula": "=WP('M5','审定表','本期提取')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-19",
+      "description": "应付股利分配到未分配利润",
+      "severity": "blocking",
+      "category": "profit",
+      "source": {
+        "wp_code": "M1",
+        "file": "M1 应付股利（利润）.xlsx",
+        "sheet": "审定表M1-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表",
+        "description_cell": "本期分配"
+      },
+      "targets": [
+        {
+          "wp_code": "M6",
+          "file": "M6 未分配利润.xlsx",
+          "sheet": "审定表M6-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "利润分配行",
+          "formula": "=WP('M1','审定表','本期分配')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-20",
+      "description": "存货跌价准备到资产减值损失",
+      "severity": "warning",
+      "category": "impairment",
+      "source": {
+        "wp_code": "F2",
+        "file": "F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+        "sheet": "附注披露信息（上市公司）",
+        "cell": "C23",
+        "matched_anchor": "计提",
+        "match_type": "contains",
+        "description_sheet": "审定表",
+        "description_cell": "本期计提跌价"
+      },
+      "targets": [
+        {
+          "wp_code": "K11",
+          "file": "K11 资产减值损失.xlsx",
+          "sheet": "审定表K11-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "存货跌价行",
+          "formula": "=WP('F2','审定表','本期计提跌价')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-21",
+      "description": "应收账款审定数→函证确认金额",
+      "severity": "warning",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D2",
+        "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+        "sheet": "审定表D2-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D2-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "D0",
+          "file": "D0 收入循环函证.xlsx",
+          "sheet": "应收及销售替代程序D0-6",
+          "cell": "A12",
+          "matched_anchor": "应收账款",
+          "match_type": "contains",
+          "description_cell": "应收账款审定数",
+          "formula": "=WP('D2','审定表D2-1','审定数')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-22",
+      "description": "营业收入审定数→应收周转率分析",
+      "severity": "warning",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D4",
+        "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+        "sheet": "营业收入审定表D4-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "营业收入审定表D4-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "D2",
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet": "应收账款实质性程序表D2A",
+          "cell": "A28",
+          "matched_anchor": "对于大额应收账款客户：\n(1)检查报告期公司应收账款（含余额及发生额）主要客户与营业收入主要客户是否匹配，新增客户的应收账款余额与向该客户的销售是否匹配；\n(2.=底稿目录!A3",
+          "match_type": "contains",
+          "description_cell": "营业收入",
+          "formula": "=WP('D4','营业收入审定表D4-1','审定数')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-23",
+      "description": "预收款项变动→收入确认分析",
+      "severity": "warning",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D3",
+        "file": "D3 预收账款.xlsx",
+        "sheet": "审定表D3-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D3-1",
+        "description_cell": "变动额"
+      },
+      "targets": [
+        {
+          "wp_code": "D4",
+          "file": "D4-12 营业收入-合同检查（Leap-常规程序）.xlsx",
+          "sheet": "合同检查表D4-12",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=[4]底稿目录!$A$3",
+          "match_type": "wp_only_fallback",
+          "description_cell": "预收款项变动",
+          "formula": "=WP('D3','审定表D3-1','变动额')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-24",
+      "description": "应收账款坏账准备→应收款项融资减值",
+      "severity": "warning",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D2",
+        "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+        "sheet": "底稿目录",
+        "cell": "A1",
+        "matched_anchor": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：.编制人：",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "坏账准备计算表D2-8",
+        "description_cell": "坏账准备余额"
+      },
+      "targets": [
+        {
+          "wp_code": "D5",
+          "file": "D5 应收款项融资.xlsx",
+          "sheet": "审定表D5",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "减值参考",
+          "formula": "=WP('D2','坏账准备计算表D2-8','坏账准备余额')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-25",
+      "description": "应收账款审定数→附注 5.7",
+      "severity": "warning",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D2",
+        "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+        "sheet": "审定表D2-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D2-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.7 应收账款合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-26",
+      "description": "营业收入审定数→附注 5.14",
+      "severity": "warning",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D4",
+        "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+        "sheet": "营业收入审定表D4-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "营业收入审定表D4-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.14 营业收入合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-27",
+      "description": "应收票据审定数→附注 5.3",
+      "severity": "warning",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D1",
+        "file": "D1 应收票据.xlsx",
+        "sheet": "审定表D1-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.3 应收票据合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-28",
+      "description": "预收款项审定数→附注 5.15",
+      "severity": "warning",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D3",
+        "file": "D3 预收账款.xlsx",
+        "sheet": "审定表D3-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D3-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.15 合同负债/预收款项合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-29",
+      "description": "应收款项融资审定数→附注 5.5",
+      "severity": "warning",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D5",
+        "file": "D5 应收款项融资.xlsx",
+        "sheet": "审定表D5",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D5-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.5 应收款项融资合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-30",
+      "description": "合同资产审定数→附注 5.6",
+      "severity": "warning",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D6",
+        "file": "D6 合同资产.xlsx",
+        "sheet": "审定表D6-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D6-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.6 合同资产合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-31",
+      "description": "合同负债审定数→附注 5.15",
+      "severity": "warning",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D7",
+        "file": "D7 合同负债.xlsx",
+        "sheet": "审定表D7-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D7-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.15 合同负债合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-32",
+      "description": "应收账款审定数→报表 BS-005",
+      "severity": "info",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D2",
+        "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+        "sheet": "审定表D2-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D2-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "应收账款行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-33",
+      "description": "营业收入审定数→报表 IS-001",
+      "severity": "info",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D4",
+        "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+        "sheet": "营业收入审定表D4-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "营业收入审定表D4-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "营业收入行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-34",
+      "description": "应收票据审定数→报表 BS-003",
+      "severity": "info",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D1",
+        "file": "D1 应收票据.xlsx",
+        "sheet": "审定表D1-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "应收票据行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-35",
+      "description": "预收款项审定数→报表 BS-034",
+      "severity": "info",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D3",
+        "file": "D3 预收账款.xlsx",
+        "sheet": "审定表D3-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D3-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "预收款项行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-36",
+      "description": "应收款项融资审定数→报表 BS-006",
+      "severity": "info",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D5",
+        "file": "D5 应收款项融资.xlsx",
+        "sheet": "审定表D5",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D5-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "应收款项融资行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-37",
+      "description": "合同资产审定数→报表 BS-007",
+      "severity": "info",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D6",
+        "file": "D6 合同资产.xlsx",
+        "sheet": "审定表D6-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D6-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "合同资产行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-38",
+      "description": "合同负债审定数→报表 BS-035",
+      "severity": "info",
+      "category": "revenue_cycle",
+      "source": {
+        "wp_code": "D7",
+        "file": "D7 合同负债.xlsx",
+        "sheet": "审定表D7-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表D7-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "合同负债行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-39",
+      "description": "货币资金审定数→附注 5.1",
+      "severity": "warning",
+      "category": "cash_cycle",
+      "source": {
+        "wp_code": "E1",
+        "file": "E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+        "sheet": "现金明细表E1-2",
+        "cell": "A31",
+        "matched_anchor": "3.期初余额应与上年末审定数一致。.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表E1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.1 货币资金合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-40",
+      "description": "货币资金审定数→报表 BS-001",
+      "severity": "info",
+      "category": "cash_cycle",
+      "source": {
+        "wp_code": "E1",
+        "file": "E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+        "sheet": "现金明细表E1-2",
+        "cell": "A31",
+        "matched_anchor": "3.期初余额应与上年末审定数一致。.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表E1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "货币资金行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-41",
+      "description": "存货审定数→附注 5.8",
+      "severity": "warning",
+      "category": "inventory_cycle",
+      "source": {
+        "wp_code": "F2",
+        "file": "F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+        "sheet": "存货审定表F2-1",
+        "cell": "A35",
+        "matched_anchor": "审定数（原值）.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表F2-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.8 存货合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-42",
+      "description": "存货审定数→报表 BS-008",
+      "severity": "info",
+      "category": "inventory_cycle",
+      "source": {
+        "wp_code": "F2",
+        "file": "F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+        "sheet": "存货审定表F2-1",
+        "cell": "A35",
+        "matched_anchor": "审定数（原值）.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表F2-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "存货行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-43",
+      "description": "长期股权投资审定数→附注 5.9",
+      "severity": "warning",
+      "category": "investment_cycle",
+      "source": {
+        "wp_code": "G1",
+        "file": "G1 交易性金融资产.xlsx",
+        "sheet": "审定表G1-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表G1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.9 长期股权投资合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-44",
+      "description": "长期股权投资审定数→报表 BS-009",
+      "severity": "info",
+      "category": "investment_cycle",
+      "source": {
+        "wp_code": "G1",
+        "file": "G1 交易性金融资产.xlsx",
+        "sheet": "审定表G1-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表G1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "长期股权投资行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-45",
+      "description": "固定资产审定数→附注 5.10",
+      "severity": "warning",
+      "category": "fixed_asset_cycle",
+      "source": {
+        "wp_code": "H1",
+        "file": "H1 固定资产.xlsx",
+        "sheet": "审定表H1-1",
+        "cell": "A51",
+        "matched_anchor": "固定资产净值审定数.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表H1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.10 固定资产合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-46",
+      "description": "固定资产审定数→报表 BS-010",
+      "severity": "info",
+      "category": "fixed_asset_cycle",
+      "source": {
+        "wp_code": "H1",
+        "file": "H1 固定资产.xlsx",
+        "sheet": "审定表H1-1",
+        "cell": "A51",
+        "matched_anchor": "固定资产净值审定数.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表H1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "固定资产行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-47",
+      "description": "无形资产审定数→附注 5.11",
+      "severity": "warning",
+      "category": "intangible_cycle",
+      "source": {
+        "wp_code": "I1",
+        "file": "I1 无形资产、累计摊销及减值准备.xlsx",
+        "sheet": "明细表I1-2",
+        "cell": "A6",
+        "matched_anchor": "核对明细账、总账、报表、上年审计报告审定数金额是否相符，确定期初、期末余额是否正确。.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表I1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.11 无形资产合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-48",
+      "description": "无形资产审定数→报表 BS-011",
+      "severity": "info",
+      "category": "intangible_cycle",
+      "source": {
+        "wp_code": "I1",
+        "file": "I1 无形资产、累计摊销及减值准备.xlsx",
+        "sheet": "明细表I1-2",
+        "cell": "A6",
+        "matched_anchor": "核对明细账、总账、报表、上年审计报告审定数金额是否相符，确定期初、期末余额是否正确。.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表I1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "无形资产行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-49",
+      "description": "应付职工薪酬审定数→附注 5.12",
+      "severity": "warning",
+      "category": "payroll_cycle",
+      "source": {
+        "wp_code": "J1",
+        "file": "J1 应付职工薪酬.xlsx",
+        "sheet": "审定表J1-1 ",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表J1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.12 应付职工薪酬合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-50",
+      "description": "应付职工薪酬审定数→报表 BS-030",
+      "severity": "info",
+      "category": "payroll_cycle",
+      "source": {
+        "wp_code": "J1",
+        "file": "J1 应付职工薪酬.xlsx",
+        "sheet": "审定表J1-1 ",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表J1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "应付职工薪酬行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-51",
+      "description": "管理费用审定数→附注 5.16",
+      "severity": "warning",
+      "category": "expense_cycle",
+      "source": {
+        "wp_code": "K8",
+        "file": "K8 销售费用.xlsx",
+        "sheet": "审定表K8-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表K8-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.16 管理费用合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-52",
+      "description": "管理费用审定数→报表 IS-005",
+      "severity": "info",
+      "category": "expense_cycle",
+      "source": {
+        "wp_code": "K8",
+        "file": "K8 销售费用.xlsx",
+        "sheet": "审定表K8-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表K8-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "管理费用行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-53",
+      "description": "短期借款审定数→附注 5.13",
+      "severity": "warning",
+      "category": "debt_cycle",
+      "source": {
+        "wp_code": "L1",
+        "file": "L1 短期借款.xlsx",
+        "sheet": "逾期贷款检查表L1-7",
+        "cell": "A16",
+        "matched_anchor": "短期借款审定数.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表L1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.13 短期借款合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-54",
+      "description": "短期借款审定数→报表 BS-020",
+      "severity": "info",
+      "category": "debt_cycle",
+      "source": {
+        "wp_code": "L1",
+        "file": "L1 短期借款.xlsx",
+        "sheet": "逾期贷款检查表L1-7",
+        "cell": "A16",
+        "matched_anchor": "短期借款审定数.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表L1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "短期借款行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-55",
+      "description": "实收资本审定数→附注 5.17",
+      "severity": "warning",
+      "category": "equity_cycle",
+      "source": {
+        "wp_code": "M1",
+        "file": "M1 应付股利（利润）.xlsx",
+        "sheet": "审定表M1-1",
+        "cell": "A22",
+        "matched_anchor": "应付利息审定数.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表M1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.17 实收资本合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-56",
+      "description": "实收资本审定数→报表 BS-040",
+      "severity": "info",
+      "category": "equity_cycle",
+      "source": {
+        "wp_code": "M1",
+        "file": "M1 应付股利（利润）.xlsx",
+        "sheet": "审定表M1-1",
+        "cell": "A22",
+        "matched_anchor": "应付利息审定数.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表M1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "实收资本行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-57",
+      "description": "应交税费审定数→附注 5.18",
+      "severity": "warning",
+      "category": "tax_cycle",
+      "source": {
+        "wp_code": "N1",
+        "file": "N1 递延所得税资产.xlsx",
+        "sheet": "递延所得税资产审定表N1-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表N1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "NOTE",
+          "description_cell": "5.18 应交税费合计",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-58",
+      "description": "应交税费审定数→报表 BS-025",
+      "severity": "info",
+      "category": "tax_cycle",
+      "source": {
+        "wp_code": "N1",
+        "file": "N1 递延所得税资产.xlsx",
+        "sheet": "递延所得税资产审定表N1-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表N1-1",
+        "description_cell": "审定数"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "应交税费行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-59",
+      "description": "B15 重要性水平→试算平衡表重要性设定",
+      "severity": "recommended",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "B15",
+        "file": "B15 重要性计算表.xlsx",
+        "sheet": "B15 重要性计算表",
+        "cell": "E10",
+        "matched_anchor": "E10",
+        "match_type": "direct_coord",
+        "description_sheet": "重要性计算",
+        "description_cell": "E10"
+      },
+      "targets": [
+        {
+          "target_module": "trial_balance",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-60",
+      "description": "B60 总体审计策略→所有D-N实质性程序底稿",
+      "severity": "recommended",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "B60",
+        "file": "B60-1 审计项目工时预算与控制表.xlsx",
+        "sheet": "底稿目录",
+        "cell": "A1",
+        "matched_anchor": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：.编制人：张XX",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "总体审计策略",
+        "description_cell": "审计计划摘要"
+      },
+      "targets": [
+        {
+          "target_module": "audit_plan",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-61",
+      "description": "C2 销售循环控制测试→D4 营业收入实质性程序",
+      "severity": "recommended",
+      "category": "internal",
+      "source": {
+        "wp_code": "C2",
+        "file": "C2 销售循环控制测试.xlsx",
+        "sheet": "销售循环业务层面控制底稿目录",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.C2",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "销售循环控制测试",
+        "description_cell": "控制有效性结论"
+      },
+      "targets": [
+        {
+          "target_module": "D4",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-62",
+      "description": "C3 货币资金控制测试→E1 货币资金实质性程序",
+      "severity": "recommended",
+      "category": "internal",
+      "source": {
+        "wp_code": "C3",
+        "file": "C3 货币资金循环业务层面控制测试.xlsx",
+        "sheet": "货币资金循环业务层面控制底稿目录",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.C3",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "货币资金控制测试",
+        "description_cell": "控制有效性结论"
+      },
+      "targets": [
+        {
+          "target_module": "E1",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-63",
+      "description": "C4 存货控制测试→F2 存货实质性程序",
+      "severity": "recommended",
+      "category": "internal",
+      "source": {
+        "wp_code": "C4",
+        "file": "C4 存货循环控制测试.xlsx",
+        "sheet": "存货循环业务层面控制底稿目录",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.C4",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "存货控制测试",
+        "description_cell": "控制有效性结论"
+      },
+      "targets": [
+        {
+          "target_module": "F2",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-64",
+      "description": "C5 投资控制测试→G1 长期股权投资实质性程序",
+      "severity": "recommended",
+      "category": "internal",
+      "source": {
+        "wp_code": "C5",
+        "file": "C5 投资循环控制测试.xlsx",
+        "sheet": "投资循环业务层面控制底稿目录",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.C5",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "投资控制测试",
+        "description_cell": "控制有效性结论"
+      },
+      "targets": [
+        {
+          "target_module": "G1",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-65",
+      "description": "C6 固定资产控制测试→H1 固定资产实质性程序",
+      "severity": "recommended",
+      "category": "internal",
+      "source": {
+        "wp_code": "C6",
+        "file": "C6 固定资产循环控制测试.xlsx",
+        "sheet": "固定资产循环业务层面控制底稿目录",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.C6",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "固定资产控制测试",
+        "description_cell": "控制有效性结论"
+      },
+      "targets": [
+        {
+          "target_module": "H1",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-66",
+      "description": "C7 在建工程控制测试→H8 在建工程实质性程序",
+      "severity": "recommended",
+      "category": "internal",
+      "source": {
+        "wp_code": "C7",
+        "file": "C7 在建工程循环控制测试.xlsx",
+        "sheet": "在建工程循环业务层面控制底稿目录",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.C7",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "在建工程控制测试",
+        "description_cell": "控制有效性结论"
+      },
+      "targets": [
+        {
+          "target_module": "H8",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-67",
+      "description": "C8 无形资产控制测试→I1 无形资产实质性程序",
+      "severity": "recommended",
+      "category": "internal",
+      "source": {
+        "wp_code": "C8",
+        "file": "C8 无形资产及其他长期资产循环控制测试.xlsx",
+        "sheet": "无形资产及其他长期资产业务层面控制底稿目录",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.C8",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "无形资产控制测试",
+        "description_cell": "控制有效性结论"
+      },
+      "targets": [
+        {
+          "target_module": "I1",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-68",
+      "description": "C10 薪酬控制测试→J1 职工薪酬实质性程序",
+      "severity": "recommended",
+      "category": "internal",
+      "source": {
+        "wp_code": "C10",
+        "file": "C10 职工薪酬循环控制测试.xlsx",
+        "sheet": "职工薪酬循环业务层面控制底稿目录",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.C10",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "薪酬控制测试",
+        "description_cell": "控制有效性结论"
+      },
+      "targets": [
+        {
+          "target_module": "J1",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-69",
+      "description": "C12 税金控制测试→N1 应交税费实质性程序",
+      "severity": "recommended",
+      "category": "internal",
+      "source": {
+        "wp_code": "C12",
+        "file": "C12 税金循环控制测试.xlsx",
+        "sheet": "税金循环业务层面控制底稿目录",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.C12",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "税金控制测试",
+        "description_cell": "控制有效性结论"
+      },
+      "targets": [
+        {
+          "target_module": "N1",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-70",
+      "description": "C13 债务控制测试→L1 短期借款实质性程序",
+      "severity": "recommended",
+      "category": "internal",
+      "source": {
+        "wp_code": "C13",
+        "file": "C13 债务循环业务层面控制测试.xlsx",
+        "sheet": "债务循环业务层面控制底稿目录",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.C13",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "债务控制测试",
+        "description_cell": "控制有效性结论"
+      },
+      "targets": [
+        {
+          "target_module": "L1",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-71",
+      "description": "A2 调整分录汇总→调整分录模块",
+      "severity": "required",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "A2",
+        "file": "A2 调整分录程序表.xlsx",
+        "sheet": "A2 调整分录程序表",
+        "cell": "B1",
+        "matched_anchor": "致同会计师事务所.调整分录程序表",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "调整分录汇总表",
+        "description_cell": "调整分录合计"
+      },
+      "targets": [
+        {
+          "target_module": "adjustments",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-72",
+      "description": "A11 期后事项→附注披露",
+      "severity": "required",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "A11",
+        "file": "A11 期后事项程序表.xlsx",
+        "sheet": "底稿目录",
+        "cell": "A1",
+        "matched_anchor": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：.编制人：张三",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "期后事项检查表",
+        "description_cell": "期后事项结论"
+      },
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-73",
+      "description": "A13 错报汇总→错报管理模块",
+      "severity": "required",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "A13",
+        "file": "A13 错报（程序表及底稿）.xlsx",
+        "sheet": "A13-3 评价识别出的错报",
+        "cell": "A10",
+        "matched_anchor": "未更正错报合计",
+        "match_type": "exact_anchor",
+        "description_sheet": "错报汇总表",
+        "description_cell": "未更正错报合计"
+      },
+      "targets": [
+        {
+          "target_module": "misstatements",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-74",
+      "description": "A14 内控缺陷→附注披露",
+      "severity": "required",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "A14",
+        "file": "A14 内部控制缺陷程序表.xlsx",
+        "sheet": "审计程序A14",
+        "cell": "B1",
+        "matched_anchor": "致同会计师事务所.内部控制缺陷程序表",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "内控缺陷汇总",
+        "description_cell": "重大缺陷结论"
+      },
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-75",
+      "description": "A15 持续经营→附注披露及审计报告",
+      "severity": "required",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "A15",
+        "file": "A15 持续经营假设的考虑程序表.xlsx",
+        "sheet": "审计程序A15",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.会计期间：201X年度",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "持续经营评估",
+        "description_cell": "持续经营结论"
+      },
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        },
+        {
+          "target_module": "audit_report",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-76",
+      "description": "A16 管理层声明书→审计报告",
+      "severity": "required",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "A16",
+        "file": "A16  管理层声明书程序表.xlsx",
+        "sheet": "审计程序A16",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.会计期间：201X年度",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "管理层声明书",
+        "description_cell": "声明书签署日期"
+      },
+      "targets": [
+        {
+          "target_module": "audit_report",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-77",
+      "description": "A17 重大事项概要→审计报告",
+      "severity": "required",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "A17",
+        "file": "A17  重大事项概要程序表.xlsx",
+        "sheet": "A17 重大事项概要程序表",
+        "cell": "B1",
+        "matched_anchor": "致同会计师事务所.重大事项概要程序表",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "重大事项概要",
+        "description_cell": "审计意见类型"
+      },
+      "targets": [
+        {
+          "target_module": "audit_report",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-78",
+      "description": "S2 期初余额→试算平衡表",
+      "severity": "recommended",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "S2",
+        "file": "S2 首次接受委托时对期初余额的审计2019.xlsx",
+        "sheet": "表头（请先填写）",
+        "cell": "A1",
+        "matched_anchor": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：.编制人：",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "期初余额审计",
+        "description_cell": "期初余额确认"
+      },
+      "targets": [
+        {
+          "target_module": "trial_balance",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-79",
+      "description": "S14 会计估计→附注披露",
+      "severity": "recommended",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "S14",
+        "file": "S14 会计估计和相关披露.xlsx",
+        "sheet": "S14程序表",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.基准日：",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "会计估计审计",
+        "description_cell": "估计合理性结论"
+      },
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-80",
+      "description": "S15 每股收益→财务报告",
+      "severity": "recommended",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "S15",
+        "file": "S15 每股收益和净资产收益率.xlsx",
+        "sheet": "基本每股收益计算表S15-2",
+        "cell": "A2",
+        "matched_anchor": "基本每股收益计算表.='表头（请先填写）'!A3",
+        "match_type": "contains",
+        "description_sheet": "每股收益计算",
+        "description_cell": "基本每股收益"
+      },
+      "targets": [
+        {
+          "target_module": "financial_report",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-81",
+      "description": "B19 关联方识别→附注披露",
+      "severity": "recommended",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "B19",
+        "file": "B19 识别关联方程序表.xlsx",
+        "sheet": "B19-1管理层提供的关联方清单",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.公司全称",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "关联方清单",
+        "description_cell": "关联方汇总"
+      },
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-82",
+      "description": "A7 关联交易→附注披露",
+      "severity": "required",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "A7",
+        "file": "A7-1 汇总关联方交易及关联往来.xlsx",
+        "sheet": "关联交易及往来汇总A7-1",
+        "cell": "A6",
+        "matched_anchor": "关联交易",
+        "match_type": "contains",
+        "description_sheet": "关联交易汇总",
+        "description_cell": "关联交易合计"
+      },
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-83",
+      "description": "C14 租赁控制测试→附注披露",
+      "severity": "recommended",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "C14",
+        "file": "C14 租赁循环控制测试.xlsx",
+        "sheet": "选项清单列表（不归档） (2)",
+        "cell": "B7",
+        "matched_anchor": "分类",
+        "match_type": "contains",
+        "description_sheet": "租赁控制测试",
+        "description_cell": "租赁分类结论"
+      },
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-84",
+      "description": "A1 财务报告→财务报告模块",
+      "severity": "required",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "A1",
+        "file": "A1 财务报告程序表.xlsx",
+        "sheet": "审计程序A1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.会计期间：201X年度",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "财务报告审阅",
+        "description_cell": "报告审阅结论"
+      },
+      "targets": [
+        {
+          "target_module": "financial_report",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-85",
+      "description": "A3 合并流程→合并模块",
+      "severity": "required",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "A3",
+        "file": "A3-5 合并附注汇总-2019.xlsx",
+        "sheet": "Word附注",
+        "cell": "C411",
+        "matched_anchor": "合计",
+        "match_type": "contains",
+        "description_sheet": "合并抵消分录",
+        "description_cell": "合并抵消合计"
+      },
+      "targets": [
+        {
+          "target_module": "consolidation",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-86",
+      "description": "A4 经营分部→附注披露",
+      "severity": "required",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "A4",
+        "file": "A4 经营分部程序表.xlsx",
+        "sheet": "A4 经营分部程序表",
+        "cell": "B1",
+        "matched_anchor": "致同会计师事务所.经营分部程序表",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "经营分部分析",
+        "description_cell": "分部信息汇总"
+      },
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-87",
+      "description": "S1 违法违规→附注披露",
+      "severity": "recommended",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "S1",
+        "file": "S1 对被审计单位违反法规行为的考虑2019.xlsx",
+        "sheet": "表头（请先填写）",
+        "cell": "A1",
+        "matched_anchor": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：.编制人：",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "违法违规检查",
+        "description_cell": "违法违规结论"
+      },
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-88",
+      "description": "S3 会计政策变更→附注披露",
+      "severity": "recommended",
+      "category": "cross_module",
+      "source": {
+        "wp_code": "S3",
+        "file": "S3 会计政策变更、前期差错会计、估计变更2020.xlsx",
+        "sheet": "表头（请先填写）",
+        "cell": "A1",
+        "matched_anchor": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：.编制人：",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "会计政策变更分析",
+        "description_cell": "政策变更影响"
+      },
+      "targets": [
+        {
+          "target_module": "disclosure_notes",
+          "target_type": "module",
+          "note_section_code": null,
+          "report_row_code": null,
+          "match_type": "module"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-89",
+      "description": "D0 函证回函→D2 应收账款确认",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "D0",
+        "file": "D0 收入循环函证.xlsx",
+        "sheet": "函证结果汇总表D0-1",
+        "cell": "C31",
+        "matched_anchor": "回函确认金额：.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "函证汇总表D0-2",
+        "description_cell": "回函确认金额"
+      },
+      "targets": [
+        {
+          "wp_code": "D2",
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet": "附注披露信息（国企）D2-1",
+          "cell": "C34",
+          "matched_anchor": "金额",
+          "match_type": "contains",
+          "description_cell": "函证确认金额",
+          "formula": "=WP('D0','函证汇总表D0-2','回函确认金额')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-90",
+      "description": "D2 坏账准备→A13 错报汇总",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "D2",
+        "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+        "sheet": "附注披露信息（国企）D2-1",
+        "cell": "C34",
+        "matched_anchor": "金额",
+        "match_type": "contains",
+        "description_sheet": "坏账准备计算表D2-8",
+        "description_cell": "坏账差异金额"
+      },
+      "targets": [
+        {
+          "wp_code": "A13",
+          "file": "A13 错报（程序表及底稿）.xlsx",
+          "sheet": "A13-1 未更正错报汇总表",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A9",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "应收账款坏账差异",
+          "formula": "=WP('D2','坏账准备计算表D2-8','坏账差异金额')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-91",
+      "description": "D4 收入截止测试→A11 期后事项",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "D4",
+        "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+        "sheet": "附注披露信息（上市公司）",
+        "cell": "C9",
+        "matched_anchor": "收入",
+        "match_type": "contains",
+        "description_sheet": "截止测试工作表",
+        "description_cell": "跨期收入金额"
+      },
+      "targets": [
+        {
+          "wp_code": "A11",
+          "file": "A11 期后事项程序表.xlsx",
+          "sheet": "底稿目录",
+          "cell": "A1",
+          "matched_anchor": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：.编制人：张三",
+          "match_type": "wp_only_fallback",
+          "description_cell": "收入截止跨期",
+          "formula": "=WP('D4','截止测试工作表','跨期收入金额')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-92",
+      "description": "E1 银行对账单→E1 银行余额调节表",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "E1",
+        "file": "E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+        "sheet": "银行存款余额调节表E1-6",
+        "cell": "A9",
+        "matched_anchor": "1.获取（本期）货币资金银行余额调节表确定计算的准确性，将账面余额与总账核对并与银行对账单核对。.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "银行对账单",
+        "description_cell": "银行余额"
+      },
+      "targets": [
+        {
+          "wp_code": "E1",
+          "file": "E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet": "银行存款余额调节表E1-6",
+          "cell": "A34",
+          "matched_anchor": "银行对账单余额",
+          "match_type": "exact_anchor",
+          "description_cell": "银行对账单余额",
+          "formula": "=WP('E1','银行对账单','银行余额')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-93",
+      "description": "F2 存货监盘→F2 存货审定表",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "F2",
+        "file": "F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+        "sheet": "计价方法测试表-平均F2-38",
+        "cell": "E13",
+        "matched_anchor": "数量",
+        "match_type": "contains",
+        "description_sheet": "监盘记录表",
+        "description_cell": "监盘数量"
+      },
+      "targets": [
+        {
+          "wp_code": "F2",
+          "file": "F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+          "sheet": "计价方法测试表-平均F2-38",
+          "cell": "E13",
+          "matched_anchor": "数量",
+          "match_type": "contains",
+          "description_cell": "监盘确认数量",
+          "formula": "=WP('F2','监盘记录表','监盘数量')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-94",
+      "description": "F2 存货跌价→A13 错报汇总",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "F2",
+        "file": "F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+        "sheet": "六、库存商品明细表F2-8",
+        "cell": "A29",
+        "matched_anchor": "差异",
+        "match_type": "contains",
+        "description_sheet": "审定表F2-1",
+        "description_cell": "跌价准备差异"
+      },
+      "targets": [
+        {
+          "wp_code": "A13",
+          "file": "A13 错报（程序表及底稿）.xlsx",
+          "sheet": "A13-1 未更正错报汇总表",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A9",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "存货跌价差异",
+          "formula": "=WP('F2','审定表F2-1','跌价准备差异')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-95",
+      "description": "G1 投资收益→IS 利润表投资收益行",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "G1",
+        "file": "G1 交易性金融资产.xlsx",
+        "sheet": "收益测算表G1-5",
+        "cell": "A22",
+        "matched_anchor": "投资收益",
+        "match_type": "exact_anchor",
+        "description_sheet": "审定表G1-1",
+        "description_cell": "投资收益"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "投资收益行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-96",
+      "description": "H1 折旧政策→B60 总体审计策略",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "H1",
+        "file": "H1 固定资产.xlsx",
+        "sheet": "审定表H1-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表H1-1",
+        "description_cell": "折旧政策说明"
+      },
+      "targets": [
+        {
+          "wp_code": "B60",
+          "file": "B60-1 审计项目工时预算与控制表.xlsx",
+          "sheet": "B61-1工时预算与控制板（按阶段）",
+          "cell": "A17",
+          "matched_anchor": "固定资产",
+          "match_type": "contains",
+          "description_cell": "固定资产折旧政策",
+          "formula": null
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-97",
+      "description": "I1 摊销政策→B60 总体审计策略",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "I1",
+        "file": "I1 无形资产、累计摊销及减值准备.xlsx",
+        "sheet": "审定表I1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表I1-1",
+        "description_cell": "摊销政策说明"
+      },
+      "targets": [
+        {
+          "wp_code": "B60",
+          "file": "B60-1 审计项目工时预算与控制表.xlsx",
+          "sheet": "底稿目录",
+          "cell": "A1",
+          "matched_anchor": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：.编制人：张XX",
+          "match_type": "wp_only_fallback",
+          "description_cell": "无形资产摊销政策",
+          "formula": null
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-98",
+      "description": "J1 社保公积金→N1 应交税费",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "J1",
+        "file": "J1 应付职工薪酬.xlsx",
+        "sheet": "审定表J1-1 ",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表J1-1",
+        "description_cell": "社保公积金计提"
+      },
+      "targets": [
+        {
+          "wp_code": "N1",
+          "file": "N1 递延所得税资产.xlsx",
+          "sheet": "递延所得税资产审定表N1-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "社保公积金应缴",
+          "formula": "=WP('J1','审定表J1-1','社保公积金计提')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-99",
+      "description": "K8 管理费用明细→各科目底稿",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "K8",
+        "file": "K8 销售费用.xlsx",
+        "sheet": "审定表K8-1",
+        "cell": "A17",
+        "matched_anchor": "合计",
+        "match_type": "contains",
+        "description_sheet": "审定表K8-1",
+        "description_cell": "费用分配合计"
+      },
+      "targets": [
+        {
+          "wp_code": "H1",
+          "file": "H1 固定资产.xlsx",
+          "sheet": "折旧分配分析表H1-13",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "管理费用折旧",
+          "formula": "=WP('K8','审定表K8-1','折旧费')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-100",
+      "description": "K9 销售费用明细→D4 营业收入配比",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "K9",
+        "file": "K9 管理费用.xlsx",
+        "sheet": "审定表K9-1",
+        "cell": "A25",
+        "matched_anchor": "合计",
+        "match_type": "contains",
+        "description_sheet": "审定表K9-1",
+        "description_cell": "销售费用合计"
+      },
+      "targets": [
+        {
+          "wp_code": "D4",
+          "file": "D4-12 营业收入-合同检查（Leap-常规程序）.xlsx",
+          "sheet": "合同检查表D4-12",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=[4]底稿目录!$A$3",
+          "match_type": "wp_only_fallback",
+          "description_cell": "销售费用率",
+          "formula": "=WP('K9','审定表K9-1','销售费用合计') / WP('D4','营业收入审定表D4-1','审定数')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-101",
+      "description": "L1 借款利率→L8 财务费用利息",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "L1",
+        "file": "L1 短期借款.xlsx",
+        "sheet": "审定表L1-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表L1-1",
+        "description_cell": "加权平均利率"
+      },
+      "targets": [
+        {
+          "wp_code": "L8",
+          "file": "L8 财务费用.xlsx",
+          "sheet": "审定表L8-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "利息重算依据",
+          "formula": "=WP('L1','审定表L1-1','加权平均利率')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-102",
+      "description": "M1 股东变更→B19 关联方",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "M1",
+        "file": "M1 应付股利（利润）.xlsx",
+        "sheet": "审定表M1-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表M1-1",
+        "description_cell": "股东变更记录"
+      },
+      "targets": [
+        {
+          "wp_code": "B19",
+          "file": "B19 识别关联方程序表.xlsx",
+          "sheet": "底稿目录",
+          "cell": "A1",
+          "matched_anchor": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：.编制人：张XX",
+          "match_type": "wp_only_fallback",
+          "description_cell": "股东变更信息",
+          "formula": null
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-103",
+      "description": "N1 所得税计算→IS 利润表所得税行",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "N1",
+        "file": "N1 递延所得税资产.xlsx",
+        "sheet": "递延所得税资产审定表N1-1",
+        "cell": "A1",
+        "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+        "match_type": "sheet_only_fallback",
+        "description_sheet": "审定表N1-1",
+        "description_cell": "当期所得税费用"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "所得税费用行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-104",
+      "description": "N3 递延所得税→BS 资产负债表递延税项",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "N3",
+        "file": "N3 递延所得税负债.xlsx",
+        "sheet": "递延所得税负债明细表N3-2",
+        "cell": "A25",
+        "matched_anchor": "递延所得税负债测算详见<递延所得税资产（负债）测算表N1-4>.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "审定表N3-1",
+        "description_cell": "递延所得税资产"
+      },
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "description_cell": "递延所得税资产行",
+          "match_type": "unmatched"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-105",
+      "description": "D0 函证发函数→D2 应收账款确认覆盖率",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "D0",
+        "file": "D0 收入循环函证.xlsx",
+        "sheet": "底稿目录",
+        "cell": "A1",
+        "matched_anchor": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：.编制人：",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "函证汇总表D0-2",
+        "description_cell": "发函覆盖率"
+      },
+      "targets": [
+        {
+          "wp_code": "D2",
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet": "审定表D2-1",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A3",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "函证覆盖率",
+          "formula": "=WP('D0','函证汇总表D0-2','发函覆盖率')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-106",
+      "description": "D0 函证回函率→A17 重大事项概要",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "D0",
+        "file": "D0 收入循环函证.xlsx",
+        "sheet": "函证程序表D0A",
+        "cell": "A15",
+        "matched_anchor": "分析核实退回或无法寄到的函证、未回函、回函率较低的原因，考虑与被询证者联系，要求对方作出回应或再次寄发询证函，必要时增加现场走访等程序，关注是否存在账面记录与外.=底稿目录!A3",
+        "match_type": "contains",
+        "description_sheet": "函证汇总表D0-2",
+        "description_cell": "回函率"
+      },
+      "targets": [
+        {
+          "wp_code": "A17",
+          "file": "A17  重大事项概要程序表.xlsx",
+          "sheet": "A17 重大事项概要程序表",
+          "cell": "B1",
+          "matched_anchor": "致同会计师事务所.重大事项概要程序表",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "函证回函率",
+          "formula": "=WP('D0','函证汇总表D0-2','回函率')"
+        }
+      ]
+    },
+    {
+      "ref_id": "CW-107",
+      "description": "D0 函证差异→A13 错报汇总",
+      "severity": "warning",
+      "category": "internal",
+      "source": {
+        "wp_code": "D0",
+        "file": "D0 收入循环函证.xlsx",
+        "sheet": "底稿目录",
+        "cell": "A1",
+        "matched_anchor": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：.编制人：",
+        "match_type": "wp_only_fallback",
+        "description_sheet": "函证汇总表D0-2",
+        "description_cell": "函证差异金额"
+      },
+      "targets": [
+        {
+          "wp_code": "A13",
+          "file": "A13 错报（程序表及底稿）.xlsx",
+          "sheet": "A13-1 未更正错报汇总表",
+          "cell": "A1",
+          "matched_anchor": "致同会计师事务所.=底稿目录!A9",
+          "match_type": "sheet_only_fallback",
+          "description_cell": "函证差异",
+          "formula": "=WP('D0','函证汇总表D0-2','函证差异金额')"
+        }
+      ]
+    }
+  ],
+  "unmatched": [
+    {
+      "ref_id": "CW-11",
+      "reason": "L2 has no entry for IS"
+    }
+  ]
+}

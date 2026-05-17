@@ -141,7 +141,13 @@ inclusion: always
 - **底稿名称单一真源铁律**：`wp_template_metadata_*_seed.json` 是底稿名称的权威源（从模板 Excel 文件名提取，179 全覆盖），其他 procedure/mapping 文件的 wp_name 必须与之一致；本轮修正 173 处不一致（A1 完成阶段→财务报告程序表 / B10 了解被审计单位→了解被审计单位及其环境和适用的财务报告编制基础 / C系列等）
 - **底稿循环命名修正**：cycleOptions 之前错误（D=货币资金 E=应收账款）应为 D=收入循环 E=货币资金 F=存货 G=投资 H=固定资产 I=无形资产 J=职工薪酬 K=管理/费用 L=债务 M=权益 N=税金 + 补 A=完成阶段 S=特定项目（之前漏了）
 - **底稿模块整体诊断（2026-05-17）**：核心问题 = 功能堆叠而非流程驱动；WorkpaperList 1720 行单文件 / 9 个对话框 / 17 区块详情卡片 / 3 视图模式塞一起；缺关键能力 = 生命周期流程图 + 依赖关系图 + 委派矩阵 + 裁剪执行联动 + 状态泳道；UI 应按流程（裁剪→生成→委派→编制→复核→归档）而非功能组织
-- **底稿模块下一步优先级 P0-P5**：P0 生命周期可视化（2-3天，左中右三栏阶段导航）/ P1 依赖关系图（2天，cross_wp_references DAG vis-network）/ P2 委派矩阵（1天，审计员×循环网格）/ P3 裁剪执行联动（1.5天，顶部导航条）/ P4 状态流转泳道图（1天，Editor顶部）/ P5 拆分 WorkpaperList 1720→<300行（1天）；推荐路线 P0+P1+P2 共 5-6 天
+- **底稿模块下一步优先级 P0-P5**：~~P0 生命周期可视化（2-3天，左中右三栏阶段导航）/ P1 依赖关系图（2天，cross_wp_references DAG vis-network）/ P2 委派矩阵（1天，审计员×循环网格）~~ / P3 裁剪执行联动（1.5天，顶部导航条）/ P4 状态流转泳道图（1天，Editor顶部）/ P5 拆分 WorkpaperList 1720→<300行（1天）；推荐路线 P0+P1+P2 共 5-6 天
+- **底稿模块 P0-P2 全部完成（2026-05-17，commit 2f125b7）**：3 个新视图模式接入 WorkpaperList（lifecycle/graph/matrix）/ 3 新 Vue 组件 ~2200 行（WorkpaperLifecycleView 1006 / WorkpaperDependencyGraph 675 / WorkpaperAssignmentMatrix 522）+ 1 后端端点 `GET /api/workpapers/dependency-graph`；轻量优先 = 不引入 vis-network/g6 等图库，全部 SVG 手绘
+- **生命周期视图实现**：SVG 6 阶段流程图（裁剪→生成→委派→编制→复核→归档）+ 三栏（左阶段列表/中阶段内容/右任务面板）+ 自动定位首个非completed阶段；3 个可选端点（procedures/summary、ai/recommend-workpapers、workpapers/overdue）容错降级为静默置空
+- **依赖图实现**：圆形布局 SVG（节点按 cycle 分组+id 排序在圆周分布）+ 15 循环色谱（hex 分类色，用户偏好 token 的例外场景）+ 5 严重度边样式（blocking/required/warning/recommended/info）+ hover 高亮关联边+dim 非关联节点；点击节点跳转编辑器
+- **委派矩阵实现**：成员×循环 el-table 网格 + 智能单元格行为（已分配→改派/未分配→委派）+ 未分配 dashed border 警告 + 底部按循环未分配 tag
+- **底稿地址坐标映射诊断（2026-05-17）**：当前数据底盘 70% 完成；✅ sheet 名称全覆盖 / ✅ 步骤→sheet 映射 100% / ✅ 底稿间引用 107 条（语义级）；❌ **单元格级物理坐标映射完全缺失**（cross_wp_references 的 source_cell 是中文描述如"销售费用折旧"而非 `H1!分配表!E15`）/ ❌ 109 个 docx 类底稿完全未扫描 / ❌ 用户改单元格触发 stale 链路断裂
+- **Address Registry 三级解析架构待落地**：Level 1 物理地址（cell+row+col）/ Level 2 语义地址（anchor+row_label+col_label）/ Level 3 业务地址（entity+code+field）；后端已有 address_registry router 但实际写入逻辑未确认；构建需扫描 477 模板单元格+解析行列表头，工程量 3-5 天，半自动+人工校对；做完才能让 stale 传播链真正闭环
 - **复盘补齐 3 个关键缺口（commit 74d87f2）**：(1) Foundation 新增 Requirement 0"底稿模板完整加载保障"（8 条验收标准覆盖全 sheet/合并/冻结/格式/固定文字/错误提示）；(2) Foundation 新增 Task 1.0"验证底稿模板完整加载链路"作为 Sprint 1 第一个任务（不通过不进后续）；(3) Foundation 新增 Task 1.2b"prefill_engine 新增 TB_AUX formula_type 支持"（Cycle-D 只产出数据不改引擎，引擎扩展由 Foundation 承担）
 - **底稿在线编辑空白问题深入分析（2026-05-16 Playwright 实测）**：
   - **后端 100% 正常**：GET /xlsx-to-json 返回 200 + 20 sheets 完整数据（浏览器内 fetch 实测确认）
