@@ -1,21 +1,20 @@
 {
-  "description": "审计程序步骤→模板Sheet映射（规则引擎V3）",
-  "version": "2025-R3",
+  "description": "审计程序步骤→模板Sheet映射（规则引擎V4 + 自动兜底）",
+  "version": "2025-R4",
   "stats": {
     "total_codes": 179,
     "codes_with_template": 173,
     "codes_without_template": 6,
     "total_steps": 1040,
-    "mapped_steps": 947,
-    "unmapped_steps": 93,
-    "mapping_rate": "91.1%",
+    "mapped_steps": 1040,
+    "unmapped_steps": 0,
+    "mapping_rate": "100.0%",
     "by_level": {
       "exact": 71,
-      "custom": 0,
-      "pattern": 533,
-      "description": 100,
       "category": 243,
-      "none": 93
+      "description": 100,
+      "pattern": 533,
+      "auto_fallback": 93
     }
   },
   "mappings": {
@@ -797,8 +796,11 @@
         {
           "step_order": 4,
           "step_name": "银行函证",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "企业信用报告信息与账面核对记录E1-19",
+            "企业信用报告信息查询记录E1-18"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 5,
@@ -1710,8 +1712,11 @@
         {
           "step_order": 6,
           "step_name": "差异调查",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "借款发函记录表E0-4",
+            "函证程序舞弊风险评价表E0-8"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 7,
@@ -7442,14 +7447,20 @@
         {
           "step_order": 4,
           "step_name": "形成结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "S1-1对法律法规的考虑记录表",
+            "S1-2沟通记录"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 5,
           "step_name": "记录",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "S1-1对法律法规的考虑记录表",
+            "S1-2沟通记录"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -8909,14 +8920,20 @@
         {
           "step_order": 1,
           "step_name": "复核关键领域",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "复核记录A25-1-1",
+            "复核记录参考模板A25-2-1"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "评估独立性",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "复核记录A25-1-1",
+            "复核记录参考模板A25-2-1"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
@@ -9015,26 +9032,34 @@
         {
           "step_order": 1,
           "step_name": "提交资料",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "项目内复核表A28"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "获取意见",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "项目内复核表A28"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "评估影响",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "项目内复核表A28"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
           "step_name": "记录",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "项目内复核表A28"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -9089,20 +9114,26 @@
         {
           "step_order": 1,
           "step_name": "确认标识",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "审计标识A31"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "核对使用",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "审计标识A31"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "归档",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "审计标识A31"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -9149,8 +9180,11 @@
         {
           "step_order": 5,
           "step_name": "记录",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B2 与前任注册会计师的沟通",
+            "B2-5 与前任注册会计师沟通后的评价"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -9164,20 +9198,26 @@
         {
           "step_order": 1,
           "step_name": "评估独立性",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B3 独立性确认表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "签署声明",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B3 独立性确认表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "归档",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B3 独立性确认表"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -9333,32 +9373,47 @@
         {
           "step_order": 1,
           "step_name": "确定对象",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B12A 与管理层访谈程序",
+            "B12A-1与管理层访谈记录"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "编制提纲",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B12A 与管理层访谈程序",
+            "B12A-1与管理层访谈记录"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "执行",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B12A 与管理层访谈程序",
+            "B12A-1与管理层访谈记录"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
           "step_name": "记录",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B12A 与管理层访谈程序",
+            "B12A-1与管理层访谈记录"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 5,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B12A 与管理层访谈程序",
+            "B12A-1与管理层访谈记录"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -9471,8 +9526,11 @@
         {
           "step_order": 6,
           "step_name": "特定类别重要性",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B15 重要性计算表",
+            "准则及应用指南的相关规定"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 7,
@@ -9967,26 +10025,38 @@
         {
           "step_order": 1,
           "step_name": "制定策略",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B50 汇总风险评估结果",
+            "B50-1 汇总识别出的风险因素"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "确定方向",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B50 汇总风险评估结果",
+            "B50-1 汇总识别出的风险因素"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "分配资源",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B50 汇总风险评估结果",
+            "B50-1 汇总识别出的风险因素"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
           "step_name": "记录",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B50 汇总风险评估结果",
+            "B50-1 汇总识别出的风险因素"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -10005,26 +10075,38 @@
         {
           "step_order": 1,
           "step_name": "编制计划",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B51-1 识别舞弊风险因素（虚假报告）",
+            "B51-2 识别舞弊风险因素（侵占资产）"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "确定程序",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B51-1 识别舞弊风险因素（虚假报告）",
+            "B51-2 识别舞弊风险因素（侵占资产）"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "分配任务",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B51-1 识别舞弊风险因素（虚假报告）",
+            "B51-2 识别舞弊风险因素（侵占资产）"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
           "step_name": "审批",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B51-1 识别舞弊风险因素（虚假报告）",
+            "B51-2 识别舞弊风险因素（侵占资产）"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 5,
@@ -10046,26 +10128,34 @@
         {
           "step_order": 1,
           "step_name": "估算工时",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B52 管理层凌驾"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "分配人员",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B52 管理层凌驾"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "编制预算",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B52 管理层凌驾"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
           "step_name": "审批",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B52 管理层凌驾"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -10082,8 +10172,11 @@
         {
           "step_order": 1,
           "step_name": "风险评估汇总",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B61-1工时预算与控制板（按阶段）",
+            "B61-1工时预算与控制表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
@@ -10097,38 +10190,56 @@
         {
           "step_order": 3,
           "step_name": "时间安排",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B61-1工时预算与控制板（按阶段）",
+            "B61-1工时预算与控制表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
           "step_name": "团队分工",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B61-1工时预算与控制板（按阶段）",
+            "B61-1工时预算与控制表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 5,
           "step_name": "专家需求",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B61-1工时预算与控制板（按阶段）",
+            "B61-1工时预算与控制表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 6,
           "step_name": "IT审计考虑",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B61-1工时预算与控制板（按阶段）",
+            "B61-1工时预算与控制表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 7,
           "step_name": "沟通计划",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B61-1工时预算与控制板（按阶段）",
+            "B61-1工时预算与控制表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 8,
           "step_name": "审批与下达",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "B61-1工时预算与控制板（按阶段）",
+            "B61-1工时预算与控制表"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -10188,8 +10299,11 @@
         {
           "step_order": 6,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C2-1-X控制测试",
+            "C2-2评价控制偏差"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -10249,8 +10363,11 @@
         {
           "step_order": 6,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C3-1-X控制测试",
+            "C3-2评价控制偏差"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -10435,8 +10552,11 @@
         {
           "step_order": 6,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C6-1-X控制测试",
+            "C6-2评价控制偏差"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -10495,8 +10615,11 @@
         {
           "step_order": 6,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C7-1-X控制测试",
+            "C7-2评价控制偏差"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -10556,8 +10679,11 @@
         {
           "step_order": 6,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C2-2评价控制偏差",
+            "C2-8-X控制测试"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -10743,8 +10869,11 @@
         {
           "step_order": 6,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C11-1-X控制测试",
+            "C11-2评价控制偏差"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -10993,8 +11122,11 @@
         {
           "step_order": 6,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C15-1-X控制测试",
+            "C15-2评价控制偏差"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -11010,32 +11142,47 @@
         {
           "step_order": 1,
           "step_name": "评估IT环境",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C21 具有信息技术专业技能的项目组成员",
+            "IT 审计发现汇总表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "识别风险",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C21 具有信息技术专业技能的项目组成员",
+            "IT 审计发现汇总表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "设计测试",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C21 具有信息技术专业技能的项目组成员",
+            "IT 审计发现汇总表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
           "step_name": "执行",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C21 具有信息技术专业技能的项目组成员",
+            "IT 审计发现汇总表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 5,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C21 具有信息技术专业技能的项目组成员",
+            "IT 审计发现汇总表"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -11194,32 +11341,47 @@
         {
           "step_order": 1,
           "step_name": "选择样本",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "2025假期清单",
+            "C24-0汇总表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "检查",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "2025假期清单",
+            "C24-0汇总表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "评价",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "2025假期清单",
+            "C24-0汇总表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
           "step_name": "记录",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "2025假期清单",
+            "C24-0汇总表"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 5,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "2025假期清单",
+            "C24-0汇总表"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -11234,14 +11396,18 @@
         {
           "step_order": 1,
           "step_name": "评估能力",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C25利用内部审计工作"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "复核工作",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "C25利用内部审计工作"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
@@ -11321,26 +11487,34 @@
         {
           "step_order": 1,
           "step_name": "获取数据",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "首次接受委托时对期初余额的审计S2"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "核对",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "首次接受委托时对期初余额的审计S2"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "评估",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "首次接受委托时对期初余额的审计S2"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "首次接受委托时对期初余额的审计S2"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -11416,14 +11590,20 @@
         {
           "step_order": 2,
           "step_name": "评估计量",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "商业实质的判断S4-2",
+            "审定表S4-1"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "检查披露",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "商业实质的判断S4-2",
+            "审定表S4-1"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
@@ -11448,20 +11628,29 @@
         {
           "step_order": 1,
           "step_name": "识别事项",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "债务重组审计程序S5",
+            "债务重组损益确认时点S5-2"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "评估处理",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "债务重组审计程序S5",
+            "债务重组损益确认时点S5-2"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "检查披露",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "债务重组审计程序S5",
+            "债务重组损益确认时点S5-2"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
@@ -11530,32 +11719,47 @@
         {
           "step_order": 1,
           "step_name": "识别租赁",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "审定表S8-1",
+            "租赁S8"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "分类判断",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "审定表S8-1",
+            "租赁S8"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "计量检查",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "审定表S8-1",
+            "租赁S8"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
           "step_name": "披露检查",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "审定表S8-1",
+            "租赁S8"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 5,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "审定表S8-1",
+            "租赁S8"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -11582,8 +11786,11 @@
         {
           "step_order": 2,
           "step_name": "评估风险",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "内部控制调查表S9-2",
+            "审定表S9-1"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
@@ -11596,8 +11803,11 @@
         {
           "step_order": 4,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "内部控制调查表S9-2",
+            "审定表S9-1"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -11616,26 +11826,38 @@
         {
           "step_order": 1,
           "step_name": "识别事项",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "审定表S10-1",
+            "对环境事项的考虑S10"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "评估影响",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "审定表S10-1",
+            "对环境事项的考虑S10"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "检查披露",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "审定表S10-1",
+            "对环境事项的考虑S10"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "审定表S10-1",
+            "对环境事项的考虑S10"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -11650,26 +11872,34 @@
         {
           "step_order": 1,
           "step_name": "获取报告",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "对被审计单位使用服务机构的考虑S11"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "评估",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "对被审计单位使用服务机构的考虑S11"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "确定影响",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "对被审计单位使用服务机构的考虑S11"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "对被审计单位使用服务机构的考虑S11"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -11847,14 +12077,20 @@
         {
           "step_order": 2,
           "step_name": "验证计算",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "净资产收益率计算S15-4",
+            "基本每股收益计算表S15-2"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "检查披露",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "净资产收益率计算S15-4",
+            "基本每股收益计算表S15-2"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
@@ -11877,32 +12113,42 @@
         {
           "step_order": 1,
           "step_name": "识别关系",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "套期活动S16"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 2,
           "step_name": "评估有效性",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "套期活动S16"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 3,
           "step_name": "检查计量",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "套期活动S16"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 4,
           "step_name": "检查披露",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "套期活动S16"
+          ],
+          "match_level": "auto_fallback"
         },
         {
           "step_order": 5,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "套期活动S16"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
@@ -12016,8 +12262,11 @@
         {
           "step_order": 4,
           "step_name": "结论",
-          "target_sheets": [],
-          "match_level": "none"
+          "target_sheets": [
+            "开发支出资本化分析表S21-2",
+            "成本归集与分摊检查表S21-3"
+          ],
+          "match_level": "auto_fallback"
         }
       ]
     },
