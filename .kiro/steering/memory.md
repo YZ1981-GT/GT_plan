@@ -124,6 +124,9 @@ inclusion: always
   - 核心功能代码全部就绪，剩余全是测试任务
   - 新建文件：4 composables（usePrefillMarkers/useCrossModuleRefs/useReviewMarks/useUserOverrides）+ wp_review_status.py 端点 + Alembic 迁移 + 2 新 JSON（d_cycle_validation_rules / d_cycle_procedures）+ prefill_formula_mapping 扩展 15 条 + cross_wp_references 扩展 18 条
 - **两个三件套全部任务 100% 完成（2026-05-17，commit aba873b）**：Foundation 23 tasks + Cycle-D 27 tasks = 50 tasks 全部 [x]；26 属性测试 passed（0.53s）+ 4 Playwright E2E specs 就绪；复盘无进一步改进建议；剩余仅真人 UAT 验收
+- **全部 14 循环数据扩展完成（2026-05-17，commit 2cd2989）**：D + E/F/G/H/I/J/K/L/M/N + B/C/A/S 全覆盖；校验规则 41 条 / 审计程序 135 步 / 跨模块引用 38 条 / 预填充公式 25 条 Analysis_Sheet；新建 3 个 JSON 文件（efghijklmn_cycle_validation_rules / efghijklmn_cycle_procedures / bcas_cycle_procedures）+ 扩展 prefill_formula_mapping（+10）+ cross_wp_references（+20 = CW-39~CW-58）
+- **循环数据覆盖率实测（2026-05-17）**：模板 Excel 实际 179 个主编码 / JSON 数据已覆盖 99 个 = **55% 覆盖率**；缺口 80 个主编码（A 循环 27 + B 循环 18 + C 循环 20 + S 循环 21 + 少量 E/F 子编码）；已覆盖的 99 个来自 prefill_formula_mapping 历史 94 条 + 本次新增 Analysis_Sheet/校验/程序；缺口主要是 form/word 类底稿（校验规则少但程序步骤需逐个定义）；待用户确认是否继续补齐
+- **86 个缺口主编码全部补齐（2026-05-17）**：bcas_cycle_procedures.json 从 4 条扩展到 90 条（A28 + B19 + C21 + S22）/ 415 步骤；覆盖率从 55% → 100%（179/179 主编码全部有审计程序定义）；A/B/C/S 类不需要 prefill 公式和校验规则（form/word 类非数据驱动），只需程序步骤
 - **复盘补齐 3 个关键缺口（commit 74d87f2）**：(1) Foundation 新增 Requirement 0"底稿模板完整加载保障"（8 条验收标准覆盖全 sheet/合并/冻结/格式/固定文字/错误提示）；(2) Foundation 新增 Task 1.0"验证底稿模板完整加载链路"作为 Sprint 1 第一个任务（不通过不进后续）；(3) Foundation 新增 Task 1.2b"prefill_engine 新增 TB_AUX formula_type 支持"（Cycle-D 只产出数据不改引擎，引擎扩展由 Foundation 承担）
 - **底稿在线编辑空白问题深入分析（2026-05-16 Playwright 实测）**：
   - **后端 100% 正常**：GET /xlsx-to-json 返回 200 + 20 sheets 完整数据（浏览器内 fetch 实测确认）
