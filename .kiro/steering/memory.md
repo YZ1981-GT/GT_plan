@@ -137,6 +137,11 @@ inclusion: always
 - **底稿数据体系下一步优先级**：~~P0 前端接入 step_sheet_mapping（1天）→ P1 跨模块引用可视化（2天）→ P2 校验规则实时检查（2天）→ P3 stale 传播链（已有基础设施）→ P4 B/C/A/S 预填充项目信息（1天）~~；核心洞察 = 数据层已完备，瓶颈在前端呈现层
 - **P0-P4 全部完成（2026-05-17，commit 239e970）**：新建 `wp_step_mapping.py`（6 端点：step-mapping/mapping-rules/custom/references/validation-rules/stale-chain）+ `wp_prefill_context.py`（1 端点）+ `useStepMapping.ts` composable + `WpReferencePanel.vue` 组件 + WorkpaperEditor 步骤导航栏；router_registry §57+§58 注册；apiPaths 新增 8 条路径
 - **底稿模块 3 个前端界面关系梳理**：WorkpaperList（树形列表/项目经理视角/管理入口）→ WorkpaperEditor（Univer 编辑器/审计助理/具体工作）← WorkpaperWorkbench（循环看板/进度追踪/批量操作）；List 和 Workbench 功能重叠（都展示列表+跳转 Editor），建议未来合并为一个界面用 Tab 切换视图模式（树形/看板/进度），当前保持现状不大改
+- **底稿模块界面合并完成（2026-05-17，commit ab19d5f）**：WorkpaperList 新增"工作台"视图模式（列表/看板/工作台 三档切换）整合 WorkpaperWorkbench；删除独立 WorkpaperWorkbench.vue（净删 1181 行）；/workpaper-bench 改重定向 ?view=workbench 兼容旧链接；DetailProjectPanel 底稿按钮改跳 /workpapers
+- **底稿名称单一真源铁律**：`wp_template_metadata_*_seed.json` 是底稿名称的权威源（从模板 Excel 文件名提取，179 全覆盖），其他 procedure/mapping 文件的 wp_name 必须与之一致；本轮修正 173 处不一致（A1 完成阶段→财务报告程序表 / B10 了解被审计单位→了解被审计单位及其环境和适用的财务报告编制基础 / C系列等）
+- **底稿循环命名修正**：cycleOptions 之前错误（D=货币资金 E=应收账款）应为 D=收入循环 E=货币资金 F=存货 G=投资 H=固定资产 I=无形资产 J=职工薪酬 K=管理/费用 L=债务 M=权益 N=税金 + 补 A=完成阶段 S=特定项目（之前漏了）
+- **底稿模块整体诊断（2026-05-17）**：核心问题 = 功能堆叠而非流程驱动；WorkpaperList 1720 行单文件 / 9 个对话框 / 17 区块详情卡片 / 3 视图模式塞一起；缺关键能力 = 生命周期流程图 + 依赖关系图 + 委派矩阵 + 裁剪执行联动 + 状态泳道；UI 应按流程（裁剪→生成→委派→编制→复核→归档）而非功能组织
+- **底稿模块下一步优先级 P0-P5**：P0 生命周期可视化（2-3天，左中右三栏阶段导航）/ P1 依赖关系图（2天，cross_wp_references DAG vis-network）/ P2 委派矩阵（1天，审计员×循环网格）/ P3 裁剪执行联动（1.5天，顶部导航条）/ P4 状态流转泳道图（1天，Editor顶部）/ P5 拆分 WorkpaperList 1720→<300行（1天）；推荐路线 P0+P1+P2 共 5-6 天
 - **复盘补齐 3 个关键缺口（commit 74d87f2）**：(1) Foundation 新增 Requirement 0"底稿模板完整加载保障"（8 条验收标准覆盖全 sheet/合并/冻结/格式/固定文字/错误提示）；(2) Foundation 新增 Task 1.0"验证底稿模板完整加载链路"作为 Sprint 1 第一个任务（不通过不进后续）；(3) Foundation 新增 Task 1.2b"prefill_engine 新增 TB_AUX formula_type 支持"（Cycle-D 只产出数据不改引擎，引擎扩展由 Foundation 承担）
 - **底稿在线编辑空白问题深入分析（2026-05-16 Playwright 实测）**：
   - **后端 100% 正常**：GET /xlsx-to-json 返回 200 + 20 sheets 完整数据（浏览器内 fetch 实测确认）

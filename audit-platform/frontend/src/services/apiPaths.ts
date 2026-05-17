@@ -394,6 +394,8 @@ export const wpAI = {
   staleChain: (wpId: string) => `/api/workpapers/${wpId}/stale-chain`,
   // P4: 项目信息预填充上下文
   prefillContext: (pid: string) => `/api/projects/${pid}/workpapers/prefill-context`,
+  // 全局依赖关系图（圆形布局可视化）
+  dependencyGraph: '/api/workpapers/dependency-graph',
 } as const
 
 // ─── 底稿精细化规则 ─────────────────────────────────────────────────────────

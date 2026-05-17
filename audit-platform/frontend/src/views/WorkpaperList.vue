@@ -10,6 +10,9 @@
                 <el-radio-button value="list">列表</el-radio-button>
                 <el-radio-button value="kanban">看板</el-radio-button>
                 <el-radio-button value="workbench">工作台</el-radio-button>
+                <el-radio-button value="lifecycle">生命周期</el-radio-button>
+                <el-radio-button value="graph">依赖图</el-radio-button>
+                <el-radio-button value="matrix">委派矩阵</el-radio-button>
               </el-radio-group>
             </div>
           </template>
@@ -70,8 +73,7 @@
       @assign="onKanbanAssign"
     />
     <!-- 工作台视图：按循环分组 + 进度追踪 + 批量操作 -->
-    <div v-else-if="viewMode === 'workbench'" class="gt-wp-workbench-view">
-      <div class="gt-wpb-progress-summary">
+    <div v-else-if="viewMode === 'workbench'" class="gt-wp-workbench-view">      <div class="gt-wpb-progress-summary">
         <div class="gt-wpb-prog-card" v-for="cycle in cycleSummary" :key="cycle.code">
           <div class="gt-wpb-prog-card__header">
             <span class="gt-wpb-prog-card__code">{{ cycle.code }}</span>
@@ -108,6 +110,34 @@
         </el-table>
       </div>
     </div>
+    <!-- 生命周期视图：6 阶段流程导航 -->
+    <WorkpaperLifecycleView
+      v-else-if="viewMode === 'lifecycle'"
+      :project-id="projectId"
+      :workpapers="lifecycleWpItems"
+      :loading="loading"
+      style="flex: 1; min-height: 0"
+      @switch-view="(v: string) => viewMode = v"
+      @open-workpaper="onOpenWorkpaperById"
+      @refresh="fetchData"
+    />
+    <!-- 依赖图视图：圆形布局可视化 -->
+    <WorkpaperDependencyGraph
+      v-else-if="viewMode === 'graph'"
+      :project-id="projectId"
+      style="flex: 1; min-height: 0"
+      @navigate="onCycleNodeClick"
+    />
+    <!-- 委派矩阵视图：成员 × 循环网格 -->
+    <WorkpaperAssignmentMatrix
+      v-else-if="viewMode === 'matrix'"
+      :project-id="projectId"
+      :workpapers="lifecycleWpItems"
+      :members="userOptions"
+      style="flex: 1; min-height: 0"
+      @cell-click="onMatrixCellClick"
+      @assign="onMatrixAssign"
+    />
     <!-- 无底稿时：两栏布局（左操作入口 + 右审计程序总览） -->
     <div v-else-if="!loading && treeData.length === 0" class="gt-wp-intro-layout">
       <!-- 左栏：操作入口 -->
@@ -597,6 +627,9 @@ import { Download, Monitor, Upload, Loading } from '@element-plus/icons-vue'
 import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
 import SoDConflictDialog from '@/components/gate/SoDConflictDialog.vue'
 import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
+import WorkpaperLifecycleView from '@/components/workpaper/WorkpaperLifecycleView.vue'
+import WorkpaperDependencyGraph from '@/components/workpaper/WorkpaperDependencyGraph.vue'
+import WorkpaperAssignmentMatrix from '@/components/workpaper/WorkpaperAssignmentMatrix.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
@@ -1121,6 +1154,55 @@ function onGuideClick(cycle: string) {
 function onWpImported() {
   showWpImport.value = false
   fetchData()
+}
+
+// ════════════════════════════════════════════════════════════
+// 新视图（生命周期/依赖图/委派矩阵）helpers
+// ════════════════════════════════════════════════════════════
+
+// 给 LifecycleView 和 AssignmentMatrix 提供合并好的 wp 列表（含 wp_code/wp_name）
+const lifecycleWpItems = computed(() =>
+  wpList.value.map((w: WorkpaperDetail) => {
+    const idx = wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    return {
+      id: w.id,
+      wp_code: w.wp_code || idx?.wp_code || '',
+      wp_name: w.wp_name || idx?.wp_name || '',
+      audit_cycle: w.audit_cycle || idx?.audit_cycle || '',
+      status: w.status,
+      review_status: w.review_status,
+      assigned_to: w.assigned_to,
+      reviewer: w.reviewer,
+      wp_index_id: w.wp_index_id,
+    }
+  })
+)
+
+function onOpenWorkpaperById(wpId: string) {
+  router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId } })
+}
+
+function onMatrixAssign(payload: { wp_ids: string[]; member_id: string }) {
+  selectedWpIds.value = payload.wp_ids
+  showBatchAssign.value = true
+}
+
+function onMatrixCellClick(_payload: { member_id: string; cycle: string }) {
+  // 只用作选中提示，真正分配走 onMatrixAssign
+}
+
+function onCycleNodeClick(code: string) {
+  // 依赖图 wp_code → 跳转编辑器
+  const wp = wpList.value.find((w: WorkpaperDetail) => {
+    const idx = wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    const wpCode = idx?.wp_code || w.wp_code || ''
+    return wpCode === code || wpCode.startsWith(code + '-') || wpCode === code
+  })
+  if (wp) {
+    router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: wp.id } })
+  } else {
+    ElMessage.info(`未找到底稿 ${code}（可能未生成）`)
+  }
 }
 
 async function fetchData() {
@@ -1675,7 +1757,7 @@ watch([filterCycle, filterStatus, filterAssignee], () => fetchData())
 onMounted(async () => {
   // 从 URL query 读取视图模式（用于 /workpaper-bench 重定向兼容）
   const queryView = route.query.view as string
-  if (queryView && ['list', 'kanban', 'workbench'].includes(queryView)) {
+  if (queryView && ['list', 'kanban', 'workbench', 'lifecycle', 'graph', 'matrix'].includes(queryView)) {
     viewMode.value = queryView
   }
   await fetchData()

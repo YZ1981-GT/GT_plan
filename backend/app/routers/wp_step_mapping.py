@@ -270,6 +270,87 @@ async def get_wp_validation_rules(
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# P1.5: 全局依赖关系图（用于前端 SVG 圆形布局可视化）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/dependency-graph")
+async def get_dependency_graph(user=Depends(get_current_user)):
+    """获取全部底稿依赖关系图谱（供前端 SVG 渲染圆形依赖图）
+
+    返回：
+    - nodes: 全部节点（wp_code → 含 cycle/name）
+    - edges: 全部边（含 severity/category/description）
+    - stats: 统计信息（节点总数/边总数/severity 分布）
+    """
+    base = Path(__file__).parent.parent.parent / "data"
+    cwr = json.loads((base / "cross_wp_references.json").read_bytes())
+
+    nodes: dict[str, dict] = {}
+    edges: list[dict] = []
+    severity_counts: dict[str, int] = {}
+
+    for ref in cwr.get("references", []):
+        source = ref.get("source_wp", "")
+        if not source:
+            continue
+        if source not in nodes:
+            nodes[source] = {
+                "id": source,
+                "cycle": source[0] if source else "?",
+                "name": "",
+            }
+
+        for t in ref.get("targets", []):
+            target = t.get("wp_code") or t.get("target_module", "")
+            if not target:
+                continue
+            if target not in nodes:
+                nodes[target] = {
+                    "id": target,
+                    "cycle": target[0] if target else "?",
+                    "name": "",
+                }
+            severity = ref.get("severity", "warning")
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            edges.append({
+                "ref_id": ref.get("ref_id", ""),
+                "source": source,
+                "target": target,
+                "severity": severity,
+                "category": ref.get("category", ""),
+                "description": ref.get("description", ""),
+            })
+
+    # 补 wp_name：从循环程序文件读取
+    proc_files = [
+        "d_cycle_procedures.json",
+        "efghijklmn_cycle_procedures.json",
+        "bcas_cycle_procedures.json",
+    ]
+    for fname in proc_files:
+        fp = base / fname
+        if fp.exists():
+            try:
+                data = json.loads(fp.read_bytes())
+                for code, proc in (data.get("procedures") or {}).items():
+                    if code in nodes:
+                        nodes[code]["name"] = proc.get("wp_name", "") or proc.get("name", "")
+            except Exception:
+                continue
+
+    return {
+        "nodes": list(nodes.values()),
+        "edges": edges,
+        "stats": {
+            "total_nodes": len(nodes),
+            "total_edges": len(edges),
+            "by_severity": severity_counts,
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # P3: stale propagation chain
 # ═══════════════════════════════════════════════════════════════════════════════
 
