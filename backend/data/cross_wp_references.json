@@ -22,170 +22,220 @@
       "description": "折旧分摊到销售费用",
       "source_wp": "H1",
       "source_sheet": "折旧分配分析表H1-13",
-      "source_cell": "销售费用折旧",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "K8",
-          "sheet": "审定表",
-          "cell": "折旧行",
-          "formula": "=WP('H1','折旧分配分析表H1-13','销售费用折旧')"
+          "sheet": "审定表K8-1",
+          "cell": "D1",
+          "formula": "=WP('H1','折旧分配分析表H1-13','销售费用折旧')",
+          "cell_label": "折旧行",
+          "address": "K8:审定表K8-1:D1"
         }
       ],
       "category": "depreciation",
-      "severity": "blocking"
+      "severity": "blocking",
+      "source_cell_label": "销售费用折旧",
+      "source_file": "H1 固定资产.xlsx",
+      "source_address": "H1:折旧分配分析表H1-13:D1"
     },
     {
       "ref_id": "CW-02",
       "description": "折旧分摊到管理费用",
       "source_wp": "H1",
       "source_sheet": "折旧分配分析表H1-13",
-      "source_cell": "管理费用折旧",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "K9",
-          "sheet": "审定表",
-          "cell": "折旧行",
-          "formula": "=WP('H1','折旧分配分析表H1-13','管理费用折旧')"
+          "sheet": "审定表K9-1",
+          "cell": "D1",
+          "formula": "=WP('H1','折旧分配分析表H1-13','管理费用折旧')",
+          "cell_label": "折旧行",
+          "address": "K9:审定表K9-1:D1"
         }
       ],
       "category": "depreciation",
-      "severity": "blocking"
+      "severity": "blocking",
+      "source_cell_label": "管理费用折旧",
+      "source_file": "H1 固定资产.xlsx",
+      "source_address": "H1:折旧分配分析表H1-13:D1"
     },
     {
       "ref_id": "CW-03",
       "description": "折旧分摊到生产成本",
       "source_wp": "H1",
       "source_sheet": "折旧分配分析表H1-13",
-      "source_cell": "生产成本折旧",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "F5",
-          "sheet": "审定表",
-          "cell": "折旧行",
-          "formula": "=WP('H1','折旧分配分析表H1-13','生产成本折旧')"
+          "sheet": "营业务成本审定表F5-1",
+          "cell": "D1",
+          "formula": "=WP('H1','折旧分配分析表H1-13','生产成本折旧')",
+          "cell_label": "折旧行",
+          "address": "F5:营业务成本审定表F5-1:D1"
         }
       ],
       "category": "depreciation",
-      "severity": "blocking"
+      "severity": "blocking",
+      "source_cell_label": "生产成本折旧",
+      "source_file": "H1 固定资产.xlsx",
+      "source_address": "H1:折旧分配分析表H1-13:D1"
     },
     {
       "ref_id": "CW-04",
       "description": "薪酬分摊到销售费用",
       "source_wp": "J1",
-      "source_sheet": "审定表",
-      "source_cell": "销售人员薪酬",
+      "source_sheet": "与同行业对比分析表J1-5",
+      "source_cell": "A17",
       "targets": [
         {
           "wp_code": "K8",
-          "sheet": "审定表",
-          "cell": "薪酬行",
-          "formula": "=WP('J1','审定表','销售人员薪酬')"
+          "sheet": "审定表K8-1",
+          "cell": "D1",
+          "formula": "=WP('J1','审定表','销售人员薪酬')",
+          "cell_label": "薪酬行",
+          "address": "K8:审定表K8-1:D1"
         }
       ],
       "category": "salary",
-      "severity": "blocking"
+      "severity": "blocking",
+      "source_cell_label": "销售人员薪酬",
+      "source_file": "J1 应付职工薪酬.xlsx",
+      "source_address": "J1:与同行业对比分析表J1-5:A17"
     },
     {
       "ref_id": "CW-05",
       "description": "薪酬分摊到管理费用",
       "source_wp": "J1",
-      "source_sheet": "审定表",
-      "source_cell": "管理人员薪酬",
+      "source_sheet": "应付职工薪酬实质性程序表 J1A",
+      "source_cell": "A32",
       "targets": [
         {
           "wp_code": "K9",
-          "sheet": "审定表",
-          "cell": "薪酬行",
-          "formula": "=WP('J1','审定表','管理人员薪酬')"
+          "sheet": "审定表K9-1",
+          "cell": "D1",
+          "formula": "=WP('J1','审定表','管理人员薪酬')",
+          "cell_label": "薪酬行",
+          "address": "K9:审定表K9-1:D1"
         }
       ],
       "category": "salary",
-      "severity": "blocking"
+      "severity": "blocking",
+      "source_cell_label": "管理人员薪酬",
+      "source_file": "J1 应付职工薪酬.xlsx",
+      "source_address": "J1:应付职工薪酬实质性程序表 J1A:A32"
     },
     {
       "ref_id": "CW-06",
       "description": "薪酬分摊到生产成本",
       "source_wp": "J1",
-      "source_sheet": "审定表",
-      "source_cell": "生产人员薪酬",
+      "source_sheet": "与同行业对比分析表J1-5",
+      "source_cell": "A15",
       "targets": [
         {
           "wp_code": "F5",
-          "sheet": "审定表",
-          "cell": "薪酬行",
-          "formula": "=WP('J1','审定表','生产人员薪酬')"
+          "sheet": "营业务成本审定表F5-1",
+          "cell": "D1",
+          "formula": "=WP('J1','审定表','生产人员薪酬')",
+          "cell_label": "薪酬行",
+          "address": "F5:营业务成本审定表F5-1:D1"
         }
       ],
       "category": "salary",
-      "severity": "blocking"
+      "severity": "blocking",
+      "source_cell_label": "生产人员薪酬",
+      "source_file": "J1 应付职工薪酬.xlsx",
+      "source_address": "J1:与同行业对比分析表J1-5:A15"
     },
     {
       "ref_id": "CW-07",
       "description": "应收坏账计提到信用减值损失",
       "source_wp": "D2",
-      "source_sheet": "坏账准备明细表D2-3",
-      "source_cell": "本期计提合计",
+      "source_sheet": "附注披露信息(上市公司）D2-1",
+      "source_cell": "A81",
       "targets": [
         {
           "wp_code": "G14",
-          "sheet": "审定表",
-          "cell": "应收账款减值行",
-          "formula": "=WP('D2','坏账准备明细表D2-3','本期计提合计')"
+          "sheet": "审定表G14-1",
+          "cell": "D1",
+          "formula": "=WP('D2','坏账准备明细表D2-3','本期计提合计')",
+          "cell_label": "应收账款减值行",
+          "address": "G14:审定表G14-1:D1"
         }
       ],
       "category": "impairment",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "本期计提合计",
+      "source_file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+      "source_address": "D2:附注披露信息(上市公司）D2-1:A81"
     },
     {
       "ref_id": "CW-08",
       "description": "其他应收坏账到信用减值损失",
       "source_wp": "K1",
-      "source_sheet": "坏账准备明细表",
-      "source_cell": "本期计提合计",
+      "source_sheet": "坏账准备明细表K1-3",
+      "source_cell": "A32",
       "targets": [
         {
           "wp_code": "G14",
-          "sheet": "审定表",
-          "cell": "其他应收减值行",
-          "formula": "=WP('K1','坏账准备明细表','本期计提合计')"
+          "sheet": "明细表G14-2",
+          "cell": "A19",
+          "formula": "=WP('K1','坏账准备明细表','本期计提合计')",
+          "cell_label": "其他应收减值行",
+          "address": "G14:明细表G14-2:A19"
         }
       ],
       "category": "impairment",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "本期计提合计",
+      "source_file": "K1 其他应收款.xlsx",
+      "source_address": "K1:坏账准备明细表K1-3:A32"
     },
     {
       "ref_id": "CW-09",
       "description": "短期借款利息到财务费用",
       "source_wp": "L1",
-      "source_sheet": "审定表",
-      "source_cell": "利息支出",
+      "source_sheet": "利息测算表L1-5",
+      "source_cell": "A22",
       "targets": [
         {
           "wp_code": "L8",
-          "sheet": "审定表",
-          "cell": "利息支出行",
-          "formula": "=WP('L1','审定表','利息支出')"
+          "sheet": "审定表L8-1",
+          "cell": "D1",
+          "formula": "=WP('L1','审定表','利息支出')",
+          "cell_label": "利息支出行",
+          "address": "L8:审定表L8-1:D1"
         }
       ],
       "category": "interest",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "利息支出",
+      "source_file": "L1 短期借款.xlsx",
+      "source_address": "L1:利息测算表L1-5:A22"
     },
     {
       "ref_id": "CW-10",
       "description": "长期借款利息到财务费用",
       "source_wp": "L3",
-      "source_sheet": "审定表",
-      "source_cell": "利息支出",
+      "source_sheet": "利息测算表L3-5",
+      "source_cell": "A22",
       "targets": [
         {
           "wp_code": "L8",
-          "sheet": "审定表",
-          "cell": "利息支出行",
-          "formula": "=WP('L3','审定表','利息支出')"
+          "sheet": "审定表L8-1",
+          "cell": "D1",
+          "formula": "=WP('L3','审定表','利息支出')",
+          "cell_label": "利息支出行",
+          "address": "L8:审定表L8-1:D1"
         }
       ],
       "category": "interest",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "利息支出",
+      "source_file": "L3 长期借款.xlsx",
+      "source_address": "L3:利息测算表L3-5:A22"
     },
     {
       "ref_id": "CW-11",
@@ -196,217 +246,281 @@
       "targets": [
         {
           "wp_code": "M6",
-          "sheet": "审定表",
-          "cell": "本年净利润行",
-          "formula": "=TB_SUM('5001~6999','审定数')"
+          "sheet": "审定表M6-1",
+          "cell": "D1",
+          "formula": "=TB_SUM('5001~6999','审定数')",
+          "cell_label": "本年净利润行",
+          "address": "M6:审定表M6-1:D1"
         }
       ],
       "category": "profit",
-      "severity": "blocking"
+      "severity": "blocking",
+      "source_cell_label": "净利润",
+      "source_address": "IS:利润表:净利润"
     },
     {
       "ref_id": "CW-12",
       "description": "无形资产摊销到管理费用",
       "source_wp": "I1",
-      "source_sheet": "审定表",
-      "source_cell": "本期摊销",
+      "source_sheet": "无形资产实质性程序 I1A",
+      "source_cell": "A23",
       "targets": [
         {
           "wp_code": "K9",
-          "sheet": "审定表",
-          "cell": "摊销行",
-          "formula": "=WP('I1','审定表','本期摊销')"
+          "sheet": "审定表K9-1",
+          "cell": "D1",
+          "formula": "=WP('I1','审定表','本期摊销')",
+          "cell_label": "摊销行",
+          "address": "K9:审定表K9-1:D1"
         }
       ],
       "category": "depreciation",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "本期摊销",
+      "source_file": "I1 无形资产、累计摊销及减值准备.xlsx",
+      "source_address": "I1:无形资产实质性程序 I1A:A23"
     },
     {
       "ref_id": "CW-13",
       "description": "使用权资产折旧到管理费用",
       "source_wp": "H8",
-      "source_sheet": "审定表",
-      "source_cell": "本期折旧",
+      "source_sheet": "审定表H8-1",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "K9",
-          "sheet": "审定表",
-          "cell": "使用权资产折旧行",
-          "formula": "=WP('H8','审定表','本期折旧')"
+          "sheet": "审定表K9-1",
+          "cell": "D1",
+          "formula": "=WP('H8','审定表','本期折旧')",
+          "cell_label": "使用权资产折旧行",
+          "address": "K9:审定表K9-1:D1"
         }
       ],
       "category": "depreciation",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "本期折旧",
+      "source_file": "H8 使用权资产.xlsx",
+      "source_address": "H8:审定表H8-1:D1"
     },
     {
       "ref_id": "CW-14",
       "description": "租赁负债利息到财务费用",
       "source_wp": "H9",
-      "source_sheet": "审定表",
-      "source_cell": "本期利息",
+      "source_sheet": "审定表H9-1",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "L8",
-          "sheet": "审定表",
-          "cell": "租赁利息行",
-          "formula": "=WP('H9','审定表','本期利息')"
+          "sheet": "审定表L8-1",
+          "cell": "D1",
+          "formula": "=WP('H9','审定表','本期利息')",
+          "cell_label": "租赁利息行",
+          "address": "L8:审定表L8-1:D1"
         }
       ],
       "category": "interest",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "本期利息",
+      "source_file": "H9 租赁负债.xlsx",
+      "source_address": "H9:审定表H9-1:D1"
     },
     {
       "ref_id": "CW-15",
       "description": "各投资底稿收益汇总到投资收益",
       "source_wp": "G7",
-      "source_sheet": "审定表",
-      "source_cell": "投资收益",
+      "source_sheet": "权益法未实现内部交易抵销测算表G7-15",
+      "source_cell": "E35",
       "targets": [
         {
           "wp_code": "G11",
-          "sheet": "审定表",
-          "cell": "长期股权投资收益行",
-          "formula": "=WP('G7','审定表','投资收益')"
+          "sheet": "投资收益实质性程序表G11A-修订前",
+          "cell": "A6",
+          "formula": "=WP('G7','审定表','投资收益')",
+          "cell_label": "长期股权投资收益行",
+          "address": "G11:投资收益实质性程序表G11A-修订前:A6"
         }
       ],
       "category": "other",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "投资收益",
+      "source_file": "G7 长期股权投资.xlsx",
+      "source_address": "G7:权益法未实现内部交易抵销测算表G7-15:E35"
     },
     {
       "ref_id": "CW-16",
       "description": "递延所得税资产变动到所得税费用",
       "source_wp": "N1",
-      "source_sheet": "审定表",
-      "source_cell": "期末余额",
+      "source_sheet": "递延所得税资产审定表N1-1",
+      "source_cell": "A20",
       "targets": [
         {
           "wp_code": "N5",
-          "sheet": "审定表",
-          "cell": "递延所得税资产变动行",
-          "formula": "=WP('N1','审定表','期末') - WP('N1','审定表','期初')"
+          "sheet": "所得税费用审定表N5-1",
+          "cell": "D1",
+          "formula": "=WP('N1','审定表','期末') - WP('N1','审定表','期初')",
+          "cell_label": "递延所得税资产变动行",
+          "address": "N5:所得税费用审定表N5-1:D1"
         }
       ],
       "category": "tax",
-      "severity": "blocking"
+      "severity": "blocking",
+      "source_cell_label": "期末余额",
+      "source_file": "N1 递延所得税资产.xlsx",
+      "source_address": "N1:递延所得税资产审定表N1-1:A20"
     },
     {
       "ref_id": "CW-17",
       "description": "递延所得税负债变动到所得税费用",
       "source_wp": "N3",
-      "source_sheet": "审定表",
-      "source_cell": "期末余额",
+      "source_sheet": "递延所得税负债审定表N3-1",
+      "source_cell": "A17",
       "targets": [
         {
           "wp_code": "N5",
-          "sheet": "审定表",
-          "cell": "递延所得税负债变动行",
-          "formula": "=WP('N3','审定表','期初') - WP('N3','审定表','期末')"
+          "sheet": "所得税费用审定表N5-1",
+          "cell": "D1",
+          "formula": "=WP('N3','审定表','期初') - WP('N3','审定表','期末')",
+          "cell_label": "递延所得税负债变动行",
+          "address": "N5:所得税费用审定表N5-1:D1"
         }
       ],
       "category": "tax",
-      "severity": "blocking"
+      "severity": "blocking",
+      "source_cell_label": "期末余额",
+      "source_file": "N3 递延所得税负债.xlsx",
+      "source_address": "N3:递延所得税负债审定表N3-1:A17"
     },
     {
       "ref_id": "CW-18",
       "description": "盈余公积提取到未分配利润",
       "source_wp": "M5",
-      "source_sheet": "审定表",
-      "source_cell": "本期提取",
+      "source_sheet": "审定表M5-1",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "M6",
-          "sheet": "审定表",
-          "cell": "盈余公积提取行",
-          "formula": "=WP('M5','审定表','本期提取')"
+          "sheet": "审定表M6-1",
+          "cell": "D1",
+          "formula": "=WP('M5','审定表','本期提取')",
+          "cell_label": "盈余公积提取行",
+          "address": "M6:审定表M6-1:D1"
         }
       ],
       "category": "profit",
-      "severity": "blocking"
+      "severity": "blocking",
+      "source_cell_label": "本期提取",
+      "source_file": "M5 盈余公积.xlsx",
+      "source_address": "M5:审定表M5-1:D1"
     },
     {
       "ref_id": "CW-19",
       "description": "应付股利分配到未分配利润",
       "source_wp": "M1",
-      "source_sheet": "审定表",
-      "source_cell": "本期分配",
+      "source_sheet": "审定表M1-1",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "M6",
-          "sheet": "审定表",
-          "cell": "利润分配行",
-          "formula": "=WP('M1','审定表','本期分配')"
+          "sheet": "审定表M6-1",
+          "cell": "D1",
+          "formula": "=WP('M1','审定表','本期分配')",
+          "cell_label": "利润分配行",
+          "address": "M6:审定表M6-1:D1"
         }
       ],
       "category": "profit",
-      "severity": "blocking"
+      "severity": "blocking",
+      "source_cell_label": "本期分配",
+      "source_file": "M1 应付股利（利润）.xlsx",
+      "source_address": "M1:审定表M1-1:D1"
     },
     {
       "ref_id": "CW-20",
       "description": "存货跌价准备到资产减值损失",
       "source_wp": "F2",
-      "source_sheet": "审定表",
-      "source_cell": "本期计提跌价",
+      "source_sheet": "附注披露信息（国企）",
+      "source_cell": "E26",
       "targets": [
         {
           "wp_code": "K11",
-          "sheet": "审定表",
-          "cell": "存货跌价行",
-          "formula": "=WP('F2','审定表','本期计提跌价')"
+          "sheet": "审定表K11-1",
+          "cell": "D1",
+          "formula": "=WP('F2','审定表','本期计提跌价')",
+          "cell_label": "存货跌价行",
+          "address": "K11:审定表K11-1:D1"
         }
       ],
       "category": "impairment",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "本期计提跌价",
+      "source_file": "F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+      "source_address": "F2:附注披露信息（国企）:E26"
     },
     {
       "ref_id": "CW-21",
       "description": "应收账款审定数→函证确认金额",
       "source_wp": "D2",
       "source_sheet": "审定表D2-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "D0",
-          "sheet": "函证汇总表D0-2",
-          "cell": "应收账款审定数",
-          "formula": "=WP('D2','审定表D2-1','审定数')"
+          "sheet": "应收及销售替代程序D0-6",
+          "cell": "A12",
+          "formula": "=WP('D2','审定表D2-1','审定数')",
+          "cell_label": "应收账款审定数",
+          "address": "D0:应收及销售替代程序D0-6:A12"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+      "source_address": "D2:审定表D2-1:D1"
     },
     {
       "ref_id": "CW-22",
       "description": "营业收入审定数→应收周转率分析",
       "source_wp": "D4",
       "source_sheet": "营业收入审定表D4-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "D2",
-          "sheet": "分析程序D2-5",
-          "cell": "营业收入",
-          "formula": "=WP('D4','营业收入审定表D4-1','审定数')"
+          "sheet": "应收账款实质性程序表D2A",
+          "cell": "A28",
+          "formula": "=WP('D4','营业收入审定表D4-1','审定数')",
+          "cell_label": "营业收入",
+          "address": "D2:应收账款实质性程序表D2A:A28"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+      "source_address": "D4:营业收入审定表D4-1:D1"
     },
     {
       "ref_id": "CW-23",
       "description": "预收款项变动→收入确认分析",
       "source_wp": "D3",
       "source_sheet": "审定表D3-1",
-      "source_cell": "变动额",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "D4",
           "sheet": "分析程序D4-3",
           "cell": "预收款项变动",
-          "formula": "=WP('D3','审定表D3-1','变动额')"
+          "formula": "=WP('D3','审定表D3-1','变动额')",
+          "cell_label": "预收款项变动",
+          "address": "D4:分析程序D4-3:预收款项变动"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "变动额",
+      "source_file": "D3 预收账款.xlsx",
+      "source_address": "D3:审定表D3-1:D1"
     },
     {
       "ref_id": "CW-24",
@@ -417,20 +531,24 @@
       "targets": [
         {
           "wp_code": "D5",
-          "sheet": "审定表D5-1",
-          "cell": "减值参考",
-          "formula": "=WP('D2','坏账准备计算表D2-8','坏账准备余额')"
+          "sheet": "审定表D5",
+          "cell": "D1",
+          "formula": "=WP('D2','坏账准备计算表D2-8','坏账准备余额')",
+          "cell_label": "减值参考",
+          "address": "D5:审定表D5:D1"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "坏账准备余额",
+      "source_address": "D2:坏账准备计算表D2-8:坏账准备余额"
     },
     {
       "ref_id": "CW-25",
       "description": "应收账款审定数→附注 5.7",
       "source_wp": "D2",
       "source_sheet": "审定表D2-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -440,18 +558,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.7 应收账款",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.7",
-          "note_section_code": "5.7"
+          "note_section_code": "5.7",
+          "cell_label": "5.7 应收账款合计",
+          "address": "NOTE:附注:5.7 应收账款合计"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+      "source_address": "D2:审定表D2-1:D1"
     },
     {
       "ref_id": "CW-26",
       "description": "营业收入审定数→附注 5.14",
       "source_wp": "D4",
       "source_sheet": "营业收入审定表D4-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -461,18 +584,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.14 营业收入",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.14",
-          "note_section_code": "5.14"
+          "note_section_code": "5.14",
+          "cell_label": "5.14 营业收入合计",
+          "address": "NOTE:附注:5.14 营业收入合计"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+      "source_address": "D4:营业收入审定表D4-1:D1"
     },
     {
       "ref_id": "CW-27",
       "description": "应收票据审定数→附注 5.3",
       "source_wp": "D1",
       "source_sheet": "审定表D1-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -482,18 +610,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.3 应收票据",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.3",
-          "note_section_code": "5.3"
+          "note_section_code": "5.3",
+          "cell_label": "5.3 应收票据合计",
+          "address": "NOTE:附注:5.3 应收票据合计"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "D1 应收票据.xlsx",
+      "source_address": "D1:审定表D1-1:D1"
     },
     {
       "ref_id": "CW-28",
       "description": "预收款项审定数→附注 5.15",
       "source_wp": "D3",
       "source_sheet": "审定表D3-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -503,18 +636,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.15 合同负债/预收款项",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.15",
-          "note_section_code": "5.15"
+          "note_section_code": "5.15",
+          "cell_label": "5.15 合同负债/预收款项合计",
+          "address": "NOTE:附注:5.15 合同负债/预收款项合计"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "D3 预收账款.xlsx",
+      "source_address": "D3:审定表D3-1:D1"
     },
     {
       "ref_id": "CW-29",
       "description": "应收款项融资审定数→附注 5.5",
       "source_wp": "D5",
-      "source_sheet": "审定表D5-1",
-      "source_cell": "审定数",
+      "source_sheet": "审定表D5",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -524,18 +662,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.5 应收款项融资",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.5",
-          "note_section_code": "5.5"
+          "note_section_code": "5.5",
+          "cell_label": "5.5 应收款项融资合计",
+          "address": "NOTE:附注:5.5 应收款项融资合计"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "D5 应收款项融资.xlsx",
+      "source_address": "D5:审定表D5:D1"
     },
     {
       "ref_id": "CW-30",
       "description": "合同资产审定数→附注 5.6",
       "source_wp": "D6",
       "source_sheet": "审定表D6-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -545,18 +688,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.6 合同资产",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.6",
-          "note_section_code": "5.6"
+          "note_section_code": "5.6",
+          "cell_label": "5.6 合同资产合计",
+          "address": "NOTE:附注:5.6 合同资产合计"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "D6 合同资产.xlsx",
+      "source_address": "D6:审定表D6-1:D1"
     },
     {
       "ref_id": "CW-31",
       "description": "合同负债审定数→附注 5.15",
       "source_wp": "D7",
       "source_sheet": "审定表D7-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -566,18 +714,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.15 合同负债",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.15",
-          "note_section_code": "5.15"
+          "note_section_code": "5.15",
+          "cell_label": "5.15 合同负债合计",
+          "address": "NOTE:附注:5.15 合同负债合计"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "D7 合同负债.xlsx",
+      "source_address": "D7:审定表D7-1:D1"
     },
     {
       "ref_id": "CW-32",
       "description": "应收账款审定数→报表 BS-005",
       "source_wp": "D2",
       "source_sheet": "审定表D2-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -587,18 +740,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-005 应收账款",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-005",
-          "report_row_code": "BS-005"
+          "report_row_code": "BS-005",
+          "cell_label": "应收账款行",
+          "address": "REPORT:资产负债表:应收账款行"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+      "source_address": "D2:审定表D2-1:D1"
     },
     {
       "ref_id": "CW-33",
       "description": "营业收入审定数→报表 IS-001",
       "source_wp": "D4",
       "source_sheet": "营业收入审定表D4-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -608,18 +766,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 IS-001 营业收入",
           "target_route": "/projects/{pid}/reports?type=income_statement&row=IS-001",
-          "report_row_code": "IS-001"
+          "report_row_code": "IS-001",
+          "cell_label": "营业收入行",
+          "address": "REPORT:利润表:营业收入行"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+      "source_address": "D4:营业收入审定表D4-1:D1"
     },
     {
       "ref_id": "CW-34",
       "description": "应收票据审定数→报表 BS-003",
       "source_wp": "D1",
       "source_sheet": "审定表D1-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -629,18 +792,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-003 应收票据",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-003",
-          "report_row_code": "BS-003"
+          "report_row_code": "BS-003",
+          "cell_label": "应收票据行",
+          "address": "REPORT:资产负债表:应收票据行"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "D1 应收票据.xlsx",
+      "source_address": "D1:审定表D1-1:D1"
     },
     {
       "ref_id": "CW-35",
       "description": "预收款项审定数→报表 BS-034",
       "source_wp": "D3",
       "source_sheet": "审定表D3-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -650,18 +818,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-034 预收款项",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-034",
-          "report_row_code": "BS-034"
+          "report_row_code": "BS-034",
+          "cell_label": "预收款项行",
+          "address": "REPORT:资产负债表:预收款项行"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "D3 预收账款.xlsx",
+      "source_address": "D3:审定表D3-1:D1"
     },
     {
       "ref_id": "CW-36",
       "description": "应收款项融资审定数→报表 BS-006",
       "source_wp": "D5",
-      "source_sheet": "审定表D5-1",
-      "source_cell": "审定数",
+      "source_sheet": "审定表D5",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -671,18 +844,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-006 应收款项融资",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-006",
-          "report_row_code": "BS-006"
+          "report_row_code": "BS-006",
+          "cell_label": "应收款项融资行",
+          "address": "REPORT:资产负债表:应收款项融资行"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "D5 应收款项融资.xlsx",
+      "source_address": "D5:审定表D5:D1"
     },
     {
       "ref_id": "CW-37",
       "description": "合同资产审定数→报表 BS-007",
       "source_wp": "D6",
       "source_sheet": "审定表D6-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -692,18 +870,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-007 合同资产",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-007",
-          "report_row_code": "BS-007"
+          "report_row_code": "BS-007",
+          "cell_label": "合同资产行",
+          "address": "REPORT:资产负债表:合同资产行"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "D6 合同资产.xlsx",
+      "source_address": "D6:审定表D6-1:D1"
     },
     {
       "ref_id": "CW-38",
       "description": "合同负债审定数→报表 BS-035",
       "source_wp": "D7",
       "source_sheet": "审定表D7-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -713,18 +896,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-035 合同负债",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-035",
-          "report_row_code": "BS-035"
+          "report_row_code": "BS-035",
+          "cell_label": "合同负债行",
+          "address": "REPORT:资产负债表:合同负债行"
         }
       ],
       "category": "revenue_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "D7 合同负债.xlsx",
+      "source_address": "D7:审定表D7-1:D1"
     },
     {
       "ref_id": "CW-39",
       "description": "货币资金审定数→附注 5.1",
       "source_wp": "E1",
-      "source_sheet": "审定表E1-1",
-      "source_cell": "审定数",
+      "source_sheet": "现金明细表E1-2",
+      "source_cell": "A31",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -734,18 +922,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.1 货币资金",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.1",
-          "note_section_code": "5.1"
+          "note_section_code": "5.1",
+          "cell_label": "5.1 货币资金合计",
+          "address": "NOTE:附注:5.1 货币资金合计"
         }
       ],
       "category": "cash_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+      "source_address": "E1:现金明细表E1-2:A31"
     },
     {
       "ref_id": "CW-40",
       "description": "货币资金审定数→报表 BS-001",
       "source_wp": "E1",
-      "source_sheet": "审定表E1-1",
-      "source_cell": "审定数",
+      "source_sheet": "现金明细表E1-2",
+      "source_cell": "A31",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -755,18 +948,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-001 货币资金",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-001",
-          "report_row_code": "BS-001"
+          "report_row_code": "BS-001",
+          "cell_label": "货币资金行",
+          "address": "REPORT:资产负债表:货币资金行"
         }
       ],
       "category": "cash_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+      "source_address": "E1:现金明细表E1-2:A31"
     },
     {
       "ref_id": "CW-41",
       "description": "存货审定数→附注 5.8",
       "source_wp": "F2",
-      "source_sheet": "审定表F2-1",
-      "source_cell": "审定数",
+      "source_sheet": "存货审定表F2-1",
+      "source_cell": "A35",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -776,18 +974,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.8 存货",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.8",
-          "note_section_code": "5.8"
+          "note_section_code": "5.8",
+          "cell_label": "5.8 存货合计",
+          "address": "NOTE:附注:5.8 存货合计"
         }
       ],
       "category": "inventory_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+      "source_address": "F2:存货审定表F2-1:A35"
     },
     {
       "ref_id": "CW-42",
       "description": "存货审定数→报表 BS-008",
       "source_wp": "F2",
-      "source_sheet": "审定表F2-1",
-      "source_cell": "审定数",
+      "source_sheet": "存货审定表F2-1",
+      "source_cell": "A35",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -797,18 +1000,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-008 存货",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-008",
-          "report_row_code": "BS-008"
+          "report_row_code": "BS-008",
+          "cell_label": "存货行",
+          "address": "REPORT:资产负债表:存货行"
         }
       ],
       "category": "inventory_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+      "source_address": "F2:存货审定表F2-1:A35"
     },
     {
       "ref_id": "CW-43",
       "description": "长期股权投资审定数→附注 5.9",
       "source_wp": "G1",
       "source_sheet": "审定表G1-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -818,18 +1026,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.9 长期股权投资",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.9",
-          "note_section_code": "5.9"
+          "note_section_code": "5.9",
+          "cell_label": "5.9 长期股权投资合计",
+          "address": "NOTE:附注:5.9 长期股权投资合计"
         }
       ],
       "category": "investment_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "G1 交易性金融资产.xlsx",
+      "source_address": "G1:审定表G1-1:D1"
     },
     {
       "ref_id": "CW-44",
       "description": "长期股权投资审定数→报表 BS-009",
       "source_wp": "G1",
       "source_sheet": "审定表G1-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -839,18 +1052,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-009 长期股权投资",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-009",
-          "report_row_code": "BS-009"
+          "report_row_code": "BS-009",
+          "cell_label": "长期股权投资行",
+          "address": "REPORT:资产负债表:长期股权投资行"
         }
       ],
       "category": "investment_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "G1 交易性金融资产.xlsx",
+      "source_address": "G1:审定表G1-1:D1"
     },
     {
       "ref_id": "CW-45",
       "description": "固定资产审定数→附注 5.10",
       "source_wp": "H1",
       "source_sheet": "审定表H1-1",
-      "source_cell": "审定数",
+      "source_cell": "A51",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -860,18 +1078,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.10 固定资产",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.10",
-          "note_section_code": "5.10"
+          "note_section_code": "5.10",
+          "cell_label": "5.10 固定资产合计",
+          "address": "NOTE:附注:5.10 固定资产合计"
         }
       ],
       "category": "fixed_asset_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "H1 固定资产.xlsx",
+      "source_address": "H1:审定表H1-1:A51"
     },
     {
       "ref_id": "CW-46",
       "description": "固定资产审定数→报表 BS-010",
       "source_wp": "H1",
       "source_sheet": "审定表H1-1",
-      "source_cell": "审定数",
+      "source_cell": "A51",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -881,18 +1104,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-010 固定资产",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-010",
-          "report_row_code": "BS-010"
+          "report_row_code": "BS-010",
+          "cell_label": "固定资产行",
+          "address": "REPORT:资产负债表:固定资产行"
         }
       ],
       "category": "fixed_asset_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "H1 固定资产.xlsx",
+      "source_address": "H1:审定表H1-1:A51"
     },
     {
       "ref_id": "CW-47",
       "description": "无形资产审定数→附注 5.11",
       "source_wp": "I1",
-      "source_sheet": "审定表I1-1",
-      "source_cell": "审定数",
+      "source_sheet": "明细表I1-2",
+      "source_cell": "A6",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -902,18 +1130,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.11 无形资产",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.11",
-          "note_section_code": "5.11"
+          "note_section_code": "5.11",
+          "cell_label": "5.11 无形资产合计",
+          "address": "NOTE:附注:5.11 无形资产合计"
         }
       ],
       "category": "intangible_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "I1 无形资产、累计摊销及减值准备.xlsx",
+      "source_address": "I1:明细表I1-2:A6"
     },
     {
       "ref_id": "CW-48",
       "description": "无形资产审定数→报表 BS-011",
       "source_wp": "I1",
-      "source_sheet": "审定表I1-1",
-      "source_cell": "审定数",
+      "source_sheet": "明细表I1-2",
+      "source_cell": "A6",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -923,18 +1156,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-011 无形资产",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-011",
-          "report_row_code": "BS-011"
+          "report_row_code": "BS-011",
+          "cell_label": "无形资产行",
+          "address": "REPORT:资产负债表:无形资产行"
         }
       ],
       "category": "intangible_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "I1 无形资产、累计摊销及减值准备.xlsx",
+      "source_address": "I1:明细表I1-2:A6"
     },
     {
       "ref_id": "CW-49",
       "description": "应付职工薪酬审定数→附注 5.12",
       "source_wp": "J1",
-      "source_sheet": "审定表J1-1",
-      "source_cell": "审定数",
+      "source_sheet": "审定表J1-1 ",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -944,18 +1182,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.12 应付职工薪酬",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.12",
-          "note_section_code": "5.12"
+          "note_section_code": "5.12",
+          "cell_label": "5.12 应付职工薪酬合计",
+          "address": "NOTE:附注:5.12 应付职工薪酬合计"
         }
       ],
       "category": "payroll_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "J1 应付职工薪酬.xlsx",
+      "source_address": "J1:审定表J1-1 :D1"
     },
     {
       "ref_id": "CW-50",
       "description": "应付职工薪酬审定数→报表 BS-030",
       "source_wp": "J1",
-      "source_sheet": "审定表J1-1",
-      "source_cell": "审定数",
+      "source_sheet": "审定表J1-1 ",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -965,18 +1208,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-030 应付职工薪酬",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-030",
-          "report_row_code": "BS-030"
+          "report_row_code": "BS-030",
+          "cell_label": "应付职工薪酬行",
+          "address": "REPORT:资产负债表:应付职工薪酬行"
         }
       ],
       "category": "payroll_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "J1 应付职工薪酬.xlsx",
+      "source_address": "J1:审定表J1-1 :D1"
     },
     {
       "ref_id": "CW-51",
       "description": "管理费用审定数→附注 5.16",
       "source_wp": "K8",
       "source_sheet": "审定表K8-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -986,18 +1234,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.16 管理费用",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.16",
-          "note_section_code": "5.16"
+          "note_section_code": "5.16",
+          "cell_label": "5.16 管理费用合计",
+          "address": "NOTE:附注:5.16 管理费用合计"
         }
       ],
       "category": "expense_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "K8 销售费用.xlsx",
+      "source_address": "K8:审定表K8-1:D1"
     },
     {
       "ref_id": "CW-52",
       "description": "管理费用审定数→报表 IS-005",
       "source_wp": "K8",
       "source_sheet": "审定表K8-1",
-      "source_cell": "审定数",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -1007,18 +1260,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 IS-005 管理费用",
           "target_route": "/projects/{pid}/reports?type=income_statement&row=IS-005",
-          "report_row_code": "IS-005"
+          "report_row_code": "IS-005",
+          "cell_label": "管理费用行",
+          "address": "REPORT:利润表:管理费用行"
         }
       ],
       "category": "expense_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "K8 销售费用.xlsx",
+      "source_address": "K8:审定表K8-1:D1"
     },
     {
       "ref_id": "CW-53",
       "description": "短期借款审定数→附注 5.13",
       "source_wp": "L1",
-      "source_sheet": "审定表L1-1",
-      "source_cell": "审定数",
+      "source_sheet": "逾期贷款检查表L1-7",
+      "source_cell": "A16",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -1028,18 +1286,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.13 短期借款",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.13",
-          "note_section_code": "5.13"
+          "note_section_code": "5.13",
+          "cell_label": "5.13 短期借款合计",
+          "address": "NOTE:附注:5.13 短期借款合计"
         }
       ],
       "category": "debt_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "L1 短期借款.xlsx",
+      "source_address": "L1:逾期贷款检查表L1-7:A16"
     },
     {
       "ref_id": "CW-54",
       "description": "短期借款审定数→报表 BS-020",
       "source_wp": "L1",
-      "source_sheet": "审定表L1-1",
-      "source_cell": "审定数",
+      "source_sheet": "逾期贷款检查表L1-7",
+      "source_cell": "A16",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -1049,18 +1312,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-020 短期借款",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-020",
-          "report_row_code": "BS-020"
+          "report_row_code": "BS-020",
+          "cell_label": "短期借款行",
+          "address": "REPORT:资产负债表:短期借款行"
         }
       ],
       "category": "debt_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "L1 短期借款.xlsx",
+      "source_address": "L1:逾期贷款检查表L1-7:A16"
     },
     {
       "ref_id": "CW-55",
       "description": "实收资本审定数→附注 5.17",
       "source_wp": "M1",
       "source_sheet": "审定表M1-1",
-      "source_cell": "审定数",
+      "source_cell": "A22",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -1070,18 +1338,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.17 实收资本",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.17",
-          "note_section_code": "5.17"
+          "note_section_code": "5.17",
+          "cell_label": "5.17 实收资本合计",
+          "address": "NOTE:附注:5.17 实收资本合计"
         }
       ],
       "category": "equity_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "M1 应付股利（利润）.xlsx",
+      "source_address": "M1:审定表M1-1:A22"
     },
     {
       "ref_id": "CW-56",
       "description": "实收资本审定数→报表 BS-040",
       "source_wp": "M1",
       "source_sheet": "审定表M1-1",
-      "source_cell": "审定数",
+      "source_cell": "A22",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -1091,18 +1364,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-040 实收资本",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-040",
-          "report_row_code": "BS-040"
+          "report_row_code": "BS-040",
+          "cell_label": "实收资本行",
+          "address": "REPORT:资产负债表:实收资本行"
         }
       ],
       "category": "equity_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "M1 应付股利（利润）.xlsx",
+      "source_address": "M1:审定表M1-1:A22"
     },
     {
       "ref_id": "CW-57",
       "description": "应交税费审定数→附注 5.18",
       "source_wp": "N1",
-      "source_sheet": "审定表N1-1",
-      "source_cell": "审定数",
+      "source_sheet": "递延所得税资产审定表N1-1",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "NOTE",
@@ -1112,18 +1390,23 @@
           "target_type": "note_section",
           "target_label": "→ 附注 5.18 应交税费",
           "target_route": "/projects/{pid}/disclosure-notes?section=5.18",
-          "note_section_code": "5.18"
+          "note_section_code": "5.18",
+          "cell_label": "5.18 应交税费合计",
+          "address": "NOTE:附注:5.18 应交税费合计"
         }
       ],
       "category": "tax_cycle",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_file": "N1 递延所得税资产.xlsx",
+      "source_address": "N1:递延所得税资产审定表N1-1:D1"
     },
     {
       "ref_id": "CW-58",
       "description": "应交税费审定数→报表 BS-025",
       "source_wp": "N1",
-      "source_sheet": "审定表N1-1",
-      "source_cell": "审定数",
+      "source_sheet": "递延所得税资产审定表N1-1",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -1133,17 +1416,22 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-025 应交税费",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-025",
-          "report_row_code": "BS-025"
+          "report_row_code": "BS-025",
+          "cell_label": "应交税费行",
+          "address": "REPORT:资产负债表:应交税费行"
         }
       ],
       "category": "tax_cycle",
-      "severity": "info"
+      "severity": "info",
+      "source_cell_label": "审定数",
+      "source_file": "N1 递延所得税资产.xlsx",
+      "source_address": "N1:递延所得税资产审定表N1-1:D1"
     },
     {
       "ref_id": "CW-59",
       "description": "B15 重要性水平→试算平衡表重要性设定",
       "source_wp": "B15",
-      "source_sheet": "重要性计算",
+      "source_sheet": "B15 重要性计算表",
       "source_cell": "E10",
       "targets": [
         {
@@ -1153,7 +1441,10 @@
         }
       ],
       "category": "cross_module",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "E10",
+      "source_file": "B15 重要性计算表.xlsx",
+      "source_address": "B15:B15 重要性计算表:E10"
     },
     {
       "ref_id": "CW-60",
@@ -1169,7 +1460,9 @@
         }
       ],
       "category": "cross_module",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "审计计划摘要",
+      "source_address": "B60:总体审计策略:审计计划摘要"
     },
     {
       "ref_id": "CW-61",
@@ -1185,7 +1478,9 @@
         }
       ],
       "category": "internal",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "控制有效性结论",
+      "source_address": "C2:销售循环控制测试:控制有效性结论"
     },
     {
       "ref_id": "CW-62",
@@ -1201,7 +1496,9 @@
         }
       ],
       "category": "internal",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "控制有效性结论",
+      "source_address": "C3:货币资金控制测试:控制有效性结论"
     },
     {
       "ref_id": "CW-63",
@@ -1217,7 +1514,9 @@
         }
       ],
       "category": "internal",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "控制有效性结论",
+      "source_address": "C4:存货控制测试:控制有效性结论"
     },
     {
       "ref_id": "CW-64",
@@ -1233,7 +1532,9 @@
         }
       ],
       "category": "internal",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "控制有效性结论",
+      "source_address": "C5:投资控制测试:控制有效性结论"
     },
     {
       "ref_id": "CW-65",
@@ -1249,7 +1550,9 @@
         }
       ],
       "category": "internal",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "控制有效性结论",
+      "source_address": "C6:固定资产控制测试:控制有效性结论"
     },
     {
       "ref_id": "CW-66",
@@ -1265,7 +1568,9 @@
         }
       ],
       "category": "internal",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "控制有效性结论",
+      "source_address": "C7:在建工程控制测试:控制有效性结论"
     },
     {
       "ref_id": "CW-67",
@@ -1281,7 +1586,9 @@
         }
       ],
       "category": "internal",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "控制有效性结论",
+      "source_address": "C8:无形资产控制测试:控制有效性结论"
     },
     {
       "ref_id": "CW-68",
@@ -1297,7 +1604,9 @@
         }
       ],
       "category": "internal",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "控制有效性结论",
+      "source_address": "C10:薪酬控制测试:控制有效性结论"
     },
     {
       "ref_id": "CW-69",
@@ -1313,7 +1622,9 @@
         }
       ],
       "category": "internal",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "控制有效性结论",
+      "source_address": "C12:税金控制测试:控制有效性结论"
     },
     {
       "ref_id": "CW-70",
@@ -1329,7 +1640,9 @@
         }
       ],
       "category": "internal",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "控制有效性结论",
+      "source_address": "C13:债务控制测试:控制有效性结论"
     },
     {
       "ref_id": "CW-71",
@@ -1345,7 +1658,9 @@
         }
       ],
       "category": "cross_module",
-      "severity": "required"
+      "severity": "required",
+      "source_cell_label": "调整分录合计",
+      "source_address": "A2:调整分录汇总表:调整分录合计"
     },
     {
       "ref_id": "CW-72",
@@ -1361,14 +1676,16 @@
         }
       ],
       "category": "cross_module",
-      "severity": "required"
+      "severity": "required",
+      "source_cell_label": "期后事项结论",
+      "source_address": "A11:期后事项检查表:期后事项结论"
     },
     {
       "ref_id": "CW-73",
       "description": "A13 错报汇总→错报管理模块",
       "source_wp": "A13",
-      "source_sheet": "错报汇总表",
-      "source_cell": "未更正错报合计",
+      "source_sheet": "A13-3 评价识别出的错报",
+      "source_cell": "A10",
       "targets": [
         {
           "target_module": "misstatements",
@@ -1377,7 +1694,10 @@
         }
       ],
       "category": "cross_module",
-      "severity": "required"
+      "severity": "required",
+      "source_cell_label": "未更正错报合计",
+      "source_file": "A13 错报（程序表及底稿）.xlsx",
+      "source_address": "A13:A13-3 评价识别出的错报:A10"
     },
     {
       "ref_id": "CW-74",
@@ -1393,7 +1713,9 @@
         }
       ],
       "category": "cross_module",
-      "severity": "required"
+      "severity": "required",
+      "source_cell_label": "重大缺陷结论",
+      "source_address": "A14:内控缺陷汇总:重大缺陷结论"
     },
     {
       "ref_id": "CW-75",
@@ -1414,7 +1736,9 @@
         }
       ],
       "category": "cross_module",
-      "severity": "required"
+      "severity": "required",
+      "source_cell_label": "持续经营结论",
+      "source_address": "A15:持续经营评估:持续经营结论"
     },
     {
       "ref_id": "CW-76",
@@ -1430,14 +1754,16 @@
         }
       ],
       "category": "cross_module",
-      "severity": "required"
+      "severity": "required",
+      "source_cell_label": "声明书签署日期",
+      "source_address": "A16:管理层声明书:声明书签署日期"
     },
     {
       "ref_id": "CW-77",
       "description": "A17 重大事项概要→审计报告",
       "source_wp": "A17",
-      "source_sheet": "重大事项概要",
-      "source_cell": "审计意见类型",
+      "source_sheet": "A17 重大事项概要程序表",
+      "source_cell": "D1",
       "targets": [
         {
           "target_module": "audit_report",
@@ -1446,7 +1772,10 @@
         }
       ],
       "category": "cross_module",
-      "severity": "required"
+      "severity": "required",
+      "source_cell_label": "审计意见类型",
+      "source_file": "A17  重大事项概要程序表.xlsx",
+      "source_address": "A17:A17 重大事项概要程序表:D1"
     },
     {
       "ref_id": "CW-78",
@@ -1462,7 +1791,9 @@
         }
       ],
       "category": "cross_module",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "期初余额确认",
+      "source_address": "S2:期初余额审计:期初余额确认"
     },
     {
       "ref_id": "CW-79",
@@ -1478,14 +1809,16 @@
         }
       ],
       "category": "cross_module",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "估计合理性结论",
+      "source_address": "S14:会计估计审计:估计合理性结论"
     },
     {
       "ref_id": "CW-80",
       "description": "S15 每股收益→财务报告",
       "source_wp": "S15",
-      "source_sheet": "每股收益计算",
-      "source_cell": "基本每股收益",
+      "source_sheet": "审定表S15-1",
+      "source_cell": "C6",
       "targets": [
         {
           "target_module": "financial_report",
@@ -1494,14 +1827,17 @@
         }
       ],
       "category": "cross_module",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "基本每股收益",
+      "source_file": "S15 每股收益和净资产收益率.xlsx",
+      "source_address": "S15:审定表S15-1:C6"
     },
     {
       "ref_id": "CW-81",
       "description": "B19 关联方识别→附注披露",
       "source_wp": "B19",
-      "source_sheet": "关联方清单",
-      "source_cell": "关联方汇总",
+      "source_sheet": "B19-1管理层提供的关联方清单",
+      "source_cell": "D1",
       "targets": [
         {
           "target_module": "disclosure_notes",
@@ -1510,14 +1846,17 @@
         }
       ],
       "category": "cross_module",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "关联方汇总",
+      "source_file": "B19 识别关联方程序表.xlsx",
+      "source_address": "B19:B19-1管理层提供的关联方清单:D1"
     },
     {
       "ref_id": "CW-82",
       "description": "A7 关联交易→附注披露",
       "source_wp": "A7",
-      "source_sheet": "关联交易汇总",
-      "source_cell": "关联交易合计",
+      "source_sheet": "关联交易及往来汇总A7-1",
+      "source_cell": "A6",
       "targets": [
         {
           "target_module": "disclosure_notes",
@@ -1526,14 +1865,17 @@
         }
       ],
       "category": "cross_module",
-      "severity": "required"
+      "severity": "required",
+      "source_cell_label": "关联交易合计",
+      "source_file": "A7-1 汇总关联方交易及关联往来.xlsx",
+      "source_address": "A7:关联交易及往来汇总A7-1:A6"
     },
     {
       "ref_id": "CW-83",
       "description": "C14 租赁控制测试→附注披露",
       "source_wp": "C14",
-      "source_sheet": "租赁控制测试",
-      "source_cell": "租赁分类结论",
+      "source_sheet": "选项清单列表（不归档） (2)",
+      "source_cell": "B7",
       "targets": [
         {
           "target_module": "disclosure_notes",
@@ -1542,7 +1884,10 @@
         }
       ],
       "category": "cross_module",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "租赁分类结论",
+      "source_file": "C14 租赁循环控制测试.xlsx",
+      "source_address": "C14:选项清单列表（不归档） (2):B7"
     },
     {
       "ref_id": "CW-84",
@@ -1558,14 +1903,16 @@
         }
       ],
       "category": "cross_module",
-      "severity": "required"
+      "severity": "required",
+      "source_cell_label": "报告审阅结论",
+      "source_address": "A1:财务报告审阅:报告审阅结论"
     },
     {
       "ref_id": "CW-85",
       "description": "A3 合并流程→合并模块",
       "source_wp": "A3",
-      "source_sheet": "合并抵消分录",
-      "source_cell": "合并抵消合计",
+      "source_sheet": "合并范围判断流程图（举例）",
+      "source_cell": "E18",
       "targets": [
         {
           "target_module": "consolidation",
@@ -1574,7 +1921,10 @@
         }
       ],
       "category": "cross_module",
-      "severity": "required"
+      "severity": "required",
+      "source_cell_label": "合并抵消合计",
+      "source_file": "A3-3 结构化主体纳入合并范围的判断.xlsx",
+      "source_address": "A3:合并范围判断流程图（举例）:E18"
     },
     {
       "ref_id": "CW-86",
@@ -1590,7 +1940,9 @@
         }
       ],
       "category": "cross_module",
-      "severity": "required"
+      "severity": "required",
+      "source_cell_label": "分部信息汇总",
+      "source_address": "A4:经营分部分析:分部信息汇总"
     },
     {
       "ref_id": "CW-87",
@@ -1606,7 +1958,9 @@
         }
       ],
       "category": "cross_module",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "违法违规结论",
+      "source_address": "S1:违法违规检查:违法违规结论"
     },
     {
       "ref_id": "CW-88",
@@ -1622,116 +1976,148 @@
         }
       ],
       "category": "cross_module",
-      "severity": "recommended"
+      "severity": "recommended",
+      "source_cell_label": "政策变更影响",
+      "source_address": "S3:会计政策变更分析:政策变更影响"
     },
     {
       "ref_id": "CW-89",
       "description": "D0 函证回函→D2 应收账款确认",
       "source_wp": "D0",
-      "source_sheet": "函证汇总表D0-2",
-      "source_cell": "回函确认金额",
+      "source_sheet": "函证结果汇总表D0-1",
+      "source_cell": "C31",
       "targets": [
         {
           "wp_code": "D2",
-          "sheet": "审定表D2-1",
-          "cell": "函证确认金额",
-          "formula": "=WP('D0','函证汇总表D0-2','回函确认金额')"
+          "sheet": "附注披露信息（国企）D2-1",
+          "cell": "C34",
+          "formula": "=WP('D0','函证汇总表D0-2','回函确认金额')",
+          "cell_label": "函证确认金额",
+          "address": "D2:附注披露信息（国企）D2-1:C34"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "回函确认金额",
+      "source_file": "D0 收入循环函证.xlsx",
+      "source_address": "D0:函证结果汇总表D0-1:C31"
     },
     {
       "ref_id": "CW-90",
       "description": "D2 坏账准备→A13 错报汇总",
       "source_wp": "D2",
-      "source_sheet": "坏账准备计算表D2-8",
-      "source_cell": "坏账差异金额",
+      "source_sheet": "附注披露信息（国企）D2-1",
+      "source_cell": "C34",
       "targets": [
         {
           "wp_code": "A13",
-          "sheet": "错报汇总表",
-          "cell": "应收账款坏账差异",
-          "formula": "=WP('D2','坏账准备计算表D2-8','坏账差异金额')"
+          "sheet": "A13-1 未更正错报汇总表",
+          "cell": "D1",
+          "formula": "=WP('D2','坏账准备计算表D2-8','坏账差异金额')",
+          "cell_label": "应收账款坏账差异",
+          "address": "A13:A13-1 未更正错报汇总表:D1"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "坏账差异金额",
+      "source_file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+      "source_address": "D2:附注披露信息（国企）D2-1:C34"
     },
     {
       "ref_id": "CW-91",
       "description": "D4 收入截止测试→A11 期后事项",
       "source_wp": "D4",
-      "source_sheet": "截止测试工作表",
-      "source_cell": "跨期收入金额",
+      "source_sheet": "其他业务毛利率分析表D4-33",
+      "source_cell": "F11",
       "targets": [
         {
           "wp_code": "A11",
           "sheet": "期后事项检查表",
           "cell": "收入截止跨期",
-          "formula": "=WP('D4','截止测试工作表','跨期收入金额')"
+          "formula": "=WP('D4','截止测试工作表','跨期收入金额')",
+          "cell_label": "收入截止跨期",
+          "address": "A11:期后事项检查表:收入截止跨期"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "跨期收入金额",
+      "source_file": "D4-33至D4-36 其他业务收入.xlsx",
+      "source_address": "D4:其他业务毛利率分析表D4-33:F11"
     },
     {
       "ref_id": "CW-92",
       "description": "E1 银行对账单→E1 银行余额调节表",
       "source_wp": "E1",
-      "source_sheet": "银行对账单",
-      "source_cell": "银行余额",
+      "source_sheet": "银行存款余额调节表E1-6",
+      "source_cell": "A9",
       "targets": [
         {
           "wp_code": "E1",
-          "sheet": "银行余额调节表E1-3",
-          "cell": "银行对账单余额",
-          "formula": "=WP('E1','银行对账单','银行余额')"
+          "sheet": "银行存款余额调节表E1-6",
+          "cell": "A34",
+          "formula": "=WP('E1','银行对账单','银行余额')",
+          "cell_label": "银行对账单余额",
+          "address": "E1:银行存款余额调节表E1-6:A34"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "银行余额",
+      "source_file": "E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+      "source_address": "E1:银行存款余额调节表E1-6:A9"
     },
     {
       "ref_id": "CW-93",
       "description": "F2 存货监盘→F2 存货审定表",
       "source_wp": "F2",
-      "source_sheet": "监盘记录表",
-      "source_cell": "监盘数量",
+      "source_sheet": "原材料单价分析F2-62",
+      "source_cell": "D41",
       "targets": [
         {
           "wp_code": "F2",
-          "sheet": "审定表F2-1",
-          "cell": "监盘确认数量",
-          "formula": "=WP('F2','监盘记录表','监盘数量')"
+          "sheet": "原材料单价分析F2-62",
+          "cell": "D41",
+          "formula": "=WP('F2','监盘记录表','监盘数量')",
+          "cell_label": "监盘确认数量",
+          "address": "F2:原材料单价分析F2-62:D41"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "监盘数量",
+      "source_file": "F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "source_address": "F2:原材料单价分析F2-62:D41"
     },
     {
       "ref_id": "CW-94",
       "description": "F2 存货跌价→A13 错报汇总",
       "source_wp": "F2",
-      "source_sheet": "审定表F2-1",
-      "source_cell": "跌价准备差异",
+      "source_sheet": "七、发出商品F2-9",
+      "source_cell": "A29",
       "targets": [
         {
           "wp_code": "A13",
-          "sheet": "错报汇总表",
-          "cell": "存货跌价差异",
-          "formula": "=WP('F2','审定表F2-1','跌价准备差异')"
+          "sheet": "A13-1 未更正错报汇总表",
+          "cell": "D1",
+          "formula": "=WP('F2','审定表F2-1','跌价准备差异')",
+          "cell_label": "存货跌价差异",
+          "address": "A13:A13-1 未更正错报汇总表:D1"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "跌价准备差异",
+      "source_file": "F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+      "source_address": "F2:七、发出商品F2-9:A29"
     },
     {
       "ref_id": "CW-95",
       "description": "G1 投资收益→IS 利润表投资收益行",
       "source_wp": "G1",
-      "source_sheet": "审定表G1-1",
-      "source_cell": "投资收益",
+      "source_sheet": "收益测算表G1-5",
+      "source_cell": "A22",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -1741,137 +2127,177 @@
           "target_type": "report_row",
           "target_label": "→ 报表 IS-009 投资收益",
           "target_route": "/projects/{pid}/reports?type=income_statement&row=IS-009",
-          "report_row_code": "IS-009"
+          "report_row_code": "IS-009",
+          "cell_label": "投资收益行",
+          "address": "REPORT:利润表:投资收益行"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "投资收益",
+      "source_file": "G1 交易性金融资产.xlsx",
+      "source_address": "G1:收益测算表G1-5:A22"
     },
     {
       "ref_id": "CW-96",
       "description": "H1 折旧政策→B60 总体审计策略",
       "source_wp": "H1",
       "source_sheet": "审定表H1-1",
-      "source_cell": "折旧政策说明",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "B60",
-          "sheet": "总体审计策略",
-          "cell": "固定资产折旧政策",
-          "formula": null
+          "sheet": "B61-1工时预算与控制板（按阶段）",
+          "cell": "A17",
+          "formula": null,
+          "cell_label": "固定资产折旧政策",
+          "address": "B60:B61-1工时预算与控制板（按阶段）:A17"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "折旧政策说明",
+      "source_file": "H1 固定资产.xlsx",
+      "source_address": "H1:审定表H1-1:D1"
     },
     {
       "ref_id": "CW-97",
       "description": "I1 摊销政策→B60 总体审计策略",
       "source_wp": "I1",
-      "source_sheet": "审定表I1-1",
-      "source_cell": "摊销政策说明",
+      "source_sheet": "审定表I1",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "B60",
           "sheet": "总体审计策略",
           "cell": "无形资产摊销政策",
-          "formula": null
+          "formula": null,
+          "cell_label": "无形资产摊销政策",
+          "address": "B60:总体审计策略:无形资产摊销政策"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "摊销政策说明",
+      "source_file": "I1 无形资产、累计摊销及减值准备.xlsx",
+      "source_address": "I1:审定表I1:D1"
     },
     {
       "ref_id": "CW-98",
       "description": "J1 社保公积金→N1 应交税费",
       "source_wp": "J1",
-      "source_sheet": "审定表J1-1",
-      "source_cell": "社保公积金计提",
+      "source_sheet": "审定表J1-1 ",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "N1",
-          "sheet": "审定表N1-1",
-          "cell": "社保公积金应缴",
-          "formula": "=WP('J1','审定表J1-1','社保公积金计提')"
+          "sheet": "递延所得税资产审定表N1-1",
+          "cell": "D1",
+          "formula": "=WP('J1','审定表J1-1','社保公积金计提')",
+          "cell_label": "社保公积金应缴",
+          "address": "N1:递延所得税资产审定表N1-1:D1"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "社保公积金计提",
+      "source_file": "J1 应付职工薪酬.xlsx",
+      "source_address": "J1:审定表J1-1 :D1"
     },
     {
       "ref_id": "CW-99",
       "description": "K8 管理费用明细→各科目底稿",
       "source_wp": "K8",
-      "source_sheet": "审定表K8-1",
-      "source_cell": "费用分配合计",
+      "source_sheet": "销售费用检查表K8-8",
+      "source_cell": "A34",
       "targets": [
         {
           "wp_code": "H1",
           "sheet": "折旧分配分析表H1-13",
-          "cell": "管理费用折旧",
-          "formula": "=WP('K8','审定表K8-1','折旧费')"
+          "cell": "D1",
+          "formula": "=WP('K8','审定表K8-1','折旧费')",
+          "cell_label": "管理费用折旧",
+          "address": "H1:折旧分配分析表H1-13:D1"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "费用分配合计",
+      "source_file": "K8 销售费用.xlsx",
+      "source_address": "K8:销售费用检查表K8-8:A34"
     },
     {
       "ref_id": "CW-100",
       "description": "K9 销售费用明细→D4 营业收入配比",
       "source_wp": "K9",
-      "source_sheet": "审定表K9-1",
-      "source_cell": "销售费用合计",
+      "source_sheet": "管理费用检查表K9-8",
+      "source_cell": "A31",
       "targets": [
         {
           "wp_code": "D4",
           "sheet": "分析程序D4-3",
           "cell": "销售费用率",
-          "formula": "=WP('K9','审定表K9-1','销售费用合计') / WP('D4','营业收入审定表D4-1','审定数')"
+          "formula": "=WP('K9','审定表K9-1','销售费用合计') / WP('D4','营业收入审定表D4-1','审定数')",
+          "cell_label": "销售费用率",
+          "address": "D4:分析程序D4-3:销售费用率"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "销售费用合计",
+      "source_file": "K9 管理费用.xlsx",
+      "source_address": "K9:管理费用检查表K9-8:A31"
     },
     {
       "ref_id": "CW-101",
       "description": "L1 借款利率→L8 财务费用利息",
       "source_wp": "L1",
       "source_sheet": "审定表L1-1",
-      "source_cell": "加权平均利率",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "L8",
-          "sheet": "审定表",
-          "cell": "利息重算依据",
-          "formula": "=WP('L1','审定表L1-1','加权平均利率')"
+          "sheet": "审定表L8-1",
+          "cell": "D1",
+          "formula": "=WP('L1','审定表L1-1','加权平均利率')",
+          "cell_label": "利息重算依据",
+          "address": "L8:审定表L8-1:D1"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "加权平均利率",
+      "source_file": "L1 短期借款.xlsx",
+      "source_address": "L1:审定表L1-1:D1"
     },
     {
       "ref_id": "CW-102",
       "description": "M1 股东变更→B19 关联方",
       "source_wp": "M1",
       "source_sheet": "审定表M1-1",
-      "source_cell": "股东变更记录",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "B19",
           "sheet": "关联方识别表",
           "cell": "股东变更信息",
-          "formula": null
+          "formula": null,
+          "cell_label": "股东变更信息",
+          "address": "B19:关联方识别表:股东变更信息"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "股东变更记录",
+      "source_file": "M1 应付股利（利润）.xlsx",
+      "source_address": "M1:审定表M1-1:D1"
     },
     {
       "ref_id": "CW-103",
       "description": "N1 所得税计算→IS 利润表所得税行",
       "source_wp": "N1",
-      "source_sheet": "审定表N1-1",
-      "source_cell": "当期所得税费用",
+      "source_sheet": "递延所得税资产审定表N1-1",
+      "source_cell": "D1",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -1881,18 +2307,23 @@
           "target_type": "report_row",
           "target_label": "→ 报表 IS-013 所得税费用",
           "target_route": "/projects/{pid}/reports?type=income_statement&row=IS-013",
-          "report_row_code": "IS-013"
+          "report_row_code": "IS-013",
+          "cell_label": "所得税费用行",
+          "address": "REPORT:利润表:所得税费用行"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "当期所得税费用",
+      "source_file": "N1 递延所得税资产.xlsx",
+      "source_address": "N1:递延所得税资产审定表N1-1:D1"
     },
     {
       "ref_id": "CW-104",
       "description": "N3 递延所得税→BS 资产负债表递延税项",
       "source_wp": "N3",
-      "source_sheet": "审定表N3-1",
-      "source_cell": "递延所得税资产",
+      "source_sheet": "递延所得税负债明细表N3-2",
+      "source_cell": "A25",
       "targets": [
         {
           "wp_code": "REPORT",
@@ -1902,11 +2333,16 @@
           "target_type": "report_row",
           "target_label": "→ 报表 BS-015 递延所得税资产",
           "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-015",
-          "report_row_code": "BS-015"
+          "report_row_code": "BS-015",
+          "cell_label": "递延所得税资产行",
+          "address": "REPORT:资产负债表:递延所得税资产行"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "递延所得税资产",
+      "source_file": "N3 递延所得税负债.xlsx",
+      "source_address": "N3:递延所得税负债明细表N3-2:A25"
     },
     {
       "ref_id": "CW-105",
@@ -1918,29 +2354,38 @@
         {
           "wp_code": "D2",
           "sheet": "审定表D2-1",
-          "cell": "函证覆盖率",
-          "formula": "=WP('D0','函证汇总表D0-2','发函覆盖率')"
+          "cell": "D1",
+          "formula": "=WP('D0','函证汇总表D0-2','发函覆盖率')",
+          "cell_label": "函证覆盖率",
+          "address": "D2:审定表D2-1:D1"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "发函覆盖率",
+      "source_address": "D0:函证汇总表D0-2:发函覆盖率"
     },
     {
       "ref_id": "CW-106",
       "description": "D0 函证回函率→A17 重大事项概要",
       "source_wp": "D0",
-      "source_sheet": "函证汇总表D0-2",
-      "source_cell": "回函率",
+      "source_sheet": "函证程序表D0A",
+      "source_cell": "A15",
       "targets": [
         {
           "wp_code": "A17",
-          "sheet": "重大事项概要",
-          "cell": "函证回函率",
-          "formula": "=WP('D0','函证汇总表D0-2','回函率')"
+          "sheet": "A17 重大事项概要程序表",
+          "cell": "D1",
+          "formula": "=WP('D0','函证汇总表D0-2','回函率')",
+          "cell_label": "函证回函率",
+          "address": "A17:A17 重大事项概要程序表:D1"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "回函率",
+      "source_file": "D0 收入循环函证.xlsx",
+      "source_address": "D0:函证程序表D0A:A15"
     },
     {
       "ref_id": "CW-107",
@@ -1951,13 +2396,17 @@
       "targets": [
         {
           "wp_code": "A13",
-          "sheet": "错报汇总表",
-          "cell": "函证差异",
-          "formula": "=WP('D0','函证汇总表D0-2','函证差异金额')"
+          "sheet": "A13-1 未更正错报汇总表",
+          "cell": "D1",
+          "formula": "=WP('D0','函证汇总表D0-2','函证差异金额')",
+          "cell_label": "函证差异",
+          "address": "A13:A13-1 未更正错报汇总表:D1"
         }
       ],
       "category": "internal",
-      "severity": "warning"
+      "severity": "warning",
+      "source_cell_label": "函证差异金额",
+      "source_address": "D0:函证汇总表D0-2:函证差异金额"
     }
   ],
   "stats": {
@@ -1971,6 +2420,17 @@
       "tax": 2,
       "other": 1
     },
-    "coverage_note": "覆盖 D-N 实质性程序（CW-01~CW-58）+ B/C/A/S 计划/控制/完成/特定项目跨模块引用（CW-59~CW-88）共 88 条。"
+    "coverage_note": "覆盖 D-N 实质性程序（CW-01~CW-58）+ B/C/A/S 计划/控制/完成/特定项目跨模块引用（CW-59~CW-88）共 88 条。",
+    "naming_resolved": 81,
+    "naming_unresolved": 26,
+    "naming_rate": "75.7%"
+  },
+  "naming_rule": {
+    "format": "{wp_code}:{sheet_name}:{cell_coordinate}",
+    "wp_code": "模板主编码（与 wp_template_metadata 一致）",
+    "sheet_name": "Excel 文件中的精确 sheet 标签名",
+    "cell_coordinate": "Excel 单元格坐标（A1 格式）",
+    "source_cell_label": "原语义描述（人读用，非寻址用）",
+    "source_address": "统一地址（系统寻址用）"
   }
 }

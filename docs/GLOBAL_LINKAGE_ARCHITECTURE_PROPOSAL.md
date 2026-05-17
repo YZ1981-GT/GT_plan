@@ -178,23 +178,124 @@ formula_unified.py
 ### 3.2 统一寻址格式（URI）
 
 ```
-格式：{module}:{code}:{sheet_or_section}:{cell_or_field}
+格式：{module}:{code}:{sheet_name}:{label}
+
+规则：
+  module     = 模块标识（WP/REPORT/NOTE/ADJ/TB/FORMULA）
+  code       = 模块内编码（D2/BS-005/5.7/1122）
+  sheet_name = Excel sheet 精确标签名（如"折旧分配分析表H1-13"），非 Excel 模块留空
+  label      = 语义标签（"销售费用折旧"/"期初余额"/"审定数"）
+
+关键设计决策：
+  ✓ label 用语义描述（稳定，不受插入行影响）
+  ✗ 不用物理坐标（D13/C10 会因插入行而漂移）
+  ✓ sheet_name 用 Excel 精确标签名（天然唯一，每个文件内不重复）
+  ✓ 物理坐标只在运行时动态解析（打开 xlsx 搜索行列表头定位）
 
 示例：
-  WP:D2:审定表D2-1:C10           底稿 D2 审定表 C10 单元格
-  WP:H1:折旧分配分析表H1-13:E15  底稿 H1 折旧分配表 E15
-  REPORT:BS-005:current           报表资产负债表第 5 行当期金额
-  REPORT:IS-001:current           利润表第 1 行
-  NOTE:5.7:应收账款:期末余额      附注 5.7 节应收账款期末余额
-  ADJ:1122:aje_net                科目 1122 的 AJE 净额
-  ADJ:1122:rje_net                科目 1122 的 RJE 净额
-  TB:1122:closing_balance         试算表 1122 期末余额
-  TB:1122:opening_balance         试算表 1122 期初余额
-  FORMULA:BS-005                  报表公式配置（改公式本身）
-  FORMULA:prefill:D2:期初余额     预填充公式配置
+  WP:H1:折旧分配分析表H1-13:销售费用折旧     底稿 H1 折旧分配表中的销售费用折旧金额
+  WP:H1:折旧分配分析表H1-13:管理费用折旧     底稿 H1 折旧分配表中的管理费用折旧金额
+  WP:H1:折旧分配分析表H1-13:生产成本折旧     底稿 H1 折旧分配表中的生产成本折旧金额
+  WP:D2:审定表D2-1:期初余额                  底稿 D2 审定表中的期初余额
+  WP:D2:审定表D2-1:审定数                    底稿 D2 审定表中的审定数
+  WP:D2:审定表D2-1:AJE调整                   底稿 D2 审定表中的 AJE 调整金额
+  WP:K8:审定表K8-1:折旧费                    底稿 K8 管理费用审定表中的折旧费行
+  REPORT:BS-005::当期金额                     报表资产负债表第 5 行当期金额
+  REPORT:IS-001::当期金额                     利润表第 1 行
+  NOTE:5.7:应收账款:期末余额                  附注 5.7 节应收账款期末余额
+  ADJ:1122::aje_net                           科目 1122 的 AJE 净额
+  TB:1122::期末余额                           试算表 1122 期末余额
+  FORMULA:BS-005::公式定义                    报表公式配置（改公式本身触发）
+  FORMULA:prefill:D2:期初余额                 预填充公式配置
+
+运行时解析流程（label → 物理坐标）：
+  1. 根据 wp_code + sheet_name 打开对应 xlsx 文件
+  2. 扫描 sheet 全部行列（不限前 3 行），找到 label 文本所在的行或列
+  3. 结合行列交叉点确定物理坐标（如"销售费用"在 D 列表头，"合计"在第 13 行 → D13）
+  4. 缓存结果（同一模板结构不变，只需解析一次）
+  5. 用户插入行后，下次打开重新解析（label 不变，坐标自动更新）
 ```
 
-### 3.3 依赖图构建来源（5 个数据源合并）
+### 3.3 地址解析三层优先级 + 用户手动校正
+
+系统自动识别表头位置不可能 100% 准确（审计底稿前 5-8 行是标题/公司名/日期装饰行，真正数据表头在更深处），必须支持用户手动校正，且校正结果持久化为全局规则。
+
+```
+解析优先级（高→低）：
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. address_label_overrides.json → overrides                      │
+│    用户手动指定 label → (row, col)，最高优先                      │
+│    例：H1:折旧分配分析表H1-13:销售费用折旧 → {row:13, col:"D"}   │
+│                                                                   │
+│ 2. address_label_overrides.json → header_rules                   │
+│    用户指定某 sheet 的数据起始行/列表头行/行表头列                 │
+│    系统按此规则重新扫描（替代默认"前 3 行"启发式）                │
+│    例：H1:折旧分配分析表H1-13 → {data_start_row:7, col_header:7} │
+│                                                                   │
+│ 3. 系统自动启发式识别（兜底）                                     │
+│    改进后算法：找"数据区域首行"而非固定前 3 行                    │
+│    特征：连续多非空短文本单元格，排除标题/公司名/日期装饰行       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**全局规则文件**：`backend/data/address_label_overrides.json`
+
+```json
+{
+  "description": "用户手动校正的 label→物理坐标映射（覆盖自动识别结果）",
+  "version": "2025-R1",
+  "overrides": {
+    "H1:折旧分配分析表H1-13:销售费用折旧": {
+      "row": 13, "col": "D",
+      "corrected_by": "admin",
+      "corrected_at": "2026-05-17T10:00:00Z",
+      "note": "合计行D列是销售费用折旧合计"
+    },
+    "H1:折旧分配分析表H1-13:管理费用折旧": {
+      "row": 13, "col": "E",
+      "corrected_by": "admin",
+      "corrected_at": "2026-05-17T10:00:00Z"
+    },
+    "H1:折旧分配分析表H1-13:生产成本折旧": {
+      "row": 13, "col": "F",
+      "corrected_by": "admin",
+      "corrected_at": "2026-05-17T10:00:00Z"
+    }
+  },
+  "header_rules": {
+    "_doc": "全局表头检测规则（覆盖默认启发式，指定数据区域起始位置）",
+    "H1:折旧分配分析表H1-13": {
+      "data_start_row": 7,
+      "col_header_row": 7,
+      "row_header_col": "A"
+    },
+    "D2:审定表D2-1": {
+      "data_start_row": 5,
+      "col_header_row": 5,
+      "row_header_col": "A"
+    }
+  }
+}
+```
+
+**前端入口**：
+- 底稿编辑器右键菜单 → "标记此单元格为 [label]" → 弹窗输入语义标签 → 写入 overrides
+- 模板管理页 → "表头规则" Tab → 指定每个 sheet 的数据起始行
+
+**API**：
+- `POST /api/address-registry/v2/override` — 用户手动校正（写入 overrides）
+- `GET /api/address-registry/v2/overrides` — 查看全部校正规则
+- `DELETE /api/address-registry/v2/override/{uri}` — 删除某条校正
+- `POST /api/address-registry/v2/header-rule` — 设置某 sheet 的表头规则
+- `GET /api/address-registry/v2/header-rules` — 查看全部表头规则
+
+**设计原则**：
+- 用户改一次，全局生效（同一模板的所有项目共享）
+- 校正结果优先于自动识别（永远不会被覆盖）
+- 支持导出/导入（团队间共享校正规则）
+- 底稿保存时自动清除该 wp 的解析缓存（下次打开重新解析）
+
+### 3.4 依赖图构建来源（5 个数据源合并）
 
 | 数据源 | 产出边类型 | 数量级 |
 |--------|-----------|--------|
@@ -206,7 +307,7 @@ formula_unified.py
 
 **合并后总边数**：~43,000 条（去重后）
 
-### 3.4 变更触发点（7 个入口）
+### 3.5 变更触发点（7 个入口）
 
 | 触发点 | 当前实现 | 改进后 |
 |--------|---------|--------|
@@ -222,22 +323,22 @@ formula_unified.py
 
 ## 四、实施方案（4 个 Sprint）
 
-### Sprint 1：统一依赖图构建（2 天）
+### Sprint 1：统一依赖图构建 + 运行时解析器（3 天）
 
-**目标**：把 5 个数据源合并为一个 `unified_dependency_graph.json`
+**目标**：把 5 个数据源合并为统一依赖图 + 实现 label→物理坐标的运行时解析器
 
 ```python
 # 新建 backend/app/services/linkage_graph_builder.py
 class LinkageGraphBuilder:
-    """从 5 个数据源构建统一依赖图"""
+    """从 5 个数据源构建统一依赖图（边用语义 URI，不含物理坐标）"""
     
     def build(self) -> dict:
         edges = []
-        edges += self._from_prefill_mapping()      # TB/ADJ → WP
-        edges += self._from_cross_wp_references()   # WP → WP/NOTE/REPORT
-        edges += self._from_report_config()         # TB → REPORT
-        edges += self._from_l3_dependencies()       # WP:sheet → WP:sheet
-        edges += self._from_note_account_mapping()  # WP → NOTE
+        edges += self._from_prefill_mapping()      # TB:1122::期末余额 → WP:D2:审定表D2-1:未审数
+        edges += self._from_cross_wp_references()   # WP:H1:折旧分配分析表H1-13:销售费用折旧 → WP:K8:审定表K8-1:折旧费
+        edges += self._from_report_config()         # TB:1122::期末余额 → REPORT:BS-005::当期金额
+        edges += self._from_l3_dependencies()       # WP:H1:审定表H1-1:* → WP:H1:折旧分配分析表H1-13:*（同文件跨sheet）
+        edges += self._from_note_account_mapping()  # WP:D2:审定表D2-1:审定数 → NOTE:5.7:应收账款:期末余额
         
         # 反向边（公式配置→引用方）
         edges += self._build_formula_reverse_index()
@@ -245,14 +346,42 @@ class LinkageGraphBuilder:
         return {
             "nodes": self._collect_nodes(edges),
             "edges": self._deduplicate(edges),
-            "stats": {...}
         }
+
+# 新建 backend/app/services/linkage_label_resolver.py
+class LinkageLabelResolver:
+    """运行时解析器：语义 label → 物理坐标
+    
+    设计原则：
+    - label 是稳定标识（"销售费用折旧"），物理坐标是易变实现（D13）
+    - 解析结果缓存到 Redis（key = wp_code:sheet_name:label，TTL = 24h）
+    - 用户插入行后缓存自动失效（底稿保存时清除该 wp 的全部缓存）
+    """
+    
+    async def resolve(self, wp_code: str, sheet_name: str, label: str) -> tuple[int, int] | None:
+        """返回 (row, col) 或 None
+        
+        搜索策略（不限前 3 行）：
+        1. 全 sheet 扫描所有单元格文本，精确匹配 label
+        2. 如果 label 是"行表头.列表头"格式（如"合计.销售费用"），分别匹配行和列
+        3. 如果 label 是单一词（如"销售费用折旧"），搜索包含该词的单元格
+        4. 返回匹配到的单元格坐标（优先数据区域，排除标题行）
+        """
+        
+    async def resolve_batch(self, uris: list[str]) -> dict[str, tuple[int, int] | None]:
+        """批量解析（减少重复打开文件）"""
+        
+    def invalidate_cache(self, wp_code: str):
+        """底稿保存后清除该 wp 的全部解析缓存"""
 ```
 
 **产出**：
-- `backend/data/unified_dependency_graph.json`（~2MB，去重后 ~5000 条有效边）
+- `backend/app/services/linkage_graph_builder.py`
+- `backend/app/services/linkage_label_resolver.py`
+- `backend/data/unified_dependency_graph.json`（语义 URI 边，~5000 条去重后）
 - `GET /api/linkage/graph` 端点
-- `GET /api/linkage/impact?uri=WP:D2:审定表D2-1:C10` 端点
+- `GET /api/linkage/resolve?uri=WP:H1:折旧分配分析表H1-13:销售费用折旧` 端点（返回物理坐标）
+- `GET /api/linkage/impact?uri=...&max_depth=3` 端点（BFS 下游影响）
 
 ### Sprint 2：Stale Propagation Engine 统一化（2 天）
 
@@ -289,23 +418,127 @@ class StalePropagationEngine:
 
 **目标**：实现"报表改→底稿 stale"和"公式管理改→底稿 stale"
 
+#### 3.1 公式管理与底稿的联动现状
+
+当前系统有 3 种公式引用格式，**已天然符合统一 URI 规则**：
+
+| 公式来源 | 格式 | 对应 URI |
+|---------|------|---------|
+| `report_config.formula` | `TB('1122','期末余额')` | `TB:1122::期末余额` |
+| `prefill_formula_mapping` | `=WP('H1','折旧分配分析表H1-13','销售费用折旧')` | `WP:H1:折旧分配分析表H1-13:销售费用折旧` |
+| `prefill_formula_mapping` | `=TB('1122','期初余额')` | `TB:1122::期初余额` |
+| `prefill_formula_mapping` | `=ADJ('1122','aje_net')` | `ADJ:1122::aje_net` |
+| `prefill_formula_mapping` | `=PREV('D1','审定表D1-1','审定数')` | `WP:D1:审定表D1-1:审定数`（上年） |
+| `cross_wp_references` | `=WP('H1','折旧分配分析表H1-13','销售费用折旧')` | `WP:H1:折旧分配分析表H1-13:销售费用折旧` |
+
+**关键发现**：`=WP('wp_code','sheet_name','label')` 公式的三个参数**恰好就是 URI 的后三段**。无需额外转换。
+
+#### 3.2 需要修改的联动点
+
+**A. report_config.formula 改动 → 底稿 stale**
+
+```
+触发：管理员在公式管理页面修改 report_config 某行的 formula 字段
+影响：所有引用该 report_config 行的底稿需要 stale
+
+实现：
+1. report_config UPDATE 时发布 FORMULA_CONFIG_CHANGED 事件
+2. 事件 payload 含 {row_code, old_formula, new_formula}
+3. 从 old_formula 解析出引用的 TB 科目列表
+4. 从 prefill_formula_mapping 反查哪些底稿引用了这些科目
+5. 标记这些底稿 prefill_stale=True
+
+代码改动：
+- backend/app/routers/report_config.py: PUT 端点追加事件发布
+- backend/app/services/event_handlers.py: 新增 FORMULA_CONFIG_CHANGED handler
+- backend/app/services/linkage_graph_builder.py: 构建 FORMULA:row_code → REPORT:row_code 边
+```
+
+**B. prefill_formula_mapping 改动 → 底稿 stale**
+
+```
+触发：管理员修改 prefill_formula_mapping.json（通过 reseed 或手动编辑）
+影响：被修改公式对应的底稿需要重新预填充
+
+实现：
+1. /api/template-library-mgmt/seed-all 端点执行后发布 PREFILL_MAPPING_CHANGED 事件
+2. 对比新旧 mapping 差异，找出变更的 wp_code 列表
+3. 标记这些底稿 prefill_stale=True
+
+代码改动：
+- backend/app/routers/template_library_mgmt.py: seed 端点追加事件发布
+- backend/app/services/event_handlers.py: 新增 PREFILL_MAPPING_CHANGED handler
+```
+
+**C. 底稿保存 → 引用该底稿的其他底稿 stale（=WP() 公式反向）**
+
+```
+触发：用户保存底稿 H1（修改了折旧分配分析表H1-13 的数据）
+影响：K8/K9/F5 等引用 =WP('H1',...) 的底稿需要 stale
+
+实现（已有基础，需打通）：
+1. WorkpaperEditor.onSave → staleImpact.notify({sheet: '折旧分配分析表H1-13'})
+2. 后端从 prefill_formula_mapping 反查：谁的公式引用了 WP('H1','折旧分配分析表H1-13',*)
+3. 找到 K8/K9/F5 → 标记 prefill_stale=True（当前只返回前端，不写 DB）
+4. 【需修改】：notify-cell-change 端点同时写 DB stale 字段
+
+代码改动：
+- backend/app/routers/address_registry_v2.py: notify_cell_change 追加 mark_stale 调用
+```
+
+**D. 附注保存 → 引用该附注的底稿 stale（=NOTE() 公式反向）**
+
+```
+触发：用户编辑附注 5.7 节并保存
+影响：引用 =NOTE('5.7',...) 的底稿需要 stale
+
+实现：
+1. 附注保存端点发布 NOTE_SECTION_SAVED 事件
+2. 从 prefill_formula_mapping 反查：谁的公式引用了 NOTE('5.7',*)
+3. 标记这些底稿 prefill_stale=True
+
+代码改动：
+- backend/app/routers/disclosure_notes.py: PUT 端点追加事件发布
+- backend/app/services/event_handlers.py: 新增 NOTE_SECTION_SAVED handler
+```
+
+#### 3.3 反向索引构建
+
 ```python
-# 反向索引构建
+# 新建 backend/app/services/formula_reverse_index.py
 class FormulaReverseIndex:
-    """从 report_config.formula 解析出 TB 引用，建立反向索引
+    """从公式文本解析引用关系，建立"被引用方 → 引用方"反向索引
     
-    例：report_config BS-005 formula = "TB('1122','期末余额')"
-    → 反向索引：TB:1122 被 REPORT:BS-005 引用
-    → 当 TB:1122 变了，REPORT:BS-005 需要 stale
+    数据源：
+    1. prefill_formula_mapping.json 的 cells[].formula 字段
+    2. report_config 表的 formula 字段
+    3. cross_wp_references.json 的 targets[].formula 字段
     
-    例：prefill_formula_mapping D2 cells[0] formula = "=TB('1122','期初余额')"
-    → 反向索引：TB:1122 被 WP:D2:审定表D2-1:期初余额 引用
-    → 当 TB:1122 变了，WP:D2 需要 stale
+    产出：
+    {
+      "TB:1122::期末余额": ["WP:D2:审定表D2-1:未审数", "REPORT:BS-005::当期金额"],
+      "WP:H1:折旧分配分析表H1-13:销售费用折旧": ["WP:K8:审定表K8-1:折旧"],
+      "NOTE:5.7:应收账款:期末余额": ["WP:D2:审定表D2-1:附注引用"],
+    }
+    
+    用法：
+    当 TB:1122 变了 → 查反向索引 → 得到 [WP:D2, REPORT:BS-005] → 标 stale
+    当 WP:H1:折旧分配分析表H1-13 变了 → 查反向索引 → 得到 [WP:K8] → 标 stale
     """
+    
+    def build_from_prefill_mapping(self) -> dict[str, list[str]]:
+        """解析 =TB()/=WP()/=ADJ()/=NOTE() 公式，提取被引用 URI"""
+        
+    def build_from_report_config(self) -> dict[str, list[str]]:
+        """解析 report_config.formula 中的 TB()/SUM_TB()/ROW() 引用"""
+        
+    def query(self, changed_uri: str) -> list[str]:
+        """查询：谁引用了 changed_uri → 返回引用方 URI 列表"""
 ```
 
 **新增事件**：
 - `FORMULA_CONFIG_CHANGED`：report_config 表 formula 字段被修改
+- `PREFILL_MAPPING_CHANGED`：prefill_formula_mapping.json 被 reseed
 - `NOTE_SECTION_SAVED`：附注章节保存
 - `TB_MANUAL_EDITED`：试算表手动编辑（非公式计算）
 
@@ -318,6 +551,7 @@ class FormulaReverseIndex:
 # 扫描 docx 占位符 → 注册为 L2 锚点
 # 占位符格式：{{company_name}} / {{partner_name}} / {{materiality_level}}
 # 来源：wp_prefill_context 端点的字段
+# URI 格式：WP:B60:总体审计策略:{{partner_name}}
 ```
 
 **前端统一展示**：
@@ -382,11 +616,11 @@ class FormulaReverseIndex:
 
 | Sprint | 内容 | 工时 | 价值 |
 |--------|------|------|------|
-| 1 | 统一依赖图构建 | 2 天 | 基础设施（后续全依赖） |
+| 1 | 统一依赖图构建 + 运行时解析器 | 3 天 | 基础设施（后续全依赖） |
 | 2 | Stale 传播引擎统一化 | 2 天 | 消除两套机制并存 |
 | 3 | 反向联动 + 公式管理 | 2 天 | 解决最大断裂点 |
 | 4 | docx + 前端统一展示 | 2 天 | 完整性收尾 |
-| **合计** | | **8 天** | |
+| **合计** | | **9 天** | |
 
 **推荐执行顺序**：Sprint 1 → 2 → 3 → 4（严格串行，每步依赖前步产出）
 
