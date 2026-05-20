@@ -10,7 +10,8 @@
       "formula": "materiality_level == trial_balance.materiality",
       "description": "重要性水平应与试算平衡表设定一致",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-02",
@@ -20,7 +21,8 @@
       "formula": "abs(actual_hours - budget_hours) / budget_hours <= 0.2",
       "description": "实际审计工时与预算偏差不应超过20%",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-03",
@@ -30,7 +32,8 @@
       "formula": "control_effective == True implies substantive_reduced == True",
       "description": "控制测试有效时应相应减少实质性程序范围",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-04",
@@ -40,7 +43,8 @@
       "formula": "control_effective == True implies substantive_reduced == True",
       "description": "货币资金控制有效时应相应减少实质性程序范围",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-05",
@@ -50,7 +54,8 @@
       "formula": "control_effective == True implies substantive_reduced == True",
       "description": "存货控制有效时应相应减少实质性程序范围",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-06",
@@ -60,7 +65,8 @@
       "formula": "control_effective == True implies substantive_reduced == True",
       "description": "投资控制有效时应相应减少实质性程序范围",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-07",
@@ -70,7 +76,8 @@
       "formula": "control_effective == True implies substantive_reduced == True",
       "description": "固定资产控制有效时应相应减少实质性程序范围",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-08",
@@ -80,7 +87,8 @@
       "formula": "control_effective == True implies substantive_reduced == True",
       "description": "薪酬控制有效时应相应减少实质性程序范围",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-09",
@@ -90,7 +98,8 @@
       "formula": "control_effective == True implies substantive_reduced == True",
       "description": "税金控制有效时应相应减少实质性程序范围",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-10",
@@ -100,7 +109,8 @@
       "formula": "control_effective == True implies substantive_reduced == True",
       "description": "债务控制有效时应相应减少实质性程序范围",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-11",
@@ -110,7 +120,8 @@
       "formula": "total_aje == sum(individual_aje_amounts)",
       "description": "调整分录汇总金额应等于各单笔调整分录之和",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": 0.01
     },
     {
       "rule_id": "BCAS-VR-12",
@@ -120,7 +131,8 @@
       "formula": "total_misstatements == sum(individual_misstatement_amounts)",
       "description": "错报汇总金额应等于各单笔错报之和",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": 0.01
     },
     {
       "rule_id": "BCAS-VR-13",
@@ -130,7 +142,8 @@
       "formula": "total_uncorrected_misstatements < materiality_level",
       "description": "未更正错报汇总金额应低于重要性水平",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-14",
@@ -140,7 +153,8 @@
       "formula": "going_concern_doubt == True implies disclosure_adequate == True",
       "description": "存在持续经营重大疑虑时应确保披露充分",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-15",
@@ -150,7 +164,8 @@
       "formula": "subsequent_events_cutoff_date >= report_date",
       "description": "期后事项检查截止日期不应早于审计报告日",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-16",
@@ -160,7 +175,8 @@
       "formula": "opening_balance == prior_year_closing_balance",
       "description": "期初余额应等于上年审定期末余额",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": 0.01
     },
     {
       "rule_id": "BCAS-VR-17",
@@ -170,7 +186,8 @@
       "formula": "all_significant_estimates_disclosed == True",
       "description": "所有重大会计估计均应在附注中充分披露",
       "severity": "warning",
-      "auto_check": false
+      "auto_check": false,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-18",
@@ -180,7 +197,8 @@
       "formula": "report_date == audit_report_date",
       "description": "财务报告批准日期应与审计报告日期一致",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-19",
@@ -190,7 +208,8 @@
       "formula": "sum(elimination_debits) == sum(elimination_credits)",
       "description": "合并抵消分录借方合计应等于贷方合计",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": 0.01
     },
     {
       "rule_id": "BCAS-VR-20",
@@ -200,7 +219,8 @@
       "formula": "performance_materiality >= materiality_level * 0.5 and performance_materiality <= materiality_level * 0.75",
       "description": "实际执行的重要性通常为重要性水平的50%-75%",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-21",
@@ -210,7 +230,8 @@
       "formula": "clearly_trivial_threshold <= materiality_level * 0.05",
       "description": "明显微小错报阈值通常不超过重要性水平的5%",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-22",
@@ -220,7 +241,8 @@
       "formula": "all_coso_components_evaluated == True",
       "description": "应对COSO五要素全部进行评价（控制环境、风险评估、控制活动、信息与沟通、监督）",
       "severity": "warning",
-      "auto_check": false
+      "auto_check": false,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-23",
@@ -230,7 +252,8 @@
       "formula": "representation_letter_date == audit_report_date",
       "description": "管理层声明书日期应与审计报告日期相同",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "BCAS-VR-24",
@@ -240,7 +263,8 @@
       "formula": "sum(aje_debits) == sum(aje_credits)",
       "description": "每笔调整分录借方合计应等于贷方合计",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": 0.01
     },
     {
       "rule_id": "BCAS-VR-25",
@@ -250,7 +274,8 @@
       "formula": "going_concern_assessment_period >= 12",
       "description": "管理层持续经营评估期间应至少覆盖自报告日起12个月",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     }
   ]
 }

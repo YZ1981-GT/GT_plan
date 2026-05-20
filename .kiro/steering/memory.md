@@ -116,6 +116,7 @@ inclusion: always
 - 前端 services 30 / utils 23 / common 组件 28 / apiPaths.ts 1558 行
 - 底稿模板 473 个 / 精细化规则 347 个 / 模板索引 363 条
 - cross_wp_references 400 条 / prefill_formula_mapping 1035 cells / validation_rules VR-D4-01~04 + VR-H1-01~03 + VR-H8-01 + VR-I1-01 + VR-I3-01 + VR-I6-01 + VR-G7-01 + VR-G11-01 + VR-G1-01 + VR-G14-01 + VR-J1-01~03 + VR-L8-01 + VR-L1-01 + VR-L3-01 + VR-M6-01 + VR-M2-01 + VR-N2-01 + VR-N5-01
+- **VR 规则 schema 历史遗留已修复（2026-05-20）**：bcas 25 条补 tolerance / d_cycle DV-009~021 补 formula / efghijklmn DV-121~136 补 tolerance；全仓 114 条 VR 规则 schema 一致（均含 formula + tolerance 字段）
 - git 分支：master + feature/ledger-import-view-refactor + feature/e2e-business-flow（当前 HEAD）
 
 ## 活跃待办（精简版，详情见 #dev-history）
@@ -196,6 +197,7 @@ inclusion: always
 ### P2 长期
 - PBC 清单 / 函证管理真实实现（后端当前 stub）
 - 全局联动真正闭环（docs/GLOBAL_LINKAGE_ARCHITECTURE_PROPOSAL.md 方案已输出）
+- **底稿模块体验断层（2026-05-20 复盘识别 6 项）**：①B/C sheet 分组 composable（49+36 sheet 平铺无分组，P1 半天）②程序适用性裁剪 UI（项目经理标记"不适用"程序→sheet 灰显+状态 N/A，P1 2 天）③合伙人仪表盘（全循环进度+blocking VR 汇总+未解决复核意见，P2 3 天）④联动全景图 D3.js 力导向（400 CWR 宏观可视化，P2 3 天）⑤角色视图切换（不同角色默认不同排序/过滤/高亮，P2 2 天）⑥LLM 真实接入 6 个 stub 引擎（P3 5+ 天）
 - 暗色模式 / 全局 Ctrl+K 搜索 / vitest 全量基建
 
 ## 关键引用指南

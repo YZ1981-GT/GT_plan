@@ -859,6 +859,8 @@ import { useKAdminCycleSheetGroups } from '@/composables/useKAdminCycleSheetGrou
 import { useLDebtCycleSheetGroups } from '@/composables/useLDebtCycleSheetGroups'
 import { useMEquityCycleSheetGroups } from '@/composables/useMEquityCycleSheetGroups'
 import { useNTaxCycleSheetGroups } from '@/composables/useNTaxCycleSheetGroups'
+import { useBAuditPlanSheetGroups } from '@/composables/useBAuditPlanSheetGroups'
+import { useCControlTestSheetGroups } from '@/composables/useCControlTestSheetGroups'
 import {
   useGInvestmentCycleSheetGroups,
   type GParsedData,
@@ -1031,6 +1033,18 @@ const isNCycle = computed(() => {
   return /^N\d/.test(code)
 })
 
+// B 类底稿（控制了解/审计计划）: B1, B10, B15, B22, B23, B30, B40, B50, B51, B52, B60
+const isBCycle = computed(() => {
+  const code = (wpDetail.value?.wp_code || '').toUpperCase()
+  return /^B\d|^B[1-6]/i.test(code)
+})
+
+// C 类底稿（控制测试）: C1~C26
+const isCCycle = computed(() => {
+  const code = (wpDetail.value?.wp_code || '').toUpperCase()
+  return /^C\d/i.test(code)
+})
+
 // 同时实例化三个 nav，按 isDCycle/isFCycle 选择活跃的对外暴露
 // 三者接口一致（groups / activeSheetId / totalCount / refresh / switchTo），
 // 未激活的一方 sheets/groups 数据虽被算但不显示，不影响功能。
@@ -1070,6 +1084,12 @@ const mCycleNav = useMEquityCycleSheetGroups(univerAPIRef)
 // N 税金循环 task 2.1: N 循环 nav（8 类分组规则）
 const nCycleNav = useNTaxCycleSheetGroups(univerAPIRef)
 
+// B 类底稿（控制了解/审计计划）nav（7 类分组规则）
+const bCycleNav = useBAuditPlanSheetGroups(univerAPIRef)
+
+// C 类底稿（控制测试）nav（5 类分组规则）
+const cCycleNav = useCControlTestSheetGroups(univerAPIRef)
+
 // 统一对外 facade（保持模板原有 sheetNav.groups.value / sheetNav.activeSheetId.value 调用形态）
 const sheetNavGroups = computed<SheetGroup[]>(() => {
   if (isHCycle.value) return hCycleNav.groups.value as unknown as SheetGroup[]
@@ -1079,6 +1099,8 @@ const sheetNavGroups = computed<SheetGroup[]>(() => {
   if (isLCycle.value) return lCycleNav.groups.value as unknown as SheetGroup[]
   if (isMCycle.value) return mCycleNav.groups.value as unknown as SheetGroup[]
   if (isNCycle.value) return nCycleNav.groups.value as unknown as SheetGroup[]
+  if (isBCycle.value) return bCycleNav.groups.value as unknown as SheetGroup[]
+  if (isCCycle.value) return cCycleNav.groups.value as unknown as SheetGroup[]
   if (isFCycle.value) return fCycleNav.groups.value
   if (isDCycle.value) return dCycleNav.groups.value
   return eUniverNav.groups.value
@@ -1091,6 +1113,8 @@ const sheetNavActiveId = computed<string>(() => {
   if (isLCycle.value) return lCycleNav.activeSheetId.value
   if (isMCycle.value) return mCycleNav.activeSheetId.value
   if (isNCycle.value) return nCycleNav.activeSheetId.value
+  if (isBCycle.value) return bCycleNav.activeSheetId.value
+  if (isCCycle.value) return cCycleNav.activeSheetId.value
   if (isFCycle.value) return fCycleNav.activeSheetId.value
   if (isDCycle.value) return dCycleNav.activeSheetId.value
   return eUniverNav.activeSheetId.value
@@ -1103,6 +1127,8 @@ const sheetNavTotalCount = computed<number>(() => {
   if (isLCycle.value) return lCycleNav.totalCount.value
   if (isMCycle.value) return mCycleNav.totalCount.value
   if (isNCycle.value) return nCycleNav.totalCount.value
+  if (isBCycle.value) return bCycleNav.totalCount.value
+  if (isCCycle.value) return cCycleNav.totalCount.value
   if (isFCycle.value) return fCycleNav.totalCount.value
   if (isDCycle.value) return dCycleNav.totalCount.value
   return eUniverNav.totalCount.value
@@ -1115,6 +1141,8 @@ function sheetNavSwitchTo(id: string) {
   else if (isLCycle.value) lCycleNav.switchTo(id)
   else if (isMCycle.value) mCycleNav.switchTo(id)
   else if (isNCycle.value) nCycleNav.switchTo(id)
+  else if (isBCycle.value) bCycleNav.switchTo(id)
+  else if (isCCycle.value) cCycleNav.switchTo(id)
   else if (isFCycle.value) fCycleNav.switchTo(id)
   else if (isDCycle.value) dCycleNav.switchTo(id)
   else eUniverNav.switchTo(id)
@@ -1127,6 +1155,8 @@ function sheetNavRefresh() {
   else if (isLCycle.value) lCycleNav.refresh()
   else if (isMCycle.value) mCycleNav.refresh()
   else if (isNCycle.value) nCycleNav.refresh()
+  else if (isBCycle.value) bCycleNav.refresh()
+  else if (isCCycle.value) cCycleNav.refresh()
   else if (isFCycle.value) fCycleNav.refresh()
   else if (isDCycle.value) dCycleNav.refresh()
   else eUniverNav.refresh()

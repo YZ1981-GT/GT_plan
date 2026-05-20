@@ -510,7 +510,8 @@
       "formula": "abs(bank_statement_balance - (book_balance + outstanding_deposits - outstanding_checks)) == 0",
       "description": "银行余额调节表调节后差异必须为零",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": 0.01
     },
     {
       "rule_id": "DV-122",
@@ -520,7 +521,8 @@
       "formula": "if restricted_cash > 0 then disclosure_exists == true",
       "description": "存在受限货币资金时必须在附注中披露",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "DV-123",
@@ -530,7 +532,8 @@
       "formula": "abs(count_quantity - book_quantity) / book_quantity < materiality * 0.05",
       "description": "存货监盘差异不得超过重要性水平的5%",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "DV-124",
@@ -540,7 +543,8 @@
       "formula": "if aging_days > 365 then provision_amount > 0",
       "description": "库龄超过1年的存货必须计提跌价准备",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "DV-125",
@@ -550,7 +554,8 @@
       "formula": "if holding_ratio >= 0.2 then method == 'equity_method'",
       "description": "持股比例≥20%应采用权益法核算",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "DV-126",
@@ -560,7 +565,8 @@
       "formula": "abs(investment_income - investee_net_profit * holding_ratio) / abs(investee_net_profit * holding_ratio) < 0.01",
       "description": "投资收益应等于被投资方净利润乘以持股比例",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": 0.01
     },
     {
       "rule_id": "DV-127",
@@ -570,7 +576,8 @@
       "formula": "abs(recalc_depreciation - book_depreciation) / abs(book_depreciation) < 0.01",
       "description": "折旧重新计算差异不得超过1%",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": 0.01
     },
     {
       "rule_id": "DV-128",
@@ -580,7 +587,8 @@
       "formula": "disposal_gain_loss == disposal_proceeds - book_value - disposal_tax",
       "description": "处置损益应等于处置收入减去账面价值减去相关税费",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": 0.01
     },
     {
       "rule_id": "DV-129",
@@ -590,7 +598,8 @@
       "formula": "abs(recalc_amortization - book_amortization) / abs(book_amortization) < 0.01",
       "description": "无形资产摊销重新计算差异不得超过1%",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": 0.01
     },
     {
       "rule_id": "DV-130",
@@ -600,7 +609,8 @@
       "formula": "pension + medical + unemployment + injury + maternity + housing_fund > 0",
       "description": "五险一金各项计提必须完整，不得遗漏",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "DV-131",
@@ -610,7 +620,8 @@
       "formula": "actual_salary <= contract_salary",
       "description": "实际发放薪酬不得超过劳动合同约定金额",
       "severity": "warning",
-      "auto_check": false
+      "auto_check": false,
+      "tolerance": null
     },
     {
       "rule_id": "DV-132",
@@ -620,7 +631,8 @@
       "formula": "actual_expense <= budget_amount * 1.2",
       "description": "管理费用实际发生额不得超过预算的120%",
       "severity": "warning",
-      "auto_check": false
+      "auto_check": false,
+      "tolerance": null
     },
     {
       "rule_id": "DV-133",
@@ -630,7 +642,8 @@
       "formula": "abs(recalc_interest - book_interest) / abs(book_interest) < 0.01 where recalc_interest = principal * rate * days / 365",
       "description": "利息费用重算应等于本金×利率×天数÷365，差异不超过1%",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": 0.01
     },
     {
       "rule_id": "DV-134",
@@ -640,7 +653,8 @@
       "formula": "if maturity_days <= 365 then classified_as_current == true",
       "description": "一年内到期的长期借款必须重分类为流动负债",
       "severity": "blocking",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     },
     {
       "rule_id": "DV-135",
@@ -650,7 +664,8 @@
       "formula": "paid_in_capital == capital_verification_amount",
       "description": "实收资本金额应与验资报告确认金额一致",
       "severity": "blocking",
-      "auto_check": false
+      "auto_check": false,
+      "tolerance": null
     },
     {
       "rule_id": "DV-136",
@@ -660,7 +675,8 @@
       "formula": "applied_tax_rate == registered_tax_rate",
       "description": "适用税率应与税务登记的税率一致",
       "severity": "warning",
-      "auto_check": true
+      "auto_check": true,
+      "tolerance": null
     }
   ]
 }

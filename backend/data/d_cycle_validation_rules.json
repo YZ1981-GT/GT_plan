@@ -251,7 +251,8 @@
           "row": "total"
         }
       },
-      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}",
+      "formula": "wp_amount == tb_amount"
     },
     {
       "rule_id": "DV-010",
@@ -270,7 +271,8 @@
           "row": "total"
         }
       },
-      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}",
+      "formula": "wp_amount == tb_amount"
     },
     {
       "rule_id": "DV-011",
@@ -289,7 +291,8 @@
           "row": "total"
         }
       },
-      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}",
+      "formula": "wp_amount == tb_amount"
     },
     {
       "rule_id": "DV-012",
@@ -308,7 +311,8 @@
           "row": "total"
         }
       },
-      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}",
+      "formula": "wp_amount == tb_amount"
     },
     {
       "rule_id": "DV-013",
@@ -328,7 +332,8 @@
           "row": "total"
         }
       },
-      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}",
+      "formula": "wp_amount == tb_amount"
     },
     {
       "rule_id": "DV-014",
@@ -347,7 +352,8 @@
           "row": "total"
         }
       },
-      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}",
+      "formula": "wp_amount == tb_amount"
     },
     {
       "rule_id": "DV-015",
@@ -366,7 +372,8 @@
           "row": "total"
         }
       },
-      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}",
+      "formula": "wp_amount == tb_amount"
     },
     {
       "rule_id": "DV-016",
@@ -385,7 +392,8 @@
           "row": "total"
         }
       },
-      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}"
+      "message_template": "与试算表不一致: 底稿审定数({wp_amount}) ≠ TB审定数({tb_amount}), 差异={diff}",
+      "formula": "wp_amount == tb_amount"
     },
     {
       "rule_id": "DV-017",
@@ -404,7 +412,8 @@
       },
       "message_template": "与附注不一致: 底稿审定数({wp_amount}) ≠ 附注合计({note_amount}), 差异={diff}",
       "skip_if_missing": true,
-      "skip_message": "附注章节未生成，跳过一致性校验"
+      "skip_message": "附注章节未生成，跳过一致性校验",
+      "formula": "wp_amount == note_amount"
     },
     {
       "rule_id": "DV-018",
@@ -423,7 +432,8 @@
       },
       "message_template": "与附注不一致: 底稿审定数({wp_amount}) ≠ 附注合计({note_amount}), 差异={diff}",
       "skip_if_missing": true,
-      "skip_message": "附注章节未生成，跳过一致性校验"
+      "skip_message": "附注章节未生成，跳过一致性校验",
+      "formula": "wp_amount == note_amount"
     },
     {
       "rule_id": "DV-019",
@@ -442,7 +452,8 @@
       },
       "message_template": "与附注不一致: 底稿审定数({wp_amount}) ≠ 附注合计({note_amount}), 差异={diff}",
       "skip_if_missing": true,
-      "skip_message": "附注章节未生成，跳过一致性校验"
+      "skip_message": "附注章节未生成，跳过一致性校验",
+      "formula": "wp_amount == note_amount"
     },
     {
       "rule_id": "DV-020",
@@ -459,7 +470,8 @@
           "row": "total"
         }
       },
-      "message_template": "明细表合计({detail_sum}) ≠ 审定数({audited}), 差异={diff}"
+      "message_template": "明细表合计({detail_sum}) ≠ 审定数({audited}), 差异={diff}",
+      "formula": "detail_sum == audited"
     },
     {
       "rule_id": "DV-021",
@@ -476,7 +488,8 @@
           "row": "total"
         }
       },
-      "message_template": "明细表合计({detail_sum}) ≠ 审定数({audited}), 差异={diff}"
+      "message_template": "明细表合计({detail_sum}) ≠ 审定数({audited}), 差异={diff}",
+      "formula": "detail_sum == audited"
     },
     {
       "rule_id": "VR-D4-01",
@@ -488,9 +501,21 @@
       "severity": "blocking",
       "scope": "total",
       "sources": {
-        "revenue_total": {"wp": "D4", "sheet": "营业收入审定表D4-1", "cell": "审定数"},
-        "main_revenue": {"wp": "D4", "sheet": "营业收入审定表D4-1", "cell": "主营业务收入审定数"},
-        "other_revenue": {"wp": "D4", "sheet": "营业收入审定表D4-1", "cell": "其他业务收入审定数"}
+        "revenue_total": {
+          "wp": "D4",
+          "sheet": "营业收入审定表D4-1",
+          "cell": "审定数"
+        },
+        "main_revenue": {
+          "wp": "D4",
+          "sheet": "营业收入审定表D4-1",
+          "cell": "主营业务收入审定数"
+        },
+        "other_revenue": {
+          "wp": "D4",
+          "sheet": "营业收入审定表D4-1",
+          "cell": "其他业务收入审定数"
+        }
       },
       "message_template": "营业收入合计 ≠ 主营+其他，差异超过 1 元: 合计({revenue_total}) ≠ 主营({main_revenue}) + 其他({other_revenue}), 差异={diff}"
     },
@@ -504,8 +529,16 @@
       "severity": "warning",
       "scope": "total",
       "sources": {
-        "ar_growth_rate": {"wp": "D2", "sheet": "审定表D2-1", "cell": "变动率"},
-        "revenue_growth_rate": {"wp": "D4", "sheet": "营业收入审定表D4-1", "cell": "变动率"}
+        "ar_growth_rate": {
+          "wp": "D2",
+          "sheet": "审定表D2-1",
+          "cell": "变动率"
+        },
+        "revenue_growth_rate": {
+          "wp": "D4",
+          "sheet": "营业收入审定表D4-1",
+          "cell": "变动率"
+        }
       },
       "message_template": "应收账款增长率与收入增长率差异超过 50%，可能存在收入虚增风险: AR增长率({ar_growth_rate}) vs 收入增长率({revenue_growth_rate}), 差异={diff}"
     },
@@ -519,8 +552,16 @@
       "severity": "warning",
       "scope": "total",
       "sources": {
-        "current_gross_margin": {"wp": "D4", "sheet": "营业收入审定表D4-1", "cell": "本期毛利率"},
-        "prior_gross_margin": {"wp": "D4", "sheet": "营业收入审定表D4-1", "cell": "上期毛利率"}
+        "current_gross_margin": {
+          "wp": "D4",
+          "sheet": "营业收入审定表D4-1",
+          "cell": "本期毛利率"
+        },
+        "prior_gross_margin": {
+          "wp": "D4",
+          "sheet": "营业收入审定表D4-1",
+          "cell": "上期毛利率"
+        }
       },
       "message_template": "毛利率波动超过 5%，需关注成本配比异常: 本期({current_gross_margin}) vs 上期({prior_gross_margin}), 差异={diff}"
     },
@@ -534,8 +575,16 @@
       "severity": "blocking",
       "scope": "total",
       "sources": {
-        "d4_contract_liability": {"wp": "D4", "sheet": "营业收入审定表D4-1", "cell": "合同负债期末"},
-        "d7_audited": {"wp": "D7", "sheet": "合同负债审定表D7-1", "cell": "审定数"}
+        "d4_contract_liability": {
+          "wp": "D4",
+          "sheet": "营业收入审定表D4-1",
+          "cell": "合同负债期末"
+        },
+        "d7_audited": {
+          "wp": "D7",
+          "sheet": "合同负债审定表D7-1",
+          "cell": "审定数"
+        }
       },
       "message_template": "D4 合同负债期末 ≠ D7-1 审定数，差异超过 1 元: D4({d4_contract_liability}) vs D7({d7_audited}), 差异={diff}"
     }
