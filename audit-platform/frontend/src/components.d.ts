@@ -353,6 +353,7 @@ declare module 'vue' {
     ValidationList: typeof import('./components/common/ValidationList.vue')['default']
     VersionHistoryDialog: typeof import('./components/template-library/VersionHistoryDialog.vue')['default']
     VersionLineTimeline: typeof import('./components/version/VersionLineTimeline.vue')['default']
+    ViewSwitcher: typeof import('./components/workpaper/ViewSwitcher.vue')['default']
     VirtualScrollTable: typeof import('./components/common/VirtualScrollTable.vue')['default']
     WorkflowDashboard: typeof import('./components/WorkflowDashboard.vue')['default']
     WorkflowProgress: typeof import('./components/common/WorkflowProgress.vue')['default']

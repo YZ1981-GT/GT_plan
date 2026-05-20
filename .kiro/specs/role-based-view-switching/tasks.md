@@ -8,8 +8,8 @@
 
 ## Tasks
 
-- [ ] 1. Sprint 1 — composable + ViewSwitcher 组件 + 4 视图预设
-  - [ ] 1.1 创建 viewPresetConfig.ts 配置文件
+- [x] 1. Sprint 1 — composable + ViewSwitcher 组件 + 4 视图预设
+  - [x] 1.1 创建 viewPresetConfig.ts 配置文件
     - 创建 `frontend/src/composables/viewPresetConfig.ts`
     - 定义 `ViewPresetId` / `ViewPresetConfig` / `HighlightRule` / `BadgeRule` / `HighlightContext` 类型
     - 定义 `ROLE_DEFAULT_MAP`（角色→默认视图映射）
@@ -19,7 +19,7 @@
     - 实现 `partnerSummary` / `qcSummary` 汇总函数
     - _Requirements: 3.1, 4.5, 5.1, 6.1_
 
-  - [ ] 1.2 创建 useRoleViewPreset composable
+  - [x] 1.2 创建 useRoleViewPreset composable
     - 创建 `frontend/src/composables/useRoleViewPreset.ts`
     - 接收参数：`projectId` / `userId` / `wpList` / `searchKeyword` / `manualFilters`
     - 实现 localStorage 读写：key 格式 `gt_wp_view_preset_{userId}`
@@ -33,7 +33,7 @@
     - 实现 `summaryData` computed：调用 summaryFn
     - _Requirements: 1.2, 1.3, 2.1, 2.2, 2.3, 2.4, 7.2, 7.4_
 
-  - [ ] 1.3 创建 HighlightContext 数据注入
+  - [x] 1.3 创建 HighlightContext 数据注入
     - 在 `useRoleViewPreset` 中构建 `HighlightContext` 对象
     - `prerequisiteStatus`：从已有 `usePrerequisiteStatus` 批量查询结果构建 Map
     - `consistencyGate`：从已有 consistency_gate 缓存数据构建 Map
@@ -41,7 +41,7 @@
     - 数据未就绪时返回空 Map（高亮规则安全跳过）
     - _Requirements: 3.2, 3.4, 5.1, 5.2, 5.4, 6.4_
 
-  - [ ] 1.4 实现助理视图预设配置
+  - [x] 1.4 实现助理视图预设配置
     - 在 `VIEW_PRESET_CONFIG.assistant` 中配置：
     - sortFn: statusPrioritySort（pending→in_progress→completed→reviewed）
     - highlightRules[0]: prerequisite blocked → 橙色左边框 3px + tooltip 显示缺失编码
@@ -49,7 +49,7 @@
     - 无 filterFn / 无 groupBy / 无 badgeRules
     - _Requirements: 3.1, 3.2, 3.3, 3.5_
 
-  - [ ] 1.5 实现经理视图预设配置
+  - [x] 1.5 实现经理视图预设配置
     - 在 `VIEW_PRESET_CONFIG.manager` 中配置：
     - sortFn: wpCodeNaturalSort（分组内排序）
     - groupBy: `(item) => item.audit_cycle`
@@ -58,7 +58,7 @@
     - 无 highlightRules / 无 badgeRules
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-  - [ ] 1.6 实现合伙人视图预设配置
+  - [x] 1.6 实现合伙人视图预设配置
     - 在 `VIEW_PRESET_CONFIG.partner` 中配置：
     - sortFn: riskLevelSort（高→中→低，基于 consistency_gate blocking/warning 状态）
     - highlightRules[0]: blocking VR 未通过 → 红色背景 rgba(255,0,0,0.08) + 红色左边框 3px
@@ -66,7 +66,7 @@
     - summaryFn: partnerSummary（blocking 未通过总数 + 未解决复核意见总数）
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-  - [ ] 1.7 实现质控视图预设配置
+  - [x] 1.7 实现质控视图预设配置
     - 在 `VIEW_PRESET_CONFIG.qc` 中配置：
     - sortFn: riskLevelSort
     - filterFn: isKeyJudgmentPoint（B15/A15/B50-4/各循环审定表 `^[A-Z]\d+-1$`）
@@ -75,7 +75,7 @@
     - 空结果时返回空状态标记
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-  - [ ] 1.8 创建 ViewSwitcher.vue 组件
+  - [x] 1.8 创建 ViewSwitcher.vue 组件
     - 创建 `frontend/src/components/workpaper/ViewSwitcher.vue`
     - el-select 下拉，4 个选项带图标前缀（👤/📊/🔍/✅）
     - Props: `modelValue: ViewPresetId` / `disabled: boolean`
@@ -83,8 +83,8 @@
     - 样式：与筛选栏其他 el-select 对齐（size=default, width=160px）
     - _Requirements: 1.1, 1.4_
 
-- [ ] 2. Sprint 2 — 集成 WorkpaperList + 测试 + 回归
-  - [ ] 2.1 集成 ViewSwitcher 到 WorkpaperList.vue
+- [x] 2. Sprint 2 — 集成 WorkpaperList + 测试 + 回归
+  - [x] 2.1 集成 ViewSwitcher 到 WorkpaperList.vue
     - 在筛选栏 `.gt-wp-filter-bar` 最左侧插入 ViewSwitcher 组件
     - 仅 `viewMode === 'list'` 时显示（v-if）
     - 绑定 `useRoleViewPreset` 的 activePreset
@@ -92,14 +92,14 @@
     - viewMode 切换到其他模式再切回时恢复之前的 activePreset
     - _Requirements: 1.3, 1.5, 8.1, 8.5_
 
-  - [ ] 2.2 集成排序/过滤到 WorkpaperList 列表渲染
+  - [x] 2.2 集成排序/过滤到 WorkpaperList 列表渲染
     - 将现有 el-table :data 绑定替换为 `processedList`（已排序+已过滤）
     - 经理视图：替换为分组折叠渲染（v-for groupedList + el-collapse）
     - 质控视图：使用 filterFn 过滤后的子集 + 空状态提示
     - 确保与现有 manualFilters（循环/状态/编制人）叠加生效
     - _Requirements: 3.1, 4.1, 5.1, 6.1, 7.4_
 
-  - [ ] 2.3 集成高亮/badge 到列表行渲染
+  - [x] 2.3 集成高亮/badge 到列表行渲染
     - el-table :row-style 绑定 highlightMap（行级样式）
     - 助理视图：橙色左边框 + ⚠️ 图标（hover tooltip 显示缺失前置编码）
     - 合伙人视图：红色背景 + 复核意见数 el-badge
@@ -107,13 +107,13 @@
     - 经理视图：分组头进度条 + 裁剪标签
     - _Requirements: 3.2, 3.3, 3.5, 4.2, 4.3, 5.2, 5.3, 5.4, 6.2, 6.4_
 
-  - [ ] 2.4 集成汇总统计面板
+  - [x] 2.4 集成汇总统计面板
     - 合伙人视图：列表顶部显示 blocking 未通过总数 + 未解决复核意见总数
     - 质控视图：列表顶部显示抽查路径建议（编码序列）
     - 仅对应视图激活时显示（v-if activePreset === 'partner'/'qc'）
     - _Requirements: 5.5, 6.3_
 
-  - [ ] 2.5 编写 useRoleViewPreset 单元测试
+  - [x] 2.5 编写 useRoleViewPreset 单元测试
     - 创建 `frontend/src/composables/__tests__/useRoleViewPreset.spec.ts`
     - 测试角色默认映射：assistant→assistant / manager→manager / partner→partner / qc→qc / admin→partner
     - 测试 localStorage 读写：写入后读取一致 / 无效值回退 / 空值回退
@@ -124,7 +124,7 @@
     - 测试搜索关键词保留：切换视图后 searchKeyword 不变
     - _Requirements: 1.2, 2.1-2.4, 3.1, 5.1, 6.1, 7.2_
 
-  - [ ] 2.6 编写 ViewSwitcher 组件测试
+  - [x] 2.6 编写 ViewSwitcher 组件测试
     - 创建 `frontend/src/components/workpaper/__tests__/ViewSwitcher.spec.ts`
     - 测试渲染 4 个选项（助理/经理/合伙人/质控）
     - 测试选择事件 emit update:modelValue
@@ -158,14 +158,14 @@
     - ≥ 100 iterations
     - **Validates: Requirements 3.1, 4.5, 5.1**
 
-- [ ] 3. Checkpoint — 全部测试通过 + 回归验证
-  - [ ] 3.1 运行现有 WorkpaperList 相关测试确认零回归
+- [x] 3. Checkpoint — 全部测试通过 + 回归验证
+  - [x] 3.1 运行现有 WorkpaperList 相关测试确认零回归
     - 运行 `vitest --run` 确认现有 workpaper 相关测试全绿
     - 确认 viewMode 切换（kanban/workbench/lifecycle/graph/matrix）不受影响
     - 确认搜索/批量下载/批量委派功能正常
     - _Requirements: 8.2, 8.3, 8.4_
 
-  - [ ] 3.2 vue-tsc 类型检查通过
+  - [x] 3.2 vue-tsc 类型检查通过
     - 运行 `vue-tsc --noEmit` 确认零新增类型错误
     - 确认 ViewPresetConfig 类型定义与实际使用一致
 

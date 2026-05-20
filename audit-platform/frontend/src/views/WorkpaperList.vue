@@ -31,6 +31,12 @@
 
     <!-- 筛选栏（独立行，内容多不塞进 GtToolbar） -->
     <div v-if="treeData.length > 0" class="gt-wp-filter-bar">
+      <!-- Task 2.1: 角色视图切换（仅列表模式） -->
+      <ViewSwitcher
+        v-if="viewMode === 'list'"
+        v-model="roleViewPreset"
+        :disabled="loading"
+      />
       <el-input
         v-model="searchKeyword"
         placeholder="搜索底稿..."
@@ -49,6 +55,14 @@
         <el-option label="全部" value="" />
         <el-option v-for="u in userOptions" :key="u.id" :label="u.full_name || u.username" :value="u.id" />
       </el-select>
+    </div>
+
+    <!-- Task 2.4: 角色视图汇总统计面板 -->
+    <div v-if="viewMode === 'list' && roleViewSummary" class="gt-wp-role-summary-panel">
+      <span class="gt-wp-role-summary-label">{{ roleViewSummary.label }}：</span>
+      <span v-for="item in roleViewSummary.items" :key="item.key" class="gt-wp-role-summary-item">
+        {{ item.key }} <strong>{{ item.value }}</strong>
+      </span>
     </div>
 
     <!-- 进度指示器（任务 7.2） -->
@@ -215,8 +229,27 @@
           ref="treeRef"
         >
           <template #default="{ data }">
-            <div class="gt-wp-tree-node">
+            <div class="gt-wp-tree-node" :style="getTreeNodeHighlightStyle(data)">
               <span class="gt-wp-tree-node-label">{{ data.label }}</span>
+              <!-- Task 2.3: 助理视图前置依赖警告图标 -->
+              <el-tooltip
+                v-if="getTreeNodeHighlight(data)?.tooltip"
+                :content="getTreeNodeHighlight(data)?.tooltip"
+                placement="top"
+              >
+                <span class="gt-wp-tree-node-warn">⚠️</span>
+              </el-tooltip>
+              <!-- Task 2.3: 合伙人视图复核意见 badge -->
+              <el-badge
+                v-if="getTreeNodeBadge(data)?.visible"
+                :value="getTreeNodeBadge(data)?.value"
+                :type="getTreeNodeBadge(data)?.type"
+                class="gt-wp-tree-node-badge"
+              />
+              <!-- Task 2.3: 质控视图复核标记 -->
+              <span v-if="roleViewPreset === 'qc' && data.wpId" class="gt-wp-tree-node-review-mark">
+                {{ getQcReviewMark(data) }}
+              </span>
               <GtStatusTag v-if="data.status" dict-key="wp_status" :value="data.status" class="gt-wp-tree-node-tag" />
               <!-- Sprint 4：StaleIndicator 统一组件 -->
               <StaleIndicator
@@ -646,6 +679,11 @@ import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
+import ViewSwitcher from '@/components/workpaper/ViewSwitcher.vue'
+import { useRoleViewPreset } from '@/composables/useRoleViewPreset'
+import type { ViewPresetId } from '@/composables/viewPresetConfig'
+import { usePermission } from '@/composables/usePermission'
+import { useAuthStore } from '@/stores/auth'
 import { useDictStore } from '@/stores/dict'
 import {
   listWorkpaperAnnotations, createAnnotation, updateAnnotation,
@@ -680,6 +718,10 @@ const { workpapers: wpStaleSummary } = useStaleSummaryFull(projectId, currentYea
 // stale wp_id Set，用于 tree 节点判定
 const staleWpIdSet = computed(() => new Set(wpStaleSummary.value.items.map((it: any) => it.id)))
 const projectName = ref('')
+
+// ─── Task 2.1-2.4: 角色视图切换集成 ─────────────────────────────────────────
+// 保存 viewMode 切换前的 activePreset，切回 list 时恢复
+const _savedRolePreset = ref<ViewPresetId | null>(null)
 
 // Foundation Task 2.9: 循环级复核状态徽章
 interface CycleReviewStat {
@@ -734,6 +776,105 @@ const searchKeyword = ref('')
 const viewMode = ref('list')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
+// Filters (declared early for composable dependency)
+const filterCycle = ref('')
+const filterStatus = ref('')
+const filterAssignee = ref('')
+
+// Core data (declared early for composable dependency)
+const wpList = ref<WorkpaperDetail[]>([])
+const wpIndex = ref<WpIndexItem[]>([])
+
+// ─── Task 2.1-2.4: useRoleViewPreset 集成 ───────────────────────────────────
+const { role: currentRole } = usePermission()
+const authStore = useAuthStore()
+const currentUserId = computed(() => authStore.userId || 'anonymous')
+
+// 将 wpList 转换为 WpItem 格式供 composable 使用
+const roleViewWpList = computed(() =>
+  wpList.value.map((w: WorkpaperDetail) => {
+    const idx = wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    return {
+      id: w.id,
+      wp_code: w.wp_code || idx?.wp_code || '',
+      wp_name: w.wp_name || idx?.wp_name || '',
+      status: w.status || 'pending',
+      audit_cycle: w.audit_cycle || idx?.audit_cycle || '',
+      review_status: w.review_status || 'pending',
+      preparer: w.assigned_to || '',
+      _openReviewCount: (w as any)._openReviewCount ?? 0,
+      _riskLevel: (w as any)._riskLevel ?? 2,
+      is_trimmed: (w as any).is_trimmed ?? false,
+    }
+  })
+)
+
+const roleViewManualFilters = computed(() => ({
+  audit_cycle: filterCycle.value || undefined,
+  status: filterStatus.value || undefined,
+  preparer: filterAssignee.value || undefined,
+}))
+
+const {
+  activePreset: _roleActivePreset,
+  processedList: roleProcessedList,
+  highlightMap: roleHighlightMap,
+  badgeMap: roleBadgeMap,
+  groupedList: roleGroupedList,
+  summaryData: roleViewSummary,
+  switchPreset: roleSwitchPreset,
+} = useRoleViewPreset(
+  projectId as any,
+  currentUserId as any,
+  roleViewWpList as any,
+  searchKeyword,
+  roleViewManualFilters as any,
+  { role: currentRole },
+)
+
+/** 双向绑定 roleViewPreset（ViewSwitcher v-model） */
+const roleViewPreset = computed({
+  get: () => _roleActivePreset.value,
+  set: (val: ViewPresetId) => roleSwitchPreset(val),
+})
+
+/** Task 2.3: 获取树节点高亮样式 */
+function getTreeNodeHighlightStyle(data: any): Record<string, string> {
+  if (viewMode.value !== 'list' || !data.wpId) return {}
+  const highlight = roleHighlightMap.value.get(data.id || data.wpId)
+  return highlight?.style ?? {}
+}
+
+/** Task 2.3: 获取树节点高亮信息（含 tooltip） */
+function getTreeNodeHighlight(data: any): { style: Record<string, string>; tooltip?: string } | undefined {
+  if (viewMode.value !== 'list' || !data.wpId) return undefined
+  return roleHighlightMap.value.get(data.id || data.wpId)
+}
+
+/** Task 2.3: 获取树节点 badge 数据 */
+function getTreeNodeBadge(data: any): { value: number; type: string; visible: boolean } | undefined {
+  if (viewMode.value !== 'list' || !data.wpId) return undefined
+  return roleBadgeMap.value.get(data.id || data.wpId)
+}
+
+/** Task 2.3: 质控视图复核标记 */
+function getQcReviewMark(data: any): string {
+  if (!data.wpId) return ''
+  const wp = wpList.value.find((w: WorkpaperDetail) => w.id === data.id || w.id === data.wpId)
+  if (!wp) return ''
+  return wp.review_status === 'reviewed' || wp.review_status === 'level1_passed' || wp.review_status === 'level2_passed' ? '✓' : '○'
+}
+
+// Task 2.1: viewMode 切换时保存/恢复 activePreset
+watch(viewMode, (newMode, oldMode) => {
+  if (oldMode === 'list' && newMode !== 'list') {
+    _savedRolePreset.value = _roleActivePreset.value
+  }
+  if (newMode === 'list' && oldMode !== 'list' && _savedRolePreset.value) {
+    roleSwitchPreset(_savedRolePreset.value)
+  }
+})
+
 function onSearchDebounce() {
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
@@ -742,8 +883,7 @@ function onSearchDebounce() {
 }
 const uploadLoading = ref(false)
 const parseLoading = ref(false)
-const wpList = ref<WorkpaperDetail[]>([])
-const wpIndex = ref<WpIndexItem[]>([])
+// wpList and wpIndex declared earlier (for composable dependency)
 const selectedWp = ref<WorkpaperDetail | null>(null)
 const selectedWpIds = ref<string[]>([])
 const qcResult = ref<QCResult | null>(null)
@@ -970,10 +1110,10 @@ const isReviewable = computed(() => {
     || rs === 'pending_level2' || rs === 'level2_in_progress'
 })
 
-// Filters
-const filterCycle = ref('')
-const filterStatus = ref('')
-const filterAssignee = ref('')
+// Filters (moved up for composable dependency)
+// const filterCycle = ref('')  -- already declared above
+// const filterStatus = ref('')
+// const filterAssignee = ref('')
 
 const cycleOptions = [
   { value: 'B', label: 'B类 计划阶段' },
@@ -2008,4 +2148,22 @@ onMounted(async () => {
   border-radius: var(--gt-radius-md); padding: 12px; box-shadow: var(--gt-shadow-sm);
 }
 .gt-text-tertiary { color: var(--gt-color-text-tertiary, #999); }
+
+/* Task 2.3-2.4: 角色视图集成样式 */
+.gt-wp-role-summary-panel {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 8px 12px; margin-bottom: var(--gt-space-3);
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  box-shadow: var(--gt-shadow-sm); font-size: var(--gt-font-size-sm);
+  border-left: 3px solid var(--gt-color-primary);
+}
+.gt-wp-role-summary-label { color: var(--gt-color-text-secondary); font-weight: 600; }
+.gt-wp-role-summary-item { color: var(--gt-color-text-primary); }
+.gt-wp-role-summary-item strong { color: var(--gt-color-primary); margin-left: 4px; }
+.gt-wp-tree-node-warn { font-size: 14px; flex-shrink: 0; cursor: help; }
+.gt-wp-tree-node-badge { flex-shrink: 0; margin-left: 4px; }
+.gt-wp-tree-node-review-mark {
+  flex-shrink: 0; font-size: var(--gt-font-size-xs); font-weight: 600;
+  color: var(--gt-color-success); margin-left: 4px;
+}
 </style>
