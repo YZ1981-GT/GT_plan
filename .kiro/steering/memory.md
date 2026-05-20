@@ -197,7 +197,7 @@ inclusion: always
 ### P2 长期
 - PBC 清单 / 函证管理真实实现（后端当前 stub）
 - 全局联动真正闭环（docs/GLOBAL_LINKAGE_ARCHITECTURE_PROPOSAL.md 方案已输出）
-- **底稿模块体验断层（2026-05-20 复盘识别 6 项）**：①B/C sheet 分组 composable ✅ 已完成 ②程序适用性裁剪 UI spec 三件套 ✅ 已生成（`.kiro/specs/procedure-applicability-trimming/`，26 tasks / 2 天）③合伙人仪表盘 spec 三件套 ✅ 已生成（`.kiro/specs/partner-dashboard/`，20 tasks / 3 天）④联动全景图 D3.js 力导向 spec 三件套 ✅ 已生成（`.kiro/specs/linkage-panorama-graph/`，18 tasks / 3 天，D3.js 为新增依赖）⑤角色视图切换 spec 三件套 ✅ 已生成（`.kiro/specs/role-based-view-switching/`，15 tasks / 2 天，纯前端无新后端端点）⑥LLM 真实接入 6 个 stub 引擎（P3 5+ 天，待 wp_ai_service）；4 个 spec 合计 79 tasks / ~10 天，待执行
+- **底稿模块体验断层（2026-05-20 复盘识别 6 项）**：①B/C sheet 分组 composable ✅ 已完成 ②程序适用性裁剪 UI spec 三件套 ✅ 已生成（`.kiro/specs/procedure-applicability-trimming/`，26 tasks / 2 天，待执行）③合伙人仪表盘 spec 三件套 ✅ 已生成（`.kiro/specs/partner-dashboard/`，20 tasks / 3 天，待执行）④联动全景图 D3.js 力导向 spec 三件套 ✅ 已生成（`.kiro/specs/linkage-panorama-graph/`，18 tasks / 3 天，D3.js 为新增依赖，待执行）⑤角色视图切换 ✅ 已完成（12/15 tasks，62 vitest，viewPresetConfig + useRoleViewPreset + ViewSwitcher + WorkpaperList 集成）⑥LLM 真实接入 6 个 stub 引擎（P3 5+ 天，待 wp_ai_service）；剩余 3 个 spec 合计 64 tasks / ~8 天待执行
 - 暗色模式 / 全局 Ctrl+K 搜索 / vitest 全量基建
 
 ## 关键引用指南

@@ -684,3 +684,8 @@ def register_all_routers(app: FastAPI) -> None:
     # ═══ 84. N 税金循环：N-F7 所得税费用测算引擎 ═══
     from app.routers.wp_n_income_tax_calc import router as wp_n_income_tax_calc_router
     app.include_router(wp_n_income_tax_calc_router, tags=["wp-n-income-tax"])
+
+    # ═══ 85. 程序适用性裁剪（procedure-applicability-trimming） ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/workpapers/{wp_id}"，注册时不加额外前缀。
+    from app.routers.wp_procedure_trim import router as wp_procedure_trim_router
+    app.include_router(wp_procedure_trim_router, tags=["workpaper-procedure-trim"])

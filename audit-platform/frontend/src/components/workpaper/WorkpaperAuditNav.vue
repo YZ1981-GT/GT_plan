@@ -103,6 +103,20 @@
         </div>
       </section>
 
+      <!-- 2.4e 程序适用性裁剪 tab -->
+      <section class="gt-audit-nav-section">
+        <h4 class="gt-audit-nav-section-title" style="cursor: pointer" @click="showTrimmingPanel = !showTrimmingPanel">
+          ✂️ 程序适用性
+          <el-button text size="small">{{ showTrimmingPanel ? '收起 ▲' : '展开 ▼' }}</el-button>
+        </h4>
+        <ProcedureTrimmingPanel
+          v-if="showTrimmingPanel"
+          :project-id="props.projectId"
+          :wp-id="props.wpId"
+          :sheet-key="resolvedSheetKey"
+        />
+      </section>
+
       <!-- 2.4d 关键风险提示 + 底稿间关系图 -->
       <section class="gt-audit-nav-section">
         <h4 class="gt-audit-nav-section-title">
@@ -174,6 +188,7 @@ import { useProcedureStatus } from '@/composables/useProcedureStatus'
 import { usePrerequisiteStatus } from '@/composables/usePrerequisiteStatus'
 import { resolveProcedureSheetKey } from '@/utils/resolveProcedureSheetKey'
 import { api } from '@/services/apiProxy'
+import ProcedureTrimmingPanel from './ProcedureTrimmingPanel.vue'
 
 interface Props {
   projectId: string
@@ -192,13 +207,18 @@ function toggleCollapsed() {
   collapsed.value = !collapsed.value
 }
 
+// 程序适用性裁剪面板显隐
+const showTrimmingPanel = ref(false)
+
 // F-F13 Task 3.7: 按 wp_code 路由程序状态数据源（E1→e1a / D2→d2a / D4→d4a / F2→f2a 等）
 // H-F13 Task 3.6: 加 H 循环路由 H1→h1a / H2→h2a / H3→h3a / H8→h8a / H9→h9a
+
+const resolvedSheetKey = resolveProcedureSheetKey(props.wpCode)
 
 const procedureStatus = useProcedureStatus(
   props.projectId,
   props.wpId,
-  resolveProcedureSheetKey(props.wpCode),
+  resolvedSheetKey,
 )
 const prerequisiteStatus = usePrerequisiteStatus(props.projectId, props.wpCode)
 

@@ -6,8 +6,8 @@
 
 ## Tasks
 
-- [ ] 1. Sprint 1 — 后端核心实现
-  - [ ] 1.1 创建 ProcedureTrimEngine 服务
+- [x] 1. Sprint 1 — 后端核心实现
+  - [x] 1.1 创建 ProcedureTrimEngine 服务
     - 创建 `backend/app/services/procedure_trim_engine.py`
     - 实现 `ProcedureTrimEngine` 类：`trim()` / `revert()` / `get_summary()` / `get_history()` 方法
     - `trim()`: 更新 `parsed_data.procedure_status[sheet_key].{Rxx}.status = 'not_applicable'` + 写入 `parsed_data.trimming_metadata[sheet_key].{Rxx}` 元数据
@@ -18,7 +18,7 @@
     - 幂等处理：trim 时跳过已 N/A 行，revert 时跳过非 N/A 行
     - _Requirements: 2.4, 3.3, 3.5, 4.1, 7.1, 7.2_
 
-  - [ ] 1.2 创建 wp_procedure_trim.py 路由
+  - [x] 1.2 创建 wp_procedure_trim.py 路由
     - 创建 `backend/app/routers/wp_procedure_trim.py`
     - `PATCH /api/projects/{project_id}/workpapers/{wp_id}/procedure-trim` — 单行/批量裁剪 + 恢复
     - `GET /api/projects/{project_id}/workpapers/{wp_id}/procedure-trim/summary` — 裁剪汇总
@@ -28,13 +28,13 @@
     - 注册路由到 `router_registry.py`
     - _Requirements: 2.1, 2.2, 2.3, 2.5, 3.1, 3.4, 4.1, 4.4, 6.3, 6.4, 8.1, 8.3_
 
-  - [ ] 1.3 集成 WpAuditTrailService 审计日志
+  - [x] 1.3 集成 WpAuditTrailService 审计日志
     - 在 `ProcedureTrimEngine.trim()` 和 `revert()` 中调用 `WpAuditTrailService.log_procedure_trim`
     - 扩展 details 字段：`action_type`（trim/revert）/ `row_ids` / `reason_code` / `reason_text` / `batch_id` / `user_id` / `timestamp`
     - 确保 revert 操作不删除历史 trim 日志条目（仅追加新 revert 条目）
     - _Requirements: 4.2, 4.3, 6.1, 6.2_
 
-  - [ ] 1.4 编写后端单元测试
+  - [x] 1.4 编写后端单元测试
     - 创建 `backend/tests/test_procedure_trimming.py`
     - 测试 PATCH trim happy path（单行 + 批量）
     - 测试 PATCH revert happy path
@@ -47,7 +47,7 @@
     - 测试审计日志写入完整性
     - _Requirements: 2.3, 2.4, 2.5, 3.3, 3.4, 3.5, 4.1, 4.2, 6.1, 8.1, 8.3_
 
-  - [ ] 1.5 创建 ProcedureTrimEngine 服务单元测试
+  - [x] 1.5 创建 ProcedureTrimEngine 服务单元测试
     - 创建 `backend/tests/test_procedure_trim_engine.py`
     - 测试 trim 方法：状态变更 + trimming_metadata 写入
     - 测试 revert 方法：状态恢复 + metadata 清除
@@ -106,8 +106,8 @@
 - [ ] 3. Checkpoint — 后端测试全绿
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 4. Sprint 2 — 前端 composable + 组件实现
-  - [ ] 4.1 创建 useProcedureTrimming composable
+- [x] 4. Sprint 2 — 前端 composable + 组件实现
+  - [x] 4.1 创建 useProcedureTrimming composable
     - 创建 `audit-platform/frontend/src/composables/useProcedureTrimming.ts`
     - 实现 `useProcedureTrimming(projectId, wpId, sheetKey)` 返回 `rows` / `stats` / `loading` / `trimHistory`
     - 实现 `trimRows(rowIds, reason)` → PATCH /procedure-trim action=trim
@@ -117,7 +117,7 @@
     - 操作成功后 `eventBus.emit('procedure-status:changed')` 触发 sheet 导航刷新
     - _Requirements: 2.4, 3.3, 4.1, 5.1, 5.2_
 
-  - [ ] 4.2 创建 TrimReasonDialog.vue 组件
+  - [x] 4.2 创建 TrimReasonDialog.vue 组件
     - 创建 `audit-platform/frontend/src/components/workpaper/TrimReasonDialog.vue`
     - 预设理由选项：无相关业务 / 风险评估为低 / 控制测试有效 / 其他
     - "其他"选项时显示文本输入框，实时校验 ≥ 5 字符
@@ -125,14 +125,14 @@
     - emit `confirm({ reason_code, reason_text })` / `cancel`
     - _Requirements: 2.1, 2.2, 2.3, 2.5_
 
-  - [ ] 4.3 创建 BatchTrimSelector.vue 组件
+  - [x] 4.3 创建 BatchTrimSelector.vue 组件
     - 创建 `audit-platform/frontend/src/components/workpaper/BatchTrimSelector.vue`
     - 三种筛选维度：按循环 / 按认定 / 按风险等级
     - 实时预览匹配程序行列表及数量
     - 选择后触发 TrimReasonDialog → 确认后调用 composable.trimRows
     - _Requirements: 3.1, 3.2_
 
-  - [ ] 4.4 创建 ProcedureTrimmingPanel.vue 主面板
+  - [x] 4.4 创建 ProcedureTrimmingPanel.vue 主面板
     - 创建 `audit-platform/frontend/src/components/workpaper/ProcedureTrimmingPanel.vue`
     - 作为 WorkpaperAuditNav 新 tab "程序适用性"
     - 顶部统计摘要（总程序数 / 已裁剪数 / 裁剪率）
@@ -143,7 +143,7 @@
     - RBAC：assistant/auditor 角色隐藏操作按钮（只读模式）
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 4.1, 8.2_
 
-  - [ ] 4.5 创建 TrimmingSummaryPanel.vue 汇总面板
+  - [x] 4.5 创建 TrimmingSummaryPanel.vue 汇总面板
     - 创建 `audit-platform/frontend/src/components/workpaper/TrimmingSummaryPanel.vue`
     - 按循环分组裁剪数 / 按理由分组裁剪数 / 裁剪率
     - 裁剪率 > 50% 循环标记黄色警告
@@ -152,14 +152,14 @@
     - 所有角色可见（只读）
     - _Requirements: 6.3, 6.4, 7.1, 7.2, 7.3, 8.4_
 
-  - [ ] 4.6 集成到 WorkpaperAuditNav + eventBus 联动
+  - [x] 4.6 集成到 WorkpaperAuditNav + eventBus 联动
     - 在 WorkpaperAuditNav.vue 中注册"程序适用性"tab → 渲染 ProcedureTrimmingPanel
     - 确认 `eventBus.emit('procedure-status:changed')` 触发 useProcedureStatus 自动 refresh
     - 确认 sheet 导航灰显逻辑：所有关联程序行均 N/A → sheet 整体灰显；撤销后立即移除灰显
     - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 5. Sprint 2 — 前端测试
-  - [ ] 5.1 编写 useProcedureTrimming composable 测试
+- [x] 5. Sprint 2 — 前端测试
+  - [x] 5.1 编写 useProcedureTrimming composable 测试
     - 创建 `audit-platform/frontend/src/composables/__tests__/useProcedureTrimming.spec.ts`
     - 测试 trimRows 调用 API + 更新 rows 状态 + emit eventBus
     - 测试 revertRows 调用 API + 恢复状态 + emit eventBus
@@ -167,7 +167,7 @@
     - 测试批量操作结果摘要（succeeded/skipped/failed）
     - _Requirements: 2.4, 3.4, 5.2_
 
-  - [ ] 5.2 编写 ProcedureTrimmingPanel 组件测试
+  - [x] 5.2 编写 ProcedureTrimmingPanel 组件测试
     - 创建 `audit-platform/frontend/src/components/workpaper/__tests__/ProcedureTrimmingPanel.spec.ts`
     - 测试面板渲染：统计摘要 + 程序行列表 + N/A 行灰色样式
     - 测试 RBAC 按钮显隐：manager 可见 / assistant 隐藏
@@ -175,7 +175,7 @@
     - 测试"恢复"按钮点击 → 调用 revertRows
     - _Requirements: 1.1, 1.2, 1.3, 8.2_
 
-  - [ ] 5.3 编写 TrimReasonDialog 组件测试
+  - [x] 5.3 编写 TrimReasonDialog 组件测试
     - 创建 `audit-platform/frontend/src/components/workpaper/__tests__/TrimReasonDialog.spec.ts`
     - 测试理由选项渲染（4 个预设选项）
     - 测试"其他"选项 → 文本输入框显示 + < 5 字符禁用确认
@@ -198,20 +198,20 @@
 - [ ] 6. Checkpoint — 全部测试通过
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 7. 回归验证 + 现有 procedure_status 兼容性
-  - [ ] 7.1 验证现有 useProcedureStatus 兼容性
+- [x] 7. 回归验证 + 现有 procedure_status 兼容性
+  - [x] 7.1 验证现有 useProcedureStatus 兼容性
     - 确认 `useProcedureStatus.markStatus` 方法与裁剪操作不冲突
     - 确认 `procedure-status:changed` 事件触发后 useProcedureStatus 正确 refresh
     - 确认已有 11 个循环的 sheet 分组逻辑不受影响
     - 运行现有 `backend/tests/test_procedure_status*.py` + `frontend/src/composables/__tests__/useProcedureStatus.spec.ts` 确认零回归
     - _Requirements: 5.2, 非功能需求-兼容性_
 
-  - [ ] 7.2 验证审计日志哈希链完整性
+  - [x] 7.2 验证审计日志哈希链完整性
     - 确认裁剪/恢复操作写入 `audit_log_entries` 表后哈希链不断裂
     - 确认 `WpAuditTrailService.log_procedure_trim` 调用参数完整
     - _Requirements: 6.1, 非功能需求-可观测性_
 
-- [ ] 8. Final checkpoint — 全部测试通过 + 回归零失败
+- [x] 8. Final checkpoint — 全部测试通过 + 回归零失败
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

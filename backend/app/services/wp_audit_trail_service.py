@@ -74,6 +74,9 @@ class WpAuditTrailService:
             },
         )
 
+    # 程序裁剪恢复动作类型
+    ACTION_PROCEDURE_TRIM_REVERTED = "workpaper.procedure_trim_reverted"
+
     @staticmethod
     async def log_procedure_trim(
         *,
@@ -82,17 +85,39 @@ class WpAuditTrailService:
         project_id: uuid.UUID,
         trimmed_procedures: list[str],
         reason: str,
+        action_type: str = "trim",
+        reason_code: Optional[str] = None,
+        reason_text: Optional[str] = None,
+        batch_id: Optional[str] = None,
+        sheet_key: Optional[str] = None,
     ) -> None:
-        """记录程序裁剪"""
+        """记录程序裁剪/恢复操作。
+
+        扩展 details 字段：action_type / row_ids / reason_code / reason_text / batch_id / user_id / timestamp
+        revert 操作不删除历史 trim 日志条目（仅追加新 revert 条目）。
+        """
+        action = (
+            WpAuditTrailService.ACTION_PROCEDURE_TRIMMED
+            if action_type == "trim"
+            else WpAuditTrailService.ACTION_PROCEDURE_TRIM_REVERTED
+        )
         await audit_logger.log_action(
             user_id=user_id,
-            action=WpAuditTrailService.ACTION_PROCEDURE_TRIMMED,
+            action=action,
             object_type="workpaper",
             object_id=wp_id,
             project_id=project_id,
             details={
+                "action_type": action_type,
                 "trimmed_procedures": trimmed_procedures,
+                "row_ids": trimmed_procedures,
                 "reason": reason,
+                "reason_code": reason_code,
+                "reason_text": reason_text,
+                "batch_id": batch_id,
+                "sheet_key": sheet_key,
+                "user_id": str(user_id),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
 
