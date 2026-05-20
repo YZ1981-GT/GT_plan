@@ -102,15 +102,21 @@ export interface ViewPresetConfig {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** 角色→默认视图映射 */
+/** 角色→默认视图映射（统一走 normalizeRole 处理别名） */
 export const ROLE_DEFAULT_MAP: Record<string, ViewPresetId> = {
-  assistant: 'assistant',
-  auditor: 'assistant',
-  manager: 'manager',
-  partner: 'partner',
-  qc: 'qc',
+  // 后端枚举值
   admin: 'partner',
+  partner: 'partner',
+  manager: 'manager',
+  auditor: 'assistant', // 后端 auditor 对应 UI assistant 视图
+  qc: 'qc',
+  readonly: 'assistant',
+  // 别名兼容
+  assistant: 'assistant',
+  quality_control: 'qc',
   eqcr: 'qc',
+  pm: 'manager',
+  project_manager: 'manager',
 }
 
 /** 状态优先级（助理视图排序） */
