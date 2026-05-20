@@ -218,14 +218,25 @@
             <div class="gt-wp-tree-node">
               <span class="gt-wp-tree-node-label">{{ data.label }}</span>
               <GtStatusTag v-if="data.status" dict-key="wp_status" :value="data.status" class="gt-wp-tree-node-tag" />
-              <!-- Spec A R1：stale 角标（显示在节点最右） -->
-              <el-tooltip
+              <!-- Sprint 4：StaleIndicator 统一组件 -->
+              <StaleIndicator
                 v-if="data.id && staleWpIdSet.has(data.id)"
-                content="底稿已过期，建议重新生成"
-                placement="top"
+                :stale="true"
+                tooltip="底稿已过期，建议重新生成"
+                size="small"
+              />
+              <!-- Foundation Task 2.9: 循环级复核状态徽章（仅 group 节点） -->
+              <el-tag
+                v-if="data.cycleCode && data.totalCount !== undefined"
+                :type="data.reviewedCount === data.totalCount && data.totalCount > 0 ? 'success' : (data.reviewedCount > 0 ? 'warning' : 'info')"
+                size="small"
+                class="gt-wp-tree-cycle-badge"
+                @click.stop="onCycleBadgeClick(data)"
               >
-                <span class="gt-wp-tree-stale-badge">🟡</span>
-              </el-tooltip>
+                {{ data.reviewedCount === data.totalCount && data.totalCount > 0
+                  ? `✓ 全部完成 (${data.totalCount})`
+                  : `${data.reviewedCount}/${data.totalCount} 已复核` }}
+              </el-tag>
             </div>
           </template>
         </el-tree>
@@ -654,8 +665,10 @@ import {
   type WorkpaperDetail, type WpIndexItem, type QCResult,
 } from '@/services/workpaperApi'
 import { handleApiError } from '@/utils/errorHandler'
+import { api } from '@/services/apiProxy'
 // Spec A R1 / R3：跨视图 stale 摘要（推到 6 视图之一）
 import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
+import StaleIndicator from '@/components/StaleIndicator.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -667,6 +680,39 @@ const { workpapers: wpStaleSummary } = useStaleSummaryFull(projectId, currentYea
 // stale wp_id Set，用于 tree 节点判定
 const staleWpIdSet = computed(() => new Set(wpStaleSummary.value.items.map((it: any) => it.id)))
 const projectName = ref('')
+
+// Foundation Task 2.9: 循环级复核状态徽章
+interface CycleReviewStat {
+  cycle_code: string
+  cycle_name: string
+  total_workpapers: number
+  reviewed_workpapers: number
+  workpapers: Array<{ wp_code: string; wp_name: string; is_reviewed: boolean }>
+}
+const cycleReviewStats = ref<Record<string, CycleReviewStat>>({})
+let _reviewStatusTimer: ReturnType<typeof setTimeout> | null = null
+
+async function loadCycleReviewStatus() {
+  if (!projectId.value) return
+  try {
+    const { default: http } = await import('@/utils/http')
+    const resp = await http.get(`/api/projects/${projectId.value}/workpapers/review-status`)
+    const data = resp.data?.data ?? resp.data
+    const cycles: CycleReviewStat[] = data?.cycles || []
+    const map: Record<string, CycleReviewStat> = {}
+    for (const c of cycles) {
+      map[c.cycle_code] = c
+    }
+    cycleReviewStats.value = map
+  } catch {
+    // 静默失败：徽章不显示即可，不阻断主流程
+  }
+}
+
+function _scheduleReviewStatusReload() {
+  if (_reviewStatusTimer) clearTimeout(_reviewStatusTimer)
+  _reviewStatusTimer = setTimeout(() => loadCycleReviewStatus(), 500)
+}
 
 const loading = ref(false)
 const showWpImport = ref(false)
@@ -1024,8 +1070,33 @@ const treeData = computed<TreeNode[]>(() => {
     })
   }
 
+  // Foundation Task 2.9: 注入循环级复核状态到 group 节点
+  for (const [key, group] of Object.entries(groups)) {
+    const stat = cycleReviewStats.value[key]
+    if (stat) {
+      ;(group as any).cycleCode = key
+      ;(group as any).totalCount = stat.total_workpapers
+      ;(group as any).reviewedCount = stat.reviewed_workpapers
+    }
+  }
+
   return Object.values(groups).sort((a, b) => a.label.localeCompare(b.label))
 })
+
+// Foundation Task 2.9: 点击循环徽章展开 per-workpaper 复核状态列表
+function onCycleBadgeClick(data: any) {
+  const stat = cycleReviewStats.value[data.cycleCode]
+  if (!stat) return
+  const lines = stat.workpapers.slice(0, 30).map((w: any) =>
+    `${w.is_reviewed ? '✓' : '○'} ${w.wp_code} ${w.wp_name}`
+  )
+  ElMessage({
+    message: `${stat.cycle_name}：${stat.reviewed_workpapers}/${stat.total_workpapers} 已复核\n${lines.join('\n')}`,
+    type: 'info',
+    duration: 6000,
+    showClose: true,
+  })
+}
 
 
 
@@ -1784,6 +1855,10 @@ onMounted(async () => {
   } catch { /* 默认 pilot */ }
   await refreshOnlineEditState()
   await handleUploadRedirect()
+
+  // Foundation Task 2.9: 初次加载循环复核状态 + 订阅 review-mark:changed 事件刷新
+  await loadCycleReviewStatus()
+  eventBus.on('review-mark:changed', _scheduleReviewStatusReload)
 })
 </script>
 
@@ -1805,6 +1880,7 @@ onMounted(async () => {
 .gt-wp-tree-node-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-wp-tree-node-tag { flex-shrink: 0; }
 .gt-wp-tree-stale-badge { flex-shrink: 0; font-size: var(--gt-font-size-xs); opacity: 0.85; cursor: help; }
+.gt-wp-tree-cycle-badge { flex-shrink: 0; cursor: pointer; margin-left: 4px; }
 .gt-wp-detail-card { }
 .gt-wp-detail-title { margin: 0 0 var(--gt-space-4); color: var(--gt-color-primary); font-size: var(--gt-font-size-xl); }
 .gt-wp-detail-actions { display: flex; gap: var(--gt-space-2); margin-top: var(--gt-space-4); flex-wrap: wrap; }

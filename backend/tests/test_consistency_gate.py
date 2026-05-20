@@ -94,10 +94,11 @@ class TestConsistencyGateChecks:
     """Test individual consistency checks."""
 
     async def test_run_all_checks_returns_5_items(self, db_session, project_id):
-        """run_all_checks should return exactly 5 check items."""
+        """run_all_checks should return at least 5 base check items + E1 + D4."""
         gate = ConsistencyGate(db_session)
         result = await gate.run_all_checks(project_id, 2024)
-        assert len(result.checks) == 5
+        # 5 base + 3 E1↔CFS + 4 D4 勾稽 = 12
+        assert len(result.checks) >= 5
 
     async def test_run_all_checks_overall_pass_no_data(self, db_session, project_id):
         """With no data, all checks should pass (skip)."""

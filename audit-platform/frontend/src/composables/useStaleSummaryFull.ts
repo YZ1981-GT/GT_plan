@@ -104,6 +104,21 @@ export function useStaleSummaryFull(
 
   function _onYearChanged() { refresh() }  // 切年立即刷新不防抖
 
+  // Sprint 4 Task 4.7：SSE linkage:stale-changed 事件处理
+  function _onSSEEvent(payload: any) {
+    if (payload?.extra?.linkage_event === 'stale-changed') {
+      // 从 SSE 收到 stale-changed 事件，触发 linkage:stale-changed 本地事件
+      eventBus.emit('linkage:stale-changed', {
+        project_id: payload.project_id,
+        affected_modules: payload.extra?.affected_modules || [],
+        total_affected: payload.extra?.total_affected || 0,
+      })
+      debouncedRefresh()
+    }
+  }
+
+  function _onLinkageStaleChanged() { debouncedRefresh() }
+
   onMounted(() => {
     refresh()
     eventBus.on('workpaper:saved', debouncedRefresh)
@@ -113,6 +128,8 @@ export function useStaleSummaryFull(
     eventBus.on('materiality:changed', debouncedRefresh)
     eventBus.on('dataset:activated', debouncedRefresh)
     eventBus.on('year:changed', _onYearChanged)
+    eventBus.on('sse:sync-event', _onSSEEvent)
+    eventBus.on('linkage:stale-changed', _onLinkageStaleChanged)
   })
 
   onUnmounted(() => {
@@ -124,6 +141,8 @@ export function useStaleSummaryFull(
     eventBus.off('materiality:changed', debouncedRefresh)
     eventBus.off('dataset:activated', debouncedRefresh)
     eventBus.off('year:changed', _onYearChanged)
+    eventBus.off('sse:sync-event', _onSSEEvent)
+    eventBus.off('linkage:stale-changed', _onLinkageStaleChanged)
   })
 
   watch([projectId, year], () => refresh())

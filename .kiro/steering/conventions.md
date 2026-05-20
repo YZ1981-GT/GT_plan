@@ -373,3 +373,60 @@ WHERE l.project_id = :pid AND l.year = :yr
 - P0 关键 Property（authz / readonly / 边界条件）：50-100
 - 可选探索类：5（MVP 速度优先）
 - 不允许 P0 关键 Property 用 `max_examples=5` 充数
+
+## Spec 工作流规范（2026-05-18 从 memory 迁入精简版）
+
+### Spec 三档分类
+- **档 1 直接修**（不写 spec）：单文件/单端点/配置类，工时 ≤ 0.5 天
+- **档 2 小型 spec**（仅 README）：根因不清晰/多文件协调，工时 0.5-2 天
+- **档 3 完整三件套**（requirements + design + tasks）：跨视图/跨服务，工时 ≥ 1 周
+- 判断铁律：spec 起草本身 ≥ 0.5 天 + 复盘 + 评审；范围清晰+单文件 → 不该走三件套
+
+### Spec 起草铁律
+- design.md 必须"代码锚定"：每个修改点列文件+行号/函数名，字段/枚举/端点 grep 核对
+- tasks.md 只放编码任务；手动验证放 UAT 验收清单
+- Sprint 粒度 ≤ 10 任务，强制回归测试+UAT 才进下一 Sprint
+- 创建时强制"假设清单 grep 核验"5 项：ORM 字段 / seed JSON / 路由编号 / 前端文件 / DB 表列
+- 创建阶段禁止动 production 代码（代码骨架放独立区块加注释"非实施"）
+- tasks.md 末尾固定"已知缺口与技术债"章节（P0/P1/P2 + 触发条件 + 后续 spec）
+- 三件套顶部各加 `## 变更记录` 表格（版本号+日期+摘要+触发原因）
+
+### Spec 实施铁律
+- 实施前预检：grep 所有目标文件核对是否已预先实施，已存在直接验证后标 [x]
+- 标 [x] 前必须跑 pytest 验证（"代码文件存在" ≠ "功能可用"）
+- 跨文件字段/枚举假设必须 grep 核对（凭印象写 = runtime 失败）
+- 测试 fixture 复用邻居文件的 `db_session` 模板（conftest.py 不提供 db_session）
+- 集成测试 docstring 强制 `# Validates: Property X` 反向映射
+- spec 不硬编码数字：task/Property/验收标准必须运行时表达式，narrative 允许快照值
+
+### Subagent 调用约束（扩展版）
+- 单次任务 ≤ 4 件事，超过强制拆批次
+- prompt 强制返回结构化 JSON（files_created / files_modified / vue_tsc_status / pytest_count）
+- orchestrator 不预读 subagent 即将创建的目标文件
+- 越权三类风险：范围扩张 / bug 修复混入测试 commit / 状态变更单方面声明
+- 工时压缩比 > 5× 必须暂停 review（可能是 grep 不全而非高效）
+- 大批量 search-replace 后必须 grep 多种相关属性变体复核（不信 subagent 自报值）
+- "已实施"三步验证：端点存在 ✓ + 至少 1 处真实调用方 ✓ + UI 触发路径明确 ✓
+
+### UAT 规约
+- 状态枚举：`✓ pass` / `○ pending-uat` / `⚠ partial` / `✗ fail`
+- spec 完成时建 `.kiro/uat-pending/{spec_id}.md` 触发清单
+- TD 只列未解决项；已落地的迁到 spec 末尾"实施记录"
+
+### 跨 Spec 协调
+- A spec 依赖 B spec 产出时，A 启动条件核验列出 B 完成度 + fallback 策略
+- 跨 spec 共享文件依赖方向必须双向声明
+- `.kiro/specs/INDEX.md` 不删除，新 spec 必须登记，每月一审
+
+### CI Baseline 规约
+- `.github/workflows/baselines.json` 字段格式：`{property}-{format}-{scope}`
+- 占位值由 Sprint 0 实测填入，design 显式标注
+- 属性级前缀（`border-color-prop-hex-vue-files`）替代泛化命名
+
+### 批量替换通用模式
+- 100+ 文件用 Python 脚本（正则 + skip allow-* 注释 + 字节级 read/write 绕 PowerShell GBK）
+- dry-run → 补映射表 → 二轮 dry-run → apply → grep 多变体复核 → 修订 baseline
+- 脚本用完即删（不进 git）
+
+### 占位 Spec README 模板（17 章）
+一为什么做 / 二真实结构 / 三总控台拆解 / 四审定表公式拓扑 / 五优化方向 / 六范围边界 / 七启动条件 / 八UAT清单 / 九技术债 / 十风险缓解 / 十一差异说明 / 十二启动建议 / 十三工时估算 / 十四范围边界做不做 / 十五风险与缓解 / 十六修订记录 / 十七后续启动建议

@@ -157,6 +157,23 @@ async def update_note(
     if note is None:
         raise HTTPException(status_code=404, detail="附注章节不存在")
     await db.commit()
+
+    # Publish NOTE_SECTION_SAVED event
+    try:
+        from app.models.audit_platform_schemas import EventPayload, EventType
+        from app.services.event_bus import event_bus
+
+        await event_bus.publish(EventPayload(
+            event_type=EventType.NOTE_SECTION_SAVED,
+            project_id=note.project_id,
+            year=note.year,
+            extra={
+                "section_code": note.section_code if hasattr(note, "section_code") else str(note_id),
+            },
+        ))
+    except Exception:
+        pass  # Never block main operation
+
     return DisclosureNoteDetail.model_validate(note)
 
 

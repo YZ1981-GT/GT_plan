@@ -306,6 +306,8 @@ async def notify_cell_change(
     sheet = body.get("sheet", "")
     cell = body.get("cell", "")
     max_depth = int(body.get("max_depth", 3))
+    project_id = body.get("project_id", "")
+    year = int(body.get("year", 2025))
 
     if not wp_code:
         raise HTTPException(400, "wp_code is required")
@@ -313,8 +315,15 @@ async def notify_cell_change(
     # 直接复用 stale-impact
     impact = await stale_impact(wp_code, sheet, cell, max_depth, user)
 
-    # TODO: 这里可加事件总线广播 (event_bus.publish('CELL_CHANGED', ...))
-    # 让 outbox/SSE 自动推送 stale 标记给所有打开了下游底稿的客户端
+    # Global Linkage Bus Sprint 3: 调用 stale_engine.on_change 写 DB stale 标记
+    try:
+        from app.services.stale_propagation_engine import stale_engine
+
+        uri = f"WP:{wp_code}:{sheet}:{cell}" if cell else f"WP:{wp_code}:{sheet}:"
+        if project_id:
+            await stale_engine.on_change(uri, project_id, year)
+    except Exception:
+        pass  # Never block main operation
 
     return {
         "ok": True,

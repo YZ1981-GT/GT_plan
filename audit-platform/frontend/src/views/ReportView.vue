@@ -74,9 +74,9 @@
         @close="balanceCheckResult = null"
       />
 
-      <!-- R8-S2-03：Stale 状态横幅（上游数据变更提示） -->
+      <!-- Sprint 4：StaleIndicator 统一组件 + 横幅 -->
       <div v-if="stale.isStale.value" class="gt-stale-banner">
-        <span class="gt-stale-icon">⚠️</span>
+        <StaleIndicator :stale="true" tooltip="上游数据已变更" />
         <span class="gt-stale-text">
           上游数据已变更，当前报表可能基于旧试算表（{{ stale.staleCount.value }} 张底稿待重算）
         </span>
@@ -624,7 +624,19 @@
     <div class="gt-ucell-ctx-item" @click="onRvCtxGoNote"><span class="gt-ucell-ctx-icon">📝</span> 跳转附注</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxOpenWorkpaper"><span class="gt-ucell-ctx-icon">📋</span> 打开对应底稿</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxViewAdjustments"><span class="gt-ucell-ctx-icon">🔗</span> 查看调整明细</div>
+    <div class="gt-ucell-ctx-item" @click="onRvCtxViewFormulaSource"><span class="gt-ucell-ctx-icon">🔍</span> 查看公式来源</div>
   </CellContextMenu>
+
+  <!-- Sprint 5.6: 公式来源弹窗 -->
+  <CellFormulaDetail
+    :visible="showCellFormulaDetail"
+    module="REPORT"
+    :wp-code="cellDetailWpCode"
+    :sheet-name="cellDetailSheet"
+    :label="cellDetailLabel"
+    @update:visible="showCellFormulaDetail = $event"
+    @navigate="onCellDetailNavigate"
+  />
 </template>
 
 <script setup lang="ts">
@@ -638,6 +650,7 @@ import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
@@ -681,6 +694,7 @@ onDatasetRolledBack(() => fetchReport())
 
 // R8-S2-03：Stale 状态追踪（上游数据变更提示）
 import { useStaleStatus } from '@/composables/useStaleStatus'
+import StaleIndicator from '@/components/StaleIndicator.vue'
 const stale = useStaleStatus(projectId)
 async function onStaleRecalc() {
   await stale.recalc()
@@ -1680,6 +1694,39 @@ function onRvCtxViewAdjustments() {
     query: { highlight_row: row.row_code, year: String(year.value) },
   })
 }
+
+// Sprint 5.6: 查看公式来源
+const showCellFormulaDetail = ref(false)
+const cellDetailWpCode = ref('')
+const cellDetailSheet = ref('')
+const cellDetailLabel = ref('')
+
+function onRvCtxViewFormulaSource() {
+  rvCtx.closeContextMenu()
+  const row = rvCtx.contextMenu.rowData
+  if (!row?.row_code) {
+    ElMessage.info('请在数据行上右键')
+    return
+  }
+  cellDetailWpCode.value = row.row_code
+  cellDetailSheet.value = ''
+  cellDetailLabel.value = ''
+  showCellFormulaDetail.value = true
+}
+
+function onCellDetailNavigate(uri: string) {
+  showCellFormulaDetail.value = false
+  const parts = uri.split(':')
+  const mod = parts[0]?.toUpperCase()
+  if (mod === 'WP' && parts[1]) {
+    router.push({ name: 'WorkpaperEditor', params: { id: projectId.value }, query: { wp: parts[1] } })
+  } else if (mod === 'NOTE') {
+    router.push({ name: 'DisclosureEditor', params: { id: projectId.value } })
+  } else if (mod === 'TB') {
+    router.push({ path: `/projects/${projectId.value}/trial-balance` })
+  }
+}
+
 
 function onRvCtxSum() {
   rvCtx.closeContextMenu()

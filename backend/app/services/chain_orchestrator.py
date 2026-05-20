@@ -422,17 +422,25 @@ class ChainOrchestrator:
         # 2. Get project info for audit stage flags
         try:
             proj_result = await db.execute(
-                sa.select(Project.template_type, Project.report_scope).where(Project.id == project_id)
+                sa.select(
+                    Project.template_type,
+                    Project.report_scope,
+                    Project.scenario,
+                    Project.has_foreign_currency,
+                ).where(Project.id == project_id)
             )
             proj_row = proj_result.first()
             template_type = (proj_row[0] if proj_row else None) or "soe"
             report_scope = (proj_row[1] if proj_row else None) or "standalone"
+            scenario = (proj_row[2] if proj_row else None) or "normal"
+            has_foreign_currency = bool(proj_row[3]) if proj_row else False
         except Exception:
             try:
                 await db.rollback()
             except Exception:
                 pass
             template_type, report_scope = "soe", "standalone"
+            scenario, has_foreign_currency = "normal", False
 
         # Build project context flags for conditional triggers
         project_flags = {
@@ -440,11 +448,15 @@ class ChainOrchestrator:
             "listed": template_type == "listed",
             "listed_or_segments": template_type == "listed",
             "listed_or_regulated": template_type == "listed",
-            "listed_or_ipo": template_type == "listed",
+            "listed_or_ipo": template_type == "listed" or scenario in ("ipo", "listed"),
             "small_soe_or_general": template_type == "soe",
             "large_soe": False,  # default; can be overridden by project metadata
             "first_engagement": False,  # default; can be overridden
             "group_audit": report_scope == "consolidated",
+            # E1 Sprint 2 Task 2.2: scenario 驱动文件级裁剪（F1.2）
+            "scenario_normal": scenario == "normal",
+            "scenario_ipo_or_above": scenario in ("ipo", "listed", "transfer", "restructure", "fraud_response"),
+            "has_foreign_currency": has_foreign_currency,
             # Default to False for cycle-specific flags; will be set based on TB analysis
         }
 
@@ -489,7 +501,13 @@ class ChainOrchestrator:
         # Has policy change: assume False unless tracked elsewhere
         project_flags.setdefault("has_policy_change", False)
 
-        # 5. Match workpapers
+        # E1 Sprint 2 Task 2.32: scenario / has_foreign_currency / 1502 数字货币科目存在性
+        # 三类 sheet 过滤规则（与 useUniverSheetNav scenarioFilter 对齐）：
+        # (1) (修订前)/(示例)/(提示) → init 时统一过滤（前端导航 + chain merge 跳过）
+        # (2) 双附注按 template_type 二选一（已通过 wp_account_mapping 控制）
+        # (3) 双 E1-3 按 has_foreign_currency 二选一（前端 useUniverSheetNav 隐藏）
+        # (4) 数字货币 E1-4 按 has_digital_currency 触发（TB 含 1502 科目存在性）
+        project_flags["has_digital_currency"] = "1502" in tb_accounts
         # Strategy: Subtables (D2-2/E1-1) collapse to primary (D2/E1).
         # Each primary becomes ONE workpaper file with multiple sheets (auto-merged from sibling files).
         matched_primary: set[str] = set()  # 主编码集合（实际生成的 wp_index）
@@ -609,11 +627,22 @@ class ChainOrchestrator:
                         project_id=project_id,
                         wp_id=wp.id,
                         wp_code=code,
+                        scenario=scenario,
+                        has_foreign_currency=has_foreign_currency,
                     )
                     if actual_path:
                         # Update file_path to match actual extension (xlsx vs docx vs xlsm)
                         wp.file_path = str(actual_path)
                         copied_count += 1
+                        # E1 spec Sprint 1 Task 1.18: 自动填充表头 R3/R4
+                        try:
+                            from app.services.prefill_engine import fill_header_cells
+                            await fill_header_cells(db, wp.id)
+                        except Exception as he:
+                            logger.warning(
+                                "fill_header_cells failed for wp=%s code=%s: %s",
+                                wp.id, code, he,
+                            )
                 except Exception as ce:
                     logger.warning("Template file copy failed for %s: %s", code, ce)
             except Exception as e:
@@ -759,3 +788,26 @@ class ChainConflictError(Exception):
 
 # Module-level singleton
 chain_orchestrator = ChainOrchestrator()
+
+
+# ---------------------------------------------------------------------------
+# F2 / F3 / F4 sheet 合并去重 + scenario 文件裁剪工具 — re-export
+# （spec workpaper-d-sales-cycle 任务 1.5 / 1.8 / 2.1）
+#
+# spec 任务文本声明 `_normalize_sheet_name` / `_merge_sheets_dedup` /
+# `SCENARIO_TO_FILE_FILTER` / `_filter_files_by_scenario` 位于本模块；
+# 实际实现位于 ``app.services.wp_template_init_service``（多文件合并 + 文件
+# 加载的真实调用位置）。在此 re-export 以满足 spec 描述的模块位置，使
+# `from app.services.chain_orchestrator import SCENARIO_TO_FILE_FILTER` 可用，
+# 同时避免 chain_orchestrator → wp_template_init_service 的循环导入。
+# ---------------------------------------------------------------------------
+
+from app.services.wp_template_init_service import (  # noqa: E402,F401
+    MEASUREMENT_MODEL_FILTER,
+    SCENARIO_TO_FILE_FILTER,
+    _ensure_d4_ipo_loaded,
+    _filter_files_by_scenario,
+    _merge_sheets_dedup,
+    _normalize_sheet_name,
+    _should_skip_historical_sheet,
+)

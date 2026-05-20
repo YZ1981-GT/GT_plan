@@ -175,7 +175,7 @@
             <span class="gt-ftab-sub-label">
               <el-icon><PieChart /></el-icon>报表公式
               <el-tag size="small" type="info" effect="plain" round>
-                <span class="gt-amt">{{ reportRowsTotal }}</span>
+                <span class="gt-amt">{{ reportRowsTotal || reportRowsTotalHint }}</span>
               </el-tag>
             </span>
           </template>
@@ -455,6 +455,10 @@ async function loadFormulaTypeDistribution() {
   try {
     const data = await api.get(P_tlm.formulaCoverage)
     formulaTypeBadges.value = (data?.formula_type_distribution || []) as FormulaTypeCount[]
+    // 顺手把 report 子 Tab 的 badge 数从 summary.total_report_rows 取（避免显示 0）
+    if (data?.summary?.total_report_rows !== undefined) {
+      reportRowsTotalHint.value = data.summary.total_report_rows
+    }
   } catch {
     formulaTypeBadges.value = []
   }
@@ -508,10 +512,13 @@ function formatReportType(code: string): string {
 
 const reportRowsTotal = computed(() => {
   return Object.values(reportRowsByStandard.value).reduce(
-    (s, arr) => s + arr.length,
+    (s: number, arr) => s + arr.length,
     0,
-  )
+  ) as number
 })
+
+// 懒加载提示：从 formula-coverage.summary.total_report_rows 获取（在 loadFormulaTypeDistribution 已拉过）
+const reportRowsTotalHint = ref<number | string>('···')
 
 const groupedByReportType = computed<Record<string, ReportTypeGroup[]>>(() => {
   const result: Record<string, ReportTypeGroup[]> = {}
@@ -753,10 +760,12 @@ watch(activeSubTab, async (val) => {
 }, { immediate: false })
 
 onMounted(async () => {
-  // 默认子 Tab 是 prefill，立即加载它 + 类型分布
+  // 默认子 Tab 是 prefill；预加载 prefill + 类型分布 + 跨底稿引用（badge 计数）
+  // 报表公式按需懒加载（4 标准 × 数百行较重）
   await Promise.all([
     loadPrefillFormulas(),
     loadFormulaTypeDistribution(),
+    loadCrossWpReferences(),
   ])
 })
 </script>

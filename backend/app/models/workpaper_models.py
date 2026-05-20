@@ -450,6 +450,21 @@ class ReviewRecord(Base):
         nullable=True,
         comment="关联的多轮讨论链（可选）",
     )
+    # E1 Sprint 2 Task 2.21: 复核模板↔底稿双向溯源（D14 ADR）
+    source_sheet: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, comment="源 sheet 名（复核模板的复核记录 sheet）"
+    )
+    target_sheet: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, comment="目标 sheet 名（被复核底稿）"
+    )
+    target_cell: Mapped[str | None] = mapped_column(
+        String(50), nullable=True, comment="目标 cell（如 R41）"
+    )
+    review_layer: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="复核层级: L1/L2/L3/L4/L5/committee/it/tax",
+    )
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )

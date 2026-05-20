@@ -1,0 +1,157 @@
+{
+  "description": "G 投资循环校验规则定义（VR-G7-01 权益法投资收益勾稽 + VR-G11-01 投资收益汇总 + VR-G1-01 公允价值变动 + VR-G14-01 信用减值损失汇总）",
+  "version": "2025-R1",
+  "rules": [
+    {
+      "rule_id": "VR-G7-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "G7",
+      "description": "G7 权益法投资收益 = 被投资方净利润 × 持股比例 − 内部交易抵消",
+      "formula": "ABS(recognized_income - (investee_net_profit * shareholding_ratio - internal_offset)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "trigger_condition": "G7_equity_method_recognized",
+      "applies_when": {
+        "description": "仅当 G7 底稿已保存且至少 1 笔投资采用权益法核算（shareholding_ratio > 0）时触发；持股比例为零时 skip",
+        "skip_message": "G7 持股比例为零或权益法投资未保存，跳过"
+      },
+      "sources": {
+        "recognized_income": {
+          "wp": "G7",
+          "sheet": "审定表G7-1",
+          "cell": "权益法投资收益_审定数"
+        },
+        "investee_net_profit": {
+          "wp": "G7",
+          "sheet": "明细表G7-2",
+          "cell": "被投资方本期净利润"
+        },
+        "shareholding_ratio": {
+          "wp": "G7",
+          "sheet": "明细表G7-2",
+          "cell": "投资比例"
+        },
+        "internal_offset": {
+          "wp": "G7",
+          "sheet": "明细表G7-2",
+          "cell": "内部交易抵消"
+        }
+      },
+      "message_template": "G7 权益法投资收益勾稽不平衡，差异超过 1 元: 确认收益({recognized_income}) ≠ 净利润({investee_net_profit}) × 持股比例({shareholding_ratio}) − 内部抵消({internal_offset}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-G11-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "G11",
+      "description": "G11 投资收益 = G1 投资收益 + G4 利息收入 + G6 利息收入 + G7 投资收益 + G8 处置收益",
+      "formula": "ABS(g11_total - (g1_income + g4_interest + g6_interest + g7_income + g8_disposal)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "trigger_condition": "G11_and_at_least_one_sub_saved",
+      "applies_when": {
+        "description": "当 G11 已保存且至少 1 个子循环（G1/G4/G6/G7/G8）已保存（parsed_data 含对应字段）时触发 blocking；全部子循环未保存时 skip 避免 G11 先保存时误阻断",
+        "required_main_wp": "G11",
+        "required_any_of_subs": ["G1", "G4", "G6", "G7", "G8"],
+        "skip_message": "子循环底稿未保存，跳过"
+      },
+      "sources": {
+        "g11_total": {
+          "wp": "G11",
+          "sheet": "审定表G11-1",
+          "cell": "投资收益_审定数_合计"
+        },
+        "g1_income": {
+          "wp": "G1",
+          "sheet": "审定表G1-1",
+          "cell": "交易性金融资产投资收益_审定数"
+        },
+        "g4_interest": {
+          "wp": "G4",
+          "sheet": "审定表G4-1",
+          "cell": "债权投资利息收入_审定数"
+        },
+        "g6_interest": {
+          "wp": "G6",
+          "sheet": "审定表G6-1",
+          "cell": "其他债权投资利息收入_审定数"
+        },
+        "g7_income": {
+          "wp": "G7",
+          "sheet": "审定表G7-1",
+          "cell": "长期股权投资收益_审定数"
+        },
+        "g8_disposal": {
+          "wp": "G8",
+          "sheet": "审定表G8-1",
+          "cell": "处置收益_审定数"
+        }
+      },
+      "message_template": "G11 投资收益汇总不平衡，差异超过 1 元: 合计({g11_total}) ≠ G1({g1_income}) + G4({g4_interest}) + G6({g6_interest}) + G7({g7_income}) + G8({g8_disposal}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-G1-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "G1",
+      "description": "G1 公允价值变动 = 期末公允价值 − 期初公允价值",
+      "formula": "ABS(fv_change - (fv_closing - fv_opening)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "sources": {
+        "fv_change": {
+          "wp": "G1",
+          "sheet": "审定表G1-1",
+          "cell": "公允价值变动_本期变动"
+        },
+        "fv_closing": {
+          "wp": "G1",
+          "sheet": "明细表G1-2",
+          "cell": "期末余额_公允价值_合计"
+        },
+        "fv_opening": {
+          "wp": "G1",
+          "sheet": "明细表G1-2",
+          "cell": "期初余额_公允价值_合计"
+        }
+      },
+      "message_template": "G1 公允价值变动勾稽不平衡，差异超过 1 元: 本期变动({fv_change}) ≠ 期末公允价值({fv_closing}) − 期初公允价值({fv_opening}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-G14-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "G14",
+      "description": "G14 信用减值损失 = G4 ECL 本期变动 + G6 ECL 本期变动",
+      "formula": "ABS(g14_total - (g4_ecl_change + g6_ecl_change)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "trigger_condition": "G14_and_at_least_one_sub_saved",
+      "applies_when": {
+        "description": "当 G14 已保存且至少 1 个子循环（G4/G6）已保存（parsed_data 含 ECL 变动字段）时触发 blocking；全部子循环未保存时 skip 避免 G14 先保存时误阻断",
+        "required_main_wp": "G14",
+        "required_any_of_subs": ["G4", "G6"],
+        "skip_message": "子循环底稿未保存，跳过"
+      },
+      "sources": {
+        "g14_total": {
+          "wp": "G14",
+          "sheet": "审定表G14-1",
+          "cell": "信用减值损失_审定数_合计"
+        },
+        "g4_ecl_change": {
+          "wp": "G4",
+          "sheet": "审定表G4-1",
+          "cell": "ECL_本期变动"
+        },
+        "g6_ecl_change": {
+          "wp": "G6",
+          "sheet": "审定表G6-1",
+          "cell": "ECL_本期变动"
+        }
+      },
+      "message_template": "G14 信用减值损失汇总不平衡，差异超过 1 元: 合计({g14_total}) ≠ G4 ECL变动({g4_ecl_change}) + G6 ECL变动({g6_ecl_change}), 差异={diff}"
+    }
+  ]
+}

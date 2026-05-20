@@ -300,11 +300,31 @@ async def get_formula_coverage(
     prefill_mappings = _load_prefill_mappings()
     prefill_wp_codes = {m.get("wp_code") for m in prefill_mappings if m.get("wp_code")}
 
+    # 加载 _index.json 以补充 wp_name（wp_template_metadata 表无此字段）
+    try:
+        from app.services.wp_template_init_service import _load_index
+        index = _load_index()
+    except Exception:
+        index = []
+    primary_to_name: dict[str, str] = {}
+    for entry in index:
+        wp_code = entry.get("wp_code") or ""
+        if not wp_code or wp_code.startswith("_"):
+            continue
+        primary = wp_code.split("-")[0]
+        if primary in primary_to_name:
+            continue
+        fname = entry.get("filename") or ""
+        name_part = fname.rsplit(".", 1)[0] if fname else primary
+        if " " in name_part:
+            name_part = name_part.split(" ", 1)[1]
+        primary_to_name[primary] = name_part or primary
+
     # 2) 查 wp_template_metadata 主编码（按 cycle 分组）
     rows = (
         await db.execute(
             text(
-                "SELECT wp_code, cycle FROM wp_template_metadata "
+                "SELECT wp_code, cycle, component_type FROM wp_template_metadata "
                 "WHERE wp_code IS NOT NULL"
             )
         )
@@ -312,7 +332,7 @@ async def get_formula_coverage(
 
     # 主编码 = wp_code.split("-")[0] 去重（Property 11 子表收敛）
     primary_by_cycle: dict[str, set[str]] = defaultdict(set)
-    primary_to_name: dict[str, str] = {}
+    primary_component_type: dict[str, str] = {}  # 主编码 → component_type（取第一个非空）
     for r in rows:
         wp_code = r["wp_code"]
         primary = wp_code.split("-")[0] if wp_code else None
@@ -320,23 +340,31 @@ async def get_formula_coverage(
             continue
         cycle = r.get("cycle") or (primary[0] if primary else "?")
         primary_by_cycle[cycle].add(primary)
-        primary_to_name.setdefault(primary, "")  # 保留待补充
+        if r.get("component_type") and primary not in primary_component_type:
+            primary_component_type[primary] = r["component_type"]
 
     prefill_coverage: list[CycleCoverage] = []
     all_primary: set[str] = set()
     primary_with_formula: set[str] = set()
+    # 仅 univer/hybrid/null（默认 univer）参与覆盖率分母；form/word 类不需要公式
+    _NON_PREFILL_COMPONENTS = {"form", "word"}
     for cycle in sorted(primary_by_cycle.keys()):
         primaries = primary_by_cycle[cycle]
-        all_primary.update(primaries)
-        with_formula = primaries & prefill_wp_codes
+        # 过滤 form/word 类：分母只统计应有公式的模板
+        eligible = {p for p in primaries if primary_component_type.get(p) not in _NON_PREFILL_COMPONENTS}
+        # 跳过该循环全是 form/word 的（A/S 类）：分母 0 显示无意义
+        if not eligible:
+            continue
+        all_primary.update(eligible)
+        with_formula = eligible & prefill_wp_codes
         primary_with_formula.update(with_formula)
         prefill_coverage.append(
             CycleCoverage(
                 cycle=cycle,
                 cycle_name=CYCLE_NAMES.get(cycle, f"{cycle} 循环"),
-                total_templates=len(primaries),
+                total_templates=len(eligible),
                 templates_with_formula=len(with_formula),
-                coverage_percent=_percent(len(with_formula), len(primaries)),
+                coverage_percent=_percent(len(with_formula), len(eligible)),
             )
         )
 
@@ -376,20 +404,27 @@ async def get_formula_coverage(
     ]
 
     # 5) 无公式底稿清单（主编码维度）
-    no_formula_primaries = all_primary - prefill_wp_codes
+    # all_primary 已在上方过滤掉 form/word（仅含应有公式但缺失的模板）
+    no_formula_primaries = sorted(all_primary - prefill_wp_codes)
     no_formula_templates = [
         NoFormulaItem(
             wp_code=p,
+            wp_name=primary_to_name.get(p) or None,
             cycle=p[0] if p else None,
         )
-        for p in sorted(no_formula_primaries)
+        for p in no_formula_primaries
     ]
 
     # 6) 顶部摘要（运行时聚合）
     total_report_rows = sum(c.total_rows for c in report_formula_coverage)
     total_report_with_formula = sum(c.rows_with_formula for c in report_formula_coverage)
+    # 全部主编码数（含 form/word 不参与公式覆盖率）
+    all_primaries_full = set()
+    for primaries in primary_by_cycle.values():
+        all_primaries_full.update(primaries)
     summary = {
-        "total_primary_templates": len(all_primary),
+        "total_primary_templates": len(all_primary),  # 仅含 univer/hybrid（公式分母）
+        "total_all_primaries": len(all_primaries_full),  # 全部主编码（含 form/word）
         "primary_with_formula": len(primary_with_formula),
         "prefill_coverage_percent": _percent(len(primary_with_formula), len(all_primary)),
         "total_report_rows": total_report_rows,
@@ -491,6 +526,10 @@ async def get_seed_status(
       expected = 当前 DB COUNT，status=loaded 当 count > 0；status=not_loaded 当 count = 0
     """
     # 一次性查每张表 COUNT(*)（独立 SELECT 避免 N+1）
+    # 注意：template_sets 实际表名 wp_template_set；accounting_standards 实际表名也需核验
+    _ACTUAL_TABLE_NAMES = {
+        "template_sets": "wp_template_set",
+    }
     table_counts: dict[str, int] = {}
     for table in [
         "wp_template_metadata",
@@ -499,35 +538,40 @@ async def get_seed_status(
         "accounting_standards",
         "template_sets",
     ]:
+        actual_table = _ACTUAL_TABLE_NAMES.get(table, table)
         try:
             row = (
-                await db.execute(text(f"SELECT COUNT(*) AS c FROM {table}"))
+                await db.execute(text(f"SELECT COUNT(*) AS c FROM {actual_table}"))
             ).mappings().first()
             table_counts[table] = int(row["c"] or 0) if row else 0
         except Exception as exc:
             logger.warning("count(%s) failed: %s", table, exc)
+            try:
+                await db.rollback()
+            except Exception:
+                pass
             table_counts[table] = 0
 
-    # audit_report_templates（实际表名是 audit_report_templates 还是其他需要确认）
-    # 复用 disclosure 注解：audit_report 表存项目报告，模板表是 audit_report_templates
+    # audit_report_template（实际表名是单数）
     try:
         row = (
             await db.execute(
-                text("SELECT COUNT(*) AS c FROM audit_report_templates")
+                text("SELECT COUNT(*) AS c FROM audit_report_template")
             )
         ).mappings().first()
         table_counts["audit_report_templates"] = int(row["c"] or 0) if row else 0
-    except Exception:
+    except Exception as exc:
+        logger.warning("count(audit_report_template) failed: %s", exc)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
         table_counts["audit_report_templates"] = 0
 
-    # note_templates 表（用于附注模板）
-    try:
-        row = (
-            await db.execute(text("SELECT COUNT(*) AS c FROM note_templates"))
-        ).mappings().first()
-        table_counts["note_templates"] = int(row["c"] or 0) if row else 0
-    except Exception:
-        table_counts["note_templates"] = 0
+    # note_templates 是从 JSON 文件加载的（不存 PG 表）
+    # 实际数据源是 backend/data/note_template_{soe,listed}.json
+    # 用 _expected_note_templates() 同款逻辑作为 record_count
+    table_counts["note_templates"] = _expected_note_templates() or 0
 
     # 查 seed_load_history 最近 last_loaded_at
     last_loaded_map: dict[str, str] = {}
@@ -545,6 +589,10 @@ async def get_seed_status(
                 last_loaded_map[r["seed_name"]] = r["last_at"].isoformat() if hasattr(r["last_at"], "isoformat") else str(r["last_at"])
     except Exception as exc:
         logger.warning("query seed_load_history failed: %s", exc)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
 
     # 构造每个 seed 的状态
     seeds: list[SeedInfo] = []
@@ -858,6 +906,27 @@ async def seed_all(
 
     success_count = sum(1 for r in results if r.get("status") == "loaded")
     failed_count = sum(1 for r in results if r.get("status") == "failed")
+
+    # Publish PREFILL_MAPPING_CHANGED event after seed completes
+    try:
+        from app.models.audit_platform_schemas import EventPayload, EventType
+        from app.services.event_bus import event_bus
+
+        changed_wp_codes = []
+        for r in results:
+            if r.get("status") == "loaded" and r.get("seed_name") in (
+                "prefill_formula_mapping", "wp_template_metadata"
+            ):
+                changed_wp_codes.append(r.get("seed_name", ""))
+
+        if changed_wp_codes:
+            await event_bus.publish(EventPayload(
+                event_type=EventType.PREFILL_MAPPING_CHANGED,
+                project_id=current_user.id,
+                extra={"changed_wp_codes": changed_wp_codes},
+            ))
+    except Exception:
+        pass  # Never block main operation
 
     return {
         "total": len(results),

@@ -225,6 +225,7 @@ const FULLWIDTH_PATHS = [
   '/', '/projects/new', '/recycle-bin', '/forum', '/private-storage',
   '/knowledge', '/consolidation', '/attachments', '/confirmation',
   '/archive', '/work-hours',
+  '/template-library', '/custom-query',
 ]
 const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/', '/eqcr/']
 

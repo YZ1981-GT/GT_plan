@@ -1,0 +1,131 @@
+{
+  "description": "K 管理循环校验规则定义（K8 销售费用合计勾稽 + K9 管理费用合计勾稽 + K11 资产减值损失跨循环汇总）",
+  "version": "2025-R1",
+  "rules": [
+    {
+      "rule_id": "VR-K8-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "K8",
+      "description": "K8 销售费用 = K8-2 明细合计（含薪酬+折旧+其他费用类别）",
+      "formula": "ABS(k8_total - sum(k8_2_categories)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "trigger_condition": "K8-1 AND K8-2 saved",
+      "applies_when": {
+        "description": "当 K8 审定表与 K8-2 明细表同时已保存（parsed_data 含对应字段）时触发 blocking；任一未保存时 skip",
+        "required_main_wp": "K8",
+        "required_any_of_subs": ["K8-2"],
+        "skip_message": "K8-2 销售费用明细表未保存，跳过"
+      },
+      "sources": {
+        "k8_total": {
+          "wp": "K8",
+          "sheet": "审定表K8-1",
+          "cell": "销售费用_审定数_合计"
+        },
+        "k8_payroll": {
+          "wp": "K8",
+          "sheet": "明细表K8-2",
+          "cell": "专设销售机构的职工薪酬_合计"
+        },
+        "k8_depreciation": {
+          "wp": "K8",
+          "sheet": "明细表K8-2",
+          "cell": "折旧费_合计"
+        },
+        "k8_other": {
+          "wp": "K8",
+          "sheet": "明细表K8-2",
+          "cell": "其他费用类别_合计"
+        }
+      },
+      "message_template": "K8 销售费用合计勾稽不平衡，差异超过 1 元: 审定数({k8_total}) ≠ 明细合计（薪酬{k8_payroll} + 折旧{k8_depreciation} + 其他{k8_other}）, 差异={diff}"
+    },
+    {
+      "rule_id": "VR-K9-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "K9",
+      "description": "K9 管理费用 = K9-2 明细合计（含薪酬+折旧+其他费用类别）",
+      "formula": "ABS(k9_total - sum(k9_2_categories)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "trigger_condition": "K9-1 AND K9-2 saved",
+      "applies_when": {
+        "description": "当 K9 审定表与 K9-2 明细表同时已保存（parsed_data 含对应字段）时触发 blocking；任一未保存时 skip",
+        "required_main_wp": "K9",
+        "required_any_of_subs": ["K9-2"],
+        "skip_message": "K9-2 管理费用明细表未保存，跳过"
+      },
+      "sources": {
+        "k9_total": {
+          "wp": "K9",
+          "sheet": "审定表K9-1",
+          "cell": "管理费用_审定数_合计"
+        },
+        "k9_payroll": {
+          "wp": "K9",
+          "sheet": "明细表K9-2",
+          "cell": "职工工资_合计"
+        },
+        "k9_depreciation": {
+          "wp": "K9",
+          "sheet": "明细表K9-2",
+          "cell": "折旧费_合计"
+        },
+        "k9_other": {
+          "wp": "K9",
+          "sheet": "明细表K9-2",
+          "cell": "其他费用类别_合计"
+        }
+      },
+      "message_template": "K9 管理费用合计勾稽不平衡，差异超过 1 元: 审定数({k9_total}) ≠ 明细合计（薪酬{k9_payroll} + 折旧{k9_depreciation} + 其他{k9_other}）, 差异={diff}"
+    },
+    {
+      "rule_id": "VR-K11-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "K11",
+      "description": "K11 资产减值损失 = H1-14 固定资产减值 + I3 商誉减值 + G ECL 减值 + F2 存货跌价（汇总类规则时机铁律：至少 1 个来源已保存才触发）",
+      "formula": "ABS(k11_total - (h1_impairment + i3_impairment + g_ecl + f2_impairment)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "warning",
+      "scope": "total",
+      "trigger_condition": "K11_and_at_least_one_source_saved",
+      "applies_when": {
+        "description": "当 K11 已保存且至少 1 个来源底稿（H1/I3/G14/F2）已保存（parsed_data 含对应减值字段）时触发 warning；全部来源未保存时 skip 避免 K11 先保存时误提示",
+        "required_main_wp": "K11",
+        "required_any_of_subs": ["H1", "I3", "G14", "F2"],
+        "skip_message": "跨循环减值来源底稿未保存，跳过"
+      },
+      "sources": {
+        "k11_total": {
+          "wp": "K11",
+          "sheet": "审定表K11-1",
+          "cell": "资产减值损失_审定数_合计"
+        },
+        "h1_impairment": {
+          "wp": "H1",
+          "sheet": "减值测算表H1-14",
+          "cell": "本期固定资产减值损失"
+        },
+        "i3_impairment": {
+          "wp": "I3",
+          "sheet": "减值测试I3-6",
+          "cell": "本期商誉减值损失"
+        },
+        "g_ecl": {
+          "wp": "G14",
+          "sheet": "审定表G14-1",
+          "cell": "信用减值损失_审定数_合计"
+        },
+        "f2_impairment": {
+          "wp": "F2",
+          "sheet": "存货跌价准备F2-47",
+          "cell": "本期存货跌价损失"
+        }
+      },
+      "message_template": "K11 资产减值损失跨循环汇总不平衡，差异超过 1 元: 审定数({k11_total}) ≠ H1固定资产减值({h1_impairment}) + I3商誉减值({i3_impairment}) + G信用减值({g_ecl}) + F2存货跌价({f2_impairment}), 差异={diff}"
+    }
+  ]
+}

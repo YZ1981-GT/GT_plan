@@ -17,6 +17,28 @@ from app.deps import get_db, get_current_user
 
 router = APIRouter(prefix="/api/workpapers", tags=["workpaper-step-mapping"])
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# D 循环前置依赖配置（D-sales-cycle spec F8 Task 2.20）
+# ═══════════════════════════════════════════════════════════════════════════════
+D_CYCLE_PREREQUISITES = [
+    {"wp_code": "B23-1", "label": "了解内部控制", "required": True},
+    {"wp_code": "C2", "label": "控制测试结论", "required": True},
+    {"wp_code": "B51-5", "label": "舞弊风险评估", "required": False},  # 非必须但影响 IPO 触发
+]
+
+# E1 前置依赖配置（参照 wp_prerequisite_status.py）
+E1_CYCLE_PREREQUISITES = [
+    {"wp_code": "B23-2", "label": "货币资金控制了解", "required": True},
+    {"wp_code": "C3", "label": "货币资金控制测试结论", "required": True},
+    {"wp_code": "B51-3", "label": "舞弊风险评估", "required": True},
+]
+
+# 全循环前置依赖注册表（未来扩展 E/F/G/H 等循环时在此追加）
+CYCLE_PREREQUISITES_REGISTRY: dict[str, list[dict]] = {
+    "D": D_CYCLE_PREREQUISITES,
+    "E1": E1_CYCLE_PREREQUISITES,
+}
+
 # Load mapping data at module level (hot-reload friendly)
 _MAPPING_DATA = None
 _RULES_DATA = None
@@ -251,6 +273,7 @@ async def get_wp_validation_rules(
     all_rules = []
     for fname in [
         "d_cycle_validation_rules.json",
+        "f_cycle_validation_rules.json",
         "efghijklmn_cycle_validation_rules.json",
         "bcas_cycle_validation_rules.json",
     ]:
@@ -424,4 +447,52 @@ async def get_stale_chain(
         "primary_code": primary_code,
         "affected": affected,
         "total_affected": len(affected),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# P1: D 循环前置依赖端点（D-sales-cycle spec F8 Task 2.20）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/cycle-prerequisites/{cycle_code}")
+async def get_cycle_prerequisites(
+    cycle_code: str,
+    user=Depends(get_current_user),
+):
+    """获取指定循环的前置依赖配置。
+
+    Parameters:
+        cycle_code: 循环编码（如 'D' 或 'E1'）
+
+    Returns:
+        {
+          "cycle_code": "D",
+          "prerequisites": [
+            {"wp_code": "B23-1", "label": "了解内部控制", "required": true},
+            ...
+          ],
+          "total": 3,
+          "required_count": 2,
+          "message": "D 循环需完成 2 个必要前置 + 1 个可选前置"
+        }
+    """
+    code = cycle_code.upper()
+    # D0~D7 统一归为 D 循环
+    if code.startswith("D") and len(code) > 1 and code[1:2].isdigit():
+        code = "D"
+
+    prereqs = CYCLE_PREREQUISITES_REGISTRY.get(code, [])
+    required_count = sum(1 for p in prereqs if p.get("required", True))
+
+    return {
+        "cycle_code": code,
+        "prerequisites": prereqs,
+        "total": len(prereqs),
+        "required_count": required_count,
+        "message": (
+            f"{code} 循环需完成 {required_count} 个必要前置 + {len(prereqs) - required_count} 个可选前置"
+            if prereqs
+            else f"未配置 {code} 循环前置依赖"
+        ),
     }

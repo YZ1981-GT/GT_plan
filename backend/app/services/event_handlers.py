@@ -173,6 +173,136 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_workpaper_saved)
 
     # ------------------------------------------------------------------
+    # spec workpaper-d-sales-cycle 任务 2.2 (F4 ADR D4):
+    # B51-5 反舞弊高风险评估保存后 → 强制加载 D4 IPO 应对类底稿（D4-22~D4-32）
+    #
+    # 触发条件（AND 关系）:
+    #   1. event_type == WORKPAPER_SAVED
+    #   2. payload.extra['wp_code'] == 'B51-5'
+    #   3. risk_level == 'high'（来自 extra['risk_level'] 或
+    #      extra['parsed_data']['conclusion']['fraud_risk_level']）
+    # ------------------------------------------------------------------
+    async def _on_b515_high_risk(payload: EventPayload) -> None:
+        """B51-5 高风险触发 → 调 _ensure_d4_ipo_loaded 追加加载 D4-22~D4-32。
+
+        即使 project.scenario='normal' 也强制加载（spec ADR D4 铁律：
+        高风险评估覆盖普通项目场景过滤）。
+        """
+        if not payload.extra:
+            return
+        wp_code = payload.extra.get("wp_code", "")
+        if wp_code != "B51-5":
+            return
+
+        # 解析 risk_level：优先 extra['risk_level']，否则从 parsed_data.conclusion 解析
+        risk_level = payload.extra.get("risk_level")
+        if not risk_level:
+            parsed = payload.extra.get("parsed_data") or {}
+            conclusion = parsed.get("conclusion") or {} if isinstance(parsed, dict) else {}
+            risk_level = conclusion.get("fraud_risk_level") or conclusion.get("risk_level")
+
+        if str(risk_level).lower() != "high":
+            return
+
+        project_id = payload.project_id
+        year = payload.year
+        if not project_id or not year:
+            logger.warning(
+                "_on_b515_high_risk: missing project_id or year in payload extra=%s",
+                payload.extra,
+            )
+            return
+
+        async with async_session_factory() as session:
+            try:
+                from app.services.wp_template_init_service import (
+                    _ensure_d4_ipo_loaded,
+                )
+
+                ipo_result = await _ensure_d4_ipo_loaded(
+                    session, project_id, year
+                )
+                await session.commit()
+                logger.info(
+                    "[F4 B51-5 high-risk trigger] project=%s year=%s "
+                    "added=%d skipped=%d errors=%d",
+                    project_id,
+                    year,
+                    len(ipo_result.get("added_codes", [])),
+                    len(ipo_result.get("skipped_existing", [])),
+                    len(ipo_result.get("errors", [])),
+                )
+            except Exception as e:
+                await session.rollback()
+                logger.warning(
+                    "_on_b515_high_risk failed for project=%s year=%s: %s",
+                    project_id, year, e,
+                )
+
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_b515_high_risk)
+
+    # ------------------------------------------------------------------
+    # spec workpaper-f-purchase-inventory F-F14 (ADR-F4):
+    # B51-4 存货舞弊风险评估高风险保存后 → 强制加载 F2 IPO 应对类底稿（F2-61~F2-72）
+    #
+    # 触发条件（AND 关系）:
+    #   1. event_type == WORKPAPER_SAVED
+    #   2. payload.extra['wp_code'] == 'B51-4'
+    #   3. risk_level == 'high'
+    # ------------------------------------------------------------------
+    async def _on_b514_high_risk(payload: EventPayload) -> None:
+        """B51-4 高风险触发 → 调 _ensure_ipo_loaded(prefix='F2') 追加加载 F2-61~F2-72。"""
+        if not payload.extra:
+            return
+        wp_code = payload.extra.get("wp_code", "")
+        if wp_code != "B51-4":
+            return
+
+        risk_level = payload.extra.get("risk_level")
+        if not risk_level:
+            parsed = payload.extra.get("parsed_data") or {}
+            conclusion = parsed.get("conclusion") or {} if isinstance(parsed, dict) else {}
+            risk_level = conclusion.get("fraud_risk_level") or conclusion.get("risk_level")
+
+        if str(risk_level).lower() != "high":
+            return
+
+        project_id = payload.project_id
+        year = payload.year
+        if not project_id or not year:
+            logger.warning(
+                "_on_b514_high_risk: missing project_id or year in payload extra=%s",
+                payload.extra,
+            )
+            return
+
+        async with async_session_factory() as session:
+            try:
+                from app.services.wp_template_init_service import _ensure_ipo_loaded
+
+                ipo_result = await _ensure_ipo_loaded(
+                    session, project_id, year, wp_code_prefix="F2"
+                )
+                await session.commit()
+                logger.info(
+                    "[F-F14 B51-4 high-risk trigger] project=%s year=%s "
+                    "added=%d skipped=%d errors=%d",
+                    project_id,
+                    year,
+                    len(ipo_result.get("added_codes", [])),
+                    len(ipo_result.get("skipped_existing", [])),
+                    len(ipo_result.get("errors", [])),
+                )
+            except Exception as e:
+                await session.rollback()
+                logger.warning(
+                    "_on_b514_high_risk failed for project=%s year=%s: %s",
+                    project_id, year, e,
+                )
+
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_b514_high_risk)
+
+    # ------------------------------------------------------------------
     # R1 需求 2：复核退回 → IssueTicket 工单创建补偿（幂等）
     # ------------------------------------------------------------------
     async def _on_review_record_created(payload: EventPayload) -> None:
@@ -721,3 +851,311 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.WORKPAPER_PROCEDURE_COMPLETED, _on_workpaper_procedure_completed)
     event_bus.subscribe(EventType.CROSS_CHECK_FAILED, _on_cross_check_failed)
     logger.info("Sprint 10: 5 new workpaper event handlers registered")
+
+    # ------------------------------------------------------------------
+    # Global Linkage Bus Sprint 2: Stale Propagation Engine 统一入口
+    # 每个 handler 末尾追加 stale_engine.on_change(uri, project_id, year)
+    # Validates: Requirements F6, F7
+    # ------------------------------------------------------------------
+    from app.services.stale_propagation_engine import stale_engine
+
+    async def _stale_engine_on_adjustment(payload: EventPayload) -> None:
+        """调整分录变更 → stale_engine.on_change（按科目构建 URI）"""
+        if not payload.project_id or not payload.year:
+            return
+        account_codes = payload.account_codes or []
+        for code in account_codes:
+            uri = f"ADJ:{code}::aje_net"
+            try:
+                await stale_engine.on_change(uri, payload.project_id, payload.year)
+            except Exception as e:
+                logger.warning("[stale_engine] on_adjustment failed for %s: %s", uri, e)
+
+    async def _stale_engine_on_data_imported(payload: EventPayload) -> None:
+        """数据导入 → stale_engine.on_change（TB 全量）"""
+        if not payload.project_id or not payload.year:
+            return
+        uri = f"TB:::全量导入"
+        try:
+            await stale_engine.on_change(uri, payload.project_id, payload.year)
+        except Exception as e:
+            logger.warning("[stale_engine] on_data_imported failed: %s", e)
+
+    async def _stale_engine_on_workpaper_saved(payload: EventPayload) -> None:
+        """底稿保存 → stale_engine.on_change"""
+        if not payload.project_id or not payload.year:
+            return
+        extra = payload.extra or {}
+        wp_code = extra.get("wp_code", "")
+        sheet = extra.get("sheet", "")
+        if wp_code:
+            uri = f"WP:{wp_code}:{sheet}:审定数"
+            try:
+                await stale_engine.on_change(uri, payload.project_id, payload.year)
+            except Exception as e:
+                logger.warning("[stale_engine] on_workpaper_saved failed for %s: %s", uri, e)
+
+    async def _stale_engine_on_mapping_changed(payload: EventPayload) -> None:
+        """科目映射变更 → stale_engine.on_change"""
+        if not payload.project_id or not payload.year:
+            return
+        account_codes = payload.account_codes or []
+        for code in account_codes:
+            uri = f"MAPPING:{code}::"
+            try:
+                await stale_engine.on_change(uri, payload.project_id, payload.year)
+            except Exception as e:
+                logger.warning("[stale_engine] on_mapping_changed failed for %s: %s", uri, e)
+
+    event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _stale_engine_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _stale_engine_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _stale_engine_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, _stale_engine_on_adjustment)
+    event_bus.subscribe(EventType.DATA_IMPORTED, _stale_engine_on_data_imported)
+    event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, _stale_engine_on_data_imported)
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _stale_engine_on_workpaper_saved)
+    event_bus.subscribe(EventType.MAPPING_CHANGED, _stale_engine_on_mapping_changed)
+    logger.info("Global Linkage Bus: stale_engine event handlers registered")
+
+    # ------------------------------------------------------------------
+    # Global Linkage Bus Sprint 3: 5 个新事件 handler（反向联动）
+    # FORMULA_CONFIG_CHANGED / PREFILL_MAPPING_CHANGED / NOTE_SECTION_SAVED
+    # ACCOUNT_MAPPING_CHANGED / REPORT_ROW_CHANGED
+    # Validates: Requirements F9, F10, F11, F12, F13, F14, F15
+    # ------------------------------------------------------------------
+
+    async def _stale_engine_on_formula_config_changed(payload: EventPayload) -> None:
+        """公式配置变更 → stale_engine.on_change（按 row_code 构建 REPORT URI）"""
+        if not payload.project_id:
+            return
+        extra = payload.extra or {}
+        row_code = extra.get("row_code", "")
+        if row_code:
+            uri = f"REPORT:{row_code}::"
+            try:
+                year = payload.year or 2025
+                await stale_engine.on_change(uri, payload.project_id, year)
+            except Exception as e:
+                logger.warning("[stale_engine] on_formula_config_changed failed for %s: %s", uri, e)
+
+    async def _stale_engine_on_prefill_mapping_changed(payload: EventPayload) -> None:
+        """预填充映射变更 → stale_engine.on_change（标记相关底稿 stale）"""
+        if not payload.project_id:
+            return
+        extra = payload.extra or {}
+        changed_wp_codes = extra.get("changed_wp_codes", [])
+        year = payload.year or 2025
+        for wp_code in changed_wp_codes:
+            uri = f"WP:{wp_code}::预填充"
+            try:
+                await stale_engine.on_change(uri, payload.project_id, year)
+            except Exception as e:
+                logger.warning("[stale_engine] on_prefill_mapping_changed failed for %s: %s", uri, e)
+
+    async def _stale_engine_on_note_section_saved(payload: EventPayload) -> None:
+        """附注章节保存 → stale_engine.on_change（标记引用该附注的底稿 stale）"""
+        if not payload.project_id or not payload.year:
+            return
+        extra = payload.extra or {}
+        section_code = extra.get("section_code", "")
+        if section_code:
+            uri = f"NOTE:{section_code}::"
+            try:
+                await stale_engine.on_change(uri, payload.project_id, payload.year)
+            except Exception as e:
+                logger.warning("[stale_engine] on_note_section_saved failed for %s: %s", uri, e)
+
+    async def _stale_engine_on_account_mapping_changed(payload: EventPayload) -> None:
+        """科目映射变更 → stale_engine.on_change（全链路 stale）"""
+        if not payload.project_id:
+            return
+        extra = payload.extra or {}
+        affected_codes = extra.get("affected_account_codes", [])
+        year = payload.year or 2025
+        for code in affected_codes:
+            uri = f"MAPPING:{code}::"
+            try:
+                await stale_engine.on_change(uri, payload.project_id, year)
+            except Exception as e:
+                logger.warning("[stale_engine] on_account_mapping_changed failed for %s: %s", uri, e)
+
+    async def _stale_engine_on_report_row_changed(payload: EventPayload) -> None:
+        """报表行变更 → stale_engine.on_change（标记引用该行的底稿 stale）"""
+        if not payload.project_id or not payload.year:
+            return
+        extra = payload.extra or {}
+        changed_row_codes = extra.get("changed_row_codes", [])
+        for row_code in changed_row_codes[:50]:  # Limit to prevent excessive BFS
+            uri = f"REPORT:{row_code}::"
+            try:
+                await stale_engine.on_change(uri, payload.project_id, payload.year)
+            except Exception as e:
+                logger.warning("[stale_engine] on_report_row_changed failed for %s: %s", uri, e)
+
+    event_bus.subscribe(EventType.FORMULA_CONFIG_CHANGED, _stale_engine_on_formula_config_changed)
+    event_bus.subscribe(EventType.PREFILL_MAPPING_CHANGED, _stale_engine_on_prefill_mapping_changed)
+    event_bus.subscribe(EventType.NOTE_SECTION_SAVED, _stale_engine_on_note_section_saved)
+    event_bus.subscribe(EventType.ACCOUNT_MAPPING_CHANGED, _stale_engine_on_account_mapping_changed)
+    event_bus.subscribe(EventType.REPORT_ROW_CHANGED, _stale_engine_on_report_row_changed)
+    logger.info("Global Linkage Bus Sprint 3: 5 new reverse-linkage event handlers registered")
+
+    # ------------------------------------------------------------------
+    # H-F8: H9→H8 租赁两表反向回填 (ADR-H5)
+    # WORKPAPER_SAVED + wp_code='H9' → stale 传播到 H8 使用权资产初始计量
+    # WORKPAPER_SAVED + wp_code='H8-7' → stale 传播到 H8 后续计量
+    # cross_wp_references: CW-217 (H9→H8) / CW-242 (H8-7→H8)
+    # Validates: Requirements H-F8.2, H-F8.3, H-F8.4, H-F8.5
+    # ------------------------------------------------------------------
+
+    # H9/H8-7 wp_code 过滤集合
+    _H_LEASE_REVERSE_WP_CODES = {"H9", "H8-7"}
+
+    async def _on_h_lease_reverse_backfill(payload: EventPayload) -> None:
+        """H9/H8-7 保存 → stale_engine 沿 cross_wp_references 传播到 H8。
+
+        触发条件（AND 关系）:
+          1. event_type == WORKPAPER_SAVED
+          2. payload.extra['wp_code'] in {'H9', 'H8-7'}
+          3. project_id 和 year 有效
+
+        行为:
+          - H9 保存 → stale 传播到 H8 使用权资产初始计量 (CW-217)
+          - H8-7 保存 → stale 传播到 H8 后续计量 (CW-242)
+          - 发布 cross-ref:updated 事件通知前端刷新 H8
+        """
+        if not payload.extra:
+            return
+        wp_code = payload.extra.get("wp_code", "")
+        if wp_code not in _H_LEASE_REVERSE_WP_CODES:
+            return
+
+        project_id = payload.project_id
+        year = payload.year
+        if not project_id or not year:
+            return
+
+        # 构建 stale URI 并传播
+        sheet = payload.extra.get("sheet", "")
+        uri = f"WP:{wp_code}:{sheet}:租赁回填"
+        try:
+            result = await stale_engine.on_change(uri, project_id, year)
+            logger.info(
+                "[H-F8 lease reverse backfill] wp_code=%s project=%s "
+                "affected=%d degraded=%s",
+                wp_code,
+                project_id,
+                result.get("total", 0),
+                result.get("degraded", False),
+            )
+        except Exception as e:
+            logger.warning(
+                "[H-F8 lease reverse backfill] stale propagation failed "
+                "for wp_code=%s project=%s: %s",
+                wp_code, project_id, e,
+            )
+
+        # 发布 cross-ref:updated 事件 → 前端 WorkpaperEditor 自动刷新 H8
+        try:
+            ref_id = "CW-217" if wp_code == "H9" else "CW-242"
+            await event_bus.publish_immediate(
+                EventPayload(
+                    event_type=EventType.CROSS_REF_UPDATED,
+                    project_id=project_id,
+                    year=year,
+                    extra={
+                        "source_wp_code": wp_code,
+                        "target_wp_code": "H8",
+                        "ref_id": ref_id,
+                        "trigger": f"workpaper:saved:{wp_code}",
+                    },
+                )
+            )
+        except Exception as e:
+            logger.warning(
+                "[H-F8 lease reverse backfill] cross-ref:updated publish failed: %s", e
+            )
+
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_h_lease_reverse_backfill)
+    logger.info("H-F8: H9/H8-7 lease reverse backfill event handler registered")
+
+    # ------------------------------------------------------------------
+    # I-F8: I6↔I2 研发费用↔开发支出反向回填 (ADR-I4)
+    # WORKPAPER_SAVED + wp_code='I2' → stale 传播到 I6 资本化支出（CW-265）
+    # WORKPAPER_SAVED + wp_code='I6' → stale 传播到 I2 对应费用化金额（CW-266）
+    # cross_wp_references: CW-265 (I2→I6) / CW-266 (I6→I2)
+    # Validates: Requirements I-F8.2, I-F8.3, I-F8.4, I-F8.5
+    # ------------------------------------------------------------------
+
+    # I2/I6 wp_code 过滤集合 + ref_id 映射（保存方 → 反向回填条目 ref_id）
+    _I_RD_REVERSE_WP_CODES = {"I2", "I6"}
+    _I_RD_REVERSE_REF_ID = {"I2": "CW-265", "I6": "CW-266"}
+    _I_RD_REVERSE_TARGET = {"I2": "I6", "I6": "I2"}
+
+    async def _on_i_rd_reverse_backfill(payload: EventPayload) -> None:
+        """I2/I6 保存 → stale_engine 沿 cross_wp_references 双向传播。
+
+        触发条件（AND 关系）:
+          1. event_type == WORKPAPER_SAVED
+          2. payload.extra['wp_code'] in {'I2', 'I6'}
+          3. project_id 和 year 有效
+
+        行为:
+          - I2 保存（开发支出资本化金额变更）→ stale 传播到 I6 资本化支出 (CW-265)
+          - I6 保存（研发费用费用化金额变更）→ stale 传播到 I2 对应费用化金额 (CW-266)
+          - 发布 cross-ref:updated 事件通知前端刷新对方底稿
+        """
+        if not payload.extra:
+            return
+        wp_code = payload.extra.get("wp_code", "")
+        if wp_code not in _I_RD_REVERSE_WP_CODES:
+            return
+
+        project_id = payload.project_id
+        year = payload.year
+        if not project_id or not year:
+            return
+
+        # 构建 stale URI 并传播
+        sheet = payload.extra.get("sheet", "")
+        uri = f"WP:{wp_code}:{sheet}:研发回填"
+        try:
+            result = await stale_engine.on_change(uri, project_id, year)
+            logger.info(
+                "[I-F8 RD reverse backfill] wp_code=%s project=%s "
+                "affected=%d degraded=%s",
+                wp_code,
+                project_id,
+                result.get("total", 0),
+                result.get("degraded", False),
+            )
+        except Exception as e:
+            logger.warning(
+                "[I-F8 RD reverse backfill] stale propagation failed "
+                "for wp_code=%s project=%s: %s",
+                wp_code, project_id, e,
+            )
+
+        # 发布 cross-ref:updated 事件 → 前端 WorkpaperEditor 自动刷新对方底稿
+        try:
+            ref_id = _I_RD_REVERSE_REF_ID[wp_code]
+            target_wp = _I_RD_REVERSE_TARGET[wp_code]
+            await event_bus.publish_immediate(
+                EventPayload(
+                    event_type=EventType.CROSS_REF_UPDATED,
+                    project_id=project_id,
+                    year=year,
+                    extra={
+                        "source_wp_code": wp_code,
+                        "target_wp_code": target_wp,
+                        "ref_id": ref_id,
+                        "trigger": f"workpaper:saved:{wp_code}",
+                    },
+                )
+            )
+        except Exception as e:
+            logger.warning(
+                "[I-F8 RD reverse backfill] cross-ref:updated publish failed: %s", e
+            )
+
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_i_rd_reverse_backfill)
+    logger.info("I-F8: I2/I6 RD reverse backfill event handler registered")

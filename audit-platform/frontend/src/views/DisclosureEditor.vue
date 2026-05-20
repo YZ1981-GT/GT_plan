@@ -57,9 +57,9 @@
     <!-- 工作流进度条 -->
     <WorkflowProgress :project-id="selectedProjectId" :year="selectedYear" />
 
-    <!-- R8-S2-03：Stale 状态横幅 -->
+    <!-- Sprint 4：StaleIndicator 统一组件 + 横幅 -->
     <div v-if="stale.isStale.value" class="gt-stale-banner">
-      <span class="gt-stale-icon">⚠️</span>
+      <StaleIndicator :stale="true" tooltip="上游数据已变更，附注数据可能过时" />
       <span class="gt-stale-text">
         上游数据已变更（{{ stale.staleCount.value }} 张底稿待重算），附注数据可能过时
       </span>
@@ -424,7 +424,22 @@
     <div class="gt-ucell-ctx-item" @click="onDeCtxPenetrateToLedger">
       <span class="gt-ucell-ctx-icon">📊</span> 穿透到序时账
     </div>
+    <!-- Sprint 5.7：查看数据来源 -->
+    <div class="gt-ucell-ctx-item" @click="onDeCtxViewDataSource">
+      <span class="gt-ucell-ctx-icon">🔍</span> 查看数据来源
+    </div>
   </CellContextMenu>
+
+  <!-- Sprint 5.7: 数据来源弹窗 -->
+  <CellFormulaDetail
+    :visible="showCellFormulaDetail"
+    module="NOTE"
+    :wp-code="cellDetailWpCode"
+    :sheet-name="cellDetailSheet"
+    :label="cellDetailLabel"
+    @update:visible="showCellFormulaDetail = $event"
+    @navigate="onCellDetailNavigate"
+  />
 
   <!-- 知识库文档选择弹窗 [R3.7] -->
   <KnowledgePickerDialog v-model:visible="knowledgePickerVisible" />
@@ -446,6 +461,7 @@ import { useCellSelection } from '@/composables/useCellSelection'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useEditMode } from '@/composables/useEditMode'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
@@ -510,6 +526,7 @@ onDatasetRolledBack(() => fetchTree())
 
 // R8-S2-03：Stale 状态追踪
 import { useStaleStatus } from '@/composables/useStaleStatus'
+import StaleIndicator from '@/components/StaleIndicator.vue'
 const stale = useStaleStatus(projectId)
 async function onStaleRecalc() {
   await stale.recalc()
@@ -522,14 +539,7 @@ const editLock = useEditingLock({
   autoAcquire: false,
 })
 
-// 编辑锁联动：进入编辑时 acquire，退出时 release；他人持锁时强制退出
-watch(() => editMode.value, async (editing) => {
-  if (editing) await editLock.acquire()
-  else editLock.release()
-})
-watch(() => editLock.isMine.value, (mine) => {
-  if (!mine && editMode.value) exitEdit()
-})
+// 编辑锁联动 watch 推迟到 useEditMode 定义之后挂载（避免 TDZ）
 
 // R7-S2-05：后端定时自动保存（2 分钟间隔）
 const autoSave = useWorkpaperAutoSave(async () => {
@@ -628,6 +638,15 @@ const showPrintPreview = ref(false)
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
 const syncError = ref(false)
 const { isEditing: editMode, isDirty: editDirty, enterEdit, exitEdit, markDirty: markEditDirty, clearDirty: clearEditDirty } = useEditMode()
+
+// 编辑锁联动：进入编辑时 acquire，退出时 release；他人持锁时强制退出
+watch(() => editMode.value, async (editing) => {
+  if (editing) await editLock.acquire()
+  else editLock.release()
+})
+watch(() => editLock.isMine.value, (mine) => {
+  if (!mine && editMode.value) exitEdit()
+})
 const templateType = ref('soe')
 const justSaved = ref(false)
 const customTemplateId = ref('')
@@ -1743,6 +1762,38 @@ function onDeCtxPenetrateToLedger() {
     penetrate.toLedger(String(accountCode))
   } else {
     ElMessage.warning('无法识别当前行的科目编码')
+  }
+}
+
+// Sprint 5.7: 查看数据来源
+const showCellFormulaDetail = ref(false)
+const cellDetailWpCode = ref('')
+const cellDetailSheet = ref('')
+const cellDetailLabel = ref('')
+
+function onDeCtxViewDataSource() {
+  deCtx.closeContextMenu()
+  const note = currentNote.value
+  if (!note?.note_section) {
+    ElMessage.warning('请先选择附注章节')
+    return
+  }
+  cellDetailWpCode.value = note.note_section
+  cellDetailSheet.value = ''
+  cellDetailLabel.value = ''
+  showCellFormulaDetail.value = true
+}
+
+function onCellDetailNavigate(uri: string) {
+  showCellFormulaDetail.value = false
+  const parts = uri.split(':')
+  const mod = parts[0]?.toUpperCase()
+  if (mod === 'WP' && parts[1]) {
+    router.push({ name: 'WorkpaperEditor', params: { id: projectId.value }, query: { wp: parts[1] } })
+  } else if (mod === 'REPORT') {
+    router.push({ name: 'ReportView', params: { id: projectId.value } })
+  } else if (mod === 'TB') {
+    router.push({ path: `/projects/${projectId.value}/trial-balance` })
   }
 }
 

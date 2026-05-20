@@ -15,28 +15,32 @@ inclusion: manual
 - OCR：Tesseract + MinerU（GPU 加速）+ PaddleOCR
 - 文件存储：本地磁盘 storage/ + Paperless-ngx（OCR/检索）+ 云端归档（S3/SFTP/SMB）
 
-## 系统规模（2026-05-05 实测）
+## 系统规模（2026-05-18 实测）
 
-- 后端路由：127 个文件，按 11 个业务域分组（router_registry.py）
-- 后端服务：181 个文件（含子目录 import_engine/、wp_scripts/）
-- 后端模型：39 个文件，~152 张数据库表
+- 后端路由文件：**202** 个（router_registry.py 11 个业务域分组）
+- 后端服务文件：**325** 个（含子目录 import_engine/、wp_scripts/、ledger_import/ 等）
+- 后端模型文件：**56** 个，PG ~**188** 张表
+- 后端 Alembic 迁移：**59** 个版本文件
+- 后端 Worker：**10** 个（audit_log_writer / budget_alert / dataset_purge / import_recover / import / outbox_replay / qc_rating / reviewer_metrics / sla / staged_orphan_cleaner）
+- 后端测试：**282** 个测试文件
 - 后端中间件：9 个（audit_log/audit_log_middleware/auth_middleware/body_limit/error_handler/observability/rate_limiter/request_id/response）
 - 后端核心模块：11 个（core/）
-- 后端 Worker：4 个（workers/）— sla_worker、import_recover_worker、outbox_replay_worker、import_worker
-- 后端测试：98 个单元/集成测试文件 + 4 个 E2E + 4 个集成测试
-- 前端页面：80 个 Vue 页面（views/）
-- 前端组件：20 个 common 组件 + 150+ 个业务组件
-- 前端 Pinia store：9 个（auth/project/collaboration/roleContext/wizard/dict/displayPrefs/drilldown/addressRegistry）
-- 前端 composables：16 个
-- 前端 services：19 个文件（含 apiPaths.ts 500+ 路径）
-- 前端 utils：19 个文件
-- 数据库迁移脚本：3 个（V001__init / V002__add_schema_version / V003__example_add_comment）
-- 底稿精细化规则：347 个 JSON
-- 前端依赖：22 dependencies + 7 devDependencies
+- V*.sql 迁移脚本：3 个（V001__init / V002__add_schema_version / V003__example_add_comment）
+- 前端页面：**96** 个 Vue 视图（views/ 含子目录）
+- 前端组件：**280** 个（components/ 含所有子目录）
+- 前端 common 组件：**28** 个
+- 前端 composables：**51** 个
+- 前端 stores：**9** 个（auth/project/collaboration/roleContext/wizard/dict/displayPrefs/drilldown/addressRegistry）
+- 前端 services：**30** 个文件（含 apiPaths.ts 1558 行）
+- 前端 utils：**23** 个文件
+- 底稿模板：**473** 个（xlsx + docx）
+- 底稿精细化规则：**347** 个 JSON
+- 底稿模板索引：**363** 条（gt_template_library.json）
+- 底稿科目映射：**206** 条（wp_account_mapping.json v2025-R5）
 
-## 前端全局组件库（2026-05-05 完成）
+## 前端全局组件库（2026-05-18 更新）
 
-### Composables（composables/）— 16 个
+### Composables（composables/）— 51 个
 | 文件 | 功能 | 接入模块数 |
 |------|------|-----------|
 | useFullscreen | 全屏切换+ESC退出 | 17（13 worksheet + 4 views） |
@@ -69,7 +73,7 @@ inclusion: manual
 | dict | 枚举字典（后端 /api/system/dicts） | 全局（sessionStorage 缓存） |
 | addressRegistry | 地址坐标全局注册表 | CellSelector/FormulaRefPicker |
 
-### Common Components（components/common/）— 20 个
+### Common Components（components/common/）— 28 个
 | 文件 | 功能 |
 |------|------|
 | CellContextMenu | 右键菜单+全局选中样式 |
@@ -94,7 +98,7 @@ inclusion: manual
 | KnowledgePickerDialog | 知识库文档选择器 |
 | SharedTemplatePicker | 共享模板选择器（8 configType） |
 
-### Utils（utils/）— 19 个文件
+### Utils（utils/）— 23 个文件
 | 文件 | 功能 | 状态 |
 |------|------|------|
 | formatters.ts | 金额/日期/百分比格式化+单位换算 | 5核心+14worksheet |
@@ -110,10 +114,10 @@ inclusion: manual
 | importValidation.ts + 相关 | 统一导入流程工具（5个文件） | 导入模块 |
 | webVitals.ts | Web Vitals 上报 | 全局 |
 
-### Services（services/）— 19 个文件
-- apiPaths.ts — API 路径集中管理（500+ 路径，40+ 业务域）
+### Services（services/）— 30 个文件
+- apiPaths.ts — API 路径集中管理（1558 行，40+ 业务域）
 - apiProxy.ts — 统一 API 代理（所有 view/component 通过此访问）
-- auditPlatformApi.ts、consolidationApi.ts、workpaperApi.ts 等 16 个业务 API 文件
+- auditPlatformApi.ts、consolidationApi.ts、workpaperApi.ts 等 28 个业务 API 文件
 
 ### 后端基础设施（core/）— 12 个模块
 | 文件 | 功能 | 状态 |
@@ -126,8 +130,20 @@ inclusion: manual
 | core/security.py | JWT 认证 + 权限 | 全局 |
 | core/redis.py | Redis 连接管理 | 全局 |
 | core/container.py | 依赖注入容器 | 全局 |
-| services/equity_method_service.py | 模拟权益法（6 项改进） | 合并模块 |
-| services/elimination_service.py | 抵消分录 + 汇总中心（5 区域）+ 自动汇总 | 合并模块 |
+
+### 后端 Worker（workers/）— 10 个
+| 文件 | 功能 |
+|------|------|
+| sla_worker | SLA 超时检测 |
+| import_worker | 账表导入主 Worker |
+| import_recover_worker | 导入中断恢复 |
+| outbox_replay_worker | 事件 outbox 重放 |
+| dataset_purge_worker | superseded 数据集清理 |
+| staged_orphan_cleaner | 孤立 staged 数据清理 |
+| audit_log_writer_worker | 审计日志异步写入 |
+| budget_alert_worker | 预算预警 |
+| qc_rating_worker | QC 评分计算 |
+| reviewer_metrics_worker | 复核人指标统计 |
 
 ## 11 个业务域（router_registry.py）
 
@@ -157,7 +173,7 @@ inclusion: manual
 ## 关键环境配置
 
 - Git 远程：https://github.com/YZ1981-GT/GT_plan.git（master 分支）
-- 后端端口：9980，前端端口：3030，vLLM：8100，ONLYOFFICE：8080，Paperless：8010，Redis：6379，PG：5432
+- 后端端口：9980，前端端口：3030，vLLM：8100，Paperless：8010，Redis：6379，PG：5432
 - 初始化数据库：`python backend/scripts/_init_tables.py`（自动扫描 models + create_all + 种子数据）+ `python backend/scripts/_create_admin.py`（admin/admin123）
 - 数据库迁移：启动时 migration_runner.py 自动扫描 backend/migrations/V*.sql 执行未应用版本
 - 启动开发：`start-dev.bat` 或 `uvicorn app.main:app --host 0.0.0.0 --port 9980 --reload --reload-dir app`（从 backend/ 目录）
@@ -169,34 +185,26 @@ inclusion: manual
 - `backend/data/report_config_seed.json` — 报表行次种子（4 套 × 6 张报表，1191 行）
 - `backend/data/note_template_soe.json` — 国企版附注模板（14 章 170 节）
 - `backend/data/note_template_listed.json` — 上市版附注模板（17 章 185 节）
-- `backend/data/wp_account_mapping.json` — 底稿科目映射（88 条）
+- `backend/data/wp_account_mapping.json` — 底稿科目映射（206 条 v2025-R5）
 - `backend/data/wp_fine_rules/` — 347 个底稿精细化规则 JSON
 - `backend/data/wp_system_map.json` — 底稿体系全景图（四阶段递进+11个业务循环关联）
 - `backend/data/gt_template_library.json` — 363 条底稿模板索引
 - `backend/data/standard_account_chart.json` — 标准科目表（166 个）
 
-## 17 个开发阶段状态
+## 开发阶段状态（全部 ✅ 完成）
 
 | 阶段 | 名称 | 状态 |
 |------|------|------|
-| Phase 0 | 基础设施 | ✅ 完成 |
-| Phase 1a | MVP Core | ✅ 完成 |
-| Phase 1b | MVP Report | ✅ 完成 |
-| Phase 1c | MVP Workpaper | ✅ 完成 |
-| Phase 2 | 合并报表 | ✅ 完成（前端 TS 错误已全部修复） |
-| Phase 3 | 协作功能 | ✅ 死代码已清理 |
-| Phase 4 | AI 服务 | ✅ 通过统一入口间接可达 |
-| Phase 5 | 扩展功能 | ✅ 完成 |
-| Phase 6 | 深度集成 | ✅ 完成 |
-| Phase 7 | 增强功能 | ✅ 完成 |
-| Phase 8 | 数据模型优化 | ✅ 完成（性能测试待真实环境） |
-| Phase 11 | 系统加固 | ✅ 完成 |
-| Phase 12 | 底稿深度开发 | ✅ 完成 |
-| Phase 13 | Word 导出引擎 | ✅ 完成 |
-| Phase 14 | 门禁引擎 | ✅ 完成 |
-| Phase 15 | 任务树编排 | ✅ 完成 |
-| Phase 16 | 取证版本链 | ✅ 完成 |
-| Phase 17 | 数据集版本治理 | ✅ 完成 |
+| Phase 0 | 基础设施 | ✅ |
+| Phase 1a/1b/1c | MVP Core/Report/Workpaper | ✅ |
+| Phase 2 | 合并报表 | ✅ |
+| Phase 3 | 协作功能 | ✅ |
+| Phase 4 | AI 服务 | ✅ |
+| Phase 5-7 | 扩展/深度集成/增强 | ✅ |
+| Phase 8 | 数据模型优化 | ✅ |
+| Phase 11-17 | 系统加固~数据集版本治理 | ✅ |
+
+当前处于**系统打磨+底稿深度优化**阶段，通过 spec 三件套驱动迭代。47 个 spec 目录见 `.kiro/specs/INDEX.md`。
 
 ## 底稿精细化规则分级体系
 
@@ -359,3 +367,42 @@ where.append(sa.or_(loss_gain_active, other_active))
 - 首版无 previous 返回 None 不改状态
 - 跨项目 A staged + B active 互不污染（按 project_id 隔离）
 - 两项目同时 active 查询严格隔离
+
+## 账表导入可见性架构（B' 视图重构，2026-05-11 落地）
+
+- 业务查询统一走 `get_active_filter(db, table, pid, year)` 过滤可见数据
+- pipeline 写入 `is_deleted=False`，staged 隔离靠 `dataset.status=staged`
+- `DatasetService.activate/rollback` 只改 metadata（不 UPDATE 200 万行），activate <1s
+- 4 张 Tb* 表 + partial index `WHERE is_deleted=false` 覆盖 active 查询
+- CI guard：`Tb*.is_deleted==` baseline=6（year=None 兜底分支），新增查询必须走 get_active_filter
+
+## 底稿模块架构（2026-05-17 落地）
+
+- 模板文件：473 个致同 2025 修订版（xlsx + docx），存储 `backend/wp_templates/`
+- 元数据：`wp_template_metadata` 表 179 主编码 + 24 子表继承 = 203 条
+- 映射：`wp_account_mapping.json` 206 条（D-N 科目驱动 + A/B/C/S 阶段驱动，v2025-R5）
+- 组件选型：Univer（xlsx 公式类）/ el-form（问答类）/ el-table（清单类）/ 富文本（docx 类）/ 混合视图
+- 预填充双路径：生成时用 `prefill_formula_mapping.json`（119 条语义映射）；编辑时扫 xlsx 内嵌 `=TB()/=WP()` 公式执行
+- 公式引擎类型 10 种：TB / SUM_TB / WP / AUX / PREV / ADJ / LEDGER / NOTE / TB_AUX / LEDGER_DETAIL
+- 地址坐标 URI 格式：`{wp_code}:{sheet_name}:{label}`（语义描述稳定标识，物理坐标运行时动态解析）
+- 全局联动：Unified Linkage Bus + 统一依赖图 46K 节点 / 36K 边 + Stale Propagation Engine BFS（spec 三件套已完成）
+
+## 关键 PG 事实
+
+- `working_paper` 表名单数（不是 working_papers）
+- WorkingPaper 模型无 year/wp_code 字段（year 从 Project 取，wp_code 从 wp_index JOIN 取）
+- `check_consol_lock` 必须用 SAVEPOINT（否则 rollback 让 ORM 对象 expired → MissingGreenlet）
+- PG enum 值：`report_type` 7 个 / `job_status_enum` 13 个（含 interrupted/retrying/cancelled）
+- SQLAlchemy `session.refresh(obj)` 会覆盖未 flush 修改；`db.add(obj)` 不立即生成 PK 需先 flush
+- 任何 `try: db.execute(...) except: pass` 必须在 except 中 `await db.rollback()`（否则 session 进 aborted 状态）
+- `async with db.begin_nested()` SAVEPOINT 模式：探测性查询失败只回滚子事务不破坏外层
+
+## 关键前端事实
+
+- apiProxy：`api.get/post` 返回 unwrapped data；HTTPException.detail 走 `body.message` 字段
+- token 存 sessionStorage（不是 localStorage）；fetch 用 `sessionStorage.getItem('token') || localStorage.getItem('token')`
+- DefaultLayout `FULLWIDTH_PATHS` 数组：新建一级路由必须登记，否则被三栏布局吞掉
+- Univer JSON `cellData[r][c].s` 可以是 inline dict 或 styleId 字符串引用（必须 isinstance 校验）
+- openpyxl `Color.rgb` 对 theme/indexed 色返回降级字符串，必须用 `_safe_hex_rgb()` 二次校验
+- el-dialog 必须 `append-to-body`（三栏布局 overflow:hidden 截断）
+- eventBus 新事件必须先在 Events type map 添加键（mitt 运行时通过但 TS 报错）

@@ -143,14 +143,13 @@
       <template #col-created_at="{ row }">{{ row.created_at?.slice(0, 10) }}</template>
       <template #col-review_status="{ row }">
         <GtStatusTag dict-key="adjustment_status" :value="row.review_status" />
-        <!-- Spec A R1：已转错报但错报阈值变化时显示 stale 标志 -->
-        <el-tooltip
+        <!-- Sprint 4：StaleIndicator 统一组件 -->
+        <StaleIndicator
           v-if="row.converted_to_misstatement_id && missStaleIdSet.has(row.converted_to_misstatement_id)"
-          content="错报阈值已变更，建议重新评估"
-          placement="top"
-        >
-          <span style="margin-left: 4px; cursor: help">🟡</span>
-        </el-tooltip>
+          :stale="true"
+          tooltip="错报阈值已变更，建议重新评估"
+          size="small"
+        />
       </template>
       <template #extra-columns>
         <el-table-column label="操作" width="180" fixed="right">
@@ -186,6 +185,9 @@
       <template #context-menu="{ selectedCells }">
         <div class="gt-ucell-ctx-item" @click="onCtxRelatedWp(selectedCells)">
           <span class="gt-ucell-ctx-icon">📝</span> 查看关联底稿
+        </div>
+        <div class="gt-ucell-ctx-item" @click="onCtxViewImpactScope(selectedCells)">
+          <span class="gt-ucell-ctx-icon">🔎</span> 查看影响范围
         </div>
       </template>
     </GtEditableTable>
@@ -354,6 +356,17 @@
       :year="year"
       @imported="onImported"
     />
+
+    <!-- Sprint 5.9: 影响范围弹窗 -->
+    <CellFormulaDetail
+      :visible="showCellFormulaDetail"
+      module="ADJ"
+      :wp-code="cellDetailWpCode"
+      :sheet-name="cellDetailSheet"
+      :label="cellDetailLabel"
+      @update:visible="showCellFormulaDetail = $event"
+      @navigate="onCellDetailNavigate"
+    />
   </div>
 </template>
 
@@ -387,6 +400,7 @@ import { useFullscreen } from '@/composables/useFullscreen'
 import { useEditMode } from '@/composables/useEditMode'
 // Spec A R1：跨视图 stale 摘要
 import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
+import StaleIndicator from '@/components/StaleIndicator.vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
@@ -395,6 +409,7 @@ import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import GtEditableTable from '@/components/common/GtEditableTable.vue'
 import type { GtColumn } from '@/components/common/GtEditableTable.vue'
 import ImpactPreviewPanel from '@/components/ImpactPreviewPanel.vue'
+import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import { useImpactPreview } from '@/composables/useImpactPreview'
 
 const route = useRoute()
@@ -488,6 +503,40 @@ async function onCtxRelatedWp(selectedCells: any[]) {
     ElMessage.info(`该分录关联 ${wps.length} 张底稿：\n${list}`)
   } catch (e: any) {
     handleApiError(e, '查看关联底稿')
+  }
+}
+
+// Sprint 5.9: 查看影响范围
+const showCellFormulaDetail = ref(false)
+const cellDetailWpCode = ref('')
+const cellDetailSheet = ref('')
+const cellDetailLabel = ref('')
+
+function onCtxViewImpactScope(_selectedCells: any[]) {
+  const ctxMenu = (adjTableRef.value as any)?.cellSelection?.contextMenu
+  const row = ctxMenu?.row
+  if (!row?.standard_account_code) {
+    ElMessage.warning('请右键点击具体分录行')
+    return
+  }
+  cellDetailWpCode.value = row.standard_account_code
+  cellDetailSheet.value = ''
+  cellDetailLabel.value = ''
+  showCellFormulaDetail.value = true
+}
+
+function onCellDetailNavigate(uri: string) {
+  showCellFormulaDetail.value = false
+  const parts = uri.split(':')
+  const mod = parts[0]?.toUpperCase()
+  if (mod === 'WP' && parts[1]) {
+    router.push({ name: 'WorkpaperEditor', params: { id: projectId.value }, query: { wp: parts[1] } })
+  } else if (mod === 'REPORT') {
+    router.push({ name: 'ReportView', params: { id: projectId.value } })
+  } else if (mod === 'NOTE') {
+    router.push({ name: 'DisclosureEditor', params: { id: projectId.value } })
+  } else if (mod === 'TB') {
+    router.push({ path: `/projects/${projectId.value}/trial-balance` })
   }
 }
 usePasteImport({

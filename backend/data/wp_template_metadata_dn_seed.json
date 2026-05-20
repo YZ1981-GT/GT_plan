@@ -1050,7 +1050,7 @@
       "cross_wp_references": []
     },
     {
-      "wp_code": "D5",
+      "wp_code": "D6",
       "wp_name": "合同资产审定表",
       "component_type": "univer",
       "audit_stage": "substantive",
@@ -1231,7 +1231,7 @@
       "cross_wp_references": []
     },
     {
-      "wp_code": "D6",
+      "wp_code": "D7",
       "wp_name": "合同负债审定表",
       "component_type": "univer",
       "audit_stage": "substantive",
@@ -1406,7 +1406,7 @@
       "cross_wp_references": []
     },
     {
-      "wp_code": "D7",
+      "wp_code": "D5",
       "wp_name": "应收款项融资审定表",
       "component_type": "univer",
       "audit_stage": "substantive",
@@ -1969,7 +1969,143 @@
         "1012"
       ],
       "note_section": "五、1",
-      "cross_wp_references": []
+      "cross_wp_references": [],
+      "header_cells": {
+        "default": {
+          "company_name": {
+            "cell": "A3",
+            "source": "底稿目录!A2"
+          },
+          "audit_period": {
+            "cell": "E3",
+            "source": "底稿目录!A4"
+          },
+          "audit_period_subtitle": {
+            "cell": "G3",
+            "source": "底稿目录!A5"
+          },
+          "index_no": {
+            "cell": "J3",
+            "source": "底稿目录!F7"
+          },
+          "preparer": {
+            "cell": "A4",
+            "field": "preparer_name_with_date"
+          },
+          "reviewer": {
+            "cell": "E4",
+            "field": "reviewer_name_with_date"
+          },
+          "page_no": {
+            "cell": "G4",
+            "field": "page_no"
+          }
+        },
+        "sheet_overrides": {
+          "银行存款及其他货币资金明细表(人民币及外币)E1-3": {
+            "company_name": {
+              "cell": "A3",
+              "source": "底稿目录!A2"
+            },
+            "audit_period": {
+              "cell": "G3",
+              "source": "底稿目录!A4"
+            },
+            "audit_period_subtitle": {
+              "cell": "L3",
+              "source": "底稿目录!A5"
+            },
+            "index_no": {
+              "cell": "R3",
+              "source": "底稿目录!F9"
+            },
+            "preparer": {
+              "cell": "A4",
+              "field": "preparer_name_with_date"
+            },
+            "reviewer": {
+              "cell": "G4",
+              "field": "reviewer_name_with_date"
+            },
+            "page_no": {
+              "cell": "Q4",
+              "field": "page_no"
+            }
+          },
+          "数字货币明细表E1-4": {
+            "company_name": {
+              "cell": "A3",
+              "source": "底稿目录!A2"
+            },
+            "audit_period": {
+              "cell": "E3",
+              "source": "底稿目录!A4"
+            },
+            "audit_period_subtitle": {
+              "cell": "K3",
+              "source": "底稿目录!A5"
+            },
+            "index_no": {
+              "cell": "Q3",
+              "source": "底稿目录!F10"
+            },
+            "preparer": {
+              "cell": "A4",
+              "field": "preparer_name_with_date"
+            },
+            "reviewer": {
+              "cell": "E4",
+              "field": "reviewer_name_with_date"
+            },
+            "page_no": {
+              "cell": "P4",
+              "field": "page_no"
+            }
+          }
+        }
+      },
+      "llm_prompts": {
+        "audit_conclusion": {
+          "title": "审计说明自动生成(R40-R46 区域)",
+          "scenario": "E1-1 货币资金审定表结论区",
+          "system_prompt": "你是一名注册会计师,基于以下 货币资金审定表 数据,生成专业、简洁、客观的审计说明草稿。要求覆盖:1)期末审定数;2)主要变动原因;3)异常项说明;4)审计程序执行情况;5)结论建议。语言风格:正式、专业、谨慎,不下结论性判断除非数据明确支撑。",
+          "user_template": "项目:{company_name_masked}\n审计期间:{audit_period}\n货币资金期末审定数:{audited_amount}\n本期变动:{period_change} (变动率 {change_rate:.2%})\n上年审定数:{prior_amount}\nAJE 调整:{aje_total}\nRJE 调整:{rje_total}\n异常发现:{anomalies}\n\n请生成 200-300 字的审计说明草稿。",
+          "output_target": {
+            "sheet": "货币资金审定表E1-1",
+            "cell": "R41"
+          }
+        },
+        "variance_analysis": {
+          "title": "差异原因分析",
+          "scenario": "E1-1 R45 异常发现 / E1-6 余额调节差异",
+          "system_prompt": "你是一名注册会计师,基于以下 银行存款余额调节差异/审定数变动 数据,分析差异成因。覆盖:1)差异金额与方向;2)可能成因(在途存款/在途票据/银行错记/未达账项);3)是否需要调整分录;4)是否构成错报。",
+          "user_template": "项目:{company_name_masked}\n差异金额:{diff_amount}\n差异方向:{diff_direction}\n涉及银行:{bank_name_masked}\n重要性水平:{materiality_level}\n\n请生成 100-200 字的差异分析。",
+          "output_target": {
+            "sheet": "银行存款余额调节表E1-6",
+            "cell": "差异说明区"
+          }
+        },
+        "check_conclusion": {
+          "title": "检查结论生成(B/D 类弹窗)",
+          "scenario": "E1-7~E1-11 库存现金盘点/银行存单盘点/银行账户清单核对/承诺书",
+          "system_prompt": "你是一名注册会计师,基于以下 检查清单完成情况,生成检查结论。覆盖:1)检查范围与覆盖率;2)发现的问题;3)整改情况;4)结论(是否充分适当)。",
+          "user_template": "检查类型:{check_type}\n检查范围:{check_scope}\n通过项数:{passed_count}/{total_count}\n异常项:{exceptions}\n附件数量:{attachment_count}\n\n请生成 80-150 字的检查结论。",
+          "output_target": {
+            "sheet": "_active",
+            "cell": "结论区"
+          }
+        },
+        "cutoff_conclusion": {
+          "title": "截止测试结论",
+          "scenario": "E1-21~E1-23 截止测试 — 跨期凭证检查",
+          "system_prompt": "你是一名注册会计师,基于以下 截止测试样本检查情况,生成截止测试结论。覆盖:1)测试范围(跨期前后天数);2)样本量;3)异常发现;4)是否存在跨期错报。",
+          "user_template": "截止日:{cutoff_date}\n前后天数:{days_before}/{days_after}\n样本量:{sample_count}\n金额范围:{amount_range}\n异常项:{issues_count}\n\n请生成 100-150 字的截止测试结论。",
+          "output_target": {
+            "sheet": "_active",
+            "cell": "截止测试结论区"
+          }
+        }
+      }
     },
     {
       "wp_code": "F0",

@@ -545,6 +545,37 @@ class ReportEngine:
             import logging
             logging.getLogger(__name__).warning(f"[VERSION_LINE] report write_stamp failed: {_vl_err}")
 
+        # ── Global Linkage Bus Sprint 3: Publish REPORT_ROW_CHANGED event ──
+        try:
+            from app.models.audit_platform_schemas import EventPayload, EventType
+            from app.services.event_bus import event_bus
+
+            # Collect row_codes that have non-zero values (changed rows)
+            changed_row_codes: list[str] = []
+            for rt_value, rows in results.items():
+                if rt_value in ("coverage_stats", "debug_info"):
+                    continue
+                if isinstance(rows, list):
+                    for row in rows:
+                        if isinstance(row, dict):
+                            amount = row.get("current_period_amount") or row.get("amount") or 0
+                            if amount:
+                                rc = row.get("row_code", "")
+                                if rc:
+                                    changed_row_codes.append(rc)
+
+            if changed_row_codes:
+                await event_bus.publish(EventPayload(
+                    event_type=EventType.REPORT_ROW_CHANGED,
+                    project_id=project_id,
+                    year=year,
+                    extra={
+                        "changed_row_codes": changed_row_codes[:100],  # Limit payload size
+                    },
+                ))
+        except Exception:
+            pass  # Never block main operation
+
         return results
 
     async def _generate_report(

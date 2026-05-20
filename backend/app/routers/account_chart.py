@@ -467,4 +467,20 @@ async def batch_update_accounts(
         updated += 1
 
     await db.commit()
+
+    # Publish ACCOUNT_MAPPING_CHANGED event
+    try:
+        from app.models.audit_platform_schemas import EventPayload, EventType
+        from app.services.event_bus import event_bus
+
+        affected_codes = [item.account_code for item in body.updates if item.account_code]
+        if affected_codes:
+            await event_bus.publish(EventPayload(
+                event_type=EventType.ACCOUNT_MAPPING_CHANGED,
+                project_id=project_id,
+                extra={"affected_account_codes": affected_codes},
+            ))
+    except Exception:
+        pass  # Never block main operation
+
     return {"updated": updated, "total": len(body.updates)}

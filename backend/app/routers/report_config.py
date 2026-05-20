@@ -95,8 +95,32 @@ async def update_report_config(
     """修改配置行"""
     svc = ReportConfigService(db)
     try:
+        # Capture old formula for event payload
+        old_row = await svc.get_config(config_id)
+        old_formula = old_row.formula if old_row else None
+
         row = await svc.update_config(config_id, updates, user_id=current_user.id)
         await db.commit()
+
+        # Publish FORMULA_CONFIG_CHANGED event if formula changed
+        try:
+            new_formula = row.formula if row else None
+            if old_formula != new_formula:
+                from app.models.audit_platform_schemas import EventPayload, EventType
+                from app.services.event_bus import event_bus
+
+                await event_bus.publish(EventPayload(
+                    event_type=EventType.FORMULA_CONFIG_CHANGED,
+                    project_id=current_user.id,  # Use user id as fallback; row has no project_id
+                    extra={
+                        "row_code": row.row_code if row else "",
+                        "old_formula": old_formula,
+                        "new_formula": new_formula,
+                    },
+                ))
+        except Exception:
+            pass  # Never block main operation
+
         return ReportConfigRow.model_validate(row)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

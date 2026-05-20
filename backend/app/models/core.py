@@ -104,6 +104,19 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     risk_level: Mapped[str | None] = mapped_column(String(10), nullable=True, comment="风险等级: high/medium/low")
     risk_level_updated_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
+    # E1 Sprint 2 Task 2.1: 场景驱动裁剪（F1.1 + F1.6）
+    scenario: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        server_default=text("'normal'"),
+        comment="项目场景: normal/ipo/listed/transfer/restructure/fraud_response",
+    )
+    has_foreign_currency: Mapped[bool] = mapped_column(
+        nullable=False,
+        server_default=text("false"),
+        comment="是否有外币业务（驱动 E1-1 双区显隐 + E1-3 双版本二选一）",
+    )
+
     __table_args__ = (
         Index(
             "idx_projects_status",

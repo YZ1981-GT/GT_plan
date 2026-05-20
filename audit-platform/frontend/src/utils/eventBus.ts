@@ -123,6 +123,78 @@ export interface WorkpaperLocateCellPayload {
   cellRef: string
 }
 
+/** 复核标记变更（Foundation Task 2.9：触发循环徽章刷新） */
+export interface ReviewMarkChangedPayload {
+  projectId: string
+  wpId: string
+}
+
+// ─── E1 Sprint 2 新增事件类型 ───────────────────────────────────────────────
+
+/** 试算表变更（E1 Sprint 2 Task 2.33: 触发 prefill 重取） */
+export interface TrialBalanceUpdatedPayload {
+  projectId: string
+  year?: number
+}
+
+/** 调整分录变更（触发 AJE/RJE 重取） */
+export interface AdjustmentSavedPayload {
+  projectId: string
+  year?: number
+  adjustmentId?: string
+}
+
+/** 项目信息变更（触发表头重填） */
+export interface ProjectUpdatedPayload {
+  projectId: string
+  changedFields?: string[]
+}
+
+/** 函证回函（E1-3 标记已函证） */
+export interface ConfirmationReceivedPayload {
+  projectId: string
+  confirmationId?: string
+  accountCode?: string
+}
+
+/** 上年数据导入（PREV 公式重取） */
+export interface PriorYearImportedPayload {
+  projectId: string
+  year: number
+}
+
+/** 复核记录已解决（E1 Sprint 2 Task 2.13） */
+export interface ReviewRecordResolvedPayload {
+  projectId?: string
+  reviewRecordId: string
+  wpId?: string
+}
+
+/** 签字已创建（E1 Sprint 2 Task 2.29） */
+export interface SignatureCreatedPayload {
+  projectId?: string
+  objectType: string
+  objectId: string
+  signerId: string
+}
+
+/** 程序状态变更（E1 Sprint 2 Task 2.13） */
+export interface ProcedureStatusChangedPayload {
+  projectId: string
+  wpId: string
+  sheetKey: string
+  row: string
+  status: string
+}
+
+/** 跨底稿引用更新（D 销售循环 F6: D0→D2 反向回填 / H-F8: H9→H8 租赁回填） */
+export interface CrossRefUpdatedPayload {
+  projectId: string
+  targetWpCode?: string
+  sourceWpCode?: string
+  refId?: string
+}
+
 // ─── 事件映射表 ───────────────────────────────────────────────────────────────
 
 export type Events = {
@@ -153,11 +225,33 @@ export type Events = {
   'workpaper:saved': WorkpaperSavedPayload
   'workpaper:locate-cell': WorkpaperLocateCellPayload
 
+  // 复核标记变更（Foundation Task 2.9）
+  'review-mark:changed': ReviewMarkChangedPayload
+
   // 重要性水平
   'materiality:changed': MaterialityChangedPayload
 
+  // 联动总线 stale 事件（Sprint 4 Task 4.7）
+  'linkage:stale-changed': { project_id: string; affected_modules: string[]; total_affected: number }
+
   // 年度切换（R8-S1-04）
   'year:changed': YearChangedPayload
+
+  // E1 Sprint 2 Task 2.33: 数据刷新 6 种事件
+  'trial-balance:updated': TrialBalanceUpdatedPayload
+  'adjustment:saved': AdjustmentSavedPayload
+  'project:updated': ProjectUpdatedPayload
+  'confirmation:received': ConfirmationReceivedPayload
+  'prior-year:imported': PriorYearImportedPayload
+  'manual-refresh': { projectId?: string; wpId?: string }
+
+  // E1 Sprint 2 Task 2.13/2.29: 程序状态联动
+  'review-record:resolved': ReviewRecordResolvedPayload
+  'signature:created': SignatureCreatedPayload
+  'procedure-status:changed': ProcedureStatusChangedPayload
+
+  // D 销售循环 F6: 跨底稿引用更新（D0→D2 反向回填）
+  'cross-ref:updated': CrossRefUpdatedPayload
 
   // 快捷键（shortcuts.ts 发出）
   'shortcut:save': void

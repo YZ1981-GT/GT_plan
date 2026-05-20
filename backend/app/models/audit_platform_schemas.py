@@ -789,6 +789,21 @@ class EventType(str, enum.Enum):
     WORKPAPER_STALE_DETECTED = "workpaper.stale_detected"
     CROSS_CHECK_FAILED = "cross_check.failed"
 
+    # Global Linkage Bus Sprint 3: 反向联动事件
+    FORMULA_CONFIG_CHANGED = "formula_config.changed"
+    PREFILL_MAPPING_CHANGED = "prefill_mapping.changed"
+    NOTE_SECTION_SAVED = "note_section.saved"
+    ACCOUNT_MAPPING_CHANGED = "account_mapping.changed"
+    REPORT_ROW_CHANGED = "report_row.changed"
+    # Global Linkage Bus Sprint 4: stale 传播专用事件
+    LINKAGE_STALE_CHANGED = "linkage.stale_changed"
+
+    # D 销售循环 F6: 函证回函 → D2 stale 传播
+    CONFIRMATION_RECEIVED = "confirmation.received"
+
+    # H-F8: 跨底稿引用更新（H9→H8 租赁两表反向回填）
+    CROSS_REF_UPDATED = "cross_ref.updated"
+
 
 class EventPayload(BaseModel):
     """事件载荷"""

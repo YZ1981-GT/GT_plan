@@ -247,3 +247,245 @@ class WpAIService:
                 })
 
         return results
+
+    # ------------------------------------------------------------------
+    # E1 spec Sprint 1 Task 1.16: 4 个 LLM 辅助方法
+    # 复用 mask_context 脱敏 + chat_completion + wrap_ai_output 包装
+    # 锚定: requirements F6.3 / wp_template_metadata.llm_prompts
+    # ------------------------------------------------------------------
+
+    async def _load_llm_prompt(
+        self, wp_code: str, scenario: str
+    ) -> dict | None:
+        """从 wp_template_metadata.llm_prompts 加载指定场景的 prompt 模板
+
+        Args:
+            wp_code: 底稿编码(如 'E1')
+            scenario: 场景名(audit_conclusion / variance_analysis /
+                      check_conclusion / cutoff_conclusion)
+
+        Returns:
+            {"system_prompt", "user_template", "output_target"} 或 None
+        """
+        try:
+            from app.models.wp_optimization_models import WpTemplateMetadata
+
+            stmt = sa.select(WpTemplateMetadata).where(
+                WpTemplateMetadata.wp_code == wp_code
+            ).limit(1)
+            result = await self.db.execute(stmt)
+            meta = result.scalar_one_or_none()
+            if meta is None or not meta.llm_prompts:
+                return None
+            return meta.llm_prompts.get(scenario)
+        except Exception as e:
+            logger.warning("_load_llm_prompt(%s, %s) failed: %s", wp_code, scenario, e)
+            return None
+
+    async def _execute_llm_with_mask(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        scenario: str,
+        target: dict | None = None,
+    ) -> dict:
+        """统一 LLM 执行 + 脱敏 + 包装 helper
+
+        步骤:
+        1. mask_text 脱敏(金额/客户名等)
+        2. chat_completion 调 LLM
+        3. wrap_ai_output 包装(便于前端 AiContentConfirmDialog 确认)
+        4. 失败时降级 fallback 文本
+        """
+        from app.services.export_mask_service import export_mask_service
+        from app.services.llm_client import chat_completion
+
+        masked_user, _ = export_mask_service.mask_text(user_prompt)
+        try:
+            ai_text = await chat_completion([
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": masked_user},
+            ])
+            source_model = "qwen3.5-27b"
+            confidence = 0.8
+        except Exception as e:
+            logger.warning("LLM scenario=%s failed: %s", scenario, e)
+            ai_text = f"[{scenario} LLM 调用失败,请人工填写] (错误: {e})"
+            source_model = "fallback"
+            confidence = 0.0
+
+        return wrap_ai_output(
+            content=ai_text,
+            confidence=confidence,
+            source_model=source_model,
+            target_cell=(target or {}).get("cell"),
+            target_field=scenario,
+            source_prompt_version=f"e1_v1_{scenario}",
+        )
+
+    async def generate_audit_conclusion(
+        self,
+        project_id: UUID,
+        wp_code: str,
+        year: int,
+        *,
+        company_name: str = "",
+        audited_amount: float = 0.0,
+        prior_amount: float = 0.0,
+        period_change: float = 0.0,
+        change_rate: float = 0.0,
+        aje_total: float = 0.0,
+        rje_total: float = 0.0,
+        anomalies: str = "无",
+    ) -> dict:
+        """E1 spec F6.3 场景 1: 审计说明自动生成(R40-R46)
+
+        基于审定表数据生成 200-300 字审计说明草稿。
+        """
+        prompt_cfg = await self._load_llm_prompt(wp_code, "audit_conclusion")
+        if prompt_cfg is None:
+            return wrap_ai_output(
+                content=f"[{wp_code} 未配置 audit_conclusion prompt,请先在 wp_template_metadata.llm_prompts 添加]",
+                confidence=0.0,
+                source_model="fallback",
+                target_field="audit_conclusion",
+            )
+
+        user_prompt = prompt_cfg["user_template"].format(
+            company_name_masked=company_name or "[company_1]",
+            audit_period=str(year),
+            audited_amount=f"{audited_amount:,.2f}",
+            period_change=f"{period_change:,.2f}",
+            change_rate=change_rate,
+            prior_amount=f"{prior_amount:,.2f}",
+            aje_total=f"{aje_total:,.2f}",
+            rje_total=f"{rje_total:,.2f}",
+            anomalies=anomalies,
+        )
+        return await self._execute_llm_with_mask(
+            system_prompt=prompt_cfg["system_prompt"],
+            user_prompt=user_prompt,
+            scenario="audit_conclusion",
+            target=prompt_cfg.get("output_target"),
+        )
+
+    async def generate_variance_analysis(
+        self,
+        project_id: UUID,
+        wp_code: str,
+        year: int,
+        *,
+        company_name: str = "",
+        diff_amount: float = 0.0,
+        diff_direction: str = "",
+        bank_name: str = "",
+        materiality_level: float = 0.0,
+    ) -> dict:
+        """E1 spec F6.3 场景 2: 差异原因分析(银行存款余额调节差异)
+
+        分析差异成因:在途存款 / 在途票据 / 银行错记 / 未达账项。
+        """
+        prompt_cfg = await self._load_llm_prompt(wp_code, "variance_analysis")
+        if prompt_cfg is None:
+            return wrap_ai_output(
+                content=f"[{wp_code} 未配置 variance_analysis prompt]",
+                confidence=0.0,
+                source_model="fallback",
+                target_field="variance_analysis",
+            )
+
+        user_prompt = prompt_cfg["user_template"].format(
+            company_name_masked=company_name or "[company_1]",
+            diff_amount=f"{diff_amount:,.2f}",
+            diff_direction=diff_direction or "未指明",
+            bank_name_masked=bank_name or "[bank_1]",
+            materiality_level=f"{materiality_level:,.2f}",
+        )
+        return await self._execute_llm_with_mask(
+            system_prompt=prompt_cfg["system_prompt"],
+            user_prompt=user_prompt,
+            scenario="variance_analysis",
+            target=prompt_cfg.get("output_target"),
+        )
+
+    async def generate_check_conclusion(
+        self,
+        project_id: UUID,
+        wp_code: str,
+        year: int,
+        *,
+        check_type: str = "",
+        check_scope: str = "",
+        passed_count: int = 0,
+        total_count: int = 0,
+        exceptions: str = "无",
+        attachment_count: int = 0,
+    ) -> dict:
+        """E1 spec F6.3 场景 3: 检查结论生成(B/D 类弹窗)
+
+        基于检查清单完成情况生成结论(80-150 字)。
+        """
+        prompt_cfg = await self._load_llm_prompt(wp_code, "check_conclusion")
+        if prompt_cfg is None:
+            return wrap_ai_output(
+                content=f"[{wp_code} 未配置 check_conclusion prompt]",
+                confidence=0.0,
+                source_model="fallback",
+                target_field="check_conclusion",
+            )
+
+        user_prompt = prompt_cfg["user_template"].format(
+            check_type=check_type,
+            check_scope=check_scope,
+            passed_count=passed_count,
+            total_count=total_count,
+            exceptions=exceptions,
+            attachment_count=attachment_count,
+        )
+        return await self._execute_llm_with_mask(
+            system_prompt=prompt_cfg["system_prompt"],
+            user_prompt=user_prompt,
+            scenario="check_conclusion",
+            target=prompt_cfg.get("output_target"),
+        )
+
+    async def generate_cutoff_conclusion(
+        self,
+        project_id: UUID,
+        wp_code: str,
+        year: int,
+        *,
+        cutoff_date: str = "",
+        days_before: int = 5,
+        days_after: int = 5,
+        sample_count: int = 0,
+        amount_range: str = "",
+        issues_count: int = 0,
+    ) -> dict:
+        """E1 spec F6.3 场景 4: 截止测试结论(E1-21~E1-23)
+
+        基于跨期凭证检查情况生成结论(100-150 字)。
+        """
+        prompt_cfg = await self._load_llm_prompt(wp_code, "cutoff_conclusion")
+        if prompt_cfg is None:
+            return wrap_ai_output(
+                content=f"[{wp_code} 未配置 cutoff_conclusion prompt]",
+                confidence=0.0,
+                source_model="fallback",
+                target_field="cutoff_conclusion",
+            )
+
+        user_prompt = prompt_cfg["user_template"].format(
+            cutoff_date=cutoff_date,
+            days_before=days_before,
+            days_after=days_after,
+            sample_count=sample_count,
+            amount_range=amount_range,
+            issues_count=issues_count,
+        )
+        return await self._execute_llm_with_mask(
+            system_prompt=prompt_cfg["system_prompt"],
+            user_prompt=user_prompt,
+            scenario="cutoff_conclusion",
+            target=prompt_cfg.get("output_target"),
+        )

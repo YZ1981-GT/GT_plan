@@ -32,8 +32,13 @@ test.describe('复核标记', () => {
     // Wait for Univer canvas to load
     await page.waitForSelector('canvas', { timeout: 20_000 })
 
-    // Look for the review marks tab in the side panel
-    const reviewTab = page.locator('text=复核标记')
+    // Open the side panel drawer (默认隐藏)
+    const panelBtn = page.locator('button:has-text("面板")')
+    await expect(panelBtn).toBeVisible({ timeout: 10_000 })
+    await panelBtn.click()
+
+    // Now drawer is open — verify the 复核标记 tab is rendered
+    const reviewTab = page.locator('text=复核标记').first()
     await expect(reviewTab).toBeVisible({ timeout: 10_000 })
   })
 })

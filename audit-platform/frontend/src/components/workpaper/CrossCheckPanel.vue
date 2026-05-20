@@ -3,10 +3,12 @@
  * CrossCheckPanel — 跨科目校验结果展示 + 差异明细
  *
  * Sprint 4 Task 4.6
+ * D spec F7 Task 2.17: 集成 D4 营业收入勾稽 4 条 VR 展示
  */
 import { ref, onMounted, watch } from 'vue'
 import { useCrossCheck } from '@/composables/useCrossCheck'
 import type { CrossCheckResult } from '@/composables/useCrossCheck'
+import ConsistencyGatePanel from './ConsistencyGatePanel.vue'
 
 const props = defineProps<{
   projectId: string
@@ -104,6 +106,12 @@ function getRuleDescription(ruleId: string): string {
         <span class="summary-label">跳过</span>
       </div>
     </div>
+
+    <!-- D4 营业收入勾稽 VR 面板 -->
+    <ConsistencyGatePanel
+      :project-id="props.projectId"
+      :year="props.year"
+    />
 
     <!-- 结果列表 -->
     <div v-loading="loading" class="results-list">

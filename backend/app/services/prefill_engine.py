@@ -31,7 +31,7 @@ _logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _FORMULA_RE = re.compile(
-    r'=(TB|WP|AUX|PREV|SUM_TB|LEDGER|ADJ|NOTE)\s*\(([^)]*)\)',
+    r'=(TB|WP|AUX|PREV|SUM_TB|LEDGER_DETAIL|COUNT_LEDGER|LEDGER|ADJ|NOTE)\s*\(([^)]*)\)',
     re.IGNORECASE,
 )
 
@@ -114,11 +114,14 @@ async def _resolve_wp_formula(
 async def _resolve_ledger_formula(
     db: AsyncSession, project_id: UUID, year: int, args: list[str]
 ) -> Decimal | None:
-    """=LEDGER('code', 'direction', 'period') → 从 tb_ledger 表取发生额"""
+    """=LEDGER('code', 'direction', 'period') → 从 tb_ledger 表取发生额
+
+    支持 H 循环场景：=LEDGER('1602','credit','1月') / '1-6月' / '全年'
+    """
     if len(args) < 3:
         return None
     account_code, direction, period = args[0], args[1], args[2]
-    from app.models.dataset_models import TbLedger
+    from app.models.audit_platform_models import TbLedger
     from app.services.dataset_query import get_active_filter
 
     active_filter = await get_active_filter(db, TbLedger, project_id, year)
@@ -127,8 +130,10 @@ async def _resolve_ledger_formula(
         active_filter,
         TbLedger.account_code == account_code,
     )
-    if period and period != "全年":
-        q = q.where(TbLedger.accounting_period == period)
+    # 期间过滤 — 使用 _parse_period_range 将 "1月"/"1-6月"/"全年" 转为整数范围
+    start_p, end_p = _parse_period_range(period)
+    if start_p is not None and end_p is not None and (start_p, end_p) != (1, 12):
+        q = q.where(TbLedger.accounting_period.between(start_p, end_p))
     result = await db.execute(q)
     val = result.scalar()
     return Decimal(str(val)) if val is not None else Decimal("0")
@@ -251,6 +256,162 @@ async def _resolve_note_formula(
     return None
 
 
+# ---------------------------------------------------------------------------
+# E1 spec Sprint 1 Task 1.4 + 1.5: LEDGER_DETAIL & COUNT_LEDGER
+# ---------------------------------------------------------------------------
+
+
+def _parse_period_range(period: str) -> tuple[int | None, int | None]:
+    """解析期间字符串为 (start_period, end_period)。
+
+    支持：
+    - "全年"   → (1, 12)
+    - "1月"    → (1, 1)
+    - "1-3月"  → (1, 3)
+    - "3"      → (3, 3)
+    - 纯月份数字 1-12
+    """
+    if not period or period in ("全年", "all", "*"):
+        return 1, 12
+    s = str(period).strip().replace("月", "")
+    if "-" in s or "~" in s:
+        sep = "-" if "-" in s else "~"
+        parts = [p.strip() for p in s.split(sep)]
+        try:
+            return int(parts[0]), int(parts[1])
+        except (ValueError, IndexError):
+            return None, None
+    try:
+        m = int(s)
+        return m, m
+    except ValueError:
+        return None, None
+
+
+async def _resolve_ledger_detail_formula(
+    db: AsyncSession, project_id: UUID, year: int, args: list[str]
+) -> list[dict[str, Any]]:
+    """=LEDGER_DETAIL('科目','日期范围','金额条件') → 返回符合条件的 tb_ledger 明细行列表
+
+    Args (3 个):
+      0: account_code   科目编码（精确匹配，可加 % 模糊）
+      1: period_range   "全年" / "1月" / "1-3月" / "12月"
+      2: amount_filter  金额条件，如 ">=100000" / "<0" / "*"（不过滤）
+
+    Returns:
+      [{voucher_date, voucher_no, summary, debit_amount, credit_amount, counterpart_account}, ...]
+      按 voucher_date 升序，最多返回 200 行（截断保护）
+    """
+    if len(args) < 1:
+        return []
+    account_code = args[0]
+    period = args[1] if len(args) > 1 else "全年"
+    amount_filter = args[2] if len(args) > 2 else "*"
+
+    from app.models.audit_platform_models import TbLedger
+    from app.services.dataset_query import get_active_filter
+
+    active_filter = await get_active_filter(db, TbLedger, project_id, year)
+    q = sa.select(
+        TbLedger.voucher_date,
+        TbLedger.voucher_no,
+        TbLedger.summary,
+        TbLedger.debit_amount,
+        TbLedger.credit_amount,
+        TbLedger.counterpart_account,
+        TbLedger.account_code,
+        TbLedger.account_name,
+    ).where(
+        active_filter,
+    )
+
+    # 科目过滤 — 支持精确 / LIKE 前缀
+    if "%" in account_code:
+        q = q.where(TbLedger.account_code.like(account_code))
+    else:
+        q = q.where(TbLedger.account_code == account_code)
+
+    # 期间过滤
+    start_p, end_p = _parse_period_range(period)
+    if start_p is not None and end_p is not None and (start_p, end_p) != (1, 12):
+        q = q.where(
+            TbLedger.accounting_period.between(start_p, end_p)
+        )
+
+    # 金额条件过滤（>= / > / <= / < / ==）
+    af = (amount_filter or "").strip()
+    if af and af != "*":
+        import re as _re
+        m = _re.match(r"^(>=|<=|>|<|==|=)\s*(-?\d+(?:\.\d+)?)\s*$", af)
+        if m:
+            op_map = {
+                ">=": lambda x: (TbLedger.debit_amount >= x) | (TbLedger.credit_amount >= x),
+                "<=": lambda x: (TbLedger.debit_amount <= x) | (TbLedger.credit_amount <= x),
+                ">": lambda x: (TbLedger.debit_amount > x) | (TbLedger.credit_amount > x),
+                "<": lambda x: (TbLedger.debit_amount < x) | (TbLedger.credit_amount < x),
+                "==": lambda x: (TbLedger.debit_amount == x) | (TbLedger.credit_amount == x),
+                "=": lambda x: (TbLedger.debit_amount == x) | (TbLedger.credit_amount == x),
+            }
+            try:
+                threshold = Decimal(m.group(2))
+                q = q.where(op_map[m.group(1)](threshold))
+            except Exception:
+                pass
+
+    q = q.order_by(TbLedger.voucher_date.asc(), TbLedger.voucher_no.asc()).limit(200)
+    result = await db.execute(q)
+    rows = result.all()
+
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        out.append({
+            "voucher_date": r.voucher_date.isoformat() if r.voucher_date else None,
+            "voucher_no": r.voucher_no,
+            "summary": r.summary or "",
+            "debit_amount": str(Decimal(str(r.debit_amount))) if r.debit_amount is not None else "0",
+            "credit_amount": str(Decimal(str(r.credit_amount))) if r.credit_amount is not None else "0",
+            "counterpart_account": r.counterpart_account or "",
+            "account_code": r.account_code,
+            "account_name": r.account_name or "",
+        })
+    return out
+
+
+async def _resolve_count_ledger_formula(
+    db: AsyncSession, project_id: UUID, year: int, args: list[str]
+) -> Decimal | None:
+    """=COUNT_LEDGER('科目','日期范围') → 返回符合条件的 tb_ledger 笔数
+
+    Args (1-2 个):
+      0: account_code   科目编码
+      1: period_range   "全年" / "1月" / "1-3月" / "12月"
+    """
+    if len(args) < 1:
+        return Decimal("0")
+    account_code = args[0]
+    period = args[1] if len(args) > 1 else "全年"
+
+    from app.models.audit_platform_models import TbLedger
+    from app.services.dataset_query import get_active_filter
+
+    active_filter = await get_active_filter(db, TbLedger, project_id, year)
+    q = sa.select(sa.func.count()).select_from(TbLedger).where(active_filter)
+    if "%" in account_code:
+        q = q.where(TbLedger.account_code.like(account_code))
+    else:
+        q = q.where(TbLedger.account_code == account_code)
+
+    start_p, end_p = _parse_period_range(period)
+    if start_p is not None and end_p is not None and (start_p, end_p) != (1, 12):
+        q = q.where(
+            TbLedger.accounting_period.between(start_p, end_p)
+        )
+
+    result = await db.execute(q)
+    val = result.scalar()
+    return Decimal(str(val or 0))
+
+
 # 公式类型 → 解析器映射
 _FORMULA_RESOLVERS = {
     "WP": _resolve_wp_formula,
@@ -259,6 +420,9 @@ _FORMULA_RESOLVERS = {
     "PREV": _resolve_prev_formula,
     "ADJ": _resolve_adj_formula,
     "NOTE": _resolve_note_formula,
+    # E1 spec Sprint 1 Task 1.4 + 1.5
+    "LEDGER_DETAIL": _resolve_ledger_detail_formula,
+    "COUNT_LEDGER": _resolve_count_ledger_formula,
     "TB_AUX": None,  # handled separately below
 }
 
@@ -324,6 +488,13 @@ async def resolve_extended_formula(
             total = sum(r["value"] for r in results)
             return Decimal(str(total))
         return None
+
+    # E1 spec Task 1.4: LEDGER_DETAIL 返回列表，统一入口返回笔数（合计意义不大）
+    # 调用方如需明细应直接调 _resolve_ledger_detail_formula
+    if ft == "LEDGER_DETAIL":
+        args = _parse_args(raw_args)
+        rows = await _resolve_ledger_detail_formula(db, project_id, year, args)
+        return Decimal(str(len(rows)))
 
     resolver = _FORMULA_RESOLVERS.get(ft)
     if resolver is None:
@@ -1026,3 +1197,226 @@ def _write_cell_provenance(wp, provenance: dict[str, dict]) -> None:
                 }
                 new_entry["_prev"] = prev_snapshot
                 cp[cell_ref] = new_entry
+
+
+# ---------------------------------------------------------------------------
+# E1 spec Sprint 1 Task 1.17/1.18: 表头自动填充
+# ---------------------------------------------------------------------------
+
+
+async def fill_header_cells(
+    db: AsyncSession,
+    wp_id: UUID,
+    project: Any | None = None,
+) -> dict[str, Any]:
+    """按 wp_template_metadata.header_cells 配置填充底稿 R3/R4 表头
+
+    锚定 requirements F4.2:
+    - R3 左:被审计单位名称(Project.company_name)
+    - R3 中:审计期间(Project.year)
+    - R3 右:索引号(wp_code + sheet 后缀)
+    - R4 左:编制人/日期(从 WorkingPaper.created_by 取 + first_open_at)
+    - R4 中:复核人/日期(L1 复核通过后回填)
+    - R4 右:页次(自动计算)
+
+    支持 sheet_overrides:不同 sheet 表头位置可能不同(E1A vs E1-2 等)。
+    严格遵守 Task 1.1: 不覆盖已有公式 cell(如 A3 含 =底稿目录!A2 引用)。
+
+    Returns:
+        {wp_id, status, cells_filled, sheets_processed, errors}
+    """
+    try:
+        import openpyxl
+    except ImportError:
+        return {"wp_id": str(wp_id), "status": "error", "message": "openpyxl 未安装"}
+
+    from datetime import datetime, timezone
+
+    # 1. 加载底稿 + wp_index + 元数据
+    from app.models.audit_platform_models import WpIndex
+    from app.models.wp_optimization_models import WpTemplateMetadata
+    from app.models.core import Project
+
+    wp_q = sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+    wp = (await db.execute(wp_q)).scalar_one_or_none()
+    if not wp or not wp.file_path:
+        return {"wp_id": str(wp_id), "status": "skip", "message": "底稿无文件路径"}
+
+    fp = Path(wp.file_path)
+    if not fp.exists():
+        return {"wp_id": str(wp_id), "status": "skip", "message": f"文件不存在: {fp}"}
+
+    # 仅处理 xlsx/xlsm
+    if fp.suffix.lower() not in (".xlsx", ".xlsm"):
+        return {"wp_id": str(wp_id), "status": "skip", "message": f"非 xlsx 类型: {fp.suffix}"}
+
+    # 2. 取 wp_code(从 wp_index)
+    wp_code = None
+    if wp.wp_index_id:
+        idx_q = sa.select(WpIndex.wp_code, WpIndex.wp_name).where(WpIndex.id == wp.wp_index_id)
+        idx_row = (await db.execute(idx_q)).first()
+        if idx_row:
+            wp_code = idx_row[0]
+
+    if not wp_code:
+        return {"wp_id": str(wp_id), "status": "skip", "message": "wp_code 未知"}
+
+    # 3. 取项目元数据(Project)
+    company_name = ""
+    audit_year = ""
+    if project is not None:
+        company_name = getattr(project, "company_name", "") or getattr(project, "name", "") or ""
+        audit_year = str(getattr(project, "year", "") or "")
+    else:
+        proj_q = sa.select(Project.company_name, Project.year).where(Project.id == wp.project_id)
+        proj_row = (await db.execute(proj_q)).first()
+        if proj_row:
+            company_name = proj_row[0] or ""
+            audit_year = str(proj_row[1] or "")
+
+    # 4. 取 wp_template_metadata.header_cells
+    meta_q = sa.select(WpTemplateMetadata).where(
+        WpTemplateMetadata.wp_code == wp_code
+    ).limit(1)
+    meta = (await db.execute(meta_q)).scalar_one_or_none()
+    if meta is None or not meta.header_cells:
+        return {
+            "wp_id": str(wp_id),
+            "status": "skip",
+            "message": f"wp_code={wp_code} 无 header_cells 配置",
+        }
+
+    header_cfg = meta.header_cells or {}
+    default_cfg = header_cfg.get("default", {})
+    sheet_overrides = header_cfg.get("sheet_overrides", {})
+
+    # 5. 取编制人/复核人(从 WorkingPaper / 用户表)
+    preparer_str = ""
+    reviewer_str = ""
+    try:
+        if wp.created_by:
+            from app.models.core import User
+            usr = (await db.execute(
+                sa.select(User.full_name, User.username).where(User.id == wp.created_by)
+            )).first()
+            if usr:
+                preparer_name = usr[0] or usr[1] or ""
+                preparer_date = (wp.created_at or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+                preparer_str = f"{preparer_name} {preparer_date}"
+    except Exception as e:
+        _logger.debug("fill_header_cells get preparer fallback: %s", e)
+
+    # 复核人 / 页次 — 当前阶段留空,L1 复核通过后由 review 服务回填
+    reviewer_str = ""
+    page_no_str = ""
+
+    # 6. 打开 xlsx,逐 sheet 写入
+    try:
+        wb = openpyxl.load_workbook(str(fp), data_only=False)
+    except Exception as e:
+        return {"wp_id": str(wp_id), "status": "error", "message": f"打开文件失败: {e}"}
+
+    cells_filled = 0
+    sheets_processed = 0
+    errors: list[str] = []
+
+    def _is_formula(cell) -> bool:
+        v = cell.value
+        return isinstance(v, str) and v.lstrip().startswith("=")
+
+    def _apply_sheet(ws, cfg: dict) -> int:
+        """对一个 sheet 应用一份 header_cells 配置;返回 filled 数量"""
+        n = 0
+        # 字段映射 — 配置 key → 值的来源
+        index_no = f"{wp_code}-{ws.title.split(wp_code)[-1] if wp_code in ws.title else ws.title}"
+        value_map = {
+            "company_name": company_name,
+            "audit_period": audit_year,
+            "audit_period_subtitle": audit_year,
+            "index_no": index_no,
+            "preparer": preparer_str,
+            "reviewer": reviewer_str,
+            "page_no": page_no_str,
+            "preparer_name_with_date": preparer_str,
+            "reviewer_name_with_date": reviewer_str,
+        }
+        for key, item in cfg.items():
+            if not isinstance(item, dict):
+                continue
+            cell_ref = item.get("cell")
+            if not cell_ref:
+                continue
+
+            # 优先级: source 引用(底稿目录!A2) → field 字段 → key 直接查表
+            new_value: str | None = None
+            src = item.get("source")
+            field_key = item.get("field")
+            if src:
+                # 引用其他 sheet 的 cell - 让 Excel 公式自然生效,我们不覆盖
+                # 检查目标 cell 是否已是公式,是则跳过(模板自带 =底稿目录!A2)
+                try:
+                    target_cell = ws[cell_ref]
+                except Exception:
+                    continue
+                if _is_formula(target_cell):
+                    continue
+                # 如果不是公式,则写入 source 引用作为 Excel 公式
+                new_value = f"={src}"
+            elif field_key:
+                new_value = str(value_map.get(field_key, "") or "")
+            else:
+                # 直接用 key(向后兼容)
+                new_value = str(value_map.get(key, "") or "")
+
+            if not new_value:
+                continue
+
+            try:
+                target_cell = ws[cell_ref]
+            except Exception:
+                continue
+
+            # Task 1.1: 不覆盖已有公式
+            if _is_formula(target_cell):
+                continue
+            # 已有非空值且非默认占位时跳过(避免覆盖用户填写)
+            if target_cell.value and not isinstance(target_cell.value, (int, float)):
+                existing = str(target_cell.value).strip()
+                # 占位符(空白/单一日期占位)允许覆盖
+                if existing and existing != "  " and existing != "—":
+                    continue
+
+            target_cell.value = new_value
+            n += 1
+        return n
+
+    for ws in wb.worksheets:
+        cfg = sheet_overrides.get(ws.title) or default_cfg
+        if not cfg:
+            continue
+        try:
+            sheets_processed += 1
+            cells_filled += _apply_sheet(ws, cfg)
+        except Exception as e:
+            errors.append(f"{ws.title}: {e}")
+
+    try:
+        wb.save(str(fp))
+    except Exception as e:
+        wb.close()
+        return {"wp_id": str(wp_id), "status": "error", "message": f"保存失败: {e}"}
+
+    wb.close()
+
+    _logger.info(
+        "fill_header_cells: wp=%s code=%s sheets=%d filled=%d errors=%d",
+        wp_id, wp_code, sheets_processed, cells_filled, len(errors),
+    )
+    return {
+        "wp_id": str(wp_id),
+        "wp_code": wp_code,
+        "status": "ok",
+        "cells_filled": cells_filled,
+        "sheets_processed": sheets_processed,
+        "errors": errors[:5],
+    }

@@ -1,0 +1,136 @@
+{
+  "description": "L 筹资循环校验规则定义（L8 财务费用利息汇总勾稽 + L1 短期借款期末余额勾稽 + L3 长期借款期末+重分类勾稽）",
+  "version": "2025-R1",
+  "rules": [
+    {
+      "rule_id": "VR-L8-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "L8",
+      "description": "L8 财务费用利息支出 = L1利息(L1-5) + L3利息(L3-5) + H9租赁利息 + L5债券利息（汇总类规则时机铁律：至少 1 个来源已保存才触发）",
+      "formula": "ABS(l8_interest - (l1_interest + l3_interest + h9_lease_interest + l5_bond_interest)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "trigger_condition": "L8-1 AND at least 1 source saved",
+      "applies_when": {
+        "description": "当 L8 审定表已保存且至少 1 个利息来源底稿（L1-5/L3-5/H9/L5）已保存（parsed_data 含对应利息字段）时触发 blocking；全部来源未保存时 skip 避免 L8 先保存时误提示",
+        "required_main_wp": "L8",
+        "required_any_of_subs": ["L1", "L3", "H9", "L5"],
+        "skip_message": "利息来源底稿（L1-5/L3-5/H9/L5）均未保存，跳过"
+      },
+      "sources": {
+        "l8_interest": {
+          "wp": "L8",
+          "sheet": "审定表L8-1",
+          "cell": "利息费用_审定数_合计"
+        },
+        "l1_interest": {
+          "wp": "L1",
+          "sheet": "利息测算表L1-5",
+          "cell": "本期应计利息_合计"
+        },
+        "l3_interest": {
+          "wp": "L3",
+          "sheet": "利息测算表L3-5",
+          "cell": "本期应计利息_合计"
+        },
+        "h9_lease_interest": {
+          "wp": "H9",
+          "sheet": "租赁负债利息H9-5",
+          "cell": "本期租赁利息费用"
+        },
+        "l5_bond_interest": {
+          "wp": "L5",
+          "sheet": "明细表L5-2",
+          "cell": "本期利息费用_合计"
+        }
+      },
+      "message_template": "L8 财务费用利息勾稽不平衡，差异超过 1 元: 审定数({l8_interest}) ≠ L1利息({l1_interest}) + L3利息({l3_interest}) + H9租赁利息({h9_lease_interest}) + L5债券利息({l5_bond_interest}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-L1-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "L1",
+      "description": "短期借款期末余额 = 期初余额 + 本期新增借款 − 本期偿还",
+      "formula": "ABS(closing - (opening + new_borrowings - repayments)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "trigger_condition": "L1-1 saved",
+      "applies_when": {
+        "description": "当 L1 审定表已保存（parsed_data 含期初/期末/本期增减字段）时触发 blocking",
+        "required_main_wp": "L1",
+        "required_any_of_subs": [],
+        "skip_message": "L1-1 审定表未保存，跳过"
+      },
+      "sources": {
+        "closing": {
+          "wp": "L1",
+          "sheet": "审定表L1-1",
+          "cell": "短期借款_期末余额"
+        },
+        "opening": {
+          "wp": "L1",
+          "sheet": "审定表L1-1",
+          "cell": "短期借款_期初余额"
+        },
+        "new_borrowings": {
+          "wp": "L1",
+          "sheet": "审定表L1-1",
+          "cell": "短期借款_本期增加"
+        },
+        "repayments": {
+          "wp": "L1",
+          "sheet": "审定表L1-1",
+          "cell": "短期借款_本期减少"
+        }
+      },
+      "message_template": "短期借款期末余额勾稽不平衡: 期末({closing}) ≠ 期初({opening}) + 新增({new_borrowings}) − 偿还({repayments}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-L3-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "L3",
+      "description": "长期借款期末余额 + 重分类至一年内到期 = 期初余额 + 本期新增 − 本期偿还",
+      "formula": "ABS((closing + reclassified_current) - (opening + new_borrowings - repayments)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "warning",
+      "scope": "total",
+      "trigger_condition": "L3-1 saved",
+      "applies_when": {
+        "description": "当 L3 审定表已保存（parsed_data 含期初/期末/重分类/本期增减字段）时触发 warning（不阻断签字）",
+        "required_main_wp": "L3",
+        "required_any_of_subs": [],
+        "skip_message": "L3-1 审定表未保存，跳过"
+      },
+      "sources": {
+        "closing": {
+          "wp": "L3",
+          "sheet": "审定表L3-1",
+          "cell": "长期借款_期末余额"
+        },
+        "reclassified_current": {
+          "wp": "L3",
+          "sheet": "审定表L3-1",
+          "cell": "重分类至一年内到期_金额"
+        },
+        "opening": {
+          "wp": "L3",
+          "sheet": "审定表L3-1",
+          "cell": "长期借款_期初余额"
+        },
+        "new_borrowings": {
+          "wp": "L3",
+          "sheet": "审定表L3-1",
+          "cell": "长期借款_本期增加"
+        },
+        "repayments": {
+          "wp": "L3",
+          "sheet": "审定表L3-1",
+          "cell": "长期借款_本期减少"
+        }
+      },
+      "message_template": "长期借款期末+重分类勾稽不平衡: 期末({closing}) + 重分类({reclassified_current}) ≠ 期初({opening}) + 新增({new_borrowings}) − 偿还({repayments}), 差异={diff}"
+    }
+  ]
+}

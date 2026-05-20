@@ -61,6 +61,9 @@ class WpTemplateMetadata(Base):
     audit_objective: Mapped[str | None] = mapped_column(Text, nullable=True)
     related_assertions: Mapped[dict | None] = mapped_column(JSONB, server_default="[]")
     procedure_flow_config: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # E1 spec (workpaper-e1-cash-optimization) Sprint 1 Task 1.0
+    header_cells: Mapped[dict | None] = mapped_column(JSONB, server_default="{}")
+    llm_prompts: Mapped[dict | None] = mapped_column(JSONB, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 

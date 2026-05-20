@@ -122,6 +122,10 @@ class Settings(BaseSettings):
     # production 模式下强制校验关键安全配置（JWT_SECRET_KEY 等），校验失败启动报错
     APP_ENV: str = "dev"
 
+    # I-F4 商誉减值 / 后续 LLM 接入开关（默认 False = stub 实现）
+    # 当 wp_ai_service 升级真实接入 LLM 后改为 True，前端 is_llm_stub 字段自动反映
+    WP_AI_SERVICE_ENABLED: bool = False
+
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 
     @property

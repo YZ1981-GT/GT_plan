@@ -1,0 +1,2544 @@
+{
+  "description": "附注业务名称↔底稿映射种子数据（仅单体版）",
+  "version": "2025-R2",
+  "source": "wp_account_mapping.json + 手工补充关联方/母公司章节",
+  "design_rationale": [
+    "1. 合并版（consolidated）多家加总，附注不直接对应底稿，本 seed 不生成合并版条目",
+    "2. 单体版（standalone）单家维度，附注精确对应底稿，本 seed 主战场",
+    "3. note_section_code 字段语义重载：存稳定的业务名称（如'应收账款'），不存机械编号",
+    "4. LinkageGraphBuilder 运行时按 disclosure_notes.section_title 反查实际章节编号",
+    "5. 项目无关：同样的种子可服务陕西华氏（用八、N）/ 任何其他项目（用其他编号）"
+  ],
+  "fields": {
+    "template_type": "soe_standalone / listed_standalone（仅单体版）",
+    "report_row_code": "对应报表行次（BS-XXX / IS-XXX），空串=无报表行直接对应",
+    "note_section_code": "稳定业务名称（如'应收账款'），运行时按 section_title 匹配",
+    "table_index": "同一章节内多张表的序号（默认 0）",
+    "validation_role": "balance(余额表) / wide(宽表) / cross(交叉) / aging(账龄) / change(变动)",
+    "wp_code": "对应底稿编码",
+    "fetch_mode": "total(合计) / detail(明细) / category(分类) / change(变动)"
+  },
+  "total": 280,
+  "entries": [
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-002",
+      "note_section_code": "货币资金",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-002",
+      "note_section_code": "货币资金",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-002",
+      "note_section_code": "货币资金",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E1-1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-002",
+      "note_section_code": "货币资金",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E1-1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "库存现金",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "库存现金",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "银行存款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E1-3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "银行存款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E1-3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-004",
+      "note_section_code": "应收票据",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-004",
+      "note_section_code": "应收票据",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-005",
+      "note_section_code": "应收账款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-005",
+      "note_section_code": "应收账款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-034",
+      "note_section_code": "预收款项",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-034",
+      "note_section_code": "预收款项",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "IS-001",
+      "note_section_code": "营业收入",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "IS-001",
+      "note_section_code": "营业收入",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "合同资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "合同资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "合同负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "合同负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-006",
+      "note_section_code": "预付款项",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-006",
+      "note_section_code": "预付款项",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-008",
+      "note_section_code": "存货",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-008",
+      "note_section_code": "存货",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-032",
+      "note_section_code": "应付票据",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-032",
+      "note_section_code": "应付票据",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-033",
+      "note_section_code": "应付账款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-033",
+      "note_section_code": "应付账款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "IS-002",
+      "note_section_code": "营业成本",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "IS-002",
+      "note_section_code": "营业成本",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-012",
+      "note_section_code": "长期股权投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-012",
+      "note_section_code": "长期股权投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-013",
+      "note_section_code": "投资性房地产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-013",
+      "note_section_code": "投资性房地产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-003",
+      "note_section_code": "交易性金融资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-003",
+      "note_section_code": "交易性金融资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-014",
+      "note_section_code": "固定资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-014",
+      "note_section_code": "固定资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-015",
+      "note_section_code": "在建工程",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-015",
+      "note_section_code": "在建工程",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-016",
+      "note_section_code": "无形资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-016",
+      "note_section_code": "无形资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "商誉",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "商誉",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-017",
+      "note_section_code": "长期待摊费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-017",
+      "note_section_code": "长期待摊费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-035",
+      "note_section_code": "应付职工薪酬",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "J1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-035",
+      "note_section_code": "应付职工薪酬",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "J1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-007",
+      "note_section_code": "其他应收款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-007",
+      "note_section_code": "其他应收款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "销售费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "销售费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "财务费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "财务费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "研发费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "研发费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "税金及附加",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "税金及附加",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "持有待售资产和负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "持有待售资产和负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-006",
+      "note_section_code": "预付款项",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-006",
+      "note_section_code": "预付款项",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-037",
+      "note_section_code": "其他应付款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K8",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-037",
+      "note_section_code": "其他应付款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K8",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "管理费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K9",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "管理费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K9",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-031",
+      "note_section_code": "短期借款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-031",
+      "note_section_code": "短期借款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-041",
+      "note_section_code": "长期借款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-041",
+      "note_section_code": "长期借款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-051",
+      "note_section_code": "实收资本",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-051",
+      "note_section_code": "实收资本",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-052",
+      "note_section_code": "资本公积",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-052",
+      "note_section_code": "资本公积",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-054",
+      "note_section_code": "盈余公积",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-054",
+      "note_section_code": "盈余公积",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-055",
+      "note_section_code": "未分配利润",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-055",
+      "note_section_code": "未分配利润",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-018",
+      "note_section_code": "递延所得税资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-018",
+      "note_section_code": "递延所得税资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-036",
+      "note_section_code": "应交税费",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-036",
+      "note_section_code": "应交税费",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "所得税费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "所得税费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-011",
+      "note_section_code": "债权投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-011",
+      "note_section_code": "债权投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他权益工具投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他权益工具投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-019",
+      "note_section_code": "使用权资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-019",
+      "note_section_code": "使用权资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-042",
+      "note_section_code": "租赁负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-042",
+      "note_section_code": "租赁负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-043",
+      "note_section_code": "应付债券",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-043",
+      "note_section_code": "应付债券",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "应收款项融资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "应收款项融资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-053",
+      "note_section_code": "其他综合收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-053",
+      "note_section_code": "其他综合收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "库存股",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "库存股",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "营业外收入",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K10",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "营业外收入",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K10",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "营业外支出",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K11",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "营业外支出",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K11",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他非流动金融资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他非流动金融资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "开发支出",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "开发支出",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-044",
+      "note_section_code": "长期应付款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-044",
+      "note_section_code": "长期应付款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "信用减值损失",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K12",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "信用减值损失",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K12",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "资产减值损失",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K13",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "资产减值损失",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K13",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "资产处置收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K14",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "资产处置收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K14",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K15",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K15",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "应收函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "应收函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "银行函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "银行函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "应收款项融资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D5-1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "应收款项融资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D5-1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "合同资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D6-1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "合同资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D6-1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "合同负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D7-1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "合同负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D7-1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "存货明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "存货明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "存货跌价准备",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F1-3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "存货跌价准备",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F1-3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期股权投资明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期股权投资明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "权益法核算",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G1-3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "权益法核算",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G1-3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "固定资产明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "固定资产明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "累计折旧",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H1-12",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "累计折旧",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H1-12",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "固定资产减值",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H1-14",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "固定资产减值",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H1-14",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "无形资产明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "无形资产明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "商誉减值",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I2-1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "商誉减值",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I2-1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "薪酬明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "J1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "薪酬明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "J1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "短期借款明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "短期借款明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期借款明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L2-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期借款明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L2-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "预计负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "预计负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "投资收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K16",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "投资收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K16",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "公允价值变动收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K17",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "公允价值变动收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K17",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "递延收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K18",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "递延收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K18",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "应收账款明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D2-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "应收账款明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D2-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "应收坏账准备",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D2-3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "应收坏账准备",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D2-3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "应收调整分录",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D2-4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "应收调整分录",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D2-4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他应收款明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他应收款明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他应收坏账",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K1-3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他应收坏账",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K1-3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "应付账款明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F4-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "应付账款明细",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F4-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "委外加工函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "委外加工函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "证券/股权函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "证券/股权函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-012",
+      "note_section_code": "长期股权投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-012",
+      "note_section_code": "长期股权投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他权益工具投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G8",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他权益工具投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G8",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他非流动金融资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G9",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他非流动金融资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G9",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "交易性金融负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G10",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "交易性金融负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G10",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "IS-009",
+      "note_section_code": "投资收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G11",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "IS-009",
+      "note_section_code": "投资收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G11",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "净敞口套期收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G12",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "净敞口套期收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G12",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "IS-010",
+      "note_section_code": "公允价值变动收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G13",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "IS-010",
+      "note_section_code": "公允价值变动收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G13",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "IS-011",
+      "note_section_code": "信用减值损失",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G14",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "IS-011",
+      "note_section_code": "信用减值损失",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G14",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "产权/抵押函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "产权/抵押函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "工程物资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "工程物资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "油气资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "油气资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "固定资产清理",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "固定资产清理",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "生产性生物资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "生产性生物资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "使用权资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H8",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "使用权资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H8",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "租赁负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H9",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "租赁负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H9",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "资产处置损益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H10",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "资产处置损益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H10",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他非流动资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他非流动资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "研发费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "研发费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期应付职工薪酬",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "J2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期应付职工薪酬",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "J2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "股份支付",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "J3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "股份支付",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "J3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他应收/应付函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他应收/应付函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "借款函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "借款函证",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-040",
+      "note_section_code": "长期借款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-040",
+      "note_section_code": "长期借款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "IS-007",
+      "note_section_code": "财务费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L8",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "IS-007",
+      "note_section_code": "财务费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L8",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "专项储备",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "专项储备",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他综合收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M9",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他综合收益",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M9",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他权益工具",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M10",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "其他权益工具",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M10",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "IS-003",
+      "note_section_code": "税金及附加",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "IS-003",
+      "note_section_code": "税金及附加",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "IS-015",
+      "note_section_code": "所得税费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "IS-015",
+      "note_section_code": "所得税费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "关联方关系及其交易",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "B19",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "关联方关系及其交易",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "B19",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "关联方关系及其交易",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "C15",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "关联方关系及其交易",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "C15",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "母公司财务报表附注",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "S15",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "母公司财务报表附注",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "S15",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-006",
+      "note_section_code": "应收款项融资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-006",
+      "note_section_code": "应收款项融资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D5",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "合同资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "合同资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-034",
+      "note_section_code": "合同负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-034",
+      "note_section_code": "合同负债",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D7",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-002",
+      "note_section_code": "货币资金",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-002",
+      "note_section_code": "货币资金",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E1-2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-002",
+      "note_section_code": "货币资金",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E1-3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-002",
+      "note_section_code": "货币资金",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "E1-3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-008",
+      "note_section_code": "存货",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-008",
+      "note_section_code": "存货",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-008",
+      "note_section_code": "存货",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-008",
+      "note_section_code": "存货",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "F3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期股权投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期股权投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期股权投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期股权投资",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "投资性房地产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "投资性房地产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "G3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-013",
+      "note_section_code": "使用权资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-013",
+      "note_section_code": "使用权资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "H4",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "无形资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "无形资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期待摊费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期待摊费用",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "I6",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "应付职工薪酬",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "J1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "应付职工薪酬",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "J1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "应交税费",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K8",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "应交税费",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "K8",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期借款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "长期借款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "L3",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "实收资本",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "实收资本",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "M1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "递延所得税资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "递延所得税资产",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N1",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "",
+      "note_section_code": "应交税费",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "",
+      "note_section_code": "应交税费",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "N2",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "soe_standalone",
+      "report_row_code": "BS-005",
+      "note_section_code": "应收账款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D0",
+      "fetch_mode": "total"
+    },
+    {
+      "template_type": "listed_standalone",
+      "report_row_code": "BS-005",
+      "note_section_code": "应收账款",
+      "table_index": 0,
+      "validation_role": "balance",
+      "wp_code": "D0",
+      "fetch_mode": "total"
+    }
+  ]
+}

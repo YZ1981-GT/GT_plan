@@ -1,0 +1,134 @@
+{
+  "description": "H 固定资产循环校验规则定义（H1 三角勾稽 + H8 使用权资产 + 折旧率波动）",
+  "version": "2025-R1",
+  "rules": [
+    {
+      "rule_id": "VR-H1-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "H1",
+      "description": "固定资产期末 = 期初 + 增加(H1-7) − 减少(H1-8) + H10处置",
+      "formula": "ABS(closing - (opening + additions - disposals + h10_disposal)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "sources": {
+        "closing": {
+          "wp": "H1",
+          "sheet": "审定表H1-1",
+          "cell": "固定资产原值_期末余额"
+        },
+        "opening": {
+          "wp": "H1",
+          "sheet": "审定表H1-1",
+          "cell": "固定资产原值_期初余额"
+        },
+        "additions": {
+          "wp": "H1",
+          "sheet": "增加检查表H1-7",
+          "cell": "本期增加合计"
+        },
+        "disposals": {
+          "wp": "H1",
+          "sheet": "减少检查表H1-8",
+          "cell": "本期减少合计"
+        },
+        "h10_disposal": {
+          "wp": "H10",
+          "sheet": "审定表H10-1",
+          "cell": "处置固定资产原值"
+        }
+      },
+      "message_template": "固定资产原值三角勾稽不平衡，差异超过 1 元: 期末({closing}) ≠ 期初({opening}) + 增加({additions}) − 减少({disposals}) + 处置({h10_disposal}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-H1-02",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "H1",
+      "description": "累计折旧期末 = 期初 + 本期计提(H1-12) − 处置冲减(H10)",
+      "formula": "ABS(dep_closing - (dep_opening + current_provision - disposal_offset)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "sources": {
+        "dep_closing": {
+          "wp": "H1",
+          "sheet": "审定表H1-1",
+          "cell": "累计折旧_期末余额"
+        },
+        "dep_opening": {
+          "wp": "H1",
+          "sheet": "审定表H1-1",
+          "cell": "累计折旧_期初余额"
+        },
+        "current_provision": {
+          "wp": "H1",
+          "sheet": "折旧测算表H1-12",
+          "cell": "本期计提折旧合计"
+        },
+        "disposal_offset": {
+          "wp": "H10",
+          "sheet": "审定表H10-1",
+          "cell": "处置累计折旧冲减"
+        }
+      },
+      "message_template": "累计折旧三角勾稽不平衡，差异超过 1 元: 期末({dep_closing}) ≠ 期初({dep_opening}) + 本期计提({current_provision}) − 处置冲减({disposal_offset}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-H8-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "H8",
+      "description": "使用权资产期末 = 租赁负债期末 + 初始直接费用 − 激励",
+      "formula": "ABS(h8_closing - (h9_closing + initial_direct_cost - incentive)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "sources": {
+        "h8_closing": {
+          "wp": "H8",
+          "sheet": "审定表H8-1",
+          "cell": "使用权资产_期末余额"
+        },
+        "h9_closing": {
+          "wp": "H9",
+          "sheet": "审定表H9-1",
+          "cell": "租赁负债_期末余额"
+        },
+        "initial_direct_cost": {
+          "wp": "H8",
+          "sheet": "审定表H8-1",
+          "cell": "初始直接费用"
+        },
+        "incentive": {
+          "wp": "H8",
+          "sheet": "审定表H8-1",
+          "cell": "租赁激励"
+        }
+      },
+      "message_template": "使用权资产三角勾稽不平衡，差异超过 1 元: H8期末({h8_closing}) ≠ H9期末({h9_closing}) + 初始直接费用({initial_direct_cost}) − 激励({incentive}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-H1-03",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "H1",
+      "description": "平均折旧率波动 < 5%（与上年比较）",
+      "formula": "ABS(current_dep_rate - prior_dep_rate) < 0.05",
+      "tolerance": 0.05,
+      "severity": "warning",
+      "scope": "total",
+      "sources": {
+        "current_dep_rate": {
+          "wp": "H1",
+          "sheet": "折旧测算表H1-12",
+          "cell": "本年平均折旧率"
+        },
+        "prior_dep_rate": {
+          "wp": "H1",
+          "sheet": "折旧测算表H1-12",
+          "cell": "上年平均折旧率"
+        }
+      },
+      "cross_validation": "cross_to_D5",
+      "message_template": "固定资产平均折旧率波动超过 5%，需关注折旧政策变更合理性: 本年({current_dep_rate}) vs 上年({prior_dep_rate}), 差异={diff}"
+    }
+  ]
+}

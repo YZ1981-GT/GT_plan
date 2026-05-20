@@ -84,6 +84,8 @@ async def load_to_database(entries: list[dict]) -> dict:
                     "audit_objective": entry.get("audit_objective"),
                     "related_assertions": json.dumps(entry.get("related_assertions") or [], ensure_ascii=False),
                     "procedure_flow_config": None,
+                    "llm_prompts": json.dumps(entry.get("llm_prompts"), ensure_ascii=False) if entry.get("llm_prompts") else None,
+                    "header_cells": json.dumps(entry.get("header_cells"), ensure_ascii=False) if entry.get("header_cells") else None,
                 }
 
                 if existing:

@@ -212,7 +212,22 @@ import VersionHistoryDialog from '@/components/template-library/VersionHistoryDi
 const route = useRoute()
 
 // 当前项目 ID（可选 — 模板库管理是全局页面，但 /list 端点需要 pid）
-const currentProjectId = computed(() => (route.params.projectId as string) || (route.query.project_id as string) || '')
+// fallback：路由/query 都没传时，自动拉第一个项目作为 demo（让模板列表能展示 generated 列）
+const fallbackProjectId = ref<string>('')
+const currentProjectId = computed(() => (route.params.projectId as string) || (route.query.project_id as string) || fallbackProjectId.value)
+
+async function ensureFallbackProject() {
+  if (route.params.projectId || route.query.project_id) return
+  try {
+    const list = await api.get<any>('/api/projects')
+    const projects = Array.isArray(list) ? list : (list?.items || list?.data || [])
+    if (projects.length > 0) {
+      fallbackProjectId.value = projects[0].id
+    }
+  } catch {
+    /* 静默 — 没项目时模板库仍可看，只是 generated 列空 */
+  }
+}
 
 const activeTab = ref<'wp-template' | 'formula' | 'audit-report' | 'note-template' | 'gt-coding' | 'report-config' | 'enum-dict' | 'custom-query'>('wp-template')
 
@@ -271,22 +286,22 @@ function onWpTemplateSelect(wpCode: string) {
 // ─── 数据加载 ───
 
 async function loadTemplateCount() {
-  if (!currentProjectId.value) {
-    templateCount.value = null
-    return
-  }
-  try {
-    const data = await api.get(P_wp.templateList(currentProjectId.value))
-    const items = Array.isArray(data) ? data : (data?.items || [])
-    templateCount.value = items.length
-  } catch {
-    templateCount.value = null
-  }
+  // 不调 /list 端点（与 WpTemplateTab 重复会被 axios dedup 取消）
+  // 改用 /formula-coverage 的 summary.total_primary_templates（含全部 179 主编码）
+  // 注意：这只是顶部摘要的总数显示，WpTemplateTab 自己会调 /list 拿完整数据
+  // 实际值会被 loadFormulaCoverage 内部更新
+  templateCount.value = null  // 待 loadFormulaCoverage 联动赋值
 }
 
 async function loadFormulaCoverage() {
   try {
     const data = await api.get(P_tlm.formulaCoverage)
+    // 顶部主编码总数：用 summary.total_all_primaries（含 form/word 全部主编码 = 179）
+    if (data?.summary?.total_all_primaries !== undefined) {
+      templateCount.value = data.summary.total_all_primaries
+    } else if (data?.summary?.total_primary_templates !== undefined) {
+      templateCount.value = data.summary.total_primary_templates
+    }
     // 后端 FormulaCoverageResponse 含 prefill_coverage[] 和 report_formula_coverage[]
     // 顶部摘要展示"全局公式覆盖率"= 预填充覆盖率 + 报表公式覆盖率 加权平均（简单平均近似）
     const prefill = (data?.prefill_coverage || []) as Array<{ total_templates: number; templates_with_formula: number }>
@@ -309,7 +324,7 @@ async function loadFormulaCoverage() {
 async function loadSeedStatus() {
   try {
     const data = await api.get(P_tlm.seedStatus)
-    const seeds = (data?.seeds || []) as Array<{ status: string }>
+    const seeds = (data?.seeds || []) as Array<{ seed_name: string; record_count: number; status: string }>
     seedTotal.value = seeds.length
     seedLoadedCount.value = seeds.filter(s => s.status === 'loaded').length
   } catch {
@@ -352,7 +367,8 @@ async function refreshSummary() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await ensureFallbackProject()
   refreshSummary()
 })
 </script>

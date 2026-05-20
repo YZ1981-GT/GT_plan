@@ -1,0 +1,88 @@
+{
+  "description": "N 税金循环校验规则定义（VR-N2-01 应交税费期末勾稽 + VR-N5-01 所得税费用勾稽）",
+  "version": "2025-R1",
+  "rules": [
+    {
+      "rule_id": "VR-N2-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "N2",
+      "description": "N2 应交税费期末 = 期初 + 计提 − 缴纳（blocking, tolerance=1.0; N2-1 saved 触发）",
+      "formula": "ABS(N2_closing - (N2_opening + N2_accrued - N2_paid)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "trigger_condition": "N2-1 saved",
+      "applies_when": {
+        "description": "当 N2 审定表已保存（期初/期末/计提/缴纳字段存在）时触发 blocking；N2-1 未保存 → skip",
+        "required_main_wp": "N2",
+        "required_any_of_subs": [],
+        "skip_message": "N2-1 审定表未保存，跳过"
+      },
+      "sources": {
+        "n2_closing": {
+          "wp": "N2",
+          "sheet": "审定表N2-1",
+          "cell": "应交税费_期末余额"
+        },
+        "n2_opening": {
+          "wp": "N2",
+          "sheet": "审定表N2-1",
+          "cell": "应交税费_期初余额"
+        },
+        "n2_accrued": {
+          "wp": "N2",
+          "sheet": "审定表N2-1",
+          "cell": "应交税费_本期计提"
+        },
+        "n2_paid": {
+          "wp": "N2",
+          "sheet": "审定表N2-1",
+          "cell": "应交税费_本期缴纳"
+        }
+      },
+      "message_template": "N2 应交税费勾稽不平衡，差异超过 1 元: 期末({n2_closing}) ≠ 期初({n2_opening}) + 计提({n2_accrued}) − 缴纳({n2_paid}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-N5-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "N5",
+      "description": "N5 所得税费用 ≈ 利润总额 × 税率 ± 递延调整（warning, tolerance=1.0; 汇总类规则时机铁律：利润总额未保存时 skip）",
+      "formula": "ABS(N5_total - (profit_before_tax * rate + deferred_adjustment)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "warning",
+      "scope": "total",
+      "trigger_condition": "N5-1 AND PL saved",
+      "applies_when": {
+        "description": "当 N5 审定表已保存且利润总额（PL）已保存时触发 warning；利润总额未保存时 skip（汇总类规则时机铁律）",
+        "required_main_wp": "N5",
+        "required_any_of_subs": ["PL"],
+        "skip_message": "利润总额（PL）未保存，跳过"
+      },
+      "sources": {
+        "n5_total": {
+          "wp": "N5",
+          "sheet": "审定表N5-1",
+          "cell": "所得税费用_合计"
+        },
+        "profit_before_tax": {
+          "wp": "PL",
+          "sheet": "利润表",
+          "cell": "利润总额"
+        },
+        "statutory_rate": {
+          "wp": "N5",
+          "sheet": "审定表N5-1",
+          "cell": "法定税率",
+          "default": 0.25
+        },
+        "deferred_adjustment": {
+          "wp": "N5",
+          "sheet": "审定表N5-1",
+          "cell": "递延所得税调整",
+          "fallback": "=WP('N1','递延资产变动') - =WP('N3','递延负债变动')"
+        }
+      },
+      "message_template": "N5 所得税费用勾稽不平衡: 合计({n5_total}) ≠ 利润总额({profit_before_tax}) × 税率({statutory_rate}) + 递延调整({deferred_adjustment}), 差异={diff}"
+    }
+  ]
+}

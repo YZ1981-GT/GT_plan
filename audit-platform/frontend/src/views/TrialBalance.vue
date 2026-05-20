@@ -150,9 +150,9 @@
       </div>
     </el-alert>
 
-    <!-- 数据新鲜度提示（有未重算的调整分录时） -->
+    <!-- Sprint 4：StaleIndicator 统一组件 + 数据新鲜度提示 -->
     <div v-if="isStale && rows.length > 0" class="gt-stale-banner">
-      <span class="gt-stale-icon">⚠️</span>
+      <StaleIndicator :stale="true" tooltip="数据已过期，请刷新" />
       <span class="gt-stale-text">
         {{ isFrozen ? '试算表已锁定，不会自动重算' : '数据已过期，请刷新（检测到新调整分录）' }}
       </span>
@@ -605,7 +605,19 @@
     <div class="gt-ucell-ctx-item" @click="onTbCtxOpenWp"><span class="gt-ucell-ctx-icon">📝</span> 打开底稿</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewAdj"><span class="gt-ucell-ctx-icon">📋</span> 查看调整分录</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewLinkedWp"><span class="gt-ucell-ctx-icon">🔗</span> 查看关联底稿</div>
+    <div class="gt-ucell-ctx-item" @click="onTbCtxViewReferences"><span class="gt-ucell-ctx-icon">🔎</span> 查看引用方</div>
   </CellContextMenu>
+
+  <!-- Sprint 5.8: 引用方弹窗 -->
+  <CellFormulaDetail
+    :visible="showCellFormulaDetail"
+    module="TB"
+    :wp-code="cellDetailWpCode"
+    :sheet-name="cellDetailSheet"
+    :label="cellDetailLabel"
+    @update:visible="showCellFormulaDetail = $event"
+    @navigate="onCellDetailNavigate"
+  />
 
   <DataQualityDialog
     v-model="showDataQualityDialog"
@@ -623,6 +635,7 @@ import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
@@ -647,6 +660,7 @@ import { setupPasteListener, pasteToSelection } from '@/composables/useCopyPaste
 import { withLoading } from '@/composables/useLoading'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import StaleIndicator from '@/components/StaleIndicator.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import DataQualityDialog from '@/components/DataQualityDialog.vue'
@@ -2104,6 +2118,38 @@ function onTbCtxViewLinkedWp() {
     path: `/projects/${projectId.value}/workpapers`,
     query: { account: row.standard_account_code },
   })
+}
+
+// Sprint 5.8: 查看引用方
+const showCellFormulaDetail = ref(false)
+const cellDetailWpCode = ref('')
+const cellDetailSheet = ref('')
+const cellDetailLabel = ref('')
+
+function onTbCtxViewReferences() {
+  tbCtx.closeContextMenu()
+  const row = tbCtx.contextMenu.rowData
+  if (!row?.standard_account_code) {
+    ElMessage.info('请先选中一个科目行')
+    return
+  }
+  cellDetailWpCode.value = row.standard_account_code
+  cellDetailSheet.value = ''
+  cellDetailLabel.value = ''
+  showCellFormulaDetail.value = true
+}
+
+function onCellDetailNavigate(uri: string) {
+  showCellFormulaDetail.value = false
+  const parts = uri.split(':')
+  const mod = parts[0]?.toUpperCase()
+  if (mod === 'WP' && parts[1]) {
+    router.push({ name: 'WorkpaperEditor', params: { id: projectId.value }, query: { wp: parts[1] } })
+  } else if (mod === 'REPORT') {
+    router.push({ name: 'ReportView', params: { id: projectId.value } })
+  } else if (mod === 'NOTE') {
+    router.push({ name: 'DisclosureEditor', params: { id: projectId.value } })
+  }
 }
 
 const tbSummaryTypes = [

@@ -1,0 +1,119 @@
+{
+  "description": "F 采购存货循环校验规则定义（F5↔D4↔F2 三角勾稽 + F2 跌价/周转）",
+  "version": "2025-R1",
+  "rules": [
+    {
+      "rule_id": "VR-F5-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "F5",
+      "description": "营业成本 = 期初存货 + 本期采购 - 期末存货",
+      "formula": "ABS(cost - (opening + purchases - closing)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "sources": {
+        "cost": {
+          "wp": "F5",
+          "sheet": "审定表F5-1",
+          "cell": "主营业务成本_审定数"
+        },
+        "opening": {
+          "wp": "F2",
+          "sheet": "存货审定表F2-1",
+          "cell": "存货合计_期初余额"
+        },
+        "purchases": {
+          "wp": "F2",
+          "sheet": "存货审定表F2-1",
+          "cell": "存货合计_本期增加"
+        },
+        "closing": {
+          "wp": "F2",
+          "sheet": "存货审定表F2-1",
+          "cell": "存货合计_期末余额"
+        }
+      },
+      "message_template": "营业成本三角勾稽不平衡，差异超过 1 元: 成本({cost}) ≠ 期初({opening}) + 采购({purchases}) - 期末({closing}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-F5-02",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "F5",
+      "description": "毛利率波动 < 5%（与 VR-D4-03 交叉验证）",
+      "formula": "ABS(current_gross_margin - prior_gross_margin) < 0.05",
+      "tolerance": 0.05,
+      "severity": "warning",
+      "scope": "total",
+      "sources": {
+        "revenue": {
+          "wp": "D4",
+          "sheet": "营业收入审定表D4-1",
+          "cell": "审定数"
+        },
+        "cost": {
+          "wp": "F5",
+          "sheet": "审定表F5-1",
+          "cell": "审定数"
+        },
+        "prior_margin": {
+          "wp": "F5",
+          "sheet": "审定表F5-1",
+          "cell": "上年毛利率"
+        },
+        "current_margin": {
+          "wp": "F5",
+          "sheet": "审定表F5-1",
+          "cell": "本年毛利率"
+        }
+      },
+      "cross_validation": "VR-D4-03",
+      "message_template": "毛利率波动超过 5%，需关注成本配比异常: 本期({current_gross_margin}) vs 上期({prior_gross_margin}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-F2-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "F2",
+      "description": "存货跌价准备计提率 vs 上年变动 < 3%",
+      "formula": "ABS(current_impairment_ratio - prior_impairment_ratio) < 0.03",
+      "tolerance": 0.03,
+      "severity": "warning",
+      "scope": "total",
+      "sources": {
+        "current_impairment_ratio": {
+          "wp": "F2",
+          "sheet": "存货跌价准备测试F2-47",
+          "cell": "本期计提率"
+        },
+        "prior_impairment_ratio": {
+          "wp": "F2",
+          "sheet": "存货跌价准备测试F2-47",
+          "cell": "上年计提率"
+        }
+      },
+      "message_template": "存货跌价准备计提率较上年波动超过 3%，需关注估计变更合理性: 本期({current_impairment_ratio}) vs 上年({prior_impairment_ratio}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-F2-02",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "F2",
+      "description": "存货周转天数 vs 行业均值差异 < 30 天",
+      "formula": "ABS(turnover_days - industry_avg_days) < 30",
+      "tolerance": 30,
+      "severity": "warning",
+      "scope": "total",
+      "sources": {
+        "turnover_days": {
+          "wp": "F2",
+          "sheet": "存货周转分析F2-14",
+          "cell": "本期周转天数"
+        },
+        "industry_avg_days": {
+          "wp": "F2",
+          "sheet": "存货周转分析F2-14",
+          "cell": "行业均值周转天数"
+        }
+      },
+      "message_template": "存货周转天数与行业均值差异超过 30 天，需关注存货管理或销售情况: 本期({turnover_days}) vs 行业均值({industry_avg_days}), 差异={diff}"
+    }
+  ]
+}

@@ -563,3 +563,124 @@ def register_all_routers(app: FastAPI) -> None:
     # 路由内部已声明 prefix="/api/address-registry/v2"，注册时不加额外前缀。
     from app.routers.address_registry_v2 import router as address_registry_v2_router
     app.include_router(address_registry_v2_router, tags=["address-registry-v2"])
+
+    # ═══ 60. global-linkage-bus：统一联动总线（依赖图 + Label 解析器） ═══
+    # 路由内部已声明 prefix="/api/linkage-bus"，注册时不加额外前缀。
+    from app.routers.linkage_bus import router as linkage_bus_router
+    app.include_router(linkage_bus_router, tags=["linkage-bus"])
+
+    # ═══ 61. workpaper-e1-cash-optimization：用户自定义公式编辑器 ═══
+    # 路由内部已声明 prefix="/api/workpapers/{wp_id}"，注册时不加额外前缀。
+    # 提供 GET/PUT/DELETE user-formulas + POST validate-formula。
+    from app.routers.wp_user_formulas import router as wp_user_formulas_router
+    app.include_router(wp_user_formulas_router, tags=["workpaper-user-formulas"])
+
+    # ═══ 62. workpaper-e1-cash-optimization Sprint 2: 前置底稿状态 + 程序状态 + 程序分类 ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/workpapers"，注册时不加额外前缀。
+    from app.routers.wp_prerequisite_status import router as wp_prerequisite_status_router
+    app.include_router(wp_prerequisite_status_router, tags=["workpaper-prerequisite-status"])
+
+    from app.routers.wp_procedure_status import router as wp_procedure_status_router
+    app.include_router(wp_procedure_status_router, tags=["workpaper-procedure-status"])
+
+    # categories_router 内部已声明 prefix="/api/workpapers"，注册时不加额外前缀。
+    from app.routers.wp_procedure_status import categories_router as wp_procedure_categories_router
+    app.include_router(wp_procedure_categories_router, tags=["workpaper-procedure-categories"])
+
+    # ═══ 63. workpaper-e1-cash-optimization UAT 修复: review-records 全局列表 ═══
+    # 路由内部已声明 prefix="/api/review-records"，注册时不加额外前缀。
+    # 提供 GET /api/review-records?project_id=X&target_wp=Y 供 ReviewLayerBadges 拉取 8 层 badge 状态。
+    from app.routers.review_records_global import router as review_records_global_router
+    app.include_router(review_records_global_router, tags=["review-records"])
+
+    # ═══ 64. D 销售循环：客户访谈 LLM 摘要 ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/workpapers/{wp_id}/ai"，注册时不加额外前缀。
+    from app.routers.wp_ai_interview import router as wp_ai_interview_router
+    app.include_router(wp_ai_interview_router, tags=["wp-ai-interview"])
+
+    # ═══ 65. D 销售循环：D2 业务模式分析 ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/workpapers/D2"，注册时不加额外前缀。
+    from app.routers.wp_business_pattern import router as wp_business_pattern_router
+    app.include_router(wp_business_pattern_router, tags=["wp-business-pattern"])
+
+    # ═══ 66. F 采购存货循环：存货监盘 LLM 差异分析（F-F5） ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/workpapers/{wp_id}/ai"，注册时不加额外前缀。
+    from app.routers.wp_ai_stocktake import router as wp_ai_stocktake_router
+    app.include_router(wp_ai_stocktake_router, tags=["wp-ai-stocktake"])
+
+    # ═══ 67. F 采购存货循环：F-F11 计价测试自动抽样 ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/workpapers/{wp_id}/f2"，注册时不加额外前缀。
+    from app.routers.wp_f2_valuation import router as wp_f2_valuation_router
+    app.include_router(wp_f2_valuation_router, tags=["wp-f2-valuation"])
+
+    # ═══ 68. F 采购存货循环：F-F12 跌价准备 ECL 模型辅助 ═══
+    from app.routers.wp_f2_impairment import router as wp_f2_impairment_router
+    app.include_router(wp_f2_impairment_router, tags=["wp-f2-impairment"])
+
+    # ═══ 69. H 固定资产循环：H-F11 折旧自动测算引擎 ═══
+    from app.routers.wp_h_depreciation import router as wp_h_depreciation_router
+    app.include_router(wp_h_depreciation_router, tags=["wp-h-depreciation"])
+
+    # ═══ 70. H 固定资产循环：H-F12 减值 DCF 模型辅助 ═══
+    from app.routers.wp_h_impairment import router as wp_h_impairment_router
+    app.include_router(wp_h_impairment_router, tags=["wp-h-impairment"])
+
+    # ═══ 71. I 无形资产循环：I-F4 商誉减值 DCF 模型辅助（含 Gordon growth + CAS 8 分摊）═══
+    from app.routers.wp_i_goodwill import router as wp_i_goodwill_router
+    app.include_router(wp_i_goodwill_router, tags=["wp-i-goodwill"])
+
+    # ═══ 72. I 无形资产循环：I-F5 开发支出资本化时点判断（CAS 6 五条件） ═══
+    from app.routers.wp_i_capitalization import router as wp_i_capitalization_router
+    app.include_router(wp_i_capitalization_router, tags=["wp-i-capitalization"])
+
+    # ═══ 73. I 无形资产循环：I-F2 摊销自动测算引擎（直线法 + 工作量法 / I1 + I4） ═══
+    from app.routers.wp_i_amortization import (
+        router_i1 as wp_i_amortization_i1_router,
+        router_i4 as wp_i_amortization_i4_router,
+    )
+    app.include_router(wp_i_amortization_i1_router, tags=["wp-i-amortization"])
+    app.include_router(wp_i_amortization_i4_router, tags=["wp-i-amortization"])
+
+    # ═══ 74. G 投资循环：G-F4 公允价值测试（Level 1/2/3）═══
+    from app.routers.wp_g_fair_value import router as wp_g_fair_value_router
+    app.include_router(wp_g_fair_value_router, tags=["wp-g-fair-value"])
+
+    # ═══ 75. G 投资循环：G-F5 ECL 三阶段模型（IFRS 9 / CAS 22）═══
+    from app.routers.wp_g_ecl import router as wp_g_ecl_router
+    app.include_router(wp_g_ecl_router, tags=["wp-g-ecl"])
+
+    # ═══ 76. G 投资循环：G-F11 金融资产分类辅助（CAS 22 / IFRS 9 决策树）═══
+    from app.routers.wp_g_classification import router as wp_g_classification_router
+    app.include_router(wp_g_classification_router, tags=["wp-g-classification"])
+
+    # ═══ 77. J 职工薪酬循环：J-F7 薪酬计提引擎 ═══
+    from app.routers.wp_j_payroll_calc import router as wp_j_payroll_calc_router
+    app.include_router(wp_j_payroll_calc_router, tags=["wp-j-payroll"])
+
+    # ═══ 78. J 职工薪酬循环：J-F8 股份支付 Black-Scholes ═══
+    from app.routers.wp_j_share_payment import router as wp_j_share_payment_router
+    app.include_router(wp_j_share_payment_router, tags=["wp-j-share-payment"])
+
+    # ═══ 79. K 管理循环：K-F7 销售/管理费用分析引擎 ═══
+    from app.routers.wp_k_expense_analysis import router as wp_k_expense_analysis_router
+    app.include_router(wp_k_expense_analysis_router, tags=["wp-k-expense-analysis"])
+
+    # ═══ 80. K 管理循环：K-F8 K11 资产减值损失跨循环汇总 ═══
+    from app.routers.wp_k_impairment_summary import router as wp_k_impairment_summary_router
+    app.include_router(wp_k_impairment_summary_router, tags=["wp-k-impairment-summary"])
+
+    # ═══ 81. L 筹资循环：L-F7 利息自动测算引擎 ═══
+    from app.routers.wp_l_interest_calc import router as wp_l_interest_calc_router
+    app.include_router(wp_l_interest_calc_router, tags=["wp-l-interest"])
+
+    # ═══ 82. L 筹资循环：L-F8 应付债券摊余成本引擎 ═══
+    from app.routers.wp_l_bond_amortization import router as wp_l_bond_amortization_router
+    app.include_router(wp_l_bond_amortization_router, tags=["wp-l-bond-amortization"])
+
+    # ═══ 83. M 权益循环：M-F7 权益变动表引擎 ═══
+    from app.routers.wp_m_equity_movement import router as wp_m_equity_movement_router
+    app.include_router(wp_m_equity_movement_router, tags=["wp-m-equity-movement"])
+
+    # ═══ 84. N 税金循环：N-F7 所得税费用测算引擎 ═══
+    from app.routers.wp_n_income_tax_calc import router as wp_n_income_tax_calc_router
+    app.include_router(wp_n_income_tax_calc_router, tags=["wp-n-income-tax"])

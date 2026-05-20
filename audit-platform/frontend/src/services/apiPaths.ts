@@ -353,6 +353,15 @@ export const workpapers = {
     rules: (pid: string) => `/api/projects/${pid}/cross-check/rules`,
     customRule: (pid: string) => `/api/projects/${pid}/cross-check/rules/custom`,
   },
+  // E1 Sprint 2 Task 2.16/2.13/2.40: 前置状态 + 程序状态 + 程序分类
+  prerequisiteStatus: (pid: string, wpCode: string) =>
+    `/api/projects/${pid}/workpapers/prerequisite-status?wp_code=${encodeURIComponent(wpCode)}`,
+  procedureStatus: (pid: string, wpId: string) =>
+    `/api/projects/${pid}/working-papers/${wpId}/procedure-status`,
+  procedureCategories: (wpId: string) => `/api/workpapers/${wpId}/procedure-categories`,
+  // E1 Sprint 2 Task 2.21: AI 复核问题与回复辅助
+  aiReviewQuestions: (wpId: string) => `/api/workpapers/${wpId}/ai/review-questions`,
+  aiReviewReply: (wpId: string) => `/api/workpapers/${wpId}/ai/review-reply`,
 } as const
 
 // ─── 底稿复核批注 ───────────────────────────────────────────────────────────
@@ -1407,6 +1416,21 @@ export const linkage = {
   changeHistory: (pid: string, rowCode: string) => `/api/projects/${pid}/linkage/change-history/${encodeURIComponent(rowCode)}`,
 } as const
 
+// ─── Linkage Bus（全局联动总线 — 统一依赖图 + Stale 传播 + 公式穿透） ───────
+
+export const linkageBus = {
+  graph: '/api/linkage-bus/graph',
+  resolve: '/api/linkage-bus/resolve',
+  impact: '/api/linkage-bus/impact',
+  override: '/api/linkage-bus/override',
+  headerRule: '/api/linkage-bus/header-rule',
+  auditLog: '/api/linkage-bus/audit-log',
+  health: '/api/linkage-bus/health',
+  formulaUsage: '/api/linkage-bus/formula-usage',
+  formulasFor: '/api/linkage-bus/formulas-for',
+  cellDetail: '/api/linkage-bus/cell-detail',
+} as const
+
 // ─── Conflict Guard（调整分录编辑锁） ───────────────────────────────────────
 
 export const conflictGuard = {
@@ -1525,7 +1549,7 @@ export const API = {
   admin, my, partner, qcDashboard, qcRules, qcInspections, qcCases,
   qcAnnualReports, qcAuditLogCompliance, qcArchiveReadiness,
   jobs, governance, eqcr, signatures, rotation,
-  presence, linkage, conflictGuard, chainWorkflow, projectConfig,
+  presence, linkage, linkageBus, conflictGuard, chainWorkflow, projectConfig,
   noteLocks, dataLock, noteGroupTemplate, noteCustomSections,
   templateLibraryMgmt,
   customQuery, systemDicts,

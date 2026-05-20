@@ -62,6 +62,25 @@
         </div>
 
         <!-- 分类 Tab -->
+        <!-- Sprint 5.10: 健康度卡片 + URI 搜索 -->
+        <div class="gt-fm-health-bar">
+          <div class="gt-fm-health-card">
+            <span class="gt-fm-health-label">健康度</span>
+            <span class="gt-fm-health-value" :style="{ color: healthPercent >= 80 ? 'var(--gt-color-success)' : healthPercent >= 50 ? 'var(--gt-color-wheat)' : 'var(--gt-color-danger)' }">
+              {{ healthPercent }}%
+            </span>
+            <span class="gt-fm-health-desc">{{ healthDesc }}</span>
+          </div>
+          <el-input
+            v-model="uriSearchQuery"
+            size="small"
+            placeholder="按 URI 搜索公式..."
+            clearable
+            style="width: 260px;"
+            prefix-icon="Search"
+          />
+        </div>
+
         <el-tabs v-model="activeCategory" size="small" style="margin-bottom: 8px;">
           <el-tab-pane name="all">
             <template #label>全部 ({{ currentRows.length }})</template>
@@ -77,6 +96,52 @@
           </el-tab-pane>
           <el-tab-pane name="no_formula">
             <template #label>⬜ 未配置 ({{ currentRows.length - currentRows.filter(r => r.formula).length }})</template>
+          </el-tab-pane>
+          <!-- E1 Sprint 2 Task 2.34: 用户自定义公式 Tab -->
+          <el-tab-pane name="user_formulas">
+            <template #label>✏️ 用户自定义 ({{ userFormulasList.length }})</template>
+            <div class="gt-fm-user-formulas">
+              <el-alert type="info" :closable="false" show-icon class="gt-fm-user-alert">
+                <span>蓝色背景 = 系统预设公式（来自 prefill_formula_mapping.json）；绿色背景 = 用户自定义公式（覆盖系统预设可恢复）</span>
+              </el-alert>
+              <el-table
+                :data="userFormulasList"
+                size="small"
+                border
+                max-height="calc(100vh - 360px)"
+                :row-class-name="userFormulaRowClass"
+              >
+                <el-table-column label="单元格" prop="cell_key" width="180">
+                  <template #default="{ row }">
+                    <span class="gt-fm-mono">{{ row.cell_key }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="公式" min-width="260">
+                  <template #default="{ row }">
+                    <code class="gt-fm-mono">{{ row.formula }}</code>
+                  </template>
+                </el-table-column>
+                <el-table-column label="类型" width="120">
+                  <template #default="{ row }">
+                    <el-tag :type="row.is_preset_override ? 'warning' : 'success'" size="small">
+                      {{ row.is_preset_override ? '已修改预设' : '用户新增' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="200">
+                  <template #default="{ row }">
+                    <el-button
+                      v-if="row.is_preset_override"
+                      size="small"
+                      type="warning"
+                      text
+                      @click="onRestorePresetFormula(row)"
+                    >↺ 恢复预设</el-button>
+                    <el-button size="small" type="danger" text @click="onDeleteUserFormula(row)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
           </el-tab-pane>
         </el-tabs>
 
@@ -153,6 +218,12 @@
             <template #default="{ row }">
               <span v-if="isPresetFormula(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-teal); background: var(--gt-bg-info); padding: 1px 6px; border-radius: 3px;">预设</span>
               <span v-else-if="row.formula" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">自定义</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="引用方" width="70" align="center">
+            <template #default="{ row }">
+              <el-badge v-if="row._ref_count > 0" :value="row._ref_count" :max="99" type="info" />
+              <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder);">0</span>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="80" align="center">
@@ -336,7 +407,7 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
-import { reportConfig as P_rc, noteTemplates as P_nt } from '@/services/apiPaths'
+import { reportConfig as P_rc, noteTemplates as P_nt, linkageBus } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
 import FormulaEditDialog from './FormulaEditDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
@@ -979,8 +1050,35 @@ function onRemoveCrossRule(index: number) {
 // ── 分类筛选 ──
 const activeCategory = ref('all')
 
-const filteredRows = computed(() => {
+// Sprint 5.10: URI search + health
+const uriSearchQuery = ref('')
+
+const healthPercent = computed(() => {
   const rows = currentRows.value
+  if (!rows.length) return 100
+  const withFormula = rows.filter(r => r.formula).length
+  return Math.round((withFormula / rows.length) * 100)
+})
+
+const healthDesc = computed(() => {
+  const rows = currentRows.value
+  const withFormula = rows.filter(r => r.formula).length
+  return `${withFormula}/${rows.length} 已配置`
+})
+
+const filteredRows = computed(() => {
+  let rows = currentRows.value
+
+  // URI search filter
+  if (uriSearchQuery.value.trim()) {
+    const q = uriSearchQuery.value.trim().toLowerCase()
+    rows = rows.filter(r =>
+      (r.row_code || '').toLowerCase().includes(q) ||
+      (r.row_name || '').toLowerCase().includes(q) ||
+      (r.formula || '').toLowerCase().includes(q)
+    )
+  }
+
   if (activeCategory.value === 'all') return rows
   if (activeCategory.value === 'no_formula') return rows.filter(r => !r.formula)
   return rows.filter(r => r.formula && r.formula_category === activeCategory.value)
@@ -1354,6 +1452,17 @@ async function onSaveAllFormulas() {
     }
     ElMessage.success(`已保存 ${saved} 个公式`)
     emit('saved')
+
+    // Sprint 5.10: 保存后调 stale_engine 传播变更
+    try {
+      await api.post(linkageBus.impact, {
+        source_uri: `FORMULA:${selectedNodeKey.value}::config_changed`,
+        project_id: props.projectId,
+        year: new Date().getFullYear(),
+      }, { validateStatus: (s: number) => s < 600 })
+    } catch {
+      // stale propagation failure is non-blocking
+    }
   } catch (e) {
     handleApiError(e, '保存失败')
   } finally {
@@ -1455,6 +1564,80 @@ watch(showFormulaDashboard, async (v) => {
     } catch { /* skip */ }
   }
 })
+
+// ─── E1 Sprint 2 Task 2.34/2.36: 用户自定义公式 Tab ──────────────────────────
+
+interface UserFormulaItem {
+  cell_key: string  // 'sheet!cell_ref'
+  formula: string
+  is_preset_override: boolean
+  formula_type?: string
+  modified_at?: string
+}
+
+const userFormulasList = ref<UserFormulaItem[]>([])
+const wpIdForUserFormulas = ref<string>('')
+
+function userFormulaRowClass(_ctx: { row: UserFormulaItem; rowIndex: number }) {
+  return _ctx.row.is_preset_override ? 'gt-fm-user-override' : 'gt-fm-user-new'
+}
+
+async function loadUserFormulas(wpId: string) {
+  if (!wpId) return
+  wpIdForUserFormulas.value = wpId
+  try {
+    const data: any = await api.get(`/api/workpapers/${wpId}/user-formulas`)
+    const list = data?.user_formulas || data?.items || data || {}
+    const arr: UserFormulaItem[] = []
+    if (Array.isArray(list)) {
+      for (const it of list) arr.push(it)
+    } else if (typeof list === 'object') {
+      for (const [k, v] of Object.entries(list)) {
+        const o = v as any
+        arr.push({
+          cell_key: k,
+          formula: o?.formula || '',
+          is_preset_override: !!o?.is_preset_override,
+          formula_type: o?.formula_type,
+          modified_at: o?.modified_at,
+        })
+      }
+    }
+    userFormulasList.value = arr
+  } catch {
+    userFormulasList.value = []
+  }
+}
+
+async function onRestorePresetFormula(row: UserFormulaItem) {
+  if (!wpIdForUserFormulas.value) return
+  try {
+    await api.delete(`/api/workpapers/${wpIdForUserFormulas.value}/user-formulas/${encodeURIComponent(row.cell_key)}`)
+    userFormulasList.value = userFormulasList.value.filter((u) => u.cell_key !== row.cell_key)
+    ElMessage.success(`已恢复 ${row.cell_key} 的预设公式`)
+  } catch (err) {
+    handleApiError(err, '恢复预设')
+  }
+}
+
+async function onDeleteUserFormula(row: UserFormulaItem) {
+  if (!wpIdForUserFormulas.value) return
+  try {
+    await api.delete(`/api/workpapers/${wpIdForUserFormulas.value}/user-formulas/${encodeURIComponent(row.cell_key)}`)
+    userFormulasList.value = userFormulasList.value.filter((u) => u.cell_key !== row.cell_key)
+    ElMessage.success('已删除用户自定义公式')
+  } catch (err) {
+    handleApiError(err, '删除用户公式')
+  }
+}
+
+// 当 activeCategory 切换到 user_formulas 时自动加载（基于 props.wpId 假设）
+watch(activeCategory, (v) => {
+  if (v === 'user_formulas') {
+    const wpId = (props as any).wpId || (props as any).workpaperId || ''
+    if (wpId) loadUserFormulas(String(wpId))
+  }
+})
 </script>
 
 <style scoped>
@@ -1552,6 +1735,32 @@ watch(showFormulaDashboard, async (v) => {
 .gt-fm-dash-group-title:hover {
   background: var(--gt-bg-info);
 }
+.gt-fm-health-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 6px;
+}
+.gt-fm-health-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gt-fm-health-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.gt-fm-health-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+.gt-fm-health-desc {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
+}
 </style>
 
 <!-- 公式管理弹窗独立配色（非 scoped，因为 el-dialog 渲染在 body） -->
@@ -1593,5 +1802,27 @@ watch(showFormulaDashboard, async (v) => {
 /* 表头行蓝色系 */
 .gt-fm-dialog :deep(.el-table th.el-table__cell) {
   background: var(--gt-bg-info) !important;
+}
+</style>
+
+
+<style scoped>
+/* E1 Sprint 2 Task 2.34: 用户自定义公式 Tab 样式 */
+.gt-fm-user-formulas {
+  padding: 8px;
+}
+.gt-fm-user-alert {
+  margin-bottom: 8px;
+}
+.gt-fm-mono {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  color: var(--gt-color-text-regular);
+}
+:deep(.el-table__row.gt-fm-user-override) {
+  background: rgba(230, 244, 234, 0.5) !important;  /* 绿色 */
+}
+:deep(.el-table__row.gt-fm-user-new) {
+  background: rgba(232, 244, 253, 0.5) !important;  /* 蓝色 */
 }
 </style>

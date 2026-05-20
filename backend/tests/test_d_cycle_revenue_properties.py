@@ -164,10 +164,15 @@ class TestProperty3InternalRefCategorization:
     """
 
     def test_internal_d_cycle_refs_have_correct_category_severity(self):
-        """Internal D-cycle references have category=revenue_cycle, severity=warning."""
+        """Internal D-cycle references (in-spec range CW-21~CW-38) have category=revenue_cycle, severity=warning."""
         references = CROSS_WP_DATA["references"]
 
         for ref in references:
+            ref_id = ref.get("ref_id", "")
+            # Scope to this spec's added range only (CW-21~CW-38);
+            # later expansions (CW-89+) used different category taxonomy
+            if not (ref_id.startswith("CW-") and ref_id[3:].isdigit() and 21 <= int(ref_id[3:]) <= 38):
+                continue
             source_wp = ref.get("source_wp", "")
             if source_wp not in D_CYCLE_WP_CODES:
                 continue
@@ -576,13 +581,13 @@ class TestJSONSchemaValidation:
     """
 
     # Valid rule_type enum values
-    VALID_RULE_TYPES = {"balance_check", "tb_consistency", "note_consistency", "detail_total_check"}
+    VALID_RULE_TYPES = {"balance_check", "tb_consistency", "note_consistency", "detail_total_check", "cross_reconciliation"}
 
-    # Valid step category enum values
-    VALID_STEP_CATEGORIES = {"substantive", "confirmation", "conclusion"}
+    # Valid step category enum values (致同 2025 修订版审计程序模板)
+    VALID_STEP_CATEGORIES = {"substantive", "confirmation", "conclusion", "analytical", "cutoff", "review", "documentation"}
 
     # Valid formula_type enum values
-    VALID_FORMULA_TYPES = {"TB", "TB_SUM", "PREV", "TB_AUX", "WP", "ADJ"}
+    VALID_FORMULA_TYPES = {"TB", "TB_SUM", "PREV", "TB_AUX", "WP", "ADJ", "AUX", "LEDGER", "LEDGER_DETAIL"}
 
     def test_validation_rules_rule_type_enum(self):
         """d_cycle_validation_rules.json rule_type only contains valid values."""

@@ -1,0 +1,101 @@
+{
+  "description": "I 无形资产循环校验规则定义（VR-I1-01 无形资产三角勾稽 + VR-I3-01 商誉减值勾稽 + VR-I6-01 研发费用资本化/费用化勾稽）",
+  "version": "2025-R1",
+  "rules": [
+    {
+      "rule_id": "VR-I1-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "I1",
+      "description": "无形资产期末 = 期初 + 增加(I1-5) − 减少(I1-6) − 摊销(I1-10/I1-11)",
+      "formula": "ABS(closing - (opening + additions - disposals - amortization)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "sources": {
+        "closing": {
+          "wp": "I1",
+          "sheet": "审定表I1-1",
+          "cell": "无形资产_期末余额"
+        },
+        "opening": {
+          "wp": "I1",
+          "sheet": "审定表I1-1",
+          "cell": "无形资产_期初余额"
+        },
+        "additions": {
+          "wp": "I1",
+          "sheet": "增加检查表I1-5",
+          "cell": "本期增加合计"
+        },
+        "disposals": {
+          "wp": "I1",
+          "sheet": "减少检查表I1-6",
+          "cell": "本期减少合计"
+        },
+        "amortization": {
+          "wp": "I1",
+          "sheet": "摊销测算表（不含减值）I1-10（剩余年限法）",
+          "cell": "本期摊销合计"
+        }
+      },
+      "message_template": "无形资产三角勾稽不平衡，差异超过 1 元: 期末({closing}) ≠ 期初({opening}) + 增加({additions}) − 减少({disposals}) − 摊销({amortization}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-I3-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "I3",
+      "description": "商誉期末 = 期初 − 减值损失(I3-6)（商誉不摊销）",
+      "formula": "ABS(closing - (opening - impairment_loss)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "sources": {
+        "closing": {
+          "wp": "I3",
+          "sheet": "审定表I3-1",
+          "cell": "商誉_期末余额"
+        },
+        "opening": {
+          "wp": "I3",
+          "sheet": "审定表I3-1",
+          "cell": "商誉_期初余额"
+        },
+        "impairment_loss": {
+          "wp": "I3",
+          "sheet": "减值测试I3-6",
+          "cell": "本期减值损失"
+        }
+      },
+      "message_template": "商誉减值勾稽不平衡，差异超过 1 元: 期末({closing}) ≠ 期初({opening}) − 减值({impairment_loss}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-I6-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "I6",
+      "description": "研发费用总额 = 费用化金额(I6) + 资本化金额(I2)",
+      "formula": "ABS(rd_expense_total - (rd_expensed + rd_capitalized)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "trigger_condition": "I6_and_I2_both_saved",
+      "sources": {
+        "rd_expense_total": {
+          "wp": "I6",
+          "sheet": "审定表I6-1",
+          "cell": "研发费用合计"
+        },
+        "rd_expensed": {
+          "wp": "I6",
+          "sheet": "审定表I6-1",
+          "cell": "费用化支出"
+        },
+        "rd_capitalized": {
+          "wp": "I2",
+          "sheet": "审定表I2-1",
+          "cell": "资本化金额"
+        }
+      },
+      "message_template": "研发费用资本化/费用化勾稽不平衡，差异超过 1 元: 总额({rd_expense_total}) ≠ 费用化({rd_expensed}) + 资本化({rd_capitalized}), 差异={diff}"
+    }
+  ]
+}

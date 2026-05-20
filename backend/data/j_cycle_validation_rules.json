@@ -1,0 +1,104 @@
+{
+  "description": "J 职工薪酬循环校验规则定义（J1 期末勾稽 + 薪酬费用率波动 + 薪酬分配合计勾稽）",
+  "version": "2025-R1",
+  "rules": [
+    {
+      "rule_id": "VR-J1-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "J1",
+      "description": "应付职工薪酬期末 = 期初 + 本期计提(J1-6) − 本期实发(J1-7)",
+      "formula": "ABS(closing - (opening + accrued - paid)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "sources": {
+        "closing": {
+          "wp": "J1",
+          "sheet": "审定表J1-1 ",
+          "cell": "应付职工薪酬_期末余额"
+        },
+        "opening": {
+          "wp": "J1",
+          "sheet": "审定表J1-1 ",
+          "cell": "应付职工薪酬_期初余额"
+        },
+        "accrued": {
+          "wp": "J1",
+          "sheet": "计提情况检查表J1-6",
+          "cell": "本期计提合计"
+        },
+        "paid": {
+          "wp": "J1",
+          "sheet": "分配情况检查表J1-7",
+          "cell": "本期实发合计"
+        }
+      },
+      "trigger_condition": "J1-1 AND (J1-6 OR J1-7) saved",
+      "message_template": "应付职工薪酬三角勾稽不平衡: 期末({closing}) ≠ 期初({opening}) + 计提({accrued}) − 实发({paid}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-J1-02",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "J1",
+      "description": "薪酬费用率年度波动 < 5%（与上年对比）",
+      "formula": "ABS(current_rate - prev_rate) / MAX(prev_rate, 0.001) < 0.05",
+      "tolerance": 0.05,
+      "severity": "warning",
+      "scope": "ratio",
+      "sources": {
+        "current_rate": {
+          "wp": "J1",
+          "sheet": "月度分析表J1-4",
+          "cell": "本年薪酬费用率"
+        },
+        "prev_rate": {
+          "wp": "J1",
+          "sheet": "月度分析表J1-4",
+          "cell": "上年薪酬费用率"
+        }
+      },
+      "trigger_condition": "J1-4 saved AND PREV available",
+      "message_template": "薪酬费用率年度波动超过 5%: 本年({current_rate:.2%}) vs 上年({prev_rate:.2%}), 波动={diff:.2%}"
+    },
+    {
+      "rule_id": "VR-J1-03",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "J1",
+      "description": "薪酬分配合计 = D5营业成本薪酬 + K8销售费用薪酬 + K9管理费用薪酬 + F2生产成本薪酬",
+      "formula": "ABS(total_allocation - (d5_payroll + k8_payroll + k9_payroll + f2_payroll)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "sources": {
+        "total_allocation": {
+          "wp": "J1",
+          "sheet": "分配情况检查表J1-7",
+          "cell": "本期合计"
+        },
+        "d5_payroll": {
+          "wp": "D5",
+          "sheet": "审定表F5-1",
+          "cell": "薪酬"
+        },
+        "k8_payroll": {
+          "wp": "K8",
+          "sheet": "明细表K8-2",
+          "cell": "专设销售机构的职工薪酬"
+        },
+        "k9_payroll": {
+          "wp": "K9",
+          "sheet": "明细表K9-2",
+          "cell": "职工工资"
+        },
+        "f2_payroll": {
+          "wp": "F2",
+          "sheet": "审定表F2-1",
+          "cell": "生产人员薪酬"
+        }
+      },
+      "trigger_condition": "J1-7 AND at least 1 target (D5/K8/K9/F2) saved",
+      "skip_if_all_targets_missing": true,
+      "message_template": "薪酬分配合计勾稽不平衡: 分配合计({total_allocation}) ≠ D5({d5_payroll}) + K8({k8_payroll}) + K9({k9_payroll}) + F2({f2_payroll}), 差异={diff}"
+    }
+  ]
+}

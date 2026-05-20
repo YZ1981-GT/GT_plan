@@ -654,38 +654,99 @@ async def convert_docx_to_univer_doc(
 
 
 def _has_style(cell) -> bool:
-    """检查单元格是否有非默认样式"""
+    """检查单元格是否有非默认样式（即是否需要写入 cellData 即使无值）
+
+    [2026-05-17] 全面检测：font name/size/bold/italic/underline/strike/color +
+    fill bg + border + number_format + alignment（horizontal/vertical/wrap/rotation/indent）。
+    任何一项非默认即返回 True，确保模板细节不丢。
+    """
     try:
-        if cell.font and (cell.font.bold or cell.font.italic or (cell.font.size and cell.font.size != 11)):
-            return True
+        font = cell.font
+        if font:
+            # 字体名/字号 — 任何非空都视为有样式
+            if font.name and font.name not in ("Calibri", "等线"):
+                return True
+            if font.size and font.size != 11:
+                return True
+            if font.bold or font.italic or font.strikethrough:
+                return True
+            if font.underline and font.underline != "none":
+                return True
+            # 字体颜色 — 排除默认黑/全 0
+            if font.color and font.color.rgb:
+                raw = str(font.color.rgb).strip()
+                if raw and raw not in ("00000000", "0", "FF000000"):
+                    return True
         if cell.fill and cell.fill.fgColor and cell.fill.fgColor.rgb and str(cell.fill.fgColor.rgb) not in ("00000000", "0"):
             return True
         if cell.border and (cell.border.left.style or cell.border.right.style or cell.border.top.style or cell.border.bottom.style):
             return True
         if cell.number_format and cell.number_format != "General":
             return True
-        if cell.alignment and (cell.alignment.wrap_text or cell.alignment.vertical != "bottom"):
+        align = cell.alignment
+        if align and (
+            align.wrap_text
+            or (align.horizontal and align.horizontal != "general")
+            or (align.vertical and align.vertical != "bottom")
+            or (align.text_rotation and align.text_rotation != 0)
+            or (align.indent and align.indent != 0)
+        ):
             return True
     except Exception:
         pass
     return False
 
 
+def _safe_hex_rgb(raw: Any) -> str | None:
+    """从 openpyxl Color 对象的 rgb 属性安全提取 6/8 位 hex 字符串。
+
+    openpyxl 的 fgColor.rgb / font.color.rgb 当底层是 theme/indexed/auto
+    类型时，str(...) 会返回 "<class 'str'>" 之类的对象描述（而非真实 hex）；
+    或者 .rgb 属性本身是 None 但 .indexed/.theme 有值。
+    本函数只接受纯 hex 字符 + 长度 6/8，否则返回 None。
+
+    返回：6 位 hex（不带 #），无效则返回 None
+    """
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    # 仅接受纯 hex 字符（A-F0-9）
+    if not all(c in "0123456789abcdefABCDEF" for c in s):
+        return None
+    if len(s) == 8:
+        # ARGB → 取后 6 位（去 alpha）
+        return s[-6:].upper()
+    if len(s) == 6:
+        return s.upper()
+    return None
+
+
 def _extract_cell_style(cell) -> dict | None:
     """从 openpyxl cell 提取样式转为 Univer 格式
 
     支持：字体/底纹/边框/对齐/数字格式/文本换行/下划线/删除线
+
+    [2026-05-17 用户偏好硬约束]
+    转 Univer 时**保留原 xlsx 的全部字体/字号/对齐/颜色样式**，
+    不主动跳过"等线/Calibri/宋体/size=11/bottom 对齐"等"默认值"——
+    模板可能依赖这些显式默认值，跳过会导致渲染与原 xlsx 不一致（"太丑"）。
     """
     style: dict = {}
 
     try:
-        # 字体
+        # 字体（保留所有字体名/字号，不再做"默认值跳过"）
         font = cell.font
         if font:
-            if font.name and font.name not in ("等线", "Calibri", "宋体"):
+            if font.name:
                 style["ff"] = font.name
-            if font.size and font.size != 11:
-                style["fs"] = int(font.size)
+            if font.size:
+                # Univer 使用 number；保留原 size 不论是否 = 11
+                try:
+                    style["fs"] = int(round(float(font.size)))
+                except (TypeError, ValueError):
+                    pass
             if font.bold:
                 style["bl"] = 1
             if font.italic:
@@ -694,17 +755,22 @@ def _extract_cell_style(cell) -> dict | None:
                 style["ul"] = 1
             if font.strikethrough:
                 style["st"] = 1
-            if font.color and font.color.rgb and str(font.color.rgb) not in ("00000000", "0", "FF000000"):
-                rgb = str(font.color.rgb)[-6:]
-                if rgb != "000000":
-                    style["cl"] = {"rgb": f"#{rgb}"}
+            # 字体颜色：仅排除 "00000000/0/FF000000" 这些"未设置/全透明/默认黑"
+            # 任何合法 hex 都保留（包括纯黑——某些模板显式声明黑色）
+            if font.color and font.color.rgb:
+                raw = str(font.color.rgb).strip()
+                if raw and raw not in ("00000000", "0", "FF000000"):
+                    rgb = _safe_hex_rgb(font.color.rgb)
+                    if rgb:
+                        style["cl"] = {"rgb": f"#{rgb}"}
 
         # 底纹/填充
         fill = cell.fill
         if fill and fill.fgColor and fill.fgColor.rgb:
-            rgb = str(fill.fgColor.rgb)
-            if len(rgb) >= 6 and rgb[-6:] != "000000" and rgb not in ("00000000", "0"):
-                style["bg"] = {"rgb": f"#{rgb[-6:]}"}
+            rgb = _safe_hex_rgb(fill.fgColor.rgb)
+            # 跳过纯黑（00000000 = 默认未设置）；其他有效色保留
+            if rgb and rgb != "000000":
+                style["bg"] = {"rgb": f"#{rgb}"}
 
         # 边框（含线型粗细）
         border = cell.border
@@ -717,24 +783,24 @@ def _extract_cell_style(cell) -> dict | None:
                     s_val = border_style_map.get(side.style, 1)
                     side_color = "#000000"
                     if side.color and side.color.rgb:
-                        c = str(side.color.rgb)
-                        if len(c) >= 6:
-                            side_color = f"#{c[-6:]}"
+                        c = _safe_hex_rgb(side.color.rgb)
+                        if c:
+                            side_color = f"#{c}"
                     bd[side_key] = {"s": s_val, "cl": {"rgb": side_color}}
             if bd:
                 style["bd"] = bd
 
-        # 对齐
+        # 对齐（保留所有对齐方式，不再做"bottom 默认值跳过"）
         align = cell.alignment
         if align:
             # 水平对齐
             if align.horizontal:
-                h_map = {"left": 0, "center": 1, "right": 2, "justify": 3, "fill": 4}
+                h_map = {"left": 0, "center": 1, "right": 2, "justify": 3, "fill": 4, "centerContinuous": 1, "distributed": 3}
                 if align.horizontal in h_map:
                     style["ht"] = h_map[align.horizontal]
-            # 垂直对齐
-            if align.vertical and align.vertical != "bottom":
-                v_map = {"top": 0, "center": 1, "bottom": 2}
+            # 垂直对齐（保留 bottom，因模板可能显式声明此值）
+            if align.vertical:
+                v_map = {"top": 0, "center": 1, "bottom": 2, "justify": 3, "distributed": 3}
                 if align.vertical in v_map:
                     style["vt"] = v_map[align.vertical]
             # 文本换行
@@ -743,6 +809,9 @@ def _extract_cell_style(cell) -> dict | None:
             # 文本旋转
             if align.text_rotation and align.text_rotation != 0:
                 style["tr"] = align.text_rotation
+            # 文本缩进（致同模板部分使用）
+            if align.indent and align.indent != 0:
+                style["pd"] = {"l": int(align.indent) * 8}  # Univer 用 pd（padding）模拟缩进
 
         # 数字格式
         nf = cell.number_format
@@ -836,11 +905,13 @@ def _extract_conditional_formatting(ws) -> list[dict]:
                     if rule.dxf:
                         fmt: dict = {}
                         if rule.dxf.font and rule.dxf.font.color and rule.dxf.font.color.rgb:
-                            rgb = str(rule.dxf.font.color.rgb)[-6:]
-                            fmt["cl"] = {"rgb": f"#{rgb}"}
+                            rgb = _safe_hex_rgb(rule.dxf.font.color.rgb)
+                            if rgb:
+                                fmt["cl"] = {"rgb": f"#{rgb}"}
                         if rule.dxf.fill and rule.dxf.fill.fgColor and rule.dxf.fill.fgColor.rgb:
-                            rgb = str(rule.dxf.fill.fgColor.rgb)[-6:]
-                            fmt["bg"] = {"rgb": f"#{rgb}"}
+                            rgb = _safe_hex_rgb(rule.dxf.fill.fgColor.rgb)
+                            if rgb:
+                                fmt["bg"] = {"rgb": f"#{rgb}"}
                         if fmt:
                             rule_obj["style"] = fmt
 
@@ -849,7 +920,7 @@ def _extract_conditional_formatting(ws) -> list[dict]:
                     cs = rule.colorScale
                     rule_obj["colorScale"] = {
                         "colors": [
-                            f"#{str(c.rgb)[-6:]}" if c and c.rgb else "#FFFFFF"
+                            f"#{_safe_hex_rgb(c.rgb)}" if c and c.rgb and _safe_hex_rgb(c.rgb) else "#FFFFFF"
                             for c in (cs.color or [])
                         ],
                     }

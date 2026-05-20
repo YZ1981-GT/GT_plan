@@ -1,0 +1,92 @@
+{
+  "description": "M 权益循环校验规则定义（VR-M6-01 未分配利润变动勾稽 + VR-M2-01 实收资本变动勾稽）",
+  "version": "2025-R1",
+  "rules": [
+    {
+      "rule_id": "VR-M6-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "M6",
+      "description": "M6 未分配利润期末 = 期初 + 净利润 − 盈余公积 − 股利（汇总类规则时机铁律：至少 1 个来源已保存才触发 blocking）",
+      "formula": "ABS(M6_closing - (M6_opening + net_profit - surplus_reserve - dividends)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "blocking",
+      "scope": "total",
+      "trigger_condition": "M6-1 AND (PL OR M5 OR M1) saved",
+      "applies_when": {
+        "description": "当 M6 审定表已保存且至少 1 个来源底稿（PL利润表/M5盈余公积/M1应付股利）已保存时触发 blocking；全部来源未保存时 skip 避免 M6 先保存时误提示",
+        "required_main_wp": "M6",
+        "required_any_of_subs": ["PL", "M5", "M1"],
+        "skip_message": "净利润来源底稿（PL/M5/M1）均未保存，跳过"
+      },
+      "sources": {
+        "m6_closing": {
+          "wp": "M6",
+          "sheet": "明细表M6-2",
+          "cell": "七、本年年末余额_审定数"
+        },
+        "m6_opening": {
+          "wp": "M6",
+          "sheet": "明细表M6-2",
+          "cell": "二、本年年初余额_审定数"
+        },
+        "net_profit": {
+          "wp": "PL",
+          "sheet": "利润表",
+          "cell": "净利润",
+          "fallback": "=TB('4103','本年利润期末余额')"
+        },
+        "surplus_reserve": {
+          "wp": "M5",
+          "sheet": "明细表M5-2",
+          "cell": "本期增加_合计"
+        },
+        "dividends": {
+          "wp": "M1",
+          "sheet": "审定表M1-1",
+          "cell": "本期应付股利_合计"
+        }
+      },
+      "message_template": "M6 未分配利润勾稽不平衡，差异超过 1 元: 期末({m6_closing}) ≠ 期初({m6_opening}) + 净利润({net_profit}) − 盈余公积({surplus_reserve}) − 股利({dividends}), 差异={diff}"
+    },
+    {
+      "rule_id": "VR-M2-01",
+      "rule_type": "cross_reconciliation",
+      "wp_code": "M2",
+      "description": "M2 实收资本期末 = 期初 + 增资 − 减资",
+      "formula": "ABS(M2_closing - (M2_opening + capital_increase - capital_decrease)) < 1.0",
+      "tolerance": 1.0,
+      "severity": "warning",
+      "scope": "total",
+      "trigger_condition": "M2-1 saved",
+      "applies_when": {
+        "description": "当 M2 审定表已保存（parsed_data 含期初/期末/增减字段）时触发 warning（不阻断签字）",
+        "required_main_wp": "M2",
+        "required_any_of_subs": [],
+        "skip_message": "M2-1 审定表未保存，跳过"
+      },
+      "sources": {
+        "m2_closing": {
+          "wp": "M2",
+          "sheet": "审定表M2-1",
+          "cell": "实收资本_期末余额"
+        },
+        "m2_opening": {
+          "wp": "M2",
+          "sheet": "审定表M2-1",
+          "cell": "实收资本_期初余额"
+        },
+        "capital_increase": {
+          "wp": "M2",
+          "sheet": "审定表M2-1",
+          "cell": "实收资本_本期增加"
+        },
+        "capital_decrease": {
+          "wp": "M2",
+          "sheet": "审定表M2-1",
+          "cell": "实收资本_本期减少"
+        }
+      },
+      "message_template": "M2 实收资本勾稽不平衡: 期末({m2_closing}) ≠ 期初({m2_opening}) + 增资({capital_increase}) − 减资({capital_decrease}), 差异={diff}"
+    }
+  ]
+}
