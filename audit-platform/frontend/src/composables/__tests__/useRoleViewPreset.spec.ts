@@ -180,8 +180,12 @@ describe('isKeyJudgmentPoint — 质控过滤', () => {
     expect(isKeyJudgmentPoint(makeWpItem({ wp_code: 'D2-2' }))).toBe(false)
   })
 
-  it('B23-1 通过（匹配 [A-Z]\\d+-1 模式）', () => {
-    expect(isKeyJudgmentPoint(makeWpItem({ wp_code: 'B23-1' }))).toBe(true)
+  it('B23-1 不通过（控制底稿，非业务循环审定表）', () => {
+    expect(isKeyJudgmentPoint(makeWpItem({ wp_code: 'B23-1' }))).toBe(false)
+  })
+
+  it('C2-1 不通过（控制测试，非业务循环）', () => {
+    expect(isKeyJudgmentPoint(makeWpItem({ wp_code: 'C2-1' }))).toBe(false)
   })
 
   it('C2-3 不通过', () => {

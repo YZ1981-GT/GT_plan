@@ -126,7 +126,7 @@ async function loadProjectList() {
 }
 
 function goToCreateProject() { router.push('/projects/new') }
-function openProject(id: string) { router.push(`/projects/${id}/trial-balance`) }
+function openProject(id: string) { router.push({ name: 'ProjectEntry', params: { projectId: id } }) }
 function openImport(id: string) {
   router.push({ path: `/projects/${id}/ledger`, query: { import: '1' } })
 }

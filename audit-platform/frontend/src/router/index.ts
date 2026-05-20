@@ -334,6 +334,25 @@ const router = createRouter({
           component: () => import('@/views/ProjectDashboard.vue'),
         },
         {
+          path: 'projects/:projectId/dashboard',
+          name: 'PartnerProjectDashboard',
+          component: () => import('@/views/PartnerProjectDashboard.vue'),
+        },
+        {
+          // 项目入口路由：partner/admin 默认跳转到仪表盘，其他角色跳转到试算表
+          path: 'projects/:projectId/entry',
+          name: 'ProjectEntry',
+          redirect: (to) => {
+            const authStore = useAuthStore()
+            const role = authStore.user?.role
+            const projectId = to.params.projectId as string
+            if (role === 'partner' || role === 'admin') {
+              return { name: 'PartnerProjectDashboard', params: { projectId } }
+            }
+            return { name: 'TrialBalance', params: { projectId } }
+          },
+        },
+        {
           path: 'my/dashboard',
           name: 'PersonalDashboard',
           component: () => import('@/views/PersonalDashboard.vue'),

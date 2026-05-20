@@ -178,3 +178,21 @@
 - 前端 PBT 使用 fast-check（≥ 100 iterations）
 - 复用已有数据源：usePrerequisiteStatus / consistency_gate 缓存 / review_records
 - localStorage key 含 userId 避免多用户冲突
+
+## 已知缺口
+
+> 跳过决策记录（铁律：optional PBT task 跳过必须显式列出）
+
+| PBT Property | 跳过决策 | 原因 |
+|--------------|---------|------|
+| P1 view switch data invariant | 跳过 | 单测已覆盖 — `useRoleViewPreset.spec.ts` 中"质控视图仅显示关键判断点"+"切换视图保留搜索关键词"已验证 ID 集合不变性 |
+| P2 persistence round-trip | 跳过 | 单测已覆盖 — "switchPreset 写入 localStorage" + "初始化时从 localStorage 读取有效值" + "无效值回退" 三个测试覆盖完整 round-trip |
+| P3 sort stability | 跳过 | Array.prototype.sort 在 V8/SpiderMonkey 中 ES2019+ 已保证 stable，依赖语言规范不需 PBT 验证 |
+
+后续如需补充 PBT，使用 fast-check（≥ 100 iterations），文件位置 `frontend/src/composables/__tests__/useRoleViewPreset.pbt.spec.ts`。
+
+## 复盘修复（2026-05-20）
+
+| 问题 | 修复 |
+|------|------|
+| 质控正则误命中 B23-1/C2-1 等控制底稿 | 限定为 `^(B15|A15|B50-4)$|^[D-N]\d+-1$`，仅业务循环 D~N 审定表 |

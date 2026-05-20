@@ -140,8 +140,15 @@ export function wpCodeNaturalSort(a: WpItem, b: WpItem): number {
 
 // ─── Filter Functions ────────────────────────────────────────────────────────
 
-/** 质控视图过滤：关键判断点底稿 */
-const QC_FILTER_PATTERN = /^(B15|A15|B50-4|[A-Z]\d+-1)$/
+/** 质控视图过滤：关键判断点底稿
+ *
+ * 包含规则：
+ * - B15（重要性水平）/ A15（持续经营）/ B50-4（特别风险）
+ * - 各业务循环审定表（D~N 循环 + 数字 + "-1"，如 D2-1/F2-1/H1-1）
+ *
+ * 不包含：B23-1（控制了解）/ C2-1（控制测试）等非业务循环底稿
+ */
+const QC_FILTER_PATTERN = /^(B15|A15|B50-4)$|^[D-N]\d+-1$/
 export function isKeyJudgmentPoint(item: WpItem): boolean {
   return QC_FILTER_PATTERN.test(item.wp_code)
 }

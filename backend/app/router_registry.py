@@ -689,3 +689,8 @@ def register_all_routers(app: FastAPI) -> None:
     # 路由内部已声明 prefix="/api/projects/{project_id}/workpapers/{wp_id}"，注册时不加额外前缀。
     from app.routers.wp_procedure_trim import router as wp_procedure_trim_router
     app.include_router(wp_procedure_trim_router, tags=["workpaper-procedure-trim"])
+
+    # ═══ 86. 合伙人仪表盘聚合端点（partner-dashboard） ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/dashboard"，注册时不加额外前缀。
+    from app.routers.dashboard_aggregator import router as dashboard_aggregator_router
+    app.include_router(dashboard_aggregator_router, tags=["partner-dashboard"])

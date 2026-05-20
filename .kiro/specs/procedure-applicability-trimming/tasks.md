@@ -222,3 +222,28 @@
 - 数据存储在 `parsed_data.trimming_metadata`（JSONB 扩展），不新增 PG 表，不需要 Alembic 迁移
 - eventBus 复用现有 `procedure-status:changed` 事件，不新增事件类型
 - RBAC 复用现有 `require_role` 依赖注入模式
+
+## 已知缺口
+
+> 跳过决策记录（铁律：optional PBT task 跳过必须显式列出）
+
+| PBT Property | 跳过决策 | 原因 |
+|--------------|---------|------|
+| P1 trim-revert round trip | 跳过 | 单测 `test_revert_restores_status_to_pending` + `test_revert_clears_trimming_metadata` 已覆盖具体 round trip 场景 |
+| P2 batch trim idempotence | 跳过 | 单测 `test_trim_idempotent_skips_already_na` + `test_revert_idempotent_skips_non_na` 已覆盖幂等性 |
+| P3 count invariant | 跳过 | trim/revert 后总行数保持不变是 dict 操作的天然属性，不需 PBT |
+| P4 batch result count conservation | 跳过 | 单测 `test_batch_result_count_conservation` 已显式验证 succeeded+skipped+failed == K |
+| P5 sheet graying | 待补充 | 真实灰显验证需要更复杂的 mock，与联动全景图 spec 一起实施 |
+| P6 audit log completeness | 跳过 | 单测 `test_trim_writes_audit_log` + `test_revert_writes_audit_log_without_deleting_trim_log` 覆盖完整字段 |
+| P7 RBAC enforcement | 跳过 | 单测 `test_trim_rbac_enforcement` + `test_trim_rbac_allows_manager` 已通过 require_role 依赖测试覆盖 |
+| P8 custom reason validation | 跳过 | 单测 `test_trim_request_other_reason_requires_text` 显式验证 < 5 字符行为 |
+| P9 trim rate warning | 跳过 | 单测 `test_get_summary_warning_above_50_percent` + `test_get_summary_no_warning_at_exactly_50_percent` 已显式覆盖边界 |
+| P10 history ordering | 跳过 | SQL `ORDER BY created_at DESC` 是数据库保证，不需 PBT 验证应用层 |
+
+后续 P5 sheet 灰显 PBT 在联动全景图 spec 实施时一并补充。
+
+## 复盘修复（2026-05-20）
+
+| 问题 | 修复 |
+|------|------|
+| TrimmingSummaryPanel.vue 已创建但无父组件 import | 在 WorkpaperAuditNav.vue 第 2.4f section 中 wired，仅 partner/qc/manager/admin/eqcr 角色可见 |

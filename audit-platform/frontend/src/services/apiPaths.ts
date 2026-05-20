@@ -1212,6 +1212,7 @@ export const partner = {
   overview: '/api/partner/overview',
   teamEfficiency: '/api/partner/team-efficiency',
   workpaperReadiness: (pid: string) => `/api/projects/${pid}/partner/workpaper-readiness`,
+  dashboardSummary: (pid: string) => `/api/projects/${pid}/dashboard/summary`,
 } as const
 
 // ─── 质控看板 ───────────────────────────────────────────────────────────────

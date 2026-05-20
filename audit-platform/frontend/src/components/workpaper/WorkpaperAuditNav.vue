@@ -117,6 +117,19 @@
         />
       </section>
 
+      <!-- 2.4f 裁剪汇总（合伙人/质控视角） -->
+      <section v-if="canViewTrimSummary" class="gt-audit-nav-section">
+        <h4 class="gt-audit-nav-section-title" style="cursor: pointer" @click="showTrimmingSummary = !showTrimmingSummary">
+          📊 裁剪汇总（合伙人/质控）
+          <el-button text size="small">{{ showTrimmingSummary ? '收起 ▲' : '展开 ▼' }}</el-button>
+        </h4>
+        <TrimmingSummaryPanel
+          v-if="showTrimmingSummary"
+          :fetch-summary-fn="trimSummaryFns.fetchSummary"
+          :fetch-history-fn="trimSummaryFns.fetchHistory"
+        />
+      </section>
+
       <!-- 2.4d 关键风险提示 + 底稿间关系图 -->
       <section class="gt-audit-nav-section">
         <h4 class="gt-audit-nav-section-title">
@@ -186,9 +199,12 @@ import { ref, computed, onMounted } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { useProcedureStatus } from '@/composables/useProcedureStatus'
 import { usePrerequisiteStatus } from '@/composables/usePrerequisiteStatus'
+import { useProcedureTrimming } from '@/composables/useProcedureTrimming'
+import { usePermission } from '@/composables/usePermission'
 import { resolveProcedureSheetKey } from '@/utils/resolveProcedureSheetKey'
 import { api } from '@/services/apiProxy'
 import ProcedureTrimmingPanel from './ProcedureTrimmingPanel.vue'
+import TrimmingSummaryPanel from './TrimmingSummaryPanel.vue'
 
 interface Props {
   projectId: string
@@ -209,6 +225,16 @@ function toggleCollapsed() {
 
 // 程序适用性裁剪面板显隐
 const showTrimmingPanel = ref(false)
+
+// 裁剪汇总面板显隐 + RBAC（仅 partner/qc/admin/manager 可见）
+const showTrimmingSummary = ref(false)
+const { role: currentRole } = usePermission()
+const canViewTrimSummary = computed(() => {
+  return ['admin', 'partner', 'qc', 'quality_control', 'manager', 'eqcr'].includes(currentRole.value)
+})
+
+// 裁剪汇总数据源（复用 useProcedureTrimming 的 fetchSummary/fetchHistory）
+const trimSummaryFns = useProcedureTrimming(props.projectId, props.wpId, '')
 
 // F-F13 Task 3.7: 按 wp_code 路由程序状态数据源（E1→e1a / D2→d2a / D4→d4a / F2→f2a 等）
 // H-F13 Task 3.6: 加 H 循环路由 H1→h1a / H2→h2a / H3→h3a / H8→h8a / H9→h9a

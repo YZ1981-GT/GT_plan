@@ -8,8 +8,8 @@
 
 ## Tasks
 
-- [ ] 1. Sprint 1 — 后端聚合端点
-  - [ ] 1.1 创建 DashboardAggregatorService 服务
+- [x] 1. Sprint 1 — 后端聚合端点
+  - [x] 1.1 创建 DashboardAggregatorService 服务
     - 创建 `backend/app/services/dashboard_aggregator_service.py`
     - 实现 `DashboardAggregatorService` 类
     - `get_summary()`: 并发调用 4 个子查询（asyncio.gather），任一失败降级为 null + errors 记录
@@ -22,12 +22,12 @@
     - 实现 `sort_reviews(items)` 纯函数：按 LAYER_PRIORITY desc + created_at desc
     - _Requirements: 2.2, 3.1, 3.2, 4.1, 4.2, 7.2, 9.2, 9.3, 9.5_
 
-  - [ ] 1.2 创建 Pydantic Schema 定义
+  - [x] 1.2 创建 Pydantic Schema 定义
     - 创建 `backend/app/schemas/dashboard.py`（或追加到已有 schemas 目录）
     - 定义 `DashboardSummaryResponse` / `CycleProgressItem` / `VRSummaryData` / `CycleVRStat` / `FailedRuleItem` / `OpenReviewsData` / `ReviewItem` / `TimelineData` / `StageItem` / `TrimmingData` / `CycleTrimStat`
     - _Requirements: 9.2_
 
-  - [ ] 1.3 创建 dashboard_aggregator.py 路由
+  - [x] 1.3 创建 dashboard_aggregator.py 路由
     - 创建 `backend/app/routers/dashboard_aggregator.py`
     - `GET /api/projects/{project_id}/dashboard/summary` — 调用 DashboardAggregatorService.get_summary
     - 使用 `Depends(get_current_user)` 认证守卫
@@ -36,7 +36,7 @@
     - 添加日志：记录 project_id + user_id + 响应耗时
     - _Requirements: 9.1, 9.4, 9.6_
 
-  - [ ] 1.4 编写后端单元测试
+  - [x] 1.4 编写后端单元测试
     - 创建 `backend/tests/test_dashboard_aggregator.py`
     - 测试 GET /summary happy path（mock 各子查询返回正常数据）
     - 测试认证守卫（未登录 → 401）
@@ -47,7 +47,7 @@
     - 测试响应结构完整性（所有字段存在）
     - _Requirements: 9.1, 9.2, 9.5, 9.6_
 
-  - [ ] 1.5 编写 DashboardAggregatorService 服务单元测试
+  - [x] 1.5 编写 DashboardAggregatorService 服务单元测试
     - 创建 `backend/tests/test_dashboard_aggregator_service.py`
     - 测试 `calc_progress_rate`：正常值 / total=0 / trimmed=total / completed > total-trimmed（clamp）
     - 测试 `sort_reviews`：多层级混合排序 / 同层级时间排序 / 空列表
@@ -57,7 +57,7 @@
     - 测试 `_aggregate_timeline`：各阶段推断逻辑
     - _Requirements: 2.2, 3.1, 4.2, 7.2, 9.5_
 
-  - [ ] 1.6 编写后端 PBT 属性测试
+  - [x] 1.6 编写后端 PBT 属性测试
     - 创建 `backend/tests/test_dashboard_pbt.py`
     - **Property 1: progress rate bounds** — 使用 hypothesis 生成 total ∈ [0, 500], completed ∈ [0, total], trimmed ∈ [0, total]，验证 `0.0 <= calc_progress_rate(total, completed, trimmed) <= 100.0`；当 total==trimmed 时验证 rate==100.0
     - **Property 2: blocking count monotone** — 生成 total_rules ∈ [1, 100] + per_cycle blocking counts（sum ≤ total），验证 `blocking_failed <= total_rules` 且 `sum(by_cycle.blocking_failed) == blocking_failed`
@@ -66,12 +66,12 @@
     - 标签：`Feature: partner-dashboard, Property {N}: {title}`
     - _Requirements: 2.2, 3.1, 3.2, 4.2_
 
-- [ ] 2. Checkpoint — 后端测试全绿
+- [x] 2. Checkpoint — 后端测试全绿
   - 运行 `python -m pytest backend/tests/test_dashboard_aggregator.py backend/tests/test_dashboard_aggregator_service.py backend/tests/test_dashboard_pbt.py -v`
   - 确认全部通过，如有问题修复后继续
 
-- [ ] 3. Sprint 2 — 前端页面 + 6 模块
-  - [ ] 3.1 创建 useDashboardData composable
+- [x] 3. Sprint 2 — 前端页面 + 6 模块
+  - [x] 3.1 创建 useDashboardData composable
     - 创建 `frontend/src/composables/useDashboardData.ts`
     - 实现 `useDashboardData(projectId)` 返回 data / loading / error / lastUpdated
     - `refresh()`: 调用 `GET /api/projects/{pid}/dashboard/summary`
@@ -80,7 +80,7 @@
     - 错误处理：网络错误 → error ref 赋值 + console.warn
     - _Requirements: 1.4, 9.1_
 
-  - [ ] 3.2 注册路由 + 创建 ProjectDashboard.vue 页面骨架
+  - [x] 3.2 注册路由 + 创建 ProjectDashboard.vue 页面骨架
     - 在 Vue Router 中注册 `/projects/:id/dashboard` 路由
     - 创建 `frontend/src/views/ProjectDashboard.vue`
     - 页面 Header：项目名称 + 审计年度 + 最后更新时间 + 刷新按钮
@@ -89,7 +89,7 @@
     - RBAC 模块显隐逻辑：根据 currentUser.role 控制 6 模块 v-if
     - _Requirements: 1.1, 1.2, 1.3, 1.5, 8.1, 8.2, 8.3, 8.4_
 
-  - [ ] 3.3 创建 CycleProgressRing.vue 组件
+  - [x] 3.3 创建 CycleProgressRing.vue 组件
     - 创建 `frontend/src/components/dashboard/CycleProgressRing.vue`
     - 使用 ECharts gauge/pie 渲染 11 个循环环形图
     - 颜色映射：< 50% 红色 / 50%~99% 橙色 / 100% 绿色
@@ -97,7 +97,7 @@
     - Props: `cycleProgress: CycleProgressItem[]`
     - _Requirements: 2.1, 2.3, 2.4, 2.5, 2.6_
 
-  - [ ] 3.4 创建 VRSummaryCard.vue 组件
+  - [x] 3.4 创建 VRSummaryCard.vue 组件
     - 创建 `frontend/src/components/dashboard/VRSummaryCard.vue`
     - 顶部：blocking 未通过总数 / 总规则数（如 "3 / 33 blocking"）
     - 全通过时：绿色"全部通过"标识
@@ -107,7 +107,7 @@
     - Props: `vrSummary: VRSummaryData | null`, `error: string | null`
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
-  - [ ] 3.5 创建 ReviewOpinionList.vue 组件
+  - [x] 3.5 创建 ReviewOpinionList.vue 组件
     - 创建 `frontend/src/components/dashboard/ReviewOpinionList.vue`
     - 顶部统计：总未解决数 + 按层级分布（可用 mini 饼图或标签）
     - 列表：层级标签 + 意见摘要（80 字符）+ 创建时间 + 关联底稿编码
@@ -116,7 +116,7 @@
     - Props: `openReviews: OpenReviewsData | null`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
 
-  - [ ] 3.6 创建 QuickEntryPanel.vue 组件
+  - [x] 3.6 创建 QuickEntryPanel.vue 组件
     - 创建 `frontend/src/components/dashboard/QuickEntryPanel.vue`
     - 三个卡片：重要性水平(B15) / 持续经营(A15) / 特别风险(B50-4)
     - 每个卡片显示底稿当前状态标签
@@ -124,7 +124,7 @@
     - 底稿不存在时：灰色不可点击 + "未创建"提示
     - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-  - [ ] 3.7 创建 ProjectTimeline.vue 组件
+  - [x] 3.7 创建 ProjectTimeline.vue 组件
     - 创建 `frontend/src/components/dashboard/ProjectTimeline.vue`
     - 四阶段水平时间线：计划 → 执行 → 复核 → 报告
     - 当前阶段高亮 + 已完成阶段显示完成时间
@@ -133,7 +133,7 @@
     - Props: `timeline: TimelineData | null`
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-  - [ ] 3.8 创建 TrimmingOverview.vue 组件
+  - [x] 3.8 创建 TrimmingOverview.vue 组件
     - 创建 `frontend/src/components/dashboard/TrimmingOverview.vue`
     - 条件渲染：`v-if="trimmingOverview?.available"`
     - 展示：总裁剪数 / 总程序数 / 裁剪率 / 按循环分布
@@ -141,14 +141,14 @@
     - Props: `trimmingOverview: TrimmingData | null`
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-  - [ ] 3.9 合伙人/质控角色默认跳转逻辑
+  - [x] 3.9 合伙人/质控角色默认跳转逻辑
     - 在项目入口路由（如 `/projects/:id`）添加 beforeEnter guard
     - partner/admin 角色 → 默认 redirect 到 `/projects/:id/dashboard`
     - 其他角色 → 保持原有默认页面
     - _Requirements: 1.1_
 
-- [ ] 4. Sprint 2 — 前端测试
-  - [ ] 4.1 编写 useDashboardData composable 测试
+- [x] 4. Sprint 2 — 前端测试
+  - [x] 4.1 编写 useDashboardData composable 测试
     - 创建 `frontend/src/composables/__tests__/useDashboardData.spec.ts`
     - 测试 refresh 调用 API + 更新 data ref
     - 测试 loading 状态切换
@@ -157,7 +157,7 @@
     - 测试计算属性正确解构响应数据
     - _Requirements: 1.4, 9.1_
 
-  - [ ] 4.2 编写 ProjectDashboard.vue 页面测试
+  - [x] 4.2 编写 ProjectDashboard.vue 页面测试
     - 创建 `frontend/src/views/__tests__/ProjectDashboard.spec.ts`
     - 测试骨架屏渲染（loading=true）
     - 测试 RBAC 模块显隐：partner 看全量 / assistant 看简化 / manager 看除裁剪外
@@ -165,7 +165,7 @@
     - 测试 Header 信息渲染（项目名 + 年度 + 更新时间）
     - _Requirements: 1.3, 1.4, 1.5, 8.1, 8.2, 8.3, 8.4_
 
-  - [ ] 4.3 编写 6 模块组件测试
+  - [x] 4.3 编写 6 模块组件测试
     - 创建 `frontend/src/components/dashboard/__tests__/CycleProgressRing.spec.ts`
       - 测试 11 环渲染 + 颜色映射（<50% 红 / 50-99% 橙 / 100% 绿）+ 点击跳转
     - 创建 `frontend/src/components/dashboard/__tests__/VRSummaryCard.spec.ts`
@@ -174,23 +174,23 @@
       - 测试排序正确性 / 点击跳转 / 空状态
     - _Requirements: 2.1~2.6, 3.1~3.6, 4.1~4.6_
 
-- [ ] 5. Checkpoint — 前端测试全绿
+- [x] 5. Checkpoint — 前端测试全绿
   - 运行 vitest 确认全部通过
 
 - [ ] 6. 回归验证
-  - [ ] 6.1 验证现有路由不受影响
+  - [x] 6.1 验证现有路由不受影响
     - 确认 `/projects/:id/workpapers` 等现有路由正常工作
     - 确认 WorkpaperList / WorkpaperEditor 页面无回归
     - 运行现有前端测试套件确认零回归
     - _Requirements: 非功能需求-兼容性_
 
-  - [ ] 6.2 验证 ConsistencyGate 集成
+  - [x] 6.2 验证 ConsistencyGate 集成
     - 确认 `ConsistencyGate.run_all_checks` 调用参数正确
     - 确认 VR 规则结果按循环分组逻辑与现有 consistency_gate 返回格式兼容
     - 运行现有 `backend/tests/test_consistency_gate*.py` 确认零回归
     - _Requirements: 9.3, 非功能需求-兼容性_
 
-- [ ] 7. Final checkpoint — 全部测试通过 + 回归零失败
+- [x] 7. Final checkpoint — 全部测试通过 + 回归零失败
 
 ## Notes
 
