@@ -79,7 +79,7 @@ inclusion: always
 - **API 写回联动模式**：后端 endpoint 加 `apply_to_sheet: str | None`，写入 `working_paper.parsed_data.{namespace}[sheet]={method/applied_at/data}`；前端弹窗加 `targetSheet` prop + 「采纳并写回」按钮 + emit `applied` 事件，由父组件再 emit `workpaper:saved` 触发刷新
 - **复盘"形式 vs 实质"原则**：spec 完成后必须做"复盘 → 找出形式合规但本质未到位 → 列 P0/P1/P2 修复轮 → 修完再标 ✓"循环；F spec 首版 19/19 ✓ 是过度乐观，复盘后真实评级 16 ✓ + 3 限定（含 P0 真实性 / 测试伪绿 / RBAC 漏洞）
 - **审计循环代号映射**（致同 2025 实测）：A=报表/调整/重要性 / B=控制了解 / C=控制测试 / D=销售收入 / E=货币资金 / F=采购存货 / G=投资 / H=固定资产+在建工程+使用权资产+租赁负债 / I=无形资产+商誉+开发支出 / J=职工薪酬+股份支付 / K=（预留） / L=筹资 / M=股东权益 / N=税费 / S=专项程序；用户口语"M 固定资产"实际是 H 循环
-- **B/C 类底稿架构决策（2026-05-20 确认）**：B/C 是定性判断类（控制有效/无效、风险高/中/低），不需要独立循环 spec；已有 bcas_cycle_validation_rules.json 25 条 VR + usePrerequisiteStatus 联动（C2~C15→各循环前置横幅）+ CWR 26 条（source 18 + target 8）；无 prefill（无科目余额填充）/ 无独立计算引擎 / 无 sheet 分组 composable；后续如需 B/C 控制测试工作流可单独立 spec，但不属于"循环底稿未完成"
+- **B/C 类底稿架构决策（2026-05-20 确认）**：B/C 是定性判断类（控制有效/无效、风险高/中/低），不需要独立循环 spec；已有 bcas_cycle_validation_rules.json 25 条 VR + usePrerequisiteStatus 联动（C2~C15→各循环前置横幅）+ CWR 26 条（source 18 + target 8）；无 prefill（无科目余额填充）/ 无独立计算引擎；**已完成 B/C sheet 分组 composable**（useBAuditPlanSheetGroups 7 类 + useCControlTestSheetGroups 5 类 + WorkpaperEditor isBCycle/isCCycle 接入 + 39 vitest）
 - **跨底稿联动缺口已补充（2026-05-20）**：CW-382~CW-400 共 19 条新增；B15 重要性水平→10 循环抽样范围（materiality_linkage）+ C 控制测试结论→9 循环实质性程序范围（control_test_linkage）；cross_wp_references 总计 400 条；B/C→各循环方向联动缺口已消除
 - **H 循环 Sprint 0 关键发现（2026-05-19）**：①0 历史遗留（H 模板比 D/F 干净）②同名 sheet 多版本（H1-12 折旧 3 版 / H3-1+H7-1 成本/公允双模式 / H8-8 折旧 2 版）→ 不能简单去重 ③两模式切换需新 scenario 类型（成本 vs 公允价值，非 IPO）④H8↔H9 租赁两表强联动（类似 F0↔F2 反向回填）⑤折旧/减值多分支（不含/含/多次减值）需 prefill 指引 ⑥prefill 极度欠覆盖（仅 12 entries / 56 cells，目标 ≥ 100 cells）
 - **H 循环关键架构决策（requirements.md 落地 2026-05-19）**：①归一化策略升级 — 同 wp_code 多版本必须保留（按"sheet 名+括号修饰词+文件来源"三元组归一化）②新增 `MEASUREMENT_MODEL_FILTER`（cost / fair_value）独立于 SCENARIO_TO_FILE_FILTER ③H9→H8 cross-ref 反向回填（租赁两表）④4 种折旧方法计算引擎（直线/双倍余额/年数总和/工作量）作为 H-F11 独立 endpoint ⑤致同 H 模板未提供 IPO 应对类专属文件，H-F14 降级为占位 + 文档化机制
@@ -197,7 +197,7 @@ inclusion: always
 ### P2 长期
 - PBC 清单 / 函证管理真实实现（后端当前 stub）
 - 全局联动真正闭环（docs/GLOBAL_LINKAGE_ARCHITECTURE_PROPOSAL.md 方案已输出）
-- **底稿模块体验断层（2026-05-20 复盘识别 6 项）**：①B/C sheet 分组 composable（49+36 sheet 平铺无分组，P1 半天）②程序适用性裁剪 UI（项目经理标记"不适用"程序→sheet 灰显+状态 N/A，P1 2 天）③合伙人仪表盘（全循环进度+blocking VR 汇总+未解决复核意见，P2 3 天）④联动全景图 D3.js 力导向（400 CWR 宏观可视化，P2 3 天）⑤角色视图切换（不同角色默认不同排序/过滤/高亮，P2 2 天）⑥LLM 真实接入 6 个 stub 引擎（P3 5+ 天）
+- **底稿模块体验断层（2026-05-20 复盘识别 6 项）**：①B/C sheet 分组 composable ✅ 已完成 ②程序适用性裁剪 UI（spec requirements 已生成 `.kiro/specs/procedure-applicability-trimming/`，待 design+tasks）③合伙人仪表盘（spec requirements 已生成 `.kiro/specs/partner-dashboard/`，待 design+tasks）④联动全景图 D3.js 力导向（spec requirements 已生成 `.kiro/specs/linkage-panorama-graph/`，待 design+tasks，D3.js 为新增依赖）⑤角色视图切换（spec requirements 已生成 `.kiro/specs/role-based-view-switching/`，待 design+tasks，纯前端无新后端端点）⑥LLM 真实接入 6 个 stub 引擎（P3 5+ 天，待 wp_ai_service）
 - 暗色模式 / 全局 Ctrl+K 搜索 / vitest 全量基建
 
 ## 关键引用指南
