@@ -79,6 +79,16 @@ class WpReviewStatus(str, enum.Enum):
     level2_in_progress = "level2_in_progress"  # 二级复核处理中
     level2_passed = "level2_passed"          # 二级复核通过
     level2_rejected = "level2_rejected"      # 二级复核退回
+    # Level 3 (Phase 6 F8)
+    pending_level3 = "pending_level3"        # 待三级复核
+    level3_in_progress = "level3_in_progress"  # 三级复核处理中
+    level3_passed = "level3_passed"          # 三级复核通过
+    level3_rejected = "level3_rejected"      # 三级复核退回
+    # Level 4 (Phase 6 F8)
+    pending_level4 = "pending_level4"        # 待四级复核
+    level4_in_progress = "level4_in_progress"  # 四级复核处理中
+    level4_passed = "level4_passed"          # 四级复核通过
+    level4_rejected = "level4_rejected"      # 四级复核退回
 
 
 class ReviewCommentStatus(str, enum.Enum):
@@ -449,6 +459,13 @@ class ReviewRecord(Base):
         ForeignKey("review_conversations.id"),
         nullable=True,
         comment="关联的多轮讨论链（可选）",
+    )
+    # Phase 2 F5: 复核意见优先级
+    priority: Mapped[str] = mapped_column(
+        sa.String(10),
+        server_default=sa.text("'suggest'"),
+        nullable=False,
+        comment="must_fix=必须修改 / suggest=建议修改 / info=仅供参考",
     )
     # E1 Sprint 2 Task 2.21: 复核模板↔底稿双向溯源（D14 ADR）
     source_sheet: Mapped[str | None] = mapped_column(

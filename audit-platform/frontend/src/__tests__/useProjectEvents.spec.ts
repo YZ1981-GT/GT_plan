@@ -38,6 +38,7 @@ vi.mock('@/utils/eventBus', () => ({
 
 import { useProjectEvents } from '@/composables/useProjectEvents'
 import { eventBus } from '@/utils/eventBus'
+import type { SSEEventType } from '@/types/sse'
 
 describe('useProjectEvents', () => {
   beforeEach(() => {
@@ -57,14 +58,14 @@ describe('useProjectEvents', () => {
 
     // Emit event for different project
     eventBus.emit('sse:sync-event', {
-      event_type: 'DATASET_ACTIVATED',
+      event_type: 'DATASET_ACTIVATED' as SSEEventType,
       project_id: 'proj-999',
     })
     expect(lastEvent.value).toBeNull()
 
     // Emit event for our project
     eventBus.emit('sse:sync-event', {
-      event_type: 'DATASET_ACTIVATED',
+      event_type: 'DATASET_ACTIVATED' as SSEEventType,
       project_id: 'proj-001',
       year: 2024,
     })
@@ -79,7 +80,7 @@ describe('useProjectEvents', () => {
     onDatasetActivated(handler)
 
     eventBus.emit('sse:sync-event', {
-      event_type: 'DATASET_ACTIVATED',
+      event_type: 'DATASET_ACTIVATED' as SSEEventType,
       project_id: 'proj-001',
       year: 2024,
     })
@@ -98,7 +99,7 @@ describe('useProjectEvents', () => {
     onDatasetRolledBack(handler)
 
     eventBus.emit('sse:sync-event', {
-      event_type: 'DATASET_ROLLED_BACK',
+      event_type: 'DATASET_ROLLED_BACK' as SSEEventType,
       project_id: 'proj-001',
     })
     expect(handler).toHaveBeenCalledTimes(1)
@@ -111,7 +112,7 @@ describe('useProjectEvents', () => {
     onAnyEvent(handler)
 
     eventBus.emit('sse:sync-event', {
-      event_type: 'SOME_CUSTOM_EVENT',
+      event_type: 'SOME_CUSTOM_EVENT' as SSEEventType,
       project_id: 'proj-001',
     })
     expect(handler).toHaveBeenCalledTimes(1)
@@ -122,13 +123,13 @@ describe('useProjectEvents', () => {
     const { lastEvent } = useProjectEvents(projectId)
 
     eventBus.emit('sse:sync-event', {
-      event_type: 'EVENT_A',
+      event_type: 'EVENT_A' as SSEEventType,
       project_id: 'proj-001',
     })
     expect(lastEvent.value?.event_type).toBe('EVENT_A')
 
     eventBus.emit('sse:sync-event', {
-      event_type: 'EVENT_B',
+      event_type: 'EVENT_B' as SSEEventType,
       project_id: 'proj-001',
     })
     expect(lastEvent.value?.event_type).toBe('EVENT_B')

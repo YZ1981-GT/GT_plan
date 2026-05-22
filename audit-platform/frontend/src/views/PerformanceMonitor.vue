@@ -91,6 +91,66 @@
       </el-table>
     </el-card>
 
+    <!-- LLM 调用统计 -->
+    <el-card style="margin-top: 16px">
+      <template #header>
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <span>LLM 调用统计</span>
+          <el-button size="small" @click="loadLlmMetrics" :loading="llmMetricsLoading">刷新</el-button>
+        </div>
+      </template>
+
+      <el-row :gutter="16" style="margin-bottom: 16px">
+        <el-col :span="5">
+          <div class="llm-stat-card">
+            <div class="llm-stat-value">{{ llmMetricsData.total_calls }}</div>
+            <div class="llm-stat-label">总调用次数</div>
+          </div>
+        </el-col>
+        <el-col :span="5">
+          <div class="llm-stat-card">
+            <div class="llm-stat-value" style="color: #67c23a">{{ llmMetricsData.success_count }}</div>
+            <div class="llm-stat-label">成功</div>
+          </div>
+        </el-col>
+        <el-col :span="5">
+          <div class="llm-stat-card">
+            <div class="llm-stat-value" style="color: #f56c6c">{{ llmMetricsData.failure_count }}</div>
+            <div class="llm-stat-label">失败</div>
+          </div>
+        </el-col>
+        <el-col :span="5">
+          <div class="llm-stat-card">
+            <div class="llm-stat-value">{{ llmMetricsData.avg_duration_ms }} ms</div>
+            <div class="llm-stat-label">平均耗时</div>
+          </div>
+        </el-col>
+        <el-col :span="4">
+          <div class="llm-stat-card">
+            <div class="llm-stat-value">{{ llmMetricsData.total_tokens }}</div>
+            <div class="llm-stat-label">总 Token</div>
+          </div>
+        </el-col>
+      </el-row>
+
+      <el-table :data="llmMetricsData.recent_calls" stripe size="small" max-height="300">
+        <el-table-column label="时间" width="180">
+          <template #default="{ row }">{{ formatTimestamp(row.timestamp) }}</template>
+        </el-table-column>
+        <el-table-column prop="model" label="模型" width="180" show-overflow-tooltip />
+        <el-table-column prop="duration_ms" label="耗时(ms)" width="100" align="right" />
+        <el-table-column prop="tokens_used" label="Token" width="80" align="right" />
+        <el-table-column label="状态" width="80" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.success ? 'success' : 'danger'" size="small">
+              {{ row.success ? '成功' : '失败' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="error" label="错误信息" show-overflow-tooltip />
+      </el-table>
+    </el-card>
+
     <!-- 导入事件健康 -->
     <el-card style="margin-top: 16px">
       <template #header>
@@ -227,6 +287,15 @@ const trendLoading = ref(false)
 const bottlenecks = ref<any[]>([])
 const eventHealthLoading = ref(false)
 const eventReplayLoading = ref(false)
+const llmMetricsLoading = ref(false)
+const llmMetricsData = ref<any>({
+  total_calls: 0,
+  success_count: 0,
+  failure_count: 0,
+  avg_duration_ms: 0,
+  total_tokens: 0,
+  recent_calls: [],
+})
 const eventScope = ref<{ projectId: string; year: number | null }>({
   projectId: '',
   year: null,
@@ -256,6 +325,21 @@ async function loadStats() {
     const sqRes = await api.get(P_admin.slowQueries)
     slowQueries.value = (sqRes as any).queries || []
   } catch { /* ignore */ }
+}
+
+async function loadLlmMetrics() {
+  llmMetricsLoading.value = true
+  try {
+    const res = await api.get(P_admin.llmMetrics)
+    llmMetricsData.value = res?.data ?? res ?? llmMetricsData.value
+  } catch { /* ignore - non-admin or endpoint unavailable */ }
+  finally { llmMetricsLoading.value = false }
+}
+
+function formatTimestamp(ts: number): string {
+  if (!ts) return '-'
+  const d = new Date(ts * 1000)
+  return d.toLocaleString('zh-CN', { hour12: false })
 }
 
 async function loadTrends() {
@@ -474,6 +558,7 @@ onMounted(async () => {
   hydrateScopeFromRouteQuery()
   await loadStats()
   await loadBottlenecks()
+  await loadLlmMetrics()
   await loadImportEventHealth()
   await nextTick()
   await loadTrends()
@@ -506,4 +591,7 @@ onUnmounted(() => {
 .stat-value { font-size: var(--gt-font-size-3xl); font-weight: 600; color: var(--gt-primary, #4b2d77); }
 .stat-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 4px; }
 .bottleneck-section h4 { color: var(--gt-color-text-primary); font-size: var(--gt-font-size-sm); }
+.llm-stat-card { text-align: center; padding: 12px 8px; background: var(--gt-bg-secondary, #f8f9fa); border-radius: 6px; }
+.llm-stat-value { font-size: 20px; font-weight: 600; color: var(--gt-primary, #4b2d77); }
+.llm-stat-label { font-size: 12px; color: var(--gt-color-text-tertiary); margin-top: 4px; }
 </style>

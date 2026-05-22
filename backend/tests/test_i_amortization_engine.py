@@ -376,8 +376,8 @@ class TestRBAC:
 
     def test_endpoints_registered_in_router_registry(self):
         """两个 router 必须被 register_all_routers 注册"""
-        import app.router_registry as reg
-        src = inspect.getsource(reg)
+        from app.router_registry import cycle_engines
+        src = inspect.getsource(cycle_engines)
         assert "wp_i_amortization" in src, "wp_i_amortization 必须在 router_registry 中注册"
         assert "router_i1" in src
         assert "router_i4" in src

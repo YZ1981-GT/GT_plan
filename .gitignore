@@ -35,6 +35,7 @@ backend/logs/
 backend/uploads/
 backend/storage/
 backend/wp_storage/
+backend/backups/
 *.xlsx
 !2025人员情况.xlsx
 !backend/wp_templates/**/*.xlsx

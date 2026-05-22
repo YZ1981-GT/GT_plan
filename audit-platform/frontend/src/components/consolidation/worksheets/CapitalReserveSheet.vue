@@ -120,6 +120,7 @@ import { confirmBatch, confirmDangerous } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO } from '@/composables/useExcelIO'
+import { useDecimalCalc } from '@/composables/useDecimalCalc'
 
 interface CompanyCol { name: string; ratio: number }
 
@@ -155,6 +156,7 @@ const adjItems = ref<AdjItem[]>([
   { description: '', amount: null },
   { description: '', amount: null },
 ])
+const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
 
 // 确保每行的 values 数组长度与 companies 一致
 function ensureValues(rows: CapitalReserveRow[]) {
@@ -195,7 +197,7 @@ watch(tableData, (v) => {
 const endRow = computed(() => tableData.value.find(r => r.item === '期末金额'))
 const diffAmount = computed(() => {
   if (consolReportAmount.value == null || !endRow.value) return 0
-  return (endRow.value.total || 0) - consolReportAmount.value
+  return Number(decSub(String(endRow.value.total || 0), String(consolReportAmount.value)))
 })
 
 // 从合并抵消分录提取资本公积相关科目

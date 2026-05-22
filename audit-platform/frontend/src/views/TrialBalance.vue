@@ -667,6 +667,7 @@ import DataQualityDialog from '@/components/DataQualityDialog.vue'
 import ReportLineMappingDialog from '@/components/trial-balance/ReportLineMappingDialog.vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { usePenetrate } from '@/composables/usePenetrate'
+import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { useProjectEvents } from '@/composables/useProjectEvents'
 import { usePasteImport } from '@/composables/usePasteImport'
 import { usePermission } from '@/composables/usePermission'
@@ -677,6 +678,7 @@ import { useLinkageIndicator } from '@/composables/useLinkageIndicator'
 const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
+const { add: decAdd, sub: decSub } = useDecimalCalc()
 
 const projectId = computed(() => projectStore.projectId || (route.params.projectId as string) || '')
 const selectedProjectId = ref(projectStore.projectId)
@@ -1034,7 +1036,7 @@ const assetTotal = computed(() => {
   for (const r of assetRows) {
     const val = Math.abs(num(r.audited_amount))
     const dir = getDirection(r)
-    total += dir === '贷' ? -val : val
+    total = Number(decAdd(String(total), String(dir === '贷' ? -val : val)))
   }
   return total
 })
@@ -1046,7 +1048,7 @@ const liabEquityTotal = computed(() => {
     const val = Math.abs(num(r.audited_amount))
     const dir = getDirection(r)
     // 负债/权益类：贷方加正数，借方减
-    total += dir === '借' ? -val : val
+    total = Number(decAdd(String(total), String(dir === '借' ? -val : val)))
   }
   return total
 })
@@ -1949,7 +1951,7 @@ function _showNetProfitDetail() {
   detail += `  费用合计：${totalExpense.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n\n`
 
   // 净利润
-  const netProfit = totalRevenue - totalExpense
+  const netProfit = Number(decSub(String(totalRevenue), String(totalExpense)))
   detail += '━━━━━━━━━━━━━━━━\n'
   detail += `净利润 = 收入 - 费用 = ${netProfit.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n`
   detail += netProfit >= 0 ? '（盈利）' : '（亏损）'

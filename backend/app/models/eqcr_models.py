@@ -2,6 +2,7 @@
 
 Refinement Round 5 — EQCR 工作台所需的意见留痕、独立复核笔记、
 影子计算与异议合议四张表。
+Phase 7 F1 — 新增 EqcrSnapshot ORM 模型（含 judgments JSONB 列）。
 
 对应 Alembic 迁移脚本 ``round5_eqcr_20260505.py``。
 
@@ -190,4 +191,42 @@ class EqcrDisagreementResolution(Base, TimestampMixin):
             "idx_eqcr_disagreement_project",
             "project_id",
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# EQCR 快照（Phase 4 F3 创建，Phase 7 F1 新增 judgments 列）
+# ---------------------------------------------------------------------------
+
+
+class EqcrSnapshot(Base):
+    """EQCR 快照 — 聚合项目数据供独立复核使用。
+
+    Phase 7 F1 新增 judgments JSONB 列存储 5 维度结构化判断。
+    """
+
+    __tablename__ = "eqcr_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    snapshot_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    is_current: Mapped[bool] = mapped_column(
+        sa.Boolean, server_default=text("true"), nullable=False
+    )
+    # Phase 7 F1: 5 维度结构化判断
+    judgments: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    __table_args__ = (
+        Index("idx_eqcr_snapshots_project_year", "project_id", "year"),
     )

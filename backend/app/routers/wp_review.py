@@ -12,11 +12,12 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.field_selection import parse_fields, BLOCKED_FIELDS
 from app.deps import get_current_user
 from app.models.core import User
 from app.services.wp_review_service import WpReviewService
@@ -57,12 +58,25 @@ class ResolveRequest(BaseModel):
 async def list_reviews(
     wp_id: UUID,
     status: str | None = None,
+    fields: str | None = Query(None, description="逗号分隔的字段名，如 id,comment_text,status"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """获取复核意见列表"""
     svc = WpReviewService()
-    return await svc.list_reviews(db=db, working_paper_id=wp_id, status=status)
+    items = await svc.list_reviews(db=db, working_paper_id=wp_id, status=status)
+
+    # 字段选择：过滤返回字段
+    requested_fields = parse_fields(fields)
+    if requested_fields is not None:
+        allowed = requested_fields - BLOCKED_FIELDS
+        allowed.add("id")
+        items = [
+            {k: v for k, v in item.items() if k in allowed}
+            for item in items
+        ]
+
+    return items
 
 
 @router.post("")

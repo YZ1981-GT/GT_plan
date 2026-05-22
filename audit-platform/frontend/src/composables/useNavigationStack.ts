@@ -19,6 +19,8 @@ import { useRouter, type Router } from 'vue-router'
 
 export interface NavigationEntry {
   source_view: string
+  label?: string  // Phase 1 F3: 面包屑显示文本
+  direction?: 'down' | 'up'  // Phase 3 F1.5: 穿透方向标记（↓下钻 / ↑上钻）
   row_index?: number
   scroll_position?: number
   query?: Record<string, string>
@@ -90,5 +92,18 @@ export function useNavigationStack() {
     }
   }
 
-  return { push, pop, canGoBack, goBack, stack }
+  /** Phase 1 F3: 跳转到 stack 中指定位置（截断后续层级） */
+  async function jumpTo(index: number) {
+    if (index < 0 || index >= stack.value.length) return
+    const entry = stack.value[index]
+    stack.value = stack.value.slice(0, index)
+    await router.push({ path: entry.source_view, query: entry.query })
+    if (entry.scroll_position != null) {
+      setTimeout(() => {
+        window.scrollTo({ top: entry.scroll_position, behavior: 'instant' })
+      }, 100)
+    }
+  }
+
+  return { push, pop, canGoBack, goBack, jumpTo, stack }
 }

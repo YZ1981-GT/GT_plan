@@ -94,6 +94,7 @@
         <el-tab-pane label="现金流附表" name="cash_flow_supplement" />
         <el-tab-pane label="资产减值准备表" name="impairment_provision" />
         <el-tab-pane label="⚖️ 跨表核对" name="cross_check" />
+        <el-tab-pane label="📊 多年度对比" name="multi_year_compare" />
       </el-tabs>
     </div>
 
@@ -257,7 +258,7 @@
               :prior-value="row.prior_period_amount"
               :clickable="true"
               :comment="rvComments.getComment(`report_${activeTab}`, $index, 2)"
-              @click="onDrilldown(row)"
+              @click="onLineComposition(row)"
             />
           </template>
         </template>
@@ -376,6 +377,14 @@
       </div>
     </div>
 
+    <!-- Phase 4 F2: 多年度对比 -->
+    <div v-if="activeTab === 'multi_year_compare'" class="gt-rv-multi-year">
+      <MultiYearCompare
+        :project-id="projectId"
+        :current-year="year"
+      />
+    </div>
+
     </div><!-- /gt-rv-table-area -->
 
     <!-- 穿透弹窗 -->
@@ -401,6 +410,68 @@
         </el-table>
       </div>
       <div v-else v-loading="drilldownLoading" style="min-height: 100px" />
+    </el-dialog>
+
+    <!-- Phase 3 F1.2: 报表行构成科目弹窗 -->
+    <el-dialog
+      append-to-body
+      v-model="lineCompVisible"
+      :title="`构成科目 — ${lineCompData?.item_name || ''}`"
+      width="650px"
+    >
+      <div v-if="lineCompData" class="gt-rv-line-comp-content">
+        <!-- 报表行汇总 -->
+        <div class="gt-rv-line-comp-header">
+          <span class="gt-rv-line-comp-label">报表行次</span>
+          <div class="gt-rv-line-comp-summary">
+            <span class="gt-rv-line-comp-name">{{ lineCompData.item_name }}</span>
+            <span class="gt-amt">{{ fmt(lineCompData.total_amount) }}</span>
+          </div>
+        </div>
+
+        <!-- 构成科目列表 -->
+        <div class="gt-rv-line-comp-accounts">
+          <span class="gt-rv-line-comp-label">构成科目（点击跳转试算表）</span>
+          <el-table
+            :data="lineCompData.accounts"
+            border
+            size="small"
+            style="margin-top: 8px"
+            :row-style="{ cursor: 'pointer' }"
+            @row-click="(row: any) => onLineCompJumpToTB(row.code)"
+          >
+            <el-table-column prop="code" label="科目编码" width="120">
+              <template #default="{ row }">
+                <span class="gt-amt" style="color: var(--gt-color-primary)">{{ row.code }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="name" label="科目名称" min-width="180" />
+            <el-table-column label="期末余额" width="150" align="right">
+              <template #default="{ row }">
+                <span class="gt-amt">{{ fmt(row.closing_balance) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="占比" width="90" align="right">
+              <template #default="{ row }">
+                <span style="color: var(--gt-color-text-secondary); font-size: 12px">{{ row.pct?.toFixed(1) }}%</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="" width="60" align="center">
+              <template #default>
+                <span style="color: var(--gt-color-primary); font-size: 12px">→</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <!-- 底部提示 -->
+        <div class="gt-rv-line-comp-footer">
+          <span style="color: var(--gt-color-text-tertiary); font-size: 12px">
+            点击任意科目行可跳转到试算表定位（支持 Backspace 返回）
+          </span>
+        </div>
+      </div>
+      <div v-else v-loading="lineCompLoading" style="min-height: 100px" />
     </el-dialog>
 
     <!-- 公式管理弹窗 -->
@@ -648,6 +719,7 @@ import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, report
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import MultiYearCompare from '@/components/report/MultiYearCompare.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
@@ -676,6 +748,7 @@ import {
   type ReportRow, type ReportDrilldownData, type ReportConsistencyCheck,
 } from '@/services/auditPlatformApi'
 import { useAuthStore } from '@/stores/auth'
+import { useNavigationStack } from '@/composables/useNavigationStack'
 
 const route = useRoute()
 const router = useRouter()
@@ -918,6 +991,68 @@ const drilldownVisible = ref(false)
 const drilldownLoading = ref(false)
 const drilldownData = ref<ReportDrilldownData | null>(null)
 const showFormulaManager = ref(false)
+
+// ─── Phase 3 F1.2/F1.3: 报表行构成科目弹窗 ─────────────────────────────────
+const { push: navPush } = useNavigationStack()
+
+interface LineCompositionAccount {
+  code: string
+  name: string
+  closing_balance: number
+  pct: number
+}
+
+interface LineCompositionData {
+  line_code: string
+  item_name: string
+  total_amount: number
+  accounts: LineCompositionAccount[]
+}
+
+const lineCompVisible = ref(false)
+const lineCompLoading = ref(false)
+const lineCompData = ref<LineCompositionData | null>(null)
+
+/**
+ * F1.2: 点击报表行金额 → 调用 line-composition API → 显示构成科目弹窗
+ */
+async function onLineComposition(row: ReportRow) {
+  if (!row.row_code || row.is_total_row || getRowType(row) === 'header') return
+  lineCompVisible.value = true
+  lineCompLoading.value = true
+  lineCompData.value = null
+  try {
+    const resp: any = await api.get(P_reports.lineComposition(projectId.value, row.row_code))
+    lineCompData.value = resp as LineCompositionData
+  } catch (e) {
+    handleApiError(e, '构成科目查询')
+    lineCompVisible.value = false
+  } finally {
+    lineCompLoading.value = false
+  }
+}
+
+/**
+ * F1.3: 构成科目列表中点击某科目 → 跳转到 TrialBalance 并定位
+ * F1.4: 跳转前记录到 useNavigationStack（支持 Backspace 返回）
+ */
+function onLineCompJumpToTB(accountCode: string) {
+  lineCompVisible.value = false
+
+  // 记录到 useNavigationStack（direction: 'down' — 报表→TB 为下钻）
+  navPush({
+    source_view: route.fullPath,
+    label: `报表 ${activeTabLabel.value}`,
+    direction: 'down',
+  })
+
+  // 跳转到 TrialBalance 并定位到该科目行
+  router.push({
+    name: 'TrialBalance',
+    params: { projectId: projectId.value },
+    query: { account_code: accountCode },
+  })
+}
 
 // 权益变动表列定义 — 根据合并/单体动态切换
 const eqColumnsBase = [
@@ -2124,6 +2259,52 @@ function copyReportTable() {
 }
 .gt-rv-coverage-text {
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Phase 3 F1.2: 构成科目弹窗 ── */
+.gt-rv-line-comp-content {
+  padding: 4px 0;
+}
+
+.gt-rv-line-comp-header {
+  margin-bottom: 16px;
+}
+
+.gt-rv-line-comp-label {
+  display: block;
+  font-size: 12px;
+  color: var(--gt-color-text-secondary, #999);
+  margin-bottom: 6px;
+}
+
+.gt-rv-line-comp-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--gt-bg-secondary, #f8f9fa);
+  border-radius: 6px;
+  border: 1px solid var(--gt-border-color, #e4e7ed);
+}
+
+.gt-rv-line-comp-name {
+  font-weight: 600;
+  color: var(--gt-text-primary, #1a1a1a);
+  font-size: 14px;
+}
+
+.gt-rv-line-comp-accounts {
+  margin-bottom: 12px;
+}
+
+.gt-rv-line-comp-accounts :deep(.el-table__row:hover td) {
+  background: var(--gt-table-row-hover, #f5f8fc) !important;
+}
+
+.gt-rv-line-comp-footer {
+  padding-top: 8px;
+  border-top: 1px solid var(--gt-border-color, #e4e7ed);
+  text-align: center;
 }
 
 

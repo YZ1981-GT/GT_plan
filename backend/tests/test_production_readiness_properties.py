@@ -459,17 +459,21 @@ async def test_property_13_worker_isolates_exceptions():
 # ===========================================================================
 
 def test_property_14_no_hasattr_patch_remaining():
-    """Property 14: router_registry.py 不得再有 hasattr 补丁（需求 11.1/11.2）"""
+    """Property 14: router_registry 不得再有 hasattr 补丁（需求 11.1/11.2）"""
     # 解析相对于本测试文件的路径，兼容 cwd=repo root 或 cwd=backend
+    # 拆分后 router_registry 是包目录，检查所有子模块
     test_dir = Path(__file__).resolve().parent
     candidates = [
-        test_dir.parent / "app" / "router_registry.py",  # backend/app/router_registry.py
-        Path("backend/app/router_registry.py"),
-        Path("app/router_registry.py"),
+        test_dir.parent / "app" / "router_registry",  # backend/app/router_registry/
+        Path("backend/app/router_registry"),
+        Path("app/router_registry"),
     ]
-    src_path = next((p for p in candidates if p.exists()), None)
-    assert src_path is not None, f"router_registry.py 未找到（尝试路径：{candidates}）"
-    src = src_path.read_text(encoding="utf-8")
+    pkg_path = next((p for p in candidates if p.is_dir()), None)
+    assert pkg_path is not None, f"router_registry 包未找到（尝试路径：{candidates}）"
+    # 读取包内所有 .py 文件的源码
+    src = ""
+    for py_file in pkg_path.glob("*.py"):
+        src += py_file.read_text(encoding="utf-8")
     # hasattr(r, 'prefix') 这种运行时判断补丁必须已经删除
     assert "hasattr(r, 'prefix')" not in src
     assert "hasattr(r, \"prefix\")" not in src

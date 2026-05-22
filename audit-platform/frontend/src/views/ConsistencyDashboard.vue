@@ -3,63 +3,183 @@
     <div class="gt-cons-header">
       <GtPageHeader title="全链路一致性校验" :show-back="false">
         <template #actions>
-          <el-button type="primary" @click="runCheck" :loading="loading">运行校验</el-button>
+          <el-button v-if="activeTab === 'consistency'" type="primary" @click="runCheck" :loading="loading">运行校验</el-button>
+          <el-button v-if="activeTab === 'breakage'" type="primary" @click="fetchBreakage" :loading="breakageLoading">刷新断裂清单</el-button>
         </template>
       </GtPageHeader>
     </div>
 
-    <!-- 整体状态 -->
-    <el-alert v-if="result && result.all_consistent" type="success" title="全部校验通过" show-icon
-      style="margin-bottom: 16px" />
-    <el-alert v-else-if="result && !result.all_consistent" type="warning" show-icon
-      style="margin-bottom: 16px">
-      <template #title>
-        {{ result.checks.filter((c: any) => !c.passed).length }} 项校验未通过
-      </template>
-    </el-alert>
+    <el-tabs v-model="activeTab" style="margin-bottom: 16px">
+      <el-tab-pane label="一致性校验" name="consistency" />
+      <el-tab-pane label="跨循环断裂清单" name="breakage" />
+    </el-tabs>
 
-    <!-- 5 个校验卡片 -->
-    <el-row :gutter="16">
-      <el-col :span="8" v-for="check in (result?.checks || [])" :key="check.check_name" style="margin-bottom: 16px">
-        <div class="gt-check-card" :class="{ 'gt-check-pass': check.passed, 'gt-check-fail': !check.passed }">
-          <div class="gt-check-icon">{{ check.passed ? '✅' : '⚠️' }}</div>
-          <div class="gt-check-name">{{ check.check_name }}</div>
-          <div class="gt-check-detail">
-            {{ check.passed ? '全部一致' : `${check.failed_items.length} 项不一致` }}
-          </div>
-          <div class="gt-check-count">{{ check.passed_items }} / {{ check.total_items }}</div>
-          <!-- 不一致明细 -->
-          <div v-if="!check.passed && check.failed_items.length" class="gt-check-failures">
-            <div v-for="(f, i) in check.failed_items.slice(0, 5)" :key="i" class="gt-failure-item">
-              {{ f.message || f.entity_id }}
+    <!-- ═══ Tab 1: 一致性校验 ═══ -->
+    <template v-if="activeTab === 'consistency'">
+      <!-- 整体状态 -->
+      <el-alert v-if="result && result.all_consistent" type="success" title="全部校验通过" show-icon
+        style="margin-bottom: 16px" />
+      <el-alert v-else-if="result && !result.all_consistent" type="warning" show-icon
+        style="margin-bottom: 16px">
+        <template #title>
+          {{ result.checks.filter((c: any) => !c.passed).length }} 项校验未通过
+        </template>
+      </el-alert>
+
+      <!-- 5 个校验卡片 -->
+      <el-row :gutter="16">
+        <el-col :span="8" v-for="check in (result?.checks || [])" :key="check.check_name" style="margin-bottom: 16px">
+          <div class="gt-check-card" :class="{ 'gt-check-pass': check.passed, 'gt-check-fail': !check.passed }">
+            <div class="gt-check-icon">{{ check.passed ? '✅' : '⚠️' }}</div>
+            <div class="gt-check-name">{{ check.check_name }}</div>
+            <div class="gt-check-detail">
+              {{ check.passed ? '全部一致' : `${check.failed_items.length} 项不一致` }}
+            </div>
+            <div class="gt-check-count">{{ check.passed_items }} / {{ check.total_items }}</div>
+            <!-- 不一致明细 -->
+            <div v-if="!check.passed && check.failed_items.length" class="gt-check-failures">
+              <div v-for="(f, i) in check.failed_items.slice(0, 5)" :key="i" class="gt-failure-item">
+                {{ f.message || f.entity_id }}
+              </div>
             </div>
           </div>
-        </div>
-      </el-col>
-    </el-row>
+        </el-col>
+      </el-row>
 
-    <div v-if="result" class="gt-cons-footer">
-      校验时间：{{ result.checked_at }}
-    </div>
+      <div v-if="result" class="gt-cons-footer">
+        校验时间：{{ result.checked_at }}
+      </div>
+    </template>
+
+    <!-- ═══ Tab 2: 跨循环断裂清单 ═══ -->
+    <template v-if="activeTab === 'breakage'">
+      <!-- 统计摘要 -->
+      <div v-if="breakageSummary" class="gt-breakage-summary">
+        <el-tag type="danger" size="default" effect="dark">blocking {{ breakageSummary.blocking }}</el-tag>
+        <el-tag type="warning" size="default" effect="dark">warning {{ breakageSummary.warning }}</el-tag>
+        <el-tag type="info" size="default">info {{ breakageSummary.info }}</el-tag>
+      </div>
+
+      <!-- 断裂列表 -->
+      <el-table
+        :data="breakageItems"
+        v-loading="breakageLoading"
+        stripe
+        size="small"
+        style="width: 100%"
+        @row-click="onBreakageRowClick"
+      >
+        <el-table-column prop="ref_id" label="Ref ID" width="100" />
+        <el-table-column prop="source_wp_code" label="Source" width="140" />
+        <el-table-column prop="target_wp_code" label="Target" width="140" />
+        <el-table-column label="Severity" width="120">
+          <template #default="{ row }">
+            <el-tag :type="severityTagType(row.severity)" size="small">
+              {{ row.severity }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="reason" label="断裂原因" width="140">
+          <template #default="{ row }">
+            {{ row.reason === 'target_missing' ? '目标缺失' : '目标过期' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="最后检查时间" min-width="160">
+          <template #default="{ row }">
+            {{ row.last_checked_at ? new Date(row.last_checked_at).toLocaleString('zh-CN') : '-' }}
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <el-empty v-if="!breakageLoading && !breakageItems.length" description="暂无断裂记录" />
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { runConsistencyCheck, getConsistencyCheck } from '@/services/commonApi'
+import { api } from '@/services/apiProxy'
 
 const route = useRoute()
+const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 const loading = ref(false)
 const result = ref<any>(null)
+const activeTab = ref('consistency')
 
+// ── 一致性校验 ──
 async function runCheck() {
   loading.value = true
   try {
     result.value = await runConsistencyCheck(projectId.value)
   } finally { loading.value = false }
 }
+
+// ── 跨循环断裂清单 ──
+interface BreakageRecord {
+  ref_id: string
+  source_wp_code: string
+  target_wp_code: string
+  severity: string
+  reason: string
+  last_checked_at: string
+}
+
+interface BreakageSummary {
+  blocking: number
+  required: number
+  warning: number
+  recommended: number
+  info: number
+}
+
+const breakageLoading = ref(false)
+const breakageItems = ref<BreakageRecord[]>([])
+const breakageSummary = ref<BreakageSummary | null>(null)
+
+function severityTagType(severity: string): 'danger' | 'warning' | 'info' | 'success' {
+  switch (severity) {
+    case 'blocking': return 'danger'
+    case 'required': return 'warning'
+    case 'warning': return 'warning'
+    case 'recommended': return 'info'
+    case 'info': return 'info'
+    default: return 'info'
+  }
+}
+
+async function fetchBreakage() {
+  breakageLoading.value = true
+  try {
+    const data = await api.get<{ items: BreakageRecord[]; summary: BreakageSummary }>(
+      `/api/projects/${projectId.value}/cross-cycle-breakage`
+    )
+    breakageItems.value = data.items || []
+    breakageSummary.value = data.summary || null
+  } catch {
+    breakageItems.value = []
+    breakageSummary.value = null
+  } finally {
+    breakageLoading.value = false
+  }
+}
+
+function onBreakageRowClick(row: BreakageRecord) {
+  // 跳转到 source 底稿
+  router.push({
+    name: 'WorkpaperEditor',
+    params: { projectId: projectId.value, wpId: row.source_wp_code },
+  })
+}
+
+// 切换到断裂 Tab 时自动加载
+watch(activeTab, (tab) => {
+  if (tab === 'breakage' && !breakageItems.value.length && !breakageLoading.value) {
+    fetchBreakage()
+  }
+})
 
 onMounted(async () => {
   loading.value = true
@@ -86,4 +206,11 @@ onMounted(async () => {
 .gt-check-failures { margin-top: 8px; text-align: left; }
 .gt-failure-item { font-size: var(--gt-font-size-xs); color: var(--gt-color-coral); padding: 2px 0; }
 .gt-cons-footer { margin-top: 16px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); text-align: right; }
+
+/* 断裂清单样式 */
+.gt-breakage-summary {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
 </style>

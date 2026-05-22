@@ -152,6 +152,7 @@ import ItemAttachment from '../ItemAttachment.vue'
 import AiConclusionButton from '../AiConclusionButton.vue'
 import SignatureBlock from './SignatureBlock.vue'
 import { confirmLeave } from '@/utils/confirm'
+import { useDecimalCalc } from '@/composables/useDecimalCalc'
 
 interface Props {
   modelValue: boolean
@@ -183,13 +184,14 @@ const form = ref({
   signatures: {} as any,
 })
 const saving = ref(false)
+const { sum: decSum, sub: decSub } = useDecimalCalc()
 
 const totalCounted = computed(() => {
-  return form.value.items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0).toFixed(2)
+  return decSum(...form.value.items.map(it => String(Number(it.amount) || 0)))
 })
 
 const difference = computed(() => {
-  return Number(totalCounted.value) - (Number(form.value.book_balance) || 0)
+  return Number(decSub(totalCounted.value, String(Number(form.value.book_balance) || 0)))
 })
 const differenceTagType = computed<'success' | 'warning' | 'danger'>(() => {
   const d = Math.abs(difference.value)

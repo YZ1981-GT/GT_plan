@@ -197,5 +197,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 路由注册（按业务域分组，详见 router_registry.py） ---
+# --- 路由注册（按业务域分组，详见 router_registry/ 包） ---
 register_all_routers(app)

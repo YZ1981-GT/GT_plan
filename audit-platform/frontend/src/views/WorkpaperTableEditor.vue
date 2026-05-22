@@ -46,6 +46,7 @@
           :width="col.width"
           :min-width="col.minWidth || 120"
           sortable
+          :sort-method="isNumericColumn(col.key) ? numericSortMethod(col.key) : undefined"
         >
           <template #default="{ row }">
             <el-input
@@ -72,6 +73,7 @@ import EditorSharedToolbar from '@/components/workpaper/EditorSharedToolbar.vue'
 import { api as httpApi } from '@/services/apiProxy'
 import { workpapers as P_wp } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import { numericSortMethod } from '@/utils/numericSort'
 import type { WorkpaperDetail } from '@/services/workpaperApi'
 
 interface TableColumn {
@@ -108,6 +110,11 @@ const filteredRows = computed(() => {
     Object.values(r).some(v => String(v || '').toLowerCase().includes(q))
   )
 })
+
+const NUMERIC_COL_PATTERN = /amount|balance|total|sum|debit|credit|qty|quantity|price|rate|ratio/i
+function isNumericColumn(key: string): boolean {
+  return NUMERIC_COL_PATTERN.test(key)
+}
 
 function markDirty() { dirty.value = true }
 function goBack() { window.history.back() }

@@ -1,23 +1,28 @@
 /**
  * GT 暗色模式 CSS 变量映射 SCSS 包装
- * 暗色模式变量已在 gt-tokens.css 中通过 @media (prefers-color-scheme: dark) 定义
+ * 暗色模式变量已在 gt-tokens.css 中通过 html.dark { ... } 定义
  * 此文件提供 SCSS 级别的暗色模式工具
+ *
+ * 切换方式：useTheme composable 切换 html.dark class
+ * 打印：@media print 强制 light 主题
  */
 
-// 暗色模式混入
+// 暗色模式混入（用于组件级暗色覆盖）
 @mixin gt-dark-mode {
-  @media (prefers-color-scheme: dark) {
-    :root.gt-dark & {
-      @content;
-    }
+  html.dark & {
+    @content;
   }
 }
 
-// 暗色模式 SCSS 变量
-$gt-dark-primary: #A06DFF;
+// 暗色模式 SCSS 变量（与 gt-tokens.css html.dark 保持同步）
+$gt-dark-primary: #a87de0;
 $gt-dark-primary-bg: #1a1035;
-$gt-dark-text: #e5e5ea;
-$gt-dark-text-secondary: #a1a1a6;
-$gt-dark-border: #38383a;
-$gt-dark-bg: #1c1c1e;
-$gt-dark-bg-white: #2c2c2e;
+$gt-dark-text: #e0e0e0;
+$gt-dark-text-secondary: #a0a0a0;
+$gt-dark-border: #2a2a4a;
+$gt-dark-bg: #1a1a2e;
+$gt-dark-bg-secondary: #16213e;
+$gt-dark-bg-elevated: #1f1f3a;
+$gt-dark-table-header-bg: #1f1f3a;
+$gt-dark-table-row-hover: #252545;
+$gt-dark-table-row-selected: #1a3a5c;

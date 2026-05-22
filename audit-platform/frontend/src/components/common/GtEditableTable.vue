@@ -37,7 +37,7 @@
       border
       size="small"
       :max-height="tableMaxHeight"
-      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
+      :class="`gt-tb-font-${displayPrefs.fontSize}`"
       :header-cell-style="mergedHeaderStyle"
       :cell-style="mergedCellStyle"
       :cell-class-name="combinedCellClassName"
@@ -188,7 +188,7 @@
  * - 新代码请按场景使用 GtTableExtended（列表型）或 GtFormTable（编辑型）
  * - 60 天观察期后无新增引用即可删除
  */
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useCellSelection } from '@/composables/useCellSelection'
 import { useLazyEdit } from '@/composables/useLazyEdit'
@@ -267,6 +267,11 @@ const toolbar = useTableToolbar(tableDataRef)
 // ── Refs ──────────────────────────────────────────────────────────────────────
 const containerRef = ref<HTMLElement | null>(null)
 const tableRef = ref<any>(null)
+
+// Phase 1 F2: 字号切换后重新计算列宽
+watch(() => displayPrefs.fontSize, () => {
+  nextTick(() => tableRef.value?.doLayout?.())
+})
 
 // ── 计算属性 ──────────────────────────────────────────────────────────────────
 const visibleColumns = computed(() => props.columns.filter(c => !c.hidden))

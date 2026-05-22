@@ -138,16 +138,19 @@ const router = createRouter({
           path: 'projects/:projectId/archive',
           name: 'ArchiveWizard',
           component: () => import('@/views/ArchiveWizard.vue'),
+          meta: { permission: 'archive:execute' },
         },
         {
           path: 'projects/:projectId/archive/jobs/:jobId',
           name: 'ArchiveWizardJob',
           component: () => import('@/views/ArchiveWizard.vue'),
+          meta: { permission: 'archive:execute' },
         },
         {
           path: 'projects/:projectId/qc-dashboard',
           name: 'QCDashboard',
           component: () => import('@/views/QCDashboard.vue'),
+          meta: { permission: 'qc:initiate' },
         },
         {
           path: 'projects/:projectId/progress-board',
@@ -300,7 +303,7 @@ const router = createRouter({
           path: 'partner/sign-decision/:projectId/:year',
           name: 'PartnerSignDecision',
           component: () => import('@/views/PartnerSignDecision.vue'),
-          meta: { roles: ['partner', 'admin'] },
+          meta: { permission: 'sign:execute' },
         },
         {
           path: 'projects/:projectId/consistency',
@@ -337,6 +340,19 @@ const router = createRouter({
           path: 'projects/:projectId/dashboard',
           name: 'PartnerProjectDashboard',
           component: () => import('@/views/PartnerProjectDashboard.vue'),
+        },
+        {
+          path: 'projects/:projectId/linkage-panorama',
+          name: 'LinkagePanorama',
+          component: () => import('@/views/LinkagePanoramaView.vue'),
+          meta: { permission: 'project:view' },
+        },
+        // ── Phase 6 F5: 待回复批注聚合面板 ──
+        {
+          path: 'projects/:projectId/my-reviews',
+          name: 'MyReviews',
+          component: () => import('@/components/MyReviewsPanel.vue'),
+          meta: { permission: 'project:view' },
         },
         {
           // 项目入口路由：partner/admin 默认跳转到仪表盘，其他角色跳转到试算表
@@ -415,6 +431,7 @@ const router = createRouter({
           path: 'settings',
           name: 'SystemSettings',
           component: () => import('@/views/SystemSettings.vue'),
+          meta: { permission: 'admin' },
         },
         {
           path: 'knowledge',
@@ -481,20 +498,20 @@ const router = createRouter({
           path: 'eqcr/metrics',
           name: 'EqcrMetrics',
           component: () => import('@/views/eqcr/EqcrMetrics.vue'),
-          meta: { requiresAnnualDeclaration: true, roles: ['admin', 'partner', 'eqcr'] },
+          meta: { requiresAnnualDeclaration: true, permission: 'view_eqcr' },
         },
         // ── Round 6：QC 规则定义只读列表 ──
         {
           path: 'qc/rules',
           name: 'QcRuleList',
           component: () => import('@/views/qc/QcRuleList.vue'),
-          meta: { roles: ['qc', 'admin', 'partner'] },
+          meta: { permission: 'qc:initiate' },
         },
         {
           path: 'qc/rules/:ruleId/edit',
           name: 'QcRuleEditor',
           component: () => import('@/views/qc/QcRuleEditor.vue'),
-          meta: { roles: ['qc', 'admin', 'partner'] },
+          meta: { permission: 'qc:initiate' },
         },
         {
           path: 'qc',
@@ -504,25 +521,25 @@ const router = createRouter({
           path: 'qc/inspections',
           name: 'QcInspectionWorkbench',
           component: () => import('@/views/qc/QcInspectionWorkbench.vue'),
-          meta: { roles: ['qc', 'admin', 'partner'] },
+          meta: { permission: 'qc:initiate' },
         },
         {
           path: 'qc/clients/:clientName/trend',
           name: 'ClientQualityTrend',
           component: () => import('@/views/qc/ClientQualityTrend.vue'),
-          meta: { roles: ['qc', 'admin', 'partner'] },
+          meta: { permission: 'qc:initiate' },
         },
         {
           path: 'qc/cases',
           name: 'QcCaseLibrary',
           component: () => import('@/views/qc/QcCaseLibrary.vue'),
-          meta: { roles: ['qc', 'admin', 'partner'] },
+          meta: { permission: 'qc:initiate' },
         },
         {
           path: 'qc/annual-reports',
           name: 'QcAnnualReports',
           component: () => import('@/views/qc/QcAnnualReports.vue'),
-          meta: { roles: ['qc', 'admin', 'partner'] },
+          meta: { permission: 'qc:initiate' },
         },
         // ── R7-S1-06：函证占位路由 ──
         {
@@ -549,14 +566,14 @@ const router = createRouter({
           path: 'template-library',
           name: 'TemplateLibraryMgmt',
           component: () => import('@/views/TemplateLibraryMgmt.vue'),
-          meta: { roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
+          meta: { permission: 'project:view' },
         },
         // ── 自定义查询独立页面 [template-library-coordination Sprint 6 Task 6.4] ──
         {
           path: 'custom-query',
           name: 'CustomQuery',
           component: () => import('@/views/CustomQuery.vue'),
-          meta: { roles: ['admin', 'partner', 'manager', 'auditor', 'qc', 'eqcr'] },
+          meta: { permission: 'project:view' },
         },
       ],
     },
@@ -609,6 +626,19 @@ router.beforeEach(async (to) => {
         permissionRequired !== 'admin' &&
         (ROLE_PERMISSIONS[role]?.includes(permissionRequired as string) ?? false))
     if (!hasPermission) {
+      import('element-plus').then(({ ElMessage }) => {
+        ElMessage.warning('您没有访问该页面的权限')
+      })
+      NProgress.done()
+      return { path: '/' }
+    }
+  }
+
+  // ④b 角色守卫：检查路由级 meta.roles（R-1 安全加固）
+  const allowedRoles = to.meta.roles as string[] | undefined
+  if (allowedRoles && authStore.isAuthenticated && !to.matched.some((r) => r.meta.requiresAnnualDeclaration)) {
+    const role = authStore.user?.role ?? ''
+    if (!allowedRoles.includes(role)) {
       import('element-plus').then(({ ElMessage }) => {
         ElMessage.warning('您没有访问该页面的权限')
       })

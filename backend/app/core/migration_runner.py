@@ -8,21 +8,33 @@
     runner = MigrationRunner(database_url)
     await runner.run_pending()
 
+回滚用法（CLI）::
+
+    python -m app.core.migration_runner --rollback 002
+    python -m app.core.migration_runner --rollback 002 --confirm  # 生产环境
+
 目录结构::
 
     backend/migrations/
     ├── V001__init.sql
+    ├── R001__rollback_init.sql
     ├── V002__add_schema_version.sql
+    ├── R002__rollback_schema_version.sql
     └── V003__example_add_comment.sql
+        R003__rollback_example_add_comment.sql
 """
 
 from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import re
+import subprocess
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
@@ -31,6 +43,9 @@ logger = logging.getLogger("audit_platform.migration")
 
 # 匹配 V001__xxx.sql 格式
 _VERSION_RE = re.compile(r"^V(\d+)__.*\.sql$", re.IGNORECASE)
+
+# 匹配 R001__xxx.sql 格式（回滚脚本）
+_ROLLBACK_RE = re.compile(r"^R(\d+)__.*\.sql$", re.IGNORECASE)
 
 # schema_version 表 DDL
 _SCHEMA_VERSION_DDL = """\
@@ -41,6 +56,26 @@ CREATE TABLE IF NOT EXISTS schema_version (
     applied_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
     checksum    VARCHAR(64)  NOT NULL
 );
+"""
+
+# 回滚追踪列 DDL（ALTER TABLE IF NOT EXISTS 模式）
+_SCHEMA_VERSION_ROLLBACK_COLUMNS_DDL = """\
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'schema_version' AND column_name = 'operator'
+    ) THEN
+        ALTER TABLE schema_version ADD COLUMN operator VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'schema_version' AND column_name = 'rollback_note'
+    ) THEN
+        ALTER TABLE schema_version ADD COLUMN rollback_note TEXT;
+    END IF;
+END
+$$;
 """
 
 
@@ -165,6 +200,29 @@ class MigrationRunner:
         result.sort(key=lambda x: int(x.version))
         return result
 
+    def scan_rollback_scripts(self) -> list[MigrationFile]:
+        """扫描 migrations/ 目录，返回按版本号排序的回滚脚本列表。"""
+        if not self._migrations_dir.is_dir():
+            logger.warning("[Migration] 迁移目录不存在: %s", self._migrations_dir)
+            return []
+
+        result: list[MigrationFile] = []
+        for f in sorted(self._migrations_dir.iterdir()):
+            m = _ROLLBACK_RE.match(f.name)
+            if m and f.is_file():
+                content = f.read_text(encoding="utf-8")
+                checksum = hashlib.sha256(content.encode("utf-8")).hexdigest()
+                result.append(MigrationFile(
+                    version=m.group(1),   # "001", "002", ...
+                    filename=f.name,
+                    path=f,
+                    checksum=checksum,
+                ))
+
+        # 按版本号数值排序
+        result.sort(key=lambda x: int(x.version))
+        return result
+
     # ------------------------------------------------------------------
     # 查询已应用版本
     # ------------------------------------------------------------------
@@ -177,6 +235,223 @@ class MigrationRunner:
             )
             return {row[0] for row in rows.fetchall()}
 
+    async def get_current_version(self) -> str | None:
+        """获取当前最大已应用版本号。"""
+        async with self._engine.begin() as conn:
+            result = await conn.execute(
+                text("SELECT MAX(version) FROM schema_version")
+            )
+            return result.scalar()
+
+    # ------------------------------------------------------------------
+    # 回滚 API
+    # ------------------------------------------------------------------
+
+    async def rollback_to(
+        self,
+        target_version: str,
+        confirm: bool = False,
+        operator: str | None = None,
+    ) -> list[str]:
+        """回滚到指定版本（逆序执行 R*.sql 脚本）。
+
+        Parameters
+        ----------
+        target_version : str
+            目标版本号（如 "002"），回滚后数据库将处于此版本状态。
+            即：target_version 本身保留，大于 target 的版本被回滚。
+        confirm : bool
+            生产环境必须传 True，否则拒绝执行。
+        operator : str | None
+            操作人标识，记录到 schema_version 表。
+
+        Returns
+        -------
+        list[str]
+            已回滚的版本号列表（逆序）。
+
+        Raises
+        ------
+        RuntimeError
+            生产环境未传 --confirm / 目标版本无效 / 回滚脚本缺失。
+        """
+        from app.core.config import settings
+
+        # 生产环境安全检查
+        if settings.APP_ENV.lower() in ("prod", "production") and not confirm:
+            raise RuntimeError(
+                "生产环境回滚需要 --confirm 参数。"
+                "请确认已通知相关人员并做好备份后重新执行。"
+            )
+
+        await self.ensure_schema_version_table()
+
+        current_version = await self.get_current_version()
+        if current_version is None:
+            raise RuntimeError("schema_version 表为空，无法回滚")
+
+        # 验证目标版本
+        target_int = int(target_version)
+        current_int = int(current_version)
+
+        if target_int >= current_int:
+            raise RuntimeError(
+                f"目标版本 {target_version} 必须小于当前版本 {current_version}"
+            )
+
+        # 计算需回滚的版本列表（从当前到 target+1，逆序）
+        applied = await self.get_applied_versions()
+        versions_to_rollback = sorted(
+            [v for v in applied if int(v) > target_int],
+            key=lambda x: int(x),
+            reverse=True,  # 逆序：从高到低回滚
+        )
+
+        if not versions_to_rollback:
+            logger.info("[Migration] 无需回滚，当前已在目标版本")
+            return []
+
+        # 检查所有回滚脚本是否存在
+        rollback_scripts = {m.version: m for m in self.scan_rollback_scripts()}
+        missing = [v for v in versions_to_rollback if v not in rollback_scripts]
+        if missing:
+            raise RuntimeError(
+                f"以下版本缺少回滚脚本 (R*.sql): {missing}。"
+                "请先创建对应的回滚脚本。"
+            )
+
+        # 执行 pg_dump 备份
+        backup_path = self._run_backup(current_version, target_version)
+        logger.info("[Migration] 备份完成: %s", backup_path)
+
+        # 逆序执行回滚脚本
+        rolled_back: list[str] = []
+        for version in versions_to_rollback:
+            rollback_mig = rollback_scripts[version]
+            await self._execute_rollback_script(rollback_mig)
+            rolled_back.append(version)
+
+        # 更新 schema_version 表：删除已回滚版本的记录
+        async with self._engine.begin() as conn:
+            await conn.execute(
+                text("DELETE FROM schema_version WHERE version > :target"),
+                {"target": target_version},
+            )
+            # 插入回滚日志记录（使用特殊 version 标记）
+            rollback_note = (
+                f"rollback from {current_version} to {target_version} "
+                f"at {datetime.now().isoformat()}"
+            )
+            # 更新目标版本行的 operator 和 rollback_note
+            await conn.execute(
+                text(
+                    "UPDATE schema_version SET operator = :operator, "
+                    "rollback_note = :note WHERE version = :version"
+                ),
+                {
+                    "operator": operator or os.environ.get("USERNAME") or os.environ.get("USER") or "unknown",
+                    "note": rollback_note,
+                    "version": target_version,
+                },
+            )
+
+        logger.info(
+            "[Migration] ✅ 回滚完成: %s → %s（回滚了 %d 个版本: %s）",
+            current_version, target_version, len(rolled_back), rolled_back,
+        )
+        return rolled_back
+
+    # ------------------------------------------------------------------
+    # 备份
+    # ------------------------------------------------------------------
+
+    def _get_sync_database_url(self) -> str:
+        """获取同步数据库 URL（去除 +asyncpg）。"""
+        from app.core.config import settings
+        url = settings.DATABASE_URL
+        # 去除 +asyncpg 后缀，得到 psycopg2 兼容的 URL
+        return url.replace("+asyncpg", "")
+
+    def _run_backup(self, from_version: str, to_version: str) -> Path:
+        """执行 pg_dump 备份。
+
+        Parameters
+        ----------
+        from_version : str
+            当前版本号
+        to_version : str
+            目标版本号
+
+        Returns
+        -------
+        Path
+            备份文件路径
+        """
+        # 确保备份目录存在
+        backup_dir = Path(__file__).resolve().parent.parent.parent / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_file = backup_dir / f"backup_{from_version}_to_{to_version}_{timestamp}.sql"
+
+        # 解析数据库连接参数
+        sync_url = self._get_sync_database_url()
+        parsed = urlparse(sync_url)
+
+        # 构建 pg_dump 命令
+        pg_dump_cmd = ["pg_dump"]
+
+        if parsed.hostname:
+            pg_dump_cmd.extend(["-h", parsed.hostname])
+        if parsed.port:
+            pg_dump_cmd.extend(["-p", str(parsed.port)])
+        if parsed.username:
+            pg_dump_cmd.extend(["-U", parsed.username])
+
+        # 数据库名（去除前导 /）
+        db_name = parsed.path.lstrip("/") if parsed.path else "audit_platform"
+        pg_dump_cmd.extend(["-f", str(backup_file), db_name])
+
+        # 设置 PGPASSWORD 环境变量
+        env = os.environ.copy()
+        if parsed.password:
+            env["PGPASSWORD"] = parsed.password
+
+        logger.info("[Migration] 执行备份: %s", " ".join(pg_dump_cmd))
+
+        result = subprocess.run(
+            pg_dump_cmd,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 分钟超时
+        )
+
+        if result.returncode != 0:
+            logger.warning(
+                "[Migration] pg_dump 警告/错误 (returncode=%d): %s",
+                result.returncode, result.stderr,
+            )
+            # 不阻断回滚流程，仅警告（备份失败不应阻止紧急回滚）
+            if not backup_file.exists():
+                logger.error("[Migration] 备份文件未生成，但继续回滚流程")
+
+        return backup_file
+
+    async def _execute_rollback_script(self, mig: MigrationFile) -> None:
+        """执行单个回滚脚本。"""
+        sql_content = mig.path.read_text(encoding="utf-8")
+        logger.info("[Migration] 执行回滚 %s (version=%s) ...", mig.filename, mig.version)
+
+        statements = self._split_sql_statements(sql_content)
+        logger.debug("[Migration] %s 共 %d 条语句", mig.filename, len(statements))
+
+        async with self._engine.begin() as conn:
+            for stmt in statements:
+                await conn.execute(text(stmt))
+
+        logger.info("[Migration] ✅ 回滚 %s 执行成功（%d 条语句）", mig.filename, len(statements))
+
     # ------------------------------------------------------------------
     # 确保 schema_version 表存在
     # ------------------------------------------------------------------
@@ -185,9 +460,24 @@ class MigrationRunner:
         """如果 schema_version 表不存在则创建。
 
         首次运行时，还会自动将 V001 标记为已应用（因为现有表已通过 create_all 创建）。
+        同时确保回滚追踪列存在（operator / rollback_note）。
         """
         async with self._engine.begin() as conn:
             await conn.execute(text(_SCHEMA_VERSION_DDL))
+
+            # 确保回滚追踪列存在（仅 PostgreSQL 支持 DO $$ 块，SQLite 跳过）
+            dialect_name = self._engine.dialect.name
+            if dialect_name == "postgresql":
+                await conn.execute(text(_SCHEMA_VERSION_ROLLBACK_COLUMNS_DDL))
+            elif dialect_name == "sqlite":
+                # SQLite: 尝试直接 ALTER TABLE（忽略已存在的列错误）
+                for col, col_type in [("operator", "VARCHAR(100)"), ("rollback_note", "TEXT")]:
+                    try:
+                        await conn.execute(text(
+                            f"ALTER TABLE schema_version ADD COLUMN {col} {col_type}"
+                        ))
+                    except Exception:
+                        pass  # 列已存在，忽略
 
             # 检查是否为全新的 schema_version 表（无记录）
             result = await conn.execute(text("SELECT COUNT(*) FROM schema_version"))
@@ -361,3 +651,89 @@ class MigrationRunner:
         """关闭自建引擎（如果有）。"""
         if self._owns_engine:
             await self._engine.dispose()
+
+
+# ------------------------------------------------------------------
+# CLI 入口
+# ------------------------------------------------------------------
+
+def _cli_main() -> None:
+    """CLI 入口：支持 --rollback <target_version> [--confirm] 参数。
+
+    用法::
+
+        # 回滚到版本 002（开发环境）
+        python -m app.core.migration_runner --rollback 002
+
+        # 回滚到版本 002（生产环境，需 --confirm）
+        python -m app.core.migration_runner --rollback 002 --confirm
+
+        # 执行待应用迁移（默认行为）
+        python -m app.core.migration_runner
+    """
+    import argparse
+    import asyncio
+    import sys
+
+    from app.core.config import settings
+
+    parser = argparse.ArgumentParser(
+        description="数据库迁移运行器 — 支持前进迁移和回滚",
+    )
+    parser.add_argument(
+        "--rollback",
+        metavar="TARGET_VERSION",
+        help="回滚到指定版本号（如 002），大于该版本的迁移将被逆序回滚",
+    )
+    parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="生产环境回滚确认（APP_ENV=production 时必须传此参数）",
+    )
+    parser.add_argument(
+        "--operator",
+        help="操作人标识（记录到 schema_version 表），默认取系统用户名",
+    )
+
+    args = parser.parse_args()
+
+    # 配置日志
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+
+    runner = MigrationRunner(database_url=settings.DATABASE_URL)
+
+    async def _run() -> None:
+        try:
+            if args.rollback:
+                # 标准化版本号（补零到 3 位）
+                target = args.rollback.zfill(3)
+                rolled_back = await runner.rollback_to(
+                    target_version=target,
+                    confirm=args.confirm,
+                    operator=args.operator,
+                )
+                if rolled_back:
+                    print(f"✅ 回滚完成，已回滚版本: {rolled_back}")
+                else:
+                    print("ℹ️  无需回滚，已在目标版本")
+            else:
+                # 默认：执行待应用迁移
+                executed = await runner.run_pending()
+                if executed:
+                    print(f"✅ 迁移完成，已执行版本: {executed}")
+                else:
+                    print("ℹ️  数据库已是最新版本")
+        except RuntimeError as e:
+            print(f"❌ 错误: {e}", file=sys.stderr)
+            sys.exit(1)
+        finally:
+            await runner.close()
+
+    asyncio.run(_run())
+
+
+if __name__ == "__main__":
+    _cli_main()

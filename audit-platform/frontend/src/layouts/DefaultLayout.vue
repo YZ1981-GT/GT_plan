@@ -80,6 +80,12 @@
       />
       <!-- 具体子页面：右侧全宽显示路由内容 -->
       <div v-else class="gt-detail-content">
+        <!-- Phase 1 F3: 穿透面包屑导航 -->
+        <DrilldownBreadcrumb
+          v-if="navigationStack.length > 0"
+          :stack="navigationStack"
+          @jump="navJumpTo"
+        />
         <!-- R7-S3-10：联动状态横条 -->
         <LinkageStatusBar
           v-if="staleCount > 0"
@@ -89,7 +95,7 @@
         />
         <router-view v-slot="{ Component, route: viewRoute }">
           <ErrorBoundary :key="viewRoute.fullPath">
-            <Transition name="gt-page" mode="out-in">
+            <Transition :name="transitionName" mode="out-in">
               <component :is="Component" :key="viewRoute.fullPath" />
             </Transition>
           </ErrorBoundary>
@@ -97,6 +103,9 @@
       </div>
     </template>
   </ThreeColumnLayout>
+
+  <!-- Phase 1 F1: 全局搜索 Ctrl+K -->
+  <GlobalSearchDialog v-model:visible="showGlobalSearch" />
 </template>
 
 <script setup lang="ts">
@@ -113,7 +122,9 @@ import LinkageStatusBar from '@/components/common/LinkageStatusBar.vue'
 import ConsolMiddleNav from '@/components/consolidation/ConsolMiddleNav.vue'
 import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
 import NotificationCenter from '@/components/collaboration/NotificationCenter.vue'
-import { initGlobalBackspace } from '@/composables/useNavigationStack'
+import GlobalSearchDialog from '@/components/common/GlobalSearchDialog.vue'
+import DrilldownBreadcrumb from '@/components/common/DrilldownBreadcrumb.vue'
+import { initGlobalBackspace, useNavigationStack } from '@/composables/useNavigationStack'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
 import { getProject } from '@/services/auditPlatformApi'
@@ -122,6 +133,16 @@ import { getGlobalReviewInbox } from '@/services/pmApi'
 const route = useRoute()
 const router = useRouter()
 initGlobalBackspace(router)
+const { stack: navigationStack, jumpTo: navJumpTo } = useNavigationStack()
+
+// UI-1: 方向性页面过渡动画（前进 slide-left，后退 slide-right）
+const transitionName = ref('slide-left')
+router.afterEach((_to, _from, failure) => {
+  if (failure) return
+  // history.state.back 存在说明是后退操作
+  const isBack = !!(window.history.state && window.history.state.back)
+  transitionName.value = isBack ? 'slide-right' : 'slide-left'
+})
 const roleStore = useRoleContextStore()
 const projectStore = useProjectStore()
 const selectedProject = ref<any>(null)
@@ -179,17 +200,33 @@ async function loadPendingReviewCount() {
 }
 
 // 初始化角色上下文
+const showGlobalSearch = ref(false)
+
 onMounted(async () => {
   if (!roleStore.loaded) {
     await roleStore.initialize()
   }
   loadPendingReviewCount()
   badgeTimer = setInterval(loadPendingReviewCount, 5 * 60 * 1000)
+
+  // Phase 1 F1: 全局搜索 Ctrl+K
+  document.addEventListener('keydown', onGlobalSearchShortcut)
 })
 
 onBeforeUnmount(() => {
   if (badgeTimer) clearInterval(badgeTimer)
+  document.removeEventListener('keydown', onGlobalSearchShortcut)
 })
+
+function onGlobalSearchShortcut(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    // 不拦截输入框/textarea/contentEditable 内的 Ctrl+K
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+    e.preventDefault()
+    showGlobalSearch.value = true
+  }
+}
 
 // 进入项目子页面时加载项目角色
 watch(() => route.params.projectId, async (pid) => {

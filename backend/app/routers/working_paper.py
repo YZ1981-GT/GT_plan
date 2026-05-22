@@ -26,6 +26,7 @@ import sqlalchemy as sa
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.field_selection import parse_fields, DEFAULT_SUMMARY_FIELDS, BLOCKED_FIELDS
 from app.deps import require_project_access
 from app.models.ai_models import AIConfirmationStatus, AIContent
 from app.models.core import User
@@ -74,6 +75,7 @@ async def list_workpapers(
     audit_cycle: str | None = None,
     status: str | None = None,
     assigned_to: UUID | None = None,
+    fields: str | None = Query(None, description="逗号分隔的字段名，如 id,wp_code,status"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
@@ -93,7 +95,7 @@ async def list_workpapers(
             scope_cycles = [c.strip() for c in pu.split(",") if c.strip()]
 
     svc = WorkingPaperService()
-    return await svc.list_workpapers(
+    items = await svc.list_workpapers(
         db=db,
         project_id=project_id,
         audit_cycle=audit_cycle,
@@ -101,6 +103,24 @@ async def list_workpapers(
         assigned_to=assigned_to,
         scope_cycles=scope_cycles,
     )
+
+    # 字段选择：过滤返回字段
+    requested_fields = parse_fields(fields)
+    if requested_fields is not None:
+        # 移除屏蔽字段
+        allowed = requested_fields - BLOCKED_FIELDS
+        # 确保至少包含 id
+        allowed.add("id")
+        items = [
+            {k: v for k, v in item.items() if k in allowed}
+            for item in items
+        ]
+    else:
+        # 默认行为：使用默认摘要字段集排除大字段
+        # 保持向后兼容 — 现有返回字段不含 parsed_data，无需额外过滤
+        pass
+
+    return items
 
 
 @router.post("/working-papers/download-pack")
@@ -939,10 +959,31 @@ async def prefill_workpaper(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """手动触发预填充（需编辑权限）— 真正打开 .xlsx 扫描公式并写入"""
+    """手动触发预填充（需编辑权限）— 真正打开 .xlsx 扫描公式并写入
+
+    使用 Redis 缓存优化：key=wp_id+tb_version，避免重复计算。
+    """
     from app.services.prefill_engine import prefill_workpaper_real
+    from app.services.cache_service import CacheService
+    from app.core.redis import redis_client
+
+    # 计算 TB 版本标识（用于缓存 key）
+    tb_version = CacheService.compute_tb_version(project_id, year)
+    cache_svc = CacheService(redis_client)
+
+    # 尝试从缓存获取
+    cached = await cache_svc.get_prefill_cache(wp_id, tb_version)
+    if cached is not None and cached.get("status") == "ok":
+        return cached
+
+    # 缓存未命中，执行 prefill
     result = await prefill_workpaper_real(db=db, project_id=project_id, year=year, wp_id=wp_id)
     await db.commit()
+
+    # 写入缓存（仅成功结果）
+    if result.get("status") == "ok":
+        await cache_svc.set_prefill_cache(wp_id, tb_version, result)
+
     return result
 
 

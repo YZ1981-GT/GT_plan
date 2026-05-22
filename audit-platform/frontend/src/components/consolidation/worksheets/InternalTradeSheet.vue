@@ -114,6 +114,7 @@ import { ElMessage } from 'element-plus'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
 import GtEditableTable, { type GtColumn } from '@/components/common/GtEditableTable.vue'
+import { useDecimalCalc } from '@/composables/useDecimalCalc'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface TradeRow {
@@ -132,6 +133,7 @@ const emitTrade = defineEmits<{
 const displayPrefs = useDisplayPrefsStore()
 const fmt = (v: any) => displayPrefs.fmt(v)
 const n = (v: any) => Number(v) || 0
+const { sub: decSub, mul: decMul, div: decDiv } = useDecimalCalc()
 const tradeFileRef = ref<HTMLInputElement|null>(null)
 const editableTableRef = ref<InstanceType<typeof GtEditableTable> | null>(null)
 
@@ -172,8 +174,8 @@ const generatedEntries = computed(() => {
   let totalRevenue = 0, totalCost = 0, totalUnrealized = 0
   for (const row of rows.value) {
     if (!row.sellerCompany || !row.buyerCompany) continue
-    totalRevenue += n(row.sellerAmount); totalCost += n(row.buyerAmount)
-    totalUnrealized += n(row.unrealizedProfit) * n(row.inventoryRatio) / 100
+    totalRevenue = Number(decSub(String(totalRevenue + n(row.sellerAmount)), '0')); totalCost = Number(decSub(String(totalCost + n(row.buyerAmount)), '0'))
+    totalUnrealized = Number(decSub(String(totalUnrealized + Number(decDiv(decMul(String(n(row.unrealizedProfit)), String(n(row.inventoryRatio))), '100'))), '0'))
   }
   if (totalRevenue > 0 || totalCost > 0) {
     const amount = Math.min(totalRevenue, totalCost)
@@ -223,8 +225,8 @@ async function exportTradeData() {
     fileName: '内部交易抵消_数据.xlsx',
     extraHeaders: ['差异', '应抵消利润'],
     extraDataFn: (r) => [
-      n(r.sellerAmount) - n(r.buyerAmount),
-      n(r.unrealizedProfit) * n(r.inventoryRatio) / 100,
+      Number(decSub(String(n(r.sellerAmount)), String(n(r.buyerAmount)))),
+      Number(decDiv(decMul(String(n(r.unrealizedProfit)), String(n(r.inventoryRatio))), '100')),
     ],
   })
 }

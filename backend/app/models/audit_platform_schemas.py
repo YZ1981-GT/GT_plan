@@ -804,6 +804,10 @@ class EventType(str, enum.Enum):
     # H-F8: 跨底稿引用更新（H9→H8 租赁两表反向回填）
     CROSS_REF_UPDATED = "cross_ref.updated"
 
+    # Phase 7 F11: 复核进度实时通知
+    REVIEW_ACCEPTED = "review.accepted"
+    REVIEW_COMPLETED = "review.completed"
+
 
 class EventPayload(BaseModel):
     """事件载荷"""

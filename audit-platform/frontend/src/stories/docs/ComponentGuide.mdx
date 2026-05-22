@@ -1,0 +1,215 @@
+import { Meta } from '@storybook/blocks'
+
+<Meta title="Docs/组件使用指南" />
+
+# 组件使用指南
+
+本文档帮助开发者快速判断在不同场景下应使用哪个组件，以及金额格式化、表格字号等 UI 规范。
+
+---
+
+## 1. GtEditableTable vs 原生 el-table
+
+### GtEditableTable 适用场景
+
+- 需要**查看/编辑模式切换**的表格（如审定表、调整分录）
+- 需要**行选择**（checkbox）+ **右键菜单**的表格
+- 需要**单元格级别编辑**（点击 cell 进入编辑态）
+- 需要内置**分页**（标准分页组件：左侧 page size + 右侧页码导航含 jumper）
+- 需要**选中行高亮**（14%+ 透明度背景 + 左侧 3px 紫色竖线指示器）
+
+```vue
+<GtEditableTable
+  :columns="columns"
+  v-model="tableData"
+  :editable="isEditMode"
+  :show-selection="true"
+/>
+```
+
+### 原生 el-table 适用场景
+
+- **纯展示**型表格，无编辑需求
+- 需要**高度自定义列模板**（复杂 slot 嵌套）
+- 表格行为与 GtEditableTable 封装不兼容的特殊场景（如树形表格、合并行列）
+- 临时性/一次性展示（弹窗内的简单列表）
+
+```vue
+<el-table :data="list" :class="`gt-tb-font-${fontSize}`">
+  <el-table-column prop="name" label="名称" />
+  <el-table-column prop="amount" label="金额">
+    <template #default="{ row }">
+      <span class="gt-amt">{{ formatAmount(row.amount) }}</span>
+    </template>
+  </el-table-column>
+</el-table>
+```
+
+### 决策速查
+
+| 需求 | 选择 |
+|------|------|
+| 查看+编辑切换 | GtEditableTable |
+| 行选择 + 右键菜单 | GtEditableTable |
+| 分页 + 选中高亮 | GtEditableTable |
+| 纯展示 + 简单列 | el-table |
+| 树形/合并行列 | el-table |
+| 弹窗内简单列表 | el-table |
+
+---
+
+## 2. GtPageHeader vs 白色工具栏
+
+### GtPageHeader 适用场景
+
+- **项目级页面**：仪表盘（PartnerProjectDashboard）、项目概览
+- **需要视觉层级**的入口页面：报表视图、试算平衡表顶部
+- 带**返回按钮**的二级页面（variant="default"）
+- 带**渐变 banner**的仪表盘页面（variant="banner"）
+
+```vue
+<GtPageHeader title="项目仪表盘" variant="banner" icon="📊" />
+```
+
+### 白色简洁工具栏适用场景
+
+- **简单 CRUD 列表页**：人员档案、知识库、模板管理
+- **表格上方操作区**：左标题 + 右操作按钮（刷新/导出/保存）
+- 紫色渐变在简单页面显得过重，白色工具栏更轻量
+
+```vue
+<div class="toolbar">
+  <span class="toolbar-title">人员档案</span>
+  <div class="toolbar-actions">
+    <el-button @click="refresh">刷新</el-button>
+    <el-button type="primary" @click="add">新增</el-button>
+  </div>
+</div>
+```
+
+### 决策速查
+
+| 页面类型 | 选择 |
+|----------|------|
+| 项目仪表盘 / 概览 | GtPageHeader (banner) |
+| 报表 / 试算表顶部 | GtPageHeader (default) |
+| 人员档案 / 知识库 | 白色工具栏 |
+| 底稿列表 / 模板管理 | 白色工具栏 |
+| 弹窗内工具区 | 白色工具栏 |
+
+> **原则**：GtPageHeader 只用于需要视觉层级的项目级/仪表盘页面。简单 CRUD 页面用白色工具栏，避免紫色大块喧宾夺主。
+
+---
+
+## 3. 金额格式化规范
+
+所有表格中的金额列必须使用 `.gt-amt` class，确保数字对齐和可读性。
+
+### 样式规范
+
+```css
+.gt-amt {
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+```
+
+### 效果说明
+
+| 属性 | 作用 |
+|------|------|
+| `font-family: Arial Narrow` | 等宽数字字体，列内数字自然对齐 |
+| `font-variant-numeric: tabular-nums` | 强制等宽数字（每位数字占相同宽度） |
+| `white-space: nowrap` | 禁止金额换行，避免千分位被截断 |
+
+### 使用方式
+
+```vue
+<!-- 在 el-table 列模板中 -->
+<el-table-column prop="amount" label="期末余额" align="right">
+  <template #default="{ row }">
+    <span class="gt-amt">{{ formatAmount(row.amount) }}</span>
+  </template>
+</el-table-column>
+
+<!-- 在 GtEditableTable 列定义中 -->
+const columns = [
+  { prop: 'balance', label: '余额', width: 150, align: 'right', className: 'gt-amt' },
+]
+```
+
+### 注意事项
+
+- 科目编号列也应使用 `.gt-amt`（等宽对齐）
+- 金额列统一右对齐（`align: 'right'`）
+- 列宽要足够大，不折行不省略号截断
+
+---
+
+## 4. 表格字号规范
+
+Element Plus 的 el-table 内部 DOM 层级深，`:style="{ fontSize }"` 无法穿透生效。必须使用**动态 class + `:deep()` + `!important`** 方案。
+
+### 正确方案
+
+```vue
+<template>
+  <el-table :data="data" :class="`gt-tb-font-${fontSize}`">
+    <!-- columns -->
+  </el-table>
+</template>
+
+<script setup>
+const fontSize = ref('sm') // 'xs' | 'sm' | 'md' | 'lg'
+</script>
+
+<style scoped>
+:deep(.gt-tb-font-xs) th .cell,
+:deep(.gt-tb-font-xs) td .cell {
+  font-size: 11px !important;
+}
+
+:deep(.gt-tb-font-sm) th .cell,
+:deep(.gt-tb-font-sm) td .cell {
+  font-size: 12px !important;
+}
+
+:deep(.gt-tb-font-md) th .cell,
+:deep(.gt-tb-font-md) td .cell {
+  font-size: 13px !important;
+}
+
+:deep(.gt-tb-font-lg) th .cell,
+:deep(.gt-tb-font-lg) td .cell {
+  font-size: 14px !important;
+}
+</style>
+```
+
+### 错误方式（不生效）
+
+```vue
+<!-- ❌ :style 无法穿透 el-table 内部 DOM -->
+<el-table :data="data" :style="{ fontSize: '12px' }">
+```
+
+### 字号选择建议
+
+| 场景 | 推荐字号 |
+|------|---------|
+| 数据密集型表格（试算表/明细账） | `sm` (12px) |
+| 常规列表（底稿列表/人员档案） | `md` (13px) |
+| 大屏展示 / 演示模式 | `lg` (14px) |
+| 紧凑模式（弹窗内表格） | `xs` (11px) |
+
+---
+
+## 5. 通用组件选择原则
+
+1. **优先复用 common 组件**：在 `src/components/common/` 中查找是否已有满足需求的组件
+2. **不引入 AG Grid**：包体积大且与 Univer 重叠，所有表格统一用 el-table 或 GtEditableTable
+3. **底稿编辑器用 Univer**：底稿内容编辑继续使用 Univer Core Preset
+4. **弹窗优先 el-dialog**：除追溯类轻量信息用 el-popover，其余交互统一用 el-dialog
+5. **图表用 vue-echarts**：已全局引入，不要引入其他图表库
+6. **表格分页用标准分页组件**：左侧 page size 选择器 + 右侧页码导航含 jumper，不用"加载更多"模式

@@ -26,10 +26,13 @@ from app.routers.wp_k_expense_analysis import (
     INDUSTRY_DEVIATION_THRESHOLD,
     YOY_CHANGE_THRESHOLD,
     _build_anomaly_flags,
+    _build_expense_prompt,
     _build_summary,
     _calc_budget_variance,
     _calc_industry_comparison,
     _calc_yoy,
+    _call_llm_for_explanation,
+    _EXPENSE_SYSTEM_PROMPT,
     _maybe_apply_analysis_to_workpaper,
     _validate_request,
     k_expense_analysis,
@@ -442,3 +445,243 @@ class TestIntegration:
         assert YOY_CHANGE_THRESHOLD == 0.20
         assert BUDGET_VARIANCE_THRESHOLD == 0.10
         assert INDUSTRY_DEVIATION_THRESHOLD == 0.10
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 11. LLM Prompt Builder — _build_expense_prompt
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestBuildExpensePrompt:
+    """_build_expense_prompt 构建 LLM 用户提示词"""
+
+    def test_prompt_contains_wp_name_k8(self):
+        """K8 → 提示词包含'销售费用'"""
+        yoy = {"职工薪酬": {"amount_change": 200000, "rate_change": 0.20, "flag": "normal"}}
+        prompt = _build_expense_prompt("K8", yoy, None, None, [])
+        assert "销售费用" in prompt
+        assert "K8" in prompt
+
+    def test_prompt_contains_wp_name_k9(self):
+        """K9 → 提示词包含'管理费用'"""
+        yoy = {"X": {"amount_change": 100, "rate_change": 0.10, "flag": "normal"}}
+        prompt = _build_expense_prompt("K9", yoy, None, None, [])
+        assert "管理费用" in prompt
+
+    def test_prompt_includes_yoy_data(self):
+        """提示词包含同比变动数据"""
+        yoy = {
+            "广告费": {"amount_change": 100000, "rate_change": 0.50, "flag": "increase_anomaly"},
+        }
+        prompt = _build_expense_prompt("K8", yoy, None, None, ["yoy_increase_anomaly_广告费"])
+        assert "广告费" in prompt
+        assert "异常增加" in prompt
+        assert "50.0%" in prompt
+
+    def test_prompt_includes_budget_data(self):
+        """提示词包含预算差异数据"""
+        yoy = {"X": {"amount_change": 0, "rate_change": 0, "flag": "normal"}}
+        budget = {"X": {"variance_amount": 50000, "variance_rate": 0.15, "flag": "overrun"}}
+        prompt = _build_expense_prompt("K8", yoy, budget, None, [])
+        assert "超支" in prompt
+        assert "15.0%" in prompt
+
+    def test_prompt_includes_industry_data(self):
+        """提示词包含行业对比数据"""
+        yoy = {"X": {"amount_change": 0, "rate_change": 0, "flag": "normal"}}
+        industry = {
+            "X": {"project_rate": 0.25, "industry_avg_rate": 0.10, "deviation": 0.15, "flag": "above_industry"}
+        }
+        prompt = _build_expense_prompt("K8", yoy, None, industry, [])
+        assert "高于行业" in prompt
+        assert "25.0%" in prompt
+        assert "10.0%" in prompt
+
+    def test_prompt_no_budget_shows_placeholder(self):
+        """无预算数据时显示占位文本"""
+        yoy = {"X": {"amount_change": 0, "rate_change": 0, "flag": "normal"}}
+        prompt = _build_expense_prompt("K8", yoy, None, None, [])
+        assert "未提供预算数据" in prompt
+
+    def test_prompt_no_industry_shows_placeholder(self):
+        """无行业数据时显示占位文本"""
+        yoy = {"X": {"amount_change": 0, "rate_change": 0, "flag": "normal"}}
+        prompt = _build_expense_prompt("K8", yoy, None, None, [])
+        assert "未提供行业对比数据" in prompt
+
+    def test_prompt_contains_output_format_instructions(self):
+        """提示词包含输出格式要求"""
+        yoy = {"X": {"amount_change": 0, "rate_change": 0, "flag": "normal"}}
+        prompt = _build_expense_prompt("K8", yoy, None, None, [])
+        assert "异常原因分析" in prompt
+        assert "建议审计程序" in prompt
+        assert "风险等级判断" in prompt
+
+    def test_prompt_new_category_rate_shows_new(self):
+        """rate_change=999 (inf) → 显示'新增'"""
+        yoy = {"新费用": {"amount_change": 5000, "rate_change": 999.0, "flag": "new_category"}}
+        prompt = _build_expense_prompt("K8", yoy, None, None, [])
+        assert "新增" in prompt
+
+    def test_prompt_anomaly_count_correct(self):
+        """异常标记数正确反映在提示词中"""
+        yoy = {
+            "A": {"amount_change": 300, "rate_change": 0.30, "flag": "increase_anomaly"},
+            "B": {"amount_change": -400, "rate_change": -0.40, "flag": "decrease_anomaly"},
+        }
+        flags = ["yoy_increase_anomaly_A", "yoy_decrease_anomaly_B"]
+        prompt = _build_expense_prompt("K8", yoy, None, None, flags)
+        assert "异常标记数：2" in prompt
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 12. LLM Call — _call_llm_for_explanation (mock)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestCallLlmForExplanation:
+    """_call_llm_for_explanation LLM 调用分支"""
+
+    @pytest.mark.asyncio
+    async def test_llm_success_returns_explanation(self, monkeypatch):
+        """LLM 成功 → 返回 (explanation_text, False)"""
+        from app.services.llm_service import LLMResponse, LLMService
+
+        fake_content = "**异常原因分析**：广告费同比增长50%，主要因市场推广力度加大。\n\n**建议审计程序**：\n1. 检查广告合同\n2. 核实费用发生真实性\n3. 分析费用效益\n\n**风险等级判断**：中"
+
+        async def mock_generate(self, **kwargs):
+            return LLMResponse(
+                content=fake_content,
+                tokens_used=150,
+                is_stub=False,
+                duration_ms=1200.0,
+            )
+
+        monkeypatch.setattr(LLMService, "generate", mock_generate)
+
+        yoy = {"广告费": {"amount_change": 100000, "rate_change": 0.50, "flag": "increase_anomaly"}}
+        text, failed = await _call_llm_for_explanation(yoy, None, None, ["yoy_increase_anomaly_广告费"], "K8")
+
+        assert failed is False
+        assert text == fake_content
+        assert "异常原因分析" in text
+
+    @pytest.mark.asyncio
+    async def test_llm_failure_returns_stub(self, monkeypatch):
+        """LLM 失败 → 返回 (None, True)"""
+        from app.services.llm_service import LLMResponse, LLMService
+
+        async def mock_generate(self, **kwargs):
+            return LLMResponse(
+                content=None,
+                tokens_used=0,
+                is_stub=True,
+                error="LLM call timeout after 30s",
+                duration_ms=30000.0,
+            )
+
+        monkeypatch.setattr(LLMService, "generate", mock_generate)
+
+        yoy = {"X": {"amount_change": 0, "rate_change": 0, "flag": "normal"}}
+        text, failed = await _call_llm_for_explanation(yoy, None, None, [], "K8")
+
+        assert failed is True
+        assert text is None
+
+    @pytest.mark.asyncio
+    async def test_llm_uses_correct_system_prompt(self, monkeypatch):
+        """LLM 调用使用正确的系统提示词"""
+        from app.services.llm_service import LLMResponse, LLMService
+
+        captured_kwargs = {}
+
+        async def mock_generate(self, **kwargs):
+            captured_kwargs.update(kwargs)
+            return LLMResponse(content="test", tokens_used=10, is_stub=False, duration_ms=100)
+
+        monkeypatch.setattr(LLMService, "generate", mock_generate)
+
+        yoy = {"X": {"amount_change": 0, "rate_change": 0, "flag": "normal"}}
+        await _call_llm_for_explanation(yoy, None, None, [], "K8")
+
+        assert captured_kwargs["system_prompt"] == _EXPENSE_SYSTEM_PROMPT
+        assert "资深审计师" in captured_kwargs["system_prompt"]
+
+    @pytest.mark.asyncio
+    async def test_llm_timeout_30s(self, monkeypatch):
+        """LLM 调用超时设置为 30s"""
+        from app.services.llm_service import LLMResponse, LLMService
+
+        captured_kwargs = {}
+
+        async def mock_generate(self, **kwargs):
+            captured_kwargs.update(kwargs)
+            return LLMResponse(content="test", tokens_used=10, is_stub=False, duration_ms=100)
+
+        monkeypatch.setattr(LLMService, "generate", mock_generate)
+
+        yoy = {"X": {"amount_change": 0, "rate_change": 0, "flag": "normal"}}
+        await _call_llm_for_explanation(yoy, None, None, [], "K8")
+
+        assert captured_kwargs["timeout"] == 30.0
+
+    @pytest.mark.asyncio
+    async def test_llm_temperature_03(self, monkeypatch):
+        """LLM 调用温度为 0.3（审计场景偏保守）"""
+        from app.services.llm_service import LLMResponse, LLMService
+
+        captured_kwargs = {}
+
+        async def mock_generate(self, **kwargs):
+            captured_kwargs.update(kwargs)
+            return LLMResponse(content="test", tokens_used=10, is_stub=False, duration_ms=100)
+
+        monkeypatch.setattr(LLMService, "generate", mock_generate)
+
+        yoy = {"X": {"amount_change": 0, "rate_change": 0, "flag": "normal"}}
+        await _call_llm_for_explanation(yoy, None, None, [], "K8")
+
+        assert captured_kwargs["temperature"] == 0.3
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 13. LLM 集成 — WP_AI_SERVICE_ENABLED 两态
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestLlmIntegrationTwoStates:
+    """WP_AI_SERVICE_ENABLED=True/False 两态测试"""
+
+    def test_ai_explanation_field_exists_in_response_model(self):
+        """ExpenseAnalysisResponse 包含 ai_explanation 字段"""
+        from app.routers.wp_k_expense_analysis import ExpenseAnalysisResponse
+        fields = ExpenseAnalysisResponse.model_fields
+        assert "ai_explanation" in fields
+
+    def test_ai_explanation_is_optional(self):
+        """ai_explanation 字段可为 None"""
+        from app.routers.wp_k_expense_analysis import ExpenseAnalysisResponse
+        field_info = ExpenseAnalysisResponse.model_fields["ai_explanation"]
+        # Optional field — default is None
+        assert field_info.default is None
+
+    def test_system_prompt_content(self):
+        """系统提示词包含审计师角色定义"""
+        assert "资深审计师" in _EXPENSE_SYSTEM_PROMPT
+        assert "审计判断" in _EXPENSE_SYSTEM_PROMPT
+
+    def test_endpoint_source_has_llm_branch(self):
+        """endpoint 源码包含 LLM 调用分支"""
+        import inspect
+        import app.routers.wp_k_expense_analysis as mod
+        src = inspect.getsource(mod.k_expense_analysis)
+        assert "WP_AI_SERVICE_ENABLED" in src
+        assert "_call_llm_for_explanation" in src
+        assert "ai_explanation" in src
+
+    def test_endpoint_source_has_degradation(self):
+        """endpoint 源码包含降级逻辑"""
+        import inspect
+        import app.routers.wp_k_expense_analysis as mod
+        src = inspect.getsource(mod.k_expense_analysis)
+        assert "AI 分析暂不可用" in src

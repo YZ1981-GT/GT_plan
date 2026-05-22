@@ -9,6 +9,8 @@
  * 5. onCalc — 调用正确的 expense-analysis endpoint 并存储 result
  * 6. onApplyToSheet — 后端返回 applied_to_sheet 时 emit applied
  * 7. visible=false 时 result 重置（watch on visible）
+ * 8. renderedExplanation — Markdown 渲染 + XSS 防护
+ * 9. is_llm_stub=true 时 renderedExplanation 为空
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -190,5 +192,69 @@ describe('ExpenseAnalysisDialog (K-F7)', () => {
     }
     await wrapper.setProps({ visible: false })
     expect(vm.result).toBeNull()
+  })
+
+  it('8. renderedExplanation：Markdown 渲染 + XSS 防护', () => {
+    const wrapper = mount(ExpenseAnalysisDialog, {
+      props: PROPS_BASE,
+      global: { stubs: STUBS },
+    })
+    const vm = wrapper.vm as any
+    vm.result = {
+      yoy_changes: {},
+      budget_variances: null,
+      industry_comparison: null,
+      anomaly_flags: [],
+      summary: 'LLM 分析完成',
+      is_llm_stub: false,
+      ai_explanation: '## 异常分析\n\n- **职工薪酬**同比增长 11%\n- 建议执行`细节测试`\n\n> 风险等级：中',
+    }
+    const html = vm.renderedExplanation
+    // Markdown 渲染正确
+    expect(html).toContain('<h2>')
+    expect(html).toContain('异常分析')
+    expect(html).toContain('<strong>职工薪酬</strong>')
+    expect(html).toContain('<li>')
+    expect(html).toContain('<code>细节测试</code>')
+    expect(html).toContain('<blockquote>')
+  })
+
+  it('8b. renderedExplanation：XSS 脚本被清除', () => {
+    const wrapper = mount(ExpenseAnalysisDialog, {
+      props: PROPS_BASE,
+      global: { stubs: STUBS },
+    })
+    const vm = wrapper.vm as any
+    vm.result = {
+      yoy_changes: {},
+      budget_variances: null,
+      industry_comparison: null,
+      anomaly_flags: [],
+      summary: 'test',
+      is_llm_stub: false,
+      ai_explanation: '正常文本<script>alert("xss")</script>结束',
+    }
+    const html = vm.renderedExplanation
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('正常文本')
+    expect(html).toContain('结束')
+  })
+
+  it('9. is_llm_stub=true 时 renderedExplanation 为空', () => {
+    const wrapper = mount(ExpenseAnalysisDialog, {
+      props: PROPS_BASE,
+      global: { stubs: STUBS },
+    })
+    const vm = wrapper.vm as any
+    vm.result = {
+      yoy_changes: {},
+      budget_variances: null,
+      industry_comparison: null,
+      anomaly_flags: [],
+      summary: 'stub 结果',
+      is_llm_stub: true,
+      ai_explanation: '## 这段不应渲染',
+    }
+    expect(vm.renderedExplanation).toBe('')
   })
 })

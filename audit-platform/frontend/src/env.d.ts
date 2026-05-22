@@ -19,6 +19,8 @@ declare module 'vue-router' {
     requireAuth?: boolean
     /** 路由级权限字符串，如 'admin' / 'project:edit'，不满足时跳转首页并提示 */
     permission?: string
+    /** 路由级角色白名单（兼容旧路由，新路由应使用 permission） */
+    roles?: string[]
     /** 标记为开发中页面，访问时提示并阻止导航 */
     developing?: boolean
   }

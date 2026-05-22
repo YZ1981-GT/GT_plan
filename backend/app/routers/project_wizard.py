@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
+from app.routers.password_confirm import require_confirmation_token
 from app.models.audit_platform_schemas import (
     BasicInfoSchema,
     ProjectCreateResponse,
@@ -206,8 +207,9 @@ async def delete_project(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _token: None = Depends(require_confirmation_token),
 ):
-    """软删除单个项目（需二次确认由前端处理）"""
+    """软删除单个项目（需二次密码确认）"""
     from sqlalchemy import select
     result = await db.execute(
         select(Project).where(Project.id == project_id, Project.is_deleted == False)  # noqa: E712
@@ -226,8 +228,9 @@ async def batch_delete_projects(
     body: BatchDeleteRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _token: None = Depends(require_confirmation_token),
 ):
-    """批量软删除项目（需二次确认由前端处理）"""
+    """批量软删除项目（需二次密码确认）"""
     from sqlalchemy import select, update
     count = 0
     for pid in body.project_ids:

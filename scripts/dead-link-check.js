@@ -16,7 +16,7 @@ const path = require('path');
 // ─── 配置 ────────────────────────────────────────────────────────────────────
 
 const API_PATHS_FILE = path.join(__dirname, '..', 'audit-platform', 'frontend', 'src', 'services', 'apiPaths.ts');
-const ROUTER_REGISTRY_FILE = path.join(__dirname, '..', 'backend', 'app', 'router_registry.py');
+const ROUTER_REGISTRY_DIR = path.join(__dirname, '..', 'backend', 'app', 'router_registry');
 const ROUTERS_DIR = path.join(__dirname, '..', 'backend', 'app', 'routers');
 
 // ─── 1. 从 apiPaths.ts 提取所有 API 路径 ────────────────────────────────────
@@ -66,13 +66,19 @@ function extractStaticPrefix(apiPath) {
   return '/' + staticSegments.join('/');
 }
 
-// ─── 2. 从 router_registry.py + 各 router 文件提取注册前缀 ─────────────────
+// ─── 2. 从 router_registry/ 包 + 各 router 文件提取注册前缀 ─────────────────
 
 function extractRegisteredPrefixes() {
   const prefixes = new Set();
 
-  // 2a. 从 router_registry.py 提取 include_router 的 prefix 参数
-  const registryContent = fs.readFileSync(ROUTER_REGISTRY_FILE, 'utf-8');
+  // 2a. 从 router_registry/ 包内所有 .py 文件提取 include_router 的 prefix 参数
+  let registryContent = '';
+  const registryFiles = fs.readdirSync(ROUTER_REGISTRY_DIR)
+    .filter(f => f.endsWith('.py'))
+    .map(f => path.join(ROUTER_REGISTRY_DIR, f));
+  for (const file of registryFiles) {
+    registryContent += fs.readFileSync(file, 'utf-8');
+  }
 
   // 解析 include_router 调用中的 prefix
   const includeRegex = /app\.include_router\([^)]*prefix\s*=\s*["']([^"']+)["']/g;
@@ -184,15 +190,15 @@ function isPathCovered(apiPath, registeredPrefixes) {
 // ─── 主流程 ──────────────────────────────────────────────────────────────────
 
 function main() {
-  console.log('🔍 前端死链检查: apiPaths.ts ↔ router_registry.py\n');
+  console.log('🔍 前端死链检查: apiPaths.ts ↔ router_registry/\n');
 
   // 检查文件存在
   if (!fs.existsSync(API_PATHS_FILE)) {
     console.error(`❌ 找不到 apiPaths.ts: ${API_PATHS_FILE}`);
     process.exit(1);
   }
-  if (!fs.existsSync(ROUTER_REGISTRY_FILE)) {
-    console.error(`❌ 找不到 router_registry.py: ${ROUTER_REGISTRY_FILE}`);
+  if (!fs.existsSync(ROUTER_REGISTRY_DIR)) {
+    console.error(`❌ 找不到 router_registry 包: ${ROUTER_REGISTRY_DIR}`);
     process.exit(1);
   }
 

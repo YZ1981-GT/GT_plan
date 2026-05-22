@@ -5,13 +5,16 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.redis import get_redis
 from app.deps import get_current_user, require_project_access, get_user_scope_cycles
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
 from app.deps import check_consol_lock
+from app.services.cache_service import CacheService
 from app.services.mapping_service import get_codes_by_cycles
 from app.services.event_bus import event_bus
 from app.services.materiality_service import MaterialityService
@@ -29,17 +32,24 @@ async def get_trial_balance(
     year: int = Query(...),
     company_code: str = Query("001"),
     db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取试算表（四列结构），含重要性水平高亮标记"""
+    cache_svc = CacheService(redis)
+
+    # 尝试从 Redis 缓存获取（60s TTL）
+    cached = await cache_svc.get_tb_cache(project_id, year, company_code)
+    if cached is not None:
+        # 缓存命中：仍需做 scope_cycles 过滤（用户级别不同）
+        scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
+        if scope_cycles is not None:
+            allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
+            cached = [r for r in cached if r.get("standard_account_code") in allowed_codes]
+        return cached
+
     svc = TrialBalanceService(db)
     rows = await svc.get_trial_balance(project_id, year, company_code)
-
-    # scope_cycles 过滤：非 admin/partner 用户只能看到被分配循环对应的科目
-    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
-    if scope_cycles is not None:
-        allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
-        rows = [r for r in rows if r.standard_account_code in allowed_codes]
 
     # 获取重要性水平用于高亮
     mat_svc = MaterialityService(db)
@@ -65,6 +75,15 @@ async def get_trial_balance(
         }
         result.append(item)
 
+    # 写入 Redis 缓存（全量数据，scope 过滤在读取时做）
+    await cache_svc.set_tb_cache(project_id, year, company_code, result)
+
+    # scope_cycles 过滤
+    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
+    if scope_cycles is not None:
+        allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
+        result = [r for r in result if r.get("standard_account_code") in allowed_codes]
+
     return result
 
 
@@ -74,6 +93,7 @@ async def recalc_trial_balance(
     year: int = Query(...),
     company_code: str = Query("001"),
     db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
     _lock_check=Depends(check_consol_lock),
     current_user: User = Depends(require_project_access("edit")),
 ):
@@ -87,6 +107,11 @@ async def recalc_trial_balance(
     svc = TrialBalanceService(db)
     await svc.full_recalc(project_id, year, company_code)
     await db.commit()
+
+    # 失效 TB 缓存
+    cache_svc = CacheService(redis)
+    await cache_svc.invalidate_tb_cache(project_id, year)
+
     await event_bus.publish_immediate(EventPayload(
         event_type=EventType.TRIAL_BALANCE_UPDATED,
         project_id=project_id,

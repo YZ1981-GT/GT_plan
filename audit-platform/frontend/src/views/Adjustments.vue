@@ -333,8 +333,8 @@
 
         <!-- 借贷差额 -->
         <div class="gt-adj-balance-diff" :class="{ 'gt-adj-unbalanced': balanceDiff !== 0 }">
-          借方合计: {{ totalDebit.toFixed(2) }} | 贷方合计: {{ totalCredit.toFixed(2) }}
-          | 差额: {{ balanceDiff.toFixed(2) }}
+          借方合计: {{ fmtAmountWithZero(totalDebit) }} | 贷方合计: {{ fmtAmountWithZero(totalCredit) }}
+          | 差额: {{ fmtAmountWithZero(balanceDiff) }}
         </div>
 
         <!-- 影响预判面板 [enterprise-linkage 3.8] -->
@@ -385,7 +385,7 @@ import {
 import { useProjectStore } from '@/stores/project'
 import { useDictStore } from '@/stores/dict'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
-import { fmtAmount } from '@/utils/formatters'
+import { fmtAmount, fmtAmountWithZero } from '@/utils/formatters'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import PresenceAvatars from '@/components/PresenceAvatars.vue'
@@ -411,10 +411,12 @@ import type { GtColumn } from '@/components/common/GtEditableTable.vue'
 import ImpactPreviewPanel from '@/components/ImpactPreviewPanel.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import { useImpactPreview } from '@/composables/useImpactPreview'
+import { useDecimalCalc } from '@/composables/useDecimalCalc'
 
 const route = useRoute()
 const router = useRouter()
 const penetrate = usePenetrate()
+const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
 const { isFullscreen, toggleFullscreen } = useFullscreen()
 const { isEditing: isPageEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 
@@ -643,9 +645,9 @@ function onTemplateSelect(key: string) {
   }))
 }
 
-const totalDebit = computed(() => form.value.line_items.reduce((s, l) => s + (l.debit_amount || 0), 0))
-const totalCredit = computed(() => form.value.line_items.reduce((s, l) => s + (l.credit_amount || 0), 0))
-const balanceDiff = computed(() => Math.round((totalDebit.value - totalCredit.value) * 100) / 100)
+const totalDebit = computed(() => form.value.line_items.reduce((s, l) => Number(decAdd(String(s), String(l.debit_amount || 0))), 0))
+const totalCredit = computed(() => form.value.line_items.reduce((s, l) => Number(decAdd(String(s), String(l.credit_amount || 0))), 0))
+const balanceDiff = computed(() => Number(decSub(String(totalDebit.value), String(totalCredit.value))))
 
 const fmtAmt = fmtAmount
 

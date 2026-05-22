@@ -210,7 +210,7 @@
                         <span v-else :class="['gt-amt', { 'total-val': row.is_total }]">
                           {{ fmt(getCellValue(row, Number(hiRaw) - 1)) }}
                         </span>
-                        <span v-if="getCellMode(row, Number(hiRaw) - 1) === 'auto'" class="gt-cell-source" title="自动填充">📊</span>
+                        <span v-if="getCellMode(row, Number(hiRaw) - 1) === 'auto'" class="gt-cell-source gt-cell-trace-trigger" title="点击追溯来源" @click.stop="onAutoCellTraceClick($index, Number(hiRaw) - 1, $event)">📊</span>
                         <span v-else-if="getCellMode(row, Number(hiRaw) - 1) === 'manual'" class="gt-cell-manual" title="手动编辑">✏️</span>
                       </div>
                       </CommentTooltip>
@@ -441,6 +441,30 @@
     @navigate="onCellDetailNavigate"
   />
 
+  <!-- Phase 3 F1: 来源追溯弹窗 (Requirements: F1.1, F1.3, F1.4) -->
+  <teleport to="body">
+    <div
+      v-if="tracePopoverVisible"
+      class="gt-trace-popover-overlay"
+      @click.self="tracePopoverVisible = false"
+    >
+      <div
+        class="gt-trace-popover-container"
+        :style="{ top: tracePopoverPos.y + 'px', left: tracePopoverPos.x + 'px' }"
+      >
+        <TraceSourcePopover
+          :trace-data="traceData"
+          :visible="tracePopoverVisible"
+          :loading="traceLoading"
+          @update:visible="tracePopoverVisible = $event"
+          @jump-to-tb="onTraceJumpToTB"
+        >
+          <span class="gt-trace-anchor" />
+        </TraceSourcePopover>
+      </div>
+    </div>
+  </teleport>
+
   <!-- 知识库文档选择弹窗 [R3.7] -->
   <KnowledgePickerDialog v-model:visible="knowledgePickerVisible" />
 
@@ -460,8 +484,11 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useCellSelection } from '@/composables/useCellSelection'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useEditMode } from '@/composables/useEditMode'
+import { useNavigationStack } from '@/composables/useNavigationStack'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
+import TraceSourcePopover from '@/components/common/TraceSourcePopover.vue'
+import type { TraceSourceData } from '@/components/common/TraceSourcePopover.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
@@ -1797,6 +1824,65 @@ function onCellDetailNavigate(uri: string) {
   }
 }
 
+// ─── Phase 3 F1: 来源追溯 (Requirements: F1.1, F1.3, F1.4) ─────────────────
+const { push: navPush } = useNavigationStack()
+const tracePopoverVisible = ref(false)
+const traceLoading = ref(false)
+const traceData = ref<TraceSourceData | null>(null)
+const tracePopoverPos = ref({ x: 0, y: 0 })
+
+/**
+ * auto 模式 cell 的 📊 图标点击 → 调用 trace-source API → 显示 TraceSourcePopover
+ */
+async function onAutoCellTraceClick(rowIndex: number, colIndex: number, event: MouseEvent) {
+  const note = currentNote.value
+  if (!note?.note_section) return
+
+  // 构建 cell_id: "{note_section}:{row_index}:{col_index}"
+  const cellId = `${note.note_section}:${rowIndex}:${colIndex}`
+
+  // 定位弹窗位置
+  tracePopoverPos.value = { x: event.clientX, y: event.clientY + 8 }
+  tracePopoverVisible.value = true
+  traceLoading.value = true
+  traceData.value = null
+
+  try {
+    const resp: any = await api.get(P.disclosureNotes.traceSource(projectId.value, cellId))
+    traceData.value = resp as TraceSourceData
+  } catch (e) {
+    handleApiError(e, '追溯来源')
+    tracePopoverVisible.value = false
+  } finally {
+    traceLoading.value = false
+  }
+}
+
+/**
+ * 跳转到试算表：记录到 useNavigationStack 后 router.push
+ */
+function onTraceJumpToTB(accountCode?: string) {
+  tracePopoverVisible.value = false
+
+  // F1.4: 记录到 useNavigationStack（支持 Backspace 返回）
+  navPush({
+    source_view: route.fullPath,
+    label: `附注 ${currentNote.value?.section_title || ''}`,
+    direction: 'up',
+  })
+
+  // F1.3: 跳转到 TrialBalance 并定位到该科目行
+  const query: Record<string, string> = {}
+  if (accountCode) {
+    query.account_code = accountCode
+  }
+  router.push({
+    name: 'TrialBalance',
+    params: { projectId: projectId.value },
+    query,
+  })
+}
+
 // ─── 校验错误标记（左侧目录树红色标记 + 单元格红色边框） ─────────────────────
 /** 判断某章节是否有校验错误 */
 function hasSectionValidationError(noteSection: string | undefined): boolean {
@@ -1954,6 +2040,15 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
 .gt-cell-wrapper { display: flex; align-items: center; gap: 4px; }
 .gt-cell-source { font-size: var(--gt-font-size-xs); cursor: help; }
 .gt-cell-manual { font-size: var(--gt-font-size-xs); cursor: help; }
+
+/* Phase 3 F1: 来源追溯触发器 */
+.gt-cell-trace-trigger {
+  cursor: pointer !important;
+  transition: transform 0.15s ease;
+}
+.gt-cell-trace-trigger:hover {
+  transform: scale(1.3);
+}
 .gt-prior-year-val { color: var(--gt-color-text-placeholder); font-style: italic; font-size: var(--gt-font-size-xs); }
 .gt-formula-mismatch { color: var(--gt-color-coral) !important; font-weight: 700; text-decoration: underline wavy #FF5149; }
 
@@ -2022,6 +2117,21 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
   padding: 6px 0;
   margin-top: 4px;
   border-top: 1px dashed var(--gt-color-border-purple);
+}
+
+/* ── Phase 3 F1: 来源追溯弹窗定位 ── */
+.gt-trace-popover-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 2000;
+  background: transparent;
+}
+.gt-trace-popover-container {
+  position: absolute;
+  z-index: 2001;
 }
 
 </style>

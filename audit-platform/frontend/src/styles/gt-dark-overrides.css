@@ -1,0 +1,370 @@
+/**
+ * GT 暗色模式覆盖 — 针对核心页面中硬编码颜色的修复
+ * Task 4.5: 核心页面暗色适配
+ *
+ * 策略：仅在 html.dark 下覆盖那些使用了硬编码 hex/rgb 值的样式，
+ * 已使用 --gt-* CSS 变量的样式会自动跟随暗色主题切换。
+ */
+
+/* ═══════════════════════════════════════════════════════════════
+   gt-table.css 硬编码颜色修复
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 表头紫色背景 #f0edf5 → 暗色 */
+html.dark .el-table thead th {
+  background: var(--gt-table-header-bg) !important;
+}
+
+/* 边框色 #e8e4f0 → 暗色 */
+html.dark .el-table--border td,
+html.dark .el-table--border th {
+  border-color: var(--gt-color-border-purple) !important;
+}
+
+html.dark .el-table--border .el-table__inner-wrapper::after,
+html.dark .el-table--border::before {
+  background-color: var(--gt-color-border-purple) !important;
+}
+
+/* 选中单元格 */
+html.dark .gt-ucell--selected {
+  background: rgba(168, 125, 224, 0.12) !important;
+}
+html.dark .gt-ucell--single-selected {
+  background: rgba(168, 125, 224, 0.18) !important;
+}
+html.dark .gt-tb-sum-selected td {
+  background: rgba(168, 125, 224, 0.12) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   全局 Element Plus 组件暗色修复
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 表格 hover 行 */
+html.dark .el-table {
+  --el-table-row-hover-bg-color: var(--gt-table-row-hover);
+}
+
+/* 表头边框 */
+html.dark .el-table th.el-table__cell {
+  border-bottom-color: var(--gt-color-border-purple) !important;
+  color: var(--gt-color-text-primary) !important;
+}
+
+/* 斑马纹行 */
+html.dark .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: var(--gt-bg-subtle) !important;
+}
+
+/* 表格外边框 */
+html.dark .el-table--border {
+  border-color: var(--gt-color-border);
+}
+
+/* 对话框头部渐变 */
+html.dark .el-dialog__header {
+  background: linear-gradient(180deg, var(--gt-color-bg-elevated) 0%, var(--gt-bg-default) 100%);
+}
+
+/* 对话框底部 */
+html.dark .el-dialog__footer {
+  background: var(--gt-bg-subtle);
+}
+
+/* 遮罩层 */
+html.dark .el-overlay {
+  background: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* 加载遮罩 */
+html.dark .el-loading-mask {
+  background: rgba(26, 26, 46, 0.85) !important;
+}
+
+/* Alert 渐变 */
+html.dark .el-alert--success { background: var(--gt-bg-success) !important; }
+html.dark .el-alert--warning { background: var(--gt-bg-warning) !important; }
+html.dark .el-alert--error { background: var(--gt-bg-danger) !important; }
+html.dark .el-alert--info { background: var(--gt-bg-info) !important; }
+
+/* Message 渐变 */
+html.dark .el-message--success { background: var(--gt-bg-success) !important; }
+html.dark .el-message--warning { background: var(--gt-bg-warning) !important; }
+html.dark .el-message--error { background: var(--gt-bg-danger) !important; }
+html.dark .el-message--info { background: var(--gt-bg-info) !important; }
+
+/* 骨架屏 */
+html.dark .el-skeleton__item {
+  background: linear-gradient(90deg, var(--gt-bg-subtle) 25%, var(--gt-color-bg-elevated) 50%, var(--gt-bg-subtle) 75%) !important;
+}
+
+/* 全屏模式 */
+html.dark .gt-fullscreen {
+  background: var(--gt-bg-default);
+}
+
+/* 滚动条 */
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(160, 109, 255, 0.25);
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(160, 109, 255, 0.4);
+}
+
+/* 骨架屏闪烁 */
+html.dark .gt-shimmer {
+  background: linear-gradient(90deg, var(--gt-bg-subtle) 25%, var(--gt-color-bg-elevated) 50%, var(--gt-bg-subtle) 75%);
+  background-size: 200% 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TrialBalance.vue — 表格行渐变 + 穿透弹窗
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 小计行渐变 */
+html.dark :deep(.subtotal-row),
+html.dark .subtotal-row {
+  background: linear-gradient(90deg, var(--gt-color-primary-bg), var(--gt-bg-subtle)) !important;
+}
+
+/* 合计行渐变 */
+html.dark :deep(.total-row),
+html.dark .total-row {
+  background: linear-gradient(90deg, #2a1a4a, #251545) !important;
+}
+
+/* 高亮行渐变 */
+html.dark :deep(.highlight-row),
+html.dark .highlight-row {
+  background: linear-gradient(90deg, var(--gt-bg-warning), var(--gt-color-wheat-light)) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   WorkpaperEditor.vue — 工具栏/侧边栏
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 白色文字在暗色模式下保持可见（badge 等） — 无需修改 */
+
+/* ═══════════════════════════════════════════════════════════════
+   ReportView.vue — 表头硬编码 + 差额颜色 + 渐变
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 报表表格 header-cell-style 硬编码 #f8f6fb/#333 的覆盖 */
+html.dark .gt-rv-table .el-table__header-wrapper th,
+html.dark .el-table__header-wrapper th[style*="f8f6fb"] {
+  background: var(--gt-table-header-bg) !important;
+  color: var(--gt-color-text-primary) !important;
+}
+
+/* 穿透弹窗 code 渐变 */
+html.dark .gt-rv-dd-section code {
+  background: linear-gradient(135deg, var(--gt-bg-subtle), var(--gt-color-bg-elevated)) !important;
+  border-color: var(--gt-color-border) !important;
+}
+
+/* 报表横幅（橙色警告） */
+html.dark .gt-rv-warning-banner,
+html.dark [class*="gt-rv"][style*="fff3e0"] {
+  background: linear-gradient(90deg, var(--gt-bg-warning), #2d2510) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Dashboard.vue — 欢迎横幅 + 卡片 + 快捷操作
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 欢迎横幅使用 --gt-gradient-primary（已在 html.dark 中定义暗色版本） */
+html.dark .welcome-banner {
+  background: var(--gt-gradient-primary);
+}
+
+/* 我的底稿卡片 */
+html.dark .my-wp-card {
+  background: var(--gt-color-bg-white) !important;
+  box-shadow: var(--gt-shadow-sm) !important;
+}
+html.dark .my-wp-card:hover {
+  box-shadow: var(--gt-shadow-md) !important;
+}
+
+/* 快捷操作卡片硬编码背景 */
+html.dark .action-icon[style*="f0ebf8"] {
+  background: var(--gt-color-primary-bg) !important;
+}
+html.dark .action-icon[style*="f5f5f7"] {
+  background: var(--gt-bg-subtle) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PartnerProjectDashboard.vue — 模块卡片
+   ═══════════════════════════════════════════════════════════════ */
+
+/* box-shadow rgba 修复 */
+html.dark .module-card,
+html.dark .ppd-header {
+  box-shadow: var(--gt-shadow-sm) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   WorkpaperList.vue — 进度卡片 + 循环指南颜色
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 进度卡片 — 已使用 var() 带 fallback，暗色自动生效 */
+
+/* ═══════════════════════════════════════════════════════════════
+   Adjustments.vue — 汇总面板渐变 + 底部操作栏
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 汇总面板渐变 */
+html.dark .gt-adj-summary-panel,
+html.dark [class*="gt-adj"][style*="f8f6fb"] {
+  background: linear-gradient(135deg, var(--gt-bg-subtle), var(--gt-color-bg-elevated)) !important;
+  border-color: var(--gt-color-border) !important;
+}
+
+/* 底部操作栏渐变 */
+html.dark .gt-adj-bottom-bar {
+  background: linear-gradient(135deg, var(--gt-bg-subtle), var(--gt-color-primary-bg)) !important;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 批量切换按钮白色文字 — 保持不变 */
+
+/* ═══════════════════════════════════════════════════════════════
+   Misstatements.vue — 横幅按钮白色
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 横幅按钮已使用 rgba(255,255,255,...) 在深色背景上，暗色模式下保持不变 */
+
+/* ═══════════════════════════════════════════════════════════════
+   全局工具类暗色修复
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 选中区域求和状态栏 */
+html.dark .gt-selection-bar {
+  background: linear-gradient(90deg, var(--gt-bg-subtle), var(--gt-color-bg-elevated));
+  border-top-color: var(--gt-color-border);
+  color: var(--gt-color-text-secondary);
+}
+html.dark .gt-selection-bar-label {
+  color: var(--gt-color-text-tertiary);
+}
+
+/* 搜索高亮 */
+html.dark .gt-search-match {
+  background: rgba(255, 204, 2, 0.25) !important;
+  outline-color: rgba(230, 194, 0, 0.5);
+}
+html.dark .gt-search-match--current {
+  background: rgba(255, 204, 2, 0.4) !important;
+  outline-color: rgba(179, 143, 0, 0.7);
+}
+
+/* 金额负数颜色 */
+html.dark .gt-amount--negative {
+  color: var(--gt-color-coral) !important;
+}
+
+/* 金额高亮 */
+html.dark .gt-amount--highlight {
+  background: var(--gt-bg-warning) !important;
+  border-bottom-color: var(--gt-color-wheat);
+}
+
+/* 玻璃态卡片 */
+html.dark .gt-card-glass {
+  background: rgba(26, 26, 46, 0.85);
+  border-color: var(--gt-color-border);
+}
+
+/* 指标卡片装饰圆 */
+html.dark .gt-metric-card-v2::after {
+  background: var(--gt-color-primary-bg);
+}
+
+/* 工作流引导弹窗 */
+html.dark .gt-workflow-guide-dialog .el-message-box__header {
+  background: linear-gradient(135deg, var(--gt-color-bg-elevated) 0%, var(--gt-bg-default) 100%);
+  border-bottom-color: var(--gt-color-border);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Login.vue — 右侧表单区域
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Login 页面右侧已使用 var(--gt-color-bg-white)，暗色自动生效 */
+/* 左侧品牌区使用 var(--gt-gradient-primary)，暗色自动生效 */
+
+/* ═══════════════════════════════════════════════════════════════
+   Projects.vue — 无硬编码颜色，全部使用 CSS 变量
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════
+   gt-polish.css 硬编码颜色修复
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 按钮渐变 — 在暗色模式下保持品牌色渐变（按钮本身是深色背景+白字，无需大改） */
+/* 但 box-shadow 需要调暗 */
+html.dark .el-button--primary {
+  box-shadow: 0 2px 8px rgba(168, 125, 224, 0.3), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+}
+html.dark .el-button--primary:hover {
+  box-shadow: 0 4px 16px rgba(168, 125, 224, 0.4), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+}
+
+/* 危险按钮 plain 模式 */
+html.dark .el-button--danger.is-plain {
+  background: var(--gt-bg-danger) !important;
+  border-color: rgba(255, 123, 116, 0.4) !important;
+  color: var(--gt-color-coral) !important;
+}
+
+/* 默认按钮 hover 渐变 */
+html.dark .el-button--default:hover {
+  background: var(--gt-color-primary-bg) !important;
+}
+
+/* 表格选中行 */
+html.dark .el-table .el-table__body tr.current-row > td.el-table__cell {
+  background: var(--gt-table-row-selected) !important;
+}
+
+/* Tag 颜色 */
+html.dark .el-tag--success {
+  background: var(--gt-bg-success) !important;
+  color: var(--gt-color-success) !important;
+}
+html.dark .el-tag--warning {
+  background: var(--gt-bg-warning) !important;
+  color: var(--gt-color-wheat) !important;
+}
+html.dark .el-tag--danger {
+  background: var(--gt-bg-danger) !important;
+  color: var(--gt-color-coral) !important;
+}
+html.dark .el-tag--info {
+  background: var(--gt-bg-info) !important;
+  color: var(--gt-color-teal) !important;
+}
+
+/* Tree 选中节点 */
+html.dark .el-tree-node.is-current > .el-tree-node__content {
+  background: var(--gt-color-primary-bg) !important;
+}
+
+/* 警告横幅（前置条件等） */
+html.dark .gt-prerequisite-banner,
+html.dark [style*="fff8e6"][style*="border-bottom"] {
+  background: linear-gradient(90deg, var(--gt-bg-warning) 0%, #2d2510 100%) !important;
+  border-bottom-color: var(--gt-color-wheat) !important;
+  color: var(--gt-color-wheat) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   gt-page-components.css 硬编码颜色修复
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 团队统计 hover */
+html.dark .gt-team-stat:hover {
+  background: var(--gt-color-primary-bg);
+}

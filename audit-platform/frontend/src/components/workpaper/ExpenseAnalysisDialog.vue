@@ -119,6 +119,16 @@
         <el-descriptions-item label="简要" :span="2">{{ result.summary }}</el-descriptions-item>
       </el-descriptions>
 
+      <!-- AI 解释区域 -->
+      <div v-if="result.is_llm_stub" class="ai-explanation-stub">
+        AI 分析功能待接入，当前显示规则引擎结果。
+      </div>
+      <div
+        v-else-if="renderedExplanation"
+        class="ai-explanation-content"
+        v-html="renderedExplanation"
+      />
+
       <el-tabs>
         <el-tab-pane label="同比变化">
           <el-table :data="yoyTable" size="small" border max-height="240">
@@ -208,6 +218,8 @@
 <script setup lang="ts">
 import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import { api } from '@/services/apiProxy'
 
 interface Props {
@@ -241,6 +253,7 @@ interface AnalysisResponse {
   anomaly_flags: string[]
   summary: string
   is_llm_stub: boolean
+  ai_explanation?: string | null
   applied_to_sheet?: string | null
 }
 
@@ -303,6 +316,16 @@ const industryTable = computed(() => {
     category: cat,
     ...info,
   }))
+})
+
+/** Render ai_explanation as sanitized HTML via marked + DOMPurify */
+const renderedExplanation = computed(() => {
+  if (!result.value) return ''
+  if (result.value.is_llm_stub) return ''
+  const raw = result.value.ai_explanation
+  if (!raw) return ''
+  const html = marked(raw, { async: false }) as string
+  return DOMPurify.sanitize(html)
 })
 
 function addCategory() {
@@ -434,5 +457,88 @@ watch(
   margin-left: 8px;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+/* AI explanation stub placeholder */
+.ai-explanation-stub {
+  margin: 12px 0;
+  padding: 10px 14px;
+  background-color: var(--el-fill-color-lighter, #f5f7fa);
+  border-radius: 4px;
+  color: var(--el-text-color-placeholder, #a8abb2);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* AI explanation rendered markdown */
+.ai-explanation-content {
+  margin: 12px 0;
+  padding: 12px 16px;
+  background-color: var(--el-fill-color-blank, #ffffff);
+  border: 1px solid var(--el-border-color-lighter, #e4e7ed);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-primary);
+}
+
+.ai-explanation-content :deep(h1),
+.ai-explanation-content :deep(h2),
+.ai-explanation-content :deep(h3) {
+  margin: 12px 0 6px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.ai-explanation-content :deep(h1) { font-size: 18px; }
+.ai-explanation-content :deep(h2) { font-size: 16px; }
+.ai-explanation-content :deep(h3) { font-size: 14px; }
+
+.ai-explanation-content :deep(p) {
+  margin: 6px 0;
+}
+
+.ai-explanation-content :deep(ul),
+.ai-explanation-content :deep(ol) {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.ai-explanation-content :deep(li) {
+  margin: 3px 0;
+}
+
+.ai-explanation-content :deep(strong) {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.ai-explanation-content :deep(code) {
+  padding: 2px 5px;
+  background-color: var(--el-fill-color-light, #f0f2f5);
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.ai-explanation-content :deep(pre) {
+  margin: 8px 0;
+  padding: 10px 12px;
+  background-color: var(--el-fill-color-light, #f0f2f5);
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.ai-explanation-content :deep(pre code) {
+  padding: 0;
+  background: none;
+}
+
+.ai-explanation-content :deep(blockquote) {
+  margin: 8px 0;
+  padding: 6px 12px;
+  border-left: 3px solid var(--el-color-primary);
+  background-color: var(--el-fill-color-lighter, #f5f7fa);
+  color: var(--el-text-color-secondary);
 }
 </style>

@@ -14,6 +14,9 @@
         </div>
       </div>
       <div class="header-actions">
+        <el-button @click="goLinkagePanorama" :icon="ConnectionIcon" size="default">
+          联动全景图
+        </el-button>
         <el-button :loading="loading" @click="refresh" :icon="RefreshIcon" size="default">
           刷新
         </el-button>
@@ -58,7 +61,7 @@
             <div class="module-card__header">全循环进度</div>
             <div class="module-card__body">
               <!-- TODO: CycleProgressRing.vue 组件（Task 3.3） -->
-              <div class="module-placeholder">CycleProgressRing</div>
+              <CycleProgressRing :cycle-progress="cycleProgress" />
             </div>
           </div>
         </el-col>
@@ -68,7 +71,7 @@
             <div class="module-card__header">Blocking VR 汇总</div>
             <div class="module-card__body">
               <!-- TODO: VRSummaryCard.vue 组件（Task 3.4） -->
-              <div class="module-placeholder">VRSummaryCard</div>
+              <VRSummaryCard :vr-summary="vrSummary" :error="data?.errors?.vr_summary || null" />
             </div>
           </div>
         </el-col>
@@ -82,7 +85,7 @@
             <div class="module-card__header">未解决复核意见</div>
             <div class="module-card__body">
               <!-- TODO: ReviewOpinionList.vue 组件（Task 3.5） -->
-              <div class="module-placeholder">ReviewOpinionList</div>
+              <ReviewOpinionList :open-reviews="openReviewsData" />
             </div>
           </div>
         </el-col>
@@ -104,7 +107,7 @@
             <div class="module-card__header">项目时间线</div>
             <div class="module-card__body">
               <!-- TODO: ProjectTimeline.vue 组件（Task 3.7） -->
-              <div class="module-placeholder">ProjectTimeline</div>
+              <ProjectTimeline :timeline="timeline" />
             </div>
           </div>
         </el-col>
@@ -132,14 +135,19 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { Refresh as RefreshIcon } from '@element-plus/icons-vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Refresh as RefreshIcon, Connection as ConnectionIcon } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDashboardData } from '@/composables/useDashboardData'
 import QuickEntryPanel from '@/components/dashboard/QuickEntryPanel.vue'
 import TrimmingOverview from '@/components/dashboard/TrimmingOverview.vue'
+import CycleProgressRing from '@/components/dashboard/CycleProgressRing.vue'
+import VRSummaryCard from '@/components/dashboard/VRSummaryCard.vue'
+import ReviewOpinionList from '@/components/dashboard/ReviewOpinionList.vue'
+import ProjectTimeline from '@/components/dashboard/ProjectTimeline.vue'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 
 const projectId = computed(() => route.params.projectId as string)
@@ -151,6 +159,10 @@ const {
   error,
   lastUpdated,
   refresh,
+  cycleProgress,
+  vrSummary,
+  openReviewsData,
+  timeline,
   trimmingOverview,
 } = useDashboardData(projectId)
 
@@ -191,6 +203,13 @@ function formatTime(isoStr: string): string {
   } catch {
     return isoStr
   }
+}
+
+function goLinkagePanorama() {
+  router.push({
+    name: 'LinkagePanorama',
+    params: { projectId: route.params.projectId as string },
+  })
 }
 </script>
 

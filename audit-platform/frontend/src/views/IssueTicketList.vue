@@ -54,18 +54,13 @@
       <el-table-column prop="created_at" label="创建时间" width="160">
         <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="80" align="center">
+      <el-table-column label="操作" width="140" align="center">
         <template #default="{ row }">
-          <el-button
-            v-if="row.status !== 'closed' && row.status !== 'rejected'"
-            v-permission="'ticket:close'"
-            type="danger"
-            size="small"
-            text
-            @click.stop="onCloseTicket(row)"
-          >
-            关闭
-          </el-button>
+          <GtRowActions
+            :actions="getTicketRowActions(row)"
+            :max-visible="2"
+            @action="(key: string) => handleTicketRowAction(key, row)"
+          />
         </template>
       </el-table-column>
     </el-table>
@@ -91,6 +86,8 @@ import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
 import { ISSUE_STATUS, ISSUE_SEVERITY, ISSUE_SOURCE } from '@/constants/statusEnum'
 import { handleApiError } from '@/utils/errorHandler'
+import GtRowActions from '@/components/common/GtRowActions.vue'
+import type { RowAction } from '@/components/common/GtRowActions.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -129,6 +126,26 @@ async function onCloseTicket(row: IssueTicket) {
     await loadData()
   } catch (e: any) {
     handleApiError(e, '关闭')
+  }
+}
+
+// ── GtRowActions 行操作 ──
+function getTicketRowActions(row: IssueTicket): RowAction[] {
+  const isClosed = row.status === 'closed' || row.status === 'rejected'
+  return [
+    { key: 'view', label: '查看', priority: 1 },
+    { key: 'close', label: '关闭', priority: 2, danger: true, disabled: isClosed, hidden: isClosed },
+  ]
+}
+
+function handleTicketRowAction(key: string, row: IssueTicket) {
+  switch (key) {
+    case 'view':
+      handleRowClick(row)
+      break
+    case 'close':
+      onCloseTicket(row)
+      break
   }
 }
 

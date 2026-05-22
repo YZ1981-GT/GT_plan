@@ -1,6 +1,6 @@
 # Spec 总索引
 
-**最后更新**：2026-05-20（v3.0 — 全部 11 审计循环 spec 100% 完成 548/548 tasks + B/C 联动补充 CW-382~400）
+**最后更新**：2026-05-21（v3.1 — 新增 Phase 1~4 全局建议书落地 spec 四件套，共 95 tasks）
 
 > 此索引追踪所有 spec 的状态、关联文档、commit。
 > **审计原则**：spec 不删，但标"演进/被取代/已合并"避免重复阅读。
@@ -34,6 +34,10 @@
 
 | Spec | 完成度 | 说明 |
 |------|-------|------|
+| `phase1-experience-gap-fix/` | 0/20 (0%) | 全局搜索+字号统一+面包屑+compact 工具栏+版本锁，5 天 |
+| `phase2-role-experience-boost/` | 0/22 (0%) | 签字 Gate+QC 热力图+批量操作+prefill diff+复核优先级，8 天 |
+| `phase3-system-enhancement/` | 0/30 (0%) | 双向穿透+LLM 接入+压测+暗色模式+Storybook，15 天 |
+| `phase4-long-term-governance/` | 0/23 (0%) | PG RLS+多年度对比+EQCR 快照+迁移回滚+Redis HA，18 天 |
 | `e2e-business-flow/` | 50/58 (86%) | 8 task 未标（含 UAT 真人验收类）|
 | `template-library-coordination/` | 63/64 (98%) | 剩 1 task（6.3 枚举字典 DB-backed）|
 | `audit-chain-generation/` | 92/101 (91%) | 9 task（UAT 真人验收类）|

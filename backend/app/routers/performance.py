@@ -16,6 +16,7 @@ from app.services.import_event_outbox_service import ImportEventOutboxService
 from app.services.import_ops_audit_service import ImportOpsAuditService
 from app.services.import_slo_service import ImportSLOService
 from app.services.performance_monitor import performance_monitor
+from app.services.llm_metrics import llm_metrics
 
 router = APIRouter(prefix="/api/admin", tags=["performance"])
 
@@ -144,3 +145,17 @@ async def replay_import_events(
             error=str(exc),
         )
         raise
+
+
+@router.get("/llm-metrics")
+async def get_llm_metrics(
+    current_user: User = Depends(get_current_user),
+):
+    """获取 LLM 调用监控指标（仅 admin）。
+
+    返回：total_calls / success_count / failure_count / avg_duration_ms / total_tokens / recent_calls (last 100)
+    """
+    if current_user.role.value != "admin":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="仅管理员可访问 LLM 指标")
+    return llm_metrics.get_metrics()

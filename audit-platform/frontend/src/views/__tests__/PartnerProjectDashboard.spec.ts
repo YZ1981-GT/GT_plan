@@ -56,6 +56,11 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({
     params: { projectId: 'proj-test-001' },
   }),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
 }))
 
 // ─── Mock child components ───────────────────────────────────────────────────
@@ -68,10 +73,27 @@ vi.mock('@/components/dashboard/TrimmingOverview.vue', () => ({
   default: { template: '<div class="mock-trimming-overview">TrimmingOverview</div>' },
 }))
 
+vi.mock('@/components/dashboard/CycleProgressRing.vue', () => ({
+  default: { template: '<div class="mock-cycle-progress-ring">CycleProgressRing</div>' },
+}))
+
+vi.mock('@/components/dashboard/VRSummaryCard.vue', () => ({
+  default: { template: '<div class="mock-vr-summary">VRSummaryCard</div>' },
+}))
+
+vi.mock('@/components/dashboard/ReviewOpinionList.vue', () => ({
+  default: { template: '<div class="mock-review-opinion">ReviewOpinionList</div>' },
+}))
+
+vi.mock('@/components/dashboard/ProjectTimeline.vue', () => ({
+  default: { template: '<div class="mock-project-timeline">ProjectTimeline</div>' },
+}))
+
 // ─── Mock Element Plus icons ─────────────────────────────────────────────────
 
 vi.mock('@element-plus/icons-vue', () => ({
   Refresh: { template: '<i class="mock-refresh-icon" />' },
+  Connection: { template: '<i class="mock-connection-icon" />' },
 }))
 
 // ─── Import component under test ────────────────────────────────────────────

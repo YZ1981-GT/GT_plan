@@ -80,8 +80,9 @@ withDefaults(defineProps<{
    * 外观变体
    * - 'banner'：用于紫色横幅内，按钮为白色半透明风格
    * - 'default'：用于普通白色背景，按钮为标准 Element Plus 风格
+   * - 'compact'：单行紧凑模式（高度 36px），左侧 slot + 右侧 slot 同行
    */
-  variant?: 'banner' | 'default'
+  variant?: 'banner' | 'default' | 'compact'
   /** 显示复制整表按钮 */
   showCopy?: boolean
   /** 显示全屏按钮 */
@@ -176,5 +177,23 @@ defineEmits<{
 /* default 模式：普通背景，使用 Element Plus 默认按钮样式（不覆盖） */
 .gt-toolbar--default .el-button {
   /* 继承 Element Plus 默认样式，不做覆盖 */
+}
+
+/* compact 模式：单行紧凑布局（Phase 1 F4） */
+.gt-toolbar--compact {
+  height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid #e4e7ed;
+  background: #fff;
+}
+
+.gt-toolbar--compact .gt-toolbar__left,
+.gt-toolbar--compact .gt-toolbar__right {
+  gap: 4px;
+}
+
+.gt-toolbar--compact .el-button {
+  padding: 4px 8px;
+  font-size: 12px;
 }
 </style>

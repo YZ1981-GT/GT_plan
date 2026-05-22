@@ -90,6 +90,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { confirmationApi } from '@/services/collaborationApi'
 import { fmtAmount } from '@/utils/formatters'
+import { useDecimalCalc } from '@/composables/useDecimalCalc'
 
 const projectId = 'current-project-id'
 
@@ -120,14 +121,15 @@ const statusType = (s: string) => statusTypeMap[s] || 'info'
 
 const confirmations = ref<any[]>([])
 const summaryRows = ref<any[]>([])
+const { sum: decSum, div: decDiv, mul: decMul } = useDecimalCalc()
 
 const stats = computed(() => {
   const total = confirmations.value.length
   const received = confirmations.value.filter((c) => c.status === 'RECEIVED').length
   const responseRate = total > 0 ? Math.round((received / total) * 100) : 0
-  const totalAmount = confirmations.value.reduce((s: number, c: any) => s + (c.amount || 0), 0)
-  const confirmedAmount = confirmations.value.reduce((s: number, c: any) => s + (c.confirmed_amount || 0), 0)
-  const coverageRate = totalAmount > 0 ? Math.round((confirmedAmount / totalAmount) * 100) : 0
+  const totalAmount = Number(decSum(...confirmations.value.map((c: any) => String(c.amount || 0))))
+  const confirmedAmount = Number(decSum(...confirmations.value.map((c: any) => String(c.confirmed_amount || 0))))
+  const coverageRate = totalAmount > 0 ? Math.round(Number(decMul(decDiv(String(confirmedAmount), String(totalAmount)), '100'))) : 0
   return { total, received, responseRate, totalAmount, confirmedAmount, coverageRate }
 })
 

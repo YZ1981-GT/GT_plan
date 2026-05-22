@@ -437,9 +437,11 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDecimalCalc } from '@/composables/useDecimalCalc'
 
 const route = useRoute()
 const router = useRouter()
+const { mul: decMul, div: decDiv } = useDecimalCalc()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
 
@@ -677,10 +679,10 @@ async function loadDrillDownData() {
       const directRows: any[] = []
       for (const comp of companies) {
         const ratio = comp.non_common_ratio || comp.common_ratio || comp.no_consol_ratio || 0
-        const amount = totalVal ? Math.round(totalVal * (ratio / 100) * 100) / 100 : null
+        const amount = totalVal ? Number(decMul(String(totalVal), String(ratio / 100))) : null
         directRows.push({
           company_name: comp.company_name, company_code: comp.company_code,
-          amount, ratio: totalVal && amount ? Math.round(((amount / totalVal) * 100) * 100) / 100 : 0,
+          amount, ratio: totalVal && amount ? Number(decMul(decDiv(String(amount), String(totalVal)), '100')) : 0,
           source: '按持股比例估算', parent_name: comp.indirect_holder || '母公司',
         })
       }

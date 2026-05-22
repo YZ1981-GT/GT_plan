@@ -119,6 +119,14 @@
 
         <!-- EQCR 独立复核工作台入口（partner/admin 可见，Round 5） -->
         <slot name="nav-eqcr" />
+
+        <!-- Phase 3 F4: 暗色模式切换按钮 -->
+        <el-tooltip :content="isDark ? '切换到浅色模式' : '切换到暗色模式'" placement="bottom">
+          <div class="gt-topbar-btn gt-theme-toggle" @click="toggleTheme">
+            <span class="gt-theme-icon">{{ isDark ? '☀️' : '🌙' }}</span>
+          </div>
+        </el-tooltip>
+
         <el-dropdown trigger="click">
           <div class="gt-user-info">
             <el-avatar :size="30" class="gt-avatar">
@@ -321,6 +329,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useRoleContextStore } from '@/stores/roleContext'
+import { useTheme } from '@/composables/useTheme'
 import { ElMessage, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import {
@@ -332,7 +341,7 @@ import {
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
 import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
-import { eventBus } from '@/utils/eventBus'
+import { eventBus, type SyncEventPayload } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
 import { createSSE, type SSEConnection } from '@/utils/sse'
 import { events as eventPaths } from '@/services/apiPaths'
@@ -342,6 +351,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const displayPrefs = useDisplayPrefsStore()
+const { isDark, toggle: toggleTheme } = useTheme()
 
 // ── Props ──
 const props = defineProps<{
@@ -752,10 +762,11 @@ function connectSSE(projectId: string) {
 
   sseConnection.onMessage((data, _event) => {
     if (!data || !data.event_type) return
-    if (data.event_type === 'sync.failed') {
-      eventBus.emit('sse:sync-failed', data)
+    const payload = data as SyncEventPayload
+    if (payload.event_type === 'sync.failed') {
+      eventBus.emit('sse:sync-failed', payload)
     } else {
-      eventBus.emit('sse:sync-event', data)
+      eventBus.emit('sse:sync-event', payload)
     }
   })
 
@@ -893,6 +904,15 @@ onUnmounted(() => {
   transition: background 0.15s ease;
 }
 .gt-topbar-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.gt-theme-toggle {
+  font-size: 16px;
+}
+.gt-theme-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
 .gt-topbar-text-icon {
   font-size: var(--gt-font-size-sm);
   font-weight: 600;

@@ -147,22 +147,186 @@
   --gt-marker-review-mark-question: #FFC23D;          /* 复核有疑问标记色（橙） */
 }
 
-/* ══ 10.10 暗色模式 CSS 变量映射（预留） ══ */
-@media (prefers-color-scheme: dark) {
-  :root.gt-dark {
-    --gt-color-primary: #A06DFF;
-    --gt-color-primary-light: #c4a8e8;
-    --gt-color-primary-bg: #1a1035;
-    --gt-color-primary-dark: #7c5baa;
-    --gt-color-text: #e5e5ea;
-    --gt-color-text-secondary: #a1a1a6;
-    --gt-color-text-tertiary: #6e6e73;
-    --gt-color-border: #38383a;
-    --gt-color-border-light: #2c2c2e;
-    --gt-color-bg: #1c1c1e;
-    --gt-color-bg-white: #2c2c2e;
-    --gt-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.3);
-    --gt-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-    --gt-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+/* ══ 10.10 暗色模式 CSS 变量映射 ══ */
+/* html.dark 由 useTheme composable 切换，不依赖 prefers-color-scheme */
+/* 切换动画：200ms transition（background-color + color） */
+html {
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+/* WCAG AA: 正文文字与背景对比度 ≥ 4.5:1 */
+/* #e0e0e0 on #1a1a2e = 11.3:1 ✓ | #a0a0a0 on #1a1a2e = 5.7:1 ✓ */
+html.dark {
+  /* ── 品牌色系 ── */
+  --gt-color-primary: #a87de0;
+  --gt-color-primary-light: #c4a8e8;
+  --gt-color-primary-lighter: #7b5ba8;
+  --gt-color-primary-bg: #1a1035;
+  --gt-color-primary-dark: #c9a5f5;
+  --gt-color-teal: #33c4d9;
+  --gt-color-teal-light: #0d2a30;
+  --gt-color-coral: #ff7b74;
+  --gt-color-coral-light: #2d1515;
+  --gt-color-wheat: #ffd06a;
+  --gt-color-wheat-light: #2d2510;
+  --gt-color-success: #4cd964;
+  --gt-color-success-light: #0d2d14;
+
+  /* ── 渐变预设 ── */
+  --gt-gradient-primary: linear-gradient(135deg, #2B1D4D 0%, #4b2d77 50%, #7b5ba8 100%);
+  --gt-gradient-teal: linear-gradient(135deg, #0d2a30 0%, #007a94 50%, #0094B3 100%);
+  --gt-gradient-coral: linear-gradient(135deg, #2d1515 0%, #d93a33 50%, #FF5149 100%);
+  --gt-gradient-success: linear-gradient(135deg, #0d2d14 0%, #1e8a38 50%, #28A745 100%);
+  --gt-gradient-warm: linear-gradient(135deg, #2B1D4D 0%, #007a94 100%);
+  --gt-gradient-surface: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  --gt-gradient-sidebar: linear-gradient(180deg, #16213e 0%, #1a1a2e 100%);
+
+  /* ── 中性色（文字/背景/边框） ── */
+  --gt-color-text: #e0e0e0;
+  --gt-color-text-secondary: #a0a0a0;
+  --gt-color-text-tertiary: #858585;
+  --gt-color-border: #2a2a4a;
+  --gt-color-border-light: #222240;
+  --gt-color-bg: #1a1a2e;
+  --gt-color-bg-white: #16213e;
+  --gt-color-bg-elevated: #1f1f3a;
+
+  /* ── 焦点色 ── */
+  --gt-color-focus: #c4a8e8;
+  --gt-focus-ring: 0 0 0 2px rgba(196, 168, 232, 0.5);
+
+  /* ── 灰度文字梯度 ── */
+  --gt-color-text-primary: #e0e0e0;
+  --gt-color-text-regular: #c0c0c0;
+  --gt-color-text-placeholder: #5a5a7a;
+  --gt-color-text-disabled: #4a4a6a;
+  --gt-color-text-inverse: #1a1a2e;
+  --gt-color-text-on-dark: #e0e0e0;
+  --gt-color-info: #7a7a9a;
+
+  /* ── 边框梯度 ── */
+  --gt-color-border-lighter: #252545;
+  --gt-color-border-purple: #3a2a5a;
+  --gt-color-border-purple-mid: #4a3a6a;
+  --gt-color-border-purple-light: #5a4a7a;
+  --gt-color-border-success: #1a4a2a;
+  --gt-color-border-warning: #4a3a1a;
+  --gt-color-border-danger: #4a1a1a;
+  --gt-color-border-info: #1a3a4a;
+  --gt-color-bg-purple-hover: #252545;
+
+  /* ── 6 级背景 token ── */
+  --gt-bg-default: #1a1a2e;
+  --gt-bg-subtle: #1f1f3a;
+  --gt-bg-info: #0d1a2d;
+  --gt-bg-warning: #2d2510;
+  --gt-bg-success: #0d2d14;
+  --gt-bg-danger: #2d1515;
+
+  /* ── 阴影（暗色模式用更深阴影） ── */
+  --gt-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --gt-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.3);
+  --gt-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --gt-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --gt-shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.6);
+
+  /* ── 底稿视觉标记色 ── */
+  --gt-marker-ai-bg: rgba(160, 109, 255, 0.15);
+  --gt-marker-ai-border: #a87de0;
+  --gt-marker-review-bg: #2d1515;
+  --gt-marker-review-border: #ff7b74;
+  --gt-marker-review-replied: #33c4d9;
+  --gt-marker-audited-bg: #0d2d14;
+  --gt-marker-audited-border: #4cd964;
+  --gt-marker-formula-bg: #0d2a30;
+  --gt-marker-manual-bg: #1f1f3a;
+
+  /* ── 预填充来源标记色 ── */
+  --gt-marker-prefill-tb: #0d1a2d;
+  --gt-marker-prefill-aje: #0d2d14;
+  --gt-marker-prefill-prev: #1a1035;
+  --gt-marker-prefill-wp: #0d2a30;
+  --gt-marker-prefill-error: #ff7b74;
+  --gt-marker-override-bg: #2d2510;
+  --gt-marker-review-mark-ok: #4cd964;
+  --gt-marker-review-mark-question: #ffd06a;
+
+  /* ── 表格专用（design.md 指定） ── */
+  --gt-table-header-bg: #1f1f3a;
+  --gt-table-row-hover: #252545;
+  --gt-table-row-selected: #1a3a5c;
+}
+
+/* ══ 暗色模式打印强制 light 主题 ══ */
+@media print {
+  html.dark {
+    --gt-color-primary: #4b2d77;
+    --gt-color-primary-light: #A06DFF;
+    --gt-color-primary-lighter: #c4a8e8;
+    --gt-color-primary-bg: #f4f0fa;
+    --gt-color-primary-dark: #2B1D4D;
+    --gt-color-teal: #0094B3;
+    --gt-color-teal-light: #e6f7fa;
+    --gt-color-coral: #FF5149;
+    --gt-color-coral-light: #fff0ef;
+    --gt-color-wheat: #FFC23D;
+    --gt-color-wheat-light: #fff8e6;
+    --gt-color-success: #28A745;
+    --gt-color-success-light: #edf7ef;
+    --gt-gradient-primary: linear-gradient(135deg, #4b2d77 0%, #6b42a8 50%, #A06DFF 100%);
+    --gt-gradient-surface: linear-gradient(180deg, #ffffff 0%, #f8f7fc 100%);
+    --gt-gradient-sidebar: linear-gradient(180deg, #f8f7fc 0%, #f0edf5 100%);
+    --gt-color-text: #1d1d1f;
+    --gt-color-text-secondary: #6e6e73;
+    --gt-color-text-tertiary: #999;
+    --gt-color-border: #e5e5ea;
+    --gt-color-border-light: #f0f0f5;
+    --gt-color-bg: #f5f4f9;
+    --gt-color-bg-white: #ffffff;
+    --gt-color-bg-elevated: #faf9fd;
+    --gt-color-text-primary: #303133;
+    --gt-color-text-regular: #606266;
+    --gt-color-text-placeholder: #c0c4cc;
+    --gt-color-text-disabled: #c0c4cc;
+    --gt-color-text-inverse: #ffffff;
+    --gt-color-text-on-dark: #ffffff;
+    --gt-color-info: #909399;
+    --gt-color-border-lighter: #ebeef5;
+    --gt-color-border-purple: #e8e4f0;
+    --gt-color-border-purple-mid: #d9d2e8;
+    --gt-color-border-purple-light: #d8b8ee;
+    --gt-color-border-success: #b8d8b8;
+    --gt-color-border-warning: #f5d4a8;
+    --gt-color-border-danger: #f5c6c6;
+    --gt-color-border-info: #b3d9f0;
+    --gt-color-bg-purple-hover: #faf8fd;
+    --gt-bg-default: #ffffff;
+    --gt-bg-subtle: #f5f7fa;
+    --gt-bg-info: #ecf5ff;
+    --gt-bg-warning: #fdf6ec;
+    --gt-bg-success: #f0f9eb;
+    --gt-bg-danger: #fef0f0;
+    --gt-shadow-xs: 0 1px 2px rgba(75, 45, 119, 0.04);
+    --gt-shadow-sm: 0 1px 4px rgba(75, 45, 119, 0.075);
+    --gt-shadow-md: 0 4px 12px rgba(75, 45, 119, 0.15);
+    --gt-shadow-lg: 0 8px 24px rgba(75, 45, 119, 0.175);
+    --gt-shadow-xl: 0 16px 48px rgba(75, 45, 119, 0.2);
+    --gt-marker-ai-bg: rgba(75, 45, 119, 0.08);
+    --gt-marker-ai-border: #A06DFF;
+    --gt-marker-review-bg: #fff0ef;
+    --gt-marker-review-border: #FF5149;
+    --gt-marker-review-replied: #0094B3;
+    --gt-marker-audited-bg: #edf7ef;
+    --gt-marker-audited-border: #28A745;
+    --gt-marker-formula-bg: #e6f7fa;
+    --gt-marker-manual-bg: #ffffff;
+    --gt-marker-prefill-tb: #E3F2FD;
+    --gt-marker-prefill-aje: #E8F5E9;
+    --gt-marker-prefill-prev: #F3E5F5;
+    --gt-marker-prefill-wp: #E0F7FA;
+    --gt-marker-prefill-error: #FF5149;
+    --gt-marker-override-bg: #FFF8E1;
+    --gt-marker-review-mark-ok: #28A745;
+    --gt-marker-review-mark-question: #FFC23D;
   }
 }

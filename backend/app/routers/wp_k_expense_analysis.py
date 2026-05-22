@@ -15,11 +15,18 @@ POST /api/projects/{project_id}/workpapers/{wp_id}/k8/expense-analysis
 写回模式：parsed_data.expense_analysis[sheet] = {wp_code, applied_at, data}
 is_llm_stub 由 settings.WP_AI_SERVICE_ENABLED 驱动。
 
-对应 spec：workpaper-k-admin-cycle K-F7 / ADR-K4
+LLM 接入（Phase 3 F2）：
+  - WP_AI_SERVICE_ENABLED=True 时，规则引擎执行后调用 LLM 生成自然语言解释
+  - Prompt 包含：规则结果 + 科目名称 + 行业数据
+  - LLM 输出：异常原因分析(≤200字) + 建议审计程序(≤3条) + 风险等级判断
+  - LLM 失败时降级：返回规则结果 + is_llm_stub=True + "AI 分析暂不可用"
+
+对应 spec：workpaper-k-admin-cycle K-F7 / ADR-K4 / phase3-system-enhancement F2.1~F2.4
 """
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Literal
@@ -33,6 +40,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.deps import require_project_access
+from app.services.llm_service import LLMService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/workpapers/{wp_id}/k8",
@@ -95,6 +105,7 @@ class ExpenseAnalysisResponse(BaseModel):
     industry_comparison: dict[str, IndustryComparisonItem] | None
     anomaly_flags: list[str]
     summary: str
+    ai_explanation: str | None = None
     is_llm_stub: bool
     applied_to_sheet: str | None = None
     applied_at: str | None = None
@@ -261,6 +272,170 @@ def _validate_request(payload: ExpenseAnalysisRequest) -> None:
             )
 
 
+# ─── LLM Prompt Builder ──────────────────────────────────────────────────────
+
+_EXPENSE_SYSTEM_PROMPT = (
+    "你是一位资深审计师，请基于以下费用异常分析数据，给出专业的审计判断。"
+)
+
+_EXPENSE_USER_PROMPT_TEMPLATE = """\
+## 费用异常分析数据
+
+### 基本信息
+- 底稿类型：{wp_name}（{wp_code}）
+- 费用类别数：{category_count}
+- 异常标记数：{anomaly_count}
+
+### 同比变动（YoY）
+{yoy_section}
+
+### 预算差异
+{budget_section}
+
+### 行业对比
+{industry_section}
+
+---
+
+请按以下格式输出：
+
+**异常原因分析**（≤200字）：
+分析上述异常的可能原因。
+
+**建议审计程序**（≤3条）：
+1. ...
+2. ...
+3. ...
+
+**风险等级判断**：
+高/中/低，并简要说明理由。
+"""
+
+
+def _build_expense_prompt(
+    wp_code: str,
+    yoy: dict[str, dict[str, Any]],
+    budget: dict[str, dict[str, Any]] | None,
+    industry: dict[str, dict[str, Any]] | None,
+    anomaly_flags: list[str],
+) -> str:
+    """构建 LLM 用户提示词：规则结果 + 科目名称 + 行业数据 → 自然语言解释请求
+
+    Requirements: F2.2
+    """
+    name_map = {"K8": "销售费用", "K9": "管理费用"}
+    wp_name = name_map.get(wp_code, wp_code)
+
+    # YoY section
+    yoy_lines = []
+    for cat, info in yoy.items():
+        flag_label = {
+            "normal": "正常",
+            "increase_anomaly": "⚠ 异常增加",
+            "decrease_anomaly": "⚠ 异常减少",
+            "new_category": "新增类别",
+        }.get(info["flag"], info["flag"])
+        rate_str = (
+            f"{info['rate_change']:.1%}" if info["rate_change"] < 999 else "新增"
+        )
+        yoy_lines.append(
+            f"- {cat}：变动额 {info['amount_change']:,.2f}，变动率 {rate_str}，状态 {flag_label}"
+        )
+    yoy_section = "\n".join(yoy_lines) if yoy_lines else "无数据"
+
+    # Budget section
+    if budget:
+        budget_lines = []
+        for cat, info in budget.items():
+            flag_label = {
+                "normal": "正常",
+                "overrun": "⚠ 超支",
+                "underrun": "⚠ 节余过多",
+                "no_budget": "无预算",
+            }.get(info["flag"], info["flag"])
+            rate_str = (
+                f"{info['variance_rate']:.1%}"
+                if info["variance_rate"] < 999
+                else "无预算"
+            )
+            budget_lines.append(
+                f"- {cat}：差异额 {info['variance_amount']:,.2f}，差异率 {rate_str}，状态 {flag_label}"
+            )
+        budget_section = "\n".join(budget_lines)
+    else:
+        budget_section = "未提供预算数据"
+
+    # Industry section
+    if industry:
+        industry_lines = []
+        for cat, info in industry.items():
+            flag_label = {
+                "normal": "正常",
+                "above_industry": "⚠ 高于行业",
+                "below_industry": "⚠ 低于行业",
+            }.get(info["flag"], info["flag"])
+            industry_lines.append(
+                f"- {cat}：项目占比 {info['project_rate']:.1%}，"
+                f"行业均值 {info['industry_avg_rate']:.1%}，"
+                f"偏差 {info['deviation']:.1%}，状态 {flag_label}"
+            )
+        industry_section = "\n".join(industry_lines)
+    else:
+        industry_section = "未提供行业对比数据"
+
+    return _EXPENSE_USER_PROMPT_TEMPLATE.format(
+        wp_name=wp_name,
+        wp_code=wp_code,
+        category_count=len(yoy),
+        anomaly_count=len(anomaly_flags),
+        yoy_section=yoy_section,
+        budget_section=budget_section,
+        industry_section=industry_section,
+    )
+
+
+async def _call_llm_for_explanation(
+    yoy: dict[str, dict[str, Any]],
+    budget: dict[str, dict[str, Any]] | None,
+    industry: dict[str, dict[str, Any]] | None,
+    anomaly_flags: list[str],
+    wp_code: str,
+) -> tuple[str | None, bool]:
+    """调用 LLM 生成费用异常分析的自然语言解释
+
+    Returns:
+        (ai_explanation, is_llm_stub)
+        - LLM 成功: (explanation_text, False)
+        - LLM 失败: (None, True)
+
+    Requirements: F2.1, F2.3, F2.4
+    """
+    prompt = _build_expense_prompt(wp_code, yoy, budget, industry, anomaly_flags)
+    llm = LLMService()
+    llm_response = await llm.generate(
+        system_prompt=_EXPENSE_SYSTEM_PROMPT,
+        user_prompt=prompt,
+        temperature=0.3,
+        max_tokens=2000,
+        timeout=30.0,
+    )
+    if not llm_response.is_stub:
+        logger.info(
+            "K expense LLM explanation generated: wp_code=%s tokens=%d duration_ms=%.1f",
+            wp_code,
+            llm_response.tokens_used,
+            llm_response.duration_ms,
+        )
+        return llm_response.content, False
+    else:
+        logger.warning(
+            "K expense LLM call failed: wp_code=%s error=%s",
+            wp_code,
+            llm_response.error,
+        )
+        return None, True
+
+
 # ─── Main Endpoint ────────────────────────────────────────────────────────────
 
 
@@ -304,6 +479,20 @@ async def k_expense_analysis(
 
     is_llm_stub = not getattr(settings, "WP_AI_SERVICE_ENABLED", False)
 
+    # LLM 生成解释（新增 — Phase 3 F2）
+    ai_explanation: str | None = None
+    if settings.WP_AI_SERVICE_ENABLED:
+        llm_text, llm_failed = await _call_llm_for_explanation(
+            yoy, budget, industry, flags, payload.wp_code
+        )
+        if not llm_failed:
+            ai_explanation = llm_text
+            is_llm_stub = False
+        else:
+            # LLM 失败 → 降级：保留规则结果 + is_llm_stub=True + 降级提示
+            is_llm_stub = True
+            ai_explanation = "AI 分析暂不可用，当前显示规则引擎结果。"
+
     summary = _build_summary(payload.wp_code, yoy, len(flags), is_llm_stub)
 
     # 写回
@@ -336,6 +525,7 @@ async def k_expense_analysis(
         ),
         anomaly_flags=flags,
         summary=summary,
+        ai_explanation=ai_explanation,
         is_llm_stub=is_llm_stub,
         applied_to_sheet=applied_to_sheet,
         applied_at=applied_at,

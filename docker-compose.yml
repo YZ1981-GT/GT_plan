@@ -56,7 +56,7 @@ services:
 
   # ----------------------------------------------------------
 
-  # Redis 7
+  # Redis 7 — Master
 
   # ----------------------------------------------------------
 
@@ -87,6 +87,238 @@ services:
       retries: 5
 
       start_period: 5s
+
+
+
+  # ----------------------------------------------------------
+
+  # Redis Replica 1
+
+  # ----------------------------------------------------------
+
+  redis-replica-1:
+
+    image: redis:7-alpine
+
+    container_name: audit-redis-replica-1
+
+    restart: unless-stopped
+
+    command: redis-server --replicaof redis 6379
+
+    ports:
+
+      - "6380:6379"
+
+    depends_on:
+
+      redis:
+
+        condition: service_healthy
+
+    healthcheck:
+
+      test: ["CMD", "redis-cli", "ping"]
+
+      interval: 5s
+
+      timeout: 5s
+
+      retries: 5
+
+      start_period: 5s
+
+    profiles:
+
+      - redis-ha
+
+
+
+  # ----------------------------------------------------------
+
+  # Redis Replica 2
+
+  # ----------------------------------------------------------
+
+  redis-replica-2:
+
+    image: redis:7-alpine
+
+    container_name: audit-redis-replica-2
+
+    restart: unless-stopped
+
+    command: redis-server --replicaof redis 6379
+
+    ports:
+
+      - "6381:6379"
+
+    depends_on:
+
+      redis:
+
+        condition: service_healthy
+
+    healthcheck:
+
+      test: ["CMD", "redis-cli", "ping"]
+
+      interval: 5s
+
+      timeout: 5s
+
+      retries: 5
+
+      start_period: 5s
+
+    profiles:
+
+      - redis-ha
+
+
+
+  # ----------------------------------------------------------
+
+  # Redis Sentinel 1
+
+  # ----------------------------------------------------------
+
+  sentinel-1:
+
+    image: redis:7-alpine
+
+    container_name: audit-sentinel-1
+
+    restart: unless-stopped
+
+    command: redis-sentinel /etc/sentinel.conf
+
+    ports:
+
+      - "26379:26379"
+
+    volumes:
+
+      - ./docker/sentinel.conf:/etc/sentinel.conf
+
+    depends_on:
+
+      redis:
+
+        condition: service_healthy
+
+    healthcheck:
+
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+
+      interval: 5s
+
+      timeout: 5s
+
+      retries: 5
+
+      start_period: 10s
+
+    profiles:
+
+      - redis-ha
+
+
+
+  # ----------------------------------------------------------
+
+  # Redis Sentinel 2
+
+  # ----------------------------------------------------------
+
+  sentinel-2:
+
+    image: redis:7-alpine
+
+    container_name: audit-sentinel-2
+
+    restart: unless-stopped
+
+    command: redis-sentinel /etc/sentinel.conf
+
+    ports:
+
+      - "26380:26379"
+
+    volumes:
+
+      - ./docker/sentinel.conf:/etc/sentinel.conf
+
+    depends_on:
+
+      redis:
+
+        condition: service_healthy
+
+    healthcheck:
+
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+
+      interval: 5s
+
+      timeout: 5s
+
+      retries: 5
+
+      start_period: 10s
+
+    profiles:
+
+      - redis-ha
+
+
+
+  # ----------------------------------------------------------
+
+  # Redis Sentinel 3
+
+  # ----------------------------------------------------------
+
+  sentinel-3:
+
+    image: redis:7-alpine
+
+    container_name: audit-sentinel-3
+
+    restart: unless-stopped
+
+    command: redis-sentinel /etc/sentinel.conf
+
+    ports:
+
+      - "26381:26379"
+
+    volumes:
+
+      - ./docker/sentinel.conf:/etc/sentinel.conf
+
+    depends_on:
+
+      redis:
+
+        condition: service_healthy
+
+    healthcheck:
+
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+
+      interval: 5s
+
+      timeout: 5s
+
+      retries: 5
+
+      start_period: 10s
+
+    profiles:
+
+      - redis-ha
 
 
 

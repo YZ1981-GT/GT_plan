@@ -6,8 +6,9 @@
 - GET  /api/reports/{project_id}/{year}/{report_type} — 获取指定报表数据
 - GET  /api/reports/{project_id}/{year}/{report_type}/drilldown/{row_code} — 穿透查询
 - GET  /api/reports/{project_id}/{year}/{report_type}/export-excel — 导出Excel
+- GET  /api/projects/{pid}/reports/line-composition?line_code={line_code} — 报表行构成科目
 
-Validates: Requirements 2.1-2.10
+Validates: Requirements 2.1-2.10, F1.2
 """
 
 from __future__ import annotations
@@ -276,3 +277,256 @@ async def export_report_excel(
         )
     except ImportError:
         raise HTTPException(status_code=500, detail="openpyxl 未安装，无法导出 Excel")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 3 F1.2: 报表行构成科目 API（项目级路由）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+from pydantic import BaseModel
+
+from app.models.audit_platform_models import ReportLineMapping, TbBalance
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 4 F2: 多年度对比分析 API
+# ═══════════════════════════════════════════════════════════════════════════════
+
+multi_year_router = APIRouter(
+    prefix="/api/projects/{project_id}/reports",
+    tags=["multi-year-compare"],
+)
+
+
+class MultiYearRow(BaseModel):
+    """多年度对比行"""
+    line_code: str
+    item_name: str
+    values: dict[str, float | None]  # year -> amount
+    yoy_changes: dict[str, float | None]  # year -> change_pct
+
+
+class MultiYearResponse(BaseModel):
+    """多年度对比响应"""
+    years: list[int]
+    report_type: str
+    rows: list[MultiYearRow]
+
+
+def _calc_yoy(current: float | None, previous: float | None) -> float | None:
+    """计算同比变动率: (current - previous) / abs(previous) * 100
+
+    处理除零: previous 为 0 或 None 时返回 None
+    """
+    if current is None or previous is None:
+        return None
+    if previous == 0:
+        return None
+    return round((current - previous) / abs(previous) * 100, 2)
+
+
+@multi_year_router.get("/multi-year", response_model=MultiYearResponse)
+async def get_multi_year_report(
+    project_id: UUID,
+    years: str = Query(..., description="逗号分隔的年度列表，如 2023,2024,2025"),
+    report_type: FinancialReportType = Query(..., description="报表类型"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """多年度对比查询 API
+
+    查询同一项目不同年度的报表数据，计算 YoY 变动率。
+    最多支持 5 年并列。
+
+    Requirements: F2.1~F2.4
+    """
+    # 解析年度列表
+    try:
+        year_list = sorted([int(y.strip()) for y in years.split(",") if y.strip()])
+    except ValueError:
+        raise HTTPException(status_code=400, detail="年度参数格式错误，请使用逗号分隔的数字")
+
+    if len(year_list) < 1:
+        raise HTTPException(status_code=400, detail="至少需要选择 1 个年度")
+    if len(year_list) > 5:
+        raise HTTPException(status_code=400, detail="最多支持 5 年对比")
+
+    # 查询所有年度的报表数据
+    result = await db.execute(
+        sa.select(FinancialReport)
+        .where(
+            FinancialReport.project_id == project_id,
+            FinancialReport.year.in_(year_list),
+            FinancialReport.report_type == report_type,
+            FinancialReport.is_deleted == sa.false(),
+        )
+        .order_by(FinancialReport.row_code, FinancialReport.year)
+    )
+    all_rows = result.scalars().all()
+
+    # 按 row_code 分组
+    row_map: dict[str, dict[int, FinancialReport]] = {}
+    row_names: dict[str, str] = {}
+    row_order: list[str] = []
+
+    for row in all_rows:
+        code = row.row_code
+        if code not in row_map:
+            row_map[code] = {}
+            row_order.append(code)
+        row_map[code][row.year] = row
+        if code not in row_names:
+            row_names[code] = row.row_name or code
+
+    # 构建响应
+    response_rows: list[MultiYearRow] = []
+    for code in row_order:
+        year_data = row_map[code]
+        values: dict[str, float | None] = {}
+        yoy_changes: dict[str, float | None] = {}
+
+        for yr in year_list:
+            report_row = year_data.get(yr)
+            amount = float(report_row.current_period_amount) if report_row and report_row.current_period_amount is not None else None
+            values[str(yr)] = amount
+
+        # 计算 YoY（从第二年开始）
+        for i in range(1, len(year_list)):
+            current_yr = year_list[i]
+            prev_yr = year_list[i - 1]
+            current_val = values.get(str(current_yr))
+            prev_val = values.get(str(prev_yr))
+            yoy_changes[str(current_yr)] = _calc_yoy(current_val, prev_val)
+
+        response_rows.append(MultiYearRow(
+            line_code=code,
+            item_name=row_names[code],
+            values=values,
+            yoy_changes=yoy_changes,
+        ))
+
+    return MultiYearResponse(
+        years=year_list,
+        report_type=report_type.value,
+        rows=response_rows,
+    )
+
+
+line_composition_router = APIRouter(
+    prefix="/api/projects/{project_id}/reports",
+    tags=["report-line-composition"],
+)
+
+
+class LineCompositionAccount(BaseModel):
+    """构成科目条目"""
+    code: str
+    name: str
+    closing_balance: float
+    pct: float
+
+
+class LineCompositionResponse(BaseModel):
+    """报表行构成科目响应"""
+    line_code: str
+    item_name: str
+    total_amount: float
+    accounts: list[LineCompositionAccount]
+
+
+@line_composition_router.get("/line-composition", response_model=LineCompositionResponse)
+async def get_line_composition(
+    project_id: UUID,
+    line_code: str = Query(..., description="报表行次代码，如 BS-001"),
+    year: int | None = Query(None, description="年度，默认取最新年度"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """查询报表行的构成科目列表。
+
+    根据 report_line_mapping 获取该行对应的科目编号列表，
+    再查询 tb_balance 获取各科目余额，计算各科目占比(pct)，
+    按金额降序返回。
+
+    Requirements: F1.2
+    """
+    # 1. 确定年度：如果未指定，取该项目 tb_balance 最新年度
+    if year is None:
+        year_result = await db.execute(
+            sa.select(sa.func.max(TbBalance.year)).where(
+                TbBalance.project_id == project_id,
+                TbBalance.is_deleted == sa.false(),
+            )
+        )
+        year = year_result.scalar_one_or_none()
+        if year is None:
+            raise HTTPException(
+                status_code=404,
+                detail="该项目无试算平衡表数据",
+            )
+
+    # 2. 查询 report_line_mapping 获取该行对应的科目编号列表
+    mapping_result = await db.execute(
+        sa.select(ReportLineMapping).where(
+            ReportLineMapping.project_id == project_id,
+            ReportLineMapping.report_line_code == line_code,
+            ReportLineMapping.is_deleted == sa.false(),
+            ReportLineMapping.is_confirmed == sa.true(),
+        )
+    )
+    mappings = mapping_result.scalars().all()
+
+    if not mappings:
+        raise HTTPException(
+            status_code=404,
+            detail=f"报表行 '{line_code}' 无映射科目",
+        )
+
+    # 获取行次名称（取第一条映射的 report_line_name）
+    item_name = mappings[0].report_line_name
+
+    # 提取所有科目编号
+    account_codes = list({m.standard_account_code for m in mappings})
+
+    # 3. 查询 tb_balance 获取各科目余额
+    tb_result = await db.execute(
+        sa.select(TbBalance).where(
+            TbBalance.project_id == project_id,
+            TbBalance.year == year,
+            TbBalance.account_code.in_(account_codes),
+            TbBalance.is_deleted == sa.false(),
+        )
+    )
+    tb_rows = tb_result.scalars().all()
+
+    # 4. 计算总金额和各科目占比
+    accounts: list[LineCompositionAccount] = []
+    total_amount = 0.0
+
+    for tb in tb_rows:
+        balance = float(tb.closing_balance) if tb.closing_balance is not None else 0.0
+        total_amount += abs(balance)
+
+    # 按金额绝对值降序排列，计算占比
+    for tb in sorted(tb_rows, key=lambda t: abs(float(t.closing_balance) if t.closing_balance is not None else 0.0), reverse=True):
+        balance = float(tb.closing_balance) if tb.closing_balance is not None else 0.0
+        pct = (abs(balance) / total_amount * 100.0) if total_amount != 0 else 0.0
+        accounts.append(LineCompositionAccount(
+            code=tb.account_code,
+            name=tb.account_name or "",
+            closing_balance=balance,
+            pct=round(pct, 1),
+        ))
+
+    # total_amount 使用实际余额之和（非绝对值），用于显示
+    actual_total = sum(
+        float(tb.closing_balance) if tb.closing_balance is not None else 0.0
+        for tb in tb_rows
+    )
+
+    return LineCompositionResponse(
+        line_code=line_code,
+        item_name=item_name,
+        total_amount=actual_total,
+        accounts=accounts,
+    )

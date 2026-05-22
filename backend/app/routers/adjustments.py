@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.bulk_operations import BulkRequest, bulk_execute
 from app.core.database import get_db
+from app.core.field_selection import parse_fields, BLOCKED_FIELDS
 from app.core.pagination import PaginationParams
 from app.deps import get_current_user, check_consol_lock, require_project_access, get_user_scope_cycles
 from app.models.core import User
@@ -58,6 +59,7 @@ async def list_adjustments(
     year: int = Query(...),
     adjustment_type: AdjustmentType | None = Query(None),
     review_status: ReviewStatus | None = Query(None),
+    fields: str | None = Query(None, description="逗号分隔的字段名，如 id,adjustment_no,description"),
     pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
@@ -87,6 +89,16 @@ async def list_adjustments(
                 result["total"] = len(result["items"])
     except Exception:
         pass  # scope filtering failure should not block the response
+
+    # 字段选择：过滤返回字段（仅过滤 items 内的字段，保留分页元数据）
+    requested_fields = parse_fields(fields)
+    if requested_fields is not None and isinstance(result, dict) and "items" in result:
+        allowed = requested_fields - BLOCKED_FIELDS
+        allowed.add("id")
+        result["items"] = [
+            {k: v for k, v in item.items() if k in allowed}
+            for item in result["items"]
+        ]
 
     return result
 

@@ -120,6 +120,7 @@ import { ElMessage } from 'element-plus'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
 import GtEditableTable, { type GtColumn } from '@/components/common/GtEditableTable.vue'
+import { useDecimalCalc } from '@/composables/useDecimalCalc'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface CashFlowRow {
@@ -138,6 +139,7 @@ const emitCf = defineEmits<{
 const displayPrefs = useDisplayPrefsStore()
 const fmt = (v: any) => displayPrefs.fmt(v)
 const n = (v: any) => Number(v) || 0
+const { sub: decSub, sum: decSum } = useDecimalCalc()
 const cfFileRef = ref<HTMLInputElement|null>(null)
 const editableTableRef = ref<InstanceType<typeof GtEditableTable> | null>(null)
 
@@ -261,9 +263,9 @@ function getSummary({ columns: cols, data }: any) {
     if (idx === 0) { sums[idx] = '合计'; return }
     const prop = col.property
     if (prop && sumFields.has(prop)) {
-      sums[idx] = fmt(data.reduce((s: number, r: any) => s + n(r[prop]), 0))
+      sums[idx] = fmt(Number(decSum(...data.map((r: any) => String(n(r[prop]))))))
     } else if (col.label === '差异') {
-      sums[idx] = fmt(data.reduce((s: number, r: any) => s + (n(r.payerAmount) - n(r.receiverAmount)), 0))
+      sums[idx] = fmt(Number(decSum(...data.map((r: any) => decSub(String(n(r.payerAmount)), String(n(r.receiverAmount)))))))
     } else {
       sums[idx] = ''
     }

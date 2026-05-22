@@ -9,6 +9,10 @@
  * @see design.md D1
  */
 import mitt from 'mitt'
+import type { SSEEventType } from '@/types/sse'
+
+// Re-export SSEEventType for convenience
+export type { SSEEventType } from '@/types/sse'
 
 // ─── 事件载荷类型 ─────────────────────────────────────────────────────────────
 
@@ -79,7 +83,7 @@ export interface TemplateAppliedPayload {
 
 /** SSE 同步状态事件 */
 export interface SyncEventPayload {
-  event_type: string
+  event_type: SSEEventType
   project_id: string
   year?: number
   account_codes?: string[]

@@ -42,7 +42,7 @@
               <el-table-column prop="diff" label="差异" width="100" align="right">
                 <template #default="{ row }">
                   <span :class="row.severity === 'blocking' ? 'diff-blocking' : 'diff-warning'">
-                    {{ row.diff?.toFixed(2) }}
+                    {{ fmtAmountWithZero(row.diff) }}
                   </span>
                 </template>
               </el-table-column>
@@ -62,6 +62,7 @@
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { replayConsistency } from '@/services/governanceApi'
+import { fmtAmountWithZero } from '@/utils/formatters'
 
 const props = defineProps<{ projectId: string }>()
 

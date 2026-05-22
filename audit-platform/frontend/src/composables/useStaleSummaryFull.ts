@@ -19,7 +19,7 @@
  * ```
  */
 import { ref, computed, watch, onMounted, onUnmounted, type Ref } from 'vue'
-import { eventBus } from '@/utils/eventBus'
+import { eventBus, type SyncEventPayload } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 
 interface ModuleSummary<T = any> {
@@ -105,7 +105,7 @@ export function useStaleSummaryFull(
   function _onYearChanged() { refresh() }  // 切年立即刷新不防抖
 
   // Sprint 4 Task 4.7：SSE linkage:stale-changed 事件处理
-  function _onSSEEvent(payload: any) {
+  function _onSSEEvent(payload: SyncEventPayload) {
     if (payload?.extra?.linkage_event === 'stale-changed') {
       // 从 SSE 收到 stale-changed 事件，触发 linkage:stale-changed 本地事件
       eventBus.emit('linkage:stale-changed', {

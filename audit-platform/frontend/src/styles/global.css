@@ -9,6 +9,7 @@
 @import './gt-page-components.css';
 @import './gt-polish.css';
 @import './gt-table.css';
+@import './gt-dark-overrides.css';
 
 /* ═══════════════════════════════════════════════════════════════
    NProgress 主题覆盖 — GT 紫色
@@ -440,7 +441,17 @@ body {
    动画
    ═══════════════════════════════════════════════════════════════ */
 
-/* 页面路由过渡 */
+/* 页面路由过渡 — 方向性 slide（UI-1） */
+.slide-left-enter-active, .slide-left-leave-active,
+.slide-right-enter-active, .slide-right-leave-active {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+.slide-left-enter-from { transform: translateX(30px); opacity: 0; }
+.slide-left-leave-to { transform: translateX(-30px); opacity: 0; }
+.slide-right-enter-from { transform: translateX(-30px); opacity: 0; }
+.slide-right-leave-to { transform: translateX(30px); opacity: 0; }
+
+/* 保留旧 gt-page 类名兼容（其他地方可能引用） */
 .gt-page-enter-active {
   animation: gtPageIn var(--gt-transition-slow) both;
 }
@@ -790,4 +801,40 @@ body {
   user-select: none !important;
   -webkit-user-select: none !important;
   cursor: cell !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   响应式布局断点适配（UI-5）
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ≤1440px: 折叠左侧导航为图标模式 */
+@media (max-width: 1440px) {
+  .gt-three-col:not(.gt-three-col--collapsed) .gt-sidebar {
+    width: 56px !important;
+  }
+  .gt-three-col:not(.gt-three-col--collapsed) .gt-sidebar .gt-nav-label {
+    display: none;
+  }
+  .gt-three-col:not(.gt-three-col--collapsed) .gt-sidebar .gt-nav-item {
+    justify-content: center;
+  }
+  .gt-three-col:not(.gt-three-col--collapsed) .gt-sidebar .gt-logo-text {
+    display: none;
+  }
+  .gt-three-col:not(.gt-three-col--collapsed) .gt-sidebar .gt-sidebar-tools-title {
+    display: none;
+  }
+}
+
+/* ≤1280px: 隐藏中间栏，主内容区全宽 */
+@media (max-width: 1280px) {
+  .gt-three-col .gt-middle {
+    display: none !important;
+  }
+  .gt-three-col .gt-middle-collapsed {
+    display: none !important;
+  }
+  .gt-three-col .gt-detail {
+    flex: 1;
+  }
 }

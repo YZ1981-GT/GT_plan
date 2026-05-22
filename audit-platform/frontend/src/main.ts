@@ -5,6 +5,8 @@ import { ElMessage } from 'element-plus'
 // Element Plus 样式：按需导入由 unplugin-vue-components 自动处理，
 // 但仍需全局引入 base 样式（CSS 变量、字体等）
 import 'element-plus/dist/index.css'
+// Element Plus 暗色主题 CSS 变量（配合 html.dark class 自动生效）
+import 'element-plus/theme-chalk/dark/css-vars.css'
 import 'nprogress/nprogress.css'
 import './styles/global.css'
 import App from './App.vue'
@@ -12,6 +14,7 @@ import router from './router'
 import { initWebVitals } from './utils/monitor'
 import { queryClient } from './utils/queryClient'
 import { vPermission } from './directives/permission'
+import { registerServiceWorker } from './composables/useOfflineCache'
 
 const app = createApp(App)
 
@@ -44,5 +47,8 @@ router.onError((error) => {
 
 // 性能监控
 initWebVitals()
+
+// 离线缓存 Service Worker 注册（Phase 8 Task 5.2）
+registerServiceWorker()
 
 app.mount('#app')

@@ -1,0 +1,1 @@
+import{E as s,a as o}from"./index-BITwLRGo.js";import"./vue.esm-bundler-RyamH92g.js";import"./_commonjsHelpers-CqkleIqs.js";const t={success(e){o.success(e)},info(e){o.info(e)},warning(e){o.warning({message:e,duration:3e3})},error(e,r){o.error({message:e,duration:4e3,showClose:!0}),r&&console.warn("[feedback.error]",r)},notify(e){s({duration:5e3,...e})}};export{t as feedback};

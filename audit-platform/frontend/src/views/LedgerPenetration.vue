@@ -164,16 +164,16 @@
           </template>
         </el-table-column>
         <el-table-column prop="account_name" label="科目名称" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable>
+        <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('opening_balance')">
           <template #default="{ row }"><GtAmountCell :value="row.opening_balance" /></template>
         </el-table-column>
-        <el-table-column prop="debit_amount" label="借方发生额" width="200" min-width="180" align="right" sortable>
+        <el-table-column prop="debit_amount" label="借方发生额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('debit_amount')">
           <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方发生额" width="200" min-width="180" align="right" sortable>
+        <el-table-column prop="credit_amount" label="贷方发生额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('credit_amount')">
           <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable>
+        <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('closing_balance')">
           <template #default="{ row }">
             <GtAmountCell :value="row.closing_balance" :clickable="true" @click="drillToLedger(row)" />
           </template>
@@ -317,22 +317,22 @@
               </span>
             </template>
           </el-table-column>
-          <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable>
+          <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('opening_balance')">
             <template #default="{ row }">
               <GtAmountCell :value="row.opening_balance" />
             </template>
           </el-table-column>
-          <el-table-column prop="debit_amount" label="借方发生额" width="200" min-width="180" align="right" sortable>
+          <el-table-column prop="debit_amount" label="借方发生额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('debit_amount')">
             <template #default="{ row }">
               <GtAmountCell :value="row.debit_amount" />
             </template>
           </el-table-column>
-          <el-table-column prop="credit_amount" label="贷方发生额" width="200" min-width="180" align="right" sortable>
+          <el-table-column prop="credit_amount" label="贷方发生额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('credit_amount')">
             <template #default="{ row }">
               <GtAmountCell :value="row.credit_amount" />
             </template>
           </el-table-column>
-          <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable>
+          <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('closing_balance')">
             <template #default="{ row }">
               <GtAmountCell v-if="!row._isGroup" :value="row.closing_balance" :clickable="true" @click="drillToAuxLedgerFromBalance(row)" />
               <GtAmountCell v-else :value="row.closing_balance" />
@@ -956,6 +956,8 @@ import { useImportValidation } from '@/utils/useImportValidation'
 import { getActiveLedgerDataset, getImportJob, smartPreviewLedgerImport, submitSmartLedgerImport } from '@/services/ledgerImportApi'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useFullscreen } from '@/composables/useFullscreen'
+import { useDecimalCalc } from '@/composables/useDecimalCalc'
+import { numericSortMethod } from '@/utils/numericSort'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { AMOUNT_DIVISOR_KEY } from '@/constants/amountDivisor'
 import { handleApiError } from '@/utils/errorHandler'
@@ -963,6 +965,7 @@ import { handleApiError } from '@/utils/errorHandler'
 const route = useRoute()
 const router = useRouter()
 const penetrate = usePenetrate()
+const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => {
   const q = Number(route.query.year)
@@ -1953,9 +1956,9 @@ const ledgerDisplay = computed(() => {
     const item = items[i]
     const d = num(item.debit_amount)
     const c = num(item.credit_amount)
-    balance += d - c
-    monthDebit += d
-    monthCredit += c
+    balance = Number(decSub(String(decAdd(String(balance), String(d))), String(c)))
+    monthDebit = Number(decAdd(String(monthDebit), String(d)))
+    monthCredit = Number(decAdd(String(monthCredit), String(c)))
 
     const month = (item.voucher_date || '').substring(0, 7) // "2025-01"
     if (!lastMonth) lastMonth = month
@@ -2024,9 +2027,9 @@ const auxLedgerDisplay = computed(() => {
   for (const item of items) {
     const d = num(item.debit_amount)
     const c = num(item.credit_amount)
-    balance += d - c
-    monthDebit += d
-    monthCredit += c
+    balance = Number(decSub(String(decAdd(String(balance), String(d))), String(c)))
+    monthDebit = Number(decAdd(String(monthDebit), String(d)))
+    monthCredit = Number(decAdd(String(monthCredit), String(c)))
 
     const month = (item.voucher_date || '').substring(0, 7)
     if (!lastMonth) lastMonth = month
@@ -2493,10 +2496,10 @@ const _auxGroupCache = computed(() => {
     }
     const g = groups.get(code)!
     g.count += useSummary ? (row.record_count || 1) : 1
-    g.opening += num(row.opening_balance)
-    g.debit += num(row.debit_amount)
-    g.credit += num(row.credit_amount)
-    g.closing += num(row.closing_balance)
+    g.opening = Number(decAdd(String(g.opening), String(num(row.opening_balance))))
+    g.debit = Number(decAdd(String(g.debit), String(num(row.debit_amount))))
+    g.credit = Number(decAdd(String(g.credit), String(num(row.credit_amount))))
+    g.closing = Number(decAdd(String(g.closing), String(num(row.closing_balance))))
   }
   return cache
 })

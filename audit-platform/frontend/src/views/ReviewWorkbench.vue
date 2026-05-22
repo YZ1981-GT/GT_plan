@@ -130,9 +130,11 @@
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="primary" link @click="openEditor(row)">查看</el-button>
-            <el-button size="small" type="success" link @click="handleSingleApprove(row)">通过</el-button>
-            <el-button size="small" type="warning" link @click="handleSingleReject(row)">退回</el-button>
+            <GtRowActions
+              :actions="getReviewRowActions(row)"
+              :max-visible="2"
+              @action="(key: string) => handleReviewRowAction(key, row)"
+            />
           </template>
         </el-table-column>
       </el-table>
@@ -273,6 +275,11 @@
 
           <div class="panel-header">
             <span>复核意见</span>
+            <el-button size="small" text type="primary" @click="showTemplatePanel = true">📋 插入模板</el-button>
+          </div>
+          <!-- Phase 2 F5: 复核意见优先级选择 -->
+          <div class="review-priority-row">
+            <ReviewPrioritySelector v-model="reviewPriority" />
           </div>
           <el-input
             v-model="reviewComment"
@@ -327,6 +334,53 @@
         <el-button type="warning" @click="handleBatchReject">确认退回</el-button>
       </template>
     </el-dialog>
+
+    <!-- 批量通过确认弹窗 -->
+    <el-dialog v-model="showBatchPassDialog" title="批量通过确认" width="520" append-to-body>
+      <div class="batch-pass-info">
+        <p>即将批量通过 <strong>{{ selectedIds.length }}</strong> 个底稿的复核。</p>
+        <el-input
+          v-model="batchPassComment"
+          type="textarea"
+          :rows="3"
+          placeholder="复核意见"
+        />
+      </div>
+      <template #footer>
+        <el-button @click="showBatchPassDialog = false">取消</el-button>
+        <el-button type="success" :loading="batchPassLoading" @click="confirmBatchPass">确认通过</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量通过结果弹窗 -->
+    <el-dialog v-model="showBatchPassResult" title="批量通过结果" width="480" append-to-body>
+      <div class="batch-pass-result" v-if="batchPassResult">
+        <p>✅ 成功通过：<strong>{{ batchPassResult.success_count }}</strong> 个</p>
+        <p v-if="batchPassResult.skipped_count > 0">
+          ⚠️ 跳过：<strong>{{ batchPassResult.skipped_count }}</strong> 个
+        </p>
+        <el-table
+          v-if="batchPassResult.skipped_items && batchPassResult.skipped_items.length"
+          :data="batchPassResult.skipped_items"
+          size="small"
+          stripe
+          style="margin-top: 12px"
+        >
+          <el-table-column prop="wp_id" label="底稿 ID" width="280" show-overflow-tooltip />
+          <el-table-column prop="reason" label="跳过原因" min-width="180" />
+        </el-table>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="showBatchPassResult = false">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Phase 7 F4: 复核意见模板面板 -->
+    <ReviewTemplatePanel
+      :visible="showTemplatePanel"
+      @update:visible="showTemplatePanel = $event"
+      @insert="(content: string) => { reviewComment += content; showTemplatePanel = false }"
+    />
   </div>
 </template>
 
@@ -344,6 +398,11 @@ import {
 } from '@/services/pmApi'
 import { reviewContent, updateReviewStatus, type ReviewIssue } from '@/services/workpaperApi'
 import { handleApiError } from '@/utils/errorHandler'
+import ReviewPrioritySelector from '@/components/review/ReviewPrioritySelector.vue'
+import ReviewTemplatePanel from '@/components/review/ReviewTemplatePanel.vue'
+import { api } from '@/services/apiProxy'
+import GtRowActions from '@/components/common/GtRowActions.vue'
+import type { RowAction } from '@/components/common/GtRowActions.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -365,11 +424,20 @@ const selectedIds = ref<string[]>([])
 const showRejectDialog = ref(false)
 const rejectComment = ref('')
 
+// 批量通过弹窗状态
+const showBatchPassDialog = ref(false)
+const batchPassComment = ref('已审阅，无异议')
+const batchPassLoading = ref(false)
+const showBatchPassResult = ref(false)
+const batchPassResult = ref<{ success_count: number; skipped_count: number; skipped_items: { wp_id: string; reason: string }[] } | null>(null)
+
 // 三栏模式状态
 const selectedWpId = ref<string>('')
 const aiIssues = ref<ReviewIssue[]>([])
 const aiLoading = ref(false)
 const reviewComment = ref('')
+const showTemplatePanel = ref(false)
+const reviewPriority = ref('suggest')  // Phase 2 F5: must_fix / suggest / info
 const actioning = ref(false)
 const pendingAction = ref<'approve' | 'reject' | null>(null)
 
@@ -607,6 +675,29 @@ function openEditor(row: ReviewInboxItem) {
   })
 }
 
+// ── GtRowActions 行操作 ──
+function getReviewRowActions(_row: ReviewInboxItem): RowAction[] {
+  return [
+    { key: 'view', label: '查看', priority: 1 },
+    { key: 'approve', label: '通过', priority: 2 },
+    { key: 'reject', label: '退回', priority: 3, danger: true },
+  ]
+}
+
+function handleReviewRowAction(key: string, row: ReviewInboxItem) {
+  switch (key) {
+    case 'view':
+      openEditor(row)
+      break
+    case 'approve':
+      handleSingleApprove(row)
+      break
+    case 'reject':
+      handleSingleReject(row)
+      break
+  }
+}
+
 async function handleSingleApprove(row: ReviewInboxItem) {
   await confirmDangerous(`确认通过底稿 ${row.wp_code} ${row.wp_name}？`, '通过确认')
   await doBatchReview([row.id], 'approve', row.project_id)
@@ -621,10 +712,30 @@ async function handleSingleReject(row: ReviewInboxItem) {
 
 async function handleBatchApprove() {
   if (!selectedIds.value.length) return
-  await confirmBatch('通过', selectedIds.value.length)
+  // 打开批量通过确认弹窗
+  batchPassComment.value = '已审阅，无异议'
+  showBatchPassDialog.value = true
+}
+
+async function confirmBatchPass() {
   const pid = projectId.value || items.value[0]?.project_id
   if (!pid) return
-  await doBatchReview(selectedIds.value, 'approve', pid)
+  batchPassLoading.value = true
+  try {
+    const result = await api.post<{ success_count: number; skipped_count: number; skipped_items: { wp_id: string; reason: string }[] }>(
+      `/api/projects/${pid}/batch-review-pass`,
+      { wp_ids: selectedIds.value, comment: batchPassComment.value }
+    )
+    batchPassResult.value = result
+    showBatchPassDialog.value = false
+    showBatchPassResult.value = true
+    // 刷新列表
+    await loadData()
+  } catch (e: any) {
+    handleApiError(e, '批量通过')
+  } finally {
+    batchPassLoading.value = false
+  }
 }
 
 async function handleBatchReject() {
@@ -928,5 +1039,17 @@ onUnmounted(() => {
   font-size: var(--gt-font-size-xs);
   color: var(--el-text-color-secondary);
   text-align: center;
+}
+
+/* 批量通过弹窗 */
+.batch-pass-info p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--el-text-color-primary, #303133);
+}
+
+.batch-pass-result p {
+  margin: 4px 0;
+  font-size: 14px;
 }
 </style>

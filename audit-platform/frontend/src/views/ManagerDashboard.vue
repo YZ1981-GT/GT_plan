@@ -314,6 +314,114 @@
       </el-table>
       <el-empty v-else-if="!loading" :image-size="50" description="暂无团队负载数据" />
     </section>
+
+    <!-- 区块五：我的项目群（Phase 6 F7 projects-overview） -->
+    <section class="gt-section">
+      <div class="gt-section-header">
+        <h3 class="gt-section-title">我的项目群</h3>
+        <div class="gt-view-toggle">
+          <el-radio-group v-model="projectsViewMode" size="small">
+            <el-radio-button value="card">卡片</el-radio-button>
+            <el-radio-button value="table">表格</el-radio-button>
+          </el-radio-group>
+          <el-button size="small" :loading="projectsOverviewLoading" @click="loadProjectsOverview">
+            刷新
+          </el-button>
+        </div>
+      </div>
+
+      <!-- 卡片视图 -->
+      <div v-if="projectsViewMode === 'card'" class="gt-projects-overview-grid">
+        <div
+          v-for="proj in projectsOverviewList"
+          :key="proj.project_id"
+          class="gt-po-card"
+          @click="goToProjectDashboard(proj.project_id)"
+        >
+          <div class="gt-po-card-header">
+            <div class="gt-po-card-title">
+              <span class="gt-po-name">{{ proj.project_name }}</span>
+              <span class="gt-po-client">{{ proj.client_name }}</span>
+            </div>
+            <el-tag size="small" :type="urgencyTagType(proj.sla_urgency_score)">
+              紧急度 {{ (proj.sla_urgency_score * 100).toFixed(0) }}%
+            </el-tag>
+          </div>
+          <div class="gt-po-card-body">
+            <div class="gt-po-progress-row">
+              <span class="gt-po-label">总体进度</span>
+              <el-progress
+                :percentage="proj.overall_progress"
+                :stroke-width="8"
+                :color="progressColor(proj.overall_progress)"
+              />
+            </div>
+            <!-- 循环维度进度 -->
+            <div class="gt-po-cycles" v-if="proj.cycle_progress.length">
+              <div
+                v-for="cycle in proj.cycle_progress.slice(0, 6)"
+                :key="cycle.cycle"
+                class="gt-po-cycle-item"
+              >
+                <el-progress
+                  type="circle"
+                  :percentage="cycle.pct"
+                  :width="40"
+                  :stroke-width="4"
+                  :color="progressColor(cycle.pct)"
+                />
+                <span class="gt-po-cycle-label">{{ cycle.cycle }}</span>
+                <span class="gt-po-cycle-count">{{ cycle.completed }}/{{ cycle.total }}</span>
+              </div>
+            </div>
+            <div class="gt-po-metrics">
+              <div class="gt-po-metric">
+                <span class="gt-po-metric-value gt-po-metric-blocking">{{ proj.blocking_vr_count }}</span>
+                <span class="gt-po-metric-label">阻断批注</span>
+              </div>
+              <div class="gt-po-metric">
+                <span class="gt-po-metric-value">{{ proj.unresolved_review_count }}</span>
+                <span class="gt-po-metric-label">未解决批注</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 表格视图 -->
+      <el-table
+        v-else-if="projectsViewMode === 'table' && projectsOverviewList.length"
+        :data="projectsOverviewList"
+        stripe
+        style="width: 100%"
+        :header-cell-style="{ background: '#f5f7fa', fontWeight: '600' }"
+        @row-click="(row: any) => goToProjectDashboard(row.project_id)"
+        class="gt-po-table"
+      >
+        <el-table-column prop="project_name" label="项目名称" min-width="160" />
+        <el-table-column prop="client_name" label="客户" min-width="120" />
+        <el-table-column label="总体进度" min-width="140">
+          <template #default="{ row }">
+            <el-progress :percentage="row.overall_progress" :stroke-width="6" :color="progressColor(row.overall_progress)" />
+          </template>
+        </el-table-column>
+        <el-table-column label="紧急度" min-width="100" sortable :sort-method="(a: any, b: any) => a.sla_urgency_score - b.sla_urgency_score">
+          <template #default="{ row }">
+            <el-tag size="small" :type="urgencyTagType(row.sla_urgency_score)">
+              {{ (row.sla_urgency_score * 100).toFixed(0) }}%
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="blocking_vr_count" label="阻断批注" min-width="100" align="center" />
+        <el-table-column prop="unresolved_review_count" label="未解决" min-width="100" align="center" />
+      </el-table>
+
+      <el-empty
+        v-if="!projectsOverviewLoading && projectsOverviewList.length === 0"
+        :image-size="50"
+        description="暂无项目群数据"
+      />
+    </section>
   </div>
 </template>
 
@@ -811,11 +919,58 @@ function actionTagType(priority: string): 'danger' | 'warning' | 'info' {
   return 'info'
 }
 
+// ── Phase 6 F7: 我的项目群（projects-overview） ──
+interface CycleProgress {
+  cycle: string
+  completed: number
+  total: number
+  pct: number
+}
+
+interface ProjectOverviewItem {
+  project_id: string
+  project_name: string
+  client_name: string
+  overall_progress: number
+  cycle_progress: CycleProgress[]
+  sla_urgency_score: number
+  blocking_vr_count: number
+  unresolved_review_count: number
+}
+
+const projectsOverviewList = ref<ProjectOverviewItem[]>([])
+const projectsOverviewLoading = ref(false)
+const projectsViewMode = ref<'card' | 'table'>('card')
+
+async function loadProjectsOverview() {
+  projectsOverviewLoading.value = true
+  try {
+    const data = await api.get(P_dash.manager.projectsOverview)
+    projectsOverviewList.value = (data as any)?.projects || []
+  } catch (err: any) {
+    handleApiError(err, '加载项目群')
+  } finally {
+    projectsOverviewLoading.value = false
+  }
+}
+
+function goToProjectDashboard(projectId: string) {
+  router.push({ name: 'PartnerProjectDashboard', params: { projectId } })
+}
+
+function urgencyTagType(score: number): 'danger' | 'warning' | 'success' | 'info' {
+  if (score >= 0.7) return 'danger'
+  if (score >= 0.4) return 'warning'
+  if (score >= 0.2) return 'success'
+  return 'info'
+}
+
 // ── 生命周期 ──
 onMounted(() => {
   loadOverview()
   loadAssignmentStatus()
   loadPendingWorkHoursSummary()
+  loadProjectsOverview()
   elapsedTimer = setInterval(updateElapsed, 1000)
   // 监听用户交互以重启 timer
   document.addEventListener('click', onUserActivity)
@@ -1198,4 +1353,115 @@ onBeforeUnmount(() => {
 .gt-pwh-hours { font-size: var(--gt-font-size-md); font-weight: 600; color: var(--gt-color-wheat); }
 .gt-pwh-sub { font-size: var(--gt-font-size-xs); color: var(--gt-color-wheat); }
 .gt-pwh-action { margin-left: 16px; }
+
+/* ── Phase 6 F7: 我的项目群 ── */
+.gt-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.gt-view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gt-projects-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+}
+.gt-po-card {
+  background: var(--gt-color-bg-white);
+  border: 1px solid var(--gt-color-border-light);
+  border-radius: var(--gt-radius-md);
+  padding: 16px;
+  cursor: pointer;
+  transition: all var(--gt-transition-fast);
+  box-shadow: var(--gt-shadow-sm);
+}
+.gt-po-card:hover {
+  border-color: var(--gt-color-primary-lighter, #c4b0d9);
+  box-shadow: 0 4px 12px rgba(75, 45, 119, 0.1);
+  transform: translateY(-1px);
+}
+.gt-po-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.gt-po-card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gt-po-name {
+  font-size: var(--gt-font-size-sm);
+  font-weight: 600;
+  color: var(--gt-color-text);
+}
+.gt-po-client {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
+}
+.gt-po-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gt-po-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gt-po-label {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
+  white-space: nowrap;
+}
+.gt-po-cycles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.gt-po-cycle-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.gt-po-cycle-label {
+  font-size: 10px;
+  color: var(--gt-color-text-secondary);
+  text-transform: uppercase;
+}
+.gt-po-cycle-count {
+  font-size: 10px;
+  color: var(--gt-color-text-tertiary);
+}
+.gt-po-metrics {
+  display: flex;
+  gap: 24px;
+}
+.gt-po-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.gt-po-metric-value {
+  font-size: var(--gt-font-size-base);
+  font-weight: 600;
+  color: var(--gt-color-text);
+}
+.gt-po-metric-blocking {
+  color: #f56c6c;
+}
+.gt-po-metric-label {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
+}
+.gt-po-table {
+  cursor: pointer;
+}
 </style>

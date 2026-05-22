@@ -43,10 +43,18 @@ async def health_check(
         services["redis"] = "unavailable"
         all_healthy = False
 
+    # Redis 详细信息（非阻塞，失败不影响整体健康判断）
+    redis_details = {}
+    try:
+        from app.routers.health_redis import _get_redis_health_info
+        redis_details = await _get_redis_health_info()
+    except Exception:
+        pass
+
     status = "healthy" if all_healthy else "unhealthy"
     status_code = 200 if all_healthy else 503
 
     return JSONResponse(
         status_code=status_code,
-        content={"status": status, "services": services},
+        content={"status": status, "services": services, "redis": redis_details},
     )

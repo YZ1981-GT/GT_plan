@@ -5,6 +5,7 @@
 | 版本 | 日期 | 变更内容 |
 |------|------|----------|
 | v0.1 | 2026-05-20 | 初始起草 |
+| v0.2 | 2026-05-20 | Sprint 0 实测后补强：①节点数 60→128 ②severity 3 级→5 级 ③新增 A/B/C/S/other 类节点兜底规则 ④cross_module 类 target 处理 |
 
 ## 依赖矩阵
 
@@ -62,7 +63,40 @@
 - 不影响现有 WorkpaperEditor 性能（图在独立视图中渲染）
 - 不涉及 docx 类底稿节点（仅 xlsx 底稿 + 报表 + 附注）
 
-## Glossary
+## Sprint 0 实测基线（v0.2 补充）
+
+执行 `python scripts/sprint0_panorama_baseline.py`（一次性，用完即删）实测结果：
+
+| 变量 | 实测值 | 说明 |
+|------|--------|------|
+| `N_cwr_total` | 400 | cross_wp_references.json references 数组长度 |
+| `N_cwr_with_wp_target` | 370 | 标准 CWR 边数（target 含 wp_code） |
+| `N_cwr_cross_module` | 31 | target_module 类边数（target 无 wp_code，需虚拟模块节点） |
+| `N_unique_wp_nodes` | 110 | 去重 wp_code 节点数 |
+| `N_unique_module_nodes` | 18 | 去重 cross_module 虚拟节点数 |
+| `N_total_unique_nodes` | 128 | 110 + 18 |
+| `N_severity_blocking` | 75 | severity=blocking |
+| `N_severity_warning` | 202 | severity=warning |
+| `N_severity_info` | 75 | severity=info |
+| `N_severity_recommended` | 19 | severity=recommended（B/C 类控制建议） |
+| `N_severity_required` | 29 | severity=required（A 类必填提示） |
+| `N_cycle_A` | 17 | A 类节点（A1/A5 重要性/调整等） |
+| `N_cycle_B` | 5 | B 类节点（B15 重要性等） |
+| `N_cycle_C` | 12 | C 类节点（C2~C15 控制测试） |
+| `N_cycle_S` | 7 | S 类节点（专项程序） |
+| `N_cycle_other` | 5 | 不可推断节点（PL/REPORT/T1/TB/disclosure） |
+
+**起草前假设 vs Sprint 0 实测对比**：
+
+| 维度 | 起草假设 | 实测 | 偏差影响 | 修正方案 |
+|------|----------|------|----------|----------|
+| 节点数 | ~60 | 128 | UI 布局/性能参数需调 | NFR 性能段更新到 128 节点+400 边 |
+| 边数 | 400 | 370 标准 + 31 跨模块 = 401 | cross_module 需虚拟节点 | 新增 9.8 验收条款 |
+| severity 级别 | 3 级 | 5 级（增 recommended/required） | 颜色/线宽映射缺 2 级 | Requirement 4 补 2 级颜色定义 |
+| cycle 推断 | D~N + report + note 13 类 | 实际 17 类（含 A/B/C/S/other） | 推断函数必须有兜底 | Requirement 9.3 补"未匹配归 other" |
+| target 结构 | 全部含 wp_code | 7.75% 是 cross_module 类 | 必须支持虚拟模块节点 | Requirement 9.8 新增 |
+
+
 
 - **Panorama_Graph_Page**：联动全景图页面组件，路由 `/projects/:id/linkage-panorama`
 - **Force_Graph**：D3.js 力导向图核心渲染组件
@@ -72,7 +106,8 @@
 - **Search_Locator**：搜索定位组件，输入 wp_code 或底稿名称定位节点
 - **Stale_Overlay**：Stale 状态叠加层，对有 stale 影响的边施加视觉效果
 - **Graph_Data_Endpoint**：后端聚合端点，返回全量图数据 + stale 状态
-- **Cycle_Code**：审计循环代号（D/E/F/G/H/I/J/K/L/M/N + 报表/附注）
+- **Cycle_Code**：审计循环代号（D/E/F/G/H/I/J/K/L/M/N + 报表/附注 + A/B/C/S 辅助类 + other 兜底）
+- **Module_Node**：cross_module 类 target 的虚拟节点，id 形如 `__module__trial_balance`，cycle='module'
 
 ## Requirements
 
@@ -119,8 +154,8 @@
 
 #### Acceptance Criteria
 
-1. THE Force_Graph SHALL 对每条 Graph_Edge 按其 severity 着色：blocking=红(#D32F2F)/warning=橙(#F57C00)/info=灰(#9E9E9E)
-2. THE Force_Graph SHALL 对 blocking 级别的边使用 2px 线宽，warning 使用 1.5px，info 使用 1px
+1. THE Force_Graph SHALL 对每条 Graph_Edge 按其 severity 着色：blocking=红(#D32F2F)/warning=橙(#F57C00)/info=灰(#9E9E9E)/recommended=浅蓝(#42A5F5)/required=深橙(#EF6C00)
+2. THE Force_Graph SHALL 对 blocking/required 级别的边使用 2px 线宽，warning 使用 1.5px，info/recommended 使用 1px
 3. WHEN 用户 hover 某条边, THE Force_Graph SHALL 显示 tooltip 包含：ref_id + description + source_wp → target_wp + severity + category
 4. THE Force_Graph SHALL 在图例面板中同时展示边的 severity 颜色说明
 
@@ -182,17 +217,19 @@
 
 1. THE Graph_Data_Endpoint SHALL 提供 GET `/api/projects/{pid}/linkage-panorama/graph-data` 端点
 2. THE Graph_Data_Endpoint SHALL 在响应中返回：nodes[]（wp_code + cycle + label + is_stale）+ edges[]（source + target + ref_id + severity + category + is_stale）+ statistics（节点数/边数/stale 数/blocking 数）
-3. THE Graph_Data_Endpoint SHALL 从 cross_wp_references.json 加载 400 条 CWR 并聚合为图结构（按 wp_code 去重节点）
+3. THE Graph_Data_Endpoint SHALL 从 cross_wp_references.json 加载全量 CWR 并聚合为图结构（按 wp_code 去重节点）；节点数量、边数量、severity 分布以运行时聚合结果为准（实测基线见 Sprint 0 段，禁止断言字面量）
 4. THE Graph_Data_Endpoint SHALL 从数据库查询当前项目所有底稿的 prefill_stale 字段，叠加到对应节点
 5. THE Graph_Data_Endpoint SHALL 在 ≤ 1000ms 内返回响应
 6. THE Graph_Data_Endpoint SHALL 使用 `Depends(get_current_user)` 认证守卫，并校验用户对该 project_id 的访问权限
 7. IF cross_wp_references.json 加载失败, THEN THE Graph_Data_Endpoint SHALL 返回 503 并附带错误描述
+8. WHEN CWR target 字段为 cross_module 类（不含 wp_code，含 target_module + target_field）, THE Graph_Data_Endpoint SHALL 生成虚拟模块节点（id=`__module__{target_module}`，cycle='module'，label=target_module），并建立 source_wp → 虚拟节点的边
+9. THE Graph_Data_Endpoint cycle 推断 SHALL 按以下顺序：①wp_code 首字母 ∈ {A,B,C,D,E,F,G,H,I,J,K,L,M,N,S} → 该字母（且首字母后非字母，避免 BS/EQ 误命中 B/E）②BS/IS/CFS/EQ 前缀 → 'report' ③"附注" 中文前缀或 NOTE 前缀 → 'note' ④`__module__` 前缀 → 'module' ⑤其余 → 'other'
 
 ## Non-Functional Requirements
 
 ### 性能
 
-- 图渲染性能：400 节点+边在 3000ms 内完成首次布局（从数据加载到布局稳定）
+- 图渲染性能：CWR 实测节点数（≥ 100）+ 边数（≥ 370）在 3000ms 内完成首次布局（从数据加载到布局稳定）
 - 后端端点响应时间 ≤ 1000ms
 - 缩放/拖拽交互帧率 ≥ 30fps（在 1366×768 分辨率下）
 - D3.js 力模拟迭代次数上限 300 次（防止低端设备卡顿）
@@ -244,7 +281,7 @@
 | # | 验收项 | P |
 |---|--------|---|
 | 1 | 从侧边栏/仪表盘可进入联动全景图页面 | P0 |
-| 2 | 力导向图正确渲染 400 条 CWR 的节点和边 | P0 |
+| 2 | 力导向图正确渲染全量 CWR 节点和边（数量以 Sprint 0 实测基线为准） | P0 |
 | 3 | 节点按循环着色且图例正确 | P0 |
 | 4 | 边按 severity 着色（blocking 红/warning 橙/info 灰） | P0 |
 | 5 | 点击节点可跳转到对应底稿编辑器 | P0 |

@@ -29,6 +29,14 @@
       </template>
     </GtPageHeader>
 
+    <!-- Phase 2 F3: 批量状态变更操作栏 -->
+    <BatchActionBar
+      v-if="selectedWpIds.length > 0"
+      :selected-count="selectedWpIds.length"
+      :selected-ids="selectedWpIds"
+      @batch-action="onBatchStatusChange"
+    />
+
     <!-- 筛选栏（独立行，内容多不塞进 GtToolbar） -->
     <div v-if="treeData.length > 0" class="gt-wp-filter-bar">
       <!-- Task 2.1: 角色视图切换（仅列表模式） -->
@@ -116,9 +124,13 @@
               <span v-else class="gt-text-tertiary">—</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="100" fixed="right">
+          <el-table-column label="操作" width="140" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" type="primary" link @click.stop="openEditor(row)">编辑</el-button>
+              <GtRowActions
+                :actions="getWpRowActions(row)"
+                :max-visible="2"
+                @action="(key: string) => handleWpRowAction(key, row)"
+              />
             </template>
           </el-table-column>
         </el-table>
@@ -661,10 +673,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import * as P from '@/services/apiPaths'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmForcePass } from '@/utils/confirm'
 import { eventBus } from '@/utils/eventBus'
 import { Download, Monitor, Upload, Loading } from '@element-plus/icons-vue'
@@ -676,9 +688,12 @@ import WorkpaperDependencyGraph from '@/components/workpaper/WorkpaperDependency
 import WorkpaperAssignmentMatrix from '@/components/workpaper/WorkpaperAssignmentMatrix.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
+import BatchActionBar from '@/components/workpaper/BatchActionBar.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
+import GtRowActions from '@/components/common/GtRowActions.vue'
+import type { RowAction } from '@/components/common/GtRowActions.vue'
 import ViewSwitcher from '@/components/workpaper/ViewSwitcher.vue'
 import { useRoleViewPreset } from '@/composables/useRoleViewPreset'
 import type { ViewPresetId } from '@/composables/viewPresetConfig'
@@ -917,6 +932,37 @@ function onBatchAssigned(_result: { updated: number; notifications_sent: number;
   fetchData()
 }
 
+// Phase 2 F3: 批量状态变更
+async function onBatchStatusChange(payload: { action: string; ids: string[] }) {
+  const actionLabels: Record<string, string> = {
+    submit_review: '提交复核',
+    return_to_draft: '退回修改',
+    mark_complete: '标记完成',
+  }
+  const label = actionLabels[payload.action] || payload.action
+  try {
+    await ElMessageBox.confirm(
+      `确定将 ${payload.ids.length} 个底稿${label}？`,
+      '批量操作确认',
+      { type: 'warning' }
+    )
+  } catch { return }
+
+  try {
+    const { data } = await api.post(
+      `/api/projects/${projectId.value}/working-papers/batch-status`,
+      { wp_ids: payload.ids, action: payload.action }
+    ) as any
+    ElMessage.success(data?.message || `成功${label}`)
+    if (data?.skipped?.length > 0) {
+      ElMessage.warning(`${data.skipped.length} 个底稿被跳过（状态不允许）`)
+    }
+    fetchData()
+  } catch (e: any) {
+    handleApiError(e, `批量${label}`)
+  }
+}
+
 // 任务 6.1：用户名映射
 const userNameMap = ref<Map<string, string>>(new Map())
 
@@ -1042,6 +1088,29 @@ function onWorkbenchRowClick(row: any) {
 function openEditor(row: any) {
   if (row.id) {
     router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: row.id } })
+  }
+}
+
+// ── GtRowActions 行操作 ──
+function getWpRowActions(_row: any): RowAction[] {
+  return [
+    { key: 'edit', label: '编辑', priority: 1 },
+    { key: 'download', label: '下载', priority: 2 },
+    { key: 'assign', label: '委派', priority: 3 },
+  ]
+}
+
+function handleWpRowAction(key: string, row: any) {
+  switch (key) {
+    case 'edit':
+      openEditor(row)
+      break
+    case 'download':
+      if (row.id) downloadWorkpaper(projectId.value, row.id)
+      break
+    case 'assign':
+      // 触发委派弹窗（复用现有逻辑）
+      break
   }
 }
 
@@ -1528,6 +1597,35 @@ async function loadTsjReviewPrompts() {
   }
 }
 
+async function selectWorkpaperByCode(wpCode: string): Promise<boolean> {
+  // 联动全景图节点跳转入口：按 wp_code 查找节点 ID 后调用 selectWorkpaperById
+  // tree node-key 是 working_paper.id（或 wp_index.id 当无 wp 记录时）
+  // 优先精确匹配；如无则用前缀匹配（如 H1 匹配 H1-1/H1-13 第一个）
+  const exact = wpList.value.find((w: WorkpaperDetail) => w.wp_code === wpCode)
+  if (exact) {
+    await selectWorkpaperById(exact.id)
+    return true
+  }
+  const exactIdx = wpIndex.value.find((i: WpIndexItem) => i.wp_code === wpCode)
+  if (exactIdx) {
+    await selectWorkpaperById(exactIdx.id)
+    return true
+  }
+  // 前缀匹配：H1 → H1-1 / H1-13 等
+  const prefix = wpCode + '-'
+  const prefixWp = wpList.value.find((w: WorkpaperDetail) => w.wp_code?.startsWith(prefix))
+  if (prefixWp) {
+    await selectWorkpaperById(prefixWp.id)
+    return true
+  }
+  const prefixIdx = wpIndex.value.find((i: WpIndexItem) => i.wp_code?.startsWith(prefix))
+  if (prefixIdx) {
+    await selectWorkpaperById(prefixIdx.id)
+    return true
+  }
+  return false
+}
+
 async function selectWorkpaperById(wpId: string) {
   const wp = wpList.value.find((w: WorkpaperDetail) => w.wp_index_id === wpId || w.id === wpId)
   if (wp) {
@@ -1995,6 +2093,17 @@ onMounted(async () => {
   } catch { /* 默认 pilot */ }
   await refreshOnlineEditState()
   await handleUploadRedirect()
+
+  // 联动全景图跳转入口：query.wp_code 触发底稿预选
+  const wpCodeQuery = typeof route.query.wp_code === 'string' ? route.query.wp_code : ''
+  if (wpCodeQuery) {
+    // 等 tree 渲染完成再调 setCurrentKey
+    await nextTick()
+    const found = await selectWorkpaperByCode(wpCodeQuery)
+    if (!found) {
+      ElMessage.warning(`底稿 ${wpCodeQuery} 在当前项目中尚未创建`)
+    }
+  }
 
   // Foundation Task 2.9: 初次加载循环复核状态 + 订阅 review-mark:changed 事件刷新
   await loadCycleReviewStatus()

@@ -1,7 +1,9 @@
 """数据库连接模块 — SQLAlchemy 2.0 异步引擎 + 会话工厂"""
 
 from collections.abc import AsyncGenerator
+from uuid import UUID
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -46,6 +48,25 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI 依赖注入：提供异步数据库会话，请求结束后自动关闭。"""
     async with async_session() as session:
         yield session
+
+
+async def set_rls_context(session: AsyncSession, project_id: UUID | str) -> None:
+    """在当前事务中设置 RLS session 变量。
+
+    SET LOCAL 仅在当前事务内有效，事务结束后自动清除（安全）。
+    用于 PG RLS 行级安全策略 project_isolation 的过滤条件。
+
+    Parameters
+    ----------
+    session : AsyncSession
+        当前数据库会话
+    project_id : UUID | str
+        项目 ID，将设置为 app.current_project_id session 变量
+    """
+    await session.execute(
+        text("SET LOCAL app.current_project_id = :pid"),
+        {"pid": str(project_id)},
+    )
 
 
 async def dispose_engine() -> None:

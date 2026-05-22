@@ -3,9 +3,34 @@
     <!-- 顶部 banner -->
     <GtPageHeader title="独立复核" :show-back="false">
       <template #actions>
+        <el-button
+          v-if="snapshotMode"
+          type="primary"
+          size="small"
+          :loading="refreshingSnapshot"
+          @click="onRefreshSnapshot"
+        >
+          🔄 刷新快照
+        </el-button>
         <el-button size="small" @click="goBack">← 返回工作台</el-button>
       </template>
     </GtPageHeader>
+
+    <!-- 快照模式提示横幅 -->
+    <el-alert
+      v-if="snapshotMode && snapshotInfo"
+      :closable="false"
+      type="info"
+      show-icon
+      style="margin-top: 12px"
+    >
+      <template #title>
+        📸 快照模式（只读） — 数据截止于 {{ snapshotInfo.created_at_display }}
+      </template>
+      <template #default>
+        当前显示的是 EQCR 快照数据，所有编辑操作已禁用。如需查看最新数据，请点击"刷新快照"。
+      </template>
+    </el-alert>
 
     <!-- 非 EQCR 访问提示 -->
     <el-alert
@@ -255,6 +280,76 @@ const activeTab = ref<
   'materiality' | 'estimate' | 'related_party' | 'going_concern' | 'opinion_type' | 'shadow_compute' | 'review_notes' | 'prior_year' | 'memo' | 'component_auditor' | 'key_findings_summary'
 >('materiality')
 
+// ─── Phase 4 F3: EQCR 快照模式 ─────────────────────────────────────────────
+const snapshotMode = ref(false)
+const snapshotInfo = ref<{
+  id: string
+  created_at: string
+  created_at_display: string
+  snapshot_data: any
+} | null>(null)
+const refreshingSnapshot = ref(false)
+
+/** 加载快照数据 */
+async function loadSnapshot() {
+  if (!projectId.value) return
+  try {
+    const api = (await import('@/services/apiProxy')).default
+    const year = eqcrYear.value
+    const data = await api.get(`${P_eqcr.snapshot(projectId.value)}?year=${year}`)
+    if (data) {
+      snapshotMode.value = true
+      const createdAt = data.created_at ? new Date(data.created_at) : null
+      snapshotInfo.value = {
+        id: data.id,
+        created_at: data.created_at,
+        created_at_display: createdAt
+          ? `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}-${String(createdAt.getDate()).padStart(2, '0')} ${String(createdAt.getHours()).padStart(2, '0')}:${String(createdAt.getMinutes()).padStart(2, '0')}`
+          : '未知',
+        snapshot_data: data.snapshot_data,
+      }
+    }
+  } catch (e: any) {
+    // 404 = 无快照，正常情况（非快照模式）
+    if (e?.response?.status !== 404) {
+      console.warn('[EQCR] 加载快照失败', e)
+    }
+    snapshotMode.value = false
+    snapshotInfo.value = null
+  }
+}
+
+/** 刷新快照 */
+async function onRefreshSnapshot() {
+  if (!projectId.value) return
+  refreshingSnapshot.value = true
+  try {
+    const api = (await import('@/services/apiProxy')).default
+    const year = eqcrYear.value
+    const data = await api.post(`${P_eqcr.snapshotRefresh(projectId.value)}?year=${year}`)
+    if (data) {
+      const createdAt = data.created_at ? new Date(data.created_at) : null
+      snapshotInfo.value = {
+        id: data.id,
+        created_at: data.created_at,
+        created_at_display: createdAt
+          ? `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}-${String(createdAt.getDate()).padStart(2, '0')} ${String(createdAt.getHours()).padStart(2, '0')}:${String(createdAt.getMinutes()).padStart(2, '0')}`
+          : '未知',
+        snapshot_data: data.snapshot_data,
+      }
+      ElMessage.success('快照已刷新，数据已更新为最新版本')
+    }
+  } catch (e: any) {
+    handleApiError(e, '刷新快照')
+  } finally {
+    refreshingSnapshot.value = false
+  }
+}
+
+// 快照模式下禁用所有编辑操作
+const snapshotReadonly = computed(() => snapshotMode.value)
+provide('eqcrSnapshotReadonly', snapshotReadonly)
+
 const project = computed(() => overview.value?.project ?? null)
 const reportStatus = computed<ReportStatusValue | null>(
   () => overview.value?.report_status ?? null,
@@ -294,16 +389,17 @@ const isConsolidated = computed<boolean>(
 
 /** 当前用户是否为本项目 EQCR。非 EQCR 用户进入只读模式，禁用意见录入。 */
 const opinionFormDisabled = computed<boolean>(
-  () => !(overview.value?.my_role_confirmed ?? false),
+  () => snapshotMode.value || !(overview.value?.my_role_confirmed ?? false),
 )
 provide('eqcrOpinionFormDisabled', opinionFormDisabled)
 
 /**
  * 关联方 CRUD 写入权限：非 EQCR 角色（经理/合伙人/admin）可写。
  * 后端已做 403 兜底，前端仅控制 UI 显隐。
+ * 快照模式下强制只读。
  */
 const canWriteRelatedParties = computed<boolean>(
-  () => !(overview.value?.my_role_confirmed ?? true),
+  () => !snapshotMode.value && !(overview.value?.my_role_confirmed ?? true),
 )
 
 const daysToSigning = computed<number | null>(() => {
@@ -458,7 +554,10 @@ async function onUnlockClick() {
   }
 }
 
-onMounted(loadOverview)
+onMounted(() => {
+  loadOverview()
+  loadSnapshot()
+})
 
 watch(
   () => projectId.value,
@@ -565,6 +664,11 @@ function reportStatusType(
 
 .eqcr-tabs {
   margin-top: 16px;
+}
+/* Phase 4 F3: 快照模式下 tabs 区域添加只读视觉提示 */
+.eqcr-project-view--snapshot .eqcr-tabs {
+  opacity: 0.95;
+  pointer-events: auto;
 }
 /* Spec A R1：Tab badge 微调（el-badge 默认偏右上角，调到与文字基线对齐） */
 .eqcr-tab-badge {

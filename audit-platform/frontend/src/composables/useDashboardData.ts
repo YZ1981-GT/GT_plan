@@ -167,6 +167,10 @@ export function useDashboardData(projectId: Ref<string>) {
     () => data.value?.open_reviews?.items ?? [],
   )
 
+  const openReviewsData: ComputedRef<OpenReviewsData | null> = computed(
+    () => data.value?.open_reviews ?? null,
+  )
+
   const timeline: ComputedRef<TimelineData | null> = computed(
     () => data.value?.timeline ?? null,
   )
@@ -196,6 +200,7 @@ export function useDashboardData(projectId: Ref<string>) {
     cycleProgress,
     vrSummary,
     openReviews,
+    openReviewsData,
     timeline,
     trimmingOverview,
   }

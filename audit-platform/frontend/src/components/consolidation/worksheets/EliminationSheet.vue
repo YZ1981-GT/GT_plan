@@ -87,9 +87,9 @@
     <div class="ws-balance-check">
       <span>借方合计: <b class="ws-computed">{{ fmt(totalDebit) }}</b></span>
       <span style="margin:0 12px">贷方合计: <b class="ws-computed">{{ fmt(totalCredit) }}</b></span>
-      <span :class="totalDebit - totalCredit !== 0 ? 'ws-diff-warn' : ''" style="font-weight:600">
-        差额: {{ fmt(totalDebit - totalCredit) }}
-        <span v-if="totalDebit - totalCredit === 0" style="color: var(--gt-color-success);margin-left:4px">✓ 平衡</span>
+      <span :class="elimBalanceDiff !== 0 ? 'ws-diff-warn' : ''" style="font-weight:600">
+        差额: {{ fmt(elimBalanceDiff) }}
+        <span v-if="elimBalanceDiff === 0" style="color: var(--gt-color-success);margin-left:4px">✓ 平衡</span>
         <span v-else style="color: var(--gt-color-wheat);margin-left:4px">⚠ 不平衡</span>
       </span>
     </div>
@@ -104,6 +104,7 @@ import { confirmBatch } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
+import { useDecimalCalc } from '@/composables/useDecimalCalc'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface EntryRow {
@@ -130,6 +131,7 @@ const sheetRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedCustomRows = ref<EntryRow[]>([])
 const n = (v: any) => Number(v) || 0
+const { sum: decSum, sub: decSub } = useDecimalCalc()
 
 // 科目树形选项（父节点 disabled 禁止选中，只能选叶子科目）
 const subjectTree = [
@@ -287,8 +289,9 @@ function onSelChange(sel: any[]) {
 // ─── 合并所有分录 ────────────────────────────────────────────────────────────
 const allEntries = computed(() => [...autoEntries.value, ...customEntries])
 
-const totalDebit = computed(() => allEntries.value.filter(r => r.direction === '借').reduce((s, r) => s + n(r.amount), 0))
-const totalCredit = computed(() => allEntries.value.filter(r => r.direction === '贷').reduce((s, r) => s + n(r.amount), 0))
+const totalDebit = computed(() => Number(decSum(...allEntries.value.filter(r => r.direction === '借').map(r => String(n(r.amount))))))
+const totalCredit = computed(() => Number(decSum(...allEntries.value.filter(r => r.direction === '贷').map(r => String(n(r.amount))))))
+const elimBalanceDiff = computed(() => Number(decSub(String(totalDebit.value), String(totalCredit.value))))
 
 // ─── 导出/导入 ───────────────────────────────────────────────────────────────
 const { exportTemplate: _exportTemplate, exportData: _exportData, onFileSelected: _onFileSelected } = useExcelIO()

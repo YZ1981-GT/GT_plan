@@ -44,9 +44,10 @@ export function useProjectEvents(projectId: Ref<string>) {
     lastEvent.value = evt
 
     // Dispatch to typed handlers
-    if (payload.event_type === 'DATASET_ACTIVATED' || payload.event_type === 'LEDGER_DATASET_ACTIVATED') {
+    const et = payload.event_type as string
+    if (et === 'DATASET_ACTIVATED' || payload.event_type === 'ledger.dataset_activated') {
       activatedHandlers.forEach(h => h(evt))
-    } else if (payload.event_type === 'DATASET_ROLLED_BACK' || payload.event_type === 'LEDGER_DATASET_ROLLED_BACK') {
+    } else if (et === 'DATASET_ROLLED_BACK' || payload.event_type === 'ledger.dataset_rolled_back') {
       rolledBackHandlers.forEach(h => h(evt))
     }
 

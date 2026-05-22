@@ -5,18 +5,20 @@
 | 版本 | 日期 | 变更内容 |
 |------|------|----------|
 | v0.1 | 2026-05-20 | 初始设计 |
+| v0.2 | 2026-05-20 | Sprint 0 实测后补强：①CYCLE_INFERENCE_RULES 共享常量 ②cross_module 虚拟节点策略 ③severity 5 级颜色 ④节点数从 60 调整到 128 |
 
 ---
 
 ## Overview
 
-本设计实现"联动全景图"功能：新建 `/projects/:id/linkage-panorama` 页面，使用 D3.js 力导向图渲染 400 条 CWR（Cross Workpaper Reference）的宏观依赖关系网络，支持按循环着色、severity 着色、stale 状态叠加、缩放/拖拽/搜索/过滤交互，以及点击节点跳转底稿。
+本设计实现"联动全景图"功能：新建 `/projects/:id/linkage-panorama` 页面，使用 D3.js 力导向图渲染全量 CWR（Cross Workpaper Reference，Sprint 0 实测 400 条 ref / 401 条边 / 128 唯一节点）的宏观依赖关系网络，支持按循环着色、severity 着色、stale 状态叠加、缩放/拖拽/搜索/过滤交互，以及点击节点跳转底稿。
 
 核心设计原则：
 - **D3.js 直接操作 SVG**：Vue 3 负责生命周期管理和响应式数据，D3 负责力模拟和 SVG 渲染（不使用 Vue 虚拟 DOM 管理 SVG 元素）
 - **单端点聚合**：后端 GET 端点一次返回全量图数据（nodes + edges + stale 状态 + 统计），前端无需多次请求
-- **数据规模适中**：~60 unique nodes + 400 edges，SVG 渲染完全胜任（无需 Canvas）
+- **数据规模适中**：128 unique nodes（含 18 个 cross_module 虚拟节点）+ 401 edges，SVG 渲染完全胜任（无需 Canvas）
 - **纯只读可视化**：不涉及图编辑，不涉及 WebSocket 实时推送
+- **cycle 推断兜底**：A/B/C/S/other 类节点全部归入对应类别（不漏不抛错），module 类节点用虚拟前缀 `__module__` 区分
 
 ---
 
@@ -163,18 +165,42 @@ async def get_graph_data(
 ```python
 def aggregate_graph_from_cwr(references: list[dict]) -> tuple[list[dict], list[dict]]:
     """
-    输入: cross_wp_references.json 的 references 数组 (400 条)
+    输入: cross_wp_references.json 的 references 数组（Sprint 0 实测 400 条）
     输出: (nodes, edges)
     
     节点聚合规则:
-    - 遍历所有 ref 的 source_wp + targets[].wp_code
-    - 按 wp_code 去重 → ~60 unique nodes
-    - 每个节点附加: cycle (从 wp_code 首字母推断), degree (出入度)
+    - 遍历所有 ref 的 source_wp + targets[].wp_code（标准 CWR）
+    - 对 cross_module 类 target（含 target_module 不含 wp_code），生成虚拟节点 __module__{target_module}
+    - 按 wp_code/虚拟 id 去重（实测 ~128 unique，含 ~18 模块虚拟节点）
+    - 每个节点附加: cycle (按 CYCLE_INFERENCE_RULES 推断), degree (出入度)
     
     边生成规则:
-    - 每条 CWR 的每个 target 生成一条边: source_wp → target.wp_code
-    - 边附加: ref_id, severity, category
+    - 标准 ref：每条 CWR 的每个 wp_code target 生成一条边: source_wp → target.wp_code
+    - cross_module ref：source_wp → __module__{target_module}
+    - 边附加: ref_id, severity, category, label (target_field 或 sheet)
     """
+
+
+# CYCLE_INFERENCE_RULES — 共享常量，前后端用同一份逻辑
+def infer_cycle(wp_code: str) -> str:
+    """
+    Cycle 推断函数（前后端共享逻辑）：
+    1. __module__ 前缀 → 'module'
+    2. BS/IS/CFS/EQ 前缀 → 'report'
+    3. 中文'附注'前缀 或 NOTE 前缀 → 'note'
+    4. wp_code 首字母 ∈ {A,B,C,D,E,F,G,H,I,J,K,L,M,N,S} 且首字母后非字母（避免 BS/EQ 误命中）→ 该字母
+    5. 其余 → 'other'
+    """
+    if wp_code.startswith('__module__'):
+        return 'module'
+    cu = wp_code.upper()
+    if cu.startswith(('BS', 'IS', 'CFS', 'EQ')):
+        return 'report'
+    if wp_code.startswith('附注') or cu.startswith('NOTE'):
+        return 'note'
+    if cu and cu[0] in 'ABCDEFGHIJKLMNS' and (len(cu) == 1 or not cu[1].isalpha()):
+        return cu[0]
+    return 'other'
 ```
 
 ---
@@ -244,6 +270,7 @@ interface D3Link extends d3.SimulationLinkDatum<D3Node> {
 ```typescript
 // 节点颜色 — 按循环
 export const CYCLE_COLOR_MAP: Record<string, string> = {
+  // 业务循环
   D: '#1976D2',  // 蓝
   E: '#00ACC1',  // 青
   F: '#43A047',  // 绿
@@ -255,22 +282,34 @@ export const CYCLE_COLOR_MAP: Record<string, string> = {
   L: '#8D6E63',  // 棕
   M: '#AB47BC',  // 紫
   N: '#E53935',  // 红
+  // 辅助类（v0.2 新增）
+  A: '#26A69A',  // 蓝绿（A 类报表/调整）
+  B: '#7E57C2',  // 淡紫（B 类控制了解）
+  C: '#5C6BC0',  // 紫蓝（C 类控制测试）
+  S: '#FFA726',  // 浅橙（S 专项程序）
+  // 报表/附注/模块/兜底
   report: '#0D47A1',  // 深蓝 (BS/IS/CFS/EQ)
   note: '#4A148C',    // 深紫 (附注)
+  module: '#607D8B',  // 蓝灰 (cross_module 虚拟节点)
+  other: '#BDBDBD',   // 中灰 (兜底)
 }
 
-// 边颜色 — 按 severity
+// 边颜色 — 按 severity（v0.2 扩展为 5 级）
 export const SEVERITY_COLOR_MAP: Record<string, string> = {
-  blocking: '#D32F2F',  // 红
-  warning: '#F57C00',   // 橙
-  info: '#9E9E9E',      // 灰
+  blocking: '#D32F2F',     // 红
+  warning: '#F57C00',      // 橙
+  info: '#9E9E9E',         // 灰
+  recommended: '#42A5F5',  // 浅蓝（B/C 控制建议）
+  required: '#EF6C00',     // 深橙（A 类必填）
 }
 
 // 边线宽 — 按 severity
 export const SEVERITY_WIDTH_MAP: Record<string, number> = {
   blocking: 2,
+  required: 2,
   warning: 1.5,
   info: 1,
+  recommended: 1,
 }
 ```
 
@@ -342,7 +381,19 @@ const simulation = d3.forceSimulation<D3Node>(nodes)
 
 - 决策：后端一次性加载 cross_wp_references.json + 查询 DB stale 状态，聚合后返回
 - 理由：①前端无需关心数据来源（JSON 文件 vs DB）②单次请求减少网络往返 ③聚合逻辑在后端可缓存（未来可加 Redis 缓存）④JSON 文件 400 条加载 + 聚合耗时 < 50ms
-- 权衡：每次请求都重新加载 JSON 文件（无缓存），但文件仅 ~100KB，I/O 开销可忽略
+- 权衡：每次请求都重新加载 JSON 文件（无缓存），如未来响应 > 800ms，启用 `functools.lru_cache(maxsize=1)` + 文件 mtime 失效策略；当前实施先不做缓存
+
+**ADR-6: cross_module 类 target 处理（v0.2 新增）**
+
+- 决策：为 cross_module 类 target 生成虚拟节点 id=`__module__{target_module}`，cycle='module'
+- 理由：①Sprint 0 实测 7.75% 边（31/401）属于 cross_module 类，无 wp_code 但有 target_module ②若直接丢弃会损失 B15 重要性→trial_balance 等关键联动 ③虚拟节点用 `__module__` 前缀避免与真实 wp_code 冲突 ④cycle='module' 在颜色映射中独立着色（蓝灰 #607D8B），用户可识别这是模块级而非底稿级节点
+- 权衡：虚拟节点不可点击跳转到底稿（只能跳模块对应页面），点击行为按 target_module 路由到对应视图（trial_balance / consolidation / disclosure_notes 等）；如 target_module 无对应路由则 toast 提示
+
+**ADR-7: 节点 cycle 推断兜底（v0.2 新增）**
+
+- 决策：实测识别 5 个无法归类节点（PL/REPORT/T1/TB/disclosure），统一归 'other' cycle 并用中灰着色
+- 理由：①spec 起草时未预料到 PL/T1/TB 这类历史遗留命名 ②强行归到 D~N 会误导用户 ③other 兜底 + 中灰着色 + 图例标注"未分类"使其可见但不抢眼 ④后续可独立 spec 修正这些命名（不阻塞本期上线）
+- 权衡：other 节点缺少业务循环归属，过滤器不会误把它们当循环节点；图例需明确标注 "其他/未分类"
 
 ---
 

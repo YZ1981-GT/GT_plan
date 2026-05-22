@@ -117,6 +117,27 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         comment="是否有外币业务（驱动 E1-1 双区显隐 + E1-3 双版本二选一）",
     )
 
+    # Phase 6 F8: 复核链配置（2-4 级可配置状态机）
+    review_config: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=None,
+        comment='复核链配置: {"levels":2|3|4,"level_roles":{"L1":"manager","L2":"partner",...}}',
+    )
+
+    # Phase 7 F8: 工时预算配置
+    budget_config: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=None,
+        comment='工时预算配置: {"by_cycle":{"D":100,"E":80,...},"by_user":{"user_id":160,...},"total":800}',
+    )
+
+    # 软删除标记
+    is_deleted: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
+
     __table_args__ = (
         Index(
             "idx_projects_status",

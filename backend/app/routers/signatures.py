@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.routers.password_confirm import require_confirmation_token
 from app.services.sign_service import SignService
 
 router = APIRouter(tags=["signatures"])
@@ -36,8 +37,12 @@ class SignRequest(BaseModel):
 
 
 @router.post("/api/signatures/sign")
-async def sign_document(body: SignRequest, db: AsyncSession = Depends(get_db)):
-    """签署文档"""
+async def sign_document(
+    body: SignRequest,
+    db: AsyncSession = Depends(get_db),
+    _token: None = Depends(require_confirmation_token),
+):
+    """签署文档（需二次密码确认）"""
     svc = SignService()
     try:
         result = await svc.sign_document(

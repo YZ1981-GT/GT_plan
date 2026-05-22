@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.routers.password_confirm import require_confirmation_token
 from app.services.archive_orchestrator import ArchiveOrchestrator
 
 router = APIRouter(
@@ -44,8 +45,9 @@ async def orchestrate_archive(
     body: OrchestrateRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _token: None = Depends(require_confirmation_token),
 ):
-    """启动归档编排流程。
+    """启动归档编排流程（需二次密码确认）。
 
     串行执行 gate → wp_storage → push_to_cloud(可选) → purge_local(可选)。
     返回 ArchiveJob 状态，前端可轮询 jobs/{id} 获取进度。

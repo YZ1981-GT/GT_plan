@@ -2,22 +2,28 @@
 
 ## Overview
 
-基于 requirements.md 和 design.md，将联动全景图功能拆分为 2 个 Sprint：Sprint 1 后端端点 + D3 依赖 + ForceGraph 核心组件，Sprint 2 交互功能（zoom/filter/search/stale）+ 页面集成 + 测试。后端使用 Python（FastAPI + hypothesis PBT），前端使用 TypeScript（Vue 3 + D3.js + Element Plus + vitest + fast-check PBT）。
+基于 requirements.md v0.2 和 design.md v0.2，将联动全景图功能拆分为：Sprint 0 实测基线（已完成，结果回灌 spec）+ Sprint 1 后端端点 + D3 依赖 + ForceGraph 核心组件 + Sprint 2 交互功能（zoom/filter/search/stale）+ 页面集成 + 测试。后端使用 Python（FastAPI + hypothesis PBT），前端使用 TypeScript（Vue 3 + D3.js + Element Plus + vitest + fast-check PBT）。
 
-预计工时：3 天（Sprint 1: 1.5 天，Sprint 2: 1.5 天）
+预计工时：3 天（Sprint 0: 已完成 / Sprint 1: 1.5 天 / Sprint 2: 1.5 天）
 
 ## Tasks
+
+- [x] 0. Sprint 0 — 实测基线
+  - [x] 0.1 跑实测脚本输出 Sprint 0 基线变量并回灌 requirements
+    - 实测 cross_wp_references.json：N_cwr_total=400 / N_cwr_with_wp_target=370 / N_cwr_cross_module=31 / N_total_unique_nodes=128 / severity 5 级 / cycle 17 类
+    - 偏差归零回灌 requirements §Sprint 0 实测基线 + design v0.2 + tasks v0.2
+    - _Requirements: 9.2, 9.3, 9.8, 9.9_
 
 - [ ] 1. Sprint 1 — 后端端点 + D3 依赖 + ForceGraph 核心
   - [ ] 1.1 创建后端图数据聚合服务
     - 创建 `backend/app/services/linkage_panorama_aggregator.py`
-    - 实现 `aggregate_graph_from_cwr(references)` 函数：遍历 400 条 CWR → 按 wp_code 去重聚合节点 → 生成边列表
-    - 节点聚合：收集所有 `source_wp` + `targets[].wp_code` → 去重 → 推断 cycle（首字母 D~N / BS|IS|CFS|EQ→report / 其他→note）
-    - 计算每个节点的 degree（出入度）
+    - 实现 `infer_cycle(wp_code)` 函数（design v0.2 共享逻辑）：__module__→module / BS|IS|CFS|EQ→report / 附注|NOTE→note / A~N|S 首字母→该字母 / 其余→other
+    - 实现 `aggregate_graph_from_cwr(references)` 函数：遍历全量 CWR → 标准 ref 按 wp_code 去重聚合节点 → cross_module 类 target（含 target_module 不含 wp_code）生成虚拟节点 `__module__{target_module}` → 生成边列表
+    - 节点附加：cycle (调用 infer_cycle)、degree（出入度）、label（wp_code 或 target_module）
     - 实现 `overlay_stale_status(nodes, edges, stale_wp_codes)` 函数：将 DB 查询的 stale wp_codes 叠加到节点和边
-    - 边 is_stale 规则：source 或 target 任一 stale → 边 stale
-    - 实现 `compute_statistics(nodes, edges)` 函数：计算 node_count/edge_count/stale_node_count/stale_edge_count/blocking_edge_count
-    - _Requirements: 9.2, 9.3_
+    - 边 is_stale 规则：source 或 target 任一 stale → 边 stale；虚拟模块节点不参与 stale（始终 false）
+    - 实现 `compute_statistics(nodes, edges)` 函数：node_count/edge_count/stale_node_count/stale_edge_count/blocking_edge_count/severity_distribution（5 级计数）
+    - _Requirements: 9.2, 9.3, 9.8, 9.9_
 
   - [ ] 1.2 创建后端 linkage_panorama.py 路由
     - 创建 `backend/app/routers/linkage_panorama.py`
@@ -34,13 +40,15 @@
     - 测试认证守卫（无 token → 401）
     - 测试 JSON 加载失败 → 503
     - 创建 `backend/tests/test_linkage_panorama_aggregator.py`
+    - 测试 infer_cycle 各分支：H1→H / BS-1→report / 附注-资产→note / __module__trial_balance→module / PL→other / B15→B / C2-1→C / S5→S
     - 测试空 CWR → 空图
-    - 测试单条 CWR → 2 节点 1 边
-    - 测试 cycle 推断逻辑（D1→D, BS→report, 附注→note）
+    - 测试单条标准 CWR → 2 节点 1 边
+    - 测试 cross_module 类 CWR → 1 真节点 + 1 虚拟节点 + 1 边
     - 测试 degree 计算正确性
-    - 测试 stale 叠加逻辑（source stale → 边 stale / target stale → 边 stale）
-    - 测试 statistics 计算
-    - _Requirements: 9.1~9.7_
+    - 测试 stale 叠加逻辑（source stale → 边 stale / target stale → 边 stale / 虚拟模块节点不 stale）
+    - 测试 statistics 含 5 级 severity 分布
+    - 测试断言全部使用运行时聚合结果（不硬编码 128/370 等字面量）
+    - _Requirements: 9.1~9.9_
 
   - [ ] 1.4 安装 D3.js 前端依赖
     - `npm install d3 --save` + `npm install @types/d3 --save-dev`
@@ -83,7 +91,7 @@
     - 路由名称：`LinkagePanorama`
     - _Requirements: 1.1_
 
-  - [ ] 1.9 创建 LinkagePanoramaView.vue 页面骨架
+  - [x] 1.9 创建 LinkagePanoramaView.vue 页面骨架
     - 创建 `audit-platform/frontend/src/views/LinkagePanoramaView.vue`
     - 全屏布局：顶部工具栏 48px + 图区域填满剩余高度
     - 工具栏：项目名称 + "联动全景图" 标题 + 占位 slot（过滤器/搜索/按钮在 Sprint 2 填充）
@@ -92,7 +100,7 @@
     - _Requirements: 1.2, 1.3, 1.5_
 
 - [ ] 2. Sprint 2 — 交互功能 + 页面集成 + 测试
-  - [ ] 2.1 实现缩放/拖拽交互
+  - [x] 2.1 实现缩放/拖拽交互
     - 在 ForceGraph.vue 中添加 `d3.zoom()` behavior
     - 缩放范围：scaleExtent([0.1, 5])
     - 缩放中心：鼠标指针位置
@@ -176,7 +184,7 @@
     - ≥ 100 iterations
     - **Validates: Requirements 9.2, 2.1**
 
-  - [ ]* 3.3 Write property test: stale subset invariant (P3)
+  - [x]* 3.3 Write property test: stale subset invariant (P3)
     - **Property 3: Stale subset invariant**
     - 使用 hypothesis 生成随机 nodes + 随机 stale_wp_codes 子集
     - 调用 `overlay_stale_status` → 验证 stale_nodes ⊆ all_nodes 且 stale_edges ⊆ all_edges

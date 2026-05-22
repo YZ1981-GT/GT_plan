@@ -30,11 +30,65 @@
           :project-id="projectId"
           :on-refresh="fetchReadiness"
         />
+
+        <!-- 完整性自检报告面板 -->
+        <div class="gt-completeness-report" :class="{ 'gt-completeness-print': isPrinting }">
+          <div class="gt-completeness-report-header">
+            <h3>归档前完整性自检报告</h3>
+            <el-button size="small" @click="exportPdf">导出 PDF</el-button>
+          </div>
+
+          <div v-if="completenessLoading" v-loading="true" style="min-height: 100px" />
+          <template v-else-if="completenessReport">
+            <div class="gt-completeness-categories">
+              <div
+                v-for="cat in completenessReport.categories"
+                :key="cat.category"
+                class="gt-completeness-category"
+                :class="{ 'gt-completeness-blocking': cat.is_blocking && cat.count > 0 }"
+              >
+                <div class="gt-completeness-category-header">
+                  <span class="gt-completeness-category-name">
+                    {{ categoryLabel(cat.category) }}
+                  </span>
+                  <el-tag
+                    :type="cat.is_blocking && cat.count > 0 ? 'danger' : cat.count > 0 ? 'warning' : 'success'"
+                    size="small"
+                  >
+                    {{ cat.count }} 项
+                  </el-tag>
+                  <el-tag v-if="cat.is_blocking && cat.count > 0" type="danger" size="small" effect="dark" style="margin-left: 4px">
+                    阻断
+                  </el-tag>
+                </div>
+                <el-table
+                  v-if="cat.items.length > 0"
+                  :data="cat.items"
+                  size="small"
+                  stripe
+                  style="margin-top: 8px"
+                >
+                  <el-table-column prop="wp_code" label="底稿编号" width="120" />
+                  <el-table-column prop="wp_name" label="底稿名称" min-width="180" />
+                  <el-table-column prop="assignee" label="责任人" width="100" />
+                  <el-table-column prop="status" label="状态" width="100" />
+                </el-table>
+              </div>
+            </div>
+
+            <div class="gt-completeness-footer">
+              <span>生成时间：{{ completenessReport.generated_at ? new Date(completenessReport.generated_at).toLocaleString('zh-CN') : '-' }}</span>
+              <el-tag v-if="completenessReport.can_proceed" type="success" size="default">可以继续归档</el-tag>
+              <el-tag v-else type="danger" size="default">存在阻断项，无法继续</el-tag>
+            </div>
+          </template>
+        </div>
+
         <div class="gt-archive-step-actions">
           <el-button @click="goBack">返回</el-button>
           <el-button
             type="primary"
-            :disabled="!readinessData.ready"
+            :disabled="!readinessData.ready || (completenessReport !== null && !completenessReport.can_proceed)"
             @click="currentStep = 1"
           >
             下一步
@@ -222,6 +276,7 @@ import type { ArchiveJob } from '@/services/archiveApi'
 import { showApiError } from '@/composables/useApiError'
 import { handleApiError } from '@/utils/errorHandler'
 import { ARCHIVE_SCOPE } from '@/constants/statusEnum'
+import { api } from '@/services/apiProxy'
 
 const route = useRoute()
 const router = useRouter()
@@ -259,6 +314,64 @@ const archiveOptions = ref({
   push_to_cloud: true,
   purge_local: false,
 })
+
+// ── 完整性自检报告 ──────────────────────────────────────────────────────────
+interface CheckItem {
+  wp_code: string
+  wp_name: string
+  assignee: string | null
+  status: string
+}
+
+interface CheckCategory {
+  category: string
+  count: number
+  items: CheckItem[]
+  is_blocking: boolean
+}
+
+interface CompletenessReport {
+  categories: CheckCategory[]
+  can_proceed: boolean
+  generated_at: string
+}
+
+const completenessLoading = ref(false)
+const completenessReport = ref<CompletenessReport | null>(null)
+const isPrinting = ref(false)
+
+function categoryLabel(category: string): string {
+  switch (category) {
+    case 'missing': return '缺失底稿'
+    case 'unsigned': return '未签字底稿'
+    case 'unresolved_reviews': return '未解决复核意见'
+    case 'stale': return '过期底稿'
+    default: return category
+  }
+}
+
+async function fetchCompletenessReport() {
+  completenessLoading.value = true
+  try {
+    const data = await api.get<CompletenessReport>(
+      `/api/projects/${projectId.value}/archive-completeness-report`
+    )
+    completenessReport.value = data
+  } catch (err: any) {
+    completenessReport.value = null
+    handleApiError(err, '获取完整性报告')
+  } finally {
+    completenessLoading.value = false
+  }
+}
+
+function exportPdf() {
+  isPrinting.value = true
+  setTimeout(() => {
+    window.print()
+    isPrinting.value = false
+  }, 100)
+}
 
 // ── 执行状态 ──────────────────────────────────────────────────────────────
 const isExecuting = ref(false)
@@ -377,8 +490,9 @@ onMounted(async () => {
     currentStep.value = 2
     startPolling(jobIdFromRoute.value)
   } else {
-    // 正常流程：先拉就绪检查
+    // 正常流程：先拉就绪检查 + 完整性报告
     await fetchReadiness()
+    fetchCompletenessReport()
   }
 })
 
@@ -548,5 +662,86 @@ onBeforeUnmount(() => {
   margin: 4px 0;
   font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary, #606266);
+}
+
+/* ── 完整性自检报告 ── */
+.gt-completeness-report {
+  margin-top: 20px;
+  padding: 16px;
+  background: var(--el-fill-color-lighter, #fafafa);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+}
+
+.gt-completeness-report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.gt-completeness-report-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--el-text-color-primary, #303133);
+}
+
+.gt-completeness-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gt-completeness-category {
+  padding: 12px;
+  background: var(--el-bg-color, #fff);
+  border-radius: 6px;
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+}
+
+.gt-completeness-category.gt-completeness-blocking {
+  border-color: var(--el-color-danger-light-5, #fab6b6);
+  background: var(--el-color-danger-light-9, #fef0f0);
+}
+
+.gt-completeness-category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gt-completeness-category-name {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--el-text-color-primary, #303133);
+}
+
+.gt-completeness-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--el-border-color-lighter, #ebeef5);
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
+}
+
+/* PDF 打印样式 */
+@media print {
+  .gt-archive-wizard {
+    max-width: none;
+    padding: 0;
+  }
+  .gt-archive-step-actions,
+  .gt-archive-step-desc,
+  .gt-completeness-report-header .el-button {
+    display: none !important;
+  }
+  .gt-completeness-print {
+    border: none;
+    background: white;
+  }
 }
 </style>

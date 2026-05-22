@@ -13,7 +13,7 @@ from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import get_db, set_rls_context
 from app.core.redis import get_redis
 from app.core.security import decode_token
 
@@ -157,8 +157,11 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> User:
-        # admin 跳过项目权限检查
+        # admin 跳过项目权限检查（不设置 RLS context，admin 使用 bypass 函数）
         if current_user.role.value == "admin":
+            # admin 仍设置 RLS context 以便普通查询正常工作
+            # 跨项目聚合查询使用 SECURITY DEFINER 函数绕过
+            await set_rls_context(db, project_id)
             return current_user
 
         # Try Redis cache first
@@ -168,6 +171,8 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
             required_level = PERMISSION_HIERARCHY.get(min_permission, 0)
             if user_level < required_level:
                 raise HTTPException(status_code=403, detail="权限不足")
+            # 设置 RLS context（SET LOCAL 仅当前事务有效）
+            await set_rls_context(db, project_id)
             return current_user
 
         # 查询 project_users 表
@@ -194,6 +199,8 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
         if user_level < required_level:
             raise HTTPException(status_code=403, detail="权限不足")
 
+        # 设置 RLS context（SET LOCAL 仅当前事务有效）
+        await set_rls_context(db, project_id)
         return current_user
 
     return dependency

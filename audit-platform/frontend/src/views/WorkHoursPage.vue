@@ -84,6 +84,11 @@
           <el-empty description="工时统计功能开发中" />
         </div>
       </el-tab-pane>
+
+      <!-- ═══ Tab 4: 预算对比 (Phase 7 F8) ═══ -->
+      <el-tab-pane label="预算对比" name="budget">
+        <BudgetCompareChart />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -97,6 +102,7 @@ import { usePasteImport } from '@/composables/usePasteImport'
 import { useEditMode } from '@/composables/useEditMode'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import WorkHourApprovalTab from '@/components/workhour/WorkHourApprovalTab.vue'
+import BudgetCompareChart from '@/components/workhour/BudgetCompareChart.vue'
 import { handleApiError } from '@/utils/errorHandler'
 
 const { can } = usePermission()

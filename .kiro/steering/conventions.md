@@ -314,6 +314,18 @@ WHERE l.project_id = :pid AND l.year = :yr
   )
 ```
 
+### 迁移脚本编号规则（V*.sql / R*.sql）
+
+- 目录：`backend/migrations/`
+- 前进脚本：`V{NNN}__{description}.sql`（如 V005__enable_rls.sql）
+- 回滚脚本：`R{NNN}__{rollback_description}.sql`（如 R005__disable_rls.sql）
+- 编号规则：**实施时动态确定 max+1**，禁止在 spec 起草阶段硬编码编号（因为并行 spec 可能冲突）
+- 确定方法：`ls backend/migrations/V*.sql | sort | tail -1` 取最大编号 +1
+- 每个 V*.sql 必须有配套 R*.sql 回滚脚本
+- 回滚脚本必须使用 `IF EXISTS` / `DO $$` 块保证幂等性
+- R001 是 no-op（基线回滚太危险，仅文档记录）
+- 当前已落地：V001~V006 / R001~R006
+
 
 ## Spec 目标设定规约（2026-05-11 沉淀）
 

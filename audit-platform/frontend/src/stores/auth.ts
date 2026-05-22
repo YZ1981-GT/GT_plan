@@ -42,7 +42,14 @@ export const useAuthStore = defineStore('auth', {
     return {
       token: sessionStorage.getItem('token'),
       refreshToken: sessionStorage.getItem('refreshToken'),
-      user: null,
+      user: (() => {
+        try {
+          const s = sessionStorage.getItem('user')
+          return s ? JSON.parse(s) : null
+        } catch {
+          return null
+        }
+      })(),
     }
   },
 
@@ -61,6 +68,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = payload.user ?? null
       sessionStorage.setItem('token', this.token!)
       sessionStorage.setItem('refreshToken', this.refreshToken!)
+      if (this.user) sessionStorage.setItem('user', JSON.stringify(this.user))
     },
 
     async logout() {
@@ -78,6 +86,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = null
       sessionStorage.removeItem('token')
       sessionStorage.removeItem('refreshToken')
+      sessionStorage.removeItem('user')
     },
 
     async refreshAccessToken() {
@@ -96,6 +105,7 @@ export const useAuthStore = defineStore('auth', {
       // 使用带拦截器的 http 实例，自动附加 token + 401 刷新
       const { data } = await http.get(API.users.me)
       this.user = data
+      if (this.user) sessionStorage.setItem('user', JSON.stringify(this.user))
     },
   },
 })

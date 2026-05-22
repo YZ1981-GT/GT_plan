@@ -15,14 +15,20 @@ if not Path(_env_file).exists() and _root_env.exists():
 class Settings(BaseSettings):
     # 数据库
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform"
-    DB_POOL_SIZE: int = 10       # 连接池常驻连接数
-    DB_MAX_OVERFLOW: int = 20    # 连接池最大溢出连接数
+    DB_POOL_SIZE: int = 50       # 连接池常驻连接数（6000 并发优化）
+    DB_MAX_OVERFLOW: int = 100   # 连接池最大溢出连接数（6000 并发优化）
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_MODE: str = "single"  # single / sentinel
+    REDIS_SENTINEL_HOSTS: str = "localhost:26379,localhost:26380,localhost:26381"
+    REDIS_SENTINEL_SERVICE: str = "mymaster"
+    REDIS_MODE: str = "standalone"  # "standalone" | "sentinel"
+    REDIS_SENTINEL_HOSTS: str = "localhost:26379,localhost:26380,localhost:26381"
+    REDIS_SENTINEL_SERVICE: str = "mymaster"
     # JWT
     JWT_SECRET_KEY: str = "dev-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3030"
@@ -121,6 +127,11 @@ class Settings(BaseSettings):
     # Q5: 运行环境标识（dev / staging / production）
     # production 模式下强制校验关键安全配置（JWT_SECRET_KEY 等），校验失败启动报错
     APP_ENV: str = "dev"
+
+    # ClamAV 病毒扫描（SC-3）
+    CLAMAV_ENABLED: bool = False
+    CLAMAV_HOST: str = "localhost"
+    CLAMAV_PORT: int = 3310
 
     # I-F4 商誉减值 / 后续 LLM 接入开关（默认 False = stub 实现）
     # 当 wp_ai_service 升级真实接入 LLM 后改为 True，前端 is_llm_stub 字段自动反映

@@ -136,6 +136,7 @@ import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { findingApi } from '@/services/collaborationApi'
+import { useDecimalCalc } from '@/composables/useDecimalCalc'
 
 interface Finding {
   id: string
@@ -170,7 +171,8 @@ const newFinding = ref({
 })
 
 const highSeverityCount = computed(() => findings.value.filter(f => f.severity === 'high').length)
-const totalImpact = computed(() => findings.value.reduce((sum, f) => sum + (f.finding_amount || 0), 0))
+const { sum: decSum } = useDecimalCalc()
+const totalImpact = computed(() => Number(decSum(...findings.value.map(f => String(f.finding_amount || 0)))))
 const adjustedCount = computed(() => findings.value.filter(f => f.final_treatment === 'adjusted').length)
 
 function severityTag(severity: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {

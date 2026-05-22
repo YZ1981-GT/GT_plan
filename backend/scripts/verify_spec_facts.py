@@ -45,7 +45,7 @@ BACKEND_DIR = SCRIPT_DIR.parent
 REPO_ROOT = BACKEND_DIR.parent
 SPECS_DIR = REPO_ROOT / ".kiro" / "specs"
 ALEMBIC_DIR = BACKEND_DIR / "alembic" / "versions"
-ROUTER_REGISTRY = BACKEND_DIR / "app" / "router_registry.py"
+ROUTER_REGISTRY = BACKEND_DIR / "app" / "router_registry"
 
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────
@@ -268,10 +268,13 @@ def verify_router_section(snapshot: dict) -> list[dict]:
     print("[5/7] router_registry §N 占用检查")
     print("=" * 80)
     cfg = snapshot.get("router_assertions") or {}
-    if not cfg or not ROUTER_REGISTRY.exists():
-        print("  (无 router 断言或文件不存在)")
+    if not cfg or not ROUTER_REGISTRY.is_dir():
+        print("  (无 router 断言或包目录不存在)")
         return []
-    text = ROUTER_REGISTRY.read_text(encoding="utf-8")
+    # 读取包内所有 .py 文件的源码
+    text = ""
+    for py_file in sorted(ROUTER_REGISTRY.glob("*.py")):
+        text += py_file.read_text(encoding="utf-8")
     rows: list[dict] = []
     for key, sub in cfg.items():
         # key 如 "section_54" → 提取数字

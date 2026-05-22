@@ -207,6 +207,21 @@
         </el-table>
         <el-empty v-if="!reviewerLoading && reviewerMetrics.length === 0" description="暂无复核人指标数据" />
       </el-tab-pane>
+      <!-- Tab 7: 风险热力图 (Phase 2 F2) -->
+      <el-tab-pane label="风险热力图" name="heatmap">
+        <VRHeatmap
+          :matrix="heatmapMatrix"
+          :total="heatmapTotal"
+          :loading="heatmapLoading"
+          @cell-click="onHeatmapCellClick"
+          @refresh="loadHeatmap"
+        />
+      </el-tab-pane>
+
+      <!-- Tab 8: VR 覆盖度 (Phase 7 F6) -->
+      <el-tab-pane label="VR 覆盖度" name="vr-coverage">
+        <VRCoverageTab @cycle-click="onVRCycleClick" />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -215,6 +230,8 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import VRHeatmap from '@/components/qc/VRHeatmap.vue'
+import VRCoverageTab from '@/components/qc/VRCoverageTab.vue'
 import {
   getQCOverview, getStaffProgress, getOpenIssues, getArchiveReadiness, runArchiveReadinessCheck,
   type QCOverview, type StaffProgressItem, type OpenIssue, type ArchiveReadiness,
@@ -257,6 +274,11 @@ const ratingLoading = ref(false)
 
 // Reviewer metrics (R3 需求 6)
 const reviewerMetrics = ref<any[]>([])
+
+// Phase 2 F2: VR 风险热力图
+const heatmapMatrix = ref<any[]>([])
+const heatmapTotal = ref<{ blocking: number; warning: number; info: number } | null>(null)
+const heatmapLoading = ref(false)
 const reviewerLoading = ref(false)
 
 function reviewLabel(s: string): string {
@@ -357,7 +379,38 @@ function onInitiateInspection() {
 }
 
 async function loadAll() {
-  await Promise.all([loadOverview(), loadStaff(), loadIssues()])
+  await Promise.all([loadOverview(), loadStaff(), loadIssues(), loadHeatmap()])
+}
+
+// Phase 2 F2: 加载热力图数据
+async function loadHeatmap() {
+  if (!projectId.value) return
+  heatmapLoading.value = true
+  try {
+    const { data } = await import('@/utils/http').then(m => m.default.get(
+      `/api/projects/${projectId.value}/qc/vr-heatmap`
+    ))
+    heatmapMatrix.value = data?.matrix || []
+    heatmapTotal.value = data?.total || null
+  } catch {
+    heatmapMatrix.value = []
+    heatmapTotal.value = null
+  } finally {
+    heatmapLoading.value = false
+  }
+}
+
+function onHeatmapCellClick(payload: { cycle: string; severity: string }) {
+  router.push({
+    name: 'ConsistencyDashboard',
+    params: { projectId: projectId.value },
+    query: { cycle: payload.cycle, severity: payload.severity },
+  })
+}
+
+function onVRCycleClick(cycleName: string) {
+  // Navigate to cycle detail or filter heatmap
+  activeTab.value = 'heatmap'
 }
 
 onMounted(loadAll)

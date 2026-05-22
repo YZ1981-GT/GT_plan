@@ -56,6 +56,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { fmtAmount } from '@/utils/formatters'
+import { useDecimalCalc } from '@/composables/useDecimalCalc'
 
 interface TEntry {
   side: 'debit' | 'credit'
@@ -76,9 +77,10 @@ const props = withDefaults(defineProps<{
 
 const debitEntries = computed(() => props.entries.filter(e => e.side === 'debit'))
 const creditEntries = computed(() => props.entries.filter(e => e.side === 'credit'))
-const debitTotal = computed(() => debitEntries.value.reduce((s, e) => s + (e.amount || 0), 0))
-const creditTotal = computed(() => creditEntries.value.reduce((s, e) => s + (e.amount || 0), 0))
-const netChange = computed(() => debitTotal.value - creditTotal.value)
+const { sum: decSum, sub: decSub } = useDecimalCalc()
+const debitTotal = computed(() => Number(decSum(...debitEntries.value.map(e => String(e.amount || 0)))))
+const creditTotal = computed(() => Number(decSum(...creditEntries.value.map(e => String(e.amount || 0)))))
+const netChange = computed(() => Number(decSub(String(debitTotal.value), String(creditTotal.value))))
 
 const fmtAmt = fmtAmount
 </script>

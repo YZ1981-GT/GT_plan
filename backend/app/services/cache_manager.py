@@ -28,6 +28,8 @@ class CacheManager:
         "ledger": 300,        # 5 min — 穿透查询缓存
         "auth": 7200,         # 2 hours — 认证/会话缓存
         "notification": 60,   # 1 min — 通知缓存
+        "tb_query": 60,       # 1 min — 试算表查询缓存（Phase 3 F3.4）
+        "prefill_result": 300, # 5 min — Prefill 结果缓存（Phase 3 F3.4）
     }
 
     def __init__(self, redis_client: Redis):

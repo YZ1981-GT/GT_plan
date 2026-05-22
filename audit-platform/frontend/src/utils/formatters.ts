@@ -139,6 +139,37 @@ export function unitLabel(unit: AmountUnit): string {
   return AMOUNT_UNITS[unit]?.suffix || '元'
 }
 
+/**
+ * 会计格式金额（负数用括号表示）
+ * - 正数: 1,234.56
+ * - 负数: (1,234.56) — 审计惯例
+ * - 零值: '-' 或 '0.00'
+ */
+export function fmtAmountAccounting(v: any, decimals = 2, showZero = false): string {
+  if (v == null) return '-'
+  const n = typeof v === 'number' ? v : Number(v)
+  if (isNaN(n)) return '-'
+  if (n === 0 && !showZero) return '-'
+  
+  const abs = Math.abs(n)
+  const formatted = abs.toLocaleString('zh-CN', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
+  
+  return n < 0 ? `(${formatted})` : formatted
+}
+
+/**
+ * 判断金额是否为负数（用于 CSS class 绑定）
+ * Usage: :class="{ 'gt-amt-negative': isNegativeAmount(value) }"
+ */
+export function isNegativeAmount(v: any): boolean {
+  if (v == null) return false
+  const n = typeof v === 'number' ? v : Number(v)
+  return !isNaN(n) && n < 0
+}
+
 // ── 字体字号预设 ─────────────────────────────────────────
 
 /** 表格字号预设 */

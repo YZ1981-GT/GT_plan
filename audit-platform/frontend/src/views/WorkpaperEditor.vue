@@ -840,7 +840,7 @@ import {
 import { rebuildWorkpaperStructure, listUsers } from '@/services/commonApi'
 import { api as httpApi } from '@/services/apiProxy'
 import { workpapers as P_wp } from '@/services/apiPaths'
-import { eventBus, type WorkpaperSavedPayload, type CrossRefUpdatedPayload } from '@/utils/eventBus'
+import { eventBus, type SyncEventPayload, type WorkpaperSavedPayload, type CrossRefUpdatedPayload } from '@/utils/eventBus'
 import { useWorkpaperReviewMarkers, type ReviewMarkerTicket } from '@/composables/useWorkpaperReviewMarkers'
 import { useEditingLock } from '@/composables/useEditingLock'
 import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
@@ -2428,8 +2428,8 @@ function onCrossRefUpdated(payload: CrossRefUpdatedPayload) {
  * 当后端发布 CROSS_REF_UPDATED 事件（如 H9→H8 租赁回填），
  * 将 SSE payload 转换为 cross-ref:updated eventBus 事件
  */
-function onSSECrossRefUpdated(payload: any) {
-  if (!payload || payload.event_type !== 'cross_ref.updated') return
+function onSSECrossRefUpdated(payload: SyncEventPayload) {
+  if (!payload || (payload.event_type as string) !== 'cross_ref.updated') return
   const extra = payload.extra || {}
   eventBus.emit('cross-ref:updated', {
     projectId: payload.project_id || '',
