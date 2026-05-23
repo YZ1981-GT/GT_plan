@@ -77,7 +77,7 @@ inclusion: always
 - W-3 钉钉/企微集成（外部对接）
 - Sentinel failover 真实验证：phase4 UAT-8
 - 业务测试：合并模块需真实项目（技术 85%/业务 60%）
-- **高级查询 Sheet 选区器 Phase 2**：`SheetCellRangePicker` 当前仅空白 60×27 grid + 拖选 + range 注入 filters.cell_range（commit `80c806c`），待接入 `/api/wp-templates/.../xlsx-to-json` 端点拉真实 cellData + Univer 或 grid 渲染单元格内容（合并/字体/行高）+ 后端 `_query_workpaper` 按 cell_range 解析提取真实值返回
+- **高级查询 Sheet 选区器 Phase 2**：Phase 2A 已落地（commit `5cdf513`）— 底稿树灰度联动：永远基于全集 184 主底稿，传 project_id 时按 wp_index 标 `disabled` 字段（**灰色+删除线+斜体+not-allowed cursor+点击提示已裁剪**），循环 label 显示活跃/总数（如 S 专项程序 5/22），灰度节点不进 `allSources` 下拉池；Phase 2B 待办：接入 `/api/projects/{pid}/workpapers/{wp_id}/template-file/xlsx-to-json` 拉真实 cellData（需先 wp_code → wp_id 映射）+ Univer 渲染单元格（合并/字体/公式）+ sheet 级灰度 + 后端 `_query_workpaper` 按 cell_range 解析 parsed_data 提取实际值替换 `value` 列占位
 
 ### 首页 UX 复盘已完成（2026-05-23 P0+P1+P2 全 11 项，3 commit ec4ae76 / 5a6eab4 / f6c7e0f）
 

@@ -22,7 +22,14 @@
   >
     <div class="gt-sheet-picker-toolbar">
       <span class="gt-sheet-picker-tab">📄 {{ sheetName || wpCode }}</span>
+      <el-select v-if="allSheets.length > 1" v-model="activeSheet" size="small" style="width:240px"
+        @change="loadSheetData">
+        <el-option v-for="s in allSheets" :key="s" :label="s" :value="s" />
+      </el-select>
       <span style="flex:1" />
+      <span v-if="loadStatus === 'loaded'" class="gt-sheet-picker-meta">
+        {{ realRows }} 行 × {{ realCols }} 列 · {{ Object.keys(cellData).length }} 个单元格
+      </span>
       <span v-if="selectedRange" class="gt-sheet-picker-range">
         已选区域：<strong>{{ selectedRange }}</strong>
       </span>
@@ -30,10 +37,15 @@
     </div>
 
     <div class="gt-sheet-picker-hint">
-      💡 鼠标拖动框选要查询的单元格区域（Phase 1：空白网格，后续接入真实模板内容）
+      <span v-if="loadStatus === 'loading'">⏳ 加载真实模板内容...</span>
+      <span v-else-if="loadStatus === 'unavailable'" style="color:var(--gt-color-warning)">
+        ⚠ {{ unavailableReason || '该底稿在当前项目不可用' }}（仍可在空白网格上选区作占位）
+      </span>
+      <span v-else-if="loadStatus === 'loaded'">💡 鼠标拖动框选要查询的单元格区域，灰显单元格无内容</span>
+      <span v-else>💡 鼠标拖动框选要查询的单元格区域</span>
     </div>
 
-    <div class="gt-sheet-picker-grid-wrap" @mouseup="onMouseUp" @mouseleave="onMouseUp">
+    <div class="gt-sheet-picker-grid-wrap" @mouseup="onMouseUp" @mouseleave="onMouseUp" v-loading="loadStatus === 'loading'">
       <table class="gt-sheet-picker-grid" @selectstart.prevent>
         <thead>
           <tr>
@@ -47,10 +59,15 @@
             <td
               v-for="(col, ci) in COLS"
               :key="ci"
-              :class="['gt-cell', { 'gt-cell-selected': isCellSelected(row, ci) }]"
+              :class="['gt-cell', {
+                'gt-cell-selected': isCellSelected(row, ci),
+                'gt-cell-empty': loadStatus === 'loaded' && !getCell(row - 1, ci),
+                'gt-cell-numeric': isNumericCell(row - 1, ci),
+              }]"
+              :title="cellTooltip(row - 1, ci)"
               @mousedown="onMouseDown(row, ci)"
               @mouseenter="onMouseEnter(row, ci)"
-            ></td>
+            >{{ formatCell(getCell(row - 1, ci)) }}</td>
           </tr>
         </tbody>
       </table>
@@ -67,11 +84,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   modelValue: boolean
   wpCode: string
   sheetName?: string
+  projectId?: string
 }>()
 const emit = defineEmits<{
   'update:modelValue': [v: boolean]
@@ -92,7 +111,6 @@ const ROWS = Array.from({ length: ROW_COUNT }, (_, i) => i + 1)
 const COLS = Array.from({ length: COL_COUNT }, (_, i) => _colLabel(i))
 
 function _colLabel(i: number): string {
-  // A=0, B=1, ..., Z=25, AA=26
   if (i < 26) return String.fromCharCode(65 + i)
   return 'A' + String.fromCharCode(65 + (i - 26))
 }
@@ -101,6 +119,72 @@ function _colLabel(i: number): string {
 const dragging = ref(false)
 const startCell = ref<{ row: number; col: number } | null>(null)
 const endCell = ref<{ row: number; col: number } | null>(null)
+
+// 真实模板数据
+type LoadStatus = 'idle' | 'loading' | 'loaded' | 'unavailable'
+const loadStatus = ref<LoadStatus>('idle')
+const unavailableReason = ref<string>('')
+const cellData = ref<Record<string, { v: any }>>({})  // key 'r,c' (0-indexed)
+const realRows = ref(0)
+const realCols = ref(0)
+const allSheets = ref<string[]>([])
+const activeSheet = ref<string>('')
+
+function getCell(r: number, c: number): { v: any } | null {
+  return cellData.value[`${r},${c}`] || null
+}
+function isNumericCell(r: number, c: number): boolean {
+  const cell = getCell(r, c)
+  return !!cell && typeof cell.v === 'number'
+}
+function formatCell(cell: { v: any } | null): string {
+  if (!cell) return ''
+  const v = cell.v
+  if (typeof v === 'number') {
+    return Number.isInteger(v) ? String(v) : v.toFixed(2)
+  }
+  const s = String(v ?? '')
+  return s.length > 14 ? s.slice(0, 13) + '…' : s
+}
+function cellTooltip(r: number, c: number): string {
+  const cell = getCell(r, c)
+  if (!cell) return ''
+  return String(cell.v ?? '')
+}
+
+async function loadSheetData() {
+  if (!props.projectId || !props.wpCode) {
+    loadStatus.value = 'idle'
+    return
+  }
+  loadStatus.value = 'loading'
+  unavailableReason.value = ''
+  cellData.value = {}
+  try {
+    const data = await api.get('/api/custom-query/wp-sheet-preview', {
+      params: {
+        project_id: props.projectId,
+        wp_code: props.wpCode,
+        sheet_name: activeSheet.value || props.sheetName || undefined,
+      },
+    }) as any
+    if (!data?.available) {
+      loadStatus.value = 'unavailable'
+      unavailableReason.value = data?.reason || '该底稿不可用'
+      allSheets.value = []
+      return
+    }
+    cellData.value = data.cells || {}
+    realRows.value = data.rows || 0
+    realCols.value = data.cols || 0
+    allSheets.value = data.all_sheets || []
+    activeSheet.value = data.sheet_name || ''
+    loadStatus.value = 'loaded'
+  } catch (e) {
+    loadStatus.value = 'unavailable'
+    unavailableReason.value = '加载失败'
+  }
+}
 
 const selectedRange = computed(() => {
   if (!startCell.value || !endCell.value) return ''
@@ -145,15 +229,22 @@ function onConfirm() {
   if (!selectedRange.value) return
   emit('confirm', {
     wp_code: props.wpCode,
-    sheet_name: props.sheetName,
+    sheet_name: activeSheet.value || props.sheetName,
     range: selectedRange.value,
   })
   visible.value = false
 }
 
-// 弹窗关闭时清空选区，下次打开是干净状态
+// 弹窗打开时自动加载真实数据，关闭时清空
 watch(visible, (v) => {
-  if (!v) resetSelection()
+  if (v) {
+    activeSheet.value = props.sheetName || ''
+    loadSheetData()
+  } else {
+    resetSelection()
+    loadStatus.value = 'idle'
+    cellData.value = {}
+  }
 })
 </script>
 
@@ -235,6 +326,12 @@ watch(visible, (v) => {
 }
 .gt-cell {
   cursor: cell;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+  padding: 0 3px !important;
 }
 .gt-cell:hover {
   background: rgba(124, 58, 237, 0.06) !important;
@@ -242,5 +339,18 @@ watch(visible, (v) => {
 .gt-cell-selected {
   background: rgba(124, 58, 237, 0.18) !important;
   border-color: var(--gt-color-primary) !important;
+}
+.gt-cell-empty {
+  background: #fafafa !important;
+  color: #ccc;
+}
+.gt-cell-numeric {
+  text-align: right !important;
+  font-family: 'Consolas', 'Monaco', monospace;
+  color: var(--gt-color-text-primary, #303133);
+}
+.gt-sheet-picker-meta {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
 }
 </style>

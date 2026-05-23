@@ -518,6 +518,100 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
     return result
 
 
+@router.get("/wp-sheet-preview")
+async def wp_sheet_preview(
+    project_id: str = Query(..., description="项目 ID"),
+    wp_code: str = Query(..., description="底稿编码（如 D2）"),
+    sheet_name: str | None = Query(None, description="目标 sheet 名称（缺省返回首个 sheet）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """高级查询 sheet 选区器专用端点：返回模板 cellData 用于网格预览。
+
+    流程：wp_code → wp_index.id → working_paper.id → storage xlsx → openpyxl 解析
+    返回单 sheet 的 {rows, cols, cells: {[r,c]: {v, f}}, merges}，体积比 Univer 完整 JSON 小
+    """
+    try:
+        proj_uuid = uuid.UUID(project_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="invalid project_id")
+
+    # 1. 找 working_paper.id
+    row = (await db.execute(text("""
+        SELECT w.id FROM working_paper w
+        JOIN wp_index i ON w.wp_index_id = i.id
+        WHERE i.project_id = :pid AND i.wp_code = :wpc AND w.is_deleted = false
+        LIMIT 1
+    """), {"pid": str(proj_uuid), "wpc": wp_code})).first()
+
+    if not row:
+        return {"available": False, "reason": "底稿在当前项目中不存在", "wp_code": wp_code}
+
+    wp_id = row[0]
+
+    # 2. 找 storage 文件
+    from app.services.wp_template_init_service import get_workpaper_file, init_workpaper_from_template
+    storage_path = get_workpaper_file(proj_uuid, wp_id)
+    if not storage_path:
+        # 从模板初始化
+        init_result = init_workpaper_from_template(proj_uuid, wp_id, wp_code)
+        if not init_result:
+            return {"available": False, "reason": f"模板文件不存在: {wp_code}", "wp_code": wp_code}
+        storage_path = init_result
+
+    if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
+        return {"available": False, "reason": "非 xlsx 类底稿", "wp_code": wp_code}
+
+    # 3. openpyxl 解析目标 sheet
+    try:
+        from io import BytesIO
+        from openpyxl import load_workbook
+        wb = load_workbook(BytesIO(storage_path.read_bytes()), read_only=True, data_only=True)
+        target_sheet = sheet_name if sheet_name and sheet_name in wb.sheetnames else (wb.sheetnames[0] if wb.sheetnames else None)
+        if not target_sheet:
+            wb.close()
+            return {"available": False, "reason": "工作簿无 sheet", "wp_code": wp_code}
+
+        ws = wb[target_sheet]
+        rows = min(ws.max_row or 0, 100)  # 选区器 cap 100 行
+        cols = min(ws.max_column or 0, 30)  # cap 30 列
+        cells: dict[str, dict] = {}
+        for row_iter in ws.iter_rows(min_row=1, max_row=rows, max_col=cols):
+            for cell in row_iter:
+                if cell.value is None:
+                    continue
+                key = f"{cell.row - 1},{cell.column - 1}"  # 0-indexed
+                v = cell.value
+                if isinstance(v, (int, float)):
+                    cells[key] = {"v": v}
+                else:
+                    cells[key] = {"v": str(v)}
+
+        merges: list[dict] = []
+        for mr in (ws.merged_cells.ranges if hasattr(ws, "merged_cells") else []):
+            merges.append({
+                "r1": mr.min_row - 1, "c1": mr.min_col - 1,
+                "r2": mr.max_row - 1, "c2": mr.max_col - 1,
+            })
+
+        # sheet 列表（用于灰度判定）
+        all_sheets = list(wb.sheetnames)
+        wb.close()
+
+        return {
+            "available": True,
+            "wp_code": wp_code,
+            "wp_id": str(wp_id),
+            "sheet_name": target_sheet,
+            "all_sheets": all_sheets,
+            "rows": rows,
+            "cols": cols,
+            "cells": cells,
+            "merges": merges,
+        }
+    except Exception as e:
+        return {"available": False, "reason": f"解析失败: {e}", "wp_code": wp_code}
+
+
 @router.post("/execute")
 async def execute_query(
     body: QueryRequest,
@@ -709,9 +803,13 @@ async def _query_worksheet(db, pid, year, filters, limit):
 async def _query_workpaper(db, pid, year, filters, limit):
     """底稿列表（working_paper + wp_index）— working_paper 无 year 字段，year 仅用于过滤兼容
 
-    sheet_name 过滤：当传入时把它作为返回字段附加（echo），不参与 WHERE 过滤
-    （底稿表本身按 wp_code 维度，sheet 维度需进 parsed_data JSONB 子结构，本接口暂不深入）
+    特殊路径：当 filters 含 wp_code + cell_range 时，
+    走「单元格区域提取」分支：解析模板 xlsx 的指定 sheet，按 cell_range 提取真实单元格值返回（用于高级查询 sheet 选区器）
     """
+    # 单元格区域提取分支（高级查询 sheet picker 专用）
+    if filters.get("wp_code") and filters.get("cell_range"):
+        return await _query_workpaper_cell_range(db, pid, filters)
+
     sql = """
         SELECT wi.wp_code, wi.wp_name, wi.audit_cycle, wp.status, wp.review_status,
                wp.assigned_to, wp.created_at, wp.updated_at
@@ -760,6 +858,108 @@ async def _query_workpaper(db, pid, year, filters, limit):
         "columns": columns,
         "total": len(rows),
     }
+
+
+async def _query_workpaper_cell_range(db, pid: str, filters: dict):
+    """按 cell_range 从模板 xlsx 提取真实单元格值"""
+    wp_code = filters["wp_code"]
+    sheet_name = filters.get("sheet_name")
+    cell_range = filters["cell_range"]
+
+    try:
+        proj_uuid = uuid.UUID(pid)
+    except (TypeError, ValueError):
+        return {"rows": [], "columns": [], "total": 0, "error": "invalid project_id"}
+
+    # 1. wp_code → wp_id
+    row = (await db.execute(text("""
+        SELECT w.id FROM working_paper w
+        JOIN wp_index i ON w.wp_index_id = i.id
+        WHERE i.project_id = :pid AND i.wp_code = :wpc AND w.is_deleted = false
+        LIMIT 1
+    """), {"pid": str(proj_uuid), "wpc": wp_code})).first()
+    if not row:
+        return {"rows": [], "columns": [], "total": 0, "error": f"底稿 {wp_code} 在当前项目不存在"}
+    wp_id = row[0]
+
+    # 2. storage 文件
+    from app.services.wp_template_init_service import get_workpaper_file, init_workpaper_from_template
+    storage_path = get_workpaper_file(proj_uuid, wp_id)
+    if not storage_path:
+        init_result = init_workpaper_from_template(proj_uuid, wp_id, wp_code)
+        if not init_result:
+            return {"rows": [], "columns": [], "total": 0, "error": f"模板文件不存在: {wp_code}"}
+        storage_path = init_result
+
+    if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
+        return {"rows": [], "columns": [], "total": 0, "error": "非 xlsx 类底稿"}
+
+    # 3. 解析 cell_range（如 'A1:C3' / 'B5'）
+    import re as _re
+    m = _re.match(r"^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$", cell_range)
+    if not m:
+        return {"rows": [], "columns": [], "total": 0, "error": f"无效 cell_range: {cell_range}"}
+
+    def _col_to_idx(s: str) -> int:
+        n = 0
+        for ch in s:
+            n = n * 26 + (ord(ch) - 64)
+        return n  # 1-indexed
+
+    c1 = _col_to_idx(m.group(1)); r1 = int(m.group(2))
+    c2 = _col_to_idx(m.group(3)) if m.group(3) else c1
+    r2 = int(m.group(4)) if m.group(4) else r1
+
+    # 4. openpyxl 读取
+    try:
+        from io import BytesIO
+        from openpyxl import load_workbook
+        wb = load_workbook(BytesIO(storage_path.read_bytes()), read_only=True, data_only=True)
+        target_sheet = sheet_name if sheet_name and sheet_name in wb.sheetnames else (wb.sheetnames[0] if wb.sheetnames else None)
+        if not target_sheet:
+            wb.close()
+            return {"rows": [], "columns": [], "total": 0, "error": "工作簿无 sheet"}
+        ws = wb[target_sheet]
+        result_rows = []
+        idx = 0
+        MAX_CELLS = 500
+        for r in range(r1, r2 + 1):
+            for c in range(c1, c2 + 1):
+                idx += 1
+                if idx > MAX_CELLS:
+                    break
+                cell = ws.cell(row=r, column=c)
+                # cell_ref like 'A1'
+                col_letters = ""
+                cc = c
+                while cc > 0:
+                    cc, rem = divmod(cc - 1, 26)
+                    col_letters = chr(65 + rem) + col_letters
+                cell_ref = f"{col_letters}{r}"
+                v = cell.value
+                if v is None:
+                    val_str = ""
+                elif isinstance(v, (int, float)):
+                    val_str = v
+                else:
+                    val_str = str(v)
+                result_rows.append({
+                    "index": idx,
+                    "wp_code": wp_code,
+                    "sheet_name": target_sheet,
+                    "cell_ref": cell_ref,
+                    "value": val_str,
+                })
+            if idx >= MAX_CELLS:
+                break
+        wb.close()
+        return {
+            "rows": result_rows,
+            "columns": ["index", "wp_code", "sheet_name", "cell_ref", "value"],
+            "total": len(result_rows),
+        }
+    except Exception as e:
+        return {"rows": [], "columns": [], "total": 0, "error": f"解析失败: {e}"}
 
 
 async def _query_account_balance(db, pid, year, filters, limit):

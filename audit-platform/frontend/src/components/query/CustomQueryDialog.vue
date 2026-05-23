@@ -159,6 +159,7 @@
       v-model="sheetPickerVisible"
       :wp-code="sheetPickerCtx.wpCode"
       :sheet-name="sheetPickerCtx.sheetName"
+      :project-id="localProjectId"
       @confirm="onSheetRangeConfirm"
     />
   </el-dialog>
