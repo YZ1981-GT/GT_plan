@@ -6,6 +6,7 @@
 
 export const projects = {
   list: '/api/projects',
+  listWithProgress: '/api/projects/list-with-progress',
   detail: (id: string) => `/api/projects/${id}`,
   wizard: (id: string) => `/api/projects/${id}/wizard`,
   childCompanies: (id: string) => `/api/projects/${id}/child-companies`,

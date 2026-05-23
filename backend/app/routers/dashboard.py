@@ -366,3 +366,15 @@ async def stats_trend(
 ):
     svc = DashboardService(db)
     return await svc.get_stats_trend(project_id=project_id, days=days)
+
+
+@router.get("/stats/compare")
+async def stats_compare(
+    project_id: str | None = None,
+    window: int = 7,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """KPI 环比：最近 window 天 vs 前 window 天，返回 current/previous/delta_pct。"""
+    svc = DashboardService(db)
+    return await svc.get_stats_compare(project_id=project_id, window=window)

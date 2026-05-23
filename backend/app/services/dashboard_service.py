@@ -346,3 +346,73 @@ class DashboardService:
                 trend[day_str][r.status] = r.cnt
 
         return {"days": days, "trend": trend}
+
+    async def get_stats_compare(self, project_id: str | None = None, window: int = 7) -> dict:
+        """统计卡环比：最近 N 天 vs 前 N 天，按 Project.status 维度聚合。
+
+        返回：
+          {
+            "window": 7,
+            "current": {total, in_progress, pending_review, completed},
+            "previous": {同上},
+            "delta_pct": {同上, float|null（前期为 0 时返回 null 避免除零）},
+          }
+
+        Validates: 仪表盘 KPI 真实环比（替代上一轮被删的硬编码假百分比）。
+        """
+        from app.models.core import Project, ProjectStatus
+        from datetime import date, timedelta
+        import sqlalchemy as sa
+
+        today = date.today()
+        cur_start = today - timedelta(days=window - 1)
+        prev_start = today - timedelta(days=2 * window - 1)
+        prev_end = today - timedelta(days=window)
+
+        async def _bucket(start: date, end: date) -> dict[str, int]:
+            q = (
+                sa.select(Project.status, sa.func.count(Project.id))
+                .where(
+                    Project.is_deleted == sa.false(),
+                    sa.func.date(Project.updated_at) >= start,
+                    sa.func.date(Project.updated_at) <= end,
+                )
+                .group_by(Project.status)
+            )
+            if project_id:
+                from uuid import UUID
+                try:
+                    q = q.where(Project.id == UUID(project_id))
+                except ValueError:
+                    pass
+            rows = (await self.db.execute(q)).all()
+            counts: dict[str, int] = {"total": 0, "in_progress": 0, "pending_review": 0, "completed": 0}
+            for status, cnt in rows:
+                counts["total"] += cnt
+                # 与前端 stats 字段映射保持一致
+                if status in (ProjectStatus.execution, ProjectStatus.planning):
+                    counts["in_progress"] += cnt
+                elif status == ProjectStatus.completion:
+                    counts["pending_review"] += cnt
+                elif status == ProjectStatus.archived:
+                    counts["completed"] += cnt
+            return counts
+
+        cur = await _bucket(cur_start, today)
+        prev = await _bucket(prev_start, prev_end)
+
+        delta_pct: dict[str, float | None] = {}
+        for k in ("total", "in_progress", "pending_review", "completed"):
+            base = prev.get(k, 0)
+            if base == 0:
+                # 前期为 0：当期>0 显示 +100%，当期=0 显示 None（前端展示 —）
+                delta_pct[k] = 100.0 if cur.get(k, 0) > 0 else None
+            else:
+                delta_pct[k] = round((cur.get(k, 0) - base) / base * 100, 1)
+
+        return {
+            "window": window,
+            "current": cur,
+            "previous": prev,
+            "delta_pct": delta_pct,
+        }

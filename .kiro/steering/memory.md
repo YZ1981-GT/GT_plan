@@ -69,11 +69,11 @@ inclusion: always
 - Sentinel failover 真实验证：phase4 UAT-8
 - 业务测试：合并模块需真实项目（技术 85%/业务 60%）
 
-### 首页 UX 复盘待办（2026-05-23 Playwright 巡检）
+### 首页 UX 复盘已完成（2026-05-23 P0+P1+P2 全 11 项，3 commit ec4ae76 / 5a6eab4 / f6c7e0f）
 
-- **P0**：修 `/api/staff/my/assignments` 404（首屏触发 2 次） / 顶栏 3 个 emoji EQCR 链接（复核收件箱+独立复核+EQCR 指标）合并为下拉并按角色显隐 / 删除 KPI 卡假环比 ↑8%↓5% 或接真数据 / 「最近项目」表只 3 列（项目名/客户/状态）补阶段+进度+截止+负责人 4 列
-- **P1**：快捷操作 9 格与左侧导航 70% 重复，砍到 4 个高频（新建项目/工时填报/未读复核/最近底稿） / 仪表盘加角色视图切换 tab（auditor/manager/partner/eqcr） / 顶栏加 ctrl+K 全局搜索 / 「今日日程」空状态从 471×255 占位缩成 60px hint
-- **P2**：侧栏「工具」8 项二级折叠（知识/AI/查询/反馈） / 「最近项目」支持表格/卡片/甘特三视图（复用现有 ProjectGanttChart） / 函证「开发中」从一级菜单下沉到「即将上线」分组
+- **修复要点**：`/api/staff/my/assignments` 404 改 `/api/projects/my/assignments` + 删 staff.myAssignments 死常量 / 顶栏 3 emoji EQCR 链接合并为 1 dropdown + emoji 全替换 element-plus icons / 删 KPI 卡假环比百分比 / 最近项目 3 列→5 列（项目名/年度/类型/阶段/创建）+ 表格/卡片视图切换
+- **新增能力**：仪表盘 banner 角色视图 4 tab（我的/团队/项目/EQCR，按 effectiveRole 过滤路由分发） / 顶栏 Search 按钮 emit `open-global-search`（Ctrl+K 仍可用） / 侧栏工具 8 项加 4 分组小标题（📚知识/🤖AI/🔎查询/💬反馈，扁平不折叠）
+- **遗留**：首页甘特视图（`Project` 模型 + `/api/projects` 需补 start_date/due_date/overall_progress/partner_name/manager_name 5 字段后接 ProjectGanttChart）；统计卡真实环比待接 statsTrend 端点
 
 ## 关键引用指南
 

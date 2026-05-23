@@ -94,6 +94,116 @@ async def list_projects(
     return [_to_project_response(p) for p in projects]
 
 
+@router.get("/list-with-progress")
+async def list_projects_with_progress(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[dict]:
+    """仪表盘甘特视图专用：项目列表 + 进度 + 派生时间窗 + 负责人姓名。
+
+    派生规则（避免改 Project 模型）：
+      - start_date = audit_year-12-01（典型审计期开始：年报年末）
+      - due_date   = (audit_year+1)-04-30（典型审计报告截止）
+      - overall_progress = sum(已完成 wp count) / sum(wp count) * 100
+        已完成 = WorkingPaper.status in (locked, archived)；空集时为 0
+      - partner_name / manager_name = JOIN users.display_name
+
+    单次 SQL 聚合（项目数 N）+ 单次 SQL 取 wp 进度（GROUP BY project_id）+ 单次 users JOIN，
+    总计 3 次 IO，不会随 N 退化。
+    """
+    from datetime import date
+    from sqlalchemy import select, func
+    from app.models.core import ProjectUser
+    from app.models.workpaper_models import WorkingPaper
+
+    # 1. 项目可见性过滤
+    if current_user.role.value in ("admin", "partner"):
+        proj_result = await db.execute(
+            select(Project).where(Project.is_deleted == False)  # noqa: E712
+        )
+    else:
+        my_pids = await db.execute(
+            select(ProjectUser.project_id).where(
+                ProjectUser.user_id == current_user.id,
+                ProjectUser.is_deleted == False,  # noqa: E712
+            )
+        )
+        pids = [r[0] for r in my_pids.all()]
+        if not pids:
+            return []
+        proj_result = await db.execute(
+            select(Project).where(
+                Project.id.in_(pids),
+                Project.is_deleted == False,  # noqa: E712
+            )
+        )
+    projects = proj_result.scalars().all()
+    if not projects:
+        return []
+    proj_ids = [p.id for p in projects]
+
+    # 2. 一次性聚合 wp 进度（review_passed/archived 占比 = 完成度）
+    from sqlalchemy import case
+    progress_q = (
+        select(
+            WorkingPaper.project_id,
+            func.count(WorkingPaper.id).label("total"),
+            func.sum(
+                case((WorkingPaper.status.in_(("review_passed", "archived")), 1), else_=0)
+            ).label("done"),
+        )
+        .where(
+            WorkingPaper.project_id.in_(proj_ids),
+            WorkingPaper.is_deleted == False,  # noqa: E712
+        )
+        .group_by(WorkingPaper.project_id)
+    )
+    progress_rows = (await db.execute(progress_q)).all()
+    progress_map = {
+        row[0]: round((int(row[2] or 0) / int(row[1])) * 100, 1) if int(row[1]) > 0 else 0.0
+        for row in progress_rows
+    }
+
+    # 3. 一次性取 partner/manager display_name
+    user_ids = {p.partner_id for p in projects if p.partner_id} | {p.manager_id for p in projects if p.manager_id}
+    name_map: dict = {}
+    if user_ids:
+        from app.models.core import User as UserModel
+        user_rows = (await db.execute(
+            select(UserModel.id, UserModel.display_name, UserModel.username).where(UserModel.id.in_(list(user_ids)))
+        )).all()
+        for uid, dname, uname in user_rows:
+            name_map[uid] = dname or uname
+
+    # 4. 组装
+    out: list[dict] = []
+    for p in projects:
+        ay = _extract_project_audit_year(p)
+        start_date_iso: str | None = None
+        due_date_iso: str | None = None
+        if ay:
+            try:
+                start_date_iso = date(ay, 12, 1).isoformat()
+                due_date_iso = date(ay + 1, 4, 30).isoformat()
+            except ValueError:
+                pass
+        out.append({
+            "id": str(p.id),
+            "name": p.name,
+            "client_name": p.client_name,
+            "audit_year": ay,
+            "project_type": p.project_type.value if p.project_type else None,
+            "status": p.status.value,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "start_date": start_date_iso,
+            "due_date": due_date_iso,
+            "overall_progress": progress_map.get(p.id, 0.0),
+            "partner_name": name_map.get(p.partner_id) if p.partner_id else None,
+            "manager_name": name_map.get(p.manager_id) if p.manager_id else None,
+        })
+    return out
+
+
 @router.get("/{project_id}", response_model=ProjectCreateResponse)
 async def get_project(
     project_id: UUID,

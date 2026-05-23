@@ -7,7 +7,7 @@
         <div class="dashboard-view-switcher" v-if="availableViews.length > 1">
           <el-radio-group v-model="activeView" size="small" @change="onViewChange">
             <el-radio-button v-for="v in availableViews" :key="v.key" :value="v.key">
-              <el-icon style="margin-right: 3px"><component :is="v.icon" /></el-icon>{{ v.label }}
+              {{ v.label }}
             </el-radio-button>
           </el-radio-group>
         </div>
@@ -20,6 +20,13 @@
         <div class="stat-top">
           <div class="stat-icon-wrap">
             <el-icon :size="24"><component :is="card.icon" /></el-icon>
+          </div>
+          <div
+            v-if="card.trend !== null"
+            class="stat-trend"
+            :class="card.trend >= 0 ? 'trend-up' : 'trend-down'"
+          >
+            {{ card.trend >= 0 ? '↑' : '↓' }} {{ Math.abs(card.trend) }}%
           </div>
         </div>
         <div class="stat-body">
@@ -65,6 +72,7 @@
               <el-radio-group v-model="recentViewMode" size="small">
                 <el-radio-button value="table">表格</el-radio-button>
                 <el-radio-button value="card">卡片</el-radio-button>
+                <el-radio-button value="gantt">甘特</el-radio-button>
               </el-radio-group>
               <el-button text size="small" @click="$router.push('/projects')">查看全部</el-button>
             </div>
@@ -86,19 +94,36 @@
                 <el-tag size="small" effect="plain" round>{{ projectTypeLabel(row.project_type) }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="status" label="阶段" width="90" align="center">
+            <el-table-column label="阶段" width="80" align="center">
               <template #default="{ row }">
                 <el-tag :type="(statusType(row.status)) || undefined" size="small" effect="light" round>{{ statusLabel(row.status) }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="created_at" label="创建" width="100" align="center">
+            <el-table-column label="进度" width="120" align="center">
               <template #default="{ row }">
-                <span class="gt-mono">{{ shortDate(row.created_at) }}</span>
+                <el-progress
+                  :percentage="row.overall_progress ?? 0"
+                  :stroke-width="6"
+                  :show-text="true"
+                  text-inside
+                  :color="progressColor(row.overall_progress ?? 0)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="负责人" width="100" align="center">
+              <template #default="{ row }">
+                <span v-if="row.partner_name || row.manager_name">{{ row.partner_name || row.manager_name }}</span>
+                <span v-else class="gt-empty">—</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="due_date" label="截止" width="100" align="center">
+              <template #default="{ row }">
+                <span class="gt-mono">{{ shortDate(row.due_date || row.created_at) }}</span>
               </template>
             </el-table-column>
           </el-table>
-          <!-- 卡片视图（recentViewMode === 'card'）-->
-          <div v-else class="recent-card-grid">
+          <!-- 卡片视图 -->
+          <div v-else-if="recentViewMode === 'card'" class="recent-card-grid">
             <div
               v-for="row in recentProjects"
               :key="row.id"
@@ -111,10 +136,26 @@
                 <el-tag :type="statusType(row.status) || undefined" size="small" effect="light" round>{{ statusLabel(row.status) }}</el-tag>
                 <span class="gt-amt recent-card-year">{{ row.audit_year || '—' }}</span>
               </div>
+              <el-progress
+                :percentage="row.overall_progress ?? 0"
+                :stroke-width="6"
+                :show-text="true"
+                text-inside
+                :color="progressColor(row.overall_progress ?? 0)"
+              />
               <div class="recent-card-foot">
-                <span class="gt-mono">{{ shortDate(row.created_at) }} 创建</span>
+                <span>👤 {{ row.partner_name || row.manager_name || '—' }}</span>
+                <span class="gt-mono">{{ shortDate(row.due_date) }} 截止</span>
               </div>
             </div>
+          </div>
+          <!-- 甘特视图 -->
+          <div v-else class="recent-gantt-wrap">
+            <ProjectGanttChart
+              :projects="ganttProjects"
+              :height="280"
+              @project-click="(pid: string) => $router.push(`/projects/${pid}/ledger`)"
+            />
           </div>
         </div>
       </el-col>
@@ -162,15 +203,15 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useRoleContextStore } from '@/stores/roleContext'
-import { listProjects, getMyAssignments } from '@/services/commonApi'
+import { listProjectsWithProgress, getMyAssignments } from '@/services/commonApi'
 import { api as httpApi } from '@/services/apiProxy'
 import { dashboard as P_dash, workpapers as P_wp } from '@/services/apiPaths'
 import { WP_STATUS, PROJECT_STATUS } from '@/constants/statusEnum'
 import GTChart from '@/components/GTChart.vue'
+import ProjectGanttChart from '@/components/dashboard/ProjectGanttChart.vue'
 import {
   FolderOpened, Loading, Warning, CircleCheck,
   Plus, Timer, Reading, Search,
-  User, UserFilled, Avatar, Lock,
 } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
@@ -178,12 +219,16 @@ const roleStore = useRoleContextStore()
 const router = useRouter()
 
 // ── 角色视图切换（多维视图）──
+// 视图分两类：
+//   me / team / project / eqcr 都是仪表盘的不同聚合粒度。
+//   team / project / eqcr 当前直接路由到已有的专门 dashboard 页面（避免重复实现），
+//   保留 me 在本页（默认）。命名统一带"视图"后缀，避免上一轮 EQCR 单字标签不一致。
 type ViewKey = 'me' | 'team' | 'project' | 'eqcr'
-const ALL_VIEWS: { key: ViewKey; label: string; icon: any; roles: string[] }[] = [
-  { key: 'me',      label: '我的视图', icon: User,        roles: ['auditor', 'reviewer', 'manager', 'partner', 'eqcr', 'admin'] },
-  { key: 'team',    label: '团队视图', icon: UserFilled,  roles: ['manager', 'partner', 'admin'] },
-  { key: 'project', label: '项目视图', icon: Avatar,      roles: ['partner', 'admin'] },
-  { key: 'eqcr',    label: 'EQCR',     icon: Lock,        roles: ['eqcr', 'partner', 'admin'] },
+const ALL_VIEWS: { key: ViewKey; label: string; roles: string[]; route?: string }[] = [
+  { key: 'me',      label: '我的视图',  roles: ['auditor', 'reviewer', 'manager', 'partner', 'eqcr', 'admin'] },
+  { key: 'team',    label: '团队视图',  roles: ['manager', 'partner', 'admin'], route: '/dashboard/manager' },
+  { key: 'project', label: '项目视图',  roles: ['partner', 'admin'],            route: '/dashboard/partner' },
+  { key: 'eqcr',    label: 'EQCR 视图', roles: ['eqcr', 'partner', 'admin'],    route: '/eqcr/metrics' },
 ]
 const activeView = ref<ViewKey>('me')
 const availableViews = computed(() => {
@@ -191,10 +236,8 @@ const availableViews = computed(() => {
   return ALL_VIEWS.filter(v => v.roles.includes(role))
 })
 function onViewChange(val: ViewKey) {
-  // team / project / eqcr 直接路由到对应页面（复用现有实现）
-  if (val === 'team') router.push('/dashboard/manager')
-  else if (val === 'project') router.push('/dashboard/partner')
-  else if (val === 'eqcr') router.push('/eqcr/metrics')
+  const v = ALL_VIEWS.find(x => x.key === val)
+  if (v?.route) router.push(v.route)
   // me 视图保留在当前页
 }
 
@@ -221,8 +264,26 @@ const stats = reactive({ total: 0, inProgress: 0, pendingReview: 0, completed: 0
 const loadingProjects = ref(true)
 const loadingSchedule = ref(true)
 const recentProjects = ref<any[]>([])
-const recentViewMode = ref<'table' | 'card'>('table')
+const allProjects = ref<any[]>([])  // 甘特视图用：完整列表（partner/start/due/progress 已派生）
+const recentViewMode = ref<'table' | 'card' | 'gantt'>('table')
 const todaySchedule = ref<any[]>([])
+
+// 甘特组件 props 适配（id → project_id, name → project_name）
+const ganttProjects = computed(() => allProjects.value.map((p: any) => ({
+  project_id: p.id,
+  project_name: p.name,
+  start_date: p.start_date,
+  due_date: p.due_date,
+  overall_progress: p.overall_progress ?? 0,
+  primary_cycle: 'D',  // 仪表盘场景无单一循环，用默认色
+})))
+
+function progressColor(pct: number): string {
+  if (pct >= 80) return 'var(--gt-color-success, #28a745)'
+  if (pct >= 50) return 'var(--gt-color-primary, #4b2d77)'
+  if (pct >= 20) return 'var(--gt-color-wheat, #e6a817)'
+  return 'var(--gt-color-coral, #FF5149)'
+}
 
 function makeSparkline(data: number[], color: string) {
   return {
@@ -244,6 +305,11 @@ function makeSparkline(data: number[], color: string) {
 const trendData = ref<Record<string, Record<string, number>>>({})
 const trendLoadError = ref(false)
 
+// 真实环比（最近 7 天 vs 前 7 天）
+const compareDelta = ref<{ total: number | null; in_progress: number | null; pending_review: number | null; completed: number | null }>({
+  total: null, in_progress: null, pending_review: null, completed: null,
+})
+
 async function loadTrendData() {
   trendLoadError.value = false
   try {
@@ -253,6 +319,15 @@ async function loadTrendData() {
     trendData.value = res.trend || {}
   } catch {
     trendLoadError.value = true
+  }
+}
+
+async function loadCompareData() {
+  try {
+    const res: any = await httpApi.get(P_dash.statsCompare, { params: { window: 7 } })
+    if (res?.delta_pct) compareDelta.value = res.delta_pct
+  } catch {
+    // 静默失败 — 前端 trend 为 null 即不渲染百分比
   }
 }
 
@@ -269,21 +344,25 @@ const statCards = computed(() => [
   {
     label: '项目总数', value: stats.total, icon: FolderOpened,
     cls: 'stat-card--primary',
+    trend: compareDelta.value.total,
     sparkOpt: makeSparkline(sparkSeries.value.review_passed, '#4b2d77'),
   },
   {
     label: '进行中', value: stats.inProgress, icon: Loading,
     cls: 'stat-card--teal',
+    trend: compareDelta.value.in_progress,
     sparkOpt: makeSparkline(sparkSeries.value.in_progress, '#0094B3'),
   },
   {
     label: '待复核', value: stats.pendingReview, icon: Warning,
     cls: 'stat-card--coral',
+    trend: compareDelta.value.pending_review,
     sparkOpt: makeSparkline(sparkSeries.value.edit_complete, '#FF5149'),
   },
   {
     label: '已完成', value: stats.completed, icon: CircleCheck,
     cls: 'stat-card--success',
+    trend: compareDelta.value.completed,
     sparkOpt: makeSparkline(sparkSeries.value.review_passed, '#28A745'),
   },
 ])
@@ -326,17 +405,19 @@ onMounted(async () => {
     try { await authStore.fetchUserProfile() } catch { /* ignore */ }
   }
 
-  // 加载趋势数据
+  // 加载趋势数据 + 真实环比
   loadTrendData()
+  loadCompareData()
 
-  // 加载项目统计
+  // 加载项目统计 + 进度（含 partner/manager/start/due/progress 派生字段）
   try {
-    const list = await listProjects()
+    const list = await listProjectsWithProgress()
     stats.total = list.length
     stats.inProgress = list.filter((p: any) => ['execution', 'planning'].includes(p.status)).length
     stats.pendingReview = list.filter((p: any) => p.status === 'completion').length
     stats.completed = list.filter((p: any) => p.status === PROJECT_STATUS.ARCHIVED).length
     recentProjects.value = list.slice(0, 5)
+    allProjects.value = list
   } catch { /* ignore */ }
   loadingProjects.value = false
 
@@ -489,7 +570,9 @@ onMounted(async () => {
 }
 .recent-card-meta { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 6px; }
 .recent-card-year { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); margin-left: auto; }
-.recent-card-foot { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.recent-card-foot { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.recent-gantt-wrap { width: 100%; min-height: 280px; }
+.gt-empty { color: var(--gt-color-text-placeholder); }
 
 .project-link { color: var(--gt-color-primary); cursor: pointer; font-weight: 500; }
 .project-link:hover { text-decoration: underline; }

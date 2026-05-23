@@ -27,6 +27,12 @@ export async function listProjects(params?: Record<string, any>): Promise<any[]>
   return Array.isArray(data) ? data : data?.items || []
 }
 
+export async function listProjectsWithProgress(): Promise<any[]> {
+  // 仪表盘甘特/卡片视图专用：含 start_date / due_date / overall_progress / partner_name / manager_name
+  const { data } = await http.get(P_proj.listWithProgress, { validateStatus: () => true })
+  return Array.isArray(data) ? data : data?.items || []
+}
+
 export async function getProjectWizardState(projectId: string): Promise<any> {
   const { data } = await http.get(P_proj.wizard(projectId))
   return data
