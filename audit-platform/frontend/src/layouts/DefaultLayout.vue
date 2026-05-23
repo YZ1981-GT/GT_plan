@@ -4,6 +4,7 @@
     :catalog-title="catalogTitle"
     @nav-change="onNavChange"
     @view-change="onViewChange"
+    @open-global-search="showGlobalSearch = true"
   >
     <template #nav-review-inbox>
       <router-link

@@ -17,6 +17,13 @@
         </el-breadcrumb>
       </div>
       <div class="gt-topbar-right">
+        <!-- 全局搜索（Ctrl+K） -->
+        <el-tooltip content="全局搜索 (Ctrl+K)" placement="bottom">
+          <span class="gt-topbar-btn" @click="$emit('open-global-search')">
+            <el-icon><Search /></el-icon>
+          </span>
+        </el-tooltip>
+
         <!-- 通知铃铛 -->
         <slot name="nav-notifications" />
 
@@ -337,6 +344,7 @@ import {
   Stamp, Box, Setting, ArrowDown, SwitchButton,
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
   DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
+  Search,
 } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
@@ -426,6 +434,7 @@ const activeToolPath = computed(() => {
 const emit = defineEmits<{
   (e: 'nav-change', key: string): void
   (e: 'view-change', mode: 'three' | 'four'): void
+  (e: 'open-global-search'): void
 }>()
 
 function onNavClick(item: (typeof FALLBACK_NAV)[0]) {

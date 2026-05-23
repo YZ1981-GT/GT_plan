@@ -1,8 +1,17 @@
 <template>
   <div class="gt-dashboard gt-fade-in">
-    <!-- ── 欢迎横幅 ── -->
+    <!-- ── 欢迎横幅 + 角色视图切换（多维视图）── -->
     <GtPageHeader title="工作台" variant="banner" icon="🏠" :show-back="false">
       <template #subtitle>{{ todayStr }}</template>
+      <template #actions>
+        <div class="dashboard-view-switcher" v-if="availableViews.length > 1">
+          <el-radio-group v-model="activeView" size="small" @change="onViewChange">
+            <el-radio-button v-for="v in availableViews" :key="v.key" :value="v.key">
+              <el-icon style="margin-right: 3px"><component :is="v.icon" /></el-icon>{{ v.label }}
+            </el-radio-button>
+          </el-radio-group>
+        </div>
+      </template>
     </GtPageHeader>
 
     <!-- ── 统计卡片 ── -->
@@ -85,13 +94,13 @@
         </div>
       </el-col>
       <el-col :span="10">
-        <div class="section-card schedule-card">
+        <div class="section-card schedule-card" :class="{ 'schedule-card--collapsed': !loadingSchedule && todaySchedule.length === 0 }">
           <div class="section-header">
             <h2 class="section-title">今日日程</h2>
           </div>
           <el-skeleton v-if="loadingSchedule" :rows="3" animated />
-          <div v-else-if="todaySchedule.length === 0" class="empty-schedule">
-            <el-empty description="今日暂无安排" :image-size="48" />
+          <div v-else-if="todaySchedule.length === 0" class="empty-schedule-mini">
+            <span>📅 今日暂无日程</span>
           </div>
           <div v-else class="timeline-list">
             <div v-for="(item, i) in todaySchedule" :key="i" class="timeline-item">
@@ -125,7 +134,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useRoleContextStore } from '@/stores/roleContext'
 import { listProjects, getMyAssignments } from '@/services/commonApi'
 import { api as httpApi } from '@/services/apiProxy'
 import { dashboard as P_dash, workpapers as P_wp } from '@/services/apiPaths'
@@ -133,11 +144,34 @@ import { WP_STATUS, PROJECT_STATUS } from '@/constants/statusEnum'
 import GTChart from '@/components/GTChart.vue'
 import {
   FolderOpened, Loading, Warning, CircleCheck,
-  Plus, Timer, DataBoard, Reading, Setting,
-  Document, Paperclip, Search,
+  Plus, Timer, Reading, Search,
+  User, UserFilled, Avatar, Lock,
 } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
+const roleStore = useRoleContextStore()
+const router = useRouter()
+
+// ── 角色视图切换（多维视图）──
+type ViewKey = 'me' | 'team' | 'project' | 'eqcr'
+const ALL_VIEWS: { key: ViewKey; label: string; icon: any; roles: string[] }[] = [
+  { key: 'me',      label: '我的视图', icon: User,        roles: ['auditor', 'reviewer', 'manager', 'partner', 'eqcr', 'admin'] },
+  { key: 'team',    label: '团队视图', icon: UserFilled,  roles: ['manager', 'partner', 'admin'] },
+  { key: 'project', label: '项目视图', icon: Avatar,      roles: ['partner', 'admin'] },
+  { key: 'eqcr',    label: 'EQCR',     icon: Lock,        roles: ['eqcr', 'partner', 'admin'] },
+]
+const activeView = ref<ViewKey>('me')
+const availableViews = computed(() => {
+  const role = roleStore.effectiveRole || authStore.user?.role || 'auditor'
+  return ALL_VIEWS.filter(v => v.roles.includes(role))
+})
+function onViewChange(val: ViewKey) {
+  // team / project / eqcr 直接路由到对应页面（复用现有实现）
+  if (val === 'team') router.push('/dashboard/manager')
+  else if (val === 'project') router.push('/dashboard/partner')
+  else if (val === 'eqcr') router.push('/eqcr/metrics')
+  // me 视图保留在当前页
+}
 
 // ── 欢迎区 ──
 const displayName = computed(() => authStore.user?.username || '用户')
@@ -228,17 +262,12 @@ const statCards = computed(() => [
   },
 ])
 
-// ── 快捷操作 ──
+// ── 快捷操作（精简到 4 个真高频任务，与左侧导航解耦）──
 const quickActions = [
   { label: '新建项目', path: '/projects/new', icon: Plus, bg: 'var(--gt-color-primary-bg)', color: 'var(--gt-color-primary)' },
-  { label: '项目列表', path: '/projects', icon: FolderOpened, bg: 'var(--gt-color-teal-light)', color: 'var(--gt-color-teal)' },
-  { label: '模板库', path: '/template-library', icon: Document, bg: '#fef3e7', color: '#d97706' },
-  { label: '附件管理', path: '/attachments', icon: Paperclip, bg: '#fce7f3', color: '#db2777' },
   { label: '工时填报', path: '/work-hours', icon: Timer, bg: 'var(--gt-color-wheat-light)', color: '#e6a817' },
-  { label: '管理看板', path: '/dashboard/management', icon: DataBoard, bg: '#f0ebf8', color: 'var(--gt-color-primary)' },
-  { label: '知识库', path: '/knowledge', icon: Reading, bg: 'var(--gt-color-success-light)', color: 'var(--gt-color-success)' },
+  { label: '复核收件箱', path: '/review-inbox', icon: Reading, bg: 'var(--gt-color-coral-light)', color: '#FF5149' },
   { label: '高级查询', path: '/advanced-query', icon: Search, bg: '#e0f2fe', color: '#0284c7' },
-  { label: '系统设置', path: '/settings', icon: Setting, bg: '#f5f5f7', color: '#6e6e73' },
 ]
 
 // ── 状态映射 ──
@@ -412,6 +441,13 @@ onMounted(async () => {
 
 /* ── 今日日程 ── */
 .schedule-card { min-height: 240px; }
+.schedule-card--collapsed { min-height: auto; padding: var(--gt-space-3) var(--gt-space-5); }
+.schedule-card--collapsed .section-header { margin-bottom: var(--gt-space-1); }
+.empty-schedule-mini {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
+  padding: 4px 0;
+}
 .empty-schedule { display: flex; align-items: center; justify-content: center; min-height: 160px; }
 .timeline-list { display: flex; flex-direction: column; gap: var(--gt-space-3); }
 .timeline-item { display: flex; align-items: center; gap: var(--gt-space-3); padding: var(--gt-space-2) 0; }
@@ -448,6 +484,23 @@ onMounted(async () => {
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .action-grid { grid-template-columns: repeat(3, 1fr); }
   .mid-row .el-col { max-width: 100%; flex: 0 0 100%; margin-bottom: var(--gt-space-4); }
+}
+
+/* ── 角色视图切换器（banner 内 actions slot）── */
+.dashboard-view-switcher {
+  margin-top: var(--gt-space-2);
+  display: inline-flex;
+}
+.dashboard-view-switcher :deep(.el-radio-button__inner) {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--gt-color-text-inverse);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+.dashboard-view-switcher :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--gt-color-primary);
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: none;
 }
 @media (max-width: 640px) {
   .stat-grid { grid-template-columns: 1fr; }
