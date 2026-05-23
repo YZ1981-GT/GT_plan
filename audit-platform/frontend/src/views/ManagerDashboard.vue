@@ -8,6 +8,7 @@
         </span>
       </template>
       <template #actions>
+        <DashboardViewSwitcher />
         <span class="gt-last-update" v-if="lastUpdateTime">
           上次更新 {{ elapsedText }} 前
         </span>
@@ -429,6 +430,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import DashboardViewSwitcher from '@/components/dashboard/DashboardViewSwitcher.vue'
 import { api } from '@/services/apiProxy'
 import { dashboard as P_dash, workHours as P_wh, projects as P_proj } from '@/services/apiPaths'
 import http from '@/utils/http'

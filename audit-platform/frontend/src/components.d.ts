@@ -91,6 +91,7 @@ declare module 'vue' {
     CustomQueryTab: typeof import('./components/template-library/CustomQueryTab.vue')['default']
     CycleFilter: typeof import('./components/panorama/CycleFilter.vue')['default']
     CycleProgressRing: typeof import('./components/dashboard/CycleProgressRing.vue')['default']
+    DashboardViewSwitcher: typeof import('./components/dashboard/DashboardViewSwitcher.vue')['default']
     DataConsistencyMonitor: typeof import('./components/workpaper/DataConsistencyMonitor.vue')['default']
     DataImportPanel: typeof import('./components/import/DataImportPanel.vue')['default']
     DataQualityDialog: typeof import('./components/DataQualityDialog.vue')['default']

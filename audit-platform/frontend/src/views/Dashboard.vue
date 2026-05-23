@@ -4,13 +4,7 @@
     <GtPageHeader title="工作台" variant="banner" icon="🏠" :show-back="false">
       <template #subtitle>{{ todayStr }}</template>
       <template #actions>
-        <div class="dashboard-view-switcher" v-if="availableViews.length > 1">
-          <el-radio-group v-model="activeView" size="small" @change="onViewChange">
-            <el-radio-button v-for="v in availableViews" :key="v.key" :value="v.key">
-              {{ v.label }}
-            </el-radio-button>
-          </el-radio-group>
-        </div>
+        <DashboardViewSwitcher />
       </template>
     </GtPageHeader>
 
@@ -209,6 +203,7 @@ import { dashboard as P_dash, workpapers as P_wp } from '@/services/apiPaths'
 import { WP_STATUS, PROJECT_STATUS } from '@/constants/statusEnum'
 import GTChart from '@/components/GTChart.vue'
 import ProjectGanttChart from '@/components/dashboard/ProjectGanttChart.vue'
+import DashboardViewSwitcher from '@/components/dashboard/DashboardViewSwitcher.vue'
 import {
   FolderOpened, Loading, Warning, CircleCheck,
   Plus, Timer, Reading, Search,
@@ -217,29 +212,6 @@ import {
 const authStore = useAuthStore()
 const roleStore = useRoleContextStore()
 const router = useRouter()
-
-// ── 角色视图切换（多维视图）──
-// 视图分两类：
-//   me / team / project / eqcr 都是仪表盘的不同聚合粒度。
-//   team / project / eqcr 当前直接路由到已有的专门 dashboard 页面（避免重复实现），
-//   保留 me 在本页（默认）。命名统一带"视图"后缀，避免上一轮 EQCR 单字标签不一致。
-type ViewKey = 'me' | 'team' | 'project' | 'eqcr'
-const ALL_VIEWS: { key: ViewKey; label: string; roles: string[]; route?: string }[] = [
-  { key: 'me',      label: '我的视图',  roles: ['auditor', 'reviewer', 'manager', 'partner', 'eqcr', 'admin'] },
-  { key: 'team',    label: '团队视图',  roles: ['manager', 'partner', 'admin'], route: '/dashboard/manager' },
-  { key: 'project', label: '项目视图',  roles: ['partner', 'admin'],            route: '/dashboard/partner' },
-  { key: 'eqcr',    label: 'EQCR 视图', roles: ['eqcr', 'partner', 'admin'],    route: '/eqcr/metrics' },
-]
-const activeView = ref<ViewKey>('me')
-const availableViews = computed(() => {
-  const role = roleStore.effectiveRole || authStore.user?.role || 'auditor'
-  return ALL_VIEWS.filter(v => v.roles.includes(role))
-})
-function onViewChange(val: ViewKey) {
-  const v = ALL_VIEWS.find(x => x.key === val)
-  if (v?.route) router.push(v.route)
-  // me 视图保留在当前页
-}
 
 // ── 欢迎区 ──
 const displayName = computed(() => authStore.user?.username || '用户')
@@ -628,22 +600,6 @@ onMounted(async () => {
   .mid-row .el-col { max-width: 100%; flex: 0 0 100%; margin-bottom: var(--gt-space-4); }
 }
 
-/* ── 角色视图切换器（banner 内 actions slot）── */
-.dashboard-view-switcher {
-  margin-top: var(--gt-space-2);
-  display: inline-flex;
-}
-.dashboard-view-switcher :deep(.el-radio-button__inner) {
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--gt-color-text-inverse);
-  border-color: rgba(255, 255, 255, 0.24);
-}
-.dashboard-view-switcher :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
-  background: rgba(255, 255, 255, 0.95);
-  color: var(--gt-color-primary);
-  border-color: rgba(255, 255, 255, 0.95);
-  box-shadow: none;
-}
 @media (max-width: 640px) {
   .stat-grid { grid-template-columns: 1fr; }
   .action-grid { grid-template-columns: repeat(2, 1fr); }

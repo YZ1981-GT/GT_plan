@@ -67,10 +67,11 @@ def register_collaboration_routers(app: FastAPI) -> None:
     from app.routers.procedures import router as proc_router
     from app.routers.subsequent_events import router as se_router
     from app.routers.forum import router as forum_router
+    from app.routers.independence import router as independence_router
 
     for r in [staff_router, assign_router, wh_router, wh_list_router, dash_router,
               pmd_router, qcd_router, pd_router, rc2_router, proc_router,
-              se_router, forum_router]:
+              se_router, forum_router, independence_router]:
         app.include_router(r, tags=["团队与看板"])
 
     # 角色AI辅助

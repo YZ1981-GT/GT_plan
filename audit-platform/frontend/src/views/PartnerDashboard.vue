@@ -7,6 +7,7 @@
         </span>
       </template>
       <template #actions>
+        <DashboardViewSwitcher />
         <!-- 待签字项目一键跳转 [R9 F7-Partner Task 24] -->
         <el-button
           v-if="overview && overview.pending_sign_count > 0"
@@ -300,6 +301,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import DashboardViewSwitcher from '@/components/dashboard/DashboardViewSwitcher.vue'
 import { useAuthStore } from '@/stores/auth'
 import {
   getPartnerOverview, getTeamEfficiency,

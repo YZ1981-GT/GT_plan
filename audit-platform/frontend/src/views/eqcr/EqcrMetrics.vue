@@ -1,7 +1,8 @@
 <template>
   <div class="eqcr-metrics gt-fade-in">
-    <GtPageHeader title="EQCR 指标仪表盘" @back="router.push('/eqcr/workbench')">
+    <GtPageHeader title="EQCR 指标仪表盘" variant="banner" icon="📊" :show-back="false">
       <template #actions>
+        <DashboardViewSwitcher />
         <el-select v-model="selectedYear" size="small" style="width: 120px" @change="fetchMetrics">
           <el-option v-for="y in yearOptions" :key="y" :label="`${y}年`" :value="y" />
         </el-select>
@@ -64,6 +65,7 @@ import { useRouter } from 'vue-router'
 import api from '@/services/apiProxy'
 import { eqcr as P_eqcr } from '@/services/apiPaths'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import DashboardViewSwitcher from '@/components/dashboard/DashboardViewSwitcher.vue'
 import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
