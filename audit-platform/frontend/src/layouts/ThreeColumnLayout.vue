@@ -175,14 +175,17 @@
                 {{ item.label }}
                 <span v-if="item.maturity === 'pilot'" class="gt-maturity-badge gt-maturity-pilot">试点</span>
                 <span v-else-if="item.maturity === 'experimental'" class="gt-maturity-badge gt-maturity-exp">实验</span>
-                <span v-else-if="item.maturity === 'developing'" class="gt-maturity-badge gt-maturity-dev">开发中</span>
+                <span v-else-if="item.maturity === 'developing'" class="gt-maturity-badge gt-maturity-dev">📌 即将上线</span>
               </span>
             </transition>
           </div>
         </nav>
         <div class="gt-sidebar-bottom">
-          <!-- 工具簇（从顶栏迁移过来，避免顶栏过载） -->
+          <!-- 工具簇（按职能分组，扁平不折叠便于一击即达）-->
           <div class="gt-sidebar-tools-title" v-if="!sidebarCollapsed">工具</div>
+
+          <!-- 知识 -->
+          <div class="gt-tool-group-label" v-if="!sidebarCollapsed">📚 知识</div>
           <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': route.path.startsWith('/knowledge') }" @click="router.push('/knowledge')" title="知识库">
             <el-icon :size="18"><Reading /></el-icon>
             <transition name="gt-fade">
@@ -195,22 +198,19 @@
               <span v-if="!sidebarCollapsed" class="gt-nav-label">私人库</span>
             </transition>
           </div>
-          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/settings/ai-models' }" @click="router.push('/settings/ai-models')" title="AI 模型">
-            <el-icon :size="18"><Cpu /></el-icon>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">AI 模型</span>
-            </transition>
-          </div>
           <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/settings/report-format' }" @click="router.push('/settings/report-format')" title="排版模板">
             <el-icon :size="18"><Document /></el-icon>
             <transition name="gt-fade">
               <span v-if="!sidebarCollapsed" class="gt-nav-label">排版模板</span>
             </transition>
           </div>
-          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/forum' }" @click="router.push('/forum')" title="吐槽求助">
-            <el-icon :size="18"><ChatDotSquare /></el-icon>
+
+          <!-- AI -->
+          <div class="gt-tool-group-label" v-if="!sidebarCollapsed">🤖 AI</div>
+          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/settings/ai-models' }" @click="router.push('/settings/ai-models')" title="AI 模型">
+            <el-icon :size="18"><Cpu /></el-icon>
             <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">吐槽求助</span>
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">AI 模型</span>
             </transition>
           </div>
           <div class="gt-nav-item gt-nav-item--tool" @click="showFormulaManager = true" title="公式管理">
@@ -219,10 +219,22 @@
               <span v-if="!sidebarCollapsed" class="gt-nav-label">公式管理</span>
             </transition>
           </div>
+
+          <!-- 查询 -->
+          <div class="gt-tool-group-label" v-if="!sidebarCollapsed">🔎 查询</div>
           <div class="gt-nav-item gt-nav-item--tool" @click="showCustomQuery = true" title="自定义查询">
-            <span class="gt-tool-text-icon">🔍</span>
+            <el-icon :size="18"><Search /></el-icon>
             <transition name="gt-fade">
               <span v-if="!sidebarCollapsed" class="gt-nav-label">自定义查询</span>
+            </transition>
+          </div>
+
+          <!-- 反馈 -->
+          <div class="gt-tool-group-label" v-if="!sidebarCollapsed">💬 反馈</div>
+          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/forum' }" @click="router.push('/forum')" title="吐槽求助">
+            <el-icon :size="18"><ChatDotSquare /></el-icon>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">吐槽求助</span>
             </transition>
           </div>
 
@@ -1063,6 +1075,13 @@ onUnmounted(() => {
   color: var(--gt-color-text-tertiary, #909399);
   padding: 8px 14px 4px;
   letter-spacing: 0.5px;
+}
+.gt-tool-group-label {
+  font-size: 11px;
+  color: var(--gt-color-text-placeholder, #c0c4cc);
+  padding: 6px 14px 2px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
 }
 .gt-nav-item--tool {
   font-size: var(--gt-font-size-sm);

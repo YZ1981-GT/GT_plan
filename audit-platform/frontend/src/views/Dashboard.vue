@@ -61,10 +61,16 @@
         <div class="section-card">
           <div class="section-header">
             <h2 class="section-title">最近项目</h2>
-            <el-button text size="small" @click="$router.push('/projects')">查看全部</el-button>
+            <div class="section-header-right">
+              <el-radio-group v-model="recentViewMode" size="small">
+                <el-radio-button value="table">表格</el-radio-button>
+                <el-radio-button value="card">卡片</el-radio-button>
+              </el-radio-group>
+              <el-button text size="small" @click="$router.push('/projects')">查看全部</el-button>
+            </div>
           </div>
           <el-skeleton v-if="loadingProjects" :rows="4" animated />
-          <el-table v-else :data="recentProjects" size="small" class="gt-compact-table" :show-header="true" stripe>
+          <el-table v-else-if="recentViewMode === 'table'" :data="recentProjects" size="small" class="gt-compact-table" :show-header="true" stripe>
             <el-table-column prop="name" label="项目名称" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">
                 <span class="project-link" @click="$router.push(`/projects/${row.id}/ledger`)">{{ row.name }}</span>
@@ -91,6 +97,25 @@
               </template>
             </el-table-column>
           </el-table>
+          <!-- 卡片视图（recentViewMode === 'card'）-->
+          <div v-else class="recent-card-grid">
+            <div
+              v-for="row in recentProjects"
+              :key="row.id"
+              class="recent-card"
+              @click="$router.push(`/projects/${row.id}/ledger`)"
+            >
+              <div class="recent-card-name" :title="row.name">{{ row.name }}</div>
+              <div class="recent-card-meta">
+                <el-tag size="small" effect="plain" round>{{ projectTypeLabel(row.project_type) }}</el-tag>
+                <el-tag :type="statusType(row.status) || undefined" size="small" effect="light" round>{{ statusLabel(row.status) }}</el-tag>
+                <span class="gt-amt recent-card-year">{{ row.audit_year || '—' }}</span>
+              </div>
+              <div class="recent-card-foot">
+                <span class="gt-mono">{{ shortDate(row.created_at) }} 创建</span>
+              </div>
+            </div>
+          </div>
         </div>
       </el-col>
       <el-col :span="10">
@@ -196,6 +221,7 @@ const stats = reactive({ total: 0, inProgress: 0, pendingReview: 0, completed: 0
 const loadingProjects = ref(true)
 const loadingSchedule = ref(true)
 const recentProjects = ref<any[]>([])
+const recentViewMode = ref<'table' | 'card'>('table')
 const todaySchedule = ref<any[]>([])
 
 function makeSparkline(data: number[], color: string) {
@@ -430,7 +456,40 @@ onMounted(async () => {
   box-shadow: var(--gt-shadow-sm);
 }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
+.section-header-right { display: flex; align-items: center; gap: var(--gt-space-3); }
 .section-title { font-size: var(--gt-font-size-md); font-weight: 600; color: var(--gt-color-text); margin: 0; }
+
+/* 最近项目 — 卡片视图 */
+.recent-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--gt-space-3);
+}
+.recent-card {
+  padding: var(--gt-space-3) var(--gt-space-4);
+  border: 1px solid var(--gt-color-border-light);
+  border-radius: var(--gt-radius-md);
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--gt-color-bg-white);
+}
+.recent-card:hover {
+  border-color: var(--gt-color-primary-lighter);
+  box-shadow: var(--gt-shadow-sm);
+  transform: translateY(-1px);
+}
+.recent-card-name {
+  font-weight: 600;
+  color: var(--gt-color-primary);
+  font-size: var(--gt-font-size-sm);
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recent-card-meta { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 6px; }
+.recent-card-year { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); margin-left: auto; }
+.recent-card-foot { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 
 .project-link { color: var(--gt-color-primary); cursor: pointer; font-weight: 500; }
 .project-link:hover { text-decoration: underline; }
