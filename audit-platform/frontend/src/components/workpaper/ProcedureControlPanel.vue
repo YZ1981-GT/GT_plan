@@ -43,7 +43,7 @@
           <el-checkbox-group
             :model-value="rowCategoryArray(row)"
             size="small"
-            @change="(v: string[]) => onRowCategoryChange(row, v)"
+            @change="(v: (string | number | boolean)[]) => onRowCategoryChange(row, v.map(String))"
           >
             <el-checkbox value="常规★">常规★</el-checkbox>
             <el-checkbox value="备选">备选</el-checkbox>

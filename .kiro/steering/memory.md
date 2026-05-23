@@ -100,6 +100,6 @@ inclusion: always
 - **临时文件不进 commit**（2026-05-23 沉淀）：写长 commit message 时若用 fsWrite 创建 `commit-msg.txt` 中转，必须 `git rm --cached commit-msg.txt` 后 `--amend` 清掉；更稳的做法 = 用 `git commit -m "..." -m "..."` 多 -m 拼接或反斜杠续行
 - **SQLite 测试 set_rls_context 兼容**（2026-05-23 沉淀）：set_rls_context 调 PG 的 `set_config(...)` 在 SQLite in-memory 测试会爆 `no such function`；admin 路径走 require_project_access 仍会触发；测试侧 `patch("app.deps.set_rls_context", new=AsyncMock())` 绕开（不在 conftest 全局短路，按需测试 mock 保留生产语义）
 - **FastAPI dep_overrides 闭包陷阱**（2026-05-23 沉淀）：`require_project_access("readonly")` 工厂每次返回新闭包，`app.dependency_overrides[require_project_access("readonly")]` 不会命中路由实际 Depends 对象；正确做法 = 仅 override `get_current_user` + `get_db`，让 admin 路径自身短路，配合上一条 mock set_rls_context 即可
-- **PowerShell**：写中文/emoji 用 fsWrite 工具；`Out-File` 文件锁需先 Stop-Process powershell + 用 `cmd /c "... > log 2>&1"`
+- **PowerShell**：写中文/emoji 用 fsWrite 工具；`Out-File` 文件锁需先 Stop-Process powershell + 用 `cmd /c "... > log 2>&1"`；多 `-m` 长 commit message 含 `()` / `→` / 中文冒号会被 pwsh 当子表达式或 pathspec 错切，必须 `git commit --% -m "..." -m "..."` 用 stop-parsing token 把后续参数原样交给 git（`commit-msg.txt` 临时文件方案不进 commit 是底线，`--%` 是优选）
 - **agent 调 service 优于 Playwright UI**：大文件入库直调 ledger_import 管线快 10x，Playwright 仅做前端可见性验证
 - **历史档案不回填修改铁律**（2026-05-23 沉淀）：`.kiro/steering/dev-history.md` / `.kiro/specs/*/tasks.md` 等历史记录是 append-only 审计轨迹；做目录重组/路径迁移时**不回填**这些文档中的旧路径（保持时点准确性），只更新活跃代码 + 当前文档；判定边界 = "记录写入时该路径是真的吗" → 是即保留

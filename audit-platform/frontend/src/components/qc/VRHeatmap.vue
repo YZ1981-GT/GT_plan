@@ -1,5 +1,5 @@
 <template>
-  <div class="gt-vr-heatmap" v-loading="loading">
+  <div class="gt-vr-heatmap" v-loading="!!loading">
     <div class="gt-heatmap-header">
       <h3>风险热力图</h3>
       <el-button size="small" @click="$emit('refresh')">刷新</el-button>

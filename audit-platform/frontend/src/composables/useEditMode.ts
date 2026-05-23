@@ -16,9 +16,12 @@
  * @module composables/useEditMode
  * @see R3.4
  */
-import { ref } from 'vue'
+import { ref, watch, type Ref } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
+
+/** 编辑模式过渡动画时长（毫秒），与 CSS transition-duration 保持一致 */
+export const EDIT_TRANSITION_MS = 300
 
 export interface UseEditModeOptions {
   /** 初始编辑状态，默认 false */
@@ -30,6 +33,15 @@ export interface UseEditModeOptions {
 export function useEditMode(options?: UseEditModeOptions) {
   const isEditing = ref(options?.initialEditing ?? false)
   const isDirty = ref(false)
+  const transitioning = ref(false)
+  let _transitionTimer: ReturnType<typeof setTimeout> | null = null
+
+  // isEditing 切换时触发过渡动画状态：transitioning 立即 true，EDIT_TRANSITION_MS 后回 false
+  watch(isEditing, () => {
+    transitioning.value = true
+    if (_transitionTimer) clearTimeout(_transitionTimer)
+    _transitionTimer = setTimeout(() => { transitioning.value = false }, EDIT_TRANSITION_MS)
+  })
 
   /** 进入编辑模式 */
   function enterEdit() {
@@ -99,9 +111,27 @@ export function useEditMode(options?: UseEditModeOptions) {
   return {
     isEditing,
     isDirty,
+    transitioning,
     enterEdit,
     exitEdit,
     markDirty,
     clearDirty,
   }
+}
+
+/**
+ * 独立过渡 helper — 监听任意 ref，切换时触发 transitioning 状态
+ * （用于 WorkpaperEditor editLock.isMine 等外部布尔值的过渡动画）
+ */
+export function useEditTransition(source: Ref<boolean>) {
+  const transitioning = ref(false)
+  let _timer: ReturnType<typeof setTimeout> | null = null
+
+  watch(source, () => {
+    transitioning.value = true
+    if (_timer) clearTimeout(_timer)
+    _timer = setTimeout(() => { transitioning.value = false }, EDIT_TRANSITION_MS)
+  })
+
+  return { transitioning }
 }

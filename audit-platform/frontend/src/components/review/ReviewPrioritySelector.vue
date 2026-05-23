@@ -1,6 +1,6 @@
 <template>
   <div class="gt-priority-selector">
-    <el-radio-group :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" size="small">
+    <el-radio-group :model-value="modelValue" @update:model-value="(v: string | number | boolean | undefined) => $emit('update:modelValue', String(v ?? ''))" size="small">
       <el-radio-button value="must_fix">
         <span class="gt-priority-label must-fix">🔴 必须修改</span>
       </el-radio-button>

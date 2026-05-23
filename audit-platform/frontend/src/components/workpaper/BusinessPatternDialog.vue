@@ -133,12 +133,12 @@ const analyzed = ref(false)
 const patterns = ref<CustomerPattern[]>([])
 const llmSuggestion = ref('')
 
-function getCategoryTagType(category: string): '' | 'success' | 'warning' | 'danger' | 'info' {
+function getCategoryTagType(category: string): 'success' | 'warning' | 'danger' | 'info' | 'primary' | undefined {
   switch (category) {
     case '现销型':
       return 'success'
     case '短期信用':
-      return ''
+      return undefined
     case '中期信用':
       return 'warning'
     case '长期信用':

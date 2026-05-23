@@ -74,6 +74,10 @@ export interface WorkpaperDetail {
   wp_name?: string
   audit_cycle?: string
   qc_passed?: boolean | null
+  /** 解析后的工作簿数据（含 user_overrides 等扩展信息），后端按需返回 */
+  parsed_data?: Record<string, any> | null
+  /** 业务年度（部分接口返回） */
+  year?: number | null
 }
 
 export interface OnlineEditSession {

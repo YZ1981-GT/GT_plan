@@ -27,6 +27,8 @@ export const workHours = {
   batchApprove: '/api/workhours/batch-approve',
   detail: (hourId: string) => `/api/work-hours/${hourId}`,
   editTimeSuggest: '/api/work-hours/edit-time-suggest',
+  /** 智能填报建议（基于项目分配 + 历史工时推荐当日候选项） */
+  aiSuggest: '/api/work-hours/ai-suggest',
 } as const
 
 // ─── 通知 ───────────────────────────────────────────────────────────────────

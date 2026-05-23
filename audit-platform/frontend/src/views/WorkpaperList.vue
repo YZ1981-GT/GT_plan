@@ -867,7 +867,7 @@ function getTreeNodeHighlight(data: any): { style: Record<string, string>; toolt
 }
 
 /** Task 2.3: 获取树节点 badge 数据 */
-function getTreeNodeBadge(data: any): { value: number; type: string; visible: boolean } | undefined {
+function getTreeNodeBadge(data: any): { value: number; type: 'danger' | 'warning' | 'info'; visible: boolean } | undefined {
   if (viewMode.value !== 'list' || !data.wpId) return undefined
   return roleBadgeMap.value.get(data.id || data.wpId)
 }

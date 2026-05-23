@@ -541,7 +541,7 @@
     <!-- Sprint 5.5: 查看公式详情弹窗 -->
     <CellFormulaDetail
       :visible="showCellFormulaDetail"
-      :wp-code="wpDetail?.wp_code"
+      :wp-code="wpDetail?.wp_code || ''"
       :sheet-name="cellDetailSheet"
       :label="cellDetailLabel"
       @update:visible="showCellFormulaDetail = $event"

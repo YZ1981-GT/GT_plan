@@ -45,7 +45,7 @@
         >
           模板格式较复杂，已切换到富文本兜底编辑器（保留 80%+ 内容，部分高级格式如页眉/嵌套表格/字段域可能损失）
         </el-alert>
-        <editor-content :editor="tiptapEditor" class="gt-word-tiptap-editor" />
+        <editor-content :editor="tiptapEditor ?? undefined" class="gt-word-tiptap-editor" />
       </div>
 
       <!-- 渲染模式 3：纯文本 textarea（最末端兜底） -->
@@ -192,8 +192,8 @@ async function tryLoadUniver(): Promise<boolean> {
     univerInstance.value = univer
     univerAPI.value = api
 
-    // 加载 docx snapshot
-    api.createUnit('UNIVER_DOC', result.snapshot)
+    // 加载 docx snapshot（FUniver 类型未对外暴露 createUnit，使用 any cast 避免类型噪声）
+    ;(api as any).createUnit('UNIVER_DOC', result.snapshot)
     return true
   } catch (e: any) {
     console.warn('[WorkpaperWordEditor] Univer Docs load failed, fallback to TipTap:', e)

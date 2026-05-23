@@ -58,3 +58,9 @@ export type SSEEventType =
   // Phase 7 F11: 复核进度实时通知
   | 'review.accepted'
   | 'review.completed'
+  // 编辑锁强抢
+  | 'editing_lock.force_acquired'
+  // 导出进度（ExportProgressBar）
+  | 'export.progress'
+  | 'export.complete'
+  | 'export.failed'

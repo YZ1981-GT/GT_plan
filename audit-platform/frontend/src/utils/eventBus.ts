@@ -84,15 +84,22 @@ export interface TemplateAppliedPayload {
 /** SSE 同步状态事件 */
 export interface SyncEventPayload {
   event_type: SSEEventType
-  project_id: string
+  project_id?: string
   year?: number
   account_codes?: string[]
+  /** 编辑锁强抢事件常带字段 */
+  wp_id?: string
+  new_holder_id?: string
+  new_holder_name?: string
+  previous_holder_id?: string
   extra?: {
     source_event?: string
     handler?: string
     error?: string
     [key: string]: any
   }
+  /** 允许其他事件类型携带自有顶层字段（弱约束 escape hatch） */
+  [key: string]: any
 }
 
 /** 底稿解析完成（上传→解析→试算表联动） */
@@ -237,6 +244,23 @@ export type Events = {
 
   // 联动总线 stale 事件（Sprint 4 Task 4.7）
   'linkage:stale-changed': { project_id: string; affected_modules: string[]; total_affected: number }
+
+  // useStaleSummaryFull 订阅的细粒度事件（payload 不强约束，由 SSE bridge / 业务方按需 emit）
+  'adjustment:created': void
+  'adjustment:updated': void
+  'adjustment:deleted': void
+  'dataset:activated': void
+
+  // 编辑锁强抢通知（useEditingLock → SSE force_acquired 反射）
+  'editing-lock:taken-over': {
+    wp_id: string
+    new_holder_id: string
+    new_holder_name: string
+    previous_holder_id?: string
+  }
+
+  // 全局打开自定义查询（Dashboard 快捷操作 / 侧栏 → ThreeColumnLayout 打开弹窗）
+  'open-custom-query': { tab?: 'basic' | 'advanced' } | undefined
 
   // 年度切换（R8-S1-04）
   'year:changed': YearChangedPayload

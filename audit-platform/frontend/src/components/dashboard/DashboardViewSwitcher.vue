@@ -76,8 +76,8 @@ watch(
   { immediate: true },
 )
 
-function onChange(val: ViewKey) {
-  const v = ALL_VIEWS.find(x => x.key === val)
+function onChange(val: string | number | boolean | undefined) {
+  const v = ALL_VIEWS.find(x => x.key === val as ViewKey)
   if (!v) return
   if (route.path === v.route) return
   router.push(v.route)

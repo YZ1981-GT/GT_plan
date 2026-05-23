@@ -211,7 +211,7 @@ async function onCancel() {
   }
 }
 
-function onCloseAttempt(_done: any) {
+function onCloseAttempt() {
   // ESC 两步退出 — 默认 fullscreen + close-on-press-escape=false 已防止首次 ESC
   // 此处由用户手动点关闭按钮触发，走 confirmLeave 流程
   onCancel()

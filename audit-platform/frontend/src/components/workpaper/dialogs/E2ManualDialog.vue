@@ -198,7 +198,7 @@ async function onCancel() {
   }
 }
 
-function onCloseAttempt(_done: any) {
+function onCloseAttempt() {
   onCancel()
 }
 </script>

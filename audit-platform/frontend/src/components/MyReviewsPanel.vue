@@ -113,12 +113,12 @@ function handleNavigate(item: ReviewItem) {
   })
 }
 
-function priorityTagType(priority: string): '' | 'success' | 'warning' | 'danger' | 'info' {
+function priorityTagType(priority: string): 'success' | 'warning' | 'danger' | 'info' | 'primary' | undefined {
   switch (priority) {
     case 'must_fix': return 'danger'
     case 'suggest': return 'warning'
     case 'info': return 'info'
-    default: return ''
+    default: return undefined
   }
 }
 

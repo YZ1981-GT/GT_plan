@@ -159,7 +159,7 @@ export function usePrerequisiteStatus(projectId: string, wpCode: string) {
   const lastError = ref<string>('')
 
   const banner = computed(() => {
-    if (loading.value) return { type: 'info', message: '正在加载前置状态...' }
+    if (loading.value) return { type: 'info' as const, message: '正在加载前置状态...' }
     if (overall.value === 'ready') {
       return {
         type: 'success' as const,

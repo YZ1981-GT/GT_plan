@@ -19,6 +19,22 @@
  */
 import { ref, computed, onMounted, onUnmounted, watch, type Ref } from 'vue'
 import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
+
+/** 锁冲突信息（他人持锁时由 acquire 409 / SSE 推送返回） */
+export interface LockConflictInfo {
+  locked_by?: string
+  locked_by_name?: string
+  acquired_at?: string
+}
+
+/** force_acquired SSE 事件 payload（被强抢通知） */
+export interface EditingLockTakenOverPayload {
+  wp_id: string
+  new_holder_id: string
+  new_holder_name: string
+  previous_holder_id?: string
+}
 
 export interface EditingLockOptions {
   /** 资源 ID（底稿 UUID / 其他标识） */
@@ -105,18 +121,37 @@ export function useEditingLock(options: EditingLockOptions) {
 
   function onBeforeUnload() { release() }
 
+  /** SSE 事件处理：他人通过 force_acquired 强抢了我的锁 */
+  function onSSEEvent(payload: any) {
+    if (!payload || payload.event_type !== 'editing_lock.force_acquired') return
+    if (!isWorkpaper) return
+    if (payload.wp_id !== options.resourceId.value) return
+    // 仅当本人原本持锁时才反应（避免他人之间互抢的杂讯）
+    if (!isMine.value) return
+    isMine.value = false
+    lockedBy.value = payload.new_holder_name ?? null
+    eventBus.emit('editing-lock:taken-over', {
+      wp_id: payload.wp_id,
+      new_holder_id: payload.new_holder_id,
+      new_holder_name: payload.new_holder_name,
+      previous_holder_id: payload.previous_holder_id,
+    })
+  }
+
   onMounted(async () => {
     if (options.autoAcquire !== false) {
       await acquire()
       if (isMine.value) startHeartbeat()
     }
     window.addEventListener('beforeunload', onBeforeUnload)
+    eventBus.on('sse:sync-event', onSSEEvent)
   })
 
   onUnmounted(() => {
     stopHeartbeat()
     release()
     window.removeEventListener('beforeunload', onBeforeUnload)
+    eventBus.off('sse:sync-event', onSSEEvent)
   })
 
   // 资源 ID 变化时重新获取锁

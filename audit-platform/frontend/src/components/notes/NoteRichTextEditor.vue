@@ -191,7 +191,7 @@ function applyHeading(tag: string) {
   }
 }
 
-function applyFontColor(color: string) {
+function applyFontColor(color: string | null) {
   if (color) {
     execCommand('foreColor', color)
   }

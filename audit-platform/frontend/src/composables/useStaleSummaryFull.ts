@@ -109,7 +109,7 @@ export function useStaleSummaryFull(
     if (payload?.extra?.linkage_event === 'stale-changed') {
       // 从 SSE 收到 stale-changed 事件，触发 linkage:stale-changed 本地事件
       eventBus.emit('linkage:stale-changed', {
-        project_id: payload.project_id,
+        project_id: payload.project_id || '',
         affected_modules: payload.extra?.affected_modules || [],
         total_affected: payload.extra?.total_affected || 0,
       })

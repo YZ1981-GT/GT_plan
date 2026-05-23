@@ -140,6 +140,7 @@
       :x="msCtx.contextMenu.x"
       :y="msCtx.contextMenu.y"
       :item-name="msCtx.contextMenu.itemName"
+      :multi-count="0"
     >
       <div class="gt-ucell-ctx-item" @click="onCtxRelatedWp">
         <span class="gt-ucell-ctx-icon">📝</span> 查看关联底稿

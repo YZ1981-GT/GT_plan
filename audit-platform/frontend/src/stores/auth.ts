@@ -19,6 +19,8 @@ export interface UserProfile {
   created_at: string
   /** 后端下发的权限列表（从 /api/users/me 获取），供 usePermission 使用 */
   permissions?: string[]
+  /** 用户全名（中文姓名），eqcr/签字/审批等界面优先显示 */
+  full_name?: string | null
 }
 
 export interface AuthState {

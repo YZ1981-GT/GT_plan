@@ -253,6 +253,10 @@ export const attachments = {
   download: (id: string) => `/api/attachments/${id}/download`,
   associate: (id: string) => `/api/attachments/${id}/associate`,
   ocrStatus: (id: string) => `/api/attachments/${id}/ocr-status`,
+  /** 附件版本列表（AttachmentVersionsDialog 加载用） */
+  versions: (id: string) => `/api/attachments/${id}/versions`,
+  /** 回滚附件到指定版本（创建新版本复制旧版本内容） */
+  rollback: (id: string, versionId: string) => `/api/attachments/${id}/versions/${versionId}/rollback`,
 } as const
 
 /** Office 在线预览健康探测（决定是否展示 iframe） */

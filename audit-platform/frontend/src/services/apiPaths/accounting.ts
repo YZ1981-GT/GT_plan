@@ -24,6 +24,8 @@ export const adjustments = {
   accountDropdown: (pid: string) => `/api/projects/${pid}/adjustments/account-dropdown`,
   exportSummary: (pid: string) => `/api/projects/${pid}/adjustments/export-summary`,
   convertToMisstatement: (pid: string, groupId: string) => `/api/projects/${pid}/adjustments/${groupId}/convert-to-misstatement`,
+  /** AdjustmentImpactPreview 实时影响预览（POST line_items[]） */
+  previewImpact: (pid: string) => `/api/projects/${pid}/adjustments/preview-impact`,
 } as const
 
 // ─── 重要性 ─────────────────────────────────────────────────────────────────

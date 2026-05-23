@@ -9,11 +9,10 @@
     >✨ AI 审计说明</el-button>
     <AiContentConfirmDialog
       v-if="aiResult"
-      v-model="dialogVisible"
-      :content="aiResult.text || aiResult.summary || ''"
-      :metadata="aiMeta"
+      :visible="dialogVisible"
+      :ai-content-item="aiContentItem"
+      @update:visible="dialogVisible = $event"
       @confirm="onConfirm"
-      @reject="onReject"
     />
   </div>
 </template>
@@ -29,7 +28,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import AiContentConfirmDialog from '@/components/ai/AiContentConfirmDialog.vue'
+import AiContentConfirmDialog, { type AiContentItemForConfirm } from '@/components/ai/AiContentConfirmDialog.vue'
 
 interface Props {
   wpId: string
@@ -48,11 +47,19 @@ const loading = ref(false)
 const aiResult = ref<any>(null)
 const dialogVisible = ref(false)
 
-const aiMeta = computed(() => ({
-  scenario: props.scenario,
-  wp_id: props.wpId,
-  sheet_key: props.sheetKey || '',
-}))
+// 适配 AiContentConfirmDialog 的 aiContentItem 形态
+const aiContentItem = computed<AiContentItemForConfirm | null>(() => {
+  if (!aiResult.value) return null
+  return {
+    id: aiResult.value.id || `${props.wpId}-${props.scenario}`,
+    type: props.scenario,
+    source_model: aiResult.value.model || '',
+    confidence: aiResult.value.confidence ?? null,
+    content: aiResult.value.text || aiResult.value.summary || '',
+    target_cell: null,
+    target_field: props.sheetKey || null,
+  }
+})
 
 async function onClick() {
   loading.value = true
@@ -70,15 +77,13 @@ async function onClick() {
   }
 }
 
-function onConfirm(payload?: { text?: string; revisedContent?: string }) {
-  const text = payload?.revisedContent || payload?.text || aiResult.value?.text || ''
-  emit('apply', text)
-  dialogVisible.value = false
-  aiResult.value = null
-}
-
-function onReject() {
-  emit('reject')
+function onConfirm(action: 'accept' | 'revise' | 'reject', revisedContent?: string) {
+  if (action === 'reject') {
+    emit('reject')
+  } else {
+    const text = revisedContent || aiResult.value?.text || aiResult.value?.summary || ''
+    emit('apply', text)
+  }
   dialogVisible.value = false
   aiResult.value = null
 }

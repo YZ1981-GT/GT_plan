@@ -465,7 +465,7 @@ export async function parseFile(
   // 查找目标 sheet
   let targetSheet = ''
   if (sheetName) {
-    targetSheet = wb.SheetNames.find(n => n === sheetName) || ''
+    targetSheet = wb.SheetNames.find((n: string) => n === sheetName) || ''
   }
   if (!targetSheet) {
     // 降级：取第一个 sheet（而非最后一个），多 sheet 文件时更符合预期
