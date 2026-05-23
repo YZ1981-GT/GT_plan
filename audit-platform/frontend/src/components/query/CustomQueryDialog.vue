@@ -474,7 +474,7 @@ async function exportResult() {
 }
 
 // 加载指标树（按项目缓存：每个项目独立 sessionStorage key）
-const INDICATOR_CACHE_KEY_PREFIX = 'gt:custom-query:indicators-v4:'
+const INDICATOR_CACHE_KEY_PREFIX = 'gt:custom-query:indicators-v5:'
 
 function _indicatorCacheKey(pid: string | undefined) {
   return `${INDICATOR_CACHE_KEY_PREFIX}${pid || 'no-project'}`

@@ -135,9 +135,7 @@ async def get_indicators(
     })
     base_tree.append({
         "key": "workpaper", "label": "📄 底稿列表", "icon": "📄",
-        "children": [
-            {"key": "workpaper", "label": "底稿列表", "columns": ["wp_code", "wp_name", "status", "review_status", "preparer_id"]},
-        ],
+        "children": await _build_workpaper_tree(db, project_id),
     })
     base_tree.append({
         "key": "account_balance", "label": "💰 科目余额", "icon": "💰",
@@ -170,6 +168,26 @@ async def get_indicators(
 
 _STANDARD_LABEL = {"soe": "国企", "listed": "上市"}
 _DISCLOSURE_CACHE: dict[str, list[dict]] = {}
+_WP_MAPPING_CACHE: list[dict] | None = None
+
+# 14 审计循环代号 → 中文名（与 memory.md 沉淀对齐：A=报表/调整 / B=控制了解 / C=控制测试 / D=销售收入 / E=货币资金 / F=采购存货 / G=投资 / H=固定资产+在建工程+使用权资产+租赁负债 / I=无形资产+商誉+开发支出 / J=职工薪酬+股份支付 / K=管理 / L=筹资 / M=股东权益 / N=税费 / S=专项程序）
+_CYCLE_NAMES: dict[str, str] = {
+    "A": "报表/调整",
+    "B": "控制了解",
+    "C": "控制测试",
+    "D": "销售收入",
+    "E": "货币资金",
+    "F": "采购存货",
+    "G": "投资",
+    "H": "固定资产+在建+使用权",
+    "I": "无形资产+商誉",
+    "J": "职工薪酬+股份支付",
+    "K": "管理",
+    "L": "筹资",
+    "M": "股东权益",
+    "N": "税费",
+    "S": "专项程序",
+}
 
 
 async def _resolve_project_template_type(db: AsyncSession, project_id: str | None) -> str:
@@ -331,6 +349,144 @@ def _load_disclosure_sections(template_type: str) -> list[dict]:
     return _DISCLOSURE_CACHE[template_type]
 
 
+def _load_wp_mapping() -> list[dict]:
+    """读 backend/data/wp_account_mapping.json（带模块级缓存）"""
+    global _WP_MAPPING_CACHE
+    if _WP_MAPPING_CACHE is not None:
+        return _WP_MAPPING_CACHE
+    data_path = Path(__file__).resolve().parent.parent.parent / "data" / "wp_account_mapping.json"
+    if not data_path.exists():
+        _WP_MAPPING_CACHE = []
+        return []
+    try:
+        with data_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            _WP_MAPPING_CACHE = data.get("mappings", []) or []
+        elif isinstance(data, list):
+            _WP_MAPPING_CACHE = data
+        else:
+            _WP_MAPPING_CACHE = []
+    except Exception:
+        _WP_MAPPING_CACHE = []
+    return _WP_MAPPING_CACHE
+
+
+async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> list[dict]:
+    """底稿树：循环 → 主底稿（科目名）→ sheet 程序明细。
+
+    数据源双轨：
+      - 传入 project_id：从 `wp_index` 取项目实际配置的底稿（裁剪后）
+      - 未传 project_id：从 `wp_account_mapping.json` 取全集
+    主底稿 = wp_code 不含连字符的根节点（如 E1 / D2），sheet 程序 = 同 cycle 下 wp_code-N 形式的子项
+    """
+    mapping = _load_wp_mapping()
+    # mapping 索引：wp_code -> {account_name, account_codes, ...}
+    map_by_code: dict[str, dict] = {m.get("wp_code", ""): m for m in mapping if m.get("wp_code")}
+
+    # 取底稿条目：项目级走 wp_index，否则走全集 mapping
+    items: list[dict] = []
+    if project_id:
+        try:
+            proj_uuid = uuid.UUID(project_id)
+            sql = text("""
+                SELECT wp_code, wp_name, audit_cycle
+                FROM wp_index
+                WHERE project_id = :pid AND is_deleted = false
+                ORDER BY audit_cycle, wp_code
+            """)
+            rows = (await db.execute(sql, {"pid": str(proj_uuid)})).fetchall()
+            for r in rows:
+                code = r[0] or ""
+                items.append({
+                    "wp_code": code,
+                    "wp_name": r[1] or "",
+                    "cycle": r[2] or (code[:1] if code else ""),
+                    "account_name": map_by_code.get(code, {}).get("account_name") or "",
+                })
+        except (TypeError, ValueError):
+            items = []
+    if not items:
+        # 全集兜底：用 mapping JSON
+        for m in mapping:
+            code = m.get("wp_code", "")
+            if not code:
+                continue
+            items.append({
+                "wp_code": code,
+                "wp_name": m.get("wp_name", ""),
+                "cycle": m.get("cycle") or (code[:1] if code else ""),
+                "account_name": m.get("account_name") or "",
+            })
+
+    # 按 cycle 分组 → 主底稿 → sheet 程序两层
+    cycle_groups: dict[str, list[dict]] = {}
+    for it in items:
+        cy = (it["cycle"] or "").upper() or "其他"
+        cycle_groups.setdefault(cy, []).append(it)
+
+    # cycle 节点排序：A-N 字母序 + S 末尾，未知字母兜底
+    def _cycle_sort_key(cy: str) -> tuple:
+        order = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "S"]
+        return (order.index(cy) if cy in order else 99, cy)
+
+    result: list[dict] = []
+    for cy in sorted(cycle_groups.keys(), key=_cycle_sort_key):
+        members = cycle_groups[cy]
+        # 主底稿：wp_code 无连字符的（如 E1 / D2）；sheet 程序：含连字符（如 E1-1）
+        primaries = sorted([m for m in members if "-" not in m["wp_code"]], key=lambda x: x["wp_code"])
+        sheets_by_primary: dict[str, list[dict]] = {p["wp_code"]: [] for p in primaries}
+        for m in members:
+            if "-" not in m["wp_code"]:
+                continue
+            base = m["wp_code"].split("-", 1)[0]
+            sheets_by_primary.setdefault(base, []).append(m)
+        # 处理孤儿（只有 sheet 子项无主底稿）：把 base 当伪主底稿
+        primary_codes = {p["wp_code"] for p in primaries}
+        for base, ss in sheets_by_primary.items():
+            if base not in primary_codes and ss:
+                primaries.append({"wp_code": base, "wp_name": base, "cycle": cy, "account_name": ""})
+        primaries.sort(key=lambda x: x["wp_code"])
+
+        primary_nodes: list[dict] = []
+        for p in primaries:
+            code = p["wp_code"]
+            acc = p.get("account_name") or ""
+            wpname = p.get("wp_name") or ""
+            # label: "E1 货币资金" 优先用科目名，否则用 wp_name
+            primary_label = f"{code} {acc or wpname}".strip()
+            sheet_children = sheets_by_primary.get(code, [])
+            children_nodes: list[dict] = []
+            # 主底稿自己作为 sheet 列表的"汇总入口"叶子（点它查整张主表）
+            children_nodes.append({
+                "key": f"workpaper:{code}",
+                "label": f"{code}（汇总）",
+                "wp_code": code,
+                "columns": ["wp_code", "wp_name", "cycle", "status", "review_status"],
+            })
+            for s in sorted(sheet_children, key=lambda x: x["wp_code"]):
+                s_code = s["wp_code"]
+                s_acc = s.get("account_name") or s.get("wp_name") or ""
+                children_nodes.append({
+                    "key": f"workpaper:{s_code}",
+                    "label": f"{s_code} {s_acc}".strip(),
+                    "wp_code": s_code,
+                    "columns": ["wp_code", "wp_name", "cycle", "status", "review_status"],
+                })
+            primary_nodes.append({
+                "key": f"wp_primary_{code}",
+                "label": primary_label,
+                "children": children_nodes,
+            })
+        cycle_label = f"{cy} {_CYCLE_NAMES.get(cy, '')}".strip() + f"（{len(primaries)}）"
+        result.append({
+            "key": f"wp_cycle_{cy}",
+            "label": cycle_label,
+            "children": primary_nodes,
+        })
+    return result
+
+
 @router.post("/execute")
 async def execute_query(
     body: QueryRequest,
@@ -365,6 +521,10 @@ async def execute_query(
                     # 调整分录按 company_code 暂走通用查询（adjustments 表无 company_code 列时返回空）
                     return await _query_adjustments(db, pid, year, {**filters, "adjustment_type": "AJE"}, limit)
             return {"rows": [], "columns": [], "total": 0, "error": f"未知合并单位查询: {source}"}
+        # workpaper:{wp_code} 形式（底稿树叶子点击）
+        if source.startswith("workpaper:"):
+            wp_code = source.split(":", 1)[1]
+            return await _query_workpaper(db, pid, year, {**filters, "wp_code": wp_code}, limit)
         if source == 'report' or source.startswith('report_'):
             return await _query_report(db, pid, year, filters, limit)
         elif source == 'trial_balance' or source == 'tb_detail':
@@ -513,15 +673,15 @@ async def _query_worksheet(db, pid, year, filters, limit):
 
 
 async def _query_workpaper(db, pid, year, filters, limit):
-    """底稿列表（working_paper）"""
+    """底稿列表（working_paper + wp_index）— working_paper 无 year 字段，year 仅用于过滤兼容"""
     sql = """
-        SELECT wi.wp_code, wi.wp_name, wi.cycle, wp.status, wp.review_status,
-               wp.preparer_id, wp.created_at, wp.updated_at
+        SELECT wi.wp_code, wi.wp_name, wi.audit_cycle, wp.status, wp.review_status,
+               wp.assigned_to, wp.created_at, wp.updated_at
         FROM working_paper wp
         LEFT JOIN wp_index wi ON wi.id = wp.wp_index_id
-        WHERE wp.project_id = :pid AND wp.year = :y AND wp.is_deleted = false
+        WHERE wp.project_id = :pid AND wp.is_deleted = false
     """
-    params: dict = {"pid": pid, "y": year, "lim": limit}
+    params: dict = {"pid": pid, "lim": limit}
     if filters.get("status"):
         sql += " AND wp.status = :st"
         params["st"] = filters["status"]
@@ -529,18 +689,23 @@ async def _query_workpaper(db, pid, year, filters, limit):
         sql += " AND wp.review_status = :rs"
         params["rs"] = filters["review_status"]
     if filters.get("cycle"):
-        sql += " AND wi.cycle = :cy"
+        sql += " AND wi.audit_cycle = :cy"
         params["cy"] = filters["cycle"]
+    if filters.get("wp_code"):
+        # 支持精确单底稿查询（树叶子点击）+ 同 cycle 下子表前缀模糊（wp_code='E1' 时也带出 E1-1/E1-2）
+        sql += " AND (wi.wp_code = :wpc OR wi.wp_code LIKE :wpc_like)"
+        params["wpc"] = filters["wp_code"]
+        params["wpc_like"] = f"{filters['wp_code']}-%"
     sql += " ORDER BY wi.wp_code LIMIT :lim"
     result = await db.execute(text(sql), params)
     rows = [
         {
             "wp_code": r[0],
             "wp_name": r[1],
-            "cycle": r[2],
+            "audit_cycle": r[2],
             "status": r[3],
             "review_status": r[4],
-            "preparer_id": str(r[5]) if r[5] else None,
+            "assigned_to": str(r[5]) if r[5] else None,
             "created_at": str(r[6]) if r[6] else None,
             "updated_at": str(r[7]) if r[7] else None,
         }
@@ -548,7 +713,7 @@ async def _query_workpaper(db, pid, year, filters, limit):
     ]
     return {
         "rows": rows,
-        "columns": ["wp_code", "wp_name", "cycle", "status", "review_status", "preparer_id"],
+        "columns": ["wp_code", "wp_name", "audit_cycle", "status", "review_status", "assigned_to"],
         "total": len(rows),
     }
 
