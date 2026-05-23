@@ -663,6 +663,46 @@ async def prefill_workpaper_real(
 
     wb.close()
 
+    # ── proposal-remaining-18 task 2.3 / L-3：写入 TB 快照供下次比对 ──
+    # 仅在 filled > 0 时写入，避免无公式底稿误覆盖既有快照。
+    # 从 formulas_found 收集 TB / AUX 类首参 account_code（WP/PREV/NOTE 不进快照）。
+    if filled > 0:
+        try:
+            from app.models.audit_platform_models import TrialBalance
+            snapshot_codes: set[str] = set()
+            for f in formulas_found:
+                args = _parse_args(f["raw_args"])
+                ft = f["formula_type"]
+                if ft in ("TB", "AUX") and args:
+                    snapshot_codes.add(args[0])
+            if snapshot_codes:
+                rows = (await db.execute(
+                    sa.select(
+                        TrialBalance.standard_account_code,
+                        TrialBalance.audited_amount,
+                    ).where(
+                        TrialBalance.project_id == project_id,
+                        TrialBalance.year == year,
+                        TrialBalance.is_deleted == sa.false(),
+                        TrialBalance.standard_account_code.in_(snapshot_codes),
+                    )
+                )).all()
+                snapshot = {
+                    row.standard_account_code: float(row.audited_amount)
+                    if row.audited_amount is not None else 0.0
+                    for row in rows
+                }
+                wp.prefill_tb_snapshot = snapshot
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(wp, "prefill_tb_snapshot")
+                _logger.info(
+                    "prefill_real: wp=%s snapshot recorded for %d accounts",
+                    wp_id, len(snapshot),
+                )
+        except Exception as e:
+            # 快照写入失败不阻断 prefill 主流程（仅警告）
+            _logger.warning("prefill_real: snapshot write failed wp=%s err=%s", wp_id, e)
+
     _logger.info("prefill_real: wp=%s found=%d filled=%d errors=%d", wp_id, len(formulas_found), filled, len(errors))
 
     return {

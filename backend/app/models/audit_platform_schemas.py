@@ -808,6 +808,11 @@ class EventType(str, enum.Enum):
     REVIEW_ACCEPTED = "review.accepted"
     REVIEW_COMPLETED = "review.completed"
 
+    # proposal-remaining-18 C-3: 批量导出 SSE 进度推送
+    EXPORT_PROGRESS = "export.progress"
+    EXPORT_COMPLETE = "export.complete"
+    EXPORT_FAILED = "export.failed"
+
 
 class EventPayload(BaseModel):
     """事件载荷"""

@@ -206,7 +206,8 @@ class KnowledgeDocumentService:
         project_ids: list[str] | None = None,
         created_by: UUID | None = None,
     ) -> KnowledgeDocument:
-        """创建文档"""
+        """创建文档（AT-3：同 (folder_id, name) 第二次创建自动建版本链）"""
+        version, prev_id = await self._resolve_version_chain(folder_id, name)
         doc = KnowledgeDocument(
             id=uuid.uuid4(),
             folder_id=folder_id,
@@ -219,10 +220,122 @@ class KnowledgeDocumentService:
             access_level=KnowledgeAccessLevel(access_level) if access_level else None,
             project_ids=project_ids,
             created_by=created_by,
+            version=version,
+            previous_version_id=prev_id,
         )
         self.db.add(doc)
         await self.db.flush()
         return doc
+
+    async def _resolve_version_chain(
+        self, folder_id: UUID, name: str
+    ) -> tuple[int, UUID | None]:
+        """计算新版本号 + previous_version_id（AT-3 KB 接入）"""
+        latest = (
+            await self.db.execute(
+                sa.select(KnowledgeDocument)
+                .where(
+                    KnowledgeDocument.folder_id == folder_id,
+                    KnowledgeDocument.name == name,
+                    KnowledgeDocument.is_deleted == sa.false(),
+                )
+                .order_by(KnowledgeDocument.version.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if latest is None:
+            return 1, None
+        return (latest.version or 1) + 1, latest.id
+
+    async def list_versions(self, doc_id: UUID) -> list[dict]:
+        """列出 doc_id 所属版本链（按 version 升序）
+
+        AT-3 KB 接入：通过 doc_id 反查 (folder_id, name) 锁定链
+        doc_id 不存在时返回 []
+        """
+        entry = (
+            await self.db.execute(
+                sa.select(KnowledgeDocument).where(KnowledgeDocument.id == doc_id)
+            )
+        ).scalar_one_or_none()
+        if entry is None:
+            return []
+        result = await self.db.execute(
+            sa.select(KnowledgeDocument)
+            .where(
+                KnowledgeDocument.folder_id == entry.folder_id,
+                KnowledgeDocument.name == entry.name,
+                KnowledgeDocument.is_deleted == sa.false(),
+            )
+            .order_by(KnowledgeDocument.version.asc())
+        )
+        return [self._doc_to_dict(d) for d in result.scalars().all()]
+
+    async def rollback_to_version(
+        self,
+        doc_id: UUID,
+        version_id: UUID,
+        created_by: UUID | None = None,
+    ) -> dict:
+        """回滚到指定历史版本：复制旧版本元数据创建 version=N+1 新行
+
+        AT-3 KB 接入：跨链回滚被拒绝（version_id 必须与 doc_id 同链）
+        """
+        entry = (
+            await self.db.execute(
+                sa.select(KnowledgeDocument).where(KnowledgeDocument.id == doc_id)
+            )
+        ).scalar_one_or_none()
+        if entry is None:
+            raise ValueError(f"doc_id 不存在: {doc_id}")
+        target = (
+            await self.db.execute(
+                sa.select(KnowledgeDocument).where(KnowledgeDocument.id == version_id)
+            )
+        ).scalar_one_or_none()
+        if target is None:
+            raise ValueError(f"version_id 不存在: {version_id}")
+        if target.folder_id != entry.folder_id or target.name != entry.name:
+            raise ValueError(
+                f"跨链回滚被拒绝：version_id={version_id} 不属于 doc_id={doc_id} 所在链"
+            )
+
+        new_version, prev_id = await self._resolve_version_chain(entry.folder_id, entry.name)
+        new_doc = KnowledgeDocument(
+            id=uuid.uuid4(),
+            folder_id=target.folder_id,
+            name=target.name,
+            content_text=target.content_text,
+            file_type=target.file_type,
+            file_size=target.file_size,
+            storage_path=target.storage_path,
+            tags=target.tags,
+            access_level=target.access_level,
+            project_ids=target.project_ids,
+            created_by=created_by,
+            version=new_version,
+            previous_version_id=prev_id,
+        )
+        self.db.add(new_doc)
+        await self.db.flush()
+        return self._doc_to_dict(new_doc)
+
+    @staticmethod
+    def _doc_to_dict(d: KnowledgeDocument) -> dict:
+        return {
+            "id": str(d.id),
+            "folder_id": str(d.folder_id),
+            "name": d.name,
+            "file_type": d.file_type,
+            "file_size": d.file_size,
+            "storage_path": d.storage_path,
+            "version": getattr(d, "version", 1),
+            "previous_version_id": (
+                str(d.previous_version_id) if getattr(d, "previous_version_id", None) else None
+            ),
+            "is_deleted": d.is_deleted,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+        }
 
     async def list_documents(
         self,

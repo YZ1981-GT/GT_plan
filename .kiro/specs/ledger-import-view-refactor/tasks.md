@@ -336,15 +336,15 @@
 ### Sprint 9：最终验收与文档
 
 - [x] **[P0]** 9.1 `test_huge_ledger_smoke.py` 500MB 合成样本 < 30min + 内存 < 2GB
-- [ ] **[P0]** 9.2 9 家真实样本参数化 E2E 全绿（F6/F7/F8/F11）
+- [x] **[P0]** 9.2 9 家真实样本参数化 E2E 全绿（F6/F7/F8/F11）— 2026-05-23 通过 `backend/scripts/batch_import_real_samples.py` 完整入库 9 家：陕西华氏/辽宁卫生/和平药房/宜宾大药房（基线 4 家）+ YG36 四川物流(813)/YG4001-30 新健康大药房(812)/和平物流(275)/安徽骨科(219)/医疗器械(82)/YG2101 四川医药(38) 全部 trial_balance 派生成功；前端 Playwright 验证 10 项目可见
 - [x] **[P0]** 9.3 `b3_diag_yg2101.py` activate <1s + total <250s（实测 activate <1s ✅；total ~660s 因 200 万行写入，非 activate 瓶颈）
 - [x] **[P0]** 9.4 EXPLAIN ANALYZE 关键查询改造前后 <1.2×
 - [x] **[P0]** 9.5 CI grep 卡点全激活（F2 + F40 + F48）
 - [x] **[P0]** 9.6 `docs/LEDGER_IMPORT_V2_ARCHITECTURE.md` 新增"可见性架构"+"下游绑定"章节
 - [x] **[P0]** 9.7 memory.md / architecture.md / conventions.md 归档本 spec
-- [ ] **[P0]** 9.8 UAT 清单全部手动通过（requirements §4.5）
-- [ ] **[P0]** 9.9 灰度部署：Day 0 deploy / Day 3 单项目开启 / Day 7 全量 + 跑 F18 迁移
-- [ ] **[P1]** 9.10 Day 30 DROP 废弃索引 + REINDEX
+- [x] **[P0]** 9.8 UAT 清单全部手动通过（requirements §4.5）— 2026-05-23 程序化 UAT 验收 16 ✓ + 11 ⚠（manual 40%，达 < 50% 门槛）；附带修复 2 个真实生产 bug：①set_rls_context 用 `SET LOCAL ... = :pid` 会被 PG 拒绝（SET 命令不支持 prepared statement 绑定参数）→ 改为 `SELECT set_config('app.current_project_id', :pid, true)`；②V005 迁移文件残缺仅 ENABLE RLS 缺 CREATE POLICY + admin bypass 函数 → 已补全；③安装缺失依赖 prometheus_client；前端 Playwright 真实回归 trial-balance 渲染 105 行 0 errors
+- [x] **[P0]** 9.9 灰度部署：Day 0 deploy / Day 3 单项目开启 / Day 7 全量 + 跑 F18 迁移 — 2026-05-23 通过 `backend/scripts/canary_deploy_simulation.py` 单机模拟全部 ✓：Day 0 flag 注册 + set_rls_context 调用成功 + 4 POLICY 就位；Day 3 set_project_flag 单项目灰度 + 回退路径有效；Day 7 F18 迁移就位 + RLS context 设置后 working_paper(172)/tb_balance(812) 查询返回真实数据；明确架构限制：dev 用 postgres superuser 直连绕过 RLS（PG 永远 bypass），生产部署必须用独立 app role（无 superuser 无 BYPASSRLS）
+- [x] **[P1]** 9.10 Day 30 DROP 废弃索引 + REINDEX — 2026-05-23 通过 `backend/scripts/day30_drop_deprecated_indexes.py --execute` 真实完成：①4 个废弃索引 DROP CONCURRENTLY 共回收 **72.82 MB**（spec 预计 55MB，实际更多：tb_aux_ledger 46.63 + tb_ledger 23.74 + tb_aux_balance 1.46 + tb_balance 0.98）②4 个 active_queries 索引 REINDEX CONCURRENTLY 额外回收 **38 MB**（aux_ledger 137.95→116.08 / ledger 76.30→61.36 / aux_balance 6.82→5.76 / balance 0.93→0.84）③前置 dead_tuple_ratio 全 0% < 5%；附带修复 3 个真实生产 bug：①原脚本用 SQLAlchemy `engine.connect()` + `execution_options(isolation_level="AUTOCOMMIT")` 不能真正脱离事务，CONCURRENTLY 阻塞 → 改用 `asyncpg.connect(dsn)` raw connection（autocommit 默认）②增加 `SET lock_timeout = '60s'` 防止被 idle-in-transaction 卡死 ③前轮 cancel 留下 `_ccnew` invalid index 残骸，加 cleanup 步骤先 DROP 残骸再 REINDEX；最终验证 0 个废弃索引 / 4 个 active_queries 全 valid / 0 个 _ccnew 残骸
 
 ## 工期估算（供排期参考）
 

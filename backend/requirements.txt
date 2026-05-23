@@ -32,3 +32,4 @@ jsonpath-ng
 pypinyin
 locust
 python-docx
+prometheus_client==0.25.0

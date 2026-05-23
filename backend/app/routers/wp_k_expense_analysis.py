@@ -109,6 +109,72 @@ class ExpenseAnalysisResponse(BaseModel):
     is_llm_stub: bool
     applied_to_sheet: str | None = None
     applied_at: str | None = None
+    # K-4 解释链字段（task 4.2 / ADR-6）
+    reasoning: str | None = None
+    references: list[dict] = Field(default_factory=list)
+    data_sources: list[str] = Field(default_factory=list)
+    confidence: float = 0.0
+
+
+def _build_reasoning_chain(
+    wp_code: str,
+    yoy: dict[str, dict[str, Any]],
+    budget: dict[str, dict[str, Any]] | None,
+    industry: dict[str, dict[str, Any]] | None,
+    anomaly_flags: list[str],
+    is_llm_stub: bool,
+) -> tuple[str | None, list[dict], list[str], float]:
+    """K-F7 解释链构造器（task 4.2 / ADR-6）
+
+    生成：
+    - reasoning：本次费用分析推理摘要（含异常数 / 类别数 / stub 降级提示）
+    - references：CAS 28 / ISA 520 等审计准则引用
+    - data_sources：本年/上年/预算/行业 4 维度数据来源标记
+    - confidence：stub→0.0；非 stub→0.75（规则引擎置信度）
+    """
+    from app.services.llm_service import build_reasoning_chain
+
+    name_map = {"K8": "销售费用", "K9": "管理费用"}
+    name = name_map.get(wp_code, wp_code)
+    category_count = len(yoy)
+    anomaly_count = len(anomaly_flags)
+
+    parts = [
+        f"基于 {name} 规则引擎对 {category_count} 个费用类别进行 3 维度分析，",
+        f"识别出 {anomaly_count} 项异常",
+    ]
+    if is_llm_stub:
+        parts.append("（LLM 暂未启用，已降级为规则引擎结果）")
+    else:
+        parts.append("（结合 LLM 自然语言解释）")
+    reasoning = "".join(parts)
+
+    references = [
+        {"type": "CAS", "code": "CAS 28", "section": "会计政策、会计估计变更和差错更正"},
+        {"type": "ISA", "code": "ISA 520", "section": "分析程序"},
+    ]
+
+    sources: list[str] = [f"WP:{wp_code}:本年费用"]
+    # 上年（仅当 yoy 有非零 rate_change 时添加）
+    has_yoy = any(
+        v.get("rate_change", 0) not in (0, 0.0) and v.get("rate_change", 0) < 999
+        for v in yoy.values()
+    )
+    if has_yoy:
+        sources.append(f"WP:{wp_code}:上年费用")
+    if budget:
+        sources.append(f"WP:{wp_code}:预算数")
+    if industry:
+        sources.append(f"WP:{wp_code}:行业均值")
+
+    base_conf = 0.75
+    return build_reasoning_chain(
+        reasoning=reasoning,
+        references=references,
+        data_sources=sources,
+        is_llm_stub=is_llm_stub,
+        base_confidence=base_conf,
+    )
 
 
 # ─── Calculation Core ────────────────────────────────────────────────────────

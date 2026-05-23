@@ -36,6 +36,8 @@ backend/uploads/
 backend/storage/
 backend/wp_storage/
 backend/backups/
+# Univer Server install artifacts (univer_install.sh target dir, gitignored — not used in current deployment)
+univer-server/
 *.xlsx
 !2025人员情况.xlsx
 !backend/wp_templates/**/*.xlsx

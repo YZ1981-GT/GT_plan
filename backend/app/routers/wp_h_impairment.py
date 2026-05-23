@@ -79,6 +79,11 @@ class ImpairmentAnalysisResponse(BaseModel):
     summary: str
     is_llm_stub: bool = True
     applied_to_sheet: str | None = None
+    # K-4 解释链字段（task 4.2 / ADR-6）
+    reasoning: str | None = None
+    references: list[dict] = Field(default_factory=list)
+    data_sources: list[str] = Field(default_factory=list)
+    confidence: float = 0.0
 
 
 # ─── DCF Calculation ──────────────────────────────────────────────────────────

@@ -291,3 +291,11 @@ def register_collaboration_routers(app: FastAPI) -> None:
     # ═══ §115. Phase 7 F12: 多项目紧急度评分 ═══
     from app.routers.partner_urgency import router as partner_urgency_router
     app.include_router(partner_urgency_router, tags=["partner-urgency"])
+
+    # ═══ §116. proposal-remaining-18 C-3: 批量导出 SSE 进度推送 ═══
+    from app.routers.batch_export_progress import (
+        router as batch_export_progress_router,
+        download_router as batch_export_download_router,
+    )
+    app.include_router(batch_export_progress_router, tags=["batch-export-progress"])
+    app.include_router(batch_export_download_router, tags=["batch-export-progress"])

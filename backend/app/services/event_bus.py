@@ -104,6 +104,54 @@ class EventBus:
         """立即发布事件，不经过 debounce（供需要立即触发的场景使用）"""
         await self._dispatch(payload)
 
+    def broadcast_raw(self, event_type: str, extra: dict | None = None) -> None:
+        """轻量级广播原始事件（同步调用）— 用于不走完整 EventBus dispatch 的场景。
+
+        proposal-remaining-18 task 5.7 / C-3：批量导出 SSE 进度推送 + presence 类
+        进程内事件总线，仅持久化到 Redis Stream 给 SSE 端订阅，不触发 _handlers。
+
+        与 ``publish/publish_immediate`` 区别：
+        - 不需要 EventPayload schema（接受任意 ``event_type`` 字符串）
+        - 不入 debounce（实时推）
+        - 不触发 _handlers（避免循环触发）
+        - 仅写 Redis Stream + log
+
+        Args:
+            event_type: 事件类型字符串（如 "export.progress" / "presence.joined"）
+            extra: 附加 payload（含 project_id / task_id / 业务字段）
+        """
+        extra = extra or {}
+        logger.info(
+            "EventBus.broadcast_raw: %s (project=%s, extra_keys=%s)",
+            event_type, extra.get("project_id"), list(extra.keys()),
+        )
+        # 异步持久化到 Redis Stream（不阻断调用方）
+        try:
+            asyncio.ensure_future(self._persist_raw_to_stream(event_type, extra))
+        except RuntimeError:
+            # 测试环境无 running event loop 时静默
+            pass
+
+    async def _persist_raw_to_stream(self, event_type: str, extra: dict) -> None:
+        """把 raw event 写入 Redis Stream（XADD）"""
+        try:
+            from app.core.redis import get_redis
+            redis = await get_redis()
+            if redis is None:
+                return
+            stream_key = f"sse:project:{extra.get('project_id', 'global')}"
+            await redis.xadd(
+                stream_key,
+                {
+                    "event_type": event_type,
+                    "payload": json.dumps(extra, default=str),
+                },
+                maxlen=1000,
+                approximate=True,
+            )
+        except Exception as exc:
+            logger.debug("[EventBus] broadcast_raw persist failed (non-blocking): %s", exc)
+
     async def _dispatch(self, payload: EventPayload) -> None:
         """实际分发事件到处理器"""
         dedup_key = self._build_dedup_key(payload)

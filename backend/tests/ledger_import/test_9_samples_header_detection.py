@@ -8,7 +8,7 @@
 
 真实样本缺失时该家测试 skip（CI 模式下数据目录可能不可用）。
 
-快照再生：``python scripts/_gen_header_snapshots.py``
+快照再生：``python scripts/gen_header_snapshots.py``
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ def test_snapshot_file_exists():
     """快照文件必须存在（CI 保护）。"""
     assert SNAPSHOT_PATH.exists(), (
         f"快照文件 {SNAPSHOT_PATH} 不存在，"
-        "请运行 `python scripts/_gen_header_snapshots.py` 生成"
+        "请运行 `python scripts/gen_header_snapshots.py` 生成"
     )
     data = _load_snapshot()
     assert data, "快照文件内容为空"

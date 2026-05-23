@@ -42,6 +42,7 @@ from app.models.audit_platform_schemas import (
     WPAdjustmentSummary,
 )
 from app.services.adjustment_service import AdjustmentService
+from app.services.adjustment_impact_service import preview_impact as preview_impact_service
 from app.services.mapping_service import get_codes_by_cycles
 from app.services.misstatement_service import UnadjustedMisstatementService
 
@@ -133,6 +134,74 @@ async def batch_commit(
     svc = AdjustmentService(db)
     result = await svc.batch_commit(project_id, year)
     return result
+
+
+# ---------------------------------------------------------------------------
+# L-2 task 2.1: 调整分录影响预览（不写 DB）
+# ---------------------------------------------------------------------------
+
+
+class PreviewLineItem(BaseModel):
+    """preview-impact 单条 line_item（兼容多种字段名）"""
+    model_config = {"extra": "ignore"}
+
+    account_code: str | None = Field(default=None, description="标准科目编码")
+    standard_account_code: str | None = Field(default=None, description="兼容字段：等同 account_code")
+    debit: float | None = Field(default=0)
+    credit: float | None = Field(default=0)
+    debit_amount: float | None = Field(default=None)
+    credit_amount: float | None = Field(default=None)
+
+
+class AdjustmentPreviewRequest(BaseModel):
+    line_items: list[PreviewLineItem] = Field(min_length=1)
+    year: int | None = None
+
+
+@router.post("/preview-impact")
+async def preview_adjustment_impact(
+    project_id: UUID,
+    body: AdjustmentPreviewRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """模拟调整分录影响（**不写 DB**）
+
+    返回受影响的报表行（按 report_type/row_code 聚合 delta）+ 受影响底稿 wp_code 列表。
+    用于前端 AdjustmentImpactPreview 弹窗的实时预览（debounce 500ms 触发）。
+
+    Validates: proposal-remaining-18 §二 L-2，design.md ADR-2
+    """
+    raw_items: list[dict] = []
+    for it in body.line_items:
+        d = it.model_dump(exclude_none=False)
+        if d.get("debit_amount") is not None:
+            d["debit"] = d["debit_amount"]
+        if d.get("credit_amount") is not None:
+            d["credit"] = d["credit_amount"]
+        raw_items.append(d)
+
+    result = await preview_impact_service(
+        db=db,
+        project_id=project_id,
+        line_items=raw_items,
+        year=body.year,
+    )
+    serialized_rows = [
+        {
+            "report_type": r["report_type"],
+            "row_code": r["row_code"],
+            "row_name": r["row_name"],
+            "field": r["field"],
+            "delta": str(r["delta"]),
+        }
+        for r in result["affected_report_rows"]
+    ]
+    return {
+        "affected_report_rows": serialized_rows,
+        "affected_workpapers": result["affected_workpapers"],
+        "unmapped_accounts": result["unmapped_accounts"],
+    }
 
 
 @router.put("/{entry_group_id}")

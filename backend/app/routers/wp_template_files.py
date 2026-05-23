@@ -6,9 +6,12 @@ WorkpaperEditor 前端通过这些端点加载底稿 xlsx 文件供 Univer 渲�
 from __future__ import annotations
 
 import logging
+from io import BytesIO
+from pathlib import Path
+from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.requests import Request
 from sqlalchemy import text
@@ -350,6 +353,10 @@ async def convert_xlsx_to_json(
 async def convert_xlsx_storage_to_json(
     project_id: str,
     wp_id: str,
+    sheets: str | None = Query(
+        None,
+        description="懒加载控制：'active' 仅返回首个 sheet 的完整 cellData，其余仅元数据；缺省返回全部完整数据（向后兼容）",
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """直接读 storage 中的 xlsx 文件转 Univer JSON。
@@ -358,10 +365,10 @@ async def convert_xlsx_storage_to_json(
     storage 里，没必要再传一次。前端调用 GET /xlsx-to-json 即可拿到 Univer
     workbook JSON（含完整 cellData/合并/列宽/样式/公式/图片/数据验证/条件格式）。
 
-    流程：
-    1. 找 storage/{project_id}/{wp_id}.xlsx；不存在则 init_workpaper_from_template
-    2. openpyxl 读取 + _has_style + _extract_cell_style + _extract_conditional_formatting + _extract_data_validations + _extract_images
-    3. 返回 Univer 的 IWorkbookData JSON snapshot
+    proposal-remaining-18 D-1 大底稿懒加载（2026-05-22）：
+    - sheets=active：仅返回首个 sheet 的完整 cellData，其余仅返回 {id, name, rowCount, columnCount, cellData={}, custom._lazy=True}
+      用于 100+ sheet 大底稿场景，首屏 JSON 体积可下降 90%+
+    - 缺省 / 未识别值（如 sheets=all）：返回全部完整数据（向后兼容）
     """
     from io import BytesIO
 
@@ -390,114 +397,46 @@ async def convert_xlsx_storage_to_json(
             detail=f"非 xlsx 类底稿: {storage_path.name}（docx 走 /docx-to-json）",
         )
 
+    # proposal-remaining-18 D-1：解析懒加载模式（仅 'active' 触发）
+    _lazy_mode = (sheets or "").lower() == "active"
+
     # 2. 读取文件并复用 POST /to-json 的转换逻辑
     try:
         content = storage_path.read_bytes()
         from openpyxl import load_workbook
         wb = load_workbook(BytesIO(content), read_only=False, data_only=False)
-        sheets: dict = {}
+        sheets_map: dict = {}
         sheet_order: list[str] = []
 
+        # 计算 active sheet 索引（懒加载时仅完整读取此 sheet）
+        try:
+            _active_sheet_idx = wb.sheetnames.index(wb.active.title) if wb.active else 0
+        except (ValueError, AttributeError):
+            _active_sheet_idx = 0
+
         for idx, sheet_name in enumerate(wb.sheetnames):
-            ws = wb[sheet_name]
             sheet_id = f"sheet{idx}"
             sheet_order.append(sheet_id)
-            cell_data: dict = {}
-            merge_data: list = []
-            column_data: dict = {}
-            row_data_map: dict = {}
 
-            for merged_range in ws.merged_cells.ranges:
-                merge_data.append({
-                    "startRow": merged_range.min_row - 1,
-                    "endRow": merged_range.max_row - 1,
-                    "startColumn": merged_range.min_col - 1,
-                    "endColumn": merged_range.max_col - 1,
-                })
+            # ── 懒加载分支：非 active sheet 仅返回元数据 ──
+            if _lazy_mode and idx != _active_sheet_idx:
+                ws = wb[sheet_name]
+                # 估算 row/col 数（不遍历 cellData）
+                _row_count = max(ws.max_row or 0, 100)
+                _col_count = max(ws.max_column or 0, 26)
+                sheets_map[sheet_id] = {
+                    "id": sheet_id,
+                    "name": sheet_name,
+                    "rowCount": _row_count,
+                    "columnCount": _col_count,
+                    "cellData": {},
+                    "custom": {"_lazy": True},
+                }
+                continue
 
-            for col_letter, dim in ws.column_dimensions.items():
-                if dim.width and dim.width != 8.43:
-                    col_idx = ord(col_letter.upper()) - 65 if len(col_letter) == 1 else (ord(col_letter[0].upper()) - 64) * 26 + ord(col_letter[1].upper()) - 65
-                    column_data[col_idx] = {"w": int(dim.width * 7.5)}
-
-            for row_num, dim in ws.row_dimensions.items():
-                if dim.height and dim.height != 15:
-                    row_data_map[row_num - 1] = {"h": int(dim.height * 1.33)}
-
-            row_count = 0
-            col_count = 0
-            for row in ws.iter_rows():
-                for cell in row:
-                    row_idx = cell.row - 1
-                    col_idx = cell.column - 1
-                    row_count = max(row_count, row_idx + 1)
-                    col_count = max(col_count, col_idx + 1)
-
-                    if cell.value is None and not _has_style(cell):
-                        continue
-
-                    cell_obj: dict = {}
-                    if cell.value is not None:
-                        val = cell.value
-                        if isinstance(val, str) and val.startswith("="):
-                            cell_obj["f"] = val
-                        elif isinstance(val, (int, float)):
-                            cell_obj["v"] = val
-                        else:
-                            cell_obj["v"] = str(val)
-                    style = _extract_cell_style(cell)
-                    if style:
-                        cell_obj["s"] = style
-                    if cell_obj:
-                        if row_idx not in cell_data:
-                            cell_data[row_idx] = {}
-                        cell_data[row_idx][col_idx] = cell_obj
-
-            sheet_obj: dict = {
-                "id": sheet_id,
-                "name": sheet_name,
-                "rowCount": max(row_count, 100),
-                "columnCount": max(col_count, 26),
-                "cellData": cell_data,
-            }
-            if merge_data:
-                sheet_obj["mergeData"] = merge_data
-            if column_data:
-                sheet_obj["columnData"] = column_data
-            if row_data_map:
-                sheet_obj["rowData"] = row_data_map
-
-            if ws.freeze_panes:
-                freeze_cell = str(ws.freeze_panes)
-                import re as _re
-                m = _re.match(r"([A-Z]+)(\d+)", freeze_cell)
-                if m:
-                    freeze_col = 0
-                    for ch in m.group(1):
-                        freeze_col = freeze_col * 26 + (ord(ch) - 64)
-                    freeze_col -= 1
-                    freeze_row = int(m.group(2)) - 1
-                    if freeze_row > 0 or freeze_col > 0:
-                        sheet_obj["freeze"] = {
-                            "startRow": freeze_row,
-                            "startColumn": freeze_col,
-                            "xSplit": freeze_col,
-                            "ySplit": freeze_row,
-                        }
-
-            cf_rules = _extract_conditional_formatting(ws)
-            if cf_rules:
-                sheet_obj["conditionalFormattingRules"] = cf_rules
-
-            dv_rules = _extract_data_validations(ws)
-            if dv_rules:
-                sheet_obj["dataValidations"] = dv_rules
-
-            images = _extract_images(ws)
-            if images:
-                sheet_obj["drawings"] = images
-
-            sheets[sheet_id] = sheet_obj
+            ws = wb[sheet_name]
+            sheet_obj = _build_sheet_obj_from_ws(ws, sheet_id, sheet_name)
+            sheets_map[sheet_id] = sheet_obj
 
         wb.close()
 
@@ -536,14 +475,14 @@ async def convert_xlsx_storage_to_json(
                         _target_sheet = _mapping.get("sheet", "")
                         # 找到对应的 sheet_id
                         _target_sheet_id = None
-                        for _sid, _sobj in sheets.items():
+                        for _sid, _sobj in sheets_map.items():
                             if _sobj.get("name") == _target_sheet:
                                 _target_sheet_id = _sid
                                 break
                         if not _target_sheet_id:
                             continue
 
-                        _sheet_cell_data = sheets[_target_sheet_id].get("cellData", {})
+                        _sheet_cell_data = sheets_map[_target_sheet_id].get("cellData", {})
                         for _cell_mapping in _mapping.get("cells", []):
                             _cell_ref = _cell_mapping.get("cell_ref", "")
                             _formula = _cell_mapping.get("formula", "")
@@ -556,11 +495,11 @@ async def convert_xlsx_storage_to_json(
                             _bg_color = _SOURCE_COLOR_MAP.get(_formula_type, "#E3F2FD")
 
                             # 将 prefill 元数据存到 sheet 级别的 custom 字段
-                            if "custom" not in sheets[_target_sheet_id]:
-                                sheets[_target_sheet_id]["custom"] = {}
-                            if "prefill_mappings" not in sheets[_target_sheet_id]["custom"]:
-                                sheets[_target_sheet_id]["custom"]["prefill_mappings"] = []
-                            sheets[_target_sheet_id]["custom"]["prefill_mappings"].append({
+                            if "custom" not in sheets_map[_target_sheet_id]:
+                                sheets_map[_target_sheet_id]["custom"] = {}
+                            if "prefill_mappings" not in sheets_map[_target_sheet_id]["custom"]:
+                                sheets_map[_target_sheet_id]["custom"]["prefill_mappings"] = []
+                            sheets_map[_target_sheet_id]["custom"]["prefill_mappings"].append({
                                 "cell_ref": _cell_ref,
                                 "formula": _formula,
                                 "formula_type": _formula_type,
@@ -573,7 +512,7 @@ async def convert_xlsx_storage_to_json(
             "id": f"wp-{wp_id[:8]}",
             "name": storage_path.stem,
             "sheetOrder": sheet_order,
-            "sheets": sheets,
+            "sheets": sheets_map,
         })
 
     except Exception as e:
@@ -1097,3 +1036,191 @@ def _extract_images(ws) -> list[dict]:
         pass  # 图片提取失败不阻断
 
     return drawings
+
+# ─────────────────────────────────────────────────────────────────────────────
+# proposal-remaining-18 D-1 大底稿懒加载 helper + 单 sheet 按需端点
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _build_sheet_obj_from_ws(ws: Any, sheet_id: str, sheet_name: str) -> dict:
+    """从 openpyxl worksheet 构建 Univer sheet 对象（含完整 cellData / 样式 / 合并 / 列宽 / 公式）。
+
+    抽取自 convert_xlsx_to_json / convert_xlsx_storage_to_json 共用逻辑，
+    供 /sheet/{sheet_name} 端点按需加载单 sheet 时复用。
+    """
+    import re as _re
+
+    cell_data: dict = {}
+    merge_data: list = []
+    column_data: dict = {}
+    row_data_map: dict = {}
+
+    # 合并单元格
+    for merged_range in ws.merged_cells.ranges:
+        merge_data.append({
+            "startRow": merged_range.min_row - 1,
+            "endRow": merged_range.max_row - 1,
+            "startColumn": merged_range.min_col - 1,
+            "endColumn": merged_range.max_col - 1,
+        })
+
+    # 列宽
+    for col_letter, dim in ws.column_dimensions.items():
+        if dim.width and dim.width != 8.43:
+            col_idx = (
+                ord(col_letter.upper()) - 65
+                if len(col_letter) == 1
+                else (ord(col_letter[0].upper()) - 64) * 26 + ord(col_letter[1].upper()) - 65
+            )
+            column_data[col_idx] = {"w": int(dim.width * 7.5)}
+
+    # 行高
+    for row_num, dim in ws.row_dimensions.items():
+        if dim.height and dim.height != 15:
+            row_data_map[row_num - 1] = {"h": int(dim.height * 1.33)}
+
+    # 单元格数据
+    row_count = 0
+    col_count = 0
+    for row in ws.iter_rows():
+        for cell in row:
+            row_idx = cell.row - 1
+            col_idx = cell.column - 1
+            row_count = max(row_count, row_idx + 1)
+            col_count = max(col_count, col_idx + 1)
+
+            if cell.value is None and not _has_style(cell):
+                continue
+
+            cell_obj: dict = {}
+            if cell.value is not None:
+                val = cell.value
+                if isinstance(val, str) and val.startswith("="):
+                    cell_obj["f"] = val
+                elif isinstance(val, (int, float)):
+                    cell_obj["v"] = val
+                else:
+                    cell_obj["v"] = str(val)
+            style = _extract_cell_style(cell)
+            if style:
+                cell_obj["s"] = style
+            if cell_obj:
+                if row_idx not in cell_data:
+                    cell_data[row_idx] = {}
+                cell_data[row_idx][col_idx] = cell_obj
+
+    sheet_obj: dict = {
+        "id": sheet_id,
+        "name": sheet_name,
+        "rowCount": max(row_count, 100),
+        "columnCount": max(col_count, 26),
+        "cellData": cell_data,
+    }
+    if merge_data:
+        sheet_obj["mergeData"] = merge_data
+    if column_data:
+        sheet_obj["columnData"] = column_data
+    if row_data_map:
+        sheet_obj["rowData"] = row_data_map
+
+    # 冻结窗格
+    if ws.freeze_panes:
+        freeze_cell = str(ws.freeze_panes)
+        m = _re.match(r"([A-Z]+)(\d+)", freeze_cell)
+        if m:
+            freeze_col = 0
+            for ch in m.group(1):
+                freeze_col = freeze_col * 26 + (ord(ch) - 64)
+            freeze_col -= 1
+            freeze_row = int(m.group(2)) - 1
+            if freeze_row > 0 or freeze_col > 0:
+                sheet_obj["freeze"] = {
+                    "startRow": freeze_row,
+                    "startColumn": freeze_col,
+                    "xSplit": freeze_col,
+                    "ySplit": freeze_row,
+                }
+
+    cf_rules = _extract_conditional_formatting(ws)
+    if cf_rules:
+        sheet_obj["conditionalFormattingRules"] = cf_rules
+
+    dv_rules = _extract_data_validations(ws)
+    if dv_rules:
+        sheet_obj["dataValidations"] = dv_rules
+
+    images = _extract_images(ws)
+    if images:
+        sheet_obj["drawings"] = images
+
+    return sheet_obj
+
+
+@router.get("/sheet/{sheet_name}")
+async def get_single_sheet_data(
+    project_id: str,
+    wp_id: str,
+    sheet_name: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """proposal-remaining-18 D-1：按需加载单个 sheet 完整数据
+
+    配合 GET /xlsx-to-json?sheets=active 使用：
+    - 首屏只加载 active sheet（其余仅元数据）
+    - 用户切换 sheet 时调用此端点按需加载
+    - 前端 useLazySheetLoader composable 含缓存 + inflight 去重
+
+    返回：单 sheet 完整对象 {id, name, rowCount, columnCount, cellData, mergeData, ...}
+    """
+    pid = UUID(project_id)
+    wid = UUID(wp_id)
+
+    # 1. 找 storage 文件，不存在则从模板初始化
+    storage_path = get_workpaper_file(pid, wid)
+    if not storage_path:
+        row = (await db.execute(text("""
+            SELECT i.wp_code FROM working_paper w
+            LEFT JOIN wp_index i ON w.wp_index_id = i.id
+            WHERE w.id = :wid
+        """), {"wid": wp_id})).first()
+        if not row or not row[0]:
+            raise HTTPException(status_code=404, detail="底稿不存在或无编码")
+        result = init_workpaper_from_template(pid, wid, row[0])
+        if not result:
+            raise HTTPException(status_code=404, detail=f"模板文件不存在: {row[0]}")
+        storage_path = result
+
+    if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"非 xlsx 类底稿: {storage_path.name}",
+        )
+
+    try:
+        from openpyxl import load_workbook
+        content = storage_path.read_bytes()
+        wb = load_workbook(BytesIO(content), read_only=False, data_only=False)
+
+        if sheet_name not in wb.sheetnames:
+            wb.close()
+            raise HTTPException(
+                status_code=404,
+                detail=f"sheet 不存在: {sheet_name}",
+            )
+
+        idx = wb.sheetnames.index(sheet_name)
+        sheet_id = f"sheet{idx}"
+        ws = wb[sheet_name]
+        sheet_obj = _build_sheet_obj_from_ws(ws, sheet_id, sheet_name)
+        wb.close()
+
+        return JSONResponse(content=sheet_obj)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("get_single_sheet_data failed: sheet=%s, err=%s", sheet_name, e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"加载 sheet 失败: {type(e).__name__}: {e}",
+        )

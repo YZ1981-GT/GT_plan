@@ -174,7 +174,7 @@ inclusion: manual
 
 - Git 远程：https://github.com/YZ1981-GT/GT_plan.git（master 分支）
 - 后端端口：9980，前端端口：3030，vLLM：8100，Paperless：8010，Redis：6379，PG：5432
-- 初始化数据库：`python backend/scripts/_init_tables.py`（自动扫描 models + create_all + 种子数据）+ `python backend/scripts/_create_admin.py`（admin/admin123）
+- 初始化数据库：`python backend/scripts/init_tables.py`（自动扫描 models + create_all + 种子数据）+ `python backend/scripts/create_admin.py`（admin/admin123）
 - 数据库迁移：启动时 migration_runner.py 自动扫描 backend/migrations/V*.sql 执行未应用版本
 - 启动开发：`start-dev.bat` 或 `uvicorn app.main:app --host 0.0.0.0 --port 9980 --reload --reload-dir app`（从 backend/ 目录）
 - vLLM 启动：`docker compose --profile gpu up vllm`

@@ -2,7 +2,7 @@
   <!--
     GtFormTable — 行内编辑型表格（R10 Spec B / Sprint 3.1.2）
 
-    @docs ../../../docs/COMPONENT_USAGE_GUIDE.md
+    @docs ../../../docs/frontend/component-usage.md
     @see GtTableExtended / GtEditableTable
 
     定位：

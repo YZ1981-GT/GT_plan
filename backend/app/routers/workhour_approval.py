@@ -1,13 +1,15 @@
-"""工时审批与底稿进度关联 API — Phase 7 F10
+"""工时审批与底稿进度关联 API — Phase 7 F10 + proposal-remaining-18 M-5
 
-GET /api/projects/{id}/workhours/approval — 待审批列表含底稿进度列
+GET /api/projects/{id}/workhours/approval — 待审批列表含底稿进度 + 底稿完成度列
 POST approve/reject — 批量审批/退回
 进度计算：level2_passed+ = 100% / level1_passed = 50% / else 0%
+完成度计算（M-5）：每个填报人 assignee 的 wp 完成率
+    COUNT(WorkingPaper.status >= edit_complete) / COUNT(assigned_to=user)
 警告：progress < 30% AND hours > budget 80%
 权限：manager/partner/admin
 注册到 router_registry 协作域 §114。
 
-Validates: Requirements F10.1, F10.2, F10.3, F10.4, F10.6
+Validates: Requirements F10.1, F10.2, F10.3, F10.4, F10.6 + M-5
 """
 
 from __future__ import annotations
@@ -18,13 +20,25 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import Project, User
 from app.models.workhour_entry_models import WorkHourEntry, WorkHourEntryStatus
+from app.models.workpaper_models import WorkingPaper, WpFileStatus
+
+# WpFileStatus 中视为"已完成编制"的状态集合（status >= edit_complete）
+_COMPLETED_WP_STATUSES: tuple[str, ...] = (
+    WpFileStatus.edit_complete.value,
+    WpFileStatus.under_review.value,
+    WpFileStatus.revision_required.value,
+    WpFileStatus.review_passed.value,
+    WpFileStatus.archived.value,
+    WpFileStatus.review_level1_passed.value,
+    WpFileStatus.review_level2_passed.value,
+)
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/workhours/approval",
@@ -50,6 +64,53 @@ def _calc_wp_progress(wp_code: str | None) -> float:
     """
     # Stub: return 0% (no review data available without full integration)
     return 0.0
+
+
+async def _calc_user_wp_completion_rates(
+    db: AsyncSession,
+    project_id: UUID,
+    user_ids: list[UUID],
+) -> dict[UUID, float | None]:
+    """批量统计指定项目下每位填报人的底稿完成度（M-5）
+
+    完成度 = COUNT(working_paper.status ∈ 已完成集合) / COUNT(assigned_to=user)
+    返回百分比（0~100，保留 1 位小数）；该用户在本项目无任何分配底稿时返回 None
+    （前端会渲染为 "—"，区别于 0%）
+
+    使用单条聚合 SQL（GROUP BY assigned_to + CASE 求和）避免 N+1。
+    """
+    if not user_ids:
+        return {}
+
+    completed_expr = case(
+        (WorkingPaper.status.in_(_COMPLETED_WP_STATUSES), 1),
+        else_=0,
+    )
+
+    stmt = (
+        select(
+            WorkingPaper.assigned_to.label("user_id"),
+            func.count().label("total"),
+            func.sum(completed_expr).label("completed"),
+        )
+        .where(
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == False,  # noqa: E712 — SQL 表达式
+            WorkingPaper.assigned_to.in_(user_ids),
+        )
+        .group_by(WorkingPaper.assigned_to)
+    )
+    result = await db.execute(stmt)
+
+    rates: dict[UUID, float | None] = {uid: None for uid in user_ids}
+    for row in result.all():
+        total = int(row.total or 0)
+        if total <= 0:
+            continue
+        completed = int(row.completed or 0)
+        rates[row.user_id] = round(completed * 100.0 / total, 1)
+
+    return rates
 
 
 @router.get("")
@@ -89,6 +150,11 @@ async def list_pending_approvals(
         for u in user_result.scalars().all():
             user_map[u.id] = u.username
 
+    # M-5: 批量统计每位填报人本项目的底稿完成度（None=未分配任何底稿）
+    wp_completion_map = await _calc_user_wp_completion_rates(
+        db, project_id, user_ids
+    )
+
     items = []
     for entry in entries:
         wp_progress = _calc_wp_progress(entry.wp_code)
@@ -110,6 +176,7 @@ async def list_pending_approvals(
             "wp_code": entry.wp_code,
             "description": entry.description,
             "wp_progress_pct": wp_progress,
+            "wp_completion_rate": wp_completion_map.get(entry.user_id),
             "is_warning": is_warning,
         })
 

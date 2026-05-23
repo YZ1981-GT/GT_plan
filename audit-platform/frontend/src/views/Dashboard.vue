@@ -123,6 +123,7 @@ import GTChart from '@/components/GTChart.vue'
 import {
   FolderOpened, Loading, Warning, CircleCheck,
   Plus, Timer, DataBoard, Reading, Setting,
+  Document, Paperclip, Search,
 } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
@@ -220,9 +221,12 @@ const statCards = computed(() => [
 const quickActions = [
   { label: '新建项目', path: '/projects/new', icon: Plus, bg: 'var(--gt-color-primary-bg)', color: 'var(--gt-color-primary)' },
   { label: '项目列表', path: '/projects', icon: FolderOpened, bg: 'var(--gt-color-teal-light)', color: 'var(--gt-color-teal)' },
+  { label: '模板库', path: '/template-library', icon: Document, bg: '#fef3e7', color: '#d97706' },
+  { label: '附件管理', path: '/attachments', icon: Paperclip, bg: '#fce7f3', color: '#db2777' },
   { label: '工时填报', path: '/work-hours', icon: Timer, bg: 'var(--gt-color-wheat-light)', color: '#e6a817' },
   { label: '管理看板', path: '/dashboard/management', icon: DataBoard, bg: '#f0ebf8', color: 'var(--gt-color-primary)' },
   { label: '知识库', path: '/knowledge', icon: Reading, bg: 'var(--gt-color-success-light)', color: 'var(--gt-color-success)' },
+  { label: '高级查询', path: '/advanced-query', icon: Search, bg: '#e0f2fe', color: '#0284c7' },
   { label: '系统设置', path: '/settings', icon: Setting, bg: '#f5f5f7', color: '#6e6e73' },
 ]
 
@@ -400,7 +404,7 @@ onMounted(async () => {
 /* ── 快捷操作 ── */
 .action-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: var(--gt-space-4);
 }
 .action-card {

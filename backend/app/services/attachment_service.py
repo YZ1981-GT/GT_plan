@@ -59,7 +59,11 @@ class AttachmentService:
         data: dict[str, Any],
         created_by: UUID | None = None,
     ) -> dict:
-        """创建附件记录"""
+        """创建附件记录（AT-3：同名自动建版本链）
+
+        同 (project_id, reference_id, reference_type, file_name) 第二次调用时
+        新行 version=N+1，previous_version_id 指向当前最新版本。
+        """
         paperless_document_id = data.get("paperless_document_id")
         storage_type = data.get("storage_type")
         if not storage_type:
@@ -72,6 +76,16 @@ class AttachmentService:
         if storage_type == "paperless" and paperless_document_id and not str(file_path).startswith("paperless://"):
             file_path = self._paperless_uri(paperless_document_id)
 
+        # AT-3：解析版本链
+        ref_id_raw = data.get("reference_id")
+        ref_id = ref_id_raw if isinstance(ref_id_raw, UUID) else (UUID(ref_id_raw) if ref_id_raw else None)
+        version, prev_id = await self._resolve_version_chain(
+            project_id=project_id,
+            file_name=data["file_name"],
+            reference_id=ref_id,
+            reference_type=data.get("reference_type"),
+        )
+
         attachment = Attachment(
             project_id=project_id,
             file_name=data["file_name"],
@@ -79,13 +93,15 @@ class AttachmentService:
             file_type=data.get("file_type") or self._guess_file_type(data["file_name"]),
             file_size=data.get("file_size", 0),
             attachment_type=data.get("attachment_type", "general"),
-            reference_id=data.get("reference_id"),
+            reference_id=ref_id,
             reference_type=data.get("reference_type"),
             storage_type=storage_type,
             paperless_document_id=paperless_document_id,
             ocr_status=data.get("ocr_status") or self._default_ocr_status(storage_type, paperless_document_id),
             ocr_text=data.get("ocr_text"),
             created_by=created_by,
+            version=version,
+            previous_version_id=prev_id,
         )
         self.db.add(attachment)
         await self.db.flush()
@@ -632,4 +648,208 @@ class AttachmentService:
             "ocr_text": a.ocr_text[:200] if a.ocr_text else None,  # 截断预览
             "is_deleted": a.is_deleted,
             "created_at": a.created_at.isoformat() if a.created_at else None,
+            # AT-3 版本字段
+            "version": getattr(a, "version", 1),
+            "previous_version_id": (
+                str(a.previous_version_id) if getattr(a, "previous_version_id", None) else None
+            ),
         }
+
+    # ──────────────────────────────────────────────────────────────────────
+    # AT-3 版本管理（spec proposal-remaining-18 task 5.3）
+    # ──────────────────────────────────────────────────────────────────────
+
+    async def _resolve_version_chain(
+        self,
+        project_id: UUID,
+        file_name: str,
+        reference_id: UUID | None,
+        reference_type: str | None,
+    ) -> tuple[int, UUID | None]:
+        """计算新版本号 + previous_version_id
+
+        同 (project_id, reference_id, reference_type, file_name) 已有记录时，
+        新 version = max(version) + 1，previous_version_id 指向当前最新版本。
+        否则 version=1, previous_version_id=None。
+        """
+        stmt = (
+            sa.select(Attachment)
+            .where(
+                Attachment.project_id == project_id,
+                Attachment.file_name == file_name,
+                Attachment.is_deleted == sa.false(),
+            )
+            .order_by(Attachment.version.desc())
+            .limit(1)
+        )
+        if reference_id is not None:
+            stmt = stmt.where(Attachment.reference_id == reference_id)
+        else:
+            stmt = stmt.where(Attachment.reference_id.is_(None))
+        if reference_type is not None:
+            stmt = stmt.where(Attachment.reference_type == reference_type)
+        else:
+            stmt = stmt.where(Attachment.reference_type.is_(None))
+
+        latest = (await self.db.execute(stmt)).scalar_one_or_none()
+        if latest is None:
+            return 1, None
+        return (latest.version or 1) + 1, latest.id
+
+    async def list_versions(
+        self,
+        attachment_id_or_project_id: UUID,
+        file_name: str | None = None,
+        reference_id: UUID | None = None,
+        reference_type: str | None = None,
+    ) -> list[dict]:
+        """列出同名附件的版本链（按 version 升序）
+
+        两种调用契约：
+        - list_versions(attachment_id)：从 attachment_id 反查所属链（同 project_id + 同 file_name + 同 reference）
+        - list_versions(project_id, file_name=..., reference_id=..., reference_type=...)：直接定位链
+
+        attachment_id 不存在时返回 []
+        """
+        # 契约 1：仅传 attachment_id
+        if file_name is None:
+            entry = (
+                await self.db.execute(
+                    sa.select(Attachment).where(Attachment.id == attachment_id_or_project_id)
+                )
+            ).scalar_one_or_none()
+            if entry is None:
+                return []
+            project_id = entry.project_id
+            file_name = entry.file_name
+            reference_id = entry.reference_id
+            reference_type = entry.reference_type
+        else:
+            project_id = attachment_id_or_project_id
+
+        stmt = (
+            sa.select(Attachment)
+            .where(
+                Attachment.project_id == project_id,
+                Attachment.file_name == file_name,
+                Attachment.is_deleted == sa.false(),
+            )
+            .order_by(Attachment.version.asc())
+        )
+        if reference_id is not None:
+            stmt = stmt.where(Attachment.reference_id == reference_id)
+        else:
+            stmt = stmt.where(Attachment.reference_id.is_(None))
+        if reference_type is not None:
+            stmt = stmt.where(Attachment.reference_type == reference_type)
+        else:
+            stmt = stmt.where(Attachment.reference_type.is_(None))
+
+        result = await self.db.execute(stmt)
+        return [self._to_dict(a) for a in result.scalars().all()]
+
+    async def rollback_to_version(
+        self,
+        attachment_id: UUID | None = None,
+        version_id: UUID | None = None,
+        project_id: UUID | None = None,
+        file_name: str | None = None,
+        target_version: int | None = None,
+        reference_id: UUID | None = None,
+        reference_type: str | None = None,
+        created_by: UUID | None = None,
+        rolled_back_by: UUID | None = None,
+    ) -> dict:
+        """回滚到指定历史版本：复制旧版本元数据创建 version=N+1 新行
+
+        两种调用契约（任一即可）：
+        - rollback_to_version(attachment_id, version_id, created_by=...) — 通过 attachment_id 锁定链 + version_id 定位目标
+        - rollback_to_version(project_id, file_name, target_version, reference_id, reference_type, rolled_back_by=...) — 显式定位
+
+        跨链回滚（version_id 不属于 attachment_id 所在链）→ raise ValueError
+        旧版本不真删（is_deleted=false 保留），新行 previous_version_id 指向当前最新版本。
+        """
+        actor = created_by or rolled_back_by
+
+        # 契约 1：attachment_id + version_id
+        if attachment_id is not None and version_id is not None:
+            entry = (
+                await self.db.execute(
+                    sa.select(Attachment).where(Attachment.id == attachment_id)
+                )
+            ).scalar_one_or_none()
+            if entry is None:
+                raise ValueError(f"attachment_id 不存在: {attachment_id}")
+            target = (
+                await self.db.execute(
+                    sa.select(Attachment).where(Attachment.id == version_id)
+                )
+            ).scalar_one_or_none()
+            if target is None:
+                raise ValueError(f"version_id 不存在: {version_id}")
+            # 跨链校验
+            if (
+                target.project_id != entry.project_id
+                or target.file_name != entry.file_name
+                or target.reference_id != entry.reference_id
+                or target.reference_type != entry.reference_type
+            ):
+                raise ValueError(
+                    f"跨链回滚被拒绝：version_id={version_id} 不属于 attachment_id={attachment_id} 所在链"
+                )
+            project_id = entry.project_id
+            file_name = entry.file_name
+            reference_id = entry.reference_id
+            reference_type = entry.reference_type
+        # 契约 2：(project_id, file_name, target_version)
+        elif project_id is not None and file_name is not None and target_version is not None:
+            target_stmt = (
+                sa.select(Attachment)
+                .where(
+                    Attachment.project_id == project_id,
+                    Attachment.file_name == file_name,
+                    Attachment.version == target_version,
+                    Attachment.is_deleted == sa.false(),
+                )
+            )
+            if reference_id is not None:
+                target_stmt = target_stmt.where(Attachment.reference_id == reference_id)
+            else:
+                target_stmt = target_stmt.where(Attachment.reference_id.is_(None))
+            if reference_type is not None:
+                target_stmt = target_stmt.where(Attachment.reference_type == reference_type)
+            else:
+                target_stmt = target_stmt.where(Attachment.reference_type.is_(None))
+            target = (await self.db.execute(target_stmt)).scalar_one_or_none()
+            if target is None:
+                raise ValueError(
+                    f"目标版本不存在: file_name={file_name}, version={target_version}"
+                )
+        else:
+            raise ValueError(
+                "必须提供 (attachment_id, version_id) 或 (project_id, file_name, target_version)"
+            )
+
+        new_version, prev_id = await self._resolve_version_chain(
+            project_id, file_name, reference_id, reference_type
+        )
+        new_att = Attachment(
+            project_id=project_id,
+            file_name=target.file_name,
+            file_path=target.file_path,
+            file_type=target.file_type,
+            file_size=target.file_size,
+            attachment_type=target.attachment_type,
+            reference_id=target.reference_id,
+            reference_type=target.reference_type,
+            storage_type=target.storage_type,
+            paperless_document_id=target.paperless_document_id,
+            ocr_status=target.ocr_status,
+            ocr_text=target.ocr_text,
+            created_by=actor,
+            version=new_version,
+            previous_version_id=prev_id,
+        )
+        self.db.add(new_att)
+        await self.db.flush()
+        return self._to_dict(new_att)

@@ -32,6 +32,41 @@ class LLMResponse:
     is_stub: bool = False
     error: str | None = None
     duration_ms: float = 0.0
+    # K-4 解释链字段（task 4.2）— 各引擎填充供前端展示推理依据
+    reasoning: str | None = None
+    references: list[dict] = field(default_factory=list)
+    data_sources: list[str] = field(default_factory=list)
+    confidence: float = 0.0
+
+
+def build_reasoning_chain(
+    reasoning: str | None = None,
+    references: list[dict] | None = None,
+    data_sources: list[str] | None = None,
+    is_llm_stub: bool = True,
+    base_confidence: float = 0.0,
+) -> tuple[str | None, list[dict], list[str], float]:
+    """K-4 解释链统一构造器（task 4.2 / ADR-6）
+
+    所有 stub 引擎共用：
+    - is_llm_stub=True  → confidence 强制 0.0
+    - is_llm_stub=False → confidence = clamp(base_confidence, 0.0, 1.0)
+    - references / data_sources 为 None 时归一化为 []
+
+    Returns: (reasoning, references, data_sources, confidence)
+    """
+    refs = list(references) if references else []
+    sources = list(data_sources) if data_sources else []
+    if is_llm_stub:
+        confidence = 0.0
+    else:
+        if base_confidence > 1.0:
+            confidence = 1.0
+        elif base_confidence < 0.0:
+            confidence = 0.0
+        else:
+            confidence = float(base_confidence)
+    return reasoning, refs, sources, confidence
 
 
 class LLMService:

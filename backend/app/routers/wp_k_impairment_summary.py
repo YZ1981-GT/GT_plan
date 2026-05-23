@@ -69,6 +69,41 @@ class ImpairmentSummaryResponse(BaseModel):
     is_llm_stub: bool
     applied_to_sheet: str | None = None
     applied_at: str | None = None
+    # K-4 解释链字段（task 4.2 / ADR-6）
+    reasoning: str | None = None
+    references: list[dict] = Field(default_factory=list)
+    data_sources: list[str] = Field(default_factory=list)
+    confidence: float = 0.0
+
+
+def _build_impairment_reasoning(
+    total: float,
+    sources_found: list[str],
+    sources_missing: list[str],
+    is_llm_stub: bool,
+) -> str:
+    """K11 减值汇总推理文本（test 仅校验关键 token 存在性）"""
+    if total > 0:
+        amount_str = f"{total:,.2f}"
+        suffix = (
+            "（LLM 暂未启用，已降级为规则汇总结果）"
+            if is_llm_stub
+            else "（结合 LLM 智能分析）"
+        )
+        return (
+            f"K11 资产减值汇总规则：合计金额 {amount_str}，"
+            f"匹配 {len(sources_found)} 个来源底稿，"
+            f"{len(sources_missing)} 个来源待补充。{suffix}"
+        )
+    suffix = (
+        "（LLM 暂未启用，已降级为规则结果）"
+        if is_llm_stub
+        else "（结合 LLM 智能分析）"
+    )
+    return (
+        f"暂无来源底稿提供减值数据，"
+        f"建议优先完成 H1 / I3 / G14 / F2 减值底稿{suffix}"
+    )
 
 
 # ─── Cross-cycle Source Lookup ────────────────────────────────────────────────

@@ -17,6 +17,8 @@
   §59 Address Registry V2
   §92 Redis 健康检查（§92 编号复用，实际为 health_redis）
   §96 Redis 健康检查（Phase 4 F5）
+  §118 proposal-remaining-18 AT-2: Office 文件在线预览（LibreOffice）
+  §120 MT-8 日志集中查看（admin only）
 """
 from fastapi import FastAPI
 
@@ -187,3 +189,11 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §59. Address Registry V2 ═══
     from app.routers.address_registry_v2 import router as address_registry_v2_router
     app.include_router(address_registry_v2_router, tags=["address-registry-v2"])
+
+    # ═══ §118. proposal-remaining-18 AT-2: Office 文件在线预览（LibreOffice 转 PDF） ═══
+    from app.routers.office_preview import router as office_preview_router
+    app.include_router(office_preview_router, tags=["office-preview"])
+
+    # ═══ §120. MT-8 日志集中查看（admin only） ═══
+    from app.routers.logs_viewer import router as logs_viewer_router
+    app.include_router(logs_viewer_router, tags=["admin-logs"])

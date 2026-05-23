@@ -57,7 +57,7 @@
     - 公式执行失败时记录 warning 而非抛异常（容错处理）
     - _Requirements: 20.5, 20.6_
 
-  - [ ]* 1.8 Write property tests for report mode correctness
+  - [x]* 1.8 Write property tests for report mode correctness
     - **Property 4: 报表模式取数正确性**
     - **Property 11: 公式 fallback 取数**
     - **Validates: Requirements 18.1, 18.2, 18.3, 18.8**
@@ -117,7 +117,7 @@
     - 新增 apiPaths.ts 中 workflow 路径对象
     - _Requirements: 1.1, 2.1_
 
-  - [ ]* 2.7 Write property tests for chain orchestration
+  - [x]* 2.7 Write property tests for chain orchestration
     - **Property 1: 步骤依赖自动补充**
     - **Property 2: 互斥锁保证单一执行**
     - **Property 3: SSE 事件完整性**
@@ -176,7 +176,7 @@
     - 空报表友好提示"请先导入账套数据并执行刷新"
     - _Requirements: 18.10, 19.8, 19.9_
 
-  - [ ]* 3.6 Write property tests for Excel export
+  - [x]* 3.6 Write property tests for Excel export
     - **Property 5: Excel 导出格式不变性**
     - **Property 6: Excel 合计行公式保留**
     - **Validates: Requirements 3.3, 3.5-3.10**
@@ -233,7 +233,7 @@
     - 不平衡时标记 warning 并显示差异金额
     - _Requirements: 24.1, 24.2, 24.3, 24.4_
 
-  - [ ]* 4.7 Write property tests for validation engine
+  - [x]* 4.7 Write property tests for validation engine
     - **Property 12: 附注模板选择正确性**
     - **Property 13: 附注校验互斥规则**
     - **Property 14: 宽表横向公式平衡**
@@ -303,7 +303,7 @@
     - 支持"从底稿刷新"操作
     - _Requirements: 25.7, 36.4, 36.5_
 
-  - [ ]* 5.8 Write property tests for note generation rules
+  - [x]* 5.8 Write property tests for note generation rules
     - **Property 15: 附注规则引擎驱动生成**
     - **Validates: Requirements 35.1, 35.2, 35.3**
 
@@ -366,7 +366,7 @@
     - 文件名避免特殊字符（替换为下划线）
     - _Requirements: 32.1, 32.2, 32.3, 32.4_
 
-  - [ ]* 6.7 Write property tests for Word export and package
+  - [x]* 6.7 Write property tests for Word export and package
     - **Property 7: Word 导出页面设置**
     - **Property 8: 附注空章节占位文本**
     - **Property 9: 组合导出包完整性**
@@ -428,7 +428,7 @@
     - 执行完成后显示摘要
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8_
 
-  - [ ]* 7.6 Write property tests for consistency gate and stale cascade
+  - [x]* 7.6 Write property tests for consistency gate and stale cascade
     - **Property 10: 一致性门控正确性**
     - **Property 17: 数据过期级联标记**
     - **Validates: Requirements 6.5, 6.6, 8.1, 8.2, 8.3**
@@ -555,7 +555,7 @@
     - 变动率 ≤ 20% 不生成（除非手动要求）
     - _Requirements: 43.1, 43.2, 43.3, 43.5_
 
-  - [ ]* 9.7 Write property tests for cross-reference and variation analysis
+  - [x]* 9.7 Write property tests for cross-reference and variation analysis
     - **Property 18: 交叉引用编号一致性**
     - **Property 19: 变动分析生成阈值**
     - **Validates: Requirements 42.1-42.3, 43.1, 43.5**
@@ -634,7 +634,7 @@
     - 折叠全部/展开全部
     - _Requirements: 50.1, 50.2, 50.3, 50.4, 50.5, 50.6_
 
-  - [ ]* 10.9 Write property tests for data locking
+  - [x]* 10.9 Write property tests for data locking
     - **Property 20: 签字后数据不可变**
     - **Validates: Requirements 53.1, 53.3**
 

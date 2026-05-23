@@ -594,3 +594,8 @@ export const systemDicts = {
   items: (key: string) => `/api/system/dicts/${key}/items`,
   itemDetail: (key: string, value: string) => `/api/system/dicts/${key}/items/${value}`,
 } as const
+// ─── MT-8 日志集中查看（admin only） ────────────────────────────────────────
+
+export const adminLogs = {
+  recent: '/api/admin/logs',
+} as const

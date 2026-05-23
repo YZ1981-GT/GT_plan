@@ -256,7 +256,7 @@ GT_plan/
 - [项目记忆文档](.kiro/steering/memory.md) - AI 持久记忆，包含项目上下文、技术决策、开发记录
 
 ### 部署文档
-- [MinerU 部署指南](docs/mineru-deployment.md) - MinerU OCR 服务部署
+- [MinerU 部署指南](docs/deployment/mineru.md) - MinerU OCR 服务部署
 
 ## 开发指南
 

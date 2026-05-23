@@ -4,11 +4,11 @@ Generated: 2026-04-26 18:09
 Replaces: 36 individual migration files (archived to _archived/)
 
 This migration is a no-op marker. The actual schema is created by
-Base.metadata.create_all() in _init_tables.py.
+Base.metadata.create_all() in init_tables.py.
 
 To initialize a fresh database:
-  1. python backend/scripts/_init_tables.py
-  2. python backend/scripts/_create_admin.py
+  1. python backend/scripts/init_tables.py
+  2. python backend/scripts/create_admin.py
   3. alembic stamp head
 """
 

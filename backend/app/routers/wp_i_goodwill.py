@@ -122,6 +122,80 @@ class GoodwillImpairmentResponse(BaseModel):
         ),
     )
     applied_to_sheet: str | None = None
+    # K-4 解释链字段（task 4.2 / ADR-6）
+    reasoning: str | None = None
+    references: list[dict] = Field(default_factory=list)
+    data_sources: list[str] = Field(default_factory=list)
+    confidence: float = 0.0
+
+
+def _build_i3_reasoning(
+    payload: "GoodwillImpairmentRequest",
+    pv_cash_flows: Decimal,
+    recoverable_amount: Decimal,
+    impairment_loss: Decimal,
+    goodwill_writedown: Decimal,
+    other_assets_writedown: Decimal,
+    asset_allocations: list[dict],
+    is_llm_stub: bool,
+) -> dict:
+    """I3 商誉减值推理链构造器（task 4.2）
+
+    Returns: {"reasoning", "references", "data_sources", "confidence"}
+    """
+    from app.services.llm_service import build_reasoning_chain
+
+    g = payload.terminal_growth_rate
+    parts = [
+        f"基于 DCF 模型测算 CGU '{payload.cgu_id}' 可收回金额：现金流现值 {pv_cash_flows} 元",
+    ]
+    if g and g > 0:
+        parts.append(
+            f"，叠加 Gordon 永续增长终值（g={g}）"
+        )
+    parts.append(
+        f"，可收回金额 {recoverable_amount} 元；"
+    )
+    if impairment_loss > 0:
+        parts.append(
+            f"账面合计高于可收回金额 → 减值损失 {impairment_loss} 元，"
+            f"按 CAS 8 / IFRS 36 优先冲减商誉 {goodwill_writedown} 元，"
+            f"其余 {other_assets_writedown} 元按账面比例分摊到 CGU 其他资产。"
+        )
+    else:
+        parts.append("账面 ≤ 可收回金额，本期无需减值。")
+    if is_llm_stub:
+        parts.append("（LLM 暂未启用，已降级为规则结果）")
+    reasoning = "".join(parts)
+
+    references = [
+        {"type": "CAS", "code": "CAS 8", "section": "资产减值"},
+        {"type": "IFRS", "code": "IFRS 36", "section": "Impairment of Assets"},
+        {"type": "ISA", "code": "ISA 540", "section": "审计会计估计"},
+    ]
+
+    sources = [
+        f"WP:I3:{payload.cgu_id}.商誉账面价值",
+        f"WP:I3:{payload.cgu_id}.其他资产账面价值",
+        f"WP:I3:{payload.cgu_id}.现金流预测",
+    ]
+    if asset_allocations:
+        sources.append(f"WP:I3:{payload.cgu_id}.CGU 资产清单")
+
+    base_conf = 0.7  # I3 商誉减值规则相对成熟
+    reasoning, refs, srcs, conf = build_reasoning_chain(
+        reasoning=reasoning,
+        references=references,
+        data_sources=sources,
+        is_llm_stub=is_llm_stub,
+        base_confidence=base_conf,
+    )
+    return {
+        "reasoning": reasoning,
+        "references": refs,
+        "data_sources": srcs,
+        "confidence": conf,
+    }
 
 
 # ─── DCF + Gordon Growth Calculation ──────────────────────────────────────────

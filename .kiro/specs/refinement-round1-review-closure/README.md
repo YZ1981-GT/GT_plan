@@ -57,7 +57,7 @@
 
 ## 数据库迁移约定（全轮共享）
 
-按 ADR：baseline=`_init_tables.py` create_all，增量=Alembic autogenerate 补丁。5 轮合计新增约 10 张表 + 20+ 字段，所有迁移遵循：
+按 ADR：baseline=`init_tables.py` create_all，增量=Alembic autogenerate 补丁。5 轮合计新增约 10 张表 + 20+ 字段，所有迁移遵循：
 
 1. 每个 Round 的 design.md 必须列**新增表清单**与**字段变更清单**，作为该轮 Alembic 迁移脚本的权威来源
 2. Alembic 迁移脚本命名：`round{N}_{domain}_{date}.py`（如 `round1_signature_workflow_20260508.py`）

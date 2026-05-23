@@ -168,13 +168,21 @@
       </div>
     </div>
 
-    <!-- 版本历史抽屉（任务 8.19.1） -->
+    <!-- 版本历史抽屉（任务 8.19.1）+ S-4 历史版本搜索 -->
     <el-drawer
       v-model="showVersionDrawer"
       title="版本历史"
       direction="rtl"
-      size="360px"
+      size="420px"
     >
+      <!-- S-4 (proposal-remaining-18 task 5.4)：历史版本搜索 -->
+      <VersionHistorySearch
+        v-if="showVersionDrawer && wpId"
+        :wp-id="wpId"
+        style="margin-bottom: 16px"
+        @jump="onVersionSearchJump"
+      />
+      <el-divider style="margin: 8px 0" />
       <div v-loading="versionLoading">
         <el-empty v-if="!versionLoading && versionList.length === 0" description="暂无历史版本" />
         <el-timeline v-else>
@@ -888,6 +896,8 @@ import ImpairmentSummaryDialog from '@/components/workpaper/ImpairmentSummaryDia
 // workpaper-l-debt-cycle L-F7/L-F8: L 循环弹窗 wiring（L1/L3 利息测算 + L5 摊余成本）
 import InterestCalcDialog from '@/components/workpaper/InterestCalcDialog.vue'
 import BondAmortizationDialog from '@/components/workpaper/BondAmortizationDialog.vue'
+// proposal-remaining-18 task 5.4 (S-4)：历史版本搜索
+import VersionHistorySearch from '@/components/workpaper/VersionHistorySearch.vue'
 // workpaper-m-equity-cycle M-F7: M6 权益变动表弹窗
 import EquityMovementDialog from '@/components/workpaper/EquityMovementDialog.vue'
 // workpaper-n-tax-cycle N-F7: N5 所得税费用测算弹窗
@@ -1725,6 +1735,22 @@ async function onShowVersions() {
   } finally {
     versionLoading.value = false
   }
+}
+
+/**
+ * S-4 (proposal-remaining-18 task 5.4)：历史版本搜索结果点击跳转
+ * 通过已有的 workpaper:locate-cell 事件触发 Univer 跳转 + 高亮。
+ * v1 实现仅在当前活跃版本上定位 cell；切换到具体快照版本数据源由后续迭代实现。
+ */
+function onVersionSearchJump(payload: { versionId: string; sheet: string; cellRef: string }) {
+  if (!payload.cellRef || !wpId.value) return
+  eventBus.emit('workpaper:locate-cell', {
+    wpId: wpId.value,
+    sheetName: payload.sheet || undefined,
+    cellRef: payload.cellRef,
+  })
+  // 关闭抽屉，聚焦到编辑区
+  showVersionDrawer.value = false
 }
 
 // （旧 30s 自动保存已合并到 useWorkpaperAutoSave 60s 统一方案）

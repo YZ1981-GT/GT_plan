@@ -56,6 +56,14 @@ async def set_rls_context(session: AsyncSession, project_id: UUID | str) -> None
     SET LOCAL 仅在当前事务内有效，事务结束后自动清除（安全）。
     用于 PG RLS 行级安全策略 project_isolation 的过滤条件。
 
+    实现注意：
+    PostgreSQL 的 ``SET LOCAL`` 命令不支持 prepared statement 绑定参数
+    （会抛 ``syntax error at or near "$1"``，因为 SET 在 parser 层先于 bind 处理）。
+    必须改用 ``set_config(name, value, is_local)`` 函数 — 它是真函数，可正常绑定。
+    ``is_local=true`` 等价于 SET LOCAL 语义（仅当前事务有效）。
+
+    参考：https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-ADMIN-SET
+
     Parameters
     ----------
     session : AsyncSession
@@ -64,7 +72,7 @@ async def set_rls_context(session: AsyncSession, project_id: UUID | str) -> None
         项目 ID，将设置为 app.current_project_id session 变量
     """
     await session.execute(
-        text("SET LOCAL app.current_project_id = :pid"),
+        text("SELECT set_config('app.current_project_id', :pid, true)"),
         {"pid": str(project_id)},
     )
 

@@ -505,7 +505,7 @@ onMounted(() => {
       console.warn(
         '[GtEditableTable] 已拆分为 GtTableExtended（列表型）+ GtFormTable（编辑型）。\n'
         + '请按场景迁移：列表展示用 GtTableExtended，行内编辑用 GtFormTable。\n'
-        + '本 wrapper 60 天观察期后将删除。详见 docs/COMPONENT_USAGE_GUIDE.md',
+        + '本 wrapper 60 天观察期后将删除。详见 docs/frontend/component-usage.md',
       )
     }
   }

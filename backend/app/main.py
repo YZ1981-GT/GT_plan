@@ -134,7 +134,7 @@ def _start_workers(stop_event):
     from app.workers import (
         sla_worker, import_recover_worker, outbox_replay_worker,
         audit_log_writer_worker, budget_alert_worker, dataset_purge_worker,
-        staged_orphan_cleaner,
+        staged_orphan_cleaner, export_cleanup_worker,
     )
     return [
         asyncio.create_task(sla_worker.run(stop_event)),
@@ -144,6 +144,7 @@ def _start_workers(stop_event):
         asyncio.create_task(budget_alert_worker.run(stop_event)),
         asyncio.create_task(dataset_purge_worker.run(stop_event)),
         asyncio.create_task(staged_orphan_cleaner.run(stop_event)),
+        asyncio.create_task(export_cleanup_worker.run(stop_event)),
     ]
 
 

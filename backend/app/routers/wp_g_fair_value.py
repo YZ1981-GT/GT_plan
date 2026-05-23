@@ -104,6 +104,75 @@ class FairValueTestResponse(BaseModel):
     dcf_details: list[dict] | None = None
     is_llm_stub: bool
     applied_to_sheet: str | None = None
+    # K-4 解释链字段（task 4.2 / ADR-6）
+    reasoning: str | None = None
+    references: list[dict] = Field(default_factory=list)
+    data_sources: list[str] = Field(default_factory=list)
+    confidence: float = 0.0
+
+
+def _build_g_fair_value_reasoning(
+    payload: "FairValueTestRequest",
+    fair_value: Decimal,
+    valuation_method: str,
+    is_llm_stub: bool,
+) -> tuple[str | None, list[dict], list[str], float]:
+    """G 公允价值测试推理链（task 4.2）"""
+    from app.services.llm_service import build_reasoning_chain
+
+    level = payload.level
+    parts = [
+        f"基于公允价值层级 Level {level} 对 '{payload.instrument_type}' 进行估值，"
+        f"采用 {valuation_method}",
+    ]
+    if level == 1:
+        parts.append(
+            f"，按市场报价 × 数量计算公允价值 {fair_value} 元。"
+        )
+    elif level == 2:
+        parts.append(
+            f"，结合利率曲线/信用利差/波动率调整后公允价值 {fair_value} 元。"
+        )
+    else:
+        parts.append(
+            f"，DCF 折现现金流后公允价值 {fair_value} 元。"
+        )
+    if is_llm_stub:
+        parts.append("（LLM 暂未启用，已降级为规则结果）")
+    reasoning = "".join(parts)
+
+    references = [
+        {"type": "IFRS", "code": "IFRS 13", "section": "Fair Value Measurement"},
+        {"type": "CAS", "code": "CAS 39", "section": "公允价值计量"},
+    ]
+    if level == 3:
+        references.append(
+            {"type": "ISA", "code": "ISA 540", "section": "审计会计估计"}
+        )
+
+    sources = [f"WP:G:{payload.instrument_type}.面值"]
+    if level == 1 and payload.market_price is not None:
+        sources.append(f"WP:G:{payload.instrument_type}.市场报价")
+    elif level == 2:
+        if payload.interest_rate_curve:
+            sources.append(f"WP:G:{payload.instrument_type}.利率曲线")
+        if payload.credit_spread is not None:
+            sources.append(f"WP:G:{payload.instrument_type}.信用利差")
+    elif level == 3:
+        if payload.cash_flow_projections:
+            sources.append(f"WP:G:{payload.instrument_type}.现金流预测")
+        if payload.discount_rate is not None:
+            sources.append(f"WP:G:{payload.instrument_type}.折现率")
+
+    # 不同 level 的置信度差异
+    base_conf = {1: 0.85, 2: 0.75, 3: 0.7}.get(level, 0.7)
+    return build_reasoning_chain(
+        reasoning=reasoning,
+        references=references,
+        data_sources=sources,
+        is_llm_stub=is_llm_stub,
+        base_confidence=base_conf,
+    )
 
 
 # ─── Calculation Helpers ──────────────────────────────────────────────────────

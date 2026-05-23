@@ -1917,13 +1917,24 @@
               "label": "净利润"
             },
             {
-              "label": "资本公积"
+              "label": "资本公积",
+              "account_codes": [
+                "4002"
+              ],
+              "report_row_code": "BS-052"
             },
             {
-              "label": "其他综合收益"
+              "label": "其他综合收益",
+              "account_codes": [
+                "3102"
+              ],
+              "report_row_code": "BS-053"
             },
             {
-              "label": "专项储备"
+              "label": "专项储备",
+              "account_codes": [
+                "4301"
+              ]
             },
             {
               "label": "期末净资产"
@@ -1979,13 +1990,19 @@
               "label": "衍生金融工具产生的公允价值变动收益"
             },
             {
-              "label": "交易性金融负债"
+              "label": "交易性金融负债",
+              "account_codes": [
+                "2101"
+              ]
             },
             {
               "label": "其中：指定为以公允价值计量且其变动计入当期损益的金融负债"
             },
             {
-              "label": "其他非流动金融资产"
+              "label": "其他非流动金融资产",
+              "account_codes": [
+                "1510"
+              ]
             },
             {
               "label": "其中：指定为以公允价值计量且其变动计入当期损益的金融资产计入当期损益的金融资产"
@@ -2475,7 +2492,10 @@
               "label": "其他"
             },
             {
-              "label": "所得税费用"
+              "label": "所得税费用",
+              "account_codes": [
+                "6801"
+              ]
             }
           ]
         }
@@ -2636,16 +2656,32 @@
               "label": "项目"
             },
             {
-              "label": "短期借款"
+              "label": "短期借款",
+              "account_codes": [
+                "2001"
+              ],
+              "report_row_code": "BS-031"
             },
             {
-              "label": "长期借款"
+              "label": "长期借款",
+              "account_codes": [
+                "2501"
+              ],
+              "report_row_code": "BS-041"
             },
             {
-              "label": "应付债券"
+              "label": "应付债券",
+              "account_codes": [
+                "2502"
+              ],
+              "report_row_code": "BS-043"
             },
             {
-              "label": "租赁负债"
+              "label": "租赁负债",
+              "account_codes": [
+                "2601"
+              ],
+              "report_row_code": "BS-042"
             },
             {
               "label": "合计",
@@ -3071,25 +3107,61 @@
               "label": "资产："
             },
             {
-              "label": "货币资金"
+              "label": "货币资金",
+              "account_codes": [
+                "1001",
+                "1002",
+                "1012"
+              ],
+              "report_row_code": "BS-002"
             },
             {
-              "label": "应收票据"
+              "label": "应收票据",
+              "account_codes": [
+                "1121"
+              ],
+              "report_row_code": "BS-004"
             },
             {
-              "label": "应收账款"
+              "label": "应收账款",
+              "account_codes": [
+                "1122"
+              ],
+              "report_row_code": "BS-005"
             },
             {
-              "label": "应收款项融资"
+              "label": "应收款项融资",
+              "account_codes": [
+                "1124"
+              ]
             },
             {
-              "label": "存货"
+              "label": "存货",
+              "account_codes": [
+                "1401",
+                "1402",
+                "1403",
+                "1405",
+                "1408",
+                "1461"
+              ],
+              "report_row_code": "BS-008"
             },
             {
-              "label": "固定资产"
+              "label": "固定资产",
+              "account_codes": [
+                "1601",
+                "1602"
+              ],
+              "report_row_code": "BS-014"
             },
             {
-              "label": "无形资产"
+              "label": "无形资产",
+              "account_codes": [
+                "1701",
+                "1702"
+              ],
+              "report_row_code": "BS-016"
             },
             {
               "label": "......"
@@ -3101,10 +3173,18 @@
               "label": "借款"
             },
             {
-              "label": "应付票据"
+              "label": "应付票据",
+              "account_codes": [
+                "2201"
+              ],
+              "report_row_code": "BS-032"
             },
             {
-              "label": "应付账款"
+              "label": "应付账款",
+              "account_codes": [
+                "2202"
+              ],
+              "report_row_code": "BS-033"
             },
             {
               "label": "递延所得税负债"
@@ -3259,25 +3339,61 @@
               "label": "资产："
             },
             {
-              "label": "货币资金"
+              "label": "货币资金",
+              "account_codes": [
+                "1001",
+                "1002",
+                "1012"
+              ],
+              "report_row_code": "BS-002"
             },
             {
-              "label": "应收票据"
+              "label": "应收票据",
+              "account_codes": [
+                "1121"
+              ],
+              "report_row_code": "BS-004"
             },
             {
-              "label": "应收账款"
+              "label": "应收账款",
+              "account_codes": [
+                "1122"
+              ],
+              "report_row_code": "BS-005"
             },
             {
-              "label": "应收款项融资"
+              "label": "应收款项融资",
+              "account_codes": [
+                "1124"
+              ]
             },
             {
-              "label": "存货"
+              "label": "存货",
+              "account_codes": [
+                "1401",
+                "1402",
+                "1403",
+                "1405",
+                "1408",
+                "1461"
+              ],
+              "report_row_code": "BS-008"
             },
             {
-              "label": "固定资产"
+              "label": "固定资产",
+              "account_codes": [
+                "1601",
+                "1602"
+              ],
+              "report_row_code": "BS-014"
             },
             {
-              "label": "无形资产"
+              "label": "无形资产",
+              "account_codes": [
+                "1701",
+                "1702"
+              ],
+              "report_row_code": "BS-016"
             },
             {
               "label": "......"
@@ -3286,13 +3402,25 @@
               "label": "负债："
             },
             {
-              "label": "短期借款"
+              "label": "短期借款",
+              "account_codes": [
+                "2001"
+              ],
+              "report_row_code": "BS-031"
             },
             {
-              "label": "应付票据"
+              "label": "应付票据",
+              "account_codes": [
+                "2201"
+              ],
+              "report_row_code": "BS-032"
             },
             {
-              "label": "应付账款"
+              "label": "应付账款",
+              "account_codes": [
+                "2202"
+              ],
+              "report_row_code": "BS-033"
             },
             {
               "label": "递延所得税负债"
@@ -3644,7 +3772,10 @@
               "label": "调整事项"
             },
             {
-              "label": "其中：商誉"
+              "label": "其中：商誉",
+              "account_codes": [
+                "1711"
+              ]
             },
             {
               "label": "未实现内部交易损益"
@@ -3679,13 +3810,24 @@
               "label": "项目"
             },
             {
-              "label": "营业收入"
+              "label": "营业收入",
+              "account_codes": [
+                "6001",
+                "6051"
+              ],
+              "report_row_code": "IS-001"
             },
             {
-              "label": "财务费用"
+              "label": "财务费用",
+              "account_codes": [
+                "6603"
+              ]
             },
             {
-              "label": "所得税费用"
+              "label": "所得税费用",
+              "account_codes": [
+                "6801"
+              ]
             },
             {
               "label": "净利润"
@@ -3694,7 +3836,11 @@
               "label": "终止经营的净利润"
             },
             {
-              "label": "其他综合收益"
+              "label": "其他综合收益",
+              "account_codes": [
+                "3102"
+              ],
+              "report_row_code": "BS-053"
             },
             {
               "label": "综合收益总额"
@@ -3755,7 +3901,10 @@
               "label": "调整事项"
             },
             {
-              "label": "其中：商誉"
+              "label": "其中：商誉",
+              "account_codes": [
+                "1711"
+              ]
             },
             {
               "label": "未实现内部交易损益"
@@ -3790,7 +3939,12 @@
               "label": "项目"
             },
             {
-              "label": "营业收入"
+              "label": "营业收入",
+              "account_codes": [
+                "6001",
+                "6051"
+              ],
+              "report_row_code": "IS-001"
             },
             {
               "label": "净利润"
@@ -3799,7 +3953,11 @@
               "label": "终止经营的净利润"
             },
             {
-              "label": "其他综合收益"
+              "label": "其他综合收益",
+              "account_codes": [
+                "3102"
+              ],
+              "report_row_code": "BS-053"
             },
             {
               "label": "综合收益总额"
@@ -3832,7 +3990,11 @@
               "label": "净利润"
             },
             {
-              "label": "其他综合收益"
+              "label": "其他综合收益",
+              "account_codes": [
+                "3102"
+              ],
+              "report_row_code": "BS-053"
             },
             {
               "label": "综合收益总额"
@@ -3852,7 +4014,11 @@
               "label": "净利润"
             },
             {
-              "label": "其他综合收益"
+              "label": "其他综合收益",
+              "account_codes": [
+                "3102"
+              ],
+              "report_row_code": "BS-053"
             },
             {
               "label": "综合收益总额"
@@ -4329,16 +4495,30 @@
           ],
           "rows": [
             {
-              "label": "交易性金融资产"
+              "label": "交易性金融资产",
+              "account_codes": [
+                "1101"
+              ],
+              "report_row_code": "BS-003"
             },
             {
-              "label": "债权投资"
+              "label": "债权投资",
+              "account_codes": [
+                "1504",
+                "1505",
+                "1506",
+                "1507"
+              ],
+              "report_row_code": "BS-011"
             },
             {
               "label": "其他债权投资"
             },
             {
-              "label": "其他非流动金融资产"
+              "label": "其他非流动金融资产",
+              "account_codes": [
+                "1510"
+              ]
             },
             {
               "label": "[其他]"
@@ -4503,19 +4683,35 @@
               "label": "金融负债："
             },
             {
-              "label": "短期借款"
+              "label": "短期借款",
+              "account_codes": [
+                "2001"
+              ],
+              "report_row_code": "BS-031"
             },
             {
               "label": "衍生金融负债"
             },
             {
-              "label": "应付票据"
+              "label": "应付票据",
+              "account_codes": [
+                "2201"
+              ],
+              "report_row_code": "BS-032"
             },
             {
-              "label": "应付账款"
+              "label": "应付账款",
+              "account_codes": [
+                "2202"
+              ],
+              "report_row_code": "BS-033"
             },
             {
-              "label": "其他应付款"
+              "label": "其他应付款",
+              "account_codes": [
+                "2241"
+              ],
+              "report_row_code": "BS-037"
             },
             {
               "label": "一年内到期的非流动负债"
@@ -4524,16 +4720,32 @@
               "label": "其他流动负债（不含递延收益）"
             },
             {
-              "label": "长期借款"
+              "label": "长期借款",
+              "account_codes": [
+                "2501"
+              ],
+              "report_row_code": "BS-041"
             },
             {
-              "label": "应付债券"
+              "label": "应付债券",
+              "account_codes": [
+                "2502"
+              ],
+              "report_row_code": "BS-043"
             },
             {
-              "label": "租赁负债"
+              "label": "租赁负债",
+              "account_codes": [
+                "2601"
+              ],
+              "report_row_code": "BS-042"
             },
             {
-              "label": "长期应付款"
+              "label": "长期应付款",
+              "account_codes": [
+                "2701"
+              ],
+              "report_row_code": "BS-044"
             },
             {
               "label": "对外提供的担保"
@@ -4563,19 +4775,35 @@
               "label": "金融负债："
             },
             {
-              "label": "短期借款"
+              "label": "短期借款",
+              "account_codes": [
+                "2001"
+              ],
+              "report_row_code": "BS-031"
             },
             {
               "label": "衍生金融负债"
             },
             {
-              "label": "应付票据"
+              "label": "应付票据",
+              "account_codes": [
+                "2201"
+              ],
+              "report_row_code": "BS-032"
             },
             {
-              "label": "应付账款"
+              "label": "应付账款",
+              "account_codes": [
+                "2202"
+              ],
+              "report_row_code": "BS-033"
             },
             {
-              "label": "其他应付款"
+              "label": "其他应付款",
+              "account_codes": [
+                "2241"
+              ],
+              "report_row_code": "BS-037"
             },
             {
               "label": "一年内到期的非流动负债"
@@ -4584,13 +4812,25 @@
               "label": "其他流动负债（不含递延收益）"
             },
             {
-              "label": "长期借款"
+              "label": "长期借款",
+              "account_codes": [
+                "2501"
+              ],
+              "report_row_code": "BS-041"
             },
             {
-              "label": "应付债券"
+              "label": "应付债券",
+              "account_codes": [
+                "2502"
+              ],
+              "report_row_code": "BS-043"
             },
             {
-              "label": "长期应付款"
+              "label": "长期应付款",
+              "account_codes": [
+                "2701"
+              ],
+              "report_row_code": "BS-044"
             },
             {
               "label": "应付融资租赁款的未确认融资费用"
@@ -4619,7 +4859,11 @@
               "label": "金融负债"
             },
             {
-              "label": "其中：短期借款"
+              "label": "其中：短期借款",
+              "account_codes": [
+                "2001"
+              ],
+              "report_row_code": "BS-031"
             },
             {
               "label": "合计",
@@ -4632,13 +4876,23 @@
               "label": "金融资产"
             },
             {
-              "label": "其中：货币资金"
+              "label": "其中：货币资金",
+              "account_codes": [
+                "1001",
+                "1002",
+                "1012"
+              ],
+              "report_row_code": "BS-002"
             },
             {
               "label": "金融负债"
             },
             {
-              "label": "其中：短期借款"
+              "label": "其中：短期借款",
+              "account_codes": [
+                "2001"
+              ],
+              "report_row_code": "BS-031"
             },
             {
               "label": "合计",
@@ -4751,7 +5005,11 @@
           ],
           "rows": [
             {
-              "label": "短期借款"
+              "label": "短期借款",
+              "account_codes": [
+                "2001"
+              ],
+              "report_row_code": "BS-031"
             },
             {
               "label": "一年内到期的长期借款"
@@ -4760,10 +5018,18 @@
               "label": "一年内到期的应付债券"
             },
             {
-              "label": "长期借款"
+              "label": "长期借款",
+              "account_codes": [
+                "2501"
+              ],
+              "report_row_code": "BS-041"
             },
             {
-              "label": "应付债券"
+              "label": "应付债券",
+              "account_codes": [
+                "2502"
+              ],
+              "report_row_code": "BS-043"
             },
             {
               "label": "减：列示于现金流量表的现金余额"
@@ -5309,7 +5575,11 @@
               "label": "信用合同"
             },
             {
-              "label": "投资性房地产："
+              "label": "投资性房地产：",
+              "account_codes": [
+                "1521"
+              ],
+              "report_row_code": "BS-013"
             },
             {
               "label": "商业房地产"
@@ -5340,7 +5610,11 @@
               "label": "项目（本期金额）"
             },
             {
-              "label": "交易性金融资产："
+              "label": "交易性金融资产：",
+              "account_codes": [
+                "1101"
+              ],
+              "report_row_code": "BS-003"
             },
             {
               "label": "债务工具投资"
@@ -5358,19 +5632,32 @@
               "label": "衍生金融资产"
             },
             {
-              "label": "应收款项融资"
+              "label": "应收款项融资",
+              "account_codes": [
+                "1124"
+              ]
             },
             {
               "label": "其他债权投资"
             },
             {
-              "label": "其他权益工具投资"
+              "label": "其他权益工具投资",
+              "account_codes": [
+                "1503"
+              ]
             },
             {
-              "label": "其他非流动金融资产"
+              "label": "其他非流动金融资产",
+              "account_codes": [
+                "1510"
+              ]
             },
             {
-              "label": "投资性房地产："
+              "label": "投资性房地产：",
+              "account_codes": [
+                "1521"
+              ],
+              "report_row_code": "BS-013"
             },
             {
               "label": "出租的土地使用权"
@@ -5388,7 +5675,10 @@
               "label": "消耗性生物资产"
             },
             {
-              "label": "生产性生物资产"
+              "label": "生产性生物资产",
+              "account_codes": [
+                "1621"
+              ]
             },
             {
               "label": "合计",
@@ -5433,7 +5723,11 @@
               "label": "项目<br/>（上期金额）"
             },
             {
-              "label": "交易性金融资产："
+              "label": "交易性金融资产：",
+              "account_codes": [
+                "1101"
+              ],
+              "report_row_code": "BS-003"
             },
             {
               "label": "债务工具投资"
@@ -5451,19 +5745,32 @@
               "label": "衍生金融资产"
             },
             {
-              "label": "应收款项融资"
+              "label": "应收款项融资",
+              "account_codes": [
+                "1124"
+              ]
             },
             {
               "label": "其他债权投资"
             },
             {
-              "label": "其他权益工具投资"
+              "label": "其他权益工具投资",
+              "account_codes": [
+                "1503"
+              ]
             },
             {
-              "label": "其他非流动金融资产"
+              "label": "其他非流动金融资产",
+              "account_codes": [
+                "1510"
+              ]
             },
             {
-              "label": "投资性房地产："
+              "label": "投资性房地产：",
+              "account_codes": [
+                "1521"
+              ],
+              "report_row_code": "BS-013"
             },
             {
               "label": "出租的土地使用权"
@@ -5481,7 +5788,10 @@
               "label": "消耗性生物资产"
             },
             {
-              "label": "生产性生物资产"
+              "label": "生产性生物资产",
+              "account_codes": [
+                "1621"
+              ]
             },
             {
               "label": "合计",
@@ -5520,7 +5830,14 @@
               "label": "金融资产："
             },
             {
-              "label": "债权投资"
+              "label": "债权投资",
+              "account_codes": [
+                "1504",
+                "1505",
+                "1506",
+                "1507"
+              ],
+              "report_row_code": "BS-011"
             },
             {
               "label": "长期应收款"
@@ -5539,13 +5856,25 @@
               "label": "其他流动负债（不含递延收益）"
             },
             {
-              "label": "长期借款"
+              "label": "长期借款",
+              "account_codes": [
+                "2501"
+              ],
+              "report_row_code": "BS-041"
             },
             {
-              "label": "应付债券"
+              "label": "应付债券",
+              "account_codes": [
+                "2502"
+              ],
+              "report_row_code": "BS-043"
             },
             {
-              "label": "长期应付款"
+              "label": "长期应付款",
+              "account_codes": [
+                "2701"
+              ],
+              "report_row_code": "BS-044"
             },
             {
               "label": "金融负债小计",
@@ -5568,7 +5897,14 @@
               "label": "金融资产："
             },
             {
-              "label": "债权投资"
+              "label": "债权投资",
+              "account_codes": [
+                "1504",
+                "1505",
+                "1506",
+                "1507"
+              ],
+              "report_row_code": "BS-011"
             },
             {
               "label": "长期应收款"
@@ -5587,13 +5923,25 @@
               "label": "其他流动负债（不含递延收益）"
             },
             {
-              "label": "长期借款"
+              "label": "长期借款",
+              "account_codes": [
+                "2501"
+              ],
+              "report_row_code": "BS-041"
             },
             {
-              "label": "应付债券"
+              "label": "应付债券",
+              "account_codes": [
+                "2502"
+              ],
+              "report_row_code": "BS-043"
             },
             {
-              "label": "长期应付款"
+              "label": "长期应付款",
+              "account_codes": [
+                "2701"
+              ],
+              "report_row_code": "BS-044"
             },
             {
               "label": "金融负债小计",
@@ -5772,16 +6120,29 @@
           ],
           "rows": [
             {
-              "label": "库存现金"
+              "label": "库存现金",
+              "account_codes": [
+                "1001"
+              ]
             },
             {
-              "label": "银行存款"
+              "label": "银行存款",
+              "account_codes": [
+                "1002",
+                "1012"
+              ]
             },
             {
               "label": "存放财务公司款项"
             },
             {
-              "label": "其他货币资金"
+              "label": "其他货币资金",
+              "account_codes": [
+                "1001",
+                "1002",
+                "1012"
+              ],
+              "report_row_code": "BS-002"
             },
             {
               "label": "存款应计利息"
@@ -6757,10 +7118,18 @@
           ],
           "rows": [
             {
-              "label": "应收票据"
+              "label": "应收票据",
+              "account_codes": [
+                "1121"
+              ],
+              "report_row_code": "BS-004"
             },
             {
-              "label": "应收账款"
+              "label": "应收账款",
+              "account_codes": [
+                "1122"
+              ],
+              "report_row_code": "BS-005"
             },
             {
               "label": "小计",
@@ -6981,7 +7350,11 @@
               "label": "应收股利"
             },
             {
-              "label": "其他应收款"
+              "label": "其他应收款",
+              "account_codes": [
+                "1221"
+              ],
+              "report_row_code": "BS-007"
             },
             {
               "label": "合计",
@@ -7949,7 +8322,10 @@
           ],
           "rows": [
             {
-              "label": "合同资产"
+              "label": "合同资产",
+              "account_codes": [
+                "1141"
+              ]
             },
             {
               "label": "减：合同资产减值准备"
@@ -8178,10 +8554,20 @@
               "label": "（一）持有待售非流动资产"
             },
             {
-              "label": "其中：固定资产"
+              "label": "其中：固定资产",
+              "account_codes": [
+                "1601",
+                "1602"
+              ],
+              "report_row_code": "BS-014"
             },
             {
-              "label": "无形资产"
+              "label": "无形资产",
+              "account_codes": [
+                "1701",
+                "1702"
+              ],
+              "report_row_code": "BS-016"
             },
             {
               "label": "……"
@@ -8248,10 +8634,20 @@
               "label": "（一）持有待售非流动资产"
             },
             {
-              "label": "其中：固定资产"
+              "label": "其中：固定资产",
+              "account_codes": [
+                "1601",
+                "1602"
+              ],
+              "report_row_code": "BS-014"
             },
             {
-              "label": "无形资产"
+              "label": "无形资产",
+              "account_codes": [
+                "1701",
+                "1702"
+              ],
+              "report_row_code": "BS-016"
             },
             {
               "label": "……"
@@ -8304,10 +8700,21 @@
               "label": "持有待售的处置组中的资产"
             },
             {
-              "label": "货币资金"
+              "label": "货币资金",
+              "account_codes": [
+                "1001",
+                "1002",
+                "1012"
+              ],
+              "report_row_code": "BS-002"
             },
             {
-              "label": "固定资产"
+              "label": "固定资产",
+              "account_codes": [
+                "1601",
+                "1602"
+              ],
+              "report_row_code": "BS-014"
             },
             {
               "label": "……"
@@ -8316,13 +8723,25 @@
               "label": "持有待售的处置组中的负债"
             },
             {
-              "label": "应付票据"
+              "label": "应付票据",
+              "account_codes": [
+                "2201"
+              ],
+              "report_row_code": "BS-032"
             },
             {
-              "label": "应付账款"
+              "label": "应付账款",
+              "account_codes": [
+                "2202"
+              ],
+              "report_row_code": "BS-033"
             },
             {
-              "label": "长期应付款"
+              "label": "长期应付款",
+              "account_codes": [
+                "2701"
+              ],
+              "report_row_code": "BS-044"
             },
             {
               "label": "……"
@@ -8343,10 +8762,21 @@
               "label": "持有待售的处置组中的资产"
             },
             {
-              "label": "货币资金"
+              "label": "货币资金",
+              "account_codes": [
+                "1001",
+                "1002",
+                "1012"
+              ],
+              "report_row_code": "BS-002"
             },
             {
-              "label": "固定资产"
+              "label": "固定资产",
+              "account_codes": [
+                "1601",
+                "1602"
+              ],
+              "report_row_code": "BS-014"
             },
             {
               "label": "……"
@@ -8355,13 +8785,25 @@
               "label": "持有待售的处置组中的负债"
             },
             {
-              "label": "应付票据"
+              "label": "应付票据",
+              "account_codes": [
+                "2201"
+              ],
+              "report_row_code": "BS-032"
             },
             {
-              "label": "应付账款"
+              "label": "应付账款",
+              "account_codes": [
+                "2202"
+              ],
+              "report_row_code": "BS-033"
             },
             {
-              "label": "长期应付款"
+              "label": "长期应付款",
+              "account_codes": [
+                "2701"
+              ],
+              "report_row_code": "BS-044"
             },
             {
               "label": "……"
@@ -10185,10 +10627,18 @@
           ],
           "rows": [
             {
-              "label": "固定资产"
+              "label": "固定资产",
+              "account_codes": [
+                "1601",
+                "1602"
+              ],
+              "report_row_code": "BS-014"
             },
             {
-              "label": "固定资产清理"
+              "label": "固定资产清理",
+              "account_codes": [
+                "1606"
+              ]
             },
             {
               "label": "合计",
@@ -10455,10 +10905,17 @@
           ],
           "rows": [
             {
-              "label": "在建工程"
+              "label": "在建工程",
+              "account_codes": [
+                "1604"
+              ],
+              "report_row_code": "BS-015"
             },
             {
-              "label": "工程物资"
+              "label": "工程物资",
+              "account_codes": [
+                "1605"
+              ]
             },
             {
               "label": "合计",
@@ -11237,7 +11694,10 @@
           ],
           "rows": [
             {
-              "label": "开发支出"
+              "label": "开发支出",
+              "account_codes": [
+                "1703"
+              ]
             }
           ]
         }
@@ -11450,7 +11910,11 @@
               "label": "项目"
             },
             {
-              "label": "递延所得税资产："
+              "label": "递延所得税资产：",
+              "account_codes": [
+                "1811"
+              ],
+              "report_row_code": "BS-018"
             },
             {
               "label": "资产减值准备"
@@ -11465,7 +11929,11 @@
               "label": "可抵扣亏损"
             },
             {
-              "label": "租赁负债"
+              "label": "租赁负债",
+              "account_codes": [
+                "2601"
+              ],
+              "report_row_code": "BS-042"
             },
             {
               "label": "小计",
@@ -11487,7 +11955,13 @@
               "label": "计入其他综合收益的其他债权投资公允价值变动"
             },
             {
-              "label": "使用权资产"
+              "label": "使用权资产",
+              "account_codes": [
+                "1641",
+                "1642",
+                "1643"
+              ],
+              "report_row_code": "BS-019"
             },
             {
               "label": "小计",
@@ -11506,7 +11980,11 @@
           ],
           "rows": [
             {
-              "label": "递延所得税资产"
+              "label": "递延所得税资产",
+              "account_codes": [
+                "1811"
+              ],
+              "report_row_code": "BS-018"
             },
             {
               "label": "递延所得税负债"
@@ -11629,7 +12107,10 @@
               "label": "应收退货成本"
             },
             {
-              "label": "合同资产"
+              "label": "合同资产",
+              "account_codes": [
+                "1141"
+              ]
             },
             {
               "label": "合计",
@@ -11697,22 +12178,55 @@
               "label": "项目"
             },
             {
-              "label": "货币资金"
+              "label": "货币资金",
+              "account_codes": [
+                "1001",
+                "1002",
+                "1012"
+              ],
+              "report_row_code": "BS-002"
             },
             {
-              "label": "应收票据"
+              "label": "应收票据",
+              "account_codes": [
+                "1121"
+              ],
+              "report_row_code": "BS-004"
             },
             {
-              "label": "应收账款"
+              "label": "应收账款",
+              "account_codes": [
+                "1122"
+              ],
+              "report_row_code": "BS-005"
             },
             {
-              "label": "存货"
+              "label": "存货",
+              "account_codes": [
+                "1401",
+                "1402",
+                "1403",
+                "1405",
+                "1408",
+                "1461"
+              ],
+              "report_row_code": "BS-008"
             },
             {
-              "label": "固定资产"
+              "label": "固定资产",
+              "account_codes": [
+                "1601",
+                "1602"
+              ],
+              "report_row_code": "BS-014"
             },
             {
-              "label": "无形资产"
+              "label": "无形资产",
+              "account_codes": [
+                "1701",
+                "1702"
+              ],
+              "report_row_code": "BS-016"
             },
             {
               "label": "……"
@@ -11737,22 +12251,55 @@
               "label": "项目"
             },
             {
-              "label": "货币资金"
+              "label": "货币资金",
+              "account_codes": [
+                "1001",
+                "1002",
+                "1012"
+              ],
+              "report_row_code": "BS-002"
             },
             {
-              "label": "应收票据"
+              "label": "应收票据",
+              "account_codes": [
+                "1121"
+              ],
+              "report_row_code": "BS-004"
             },
             {
-              "label": "应收账款"
+              "label": "应收账款",
+              "account_codes": [
+                "1122"
+              ],
+              "report_row_code": "BS-005"
             },
             {
-              "label": "存货"
+              "label": "存货",
+              "account_codes": [
+                "1401",
+                "1402",
+                "1403",
+                "1405",
+                "1408",
+                "1461"
+              ],
+              "report_row_code": "BS-008"
             },
             {
-              "label": "固定资产"
+              "label": "固定资产",
+              "account_codes": [
+                "1601",
+                "1602"
+              ],
+              "report_row_code": "BS-014"
             },
             {
-              "label": "无形资产"
+              "label": "无形资产",
+              "account_codes": [
+                "1701",
+                "1702"
+              ],
+              "report_row_code": "BS-016"
             },
             {
               "label": "……"
@@ -11854,7 +12401,10 @@
           ],
           "rows": [
             {
-              "label": "交易性金融负债"
+              "label": "交易性金融负债",
+              "account_codes": [
+                "2101"
+              ]
             },
             {
               "label": "其中："
@@ -12420,7 +12970,11 @@
               "label": "应付股利"
             },
             {
-              "label": "其他应付款"
+              "label": "其他应付款",
+              "account_codes": [
+                "2241"
+              ],
+              "report_row_code": "BS-037"
             },
             {
               "label": "合计",
@@ -13065,7 +13619,11 @@
           ],
           "rows": [
             {
-              "label": "长期应付款"
+              "label": "长期应付款",
+              "account_codes": [
+                "2701"
+              ],
+              "report_row_code": "BS-044"
             },
             {
               "label": "专项应付款"
@@ -14810,10 +15368,16 @@
               "label": "净利润"
             },
             {
-              "label": "加：资产减值损失"
+              "label": "加：资产减值损失",
+              "account_codes": [
+                "6702"
+              ]
             },
             {
-              "label": "信用减值损失"
+              "label": "信用减值损失",
+              "account_codes": [
+                "6701"
+              ]
             },
             {
               "label": "固定资产折旧、投资性房地产折旧、油气资产折耗、生产性生物资产折旧（不适用的项目，可删除）"
@@ -14985,7 +15549,10 @@
               "label": "一、现金"
             },
             {
-              "label": "其中：库存现金"
+              "label": "其中：库存现金",
+              "account_codes": [
+                "1001"
+              ]
             },
             {
               "label": "数字货币"
@@ -15043,19 +15610,31 @@
           ],
           "rows": [
             {
-              "label": "应付账款"
+              "label": "应付账款",
+              "account_codes": [
+                "2202"
+              ],
+              "report_row_code": "BS-033"
             },
             {
               "label": "其中：供应商已收到款项"
             },
             {
-              "label": "短期借款"
+              "label": "短期借款",
+              "account_codes": [
+                "2001"
+              ],
+              "report_row_code": "BS-031"
             },
             {
               "label": "其中：供应商已收到款项"
             },
             {
-              "label": "其他应付款"
+              "label": "其他应付款",
+              "account_codes": [
+                "2241"
+              ],
+              "report_row_code": "BS-037"
             },
             {
               "label": "其中：供应商已收到款项"
@@ -15141,7 +15720,13 @@
           ],
           "rows": [
             {
-              "label": "货币资金"
+              "label": "货币资金",
+              "account_codes": [
+                "1001",
+                "1002",
+                "1012"
+              ],
+              "report_row_code": "BS-002"
             },
             {
               "label": "其中：美元"
@@ -15156,7 +15741,11 @@
               "label": "可无限量添加行"
             },
             {
-              "label": "应收账款"
+              "label": "应收账款",
+              "account_codes": [
+                "1122"
+              ],
+              "report_row_code": "BS-005"
             },
             {
               "label": "其中：美元"
@@ -15171,7 +15760,11 @@
               "label": "可无限量添加行"
             },
             {
-              "label": "长期借款"
+              "label": "长期借款",
+              "account_codes": [
+                "2501"
+              ],
+              "report_row_code": "BS-041"
             },
             {
               "label": "其中：美元"
@@ -16933,7 +17526,12 @@
           ],
           "rows": [
             {
-              "label": "营业收入"
+              "label": "营业收入",
+              "account_codes": [
+                "6001",
+                "6051"
+              ],
+              "report_row_code": "IS-001"
             },
             {
               "label": "其中：对外交易收入"
@@ -16945,7 +17543,12 @@
               "label": "其中：主营业务收入"
             },
             {
-              "label": "营业成本"
+              "label": "营业成本",
+              "account_codes": [
+                "6401",
+                "6402"
+              ],
+              "report_row_code": "IS-002"
             },
             {
               "label": "其中：主营业务成本"
@@ -16991,7 +17594,12 @@
           ],
           "rows": [
             {
-              "label": "营业收入"
+              "label": "营业收入",
+              "account_codes": [
+                "6001",
+                "6051"
+              ],
+              "report_row_code": "IS-001"
             },
             {
               "label": "其中：对外交易收入"
@@ -17003,7 +17611,12 @@
               "label": "其中：主营业务收入"
             },
             {
-              "label": "营业成本"
+              "label": "营业成本",
+              "account_codes": [
+                "6401",
+                "6402"
+              ],
+              "report_row_code": "IS-002"
             },
             {
               "label": "其中：主营业务成本"
@@ -17033,7 +17646,10 @@
               "label": "折旧和摊销以外的非现金费用"
             },
             {
-              "label": "资产减值损失"
+              "label": "资产减值损失",
+              "account_codes": [
+                "6702"
+              ]
             }
           ]
         },
@@ -18263,7 +18879,11 @@
               "label": "应收股利"
             },
             {
-              "label": "其他应收款"
+              "label": "其他应收款",
+              "account_codes": [
+                "1221"
+              ],
+              "report_row_code": "BS-007"
             },
             {
               "label": "合计",

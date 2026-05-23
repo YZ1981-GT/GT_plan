@@ -28,7 +28,8 @@ class TestSetRlsContext:
     """set_rls_context() 单元测试。"""
 
     async def test_sets_session_variable(self):
-        """应执行 SET LOCAL app.current_project_id。"""
+        """应执行 set_config 设置 app.current_project_id（PG 的 SET 命令不支持 prepared
+        statement 绑定参数，必须用 set_config 函数）。"""
         mock_session = AsyncMock(spec=AsyncSession)
         project_id = uuid4()
 
@@ -36,10 +37,12 @@ class TestSetRlsContext:
 
         mock_session.execute.assert_called_once()
         call_args = mock_session.execute.call_args
-        # 验证 SQL 文本包含 SET LOCAL
+        # 验证 SQL 文本包含 set_config
         sql_text = str(call_args[0][0])
-        assert "SET LOCAL" in sql_text
+        assert "set_config" in sql_text
         assert "app.current_project_id" in sql_text
+        # is_local=true（参数化中体现为 SQL 中的 true 字面量）
+        assert "true" in sql_text.lower()
 
     async def test_accepts_uuid(self):
         """应接受 UUID 类型的 project_id。"""
@@ -84,12 +87,12 @@ class TestRlsMigrationScript:
         assert r005.exists(), f"R005 回滚脚本不存在: {r005}"
 
     def test_v005_contains_all_tables(self):
-        """V005 应包含 5 张表的 RLS 启用语句。"""
+        """V005 应包含 4 张表的 RLS 启用语句（design.md F1：working_paper / adjustments / tb_balance / review_records，reports 不含因表名是 financial_report 且未启用 RLS）。"""
         from pathlib import Path
         v005 = Path(__file__).resolve().parent.parent / "migrations" / "V005__enable_rls.sql"
         content = v005.read_text(encoding="utf-8")
 
-        tables = ["working_paper", "adjustments", "tb_balance", "reports", "review_records"]
+        tables = ["working_paper", "adjustments", "tb_balance", "review_records"]
         for table in tables:
             assert f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY" in content, \
                 f"V005 缺少 {table} 的 RLS 启用语句"
@@ -158,12 +161,12 @@ class TestRequireProjectAccessRls:
 
         # admin 应设置 RLS context
         mock_db.execute.assert_called()
-        # 验证 SET LOCAL 被调用
+        # 验证 set_config 被调用（PG 的 SET 命令不支持参数化绑定，必须用 set_config）
         calls = mock_db.execute.call_args_list
-        set_local_found = any(
-            "SET LOCAL" in str(call[0][0]) for call in calls
+        set_config_found = any(
+            "set_config" in str(call[0][0]) for call in calls
         )
-        assert set_local_found, "require_project_access 应调用 SET LOCAL"
+        assert set_config_found, "require_project_access 应调用 set_config 设置 RLS context"
 
 
 # ---------------------------------------------------------------------------

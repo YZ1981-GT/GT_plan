@@ -70,4 +70,4 @@ export async function getItem(id: string) {
 - [ ] 前端 service 使用 apiPaths 常量（不硬编码）
 - [ ] `node scripts/dead-link-check.js` 通过
 - [ ] `npx vue-tsc --noEmit` 零错误
-- [ ] `docs/API_CHANGELOG.md` 已更新
+- [ ] `docs/reference/api-changelog.md` 已更新

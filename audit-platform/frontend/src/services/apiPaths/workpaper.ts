@@ -48,6 +48,8 @@ export const workpapers = {
   generateFromCodes: (pid: string) => `/api/projects/${pid}/working-papers/generate-from-codes`,
   wpMappingTsj: (pid: string, accountName: string) => `/api/projects/${pid}/wp-mapping/tsj/${encodeURIComponent(accountName)}`,
   versions: (wpId: string) => `/api/workpapers/${wpId}/versions`,
+  /** S-4 (proposal-remaining-18 task 5.4)：在底稿全部历史版本 parsed_data.cells 中模糊搜索值 */
+  searchVersions: (wpId: string) => `/api/working-papers/${wpId}/versions/search`,
   univerData: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/univer-data`,
   univerSave: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/univer-save`,
   exportPdf: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/export-pdf`,

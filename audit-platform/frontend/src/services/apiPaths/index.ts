@@ -42,7 +42,7 @@ export {
   governance, eqcr, signatures, rotation, archive, subsequentEvents,
   goingConcern, riskAssessments, auditPrograms, findings, managementLetter,
   linkage, linkageBus, conflictGuard, chainWorkflow, dataLock,
-  addressRegistry, customQuery, systemDicts,
+  addressRegistry, customQuery, systemDicts, adminLogs,
 } from './system'
 
 // ─── 聚合导出（便于 import { API } from '@/services/apiPaths'） ─────────────
@@ -82,7 +82,7 @@ import {
   governance, eqcr, signatures, rotation, archive, subsequentEvents,
   goingConcern, riskAssessments, auditPrograms, findings, managementLetter,
   linkage, linkageBus, conflictGuard, chainWorkflow, dataLock,
-  addressRegistry, customQuery, systemDicts,
+  addressRegistry, customQuery, systemDicts, adminLogs,
 } from './system'
 
 export const API = {
@@ -108,7 +108,7 @@ export const API = {
   presence, linkage, linkageBus, conflictGuard, chainWorkflow, projectConfig,
   noteLocks, dataLock, noteGroupTemplate, noteCustomSections,
   templateLibraryMgmt,
-  customQuery, systemDicts,
+  customQuery, systemDicts, adminLogs,
 } as const
 
 export default API

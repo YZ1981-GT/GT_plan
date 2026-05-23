@@ -19,10 +19,7 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 100   # 连接池最大溢出连接数（6000 并发优化）
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
-    REDIS_MODE: str = "single"  # single / sentinel
-    REDIS_SENTINEL_HOSTS: str = "localhost:26379,localhost:26380,localhost:26381"
-    REDIS_SENTINEL_SERVICE: str = "mymaster"
-    REDIS_MODE: str = "standalone"  # "standalone" | "sentinel"
+    REDIS_MODE: str = "single"  # "single"（默认） | "sentinel"（HA）
     REDIS_SENTINEL_HOSTS: str = "localhost:26379,localhost:26380,localhost:26381"
     REDIS_SENTINEL_SERVICE: str = "mymaster"
     # JWT

@@ -295,6 +295,9 @@ class WorkingPaper(Base):
     prefill_stale: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    # proposal-remaining-18 task 2.3 / L-3：上次 prefill 的 TB 快照
+    # {account_code: audited_amount}，用于检测 TB 变更触发 stale_since_last_prefill
+    prefill_tb_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     rejected_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True

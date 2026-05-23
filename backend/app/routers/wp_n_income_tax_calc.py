@@ -78,6 +78,75 @@ class IncomeTaxCalcResponse(BaseModel):
     )
     is_llm_stub: bool = Field(..., description="是否为 stub 模式（待 wp_ai_service 接入）")
     applied_to_sheet: str | None = None
+    # K-4 解释链字段（task 4.2 / ADR-6）
+    reasoning: str | None = None
+    references: list[dict] = Field(default_factory=list)
+    data_sources: list[str] = Field(default_factory=list)
+    confidence: float = 0.0
+
+
+def _build_n5_reasoning(
+    payload: "IncomeTaxCalcRequest",
+    result: dict[str, Any],
+    is_llm_stub: bool,
+) -> dict:
+    """N5 所得税费用测算推理链（task 4.2）"""
+    from app.services.llm_service import build_reasoning_chain
+
+    profit = payload.profit_before_tax
+    rate = payload.statutory_rate
+    current_tax = result.get("current_income_tax", 0.0)
+    deferred_tax = result.get("deferred_income_tax", 0.0)
+    total = result.get("total_income_tax", 0.0)
+    eff = result.get("effective_rate", 0.0)
+
+    perm_count = len(payload.permanent_differences or {})
+    temp_count = len(payload.temporary_differences or {})
+
+    parts = [
+        f"基于税率调节表方法测算所得税费用：",
+        f"利润总额 {profit:,.2f} 元，法定税率 {rate:.1%}，",
+        f"考虑 {perm_count} 项永久性差异 + {temp_count} 项暂时性差异，",
+        f"当期所得税 {current_tax:,.2f} 元，递延所得税 {deferred_tax:,.2f} 元，",
+        f"所得税合计 {total:,.2f} 元，有效税率 {eff:.2%}。",
+    ]
+    if is_llm_stub:
+        parts.append("（LLM 暂未启用，已降级为规则结果）")
+    reasoning = "".join(parts)
+
+    references = [
+        {"type": "CAS", "code": "CAS 18", "section": "所得税"},
+        {"type": "CAS", "code": "CAS 30", "section": "财务报表列报"},
+        {"type": "ISA", "code": "ISA 540", "section": "审计会计估计"},
+    ]
+
+    sources = [
+        "WP:N5:利润总额",
+        "WP:N5:法定税率",
+    ]
+    if perm_count:
+        sources.append("WP:N5:永久性差异")
+    if temp_count:
+        sources.append("WP:N5:暂时性差异")
+    if payload.deferred_tax_asset_change != 0:
+        sources.append("WP:N5:递延所得税资产变动")
+    if payload.deferred_tax_liability_change != 0:
+        sources.append("WP:N5:递延所得税负债变动")
+
+    base_conf = 0.85  # 所得税公式确定性高
+    reasoning, refs, srcs, conf = build_reasoning_chain(
+        reasoning=reasoning,
+        references=references,
+        data_sources=sources,
+        is_llm_stub=is_llm_stub,
+        base_confidence=base_conf,
+    )
+    return {
+        "reasoning": reasoning,
+        "references": refs,
+        "data_sources": srcs,
+        "confidence": conf,
+    }
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────

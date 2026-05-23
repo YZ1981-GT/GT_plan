@@ -2,7 +2,7 @@
 
 职责：
 - 与 `excel_parser.py`（openpyxl）行为等价，纯粹替换底层解析引擎。
-- 真实样本实测（见 `scripts/b3_calamine_smoke.py`）比 openpyxl 快 ~3.2-3.4×，
+- 真实样本实测比 openpyxl 快 ~3.2-3.4×（见 `scripts/b3_diag_yg2101.py` 大样本诊断），
   YG2101 128MB 从 76s → 22s。
 
 契约：

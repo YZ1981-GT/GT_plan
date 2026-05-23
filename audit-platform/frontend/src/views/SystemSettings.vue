@@ -3,48 +3,52 @@
     <GtPageHeader title="系统设置" :show-back="false">
       <template #actions>
         <el-switch
+          v-if="activeTab === 'basic'"
           v-model="expertMode"
           active-text="专家模式"
           inactive-text="简洁模式"
           size="small"
           style="margin-right: 12px"
         />
-        <el-button size="small" @click="checkHealth" :loading="healthLoading">
+        <el-button v-if="activeTab === 'basic'" size="small" @click="checkHealth" :loading="healthLoading">
           <el-icon><Monitor /></el-icon> 服务检测
         </el-button>
-        <el-button size="small" type="primary" @click="loadSettings" :loading="loading">
+        <el-button v-if="activeTab === 'basic'" size="small" type="primary" @click="loadSettings" :loading="loading">
           <el-icon><Refresh /></el-icon> 刷新
         </el-button>
       </template>
     </GtPageHeader>
 
-    <!-- 服务健康状态 -->
-    <div v-if="healthResults" class="gt-health-bar">
-      <span
-        v-for="(info, name) in healthResults"
-        :key="name"
-        class="gt-health-item"
-        :class="info.status === 'ok' ? 'gt-health-ok' : 'gt-health-err'"
-        :title="info.error || info.url || ''"
-      >
-        <span class="gt-health-dot" />
-        {{ name }}
-      </span>
-    </div>
+    <el-tabs v-model="activeTab" class="gt-settings-tabs">
+      <!-- ═══ Tab 1: 基础设置（所有用户可见） ═══ -->
+      <el-tab-pane label="基础设置" name="basic">
+        <!-- 服务健康状态 -->
+        <div v-if="healthResults" class="gt-health-bar">
+          <span
+            v-for="(info, name) in healthResults"
+            :key="name"
+            class="gt-health-item"
+            :class="info.status === 'ok' ? 'gt-health-ok' : 'gt-health-err'"
+            :title="info.error || info.url || ''"
+          >
+            <span class="gt-health-dot" />
+            {{ name }}
+          </span>
+        </div>
 
-    <!-- JWT 安全警告 -->
-    <el-alert
-      v-if="!jwtSecure && expertMode"
-      title="JWT 密钥不安全"
-      description="当前使用默认弱密钥，生产环境请在 .env 中设置至少 16 字符的强随机密钥"
-      type="warning"
-      show-icon
-      :closable="false"
-      style="margin-bottom: 16px"
-    />
+        <!-- JWT 安全警告 -->
+        <el-alert
+          v-if="!jwtSecure && expertMode"
+          title="JWT 密钥不安全"
+          description="当前使用默认弱密钥，生产环境请在 .env 中设置至少 16 字符的强随机密钥"
+          type="warning"
+          show-icon
+          :closable="false"
+          style="margin-bottom: 16px"
+        />
 
-    <!-- 双栏主体：左侧配置 + 右侧说明 -->
-    <div v-if="!loading" class="gt-settings-body">
+        <!-- 双栏主体：左侧配置 + 右侧说明 -->
+        <div v-if="!loading" class="gt-settings-body">
       <!-- 左侧：配置列表 -->
       <div class="gt-settings-left">
         <el-collapse v-model="expandedGroups">
@@ -140,6 +144,18 @@
       <el-icon class="is-loading" :size="32"><Loading /></el-icon>
       <p style="color: var(--gt-color-text-tertiary); margin-top: 12px">加载配置中...</p>
     </div>
+      </el-tab-pane>
+
+      <!-- ═══ Tab 2: 枚举管理（仅 admin） ═══ -->
+      <el-tab-pane v-if="isAdmin" label="枚举管理" name="enum-dict">
+        <EnumDictManager v-if="activeTab === 'enum-dict'" />
+      </el-tab-pane>
+
+      <!-- ═══ Tab 3: 日志查看（仅 admin，MT-8） ═══ -->
+      <el-tab-pane v-if="isAdmin" label="日志查看" name="logs">
+        <LogViewerPanel v-if="activeTab === 'logs'" />
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
@@ -149,6 +165,14 @@ import { ElMessage } from 'element-plus'
 import { Monitor, Refresh, Edit, Loading, InfoFilled } from '@element-plus/icons-vue'
 import { getSystemSettings, updateSystemSetting, getSystemHealth } from '@/services/commonApi'
 import { handleApiError } from '@/utils/errorHandler'
+import { useAuthStore } from '@/stores/auth'
+import EnumDictManager from '@/components/system/EnumDictManager.vue'
+import LogViewerPanel from '@/components/system/LogViewerPanel.vue'
+
+const authStore = useAuthStore()
+const isAdmin = computed(() => (authStore.user?.role || '') === 'admin')
+
+const activeTab = ref<'basic' | 'enum-dict' | 'logs'>('basic')
 
 const loading = ref(false)
 const saving = ref(false)

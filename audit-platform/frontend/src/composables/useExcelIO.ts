@@ -7,12 +7,190 @@
  *   parseFile(file, options)                       — 解析上传的 Excel 文件，返回行数组
  *   onFileSelected(event, callback)                — 处理 file input change 事件
  *
- * 全部使用 dynamic import('xlsx') 实现代码分割。
+ * 库选择（2026-05-22 升级，task 3.2 / C-2 真实生效）：
+ *   导出（exportTemplate / exportData）：用 `xlsx-js-style@1.2.0` 写入完整 cell.s 样式
+ *     （仿宋_GB2312 / Arial Narrow / 三线表边框；社区版 xlsx 不序列化 cell.s）
+ *   解析（parseFile）：继续用 `xlsx@0.18.5`（解析无需样式，零额外依赖体积）
+ *
+ *   API 100% 兼容（xlsx-js-style 是 xlsx 的 fork），`book_new` / `aoa_to_sheet` /
+ *   `writeFile` / `utils.encode_cell` 行为一致；其余 18 处 `import('xlsx')` 调用
+ *   不动（只读 + 不写样式 = 用社区版即可）。
  */
 
 import { ElMessage } from 'element-plus'
 
+/**
+ * 加载 xlsx-js-style 并兼容 CJS/ESM 互操作
+ *
+ * xlsx-js-style 是 CommonJS 模块，Vite 在 dev 模式下 `await import()` 返回
+ * `{ default: 实际模块, utils: ..., ... }` 的 namespace 对象；
+ * 部分构建器/Node 环境下又只有 `{ default: 实际模块 }` 形式。
+ * 取 `mod.utils ?? mod.default?.utils` 都能命中。
+ */
+async function _loadXlsxStyle(): Promise<any> {
+  const mod: any = await import('xlsx-js-style')
+  // 优先用 namespace 顶层（Vite dev 模式）；否则解 default
+  if (mod && mod.utils) return mod
+  if (mod && mod.default && mod.default.utils) return mod.default
+  return mod
+}
+
+async function _loadXlsxPlain(): Promise<any> {
+  const mod: any = await import('xlsx')
+  if (mod && mod.utils) return mod
+  if (mod && mod.default && mod.default.utils) return mod.default
+  return mod
+}
+
 /* ── 类型定义 ── */
+
+/* ─── task 3.2 / C-2: 样式模板辅助函数 ─── */
+
+/**
+ * 计算字符串可视宽度（CJK 字符算 2，其余算 1），适用于 Excel 列宽自适应。
+ */
+export function computeColumnWidth(header: string, values: any[]): number {
+  const visualWidth = (s: string): number => {
+    let w = 0
+    for (const ch of s) {
+      const code = ch.codePointAt(0) || 0
+      // CJK + 全角范围
+      if (
+        (code >= 0x4e00 && code <= 0x9fff) ||
+        (code >= 0x3000 && code <= 0x303f) ||
+        (code >= 0xff00 && code <= 0xffef)
+      ) {
+        w += 2
+      } else {
+        w += 1
+      }
+    }
+    return w
+  }
+  let maxW = visualWidth(String(header || ''))
+  for (const v of values) {
+    if (v == null || v === '') continue
+    const w = visualWidth(String(v))
+    if (w > maxW) maxW = w
+  }
+  return Math.min(60, Math.max(8, maxW + 2))
+}
+
+/**
+ * 判定列是否为数字列（≥80% 非空值为有限数字）
+ */
+export function isNumericColumn(values: any[]): boolean {
+  let nonEmpty = 0
+  let numeric = 0
+  for (const v of values) {
+    if (v == null || v === '') continue
+    nonEmpty++
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      numeric++
+    } else if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) {
+      numeric++
+    }
+  }
+  if (nonEmpty === 0) return false
+  return numeric / nonEmpty >= 0.8
+}
+
+const _STYLE_CHINESE_FONT = '仿宋_GB2312'
+const _STYLE_NUMERIC_FONT = 'Arial Narrow'
+const _STYLE_HEADER_SIZE = 11
+const _STYLE_BODY_SIZE = 10
+const _STYLE_TOP = { style: 'medium' as const, color: { rgb: '000000' } }
+const _STYLE_MID = { style: 'thin' as const, color: { rgb: '000000' } }
+const _STYLE_BOTTOM = { style: 'medium' as const, color: { rgb: '000000' } }
+
+function _setCellStyle(ws: any, r: number, c: number, style: any, XLSX: any): void {
+  const addr = XLSX.utils.encode_cell({ r, c })
+  if (!ws[addr]) return
+  ws[addr].s = { ...(ws[addr].s || {}), ...style }
+}
+
+/**
+ * 应用 task 3.2 / C-2 样式模板（仿宋_GB2312 + Arial Narrow + 三线表 + 列宽自适应）
+ *
+ * @param opts.dataEndRowIdx 含；无数据行时传 -1
+ */
+export function applyExcelStyleTemplate(
+  ws: any,
+  XLSX: any,
+  opts: {
+    headerRowIdx: number
+    dataStartRowIdx: number
+    dataEndRowIdx: number
+    columns: ExcelColumn[]
+    dataMatrix: any[][]
+    numericColumnKeys?: string[]
+  },
+): void {
+  const { headerRowIdx, dataStartRowIdx, dataEndRowIdx, columns, dataMatrix, numericColumnKeys } = opts
+  const explicitNumeric = new Set(numericColumnKeys || [])
+
+  // 列宽 + 数字列检测
+  const cols: Array<{ wch: number }> = []
+  const colIsNumeric: boolean[] = []
+  for (let c = 0; c < columns.length; c++) {
+    const colDef = columns[c]
+    const colVals = dataMatrix.map(row => row?.[c])
+    const wch =
+      colDef.width != null && colDef.width > 0
+        ? colDef.width
+        : computeColumnWidth(colDef.header || '', colVals)
+    cols.push({ wch })
+    colIsNumeric.push(explicitNumeric.has(colDef.key) || isNumericColumn(colVals))
+  }
+  ws['!cols'] = cols
+
+  // 表头：仿宋加粗 + medium top + thin bottom
+  for (let c = 0; c < columns.length; c++) {
+    _setCellStyle(
+      ws,
+      headerRowIdx,
+      c,
+      {
+        font: { name: _STYLE_CHINESE_FONT, sz: _STYLE_HEADER_SIZE, bold: true },
+        alignment: { horizontal: 'center', vertical: 'middle' },
+        border: { top: _STYLE_TOP, bottom: _STYLE_MID },
+      },
+      XLSX,
+    )
+  }
+
+  // 数据行
+  if (dataEndRowIdx >= dataStartRowIdx) {
+    for (let r = dataStartRowIdx; r <= dataEndRowIdx; r++) {
+      for (let c = 0; c < columns.length; c++) {
+        const isLast = r === dataEndRowIdx
+        const fontName = colIsNumeric[c] ? _STYLE_NUMERIC_FONT : _STYLE_CHINESE_FONT
+        const style: any = {
+          font: { name: fontName, sz: _STYLE_BODY_SIZE },
+          alignment: {
+            horizontal: colIsNumeric[c] ? 'right' : 'left',
+            vertical: 'middle',
+          },
+        }
+        if (isLast) style.border = { bottom: _STYLE_BOTTOM }
+        _setCellStyle(ws, r, c, style, XLSX)
+      }
+    }
+  } else {
+    // 无数据行：表头同时承担三线表上+下边框
+    for (let c = 0; c < columns.length; c++) {
+      _setCellStyle(
+        ws,
+        headerRowIdx,
+        c,
+        { border: { top: _STYLE_TOP, bottom: _STYLE_BOTTOM } },
+        XLSX,
+      )
+    }
+  }
+}
+
+/* ── 列定义 ── */
 
 /** 列定义 */
 export interface ExcelColumn {
@@ -52,6 +230,10 @@ export interface ExportTemplateOptions {
   existingData?: any[][]
   /** 是否包含说明行（第二行，列 note） */
   includeNoteRow?: boolean
+  /** 是否应用样式模板（task 3.2 / C-2，默认 true） */
+  applyStyles?: boolean
+  /** 显式指定数字列 key（不指定则按 ≥80% 数字值自动检测） */
+  numericColumnKeys?: string[]
 }
 
 /** 数据导出选项 */
@@ -68,6 +250,10 @@ export interface ExportDataOptions {
   extraHeaders?: string[]
   /** 额外列的数据提取函数 */
   extraDataFn?: (row: Record<string, any>) => any[]
+  /** 是否应用样式模板（task 3.2 / C-2，默认 true） */
+  applyStyles?: boolean
+  /** 显式指定数字列 key */
+  numericColumnKeys?: string[]
 }
 
 /** 文件解析选项 */
@@ -96,7 +282,8 @@ export interface ParseResult<T = Record<string, any>> {
  * 导出模板（含表头+说明+示例）
  */
 export async function exportTemplate(options: ExportTemplateOptions): Promise<void> {
-  const XLSX = await import('xlsx')
+  // task 3.2 / C-2: 导出走 xlsx-js-style 写入 cell.s 样式
+  const XLSX = await _loadXlsxStyle()
   const wb = XLSX.utils.book_new()
   const {
     columns,
@@ -110,6 +297,8 @@ export async function exportTemplate(options: ExportTemplateOptions): Promise<vo
     exampleRows,
     existingData,
     includeNoteRow = true,
+    applyStyles = true,
+    numericColumnKeys,
   } = options
 
   // ── 填写说明 sheet（可选） ──
@@ -138,31 +327,53 @@ export async function exportTemplate(options: ExportTemplateOptions): Promise<vo
 
   // ── 数据填写 sheet ──
   const allRows: any[][] = []
+  let curIdx = 0
 
   // 分类行（可选）
   if (categoryRow) {
     allRows.push(categoryRow)
+    curIdx++
   }
 
   // 说明行（可选）
   if (includeNoteRow) {
     allRows.push(columns.map(c => c.note || ''))
+    curIdx++
   }
 
   // 表头行
+  const headerRowIdx = curIdx
   allRows.push(columns.map(c => c.header))
+  curIdx++
 
   // 数据行：优先使用现有数据，否则使用示例行
+  const dataStartRowIdx = curIdx
+  let dataMatrix: any[][] = []
   if (existingData && existingData.length > 0) {
     allRows.push(...existingData)
+    dataMatrix = existingData
   } else if (exampleRows && exampleRows.length > 0) {
     allRows.push(...exampleRows)
+    dataMatrix = exampleRows
   }
+  const dataEndRowIdx = dataStartRowIdx + dataMatrix.length - 1
 
   const wsData = XLSX.utils.aoa_to_sheet(allRows)
-  wsData['!cols'] = columns.map(c => ({
-    wch: c.width || Math.max(c.header.length * 2.5, 14),
-  }))
+
+  if (applyStyles) {
+    applyExcelStyleTemplate(wsData, XLSX, {
+      headerRowIdx,
+      dataStartRowIdx,
+      dataEndRowIdx,
+      columns,
+      dataMatrix,
+      numericColumnKeys,
+    })
+  } else {
+    wsData['!cols'] = columns.map(c => ({
+      wch: c.width || Math.max(c.header.length * 2.5, 14),
+    }))
+  }
 
   if (categoryMerges) {
     wsData['!merges'] = categoryMerges
@@ -177,7 +388,8 @@ export async function exportTemplate(options: ExportTemplateOptions): Promise<vo
  * 导出数据到 Excel
  */
 export async function exportData(options: ExportDataOptions): Promise<void> {
-  const XLSX = await import('xlsx')
+  // task 3.2 / C-2: 导出走 xlsx-js-style 写入 cell.s 样式
+  const XLSX = await _loadXlsxStyle()
   const wb = XLSX.utils.book_new()
   const {
     data,
@@ -186,6 +398,8 @@ export async function exportData(options: ExportDataOptions): Promise<void> {
     fileName,
     extraHeaders,
     extraDataFn,
+    applyStyles = true,
+    numericColumnKeys,
   } = options
 
   const headers = columns.map(c => c.header)
@@ -202,9 +416,25 @@ export async function exportData(options: ExportDataOptions): Promise<void> {
   })
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = headers.map(h => ({
-    wch: Math.max(h.length * 2.5, 14),
-  }))
+
+  if (applyStyles) {
+    const fullCols: ExcelColumn[] = [
+      ...columns,
+      ...(extraHeaders || []).map(h => ({ key: `__extra_${h}`, header: h })),
+    ]
+    applyExcelStyleTemplate(ws, XLSX, {
+      headerRowIdx: 0,
+      dataStartRowIdx: 1,
+      dataEndRowIdx: dataRows.length,
+      columns: fullCols,
+      dataMatrix: dataRows,
+      numericColumnKeys,
+    })
+  } else {
+    ws['!cols'] = headers.map(h => ({
+      wch: Math.max(h.length * 2.5, 14),
+    }))
+  }
 
   XLSX.utils.book_append_sheet(wb, ws, sheetName)
   XLSX.writeFile(wb, fileName)
@@ -220,7 +450,7 @@ export async function parseFile(
   file: File,
   options: ParseFileOptions = {},
 ): Promise<ParseResult> {
-  const XLSX = await import('xlsx')
+  const XLSX = await _loadXlsxPlain()
   const {
     sheetName = '数据填写',
     skipRows = 1,

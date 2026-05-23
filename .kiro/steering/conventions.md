@@ -442,3 +442,193 @@ WHERE l.project_id = :pid AND l.year = :yr
 
 ### 占位 Spec README 模板（17 章）
 一为什么做 / 二真实结构 / 三总控台拆解 / 四审定表公式拓扑 / 五优化方向 / 六范围边界 / 七启动条件 / 八UAT清单 / 九技术债 / 十风险缓解 / 十一差异说明 / 十二启动建议 / 十三工时估算 / 十四范围边界做不做 / 十五风险与缓解 / 十六修订记录 / 十七后续启动建议
+
+
+## §测试与 PBT 铁律（2026-05 沉淀）
+
+### PBT 设计
+- **避免恒真断言（tautology）**：测 `(p and X<C) or (not p and X>=C)` 当 `p := X<C` 时是恒真断言，毫无业务价值；正确做法用业务不变量（恒等点/边界内/边界外/对称性/单调性）+ parametrize 显式边界用例覆盖
+- **PBT 量化精度**：被测函数若内部 quantize 到 N 位小数，property 用极小 delta 会因量化损失等值，严格单调性会失败；正确做法 = ①property 改为非严格（`>=`，量化容忍）+ ②独立 property 在更"原始"字段（如 amount_change，未量化或量化损失更小）上验证严格单调
+- **PBT 阈值边界严格不等式陷阱**：源码用 `if rate < -THRESHOLD` 严格不等式时，恰好 ±THRESHOLD 整点归 normal 而非 anomaly；parametrize 边界用例必须仔细对照源码不等号严格性（≤/< 区别）
+- **VR 三角勾稽 PBT 模板**：避免恒真断言用 drift ∈ [-2,2] 区间生成 closing = expected + drift，业务不变量 `passes ↔ |drift| < tolerance`；boundary 用 parametrize 显式覆盖临界点（drift=0/±0.99/±1.0/±1.5）；金额用 `st.floats(0, 1e9)` + 后转 Decimal 避免极端值异常
+- **PBT 策略选择**：用 `st.floats` + 后转 Decimal 验证（hypothesis 对 float shrinking 成熟 + 生成快 10x），不要直接用 `st.decimals`（慢且 shrinking 不成熟）
+- **PBT 已注册 vs 未注册 prefix 必须分开测**：`_ensure_ipo_loaded` 对未注册 prefix 返回降级 errors 而非 []；用 `st.text().filter(lambda s: s.upper() not in REGISTERED)` 拆出独立 property 验证降级行为
+- **optional PBT task 跳过必须注明**：spec 起草时把 PBT 列为 `[ ]*` 但实施时跳过，形成"显式列出但隐式跳过"的偏差；跳过决策（实施/等价 case 覆盖/性价比不足）须在 spec 末尾"已知缺口"段落留一句话注明
+
+### pytest 输出与运行
+- **pytest 输出捕获铁律**：①PowerShell `2>&1 | Tee-Object` 在长时输出 + 并发情况下会出现"文件被锁"+ 静默丢失输出；正确方法 = `cmd /c "python -m pytest ... > _log 2>&1"` 然后 `Get-Content _log -Tail N` 分两步 ②本仓库未装 `pytest-timeout` 插件（`--timeout=60` 报错 unrecognized arguments）③测试代码用 `Path("backend/data")` 相对路径时必须从仓库根 cwd 跑（不能在 backend/ cwd 跑）
+
+### 跨 spec ref_id 铁律
+- **跨 spec 引擎复用 term 参数标准模式**（H→I 落地）：H-F11 折旧引擎 `_calc_*(*, term: Literal['depreciation','amortization'] = 'depreciation')` 默认值保持向后兼容；I-F2 摊销引擎调用时显式传 `term='amortization'`；schedule 输出字段名按 term 切换；写回时直接读取 `s["amortization"]` 不需手动改名兼容
+- **跨 spec ref_id 区间过滤铁律**：单边 `int(...) >= N` 过滤会被后续 spec 新条目污染；正确做法 = 双重过滤 `(N_lo <= ref_id <= N_hi) AND cycle_membership(source_wp.startswith(L) OR target_wp.startswith(L))`；test_cross_spec_ref_id_ranges.py 含 SingleSidedFilterDetection 自动扫描全仓 cross_wp_refs tests 检测违规；闭区间已对齐：F 176-210 / H 211-242 / I 243-266
+- **CWR severity 三级语义**：blocking = 阻断签字 / warning = stale 标记 + 提示用户 / info = 仅披露引用不影响流程；新增 CWR 时 info 占比应 < 25%
+- **CWR blocking 比例由业务性质决定**：N 循环 blocking 占比 42% (5/12) 显著高于 M 循环 7% (1/15)，因 N→报表/N→税金内部联动错误均阻断签字；不应套用统一 blocking 阈值
+
+## §UAT 标注铁律
+
+- **形式合规但用户不可达 UAT 标注**：UAT 标 ✓ 必须验证"用户在 UI 层实际能触达功能"，不能仅基于"组件文件存在 + 后端单测全绿"；前端 Dialog 类组件必须**同时**满足：①组件创建 ②WorkpaperEditor 集成（toolbar 按钮 / 右键菜单 / sheet 顶部入口）③vitest 覆盖 buildBody/formatRate/flag 映射；缺任一项应标 ⚠ partial 而非 ✓
+- **UAT 分级铁律**：标 ✓ pass 必须"功能在用户层可用"，stub/占位实现一律标 ⚠ stub，部分实现标 ⚠ partial；不要一律 ✓ 误导上线决策
+- **程序化 UAT 验收方法**：写一次性脚本 `_uat_check.py` 跑量化指标（sheet 数 / cells / cross_wp_ref 数 / VR 规则数 / 4-arg AUX 校验等）+ 复用已有 pytest/vitest 断言 + 代码锚定核验，按 N 项验收一次输出全部 ✓/⚠/✗ 分级；脚本用完即删；比手动 UAT 快 10x，但仅适用于"可量化"指标
+- **UAT 数量指标语义**——总数 vs 新增段：spec UAT "≥ N 条"类指标默认是"总条目数"（含基线 + 新增）；闭区间过滤仅用于"新增段"度量，绝对不能替代总数核验
+- **UAT P 列优先级标注**：F spec 缺失（仅备注 P0 #1/#2/#3），H spec v1.2 升级为表格 P 列；P0 项数 = 关键架构改动数 × 2~3
+- **真实 UAT 验收暴露价值铁律**（partner-dashboard 实战）：单元测试 100% + memory 记录"20/20 tasks ✅"不等于"用户层可用"；类似"组件已建但没在视图中接进来" / "状态没持久化导致 reload 后逻辑失效"等 bug 只能用 playwright 真实数据 UAT 暴露
+
+## §sub-agent 协作铁律
+
+- **sub-agent 沙箱伪绿铁律**：sub-agent 报告"task 完成 + N/N 测试全绿"必须在主 agent 跑一次原仓库测试做真实验证；防御机制 = ①每个子代理 task 完成后主 agent 执行 `python -c "import; getattr"` 锚定核验关键符号 ②sub-agent 报告"全绿"后主 agent 重跑相关测试文件 ③大 spec 完成后做"伪绿系统性盘点"
+- **sub-agent overload 直接执行降级**：sub-agent 反复 high load 时不要重试浪费 turn，直接在主 agent 执行 task；批量委托建议每批 4-5 task，单 task 不值得委托
+- **sub-agent 高负载降级硬规则**：sub-agent 报 "high load" 时**只重试 1 次**，第二次失败立刻在 main agent 直接执行（保持进度），不要反复重试浪费 turn
+
+## §spec 工作流铁律
+
+- **二轮复盘"形式 vs 实质"自查铁律**：Sprint 4 P0/P1/P2 修复完成后必须再做"形式合规但本质未到位"自查；典型隐患：①stub 标志硬编码 ②CWR severity 偏松 ③LLM summary 文案模板写死（无变量插值）④隐式覆盖（PBT 跳过的"等价覆盖"未形式化证明）
+- **复盘"形式 vs 实质"原则**：spec 完成后必须做"复盘 → 找出形式合规但本质未到位 → 列 P0/P1/P2 修复轮 → 修完再标 ✓"循环
+- **复盘核验"先实测再修复"铁律**：复盘怀疑某项不达标时必须先 grep 现状 + 跑核验脚本实测，再决定是否写补丁脚本；I3-2/I2-6/I1-10+I1-11 prefill 复盘前以为各 4/0/10 cells，实测发现 Sprint 2 实施时已 9/4/14 cells 全部超原始目标，UAT 表过时未更新形成 partial 假象
+- **partial 项必须独立追踪铁律**：spec 完成后 ⚠ partial 项必须升级到 INDEX.md 或独立 backlog 入 P0/P1/P2 队列，不能仅以"task 5.x 已完成 + 已知限制 X"形式埋在 spec 文档内
+- **spec 父任务标 `[ ]` 但子任务全 `[x]` 不视为未完成**：spec-task-execution 子代理只标更新子任务勾选，父任务标记常被忽略；判定 spec 完成度应基于"叶子任务全 `[x]`"而非父任务标记
+- **memory 中"转季度迭代/延后/未覆盖"表述定期实测核验**：早期复盘记录"剩余 N 项延后"在后续 spec 实施完成后会变成假象；问"还有什么剩余"前必须 grep tasks.md 实测每项当前状态
+- **task 标 [x] 铁律**：只有跑过 pytest/vitest 且全绿才能标 [x]；"假设复用已有逻辑 = 0 改动"不等于验证通过
+- **大 spec 拆分铁律**：把异质度极大的 N 项功能塞进单 spec 会导致 30/30 标 ✓ 假象 + 复盘工作量 = N × 单 spec 复盘；判定信号：spec 内 ADR 数 ≥ 6 且彼此无依赖时一定要拆
+- **router_registry 注册必须验证铁律**：新建 router 必须有对应 `test_router_registered_in_*` 测试 + 主 agent 跑通验证 §N 字符串
+
+## §migration / SQL 铁律
+
+- **migration_runner SQL 限制**：使用 SQLAlchemy text() 执行，不支持 `DO $$...$$` PL/pgSQL 块（`$$` 被解析为绑定参数）；所有迁移必须用纯 SQL 语句（ALTER TABLE IF NOT EXISTS / CREATE INDEX IF NOT EXISTS / ALTER TYPE ADD VALUE IF NOT EXISTS）
+- **迁移文件位置**：必须放 `backend/migrations/`（migration_runner 读取此目录），从 alembic/versions/ 写后必须复制
+- **模型字段无迁移补救**：当 task 仅在 ORM 模型加 JSONB 字段但未配套 V0XX 迁移时，SQLAlchemy server-side `Mapped` 默认值不会触发 ALTER TABLE；必须手动补迁移
+
+## §通用代码模式
+
+- **变量名与 FastAPI Query 参数名冲突陷阱**：函数签名 `sheets: str | None = Query(None)` 后函数体内不能再用 `sheets: dict = {}`（参数会立即被覆盖丢失），必须重命名内部变量；同款适用所有"参数名 = 短变量名"场景（rows / cols / data 等）
+- **xlsx-js-style CJS/ESM 互操作**：`await import('xlsx-js-style')` 在不同环境返回 `{utils, writeFile, ...}` 或 `{default: 实际模块}`；用 helper `_loadXlsxStyle()` 优先取 `mod.utils` 顶层、否则解 `mod.default.utils`
+- **LibreOffice 路径 fallback 铁律**：Windows winget 安装的 LibreOffice 默认不加 PATH（`C:\Program Files\LibreOffice\program\soffice.exe`）；任何依赖外部命令行工具的服务必须 4 路径 fallback：①shutil.which ②env 变量显式覆盖 ③Windows 默认 ④macOS Homebrew Cask ⑤Linux 包管理器路径
+- **EventBus.broadcast_raw 模式**：进程内事件总线轻量级广播 API（不走完整 publish dispatch / 不入 debounce / 仅写 Redis Stream + log）；适用于不需要 EventPayload schema 的场景
+- **API 写回联动模式**：后端 endpoint 加 `apply_to_sheet: str | None`，写入 `working_paper.parsed_data.{namespace}[sheet]={method/applied_at/data}`；前端弹窗加 `targetSheet` prop + 「采纳并写回」按钮 + emit `applied` 事件
+- **配置驱动型 stub 测试模式**：用 `monkeypatch.setattr(settings, "WP_AI_SERVICE_ENABLED", False/True)` 切换两态，验证 endpoint 响应字段 `is_llm_stub` 同步切换 + summary 文案条件分支正确
+- **WorkingPaper 模型 wp_code 在 WpIndex 上不在主表**：按 wp_code 查询底稿必须 `select(WorkingPaper).join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id).where(WpIndex.wp_code == wp_code)`
+- **build_reasoning_chain 公共构造器模式**：`app.services.llm_service.build_reasoning_chain(reasoning, references, data_sources, is_llm_stub, base_confidence)` 返回 4-tuple；is_llm_stub=True → confidence 强制 0.0 / False → clamp(base_confidence, 0.0, 1.0)；6 个 stub endpoint 共用此 helper 防文案漂移
+- **stub 标志铁律**：API 返回字段如 `is_llm_stub` 不能写死 True/False，应由 `settings.WP_AI_SERVICE_ENABLED` 类配置驱动
+
+## §K 循环 sheet 分类与正则陷阱
+
+- **K 循环 sheet 分类优先级**：10 类规则中"费用明细" priority=3 前置于"明细表" priority=4，专门匹配 `^明细表K[89]-`（K8-2/K9-2 销售/管理费用月度明细）；"往来款检查" priority=6 仅匹配 K1-/K3- 含业务关键词
+- **正则 negative lookbehind 防误命中**：sheet 名 `会计提示` 的"计提"二字会被通用"计提"规则误命中检查表，用 `(?<!会)计提` 排除前缀为"会"的情况
+- **附注披露 5 种括号变体**：`附注披露信息(上市公司)` / `(国企)` / `（上市公司）` / `（国企）` / `（国有企业）` 5 种全角/半角括号 + 双称呼组合
+- **真实 sheet 名末尾空格陷阱**：openpyxl 读 J1 模板发现 `审定表J1-1 ` 末尾带空格，prefill cell 的 `sheet` 字段必须包含真实空格；spec 起草时 sheet 名核对必须用 `repr(name)` 输出避免肉眼漏看
+
+## §Frontend UI 路由与导航
+
+- **首页快捷区盘点铁律**：新功能上线后 Dashboard.vue `quickActions` 数组必须同步追加快捷入口；判定信号：所有"全局功能"（无 :projectId 前缀的路由）必须同时出现在①Dashboard quickActions ②ThreeColumnLayout FALLBACK_NAV 或 sidebar tools 簇；缺一不可
+- **路由可达性核验铁律**：vue-router 子路由 `path: 'xxx'`（无前导 `/`）在父路由 `path: '/'` 下最终 URL 是 `/xxx` 是合法的；防御脚本 = grep ThreeColumnLayout 所有 `path: '/xxx'` + `@click="router.push('/xxx')"` 集合，与 router/index.ts 全部 `path: '...'` 集合做差集
+- **node 跳转 routeMap 实施前必须 grep router 验证**：图省事猜路由 name 可能整片失效，必须 ① grep router/index.ts 验证 name 存在 ② grep 路由 path 验证是否需要 projectId 参数 ③ 区分"模块名"与"实际是底稿 wp_code"
+
+
+## §可复用架构模式（2026-05-22 沉淀）
+
+### DT-3 方案 B：DB-backed 重构的混合替代方案
+
+枚举字典/配置项类需求要支持"在线修改"但不能完整 DB 化（value 与代码引用绑定）时：
+- value 字段（与代码 enum 绑定）锁定，POST/DELETE on `/items` 仍返 405
+- 仅"展示属性"（label/color/desc）允许 DB 覆盖：新建 `*_overrides` 表 PK=(key, value) 仅存 `*_override` 字段（NULL=用代码默认）
+- GET 端点合并代码默认 + DB 覆盖（覆盖优先）
+- PUT 端点 admin only，校验 (dict_key, value) 必须存在于代码 _DICTS（防新增）
+- DELETE `/items/{value}/override` 子路径清除覆盖恢复默认（独立路径与"删除 value"区分）
+
+### S-3 v2：声明式 JOIN 白名单
+
+高级查询构建器/DSL 类要支持 JOIN 但不能接受任意 ON 条件时：
+- 预登记 `JOIN_WHITELIST: dict[base_table, dict[target_table, {on: [(left_col, right_col), ...]}]]`
+- DSL 仅接受 `joins: [{table: str, type: 'inner'|'left'}]`，不接 ON 表达式
+- 字段引用双段语法 `table.field`，校验 table 必须 ∈ (base ∪ joins)
+- 单段语法（如 `audited_amount`）默认从 base_table 解析（向后兼容）
+- 新增 JOIN 关系走代码 PR 而非用户输入
+
+### DSL 类型 coerce（query_builder 实战）
+
+DSL endpoint 接受 user JSON 时，filter value 必须按列类型 coerce 否则 SQLAlchemy 报奇怪错误：
+- `_coerce_value(col, value)` helper：用 `col.type.python_type` 决定目标类型
+- UUID 列 + str value → `uuid.UUID(value)`，非法字符串返 400 INVALID_UUID（避免 SQLAlchemy 抛 `'str' object has no attribute 'hex'`）
+- Decimal/Date/DateTime/Bool 同款，str 输入按 ISO 8601 / Python 标准转换
+- in/between 操作符的 list 内每元素都要 coerce
+- like/not_like 不 coerce（强制字符串语义）
+- is_null/is_not_null 忽略 value
+
+### 版本管理双契约模式（AT-3 实战）
+
+attachments / KnowledgeDocument 类版本链 service 同时支持两种调用契约：
+- 契约 A：`(attachment_id, version_id)` — 通过实例 id 反查链 + 跨链拒绝校验（version_id 必须与 attachment_id 同 chain key）
+- 契约 B：`(project_id/folder_id, name, target_version)` — 显式定位
+- list_versions 同款双契约（仅传 attachment_id 反查 vs 显式 project_id+name）
+- chain key = (project_id, reference_id, reference_type, file_name) 或 (folder_id, name)
+- 旧版本不真删（is_deleted=false 保留），rollback 创建 version=N+1 + previous_version_id 指向当前最新
+- 测试必须两种契约都覆盖（部分前端代码用 A，部分用 B）
+
+### service 层"DB+ORM+service"三层一致校验
+
+子代理或人工实施"加字段/加方法"类任务时，必须 grep 三层是否一致：
+- ①DB 迁移文件（V0XX.sql 或 alembic version 文件）
+- ②ORM 模型 `Mapped[]` 字段
+- ③service 方法（含 list/rollback/get 等）
+
+任一层缺失即伪绿。AT-3 实战中 V014 迁移已写但 Attachment 模型 + service 都没补，pytest 设施齐备反而掩盖缺陷（fixture create_all 自动建表）。
+
+## §PG / 运维操作铁律（2026-05-23 ledger-import-view-refactor 9.8/9.9/9.10 沉淀）
+
+### PG SET 命令不支持 prepared statement 绑定参数
+
+`SET LOCAL app.current_project_id = :pid` 会被 PG 拒绝。必须用 `SELECT set_config('app.current_project_id', :pid, true)` 函数等价；session 级（`is_local=false`）/ tx 级（`is_local=true`）由第三参数控制。set_rls_context 等场景一律走 set_config。
+
+### PG superuser 永远 bypass RLS
+
+dev 用 postgres 直连测不到 RLS 隔离效果（PG 永远 bypass superuser）。生产部署必须用独立 app role（无 SUPERUSER 无 BYPASSRLS）。canary 验证脚本里要 grep `current_user` 确认非 superuser，否则 RLS POLICY 等于没启用。
+
+### CONCURRENTLY 不能在事务内（含 SQLAlchemy AUTOCOMMIT）
+
+SQLAlchemy async `engine.connect()` + `execution_options(isolation_level="AUTOCOMMIT")` 仍走连接池事务包装，DROP/REINDEX INDEX CONCURRENTLY 会阻塞。正解：
+- 用 `asyncpg.connect(dsn)` raw connection（asyncpg 默认 autocommit）
+- 加 `SET lock_timeout = '60s'` 防止被 idle-in-transaction 卡死
+- DSN 转换：`postgresql+asyncpg://...` → `postgresql://...`
+
+### CONCURRENTLY 失败留 _ccnew 残骸
+
+被 cancel/timeout 的 REINDEX/CREATE INDEX CONCURRENTLY 会留 `_ccnew*` 或 `_ccold*` 同名 invalid index，再次 REINDEX 会拒绝重建。脚本必须先清理：
+```sql
+SELECT c.relname FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
+WHERE NOT i.indisvalid AND (c.relname LIKE 'idx_%_ccnew%' OR c.relname LIKE 'idx_%_ccold%');
+-- 对每行 DROP INDEX CONCURRENTLY IF EXISTS xxx_ccnew
+```
+
+### CONCURRENTLY 卡住调试套路
+
+①`pg_stat_activity` 查 active 会话（query 是否仍是 REINDEX/DROP）+ `idle in transaction`（最常见 blocker，xact_start 老旧）
+②`pg_locks` 看目标表 `ShareUpdateExclusiveLock granted=False`（被等待的锁请求）
+③`pg_cancel_backend(pid)` 软取消 active / `pg_terminate_backend(pid)` 硬终止 idle-in-tx
+④清完后查 `pg_index WHERE NOT indisvalid` 找 _ccnew 残骸先 DROP 再重试
+
+### PowerShell `Out-File` 文件锁
+
+powershell 进程异常退出但仍持有 log 文件句柄时，`Get-Content / Remove-Item` 都拒绝。正解：
+- `Get-Process powershell | Where-Object { $_.Id -ne $PID } | Stop-Process -Force` 先释放
+- 用 `cmd /c "python xxx.py > log 2>&1"` 替代 PowerShell 的 `2>&1 | Out-File`
+- `Set-Content -Encoding UTF8` + `-join` 字符串数组会吞 ⚠️ 📌 → 等字符；写中文/emoji 文件用 `fsWrite` / `strReplace` / `fsAppend` 工具或 `python -c` 替代
+
+## §批量入库脚本规范（2026-05-23 ledger-import 9.2 沉淀）
+
+可复用工具：`backend/scripts/batch_import_real_samples.py`，绕过前端 UI / Worker 队列直调 ledger_import 管线（detect→identify→parse→convert→write→trial_balance 派生），支持 `--skip-large/--only/--dry-run`。
+
+### 设计要点
+
+- **幂等设计**：项目按 client_name 复用；trial_balance 先 DELETE 同 (project_id, year) 再 INSERT
+- **raw SQL 创建项目**：避免 ORM 加载顺序问题
+- **通用 helper 可独立复用**：`_insert_balance` / `_insert_aux_balance` / `_insert_trial_balance` 可挪到 demo seed / E2E fixture
+
+### 踩坑清单
+
+- `projects` 表 5 个 NOT NULL 字段无 default：`version` / `consol_level` / `is_deleted` / `scenario` / `has_foreign_currency` 必须显式给值
+- `created_by` FK 到 users 表，硬编码 UUID 不存在；必须 `SELECT id FROM users WHERE username='admin'` 先查
+- `AccountCategory` 枚举只有 5 值（asset/liability/equity/revenue/expense）无 cost
+- `trial_balance` 有 unique (project_id, year, company_code, standard_account_code) 约束，幂等需先 DELETE 同 (project_id, year)
+
+### 直接调 service 优于 Playwright UI
+
+单家完整入库走前端 UI 含 30+ 步骤 + 大文件 detect 数分钟，agent turn 易超时。用 Python 调用同款 service 管线（detect/identify/parse/convert/insert）效果完全等价但快 10x，最后用 Playwright 仅做"前端可见性"验证。

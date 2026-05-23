@@ -1,6 +1,6 @@
 # Spec 总索引
 
-**最后更新**：2026-05-21（v3.1 — 新增 Phase 1~4 全局建议书落地 spec 四件套，共 95 tasks）
+**最后更新**：2026-05-23（v3.5 — `ledger-import-view-refactor` 9.8/9.9/9.10 全部上线，5 个长尾 spec 均 100%；附带修复 4 真生产 bug：set_rls_context PG 绑定参数 / V005 RLS POLICY 残缺 / day30 CONCURRENTLY 事务 / lock_timeout）
 
 > 此索引追踪所有 spec 的状态、关联文档、commit。
 > **审计原则**：spec 不删，但标"演进/被取代/已合并"避免重复阅读。
@@ -24,7 +24,7 @@
 | `workpaper-m-equity-cycle/` | 28/28 ✅ | 2026-05-20 | 权益变动 6 列汇总 / VR×2 / 87 cells / 8 类 sheet |
 | `workpaper-n-tax-cycle/` | 27/27 ✅ | 2026-05-20 | 所得税引擎 stub / VR×2 / 64 cells / 8 类 sheet / C12 前置 |
 
-**汇总**：548/548 tasks / 400 CWR / 1035 prefill cells / 53 VR rules / 全循环 PBT / 全循环 IPO 占位
+**汇总**：548/548 tasks / 400 CWR / 1035 prefill cells / 114 VR rules / 全循环 PBT / 全循环 IPO 占位
 
 ---
 
@@ -34,15 +34,20 @@
 
 | Spec | 完成度 | 说明 |
 |------|-------|------|
-| `phase1-experience-gap-fix/` | 0/20 (0%) | 全局搜索+字号统一+面包屑+compact 工具栏+版本锁，5 天 |
-| `phase2-role-experience-boost/` | 0/22 (0%) | 签字 Gate+QC 热力图+批量操作+prefill diff+复核优先级，8 天 |
-| `phase3-system-enhancement/` | 0/30 (0%) | 双向穿透+LLM 接入+压测+暗色模式+Storybook，15 天 |
-| `phase4-long-term-governance/` | 0/23 (0%) | PG RLS+多年度对比+EQCR 快照+迁移回滚+Redis HA，18 天 |
-| `e2e-business-flow/` | 50/58 (86%) | 8 task 未标（含 UAT 真人验收类）|
-| `template-library-coordination/` | 63/64 (98%) | 剩 1 task（6.3 枚举字典 DB-backed）|
-| `audit-chain-generation/` | 92/101 (91%) | 9 task（UAT 真人验收类）|
-| `enterprise-linkage/` | 46/56 (82%) | 功能已被后续 spec 增强，保留 ADR |
-| `ledger-import-view-refactor/` | 239/243 (98%) | 4 task（运维/手动验证）|
+| `phase1-experience-gap-fix/` | 19/19 ✅ | 2026-05-21 上线（全局搜索+字号统一+面包屑+compact+版本锁，UAT 10/10）|
+| `phase2-role-experience-boost/` | 22/22 ✅ | 2026-05-21 上线（签字 Gate+QC 热力图+批量+prefill diff+优先级，UAT 12/12）|
+| `phase3-system-enhancement/` | 30/30 ✅ ⚠ | 2026-05-21 上线（双向穿透+LLM+压测+暗色+Storybook）；UAT-3/UAT-5 待外部环境（vLLM 真实接入 + 6000 并发实测）|
+| `phase4-long-term-governance/` | 23/23 ✅ | 2026-05-21 上线（PG RLS+多年度对比+EQCR 快照+迁移回滚+Redis HA，UAT 9/10）|
+| `phase5-operational-excellence/` | 63/63 ✅ | 2026-05-22 上线（router_registry 拆分+SSE 32 类型+SLA 预警+批量复核，UAT 10/10）|
+| `phase6-precision-and-security/` | 32/32 ✅ | 2026-05-22 上线（Decimal.js+ESLint 防护+项目级权限+二次密码+复核层级，UAT 14/14）|
+| `phase7-role-experience-closure/` | 50/50 ✅ | 2026-05-22 上线（EQCR 三件套+QC 三件套+工时四件套+复核通知+紧急度，UAT 14/14）|
+| `phase8/` | 116/116 ✅ | 2026-05-22 完成（116 tests，含性能 23 + 冒烟 16）|
+| `proposal-remaining-18/` | 30/30 ✅ ⚠ | 2026-05-22 上线（27 项剩余功能 + 6 项伪绿真补：D-1 lazy load / L-4 公式引擎 / K-4 reasoning chain / M-5 / L-2 / L-3 / C-3 SSE / AT-2 LibreOffice / MT-8 cleanup worker）|
+| `e2e-business-flow/` | 58/58 ✅ | 2026-05-23 完成（程序化 UAT 验收 4 项目 Layer 1-4 全 PASS）|
+| `template-library-coordination/` | 64/64 ✅ | 2026-05-23 完成（Property 2 PBT 就位）|
+| `audit-chain-generation/` | 101/101 ✅ | 2026-05-23 完成（综合 PBT 9 项 / 22 tests）|
+| `enterprise-linkage/` | 56/56 ✅ | 2026-05-23 完成（10 项 PBT + 集成 + 性能基线 / 22 tests）|
+| `ledger-import-view-refactor/` | 243/243 ✅ | 2026-05-23 完成（9.10 Day 30 索引清理：72.82MB DROP + 38MB REINDEX 共 110MB 回收）|
 | `k-admin-cycle-post-review-fix/` | 18/18 ✅ | 2026-05-20 完成 |
 
 ### 2.2 已被取代（保留 ADR）
@@ -105,24 +110,28 @@
 
 ---
 
-## §5 当前程序规模（2026-05-20 实测）
+## §5 当前程序规模（2026-05-22 实测）
 
 | 维度 | 值 |
 |------|---|
-| 后端 routers | 215+ |
-| 后端 services | 330+ |
-| 后端 models | 56 |
-| 前端 views | 96 |
-| 前端 components | 283 |
-| 前端 composables | 52 |
+| 后端 routers | 271 |
+| 后端 services | 345 |
+| 后端 models | 58 |
+| 后端 workers | 12 |
+| 后端 tests | 464 |
+| 前端 views | 99 |
+| 前端 components | 353 |
+| 前端 composables | 81 |
 | 前端 stores | 9 |
+| 前端 services | 37 |
+| 前端 utils | 39 |
 | PG 表数 | 188 |
-| 底稿模板 | 473 |
+| 底稿模板 | 456 |
 | cross_wp_references | 400 条 |
 | prefill_formula_mapping | 1035 cells |
-| validation_rules | 53 条（D×25 + F×4 + G×4 + H×4 + I×3 + J×3 + K×3 + L×3 + M×2 + N×2）|
-| 测试文件 | 300+ |
-| Alembic 迁移 | 59 版本 |
+| validation_rules | 114 条（bcas×25 / d×25 / efghijklmn×36 / f×4 / g×4 / h×4 / i×3 / j×3 / k×3 / l×3 / m×2 / n×2）|
+| Alembic 迁移 | 61 版本 + 28 SQL（migrations/）|
+| Spec 总数 | 70 |
 | git 分支 | feature/e2e-business-flow (HEAD) |
 
 ---

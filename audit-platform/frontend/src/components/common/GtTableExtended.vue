@@ -2,7 +2,7 @@
   <!--
     GtTableExtended — 列表展示型表格（R10 Spec B / Sprint 3.1.1）
 
-    @docs ../../../docs/COMPONENT_USAGE_GUIDE.md
+    @docs ../../../docs/frontend/component-usage.md
     @see GtFormTable / GtEditableTable
 
     定位：

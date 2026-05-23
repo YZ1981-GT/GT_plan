@@ -18,6 +18,8 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+import sqlalchemy as sa
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -117,9 +119,40 @@ _DICTS: dict[str, list[dict[str, str]]] = {
 @router.get("/dicts")
 async def get_system_dicts(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    """返回所有枚举字典，前端启动时加载一次并缓存到 sessionStorage"""
-    return _DICTS
+    """返回所有枚举字典，前端启动时加载一次并缓存到 sessionStorage
+
+    DT-3 方案 B：合并 _DICTS 代码默认值 + enum_dict_overrides DB 覆盖
+    """
+    from app.models.enum_dict_override_models import EnumDictOverride
+
+    # 加载所有 overrides
+    overrides_map: dict[tuple[str, str], dict[str, str | None]] = {}
+    try:
+        rows = await db.execute(sa.select(EnumDictOverride))
+        for ov in rows.scalars().all():
+            overrides_map[(ov.dict_key, ov.value)] = {
+                "label": ov.label_override,
+                "color": ov.color_override,
+            }
+    except Exception as e:
+        # 表不存在或查询失败时降级为只返回代码默认值
+        logger.warning("enum_dict_overrides query failed (degraded to defaults): %s", e)
+
+    # 合并：override.label/color 非 NULL 时覆盖
+    result: dict[str, list[dict[str, str]]] = {}
+    for dict_key, items in _DICTS.items():
+        merged = []
+        for item in items:
+            ov = overrides_map.get((dict_key, item["value"]))
+            merged.append({
+                "value": item["value"],
+                "label": ov["label"] if ov and ov["label"] is not None else item["label"],
+                "color": ov["color"] if ov and ov["color"] is not None else item["color"],
+            })
+        result[dict_key] = merged
+    return result
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -229,52 +262,200 @@ async def get_dict_usage_count(
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# Sprint 6 Task 6.3 — 枚举项 CRUD 端点（拒绝写操作 / D13 ADR）
+# Sprint 6 Task 6.3 — 枚举项 CRUD 端点（DT-3 方案 B：value 锁定 + label/color 可改）
 # ──────────────────────────────────────────────────────────────────────────
 
+
+@router.put("/dicts/{dict_key}/items/{item_value}")
+async def update_dict_item(
+    dict_key: str,
+    item_value: str,
+    payload: "EnumDictItemUpdate",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """DT-3 方案 B：仅修改 label/color（value 锁定，admin 可改）
+
+    业务约束：
+    - 仅 admin 角色可调用（其他角色 403）
+    - dict_key 必须在 _DICTS 中
+    - value 必须存在于 _DICTS[dict_key]（不允许新增）
+    - label/color 至少一项非 None
+    - color 必须 ∈ {success, warning, danger, info, ""}
+    """
+    from app.models.enum_dict_override_models import EnumDictOverride
+
+    role = getattr(current_user, "role", "")
+    role_value = role.value if hasattr(role, "value") else str(role)
+    if role_value != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error_code": "ENUM_DICT_FORBIDDEN",
+                "message": "仅 admin 可修改枚举字典展示属性",
+            },
+        )
+
+    if dict_key not in _DICTS:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error_code": "DICT_NOT_FOUND",
+                "message": f"字典 '{dict_key}' 不存在",
+                "available_keys": sorted(_DICTS.keys()),
+            },
+        )
+    valid_values = {item["value"] for item in _DICTS[dict_key]}
+    if item_value not in valid_values:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error_code": "DICT_VALUE_NOT_FOUND",
+                "message": f"枚举值 '{item_value}' 不在 '{dict_key}' 中（不允许新增）",
+                "available_values": sorted(valid_values),
+            },
+        )
+
+    if payload.label is None and payload.color is None:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_code": "EMPTY_UPDATE",
+                "message": "label / color 至少需一项非 None",
+            },
+        )
+    if payload.color is not None and payload.color not in ("success", "warning", "danger", "info", ""):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_code": "INVALID_COLOR",
+                "message": "color 必须 ∈ {success, warning, danger, info, ''}",
+            },
+        )
+
+    # upsert：先查再更新或插入
+    existing = (
+        await db.execute(
+            sa.select(EnumDictOverride).where(
+                EnumDictOverride.dict_key == dict_key,
+                EnumDictOverride.value == item_value,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if existing:
+        if payload.label is not None:
+            existing.label_override = payload.label
+        if payload.color is not None:
+            existing.color_override = payload.color
+        existing.updated_by = getattr(current_user, "id", None)
+    else:
+        ov = EnumDictOverride(
+            dict_key=dict_key,
+            value=item_value,
+            label_override=payload.label,
+            color_override=payload.color,
+            updated_by=getattr(current_user, "id", None),
+        )
+        db.add(ov)
+    await db.flush()
+    await db.commit()
+    return {
+        "dict_key": dict_key,
+        "value": item_value,
+        "label": payload.label,
+        "color": payload.color,
+        "message": "已更新（value 锁定，仅修改展示属性）",
+    }
+
+
+@router.delete("/dicts/{dict_key}/items/{item_value}/override")
+async def reset_dict_item_override(
+    dict_key: str,
+    item_value: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """DT-3 方案 B：清除 label/color 覆盖，恢复代码默认值（不删除枚举值本身）"""
+    from app.models.enum_dict_override_models import EnumDictOverride
+
+    role = getattr(current_user, "role", "")
+    role_value = role.value if hasattr(role, "value") else str(role)
+    if role_value != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error_code": "ENUM_DICT_FORBIDDEN",
+                "message": "仅 admin 可重置枚举字典覆盖",
+            },
+        )
+
+    result = await db.execute(
+        sa.delete(EnumDictOverride).where(
+            EnumDictOverride.dict_key == dict_key,
+            EnumDictOverride.value == item_value,
+        )
+    )
+    await db.commit()
+    return {
+        "dict_key": dict_key,
+        "value": item_value,
+        "deleted": result.rowcount,
+        "message": "已恢复代码默认值",
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Schema for label/color update
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class EnumDictItemUpdate(BaseModel):
+    """枚举项展示属性更新（DT-3 方案 B）"""
+
+    label: str | None = Field(None, max_length=255, description="展示文本（None 表示不改）")
+    color: str | None = Field(
+        None,
+        description="el-tag type，必须 ∈ {success, warning, danger, info, ''}（None 表示不改）",
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 仍保留：拒绝新增枚举值（POST 405） + 拒绝物理删除枚举值（DELETE on /items 405）
+# ─────────────────────────────────────────────────────────────────────────────
+
 _DICT_HARDCODED_HINT = (
-    "枚举字典当前为代码定义（backend/app/routers/system_dicts.py 中的 _DICTS），"
-    "如需新增/修改/禁用枚举项请提交 PR 编辑 _DICTS 字典后重启后端。"
-    "已被引用的值不允许物理删除，只能在代码中标记为 deprecated/disabled。"
+    "枚举字典 value 由代码定义（backend/app/routers/system_dicts.py 中的 _DICTS），"
+    "不允许新增/删除/修改 value（避免代码引用悬空）。"
+    "如需修改 label/color 展示属性请用 PUT /dicts/{dict_key}/items/{value}（仅 admin）。"
 )
 
 
 @router.post("/dicts/{dict_key}/items", status_code=405)
 async def reject_dict_item_create(dict_key: str):
-    """拒绝新增枚举项 — 字典硬编码在代码中（D13 ADR）。"""
+    """拒绝新增枚举项 — value 由代码硬编码（DT-3 / D13 ADR）。"""
     raise HTTPException(
         status_code=405,
         detail={
             "error_code": "ENUM_DICT_HARDCODED",
             "dict_key": dict_key,
-            "hint": _DICT_HARDCODED_HINT,
-        },
-    )
-
-
-@router.put("/dicts/{dict_key}/items/{item_value}", status_code=405)
-async def reject_dict_item_update(dict_key: str, item_value: str):
-    """拒绝修改枚举项 — 字典硬编码在代码中（D13 ADR）。"""
-    raise HTTPException(
-        status_code=405,
-        detail={
-            "error_code": "ENUM_DICT_HARDCODED",
-            "dict_key": dict_key,
-            "item_value": item_value,
             "hint": _DICT_HARDCODED_HINT,
         },
     )
 
 
 @router.delete("/dicts/{dict_key}/items/{item_value}", status_code=405)
-async def reject_dict_item_delete(dict_key: str, item_value: str):
-    """拒绝删除枚举项 — 字典硬编码在代码中（D13 ADR）。"""
+async def reject_dict_item_delete_value(dict_key: str, item_value: str):
+    """拒绝物理删除枚举值 — 已被代码引用不可删（DT-3 / D13 ADR）。
+
+    如需重置 label/color 覆盖请用 DELETE /dicts/{dict_key}/items/{value}/override
+    """
     raise HTTPException(
         status_code=405,
         detail={
             "error_code": "ENUM_DICT_HARDCODED",
             "dict_key": dict_key,
             "item_value": item_value,
-            "hint": _DICT_HARDCODED_HINT,
+            "hint": _DICT_HARDCODED_HINT + " 重置覆盖请用 .../override 子路径。",
         },
     )

@@ -73,6 +73,62 @@ class SharePaymentCalcResponse(BaseModel):
     is_llm_stub: bool
     applied_to_sheet: str | None = None
     applied_at: str | None = None
+    # K-4 解释链字段（task 4.2 / ADR-6）
+    reasoning: str | None = None
+    references: list[dict] = Field(default_factory=list)
+    data_sources: list[str] = Field(default_factory=list)
+    confidence: float = 0.0
+
+
+def _build_j3_reasoning(
+    payload: "SharePaymentCalcRequest",
+    result: dict[str, Any],
+    is_llm_stub: bool,
+) -> dict:
+    """J3 股份支付推理链（task 4.2）"""
+    from app.services.llm_service import build_reasoning_chain
+
+    option_value = result.get("option_value", 0.0)
+    total_fv = result.get("total_fair_value", 0.0)
+    parts = [
+        f"基于 Black-Scholes 期权定价模型计算单股期权价值 {option_value:.4f} 元，"
+        f"授予数量 {payload.grant_quantity} 股，"
+        f"总公允价值 {total_fv:,.2f} 元，"
+        f"在 {payload.vesting_period} 年等待期内分摊确认。",
+    ]
+    if is_llm_stub:
+        parts.append("（LLM 暂未启用，已降级为规则结果）")
+    reasoning = "".join(parts)
+
+    references = [
+        {"type": "IFRS", "code": "IFRS 2", "section": "Share-based Payment"},
+        {"type": "CAS", "code": "CAS 11", "section": "股份支付"},
+    ]
+
+    sources = [
+        "WP:J3:授予日股票价格",
+        "WP:J3:行权价格",
+        "WP:J3:无风险利率",
+        "WP:J3:波动率",
+        "WP:J3:股息率",
+        "WP:J3:授予数量",
+        "WP:J3:等待期",
+    ]
+
+    base_conf = 0.85  # Black-Scholes 公式确定性高
+    reasoning, refs, srcs, conf = build_reasoning_chain(
+        reasoning=reasoning,
+        references=references,
+        data_sources=sources,
+        is_llm_stub=is_llm_stub,
+        base_confidence=base_conf,
+    )
+    return {
+        "reasoning": reasoning,
+        "references": refs,
+        "data_sources": srcs,
+        "confidence": conf,
+    }
 
 
 # ─── Black-Scholes Core ───────────────────────────────────────────────────────

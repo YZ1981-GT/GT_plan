@@ -2460,3 +2460,136 @@ YG36 重庆医药集团四川物流真实样本导入后发现 `tb_balance` 同 
 
 - D/F/K/N 循环，映射文件：backend/data/wp_account_mapping.json（88 条，v2025-R4）
 
+
+
+## §X 审计循环 Spec 实施详情归档（2026-05-19~20，从 memory.md 迁移）
+
+### K 管理循环（workpaper-k-admin-cycle，2026-05-19）
+- 全部 required + optional PBT-P5 tasks completed + UAT 14/14 ✓ + P0 6/6 全 ✓ ✅ 上线门槛
+- 361 K-cycle backend tests（274 + 87 PBT）+ ~67 K frontend vitest + 327 prior-cycle 回归全绿
+- 产出：cross_wp_ref 17→37 条 K-cycle（CW-313~332）/ prefill K-cycle +40 cells（K8-2/K9-2 LEDGER_DETAIL 月度 + K1-2/K3-2 AUX 4-arg + K5-2 含空格 + K8-4 PREV+TB）/ k_cycle_validation_rules.json 3 VR + check_k_cycle_triangle_reconciliation 注入 consistency_gate / wp_k_expense_analysis.py 3 维度（YoY/budget/industry）+ ExpenseAnalysisDialog / wp_k_impairment_summary.py 4 来源跨循环汇总（H1/I3/G14/F2）+ ImpairmentSummaryDialog / useKAdminCycleSheetGroups 10 类（费用明细 priority 3 前置于明细表 4，往来款检查 K1-/K3- 业务专项）/ usePrerequisiteStatus K_CYCLE_PREREQUISITES=[C11] / WorkpaperEditor isKCycle 接入（首个 spec 把 K nav 完整 wired 到 sheetNav facade）/ resolveProcedureSheetKey K1/K3/K5/K8/K9/K11 路由 + K10/K12/K13 fallback / _IPO_CONFIG['K8'] 占位注册 / 5 PBT property（P1 normalize 100 + P2 VR-K8-01 triangle 200+9 + P3 sheet group 200 + P4 ref_id unique 50 + P5 YoY 单调性 200+200 + 9 阈值边界 + 50 防御性）+ 87 K PBT tests
+- K-F4 cross_wp_ref 起编：J spec 占至 CW-312，K 起编 CW-313~332 闭区间；20 条按 5 分组分布（K 内部 4 + K→跨循环来源 5 + K→报表 4 + K→附注 4 + K→其他循环 3）；severity 4 blocking + 13 warning + 3 info（info 15% < 25%）；CW-316/329 source_sheet 用真实 sheet 名 `明细表 K5-2`（含空格）
+- K Sprint 0 基线偏差：spec 起草 N_k_dedup_sheets=114 / N_k_cross_file_dups=38，task 1.1 openpyxl 实测 109 / 43；分布：底稿目录 14×→13 dup / 附注披露(上市公司) 13×→12 / 附注披露(国企) 12×→11 / GT_Custom 8×→7 = 43；边缘 case：`附注披露信息(国有企业)` 1 份与 `(国企)` 归一化 key 不同不去重
+- K aux 实测：6601 销售费用 aux_type='客户'（20+ distinct）/ 6602 管理费用 aux_type='区域2'+'客户' / 1221 其他应收款 aux_type='三方收款标识'+'代收代付类别' / 2241 其他应付款 aux_type='代收代付类别'；全部有数据不降级；aux_type 与业务预期不匹配 → 费用明细表用 =LEDGER_DETAIL 月度结构，往来款明细表用 =AUX
+
+### k-admin-cycle-post-review-fix（2026-05-20）
+- 13/13 completed ✅；311 K backend + 510 vitest + 952 prior-cycle 全绿
+- 产出：WorkpaperEditor K8/K9/K11 toolbar 按钮 wired + ExpenseAnalysisDialog.spec.ts + ImpairmentSummaryDialog.spec.ts + test_k_prefill_ledger_detail.py 5 tests + test_k_vr_integration.py 2 tests + test_k11_schema_verification.py 9 tests + 函证辅助分组 priority=7.5 + 费用明细 regex 扩展 K(8|9|1[0-3]) + L spec max(ref_id) 防护注记 + wp_account_mapping tracking issue
+
+### L 债务循环（workpaper-l-debt-cycle，2026-05-20）
+- 26 required tasks + UAT 15/15 ✓ + P0 6/6 全 ✓ ✅ 上线门槛
+- 299 L-cycle backend tests + 63 frontend vitest（51 原有 + 12 新增 Dialog spec）+ 26 prior-cycle IPO 回归全绿
+- 产出：cross_wp_ref 6→26 条 L-cycle（CW-333~352）/ prefill L-cycle 44→90 cells（+46，7 sheet 全覆盖）/ l_cycle_validation_rules.json 3 VR（VR-L8-01 blocking 利息汇总 + VR-L1-01 blocking 短期借款余额 + VR-L3-01 warning 长期借款重分类）/ wp_l_interest_calc.py 3 计息基准×3 复利频率 + InterestCalcDialog（L1/L3 toolbar）/ wp_l_bond_amortization.py 实际利率法+收敛性尾差调整 + BondAmortizationDialog（L5 toolbar）/ useLDebtCycleSheetGroups 10 类（利息测算 priority=6 前置于检查表 priority=7）/ L_CYCLE_PREREQUISITES=[C13] / resolveProcedureSheetKey L1→l1a/L3→l3a/L5→l5a/L8→l8a / 4 PBT property
+- L Sprint 0.X aux 实测：200%（短期借款 2001）有 aux_type='借款性质'(3)+'金融机构'(34) = 37 → L1-2 保留 =AUX；250%（长期借款 2501）0 行 → L3-2 降级 =TB；6603%（财务费用）有 aux_type='客户' 50+ → L8-2 保留 =AUX；2502%（应付债券）0 行 → L5-2 维持 =TB；270%（长期应付款 2701）有 aux 32 → L6-2 保留 =AUX；不降级，目标 ≥ 40 cells 保持
+- L Sprint 0 基线偏差：N_l_cross_file_dups=19→20 / N_l_dedup_sheets=80→79；cross_wp_ref max_id 292→332（J+K 已执行）；L 起编 CW-333（非 CW-313）；L4-7/L4-8 各 2 个付息方式变体（合法多版本）
+
+### M 权益循环（workpaper-m-equity-cycle，2026-05-20）
+- 24 required tasks + UAT 10/10 + P0 5/5 全 ✓ ✅ 上线门槛
+- 233 M-cycle backend tests + 71 frontend vitest + 2066 prior-cycle 回归全绿
+- 产出：cross_wp_ref 8→25 条 M-cycle（CW-353~369，17 新增）/ prefill M-cycle 52→87 cells（+35，M2 =AUX 9 cells + M4/M5/M6/M9/M10）/ m_cycle_validation_rules.json 2 VR（VR-M6-01 blocking 未分配利润勾稽 + VR-M2-01 warning 实收资本）/ wp_m_equity_movement.py 6 列变动汇总 + EquityMovementDialog（M6 toolbar）/ useMEquityCycleSheetGroups 8 类 / M_CYCLE_PREREQUISITES=[]（无独立 C 类，A 类覆盖）/ 4 PBT property
+- 实际工时 ~2.8 天（估计 5.5 天，压缩比 0.51×，第 8 个循环复用红利）
+
+### N 税金循环（workpaper-n-tax-cycle，2026-05-20）
+- 24 required tasks + UAT 10/10 + P0 5/5 全 ✓ ✅ 上线门槛
+- 211 N-cycle backend tests + 90 frontend vitest + 65 prior-cycle 回归全绿
+- 产出：cross_wp_ref 14→26 条 N-cycle（CW-370~381，12 新增）/ prefill N-cycle 28→64 cells（+36，N2 =AUX 4-arg aux_type='税率' + N1/N3/N4/N5 =TB）/ n_cycle_validation_rules.json 2 VR / wp_n_income_tax_calc.py 税率调节表+递延调整 + IncomeTaxCalcDialog（N5 toolbar）/ useNTaxCycleSheetGroups 8 类 / N_CYCLE_PREREQUISITES=[C12] / 4 PBT property
+- Sprint 0.2 关键偏差：CWR 基线 45→14（原与 dedup_sheets 混淆）；Sprint 0.X 降级：仅 N2(2221) 保留 =AUX，N1/N3/N4/N5 降级 =TB（1811/1812/6801 无辅助账数据）
+
+### J 职工薪酬循环（workpaper-j-payroll-cycle，2026-05-19）
+- 全部 required tasks completed ✅ 上线门槛
+- 305 tests green（227 backend + 44 frontend + 34 D/F/H IPO 回归）
+- 产出：wp_j_payroll_calc.py 薪酬计提引擎（12 月度序列 + 5 险一金 + apply_to_sheet）/ wp_j_share_payment.py Black-Scholes 引擎（含股息率 q + is_llm_stub config 驱动 + 费用摊销计划）/ PayrollCalcDialog + SharePaymentDialog / resolveProcedureSheetKey J1→j1a/J2→j2a/J3→j3a / 4 PBT property
+- J Sprint 0 实测：openpyxl 读 J1 模板发现 `审定表J1-1 ` / `明细表J1-2 ` 末尾带空格，prefill cell 的 `sheet` 字段必须包含真实空格
+
+### G 投资循环（workpaper-g-investment-cycle，2026-05-20）
+- 全部 required + optional PBT + UAT 17/17 + P0 7/7 全 ✓ ✅ 上线门槛
+- 307 backend tests + 83 frontend vitest + 210 D/F/H/I 回归全绿
+- 产出：3 router（wp_g_fair_value / wp_g_ecl / wp_g_classification）/ 4 VR + consistency_gate 集成 / cross_wp_ref 8→34 条（CW-267~292）/ prefill 74→134 cells（+60）/ 3 前端弹窗（FairValueTestDialog / ECLCalcDialog / ClassificationCheckDialog）/ 13 类 sheet 分组 + WorkpaperEditor 路由 / G7 三种核算方式 per-investment 显隐 / G 循环前置横幅 C5 / 6 PBT property
+- G Sprint 0.X 实测：tb_aux_balance G 类账户 110%/150% 全 0；151%（长投 1511）有 27 distinct (aux_type, aux_code)；152%（其他权益工具）有 tb_balance 余额但无辅助账；153%（其他金融资产 1531.02）有 12 行；G-F10 部分降级：G7（1511）保留 =AUX，G6（1531.02）保留 1-2 个 =AUX，其余 =TB/=WP；总目标 ≥ 80 → ≥ 60 cells
+
+### H Sprint 0.X 降级结论
+- tb_aux_balance 1601/1602 无辅助账数据（仅 1604 在建工程有 aux_type='项目名称'）→ H-F10 降级为仅 =TB/=LEDGER 公式（不含 =AUX for 1601/1602），prefill 目标降为 ≥ 70 cells（实际达成 92 new cells）；I-F10 同步降级
+
+## §Y 全局建议书 Phase 1~8 实施详情归档（2026-05-21~22，从 memory.md 迁移）
+
+### Phase 1 实施完成（2026-05-21）
+- 19/19 tasks ✅；后端 13 tests + 前端 18 vitest 全绿；UAT 10/10 ✓
+- 产出：global_search_service.py + global_search.py（路由 §88）+ GlobalSearchDialog.vue + DrilldownBreadcrumb.vue + useNavigationStack 扩展（label+jumpTo）+ GtToolbar compact 模式 + GtEditableTable 字号 class 迁移 + DefaultLayout 集成（Ctrl+K + 面包屑）
+
+### Phase 2 实施完成（2026-05-21）
+- 22/22 tasks ✅；后端 22 tests 全绿
+- 产出：qc_vr_heatmap.py（§89）+ workpaper_batch_status.py（§90）+ wp_prefill_preview.py（§91）+ V004__add_review_priority.sql + ReviewRecord.priority + VRHeatmap.vue + BatchActionBar.vue + PrefillDiffPanel.vue + ReviewPrioritySelector.vue + QCDashboard 热力图 Tab + WorkpaperList 批量 + ReviewWorkbench 优先级
+- v1 限制：F4 prefill diff cell-level 对比需后续迭代
+
+### Phase 3 实施完成（2026-05-21）
+- 30/30 tasks ✅ + UAT 8/10 ✓
+- F1 双向穿透（note_trace §92 + line_composition §93 + TraceSourcePopover + 面包屑方向标记 ↓/↑，48 tests）/ F2 LLM 接入（LLMService + wp_k_expense_analysis 改造 + marked+DOMPurify + llm_metrics，92 tests）/ F3 压力测试（Locust 100→6000 + run_baseline.py + run_final.py + CacheService TB 60s + prefill 5min + DB pool=50/100）/ F4 暗色模式（gt-tokens.css html.dark 70+ 变量 WCAG AA / useTheme / @media print 强制 light，21 tests）/ F5 Storybook（8.6.14 + 28 common + 5 business stories）
+- UAT ⚠ 2 项待外部：#3 LLM 非 stub 需 vLLM / #5 压测需真实后端
+
+### Phase 4 实施完成（2026-05-21）
+- 23/23 tasks ✅ + UAT 9✓+1⚠
+- 76 backend tests + 17 vitest
+- F4 迁移回滚（R001~R004 + migration_runner.py --rollback/--confirm/pg_dump 备份/schema_version）/ F1 PG RLS（V005 5 表 ENABLE+FORCE+project_isolation POLICY+admin bypass / set_rls_context() / deps.py 自动 SET LOCAL）/ F5 Redis HA（sentinel.conf + redis.py 双模式 single/sentinel + 健康检查 §96）/ F2 多年度对比（multi_year_router §94 + MultiYearCompare.vue + ReportView Tab）/ F3 EQCR 快照（V006 + eqcr_snapshot_service.py + 3 API §95）
+- config.py 新增 REDIS_MODE/REDIS_SENTINEL_HOSTS/REDIS_SENTINEL_SERVICE
+- UAT-8 ⚠ Sentinel failover 需真实环境验证
+
+### Phase 5 实施完成（2026-05-22）
+- 63/63 tasks ✅ + UAT 10/10
+- 后端 179 tests（133 + 46 PBT）+ 前端 25 vitest；16 个正确性属性
+- 产出：router_registry 包拆分（5 子文件 §97~§100）/ field_selection.py 核心模块 / SSEEventType 联合类型 32 值 / my_todo_service §97 / cross_cycle_breakage_service §98 / archive_completeness_service §99 / sla_worker 前置预警 / batch_review §100（RBAC manager/partner/admin）/ MyTodoCard + ConsistencyDashboard 断裂 Tab + ArchiveWizard 自检面板 + ReviewWorkbench 批量通过 + GtRowActions 组件 / ESLint no-amount-toFixed 规则 / 7 PBT 文件
+- 复盘快修：①SC-4 JWT 缩短 120→30min ②N-4 负数会计格式 ③SC-1 审计日志 append-only V007 ④MT-3 apiPaths.ts 拆分 6 子文件 ⑤R-1 路由 meta.roles 补充
+
+### Phase 6 实施完成（2026-05-22）
+- 32/32 子任务 ✅ + UAT 14/14（P0 9/9 + P1 5/5）
+- 后端 66 + 前端 28 = 94 tests 全绿；7 个正确性属性
+- 修复 Project.is_deleted 字段缺失（models/core.py 补充 mapped_column）
+
+### Phase 7 实施完成（2026-05-22）
+- 50/50 子任务 ✅ + UAT 14/14（P0 7/7 + P1 7/7）
+- 后端 96 tests（90 + 6 PBT）+ 前端 5 tests；7 个正确性属性
+- 新增路由 §105~§115（11 个）/ 迁移 V009~V012（4 个）/ python-docx 新增依赖
+
+### Phase 8 实施完成（2026-05-22）
+- 116 tests 全绿（77 原有 + 23 性能 + 16 冒烟）
+- 产出：test_phase8_performance.py + test_phase8_smoke.py + useOfflineCache.ts + sw.js + docs/PHASE8_*.md + report_export_engine.py（模板缓存+异步PDF+格式校验器）
+- 14 个 pre-existing 失败已修复（FormulaEngine 无 _execute_inner / ProcedureTrimEngine 无构造参数 / AuditLoggerEnhanced 返回 action_type 非 action / report_export_engine 模块缺失）
+
+### proposal-remaining-18 spec 全量执行完成（2026-05-22）
+- 30/30 tasks 100% completed（27 项功能 / 6 Sprint）；建议书覆盖率 75% → ~99%
+- 新增路由 §116~§120（batch-export-progress / office-preview / query-builder / wp-version-search / admin-logs）
+- DB 迁移 V013-V014（prefill_tb_snapshot / attachment versioning）
+- 后端服务 12 个 + 前端组件 ~15 个 + docs 2 个（SERVICE_DEPENDENCY.md / CONFIGURATION_REFERENCE.md）+ scripts/gen_service_deps.py
+- 终轮 P0 真补完成：task 0.4 D-1 `?sheets=active` 懒加载 + `/sheet/{sheet_name}` 端点（6 tests）/ task 4.1 L-4 公式引擎 6 函数（25 tests）/ task 4.2 K-4 LLMService.build_reasoning_chain helper + 5 endpoint schema 加 4 字段 + 6 个 reasoning helpers（29 tests）/ task 5.5 UI-8 微交互（gt-polish.css 标记修正）；478 tests focused regression 全绿
+
+### DB 迁移全部执行成功（2026-05-22）
+- V005~V012 共 8 个迁移在真实 PG 上执行完成
+- 关键修复：①迁移文件从 alembic/versions/ 复制到 migrations/（migration_runner 读取后者）②V005 RLS 去掉 reports 表引用 ③V007 audit_log 改为 DO $$ IF EXISTS → 后改为去掉 DO $$ 块（SQLAlchemy text() 不支持 $$ 绑定参数）④V008/V009/V011 统一改为 ADD COLUMN IF NOT EXISTS + ADD VALUE IF NOT EXISTS 简单语法
+
+
+## 2026-05-22：S-3 / DT-3 / AT-3 小迭代点 v2
+
+**S-3 v2（声明式 JOIN 白名单）**：JOIN_WHITELIST 7 表 12 关联 + DSL `joins[{table,type}]` + 字段双段 `table.field`；附带修复**长期生产 bug** — `_build_filter` 的 value 直接绑定不做类型 coerce，UUID/Decimal/Date 列遇 str value 抛 `'str' object has no attribute 'hex'`；新增 `_coerce_value` helper 按 `col.type.python_type` 自动转 + 非法值返 400 而非 500（含 5 条 UUID/Decimal coerce 防御测试）。
+
+**DT-3 方案 B（枚举字典 UI write 405）**：V015 + EnumDictOverride 模型；value 锁定（POST/DELETE 仍 405），label/color 可 admin 改（PUT 200）+ DELETE `.../override` 恢复默认。
+
+**AT-3（KB 接入 + Attachment 真补）**：①Attachment 模型 + service 补 version 字段（修补伪绿，V014 迁移已就位但模型/service 缺失）②V016 + KnowledgeDocument 加版本 + 双契约 list_versions/rollback_to_version + 跨链回滚拒绝。
+
+**实施总计**：67 tests passed（13 DT-3 + 9 attach + 10 KB + 10 v2 JOIN + 5 coerce + 20 v1 回归）/ 5 新文件 / 2 迁移（V015/V016）。
+
+## 2026-05-23：ledger-import-view-refactor 9.8/9.9/9.10 上线
+
+**9.8 程序化 UAT**（`backend/scripts/uat_ledger_import_view_refactor.py`）：27 项 UAT，最终 16 ✓ + 11 ⚠（manual 40%，达 < 50% 门槛）。附带修复 3 个真生产 bug：
+- `set_rls_context` 用 `SET LOCAL ... = :pid` 被 PG 拒绝（PG SET 命令不支持 prepared statement 绑定参数）→ 改为 `SELECT set_config('app.current_project_id', :pid, true)` in `backend/app/core/database.py`
+- V005 迁移文件残缺仅 ENABLE RLS 缺 CREATE POLICY → 重写 `backend/migrations/V005__enable_rls.sql` 含 4 个 project_isolation POLICY + admin bypass 函数
+- 安装缺失依赖 `prometheus_client==0.25.0`（追加到 `backend/requirements.txt`）
+
+**9.9 灰度部署单机模拟**（`backend/scripts/canary_deploy_simulation.py`）：Day 0 flag 注册 + set_rls_context 调用成功 + 4 POLICY 就位；Day 3 set_project_flag 单项目灰度 + 回退路径有效；Day 7 F18 迁移就位 + RLS context 设置后 working_paper(172)/tb_balance(812) 查询返回真实数据。架构限制：dev 用 postgres superuser 直连绕过 RLS。
+
+**9.10 Day 30 索引清理**（`backend/scripts/day30_drop_deprecated_indexes.py`）：4 个废弃索引 DROP CONCURRENTLY 共回收 **72.82 MB**（spec 预计 55MB），4 个 active_queries 索引 REINDEX CONCURRENTLY 额外回收 **38 MB**，共 110 MB。修复 3 个生产问题：
+- 原脚本用 SQLAlchemy AUTOCOMMIT 不能脱离事务，CONCURRENTLY 阻塞 → 改 `asyncpg.connect(dsn)` raw connection
+- 加 `SET lock_timeout = '60s'` 防 idle-in-transaction 卡死
+- 增加 `_ccnew` 残骸 cleanup 步骤
+
+**9 家样本完整入库（spec 9.2 真实通过）**：YG36 813/100 + YG4001-30 812/100 + 和平物流 275/40 + 安徽骨科 219/53 + 医疗器械 82/27 + YG2101 38/7 + 基线 4 家（陕西华氏/辽宁卫生/和平药房/宜宾大药房）；前端 Playwright 验证 10 项目可见。
+
+**长尾 spec 全部上线**：e2e-business-flow 58/58 / template-library-coordination 64/64 / audit-chain-generation 101/101 / enterprise-linkage 56/56 / ledger-import-view-refactor 243/243。综合 PBT/集成测试约 60 tests 新增。

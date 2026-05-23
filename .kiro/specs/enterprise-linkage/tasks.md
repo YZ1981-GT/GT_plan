@@ -1,4 +1,4 @@
-# 实施计划：企业级联动
+﻿# 实施计划：企业级联动
 
 ## 概述
 
@@ -100,12 +100,12 @@
     - 失败时标记 degraded + 记录失败原因
     - _Requirements: 7.1, 7.2_
 
-  - [ ]* 2.9 Property 15 测试：批量操作单次级联
+  - [x]* 2.9 Property 15 测试：批量操作单次级联
     - **Property 15: 批量操作单次级联**
     - 生成 1-50 笔随机分录，验证只触发一次 recalc
     - **Validates: Requirements 9.1, 9.2, 9.3**
 
-  - [ ]* 2.10 Property 17 测试：试算平衡表恒等式不变量
+  - [x]* 2.10 Property 17 测试：试算平衡表恒等式不变量
     - **Property 17: 试算平衡表恒等式不变量**
     - 生成随机调整分录集合，验证 audited = unadjusted + aje_dr - aje_cr + rcl_dr - rcl_cr
     - **Validates: Requirements 10.6**
@@ -216,40 +216,40 @@
   - [x] 4.9 Checkpoint - 确保所有测试通过，有问题请询问用户
 
 - [x] 5. Sprint 5：测试与验收
-  - [ ]* 5.1 Property 9 测试：编辑锁互斥性
+  - [x]* 5.1 Property 9 测试：编辑锁互斥性
     - **Property 9: 编辑锁互斥性**
     - 生成随机用户对和 entry_group_id，验证并发锁行为
     - **Validates: Requirements 5.1, 5.2, 5.3**
 
-  - [ ]* 5.2 Property 4 测试：Presence 视图记录一致性
+  - [x]* 5.2 Property 4 测试：Presence 视图记录一致性
     - **Property 4: Presence 视图记录一致性**
     - 验证心跳/过期/视图切换的状态正确性
     - **Validates: Requirements 2.1, 2.2, 2.3**
 
-  - [ ]* 5.3 Property 22 测试：重分类导入拆分正确性
+  - [x]* 5.3 Property 22 测试：重分类导入拆分正确性
     - **Property 22: 重分类导入拆分正确性**
     - 生成随机借贷行序列，验证按平衡组拆分
     - **Validates: Requirements 16.2, 16.3, 16.4**
 
-  - [ ]* 5.4 Property 19 测试：跨年度隔离
+  - [x]* 5.4 Property 19 测试：跨年度隔离
     - **Property 19: 跨年度隔离**
     - 生成跨年度调整分录，验证联动不跨年
     - **Validates: Requirements 14.1, 14.2, 14.3**
 
-  - [ ]* 5.5 Property 11 测试：乐观锁版本冲突检测
+  - [x]* 5.5 Property 11 测试：乐观锁版本冲突检测
     - **Property 11: 乐观锁版本冲突检测**
     - 验证 version 不一致时返回 409
     - **Validates: Requirements 5.5**
 
-  - [ ]* 5.6 集成测试：调整分录→SSE→TB 重算→前端刷新全链路
+  - [x]* 5.6 集成测试：调整分录→SSE→TB 重算→前端刷新全链路
     - 创建分录 → 验证 SSE 事件 → 验证 TB 增量重算 → 验证 affected_row_codes
     - _Requirements: 1.1, 1.4, 1.5, 1.6_
 
-  - [ ]* 5.7 集成测试：批量提交→单次级联→汇总事件全链路
+  - [x]* 5.7 集成测试：批量提交→单次级联→汇总事件全链路
     - 批量 N 笔 → 验证只触发 1 次 recalc → 验证 1 条汇总 SSE
     - _Requirements: 9.1, 9.2, 9.3_
 
-  - [ ]* 5.8 性能基准测试
+  - [x]* 5.8 性能基准测试
     - TB 增量重算 < 500ms（129 行）
     - 影响预判 < 200ms
     - Presence 心跳 Redis < 1ms

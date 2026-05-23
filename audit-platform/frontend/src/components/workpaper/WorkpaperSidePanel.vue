@@ -1,7 +1,7 @@
 <!--
   WorkpaperSidePanel — 底稿/报表编辑器统一右栏面板 [R7-S3-05 Task 24 / R8-S2-01]
 
-  @docs ../../../docs/WORKPAPER_SIDE_PANEL_GUIDE.md
+  @docs ../../../docs/frontend/workpaper-side-panel.md
 
   10 Tab 容器：AI / 附件 / 版本 / 批注 / 程序 / 程序要求 / 依赖 / 一致性 / 自检 / 提示
   所有编辑器（WorkpaperEditor/WorkpaperWorkbench/DisclosureEditor/AuditReportEditor/ReportConfigEditor）

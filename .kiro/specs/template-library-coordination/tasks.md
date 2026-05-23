@@ -118,7 +118,7 @@
     - **Property 6: Coverage calculation correctness**
     - **Validates: Requirements 7.5, 8.2, 8.3, 17.2, 17.3**
 
-  - [ ]* 1.9 Write property test for template list completeness（迁移自 5.1）
+  - [x]* 1.9 Write property test for template list completeness（迁移自 5.1）
     - **Property 2: Template list completeness and field presence**
     - **Validates: Requirements 2.3, 3.2, 16.2, 16.4, 16.6, 16.7**
 

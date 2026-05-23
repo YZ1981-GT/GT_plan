@@ -11,7 +11,7 @@
 
 本项目采用"Baseline + Incremental"双轨模式，**不走 Alembic 全量 autogenerate 链**：
 
-1. **基线创建**：`_init_tables.py` 使用 `Base.metadata.create_all()` 一次性建所有 152 张表
+1. **基线创建**：`init_tables.py` 使用 `Base.metadata.create_all()` 一次性建所有 152 张表
    - 优点：新库部署 < 10 秒，不需逐条执行 36 个历史迁移
    - 优点：模型与 schema 始终一致，不会出现 autogenerate 漏表
    - 代价：放弃了完整的 schema 变更历史链
@@ -84,7 +84,7 @@ alembic upgrade head
 
 新环境不走迁移链，直接：
 ```bash
-python backend/scripts/_init_tables.py
-python backend/scripts/_create_admin.py
+python backend/scripts/init_tables.py
+python backend/scripts/create_admin.py
 alembic stamp head
 ```

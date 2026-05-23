@@ -22,6 +22,7 @@
   §88 全局搜索
   §90 底稿批量状态变更
   §91 Prefill 预览+应用
+  §119 proposal-remaining-18 S-4：历史版本搜索
 """
 from fastapi import FastAPI
 
@@ -171,3 +172,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
     # ═══ §91. Prefill 预览+应用 ═══
     from app.routers.wp_prefill_preview import router as wp_prefill_preview_router
     app.include_router(wp_prefill_preview_router, tags=["底稿Prefill预览"])
+
+    # ═══ §119. proposal-remaining-18 S-4：历史版本搜索 ═══
+    from app.routers.wp_version_search import router as wp_version_search_router
+    app.include_router(wp_version_search_router, tags=["wp-version-search"])

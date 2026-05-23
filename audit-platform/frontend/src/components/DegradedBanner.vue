@@ -2,7 +2,7 @@
 /**
  * DegradedBanner — 系统降级横幅（R10 Spec C / Sprint 1.4）
  *
- * @docs ../../docs/EVENT_CASCADE_HEALTH_GUIDE.md
+ * @docs ../../docs/operations/event-cascade-health.md
  *
  * 三档扩展（design D2/D5）：
  * - hidden: 健康

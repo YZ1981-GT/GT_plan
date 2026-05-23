@@ -35,21 +35,91 @@ from app.models.report_models import DisclosureNote
 logger = logging.getLogger(__name__)
 
 
-def generate_formulas_for_table(table_template: dict, check_presets: list[str]) -> dict[str, dict]:
+def generate_formulas_for_table(
+    table_template: dict,
+    check_presets: list[str],
+    wp_mapping: dict[str, dict] | None = None,
+) -> dict[str, dict]:
     """根据表格模板和校验预设，自动生成单元格公式。
 
-    Returns: {"row_idx:col_idx": {"type": ..., "expression": ..., "description": ..., "category": ...}}
+    扩展（L-4 task 4.1）：
+    - 明细行 wp_mapping 优先 → 生成 =WP() 公式
+    - 明细行 account_codes → 生成 =TB() 公式（多科目用 +）
+    - 明细行 report_row_code → 生成 =REPORT() 公式（兜底）
+    - 合计行（is_total）保持 vertical_sum 不变
+
+    Args:
+        table_template: {"headers": [...], "rows": [{"label", "account_codes", "is_total", "report_row_code"}]}
+        check_presets: ["balance", "sub_item", "movement", "book_value"] 等
+        wp_mapping: {label: {"wp_code", "sheet", "cell_closing", "cell_opening"}} 可选
+
+    Returns: {"row_idx:col_idx": {"type": ..., "expression": ..., "description": ..., "category": ..., "source": ...}}
     """
     formulas: dict[str, dict] = {}
     headers = table_template.get("headers") or []
     rows = table_template.get("rows") or []
+    wp_mapping = wp_mapping or {}
 
     if not rows or not headers:
         return formulas
 
     num_cols = len(headers) - 1  # 第0列是标签列
+    if num_cols <= 0:
+        return formulas
 
-    # 1. 纵向合计公式（sub_item 预设）
+    # 检测每列对应的"期间"标签（期末 / 期初）
+    period_columns = _detect_period_columns(headers[1:])  # 跳过标签列
+
+    # 1. 明细行公式（wp_mapping > account_codes > report_row_code）
+    for row_idx, row in enumerate(rows):
+        if row.get("is_total"):
+            continue
+
+        label = (row.get("label") or "").strip()
+        account_codes = row.get("account_codes") or []
+        report_row_code = row.get("report_row_code")
+        wp_cfg = wp_mapping.get(label) if label else None
+
+        for col_idx, period_label in period_columns.items():
+            if col_idx >= num_cols:
+                continue
+
+            key = f"{row_idx}:{col_idx}"
+            expr: str | None = None
+            source: str | None = None
+
+            # 优先级 1：wp_mapping
+            if wp_cfg:
+                cell_field = "cell_closing" if "期末" in period_label else "cell_opening"
+                cell_ref = wp_cfg.get(cell_field)
+                if cell_ref:
+                    expr = (
+                        f"WP('{wp_cfg['wp_code']}','{wp_cfg.get('sheet', '')}',"
+                        f"'{cell_ref}')"
+                    )
+                    source = "wp_mapping"
+
+            # 优先级 2：account_codes（多科目用 + 累加）
+            if not expr and account_codes:
+                tb_parts = [f"TB('{code}','{period_label}')" for code in account_codes]
+                expr = " + ".join(tb_parts)
+                source = "account_codes"
+
+            # 优先级 3：report_row_code 兜底
+            if not expr and report_row_code:
+                expr = f"REPORT('{report_row_code}','{period_label}')"
+                source = "report_row_code"
+
+            if expr:
+                formulas[key] = {
+                    "type": "cross_table",
+                    "expression": expr,
+                    "description": f"{label} {period_label}",
+                    "category": "auto_calc",
+                    "source": source,
+                }
+
+    # 2. 纵向合计公式（sub_item 预设）
     if "sub_item" in check_presets or "balance" in check_presets:
         total_indices = [i for i, r in enumerate(rows) if r.get("is_total")]
         for total_idx in total_indices:
@@ -70,15 +140,13 @@ def generate_formulas_for_table(table_template: dict, check_presets: list[str]) 
                     "source": "check_presets.sub_item",
                 }
 
-    # 2. 横向公式（movement 预设：期初+增加-减少=期末）
+    # 3. 横向公式（movement 预设：期初+增加-减少=期末）
     if "movement" in check_presets:
-        # 检测表头中是否有"期初""增加""减少""期末"
         col_map = _detect_movement_columns(headers)
         if col_map:
             for row_idx, row in enumerate(rows):
                 if row.get("is_total"):
                     continue
-                # 期末 = 期初 + 增加 - 减少
                 if "closing" in col_map and "opening" in col_map:
                     closing_col = col_map["closing"]
                     key = f"{row_idx}:{closing_col}"
@@ -97,13 +165,11 @@ def generate_formulas_for_table(table_template: dict, check_presets: list[str]) 
                         "source": "check_presets.movement",
                     }
 
-    # 3. 账面价值公式（book_value 预设）
+    # 4. 账面价值公式（book_value 预设）
     if "book_value" in check_presets:
-        # 检测是否有"账面价值"行
         for row_idx, row in enumerate(rows):
             label = row.get("label", "")
             if "账面价值" in label and "期末" in label:
-                # 找原值行和折旧行
                 original_idx = _find_row_by_keyword(rows, "原值期末")
                 depreciation_idx = _find_row_by_keyword(rows, "累计折旧期末") or _find_row_by_keyword(rows, "累计摊销期末")
                 impairment_idx = _find_row_by_keyword(rows, "减值准备期末") or _find_row_by_keyword(rows, "减值准备")
@@ -127,6 +193,23 @@ def generate_formulas_for_table(table_template: dict, check_presets: list[str]) 
                         }
 
     return formulas
+
+
+def _detect_period_columns(data_headers: list[str]) -> dict[int, str]:
+    """检测数据列（去掉首列标签）对应的"期末/期初"语义。
+
+    返回 {col_idx (0-based 数据列): "期末" | "期初"}；
+    非"期末/期初/本期/上期/年初/年末"列不返回（如"备注"列）。
+    """
+    mapping: dict[int, str] = {}
+    for i, h in enumerate(data_headers):
+        s = str(h or "")
+        if "期末" in s or "本期" in s or "年末" in s:
+            mapping[i] = "期末"
+        elif "期初" in s or "上期" in s or "年初" in s:
+            mapping[i] = "期初"
+        # 其他列（如"备注"）不参与公式生成
+    return mapping
 
 
 def _detect_movement_columns(headers: list[str]) -> dict[str, int]:
@@ -343,12 +426,14 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
         "report": {"BS-002": {"current": 1000, "prior": 900}, ...},
         "tb": {"1001": {"audited": 500, "unadjusted": 480, "opening": 450}, ...},
         "notes": {"五、3": {"total_closing": 1200, "total_opening": 1100}, ...},
+        "wp": {"E1": {"审定表E1!B5": 50.0, "审定表E1!C5": 40.0}, ...},
     }
     """
     from app.models.report_models import FinancialReport
     from app.models.audit_platform_models import TrialBalance
+    from app.models.workpaper_models import WorkingPaper, WpIndex
 
-    cross_data: dict[str, Any] = {"report": {}, "tb": {}, "notes": {}}
+    cross_data: dict[str, Any] = {"report": {}, "tb": {}, "notes": {}, "wp": {}}
 
     # 加载报表数据
     try:
@@ -394,6 +479,29 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
     except Exception:
         pass
 
+    # 加载底稿 cells（L-4 task 4.1 新增）
+    try:
+        wp_result = await db.execute(
+            sa.select(WorkingPaper, WpIndex.wp_code)
+            .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+            .where(
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.is_deleted == sa.false(),
+            )
+        )
+        for wp, wp_code in wp_result.all():
+            if not wp_code or not wp.parsed_data:
+                continue
+            cells = wp.parsed_data.get("cells") or {}
+            if cells:
+                cross_data["wp"][wp_code] = {
+                    k: float(v) if v is not None else 0
+                    for k, v in cells.items()
+                    if isinstance(v, (int, float))
+                }
+    except Exception:
+        pass
+
     # 加载其他附注合计值
     try:
         result = await db.execute(
@@ -419,60 +527,153 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
     return cross_data
 
 
-def _exec_cross_table(expression: str, cross_data: dict[str, Any]) -> float | None:
-    """执行跨表引用公式。
+# ─────────────────────────────────────────────────────────────────────────────
+# L-4 task 4.1：单引用解析 + 多 token 加减组合
+# ─────────────────────────────────────────────────────────────────────────────
 
-    支持语法：
-    - REPORT('BS-002','期末') → cross_data["report"]["BS-002"]["current"]
-    - REPORT('BS-002','期初') → cross_data["report"]["BS-002"]["prior"]
-    - TB('1001','审定数') → cross_data["tb"]["1001"]["audited"]
-    - TB('1001','未审数') → cross_data["tb"]["1001"]["unadjusted"]
-    - TB('1001','期初') → cross_data["tb"]["1001"]["opening"]
-    - NOTE('五、3','合计','期末') → cross_data["notes"]["五、3"]["total_closing"]
+
+def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float | None:
+    """解析单个跨表引用 token，返回数值或 None。
+
+    支持：
+    - TB('account_code','column')  column ∈ 期末/期初/审定数/未审数
+    - REPORT('row_code','period')  period ∈ 期末/期初/current/prior
+    - WP('wp_code','sheet','cell_ref')
+    - NOTE('section','合计','期末'/'期初')
+
+    无法解析或科目/底稿/附注不存在时返回 None；TB 列存在但 account 不存在 → 0。
     """
     import re
 
-    try:
-        # REPORT('row_code','period')
-        report_match = re.search(r"REPORT\('([^']+)','([^']+)'\)", expression)
-        if report_match:
-            row_code = report_match.group(1)
-            period = report_match.group(2)
-            report_data = cross_data.get("report", {}).get(row_code, {})
-            if "期末" in period or "current" in period:
-                return report_data.get("current", 0)
-            elif "期初" in period or "prior" in period:
-                return report_data.get("prior", 0)
-
-        # TB('account_code','column')
-        tb_match = re.search(r"TB\('([^']+)','([^']+)'\)", expression)
-        if tb_match:
-            account_code = tb_match.group(1)
-            column = tb_match.group(2)
-            tb_data = cross_data.get("tb", {}).get(account_code, {})
-            if "审定" in column or "audited" in column:
-                return tb_data.get("audited", 0)
-            elif "未审" in column or "unadjusted" in column:
-                return tb_data.get("unadjusted", 0)
-            elif "期初" in column or "opening" in column:
-                return tb_data.get("opening", 0)
-            elif "期末" in column:
-                return tb_data.get("audited", 0)  # 期末余额=审定数
-
-        # NOTE('section','合计','period')
-        note_match = re.search(r"NOTE\('([^']+)','[^']*','([^']+)'\)", expression)
-        if note_match:
-            section = note_match.group(1)
-            period = note_match.group(2)
-            note_data = cross_data.get("notes", {}).get(section, {})
-            if "期末" in period:
-                return note_data.get("total_closing", 0)
-            elif "期初" in period:
-                return note_data.get("total_opening", 0)
-
+    if not token or not isinstance(token, str):
         return None
-    except Exception:
+
+    s = token.strip()
+
+    # WP('wp_code','sheet','cell_ref')
+    m = re.fullmatch(r"\s*WP\('([^']+)','([^']*)','([^']+)'\)\s*", s)
+    if m:
+        wp_code = m.group(1)
+        sheet = m.group(2)
+        cell_ref = m.group(3)
+        wp_data = cross_data.get("wp", {}).get(wp_code)
+        if wp_data is None:
+            return None
+        # 优先匹配 "sheet!cell_ref" 复合 key，再退回单独 cell_ref
+        composite = f"{sheet}!{cell_ref}" if sheet else cell_ref
+        if composite in wp_data:
+            return float(wp_data[composite])
+        if cell_ref in wp_data:
+            return float(wp_data[cell_ref])
         return None
+
+    # NOTE('section','*','period')
+    m = re.fullmatch(r"\s*NOTE\('([^']+)','([^']*)','([^']+)'\)\s*", s)
+    if m:
+        section = m.group(1)
+        period = m.group(3)
+        note_data = cross_data.get("notes", {}).get(section)
+        if note_data is None:
+            return None
+        if "期末" in period:
+            return float(note_data.get("total_closing", 0))
+        if "期初" in period:
+            return float(note_data.get("total_opening", 0))
+        return None
+
+    # REPORT('row_code','period')
+    m = re.fullmatch(r"\s*REPORT\('([^']+)','([^']+)'\)\s*", s)
+    if m:
+        row_code = m.group(1)
+        period = m.group(2)
+        report_data = cross_data.get("report", {}).get(row_code)
+        if report_data is None:
+            return None
+        if "期末" in period or "current" in period or "本期" in period:
+            return float(report_data.get("current", 0))
+        if "期初" in period or "prior" in period or "上期" in period:
+            return float(report_data.get("prior", 0))
+        return None
+
+    # TB('account_code','column')
+    m = re.fullmatch(r"\s*TB\('([^']+)','([^']+)'\)\s*", s)
+    if m:
+        account_code = m.group(1)
+        column = m.group(2)
+        # 列名识别（先做白名单：只接受预期列）
+        col_key: str | None = None
+        if "审定" in column or column == "audited":
+            col_key = "audited"
+        elif "未审" in column or column == "unadjusted":
+            col_key = "unadjusted"
+        elif "期初" in column or column == "opening":
+            col_key = "opening"
+        elif "期末" in column or column == "closing":
+            # 期末余额 = 审定数
+            col_key = "audited"
+        else:
+            return None
+        tb_data = cross_data.get("tb", {}).get(account_code)
+        if tb_data is None:
+            # 列名合法但 account 不存在 → 默认 0
+            return 0.0
+        return float(tb_data.get(col_key, 0))
+
+    return None
+
+
+def _exec_cross_table(expression: Any, cross_data: dict[str, Any]) -> float | None:
+    """执行跨表引用公式（支持多 token 加减组合）。
+
+    支持语法：
+    - 单引用：TB('1001','期末') / REPORT('BS-002','期末') / WP('E1','审定表E1','B5')
+    - 加减组合：TB('1001','期末') + TB('1002','期末') - WP('E1','审定表E1','C5')
+
+    任何 token 解析失败返回 None；空 / 非字符串 / 完全不匹配的字符串返回 None。
+    """
+    import re
+
+    if expression is None or not isinstance(expression, str):
+        return None
+    s = expression.strip()
+    if not s:
+        return None
+
+    # 切分 +/- 操作符（保留符号）
+    # 例 "TB('1','期末') + TB('2','期末') - WP('E1','审定表','B5')"
+    # 用正则把整个表达式拆为 [(sign, token), ...]
+    pattern = re.compile(
+        r"([+-]?)\s*((?:TB|REPORT|WP|NOTE)\([^)]*\))",
+    )
+    matches = pattern.findall(s)
+    if not matches:
+        return None
+
+    # 把所有匹配的 token 还原拼接，验证整个 expression 由这些 token + +/- 组成
+    reconstructed = "".join(
+        f"{sign or '+'}{token}" for sign, token in matches
+    )
+    # 移除原 s 内的空白后再比较
+    s_no_space = re.sub(r"\s+", "", s)
+    rec_no_space = re.sub(r"\s+", "", reconstructed)
+    # 允许首项无 + 号
+    if rec_no_space.startswith("+"):
+        rec_no_space_alt = rec_no_space[1:]
+    else:
+        rec_no_space_alt = rec_no_space
+    if s_no_space not in (rec_no_space, rec_no_space_alt):
+        return None
+
+    total = 0.0
+    for sign, token in matches:
+        val = _resolve_single_cross_ref(token, cross_data)
+        if val is None:
+            return None
+        if sign == "-":
+            total -= val
+        else:
+            total += val
+    return total
 
 
 def _exec_generic(expression: str, rows: list[dict], cross_data: dict[str, Any]) -> float | None:
@@ -532,3 +733,109 @@ def _exec_horizontal(rows: list[dict], expression: str) -> float | None:
         return result
     except Exception:
         return None
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# L-4 task 4.1：覆盖率统计
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def compute_formula_coverage(table_data: dict | None) -> dict[str, Any]:
+    """计算单个附注表格的公式覆盖率。
+
+    覆盖率 = 可生成公式的 cell 数 / 数据列总 cell 数（不含标签列）
+
+    Args:
+        table_data: {"headers", "rows", "_check_presets", "_wp_mapping"?}
+
+    Returns: {"total_cells": N, "configured_cells": M, "coverage_pct": X.X}
+    """
+    if not table_data or not isinstance(table_data, dict):
+        return {"total_cells": 0, "configured_cells": 0, "coverage_pct": 0.0}
+
+    headers = table_data.get("headers") or []
+    rows = table_data.get("rows") or []
+    if not headers or not rows:
+        return {"total_cells": 0, "configured_cells": 0, "coverage_pct": 0.0}
+
+    # 仅统计 _detect_period_columns 识别的"期末/期初"类列（备注列等不计入分母）
+    period_cols = _detect_period_columns(headers[1:])
+    num_period_cols = len(period_cols)
+    if num_period_cols == 0:
+        return {"total_cells": 0, "configured_cells": 0, "coverage_pct": 0.0}
+
+    total_cells = len(rows) * num_period_cols
+    check_presets = table_data.get("_check_presets") or []
+    wp_mapping = table_data.get("_wp_mapping") or {}
+
+    formulas = generate_formulas_for_table(
+        {"headers": headers, "rows": rows},
+        check_presets,
+        wp_mapping=wp_mapping,
+    )
+
+    # 仅统计 period_cols 范围内的 configured cells
+    configured_cells = 0
+    for key in formulas:
+        try:
+            r_str, c_str = key.split(":", 1)
+            c_idx = int(c_str)
+            if c_idx in period_cols:
+                configured_cells += 1
+        except (ValueError, IndexError):
+            continue
+
+    coverage_pct = round(configured_cells * 100 / total_cells, 1) if total_cells else 0.0
+    return {
+        "total_cells": total_cells,
+        "configured_cells": configured_cells,
+        "coverage_pct": coverage_pct,
+    }
+
+
+async def compute_project_formula_coverage(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+) -> dict[str, Any]:
+    """项目级附注公式覆盖率统计（聚合所有 DisclosureNote）。
+
+    Returns: {
+        "total_cells": N,
+        "configured_cells": M,
+        "coverage_pct": X.X,
+        "by_section": [{"note_section": "五、1", "total_cells": ..., "configured_cells": ..., "coverage_pct": ...}, ...],
+    }
+    """
+    result = await db.execute(
+        sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.is_deleted == sa.false(),
+        )
+    )
+    notes = list(result.scalars().all())
+
+    total = 0
+    configured = 0
+    by_section: list[dict[str, Any]] = []
+    for note in notes:
+        td = note.table_data
+        if not td:
+            continue
+        s = compute_formula_coverage(td)
+        total += s["total_cells"]
+        configured += s["configured_cells"]
+        by_section.append({
+            "note_section": note.note_section,
+            **s,
+        })
+
+    coverage_pct = round(configured * 100 / total, 1) if total else 0.0
+    return {
+        "total_cells": total,
+        "configured_cells": configured,
+        "coverage_pct": coverage_pct,
+        "by_section": by_section,
+    }

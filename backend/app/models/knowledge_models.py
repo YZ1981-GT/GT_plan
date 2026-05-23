@@ -107,6 +107,12 @@ class KnowledgeDocument(Base):
         server_default=text("false"), nullable=False
     )
 
+    # AT-3 KB 接入：版本管理（V016）
+    version: Mapped[int] = mapped_column(sa.Integer, server_default=text("1"), nullable=False)
+    previous_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+
     __table_args__ = (
         Index("idx_knowledge_documents_folder", "folder_id"),
         Index("idx_knowledge_documents_name", "name"),
