@@ -270,18 +270,31 @@ const STATIC_SOURCES = [
   { key: 'ws_elimination', label: '📑 抵消分录', parentKey: 'worksheet' },
 ]
 
-// 数据源全集：从 indicatorTree 扁平化派生（叶子节点带 parentKey），树未加载时用 STATIC_SOURCES 兜底
+// 数据源全集：从 indicatorTree 递归扁平化派生（支持 N 层嵌套，每个叶子带顶层 parentKey）
+// 附注 3 层：disclosure → 货币资金大类 → 五-1-1 明细，明细的 parentKey 仍归到 'disclosure'
 const allSources = computed(() => {
   if (!indicatorTree.value.length) return STATIC_SOURCES
   const list: { key: string; label: string; parentKey: string }[] = []
+  function walk(node: any, topKey: string, prefix: string) {
+    const childList = node.children || []
+    if (childList.length === 0) {
+      // 叶子
+      list.push({
+        key: node.key,
+        label: prefix ? `${prefix} / ${node.label}` : node.label,
+        parentKey: topKey,
+      })
+      return
+    }
+    for (const child of childList) {
+      const nextPrefix = prefix ? `${prefix} / ${node.label}` : node.label
+      walk(child, topKey, nextPrefix)
+    }
+  }
   for (const cat of indicatorTree.value) {
     const icon = cat.icon || ''
     for (const leaf of (cat.children || [])) {
-      list.push({
-        key: leaf.key,
-        label: `${icon} ${leaf.label}`.trim(),
-        parentKey: cat.key,
-      })
+      walk(leaf, cat.key, icon)
     }
   }
   return list.length ? list : STATIC_SOURCES
@@ -343,20 +356,50 @@ function formatCell(v: any) {
   return s
 }
 
+// 工具：递归找节点的第一个叶子（用于点大类自动选明细）
+function findFirstLeaf(node: any): any | null {
+  if (!node) return null
+  if (!node.children?.length) return node
+  for (const c of node.children) {
+    const r = findFirstLeaf(c)
+    if (r) return r
+  }
+  return null
+}
+
+// 工具：在 indicatorTree 中找节点 key 对应的顶层大类 key（disclosure/report/...）
+function findTopCategoryOf(targetKey: string): string | null {
+  for (const top of indicatorTree.value) {
+    if (top.key === targetKey) return top.key
+    function walk(n: any): boolean {
+      if (n.key === targetKey) return true
+      for (const c of (n.children || [])) {
+        if (walk(c)) return true
+      }
+      return false
+    }
+    for (const c of (top.children || [])) {
+      if (walk(c)) return top.key
+    }
+  }
+  return null
+}
+
 function onIndicatorClick(data: any) {
   if (data.children?.length) {
-    // 大类节点：记录 category 并自动选第一个子项
-    clickedCategory.value = data.key
-    const first = data.children[0]
-    if (first?.key) {
-      selectedSource.value = first.key
-      if (first.key.startsWith('report_')) filterReportType.value = first.key.replace('report_', '')
+    // 大类/中间层节点：定位顶层 category + 递归找第一明细叶子
+    const topKey = findTopCategoryOf(data.key) || data.key
+    clickedCategory.value = topKey
+    const firstLeaf = findFirstLeaf(data)
+    if (firstLeaf?.key) {
+      selectedSource.value = firstLeaf.key
+      if (firstLeaf.key.startsWith('report_')) filterReportType.value = firstLeaf.key.replace('report_', '')
     }
   } else if (data.key) {
-    // 叶子节点：设 source，并反查父大类同步 clickedCategory
+    // 叶子节点：设 source，并反查顶层大类同步 clickedCategory
     selectedSource.value = data.key
     if (data.key.startsWith('report_')) filterReportType.value = data.key.replace('report_', '')
-    const parent = leafToCategory.value[data.key]
+    const parent = leafToCategory.value[data.key] || findTopCategoryOf(data.key)
     if (parent) clickedCategory.value = parent
   }
 }
@@ -430,21 +473,28 @@ async function exportResult() {
   ElMessage.success('已导出')
 }
 
-// 加载指标树（sessionStorage 缓存：登录会话内只拉一次）
-const INDICATOR_CACHE_KEY = 'gt:custom-query:indicators-v1'
-async function loadIndicators() {
+// 加载指标树（按项目缓存：每个项目独立 sessionStorage key）
+const INDICATOR_CACHE_KEY_PREFIX = 'gt:custom-query:indicators-v2:'
+
+function _indicatorCacheKey(pid: string | undefined) {
+  return `${INDICATOR_CACHE_KEY_PREFIX}${pid || 'no-project'}`
+}
+
+async function loadIndicators(pid: string | undefined) {
+  const cacheKey = _indicatorCacheKey(pid)
   // 先尝试缓存
   try {
-    const cached = sessionStorage.getItem(INDICATOR_CACHE_KEY)
+    const cached = sessionStorage.getItem(cacheKey)
     if (cached) {
       indicatorTree.value = JSON.parse(cached)
       return
     }
   } catch { /* ignore */ }
   try {
-    const data = await api.get('/api/custom-query/indicators')
+    const url = pid ? `/api/custom-query/indicators?project_id=${encodeURIComponent(pid)}` : '/api/custom-query/indicators'
+    const data = await api.get(url)
     indicatorTree.value = Array.isArray(data) ? data : (data ?? [])
-    try { sessionStorage.setItem(INDICATOR_CACHE_KEY, JSON.stringify(indicatorTree.value)) } catch { /* ignore */ }
+    try { sessionStorage.setItem(cacheKey, JSON.stringify(indicatorTree.value)) } catch { /* ignore */ }
   } catch {
     // 兜底：用 STATIC_SOURCES 重建一棵简易树（按 parentKey 分组）
     const grouped: Record<string, any[]> = {}
@@ -454,7 +504,19 @@ async function loadIndicators() {
     indicatorTree.value = Object.entries(grouped).map(([k, children]) => ({ key: k, label: k, children }))
   }
 }
-loadIndicators()
+
+// 项目切换 → 重新拉树（带项目级缓存）
+watch(localProjectId, (pid) => {
+  if (pid) loadIndicators(pid)
+}, { immediate: false })
+
+// 弹窗第一次打开时按当前 project 加载（如果尚未加载）
+watch(visible, (v) => {
+  if (v && !indicatorTree.value.length) loadIndicators(localProjectId.value)
+})
+
+// 初次挂载时按现有 projectId 加载（弹窗未必打开但提前缓存）
+loadIndicators(localProjectId.value)
 </script>
 
 <style scoped>

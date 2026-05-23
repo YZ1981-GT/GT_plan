@@ -30,18 +30,20 @@ API:
   DELETE /api/custom-query/templates/{id}       — 删除模板（仅创建者或 admin）
 """
 
+import json
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
-from app.models.core import User
+from app.models.core import Project, User
 from app.models.custom_query_models import CustomQueryTemplate
 
 router = APIRouter(prefix="/api/custom-query", tags=["custom-query"])
@@ -58,17 +60,37 @@ class QueryRequest(BaseModel):
 
 
 @router.get("/indicators")
-async def get_indicators():
-    """获取可查询指标库（树形结构）"""
+async def get_indicators(
+    project_id: str | None = Query(default=None, description="项目 ID — 传入后报表/附注树会按项目模板类型动态生成"),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取可查询指标库（树形结构）
+
+    传入 project_id 时：
+      - 报表大类下展示项目模板类型（国企/上市）对应的具体报表
+      - 附注大类下展示项目实际配置的章节（按 parent_section 分组成子大类）
+    未传 project_id 时：报表/附注用通用降级树（仅显示报表类型，无国企/上市区分）
+    """
+    template_type = await _resolve_project_template_type(db, project_id)
+    standard_label = _STANDARD_LABEL.get(template_type, "通用")
+
+    # ─── 报表树：项目模板类型决定大类标签 ───────────────────────────
+    report_children = [
+        {"key": "report_balance_sheet", "label": f"资产负债表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
+        {"key": "report_income_statement", "label": f"利润表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
+        {"key": "report_cash_flow_statement", "label": f"现金流量表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
+        {"key": "report_equity_statement", "label": f"所有者权益变动表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
+    ]
+
+    # ─── 附注树：按 parent_section 分组成大类→明细两层 ─────────────
+    disclosure_children = await _build_disclosure_tree(template_type)
+
     return [
         {
-            "key": "report", "label": "📊 报表", "icon": "📊",
-            "children": [
-                {"key": "report_balance_sheet", "label": "资产负债表", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"]},
-                {"key": "report_income_statement", "label": "利润表", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"]},
-                {"key": "report_cash_flow_statement", "label": "现金流量表", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"]},
-                {"key": "report_equity_statement", "label": "所有者权益变动表", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"]},
-            ],
+            "key": "report",
+            "label": f"📊 报表（{standard_label}）" if project_id else "📊 报表",
+            "icon": "📊",
+            "children": report_children,
         },
         {
             "key": "trial_balance", "label": "📋 试算表", "icon": "📋",
@@ -78,10 +100,10 @@ async def get_indicators():
             ],
         },
         {
-            "key": "disclosure", "label": "📝 附注", "icon": "📝",
-            "children": [
-                {"key": "disclosure_note", "label": "附注章节数据", "columns": ["section_id", "headers", "rows"]},
-            ],
+            "key": "disclosure",
+            "label": f"📝 附注（{standard_label}）" if project_id else "📝 附注",
+            "icon": "📝",
+            "children": disclosure_children,
         },
         {
             "key": "adjustment", "label": "📐 调整分录", "icon": "📐",
@@ -98,7 +120,6 @@ async def get_indicators():
                 {"key": "ws_consol_tb", "label": "合并试算平衡表", "columns": ["row_code", "row_name", "summary", "equity_dr", "equity_cr", "audited"]},
             ],
         },
-        # Sprint 6 新增数据源
         {
             "key": "workpaper", "label": "📄 底稿列表", "icon": "📄",
             "children": [
@@ -132,6 +153,106 @@ async def get_indicators():
     ]
 
 
+# ─── 辅助函数：项目模板类型解析 + 附注树构建 ───────────────────────────────
+
+_STANDARD_LABEL = {"soe": "国企", "listed": "上市"}
+_DISCLOSURE_CACHE: dict[str, list[dict]] = {}
+
+
+async def _resolve_project_template_type(db: AsyncSession, project_id: str | None) -> str:
+    """从项目读 template_type，未配置或未传 project_id 则降级为 'soe'"""
+    if not project_id:
+        return "soe"
+    try:
+        proj_uuid = uuid.UUID(project_id)
+    except (TypeError, ValueError):
+        return "soe"
+    proj = await db.get(Project, proj_uuid)
+    if proj and proj.template_type in _STANDARD_LABEL:
+        return proj.template_type
+    return "soe"
+
+
+async def _resolve_project_report_scope(db: AsyncSession, project_id: str | None) -> str:
+    """从项目读 report_scope（standalone / consolidated），默认 standalone"""
+    if not project_id:
+        return "standalone"
+    try:
+        proj_uuid = uuid.UUID(project_id)
+    except (TypeError, ValueError):
+        return "standalone"
+    proj = await db.get(Project, proj_uuid)
+    if proj and proj.report_scope in ("standalone", "consolidated"):
+        return proj.report_scope
+    return "standalone"
+
+
+async def _build_disclosure_tree(template_type: str) -> list[dict]:
+    """读 consol_note_sections_{template_type}.json，按 parent_section 分组成两层树。
+
+    返回结构：
+      [
+        { key: 'note_group_货币资金', label: '货币资金', children: [
+            { key: 'disclosure_note:五-1-1', label: '五-1-1 货币资金', section_id: '五-1-1' },
+            { key: 'disclosure_note:五-1-2', label: '五-1-2 受限制货币资金明细', section_id: '五-1-2' },
+        ] },
+        ...
+      ]
+    """
+    sections = _load_disclosure_sections(template_type)
+    if not sections:
+        # 降级：未读到 JSON 时返回单一通用入口
+        return [{"key": "disclosure_note", "label": "附注章节数据（通用）", "columns": ["section_id", "headers", "rows"]}]
+
+    # 按 parent_section 分组（按 parent_seq 排序）
+    groups: dict[str, dict] = {}
+    for sec in sections:
+        parent = sec.get("parent_section") or sec.get("title") or "其他"
+        parent_seq = sec.get("parent_seq", 999)
+        if parent not in groups:
+            groups[parent] = {
+                "key": f"note_group_{parent}",
+                "label": parent,
+                "_seq": parent_seq,
+                "children": [],
+            }
+        section_id = sec.get("section_id", "")
+        title = sec.get("title", "")
+        groups[parent]["children"].append({
+            "key": f"disclosure_note:{section_id}",
+            "label": f"{section_id} {title}".strip(),
+            "section_id": section_id,
+            "columns": ["section_id", "headers", "rows"],
+            "_seq": sec.get("seq", 999),
+        })
+
+    # 按 parent_seq 排序大类，按 seq 排序明细
+    sorted_groups = sorted(groups.values(), key=lambda g: g["_seq"])
+    for g in sorted_groups:
+        g["children"].sort(key=lambda c: c["_seq"])
+        for c in g["children"]:
+            c.pop("_seq", None)
+        g.pop("_seq", None)
+    return sorted_groups
+
+
+def _load_disclosure_sections(template_type: str) -> list[dict]:
+    """读 backend/data/consol_note_sections_{template_type}.json（带模块级缓存）"""
+    if template_type in _DISCLOSURE_CACHE:
+        return _DISCLOSURE_CACHE[template_type]
+    data_path = Path(__file__).resolve().parent.parent.parent / "data" / f"consol_note_sections_{template_type}.json"
+    if not data_path.exists():
+        _DISCLOSURE_CACHE[template_type] = []
+        return []
+    try:
+        with data_path.open("r", encoding="utf-8") as f:
+            sections = json.load(f)
+        _DISCLOSURE_CACHE[template_type] = sections if isinstance(sections, list) else []
+    except Exception:
+        _DISCLOSURE_CACHE[template_type] = []
+    return _DISCLOSURE_CACHE[template_type]
+
+
 @router.post("/execute")
 async def execute_query(
     body: QueryRequest,
@@ -145,6 +266,11 @@ async def execute_query(
     limit = min(body.limit, 2000)
 
     try:
+        # disclosure_note:section_id 形式（树叶子点击）→ 走 disclosure 并把 section_id 注入 filters
+        if source.startswith("disclosure_note:"):
+            sid = source.split(":", 1)[1]
+            new_filters = {**filters, "section_id": sid}
+            return await _query_disclosure(db, pid, year, new_filters, limit)
         if source == 'report' or source.startswith('report_'):
             return await _query_report(db, pid, year, filters, limit)
         elif source == 'trial_balance' or source == 'tb_detail':
@@ -180,7 +306,17 @@ async def execute_query(
 
 async def _query_report(db, pid, year, filters, limit):
     report_type = filters.get("report_type", "balance_sheet")
-    standard = filters.get("standard", "soe_standalone")
+    # standard 优先级：filters.standard > 项目 (template_type + report_scope) 推断 > 默认 soe_standalone
+    standard = filters.get("standard")
+    if not standard:
+        template_type = await _resolve_project_template_type(db, pid)
+        scope = await _resolve_project_report_scope(db, pid)
+        # report_config 取值：soe_standalone / listed_standalone / listed_consolidated
+        # soe 暂无 consolidated 数据，强制走 standalone
+        if template_type == "soe":
+            standard = "soe_standalone"
+        else:
+            standard = f"listed_{scope or 'standalone'}"
     # 优先查项目级数据，降级查全局模板
     query = "SELECT row_code, row_name, current_period_amount, prior_period_amount, indent_level, is_total_row FROM report_config WHERE report_type = :rt AND applicable_standard = :std AND is_deleted = false"
     params: dict = {"rt": report_type, "std": standard, "lim": limit}
@@ -190,7 +326,7 @@ async def _query_report(db, pid, year, filters, limit):
     query += " ORDER BY row_number LIMIT :lim"
     result = await db.execute(text(query), params)
     rows = [{"row_code": r[0], "row_name": r[1], "current_period_amount": float(r[2]) if r[2] else None, "prior_period_amount": float(r[3]) if r[3] else None, "indent": r[4], "is_total": r[5]} for r in result.fetchall()]
-    return {"rows": rows, "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "total": len(rows)}
+    return {"rows": rows, "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "total": len(rows), "applicable_standard": standard}
 
 
 async def _query_trial_balance(db, pid, year, filters, limit):
