@@ -797,6 +797,69 @@ async def wp_id_by_code(
     return {"wp_id": str(row[0]), "wp_code": wp_code, "project_id": project_id}
 
 
+def _try_render_preview_from_snapshot(parsed_data: dict, sheet_name: str | None) -> dict | None:
+    """从 parsed_data['univer_snapshot'] 直接渲染 picker 预览（零计算）
+
+    返回 {sheet_name, all_sheets, rows, cols, cells, merges} 或 None（snapshot 不可用降级 xlsx）
+    """
+    if not isinstance(parsed_data, dict):
+        return None
+    snapshot = parsed_data.get("univer_snapshot")
+    if not isinstance(snapshot, dict):
+        return None
+    sheets_map = snapshot.get("sheets") or {}
+    if not sheets_map:
+        return None
+    order = snapshot.get("sheet_order_names") or list(sheets_map.keys())
+    target = sheet_name if sheet_name and sheet_name in sheets_map else (order[0] if order else None)
+    if not target:
+        return None
+    sheet_obj = sheets_map.get(target) or {}
+    cell_data = sheet_obj.get("cellData") or {}
+    if not isinstance(cell_data, dict):
+        return None
+    # 转为 picker 期望的 {(r,c): {v, f}} 形式（0-indexed key 'r,c'），同时算 rows/cols 边界
+    cells: dict[str, dict] = {}
+    max_r = 0
+    max_c = 0
+    for r_str, row in cell_data.items():
+        try:
+            r = int(r_str)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(row, dict):
+            continue
+        for c_str, cell in row.items():
+            try:
+                c = int(c_str)
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(cell, dict):
+                continue
+            obj: dict = {}
+            v = cell.get("v")
+            if v is not None and v != "":
+                obj["v"] = v if isinstance(v, (int, float)) else str(v)
+            else:
+                obj["v"] = ""
+            if cell.get("f"):
+                obj["f"] = str(cell["f"])
+            if obj.get("v") != "" or obj.get("f"):
+                cells[f"{r},{c}"] = obj
+                if r > max_r:
+                    max_r = r
+                if c > max_c:
+                    max_c = c
+    return {
+        "sheet_name": target,
+        "all_sheets": order,
+        "rows": min(max_r + 1, 100) or 30,
+        "cols": min(max_c + 1, 30) or 10,
+        "cells": cells,
+        "merges": [],  # snapshot 暂不存合并信息（未来可加 mergeData 字段）
+    }
+
+
 @router.get("/wp-sheet-preview")
 async def wp_sheet_preview(
     project_id: str = Query(..., description="项目 ID"),
@@ -804,30 +867,41 @@ async def wp_sheet_preview(
     sheet_name: str | None = Query(None, description="目标 sheet 名称（缺省返回首个 sheet）"),
     db: AsyncSession = Depends(get_db),
 ):
-    """高级查询 sheet 选区器专用端点：返回模板 cellData 用于网格预览。
+    """高级查询 sheet 选区器专用端点：返回 cellData 用于网格预览。
 
-    流程：wp_code → wp_index.id → working_paper.id → storage xlsx → openpyxl 解析
-    返回单 sheet 的 {rows, cols, cells: {[r,c]: {v, f}}, merges}，体积比 Univer 完整 JSON 小
+    数据源优先级：
+      1. `working_paper.parsed_data['univer_snapshot']` — 用户保存底稿时已落库（首选，零计算）
+      2. storage xlsx → openpyxl 解析（首次未保存的模板）
     """
     try:
         proj_uuid = uuid.UUID(project_id)
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="invalid project_id")
 
-    # 1. 找 working_paper.id
+    # 1. wp_id + parsed_data 一次查询
     row = (await db.execute(text("""
-        SELECT w.id FROM working_paper w
+        SELECT w.id, w.parsed_data FROM working_paper w
         JOIN wp_index i ON w.wp_index_id = i.id
         WHERE i.project_id = :pid AND i.wp_code = :wpc AND w.is_deleted = false
         LIMIT 1
     """), {"pid": str(proj_uuid), "wpc": wp_code})).first()
-
     if not row:
         return {"available": False, "reason": "底稿在当前项目中不存在", "wp_code": wp_code}
-
     wp_id = row[0]
+    parsed_data = row[1] if isinstance(row[1], dict) else {}
 
-    # 2. 找 storage 文件
+    # 2. 优先从 parsed_data['univer_snapshot'] 渲染
+    snap_view = _try_render_preview_from_snapshot(parsed_data, sheet_name)
+    if snap_view is not None:
+        return {
+            "available": True,
+            "wp_code": wp_code,
+            "wp_id": str(wp_id),
+            "source": "univer_snapshot",
+            **snap_view,
+        }
+
+    # 3. 降级 storage xlsx 解析（异步化）
     from app.services.wp_template_init_service import get_workpaper_file, init_workpaper_from_template
     storage_path = get_workpaper_file(proj_uuid, wp_id)
     if not storage_path:
@@ -1136,14 +1210,14 @@ async def _query_workpaper(db, pid, year, filters, limit):
 
 
 async def _query_workpaper_cell_range(db, pid: str, filters: dict):
-    """按 cell_range 从模板 xlsx 提取真实单元格值
+    """按 cell_range 提取真实单元格值
 
-    支持语法：
-      - 'A1:C3' 矩形区域
-      - 'B5' 单 cell
-      - 'A1:A10,C1:C5' 多区域逗号分隔
-      - 'A:A' 整列（限 100 行）
-      - 'A:C' 整列范围
+    数据源优先级（零计算路径优先）：
+      1. `working_paper.parsed_data['univer_snapshot']` — 用户保存底稿时已落库的 Univer 计算后值（首选，零计算）
+      2. storage xlsx 的 cache（data_only=True 读，模板从未保存过时为 None）
+      3. LibreOffice headless 重算（仅前两路径都拿不到值时按需触发，重算后回写 cache）
+
+    支持语法：'A1:C3' / 'B5' / 'A1:A10,C1:C5' / 'A:A' / 'A:C'
     """
     wp_code = filters["wp_code"]
     sheet_name = filters.get("sheet_name")
@@ -1154,9 +1228,10 @@ async def _query_workpaper_cell_range(db, pid: str, filters: dict):
     except (TypeError, ValueError):
         return {"rows": [], "columns": [], "total": 0, "error": "invalid project_id"}
 
-    # 1. wp_code → wp_id
+    # 1. wp_code → wp_id + parsed_data 一次查询拿到
     row = (await db.execute(text("""
-        SELECT w.id FROM working_paper w
+        SELECT w.id, w.parsed_data
+        FROM working_paper w
         JOIN wp_index i ON w.wp_index_id = i.id
         WHERE i.project_id = :pid AND i.wp_code = :wpc AND w.is_deleted = false
         LIMIT 1
@@ -1164,8 +1239,27 @@ async def _query_workpaper_cell_range(db, pid: str, filters: dict):
     if not row:
         return {"rows": [], "columns": [], "total": 0, "error": f"底稿 {wp_code} 在当前项目不存在"}
     wp_id = row[0]
+    parsed_data = row[1] if isinstance(row[1], dict) else {}
 
-    # 2. storage 文件
+    # 2. 解析 cell_range 多区域
+    ranges = _parse_cell_ranges(cell_range)
+    if not ranges:
+        return {"rows": [], "columns": [], "total": 0, "error": f"无效 cell_range: {cell_range}"}
+
+    # 3. 优先尝试 parsed_data['univer_snapshot']（零计算快路径）
+    snapshot_rows = _try_extract_from_univer_snapshot(parsed_data, sheet_name, ranges, wp_code)
+    if snapshot_rows is not None:
+        result_columns = ["index", "wp_code", "sheet_name", "cell_ref", "value"]
+        if any("formula" in r for r in snapshot_rows):
+            result_columns.append("formula")
+        return {
+            "rows": snapshot_rows,
+            "columns": result_columns,
+            "total": len(snapshot_rows),
+            "source": "univer_snapshot",
+        }
+
+    # 4. 降级：storage xlsx 路径（含 LibreOffice 按需重算）
     from app.services.wp_template_init_service import get_workpaper_file, init_workpaper_from_template
     storage_path = get_workpaper_file(proj_uuid, wp_id)
     if not storage_path:
@@ -1177,12 +1271,6 @@ async def _query_workpaper_cell_range(db, pid: str, filters: dict):
     if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
         return {"rows": [], "columns": [], "total": 0, "error": "非 xlsx 类底稿"}
 
-    # 3. 解析 cell_range 多区域语法
-    ranges = _parse_cell_ranges(cell_range)
-    if not ranges:
-        return {"rows": [], "columns": [], "total": 0, "error": f"无效 cell_range: {cell_range}"}
-
-    # 4. 异步化读取 + 多区域累计
     try:
         content = storage_path.read_bytes()
         loop = asyncio.get_running_loop()
@@ -1224,7 +1312,6 @@ async def _query_workpaper_cell_range(db, pid: str, filters: dict):
             ok = await loop.run_in_executor(None, _sync_recompute_xlsx_with_libreoffice, storage_path)
             if ok:
                 recomputed = True
-                # 重新读取 + 替换 value（公式 cell 现在有 cache 了）
                 new_content = storage_path.read_bytes()
                 value_map: dict[str, Any] = {}
                 for (r1, c1, r2, c2) in ranges:
@@ -1235,7 +1322,6 @@ async def _query_workpaper_cell_range(db, pid: str, filters: dict):
                         continue
                     for cell_row in parsed2["rows"]:
                         value_map[cell_row["cell_ref"]] = cell_row["value"]
-                # 把 value_map 回填到 all_rows（保留 formula 字段供前端区分）
                 for row_obj in all_rows:
                     cref = row_obj.get("cell_ref")
                     if cref and cref in value_map and row_obj.get("formula"):
@@ -1250,11 +1336,87 @@ async def _query_workpaper_cell_range(db, pid: str, filters: dict):
             "rows": all_rows,
             "columns": result_columns,
             "total": len(all_rows),
+            "source": "xlsx_recomputed" if recomputed else "xlsx_cache",
             "formula_recomputed": recomputed,
         }
     except Exception as e:
         logger.warning("cell_range extract failed for %s/%s: %s", wp_code, cell_range, e)
         return {"rows": [], "columns": [], "total": 0, "error": f"解析失败: {e}"}
+
+
+def _try_extract_from_univer_snapshot(parsed_data: dict, sheet_name: str | None, ranges: list, wp_code: str) -> list[dict] | None:
+    """从 working_paper.parsed_data['univer_snapshot'] 直接提取，零计算
+
+    返回 None 表示快路径不可用（无 snapshot 或 sheet 不存在），让上层走 xlsx fallback
+    """
+    if not isinstance(parsed_data, dict):
+        return None
+    snapshot = parsed_data.get("univer_snapshot")
+    if not isinstance(snapshot, dict):
+        return None
+    sheets_map = snapshot.get("sheets") or {}
+    if not sheets_map:
+        return None
+    # 选 sheet：优先精确匹配 sheet_name，否则取第一个（与 _sync_extract_cell_range 行为一致）
+    target_sheet_name = None
+    if sheet_name and sheet_name in sheets_map:
+        target_sheet_name = sheet_name
+    else:
+        order = snapshot.get("sheet_order_names") or list(sheets_map.keys())
+        target_sheet_name = order[0] if order else None
+    if not target_sheet_name:
+        return None
+    sheet_obj = sheets_map.get(target_sheet_name) or {}
+    cell_data = sheet_obj.get("cellData") or {}
+    if not isinstance(cell_data, dict):
+        return None
+    # snapshot 用 0-indexed (与 Univer 一致)，cell_range 解析后 ranges 是 1-indexed
+    out_rows: list[dict] = []
+    idx = 0
+    MAX_TOTAL = 500
+    for (r1, c1, r2, c2) in ranges:
+        for r in range(r1, r2 + 1):
+            for c in range(c1, c2 + 1):
+                idx += 1
+                if idx > MAX_TOTAL:
+                    break
+                # cell_ref
+                col_letters = ""
+                cc = c
+                while cc > 0:
+                    cc, rem = divmod(cc - 1, 26)
+                    col_letters = chr(65 + rem) + col_letters
+                cell_ref = f"{col_letters}{r}"
+                # 取值（snapshot 0-indexed: row=r-1, col=c-1）
+                row_obj = cell_data.get(str(r - 1)) or {}
+                cell = row_obj.get(str(c - 1)) if isinstance(row_obj, dict) else None
+                v = ""
+                f_str = ""
+                if isinstance(cell, dict):
+                    cv = cell.get("v")
+                    if cv is None or cv == "":
+                        v = ""
+                    elif isinstance(cv, (int, float)):
+                        v = cv
+                    else:
+                        v = str(cv)
+                    if cell.get("f"):
+                        f_str = str(cell["f"])
+                row_dict: dict = {
+                    "index": idx,
+                    "wp_code": wp_code,
+                    "sheet_name": target_sheet_name,
+                    "cell_ref": cell_ref,
+                    "value": v,
+                }
+                if f_str:
+                    row_dict["formula"] = f_str
+                out_rows.append(row_dict)
+            if idx >= MAX_TOTAL:
+                break
+        if idx >= MAX_TOTAL:
+            break
+    return out_rows
 
 
 def _parse_cell_ranges(spec: str) -> list[tuple[int, int, int, int]]:

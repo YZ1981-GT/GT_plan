@@ -325,11 +325,52 @@ async def save_univer_data(
     # 4. 哈希校验
     content_hash = hashlib.sha256(fp.read_bytes()).hexdigest()
 
-    # 5. DB 更新
+    # 5. DB 更新（同时把 Univer snapshot 落到 parsed_data 供高级查询零计算读取，
+    #    snapshot 已含公式 + Univer 计算后的 v 值，按 sheet/row/col 精确索引）
     old_version = wp.file_version
     wp.file_version += 1
     wp.updated_at = datetime.now(timezone.utc)
     wp.prefill_stale = True
+    # 提取轻量化的 cellData（只保留 v 和 f，剥离样式 s 减小 JSONB 体积）
+    try:
+        from sqlalchemy.orm.attributes import flag_modified
+        existing = dict(wp.parsed_data) if isinstance(wp.parsed_data, dict) else {}
+        slim_sheets: dict = {}
+        sheet_order = snapshot.get("sheetOrder") or list((snapshot.get("sheets") or {}).keys())
+        for sid in sheet_order:
+            s = (snapshot.get("sheets") or {}).get(sid) or {}
+            slim_cells: dict = {}
+            for r_key, row in (s.get("cellData") or {}).items():
+                if not isinstance(row, dict):
+                    continue
+                slim_row: dict = {}
+                for c_key, cell in row.items():
+                    if not isinstance(cell, dict):
+                        continue
+                    obj: dict = {}
+                    if "v" in cell and cell.get("v") not in (None, ""):
+                        obj["v"] = cell["v"]
+                    if cell.get("f"):
+                        obj["f"] = cell["f"]
+                    if obj:
+                        slim_row[str(c_key)] = obj
+                if slim_row:
+                    slim_cells[str(r_key)] = slim_row
+            slim_sheets[s.get("name") or sid] = {
+                "id": sid,
+                "cellData": slim_cells,
+            }
+        existing["univer_snapshot"] = {
+            "sheets": slim_sheets,
+            "sheet_order_names": [(snapshot.get("sheets") or {}).get(sid, {}).get("name") or sid for sid in sheet_order],
+            "saved_at": datetime.now(timezone.utc).isoformat(),
+            "version": wp.file_version,
+        }
+        wp.parsed_data = existing
+        flag_modified(wp, "parsed_data")
+    except Exception:
+        # snapshot 缓存失败不阻塞保存主流程
+        pass
     await db.flush()
 
     # 6. 审计留痕
