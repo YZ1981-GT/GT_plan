@@ -77,7 +77,7 @@ inclusion: always
 - W-3 钉钉/企微集成（外部对接）
 - Sentinel failover 真实验证：phase4 UAT-8
 - 业务测试：合并模块需真实项目（技术 85%/业务 60%）
-- **高级查询 Sheet 选区器 Phase 2**：Phase 2A 已落地（commit `5cdf513`）— 底稿树灰度联动：永远基于全集 184 主底稿，传 project_id 时按 wp_index 标 `disabled` 字段（**灰色+删除线+斜体+not-allowed cursor+点击提示已裁剪**），循环 label 显示活跃/总数（如 S 专项程序 5/22），灰度节点不进 `allSources` 下拉池；Phase 2B 待办：接入 `/api/projects/{pid}/workpapers/{wp_id}/template-file/xlsx-to-json` 拉真实 cellData（需先 wp_code → wp_id 映射）+ Univer 渲染单元格（合并/字体/公式）+ sheet 级灰度 + 后端 `_query_workpaper` 按 cell_range 解析 parsed_data 提取实际值替换 `value` 列占位
+- **高级查询 Sheet 选区器 Phase 2**：Phase 2A+2B 已落地（commit `5cdf513` / `fd96c07`）— **2A 树灰度联动**：永远基于全集 184 主底稿，传 project_id 时按 wp_index 标 `disabled`（灰色+删除线+斜体+not-allowed cursor），循环 label 显示活跃/总数（如 S 专项程序 5/22），灰度节点不进 `allSources` 下拉池；**2B 真实 cellData 接入**：新增 `GET /api/custom-query/wp-sheet-preview`（wp_code → wp_id → storage xlsx → openpyxl 解析单 sheet，cap 100 行 30 列），`_query_workpaper` 加 cell_range 分支调 `_query_workpaper_cell_range`（按 A1:C3 区域提取真实值，cap 500 cell），前端 SheetCellRangePicker 加 projectId prop + loadStatus 状态机（idle/loading/loaded/unavailable）+ 真实数据渲染（numeric 右对齐 + 空 cell 灰色 + 14 字符 ellipsis + sheet 切换器）；P0-P2 改进待办：sheet 级灰度精细化（用 all_sheets 差集）/ 查询结果 cell_ref 穿透跳转 / 审计跟踪 / 多区域语法（A1:A10,C1:C5 / A:A 整列）/ 公式值还原 / 双向编辑写回 / Univer 嵌入 / 模板模式无 project / 保存查询模板入口；**风险点**：缓存键 v1→v7 偏脆弱（建议 schema_version 自动失效）/ wp_account_mapping + step_sheet_mapping 双源可能漂移 / `_query_workpaper_cell_range` 同步 openpyxl IO 6000 并发会阻塞 event loop（须 `run_in_executor`）
 
 ### 首页 UX 复盘已完成（2026-05-23 P0+P1+P2 全 11 项，3 commit ec4ae76 / 5a6eab4 / f6c7e0f）
 

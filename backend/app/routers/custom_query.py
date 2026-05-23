@@ -30,13 +30,15 @@ API:
   DELETE /api/custom-query/templates/{id}       — 删除模板（仅创建者或 admin）
 """
 
+import asyncio
 import json
+import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +49,8 @@ from app.models.core import Project, User
 from app.models.custom_query_models import CustomQueryTemplate
 
 router = APIRouter(prefix="/api/custom-query", tags=["custom-query"])
+
+logger = logging.getLogger(__name__)
 
 
 class QueryRequest(BaseModel):
@@ -62,9 +66,14 @@ class QueryRequest(BaseModel):
 @router.get("/indicators")
 async def get_indicators(
     project_id: str | None = Query(default=None, description="项目 ID — 传入后报表/附注树会按项目模板类型动态生成"),
+    response: Response = None,  # type: ignore[assignment]
     db: AsyncSession = Depends(get_db),
 ):
     """获取可查询指标库（树形结构）
+
+    响应头：
+      - X-Indicators-Schema-Version：树结构版本号，前端用此值做缓存键，schema 升版自动失效
+      - Cache-Control：private, max-age=0, must-revalidate（每次都校验，但允许 ETag 复用）
 
     传入 project_id 时：
       - 报表大类下展示项目模板类型（国企/上市）对应的具体报表
@@ -161,12 +170,18 @@ async def get_indicators(
             {"key": "workhours", "label": "工时记录", "columns": ["work_date", "hours", "description", "status", "staff_id"]},
         ],
     })
+    if response is not None:
+        response.headers["X-Indicators-Schema-Version"] = str(_INDICATORS_SCHEMA_VERSION)
+        response.headers["Cache-Control"] = "private, max-age=0, must-revalidate"
     return base_tree
 
 
 # ─── 辅助函数：项目模板类型解析 + 附注树构建 ───────────────────────────────
 
 _STANDARD_LABEL = {"soe": "国企", "listed": "上市"}
+# indicators 树结构 schema 版本：树字段/叶子 key 形态有变更时升 1，前端用此值自动失效旧缓存
+# 历史演进：v1 扁平 → v2 项目级 → v3 6 报表 → v4 合并模块 → v5 底稿 3 层 → v6 sheet 全集 → v7 disabled → v8 sheet 辅助灰度 + ancestorKeys
+_INDICATORS_SCHEMA_VERSION = 8
 _DISCLOSURE_CACHE: dict[str, list[dict]] = {}
 _WP_MAPPING_CACHE: list[dict] | None = None
 
@@ -373,12 +388,26 @@ def _load_wp_mapping() -> list[dict]:
 
 
 _STEP_SHEET_CACHE: dict[str, dict] | None = None
+# wp_code → 真实模板 xlsx 的 sheet 列表（启动后惰性扫描，缺失则降级为 step_sheet_mapping）
+_REAL_SHEETS_CACHE: dict[str, list[str]] = {}
+
+# sheet 灰度判定：辅助 sheet 关键词（与 chain_orchestrator scenarioFilter 对齐）
+# 业务规则：模板里这些 sheet 是给审计师参考的辅助资料，不参与正式数据填报，查询无意义
+_AUX_SHEET_KEYWORDS = ("(修订前)", "（修订前）", "(示例)", "（示例）", "(提示)", "（提示）", "-修订前", "GT_Custom")
+
+
+def _is_aux_sheet(sheet_name: str) -> bool:
+    """判断 sheet 名是否为辅助 sheet（应灰显）"""
+    if not sheet_name:
+        return False
+    return any(kw in sheet_name for kw in _AUX_SHEET_KEYWORDS)
 
 
 def _load_step_sheet_mapping() -> dict[str, dict]:
     """读 backend/data/step_sheet_mapping.json — 全集 wp_code → {wp_name, available_sheets[]}
 
     覆盖率 100% (179 底稿 / 1040 sheet)，是底稿全 sheet 列表的权威源。
+    首次加载时与 wp_account_mapping.json 主底稿做漂移检测，差异写 logger.warning（提醒维护对齐）。
     """
     global _STEP_SHEET_CACHE
     if _STEP_SHEET_CACHE is not None:
@@ -393,6 +422,23 @@ def _load_step_sheet_mapping() -> dict[str, dict]:
         _STEP_SHEET_CACHE = data.get("mappings", {}) if isinstance(data, dict) else {}
     except Exception:
         _STEP_SHEET_CACHE = {}
+
+    # 双源漂移检测（首次加载时执行一次）
+    try:
+        wp_codes_step = {c for c in _STEP_SHEET_CACHE.keys() if "-" not in c}
+        wp_codes_acc = {m.get("wp_code") for m in _load_wp_mapping() if m.get("wp_code") and "-" not in m.get("wp_code", "")}
+        only_in_step = wp_codes_step - wp_codes_acc
+        only_in_acc = wp_codes_acc - wp_codes_step
+        if only_in_step or only_in_acc:
+            logger.warning(
+                "wp mapping double-source drift: step_sheet_mapping has %d codes not in wp_account_mapping (%s...), "
+                "wp_account_mapping has %d codes not in step_sheet_mapping (%s...). "
+                "Maintain both files in sync to avoid tree inconsistency.",
+                len(only_in_step), sorted(list(only_in_step))[:5],
+                len(only_in_acc), sorted(list(only_in_acc))[:5],
+            )
+    except Exception as e:
+        logger.debug("drift detection skipped: %s", e)
     return _STEP_SHEET_CACHE
 
 
@@ -486,14 +532,17 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
                 "columns": ["wp_code", "wp_name", "audit_cycle", "status", "review_status"],
             })
             for s_name in sheets:
+                # sheet 灰度规则:
+                # 1) 主底稿在项目内被裁剪 → 该 sheet 也灰
+                # 2) sheet 名带 "(修订前)" / "(示例)" / "(提示)" / "GT_Custom" 等模板辅助标识 → 灰显（与 chain_orchestrator scenarioFilter 对齐）
+                sheet_aux = _is_aux_sheet(s_name)
                 children_nodes.append({
                     "key": f"workpaper:{code}|{s_name}",
                     "label": s_name,
                     "wp_code": code,
                     "sheet_name": s_name,
-                    # sheet 灰度规则：主底稿不在项目内 → 该 sheet 也灰
-                    # 主底稿在项目内但具体 sheet 是否真存在需 Phase 2B 解析模板，暂沿用 primary_disabled
-                    "disabled": primary_disabled,
+                    "disabled": primary_disabled or sheet_aux,
+                    "disabled_reason": "辅助 sheet" if sheet_aux and not primary_disabled else None,
                     "columns": ["wp_code", "wp_name", "audit_cycle", "status", "review_status"],
                 })
             primary_nodes.append({
@@ -516,6 +565,101 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
             "children": primary_nodes,
         })
     return result
+
+
+def _sync_parse_sheet_preview(content: bytes, sheet_name: str | None) -> dict:
+    """同步函数：openpyxl 解析单 sheet 返回 cellData（供 run_in_executor 调用避免阻塞 event loop）"""
+    from io import BytesIO
+    from openpyxl import load_workbook
+    wb = load_workbook(BytesIO(content), read_only=True, data_only=True)
+    target = sheet_name if sheet_name and sheet_name in wb.sheetnames else (wb.sheetnames[0] if wb.sheetnames else None)
+    if not target:
+        wb.close()
+        return {"error": "工作簿无 sheet"}
+    ws = wb[target]
+    rows = min(ws.max_row or 0, 100)
+    cols = min(ws.max_column or 0, 30)
+    cells: dict[str, dict] = {}
+    for row_iter in ws.iter_rows(min_row=1, max_row=rows, max_col=cols):
+        for cell in row_iter:
+            if cell.value is None:
+                continue
+            key = f"{cell.row - 1},{cell.column - 1}"
+            v = cell.value
+            cells[key] = {"v": v if isinstance(v, (int, float)) else str(v)}
+    merges = []
+    for mr in (ws.merged_cells.ranges if hasattr(ws, "merged_cells") else []):
+        merges.append({"r1": mr.min_row - 1, "c1": mr.min_col - 1, "r2": mr.max_row - 1, "c2": mr.max_col - 1})
+    all_sheets = list(wb.sheetnames)
+    wb.close()
+    return {
+        "sheet_name": target,
+        "all_sheets": all_sheets,
+        "rows": rows,
+        "cols": cols,
+        "cells": cells,
+        "merges": merges,
+    }
+
+
+def _sync_extract_cell_range(content: bytes, sheet_name: str | None, r1: int, c1: int, r2: int, c2: int, max_cells: int = 500) -> dict:
+    """同步函数：按 cell_range 提取单元格值清单（供 run_in_executor 调用）"""
+    from io import BytesIO
+    from openpyxl import load_workbook
+    wb = load_workbook(BytesIO(content), read_only=True, data_only=True)
+    target = sheet_name if sheet_name and sheet_name in wb.sheetnames else (wb.sheetnames[0] if wb.sheetnames else None)
+    if not target:
+        wb.close()
+        return {"error": "工作簿无 sheet"}
+    ws = wb[target]
+    out_rows: list[dict] = []
+    idx = 0
+    for r in range(r1, r2 + 1):
+        for c in range(c1, c2 + 1):
+            idx += 1
+            if idx > max_cells:
+                break
+            cell = ws.cell(row=r, column=c)
+            col_letters = ""
+            cc = c
+            while cc > 0:
+                cc, rem = divmod(cc - 1, 26)
+                col_letters = chr(65 + rem) + col_letters
+            cell_ref = f"{col_letters}{r}"
+            v = cell.value
+            if v is None:
+                val_str: str | int | float = ""
+            elif isinstance(v, (int, float)):
+                val_str = v
+            else:
+                val_str = str(v)
+            out_rows.append({"cell_ref": cell_ref, "value": val_str})
+        if idx >= max_cells:
+            break
+    wb.close()
+    return {"rows": out_rows, "sheet_name": target}
+
+
+@router.get("/wp-id-by-code")
+async def wp_id_by_code(
+    project_id: str = Query(..., description="项目 ID"),
+    wp_code: str = Query(..., description="底稿编码（如 D2）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """wp_code → working_paper.id 映射（供前端穿透跳转 WorkpaperEditor 用）"""
+    try:
+        proj_uuid = uuid.UUID(project_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="invalid project_id")
+    row = (await db.execute(text("""
+        SELECT w.id FROM working_paper w
+        JOIN wp_index i ON w.wp_index_id = i.id
+        WHERE i.project_id = :pid AND i.wp_code = :wpc AND w.is_deleted = false
+        LIMIT 1
+    """), {"pid": str(proj_uuid), "wpc": wp_code})).first()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"底稿 {wp_code} 在当前项目不存在")
+    return {"wp_id": str(row[0]), "wp_code": wp_code, "project_id": project_id}
 
 
 @router.get("/wp-sheet-preview")
@@ -561,54 +705,21 @@ async def wp_sheet_preview(
     if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
         return {"available": False, "reason": "非 xlsx 类底稿", "wp_code": wp_code}
 
-    # 3. openpyxl 解析目标 sheet
+    # 3. openpyxl 解析（异步化：放线程池避免阻塞 event loop）
     try:
-        from io import BytesIO
-        from openpyxl import load_workbook
-        wb = load_workbook(BytesIO(storage_path.read_bytes()), read_only=True, data_only=True)
-        target_sheet = sheet_name if sheet_name and sheet_name in wb.sheetnames else (wb.sheetnames[0] if wb.sheetnames else None)
-        if not target_sheet:
-            wb.close()
-            return {"available": False, "reason": "工作簿无 sheet", "wp_code": wp_code}
-
-        ws = wb[target_sheet]
-        rows = min(ws.max_row or 0, 100)  # 选区器 cap 100 行
-        cols = min(ws.max_column or 0, 30)  # cap 30 列
-        cells: dict[str, dict] = {}
-        for row_iter in ws.iter_rows(min_row=1, max_row=rows, max_col=cols):
-            for cell in row_iter:
-                if cell.value is None:
-                    continue
-                key = f"{cell.row - 1},{cell.column - 1}"  # 0-indexed
-                v = cell.value
-                if isinstance(v, (int, float)):
-                    cells[key] = {"v": v}
-                else:
-                    cells[key] = {"v": str(v)}
-
-        merges: list[dict] = []
-        for mr in (ws.merged_cells.ranges if hasattr(ws, "merged_cells") else []):
-            merges.append({
-                "r1": mr.min_row - 1, "c1": mr.min_col - 1,
-                "r2": mr.max_row - 1, "c2": mr.max_col - 1,
-            })
-
-        # sheet 列表（用于灰度判定）
-        all_sheets = list(wb.sheetnames)
-        wb.close()
-
+        content = storage_path.read_bytes()
+        loop = asyncio.get_running_loop()
+        parsed = await loop.run_in_executor(None, _sync_parse_sheet_preview, content, sheet_name)
+        if "error" in parsed:
+            return {"available": False, "reason": parsed["error"], "wp_code": wp_code}
         return {
             "available": True,
             "wp_code": wp_code,
             "wp_id": str(wp_id),
-            "sheet_name": target_sheet,
-            "all_sheets": all_sheets,
-            "rows": rows,
-            "cols": cols,
-            "cells": cells,
-            "merges": merges,
+            **parsed,
         }
     except Exception as e:
+        logger.warning("wp-sheet-preview parse failed for %s: %s", wp_code, e)
         return {"available": False, "reason": f"解析失败: {e}", "wp_code": wp_code}
 
 
@@ -616,74 +727,103 @@ async def wp_sheet_preview(
 async def execute_query(
     body: QueryRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """执行自定义查询"""
+    """执行自定义查询（关键路径自动写 audit_log）"""
     source = body.source
     pid = body.project_id
     year = body.year
     filters = body.filters
     limit = min(body.limit, 2000)
 
+    result: dict = {"rows": [], "columns": [], "total": 0}
     try:
         # disclosure_note:section_id 形式（树叶子点击）→ 走 disclosure 并把 section_id 注入 filters
         if source.startswith("disclosure_note:"):
             sid = source.split(":", 1)[1]
             new_filters = {**filters, "section_id": sid}
-            return await _query_disclosure(db, pid, year, new_filters, limit)
+            result = await _query_disclosure(db, pid, year, new_filters, limit)
         # consol_unit:{company_code}:{kind} 形式（合并单位树叶子点击）
-        if source.startswith("consol_unit:"):
+        elif source.startswith("consol_unit:"):
             parts = source.split(":", 2)
             if len(parts) == 3:
                 _, cc, kind = parts
                 new_filters = {**filters, "company_code": cc}
                 if kind == "account_balance":
-                    return await _query_account_balance(db, pid, year, new_filters, limit)
-                if kind == "ledger_entries":
-                    return await _query_ledger_entries(db, pid, year, new_filters, limit)
-                if kind == "tb_detail":
-                    return await _query_trial_balance(db, pid, year, new_filters, limit)
-                if kind == "adjustment":
-                    # 调整分录按 company_code 暂走通用查询（adjustments 表无 company_code 列时返回空）
-                    return await _query_adjustments(db, pid, year, {**filters, "adjustment_type": "AJE"}, limit)
-            return {"rows": [], "columns": [], "total": 0, "error": f"未知合并单位查询: {source}"}
+                    result = await _query_account_balance(db, pid, year, new_filters, limit)
+                elif kind == "ledger_entries":
+                    result = await _query_ledger_entries(db, pid, year, new_filters, limit)
+                elif kind == "tb_detail":
+                    result = await _query_trial_balance(db, pid, year, new_filters, limit)
+                elif kind == "adjustment":
+                    result = await _query_adjustments(db, pid, year, {**filters, "adjustment_type": "AJE"}, limit)
+                else:
+                    result = {"rows": [], "columns": [], "total": 0, "error": f"未知合并单位查询: {source}"}
+            else:
+                result = {"rows": [], "columns": [], "total": 0, "error": f"未知合并单位查询: {source}"}
         # workpaper:{wp_code} 或 workpaper:{wp_code}|{sheet_name} 形式（底稿树叶子点击）
-        if source.startswith("workpaper:"):
+        elif source.startswith("workpaper:"):
             tail = source.split(":", 1)[1]
             if "|" in tail:
                 wp_code, sheet_name = tail.split("|", 1)
-                return await _query_workpaper(db, pid, year, {**filters, "wp_code": wp_code, "sheet_name": sheet_name}, limit)
-            return await _query_workpaper(db, pid, year, {**filters, "wp_code": tail}, limit)
-        if source == 'report' or source.startswith('report_'):
-            return await _query_report(db, pid, year, filters, limit)
+                result = await _query_workpaper(db, pid, year, {**filters, "wp_code": wp_code, "sheet_name": sheet_name}, limit)
+            else:
+                result = await _query_workpaper(db, pid, year, {**filters, "wp_code": tail}, limit)
+        elif source == 'report' or source.startswith('report_'):
+            result = await _query_report(db, pid, year, filters, limit)
         elif source == 'trial_balance' or source == 'tb_detail':
-            return await _query_trial_balance(db, pid, year, filters, limit)
+            result = await _query_trial_balance(db, pid, year, filters, limit)
         elif source == 'tb_summary':
-            return await _query_tb_summary(db, pid, year, filters, limit)
+            result = await _query_tb_summary(db, pid, year, filters, limit)
         elif source == 'disclosure' or source == 'disclosure_note':
-            return await _query_disclosure(db, pid, year, filters, limit)
+            result = await _query_disclosure(db, pid, year, filters, limit)
         elif source.startswith('adj_') or source == 'adjustment':
-            return await _query_adjustments(db, pid, year, filters, limit)
+            result = await _query_adjustments(db, pid, year, filters, limit)
         elif source.startswith('ws_') or source == 'worksheet':
-            return await _query_worksheet(db, pid, year, filters, limit)
+            result = await _query_worksheet(db, pid, year, filters, limit)
         elif source == 'workpaper':
-            return await _query_workpaper(db, pid, year, filters, limit)
+            result = await _query_workpaper(db, pid, year, filters, limit)
         elif source == 'account_balance':
-            return await _query_account_balance(db, pid, year, filters, limit)
+            result = await _query_account_balance(db, pid, year, filters, limit)
         elif source == 'ledger_entries':
-            return await _query_ledger_entries(db, pid, year, filters, limit)
+            result = await _query_ledger_entries(db, pid, year, filters, limit)
         elif source == 'report_lines':
-            return await _query_report_lines(db, pid, year, filters, limit)
+            result = await _query_report_lines(db, pid, year, filters, limit)
         elif source == 'workhours':
-            return await _query_workhours(db, pid, year, filters, limit)
+            result = await _query_workhours(db, pid, year, filters, limit)
         else:
-            return {"rows": [], "columns": [], "total": 0, "error": f"未知数据源: {source}"}
+            result = {"rows": [], "columns": [], "total": 0, "error": f"未知数据源: {source}"}
     except Exception as e:
         # 失败时回滚事务（防止 asyncpg session 污染影响后续请求）
         try:
             await db.rollback()
         except Exception:
             pass
-        return {"rows": [], "columns": [], "total": 0, "error": str(e)}
+        result = {"rows": [], "columns": [], "total": 0, "error": str(e)}
+
+    # 审计日志（关键路径：底稿/合并/附注/调整 写日志，普通试算/报表/工时跳过避免噪声）
+    _SENSITIVE_PREFIXES = ("workpaper:", "consol_unit:", "disclosure_note:", "adj_", "disclosure")
+    if source.startswith(_SENSITIVE_PREFIXES) or source in ("workpaper", "adjustment", "disclosure"):
+        try:
+            from app.services.audit_logger_enhanced import audit_logger
+            await audit_logger.log_action(
+                user_id=current_user.id,
+                action="custom_query.execute",
+                object_type="custom_query",
+                object_id=None,
+                project_id=pid,
+                details={
+                    "source": source,
+                    "year": year,
+                    "filters": {k: v for k, v in filters.items() if not isinstance(v, (dict, list)) or len(str(v)) < 200},
+                    "row_count": result.get("total", 0),
+                    "has_error": "error" in result,
+                },
+            )
+        except Exception as audit_e:
+            logger.warning("audit_log enqueue failed for custom_query: %s", audit_e)
+
+    return result
 
 
 async def _query_report(db, pid, year, filters, limit):
@@ -861,7 +1001,15 @@ async def _query_workpaper(db, pid, year, filters, limit):
 
 
 async def _query_workpaper_cell_range(db, pid: str, filters: dict):
-    """按 cell_range 从模板 xlsx 提取真实单元格值"""
+    """按 cell_range 从模板 xlsx 提取真实单元格值
+
+    支持语法：
+      - 'A1:C3' 矩形区域
+      - 'B5' 单 cell
+      - 'A1:A10,C1:C5' 多区域逗号分隔
+      - 'A:A' 整列（限 100 行）
+      - 'A:C' 整列范围
+    """
     wp_code = filters["wp_code"]
     sheet_name = filters.get("sheet_name")
     cell_range = filters["cell_range"]
@@ -894,72 +1042,94 @@ async def _query_workpaper_cell_range(db, pid: str, filters: dict):
     if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
         return {"rows": [], "columns": [], "total": 0, "error": "非 xlsx 类底稿"}
 
-    # 3. 解析 cell_range（如 'A1:C3' / 'B5'）
-    import re as _re
-    m = _re.match(r"^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$", cell_range)
-    if not m:
+    # 3. 解析 cell_range 多区域语法
+    ranges = _parse_cell_ranges(cell_range)
+    if not ranges:
         return {"rows": [], "columns": [], "total": 0, "error": f"无效 cell_range: {cell_range}"}
+
+    # 4. 异步化读取 + 多区域累计
+    try:
+        content = storage_path.read_bytes()
+        loop = asyncio.get_running_loop()
+        all_rows: list[dict] = []
+        used_sheet = ""
+        idx = 0
+        MAX_TOTAL = 500
+        for (r1, c1, r2, c2) in ranges:
+            remaining = MAX_TOTAL - idx
+            if remaining <= 0:
+                break
+            parsed = await loop.run_in_executor(
+                None, _sync_extract_cell_range, content, sheet_name, r1, c1, r2, c2, remaining
+            )
+            if "error" in parsed:
+                return {"rows": [], "columns": [], "total": 0, "error": parsed["error"]}
+            used_sheet = parsed.get("sheet_name", used_sheet)
+            for cell_row in parsed["rows"]:
+                idx += 1
+                all_rows.append({
+                    "index": idx,
+                    "wp_code": wp_code,
+                    "sheet_name": used_sheet,
+                    "cell_ref": cell_row["cell_ref"],
+                    "value": cell_row["value"],
+                })
+                if idx >= MAX_TOTAL:
+                    break
+        return {
+            "rows": all_rows,
+            "columns": ["index", "wp_code", "sheet_name", "cell_ref", "value"],
+            "total": len(all_rows),
+        }
+    except Exception as e:
+        logger.warning("cell_range extract failed for %s/%s: %s", wp_code, cell_range, e)
+        return {"rows": [], "columns": [], "total": 0, "error": f"解析失败: {e}"}
+
+
+def _parse_cell_ranges(spec: str) -> list[tuple[int, int, int, int]]:
+    """解析 cell_range 字符串为 (r1, c1, r2, c2) 元组列表（1-indexed）
+
+    支持：
+      - 'A1:C3'    → [(1, 1, 3, 3)]
+      - 'B5'       → [(5, 2, 5, 2)]
+      - 'A1:A10,C1:C5' → [(1, 1, 10, 1), (1, 3, 5, 3)]
+      - 'A:A'      → [(1, 1, 100, 1)]  整列限 100 行
+      - 'A:C'      → [(1, 1, 100, 3)]
+    """
+    import re as _re
+    INTEGER_COL_LIMIT = 100  # 整列默认行数上限
 
     def _col_to_idx(s: str) -> int:
         n = 0
         for ch in s:
             n = n * 26 + (ord(ch) - 64)
-        return n  # 1-indexed
+        return n
 
-    c1 = _col_to_idx(m.group(1)); r1 = int(m.group(2))
-    c2 = _col_to_idx(m.group(3)) if m.group(3) else c1
-    r2 = int(m.group(4)) if m.group(4) else r1
-
-    # 4. openpyxl 读取
-    try:
-        from io import BytesIO
-        from openpyxl import load_workbook
-        wb = load_workbook(BytesIO(storage_path.read_bytes()), read_only=True, data_only=True)
-        target_sheet = sheet_name if sheet_name and sheet_name in wb.sheetnames else (wb.sheetnames[0] if wb.sheetnames else None)
-        if not target_sheet:
-            wb.close()
-            return {"rows": [], "columns": [], "total": 0, "error": "工作簿无 sheet"}
-        ws = wb[target_sheet]
-        result_rows = []
-        idx = 0
-        MAX_CELLS = 500
-        for r in range(r1, r2 + 1):
-            for c in range(c1, c2 + 1):
-                idx += 1
-                if idx > MAX_CELLS:
-                    break
-                cell = ws.cell(row=r, column=c)
-                # cell_ref like 'A1'
-                col_letters = ""
-                cc = c
-                while cc > 0:
-                    cc, rem = divmod(cc - 1, 26)
-                    col_letters = chr(65 + rem) + col_letters
-                cell_ref = f"{col_letters}{r}"
-                v = cell.value
-                if v is None:
-                    val_str = ""
-                elif isinstance(v, (int, float)):
-                    val_str = v
-                else:
-                    val_str = str(v)
-                result_rows.append({
-                    "index": idx,
-                    "wp_code": wp_code,
-                    "sheet_name": target_sheet,
-                    "cell_ref": cell_ref,
-                    "value": val_str,
-                })
-            if idx >= MAX_CELLS:
-                break
-        wb.close()
-        return {
-            "rows": result_rows,
-            "columns": ["index", "wp_code", "sheet_name", "cell_ref", "value"],
-            "total": len(result_rows),
-        }
-    except Exception as e:
-        return {"rows": [], "columns": [], "total": 0, "error": f"解析失败: {e}"}
+    out: list[tuple[int, int, int, int]] = []
+    for part in spec.split(","):
+        part = part.strip().upper()
+        if not part:
+            continue
+        # 单 cell 'B5'
+        m = _re.match(r"^([A-Z]+)(\d+)$", part)
+        if m:
+            col = _col_to_idx(m.group(1)); r = int(m.group(2))
+            out.append((r, col, r, col))
+            continue
+        # 整列 'A:A' / 'A:C'
+        m = _re.match(r"^([A-Z]+):([A-Z]+)$", part)
+        if m:
+            c1 = _col_to_idx(m.group(1)); c2 = _col_to_idx(m.group(2))
+            out.append((1, min(c1, c2), INTEGER_COL_LIMIT, max(c1, c2)))
+            continue
+        # 矩形 'A1:C3'
+        m = _re.match(r"^([A-Z]+)(\d+):([A-Z]+)(\d+)$", part)
+        if m:
+            c1 = _col_to_idx(m.group(1)); r1 = int(m.group(2))
+            c2 = _col_to_idx(m.group(3)); r2 = int(m.group(4))
+            out.append((min(r1, r2), min(c1, c2), max(r1, r2), max(c1, c2)))
+            continue
+    return out
 
 
 async def _query_account_balance(db, pid, year, filters, limit):

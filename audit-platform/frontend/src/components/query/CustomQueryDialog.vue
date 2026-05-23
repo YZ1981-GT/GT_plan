@@ -91,6 +91,7 @@
               <el-button size="small" type="primary" @click="executeQuery" :loading="loading">▶ 查询</el-button>
               <span style="flex:1" />
               <el-button size="small" @click="goToFullCustomQuery" title="跳转独立页支持模板保存/共享">📑 模板</el-button>
+              <el-button size="small" @click="saveAsTemplate" :disabled="!selectedSource" title="保存当前选区/条件为查询模板">💾 保存</el-button>
               <el-button size="small" @click="transposed = !transposed">{{ transposed ? '↩ 还原' : '↔ 转置' }}</el-button>
               <el-button size="small" @click="copyResult">📋 复制</el-button>
               <el-button size="small" @click="exportResult">📤 导出</el-button>
@@ -120,7 +121,11 @@
               </template>
               <el-table-column v-for="col in resultColumns" :key="col" :prop="col" :label="columnLabel(col)" min-width="120" show-overflow-tooltip>
                 <template #default="{ row }">
-                  <span :style="{ textAlign: isNumeric(row[col]) ? 'right' : 'left', display: 'block' }">
+                  <span v-if="col === 'cell_ref' && row.wp_code" class="gt-cq-cell-ref-link"
+                    @click="jumpToCell(row)" :title="`跳到底稿 ${row.wp_code} ${row.sheet_name || ''} 单元格 ${row[col]}`">
+                    {{ formatCell(row[col]) }}
+                  </span>
+                  <span v-else :style="{ textAlign: isNumeric(row[col]) ? 'right' : 'left', display: 'block' }">
                     {{ formatCell(row[col]) }}
                   </span>
                 </template>
@@ -168,7 +173,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { FullScreen, Aim, Close, RefreshLeft } from '@element-plus/icons-vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
@@ -541,6 +546,65 @@ function reopenSheetPicker() {
   sheetPickerVisible.value = true
 }
 
+/** 保存当前选区+条件为查询模板（POST /api/custom-query/templates） */
+async function saveAsTemplate() {
+  if (!selectedSource.value) return
+  try {
+    const { value: name } = await ElMessageBox.prompt('为该查询模板命名（项目+源+选区会自动记录）', '保存查询模板', {
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputPattern: /.+/,
+      inputErrorMessage: '请输入名称',
+    })
+    if (!name) return
+    const config: Record<string, any> = {
+      project_id: localProjectId.value,
+      year: localYear.value,
+      source: selectedSource.value,
+      filter_text: filterText.value,
+    }
+    if (sheetCellRange.value) config.cell_range = sheetCellRange.value
+    if (sheetPickerCtx.value.sheetName) config.sheet_name = sheetPickerCtx.value.sheetName
+    await api.post('/api/custom-query/templates', {
+      name,
+      description: `${currentSourceLabel.value}${sheetCellRange.value ? ' / ' + sheetCellRange.value : ''}`,
+      data_source: selectedSource.value,
+      config,
+      scope: 'private',
+    })
+    ElMessage.success(`已保存模板「${name}」`)
+  } catch (err: any) {
+    if (err === 'cancel' || err?.action === 'cancel') return
+    handleApiError(err, '保存失败')
+  }
+}
+
+/** 结果表格 cell_ref 列点击 → 跳到 WorkpaperEditor + 高亮该 cell */
+async function jumpToCell(row: any) {
+  if (!row.wp_code || !localProjectId.value) return
+  try {
+    const data = await api.get('/api/custom-query/wp-id-by-code', {
+      params: { project_id: localProjectId.value, wp_code: row.wp_code },
+    }) as any
+    const wpId = data?.wp_id
+    if (!wpId) {
+      ElMessage.warning(`底稿 ${row.wp_code} 在当前项目不存在`)
+      return
+    }
+    visible.value = false  // 关闭弹窗
+    router.push({
+      name: 'WorkpaperEditor',
+      params: { projectId: localProjectId.value, wpId },
+      query: {
+        sheet: row.sheet_name || undefined,
+        highlight: row.cell_ref || undefined,
+      },
+    })
+  } catch (err: any) {
+    handleApiError(err, '跳转失败')
+  }
+}
+
 async function executeQuery() {
   if (!localProjectId.value) { ElMessage.warning('请先选择项目'); return }
   hasQueried.value = true
@@ -595,28 +659,38 @@ async function exportResult() {
   ElMessage.success('已导出')
 }
 
-// 加载指标树（按项目缓存：每个项目独立 sessionStorage key）
-const INDICATOR_CACHE_KEY_PREFIX = 'gt:custom-query:indicators-v7:'
+// 加载指标树（按 project_id + 后端 schema_version 双键缓存：树结构改动后端升 schema 即自动失效）
+// 缓存键形如 'gt:custom-query:indicators:{schema_version}:{pid}'，schema 升版后旧 key 自然不命中
+const INDICATOR_CACHE_KEY_PREFIX = 'gt:custom-query:indicators:'
+const INDICATOR_SCHEMA_HEADER = 'x-indicators-schema-version'
 
-function _indicatorCacheKey(pid: string | undefined) {
-  return `${INDICATOR_CACHE_KEY_PREFIX}${pid || 'no-project'}`
+function _indicatorCacheKey(pid: string | undefined, schemaVersion: string | number) {
+  return `${INDICATOR_CACHE_KEY_PREFIX}${schemaVersion}:${pid || 'no-project'}`
 }
 
 async function loadIndicators(pid: string | undefined) {
-  const cacheKey = _indicatorCacheKey(pid)
-  // 先尝试缓存
+  // 拉数据：用原始 fetch 才能拿到 response headers（apiProxy 只返 body）
+  const url = pid ? `/api/custom-query/indicators?project_id=${encodeURIComponent(pid)}` : '/api/custom-query/indicators'
   try {
-    const cached = sessionStorage.getItem(cacheKey)
-    if (cached) {
-      indicatorTree.value = JSON.parse(cached)
-      return
-    }
-  } catch { /* ignore */ }
-  try {
-    const url = pid ? `/api/custom-query/indicators?project_id=${encodeURIComponent(pid)}` : '/api/custom-query/indicators'
-    const data = await api.get(url)
-    indicatorTree.value = Array.isArray(data) ? data : (data ?? [])
+    const token = localStorage.getItem('access_token') || ''
+    const resp = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    const schemaVersion = resp.headers.get(INDICATOR_SCHEMA_HEADER) || 'unknown'
+    const cacheKey = _indicatorCacheKey(pid, schemaVersion)
+    // 命中缓存优先（同 schema_version 下结构稳定）
+    try {
+      const cached = sessionStorage.getItem(cacheKey)
+      if (cached) {
+        indicatorTree.value = JSON.parse(cached)
+        return
+      }
+    } catch { /* ignore */ }
+    const json = await resp.json()
+    // 后端 ApiResponse 包装 {code, data} 或裸数组
+    const tree = Array.isArray(json) ? json : (json?.data ?? json ?? [])
+    indicatorTree.value = Array.isArray(tree) ? tree : []
     try { sessionStorage.setItem(cacheKey, JSON.stringify(indicatorTree.value)) } catch { /* ignore */ }
+    // 清理旧 schema 版本的缓存（保持 sessionStorage 干净）
+    _purgeStaleIndicatorCache(schemaVersion)
   } catch {
     // 兜底：用 STATIC_SOURCES 重建一棵简易树（按 parentKey 分组）
     const grouped: Record<string, any[]> = {}
@@ -625,6 +699,19 @@ async function loadIndicators(pid: string | undefined) {
     }
     indicatorTree.value = Object.entries(grouped).map(([k, children]) => ({ key: k, label: k, children }))
   }
+}
+
+function _purgeStaleIndicatorCache(currentVersion: string) {
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i)
+      if (k && k.startsWith(INDICATOR_CACHE_KEY_PREFIX) && !k.startsWith(`${INDICATOR_CACHE_KEY_PREFIX}${currentVersion}:`)) {
+        keys.push(k)
+      }
+    }
+    keys.forEach(k => sessionStorage.removeItem(k))
+  } catch { /* ignore */ }
 }
 
 // 项目切换 → 重新拉树（带项目级缓存）
@@ -680,5 +767,20 @@ loadIndicators(localProjectId.value)
   text-decoration: line-through;
   font-style: italic;
   cursor: not-allowed;
+}
+
+/* 结果表格 cell_ref 列穿透跳转链接 */
+.gt-cq-cell-ref-link {
+  color: var(--gt-color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+.gt-cq-cell-ref-link:hover {
+  color: var(--gt-color-primary-dark, #5a2db8);
+  text-decoration: none;
+  background: rgba(124, 58, 237, 0.08);
+  padding: 0 4px;
+  border-radius: 3px;
 }
 </style>
