@@ -63,6 +63,7 @@
                 'gt-cell-selected': isCellSelected(row, ci),
                 'gt-cell-empty': loadStatus === 'loaded' && !getCell(row - 1, ci),
                 'gt-cell-numeric': isNumericCell(row - 1, ci),
+                'gt-cell-formula': isFormulaCell(row - 1, ci),
               }]"
               :title="cellTooltip(row - 1, ci)"
               @mousedown="onMouseDown(row, ci)"
@@ -137,9 +138,18 @@ function isNumericCell(r: number, c: number): boolean {
   const cell = getCell(r, c)
   return !!cell && typeof cell.v === 'number'
 }
+function isFormulaCell(r: number, c: number): boolean {
+  const cell = getCell(r, c) as any
+  return !!cell && cell.f != null && cell.f !== ''
+}
 function formatCell(cell: { v: any } | null): string {
   if (!cell) return ''
   const v = cell.v
+  // 公式 cell 但 cache 为空 → 显示公式 string 截断
+  if ((v === '' || v == null) && (cell as any).f) {
+    const f = String((cell as any).f).slice(0, 14)
+    return f
+  }
   if (typeof v === 'number') {
     return Number.isInteger(v) ? String(v) : v.toFixed(2)
   }
@@ -147,8 +157,9 @@ function formatCell(cell: { v: any } | null): string {
   return s.length > 14 ? s.slice(0, 13) + '…' : s
 }
 function cellTooltip(r: number, c: number): string {
-  const cell = getCell(r, c)
+  const cell = getCell(r, c) as any
   if (!cell) return ''
+  if (cell.f) return `公式: ${cell.f}\n值: ${cell.v ?? '(待求值, 查询时自动重算)'}`
   return String(cell.v ?? '')
 }
 
@@ -349,6 +360,12 @@ watch(visible, (v) => {
   font-family: 'Consolas', 'Monaco', monospace;
   color: var(--gt-color-text-primary, #303133);
 }
+.gt-cell-formula {
+  color: var(--gt-color-warning, #e6a23c) !important;
+  font-style: italic;
+  background: rgba(230, 162, 60, 0.05);
+}
+.gt-cell-formula::before { content: "ƒ "; color: var(--gt-color-warning, #e6a23c); }
 .gt-sheet-picker-meta {
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary);

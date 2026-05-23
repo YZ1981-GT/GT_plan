@@ -36,7 +36,7 @@ import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
@@ -568,7 +568,10 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
 
 
 def _sync_parse_sheet_preview(content: bytes, sheet_name: str | None) -> dict:
-    """同步函数：openpyxl 解析单 sheet 返回 cellData（供 run_in_executor 调用避免阻塞 event loop）"""
+    """同步函数：openpyxl 解析单 sheet 返回 cellData（供 run_in_executor 调用避免阻塞 event loop）
+
+    公式 cell 处理：data_only=True 拿不到 cache（None）时同时附 formula 字段，前端可标识灰色斜体
+    """
     from io import BytesIO
     from openpyxl import load_workbook
     wb = load_workbook(BytesIO(content), read_only=True, data_only=True)
@@ -580,18 +583,49 @@ def _sync_parse_sheet_preview(content: bytes, sheet_name: str | None) -> dict:
     rows = min(ws.max_row or 0, 100)
     cols = min(ws.max_column or 0, 30)
     cells: dict[str, dict] = {}
+    has_unresolved_formula = False
+    # 第二份 wb 用 data_only=False 探测公式（仅按需打开）
+    wb_formula = None
+    ws_formula = None
     for row_iter in ws.iter_rows(min_row=1, max_row=rows, max_col=cols):
         for cell in row_iter:
-            if cell.value is None:
+            try:
+                row_num = cell.row
+                col_num = cell.column
+                v = cell.value
+            except AttributeError:
                 continue
-            key = f"{cell.row - 1},{cell.column - 1}"
-            v = cell.value
+            key = f"{row_num - 1},{col_num - 1}"
+            if v is None:
+                # 可能是公式 cell 但 cache 缺失
+                if wb_formula is None:
+                    wb_formula = load_workbook(BytesIO(content), read_only=True, data_only=False)
+                    ws_formula = wb_formula[target] if target in wb_formula.sheetnames else None
+                if ws_formula is not None:
+                    # read_only 模式不能 ws.cell(r, c)，用 iter_rows 一次性扫公式
+                    if not hasattr(ws_formula, "_formula_cache"):
+                        fcache: dict[tuple[int, int], str] = {}
+                        for f_row_iter in ws_formula.iter_rows(min_row=1, max_row=rows, max_col=cols):
+                            for fc in f_row_iter:
+                                try:
+                                    if isinstance(fc.value, str) and fc.value.startswith("="):
+                                        fcache[(fc.row, fc.column)] = fc.value
+                                except AttributeError:
+                                    continue
+                        ws_formula._formula_cache = fcache  # type: ignore[attr-defined]
+                    raw = ws_formula._formula_cache.get((row_num, col_num))  # type: ignore[attr-defined]
+                    if raw:
+                        cells[key] = {"v": "", "f": raw}
+                        has_unresolved_formula = True
+                continue
             cells[key] = {"v": v if isinstance(v, (int, float)) else str(v)}
     merges = []
     for mr in (ws.merged_cells.ranges if hasattr(ws, "merged_cells") else []):
         merges.append({"r1": mr.min_row - 1, "c1": mr.min_col - 1, "r2": mr.max_row - 1, "c2": mr.max_col - 1})
     all_sheets = list(wb.sheetnames)
     wb.close()
+    if wb_formula is not None:
+        wb_formula.close()
     return {
         "sheet_name": target,
         "all_sheets": all_sheets,
@@ -599,19 +633,55 @@ def _sync_parse_sheet_preview(content: bytes, sheet_name: str | None) -> dict:
         "cols": cols,
         "cells": cells,
         "merges": merges,
+        "has_unresolved_formula": has_unresolved_formula,
     }
 
 
 def _sync_extract_cell_range(content: bytes, sheet_name: str | None, r1: int, c1: int, r2: int, c2: int, max_cells: int = 500) -> dict:
-    """同步函数：按 cell_range 提取单元格值清单（供 run_in_executor 调用）"""
+    """同步函数：按 cell_range 提取单元格值清单（run_in_executor 调用）
+
+    公式还原策略：data_only=True 读 cache + data_only=False 探公式字符串。
+    注意 openpyxl read_only 模式下 ws.cell(r, c) 不能随机访问，必须 iter_rows 顺序读取。
+    """
     from io import BytesIO
     from openpyxl import load_workbook
+
+    # 第一份：data_only=True 读 cache（用 iter_rows，read_only 模式 ws.cell 不可随机）
     wb = load_workbook(BytesIO(content), read_only=True, data_only=True)
     target = sheet_name if sheet_name and sheet_name in wb.sheetnames else (wb.sheetnames[0] if wb.sheetnames else None)
     if not target:
         wb.close()
         return {"error": "工作簿无 sheet"}
     ws = wb[target]
+    cache_map: dict[tuple[int, int], Any] = {}
+    for row_iter in ws.iter_rows(min_row=r1, max_row=r2, min_col=c1, max_col=c2):
+        for cell in row_iter:
+            # read_only 模式下边界外为 EmptyCell（无 row/column 属性），跳过
+            try:
+                cache_map[(cell.row, cell.column)] = cell.value
+            except AttributeError:
+                continue
+    wb.close()
+
+    # 第二份：data_only=False 读公式字符串
+    formula_map: dict[tuple[int, int], str] = {}
+    has_unresolved_formula = False
+    expected_count = (r2 - r1 + 1) * (c2 - c1 + 1)
+    if any(v is None for v in cache_map.values()) or len(cache_map) < expected_count:
+        wb_f = load_workbook(BytesIO(content), read_only=True, data_only=False)
+        if target in wb_f.sheetnames:
+            ws_f = wb_f[target]
+            for row_iter in ws_f.iter_rows(min_row=r1, max_row=r2, min_col=c1, max_col=c2):
+                for cell in row_iter:
+                    try:
+                        if isinstance(cell.value, str) and cell.value.startswith("="):
+                            formula_map[(cell.row, cell.column)] = cell.value
+                            if cache_map.get((cell.row, cell.column)) is None:
+                                has_unresolved_formula = True
+                    except AttributeError:
+                        continue
+        wb_f.close()
+
     out_rows: list[dict] = []
     idx = 0
     for r in range(r1, r2 + 1):
@@ -619,25 +689,90 @@ def _sync_extract_cell_range(content: bytes, sheet_name: str | None, r1: int, c1
             idx += 1
             if idx > max_cells:
                 break
-            cell = ws.cell(row=r, column=c)
             col_letters = ""
             cc = c
             while cc > 0:
                 cc, rem = divmod(cc - 1, 26)
                 col_letters = chr(65 + rem) + col_letters
             cell_ref = f"{col_letters}{r}"
-            v = cell.value
+            v = cache_map.get((r, c))
+            f_str = formula_map.get((r, c))
             if v is None:
                 val_str: str | int | float = ""
             elif isinstance(v, (int, float)):
                 val_str = v
             else:
                 val_str = str(v)
-            out_rows.append({"cell_ref": cell_ref, "value": val_str})
+            row_obj: dict = {"cell_ref": cell_ref, "value": val_str}
+            if f_str:
+                row_obj["formula"] = f_str
+            out_rows.append(row_obj)
         if idx >= max_cells:
             break
-    wb.close()
-    return {"rows": out_rows, "sheet_name": target}
+    return {
+        "rows": out_rows,
+        "sheet_name": target,
+        "has_unresolved_formula": has_unresolved_formula,
+    }
+
+
+_LIBREOFFICE_PATHS = (
+    "libreoffice", "soffice",
+    r"C:\Program Files\LibreOffice\program\soffice.exe",
+    r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+    "/usr/bin/libreoffice",
+    "/usr/bin/soffice",
+    "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+)
+
+
+def _find_soffice() -> str | None:
+    """检测 LibreOffice 可执行路径（4 路径 fallback，与 archive_pdf_generators 对齐）"""
+    import shutil as _shutil
+    for cmd in _LIBREOFFICE_PATHS:
+        path = _shutil.which(cmd) if not Path(cmd).is_absolute() else (cmd if Path(cmd).exists() else None)
+        if path:
+            return path
+    return None
+
+
+def _sync_recompute_xlsx_with_libreoffice(xlsx_path: Path) -> bool:
+    """用 LibreOffice headless 重算 xlsx 公式 + 回写缓存（覆盖原文件）
+
+    仅在 _sync_extract_cell_range 返回 has_unresolved_formula=True 时按需触发。
+    成功返回 True，LibreOffice 不可用 / 转换失败返回 False。
+    Windows 用户文件锁场景：通过 --convert-to xlsx --outdir 转换到临时目录再 copy 覆盖避免。
+    """
+    import subprocess
+    import tempfile
+    import shutil as _shutil
+
+    soffice = _find_soffice()
+    if soffice is None:
+        logger.warning("LibreOffice 未找到，公式无法重算（请装 LibreOffice 或在 PATH 中加 soffice）")
+        return False
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            # --calc 强制用 Calc 打开（默认会用 Writer 打开 xlsx 失败）
+            # --convert-to xlsx 触发重算 + 回写 cache
+            result = subprocess.run(
+                [soffice, "--headless", "--calc", "--convert-to", "xlsx", "--outdir", str(tmpdir_path), str(xlsx_path)],
+                capture_output=True,
+                timeout=60,
+            )
+            if result.returncode != 0:
+                logger.warning("LibreOffice 转换失败 rc=%d stderr=%s", result.returncode, result.stderr[:200])
+                return False
+            converted = tmpdir_path / f"{xlsx_path.stem}.xlsx"
+            if not converted.exists():
+                logger.warning("LibreOffice 转换后文件不存在: %s", converted)
+                return False
+            _shutil.copy(converted, xlsx_path)
+            return True
+    except Exception as e:
+        logger.warning("LibreOffice 重算异常: %s", e)
+        return False
 
 
 @router.get("/wp-id-by-code")
@@ -1055,6 +1190,7 @@ async def _query_workpaper_cell_range(db, pid: str, filters: dict):
         used_sheet = ""
         idx = 0
         MAX_TOTAL = 500
+        any_unresolved = False
         for (r1, c1, r2, c2) in ranges:
             remaining = MAX_TOTAL - idx
             if remaining <= 0:
@@ -1065,21 +1201,56 @@ async def _query_workpaper_cell_range(db, pid: str, filters: dict):
             if "error" in parsed:
                 return {"rows": [], "columns": [], "total": 0, "error": parsed["error"]}
             used_sheet = parsed.get("sheet_name", used_sheet)
+            if parsed.get("has_unresolved_formula"):
+                any_unresolved = True
             for cell_row in parsed["rows"]:
                 idx += 1
-                all_rows.append({
+                row_obj = {
                     "index": idx,
                     "wp_code": wp_code,
                     "sheet_name": used_sheet,
                     "cell_ref": cell_row["cell_ref"],
                     "value": cell_row["value"],
-                })
+                }
+                if "formula" in cell_row:
+                    row_obj["formula"] = cell_row["formula"]
+                all_rows.append(row_obj)
                 if idx >= MAX_TOTAL:
                     break
+
+        # 公式还原：检测到未求值公式 → 调 LibreOffice 重算后再读一次
+        recomputed = False
+        if any_unresolved:
+            ok = await loop.run_in_executor(None, _sync_recompute_xlsx_with_libreoffice, storage_path)
+            if ok:
+                recomputed = True
+                # 重新读取 + 替换 value（公式 cell 现在有 cache 了）
+                new_content = storage_path.read_bytes()
+                value_map: dict[str, Any] = {}
+                for (r1, c1, r2, c2) in ranges:
+                    parsed2 = await loop.run_in_executor(
+                        None, _sync_extract_cell_range, new_content, sheet_name, r1, c1, r2, c2, MAX_TOTAL
+                    )
+                    if "error" in parsed2:
+                        continue
+                    for cell_row in parsed2["rows"]:
+                        value_map[cell_row["cell_ref"]] = cell_row["value"]
+                # 把 value_map 回填到 all_rows（保留 formula 字段供前端区分）
+                for row_obj in all_rows:
+                    cref = row_obj.get("cell_ref")
+                    if cref and cref in value_map and row_obj.get("formula"):
+                        new_v = value_map[cref]
+                        if new_v != "":
+                            row_obj["value"] = new_v
+
+        result_columns = ["index", "wp_code", "sheet_name", "cell_ref", "value"]
+        if any(("formula" in r) for r in all_rows):
+            result_columns.append("formula")
         return {
             "rows": all_rows,
-            "columns": ["index", "wp_code", "sheet_name", "cell_ref", "value"],
+            "columns": result_columns,
             "total": len(all_rows),
+            "formula_recomputed": recomputed,
         }
     except Exception as e:
         logger.warning("cell_range extract failed for %s/%s: %s", wp_code, cell_range, e)
