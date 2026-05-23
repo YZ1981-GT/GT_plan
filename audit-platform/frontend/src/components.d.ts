@@ -33,6 +33,7 @@ declare module 'vue' {
     AttachmentDropZoneOverlay: typeof import('./components/workpaper/AttachmentDropZoneOverlay.vue')['default']
     AttachmentPreview: typeof import('./components/extension/AttachmentPreview.vue')['default']
     AttachmentPreviewDrawer: typeof import('./components/common/AttachmentPreviewDrawer.vue')['default']
+    AttachmentTabPanel: typeof import('./components/workpaper/AttachmentTabPanel.vue')['default']
     AttachmentVersionsDialog: typeof import('./components/attachment/AttachmentVersionsDialog.vue')['default']
     AuditContextHeader: typeof import('./components/workpaper/dialogs/AuditContextHeader.vue')['default']
     AuditFindingPanel: typeof import('./components/collaboration/AuditFindingPanel.vue')['default']

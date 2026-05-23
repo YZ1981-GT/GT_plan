@@ -21,7 +21,7 @@
       </el-tab-pane>
       <el-tab-pane label="附件" name="attachments" lazy>
         <slot name="attachments">
-          <AttachmentDropZone v-if="wpId" :project-id="projectId" :wp-id="wpId" />
+          <AttachmentTabPanel v-if="wpId" :project-id="projectId" :wp-id="wpId" />
           <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
         </slot>
       </el-tab-pane>
@@ -216,6 +216,7 @@
 import { ref, watch, computed } from 'vue'
 import AiAssistantSidebar from '@/components/workpaper/AiAssistantSidebar.vue'
 import AttachmentDropZone from '@/components/workpaper/AttachmentDropZone.vue'
+import AttachmentTabPanel from '@/components/workpaper/AttachmentTabPanel.vue'
 import ProgramRequirementsSidebar from '@/components/workpaper/ProgramRequirementsSidebar.vue'
 import ProcedurePanel from '@/components/workpaper/ProcedurePanel.vue'
 import DependencyGraph from '@/components/workpaper/DependencyGraph.vue'

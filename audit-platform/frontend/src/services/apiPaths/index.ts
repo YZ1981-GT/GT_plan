@@ -43,6 +43,7 @@ export {
   goingConcern, riskAssessments, auditPrograms, findings, managementLetter,
   linkage, linkageBus, conflictGuard, chainWorkflow, dataLock,
   addressRegistry, customQuery, systemDicts, adminLogs,
+  officePreview,
 } from './system'
 
 // ─── 聚合导出（便于 import { API } from '@/services/apiPaths'） ─────────────
@@ -83,6 +84,7 @@ import {
   goingConcern, riskAssessments, auditPrograms, findings, managementLetter,
   linkage, linkageBus, conflictGuard, chainWorkflow, dataLock,
   addressRegistry, customQuery, systemDicts, adminLogs,
+  officePreview,
 } from './system'
 
 export const API = {
@@ -109,6 +111,7 @@ export const API = {
   noteLocks, dataLock, noteGroupTemplate, noteCustomSections,
   templateLibraryMgmt,
   customQuery, systemDicts, adminLogs,
+  officePreview,
 } as const
 
 export default API

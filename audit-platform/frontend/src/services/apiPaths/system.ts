@@ -247,9 +247,16 @@ export const attachments = {
   upload: (pid: string) => `/api/projects/${pid}/attachments/upload`,
   classify: (pid: string) => `/api/projects/${pid}/attachments/classify`,
   preview: (id: string) => `/api/attachments/${id}/preview`,
+  /** Office 文件高保真预览：后端 LibreOffice 转 PDF（503 时前端降级到下载提示） */
+  previewPdf: (id: string) => `/api/attachments/${id}/preview-pdf`,
   download: (id: string) => `/api/attachments/${id}/download`,
   associate: (id: string) => `/api/attachments/${id}/associate`,
   ocrStatus: (id: string) => `/api/attachments/${id}/ocr-status`,
+} as const
+
+/** Office 在线预览健康探测（决定是否展示 iframe） */
+export const officePreview = {
+  health: '/api/office-preview/health',
 } as const
 
 // ─── 合伙人 ─────────────────────────────────────────────────────────────────

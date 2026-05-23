@@ -49,7 +49,8 @@ inclusion: always
 - **空目录清理判定原则**：纯安装残骸（如 univer-server）= 直接删；运行时数据目录（storage 下 UUID 目录）即使空也不能简单删，必须先比对 DB 引用作"数据维护"，建议走 `cleanup_orphan_storage_dirs.py` dry-run 工具 + 回收站
 - **程序规模**：后端 routers 271 / services 345 / models 58 / workers 12 / tests 464 / Alembic 61 + 28 SQL；前端 views 99 / components 353 / composables 81 / stores 9 / services 37 / utils 39
 - **数据规模**：模板 456 / cross_wp_ref 400 / prefill 1035 cells / VR 114 条 / Spec 70
-- **新增依赖（Phase 3+）**：locust / marked + dompurify / Storybook 8.6.14 / xlsx-js-style / decimal.js / python-docx / prometheus_client；外部 LibreOffice（4 路径 fallback）
+- **新增依赖（Phase 3+）**：locust / marked + dompurify / Storybook 8.6.14 / xlsx-js-style / decimal.js / python-docx / prometheus_client；外部 LibreOffice（4 路径 fallback，本地已装 2026-05-23）
+- **文档/表格生成职责边界**（2026-05-23 厘清，禁止越界）：Univer Sheets = 底稿在线编辑（纯前端） / Univer Docs + TipTap + textarea 三级降级 = WorkpaperWordEditor 看 docx / python-docx = 程序化生成附注/EQCR/年报（内容可控可单测） / LibreOffice = 仅承担 docx+xlsx → PDF 转换（weasyprint 优先 → LibreOffice 降级，office_preview + archive_pdf_generators 共享 `_find_libreoffice`）；LibreOffice 不替换 python-docx 不接入编辑回环；6000 并发场景需队列化 + 信号量保护避免 soffice 被打挂；中文字体（仿宋/楷体_GB2312/宋体/Arial Narrow）必须装齐否则 PDF 出方块
 
 ## 任务状态
 
