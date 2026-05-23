@@ -74,13 +74,20 @@ async def get_indicators(
     template_type = await _resolve_project_template_type(db, project_id)
     standard_label = _STANDARD_LABEL.get(template_type, "通用")
 
-    # ─── 报表树：项目模板类型决定大类标签 ───────────────────────────
+    # ─── 报表树：项目模板类型决定大类标签 + 报表清单 ───────────────
+    # 6 张报表：BS / IS / CFS / CFS-补充资料 / 权益变动 / 减值准备表
+    # 减值准备表 (impairment_provision) 仅 soe 模板有数据，listed 自动隐藏避免误点
     report_children = [
         {"key": "report_balance_sheet", "label": f"资产负债表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
         {"key": "report_income_statement", "label": f"利润表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
         {"key": "report_cash_flow_statement", "label": f"现金流量表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
+        {"key": "report_cash_flow_supplement", "label": f"现金流量表补充资料（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
         {"key": "report_equity_statement", "label": f"所有者权益变动表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
     ]
+    if template_type == "soe":
+        report_children.append(
+            {"key": "report_impairment_provision", "label": f"减值准备表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type}
+        )
 
     # ─── 附注树：按 parent_section 分组成大类→明细两层 ─────────────
     disclosure_children = await _build_disclosure_tree(template_type)
