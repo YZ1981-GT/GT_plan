@@ -92,72 +92,78 @@ async def get_indicators(
     # ─── 附注树：按 parent_section 分组成大类→明细两层 ─────────────
     disclosure_children = await _build_disclosure_tree(template_type)
 
-    return [
-        {
-            "key": "report",
-            "label": f"📊 报表（{standard_label}）" if project_id else "📊 报表",
-            "icon": "📊",
-            "children": report_children,
-        },
-        {
-            "key": "trial_balance", "label": "📋 试算表", "icon": "📋",
-            "children": [
-                {"key": "tb_detail", "label": "科目明细", "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"]},
-                {"key": "tb_summary", "label": "试算平衡表", "columns": ["row_code", "row_name", "unadjusted", "aje_dr", "aje_cr", "rcl_dr", "rcl_cr", "audited"]},
-            ],
-        },
-        {
-            "key": "disclosure",
-            "label": f"📝 附注（{standard_label}）" if project_id else "📝 附注",
-            "icon": "📝",
-            "children": disclosure_children,
-        },
-        {
-            "key": "adjustment", "label": "📐 调整分录", "icon": "📐",
-            "children": [
-                {"key": "adj_aje", "label": "审计调整分录(AJE)", "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description"]},
-                {"key": "adj_rcl", "label": "重分类调整(RCL)", "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description"]},
-            ],
-        },
-        {
-            "key": "worksheet", "label": "📑 工作底稿", "icon": "📑",
-            "children": [
-                {"key": "ws_info", "label": "基本信息表", "columns": ["company_name", "company_code", "holding_type", "non_common_ratio"]},
-                {"key": "ws_elimination", "label": "抵消分录", "columns": ["direction", "subject", "amount", "desc"]},
-                {"key": "ws_consol_tb", "label": "合并试算平衡表", "columns": ["row_code", "row_name", "summary", "equity_dr", "equity_cr", "audited"]},
-            ],
-        },
-        {
-            "key": "workpaper", "label": "📄 底稿列表", "icon": "📄",
-            "children": [
-                {"key": "workpaper", "label": "底稿列表", "columns": ["wp_code", "wp_name", "status", "review_status", "preparer_id"]},
-            ],
-        },
-        {
-            "key": "account_balance", "label": "💰 科目余额", "icon": "💰",
-            "children": [
-                {"key": "account_balance", "label": "科目余额表", "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"]},
-            ],
-        },
-        {
-            "key": "ledger_entries", "label": "📜 序时账", "icon": "📜",
-            "children": [
-                {"key": "ledger_entries", "label": "序时账明细", "columns": ["voucher_date", "voucher_no", "account_code", "account_name", "debit_amount", "credit_amount", "summary"]},
-            ],
-        },
-        {
-            "key": "report_lines", "label": "📈 报表行次", "icon": "📈",
-            "children": [
-                {"key": "report_lines", "label": "报表行次配置", "columns": ["row_code", "row_name", "report_type", "applicable_standard", "indent_level", "is_total_row", "formula"]},
-            ],
-        },
-        {
-            "key": "workhours", "label": "⏱️ 工时记录", "icon": "⏱️",
-            "children": [
-                {"key": "workhours", "label": "工时记录", "columns": ["work_date", "hours", "description", "status", "staff_id"]},
-            ],
-        },
-    ]
+    # ─── 合并范围单位树（仅合并项目可见）────────────────────────
+    consol_units_node = await _build_consol_units_tree(db, project_id)
+
+    base_tree: list[dict] = []
+    base_tree.append({
+        "key": "report",
+        "label": f"📊 报表（{standard_label}）" if project_id else "📊 报表",
+        "icon": "📊",
+        "children": report_children,
+    })
+    base_tree.append({
+        "key": "trial_balance", "label": "📋 试算表", "icon": "📋",
+        "children": [
+            {"key": "tb_detail", "label": "科目明细", "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"]},
+            {"key": "tb_summary", "label": "试算平衡表", "columns": ["row_code", "row_name", "unadjusted", "aje_dr", "aje_cr", "rcl_dr", "rcl_cr", "audited"]},
+        ],
+    })
+    base_tree.append({
+        "key": "disclosure",
+        "label": f"📝 附注（{standard_label}）" if project_id else "📝 附注",
+        "icon": "📝",
+        "children": disclosure_children,
+    })
+    # 合并范围节点：仅合并项目（report_scope=consolidated 且至少 1 家纳入单位）展示
+    if consol_units_node:
+        base_tree.append(consol_units_node)
+    base_tree.append({
+        "key": "adjustment", "label": "📐 调整分录", "icon": "📐",
+        "children": [
+            {"key": "adj_aje", "label": "审计调整分录(AJE)", "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description"]},
+            {"key": "adj_rcl", "label": "重分类调整(RCL)", "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description"]},
+        ],
+    })
+    base_tree.append({
+        "key": "worksheet", "label": "📑 工作底稿", "icon": "📑",
+        "children": [
+            {"key": "ws_info", "label": "基本信息表", "columns": ["company_name", "company_code", "holding_type", "non_common_ratio"]},
+            {"key": "ws_elimination", "label": "抵消分录", "columns": ["direction", "subject", "amount", "desc"]},
+            {"key": "ws_consol_tb", "label": "合并试算平衡表", "columns": ["row_code", "row_name", "summary", "equity_dr", "equity_cr", "audited"]},
+        ],
+    })
+    base_tree.append({
+        "key": "workpaper", "label": "📄 底稿列表", "icon": "📄",
+        "children": [
+            {"key": "workpaper", "label": "底稿列表", "columns": ["wp_code", "wp_name", "status", "review_status", "preparer_id"]},
+        ],
+    })
+    base_tree.append({
+        "key": "account_balance", "label": "💰 科目余额", "icon": "💰",
+        "children": [
+            {"key": "account_balance", "label": "科目余额表", "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"]},
+        ],
+    })
+    base_tree.append({
+        "key": "ledger_entries", "label": "📜 序时账", "icon": "📜",
+        "children": [
+            {"key": "ledger_entries", "label": "序时账明细", "columns": ["voucher_date", "voucher_no", "account_code", "account_name", "debit_amount", "credit_amount", "summary"]},
+        ],
+    })
+    base_tree.append({
+        "key": "report_lines", "label": "📈 报表行次", "icon": "📈",
+        "children": [
+            {"key": "report_lines", "label": "报表行次配置", "columns": ["row_code", "row_name", "report_type", "applicable_standard", "indent_level", "is_total_row", "formula"]},
+        ],
+    })
+    base_tree.append({
+        "key": "workhours", "label": "⏱️ 工时记录", "icon": "⏱️",
+        "children": [
+            {"key": "workhours", "label": "工时记录", "columns": ["work_date", "hours", "description", "status", "staff_id"]},
+        ],
+    })
+    return base_tree
 
 
 # ─── 辅助函数：项目模板类型解析 + 附注树构建 ───────────────────────────────
@@ -192,6 +198,71 @@ async def _resolve_project_report_scope(db: AsyncSession, project_id: str | None
     if proj and proj.report_scope in ("standalone", "consolidated"):
         return proj.report_scope
     return "standalone"
+
+
+async def _build_consol_units_tree(db: AsyncSession, project_id: str | None) -> dict | None:
+    """合并项目下生成「合并范围」顶层节点，children 是每家纳入合并的单位。
+
+    判定 = report_scope=consolidated **或** consol_scope 表已有数据（向导未走完时兜底）
+    每家单位下挂 4 个明细：科目余额 / 序时账 / 试算表（个体） / 调整分录（按 company_code）
+    返回 None 表示当前项目非合并 / 无单位 / 无 project_id（不渲染该节点）
+    """
+    if not project_id:
+        return None
+    try:
+        proj_uuid = uuid.UUID(project_id)
+    except (TypeError, ValueError):
+        return None
+    # 取最新年度的纳入合并单位（按 ownership_ratio 排序）
+    sql = text("""
+        SELECT DISTINCT ON (company_code) company_code, company_name, company_type, ownership_ratio
+        FROM consol_scope
+        WHERE project_id = :pid AND is_included = true AND is_deleted = false
+        ORDER BY company_code, year DESC
+    """)
+    try:
+        rows = (await db.execute(sql, {"pid": str(proj_uuid)})).fetchall()
+    except Exception:
+        return None
+    if not rows:
+        # 兜底：若 consol_scope 无数据但 project.report_scope=consolidated，仍提示「待录入」节点
+        scope = await _resolve_project_report_scope(db, project_id)
+        if scope == "consolidated":
+            return {
+                "key": "consol_units",
+                "label": "🏢 合并范围（待录入）",
+                "icon": "🏢",
+                "children": [
+                    {"key": "consol_units_empty", "label": "⚠ 尚未配置纳入合并的单位"},
+                ],
+            }
+        return None
+    units: list[dict] = []
+    for r in rows:
+        cc = r[0]
+        cname = r[1] or cc
+        ctype = r[2] or ""
+        ratio = float(r[3]) if r[3] is not None else None
+        ratio_label = f" {ratio:.2f}%" if ratio is not None else ""
+        type_label = {"parent": "母", "subsidiary": "子", "associate": "联", "joint_venture": "合营"}.get(str(ctype), "")
+        unit_label = f"[{type_label}] {cname}{ratio_label}".strip()
+        units.append({
+            "key": f"consol_unit_group_{cc}",
+            "label": unit_label,
+            "company_code": cc,
+            "children": [
+                {"key": f"consol_unit:{cc}:account_balance", "label": "科目余额", "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"], "company_code": cc},
+                {"key": f"consol_unit:{cc}:ledger_entries", "label": "序时账明细", "columns": ["voucher_date", "voucher_no", "account_code", "account_name", "debit_amount", "credit_amount", "summary"], "company_code": cc},
+                {"key": f"consol_unit:{cc}:tb_detail", "label": "试算表（个体）", "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"], "company_code": cc},
+                {"key": f"consol_unit:{cc}:adjustment", "label": "调整分录", "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description"], "company_code": cc},
+            ],
+        })
+    return {
+        "key": "consol_units",
+        "label": f"🏢 合并范围（{len(units)}家）",
+        "icon": "🏢",
+        "children": units,
+    }
 
 
 async def _build_disclosure_tree(template_type: str) -> list[dict]:
@@ -278,6 +349,22 @@ async def execute_query(
             sid = source.split(":", 1)[1]
             new_filters = {**filters, "section_id": sid}
             return await _query_disclosure(db, pid, year, new_filters, limit)
+        # consol_unit:{company_code}:{kind} 形式（合并单位树叶子点击）
+        if source.startswith("consol_unit:"):
+            parts = source.split(":", 2)
+            if len(parts) == 3:
+                _, cc, kind = parts
+                new_filters = {**filters, "company_code": cc}
+                if kind == "account_balance":
+                    return await _query_account_balance(db, pid, year, new_filters, limit)
+                if kind == "ledger_entries":
+                    return await _query_ledger_entries(db, pid, year, new_filters, limit)
+                if kind == "tb_detail":
+                    return await _query_trial_balance(db, pid, year, new_filters, limit)
+                if kind == "adjustment":
+                    # 调整分录按 company_code 暂走通用查询（adjustments 表无 company_code 列时返回空）
+                    return await _query_adjustments(db, pid, year, {**filters, "adjustment_type": "AJE"}, limit)
+            return {"rows": [], "columns": [], "total": 0, "error": f"未知合并单位查询: {source}"}
         if source == 'report' or source.startswith('report_'):
             return await _query_report(db, pid, year, filters, limit)
         elif source == 'trial_balance' or source == 'tb_detail':
