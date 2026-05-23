@@ -358,6 +358,7 @@ declare module 'vue' {
     ShareChangeSheet: typeof import('./components/consolidation/worksheets/ShareChangeSheet.vue')['default']
     SharedTemplatePicker: typeof import('./components/shared/SharedTemplatePicker.vue')['default']
     SharePaymentDialog: typeof import('./components/workpaper/SharePaymentDialog.vue')['default']
+    SheetCellRangePicker: typeof import('./components/query/SheetCellRangePicker.vue')['default']
     ShortcutHelpDialog: typeof import('./components/common/ShortcutHelpDialog.vue')['default']
     SideStandardsTab: typeof import('./components/workpaper/SideStandardsTab.vue')['default']
     SideTimerTab: typeof import('./components/workpaper/SideTimerTab.vue')['default']

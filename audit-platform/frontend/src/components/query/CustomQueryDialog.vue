@@ -103,6 +103,11 @@
               <el-tag size="small" effect="plain" round type="success">
                 {{ currentSourceLabel }}
               </el-tag>
+              <el-tag v-if="sheetCellRange" size="small" effect="dark" round type="warning"
+                closable @close="sheetCellRange = ''" @click="reopenSheetPicker"
+                style="cursor:pointer">
+                选区: {{ sheetCellRange }} (点击重选)
+              </el-tag>
             </div>
             <!-- 结果表格 -->
             <el-table v-if="!transposed" :data="filteredRows" v-loading="loading" border size="small"
@@ -145,6 +150,14 @@
         <AdvancedQueryBuilder embedded />
       </el-tab-pane>
     </el-tabs>
+
+    <!-- Sheet 单元格区域选择器（点 sheet 叶子时弹出） -->
+    <SheetCellRangePicker
+      v-model="sheetPickerVisible"
+      :wp-code="sheetPickerCtx.wpCode"
+      :sheet-name="sheetPickerCtx.sheetName"
+      @confirm="onSheetRangeConfirm"
+    />
   </el-dialog>
 </template>
 
@@ -159,6 +172,7 @@ import { fmtAmount } from '@/utils/formatters'
 import { useAuthStore } from '@/stores/auth'
 import { listProjectsWithProgress } from '@/services/commonApi'
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
+import SheetCellRangePicker from '@/components/query/SheetCellRangePicker.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -234,6 +248,11 @@ const treeRef = ref<any>(null)
 const hasQueried = ref(false)
 // 左树点击的大类 key（null = 未点击大类，下拉显示全部）
 const clickedCategory = ref<string | null>(null)
+
+// Sheet 单元格区域选择器状态
+const sheetPickerVisible = ref(false)
+const sheetPickerCtx = ref<{ wpCode: string; sheetName?: string }>({ wpCode: '' })
+const sheetCellRange = ref<string>('')  // 用户在 sheet picker 选中的 cell range（如 'A1:E5'）
 
 // 当前项目/数据源的可读标签（chip 显示）
 const currentProjectLabel = computed(() => {
@@ -417,6 +436,13 @@ function onIndicatorClick(data: any) {
     } else {
       clickedCategory.value = leafToCategory.value[data.key] || findTopCategoryOf(data.key)
     }
+    // 底稿 sheet 叶子（含 |）→ 弹出单元格区域选择器
+    if (data.key.startsWith('workpaper:') && data.key.includes('|')) {
+      const tail = data.key.slice('workpaper:'.length)
+      const [wpCode, sheetName] = tail.split('|', 2)
+      sheetPickerCtx.value = { wpCode, sheetName }
+      sheetPickerVisible.value = true
+    }
   }
 }
 
@@ -434,7 +460,37 @@ watch(selectedSource, (v) => {
   if (treeRef.value && v) {
     try { treeRef.value.setCurrentKey(v) } catch { /* ignore */ }
   }
+  // 用户在右侧下拉直接切换到 sheet 选项 → 同样弹出选区器
+  if (v.startsWith('workpaper:') && v.includes('|')) {
+    const tail = v.slice('workpaper:'.length)
+    const [wpCode, sheetName] = tail.split('|', 2)
+    // 不在弹窗已开时重复弹（避免左树点击时再开一次）
+    if (!sheetPickerVisible.value || sheetPickerCtx.value.wpCode !== wpCode || sheetPickerCtx.value.sheetName !== sheetName) {
+      sheetPickerCtx.value = { wpCode, sheetName }
+      sheetPickerVisible.value = true
+    }
+    // 切换 sheet 时重置已选 cell range（旧选区不再适用）
+    sheetCellRange.value = ''
+  } else {
+    // 切到非 sheet 选项时清空 range 上下文
+    sheetCellRange.value = ''
+  }
 })
+
+function onSheetRangeConfirm(payload: { wp_code: string; sheet_name?: string; range: string }) {
+  sheetCellRange.value = payload.range
+  ElMessage.success(`已锁定 ${payload.wp_code} / ${payload.sheet_name || ''} 选区 ${payload.range}，点「▶ 查询」执行`)
+}
+
+function reopenSheetPicker() {
+  // chip 点击重选：当前 selectedSource 必须是 sheet 形式才能重开
+  const v = selectedSource.value
+  if (!v.startsWith('workpaper:') || !v.includes('|')) return
+  const tail = v.slice('workpaper:'.length)
+  const [wpCode, sheetName] = tail.split('|', 2)
+  sheetPickerCtx.value = { wpCode, sheetName }
+  sheetPickerVisible.value = true
+}
 
 async function executeQuery() {
   if (!localProjectId.value) { ElMessage.warning('请先选择项目'); return }
@@ -450,7 +506,8 @@ async function executeQuery() {
     if (filterText.value && (source === 'tb_detail')) filters.account_name = filterText.value
 
     const data = await api.post('/api/custom-query/execute', {
-      project_id: localProjectId.value, year: localYear.value, source, filters,
+      project_id: localProjectId.value, year: localYear.value, source,
+      filters: sheetCellRange.value ? { ...filters, cell_range: sheetCellRange.value } : filters,
     }, { validateStatus: (s: number) => s < 600 })
     const result = data
     resultRows.value = result?.rows || []
