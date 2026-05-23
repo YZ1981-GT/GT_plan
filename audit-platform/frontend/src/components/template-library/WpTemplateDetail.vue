@@ -120,8 +120,33 @@
         >
           <el-icon style="margin-right: 4px"><Download /></el-icon>下载主文件
         </el-button>
+        <el-button
+          v-if="canPreview"
+          size="default"
+          :disabled="!projectId || officeAvailable === false"
+          :title="officeAvailable === false ? '服务器未安装 LibreOffice，无法在线预览' : ''"
+          @click="onPreviewMain"
+        >
+          <el-icon style="margin-right: 4px"><View /></el-icon>在线预览
+        </el-button>
       </div>
     </div>
+
+    <!-- 预览抽屉：模板主文件转 PDF iframe -->
+    <el-drawer
+      v-model="previewOpen"
+      :title="`预览 — ${template?.filename || wpCode}`"
+      direction="rtl"
+      size="60%"
+      :close-on-click-modal="true"
+      append-to-body
+    >
+      <iframe
+        v-if="previewOpen && previewUrl"
+        :src="previewUrl"
+        class="gt-wpd-preview-frame"
+      />
+    </el-drawer>
 
     <!-- 3. 合并 sheets 列表 -->
     <div class="gt-wpd-card">
@@ -350,11 +375,13 @@ import {
   DataAnalysis,
   Connection,
   DataLine,
+  View,
 } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import {
   templateLibraryMgmt as P_tlm,
   workpapers as P_wp,
+  officePreview as P_office,
 } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 
@@ -627,6 +654,46 @@ function onDownloadMain() {
   window.open(url, '_blank')
 }
 
+// ─── 在线预览（LibreOffice 转 PDF）─────────────────────────────────────────
+// 模块级缓存：health 探测结果，避免每次开抽屉都打后端
+let officeHealthCache: boolean | null = null
+const officeAvailable = ref<boolean | null>(officeHealthCache)
+const previewOpen = ref(false)
+
+const OFFICE_EXTS = ['xlsx', 'xls', 'xlsm', 'docx', 'doc', 'pptx', 'ppt']
+const canPreview = computed(() => {
+  const f = (template.value?.format || '').toLowerCase()
+  return OFFICE_EXTS.includes(f)
+})
+const previewUrl = computed(() => {
+  if (!props.projectId || !props.wpCode) return ''
+  return P_wp.templatePreviewPdf(props.projectId, props.wpCode)
+})
+
+async function probeOfficeHealth() {
+  if (officeHealthCache !== null) {
+    officeAvailable.value = officeHealthCache
+    return
+  }
+  try {
+    const data: any = await api.get(P_office.health)
+    officeHealthCache = !!data?.available
+    officeAvailable.value = officeHealthCache
+  } catch {
+    officeHealthCache = false
+    officeAvailable.value = false
+  }
+}
+
+async function onPreviewMain() {
+  if (officeAvailable.value === null) await probeOfficeHealth()
+  if (officeAvailable.value === false) {
+    handleApiError(new Error('服务器未安装 LibreOffice，无法在线预览'), '在线预览')
+    return
+  }
+  previewOpen.value = true
+}
+
 // ─── 生命周期 ─────────────────────────────────────────────────────────────
 
 onMounted(loadAll)
@@ -820,5 +887,13 @@ watch(
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-placeholder);
   font-style: italic;
+}
+
+/* 在线预览 iframe */
+.gt-wpd-preview-frame {
+  width: 100%;
+  height: calc(100vh - 120px);
+  border: none;
+  border-radius: 4px;
 }
 </style>

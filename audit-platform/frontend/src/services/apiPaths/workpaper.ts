@@ -10,6 +10,7 @@ export const workpapers = {
   download: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/download`,
   downloadPack: (pid: string) => `/api/projects/${pid}/working-papers/download-pack`,
   templateDownload: (pid: string, wpCode: string) => `/api/projects/${pid}/wp-templates/${wpCode}/download`,
+  templatePreviewPdf: (pid: string, wpCode: string) => `/api/projects/${pid}/wp-templates/${wpCode}/preview-pdf`,
   templateDownloadAll: (pid: string) => `/api/projects/${pid}/wp-templates/download-all`,
   templateList: (pid: string) => `/api/projects/${pid}/wp-templates/list`,
   upload: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/upload`,

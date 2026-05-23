@@ -51,6 +51,7 @@ inclusion: always
 - **数据规模**：模板 456 / cross_wp_ref 400 / prefill 1035 cells / VR 114 条 / Spec 70
 - **新增依赖（Phase 3+）**：locust / marked + dompurify / Storybook 8.6.14 / xlsx-js-style / decimal.js / python-docx / prometheus_client；外部 LibreOffice（4 路径 fallback，本地已装 2026-05-23）
 - **文档/表格生成职责边界**（2026-05-23 厘清，禁止越界）：Univer Sheets = 底稿在线编辑（纯前端） / Univer Docs + TipTap + textarea 三级降级 = WorkpaperWordEditor 看 docx / python-docx = 程序化生成附注/EQCR/年报（内容可控可单测） / LibreOffice = 仅承担 docx+xlsx → PDF 转换（weasyprint 优先 → LibreOffice 降级，office_preview + archive_pdf_generators 共享 `_find_libreoffice`）；LibreOffice 不替换 python-docx 不接入编辑回环；6000 并发场景需队列化 + 信号量保护避免 soffice 被打挂；中文字体（仿宋/楷体_GB2312/宋体/Arial Narrow）必须装齐否则 PDF 出方块
+- **底稿右栏附件 Tab**（2026-05-23 接入 AT-2）：`WorkpaperSidePanel` 附件 Tab = `AttachmentTabPanel`（列表 + 拖拽上传 + 点击预览） / `AttachmentPreviewDrawer` Office 文件走 `attachments.previewPdf` 端点 LibreOffice 转 PDF iframe，503 时降级下载提示（`officePreview.health` 探测结果模块级缓存避免重复打）；扩展点：模板库 `WpTemplateDetail` 主文件预览待接入同款管线
 
 ## 任务状态
 

@@ -331,3 +331,119 @@ async def download_all_templates(
             "Content-Disposition": 'attachment; filename="workpaper_templates_all.zip"; filename*=UTF-8\'\'%E5%BA%95%E7%A8%BF%E6%A8%A1%E6%9D%BF%E5%85%A8%E9%87%8F.zip',
         },
     )
+
+
+# ─── 模板在线预览（LibreOffice 转 PDF）─────────────────────────────────────
+# 复用 office_preview 的 LibreOffice 抽象，模板库 `WpTemplateDetail` 主文件预览管线。
+
+import hashlib
+import subprocess
+import tempfile
+
+from fastapi import Response
+
+from app.core.config import settings
+from app.routers.office_preview import (
+    LIBREOFFICE_TIMEOUT_SECONDS,
+    OFFICE_EXTENSIONS,
+    _find_libreoffice,
+)
+
+
+@router.get("/{wp_code}/preview-pdf")
+async def preview_template_as_pdf(
+    project_id: str,
+    wp_code: str,
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """模板主文件转 PDF 在线预览。
+
+    复用 office_preview 同款 LibreOffice 转 PDF 管线（共享 _find_libreoffice + 相同超时）：
+      - 多文件场景：仅预览第一个文件（主文件）；多文件下载仍走 /download 打 ZIP
+      - 缓存到 STORAGE_ROOT/preview_cache/{wp_code}_{file_size}.pdf
+      - 503 + reason="libreoffice_unavailable" → 前端降级到下载
+
+    返回：
+      - 200 + application/pdf
+      - 404：模板不存在
+      - 503：LibreOffice 不可用
+      - 500：转换失败
+    """
+    all_files = find_all_template_files(wp_code)
+    if not all_files:
+        single = find_template_file_any(wp_code)
+        if single:
+            all_files = [single]
+    if not all_files:
+        raise HTTPException(status_code=404, detail=f"模板不存在: {wp_code}")
+
+    src_path = all_files[0]
+    ext = src_path.suffix.lower()
+    if ext not in OFFICE_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"模板格式 {ext or '未知'} 非 Office 类型，无法预览",
+        )
+
+    soffice = _find_libreoffice()
+    if soffice is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "reason": "libreoffice_unavailable",
+                "message": "在线预览不可用：服务器未安装 LibreOffice，请下载查看",
+            },
+        )
+
+    # 缓存键：wp_code + file_size + mtime（mtime 兜底，避免模板更新后命中旧 PDF）
+    stat = src_path.stat()
+    cache_raw = f"tpl|{wp_code}|{src_path.name}|{stat.st_size}|{int(stat.st_mtime)}".encode()
+    cache_key = hashlib.sha256(cache_raw).hexdigest()[:16]
+    cache_dir = Path(settings.STORAGE_ROOT) / "preview_cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = cache_dir / f"{cache_key}.pdf"
+
+    if cache_path.exists():
+        pdf_bytes = cache_path.read_bytes()
+        cache_status = "hit"
+    else:
+        with tempfile.TemporaryDirectory(prefix="tpl_preview_") as tmpdir:
+            try:
+                proc = subprocess.run(
+                    [soffice, "--headless", "--convert-to", "pdf",
+                     "--outdir", tmpdir, str(src_path)],
+                    capture_output=True,
+                    timeout=LIBREOFFICE_TIMEOUT_SECONDS,
+                )
+            except subprocess.TimeoutExpired:
+                logger.warning("[TPL_PREVIEW] LibreOffice timed out for %s", src_path.name)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"PDF 转换超时（{LIBREOFFICE_TIMEOUT_SECONDS}s）",
+                )
+            if proc.returncode != 0:
+                err = proc.stderr.decode("utf-8", errors="ignore")[:500] if proc.stderr else ""
+                logger.warning(
+                    "[TPL_PREVIEW] LibreOffice conversion failed (rc=%d): %s",
+                    proc.returncode, err,
+                )
+                raise HTTPException(status_code=500, detail=f"PDF 转换失败: {err}" if err else "PDF 转换失败")
+            pdf_path = Path(tmpdir) / f"{src_path.stem}.pdf"
+            if not pdf_path.exists():
+                raise HTTPException(status_code=500, detail="LibreOffice 未生成 PDF 文件")
+            pdf_bytes = pdf_path.read_bytes()
+
+        try:
+            cache_path.write_bytes(pdf_bytes)
+        except OSError as e:
+            logger.warning("[TPL_PREVIEW] cache write failed: %s", e)
+        cache_status = "miss"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{src_path.stem}.pdf"',
+            "X-Preview-Cache": cache_status,
+        },
+    )
