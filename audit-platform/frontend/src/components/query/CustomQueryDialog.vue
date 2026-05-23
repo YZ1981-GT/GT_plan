@@ -245,8 +245,18 @@ const currentSourceLabel = computed(() => {
 })
 const currentCategoryLabel = computed(() => {
   if (!clickedCategory.value) return ''
-  const cat = indicatorTree.value.find((c: any) => c.key === clickedCategory.value)
-  return cat?.label || clickedCategory.value
+  // 递归找 clickedCategory 节点的 label（任意层）
+  function findLabel(nodes: any[]): string | null {
+    for (const n of nodes) {
+      if (n.key === clickedCategory.value) return n.label || ''
+      if (n.children?.length) {
+        const r = findLabel(n.children)
+        if (r !== null) return r
+      }
+    }
+    return null
+  }
+  return findLabel(indicatorTree.value) || (clickedCategory.value as string)
 })
 
 // 空态文案：根据是否已查询给不同提示
@@ -270,40 +280,42 @@ const STATIC_SOURCES = [
   { key: 'ws_elimination', label: '📑 抵消分录', parentKey: 'worksheet' },
 ]
 
-// 数据源全集：从 indicatorTree 递归扁平化派生（支持 N 层嵌套，每个叶子带顶层 parentKey）
-// 附注 3 层：disclosure → 货币资金大类 → 五-1-1 明细，明细的 parentKey 仍归到 'disclosure'
+// 数据源全集：从 indicatorTree 递归扁平化派生（支持 N 层嵌套）
+// 每个叶子带 ancestorKeys（从顶到自己的所有祖先 key 路径），用于按任意层过滤下拉
 const allSources = computed(() => {
-  if (!indicatorTree.value.length) return STATIC_SOURCES
-  const list: { key: string; label: string; parentKey: string }[] = []
-  function walk(node: any, topKey: string, prefix: string) {
+  if (!indicatorTree.value.length) return STATIC_SOURCES.map(s => ({ ...s, ancestorKeys: [s.parentKey] }))
+  const list: { key: string; label: string; parentKey: string; ancestorKeys: string[] }[] = []
+  function walk(node: any, ancestors: string[], prefix: string) {
     const childList = node.children || []
+    const myAncestors = [...ancestors, node.key]
     if (childList.length === 0) {
       // 叶子
       list.push({
         key: node.key,
         label: prefix ? `${prefix} / ${node.label}` : node.label,
-        parentKey: topKey,
+        parentKey: ancestors[0] || node.key,
+        ancestorKeys: myAncestors,
       })
       return
     }
     for (const child of childList) {
       const nextPrefix = prefix ? `${prefix} / ${node.label}` : node.label
-      walk(child, topKey, nextPrefix)
+      walk(child, myAncestors, nextPrefix)
     }
   }
   for (const cat of indicatorTree.value) {
     const icon = cat.icon || ''
-    for (const leaf of (cat.children || [])) {
-      walk(leaf, cat.key, icon)
-    }
+    walk(cat, [], icon)
   }
-  return list.length ? list : STATIC_SOURCES
+  return list.length
+    ? list
+    : STATIC_SOURCES.map(s => ({ ...s, ancestorKeys: [s.parentKey] }))
 })
 
-// 下拉选项：受 clickedCategory 过滤（未点大类时显示全部）
+// 下拉选项：受 clickedCategory 过滤（点击任意层时只显示该节点子树下叶子，未点击 = 显示全部）
 const sourceOptions = computed(() => {
   if (!clickedCategory.value) return allSources.value
-  return allSources.value.filter(s => s.parentKey === clickedCategory.value)
+  return allSources.value.filter(s => s.ancestorKeys.includes(clickedCategory.value as string))
 })
 
 // 叶子 → 父大类反查表
@@ -387,20 +399,24 @@ function findTopCategoryOf(targetKey: string): string | null {
 
 function onIndicatorClick(data: any) {
   if (data.children?.length) {
-    // 大类/中间层节点：定位顶层 category + 递归找第一明细叶子
-    const topKey = findTopCategoryOf(data.key) || data.key
-    clickedCategory.value = topKey
+    // 大类/中间层节点：clickedCategory 直接设为该节点 key（精确过滤当前子树）
+    clickedCategory.value = data.key
     const firstLeaf = findFirstLeaf(data)
     if (firstLeaf?.key) {
       selectedSource.value = firstLeaf.key
       if (firstLeaf.key.startsWith('report_')) filterReportType.value = firstLeaf.key.replace('report_', '')
     }
   } else if (data.key) {
-    // 叶子节点：设 source，并反查顶层大类同步 clickedCategory
+    // 叶子节点：设 source，clickedCategory 设为该叶子的直接父节点（让下拉只显示同 sheet 范围）
     selectedSource.value = data.key
     if (data.key.startsWith('report_')) filterReportType.value = data.key.replace('report_', '')
-    const parent = leafToCategory.value[data.key] || findTopCategoryOf(data.key)
-    if (parent) clickedCategory.value = parent
+    const src = allSources.value.find(s => s.key === data.key)
+    if (src && src.ancestorKeys.length >= 2) {
+      // 取叶子的直接父节点 key（ancestorKeys 倒数第二个，最后一个是叶子自己）
+      clickedCategory.value = src.ancestorKeys[src.ancestorKeys.length - 2]
+    } else {
+      clickedCategory.value = leafToCategory.value[data.key] || findTopCategoryOf(data.key)
+    }
   }
 }
 
