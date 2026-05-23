@@ -1,19 +1,35 @@
 <template>
   <div class="eqcr-workbench">
-    <GtPageHeader title="EQCR 工作台" :show-back="false">
-      <template #actions>
-        <el-radio-group
-          v-model="progressFilter"
+    <GtPageHeader title="EQCR 工作台" variant="banner" icon="🛡️" :show-back="false">
+      <template #subtitle>
+        <span v-if="cards.length > 0">
+          {{ cards.length }} 个被委派 EQCR 项目 · {{ filteredCards.length }} 项符合筛选
+        </span>
+        <span v-else>当前无被委派项目</span>
+      </template>
+      <el-radio-group
+        v-model="progressFilter"
+        size="small"
+        class="eqcr-progress-filter"
+      >
+        <el-radio-button value="all">全部</el-radio-button>
+        <el-radio-button value="not_started">未开始</el-radio-button>
+        <el-radio-button value="in_progress">进行中</el-radio-button>
+        <el-radio-button value="approved">已同意</el-radio-button>
+        <el-radio-button value="disagree">有异议</el-radio-button>
+      </el-radio-group>
+      <div class="gt-header-refresh-wrap">
+        <el-button
+          circle
           size="small"
-          style="margin-right: 12px"
-        >
-          <el-radio-button value="all">全部</el-radio-button>
-          <el-radio-button value="not_started">未开始</el-radio-button>
-          <el-radio-button value="in_progress">进行中</el-radio-button>
-          <el-radio-button value="approved">已同意</el-radio-button>
-          <el-radio-button value="disagree">有异议</el-radio-button>
-        </el-radio-group>
-        <el-button size="small" :loading="loading" @click="load">刷新</el-button>
+          :loading="loading"
+          :icon="Refresh"
+          title="刷新"
+          @click="load"
+        />
+      </div>
+      <template #actions>
+        <DashboardViewSwitcher />
       </template>
     </GtPageHeader>
 
@@ -132,6 +148,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Refresh } from '@element-plus/icons-vue'
 import {
   eqcrApi,
   type EqcrProgress,
@@ -290,6 +307,36 @@ function reportStatusTagType(
 <style scoped>
 .eqcr-workbench {
   padding: 0;
+}
+
+/* 刷新按钮：放在 GtPageHeader row1 右端（小图标圆按钮） */
+:deep(.gt-page-header__row1 .gt-header-refresh-wrap) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+/* progress filter 在 row1 中段（标题与刷新按钮之间，margin-left: auto 把它推到中间） */
+.eqcr-progress-filter {
+  margin-left: auto;
+}
+.eqcr-progress-filter :deep(.el-radio-button .el-radio-button__inner) {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--gt-color-text-inverse);
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: none;
+}
+.eqcr-progress-filter :deep(.el-radio-button .el-radio-button__inner:hover) {
+  color: var(--gt-color-text-inverse);
+  background: rgba(255, 255, 255, 0.22);
+}
+.eqcr-progress-filter :deep(.el-radio-button.is-active .el-radio-button__inner),
+.eqcr-progress-filter :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: #ffffff !important;
+  color: var(--gt-color-primary) !important;
+  border-color: #ffffff !important;
+  box-shadow: -1px 0 0 0 #ffffff !important;
 }
 
 .eqcr-cards-row {

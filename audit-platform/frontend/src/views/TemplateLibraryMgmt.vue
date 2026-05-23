@@ -156,10 +156,10 @@
           <EnumDictTab v-if="activeTab === 'enum-dict'" />
         </el-tab-pane>
 
-        <el-tab-pane name="custom-query" label="自定义查询">
+        <el-tab-pane name="custom-query" label="高级查询">
           <template #label>
             <span class="gt-tlm-tab-label">
-              <el-icon><Search /></el-icon>自定义查询
+              <el-icon><Search /></el-icon>高级查询
             </span>
           </template>
           <CustomQueryTab v-if="activeTab === 'custom-query'" />

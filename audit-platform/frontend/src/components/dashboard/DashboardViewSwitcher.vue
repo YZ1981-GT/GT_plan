@@ -5,14 +5,17 @@
     me      → '/'（Dashboard.vue 默认页）
     team    → '/dashboard/manager'
     project → '/dashboard/partner'
-    eqcr    → '/eqcr/metrics'
+    eqcr    → '/eqcr/metrics'（admin 无年度声明时被守卫弹回 /eqcr/workbench）
 
   路由变化时自动同步 activeView，避免「点进去回不来」。
 
-  用法：放在每个 dashboard 页面顶部 banner #actions slot 即可。
+  Props:
+    theme: 'dark' (默认，紫色 banner 上用) | 'light' (白色普通 header 上用)
+
+  用法：放在每个 dashboard 页面顶部 banner #actions slot。
 -->
 <template>
-  <div v-if="availableViews.length > 1" class="dashboard-view-switcher">
+  <div v-if="availableViews.length > 1" class="dashboard-view-switcher" :class="`dashboard-view-switcher--${theme}`">
     <el-radio-group v-model="activeView" size="small" @change="onChange">
       <el-radio-button v-for="v in availableViews" :key="v.key" :value="v.key">
         {{ v.label }}
@@ -26,6 +29,8 @@ import { computed, watch, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useRoleContextStore } from '@/stores/roleContext'
+
+withDefaults(defineProps<{ theme?: 'dark' | 'light' }>(), { theme: 'dark' })
 
 type ViewKey = 'me' | 'team' | 'project' | 'eqcr'
 
@@ -57,7 +62,8 @@ const availableViews = computed(() => {
 function deriveActive(path: string): ViewKey {
   if (path.startsWith('/dashboard/manager')) return 'team'
   if (path.startsWith('/dashboard/partner')) return 'project'
-  if (path.startsWith('/eqcr/metrics')) return 'eqcr'
+  // EQCR：metrics 与 workbench 都视为 eqcr 视图（admin 无声明时守卫会从 metrics 弹回 workbench）
+  if (path.startsWith('/eqcr/')) return 'eqcr'
   return 'me'
 }
 
@@ -80,26 +86,35 @@ function onChange(val: ViewKey) {
 
 <style scoped>
 .dashboard-view-switcher {
-  margin-top: var(--gt-space-2);
   display: inline-flex;
 }
 
-/* 紫色 banner 上的视图切换：未选中 = 半透白底白字；选中 = 白底紫字（高 specificity 覆盖 element-plus 默认） */
-.dashboard-view-switcher :deep(.el-radio-button .el-radio-button__inner) {
+/* dark 主题（紫色 banner 上用）：未选中 = 半透白底白字；选中 = 白底紫字 */
+.dashboard-view-switcher--dark { margin-top: var(--gt-space-2); }
+.dashboard-view-switcher--dark :deep(.el-radio-button .el-radio-button__inner) {
   background: rgba(255, 255, 255, 0.12);
   color: var(--gt-color-text-inverse);
   border-color: rgba(255, 255, 255, 0.32);
   box-shadow: none;
 }
-.dashboard-view-switcher :deep(.el-radio-button .el-radio-button__inner:hover) {
+.dashboard-view-switcher--dark :deep(.el-radio-button .el-radio-button__inner:hover) {
   color: var(--gt-color-text-inverse);
   background: rgba(255, 255, 255, 0.22);
 }
-.dashboard-view-switcher :deep(.el-radio-button.is-active .el-radio-button__inner),
-.dashboard-view-switcher :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+.dashboard-view-switcher--dark :deep(.el-radio-button.is-active .el-radio-button__inner),
+.dashboard-view-switcher--dark :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
   background: #ffffff !important;
   color: var(--gt-color-primary) !important;
   border-color: #ffffff !important;
   box-shadow: -1px 0 0 0 #ffffff !important;
+}
+
+/* light 主题（白色 header 上用）：默认 element-plus 灰底，选中 = 紫底白字 */
+.dashboard-view-switcher--light :deep(.el-radio-button.is-active .el-radio-button__inner),
+.dashboard-view-switcher--light :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: var(--gt-color-primary) !important;
+  color: #ffffff !important;
+  border-color: var(--gt-color-primary) !important;
+  box-shadow: -1px 0 0 0 var(--gt-color-primary) !important;
 }
 </style>

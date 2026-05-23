@@ -6,6 +6,16 @@
           {{ overview.total_projects }} 个项目 · {{ overview.risk_alert_count }} 个风险预警 · {{ overview.pending_sign_count }} 个待签字
         </span>
       </template>
+      <div class="gt-header-refresh-wrap">
+        <el-button
+          circle
+          size="small"
+          :loading="loading"
+          :icon="Refresh"
+          title="刷新"
+          @click="loadAll"
+        />
+      </div>
       <template #actions>
         <DashboardViewSwitcher />
         <!-- 待签字项目一键跳转 [R9 F7-Partner Task 24] -->
@@ -17,12 +27,17 @@
         >
           ✍️ 待签字项目 ({{ overview.pending_sign_count }})
         </el-button>
-        <el-button size="small" @click="loadAll" :loading="loading">刷新</el-button>
       </template>
     </GtPageHeader>
 
-    <!-- 风险预警横幅 -->
-    <el-alert v-if="overview && overview.risk_alert_count > 0" type="warning" :closable="false" style="margin-bottom: 16px">
+    <!-- 风险预警横幅（用户可关闭，组件 remount 后再次提示） -->
+    <el-alert
+      v-if="overview && overview.risk_alert_count > 0 && riskAlertVisible"
+      type="warning"
+      closable
+      style="margin-bottom: 16px"
+      @close="riskAlertVisible = false"
+    >
       <template #title>
         ⚠️ {{ overview.risk_alert_count }} 个项目存在风险预警
       </template>
@@ -108,42 +123,52 @@
     <el-tabs v-model="activeTab">
       <!-- Tab 1: 项目总览 -->
       <el-tab-pane label="项目总览" name="projects">
-        <el-table :data="overview?.projects || []" stripe v-loading="loading" @row-click="onProjectClick" style="cursor: pointer">
-          <el-table-column label="风险" width="60" align="center">
+        <el-table
+          :data="overview?.projects || []"
+          stripe
+          border
+          v-loading="loading"
+          @row-click="onProjectClick"
+          class="gt-projects-overview-table"
+          style="cursor: pointer"
+        >
+          <el-table-column label="风险" width="70" align="center" resizable>
             <template #default="{ row }">
               <span :class="'gt-risk-dot gt-risk-dot--' + row.risk_level" />
             </template>
           </el-table-column>
-          <el-table-column label="客户" prop="client_name" width="160" />
-          <el-table-column label="项目" prop="name" min-width="180" />
-          <el-table-column label="状态" width="80">
+          <el-table-column label="客户" prop="client_name" min-width="180" resizable show-overflow-tooltip />
+          <el-table-column label="项目" prop="name" min-width="220" resizable show-overflow-tooltip />
+          <el-table-column label="状态" min-width="100" resizable>
             <template #default="{ row }">
               <el-tag size="small" :type="(statusType(row.status)) || undefined">{{ statusLabel(row.status) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="完成率" width="130">
+          <el-table-column label="完成率" min-width="130" resizable>
             <template #default="{ row }">
               <el-progress :percentage="row.completion_rate" :stroke-width="6"
-                :color="row.completion_rate >= 80 ? '#67c23a' : row.completion_rate >= 50 ? '#e6a23c' : '#f56c6c'" />
+                :color="row.completion_rate >= 80 ? 'var(--gt-color-success)' : row.completion_rate >= 50 ? 'var(--gt-color-wheat)' : 'var(--gt-color-coral)'" />
             </template>
           </el-table-column>
-          <el-table-column label="底稿" width="80" align="center">
-            <template #default="{ row }">{{ row.wp_passed }}/{{ row.wp_total }}</template>
+          <el-table-column label="底稿" min-width="80" align="center" resizable>
+            <template #default="{ row }"><span class="gt-amt">{{ row.wp_passed }}/{{ row.wp_total }}</span></template>
           </el-table-column>
-          <el-table-column label="待复核" width="70" align="center">
+          <el-table-column label="待复核" min-width="100" align="right" resizable>
             <template #default="{ row }">
-              <span :style="{ color: row.wp_pending > 0 ? '#e6a23c' : '#999' }">{{ row.wp_pending }}</span>
+              <span class="gt-amt" :style="{ color: row.wp_pending > 0 ? 'var(--gt-color-wheat)' : 'var(--gt-color-text-tertiary)' }">{{ row.wp_pending }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="退回" width="60" align="center">
+          <el-table-column label="退回" min-width="90" align="right" resizable>
             <template #default="{ row }">
-              <span :style="{ color: row.wp_rejected > 0 ? '#f56c6c' : '#999' }">{{ row.wp_rejected }}</span>
+              <span class="gt-amt" :style="{ color: row.wp_rejected > 0 ? 'var(--gt-color-coral)' : 'var(--gt-color-text-tertiary)' }">{{ row.wp_rejected }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right">
+          <el-table-column label="操作" width="170" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" link type="primary" @click.stop="goToProject(row.id)">进入</el-button>
-              <el-button size="small" link @click.stop="checkSign(row.id)">签字检查</el-button>
+              <div class="gt-row-actions-inline">
+                <el-button size="small" link type="primary" @click.stop="goToProject(row.id)">进入</el-button>
+                <el-button size="small" link @click.stop="checkSign(row.id)">签字检查</el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -173,30 +198,57 @@
 
       <!-- Tab 3: 团队效能 -->
       <el-tab-pane label="团队效能" name="team">
-        <div v-if="teamData" class="gt-team-summary">
-          <div class="gt-team-stat" v-for="s in teamStats" :key="s.label">
-            <div class="gt-team-stat-num">{{ s.value }}</div>
-            <div class="gt-team-stat-label">{{ s.label }}</div>
+        <!-- KPI 卡片网格（与项目总览风险卡视觉风格统一）-->
+        <div v-if="teamData" class="gt-team-kpi-grid">
+          <div
+            v-for="s in teamStats"
+            :key="s.label"
+            class="gt-team-kpi-card"
+            :class="`gt-team-kpi-card--${s.tone}`"
+          >
+            <div class="gt-team-kpi-icon">{{ s.icon }}</div>
+            <div class="gt-team-kpi-body">
+              <div class="gt-team-kpi-num">{{ s.value }}</div>
+              <div class="gt-team-kpi-label">{{ s.label }}</div>
+            </div>
           </div>
         </div>
-        <el-table :data="teamData?.staff_metrics || []" stripe v-loading="teamLoading">
-          <el-table-column label="人员" prop="user_name" width="120" />
-          <el-table-column label="底稿数" prop="total" width="80" align="center" />
-          <el-table-column label="通过" prop="passed" width="60" align="center" />
-          <el-table-column label="退回" width="60" align="center">
+
+        <!-- 团队成员明细表 -->
+        <el-table
+          :data="teamData?.staff_metrics || []"
+          stripe
+          border
+          v-loading="teamLoading"
+          class="gt-team-staff-table"
+        >
+          <template #empty>
+            <el-empty description="暂无团队成员效能数据" :image-size="60" />
+          </template>
+          <el-table-column label="人员" prop="user_name" min-width="160" resizable show-overflow-tooltip />
+          <el-table-column label="底稿总数" prop="total" min-width="120" align="right" resizable>
+            <template #default="{ row }"><span class="gt-amt">{{ row.total }}</span></template>
+          </el-table-column>
+          <el-table-column label="通过" prop="passed" min-width="100" align="right" resizable>
+            <template #default="{ row }"><span class="gt-amt">{{ row.passed }}</span></template>
+          </el-table-column>
+          <el-table-column label="退回" min-width="100" align="right" resizable>
             <template #default="{ row }">
-              <span :style="{ color: row.rejected > 0 ? '#f56c6c' : '#999' }">{{ row.rejected }}</span>
+              <span class="gt-amt" :style="{ color: row.rejected > 0 ? 'var(--gt-color-coral)' : 'var(--gt-color-text-tertiary)' }">{{ row.rejected }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="通过率" width="120">
+          <el-table-column label="通过率" min-width="220" resizable>
             <template #default="{ row }">
-              <el-progress :percentage="row.pass_rate" :stroke-width="6"
-                :color="row.pass_rate >= 80 ? '#67c23a' : row.pass_rate >= 50 ? '#e6a23c' : '#f56c6c'" />
+              <el-progress
+                :percentage="row.pass_rate ?? 0"
+                :stroke-width="8"
+                :color="row.pass_rate >= 80 ? 'var(--gt-color-success)' : row.pass_rate >= 50 ? 'var(--gt-color-wheat)' : 'var(--gt-color-coral)'"
+              />
             </template>
           </el-table-column>
-          <el-table-column label="退回率" width="80" align="center">
+          <el-table-column label="退回率" min-width="120" align="right" resizable>
             <template #default="{ row }">
-              <span :style="{ color: row.reject_rate > 10 ? '#f56c6c' : '#999' }">{{ row.reject_rate }}%</span>
+              <span class="gt-amt" :style="{ color: row.reject_rate > 10 ? 'var(--gt-color-coral)' : 'var(--gt-color-text-tertiary)' }">{{ row.reject_rate ?? 0 }}%</span>
             </template>
           </el-table-column>
         </el-table>
@@ -299,7 +351,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useNavigationStack } from '@/composables/useNavigationStack'
 import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import DashboardViewSwitcher from '@/components/dashboard/DashboardViewSwitcher.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -325,11 +379,21 @@ import { parseApiError } from '@/composables/useApiError'
 import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
+const { push: pushNavStack } = useNavigationStack()
+
+/** 跳转前记录来源（按 Backspace 可返回当前 PartnerDashboard） */
+function recordOrigin() {
+  pushNavStack({ source_view: '/dashboard/partner', query: {} })
+}
 const authStore = useAuthStore()
 const loading = ref(false)
 const activeTab = ref('projects')
 
 const overview = ref<PartnerOverview | null>(null)
+
+// 风险预警横幅本次会话可见性：组件 unmount 即重置为 true，
+// 切换路由回来 / 刷新 dashboard 都会重新提示（与 ManagerDashboard 待审批工时横幅同语义）
+const riskAlertVisible = ref(true)
 const teamData = ref<TeamEfficiency | null>(null)
 const teamLoading = ref(false)
 
@@ -360,12 +424,18 @@ const overrideResult = ref<RotationOverrideResult | null>(null)
 const teamStats = computed(() => {
   const s = teamData.value?.summary
   if (!s) return []
+  const fmtPct = (v: number | null | undefined): string => {
+    return v == null || Number.isNaN(v) ? '—' : `${v}%`
+  }
+  const fmtNum = (v: number | null | undefined): string | number => {
+    return v == null || Number.isNaN(v) ? '—' : v
+  }
   return [
-    { label: '团队人数', value: s.total_staff },
-    { label: '底稿总数', value: s.total_workpapers },
-    { label: '平均通过率', value: s.avg_pass_rate + '%' },
-    { label: '平均退回率', value: s.avg_reject_rate + '%' },
-    { label: '人均底稿', value: s.avg_per_person },
+    { label: '团队人数',   value: fmtNum(s.total_staff),       icon: '👥', tone: 'primary' },
+    { label: '底稿总数',   value: fmtNum(s.total_workpapers),  icon: '📄', tone: 'teal' },
+    { label: '平均通过率', value: fmtPct(s.avg_pass_rate),     icon: '✅', tone: 'success' },
+    { label: '平均退回率', value: fmtPct(s.avg_reject_rate),   icon: '⚠️', tone: 'coral' },
+    { label: '人均底稿',   value: fmtNum(s.avg_per_person),    icon: '📊', tone: 'wheat' },
   ]
 })
 
@@ -384,6 +454,7 @@ const pendingIndependenceProjects = ref<{
 const pendingIndependenceLoadingMore = ref(false)
 
 function goToIndependence(pid: string) {
+  recordOrigin()
   router.push(`/projects/${pid}/independence`)
 }
 
@@ -414,6 +485,7 @@ function statusType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' |
 }
 
 function goToProject(pid: string) {
+  recordOrigin()
   router.push(`/projects/${pid}/progress-board`)
 }
 
@@ -421,6 +493,7 @@ function goToProject(pid: string) {
 function goToPartnerSignDecision() {
   // 如果只有一个待签字项目，直接跳到该项目的签字决策页
   if (overview.value?.pending_sign?.length === 1) {
+    recordOrigin()
     router.push(`/projects/${overview.value.pending_sign[0].id}/sign-decision`)
   } else {
     // 多个待签字项目，跳到待签字 Tab
@@ -429,11 +502,13 @@ function goToPartnerSignDecision() {
 }
 
 function goToReport(pid: string) {
+  recordOrigin()
   router.push(`/projects/${pid}/audit-report`)
 }
 
 // R8-S2-06：跳转签字决策面板
 function goToSignDecision(pid: string, year?: number) {
+  recordOrigin()
   const y = year || new Date().getFullYear() - 1
   router.push(`/partner/sign-decision/${pid}/${y}`)
 }
@@ -698,6 +773,21 @@ onMounted(loadAll)
 
 <style scoped>
 .partner-dashboard { padding: 0; }
+
+/* 刷新按钮：放在 GtPageHeader row1 右端（小图标圆按钮 + 下方"X 前"时间标） */
+:deep(.gt-page-header__row1 .gt-header-refresh-wrap) {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+:deep(.gt-page-header__row1 .gt-header-refresh-wrap .gt-last-update) {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+  line-height: 1;
+}
 .sign-list { display: flex; flex-direction: column; gap: var(--gt-space-3); }
 .sign-card {
   display: flex; justify-content: space-between; align-items: center;
@@ -818,5 +908,66 @@ onMounted(loadAll)
   padding: 6px 0;
   font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary, #606266);
+}
+
+/* ── 团队效能 KPI 卡片 ─────────────────────────────────────── */
+.gt-team-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--gt-space-3);
+  margin-bottom: var(--gt-space-4);
+}
+.gt-team-kpi-card {
+  display: flex;
+  align-items: center;
+  gap: var(--gt-space-3);
+  padding: var(--gt-space-3) var(--gt-space-4);
+  border-radius: var(--gt-radius-md);
+  background: var(--gt-color-bg-white);
+  border: 1px solid var(--gt-color-border-light);
+  border-left-width: 3px;
+  box-shadow: var(--gt-shadow-sm);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.gt-team-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--gt-shadow-md);
+}
+.gt-team-kpi-card--primary { border-left-color: var(--gt-color-primary); }
+.gt-team-kpi-card--teal    { border-left-color: var(--gt-color-teal); }
+.gt-team-kpi-card--success { border-left-color: var(--gt-color-success); }
+.gt-team-kpi-card--coral   { border-left-color: var(--gt-color-coral); }
+.gt-team-kpi-card--wheat   { border-left-color: var(--gt-color-wheat); }
+
+.gt-team-kpi-icon {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.gt-team-kpi-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gt-team-kpi-num {
+  font-size: var(--gt-font-size-xl, 22px);
+  font-weight: 700;
+  color: var(--gt-color-text);
+  line-height: 1.2;
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.gt-team-kpi-label {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
+}
+
+.gt-team-staff-table {
+  margin-top: var(--gt-space-3);
+}
+.gt-team-staff-table :deep(.el-table__row td) { padding: 10px 0; }
+
+/* 项目总览 — 操作列内联按钮：禁止竖排折行 */
+.gt-row-actions-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
 }
 </style>

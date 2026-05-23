@@ -47,8 +47,9 @@ from app.models.audit_platform_models import (
     TrialBalance,
     UnadjustedMisstatement,
 )
-from app.models.core import User
-from app.models.report_models import ReportConfig
+from app.models.core import Project, User
+from app.models.report_models import DisclosureNote, ReportConfig
+from app.models.staff_models import StaffMember, WorkHour
 from app.models.workpaper_models import WorkingPaper, WpIndex
 
 logger = logging.getLogger(__name__)
@@ -175,6 +176,65 @@ TABLE_WHITELIST: dict[str, dict[str, Any]] = {
             "is_override", "is_deleted", "created_at", "updated_at",
         ],
     },
+    # ── 业务维度扩展（项目 / 单位 / 附注 / 人员 / 工时） ──
+    "projects": {
+        "model": Project,
+        "label": "项目",
+        "fields": [
+            "id", "name", "client_name",
+            "audit_period_start", "audit_period_end",
+            "project_type", "status", "scenario",
+            "manager_id", "partner_id",
+            "company_code", "template_type", "report_scope",
+            "parent_company_name", "parent_company_code",
+            "ultimate_company_name", "ultimate_company_code",
+            "consol_level", "risk_level",
+            "budget_hours", "contract_amount",
+            "archived_at", "is_deleted", "created_at", "updated_at",
+        ],
+    },
+    "disclosure_notes": {
+        "model": DisclosureNote,
+        "label": "附注",
+        "fields": [
+            "id", "project_id", "year",
+            "note_section", "section_title", "account_name",
+            "content_type", "source_template", "status",
+            "sort_order", "is_stale",
+            "is_deleted", "created_at", "updated_at",
+        ],
+    },
+    "staff_members": {
+        "model": StaffMember,
+        "label": "人员",
+        "fields": [
+            "id", "user_id", "name", "employee_no",
+            "department", "title", "partner_name", "partner_id",
+            "specialty", "phone", "email", "join_date",
+            "source", "role_level",
+            "is_deleted", "created_at", "updated_at",
+        ],
+    },
+    "work_hours": {
+        "model": WorkHour,
+        "label": "工时",
+        "fields": [
+            "id", "staff_id", "project_id", "work_date",
+            "hours", "start_time", "end_time",
+            "description", "status", "purpose", "ai_suggested",
+            "is_deleted", "created_at", "updated_at",
+        ],
+    },
+    "users": {
+        "model": User,
+        "label": "用户",
+        # 显式排除 hashed_password / 安全敏感字段
+        "fields": [
+            "id", "username", "email", "role",
+            "office_code", "is_active",
+            "is_deleted", "created_at", "updated_at",
+        ],
+    },
 }
 
 
@@ -224,6 +284,34 @@ JOIN_WHITELIST: dict[str, dict[str, dict[str, list[tuple[str, str]]]]] = {
     },
     "report_line_mapping": {
         "report_config": {"on": [("report_line_code", "row_code")]},
+    },
+    # ── 业务维度 JOIN ──
+    "projects": {
+        # 项目 → 项目下所有业务对象
+        "trial_balance":     {"on": [("id", "project_id")]},
+        "working_paper":     {"on": [("id", "project_id")]},
+        "wp_index":          {"on": [("id", "project_id")]},
+        "tb_balance":        {"on": [("id", "project_id")]},
+        "tb_ledger":         {"on": [("id", "project_id")]},
+        "adjustments":       {"on": [("id", "project_id")]},
+        "disclosure_notes":  {"on": [("id", "project_id")]},
+        "work_hours":        {"on": [("id", "project_id")]},
+        "users":             {"on": [("manager_id", "id")]},  # 项目经理
+    },
+    "disclosure_notes": {
+        "projects":          {"on": [("project_id", "id")]},
+        "users":             {"on": [("updated_by", "id")]},
+    },
+    "staff_members": {
+        "users":             {"on": [("user_id", "id")]},
+        "work_hours":        {"on": [("id", "staff_id")]},
+    },
+    "work_hours": {
+        "staff_members":     {"on": [("staff_id", "id")]},
+        "projects":          {"on": [("project_id", "id")]},
+    },
+    "users": {
+        "staff_members":     {"on": [("id", "user_id")]},
     },
 }
 
@@ -860,7 +948,11 @@ def _serialize_cell(v: Any) -> Any:
 
 
 def _excel_cell_value(v: Any) -> Any:
-    """Excel cell 接受 str/number/datetime；UUID/Decimal/枚举要转换。"""
+    """Excel cell 接受 str/number/datetime；UUID/Decimal/枚举要转换。
+
+    openpyxl 不支持 timezone-aware datetime（会抛 TypeError），
+    PG ``timestamptz`` 字段会带 tzinfo，必须显式 strip。
+    """
     from datetime import date, datetime
     from decimal import Decimal
     from uuid import UUID
@@ -868,7 +960,10 @@ def _excel_cell_value(v: Any) -> Any:
         return None
     if isinstance(v, Decimal):
         return float(v)
-    if isinstance(v, (datetime, date)):
+    if isinstance(v, datetime):
+        # strip tzinfo（保持壁钟时间，符合用户本地化预期）
+        return v.replace(tzinfo=None) if v.tzinfo is not None else v
+    if isinstance(v, date):
         return v
     if isinstance(v, UUID):
         return str(v)

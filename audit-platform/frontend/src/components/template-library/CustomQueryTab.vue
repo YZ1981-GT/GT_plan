@@ -612,7 +612,7 @@ async function onExportExcel() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '查询结果')
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-    const fname = `自定义查询_${formCtx.value.source}_${ts}.xlsx`
+    const fname = `高级查询_${formCtx.value.source}_${ts}.xlsx`
     XLSX.writeFile(wb, fname)
     ElMessage.success(`已导出 ${fname}`)
   } catch (e: any) {

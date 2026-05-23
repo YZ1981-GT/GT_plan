@@ -16,8 +16,8 @@
   - 导出 Excel：调用 /api/query/export-excel 下载 xlsx
 -->
 <template>
-  <div class="gt-aqb gt-fade-in">
-    <div class="gt-aqb-header">
+  <div class="gt-aqb gt-fade-in" :class="{ 'gt-aqb--embedded': embedded }">
+    <div v-if="!embedded" class="gt-aqb-header">
       <h2 class="gt-aqb-title">高级查询构建器</h2>
       <span class="gt-aqb-subtitle">
         可视化条件 · SQL 预览 · 结果导出 · 仅 admin / manager 可访问
@@ -144,7 +144,77 @@
             </div>
           </el-form-item>
 
-          <!-- 高级：分组 + 聚合 + limit -->
+          <!-- 关联表（JOIN，从 schema 的 joins 自动列出） -->
+          <el-form-item v-if="currentTable && availableJoins.length" label="关联表（JOIN）">
+            <div class="gt-aqb-filter-logic">
+              <el-button type="primary" link @click="addJoin" size="small">
+                + 添加关联
+              </el-button>
+            </div>
+            <div class="gt-aqb-filter-rows">
+              <div
+                v-for="(j, idx) in dsl.joins"
+                :key="idx"
+                class="gt-aqb-filter-row"
+              >
+                <el-select v-model="j.table" placeholder="目标表" size="small" filterable style="width: 240px" @change="onJoinTableChange(idx)">
+                  <el-option
+                    v-for="t in availableJoins"
+                    :key="t.target_table"
+                    :label="t.target_label + '（' + t.target_table + '）'"
+                    :value="t.target_table"
+                  />
+                </el-select>
+                <el-select v-model="j.type" size="small" style="width: 110px">
+                  <el-option label="INNER" value="inner" />
+                  <el-option label="LEFT" value="left" />
+                </el-select>
+                <span class="gt-aqb-filter-noval" style="flex:1">
+                  ON {{ joinOnSummary(j) || '（自动按 schema）' }}
+                </span>
+                <el-button link type="danger" @click="removeJoin(idx)" size="small">
+                  删除
+                </el-button>
+              </div>
+            </div>
+          </el-form-item>
+
+          <!-- 聚合（SUM / COUNT / AVG / MIN / MAX） -->
+          <el-form-item v-if="currentTable" label="聚合（可选）">
+            <div class="gt-aqb-filter-logic">
+              <el-button type="primary" link @click="addAggregate" size="small">
+                + 添加聚合
+              </el-button>
+            </div>
+            <div class="gt-aqb-filter-rows">
+              <div
+                v-for="(a, idx) in dsl.aggregates"
+                :key="idx"
+                class="gt-aqb-filter-row"
+              >
+                <el-select v-model="a.func" size="small" style="width: 110px">
+                  <el-option v-for="fn in (schema?.aggregates || [])" :key="fn" :label="fn.toUpperCase()" :value="fn" />
+                </el-select>
+                <el-select v-model="a.field" size="small" filterable style="width: 200px">
+                  <el-option label="*（行数）" value="*" />
+                  <el-option v-for="fld in currentTable.fields" :key="fld" :label="fld" :value="fld" />
+                </el-select>
+                <el-input v-model="a.alias" size="small" placeholder="别名" style="flex: 1" />
+                <el-button link type="danger" @click="removeAggregate(idx)" size="small">
+                  删除
+                </el-button>
+              </div>
+            </div>
+          </el-form-item>
+
+          <!-- 分组 GROUP BY -->
+          <el-form-item v-if="currentTable && dsl.aggregates.length" label="分组 GROUP BY">
+            <el-select v-model="dsl.group_by" size="small" filterable multiple style="width: 100%">
+              <el-option v-for="fld in currentTable.fields" :key="fld" :label="fld" :value="fld" />
+            </el-select>
+          </el-form-item>
+
+          <!-- 高级：limit -->
           <el-form-item label="结果限制">
             <el-input-number v-model="dsl.limit" :min="1" :max="1000" size="small" />
             <span style="margin-left:8px;color:#888;font-size:12px">
@@ -207,14 +277,17 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import api from '@/services/apiProxy'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 interface TableMeta {
   name: string
   label: string
   fields: string[]
+  joins?: { target_table: string; target_label: string; on: { left_field: string; right_field: string }[] }[]
 }
 interface Schema {
   tables: TableMeta[]
@@ -230,6 +303,15 @@ interface OrderRow {
   field: string
   direction: 'asc' | 'desc'
 }
+interface JoinRow {
+  table: string
+  type: 'inner' | 'left'
+}
+interface AggregateRow {
+  func: string
+  field: string
+  alias: string
+}
 interface QueryResult {
   rows: Record<string, any>[]
   columns: string[]
@@ -239,6 +321,8 @@ interface QueryResult {
 }
 
 const schema = ref<Schema | null>(null)
+// schema 缓存（sessionStorage）
+const SCHEMA_CACHE_KEY = 'gt:query-builder:schema-v1'
 const sqlPreview = ref<string>('')
 const result = ref<QueryResult | null>(null)
 const loadingPreview = ref(false)
@@ -251,6 +335,9 @@ const dsl = reactive<{
   filters: FilterRow[]
   filter_logic: 'and' | 'or'
   order_by: OrderRow[]
+  joins: JoinRow[]
+  aggregates: AggregateRow[]
+  group_by: string[]
   limit: number
 }>({
   table: '',
@@ -258,6 +345,9 @@ const dsl = reactive<{
   filters: [],
   filter_logic: 'and',
   order_by: [],
+  joins: [],
+  aggregates: [],
+  group_by: [],
   limit: 100,
 })
 
@@ -266,9 +356,27 @@ const currentTable = computed<TableMeta | null>(() => {
   return schema.value.tables.find((t) => t.name === dsl.table) || null
 })
 
+const availableJoins = computed(() => currentTable.value?.joins || [])
+
+function joinOnSummary(j: JoinRow): string {
+  if (!j.table || !currentTable.value) return ''
+  const meta = currentTable.value.joins?.find(x => x.target_table === j.table)
+  if (!meta) return ''
+  return meta.on.map(p => `${dsl.table}.${p.left_field} = ${j.table}.${p.right_field}`).join(' AND ')
+}
+
 onMounted(async () => {
+  // 先尝试 schema 缓存（登录会话内只拉一次）
+  try {
+    const cached = sessionStorage.getItem(SCHEMA_CACHE_KEY)
+    if (cached) {
+      schema.value = JSON.parse(cached)
+      return
+    }
+  } catch { /* ignore */ }
   try {
     schema.value = await api.get<Schema>('/api/query/schema')
+    try { sessionStorage.setItem(SCHEMA_CACHE_KEY, JSON.stringify(schema.value)) } catch { /* ignore */ }
   } catch (e: any) {
     if (e?.response?.status === 403) {
       ElMessage.error('当前角色无权访问高级查询构建器（仅 admin / manager / partner）')
@@ -283,9 +391,31 @@ function onTableChange() {
   dsl.fields = []
   dsl.filters = []
   dsl.order_by = []
+  dsl.joins = []
+  dsl.aggregates = []
+  dsl.group_by = []
   sqlPreview.value = ''
   result.value = null
 }
+
+function addJoin() {
+  const first = availableJoins.value[0]
+  if (!first) return
+  dsl.joins.push({ table: first.target_table, type: 'left' })
+}
+function removeJoin(idx: number) { dsl.joins.splice(idx, 1) }
+function onJoinTableChange(_idx: number) { /* type/table 切换无副作用，预留 */ }
+
+function addAggregate() {
+  if (!currentTable.value || !schema.value) return
+  const fn = (schema.value.aggregates || ['count'])[0] || 'count'
+  dsl.aggregates.push({
+    func: fn,
+    field: '*',
+    alias: `${fn}_value`,
+  })
+}
+function removeAggregate(idx: number) { dsl.aggregates.splice(idx, 1) }
 
 function addFilter() {
   if (!currentTable.value) return
@@ -371,6 +501,13 @@ function buildPayload() {
       }),
     filter_logic: dsl.filter_logic,
     order_by: dsl.order_by.filter((o) => o.field),
+    joins: dsl.joins.filter((j) => j.table).map((j) => ({ table: j.table, type: j.type })),
+    aggregates: dsl.aggregates.filter((a) => a.func && a.field).map((a) => ({
+      func: a.func,
+      field: a.field,
+      alias: a.alias || `${a.func}_${a.field}`,
+    })),
+    group_by: dsl.group_by,
     limit: dsl.limit,
   }
 }
@@ -421,6 +558,17 @@ async function doExecute() {
 
 async function doExport() {
   if (!dsl.table) return
+  // 大量数据导出前提示（result.total > 1000 或 limit > 500）
+  const expectedRows = result.value?.total ?? dsl.limit
+  if (expectedRows > 500) {
+    try {
+      await ElMessageBox.confirm(
+        `本次将导出约 ${expectedRows} 行数据，可能耗时 10-30 秒。是否继续？`,
+        '导出确认',
+        { confirmButtonText: '继续导出', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch { return /* cancelled */ }
+  }
   loadingExport.value = true
   try {
     const response = await http.post('/api/query/export-excel', buildPayload(), {
@@ -429,7 +577,9 @@ async function doExport() {
     const blob = new Blob([response.data])
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    link.download = `query_${dsl.table}_${Date.now()}.xlsx`
+    // 文件名带表 label 更易识别
+    const tableLabel = (currentTable.value?.label || dsl.table).replace(/[\\/:*?"<>|]/g, '_')
+    link.download = `${tableLabel}_${Date.now()}.xlsx`
     link.click()
     URL.revokeObjectURL(link.href)
     ElMessage.success('导出成功')
@@ -450,6 +600,8 @@ async function doExport() {
   overflow: hidden;
   background: var(--gt-color-bg, #f5f5f7);
 }
+/* 嵌入到弹窗时去掉外层背景与 padding，由 dialog/tab 自己控制 */
+.gt-aqb--embedded { padding: 0; background: transparent; }
 .gt-aqb-header {
   display: flex;
   align-items: baseline;

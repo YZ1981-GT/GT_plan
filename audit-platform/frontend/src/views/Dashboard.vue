@@ -3,6 +3,12 @@
     <!-- ── 欢迎横幅 + 角色视图切换（多维视图）── -->
     <GtPageHeader title="工作台" variant="banner" icon="🏠" :show-back="false">
       <template #subtitle>{{ todayStr }}</template>
+      <div class="gt-welcome-greet">
+        <div class="gt-welcome-greet__hi">
+          {{ greeting }}，<span class="gt-welcome-greet__name">{{ displayName }}</span> 👋
+        </div>
+        <div class="gt-welcome-greet__motto">{{ motto }}</div>
+      </div>
       <template #actions>
         <DashboardViewSwitcher />
       </template>
@@ -157,6 +163,7 @@
         <div class="section-card schedule-card" :class="{ 'schedule-card--collapsed': !loadingSchedule && todaySchedule.length === 0 }">
           <div class="section-header">
             <h2 class="section-title">今日日程</h2>
+            <el-button text size="small" @click="$router.push('/work-hours')">去填报 →</el-button>
           </div>
           <el-skeleton v-if="loadingSchedule" :rows="3" animated />
           <div v-else-if="todaySchedule.length === 0" class="empty-schedule-mini">
@@ -171,6 +178,30 @@
               </div>
             </div>
           </div>
+
+          <!-- 迷你日历：紧凑中文风格，今日高亮，可切月 + 点击日期跳工时填报 -->
+          <div class="dashboard-calendar">
+            <div class="dashboard-cal-header">
+              <button class="dashboard-cal-nav" @click="calShift(-1)" title="上个月">‹</button>
+              <span class="dashboard-cal-title">{{ calYear }}年 {{ calMonth + 1 }}月</span>
+              <button class="dashboard-cal-today" @click="calBackToToday" title="回到今天">今</button>
+              <button class="dashboard-cal-nav" @click="calShift(1)" title="下个月">›</button>
+            </div>
+            <div class="dashboard-cal-grid">
+              <div v-for="d in ['一','二','三','四','五','六','日']" :key="d" class="dashboard-cal-weekday">{{ d }}</div>
+              <div
+                v-for="cell in calCells"
+                :key="cell.iso"
+                class="dashboard-cal-cell"
+                :class="{
+                  'dashboard-cal-cell--today':       cell.iso === todayIso,
+                  'dashboard-cal-cell--other-month': !cell.inMonth,
+                  'dashboard-cal-cell--weekend':     cell.weekend,
+                }"
+                @click="onCalendarClick(cell.iso)"
+              >{{ cell.day }}</div>
+            </div>
+          </div>
         </div>
       </el-col>
     </el-row>
@@ -181,7 +212,7 @@
         <h2 class="section-title">快捷操作</h2>
       </div>
       <div class="action-grid">
-        <div v-for="act in quickActions" :key="act.label" class="action-card" @click="$router.push(act.path)">
+        <div v-for="act in quickActions" :key="act.label" class="action-card" @click="onQuickActionClick(act)">
           <div class="action-icon" :style="{ background: act.bg, color: act.color }">
             <el-icon :size="22"><component :is="act.icon" /></el-icon>
           </div>
@@ -201,12 +232,13 @@ import { listProjectsWithProgress, getMyAssignments } from '@/services/commonApi
 import { api as httpApi } from '@/services/apiProxy'
 import { dashboard as P_dash, workpapers as P_wp } from '@/services/apiPaths'
 import { WP_STATUS, PROJECT_STATUS } from '@/constants/statusEnum'
+import { eventBus } from '@/utils/eventBus'
 import GTChart from '@/components/GTChart.vue'
 import ProjectGanttChart from '@/components/dashboard/ProjectGanttChart.vue'
 import DashboardViewSwitcher from '@/components/dashboard/DashboardViewSwitcher.vue'
 import {
   FolderOpened, Loading, Warning, CircleCheck,
-  Plus, Timer, Reading, Search,
+  Plus, Timer, Reading, Search, Bell, Document, Setting,
 } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
@@ -224,10 +256,14 @@ const todayStr = computed(() => {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 星期${weekdays[d.getDay()]}`
 })
 const mottos = [
-  '审计之道，在于细节。',
-  '每一份底稿，都是专业的证明。',
-  '严谨求实，追求卓越。',
-  '今天也是高效工作的一天。',
+  '审计之道，在于细节。每一笔数字背后都是责任。',
+  '每一份底稿，都是专业的证明 —— 今天也加油 ✨',
+  '严谨求实，追求卓越。Stay sharp, stay focused.',
+  '高效流畅的一天，从一个清晰的计划开始 🚀',
+  '复核不止于发现问题，更在于守住底线。',
+  '专业是日复一日的积累，加油，今天又精进一点 💪',
+  '审计的浪漫，是把每一个数字讲清楚。',
+  '今天的你，离卓越又近了一步。',
 ]
 const motto = mottos[Math.floor(Math.random() * mottos.length)]
 
@@ -239,6 +275,49 @@ const recentProjects = ref<any[]>([])
 const allProjects = ref<any[]>([])  // 甘特视图用：完整列表（partner/start/due/progress 已派生）
 const recentViewMode = ref<'table' | 'card' | 'gantt'>('table')
 const todaySchedule = ref<any[]>([])
+
+// 日历：自定义紧凑日历（中文，周一起始，6 行 7 列固定网格）
+const calAnchor = ref(new Date()) // 当前显示的月份锚点
+const todayIso = new Date().toISOString().slice(0, 10)
+
+const calYear  = computed(() => calAnchor.value.getFullYear())
+const calMonth = computed(() => calAnchor.value.getMonth())
+
+interface CalCell { iso: string; day: number; inMonth: boolean; weekend: boolean }
+
+/** 6×7 = 42 格的当月视图（周一起始） */
+const calCells = computed<CalCell[]>(() => {
+  const y = calYear.value
+  const m = calMonth.value
+  const first = new Date(y, m, 1)
+  // JS getDay: 0=Sun, 1=Mon... 我们要周一起始，所以 Sun(0) → 6, 其他 -1
+  const offset = (first.getDay() + 6) % 7
+  const start = new Date(y, m, 1 - offset)
+  const cells: CalCell[] = []
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const dow = d.getDay()  // 0=Sun, 6=Sat
+    cells.push({
+      iso,
+      day: d.getDate(),
+      inMonth: d.getMonth() === m,
+      weekend: dow === 0 || dow === 6,
+    })
+  }
+  return cells
+})
+
+function calShift(delta: number) {
+  const next = new Date(calAnchor.value)
+  next.setMonth(next.getMonth() + delta)
+  calAnchor.value = next
+}
+function calBackToToday() { calAnchor.value = new Date() }
+
+function onCalendarClick(day: string) {
+  router.push({ path: '/work-hours', query: { date: day } })
+}
 
 // 甘特组件 props 适配（id → project_id, name → project_name）
 const ganttProjects = computed(() => allProjects.value.map((p: any) => ({
@@ -339,13 +418,27 @@ const statCards = computed(() => [
   },
 ])
 
-// ── 快捷操作（精简到 4 个真高频任务，与左侧导航解耦）──
+// ── 快捷操作（8 个高频场景：4 任务 + 4 高频导航）──
 const quickActions = [
-  { label: '新建项目', path: '/projects/new', icon: Plus, bg: 'var(--gt-color-primary-bg)', color: 'var(--gt-color-primary)' },
-  { label: '工时填报', path: '/work-hours', icon: Timer, bg: 'var(--gt-color-wheat-light)', color: '#e6a817' },
-  { label: '复核收件箱', path: '/review-inbox', icon: Reading, bg: 'var(--gt-color-coral-light)', color: '#FF5149' },
-  { label: '高级查询', path: '/advanced-query', icon: Search, bg: '#e0f2fe', color: '#0284c7' },
+  // 任务类（与左侧导航解耦）
+  { label: '新建项目',   path: '/projects/new',     icon: Plus,         bg: 'var(--gt-color-primary-bg)',     color: 'var(--gt-color-primary)' },
+  { label: '工时填报',   path: '/work-hours',       icon: Timer,        bg: 'var(--gt-color-wheat-light)',    color: 'var(--gt-color-wheat)' },
+  { label: '复核收件箱', path: '/review-inbox',     icon: Bell,         bg: 'var(--gt-color-coral-light)',    color: 'var(--gt-color-coral)' },
+  { label: '高级查询', action: 'custom-query',    icon: Search,       bg: 'var(--gt-color-info-light, #e0f2fe)', color: 'var(--gt-color-teal)' },
+  // 高频导航
+  { label: '项目列表',   path: '/projects',         icon: FolderOpened, bg: 'var(--gt-color-teal-light)',     color: 'var(--gt-color-teal)' },
+  { label: '模板库',     path: '/template-library', icon: Document,     bg: 'var(--gt-color-success-light)',  color: 'var(--gt-color-success)' },
+  { label: '知识库',     path: '/knowledge',        icon: Reading,      bg: 'var(--gt-color-primary-bg)',     color: 'var(--gt-color-primary)' },
+  { label: '系统设置',   path: '/settings',         icon: Setting,      bg: 'var(--gt-color-bg-light, #f5f5f7)', color: 'var(--gt-color-text-secondary)' },
 ]
+
+function onQuickActionClick(act: typeof quickActions[number]) {
+  if (act.action === 'custom-query') {
+    eventBus.emit('open-custom-query')
+    return
+  }
+  if (act.path) router.push(act.path)
+}
 
 // ── 状态映射 ──
 function statusLabel(s: string) {
@@ -435,7 +528,39 @@ onMounted(async () => {
 .my-wp-code { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); font-family: monospace; }
 .my-wp-name { font-size: var(--gt-font-size-sm); font-weight: 500; margin: 4px 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ── 欢迎横幅 ── */
+/* ── 欢迎语（banner row1 默认 slot 内，紧贴标题右侧填充空白）── */
+.gt-welcome-greet {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--gt-color-text-inverse);
+  max-width: 50%;
+}
+.gt-welcome-greet__hi {
+  font-size: var(--gt-font-size-lg, 18px);
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.3px;
+}
+.gt-welcome-greet__name {
+  color: #fff;
+  font-weight: 700;
+  margin: 0 4px;
+  font-size: 1.05em;
+}
+.gt-welcome-greet__motto {
+  font-size: var(--gt-font-size-sm);
+  opacity: 0.9;
+  font-style: italic;
+  text-align: right;
+  line-height: 1.7;
+  letter-spacing: 0.2px;
+}
+
+/* 旧 welcome-banner 类已废弃（保留 css 兼容残留引用，无害） */
 .welcome-banner {
   background: linear-gradient(135deg, #4b2d77 0%, #6b42a8 50%, #A06DFF 100%);
   border-radius: var(--gt-radius-lg);
@@ -563,6 +688,90 @@ onMounted(async () => {
   padding: 4px 0;
 }
 .empty-schedule { display: flex; align-items: center; justify-content: center; min-height: 160px; }
+
+/* 紧凑型日历（自定义实现，中文 / 周一起始 / 28px 圆点格） */
+.dashboard-calendar {
+  margin-top: var(--gt-space-3);
+  border-top: 1px dashed var(--gt-color-border-light);
+  padding-top: var(--gt-space-3);
+}
+.dashboard-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text);
+  margin-bottom: 8px;
+}
+.dashboard-cal-title {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  flex: 1;
+  text-align: center;
+}
+.dashboard-cal-nav,
+.dashboard-cal-today {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--gt-color-text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+.dashboard-cal-nav:hover,
+.dashboard-cal-today:hover {
+  background: var(--gt-color-primary-bg);
+  color: var(--gt-color-primary);
+}
+.dashboard-cal-today {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gt-color-primary);
+}
+
+.dashboard-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.dashboard-cal-weekday {
+  font-size: 11px;
+  color: var(--gt-color-text-tertiary);
+  text-align: center;
+  padding: 4px 0;
+  font-weight: 500;
+}
+.dashboard-cal-cell {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--gt-color-text);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+.dashboard-cal-cell:hover {
+  background: var(--gt-color-primary-bg);
+  color: var(--gt-color-primary);
+}
+.dashboard-cal-cell--today {
+  background: var(--gt-color-primary);
+  color: #fff;
+  font-weight: 600;
+}
+.dashboard-cal-cell--today:hover { background: var(--gt-color-primary); color: #fff; }
+.dashboard-cal-cell--other-month { color: var(--gt-color-text-placeholder); }
+.dashboard-cal-cell--weekend:not(.dashboard-cal-cell--today):not(.dashboard-cal-cell--other-month) {
+  color: var(--gt-color-coral);
+}
 .timeline-list { display: flex; flex-direction: column; gap: var(--gt-space-3); }
 .timeline-item { display: flex; align-items: center; gap: var(--gt-space-3); padding: var(--gt-space-2) 0; }
 .timeline-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }

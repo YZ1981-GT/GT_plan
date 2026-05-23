@@ -9,7 +9,7 @@
   <div class="gt-cq-view gt-fade-in">
     <div class="gt-cq-header">
       <div class="gt-cq-title-block">
-        <h2 class="gt-cq-title">自定义查询</h2>
+        <h2 class="gt-cq-title">高级查询</h2>
         <span class="gt-cq-subtitle">跨模块灵活检索 · 模板保存 · Excel 导出</span>
       </div>
     </div>

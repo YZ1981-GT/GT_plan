@@ -25,6 +25,13 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
 def _extract_project_audit_year(project: Project) -> int | None:
+    """提取项目审计年度，兜底优先级（防止 wizard_state 未填齐导致 null）：
+
+    1. wizard_state.steps.basic_info.data.audit_year (主要来源，向导走完时填)
+    2. project.audit_period_start.year（创建时填的审计期间起）
+    3. project.name 末尾的 _YYYY 后缀（命名约定 `{客户}_{年度}`）
+    返回值始终 > 2000。
+    """
     wizard_state = project.wizard_state or {}
     basic_info = (
         wizard_state.get("steps", {}).get("basic_info", {}).get("data")
@@ -32,11 +39,36 @@ def _extract_project_audit_year(project: Project) -> int | None:
         or {}
     )
     raw_year = basic_info.get("audit_year") or basic_info.get("year")
-    try:
-        audit_year = int(raw_year)
-    except (TypeError, ValueError):
-        return None
-    return audit_year if audit_year > 2000 else None
+    if raw_year:
+        try:
+            audit_year = int(raw_year)
+            if audit_year > 2000:
+                return audit_year
+        except (TypeError, ValueError):
+            pass
+
+    # 兜底 1：审计期间起始年
+    if project.audit_period_start:
+        try:
+            y = project.audit_period_start.year
+            if y > 2000:
+                return y
+        except (AttributeError, TypeError):
+            pass
+
+    # 兜底 2：项目名末尾 _YYYY 后缀
+    if project.name:
+        import re
+        m = re.search(r'_(\d{4})$', project.name)
+        if m:
+            try:
+                y = int(m.group(1))
+                if y > 2000:
+                    return y
+            except ValueError:
+                pass
+
+    return None
 
 
 def _to_project_response(project: Project) -> ProjectCreateResponse:

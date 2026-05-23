@@ -7,20 +7,34 @@
           {{ overview.projects.length }} 个项目 · {{ crossTodoTotal }} 项待办
         </span>
       </template>
+      <div class="gt-header-refresh-wrap">
+        <el-button
+          circle
+          size="small"
+          :loading="loading"
+          :icon="Refresh"
+          title="刷新"
+          @click="loadOverview"
+        />
+        <span v-if="lastUpdateTime" class="gt-last-update">
+          {{ elapsedText }} 前
+        </span>
+      </div>
       <template #actions>
         <DashboardViewSwitcher />
-        <span class="gt-last-update" v-if="lastUpdateTime">
-          上次更新 {{ elapsedText }} 前
-        </span>
-        <el-button size="small" :loading="loading" @click="loadOverview">
-          刷新
-        </el-button>
       </template>
     </GtPageHeader>
 
-    <!-- 区块零：待审批工时聚合卡片 [R9 F7-PM Task 22] -->
-    <section class="gt-section" v-if="pendingWorkHoursSummary">
+    <!-- 区块零：待审批工时聚合卡片 [R9 F7-PM Task 22] —— 用户可关闭，切换路由回来后会再提示 -->
+    <section class="gt-section" v-if="pendingWorkHoursSummary && pendingWorkHoursVisible">
       <div class="gt-pending-workhours-card" @click="goToWorkHoursApprove()">
+        <el-button
+          class="gt-pwh-close"
+          link
+          :icon="Close"
+          title="本次会话关闭（切换回来后会再提示）"
+          @click.stop="pendingWorkHoursVisible = false"
+        />
         <div class="gt-pwh-icon">⏱️</div>
         <div class="gt-pwh-info">
           <div class="gt-pwh-count">{{ pendingWorkHoursSummary.pending_count }}</div>
@@ -429,6 +443,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { Refresh, Close } from '@element-plus/icons-vue'
+import { useNavigationStack } from '@/composables/useNavigationStack'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import DashboardViewSwitcher from '@/components/dashboard/DashboardViewSwitcher.vue'
 import { api } from '@/services/apiProxy'
@@ -442,6 +458,12 @@ import type { BriefProject } from '@/components/pm/CrossProjectBriefExporter.vue
 import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
+const { push: pushNavStack } = useNavigationStack()
+
+/** 跳转前记录来源（按 Backspace 可返回当前 ManagerDashboard） */
+function recordOrigin() {
+  pushNavStack({ source_view: '/dashboard/manager', query: {} })
+}
 
 // ── 数据状态 ──
 interface ProjectCard {
@@ -506,6 +528,9 @@ interface PendingWorkHoursSummary {
   staff_count: number
 }
 const pendingWorkHoursSummary = ref<PendingWorkHoursSummary | null>(null)
+// 「待审批工时」横幅本次会话可见性：用户关闭后仅当前组件实例有效，
+// 切换路由再回来组件 remount → ref 重置为 true → 重新提示
+const pendingWorkHoursVisible = ref(true)
 
 async function loadPendingWorkHoursSummary() {
   try {
@@ -778,6 +803,7 @@ function goToProject(projectId: string) {
 }
 
 function goToReviewInbox(projectId?: string) {
+  recordOrigin()
   if (projectId) {
     router.push(`/projects/${projectId}/review-inbox`)
   } else {
@@ -786,6 +812,7 @@ function goToReviewInbox(projectId?: string) {
 }
 
 function goToUnassigned(projectId?: string) {
+  recordOrigin()
   if (projectId) {
     router.push({ path: `/projects/${projectId}/workpapers`, query: { filter_assigned: 'unassigned' } })
   } else {
@@ -798,6 +825,7 @@ function goToUnassigned(projectId?: string) {
 }
 
 function goToWorkHoursApprove() {
+  recordOrigin()
   router.push('/work-hours/approve')
 }
 
@@ -1006,6 +1034,21 @@ onBeforeUnmount(() => {
 .gt-manager-dashboard {
   padding: var(--gt-space-4);
   max-width: 1400px;
+}
+
+/* 刷新按钮：放在 GtPageHeader row1 右端（小图标圆按钮 + 下方"X 前"时间标） */
+:deep(.gt-page-header__row1 .gt-header-refresh-wrap) {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+:deep(.gt-page-header__row1 .gt-header-refresh-wrap .gt-last-update) {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+  line-height: 1;
 }
 
 /* 页面头部 */
@@ -1333,6 +1376,7 @@ onBeforeUnmount(() => {
 
 /* 待审批工时聚合卡片 [R9 F7-PM Task 22] */
 .gt-pending-workhours-card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -1355,6 +1399,16 @@ onBeforeUnmount(() => {
 .gt-pwh-hours { font-size: var(--gt-font-size-md); font-weight: 600; color: var(--gt-color-wheat); }
 .gt-pwh-sub { font-size: var(--gt-font-size-xs); color: var(--gt-color-wheat); }
 .gt-pwh-action { margin-left: 16px; }
+.gt-pwh-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: var(--gt-color-text-tertiary);
+  font-size: 14px;
+  padding: 4px;
+  height: auto;
+}
+.gt-pwh-close:hover { color: var(--gt-color-text-secondary); }
 
 /* ── Phase 6 F7: 我的项目群 ── */
 .gt-section-header {

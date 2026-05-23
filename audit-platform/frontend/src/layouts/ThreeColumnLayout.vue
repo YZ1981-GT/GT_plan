@@ -222,10 +222,10 @@
 
           <!-- 查询 -->
           <div class="gt-tool-group-label" v-if="!sidebarCollapsed">🔎 查询</div>
-          <div class="gt-nav-item gt-nav-item--tool" @click="showCustomQuery = true" title="自定义查询">
+          <div class="gt-nav-item gt-nav-item--tool" @click="showCustomQuery = true" title="高级查询">
             <el-icon :size="18"><Search /></el-icon>
             <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">自定义查询</span>
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">高级查询</span>
             </transition>
           </div>
 
@@ -335,6 +335,7 @@
       v-model="showCustomQuery"
       :project-id="currentProjectId"
       :year="currentYear"
+      :initial-tab="customQueryInitialTab"
     />
 
     <!-- 全局快捷键帮助面板 [R7-S2-12] -->
@@ -466,6 +467,7 @@ const fourColumnMode = ref(false)
 const fullscreen = ref(false)
 const showFormulaManager = ref(false)
 const showCustomQuery = ref(false)
+const customQueryInitialTab = ref<'basic' | 'advanced'>('basic')
 const showShortcutHelp = ref(false)
 const currentProjectId = computed(() => (route.params.projectId as string) || '')
 const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
@@ -804,11 +806,16 @@ watch(() => route.params.projectId, (newId) => {
 // 监听子组件打开公式管理的自定义事件
 function onOpenFormulaEvent(payload: { nodeKey?: string }) {
   showFormulaManager.value = true
-  // 如果有 nodeKey，后续 FormulaManagerDialog 可以通过 props 或 watch 定位到对应节点
   if (payload?.nodeKey) {
     // 存储到 sessionStorage 供 FormulaManagerDialog 读取
     sessionStorage.setItem('gt-formula-target-node', payload.nodeKey)
   }
+}
+
+/** 监听全局打开自定义查询事件（如 Dashboard 快捷操作触发） */
+function onOpenCustomQueryEvent(payload?: { tab?: 'basic' | 'advanced' }) {
+  customQueryInitialTab.value = payload?.tab || 'basic'
+  showCustomQuery.value = true
 }
 
 // 公式保存/应用后广播通知所有表刷新
@@ -839,6 +846,7 @@ onMounted(() => {
   loadPrefs()
   document.addEventListener('keydown', onKeydown)
   eventBus.on('open-formula-manager', onOpenFormulaEvent)
+  eventBus.on('open-custom-query', onOpenCustomQueryEvent)
   eventBus.on('four-col-switch', onSwitchFourCol)
   eventBus.on('shortcut:undo', onShortcutUndo)
   eventBus.on('shortcut:help', () => { showShortcutHelp.value = true })
@@ -852,6 +860,7 @@ onUnmounted(() => {
   document.removeEventListener('touchstart', onTouchStart)
   document.removeEventListener('visibilitychange', onVisibilityChange)
   eventBus.off('open-formula-manager', onOpenFormulaEvent)
+  eventBus.off('open-custom-query', onOpenCustomQueryEvent)
   eventBus.off('four-col-switch', onSwitchFourCol)
   eventBus.off('shortcut:undo', onShortcutUndo)
   document.removeEventListener('touchend', onTouchEnd)

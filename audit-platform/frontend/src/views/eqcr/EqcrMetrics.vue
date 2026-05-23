@@ -1,12 +1,21 @@
 <template>
   <div class="eqcr-metrics gt-fade-in">
     <GtPageHeader title="EQCR 指标仪表盘" variant="banner" icon="📊" :show-back="false">
+      <div class="gt-header-refresh-wrap">
+        <el-button
+          circle
+          size="small"
+          :loading="loading"
+          :icon="Refresh"
+          title="刷新"
+          @click="fetchMetrics"
+        />
+      </div>
       <template #actions>
         <DashboardViewSwitcher />
         <el-select v-model="selectedYear" size="small" style="width: 120px" @change="fetchMetrics">
           <el-option v-for="y in yearOptions" :key="y" :label="`${y}年`" :value="y" />
         </el-select>
-        <el-button size="small" @click="fetchMetrics" :loading="loading" round>刷新</el-button>
       </template>
     </GtPageHeader>
 
@@ -62,6 +71,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { Refresh } from '@element-plus/icons-vue'
 import api from '@/services/apiProxy'
 import { eqcr as P_eqcr } from '@/services/apiPaths'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
@@ -101,4 +111,19 @@ onMounted(fetchMetrics)
 
 <style scoped>
 .eqcr-metrics { padding: var(--gt-space-5, 20px); }
+
+/* 刷新按钮：放在 GtPageHeader row1 右端（小图标圆按钮 + 下方"X 前"时间标） */
+:deep(.gt-page-header__row1 .gt-header-refresh-wrap) {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+:deep(.gt-page-header__row1 .gt-header-refresh-wrap .gt-last-update) {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+  line-height: 1;
+}
 </style>
