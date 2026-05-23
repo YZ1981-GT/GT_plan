@@ -372,20 +372,44 @@ def _load_wp_mapping() -> list[dict]:
     return _WP_MAPPING_CACHE
 
 
+_STEP_SHEET_CACHE: dict[str, dict] | None = None
+
+
+def _load_step_sheet_mapping() -> dict[str, dict]:
+    """读 backend/data/step_sheet_mapping.json — 全集 wp_code → {wp_name, available_sheets[]}
+
+    覆盖率 100% (179 底稿 / 1040 sheet)，是底稿全 sheet 列表的权威源。
+    """
+    global _STEP_SHEET_CACHE
+    if _STEP_SHEET_CACHE is not None:
+        return _STEP_SHEET_CACHE
+    data_path = Path(__file__).resolve().parent.parent.parent / "data" / "step_sheet_mapping.json"
+    if not data_path.exists():
+        _STEP_SHEET_CACHE = {}
+        return {}
+    try:
+        with data_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        _STEP_SHEET_CACHE = data.get("mappings", {}) if isinstance(data, dict) else {}
+    except Exception:
+        _STEP_SHEET_CACHE = {}
+    return _STEP_SHEET_CACHE
+
+
 async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> list[dict]:
     """底稿树：循环 → 主底稿（科目名）→ sheet 程序明细。
 
-    数据源双轨：
-      - 传入 project_id：从 `wp_index` 取项目实际配置的底稿（裁剪后）
-      - 未传 project_id：从 `wp_account_mapping.json` 取全集
-    主底稿 = wp_code 不含连字符的根节点（如 E1 / D2），sheet 程序 = 同 cycle 下 wp_code-N 形式的子项
+    数据源：
+      - 主底稿清单：传 `project_id` 走 `wp_index`（裁剪后），未传走 `wp_account_mapping.json` 全集
+      - sheet 程序：`step_sheet_mapping.json`（179 底稿 / 1040 sheet，权威全集）
     """
     mapping = _load_wp_mapping()
+    sheet_map = _load_step_sheet_mapping()
     # mapping 索引：wp_code -> {account_name, account_codes, ...}
     map_by_code: dict[str, dict] = {m.get("wp_code", ""): m for m in mapping if m.get("wp_code")}
 
-    # 取底稿条目：项目级走 wp_index，否则走全集 mapping
-    items: list[dict] = []
+    # 取主底稿条目：项目级走 wp_index，否则走全集 mapping
+    primaries: list[dict] = []
     if project_id:
         try:
             proj_uuid = uuid.UUID(project_id)
@@ -398,87 +422,86 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
             rows = (await db.execute(sql, {"pid": str(proj_uuid)})).fetchall()
             for r in rows:
                 code = r[0] or ""
-                items.append({
+                # 仅保留主底稿（无连字符），sheet 通过 step_sheet_mapping 注入
+                if "-" in code:
+                    continue
+                primaries.append({
                     "wp_code": code,
-                    "wp_name": r[1] or "",
+                    "wp_name": r[1] or sheet_map.get(code, {}).get("wp_name") or "",
                     "cycle": r[2] or (code[:1] if code else ""),
                     "account_name": map_by_code.get(code, {}).get("account_name") or "",
                 })
         except (TypeError, ValueError):
-            items = []
-    if not items:
-        # 全集兜底：用 mapping JSON
+            primaries = []
+    if not primaries:
+        # 全集兜底：用 mapping JSON 主底稿
+        seen: set[str] = set()
         for m in mapping:
             code = m.get("wp_code", "")
-            if not code:
+            if not code or "-" in code or code in seen:
                 continue
-            items.append({
+            seen.add(code)
+            primaries.append({
                 "wp_code": code,
                 "wp_name": m.get("wp_name", ""),
                 "cycle": m.get("cycle") or (code[:1] if code else ""),
                 "account_name": m.get("account_name") or "",
             })
+        # step_sheet_mapping 中可能有 mapping 没的主底稿（如 D0/G0 函证类），补上
+        for code, info in sheet_map.items():
+            if "-" in code or code in seen:
+                continue
+            seen.add(code)
+            primaries.append({
+                "wp_code": code,
+                "wp_name": info.get("wp_name", ""),
+                "cycle": code[:1] if code else "",
+                "account_name": "",
+            })
 
-    # 按 cycle 分组 → 主底稿 → sheet 程序两层
+    # 按 cycle 分组
     cycle_groups: dict[str, list[dict]] = {}
-    for it in items:
-        cy = (it["cycle"] or "").upper() or "其他"
-        cycle_groups.setdefault(cy, []).append(it)
+    for p in primaries:
+        cy = (p["cycle"] or "").upper() or "其他"
+        cycle_groups.setdefault(cy, []).append(p)
 
-    # cycle 节点排序：A-N 字母序 + S 末尾，未知字母兜底
     def _cycle_sort_key(cy: str) -> tuple:
         order = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "S"]
         return (order.index(cy) if cy in order else 99, cy)
 
     result: list[dict] = []
     for cy in sorted(cycle_groups.keys(), key=_cycle_sort_key):
-        members = cycle_groups[cy]
-        # 主底稿：wp_code 无连字符的（如 E1 / D2）；sheet 程序：含连字符（如 E1-1）
-        primaries = sorted([m for m in members if "-" not in m["wp_code"]], key=lambda x: x["wp_code"])
-        sheets_by_primary: dict[str, list[dict]] = {p["wp_code"]: [] for p in primaries}
-        for m in members:
-            if "-" not in m["wp_code"]:
-                continue
-            base = m["wp_code"].split("-", 1)[0]
-            sheets_by_primary.setdefault(base, []).append(m)
-        # 处理孤儿（只有 sheet 子项无主底稿）：把 base 当伪主底稿
-        primary_codes = {p["wp_code"] for p in primaries}
-        for base, ss in sheets_by_primary.items():
-            if base not in primary_codes and ss:
-                primaries.append({"wp_code": base, "wp_name": base, "cycle": cy, "account_name": ""})
-        primaries.sort(key=lambda x: x["wp_code"])
-
+        primary_list = sorted(cycle_groups[cy], key=lambda x: x["wp_code"])
         primary_nodes: list[dict] = []
-        for p in primaries:
+        for p in primary_list:
             code = p["wp_code"]
             acc = p.get("account_name") or ""
             wpname = p.get("wp_name") or ""
-            # label: "E1 货币资金" 优先用科目名，否则用 wp_name
             primary_label = f"{code} {acc or wpname}".strip()
-            sheet_children = sheets_by_primary.get(code, [])
+            # sheet 来自 step_sheet_mapping，未命中则降级单一汇总入口
+            sheets = sheet_map.get(code, {}).get("available_sheets") or []
             children_nodes: list[dict] = []
-            # 主底稿自己作为 sheet 列表的"汇总入口"叶子（点它查整张主表）
             children_nodes.append({
                 "key": f"workpaper:{code}",
                 "label": f"{code}（汇总）",
                 "wp_code": code,
-                "columns": ["wp_code", "wp_name", "cycle", "status", "review_status"],
+                "columns": ["wp_code", "wp_name", "audit_cycle", "status", "review_status"],
             })
-            for s in sorted(sheet_children, key=lambda x: x["wp_code"]):
-                s_code = s["wp_code"]
-                s_acc = s.get("account_name") or s.get("wp_name") or ""
+            for s_name in sheets:
+                # sheet key 用 wp_code+|+sheet_name 形式（execute 端 split 第一段为 wp_code）
                 children_nodes.append({
-                    "key": f"workpaper:{s_code}",
-                    "label": f"{s_code} {s_acc}".strip(),
-                    "wp_code": s_code,
-                    "columns": ["wp_code", "wp_name", "cycle", "status", "review_status"],
+                    "key": f"workpaper:{code}|{s_name}",
+                    "label": s_name,
+                    "wp_code": code,
+                    "sheet_name": s_name,
+                    "columns": ["wp_code", "wp_name", "audit_cycle", "status", "review_status"],
                 })
             primary_nodes.append({
                 "key": f"wp_primary_{code}",
-                "label": primary_label,
+                "label": f"{primary_label}（{len(sheets)}）",
                 "children": children_nodes,
             })
-        cycle_label = f"{cy} {_CYCLE_NAMES.get(cy, '')}".strip() + f"（{len(primaries)}）"
+        cycle_label = f"{cy} {_CYCLE_NAMES.get(cy, '')}".strip() + f"（{len(primary_list)}）"
         result.append({
             "key": f"wp_cycle_{cy}",
             "label": cycle_label,
@@ -521,10 +544,13 @@ async def execute_query(
                     # 调整分录按 company_code 暂走通用查询（adjustments 表无 company_code 列时返回空）
                     return await _query_adjustments(db, pid, year, {**filters, "adjustment_type": "AJE"}, limit)
             return {"rows": [], "columns": [], "total": 0, "error": f"未知合并单位查询: {source}"}
-        # workpaper:{wp_code} 形式（底稿树叶子点击）
+        # workpaper:{wp_code} 或 workpaper:{wp_code}|{sheet_name} 形式（底稿树叶子点击）
         if source.startswith("workpaper:"):
-            wp_code = source.split(":", 1)[1]
-            return await _query_workpaper(db, pid, year, {**filters, "wp_code": wp_code}, limit)
+            tail = source.split(":", 1)[1]
+            if "|" in tail:
+                wp_code, sheet_name = tail.split("|", 1)
+                return await _query_workpaper(db, pid, year, {**filters, "wp_code": wp_code, "sheet_name": sheet_name}, limit)
+            return await _query_workpaper(db, pid, year, {**filters, "wp_code": tail}, limit)
         if source == 'report' or source.startswith('report_'):
             return await _query_report(db, pid, year, filters, limit)
         elif source == 'trial_balance' or source == 'tb_detail':
@@ -673,7 +699,11 @@ async def _query_worksheet(db, pid, year, filters, limit):
 
 
 async def _query_workpaper(db, pid, year, filters, limit):
-    """底稿列表（working_paper + wp_index）— working_paper 无 year 字段，year 仅用于过滤兼容"""
+    """底稿列表（working_paper + wp_index）— working_paper 无 year 字段，year 仅用于过滤兼容
+
+    sheet_name 过滤：当传入时把它作为返回字段附加（echo），不参与 WHERE 过滤
+    （底稿表本身按 wp_code 维度，sheet 维度需进 parsed_data JSONB 子结构，本接口暂不深入）
+    """
     sql = """
         SELECT wi.wp_code, wi.wp_name, wi.audit_cycle, wp.status, wp.review_status,
                wp.assigned_to, wp.created_at, wp.updated_at
@@ -698,8 +728,10 @@ async def _query_workpaper(db, pid, year, filters, limit):
         params["wpc_like"] = f"{filters['wp_code']}-%"
     sql += " ORDER BY wi.wp_code LIMIT :lim"
     result = await db.execute(text(sql), params)
-    rows = [
-        {
+    sheet_echo = filters.get("sheet_name")
+    rows = []
+    for r in result.fetchall():
+        row = {
             "wp_code": r[0],
             "wp_name": r[1],
             "audit_cycle": r[2],
@@ -709,11 +741,15 @@ async def _query_workpaper(db, pid, year, filters, limit):
             "created_at": str(r[6]) if r[6] else None,
             "updated_at": str(r[7]) if r[7] else None,
         }
-        for r in result.fetchall()
-    ]
+        if sheet_echo:
+            row["sheet_name"] = sheet_echo
+        rows.append(row)
+    columns = ["wp_code", "wp_name", "audit_cycle", "status", "review_status", "assigned_to"]
+    if sheet_echo:
+        columns.append("sheet_name")
     return {
         "rows": rows,
-        "columns": ["wp_code", "wp_name", "audit_cycle", "status", "review_status", "assigned_to"],
+        "columns": columns,
         "total": len(rows),
     }
 
