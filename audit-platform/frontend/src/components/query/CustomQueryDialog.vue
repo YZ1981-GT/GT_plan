@@ -479,7 +479,45 @@ watch(selectedSource, (v) => {
 
 function onSheetRangeConfirm(payload: { wp_code: string; sheet_name?: string; range: string }) {
   sheetCellRange.value = payload.range
-  ElMessage.success(`已锁定 ${payload.wp_code} / ${payload.sheet_name || ''} 选区 ${payload.range}，点「▶ 查询」执行`)
+  // 在结果表格区直接预览：把选区拆成 cell 清单（如 A1:C3 → A1,A2,A3,B1,...,C3）
+  const cells = _expandRange(payload.range)
+  resultColumns.value = ['index', 'wp_code', 'sheet_name', 'cell_ref', 'value']
+  resultRows.value = cells.map((c, i) => ({
+    index: i + 1,
+    wp_code: payload.wp_code,
+    sheet_name: payload.sheet_name || '',
+    cell_ref: c,
+    value: '— 待查询 —',
+  }))
+  hasQueried.value = true
+  ElMessage.success(`已锁定 ${payload.wp_code} / ${payload.sheet_name || ''} 选区 ${payload.range}（共 ${cells.length} 个单元格），点「▶ 查询」调取后台数据`)
+}
+
+/** 展开 'A1:C3' / 'B5' 形式 range 为单元格清单 */
+function _expandRange(range: string): string[] {
+  const m = /^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/.exec(range)
+  if (!m) return []
+  const c1 = _colToIdx(m[1]); const r1 = parseInt(m[2], 10)
+  const c2 = m[3] ? _colToIdx(m[3]) : c1
+  const r2 = m[4] ? parseInt(m[4], 10) : r1
+  const out: string[] = []
+  const MAX = 500  // 防爆量
+  for (let r = r1; r <= r2; r++) {
+    for (let c = c1; c <= c2; c++) {
+      out.push(`${_idxToCol(c)}${r}`)
+      if (out.length >= MAX) return out
+    }
+  }
+  return out
+}
+function _colToIdx(s: string): number {
+  let n = 0
+  for (let i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64)
+  return n - 1
+}
+function _idxToCol(i: number): string {
+  if (i < 26) return String.fromCharCode(65 + i)
+  return String.fromCharCode(65 + Math.floor(i / 26) - 1) + String.fromCharCode(65 + (i % 26))
 }
 
 function reopenSheetPicker() {
