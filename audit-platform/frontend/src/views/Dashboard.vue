@@ -12,9 +12,6 @@
           <div class="stat-icon-wrap">
             <el-icon :size="24"><component :is="card.icon" /></el-icon>
           </div>
-          <div v-if="card.trend !== 0" class="stat-trend" :class="card.trend > 0 ? 'trend-up' : 'trend-down'">
-            {{ card.trend > 0 ? '↑' : '↓' }} {{ Math.abs(card.trend) }}%
-          </div>
         </div>
         <div class="stat-body">
           <span class="stat-value">{{ card.value }}</span>
@@ -59,15 +56,29 @@
           </div>
           <el-skeleton v-if="loadingProjects" :rows="4" animated />
           <el-table v-else :data="recentProjects" size="small" class="gt-compact-table" :show-header="true" stripe>
-            <el-table-column prop="name" label="项目名称" min-width="160">
+            <el-table-column prop="name" label="项目名称" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">
                 <span class="project-link" @click="$router.push(`/projects/${row.id}/ledger`)">{{ row.name }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="client_name" label="客户" min-width="120" />
-            <el-table-column prop="status" label="状态" width="100" align="center">
+            <el-table-column prop="audit_year" label="年度" width="80" align="center">
+              <template #default="{ row }">
+                <span class="gt-amt">{{ row.audit_year || '—' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="类型" width="90" align="center">
+              <template #default="{ row }">
+                <el-tag size="small" effect="plain" round>{{ projectTypeLabel(row.project_type) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="status" label="阶段" width="90" align="center">
               <template #default="{ row }">
                 <el-tag :type="(statusType(row.status)) || undefined" size="small" effect="light" round>{{ statusLabel(row.status) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="created_at" label="创建" width="100" align="center">
+              <template #default="{ row }">
+                <span class="gt-mono">{{ shortDate(row.created_at) }}</span>
               </template>
             </el-table-column>
           </el-table>
@@ -197,22 +208,22 @@ const sparkSeries = computed(() => {
 const statCards = computed(() => [
   {
     label: '项目总数', value: stats.total, icon: FolderOpened,
-    cls: 'stat-card--primary', trend: 8,
+    cls: 'stat-card--primary',
     sparkOpt: makeSparkline(sparkSeries.value.review_passed, '#4b2d77'),
   },
   {
     label: '进行中', value: stats.inProgress, icon: Loading,
-    cls: 'stat-card--teal', trend: 12,
+    cls: 'stat-card--teal',
     sparkOpt: makeSparkline(sparkSeries.value.in_progress, '#0094B3'),
   },
   {
     label: '待复核', value: stats.pendingReview, icon: Warning,
-    cls: 'stat-card--coral', trend: -5,
+    cls: 'stat-card--coral',
     sparkOpt: makeSparkline(sparkSeries.value.edit_complete, '#FF5149'),
   },
   {
     label: '已完成', value: stats.completed, icon: CircleCheck,
-    cls: 'stat-card--success', trend: 15,
+    cls: 'stat-card--success',
     sparkOpt: makeSparkline(sparkSeries.value.review_passed, '#28A745'),
   },
 ])
@@ -239,6 +250,14 @@ function statusType(s: string): '' | 'success' | 'warning' | 'danger' | 'info' {
   const m: Record<string, '' | 'success' | 'warning' | 'danger' | 'info'> = { execution: '', planning: 'warning', completion: 'success', archived: 'info', created: 'info' }
   return m[s] ?? ''
 }
+function projectTypeLabel(t?: string): string {
+  const m: Record<string, string> = { annual: '年报', interim: '中报', special: '专项', other: '其他' }
+  return t ? (m[t] || t) : '—'
+}
+function shortDate(s?: string): string {
+  if (!s) return '—'
+  return s.slice(5, 10)
+}
 const timelineColors = ['#4b2d77', '#0094B3', '#FF5149', '#F5A623', '#28a745']
 function timelineColor(i: number) { return timelineColors[i % timelineColors.length] }
 
@@ -262,7 +281,7 @@ onMounted(async () => {
     stats.inProgress = list.filter((p: any) => ['execution', 'planning'].includes(p.status)).length
     stats.pendingReview = list.filter((p: any) => p.status === 'completion').length
     stats.completed = list.filter((p: any) => p.status === PROJECT_STATUS.ARCHIVED).length
-    recentProjects.value = list.slice(0, 3)
+    recentProjects.value = list.slice(0, 5)
   } catch { /* ignore */ }
   loadingProjects.value = false
 

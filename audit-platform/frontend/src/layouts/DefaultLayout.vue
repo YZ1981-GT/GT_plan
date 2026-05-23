@@ -14,7 +14,10 @@
       >
         <el-tooltip content="待复核底稿收件箱" placement="bottom">
           <el-badge :value="pendingReviewCount" :hidden="pendingReviewCount === 0" type="danger">
-            <span class="gt-topbar-action-btn">📋 复核收件箱</span>
+            <span class="gt-topbar-action-btn">
+              <el-icon><Bell /></el-icon>
+              <span class="gt-topbar-btn-text">复核收件箱</span>
+            </span>
           </el-badge>
         </el-tooltip>
       </router-link>
@@ -25,26 +28,27 @@
     </template>
 
     <template #nav-eqcr>
-      <router-link
+      <el-dropdown
         v-if="isEqcrEligible"
-        to="/eqcr/workbench"
-        class="gt-topbar-action-link"
-        style="text-decoration: none;"
+        trigger="click"
+        placement="bottom-end"
       >
-        <el-tooltip content="EQCR 独立复核工作台" placement="bottom">
-          <span class="gt-topbar-action-btn">🛡️ 独立复核</span>
-        </el-tooltip>
-      </router-link>
-      <router-link
-        v-if="isEqcrEligible"
-        to="/eqcr/metrics"
-        class="gt-topbar-action-link"
-        style="text-decoration: none; margin-left: 2px;"
-      >
-        <el-tooltip content="EQCR 指标仪表盘" placement="bottom">
-          <span class="gt-topbar-action-btn">📊 EQCR 指标</span>
-        </el-tooltip>
-      </router-link>
+        <span class="gt-topbar-action-btn">
+          <el-icon><DataAnalysis /></el-icon>
+          <span class="gt-topbar-btn-text">EQCR</span>
+          <el-icon class="gt-topbar-btn-caret"><CaretBottom /></el-icon>
+        </span>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="$router.push('/eqcr/workbench')">
+              <el-icon><Lock /></el-icon>独立复核工作台
+            </el-dropdown-item>
+            <el-dropdown-item @click="$router.push('/eqcr/metrics')">
+              <el-icon><DataLine /></el-icon>EQCR 指标仪表盘
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
     </template>
 
     <template #middle>
@@ -124,6 +128,7 @@ import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
 import NotificationCenter from '@/components/collaboration/NotificationCenter.vue'
 import GlobalSearchDialog from '@/components/common/GlobalSearchDialog.vue'
 import DrilldownBreadcrumb from '@/components/common/DrilldownBreadcrumb.vue'
+import { Bell, DataAnalysis, DataLine, Lock, CaretBottom } from '@element-plus/icons-vue'
 import { initGlobalBackspace, useNavigationStack } from '@/composables/useNavigationStack'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
@@ -332,6 +337,7 @@ function onCatalogSelect(item: any) {
 .gt-topbar-action-btn {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   padding: 4px 10px;
   border-radius: 6px;
   font-size: var(--gt-font-size-sm);
@@ -344,4 +350,6 @@ function onCatalogSelect(item: any) {
 .gt-topbar-action-btn:hover {
   background: rgba(255, 255, 255, 0.12);
 }
+.gt-topbar-btn-text { line-height: 1; }
+.gt-topbar-btn-caret { font-size: 10px; opacity: 0.85; }
 </style>

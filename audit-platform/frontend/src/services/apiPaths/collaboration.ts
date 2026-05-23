@@ -11,7 +11,6 @@ export const staff = {
   resume: (id: string) => `/api/staff/${id}/resume`,
   projects: (id: string) => `/api/staff/${id}/projects`,
   meStaffId: '/api/staff/me/staff-id',
-  myAssignments: '/api/staff/my/assignments',
   myTodos: '/api/staff/me/todos',
   workHours: (id: string) => `/api/staff/${id}/work-hours`,
   checkIn: (id: string) => `/api/staff/${id}/check-in`,

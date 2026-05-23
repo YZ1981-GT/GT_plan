@@ -40,7 +40,9 @@ export async function getMyStaffId(): Promise<string | null> {
 }
 
 export async function getMyAssignments(): Promise<any[]> {
-  const { data } = await http.get(P_staff.myAssignments, { validateStatus: () => true })
+  // 后端真实端点是 /api/projects/my/assignments（assignments.py）；
+  // P_staff.myAssignments 指向 /api/staff/my/assignments 是历史命名错误，已不存在。
+  const { data } = await http.get(P_proj.myAssignments, { validateStatus: () => true })
   return Array.isArray(data) ? data : data || []
 }
 

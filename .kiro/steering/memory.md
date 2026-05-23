@@ -51,7 +51,7 @@ inclusion: always
 - **数据规模**：模板 456 / cross_wp_ref 400 / prefill 1035 cells / VR 114 条 / Spec 70
 - **新增依赖（Phase 3+）**：locust / marked + dompurify / Storybook 8.6.14 / xlsx-js-style / decimal.js / python-docx / prometheus_client；外部 LibreOffice（4 路径 fallback，本地已装 2026-05-23）
 - **文档/表格生成职责边界**（2026-05-23 厘清，禁止越界）：Univer Sheets = 底稿在线编辑（纯前端） / Univer Docs + TipTap + textarea 三级降级 = WorkpaperWordEditor 看 docx / python-docx = 程序化生成附注/EQCR/年报（内容可控可单测） / LibreOffice = 仅承担 docx+xlsx → PDF 转换（weasyprint 优先 → LibreOffice 降级，office_preview + archive_pdf_generators 共享 `_find_libreoffice`）；LibreOffice 不替换 python-docx 不接入编辑回环；6000 并发场景需队列化 + 信号量保护避免 soffice 被打挂；中文字体（仿宋/楷体_GB2312/宋体/Arial Narrow）必须装齐否则 PDF 出方块
-- **底稿右栏附件 Tab**（2026-05-23 接入 AT-2）：`WorkpaperSidePanel` 附件 Tab = `AttachmentTabPanel`（列表 + 拖拽上传 + 点击预览） / `AttachmentPreviewDrawer` Office 文件走 `attachments.previewPdf` 端点 LibreOffice 转 PDF iframe，503 时降级下载提示（`officePreview.health` 探测结果模块级缓存避免重复打）；扩展点：模板库 `WpTemplateDetail` 主文件预览待接入同款管线
+- **底稿右栏附件 Tab**（2026-05-23 接入 AT-2）：`WorkpaperSidePanel` 附件 Tab = `AttachmentTabPanel`（列表 + 拖拽上传 + 点击预览） / `AttachmentPreviewDrawer` Office 文件走 `attachments.previewPdf` 端点 LibreOffice 转 PDF iframe，503 时降级下载提示（`officePreview.health` 探测结果模块级缓存避免重复打）；模板库 `WpTemplateDetail` 主文件区已接入同款管线（`/wp-templates/{wp_code}/preview-pdf` + drawer iframe + health 缓存）
 
 ## 任务状态
 
@@ -69,6 +69,12 @@ inclusion: always
 - Sentinel failover 真实验证：phase4 UAT-8
 - 业务测试：合并模块需真实项目（技术 85%/业务 60%）
 
+### 首页 UX 复盘待办（2026-05-23 Playwright 巡检）
+
+- **P0**：修 `/api/staff/my/assignments` 404（首屏触发 2 次） / 顶栏 3 个 emoji EQCR 链接（复核收件箱+独立复核+EQCR 指标）合并为下拉并按角色显隐 / 删除 KPI 卡假环比 ↑8%↓5% 或接真数据 / 「最近项目」表只 3 列（项目名/客户/状态）补阶段+进度+截止+负责人 4 列
+- **P1**：快捷操作 9 格与左侧导航 70% 重复，砍到 4 个高频（新建项目/工时填报/未读复核/最近底稿） / 仪表盘加角色视图切换 tab（auditor/manager/partner/eqcr） / 顶栏加 ctrl+K 全局搜索 / 「今日日程」空状态从 471×255 占位缩成 60px hint
+- **P2**：侧栏「工具」8 项二级折叠（知识/AI/查询/反馈） / 「最近项目」支持表格/卡片/甘特三视图（复用现有 ProjectGanttChart） / 函证「开发中」从一级菜单下沉到「即将上线」分组
+
 ## 关键引用指南
 
 - 详细技术事实 / 端点速查 / PG schema → `#dev-history` grep 关键词
@@ -82,6 +88,8 @@ inclusion: always
 - **三层一致校验**：DB 迁移 + ORM `Mapped[]` + service 方法，任一缺失即伪绿（AT-3 实战教训）
 - **可复用脚本沉淀**：批量入库/UAT/迁移类工具放 `backend/scripts/{name}.py`（非 `_{tmp}.py`）配 docstring + 多场景；判定 = 操作目标可能再发生即保留
 - **PG 运维**：SET 不支持绑定参数（用 set_config）/ superuser bypass RLS / CONCURRENTLY 必须 asyncpg raw conn + lock_timeout / 失败留 _ccnew 残骸需先 cleanup
+- **SQLite 测试 set_rls_context 兼容**（2026-05-23 沉淀）：set_rls_context 调 PG 的 `set_config(...)` 在 SQLite in-memory 测试会爆 `no such function`；admin 路径走 require_project_access 仍会触发；测试侧 `patch("app.deps.set_rls_context", new=AsyncMock())` 绕开（不在 conftest 全局短路，按需测试 mock 保留生产语义）
+- **FastAPI dep_overrides 闭包陷阱**（2026-05-23 沉淀）：`require_project_access("readonly")` 工厂每次返回新闭包，`app.dependency_overrides[require_project_access("readonly")]` 不会命中路由实际 Depends 对象；正确做法 = 仅 override `get_current_user` + `get_db`，让 admin 路径自身短路，配合上一条 mock set_rls_context 即可
 - **PowerShell**：写中文/emoji 用 fsWrite 工具；`Out-File` 文件锁需先 Stop-Process powershell + 用 `cmd /c "... > log 2>&1"`
 - **agent 调 service 优于 Playwright UI**：大文件入库直调 ledger_import 管线快 10x，Playwright 仅做前端可见性验证
 - **历史档案不回填修改铁律**（2026-05-23 沉淀）：`.kiro/steering/dev-history.md` / `.kiro/specs/*/tasks.md` 等历史记录是 append-only 审计轨迹；做目录重组/路径迁移时**不回填**这些文档中的旧路径（保持时点准确性），只更新活跃代码 + 当前文档；判定边界 = "记录写入时该路径是真的吗" → 是即保留
