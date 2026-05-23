@@ -53,13 +53,14 @@
           <!-- 右侧：查询条件 + 结果 -->
           <div class="gt-cq-main">
             <div class="gt-cq-filter-bar">
-              <!-- 项目选择（必填） -->
+              <!-- 项目选择（可选：不选 = 模板浏览模式） -->
               <el-select
                 v-model="localProjectId"
                 size="small"
                 style="width:240px"
-                placeholder="选择项目"
+                placeholder="选择项目（可空 = 模板浏览）"
                 filterable
+                clearable
                 :loading="projectsLoading"
               >
                 <el-option
@@ -289,10 +290,22 @@ const currentCategoryLabel = computed(() => {
 
 // 空态文案：根据是否已查询给不同提示
 const emptyText = computed(() => {
-  if (!hasQueried.value) return '请选择项目 + 数据源后点击「▶ 查询」'
-  if (!localProjectId.value) return '请先选择项目'
-  return `当前项目「${currentProjectLabel.value}」${localYear.value} 年度暂无该数据源记录`
+  if (!hasQueried.value) return '请选择数据源后点击「▶ 查询」（项目可选，未选时仅展示模板结构）'
+  if (!localProjectId.value && _sourceRequiresProject(selectedSource.value)) return '该数据源需先选择项目'
+  return localProjectId.value
+    ? `当前项目「${currentProjectLabel.value}」${localYear.value} 年度暂无该数据源记录`
+    : '模板浏览模式（未选项目）：仅显示报表/附注/底稿模板结构，不含项目实际值'
 })
+
+/** 判定 source 是否必须传 project_id（试算/账簿/底稿等业务数据必须，报表/附注/调整等模板可缺省） */
+function _sourceRequiresProject(s: string): boolean {
+  // 模板可浏览的源（无项目时返回模板默认）
+  const TEMPLATE_OK_PREFIXES = ['report_', 'disclosure_note:', 'report_lines']
+  const TEMPLATE_OK = ['report', 'disclosure', 'disclosure_note', 'report_lines']
+  if (TEMPLATE_OK.includes(s)) return false
+  if (TEMPLATE_OK_PREFIXES.some(p => s.startsWith(p))) return false
+  return true  // 其他源（试算/账簿/底稿单元格/合并单位等）必须传 project_id
+}
 
 // 静态预设数据源（树未加载时的兜底 + 用于补全树里没有的旧 key）
 const STATIC_SOURCES = [
@@ -606,7 +619,10 @@ async function jumpToCell(row: any) {
 }
 
 async function executeQuery() {
-  if (!localProjectId.value) { ElMessage.warning('请先选择项目'); return }
+  if (!localProjectId.value && _sourceRequiresProject(selectedSource.value)) {
+    ElMessage.warning('该数据源需先选择项目（模板浏览模式仅支持报表/附注/底稿模板）')
+    return
+  }
   hasQueried.value = true
   loading.value = true
   try {

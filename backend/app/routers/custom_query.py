@@ -925,6 +925,7 @@ async def wp_sheet_preview(
             "available": True,
             "wp_code": wp_code,
             "wp_id": str(wp_id),
+            "source": "xlsx_cache",
             **parsed,
         }
     except Exception as e:
@@ -1036,28 +1037,79 @@ async def execute_query(
 
 
 async def _query_report(db, pid, year, filters, limit):
+    """报表数据查询：双源策略
+
+    模板源（report_config）：永远有数据，提供报表结构（行次/行名/缩进/总计标识/公式描述）
+    项目源（report_snapshot.data JSONB）：项目实际生成的报表金额（按 report_type/year 索引）
+    返回：模板结构 + JOIN 项目金额（无项目时金额为 None，模板浏览模式可用）
+    """
     report_type = filters.get("report_type", "balance_sheet")
-    # standard 优先级：filters.standard > 项目 (template_type + report_scope) 推断 > 默认 soe_standalone
+    # standard 优先级：filters.standard > 项目 template_type + report_scope > soe_standalone
     standard = filters.get("standard")
     if not standard:
         template_type = await _resolve_project_template_type(db, pid)
         scope = await _resolve_project_report_scope(db, pid)
-        # report_config 取值：soe_standalone / listed_standalone / listed_consolidated
-        # soe 暂无 consolidated 数据，强制走 standalone
         if template_type == "soe":
             standard = "soe_standalone"
         else:
             standard = f"listed_{scope or 'standalone'}"
-    # 优先查项目级数据，降级查全局模板
-    query = "SELECT row_code, row_name, current_period_amount, prior_period_amount, indent_level, is_total_row FROM report_config WHERE report_type = :rt AND applicable_standard = :std AND is_deleted = false"
-    params: dict = {"rt": report_type, "std": standard, "lim": limit}
-    if pid:
-        query += " AND (project_id = :pid OR project_id IS NULL)"
-        params["pid"] = pid
-    query += " ORDER BY row_number LIMIT :lim"
-    result = await db.execute(text(query), params)
-    rows = [{"row_code": r[0], "row_name": r[1], "current_period_amount": float(r[2]) if r[2] else None, "prior_period_amount": float(r[3]) if r[3] else None, "indent": r[4], "is_total": r[5]} for r in result.fetchall()]
-    return {"rows": rows, "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "total": len(rows), "applicable_standard": standard}
+
+    # 1) 模板结构（无项目时也可查）
+    structure_sql = """
+        SELECT row_code, row_name, indent_level, is_total_row, formula, formula_description
+        FROM report_config
+        WHERE report_type = :rt AND applicable_standard = :std AND is_deleted = false
+        ORDER BY row_number
+        LIMIT :lim
+    """
+    result = await db.execute(text(structure_sql), {"rt": report_type, "std": standard, "lim": limit})
+    structure_rows = result.fetchall()
+
+    # 2) 项目金额（report_snapshot.data JSONB），仅传 pid + year 时可用
+    amount_map: dict[str, dict] = {}
+    source_marker = "template_only"
+    if pid and year:
+        try:
+            snap_row = (await db.execute(text("""
+                SELECT data FROM report_snapshot
+                WHERE project_id = :pid AND year = :y AND report_type = :rt
+                ORDER BY generated_at DESC
+                LIMIT 1
+            """), {"pid": pid, "y": year, "rt": report_type})).first()
+            if snap_row and isinstance(snap_row[0], dict):
+                # report_snapshot.data 通常是 {rows: [{row_code, current_period_amount, prior_period_amount, ...}]}
+                data = snap_row[0]
+                rows_arr = data.get("rows") if isinstance(data, dict) else None
+                if isinstance(rows_arr, list):
+                    for item in rows_arr:
+                        if isinstance(item, dict) and item.get("row_code"):
+                            amount_map[str(item["row_code"])] = item
+                    source_marker = "project_snapshot"
+        except Exception as e:
+            logger.debug("report_snapshot 读取失败 pid=%s year=%s: %s", pid, year, e)
+
+    # 3) 合并模板结构 + 项目金额
+    rows = []
+    for r in structure_rows:
+        row_code = r[0]
+        amt = amount_map.get(str(row_code), {})
+        rows.append({
+            "row_code": row_code,
+            "row_name": r[1],
+            "current_period_amount": amt.get("current_period_amount"),
+            "prior_period_amount": amt.get("prior_period_amount"),
+            "indent": r[2],
+            "is_total": r[3],
+            "formula": r[4],
+            "formula_description": r[5],
+        })
+    return {
+        "rows": rows,
+        "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount", "indent", "is_total"],
+        "total": len(rows),
+        "applicable_standard": standard,
+        "source": source_marker,
+    }
 
 
 async def _query_trial_balance(db, pid, year, filters, limit):

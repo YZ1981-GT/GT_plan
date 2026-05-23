@@ -334,43 +334,28 @@ async def save_univer_data(
     # 提取轻量化的 cellData（只保留 v 和 f，剥离样式 s 减小 JSONB 体积）
     try:
         from sqlalchemy.orm.attributes import flag_modified
+        from app.services.univer_snapshot_helper import build_slim_snapshot, merge_snapshot_incremental, SNAPSHOT_TOO_LARGE
         existing = dict(wp.parsed_data) if isinstance(wp.parsed_data, dict) else {}
-        slim_sheets: dict = {}
-        sheet_order = snapshot.get("sheetOrder") or list((snapshot.get("sheets") or {}).keys())
-        for sid in sheet_order:
-            s = (snapshot.get("sheets") or {}).get(sid) or {}
-            slim_cells: dict = {}
-            for r_key, row in (s.get("cellData") or {}).items():
-                if not isinstance(row, dict):
-                    continue
-                slim_row: dict = {}
-                for c_key, cell in row.items():
-                    if not isinstance(cell, dict):
-                        continue
-                    obj: dict = {}
-                    if "v" in cell and cell.get("v") not in (None, ""):
-                        obj["v"] = cell["v"]
-                    if cell.get("f"):
-                        obj["f"] = cell["f"]
-                    if obj:
-                        slim_row[str(c_key)] = obj
-                if slim_row:
-                    slim_cells[str(r_key)] = slim_row
-            slim_sheets[s.get("name") or sid] = {
-                "id": sid,
-                "cellData": slim_cells,
+        prev_snap = existing.get("univer_snapshot") if isinstance(existing.get("univer_snapshot"), dict) else None
+        # P0-1 + P0-2: slim 化 + 增量合并 + 体积保护
+        new_snap = build_slim_snapshot(snapshot, wp.file_version)
+        if new_snap is SNAPSHOT_TOO_LARGE:
+            # 单次保存的 sheet 太大（> 5MB / > 50K cells），降级只存元数据
+            existing["univer_snapshot"] = {
+                "sheets": {},
+                "sheet_order_names": list((snapshot.get("sheets") or {}).keys()),
+                "saved_at": datetime.now(timezone.utc).isoformat(),
+                "version": wp.file_version,
+                "skipped_reason": "single_save_too_large",
             }
-        existing["univer_snapshot"] = {
-            "sheets": slim_sheets,
-            "sheet_order_names": [(snapshot.get("sheets") or {}).get(sid, {}).get("name") or sid for sid in sheet_order],
-            "saved_at": datetime.now(timezone.utc).isoformat(),
-            "version": wp.file_version,
-        }
+        else:
+            existing["univer_snapshot"] = merge_snapshot_incremental(prev_snap, new_snap)
         wp.parsed_data = existing
         flag_modified(wp, "parsed_data")
-    except Exception:
-        # snapshot 缓存失败不阻塞保存主流程
-        pass
+    except Exception as exc:
+        # snapshot 缓存失败不阻塞保存主流程，但要记录便于追查
+        import logging as _logging
+        _logging.getLogger(__name__).warning("univer_snapshot 落库失败 wp=%s: %s", wp_id, exc)
     await db.flush()
 
     # 6. 审计留痕

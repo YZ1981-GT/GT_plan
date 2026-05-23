@@ -22,6 +22,12 @@
   >
     <div class="gt-sheet-picker-toolbar">
       <span class="gt-sheet-picker-tab">📄 {{ sheetName || wpCode }}</span>
+      <el-tag v-if="dataSource === 'univer_snapshot'" size="small" effect="dark" type="success" round
+        title="数据来自用户最近一次保存的 Univer snapshot（公式已计算）">📥 实时</el-tag>
+      <el-tag v-else-if="dataSource === 'xlsx_recomputed'" size="small" effect="plain" type="warning" round
+        title="模板首次查询，已通过 LibreOffice 重算公式">⚙ 重算</el-tag>
+      <el-tag v-else-if="dataSource === 'xlsx_cache'" size="small" effect="plain" type="info" round
+        title="数据来自模板默认值（无用户编辑）">📋 模板</el-tag>
       <el-select v-if="allSheets.length > 1" v-model="activeSheet" size="small" style="width:240px"
         @change="loadSheetData">
         <el-option v-for="s in allSheets" :key="s" :label="s" :value="s" />
@@ -130,6 +136,7 @@ const realRows = ref(0)
 const realCols = ref(0)
 const allSheets = ref<string[]>([])
 const activeSheet = ref<string>('')
+const dataSource = ref<string>('')  // univer_snapshot / xlsx_cache / xlsx_recomputed
 
 function getCell(r: number, c: number): { v: any } | null {
   return cellData.value[`${r},${c}`] || null
@@ -190,6 +197,7 @@ async function loadSheetData() {
     realCols.value = data.cols || 0
     allSheets.value = data.all_sheets || []
     activeSheet.value = data.sheet_name || ''
+    dataSource.value = data.source || ''
     loadStatus.value = 'loaded'
   } catch (e) {
     loadStatus.value = 'unavailable'
