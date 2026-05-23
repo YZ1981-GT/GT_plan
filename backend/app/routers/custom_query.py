@@ -399,65 +399,53 @@ def _load_step_sheet_mapping() -> dict[str, dict]:
 async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> list[dict]:
     """底稿树：循环 → 主底稿（科目名）→ sheet 程序明细。
 
-    数据源：
-      - 主底稿清单：传 `project_id` 走 `wp_index`（裁剪后），未传走 `wp_account_mapping.json` 全集
-      - sheet 程序：`step_sheet_mapping.json`（179 底稿 / 1040 sheet，权威全集）
+    - 树永远基于全集（wp_account_mapping + step_sheet_mapping）
+    - 传入 project_id 时，从 wp_index 取该项目实际有的 wp_code 集合（裁剪后），
+      不在集合里的节点标 disabled=true 灰显不可选；
+      项目实际有但全集没的（罕见）补充到全集末尾
     """
     mapping = _load_wp_mapping()
     sheet_map = _load_step_sheet_mapping()
-    # mapping 索引：wp_code -> {account_name, account_codes, ...}
     map_by_code: dict[str, dict] = {m.get("wp_code", ""): m for m in mapping if m.get("wp_code")}
 
-    # 取主底稿条目：项目级走 wp_index，否则走全集 mapping
-    primaries: list[dict] = []
+    # 项目级实际有的 wp_code 集合（用于判定 disabled）
+    available_codes: set[str] | None = None
     if project_id:
         try:
             proj_uuid = uuid.UUID(project_id)
             sql = text("""
-                SELECT wp_code, wp_name, audit_cycle
-                FROM wp_index
+                SELECT wp_code FROM wp_index
                 WHERE project_id = :pid AND is_deleted = false
-                ORDER BY audit_cycle, wp_code
             """)
             rows = (await db.execute(sql, {"pid": str(proj_uuid)})).fetchall()
-            for r in rows:
-                code = r[0] or ""
-                # 仅保留主底稿（无连字符），sheet 通过 step_sheet_mapping 注入
-                if "-" in code:
-                    continue
-                primaries.append({
-                    "wp_code": code,
-                    "wp_name": r[1] or sheet_map.get(code, {}).get("wp_name") or "",
-                    "cycle": r[2] or (code[:1] if code else ""),
-                    "account_name": map_by_code.get(code, {}).get("account_name") or "",
-                })
+            available_codes = {r[0] for r in rows if r[0]}
         except (TypeError, ValueError):
-            primaries = []
-    if not primaries:
-        # 全集兜底：用 mapping JSON 主底稿
-        seen: set[str] = set()
-        for m in mapping:
-            code = m.get("wp_code", "")
-            if not code or "-" in code or code in seen:
-                continue
-            seen.add(code)
-            primaries.append({
-                "wp_code": code,
-                "wp_name": m.get("wp_name", ""),
-                "cycle": m.get("cycle") or (code[:1] if code else ""),
-                "account_name": m.get("account_name") or "",
-            })
-        # step_sheet_mapping 中可能有 mapping 没的主底稿（如 D0/G0 函证类），补上
-        for code, info in sheet_map.items():
-            if "-" in code or code in seen:
-                continue
-            seen.add(code)
-            primaries.append({
-                "wp_code": code,
-                "wp_name": info.get("wp_name", ""),
-                "cycle": code[:1] if code else "",
-                "account_name": "",
-            })
+            available_codes = None
+
+    # 主底稿全集：mapping JSON 主底稿 + step_sheet_mapping 主底稿（去重）
+    primaries: list[dict] = []
+    seen: set[str] = set()
+    for m in mapping:
+        code = m.get("wp_code", "")
+        if not code or "-" in code or code in seen:
+            continue
+        seen.add(code)
+        primaries.append({
+            "wp_code": code,
+            "wp_name": m.get("wp_name", ""),
+            "cycle": m.get("cycle") or (code[:1] if code else ""),
+            "account_name": m.get("account_name") or "",
+        })
+    for code, info in sheet_map.items():
+        if "-" in code or code in seen:
+            continue
+        seen.add(code)
+        primaries.append({
+            "wp_code": code,
+            "wp_name": info.get("wp_name", ""),
+            "cycle": code[:1] if code else "",
+            "account_name": "",
+        })
 
     # 按 cycle 分组
     cycle_groups: dict[str, list[dict]] = {}
@@ -469,42 +457,62 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
         order = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "S"]
         return (order.index(cy) if cy in order else 99, cy)
 
+    def _is_disabled(code: str) -> bool:
+        """传 project_id 时，wp_code 不在 available_codes 即灰显"""
+        if available_codes is None:
+            return False
+        return code not in available_codes
+
     result: list[dict] = []
     for cy in sorted(cycle_groups.keys(), key=_cycle_sort_key):
         primary_list = sorted(cycle_groups[cy], key=lambda x: x["wp_code"])
         primary_nodes: list[dict] = []
+        cycle_active_count = 0
         for p in primary_list:
             code = p["wp_code"]
             acc = p.get("account_name") or ""
             wpname = p.get("wp_name") or ""
             primary_label = f"{code} {acc or wpname}".strip()
-            # sheet 来自 step_sheet_mapping，未命中则降级单一汇总入口
+            primary_disabled = _is_disabled(code)
+            if not primary_disabled:
+                cycle_active_count += 1
             sheets = sheet_map.get(code, {}).get("available_sheets") or []
             children_nodes: list[dict] = []
             children_nodes.append({
                 "key": f"workpaper:{code}",
                 "label": f"{code}（汇总）",
                 "wp_code": code,
+                "disabled": primary_disabled,
                 "columns": ["wp_code", "wp_name", "audit_cycle", "status", "review_status"],
             })
             for s_name in sheets:
-                # sheet key 用 wp_code+|+sheet_name 形式（execute 端 split 第一段为 wp_code）
                 children_nodes.append({
                     "key": f"workpaper:{code}|{s_name}",
                     "label": s_name,
                     "wp_code": code,
                     "sheet_name": s_name,
+                    # sheet 灰度规则：主底稿不在项目内 → 该 sheet 也灰
+                    # 主底稿在项目内但具体 sheet 是否真存在需 Phase 2B 解析模板，暂沿用 primary_disabled
+                    "disabled": primary_disabled,
                     "columns": ["wp_code", "wp_name", "audit_cycle", "status", "review_status"],
                 })
             primary_nodes.append({
                 "key": f"wp_primary_{code}",
                 "label": f"{primary_label}（{len(sheets)}）",
+                "disabled": primary_disabled,
                 "children": children_nodes,
             })
-        cycle_label = f"{cy} {_CYCLE_NAMES.get(cy, '')}".strip() + f"（{len(primary_list)}）"
+        # 循环节点 label 显示 "活跃数/总数"（项目模式）或 "总数"（全集模式）
+        if available_codes is not None:
+            cycle_label = f"{cy} {_CYCLE_NAMES.get(cy, '')}".strip() + f"（{cycle_active_count}/{len(primary_list)}）"
+        else:
+            cycle_label = f"{cy} {_CYCLE_NAMES.get(cy, '')}".strip() + f"（{len(primary_list)}）"
+        # 整个循环全部灰则循环本身也 disabled
+        cycle_all_disabled = available_codes is not None and cycle_active_count == 0
         result.append({
             "key": f"wp_cycle_{cy}",
             "label": cycle_label,
+            "disabled": cycle_all_disabled,
             "children": primary_nodes,
         })
     return result

@@ -35,7 +35,7 @@
             <el-tree
               ref="treeRef"
               :data="indicatorTree"
-              :props="{ label: 'label', children: 'children' }"
+              :props="{ label: 'label', children: 'children', disabled: 'disabled' }"
               node-key="key"
               highlight-current
               :expand-on-click-node="false"
@@ -43,7 +43,10 @@
               @node-click="onIndicatorClick"
             >
               <template #default="{ data }">
-                <span style="font-size: var(--gt-font-size-xs)">{{ data.label }}</span>
+                <span :class="['gt-cq-tree-node', { 'gt-cq-tree-node-disabled': data.disabled }]"
+                  :title="data.disabled ? '该底稿在当前项目中已裁剪，不可选' : ''">
+                  {{ data.label }}
+                </span>
               </template>
             </el-tree>
           </div>
@@ -305,6 +308,8 @@ const allSources = computed(() => {
   if (!indicatorTree.value.length) return STATIC_SOURCES.map(s => ({ ...s, ancestorKeys: [s.parentKey] }))
   const list: { key: string; label: string; parentKey: string; ancestorKeys: string[] }[] = []
   function walk(node: any, ancestors: string[], prefix: string) {
+    // 灰度节点跳过（不进入下拉数据源池）
+    if (node.disabled) return
     const childList = node.children || []
     const myAncestors = [...ancestors, node.key]
     if (childList.length === 0) {
@@ -417,6 +422,11 @@ function findTopCategoryOf(targetKey: string): string | null {
 }
 
 function onIndicatorClick(data: any) {
+  // 灰度节点不可选中
+  if (data.disabled) {
+    ElMessage.info('该底稿在当前项目中已裁剪，无法查询')
+    return
+  }
   if (data.children?.length) {
     // 大类/中间层节点：clickedCategory 直接设为该节点 key（精确过滤当前子树）
     clickedCategory.value = data.key
@@ -585,7 +595,7 @@ async function exportResult() {
 }
 
 // 加载指标树（按项目缓存：每个项目独立 sessionStorage key）
-const INDICATOR_CACHE_KEY_PREFIX = 'gt:custom-query:indicators-v6:'
+const INDICATOR_CACHE_KEY_PREFIX = 'gt:custom-query:indicators-v7:'
 
 function _indicatorCacheKey(pid: string | undefined) {
   return `${INDICATOR_CACHE_KEY_PREFIX}${pid || 'no-project'}`
@@ -661,4 +671,13 @@ loadIndicators(localProjectId.value)
 }
 .gt-cq-footer { padding: 6px 0; }
 .gt-cq-transposed { overflow: auto; flex: 1; }
+
+/* 树节点：灰度（项目裁剪后不存在的底稿）*/
+.gt-cq-tree-node { font-size: var(--gt-font-size-xs); }
+.gt-cq-tree-node-disabled {
+  color: var(--gt-color-text-tertiary, #b0b0b0) !important;
+  text-decoration: line-through;
+  font-style: italic;
+  cursor: not-allowed;
+}
 </style>
