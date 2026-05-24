@@ -26,7 +26,7 @@
         >
           <template #default="{ node, data }">
             <span class="gt-fm-tree-node">
-              <span>{{ data.icon }} {{ node.label }}</span>
+              <span>{{ data.icon }} {{ node.label }}<span v-if="data._isExternalLink" style="color: var(--gt-color-info); font-size: 10px; margin-left: 4px;">↗</span></span>
               <el-badge v-if="data.count" :value="data.count" type="info" :max="999" />
             </span>
           </template>
@@ -404,7 +404,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 import { reportConfig as P_rc, noteTemplates as P_nt, linkageBus } from '@/services/apiPaths'
@@ -430,6 +431,9 @@ const visible = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v),
 })
+
+// 路由器(用于外链节点跳转)
+const router = useRouter()
 
 // ── 树形导航数据 ──
 const selectedNodeKey = ref('report_balance_sheet')
@@ -660,6 +664,17 @@ const treeData = computed(() => [
       ]},
     ],
   },
+  // 方案 A: 数据质量规则节点 (跳转到 ValidationRules 独立页面)
+  {
+    key: 'data_quality', label: '数据质量规则', icon: '📐',
+    _isExternalLink: true,
+    _externalRoute: '/ledger-import/validation-rules',
+    children: [
+      { key: 'dq_l1', label: 'L1 基础格式校验', icon: '📌', _isExternalLink: true, _externalRoute: '/ledger-import/validation-rules' },
+      { key: 'dq_l2', label: 'L2 逻辑一致性', icon: '📌', _isExternalLink: true, _externalRoute: '/ledger-import/validation-rules' },
+      { key: 'dq_l3', label: 'L3 跨表核对', icon: '📌', _isExternalLink: true, _externalRoute: '/ledger-import/validation-rules' },
+    ],
+  },
 ])
 
 function countFormulas(reportType: string): number {
@@ -746,6 +761,19 @@ watch(visible, async (v) => {
 })
 
 function onTreeNodeClick(data: any) {
+  // 外链节点: 跳转到独立页面
+  if (data._isExternalLink && data._externalRoute) {
+    ElMessageBox.confirm(
+      `即将跳转到「${data.label}」独立页面查看/编辑。\n\n当前公式管理弹窗的未保存修改将丢失,是否继续?`,
+      '跳转确认',
+      { confirmButtonText: '跳转', cancelButtonText: '取消', type: 'info' }
+    ).then(() => {
+      visible.value = false
+      router.push(data._externalRoute)
+    }).catch(() => {})
+    return
+  }
+
   if (!data.children || data.children.length === 0) {
     selectedNodeKey.value = data.key
     // 构建路径
