@@ -143,7 +143,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { reportLineMapping } from '@/services/apiPaths'
 import { useProjectStore } from '@/stores/project'
@@ -327,9 +327,30 @@ function _buildDefaultReportLines() {
 // ─── 一键预设（生成 + 自动确认） ───
 async function onPreset() {
   if (!props.projectId) { ElMessage.warning('请先选择项目'); return }
+
+  // 检测是否有老格式记录,有则提示用户是否强制刷新
+  const oldFormatCount = mappings.value.filter(m =>
+    m.report_line_code && !m.report_line_code.includes('-')
+  ).length
+  let forceRefresh = false
+  if (oldFormatCount > 0) {
+    try {
+      await ElMessageBox.confirm(
+        `检测到 ${oldFormatCount} 条老格式映射(BSXXX/ISXXX,与新报表不兼容)。\n\n是否强制刷新为新格式 BS-XXX/IS-XXX?\n\n注:仅刷新 AI 建议的记录,手工调整的不动。`,
+        '检测到过期映射',
+        { confirmButtonText: '强制刷新', cancelButtonText: '仅补新增', type: 'warning' }
+      )
+      forceRefresh = true
+    } catch {
+      // 用户选"仅补新增"
+      forceRefresh = false
+    }
+  }
+
   presetLoading.value = true
   try {
-    await api.post(reportLineMapping.aiSuggest(props.projectId))
+    const url = reportLineMapping.aiSuggest(props.projectId) + (forceRefresh ? '?force_refresh=true' : '')
+    await api.post(url)
     await loadMappings()
     const toConfirm = mappings.value.filter(m => !m.is_confirmed).map(m => m.id)
     if (toConfirm.length) {

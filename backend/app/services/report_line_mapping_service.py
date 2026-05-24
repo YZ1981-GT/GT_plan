@@ -182,6 +182,7 @@ def _determine_report_type_from_code(account_code: str) -> ReportType | None:
 async def ai_suggest_mappings(
     project_id: UUID,
     db: AsyncSession,
+    force_refresh: bool = False,
 ) -> list[dict]:
     """根据项目维度 (template_type × report_scope) 从 seed 加载映射规则,生成报表行次映射建议.
 
@@ -192,6 +193,11 @@ async def ai_suggest_mappings(
     2. 从 account_to_report_line_seed.json 加载对应维度的 seed
     3. 遍历项目已映射的标准科目, 按 seed 查 (line_code, line_name, report_type)
     4. 创建 ReportLineMapping 记录(is_confirmed=False, mapping_type=ai_suggested)
+
+    Args:
+        force_refresh: True 时强制刷新所有 ai_suggested 记录(不管 is_confirmed),
+                       覆盖老 BSXXX 格式. manual / reference_copied 永远不动.
+                       False(默认)时仅刷新 ai_suggested + is_confirmed=False 的记录.
     """
     # 1. 派生 applicable_standard
     applicable_standard = await _get_project_applicable_standard(project_id, db)
@@ -269,7 +275,7 @@ async def ai_suggest_mappings(
         seen_keys.add(key)
 
         # 检查是否已存在映射
-        existing = await db.execute(
+        existing_result = await db.execute(
             select(ReportLineMapping).where(
                 ReportLineMapping.project_id == project_id,
                 ReportLineMapping.standard_account_code == std_code,
@@ -277,7 +283,36 @@ async def ai_suggest_mappings(
                 ReportLineMapping.is_deleted == False,  # noqa: E712
             )
         )
-        if existing.scalar_one_or_none():
+        existing = existing_result.scalar_one_or_none()
+
+        if existing is not None:
+            # 已存在: 仅当原是 ai_suggested 时考虑刷新
+            # manual / reference_copied 永远不动,保护用户手工设置
+            if existing.mapping_type != ReportLineMappingType.ai_suggested:
+                continue
+            # ai_suggested 记录:
+            # - force_refresh=True: 不管 is_confirmed 都刷新 (修复底层格式 BSXXX→BS-XXX)
+            # - force_refresh=False: 仅刷新未确认的
+            if not force_refresh and existing.is_confirmed:
+                continue
+            old_code = existing.report_line_code
+            if old_code != line_code or existing.report_line_name != line_name:
+                existing.report_line_code = line_code
+                existing.report_line_name = line_name
+                existing.report_line_level = 1
+                existing.parent_line_code = None
+                suggestions.append({
+                    "standard_account_code": std_code,
+                    "report_type": rt.value,
+                    "report_line_code": line_code,
+                    "report_line_name": line_name,
+                    "report_line_level": 1,
+                    "parent_line_code": None,
+                    "confidence": 1.0,
+                    "applicable_standard": applicable_standard,
+                    "action": "refreshed",
+                    "old_report_line_code": old_code,
+                })
             continue
 
         # 创建映射建议
@@ -302,6 +337,7 @@ async def ai_suggest_mappings(
             "parent_line_code": None,
             "confidence": 1.0,
             "applicable_standard": applicable_standard,
+            "action": "created",
         })
 
     await db.flush()

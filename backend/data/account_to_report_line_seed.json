@@ -1,7 +1,7 @@
 {
-  "description": "标准科目 → 报表行次映射 seed (按 4 套维度独立映射: soe_standalone / soe_consolidated / listed_standalone / listed_consolidated)",
+  "description": "标准科目 → 报表行次映射 seed (按 4 套维度独立映射 + 客户常用别名 + r4: 4401 工程施工→合同资产)",
   "data_source": "backend/data/standard_account_chart.json + backend/data/report_config_seed.json",
-  "version": "v2026-05-24",
+  "version": "v2026-05-24-r4",
   "mappings": {
     "soe_standalone": [
       {
@@ -63,6 +63,12 @@
         "report_type": "balance_sheet",
         "report_line_code": "BS-015",
         "report_line_name": "其他应收款"
+      },
+      {
+        "standard_account_code": "1231",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-008",
+        "report_line_name": "应收账款"
       },
       {
         "standard_account_code": "1231-01",
@@ -371,6 +377,24 @@
         "report_line_name": "使用权资产"
       },
       {
+        "standard_account_code": "1651",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-044",
+        "report_line_name": "使用权资产"
+      },
+      {
+        "standard_account_code": "1652",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-044",
+        "report_line_name": "使用权资产"
+      },
+      {
+        "standard_account_code": "1653",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-044",
+        "report_line_name": "使用权资产"
+      },
+      {
         "standard_account_code": "1701",
         "report_type": "balance_sheet",
         "report_line_code": "BS-045",
@@ -413,76 +437,10 @@
         "report_line_name": "其他非流动资产"
       },
       {
-        "standard_account_code": "3001",
+        "standard_account_code": "1922",
         "report_type": "balance_sheet",
-        "report_line_code": "BS-102",
-        "report_line_name": "实收资本"
-      },
-      {
-        "standard_account_code": "3002",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-113",
-        "report_line_name": "资本公积"
-      },
-      {
-        "standard_account_code": "3003",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-110",
-        "report_line_name": "其他权益工具"
-      },
-      {
-        "standard_account_code": "3101",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-118",
-        "report_line_name": "盈余公积"
-      },
-      {
-        "standard_account_code": "3102",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-115",
-        "report_line_name": "其他综合收益"
-      },
-      {
-        "standard_account_code": "3104",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-125",
-        "report_line_name": "未分配利润"
-      },
-      {
-        "standard_account_code": "3201",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-125",
-        "report_line_name": "未分配利润"
-      },
-      {
-        "standard_account_code": "4001",
-        "report_type": "income_statement",
-        "report_line_code": "IS-008",
-        "report_line_name": "营业成本"
-      },
-      {
-        "standard_account_code": "4101",
-        "report_type": "income_statement",
-        "report_line_code": "IS-008",
-        "report_line_name": "营业成本"
-      },
-      {
-        "standard_account_code": "4301",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-046",
-        "report_line_name": "开发支出"
-      },
-      {
-        "standard_account_code": "4401",
-        "report_type": "income_statement",
-        "report_line_code": "IS-008",
-        "report_line_name": "营业成本"
-      },
-      {
-        "standard_account_code": "4403",
-        "report_type": "income_statement",
-        "report_line_code": "IS-008",
-        "report_line_name": "营业成本"
+        "report_line_code": "BS-050",
+        "report_line_name": "其他非流动资产"
       },
       {
         "standard_account_code": "2001",
@@ -587,6 +545,12 @@
         "report_line_name": "租赁负债"
       },
       {
+        "standard_account_code": "2651",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-091",
+        "report_line_name": "租赁负债"
+      },
+      {
         "standard_account_code": "2701",
         "report_type": "balance_sheet",
         "report_line_code": "BS-092",
@@ -617,10 +581,82 @@
         "report_line_name": "递延所得税负债"
       },
       {
-        "standard_account_code": "5001",
+        "standard_account_code": "3001",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-102",
+        "report_line_name": "实收资本"
+      },
+      {
+        "standard_account_code": "3002",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-113",
+        "report_line_name": "资本公积"
+      },
+      {
+        "standard_account_code": "3003",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-110",
+        "report_line_name": "其他权益工具"
+      },
+      {
+        "standard_account_code": "3101",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-118",
+        "report_line_name": "盈余公积"
+      },
+      {
+        "standard_account_code": "3102",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-115",
+        "report_line_name": "其他综合收益"
+      },
+      {
+        "standard_account_code": "3104",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-125",
+        "report_line_name": "未分配利润"
+      },
+      {
+        "standard_account_code": "3201",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-125",
+        "report_line_name": "未分配利润"
+      },
+      {
+        "standard_account_code": "4001",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-018",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "4101",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-018",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "4301",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-046",
+        "report_line_name": "开发支出"
+      },
+      {
+        "standard_account_code": "4401",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-021",
+        "report_line_name": "合同资产"
+      },
+      {
+        "standard_account_code": "4403",
         "report_type": "income_statement",
         "report_line_code": "IS-008",
         "report_line_name": "营业成本"
+      },
+      {
+        "standard_account_code": "5001",
+        "report_type": "income_statement",
+        "report_line_code": "IS-002",
+        "report_line_name": "营业收入"
       },
       {
         "standard_account_code": "5002",
@@ -727,8 +763,8 @@
       {
         "standard_account_code": "6111",
         "report_type": "income_statement",
-        "report_line_code": "IS-036",
-        "report_line_name": "公允价值变动收益"
+        "report_line_code": "IS-031",
+        "report_line_name": "投资收益"
       },
       {
         "standard_account_code": "6115",
@@ -819,6 +855,12 @@
         "report_type": "income_statement",
         "report_line_code": "IS-045",
         "report_line_name": "所得税费用"
+      },
+      {
+        "standard_account_code": "6901",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-125",
+        "report_line_name": "未分配利润"
       }
     ],
     "soe_consolidated": [
@@ -883,6 +925,12 @@
         "report_line_name": "其他应收款"
       },
       {
+        "standard_account_code": "1231",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-008",
+        "report_line_name": "应收账款"
+      },
+      {
         "standard_account_code": "1231-01",
         "report_type": "balance_sheet",
         "report_line_code": "BS-007",
@@ -1189,6 +1237,24 @@
         "report_line_name": "使用权资产"
       },
       {
+        "standard_account_code": "1651",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-044",
+        "report_line_name": "使用权资产"
+      },
+      {
+        "standard_account_code": "1652",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-044",
+        "report_line_name": "使用权资产"
+      },
+      {
+        "standard_account_code": "1653",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-044",
+        "report_line_name": "使用权资产"
+      },
+      {
         "standard_account_code": "1701",
         "report_type": "balance_sheet",
         "report_line_code": "BS-045",
@@ -1231,76 +1297,10 @@
         "report_line_name": "其他非流动资产"
       },
       {
-        "standard_account_code": "3001",
+        "standard_account_code": "1922",
         "report_type": "balance_sheet",
-        "report_line_code": "BS-102",
-        "report_line_name": "实收资本"
-      },
-      {
-        "standard_account_code": "3002",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-113",
-        "report_line_name": "资本公积"
-      },
-      {
-        "standard_account_code": "3003",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-110",
-        "report_line_name": "其他权益工具"
-      },
-      {
-        "standard_account_code": "3101",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-118",
-        "report_line_name": "盈余公积"
-      },
-      {
-        "standard_account_code": "3102",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-115",
-        "report_line_name": "其他综合收益"
-      },
-      {
-        "standard_account_code": "3104",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-125",
-        "report_line_name": "未分配利润"
-      },
-      {
-        "standard_account_code": "3201",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-125",
-        "report_line_name": "未分配利润"
-      },
-      {
-        "standard_account_code": "4001",
-        "report_type": "income_statement",
-        "report_line_code": "IS-008",
-        "report_line_name": "营业成本"
-      },
-      {
-        "standard_account_code": "4101",
-        "report_type": "income_statement",
-        "report_line_code": "IS-008",
-        "report_line_name": "营业成本"
-      },
-      {
-        "standard_account_code": "4301",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-046",
-        "report_line_name": "开发支出"
-      },
-      {
-        "standard_account_code": "4401",
-        "report_type": "income_statement",
-        "report_line_code": "IS-008",
-        "report_line_name": "营业成本"
-      },
-      {
-        "standard_account_code": "4403",
-        "report_type": "income_statement",
-        "report_line_code": "IS-008",
-        "report_line_name": "营业成本"
+        "report_line_code": "BS-050",
+        "report_line_name": "其他非流动资产"
       },
       {
         "standard_account_code": "2001",
@@ -1405,6 +1405,12 @@
         "report_line_name": "租赁负债"
       },
       {
+        "standard_account_code": "2651",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-091",
+        "report_line_name": "租赁负债"
+      },
+      {
         "standard_account_code": "2701",
         "report_type": "balance_sheet",
         "report_line_code": "BS-092",
@@ -1435,10 +1441,82 @@
         "report_line_name": "递延所得税负债"
       },
       {
-        "standard_account_code": "5001",
+        "standard_account_code": "3001",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-102",
+        "report_line_name": "实收资本"
+      },
+      {
+        "standard_account_code": "3002",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-113",
+        "report_line_name": "资本公积"
+      },
+      {
+        "standard_account_code": "3003",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-110",
+        "report_line_name": "其他权益工具"
+      },
+      {
+        "standard_account_code": "3101",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-118",
+        "report_line_name": "盈余公积"
+      },
+      {
+        "standard_account_code": "3102",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-115",
+        "report_line_name": "其他综合收益"
+      },
+      {
+        "standard_account_code": "3104",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-125",
+        "report_line_name": "未分配利润"
+      },
+      {
+        "standard_account_code": "3201",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-125",
+        "report_line_name": "未分配利润"
+      },
+      {
+        "standard_account_code": "4001",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-018",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "4101",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-018",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "4301",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-046",
+        "report_line_name": "开发支出"
+      },
+      {
+        "standard_account_code": "4401",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-021",
+        "report_line_name": "合同资产"
+      },
+      {
+        "standard_account_code": "4403",
         "report_type": "income_statement",
         "report_line_code": "IS-008",
         "report_line_name": "营业成本"
+      },
+      {
+        "standard_account_code": "5001",
+        "report_type": "income_statement",
+        "report_line_code": "IS-002",
+        "report_line_name": "营业收入"
       },
       {
         "standard_account_code": "5002",
@@ -1545,8 +1623,8 @@
       {
         "standard_account_code": "6111",
         "report_type": "income_statement",
-        "report_line_code": "IS-036",
-        "report_line_name": "公允价值变动收益"
+        "report_line_code": "IS-031",
+        "report_line_name": "投资收益"
       },
       {
         "standard_account_code": "6115",
@@ -1637,6 +1715,12 @@
         "report_type": "income_statement",
         "report_line_code": "IS-045",
         "report_line_name": "所得税费用"
+      },
+      {
+        "standard_account_code": "6901",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-125",
+        "report_line_name": "未分配利润"
       }
     ],
     "listed_standalone": [
@@ -1701,6 +1785,12 @@
         "report_line_name": "其他应收款"
       },
       {
+        "standard_account_code": "1231",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-006",
+        "report_line_name": "应收账款"
+      },
+      {
         "standard_account_code": "1231-01",
         "report_type": "balance_sheet",
         "report_line_code": "BS-005",
@@ -2007,6 +2097,24 @@
         "report_line_name": "使用权资产"
       },
       {
+        "standard_account_code": "1651",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-032",
+        "report_line_name": "使用权资产"
+      },
+      {
+        "standard_account_code": "1652",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-032",
+        "report_line_name": "使用权资产"
+      },
+      {
+        "standard_account_code": "1653",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-032",
+        "report_line_name": "使用权资产"
+      },
+      {
         "standard_account_code": "1701",
         "report_type": "balance_sheet",
         "report_line_code": "BS-033",
@@ -2049,76 +2157,10 @@
         "report_line_name": "其他非流动资产"
       },
       {
-        "standard_account_code": "3001",
+        "standard_account_code": "1922",
         "report_type": "balance_sheet",
-        "report_line_code": "BS-075",
-        "report_line_name": "实收资本"
-      },
-      {
-        "standard_account_code": "3002",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-079",
-        "report_line_name": "资本公积"
-      },
-      {
-        "standard_account_code": "3003",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-076",
-        "report_line_name": "其他权益工具"
-      },
-      {
-        "standard_account_code": "3101",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-083",
-        "report_line_name": "盈余公积"
-      },
-      {
-        "standard_account_code": "3102",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-081",
-        "report_line_name": "其他综合收益"
-      },
-      {
-        "standard_account_code": "3104",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-084",
-        "report_line_name": "未分配利润"
-      },
-      {
-        "standard_account_code": "3201",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-084",
-        "report_line_name": "未分配利润"
-      },
-      {
-        "standard_account_code": "4001",
-        "report_type": "income_statement",
-        "report_line_code": "IS-002",
-        "report_line_name": "营业成本"
-      },
-      {
-        "standard_account_code": "4101",
-        "report_type": "income_statement",
-        "report_line_code": "IS-002",
-        "report_line_name": "营业成本"
-      },
-      {
-        "standard_account_code": "4301",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-035",
-        "report_line_name": "开发支出"
-      },
-      {
-        "standard_account_code": "4401",
-        "report_type": "income_statement",
-        "report_line_code": "IS-002",
-        "report_line_name": "营业成本"
-      },
-      {
-        "standard_account_code": "4403",
-        "report_type": "income_statement",
-        "report_line_code": "IS-002",
-        "report_line_name": "营业成本"
+        "report_line_code": "BS-040",
+        "report_line_name": "其他非流动资产"
       },
       {
         "standard_account_code": "2001",
@@ -2223,6 +2265,12 @@
         "report_line_name": "租赁负债"
       },
       {
+        "standard_account_code": "2651",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-065",
+        "report_line_name": "租赁负债"
+      },
+      {
         "standard_account_code": "2701",
         "report_type": "balance_sheet",
         "report_line_code": "BS-066",
@@ -2253,10 +2301,82 @@
         "report_line_name": "递延所得税负债"
       },
       {
-        "standard_account_code": "5001",
+        "standard_account_code": "3001",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-075",
+        "report_line_name": "实收资本"
+      },
+      {
+        "standard_account_code": "3002",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-079",
+        "report_line_name": "资本公积"
+      },
+      {
+        "standard_account_code": "3003",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-076",
+        "report_line_name": "其他权益工具"
+      },
+      {
+        "standard_account_code": "3101",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-083",
+        "report_line_name": "盈余公积"
+      },
+      {
+        "standard_account_code": "3102",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-081",
+        "report_line_name": "其他综合收益"
+      },
+      {
+        "standard_account_code": "3104",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-084",
+        "report_line_name": "未分配利润"
+      },
+      {
+        "standard_account_code": "3201",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-084",
+        "report_line_name": "未分配利润"
+      },
+      {
+        "standard_account_code": "4001",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-012",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "4101",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-012",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "4301",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-035",
+        "report_line_name": "开发支出"
+      },
+      {
+        "standard_account_code": "4401",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-014",
+        "report_line_name": "合同资产"
+      },
+      {
+        "standard_account_code": "4403",
         "report_type": "income_statement",
         "report_line_code": "IS-002",
         "report_line_name": "营业成本"
+      },
+      {
+        "standard_account_code": "5001",
+        "report_type": "income_statement",
+        "report_line_code": "IS-001",
+        "report_line_name": "营业收入"
       },
       {
         "standard_account_code": "5002",
@@ -2363,8 +2483,8 @@
       {
         "standard_account_code": "6111",
         "report_type": "income_statement",
-        "report_line_code": "IS-015",
-        "report_line_name": "公允价值变动收益"
+        "report_line_code": "IS-011",
+        "report_line_name": "投资收益"
       },
       {
         "standard_account_code": "6115",
@@ -2455,6 +2575,12 @@
         "report_type": "income_statement",
         "report_line_code": "IS-023",
         "report_line_name": "所得税费用"
+      },
+      {
+        "standard_account_code": "6901",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-084",
+        "report_line_name": "未分配利润"
       }
     ],
     "listed_consolidated": [
@@ -2519,6 +2645,12 @@
         "report_line_name": "其他应收款"
       },
       {
+        "standard_account_code": "1231",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-006",
+        "report_line_name": "应收账款"
+      },
+      {
         "standard_account_code": "1231-01",
         "report_type": "balance_sheet",
         "report_line_code": "BS-005",
@@ -2825,6 +2957,24 @@
         "report_line_name": "使用权资产"
       },
       {
+        "standard_account_code": "1651",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-032",
+        "report_line_name": "使用权资产"
+      },
+      {
+        "standard_account_code": "1652",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-032",
+        "report_line_name": "使用权资产"
+      },
+      {
+        "standard_account_code": "1653",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-032",
+        "report_line_name": "使用权资产"
+      },
+      {
         "standard_account_code": "1701",
         "report_type": "balance_sheet",
         "report_line_code": "BS-033",
@@ -2867,76 +3017,10 @@
         "report_line_name": "其他非流动资产"
       },
       {
-        "standard_account_code": "3001",
+        "standard_account_code": "1922",
         "report_type": "balance_sheet",
-        "report_line_code": "BS-075",
-        "report_line_name": "实收资本"
-      },
-      {
-        "standard_account_code": "3002",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-079",
-        "report_line_name": "资本公积"
-      },
-      {
-        "standard_account_code": "3003",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-076",
-        "report_line_name": "其他权益工具"
-      },
-      {
-        "standard_account_code": "3101",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-083",
-        "report_line_name": "盈余公积"
-      },
-      {
-        "standard_account_code": "3102",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-081",
-        "report_line_name": "其他综合收益"
-      },
-      {
-        "standard_account_code": "3104",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-084",
-        "report_line_name": "未分配利润"
-      },
-      {
-        "standard_account_code": "3201",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-084",
-        "report_line_name": "未分配利润"
-      },
-      {
-        "standard_account_code": "4001",
-        "report_type": "income_statement",
-        "report_line_code": "IS-002",
-        "report_line_name": "营业成本"
-      },
-      {
-        "standard_account_code": "4101",
-        "report_type": "income_statement",
-        "report_line_code": "IS-002",
-        "report_line_name": "营业成本"
-      },
-      {
-        "standard_account_code": "4301",
-        "report_type": "balance_sheet",
-        "report_line_code": "BS-035",
-        "report_line_name": "开发支出"
-      },
-      {
-        "standard_account_code": "4401",
-        "report_type": "income_statement",
-        "report_line_code": "IS-002",
-        "report_line_name": "营业成本"
-      },
-      {
-        "standard_account_code": "4403",
-        "report_type": "income_statement",
-        "report_line_code": "IS-002",
-        "report_line_name": "营业成本"
+        "report_line_code": "BS-040",
+        "report_line_name": "其他非流动资产"
       },
       {
         "standard_account_code": "2001",
@@ -3041,6 +3125,12 @@
         "report_line_name": "租赁负债"
       },
       {
+        "standard_account_code": "2651",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-065",
+        "report_line_name": "租赁负债"
+      },
+      {
         "standard_account_code": "2701",
         "report_type": "balance_sheet",
         "report_line_code": "BS-066",
@@ -3071,10 +3161,82 @@
         "report_line_name": "递延所得税负债"
       },
       {
-        "standard_account_code": "5001",
+        "standard_account_code": "3001",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-075",
+        "report_line_name": "实收资本"
+      },
+      {
+        "standard_account_code": "3002",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-079",
+        "report_line_name": "资本公积"
+      },
+      {
+        "standard_account_code": "3003",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-076",
+        "report_line_name": "其他权益工具"
+      },
+      {
+        "standard_account_code": "3101",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-083",
+        "report_line_name": "盈余公积"
+      },
+      {
+        "standard_account_code": "3102",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-081",
+        "report_line_name": "其他综合收益"
+      },
+      {
+        "standard_account_code": "3104",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-084",
+        "report_line_name": "未分配利润"
+      },
+      {
+        "standard_account_code": "3201",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-084",
+        "report_line_name": "未分配利润"
+      },
+      {
+        "standard_account_code": "4001",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-012",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "4101",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-012",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "4301",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-035",
+        "report_line_name": "开发支出"
+      },
+      {
+        "standard_account_code": "4401",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-014",
+        "report_line_name": "合同资产"
+      },
+      {
+        "standard_account_code": "4403",
         "report_type": "income_statement",
         "report_line_code": "IS-002",
         "report_line_name": "营业成本"
+      },
+      {
+        "standard_account_code": "5001",
+        "report_type": "income_statement",
+        "report_line_code": "IS-001",
+        "report_line_name": "营业收入"
       },
       {
         "standard_account_code": "5002",
@@ -3181,8 +3343,8 @@
       {
         "standard_account_code": "6111",
         "report_type": "income_statement",
-        "report_line_code": "IS-015",
-        "report_line_name": "公允价值变动收益"
+        "report_line_code": "IS-011",
+        "report_line_name": "投资收益"
       },
       {
         "standard_account_code": "6115",
@@ -3273,6 +3435,12 @@
         "report_type": "income_statement",
         "report_line_code": "IS-023",
         "report_line_name": "所得税费用"
+      },
+      {
+        "standard_account_code": "6901",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-084",
+        "report_line_name": "未分配利润"
       }
     ]
   }

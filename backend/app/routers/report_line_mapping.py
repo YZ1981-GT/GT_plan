@@ -30,14 +30,19 @@ router = APIRouter(prefix="/api/projects", tags=["report-line-mapping"])
 )
 async def ai_suggest(
     project_id: UUID,
+    force_refresh: bool = Query(False, description="强制刷新所有 ai_suggested 记录(包括已确认的),用于修复老 BSXXX→BS-XXX 格式"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[dict]:
-    """AI建议报表行次映射（当前为规则匹配占位）。
+    """AI建议报表行次映射(数据驱动 + 项目维度感知).
 
     Validates: Requirements 3.10
+
+    Args:
+        force_refresh: True 时刷新所有 ai_suggested 记录(用于 seed 升级后批量修复);
+                       False 时仅处理新科目和未确认记录.manual 永远不动.
     """
-    return await svc.ai_suggest_mappings(project_id, db)
+    return await svc.ai_suggest_mappings(project_id, db, force_refresh=force_refresh)
 
 
 @router.get(
