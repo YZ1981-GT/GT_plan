@@ -414,6 +414,7 @@ async def _import_adjustments(
         groups[adj_no]["lines"].append({
             "row_idx": i,
             "code": std_code,
+            "raw_code": sub_code or level1_code,  # 保留用户原始输入,供错误信息使用
             "name": sub_name,
             "debit": _Dec(str(debit or 0)),
             "credit": _Dec(str(credit or 0)),
@@ -421,6 +422,31 @@ async def _import_adjustments(
 
     # ─── Step 2: 每组调 create_entry 写入 ─────────────────
     imported, failed, failed_rows = 0, 0, []
+
+    # 改进 A: 预校验科目并产出友好错误信息 (在调 create_entry 前先扫一遍)
+    def _build_friendly_error(g: dict, base_error: str) -> str:
+        """根据分录组的明细产出友好错误信息"""
+        unmatched = []
+        for ln in g["lines"]:
+            if not ln["code"] or ln["code"] not in valid_codes:
+                # 该明细行未解析出有效标准编码
+                unmatched.append({
+                    "row_idx": ln["row_idx"],
+                    "name": ln["name"],
+                    "raw_code": ln.get("raw_code", ""),
+                })
+        if unmatched:
+            details = []
+            for u in unmatched[:3]:  # 最多列 3 条
+                hint = f"二级名称='{u['name']}'" if u["name"] else f"编码='{u['raw_code']}'"
+                details.append(f"第 {u['row_idx']} 行 {hint} 在项目科目库中找不到")
+            msg = ";  ".join(details)
+            if len(unmatched) > 3:
+                msg += f";  共 {len(unmatched)} 行有此问题"
+            return f"{msg}。请打开模板【项目科目库】sheet 查找正确的二级科目名称,或先在 [试算表 → 映射规则] 完善映射"
+        # 借贷不平衡 / 其他业务错误,保留原错
+        return base_error
+
     for adj_no, g in groups.items():
         try:
             line_items = [
@@ -443,11 +469,12 @@ async def _import_adjustments(
         except Exception as e:
             failed += 1
             row_idxs = [ln["row_idx"] for ln in g["lines"]]
+            friendly = _build_friendly_error(g, str(e))
             failed_rows.append({
                 "row": row_idxs[0] if row_idxs else 0,
                 "adj_no": adj_no if not adj_no.startswith("__auto_") else "(无编号)",
                 "rows_in_group": row_idxs,
-                "error": str(e),
+                "error": friendly,
             })
             logger.warning("调整分录导入分录组 %s 失败: %s", adj_no, e)
 

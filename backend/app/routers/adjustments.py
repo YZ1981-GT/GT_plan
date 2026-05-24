@@ -794,7 +794,7 @@ async def export_adjustment_template(
         ("• 浅绿底 = 试算表有余额的科目 (按余额优先排序在前)", ""),
         ("• 浅灰底 = 试算表无余额的科目 (兜底,可用于新增预提)", ""),
         ("• 浅橙底报表项目列 = ⚠ 未映射,请先到 [试算表 → 映射规则] 完善", ""),
-        ("• 当前余额 / 已有调整数 = 提示用户当前金额,避免重复调整 (导入时不参与校验)", ""),
+        ("• 当前余额 / 已有调整数 = 一级聚合值,客户子明细共享同一聚合 (仅供参考,导入时不参与校验)", ""),
         ("该 sheet 是 E 列下拉数据源 + D/F/G/H 列联动公式取值源,请勿删除", ""),
     ]
 
@@ -906,6 +906,7 @@ async def export_adjustment_template(
         # 项目科目库 sheet 7 列: A=二级编码 / B=二级名称 / C=一级编码 / D=一级名称 / E=报表项目 / F=余额 / G=调整
         if sub_accounts:
             n = len(sub_accounts)
+            from openpyxl.styles import Protection
             for ri in range(7, 201):
                 # D 列: 用 E 名称反查 二级编码 (项目科目库 A 列)
                 d_cell = ws.cell(row=ri, column=4,
@@ -926,6 +927,26 @@ async def export_adjustment_template(
                 for c in (d_cell, f_cell, g_cell, h_cell):
                     c.border = thin_border
                     c.fill = formula_fill
+                    # 改进 D: 公式列锁定,防止用户误改 (sheet 保护开启后才生效)
+                    c.protection = Protection(locked=True)
+
+            # 用户可输入的列 (A 编号/B 类型/C 摘要/E 名称/I 借/J 贷) 解锁
+            for ri in range(2, 201):
+                for col in (1, 2, 3, 5, 9, 10):
+                    ws.cell(row=ri, column=col).protection = Protection(locked=False)
+
+            # 启用 sheet 保护 (空密码,只为防止误操作而非加密)
+            ws.protection.sheet = True
+            ws.protection.password = ""  # 空密码用户可手动取消保护
+            ws.protection.formatCells = False  # 允许格式化
+            ws.protection.formatColumns = False
+            ws.protection.formatRows = False
+            ws.protection.insertRows = True  # 允许插入行(用户可能加分录)
+            ws.protection.deleteRows = True
+            ws.protection.selectLockedCells = True  # 允许选中锁定单元格(看公式)
+            ws.protection.selectUnlockedCells = True
+            ws.protection.sort = True
+            ws.protection.autoFilter = True
 
     # ─── Sheet 4: 项目科目库 (7 列: A 二级编码/B 二级名称/C 一级编码/D 一级名称/E 报表项目/F 当前余额/G 已有调整) ───
     ws_lib = wb.create_sheet("项目科目库")
