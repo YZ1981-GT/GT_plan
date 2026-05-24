@@ -21,9 +21,18 @@
         >
           <el-button size="small" plain @click="toggleFullscreen">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
           <template #right-extra>
-            <el-tooltip content="导出空白模板(含关注事项 + 科目下拉,用于线下填写后批量导入)" placement="bottom">
-              <el-button size="small" plain @click="onExportTemplate">📋 导出模板</el-button>
-            </el-tooltip>
+            <el-dropdown @command="onExportTemplate">
+              <el-button size="small" plain>
+                📋 导出模板
+                <el-icon style="margin-left: 4px"><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="soe">国企版模板 (致同 SOE)</el-dropdown-item>
+                  <el-dropdown-item command="listed">上市版模板 (致同 Listed)</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </template>
           <template #left>
             <el-button size="small" type="primary" v-permission="'adjustment:create'" @click="openCreateDialog">+ 新建分录</el-button>
@@ -379,6 +388,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { ArrowDown } from '@element-plus/icons-vue'
 import { confirmDelete, confirmConvert, confirmDangerous } from '@/utils/confirm'
 import {
   listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment,
@@ -975,13 +985,14 @@ function onExportSummary() {
   })
 }
 
-function onExportTemplate() {
+function onExportTemplate(templateType: 'soe' | 'listed' = 'soe') {
+  const label = templateType === 'soe' ? '国企版' : '上市版'
   import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
     downloadFileAsBlob(
-      `${P.adjustments.exportTemplate(projectId.value)}?year=${year.value}`,
-      `调整分录导入模板_${year.value}.xlsx`
+      `${P.adjustments.exportTemplate(projectId.value)}?year=${year.value}&template_type=${templateType}`,
+      `调整分录导入模板_${label}_${year.value}.xlsx`
     )
-    ElMessage.success('模板已开始下载,请按 [关注事项] sheet 提示填写')
+    ElMessage.success(`${label}模板已开始下载,请按 [关注事项] sheet 提示填写`)
   })
 }
 

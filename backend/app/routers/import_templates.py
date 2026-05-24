@@ -227,35 +227,236 @@ def _safe_int(val: any, default: int = 0) -> int:
 async def _import_adjustments(
     rows: list[dict], project_id: UUID, year: int, user: User, db: AsyncSession,
 ) -> dict:
-    """导入调整分录"""
+    """导入调整分录 — 按 编号 分组合并明细行,调 create_entry 创建分录组.
+
+    模板格式 (新版,与 export-template 一致):
+      列: 编号 | 类型 | 摘要 | 科目名称 | 科目编码 | 借方金额 | 贷方金额
+      规则: 同一编号下多行合并为一个分录组(借贷双方各占 1+ 行)
+
+    兼容旧字段名 (向后兼容):
+      - 分录编号 / 调整类型 / 借方科目代码 / 借方科目名称 / 借方金额 等
+    """
+    from collections import defaultdict
+    from decimal import Decimal as _Dec
     from app.services.adjustment_service import AdjustmentService
+    from app.models.audit_platform_schemas import (
+        AdjustmentCreate, AdjustmentLineItem,
+    )
+    from app.models.audit_platform_models import (
+        AdjustmentType, AccountChart, AccountSource,
+    )
+    from sqlalchemy import select as sa_select
+
     svc = AdjustmentService(db)
-    imported, failed, failed_rows = 0, 0, []
+
+    # 加载所有科目 (standard + client 全集) 用于按编码或名称反查
+    chart_result = await db.execute(
+        sa_select(
+            AccountChart.account_code,
+            AccountChart.account_name,
+            AccountChart.source,
+        ).where(
+            AccountChart.project_id == project_id,
+            AccountChart.is_deleted == False,  # noqa: E712
+        )
+    )
+    all_accounts = list(chart_result.all())
+
+    # 名称 → 编码 (合并 standard + client,客户优先因为客户名称更精确)
+    name_to_code: dict[str, str] = {}
+    # 编码 → 名称 (用于反查名称)
+    code_to_name: dict[str, str] = {}
+    # 标准编码合集 (only standard,作为"有效"判定)
+    valid_codes: set[str] = set()
+    # 客户编码合集 (client 编码归一到一级后才能给 create_entry 使用)
+    for code, name, source in all_accounts:
+        if not code:
+            continue
+        code_to_name[code] = name or ""
+        if source == AccountSource.standard:
+            valid_codes.add(code)
+            if name:
+                name_to_code.setdefault(name, code)
+        else:  # client
+            if name:
+                # client 名称优先(用户在模板中下拉看到的就是这个)
+                name_to_code[name] = code
+
+    # 加载 AccountMapping (客户码 → 标准码)
+    from app.models.audit_platform_models import AccountMapping
+    mapping_result = await db.execute(
+        sa_select(
+            AccountMapping.original_account_code,
+            AccountMapping.standard_account_code,
+        ).where(
+            AccountMapping.project_id == project_id,
+            AccountMapping.is_deleted == False,  # noqa: E712
+        )
+    )
+    client_to_std: dict[str, str] = {
+        row[0]: row[1] for row in mapping_result.all() if row[1]
+    }
+
+    def _normalize_to_level1(code: str) -> str:
+        """归一到一级编码: 1122.01 → 1122 (查 mapping); 1231-01 保留; 否则取前 4 位"""
+        if not code:
+            return ""
+        if code.startswith("1231-"):
+            return code
+        if code in client_to_std:
+            return client_to_std[code]
+        if code in valid_codes:
+            return code  # 已是标准码
+        # 取前 4 位
+        clean = code.strip()
+        for sep in (".", "-", "/", "_", "\\", " "):
+            clean = clean.split(sep)[0]
+        return clean[:4] if len(clean) >= 4 else clean
+
+    def _resolve_code(code_val: str, name_val: str) -> str:
+        """根据编码或名称解析出标准科目编码 (用于 create_entry 校验).
+
+        策略:
+        1. code_val 直接在标准库 → 用之
+        2. name_val 在 name_to_code → 取出码 → 归一到一级
+        3. code_val 归一到一级 → 用一级
+        4. 都不行 → 返回 code_val 原值 (后续 create_entry 会报错)
+        """
+        code_val = (code_val or "").strip()
+        name_val = (name_val or "").strip()
+
+        # 策略 1: 编码直接命中标准库
+        if code_val and code_val in valid_codes:
+            return code_val
+
+        # 策略 2: 名称反查 (含 client 二级名称)
+        if name_val and name_val in name_to_code:
+            raw_code = name_to_code[name_val]
+            # 客户码归一到一级
+            level1 = _normalize_to_level1(raw_code)
+            if level1 in valid_codes:
+                return level1
+            return raw_code  # 兜底返回原码
+
+        # 策略 3: 编码归一到一级
+        if code_val:
+            level1 = _normalize_to_level1(code_val)
+            if level1 in valid_codes:
+                return level1
+
+        return code_val or ""
+
+    # ─── Step 1: 按 编号 分组明细行 ──────────────────────
+    groups: dict[str, dict] = defaultdict(lambda: {
+        "type": "AJE",
+        "description": "",
+        "lines": [],
+    })
+    no_no_counter = 0  # 没编号的行临时编号
     for i, row in enumerate(rows, 1):
+        # 字段名容错: 新模板 编号 / 旧 分录编号
+        adj_no = str(row.get("编号", "") or row.get("分录编号", "") or "").strip()
+        adj_type_raw = str(row.get("类型", "") or row.get("调整类型", "AJE") or "AJE").strip().upper()
+        desc = str(row.get("摘要", "") or "").strip()
+
+        # 新 9 列模板: 二级名称(主输入) + 二级编码(联动) + 一级编码(联动) + 一级名称(联动)
+        # 旧 7 列模板: 科目名称 + 科目编码
+        # 旧 分录模板: 借方科目名称/借方科目代码/贷方科目名称/贷方科目代码
+        sub_name = str(
+            row.get("二级科目名称", "") or row.get("科目名称", "")
+            or row.get("借方科目名称", "") or row.get("贷方科目名称", "")
+            or ""
+        ).strip()
+        sub_code = str(
+            row.get("二级科目编码", "") or row.get("科目编码", "")
+            or row.get("借方科目代码", "") or row.get("贷方科目代码", "")
+            or ""
+        ).strip()
+        # 一级编码(若用户填了或公式联动了,优先用)
+        level1_code = str(row.get("一级科目编码", "") or "").strip()
+
+        debit = _safe_float(row.get("借方金额"))
+        credit = _safe_float(row.get("贷方金额"))
+
+        # 跳过完全空行
+        if not (sub_name or sub_code or level1_code) and debit == 0 and credit == 0:
+            continue
+
+        # 没填编号 → 自动生成临时 key (每行独立)
+        if not adj_no:
+            no_no_counter += 1
+            adj_no = f"__auto_{no_no_counter}"
+
+        # 解析最终 standard_account_code:
+        # 优先级: 一级编码 > 二级编码归一一级 > 二级名称归一一级
+        std_code = ""
+        if level1_code and level1_code in valid_codes:
+            std_code = level1_code
+        elif sub_code:
+            # 直接用二级编码,后续 _validate_account_codes 会检查
+            # 若二级在 standard 表则 OK,否则归一到一级
+            std_code = _resolve_code(sub_code, sub_name)
+            # 若解析后还是不在标准表,尝试归一到一级
+            if std_code and std_code not in valid_codes:
+                # 取前 4 位
+                clean = std_code
+                for sep in (".", "-", "/", "_", "\\", " "):
+                    clean = clean.split(sep)[0]
+                clean4 = clean[:4] if len(clean) >= 4 else clean
+                if clean4 in valid_codes:
+                    std_code = clean4
+        elif sub_name:
+            std_code = _resolve_code("", sub_name)
+
+        groups[adj_no]["type"] = adj_type_raw if adj_type_raw in ("AJE", "RJE") else "AJE"
+        if desc and not groups[adj_no]["description"]:
+            groups[adj_no]["description"] = desc
+        groups[adj_no]["lines"].append({
+            "row_idx": i,
+            "code": std_code,
+            "name": sub_name,
+            "debit": _Dec(str(debit or 0)),
+            "credit": _Dec(str(credit or 0)),
+        })
+
+    # ─── Step 2: 每组调 create_entry 写入 ─────────────────
+    imported, failed, failed_rows = 0, 0, []
+    for adj_no, g in groups.items():
         try:
-            await svc.create_adjustment(
-                project_id=project_id,
+            line_items = [
+                AdjustmentLineItem(
+                    standard_account_code=ln["code"],
+                    account_name=ln["name"] or None,
+                    debit_amount=ln["debit"],
+                    credit_amount=ln["credit"],
+                )
+                for ln in g["lines"]
+            ]
+            data = AdjustmentCreate(
+                adjustment_type=AdjustmentType(g["type"].lower()),
                 year=year,
-                data={
-                    "entry_number": str(row.get("分录编号", "") or ""),
-                    "adjustment_type": str(row.get("调整类型", "AJE") or "AJE").upper(),
-                    "debit_account_code": str(row.get("借方科目代码", "") or ""),
-                    "debit_account_name": str(row.get("借方科目名称", "") or ""),
-                    "debit_amount": _safe_float(row.get("借方金额")),
-                    "credit_account_code": str(row.get("贷方科目代码", "") or ""),
-                    "credit_account_name": str(row.get("贷方科目名称", "") or ""),
-                    "credit_amount": _safe_float(row.get("贷方金额")),
-                    "description": str(row.get("摘要", "") or ""),
-                    "prepared_by": str(row.get("编制人", "") or "") or user.username,
-                },
-                user_id=user.id,
+                description=g["description"] or "",
+                line_items=line_items,
             )
+            await svc.create_entry(project_id, data, user.id)
             imported += 1
         except Exception as e:
             failed += 1
-            failed_rows.append({"row": i, "error": str(e)})
-            logger.warning("调整分录导入第 %d 行失败: %s", i, e)
-    return {"imported": imported, "skipped": 0, "failed": failed, "failed_rows": failed_rows}
+            row_idxs = [ln["row_idx"] for ln in g["lines"]]
+            failed_rows.append({
+                "row": row_idxs[0] if row_idxs else 0,
+                "adj_no": adj_no if not adj_no.startswith("__auto_") else "(无编号)",
+                "rows_in_group": row_idxs,
+                "error": str(e),
+            })
+            logger.warning("调整分录导入分录组 %s 失败: %s", adj_no, e)
+
+    return {
+        "imported": imported,
+        "skipped": 0,
+        "failed": failed,
+        "failed_rows": failed_rows,
+    }
 
 
 async def _import_report(

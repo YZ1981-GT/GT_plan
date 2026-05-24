@@ -40,17 +40,20 @@ class ImportType(str, Enum):
 # 每种导入类型的列定义：(列名, 是否必填, 数据类型说明, 示例值)
 TEMPLATE_COLUMNS: dict[ImportType, list[tuple[str, bool, str, str]]] = {
     ImportType.adjustments: [
-        ("分录编号", True, "文本", "AJE-001"),
-        ("调整类型", True, "AJE/RJE", "AJE"),
-        ("借方科目代码", True, "标准科目代码", "1001"),
-        ("借方科目名称", False, "文本", "库存现金"),
-        ("借方金额", True, "数值", "10000.00"),
-        ("贷方科目代码", True, "标准科目代码", "1002"),
-        ("贷方科目名称", False, "文本", "银行存款"),
-        ("贷方金额", True, "数值", "10000.00"),
-        ("摘要", True, "文本", "调整银行存款差异"),
-        ("编制人", False, "文本", "张三"),
-        ("日期", False, "YYYY-MM-DD", "2025-12-31"),
+        # 新模板格式 (export-template 端点产出): 每行 1 个科目, 借贷分行
+        # 9 列联动结构: 编号/类型/摘要/二级编码/二级名称(主输入)/一级编码/一级名称/报表项目/借方/贷方
+        # parse_import_data 也兼容旧格式 (科目名称/科目编码 7 列模板 + 分录编号/借方科目代码 等)
+        # 示例值要与 export-template 模板里的示例完全一致 (用于 _is_example_row 跳过)
+        ("编号", False, "文本", "AJE-001"),
+        ("类型", True, "AJE/RJE", "AJE"),
+        ("摘要", True, "文本", "补提应收账款减值"),
+        ("二级科目编码", False, "标准科目代码(自动填充)", ""),
+        ("二级科目名称", True, "文本(下拉选择)", "应收账款"),
+        ("一级科目编码", False, "标准科目代码(自动联动)", ""),
+        ("一级科目名称", False, "文本(自动联动)", ""),
+        ("报表项目", False, "文本(自动联动)", ""),
+        ("借方金额", False, "数值", ""),
+        ("贷方金额", False, "数值", "100000"),
     ],
     ImportType.report: [
         ("行次", True, "整数", "1"),
@@ -281,12 +284,36 @@ _NUMERIC_TYPES = {"数值", "整数"}
 
 
 def _is_example_row(row_values: list[str], columns: list[tuple]) -> bool:
-    """判断是否为模板示例行（宽松匹配：超过一半的值和示例一致即视为示例行）"""
+    """判断是否为模板示例行（宽松匹配：超过一半的值和示例一致即视为示例行）
+
+    注: 仅在前 6 行使用 (覆盖 adjustments 模板的 5 行示例区).
+    特殊处理: 编号 == AJE-001 / RJE-001 视为示例行 (导出模板预填的固定示例编号).
+    """
     if not row_values:
         return False
+
+    # 特殊路径: 第一列是编号,等于 AJE-001 / RJE-001 直接视为示例
+    if row_values and str(row_values[0]).strip() in ("AJE-001", "RJE-001"):
+        return True
+
     example_values = [col[3] for col in columns]
-    match_count = sum(1 for a, b in zip(row_values, example_values) if a == b)
-    return match_count >= len(columns) * 0.5
+
+    def _norm(v) -> str:
+        """规范化值: 去前后空白 + 数字 100000 == 字符串 100000"""
+        s = str(v).strip() if v is not None else ""
+        try:
+            f = float(s.replace(",", ""))
+            if f == int(f):
+                return str(int(f))
+            return str(f)
+        except (ValueError, TypeError):
+            return s
+
+    matchable_pairs = [(a, b) for a, b in zip(row_values, example_values) if str(b).strip()]
+    if not matchable_pairs:
+        return False
+    match_count = sum(1 for a, b in matchable_pairs if _norm(a) == _norm(b))
+    return match_count >= max(2, len(matchable_pairs) * 0.6)
 
 
 def _is_numeric_column(dtype: str) -> bool:
@@ -332,8 +359,19 @@ def validate_import_file(
         result.errors.append(ValidationError(None, "", f"无法解析文件: {e}"))
         return result
 
-    # 取第一个 sheet
-    ws = wb.active
+    # ─── 自动选 sheet (与 parse_import_data 同款策略) ─────
+    # adjustments 类型: 找模板 sheet, 跳过 关注事项/标准科目库 等说明 sheet
+    ws = None
+    if import_type == ImportType.adjustments:
+        skip_names = {"关注事项", "标准科目库", "说明", "Sheet1"}
+        for sn in wb.sheetnames:
+            if sn in skip_names:
+                continue
+            if "模板" in sn or "AJE" in sn.upper() or "RJE" in sn.upper():
+                ws = wb[sn]
+                break
+    if ws is None:
+        ws = wb.active
     if ws is None:
         result.errors.append(ValidationError(None, "", "文件中没有工作表"))
         return result
@@ -375,8 +413,8 @@ def validate_import_file(
     error_count_limit = 50  # 最多报 50 个错误，避免大文件刷屏
 
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-        # 跳过示例行（宽松匹配）
-        if row_idx <= 3:
+        # 跳过示例行 (扩展到前 6 行覆盖 adjustments 模板的 5 行示例区)
+        if row_idx <= 6:
             row_values = [str(v or "").strip() for v in row[:len(columns)]]
             if _is_example_row(row_values, columns):
                 continue
@@ -430,47 +468,91 @@ def parse_import_data(
     import_type: ImportType,
     file_bytes: bytes,
 ) -> list[dict[str, Any]]:
-    """解析已校验通过的 Excel 文件，返回结构化数据列表。"""
+    """解析已校验通过的 Excel 文件，返回结构化数据列表。
+
+    特殊处理 (adjustments):
+    - 优先读取所有匹配 AJE/RJE 模板的 sheet (跳过 关注事项 / 标准科目库 等说明型 sheet)
+    - 列名兼容新旧两套格式:
+      * 新模板: 编号 / 类型 / 摘要 / 科目名称 / 科目编码 / 借方金额 / 贷方金额
+      * 旧模板: 分录编号 / 调整类型 / 借方科目代码 / 借方金额 / 贷方科目代码 / 贷方金额 / 摘要
+    """
     columns = TEMPLATE_COLUMNS.get(import_type, [])
     expected_names = [col[0] for col in columns]
     known_set = set(expected_names)
 
     wb = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
-    ws = wb.active
-    if ws is None:
-        return []
 
-    # 读取表头
-    header_row = []
-    for cell in next(ws.iter_rows(min_row=1, max_row=1, values_only=False), []):
-        val = str(cell.value or "").strip().lstrip("* ").strip()
-        header_row.append(val)
-
-    col_map: dict[str, int] = {}
-    for idx, name in enumerate(header_row):
-        if name in known_set:
-            col_map[name] = idx
-
-    # 解析数据行
-    rows: list[dict[str, Any]] = []
-
-    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-        # 跳过示例行（宽松匹配，前 3 行内检查）
-        if row_idx <= 3:
-            row_values = [str(v or "").strip() for v in row[:len(columns)]]
-            if _is_example_row(row_values, columns):
+    # ─── 自动选 sheet ──────────────────────────────────────
+    # adjustments: 找名称含 模板 且不是 关注事项/标准科目库 的 sheet (支持多 sheet 合并)
+    target_sheets: list = []
+    if import_type == ImportType.adjustments:
+        skip_names = {"关注事项", "标准科目库", "说明", "Sheet1"}
+        for sn in wb.sheetnames:
+            if sn in skip_names:
                 continue
+            # 含"模板"关键词或不在跳过名单的都试着读
+            if "模板" in sn or "AJE" in sn.upper() or "RJE" in sn.upper():
+                target_sheets.append(wb[sn])
+        # 兜底: 没找到任何模板 sheet 就用 active
+        if not target_sheets:
+            target_sheets = [wb.active] if wb.active is not None else []
+    else:
+        # 其他类型仍用 active
+        target_sheets = [wb.active] if wb.active is not None else []
 
-        # 跳过全空行
-        if all(v is None or str(v).strip() == "" for v in row):
+    # ─── 兼容旧字段名: 把旧字段名映射到新字段 ──────────────
+    # 旧 → 新 别名表 (parse 阶段统一规范化, 后续 _import_adjustments 只看新字段)
+    legacy_alias_map = {
+        "分录编号": "编号",
+        "调整类型": "类型",
+        # 7 列模板兼容 (科目名称/科目编码 → 二级科目名称/二级科目编码)
+        "科目名称": "二级科目名称",
+        "科目编码": "二级科目编码",
+    }
+
+    # ─── 解析数据行 ──────────────────────────────────────
+    rows: list[dict[str, Any]] = []
+    for ws in target_sheets:
+        if ws is None:
             continue
 
-        row_data: dict[str, Any] = {}
-        for col_name, col_idx in col_map.items():
-            if col_idx < len(row):
-                row_data[col_name] = row[col_idx]
+        # 读取表头
+        header_row = []
+        for cell in next(ws.iter_rows(min_row=1, max_row=1, values_only=False), []):
+            val = str(cell.value or "").strip().lstrip("* ").strip()
+            header_row.append(val)
 
-        rows.append(row_data)
+        col_map: dict[str, int] = {}
+        for idx, name in enumerate(header_row):
+            # 别名规范化
+            normalized = legacy_alias_map.get(name, name)
+            if normalized in known_set or name in (
+                "借方科目代码", "借方科目名称", "贷方科目代码", "贷方科目名称",
+                "借方金额", "贷方金额",  # 可能直接含,也属于已知
+            ):
+                # 旧模板专用字段保留原名供 _import_adjustments 兜底处理
+                col_map[normalized if normalized in known_set else name] = idx
+
+        if not col_map:
+            continue  # 这个 sheet 没识别到任何列, 跳过
+
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            # 跳过示例行 (扩展到前 6 行覆盖 adjustments 模板的 5 行示例区)
+            if row_idx <= 6:
+                row_values = [str(v or "").strip() for v in row[:len(columns)]]
+                if _is_example_row(row_values, columns):
+                    continue
+
+            # 跳过全空行
+            if all(v is None or str(v).strip() == "" for v in row):
+                continue
+
+            row_data: dict[str, Any] = {}
+            for col_name, col_idx in col_map.items():
+                if col_idx < len(row):
+                    row_data[col_name] = row[col_idx]
+
+            rows.append(row_data)
 
     wb.close()
     return rows

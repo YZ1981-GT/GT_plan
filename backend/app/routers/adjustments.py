@@ -531,16 +531,24 @@ async def export_adjustment_summary(
 async def export_adjustment_template(
     project_id: UUID,
     year: int = Query(...),
+    template_type: str | None = Query(
+        None,
+        description="模板类型: soe=国企版 / listed=上市版,不传则从项目派生",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """导出调整分录空白模板 Excel.
+    """导出调整分录空白模板 Excel (按项目实际数据生成,支持国企/上市两版).
 
-    包含:
-    - 关注事项 sheet (使用说明 / 字段含义 / 校验规则)
-    - AJE 模板 sheet (含 5 行示例, 科目编码列带数据校验下拉)
-    - RJE 模板 sheet (同上)
-    - 标准科目 sheet (隐藏,作为下拉数据源)
+    包含 4 sheet:
+    - 关注事项 (使用说明 / 字段含义 / 校验规则)
+    - AJE 模板 (国企版或上市版,根据 template_type)
+    - RJE 模板 (同上)
+    - 项目科目库 (本项目实际使用的二级明细 + 一级标准 + 报表行联动数据)
+
+    数据维度 (4 列联动):
+    - 二级科目编码 / 二级科目名称 (用户主输入,从下拉选择本项目实际科目)
+    - 一级科目编码 / 报表项目 (公式自动联动填充)
     """
     from io import BytesIO
     from fastapi.responses import StreamingResponse
@@ -551,27 +559,188 @@ async def export_adjustment_template(
     except ImportError:
         raise HTTPException(500, "openpyxl 未安装")
 
-    # 加载该项目的标准科目
-    from app.models.audit_platform_models import AccountChart, AccountSource
+    from app.models.audit_platform_models import (
+        AccountChart, AccountSource, AccountMapping, ReportLineMapping,
+    )
+    from app.models.core import Project
     from sqlalchemy import select as sa_select
 
-    # ─── 自愈: 增量补齐缺失的标准科目 (历史项目可能因 seed 后添加而缺失) ───
-    # 与 fix-bad-debt 端点同款策略,确保下拉列表覆盖最新 standard_account_chart.json
+    # ─── Step 1: 派生 template_type ─────────────────────────────────
+    proj_result = await db.execute(sa_select(Project).where(Project.id == project_id))
+    proj = proj_result.scalar_one_or_none()
+    if not proj:
+        raise HTTPException(404, "项目不存在")
+
+    if not template_type:
+        template_type = (proj.template_type or "soe").lower()
+    template_type = template_type.lower()
+    if template_type not in ("soe", "listed"):
+        template_type = "soe"
+    template_label = "国企版" if template_type == "soe" else "上市版"
+
+    # ─── Step 2: 自愈增量补齐标准科目 ─────────────────────────────
     try:
         from app.services import account_chart_service
         await account_chart_service.load_standard_template(project_id, "enterprise", db)
     except Exception as e:
         import logging
-        logging.getLogger(__name__).warning(f"export-template 自愈加载标准科目失败,继续使用现有: {e}")
+        logging.getLogger(__name__).warning(f"export-template 自愈加载标准科目失败,继续: {e}")
 
-    std_result = await db.execute(
-        sa_select(AccountChart.account_code, AccountChart.account_name).where(
+    # ─── Step 3: 装载本项目科目库(client + standard) ─────────────────
+    # 客户科目 (source=client) 是本项目实际使用的二级明细 (如 1122.001 应收账款-客户A)
+    # 标准科目 (source=standard) 作为兜底 (客户没拆二级时用一级)
+    chart_result = await db.execute(
+        sa_select(
+            AccountChart.account_code,
+            AccountChart.account_name,
+            AccountChart.source,
+        ).where(
             AccountChart.project_id == project_id,
-            AccountChart.source == AccountSource.standard,
             AccountChart.is_deleted == False,  # noqa: E712
         ).order_by(AccountChart.account_code)
     )
-    std_accounts = list(std_result.all())
+    all_accounts = list(chart_result.all())
+
+    # ─── Step 4: 装载 ReportLineMapping (按当前项目维度,已含国企/上市差异) ───
+    rlm_result = await db.execute(
+        sa_select(
+            ReportLineMapping.standard_account_code,
+            ReportLineMapping.report_line_code,
+            ReportLineMapping.report_line_name,
+        ).where(
+            ReportLineMapping.project_id == project_id,
+            ReportLineMapping.is_deleted == False,  # noqa: E712
+        )
+    )
+    code_to_report: dict[str, tuple[str, str]] = {
+        row[0]: (row[1] or "", row[2] or "") for row in rlm_result.all()
+    }
+
+    # ─── Step 5: 装载 AccountMapping (客户码→标准码,用于一级反查) ─────
+    mapping_result = await db.execute(
+        sa_select(
+            AccountMapping.original_account_code,
+            AccountMapping.standard_account_code,
+        ).where(
+            AccountMapping.project_id == project_id,
+            AccountMapping.is_deleted == False,  # noqa: E712
+        )
+    )
+    client_to_std: dict[str, str] = {
+        row[0]: row[1] for row in mapping_result.all() if row[1]
+    }
+
+    def _normalize_to_level1(code: str) -> str:
+        """归一化到一级编码: 6401.01/6401-01 → 6401, 1231-01 保留"""
+        if not code:
+            return ""
+        if code.startswith("1231-"):
+            return code
+        if code in client_to_std:
+            return client_to_std[code]
+        clean = code.strip()
+        for sep in (".", "-", "/", "_", "\\", " "):
+            clean = clean.split(sep)[0]
+        return clean[:4] if len(clean) >= 4 else clean
+
+    # ─── Step 5b: 装载试算表 (P1-2: 当前余额 + 已有调整数) ──────────
+    # 试算表按 standard_account_code 聚合,用于显示参考余额
+    from app.models.audit_platform_models import TrialBalance
+    tb_result = await db.execute(
+        sa_select(
+            TrialBalance.standard_account_code,
+            TrialBalance.audited_amount,
+            TrialBalance.unadjusted_amount,
+            TrialBalance.aje_adjustment,
+            TrialBalance.rje_adjustment,
+        ).where(
+            TrialBalance.project_id == project_id,
+            TrialBalance.year == year,
+            TrialBalance.is_deleted == False,  # noqa: E712
+        )
+    )
+    # 一级编码 → (审定数, 未审数, AJE 调整数, RJE 调整数)
+    tb_data: dict[str, tuple] = {}
+    tb_codes_with_balance: set[str] = set()  # 试算表中有余额的一级码
+    for row in tb_result.all():
+        code = row[0]
+        tb_data[code] = (
+            row[1] or 0,  # audited_amount (审定数 = 当前余额)
+            row[2] or 0,  # unadjusted_amount (未审数)
+            row[3] or 0,  # aje_adjustment (已有 AJE 调整)
+            row[4] or 0,  # rje_adjustment (已有 RJE 调整)
+        )
+        # 仅余额非零的科目才视为"有余额"
+        audited = float(row[1] or 0)
+        unadjusted = float(row[2] or 0)
+        if abs(audited) > 0.01 or abs(unadjusted) > 0.01:
+            tb_codes_with_balance.add(code)
+
+    # ─── Step 6: 拼接科目库 7 列宽表 ─────────────────────────────
+    # 7 列: A=二级编码 / B=二级名称 / C=一级编码 / D=一级名称 / E=报表项目 / F=当前余额 / G=已有调整
+    # 排序原则:
+    # 1. 优先 client 二级 (本项目实际明细)
+    # 2. standard 父级在已被 client 子明细覆盖时不再展示 (P0-3 去重)
+    # 3. 试算表有余额的科目排前 (P0-1 优先级提示)
+    # 未映射科目在 E 列(报表项目)标 ⚠ 未映射 (P0-2)
+
+    seen_codes: set[str] = set()
+    # 计算被 client 已覆盖的 standard 一级码 (P0-3 去重)
+    client_level1_set: set[str] = set()
+    for code, name, source in all_accounts:
+        if source == AccountSource.client and code:
+            level1 = _normalize_to_level1(code)
+            client_level1_set.add(level1)
+
+    # 7 元组: (二级码, 二级名, 一级码, 一级名, 报表行, 余额, 已有调整, has_balance_flag)
+    sub_accounts: list[tuple[str, str, str, str, str, float, float, bool]] = []
+
+    # 一级名称查询
+    level1_name_map: dict[str, str] = {}
+    for code, name, source in all_accounts:
+        if source != AccountSource.standard:
+            continue
+        if "-" not in code and len(code) == 4 and code.isdigit():
+            level1_name_map[code] = name or ""
+    for code, name, source in all_accounts:
+        if source == AccountSource.standard and code.startswith("1231-"):
+            level1_name_map[code] = name or ""
+
+    def _build_entry(code: str, name: str) -> tuple[str, str, str, str, str, float, float, bool]:
+        """组装一行 sub_accounts 元组"""
+        level1 = _normalize_to_level1(code)
+        level1_name = level1_name_map.get(level1, "")
+        if not level1_name and code == level1:
+            level1_name = name or ""
+        rl = code_to_report.get(level1, ("", ""))
+        report_line = rl[1] if rl[1] else "⚠ 未映射"  # P0-2
+        # 余额: 优先按当前码查,再按一级码查
+        tb_row = tb_data.get(code) or tb_data.get(level1) or (0, 0, 0, 0)
+        audited = float(tb_row[0])
+        adj_total = float(tb_row[2]) + float(tb_row[3])  # AJE + RJE
+        has_balance = code in tb_codes_with_balance or level1 in tb_codes_with_balance
+        return (code, name or code, level1, level1_name, report_line, audited, adj_total, has_balance)
+
+    # 先放 client 科目 (本项目实际明细)
+    for code, name, source in all_accounts:
+        if source != AccountSource.client or not code or code in seen_codes:
+            continue
+        seen_codes.add(code)
+        sub_accounts.append(_build_entry(code, name))
+
+    # 再放 standard 科目 (P0-3: 已被 client 子明细覆盖的一级科目跳过)
+    for code, name, source in all_accounts:
+        if source != AccountSource.standard or not code or code in seen_codes:
+            continue
+        # P0-3: 如果该 standard 一级码已被 client 子明细覆盖,跳过避免重复
+        if code in client_level1_set and "-" not in code:
+            # 但保留 1231-01~05 这种二级标准 (因为客户子明细可能不全)
+            continue
+        seen_codes.add(code)
+        sub_accounts.append(_build_entry(code, name))
+
+    # P0-1: 试算表有余额的排前面 (按 has_balance 降序稳定排序)
+    sub_accounts.sort(key=lambda x: (not x[7], x[0]))  # has_balance=True 在前,然后按编码字典序
 
     wb = openpyxl.Workbook()
 
@@ -579,40 +748,54 @@ async def export_adjustment_template(
     ws_notes = wb.active
     ws_notes.title = "关注事项"
     notes = [
-        ("📋 调整分录导入模板使用说明", "header"),
+        (f"📋 调整分录导入模板使用说明 - {template_label}", "header"),
         ("", ""),
-        ("一、字段说明", "section"),
-        ("• 编号 (adjustment_no)", "可留空,系统自动生成 (AJE-001 / RJE-001)"),
-        ("• 类型 (type)", "必填,AJE=审计调整 / RJE=重分类调整"),
-        ("• 摘要 (description)", "必填,简要说明调整原因 (≤ 200 字)"),
-        ("• 科目编码 (account_code)", "必填,从 D 列下拉选择,E 列科目名称自动填充"),
-        ("• 科目名称 (account_name)", "自动填充 (E 列已写 VLOOKUP 公式),编辑编码后名称自动联动"),
-        ("• 不知编码? 按名称反查", "I 列下拉选名称 → J 列自动显示编码 → 复制粘贴到 D 列"),
-        ("• 借方金额 (debit_amount)", "正数,与贷方互斥 (同一行只填一个)"),
-        ("• 贷方金额 (credit_amount)", "正数,与借方互斥 (同一行只填一个)"),
+        ("一、字段说明 (9 列结构)", "section"),
+        ("• A 编号 (adjustment_no)", "可留空,系统自动生成 (AJE-001 / RJE-001)"),
+        ("• B 类型 (type)", "必填,AJE=审计调整 / RJE=重分类调整"),
+        ("• C 摘要 (description)", "必填,简要说明调整原因 (≤ 200 字)"),
+        ("• D 二级科目编码", "自动填充 (公式),根据 E 列名称反查"),
+        ("• E 二级科目名称 ⭐主输入", "必填,从下拉选择本项目实际科目 (含客户子明细)"),
+        ("• F 一级科目编码", "自动填充 (公式),归一到一级 (4 位编码或 1231-0x)"),
+        ("• G 一级科目名称", "自动填充 (公式),即报表项目对应的标准科目"),
+        ("• H 报表项目", f"自动填充 (公式),依据【映射规则】关联到 {template_label} 的报表行"),
+        ("• I 借方金额", "正数,与贷方互斥 (同一行只填一个)"),
+        ("• J 贷方金额", "正数,与借方互斥 (同一行只填一个)"),
         ("", ""),
-        ("二、校验规则", "section"),
+        ("二、4 列联动机制", "section"),
+        ("第一步: 在 E 列下拉选择 二级科目名称 (本项目实际明细科目)", ""),
+        ("第二步: D 列 二级编码 自动填 (INDEX/MATCH 反查)", ""),
+        ("第三步: F 列 一级编码 自动归一 (取前 4 位 / 1231 系列保留二级)", ""),
+        ("第四步: G/H 列 一级名称 + 报表项目 自动填 (依据本项目映射规则)", ""),
+        ("", ""),
+        ("三、校验规则", "section"),
         ("✅ 借贷必须平衡", "同一编号下所有行的借方合计 = 贷方合计 (容差 0.01)"),
-        ("✅ 科目必须在标准库", "下拉只显示该项目已加载的标准科目"),
+        ("✅ 科目必须在项目库", "下拉只显示本项目已加载的标准科目 + 客户实际科目"),
+        ("✅ 一级映射必须存在", "F/G/H 列联动失败 = 该科目还未做映射规则,请先到 [试算表 → 映射规则] 完善"),
         ("✅ 金额方向", "借方/贷方至少填一个,且只能填一个 (互斥)"),
-        ("✅ 编号唯一性", "若手工填编号,不能与已存在的编号重复"),
         ("", ""),
-        ("三、AJE / RJE 区别", "section"),
+        ("四、AJE / RJE 区别", "section"),
         ("AJE 审计调整", "影响审定数 (P/L 损益类调整),会更新报表数据"),
         ("RJE 重分类", "不影响损益,仅在 BS 内重分类 (如长投↔可供出售)"),
         ("", ""),
-        ("四、示例", "section"),
-        ("分录 AJE-001 (借应收账款 100, 贷主营业务收入 100)", "→ 两行,同 adjustment_no=AJE-001"),
-        ("第 1 行: 编号=AJE-001 类型=AJE 摘要=补提收入 科目=1122 借方=100", ""),
-        ("第 2 行: 编号=AJE-001 类型=AJE 摘要=补提收入 科目=6001 贷方=100", ""),
+        ("五、示例", "section"),
+        ("分录 AJE-001 (借应收账款 100, 贷信用减值损失 100)", "→ 两行,同 adjustment_no=AJE-001"),
+        ("第 1 行: 编号=AJE-001 类型=AJE 摘要=补提坏账 二级名称=应收账款 借方=100", ""),
+        ("第 2 行: 编号=AJE-001 类型=AJE 摘要=补提坏账 二级名称=信用减值损失 贷方=100", ""),
         ("", ""),
         ("⚠️ 重要提示", "section"),
         ("• 修改本模板表结构会导致导入失败", ""),
         ("• 完成填写后通过页面 'Excel 导入' 按钮上传", ""),
+        ("• 联动失败 (F/G/H 显示 #N/A) → 该科目缺映射,请先在 [试算表 → 映射规则] 配置", ""),
         ("", ""),
-        ("五、科目编码与名称对照表", "section"),
-        (f"参见本工作簿最右侧的【标准科目库】sheet,共 {len(std_accounts)} 个标准科目", ""),
-        ("该 sheet 同时是 D 列下拉数据源和 E 列 VLOOKUP 公式取值源,请勿删除", ""),
+        ("六、项目科目库 (最右侧 sheet)", "section"),
+        (f"参见本工作簿最右侧的【项目科目库】sheet,共 {len(sub_accounts)} 个科目", ""),
+        ("7 列结构: 二级编码 / 二级名称 / 一级编码 / 一级名称 / 报表项目 / 当前余额 / 已有调整数", ""),
+        ("• 浅绿底 = 试算表有余额的科目 (按余额优先排序在前)", ""),
+        ("• 浅灰底 = 试算表无余额的科目 (兜底,可用于新增预提)", ""),
+        ("• 浅橙底报表项目列 = ⚠ 未映射,请先到 [试算表 → 映射规则] 完善", ""),
+        ("• 当前余额 / 已有调整数 = 提示用户当前金额,避免重复调整 (导入时不参与校验)", ""),
+        ("该 sheet 是 E 列下拉数据源 + D/F/G/H 列联动公式取值源,请勿删除", ""),
     ]
 
     title_font = Font(bold=True, size=14, color="6750A4")
@@ -640,11 +823,17 @@ async def export_adjustment_template(
     ws_notes.column_dimensions["A"].width = 50
     ws_notes.column_dimensions["B"].width = 60
 
-    # ─── Sheet 2 & 3: AJE / RJE 模板 ───────────────────────
-    # 列结构: A编号 / B类型 / C摘要 / D科目编码 / E科目名称 / F借方 / G贷方 / [空 H] / I~J 反查辅助区
-    headers = ["编号", "类型", "摘要", "科目编码", "科目名称", "借方金额", "贷方金额", "", "📍 辅助:科目名称", "→ 对应编码"]
+    # ─── Sheet 2 & 3: AJE / RJE 模板 (9 列结构,4 列联动) ─────────
+    # 列结构: A编号 / B类型 / C摘要 / D二级编码(联动) / E二级名称(下拉⭐) /
+    #         F一级编码(联动) / G一级名称(联动) / H报表项目(联动) / I借方 / J贷方
+    # 设计原则: 用户在 E 列选名称, D/F/G/H 全部 INDEX/MATCH 自动联动
+    headers = [
+        "编号", "类型", "摘要",
+        "二级科目编码", "二级科目名称",
+        "一级科目编码", "一级科目名称", "报表项目",
+        "借方金额", "贷方金额",
+    ]
     header_fill = PatternFill(start_color="F4F0FA", end_color="F4F0FA", fill_type="solid")
-    header_aux_fill = PatternFill(start_color="FFF8E1", end_color="FFF8E1", fill_type="solid")  # 浅黄: 辅助区
     header_font = Font(bold=True, size=11)
     thin_border = Border(
         left=Side(style="thin", color="DDDDDD"),
@@ -653,134 +842,168 @@ async def export_adjustment_template(
         bottom=Side(style="thin", color="DDDDDD"),
     )
 
+    # 找一个真实存在的二级名称做示例(优先客户科目)
+    example_name1 = "应收账款"
+    example_name2 = "信用减值损失"
+    example_name3 = "其他权益工具投资"
+    example_name4 = "长期股权投资"
+    sub_names_set = {sa[1] for sa in sub_accounts}
+    if example_name1 not in sub_names_set:
+        for sa in sub_accounts:
+            if sa[2].startswith("11"):  # 一级码 1xxx
+                example_name1 = sa[1]
+                break
+
     for adj_type, sheet_name, examples in [
         ("AJE", "AJE模板", [
-            ("AJE-001", "AJE", "补提应收账款减值", "1122", "应收账款", 0, 100000.00),
-            ("AJE-001", "AJE", "补提应收账款减值", "6701", "信用减值损失", 100000.00, 0),
-            ("", "AJE", "", "", "", 0, 0),
-            ("", "AJE", "", "", "", 0, 0),
-            ("", "AJE", "", "", "", 0, 0),
+            # 仅填 编号/类型/摘要/二级名称(E)/借贷,其他列由公式自动算
+            ("AJE-001", "AJE", "补提应收账款减值", "", example_name1, "", "", "", 0, 100000.00),
+            ("AJE-001", "AJE", "补提应收账款减值", "", example_name2, "", "", "", 100000.00, 0),
+            ("", "", "", "", "", "", "", "", 0, 0),
+            ("", "", "", "", "", "", "", "", 0, 0),
+            ("", "", "", "", "", "", "", "", 0, 0),
         ]),
         ("RJE", "RJE模板", [
-            ("RJE-001", "RJE", "长投重分类为其他权益工具", "1503", "其他权益工具投资", 50000.00, 0),
-            ("RJE-001", "RJE", "长投重分类为其他权益工具", "1511", "长期股权投资", 0, 50000.00),
-            ("", "RJE", "", "", "", 0, 0),
-            ("", "RJE", "", "", "", 0, 0),
-            ("", "RJE", "", "", "", 0, 0),
+            ("RJE-001", "RJE", "长投重分类为其他权益工具", "", example_name3, "", "", "", 50000.00, 0),
+            ("RJE-001", "RJE", "长投重分类为其他权益工具", "", example_name4, "", "", "", 0, 50000.00),
+            ("", "", "", "", "", "", "", "", 0, 0),
+            ("", "", "", "", "", "", "", "", 0, 0),
+            ("", "", "", "", "", "", "", "", 0, 0),
         ]),
     ]:
         ws = wb.create_sheet(sheet_name)
-        # 表头 (A~G 主区 + I~J 辅助反查区)
+        # 表头
         for col, h in enumerate(headers, 1):
-            if not h:  # 跳过空列(分隔)
-                continue
             cell = ws.cell(row=1, column=col, value=h)
-            cell.fill = header_aux_fill if col >= 9 else header_fill
+            cell.fill = header_fill
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border = thin_border
-        # 示例数据 (浅灰底色提示是示例)
+        # 示例数据
         example_fill = PatternFill(start_color="FAFAFA", end_color="FAFAFA", fill_type="solid")
+        formula_fill = PatternFill(start_color="EAF4FB", end_color="EAF4FB", fill_type="solid")
         for ri, row_data in enumerate(examples, 2):
             for ci, val in enumerate(row_data, 1):
                 c = ws.cell(row=ri, column=ci, value=val if val != 0 else None)
                 c.border = thin_border
-                if ri <= 3:  # 前两行示例填充浅灰
+                if ri <= 3:
                     c.fill = example_fill
 
         # 列宽
-        ws.column_dimensions["A"].width = 14
-        ws.column_dimensions["B"].width = 8
-        ws.column_dimensions["C"].width = 30
-        ws.column_dimensions["D"].width = 14
-        ws.column_dimensions["E"].width = 22
-        ws.column_dimensions["F"].width = 16
-        ws.column_dimensions["G"].width = 16
-        ws.column_dimensions["H"].width = 4   # 分隔列
-        ws.column_dimensions["I"].width = 22  # 辅助:输入科目名称
-        ws.column_dimensions["J"].width = 14  # 辅助:对应编码
-        # 冻结表头
+        ws.column_dimensions["A"].width = 14   # 编号
+        ws.column_dimensions["B"].width = 8    # 类型
+        ws.column_dimensions["C"].width = 28   # 摘要
+        ws.column_dimensions["D"].width = 14   # 二级编码(联动)
+        ws.column_dimensions["E"].width = 26   # 二级名称(下拉⭐)
+        ws.column_dimensions["F"].width = 14   # 一级编码(联动)
+        ws.column_dimensions["G"].width = 22   # 一级名称(联动)
+        ws.column_dimensions["H"].width = 22   # 报表项目(联动)
+        ws.column_dimensions["I"].width = 14   # 借方
+        ws.column_dimensions["J"].width = 14   # 贷方
         ws.freeze_panes = "A2"
 
-        # ─── 主区: 科目名称列 (E 列) 写 VLOOKUP 公式: 选编码后名称自动填充 ───
-        # 仅在示例行之后 + 100 行预留区域写公式 (示例行已经手填名称)
-        # IFERROR 兜底: 编码为空时返回空字符串而非 #N/A
-        if std_accounts:
-            std_count = len(std_accounts)
-            for ri in range(7, 201):  # 第 7 行起 (跳过 5 行示例 + 表头)
-                e_cell = ws.cell(
-                    row=ri,
-                    column=5,
-                    value=f'=IFERROR(VLOOKUP(D{ri},标准科目库!$A$2:$B${std_count + 1},2,FALSE),"")',
+        # ─── 4 列联动公式 (第 7 行起,跳过 5 行示例 + 表头) ─────
+        # 项目科目库 sheet 7 列: A=二级编码 / B=二级名称 / C=一级编码 / D=一级名称 / E=报表项目 / F=余额 / G=调整
+        if sub_accounts:
+            n = len(sub_accounts)
+            for ri in range(7, 201):
+                # D 列: 用 E 名称反查 二级编码 (项目科目库 A 列)
+                d_cell = ws.cell(row=ri, column=4,
+                    value=f'=IFERROR(INDEX(项目科目库!$A$2:$A${n + 1},MATCH(E{ri},项目科目库!$B$2:$B${n + 1},0)),"")',
                 )
-                e_cell.border = thin_border
-                # 浅蓝色背景提示这是公式列(只读概念)
-                e_cell.fill = PatternFill(start_color="EAF4FB", end_color="EAF4FB", fill_type="solid")
-
-            # ─── 辅助区: I 列下拉选名称 + J 列反查编码 (用户复制粘贴到 D 列) ───
-            # I 列: 科目名称下拉 (数据校验引用标准科目库 B 列)
-            # J 列: VLOOKUP 反查 编码 = INDEX/MATCH 用名称查编码
-            aux_value_fill = PatternFill(start_color="FFFBF0", end_color="FFFBF0", fill_type="solid")
-            for ri in range(2, 201):
-                # I 列: 留空给用户输入(下拉)
-                i_cell = ws.cell(row=ri, column=9, value=None)
-                i_cell.border = thin_border
-                i_cell.fill = aux_value_fill
-                # J 列: INDEX/MATCH 反查编码(因为 VLOOKUP 不支持从右往左查)
-                j_cell = ws.cell(
-                    row=ri,
-                    column=10,
-                    value=f'=IFERROR(INDEX(标准科目库!$A$2:$A${std_count + 1},MATCH(I{ri},标准科目库!$B$2:$B${std_count + 1},0)),"")',
+                # F 列: 用 E 名称反查 一级编码 (项目科目库 C 列)
+                f_cell = ws.cell(row=ri, column=6,
+                    value=f'=IFERROR(INDEX(项目科目库!$C$2:$C${n + 1},MATCH(E{ri},项目科目库!$B$2:$B${n + 1},0)),"")',
                 )
-                j_cell.border = thin_border
-                j_cell.fill = aux_value_fill
+                # G 列: 用 E 名称反查 一级名称 (项目科目库 D 列)
+                g_cell = ws.cell(row=ri, column=7,
+                    value=f'=IFERROR(INDEX(项目科目库!$D$2:$D${n + 1},MATCH(E{ri},项目科目库!$B$2:$B${n + 1},0)),"")',
+                )
+                # H 列: 用 E 名称反查 报表项目 (项目科目库 E 列)
+                h_cell = ws.cell(row=ri, column=8,
+                    value=f'=IFERROR(INDEX(项目科目库!$E$2:$E${n + 1},MATCH(E{ri},项目科目库!$B$2:$B${n + 1},0)),"")',
+                )
+                for c in (d_cell, f_cell, g_cell, h_cell):
+                    c.border = thin_border
+                    c.fill = formula_fill
 
-    # ─── Sheet 4: 标准科目库 (可见,作为科目编码-名称对照表 + 下拉数据源) ─────────
-    ws_std = wb.create_sheet("标准科目库")
-    # 表头
-    h1 = ws_std.cell(row=1, column=1, value="科目编码")
-    h2 = ws_std.cell(row=1, column=2, value="科目名称")
-    for c in (h1, h2):
-        c.font = Font(bold=True, size=11, color="FFFFFF")
-        c.fill = PatternFill(start_color="6750A4", end_color="6750A4", fill_type="solid")
-        c.alignment = Alignment(horizontal="center", vertical="center")
-        c.border = thin_border
-    # 数据行
-    for ri, (code, name) in enumerate(std_accounts, 2):
-        c1 = ws_std.cell(row=ri, column=1, value=code)
-        c2 = ws_std.cell(row=ri, column=2, value=name)
-        c1.border = thin_border
-        c2.border = thin_border
-    ws_std.column_dimensions["A"].width = 16
-    ws_std.column_dimensions["B"].width = 32
-    ws_std.freeze_panes = "A2"
-    # sheet 保持可见 (sheet_state 默认 'visible'), 用户可查阅
+    # ─── Sheet 4: 项目科目库 (7 列: A 二级编码/B 二级名称/C 一级编码/D 一级名称/E 报表项目/F 当前余额/G 已有调整) ───
+    ws_lib = wb.create_sheet("项目科目库")
+    lib_headers = [
+        "二级科目编码", "二级科目名称",
+        "一级科目编码", "一级科目名称",
+        "报表项目",
+        "当前余额", "已有调整数",
+    ]
+    for col, h in enumerate(lib_headers, 1):
+        cell = ws_lib.cell(row=1, column=col, value=h)
+        cell.font = Font(bold=True, size=11, color="FFFFFF")
+        cell.fill = PatternFill(start_color="6750A4", end_color="6750A4", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = thin_border
 
-    # ─── 添加数据校验: 科目编码列下拉 ───────────────────────
-    if std_accounts:
-        std_count = len(std_accounts)
-        # 引用标准科目库 sheet 的 A 列 (编码)
-        formula_range_code = f"=标准科目库!$A$2:$A${std_count + 1}"
-        # 引用标准科目库 sheet 的 B 列 (名称) — 用于 I 列反查辅助
-        formula_range_name = f"=标准科目库!$B$2:$B${std_count + 1}"
+    # 数据行 (sub_accounts 是 8 元组: 二级码/二级名/一级码/一级名/报表行/余额/调整/has_balance)
+    no_balance_fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")  # 灰底:无余额
+    has_balance_fill = PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid")  # 浅绿:有余额
+    unmapped_fill = PatternFill(start_color="FFF3E0", end_color="FFF3E0", fill_type="solid")  # 浅橙:未映射
+    for ri, entry in enumerate(sub_accounts, 2):
+        sub_code, sub_name, level1_code, level1_name, report_line, balance, adj_total, has_balance = entry
+        ws_lib.cell(row=ri, column=1, value=sub_code).border = thin_border
+        ws_lib.cell(row=ri, column=2, value=sub_name).border = thin_border
+        ws_lib.cell(row=ri, column=3, value=level1_code).border = thin_border
+        ws_lib.cell(row=ri, column=4, value=level1_name).border = thin_border
+        c5 = ws_lib.cell(row=ri, column=5, value=report_line)
+        c5.border = thin_border
+        # P0-2: 未映射科目 标橙色
+        if "⚠" in (report_line or ""):
+            c5.fill = unmapped_fill
+        c6 = ws_lib.cell(row=ri, column=6, value=balance if balance else None)
+        c6.border = thin_border
+        c6.alignment = Alignment(horizontal="right")
+        c6.number_format = '#,##0.00;-#,##0.00'
+        c7 = ws_lib.cell(row=ri, column=7, value=adj_total if adj_total else None)
+        c7.border = thin_border
+        c7.alignment = Alignment(horizontal="right")
+        c7.number_format = '#,##0.00;-#,##0.00'
+        # P0-1: 有余额的浅绿底色,无余额浅灰底色 (整行)
+        if has_balance:
+            for col in range(1, 6):  # 1-5 列(科目相关)
+                ws_lib.cell(row=ri, column=col).fill = has_balance_fill
+        else:
+            for col in range(1, 6):
+                ws_lib.cell(row=ri, column=col).fill = no_balance_fill
+
+    ws_lib.column_dimensions["A"].width = 16
+    ws_lib.column_dimensions["B"].width = 32
+    ws_lib.column_dimensions["C"].width = 14
+    ws_lib.column_dimensions["D"].width = 22
+    ws_lib.column_dimensions["E"].width = 24
+    ws_lib.column_dimensions["F"].width = 16
+    ws_lib.column_dimensions["G"].width = 16
+    ws_lib.freeze_panes = "A2"
+
+    # ─── 数据校验 (E 列科目名称下拉 + B 列 AJE/RJE 类型下拉) ─────
+    if sub_accounts:
+        n = len(sub_accounts)
+        # 引用 项目科目库 B 列 (二级科目名称)
+        formula_range_name = f"=项目科目库!$B$2:$B${n + 1}"
         for sheet_name in ("AJE模板", "RJE模板"):
             ws_target = wb[sheet_name]
-            # D 列: 科目编码下拉
-            dv = DataValidation(
+            # E 列: 二级科目名称下拉
+            dv_name = DataValidation(
                 type="list",
-                formula1=formula_range_code,
+                formula1=formula_range_name,
                 allow_blank=True,
-                showDropDown=False,  # False = 显示下拉箭头
+                showDropDown=False,
             )
-            dv.error = "请从下拉列表中选择,不可手工输入未在标准库的科目编码"
-            dv.errorTitle = "科目编码必须在标准库"
-            dv.prompt = "从下拉选择标准科目编码,E 列科目名称会自动填充"
-            dv.promptTitle = "提示"
-            # 应用到 D 列 (科目编码) 第 2 ~ 200 行
-            dv.add(f"D2:D200")
-            ws_target.add_data_validation(dv)
+            dv_name.error = "请从下拉列表中选择本项目实际科目名称"
+            dv_name.errorTitle = "科目名称必须在项目科目库"
+            dv_name.prompt = "从下拉选择二级科目名称, D/F/G/H 列将自动联动填充"
+            dv_name.promptTitle = "提示"
+            dv_name.add(f"E2:E200")
+            ws_target.add_data_validation(dv_name)
 
-            # 类型列也加下拉 (AJE / RJE)
+            # B 列: AJE/RJE 类型下拉
             dv_type = DataValidation(
                 type="list",
                 formula1='"AJE,RJE"',
@@ -788,20 +1011,6 @@ async def export_adjustment_template(
             )
             dv_type.add("B2:B200")
             ws_target.add_data_validation(dv_type)
-
-            # I 列: 科目名称下拉(反查辅助区) — 用户选名称后 J 列自动显示对应编码
-            dv_name = DataValidation(
-                type="list",
-                formula1=formula_range_name,
-                allow_blank=True,
-                showDropDown=False,
-            )
-            dv_name.error = "请从下拉列表中选择标准科目名称"
-            dv_name.errorTitle = "科目名称必须在标准库"
-            dv_name.prompt = "从下拉选择科目名称,J 列会显示对应编码,可复制到 D 列"
-            dv_name.promptTitle = "辅助:按名称反查编码"
-            dv_name.add(f"I2:I200")
-            ws_target.add_data_validation(dv_name)
 
     buf = BytesIO()
     wb.save(buf)
@@ -811,7 +1020,7 @@ async def export_adjustment_template(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": f"attachment; filename=adjustment_template_{year}.xlsx"
+            "Content-Disposition": f"attachment; filename=adjustment_template_{template_type}_{year}.xlsx"
         },
     )
 
