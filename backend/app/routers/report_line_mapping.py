@@ -58,11 +58,56 @@ async def fix_bad_debt(
 
     用于"一键预设"前置: 客户码 1231.01/02/03 等被误映射到 1231 总分类时,
     按客户科目名称关键词改成对应二级 1231-01~05.
+
+    流程:
+    1. 自愈 account_chart: 增量补齐 1231-01~05 五个二级标准科目(历史项目可能缺失)
+    2. 扫描 account_mapping standard_account_code='1231' 的记录,按名称改成二级
     """
     from app.services import mapping_service
-    from app.models.audit_platform_models import AccountMapping
+    from app.models.audit_platform_models import (
+        AccountMapping, AccountChart, AccountSource, AccountDirection, AccountCategory,
+    )
     from sqlalchemy import select as sa_select
+    import json
+    from pathlib import Path
 
+    # ─── Step 1: 自愈 account_chart - 增量补齐 1231-01~05 ───────────
+    chart_result = await db.execute(
+        sa_select(AccountChart.account_code).where(
+            AccountChart.project_id == project_id,
+            AccountChart.source == AccountSource.standard,
+            AccountChart.is_deleted == False,  # noqa: E712
+            AccountChart.account_code.in_(['1231-01', '1231-02', '1231-03', '1231-04', '1231-05']),
+        )
+    )
+    existing_sub = {r[0] for r in chart_result.all()}
+    sub_codes_seed = [
+        ('1231-01', '坏账准备-应收票据'),
+        ('1231-02', '坏账准备-应收账款'),
+        ('1231-03', '坏账准备-其他应收款'),
+        ('1231-04', '坏账准备-预付账款'),
+        ('1231-05', '坏账准备-合同资产'),
+    ]
+    chart_added = 0
+    for code, name in sub_codes_seed:
+        if code in existing_sub:
+            continue
+        rec = AccountChart(
+            project_id=project_id,
+            account_code=code,
+            account_name=name,
+            direction=AccountDirection.credit,
+            level=2,
+            category=AccountCategory.asset,
+            parent_code='1231',
+            source=AccountSource.standard,
+        )
+        db.add(rec)
+        chart_added += 1
+    if chart_added > 0:
+        await db.flush()
+
+    # ─── Step 2: 修正 account_mapping ──────────────────────────────
     result = await db.execute(
         sa_select(AccountMapping).where(
             AccountMapping.project_id == project_id,
@@ -73,19 +118,57 @@ async def fix_bad_debt(
     records = result.scalars().all()
 
     fixed = 0
+    skipped = []
     for rec in records:
         if not rec.original_account_name:
             continue
+        matched = False
         for keywords, sub_code in mapping_service._BAD_DEBT_KEYWORD_MAP:
             if any(kw in rec.original_account_name for kw in keywords):
                 rec.standard_account_code = sub_code
                 fixed += 1
+                matched = True
                 break
+        if not matched:
+            skipped.append(rec.original_account_code)
 
-    if fixed > 0:
+    # ─── Step 3: 清理孤立的 1231 总分类 ReportLineMapping ─────────────
+    # 检测条件: account_mapping 中没有任何 standard_code='1231' 但 ReportLineMapping 中还有
+    rlm_orphan_deleted = 0
+    from app.models.audit_platform_models import ReportLineMapping
+
+    still_using_1231 = await db.execute(
+        sa_select(AccountMapping).where(
+            AccountMapping.project_id == project_id,
+            AccountMapping.is_deleted == False,  # noqa: E712
+            AccountMapping.standard_account_code == '1231',
+        ).limit(1)
+    )
+    if still_using_1231.scalar_one_or_none() is None:
+        orphan_result = await db.execute(
+            sa_select(ReportLineMapping).where(
+                ReportLineMapping.project_id == project_id,
+                ReportLineMapping.is_deleted == False,  # noqa: E712
+                ReportLineMapping.standard_account_code == '1231',
+            )
+        )
+        orphans = orphan_result.scalars().all()
+        for orphan in orphans:
+            # 仅清理 ai_suggested(自动生成的),保护 manual / reference_copied
+            if orphan.mapping_type.value == 'ai_suggested':
+                orphan.is_deleted = True
+                rlm_orphan_deleted += 1
+
+    if fixed > 0 or chart_added > 0 or rlm_orphan_deleted > 0:
         await db.commit()
 
-    return {"fixed_count": fixed, "total_examined": len(records)}
+    return {
+        "fixed_count": fixed,
+        "total_examined": len(records),
+        "chart_added": chart_added,
+        "skipped_unmatched": skipped,
+        "rlm_orphan_deleted": rlm_orphan_deleted,
+    }
 
 
 @router.get(

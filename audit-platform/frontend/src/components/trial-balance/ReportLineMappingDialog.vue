@@ -352,8 +352,12 @@ async function onPreset() {
     // Step 1: 修复 1231 坏账准备总分类→二级分项错配 (静默执行,无副作用)
     try {
       const fixResult: any = await api.post(reportLineMapping.fixBadDebt(props.projectId))
-      if (fixResult?.fixed_count > 0) {
-        ElMessage.info(`已修复 ${fixResult.fixed_count} 条坏账准备总分类→二级分项错配`)
+      const parts: string[] = []
+      if (fixResult?.chart_added > 0) parts.push(`补齐 ${fixResult.chart_added} 个二级标准科目`)
+      if (fixResult?.fixed_count > 0) parts.push(`修复 ${fixResult.fixed_count} 条总分类→分项映射`)
+      if (fixResult?.rlm_orphan_deleted > 0) parts.push(`清理 ${fixResult.rlm_orphan_deleted} 条孤立报表行`)
+      if (parts.length > 0) {
+        ElMessage.info(`坏账准备处理: ${parts.join(' / ')}`)
       }
     } catch (e) {
       // 修坏账失败不阻断主流程

@@ -50,9 +50,54 @@ def _match_keyword_to_sub_code(name: str) -> str | None:
     return None
 
 
-async def fix_project(project_id: UUID, db: AsyncSession, dry_run: bool = False) -> int:
-    """修单项目: 把 standard_account_code=1231 的记录按名称改成 1231-0x"""
-    # 取所有 1231 总分类映射(可能错误)
+async def fix_project(project_id: UUID, db: AsyncSession, dry_run: bool = False) -> dict:
+    """修单项目: 自愈 account_chart + 修 account_mapping + 清孤立 ReportLineMapping
+
+    Returns dict: {chart_added, fixed_count, rlm_orphan_deleted, skipped}
+    """
+    from app.models.audit_platform_models import (
+        AccountChart, AccountSource, AccountDirection, AccountCategory,
+    )
+
+    # ─── Step 1: 自愈 account_chart 增量补齐 1231-01~05 ──────────────
+    chart_result = await db.execute(
+        select(AccountChart.account_code).where(
+            AccountChart.project_id == project_id,
+            AccountChart.source == AccountSource.standard,
+            AccountChart.is_deleted == False,  # noqa: E712
+            AccountChart.account_code.in_(['1231-01', '1231-02', '1231-03', '1231-04', '1231-05']),
+        )
+    )
+    existing_sub = {r[0] for r in chart_result.all()}
+    sub_codes_seed = [
+        ('1231-01', '坏账准备-应收票据'),
+        ('1231-02', '坏账准备-应收账款'),
+        ('1231-03', '坏账准备-其他应收款'),
+        ('1231-04', '坏账准备-预付账款'),
+        ('1231-05', '坏账准备-合同资产'),
+    ]
+    chart_added = 0
+    for code, name in sub_codes_seed:
+        if code in existing_sub:
+            continue
+        logger.info(f"  [补齐二级标准] {code} {name}")
+        if not dry_run:
+            rec = AccountChart(
+                project_id=project_id,
+                account_code=code,
+                account_name=name,
+                direction=AccountDirection.credit,
+                level=2,
+                category=AccountCategory.asset,
+                parent_code='1231',
+                source=AccountSource.standard,
+            )
+            db.add(rec)
+        chart_added += 1
+    if not dry_run and chart_added > 0:
+        await db.flush()
+
+    # ─── Step 2: 修正 account_mapping ──────────────────────────────
     result = await db.execute(
         select(AccountMapping).where(
             AccountMapping.project_id == project_id,
@@ -61,13 +106,15 @@ async def fix_project(project_id: UUID, db: AsyncSession, dry_run: bool = False)
         )
     )
     records = result.scalars().all()
-    if not records:
-        return 0
 
     fixed = 0
+    skipped = []
     for rec in records:
+        if not rec.original_account_name:
+            continue
         sub_code = _match_keyword_to_sub_code(rec.original_account_name)
         if not sub_code:
+            skipped.append(rec.original_account_code)
             logger.info(
                 f"  [跳过] {rec.original_account_code} ({rec.original_account_name}) "
                 f"未匹配到二级关键词,保持 1231"
@@ -84,10 +131,46 @@ async def fix_project(project_id: UUID, db: AsyncSession, dry_run: bool = False)
             rec.standard_account_code = sub_code
         fixed += 1
 
-    if not dry_run and fixed > 0:
+    # ─── Step 3: 清理孤立的 1231 总分类 ReportLineMapping ─────────────
+    # 检测条件: account_mapping 中没有任何 standard_code='1231' 但 ReportLineMapping 中还有
+    # (孤立场景: ①刚 fix 完 ②历史项目本来 mapping 就没指向 1231 但 RLM 是错配)
+    rlm_orphan_deleted = 0
+    from app.models.audit_platform_models import ReportLineMapping, ReportLineMappingType
+
+    still_using = await db.execute(
+        select(AccountMapping).where(
+            AccountMapping.project_id == project_id,
+            AccountMapping.is_deleted == False,  # noqa: E712
+            AccountMapping.standard_account_code == '1231',
+        ).limit(1)
+    )
+    if still_using.scalar_one_or_none() is None:
+        orphan_result = await db.execute(
+            select(ReportLineMapping).where(
+                ReportLineMapping.project_id == project_id,
+                ReportLineMapping.is_deleted == False,  # noqa: E712
+                ReportLineMapping.standard_account_code == '1231',
+                ReportLineMapping.mapping_type == ReportLineMappingType.ai_suggested,
+            )
+        )
+        for orphan in orphan_result.scalars().all():
+            logger.info(
+                f"  [清理孤立 RLM] standard_code=1231 → "
+                f"{orphan.report_line_code}({orphan.report_line_name})"
+            )
+            if not dry_run:
+                orphan.is_deleted = True
+            rlm_orphan_deleted += 1
+
+    if not dry_run and (fixed > 0 or chart_added > 0 or rlm_orphan_deleted > 0):
         await db.commit()
 
-    return fixed
+    return {
+        'chart_added': chart_added,
+        'fixed_count': fixed,
+        'rlm_orphan_deleted': rlm_orphan_deleted,
+        'skipped': skipped,
+    }
 
 
 async def refresh_rlm(project_id: UUID, db: AsyncSession, dry_run: bool = False):
@@ -122,20 +205,31 @@ async def main():
             logger.info(f"将处理 {len(project_ids)} 个项目")
 
         total_fixed = 0
+        total_chart_added = 0
+        total_orphan_deleted = 0
         for pid in project_ids:
             p = (await db.execute(select(Project.client_name).where(Project.id == pid))).scalar_one_or_none()
             logger.info(f"\n--- 项目 {pid} ({p}) ---")
             try:
-                fixed = await fix_project(pid, db, dry_run=args.dry_run)
-                logger.info(f"  account_mapping 修复 {fixed} 条")
-                total_fixed += fixed
-                if fixed > 0 and not args.skip_rlm_refresh:
+                stats = await fix_project(pid, db, dry_run=args.dry_run)
+                logger.info(
+                    f"  补齐二级标准 {stats['chart_added']} 条 / "
+                    f"修 mapping {stats['fixed_count']} 条 / "
+                    f"清孤立 RLM {stats['rlm_orphan_deleted']} 条"
+                )
+                total_fixed += stats['fixed_count']
+                total_chart_added += stats['chart_added']
+                total_orphan_deleted += stats['rlm_orphan_deleted']
+                if stats['fixed_count'] > 0 and not args.skip_rlm_refresh:
                     await refresh_rlm(pid, db, dry_run=args.dry_run)
             except Exception as e:
                 logger.error(f"  ✗ 项目 {pid} 失败: {e}")
 
         mode_str = '[DRY-RUN]' if args.dry_run else '[已写入]'
-        logger.info(f"\n=== 汇总 {mode_str} 共修复 {total_fixed} 条 account_mapping ===")
+        logger.info(
+            f"\n=== 汇总 {mode_str} 补齐 {total_chart_added} 条二级标准 / "
+            f"修 {total_fixed} 条 mapping / 清 {total_orphan_deleted} 条孤立 RLM ==="
+        )
 
     await engine.dispose()
 
