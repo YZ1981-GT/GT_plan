@@ -155,6 +155,20 @@
           {{ formatAdjustmentType(row.adjustment_type) }}
         </el-tag>
       </template>
+      <template #col-main_account="{ row }">
+        <div v-if="row.line_items?.length" class="gt-adj-main-account">
+          <span class="gt-adj-main-account-code">{{ row.line_items[0].standard_account_code }}</span>
+          <span class="gt-adj-main-account-name">{{ row.line_items[0].account_name || '—' }}</span>
+          <el-tag
+            v-if="row.line_items.length > 1"
+            size="small"
+            type="info"
+            effect="plain"
+            class="gt-adj-main-account-more"
+          >+{{ row.line_items.length - 1 }}</el-tag>
+        </div>
+        <span v-else class="gt-adj-col-placeholder">—</span>
+      </template>
       <template #col-total_debit="{ row }">
         <GtAmountCell :value="row.total_debit" :clickable="true" @click="penetrate.toLedger(row.line_items?.[0]?.standard_account_code || '')" />
       </template>
@@ -446,7 +460,8 @@ const { isEditing: isPageEditing, isDirty, enterEdit, exitEdit, markDirty, clear
 const adjColumns: GtColumn[] = [
   { prop: 'adjustment_no', label: '编号', width: 120 },
   { prop: 'adjustment_type', label: '类型', width: 70 },
-  { prop: 'description', label: '摘要', minWidth: 200 },
+  { prop: 'description', label: '摘要', minWidth: 180 },
+  { prop: 'main_account', label: '主要科目', minWidth: 200 },
   { prop: 'total_debit', label: '借方合计', width: 130, align: 'right' },
   { prop: 'total_credit', label: '贷方合计', width: 130, align: 'right' },
   { prop: 'created_at', label: '日期', width: 110 },
@@ -1129,6 +1144,30 @@ watch(
 
 .gt-adj-col-placeholder {
   color: var(--gt-color-text-tertiary, #909399);
+}
+
+/* 主要科目列 */
+.gt-adj-main-account {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.gt-adj-main-account-code {
+  font-family: var(--gt-font-family-mono, monospace);
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
+}
+.gt-adj-main-account-name {
+  color: var(--gt-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gt-adj-main-account-more {
+  flex-shrink: 0;
 }
 
 /* 展开行明细 */
