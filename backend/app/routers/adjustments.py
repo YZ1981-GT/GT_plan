@@ -902,11 +902,11 @@ async def export_adjustment_template(
         ws.column_dimensions["J"].width = 14   # 贷方
         ws.freeze_panes = "A2"
 
-        # ─── 4 列联动公式 (第 7 行起,跳过 5 行示例 + 表头) ─────
+        # ─── 4 列联动公式 (第 2 行起,覆盖示例行 + 全部数据行) ─────
         # 项目科目库 sheet 7 列: A=二级编码 / B=二级名称 / C=一级编码 / D=一级名称 / E=报表项目 / F=余额 / G=调整
         if sub_accounts:
             n = len(sub_accounts)
-            for ri in range(7, 201):
+            for ri in range(2, 201):
                 # D 列: 用 E 名称反查 二级编码 (项目科目库 A 列)
                 d_cell = ws.cell(row=ri, column=4,
                     value=f'=IFERROR(INDEX(项目科目库!$A$2:$A${n + 1},MATCH(E{ri},项目科目库!$B$2:$B${n + 1},0)),"")',
@@ -926,9 +926,6 @@ async def export_adjustment_template(
                 for c in (d_cell, f_cell, g_cell, h_cell):
                     c.border = thin_border
                     c.fill = formula_fill
-                    # 公式列填浅黄底色 + 斜体提示,但**不开 sheet 保护**:
-                    # 用户可手动覆盖输入(场景=没有 Excel 公式的轻量编辑器/复制粘贴会丢公式),
-                    # 导入端 _resolve_code 三级容错(一级码/二级码/二级名称)兜底匹配。
 
     # ─── Sheet 4: 项目科目库 (7 列: A 二级编码/B 二级名称/C 一级编码/D 一级名称/E 报表项目/F 当前余额/G 已有调整) ───
     ws_lib = wb.create_sheet("项目科目库")

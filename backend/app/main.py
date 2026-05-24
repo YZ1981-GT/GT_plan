@@ -167,7 +167,7 @@ def _start_workers(stop_event):
         audit_log_writer_worker, budget_alert_worker, dataset_purge_worker,
         staged_orphan_cleaner, export_cleanup_worker,
     )
-    return [
+    tasks = [
         asyncio.create_task(sla_worker.run(stop_event)),
         asyncio.create_task(import_recover_worker.run(stop_event)),
         asyncio.create_task(outbox_replay_worker.run(stop_event)),
@@ -177,6 +177,13 @@ def _start_workers(stop_event):
         asyncio.create_task(staged_orphan_cleaner.run(stop_event)),
         asyncio.create_task(export_cleanup_worker.run(stop_event)),
     ]
+    # 进程内 ImportJob runner 主循环：写 import_worker 心跳 + 拉 queued 任务
+    # 仅当 LEDGER_IMPORT_IN_PROCESS_RUNNER_ENABLED=True 启动（生产模式下应关闭，
+    # 改用 standalone `python -m app.workers.import_worker` 进程）
+    if settings.LEDGER_IMPORT_IN_PROCESS_RUNNER_ENABLED:
+        from app.services.import_job_runner import ImportJobRunner
+        tasks.append(asyncio.create_task(ImportJobRunner.run_forever(stop_event=stop_event)))
+    return tasks
 
 
 app = FastAPI(

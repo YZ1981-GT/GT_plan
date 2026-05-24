@@ -37,15 +37,27 @@
     </div>
 
     <!-- 主体：左 SVG / 右图例 -->
-    <div class="gt-wp-dg-body">
+    <Teleport to="body" :disabled="!isFullscreen">
+    <div class="gt-wp-dg-body" :class="{ 'is-fullscreen': isFullscreen }">
       <div class="gt-wp-dg-canvas">
+        <!-- 缩放/全屏控制栏 -->
+        <div class="gt-wp-dg-zoom-controls">
+          <el-button-group>
+            <el-button size="small" @click="zoomOut" :disabled="zoomLevel <= MIN_ZOOM">−</el-button>
+            <el-button size="small" @click="zoomReset">{{ Math.round(zoomLevel * 100) }}%</el-button>
+            <el-button size="small" @click="zoomIn" :disabled="zoomLevel >= MAX_ZOOM">+</el-button>
+          </el-button-group>
+          <el-button size="small" :type="isFullscreen ? 'primary' : ''" @click="toggleFullscreen">
+            {{ isFullscreen ? '退出全屏' : '⛶ 全屏' }}
+          </el-button>
+        </div>
         <div v-if="loading" class="gt-wp-dg-loading">加载依赖图...</div>
-        <svg
-          v-else
-          :viewBox="`0 0 ${SVG_SIZE} ${SVG_SIZE}`"
-          class="gt-wp-dg-svg"
-          @mouseleave="onSvgLeave"
-        >
+        <div v-else class="gt-wp-dg-svg-wrapper" :style="{ transform: `scale(${zoomLevel})` }" @wheel.prevent="onWheel">
+          <svg
+            :viewBox="`0 0 ${SVG_SIZE} ${SVG_SIZE}`"
+            class="gt-wp-dg-svg"
+            @mouseleave="onSvgLeave"
+          >
           <!-- 边：先画灰边，再画 hover 关联边覆盖 -->
           <g class="gt-wp-dg-edges">
             <line
@@ -119,6 +131,7 @@
             </g>
           </g>
         </svg>
+        </div>
 
         <!-- Tooltip -->
         <div
@@ -183,6 +196,7 @@
         </p>
       </div>
     </div>
+    </Teleport>
   </div>
 </template>
 
@@ -217,6 +231,30 @@ const emit = defineEmits<{
 const SVG_SIZE = 800
 const CENTER = SVG_SIZE / 2
 const RADIUS = 300
+
+// 全屏 + 缩放控制
+const isFullscreen = ref(false)
+const zoomLevel = ref(1)
+const MIN_ZOOM = 0.5
+const MAX_ZOOM = 3
+
+function toggleFullscreen() {
+  isFullscreen.value = !isFullscreen.value
+}
+function zoomIn() {
+  zoomLevel.value = Math.min(MAX_ZOOM, +(zoomLevel.value + 0.25).toFixed(2))
+}
+function zoomOut() {
+  zoomLevel.value = Math.max(MIN_ZOOM, +(zoomLevel.value - 0.25).toFixed(2))
+}
+function zoomReset() {
+  zoomLevel.value = 1
+}
+function onWheel(e: WheelEvent) {
+  const delta = e.deltaY > 0 ? -0.1 : 0.1
+  const next = +(zoomLevel.value + delta).toFixed(2)
+  zoomLevel.value = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next))
+}
 const LABEL_RADIUS = 350
 
 const loading = ref(true)
@@ -560,6 +598,14 @@ onMounted(() => {
   flex: 1;
   min-height: 0;
 }
+.gt-wp-dg-body.is-fullscreen {
+  position: fixed; inset: 0; z-index: 2000;
+  background: var(--gt-color-bg-white); padding: 16px;
+  gap: 16px; border-radius: 0;
+}
+.gt-wp-dg-body.is-fullscreen .gt-wp-dg-canvas {
+  border-radius: 8px;
+}
 
 .gt-wp-dg-canvas {
   flex: 1;
@@ -573,6 +619,22 @@ onMounted(() => {
   justify-content: center;
   overflow: hidden;
 }
+
+/* 缩放控制栏 */
+.gt-wp-dg-zoom-controls {
+  position: absolute; top: 10px; right: 10px; z-index: 10;
+  display: flex; gap: 8px; align-items: center;
+  background: rgba(255,255,255,0.9); padding: 4px 8px; border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* SVG 缩放包装 */
+.gt-wp-dg-svg-wrapper {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  transition: transform 0.15s ease; transform-origin: center center;
+  cursor: grab;
+}
+.gt-wp-dg-svg-wrapper:active { cursor: grabbing; }
 
 .gt-wp-dg-svg {
   max-width: 100%;

@@ -340,32 +340,39 @@ function onUnassignedClick(cycle: string) {
   display: flex;
   flex-direction: column;
   height: 100%;
-  gap: var(--gt-space-3);
+  gap: 12px;
 }
 
+/* 顶部工具栏 — KPI 卡片式 */
 .gt-wp-matrix-toolbar {
   background: var(--gt-color-bg-white);
-  border-radius: var(--gt-radius-md);
-  box-shadow: var(--gt-shadow-sm);
-  padding: var(--gt-space-3);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 14px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: var(--gt-space-3);
+  gap: 12px;
 }
 
 .gt-wp-matrix-stats {
   display: flex;
-  gap: var(--gt-space-4);
+  gap: 8px;
 }
 .gt-wp-matrix-stat-cell {
   text-align: center;
+  padding: 8px 16px;
+  background: var(--gt-color-bg, #fafafa);
+  border-radius: 8px;
+  border: 1px solid var(--gt-color-border-light, #f0f0f0);
+  min-width: 70px;
 }
 .gt-wp-matrix-stat-num {
-  font-size: var(--gt-font-size-xl);
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
   color: var(--gt-color-primary);
+  line-height: 1.2;
 }
 .gt-wp-matrix-stat-num.gt-success {
   color: var(--gt-color-success);
@@ -374,7 +381,7 @@ function onUnassignedClick(cycle: string) {
   color: var(--gt-color-coral);
 }
 .gt-wp-matrix-stat-label {
-  font-size: var(--gt-font-size-xs);
+  font-size: 11px;
   color: var(--gt-color-text-tertiary);
   margin-top: 2px;
 }
@@ -382,19 +389,20 @@ function onUnassignedClick(cycle: string) {
 .gt-wp-matrix-filters {
   display: flex;
   align-items: center;
-  gap: var(--gt-space-2);
+  gap: 8px;
 }
 .gt-wp-matrix-filter-label {
-  font-size: var(--gt-font-size-xs);
+  font-size: 12px;
   color: var(--gt-color-text-tertiary);
 }
 
+/* 矩阵表格区 */
 .gt-wp-matrix-table-wrap {
   flex: 1;
   background: var(--gt-color-bg-white);
-  border-radius: var(--gt-radius-md);
-  box-shadow: var(--gt-shadow-sm);
-  padding: var(--gt-space-3);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -412,10 +420,10 @@ function onUnassignedClick(cycle: string) {
 .gt-wp-matrix-member-name {
   font-weight: 600;
   color: var(--gt-color-text-primary);
-  font-size: var(--gt-font-size-sm);
+  font-size: 13px;
 }
 .gt-wp-matrix-member-role {
-  font-size: var(--gt-font-size-xs);
+  font-size: 11px;
   color: var(--gt-color-text-tertiary);
 }
 
@@ -423,43 +431,47 @@ function onUnassignedClick(cycle: string) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
+  gap: 2px;
 }
 .gt-wp-matrix-col-cycle {
   font-weight: 700;
   color: var(--gt-color-primary);
-  font-size: var(--gt-font-size-md);
+  font-size: 14px;
 }
 .gt-wp-matrix-col-name {
-  font-size: var(--gt-font-size-xs);
+  font-size: 11px;
   color: var(--gt-color-text-secondary);
 }
 .gt-wp-matrix-col-total {
-  font-size: var(--gt-font-size-xs);
+  font-size: 10px;
   color: var(--gt-color-text-tertiary);
 }
 
 .gt-wp-matrix-cell {
   cursor: pointer;
-  padding: var(--gt-space-2);
-  border-radius: var(--gt-radius-sm);
-  transition: background 0.15s;
-  min-height: 50px;
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.15s;
+  min-height: 56px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
+  background: var(--gt-color-bg, #fafafa);
+  border: 1px solid transparent;
 }
 .gt-wp-matrix-cell:hover {
-  background: var(--gt-color-primary-bg);
+  background: var(--gt-color-primary-bg, #f8f5ff);
+  border-color: var(--gt-color-primary);
 }
 .gt-wp-matrix-cell.is-unassigned-warning {
-  background: var(--gt-bg-warning, #fff8e6);
-  border: 1px dashed var(--gt-color-coral);
+  background: #fff8e1;
+  border: 1px dashed #ffb74d;
 }
 .gt-wp-matrix-cell.is-complete {
-  background: var(--gt-bg-success, #edf7ef);
+  background: #e8f5e9;
+  border-color: #a5d6a7;
 }
 
 .gt-wp-matrix-cell-num {
@@ -501,16 +513,20 @@ function onUnassignedClick(cycle: string) {
 }
 
 .gt-wp-matrix-unassigned {
-  margin-top: var(--gt-space-2);
-  padding: var(--gt-space-2);
-  background: var(--gt-bg-warning, #fff8e6);
-  border-radius: var(--gt-radius-sm);
-  font-size: var(--gt-font-size-sm);
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: #fff8e1;
+  border-radius: 8px;
+  border: 1px solid #ffe082;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .gt-wp-matrix-unassigned-label {
-  color: var(--gt-color-coral);
+  color: #e65100;
   font-weight: 600;
-  margin-right: 8px;
 }
 
 :deep(.gt-wp-matrix-table .el-table__body td) {

@@ -1,131 +1,92 @@
-﻿<template>
+<template>
   <div class="gt-wp-lifecycle">
-    <!-- 顶部 SVG 阶段流（6 圆 + 5 箭头） -->
-    <div class="gt-wp-lc-flow">
-      <svg :viewBox="`0 0 ${flowWidth} 90`" class="gt-wp-lc-svg" preserveAspectRatio="xMidYMid meet">
-        <!-- 连接线 -->
-        <g v-for="(s, i) in stages" :key="`line-${s.key}`">
-          <line
-            v-if="i < stages.length - 1"
-            :x1="circleX(i) + 24"
-            :y1="45"
-            :x2="circleX(i + 1) - 24"
-            :y2="45"
-            :stroke="i < currentIdx ? 'var(--gt-color-success)' : 'var(--gt-color-border)'"
-            stroke-width="2"
-          />
-          <polygon
-            v-if="i < stages.length - 1"
-            :points="`${circleX(i + 1) - 24},45 ${circleX(i + 1) - 30},41 ${circleX(i + 1) - 30},49`"
-            :fill="i < currentIdx ? 'var(--gt-color-success)' : 'var(--gt-color-border)'"
-          />
-        </g>
-        <!-- 阶段圆 -->
-        <g
-          v-for="(s, i) in stages"
-          :key="s.key"
-          class="gt-wp-lc-stage-circle"
-          :class="{
-            'gt-lc-current': i === currentIdx,
-            'gt-lc-done': i < currentIdx || s.status === 'completed',
-            'gt-lc-blocked': s.status === 'blocked',
-          }"
-          @click="onStageClick(i)"
-        >
-          <circle
-            :cx="circleX(i)"
-            :cy="45"
-            :r="22"
-            :fill="circleFill(i, s)"
-            :stroke="circleStroke(i, s)"
-            :stroke-width="i === currentIdx ? 3 : 2"
-          />
-          <text
-            :x="circleX(i)"
-            :y="51"
-            text-anchor="middle"
-            :fill="i === currentIdx ? 'var(--gt-color-text-inverse)' : (i < currentIdx || s.status === 'completed' ? 'var(--gt-color-text-inverse)' : 'var(--gt-color-text-secondary)')"
-            font-size="14"
-            font-weight="700"
-          >
-            <template v-if="i < currentIdx || s.status === 'completed'">✓</template>
-            <template v-else>{{ i + 1 }}</template>
-          </text>
-          <text
-            :x="circleX(i)"
-            :y="82"
-            text-anchor="middle"
-            :fill="i === currentIdx ? 'var(--gt-color-primary)' : 'var(--gt-color-text-secondary)'"
-            font-size="12"
-            :font-weight="i === currentIdx ? 700 : 400"
-          >
-            {{ s.shortLabel }}
-          </text>
-        </g>
-      </svg>
-    </div>
-
-    <!-- 三栏布局：左阶段列表 / 中阶段内容 / 右任务面板 -->
+    <!-- 两栏布局：左步骤导航 / 右内容区 -->
     <div class="gt-wp-lc-body">
-      <!-- 左：阶段列表 -->
-      <div class="gt-wp-lc-stage-list">
+      <!-- 左：步骤导航（紧凑） -->
+      <div class="gt-wp-lc-stage-nav">
+        <div class="gt-wp-lc-nav-title">审计生命周期</div>
         <div
           v-for="(s, i) in stages"
           :key="s.key"
-          class="gt-wp-lc-stage-item"
-          :class="{ 'is-current': i === currentIdx }"
+          class="gt-wp-lc-nav-item"
+          :class="{
+            'is-current': i === currentIdx,
+            'is-done': i < currentIdx || s.status === 'completed',
+          }"
           @click="onStageClick(i)"
         >
-          <span class="gt-wp-lc-stage-no">{{ i + 1 }}</span>
-          <div class="gt-wp-lc-stage-info">
-            <div class="gt-wp-lc-stage-name">{{ s.label }}</div>
-            <div class="gt-wp-lc-stage-meta">
-              <el-tag
-                size="small"
-                :type="statusTagType(s.status)"
-              >
-                {{ statusLabel(s.status) }}
-              </el-tag>
-              <span class="gt-wp-lc-stage-pct">{{ s.progress }}%</span>
+          <span class="gt-wp-lc-nav-icon">
+            <template v-if="i < currentIdx || s.status === 'completed'">✓</template>
+            <template v-else>{{ i + 1 }}</template>
+          </span>
+          <div class="gt-wp-lc-nav-info">
+            <div class="gt-wp-lc-nav-name">{{ s.label }}</div>
+            <div class="gt-wp-lc-nav-progress">
+              <el-progress
+                :percentage="s.progress"
+                :stroke-width="3"
+                :show-text="false"
+                :color="s.status === 'completed' ? '#67c23a' : '#6750A4'"
+              />
+              <span class="gt-wp-lc-nav-pct">{{ s.progress }}%</span>
             </div>
-            <el-progress
-              :percentage="s.progress"
-              :stroke-width="4"
-              :show-text="false"
-              :color="s.status === 'completed' ? 'var(--gt-color-success)' : 'var(--gt-color-primary)'"
-            />
+          </div>
+        </div>
+        <!-- 底部任务摘要 -->
+        <div class="gt-wp-lc-nav-summary">
+          <div class="gt-wp-lc-nav-summary__item" v-if="myTodos.length">
+            <span class="gt-wp-lc-nav-summary__num">{{ myTodos.length }}</span>
+            <span class="gt-wp-lc-nav-summary__label">待办任务</span>
+          </div>
+          <div class="gt-wp-lc-nav-summary__item gt-wp-lc-nav-summary__item--warn" v-if="overdueItems.length">
+            <span class="gt-wp-lc-nav-summary__num">{{ overdueItems.length }}</span>
+            <span class="gt-wp-lc-nav-summary__label">逾期项</span>
           </div>
         </div>
       </div>
 
-      <!-- 中：阶段内容 -->
+      <!-- 右：阶段内容（宽） -->
       <div class="gt-wp-lc-content">
         <!-- 程序裁剪 -->
         <div v-if="currentKey === 'tailor'" class="gt-wp-lc-stage-content">
-          <h3 class="gt-wp-lc-h3">1. 程序裁剪</h3>
-          <div class="gt-wp-lc-card">
-            <div class="gt-wp-lc-card-stat">
-              <span class="gt-wp-lc-stat-num">{{ tailorStats.tailored }}</span>
-              <span class="gt-wp-lc-stat-divider">/</span>
-              <span class="gt-wp-lc-stat-total">{{ tailorStats.total }}</span>
-              <span class="gt-wp-lc-stat-label">程序已裁剪</span>
+          <div class="gt-wp-lc-content-header">
+            <h3 class="gt-wp-lc-h3">程序裁剪</h3>
+            <el-tag size="small" :type="tailorStats.tailored > 0 ? 'success' : 'info'">
+              {{ tailorStats.tailored }}/{{ tailorStats.total }} 已裁剪
+            </el-tag>
+            <el-button type="primary" size="small" @click="goToTailor" style="margin-left: auto">
+              <el-icon style="margin-right: 4px"><Setting /></el-icon>配置裁剪
+            </el-button>
+          </div>
+          <p class="gt-wp-lc-desc">合伙人/项目经理根据风险评估裁剪不适用的审计程序。未裁剪的循环底稿无法启动后续步骤。</p>
+
+          <!-- 裁剪统计卡片（支持点击跳转） -->
+          <div class="gt-wp-lc-tailor-grid">
+            <div class="gt-wp-lc-tailor-stat gt-wp-lc-tailor-stat--clickable" @click="goToTailor">
+              <div class="gt-wp-lc-tailor-stat__num">{{ tailorStats.total }}</div>
+              <div class="gt-wp-lc-tailor-stat__label">总程序数</div>
             </div>
-            <p class="gt-wp-lc-desc">合伙人/项目经理根据风险评估裁剪审计程序，未裁剪的循环底稿无法启动后续步骤。</p>
-            <el-button type="primary" @click="goToTailor">前往裁剪页</el-button>
+            <div class="gt-wp-lc-tailor-stat gt-wp-lc-tailor-stat--clickable" @click="goToTailor">
+              <div class="gt-wp-lc-tailor-stat__num" style="color: var(--gt-color-success)">{{ tailorStats.tailored }}</div>
+              <div class="gt-wp-lc-tailor-stat__label">已裁剪</div>
+            </div>
+            <div class="gt-wp-lc-tailor-stat gt-wp-lc-tailor-stat--clickable" @click="goToTailor">
+              <div class="gt-wp-lc-tailor-stat__num" style="color: var(--gt-color-warning)">{{ tailorStats.total - tailorStats.tailored }}</div>
+              <div class="gt-wp-lc-tailor-stat__label">保留执行</div>
+            </div>
           </div>
         </div>
 
         <!-- 底稿生成 -->
         <div v-else-if="currentKey === 'generate'" class="gt-wp-lc-stage-content">
-          <h3 class="gt-wp-lc-h3">2. 底稿生成</h3>
-          <div class="gt-wp-lc-card">
-            <div class="gt-wp-lc-card-stat">
-              <span class="gt-wp-lc-stat-num">{{ generateStats.generated }}</span>
-              <span class="gt-wp-lc-stat-divider">/</span>
-              <span class="gt-wp-lc-stat-total">{{ generateStats.expected }}</span>
-              <span class="gt-wp-lc-stat-label">底稿已生成</span>
-            </div>
-            <p class="gt-wp-lc-desc">基于裁剪结果一键生成底稿、附注、报表，触发跨模块联动公式。</p>
+          <div class="gt-wp-lc-content-header">
+            <h3 class="gt-wp-lc-h3">底稿生成</h3>
+            <el-tag size="small" :type="generateStats.generated >= generateStats.expected ? 'success' : 'warning'">
+              {{ generateStats.generated }}/{{ generateStats.expected }}
+            </el-tag>
+          </div>
+          <p class="gt-wp-lc-desc">基于裁剪结果一键生成底稿、附注、报表，触发跨模块联动公式。</p>
+          <div class="gt-wp-lc-action-row">
             <el-button
               type="primary"
               :loading="chainLoading"
@@ -136,7 +97,7 @@
             </el-button>
             <el-button @click="emit('refresh')">刷新</el-button>
           </div>
-          <div v-if="recommendations.length" class="gt-wp-lc-card">
+          <div v-if="recommendations.length" class="gt-wp-lc-card" style="margin-top: 12px">
             <h4 class="gt-wp-lc-h4">智能推荐</h4>
             <ul class="gt-wp-lc-rec-list">
               <li v-for="r in recommendations" :key="r.code">
@@ -149,135 +110,129 @@
 
         <!-- 委派执行 -->
         <div v-else-if="currentKey === 'assign'" class="gt-wp-lc-stage-content">
-          <h3 class="gt-wp-lc-h3">3. 委派执行</h3>
-          <div class="gt-wp-lc-card">
-            <div class="gt-wp-lc-stat-row">
-              <div class="gt-wp-lc-stat-cell">
-                <div class="gt-wp-lc-stat-cell-num">{{ assignStats.total }}</div>
-                <div class="gt-wp-lc-stat-cell-label">总数</div>
-              </div>
-              <div class="gt-wp-lc-stat-cell">
-                <div class="gt-wp-lc-stat-cell-num gt-success">{{ assignStats.assigned }}</div>
-                <div class="gt-wp-lc-stat-cell-label">已委派</div>
-              </div>
-              <div class="gt-wp-lc-stat-cell">
-                <div class="gt-wp-lc-stat-cell-num gt-warning">{{ assignStats.unassigned }}</div>
-                <div class="gt-wp-lc-stat-cell-label">待委派</div>
-              </div>
-            </div>
-            <p class="gt-wp-lc-desc">将底稿委派给具体审计员，未委派底稿不计入工作量分配。</p>
-            <el-button type="primary" @click="emit('switch-view', 'matrix')">前往委派矩阵</el-button>
+          <div class="gt-wp-lc-content-header">
+            <h3 class="gt-wp-lc-h3">委派执行</h3>
+            <el-tag size="small" :type="assignStats.unassigned === 0 ? 'success' : 'warning'">
+              {{ assignStats.assigned }}/{{ assignStats.total }} 已委派
+            </el-tag>
           </div>
+          <div class="gt-wp-lc-tailor-grid">
+            <div class="gt-wp-lc-tailor-stat">
+              <div class="gt-wp-lc-tailor-stat__num">{{ assignStats.total }}</div>
+              <div class="gt-wp-lc-tailor-stat__label">总数</div>
+            </div>
+            <div class="gt-wp-lc-tailor-stat">
+              <div class="gt-wp-lc-tailor-stat__num" style="color: var(--gt-color-success)">{{ assignStats.assigned }}</div>
+              <div class="gt-wp-lc-tailor-stat__label">已委派</div>
+            </div>
+            <div class="gt-wp-lc-tailor-stat">
+              <div class="gt-wp-lc-tailor-stat__num" style="color: var(--gt-color-warning)">{{ assignStats.unassigned }}</div>
+              <div class="gt-wp-lc-tailor-stat__label">待委派</div>
+            </div>
+          </div>
+          <p class="gt-wp-lc-desc">将底稿委派给具体审计员，未委派底稿不计入工作量分配。</p>
+          <el-button type="primary" @click="emit('switch-view', 'matrix')">前往委派矩阵</el-button>
         </div>
 
         <!-- 编制 -->
         <div v-else-if="currentKey === 'compose'" class="gt-wp-lc-stage-content">
-          <h3 class="gt-wp-lc-h3">4. 编制</h3>
-          <div class="gt-wp-lc-card">
-            <div class="gt-wp-lc-card-stat">
-              <span class="gt-wp-lc-stat-num">{{ composeStats.completed }}</span>
-              <span class="gt-wp-lc-stat-divider">/</span>
-              <span class="gt-wp-lc-stat-total">{{ composeStats.total }}</span>
-              <span class="gt-wp-lc-stat-label">底稿已完成编制</span>
+          <div class="gt-wp-lc-content-header">
+            <h3 class="gt-wp-lc-h3">编制</h3>
+            <el-tag size="small" :type="composeStats.percent === 100 ? 'success' : 'warning'">
+              {{ composeStats.completed }}/{{ composeStats.total }}
+            </el-tag>
+          </div>
+          <el-progress :percentage="composeStats.percent" :stroke-width="8" style="margin-bottom: 12px" />
+          <div class="gt-wp-lc-filter-row">
+            <el-radio-group v-model="composeFilter" size="small">
+              <el-radio-button value="all">全部 ({{ composeStats.total }})</el-radio-button>
+              <el-radio-button value="mine">我的 ({{ composeStats.mine }})</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div class="gt-wp-lc-list">
+            <div
+              v-for="w in filteredComposeList"
+              :key="w.id"
+              class="gt-wp-lc-list-item"
+              @click="emit('open-workpaper', w.id)"
+            >
+              <span class="gt-wp-lc-li-code">{{ w.wp_code }}</span>
+              <span class="gt-wp-lc-li-name">{{ w.wp_name }}</span>
+              <el-tag size="small" :type="composeStatusType(w.status)">{{ composeStatusLabel(w.status) }}</el-tag>
             </div>
-            <el-progress :percentage="composeStats.percent" :stroke-width="8" />
-            <div class="gt-wp-lc-filter-row">
-              <el-radio-group v-model="composeFilter" size="small">
-                <el-radio-button value="all">全部 ({{ composeStats.total }})</el-radio-button>
-                <el-radio-button value="mine">我的 ({{ composeStats.mine }})</el-radio-button>
-              </el-radio-group>
-            </div>
-            <div class="gt-wp-lc-list">
-              <div
-                v-for="w in filteredComposeList"
-                :key="w.id"
-                class="gt-wp-lc-list-item"
-                @click="emit('open-workpaper', w.id)"
-              >
-                <span class="gt-wp-lc-li-code">{{ w.wp_code }}</span>
-                <span class="gt-wp-lc-li-name">{{ w.wp_name }}</span>
-                <el-tag size="small" :type="composeStatusType(w.status)">{{ composeStatusLabel(w.status) }}</el-tag>
-              </div>
-              <div v-if="filteredComposeList.length === 0" class="gt-wp-lc-empty">
-                暂无编制中底稿
-              </div>
-            </div>
+            <div v-if="filteredComposeList.length === 0" class="gt-wp-lc-empty">暂无编制中底稿</div>
           </div>
         </div>
 
         <!-- 复核 -->
         <div v-else-if="currentKey === 'review'" class="gt-wp-lc-stage-content">
-          <h3 class="gt-wp-lc-h3">5. 复核</h3>
-          <div class="gt-wp-lc-card">
-            <div class="gt-wp-lc-card-stat">
-              <span class="gt-wp-lc-stat-num gt-warning">{{ reviewStats.pending }}</span>
-              <span class="gt-wp-lc-stat-label">底稿待复核</span>
-            </div>
-            <p class="gt-wp-lc-desc">一级/二级复核流程，含批注、退回修改、强制通过等操作。</p>
-            <el-button type="primary" @click="goToReviewWorkbench">前往复核工作台</el-button>
+          <div class="gt-wp-lc-content-header">
+            <h3 class="gt-wp-lc-h3">复核</h3>
+            <el-tag size="small" :type="reviewStats.pending > 0 ? 'warning' : 'success'">
+              {{ reviewStats.pending }} 待复核
+            </el-tag>
           </div>
+          <p class="gt-wp-lc-desc">一级/二级复核流程，含批注、退回修改、强制通过等操作。</p>
+          <el-button type="primary" @click="goToReviewWorkbench">前往复核工作台</el-button>
         </div>
 
         <!-- 归档 -->
         <div v-else-if="currentKey === 'archive'" class="gt-wp-lc-stage-content">
-          <h3 class="gt-wp-lc-h3">6. 归档</h3>
-          <div class="gt-wp-lc-card">
-            <h4 class="gt-wp-lc-h4">归档前置条件</h4>
-            <ul class="gt-wp-lc-gate-list">
-              <li v-for="g in archiveGates" :key="g.key" class="gt-wp-lc-gate-item">
-                <span class="gt-wp-lc-gate-icon" :class="g.passed ? 'gt-success' : 'gt-warning'">
-                  {{ g.passed ? '✓' : '✗' }}
-                </span>
-                <span class="gt-wp-lc-gate-text">{{ g.label }}</span>
-              </li>
-            </ul>
-            <el-button
-              type="primary"
-              :disabled="!allGatesPassed"
-              @click="goToArchive"
-            >
-              {{ allGatesPassed ? '执行归档' : '前置条件未满足' }}
-            </el-button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 右：任务面板 -->
-      <div class="gt-wp-lc-right-panel">
-        <h4 class="gt-wp-lc-h4">我的任务</h4>
-        <div v-if="myTodos.length === 0" class="gt-wp-lc-empty">
-          暂无待办任务
-        </div>
-        <div
-          v-for="todo in myTodos"
-          :key="todo.id"
-          class="gt-wp-lc-todo-item"
-          @click="emit('open-workpaper', todo.id)"
-        >
-          <div class="gt-wp-lc-todo-line">
-            <span class="gt-wp-lc-todo-code">{{ todo.wp_code }}</span>
-            <el-tag size="small" type="warning">
-              {{ statusLabelShort(todo.status) }}
+          <div class="gt-wp-lc-content-header">
+            <h3 class="gt-wp-lc-h3">归档</h3>
+            <el-tag size="small" :type="allGatesPassed ? 'success' : 'danger'">
+              {{ allGatesPassed ? '条件满足' : '条件未满足' }}
             </el-tag>
           </div>
-          <div class="gt-wp-lc-todo-name">{{ todo.wp_name }}</div>
+          <div class="gt-wp-lc-gate-list-wrap">
+            <div v-for="g in archiveGates" :key="g.key" class="gt-wp-lc-gate-item">
+              <span class="gt-wp-lc-gate-icon" :class="g.passed ? 'gt-success' : 'gt-warning'">
+                {{ g.passed ? '✓' : '✗' }}
+              </span>
+              <span class="gt-wp-lc-gate-text">{{ g.label }}</span>
+            </div>
+          </div>
+          <el-button
+            type="primary"
+            :disabled="!allGatesPassed"
+            @click="goToArchive"
+          >
+            {{ allGatesPassed ? '执行归档' : '前置条件未满足' }}
+          </el-button>
         </div>
 
-        <h4 class="gt-wp-lc-h4" style="margin-top: 16px">逾期提醒</h4>
-        <div v-if="overdueItems.length === 0" class="gt-wp-lc-empty">
-          无逾期项
-        </div>
-        <div
-          v-for="item in overdueItems"
-          :key="`ov-${item.id}`"
-          class="gt-wp-lc-todo-item gt-wp-lc-overdue"
-          @click="emit('open-workpaper', item.id)"
-        >
-          <div class="gt-wp-lc-todo-line">
-            <span class="gt-wp-lc-todo-code">{{ item.wp_code }}</span>
-            <el-tag size="small" type="danger">{{ item.days }}天</el-tag>
+        <!-- 我的待办任务（有待办时才显示面板） -->
+        <div v-if="myTodos.length" class="gt-wp-lc-todo-panel">
+          <div class="gt-wp-lc-todo-panel__header">
+            <span class="gt-wp-lc-todo-panel__title">📋 我的待办</span>
+            <el-tag size="small">{{ myTodos.length }}</el-tag>
           </div>
-          <div class="gt-wp-lc-todo-name">{{ item.wp_name }}</div>
+          <div class="gt-wp-lc-todo-panel__list">
+            <div v-for="todo in myTodos.slice(0, 8)" :key="todo.id" class="gt-wp-lc-todo-panel__item"
+              @click="emit('open-workpaper', todo.id)">
+              <span class="gt-wp-lc-todo-panel__code">{{ todo.wp_code }}</span>
+              <span class="gt-wp-lc-todo-panel__name">{{ todo.wp_name }}</span>
+              <el-tag size="small" type="warning">{{ statusLabelShort(todo.status) }}</el-tag>
+            </div>
+          </div>
+        </div>
+        <!-- 无待办时的占位区（填充空白） -->
+        <div v-else class="gt-wp-lc-todo-empty-placeholder">
+          <div class="gt-wp-lc-todo-empty-placeholder__icon">✅</div>
+          <div class="gt-wp-lc-todo-empty-placeholder__title">暂无待办任务</div>
+          <div class="gt-wp-lc-todo-empty-placeholder__desc">当前阶段没有分配给您的底稿任务，可以查看其他阶段或协助团队成员</div>
+        </div>
+
+        <!-- 底部：逾期提醒（和当前步骤相关） -->
+        <div v-if="overdueItems.length" class="gt-wp-lc-overdue-bar">
+          <span class="gt-wp-lc-overdue-bar__icon">⚠️</span>
+          <span class="gt-wp-lc-overdue-bar__text">{{ overdueItems.length }} 个底稿逾期</span>
+          <div class="gt-wp-lc-overdue-bar__items">
+            <span v-for="item in overdueItems.slice(0, 5)" :key="item.id" class="gt-wp-lc-overdue-bar__tag"
+              @click="emit('open-workpaper', item.id)">
+              {{ item.wp_code }} ({{ item.days }}天)
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -288,6 +243,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Setting } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
 import { useAuthStore } from '@/stores/auth'
@@ -684,323 +640,159 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.gt-wp-lifecycle {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  gap: var(--gt-space-3);
-}
+.gt-wp-lifecycle { display: flex; flex-direction: column; height: 100%; }
 
-.gt-wp-lc-flow {
-  background: var(--gt-color-bg-white);
-  border-radius: var(--gt-radius-md);
-  box-shadow: var(--gt-shadow-sm);
-  padding: var(--gt-space-3) var(--gt-space-4);
-}
+.gt-wp-lc-body { display: flex; gap: 16px; flex: 1; min-height: 0; }
 
-.gt-wp-lc-svg {
-  width: 100%;
-  height: 90px;
-  overflow: visible;
+/* 左侧步骤导航 */
+.gt-wp-lc-stage-nav {
+  width: 220px; min-width: 220px; background: var(--gt-color-bg-white);
+  border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto;
 }
-
-.gt-wp-lc-stage-circle {
-  cursor: pointer;
-  transition: transform 0.15s;
+.gt-wp-lc-nav-title {
+  font-size: 14px; font-weight: 700; color: var(--gt-color-text-primary);
+  padding: 0 8px 12px; border-bottom: 1px solid var(--gt-color-border-light, #f0f0f0);
+  margin-bottom: 8px;
 }
-.gt-wp-lc-stage-circle:hover {
-  transform: scale(1.05);
-  transform-origin: center;
-}
-
-.gt-wp-lc-body {
-  display: flex;
-  gap: var(--gt-space-3);
-  flex: 1;
-  min-height: 0;
-}
-
-.gt-wp-lc-stage-list {
-  width: 200px;
-  min-width: 200px;
-  background: var(--gt-color-bg-white);
-  border-radius: var(--gt-radius-md);
-  box-shadow: var(--gt-shadow-sm);
-  padding: var(--gt-space-3);
-  overflow-y: auto;
-}
-
-.gt-wp-lc-stage-item {
-  display: flex;
-  gap: var(--gt-space-2);
-  padding: var(--gt-space-2);
-  border-radius: var(--gt-radius-sm);
-  cursor: pointer;
-  margin-bottom: var(--gt-space-2);
-  transition: background 0.15s;
+.gt-wp-lc-nav-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 8px;
+  border-radius: 8px; cursor: pointer; transition: all 0.15s;
   border-left: 3px solid transparent;
 }
-.gt-wp-lc-stage-item:hover {
-  background: var(--gt-color-primary-bg);
+.gt-wp-lc-nav-item:hover { background: var(--gt-color-bg, #fafafa); }
+.gt-wp-lc-nav-item.is-current {
+  background: var(--gt-color-primary-bg, #f0ebff); border-left-color: var(--gt-color-primary);
 }
-.gt-wp-lc-stage-item.is-current {
-  background: var(--gt-color-primary-bg);
-  border-left-color: var(--gt-color-primary);
+.gt-wp-lc-nav-item.is-done .gt-wp-lc-nav-icon { background: var(--gt-color-success); }
+.gt-wp-lc-nav-icon {
+  width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--gt-color-primary); color: #fff; font-size: 12px; font-weight: 700; flex-shrink: 0;
 }
+.gt-wp-lc-nav-info { flex: 1; min-width: 0; }
+.gt-wp-lc-nav-name { font-size: 13px; font-weight: 600; color: var(--gt-color-text-primary); margin-bottom: 4px; }
+.gt-wp-lc-nav-progress { display: flex; align-items: center; gap: 8px; }
+.gt-wp-lc-nav-pct { font-size: 11px; color: var(--gt-color-text-tertiary); white-space: nowrap; }
 
-.gt-wp-lc-stage-no {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 12px;
-  background: var(--gt-color-primary);
-  color: var(--gt-color-text-inverse);
-  font-size: var(--gt-font-size-xs);
-  font-weight: 700;
-  flex-shrink: 0;
+/* 底部任务摘要 */
+.gt-wp-lc-nav-summary {
+  margin-top: auto; padding-top: 12px; border-top: 1px solid var(--gt-color-border-light, #f0f0f0);
+  display: flex; gap: 12px; justify-content: center;
 }
+.gt-wp-lc-nav-summary__item { text-align: center; }
+.gt-wp-lc-nav-summary__num { display: block; font-size: 18px; font-weight: 700; color: var(--gt-color-primary); }
+.gt-wp-lc-nav-summary__label { font-size: 11px; color: var(--gt-color-text-tertiary); }
+.gt-wp-lc-nav-summary__item--warn .gt-wp-lc-nav-summary__num { color: var(--gt-color-coral); }
 
-.gt-wp-lc-stage-info {
-  flex: 1;
-  min-width: 0;
-}
-.gt-wp-lc-stage-name {
-  font-size: var(--gt-font-size-sm);
-  font-weight: 600;
-  color: var(--gt-color-text-primary);
-  margin-bottom: 4px;
-}
-.gt-wp-lc-stage-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--gt-font-size-xs);
-  margin-bottom: 4px;
-}
-.gt-wp-lc-stage-pct {
-  color: var(--gt-color-text-tertiary);
-}
-
+/* 右侧内容区 */
 .gt-wp-lc-content {
-  flex: 1;
-  background: var(--gt-color-bg-white);
-  border-radius: var(--gt-radius-md);
-  box-shadow: var(--gt-shadow-sm);
-  padding: var(--gt-space-4);
-  overflow-y: auto;
+  flex: 1; background: var(--gt-color-bg-white); border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04); padding: 24px; overflow-y: auto;
+  display: flex; flex-direction: column;
 }
+.gt-wp-lc-stage-content { display: flex; flex-direction: column; gap: 16px; }
+.gt-wp-lc-content-header { display: flex; align-items: center; gap: 12px; }
+.gt-wp-lc-h3 { margin: 0; font-size: 18px; color: var(--gt-color-primary); font-weight: 700; }
+.gt-wp-lc-h4 { margin: 0 0 8px; font-size: 14px; color: var(--gt-color-text-primary); font-weight: 600; }
+.gt-wp-lc-desc { font-size: 13px; color: var(--gt-color-text-secondary); line-height: 1.6; margin: 0; }
+.gt-wp-lc-action-row { display: flex; gap: 8px; }
 
-.gt-wp-lc-stage-content {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gt-space-3);
+/* 裁剪/委派统计网格 */
+.gt-wp-lc-tailor-grid {
+  display: flex; gap: 16px; padding: 16px; background: var(--gt-color-bg, #fafafa);
+  border-radius: 10px; border: 1px solid var(--gt-color-border-light, #f0f0f0);
 }
+.gt-wp-lc-tailor-stat { flex: 1; text-align: center; }
+.gt-wp-lc-tailor-stat--clickable { cursor: pointer; border-radius: 8px; padding: 12px 8px; transition: all 0.15s; }
+.gt-wp-lc-tailor-stat--clickable:hover { background: rgba(103, 80, 164, 0.06); }
+.gt-wp-lc-tailor-stat--action { display: flex; align-items: center; justify-content: center; }
+.gt-wp-lc-tailor-stat__num { font-size: 28px; font-weight: 800; color: var(--gt-color-primary); line-height: 1.2; }
+.gt-wp-lc-tailor-stat__label { font-size: 12px; color: var(--gt-color-text-tertiary); margin-top: 4px; }
 
-.gt-wp-lc-h3 {
-  margin: 0;
-  font-size: var(--gt-font-size-lg);
-  color: var(--gt-color-primary);
-  font-weight: 700;
-}
-.gt-wp-lc-h4 {
-  margin: 0 0 var(--gt-space-2);
-  font-size: var(--gt-font-size-md);
-  color: var(--gt-color-text-primary);
-  font-weight: 600;
-}
-
+/* 卡片 */
 .gt-wp-lc-card {
-  background: var(--gt-color-bg);
-  border: 1px solid var(--gt-color-border-light);
-  border-radius: var(--gt-radius-sm);
-  padding: var(--gt-space-3);
+  background: var(--gt-color-bg, #fafafa); border: 1px solid var(--gt-color-border-light, #f0f0f0);
+  border-radius: 10px; padding: 16px;
 }
+.gt-wp-lc-rec-list { list-style: none; padding: 0; margin: 0; }
+.gt-wp-lc-rec-list li { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 13px; }
+.gt-wp-lc-rec-name { color: var(--gt-color-text-primary); }
+.gt-wp-lc-filter-row { margin-bottom: 12px; }
 
-.gt-wp-lc-card-stat {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-bottom: var(--gt-space-2);
-}
-.gt-wp-lc-stat-num {
-  font-size: var(--gt-font-size-3xl);
-  font-weight: 700;
-  color: var(--gt-color-primary);
-}
-.gt-wp-lc-stat-divider {
-  color: var(--gt-color-text-tertiary);
-}
-.gt-wp-lc-stat-total {
-  font-size: var(--gt-font-size-xl);
-  color: var(--gt-color-text-secondary);
-}
-.gt-wp-lc-stat-label {
-  margin-left: 8px;
-  font-size: var(--gt-font-size-sm);
-  color: var(--gt-color-text-secondary);
-}
-
-.gt-wp-lc-stat-row {
-  display: flex;
-  justify-content: space-around;
-  margin-bottom: var(--gt-space-3);
-}
-.gt-wp-lc-stat-cell {
-  text-align: center;
-}
-.gt-wp-lc-stat-cell-num {
-  font-size: var(--gt-font-size-2xl);
-  font-weight: 700;
-  color: var(--gt-color-primary);
-}
-.gt-wp-lc-stat-cell-num.gt-success {
-  color: var(--gt-color-success);
-}
-.gt-wp-lc-stat-cell-num.gt-warning {
-  color: var(--gt-color-wheat);
-}
-.gt-wp-lc-stat-cell-label {
-  font-size: var(--gt-font-size-xs);
-  color: var(--gt-color-text-tertiary);
-  margin-top: 4px;
-}
-
-.gt-wp-lc-desc {
-  font-size: var(--gt-font-size-sm);
-  color: var(--gt-color-text-secondary);
-  margin: var(--gt-space-2) 0;
-  line-height: 1.6;
-}
-
-.gt-wp-lc-rec-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.gt-wp-lc-rec-list li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 0;
-  font-size: var(--gt-font-size-sm);
-}
-.gt-wp-lc-rec-name {
-  color: var(--gt-color-text-primary);
-}
-
-.gt-wp-lc-filter-row {
-  margin: var(--gt-space-2) 0;
-}
-
-.gt-wp-lc-list {
-  max-height: 320px;
-  overflow-y: auto;
-}
+/* 底稿列表 */
+.gt-wp-lc-list { max-height: 360px; overflow-y: auto; }
 .gt-wp-lc-list-item {
-  display: flex;
-  align-items: center;
-  gap: var(--gt-space-2);
-  padding: var(--gt-space-2);
-  border-radius: var(--gt-radius-sm);
-  cursor: pointer;
-  border-bottom: 1px solid var(--gt-color-border-light);
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border-radius: 6px; cursor: pointer; border-bottom: 1px solid var(--gt-color-border-light, #f0f0f0);
   transition: background 0.15s;
 }
-.gt-wp-lc-list-item:hover {
-  background: var(--gt-color-primary-bg);
-}
-.gt-wp-lc-li-code {
-  font-weight: 600;
-  color: var(--gt-color-primary);
-  min-width: 50px;
-}
-.gt-wp-lc-li-name {
-  flex: 1;
-  color: var(--gt-color-text-primary);
-  font-size: var(--gt-font-size-sm);
-}
+.gt-wp-lc-list-item:hover { background: var(--gt-color-primary-bg, #f8f5ff); }
+.gt-wp-lc-li-code { font-weight: 600; color: var(--gt-color-primary); min-width: 50px; font-size: 13px; }
+.gt-wp-lc-li-name { flex: 1; color: var(--gt-color-text-primary); font-size: 13px; }
+.gt-wp-lc-empty { text-align: center; color: var(--gt-color-text-tertiary); font-size: 13px; padding: 24px; }
 
-.gt-wp-lc-empty {
-  text-align: center;
-  color: var(--gt-color-text-tertiary);
-  font-size: var(--gt-font-size-sm);
-  padding: var(--gt-space-4);
-}
-
-.gt-wp-lc-gate-list {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 var(--gt-space-3);
-}
+/* 归档门禁 */
+.gt-wp-lc-gate-list-wrap { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .gt-wp-lc-gate-item {
-  display: flex;
-  align-items: center;
-  gap: var(--gt-space-2);
-  padding: var(--gt-space-2);
-  border-bottom: 1px solid var(--gt-color-border-light);
-  font-size: var(--gt-font-size-sm);
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  border-radius: 6px; background: var(--gt-color-bg, #fafafa); font-size: 13px;
 }
 .gt-wp-lc-gate-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 11px;
-  font-weight: 700;
+  width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 12px;
 }
-.gt-wp-lc-gate-icon.gt-success {
-  background: var(--gt-color-success);
-  color: var(--gt-color-text-inverse);
-}
-.gt-wp-lc-gate-icon.gt-warning {
-  background: var(--gt-color-coral);
-  color: var(--gt-color-text-inverse);
-}
+.gt-wp-lc-gate-icon.gt-success { background: var(--gt-color-success); color: #fff; }
+.gt-wp-lc-gate-icon.gt-warning { background: var(--gt-color-coral); color: #fff; }
+.gt-wp-lc-gate-text { color: var(--gt-color-text-primary); }
 
-.gt-wp-lc-right-panel {
-  width: 240px;
-  min-width: 240px;
-  background: var(--gt-color-bg-white);
-  border-radius: var(--gt-radius-md);
-  box-shadow: var(--gt-shadow-sm);
-  padding: var(--gt-space-3);
-  overflow-y: auto;
+/* 我的待办面板 */
+.gt-wp-lc-todo-panel {
+  margin-top: 24px; padding: 16px 20px; background: linear-gradient(135deg, #f8f5ff 0%, #f0ebff 100%);
+  border-radius: 12px; border: 1px solid rgba(103, 80, 164, 0.12);
+  max-width: 600px; margin-left: auto; margin-right: auto;
 }
+.gt-wp-lc-todo-panel--empty {
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: var(--gt-color-bg, #fafafa); border-color: var(--gt-color-border-light, #f0f0f0);
+}
+.gt-wp-lc-todo-panel__empty-text { font-size: 13px; color: var(--gt-color-text-tertiary); }
+.gt-wp-lc-todo-panel__header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  padding-bottom: 10px; border-bottom: 1px solid rgba(103, 80, 164, 0.1);
+}
+.gt-wp-lc-todo-panel__title { font-size: 14px; font-weight: 600; color: var(--gt-color-primary); }
+.gt-wp-lc-todo-panel__list { display: flex; flex-direction: column; gap: 6px; }
+.gt-wp-lc-todo-panel__item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  border-radius: 8px; cursor: pointer; transition: all 0.15s;
+  background: rgba(255,255,255,0.7); border: 1px solid rgba(103, 80, 164, 0.08);
+}
+.gt-wp-lc-todo-panel__item:hover { background: #fff; border-color: var(--gt-color-primary); box-shadow: 0 2px 8px rgba(103, 80, 164, 0.1); }
+.gt-wp-lc-todo-panel__code { font-size: 12px; font-weight: 700; color: var(--gt-color-primary); min-width: 40px; }
+.gt-wp-lc-todo-panel__name { flex: 1; font-size: 13px; color: var(--gt-color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.gt-wp-lc-todo-item {
-  padding: var(--gt-space-2);
-  border-radius: var(--gt-radius-sm);
-  background: var(--gt-color-bg);
-  margin-bottom: var(--gt-space-2);
-  cursor: pointer;
-  border-left: 3px solid var(--gt-color-primary);
-  transition: background 0.15s;
+/* 无待办占位区 */
+.gt-wp-lc-todo-empty-placeholder {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  margin-top: 16px; padding: 60px; text-align: center;
+  background: var(--gt-color-bg, #fafafa); border-radius: 12px;
+  border: 1px dashed var(--gt-color-border-light, #e0e0e0);
 }
-.gt-wp-lc-todo-item:hover {
-  background: var(--gt-color-primary-bg);
+.gt-wp-lc-todo-empty-placeholder__icon { font-size: 32px; margin-bottom: 10px; opacity: 0.6; }
+.gt-wp-lc-todo-empty-placeholder__title { font-size: 14px; font-weight: 600; color: var(--gt-color-text-tertiary); margin-bottom: 4px; }
+.gt-wp-lc-todo-empty-placeholder__desc { font-size: 12px; color: var(--gt-color-text-placeholder); max-width:300px; line-height: 1.5; }
+
+/* 逾期提醒条 */
+.gt-wp-lc-overdue-bar {
+  margin-top: auto; padding: 12px 16px; background: #fff8e1; border-radius: 8px;
+  border: 1px solid #ffe082; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
-.gt-wp-lc-todo-item.gt-wp-lc-overdue {
-  border-left-color: var(--gt-color-coral);
+.gt-wp-lc-overdue-bar__icon { font-size: 16px; }
+.gt-wp-lc-overdue-bar__text { font-size: 13px; font-weight: 600; color: #e65100; }
+.gt-wp-lc-overdue-bar__items { display: flex; gap: 6px; flex-wrap: wrap; }
+.gt-wp-lc-overdue-bar__tag {
+  padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+  background: #fff3e0; color: #e65100; cursor: pointer;
 }
-.gt-wp-lc-todo-line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-.gt-wp-lc-todo-code {
-  font-weight: 600;
-  color: var(--gt-color-primary);
-  font-size: var(--gt-font-size-sm);
-}
-.gt-wp-lc-todo-name {
-  font-size: var(--gt-font-size-xs);
-  color: var(--gt-color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.gt-wp-lc-overdue-bar__tag:hover { background: #ffe0b2; }
 </style>

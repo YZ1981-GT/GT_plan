@@ -549,6 +549,53 @@ class ChainOrchestrator:
         if not matched_primary:
             return {"created": 0, "skipped_reason": "无匹配的底稿模板"}
 
+        # 5b. 尊重程序裁剪结果：从 ProcedureInstance 查询已裁剪的 wp_code，排除
+        from app.models.procedure_models import ProcedureInstance
+        try:
+            trimmed_q = await db.execute(
+                sa.select(ProcedureInstance.wp_code).where(
+                    ProcedureInstance.project_id == project_id,
+                    ProcedureInstance.is_deleted == sa.false(),
+                    ProcedureInstance.status.in_(["skip", "not_applicable"]),
+                    ProcedureInstance.wp_code.isnot(None),
+                )
+            )
+            trimmed_codes = {r[0] for r in trimmed_q.all() if r[0]}
+            if trimmed_codes:
+                # 从 matched_primary 中移除被裁剪的主编码
+                before_count = len(matched_primary)
+                matched_primary -= trimmed_codes
+                # 也移除主编码被裁剪的子表（如 D2 被裁剪则 D2-1/D2-2 也跳过）
+                trimmed_prefixes = {c + '-' for c in trimmed_codes}
+                matched_primary = {c for c in matched_primary if not any(c.startswith(p) for p in trimmed_prefixes)}
+                logger.info(
+                    "chain_orchestrator: 程序裁剪过滤 %d → %d（裁剪 %d 个 wp_code）",
+                    before_count, len(matched_primary), len(trimmed_codes),
+                )
+        except Exception as trim_err:
+            logger.warning("chain_orchestrator: 查询程序裁剪状态失败，跳过过滤: %s", trim_err)
+
+        if not matched_primary:
+            return {"created": 0, "skipped_reason": "所有匹配底稿均已被裁剪"}
+
+        # 5c. 加入自定义程序（is_custom=True 且 status=execute 且有 wp_code）
+        try:
+            custom_q = await db.execute(
+                sa.select(ProcedureInstance.wp_code, ProcedureInstance.procedure_name).where(
+                    ProcedureInstance.project_id == project_id,
+                    ProcedureInstance.is_deleted == sa.false(),
+                    ProcedureInstance.is_custom == sa.true(),
+                    ProcedureInstance.status == "execute",
+                    ProcedureInstance.wp_code.isnot(None),
+                )
+            )
+            for wp_code, proc_name in custom_q.all():
+                if wp_code and wp_code not in matched_primary:
+                    matched_primary.add(wp_code)
+                    logger.info("chain_orchestrator: 加入自定义程序 %s (%s)", wp_code, proc_name)
+        except Exception as custom_err:
+            logger.warning("chain_orchestrator: 查询自定义程序失败: %s", custom_err)
+
         matched_codes = matched_primary  # for downstream code compatibility
 
         # 6. Build wp_code → name lookup (also build subtable name list per primary)

@@ -1,31 +1,35 @@
 <template>
   <div class="wp-kanban" v-loading="loading">
-    <!-- 顶部统计 -->
+    <!-- 顶部统计 KPI 卡片（点击联动筛选） -->
     <div class="kanban-stats">
-      <div class="stat-item">
-        <span class="stat-num">{{ stats.total }}</span>
-        <span class="stat-label">总数</span>
+      <div class="kanban-stat-card" :class="{ 'is-active': !focusColumn }" @click="focusColumn = ''">
+        <span class="kanban-stat-card__num">{{ stats.total }}</span>
+        <span class="kanban-stat-card__label">总数</span>
       </div>
-      <div class="stat-item stat-progress">
-        <span class="stat-num">{{ stats.completion_rate }}%</span>
-        <span class="stat-label">完成率</span>
+      <div class="kanban-stat-card kanban-stat-card--highlight">
+        <span class="kanban-stat-card__num">{{ stats.completion_rate }}%</span>
+        <span class="kanban-stat-card__label">完成率</span>
+        <el-progress :percentage="Number(stats.completion_rate) || 0" :stroke-width="4" :show-text="false" color="#fff" style="margin-top: 4px" />
       </div>
-      <div class="stat-item" v-for="(count, key) in columnCounts" :key="key">
-        <span class="stat-num" :style="{color: columnColors[key]}">{{ count }}</span>
-        <span class="stat-label">{{ columnLabels[key] }}</span>
+      <div class="kanban-stat-card" v-for="col in columns" :key="col.key"
+        :class="{ 'is-active': focusColumn === col.key }"
+        @click="focusColumn = focusColumn === col.key ? '' : col.key">
+        <span class="kanban-stat-card__num" :style="{ color: columnColors[col.key] }">{{ columnCounts[col.key] }}</span>
+        <span class="kanban-stat-card__label">{{ col.label }}</span>
       </div>
     </div>
 
     <!-- 看板列 -->
-    <div class="kanban-columns">
+    <div class="kanban-columns" :class="{ 'has-focus': !!focusColumn }">
       <div
         v-for="col in columns"
         :key="col.key"
         class="kanban-column"
+        :class="{ 'is-focused': focusColumn === col.key, 'is-dimmed': focusColumn && focusColumn !== col.key }"
       >
-        <div class="column-header" :style="{borderTopColor: columnColors[col.key]}">
+        <div class="column-header" :style="{ borderTopColor: columnColors[col.key] }">
           <span class="column-title">{{ col.label }}</span>
-          <el-badge :value="kanbanData[col.key]?.length || 0" :type="(col.badgeType) || undefined" />
+          <span class="column-count">{{ kanbanData[col.key]?.length || 0 }}</span>
         </div>
 
         <div class="column-body">
@@ -40,6 +44,16 @@
               <span class="card-cycle-badge">{{ item.audit_cycle }}</span>
             </div>
             <div class="card-name">{{ item.wp_name }}</div>
+            <!-- 进度条 -->
+            <div class="card-progress" v-if="item.total_steps">
+              <el-progress
+                :percentage="Math.round((item.completed_steps || 0) / item.total_steps * 100)"
+                :stroke-width="3"
+                :show-text="false"
+                :color="columnColors[col.key]"
+              />
+              <span class="card-progress__text">{{ item.completed_steps || 0 }}/{{ item.total_steps }}</span>
+            </div>
             <div class="card-footer" v-if="item.assigned_to">
               <el-icon :size="12"><User /></el-icon>
               <span class="card-assignee">{{ item.assigned_to?.slice(0, 8) }}</span>
@@ -51,8 +65,14 @@
             </div>
           </div>
 
+          <!-- 空态引导 -->
           <div v-if="!kanbanData[col.key]?.length" class="column-empty">
-            暂无底稿
+            <div class="column-empty__icon">{{ col.key === 'completed' ? '🎉' : '📋' }}</div>
+            <div class="column-empty__text">
+              {{ col.key === 'not_started' ? '所有底稿已开始编制' :
+                 col.key === 'under_review' ? '暂无待复核底稿' :
+                 col.key === 'completed' ? '暂无已通过底稿' : '暂无底稿' }}
+            </div>
           </div>
         </div>
       </div>
@@ -76,6 +96,7 @@ defineEmits<{
 }>()
 
 const loading = ref(false)
+const focusColumn = ref('') // 点击 KPI 卡片聚焦对应列
 const kanbanData = ref<Record<string, any[]>>({
   not_started: [],
   in_progress: [],
@@ -124,69 +145,85 @@ defineExpose({ refresh: loadKanban })
 </script>
 
 <style scoped>
-.wp-kanban { height: 100%; display: flex; flex-direction: column; background: linear-gradient(135deg, #f8f6fc 0%, #f0ecf8 100%); }
+.wp-kanban { height: 100%; display: flex; flex-direction: column; background: var(--gt-color-bg, #f8f6fc); }
 
-/* 统计栏 — 致同紫色渐变 */
+/* 统计栏 — KPI 卡片 */
 .kanban-stats {
-  display: flex; gap: 20px; padding: 16px 20px;
-  background: linear-gradient(90deg, #4b2d77 0%, #6b4a9e 100%);
-  border-radius: 10px; margin: 12px 16px 0;
-  box-shadow: 0 4px 12px rgba(75, 45, 119, 0.25);
-  flex-wrap: wrap;
+  display: flex; gap: 12px; padding: 14px 16px; flex-wrap: wrap;
 }
-.stat-item { text-align: center; min-width: 60px; }
-.stat-num { display: block; font-size: var(--gt-font-size-2xl); font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.15); }
-.stat-label { font-size: var(--gt-font-size-xs); color: rgba(255,255,255,0.85); letter-spacing: 0.5px; }
-.stat-progress .stat-num { color: var(--gt-color-wheat); font-size: 24px /* allow-px: special */; }
+.kanban-stat-card {
+  flex: 1; min-width: 80px; padding: 12px 16px; text-align: center;
+  background: var(--gt-color-bg-white); border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid var(--gt-color-border-light, #f0f0f0);
+  cursor: pointer; transition: all 0.15s;
+}
+.kanban-stat-card:hover { border-color: var(--gt-color-primary); }
+.kanban-stat-card.is-active { border-color: var(--gt-color-primary); box-shadow: 0 0 0 2px rgba(103, 80, 164, 0.15); }
+.kanban-stat-card--highlight {
+  background: linear-gradient(135deg, #6750A4 0%, #8b5cf6 100%);
+  border: none; box-shadow: 0 4px 12px rgba(103, 80, 164, 0.25);
+}
+.kanban-stat-card--highlight .kanban-stat-card__num { color: #fff; }
+.kanban-stat-card--highlight .kanban-stat-card__label { color: rgba(255,255,255,0.85); }
+.kanban-stat-card__num { display: block; font-size: 22px; font-weight: 800; color: var(--gt-color-text-primary); line-height: 1.2; }
+.kanban-stat-card__label { font-size: 11px; color: var(--gt-color-text-tertiary); margin-top: 2px; }
 
 /* 看板列 */
 .kanban-columns {
   flex: 1; display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 14px; padding: 16px; overflow: auto;
+  gap: 14px; padding: 0 16px 16px; overflow: auto;
 }
 
 .kanban-column {
   background: var(--gt-color-bg-white); border-radius: 12px; display: flex; flex-direction: column;
   min-height: 200px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.2s ease;
 }
-.kanban-column:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(75, 45, 119, 0.08); }
+.kanban-column.is-focused { box-shadow: 0 4px 16px rgba(103, 80, 164, 0.12); transform: scale(1.01); }
+.kanban-column.is-dimmed { opacity: 0.4; transform: scale(0.98); }
 
 .column-header {
   padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;
   border-top: 4px solid var(--gt-color-info); border-radius: 12px 12px 0 0;
-  background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+  background: var(--gt-color-bg, #fafafa);
 }
-.column-title { font-size: var(--gt-font-size-sm); font-weight: 700; color: var(--gt-color-text); letter-spacing: 0.5px; }
+.column-title { font-size: 13px; font-weight: 700; color: var(--gt-color-text); }
+.column-count {
+  font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+  background: var(--gt-color-bg-white); color: var(--gt-color-text-secondary);
+  border: 1px solid var(--gt-color-border-light, #e8e8e8);
+}
 .column-body { flex: 1; padding: 10px; overflow-y: auto; }
-.column-empty { text-align: center; color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs); padding: 30px 0; font-style: italic; }
 
-/* 卡片 — 动感交互 */
+/* 空态 */
+.column-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 30px 0; gap: 8px;
+}
+.column-empty__icon { font-size: 28px; opacity: 0.5; }
+.column-empty__text { font-size: 12px; color: var(--gt-color-text-placeholder); }
+
+/* 卡片 */
 .kanban-card {
   background: var(--gt-color-bg-white); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;
-  border: 1px solid var(--gt-color-border-purple); cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative; overflow: hidden;
-}
-.kanban-card::before {
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-  background: linear-gradient(180deg, #4b2d77, #8b5cf6); border-radius: 3px 0 0 3px;
-  opacity: 0; transition: opacity 0.2s;
+  border: 1px solid var(--gt-color-border-light, #f0f0f0); cursor: pointer;
+  transition: all 0.2s ease;
 }
 .kanban-card:hover {
-  box-shadow: 0 4px 12px rgba(75, 45, 119, 0.12);
-  border-color: var(--gt-color-border-purple-light); transform: translateX(3px);
+  box-shadow: 0 4px 12px rgba(75, 45, 119, 0.1);
+  border-color: var(--gt-color-primary); transform: translateY(-1px);
 }
-.kanban-card:hover::before { opacity: 1; }
 
 .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.card-code { font-weight: 700; font-size: var(--gt-font-size-sm); color: var(--gt-color-primary); }
+.card-code { font-weight: 700; font-size: 13px; color: var(--gt-color-primary); }
 .card-cycle-badge {
-  font-size: var(--gt-font-size-xs); font-weight: 600; padding: 2px 8px; border-radius: 10px;
-  background: linear-gradient(135deg, #f0e6ff, #e8d9f8); color: #4b2d77;
+  font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+  background: var(--gt-color-primary-bg, #f0e6ff); color: var(--gt-color-primary);
 }
-.card-name { font-size: var(--gt-font-size-sm); color: var(--gt-color-text); line-height: 1.5; font-weight: 500; }
-.card-footer { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-info); }
+.card-name { font-size: 13px; color: var(--gt-color-text); line-height: 1.4; }
+.card-progress { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.card-progress__text { font-size: 10px; color: var(--gt-color-text-tertiary); white-space: nowrap; }
+.card-footer { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 12px; color: var(--gt-color-text-tertiary); }
 .card-actions { justify-content: flex-end; }
-.card-assignee { color: var(--gt-color-text-regular); font-weight: 500; }
+.card-assignee { color: var(--gt-color-text-secondary); font-weight: 500; }
 </style>

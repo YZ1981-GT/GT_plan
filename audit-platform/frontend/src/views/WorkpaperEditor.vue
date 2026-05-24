@@ -14,8 +14,8 @@
   <!-- 默认 Univer 编辑器（component_type='univer' 或未配置时） -->
   <div v-else class="gt-wp-editor gt-fade-in">
     <!-- 编辑锁提示 -->
-    <el-alert v-if="editLock.locked.value && !editLock.isMine.value" type="warning" :closable="false" style="margin-bottom: 8px">
-      {{ editLock.lockedBy.value || '其他用户' }} 正在编辑，当前为只读模式
+    <el-alert v-if="editLock?.locked?.value && !editLock?.isMine?.value" type="warning" :closable="false" style="margin-bottom: 8px">
+      {{ editLock?.lockedBy?.value || '其他用户' }} 正在编辑，当前为只读模式
     </el-alert>
 
     <!-- E1 Sprint 2 Task 2.17 + D-sales-cycle F8 Task 2.19: 前置状态横幅 -->
@@ -1798,6 +1798,11 @@ async function initUniver() {
   // 1. 加载底稿详情
   try {
     wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
+    if (!wpDetail.value) {
+      ElMessage.error('底稿数据为空，可能尚未生成文件')
+      goBack()
+      return
+    }
   } catch (e: any) {
     handleApiError(e, '底稿不存在')
     goBack()

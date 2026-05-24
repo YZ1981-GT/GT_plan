@@ -287,14 +287,9 @@ def _is_example_row(row_values: list[str], columns: list[tuple]) -> bool:
     """判断是否为模板示例行（宽松匹配：超过一半的值和示例一致即视为示例行）
 
     注: 仅在前 6 行使用 (覆盖 adjustments 模板的 5 行示例区).
-    特殊处理: 编号 == AJE-001 / RJE-001 视为示例行 (导出模板预填的固定示例编号).
     """
     if not row_values:
         return False
-
-    # 特殊路径: 第一列是编号,等于 AJE-001 / RJE-001 直接视为示例
-    if row_values and str(row_values[0]).strip() in ("AJE-001", "RJE-001"):
-        return True
 
     example_values = [col[3] for col in columns]
 
@@ -363,7 +358,7 @@ def validate_import_file(
     # adjustments 类型: 找模板 sheet, 跳过 关注事项/标准科目库 等说明 sheet
     ws = None
     if import_type == ImportType.adjustments:
-        skip_names = {"关注事项", "标准科目库", "说明", "Sheet1"}
+        skip_names = {"关注事项", "标准科目库", "项目科目库", "说明", "Sheet1"}
         for sn in wb.sheetnames:
             if sn in skip_names:
                 continue
@@ -486,7 +481,7 @@ def parse_import_data(
     # adjustments: 找名称含 模板 且不是 关注事项/标准科目库 的 sheet (支持多 sheet 合并)
     target_sheets: list = []
     if import_type == ImportType.adjustments:
-        skip_names = {"关注事项", "标准科目库", "说明", "Sheet1"}
+        skip_names = {"关注事项", "标准科目库", "项目科目库", "说明", "Sheet1"}
         for sn in wb.sheetnames:
             if sn in skip_names:
                 continue

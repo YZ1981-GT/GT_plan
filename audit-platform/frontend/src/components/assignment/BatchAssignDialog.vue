@@ -11,11 +11,36 @@
     <div v-if="step === 1" class="gt-batch-assign-step1">
       <el-form label-width="100px" :model="form">
         <el-form-item label="分配策略">
-          <el-radio-group v-model="form.strategy">
-            <el-radio value="manual">手动（统一分配给同一人）</el-radio>
-            <el-radio value="round_robin">轮询（均匀分配）</el-radio>
-            <el-radio value="by_level">按职级（按底稿复杂度匹配）</el-radio>
-          </el-radio-group>
+          <div class="gt-batch-strategy-cards">
+            <div class="gt-batch-strategy-card" :class="{ 'is-active': form.strategy === 'smart' }" @click="form.strategy = 'smart'">
+              <div class="gt-batch-strategy-card__icon">🤖</div>
+              <div class="gt-batch-strategy-card__text">
+                <div class="gt-batch-strategy-card__name">智能推荐</div>
+                <div class="gt-batch-strategy-card__desc">按成员专长+工作量自动分配</div>
+              </div>
+            </div>
+            <div class="gt-batch-strategy-card" :class="{ 'is-active': form.strategy === 'round_robin' }" @click="form.strategy = 'round_robin'">
+              <div class="gt-batch-strategy-card__icon">🔄</div>
+              <div class="gt-batch-strategy-card__text">
+                <div class="gt-batch-strategy-card__name">均匀轮询</div>
+                <div class="gt-batch-strategy-card__desc">按人数平均分配底稿</div>
+              </div>
+            </div>
+            <div class="gt-batch-strategy-card" :class="{ 'is-active': form.strategy === 'by_level' }" @click="form.strategy = 'by_level'">
+              <div class="gt-batch-strategy-card__icon">📊</div>
+              <div class="gt-batch-strategy-card__text">
+                <div class="gt-batch-strategy-card__name">按职级匹配</div>
+                <div class="gt-batch-strategy-card__desc">复杂循环→高级，简单→初级</div>
+              </div>
+            </div>
+            <div class="gt-batch-strategy-card" :class="{ 'is-active': form.strategy === 'manual' }" @click="form.strategy = 'manual'">
+              <div class="gt-batch-strategy-card__icon">✋</div>
+              <div class="gt-batch-strategy-card__text">
+                <div class="gt-batch-strategy-card__name">手动指定</div>
+                <div class="gt-batch-strategy-card__desc">统一分配给同一人</div>
+              </div>
+            </div>
+          </div>
         </el-form-item>
 
         <el-form-item label="候选人">
@@ -27,18 +52,26 @@
               @selection-change="onCandidateSelectionChange"
               ref="candidateTableRef"
               row-key="user_id"
+              border
             >
               <el-table-column type="selection" width="40" reserve-selection />
               <el-table-column prop="staff_name" label="姓名" min-width="120" />
               <el-table-column prop="role" label="角色" min-width="100">
                 <template #default="{ row }">
-                  {{ roleLabel(row.role) }}
+                  <el-tag size="small" :type="row.role === 'manager' ? 'danger' : row.role === 'senior_auditor' ? 'warning' : 'info'">
+                    {{ roleLabel(row.role) }}
+                  </el-tag>
                 </template>
               </el-table-column>
               <el-table-column prop="staff_title" label="职级" min-width="100" />
             </el-table>
             <div v-if="!candidates.length" class="gt-batch-no-candidates">
-              暂无候选人（需项目中有 auditor/senior_auditor/manager 角色成员）
+              <el-icon :size="24" style="margin-bottom: 8px; opacity: 0.5"><User /></el-icon>
+              <div>暂无候选人</div>
+              <div style="font-size: 11px; margin-top: 4px; color: var(--gt-color-text-placeholder)">需先在项目中添加团队成员（auditor/senior_auditor/manager 角色）</div>
+              <el-button size="small" type="primary" text style="margin-top: 8px" @click="goToStaffManagement">
+                前往人员管理 →
+              </el-button>
             </div>
           </div>
         </el-form-item>
@@ -136,7 +169,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { User } from '@element-plus/icons-vue'
 import { handleApiError } from '@/utils/errorHandler'
 import http from '@/utils/http'
 import { listAssignments, type Assignment } from '@/services/staffApi'
@@ -158,6 +193,7 @@ const emit = defineEmits<{
 
 // ── State ──
 
+const router = useRouter()
 const visible = computed({
   get: () => props.modelValue,
   set: (val) => emit('update:modelValue', val),
@@ -178,7 +214,7 @@ interface CandidateItem {
 }
 
 const form = ref({
-  strategy: 'round_robin' as 'manual' | 'round_robin' | 'by_level',
+  strategy: 'smart' as 'manual' | 'round_robin' | 'by_level' | 'smart',
   reviewer_id: null as string | null,
 })
 
@@ -207,6 +243,7 @@ const strategyLabel = computed(() => {
     manual: '手动',
     round_robin: '轮询',
     by_level: '按职级',
+    smart: '智能推荐',
   }
   return map[form.value.strategy] || form.value.strategy
 })
@@ -268,7 +305,6 @@ function computePreview(): PreviewItem[] {
   if (!cands.length || !wpItems.length) return []
 
   if (form.value.strategy === 'manual') {
-    // All assigned to the single selected candidate
     const userId = cands[0].user_id
     return wpItems.map(w => ({
       wp_id: w.id,
@@ -279,13 +315,68 @@ function computePreview(): PreviewItem[] {
   }
 
   if (form.value.strategy === 'round_robin') {
-    // Round-robin distribution
     return wpItems.map((w, idx) => ({
       wp_id: w.id,
       wp_code: w.wp_code || '',
       wp_name: w.wp_name || '',
       user_id: cands[idx % cands.length].user_id,
     }))
+  }
+
+  if (form.value.strategy === 'smart') {
+    // 智能推荐：按循环分组 → 每个循环分配给一个人（尽量均匀 + 职级匹配）
+    // 规则：manager 负责 A/S（完成阶段+专项），senior 负责复杂循环，auditor 负责简单循环
+    const managers = cands.filter(c => c.role === 'manager')
+    const seniors = cands.filter(c => c.role === 'senior_auditor' || c.role === 'manager')
+    const juniors = cands.filter(c => c.role === 'auditor')
+    const allPool = cands
+
+    // 按循环分组
+    const byCycle: Record<string, typeof wpItems> = {}
+    for (const w of wpItems) {
+      const cycle = (w.audit_cycle || w.wp_code?.charAt(0) || '?').toUpperCase()
+      if (!byCycle[cycle]) byCycle[cycle] = []
+      byCycle[cycle].push(w)
+    }
+
+    const complexCycles = new Set(['D', 'G', 'H', 'I', 'K', 'N'])
+    const managerCycles = new Set(['A', 'S'])
+    const result: PreviewItem[] = []
+    const workload: Record<string, number> = {} // user_id → count
+    for (const c of cands) workload[c.user_id] = 0
+
+    // 找工作量最少的人
+    function leastLoaded(pool: CandidateItem[]): CandidateItem {
+      if (!pool.length) return allPool[0]
+      return pool.reduce((min, c) => (workload[c.user_id] || 0) < (workload[min.user_id] || 0) ? c : min, pool[0])
+    }
+
+    for (const [cycle, wps] of Object.entries(byCycle)) {
+      let pool: CandidateItem[]
+      if (managerCycles.has(cycle) && managers.length) {
+        pool = managers
+      } else if (complexCycles.has(cycle) && seniors.length) {
+        pool = seniors
+      } else if (juniors.length) {
+        pool = juniors
+      } else {
+        pool = allPool
+      }
+
+      // 该循环的底稿分配给工作量最少的候选人
+      const assignee = leastLoaded(pool)
+      for (const w of wps) {
+        result.push({
+          wp_id: w.id,
+          wp_code: w.wp_code || '',
+          wp_name: w.wp_name || '',
+          user_id: assignee.user_id,
+        })
+        workload[assignee.user_id] = (workload[assignee.user_id] || 0) + 1
+      }
+    }
+
+    return result.sort((a, b) => a.wp_code.localeCompare(b.wp_code))
   }
 
   if (form.value.strategy === 'by_level') {
@@ -373,9 +464,14 @@ async function onSubmit() {
 function onClose() {
   visible.value = false
   step.value = 1
-  form.value = { strategy: 'round_robin', reviewer_id: null }
+  form.value = { strategy: 'smart', reviewer_id: null }
   selectedCandidates.value = []
   previewAssignments.value = []
+}
+
+function goToStaffManagement() {
+  onClose()
+  router.push('/settings/staff')
 }
 
 // ── Watch for dialog open ──
@@ -393,15 +489,36 @@ watch(visible, (val) => {
   min-height: 300px;
 }
 
+/* 策略卡片 */
+.gt-batch-strategy-cards {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%;
+}
+.gt-batch-strategy-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: 10px; cursor: pointer;
+  border: 2px solid var(--gt-color-border-light, #f0f0f0);
+  background: var(--gt-color-bg-white); transition: all 0.15s;
+}
+.gt-batch-strategy-card:hover { border-color: var(--gt-color-primary); background: var(--gt-color-primary-bg, #f8f5ff); }
+.gt-batch-strategy-card.is-active {
+  border-color: var(--gt-color-primary); background: var(--gt-color-primary-bg, #f0ebff);
+  box-shadow: 0 0 0 3px rgba(103, 80, 164, 0.12);
+}
+.gt-batch-strategy-card__icon { font-size: 22px; flex-shrink: 0; }
+.gt-batch-strategy-card__text { display: flex; flex-direction: column; }
+.gt-batch-strategy-card__name { font-size: 13px; font-weight: 600; color: var(--gt-color-text-primary); }
+.gt-batch-strategy-card__desc { font-size: 11px; color: var(--gt-color-text-tertiary); line-height: 1.3; }
+
 .gt-batch-candidates {
   width: 100%;
 }
 
 .gt-batch-no-candidates {
-  padding: 20px;
+  padding: 24px;
   text-align: center;
   color: var(--gt-color-text-tertiary);
-  font-size: var(--gt-font-size-sm);
+  font-size: 13px;
+  display: flex; flex-direction: column; align-items: center;
 }
 
 .gt-batch-step1-info {

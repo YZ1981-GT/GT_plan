@@ -173,6 +173,7 @@ class ProcedureService:
             procedure_name=data["procedure_name"],
             sort_order=data.get("sort_order", 999),
             is_custom=True,
+            wp_code=data.get("wp_code"),
         )
         self.db.add(pi)
         await self.db.flush()

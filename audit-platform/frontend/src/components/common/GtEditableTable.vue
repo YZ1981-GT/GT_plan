@@ -1,7 +1,8 @@
 <template>
+  <Teleport to="body" :disabled="!fullscreen.isFullscreen.value">
   <div ref="containerRef" class="gt-editable-table" :class="{ 'gt-fullscreen': fullscreen.isFullscreen.value }">
-    <!-- 工具栏 -->
-    <GtToolbar v-if="showToolbar" variant="default">
+    <!-- 工具栏（全屏时即使 showToolbar=false 也强制显示，至少给"退出全屏"按钮） -->
+    <GtToolbar v-if="showToolbar || fullscreen.isFullscreen.value" variant="default">
       <template #left>
         <slot name="toolbar-left" />
         <template v-if="editable && editMode.isEditing.value">
@@ -22,7 +23,7 @@
             ✏️ 编辑
           </el-button>
         </el-button-group>
-        <el-tooltip content="全屏编辑（ESC 退出）" placement="bottom">
+        <el-tooltip :content="editable ? '全屏编辑（ESC 退出）' : '全屏查看（ESC 退出）'" placement="bottom">
           <el-button size="small" @click="fullscreen.toggleFullscreen()">
             {{ fullscreen.isFullscreen.value ? '退出全屏' : '⛶ 全屏' }}
           </el-button>
@@ -36,6 +37,7 @@
       :data="displayData"
       border
       size="small"
+      :height="tableHeight"
       :max-height="tableMaxHeight"
       :class="`gt-tb-font-${displayPrefs.fontSize}`"
       :header-cell-style="mergedHeaderStyle"
@@ -178,6 +180,7 @@
       <slot name="context-menu" :selected-cells="cellSelection.selectedCells.value" />
     </CellContextMenu>
   </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -273,9 +276,27 @@ watch(() => displayPrefs.fontSize, () => {
   nextTick(() => tableRef.value?.doLayout?.())
 })
 
+// 全屏切换后重新计算列宽（容器高度 / 父元素从 detail 切到 body 都会影响布局）
+// 多次 doLayout 等待 Teleport DOM 完成挂载（el-table 内部尺寸缓存才会刷新）
+watch(() => fullscreen.isFullscreen.value, () => {
+  nextTick(() => {
+    tableRef.value?.doLayout?.()
+    // Teleport 后 DOM 移动需要再等一帧才能拿到新容器尺寸
+    requestAnimationFrame(() => tableRef.value?.doLayout?.())
+    setTimeout(() => tableRef.value?.doLayout?.(), 100)
+  })
+})
+
 // ── 计算属性 ──────────────────────────────────────────────────────────────────
 const visibleColumns = computed(() => props.columns.filter(c => !c.hidden))
-const tableMaxHeight = computed(() => fullscreen.isFullscreen.value ? 'calc(100vh - 120px)' : props.maxHeight)
+
+// 全屏时用 '100%' 字符串让 el-table 跟父 flex 容器同高
+// （父容器走 .gt-fullscreen flex column + el-table flex:1 撑满剩余空间，
+//  比 JS viewportH - 常数 更可靠：自动适应 padding / 字号 / 工具栏行高变化）
+const tableHeight = computed(() =>
+  fullscreen.isFullscreen.value ? '100%' : undefined
+)
+const tableMaxHeight = computed(() => fullscreen.isFullscreen.value ? undefined : props.maxHeight)
 
 // ── 分组折叠 [R10.4] ─────────────────────────────────────────────────────────
 const collapsedGroups = ref(new Set<string>())
@@ -517,6 +538,17 @@ defineExpose({ editMode, fullscreen, cellSelection, toolbar, lazyEditState, tabl
 <style scoped>
 .gt-editable-table {
   position: relative;
+}
+
+/* 全屏时用 flex column 布局让 el-table 自动撑满剩余高度
+   不再依赖 JS 计算 viewportH - 常数（避免 padding/字号/工具栏变化导致基线失准） */
+.gt-editable-table.gt-fullscreen {
+  display: flex;
+  flex-direction: column;
+}
+.gt-editable-table.gt-fullscreen :deep(.el-table) {
+  flex: 1;
+  min-height: 0;
 }
 
 .gt-et-cell-text {

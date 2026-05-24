@@ -130,6 +130,7 @@ import NotificationCenter from '@/components/collaboration/NotificationCenter.vu
 import GlobalSearchDialog from '@/components/common/GlobalSearchDialog.vue'
 import DrilldownBreadcrumb from '@/components/common/DrilldownBreadcrumb.vue'
 import { Bell, DataAnalysis, DataLine, Lock, CaretBottom } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { initGlobalBackspace, useNavigationStack } from '@/composables/useNavigationStack'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
@@ -176,10 +177,18 @@ async function loadStaleCount() {
 async function onRecalcStale() {
   const pid = route.params.projectId as string
   if (!pid) return
+  // year 必传：后端 trial-balance/recalc 端点声明 year=Query(...) 必填，
+  // 漏传会爆 422 "[{type:missing,loc:[query,year],msg:Field required}]"
+  const year = projectStore.year || Number(route.query.year) || new Date().getFullYear() - 1
   try {
-    await import('@/services/apiProxy').then(m => m.api.post(`/api/projects/${pid}/trial-balance/recalc`))
+    await import('@/services/apiProxy').then(m =>
+      m.api.post(`/api/projects/${pid}/trial-balance/recalc`, undefined, { params: { year } })
+    )
     staleCount.value = 0
-  } catch { /* ignore */ }
+    ElMessage.success('已触发全量重算')
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail?.message || err?.message || '重算失败')
+  }
 }
 
 // 是否有复核权限（reviewer/partner/admin）

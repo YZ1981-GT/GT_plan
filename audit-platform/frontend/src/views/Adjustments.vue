@@ -1,5 +1,5 @@
 <template>
-  <div class="gt-adjustments gt-fade-in" :class="{ 'gt-fullscreen': isFullscreen }">
+  <div class="gt-adjustments gt-fade-in">
     <!-- 页面横幅 -->
     <GtPageHeader title="调整分录" @back="router.push('/projects')">
       <GtInfoBar
@@ -22,7 +22,6 @@
           @export="onExportSummary"
           @import="showImportDialog = true"
         >
-          <el-button size="small" plain @click="toggleFullscreen">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
           <template #right-extra>
             <el-dropdown @command="onExportTemplate">
               <el-button size="small" plain>
@@ -77,12 +76,19 @@
       </div>
     </div>
 
-    <!-- Tab 切换 -->
-    <el-tabs v-model="activeTab" @tab-change="onTabChange">
-      <el-tab-pane label="全部" name="all" />
-      <el-tab-pane label="AJE" name="aje" />
-      <el-tab-pane label="RJE" name="rje" />
-    </el-tabs>
+    <!-- Tab 切换 + 全屏按钮（同行右对齐） -->
+    <div class="gt-adj-tabs-row">
+      <el-tabs v-model="activeTab" class="gt-adj-tabs" @tab-change="onTabChange">
+        <el-tab-pane label="全部" name="all" />
+        <el-tab-pane label="AJE" name="aje" />
+        <el-tab-pane label="RJE" name="rje" />
+      </el-tabs>
+      <el-tooltip content="全屏查看（ESC 退出）" placement="bottom">
+        <el-button size="small" plain class="gt-adj-fs-btn" @click="onToggleFullscreen">
+          {{ tableFullscreen ? '退出全屏' : '⛶ 全屏' }}
+        </el-button>
+      </el-tooltip>
+    </div>
 
     <!-- 科目过滤提示（从试算表跳转时显示） -->
     <el-alert
@@ -118,7 +124,7 @@
       :columns="adjColumns"
       :editable="false"
       :show-selection="true"
-      :show-toolbar="true"
+      :show-toolbar="false"
       :show-footer="true"
       :show-selection-bar="true"
       v-loading="loading"
@@ -128,17 +134,37 @@
       <template #expand="{ row }">
         <div class="gt-adj-expand-detail">
           <table class="gt-adj-line-table">
+            <colgroup>
+              <col style="width: 140px" />
+              <col />
+              <col style="width: 80px" />
+              <col style="width: 160px" />
+              <col style="width: 160px" />
+            </colgroup>
             <thead>
-              <tr><th>科目编码</th><th>科目名称</th><th style="text-align:center">方向</th><th style="text-align:right">金额</th></tr>
+              <tr>
+                <th>科目编码</th>
+                <th>科目名称</th>
+                <th style="text-align:center">方向</th>
+                <th style="text-align:right">借方金额</th>
+                <th style="text-align:right">贷方金额</th>
+              </tr>
             </thead>
             <tbody>
               <tr v-for="(li, idx) in (row.line_items || [])" :key="idx">
                 <td>{{ li.standard_account_code }}</td>
                 <td>{{ li.account_name }}</td>
                 <td style="text-align:center">
-                  <span :class="li.debit_amount ? 'gt-adj-dir-dr' : 'gt-adj-dir-cr'">{{ li.debit_amount ? '借' : '贷' }}</span>
+                  <span :class="Number(li.debit_amount) > 0 ? 'gt-adj-dir-dr' : 'gt-adj-dir-cr'">
+                    {{ Number(li.debit_amount) > 0 ? '借' : '贷' }}
+                  </span>
                 </td>
-                <td style="text-align:right" class="gt-amt">{{ fmtAmt(li.debit_amount || li.credit_amount) }}</td>
+                <td style="text-align:right" class="gt-amt">
+                  {{ Number(li.debit_amount) > 0 ? fmtAmt(li.debit_amount) : '' }}
+                </td>
+                <td style="text-align:right" class="gt-amt">
+                  {{ Number(li.credit_amount) > 0 ? fmtAmt(li.credit_amount) : '' }}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -156,24 +182,53 @@
         </el-tag>
       </template>
       <template #col-main_account="{ row }">
-        <div v-if="row.line_items?.length" class="gt-adj-main-account">
-          <span class="gt-adj-main-account-code">{{ row.line_items[0].standard_account_code }}</span>
-          <span class="gt-adj-main-account-name">{{ row.line_items[0].account_name || '—' }}</span>
-          <el-tag
-            v-if="row.line_items.length > 1"
-            size="small"
-            type="info"
-            effect="plain"
-            class="gt-adj-main-account-more"
-          >+{{ row.line_items.length - 1 }}</el-tag>
+        <div v-if="row.line_items?.length" class="gt-adj-voucher">
+          <template v-for="(li, idx) in row.line_items" :key="idx">
+            <div
+              v-if="isDirectionSwitch(row.line_items, idx)"
+              class="gt-adj-voucher-divider-line"
+            ></div>
+            <div class="gt-adj-voucher-row">
+              <span class="gt-adj-voucher-code">{{ li.standard_account_code }}</span>
+              <span class="gt-adj-voucher-name">{{ li.account_name || '—' }}</span>
+            </div>
+          </template>
         </div>
         <span v-else class="gt-adj-col-placeholder">—</span>
       </template>
       <template #col-total_debit="{ row }">
-        <GtAmountCell :value="row.total_debit" :clickable="true" @click="penetrate.toLedger(row.line_items?.[0]?.standard_account_code || '')" />
+        <div v-if="row.line_items?.length" class="gt-adj-voucher">
+          <template v-for="(li, idx) in row.line_items" :key="idx">
+            <div
+              v-if="isDirectionSwitch(row.line_items, idx)"
+              class="gt-adj-voucher-divider-line"
+            ></div>
+            <div class="gt-adj-voucher-amt-cell gt-amt">
+              <GtAmountCell
+                v-if="Number(li.debit_amount) > 0"
+                :value="li.debit_amount"
+              />
+              <span v-else></span>
+            </div>
+          </template>
+        </div>
       </template>
       <template #col-total_credit="{ row }">
-        <GtAmountCell :value="row.total_credit" :clickable="true" @click="penetrate.toLedger(row.line_items?.[0]?.standard_account_code || '')" />
+        <div v-if="row.line_items?.length" class="gt-adj-voucher">
+          <template v-for="(li, idx) in row.line_items" :key="idx">
+            <div
+              v-if="isDirectionSwitch(row.line_items, idx)"
+              class="gt-adj-voucher-divider-line"
+            ></div>
+            <div class="gt-adj-voucher-amt-cell gt-amt">
+              <GtAmountCell
+                v-if="Number(li.credit_amount) > 0"
+                :value="li.credit_amount"
+              />
+              <span v-else></span>
+            </div>
+          </template>
+        </div>
       </template>
       <template #col-created_at="{ row }">{{ row.created_at?.slice(0, 10) }}</template>
       <template #col-review_status="{ row }">
@@ -200,21 +255,7 @@
             </el-button>
           </template>
         </el-table-column>
-        <el-table-column label="转错报" width="110" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              v-if="row.review_status === ADJUSTMENT_STATUS.REJECTED && normalizeAdjustmentType(row.adjustment_type) === ADJUSTMENT_TYPE.AJE"
-              v-permission="'adjustment:convert_to_misstatement'"
-              size="small"
-              type="warning"
-              :loading="convertingGroupId === row.entry_group_id"
-              @click="onConvertToMisstatement(row)"
-            >
-              转错报
-            </el-button>
-            <span v-else class="gt-adj-col-placeholder">—</span>
-          </template>
-        </el-table-column>
+
       </template>
       <!-- R10 Spec B / F8：调整分录右键菜单 - 查看关联底稿 -->
       <template #context-menu="{ selectedCells }">
@@ -431,8 +472,6 @@ import { operationHistory } from '@/utils/operationHistory'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { usePasteImport } from '@/composables/usePasteImport'
 import { parseApiError } from '@/composables/useApiError'
-import { usePenetrate } from '@/composables/usePenetrate'
-import { useFullscreen } from '@/composables/useFullscreen'
 import { useEditMode } from '@/composables/useEditMode'
 // Spec A R1：跨视图 stale 摘要
 import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
@@ -451,9 +490,7 @@ import { useDecimalCalc } from '@/composables/useDecimalCalc'
 
 const route = useRoute()
 const router = useRouter()
-const penetrate = usePenetrate()
 const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
-const { isFullscreen, toggleFullscreen } = useFullscreen()
 const { isEditing: isPageEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 
 /** GtEditableTable 列配置 */
@@ -461,12 +498,23 @@ const adjColumns: GtColumn[] = [
   { prop: 'adjustment_no', label: '编号', width: 120 },
   { prop: 'adjustment_type', label: '类型', width: 70 },
   { prop: 'description', label: '摘要', minWidth: 180 },
-  { prop: 'main_account', label: '主要科目', minWidth: 200 },
-  { prop: 'total_debit', label: '借方合计', width: 130, align: 'right' },
-  { prop: 'total_credit', label: '贷方合计', width: 130, align: 'right' },
-  { prop: 'created_at', label: '日期', width: 110 },
+  { prop: 'main_account', label: '主要科目', minWidth: 280 },
+  { prop: 'total_debit', label: '借方金额', width: 130, align: 'right' },
+  { prop: 'total_credit', label: '贷方金额', width: 130, align: 'right' },
+  { prop: 'created_at', label: '日期', width: 130 },
   { prop: 'review_status', label: '状态', width: 100 },
 ]
+
+/** 判断当前行是否是借/贷方向切换点（用于在三列同步加分隔线） */
+function isDirectionSwitch(items: any[], idx: number): boolean {
+  if (!items || idx === 0) return false
+  const prev = items[idx - 1]
+  const curr = items[idx]
+  const prevIsDebit = Number(prev?.debit_amount) > 0
+  const currIsDebit = Number(curr?.debit_amount) > 0
+  return prevIsDebit !== currIsDebit
+}
+
 const dictStore = useDictStore()
 const projectStore = useProjectStore()
 
@@ -513,6 +561,12 @@ const { preview: impactPreview, loading: impactLoading, fetchPreview } = useImpa
 
 // R7-S3-08 Task 41 + R9 F10 Task 33：粘贴多行分录
 const adjTableRef = ref<HTMLElement | null>(null)
+
+// 全屏代理：从 GtEditableTable 内部 fullscreen 实例读写状态
+const tableFullscreen = computed(() => (adjTableRef.value as any)?.fullscreen?.isFullscreen?.value || false)
+function onToggleFullscreen() {
+  ;(adjTableRef.value as any)?.fullscreen?.toggleFullscreen?.()
+}
 
 // R10 Spec B / F8：右键查看关联底稿
 async function onCtxRelatedWp(selectedCells: any[]) {
@@ -1146,28 +1200,48 @@ watch(
   color: var(--gt-color-text-tertiary, #909399);
 }
 
-/* 主要科目列 */
-.gt-adj-main-account {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* 主要科目列：会计凭证样式（科目编码+名称多行） */
+.gt-adj-voucher {
+  display: flex;
+  flex-direction: column;
   max-width: 100%;
 }
-.gt-adj-main-account-code {
+.gt-adj-voucher-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--gt-font-size-sm);
+  line-height: 1.7;
+  min-height: calc(var(--gt-font-size-sm) * 1.7);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.gt-adj-voucher-code {
   font-family: var(--gt-font-family-mono, monospace);
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary);
+  flex-shrink: 0;
 }
-.gt-adj-main-account-name {
+.gt-adj-voucher-name {
   color: var(--gt-color-text);
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
-.gt-adj-main-account-more {
-  flex-shrink: 0;
+/* 借方/贷方金额列：每行高度与主要科目列对齐（line-height 1.7） */
+.gt-adj-voucher-amt-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: var(--gt-font-size-sm);
+  line-height: 1.7;
+  min-height: calc(var(--gt-font-size-sm) * 1.7);
+}
+/* 借贷方向切换分隔线（三列同步独立行，相同 idx 同步插入保证水平对齐） */
+.gt-adj-voucher-divider-line {
+  height: 9px;
+  border-top: 1px dashed var(--gt-color-border, rgba(75, 45, 119, 0.18));
+  margin: 4px 0;
 }
 
 /* 展开行明细 */
@@ -1223,4 +1297,23 @@ watch(
 }
 
 :deep(.el-tabs__item.is-active) { font-weight: 600; }
+
+/* Tab 栏 + 全屏按钮同行右对齐（合并到 tab 行不独占行） */
+.gt-adj-tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.gt-adj-tabs-row :deep(.el-tabs) {
+  flex: 1;
+  margin-bottom: 0;
+}
+.gt-adj-tabs-row :deep(.el-tabs__header) {
+  margin-bottom: 0;
+}
+.gt-adj-fs-btn {
+  flex-shrink: 0;
+  margin-bottom: 8px; /* 对齐 tabs 下边线 */
+}
 </style>
