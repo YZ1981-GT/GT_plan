@@ -65,7 +65,18 @@
       </el-table-column>
       <el-table-column label="报表项目" min-width="220">
         <template #default="{ row }">
-          <div v-if="row.mapped && !row._editing" style="display:flex;align-items:center;gap:4px">
+          <!-- 坏账准备聚合行: 显示所有二级映射 -->
+          <div v-if="row._isBadDebtAggregate" style="display:flex;flex-direction:column;gap:2px">
+            <el-tag size="small" type="warning" effect="plain" style="align-self:flex-start">已分类（{{ row._badDebtSubs.length }} 项）</el-tag>
+            <div v-for="sub in row._badDebtSubs" :key="sub.id" style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--gt-color-text-secondary)">
+              <span style="color:var(--gt-color-text-placeholder)">└─</span>
+              <span>{{ subCodeLabel(sub.standard_account_code) }}</span>
+              <span style="color:var(--gt-color-text-placeholder)">→</span>
+              <el-tag size="small" type="info">{{ sub.report_line_code }}</el-tag>
+              <span>{{ sub.report_line_name }}</span>
+            </div>
+          </div>
+          <div v-else-if="row.mapped && !row._editing" style="display:flex;align-items:center;gap:4px">
             <el-tag size="small" type="info" style="flex-shrink:0">{{ row.report_line_code }}</el-tag>
             <span style="font-weight:500">{{ row.report_line_name }}</span>
             <el-button link size="small" style="margin-left:auto;color: var(--gt-color-info)" @click="row._editing = true">✏️</el-button>
@@ -105,8 +116,9 @@
       </el-table-column>
       <el-table-column label="操作" width="90" align="center">
         <template #default="{ row }">
-          <el-button v-if="row.mapped && !row.is_confirmed" link type="primary" size="small" @click="onConfirm(row)">确认</el-button>
-          <el-button v-if="row.mapped" link type="danger" size="small" @click="onDelete(row)">删除</el-button>
+          <span v-if="row._isBadDebtAggregate" style="color:var(--gt-color-text-placeholder);font-size:11px">分项已映射</span>
+          <el-button v-else-if="row.mapped && !row.is_confirmed" link type="primary" size="small" @click="onConfirm(row)">确认</el-button>
+          <el-button v-if="row.mapped && !row._isBadDebtAggregate" link type="danger" size="small" @click="onDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -195,7 +207,15 @@ const allLevel1Accounts = computed(() => {
 })
 
 // ─── 合并展示（一级科目 LEFT JOIN 映射） ───
+// 特殊处理: 1231 系列(坏账准备分项) 当一级 1231 在试算表存在时,
+// 需聚合显示其下二级映射(1231-01/02/03/04/05),展示"已分类（N 项）"标签
 const mergedRows = computed(() => {
+  // 按一级编码(前4位或完整编码)分组所有 1231 系列映射
+  const badDebtSubMappings = mappings.value.filter(m =>
+    (m.standard_account_code || '').startsWith('1231-')
+  )
+  const hasBadDebtSubs = badDebtSubMappings.length > 0
+
   const mappingByCode = new Map<string, any>()
   for (const m of mappings.value) {
     const code = (m.standard_account_code || '').slice(0, 4)
@@ -205,6 +225,24 @@ const mergedRows = computed(() => {
   const usedCodes = new Set<string>()
   for (const acct of allLevel1Accounts.value) {
     usedCodes.add(acct.code)
+    // 1231 一级特殊处理: 如果有二级映射(1231-01~05),不显示单一映射,显示聚合标签
+    if (acct.code === '1231' && hasBadDebtSubs) {
+      // 用第一条二级的 report_type(都是 balance_sheet),展示用 _isBadDebtAggregate 标记
+      const firstSub = badDebtSubMappings[0]
+      rows.push({
+        account_code: acct.code,
+        account_name: acct.name,
+        mapped: true,
+        id: null,  // 聚合行不能直接编辑/删除,id 为 null 隐藏操作按钮
+        report_line_code: '',
+        report_line_name: '',
+        report_type: firstSub.report_type,
+        is_confirmed: badDebtSubMappings.every(s => s.is_confirmed),
+        _isBadDebtAggregate: true,
+        _badDebtSubs: badDebtSubMappings,  // 用于详情展开
+      })
+      continue
+    }
     const m = mappingByCode.get(acct.code)
     rows.push({
       account_code: acct.code,
@@ -219,7 +257,13 @@ const mergedRows = computed(() => {
   }
   // 补充映射表中有但试算表没有的
   for (const m of mappings.value) {
-    const code = (m.standard_account_code || '').slice(0, 4)
+    const stdCode = m.standard_account_code || ''
+    // 1231-0x 二级如果上面 1231 一级已聚合显示则跳过
+    if (stdCode.startsWith('1231-') && usedCodes.has('1231')) {
+      continue
+    }
+    const isBadDebtSub = stdCode.startsWith('1231-')
+    const code = isBadDebtSub ? stdCode : stdCode.slice(0, 4)
     if (!usedCodes.has(code)) {
       usedCodes.add(code)
       rows.push({
@@ -553,6 +597,17 @@ function reportTypeLabel(t: string) {
 }
 function reportTypeTag(t: string) {
   return ({ balance_sheet: '', income_statement: 'success', cash_flow: 'warning', equity_change: 'info' } as any)[t] || 'info'
+}
+// 坏账分项标签: 1231-01 → "应收票据"
+function subCodeLabel(code: string) {
+  const m: Record<string, string> = {
+    '1231-01': '应收票据',
+    '1231-02': '应收账款',
+    '1231-03': '其他应收款',
+    '1231-04': '预付账款',
+    '1231-05': '合同资产',
+  }
+  return m[code] || code
 }
 </script>
 
