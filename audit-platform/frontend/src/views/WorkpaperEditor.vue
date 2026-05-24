@@ -1,7 +1,7 @@
 <template>
-  <!-- 路由分发：非 univer 类型使用对应子编辑器 -->
+  <!-- 路由分发：非 univer 类型使用对应子编辑器（须等 wpDetail 加载完成） -->
   <component
-    v-if="componentType && componentType !== 'univer'"
+    v-if="componentType && componentType !== 'univer' && wpDetail"
     :is="editorComponent"
     :project-id="projectId"
     :wp-id="wpId"
@@ -11,7 +11,13 @@
     @saved="onChildSaved"
   />
 
-  <!-- 默认 Univer 编辑器（component_type='univer' 或未配置时） -->
+  <!-- 子编辑器加载中占位 -->
+  <div v-else-if="componentType && componentType !== 'univer' && !wpDetail" class="gt-wp-editor-loading">
+    <el-icon class="is-loading" :size="32" color="var(--gt-color-primary)"><Loading /></el-icon>
+    <div style="margin-top: 12px; font-size: 13px; color: var(--gt-color-text-secondary)">加载底稿中...</div>
+  </div>
+
+  <!-- 默认 Univer 编辑器（component_type='univer' 或未配置时；univerContainer 必须挂载触发 initUniver） -->
   <div v-else class="gt-wp-editor gt-fade-in">
     <!-- 编辑锁提示 -->
     <el-alert v-if="editLock?.locked?.value && !editLock?.isMine?.value" type="warning" :closable="false" style="margin-bottom: 8px">
@@ -938,6 +944,10 @@ const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
 
+// 核心数据 ref（必须在所有依赖它们的 computed/composable 调用前定义，否则触发 ReferenceError）
+const wpDetail = ref<WorkpaperDetail | null>(null)
+const loading = ref(true)
+
 // ─── component_type 路由逻辑 ─────────────────────────────────────────────────
 const componentType = ref<string>('univer')
 const editorComponent = computed(() => EDITOR_MAP[componentType.value] || null)
@@ -1364,8 +1374,6 @@ const reviewMarkers = useWorkpaperReviewMarkers({
   },
 })
 
-const wpDetail = ref<WorkpaperDetail | null>(null)
-const loading = ref(true)
 const saving = ref(false)
 const submitting = ref(false)
 const syncLoading = ref(false)
@@ -2475,6 +2483,9 @@ onMounted(() => {
   fetchComponentType().then(() => {
     if (componentType.value === 'univer' || !componentType.value) {
       initUniver()
+    } else {
+      // 子编辑器不走 initUniver，需要在这里关闭 loading
+      loading.value = false
     }
   })
   // P0: 加载程序步骤映射
