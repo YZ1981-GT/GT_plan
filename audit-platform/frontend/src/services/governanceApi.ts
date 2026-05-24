@@ -41,7 +41,7 @@ export async function evaluateGate(params: {
   actor_id: string
   context?: Record<string, any>
 }): Promise<GateEvaluateResponse> {
-  const { data } = await api.post(P.gate.evaluate, params)
+  const data = await api.post(P.gate.evaluate, params)
   return data
 }
 
@@ -51,7 +51,7 @@ export async function checkSoD(params: {
   actor_id: string
   target_role: string
 }): Promise<SoDCheckResponse> {
-  const { data } = await api.post(P.sod.check, params)
+  const data = await api.post(P.sod.check, params)
   return data
 }
 
@@ -59,7 +59,7 @@ export async function replayTrace(
   traceId: string,
   level: 'L1' | 'L2' | 'L3' = 'L1'
 ): Promise<TraceReplayResponse> {
-  const { data } = await api.get(P.trace.replay(traceId), { params: { level } })
+  const data = await api.get(P.trace.replay(traceId), { params: { level } })
   return data
 }
 
@@ -70,7 +70,7 @@ export async function queryTraces(params: {
   page?: number
   page_size?: number
 }) {
-  const { data } = await api.get(P.trace.query, { params })
+  const data = await api.get(P.trace.query, { params })
   return data
 }
 
@@ -124,17 +124,17 @@ export async function listTaskTree(params: {
   page?: number
   page_size?: number
 }) {
-  const { data } = await api.get(P.taskTree.list, { params })
+  const data = await api.get(P.taskTree.list, { params })
   return data
 }
 
 export async function getTreeStats(projectId: string) {
-  const { data } = await api.get(P.taskTree.stats, { params: { project_id: projectId } })
+  const data = await api.get(P.taskTree.stats, { params: { project_id: projectId } })
   return data
 }
 
 export async function transitNodeStatus(nodeId: string, nextStatus: string, operatorId: string) {
-  const { data } = await api.put(P.taskTree.status(nodeId), {
+  const data = await api.put(P.taskTree.status(nodeId), {
     next_status: nextStatus,
     operator_id: operatorId,
   })
@@ -147,7 +147,7 @@ export async function reassignNode(params: {
   operator_id: string
   reason_code: string
 }) {
-  const { data } = await api.post(P.taskTree.reassign, params)
+  const data = await api.post(P.taskTree.reassign, params)
   return data
 }
 
@@ -156,7 +156,7 @@ export async function replayEvent(params: {
   operator_id: string
   reason_code: string
 }) {
-  const { data } = await api.post(P.taskEvents.replay, params)
+  const data = await api.post(P.taskEvents.replay, params)
   return data
 }
 
@@ -166,7 +166,7 @@ export async function listEvents(params: {
   page?: number
   page_size?: number
 }) {
-  const { data } = await api.get(P.taskEvents.list, { params })
+  const data = await api.get(P.taskEvents.list, { params })
   return data
 }
 
@@ -176,7 +176,7 @@ export async function createIssueFromConversation(params: {
   operator_id: string
   sla_level: 'P0' | 'P1' | 'P2'
 }) {
-  const { data } = await api.post(P.issues.fromConversation, params)
+  const data = await api.post(P.issues.fromConversation, params)
   return data
 }
 
@@ -189,7 +189,7 @@ export async function listIssues(params: {
   page?: number
   page_size?: number
 }) {
-  const { data } = await api.get(P.issues.list, { params })
+  const data = await api.get(P.issues.list, { params })
   return data
 }
 
@@ -199,7 +199,7 @@ export async function updateIssueStatus(issueId: string, params: {
   reason_code: string
   evidence_refs?: any[]
 }) {
-  const { data } = await api.put(P.issues.status(issueId), params)
+  const data = await api.put(P.issues.status(issueId), params)
   return data
 }
 
@@ -208,26 +208,26 @@ export async function escalateIssue(issueId: string, params: {
   to_level: string
   reason_code: string
 }) {
-  const { data } = await api.post(P.issues.escalate(issueId), params)
+  const data = await api.post(P.issues.escalate(issueId), params)
   return data
 }
 
 // ── Phase 16: Version Line + Integrity + Conflicts ─────────────
 
 export async function queryVersionLine(projectId: string, objectType?: string, objectId?: string) {
-  const { data } = await api.get(P.versionLine(projectId), {
+  const data = await api.get(P.versionLine(projectId), {
     params: { object_type: objectType, object_id: objectId },
   })
   return data
 }
 
 export async function checkExportIntegrity(exportId: string) {
-  const { data } = await api.get(P.exportIntegrity(exportId))
+  const data = await api.get(P.exportIntegrity(exportId))
   return data
 }
 
 export async function detectConflicts(projectId: string, wpId: string) {
-  const { data } = await api.post(P.offline.detectConflicts, {
+  const data = await api.post(P.offline.detectConflicts, {
     project_id: projectId,
     wp_id: wpId,
   })
@@ -241,7 +241,7 @@ export async function resolveConflict(params: {
   resolver_id: string
   reason_code: string
 }) {
-  const { data } = await api.post(P.offline.resolveConflict, params)
+  const data = await api.post(P.offline.resolveConflict, params)
   return data
 }
 
@@ -251,12 +251,12 @@ export async function listConflicts(params: {
   page?: number
   page_size?: number
 }) {
-  const { data } = await api.get(P.offline.listConflicts, { params })
+  const data = await api.get(P.offline.listConflicts, { params })
   return data
 }
 
 export async function replayConsistency(projectId: string, snapshotId?: string) {
-  const { data } = await api.post(P.consistency.replay, {
+  const data = await api.post(P.consistency.replay, {
     project_id: projectId,
     snapshot_id: snapshotId,
   })
@@ -264,6 +264,6 @@ export async function replayConsistency(projectId: string, snapshotId?: string) 
 }
 
 export async function getConsistencyReport(projectId: string) {
-  const { data } = await api.get(P.consistency.report(projectId))
+  const data = await api.get(P.consistency.report(projectId))
   return data
 }

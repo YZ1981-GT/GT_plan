@@ -147,7 +147,8 @@ async function runCheck() {
   loading.value = true
   error.value = ''
   try {
-    const { data } = await api.get(`/api/projects/${props.projectId}/data-quality/check`, {
+    // api.get 已经直接返回业务数据,不需要二次解构 .data
+    const data = await api.get(`/api/projects/${props.projectId}/data-quality/check`, {
       params: { checks: 'all', year: props.year },
     })
     result.value = data

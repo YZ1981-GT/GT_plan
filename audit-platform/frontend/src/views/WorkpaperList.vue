@@ -949,7 +949,7 @@ async function onBatchStatusChange(payload: { action: string; ids: string[] }) {
   } catch { return }
 
   try {
-    const { data } = await api.post(
+    const data = await api.post(
       `/api/projects/${projectId.value}/working-papers/batch-status`,
       { wp_ids: payload.ids, action: payload.action }
     ) as any
