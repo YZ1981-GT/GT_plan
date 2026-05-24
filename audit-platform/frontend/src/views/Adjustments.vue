@@ -7,7 +7,10 @@
         :show-year="true"
         :unit-value="selectedProjectId"
         :year-value="selectedYear"
-        :badges="[{ value: `AJE ${summary?.aje_count || 0} 笔 · RJE ${summary?.rje_count || 0} 笔` }]"
+        :badges="[
+          { value: `AJE ${summary?.aje_count || 0} 笔 · RJE ${summary?.rje_count || 0} 笔` },
+          ...(currentTemplateType ? [{ value: currentTemplateType === 'soe' ? '📘 国企版' : '📗 上市版', type: currentTemplateType === 'soe' ? 'warning' : 'primary' }] : []),
+        ]"
         @unit-change="onProjectChange"
         @year-change="onYearChange"
       />
@@ -28,8 +31,12 @@
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="soe">国企版模板 (致同 SOE)</el-dropdown-item>
-                  <el-dropdown-item command="listed">上市版模板 (致同 Listed)</el-dropdown-item>
+                  <el-dropdown-item command="soe" :class="{ 'is-current-version': currentTemplateType === 'soe' }">
+                    📘 国企版模板 (致同 SOE){{ currentTemplateType === 'soe' ? ' ✓ 当前项目' : '' }}
+                  </el-dropdown-item>
+                  <el-dropdown-item command="listed" :class="{ 'is-current-version': currentTemplateType === 'listed' }">
+                    📗 上市版模板 (致同 Listed){{ currentTemplateType === 'listed' ? ' ✓ 当前项目' : '' }}
+                  </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -478,6 +485,7 @@ const missStaleIdSet = computed(() => new Set(missStaleSummary.value.items.map((
 const loading = ref(false)
 const showImportDialog = ref(false)
 const submitLoading = ref(false)
+const currentTemplateType = ref<'soe' | 'listed' | ''>('')  // 当前项目的模板类型(国企/上市)
 const activeTab = ref('all')
 const entries = ref<any[]>([])
 const summary = ref<AdjustmentSummary | null>(null)
@@ -710,6 +718,21 @@ async function ensureProjectYear() {
     projectYear.value = await getProjectAuditYear(projectId.value)
   } catch {
     projectYear.value = null
+  }
+}
+
+async function fetchProjectMeta() {
+  // 加载当前项目的 template_type (国企/上市) 用于顶部 badge 显示 + 默认导出版本
+  if (!projectId.value) {
+    currentTemplateType.value = ''
+    return
+  }
+  try {
+    const data = await api.get(`/api/projects/${projectId.value}`)
+    const tt = data?.template_type || data?.basic_info?.template_type || ''
+    currentTemplateType.value = (tt === 'soe' || tt === 'listed') ? tt : ''
+  } catch {
+    currentTemplateType.value = ''
   }
 }
 
@@ -985,8 +1008,24 @@ function onExportSummary() {
   })
 }
 
-function onExportTemplate(templateType: 'soe' | 'listed' = 'soe') {
+async function onExportTemplate(templateType: 'soe' | 'listed' = 'soe') {
   const label = templateType === 'soe' ? '国企版' : '上市版'
+
+  // 当前项目版本与所选版本不一致时提醒(避免下错版本)
+  if (currentTemplateType.value && currentTemplateType.value !== templateType) {
+    const projLabel = currentTemplateType.value === 'soe' ? '国企版' : '上市版'
+    try {
+      await confirmDangerous({
+        title: '版本与项目不匹配',
+        message: `当前项目是【${projLabel}】,但你选择导出【${label}】模板。\n\n报表项目联动可能不准(项目映射规则按 ${projLabel} 配置)。\n\n建议导出 ${projLabel} 模板。是否仍然导出 ${label}?`,
+        confirmText: `仍导出 ${label}`,
+        cancelText: '取消',
+      })
+    } catch {
+      return  // 用户取消
+    }
+  }
+
   import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
     downloadFileAsBlob(
       `${P.adjustments.exportTemplate(projectId.value)}?year=${year.value}&template_type=${templateType}`,
@@ -1000,6 +1039,7 @@ watch(
   () => [projectId.value, routeYear.value],
   async () => {
     await ensureProjectYear()
+    await fetchProjectMeta()
     projectStore.syncFromRoute(route)
     selectedYear.value = year.value
     // 同步科目过滤参数
@@ -1024,6 +1064,13 @@ watch(
 .gt-adj-batch-toggle :deep(.el-switch.is-checked .el-switch__core) { background-color: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.5); }
 .gt-adj-batch-badge :deep(.el-badge__content) { z-index: 2; }
 .gt-adj-batch-toggle .el-button--success { background: rgba(103, 194, 58, 0.85); border-color: rgba(103, 194, 58, 0.6); color: #fff; }
+
+/* 导出模板下拉: 当前项目版本高亮 */
+:deep(.is-current-version) {
+  font-weight: 600;
+  color: var(--gt-color-primary);
+  background: var(--gt-bg-primary-light);
+}
 
 /* 汇总面板 */
 .gt-summary-panel { display: flex; gap: var(--gt-space-3); margin-bottom: var(--gt-space-5); flex-wrap: wrap; }
