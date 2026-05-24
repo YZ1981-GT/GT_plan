@@ -1,9 +1,19 @@
 """报表行次映射服务 — AI建议 + 确认 + 集团参照 + 跨年继承
 
 Validates: Requirements 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+
+数据驱动: 标准科目 → 报表行次的映射来自 backend/data/account_to_report_line_seed.json
+按项目维度 (template_type × report_scope) 加载 4 套独立 seed:
+  - soe_standalone (国企单体)
+  - soe_consolidated (国企合并)
+  - listed_standalone (上市单体)
+  - listed_consolidated (上市合并)
 """
 
+import json
 import logging
+from functools import lru_cache
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -24,256 +34,148 @@ from app.models.audit_platform_schemas import (
     ReportLineMappingResponse,
     ReportLineMappingUpdate,
 )
+from app.models.core import Project
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# 标准科目编码 → 报表行次 规则映射（占位，后续接入LLM）
+# 数据驱动: 加载 account_to_report_line_seed.json (按 4 套维度)
 # ---------------------------------------------------------------------------
 
-# 资产负债表行次
-_BALANCE_SHEET_LINES: dict[str, tuple[str, str, int, str | None]] = {
-    # code_prefix: (line_code, line_name, level, parent_line_code)
-    # ── 资产类 ──
-    "1001": ("BS001", "货币资金", 1, None),
-    "1002": ("BS001", "货币资金", 1, None),
-    "1012": ("BS001", "货币资金", 1, None),
-    "1101": ("BS002", "交易性金融资产", 1, None),
-    "1121": ("BS003", "应收票据", 1, None),
-    "1122": ("BS004", "应收账款", 1, None),
-    "1123": ("BS005", "预付款项", 1, None),
-    "1131": ("BS006", "应收利息", 1, None),
-    "1132": ("BS007", "应收股利", 1, None),
-    "1221": ("BS008", "其他应收款", 1, None),
-    "1401": ("BS009", "存货", 1, None),
-    "1403": ("BS009", "存货", 1, None),
-    "1405": ("BS009", "存货", 1, None),
-    "1406": ("BS009", "存货", 1, None),
-    "1408": ("BS009", "存货", 1, None),
-    "1411": ("BS009", "存货", 1, None),
-    "1501": ("BS010", "持有待售资产", 1, None),
-    "1511": ("BS010", "持有待售资产", 1, None),
-    "1601": ("BS011", "长期股权投资", 1, None),
-    "1611": ("BS011", "长期股权投资", 1, None),
-    "1701": ("BS012", "固定资产", 1, None),
-    "1702": ("BS012", "固定资产", 1, None),
-    "1703": ("BS012", "固定资产", 1, None),
-    "1711": ("BS015", "在建工程", 1, None),
-    "1801": ("BS013", "无形资产", 1, None),
-    "1811": ("BS016", "开发支出", 1, None),
-    "1901": ("BS014", "长期待摊费用", 1, None),
-    "1811": ("BS016", "开发支出", 1, None),
-    "1901": ("BS014", "长期待摊费用", 1, None),
-    "1911": ("BS017", "商誉", 1, None),
-    "1521": ("BS018", "投资性房地产", 1, None),
-    "1531": ("BS019", "可供出售金融资产", 1, None),
-    "1532": ("BS020", "其他权益工具投资", 1, None),
-    "1541": ("BS021", "持有至到期投资", 1, None),
-    "1711": ("BS015", "在建工程", 1, None),
-    # ── 负债类 ──
-    "2001": ("BS101", "短期借款", 1, None),
-    "2201": ("BS102", "应付票据", 1, None),
-    "2202": ("BS103", "应付账款", 1, None),
-    "2203": ("BS104", "预收款项", 1, None),
-    "2205": ("BS104", "预收款项", 1, None),
-    "2211": ("BS105", "应付职工薪酬", 1, None),
-    "2221": ("BS106", "应交税费", 1, None),
-    "2231": ("BS111", "应付利息", 1, None),
-    "2232": ("BS112", "应付股利", 1, None),
-    "2241": ("BS107", "其他应付款", 1, None),
-    "2401": ("BS113", "递延收益", 1, None),
-    "2501": ("BS108", "长期借款", 1, None),
-    "2502": ("BS109", "应付债券", 1, None),
-    "2701": ("BS114", "长期应付职工薪酬", 1, None),
-    "2711": ("BS110", "长期应付款", 1, None),
-    "2801": ("BS115", "预计负债", 1, None),
-    "2901": ("BS116", "递延所得税负债", 1, None),
-    # ── 权益类 ──
-    "3001": ("BS201", "实收资本", 1, None),
-    "3002": ("BS202", "资本公积", 1, None),
-    "3003": ("BS205", "其他综合收益", 1, None),
-    "3005": ("BS205", "其他综合收益", 1, None),
-    "3101": ("BS203", "盈余公积", 1, None),
-    "3102": ("BS203", "盈余公积", 1, None),
-    "3103": ("BS203", "盈余公积", 1, None),
-    "3104": ("BS204", "未分配利润", 1, None),
-    "3201": ("BS206", "库存股", 1, None),
-    "3301": ("BS207", "专项储备", 1, None),
-    # 4xxx 权益类补充
-    "4001": ("BS201", "实收资本", 1, None),
-    "4101": ("BS203", "盈余公积", 1, None),
-    "4103": ("BS204", "未分配利润", 1, None),
-    "4104": ("BS204", "未分配利润", 1, None),
-    "4201": ("BS208", "库存股", 1, None),
-    "4301": ("BS207", "专项储备", 1, None),
-    "4401": ("BS209", "其他权益工具", 1, None),
-}
-
-# 利润表行次
-_INCOME_STATEMENT_LINES: dict[str, tuple[str, str, int, str | None]] = {
-    # 5xxx 成本类（注意：5001/5002/5101/5301 是生产成本/制造费用，归入营业成本或存货）
-    "5001": ("IS002", "营业成本", 1, None),   # 基本生产成本
-    "5002": ("IS002", "营业成本", 1, None),   # 辅助生产成本
-    "5051": ("IS001", "营业收入", 1, None),   # 其他业务收入
-    "5101": ("IS002", "营业成本", 1, None),   # 制造费用
-    "5301": ("IS006", "研发费用", 1, None),   # 研发支出（费用化部分）
-    "5401": ("IS002", "营业成本", 1, None),   # 主营业务成本
-    "5402": ("IS002", "营业成本", 1, None),   # 其他业务成本
-    "5403": ("IS003", "税金及附加", 1, None),
-    "5601": ("IS004", "销售费用", 1, None),
-    "5602": ("IS005", "管理费用", 1, None),
-    "5603": ("IS006", "研发费用", 1, None),
-    "5711": ("IS007", "财务费用", 1, None),
-    "5801": ("IS008", "资产减值损失", 1, None),
-    "5802": ("IS009", "信用减值损失", 1, None),
-    "6001": ("IS010", "资产处置收益", 1, None),
-    "6051": ("IS011", "其他收益", 1, None),
-    "6101": ("IS012", "投资收益", 1, None),
-    "6111": ("IS013", "公允价值变动收益", 1, None),
-    "6115": ("IS010", "资产处置收益", 1, None),
-    "6117": ("IS011", "其他收益", 1, None),
-    "6301": ("IS014", "营业外收入", 1, None),
-    "6401": ("IS015", "营业外支出", 1, None),
-    "6801": ("IS016", "所得税费用", 1, None),
-}
+_SEED_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "account_to_report_line_seed.json"
 
 
-# ---------------------------------------------------------------------------
-# 科目名称 → 报表行次 关键词映射（编码匹配不上时的兜底）
-# ---------------------------------------------------------------------------
+@lru_cache(maxsize=1)
+def _load_seed() -> dict[str, dict[str, dict]]:
+    """加载 seed 文件,返回 {applicable_standard: {std_account_code: {row_code, row_name, report_type}}}.
 
-_NAME_TO_BALANCE_SHEET: list[tuple[list[str], str, str]] = [
-    # (关键词列表, line_code, line_name) — 科目名称包含任一关键词即命中
-    # ── 资产类 ──
-    (["银行存款", "库存现金", "现金", "货币资金", "其他货币"], "BS001", "货币资金"),
-    (["交易性金融资产"], "BS002", "交易性金融资产"),
-    (["应收票据"], "BS003", "应收票据"),
-    (["应收账款"], "BS004", "应收账款"),
-    (["预付款项", "预付账款", "预付"], "BS005", "预付款项"),
-    (["应收利息"], "BS006", "应收利息"),
-    (["应收股利"], "BS007", "应收股利"),
-    (["其他应收款", "其他应收"], "BS008", "其他应收款"),
-    (["存货", "原材料", "库存商品", "在产品", "发出商品", "周转材料", "委托加工", "低值易耗"], "BS009", "存货"),
-    (["持有待售"], "BS010", "持有待售资产"),
-    (["长期股权投资"], "BS011", "长期股权投资"),
-    (["固定资产", "累计折旧"], "BS012", "固定资产"),
-    (["无形资产", "累计摊销"], "BS013", "无形资产"),
-    (["长期待摊费用", "长期待摊"], "BS014", "长期待摊费用"),
-    (["在建工程"], "BS015", "在建工程"),
-    (["开发支出"], "BS016", "开发支出"),
-    (["商誉"], "BS017", "商誉"),
-    (["投资性房地产"], "BS018", "投资性房地产"),
-    (["可供出售金融"], "BS019", "可供出售金融资产"),
-    (["其他权益工具投资"], "BS020", "其他权益工具投资"),
-    (["递延所得税资产"], "BS022", "递延所得税资产"),
-    # ── 负债类 ──
-    (["短期借款"], "BS101", "短期借款"),
-    (["应付票据"], "BS102", "应付票据"),
-    (["应付账款"], "BS103", "应付账款"),
-    (["预收款项", "预收账款", "合同负债"], "BS104", "预收款项"),
-    (["应付职工薪酬", "应付工资", "应付福利"], "BS105", "应付职工薪酬"),
-    (["应交税费", "应交税金"], "BS106", "应交税费"),
-    (["其他应付款", "其他应付"], "BS107", "其他应付款"),
-    (["长期借款"], "BS108", "长期借款"),
-    (["应付债券"], "BS109", "应付债券"),
-    (["长期应付款"], "BS110", "长期应付款"),
-    (["应付利息"], "BS111", "应付利息"),
-    (["应付股利"], "BS112", "应付股利"),
-    (["递延收益"], "BS113", "递延收益"),
-    (["预计负债"], "BS115", "预计负债"),
-    (["递延所得税负债"], "BS116", "递延所得税负债"),
-    # ── 权益类 ──
-    (["实收资本", "股本"], "BS201", "实收资本"),
-    (["资本公积"], "BS202", "资本公积"),
-    (["盈余公积"], "BS203", "盈余公积"),
-    (["未分配利润", "利润分配"], "BS204", "未分配利润"),
-    (["其他综合收益"], "BS205", "其他综合收益"),
-    (["库存股"], "BS206", "库存股"),
-    (["专项储备"], "BS207", "专项储备"),
-    (["其他权益工具"], "BS209", "其他权益工具"),
-]
+    LRU 缓存,首次加载后常驻内存。如果 seed 改了需重启服务或调 _load_seed.cache_clear().
+    """
+    if not _SEED_PATH.exists():
+        logger.error(f"account_to_report_line_seed.json 不存在: {_SEED_PATH}")
+        return {}
+    try:
+        raw = json.loads(_SEED_PATH.read_text(encoding="utf-8"))
+        out: dict[str, dict[str, dict]] = {}
+        for std_key, mappings in raw.get("mappings", {}).items():
+            out[std_key] = {}
+            for m in mappings:
+                code = m["standard_account_code"]
+                out[std_key][code] = {
+                    "report_line_code": m["report_line_code"],
+                    "report_line_name": m["report_line_name"],
+                    "report_type": m["report_type"],
+                }
+        logger.info(
+            f"account_to_report_line_seed loaded: "
+            + ", ".join(f"{k}={len(v)}" for k, v in out.items())
+        )
+        return out
+    except Exception as e:
+        logger.error(f"加载 account_to_report_line_seed 失败: {e}")
+        return {}
 
-_NAME_TO_INCOME_STATEMENT: list[tuple[list[str], str, str]] = [
-    (["营业收入", "主营业务收入", "其他业务收入"], "IS001", "营业收入"),
-    (["营业成本", "主营业务成本", "其他业务成本"], "IS002", "营业成本"),
-    (["税金及附加", "营业税金"], "IS003", "税金及附加"),
-    (["销售费用"], "IS004", "销售费用"),
-    (["管理费用"], "IS005", "管理费用"),
-    (["研发费用"], "IS006", "研发费用"),
-    (["财务费用"], "IS007", "财务费用"),
-    (["资产减值损失"], "IS008", "资产减值损失"),
-    (["信用减值损失"], "IS009", "信用减值损失"),
-    (["资产处置收益", "资产处置"], "IS010", "资产处置收益"),
-    (["其他收益"], "IS011", "其他收益"),
-    (["投资收益"], "IS012", "投资收益"),
-    (["公允价值变动"], "IS013", "公允价值变动收益"),
-    (["营业外收入"], "IS014", "营业外收入"),
-    (["营业外支出"], "IS015", "营业外支出"),
-    (["所得税费用", "所得税"], "IS016", "所得税费用"),
-]
+
+def _derive_applicable_standard(
+    template_type: str | None, report_scope: str | None
+) -> str:
+    """根据项目的 template_type + report_scope 派生 seed 维度 key.
+
+    - template_type: soe / listed (国企版/上市版,默认 soe)
+    - report_scope: standalone / consolidated (单体/合并,默认 standalone)
+
+    返回: soe_standalone / soe_consolidated / listed_standalone / listed_consolidated
+    """
+    tt = (template_type or "soe").lower().strip()
+    if tt not in ("soe", "listed"):
+        tt = "soe"
+    rs = (report_scope or "standalone").lower().strip()
+    if rs not in ("standalone", "consolidated"):
+        rs = "standalone"
+    return f"{tt}_{rs}"
+
+
+async def _get_project_applicable_standard(
+    project_id: UUID, db: AsyncSession
+) -> str:
+    """从 project 表读 template_type + report_scope 派生 applicable_standard."""
+    result = await db.execute(
+        select(Project.template_type, Project.report_scope).where(
+            Project.id == project_id
+        )
+    )
+    row = result.first()
+    if not row:
+        return "soe_standalone"  # 项目不存在,默认国企单体
+    return _derive_applicable_standard(row[0], row[1])
+
+
+def _normalize_account_code(code: str) -> str:
+    """规范化客户科目编码,用于 seed 查表 (与 mapping_service._normalize_account_code 同源)."""
+    if not code:
+        return ""
+    out = code.strip()
+    for sep in (".", "-", "/", "_", "\\", " "):
+        out = out.replace(sep, "")
+    return out
+
+
+def _lookup_report_line_from_seed(
+    standard_account_code: str,
+    applicable_standard: str,
+) -> tuple[str, str, str] | None:
+    """从 seed 查 (line_code, line_name, report_type). 找不到返回 None.
+
+    匹配优先级:
+    1. 完整编码精确匹配(如 1231-01 / 100201)
+    2. 4 位前缀匹配(如 100201 → 1001)
+    3. 客户科目带分隔符(如 6401.01 / 6401-01) 也走规范化后的 4 位前缀
+    """
+    seed = _load_seed()
+    std_map = seed.get(applicable_standard) or seed.get("soe_standalone") or {}
+    if not std_map:
+        return None
+
+    code = standard_account_code.strip()
+
+    # 策略 1: 带连字符的二级科目(坏账分项 1231-01) 直接精确匹配
+    if "-" in code and code in std_map:
+        m = std_map[code]
+        return m["report_line_code"], m["report_line_name"], m["report_type"]
+
+    # 策略 2: 完整编码精确匹配
+    if code in std_map:
+        m = std_map[code]
+        return m["report_line_code"], m["report_line_name"], m["report_type"]
+
+    # 策略 3: 规范化后取 4 位前缀
+    normalized = _normalize_account_code(code)
+    prefix4 = normalized[:4] if len(normalized) >= 4 else normalized
+    if prefix4 in std_map:
+        m = std_map[prefix4]
+        return m["report_line_code"], m["report_line_name"], m["report_type"]
+
+    return None
 
 
 def _determine_report_type_from_code(account_code: str) -> ReportType | None:
-    """根据科目编码前缀判断报表类型。
+    """根据科目编码前缀判断报表类型(兜底,seed 优先).
 
-    企业会计准则科目编码规则：
-    - 1xxx: 资产类 → 资产负债表
-    - 2xxx: 负债类 → 资产负债表
-    - 3xxx: 共同类 → 资产负债表
-    - 4xxx: 所有者权益类 → 资产负债表（权益侧）
-    - 5xxx: 成本类 → 利润表
-    - 6xxx: 损益类 → 利润表
+    企业会计准则:
+    - 1xxx/2xxx/3xxx: 资产/负债/权益 → 资产负债表
+    - 4xxx/5xxx/6xxx: 成本/损益 → 4xxx 在新版准则归成本类(进利润表), 但 30/40 系列偶有权益用法
     """
     prefix = account_code[:1] if account_code else ""
-    if prefix in ("1", "2", "3", "4"):
+    if prefix in ("1", "2", "3"):
         return ReportType.balance_sheet
-    if prefix in ("5", "6"):
+    if prefix in ("4", "5", "6"):
         return ReportType.income_statement
     return None
 
 
-def _lookup_report_line(
-    account_code: str, report_type: ReportType, account_name: str = ""
-) -> tuple[str, str, int, str | None, float] | None:
-    """查找科目编码对应的报表行次。返回 (line_code, line_name, level, parent, confidence)。
-
-    策略：精确匹配 + 名称关键词兜底。不做前缀模糊匹配（避免乱匹配）。
-    匹配不上的返回 None，由用户手动指定。
-    """
-    mapping_dict = (
-        _BALANCE_SHEET_LINES
-        if report_type == ReportType.balance_sheet
-        else _INCOME_STATEMENT_LINES
-    )
-
-    # 策略 1：精确匹配（4位编码）
-    prefix4 = account_code[:4] if len(account_code) >= 4 else account_code
-    if prefix4 in mapping_dict:
-        lc, ln, lv, pc = mapping_dict[prefix4]
-        return lc, ln, lv, pc, 1.0
-
-    # 策略 2：按科目名称关键词兜底（编码匹配不上时）
-    if account_name:
-        name_rules = (
-            _NAME_TO_BALANCE_SHEET
-            if report_type == ReportType.balance_sheet
-            else _NAME_TO_INCOME_STATEMENT
-        )
-        clean_name = account_name.replace("_", "").replace(" ", "")
-        for keywords, lc, ln in name_rules:
-            for kw in keywords:
-                if kw in clean_name:
-                    return lc, ln, 1, None, 0.7
-
-    # 匹配不上：返回 None，由用户手动指定
-    return None
-
-    return None
-
-
 # ---------------------------------------------------------------------------
-# ai_suggest_mappings (Task 7a.2)
+# ai_suggest_mappings (Task 7a.2) — 数据驱动版,按项目维度从 seed 加载
 # ---------------------------------------------------------------------------
 
 
@@ -281,11 +183,21 @@ async def ai_suggest_mappings(
     project_id: UUID,
     db: AsyncSession,
 ) -> list[dict]:
-    """规则匹配占位（后续接入LLM）：根据标准科目编码前缀 + 科目名称双保险生成报表行次映射建议。
+    """根据项目维度 (template_type × report_scope) 从 seed 加载映射规则,生成报表行次映射建议.
 
     Validates: Requirements 3.10
+
+    数据流:
+    1. 读项目的 template_type / report_scope → 派生 applicable_standard
+    2. 从 account_to_report_line_seed.json 加载对应维度的 seed
+    3. 遍历项目已映射的标准科目, 按 seed 查 (line_code, line_name, report_type)
+    4. 创建 ReportLineMapping 记录(is_confirmed=False, mapping_type=ai_suggested)
     """
-    # 获取项目已映射的标准科目（通过 account_mapping），同时获取科目名称
+    # 1. 派生 applicable_standard
+    applicable_standard = await _get_project_applicable_standard(project_id, db)
+    logger.info(f"ai_suggest_mappings: project={project_id} standard={applicable_standard}")
+
+    # 2. 获取项目已映射的标准科目
     mapped_result = await db.execute(
         select(AccountMapping.standard_account_code).where(
             AccountMapping.project_id == project_id,
@@ -338,17 +250,19 @@ async def ai_suggest_mappings(
     seen_keys: set[str] = set()
 
     for std_code in mapped_std_codes:
-        rt = _determine_report_type_from_code(std_code)
-        if rt is None:
+        # seed 优先: 直接从 seed 查 (line_code, line_name, report_type)
+        seed_hit = _lookup_report_line_from_seed(std_code, applicable_standard)
+        if seed_hit is None:
+            # 编码前缀都不在 seed → 跳过(不再走旧的关键词兜底,避免乱匹配 BS001 vs BS-001)
             continue
 
-        # 双保险：编码 + 名称
-        account_name = code_name_map.get(std_code, "")
-        result = _lookup_report_line(std_code, rt, account_name)
-        if result is None:
+        line_code, line_name, report_type_str = seed_hit
+        try:
+            rt = ReportType(report_type_str)
+        except ValueError:
+            logger.warning(f"seed 中 report_type 值非法: {report_type_str} for {std_code}")
             continue
 
-        line_code, line_name, level, parent_code, confidence = result
         key = f"{std_code}:{rt.value}"
         if key in seen_keys:
             continue
@@ -373,8 +287,8 @@ async def ai_suggest_mappings(
             report_type=rt,
             report_line_code=line_code,
             report_line_name=line_name,
-            report_line_level=level,
-            parent_line_code=parent_code,
+            report_line_level=1,
+            parent_line_code=None,
             mapping_type=ReportLineMappingType.ai_suggested,
             is_confirmed=False,
         )
@@ -384,9 +298,10 @@ async def ai_suggest_mappings(
             "report_type": rt.value,
             "report_line_code": line_code,
             "report_line_name": line_name,
-            "report_line_level": level,
-            "parent_line_code": parent_code,
-            "confidence": confidence,
+            "report_line_level": 1,
+            "parent_line_code": None,
+            "confidence": 1.0,
+            "applicable_standard": applicable_standard,
         })
 
     await db.flush()
