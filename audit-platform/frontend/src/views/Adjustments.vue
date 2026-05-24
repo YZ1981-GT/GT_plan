@@ -20,6 +20,11 @@
           @import="showImportDialog = true"
         >
           <el-button size="small" plain @click="toggleFullscreen">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
+          <template #right-extra>
+            <el-tooltip content="导出空白模板(含关注事项 + 科目下拉,用于线下填写后批量导入)" placement="bottom">
+              <el-button size="small" plain @click="onExportTemplate">📋 导出模板</el-button>
+            </el-tooltip>
+          </template>
           <template #left>
             <el-button size="small" type="primary" v-permission="'adjustment:create'" @click="openCreateDialog">+ 新建分录</el-button>
             <div class="gt-adj-batch-toggle">
@@ -967,6 +972,16 @@ function onExportSummary() {
       `${P.adjustments.exportSummary(projectId.value)}?year=${year.value}&format=excel`,
       `审计调整汇总_${year.value}.xlsx`
     )
+  })
+}
+
+function onExportTemplate() {
+  import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
+    downloadFileAsBlob(
+      `${P.adjustments.exportTemplate(projectId.value)}?year=${year.value}`,
+      `调整分录导入模板_${year.value}.xlsx`
+    )
+    ElMessage.success('模板已开始下载,请按 [关注事项] sheet 提示填写')
   })
 }
 
