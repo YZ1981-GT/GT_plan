@@ -31,10 +31,23 @@
         <div class="gt-cq-container">
           <!-- 左侧：指标树 -->
           <div class="gt-cq-sidebar">
-            <div class="gt-cq-sidebar-title">数据源</div>
+            <div class="gt-cq-sidebar-title">
+              数据源
+              <el-tooltip :content="treeViewMode === 'source' ? '切换为按模板形态分组' : '切换为按数据源分类'" placement="top">
+                <el-button
+                  size="small"
+                  circle
+                  :type="treeViewMode === 'template' ? 'primary' : 'default'"
+                  style="margin-left: auto; font-size: 12px"
+                  @click="toggleTreeViewMode"
+                >
+                  {{ treeViewMode === 'source' ? '📂' : '📋' }}
+                </el-button>
+              </el-tooltip>
+            </div>
             <el-tree
               ref="treeRef"
-              :data="indicatorTree"
+              :data="displayTree"
               :props="{ label: 'label', children: 'children', disabled: 'disabled' }"
               node-key="key"
               highlight-current
@@ -116,7 +129,8 @@
             </div>
             <!-- 结果表格 -->
             <el-table v-if="!transposed" :data="filteredRows" v-loading="loading" border size="small"
-              max-height="calc(100vh - 280px)" style="width:100%" :header-cell-style="{ background: '#f0edf5', fontSize: '12px' }">
+              max-height="calc(100vh - 280px)" style="width:100%" :header-cell-style="{ background: '#f0edf5', fontSize: '12px' }"
+              @row-contextmenu="onRowContextMenu">
               <template #empty>
                 <el-empty :description="emptyText" :image-size="60" />
               </template>
@@ -132,6 +146,14 @@
                 </template>
               </el-table-column>
             </el-table>
+            <!-- 右键菜单（Req 14 AC 2: 跳模板溯源） -->
+            <div
+              v-if="ctxMenuVisible"
+              class="gt-cq-ctx-menu"
+              :style="{ left: ctxMenuPos.x + 'px', top: ctxMenuPos.y + 'px' }"
+            >
+              <div class="gt-cq-ctx-menu-item" @click="onTraceToTemplate">🔗 跳模板溯源</div>
+            </div>
             <!-- 转置视图 -->
             <div v-else class="gt-cq-transposed" v-loading="loading">
               <el-table :data="transposedRows" border size="small" max-height="calc(100vh - 280px)" style="width:100%"
@@ -190,6 +212,8 @@ const props = defineProps<{
   year: number
   /** 初始 tab：'basic'（默认业务视图）/ 'advanced'（高级构建器） */
   initialTab?: 'basic' | 'advanced'
+  /** 初始 source（从模板页跳入时预填） */
+  initialSource?: string
 }>()
 const emit = defineEmits<{ 'update:modelValue': [val: boolean] }>()
 const visible = computed({ get: () => props.modelValue, set: (v) => emit('update:modelValue', v) })
@@ -258,6 +282,45 @@ const treeRef = ref<any>(null)
 const hasQueried = ref(false)
 // 左树点击的大类 key（null = 未点击大类，下拉显示全部）
 const clickedCategory = ref<string | null>(null)
+
+// ─── 树视图模式 (Req 14 AC 4): 按数据源分类 / 按模板形态分组 ─────────────────
+type TreeViewMode = 'source' | 'template'
+const treeViewMode = ref<TreeViewMode>(
+  (sessionStorage.getItem('gt:cq:tree-view-mode') as TreeViewMode) || 'source'
+)
+function toggleTreeViewMode() {
+  treeViewMode.value = treeViewMode.value === 'source' ? 'template' : 'source'
+  sessionStorage.setItem('gt:cq:tree-view-mode', treeViewMode.value)
+}
+
+// 按模板形态分组视图：把 indicatorTree 重组为 4 大类（底稿/报表/附注/调整分录）
+const templateGroupedTree = computed(() => {
+  if (!indicatorTree.value.length) return []
+  const groups: Record<string, any> = {
+    workpaper: { key: '_tpl_workpaper', label: '📋 底稿模板', children: [] as any[] },
+    report: { key: '_tpl_report', label: '📊 报表模板', children: [] as any[] },
+    note: { key: '_tpl_note', label: '📝 附注模板', children: [] as any[] },
+    other: { key: '_tpl_other', label: '🔧 其他（调整/试算）', children: [] as any[] },
+  }
+  for (const cat of indicatorTree.value) {
+    const k = (cat.key || '').toLowerCase()
+    if (k.includes('workpaper') || k.includes('底稿') || k.startsWith('wp_')) {
+      groups.workpaper.children.push(cat)
+    } else if (k.includes('report') || k.includes('报表')) {
+      groups.report.children.push(cat)
+    } else if (k.includes('disclosure') || k.includes('附注') || k.includes('note')) {
+      groups.note.children.push(cat)
+    } else {
+      groups.other.children.push(cat)
+    }
+  }
+  return Object.values(groups).filter(g => g.children.length > 0)
+})
+
+// 当前展示的树数据
+const displayTree = computed(() =>
+  treeViewMode.value === 'source' ? indicatorTree.value : templateGroupedTree.value
+)
 
 // Sheet 单元格区域选择器状态
 const sheetPickerVisible = ref(false)
@@ -618,6 +681,62 @@ async function jumpToCell(row: any) {
   }
 }
 
+// ─── 右键菜单：跳模板溯源 (Req 14 AC 2) ─────────────────────────────────────
+const ctxMenuVisible = ref(false)
+const ctxMenuPos = ref({ x: 0, y: 0 })
+const ctxMenuRow = ref<any>(null)
+
+function onRowContextMenu(row: any, _col: any, event: MouseEvent) {
+  event.preventDefault()
+  ctxMenuRow.value = row
+  ctxMenuPos.value = { x: event.clientX, y: event.clientY }
+  ctxMenuVisible.value = true
+  // 点击其他地方关闭
+  const closeMenu = () => {
+    ctxMenuVisible.value = false
+    document.removeEventListener('click', closeMenu)
+  }
+  setTimeout(() => document.addEventListener('click', closeMenu), 0)
+}
+
+async function onTraceToTemplate() {
+  ctxMenuVisible.value = false
+  const row = ctxMenuRow.value
+  if (!row) return
+
+  // 构建 URI：优先用 source 字段，否则从 row 数据推断
+  let uri = ''
+  if (row.wp_code && row.sheet_name) {
+    uri = `workpaper:${row.wp_code}|${row.sheet_name}`
+    if (row.cell_ref) uri += `|${row.cell_ref}`
+  } else if (row.module === 'report' && row.report_type) {
+    uri = `report:${row.report_type}`
+  } else if (row.module === 'note' && row.section_id) {
+    uri = `note:${row.section_id}`
+  } else if (selectedSource.value) {
+    uri = selectedSource.value
+  }
+
+  if (!uri) {
+    ElMessage.warning('无法确定数据源 URI')
+    return
+  }
+
+  try {
+    const resp = await api.get('/api/custom-query/address-resolve', {
+      params: { uri },
+    }) as any
+    if (!resp.registered && resp.module === 'workpaper') {
+      ElMessage.warning('该模板未在 registry，请先 migrate')
+      return
+    }
+    visible.value = false
+    router.push({ path: resp.route_path, query: resp.route_query })
+  } catch (err: any) {
+    handleApiError(err, '模板溯源失败')
+  }
+}
+
 async function executeQuery() {
   if (!localProjectId.value && _sourceRequiresProject(selectedSource.value)) {
     ElMessage.warning('该数据源需先选择项目（模板浏览模式仅支持报表/附注/底稿模板）')
@@ -742,12 +861,50 @@ watch(visible, (v) => {
 
 // 初次挂载时按现有 projectId 加载（弹窗未必打开但提前缓存）
 loadIndicators(localProjectId.value)
+
+// ─── Req 14 AC 5: open-custom-query 事件带 source 时自动选中 + 树 reveal ────
+watch(() => props.initialSource, (source) => {
+  if (!source) return
+  // 等树加载完成后再 reveal
+  const doReveal = () => {
+    selectedSource.value = source
+    // 在树中查找匹配节点并展开 + 选中
+    if (treeRef.value) {
+      treeRef.value.setCurrentKey(source)
+      // 尝试展开祖先节点
+      const node = treeRef.value.getNode(source)
+      if (node) {
+        let parent = node.parent
+        while (parent && parent.key) {
+          parent.expanded = true
+          parent = parent.parent
+        }
+        // scroll into view
+        setTimeout(() => {
+          const el = treeRef.value?.$el?.querySelector('.is-current')
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }, 100)
+      }
+    }
+  }
+  if (indicatorTree.value.length) {
+    doReveal()
+  } else {
+    // 树尚未加载，等加载完成后 reveal
+    const stop = watch(indicatorTree, (tree) => {
+      if (tree.length) {
+        stop()
+        setTimeout(doReveal, 50)
+      }
+    })
+  }
+})
 </script>
 
 <style scoped>
 .gt-cq-container { display: flex; gap: 12px; height: calc(100vh - 140px); }
 .gt-cq-sidebar { width: 200px; flex-shrink: 0; border-right: 1px solid var(--gt-color-border-purple); padding-right: 8px; overflow-y: auto; }
-.gt-cq-sidebar-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary); margin-bottom: 8px; }
+.gt-cq-sidebar-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary); margin-bottom: 8px; display: flex; align-items: center; }
 .gt-cq-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .gt-cq-filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .gt-cq-context-chip {
@@ -798,5 +955,27 @@ loadIndicators(localProjectId.value)
   background: rgba(124, 58, 237, 0.08);
   padding: 0 4px;
   border-radius: 3px;
+}
+
+/* 右键菜单 (Req 14 AC 2) */
+.gt-cq-ctx-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--gt-color-bg-white, #fff);
+  border: 1px solid var(--gt-color-border-lighter, #e4e7ed);
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  padding: 4px 0;
+  min-width: 140px;
+}
+.gt-cq-ctx-menu-item {
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.gt-cq-ctx-menu-item:hover {
+  background: var(--gt-color-primary-bg, #f5f0ff);
+  color: var(--gt-color-primary, #7c3aed);
 }
 </style>

@@ -632,3 +632,33 @@ powershell 进程异常退出但仍持有 log 文件句柄时，`Get-Content / R
 ### 直接调 service 优于 Playwright UI
 
 单家完整入库走前端 UI 含 30+ 步骤 + 大文件 detect 数分钟，agent turn 易超时。用 Python 调用同款 service 管线（detect/identify/parse/convert/insert）效果完全等价但快 10x，最后用 Playwright 仅做"前端可见性"验证。
+
+
+## §跨模块 source 命名空间规约（2026-05-24 advanced-query-enhancements-p1p2 沉淀）
+
+### Source URI 格式（5 命名空间）
+
+- `workpaper:{wp_code}|{sheet_name}|{cell_range}` — 底稿 cell 级查询
+- `report:{report_type}|{cell_range}` — 报表虚拟 sheet（A=row_code, B=row_name, C=current_period_amount, D=prior_period_amount, E=formula）
+- `note:{section_id}|{cell_range}` — 附注虚拟 sheet（A=code, B=name, C=year_end, D=year_begin, E=formula）
+- `adj:{adjustment_type}|{cell_range}` — 调整分录虚拟 sheet（A=entry_no, B=account_code, C=account_name, D=debit_amount, E=credit_amount, F=description）
+- `tb:{aux_dim}|{cell_range}` — 试算表虚拟 sheet（A=account_code, B=account_name, C=opening_balance, D=debit_amount, E=credit_amount, F=closing_balance, G=audited_amount）
+
+判定 = 任何新增模块 cell 查询必须遵循 `{module}:{qualifier}|{cell_range}` 格式，`|` 分隔避免与命名空间 `:` 冲突。
+
+### 模板联动事件总线契约
+
+- 正向（模板→查询）：`eventBus.emit('open-custom-query', { tab: 'basic', source: string, project_id?: string })`
+- 反向（查询→模板）：`GET /api/custom-query/address-resolve?uri=...` → `router.push(route_path, route_query)`
+- 树 reveal：监听 `open-custom-query` 事件后自动展开 ancestorKeys + scroll-into-view
+
+### 跨 sheet 公式解析 regex
+
+正确 pattern（避免灾难性回溯）：
+```
+(?:'([^']+)'|([A-Za-z\u4e00-\u9fff][\w\u4e00-\u9fff]*))!([A-Z]{1,3}\d{1,7})
+```
+- Group 1 = 带引号 sheet 名（含空格/中文）
+- Group 2 = 不带引号 sheet 名（必须以字母/中文开头）
+- Group 3 = cell 引用
+- 禁止使用 `[^'!]+` 类字符类（PowerShell 转义 + 回溯风险）

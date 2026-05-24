@@ -38,7 +38,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +47,7 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import Project, User
 from app.models.custom_query_models import CustomQueryTemplate
+from app.services.wp_template_registry import wp_template_registry_service
 
 router = APIRouter(prefix="/api/custom-query", tags=["custom-query"])
 
@@ -171,7 +172,13 @@ async def get_indicators(
         ],
     })
     if response is not None:
-        response.headers["X-Indicators-Schema-Version"] = str(_INDICATORS_SCHEMA_VERSION)
+        # version = max(static schema version, DB registry max version)
+        try:
+            db_max_version = await wp_template_registry_service.get_max_version(db)
+            effective_version = max(_INDICATORS_SCHEMA_VERSION, db_max_version)
+        except Exception:
+            effective_version = _INDICATORS_SCHEMA_VERSION
+        response.headers["X-Indicators-Schema-Version"] = str(effective_version)
         response.headers["Cache-Control"] = "private, max-age=0, must-revalidate"
     return base_tree
 
@@ -180,8 +187,8 @@ async def get_indicators(
 
 _STANDARD_LABEL = {"soe": "国企", "listed": "上市"}
 # indicators 树结构 schema 版本：树字段/叶子 key 形态有变更时升 1，前端用此值自动失效旧缓存
-# 历史演进：v1 扁平 → v2 项目级 → v3 6 报表 → v4 合并模块 → v5 底稿 3 层 → v6 sheet 全集 → v7 disabled → v8 sheet 辅助灰度 + ancestorKeys
-_INDICATORS_SCHEMA_VERSION = 8
+# 历史演进：v1 扁平 → v2 项目级 → v3 6 报表 → v4 合并模块 → v5 底稿 3 层 → v6 sheet 全集 → v7 disabled → v8 sheet 辅助灰度 + ancestorKeys → v9 wp_template_registry DB
+_INDICATORS_SCHEMA_VERSION = 9
 _DISCLOSURE_CACHE: dict[str, list[dict]] = {}
 _WP_MAPPING_CACHE: list[dict] | None = None
 
@@ -445,14 +452,67 @@ def _load_step_sheet_mapping() -> dict[str, dict]:
 async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> list[dict]:
     """底稿树：循环 → 主底稿（科目名）→ sheet 程序明细。
 
-    - 树永远基于全集（wp_account_mapping + step_sheet_mapping）
+    - 优先从 wp_template_registry 表读取（Req 4），降级到 JSON 文件
     - 传入 project_id 时，从 wp_index 取该项目实际有的 wp_code 集合（裁剪后），
       不在集合里的节点标 disabled=true 灰显不可选；
       项目实际有但全集没的（罕见）补充到全集末尾
     """
-    mapping = _load_wp_mapping()
-    sheet_map = _load_step_sheet_mapping()
-    map_by_code: dict[str, dict] = {m.get("wp_code", ""): m for m in mapping if m.get("wp_code")}
+    # 优先从 DB 读取
+    registry_data: list[dict] | None = None
+    try:
+        if await wp_template_registry_service.table_exists(db):
+            registry_data = await wp_template_registry_service.load_tree(db)
+            if not registry_data:
+                registry_data = None
+    except Exception as e:
+        logger.debug("wp_template_registry read failed, fallback to JSON: %s", e)
+        registry_data = None
+
+    if registry_data:
+        # Build from DB registry
+        map_by_code: dict[str, dict] = {r["wp_code"]: r for r in registry_data}
+        primaries: list[dict] = []
+        for r in registry_data:
+            sheets_list = r.get("sheets") or []
+            sheet_names = [s["name"] if isinstance(s, dict) else s for s in sheets_list]
+            primaries.append({
+                "wp_code": r["wp_code"],
+                "wp_name": r["wp_name"],
+                "cycle": r["cycle"],
+                "account_name": "",
+                "sheets": sheet_names,
+            })
+    else:
+        # Fallback to JSON files
+        mapping = _load_wp_mapping()
+        sheet_map = _load_step_sheet_mapping()
+        map_by_code = {m.get("wp_code", ""): m for m in mapping if m.get("wp_code")}
+
+        primaries = []
+        seen: set[str] = set()
+        for m in mapping:
+            code = m.get("wp_code", "")
+            if not code or "-" in code or code in seen:
+                continue
+            seen.add(code)
+            primaries.append({
+                "wp_code": code,
+                "wp_name": m.get("wp_name", ""),
+                "cycle": m.get("cycle") or (code[:1] if code else ""),
+                "account_name": m.get("account_name") or "",
+                "sheets": sheet_map.get(code, {}).get("available_sheets") or [],
+            })
+        for code, info in sheet_map.items():
+            if "-" in code or code in seen:
+                continue
+            seen.add(code)
+            primaries.append({
+                "wp_code": code,
+                "wp_name": info.get("wp_name", ""),
+                "cycle": code[:1] if code else "",
+                "account_name": "",
+                "sheets": info.get("available_sheets") or [],
+            })
 
     # 项目级实际有的 wp_code 集合（用于判定 disabled）
     available_codes: set[str] | None = None
@@ -467,31 +527,6 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
             available_codes = {r[0] for r in rows if r[0]}
         except (TypeError, ValueError):
             available_codes = None
-
-    # 主底稿全集：mapping JSON 主底稿 + step_sheet_mapping 主底稿（去重）
-    primaries: list[dict] = []
-    seen: set[str] = set()
-    for m in mapping:
-        code = m.get("wp_code", "")
-        if not code or "-" in code or code in seen:
-            continue
-        seen.add(code)
-        primaries.append({
-            "wp_code": code,
-            "wp_name": m.get("wp_name", ""),
-            "cycle": m.get("cycle") or (code[:1] if code else ""),
-            "account_name": m.get("account_name") or "",
-        })
-    for code, info in sheet_map.items():
-        if "-" in code or code in seen:
-            continue
-        seen.add(code)
-        primaries.append({
-            "wp_code": code,
-            "wp_name": info.get("wp_name", ""),
-            "cycle": code[:1] if code else "",
-            "account_name": "",
-        })
 
     # 按 cycle 分组
     cycle_groups: dict[str, list[dict]] = {}
@@ -522,7 +557,7 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
             primary_disabled = _is_disabled(code)
             if not primary_disabled:
                 cycle_active_count += 1
-            sheets = sheet_map.get(code, {}).get("available_sheets") or []
+            sheets = p.get("sheets") or []
             children_nodes: list[dict] = []
             children_nodes.append({
                 "key": f"workpaper:{code}",
@@ -532,9 +567,6 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
                 "columns": ["wp_code", "wp_name", "audit_cycle", "status", "review_status"],
             })
             for s_name in sheets:
-                # sheet 灰度规则:
-                # 1) 主底稿在项目内被裁剪 → 该 sheet 也灰
-                # 2) sheet 名带 "(修订前)" / "(示例)" / "(提示)" / "GT_Custom" 等模板辅助标识 → 灰显（与 chain_orchestrator scenarioFilter 对齐）
                 sheet_aux = _is_aux_sheet(s_name)
                 children_nodes.append({
                     "key": f"workpaper:{code}|{s_name}",
@@ -936,10 +968,16 @@ async def wp_sheet_preview(
 @router.post("/execute")
 async def execute_query(
     body: QueryRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """执行自定义查询（关键路径自动写 audit_log）"""
+    # ─── GIN index degradation: add header when index is building ────────
+    from app.services.gin_index_monitor import is_index_building
+    if is_index_building():
+        response.headers["X-Index-Status"] = "building"
+
     source = body.source
     pid = body.project_id
     year = body.year
@@ -948,8 +986,13 @@ async def execute_query(
 
     result: dict = {"rows": [], "columns": [], "total": 0}
     try:
+        # ─── 跨模块 cell 级查询路由（Req 13）─────────────────────────────
+        # report:type|range / note:section|range / adj:type|range / tb:dim|range
+        from app.services.custom_query.module_cell_resolver import is_module_cell_source, module_cell_resolver
+        if is_module_cell_source(source):
+            result = await module_cell_resolver.resolve(db, source, pid, year)
         # disclosure_note:section_id 形式（树叶子点击）→ 走 disclosure 并把 section_id 注入 filters
-        if source.startswith("disclosure_note:"):
+        elif source.startswith("disclosure_note:"):
             sid = source.split(":", 1)[1]
             new_filters = {**filters, "section_id": sid}
             result = await _query_disclosure(db, pid, year, new_filters, limit)
@@ -1012,24 +1055,37 @@ async def execute_query(
         result = {"rows": [], "columns": [], "total": 0, "error": str(e)}
 
     # 审计日志（关键路径：底稿/合并/附注/调整 写日志，普通试算/报表/工时跳过避免噪声）
+    # 节流：相同 (user_id, source, filters) 5s 窗口内只记 1 条
     _SENSITIVE_PREFIXES = ("workpaper:", "consol_unit:", "disclosure_note:", "adj_", "disclosure")
     if source.startswith(_SENSITIVE_PREFIXES) or source in ("workpaper", "adjustment", "disclosure"):
         try:
+            from app.core.redis import get_redis
             from app.services.audit_logger_enhanced import audit_logger
-            await audit_logger.log_action(
-                user_id=current_user.id,
+            from app.services.audit_throttle import should_record
+
+            redis = await get_redis()
+            record = await should_record(
+                redis=redis,
+                user_id=str(current_user.id),
+                source=source,
+                filters=filters,
                 action="custom_query.execute",
-                object_type="custom_query",
-                object_id=None,
-                project_id=pid,
-                details={
-                    "source": source,
-                    "year": year,
-                    "filters": {k: v for k, v in filters.items() if not isinstance(v, (dict, list)) or len(str(v)) < 200},
-                    "row_count": result.get("total", 0),
-                    "has_error": "error" in result,
-                },
             )
+            if record:
+                await audit_logger.log_action(
+                    user_id=current_user.id,
+                    action="custom_query.execute",
+                    object_type="custom_query",
+                    object_id=None,
+                    project_id=pid,
+                    details={
+                        "source": source,
+                        "year": year,
+                        "filters": {k: v for k, v in filters.items() if not isinstance(v, (dict, list)) or len(str(v)) < 200},
+                        "row_count": result.get("total", 0),
+                        "has_error": "error" in result,
+                    },
+                )
         except Exception as audit_e:
             logger.warning("audit_log enqueue failed for custom_query: %s", audit_e)
 
@@ -1310,6 +1366,10 @@ async def _query_workpaper_cell_range(db, pid: str, filters: dict):
             "total": len(snapshot_rows),
             "source": "univer_snapshot",
         }
+
+    # Req 6: snapshot 缺失，记录监控指标后走 LibreOffice 兜底
+    from app.services.custom_query.metrics import inc_snapshot_missing
+    inc_snapshot_missing(wp_code)
 
     # 4. 降级：storage xlsx 路径（含 LibreOffice 按需重算）
     from app.services.wp_template_init_service import get_workpaper_file, init_workpaper_from_template
@@ -1866,3 +1926,455 @@ async def delete_template(
     await db.delete(tpl)
     await db.commit()
     return None
+
+
+# ─── Batch Execute Endpoint (Req 1) ──────────────────────────────────────────
+
+
+class BatchExecuteRequest(BaseModel):
+    wp_codes: list[str] = Field(..., min_length=1, max_length=20)
+    project_id: str
+    year: int | None = None
+    filters: dict = {}
+    cell_range: str | None = None
+    sheet_name: str | None = None
+
+
+class BatchExecuteResponse(BaseModel):
+    results: dict[str, Any]  # {wp_code: {columns, rows, total, source} | {error: str}}
+    total_success: int
+    total_failed: int
+
+
+@router.post("/batch-execute", response_model=BatchExecuteResponse)
+async def batch_execute(
+    body: BatchExecuteRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """批量查询多个底稿 wp_code（Req 1）。
+
+    - 参数校验：wp_codes 1~20 个
+    - 按 wp_code 循环调用 execute_query 内部逻辑
+    - 任一子请求失败不阻塞其它
+    - 审计日志聚合（节流适用）
+    """
+    # ─── GIN index degradation header ────────────────────────────────────
+    from app.services.gin_index_monitor import is_index_building
+    if is_index_building():
+        response.headers["X-Index-Status"] = "building"
+
+    results: dict[str, Any] = {}
+    total_success = 0
+    total_failed = 0
+
+    for wp_code in body.wp_codes:
+        try:
+            # 构建 source：workpaper:{wp_code} 或 workpaper:{wp_code}|{sheet_name}
+            if body.sheet_name:
+                source = f"workpaper:{wp_code}|{body.sheet_name}"
+            else:
+                source = f"workpaper:{wp_code}"
+
+            filters = {**body.filters, "wp_code": wp_code}
+            if body.sheet_name:
+                filters["sheet_name"] = body.sheet_name
+
+            # 判断是否走 cell_range 路径
+            if body.cell_range:
+                filters["cell_range"] = body.cell_range
+                sub_result = await _query_workpaper_cell_range(db, body.project_id, filters)
+            else:
+                sub_result = await _query_workpaper(
+                    db, body.project_id, body.year, filters, 500
+                )
+
+            results[wp_code] = sub_result
+            total_success += 1
+        except Exception as e:
+            results[wp_code] = {"error": str(e), "rows": [], "columns": [], "total": 0}
+            total_failed += 1
+
+    # 审计日志聚合（节流适用）
+    try:
+        from app.core.redis import get_redis
+        from app.services.audit_logger_enhanced import audit_logger
+        from app.services.audit_throttle import should_record
+
+        redis = await get_redis()
+        record = await should_record(
+            redis=redis,
+            user_id=str(current_user.id),
+            source=f"batch:{','.join(body.wp_codes[:5])}",
+            filters=body.filters,
+            action="custom_query.execute",
+        )
+        if record:
+            await audit_logger.log_action(
+                user_id=current_user.id,
+                action="custom_query.batch_execute",
+                object_type="custom_query",
+                object_id=None,
+                project_id=body.project_id,
+                details={
+                    "wp_codes": body.wp_codes,
+                    "year": body.year,
+                    "total_success": total_success,
+                    "total_failed": total_failed,
+                    "cell_range": body.cell_range,
+                    "sheet_name": body.sheet_name,
+                },
+            )
+    except Exception as audit_e:
+        logger.warning("audit_log enqueue failed for batch_execute: %s", audit_e)
+
+    return BatchExecuteResponse(
+        results=results,
+        total_success=total_success,
+        total_failed=total_failed,
+    )
+
+
+# ─── Cell Writeback Endpoint (Req 2, Req 13) ────────────────────────────────
+
+
+class CellWritebackRequest(BaseModel):
+    wp_code: str
+    sheet_name: str
+    cell_ref: str  # e.g. "B7"
+    new_value: Any = None
+    module: Literal["workpaper", "report", "note", "adj", "tb"] = "workpaper"
+
+
+@router.post("/cell-writeback")
+async def cell_writeback(
+    body: CellWritebackRequest,
+    response: Response,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """双向写回单 cell（Req 2, Req 13）。
+
+    Headers: X-File-Opened-At (ISO 8601)
+    Response 200: {success: true, updated_at: str}
+    Response 409: {conflict: true, latest_updated_at: str, latest_editor: str}
+    Response 403: {error: "no_write_permission"} or {error: "non_workpaper_source"}
+    """
+    from app.services.custom_query.snapshot_writer import (
+        WritebackConflict,
+        WritebackPermissionDenied,
+        snapshot_writer,
+    )
+
+    # 解析 X-File-Opened-At header
+    opened_at_str = request.headers.get("X-File-Opened-At")
+    if not opened_at_str:
+        raise HTTPException(status_code=400, detail="Missing X-File-Opened-At header")
+
+    try:
+        opened_at = datetime.fromisoformat(opened_at_str.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid X-File-Opened-At format")
+
+    # 权限检查：非 workpaper 模块的写回需要额外验证
+    if body.module != "workpaper":
+        # 对于非 workpaper 模块，检查用户是否有写权限
+        user_role = getattr(current_user, "role", "")
+        if user_role not in ("admin", "manager", "partner", "senior", "assistant"):
+            raise HTTPException(
+                status_code=403,
+                detail={"error": "no_write_permission"},
+            )
+
+    # 查找 wp_id（workpaper 模块通过 wp_code 查找）
+    if body.module == "workpaper":
+        result = await db.execute(
+            text("SELECT id FROM working_papers WHERE wp_code = :code LIMIT 1"),
+            {"code": body.wp_code},
+        )
+        wp_row = result.first()
+        if not wp_row:
+            raise HTTPException(status_code=404, detail=f"Working paper not found: {body.wp_code}")
+        wp_id = str(wp_row[0])
+    else:
+        # 对于其他模块，wp_code 作为标识符传递
+        wp_id = body.wp_code
+
+    try:
+        write_result = await snapshot_writer.write_cell(
+            db=db,
+            user=current_user,
+            wp_id=wp_id,
+            sheet_name=body.sheet_name,
+            cell_ref=body.cell_ref,
+            new_value=body.new_value,
+            opened_at=opened_at,
+            module=body.module,
+        )
+        await db.commit()
+    except WritebackConflict as e:
+        await db.rollback()
+        return Response(
+            content=json.dumps({
+                "conflict": True,
+                "latest_updated_at": e.latest_updated_at.isoformat() if e.latest_updated_at else None,
+                "latest_editor": e.latest_editor,
+            }),
+            status_code=409,
+            media_type="application/json",
+        )
+    except WritebackPermissionDenied as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=403,
+            detail={"error": e.reason},
+        )
+    except ValueError as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # 审计日志 — 敏感操作不节流（每次必记）
+    try:
+        from app.services.audit_logger_enhanced import audit_logger
+
+        await audit_logger.log_action(
+            user_id=current_user.id,
+            action="custom_query.cell_writeback",
+            object_type="working_paper",
+            object_id=wp_id,
+            project_id=None,
+            details={
+                "wp_code": body.wp_code,
+                "sheet_name": body.sheet_name,
+                "cell_ref": body.cell_ref,
+                "old_value": write_result.get("old_value"),
+                "new_value": body.new_value,
+                "module": body.module,
+            },
+        )
+    except Exception as audit_e:
+        logger.warning("audit_log for cell_writeback failed: %s", audit_e)
+
+    return {
+        "success": True,
+        "updated_at": write_result.get("updated_at"),
+    }
+
+
+# ─── GIN Index Health Endpoint ───────────────────────────────────────────────
+
+
+@router.get("/index-health")
+async def get_index_health(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get GIN index health status (building state + size alert).
+
+    Requirements: Req 5 AC 4, AC 5
+    """
+    from app.services.gin_index_monitor import (
+        is_index_building,
+        get_index_size_bytes,
+        check_index_size_alert,
+        INDEX_SIZE_ALERT_THRESHOLD_BYTES,
+    )
+
+    building = is_index_building()
+    size_bytes = await get_index_size_bytes(db)
+    alert = await check_index_size_alert(db)
+
+    return {
+        "index_name": "idx_wp_parsed_data_gin",
+        "is_building": building,
+        "size_bytes": size_bytes,
+        "size_mb": round(size_bytes / (1024 * 1024), 2) if size_bytes else None,
+        "threshold_mb": INDEX_SIZE_ALERT_THRESHOLD_BYTES / (1024 * 1024),
+        "alert": alert,
+    }
+
+
+# ─── Cross-Sheet Trace Endpoint (Req 3) ──────────────────────────────────────
+
+
+@router.get("/cross-sheet-trace")
+async def cross_sheet_trace(
+    wp_code: str = Query(..., description="底稿编码"),
+    sheet_name: str = Query(..., description="起始 sheet 名"),
+    cell_ref: str = Query(..., description="起始 cell 引用 (e.g. A2)"),
+    project_id: str = Query(..., description="项目 ID"),
+    max_depth: int = Query(default=3, ge=1, le=3, description="最大追溯深度 (上限 3)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """跨 sheet 公式追溯（BFS 最深 3 层）。
+
+    Requirements: Req 3 AC 1-5
+    - BFS 遍历 =Sheet!Cell 引用链
+    - 环检测：visited set，发现重复 URI 标 cycle=True
+    - 引用目标缺失标 missing=True 不阻塞其它分支
+    - 敏感操作不参与审计节流（每次必记）
+    """
+    from app.services.custom_query.cross_sheet_resolver import (
+        cross_sheet_resolver,
+        RefChainResponse,
+    )
+
+    # 查找 working_paper 的 parsed_data
+    result = await db.execute(
+        text("SELECT id, parsed_data FROM working_papers WHERE wp_code = :code LIMIT 1"),
+        {"code": wp_code},
+    )
+    wp_row = result.first()
+    if not wp_row:
+        raise HTTPException(status_code=404, detail=f"Working paper not found: {wp_code}")
+
+    wp_id = str(wp_row[0])
+    parsed_data = wp_row[1] if wp_row[1] else {}
+
+    # 如果 parsed_data 是字符串则解析
+    if isinstance(parsed_data, str):
+        try:
+            parsed_data = json.loads(parsed_data)
+        except (json.JSONDecodeError, TypeError):
+            parsed_data = {}
+
+    # 执行 BFS 追溯
+    trace_result = cross_sheet_resolver.resolve(
+        parsed_data=parsed_data,
+        sheet_name=sheet_name,
+        cell_ref=cell_ref,
+        max_depth=max_depth,
+    )
+
+    # 审计日志 — 敏感操作不节流（每次必记）
+    try:
+        from app.services.audit_logger_enhanced import audit_logger
+
+        await audit_logger.log_action(
+            user_id=current_user.id,
+            action="custom_query.cross_sheet_trace",
+            object_type="working_paper",
+            object_id=wp_id,
+            project_id=project_id,
+            details={
+                "wp_code": wp_code,
+                "sheet_name": sheet_name,
+                "cell_ref": cell_ref,
+                "max_depth": max_depth,
+                "chain_length": len(trace_result.chain),
+                "has_cycle": trace_result.has_cycle,
+            },
+        )
+    except Exception as audit_e:
+        logger.warning("audit_log for cross_sheet_trace failed: %s", audit_e)
+
+    return trace_result.model_dump()
+
+
+# ─── Address Resolve Endpoint (Req 14 AC 2/3) ────────────────────────────────
+
+
+class AddressResolveResponse(BaseModel):
+    module: str  # workpaper / report / note / adj / tb
+    template_wp_code: str | None = None
+    template_name: str | None = None
+    sheet_name: str | None = None
+    cell_ref: str | None = None
+    registered: bool = False  # wp_template_registry 是否已注册
+    route_path: str = ""  # 前端跳转路径
+    route_query: dict = Field(default_factory=dict)  # highlight 参数
+
+
+@router.get("/address-resolve", response_model=AddressResolveResponse)
+async def address_resolve(
+    uri: str = Query(..., description="Source URI, e.g. 'workpaper:D2|审定表D2-1|B7'"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """URI 反查模板信息（模板溯源）。
+
+    Requirements: Req 14 AC 2, AC 3
+    - 解析 URI 得到 module / wp_code / sheet / cell
+    - 查 wp_template_registry 判断是否已注册
+    - 返回前端跳转路径 + highlight 参数
+    """
+    from app.services.custom_query.module_cell_resolver import parse_source_uri
+
+    parsed = parse_source_uri(uri)
+    if not parsed:
+        raise HTTPException(status_code=400, detail=f"Invalid source URI: {uri}")
+
+    module = parsed.get("module", "")
+    qualifier = parsed.get("qualifier", "")
+    sheet_name = parsed.get("sheet_name")
+    cell_range = parsed.get("cell_range")
+
+    # 对于 workpaper 模块，qualifier 是 wp_code
+    template_wp_code: str | None = None
+    template_name: str | None = None
+    registered = False
+    route_path = ""
+    route_query: dict = {}
+
+    if module == "workpaper":
+        template_wp_code = qualifier
+        # 查 wp_template_registry 判断是否已注册
+        result = await db.execute(
+            text("SELECT wp_name FROM wp_template_registry WHERE wp_code = :code"),
+            {"code": qualifier},
+        )
+        row = result.first()
+        if row:
+            registered = True
+            template_name = row[0]
+        # 前端跳转路径：模板库底稿详情
+        route_path = "/template-library"
+        route_query = {"tab": "workpaper", "wp_code": qualifier}
+        if sheet_name:
+            route_query["sheet"] = sheet_name
+        if cell_range:
+            route_query["highlight"] = cell_range
+
+    elif module == "report":
+        template_wp_code = None
+        template_name = qualifier  # report_type as name
+        registered = True  # 报表模板始终存在于 report_config
+        route_path = "/template-library"
+        route_query = {"tab": "report", "report_type": qualifier}
+        if cell_range:
+            route_query["highlight"] = cell_range
+
+    elif module == "note":
+        template_wp_code = None
+        template_name = qualifier  # section_id as name
+        registered = True  # 附注模板始终存在于 seed JSON
+        route_path = "/template-library"
+        route_query = {"tab": "note", "section_id": qualifier}
+        if cell_range:
+            route_query["highlight"] = cell_range
+
+    elif module in ("adj", "tb"):
+        template_wp_code = None
+        template_name = qualifier
+        registered = False
+        route_path = "/template-library"
+        route_query = {"tab": module, "qualifier": qualifier}
+        if cell_range:
+            route_query["highlight"] = cell_range
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported module: {module}")
+
+    return AddressResolveResponse(
+        module=module,
+        template_wp_code=template_wp_code,
+        template_name=template_name,
+        sheet_name=sheet_name,
+        cell_ref=cell_range,
+        registered=registered,
+        route_path=route_path,
+        route_query=route_query,
+    )

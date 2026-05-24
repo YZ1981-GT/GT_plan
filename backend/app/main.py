@@ -37,6 +37,8 @@ async def lifespan(app: FastAPI):
     register_event_handlers()
     _register_phase_handlers()
     await _replay_startup_events()
+    await _check_gin_index_status()
+    await _check_libreoffice_health()
 
     stop_event = asyncio.Event()
     tasks = _start_workers(stop_event)
@@ -91,6 +93,35 @@ def _register_phase_handlers() -> None:
     register_eqcr_gate_rules()
     register_cross_check_rules()
     register_task_handlers()
+
+
+async def _check_gin_index_status() -> None:
+    """Startup check: detect if parsed_data GIN index is building → set global flag."""
+    import logging as _log
+    try:
+        from app.core.database import async_session
+        from app.services.gin_index_monitor import check_index_building_status
+        async with async_session() as session:
+            await check_index_building_status(session)
+    except Exception as e:
+        _log.getLogger("audit_platform").debug(
+            "[启动] GIN index status check skipped (non-PG or unavailable): %s", e
+        )
+
+
+async def _check_libreoffice_health() -> None:
+    """Startup check: probe LibreOffice paths + run soffice --version (Req 8.3).
+
+    失败时记录 logger.error 但不阻塞应用启动（三级数据源前两级仍可用）。
+    """
+    import logging as _log
+    try:
+        from app.services.libreoffice_pool import startup_health_check
+        await startup_health_check()
+    except Exception as e:
+        _log.getLogger("audit_platform").debug(
+            "[启动] LibreOffice health check skipped: %s", e
+        )
 
 
 async def _replay_startup_events() -> None:

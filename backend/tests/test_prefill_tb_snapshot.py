@@ -54,8 +54,8 @@ async def db_session() -> AsyncSession:
     await engine.dispose()
 
 
-def _build_xlsx_with_tb_formula(tmp: Path, formula: str = "=TB('1001','期末余额')") -> Path:
-    """构造含 TB 公式的最小 xlsx + 同名 structure.json（prefill 写值需要）"""
+def _build_xlsx_with_tb_formula(tmp: Path, formula: str = "=TB('1001','期末余额')") -> tuple[Path, dict]:
+    """构造含 TB 公式的最小 xlsx + 对应 univer_snapshot parsed_data（prefill 写值需要）"""
     wb = Workbook()
     ws = wb.active
     ws.title = "PFTest"
@@ -65,27 +65,32 @@ def _build_xlsx_with_tb_formula(tmp: Path, formula: str = "=TB('1001','期末余
     wb.save(fp)
     wb.close()
 
-    # 构造 minimal structure.json，prefill 才会增加 filled 计数
-    structure = {
-        "sheets": [{"name": "PFTest"}],
-        "rows": [
-            {
-                "cells": [
-                    {"value": "账户", "formula": None},
-                    {"value": "", "formula": formula},
-                ]
-            }
-        ],
+    # 构造 minimal univer_snapshot（Req 6 单源化：不再写 structure.json）
+    parsed_data = {
+        "univer_snapshot": {
+            "sheets": {
+                "PFTest": {
+                    "cellData": {
+                        "0": {
+                            "0": {"v": "账户"},
+                            "1": {"v": "", "f": formula},
+                        }
+                    },
+                    "cell_count": 2,
+                }
+            },
+            "sheet_order_names": ["PFTest"],
+            "saved_at": "2026-01-01T00:00:00Z",
+            "version": 1,
+            "total_cells": 2,
+        }
     }
-    structure_path = fp.with_suffix(".structure.json")
-    with open(structure_path, "w", encoding="utf-8") as sf:
-        json.dump(structure, sf, ensure_ascii=False)
 
-    return fp
+    return fp, parsed_data
 
 
 async def _seed_project_and_wp(
-    db: AsyncSession, file_path: Path
+    db: AsyncSession, file_path: Path, parsed_data: dict | None = None
 ) -> uuid.UUID:
     project = Project(
         id=FAKE_PROJECT_ID,
@@ -112,6 +117,7 @@ async def _seed_project_and_wp(
         file_path=str(file_path),
         source_type=WpSourceType.template,
         file_version=1,
+        parsed_data=parsed_data,
     )
     db.add(wp)
     await db.commit()
@@ -142,8 +148,8 @@ async def test_prefill_records_tb_snapshot_for_tb_formula(
     db_session: AsyncSession, tmp_path: Path
 ):
     """L-3 task 2.3: prefill 后 prefill_tb_snapshot 应记录 TB 公式涉及账户的 audited_amount"""
-    fp = _build_xlsx_with_tb_formula(tmp_path, "=TB('1001','期末余额')")
-    wp_id = await _seed_project_and_wp(db_session, fp)
+    fp, parsed_data = _build_xlsx_with_tb_formula(tmp_path, "=TB('1001','期末余额')")
+    wp_id = await _seed_project_and_wp(db_session, fp, parsed_data)
     _add_tb_row(db_session, "1001", 12345.67, year=2025)
     await db_session.commit()
 
@@ -189,18 +195,27 @@ async def test_prefill_snapshot_extracts_only_tb_aux_account_codes(
     wb.save(fp)
     wb.close()
 
-    structure = {
-        "sheets": [{"name": "PFTest"}],
-        "rows": [
-            {"cells": [{"value": "h1", "formula": None}, {"value": "", "formula": "=TB('2001','期末余额')"}]},
-            {"cells": [{"value": "h2", "formula": None}, {"value": "", "formula": "=AUX('1122','客户','C001','期末余额')"}]},
-            {"cells": [{"value": "h3", "formula": None}, {"value": "", "formula": "=WP('E1-1','Sheet1','B5')"}]},
-        ],
+    # 构造 univer_snapshot（Req 6 单源化：不再写 structure.json）
+    parsed_data = {
+        "univer_snapshot": {
+            "sheets": {
+                "PFTest": {
+                    "cellData": {
+                        "0": {"0": {"v": "h1"}, "1": {"v": "", "f": "=TB('2001','期末余额')"}},
+                        "1": {"0": {"v": "h2"}, "1": {"v": "", "f": "=AUX('1122','客户','C001','期末余额')"}},
+                        "2": {"0": {"v": "h3"}, "1": {"v": "", "f": "=WP('E1-1','Sheet1','B5')"}},
+                    },
+                    "cell_count": 6,
+                }
+            },
+            "sheet_order_names": ["PFTest"],
+            "saved_at": "2026-01-01T00:00:00Z",
+            "version": 1,
+            "total_cells": 6,
+        }
     }
-    with open(fp.with_suffix(".structure.json"), "w", encoding="utf-8") as sf:
-        json.dump(structure, sf, ensure_ascii=False)
 
-    wp_id = await _seed_project_and_wp(db_session, fp)
+    wp_id = await _seed_project_and_wp(db_session, fp, parsed_data)
     _add_tb_row(db_session, "2001", 9876.54, year=2025)
     _add_tb_row(db_session, "1122", 555.00, year=2025)
     await db_session.commit()

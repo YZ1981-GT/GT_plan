@@ -95,6 +95,14 @@
       </div>
     </div>
 
+    <!-- 1.5 高级查询入口按钮 (Req 14 AC 1) -->
+    <div class="gt-wpd-card gt-wpd-card--actions">
+      <TemplateLibraryButton
+        :source="templateSource"
+        :project-id="props.projectId"
+      />
+    </div>
+
     <!-- 2. 主文件下载区 -->
     <div class="gt-wpd-card">
       <div class="gt-wpd-card-title">
@@ -384,6 +392,7 @@ import {
   officePreview as P_office,
 } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import TemplateLibraryButton from './TemplateLibraryButton.vue'
 
 interface Props {
   wpCode: string
@@ -479,6 +488,9 @@ const sourcesExpanded = ref<string[]>([])
 
 const sheetCount = computed(() => template.value?.sheet_count ?? 1)
 const sourceFileCount = computed(() => template.value?.source_file_count ?? 0)
+
+// 高级查询 source URI（Req 14 AC 1）
+const templateSource = computed(() => `workpaper:${props.wpCode}`)
 
 // 合并 sheets 列表（从 prefill cells 提取去重 + 标注公式数）
 const mergedSheets = computed<MergedSheetEntry[]>(() => {
@@ -725,6 +737,11 @@ watch(
   border: 1px solid var(--gt-color-border-lighter);
   border-radius: 6px;
   padding: 12px 16px;
+}
+.gt-wpd-card--actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .gt-wpd-card-title {

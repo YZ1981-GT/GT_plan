@@ -38,6 +38,11 @@
           {{ stats.invalidRefRows }}
         </span>
       </span>
+      <!-- Req 14 AC 1: 高级查询入口 -->
+      <TemplateLibraryButton
+        :source="reportSource"
+        style="margin-left: auto"
+      />
     </div>
 
     <!-- 准则切换 Tab -->
@@ -245,6 +250,7 @@ import { api } from '@/services/apiProxy'
 import { reportConfig as P_rc } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { useAuthStore } from '@/stores/auth'
+import TemplateLibraryButton from './TemplateLibraryButton.vue'
 
 interface ReportConfigRow {
   id?: string
@@ -301,6 +307,9 @@ const loading = ref(false)
 const activeStandard = ref<string>('soe_standalone')
 const rowsByStandard = ref<Record<string, ReportConfigRow[]>>({})
 const standardCounts = ref<Record<string, number>>({})
+
+// Req 14 AC 1: 高级查询 source URI（报表模板页 → report:balance_sheet 默认）
+const reportSource = computed(() => 'report:balance_sheet')
 
 const searchInput = ref('')
 const searchText = ref('')

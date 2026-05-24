@@ -336,6 +336,7 @@
       :project-id="currentProjectId"
       :year="currentYear"
       :initial-tab="customQueryInitialTab"
+      :initial-source="customQueryInitialSource"
     />
 
     <!-- 全局快捷键帮助面板 [R7-S2-12] -->
@@ -468,6 +469,7 @@ const fullscreen = ref(false)
 const showFormulaManager = ref(false)
 const showCustomQuery = ref(false)
 const customQueryInitialTab = ref<'basic' | 'advanced'>('basic')
+const customQueryInitialSource = ref<string | undefined>(undefined)
 const showShortcutHelp = ref(false)
 const currentProjectId = computed(() => (route.params.projectId as string) || '')
 const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
@@ -812,9 +814,10 @@ function onOpenFormulaEvent(payload: { nodeKey?: string }) {
   }
 }
 
-/** 监听全局打开自定义查询事件（如 Dashboard 快捷操作触发） */
-function onOpenCustomQueryEvent(payload?: { tab?: 'basic' | 'advanced' }) {
+/** 监听全局打开自定义查询事件（如 Dashboard 快捷操作 / 模板页触发） */
+function onOpenCustomQueryEvent(payload?: { tab?: 'basic' | 'advanced'; source?: string; project_id?: string }) {
   customQueryInitialTab.value = payload?.tab || 'basic'
+  customQueryInitialSource.value = payload?.source || undefined
   showCustomQuery.value = true
 }
 

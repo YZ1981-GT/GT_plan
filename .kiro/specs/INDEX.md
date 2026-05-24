@@ -1,6 +1,6 @@
 # Spec 总索引
 
-**最后更新**：2026-05-23（v3.5 — `ledger-import-view-refactor` 9.8/9.9/9.10 全部上线，5 个长尾 spec 均 100%；附带修复 4 真生产 bug：set_rls_context PG 绑定参数 / V005 RLS POLICY 残缺 / day30 CONCURRENTLY 事务 / lock_timeout）
+**最后更新**：2026-05-24（v3.6 — `advanced-query-enhancements-p1p2` 16 Task 全部完成，212 tests green；15 Req 闭环七条线：查询+写回+追溯+治理+跨模块+联动+入口）
 
 > 此索引追踪所有 spec 的状态、关联文档、commit。
 > **审计原则**：spec 不删，但标"演进/被取代/已合并"避免重复阅读。
@@ -48,6 +48,7 @@
 | `audit-chain-generation/` | 101/101 ✅ | 2026-05-23 完成（综合 PBT 9 项 / 22 tests）|
 | `enterprise-linkage/` | 56/56 ✅ | 2026-05-23 完成（10 项 PBT + 集成 + 性能基线 / 22 tests）|
 | `ledger-import-view-refactor/` | 243/243 ✅ | 2026-05-23 完成（9.10 Day 30 索引清理：72.82MB DROP + 38MB REINDEX 共 110MB 回收）|
+| `advanced-query-enhancements-p1p2/` | 16 Tasks ✅ | 2026-05-24 完成（15 Req / 5 Phase / 212 tests：29 PBT + 单测 + e2e；wp_template_registry + GIN + 单源化 + 审计节流 + LO 池化 + 跨模块 cell + 模板联动 + 批量查询 + 写回 + 追溯 + 4 体验组件）|
 | `k-admin-cycle-post-review-fix/` | 18/18 ✅ | 2026-05-20 完成 |
 
 ### 2.2 已被取代（保留 ADR）

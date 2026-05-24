@@ -406,3 +406,59 @@ where.append(sa.or_(loss_gain_active, other_active))
 - openpyxl `Color.rgb` 对 theme/indexed 色返回降级字符串，必须用 `_safe_hex_rgb()` 二次校验
 - el-dialog 必须 `append-to-body`（三栏布局 overflow:hidden 截断）
 - eventBus 新事件必须先在 Events type map 添加键（mitt 运行时通过但 TS 报错）
+
+
+## §高级查询模块架构（2026-05-24 advanced-query-enhancements-p1p2）
+
+### wp_template_registry 表
+
+```
+wp_template_registry (184 主底稿)
+├── wp_code VARCHAR(32) PK
+├── wp_name VARCHAR(255)
+├── cycle VARCHAR(2) CHECK (A~N+S)
+├── account_codes JSONB (GIN 索引)
+├── sheets JSONB [{name, is_aux, sort_order}]
+├── applicable_standard JSONB
+├── version INTEGER (递增触发 X-Indicators-Schema-Version)
+├── source_origin VARCHAR(64) (wp_account_mapping / step_sheet_mapping / merged)
+└── 3 索引: cycle B-tree / updated_at DESC / account_codes GIN
+```
+
+### parsed_data GIN 索引
+
+- `idx_wp_parsed_data_gin` ON working_papers USING GIN (parsed_data jsonb_path_ops)
+- CREATE INDEX CONCURRENTLY（不锁表）+ _ccnew 残骸清理
+- 启动时 `pg_stat_progress_create_index` 检查 → `INDEX_BUILDING` 全局 flag
+- flag=True 时查询降级顺序扫描 + `X-Index-Status=building` 响应头
+- 体积 > 500MB 触发 `pg_index_size` 告警
+
+### LibreOffice 池化
+
+- 模块级 `asyncio.Semaphore(2)` 限制并发
+- Windows: `-env:UserInstallation=file:///tmp/soffice_{pid}_{tid}` 隔离
+- 4 路径 fallback: libreoffice / soffice / C:\Program Files\... / /usr/bin/...
+- 60s 超时 kill + HTTP 504 + semaphore 释放
+- `X-Recompute-Queue-Depth` 响应头（队列 ≥ 10 时）+ Prometheus metric
+
+### 4 模块 cell 提取器
+
+```
+SheetCellRangePicker → Module_Cell_Resolver (路由器)
+  ├── workpaper:wp_code|sheet|range → _query_workpaper_cell_range (parsed_data)
+  ├── report:type|range → _query_report_cells (report_snapshot.data JSONB)
+  ├── note:section_id|range → _query_note_cells (consol_note_data.data JSONB)
+  ├── adj:type|range → _query_adj_cells (adjustments 表 → 虚拟 sheet)
+  └── tb:aux_dim|range → _query_tb_cells (trial_balance → 虚拟 sheet)
+  
+统一输出: {cell_ref, value, formula, sheet_name, module}
+```
+
+### SnapshotWriter 写回路由
+
+- workpaper → `parsed_data['univer_snapshot']` JSONB + xlsx cache
+- report → `report_snapshot.data` JSONB
+- note → `consol_note_data.data` JSONB
+- adj → `adjustments` 表 UPDATE (按列名)
+- tb → `trial_balance.audited_amount` UPDATE (仅 G 列可写)
+- 乐观锁: X-File-Opened-At vs updated_at → 409 WritebackConflict

@@ -39,9 +39,8 @@
             :show-copy="true"
             :show-fullscreen="true"
             :is-fullscreen="tbFullscreen"
-            :show-export="true"
-            :show-import="true"
-            import-label="Excel导入"
+            :show-export="false"
+            :show-import="false"
             :show-formula="true"
             @copy="copyTbTable"
             @fullscreen="toggleTbFullscreen()"
@@ -125,6 +124,12 @@
         <input ref="tbSumImportInput" type="file" accept=".xlsx,.xls" style="display:none" @change="onTbSumImportFile" />
         <el-button size="small" @click="saveTbSummary">💾 保存</el-button>
         <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);margin-left:12px">{{ tbSummaryRows.length }} 行</span>
+      </template>
+      <!-- 科目明细工具栏（导出/导入） -->
+      <template v-if="tbViewMode === 'detail'">
+        <span style="flex:1" />
+        <el-button size="small" @click="onExport">📤 导出Excel</el-button>
+        <el-button size="small" @click="onToolbarImport">📥 Excel导入</el-button>
       </template>
     </div>
 
@@ -370,12 +375,20 @@
 
     <!-- 试算平衡表视图（报表行次级别） -->
     <div v-if="tbViewMode === 'summary'">
-      <!-- 期初/期末切换 -->
+      <!-- 期初/期末切换 — 胶囊分段控制器 -->
       <div style="display:flex;gap:12px;margin-bottom:8px;align-items:center">
-        <el-radio-group v-model="tbSumPeriod" size="small" @change="loadTbSummary()">
-          <el-radio-button value="ending">期末试算</el-radio-button>
-          <el-radio-button value="opening">期初试算</el-radio-button>
-        </el-radio-group>
+        <div class="gt-period-segmented">
+          <span
+            class="gt-period-segmented__item"
+            :class="{ 'gt-period-segmented__item--active': tbSumPeriod === 'ending' }"
+            @click="tbSumPeriod = 'ending'; loadTbSummary()"
+          >期末试算</span>
+          <span
+            class="gt-period-segmented__item"
+            :class="{ 'gt-period-segmented__item--active': tbSumPeriod === 'opening' }"
+            @click="tbSumPeriod = 'opening'; loadTbSummary()"
+          >期初试算</span>
+        </div>
         <span v-if="tbSumPeriod === 'opening'" style="font-size: var(--gt-font-size-xs);color: var(--gt-color-wheat)">
           {{ tbSumOpeningSource === 'prior_year' ? '📎 数据来源：上年审定数' : '✏️ 首次承接：手动填写' }}
         </span>
@@ -2510,6 +2523,33 @@ async function onTbSumImportFile(e: Event) {
 
 <style scoped>
   .gt-trial-balance { padding: var(--gt-space-5); }
+
+  /* 期初/期末 胶囊分段控制器 */
+  .gt-period-segmented {
+    display: inline-flex;
+    background: #f3f0f8;
+    border-radius: 6px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .gt-period-segmented__item {
+    padding: 4px 14px;
+    font-size: 13px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--gt-color-text-secondary, #606266);
+    transition: all 0.2s ease;
+    user-select: none;
+    font-weight: 500;
+  }
+  .gt-period-segmented__item:hover {
+    color: var(--gt-color-primary, #4b2d77);
+  }
+  .gt-period-segmented__item--active {
+    background: var(--gt-color-primary, #4b2d77);
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(75, 45, 119, 0.3);
+  }
 
   /* 折叠/展开按钮 */
   .gt-header-toggle {

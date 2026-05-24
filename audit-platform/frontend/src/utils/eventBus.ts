@@ -259,8 +259,8 @@ export type Events = {
     previous_holder_id?: string
   }
 
-  // 全局打开自定义查询（Dashboard 快捷操作 / 侧栏 → ThreeColumnLayout 打开弹窗）
-  'open-custom-query': { tab?: 'basic' | 'advanced' } | undefined
+  // 全局打开自定义查询（Dashboard 快捷操作 / 侧栏 / 模板页 → ThreeColumnLayout 打开弹窗）
+  'open-custom-query': { tab?: 'basic' | 'advanced'; source?: string; project_id?: string } | undefined
 
   // 年度切换（R8-S1-04）
   'year:changed': YearChangedPayload

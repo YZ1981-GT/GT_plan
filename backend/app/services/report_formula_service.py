@@ -281,9 +281,9 @@ def _convert_formula(formula: str | None, col: str) -> str | None:
         lambda m: f"ROW('{m.group(1)}')",
         result,
     )
-    # TB
+    # TB (支持纯数字如 TB(1122) 和带连字符如 TB(1231-01))
     result = re.sub(
-        r"TB\((\d+)\)",
+        r"TB\(([\d]+(?:-[\d]+)?)\)",
         lambda m: f"TB('{m.group(1)}','{col}')",
         result,
     )

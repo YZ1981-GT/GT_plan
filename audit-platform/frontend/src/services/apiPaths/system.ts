@@ -594,6 +594,7 @@ export const addressRegistry = {
 export const customQuery = {
   indicators: '/api/custom-query/indicators',
   execute: '/api/custom-query/execute',
+  batchExecute: '/api/custom-query/batch-execute',
   templates: '/api/custom-query/templates',
   templateDetail: (id: string) => `/api/custom-query/templates/${id}`,
 } as const

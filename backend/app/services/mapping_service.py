@@ -451,17 +451,67 @@ def _extract_level1_code(code: str) -> str:
     Handles multiple formats:
     - "6401.01" → "6401"  (dot-separated)
     - "6401-01" → "6401"  (dash-separated)
+    - "6401/01" → "6401"  (slash-separated)
+    - "6401_01" → "6401"  (underscore-separated)
+    - "6401\\01" → "6401" (backslash-separated)
+    - "6401 01" → "6401"  (space-separated)
     - "640101"  → "6401"  (concatenated, first 4 digits)
     - "6401"    → "6401"  (already level-1)
     """
     # Strip leading/trailing whitespace
     code = code.strip()
-    # If contains dot or dash, take the part before first separator
-    for sep in (".", "-"):
+    # If contains any common separator, take the part before first separator
+    for sep in (".", "-", "/", "_", "\\", " "):
         if sep in code:
             return code.split(sep)[0]
     # Pure digits: take first 4 chars as level-1 code
     return code[:4] if len(code) >= 4 else code
+
+
+def _normalize_account_code(code: str) -> str:
+    """Strip all common separators from an account code for lookup.
+
+    "1231.01"  → "123101"
+    "1231-01"  → "123101"
+    "1231/01"  → "123101"
+    "1231_01"  → "123101"
+    "1231\\01" → "123101"
+    "1231 01"  → "123101"
+    "123101"   → "123101"
+    """
+    if not code:
+        return ""
+    out = code.strip()
+    for sep in (".", "-", "/", "_", "\\", " "):
+        out = out.replace(sep, "")
+    return out
+
+
+# 坏账准备二级科目关键词映射表
+_BAD_DEBT_KEYWORD_MAP: list[tuple[list[str], str]] = [
+    (["应收票据", "票据"], "1231-01"),
+    (["应收账款"], "1231-02"),
+    (["其他应收"], "1231-03"),
+    (["预付账款", "预付款"], "1231-04"),
+    (["合同资产"], "1231-05"),
+]
+
+
+def _match_bad_debt_sub_account(
+    name: str, std_by_code: dict[str, "AccountChart"]
+) -> "AccountChart | None":
+    """按科目名称关键词匹配坏账准备二级标准科目。
+
+    客户科目名称中含"应收票据"→ 1231-01，含"应收账款"→ 1231-02，含"其他应收"→ 1231-03。
+    优先匹配更具体的关键词（应收票据 > 票据）。
+    """
+    if not name:
+        return None
+    for keywords, std_code in _BAD_DEBT_KEYWORD_MAP:
+        for kw in keywords:
+            if kw in name:
+                return std_by_code.get(std_code)
+    return None
 
 
 def _match_single(
@@ -473,8 +523,9 @@ def _match_single(
     """Try to match a single client account against standard accounts."""
     code = client.account_code
     name = client.account_name
-    # Normalize: strip dots/dashes for lookup (e.g. "6401.01" → "640101")
-    normalized = code.replace(".", "").replace("-", "").strip()
+    # Normalize: strip all common separators for lookup
+    # "6401.01" / "6401-01" / "6401/01" / "6401_01" / "6401 01" → "640101"
+    normalized = _normalize_account_code(code)
 
     # Priority 0: Full code exact match (e.g. "221101" → "221101 工资")
     if normalized in std_by_code:
@@ -490,6 +541,21 @@ def _match_single(
 
     # Priority 1a: First-4-digit prefix match (e.g. "640101" → "6401")
     prefix = normalized[:4] if len(normalized) >= 4 else normalized
+
+    # Priority 1a-special: 坏账准备二级科目按名称关键词匹配到对应二级标准科目
+    # 客户科目 1231.01/1231.02/1231.03 需按名称中的资产类关键词分别映射
+    if prefix == "1231" and len(normalized) > 4 and name:
+        matched_sub = _match_bad_debt_sub_account(name, std_by_code)
+        if matched_sub:
+            return MappingSuggestion(
+                original_account_code=code,
+                original_account_name=name,
+                suggested_standard_code=matched_sub.account_code,
+                suggested_standard_name=matched_sub.account_name,
+                confidence=0.97,
+                match_method="keyword_sub_account",
+            )
+
     if prefix in std_by_code:
         std = std_by_code[prefix]
         return MappingSuggestion(

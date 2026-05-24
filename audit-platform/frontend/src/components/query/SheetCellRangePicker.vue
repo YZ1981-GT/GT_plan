@@ -21,8 +21,10 @@
     class="gt-sheet-picker-dialog"
   >
     <div class="gt-sheet-picker-toolbar">
-      <span class="gt-sheet-picker-tab">📄 {{ sheetName || wpCode }}</span>
-      <el-tag v-if="dataSource === 'univer_snapshot'" size="small" effect="dark" type="success" round
+      <span class="gt-sheet-picker-tab">📄 {{ isModuleMode ? moduleLabel : (sheetName || wpCode) }}</span>
+      <el-tag v-if="dataSource === 'jsonb_direct'" size="small" effect="dark" type="success" round
+        title="数据来自 JSONB 直接读取">📥 JSONB</el-tag>
+      <el-tag v-else-if="dataSource === 'univer_snapshot'" size="small" effect="dark" type="success" round
         title="数据来自用户最近一次保存的 Univer snapshot（公式已计算）">📥 实时</el-tag>
       <el-tag v-else-if="dataSource === 'xlsx_recomputed'" size="small" effect="plain" type="warning" round
         title="模板首次查询，已通过 LibreOffice 重算公式">⚙ 重算</el-tag>
@@ -40,6 +42,7 @@
         已选区域：<strong>{{ selectedRange }}</strong>
       </span>
       <el-button size="small" @click="resetSelection" :disabled="!selectedRange">↺ 清除</el-button>
+      <el-button size="small" type="info" plain @click="onClearMemory" title="清除当前 sheet 的选区记忆">🗑 清除记忆</el-button>
     </div>
 
     <div class="gt-sheet-picker-hint">
@@ -92,16 +95,21 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { api } from '@/services/apiProxy'
+import { useRangeMemory, clampRange } from '@/composables/useRangeMemory'
+import { ElMessage } from 'element-plus'
 
 const props = defineProps<{
   modelValue: boolean
   wpCode: string
   sheetName?: string
   projectId?: string
+  /** 跨模块 source（report:type / note:section / adj:type / tb:dim），传入时走模块 cell 路由 */
+  moduleSource?: string
+  year?: number
 }>()
 const emit = defineEmits<{
   'update:modelValue': [v: boolean]
-  confirm: [payload: { wp_code: string; sheet_name?: string; range: string }]
+  confirm: [payload: { wp_code: string; sheet_name?: string; range: string; module_source?: string }]
 }>()
 
 const visible = computed({
@@ -109,7 +117,13 @@ const visible = computed({
   set: (v) => emit('update:modelValue', v),
 })
 
-const dialogTitle = computed(() => `📐 选择单元格区域 — ${props.wpCode}${props.sheetName ? ' / ' + props.sheetName : ''}`)
+// 选区记忆
+const rangeMemory = useRangeMemory('current-user') // userId 由实际登录态提供
+
+const dialogTitle = computed(() => {
+  if (isModuleMode.value) return `📐 选择单元格区域 — ${moduleLabel.value}`
+  return `📐 选择单元格区域 — ${props.wpCode}${props.sheetName ? ' / ' + props.sheetName : ''}`
+})
 
 // 网格规模：A~AA 27 列 × 60 行（覆盖大多数底稿首屏）
 const ROW_COUNT = 60
@@ -170,7 +184,77 @@ function cellTooltip(r: number, c: number): string {
   return String(cell.v ?? '')
 }
 
+/** 判断当前是否为跨模块 cell 查询模式 */
+const isModuleMode = computed(() => {
+  if (!props.moduleSource) return false
+  return /^(report|note|adj|tb):/.test(props.moduleSource)
+})
+
+/** 模块模式下的显示标签 */
+const moduleLabel = computed(() => {
+  if (!props.moduleSource) return ''
+  const m = props.moduleSource.match(/^(report|note|adj|tb):(.+)/)
+  if (!m) return props.moduleSource
+  const labels: Record<string, string> = { report: '📊 报表', note: '📝 附注', adj: '📐 调整分录', tb: '📋 试算表' }
+  return `${labels[m[1]] || m[1]} / ${m[2]}`
+})
+
 async function loadSheetData() {
+  // 跨模块 cell 查询模式：通过 execute 端点加载虚拟 sheet 数据
+  if (isModuleMode.value && props.moduleSource && props.projectId) {
+    loadStatus.value = 'loading'
+    unavailableReason.value = ''
+    cellData.value = {}
+    try {
+      // 用全范围 A1:G100 预加载虚拟 sheet 数据
+      const fullSource = `${props.moduleSource}|A1:G100`
+      const data = await api.post('/api/custom-query/execute', {
+        project_id: props.projectId,
+        year: props.year || new Date().getFullYear(),
+        source: fullSource,
+        filters: {},
+      }) as any
+      if (data?.error) {
+        loadStatus.value = 'unavailable'
+        unavailableReason.value = data.error
+        return
+      }
+      // 将 rows 转换为 cellData 格式（0-indexed key 'r,c'）
+      const cells: Record<string, { v: any; f?: string }> = {}
+      let maxR = 0, maxC = 0
+      for (const row of (data?.rows || [])) {
+        const ref = row.cell_ref as string
+        if (!ref) continue
+        const m = ref.match(/^([A-Z]+)(\d+)$/)
+        if (!m) continue
+        const colStr = m[1]
+        const rowNum = parseInt(m[2], 10)
+        let colNum = 0
+        for (const ch of colStr) colNum = colNum * 26 + (ch.charCodeAt(0) - 64)
+        const r = rowNum - 1  // 0-indexed
+        const c = colNum - 1  // 0-indexed
+        const entry: any = { v: row.value }
+        if (row.formula) entry.f = row.formula
+        cells[`${r},${c}`] = entry
+        if (r > maxR) maxR = r
+        if (c > maxC) maxC = c
+      }
+      cellData.value = cells
+      realRows.value = maxR + 1
+      realCols.value = maxC + 1
+      allSheets.value = []
+      activeSheet.value = data?.rows?.[0]?.sheet_name || ''
+      dataSource.value = data?.source || 'jsonb_direct'
+      loadStatus.value = Object.keys(cells).length > 0 ? 'loaded' : 'unavailable'
+      if (loadStatus.value === 'unavailable') unavailableReason.value = '无数据'
+    } catch (e) {
+      loadStatus.value = 'unavailable'
+      unavailableReason.value = '加载失败'
+    }
+    return
+  }
+
+  // 原有底稿模式
   if (!props.projectId || !props.wpCode) {
     loadStatus.value = 'idle'
     return
@@ -246,25 +330,84 @@ function resetSelection() {
 
 function onConfirm() {
   if (!selectedRange.value) return
+  // 保存选区记忆
+  const sheet = activeSheet.value || props.sheetName || ''
+  if (props.wpCode && sheet) {
+    rangeMemory.save(props.wpCode, sheet, selectedRange.value)
+  }
   emit('confirm', {
     wp_code: props.wpCode,
     sheet_name: activeSheet.value || props.sheetName,
     range: selectedRange.value,
+    ...(isModuleMode.value && props.moduleSource ? { module_source: props.moduleSource } : {}),
   })
   visible.value = false
 }
 
-// 弹窗打开时自动加载真实数据，关闭时清空
+function onClearMemory() {
+  const sheet = activeSheet.value || props.sheetName || ''
+  if (props.wpCode && sheet) {
+    rangeMemory.clear(props.wpCode, sheet)
+    ElMessage.success('已清除当前 sheet 的选区记忆')
+  }
+}
+
+// 弹窗打开时自动加载真实数据 + 回填选区记忆，关闭时清空
 watch(visible, (v) => {
   if (v) {
     activeSheet.value = props.sheetName || ''
-    loadSheetData()
+    loadSheetData().then(() => {
+      // 加载完成后尝试回填选区记忆
+      const sheet = activeSheet.value || props.sheetName || ''
+      if (props.wpCode && sheet) {
+        const savedRange = rangeMemory.load(props.wpCode, sheet)
+        if (savedRange) {
+          // 越界 clamp
+          const maxRow = realRows.value || ROW_COUNT
+          const maxCol = realCols.value || COL_COUNT
+          const { clampedExpr, wasClamped } = clampRange(savedRange, maxRow, maxCol)
+          if (wasClamped) {
+            ElMessage.info('上次选区已部分调整（sheet 结构变化）')
+          }
+          // 解析 clamped range 并设置选区
+          applyRangeExpr(clampedExpr)
+        }
+      }
+    })
   } else {
     resetSelection()
     loadStatus.value = 'idle'
     cellData.value = {}
   }
 })
+
+/**
+ * 从 range 表达式（如 A1:B10）设置选区状态
+ */
+function applyRangeExpr(expr: string) {
+  // 取第一个区域（多区域时取首个）
+  const firstRange = expr.split(',')[0]?.trim()
+  if (!firstRange) return
+  const parts = firstRange.split(':')
+  const start = parseCellRef(parts[0])
+  const end = parts[1] ? parseCellRef(parts[1]) : start
+  if (start && end) {
+    startCell.value = start
+    endCell.value = end
+  }
+}
+
+function parseCellRef(ref: string): { row: number; col: number } | null {
+  const m = ref.match(/^([A-Z]{1,3})(\d+)$/)
+  if (!m) return null
+  const colStr = m[1]
+  const row = parseInt(m[2], 10)
+  // 将列字母转为 0-indexed col
+  let col = 0
+  for (const ch of colStr) col = col * 26 + (ch.charCodeAt(0) - 64)
+  col -= 1 // 0-indexed
+  return { row, col }
+}
 </script>
 
 <style scoped>

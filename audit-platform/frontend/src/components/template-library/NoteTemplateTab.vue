@@ -28,6 +28,11 @@
       <span class="gt-ntt-stats-item">
         含表格：<span class="gt-amt">{{ tableSectionCount }}</span>
       </span>
+      <!-- Req 14 AC 1: 高级查询入口 -->
+      <TemplateLibraryButton
+        :source="noteSource"
+        style="margin-left: auto"
+      />
     </div>
 
     <!-- 双栏布局 -->
@@ -235,6 +240,7 @@ import { Search, Folder } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { noteTemplates as P_nt } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import TemplateLibraryButton from './TemplateLibraryButton.vue'
 
 // ─── 类型 ─────────────────────────────────────────────────────────────────
 interface NoteTable {
@@ -293,6 +299,12 @@ const onlyWithTable = ref(false)
 const detailVisible = ref(false)
 const selectedSection = ref<NoteSection | null>(null)
 const treeRef = ref<any>(null)
+
+// Req 14 AC 1: 高级查询 source URI（附注模板页 → note:{section_id}）
+const noteSource = computed(() => {
+  const sec = selectedSection.value?.section_number
+  return sec ? `note:${sec}` : `note:五-1-1`
+})
 
 // ─── 加载附注模板 ─────────────────────────────────────────────────────────
 async function loadTemplate(std: 'soe' | 'listed') {

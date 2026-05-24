@@ -32,6 +32,51 @@ router = APIRouter(
 )
 
 
+def _structure_from_univer_snapshot(snap: dict) -> dict:
+    """从 parsed_data['univer_snapshot'] slim 格式重建 structure.json 兼容格式
+
+    供 structure_to_html 渲染使用。slim snapshot 格式：
+      sheets: {sheet_name: {cellData: {row_idx: {col_idx: {v, f}}}}}
+      sheet_order_names: [name1, name2, ...]
+    """
+    sheets_map = snap.get("sheets") or {}
+    order = snap.get("sheet_order_names") or list(sheets_map.keys())
+    all_rows: list[dict] = []
+    sheet_names: list[str] = []
+
+    for name in order:
+        sheet_obj = sheets_map.get(name)
+        if not isinstance(sheet_obj, dict):
+            sheet_names.append(name)
+            continue
+        sheet_names.append(name)
+        cell_data = sheet_obj.get("cellData") or {}
+        if not cell_data:
+            continue
+        max_row = max((int(k) for k in cell_data.keys()), default=-1)
+        for r in range(max_row + 1):
+            row_cells = cell_data.get(str(r)) or {}
+            cells: list[dict] = []
+            if row_cells and isinstance(row_cells, dict):
+                max_col = max((int(k) for k in row_cells.keys()), default=-1)
+                for c in range(max_col + 1):
+                    cell = row_cells.get(str(c))
+                    if isinstance(cell, dict):
+                        cells.append({
+                            "value": cell.get("v", ""),
+                            "formula": cell.get("f"),
+                        })
+                    else:
+                        cells.append({"value": "", "formula": None})
+            all_rows.append({"cells": cells})
+
+    return {
+        "rows": all_rows,
+        "sheets": [{"name": n} for n in sheet_names],
+        "sheet_names": sheet_names,
+    }
+
+
 def _mask_structure(structure: dict) -> dict:
     """对 structure 中的单元格值进行脱敏处理。
 
@@ -84,28 +129,22 @@ async def get_workpaper_html_preview(
     # 获取 structure 数据
     structure = None
 
-    # 优先从 parsed_data 获取 structure
+    # 优先从 parsed_data['univer_snapshot'] 构建 structure（Req 6 单源化）
     if wp.parsed_data and isinstance(wp.parsed_data, dict):
-        # parsed_data 本身可能就是 structure 格式（含 sheets 键）
-        if "sheets" in wp.parsed_data:
+        univer_snap = wp.parsed_data.get("univer_snapshot")
+        if isinstance(univer_snap, dict) and univer_snap.get("sheets"):
+            # 从 slim snapshot 重建 structure 格式供 HTML 渲染
+            structure = _structure_from_univer_snapshot(univer_snap)
+        # 兼容旧 parsed_data 直接含 sheets 键的情况
+        elif "sheets" in wp.parsed_data and "univer_snapshot" not in wp.parsed_data:
             structure = wp.parsed_data
-        # 或者 parsed_data 中有 structure 子键
         elif "structure" in wp.parsed_data:
             structure = wp.parsed_data["structure"]
 
-    # 若无 structure，尝试从 file_path 解析
+    # 若无 snapshot，从 xlsx 文件解析（LibreOffice 兜底路径）
     if structure is None and wp.file_path:
         file_path = Path(wp.file_path)
-        # 尝试同目录下的 structure.json
-        structure_json_path = file_path.with_suffix(".structure.json")
-        if structure_json_path.exists():
-            try:
-                structure = json.loads(structure_json_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError) as e:
-                logger.warning(f"读取 structure.json 失败: {e}")
-
-        # 若仍无 structure，从 xlsx 文件解析
-        if structure is None and file_path.exists() and file_path.suffix in (".xlsx", ".xls"):
+        if file_path.exists() and file_path.suffix in (".xlsx", ".xls"):
             try:
                 structure = excel_to_structure(str(file_path))
             except Exception as e:

@@ -259,7 +259,7 @@ async def save_univer_data(
 
     接收 Univer IWorkbookData snapshot，执行：
     1. xlsx 回写（保留样式/公式/多Sheet）
-    2. structure.json 更新（三式联动）
+    2. parsed_data['univer_snapshot'] JSONB 落库（三式联动权威数据源）
     3. 版本递增 + 审计留痕
     4. 事件发布（触发五环联动）
     5. 自动解析 parsed_data
@@ -314,13 +314,9 @@ async def save_univer_data(
     from app.services.univer_to_xlsx import univer_data_to_xlsx
     write_result = univer_data_to_xlsx(snapshot, str(fp))
 
-    # 3. structure.json 更新
-    from app.services.univer_to_xlsx import univer_snapshot_to_structure
-    structure = univer_snapshot_to_structure(snapshot)
-    structure["metadata"]["version"] = (wp.file_version or 0) + 1
-    structure_path = fp.with_suffix(".structure.json")
-    with open(structure_path, "w", encoding="utf-8") as f:
-        json.dump(structure, f, ensure_ascii=False, indent=2)
+    # 3. [Req 6 单源化] structure.json 写入已移除
+    #    权威数据源 = parsed_data['univer_snapshot'] JSONB（步骤 5 写入）
+    #    三式联动读取路径已改为从 JSONB 解析，不再依赖 structure.json 文件
 
     # 4. 哈希校验
     content_hash = hashlib.sha256(fp.read_bytes()).hexdigest()

@@ -1,14 +1,14 @@
 """Excel ↔ HTML 互转引擎 — 双格式保存 + Univer 联动
 
 核心流程：
-1. Excel → structure.json → HTML（在线编辑）
-2. HTML 编辑 → structure.json 更新 → Excel 回写
-3. Univer 编辑 → univer-save API → 自动同步 structure.json
+1. Excel → structure dict → HTML（在线编辑）
+2. HTML 编辑 → structure dict 更新 → Excel 回写
+3. Univer 编辑 → univer-save API → parsed_data['univer_snapshot'] JSONB（Req 6 单源化）
 
-structure.json 是权威数据源，HTML 和 Excel 都从它生成。
-取数公式绑定在 structure.json 的单元格上，与格式无关。
+parsed_data['univer_snapshot'] 是权威数据源（Req 6），HTML 预览从它生成。
+取数公式绑定在 structure 的单元格上，与格式无关。
 
-═══ structure.json 格式 ═══
+═══ structure dict 格式 ═══
 {
     "sheets": [{
         "name": "Sheet1",

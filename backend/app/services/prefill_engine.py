@@ -60,6 +60,48 @@ class FormulaCell:
         return {"sheet": self.sheet, "cell_ref": self.cell_ref, "formula_type": self.formula_type, "raw_args": self.raw_args}
 
 
+def _sync_prefill_to_snapshot(snap: dict, structure_data: dict, worksheets) -> None:
+    """把 prefill 写入 structure_data 的 value 同步回 univer_snapshot 的 cellData
+
+    structure_data.rows 是跨 sheet 扁平化的，需要按 sheet 拆分后写回 snap.sheets[name].cellData
+    """
+    sheets_meta = structure_data.get("sheets", [])
+    rows_arr = structure_data.get("rows", [])
+    order = snap.get("sheet_order_names") or list(snap.get("sheets", {}).keys())
+    sheets_map = snap.get("sheets") or {}
+
+    row_offset = 0
+    for sheet_idx, ws in enumerate(worksheets):
+        sheet_name = order[sheet_idx] if sheet_idx < len(order) else ws.title
+        sheet_obj = sheets_map.get(sheet_name)
+        if not isinstance(sheet_obj, dict):
+            row_offset += ws.max_row or 0
+            continue
+        cell_data = sheet_obj.get("cellData")
+        if not isinstance(cell_data, dict):
+            cell_data = {}
+            sheet_obj["cellData"] = cell_data
+
+        sheet_rows = ws.max_row or 0
+        for r in range(sheet_rows):
+            flat_idx = row_offset + r
+            if flat_idx >= len(rows_arr):
+                break
+            row_entry = rows_arr[flat_idx]
+            cells = row_entry.get("cells", [])
+            for c, cell_info in enumerate(cells):
+                v = cell_info.get("value")
+                if v is not None and v != "":
+                    r_key = str(r)
+                    c_key = str(c)
+                    if r_key not in cell_data:
+                        cell_data[r_key] = {}
+                    if c_key not in cell_data[r_key]:
+                        cell_data[r_key][c_key] = {}
+                    cell_data[r_key][c_key]["v"] = v
+        row_offset += sheet_rows
+
+
 def _parse_args(raw: str) -> list[str]:
     """解析公式参数，处理引号和逗号"""
     args = []
@@ -562,23 +604,21 @@ async def prefill_workpaper_real(
             "message": "未发现取数公式",
         }
 
-    # 批量执行公式（需求 46：只更新 structure.json 的 v 字段，保留 xlsx 公式）
+    # 批量执行公式（需求 46：只更新 parsed_data['univer_snapshot'] 的 v 字段，保留 xlsx 公式）
     from app.services.formula_engine import FormulaEngine
     import json as _json
     engine = FormulaEngine()
 
-    # 读取 structure.json（供填入 v 字段）
-    structure_path = fp.with_suffix(".structure.json")
+    # 读取 parsed_data['univer_snapshot']（Req 6 单源化：从 JSONB 读取，不再读 structure.json）
     structure_data: dict | None = None
-    if structure_path.exists():
-        try:
-            with open(structure_path, "r", encoding="utf-8") as sf:
-                structure_data = _json.load(sf)
-        except Exception as e:
-            _logger.warning("prefill_real: structure.json 读取失败 wp=%s err=%s", wp_id, e)
-            structure_data = None
-    else:
-        _logger.warning("prefill_real: structure.json 不存在 wp=%s path=%s，预填充将跳过值写入", wp_id, structure_path)
+    if wp.parsed_data and isinstance(wp.parsed_data, dict):
+        univer_snap = wp.parsed_data.get("univer_snapshot")
+        if isinstance(univer_snap, dict) and univer_snap.get("sheets"):
+            # 从 slim snapshot 重建 structure 格式供 prefill 写值
+            from app.routers.workpaper_html_preview import _structure_from_univer_snapshot
+            structure_data = _structure_from_univer_snapshot(univer_snap)
+    if structure_data is None:
+        _logger.warning("prefill_real: univer_snapshot 不存在 wp=%s，预填充将跳过值写入", wp_id)
 
     filled = 0
     errors = []
@@ -618,10 +658,10 @@ async def prefill_workpaper_real(
 
             value = float(result) if isinstance(result, Decimal) else result
 
-            # 需求 46.1/46.2：只更新 structure.json 的 v 字段，保留 xlsx 中的公式
+            # 需求 46.1/46.2：只更新 parsed_data['univer_snapshot'] 的 v 字段，保留 xlsx 中的公式
             # 不再写 cell_obj.value（避免覆盖公式），不再将公式移入 comment
             if structure_data is not None:
-                # structure.json 的 rows 是跨 sheet 扁平化的，需累加前序 sheet 的行数
+                # structure 的 rows 是跨 sheet 扁平化的，需累加前序 sheet 的行数
                 row_offset = 0
                 sheets_meta = structure_data.get("sheets", [])
                 snapshot_sheets = wb.worksheets
@@ -633,7 +673,7 @@ async def prefill_workpaper_real(
                 rows_arr = structure_data.get("rows", [])
                 if 0 <= target_row_idx < len(rows_arr):
                     cells_arr = rows_arr[target_row_idx].get("cells", [])
-                    # 补齐列（若 structure.json 之前是稀疏写入）
+                    # 补齐列（若之前是稀疏写入）
                     while len(cells_arr) <= f["col"]:
                         cells_arr.append({"value": "", "formula": None})
                     # 保留 formula 字段不变，仅更新 value
@@ -643,23 +683,32 @@ async def prefill_workpaper_real(
                     rows_arr[target_row_idx]["cells"] = cells_arr
                     filled += 1
                 else:
-                    errors.append({"cell": f["cell"], "error": f"structure.json 行越界: {target_row_idx}"})
+                    errors.append({"cell": f["cell"], "error": f"univer_snapshot 行越界: {target_row_idx}"})
             else:
-                # 无 structure.json：跳过本单元格（避免破坏公式），但不算错误
+                # 无 univer_snapshot：跳过本单元格（避免破坏公式），但不算错误
                 # 上面已记录 warning 日志
                 pass
 
         except Exception as e:
             errors.append({"cell": f["cell"], "error": str(e)})
 
-    # 保存 structure.json（需求 46.1：不再修改 xlsx）
+    # 保存 prefill 结果到 parsed_data['univer_snapshot']（Req 6 单源化：不再写 structure.json 文件）
     if structure_data is not None and filled > 0:
         try:
-            with open(structure_path, "w", encoding="utf-8") as sf:
-                _json.dump(structure_data, sf, ensure_ascii=False, indent=2)
+            from sqlalchemy.orm.attributes import flag_modified
+            # 把 structure 格式的 prefill 结果回写到 univer_snapshot JSONB
+            existing_pd = dict(wp.parsed_data) if isinstance(wp.parsed_data, dict) else {}
+            snap = existing_pd.get("univer_snapshot")
+            if isinstance(snap, dict) and snap.get("sheets"):
+                # 把 structure_data 的 value 更新回 slim snapshot 的 cellData
+                _sync_prefill_to_snapshot(snap, structure_data, wb.worksheets)
+                existing_pd["univer_snapshot"] = snap
+                wp.parsed_data = existing_pd
+                flag_modified(wp, "parsed_data")
+                await db.flush()
         except Exception as e:
             wb.close()
-            return {"wp_id": str(wp_id), "status": "error", "message": f"structure.json 保存失败: {e}"}
+            return {"wp_id": str(wp_id), "status": "error", "message": f"parsed_data 保存失败: {e}"}
 
     wb.close()
 

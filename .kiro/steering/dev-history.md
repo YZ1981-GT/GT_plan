@@ -2593,3 +2593,33 @@ YG36 重庆医药集团四川物流真实样本导入后发现 `tb_balance` 同 
 **9 家样本完整入库（spec 9.2 真实通过）**：YG36 813/100 + YG4001-30 812/100 + 和平物流 275/40 + 安徽骨科 219/53 + 医疗器械 82/27 + YG2101 38/7 + 基线 4 家（陕西华氏/辽宁卫生/和平药房/宜宾大药房）；前端 Playwright 验证 10 项目可见。
 
 **长尾 spec 全部上线**：e2e-business-flow 58/58 / template-library-coordination 64/64 / audit-chain-generation 101/101 / enterprise-linkage 56/56 / ledger-import-view-refactor 243/243。综合 PBT/集成测试约 60 tests 新增。
+
+## 2026-05-24：advanced-query-enhancements-p1p2 全量落地
+
+**Spec**：`.kiro/specs/advanced-query-enhancements-p1p2/`（15 Req / 16 Task / 5 Phase）
+
+**Phase 1 架构基础**：
+- wp_template_registry 表（184 主底稿，双源合并 wp_account_mapping + step_sheet_mapping，冲突仲裁 step_sheet_mapping 为准）
+- parsed_data GIN 索引（jsonb_path_ops，CONCURRENTLY + _ccnew 清理 + INDEX_BUILDING 降级 flag）
+- structure.json 单源化（univer-save 不再写 structure.json，三式联动改读 JSONB，迁移脚本回填+删文件）
+- 审计节流（Redis SET NX EX 5s，敏感操作白名单绕过，Redis 不可用降级全记录）
+- LibreOffice 池化（Semaphore(2) + pid+tid UserInstallation 隔离 + 60s 超时 kill + 4 路径探测）
+
+**Phase 2 跨模块+联动**：
+- Module_Cell_Resolver：report/note/adj/tb 4 模块 cell 级查询，统一 source 命名空间 + 虚拟 sheet 列映射
+- 模板双向联动：TemplateLibraryButton（3 页面）+ address-resolve 端点 + 右键溯源 + IndicatorTree 双模式 toggle
+- 模板入口完整性：_ensure_custom_query_tables.py 兜底建表 + MyTemplatesDialog + SaveAsTemplateButton + 完整 config JSONB
+
+**Phase 3 业务功能**：
+- 批量查询：BatchQueryToolbar + BatchQueryResultGroup + useBatchQuery（Promise.allSettled 5 并发限流）+ batch-execute 端点 + xlsx-js-style 合并导出
+- 双向写回：SnapshotWriter（乐观锁 X-File-Opened-At + 单事务 JSONB+xlsx+prefill_stale + cross-ref:updated 事件）+ cell-writeback 端点 + 5 模块路由写入
+- 跨 sheet 追溯：CrossSheetResolver（BFS + 环检测 + 3 层截断）+ cross-sheet-trace 端点 + CrossSheetTracePopover
+
+**Phase 4 体验细节**：
+- 选区记忆（useRangeMemory LRU 50 + clamp + 清除按钮）
+- snapshot 过期警告（SnapshotStalenessChip 4 变体 + 重算按钮）
+- 大 range 分页（useRangePaginator >100 分页 / >5000 强制 + 禁用展开）
+- 公式 popover（FormulaTracePopover 300ms/200ms 延迟 + 跨 sheet 链接 + 解析失败兜底）
+
+**测试**：后端 174 passed + 1 skipped（19.56s）+ 前端 38 passed = 212 总计
+**修复中发现 bug**：regex 灾难性回溯（`[^'!\]]+` → 正确 pattern）/ mock proc.wait 挂死 / hypothesis HealthCheck too_slow
