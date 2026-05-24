@@ -585,8 +585,9 @@ async def export_adjustment_template(
         ("• 编号 (adjustment_no)", "可留空,系统自动生成 (AJE-001 / RJE-001)"),
         ("• 类型 (type)", "必填,AJE=审计调整 / RJE=重分类调整"),
         ("• 摘要 (description)", "必填,简要说明调整原因 (≤ 200 字)"),
-        ("• 科目编码 (account_code)", "必填,从下拉列表选择,不可手工输入未在标准库的编码"),
+        ("• 科目编码 (account_code)", "必填,从 D 列下拉选择,E 列科目名称自动填充"),
         ("• 科目名称 (account_name)", "自动填充 (E 列已写 VLOOKUP 公式),编辑编码后名称自动联动"),
+        ("• 不知编码? 按名称反查", "I 列下拉选名称 → J 列自动显示编码 → 复制粘贴到 D 列"),
         ("• 借方金额 (debit_amount)", "正数,与贷方互斥 (同一行只填一个)"),
         ("• 贷方金额 (credit_amount)", "正数,与借方互斥 (同一行只填一个)"),
         ("", ""),
@@ -640,8 +641,10 @@ async def export_adjustment_template(
     ws_notes.column_dimensions["B"].width = 60
 
     # ─── Sheet 2 & 3: AJE / RJE 模板 ───────────────────────
-    headers = ["编号", "类型", "摘要", "科目编码", "科目名称", "借方金额", "贷方金额"]
+    # 列结构: A编号 / B类型 / C摘要 / D科目编码 / E科目名称 / F借方 / G贷方 / [空 H] / I~J 反查辅助区
+    headers = ["编号", "类型", "摘要", "科目编码", "科目名称", "借方金额", "贷方金额", "", "📍 辅助:科目名称", "→ 对应编码"]
     header_fill = PatternFill(start_color="F4F0FA", end_color="F4F0FA", fill_type="solid")
+    header_aux_fill = PatternFill(start_color="FFF8E1", end_color="FFF8E1", fill_type="solid")  # 浅黄: 辅助区
     header_font = Font(bold=True, size=11)
     thin_border = Border(
         left=Side(style="thin", color="DDDDDD"),
@@ -667,10 +670,12 @@ async def export_adjustment_template(
         ]),
     ]:
         ws = wb.create_sheet(sheet_name)
-        # 表头
+        # 表头 (A~G 主区 + I~J 辅助反查区)
         for col, h in enumerate(headers, 1):
+            if not h:  # 跳过空列(分隔)
+                continue
             cell = ws.cell(row=1, column=col, value=h)
-            cell.fill = header_fill
+            cell.fill = header_aux_fill if col >= 9 else header_fill
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border = thin_border
@@ -691,10 +696,13 @@ async def export_adjustment_template(
         ws.column_dimensions["E"].width = 22
         ws.column_dimensions["F"].width = 16
         ws.column_dimensions["G"].width = 16
+        ws.column_dimensions["H"].width = 4   # 分隔列
+        ws.column_dimensions["I"].width = 22  # 辅助:输入科目名称
+        ws.column_dimensions["J"].width = 14  # 辅助:对应编码
         # 冻结表头
         ws.freeze_panes = "A2"
 
-        # ─── 科目名称列 (E 列) 写 VLOOKUP 公式: 选编码后名称自动填充 ───
+        # ─── 主区: 科目名称列 (E 列) 写 VLOOKUP 公式: 选编码后名称自动填充 ───
         # 仅在示例行之后 + 100 行预留区域写公式 (示例行已经手填名称)
         # IFERROR 兜底: 编码为空时返回空字符串而非 #N/A
         if std_accounts:
@@ -708,6 +716,24 @@ async def export_adjustment_template(
                 e_cell.border = thin_border
                 # 浅蓝色背景提示这是公式列(只读概念)
                 e_cell.fill = PatternFill(start_color="EAF4FB", end_color="EAF4FB", fill_type="solid")
+
+            # ─── 辅助区: I 列下拉选名称 + J 列反查编码 (用户复制粘贴到 D 列) ───
+            # I 列: 科目名称下拉 (数据校验引用标准科目库 B 列)
+            # J 列: VLOOKUP 反查 编码 = INDEX/MATCH 用名称查编码
+            aux_value_fill = PatternFill(start_color="FFFBF0", end_color="FFFBF0", fill_type="solid")
+            for ri in range(2, 201):
+                # I 列: 留空给用户输入(下拉)
+                i_cell = ws.cell(row=ri, column=9, value=None)
+                i_cell.border = thin_border
+                i_cell.fill = aux_value_fill
+                # J 列: INDEX/MATCH 反查编码(因为 VLOOKUP 不支持从右往左查)
+                j_cell = ws.cell(
+                    row=ri,
+                    column=10,
+                    value=f'=IFERROR(INDEX(标准科目库!$A$2:$A${std_count + 1},MATCH(I{ri},标准科目库!$B$2:$B${std_count + 1},0)),"")',
+                )
+                j_cell.border = thin_border
+                j_cell.fill = aux_value_fill
 
     # ─── Sheet 4: 标准科目库 (可见,作为科目编码-名称对照表 + 下拉数据源) ─────────
     ws_std = wb.create_sheet("标准科目库")
@@ -733,23 +759,27 @@ async def export_adjustment_template(
     # ─── 添加数据校验: 科目编码列下拉 ───────────────────────
     if std_accounts:
         std_count = len(std_accounts)
-        # 引用标准科目库 sheet 的 A 列
-        formula_range = f"=标准科目库!$A$2:$A${std_count + 1}"
+        # 引用标准科目库 sheet 的 A 列 (编码)
+        formula_range_code = f"=标准科目库!$A$2:$A${std_count + 1}"
+        # 引用标准科目库 sheet 的 B 列 (名称) — 用于 I 列反查辅助
+        formula_range_name = f"=标准科目库!$B$2:$B${std_count + 1}"
         for sheet_name in ("AJE模板", "RJE模板"):
             ws_target = wb[sheet_name]
+            # D 列: 科目编码下拉
             dv = DataValidation(
                 type="list",
-                formula1=formula_range,
+                formula1=formula_range_code,
                 allow_blank=True,
                 showDropDown=False,  # False = 显示下拉箭头
             )
             dv.error = "请从下拉列表中选择,不可手工输入未在标准库的科目编码"
             dv.errorTitle = "科目编码必须在标准库"
-            dv.prompt = "从下拉选择标准科目编码"
+            dv.prompt = "从下拉选择标准科目编码,E 列科目名称会自动填充"
             dv.promptTitle = "提示"
             # 应用到 D 列 (科目编码) 第 2 ~ 200 行
             dv.add(f"D2:D200")
             ws_target.add_data_validation(dv)
+
             # 类型列也加下拉 (AJE / RJE)
             dv_type = DataValidation(
                 type="list",
@@ -758,6 +788,20 @@ async def export_adjustment_template(
             )
             dv_type.add("B2:B200")
             ws_target.add_data_validation(dv_type)
+
+            # I 列: 科目名称下拉(反查辅助区) — 用户选名称后 J 列自动显示对应编码
+            dv_name = DataValidation(
+                type="list",
+                formula1=formula_range_name,
+                allow_blank=True,
+                showDropDown=False,
+            )
+            dv_name.error = "请从下拉列表中选择标准科目名称"
+            dv_name.errorTitle = "科目名称必须在标准库"
+            dv_name.prompt = "从下拉选择科目名称,J 列会显示对应编码,可复制到 D 列"
+            dv_name.promptTitle = "辅助:按名称反查编码"
+            dv_name.add(f"I2:I200")
+            ws_target.add_data_validation(dv_name)
 
     buf = BytesIO()
     wb.save(buf)
