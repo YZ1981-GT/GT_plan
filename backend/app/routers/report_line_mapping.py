@@ -45,6 +45,49 @@ async def ai_suggest(
     return await svc.ai_suggest_mappings(project_id, db, force_refresh=force_refresh)
 
 
+@router.post(
+    "/{project_id}/report-line-mapping/fix-bad-debt",
+    response_model=dict,
+)
+async def fix_bad_debt(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """修复 account_mapping 中 1231 坏账准备总分类→二级分项错配.
+
+    用于"一键预设"前置: 客户码 1231.01/02/03 等被误映射到 1231 总分类时,
+    按客户科目名称关键词改成对应二级 1231-01~05.
+    """
+    from app.services import mapping_service
+    from app.models.audit_platform_models import AccountMapping
+    from sqlalchemy import select as sa_select
+
+    result = await db.execute(
+        sa_select(AccountMapping).where(
+            AccountMapping.project_id == project_id,
+            AccountMapping.is_deleted == False,  # noqa: E712
+            AccountMapping.standard_account_code == '1231',
+        )
+    )
+    records = result.scalars().all()
+
+    fixed = 0
+    for rec in records:
+        if not rec.original_account_name:
+            continue
+        for keywords, sub_code in mapping_service._BAD_DEBT_KEYWORD_MAP:
+            if any(kw in rec.original_account_name for kw in keywords):
+                rec.standard_account_code = sub_code
+                fixed += 1
+                break
+
+    if fixed > 0:
+        await db.commit()
+
+    return {"fixed_count": fixed, "total_examined": len(records)}
+
+
 @router.get(
     "/{project_id}/report-line-mapping",
     response_model=list[ReportLineMappingResponse],

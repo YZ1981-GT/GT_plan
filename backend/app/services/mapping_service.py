@@ -527,6 +527,25 @@ def _match_single(
     # "6401.01" / "6401-01" / "6401/01" / "6401_01" / "6401 01" → "640101"
     normalized = _normalize_account_code(code)
 
+    # 计算 prefix(后续多处用到)
+    prefix = normalized[:4] if len(normalized) >= 4 else normalized
+
+    # Priority -1 (最高优先级): 1231 系列优先按名称关键词匹配二级标准科目
+    # 必须前置于"完整编码精确匹配",否则会被被污染的 1231 总分类抢走优先级
+    # 客户科目 1231.01/1231.02/1231.03 必须按名称中的"应收票据/应收账款/其他应收"等关键词
+    # 分别映射到 1231-01/1231-02/1231-03,而不是统一映射到 1231 总分类
+    if prefix == "1231" and name:
+        matched_sub = _match_bad_debt_sub_account(name, std_by_code)
+        if matched_sub:
+            return MappingSuggestion(
+                original_account_code=code,
+                original_account_name=name,
+                suggested_standard_code=matched_sub.account_code,
+                suggested_standard_name=matched_sub.account_name,
+                confidence=0.97,
+                match_method="bad_debt_sub_account",
+            )
+
     # Priority 0: Full code exact match (e.g. "221101" → "221101 工资")
     if normalized in std_by_code:
         std = std_by_code[normalized]
@@ -540,21 +559,7 @@ def _match_single(
         )
 
     # Priority 1a: First-4-digit prefix match (e.g. "640101" → "6401")
-    prefix = normalized[:4] if len(normalized) >= 4 else normalized
-
-    # Priority 1a-special: 坏账准备二级科目按名称关键词匹配到对应二级标准科目
-    # 客户科目 1231.01/1231.02/1231.03 需按名称中的资产类关键词分别映射
-    if prefix == "1231" and len(normalized) > 4 and name:
-        matched_sub = _match_bad_debt_sub_account(name, std_by_code)
-        if matched_sub:
-            return MappingSuggestion(
-                original_account_code=code,
-                original_account_name=name,
-                suggested_standard_code=matched_sub.account_code,
-                suggested_standard_name=matched_sub.account_name,
-                confidence=0.97,
-                match_method="keyword_sub_account",
-            )
+    # 注: prefix 已在上面计算
 
     if prefix in std_by_code:
         std = std_by_code[prefix]

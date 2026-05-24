@@ -189,3 +189,84 @@ class TestLookupReportLineFromSeed:
         """非法维度 key 降级到 soe_standalone"""
         hit = svc._lookup_report_line_from_seed("1001", "invalid_dimension")
         assert hit is not None  # 降级后能查到货币资金
+
+
+
+# ===================================================================
+# 测试 mapping_service 中 1231 系列优先匹配二级分项
+# ===================================================================
+
+
+class TestMappingServiceBadDebtPriority:
+    """验证 mapping_service._match_single 对 1231 系列科目优先按名称匹配二级"""
+
+    def setup_method(self):
+        from app.services import mapping_service
+        # 清缓存
+        mapping_service._BAD_DEBT_KEYWORD_MAP  # 触发加载
+
+    def test_客户码1231_01应收票据_优先匹配1231_01(self):
+        """1231.01 (坏账准备_应收票据) 不应被 1231 总分类抢走,应匹配 1231-01"""
+        from app.services import mapping_service
+        from app.models.audit_platform_models import AccountChart
+
+        client = AccountChart(
+            account_code='1231.01', account_name='坏账准备_应收票据',
+        )
+        # 模拟 std_by_code 含被污染的 1231 总分类(关键!这是真实环境陷阱)
+        sub_01 = AccountChart(account_code='1231-01', account_name='坏账准备-应收票据')
+        sub_02 = AccountChart(account_code='1231-02', account_name='坏账准备-应收账款')
+        sub_03 = AccountChart(account_code='1231-03', account_name='坏账准备-其他应收款')
+        polluted_total = AccountChart(account_code='1231', account_name='坏账准备_应收票据')
+        std_by_code = {
+            '1231': polluted_total,  # ← 被污染的总分类(优先级陷阱)
+            '1231-01': sub_01,
+            '1231-02': sub_02,
+            '1231-03': sub_03,
+        }
+
+        result = mapping_service._match_single(client, std_by_code, {}, [])
+        assert result is not None
+        assert result.suggested_standard_code == '1231-01', \
+            f"必须匹配 1231-01,而不是被 1231 总分类抢走 (得到 {result.suggested_standard_code})"
+        assert result.match_method == 'bad_debt_sub_account'
+
+    def test_客户码1231_02应收账款_匹配1231_02(self):
+        from app.services import mapping_service
+        from app.models.audit_platform_models import AccountChart
+
+        client = AccountChart(account_code='1231.02', account_name='坏账准备_应收账款')
+        sub_02 = AccountChart(account_code='1231-02', account_name='坏账准备-应收账款')
+        polluted_total = AccountChart(account_code='1231', account_name='坏账准备')
+        std_by_code = {'1231': polluted_total, '1231-02': sub_02}
+
+        result = mapping_service._match_single(client, std_by_code, {}, [])
+        assert result is not None
+        assert result.suggested_standard_code == '1231-02'
+
+    def test_客户码1231_03其他应收款_匹配1231_03(self):
+        from app.services import mapping_service
+        from app.models.audit_platform_models import AccountChart
+
+        client = AccountChart(account_code='1231.03', account_name='坏账准备_其他应收款')
+        sub_03 = AccountChart(account_code='1231-03', account_name='坏账准备-其他应收款')
+        polluted_total = AccountChart(account_code='1231', account_name='坏账准备')
+        std_by_code = {'1231': polluted_total, '1231-03': sub_03}
+
+        result = mapping_service._match_single(client, std_by_code, {}, [])
+        assert result is not None
+        assert result.suggested_standard_code == '1231-03'
+
+    def test_客户码1231无后缀总分类_无关键词时fallback到1231(self):
+        """如果客户用 1231 无后缀且名称就叫"坏账准备",回退到 1231 总分类是 OK 的"""
+        from app.services import mapping_service
+        from app.models.audit_platform_models import AccountChart
+
+        client = AccountChart(account_code='1231', account_name='坏账准备')
+        total = AccountChart(account_code='1231', account_name='坏账准备')
+        std_by_code = {'1231': total}
+
+        result = mapping_service._match_single(client, std_by_code, {}, [])
+        assert result is not None
+        # 名称无关键词,_match_bad_debt_sub_account 返 None,落 Priority 0 完整码匹配
+        assert result.suggested_standard_code == '1231'

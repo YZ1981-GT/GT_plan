@@ -159,6 +159,7 @@ export const reportLineMapping = {
   detail: (pid: string, id: string) => `/api/projects/${pid}/report-line-mapping/${id}`,
   confirm: (pid: string, id: string) => `/api/projects/${pid}/report-line-mapping/${id}/confirm`,
   aiSuggest: (pid: string) => `/api/projects/${pid}/report-line-mapping/ai-suggest`,
+  fixBadDebt: (pid: string) => `/api/projects/${pid}/report-line-mapping/fix-bad-debt`,
   batchConfirm: (pid: string) => `/api/projects/${pid}/report-line-mapping/batch-confirm`,
   referenceCopy: (pid: string) => `/api/projects/${pid}/report-line-mapping/reference-copy`,
 } as const

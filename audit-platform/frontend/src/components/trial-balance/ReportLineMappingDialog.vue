@@ -349,6 +349,18 @@ async function onPreset() {
 
   presetLoading.value = true
   try {
+    // Step 1: 修复 1231 坏账准备总分类→二级分项错配 (静默执行,无副作用)
+    try {
+      const fixResult: any = await api.post(reportLineMapping.fixBadDebt(props.projectId))
+      if (fixResult?.fixed_count > 0) {
+        ElMessage.info(`已修复 ${fixResult.fixed_count} 条坏账准备总分类→二级分项错配`)
+      }
+    } catch (e) {
+      // 修坏账失败不阻断主流程
+      console.warn('坏账分项修复失败,继续主流程:', e)
+    }
+
+    // Step 2: AI 建议(可能 force_refresh)
     const url = reportLineMapping.aiSuggest(props.projectId) + (forceRefresh ? '?force_refresh=true' : '')
     await api.post(url)
     await loadMappings()
