@@ -1437,44 +1437,66 @@ const showSidePanel = ref(false)
 const fineCheckFailCount = ref(0)
 const univerContainer = ref<HTMLElement | null>(null)
 
-// F-purchase-inventory F-F5 Task 2.7~2.9: 存货监盘弹窗状态
-const stocktakeDialogVisible = ref(false)
-// F2 监盘 sheet 触发按钮显示条件：F 循环且 active sheet 名匹配 F2-21~F2-26
-const showStocktakeTrigger = computed(() => {
-  if (!isFCycle.value) return false
-  const wpCode = (wpDetail.value?.wp_code || '').toUpperCase()
-  // F2 主底稿（顶层 wp_code 为 F2）或 F2-21~F2-26 子表
-  if (!wpCode.startsWith('F2')) return false
-  const activeId = sheetNav.activeSheetId.value || ''
-  // 匹配 F2-21A、F2-22B、F2-26 等监盘类 sheet
-  return /F2-2[1-6]/i.test(activeId) || /监盘|盘点|抽盘/.test(activeId)
-})
+// spec workpaper-editor-refactor Phase 2-3: 所有循环弹窗状态集中到 useCycleDialogs composable
+import { useCycleDialogs } from '@/composables/useCycleDialogs'
+const cycleDialogs = useCycleDialogs(wpDetail, wpId, sheetNavActiveId, cycleType)
 
-// H-fixed-assets-cycle H-F5 Task 2.7: 固定资产监盘弹窗状态
-const hStocktakeDialogVisible = ref(false)
-// H 循环 13 处监盘类 sheet 触发按钮显示条件
-const showHStocktakeTrigger = computed(() => {
-  if (!isHCycle.value) return false
-  const activeId = sheetNav.activeSheetId.value || ''
-  // 匹配 H1-9~H1-11 / H2-12~H2-14 / H3-9 / H5-9~H5-11 / H7-8~H7-10
-  return /H[1-9]-(?:9|1[0-4])/i.test(activeId) || /监盘|盘点/.test(activeId)
-})
+// 向后兼容：模板中仍用原变量名（后续 Phase 6 验收时可统一改为 cycleDialogs.xxx.visible）
+const stocktakeDialogVisible = cycleDialogs.stocktake.visible
+const showStocktakeTrigger = cycleDialogs.stocktake.trigger
+const hStocktakeDialogVisible = cycleDialogs.hStocktake.visible
+const showHStocktakeTrigger = cycleDialogs.hStocktake.trigger
+const valuationLoading = cycleDialogs.valuation.loading
+const showValuationTrigger = cycleDialogs.valuation.trigger
+const impairmentDialogVisible = cycleDialogs.impairment.visible
+const showImpairmentTrigger = cycleDialogs.impairment.trigger
+const depreciationCalcDialogVisible = cycleDialogs.depreciationCalc.visible
+const showDepreciationCalcTrigger = cycleDialogs.depreciationCalc.trigger
+const assetImpairmentDialogVisible = cycleDialogs.assetImpairment.visible
+const showAssetImpairmentTrigger = cycleDialogs.assetImpairment.trigger
+const goodwillImpairmentDialogVisible = cycleDialogs.goodwillImpairment.visible
+const showGoodwillImpairmentTrigger = cycleDialogs.goodwillImpairment.trigger
+const capitalizationCheckDialogVisible = cycleDialogs.capitalizationCheck.visible
+const showCapitalizationCheckTrigger = cycleDialogs.capitalizationCheck.trigger
+const amortizationCalcDialogVisible = cycleDialogs.amortizationCalc.visible
+const amortizationCalcSection = cycleDialogs.amortizationCalc.section
+const fairValueTestDialogVisible = cycleDialogs.fairValueTest.visible
+const showFairValueTestTrigger = cycleDialogs.fairValueTest.trigger
+const fairValueInstrumentType = cycleDialogs.fairValueTest.instrumentType
+const eclCalcDialogVisible = cycleDialogs.eclCalc.visible
+const showECLCalcTrigger = cycleDialogs.eclCalc.trigger
+const eclInstrumentType = cycleDialogs.eclCalc.instrumentType
+const classificationCheckDialogVisible = cycleDialogs.classificationCheck.visible
+const showClassificationCheckTrigger = cycleDialogs.classificationCheck.trigger
+const expenseAnalysisDialogVisible = cycleDialogs.expenseAnalysis.visible
+const impairmentSummaryDialogVisible = cycleDialogs.impairmentSummary.visible
+const interestCalcDialogVisible = cycleDialogs.interestCalc.visible
+const bondAmortizationDialogVisible = cycleDialogs.bondAmortization.visible
+const equityMovementDialogVisible = cycleDialogs.equityMovement.visible
+const incomeTaxCalcDialogVisible = cycleDialogs.incomeTaxCalc.visible
 
-// F-purchase-inventory F-F11 Task 3.2: F2-38~F2-44 计价测试自动抽样按钮
-const valuationLoading = ref(false)
-const showValuationTrigger = computed(() => {
-  if (!isFCycle.value) return false
-  const wpCode = (wpDetail.value?.wp_code || '').toUpperCase()
-  if (!wpCode.startsWith('F2')) return false
-  const activeId = sheetNav.activeSheetId.value || ''
-  return /F2-(3[89]|4[0-4])/i.test(activeId) || /计价测试|价格测试/.test(activeId)
-})
+// Applied handlers（模板 @applied 绑定）
+function onImpairmentApplied(sheet: string) { cycleDialogs.impairment.onApplied(sheet) }
+function onDepreciationCalcApplied(sheet: string) { cycleDialogs.depreciationCalc.onApplied(sheet) }
+function onAssetImpairmentApplied(sheet: string) { cycleDialogs.assetImpairment.onApplied(sheet) }
+function onGoodwillImpairmentApplied(sheet: string) { cycleDialogs.goodwillImpairment.onApplied(sheet) }
+function onCapitalizationCheckApplied(sheet: string) { cycleDialogs.capitalizationCheck.onApplied(sheet) }
+function onAmortizationCalcApplied(sheet: string) { cycleDialogs.amortizationCalc.onApplied(sheet) }
+function onFairValueTestApplied(sheet: string) { cycleDialogs.fairValueTest.onApplied(sheet) }
+function onECLCalcApplied(sheet: string) { cycleDialogs.eclCalc.onApplied(sheet) }
+function onClassificationCheckApplied(sheet: string) { cycleDialogs.classificationCheck.onApplied(sheet) }
+function onExpenseAnalysisApplied(sheet: string) { cycleDialogs.expenseAnalysis.onApplied(sheet) }
+function onImpairmentSummaryApplied(sheet: string) { cycleDialogs.impairmentSummary.onApplied(sheet) }
+function onInterestCalcApplied(sheet: string) { cycleDialogs.interestCalc.onApplied(sheet) }
+function onBondAmortizationApplied(sheet: string) { cycleDialogs.bondAmortization.onApplied(sheet) }
+function onEquityMovementApplied(sheet: string) { cycleDialogs.equityMovement.onApplied(sheet) }
+function onIncomeTaxCalcApplied(sheet: string) { cycleDialogs.incomeTaxCalc.onApplied(sheet) }
 
+// F-purchase-inventory F-F11 Task 3.2: F2-38~F2-44 计价测试自动抽样（自定义逻辑，不走通用 applied）
 async function onTriggerValuationSample() {
   valuationLoading.value = true
   try {
     const year = new Date().getFullYear()
-    // P0-3 写回联动：apply_to_sheet 传当前 active sheet 名，让结果落到 parsed_data
     const activeSheet = sheetNav.activeSheetId.value || ''
     const resp: any = await httpApi.post(
       `/api/projects/${projectId.value}/workpapers/${wpId.value}/f2/valuation-sample`,
@@ -1490,7 +1512,6 @@ async function onTriggerValuationSample() {
     )
     if (resp?.applied_to_sheet) {
       ElMessage.success(`已抽样 ${resp?.total_samples || 0} 笔并写回 ${resp.applied_to_sheet}`)
-      // 触发底稿刷新使 parsed_data 重读
       eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
     } else {
       ElMessage.success(`已抽样 ${resp?.total_samples || 0} 笔（${resp?.method}），未写回`)
@@ -1500,228 +1521,6 @@ async function onTriggerValuationSample() {
   } finally {
     valuationLoading.value = false
   }
-}
-
-// F-purchase-inventory F-F12 Task 3.5: F2-47 跌价准备 AI 分析弹窗状态
-const impairmentDialogVisible = ref(false)
-const showImpairmentTrigger = computed(() => {
-  if (!isFCycle.value) return false
-  const wpCode = (wpDetail.value?.wp_code || '').toUpperCase()
-  if (!wpCode.startsWith('F2')) return false
-  const activeId = sheetNav.activeSheetId.value || ''
-  return /F2-4[789]/i.test(activeId) || /跌价|减值|可变现/.test(activeId)
-})
-
-// P0-3 写回联动：弹窗写回成功后刷新底稿
-function onImpairmentApplied(sheet: string) {
-  ElMessage.success(`跌价分析已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// H-fixed-assets-cycle H-F11 Task 3.2: H1-12 折旧测算 sheet 自动计算按钮
-const depreciationCalcDialogVisible = ref(false)
-const showDepreciationCalcTrigger = computed(() => {
-  if (!isHCycle.value) return false
-  const activeId = sheetNav.activeSheetId.value || ''
-  // 匹配折旧测算表 H1-12 / H3-7 / H5-12 / H7-11 / H8-8
-  return /折旧测算表.*H1-12|H3-7|H5-12|H7-11|H8-8/i.test(activeId) || /折旧测算/.test(activeId)
-})
-
-// H-F11 写回联动：弹窗写回成功后刷新底稿
-function onDepreciationCalcApplied(sheet: string) {
-  ElMessage.success(`折旧测算已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// H-fixed-assets-cycle H-F12 Task 3.4: H1-14 减值测算 sheet AI 辅助分析按钮
-const assetImpairmentDialogVisible = ref(false)
-const showAssetImpairmentTrigger = computed(() => {
-  if (!isHCycle.value) return false
-  const activeId = sheetNav.activeSheetId.value || ''
-  // 匹配减值测算表 H1-14 / 减值测试相关 sheet
-  return /减值测算表.*H1-14|减值测算.*H\d/i.test(activeId) || /减值测算表H1-14/.test(activeId)
-})
-
-// H-F12 写回联动：弹窗写回成功后刷新底稿
-function onAssetImpairmentApplied(sheet: string) {
-  ElMessage.success(`减值分析已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// I-intangible-assets-cycle I-F4 Task 2.8: I3-6/I3-7 商誉减值 DCF 分析按钮
-const goodwillImpairmentDialogVisible = ref(false)
-const showGoodwillImpairmentTrigger = computed(() => {
-  if (!isICycle.value) return false
-  const activeId = sheetNav.activeSheetId.value || ''
-  // 匹配 I3 商誉减值 sheet（I3-6/I3-7 + 商誉减值/可收回金额）
-  return /商誉减值|可收回金额.*I3|减值.*I3-[67]|I3-[67]/i.test(activeId)
-})
-
-// I-F4 写回联动：弹窗写回成功后刷新底稿
-function onGoodwillImpairmentApplied(sheet: string) {
-  ElMessage.success(`商誉减值分析已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// I-intangible-assets-cycle I-F5 Task 2.10: I2-6 资本化时点判断按钮
-const capitalizationCheckDialogVisible = ref(false)
-const showCapitalizationCheckTrigger = computed(() => {
-  if (!isICycle.value) return false
-  const activeId = sheetNav.activeSheetId.value || ''
-  // 匹配 I2-6 资本化时点判断 sheet（按真实命名"项目成立条件 / 资本化时点 / I2-6"匹配）
-  return /资本化时点|项目成立条件.*I2|I2-6/i.test(activeId)
-})
-
-// I-F5 写回联动：弹窗写回成功后刷新底稿
-function onCapitalizationCheckApplied(sheet: string) {
-  ElMessage.success(`资本化时点判断已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// I-intangible-assets-cycle I-F2 / Sprint 3 Task 3.2: I1-10/I1-11 + I4-6/I4-7 摊销自动测算
-const amortizationCalcDialogVisible = ref(false)
-
-// 当前 sheet 是否命中 I1 / I4 摊销 sheet — 命中时返回对应 section（'I1' / 'I4'），否则返回 null
-const amortizationCalcSection = computed<'I1' | 'I4' | null>(() => {
-  if (!isICycle.value) return null
-  const activeId = sheetNav.activeSheetId.value || ''
-  // I1-10（不含减值-剩余年限法） / I1-11（含减值）
-  if (/摊销测算.*I1-1[01]|I1-1[01].*摊销/.test(activeId)) return 'I1'
-  // I4-6（直线法） / I4-7（工作量法）
-  if (/摊销测算.*I4-[67]|I4-[67].*摊销/.test(activeId)) return 'I4'
-  return null
-})
-
-// I-F2 写回联动：弹窗写回成功后刷新底稿
-function onAmortizationCalcApplied(sheet: string) {
-  ElMessage.success(`摊销测算已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// G-investment-cycle G-F4 Task 2.6: G1-6/G6/G8 公允价值测试弹窗
-const fairValueTestDialogVisible = ref(false)
-// 显示条件：G 循环 && 当前 sheet 名匹配公允价值测试类（G1-6 / G6 / G8 公允价值测试 sheet）
-// 与 ADR-G6 sheet 分组规则保持一致：/公允价值测试|公允价值计量|第三层次/
-const showFairValueTestTrigger = computed(() => {
-  if (!isGCycle.value) return false
-  const activeId = sheetNav.activeSheetId.value || ''
-  return /公允价值测试|公允价值计量|第三层次/.test(activeId)
-})
-
-// 按当前 wp_code 推荐 instrumentType 默认值（G1=交易性金融资产 / G6=其他债权投资 / G8=其他权益工具投资）
-const fairValueInstrumentType = computed(() => {
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  if (code.startsWith('G1') && !code.startsWith('G10') && !code.startsWith('G11') && !code.startsWith('G12') && !code.startsWith('G13') && !code.startsWith('G14')) {
-    return '交易性金融资产'
-  }
-  if (code.startsWith('G6')) return '其他债权投资'
-  if (code.startsWith('G8')) return '其他权益工具投资'
-  if (code.startsWith('G10')) return '交易性金融负债'
-  if (code.startsWith('G12')) return '净敞口套期'
-  if (code.startsWith('G13')) return '公允价值变动收益'
-  return '交易性金融资产'
-})
-
-// G-F4 写回联动：弹窗写回成功后刷新底稿
-function onFairValueTestApplied(sheet: string) {
-  ElMessage.success(`公允价值测试已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// G-investment-cycle G-F5 Task 2.9: G4/G6 ECL 三阶段计算弹窗
-const eclCalcDialogVisible = ref(false)
-
-// 显示条件：G 循环 && wp_code 以 G4 或 G6 开头 && 当前 sheet 名匹配减值/信用损失/ECL 模式
-// 与 ADR-G6 sheet 分组规则保持一致：/减值|信用损失|ECL/
-const showECLCalcTrigger = computed(() => {
-  if (!isGCycle.value) return false
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  // G4*（如 G4 / G4-2 等） 或 G6*（如 G6 / G6-2 等）
-  if (!(/^G4(\b|-|$|\d)/.test(code) || /^G6(\b|-|$|\d)/.test(code))) {
-    return false
-  }
-  const activeId = sheetNav.activeSheetId.value || ''
-  return /减值|信用损失|ECL/.test(activeId)
-})
-
-// 按当前 wp_code 推荐 instrumentType 默认值（G4=债权投资 / G6=其他债权投资）
-const eclInstrumentType = computed(() => {
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  if (code.startsWith('G4')) return '债权投资'
-  if (code.startsWith('G6')) return '其他债权投资'
-  return '债权投资'
-})
-
-// G-F5 写回联动：弹窗写回成功后刷新底稿
-function onECLCalcApplied(sheet: string) {
-  ElMessage.success(`ECL 计算已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// G-investment-cycle G-F11 Task 3.2: G1-8/G1-10 金融资产分类辅助弹窗
-const classificationCheckDialogVisible = ref(false)
-// 显示条件：G 循环 && wp_code 以 G1 开头（含 G1-8/G1-10）&& active sheet 命中分类相关 sheet
-// 与 ADR-G6 sheet 分组规则保持一致：/业务模式|合同现金流|分类.*适当性|SPPI/
-const showClassificationCheckTrigger = computed(() => {
-  if (!isGCycle.value) return false
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  // 仅 G1 开头（排除 G10/G11/G12/G13/G14）
-  if (!/^G1(\b|-|$)/.test(code) && !/^G1\d?$/.test(code)) {
-    // 允许 G1 / G1-8 / G1-10 等
-    if (!code.startsWith('G1') || code.startsWith('G10') || code.startsWith('G11') || code.startsWith('G12') || code.startsWith('G13') || code.startsWith('G14')) {
-      return false
-    }
-  }
-  const activeId = sheetNav.activeSheetId.value || ''
-  return /业务模式|合同现金流|分类.*适当性|SPPI/.test(activeId)
-})
-
-// G-F11 写回联动：弹窗写回成功后刷新底稿
-function onClassificationCheckApplied(sheet: string) {
-  ElMessage.success(`分类辅助已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// k-admin-cycle-post-review-fix P0 #1: K8/K9 费用分析弹窗（visible ref + applied handler）
-const expenseAnalysisDialogVisible = ref(false)
-function onExpenseAnalysisApplied(sheet: string) {
-  ElMessage.success(`费用分析已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// k-admin-cycle-post-review-fix P0 #2: K11 跨循环减值汇总弹窗（visible ref + applied handler）
-const impairmentSummaryDialogVisible = ref(false)
-function onImpairmentSummaryApplied(sheet: string) {
-  ElMessage.success(`减值汇总已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// workpaper-l-debt-cycle L-F7: L1/L3 利息测算弹窗（visible ref + applied handler）
-const interestCalcDialogVisible = ref(false)
-function onInterestCalcApplied(sheet: string) {
-  ElMessage.success(`利息测算已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// workpaper-l-debt-cycle L-F8: L5 摊余成本弹窗（visible ref + applied handler）
-const bondAmortizationDialogVisible = ref(false)
-function onBondAmortizationApplied(sheet: string) {
-  ElMessage.success(`摊余成本已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// workpaper-m-equity-cycle M-F7: M6 权益变动表弹窗（visible ref + applied handler）
-const equityMovementDialogVisible = ref(false)
-function onEquityMovementApplied(sheet: string) {
-  ElMessage.success(`权益变动已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-}
-
-// workpaper-n-tax-cycle N-F7: N5 所得税费用测算弹窗（visible ref + applied handler）
-const incomeTaxCalcDialogVisible = ref(false)
-function onIncomeTaxCalcApplied(sheet: string) {
-  ElMessage.success(`所得税测算已写回 ${sheet}`)
-  eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
 }
 
 // ─── Sprint 2: Foundation composables ─────────────────────────────────────────
