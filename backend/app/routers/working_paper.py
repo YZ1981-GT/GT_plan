@@ -1391,6 +1391,101 @@ async def get_cross_links(
     return {"wp_code": wp_code, "links": links, "count": len(links)}
 
 
+@router.get("/working-papers/{wp_id}/relation-graph")
+async def get_wp_relation_graph(
+    project_id: UUID,
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """获取底稿关系图数据（基于 cross_wp_references.json）
+
+    返回当前底稿的上游（被引用）和下游（引用其他）关系，
+    用于 WorkpaperAuditNav 的关系图 SVG 渲染。
+    """
+    import json
+    from pathlib import Path
+
+    # 1. 获取当前底稿编号
+    result = await db.execute(
+        sa.select(WpIndex)
+        .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
+    )
+    idx = result.scalar_one_or_none()
+    if not idx:
+        return {"wp_code": "", "current": None, "upstream": [], "downstream": []}
+
+    wp_code = idx.wp_code
+    # 当前底稿 cycle 前缀（如 D2 → D, E1A → E, H1-13 → H）
+    cycle_prefix = wp_code[0] if wp_code else ""
+
+    # 2. 加载 cross_wp_references.json
+    cwr_path = Path(__file__).resolve().parents[2] / "data" / "cross_wp_references.json"
+    if not cwr_path.exists():
+        return {"wp_code": wp_code, "current": {"code": wp_code, "name": idx.wp_name}, "upstream": [], "downstream": []}
+
+    try:
+        cwr_data = json.loads(cwr_path.read_text(encoding="utf-8"))
+        all_refs = cwr_data.get("references", [])
+    except Exception:
+        return {"wp_code": wp_code, "current": {"code": wp_code, "name": idx.wp_name}, "upstream": [], "downstream": []}
+
+    # 3. 找上游（其他底稿是 source，本底稿是 target）
+    # 4. 找下游（本底稿是 source，其他底稿是 target）
+    # 匹配规则：wp_code 完全匹配，或 wp_code 是子表（如 D2 匹配 D2-1, D2-12）
+    def _matches(ref_code: str, my_code: str) -> bool:
+        if not ref_code or not my_code:
+            return False
+        return ref_code == my_code or ref_code.startswith(my_code + "-") or my_code.startswith(ref_code + "-")
+
+    upstream: dict[str, dict] = {}  # wp_code → {code, description}
+    downstream: dict[str, dict] = {}
+
+    for ref in all_refs:
+        src = ref.get("source_wp", "")
+        targets = ref.get("targets", [])
+        target_codes = [t.get("wp_code", "") for t in targets if t.get("wp_code")]
+        desc = ref.get("description", "")
+        severity = ref.get("severity", "info")
+
+        # 本底稿出现在 targets 中 → src 是上游
+        if any(_matches(tc, wp_code) for tc in target_codes) and src and src != wp_code:
+            if src not in upstream:
+                upstream[src] = {"code": src, "description": desc, "severity": severity}
+
+        # 本底稿是 source → targets 是下游
+        if _matches(src, wp_code):
+            for tc in target_codes:
+                if tc and tc != wp_code and tc not in downstream:
+                    downstream[tc] = {"code": tc, "description": desc, "severity": severity}
+
+    # 5. 查询数据库获取这些 wp_code 是否在项目中存在 + 取名称
+    all_codes = list(set(list(upstream.keys()) + list(downstream.keys())))
+    if all_codes:
+        idx_result = await db.execute(
+            sa.select(WpIndex.wp_code, WpIndex.wp_name).where(
+                WpIndex.project_id == project_id,
+                WpIndex.wp_code.in_(all_codes),
+                WpIndex.is_deleted == sa.false(),
+            )
+        )
+        existing = {row[0]: row[1] for row in idx_result.all()}
+        for code, info in upstream.items():
+            info["name"] = existing.get(code, "")
+            info["exists"] = code in existing
+        for code, info in downstream.items():
+            info["name"] = existing.get(code, "")
+            info["exists"] = code in existing
+
+    return {
+        "wp_code": wp_code,
+        "current": {"code": wp_code, "name": idx.wp_name, "cycle": cycle_prefix},
+        "upstream": sorted(upstream.values(), key=lambda x: x["code"]),
+        "downstream": sorted(downstream.values(), key=lambda x: x["code"]),
+    }
+
+
 @router.post("/working-papers/{wp_id}/sync-procedure")
 async def sync_procedure_status(
     project_id: UUID,

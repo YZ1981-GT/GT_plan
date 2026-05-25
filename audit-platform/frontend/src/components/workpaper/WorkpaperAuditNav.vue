@@ -140,14 +140,19 @@
           {{ aiTipText }}
         </div>
         <div v-else class="gt-ai-tip-empty">
-          点击"✨ AI 检测"基于 E1-1 数据生成关键风险提示
+          点击"✨ AI 检测"基于 {{ wpCode || '当前底稿' }} 数据生成关键风险提示
         </div>
       </section>
 
       <section class="gt-audit-nav-section">
         <h4 class="gt-audit-nav-section-title">🔗 底稿间关系</h4>
-        <svg class="gt-audit-nav-graph-svg" :viewBox="`0 0 600 160`" preserveAspectRatio="xMidYMid meet">
-          <!-- 简化节点链接图：B23-2/C3/B51-3 → E1A → E1-1~E1-32 -->
+        <div v-if="relationLoading" class="gt-audit-nav-loading">
+          <el-icon class="is-loading"><Loading /></el-icon> 加载关系图...
+        </div>
+        <div v-else-if="!hasRelations" class="gt-audit-nav-empty">
+          当前底稿（{{ wpCode }}）暂无跨底稿引用关系
+        </div>
+        <svg v-else class="gt-audit-nav-graph-svg" :viewBox="`0 0 600 ${graphHeight}`" preserveAspectRatio="xMidYMid meet">
           <g v-for="node in graphNodes" :key="node.id">
             <rect
               :x="node.x" :y="node.y"
@@ -178,6 +183,11 @@
             </marker>
           </defs>
         </svg>
+        <div v-if="hasRelations" class="gt-audit-nav-graph-legend">
+          <span><span class="gt-graph-dot" style="background: #909399"></span> 上游（被本底稿依赖）</span>
+          <span><span class="gt-graph-dot" style="background: #4b2d77"></span> 当前底稿</span>
+          <span><span class="gt-graph-dot" style="background: #5e35b1"></span> 下游（依赖本底稿）</span>
+        </div>
       </section>
     </div>
   </div>
@@ -248,14 +258,34 @@ const procedureStatus = useProcedureStatus(
 )
 const prerequisiteStatus = usePrerequisiteStatus(props.projectId, props.wpCode)
 
-// 2.4a 5 项认定卡片（致同 E1A R7-R13 静态 + procedure_status 动态计数）
+// 2.4a 5 项认定卡片（按 wp_code cycle 派生科目类型描述 + procedure_status 动态计数）
+const assertionTipsByCycle: Record<string, Record<string, string>> = {
+  A: { A: '报表项目确实存在', B: '所有报表项目均已记录', C: '报表项目所有权归属清晰', D: '金额、计价、分摊准确', E: '财务报表披露恰当' },
+  B: { A: '风险评估证据存在', B: '风险评估覆盖完整', C: '权利义务关系清晰', D: '风险评估准确', E: '风险披露恰当' },
+  C: { A: '控制实际存在', B: '控制覆盖完整', C: '控制权责清晰', D: '控制有效性准确', E: '控制评价披露恰当' },
+  D: { A: '应收/收入确实存在', B: '所有应收/收入均已记录', C: '应收账款所有权归属清晰', D: '金额、计价、分摊准确', E: '财务报表披露恰当' },
+  E: { A: '货币资金确实存在', B: '所有货币资金均已记录', C: '货币资金所有权归属清晰', D: '金额、计价、分摊准确', E: '财务报表披露恰当' },
+  F: { A: '存货/采购确实存在', B: '所有存货/采购均已记录', C: '存货所有权归属清晰', D: '金额、计价、分摊准确', E: '财务报表披露恰当' },
+  G: { A: '投资确实存在', B: '所有投资均已记录', C: '投资所有权归属清晰', D: '金额、计价、分摊准确', E: '财务报表披露恰当' },
+  H: { A: '固定资产/在建工程确实存在', B: '所有固定资产均已记录', C: '资产所有权归属清晰', D: '金额、折旧、减值准确', E: '财务报表披露恰当' },
+  I: { A: '无形资产/商誉确实存在', B: '所有无形资产均已记录', C: '资产所有权归属清晰', D: '金额、摊销、减值准确', E: '财务报表披露恰当' },
+  J: { A: '薪酬/股份支付确实发生', B: '所有薪酬均已计提', C: '薪酬权责清晰', D: '金额、计提、分摊准确', E: '财务报表披露恰当' },
+  K: { A: '费用确实发生', B: '所有费用均已记录', C: '费用归属清晰', D: '金额、归集、分摊准确', E: '财务报表披露恰当' },
+  L: { A: '借款/债券确实存在', B: '所有筹资交易均已记录', C: '筹资权责清晰', D: '金额、利息、摊余成本准确', E: '财务报表披露恰当' },
+  M: { A: '权益项目确实存在', B: '所有权益变动均已记录', C: '权益所有权清晰', D: '金额、变动准确', E: '财务报表披露恰当' },
+  N: { A: '税费确实存在', B: '所有税费均已计提', C: '税费权责清晰', D: '金额、计算、分摊准确', E: '财务报表披露恰当' },
+  S: { A: '专项事项确实存在', B: '所有专项事项均已记录', C: '专项权责清晰', D: '金额、计量准确', E: '财务报表披露恰当' },
+}
+
 const assertionCards = computed(() => {
+  const cyclePrefix = (props.wpCode || '').charAt(0).toUpperCase()
+  const tips = assertionTipsByCycle[cyclePrefix] || assertionTipsByCycle.A
   const codes = [
-    { code: 'A', name: '存在', tip: '货币资金确实存在' },
-    { code: 'B', name: '完整性', tip: '所有货币资金均已记录' },
-    { code: 'C', name: '权利义务', tip: '货币资金所有权归属清晰' },
-    { code: 'D', name: '准确性', tip: '金额、计价、分摊准确' },
-    { code: 'E', name: '列报', tip: '财务报表披露恰当' },
+    { code: 'A', name: '存在', tip: tips.A },
+    { code: 'B', name: '完整性', tip: tips.B },
+    { code: 'C', name: '权利义务', tip: tips.C },
+    { code: 'D', name: '准确性', tip: tips.D },
+    { code: 'E', name: '列报', tip: tips.E },
   ]
   // 按 procedure_status 中 assertions 字段统计每项程序数
   const counts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, E: 0 }
@@ -325,29 +355,98 @@ async function generateAiTip() {
   }
 }
 
-// 2.4d 底稿间关系图（简化版 SVG 节点链接图）
-const graphNodes = [
-  { id: 'b23', label: 'B23-2', x: 20, y: 10, color: '#909399' },
-  { id: 'c3', label: 'C3', x: 20, y: 50, color: '#909399' },
-  { id: 'b51', label: 'B51-3', x: 20, y: 90, color: '#909399' },
-  { id: 'e1a', label: 'E1A 总控台', x: 200, y: 50, w: 100, color: '#4b2d77' },
-  { id: 'e0', label: 'E0 函证', x: 360, y: 10, color: '#5e35b1' },
-  { id: 'e11', label: 'E1-1 审定', x: 360, y: 50, color: '#5e35b1' },
-  { id: 'a51', label: 'A5-1 CFS', x: 360, y: 90, color: '#5e35b1' },
-  { id: 'a17', label: 'A17-5-5', x: 500, y: 50, w: 80, color: '#388e3c' },
-]
-const graphEdges = [
-  { x1: 95, y1: 21, x2: 200, y2: 56, color: 'gray' }, // B23 → E1A
-  { x1: 95, y1: 61, x2: 200, y2: 60, color: 'gray' }, // C3 → E1A
-  { x1: 95, y1: 101, x2: 200, y2: 65, color: 'gray' }, // B51 → E1A
-  { x1: 300, y1: 56, x2: 360, y2: 21, color: 'gray' }, // E1A → E0
-  { x1: 300, y1: 60, x2: 360, y2: 56, color: 'gray' }, // E1A → E1-1
-  { x1: 300, y1: 65, x2: 360, y2: 96, color: 'gray' }, // E1A → A5-1
-  { x1: 435, y1: 21, x2: 500, y2: 56, color: 'gray' }, // E0 → A17
-]
+// 2.4d 底稿间关系图（动态：从后端 /relation-graph API 加载）
+interface RelationNode {
+  code: string
+  name: string
+  description?: string
+  severity?: string
+  exists?: boolean
+}
+const relationLoading = ref(false)
+const upstreamNodes = ref<RelationNode[]>([])
+const downstreamNodes = ref<RelationNode[]>([])
+
+const hasRelations = computed(() => upstreamNodes.value.length > 0 || downstreamNodes.value.length > 0)
+
+const graphHeight = computed(() => {
+  const maxRows = Math.max(upstreamNodes.value.length, downstreamNodes.value.length, 1)
+  return Math.max(120, 30 + maxRows * 35)
+})
+
+const graphNodes = computed(() => {
+  const nodes: any[] = []
+  // 上游（左侧）
+  upstreamNodes.value.forEach((n, i) => {
+    nodes.push({
+      id: `up-${n.code}`,
+      label: n.code,
+      x: 20, y: 15 + i * 35,
+      color: n.exists ? '#909399' : '#bbb',
+    })
+  })
+  // 当前底稿（中心）
+  const centerY = (graphHeight.value - 22) / 2
+  nodes.push({
+    id: 'current',
+    label: props.wpCode,
+    x: 230, y: centerY,
+    w: 140, color: '#4b2d77',
+  })
+  // 下游（右侧）
+  downstreamNodes.value.forEach((n, i) => {
+    nodes.push({
+      id: `down-${n.code}`,
+      label: n.code,
+      x: 430, y: 15 + i * 35,
+      color: n.exists ? '#5e35b1' : '#bbb',
+    })
+  })
+  return nodes
+})
+
+const graphEdges = computed(() => {
+  const edges: any[] = []
+  const centerY = (graphHeight.value - 22) / 2 + 11
+  // 上游 → 当前
+  upstreamNodes.value.forEach((_, i) => {
+    edges.push({
+      x1: 90, y1: 15 + i * 35 + 11,
+      x2: 230, y2: centerY,
+      color: 'gray',
+    })
+  })
+  // 当前 → 下游
+  downstreamNodes.value.forEach((_, i) => {
+    edges.push({
+      x1: 370, y1: centerY,
+      x2: 430, y2: 15 + i * 35 + 11,
+      color: 'gray',
+    })
+  })
+  return edges
+})
+
+async function loadRelationGraph() {
+  if (!props.wpId) return
+  relationLoading.value = true
+  try {
+    const { default: http } = await import('@/utils/http')
+    const { data } = await http.get(`/api/projects/${props.projectId}/working-papers/${props.wpId}/relation-graph`)
+    upstreamNodes.value = data?.upstream || []
+    downstreamNodes.value = data?.downstream || []
+  } catch (e) {
+    console.warn('[WorkpaperAuditNav] 加载关系图失败:', e)
+    upstreamNodes.value = []
+    downstreamNodes.value = []
+  } finally {
+    relationLoading.value = false
+  }
+}
 
 onMounted(() => {
   // 子 composable 已自动加载，此处仅占位
+  loadRelationGraph()
 })
 </script>
 
@@ -478,10 +577,23 @@ onMounted(() => {
 .gt-audit-nav-graph-svg {
   width: 100%;
   height: auto;
+  max-height: 240px;
+  display: block;
   background: var(--gt-color-bg-white, #fff);
   border: 1px solid var(--gt-color-border-light, #e4e7ed);
   border-radius: 4px;
   padding: 4px 0;
+}
+.gt-audit-nav-empty {
+  padding: 16px; text-align: center; color: var(--gt-color-text-tertiary, #909399);
+  font-size: 12px; background: var(--gt-color-bg, #fafafa); border-radius: 4px;
+}
+.gt-audit-nav-graph-legend {
+  display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px;
+  font-size: 11px; color: var(--gt-color-text-secondary, #909399);
+}
+.gt-graph-dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: middle; margin-right: 4px;
 }
 .gt-audit-nav-progress-legend {
   display: flex;

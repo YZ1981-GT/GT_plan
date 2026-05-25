@@ -63,6 +63,13 @@
           :wp-id="wpId"
           :wp-code="wpDetail?.wp_code"
         />
+        <!-- 审计导航图入口：点击弹出全屏抽屉 -->
+        <el-button
+          v-if="hasAuditNav"
+          size="small"
+          @click="showAuditNavDrawer = true"
+          style="margin-right: 8px"
+        >🧭 审计导航图</el-button>
         <!-- 关键操作组：保存 / 一键填充 / 提交复核（高亮） -->
         <el-button-group class="gt-wp-toolbar-primary">
           <el-button
@@ -213,19 +220,15 @@
     <!-- Univer 编辑区（左侧 Sheet 导航 + 右侧 Univer 画布） -->
     <div class="gt-wp-editor-main">
       <!-- Loading overlay（v-if，加载完即移除）-->
-      <div v-if="loading" class="gt-wp-editor-loading-overlay">
-        <el-icon class="is-loading" :size="32" color="var(--gt-color-primary)"><Loading /></el-icon>
-        <p>正在加载底稿...</p>
-      </div>
+      <!-- spec workpaper-editor-refactor Phase 5.1: 用 GtLoadingOverlay 替代内嵌 overlay -->
+      <GtLoadingOverlay
+        :visible="loading"
+        text="正在加载底稿..."
+        :hint="loadingHint"
+        :size="32"
+      />
       <!-- 左侧 Sheet 导航：v-show 保持 DOM（数据未就绪也先占位）-->
       <div v-show="!loading" class="gt-wp-editor-left-col">
-        <!-- E1 Sprint 2 Task 2.5 + D-sales-cycle UAT #20: 审计导航图（左侧导航最顶部，默认展开可折叠） -->
-        <WorkpaperAuditNav
-          v-if="wpDetail && wpDetail.wp_code && (wpDetail.wp_code.startsWith('E1') || isDCycle || isFCycle || isHCycle || isICycle || isGCycle || isKCycle || isLCycle || isMCycle || isNCycle)"
-          :project-id="projectId"
-          :wp-id="wpId"
-          :wp-code="wpDetail?.wp_code || 'E1'"
-        />
         <UniverSheetNav
           :groups="sheetNav.groups.value"
           :active-sheet-id="sheetNav.activeSheetId.value"
@@ -509,9 +512,18 @@
           </el-button>
         </div>
       </div>
-      <!-- Univer 画布容器：始终 mount（Univer 需要 DOM 节点初始化）-->
-      <div class="gt-wp-editor-univer-wrapper">
-        <div ref="univerContainer" class="gt-wp-editor-univer"></div>
+      <!-- 中间内容区：顶部 sheet tabs + Univer 画布（垂直布局） -->
+      <div class="gt-wp-editor-center-col">
+        <!-- 顶部水平 sheet 切换栏：避免用户滚到底部找 tab -->
+        <SheetTopTabs
+          :sheets="flatSheets"
+          :active-sheet-id="sheetNav.activeSheetId.value"
+          @switch="onSwitchSheet"
+        />
+        <!-- Univer 画布容器：始终 mount（Univer 需要 DOM 节点初始化）-->
+        <div class="gt-wp-editor-univer-wrapper">
+          <div ref="univerContainer" class="gt-wp-editor-univer"></div>
+        </div>
       </div>
 
       <!-- Task 2.2: Prefill cell hover tooltip (floating div for canvas-based Univer) -->
@@ -553,6 +565,43 @@
       @update:visible="showCellFormulaDetail = $event"
       @navigate="onCellDetailNavigate"
     />
+
+    <!-- 审计导航图全屏对话框（默认全屏，支持拖拽调整） -->
+    <el-dialog
+      v-model="showAuditNavDrawer"
+      :fullscreen="auditNavFullscreen"
+      :width="auditNavFullscreen ? '100%' : '85%'"
+      :show-close="false"
+      append-to-body
+      class="gt-audit-nav-dialog"
+      :close-on-click-modal="false"
+      destroy-on-close
+    >
+      <template #header>
+        <div class="gt-audit-nav-dialog__header">
+          <div class="gt-audit-nav-dialog__title">
+            <span class="gt-audit-nav-dialog__icon">🧭</span>
+            <span>审计导航图</span>
+            <span v-if="wpDetail?.wp_code" class="gt-audit-nav-dialog__code">{{ wpDetail.wp_code }}</span>
+            <span v-if="wpDetail?.wp_name" class="gt-audit-nav-dialog__name">{{ wpDetail.wp_name }}</span>
+          </div>
+          <div class="gt-audit-nav-dialog__actions">
+            <el-button size="small" text :icon="auditNavFullscreen ? undefined : undefined" @click="auditNavFullscreen = !auditNavFullscreen">
+              {{ auditNavFullscreen ? '⊟ 退出全屏' : '⊞ 全屏' }}
+            </el-button>
+            <el-button size="small" text @click="showAuditNavDrawer = false">✕</el-button>
+          </div>
+        </div>
+      </template>
+      <div class="gt-audit-nav-dialog__body">
+        <WorkpaperAuditNav
+          v-if="hasAuditNav"
+          :project-id="projectId"
+          :wp-id="wpId"
+          :wp-code="wpDetail?.wp_code || 'E1'"
+        />
+      </div>
+    </el-dialog>
 
     <!-- F-purchase-inventory F-F5 Task 2.7~2.9: 存货监盘 D 类弹窗 -->
     <InventoryStocktakeDialog
@@ -883,6 +932,7 @@ import { useDepreciationBranchSelector } from '@/composables/useDepreciationBran
 import DepreciationBranchSelector from '@/components/workpaper/DepreciationBranchSelector.vue'
 import WorkpaperSidePanel from '@/components/workpaper/WorkpaperSidePanel.vue'
 import UniverSheetNav from '@/components/workpaper/UniverSheetNav.vue'
+import SheetTopTabs from '@/components/workpaper/SheetTopTabs.vue'
 import WorkpaperAuditNav from '@/components/workpaper/WorkpaperAuditNav.vue'
 import ProcedureDialogLauncher from '@/components/workpaper/ProcedureDialogLauncher.vue'
 import InventoryStocktakeDialog from '@/components/workpaper/InventoryStocktakeDialog.vue'
@@ -912,6 +962,7 @@ import ReviewLayerBadges from '@/components/workpaper/ReviewLayerBadges.vue'
 import { usePrerequisiteStatus } from '@/composables/usePrerequisiteStatus'
 import { useWorkpaperRefresh } from '@/composables/useWorkpaperRefresh'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
+import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
 import { WP_STATUS } from '@/constants/statusEnum'
 import { handleApiError } from '@/utils/errorHandler'
 
@@ -947,6 +998,8 @@ const wpId = computed(() => route.params.wpId as string)
 // 核心数据 ref（必须在所有依赖它们的 computed/composable 调用前定义，否则触发 ReferenceError）
 const wpDetail = ref<WorkpaperDetail | null>(null)
 const loading = ref(true)
+// 加载阶段提示（用户感知）：null/空字符串则不显示 hint
+const loadingHint = ref('')
 
 // ─── component_type 路由逻辑 ─────────────────────────────────────────────────
 const componentType = ref<string>('univer')
@@ -1191,6 +1244,19 @@ const sheetNav = {
   applyForeignCurrencyVisibility: () => eUniverNav.applyForeignCurrencyVisibility(),
 }
 const sheetNavCollapsed = ref(false)
+
+// 顶部水平 sheet 切换栏：扁平化 sheetNav.groups 为 [{id, name}] 列表
+const flatSheets = computed(() => {
+  const groups = sheetNav.groups.value || []
+  const result: Array<{ id: string; name: string }> = []
+  for (const g of groups) {
+    for (const s of (g.sheets || [])) {
+      if (s.hidden) continue
+      result.push({ id: s.id, name: s.name })
+    }
+  }
+  return result
+})
 
 // H 固定资产循环 task 2.4: 折旧/减值分支选择器
 const hActiveSheetName = computed(() => {
@@ -1699,6 +1765,18 @@ const reviewDialogComment = ref('')
 
 // Sprint 5.5: Cell formula detail dialog
 const showCellFormulaDetail = ref(false)
+
+// 审计导航图抽屉
+const showAuditNavDrawer = ref(false)
+const auditNavFullscreen = ref(true)
+const hasAuditNav = computed(() => {
+  const code = wpDetail.value?.wp_code || ''
+  return !!code && (
+    code.startsWith('E1') ||
+    isDCycle.value || isFCycle.value || isHCycle.value || isICycle.value ||
+    isGCycle.value || isKCycle.value || isLCycle.value || isMCycle.value || isNCycle.value
+  )
+})
 const cellDetailSheet = ref('')
 const cellDetailLabel = ref('')
 const reviewDialogStatus = ref<ReviewStatus>('reviewed')
@@ -1804,6 +1882,7 @@ async function initUniver() {
   if (!univerContainer.value) return
 
   // 1. 加载底稿详情
+  loadingHint.value = '加载底稿详情'
   try {
     wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
     if (!wpDetail.value) {
@@ -1818,6 +1897,7 @@ async function initUniver() {
   }
 
   // E1 Sprint 2: 加载项目元数据（scenario + has_foreign_currency）
+  loadingHint.value = '读取项目元数据'
   try {
     const proj: any = await httpApi.get(`/api/projects/${projectId.value}`, {
       validateStatus: (s: number) => s < 600,
@@ -1833,6 +1913,7 @@ async function initUniver() {
 
   // 2. 直接从后端 GET /xlsx-to-json 加载完整 Univer JSON（D2 PoC 最终方案）
   // 不再下载 xlsx blob 尝试 importXLSX（Core Preset 不支持，会静默创建空白 workbook）
+  loadingHint.value = '加载工作簿数据'
   let workbookData: any = null
   loadedFromXlsx = false
   try {
@@ -1883,6 +1964,7 @@ async function initUniver() {
   // 3. 初始化 Univer
   // Advanced Preset 需要 Univer Server（:3010），当前未部署，跳过
   // 如需启用：部署 Univer Server 后取消下方注释
+  loadingHint.value = '初始化 Univer 引擎'
   const extraPresets: any[] = []
   // try {
   //   const { UniverSheetsDrawingPreset } = await import('@univerjs/preset-sheets-drawing')
@@ -1947,6 +2029,7 @@ async function initUniver() {
   })
 
   // 初次刷新 sheet 导航（workbook 创建完毕）
+  loadingHint.value = '渲染工作表'
   setTimeout(() => {
     sheetNav.refresh()
     // E1 Sprint 2 Task 2.37: 应用 has_foreign_currency 显隐规则到 E1-1
@@ -1956,6 +2039,7 @@ async function initUniver() {
   }, 100)
 
   loading.value = false
+  loadingHint.value = ''
 
   // 6. 非阻塞加载智能提示和用户名映射
   loadSmartTips()
@@ -2659,8 +2743,12 @@ function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: stri
   flex: 1; min-height: 0; position: relative; overflow: hidden;
   display: flex; flex-direction: row;
 }
-.gt-wp-editor-univer-wrapper { flex: 1; min-width: 0; position: relative; overflow: hidden; }
+.gt-wp-editor-univer-wrapper { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: hidden; }
+.gt-wp-editor-center-col { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .gt-wp-editor-univer { width: 100%; height: 100%; }
+
+/* 审计导航图对话框：基础布局（详细样式见全局 style 块，因 dialog 通过 append-to-body 传送脱离 scoped 作用域） */
+.gt-audit-nav-dialog__body { height: 100%; }
 .gt-wp-editor-left-col {
   display: flex;
   flex-direction: column;
@@ -2681,12 +2769,6 @@ function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: stri
 }
 .gt-stocktake-trigger :deep(.el-button) {
   width: 100%;
-}
-.gt-wp-editor-loading-overlay {
-  position: absolute; inset: 0; z-index: 100;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; color: var(--gt-color-text-tertiary);
-  background: var(--gt-color-bg-white);
 }
 .gt-wp-editor-loading {
   display: flex; flex-direction: column; align-items: center;
@@ -2803,5 +2885,59 @@ function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: stri
 }
 .gt-review-marker-popover {
   padding: 12px !important;
+}
+
+/* ─── 审计导航图对话框（全局样式：dialog append-to-body 已脱离 scoped 作用域） ─── */
+.gt-audit-nav-dialog .el-dialog {
+  resize: both; overflow: hidden; min-width: 700px; min-height: 500px;
+  display: flex; flex-direction: column;
+  border-radius: 12px;
+}
+.gt-audit-nav-dialog .el-dialog__header {
+  margin: 0; padding: 14px 20px;
+  background: linear-gradient(135deg, #6750A4 0%, #8b5cf6 100%);
+  border-radius: 12px 12px 0 0;
+}
+.gt-audit-nav-dialog .el-dialog__body {
+  flex: 1; overflow: auto; padding: 0 !important;
+  background: #fafafa;
+}
+.gt-audit-nav-dialog.is-fullscreen .el-dialog {
+  resize: none; border-radius: 0;
+}
+.gt-audit-nav-dialog.is-fullscreen .el-dialog__header {
+  border-radius: 0;
+}
+/* 隐藏内嵌 WorkpaperAuditNav 自带的标题栏 */
+.gt-audit-nav-dialog .gt-audit-nav-header {
+  display: none !important;
+}
+.gt-audit-nav-dialog .gt-audit-nav {
+  border: none !important; box-shadow: none !important; background: transparent !important;
+}
+.gt-audit-nav-dialog .gt-audit-nav-body {
+  padding: 16px 20px;
+}
+/* dialog 自定义 header */
+.gt-audit-nav-dialog__header {
+  display: flex; align-items: center; gap: 12px;
+}
+.gt-audit-nav-dialog__title {
+  display: flex; align-items: center; gap: 10px; flex: 1; color: #fff; font-size: 15px; font-weight: 600;
+}
+.gt-audit-nav-dialog__icon { font-size: 18px; }
+.gt-audit-nav-dialog__code {
+  padding: 2px 8px; background: rgba(255,255,255,0.25); border-radius: 4px;
+  font-size: 12px; font-weight: 700;
+}
+.gt-audit-nav-dialog__name {
+  font-size: 13px; font-weight: 400; color: rgba(255,255,255,0.9);
+}
+.gt-audit-nav-dialog__actions { display: flex; gap: 4px; }
+.gt-audit-nav-dialog__actions .el-button {
+  color: #fff !important;
+}
+.gt-audit-nav-dialog__actions .el-button:hover {
+  background: rgba(255,255,255,0.15) !important;
 }
 </style>
