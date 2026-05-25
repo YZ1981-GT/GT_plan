@@ -994,6 +994,7 @@ import EquityMovementDialog from '@/components/workpaper/EquityMovementDialog.vu
 import IncomeTaxCalcDialog from '@/components/workpaper/IncomeTaxCalcDialog.vue'
 import ReviewLayerBadges from '@/components/workpaper/ReviewLayerBadges.vue'
 import { usePrerequisiteStatus } from '@/composables/usePrerequisiteStatus'
+import { useCycleType } from '@/composables/useCycleType'
 import { useWorkpaperRefresh } from '@/composables/useWorkpaperRefresh'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
@@ -1090,71 +1091,19 @@ const scenarioFilter = computed(() => {
   }
 })
 // Sprint 2 F5 task 2.6: D 销售循环按 wp_code 路由到 useDSalesCycleSheetGroups，其余用 useUniverSheetNav
-// D 类 wp_code 形如 D0/D1/.../D7（含子表 D2-1, D4-22A 等），统一以 /^D\d/ 识别
-const isDCycle = computed(() => {
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  return /^D\d/.test(code)
-})
-
-// F 采购存货循环 task 2.2: F 类 wp_code 形如 F0/F1/.../F5（含子表 F2-1, F2-21A 等），以 /^F\d/ 识别
-const isFCycle = computed(() => {
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  return /^F\d/.test(code)
-})
-
-// H 固定资产循环 task 2.4: H 类 wp_code 形如 H0/H1/.../H10（含子表 H1-12, H8-8 等），以 /^H\d/ 识别
-const isHCycle = computed(() => {
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  return /^H\d/.test(code)
-})
-
-// I 无形资产循环 task 2.1: I 类 wp_code 形如 I0/I1/.../I6（含子表 I1-10, I4-7 等），以 /^I\d/ 识别
-const isICycle = computed(() => {
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  return /^I\d/.test(code)
-})
-
-// G 投资循环 task 2.2: G 类 wp_code 形如 G0/G1/.../G14（含子表 G1-2, G7-3 等），以 /^G\d/ 识别
-const isGCycle = computed(() => {
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  return /^G\d/.test(code)
-})
-
-// K 管理循环 task 2.3: K 类 wp_code 形如 K0/K1/.../K13（含子表 K8-2, K1-12 等），以 /^K\d/ 识别
-const isKCycle = computed(() => {
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  return /^K\d/.test(code)
-})
-
-// L 筹资循环 task 2.1: L 类 wp_code 形如 L0/L1/.../L8（含子表 L1-2, L8-2 等），以 /^L\d/ 识别
-const isLCycle = computed(() => {
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  return /^L\d/.test(code)
-})
-
-// M 权益循环 task 2.3: M 类 wp_code 形如 M1/M2/.../M10（含子表 M2-2, M6-2 等），以 /^M\d/ 识别
-const isMCycle = computed(() => {
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  return /^M\d/.test(code)
-})
-
-// N 税金循环 task 2.1: N 类 wp_code 形如 N1/N2/.../N5（含子表 N2-1, N5-4 等），以 /^N\d/ 识别
-const isNCycle = computed(() => {
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  return /^N\d/.test(code)
-})
-
-// B 类底稿（控制了解/审计计划）: B1, B10, B15, B22, B23, B30, B40, B50, B51, B52, B60
-const isBCycle = computed(() => {
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  return /^B\d|^B[1-6]/i.test(code)
-})
-
-// C 类底稿（控制测试）: C1~C26
-const isCCycle = computed(() => {
-  const code = (wpDetail.value?.wp_code || '').toUpperCase()
-  return /^C\d/i.test(code)
-})
+// spec workpaper-editor-refactor Phase 2 — 11 处 isXCycle computed 集中到 useCycleType composable
+const cycleType = useCycleType(wpDetail)
+const isBCycle = cycleType.isBCycle
+const isCCycle = cycleType.isCCycle
+const isDCycle = cycleType.isDCycle
+const isFCycle = cycleType.isFCycle
+const isGCycle = cycleType.isGCycle
+const isHCycle = cycleType.isHCycle
+const isICycle = cycleType.isICycle
+const isKCycle = cycleType.isKCycle
+const isLCycle = cycleType.isLCycle
+const isMCycle = cycleType.isMCycle
+const isNCycle = cycleType.isNCycle
 
 // 同时实例化三个 nav，按 isDCycle/isFCycle 选择活跃的对外暴露
 // 三者接口一致（groups / activeSheetId / totalCount / refresh / switchTo），
