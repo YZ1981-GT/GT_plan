@@ -131,12 +131,12 @@
 
 - [x] Spec 三件套创建（requirements + design + tasks）
 - [x] **Phase 1 — 基础设施** ✅ (3/3 tasks, 8/8 tests passed)
-- [ ] Phase 2 — D 循环试点（待启动 — 高风险，每个循环需 Playwright 实测）
-- [ ] Phase 3 — 批量迁其他循环（待 Phase 2 完成后启动）
+- [x] **Phase 2-3 部分 — useCycleType + useCycleDialogs + useSheetNavFacade** ✅ (净减 509 行，2998→2489)
 - [x] **Phase 4.1 — WorkpaperEditor 错误状态友好引导** ✅
-- [ ] Phase 4.2-4.3 — WorkpaperList 详情面板 + 子编辑器接入（fetchComponentType 失败已转 initUniver 兜底，独立守卫待后续）
-- [x] **Phase 5.1 — Overlay 替换** ✅ （`GtLoadingOverlay` + `loadingHint` 阶段提示）
-- [x] **Phase 5.2 — Playwright 端到端测试** ✅
+- [ ] Phase 4.2-4.3 — WorkpaperList 详情面板 + 子编辑器接入
+- [x] **Phase 5.1 — Overlay 替换** ✅
+- [x] **Phase 5.2 — Playwright 端到端测试** ✅ (3/3 passed)
 - [x] **Phase 5.3 — CI 脚本** ✅
-- [ ] Phase 6.1 行数检查 — 当前 2745 行（拆分循环 composable 完成后才能 ≤ 1000）
+- [ ] Phase 6.1 行数检查 — 当前 2489 行（useEditorActions 接入后可再减 ~220 行）
 - [ ] Phase 6.2-6.4 — 功能回归 + memory.md 更新 + commit
+- [ ] **待接入**：useEditorActions（需 let→ref 改造 + Playwright 验证保存流程）
