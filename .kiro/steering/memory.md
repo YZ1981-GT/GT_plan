@@ -58,6 +58,8 @@ inclusion: always
 - Python 3.12（.venv），Docker 28.3.3，PG 16（188 表），Redis 6379；后端 9980 / 前端 3030 / vLLM 8100
 - 测试用户 admin/admin123（role=admin）；git 分支 feature/e2e-business-flow（HEAD）
 - **数据库初始化命令**（2026-05-23 重命名后）：`python backend/scripts/init_tables.py` + `python backend/scripts/create_admin.py`（旧 `_init_tables.py` / `_create_admin.py` 已重命名，文档/spec 引用已同步）
+- **4 项目底稿数据已就位**（2026-05-25 chain_orchestrator 跑通）：`python backend/scripts/init_4_projects.py` 一键初始化（auto-match→recalc→reports→chain）；陕西华氏 172wp / 和平药房 107wp / 辽宁卫生 145wp / 宜宾大药房 142wp + 各 173 notes；ChainOrchestrator API = `ChainOrchestrator()` 无参构造 + `execute_full_chain(db=db, project_id=..., year=..., force=True)`（不要传 db 给 __init__）
+- **WorkpaperEditor 拆分 Playwright 实测通过**（2026-05-25）：D2 应收账款审定表全流程 0 errors — 编辑器加载 + 18 sheet 分组导航 + 审计导航图弹窗 + 保存功能均正常；useCycleType + useCycleDialogs + useSheetNavFacade 三个新 composable 生产验证通过
 - **scripts 命名规约**：`_` 前缀 = 一次性脚本（用完即删），无前缀 = 正式工具（保留可复用）；本轮清理 backend/scripts 65→49 / scripts/ 19→14
 - **docs 目录新结构**（2026-05-23 重组）：从平铺 29 文件 → 8 子目录（`adr/` / `architecture/` / `deployment/` / `reference/` / `frontend/` / `operations/` / `proposals/` / `templates/`）+ 顶层 `README.md` 索引 + `requirements.md`；新增文档必须按子目录归类不要平铺；文件名英文小写连字符；活跃代码引用 14 处已同步更新
 - **双 storage 目录职责**（2026-05-23 厘清）：仓库根 `storage/projects/{UUID}/workpapers/` = 底稿文件落地（DB `working_papers.file_path` 引用）+ `storage/consume` 是 docker-compose Paperless 挂载点；`backend/storage/{knowledge,projects,users,ledger_uploads}/` = 附件/知识库/上传文件落地；两边都 gitignored 但代码 hardcode 路径
