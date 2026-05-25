@@ -55,7 +55,8 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async login(username: string, password: string) {
       const { data } = await authHttp.post('/api/auth/login', { username, password })
-      const payload = data.data ?? data
+      // ResponseWrapperMiddleware 包装为 {code, message, data: {...}}
+      const payload = data?.data ?? data
       this.token = payload.access_token
       this.refreshToken = payload.refresh_token
       this.user = payload.user ?? null
@@ -84,7 +85,8 @@ export const useAuthStore = defineStore('auth', {
       const { data } = await authHttp.post('/api/auth/refresh', {
         refresh_token: this.refreshToken,
       })
-      const payload = data
+      // ResponseWrapperMiddleware 包装为 {code, message, data: {...}}
+      const payload = data?.data ?? data
       // Token Rotation: 后端每次刷新都签发新的 refresh_token
       this.token = payload.access_token
       this.refreshToken = payload.refresh_token ?? this.refreshToken

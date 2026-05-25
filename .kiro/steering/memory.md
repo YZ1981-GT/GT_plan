@@ -55,6 +55,7 @@ inclusion: always
 - vLLM Qwen3.5-27B-NVFP4 端口 8100（enable_thinking: false）
 - ONLYOFFICE 端口 8080（已替换为 Univer，WOPI 保留兼容）
 - Paperless-ngx 端口 8010（admin/admin）
+- auth.ts token 存储已从 localStorage 改为 sessionStorage（关闭标签页自动清除）；authHttp 独立实例需手动解包 ResponseWrapperMiddleware 的 `{code,message,data}` 包装（`data?.data ?? data`）
 - 测试用户：admin/admin123（role=admin）
 
 ## 当前系统状态（2026-05-07 实测核对）
