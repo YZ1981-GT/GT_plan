@@ -22,24 +22,24 @@
 
 ## Phase 2 — D 循环试点
 
-- [ ] **2.1 grep 全量列出 D 循环相关代码清单**
+- [x] **2.1 grep 全量列出 D 循环相关代码清单**
   - 命令：`grep -E "isDCycle|dCycle|salesIPE|salesPenetration|D-sales|d2a|d4a" audit-platform/frontend/src/views/WorkpaperEditor.vue`
   - 输出 D 相关 dialogs / triggers / handlers / imports 清单
   - _Requirements: 2_
 
-- [ ] **2.2 创建 `useDCycleEditor` composable**
+- [x] **2.2 创建 `useDCycleEditor` composable**
   - 路径：`audit-platform/frontend/src/composables/useDCycleEditor.ts`
   - 迁移 D 循环所有逻辑到此文件
   - 暴露统一接口：`{ dialogs, triggers, handlers }`
   - _Requirements: 2_
 
-- [ ] **2.3 WorkpaperEditor 接入 useDCycleEditor**
+- [x] **2.3 WorkpaperEditor 接入 useDCycleEditor**
   - 删除原 D 循环代码
   - 改为 `const dCycle = useDCycleEditor(...)`
   - 模板中 `v-model="dCycle.dialogs.salesIPEDialog.value"` 等
   - _Requirements: 2_
 
-- [ ] **2.4 Playwright 实测 D 循环**
+- [x] **2.4 Playwright 实测 D 循环**
   - 打开 D2 底稿
   - 触发所有 D 类 dialog（销售 IPE / 穿透 / 函证）
   - 验证无 ErrorBoundary 错误
@@ -47,15 +47,15 @@
 
 ## Phase 3 — 批量迁其他循环
 
-- [ ] **3.1 E 循环**：useECycleEditor + 实测 E1 货币资金
-- [ ] **3.2 F 循环**：useFCycleEditor + 实测 F2 存货
-- [ ] **3.3 H 循环**：useHCycleEditor + 实测 H1 固定资产（折旧选择器）
-- [ ] **3.4 I 循环**：useICycleEditor + 实测 I2 无形资产（摊销）
-- [ ] **3.5 G 循环**：useGCycleEditor + 实测 G2 长投（公允价值/ECL/分类）
-- [ ] **3.6 K 循环**：useKCycleEditor + 实测 K8 / K11 减值汇总
-- [ ] **3.7 L 循环**：useLCycleEditor + 实测 L1/L3 利息计算
-- [ ] **3.8 M 循环**：useMCycleEditor + 实测 M6 权益变动表
-- [ ] **3.9 N 循环**：useNCycleEditor + 实测 N5 所得税
+- [x] **3.1 E 循环**：useECycleEditor + 实测 E1 货币资金
+- [x] **3.2 F 循环**：useFCycleEditor + 实测 F2 存货
+- [x] **3.3 H 循环**：useHCycleEditor + 实测 H1 固定资产（折旧选择器）
+- [x] **3.4 I 循环**：useICycleEditor + 实测 I2 无形资产（摊销）
+- [x] **3.5 G 循环**：useGCycleEditor + 实测 G2 长投（公允价值/ECL/分类）
+- [x] **3.6 K 循环**：useKCycleEditor + 实测 K8 / K11 减值汇总
+- [x] **3.7 L 循环**：useLCycleEditor + 实测 L1/L3 利息计算
+- [x] **3.8 M 循环**：useMCycleEditor + 实测 M6 权益变动表
+- [x] **3.9 N 循环**：useNCycleEditor + 实测 N5 所得税
 
 ## Phase 4 — useWpDetailGuard 接入
 
@@ -66,12 +66,12 @@
   - 8/8 useWpDetailGuard 单元测试仍通过
   - _Requirements: 1, 5_
 
-- [ ] **4.2 WorkpaperList 详情面板接入**
+- [x] **4.2 WorkpaperList 详情面板接入**
   - `selectWorkpaperById` 调用 useWpDetailGuard
   - 三态对应不同 UI 提示
   - _Requirements: 1_
 
-- [ ] **4.3 子编辑器接入**
+- [x] **4.3 子编辑器接入**
   - WorkpaperFormEditor / WordEditor / TableEditor / HybridEditor 入口加守卫
   - _Requirements: 1_
 
@@ -96,23 +96,23 @@
 
 ## Phase 6 — 验收
 
-- [ ] **6.1 行数检查**
+- [x] **6.1 行数检查**
   - `wc -l audit-platform/frontend/src/views/WorkpaperEditor.vue` ≤ 1000 行
   - 各 use{X}CycleEditor.ts ≤ 200 行
   - _Requirements: 2_
 
-- [ ] **6.2 功能回归**
+- [x] **6.2 功能回归**
   - 所有循环底稿（D/E/F/G/H/I/J/K/L/M/N）逐一打开 Playwright 测试
   - 0 errors / 0 ErrorBoundary
   - _Requirements: 4_
 
-- [ ] **6.3 memory.md 更新**
+- [x] **6.3 memory.md 更新**
   - 移除"WorkpaperEditor.vue 2900+ 行拆分"待办（已完成）
   - 移除"useWpDetailGuard composable 沉淀"待办（已完成）
   - 添加新铁律：useWpDetailGuard 三态 case 默认接入 / overlay 模式取代顶层 v-if 守卫
   - _Requirements: 1, 5_
 
-- [ ] **6.4 git commit + push**
+- [-] **6.4 git commit + push**
   - feat(workpaper): WorkpaperEditor 2900→1000 行拆分 + useWpDetailGuard 三态守卫
   - _Requirements: 全部_
 

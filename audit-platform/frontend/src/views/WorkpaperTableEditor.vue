@@ -1,5 +1,29 @@
 <template>
   <div class="gt-table-editor gt-fade-in">
+    <!-- spec workpaper-editor-refactor Phase 4.3: useWpDetailGuard 守卫 -->
+    <div v-if="!guard.ready.value && !guard.loading.value" class="gt-sub-editor-error-overlay">
+      <div class="gt-sub-editor-error-card">
+        <div class="gt-sub-editor-error-icon">
+          <span v-if="guard.state.value === 'no_file'">📄</span>
+          <span v-else-if="guard.state.value === 'no_index'">🔍</span>
+          <span v-else-if="guard.state.value === 'invalid_id'">⚠️</span>
+          <span v-else>❌</span>
+        </div>
+        <div class="gt-sub-editor-error-title">
+          <template v-if="guard.state.value === 'no_file'">底稿文件尚未生成</template>
+          <template v-else-if="guard.state.value === 'no_index'">底稿不存在</template>
+          <template v-else-if="guard.state.value === 'invalid_id'">底稿 ID 不合法</template>
+          <template v-else>加载底稿失败</template>
+        </div>
+        <div class="gt-sub-editor-error-message">{{ guard.errorMessage.value }}</div>
+        <div class="gt-sub-editor-error-actions">
+          <el-button size="small" @click="goBack">返回底稿列表</el-button>
+          <el-button v-if="guard.state.value === 'error'" size="small" type="primary" @click="guard.refresh">重试</el-button>
+        </div>
+      </div>
+    </div>
+
+    <template v-else>
     <EditorSharedToolbar
       :wp-code="wpDetail?.wp_code"
       :wp-name="wpDetail?.wp_name"
@@ -14,7 +38,7 @@
       @toggle-panel="$emit('toggle-panel')"
     />
 
-    <div class="gt-table-editor-body" v-loading="loading">
+    <div class="gt-table-editor-body" v-loading="loading || guard.loading.value">
       <!-- 操作栏 -->
       <div class="gt-table-editor-actions">
         <el-input v-model="searchText" placeholder="搜索..." clearable style="width: 240px" size="small" />
@@ -63,6 +87,7 @@
         </el-table-column>
       </el-table>
     </div>
+    </template>
   </div>
 </template>
 
@@ -74,6 +99,7 @@ import { api as httpApi } from '@/services/apiProxy'
 import { workpapers as P_wp } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { numericSortMethod } from '@/utils/numericSort'
+import { useWpDetailGuard } from '@/composables/useWpDetailGuard'
 import type { WorkpaperDetail } from '@/services/workpaperApi'
 
 interface TableColumn {
@@ -94,6 +120,12 @@ const emit = defineEmits<{
   'toggle-panel': []
   saved: []
 }>()
+
+// spec workpaper-editor-refactor Phase 4.3: useWpDetailGuard 入口守卫
+const guard = useWpDetailGuard(
+  () => props.projectId,
+  () => props.wpId,
+)
 
 const loading = ref(true)
 const saving = ref(false)
@@ -190,10 +222,38 @@ onMounted(() => { if (props.wpId) loadData() })
 </script>
 
 <style scoped>
-.gt-table-editor { display: flex; flex-direction: column; height: 100%; }
+.gt-table-editor { display: flex; flex-direction: column; height: 100%; position: relative; }
 .gt-table-editor-body { flex: 1; overflow-y: auto; padding: 16px; }
 .gt-table-editor-actions {
   display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
 }
 .gt-table-editor-table :deep(.el-input__inner) { font-size: var(--gt-font-size-sm); }
+/* spec workpaper-editor-refactor Phase 4.3: 加载失败友好引导 overlay */
+.gt-sub-editor-error-overlay {
+  position: absolute; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--gt-color-bg-page, #f5f7fa);
+  padding: 32px;
+}
+.gt-sub-editor-error-card {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 16px; max-width: 480px;
+  padding: 32px 40px;
+  background: var(--gt-color-bg-white, #fff);
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  text-align: center;
+}
+.gt-sub-editor-error-icon { font-size: 48px; line-height: 1; }
+.gt-sub-editor-error-title {
+  font-size: 18px; font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+.gt-sub-editor-error-message {
+  font-size: 14px; line-height: 1.6;
+  color: var(--gt-color-text-secondary, #606266);
+}
+.gt-sub-editor-error-actions {
+  display: flex; gap: 8px; margin-top: 8px;
+}
 </style>

@@ -937,7 +937,7 @@ import {
 import { rebuildWorkpaperStructure, listUsers } from '@/services/commonApi'
 import { api as httpApi } from '@/services/apiProxy'
 import { workpapers as P_wp } from '@/services/apiPaths'
-import { eventBus, type SyncEventPayload, type WorkpaperSavedPayload, type CrossRefUpdatedPayload } from '@/utils/eventBus'
+import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
 import { useWorkpaperReviewMarkers, type ReviewMarkerTicket } from '@/composables/useWorkpaperReviewMarkers'
 import { useEditingLock } from '@/composables/useEditingLock'
 import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
@@ -949,6 +949,7 @@ import { useStepMapping } from '@/composables/useStepMapping'
 import { useStaleImpact, type StaleAffectedItem } from '@/composables/useStaleImpact'
 import { type SheetGroup } from '@/composables/useUniverSheetNav'
 import { useDepreciationBranchSelector } from '@/composables/useDepreciationBranchSelector'
+import { useICycleEditor } from '@/composables/useICycleEditor'
 import DepreciationBranchSelector from '@/components/workpaper/DepreciationBranchSelector.vue'
 import WorkpaperSidePanel from '@/components/workpaper/WorkpaperSidePanel.vue'
 import UniverSheetNav from '@/components/workpaper/UniverSheetNav.vue'
@@ -1111,6 +1112,18 @@ const hCycleNav = sheetNavFacade.hCycleNav
 const iCycleNav = sheetNavFacade.iCycleNav
 const sheetNavCollapsed = ref(false)
 
+// spec workpaper-editor-refactor Phase 2 Task 2.3: D 循环逻辑接入 useDCycleEditor composable
+import { useDCycleEditor } from '@/composables/useDCycleEditor'
+const dCycle = useDCycleEditor(wpDetail, projectId, sheetNavFacade, onRefreshPrefill)
+
+// spec workpaper-editor-refactor Phase 3 Task 3.1: E 循环逻辑接入 useECycleEditor composable
+import { useECycleEditor } from '@/composables/useECycleEditor'
+const hasForeignCurrency = computed(() => !!projectMeta.value?.has_foreign_currency)
+const eCycle = useECycleEditor(wpDetail, sheetNavFacade, hasForeignCurrency)
+
+// spec workpaper-editor-refactor Phase 3 Task 3.2: F 循环逻辑接入 useFCycleEditor composable（实例化在 cycleDialogs 之后）
+import { useFCycleEditor } from '@/composables/useFCycleEditor'
+
 // H 固定资产循环 task 2.4: 折旧/减值分支选择器
 const hActiveSheetName = computed(() => {
   if (!isHCycle.value) return ''
@@ -1133,24 +1146,29 @@ const hBranchSelector = useDepreciationBranchSelector(
 )
 
 // I 无形资产循环 task 2.1 + task 2.4: 摊销分支选择器（I1-10/I1-11 / I4-6/I4-7）
-const iActiveSheetName = computed(() => {
-  if (!isICycle.value) return ''
-  const activeId = iCycleNav.activeSheetId.value
-  const sheet = iCycleNav.sheets.value.find((s: any) => s.id === activeId)
-  return sheet?.name || ''
-})
-const iAllSheetNames = computed(() => {
-  if (!isICycle.value) return []
-  return iCycleNav.sheets.value.map((s: any) => s.name)
-})
-const iBranchSelector = useDepreciationBranchSelector(
-  iActiveSheetName,
-  iAllSheetNames,
-  (sheetName: string) => {
-    const target = iCycleNav.sheets.value.find((s: any) => s.name === sheetName)
-    if (target) iCycleNav.switchTo(target.id)
-  },
-)
+// 委托 useICycleEditor composable（Phase 3 Task 3.4）
+const iCycle = useICycleEditor(wpDetail, sheetNavFacade, cycleDialogs)
+const iBranchSelector = iCycle.branchSelector
+
+// G 投资循环（Phase 3 Task 3.5）：公允价值/ECL/分类 + 计量模型分支选择器
+import { useGCycleEditor } from '@/composables/useGCycleEditor'
+const gCycle = useGCycleEditor(wpDetail, sheetNavFacade, cycleDialogs)
+
+// K 管理费用循环（Phase 3 Task 3.6）：费用分析 + 减值汇总
+import { useKCycleEditor } from '@/composables/useKCycleEditor'
+const kCycle = useKCycleEditor(wpDetail, cycleDialogs)
+
+// L 筹资循环（Phase 3 Task 3.7）：利息测算 + 摊余成本
+import { useLCycleEditor } from '@/composables/useLCycleEditor'
+const lCycle = useLCycleEditor(wpDetail, cycleDialogs)
+
+// M 股东权益循环（Phase 3 Task 3.8）：权益变动表
+import { useMCycleEditor } from '@/composables/useMCycleEditor'
+const mCycle = useMCycleEditor(wpDetail, cycleDialogs)
+
+// N 税费（所得税）循环（Phase 3 Task 3.9）：所得税测算
+import { useNCycleEditor } from '@/composables/useNCycleEditor'
+const nCycle = useNCycleEditor(wpDetail, cycleDialogs)
 
 // E1 Sprint 2 Task 2.17: 前置状态横幅（B23-2/C3/B51-3）
 // D-sales-cycle F8 Task 2.19: 扩展支持 D 循环前置状态横幅（B23-1/C2/B51-5）
@@ -1307,6 +1325,9 @@ const univerContainer = ref<HTMLElement | null>(null)
 import { useCycleDialogs } from '@/composables/useCycleDialogs'
 const cycleDialogs = useCycleDialogs(wpDetail, wpId, sheetNavActiveId, cycleType)
 
+// spec workpaper-editor-refactor Phase 3 Task 3.2: F 循环逻辑接入 useFCycleEditor composable
+const fCycle = useFCycleEditor(wpDetail, projectId, wpId, sheetNavFacade, cycleDialogs)
+
 // 向后兼容：模板中仍用原变量名（后续 Phase 6 验收时可统一改为 cycleDialogs.xxx.visible）
 const stocktakeDialogVisible = cycleDialogs.stocktake.visible
 const showStocktakeTrigger = cycleDialogs.stocktake.trigger
@@ -1320,74 +1341,57 @@ const depreciationCalcDialogVisible = cycleDialogs.depreciationCalc.visible
 const showDepreciationCalcTrigger = cycleDialogs.depreciationCalc.trigger
 const assetImpairmentDialogVisible = cycleDialogs.assetImpairment.visible
 const showAssetImpairmentTrigger = cycleDialogs.assetImpairment.trigger
-const goodwillImpairmentDialogVisible = cycleDialogs.goodwillImpairment.visible
-const showGoodwillImpairmentTrigger = cycleDialogs.goodwillImpairment.trigger
-const capitalizationCheckDialogVisible = cycleDialogs.capitalizationCheck.visible
-const showCapitalizationCheckTrigger = cycleDialogs.capitalizationCheck.trigger
-const amortizationCalcDialogVisible = cycleDialogs.amortizationCalc.visible
-const amortizationCalcSection = cycleDialogs.amortizationCalc.section
-const fairValueTestDialogVisible = cycleDialogs.fairValueTest.visible
-const showFairValueTestTrigger = cycleDialogs.fairValueTest.trigger
-const fairValueInstrumentType = cycleDialogs.fairValueTest.instrumentType
-const eclCalcDialogVisible = cycleDialogs.eclCalc.visible
-const showECLCalcTrigger = cycleDialogs.eclCalc.trigger
-const eclInstrumentType = cycleDialogs.eclCalc.instrumentType
-const classificationCheckDialogVisible = cycleDialogs.classificationCheck.visible
-const showClassificationCheckTrigger = cycleDialogs.classificationCheck.trigger
-const expenseAnalysisDialogVisible = cycleDialogs.expenseAnalysis.visible
-const impairmentSummaryDialogVisible = cycleDialogs.impairmentSummary.visible
-const interestCalcDialogVisible = cycleDialogs.interestCalc.visible
-const bondAmortizationDialogVisible = cycleDialogs.bondAmortization.visible
-const equityMovementDialogVisible = cycleDialogs.equityMovement.visible
-const incomeTaxCalcDialogVisible = cycleDialogs.incomeTaxCalc.visible
+// I 循环弹窗状态（委托 useICycleEditor — Phase 3 Task 3.4）
+const goodwillImpairmentDialogVisible = iCycle.dialogs.goodwillImpairmentDialogVisible
+const showGoodwillImpairmentTrigger = iCycle.triggers.showGoodwillImpairmentTrigger
+const capitalizationCheckDialogVisible = iCycle.dialogs.capitalizationCheckDialogVisible
+const showCapitalizationCheckTrigger = iCycle.triggers.showCapitalizationCheckTrigger
+const amortizationCalcDialogVisible = iCycle.dialogs.amortizationCalcDialogVisible
+const amortizationCalcSection = iCycle.triggers.amortizationCalcSection
+const fairValueTestDialogVisible = gCycle.dialogs.fairValueTestDialogVisible
+const showFairValueTestTrigger = gCycle.triggers.showFairValueTestTrigger
+const fairValueInstrumentType = gCycle.triggers.fairValueInstrumentType
+const eclCalcDialogVisible = gCycle.dialogs.eclCalcDialogVisible
+const showECLCalcTrigger = gCycle.triggers.showECLCalcTrigger
+const eclInstrumentType = gCycle.triggers.eclInstrumentType
+const classificationCheckDialogVisible = gCycle.dialogs.classificationCheckDialogVisible
+const showClassificationCheckTrigger = gCycle.triggers.showClassificationCheckTrigger
+const expenseAnalysisDialogVisible = kCycle.dialogs.expenseAnalysisDialogVisible
+const impairmentSummaryDialogVisible = kCycle.dialogs.impairmentSummaryDialogVisible
+// L 循环 dialogs（委托 useLCycleEditor — Phase 3 Task 3.7）
+const interestCalcDialogVisible = lCycle.dialogs.interestCalcDialogVisible
+const bondAmortizationDialogVisible = lCycle.dialogs.bondAmortizationDialogVisible
+// M 循环 dialogs（委托 useMCycleEditor — Phase 3 Task 3.8）
+const equityMovementDialogVisible = mCycle.dialogs.equityMovementDialogVisible
+// N 循环 dialogs（委托 useNCycleEditor — Phase 3 Task 3.9）
+const incomeTaxCalcDialogVisible = nCycle.dialogs.incomeTaxCalcDialogVisible
 
 // Applied handlers（模板 @applied 绑定）
-function onImpairmentApplied(sheet: string) { cycleDialogs.impairment.onApplied(sheet) }
+// onImpairmentApplied 已迁移到 useFCycleEditor composable
 function onDepreciationCalcApplied(sheet: string) { cycleDialogs.depreciationCalc.onApplied(sheet) }
 function onAssetImpairmentApplied(sheet: string) { cycleDialogs.assetImpairment.onApplied(sheet) }
-function onGoodwillImpairmentApplied(sheet: string) { cycleDialogs.goodwillImpairment.onApplied(sheet) }
-function onCapitalizationCheckApplied(sheet: string) { cycleDialogs.capitalizationCheck.onApplied(sheet) }
-function onAmortizationCalcApplied(sheet: string) { cycleDialogs.amortizationCalc.onApplied(sheet) }
-function onFairValueTestApplied(sheet: string) { cycleDialogs.fairValueTest.onApplied(sheet) }
-function onECLCalcApplied(sheet: string) { cycleDialogs.eclCalc.onApplied(sheet) }
-function onClassificationCheckApplied(sheet: string) { cycleDialogs.classificationCheck.onApplied(sheet) }
-function onExpenseAnalysisApplied(sheet: string) { cycleDialogs.expenseAnalysis.onApplied(sheet) }
-function onImpairmentSummaryApplied(sheet: string) { cycleDialogs.impairmentSummary.onApplied(sheet) }
-function onInterestCalcApplied(sheet: string) { cycleDialogs.interestCalc.onApplied(sheet) }
-function onBondAmortizationApplied(sheet: string) { cycleDialogs.bondAmortization.onApplied(sheet) }
-function onEquityMovementApplied(sheet: string) { cycleDialogs.equityMovement.onApplied(sheet) }
-function onIncomeTaxCalcApplied(sheet: string) { cycleDialogs.incomeTaxCalc.onApplied(sheet) }
+// I 循环 handlers（委托 useICycleEditor — Phase 3 Task 3.4）
+const onGoodwillImpairmentApplied = iCycle.handlers.onGoodwillImpairmentApplied
+const onCapitalizationCheckApplied = iCycle.handlers.onCapitalizationCheckApplied
+const onAmortizationCalcApplied = iCycle.handlers.onAmortizationCalcApplied
+// G 循环 handlers（委托 useGCycleEditor — Phase 3 Task 3.5）
+const onFairValueTestApplied = gCycle.handlers.onFairValueTestApplied
+const onECLCalcApplied = gCycle.handlers.onECLCalcApplied
+const onClassificationCheckApplied = gCycle.handlers.onClassificationCheckApplied
+// K 循环 handlers（委托 useKCycleEditor — Phase 3 Task 3.6）
+const onExpenseAnalysisApplied = kCycle.handlers.onExpenseAnalysisApplied
+const onImpairmentSummaryApplied = kCycle.handlers.onImpairmentSummaryApplied
+// L 循环 handlers（委托 useLCycleEditor — Phase 3 Task 3.7）
+const onInterestCalcApplied = lCycle.handlers.onInterestCalcApplied
+const onBondAmortizationApplied = lCycle.handlers.onBondAmortizationApplied
+// M 循环 handlers（委托 useMCycleEditor — Phase 3 Task 3.8）
+const onEquityMovementApplied = mCycle.handlers.onEquityMovementApplied
+// N 循环 handlers（委托 useNCycleEditor — Phase 3 Task 3.9）
+const onIncomeTaxCalcApplied = nCycle.handlers.onIncomeTaxCalcApplied
 
-// F-purchase-inventory F-F11 Task 3.2: F2-38~F2-44 计价测试自动抽样（自定义逻辑，不走通用 applied）
-async function onTriggerValuationSample() {
-  valuationLoading.value = true
-  try {
-    const year = new Date().getFullYear()
-    const activeSheet = sheetNav.activeSheetId.value || ''
-    const resp: any = await httpApi.post(
-      `/api/projects/${projectId.value}/workpapers/${wpId.value}/f2/valuation-sample`,
-      {
-        method: 'weighted_average',
-        account_code: '1403',
-        year,
-        sample_size: 20,
-        high_value_threshold: 100000,
-        period: '全年',
-        apply_to_sheet: activeSheet,
-      },
-    )
-    if (resp?.applied_to_sheet) {
-      ElMessage.success(`已抽样 ${resp?.total_samples || 0} 笔并写回 ${resp.applied_to_sheet}`)
-      eventBus.emit('workpaper:saved', { wp_id: wpId.value } as any)
-    } else {
-      ElMessage.success(`已抽样 ${resp?.total_samples || 0} 笔（${resp?.method}），未写回`)
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.message || '抽样失败')
-  } finally {
-    valuationLoading.value = false
-  }
-}
+// F-purchase-inventory F-F11 Task 3.2: 计价测试自动抽样 — 委托 useFCycleEditor composable
+const onTriggerValuationSample = fCycle.handlers.onTriggerValuationSample
+const onImpairmentApplied = fCycle.handlers.onImpairmentApplied
 
 // ─── Sprint 2: Foundation composables ─────────────────────────────────────────
 const prefillMarkers = usePrefillMarkers()
@@ -1725,9 +1729,8 @@ async function initUniver() {
   setTimeout(() => {
     sheetNav.refresh()
     // E1 Sprint 2 Task 2.37: 应用 has_foreign_currency 显隐规则到 E1-1
-    if (wpDetail.value?.wp_code?.startsWith('E1')) {
-      sheetNav.applyForeignCurrencyVisibility()
-    }
+    // spec workpaper-editor-refactor Phase 3 Task 3.1: 委托 useECycleEditor 处理
+    eCycle.handlers.applyForeignCurrencyVisibility()
   }, 100)
 
   loading.value = false
@@ -2222,37 +2225,8 @@ onBeforeRouteLeave(async (_to, _from, next) => {
   }
 })
 
-/**
- * F6 D 销售循环 task 2.12: 响应 cross-ref:updated 事件
- * 当 D0 函证回函触发 stale 传播后，如果当前打开的底稿是目标 wp_code，
- * 自动刷新 sheet nav + 重新触发 prefill 显示
- */
-function onCrossRefUpdated(payload: CrossRefUpdatedPayload) {
-  const pid = projectId.value
-  if (payload.projectId && payload.projectId !== pid) return
-  // 仅当目标 wp_code 匹配当前底稿时刷新
-  const currentWpCode = wpDetail.value?.wp_code
-  if (payload.targetWpCode && currentWpCode && payload.targetWpCode !== currentWpCode) return
-  // 刷新 sheet 分组 + 重新触发 prefill
-  sheetNav.refresh()
-  onRefreshPrefill()
-}
-
-/**
- * H-F8: SSE → cross-ref:updated 映射
- * 当后端发布 CROSS_REF_UPDATED 事件（如 H9→H8 租赁回填），
- * 将 SSE payload 转换为 cross-ref:updated eventBus 事件
- */
-function onSSECrossRefUpdated(payload: SyncEventPayload) {
-  if (!payload || (payload.event_type as string) !== 'cross_ref.updated') return
-  const extra = payload.extra || {}
-  eventBus.emit('cross-ref:updated', {
-    projectId: payload.project_id || '',
-    targetWpCode: extra.target_wp_code || '',
-    sourceWpCode: extra.source_wp_code || '',
-    refId: extra.ref_id || '',
-  })
-}
+// spec workpaper-editor-refactor Phase 2 Task 2.3: onCrossRefUpdated + onSSECrossRefUpdated
+// 已迁移到 useDCycleEditor composable（含生命周期事件订阅/清理）
 
 onMounted(() => {
   // 先获取 component_type 决定路由，再初始化对应编辑器
@@ -2268,10 +2242,6 @@ onMounted(() => {
   stepMapping.loadMapping()
   // R8-S2-02：订阅 workpaper:locate-cell 事件，定位到 Univer 单元格
   eventBus.on('workpaper:locate-cell', onLocateCell)
-  // F6 D 销售循环 task 2.12: 订阅 cross-ref:updated 自动刷新 D2-1
-  eventBus.on('cross-ref:updated', onCrossRefUpdated)
-  // H-F8: 订阅 SSE cross_ref.updated → 转发为 cross-ref:updated（H9→H8 租赁回填）
-  eventBus.on('sse:sync-event', onSSECrossRefUpdated)
   // R8-S2-14：关闭浏览器/刷新前警告
   window.addEventListener('beforeunload', onBeforeUnload)
 
@@ -2282,8 +2252,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   eventBus.off('workpaper:locate-cell', onLocateCell)
-  eventBus.off('cross-ref:updated', onCrossRefUpdated)
-  eventBus.off('sse:sync-event', onSSECrossRefUpdated)
   window.removeEventListener('beforeunload', onBeforeUnload)
   if (univerInstance) {
     try { univerInstance.dispose() } catch { /* ignore */ }

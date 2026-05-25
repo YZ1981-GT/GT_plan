@@ -576,6 +576,25 @@
       <!-- 右侧详情面板 -->
       <div class="gt-wp-detail-panel">
         <template v-if="selectedWp">
+          <!-- useWpDetailGuard 三态提示 -->
+          <div v-if="wpDetailGuard.loading.value" class="gt-wp-detail-guard-hint gt-wp-detail-guard-hint--loading">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>正在校验底稿状态...</span>
+          </div>
+          <div v-else-if="wpDetailGuard.state.value === 'invalid_id'" class="gt-wp-detail-guard-hint gt-wp-detail-guard-hint--error">
+            <el-icon><WarningFilled /></el-icon>
+            <span>无效底稿 ID</span>
+          </div>
+          <div v-else-if="wpDetailGuard.state.value === 'no_index' || wpDetailGuard.state.value === 'no_file'" class="gt-wp-detail-guard-hint gt-wp-detail-guard-hint--warning">
+            <el-icon><WarningFilled /></el-icon>
+            <span>{{ wpDetailGuard.errorMessage.value }}</span>
+            <el-button size="small" type="primary" @click="goToLifecycle">前往生命周期</el-button>
+          </div>
+          <div v-else-if="wpDetailGuard.state.value === 'error'" class="gt-wp-detail-guard-hint gt-wp-detail-guard-hint--error">
+            <el-icon><WarningFilled /></el-icon>
+            <span>{{ wpDetailGuard.errorMessage.value }}</span>
+            <el-button size="small" @click="wpDetailGuard.refresh()">重试</el-button>
+          </div>
           <div class="gt-wp-detail-card">
             <h3 class="gt-wp-detail-title">{{ selectedWp.wp_code }} {{ selectedWp.wp_name }}</h3>
             <el-descriptions :column="2" border size="default">
@@ -983,7 +1002,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmForcePass } from '@/utils/confirm'
 import { eventBus } from '@/utils/eventBus'
-import { Download, Monitor, Upload, Loading, FolderOpened } from '@element-plus/icons-vue'
+import { Download, Monitor, Upload, Loading, FolderOpened, WarningFilled } from '@element-plus/icons-vue'
 import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
 import SoDConflictDialog from '@/components/gate/SoDConflictDialog.vue'
 import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
@@ -1025,6 +1044,7 @@ import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 // Spec A R1 / R3：跨视图 stale 摘要（推到 6 视图之一）
 import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
+import { useWpDetailGuard } from '@/composables/useWpDetailGuard'
 import StaleIndicator from '@/components/StaleIndicator.vue'
 
 const route = useRoute()
@@ -1531,6 +1551,9 @@ const uploadLoading = ref(false)
 const parseLoading = ref(false)
 // wpList and wpIndex declared earlier (for composable dependency)
 const selectedWp = ref<WorkpaperDetail | null>(null)
+const selectedWpId = ref('')
+// useWpDetailGuard 三态守卫：详情面板根据底稿加载状态显示不同 UI 提示
+const wpDetailGuard = useWpDetailGuard(projectId, selectedWpId)
 const selectedWpIds = ref<string[]>([])
 const qcResult = ref<QCResult | null>(null)
 const treeRef = ref<any>(null)
@@ -2350,6 +2373,8 @@ async function selectWorkpaperByCode(wpCode: string): Promise<boolean> {
 }
 
 async function selectWorkpaperById(wpId: string) {
+  // 设置 selectedWpId 触发 useWpDetailGuard 守卫刷新
+  selectedWpId.value = wpId
   const wp = wpList.value.find((w: WorkpaperDetail) => w.wp_index_id === wpId || w.id === wpId)
   if (wp) {
     selectedWp.value = wp
@@ -2390,6 +2415,11 @@ async function onNodeClick(data: TreeNode, _node: any, _event: any) {
   if (!data.wpId) return
   if ((data as any).isTrimmed) return // 裁剪的底稿不可选中
   await selectWorkpaperById(data.wpId)
+}
+
+/** 跳转到生命周期视图（useWpDetailGuard no_file/no_index 状态引导） */
+function goToLifecycle() {
+  viewMode.value = 'lifecycle'
 }
 
 // ─── 底稿右键菜单 [enterprise-linkage 3.10] ────────────────────────────────
@@ -2858,6 +2888,20 @@ onMounted(async () => {
 .gt-wp-detail-panel {
   flex: 1; background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
   box-shadow: var(--gt-shadow-sm); padding: var(--gt-space-5); overflow-y: auto;
+}
+/* useWpDetailGuard 三态提示横幅 */
+.gt-wp-detail-guard-hint {
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+  border-radius: var(--gt-radius-md); margin-bottom: 12px; font-size: 13px;
+}
+.gt-wp-detail-guard-hint--loading {
+  background: var(--gt-color-primary-bg, #f5f0ff); color: var(--gt-color-primary);
+}
+.gt-wp-detail-guard-hint--warning {
+  background: var(--gt-bg-warning, #fdf6ec); color: var(--gt-color-warning, #e6a23c);
+}
+.gt-wp-detail-guard-hint--error {
+  background: var(--gt-bg-danger, #fef0f0); color: var(--gt-color-danger, #f56c6c);
 }
 .gt-wp-tree-node { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 0; }
 .gt-wp-tree-node.is-trimmed { opacity: 0.45; pointer-events: none; }
