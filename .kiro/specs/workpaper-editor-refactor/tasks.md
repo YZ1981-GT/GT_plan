@@ -112,7 +112,7 @@
   - 添加新铁律：useWpDetailGuard 三态 case 默认接入 / overlay 模式取代顶层 v-if 守卫
   - _Requirements: 1, 5_
 
-- [-] **6.4 git commit + push**
+- [x] **6.4 git commit + push**
   - feat(workpaper): WorkpaperEditor 2900→1000 行拆分 + useWpDetailGuard 三态守卫
   - _Requirements: 全部_
 

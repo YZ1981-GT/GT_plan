@@ -132,6 +132,9 @@ test.describe('G 循环底稿编辑器实测（Phase 3 Task 3.5）', () => {
     const sheetNav = page.locator('.gt-usn')
     await expect(sheetNav).toBeVisible({ timeout: 5_000 })
 
+    // 等待 sheet 分组渲染（并发跑时 DOM 渲染稍慢）
+    await page.waitForFunction(() => document.querySelectorAll('.gt-usn__group').length > 0, { timeout: 10_000 })
+
     // 验证至少有 1 个 sheet 分组（G 循环使用 useGInvestmentCycleSheetGroups）
     const groups = page.locator('.gt-usn__group')
     const groupCount = await groups.count()

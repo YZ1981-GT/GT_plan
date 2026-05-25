@@ -1146,29 +1146,12 @@ const hBranchSelector = useDepreciationBranchSelector(
 )
 
 // I 无形资产循环 task 2.1 + task 2.4: 摊销分支选择器（I1-10/I1-11 / I4-6/I4-7）
-// 委托 useICycleEditor composable（Phase 3 Task 3.4）
-const iCycle = useICycleEditor(wpDetail, sheetNavFacade, cycleDialogs)
-const iBranchSelector = iCycle.branchSelector
-
-// G 投资循环（Phase 3 Task 3.5）：公允价值/ECL/分类 + 计量模型分支选择器
+// 委托 useICycleEditor composable（Phase 3 Task 3.4） — 实例化在 cycleDialogs 之后
 import { useGCycleEditor } from '@/composables/useGCycleEditor'
-const gCycle = useGCycleEditor(wpDetail, sheetNavFacade, cycleDialogs)
-
-// K 管理费用循环（Phase 3 Task 3.6）：费用分析 + 减值汇总
 import { useKCycleEditor } from '@/composables/useKCycleEditor'
-const kCycle = useKCycleEditor(wpDetail, cycleDialogs)
-
-// L 筹资循环（Phase 3 Task 3.7）：利息测算 + 摊余成本
 import { useLCycleEditor } from '@/composables/useLCycleEditor'
-const lCycle = useLCycleEditor(wpDetail, cycleDialogs)
-
-// M 股东权益循环（Phase 3 Task 3.8）：权益变动表
 import { useMCycleEditor } from '@/composables/useMCycleEditor'
-const mCycle = useMCycleEditor(wpDetail, cycleDialogs)
-
-// N 税费（所得税）循环（Phase 3 Task 3.9）：所得税测算
 import { useNCycleEditor } from '@/composables/useNCycleEditor'
-const nCycle = useNCycleEditor(wpDetail, cycleDialogs)
 
 // E1 Sprint 2 Task 2.17: 前置状态横幅（B23-2/C3/B51-3）
 // D-sales-cycle F8 Task 2.19: 扩展支持 D 循环前置状态横幅（B23-1/C2/B51-5）
@@ -1328,6 +1311,14 @@ const cycleDialogs = useCycleDialogs(wpDetail, wpId, sheetNavActiveId, cycleType
 // spec workpaper-editor-refactor Phase 3 Task 3.2: F 循环逻辑接入 useFCycleEditor composable
 const fCycle = useFCycleEditor(wpDetail, projectId, wpId, sheetNavFacade, cycleDialogs)
 
+// spec workpaper-editor-refactor Phase 3 Task 3.4-3.9: 6 个循环 composable 实例化（必须在 cycleDialogs 之后）
+const iCycle = useICycleEditor(wpDetail, sheetNavFacade, cycleDialogs)
+const iBranchSelector = iCycle.branchSelector
+const gCycle = useGCycleEditor(wpDetail, sheetNavFacade, cycleDialogs)
+const kCycle = useKCycleEditor(wpDetail, cycleDialogs)
+const lCycle = useLCycleEditor(wpDetail, cycleDialogs)
+const mCycle = useMCycleEditor(wpDetail, cycleDialogs)
+const nCycle = useNCycleEditor(wpDetail, cycleDialogs)
 // 向后兼容：模板中仍用原变量名（后续 Phase 6 验收时可统一改为 cycleDialogs.xxx.visible）
 const stocktakeDialogVisible = cycleDialogs.stocktake.visible
 const showStocktakeTrigger = cycleDialogs.stocktake.trigger

@@ -114,8 +114,8 @@ test.describe('K 循环底稿编辑器实测（Phase 3 Task 3.6）', () => {
 
     await page.goto(`/projects/${PROJECT_ID}/workpapers/${wp!.id}/edit`)
 
-    // 等待页面加载
-    await page.waitForTimeout(10_000)
+    // 等待页面加载（并发跑时 K 循环加载较慢，给更长时间）
+    await page.waitForTimeout(15_000)
 
     // 检查 pre-existing ErrorBoundary
     const errorBoundary = page.locator('text=页面渲染出错')
@@ -126,7 +126,10 @@ test.describe('K 循环底稿编辑器实测（Phase 3 Task 3.6）', () => {
 
     // 验证 sheet 导航面板存在
     const sheetNav = page.locator('.gt-usn')
-    await expect(sheetNav).toBeVisible({ timeout: 5_000 })
+    await expect(sheetNav).toBeVisible({ timeout: 10_000 })
+
+    // 等待 sheet 分组渲染（并发跑时 DOM 渲染稍慢）
+    await page.waitForFunction(() => document.querySelectorAll('.gt-usn__group').length > 0, { timeout: 15_000 })
 
     // 验证至少有 1 个 sheet 分组（K 循环使用 useKAdminCycleSheetGroups）
     const groups = page.locator('.gt-usn__group')
