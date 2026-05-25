@@ -947,21 +947,7 @@ import { useReviewMarks, type ReviewStatus } from '@/composables/useReviewMarks'
 import { useUserOverrides } from '@/composables/useUserOverrides'
 import { useStepMapping } from '@/composables/useStepMapping'
 import { useStaleImpact, type StaleAffectedItem } from '@/composables/useStaleImpact'
-import { useUniverSheetNav, type SheetGroup } from '@/composables/useUniverSheetNav'
-import { useDSalesCycleSheetGroups } from '@/composables/useDSalesCycleSheetGroups'
-import { useFPurchaseInventorySheetGroups } from '@/composables/useFPurchaseInventorySheetGroups'
-import { useHFixedAssetSheetGroups } from '@/composables/useHFixedAssetSheetGroups'
-import { useIIntangibleAssetSheetGroups } from '@/composables/useIIntangibleAssetSheetGroups'
-import { useKAdminCycleSheetGroups } from '@/composables/useKAdminCycleSheetGroups'
-import { useLDebtCycleSheetGroups } from '@/composables/useLDebtCycleSheetGroups'
-import { useMEquityCycleSheetGroups } from '@/composables/useMEquityCycleSheetGroups'
-import { useNTaxCycleSheetGroups } from '@/composables/useNTaxCycleSheetGroups'
-import { useBAuditPlanSheetGroups } from '@/composables/useBAuditPlanSheetGroups'
-import { useCControlTestSheetGroups } from '@/composables/useCControlTestSheetGroups'
-import {
-  useGInvestmentCycleSheetGroups,
-  type GParsedData,
-} from '@/composables/useGInvestmentCycleSheetGroups'
+import { type SheetGroup } from '@/composables/useUniverSheetNav'
 import { useDepreciationBranchSelector } from '@/composables/useDepreciationBranchSelector'
 import DepreciationBranchSelector from '@/components/workpaper/DepreciationBranchSelector.vue'
 import WorkpaperSidePanel from '@/components/workpaper/WorkpaperSidePanel.vue'
@@ -1105,145 +1091,25 @@ const isLCycle = cycleType.isLCycle
 const isMCycle = cycleType.isMCycle
 const isNCycle = cycleType.isNCycle
 
-// 同时实例化三个 nav，按 isDCycle/isFCycle 选择活跃的对外暴露
-// 三者接口一致（groups / activeSheetId / totalCount / refresh / switchTo），
-// 未激活的一方 sheets/groups 数据虽被算但不显示，不影响功能。
-const eUniverNav = useUniverSheetNav(univerAPIRef, scenarioFilter)
-const dCycleNav = useDSalesCycleSheetGroups(univerAPIRef, scenarioFilter)
-const fCycleNav = useFPurchaseInventorySheetGroups(univerAPIRef, scenarioFilter)
-// H 固定资产循环 nav（读取 project measurement_model 控制 H3/H7 sheet 显隐）
+// spec workpaper-editor-refactor Phase 2-3: Sheet 导航 facade 集中到 useSheetNavFacade composable
+import { useSheetNavFacade } from '@/composables/useSheetNavFacade'
 const measurementModelRef = computed(() => projectMeta.value?.measurement_model || 'cost')
-const hCycleNav = useHFixedAssetSheetGroups(univerAPIRef, measurementModelRef)
-// I 无形资产循环 task 2.4: I 循环 nav（10 类分组规则，无 measurement_model 参数）
-const iCycleNav = useIIntangibleAssetSheetGroups(univerAPIRef)
-
-// G 投资循环 task 2.2: G 循环 nav（12 类分组规则 + G7 三种核算方式 per-investment 显隐）
-// - parsed_data 来自 wpDetail.parsed_data（含 g7_accounting_methods 数组）
-// - currentInvesteeName 当前 G7 选中投资名（per-investment 选择器为后续打磨项，此处置 null
-//   触发 fallback 全显，避免阻塞 G-F2 主体功能）
-const gParsedDataRef = computed<GParsedData | null>(() => {
-  const pd = (wpDetail.value as any)?.parsed_data
-  return (pd ?? null) as GParsedData | null
-})
-const gCurrentInvesteeNameRef = ref<string | null>(null)
-const gCycleNav = useGInvestmentCycleSheetGroups(
-  univerAPIRef,
-  gParsedDataRef,
-  gCurrentInvesteeNameRef,
-)
-
-// K 管理循环 task 2.1: K 循环 nav（10 类分组规则）
-const kCycleNav = useKAdminCycleSheetGroups(univerAPIRef)
-
-// L 筹资循环 task 2.1: L 循环 nav（10 类分组规则）
-const lCycleNav = useLDebtCycleSheetGroups(univerAPIRef)
-
-// M 权益循环 task 2.3: M 循环 nav（8 类分组规则）
-const mCycleNav = useMEquityCycleSheetGroups(univerAPIRef)
-
-// N 税金循环 task 2.1: N 循环 nav（8 类分组规则）
-const nCycleNav = useNTaxCycleSheetGroups(univerAPIRef)
-
-// B 类底稿（控制了解/审计计划）nav（7 类分组规则）
-const bCycleNav = useBAuditPlanSheetGroups(univerAPIRef)
-
-// C 类底稿（控制测试）nav（5 类分组规则）
-const cCycleNav = useCControlTestSheetGroups(univerAPIRef)
-
-// 统一对外 facade（保持模板原有 sheetNav.groups.value / sheetNav.activeSheetId.value 调用形态）
-const sheetNavGroups = computed<SheetGroup[]>(() => {
-  if (isHCycle.value) return hCycleNav.groups.value as unknown as SheetGroup[]
-  if (isICycle.value) return iCycleNav.groups.value as unknown as SheetGroup[]
-  if (isGCycle.value) return gCycleNav.groups.value as unknown as SheetGroup[]
-  if (isKCycle.value) return kCycleNav.groups.value as unknown as SheetGroup[]
-  if (isLCycle.value) return lCycleNav.groups.value as unknown as SheetGroup[]
-  if (isMCycle.value) return mCycleNav.groups.value as unknown as SheetGroup[]
-  if (isNCycle.value) return nCycleNav.groups.value as unknown as SheetGroup[]
-  if (isBCycle.value) return bCycleNav.groups.value as unknown as SheetGroup[]
-  if (isCCycle.value) return cCycleNav.groups.value as unknown as SheetGroup[]
-  if (isFCycle.value) return fCycleNav.groups.value
-  if (isDCycle.value) return dCycleNav.groups.value
-  return eUniverNav.groups.value
-})
-const sheetNavActiveId = computed<string>(() => {
-  if (isHCycle.value) return hCycleNav.activeSheetId.value
-  if (isICycle.value) return iCycleNav.activeSheetId.value
-  if (isGCycle.value) return gCycleNav.activeSheetId.value
-  if (isKCycle.value) return kCycleNav.activeSheetId.value
-  if (isLCycle.value) return lCycleNav.activeSheetId.value
-  if (isMCycle.value) return mCycleNav.activeSheetId.value
-  if (isNCycle.value) return nCycleNav.activeSheetId.value
-  if (isBCycle.value) return bCycleNav.activeSheetId.value
-  if (isCCycle.value) return cCycleNav.activeSheetId.value
-  if (isFCycle.value) return fCycleNav.activeSheetId.value
-  if (isDCycle.value) return dCycleNav.activeSheetId.value
-  return eUniverNav.activeSheetId.value
-})
-const sheetNavTotalCount = computed<number>(() => {
-  if (isHCycle.value) return hCycleNav.totalCount.value
-  if (isICycle.value) return iCycleNav.totalCount.value
-  if (isGCycle.value) return gCycleNav.totalCount.value
-  if (isKCycle.value) return kCycleNav.totalCount.value
-  if (isLCycle.value) return lCycleNav.totalCount.value
-  if (isMCycle.value) return mCycleNav.totalCount.value
-  if (isNCycle.value) return nCycleNav.totalCount.value
-  if (isBCycle.value) return bCycleNav.totalCount.value
-  if (isCCycle.value) return cCycleNav.totalCount.value
-  if (isFCycle.value) return fCycleNav.totalCount.value
-  if (isDCycle.value) return dCycleNav.totalCount.value
-  return eUniverNav.totalCount.value
-})
-function sheetNavSwitchTo(id: string) {
-  if (isHCycle.value) hCycleNav.switchTo(id)
-  else if (isICycle.value) iCycleNav.switchTo(id)
-  else if (isGCycle.value) gCycleNav.switchTo(id)
-  else if (isKCycle.value) kCycleNav.switchTo(id)
-  else if (isLCycle.value) lCycleNav.switchTo(id)
-  else if (isMCycle.value) mCycleNav.switchTo(id)
-  else if (isNCycle.value) nCycleNav.switchTo(id)
-  else if (isBCycle.value) bCycleNav.switchTo(id)
-  else if (isCCycle.value) cCycleNav.switchTo(id)
-  else if (isFCycle.value) fCycleNav.switchTo(id)
-  else if (isDCycle.value) dCycleNav.switchTo(id)
-  else eUniverNav.switchTo(id)
-}
-function sheetNavRefresh() {
-  if (isHCycle.value) hCycleNav.refresh()
-  else if (isICycle.value) iCycleNav.refresh()
-  else if (isGCycle.value) gCycleNav.refresh()
-  else if (isKCycle.value) kCycleNav.refresh()
-  else if (isLCycle.value) lCycleNav.refresh()
-  else if (isMCycle.value) mCycleNav.refresh()
-  else if (isNCycle.value) nCycleNav.refresh()
-  else if (isBCycle.value) bCycleNav.refresh()
-  else if (isCCycle.value) cCycleNav.refresh()
-  else if (isFCycle.value) fCycleNav.refresh()
-  else if (isDCycle.value) dCycleNav.refresh()
-  else eUniverNav.refresh()
-}
+const sheetNavFacade = useSheetNavFacade(univerAPIRef, wpDetail, cycleType, scenarioFilter, measurementModelRef)
 const sheetNav = {
-  groups: sheetNavGroups,
-  activeSheetId: sheetNavActiveId,
-  totalCount: sheetNavTotalCount,
-  switchTo: sheetNavSwitchTo,
-  refresh: sheetNavRefresh,
-  // 仅 E 类（useUniverSheetNav）独有，D/F 类不需要外币显隐
-  applyForeignCurrencyVisibility: () => eUniverNav.applyForeignCurrencyVisibility(),
+  groups: sheetNavFacade.groups,
+  activeSheetId: sheetNavFacade.activeSheetId,
+  totalCount: sheetNavFacade.totalCount,
+  switchTo: sheetNavFacade.switchTo,
+  refresh: sheetNavFacade.refresh,
+  applyForeignCurrencyVisibility: sheetNavFacade.applyForeignCurrencyVisibility,
 }
+const sheetNavGroups = sheetNavFacade.groups
+const sheetNavActiveId = sheetNavFacade.activeSheetId
+const flatSheets = sheetNavFacade.flatSheets
+// 暴露各循环 nav 实例供 branch selector 使用
+const hCycleNav = sheetNavFacade.hCycleNav
+const iCycleNav = sheetNavFacade.iCycleNav
 const sheetNavCollapsed = ref(false)
-
-// 顶部水平 sheet 切换栏：扁平化 sheetNav.groups 为 [{id, name}] 列表
-const flatSheets = computed(() => {
-  const groups = sheetNav.groups.value || []
-  const result: Array<{ id: string; name: string }> = []
-  for (const g of groups) {
-    for (const s of (g.sheets || [])) {
-      if (s.hidden) continue
-      result.push({ id: s.id, name: s.name })
-    }
-  }
-  return result
-})
 
 // H 固定资产循环 task 2.4: 折旧/减值分支选择器
 const hActiveSheetName = computed(() => {
