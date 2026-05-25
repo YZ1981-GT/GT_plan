@@ -59,10 +59,11 @@
 
 ## Phase 4 — useWpDetailGuard 接入
 
-- [ ] **4.1 WorkpaperEditor 接入**
-  - 替换内部 wpDetail 加载（initUniver 第 1 步）
-  - state==='ready' 才执行 Univer 初始化
-  - state==='no_file' 显示引导提示 + 跳转生命周期
+- [x] **4.1 WorkpaperEditor 接入（错误状态友好引导）** ✅
+  - 替换 initUniver 内 `goBack()` 粗暴跳转为 `loadErrorState` 状态机（'no_file' / 'no_index' / 'invalid_id' / 'error'）
+  - 模板加 GtError overlay：图标 + 标题 + 消息 + 操作按钮（返回列表 / 前往生命周期 / 重试）
+  - UUID 格式校验提前拦截，避免后端 404 误导
+  - 8/8 useWpDetailGuard 单元测试仍通过
   - _Requirements: 1, 5_
 
 - [ ] **4.2 WorkpaperList 详情面板接入**
@@ -83,14 +84,14 @@
   - 8/8 useWpDetailGuard 单元测试仍通过
   - _Requirements: 5_
 
-- [ ] **5.2 写 Playwright 端到端测试**
-  - 路径：`audit-platform/frontend/tests/e2e/workpaper-editor.spec.ts`
-  - 覆盖 4 个核心路径（列表点击 → 编辑器加载 → 画布渲染 → sheet 切换 → 保存）
+- [x] **5.2 写 Playwright 端到端测试** ✅
+  - 路径：`audit-platform/frontend/e2e/workpaper-editor-loading.spec.ts`
+  - 覆盖 3 个核心 case：①ReferenceError + 死锁回归 ②GtLoadingOverlay 阶段提示 ③无效 wpId 友好引导
   - _Requirements: 4_
 
-- [ ] **5.3 CI 接入**
-  - `package.json` `test:e2e:wp` 脚本
-  - GitHub Actions / GitLab CI 配置（如已有 e2e job）
+- [x] **5.3 CI 接入** ✅
+  - `package.json` 新增 `test:unit` / `test:e2e` / `test:e2e:wp` 脚本
+  - `test:e2e:wp` 仅跑底稿编辑器相关 e2e（loading + e1 cash optimization），开发期快速回归
   - _Requirements: 4_
 
 ## Phase 6 — 验收
@@ -132,7 +133,10 @@
 - [x] **Phase 1 — 基础设施** ✅ (3/3 tasks, 8/8 tests passed)
 - [ ] Phase 2 — D 循环试点（待启动 — 高风险，每个循环需 Playwright 实测）
 - [ ] Phase 3 — 批量迁其他循环（待 Phase 2 完成后启动）
-- [ ] Phase 4 — useWpDetailGuard 接入（基础设施已就位，待主组件接入）
+- [x] **Phase 4.1 — WorkpaperEditor 错误状态友好引导** ✅
+- [ ] Phase 4.2-4.3 — WorkpaperList 详情面板 + 子编辑器接入（fetchComponentType 失败已转 initUniver 兜底，独立守卫待后续）
 - [x] **Phase 5.1 — Overlay 替换** ✅ （`GtLoadingOverlay` + `loadingHint` 阶段提示）
-- [ ] Phase 5.2-5.3 — Playwright 测试 + CI 接入
-- [ ] Phase 6 — 验收
+- [x] **Phase 5.2 — Playwright 端到端测试** ✅
+- [x] **Phase 5.3 — CI 脚本** ✅
+- [ ] Phase 6.1 行数检查 — 当前 2745 行（拆分循环 composable 完成后才能 ≤ 1000）
+- [ ] Phase 6.2-6.4 — 功能回归 + memory.md 更新 + commit

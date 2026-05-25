@@ -227,6 +227,40 @@
         :hint="loadingHint"
         :size="32"
       />
+
+      <!-- spec workpaper-editor-refactor Phase 4.1: 加载失败友好引导（替代粗暴 goBack）-->
+      <div v-if="!loading && loadErrorState" class="gt-wp-editor-error-overlay">
+        <div class="gt-wp-editor-error-card">
+          <div class="gt-wp-editor-error-icon">
+            <span v-if="loadErrorState === 'no_file'">📄</span>
+            <span v-else-if="loadErrorState === 'no_index'">🔍</span>
+            <span v-else-if="loadErrorState === 'invalid_id'">⚠️</span>
+            <span v-else>❌</span>
+          </div>
+          <div class="gt-wp-editor-error-title">
+            <template v-if="loadErrorState === 'no_file'">底稿文件尚未生成</template>
+            <template v-else-if="loadErrorState === 'no_index'">底稿不存在</template>
+            <template v-else-if="loadErrorState === 'invalid_id'">底稿 ID 不合法</template>
+            <template v-else>加载底稿失败</template>
+          </div>
+          <div class="gt-wp-editor-error-message">{{ loadErrorMessage }}</div>
+          <div class="gt-wp-editor-error-actions">
+            <el-button size="small" @click="goBack">返回底稿列表</el-button>
+            <el-button
+              v-if="loadErrorState === 'no_file'"
+              size="small"
+              type="primary"
+              @click="goToLifecycle"
+            >前往生命周期</el-button>
+            <el-button
+              v-if="loadErrorState === 'error'"
+              size="small"
+              type="primary"
+              @click="onRetryLoad"
+            >重试</el-button>
+          </div>
+        </div>
+      </div>
       <!-- 左侧 Sheet 导航：v-show 保持 DOM（数据未就绪也先占位）-->
       <div v-show="!loading" class="gt-wp-editor-left-col">
         <UniverSheetNav
@@ -1000,6 +1034,10 @@ const wpDetail = ref<WorkpaperDetail | null>(null)
 const loading = ref(true)
 // 加载阶段提示（用户感知）：null/空字符串则不显示 hint
 const loadingHint = ref('')
+// 加载失败状态（spec workpaper-editor-refactor Phase 4.1：错误友好提示，不再粗暴 goBack）
+// 参考 useWpDetailGuard 状态机：'no_file' / 'no_index' / 'invalid_id' / 'error'
+const loadErrorState = ref<'no_file' | 'no_index' | 'invalid_id' | 'error' | null>(null)
+const loadErrorMessage = ref('')
 
 // ─── component_type 路由逻辑 ─────────────────────────────────────────────────
 const componentType = ref<string>('univer')
@@ -1878,21 +1916,61 @@ function goBack() {
   router.push({ name: 'WorkpaperList', params: { projectId: projectId.value } })
 }
 
+// spec workpaper-editor-refactor Phase 4.1：no_file 状态时跳转生命周期视图（用户可一键生成底稿）
+function goToLifecycle() {
+  router.push({
+    name: 'WorkpaperList',
+    params: { projectId: projectId.value },
+    query: { tab: 'lifecycle' },
+  })
+}
+
+// spec workpaper-editor-refactor Phase 4.1：error 状态时重试加载
+async function onRetryLoad() {
+  loadErrorState.value = null
+  loadErrorMessage.value = ''
+  loading.value = true
+  loadingHint.value = '重新加载'
+  await initUniver()
+}
+
 async function initUniver() {
   if (!univerContainer.value) return
+
+  // spec workpaper-editor-refactor Phase 4.1：UUID 格式校验（提前拦截，避免后端 404 误导）
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!wpId.value || !UUID_RE.test(wpId.value)) {
+    loadErrorState.value = 'invalid_id'
+    loadErrorMessage.value = '底稿 ID 格式不合法（不是 UUID）'
+    loading.value = false
+    loadingHint.value = ''
+    return
+  }
 
   // 1. 加载底稿详情
   loadingHint.value = '加载底稿详情'
   try {
     wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
     if (!wpDetail.value) {
-      ElMessage.error('底稿数据为空，可能尚未生成文件')
-      goBack()
+      // spec Phase 4.1：底稿数据为空 → 显示 no_file 引导，不再粗暴 goBack
+      loadErrorState.value = 'no_file'
+      loadErrorMessage.value = '底稿数据为空，可能尚未生成文件。请先在生命周期中执行"一键生成底稿"。'
+      loading.value = false
+      loadingHint.value = ''
       return
     }
   } catch (e: any) {
-    handleApiError(e, '底稿不存在')
-    goBack()
+    // spec Phase 4.1：404 → no_index/no_file 引导；其他错误 → error 状态
+    const status = e?.response?.status
+    if (status === 404) {
+      loadErrorState.value = 'no_index'
+      loadErrorMessage.value = '该底稿不在当前项目中（可能编码已变更或被删除）。请回到底稿列表选择有效的底稿。'
+    } else {
+      loadErrorState.value = 'error'
+      loadErrorMessage.value = e?.message || '加载底稿时发生错误'
+    }
+    loading.value = false
+    loadingHint.value = ''
     return
   }
 
@@ -2773,6 +2851,34 @@ function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: stri
 .gt-wp-editor-loading {
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; height: 100%; gap: 12px; color: var(--gt-color-text-tertiary);
+}
+/* spec workpaper-editor-refactor Phase 4.1: 加载失败友好引导 overlay */
+.gt-wp-editor-error-overlay {
+  position: absolute; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--gt-color-bg-page, #f5f7fa);
+  padding: 32px;
+}
+.gt-wp-editor-error-card {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 16px; max-width: 480px;
+  padding: 32px 40px;
+  background: var(--gt-color-bg-white, #fff);
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  text-align: center;
+}
+.gt-wp-editor-error-icon { font-size: 48px; line-height: 1; }
+.gt-wp-editor-error-title {
+  font-size: 18px; font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+.gt-wp-editor-error-message {
+  font-size: 14px; line-height: 1.6;
+  color: var(--gt-color-text-secondary, #606266);
+}
+.gt-wp-editor-error-actions {
+  display: flex; gap: 8px; margin-top: 8px;
 }
 .gt-wp-editor-statusbar {
   display: flex; gap: var(--gt-space-5); padding: 6px var(--gt-space-4);
