@@ -117,10 +117,10 @@ async def init_project(db: AsyncSession, project_id: UUID, name: str, year: int)
     print(f"  [5] 生成底稿+附注（chain）...", end=" ")
     try:
         from app.services.chain_orchestrator import ChainOrchestrator
-        orchestrator = ChainOrchestrator(db)
+        orchestrator = ChainOrchestrator()
         # force=True 跳过 stale check 强制重跑全链路
         chain_result = await orchestrator.execute_full_chain(
-            project_id=project_id, year=year, triggered_by=None, force=True,
+            db=db, project_id=project_id, year=year, triggered_by=None, force=True,
         )
         await db.commit()
         # 再查 wp + note count
