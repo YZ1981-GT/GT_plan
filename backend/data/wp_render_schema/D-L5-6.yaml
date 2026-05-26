@@ -1,0 +1,202 @@
+# backend/data/wp_render_schema/D-L5-6.yaml
+# 关联方及交易检查表 — D 类表格型子模式渲染 schema (form_type=table)
+# Requirements: 3.5.1（表格型检查表，L5-6 关联方检查 29×16）
+# Design: §3.6 GtDForm 表格型子模式（GtDFormTable，~250 sheet 适用）
+# Template: D4-21 营业收入-关联方检查（Leap-常规程序）.xlsx（同结构 sheet 复用）
+# 适用范围：所有"关联方检查 / 项目矩阵 + 字典下拉 + 审计结论"类 sheet（约 250 sheet）
+
+wp_code: D-L5-6
+template_path: backend/wp_templates/D/D4-21营业收入-关联方检查（Leap-常规程序）.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+shared: true                               # 共享模板（D 类表格型 ~250 sheet 复用此结构）
+related_accounts:
+  - code: '1122'
+    name: 应收账款
+  - code: '2202'
+    name: 应付账款
+
+sheets:
+  关联方及交易检查表:
+    component_type: d-form
+    form_type: table                        # ★ 5 子模式路由字段（design §3.6）
+
+    # ─── 固定头部（自动填充） ──────────────────────────────────────
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '关联方及交易检查表'
+      A3: '${entity_name}'                  # 来自 project.client_name（模板公式 =底稿目录!A2）
+      A4: '${period_end}'                   # 来自 project.period_end（模板公式 =底稿目录!A3）
+      P3: '${index_no}'                     # 索引号（如 L5-6 / D4-21）
+      P4: '${page_no}'
+
+    # ─── 上下文区（基本信息字段） ──────────────────────────────────
+    fields:
+      - { name: audit_objective, label: '审计目标', type: textarea,
+          cell: B6, max_length: 1000, required: true,
+          hint: '识别和评价关联方及关联方交易，检查关联方披露的完整性和准确性' }
+      - { name: audit_scope, label: '审计范围', type: textarea,
+          cell: B8, max_length: 1000,
+          hint: '说明本次检查覆盖的关联方类型（控股股东 / 实际控制人 / 联营企业等）' }
+
+    # ─── 动态表格区（行项目矩阵：项目 × 关联方 × 多列指标） ────────
+    dynamic_table:
+      start_row: 13                         # 表头第 12 行，数据起始 13 行
+      end_row: dynamic                      # 行数由用户数据决定（通常 5-30 行）
+      header_row: 12
+      add_row_button: true                  # 支持动态增删行
+      max_rows: 100                         # 最多 100 个关联方
+      columns:
+        A: { field: seq, type: number, label: '序号', width: 60 }
+        B: { field: related_party_name, type: text, label: '关联方名称',
+             max_length: 200, required: true, width: 200 }
+        C: { field: related_party_type, type: enum, label: '关联方类型',
+             render: 'dictionary_dropdown',
+             dict_source: 'related_party_types',
+             enum: ['实际控制人', '控股股东', '其他股东', '同一控制下企业',
+                    '联营企业', '合营企业', '主要管理人员', '关键管理人员近亲属',
+                    '受同一关键管理人员控制', '其他关联方'],
+             required: true, width: 140 }
+        D: { field: relationship_desc, type: textarea, label: '关联关系说明',
+             max_length: 500, width: 200 }
+        E: { field: transaction_type, type: enum, label: '交易类型',
+             enum: ['销售商品', '提供劳务', '采购商品', '接受劳务', '租赁',
+                    '担保', '资金拆借', '资产转让', '债权债务转让', '其他'],
+             width: 120 }
+        F: { field: book_amount, type: number, label: '账面金额',
+             render: 'amount', width: 130 }
+        G: { field: audited_amount, type: number, label: '审定金额',
+             render: 'amount', width: 130 }
+        H: { field: occurrence_date, type: date, label: '发生日期',
+             format: 'YYYY-MM-DD', width: 110 }
+        I: { field: settlement_date, type: date, label: '到期/结算日',
+             format: 'YYYY-MM-DD', width: 110 }
+        J: { field: pricing_basis, type: text, label: '定价依据',
+             max_length: 300, width: 200 }
+        K: { field: arms_length, type: enum, label: '是否公允',
+             enum: ['是', '否', '不适用'], render: 'tag', width: 90 }
+        L: { field: disclosure_check, type: boolean, label: '已披露',
+             render: 'checkmark', width: 80 }
+        M: { field: linked_workpapers, type: text, label: '关联底稿',
+             render: 'index_chip', max_length: 200, width: 160 }
+        N: { field: audit_procedure, type: textarea, label: '审计程序',
+             max_length: 1000, width: 250 }
+        O: { field: audit_finding, type: textarea, label: '审计发现',
+             max_length: 1000, width: 250 }
+        P: { field: row_conclusion, type: enum, label: '行项目结论',
+             enum: ['正常', '需关注', '异常'], render: 'tag', width: 90 }
+
+    # ─── 字典下拉（"勿删勿改区" → HTML 下拉数据源） ────────────────
+    dictionaries:
+      related_party_types:
+        description: '关联方类型字典（替代 Excel 底部"勿删勿改区"）'
+        source: static                       # 静态字典（不需后端 API）
+        items:
+          - { value: '实际控制人', label: '实际控制人',
+              note: '能够直接或间接控制公司的自然人 / 法人' }
+          - { value: '控股股东', label: '控股股东',
+              note: '持股 ≥ 50% 或表决权足以重大影响' }
+          - { value: '其他股东', label: '其他股东（持股 5%-50%）',
+              note: '非控股但有一定影响力的股东' }
+          - { value: '同一控制下企业', label: '同一控制下企业',
+              note: '受同一最终控制方控制的其他企业' }
+          - { value: '联营企业', label: '联营企业',
+              note: '能够施加重大影响（持股 20%-50%）' }
+          - { value: '合营企业', label: '合营企业',
+              note: '共同控制的合营安排' }
+          - { value: '主要管理人员', label: '主要管理人员',
+              note: 'CEO / CFO / 董事 / 监事等' }
+          - { value: '关键管理人员近亲属', label: '关键管理人员近亲属',
+              note: '配偶 / 父母 / 子女 / 兄弟姐妹等' }
+          - { value: '受同一关键管理人员控制', label: '受同一关键管理人员控制',
+              note: '由公司关键管理人员控制 / 共同控制 / 重大影响的其他主体' }
+          - { value: '其他关联方', label: '其他关联方',
+              note: '不属于以上类型但符合关联方定义的其他主体' }
+
+    # ─── 静态文本区（不可改，导出时跳过） ─────────────────────────
+    static_text:
+      rows: [1-5, 6-11, 12]                 # 表头 + 审计目标说明 + 列标题
+      description: |
+        Row 1-4: 事务所名称 / 表名 / 被审计单位 / 审计截止日
+        Row 5-11: 审计目标 + 审计范围 + 关联方定义说明
+        Row 12: 表格列标题（序号/关联方/类型/关系说明/交易/金额/日期/披露/底稿/程序/发现/结论）
+      footer_rows_after_dynamic: 5          # 尾部审计说明 + 审计结论 + 签字行
+
+    # ─── 审计说明 + 审计结论（自由文本，sheet 末尾固定区域） ──────
+    conclusion:
+      mode: composite                       # 复合结论（含说明 + 整体判定）
+      audit_explanation_field:
+        name: audit_explanation
+        label: '审计说明'
+        type: textarea
+        cell_after_table: 1                 # 动态表格末行 + 1 行后
+        max_length: 5000
+        hint: '汇总关联方检查的总体情况、未披露关联方的应对、披露完整性评价'
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: '审计结论'
+        type: enum
+        cell_after_table: 3
+        enum:
+          - { value: 'no_issue', label: '关联方披露完整准确',
+              class: 'success', icon: 'CircleCheck' }
+          - { value: 'minor_issue', label: '披露存在小瑕疵已沟通调整',
+              class: 'warning', icon: 'WarningFilled' }
+          - { value: 'material_issue', label: '存在未披露重大关联方交易',
+              class: 'danger', icon: 'CircleCloseFilled' }
+        required: true
+      remarks_field:
+        name: remarks
+        label: '备注 / 后续关注事项'
+        type: textarea
+        cell_after_table: 4
+        max_length: 2000
+
+    # ─── 公式区（保留模板原公式，导出时跳过） ─────────────────────
+    formulas:
+      preserve: true
+      cells:
+        - A3                                # =底稿目录!A2
+        - A4                                # =底稿目录!A3
+        - P3                                # 索引号公式
+        - P4                                # 页码公式
+
+    # ─── 合并单元格 ──────────────────────────────────────────────
+    merged_cells:
+      preserve: true
+      count: 18                             # 估算
+      description: |
+        主要合并区域：
+        - A1:P1（事务所名称横跨全宽）
+        - A2:P2（表名）
+        - 审计目标 / 审计范围标题各横跨 A:P
+        - 字典区底部"勿删勿改区"合并块
+
+    # ─── 跨底稿引用 ──────────────────────────────────────────────
+    cross_refs:
+      - ref_id: CW-D-L5-6-001
+        source_cell: M-dynamic              # 动态表 M 列每行
+        target_wp: A7-1
+        target_sheet: '汇总关联方交易及关联往来'
+        target_field: 'related_party_name'
+        description: '关联方明细 → A7-1 关联方汇总表反向溯源'
+        severity: required
+        direction: outbound
+
+      - ref_id: CW-D-L5-6-002
+        source_cell: M-dynamic
+        target_wp: A7-2
+        target_sheet: '关联方交易附注披露信息'
+        target_field: 'disclosure_section'
+        description: '关联方明细 → A7-2 关联方附注披露同步'
+        severity: required
+        direction: outbound
+
+      - ref_id: CW-D-L5-6-003
+        source_cell: row_conclusion
+        target_wp: B19
+        target_sheet: '识别关联方程序表'
+        target_field: 'identified_related_parties'
+        description: '关联方识别 ↔ B19 关联方程序表前置溯源'
+        severity: optional
+        direction: inbound

@@ -1,0 +1,204 @@
+# C23.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:58:25
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: C23
+template_path: backend/wp_templates/C/C23 会计分录 - 控制测试.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:58:25'
+  source_xlsx: C23 会计分录 - 控制测试.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  C23A 会计分录控制测试程序表:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计分录控制测试程序表
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      G3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 程序
+        D:
+          field: col_d
+          type: text
+          label: 是否适用
+        E:
+          field: col_e
+          type: text
+          label: 执行人
+        F:
+          field: col_f
+          type: text
+          label: 执行情况说明
+        G:
+          field: col_g
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 18
+      ranges_sample:
+      - A32:G32
+      - B13:C13
+      - B6:C6
+      - A1:G1
+      - B15:C15
+      - B7:C7
+      - B11:C11
+      - A35:G35
+      - B10:C10
+      - A20:G20
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  会计人员清单完整性测试表C23-1:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计人员清单完整性测试表
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 7-8
+      - 10-12
+      - 15-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:E2
+      - A1:E1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  会计分录控制测试C23-2:
+    component_type: e-control-test
+    class_code: E-控制测试单条
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计分录控制测试
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      H3: ${index_no}
+      G4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 7-11
+      - 14-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:H2
+      - A1:H1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  示例 - 会计人员清单测试:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      K3: ${index_no}
+    dynamic_table:
+      start_row: 26
+      end_row: dynamic
+      header_row: 25
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 用户编号
+        D:
+          field: col_d
+          type: text
+          label: 全名
+        E:
+          field: col_e
+          type: text
+          label: 职位
+        F:
+          field: col_f
+          type: text
+          label: 职责
+        G:
+          field: col_g
+          type: text
+          label: 编制分录
+        H:
+          field: col_h
+          type: text
+          label: 批准分录
+        I:
+          field: col_i
+          type: text
+          label: 过账
+    static_text:
+      rows:
+      - 2
+      - 6-8
+      - 10-12
+      - 15-19
+      - 22
+      - 24
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 1
+      ranges_sample:
+      - B6:K6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  示例 - 会计分录控制测试:
+    component_type: e-control-test
+    class_code: E-控制测试单条
+    fixed_cells:
+      K3: ${index_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 2
+      - 6-11
+      - 14-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 1
+      ranges_sample:
+      - B6:K6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

@@ -1,0 +1,180 @@
+# S6.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:59:03
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: S6
+template_path: backend/wp_templates/S/S6 对大股东及关联方资金占用和违规担保情况审核程序.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:59:03'
+  source_xlsx: S6 对大股东及关联方资金占用和违规担保情况审核程序.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  表头（请先填写）:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: 客户名称：
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 日期：
+        D:
+          field: col_d
+          type: text
+          label: '3'
+        E:
+          field: col_e
+          type: text
+          label: 对大股东及关联方资金占用和违规担保情况审核程序S6
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  审定表S6-1:
+    component_type: univer
+    class_code: F-审定表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 对大股东及关联方资金占用和违规担保情况审定表
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 6
+      - 13
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 22
+      ranges_sample:
+      - A14:G14
+      - A17:G17
+      - A8:G8
+      - A22:G22
+      - A20:G20
+      - A19:G19
+      - A10:G10
+      - A13:G13
+      - A9:G9
+      - A24:G24
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  '对大股东及关联方资金占用和违规担保情况审核程序S6 ':
+    component_type: a-program-console
+    class_code: A-S 议题程序
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 对大股东及关联方资金占用和违规担保情况审核程序
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 审计程序
+        E:
+          field: col_e
+          type: text
+          label: 执行人
+        H:
+          field: col_h
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 182
+      ranges_sample:
+      - B11:D11
+      - B42:D42
+      - B60:D60
+      - E13:G13
+      - B57:D57
+      - E31:G31
+      - E40:G40
+      - B53:D53
+      - B44:D44
+      - E15:G15
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  会计监管风险提示第9号——上市公司控股股东资金占用及其审计:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1
+      - 3-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  Sheet2:
+    component_type: skip
+    class_code: I-占位
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-3
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 1
+      ranges_sample:
+      - B1:C1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

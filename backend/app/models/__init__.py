@@ -75,6 +75,7 @@ from app.models.workpaper_models import (
     ReviewCommentStatus,
     ReviewRecord,
     WorkingPaper,
+    WorkpaperSheetClassification,
     WpCrossRef,
     WpFileStatus,
     WpIndex,
@@ -86,6 +87,8 @@ from app.models.workpaper_models import (
     WpTemplateSet,
     WpTemplateStatus,
 )
+from app.models.workpaper_template_version import WorkpaperTemplateVersion
+from app.models.project_wp_sheet_override import ProjectWorkpaperSheetOverride
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.ai_models import AIModelConfig, AIModelType, AIProvider, DocumentType, DocumentScan, DocumentExtracted, DocumentMatch, RecognitionStatus, MatchResult
 from app.models.archive_models import ArchiveJob
@@ -193,6 +196,9 @@ __all__ = [
     "WpCrossRef",
     "WpQcResult",
     "ReviewRecord",
+    "WorkpaperSheetClassification",
+    "WorkpaperTemplateVersion",
+    "ProjectWorkpaperSheetOverride",
     # --- archive models ---
     "ArchiveJob",
     # --- EQCR models (R5) ---

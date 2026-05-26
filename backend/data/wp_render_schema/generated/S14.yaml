@@ -1,0 +1,318 @@
+# S14.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:59:01
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: S14
+template_path: backend/wp_templates/S/S14 会计估计和相关披露.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:59:01'
+  source_xlsx: S14 会计估计和相关披露.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  S14程序表:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计估计
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 程序
+        E:
+          field: col_e
+          type: text
+          label: 是否适用
+        F:
+          field: col_f
+          type: text
+          label: 核查方式
+        G:
+          field: col_g
+          type: text
+          label: 执行人
+        H:
+          field: col_h
+          type: text
+          label: 执行情况说明
+        I:
+          field: col_i
+          type: text
+          label: 审计程序索引
+    static_text:
+      rows:
+      - 1-2
+      - 6-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 44
+      ranges_sample:
+      - B42:D42
+      - B11:D11
+      - B14:D14
+      - B7:I7
+      - B23:D23
+      - B8:D8
+      - B17:D17
+      - B13:D13
+      - B44:D44
+      - B29:D29
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  S14-1了解被审计单位及其环境（会计估计相关）:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 了解被审计单位及其环境（会计估计相关）
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      K3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 了解的项目
+        G:
+          field: col_g
+          type: text
+          label: 了解的内容和评估的风险
+        I:
+          field: col_i
+          type: text
+          label: 是否识别出风险因素
+        J:
+          field: col_j
+          type: text
+          label: 描述识别出的风险因素
+        K:
+          field: col_k
+          type: text
+          label: 索引号或信息来源
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 46
+      ranges_sample:
+      - A16:F16
+      - G12:H12
+      - G11:H11
+      - G27:H27
+      - A27:F27
+      - A12:F12
+      - A18:F18
+      - A21:C21
+      - A26:F26
+      - G23:H23
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  S14-2了解与会计估计相关的控制:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 了解与会计估计相关的控制
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      K3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 了解的项目
+        G:
+          field: col_g
+          type: text
+          label: 了解的内容和评估的风险
+        I:
+          field: col_i
+          type: text
+          label: 是否识别出风险因素
+        J:
+          field: col_j
+          type: text
+          label: 描述识别出的风险因素
+        K:
+          field: col_k
+          type: text
+          label: 索引号或信息来源
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 135
+      ranges_sample:
+      - G21:H21
+      - A66:F66
+      - A75:F75
+      - G71:H71
+      - G23:H23
+      - A50:F50
+      - A55:F55
+      - A47:F47
+      - A32:F32
+      - G57:H57
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  S14-3应对评估的重大错报风险（会计估计相关）:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应对评估的重大错报风险（会计估计相关）
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      J3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 可供选择执行的程序
+        G:
+          field: col_g
+          type: text
+          label: 执行人
+        H:
+          field: col_h
+          type: text
+          label: 执行程序的结果
+        J:
+          field: col_j
+          type: text
+          label: 索引号或信息来源
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      - 7-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 129
+      ranges_sample:
+      - H53:I53
+      - A66:F66
+      - H10:I10
+      - H55:I55
+      - A50:F50
+      - A55:F55
+      - H9:I9
+      - H39:I39
+      - A47:F47
+      - A32:F32
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  S14-4管理层偏向的迹象:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 管理层偏向的迹象
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      J3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 了解的项目
+        G:
+          field: col_g
+          type: text
+          label: 执行人
+        H:
+          field: col_h
+          type: text
+          label: 是否存在
+        J:
+          field: col_j
+          type: text
+          label: 索引号或信息来源
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 35
+      ranges_sample:
+      - A16:F16
+      - A5:J5
+      - H20:I20
+      - H10:I10
+      - A12:F12
+      - A18:F18
+      - A21:F21
+      - H9:I9
+      - H21:I21
+      - A14:F14
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

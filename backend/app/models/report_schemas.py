@@ -252,6 +252,11 @@ class DisclosureNoteDetail(BaseModel):
     status: NoteStatus = NoteStatus.draft
     sort_order: int | None = None
     updated_at: datetime | None = None
+    # workpaper-html-renderer Task 10.3: 同步标记（design §12.1）
+    last_sync_source: str | None = None
+    last_sync_wp_id: UUID | None = None
+    last_sync_at: datetime | None = None
+    last_sync_user_id: UUID | None = None
 
 
 class DisclosureNoteUpdate(BaseModel):

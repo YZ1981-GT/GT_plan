@@ -1,0 +1,803 @@
+# C24.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:58:26
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: C24
+template_path: backend/wp_templates/C/C24 会计分录 - 细节测试.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:58:25'
+  source_xlsx: C24 会计分录 - 细节测试.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  细节测试C24A:
+    component_type: a-program-console
+    class_code: A-程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计分录细节测试程序表
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      J3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 程序
+        H:
+          field: col_h
+          type: text
+          label: 是否适用
+        I:
+          field: col_i
+          type: text
+          label: 执行人
+        J:
+          field: col_j
+          type: text
+          label: 执行情况说明
+        K:
+          field: col_k
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - B26
+      - B27
+      - B28
+      - B29
+      - B30
+      - B31
+      - B32
+      - B33
+      _total_count: 8
+    merged_cells:
+      preserve: true
+      count: 48
+      ranges_sample:
+      - B42:G42
+      - B14:G14
+      - B17:G17
+      - B23:G23
+      - B8:G8
+      - B13:G13
+      - B44:G44
+      - A1:K1
+      - B29:G29
+      - B38:G38
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C24-0汇总表:
+    component_type: univer
+    class_code: F-汇总表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计分录细节测试汇总表
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      H3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 25
+      end_row: dynamic
+      header_row: 24
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 项   目
+        G:
+          field: col_g
+          type: text
+          label: 索引号
+        H:
+          field: col_h
+          type: text
+          label: 结论
+    static_text:
+      rows:
+      - 1-2
+      - 5-6
+      - 8-21
+      - 23
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - A4
+      - C4
+      - E4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 59
+      ranges_sample:
+      - A92:H92
+      - A114:H114
+      - A83:H83
+      - A107:H107
+      - A82:H82
+      - A98:H98
+      - A60:H60
+      - A94:H94
+      - A1:H1
+      - A103:H103
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C24-1完整性-借贷方发生额:
+    component_type: univer
+    class_code: F-检查数据表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计分录完整性测试表（借贷方发生额测试）
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 23
+      end_row: dynamic
+      header_row: 22
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 会计分录借方发生额汇总
+        B:
+          field: col_b
+          type: text
+          label: 会计分录贷方发生额汇总
+        C:
+          field: col_c
+          type: text
+          label: 差异
+        D:
+          field: col_d
+          type: text
+          label: 产生差异原因
+        E:
+          field: col_e
+          type: text
+          label: 结论
+        F:
+          field: col_f
+          type: text
+          label: 索引号
+        G:
+          field: col_g
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 6-7
+      - 9-10
+      - 12
+      - 21
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - A4
+      - C4
+      - E4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:G2
+      - A1:G1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C24-2完整性-分录&余额表对比:
+    component_type: univer
+    class_code: F-检查数据表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计分录完整性测试表（会计分录汇总—科目余额表对比测试）
+      A3: ${entity_name}
+      A4: ${period_end}
+      N3: ${index_no}
+      O3: ${index_no}
+      N4: ${page_no}
+    dynamic_table:
+      start_row: 26
+      end_row: dynamic
+      header_row: 25
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 会计分录汇总
+        G:
+          field: col_g
+          type: text
+          label: 科目余额表
+        N:
+          field: col_n
+          type: text
+          label: 结论
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      - 7-8
+      - 10-11
+      - 24
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - G3
+      - J3
+      - A4
+      - G4
+      - J4
+      - E27
+      - L27
+      - N27
+      - O27
+      - E28
+      - L28
+      - N28
+      - O28
+      - E29
+      - L29
+      - N29
+      - O29
+      - E30
+      - L30
+      - N30
+      - O30
+      - E31
+      - L31
+      - N31
+      - O31
+      - E32
+      - L32
+      - N32
+      - O32
+      _total_count: 47
+    merged_cells:
+      preserve: true
+      count: 5
+      ranges_sample:
+      - G25:L25
+      - A2:O2
+      - A25:E25
+      - A1:O1
+      - N25:O25
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C24-3完整性-跳号测试:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计分录完整性测试表（跳号测试）
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      I3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 25
+      end_row: dynamic
+      header_row: 24
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 年度
+        C:
+          field: col_c
+          type: text
+          label: 月份
+        D:
+          field: col_d
+          type: text
+          label: 缺号区间
+        E:
+          field: col_e
+          type: text
+          label: 是否属于异常跳号
+        F:
+          field: col_f
+          type: text
+          label: 说明
+        G:
+          field: col_g
+          type: text
+          label: 结论
+        H:
+          field: col_h
+          type: text
+          label: 索引号
+        I:
+          field: col_i
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 6-7
+      - 9-10
+      - 23
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - A4
+      - D4
+      - F4
+      - B37
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A1:I1
+      - A2:I2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C24-4细节测试-异常账户测试:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计分录细节测试表（会计分录作出人员及异常使用账户测试）
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      N3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 23
+      end_row: dynamic
+      header_row: 22
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 操作用户
+        C:
+          field: col_c
+          type: text
+          label: 用户岗位职责
+        D:
+          field: col_d
+          type: text
+          label: 编制单据数量
+        E:
+          field: col_e
+          type: text
+          label: 过账单据数量
+        F:
+          field: col_f
+          type: text
+          label: 过账单据科目分布
+        G:
+          field: col_g
+          type: text
+          label: 审核单据数量
+        H:
+          field: col_h
+          type: text
+          label: 是否在会计人员清单中
+        I:
+          field: col_i
+          type: text
+          label: 是否属于异常事项
+        J:
+          field: col_j
+          type: text
+          label: 异常事项说明
+        K:
+          field: col_k
+          type: text
+          label: 核查内容
+        L:
+          field: col_l
+          type: text
+          label: 结论
+        M:
+          field: col_m
+          type: text
+          label: 索引号
+        N:
+          field: col_n
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 6-7
+      - 9-10
+      - 21
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - J3
+      - A4
+      - F4
+      - J4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 4
+      ranges_sample:
+      - A1:N1
+      - A44:B44
+      - A2:N2
+      - A40:B40
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C24-5细节测试-异常分录测试:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计分录细节测试表（异常分录测试）
+      A3: ${entity_name}
+      A4: ${period_end}
+      O3: ${index_no}
+      O4: ${page_no}
+    dynamic_table:
+      start_row: 25
+      end_row: dynamic
+      header_row: 24
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 凭证日期
+        C:
+          field: col_c
+          type: text
+          label: 类型
+        D:
+          field: col_d
+          type: text
+          label: 编号
+        E:
+          field: col_e
+          type: text
+          label: 摘要
+        F:
+          field: col_f
+          type: text
+          label: 科目名称
+        G:
+          field: col_g
+          type: text
+          label: 对方科目
+        H:
+          field: col_h
+          type: text
+          label: 借方金额
+        I:
+          field: col_i
+          type: text
+          label: 贷方金额
+        J:
+          field: col_j
+          type: text
+          label: 辅助核算项目
+        K:
+          field: col_k
+          type: text
+          label: 异常事项
+        L:
+          field: col_l
+          type: text
+          label: 异常事项说明
+        M:
+          field: col_m
+          type: text
+          label: 核查内容
+        N:
+          field: col_n
+          type: text
+          label: 结论
+        O:
+          field: col_o
+          type: text
+          label: 索引号
+        P:
+          field: col_p
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 6-7
+      - 9-10
+      - 23
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - J3
+      - A4
+      - F4
+      - J4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 4
+      ranges_sample:
+      - A46:B46
+      - A1:P1
+      - A2:P2
+      - A42:B42
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  参考-本福特定律测试:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计分录细节测试表（本福特定律测试）
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      J4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 6-7
+      - 9-14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - H3
+      - A4
+      - E4
+      - H4
+      - B39
+      - D39
+      - E39
+      - F39
+      - B40
+      - D40
+      - E40
+      - F40
+      - B41
+      - D41
+      - E41
+      - F41
+      - B42
+      - D42
+      - E42
+      - F42
+      - B43
+      - D43
+      - E43
+      - F43
+      - B44
+      - D44
+      - E44
+      - F44
+      _total_count: 406
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - A1:J1
+      - A180:B180
+      - A176:B176
+      - A49:B49
+      - A2:J2
+      - A159:B159
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  参考-本福特定律测试-虚拟会计分录:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A2: '2025-01-01'
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: '2025-01-01'
+        B:
+          field: col_b
+          type: text
+          label: '1'
+        C:
+          field: col_c
+          type: text
+          label: 付
+        D:
+          field: col_d
+          type: text
+          label: '1'
+        E:
+          field: col_e
+          type: text
+          label: '******'
+        F:
+          field: col_f
+          type: text
+          label: 虚拟编码
+        G:
+          field: col_g
+          type: text
+          label: 虚拟科目
+        H:
+          field: col_h
+          type: text
+          label: '300'
+        I:
+          field: col_i
+          type: text
+          label: '0'
+        J:
+          field: col_j
+          type: text
+          label: '***'
+        K:
+          field: col_k
+          type: text
+          label: '***'
+        L:
+          field: col_l
+          type: text
+          label: '***'
+        M:
+          field: col_m
+          type: text
+          label: '***'
+        N:
+          field: col_n
+          type: text
+          label: "=IF(\n   OR(WEEKDAY(A5,2)>5, IF"
+        O:
+          field: col_o
+          type: text
+          label: =IF(AND(B5-B4=0,C5=C4),D5-D4,"
+    formulas:
+      preserve: true
+      cells:
+      - N2
+      - N3
+      - O3
+      - N4
+      - O4
+      - N5
+      - O5
+      - N6
+      - O6
+      - N7
+      - O7
+      - N8
+      - O8
+      - N9
+      - O9
+      - N10
+      - O10
+      - N11
+      - O11
+      - N12
+      - O12
+      - N13
+      - O13
+      - N14
+      - O14
+      - N15
+      - O15
+      - N16
+      - O16
+      - N17
+      _total_count: 597
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  2025假期清单:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: '2025-01-01'
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: '2025-01-29'
+        B:
+          field: col_b
+          type: text
+          label: 春节
+        C:
+          field: col_c
+          type: text
+          label: 春节
+        D:
+          field: col_d
+          type: text
+          label: Chinese New Year
+        E:
+          field: col_e
+          type: text
+          label: public_holiday
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

@@ -1,0 +1,176 @@
+# A24.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:58:21
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: A24
+template_path: backend/wp_templates/A/A24-1  项目质量复核合伙人复核表及记录（财务报表审计-适用非大型国企）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:58:21'
+  source_xlsx: A24-1  项目质量复核合伙人复核表及记录（财务报表审计-适用非大型国企）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：ABC公司
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：2025.XX.XX
+        E:
+          field: col_e
+          type: text
+          label: =E4+1
+        F:
+          field: col_f
+          type: text
+          label: 项目质量复核合伙人复核记录
+        G:
+          field: col_g
+          type: text
+          label: A24-1-1-1
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - E5
+      _total_count: 1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  项目质量复核合伙人复核表（独立复核）A24-1-1:
+    component_type: d-form-review
+    class_code: D-复核记录
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 项目质量复核合伙人复核表（适用非大型国企）
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      J3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目质量复核内容
+        F:
+          field: col_f
+          type: text
+          label: 是
+        G:
+          field: col_g
+          type: text
+          label: 否
+        H:
+          field: col_h
+          type: text
+          label: 不适用
+        I:
+          field: col_i
+          type: text
+          label: 相关复核记录索引
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - A4
+      _total_count: 2
+    merged_cells:
+      preserve: true
+      count: 32
+      ranges_sample:
+      - B9:E9
+      - B6:E6
+      - B30:E30
+      - B15:E15
+      - B33:E33
+      - B24:E24
+      - B20:E20
+      - B32:E32
+      - B26:E26
+      - B16:E16
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  项目质量复核合伙人复核记录A24-1-1-1:
+    component_type: d-form-review
+    class_code: D-复核记录
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 项目质量复核合伙人复核记录（适用非大型国企）
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 19
+      end_row: dynamic
+      header_row: 18
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 复核问题
+        B:
+          field: col_b
+          type: text
+          label: 项目组回复
+        C:
+          field: col_c
+          type: text
+          label: 确认复核问题已满意解决或说明需质量控制复核人跟进的具体问题
+    static_text:
+      rows:
+      - 1-2
+      - 5-17
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - C3
+      - A4
+      - B4
+      - C4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - A1:D1
+      - A8:D8
+      - A12:D12
+      - A2:D2
+      - A5:K5
+      - A13:D13
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

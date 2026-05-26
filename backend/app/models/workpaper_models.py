@@ -504,6 +504,73 @@ class ReviewRecord(Base):
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# WorkpaperSheetClassification 模型（底稿 sheet 9 类归属）
+# ---------------------------------------------------------------------------
+
+
+class WorkpaperSheetClassification(Base):
+    """底稿 sheet 归类（9 类：A~I）
+
+    对应 workpaper_sheet_classification 表。
+    每个 sheet 必有归属（A~I + 合并），无"其他无法分类"兜底。
+    """
+
+    __tablename__ = "workpaper_sheet_classification"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    wp_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    sheet_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    class_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    # ─── 扩展字段（design §4.2 DDL ③） ──────────────────────────────────
+    class_: Mapped[str | None] = mapped_column(
+        "class", String(20), nullable=True
+    )
+    is_real_workpaper: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, server_default=text("true")
+    )
+    exclude_from_archive: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, server_default=text("false")
+    )
+    exclude_from_progress: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, server_default=text("false")
+    )
+    is_static_doc: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, server_default=text("false")
+    )
+    scope: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'standalone'")
+    )
+    delegated_module: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    template_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workpaper_template_version.id"),
+        nullable=True,
+    )
+    render_schema_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        sa.UniqueConstraint("wp_code", "sheet_name", name="uq_wpsc_wp_code_sheet_name"),
+        Index("idx_wpsc_class_scope", "class", "scope"),
+        Index("idx_wpsc_wp_code_version", "wp_code", "template_version_id"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 抽样相关枚举类型（与迁移 008 一致）
+# ---------------------------------------------------------------------------
+
+
 class SamplingType(str, enum.Enum):
     """抽样类型"""
     statistical = "statistical"

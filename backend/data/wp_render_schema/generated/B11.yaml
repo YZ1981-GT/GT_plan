@@ -1,0 +1,330 @@
+# B11.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:58:22
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: B11
+template_path: backend/wp_templates/B/B11 检查相关信息或文件记录程序表.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:58:22'
+  source_xlsx: B11 检查相关信息或文件记录程序表.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：ABC有限公司
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制人：张XX
+        D:
+          field: col_d
+          type: text
+          label: =D4+1
+        E:
+          field: col_e
+          type: text
+          label: 股东大会、董事会等会议记录的摘录
+        F:
+          field: col_f
+          type: text
+          label: B11-1
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - D5
+      - D6
+      - D7
+      - D8
+      _total_count: 4
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  B11检查相关信息程序表:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 检查相关信息或文件记录程序表
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      H3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 程序
+        E:
+          field: col_e
+          type: text
+          label: 是否适用
+        F:
+          field: col_f
+          type: text
+          label: 执行人
+        G:
+          field: col_g
+          type: text
+          label: 执行情况说明
+        H:
+          field: col_h
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - D3
+      - A4
+      - C4
+      - D4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 27
+      ranges_sample:
+      - B11:D11
+      - B14:D14
+      - B23:D23
+      - B8:D8
+      - B17:D17
+      - B13:D13
+      - A1:H1
+      - B10:D10
+      - B28:D28
+      - B19:D19
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  B11-1股东大会、董事会等会议记录的摘录:
+    component_type: d-form-table
+    class_code: D-业务了解
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 股东大会、董事会等会议记录的摘录
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      K3: ${index_no}
+      J4: ${page_no}
+    dynamic_table:
+      start_row: 15
+      end_row: dynamic
+      header_row: 14
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 会议编号
+        B:
+          field: col_b
+          type: text
+          label: 会议日期
+        C:
+          field: col_c
+          type: text
+          label: 会议讨论的可能影响财务报表的重要事项
+        J:
+          field: col_j
+          type: text
+          label: 是否存在未披露的关联方
+        K:
+          field: col_k
+          type: text
+          label: 说明
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      - 10-11
+      - 13
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - A4
+      - D4
+      - G4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 19
+      ranges_sample:
+      - C23:I23
+      - C17:I17
+      - C32:I32
+      - A1:K1
+      - C28:I28
+      - C34:I34
+      - C15:I15
+      - C33:I33
+      - A3:B3
+      - C14:I14
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  B11-2评价企业内部控制评价报告:
+    component_type: d-form-table
+    class_code: D-业务了解
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 评价企业内部控制评价报告及涉及内部控制的其他报告
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 内部控制评价报告应包含的内容
+        D:
+          field: col_d
+          type: text
+          label: 是否包含
+        E:
+          field: col_e
+          type: text
+          label: 备 注
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - C3
+      - A4
+      - B4
+      - C4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 43
+      ranges_sample:
+      - A25:C25
+      - A62:D62
+      - A72:D72
+      - A18:C18
+      - A1:E1
+      - A21:C21
+      - A63:D63
+      - A12:C12
+      - A68:D68
+      - A67:D67
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  自我评价报告参考格式:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1
+      - 3-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  B11-3被审计单位的公开信息记录:
+    component_type: d-form-table
+    class_code: D-业务了解
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 被审计单位的公开信息记录
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      K3: ${index_no}
+      J4: ${page_no}
+    dynamic_table:
+      start_row: 14
+      end_row: dynamic
+      header_row: 13
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 名称
+        C:
+          field: col_c
+          type: text
+          label: 信息编号
+        D:
+          field: col_d
+          type: text
+          label: 主要内容
+    static_text:
+      rows:
+      - 1-2
+      - 5-12
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - A4
+      - D4
+      - G4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 21
+      ranges_sample:
+      - D20:K20
+      - A15:B15
+      - D19:K19
+      - A1:K1
+      - A16:B16
+      - D21:K21
+      - D13:K13
+      - A18:B18
+      - A3:B3
+      - D17:K17
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

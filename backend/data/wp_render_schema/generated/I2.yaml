@@ -1,0 +1,1674 @@
+# I2.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:58:50
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: I2
+template_path: backend/wp_templates/I/I2 开发支出.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:58:50'
+  source_xlsx: I2 开发支出.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：
+        B:
+          field: col_b
+          type: text
+          label: '2'
+        C:
+          field: col_c
+          type: text
+          label: 开发支出审定表
+        D:
+          field: col_d
+          type: text
+          label: I2-1
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 4
+      ranges_sample:
+      - A15:A17
+      - B1:E1
+      - A18:A20
+      - A11:A14
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  开发支出实质性程序I2A:
+    component_type: a-program-console
+    class_code: A-程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 开发支出实质性程序
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 16
+      end_row: dynamic
+      header_row: 15
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 审计程序
+        C:
+          field: col_c
+          type: text
+          label: 程序分类
+        D:
+          field: col_d
+          type: text
+          label: 财务报表的认定
+        I:
+          field: col_i
+          type: text
+          label: 底稿索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - I3
+      - A4
+      - C4
+      - E4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 22
+      ranges_sample:
+      - G10:I10
+      - G13:I13
+      - A12:F12
+      - J18:P18
+      - A2:I2
+      - A8:F8
+      - B15:B16
+      - J19:P19
+      - A10:F10
+      - A13:F13
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  审定表I2-1:
+    component_type: univer
+    class_code: F-审定表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 开发支出审定表
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目
+        B:
+          field: col_b
+          type: text
+          label: 期初数
+        E:
+          field: col_e
+          type: text
+          label: 期末数
+        H:
+          field: col_h
+          type: text
+          label: '本期审定数与上期
+
+            审定数的比较'
+        J:
+          field: col_j
+          type: text
+          label: 原因分析
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - J3
+      - A4
+      - D4
+      - G4
+      - A7
+      - B7
+      - C7
+      - D7
+      - E7
+      - F7
+      - G7
+      - H7
+      - I7
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - H8
+      - I8
+      - A9
+      - B9
+      - C9
+      - D9
+      - E9
+      _total_count: 75
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - A5:A6
+      - A1:J1
+      - B5:D5
+      - J5:J6
+      - E5:G5
+      - H5:I5
+      - A2:J2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  附注披露（上市公司）:
+    component_type: c-note-table
+    class_code: C-附注披露
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 开发支出附注披露表（上市公司）
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项  目
+        B:
+          field: col_b
+          type: text
+          label: 本期发生额
+        D:
+          field: col_d
+          type: text
+          label: 上期发生额
+    static_text:
+      rows:
+      - 1-2
+      - 5-6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - A4
+      - C4
+      - E4
+      - A22
+      - B22
+      - C22
+      - D22
+      - E22
+      - F22
+      - G22
+      - A23
+      - B23
+      - C23
+      - D23
+      - E23
+      - F23
+      - G23
+      - A24
+      - B24
+      - C24
+      - D24
+      - E24
+      - F24
+      - G24
+      - A25
+      - B25
+      - C25
+      _total_count: 98
+    merged_cells:
+      preserve: true
+      count: 12
+      ranges_sample:
+      - C20:D20
+      - E20:F20
+      - A1:G1
+      - D7:E7
+      - B7:C7
+      - A7:A8
+      - A20:A21
+      - A2:G2
+      - B20:B21
+      - A43:G43
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  附注披露（国有企业）:
+    component_type: c-note-table
+    class_code: C-附注披露
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 开发支出附注披露表（国有企业）
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项  目
+        B:
+          field: col_b
+          type: text
+          label: 期初余额
+        C:
+          field: col_c
+          type: text
+          label: 本期增加
+        E:
+          field: col_e
+          type: text
+          label: 本期减少
+        H:
+          field: col_h
+          type: text
+          label: 期末余额
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - A4
+      - C4
+      - E4
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - H8
+      - A9
+      - B9
+      - C9
+      - D9
+      - E9
+      - F9
+      - H9
+      - A10
+      - B10
+      - C10
+      - D10
+      - E10
+      - F10
+      - H10
+      - A11
+      - B11
+      - C11
+      _total_count: 76
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - C6:D6
+      - A2:H2
+      - H6:H7
+      - A1:H1
+      - B6:B7
+      - A6:A7
+      - E6:G6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  明细表I2-2:
+    component_type: univer
+    class_code: F-明细表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 开发支出明细表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 研究开发项目名称
+        B:
+          field: col_b
+          type: text
+          label: 未审数
+        H:
+          field: col_h
+          type: text
+          label: 期初调整
+        I:
+          field: col_i
+          type: text
+          label: 账项调整
+        L:
+          field: col_l
+          type: text
+          label: 审定数
+        Q:
+          field: col_q
+          type: text
+          label: 无形资产/存货科目记录期末审定数
+        R:
+          field: col_r
+          type: text
+          label: 差异
+        S:
+          field: col_s
+          type: text
+          label: 截至期末的研发进度
+        T:
+          field: col_t
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - H3
+      - L3
+      - T3
+      - A4
+      - H4
+      - L4
+      - G13
+      - L13
+      - M13
+      - N13
+      - O13
+      - P13
+      - R13
+      - G14
+      - L14
+      - M14
+      - N14
+      - O14
+      - P14
+      - R14
+      - G15
+      - L15
+      - M15
+      - N15
+      - O15
+      - P15
+      - R15
+      - G16
+      - L16
+      _total_count: 92
+    merged_cells:
+      preserve: true
+      count: 21
+      ranges_sample:
+      - N11:O11
+      - M11:M12
+      - B11:B12
+      - H11:H12
+      - P11:P12
+      - A1:T1
+      - B10:G10
+      - A10:A12
+      - I10:K10
+      - J11:K11
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  调整分录汇总I2-3:
+    component_type: univer
+    class_code: F-调整分录
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 开发支出调整分录汇总表
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 调整事项说明
+        B:
+          field: col_b
+          type: text
+          label: 类别（报表调整/账项调整/其他）
+        C:
+          field: col_c
+          type: text
+          label: 报表项目
+        D:
+          field: col_d
+          type: text
+          label: 科目名称
+        E:
+          field: col_e
+          type: text
+          label: 附注项目
+        F:
+          field: col_f
+          type: text
+          label: ……
+        G:
+          field: col_g
+          type: text
+          label: 借方调整金额
+        H:
+          field: col_h
+          type: text
+          label: 贷方调整金额
+        I:
+          field: col_i
+          type: text
+          label: 索引
+        J:
+          field: col_j
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - F3
+      - J3
+      - A4
+      - C4
+      - F4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A1:J1
+      - A25:J25
+      - A2:J2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  会计政策检查I2-4:
+    component_type: d-form-paragraph
+    class_code: D-政策检查
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计政策检查
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      J4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - G3
+      - K3
+      - A4
+      - B4
+      - G4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:L2
+      - A1:L1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  实质性分析I2-5:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 实质性分析
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      J4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目
+        B:
+          field: col_b
+          type: text
+          label: 本期合计
+        C:
+          field: col_c
+          type: text
+          label: 结构比
+        D:
+          field: col_d
+          type: text
+          label: 占主营业务收入比率
+        E:
+          field: col_e
+          type: text
+          label: 上年同期
+        F:
+          field: col_f
+          type: text
+          label: 结构比
+        G:
+          field: col_g
+          type: text
+          label: 占主营业务收入比率
+        H:
+          field: col_h
+          type: text
+          label: 增长比例
+        I:
+          field: col_i
+          type: text
+          label: 占主营业务收入比率变动
+        J:
+          field: col_j
+          type: text
+          label: 变动分析
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - F3
+      - K3
+      - A4
+      - C4
+      - F4
+      - A10
+      - B10
+      - C10
+      - D10
+      - F10
+      - G10
+      - H10
+      - I10
+      - A11
+      - B11
+      - C11
+      - D11
+      - F11
+      - G11
+      - H11
+      - I11
+      - A12
+      - B12
+      - C12
+      - D12
+      - F12
+      - G12
+      - H12
+      _total_count: 75
+    merged_cells:
+      preserve: true
+      count: 5
+      ranges_sample:
+      - A1:J1
+      - A26:E26
+      - K26:K27
+      - A2:J2
+      - F26:J26
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  研发项目资本化时点判断I2-6:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 研发项目资本化时点判断
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 研发项目名称
+        B:
+          field: col_b
+          type: text
+          label: 开发支出总额
+        D:
+          field: col_d
+          type: text
+          label: 研发项目具体内容
+        E:
+          field: col_e
+          type: text
+          label: 研发项目预算
+        I:
+          field: col_i
+          type: text
+          label: 研发人员构成
+        J:
+          field: col_j
+          type: text
+          label: 资本化开始的时点
+        K:
+          field: col_k
+          type: text
+          label: 资本化的具体依据
+        L:
+          field: col_l
+          type: text
+          label: 开发阶段支出资本化确认为无形资产，必须同时满足下列条件
+        Q:
+          field: col_q
+          type: text
+          label: 确认为无形资产金额
+        R:
+          field: col_r
+          type: text
+          label: 是否与无形资产明细勾稽一致
+        S:
+          field: col_s
+          type: text
+          label: 截至期末的研发进度
+        T:
+          field: col_t
+          type: text
+          label: 支持性证据
+        U:
+          field: col_u
+          type: text
+          label: 索引
+        V:
+          field: col_v
+          type: text
+          label: 开发支出资本化判断示例：
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - J3
+      - O3
+      - U3
+      - A4
+      - J4
+      - O4
+      - B16
+      - C16
+      - D16
+      - Q16
+      _total_count: 11
+    merged_cells:
+      preserve: true
+      count: 15
+      ranges_sample:
+      - T9:T10
+      - L9:P9
+      - R9:R10
+      - D9:D10
+      - E9:H9
+      - I9:I10
+      - A2:U2
+      - K9:K10
+      - A9:A10
+      - J9:J10
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  研发项目构成明细表I2-7:
+    component_type: univer
+    class_code: F-明细表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 研发项目构成明细表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目编码
+        B:
+          field: col_b
+          type: text
+          label: 项目名称
+        C:
+          field: col_c
+          type: text
+          label: 研发项目起止时间
+        D:
+          field: col_d
+          type: text
+          label: 项目阶段
+        E:
+          field: col_e
+          type: text
+          label: 账面期初余额
+        M:
+          field: col_m
+          type: text
+          label: 账面本期增加金额
+        U:
+          field: col_u
+          type: text
+          label: 账面本期减少金额
+        AC:
+          field: col_ac
+          type: text
+          label: 账面期末余额
+        AK:
+          field: col_ak
+          type: text
+          label: 审计调整
+        AS:
+          field: col_as
+          type: text
+          label: 期末审定金额
+        BA:
+          field: col_ba
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - O3
+      - AC3
+      - A4
+      - O4
+      - AC4
+      - AC12
+      - AD12
+      - AE12
+      - AF12
+      - AG12
+      - AH12
+      - AI12
+      - AJ12
+      - AS12
+      - AT12
+      - AU12
+      - AV12
+      - AW12
+      - AX12
+      - AC13
+      - AD13
+      - AE13
+      - AF13
+      - AG13
+      - AH13
+      - AI13
+      - AJ13
+      - AS13
+      - AT13
+      _total_count: 178
+    merged_cells:
+      preserve: true
+      count: 55
+      ranges_sample:
+      - P10:P11
+      - AS10:AS11
+      - AU10:AU11
+      - AD10:AD11
+      - U9:AB9
+      - AF10:AF11
+      - AA10:AB10
+      - AI10:AJ10
+      - V10:V11
+      - E10:E11
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  研发材料投入检查表I2-8:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 研发材料投入检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 测试总体：
+        B:
+          field: col_b
+          type: text
+          label: 如研发费用-研发材料借方发生额所有凭证共XX笔金额XX
+        G:
+          field: col_g
+          type: text
+          label: 特定样本：
+        H:
+          field: col_h
+          type: text
+          label: XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - J3
+      - Q3
+      - A4
+      - F4
+      - J4
+      - G31
+      - G32
+      - G33
+      _total_count: 10
+    merged_cells:
+      preserve: true
+      count: 10
+      ranges_sample:
+      - A33:C33
+      - P14:P15
+      - Q14:Q15
+      - A32:C32
+      - A31:C31
+      - A14:I14
+      - J14:N14
+      - A2:Q2
+      - O14:O15
+      - A1:Q1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  研发人员认定检查表I2-9:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 研发人员认定检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+      O3: ${index_no}
+      O4: ${page_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 姓名
+        C:
+          field: col_c
+          type: text
+          label: 性别
+        D:
+          field: col_d
+          type: text
+          label: 年龄
+        E:
+          field: col_e
+          type: text
+          label: 学历
+        F:
+          field: col_f
+          type: text
+          label: 毕业院校
+        G:
+          field: col_g
+          type: text
+          label: 所学专业
+        H:
+          field: col_h
+          type: text
+          label: 职称
+        I:
+          field: col_i
+          type: text
+          label: 职务
+        J:
+          field: col_j
+          type: text
+          label: 部门
+        K:
+          field: col_k
+          type: text
+          label: 人员类别
+        L:
+          field: col_l
+          type: text
+          label: 入职日期
+        M:
+          field: col_m
+          type: text
+          label: 聘用形式
+        N:
+          field: col_n
+          type: text
+          label: 是否全时参与该研发项目
+        O:
+          field: col_o
+          type: text
+          label: …
+        P:
+          field: col_p
+          type: text
+          label: 附件索引号
+        Q:
+          field: col_q
+          type: text
+          label: 【检查要素根据实际情况自行增减】
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - I3
+      - P3
+      - A4
+      - E4
+      - I4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 5
+      ranges_sample:
+      - A28:P28
+      - A1:P1
+      - A27:P27
+      - A34:P34
+      - A2:P2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  研发人员工时检查表I2-10:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 研发人员工时检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 项目名称
+        C:
+          field: col_c
+          type: text
+          label: 项目号
+        D:
+          field: col_d
+          type: text
+          label: 项目起止时间
+        E:
+          field: col_e
+          type: text
+          label: 研发人员姓名
+        F:
+          field: col_f
+          type: text
+          label: 研发工时
+        G:
+          field: col_g
+          type: text
+          label: 研发工时分配依据
+        H:
+          field: col_h
+          type: text
+          label: 研发薪酬计提
+        I:
+          field: col_i
+          type: text
+          label: …
+        J:
+          field: col_j
+          type: text
+          label: 附件索引号
+        K:
+          field: col_k
+          type: text
+          label: 【检查要素根据实际情况自行增减】
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - J3
+      - A4
+      - D4
+      - F4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 10
+      ranges_sample:
+      - C13:C15
+      - A1:J1
+      - B10:B12
+      - B13:B15
+      - D13:D15
+      - A23:O23
+      - A24:J24
+      - A2:J2
+      - C10:C12
+      - D10:D12
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  委外研发检查表I2-11:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 委外研发检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 研发项目
+        B:
+          field: col_b
+          type: text
+          label: 委外研发原因
+        C:
+          field: col_c
+          type: text
+          label: 销售订单/销售合同
+        H:
+          field: col_h
+          type: text
+          label: 受托方基本信息
+        L:
+          field: col_l
+          type: text
+          label: 记账凭证
+        P:
+          field: col_p
+          type: text
+          label: 研发项目验收单据
+        S:
+          field: col_s
+          type: text
+          label: ……
+        U:
+          field: col_u
+          type: text
+          label: 是否异常
+        V:
+          field: col_v
+          type: text
+          label: 索引号
+        W:
+          field: col_w
+          type: text
+          label: 【检查要素根据实际情况自行增减】
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - G3
+      - M3
+      - V3
+      - A4
+      - G4
+      - M4
+      - O21
+      - O22
+      - O23
+      _total_count: 10
+    merged_cells:
+      preserve: true
+      count: 14
+      ranges_sample:
+      - A2:V2
+      - S10:T10
+      - P10:R10
+      - A23:C23
+      - C10:G10
+      - A1:V1
+      - A22:C22
+      - A10:A11
+      - A21:C21
+      - B10:B11
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  针对性检查表I2-12:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 开（研）发支出针对性检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 测试总体：
+        B:
+          field: col_b
+          type: text
+          label: 如贷方发生额所有凭证共XX笔金额XX
+        F:
+          field: col_f
+          type: text
+          label: 特定样本：
+        G:
+          field: col_g
+          type: text
+          label: XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - I3
+      - Q3
+      - A4
+      - F4
+      - I4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 8
+      ranges_sample:
+      - I14:I15
+      - P14:P15
+      - Q14:Q15
+      - J14:N14
+      - A2:Q2
+      - A14:H14
+      - O14:O15
+      - A1:Q1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  截止性测试（账到单据）I2-13:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 开发支出截止测试
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 记账凭证
+        F:
+          field: col_f
+          type: text
+          label: 支出凭单
+        I:
+          field: col_i
+          type: text
+          label: 是否跨期
+        J:
+          field: col_j
+          type: text
+          label: 跨期金额
+    static_text:
+      rows:
+      - 1-2
+      - 5-11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - J3
+      - A4
+      - D4
+      - F4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 8
+      ranges_sample:
+      - A1:J1
+      - A12:A13
+      - B12:E12
+      - I12:I13
+      - J12:J13
+      - F12:H12
+      - A2:J2
+      - A10:J10
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  截止性测试（单据到账）I2-14:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 开发支出截止测试
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 支出凭单
+        E:
+          field: col_e
+          type: text
+          label: 记账凭证
+        I:
+          field: col_i
+          type: text
+          label: 是否跨期
+        J:
+          field: col_j
+          type: text
+          label: 跨期金额
+    static_text:
+      rows:
+      - 1-2
+      - 5-11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - J3
+      - A4
+      - D4
+      - F4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 8
+      ranges_sample:
+      - A1:J1
+      - A12:A13
+      - E12:H12
+      - I12:I13
+      - J12:J13
+      - A2:J2
+      - B12:D12
+      - A10:J10
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  减值准备测试表I2-15:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 减值准备测试表
+      A3: ${entity_name}
+      A4: ${period_end}
+      L3: ${index_no}
+      L4: ${page_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 开发支出项目名称
+        B:
+          field: col_b
+          type: text
+          label: 是否存在减值迹象
+        C:
+          field: col_c
+          type: text
+          label: '减值迹象描述
+
+            ①'
+        D:
+          field: col_d
+          type: text
+          label: 是否进行减值测试
+        E:
+          field: col_e
+          type: text
+          label: 账面价值
+        F:
+          field: col_f
+          type: text
+          label: 可收回金额
+        I:
+          field: col_i
+          type: text
+          label: 期末应计提的减值金额（当⑤＜①）
+        J:
+          field: col_j
+          type: text
+          label: 期末账面已计提的减值准备
+        K:
+          field: col_k
+          type: text
+          label: '本期应补提
+
+            或冲回的减值准备'
+        L:
+          field: col_l
+          type: text
+          label: 工作底稿索引号
+        M:
+          field: col_m
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - I3
+      - M3
+      - A4
+      - E4
+      - I4
+      - H11
+      - I11
+      - K11
+      - H12
+      - I12
+      - K12
+      - H13
+      - I13
+      - K13
+      - H14
+      - I14
+      - K14
+      - H15
+      - I15
+      - K15
+      - H16
+      - I16
+      - K16
+      - H17
+      - I17
+      - K17
+      - E18
+      - F18
+      _total_count: 35
+    merged_cells:
+      preserve: true
+      count: 13
+      ranges_sample:
+      - E8:E9
+      - A1:M1
+      - I8:I9
+      - A8:A10
+      - L8:L9
+      - J8:J9
+      - K8:K9
+      - M8:M9
+      - F8:H8
+      - D8:D10
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  可收回金额测试I2-16:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 减值准备测试表-可收回金额
+      A3: ${entity_name}
+      A4: ${period_end}
+      N3: ${index_no}
+      N4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目名称
+        B:
+          field: col_b
+          type: text
+          label: 公允价值
+        H:
+          field: col_h
+          type: text
+          label: 处置费用（资产处置的直接归属费用）
+        N:
+          field: col_n
+          type: text
+          label: 公允价值-处置费用
+        O:
+          field: col_o
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - J3
+      - O3
+      - A4
+      - E4
+      - J4
+      - M11
+      - N11
+      - M12
+      - N12
+      - M13
+      - N13
+      - B14
+      - D14
+      - F14
+      - H14
+      - I14
+      - J14
+      - K14
+      - L14
+      - M14
+      - N14
+      - G18
+      - B19
+      - C19
+      - D19
+      - E19
+      - F19
+      - G19
+      _total_count: 41
+    merged_cells:
+      preserve: true
+      count: 31
+      ranges_sample:
+      - M16:N17
+      - K21:K22
+      - B16:F16
+      - D21:D22
+      - I16:I17
+      - A16:A17
+      - N21:N22
+      - H21:H22
+      - O16:O17
+      - F21:F22
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

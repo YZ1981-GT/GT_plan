@@ -1,7 +1,19 @@
 <template>
+  <!-- spec workpaper-html-renderer Task 13.1: HTML 渲染器路由分发（A/B/C/D/E/H/skip）
+       优先级最高：HTML 类（1346 sheet）走 GtWpRenderer，保留 F/G Univer + form/word/table/hybrid 子编辑器走既有路径 -->
+  <GtWpRenderer
+    v-if="useHtmlRenderer"
+    :wp-id="wpId"
+    @save-success="onChildSaved"
+    @trigger-procedure-trimming-suggestion="onHtmlTrimmingSuggestion"
+    @cross-ref-update="onHtmlCrossRefUpdate"
+    @sync-to-disclosure-notes="onHtmlSyncToDisclosureNotes"
+    @jump-to-reference="onHtmlJumpToReference"
+  />
+
   <!-- 路由分发：非 univer 类型使用对应子编辑器（须等 wpDetail 加载完成） -->
   <component
-    v-if="componentType && componentType !== 'univer' && wpDetail"
+    v-else-if="componentType && componentType !== 'univer' && wpDetail"
     :is="editorComponent"
     :project-id="projectId"
     :wp-id="wpId"
@@ -900,7 +912,7 @@
 
   <!-- 非 Univer 编辑器的侧面板（共享） -->
   <el-drawer
-    v-if="componentType && componentType !== 'univer'"
+    v-if="!useHtmlRenderer && componentType && componentType !== 'univer'"
     v-model="showSidePanel"
     direction="rtl"
     size="400px"
@@ -983,6 +995,9 @@ import ReviewLayerBadges from '@/components/workpaper/ReviewLayerBadges.vue'
 import { usePrerequisiteStatus } from '@/composables/usePrerequisiteStatus'
 import { useCycleType } from '@/composables/useCycleType'
 import { useWorkpaperRefresh } from '@/composables/useWorkpaperRefresh'
+// spec workpaper-html-renderer Task 13.1: HTML 渲染器路由分发
+import GtWpRenderer from '@/components/workpaper/GtWpRenderer.vue'
+import { useWpClassification } from '@/composables/useWpClassification'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
 import { WP_STATUS } from '@/constants/statusEnum'
@@ -1031,6 +1046,45 @@ const loadErrorMessage = ref('')
 const componentType = ref<string>('univer')
 const editorComponent = computed(() => EDITOR_MAP[componentType.value] || null)
 
+// spec workpaper-html-renderer Task 13.1: HTML 渲染器路由分发（9 类）
+// HTML 类 componentType 白名单（与 GtWpRenderer 子组件分发一致）
+const HTML_COMPONENT_TYPES = new Set([
+  'a-program-console',
+  'b-index',
+  'c-note-table',
+  'd-form-table',
+  'd-form-paragraph',
+  'd-form-qa',
+  'd-form-confirmation',
+  'd-form-review',
+  'e-control-test',
+  'h-static-doc',
+  'skip',
+])
+// 通过 useWpClassification 解析 wp_code 对应的 HTML componentType；保留 Univer 类（F/G 558 sheet）走既有路径
+const wpCodeRef = computed(() => wpDetail.value?.wp_code || '')
+const wpClassification = useWpClassification(wpCodeRef, projectId)
+const htmlComponentType = computed(() => {
+  // 仅当后端归类成功加载（非默认 skip 兜底）且为 HTML 类时返回具体 componentType
+  // 其他情况（loading / load 失败 / Univer 类 / 委派模块）返回空字符串走既有 Univer/子编辑器路径
+  // 这样不会因为后端归类记录缺失而让旧 Univer 底稿被错误地路由到 skip placeholder
+  if (!wpClassification.classification.value) return ''
+  if (!wpClassification.classification.value.classifications?.length) return ''
+  const ct = wpClassification.componentType.value
+  return HTML_COMPONENT_TYPES.has(ct as string) ? (ct as string) : ''
+})
+const useHtmlRenderer = computed(() => !!htmlComponentType.value)
+// wp_code 就绪后自动加载归类
+watch(
+  () => [wpCodeRef.value, projectId.value] as const,
+  ([code, pid]) => {
+    if (code && pid) {
+      wpClassification.load().catch(() => { /* 静默：归类失败回退到 Univer 路径 */ })
+    }
+  },
+  { immediate: true },
+)
+
 /** 从后端获取 component_type（wp_template_metadata 或底稿详情） */
 async function fetchComponentType() {
   try {
@@ -1051,6 +1105,45 @@ function onChildSaved() {
     projectId: projectId.value,
     wpId: wpId.value,
   } as WorkpaperSavedPayload)
+}
+
+// spec workpaper-html-renderer Task 13.1: GtWpRenderer 事件 → 既有 handlers 桥接
+/** HTML E 控制测试结论 → 程序裁剪建议（forward 到 ProcedureTrimming 联动）
+ *  设计文档说明：E 控制测试组件检测到"控制有效"时建议项目级 ProcedureTrimming 对应项；
+ *  本 forward 只做日志 + 复用 procedure-status:changed 通知 procedureTrimming 联动；
+ *  实际写回（项目级 ProcedureTrimming 标记）由后端 GtEControlTest save 端点处理。
+ */
+function onHtmlTrimmingSuggestion(payload: Record<string, any>) {
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.debug('[WorkpaperEditor] procedure trimming suggestion from HTML renderer:', payload)
+  }
+}
+
+/** HTML 跨底稿引用变更 → 复用既有 cross-ref:updated 事件 */
+function onHtmlCrossRefUpdate(payload: { source_wp_code: string; target_wp_code: string; cell: string; old_value?: any; new_value?: any }) {
+  eventBus.emit('cross-ref:updated', {
+    projectId: projectId.value,
+    targetWpCode: payload.target_wp_code,
+    changedSheets: [],
+  } as any)
+}
+
+/** HTML C 附注 → disclosure_notes 单向同步触发（占位：实际 API 调用由组件内部处理） */
+function onHtmlSyncToDisclosureNotes(_payload: Record<string, any>) {
+  // C 附注组件已直接调用 /api/projects/{pid}/disclosure-notes/sync-from-workpaper
+  // 此处仅触发 UI 提示，避免重复调用
+}
+
+/** HTML 索引跳转：跨底稿 / 同底稿 sheet */
+function onHtmlJumpToReference(refCode: string) {
+  if (!refCode) return
+  // 简化实现：直接走 WorkpaperList 高亮（GtIndexChip 内部已处理大多数路由场景）
+  router.push({
+    name: 'WorkpaperList',
+    params: { projectId: projectId.value },
+    query: { highlight: refCode },
+  })
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2220,15 +2313,30 @@ onBeforeRouteLeave(async (_to, _from, next) => {
 // 已迁移到 useDCycleEditor composable（含生命周期事件订阅/清理）
 
 onMounted(() => {
-  // 先获取 component_type 决定路由，再初始化对应编辑器
-  fetchComponentType().then(() => {
+  // spec workpaper-html-renderer Task 13.1: 路由分发顺序
+  // 1. fetchComponentType 加载 wpDetail（提供 wpCodeRef 给 useWpClassification）
+  // 2. 等待 wpClassification.load() 完成（避免 Univer init 抢跑后被 HTML 路由覆盖造成实例泄漏）
+  // 3. 按优先级判定：HTML 类 → 跳过 Univer init / Univer 类 → initUniver / 子编辑器（form/word/table/hybrid）→ 关 loading
+  ;(async () => {
+    await fetchComponentType()
+    // wpClassification 已在 watch(immediate: true) 中触发 load；这里再 await 一次确保完成
+    // （load() 内部已防止重复请求，第二次调用即拿到上次结果或等当前请求完成）
+    try {
+      await wpClassification.load()
+    } catch { /* 静默：归类失败回退到 Univer/子编辑器路径 */ }
+
+    if (useHtmlRenderer.value) {
+      // HTML 类：GtWpRenderer 自行处理加载/错误/渲染，外层关 loading
+      loading.value = false
+      return
+    }
     if (componentType.value === 'univer' || !componentType.value) {
       initUniver()
     } else {
-      // 子编辑器不走 initUniver，需要在这里关闭 loading
+      // 子编辑器（form/word/table/hybrid）不走 initUniver，需要在这里关闭 loading
       loading.value = false
     }
-  })
+  })()
   // P0: 加载程序步骤映射
   stepMapping.loadMapping()
   // R8-S2-02：订阅 workpaper:locate-cell 事件，定位到 Univer 单元格

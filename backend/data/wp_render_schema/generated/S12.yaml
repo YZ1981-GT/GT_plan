@@ -1,0 +1,443 @@
+# S12.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:59:01
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: S12
+template_path: backend/wp_templates/S/S12 利用专家（注册会计师的专家）的工作.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:59:00'
+  source_xlsx: S12 利用专家（注册会计师的专家）的工作.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  S12 利用专家的工作程序表:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 利用专家（注册会计师的专家）的工作程序表
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      J3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 程序
+        G:
+          field: col_g
+          type: text
+          label: 是否适用
+        H:
+          field: col_h
+          type: text
+          label: 执行人
+        I:
+          field: col_i
+          type: text
+          label: 执行情况说明
+        J:
+          field: col_j
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 57
+      ranges_sample:
+      - B7:F7
+      - B47:F47
+      - B54:F54
+      - B16:F16
+      - B25:F25
+      - B60:J60
+      - B31:F31
+      - B46:F46
+      - B22:F22
+      - B56:F56
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  S12-1 评价胜任能力、专业素质和客观性:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 评价专家的胜任能力、专业素质和客观性
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      K3: ${index_no}
+      J4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - A4
+      _total_count: 2
+    merged_cells:
+      preserve: true
+      count: 25
+      ranges_sample:
+      - H13:K13
+      - B14:G14
+      - B17:G17
+      - H12:K12
+      - B6:K6
+      - B13:G13
+      - H15:K15
+      - A1:K1
+      - B11:G11
+      - H18:K18
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  S12-1-1 评价专家的客观性:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 评价专家的客观性
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      K3: ${index_no}
+      J4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - A4
+      _total_count: 2
+    merged_cells:
+      preserve: true
+      count: 26
+      ranges_sample:
+      - H13:K13
+      - B14:G14
+      - B17:G17
+      - H12:K12
+      - B6:K6
+      - B13:G13
+      - B20:K20
+      - H15:K15
+      - A1:K1
+      - B11:G11
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  S12-2 了解专家的专长领域:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 了解专家的专长领域并与专家达成一致意见
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      K3: ${index_no}
+      J4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - H3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 29
+      ranges_sample:
+      - D20:K20
+      - D19:K19
+      - D10:K10
+      - B22:C22
+      - B15:K15
+      - B6:K6
+      - D22:K22
+      - B18:C18
+      - A1:K1
+      - B12:C12
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  S12-3 评价专家工作的恰当性:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 评价专家工作的恰当性
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      K3: ${index_no}
+      J4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5-14
+      - 16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - H3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 13
+      ranges_sample:
+      - B13:C13
+      - D9:K9
+      - B11:C11
+      - D11:K11
+      - B10:C10
+      - D10:K10
+      - A2:K2
+      - D13:K13
+      - B6:K6
+      - B9:C9
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  S12-3-1 注册会计师的专家的报告:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 注册会计师的专家的报告
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      K3: ${index_no}
+      J4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      - 10-11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - H3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A2:K2
+      - A1:K1
+      - B11:K12
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  S12-3-2 利用专家评价管理层的工作的适当性:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 利用专家评价管理层或管理层专家的工作的适当性
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      K3: ${index_no}
+      J4: ${page_no}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 序号
+        C:
+          field: col_c
+          type: text
+          label: 项目
+        I:
+          field: col_i
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - H3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 100
+      ranges_sample:
+      - B84:K84
+      - B102:K103
+      - B94:K94
+      - B29:K30
+      - B38:K39
+      - B13:K14
+      - A2:K2
+      - B43:K43
+      - B120:K120
+      - B98:K98
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  S12-3-3 利用专家评价管理层的工作(股份支付):
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 利用专家评价管理层或管理层专家的工作的适当性
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      K3: ${index_no}
+      J4: ${page_no}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 序号
+        C:
+          field: col_c
+          type: text
+          label: 项目
+        I:
+          field: col_i
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - H3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 56
+      ranges_sample:
+      - B59:K60
+      - B35:K36
+      - L66:L67
+      - L13:L14
+      - B40:K40
+      - B62:K63
+      - L32:L33
+      - B68:K68
+      - B52:K53
+      - B65:K65
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  S12-3-4 利用专家评价管理层的工作(金融工具公允价值）:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 利用专家评价管理层或管理层专家的工作的适当性
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      K3: ${index_no}
+      J4: ${page_no}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 序号
+        C:
+          field: col_c
+          type: text
+          label: 项目
+        I:
+          field: col_i
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - H3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 81
+      ranges_sample:
+      - B84:K84
+      - B42:K43
+      - B94:K94
+      - B29:K30
+      - B23:K24
+      - B38:K39
+      - B13:K14
+      - B72:K72
+      - L38:L39
+      - B56:K56
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

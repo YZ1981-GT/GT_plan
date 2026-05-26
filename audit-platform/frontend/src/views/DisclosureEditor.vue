@@ -151,6 +151,26 @@
             <el-button size="small" @click="onManualRefresh">手动重试</el-button>
           </template>
         </el-alert>
+        <!-- 底稿同步来源提示（design §12.1：底稿 → 模块单向同步） -->
+        <el-alert
+          v-if="currentNote?.last_sync_source === 'workpaper'"
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px"
+        >
+          <template #title>
+            <span>此数据由底稿同步</span>
+          </template>
+          <template #default>
+            <div class="gt-de-sync-banner">
+              <span>建议在底稿编辑入口（C 类附注 sheet）维护，避免双源不一致。</span>
+              <span v-if="currentNote?.last_sync_at" class="gt-de-sync-time">
+                · 最近同步：{{ formatSyncTime(currentNote.last_sync_at) }}
+              </span>
+            </div>
+          </template>
+        </el-alert>
         <template v-if="currentNote">
           <div class="gt-de-editor-header">
             <div>
@@ -664,6 +684,23 @@ const showPrintPreview = ref(false)
 // 底稿保存事件防抖同步
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
 const syncError = ref(false)
+
+// design §12.1: 同步时间相对显示格式化
+function formatSyncTime(iso: string | Date | null | undefined): string {
+  if (!iso) return ''
+  try {
+    const d = typeof iso === 'string' ? new Date(iso) : iso
+    const diff = Date.now() - d.getTime()
+    if (Number.isNaN(diff)) return String(iso)
+    if (diff < 60_000) return '刚刚'
+    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
+    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
+    return d.toLocaleString('zh-CN', { hour12: false })
+  } catch {
+    return String(iso)
+  }
+}
+
 const { isEditing: editMode, isDirty: editDirty, enterEdit, exitEdit, markDirty: markEditDirty, clearDirty: clearEditDirty } = useEditMode()
 
 // 编辑锁联动：进入编辑时 acquire，退出时 release；他人持锁时强制退出
@@ -2102,6 +2139,8 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
 .gt-de-toolbar-divider { width: 1px; height: 20px; background: var(--gt-color-primary-lighter); margin: 0 6px; }
 .gt-de-ai-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-primary-lighter); margin-left: 8px; white-space: nowrap; }
 .gt-de-saved-badge { font-size: var(--gt-font-size-xs); color: var(--gt-color-success); font-weight: 400; margin-left: 8px; background: var(--gt-bg-success); padding: 1px 8px; border-radius: 10px; }
+.gt-de-sync-banner { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: var(--gt-font-size-sm); }
+.gt-de-sync-time { color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-xs); }
 .gt-de-tiptap-content { padding: 12px; min-height: 200px; font-size: var(--gt-font-size-sm); line-height: 1.8; }
 .gt-de-tiptap-content :deep(.ProseMirror) { outline: none; min-height: 180px; }
 .gt-de-tiptap-content :deep(.ProseMirror p) { margin-bottom: 10px; text-indent: 2em; }

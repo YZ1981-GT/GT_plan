@@ -1,0 +1,404 @@
+# N3.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:59:00
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: N3
+template_path: backend/wp_templates/N/N3 递延所得税负债.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:59:00'
+  source_xlsx: N3 递延所得税负债.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：
+        D:
+          field: col_d
+          type: text
+          label: '3'
+        E:
+          field: col_e
+          type: text
+          label: 递延所得税负债明细表
+        F:
+          field: col_f
+          type: text
+          label: N3-2
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A14:A16
+      - A17:A19
+      - A10:A13
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  递延所得税负债审计程序表的N3A:
+    component_type: a-program-console
+    class_code: A-程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 递延所得税负债实质性程序表
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      J3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 16
+      end_row: dynamic
+      header_row: 15
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 对应LEAP程序
+        C:
+          field: col_c
+          type: text
+          label: 审计程序
+        D:
+          field: col_d
+          type: text
+          label: 程序分类
+        E:
+          field: col_e
+          type: text
+          label: 审计目标
+        J:
+          field: col_j
+          type: text
+          label: 底稿索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - A4
+      - D4
+      - F4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 24
+      ranges_sample:
+      - A8:G8
+      - A3:C3
+      - J15:J16
+      - H11:J11
+      - A10:G10
+      - A13:G13
+      - A9:G9
+      - A5:C5
+      - A14:C14
+      - H13:J13
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  递延所得税负债审定表N3-1:
+    component_type: univer
+    class_code: F-审定表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 递延所得税负债审定表
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      N3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目
+        B:
+          field: col_b
+          type: text
+          label: 期初数
+        F:
+          field: col_f
+          type: text
+          label: 期末数
+        J:
+          field: col_j
+          type: text
+          label: '期末未审数与期初
+
+            未审数的比较'
+        L:
+          field: col_l
+          type: text
+          label: '期末审定数与期初
+
+            审定数的比较'
+        N:
+          field: col_n
+          type: text
+          label: 原因分析
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - I3
+      - A4
+      - E4
+      - I4
+      - B7
+      - C7
+      - D7
+      - E7
+      - F7
+      - G7
+      - H7
+      - I7
+      - J7
+      - K7
+      - L7
+      - M7
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - H8
+      - I8
+      - J8
+      - K8
+      - L8
+      - M8
+      _total_count: 92
+    merged_cells:
+      preserve: true
+      count: 9
+      ranges_sample:
+      - A5:A6
+      - N5:N6
+      - J5:K5
+      - A2:N2
+      - L5:M5
+      - B5:E5
+      - F5:I5
+      - D17:E17
+      - A1:N1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  递延所得税负债明细表N3-2:
+    component_type: univer
+    class_code: F-明细表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 递延所得税负债明细表
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      N3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项  目
+        B:
+          field: col_b
+          type: text
+          label: 分类
+        C:
+          field: col_c
+          type: text
+          label: 期初
+        I:
+          field: col_i
+          type: text
+          label: 期末
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - H3
+      - A4
+      - C4
+      - H4
+      - E11
+      - H11
+      - K11
+      - N11
+      - E12
+      - H12
+      - K12
+      - N12
+      - E13
+      - H13
+      - K13
+      - N13
+      - E14
+      - H14
+      - K14
+      - N14
+      - E15
+      - H15
+      - K15
+      - N15
+      - E16
+      - H16
+      - K16
+      - N16
+      _total_count: 58
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - B9:B10
+      - A9:A10
+      - A2:N2
+      - C9:H9
+      - I9:N9
+      - A1:N1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  调整分录汇总表N3-3:
+    component_type: univer
+    class_code: F-调整分录
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 递延所得税资产调整分录汇总表
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      J3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 调整事项说明
+        B:
+          field: col_b
+          type: text
+          label: 类别（报表调整/账项调整/其他）
+        C:
+          field: col_c
+          type: text
+          label: 报表项目
+        D:
+          field: col_d
+          type: text
+          label: 科目名称
+        E:
+          field: col_e
+          type: text
+          label: 附注项目
+        F:
+          field: col_f
+          type: text
+          label: ……
+        G:
+          field: col_g
+          type: text
+          label: 借方调整金额
+        H:
+          field: col_h
+          type: text
+          label: 贷方调整金额
+        I:
+          field: col_i
+          type: text
+          label: 索引
+        J:
+          field: col_j
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - A4
+      - D4
+      - G4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A1:J1
+      - A2:J2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

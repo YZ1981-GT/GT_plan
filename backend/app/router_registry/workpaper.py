@@ -176,3 +176,35 @@ def register_workpaper_routers(app: FastAPI) -> None:
     # ═══ §119. proposal-remaining-18 S-4：历史版本搜索 ═══
     from app.routers.wp_version_search import router as wp_version_search_router
     app.include_router(wp_version_search_router, tags=["wp-version-search"])
+
+    # ═══ 底稿 HTML 渲染配置（design §5.1.1） ═══
+    from app.routers.wp_render_config import router as wp_render_config_router
+    app.include_router(wp_render_config_router, tags=["wp-render-config"])
+
+    # ═══ 底稿归类查询（design §5.1.4） ═══
+    from app.routers.wp_classification import router as wp_classification_router
+    app.include_router(wp_classification_router, tags=["wp-classifications"])
+
+    # ═══ 底稿模板版本管理（Requirements 3.0.4） ═══
+    from app.routers.wp_template_version import router as wp_template_version_router
+    app.include_router(wp_template_version_router, tags=["wp-template-versions"])
+
+    # ═══ 底稿索引解析校验（design §5.1.6） ═══
+    from app.routers.wp_index_resolve import router as wp_index_resolve_router
+    app.include_router(wp_index_resolve_router, tags=["wp-index-resolve"])
+
+    # ═══ 底稿 HTML 数据保存（design §5.1.2） ═══
+    from app.routers.wp_html_save import router as wp_html_save_router
+    app.include_router(wp_html_save_router, tags=["wp-html-save"])
+
+    # ═══ 底稿 xlsx 导出（design §5.1.3） ═══
+    from app.routers.wp_xlsx_export import router as wp_xlsx_export_router
+    app.include_router(wp_xlsx_export_router, tags=["wp-xlsx-export"])
+
+    # ═══ C 类底稿 → disclosure_notes 单向同步（Task 10.3 / design §12.1） ═══
+    from app.routers.wp_disclosure_sync import router as wp_disclosure_sync_router
+    app.include_router(wp_disclosure_sync_router, tags=["wp-disclosure-sync"])
+
+    # ═══ 底稿溯源链路（Task 12.4 / design §5.1.7） ═══
+    from app.routers.wp_trace import router as wp_trace_router
+    app.include_router(wp_trace_router, tags=["wp-trace"])

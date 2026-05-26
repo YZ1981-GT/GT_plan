@@ -1,0 +1,208 @@
+# backend/data/wp_render_schema/D-D2-8.yaml
+# 坏账准备计提会计政策检查 — D 类段落型子模式渲染 schema (form_type=paragraph)
+# Requirements: 3.5.2（段落型政策检查，D2-8 坏账政策 46×9）
+# Design: §3.6 GtDForm 段落型子模式（GtDFormParagraph，~19 sheet 适用）
+# Template: D2-6至D2-13 应收账款 -检查（Leap应对措施-检查）.xlsx 中"坏账准备计提会计政策检查"sheet
+# 适用范围：所有"会计政策检查 / 编号段落 / 长篇问答"类 sheet（约 19 sheet）
+
+wp_code: D-D2-8
+template_path: backend/wp_templates/D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+shared: true                               # 共享模板（D 类段落型 ~19 sheet 复用此结构）
+related_accounts:
+  - code: '1231'
+    name: 坏账准备
+  - code: '1122'
+    name: 应收账款
+
+sheets:
+  坏账准备计提会计政策检查:
+    component_type: d-form
+    form_type: paragraph                    # ★ 5 子模式路由字段（段落型）
+
+    # ─── 固定头部（自动填充） ──────────────────────────────────────
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '坏账准备计提会计政策检查'
+      A3: '${entity_name}'
+      A4: '${period_end}'
+      I3: '${index_no}'                     # 索引号（如 D2-8）
+      I4: '${page_no}'
+
+    # ─── 编号段落区（一/二/三/四，markdown 长文本输入） ───────────
+    segments:                               # 段落型核心结构（替代 dynamic_table）
+      - id: section_1
+        seq: '一'
+        title: '审计目标'
+        start_row: 7
+        end_row: 13
+        editable: false                     # 审计目标固定，模板预设
+        content: |
+          检查被审计单位坏账准备计提会计政策的合理性、一贯性和合规性，
+          重点关注：
+          1. 计提方法是否符合企业会计准则第 22 号——金融工具确认和计量；
+          2. ECL（预期信用损失）模型的关键参数（违约概率 PD / 违约损失率 LGD / 违约风险敞口 EAD）是否合理；
+          3. 计提比例是否与同行业可比公司保持合理一致；
+          4. 与上年度政策是否一致，如变更是否符合追溯调整要求。
+
+      - id: section_2
+        seq: '二'
+        title: '审计过程'
+        start_row: 14
+        end_row: 22
+        editable: true                      # 审计员手工填写
+        type: textarea
+        cell: A15                           # 段落主体起始单元格
+        max_length: 5000
+        placeholder: |
+          请说明审计过程，包括但不限于：
+          - 获取被审计单位坏账准备计提会计政策文件
+          - 与上年度政策对比，识别变更情况
+          - 复核管理层 ECL 模型的关键假设
+          - 抽样测试账龄分析准确性
+          - 分析计提比例合理性
+        hint: '【应说明审计过程，包括获取的资料 / 执行的程序 / 关键判断】'
+        formatting: markdown                # 支持 markdown 富文本
+
+      - id: section_3
+        seq: '三'
+        title: '会计政策描述'
+        start_row: 23
+        end_row: 32
+        editable: true
+        type: textarea
+        cell: A24
+        max_length: 5000
+        placeholder: |
+          请描述被审计单位的坏账准备计提会计政策，包括：
+          【一、个别认定法适用情形】
+          对单项金额重大的应收账款（如 ≥ 总额 10%），按个别认定法计提。
+
+          【二、组合计提方法】
+          按账龄 / 信用风险特征分组，确定组合 ECL 比例。
+
+          【三、关键参数】
+          - 账龄分组：1 年内 / 1-2 年 / 2-3 年 / 3-5 年 / 5 年以上
+          - 各账龄段计提比例：__% / __% / __% / __% / __%
+        hint: '【应说明被审计单位的会计政策原文，引用财务报表附注披露】'
+        formatting: markdown
+        reference_doc:
+          enabled: true
+          label: '引用文档'
+          source: 'project.disclosure_notes.section'
+          target_section: '五-1-2 应收账款会计政策'
+          render: 'index_chip'              # 渲染为 GtIndexChip 跳到附注
+
+      - id: section_4
+        seq: '四'
+        title: '行业对比分析'
+        start_row: 33
+        end_row: 39
+        editable: true
+        type: textarea
+        cell: A34
+        max_length: 3000
+        placeholder: |
+          请对比同行业可比公司的坏账计提政策：
+          【可比公司清单】
+          - 公司 A：1 年内 5% / 1-2 年 10% / 2-3 年 30% ...
+          - 公司 B：__% / __% / __% / ...
+
+          【差异分析】
+          被审计单位 vs 行业平均：
+          - 1 年内组合：__ vs __，差异原因 __
+        hint: '【应说明行业对比情况，差异是否合理】'
+        formatting: markdown
+
+      - id: section_5
+        seq: '五'
+        title: '审计说明与结论'
+        start_row: 40
+        end_row: 46
+        editable: true
+        type: textarea
+        cell: A41
+        max_length: 3000
+        placeholder: |
+          请总结审计说明：
+          - 政策合理性评价：__
+          - 一贯性评价（与上年比较）：__
+          - 合规性评价（符合准则要求）：__
+          - 是否需要调整建议：__
+        hint: '【应说明本次政策检查的总体结论与建议】'
+        formatting: markdown
+
+    # ─── 静态文本区（不可改，导出时跳过） ─────────────────────────
+    static_text:
+      rows: [1-4, 5-6]                      # 表头 + 段落标题
+      description: |
+        Row 1-4: 事务所名称 / 表名 / 被审计单位 / 审计截止日
+        Row 5-6: "本表用途说明 / 段落编号约定"
+      footer_rows_after_segments: 3          # 尾部签字行（编制 / 复核 / 日期）
+
+    # ─── 整体审计结论（最终判定） ─────────────────────────────────
+    conclusion:
+      mode: single                          # 整张 sheet 单一最终结论
+      cell: I44                             # 写入单元格
+      options:
+        - { value: 'policy_appropriate', label: '政策合理且一贯',
+            class: 'success', icon: 'CircleCheck',
+            description: '坏账政策合理、合规、一贯，无需调整' }
+        - { value: 'policy_minor_adj', label: '政策基本合理需小幅调整',
+            class: 'warning', icon: 'WarningFilled',
+            description: '政策基本合理但部分参数需调整' }
+        - { value: 'policy_inappropriate', label: '政策不合理需重大调整',
+            class: 'danger', icon: 'CircleCloseFilled',
+            description: '政策不合理或存在重大缺陷' }
+      mutual_exclusive: true
+      required: true
+
+    # ─── 公式区 ──────────────────────────────────────────────────
+    formulas:
+      preserve: true
+      cells:
+        - A3                                # =底稿目录!A2
+        - A4                                # =底稿目录!A3
+        - I3                                # 索引号公式
+        - I4                                # 页码公式
+
+    # ─── 合并单元格 ──────────────────────────────────────────────
+    merged_cells:
+      preserve: true
+      count: 22                             # 估算（每段落标题 + 内容区合并块）
+      description: |
+        主要合并区域：
+        - A1:I1（事务所名称横跨全宽）
+        - A2:I2（表名）
+        - 5 个段落标题行各横跨 A:I
+        - 5 个段落内容区（A:I 横跨多行的大文本框）
+
+    # ─── 跨底稿引用 ──────────────────────────────────────────────
+    cross_refs:
+      - ref_id: CW-D-D2-8-001
+        source_cell: A24                    # 政策描述段落
+        target_wp: 'disclosure_notes'
+        target_sheet: '五-1-2 应收账款会计政策'
+        target_field: 'policy_text'
+        description: '会计政策检查 ↔ 附注披露五-1-2 双向同步'
+        severity: required
+        direction: bidirectional
+
+      - ref_id: CW-D-D2-8-002
+        source_cell: A41                    # 审计结论段落
+        target_wp: D2-9
+        target_sheet: '坏账准备计提合理性测算'
+        target_field: 'policy_basis'
+        description: '政策检查结论 → ECL 测算依据'
+        severity: required
+        direction: outbound
+
+      - ref_id: CW-D-D2-8-003
+        source_cell: A34                    # 行业对比段落
+        target_wp: B30-1
+        target_sheet: '行业可比公司分析'
+        target_field: 'comparable_companies'
+        description: '行业对比 ← B30-1 可比公司清单'
+        severity: optional
+        direction: inbound

@@ -1,0 +1,459 @@
+# backend/data/wp_render_schema/C-L-disclosure.yaml
+# 长期借款附注披露 — C 类附注嵌套表渲染 schema（非应收类示例）
+# Requirements: 3.4（C 附注披露详细需求）
+# Design: §3.5 GtCNoteTable
+# Template: L4 长期借款附注披露 / L7 短期借款附注披露
+# 适用范围：L 筹资循环借款类底稿对应的「附注披露信息」sheet
+# 与 C-D2-disclosure 的差异演示：
+#   1) 子表数 4 张（更少，应收账款是 7-10 张）
+#   2) 无账龄分桶（借款按到期日 + 利率 + 担保方式分类）
+#   3) inheritance_rules 跨 sheet（短期 ↔ 长期借款一年内到期重分类联动）
+#   4) 上市/国企版本切换主要影响「关联方借款」字段
+
+wp_code: C-L-disclosure
+template_path: backend/wp_templates/L/L4 长期借款附注披露.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+shared: true                               # 短期/长期借款共享此结构
+related_accounts:
+  - code: '2001'
+    name: 短期借款
+  - code: '2501'
+    name: 长期借款
+  - code: '2502'
+    name: 应付债券
+  - code: '6603'
+    name: 财务费用-利息支出
+
+sheets:
+  长期借款附注披露信息:
+    component_type: c-note-table
+
+    # ─── 版本变体 ─────────────────────────────────────────────────
+    version_variants:
+      listed:
+        label: '上市公司版'
+        extra_subtables: [related_party_borrowing]
+        extra_columns_in: { borrowing_detail: [fair_value_disclosure] }
+      soe:
+        label: '国企版'
+        extra_subtables: [parent_co_guarantee_explanation]
+
+    # ─── 固定头部 ────────────────────────────────────────────────
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '长期借款附注披露信息'
+      A3: '${entity_name}'
+      A4: '${period_end}'
+      H3: '${index_no}'
+      H4: '${page_no}'
+
+    fields:
+      - { name: section_id, label: '附注章节号', type: text,
+          cell: B6, readonly: true,
+          default: '五-2-3 长期借款' }
+      - { name: monetary_unit, label: '金额单位', type: enum,
+          cell: F6, default: '元',
+          enum: ['元', '千元', '万元', '百万元'] }
+
+    # ─── 子表组（4 张主表 + 2 张可选差异表） ────────────────────────
+    sub_tables:
+
+      # ━━━ 子表 1：借款分类汇总（按担保方式）— static_rows ━━━━━━━━
+      - id: by_guarantee_type
+        title: '一、长期借款分类（按担保方式）'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 1
+        excel_anchor:
+          sheet: 长期借款附注披露信息
+          start_row: 12
+          start_col: A
+          header_row: 11
+        description: '按"质押/抵押/保证/信用"4 类预设展示期末/期初余额'
+        columns:
+          A: { field: guarantee_label, type: text, label: '担保类型',
+               readonly: true, width: 200 }
+          B: { field: balance_period_end, type: number, label: '期末余额',
+               render: 'amount', width: 150 }
+          C: { field: balance_period_begin, type: number, label: '期初余额',
+               render: 'amount', width: 150 }
+          D: { field: change_amount, type: number, label: '变动额',
+               render: 'amount_formula', formula: '=B-C', width: 150 }
+        static_rows:
+          - { id: pledge, label: '质押借款' }
+          - { id: mortgage, label: '抵押借款' }
+          - { id: guarantee, label: '保证借款' }
+          - { id: credit, label: '信用借款' }
+          - { id: total, label: '合计', is_grand_total: true }
+
+      # ━━━ 子表 2：借款明细（按笔披露） — dynamic_rows ━━━━━━━━━━━━
+      - id: borrowing_detail
+        title: '二、长期借款明细（按笔披露）'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 2
+        excel_anchor:
+          sheet: 长期借款附注披露信息
+          start_row: 22
+          start_col: A
+          header_row: 21
+        max_rows: 100
+        add_row_button: true
+        description: '逐笔披露借款方/金额/利率/到期日/担保方式'
+        columns:
+          A: { field: seq, type: number, label: '序号', auto_increment: true, width: 60 }
+          B: { field: lender_name, type: text, label: '债权人名称',
+               max_length: 200, required: true, width: 220 }
+          C: { field: currency, type: enum, label: '币种',
+               enum: ['CNY', 'USD', 'HKD', 'EUR', 'JPY'], default: 'CNY',
+               width: 90 }
+          D: { field: original_amount, type: number, label: '原币金额',
+               render: 'amount', required: true, width: 140 }
+          E: { field: cny_balance, type: number, label: '人民币余额',
+               render: 'amount', required: true, width: 140 }
+          F: { field: interest_rate, type: number, label: '年利率(%)',
+               render: 'percent', width: 100 }
+          G: { field: rate_type, type: enum, label: '利率类型',
+               enum: ['固定利率', '浮动利率（LPR+加点）', '其他'],
+               default: '固定利率', width: 140 }
+          H: { field: borrow_date, type: date, label: '借款日',
+               format: 'YYYY-MM-DD', width: 110 }
+          I: { field: maturity_date, type: date, label: '到期日',
+               format: 'YYYY-MM-DD', required: true, width: 110 }
+          J: { field: guarantee_type, type: enum, label: '担保方式',
+               enum: ['质押', '抵押', '保证', '信用'],
+               required: true, width: 100 }
+          K: { field: guarantee_detail, type: textarea, label: '担保说明',
+               max_length: 500, width: 220 }
+          L: { field: due_within_1y, type: boolean, label: '一年内到期',
+               render: 'checkmark', width: 110,
+               hint: '勾选则联动重分类到"一年内到期的非流动负债"' }
+          # 上市公司专属：公允价值披露
+          M: { field: fair_value_disclosure, type: number,
+               label: '公允价值（仅上市）',
+               render: 'amount', width: 150,
+               applicable_to_sub_class: [listed] }
+        footer_total:
+          enabled: true
+          label: '合计'
+          sum_columns: [E]
+
+      # ━━━ 子表 3：到期日分析 — static_rows ━━━━━━━━━━━━━━━━━━━━━
+      - id: maturity_analysis
+        title: '三、长期借款到期日分析'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 3
+        excel_anchor:
+          sheet: 长期借款附注披露信息
+          start_row: 50
+          start_col: A
+          header_row: 49
+        description: '按到期时间分桶披露（1-2年 / 2-3年 / 3-4年 / 4-5年 / 5年以上）'
+        columns:
+          A: { field: maturity_label, type: text, label: '到期时间',
+               readonly: true, width: 220 }
+          B: { field: balance_amount, type: number, label: '期末余额',
+               render: 'amount', width: 150 }
+          C: { field: balance_pct, type: number, label: '占比(%)',
+               render: 'percent_formula',
+               formula: '=B/maturity_total.balance_amount*100',
+               width: 110 }
+        static_rows:
+          - { id: maturity_1_2y, label: '1-2年内到期' }
+          - { id: maturity_2_3y, label: '2-3年内到期' }
+          - { id: maturity_3_4y, label: '3-4年内到期' }
+          - { id: maturity_4_5y, label: '4-5年内到期' }
+          - { id: maturity_over_5y, label: '5年以上到期' }
+          - { id: maturity_total, label: '合计', is_grand_total: true }
+
+      # ━━━ 子表 4：本期利息及变动 — static_rows ━━━━━━━━━━━━━━━━━━
+      - id: interest_movement
+        title: '四、本期借款利息及变动'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 4
+        excel_anchor:
+          sheet: 长期借款附注披露信息
+          start_row: 62
+          start_col: A
+          header_row: 61
+        description: '本期发生利息 + 计入当期损益 + 资本化金额披露'
+        columns:
+          A: { field: movement_label, type: text, label: '项目',
+               readonly: true, width: 280 }
+          B: { field: amount, type: number, label: '金额',
+               render: 'amount', width: 150 }
+          C: { field: notes, type: textarea, label: '说明',
+               max_length: 500, width: 280 }
+        static_rows:
+          - { id: int_period_begin, label: '期初应付利息余额' }
+          - { id: int_accrued, label: '本期应计利息（计入财务费用）' }
+          - { id: int_capitalized, label: '本期资本化利息' }
+          - { id: int_paid, label: '本期实际支付' }
+          - { id: int_period_end, label: '期末应付利息余额', is_grand_total: true }
+
+      # ━━━ 子表 5（仅上市）：关联方借款披露 ━━━━━━━━━━━━━━━━━━━━
+      - id: related_party_borrowing
+        title: '五、关联方借款披露（上市公司专属）'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed]
+        order: 5
+        excel_anchor:
+          sheet: 长期借款附注披露信息
+          start_row: 75
+          start_col: A
+          header_row: 74
+        max_rows: 30
+        description: '上市公司须额外披露关联方借款条款'
+        columns:
+          A: { field: seq, type: number, label: '序号', auto_increment: true, width: 60 }
+          B: { field: related_party_name, type: text, label: '关联方名称',
+               max_length: 200, required: true, width: 220 }
+          C: { field: relationship, type: enum, label: '关联关系',
+               enum: ['控股股东', '实际控制人', '同一控制下子公司',
+                      '联营企业', '合营企业', '其他'],
+               required: true, width: 160 }
+          D: { field: balance_amount, type: number, label: '期末余额',
+               render: 'amount', width: 140 }
+          E: { field: interest_rate, type: number, label: '利率(%)',
+               render: 'percent', width: 100 }
+          F: { field: market_rate_comparison, type: textarea,
+               label: '与市场利率比较',
+               max_length: 500, width: 280 }
+          G: { field: arms_length, type: enum, label: '是否公允',
+               enum: ['是', '否', '不适用'], render: 'tag', width: 100 }
+
+      # ━━━ 子表 6（仅国企）：母公司担保说明 ━━━━━━━━━━━━━━━━━━━
+      - id: parent_co_guarantee_explanation
+        title: '五、母公司担保说明（国企专属）'
+        type: dynamic_rows
+        applicable_to_sub_class: [soe]
+        order: 6
+        excel_anchor:
+          sheet: 长期借款附注披露信息
+          start_row: 90
+          start_col: A
+          header_row: 89
+        max_rows: 20
+        description: '国企背景下母公司 / 集团兄弟单位担保的逐项说明'
+        columns:
+          A: { field: seq, type: number, label: '序号', auto_increment: true, width: 60 }
+          B: { field: guarantor_name, type: text, label: '担保方名称',
+               max_length: 200, required: true, width: 220 }
+          C: { field: guarantor_relationship, type: enum, label: '与本公司关系',
+               enum: ['母公司', '同一控制下子公司', '同一控制下兄弟单位', '其他'],
+               required: true, width: 160 }
+          D: { field: guarantee_scope, type: textarea, label: '担保范围 + 期限',
+               max_length: 500, width: 280 }
+          E: { field: counter_guarantee, type: textarea, label: '反担保安排',
+               max_length: 500, width: 280 }
+          F: { field: business_substance, type: textarea, label: '业务实质说明',
+               max_length: 1000, width: 280 }
+
+    # ─── inheritance_rules（4 子表合计 ↔ 主表行） ──────────────────
+    inheritance_rules:
+
+      # 借款明细按担保方式分组合计 → 主表对应行
+      - id: detail_to_pledge
+        source: { sub_table: borrowing_detail, sum_field: cny_balance,
+                  group_by: 'guarantee_type=质押' }
+        target: { sub_table: by_guarantee_type, row: pledge, column: balance_period_end }
+        formula: SUM
+        validation: equal
+        on_mismatch: error
+        description: '借款明细中"质押"笔合计 = 主表"质押借款"行期末'
+
+      - id: detail_to_mortgage
+        source: { sub_table: borrowing_detail, sum_field: cny_balance,
+                  group_by: 'guarantee_type=抵押' }
+        target: { sub_table: by_guarantee_type, row: mortgage, column: balance_period_end }
+        formula: SUM
+        validation: equal
+        on_mismatch: error
+
+      - id: detail_to_guarantee
+        source: { sub_table: borrowing_detail, sum_field: cny_balance,
+                  group_by: 'guarantee_type=保证' }
+        target: { sub_table: by_guarantee_type, row: guarantee, column: balance_period_end }
+        formula: SUM
+        validation: equal
+        on_mismatch: error
+
+      - id: detail_to_credit
+        source: { sub_table: borrowing_detail, sum_field: cny_balance,
+                  group_by: 'guarantee_type=信用' }
+        target: { sub_table: by_guarantee_type, row: credit, column: balance_period_end }
+        formula: SUM
+        validation: equal
+        on_mismatch: error
+
+      # 主表合计 = 试算表审定数（外部勾稽）
+      - id: total_to_tb
+        source: { sub_table: by_guarantee_type, row: total, column: balance_period_end }
+        target:
+          external: trial_balance
+          query: { account_code: '2501', period: 'period_end', field: 'audited_amount' }
+        validation: equal
+        on_mismatch: warning
+        description: '长期借款主表合计 = 试算表 2501 长期借款审定数'
+
+      # 一年内到期重分类联动（跨 sheet：长期 ↔ 短期）
+      - id: due_within_1y_reclass
+        source: { sub_table: borrowing_detail, sum_field: cny_balance,
+                  filter: 'due_within_1y=true' }
+        target:
+          external: workpaper
+          query: { wp_code: 'L7', sheet: '一年内到期的非流动负债',
+                   row: 'long_term_borrowing_due_within_1y',
+                   column: 'reclass_amount' }
+        validation: equal
+        on_mismatch: warning
+        description: '勾选"一年内到期"的笔合计 → 重分类到"一年内到期的非流动负债"sheet'
+
+      # 到期分析合计 = 主表合计（内部勾稽）
+      - id: maturity_total_to_main
+        source: { sub_table: maturity_analysis, sum_field: balance_amount,
+                  exclude_rows: [maturity_total] }
+        target: { sub_table: by_guarantee_type, row: total, column: balance_period_end }
+        formula: SUM
+        validation: equal
+        on_mismatch: error
+        description: '到期分析 5 桶合计 = 主表合计（一致性校验）'
+
+      # 关联方借款余额 ≤ 借款明细合计（不能超总额）
+      - id: related_party_lte_total
+        source: { sub_table: related_party_borrowing, sum_field: balance_amount }
+        target: { sub_table: by_guarantee_type, row: total, column: balance_period_end }
+        validation: less_than_or_equal
+        on_mismatch: error
+        description: '关联方借款合计 ≤ 主表合计（关联方是子集）'
+        applicable_when: { standard: listed }
+
+    # ─── 隐藏子表（"不适用"软标记） ────────────────────────────────
+    hidden_subtables:
+      semantics: soft_hide
+      default: []
+
+    # ─── 静态文本区 ──────────────────────────────────────────────
+    static_text:
+      rows: [1-4, 5-10]
+      description: |
+        Row 1-4: 事务所名称 / 表名 / 被审计单位 / 审计截止日
+        Row 5-10: 编辑指引段落（"按担保方式 / 按到期日分类披露"等）
+      footer_rows_after_dynamic: 5
+
+    formulas:
+      preserve: true
+      cells:
+        - A3
+        - A4
+        - H3
+        - H4
+
+    merged_cells:
+      preserve: true
+      count: 95                              # 估算
+      description: |
+        主要合并区域：
+        - A1:H1 / A2:H2（事务所 + 表名横跨全宽）
+        - 各子表标题 A:H 横跨
+        - 编辑指引段落 A:H 横跨
+
+    # ─── 跨底稿引用 ─────────────────────────────────────────────
+    cross_refs:
+      # 借款明细 ← L4-1 借款审定表
+      - ref_id: CW-C-L-disclosure-001
+        source: { sub_table: borrowing_detail }
+        target_wp: L4-1
+        target_sheet: '长期借款审定表'
+        target_field: 'borrowing_detail_table'
+        description: '借款明细 ← L4-1 审定表（自动取数）'
+        severity: required
+        direction: inbound
+        auto_pull: true
+
+      # 主表合计 ← 试算表 2501
+      - ref_id: CW-C-L-disclosure-002
+        source: { sub_table: by_guarantee_type, row: total, column: balance_period_end }
+        target_wp: TB
+        target_sheet: trial_balance
+        target_field: 'audited_amount(2501, period_end)'
+        description: '主表合计 ← 试算表 2501 长期借款审定数'
+        severity: required
+        direction: inbound
+        auto_pull: true
+
+      # 一年内到期重分类（出向）→ L7 短期借款 / 一年内到期非流动负债
+      - ref_id: CW-C-L-disclosure-003
+        source: { sub_table: borrowing_detail, filter: 'due_within_1y=true' }
+        target_wp: L7
+        target_sheet: '一年内到期的非流动负债'
+        target_field: 'long_term_borrowing_due_within_1y'
+        description: '一年内到期 → L7 重分类（出向联动）'
+        severity: required
+        direction: outbound
+
+      # 利息支出（出向）→ N 财务费用
+      - ref_id: CW-C-L-disclosure-004
+        source: { sub_table: interest_movement, row: int_accrued, column: amount }
+        target_wp: N3
+        target_sheet: '财务费用明细表'
+        target_field: 'interest_expense_long_term_borrowing'
+        description: '本期应计利息 → N3 财务费用利息支出（出向勾稽）'
+        severity: required
+        direction: outbound
+
+      # 报表勾稽（出向）→ A1 BS 长期借款行
+      - ref_id: CW-C-L-disclosure-005
+        source: { sub_table: by_guarantee_type, row: total, column: balance_period_end }
+        target_wp: A1
+        target_sheet: '资产负债表'
+        target_field: 'BS-076 长期借款 期末余额'
+        description: '主表合计 → BS 长期借款行'
+        severity: required
+        direction: outbound
+
+      # 附注模块同步（出向）→ disclosure_notes
+      - ref_id: CW-C-L-disclosure-006
+        source: full_sheet
+        target_wp: 'disclosure_notes'
+        target_section: '五-2-3 长期借款'
+        target_field: 'all_subtables'
+        description: 'C 类附注 sheet → disclosure_notes 模块单向同步'
+        severity: required
+        direction: outbound
+        sync_strategy: push_on_save
+
+    # ─── 联动语义 ───────────────────────────────────────────────
+    linkage:
+      upstream:
+        - source: trial_balance
+          fields: [account_code=2501, account_code=2502]
+          trigger: on_mount + on_recalc
+          action: 'auto_pull_audited_amount'
+
+        - source: L4-1
+          trigger: 'workpaper:saved'
+          action: 'refresh_borrowing_detail'
+          description: 'L4-1 审定表保存后刷新借款明细子表'
+
+      downstream:
+        - target: L7
+          condition: 'on_due_within_1y_change'
+          action: 'reclass_to_short_term'
+          description: '一年内到期勾选变化 → L7 重分类联动'
+
+        - target: N3
+          condition: 'on_interest_change'
+          action: 'sync_financial_expense'
+          description: '本期应计利息变化 → N3 财务费用联动'
+
+        - target: disclosure_notes
+          condition: 'on_save'
+          action: 'sync_to_disclosure_notes'
+
+        - target: A1
+          condition: 'on_total_change'
+          action: 'mark_report_stale'

@@ -1,0 +1,226 @@
+# backend/data/wp_render_schema/E-C12-1.yaml
+# 单条控制测试 — E 类 single 子模式渲染 schema
+# Requirements: 3.6.2（单条控制测试 C12-1-X，46 行 × 10 列）
+# Design: §3.7 GtEControlTest（test_type=single）
+# Template: C12-1-X 单条控制测试（46 行 × 10 列，7 段流程）
+# 适用范围：C2-1-X / C3-1-X / C12-1-X 等各循环单条控制测试 ~23 sheet（E3 类）
+
+wp_code: E-C12-1
+template_path: backend/wp_templates/C/C12-1 单条控制测试.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+shared: true                               # 共享模板（各循环单条控制测试复用）
+related_accounts: []
+
+sheets:
+  单条控制测试:
+    component_type: e-control-test
+    test_type: single                       # E 类三种 test_type 之一
+
+    # ─── 固定头部（自动填充） ──────────────────────────────────────
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '单条控制测试'
+      A3: '${entity_name}'                  # 来自 project.client_name
+      A4: '${period_end}'                   # 来自 project.period_end
+      J3: '${index_no}'                     # 索引号（C12-1-1 / C2-1-1 等）
+      J4: '${page_no}'
+
+    # ─── 7 段流程区（segments，按 design §3.7 single 子模式） ────
+    segments:                                # 单条控制测试用 segments 而非 dynamic_table
+      - id: basic_info
+        title: '一、基本信息'
+        start_row: 6
+        end_row: 9
+        fields:
+          - { name: control_no, label: '控制编号', type: text, required: true,
+              cell: B6, max_length: 30 }
+          - { name: control_name, label: '控制名称', type: text, required: true,
+              cell: B7, max_length: 200 }
+          - { name: linked_summary_ref, label: '关联汇总表', type: text,
+              cell: B8, render: 'index_chip',
+              hint: '指向 C12 控制测试汇总表的索引号' }
+          - { name: assertion, label: '认定', type: multi_enum,
+              cell: B9, enum: ['存在', '完整', '权利义务', '准确', '列报'] }
+
+      - id: test_procedure
+        title: '二、测试程序'
+        start_row: 11
+        end_row: 14
+        fields:
+          - { name: test_method, label: '测试方法', type: multi_enum,
+              cell: B11, enum: ['询问', '观察', '检查', '重新执行', '穿行测试'] }
+          - { name: test_steps, label: '测试步骤', type: textarea,
+              cell: B12, max_length: 2000 }
+          - { name: evidence_required, label: '所需证据', type: text,
+              cell: B13, max_length: 500 }
+
+      - id: population_definition
+        title: '三、总体定义'
+        start_row: 15
+        end_row: 18
+        fields:
+          - { name: population_desc, label: '总体描述', type: textarea,
+              cell: B15, max_length: 1000,
+              hint: '描述本次测试的"总体"是什么（如"全年销售订单"）' }
+          - { name: population_completeness, label: '总体完整性证据', type: text,
+              cell: B16, max_length: 500 }
+
+      - id: population_source
+        title: '四、总体来源'
+        start_row: 19
+        end_row: 22
+        fields:
+          - { name: data_source, label: '数据来源', type: text,
+              cell: B19, max_length: 200 }
+          - { name: source_reliability, label: '数据可靠性评价', type: textarea,
+              cell: B20, max_length: 1000 }
+          - { name: ipe_index, label: 'IPE 工作底稿索引', type: text,
+              cell: B21, render: 'index_chip',
+              hint: '指向 T1 IPE 信息可靠性测试' }
+
+      - id: population_count
+        title: '五、项目总数'
+        start_row: 23
+        end_row: 25
+        fields:
+          - { name: total_count, label: '项目总数', type: number,
+              cell: B23, min: 0 }
+          - { name: count_evidence, label: '总数验证证据', type: text,
+              cell: B24, max_length: 500 }
+
+      - id: sample_size
+        title: '六、样本规模'
+        start_row: 26
+        end_row: 30
+        fields:
+          - { name: frequency, label: '控制频率', type: enum,
+              cell: B26,
+              enum: ['每笔交易', '每日', '每周', '每月', '每季度', '每半年', '每年'] }
+          - { name: risk_level, label: '风险等级', type: enum,
+              cell: B27, enum: ['高', '中', '低'] }
+          - { name: sample_size, label: '样本量', type: number,
+              cell: B28, min: 1,
+              hint: '参见 C12 汇总表「样本规模区间表」' }
+          - { name: sample_basis, label: '样本量依据', type: textarea,
+              cell: B29, max_length: 500 }
+
+      - id: sampling_method
+        title: '七、抽样方法 + 抽样过程'
+        start_row: 31
+        end_row: 36
+        fields:
+          - { name: sampling_method, label: '抽样方法', type: enum,
+              cell: B31,
+              enum: ['随机抽样', '系统抽样', '整群抽样', '关键项目', '货币单元抽样'] }
+          - { name: sampling_process, label: '抽样过程描述', type: textarea,
+              cell: B32, max_length: 2000 }
+          - { name: random_seed, label: '随机种子（如适用）', type: text,
+              cell: B33, max_length: 50 }
+
+      - id: deviation_definition
+        title: '八、偏差定义 + 实施测试'
+        start_row: 37
+        end_row: 46                          # 含实施测试结果明细
+        fields:
+          - { name: deviation_def, label: '偏差定义', type: textarea,
+              cell: B37, max_length: 1000,
+              hint: '明确什么情况构成偏差（如"未签字 / 签字日期晚于交易日"）' }
+          - { name: tested_count, label: '实测样本数', type: number,
+              cell: B38, min: 0 }
+          - { name: deviation_count, label: '发现偏差数', type: number,
+              cell: B39, min: 0 }
+          - { name: deviation_details, label: '偏差明细描述', type: textarea,
+              cell: B40, max_length: 3000,
+              hint: '逐条描述偏差性质 / 金额 / 影响 / 整改情况' }
+          - { name: test_evidence_attachments, label: '测试证据附件',
+              type: attachment_list, cell: B42 }
+
+    # ─── 提示区（折叠展开，关键准则引用） ────────────────────────
+    hints:
+      - id: standard_quote
+        label: '准则原文引用（CSA 1314 / ISA 530）'
+        collapsible: true
+        default_collapsed: true
+        items:
+          - { no: 1, content: 'CSA 1314.5：注册会计师对控制运行有效性获取充分、适当审计证据' }
+          - { no: 2, content: 'ISA 530.A4：样本量受预期偏差率、可接受偏差率影响' }
+          - { no: 3, content: '总体不完整 → 抽样结论无效（IPE 测试为必要前置条件）' }
+
+    # ─── 静态文本区 ───────────────────────────────────────────────
+    static_text:
+      rows: [1-5]                            # 表头 + 段落分割行
+      description: |
+        Row 1-4: 事务所名称 / 表名 / 被审计单位 / 审计截止日
+        Row 5: "本控制测试关联汇总表" 提示行
+        每段开头有标题行（"一、基本信息" 等），由 segments[*].title 渲染
+      footer_rows_after_dynamic: 3            # 尾部签字行
+
+    # ─── 结论区（单条测试只判定本条控制是否有效） ─────────────────
+    conclusion:
+      mode: single                            # 单条控制单一结论
+      options:
+        - { value: effective, label: '本控制运行有效', class: 'success' }
+        - { value: ineffective, label: '本控制运行无效', class: 'danger' }
+        - { value: not_applicable, label: '不适用 / 未测试', class: 'info' }
+      mutual_exclusive: true
+      cell: B46                               # 结论写入单元格
+      auto_derive:
+        rule: "deviation_count == 0 ? 'effective' : 'ineffective'"
+        editable: true                        # 自动派生但允许审计员手动覆盖
+
+    # ─── 公式区 ──────────────────────────────────────────────────
+    formulas:
+      preserve: true
+      cells:
+        - A3                                  # =底稿目录!A2
+        - A4                                  # =底稿目录!A3
+        - J3                                  # 索引号公式
+        - J4                                  # 页码公式
+        - B41                                 # 偏差率 = B39 / B38
+
+    # ─── 合并单元格 ──────────────────────────────────────────────
+    merged_cells:
+      preserve: true
+      count: 14                              # 估算（含 7 段标题行 + 表头）
+      description: |
+        主要合并区域：
+        - A1:J1（事务所名称）
+        - A2:J2（表名）
+        - 7 段标题行各横跨 A:J（"一、基本信息" 等）
+        - 长文本字段输入框（B 列横跨多行）
+
+    # ─── 跨底稿引用 ──────────────────────────────────────────────
+    cross_refs:
+      - ref_id: CW-E-C12-1-001
+        source_cell: B8
+        target_wp: E-C12
+        target_sheet: '控制测试汇总表'
+        target_field: '控制编号'
+        description: '本单条控制 → 汇总表反向溯源'
+        severity: required
+        direction: outbound
+
+      - ref_id: CW-E-C12-1-002
+        source_cell: B21
+        target_wp: T1
+        target_sheet: 'IPE 信息可靠性测试'
+        target_field: 'IPE 测试结论'
+        description: '本测试依赖的 IPE 数据来源'
+        severity: required
+        direction: inbound
+
+    # ─── 联动语义 ────────────────────────────────────────────────
+    linkage:
+      upstream:
+        - source: T1
+          condition: 'IPE 测试通过'
+          description: '前置依赖：总体来源数据可靠性测试通过'
+      downstream:
+        - target: E-C11-2
+          condition: "deviation_count > 0"
+          action: 'trigger_evaluation_step'
+          description: '发现偏差 → 触发 6 步骤评价决策树'
+        - target: E-C12
+          action: 'rollup_to_summary'
+          description: '本条结论汇总到汇总表对应行'

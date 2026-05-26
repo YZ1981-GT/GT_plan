@@ -1,0 +1,241 @@
+# backend/data/wp_render_schema/D-D2-13.yaml
+# 应收账款业务模式分析 — D 类是否问答型子模式渲染 schema (form_type=qa)
+# Requirements: 3.5.3（是否问答型业务模式，D2-13 应收账款业务模式分析 30×5）
+# Design: §3.6 GtDForm 是否问答子模式（GtDFormQA，~9 sheet 适用）
+# Template: D2-6至D2-13 应收账款 -检查（Leap应对措施-检查）.xlsx 中"应收账款业务模式分析"sheet
+# 适用范围：所有"4 判断题 × N 组合 → 业务模式判定 + 报表项目判定"类 sheet（约 9 sheet）
+
+wp_code: D-D2-13
+template_path: backend/wp_templates/D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+shared: true                               # 共享模板（D 类业务模式 ~9 sheet 复用）
+related_accounts:
+  - code: '1122'
+    name: 应收账款
+  - code: '1303'
+    name: 合同资产
+
+sheets:
+  应收账款业务模式分析:
+    component_type: d-form
+    form_type: qa                           # ★ 5 子模式路由字段（是否问答型）
+
+    # ─── 固定头部（自动填充） ──────────────────────────────────────
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '应收账款业务模式分析'
+      A3: '${entity_name}'
+      A4: '${period_end}'
+      E3: '${index_no}'                     # 索引号（如 D2-13）
+      E4: '${page_no}'
+
+    # ─── 上下文区 ──────────────────────────────────────────────────
+    fields:
+      - { name: audit_objective, label: '审计目标', type: textarea,
+          cell: B6, max_length: 1000, readonly: true,
+          default: '判定金融资产业务模式，确定后续计量分类（摊余成本 / FVOCI / FVTPL）和报表项目归属。' }
+      - { name: financial_asset_scope, label: '应收账款明细范围', type: text,
+          cell: B8, max_length: 500,
+          hint: '说明本次业务模式分析覆盖的应收账款类别' }
+
+    # ─── 是否问答矩阵（4 判断题 × N 组合） ────────────────────────
+    qa_matrix:                              # 问答型核心结构（替代 dynamic_table）
+      mode: matrix                          # 矩阵模式（4 题 × N 组合）
+      questions:                            # 4 个判断题（行）
+        - id: q1
+          seq: '题 1'
+          question: '持有目的是否为收取合同现金流量？'
+          row: 12
+          help_text: |
+            判断依据：
+            - 是：以收取本金 + 利息为主要目标
+            - 否：主要为出售或赚取价差
+        - id: q2
+          seq: '题 2'
+          question: '合同现金流量是否仅为本金和利息（SPPI 测试）？'
+          row: 14
+          help_text: |
+            判断依据：
+            - 是：现金流量仅含本金 + 基于本金计算的利息
+            - 否：含与本金或利息无关的衍生工具特征
+        - id: q3
+          seq: '题 3'
+          question: '是否存在频繁出售情形？'
+          row: 16
+          help_text: |
+            判断依据：
+            - 是：年度出售金额 ≥ 20% 期初余额
+            - 否：出售非主要业务
+        - id: q4
+          seq: '题 4'
+          question: '出售目的是否为应对信用风险集中度？'
+          row: 18
+          help_text: |
+            判断依据：
+            - 是：仅在信用风险显著上升时出售
+            - 否：经常性出售获利
+
+      combinations:                         # N 个组合（列，由用户动态增删）
+        start_col: C                        # 组合 1 从 C 列开始
+        end_col: dynamic
+        max_combinations: 10                # 最多 10 个组合
+        column_def:
+          combination_name: { row: 11, type: text, label: '组合名称',
+                              max_length: 100, required: true }
+          q1_answer: { row: 12, type: enum,
+                       enum: ['是', '否', '不适用'], render: 'radio' }
+          q2_answer: { row: 14, type: enum,
+                       enum: ['是', '否', '不适用'], render: 'radio' }
+          q3_answer: { row: 16, type: enum,
+                       enum: ['是', '否', '不适用'], render: 'radio' }
+          q4_answer: { row: 18, type: enum,
+                       enum: ['是', '否', '不适用'], render: 'radio' }
+          # 自动判定区（由 auto_derivation 计算填充，不可手动改）
+          business_model: { row: 21, type: text, readonly: true,
+                            render: 'tag', label: '业务模式判定' }
+          measurement_class: { row: 23, type: text, readonly: true,
+                               render: 'tag', label: '计量分类' }
+          report_line: { row: 25, type: text, readonly: true,
+                         render: 'tag', label: '报表项目判定' }
+
+    # ─── 自动判定规则（业务模式 → 计量分类 → 报表项目） ────────────
+    auto_derivation:
+      description: |
+        基于 4 题答案自动派生业务模式 → 计量分类 → 报表项目归属
+        引用财政部《企业会计准则第 22 号》业务模式判定规则
+      rules:
+        # 业务模式判定（对应组合的 4 题答案）
+        - id: rule_held_to_collect
+          when: "q1=='是' AND q2=='是' AND q3=='否'"
+          set:
+            business_model: '持有以收取合同现金流量'
+            measurement_class: '摊余成本'
+            report_line: '应收账款（资产负债表 BS-008）'
+            confidence: 'high'
+
+        - id: rule_held_to_collect_and_sell
+          when: "q1=='是' AND q2=='是' AND q3=='是' AND q4=='是'"
+          set:
+            business_model: '既以收取合同现金流量为目标又以出售为目标'
+            measurement_class: 'FVOCI（以公允价值计量且其变动计入其他综合收益）'
+            report_line: '其他债权投资（资产负债表 BS-018）'
+            confidence: 'high'
+
+        - id: rule_other_business_model
+          when: "q1=='否' OR (q3=='是' AND q4=='否')"
+          set:
+            business_model: '其他业务模式'
+            measurement_class: 'FVTPL（以公允价值计量且其变动计入当期损益）'
+            report_line: '交易性金融资产（资产负债表 BS-002）'
+            confidence: 'high'
+
+        - id: rule_sppi_failed
+          when: "q2=='否'"
+          set:
+            business_model: '现金流量不符合 SPPI 测试'
+            measurement_class: 'FVTPL（强制以公允价值计量）'
+            report_line: '交易性金融资产（资产负债表 BS-002）'
+            confidence: 'high'
+
+        # 默认兜底（任意题未答时）
+        - id: rule_default_pending
+          when: "q1=='不适用' OR q2=='不适用' OR has_empty"
+          set:
+            business_model: '待判定（请完成 4 题）'
+            measurement_class: '—'
+            report_line: '—'
+            confidence: 'pending'
+
+    # ─── 注释长段（财政部文件引用） ───────────────────────────────
+    notes:
+      - id: note_1
+        label: '注 1：财政部《企业会计准则第 22 号》业务模式判定要点'
+        collapsible: true
+        default_collapsed: true
+        content: |
+          根据财政部《企业会计准则第 22 号——金融工具确认和计量》第十六条、第十七条：
+          1. 持有以收取合同现金流量：以收取本金和利息为主要目标，按摊余成本计量
+          2. 既以收取合同现金流量又以出售为目标：以 FVOCI 计量
+          3. 其他业务模式：以 FVTPL 计量
+
+      - id: note_2
+        label: '注 2：SPPI 测试核心要点'
+        collapsible: true
+        default_collapsed: true
+        content: |
+          SPPI（Solely Payments of Principal and Interest）测试：
+          - 合同现金流量是否仅为本金和基于本金计算的利息
+          - 利息构成：货币时间价值 + 信用风险补偿 + 流动性风险补偿 + 利润空间
+          - 不通过 SPPI 测试 → 强制 FVTPL 计量
+
+      - id: note_3
+        label: '注 3：业务模式与报表项目对应关系'
+        collapsible: true
+        default_collapsed: true
+        content: |
+          - 摊余成本 → 应收账款 / 应收票据 / 长期应收款 / 债权投资
+          - FVOCI → 其他债权投资
+          - FVTPL → 交易性金融资产 / 衍生金融资产
+
+    # ─── 静态文本区（不可改，导出时跳过） ─────────────────────────
+    static_text:
+      rows: [1-5, 9-10, 27-30]              # 表头 + 矩阵标题 + 注释区
+      description: |
+        Row 1-4: 事务所名称 / 表名 / 被审计单位 / 审计截止日
+        Row 5: "审计目标" 标题
+        Row 9-10: "业务模式判定矩阵" 标题 + 列说明
+        Row 27-30: 注释区（注 1-注 3）
+      footer_rows_after_matrix: 3            # 尾部签字行
+
+    # ─── 公式区 ──────────────────────────────────────────────────
+    formulas:
+      preserve: true
+      cells:
+        - A3                                # =底稿目录!A2
+        - A4                                # =底稿目录!A3
+        - E3                                # 索引号公式
+        - E4                                # 页码公式
+        - C21                               # 业务模式自动判定公式（如有 IF 嵌套）
+        - C23                               # 计量分类公式
+        - C25                               # 报表项目公式
+
+    # ─── 合并单元格 ──────────────────────────────────────────────
+    merged_cells:
+      preserve: true
+      count: 14                             # 估算
+      description: |
+        主要合并区域：
+        - A1:E1（事务所名称横跨全宽）
+        - A2:E2（表名）
+        - 4 题问题文本各横跨 A:B
+        - 自动判定结果区（业务模式 / 计量分类 / 报表项目标题）
+
+    # ─── 跨底稿引用 ──────────────────────────────────────────────
+    cross_refs:
+      - ref_id: CW-D-D2-13-001
+        source_cell: 'C25-dynamic'         # 报表项目判定结果
+        target_wp: A1
+        target_sheet: '资产负债表'
+        target_field: 'BS-008 应收账款'
+        description: '业务模式判定 → 报表项目归属（驱动报表行映射）'
+        severity: required
+        direction: outbound
+
+      - ref_id: CW-D-D2-13-002
+        source_cell: 'C23-dynamic'         # 计量分类判定
+        target_wp: 'disclosure_notes'
+        target_sheet: '五-1-2 应收账款会计政策'
+        target_field: 'measurement_class'
+        description: '计量分类 → 附注披露五-1-2 同步'
+        severity: required
+        direction: outbound
+
+      - ref_id: CW-D-D2-13-003
+        source_cell: 'C21-dynamic'         # 业务模式判定
+        target_wp: D2-8
+        target_sheet: '坏账准备计提会计政策检查'
+        target_field: 'ecl_model_basis'
+        description: '业务模式 → ECL 模型基础（仅摊余成本 / FVOCI 适用 ECL）'
+        severity: required
+        direction: outbound

@@ -1,0 +1,86 @@
+# backend/data/wp_render_schema/D2A.yaml
+# 应收账款实质性程序表 — A 类中控台渲染 schema
+# Requirements: 2.2 原则 2（配置驱动）+ 4.3.1（方案 C 还原约束）
+# Template: D2-1至D2-4 应收账款- 审定表明细表（Leap-常规程序）.xlsx
+
+wp_code: D2A
+template_path: backend/wp_templates/D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone]
+related_accounts:
+  - code: '1122'
+    name: 应收账款
+  - code: '1231'
+    name: 坏账准备
+
+sheets:
+  应收账款实质性程序表D2A:
+    component_type: a-program-console
+
+    # ─── 固定头部（自动填充，导出时写入） ───────────────────────────
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '应收账款实质性程序表'
+      A3: '${entity_name}'                    # 来自 project.client_name（模板公式 =底稿目录!A2）
+      A4: '${period_end}'                     # 来自 project.period_end（模板公式 =底稿目录!A3）
+      H3: '${index_no}'                       # 来自 wp_index.index_no
+      H4: '${page_no}'                        # 页码（默认 1/1）
+
+    # ─── 动态表格区（用户填写的程序清单） ──────────────────────────
+    dynamic_table:
+      start_row: 17
+      end_row: dynamic                         # 行数由用户数据决定
+      header_row: 16
+      columns:
+        A: { field: program_no, type: number }
+        B: { field: program_desc, type: text, max_length: 1000 }
+        C: { field: program_category, type: enum,
+             enum: ['常规★', 'IPO 加项', '备选程序', '舞弊应对'] }
+        D: { field: assertion.existence, type: boolean, render: 'checkmark' }
+        E: { field: assertion.completeness, type: boolean, render: 'checkmark' }
+        F: { field: assertion.rights, type: boolean, render: 'checkmark' }
+        G: { field: assertion.accuracy, type: boolean, render: 'checkmark' }
+        H: { field: assertion.presentation, type: boolean, render: 'checkmark' }
+        I: { field: linked_workpapers, type: text, render: 'index_chip' }
+        J: { field: trim_reason, type: text, conditional: "status='not_applicable'" }
+
+    # ─── 静态文本区（不可改，导出时跳过） ─────────────────────────
+    static_text:
+      rows: [1-4, 5-13, 14-16]               # 表头 + 涉及科目 + 审计目标认定 + 列标题
+      description: |
+        Row 1-4: 事务所名称 / 表名 / 被审计单位 / 审计截止日
+        Row 5-6: 本账户涉及的科目（应收账款 / 坏账准备）
+        Row 7-13: 审计目标和财务报表的认定（5 项认定 A~E）
+        Row 14-16: 程序清单列标题（序号/程序描述/类别/5项认定/关联底稿/裁剪理由）
+      footer_rows_after_dynamic: 3             # 尾部签字行（编制/复核/日期）
+
+    # ─── 公式区（保留模板原公式，导出时跳过） ─────────────────────
+    formulas:
+      preserve: true
+      cells:
+        - A3                                   # =底稿目录!A2（被审计单位名称）
+        - A4                                   # =底稿目录!A3（审计截止日）
+        - H3                                   # 索引号公式
+        - H4                                   # 页码公式
+        - I42                                  # 尾部汇总公式
+        - J42                                  # 尾部汇总公式
+
+    # ─── 合并单元格（openpyxl 加载时已含，导出时跳过） ────────────
+    merged_cells:
+      preserve: true
+      count: 24                                # 实测 24 个合并区域
+      description: |
+        主要合并区域：
+        - A1:J1（事务所名称横跨全宽）
+        - A2:G2（表名）
+        - A7:J7（审计目标标题）
+        - B8:J8 ~ B12:J12（5 项认定描述各横跨 B~J）
+
+    # ─── 跨底稿引用（GtIndexChip 渲染） ──────────────────────────
+    cross_refs:
+      - ref_id: CW-D2A-001
+        source_cell: A28
+        target_wp: D4
+        target_sheet: '营业收入审定表D4-1'
+        target_field: '审定数'
+        description: '营业收入审定数引用'

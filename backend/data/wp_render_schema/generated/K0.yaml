@@ -1,0 +1,740 @@
+# K0.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:58:53
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: K0
+template_path: backend/wp_templates/K/K0 管理循环函证.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:58:53'
+  source_xlsx: K0 管理循环函证.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：
+        D:
+          field: col_d
+          type: text
+          label: '1'
+        E:
+          field: col_e
+          type: text
+          label: 函证程序表
+        F:
+          field: col_f
+          type: text
+          label: K0A
+    static_text:
+      rows:
+      - 1-3
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A14:A16
+      - A17:A19
+      - A10:A13
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  函证程序表K0A:
+    component_type: a-program-console
+    class_code: A-程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 其他应收款/其他应付款/……函证程序
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+      E4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 审计程序
+        D:
+          field: col_d
+          type: text
+          label: 程序分类
+        E:
+          field: col_e
+          type: text
+          label: 底稿索引号
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - D3
+      - F3
+      - A4
+      - C4
+      - D4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 28
+      ranges_sample:
+      - E12:F12
+      - B16:C16
+      - B7:C7
+      - E5:F5
+      - E14:F14
+      - E17:F17
+      - E8:F8
+      - B12:C12
+      - A2:F2
+      - B11:C11
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  函证结果汇总表K0-1:
+    component_type: d-form-confirmation
+    class_code: D-函证
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 其他应收款/其他应付款/……函证结果汇总表
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 询证函索引号
+        C:
+          field: col_c
+          type: text
+          label: 发函询证纪要
+        G:
+          field: col_g
+          type: text
+          label: 1、发函信息
+        L:
+          field: col_l
+          type: text
+          label: 2、收到回函
+        S:
+          field: col_s
+          type: text
+          label: 3、回函金额确认
+        X:
+          field: col_x
+          type: text
+          label: 4、未收到回函的替代程序
+        AB:
+          field: col_ab
+          type: text
+          label: 审计结论
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - C3
+      - I3
+      - M3
+      - R3
+      - S3
+      - W3
+      - Y3
+      - AB3
+      - C4
+      - I4
+      - M4
+      - S4
+      - W4
+      - Y4
+      - D7
+      - G7
+      - J7
+      - K7
+      - M7
+      - Q7
+      - R7
+      - T7
+      - D8
+      - G8
+      - J8
+      - K8
+      - M8
+      - Q8
+      - R8
+      - T8
+      _total_count: 188
+    merged_cells:
+      preserve: true
+      count: 13
+      ranges_sample:
+      - S1:AB1
+      - A5:A6
+      - AB5:AB6
+      - L5:R5
+      - A2:R2
+      - S5:W5
+      - C28:D28
+      - G5:K5
+      - A1:R1
+      - S2:AB2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  核实被函证单位信息K0-2:
+    component_type: d-form-confirmation
+    class_code: D-函证
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 核实被函证单位信息
+      N3: ${index_no}
+      N4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 函证索引
+        B:
+          field: col_b
+          type: text
+          label: 被审计单位提供的被函证单位信息及核对（核实被函证单位信息）（
+        P:
+          field: col_p
+          type: text
+          label: 回函信息情况（回函核对记录）
+        AB:
+          field: col_ab
+          type: text
+          label: 第一次发函结果？（送抵/退回）（注2）
+        AC:
+          field: col_ac
+          type: text
+          label: 经核实的原因
+        AD:
+          field: col_ad
+          type: text
+          label: '该原因是否合理（是/否）
+
+            （注3）'
+        AE:
+          field: col_ae
+          type: text
+          label: '是否进行第二次发函？
+
+            （是/否）'
+        AF:
+          field: col_af
+          type: text
+          label: 第二次发函的被函证单位信息
+        AL:
+          field: col_al
+          type: text
+          label: '第二次发函结果？（送抵/退回）
+
+            （注4）'
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - C3
+      - F3
+      - K3
+      - O3
+      - P3
+      - T3
+      - W3
+      - AA3
+      - AB3
+      - AE3
+      - AH3
+      - AL3
+      - C4
+      - F4
+      - K4
+      - P4
+      - T4
+      - W4
+      - AB4
+      - AE4
+      - AH4
+      _total_count: 21
+    merged_cells:
+      preserve: true
+      count: 16
+      ranges_sample:
+      - A5:A6
+      - A1:N1
+      - AL5:AL6
+      - P1:AA1
+      - AF5:AK5
+      - AD5:AD6
+      - A2:N2
+      - P2:AA2
+      - AB2:AL2
+      - AB1:AL1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  跟函函证过程控制K0-3:
+    component_type: d-form-confirmation
+    class_code: D-函证
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 跟函函证过程控制
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+      E4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - D3
+      - F3
+      - A4
+      - C4
+      - D4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A2:F2
+      - A1:F1
+      - A5:F5
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  函证差异调节表K0-4:
+    component_type: d-form-confirmation
+    class_code: D-函证
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 其他应收款/其他应付款/……函证差异调节表
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 询证函索引号
+        B:
+          field: col_b
+          type: text
+          label: 被询证单位名称
+        C:
+          field: col_c
+          type: text
+          label: 账户/交易
+        D:
+          field: col_d
+          type: text
+          label: 发函金额
+        E:
+          field: col_e
+          type: text
+          label: 回函金额
+        F:
+          field: col_f
+          type: text
+          label: 差异
+        G:
+          field: col_g
+          type: text
+          label: 差异原因
+        H:
+          field: col_h
+          type: text
+          label: 相关支持性证据
+        I:
+          field: col_i
+          type: text
+          label: 是否调整
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - I3
+      - A4
+      - D4
+      - G4
+      - F6
+      - F7
+      - F8
+      - F9
+      - F10
+      - F11
+      - F12
+      - F13
+      - F14
+      - F15
+      - F16
+      - F17
+      - F18
+      - F19
+      - F20
+      - D21
+      - E21
+      - F21
+      _total_count: 25
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A1:I1
+      - A2:I2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  其他应收款替代程序K0-5:
+    component_type: a-program-console
+    class_code: A-替代程序
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 其他应收款替代程序检查表-XX公司
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 抽样总体：
+        B:
+          field: col_b
+          type: text
+          label: 测试总体扣除特定样本以外的样本，共XX笔、金额XX
+        H:
+          field: col_h
+          type: text
+          label: 确定的抽样样本量：
+        J:
+          field: col_j
+          type: text
+          label: 抽取XX笔（如果使用了样本计算器计算样本量，样本量计算过程见
+    static_text:
+      rows:
+      - 1-2
+      - 5-6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - I3
+      - N3
+      - A4
+      - F4
+      - I4
+      - E12
+      - E23
+      - H23
+      - E34
+      - E46
+      - M46
+      - E56
+      _total_count: 14
+    merged_cells:
+      preserve: true
+      count: 24
+      ranges_sample:
+      - N26:N27
+      - L48:L49
+      - M48:M49
+      - A15:E15
+      - F26:H26
+      - L15:L16
+      - F38:H38
+      - M15:M16
+      - A2:O2
+      - I48:K48
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  其他应付款替代程序K0-6:
+    component_type: a-program-console
+    class_code: A-替代程序
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 其他应付款替代程序检查表-XX公司
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 抽样总体：
+        B:
+          field: col_b
+          type: text
+          label: 测试总体扣除特定样本以外的样本，共XX笔、金额XX
+        H:
+          field: col_h
+          type: text
+          label: 确定的抽样样本量：
+        J:
+          field: col_j
+          type: text
+          label: 抽取XX笔
+        K:
+          field: col_k
+          type: text
+          label: （如果使用了样本计算器计算样本量，样本量计算过程见<XX>底
+    static_text:
+      rows:
+      - 1-2
+      - 5-6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - J3
+      - N3
+      - A4
+      - F4
+      - J4
+      - E12
+      - E23
+      - J23
+      - E34
+      - E46
+      - E56
+      _total_count: 13
+    merged_cells:
+      preserve: true
+      count: 25
+      ranges_sample:
+      - L48:L49
+      - N26:N27
+      - M48:M49
+      - A15:E15
+      - F26:H26
+      - L15:L16
+      - F38:H38
+      - M15:M16
+      - A2:O2
+      - F15:G15
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  邮件传真回函可靠性验证K0-7:
+    component_type: d-form-confirmation
+    class_code: D-函证
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 邮件/传真回函可靠性验证记录
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 函证索引号
+        C:
+          field: col_c
+          type: text
+          label: 被询证单位名称
+        D:
+          field: col_d
+          type: text
+          label: 回函方式
+        E:
+          field: col_e
+          type: text
+          label: 是否由审计项目组直接接收
+        F:
+          field: col_f
+          type: text
+          label: 是否寄回原件
+        G:
+          field: col_g
+          type: text
+          label: 期末未收回原件函证可靠性验证
+        N:
+          field: col_n
+          type: text
+          label: 回函可靠性结论
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - H3
+      - N3
+      - A4
+      - E4
+      - H4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 10
+      ranges_sample:
+      - A5:A6
+      - A1:N1
+      - N5:N6
+      - E5:E6
+      - A2:N2
+      - C5:C6
+      - F5:F6
+      - D5:D6
+      - B5:B6
+      - G5:M5
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  函证程序舞弊风险评价表K0-8:
+    component_type: d-form-confirmation
+    class_code: D-函证
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 函证程序舞弊风险评价表
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 与函证程序有关的舞弊风险迹象
+        G:
+          field: col_g
+          type: text
+          label: 是否存在
+        H:
+          field: col_h
+          type: text
+          label: 索引号或信息来源
+        I:
+          field: col_i
+          type: text
+          label: 应对措施
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - I3
+      - A4
+      - D4
+      - F4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 25
+      ranges_sample:
+      - A16:F16
+      - A12:F12
+      - A18:F18
+      - A26:F26
+      - A21:F21
+      - A2:I2
+      - A14:F14
+      - A5:F5
+      - A23:F23
+      - A8:F8
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

@@ -1,0 +1,100 @@
+# backend/data/wp_render_schema/G7A.yaml
+# 长期股权投资实质性程序表 — A 类中控台渲染 schema
+# Requirements: 2.2 原则 2（配置驱动）+ 4.3.1（方案 C 还原约束）
+# Template: G7 长期股权投资.xlsx
+
+wp_code: G7A
+template_path: backend/wp_templates/G/G7 长期股权投资.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone]
+related_accounts:
+  - code: '1511'
+    name: 长期股权投资
+  - code: '1512'
+    name: 长期股权投资减值准备
+
+sheets:
+  长期股权投资实质性程序表G7A:
+    component_type: a-program-console
+
+    # ─── 固定头部（自动填充，导出时写入） ───────────────────────────
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '长期股权投资实质性程序表'
+      A3: '${entity_name}'                    # 来自 project.client_name
+      A4: '${period_end}'                     # 来自 project.period_end
+      F3: '${index_no}'                       # 来自 wp_index.index_no
+      F4: '${page_no}'                        # 页码
+
+    # ─── 动态表格区（用户填写的程序清单） ──────────────────────────
+    dynamic_table:
+      start_row: 15
+      end_row: dynamic
+      header_row: 14
+      columns:
+        A: { field: program_no, type: number }
+        B: { field: program_desc, type: text, max_length: 1000 }
+        C: { field: program_category, type: enum,
+             enum: ['常规★', 'IPO 加项', '备选程序', '舞弊应对'] }
+        D: { field: assertion.existence, type: boolean, render: 'checkmark' }
+        E: { field: assertion.completeness, type: boolean, render: 'checkmark' }
+        F: { field: assertion.rights, type: boolean, render: 'checkmark' }
+        G: { field: assertion.accuracy, type: boolean, render: 'checkmark' }
+        H: { field: assertion.presentation, type: boolean, render: 'checkmark' }
+        I: { field: linked_workpapers, type: text, render: 'index_chip' }
+
+    # ─── 静态文本区（不可改，导出时跳过） ─────────────────────────
+    static_text:
+      rows: [1-4, 5-11, 12-14]               # 表头 + 涉及科目 + 审计目标认定 + 列标题
+      description: |
+        Row 1-4: 事务所名称 / 表名 / 被审计单位 / 审计截止日
+        Row 5-6: 本账户涉及的科目（长期股权投资 / 长期股权投资减值准备）
+        Row 7-11: 审计目标和财务报表的认定（5 项认定）
+          A. 资产负债表中记录的长期股权投资是存在的
+          B. 所有应记录的长期股权投资均已记录
+          C. 记录的长期股权投资由被审计单位拥有或控制
+          D. 长期股权投资以恰当的金额包括在财务报表中
+          E. 长期股权投资已被恰当地列报和披露
+        Row 12-14: 程序清单列标题
+      footer_rows_after_dynamic: 3             # 尾部签字行
+
+    # ─── 公式区（保留模板原公式，导出时跳过） ─────────────────────
+    formulas:
+      preserve: true
+      cells:
+        - A3                                   # =底稿目录!A2
+        - A4                                   # =底稿目录!A3
+        - F3                                   # 索引号公式
+        - F4                                   # 页码公式
+
+    # ─── 合并单元格（openpyxl 加载时已含，导出时跳过） ────────────
+    merged_cells:
+      preserve: true
+      count: 18                                # 估算合并区域数
+      description: |
+        主要合并区域：
+        - A1:I1（事务所名称横跨全宽）
+        - A2:E2（表名）
+        - A7:I7（审计目标标题）
+        - B8:I8 ~ B12:I12（5 项认定描述各横跨 B~I）
+
+    # ─── 跨底稿引用（GtIndexChip 渲染） ──────────────────────────
+    cross_refs:
+      - ref_id: CW-G7A-001
+        source_cell: A3
+        target_wp: 底稿目录
+        target_sheet: '底稿目录'
+        target_field: 'A2'
+        description: '被审计单位名称引用'
+      - ref_id: CW-G7A-002
+        source_cell: A4
+        target_wp: 底稿目录
+        target_sheet: '底稿目录'
+        target_field: 'A3'
+        description: '审计截止日引用'
+      - ref_id: CW-G7A-003
+        source_cell: control_test_ref
+        target_wp: C5
+        target_sheet: '投资循环控制测试'
+        target_field: '控制测试结论'
+        description: '控制测试结论引用 → 驱动程序范围'

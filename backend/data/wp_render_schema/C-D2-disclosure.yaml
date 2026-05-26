@@ -1,0 +1,637 @@
+# backend/data/wp_render_schema/C-D2-disclosure.yaml
+# 应收账款附注披露 — C 类附注嵌套表渲染 schema
+# Requirements: 3.4（C 附注披露详细需求）
+# Design: §3.5 GtCNoteTable（4-7 张子表 + 上市/国企版本切换 + 子表合计↔主表行实时联动）
+# Template: D2 应收账款附注披露 134×9（实测）/ 上市公司 253×13 / 国企 355×17
+# 适用范围：D2-1 应收账款审定表对应的「附注披露信息」sheet（按 standard 切版）
+# 关键挑战：
+#   1) 上市/国企两版本字段差异 30%-50%（国企多"母公司表决权说明"等）
+#   2) 大量"勿删/勿改"区 + "不适用的删除"标记 → hidden_subtables 软标记
+#   3) 子表合计必须等于主表对应行（inheritance_rules 实时校验）
+#   4) 与 trial_balance / disclosure_notes 模块单向同步取数
+
+wp_code: C-D2-disclosure
+template_path: backend/wp_templates/D/D2 应收账款附注披露.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+shared: false                              # 应收账款专属，不共享
+related_accounts:
+  - code: '1122'
+    name: 应收账款
+  - code: '1231'
+    name: 坏账准备
+  - code: '1231-02'
+    name: 坏账准备-应收账款
+
+sheets:
+  应收账款附注披露信息:
+    component_type: c-note-table
+
+    # ─── 版本变体（上市/国企切换的差异字段表） ─────────────────────
+    # 用户在 GtCNoteTable 切换 standard 时，按 sub_tables[*].applicable_to_sub_class
+    # 决定哪些子表 / 哪些列显示，共有字段值保留，差异字段 ElMessageBox 提示
+    version_variants:
+      listed:
+        label: '上市公司版'
+        extra_subtables: [single_provision_listed_disclosure]
+        extra_columns_in: { single_provision: [stage_3_lifetime_ecl_pct] }
+      soe:
+        label: '国企版'
+        extra_subtables: [parent_voting_rights_explanation]
+        extra_columns_in: { single_provision: [related_party_flag, parent_co_basis] }
+
+    # ─── 固定头部（自动填充，导出时写入） ───────────────────────────
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '应收账款附注披露信息'
+      A3: '${entity_name}'                  # 来自 project.client_name（=底稿目录!A2）
+      A4: '${period_end}'                   # 来自 project.period_end（=底稿目录!A3）
+      I3: '${index_no}'                     # 索引号（如 D2-2 / 五-1-1 应收账款）
+      I4: '${page_no}'
+
+    # ─── 上下文（disclosure section 锚点 + 单位+币种） ──────────────
+    fields:
+      - { name: section_id, label: '附注章节号', type: text,
+          cell: B6, readonly: true,
+          default: '五-1-1 应收账款' }
+      - { name: monetary_unit, label: '金额单位', type: enum,
+          cell: F6, default: '元',
+          enum: ['元', '千元', '万元', '百万元'] }
+      - { name: currency_code, label: '币种', type: enum,
+          cell: H6, default: 'CNY',
+          enum: ['CNY', 'USD', 'HKD', 'EUR', 'JPY'] }
+
+    # ─── 子表组（4-7 张，按 design §3.5 SubTableSchema） ───────────
+    # 每张子表独立渲染为可折叠卡片，支持显示/隐藏（"不适用"软标记）
+    sub_tables:
+
+      # ━━━ 子表 1：按种类披露（期末）— static_rows ━━━━━━━━━━━━━━━━
+      - id: by_category_period_end
+        title: '一、应收账款按种类披露（期末数）'
+        type: static_rows                    # 静态行（坏账分类预设 6 行）
+        applicable_to_sub_class: [listed, soe]
+        order: 1
+        excel_anchor:
+          sheet: 应收账款附注披露信息
+          start_row: 12
+          start_col: A
+          header_row: 11
+        description: '按"单项/组合"两大类 + 4 子分类预设展示余额/坏账准备/比例'
+        columns:
+          A: { field: category_label, type: text, label: '类别', readonly: true, width: 280 }
+          B: { field: book_balance, type: number, label: '账面余额', render: 'amount', width: 130 }
+          C: { field: book_balance_pct, type: number, label: '比例(%)', render: 'percent', width: 90 }
+          D: { field: bad_debt_provision, type: number, label: '坏账准备', render: 'amount', width: 130 }
+          E: { field: provision_pct, type: number, label: '计提比例(%)', render: 'percent', width: 110 }
+          F: { field: book_value, type: number, label: '账面价值', render: 'amount_formula',
+               formula: '=B-D', width: 130 }
+        static_rows:
+          - { id: cat_single, label: '一、单项计提坏账准备的应收账款', is_subtotal: true }
+          - { id: cat_portfolio, label: '二、组合计提坏账准备的应收账款', is_subtotal: true }
+          - { id: cat_portfolio_aging, label: '  其中：账龄分析法组合', indent: 1 }
+          - { id: cat_portfolio_customer, label: '  其中：客户类型组合', indent: 1 }
+          - { id: cat_portfolio_product, label: '  其中：产品类型组合', indent: 1 }
+          - { id: cat_total, label: '合计', is_grand_total: true }
+
+      # ━━━ 子表 2：按种类披露（期初）— static_rows ━━━━━━━━━━━━━━━━
+      - id: by_category_period_begin
+        title: '一、应收账款按种类披露（期初数）'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 2
+        excel_anchor:
+          sheet: 应收账款附注披露信息
+          start_row: 22
+          start_col: A
+          header_row: 21
+        description: '与期末数对应的期初分类披露（结构相同）'
+        columns:
+          A: { field: category_label, type: text, label: '类别', readonly: true, width: 280 }
+          B: { field: book_balance, type: number, label: '账面余额', render: 'amount', width: 130 }
+          C: { field: book_balance_pct, type: number, label: '比例(%)', render: 'percent', width: 90 }
+          D: { field: bad_debt_provision, type: number, label: '坏账准备', render: 'amount', width: 130 }
+          E: { field: provision_pct, type: number, label: '计提比例(%)', render: 'percent', width: 110 }
+          F: { field: book_value, type: number, label: '账面价值', render: 'amount_formula',
+               formula: '=B-D', width: 130 }
+        static_rows:
+          - { id: cat_single, label: '一、单项计提坏账准备的应收账款', is_subtotal: true }
+          - { id: cat_portfolio, label: '二、组合计提坏账准备的应收账款', is_subtotal: true }
+          - { id: cat_portfolio_aging, label: '  其中：账龄分析法组合', indent: 1 }
+          - { id: cat_portfolio_customer, label: '  其中：客户类型组合', indent: 1 }
+          - { id: cat_portfolio_product, label: '  其中：产品类型组合', indent: 1 }
+          - { id: cat_total, label: '合计', is_grand_total: true }
+
+      # ━━━ 子表 3：单项计提坏账准备明细 — dynamic_rows ━━━━━━━━━━━━━
+      - id: single_provision
+        title: '二、单项计提坏账准备的应收账款（按单位逐项披露）'
+        type: dynamic_rows                   # 动态行：用户按客户单位增删
+        applicable_to_sub_class: [listed, soe]
+        order: 3
+        excel_anchor:
+          sheet: 应收账款附注披露信息
+          start_row: 34
+          start_col: A
+          header_row: 33
+        max_rows: 200
+        add_row_button: true
+        description: '余额≥重要性水平的单项客户逐项披露（金额/坏账准备/比例/原因）'
+        columns:
+          A: { field: seq, type: number, label: '序号', auto_increment: true, width: 60 }
+          B: { field: debtor_name, type: text, label: '欠款方名称',
+               max_length: 200, required: true, width: 220 }
+          C: { field: book_balance, type: number, label: '期末余额', render: 'amount',
+               required: true, width: 130 }
+          D: { field: provision_amount, type: number, label: '坏账准备', render: 'amount',
+               required: true, width: 130 }
+          E: { field: provision_pct, type: number, label: '计提比例(%)', render: 'percent',
+               width: 110, formula: '=D/C*100' }
+          F: { field: provision_reason, type: textarea, label: '计提理由',
+               max_length: 1000, required: true, width: 280 }
+          G: { field: aging_bucket, type: enum, label: '账龄',
+               enum: ['1年以内', '1-2年', '2-3年', '3-4年', '4-5年', '5年以上'], width: 100 }
+          # 上市公司专属列（version_variants.listed.extra_columns_in.single_provision）
+          H: { field: stage_3_lifetime_ecl_pct, type: number,
+               label: '阶段3整个存续期 ECL 比例(%)',
+               render: 'percent', width: 160,
+               applicable_to_sub_class: [listed] }
+          # 国企专属列
+          I: { field: related_party_flag, type: boolean,
+               label: '是否关联方', render: 'checkmark', width: 90,
+               applicable_to_sub_class: [soe] }
+          J: { field: parent_co_basis, type: textarea,
+               label: '母公司表决权说明',
+               max_length: 500, width: 220,
+               applicable_to_sub_class: [soe] }
+        # 子表底部合计行（开启后自动从 dynamic 行 SUM 派生）
+        footer_total:
+          enabled: true
+          label: '合计'
+          sum_columns: [C, D]
+          formula_columns:
+            E: 'SUM(D)/SUM(C)*100'
+
+      # ━━━ 子表 4：账龄组合（期末）— static_rows ━━━━━━━━━━━━━━━━━
+      - id: aging_period_end
+        title: '三、账龄分析法组合（期末数）'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 4
+        excel_anchor:
+          sheet: 应收账款附注披露信息
+          start_row: 56
+          start_col: A
+          header_row: 55
+        description: '6 个账龄分桶 × 余额 × 坏账准备 × 计提比例'
+        columns:
+          A: { field: aging_label, type: text, label: '账龄', readonly: true, width: 200 }
+          B: { field: book_balance, type: number, label: '账面余额', render: 'amount', width: 130 }
+          C: { field: provision_pct_setting, type: number, label: '预期信用损失率(%)',
+               render: 'percent', width: 140 }
+          D: { field: provision_amount, type: number, label: '坏账准备', render: 'amount_formula',
+               formula: '=B*C/100', width: 130 }
+          E: { field: book_value, type: number, label: '账面价值', render: 'amount_formula',
+               formula: '=B-D', width: 130 }
+        static_rows:
+          - { id: aging_within_1y, label: '1年以内（含1年）' }
+          - { id: aging_1_2y, label: '1-2年' }
+          - { id: aging_2_3y, label: '2-3年' }
+          - { id: aging_3_4y, label: '3-4年' }
+          - { id: aging_4_5y, label: '4-5年' }
+          - { id: aging_over_5y, label: '5年以上' }
+          - { id: aging_total, label: '合计', is_grand_total: true }
+
+      # ━━━ 子表 5：账龄组合（期初）— static_rows ━━━━━━━━━━━━━━━━━
+      - id: aging_period_begin
+        title: '三、账龄分析法组合（期初数）'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 5
+        excel_anchor:
+          sheet: 应收账款附注披露信息
+          start_row: 67
+          start_col: A
+          header_row: 66
+        description: '与期末数对应的期初账龄披露（结构相同）'
+        columns:
+          A: { field: aging_label, type: text, label: '账龄', readonly: true, width: 200 }
+          B: { field: book_balance, type: number, label: '账面余额', render: 'amount', width: 130 }
+          C: { field: provision_pct_setting, type: number, label: '预期信用损失率(%)',
+               render: 'percent', width: 140 }
+          D: { field: provision_amount, type: number, label: '坏账准备', render: 'amount_formula',
+               formula: '=B*C/100', width: 130 }
+          E: { field: book_value, type: number, label: '账面价值', render: 'amount_formula',
+               formula: '=B-D', width: 130 }
+        static_rows:
+          - { id: aging_within_1y, label: '1年以内（含1年）' }
+          - { id: aging_1_2y, label: '1-2年' }
+          - { id: aging_2_3y, label: '2-3年' }
+          - { id: aging_3_4y, label: '3-4年' }
+          - { id: aging_4_5y, label: '4-5年' }
+          - { id: aging_over_5y, label: '5年以上' }
+          - { id: aging_total, label: '合计', is_grand_total: true }
+
+      # ━━━ 子表 6：客户类型 / 产品类型 / 自定义组合 — dynamic_rows ━━━
+      - id: portfolio_custom
+        title: '四、其他组合（客户类型 / 产品类型 / 自定义命名）'
+        type: dynamic_rows                   # 动态命名 + 动态行
+        applicable_to_sub_class: [listed, soe]
+        order: 6
+        excel_anchor:
+          sheet: 应收账款附注披露信息
+          start_row: 80
+          start_col: A
+          header_row: 79
+        max_rows: 50
+        add_row_button: true
+        description: '用户可自定义组合名称（如"国有大客户" / "经销商"），按组合披露余额/比例'
+        columns:
+          A: { field: portfolio_name, type: text, label: '组合名称',
+               max_length: 100, required: true, width: 220,
+               hint: '如"账龄组合"/"客户类型组合"/"自定义"' }
+          B: { field: portfolio_basis, type: textarea, label: '组合判定依据',
+               max_length: 500, width: 280 }
+          C: { field: book_balance, type: number, label: '账面余额', render: 'amount', width: 130 }
+          D: { field: provision_amount, type: number, label: '坏账准备', render: 'amount', width: 130 }
+          E: { field: provision_pct, type: number, label: '计提比例(%)',
+               render: 'percent', width: 110 }
+          F: { field: book_value, type: number, label: '账面价值',
+               render: 'amount_formula', formula: '=C-D', width: 130 }
+        footer_total:
+          enabled: true
+          label: '合计'
+          sum_columns: [C, D]
+
+      # ━━━ 子表 7：本期计提/收回/转回（流水账） — static_rows ━━━━━━
+      - id: period_movement
+        title: '五、本期坏账准备变动（计提/收回/转回/核销）'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 7
+        excel_anchor:
+          sheet: 应收账款附注披露信息
+          start_row: 96
+          start_col: A
+          header_row: 95
+        description: '坏账准备本期变动表（期初 + 计提 + 收回 + 转回 + 核销 = 期末）'
+        columns:
+          A: { field: movement_label, type: text, label: '变动项目', readonly: true, width: 280 }
+          B: { field: stage_1_amount, type: number, label: '阶段1（12个月ECL）',
+               render: 'amount', width: 160,
+               applicable_to_sub_class: [listed] }
+          C: { field: stage_2_amount, type: number, label: '阶段2（整个存续期ECL-未减值）',
+               render: 'amount', width: 220,
+               applicable_to_sub_class: [listed] }
+          D: { field: stage_3_amount, type: number, label: '阶段3（整个存续期ECL-已减值）',
+               render: 'amount', width: 220,
+               applicable_to_sub_class: [listed] }
+          # 国企版只有总额列
+          E: { field: total_amount, type: number, label: '总额',
+               render: 'amount', width: 140,
+               applicable_to_sub_class: [soe] }
+        static_rows:
+          - { id: mv_period_begin, label: '期初余额' }
+          - { id: mv_provision_current, label: '本期计提' }
+          - { id: mv_recovered, label: '本期收回（直接计入损益）' }
+          - { id: mv_reversed, label: '本期转回' }
+          - { id: mv_writeoff, label: '本期核销' }
+          - { id: mv_other_changes, label: '其他变动' }
+          - { id: mv_period_end, label: '期末余额', is_grand_total: true }
+
+      # ━━━ 子表 8：重要核销逐项披露 — dynamic_rows ━━━━━━━━━━━━━━━━
+      - id: material_writeoff
+        title: '六、本期重要核销逐项披露'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 8
+        excel_anchor:
+          sheet: 应收账款附注披露信息
+          start_row: 110
+          start_col: A
+          header_row: 109
+        max_rows: 100
+        add_row_button: true
+        description: '本期核销金额≥重要性水平的客户逐项披露（性质/金额/原因/履行程序）'
+        columns:
+          A: { field: seq, type: number, label: '序号', auto_increment: true, width: 60 }
+          B: { field: debtor_name, type: text, label: '欠款单位名称',
+               max_length: 200, required: true, width: 220 }
+          C: { field: writeoff_nature, type: text, label: '款项性质',
+               max_length: 200, width: 200 }
+          D: { field: writeoff_amount, type: number, label: '核销金额',
+               render: 'amount', required: true, width: 130 }
+          E: { field: writeoff_reason, type: textarea, label: '核销原因',
+               max_length: 1000, required: true, width: 280 }
+          F: { field: writeoff_procedure, type: textarea, label: '履行的核销程序',
+               max_length: 1000, required: true, width: 280 }
+          G: { field: arises_from_related_party, type: boolean,
+               label: '是否产生于关联方', render: 'checkmark', width: 130 }
+        footer_total:
+          enabled: true
+          label: '合计'
+          sum_columns: [D]
+
+      # ━━━ 子表 9（仅上市）：信用风险敞口分析披露 ━━━━━━━━━━━━━━━━━
+      - id: single_provision_listed_disclosure
+        title: '七、信用风险敞口分析（上市公司专属）'
+        type: static_rows
+        applicable_to_sub_class: [listed]    # 仅上市版可见
+        order: 9
+        excel_anchor:
+          sheet: 应收账款附注披露信息
+          start_row: 130
+          start_col: A
+          header_row: 129
+        description: '按 ECL 三阶段披露信用风险敞口（仅上市公司必填）'
+        columns:
+          A: { field: ecl_stage, type: text, label: 'ECL 阶段', readonly: true, width: 280 }
+          B: { field: gross_carrying_amount, type: number, label: '账面余额',
+               render: 'amount', width: 150 }
+          C: { field: ecl_amount, type: number, label: '预期信用损失',
+               render: 'amount', width: 150 }
+          D: { field: net_carrying_amount, type: number, label: '账面价值',
+               render: 'amount_formula', formula: '=B-C', width: 150 }
+        static_rows:
+          - { id: stage_1, label: '阶段1：未来12个月预期信用损失' }
+          - { id: stage_2, label: '阶段2：整个存续期预期信用损失（未发生信用减值）' }
+          - { id: stage_3, label: '阶段3：整个存续期预期信用损失（已发生信用减值）' }
+          - { id: stage_total, label: '合计', is_grand_total: true }
+
+      # ━━━ 子表 10（仅国企）：母公司表决权说明 ━━━━━━━━━━━━━━━━━━
+      - id: parent_voting_rights_explanation
+        title: '七、母公司表决权及关联方应收说明（国企专属）'
+        type: dynamic_rows
+        applicable_to_sub_class: [soe]       # 仅国企版可见
+        order: 10
+        excel_anchor:
+          sheet: 应收账款附注披露信息
+          start_row: 145
+          start_col: A
+          header_row: 144
+        max_rows: 50
+        description: '国企背景下关联方表决权 + 资金占用情况披露'
+        columns:
+          A: { field: seq, type: number, label: '序号', auto_increment: true, width: 60 }
+          B: { field: related_party_name, type: text, label: '关联方名称',
+               max_length: 200, required: true, width: 220 }
+          C: { field: relationship, type: enum, label: '关联关系',
+               enum: ['母公司', '同一控制下子公司', '联营企业', '合营企业',
+                      '同一最终控制方', '其他'],
+               required: true, width: 160 }
+          D: { field: voting_rights_pct, type: number, label: '表决权比例(%)',
+               render: 'percent', width: 130 }
+          E: { field: outstanding_amount, type: number, label: '期末余额',
+               render: 'amount', width: 130 }
+          F: { field: business_substance, type: textarea, label: '业务实质说明',
+               max_length: 1000, width: 280 }
+
+    # ─── 子表合计 → 主表对应行 联动规则（design §3.5 inheritance_rules） ─
+    # 当 source 子表的 sum_field 变化时，自动更新 target 子表的 row+column
+    # GtCNoteTable 实时校验（绿色✓ / 红色✗ + 差异金额提示）
+    inheritance_rules:
+
+      # 单项合计 → 按种类期末「单项计提」行
+      - id: single_to_category_end
+        source: { sub_table: single_provision, sum_field: book_balance }
+        target: { sub_table: by_category_period_end, row: cat_single, column: book_balance }
+        formula: SUM
+        validation: equal                     # 必须严格相等（容差 0.01）
+        on_mismatch: error                    # 不等则阻止保存
+        description: '单项计提子表余额合计 = 按种类期末"单项"行余额'
+
+      - id: single_provision_to_category_end
+        source: { sub_table: single_provision, sum_field: provision_amount }
+        target: { sub_table: by_category_period_end, row: cat_single, column: bad_debt_provision }
+        formula: SUM
+        validation: equal
+        on_mismatch: error
+        description: '单项计提坏账合计 = 按种类期末"单项"行坏账准备'
+
+      # 账龄合计 → 按种类期末「账龄分析法组合」行
+      - id: aging_to_category_end_balance
+        source: { sub_table: aging_period_end, sum_field: book_balance,
+                  exclude_rows: [aging_total] }
+        target: { sub_table: by_category_period_end,
+                  row: cat_portfolio_aging, column: book_balance }
+        formula: SUM
+        validation: equal
+        on_mismatch: error
+        description: '账龄期末 6 桶余额合计 = 按种类期末"账龄组合"行余额'
+
+      - id: aging_to_category_end_provision
+        source: { sub_table: aging_period_end, sum_field: provision_amount,
+                  exclude_rows: [aging_total] }
+        target: { sub_table: by_category_period_end,
+                  row: cat_portfolio_aging, column: bad_debt_provision }
+        formula: SUM
+        validation: equal
+        on_mismatch: error
+        description: '账龄期末 6 桶坏账合计 = 按种类期末"账龄组合"行坏账准备'
+
+      # 期初版本（账龄期初 → 按种类期初）
+      - id: aging_to_category_begin_balance
+        source: { sub_table: aging_period_begin, sum_field: book_balance,
+                  exclude_rows: [aging_total] }
+        target: { sub_table: by_category_period_begin,
+                  row: cat_portfolio_aging, column: book_balance }
+        formula: SUM
+        validation: equal
+        on_mismatch: error
+
+      # 期末汇总行 = 主表合计 = 试算表审定数（双向勾稽）
+      - id: category_end_total_to_tb
+        source: { sub_table: by_category_period_end, row: cat_total, column: book_balance }
+        target:
+          external: trial_balance
+          query: { account_code: '1122', period: 'period_end', field: 'audited_amount' }
+        validation: equal
+        on_mismatch: warning                  # 试算表数据可能未更新，仅警告
+        description: '主表合计期末账面余额 = 试算表 1122 应收账款审定数'
+
+      - id: category_end_provision_to_tb
+        source: { sub_table: by_category_period_end, row: cat_total, column: bad_debt_provision }
+        target:
+          external: trial_balance
+          query: { account_code: '1231-02', period: 'period_end', field: 'audited_amount' }
+        validation: equal
+        on_mismatch: warning
+        description: '主表合计期末坏账准备 = 试算表 1231-02 坏账准备-应收账款审定数'
+
+      # 本期变动表勾稽（期末 = 期初 + 计提 - 收回 - 转回 - 核销 ± 其他）
+      - id: movement_period_end_check
+        source:
+          sub_table: period_movement
+          formula: |
+            mv_period_begin + mv_provision_current
+            - mv_recovered - mv_reversed - mv_writeoff
+            + mv_other_changes
+        target: { sub_table: period_movement, row: mv_period_end, column: total_amount }
+        validation: equal
+        on_mismatch: error
+        description: '坏账准备期末余额勾稽公式：期末=期初+计提-收回-转回-核销+其他'
+
+      # 重要核销合计 ≤ 本期核销总额（不能超过流水账）
+      - id: writeoff_lte_period_movement
+        source: { sub_table: material_writeoff, sum_field: writeoff_amount }
+        target: { sub_table: period_movement, row: mv_writeoff, column: total_amount }
+        validation: less_than_or_equal
+        on_mismatch: warning
+        description: '重要核销合计 ≤ 本期变动表"本期核销"行（重要性水平筛选下的子集）'
+
+    # ─── 隐藏子表（"不适用"软标记，导出时保留合并区但 cell 留空 + 批注） ─
+    # 用户在 GtCNoteTable 点"不适用"按钮 → 写入此数组 → 子表卡片折叠+灰显
+    # 不真删数据，可恢复（解决 Excel "不适用的删除" 不可逆问题）
+    hidden_subtables:
+      semantics: soft_hide                    # 软隐藏（导出 xlsx 时 cell 写空 + 批注"已标记不适用"）
+      default: []                              # 默认全显示
+      # 用户保存到 working_paper.parsed_data.html_data.hidden_subtables 数组
+
+    # ─── 静态文本区（不可改，导出时跳过） ─────────────────────────
+    static_text:
+      rows: [1-4, 5-10]                      # 表头 + 编辑指引段落
+      description: |
+        Row 1-4: 事务所名称 / 表名 / 被审计单位 / 审计截止日
+        Row 5-10: 编辑指引段落（"按下列格式披露"/"不适用的删除"等）
+        子表前各 1-3 行编辑指引随子表显示/隐藏
+      footer_rows_after_dynamic: 5            # 尾部签字行 + 编制 + 复核 + 日期
+
+    # ─── 公式区（保留模板原公式，导出时跳过） ─────────────────────
+    formulas:
+      preserve: true
+      cells:
+        - A3                                  # =底稿目录!A2
+        - A4                                  # =底稿目录!A3
+        - I3                                  # 索引号公式
+        - I4                                  # 页码公式
+        # 各子表 F 列「账面价值」= 余额 - 坏账准备（保留模板内置公式，HTML 端实时计算 + 导出回写）
+
+    # ─── 合并单元格 ──────────────────────────────────────────────
+    merged_cells:
+      preserve: true
+      count: 187                              # 国企版实测 187 处合并
+      description: |
+        主要合并区域：
+        - A1:I1 / A2:I2（事务所 + 表名横跨全宽）
+        - 各子表标题行 A:I 横跨
+        - 编辑指引段落 A:I 横跨
+        - 各子表底部"勿删/勿改"提示 A:I 横跨
+        - 国企版多 187 处合并集中在"母公司表决权说明"区
+
+    # ─── 跨底稿引用（GtIndexChip 渲染） ──────────────────────────
+    cross_refs:
+      # 主表合计 ← D2-1 审定表（同底稿，自动取数）
+      - ref_id: CW-C-D2-disclosure-001
+        source: { sub_table: by_category_period_end, row: cat_total, column: book_balance }
+        target_wp: D2-1
+        target_sheet: '应收账款审定表'
+        target_field: '审定数(期末)'
+        description: '主表合计期末余额 ← D2-1 审定表期末审定数（自动取数）'
+        severity: required
+        direction: inbound
+        auto_pull: true                       # GtCNoteTable 加载时自动 query_workpaper API
+
+      # 单项计提 ← D2-9 坏账准备测算表
+      - ref_id: CW-C-D2-disclosure-002
+        source: { sub_table: single_provision }
+        target_wp: D2-9
+        target_sheet: '坏账准备测算表'
+        target_field: 'single_provision_table'
+        description: '单项计提子表 ← D2-9 测算表单项计提明细（建议复制带回）'
+        severity: optional
+        direction: inbound
+
+      # 账龄组合 ← D2-9 账龄测算表
+      - ref_id: CW-C-D2-disclosure-003
+        source: { sub_table: aging_period_end }
+        target_wp: D2-9
+        target_sheet: '账龄分析表'
+        target_field: 'aging_buckets_period_end'
+        description: '账龄期末 ← D2-9 账龄分析表（自动取数）'
+        severity: required
+        direction: inbound
+        auto_pull: true
+
+      # 业务模式判定 ← D2-13（影响"应收账款 vs 应收款项融资"分流）
+      - ref_id: CW-C-D2-disclosure-004
+        source_cell: A6                       # 章节号上方业务模式标签
+        target_wp: D2-13
+        target_sheet: '应收账款业务模式分析'
+        target_field: 'business_model_classification'
+        description: '业务模式 ← D2-13 业务模式分析（应收账款 / 应收款项融资 / FVTPL 分流）'
+        severity: required
+        direction: inbound
+
+      # 坏账政策引用 ← D2-8 政策检查
+      - ref_id: CW-C-D2-disclosure-005
+        source: { sub_table: aging_period_end, column: provision_pct_setting }
+        target_wp: D2-8
+        target_sheet: '坏账准备计提会计政策检查'
+        target_field: 'aging_provision_pct_table'
+        description: '账龄计提比例 ← D2-8 政策检查的账龄比例表（自动取数）'
+        severity: required
+        direction: inbound
+        auto_pull: true
+
+      # 报表勾稽（出向）→ A1 BS 应收账款行
+      - ref_id: CW-C-D2-disclosure-006
+        source: { sub_table: by_category_period_end, row: cat_total, column: book_value }
+        target_wp: A1
+        target_sheet: '资产负债表'
+        target_field: 'BS-008 应收账款 期末余额'
+        description: '主表合计账面价值 → BS 应收账款行（净额）'
+        severity: required
+        direction: outbound
+
+      # 附注模块同步（出向）→ disclosure_notes 模块
+      - ref_id: CW-C-D2-disclosure-007
+        source: full_sheet
+        target_wp: 'disclosure_notes'
+        target_section: '五-1-1 应收账款'
+        target_field: 'all_subtables'
+        description: 'C 类附注 sheet → disclosure_notes 模块单向同步（推荐方案 6.2 选项 A）'
+        severity: required
+        direction: outbound
+        sync_strategy: push_on_save           # 保存时触发 POST /disclosure-notes/sync-from-workpaper
+
+    # ─── 联动语义（design §3.11.5 Layer 2-4 跨级联动） ─────────────
+    linkage:
+      # Layer 2：同 sheet 子表↔主表行（inheritance_rules 已覆盖）
+      # Layer 3：同 wp 跨 sheet（D2-1 审定表 / D2-8 政策 / D2-9 测算 / D2-13 业务模式）
+      # Layer 4：跨模块（A1 报表 / disclosure_notes 附注 / 项目仪表盘 / 委派矩阵）
+
+      upstream:
+        - source: trial_balance
+          fields: [account_code=1122, account_code=1231-02]
+          trigger: on_mount + on_recalc
+          action: 'auto_pull_audited_amount'
+          description: '挂载时 / 试算表重算后自动同步主表合计（外部勾稽源）'
+
+        - source: D2-1
+          trigger: 'workpaper:saved'
+          action: 'refresh_total_row'
+          description: 'D2-1 保存后刷新主表合计（cross-ref:updated 事件）'
+
+        - source: D2-9
+          trigger: 'workpaper:saved'
+          action: 'refresh_single_provision + refresh_aging'
+          description: 'D2-9 测算表保存后刷新单项计提 + 账龄子表'
+
+        - source: D2-13
+          trigger: 'workpaper:saved'
+          action: 'refresh_business_model_classification'
+          description: 'D2-13 业务模式判定变化 → 影响应收账款 vs 应收款项融资分流'
+
+      downstream:
+        - target: disclosure_notes
+          condition: 'on_save'
+          action: 'sync_to_disclosure_notes'
+          description: 'C 类保存 → 单向同步到 disclosure_notes 模块（推荐方案 6.2 A）'
+
+        - target: A1
+          condition: 'on_total_row_change'
+          action: 'mark_report_stale'
+          description: '主表合计变化 → 报表标记 stale → 触发 cross-ref:updated 事件'
+
+        - target: cross_wp_references
+          condition: 'on_subtable_change'
+          action: 'detect_changes_and_publish'
+          description: '子表变化 → cross_ref_service.detect_changes → SSE 发布 affected 列表'

@@ -1,0 +1,152 @@
+# backend/data/wp_render_schema/E-C12.yaml
+# 控制测试汇总表 — E 类 summary 子模式渲染 schema
+# Requirements: 3.6.1（控制测试汇总表 C12 等）
+# Design: §3.7 GtEControlTest（test_type=summary）
+# Template: C12 各循环控制测试汇总表（48 行 × 15 列）
+# 适用范围：C2~C20 各循环的「控制测试汇总表」共 14 sheet（E4 类）
+
+wp_code: E-C12
+template_path: backend/wp_templates/C/C12 控制测试汇总表.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+shared: true                               # 共享模板（C2~C20 各循环复用此结构）
+related_accounts: []                       # 控制测试不直接对应特定科目
+
+sheets:
+  控制测试汇总表:
+    component_type: e-control-test
+    test_type: summary                      # E 类三种 test_type 之一
+
+    # ─── 固定头部（自动填充，导出时写入） ───────────────────────────
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '控制测试汇总表'
+      A3: '${entity_name}'                  # 来自 project.client_name（=底稿目录!A2）
+      A4: '${period_end}'                   # 来自 project.period_end（=底稿目录!A3）
+      O3: '${index_no}'                     # 索引号（C12 / C2-1 等）
+      O4: '${page_no}'                      # 页码
+
+    # ─── 主表区（控制汇总，48 行 × 15 列） ────────────────────────
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic                       # 行数由用户填写决定
+      header_row: 7
+      columns:
+        A: { field: sub_process, type: text, label: '子流程',
+             max_length: 100, render: 'select_or_text' }
+        B: { field: control_no, type: text, label: '控制编号',
+             pattern: '^[A-Z0-9.\-]+$', max_length: 30 }
+        C: { field: control_name, type: text, label: '控制名称', max_length: 200 }
+        D: { field: control_desc, type: text, label: '详细描述', max_length: 2000 }
+        E: { field: affected_transactions, type: text, label: '受影响交易', max_length: 200 }
+        F: { field: assertions, type: multi_enum, label: '认定',
+             enum: ['存在', '完整', '权利义务', '准确', '列报'] }
+        G: { field: control_attribute, type: enum, label: '控制属性',
+             enum: ['预防性', '发现性'] }
+        H: { field: frequency, type: enum, label: '频率',
+             enum: ['每笔交易', '每日', '每周', '每月', '每季度', '每半年', '每年', '不定期'] }
+        I: { field: risk_level, type: enum, label: '风险',
+             enum: ['高', '中', '低'] }
+        J: { field: test_method, type: multi_enum, label: '测试方法',
+             enum: ['询问', '观察', '检查', '重新执行', '穿行测试'] }
+        K: { field: sample_size, type: number, label: '样本量', min: 0 }
+        L: { field: deviations, type: number, label: '偏差', min: 0 }
+        M: { field: remediation, type: text, label: '整改', max_length: 500 }
+        N: { field: deficiency, type: enum, label: '缺陷',
+             enum: ['无', '控制缺陷', '重大缺陷'] }
+        O: { field: index_ref, type: text, label: '索引号', render: 'index_chip' }
+
+    # ─── 提示区（折叠展开，长段落，导出时跳过） ─────────────────────
+    hints:
+      - id: risk_notes
+        label: '与控制相关的风险说明'
+        collapsible: true
+        default_collapsed: true              # 默认折叠（占大半篇幅）
+        items:
+          - { no: 1, content: '识别业务流程中的关键控制点，确保覆盖所有重大风险' }
+          - { no: 2, content: '区分预防性控制（事前）与发现性控制（事后）' }
+          - { no: 3, content: '自动控制 vs 人工控制：自动控制需测试 ITGC' }
+          - { no: 4, content: '高频控制（每笔/每日）样本量需相应增加' }
+          - { no: 5, content: '对账类控制需关注差异调查及时性' }
+          - { no: 6, content: '权限控制需测试授权矩阵与实际审批一致性' }
+          - { no: 7, content: '系统控制需测试参数配置正确性' }
+          - { no: 8, content: '管理层凌驾于控制之上的应对程序' }
+          - { no: 9, content: '舞弊风险点需设计专门的反舞弊控制' }
+          - { no: 10, content: '控制偏差需评价根本原因（随机偏差 vs 系统性偏差）' }
+
+      - id: sample_size_table
+        label: '样本规模区间表（致同方法论）'
+        collapsible: true
+        default_collapsed: true
+        type: reference_table
+        columns: ['频率', '样本量下限', '样本量上限', '说明']
+        rows:
+          - ['每笔交易', 25, 60, '按风险高低取区间值']
+          - ['每日', 25, 30, '约 1 个月样本']
+          - ['每周', 5, 10, '约 1-2 季度样本']
+          - ['每月', 2, 5, '约半年-全年样本']
+          - ['每季度', 2, 2, '全年 4 笔取 2 笔']
+          - ['每半年', 1, 2, '全年 2 笔取 1-2 笔']
+          - ['每年', 1, 1, '全年 1 笔']
+
+    # ─── 静态文本区（不可改，导出时跳过） ─────────────────────────
+    static_text:
+      rows: [1-4, 5-7]                       # 表头 + 列标题
+      description: |
+        Row 1-4: 事务所名称 / 表名 / 被审计单位 / 审计截止日
+        Row 5-6: 控制了解索引引用（指向 B 类底稿）
+        Row 7: 主表列标题
+      footer_rows_after_dynamic: 3            # 尾部签字行（编制 / 复核 / 日期）
+
+    # ─── 结论区（与汇总表一一对应：每行控制对应一个偏差评价） ────────
+    conclusion:
+      mode: per_row                          # 每行控制独立结论（联动 N 列缺陷）
+      options:
+        - { value: control_effective, label: '控制有效', class: 'success' }
+        - { value: extended_effective, label: '扩大测试有效', class: 'warning' }
+        - { value: deviation_remains, label: '仍有偏差', class: 'danger' }
+        - { value: systemic_deviation, label: '系统性偏差', class: 'danger' }
+      mutual_exclusive: true                  # 4 选 1 互斥
+      derived_from: deficiency               # 派生自 N 列缺陷（单元格联动）
+
+    # ─── 公式区（保留模板原公式，导出时跳过） ─────────────────────
+    formulas:
+      preserve: true
+      cells:
+        - A3                                  # =底稿目录!A2
+        - A4                                  # =底稿目录!A3
+        - O3                                  # 索引号公式
+        - O4                                  # 页码公式
+
+    # ─── 合并单元格（openpyxl 加载时已含，导出时跳过） ────────────
+    merged_cells:
+      preserve: true
+      count: 18                              # 估算合并区域数（含表头 + 提示区标题）
+      description: |
+        主要合并区域：
+        - A1:O1（事务所名称横跨全宽）
+        - A2:O2（表名）
+        - 提示区标题行（横跨多列）
+        - 样本规模区间表标题行
+
+    # ─── 跨底稿引用（GtIndexChip 渲染） ──────────────────────────
+    cross_refs:
+      mode: dynamic                          # 索引号列动态引用
+      description: |
+        O 列「索引号」每行可填跨底稿引用（如 C2-1-1 / C12-1-1），
+        前端 GtIndexChip 渲染：
+        - 跳转到对应单条控制测试 sheet（test_type=single）
+        - 控制评价结论 → emit trigger-procedure-trimming-suggestion
+          → 写入 ProcedureTrimming（项目级裁剪建议）
+
+    # ─── 联动语义（design §3.11.5 Layer 4） ─────────────────────
+    linkage:
+      downstream:
+        - target: ProcedureTrimming
+          condition: "conclusion in ['control_effective', 'extended_effective']"
+          action: 'reduce_substantive_scope'
+          description: '控制有效 → 减少 D~N 实质性程序范围（已有项目级裁剪机制）'
+        - target: AuditReport
+          condition: "any(row.deficiency == '重大缺陷')"
+          action: 'flag_internal_control_weakness'
+          description: '重大缺陷 → 内控审计报告披露'

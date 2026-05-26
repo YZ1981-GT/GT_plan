@@ -1,0 +1,273 @@
+# backend/data/wp_render_schema/D-D0-N0.yaml
+# 函证模板 — D 类函证/盘点/访谈子模式渲染 schema (form_type=confirmation)
+# Requirements: 3.5（D 类 449 sheet 5 子模式 - 函证型实例 D0/E0/F0/G0/H0/K0/L0）
+# Design: §3.6 GtDForm 函证子模式（GtDFormConfirmation，~109 sheet 适用）
+# Template: D0 收入循环函证.xlsx（其他循环函证 E0/F0/G0/H0/K0/L0 复用此结构）
+# 适用范围：D0/E0/F0/G0/H0/K0/L0 各循环函证 + E1 盘点 + 访谈记录类（约 109 sheet）
+
+wp_code: D-D0-N0
+template_path: backend/wp_templates/D/D0 收入循环函证.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+shared: true                               # 共享模板（D0/E0/F0/G0/H0/K0/L0 等 ~109 sheet 复用）
+related_accounts:
+  - code: '1122'
+    name: 应收账款
+  - code: '2202'
+    name: 应付账款
+  - code: '1002'
+    name: 银行存款
+
+sheets:
+  函证统计与生成:
+    component_type: d-form
+    form_type: confirmation                 # ★ 5 子模式路由字段（函证子模式）
+    confirmation_type: receivable           # 函证类型：receivable/payable/bank/loan/inventory/interview
+    # confirmation_type 取值：
+    #   - receivable     应收函证（D0 / 应收账款 / 营业收入）
+    #   - payable        应付函证（L0 / 应付账款 / 借款）
+    #   - bank           银行函证（E0 / 银行存款 / 短期借款）
+    #   - loan           借款函证（K0 / 长短期借款）
+    #   - investment     投资函证（G0 / 长期股权投资）
+    #   - inventory      存货函证（F0 + 监盘 E1）
+    #   - inspection     盘点（E1 货币资金盘点 / 实物盘点）
+    #   - interview      访谈记录（D4 系列）
+
+    # ─── 固定头部（自动填充） ──────────────────────────────────────
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '收入循环函证统计表'
+      A3: '${entity_name}'
+      A4: '${period_end}'
+      L3: '${index_no}'                     # 索引号（如 D0 / E0 / F0）
+      L4: '${page_no}'
+
+    # ─── 上下文区 ──────────────────────────────────────────────────
+    fields:
+      - { name: confirmation_purpose, label: '函证目的', type: textarea,
+          cell: B6, max_length: 1000, readonly: true,
+          default: '通过向被审计单位的客户 / 供应商 / 银行 / 贷款方寄发询证函，独立验证账面金额、期限及其他重要条款。' }
+      - { name: confirmation_method, label: '函证方式', type: enum,
+          cell: B8, enum: ['积极式', '消极式', '混合式'], required: true,
+          hint: '积极式：要求收函方回函（无论是否一致）；消极式：仅当不一致时回函' }
+      - { name: cutoff_date, label: '函证截止日', type: date,
+          cell: B10, format: 'YYYY-MM-DD', required: true,
+          default_from: 'project.period_end' }
+
+    # ─── 函证工作流（生成 → 发出 → 回函 → 差异） ─────────────────
+    confirmation_workflow:                  # 函证子模式核心结构
+      stages:
+        - stage: generation
+          id: stage_1_generation
+          title: '阶段 1：询证函生成'
+          description: '从客户清单中筛选样本 → 生成询证函 PDF / 寄发清单'
+          start_row: 13
+          end_row: 16
+          fields:
+            - { name: total_count, label: '客户总数', type: number,
+                cell: C14, readonly: true, source: 'tb_aux_balance.distinct_count' }
+            - { name: sample_count, label: '函证样本数', type: number,
+                cell: D14, required: true, min: 0 }
+            - { name: sample_method, label: '抽样方法', type: enum,
+                cell: E14, enum: ['全部函证', '金额比例', '随机抽样', '风险导向'] }
+            - { name: coverage_ratio, label: '函证金额覆盖率', type: percent,
+                cell: F14, readonly: true, formula: 'sample_amount / total_amount * 100' }
+            - { name: total_amount, label: '总金额', type: number,
+                cell: G14, render: 'amount', readonly: true }
+            - { name: sample_amount, label: '抽样金额', type: number,
+                cell: H14, render: 'amount' }
+          actions:
+            - { name: 'generate_letters', label: '一键生成询证函',
+                emit: 'generate-confirmation-letters',
+                api: 'POST /api/projects/{pid}/confirmations/generate' }
+
+        - stage: dispatch
+          id: stage_2_dispatch
+          title: '阶段 2：函件发出'
+          description: '寄送方式 / 寄送日期 / 邮寄地址确认'
+          start_row: 17
+          end_row: 20
+          fields:
+            - { name: dispatch_method, label: '寄送方式', type: enum,
+                cell: C18, enum: ['EMS', '挂号信', '电邮', 'SWIFT 银行电文'] }
+            - { name: dispatch_date, label: '寄送日期', type: date,
+                cell: D18, format: 'YYYY-MM-DD' }
+            - { name: dispatch_count, label: '已寄送函件数', type: number,
+                cell: E18, min: 0 }
+            - { name: tracking_no_link, label: '邮寄追踪号', type: text,
+                cell: F18, max_length: 200, render: 'index_chip',
+                hint: '可上传寄送凭证 PDF 关联到附件库' }
+
+        - stage: reply
+          id: stage_3_reply
+          title: '阶段 3：回函汇总'
+          description: '回函统计 + 不符项识别'
+          start_row: 21
+          end_row: 28
+          fields:
+            - { name: reply_count, label: '已回函数', type: number,
+                cell: C22, min: 0 }
+            - { name: reply_ratio, label: '回函率', type: percent,
+                cell: D22, readonly: true, formula: 'reply_count / dispatch_count * 100' }
+            - { name: agree_count, label: '相符函数', type: number,
+                cell: E22, min: 0 }
+            - { name: disagree_count, label: '不符函数', type: number,
+                cell: F22, min: 0 }
+            - { name: no_reply_count, label: '未回函数', type: number,
+                cell: G22, readonly: true, formula: 'dispatch_count - reply_count' }
+            - { name: alternative_procedures, label: '替代审计程序', type: textarea,
+                cell: B26, max_length: 2000,
+                hint: '说明对未回函样本执行的替代程序（追查后续收款 / 凭证检查等）' }
+
+        - stage: discrepancy
+          id: stage_4_discrepancy
+          title: '阶段 4：差异分析'
+          description: '不符函逐项分析 + 调整建议'
+          start_row: 29
+          end_row: 38
+          fields:
+            - { name: discrepancy_total_amount, label: '不符差异总金额', type: number,
+                cell: C30, render: 'amount' }
+            - { name: discrepancy_classified, label: '差异分类', type: textarea,
+                cell: B32, max_length: 3000,
+                hint: '按差异类型分类：①时间性差异 ②错记金额 ③已结清未销账 ④其他' }
+            - { name: adjustment_proposal, label: '调整建议', type: textarea,
+                cell: B36, max_length: 2000,
+                render: 'index_chip',
+                hint: '可关联到 Adj:AJE-XXX 调整分录' }
+
+    # ─── 函证明细动态表格（每条函证一行） ─────────────────────────
+    dynamic_table:
+      start_row: 41
+      end_row: dynamic
+      header_row: 40
+      add_row_button: true
+      max_rows: 500                         # 最多 500 个函证样本
+      columns:
+        A: { field: seq, type: number, label: '序号', width: 60 }
+        B: { field: counterparty_name, type: text, label: '函证对象',
+             max_length: 200, required: true, width: 200 }
+        C: { field: counterparty_address, type: text, label: '邮寄地址',
+             max_length: 300, width: 250 }
+        D: { field: account_balance, type: number, label: '账面余额',
+             render: 'amount', width: 130 }
+        E: { field: dispatch_date, type: date, label: '寄送日期',
+             format: 'YYYY-MM-DD', width: 110 }
+        F: { field: reply_status, type: enum, label: '回函状态',
+             enum: ['未回函', '已回函相符', '已回函不符', '退回', '替代程序'],
+             render: 'tag', width: 120 }
+        G: { field: reply_amount, type: number, label: '回函金额',
+             render: 'amount', width: 130 }
+        H: { field: discrepancy, type: number, label: '差异金额',
+             render: 'amount', readonly: true,
+             formula: 'account_balance - reply_amount', width: 130 }
+        I: { field: discrepancy_reason, type: text, label: '差异原因',
+             max_length: 500, width: 200 }
+        J: { field: adjustment_ref, type: text, label: '调整分录',
+             render: 'index_chip', max_length: 50, width: 120 }
+        K: { field: confirmation_letter_pdf, type: text, label: '回函扫描件',
+             render: 'attachment_chip', width: 120 }
+        L: { field: row_conclusion, type: enum, label: '结论',
+             enum: ['已确认', '需关注', '待替代'], render: 'tag', width: 90 }
+
+    # ─── 整体函证结论 ──────────────────────────────────────────────
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: '函证总体说明'
+        type: textarea
+        cell_after_table: 1
+        max_length: 5000
+        hint: '汇总函证执行情况、覆盖率、回函质量、差异处理'
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: '函证结论'
+        type: enum
+        cell_after_table: 3
+        enum:
+          - { value: 'fully_verified', label: '全部相符或合理解释',
+              class: 'success', icon: 'CircleCheck',
+              description: '函证已充分确认账面余额，无需调整' }
+          - { value: 'minor_adjustment', label: '存在小额调整',
+              class: 'warning', icon: 'WarningFilled',
+              description: '差异已识别并调整，不影响整体' }
+          - { value: 'material_misstatement', label: '存在重大不符',
+              class: 'danger', icon: 'CircleCloseFilled',
+              description: '不符差异重大需关注是否存在舞弊或重大错报' }
+          - { value: 'insufficient_evidence', label: '函证证据不充分',
+              class: 'danger', icon: 'CircleCloseFilled',
+              description: '回函率低且替代程序不足' }
+        required: true
+
+    # ─── 静态文本区 ───────────────────────────────────────────────
+    static_text:
+      rows: [1-5, 12, 17, 21, 29, 39-40]   # 表头 + 各阶段标题 + 列标题
+      description: |
+        Row 1-4: 事务所名称 / 表名 / 被审计单位 / 审计截止日
+        Row 5-11: 函证目的 / 函证方式 / 函证截止日上下文区
+        Row 12, 17, 21, 29: 4 个阶段标题
+        Row 39-40: 函证明细列标题
+      footer_rows_after_table: 5             # 尾部签字行 + 函证日期
+
+    # ─── 公式区 ──────────────────────────────────────────────────
+    formulas:
+      preserve: true
+      cells:
+        - A3                                # =底稿目录!A2
+        - A4                                # =底稿目录!A3
+        - L3                                # 索引号公式
+        - L4                                # 页码公式
+        - F14                               # 覆盖率
+        - D22                               # 回函率
+        - G22                               # 未回函数
+        - 'H-dynamic'                       # 差异金额（动态表格 H 列每行）
+
+    # ─── 合并单元格 ──────────────────────────────────────────────
+    merged_cells:
+      preserve: true
+      count: 32                             # 估算（4 阶段标题 + 字段标签合并）
+      description: |
+        主要合并区域：
+        - A1:L1（事务所名称横跨全宽）
+        - A2:L2（表名）
+        - 4 阶段标题行各横跨 A:L
+        - 各阶段字段标签 A:B 横跨
+
+    # ─── 跨底稿引用 ──────────────────────────────────────────────
+    cross_refs:
+      - ref_id: CW-D-D0-001
+        source_cell: D14                    # 总金额来源
+        target_wp: D2-1
+        target_sheet: '应收账款审定表'
+        target_field: '账面余额合计'
+        description: '函证总金额 ← 应收账款审定表余额'
+        severity: required
+        direction: inbound
+
+      - ref_id: CW-D-D0-002
+        source_cell: 'J-dynamic'            # 调整分录引用
+        target_wp: 'Adj'
+        target_namespace: 'Adj:'
+        target_field: 'aje_no'
+        description: '函证不符 → 调整分录 AJE 关联'
+        severity: optional
+        direction: outbound
+
+      - ref_id: CW-D-D0-003
+        source_cell: 'K-dynamic'            # 回函扫描件
+        target_wp: 'Att'
+        target_namespace: 'Att:'
+        target_field: 'attachment_uuid'
+        description: '回函 PDF → 附件库'
+        severity: required
+        direction: outbound
+
+      - ref_id: CW-D-D0-004
+        source_cell: 'B36'                  # 调整建议汇总
+        target_wp: 'A1'
+        target_sheet: '资产负债表'
+        target_field: 'BS-008 应收账款'
+        description: '函证差异 → 报表行影响'
+        severity: optional
+        direction: outbound

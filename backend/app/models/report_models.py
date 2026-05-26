@@ -306,6 +306,22 @@ class DisclosureNote(Base):
     dataset_bound_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), nullable=True
     )
+    # workpaper-html-renderer Task 10.3: 附注双源单向同步标记
+    # design §12.1 推荐选项 A — 仅记录"最近一次"由底稿 push 同步的来源
+    last_sync_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    last_sync_wp_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("working_paper.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    last_sync_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    last_sync_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_by: Mapped[uuid.UUID | None] = mapped_column(

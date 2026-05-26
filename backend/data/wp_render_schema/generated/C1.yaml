@@ -1,0 +1,573 @@
+# C1.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:58:24
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: C1
+template_path: backend/wp_templates/C/C1 企业层面控制测试.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:58:24'
+  source_xlsx: C1 企业层面控制测试.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  C1 企业层面控制测试程序表:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业层面控制测试程序表（整合审计适用）
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      G3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 程序
+        D:
+          field: col_d
+          type: text
+          label: 是否适用
+        E:
+          field: col_e
+          type: text
+          label: 执行人
+        F:
+          field: col_f
+          type: text
+          label: 测试结果说明
+        G:
+          field: col_g
+          type: text
+          label: 索引号
+        H:
+          field: col_h
+          type: text
+          label: 开机启动项
+        I:
+          field: col_i
+          type: text
+          label: 组织架构
+        J:
+          field: col_j
+          type: text
+          label: 综合性问题
+        K:
+          field: col_k
+          type: text
+          label: 循环问题
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:G2
+      - A1:G1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C1-1 企业层面控制测试示例1:
+    component_type: e-control-test
+    class_code: E-控制测试单条
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业层面控制测试过程记录表
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 16
+      end_row: dynamic
+      header_row: 15
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 访问人员：
+        B:
+          field: col_b
+          type: text
+          label: 人力资源部经理***
+        D:
+          field: col_d
+          type: text
+          label: 访问时间：
+        E:
+          field: col_e
+          type: text
+          label: '41141'
+    static_text:
+      rows:
+      - 1-2
+      - 5-14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 4
+      ranges_sample:
+      - A8:F8
+      - A2:F2
+      - A19:F19
+      - A1:F1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C1-2 企业层面控制测试示例2:
+    component_type: e-control-test
+    class_code: E-控制测试单条
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业层面控制测试过程记录表
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 会议日期
+        B:
+          field: col_b
+          type: text
+          label: 会议名称
+        C:
+          field: col_c
+          type: text
+          label: 参加人
+        D:
+          field: col_d
+          type: text
+          label: 会议内容
+        E:
+          field: col_e
+          type: text
+          label: 是否进行后续跟踪
+        F:
+          field: col_f
+          type: text
+          label: 会议是否满足相关职责要求
+    static_text:
+      rows:
+      - 1-2
+      - 5-6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:F2
+      - A1:F1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C1-3企业层面控制测试示例3:
+    component_type: e-control-test
+    class_code: E-控制测试单条
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业层面控制测试过程记录表
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 姓名/职位
+        C:
+          field: col_c
+          type: text
+          label: 工作经验
+        D:
+          field: col_d
+          type: text
+          label: 职责
+        E:
+          field: col_e
+          type: text
+          label: 专长
+        F:
+          field: col_f
+          type: text
+          label: '提出问题实例
+
+            （向管理人员、内部、外部审计人员）'
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:F2
+      - A1:F1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C1-4企业层面内控测试示例4-财务报告内部控制:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业层面控制测试过程汇总表（财务报告）
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 关键控制
+        C:
+          field: col_c
+          type: text
+          label: 交易循环
+        D:
+          field: col_d
+          type: text
+          label: 流程名称
+        E:
+          field: col_e
+          type: text
+          label: 控制频率
+        F:
+          field: col_f
+          type: text
+          label: 测试日期
+        G:
+          field: col_g
+          type: text
+          label: 测试方法
+        H:
+          field: col_h
+          type: text
+          label: 样本规模
+        I:
+          field: col_i
+          type: text
+          label: 发现的例外
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A1:I1
+      - A5:F5
+      - A2:I2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C1-4-1企业层面内控测试示例4:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业层面控制测试过程记录表（财务报告）
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+      E4: ${page_no}
+    dynamic_table:
+      start_row: 23
+      end_row: dynamic
+      header_row: 22
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 申请日期
+        C:
+          field: col_c
+          type: text
+          label: 账户编号
+        D:
+          field: col_d
+          type: text
+          label: 账户描述
+        E:
+          field: col_e
+          type: text
+          label: 原因
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      - 10-21
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 4
+      ranges_sample:
+      - A2:E2
+      - A1:E1
+      - B21:E21
+      - B8:E9
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C1-4-2企业层面内控测试示例4:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业层面控制测试过程记录表（财务报告）
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+      E4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      - 12-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 5
+      ranges_sample:
+      - B23:E23
+      - A2:E2
+      - A1:E1
+      - B24:E24
+      - B9:E11
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C1-4-3企业层面内控测试示例4:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业层面控制测试过程记录表（财务报告）
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 24
+      end_row: dynamic
+      header_row: 23
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 测试结果：
+        B:
+          field: col_b
+          type: text
+          label: 月份
+        C:
+          field: col_c
+          type: text
+          label: '1'
+        D:
+          field: col_d
+          type: text
+          label: '2'
+        E:
+          field: col_e
+          type: text
+          label: '3'
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      - 11-22
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A2:G2
+      - B8:G10
+      - A1:G1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C1-4-4企业层面内控测试示例4:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业层面控制测试过程记录表（财务报告）
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 21
+      end_row: dynamic
+      header_row: 20
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 测试结果：
+        B:
+          field: col_b
+          type: text
+          label: 日期
+        C:
+          field: col_c
+          type: text
+          label: 账户编码
+        D:
+          field: col_d
+          type: text
+          label: 引用
+        E:
+          field: col_e
+          type: text
+          label: 交易描述
+        F:
+          field: col_f
+          type: text
+          label: 借方金额
+        G:
+          field: col_g
+          type: text
+          label: 贷方金额
+        H:
+          field: col_h
+          type: text
+          label: '1'
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      - 10-19
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - F23
+      - F25
+      - G37
+      - G42
+      - G45
+      - F49
+      - F51
+      - F52
+      - G53
+      - F57
+      - G59
+      - G61
+      - F67
+      - G69
+      - F73
+      - F75
+      - G77
+      - G79
+      - G87
+      _total_count: 19
+    merged_cells:
+      preserve: true
+      count: 4
+      ranges_sample:
+      - B8:H9
+      - A2:H2
+      - B94:H94
+      - A1:H1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C1-4-5企业层面内控测试示例4:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业层面控制测试过程记录表（财务报告）
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+      E4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 5
+      ranges_sample:
+      - B8:E8
+      - A2:E2
+      - B21:E21
+      - A1:E1
+      - B20:E20
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  C1-4-6企业层面内控测试示例4:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业层面控制测试过程记录表（财务报告）
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      - 13-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 4
+      ranges_sample:
+      - A2:F2
+      - B8:F12
+      - A1:F1
+      - B25:F25
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

@@ -1,0 +1,478 @@
+# A13.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:58:21
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: A13
+template_path: backend/wp_templates/A/A13 错报（程序表及底稿）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:58:20'
+  source_xlsx: A13 错报（程序表及底稿）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：ABC公司
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：2025.X.X
+        D:
+          field: col_d
+          type: text
+          label: =D4+1
+        E:
+          field: col_e
+          type: text
+          label: 未更正披露错报汇总表
+        F:
+          field: col_f
+          type: text
+          label: A13-2
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - D4
+      - D5
+      - D6
+      - D7
+      - D8
+      _total_count: 5
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  A13错报程序表:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      K3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 程序
+        H:
+          field: col_h
+          type: text
+          label: 是否适用
+        I:
+          field: col_i
+          type: text
+          label: 执行人
+        J:
+          field: col_j
+          type: text
+          label: 执行情况说明
+        K:
+          field: col_k
+          type: text
+          label: 索引号
+        L:
+          field: col_l
+          type: text
+          label: 开机启动项
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - A4
+      - D4
+      - F4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 22
+      ranges_sample:
+      - B14:G14
+      - B17:G17
+      - B23:G23
+      - B8:G8
+      - B13:G13
+      - B19:G19
+      - B10:G10
+      - B9:G9
+      - A3:B3
+      - B15:G15
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  A13-1 未更正错报汇总表:
+    component_type: univer
+    class_code: F-汇总表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 未更正错报汇总表（不包括列报和披露错报）
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      J3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 内容及说明
+        D:
+          field: col_d
+          type: text
+          label: 索引号
+        E:
+          field: col_e
+          type: text
+          label: 调整内容
+        I:
+          field: col_i
+          type: text
+          label: 错报
+        J:
+          field: col_j
+          type: text
+          label: 管理层不予
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - G3
+      - A4
+      - E4
+      - G4
+      - G24
+      - G25
+      - G26
+      - G27
+      - G31
+      - G32
+      - G33
+      - G34
+      _total_count: 14
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - A5:A6
+      - A1:J1
+      - B5:C6
+      - A2:J2
+      - E5:H5
+      - D5:D6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  A13-2 未更正的列报和披露错报:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 未更正的列报和披露错报汇总表
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      I3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 错报说明
+        D:
+          field: col_d
+          type: text
+          label: 索引号
+        E:
+          field: col_e
+          type: text
+          label: 相关披露和列报要求
+        G:
+          field: col_g
+          type: text
+          label: 金额(如适用)
+        H:
+          field: col_h
+          type: text
+          label: 错报性质
+        I:
+          field: col_i
+          type: text
+          label: 管理层不予更正的原因
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - A4
+      - D4
+      - F4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 36
+      ranges_sample:
+      - E12:F12
+      - B16:C16
+      - B7:C7
+      - B22:C22
+      - E23:F23
+      - E14:F14
+      - B18:C18
+      - E17:F17
+      - E8:F8
+      - B12:C12
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  A13-3 评价识别出的错报:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 评价识别出的错报
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      J3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 资产(+)
+        D:
+          field: col_d
+          type: text
+          label: 资产(-)
+        E:
+          field: col_e
+          type: text
+          label: 负债(+)
+        F:
+          field: col_f
+          type: text
+          label: 负债(-)
+        G:
+          field: col_g
+          type: text
+          label: 权益(+)
+        H:
+          field: col_h
+          type: text
+          label: 权益(-)
+        I:
+          field: col_i
+          type: text
+          label: 损益(+)
+        J:
+          field: col_j
+          type: text
+          label: 损益(-)
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - G3
+      - A4
+      - E4
+      - G4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 12
+      ranges_sample:
+      - A1:J1
+      - A5:J5
+      - A20:B21
+      - A14:J14
+      - C7:J7
+      - C29:J29
+      - A29:B30
+      - A7:B8
+      - A18:J18
+      - A27:J27
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  A13-4 评价错报的性质:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 评价错报的性质
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      J3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 索引号
+        B:
+          field: col_b
+          type: text
+          label: 导致错报的具体原因
+        D:
+          field: col_d
+          type: text
+          label: 是否为内部控制缺陷(是/否)
+        E:
+          field: col_e
+          type: text
+          label: 是否为值得关注的内部控制缺陷(是/否)
+        G:
+          field: col_g
+          type: text
+          label: 对缺陷的描述
+        I:
+          field: col_i
+          type: text
+          label: 潜在影响
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - A4
+      - D4
+      - G4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 42
+      ranges_sample:
+      - E12:F12
+      - B16:C16
+      - G12:H12
+      - I6:J6
+      - B7:C7
+      - I15:J15
+      - E14:F14
+      - G8:H8
+      - E8:F8
+      - B12:C12
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  A13-5对错报的沟通:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 对错报的沟通记录
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      - 14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - C3
+      - A4
+      - B4
+      - C4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 1
+      ranges_sample:
+      - A2:E2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

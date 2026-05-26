@@ -1,0 +1,370 @@
+# J3.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:58:53
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: J3
+template_path: backend/wp_templates/J/J3 股份支付.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:58:52'
+  source_xlsx: J3 股份支付.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：
+        D:
+          field: col_d
+          type: text
+          label: '3'
+        E:
+          field: col_e
+          type: text
+          label: 应付职工薪酬-股份支付检查表
+        F:
+          field: col_f
+          type: text
+          label: J3-2
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 4
+      ranges_sample:
+      - A14:A16
+      - A17:A19
+      - D1:G1
+      - A10:A13
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  股份支付实质性程序表 J3A:
+    component_type: a-program-console
+    class_code: A-实质性程序
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 股份支付实质性程序表
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 16
+      end_row: dynamic
+      header_row: 15
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 审计程序
+        C:
+          field: col_c
+          type: text
+          label: 程序分类
+        D:
+          field: col_d
+          type: text
+          label: 财务报表的认定
+        I:
+          field: col_i
+          type: text
+          label: 底稿索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - I3
+      - A4
+      - C4
+      - E4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 22
+      ranges_sample:
+      - G10:I10
+      - G13:I13
+      - A12:F12
+      - A2:I2
+      - A8:F8
+      - A3:B3
+      - B15:B16
+      - A10:F10
+      - F14:H14
+      - A13:F13
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  股份支付情况表J3-1:
+    component_type: univer
+    class_code: F-明细表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应付职工薪酬-股份支付情况表
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 18
+      end_row: dynamic
+      header_row: 17
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 项目
+        D:
+          field: col_d
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-12
+      - 14
+      - 16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - I3
+      - N3
+      - A4
+      - E4
+      - I4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 8
+      ranges_sample:
+      - A40:N40
+      - A39:N39
+      - A2:N2
+      - A43:N43
+      - B17:C17
+      - A42:N42
+      - A36:N36
+      - A1:N1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  股份支付检查表J3-2:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应付职工薪酬-股份支付检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 14
+      end_row: dynamic
+      header_row: 13
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 股份支付种类
+        B:
+          field: col_b
+          type: text
+          label: 时间
+        C:
+          field: col_c
+          type: text
+          label: 每股股票/每份增值权公允价值
+        D:
+          field: col_d
+          type: text
+          label: 每股股票/每份增值权支付现金
+        E:
+          field: col_e
+          type: text
+          label: 股份支付总人数
+        F:
+          field: col_f
+          type: text
+          label: 离职人数
+        G:
+          field: col_g
+          type: text
+          label: 行权人数
+        H:
+          field: col_h
+          type: text
+          label: 每人获得的股份数量
+        I:
+          field: col_i
+          type: text
+          label: 连续服务年限
+        J:
+          field: col_j
+          type: text
+          label: 测算应付职工薪酬金额
+        K:
+          field: col_k
+          type: text
+          label: 账面应付职工薪酬金额
+        L:
+          field: col_l
+          type: text
+          label: 差异
+        M:
+          field: col_m
+          type: text
+          label: 支付现金金额
+        N:
+          field: col_n
+          type: text
+          label: 测算当期费用/公允价值变动金额
+        O:
+          field: col_o
+          type: text
+          label: 账面记录当期费用/公允价值变动金额
+        P:
+          field: col_p
+          type: text
+          label: 差异
+        Q:
+          field: col_q
+          type: text
+          label: 是否为雇员或其他提供类似服务的人员
+        R:
+          field: col_r
+          type: text
+          label: 主要条款及条件与股份支付薪酬工具是否一致
+        S:
+          field: col_s
+          type: text
+          label: 授权日与行权日之间是否存在重大时间间隔
+    static_text:
+      rows:
+      - 1-2
+      - 5-12
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - H3
+      - N3
+      - S3
+      - A4
+      - H4
+      - N4
+      - L14
+      - P14
+      - L15
+      - P15
+      - L16
+      - P16
+      - L17
+      - P17
+      - L18
+      - P18
+      - E19
+      - F19
+      - G19
+      - J19
+      - K19
+      - L19
+      - M19
+      - N19
+      - O19
+      - P19
+      _total_count: 27
+    merged_cells:
+      preserve: true
+      count: 11
+      ranges_sample:
+      - I22:I23
+      - C22:C23
+      - A22:A23
+      - B22:B23
+      - F22:F23
+      - A1:S1
+      - E22:E23
+      - J22:J23
+      - G22:H22
+      - A2:S2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  IPO企业股权激励工具关注的审计重点:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 22
+      ranges_sample:
+      - A14:P14
+      - A8:P8
+      - A35:P35
+      - A20:P20
+      - A29:P29
+      - A21:O21
+      - A19:P19
+      - A10:P10
+      - A40:P40
+      - A31:P31
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  首发业务解答二:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A2: 问题1、股份支付
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

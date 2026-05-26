@@ -1,0 +1,775 @@
+# G11.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:58:37
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: G11
+template_path: backend/wp_templates/G/G11 投资收益.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:58:37'
+  source_xlsx: G11 投资收益.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：
+        D:
+          field: col_d
+          type: text
+          label: '1'
+        E:
+          field: col_e
+          type: text
+          label: 审定表
+        F:
+          field: col_f
+          type: text
+          label: G11-1
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A14:A16
+      - A17:A19
+      - A10:A13
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  投资收益实质性程序表G11A:
+    component_type: a-program-console
+    class_code: A-实质性程序
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 投资收益实质性程序表
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 16
+      end_row: dynamic
+      header_row: 15
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 审计程序
+        C:
+          field: col_c
+          type: text
+          label: 程序分类
+        D:
+          field: col_d
+          type: text
+          label: 财务报表的认定
+        I:
+          field: col_i
+          type: text
+          label: 底稿索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - F3
+      - I3
+      - A4
+      - C4
+      - F4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 23
+      ranges_sample:
+      - G10:I10
+      - G13:I13
+      - A12:F12
+      - A2:I2
+      - A8:F8
+      - A3:B3
+      - B15:B16
+      - A10:F10
+      - A13:F13
+      - A9:F9
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  投资收益实质性程序表G11A-修订前:
+    component_type: a-program-console
+    class_code: A-实质性程序
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 投资收益实质性程序表
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 审计目标与认定对应关系
+        C:
+          field: col_c
+          type: text
+          label: 财务报表的认定
+        H:
+          field: col_h
+          type: text
+          label: 信赖/不信赖/不适用
+        I:
+          field: col_i
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - F3
+      - I3
+      - A4
+      - C4
+      - F4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 56
+      ranges_sample:
+      - D18:G18
+      - H20:I20
+      - A15:B15
+      - H29:I29
+      - D25:G25
+      - A11:B11
+      - D24:G24
+      - D30:G30
+      - D33:G33
+      - H31:I31
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  审定表G11-1:
+    component_type: univer
+    class_code: F-审定表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 投资收益审定表
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      J4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目
+        B:
+          field: col_b
+          type: text
+          label: 本期数
+        E:
+          field: col_e
+          type: text
+          label: 上期数
+        H:
+          field: col_h
+          type: text
+          label: '本期审定数与上期
+
+            审定数的比较'
+        J:
+          field: col_j
+          type: text
+          label: 原因分析
+        K:
+          field: col_k
+          type: text
+          label: 索引
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - G3
+      - K3
+      - A4
+      - C4
+      - G4
+      - B7
+      - C7
+      - D7
+      - E7
+      - F7
+      - G7
+      - H7
+      - I7
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - H8
+      - I8
+      - B9
+      - C9
+      - D9
+      - E9
+      - F9
+      - G9
+      - H9
+      _total_count: 161
+    merged_cells:
+      preserve: true
+      count: 21
+      ranges_sample:
+      - A56:C56
+      - A55:C55
+      - A50:C50
+      - A57:C57
+      - A1:K1
+      - A53:C53
+      - A52:C52
+      - A5:A6
+      - B5:D5
+      - A58:C58
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  附注披露信息（上市公司）:
+    component_type: c-note-table
+    class_code: C-附注披露
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 附注披露信息（上市公司）
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项  目
+        C:
+          field: col_c
+          type: text
+          label: 本期发生额
+        D:
+          field: col_d
+          type: text
+          label: 上期发生额
+    static_text:
+      rows:
+      - 1-2
+      - 5-6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - C3
+      - E3
+      - A4
+      - B4
+      - C4
+      - C8
+      - D8
+      - C9
+      - D9
+      - C10
+      - D10
+      - C11
+      - D11
+      - C12
+      - D12
+      - C13
+      - D13
+      - C14
+      - D14
+      - C15
+      - D15
+      - C16
+      - D16
+      - C17
+      - D17
+      - C18
+      - D18
+      - C19
+      _total_count: 35
+    merged_cells:
+      preserve: true
+      count: 4
+      ranges_sample:
+      - A1:D1
+      - A22:E22
+      - A23:E23
+      - A2:D2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  附注披露信息（国企）:
+    component_type: c-note-table
+    class_code: C-附注披露
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 附注披露信息（国企）
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项  目
+        C:
+          field: col_c
+          type: text
+          label: 本期发生额
+        D:
+          field: col_d
+          type: text
+          label: 上期发生额
+    static_text:
+      rows:
+      - 1-2
+      - 5-6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - C3
+      - A4
+      - B4
+      - C4
+      - C8
+      - D8
+      - C9
+      - D9
+      - C10
+      - D10
+      - C11
+      - D11
+      - C12
+      - D12
+      - C13
+      - D13
+      - C14
+      - D14
+      - C15
+      - D15
+      - C16
+      - D16
+      - C17
+      - D17
+      - C18
+      - D18
+      - C19
+      - D19
+      _total_count: 42
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A1:D1
+      - A26:D26
+      - A2:D2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  明细分析表G11-2:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 投资收益明细分析表
+      A3: ${entity_name}
+      A4: ${period_end}
+      L3: ${index_no}
+      L4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 项目
+        C:
+          field: col_c
+          type: text
+          label: 被投资单位
+        D:
+          field: col_d
+          type: text
+          label: 本期未审数
+        E:
+          field: col_e
+          type: text
+          label: 本期调整
+        F:
+          field: col_f
+          type: text
+          label: 本期审定数
+        G:
+          field: col_g
+          type: text
+          label: 各项目占比
+        H:
+          field: col_h
+          type: text
+          label: 上年未审数
+        I:
+          field: col_i
+          type: text
+          label: 上期调整
+        J:
+          field: col_j
+          type: text
+          label: 上年审定数
+        K:
+          field: col_k
+          type: text
+          label: 各项目占比
+        L:
+          field: col_l
+          type: text
+          label: 变动额
+        M:
+          field: col_m
+          type: text
+          label: 变动原因/索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - H3
+      - M3
+      - A4
+      - E4
+      - H4
+      - F10
+      - G10
+      - J10
+      - K10
+      - L10
+      - F11
+      - G11
+      - J11
+      - K11
+      - L11
+      - F12
+      - G12
+      - J12
+      - K12
+      - L12
+      - F13
+      - G13
+      - J13
+      - K13
+      - L13
+      - F14
+      - G14
+      - J14
+      _total_count: 121
+    merged_cells:
+      preserve: true
+      count: 4
+      ranges_sample:
+      - A32:C32
+      - A2:M2
+      - A31:C31
+      - A1:M1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  调整分录汇总G11-3:
+    component_type: univer
+    class_code: F-调整分录
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 投资收益调整分录汇总表
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 调整事项说明
+        B:
+          field: col_b
+          type: text
+          label: 类别（报表调整/账项调整/其他）
+        C:
+          field: col_c
+          type: text
+          label: 报表项目
+        D:
+          field: col_d
+          type: text
+          label: 科目名称
+        E:
+          field: col_e
+          type: text
+          label: 附注项目
+        F:
+          field: col_f
+          type: text
+          label: ……
+        G:
+          field: col_g
+          type: text
+          label: 借方调整金额
+        H:
+          field: col_h
+          type: text
+          label: 贷方调整金额
+        I:
+          field: col_i
+          type: text
+          label: 索引
+        J:
+          field: col_j
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - J3
+      - A4
+      - D4
+      - G4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A1:J1
+      - A2:J2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  收益率分析表G11-4:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 投资收益分析-投资收益率
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目名称
+        C:
+          field: col_c
+          type: text
+          label: 本期数
+        F:
+          field: col_f
+          type: text
+          label: 上期数
+        I:
+          field: col_i
+          type: text
+          label: 变动⑦=③-⑥
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - F3
+      - I3
+      - A4
+      - C4
+      - F4
+      - C10
+      - E10
+      - F10
+      - H10
+      - I10
+      - C11
+      - E11
+      - F11
+      - H11
+      - I11
+      - C12
+      - E12
+      - F12
+      - H12
+      - I12
+      - C13
+      - E13
+      - F13
+      - H13
+      - I13
+      - C14
+      - E14
+      - F14
+      _total_count: 89
+    merged_cells:
+      preserve: true
+      count: 23
+      ranges_sample:
+      - A24:B24
+      - A15:B15
+      - A11:B11
+      - F8:H8
+      - A26:I26
+      - A8:B9
+      - A16:B16
+      - A2:I2
+      - A25:B25
+      - C8:E8
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  凭证检查表G11-5:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 投资收益凭证检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+      O3: ${index_no}
+      O4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 测试总体：
+        B:
+          field: col_b
+          type: text
+          label: 如投资收益本期发生额所有凭证共XX笔金额XX
+        D:
+          field: col_d
+          type: text
+          label: 特定样本：
+        E:
+          field: col_e
+          type: text
+          label: XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - P3
+      - A4
+      - D4
+      - F4
+      - F27
+      - F28
+      - F29
+      _total_count: 10
+    merged_cells:
+      preserve: true
+      count: 26
+      ranges_sample:
+      - G21:H21
+      - G27:H27
+      - A29:D29
+      - G23:H23
+      - G14:H15
+      - A28:D28
+      - G17:H17
+      - N14:N15
+      - A14:F14
+      - G19:H19
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

@@ -1,0 +1,204 @@
+# B22B.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:58:23
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: B22B
+template_path: backend/wp_templates/B/B22B 了解企业层面控制 - 控制矩阵.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:58:23'
+  source_xlsx: B22B 了解企业层面控制 - 控制矩阵.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  说明:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A2: 说明：
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 2-3
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  了解企业层面控制 - 控制矩阵表:
+    component_type: d-form-table
+    class_code: D-业务了解
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业层面控制矩阵
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 截止日期：
+        D:
+          field: col_d
+          type: text
+          label: 复核人：
+        G:
+          field: col_g
+          type: text
+          label: 复核日期：
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A2:L2
+      - A7:J7
+      - A1:L1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  示例 - 了解企业层面控制 - 控制矩阵表:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      L3: ${index_no}
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 下拉选择
+        C:
+          field: col_c
+          type: text
+          label: 下拉选择
+        D:
+          field: col_d
+          type: text
+          label: 客户的控制编号
+        F:
+          field: col_f
+          type: text
+          label: 可来自<了解底稿>
+        G:
+          field: col_g
+          type: text
+          label: 下拉选择
+        H:
+          field: col_h
+          type: text
+          label: 下拉选择
+        I:
+          field: col_i
+          type: text
+          label: 下拉选择
+        K:
+          field: col_k
+          type: text
+          label: 下拉选择
+        L:
+          field: col_l
+          type: text
+          label: 下拉选择
+        M:
+          field: col_m
+          type: text
+          label: 记录软件名称
+    static_text:
+      rows:
+      - 6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 1
+      ranges_sample:
+      - B6:K6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  选项清单列表:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: 要素
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 2-8
+      - 10-14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  示例:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      L3: ${index_no}
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 下拉选择
+        C:
+          field: col_c
+          type: text
+          label: 下拉选择
+        D:
+          field: col_d
+          type: text
+          label: 客户的控制编号
+        F:
+          field: col_f
+          type: text
+          label: 可来自<了解底稿>
+        G:
+          field: col_g
+          type: text
+          label: 下拉选择
+        H:
+          field: col_h
+          type: text
+          label: 下拉选择
+        I:
+          field: col_i
+          type: text
+          label: 下拉选择
+        K:
+          field: col_k
+          type: text
+          label: 下拉选择
+        L:
+          field: col_l
+          type: text
+          label: 下拉选择
+        M:
+          field: col_m
+          type: text
+          label: 记录软件名称
+    static_text:
+      rows:
+      - 6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 1
+      ranges_sample:
+      - B6:K6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

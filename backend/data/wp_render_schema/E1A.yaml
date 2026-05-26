@@ -1,0 +1,140 @@
+# backend/data/wp_render_schema/E1A.yaml
+# 货币资金实质性程序表 — A 类中控台渲染 schema
+# Requirements: 2.2 原则 2（配置驱动）+ 4.3.1（方案 C 还原约束）
+# Template: E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
+
+wp_code: E1A
+template_path: backend/wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone]
+related_accounts:
+  - code: '1001'
+    name: 库存现金
+  - code: '1002'
+    name: 银行存款
+  - code: '1012'
+    name: 其他货币资金
+
+sheets:
+  货币资金实质性程序表E1A:
+    component_type: a-program-console
+
+    # ─── 固定头部（自动填充，导出时写入） ───────────────────────────
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '货币资金实质性程序表'
+      A3: '${entity_name}'                    # 来自 project.client_name
+      A4: '${period_end}'                     # 来自 project.period_end
+      J3: '${index_no}'                       # 来自 wp_index.index_no
+      J4: '${page_no}'                        # 页码
+
+    # ─── 动态表格区（用户填写的程序清单） ──────────────────────────
+    dynamic_table:
+      start_row: 17
+      end_row: dynamic
+      header_row: 16
+      columns:
+        A: { field: program_no, type: number }
+        B: { field: program_desc, type: text, max_length: 1000 }
+        C: { field: program_category, type: enum,
+             enum: ['常规★', 'IPO 加项', '备选程序', '舞弊应对'] }
+        D: { field: assertion.existence, type: boolean, render: 'checkmark' }
+        E: { field: assertion.completeness, type: boolean, render: 'checkmark' }
+        F: { field: assertion.rights, type: boolean, render: 'checkmark' }
+        G: { field: assertion.accuracy, type: boolean, render: 'checkmark' }
+        H: { field: assertion.presentation, type: boolean, render: 'checkmark' }
+        I: { field: linked_workpapers, type: text, render: 'index_chip' }
+        J: { field: trim_reason, type: text, conditional: "status='not_applicable'" }
+
+    # ─── 静态文本区（不可改，导出时跳过） ─────────────────────────
+    static_text:
+      rows: [1-4, 5-13, 14-16]               # 表头 + 涉及科目 + 审计目标认定 + 列标题
+      description: |
+        Row 1-4: 事务所名称 / 表名 / 被审计单位 / 审计截止日
+        Row 5-6: 本账户涉及的科目（库存现金 / 银行存款 / 其他货币资金）
+        Row 7-13: 审计目标和财务报表的认定（5 项认定）
+          A. 资产负债表中记录的货币资金是存在的
+          B. 所有应记录的货币资金均已记录
+          C. 记录的货币资金由被审计单位拥有或控制
+          D. 货币资金以恰当的金额包括在财务报表中
+          E. 货币资金已被恰当地列报和披露
+        Row 14-16: 程序清单列标题
+      footer_rows_after_dynamic: 3             # 尾部签字行
+
+    # ─── 公式区（保留模板原公式，导出时跳过） ─────────────────────
+    formulas:
+      preserve: true
+      cells:
+        - A3                                   # =底稿目录!A2
+        - A4                                   # =底稿目录!A3
+        - J3                                   # 索引号公式
+        - J4                                   # 页码公式
+        - I42                                  # 尾部汇总
+        - J42                                  # 尾部汇总
+
+    # ─── 合并单元格（openpyxl 加载时已含，导出时跳过） ────────────
+    merged_cells:
+      preserve: true
+      count: 22                                # 估算合并区域数
+      description: |
+        主要合并区域：
+        - A1:J1（事务所名称横跨全宽）
+        - A2:G2（表名）
+        - A5:J5（涉及科目标题）
+        - A7:J7（审计目标标题）
+        - B8:J8 ~ B12:J12（5 项认定描述各横跨 B~J）
+
+    # ─── 跨底稿引用（GtIndexChip 渲染） ──────────────────────────
+    cross_refs:
+      - ref_id: CW-108
+        source_cell: R38
+        target_wp: A1
+        target_sheet: 'A1-1 调整后试算平衡表'
+        target_field: '货币资金合计'
+        description: '重分类 → A1-1 调整后试算平衡表'
+        severity: required
+      - ref_id: CW-109
+        source_cell: R44
+        target_wp: A1
+        target_sheet: 'A1-15 重分类调整明细'
+        target_field: '货币资金重分类'
+        description: '重分类调整 → A1-15 重分类调整明细'
+        severity: required
+      - ref_id: CW-111
+        source_cell: R29
+        target_wp: E0
+        target_sheet: '银行函证E0'
+        target_field: '银行函证完成度'
+        description: '银行函证程序 → E0 函证管理总检'
+        severity: required
+      - ref_id: CW-114
+        source_cell: R17
+        target_wp: E1
+        target_sheet: 'E1-1 货币资金审定表'
+        target_field: '审定数'
+        description: '主索引 → E1-1 货币资金审定表'
+        severity: required
+      - ref_id: CW-122
+        source_cell: R5
+        target_wp: B23
+        target_sheet: 'B23-2 货币资金控制了解'
+        target_field: '控制了解结论'
+        description: '前置条件：控制了解结论引用'
+        severity: required
+        direction: inbound                     # 从 B23 流入 E1A
+      - ref_id: CW-123
+        source_cell: R5
+        target_wp: C3
+        target_sheet: '货币资金控制测试C3'
+        target_field: '控制测试结论'
+        description: '控制有效性影响实质性程序范围'
+        severity: required
+        direction: inbound                     # 从 C3 流入 E1A
+      - ref_id: CW-127
+        source_cell: R45
+        target_wp: B23
+        target_sheet: 'B23-2 货币资金控制了解'
+        target_field: '新发现风险'
+        description: '执行发现新风险 → 反向溯源控制了解'
+        severity: info
+        direction: outbound

@@ -1,0 +1,234 @@
+# S10.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:59:00
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: S10
+template_path: backend/wp_templates/S/S10 对环境事项的考虑.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:59:00'
+  source_xlsx: S10 对环境事项的考虑.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  表头（请先填写）:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: 客户名称：
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 日期：
+        D:
+          field: col_d
+          type: text
+          label: '3'
+        E:
+          field: col_e
+          type: text
+          label: 审定表S10-1
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  对环境事项的考虑S10:
+    component_type: a-program-console
+    class_code: A-S 议题程序
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 对环境事项的考虑
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 二、审计程序
+        D:
+          field: col_d
+          type: text
+          label: 执行人
+        E:
+          field: col_e
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - C3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 46
+      ranges_sample:
+      - A25:C25
+      - A41:C41
+      - A37:C37
+      - A46:C46
+      - A18:C18
+      - A27:C27
+      - A1:E1
+      - A21:C21
+      - A12:C12
+      - A6:E6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  审定表S10-1:
+    component_type: univer
+    class_code: F-审定表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 审定表
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 6
+      - 13
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - D3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 22
+      ranges_sample:
+      - A16:F16
+      - A18:F18
+      - A12:F12
+      - A21:F21
+      - A2:F2
+      - A14:F14
+      - A23:F23
+      - A8:F8
+      - A22:F22
+      - A17:F17
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  附、内控调查表S10-2:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 与环境事项相关的内部控制调查表
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+      E4: ${page_no}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        D:
+          field: col_d
+          type: text
+          label: 是
+        E:
+          field: col_e
+          type: text
+          label: 弱
+        F:
+          field: col_f
+          type: text
+          label: 否
+        G:
+          field: col_g
+          type: text
+          label: 不适用
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - C3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 57
+      ranges_sample:
+      - A25:C25
+      - A41:C41
+      - A37:C37
+      - A46:C46
+      - A56:C56
+      - A27:C27
+      - A18:C18
+      - A21:C21
+      - A55:C55
+      - A12:C12
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  说明:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: “财务报表审计中对环境事项的考虑”审计程序的说明
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 4-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  环境法规:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 环境法规
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 4-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

@@ -1,0 +1,154 @@
+# backend/data/wp_render_schema/B-template.yaml
+# B 类底稿目录 — 共享模板（148 sheet 共用）
+# Requirements: 3.3（B 底稿目录详细需求）
+# Design: §3.4 GtBIndex + §6.1 YAML schema 格式
+# 所有主底稿的"底稿目录" sheet 共享此模板结构
+
+wp_code: B-template
+template_path: shared                      # 共享模板，不绑定单一 xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+shared: true                               # 标记为共享模板（148 个 B 类 sheet 复用）
+
+sheets:
+  底稿目录:
+    component_type: b-index
+
+    # ─── 固定头部（编制信息块，自动填充，导出时写入） ───────────────
+    fixed_cells:
+      A1: '底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：'
+      A2: '${entity_name}'                   # 来自 project.client_name（模板公式 =底稿目录!A2）
+      A3: '${period_end}'                    # 来自 project.period_end（模板公式 =底稿目录!A3）
+      A4: '${preparer}'                      # 来自 user_profile.display_name（编制人）
+      A5: '${prep_date}'                     # 来自 编制日期（首次保存时间）
+      A6: '${reviewer}'                      # 来自 reviewer user_profile.display_name（复核人）
+      A7: '${review_date}'                   # 来自 复核日期（复核通过时间）
+      A8: '${accounting_period}'             # 会计期间（如"2025年度"）
+
+    # ─── 编制信息字段定义（前端 GtBIndex 渲染用） ─────────────────
+    preparation_info_fields:
+      - field: entity_name
+        label: 被审计单位
+        source: project.client_name          # 自动填充来源
+        cell: A2
+        editable: false                      # 从项目元数据自动填充，不可手动改
+
+      - field: period_end
+        label: 截止日
+        source: project.period_end
+        cell: A3
+        editable: false
+        format: 'YYYY年MM月DD日'
+
+      - field: preparer
+        label: 编制人
+        source: user_profile.display_name
+        cell: A4
+        editable: false                      # 电子签自动填充
+
+      - field: prep_date
+        label: 编制日期
+        source: auto_timestamp               # 首次保存时自动记录
+        cell: A5
+        editable: false
+        format: 'YYYY.M.D'
+
+      - field: reviewer
+        label: 复核人
+        source: reviewer_profile.display_name
+        cell: A6
+        editable: false                      # 复核签字自动填充
+
+      - field: review_date
+        label: 复核日期
+        source: review_timestamp             # 复核通过时自动记录
+        cell: A7
+        editable: false
+        format: 'YYYY.M.D'
+
+      - field: accounting_period
+        label: 会计期间
+        source: project.audit_year           # 派生自 wizard_state
+        cell: A8
+        editable: false
+        format: 'YYYY年度'
+
+    # ─── 索引导航表（用户填写区，15-25 行 × 4 列） ────────────────
+    navigation_table:
+      start_row: 10                          # 导航表起始行（编制信息块之后）
+      end_row: dynamic                       # 行数由用户数据决定（15-25 行）
+      header_row: 9                          # 列标题行
+      columns:
+        A: { field: seq, type: number, label: '序号' }
+        B: { field: content, type: text, label: '内容', max_length: 200 }
+        C: { field: index_ref, type: text, label: '索引号', render: 'index_chip' }
+        D: { field: no_print, type: boolean, label: '无需打印', render: 'checkbox' }
+
+    # ─── 动态表格区（与 navigation_table 等价，供导出服务使用） ────
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A: { field: seq, type: number }
+        B: { field: content, type: text, max_length: 200 }
+        C: { field: index_ref, type: text, render: 'index_chip' }
+        D: { field: no_print, type: boolean, render: 'checkbox' }
+
+    # ─── 静态文本区（编码说明，不可改，导出时跳过） ────────────────
+    static_text:
+      rows: [1]                              # 第 1 行提示文字
+      description: |
+        Row 1: "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据："
+        底部编码说明段落（3 段长文本）：
+        - 底稿与程序对应规则
+        - 支持性证据规则
+        - 编码规则
+      coding_notes:                          # 底部 3 段编码说明（只读展示）
+        - title: '底稿与程序对应规则'
+          content: |
+            每个审计程序对应一个或多个底稿，底稿索引号与程序编号对应。
+            如 D2A 对应应收账款实质性程序表，D2-1 对应审定表。
+        - title: '支持性证据规则'
+          content: |
+            支持性证据应附在相关底稿之后，并在底稿目录中标注索引号。
+        - title: '编码规则'
+          content: |
+            底稿编码采用"循环代号+序号"格式，如 D2-1 表示销售收入循环第 2 组第 1 张底稿。
+
+    # ─── 公式区（保留模板原公式，导出时跳过） ─────────────────────
+    formulas:
+      preserve: true
+      cells:
+        - A2                                 # =底稿目录!A2（被审计单位名称，其他 sheet 引用此值）
+        - A3                                 # =底稿目录!A3（截止日，其他 sheet 引用此值）
+      description: |
+        底稿目录 sheet 的 A2/A3 单元格是其他 sheet 公式引用的数据源。
+        如 "=底稿目录!A2" / "=[1]底稿目录!$A$2" 等跨 sheet 引用。
+
+    # ─── 合并单元格（大部分 B 类 sheet 无合并，少数有） ───────────
+    merged_cells:
+      preserve: true
+      count: 0                               # 实测大部分 B 类 sheet 无合并单元格
+      description: |
+        B 类底稿目录结构简单，大部分无合并单元格。
+        少数变体（如业务层面控制底稿目录）可能有少量合并。
+
+    # ─── 跨底稿引用（索引导航行本身就是跨底稿引用） ─────────────────
+    cross_refs:
+      mode: dynamic                          # 引用关系由 navigation_rows 动态决定
+      description: |
+        B 类底稿目录的索引导航表每一行的 index_ref 字段即为跨底稿引用。
+        前端 GtBIndex 组件将 index_ref 渲染为 GtIndexChip，支持：
+        - 同底稿 sheet 切换（如 D2-1 → D2-2）
+        - 跨底稿 router.push（如 D2A → D4A）
+        引用关系不在 schema 中静态定义，而是从 html_data.navigation_rows 动态派生。
+
+# ─── 导出行为说明 ──────────────────────────────────────────────────
+# 导出 xlsx 时的写入策略：
+#   1. fixed_cells: 写入编制信息（entity_name / period_end / preparer 等）
+#   2. dynamic_table: 写入导航表行（seq / content / index_ref）
+#      - no_print=true 的行：保留原合并区，cell 写入空字符串 + 加批注"已标记不打印"
+#   3. formulas: 跳过（保留 A2/A3 原公式供其他 sheet 引用）
+#   4. static_text: 跳过（模板已含）
+#   5. merged_cells: 跳过（openpyxl 加载时已含）

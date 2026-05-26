@@ -1,0 +1,307 @@
+# backend/data/wp_render_schema/D-A22-review.yaml
+# 项目负责经理复核（财报审计） — D 类复核记录子模式渲染 schema (form_type=review)
+# Requirements: 3.5（D 类 449 sheet 5 子模式 - 复核型实例 A22 项目经理 / A23 合伙人）
+# Design: §3.6 GtDForm 复核记录子模式（GtDFormReview，~27 sheet 适用）
+# Template: A22-1 项目负责经理复核(适用于财报审计).xlsx
+# 适用范围：A22 项目经理复核 / A23 合伙人复核 / EQCR 抽查（约 27 sheet）
+
+wp_code: D-A22-review
+template_path: backend/wp_templates/A/A22-1 项目负责经理复核(适用于财报审计).xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+shared: true                               # 共享模板（A22-1/A22-2/A23-1/A23-2/EQCR 复用）
+related_accounts: []                        # 复核记录不绑定具体科目
+
+sheets:
+  项目负责经理复核:
+    component_type: d-form
+    form_type: review                       # ★ 5 子模式路由字段（复核记录子模式）
+    review_role: project_manager            # 复核角色：project_manager/partner/eqcr/quality_control
+    # review_role 取值：
+    #   - project_manager   项目经理复核（A22-1 财报 / A22-2 内控）
+    #   - partner           合伙人复核（A23-1 财报 / A23-2 内控）
+    #   - eqcr              EQCR 抽查复核
+    #   - quality_control   质控部门复核
+
+    # ─── 固定头部（自动填充） ──────────────────────────────────────
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '项目负责经理复核（适用于财报审计）'
+      A3: '${entity_name}'
+      A4: '${period_end}'
+      H3: '${index_no}'                     # 索引号（A22-1 / A22-2 / A23-1 / A23-2）
+      H4: '${page_no}'
+
+    # ─── 上下文区 ──────────────────────────────────────────────────
+    fields:
+      - { name: project_name, label: '项目名称', type: text,
+          cell: B6, source: 'project.name', readonly: true }
+      - { name: audit_year, label: '审计年度', type: text,
+          cell: B7, source: 'project.audit_year', readonly: true }
+      - { name: review_scope, label: '复核范围', type: textarea,
+          cell: B9, max_length: 1000,
+          hint: '说明本次复核覆盖的循环 / 关键事项 / 重要风险' }
+      - name: review_basis
+        label: '复核依据'
+        type: textarea
+        cell: B11
+        max_length: 1000
+        readonly: true
+        default: |
+          - 中国注册会计师独立审计准则
+          - 致同所质量管理体系（GTQMS-2024）
+          - 项目经理复核要点清单（PMR-2025-R3）
+
+    # ─── 复核步骤（review_steps，电子签 + 时间戳 + 状态机） ───────
+    review_steps:                           # 复核子模式核心结构
+      - step: 1
+        id: step_1_completion_check
+        title: '步骤 1：审计完成度检查'
+        description: '所有计划程序是否完成 / 关键风险是否覆盖'
+        start_row: 14
+        end_row: 22
+        checklist:                          # 复核要点清单
+          - { id: cl_1_1, label: '所有计划程序已执行', cell: C16,
+              required: true, render: 'checkbox' }
+          - { id: cl_1_2, label: '关键风险已覆盖（含舞弊风险）', cell: C17,
+              required: true, render: 'checkbox' }
+          - { id: cl_1_3, label: '专业判断已充分文档化', cell: C18,
+              required: true, render: 'checkbox' }
+          - { id: cl_1_4, label: '所有 cross_wp_references 已更新', cell: C19,
+              required: true, render: 'checkbox' }
+          - { id: cl_1_5, label: '调整分录已传递并响应', cell: C20,
+              required: false, render: 'checkbox' }
+        comment_field:
+          { name: step_1_comment, type: textarea, cell: B22,
+            max_length: 3000, label: '步骤 1 复核意见' }
+
+      - step: 2
+        id: step_2_financial_position
+        title: '步骤 2：财务状况合理性'
+        description: '资产 / 负债 / 权益 / 损益是否合理 / 重大波动是否有依据'
+        start_row: 23
+        end_row: 30
+        checklist:
+          - { id: cl_2_1, label: '资产负债表项目趋势分析合理', cell: C25,
+              required: true, render: 'checkbox' }
+          - { id: cl_2_2, label: '利润表波动有合理解释', cell: C26,
+              required: true, render: 'checkbox' }
+          - { id: cl_2_3, label: '现金流量表与利润表勾稽一致', cell: C27,
+              required: true, render: 'checkbox' }
+          - { id: cl_2_4, label: '关键比率（毛利率 / 应收周转）符合预期',
+              cell: C28, required: true, render: 'checkbox' }
+        comment_field:
+          { name: step_2_comment, type: textarea, cell: B30,
+            max_length: 3000, label: '步骤 2 复核意见' }
+
+      - step: 3
+        id: step_3_disclosure_completeness
+        title: '步骤 3：附注披露完整性'
+        description: '附注是否覆盖所有必要披露事项 / 是否符合准则要求'
+        start_row: 31
+        end_row: 38
+        checklist:
+          - { id: cl_3_1, label: '所有强制披露事项已覆盖', cell: C33,
+              required: true, render: 'checkbox' }
+          - { id: cl_3_2, label: '关联方交易披露完整', cell: C34,
+              required: true, render: 'checkbox' }
+          - { id: cl_3_3, label: '或有事项 / 承诺事项已披露', cell: C35,
+              required: true, render: 'checkbox' }
+          - { id: cl_3_4, label: '会计政策变更追溯调整已披露', cell: C36,
+              required: false, render: 'checkbox' }
+        comment_field:
+          { name: step_3_comment, type: textarea, cell: B38,
+            max_length: 3000, label: '步骤 3 复核意见' }
+
+      - step: 4
+        id: step_4_misstatement_evaluation
+        title: '步骤 4：错报评价'
+        description: 'A13 错报汇总评价 / 重大性判断 / 调整分录响应'
+        start_row: 39
+        end_row: 46
+        checklist:
+          - { id: cl_4_1, label: 'A13 错报汇总已完整', cell: C41,
+              required: true, render: 'checkbox' }
+          - { id: cl_4_2, label: '错报重大性已评估（金额 + 性质）', cell: C42,
+              required: true, render: 'checkbox' }
+          - { id: cl_4_3, label: '管理层已沟通并响应', cell: C43,
+              required: true, render: 'checkbox' }
+          - { id: cl_4_4, label: '未调整错报已记入审计文档', cell: C44,
+              required: true, render: 'checkbox' }
+        linked_workpapers:
+          - { ref: 'A13', label: 'A13 未更正错报汇总',
+              render: 'index_chip' }
+          - { ref: 'A14', label: 'A14 内控缺陷评价',
+              render: 'index_chip' }
+        comment_field:
+          { name: step_4_comment, type: textarea, cell: B46,
+            max_length: 3000, label: '步骤 4 复核意见' }
+
+      - step: 5
+        id: step_5_audit_report_alignment
+        title: '步骤 5：审计报告意见类型对齐'
+        description: '审计意见类型是否与发现一致'
+        start_row: 47
+        end_row: 54
+        fields:
+          - { name: opinion_type, label: '审计意见类型', type: enum,
+              cell: C49, required: true,
+              enum: ['标准无保留', '强调事项段', '保留意见', '否定意见', '无法表示意见'] }
+          - { name: opinion_basis, label: '意见类型依据', type: textarea,
+              cell: B51, max_length: 3000, required: true,
+              hint: '如非标准意见，需说明引发的关键事项及证据' }
+          - { name: kam_count, label: '关键审计事项（KAM）数量', type: number,
+              cell: C53, min: 0, max: 10 }
+        comment_field:
+          { name: step_5_comment, type: textarea, cell: B54,
+            max_length: 3000, label: '步骤 5 复核意见' }
+
+      - step: 6
+        id: step_6_signature
+        title: '步骤 6：电子签 + 时间戳 + 状态机'
+        description: '复核完成后电子签 + 时间戳锁定，状态机推进至下一阶段'
+        start_row: 55
+        end_row: 64
+        signature:                          # 电子签子结构
+          - { role: project_manager, label: '项目负责经理', cell: B57,
+              source: 'user_profile.display_name',
+              auto_timestamp: true, timestamp_cell: B58,
+              required: true }
+          - { role: senior_manager, label: '高级经理 / 部门负责人', cell: B59,
+              source: 'reviewer_profile.display_name',
+              auto_timestamp: true, timestamp_cell: B60,
+              required: false }
+        comment_field:
+          { name: final_comment, type: textarea, cell: B62,
+            max_length: 5000, label: '最终复核结论' }
+        is_terminal: true                   # 终结步骤
+
+    # ─── 复核状态机 ──────────────────────────────────────────────
+    state_machine:
+      states:
+        - { id: 'in_progress', label: '复核中', class: 'info' }
+        - { id: 'pending_response', label: '待项目组响应', class: 'warning' }
+        - { id: 'pending_signature', label: '待电子签', class: 'warning' }
+        - { id: 'review_passed', label: '复核通过', class: 'success' }
+        - { id: 'review_returned', label: '退回项目组', class: 'danger' }
+      transitions:
+        - { from: 'in_progress', to: 'pending_response',
+            trigger: 'has_review_comments',
+            description: '复核中发现问题 → 待项目组响应' }
+        - { from: 'pending_response', to: 'in_progress',
+            trigger: 'project_team_responded',
+            description: '项目组响应完成 → 重新进入复核' }
+        - { from: 'in_progress', to: 'pending_signature',
+            trigger: 'all_steps_complete',
+            description: '所有步骤完成 → 待电子签' }
+        - { from: 'pending_signature', to: 'review_passed',
+            trigger: 'signature_completed',
+            description: '电子签完成 → 复核通过' }
+        - { from: 'in_progress', to: 'review_returned',
+            trigger: 'critical_issue_found',
+            description: '发现重大问题 → 退回项目组返工' }
+        - { from: 'pending_signature', to: 'in_progress',
+            trigger: 'unsign',
+            description: '撤销签字 → 重新复核（仅 24h 内允许）' }
+      initial: 'in_progress'
+      final: ['review_passed', 'review_returned']
+      cell: H6                              # 状态字段写入单元格
+      audit_log: true                       # 记录所有状态变更（user / timestamp / reason）
+
+    # ─── 整体复核结论 ──────────────────────────────────────────────
+    conclusion:
+      mode: single
+      cell: B64
+      options:
+        - { value: 'review_passed_no_issue', label: '复核通过 / 无重大问题',
+            class: 'success', icon: 'CircleCheck',
+            description: '审计工作充分、文档完整、可签发审计报告' }
+        - { value: 'review_passed_with_observations', label: '复核通过 / 有改进观察',
+            class: 'warning', icon: 'WarningFilled',
+            description: '审计工作充分但有改进建议（不影响报告签发）' }
+        - { value: 'review_returned_minor', label: '退回 / 小幅修订',
+            class: 'warning', icon: 'WarningFilled',
+            description: '需小幅修订后重新复核（不退回项目）' }
+        - { value: 'review_returned_major', label: '退回 / 重大返工',
+            class: 'danger', icon: 'CircleCloseFilled',
+            description: '需重大返工后重新复核（影响进度）' }
+      mutual_exclusive: true
+      required: true
+
+    # ─── 静态文本区 ───────────────────────────────────────────────
+    static_text:
+      rows: [1-5, 13, 23, 31, 39, 47, 55]  # 表头 + 6 步骤标题
+      description: |
+        Row 1-4: 事务所名称 / 表名 / 被审计单位 / 审计截止日
+        Row 5-12: 项目信息 / 复核范围 / 复核依据
+        Row 13, 23, 31, 39, 47, 55: 6 个步骤标题
+      footer_rows_after_steps: 3             # 尾部签字 + 复核日期
+
+    # ─── 公式区 ──────────────────────────────────────────────────
+    formulas:
+      preserve: true
+      cells:
+        - A3                                # =底稿目录!A2
+        - A4                                # =底稿目录!A3
+        - H3                                # 索引号公式
+        - H4                                # 页码公式
+        - B58                               # 项目经理签字时间戳（公式 =NOW()）
+        - B60                               # 高级经理签字时间戳
+
+    # ─── 合并单元格 ──────────────────────────────────────────────
+    merged_cells:
+      preserve: true
+      count: 38                             # 估算（6 步骤 × 标题 + checklist 标签 + 字段标签）
+      description: |
+        主要合并区域：
+        - A1:H1（事务所名称横跨全宽）
+        - A2:H2（表名）
+        - 6 步骤标题行各横跨 A:H
+        - checklist 行标签 D:H 横跨
+
+    # ─── 跨底稿引用 ──────────────────────────────────────────────
+    cross_refs:
+      - ref_id: CW-D-A22-001
+        source_cell: 'B41'                  # A13 错报汇总引用
+        target_wp: A13
+        target_sheet: '未更正错报汇总'
+        target_field: 'misstatement_total'
+        description: '步骤 4 错报评价 ← A13 错报汇总反向溯源'
+        severity: required
+        direction: inbound
+
+      - ref_id: CW-D-A22-002
+        source_cell: 'B42'                  # A14 内控缺陷
+        target_wp: A14
+        target_sheet: '内控缺陷评价'
+        target_field: 'deficiency_summary'
+        description: '步骤 4 错报评价 ← A14 内控缺陷反向溯源'
+        severity: required
+        direction: inbound
+
+      - ref_id: CW-D-A22-003
+        source_cell: 'C49'                  # 审计意见类型
+        target_wp: A1
+        target_sheet: '审计报告'
+        target_field: 'opinion_type'
+        description: '步骤 5 审计意见 → A1 审计报告意见类型'
+        severity: required
+        direction: outbound
+
+      - ref_id: CW-D-A22-004
+        source_cell: 'B64'                  # 最终结论
+        target_wp: A23-1
+        target_sheet: '项目合伙人复核'
+        target_field: 'manager_review_conclusion'
+        description: '项目经理复核结论 → A23 合伙人复核前置依据'
+        severity: required
+        direction: outbound
+
+      - ref_id: CW-D-A22-005
+        source_cell: 'state_machine'        # 复核状态
+        target_wp: 'project_dashboard'
+        target_namespace: 'project:'
+        target_field: 'review_status'
+        description: '复核状态 → 项目仪表盘进度更新'
+        severity: required
+        direction: outbound

@@ -1,0 +1,845 @@
+# S3.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:59:03
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: S3
+template_path: backend/wp_templates/S/S3 会计政策变更、前期差错会计、估计变更2020.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:59:02'
+  source_xlsx: S3 会计政策变更、前期差错会计、估计变更2020.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  表头（请先填写）:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: 客户名称：
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 日期：
+        D:
+          field: col_d
+          type: text
+          label: '3'
+        E:
+          field: col_e
+          type: text
+          label: 会计政策变更和前期差错更正S2-1
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  审定表:
+    component_type: univer
+    class_code: F-审定表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 审定表
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      G3: ${index_no}
+      F4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 6
+      - 11
+      - 16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - D3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:G2
+      - A1:G1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  会计政策变更和前期差错更正S3-1:
+    component_type: d-form-paragraph
+    class_code: D-政策检查
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计政策变更和前期差错更正
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 二、审计程序
+        D:
+          field: col_d
+          type: text
+          label: 执行人
+        E:
+          field: col_e
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - C3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 22
+      ranges_sample:
+      - A25:C25
+      - A18:C18
+      - A1:E1
+      - A21:C21
+      - A12:C12
+      - A6:E6
+      - A23:C23
+      - A7:E7
+      - A14:C14
+      - A22:C22
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  会计估计变更审计程序S3-2:
+    component_type: a-program-console
+    class_code: A-S 议题程序
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 会计估计变更
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+    dynamic_table:
+      start_row: 12
+      end_row: dynamic
+      header_row: 11
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 二、审计程序
+        D:
+          field: col_d
+          type: text
+          label: 执行人
+        E:
+          field: col_e
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - C3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 23
+      ranges_sample:
+      - A25:C25
+      - A18:C18
+      - A1:E1
+      - A21:C21
+      - A12:C12
+      - A6:E6
+      - A26:C26
+      - A23:C23
+      - A7:E7
+      - A14:C14
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  首次执行新金融工具准则的调整S3-4:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 首次执行新金融工具准则的调整
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 原核算科目与列报项目
+        B:
+          field: col_b
+          type: text
+          label: 新准则核算项目
+        C:
+          field: col_c
+          type: text
+          label: 准则依据及转换要求
+        F:
+          field: col_f
+          type: text
+          label: 重分类分录
+        G:
+          field: col_g
+          type: text
+          label: 金额
+        H:
+          field: col_h
+          type: text
+          label: 调整分录
+        I:
+          field: col_i
+          type: text
+          label: 金额
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - G3
+      - A4
+      - G150
+      - G151
+      - G152
+      - G153
+      - G154
+      - G155
+      - G156
+      - G157
+      - G158
+      - G159
+      - G160
+      - G161
+      - G163
+      - G164
+      - G165
+      - G166
+      - G167
+      - G168
+      - G169
+      - G170
+      - G171
+      - G173
+      - G174
+      - G175
+      - G176
+      - G177
+      _total_count: 41
+    merged_cells:
+      preserve: true
+      count: 266
+      ranges_sample:
+      - F84:F85
+      - A7:I7
+      - C96:E97
+      - B50:B55
+      - A212:I212
+      - D172:E172
+      - D187:E187
+      - A186:B186
+      - B66:B69
+      - A98:B98
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  首次执行新收入准则的调整S3-6:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 首次执行新收入准则的调整
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 原核算科目与列报项目
+        B:
+          field: col_b
+          type: text
+          label: 新准则核算项目
+        C:
+          field: col_c
+          type: text
+          label: 准则依据及转换要求
+        F:
+          field: col_f
+          type: text
+          label: 重分类分录
+        G:
+          field: col_g
+          type: text
+          label: 金额
+        H:
+          field: col_h
+          type: text
+          label: 调整分录
+        I:
+          field: col_i
+          type: text
+          label: 金额
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - G3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 211
+      ranges_sample:
+      - B42:D42
+      - A7:I7
+      - B60:D60
+      - D100:E100
+      - A98:B98
+      - E62:F62
+      - E71:F71
+      - A107:B107
+      - G71:H71
+      - B53:D53
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  首次执行新租赁准则的调整S3-8:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 首次执行新租赁准则的调整
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 原核算科目与列报项目
+        B:
+          field: col_b
+          type: text
+          label: 新准则核算项目
+        C:
+          field: col_c
+          type: text
+          label: 准则依据及转换要求
+        F:
+          field: col_f
+          type: text
+          label: 重分类分录
+        G:
+          field: col_g
+          type: text
+          label: 金额
+        H:
+          field: col_h
+          type: text
+          label: 调整分录
+        I:
+          field: col_i
+          type: text
+          label: 金额
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - G3
+      - A4
+      - F55
+      - F63
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 124
+      ranges_sample:
+      - A7:I7
+      - A99:I99
+      - A73:B73
+      - D84:E84
+      - A88:B88
+      - D36:E36
+      - D45:E45
+      - D77:E77
+      - A65:E65
+      - A2:I2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  简化的追溯调整法（1）S3-9:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 首次执行日承租人使用简化的追溯调整法（1）
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 使用权资产名称
+        B:
+          field: col_b
+          type: text
+          label: 租赁期开始日
+        C:
+          field: col_c
+          type: text
+          label: 合同约定初始期满日
+        D:
+          field: col_d
+          type: text
+          label: 续租期（年）
+        E:
+          field: col_e
+          type: text
+          label: 租赁期（考虑续租可能后）
+        F:
+          field: col_f
+          type: text
+          label: 租赁期截止日期
+        G:
+          field: col_g
+          type: text
+          label: 首次执行日剩余租期
+        H:
+          field: col_h
+          type: text
+          label: 增量借款年利率
+        I:
+          field: col_i
+          type: text
+          label: 使用权资产摊销期限（年）
+        J:
+          field: col_j
+          type: text
+          label: 租赁期是指承租人有权使用租赁资产且不可撤销的期间;承租人有续
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - A4
+      - D10
+      - E10
+      - F10
+      - G10
+      - H15
+      - I15
+      - H16
+      - I16
+      - C17
+      - E17
+      - F17
+      - H17
+      - I17
+      - C18
+      - D18
+      - E18
+      - F18
+      - H18
+      - I18
+      - C19
+      - D19
+      - E19
+      - F19
+      - H19
+      - I19
+      - C20
+      _total_count: 137
+    merged_cells:
+      preserve: true
+      count: 12
+      ranges_sample:
+      - A52:I52
+      - A7:I7
+      - A2:I2
+      - A51:I51
+      - A5:I5
+      - G37:I37
+      - A1:I1
+      - B37:F37
+      - A37:A38
+      - A6:I6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  简化的追溯调整法（2）S3-10:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 首次执行日承租人使用简化的追溯调整法（2）
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 使用权资产名称
+        B:
+          field: col_b
+          type: text
+          label: 租赁期开始日
+        C:
+          field: col_c
+          type: text
+          label: 合同约定初始期满日
+        D:
+          field: col_d
+          type: text
+          label: 续租期（年）
+        E:
+          field: col_e
+          type: text
+          label: 租赁期（考虑续租可能后）
+        F:
+          field: col_f
+          type: text
+          label: 租赁期截止日期
+        G:
+          field: col_g
+          type: text
+          label: 首次执行日剩余租期
+        H:
+          field: col_h
+          type: text
+          label: 增量借款年利率
+        I:
+          field: col_i
+          type: text
+          label: 使用权资产摊销期限（年）
+        J:
+          field: col_j
+          type: text
+          label: 租赁期是指承租人有权使用租赁资产且不可撤销的期间;承租人有续
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - A4
+      - D10
+      - E10
+      - F10
+      - G10
+      - C17
+      - E17
+      - F17
+      - G17
+      - H17
+      - I17
+      - C18
+      - D18
+      - E18
+      - F18
+      - G18
+      - H18
+      - I18
+      - C19
+      - D19
+      - E19
+      - F19
+      - G19
+      - H19
+      - I19
+      - C20
+      - D20
+      _total_count: 132
+    merged_cells:
+      preserve: true
+      count: 12
+      ranges_sample:
+      - A52:I52
+      - A7:I7
+      - A2:I2
+      - A51:I51
+      - A49:I49
+      - A34:A35
+      - A5:I5
+      - B34:F34
+      - A1:I1
+      - G34:I34
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  简化的追溯调整法（2）S3-10 (2):
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 首次执行日承租人使用简化的追溯调整法（2）
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 使用权资产名称
+        B:
+          field: col_b
+          type: text
+          label: 租赁期开始日
+        C:
+          field: col_c
+          type: text
+          label: 合同约定初始期满日
+        D:
+          field: col_d
+          type: text
+          label: 续租期（年）
+        E:
+          field: col_e
+          type: text
+          label: 租赁期（考虑续租可能后）
+        F:
+          field: col_f
+          type: text
+          label: 租赁期截止日期
+        G:
+          field: col_g
+          type: text
+          label: 首次执行日剩余租期
+        H:
+          field: col_h
+          type: text
+          label: 增量借款年利率
+        I:
+          field: col_i
+          type: text
+          label: 使用权资产摊销期限（年）
+        J:
+          field: col_j
+          type: text
+          label: 租赁期是指承租人有权使用租赁资产且不可撤销的期间;承租人有续
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - A4
+      - D10
+      - E10
+      - F10
+      - G10
+      - C17
+      - D17
+      - E17
+      - F17
+      - G17
+      - H17
+      - I17
+      - C18
+      - D18
+      - E18
+      - F18
+      - G18
+      - H18
+      - I18
+      - C19
+      - D19
+      - E19
+      - F19
+      - G19
+      - H19
+      - I19
+      - C20
+      _total_count: 131
+    merged_cells:
+      preserve: true
+      count: 12
+      ranges_sample:
+      - A52:I52
+      - A7:I7
+      - A2:I2
+      - A49:I49
+      - A34:A35
+      - A5:I5
+      - B34:F34
+      - A1:I1
+      - G34:I34
+      - A6:I6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  参考-简化的追溯调整法（首次执行日）:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 首次执行日承租人使用简化的追溯调整法
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 3、
+        B:
+          field: col_b
+          type: text
+          label: 折现率*(必填）
+        C:
+          field: col_c
+          type: text
+          label: 按承租人首次执行日增量借款利率确定折现率。
+    static_text:
+      rows:
+      - 1-2
+      - 6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - A4
+      - D15
+      - E16
+      - H16
+      - E17
+      - C18
+      - F18
+      - I18
+      - F19
+      - I19
+      - B21
+      - E21
+      - H21
+      - I21
+      - A22
+      - B22
+      - E22
+      - G22
+      - H22
+      - I22
+      - A23
+      - B23
+      - E23
+      - G23
+      - H23
+      - I23
+      - A24
+      _total_count: 1691
+    merged_cells:
+      preserve: true
+      count: 10
+      ranges_sample:
+      - A16:B16
+      - A13:C13
+      - A2:I2
+      - A15:B15
+      - D13:I13
+      - A19:B19
+      - A1:I1
+      - A14:B14
+      - A17:B17
+      - A18:B18
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

@@ -1,0 +1,173 @@
+# B51.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:58:23
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: B51
+template_path: backend/wp_templates/B/B51 舞弊风险因素（三因素分析）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:58:23'
+  source_xlsx: B51 舞弊风险因素（三因素分析）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：ABC公司
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  B51-1 识别舞弊风险因素（虚假报告）:
+    component_type: d-form-table
+    class_code: D-风险评估
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 识别舞弊风险因素（虚假报告）
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 舞弊风险因素具体示例（可增加）
+        C:
+          field: col_c
+          type: text
+          label: 是
+        D:
+          field: col_d
+          type: text
+          label: 否
+        E:
+          field: col_e
+          type: text
+          label: 不适用
+        F:
+          field: col_f
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - A4
+      - C4
+      - E4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:F2
+      - A1:F1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  B51-2 识别舞弊风险因素（侵占资产）:
+    component_type: d-form-table
+    class_code: D-风险评估
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 对舞弊的考虑－识别财务报表层次舞弊风险因素（侵占资产）
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 舞弊风险因素具体示例（可增加）
+        C:
+          field: col_c
+          type: text
+          label: 是
+        D:
+          field: col_d
+          type: text
+          label: 否
+        E:
+          field: col_e
+          type: text
+          label: 不适用
+        F:
+          field: col_f
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - D3
+      - A4
+      - C4
+      - D4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:G2
+      - A1:G1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  相关资源:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 3
+      - 5
+      - 8
+      - 10
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 4
+      ranges_sample:
+      - B3:I3
+      - B8:I8
+      - B5:I6
+      - B10:I10
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

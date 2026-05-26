@@ -1,0 +1,336 @@
+# backend/data/wp_render_schema/E-C11-2.yaml
+# 评价控制偏差 — E 类 evaluation_step 子模式渲染 schema
+# Requirements: 3.6.3（评价控制偏差 C11-2，74 行 × 9 列）
+# Design: §3.7 GtEControlTest（test_type=evaluation_step），el-steps 6 步骤决策树
+# Template: C11-2 评价控制偏差（74 行 × 9 列）
+# 适用范围：C2~C20 各循环「评价控制偏差」共 29 sheet（E2 类）
+
+wp_code: E-C11-2
+template_path: backend/wp_templates/C/C11-2 评价控制偏差.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+shared: true                               # 共享模板（C2~C20 各循环复用）
+related_accounts: []
+
+sheets:
+  评价控制偏差:
+    component_type: e-control-test
+    test_type: evaluation_step              # E 类三种 test_type 之一（核心）
+
+    # ─── 固定头部（自动填充） ──────────────────────────────────────
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '评价控制偏差'
+      A3: '${entity_name}'                  # 来自 project.client_name
+      A4: '${period_end}'                   # 来自 project.period_end
+      I3: '${index_no}'                     # 索引号（C11-2 / C2-2 等）
+      I4: '${page_no}'
+
+    # ─── 上下文区（基本信息 + 偏差概览） ──────────────────────────
+    fields:                                  # 单字段（非 segments，非 dynamic_table）
+      - { name: control_no, label: '控制编号', type: text, required: true,
+          cell: B6, max_length: 30, render: 'index_chip',
+          hint: '指向单条控制测试 C12-1-X' }
+      - { name: control_name, label: '控制名称', type: text, required: true,
+          cell: B7, max_length: 200 }
+      - { name: deviation_summary, label: '偏差概况', type: textarea,
+          cell: B8, max_length: 2000,
+          hint: '简述发现的偏差性质 / 数量 / 金额范围' }
+      - { name: linked_single_test_ref, label: '关联单条控制测试', type: text,
+          cell: B9, render: 'index_chip',
+          hint: '指向 C12-1-X 单条控制测试索引号' }
+
+    # ─── 6 步骤决策树（el-steps stepper 核心结构） ────────────────
+    steps:                                   # design §3.7 evaluation_step.steps
+      - step: 1
+        id: step1_random_or_systemic
+        title: '步骤一：偏差是否随机发生？'
+        description: |
+          判定依据：
+          - 偏差是否分散在不同时点 / 不同人员 / 不同业务条线？
+          - 是否存在共同的根本原因（流程缺陷 / 系统配置错误 / 培训不足）？
+        start_row: 12
+        end_row: 20
+        fields:
+          - { name: is_random, label: '是否随机', type: enum,
+              cell: B14, enum: ['是', '否'] }
+          - { name: analysis, label: '评价分析过程', type: textarea,
+              cell: B16, max_length: 2000, required: true }
+          - { name: notes, label: '备注', type: textarea,
+              cell: B18, max_length: 1000 }
+        next_logic:
+          - { when: "is_random == '是'", goto: 2 }
+          - { when: "is_random == '否'", goto: 6, reason: '系统性偏差直接进入步骤六结论' }
+
+      - step: 2
+        id: step2_extend_sample
+        title: '步骤二：是否扩大样本测试？'
+        description: |
+          扩大测试规则（致同方法论）：
+          - 原样本量 × 2~3 倍
+          - 至少新增 25 个样本
+          - 必须独立选取（不重复使用原样本）
+        start_row: 21
+        end_row: 30
+        fields:
+          - { name: extend_decision, label: '扩大测试决策', type: enum,
+              cell: B23, enum: ['扩大', '不扩大'] }
+          - { name: extended_sample_size, label: '扩大后样本量', type: number,
+              cell: B25, min: 0,
+              conditional: "extend_decision == '扩大'" }
+          - { name: analysis, label: '评价分析过程', type: textarea,
+              cell: B27, max_length: 2000, required: true }
+          - { name: notes, label: '备注', type: textarea,
+              cell: B29, max_length: 1000 }
+        next_logic:
+          - { when: "extend_decision == '扩大'", goto: 3 }
+          - { when: "extend_decision == '不扩大'", goto: 6 }
+
+      - step: 3
+        id: step3_extended_test_result
+        title: '步骤三：扩大测试结果如何？'
+        start_row: 31
+        end_row: 40
+        fields:
+          - { name: extended_deviation_count, label: '扩大测试偏差数', type: number,
+              cell: B33, min: 0 }
+          - { name: extended_test_result, label: '扩大测试结果', type: enum,
+              cell: B35, enum: ['无新偏差', '有新偏差'] }
+          - { name: analysis, label: '评价分析过程', type: textarea,
+              cell: B37, max_length: 2000, required: true }
+          - { name: notes, label: '备注', type: textarea,
+              cell: B39, max_length: 1000 }
+        next_logic:
+          - { when: "extended_test_result == '无新偏差'", goto: 4 }
+          - { when: "extended_test_result == '有新偏差'", goto: 5 }
+
+      - step: 4
+        id: step4_root_cause_random
+        title: '步骤四：原偏差根本原因（随机偏差路径）'
+        start_row: 41
+        end_row: 50
+        fields:
+          - { name: root_cause, label: '根本原因分析', type: textarea,
+              cell: B43, max_length: 3000, required: true,
+              hint: '分析为何会出现随机偏差（人员疏忽 / 临时替岗 / 高峰期超负荷等）' }
+          - { name: management_response, label: '管理层应对措施', type: textarea,
+              cell: B45, max_length: 2000 }
+          - { name: analysis, label: '评价分析过程', type: textarea,
+              cell: B47, max_length: 2000, required: true }
+          - { name: notes, label: '备注', type: textarea,
+              cell: B49, max_length: 1000 }
+        next_logic:
+          - { when: "true", goto: 6, conclusion_hint: 'control_effective' }
+
+      - step: 5
+        id: step5_persistent_deviation
+        title: '步骤五：扩大测试仍有偏差，进一步评价'
+        start_row: 51
+        end_row: 60
+        fields:
+          - { name: pattern_analysis, label: '偏差模式分析', type: textarea,
+              cell: B53, max_length: 2000, required: true,
+              hint: '是否存在系统性根因（流程设计缺陷 / 系统漏洞）' }
+          - { name: substantive_response, label: '实质性程序应对', type: textarea,
+              cell: B55, max_length: 2000,
+              hint: '应增加哪些实质性程序弥补内控缺陷' }
+          - { name: analysis, label: '评价分析过程', type: textarea,
+              cell: B57, max_length: 2000, required: true }
+          - { name: notes, label: '备注', type: textarea,
+              cell: B59, max_length: 1000 }
+        next_logic:
+          - { when: "true", goto: 6, conclusion_hint: 'deviation_remains' }
+
+      - step: 6
+        id: step6_final_conclusion
+        title: '步骤六：最终评价结论'
+        description: |
+          综合前 5 步评价，给出 4 选 1 互斥结论：
+          - 控制有效：随机偏差 + 已分析根因
+          - 扩大测试有效：扩大测试无新偏差
+          - 仍有偏差：扩大测试仍发现偏差
+          - 系统性偏差：步骤一直接判定为系统性
+        start_row: 61
+        end_row: 70
+        fields:
+          - { name: final_conclusion, label: '最终结论', type: enum,
+              cell: B63, required: true,
+              enum: ['control_effective', 'extended_effective',
+                     'deviation_remains', 'systemic_deviation'] }
+          - { name: conclusion_basis, label: '结论依据汇总', type: textarea,
+              cell: B65, max_length: 3000, required: true }
+          - { name: substantive_impact, label: '对实质性程序的影响', type: textarea,
+              cell: B67, max_length: 2000,
+              hint: '本结论对 D~N 实质性程序裁剪的影响（控制有效则可减少实质性测试）' }
+          - { name: notes, label: '备注', type: textarea,
+              cell: B69, max_length: 1000 }
+        is_terminal: true                     # 终结步骤
+
+    # ─── 提示区（注 1-注 5 长段落折叠展开） ───────────────────────
+    hints:
+      - id: note_1
+        label: '注 1：随机偏差与系统性偏差的区分'
+        collapsible: true
+        default_collapsed: true
+        content: |
+          随机偏差：分散发生、无明显模式、无系统性原因（如个别员工失误）。
+          系统性偏差：集中发生、有共同模式、源于流程或系统设计缺陷。
+          区分要点：①时点分布 ②人员分布 ③业务条线分布 ④根本原因可归一性。
+
+      - id: note_2
+        label: '注 2：扩大测试的样本量与方法'
+        collapsible: true
+        default_collapsed: true
+        content: |
+          扩大测试样本量 = 原样本量 × 2~3 倍，且至少新增 25 个样本。
+          扩大测试样本必须从原总体中独立选取，不得重复使用原样本。
+          扩大测试发现新偏差 → 至少视为"扩大测试仍有偏差"，必要时升级为系统性。
+
+      - id: note_3
+        label: '注 3：管理层凌驾于控制之上的特殊处理'
+        collapsible: true
+        default_collapsed: true
+        content: |
+          若发现的偏差源于管理层凌驾于控制之上（management override），
+          应直接视为重大缺陷，不适用本评价流程。
+          应执行 ISA 240 / CSA 1141 规定的舞弊应对程序。
+
+      - id: note_4
+        label: '注 4：扩大测试无新偏差时的注意事项'
+        collapsible: true
+        default_collapsed: true
+        content: |
+          即使扩大测试无新偏差，仍需关注：
+          - 原偏差是否会影响特定时段（如年末关账期）；
+          - 是否需要对偏差时段执行额外实质性程序；
+          - 是否需要重新评估控制环境整体有效性。
+
+      - id: note_5
+        label: '注 5：评价结论与实质性程序的联动'
+        collapsible: true
+        default_collapsed: true
+        content: |
+          - 控制有效 / 扩大测试有效 → 实质性程序可执行减少版（项目级 ProcedureTrimming 自动建议）。
+          - 仍有偏差 → 实质性程序按完整版执行 + 增加针对性测试。
+          - 系统性偏差 → 实质性程序按完整版 + 重大缺陷披露 + 内控审计报告反映。
+
+    # ─── 静态文本区 ───────────────────────────────────────────────
+    static_text:
+      rows: [1-5, 10-11, 71-74]              # 表头 + 上下文标题 + 注释区
+      description: |
+        Row 1-4: 事务所名称 / 表名 / 被审计单位 / 审计截止日
+        Row 5: "评价对象" 标题行
+        Row 10-11: "决策树流程" 标题
+        Row 71-74: 注释区标题（注 1 至注 5）
+      footer_rows_after_dynamic: 3            # 尾部签字行
+
+    # ─── 结论区（4 互斥结论，与步骤六联动） ──────────────────────
+    conclusion:
+      mode: single                            # 整张 sheet 单一最终结论
+      options:
+        - { value: control_effective, label: '控制有效',
+            class: 'success', icon: 'CircleCheck',
+            description: '随机偏差 + 已分析根因，控制运行有效' }
+        - { value: extended_effective, label: '扩大测试有效',
+            class: 'warning', icon: 'WarningFilled',
+            description: '扩大测试无新偏差，控制基本有效' }
+        - { value: deviation_remains, label: '仍有偏差',
+            class: 'danger', icon: 'CircleCloseFilled',
+            description: '扩大测试仍发现偏差，控制不可信赖' }
+        - { value: systemic_deviation, label: '系统性偏差',
+            class: 'danger', icon: 'CircleCloseFilled',
+            description: '系统性根因，重大缺陷' }
+      mutual_exclusive: true                  # 4 选 1 互斥
+      derived_from: steps[*].next_logic       # 派生自决策树流转
+      cell: B63                                # 写入单元格（与 step6 的 final_conclusion 同步）
+
+    # ─── 公式区 ──────────────────────────────────────────────────
+    formulas:
+      preserve: true
+      cells:
+        - A3                                  # =底稿目录!A2
+        - A4                                  # =底稿目录!A3
+        - I3                                  # 索引号公式
+        - I4                                  # 页码公式
+
+    # ─── 合并单元格 ──────────────────────────────────────────────
+    merged_cells:
+      preserve: true
+      count: 28                              # 估算（含 6 步骤标题 + 注 1-5 + 字段标签合并）
+      description: |
+        主要合并区域：
+        - A1:I1（事务所名称横跨全宽）
+        - A2:I2（表名）
+        - 6 步骤标题行各横跨 A:I（"步骤一：偏差是否随机发生？" 等）
+        - 注 1-注 5 标题行各横跨 A:I
+        - 长文本字段输入框（B 列横跨多行）
+
+    # ─── 跨底稿引用 ──────────────────────────────────────────────
+    cross_refs:
+      - ref_id: CW-E-C11-2-001
+        source_cell: B6
+        target_wp: E-C12-1
+        target_sheet: '单条控制测试'
+        target_field: '控制编号'
+        description: '本评价 → 单条控制测试反向溯源'
+        severity: required
+        direction: outbound
+
+      - ref_id: CW-E-C11-2-002
+        source_cell: B9
+        target_wp: E-C12-1
+        target_sheet: '单条控制测试'
+        target_field: '偏差明细'
+        description: '本评价依赖的偏差明细数据'
+        severity: required
+        direction: inbound
+
+      - ref_id: CW-E-C11-2-003
+        source_cell: B63
+        target_wp: ProcedureTrimming
+        target_sheet: 'ProcedureTrimming'
+        target_field: '裁剪建议'
+        description: '最终结论 → 实质性程序裁剪建议'
+        severity: required
+        direction: outbound
+
+    # ─── 联动语义（4 互斥结论 → 4 种下游影响） ────────────────────
+    linkage:
+      upstream:
+        - source: E-C12-1
+          field: deviation_count
+          condition: '> 0'
+          description: '前置触发：单条控制测试发现偏差时启动评价'
+
+      downstream:
+        # 控制有效 / 扩大测试有效 → 减少实质性程序
+        - target: ProcedureTrimming
+          condition: "final_conclusion in ['control_effective', 'extended_effective']"
+          action: 'reduce_substantive_scope'
+          payload:
+            suggestion_type: 'reduce'
+            confidence: 'high'
+          description: '控制有效 → emit trigger-procedure-trimming-suggestion → 写入 ProcedureTrimming 项目级建议'
+
+        # 仍有偏差 → 增加实质性程序
+        - target: ProcedureTrimming
+          condition: "final_conclusion == 'deviation_remains'"
+          action: 'increase_substantive_scope'
+          payload:
+            suggestion_type: 'increase'
+            confidence: 'high'
+          description: '仍有偏差 → 增加针对性实质性测试'
+
+        # 系统性偏差 → 内控审计报告 + 实质性程序完整版
+        - target: AuditReport
+          condition: "final_conclusion == 'systemic_deviation'"
+          action: 'flag_material_weakness'
+          description: '系统性偏差 → 内控审计报告披露重大缺陷'
+
+        - target: ProcedureTrimming
+          condition: "final_conclusion == 'systemic_deviation'"
+          action: 'execute_full_substantive'
+          payload:
+            suggestion_type: 'full'
+            confidence: 'required'
+          description: '系统性偏差 → 实质性程序按完整版执行（不可裁剪）'

@@ -1,0 +1,106 @@
+# S20.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:59:02
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: S20
+template_path: backend/wp_templates/S/S20 营业收入扣除情况核查底稿202504.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:59:01'
+  source_xlsx: S20 营业收入扣除情况核查底稿202504.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  营业收入扣除情况核查:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 营业收入扣除情况核查
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目
+        C:
+          field: col_c
+          type: text
+          label: 本年度审定数
+        D:
+          field: col_d
+          type: text
+          label: 上年度追溯调整后（如涉及）审定数
+        E:
+          field: col_e
+          type: text
+          label: 说明
+        H:
+          field: col_h
+          type: text
+          label: 索引
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - C16
+      - D16
+      - C17
+      - D17
+      - C22
+      - D22
+      - C27
+      - D27
+      - C28
+      - D28
+      - C29
+      - D29
+      - C30
+      - D30
+      - C31
+      - D31
+      - C40
+      - D40
+      - C53
+      - D53
+      - C65
+      - D65
+      _total_count: 22
+    merged_cells:
+      preserve: true
+      count: 94
+      ranges_sample:
+      - A77:H77
+      - A15:B15
+      - A64:B64
+      - E31:G31
+      - E40:G40
+      - E15:G15
+      - A6:H6
+      - A54:B54
+      - A69:H69
+      - A41:B41
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

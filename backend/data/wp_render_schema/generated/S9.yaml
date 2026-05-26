@@ -1,0 +1,250 @@
+# S9.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:59:03
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: S9
+template_path: backend/wp_templates/S/S9 对电子商务的考虑.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:59:03'
+  source_xlsx: S9 对电子商务的考虑.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  表头（请先填写）:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: 客户名称：
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 日期：
+        D:
+          field: col_d
+          type: text
+          label: '3'
+        E:
+          field: col_e
+          type: text
+          label: 审定表S9-1
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  对电子商务的考虑S9:
+    component_type: a-program-console
+    class_code: A-S 议题程序
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 对电子商务的考虑
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+      E4: ${page_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 二、审计程序
+        D:
+          field: col_d
+          type: text
+          label: 执行人
+        E:
+          field: col_e
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - C3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 36
+      ranges_sample:
+      - A25:C25
+      - A37:C37
+      - A18:C18
+      - A27:C27
+      - A1:E1
+      - A21:C21
+      - A12:C12
+      - A6:E6
+      - A26:C26
+      - A33:C33
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  审定表S9-1:
+    component_type: univer
+    class_code: F-审定表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 审定表
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 6
+      - 13
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 22
+      ranges_sample:
+      - A14:G14
+      - A17:G17
+      - A8:G8
+      - A22:G22
+      - A20:G20
+      - A19:G19
+      - A10:G10
+      - A13:G13
+      - A9:G9
+      - A24:G24
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  内部控制调查表S9-2:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 电子商务相关的内部控制调查表
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+      E4: ${page_no}
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      columns:
+        D:
+          field: col_d
+          type: text
+          label: 是
+        E:
+          field: col_e
+          type: text
+          label: 弱
+        F:
+          field: col_f
+          type: text
+          label: 否
+        G:
+          field: col_g
+          type: text
+          label: 不适用
+    static_text:
+      rows:
+      - 1-2
+      - 6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - C3
+      - A4
+      _total_count: 4
+    merged_cells:
+      preserve: true
+      count: 59
+      ranges_sample:
+      - A25:C25
+      - A41:C41
+      - A46:C46
+      - A37:C37
+      - A18:C18
+      - A27:C27
+      - A56:C56
+      - A21:C21
+      - A55:C55
+      - A50:C50
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  程序说明:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 在了解被审计单位及其环境时对电子商务的考虑
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 59
+      ranges_sample:
+      - A7:I7
+      - A25:I25
+      - A41:I41
+      - A54:I54
+      - A37:I37
+      - A46:I46
+      - A56:I56
+      - A27:I27
+      - A18:I18
+      - A3:I3
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  电子商务法律法规:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 电子商务法律法规
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 4-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

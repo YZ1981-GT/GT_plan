@@ -1,0 +1,1828 @@
+# D1.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-26T15:58:27
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: D1
+template_path: backend/wp_templates/D/D1 应收票据.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-26T15:58:27'
+  source_xlsx: D1 应收票据.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位名称：
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：
+        D:
+          field: col_d
+          type: text
+          label: '2'
+        E:
+          field: col_e
+          type: text
+          label: 审定表
+        F:
+          field: col_f
+          type: text
+          label: D1-1
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A14:A16
+      - A17:A19
+      - A10:A13
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  应收票据审计程序表D1A:
+    component_type: a-program-console
+    class_code: A-程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据实质性程序表
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      I3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 16
+      end_row: dynamic
+      header_row: 15
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 审计程序
+        C:
+          field: col_c
+          type: text
+          label: 程序分类
+        D:
+          field: col_d
+          type: text
+          label: 财务报表的认定
+        I:
+          field: col_i
+          type: text
+          label: 底稿索引
+    static_text:
+      rows:
+      - 1-2
+      - 5-14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - F3
+      - A4
+      - C4
+      - F4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 24
+      ranges_sample:
+      - G10:I10
+      - G13:I13
+      - A12:F12
+      - A6:B6
+      - A2:I2
+      - A8:F8
+      - A3:B3
+      - B15:B16
+      - A10:F10
+      - A13:F13
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  审定表D1-1:
+    component_type: univer
+    class_code: F-审定表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据审定表
+      A3: ${entity_name}
+      A4: ${period_end}
+      K3: ${index_no}
+      L3: ${index_no}
+      K4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目
+        B:
+          field: col_b
+          type: text
+          label: 期初数
+        F:
+          field: col_f
+          type: text
+          label: 期末数
+        J:
+          field: col_j
+          type: text
+          label: 期末与期初审定数比较
+        L:
+          field: col_l
+          type: text
+          label: 原因分析
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - H3
+      - A4
+      - E4
+      - H4
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - H8
+      - I8
+      - J8
+      - K8
+      - B9
+      - C9
+      - D9
+      - E9
+      - F9
+      - G9
+      - H9
+      - I9
+      - J9
+      - K9
+      - B10
+      - C10
+      - D10
+      - E10
+      _total_count: 95
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - A5:A6
+      - A2:L2
+      - J5:K5
+      - A1:L1
+      - B5:E5
+      - F5:I5
+      - L5:L6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  附注披露信息（上市公司）:
+    component_type: c-note-table
+    class_code: C-附注披露
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 附注披露信息（上市公司）
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 票据种类
+        B:
+          field: col_b
+          type: text
+          label: 期末余额
+        E:
+          field: col_e
+          type: text
+          label: 上年年末余额
+    static_text:
+      rows:
+      - 1-2
+      - 6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - A4
+      - C4
+      - E4
+      - B9
+      - C9
+      - D9
+      - E9
+      - F9
+      - G9
+      - B10
+      - C10
+      - D10
+      - E10
+      - F10
+      - G10
+      - B11
+      - C11
+      - D11
+      - E11
+      - F11
+      - G11
+      - B19
+      - B25
+      - C25
+      - B36
+      - B40
+      - C40
+      _total_count: 130
+    merged_cells:
+      preserve: true
+      count: 20
+      ranges_sample:
+      - A70:A71
+      - A84:A85
+      - A118:F118
+      - A51:A52
+      - E84:G84
+      - B64:E64
+      - A7:A8
+      - E77:G77
+      - B84:D84
+      - E7:G7
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  附注披露信息（国企）:
+    component_type: c-note-table
+    class_code: C-附注披露
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 附注披露信息（国有企业）
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 票据种类
+        B:
+          field: col_b
+          type: text
+          label: 期末数
+        E:
+          field: col_e
+          type: text
+          label: 期初数
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - A4
+      - C4
+      - E4
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - B9
+      - C9
+      - D9
+      - E9
+      - F9
+      - G9
+      - B10
+      - C10
+      - D10
+      - E10
+      - F10
+      - G10
+      - C16
+      - E16
+      - F16
+      - C17
+      - E17
+      - F17
+      _total_count: 87
+    merged_cells:
+      preserve: true
+      count: 22
+      ranges_sample:
+      - A20:A22
+      - A89:F89
+      - B46:B47
+      - A1:H1
+      - A6:A7
+      - E6:G6
+      - A13:A15
+      - C46:E46
+      - B34:D34
+      - D21:E21
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  原值明细表（按类别）D1-2:
+    component_type: univer
+    class_code: F-明细表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据原值明细表(原值）
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      K3: ${index_no}
+      J4: ${page_no}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 票据种类
+        B:
+          field: col_b
+          type: text
+          label: 期初未审数
+        C:
+          field: col_c
+          type: text
+          label: 账项调整
+        D:
+          field: col_d
+          type: text
+          label: 重分类调整
+        E:
+          field: col_e
+          type: text
+          label: 期初审定数
+        F:
+          field: col_f
+          type: text
+          label: 本期增加
+        G:
+          field: col_g
+          type: text
+          label: 本期减少
+        H:
+          field: col_h
+          type: text
+          label: 期末未审数
+        I:
+          field: col_i
+          type: text
+          label: 账项调整
+        J:
+          field: col_j
+          type: text
+          label: 重分类调整
+        K:
+          field: col_k
+          type: text
+          label: 期末审定数
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - A4
+      - D4
+      - G4
+      - E11
+      - H11
+      - K11
+      - E12
+      - H12
+      - K12
+      - E13
+      - H13
+      - K13
+      - B14
+      - C14
+      - D14
+      - E14
+      - F14
+      - G14
+      - H14
+      - I14
+      - J14
+      - K14
+      _total_count: 25
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:K2
+      - A1:K1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  原值明细表（按客户）D1-3:
+    component_type: univer
+    class_code: F-明细表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据原值明细表(按客户）
+      A3: ${entity_name}
+      A4: ${period_end}
+      N3: ${index_no}
+      O3: ${index_no}
+      N4: ${page_no}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 客户名称
+        B:
+          field: col_b
+          type: text
+          label: 公司代码
+        C:
+          field: col_c
+          type: text
+          label: 关联关系
+        D:
+          field: col_d
+          type: text
+          label: 期初未审数
+        E:
+          field: col_e
+          type: text
+          label: 账项调整
+        F:
+          field: col_f
+          type: text
+          label: 重分类调整
+        G:
+          field: col_g
+          type: text
+          label: 期初审定数
+        H:
+          field: col_h
+          type: text
+          label: 本期增加
+        I:
+          field: col_i
+          type: text
+          label: 本期减少
+        J:
+          field: col_j
+          type: text
+          label: 期末余额
+        K:
+          field: col_k
+          type: text
+          label: 被审计单位重分类调整
+        L:
+          field: col_l
+          type: text
+          label: 期末未审余额
+        M:
+          field: col_m
+          type: text
+          label: 账项调整
+        N:
+          field: col_n
+          type: text
+          label: 重分类调整
+        O:
+          field: col_o
+          type: text
+          label: 期末审定数
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - I3
+      - A4
+      - F4
+      - I4
+      - G11
+      - J11
+      - L11
+      - O11
+      - G12
+      - J12
+      - L12
+      - O12
+      - G13
+      - J13
+      - L13
+      - O13
+      - G14
+      - J14
+      - L14
+      - O14
+      - G15
+      - J15
+      - L15
+      - O15
+      - G16
+      - J16
+      - L16
+      - O16
+      _total_count: 57
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A1:O1
+      - A2:O2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  坏账准备明细表D1-4:
+    component_type: univer
+    class_code: F-明细表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据坏账准备明细表
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      N3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目
+        B:
+          field: col_b
+          type: text
+          label: 期初余额
+        F:
+          field: col_f
+          type: text
+          label: 本期增加
+        H:
+          field: col_h
+          type: text
+          label: 本期减少
+        K:
+          field: col_k
+          type: text
+          label: 期末余额
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - I3
+      - A4
+      - E4
+      - I4
+      - B12
+      - C12
+      - D12
+      - E12
+      - F12
+      - G12
+      - H12
+      - I12
+      - J12
+      - K12
+      - L12
+      - M12
+      - N12
+      - E13
+      - K13
+      - N13
+      - E14
+      - K14
+      - N14
+      - E15
+      - K15
+      - N15
+      - E16
+      - K16
+      _total_count: 75
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - H10:J10
+      - F10:G10
+      - A2:N2
+      - A10:A11
+      - K10:N10
+      - B10:E10
+      - A1:N1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  调整分录汇总表D1-5:
+    component_type: univer
+    class_code: F-调整分录
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据调整分录汇总表
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      J3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 调整事项说明
+        B:
+          field: col_b
+          type: text
+          label: 类别（报表调整/账项调整/其他）
+        C:
+          field: col_c
+          type: text
+          label: 报表项目
+        D:
+          field: col_d
+          type: text
+          label: 科目名称
+        E:
+          field: col_e
+          type: text
+          label: 附注项目
+        F:
+          field: col_f
+          type: text
+          label: ……
+        G:
+          field: col_g
+          type: text
+          label: 借方调整金额
+        H:
+          field: col_h
+          type: text
+          label: 贷方调整金额
+        I:
+          field: col_i
+          type: text
+          label: 索引
+        J:
+          field: col_j
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - A4
+      - D4
+      - G4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A1:J1
+      - A2:J2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  应收票据业务模式分析D1-6:
+    component_type: d-form-qa
+    class_code: D-业务模式
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据业务模式分析
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+    dynamic_table:
+      start_row: 12
+      end_row: dynamic
+      header_row: 11
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 组合名称
+        B:
+          field: col_b
+          type: text
+          label: 被审计单位管理应收票据业务模式
+        C:
+          field: col_c
+          type: text
+          label: 具体依据
+        D:
+          field: col_d
+          type: text
+          label: 索引号
+        E:
+          field: col_e
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      - 10
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - C3
+      - A4
+      - B4
+      - C4
+      - B21
+      - C21
+      - D21
+      - B22
+      - C22
+      - D22
+      _total_count: 12
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - A5:D5
+      - A2:E2
+      - F6:K6
+      - A7:D7
+      - A1:E1
+      - F7:K7
+      - A44:D44
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  应收票据备查簿核对D1-7:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据备查簿核对表
+      A3: ${entity_name}
+      A4: ${period_end}
+      O3: ${index_no}
+      O4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 票据类型
+        B:
+          field: col_b
+          type: text
+          label: 票据号
+        C:
+          field: col_c
+          type: text
+          label: 收到票据日期
+        D:
+          field: col_d
+          type: text
+          label: 票据前手名称
+        E:
+          field: col_e
+          type: text
+          label: 出票日期
+        F:
+          field: col_f
+          type: text
+          label: 出票人名称
+        G:
+          field: col_g
+          type: text
+          label: 承兑人名称
+        H:
+          field: col_h
+          type: text
+          label: 票据金额
+        I:
+          field: col_i
+          type: text
+          label: 票据到期日
+        J:
+          field: col_j
+          type: text
+          label: 票据流转日期
+        K:
+          field: col_k
+          type: text
+          label: 票据状态
+        L:
+          field: col_l
+          type: text
+          label: 被背书人名称
+        M:
+          field: col_m
+          type: text
+          label: 贴现银行
+        N:
+          field: col_n
+          type: text
+          label: 贴现息
+        O:
+          field: col_o
+          type: text
+          label: 是否质押
+        P:
+          field: col_p
+          type: text
+          label: 审计日已贴现、背书
+        Q:
+          field: col_q
+          type: text
+          label: 年初余额
+        R:
+          field: col_r
+          type: text
+          label: 本期收到
+        S:
+          field: col_s
+          type: text
+          label: 本期背书
+        T:
+          field: col_t
+          type: text
+          label: 本期到期承兑
+        U:
+          field: col_u
+          type: text
+          label: 本期贴现
+        V:
+          field: col_v
+          type: text
+          label: 年末持有票据余额
+        W:
+          field: col_w
+          type: text
+          label: 期末未到期背书或贴现金额
+        X:
+          field: col_x
+          type: text
+          label: 期末未到期背书或贴现是否终止确认
+        Y:
+          field: col_y
+          type: text
+          label: 承兑单位信用评级
+        Z:
+          field: col_z
+          type: text
+          label: 审定应收款项融资
+        AA:
+          field: col_aa
+          type: text
+          label: 审定应收票据
+        AB:
+          field: col_ab
+          type: text
+          label: 被审计单位与前手或后手的关联关系
+        AC:
+          field: col_ac
+          type: text
+          label: 是否逾期
+        AD:
+          field: col_ad
+          type: text
+          label: 逾期转入应收账款金额
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      - 10-11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - I3
+      - Q3
+      - V3
+      - Z3
+      - A4
+      - E4
+      - I4
+      - Q4
+      - V4
+      - Z4
+      - Q13
+      - R13
+      - S13
+      - T13
+      - U13
+      - V13
+      - W13
+      - Q14
+      - R14
+      - S14
+      - T14
+      - U14
+      - V14
+      - W14
+      - Q15
+      - R15
+      - S15
+      - T15
+      _total_count: 127
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - A11:P11
+      - A1:P1
+      - Q2:AD2
+      - Q1:AD1
+      - Q11:AD11
+      - A2:P2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  应收票据贴现、票据已背书未到期明细表D1-8:
+    component_type: univer
+    class_code: F-明细表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据贴现、票据已背书未到期明细表
+      A3: ${entity_name}
+      A4: ${period_end}
+      O3: ${index_no}
+      O4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 票据种类
+        B:
+          field: col_b
+          type: text
+          label: 收到日期
+        C:
+          field: col_c
+          type: text
+          label: 出票人全称
+        D:
+          field: col_d
+          type: text
+          label: 票据号
+        E:
+          field: col_e
+          type: text
+          label: 汇票金额
+        F:
+          field: col_f
+          type: text
+          label: 已计利息
+        G:
+          field: col_g
+          type: text
+          label: 出票日期
+        H:
+          field: col_h
+          type: text
+          label: 到期日
+        I:
+          field: col_i
+          type: text
+          label: 承兑银行
+        J:
+          field: col_j
+          type: text
+          label: 承兑单位信用等级
+        K:
+          field: col_k
+          type: text
+          label: 贴现银行
+        L:
+          field: col_l
+          type: text
+          label: 贴现金额
+        M:
+          field: col_m
+          type: text
+          label: 贴现息
+        N:
+          field: col_n
+          type: text
+          label: 是否终止确认
+        O:
+          field: col_o
+          type: text
+          label: 会计处理是否正确
+        P:
+          field: col_p
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      - 11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - I3
+      - P3
+      - A4
+      - E4
+      - I4
+      - E22
+      - F22
+      - L22
+      - M22
+      - E34
+      _total_count: 12
+    merged_cells:
+      preserve: true
+      count: 34
+      ranges_sample:
+      - A24:A25
+      - B12:B13
+      - F12:F13
+      - L12:L13
+      - O24:O25
+      - N12:N13
+      - L24:L25
+      - A12:A13
+      - J24:J25
+      - I12:I13
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  应收票据贴息检查表D1-9:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据贴息检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+      L3: ${index_no}
+      L4: ${page_no}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 票据类型
+        B:
+          field: col_b
+          type: text
+          label: 票面金额
+        C:
+          field: col_c
+          type: text
+          label: 票面利率
+        D:
+          field: col_d
+          type: text
+          label: 出票日期
+        E:
+          field: col_e
+          type: text
+          label: 票据到期日
+        F:
+          field: col_f
+          type: text
+          label: 到期日票据价值
+        G:
+          field: col_g
+          type: text
+          label: 贴现日期
+        H:
+          field: col_h
+          type: text
+          label: 贴息天数
+        I:
+          field: col_i
+          type: text
+          label: 贴现率
+        J:
+          field: col_j
+          type: text
+          label: 应计贴现利息
+        K:
+          field: col_k
+          type: text
+          label: 账面贴现利息
+        L:
+          field: col_l
+          type: text
+          label: 差异
+        M:
+          field: col_m
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - H3
+      - M3
+      - A4
+      - D4
+      - H4
+      - H11
+      - J11
+      - L11
+      - H12
+      - J12
+      - L12
+      - H13
+      - J13
+      - L13
+      - H14
+      - J14
+      - L14
+      - H15
+      - J15
+      - L15
+      - H16
+      - J16
+      - L16
+      - H17
+      - J17
+      - L17
+      - B18
+      - J18
+      _total_count: 32
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:M2
+      - A1:M1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  应收票据监盘D1-10:
+    component_type: d-form-confirmation
+    class_code: D-盘点
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据监盘表
+      A3: ${entity_name}
+      A4: ${period_end}
+      N3: ${index_no}
+      N4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 监盘日结存
+        M:
+          field: col_m
+          type: text
+          label: 是否存在差异
+        N:
+          field: col_n
+          type: text
+          label: 差异原因
+        O:
+          field: col_o
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      - 11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - J3
+      - O3
+      - A4
+      - F4
+      - J4
+      - H21
+      - A25
+      - D25
+      - F25
+      - I25
+      - L25
+      - N25
+      _total_count: 14
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - A2:O2
+      - A1:O1
+      - M12:M13
+      - N12:N13
+      - O12:O13
+      - A12:L12
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  关联方关系及交易检查表D1-11:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据关联方关系及交易检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+      L3: ${index_no}
+      L4: ${page_no}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 关联方名称
+        B:
+          field: col_b
+          type: text
+          label: 关联关系
+        C:
+          field: col_c
+          type: text
+          label: 期初余额
+        D:
+          field: col_d
+          type: text
+          label: 借方发生
+        E:
+          field: col_e
+          type: text
+          label: 贷方发生
+        F:
+          field: col_f
+          type: text
+          label: 期末余额
+        G:
+          field: col_g
+          type: text
+          label: 减：坏账准备
+        H:
+          field: col_h
+          type: text
+          label: 账面价值
+        I:
+          field: col_i
+          type: text
+          label: 发生时间及账龄
+        J:
+          field: col_j
+          type: text
+          label: 发生原因（款项性质）
+        K:
+          field: col_k
+          type: text
+          label: 期后已兑现或已贴现
+        L:
+          field: col_l
+          type: text
+          label: 索引号
+        M:
+          field: col_m
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - I3
+      - M3
+      - A4
+      - E4
+      - I4
+      - F11
+      - H11
+      - F12
+      - H12
+      - F13
+      - H13
+      - C14
+      - D14
+      - E14
+      - F14
+      - G14
+      - H14
+      - K14
+      _total_count: 20
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:M2
+      - A1:M1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  应收票据质押检查表D1-12:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据质押情况检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+      O3: ${index_no}
+      O4: ${page_no}
+    dynamic_table:
+      start_row: 12
+      end_row: dynamic
+      header_row: 11
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 票据类型
+        B:
+          field: col_b
+          type: text
+          label: 票据号码
+        C:
+          field: col_c
+          type: text
+          label: 收到票据日期
+        D:
+          field: col_d
+          type: text
+          label: 票据前手名称
+        E:
+          field: col_e
+          type: text
+          label: 出票日期
+        F:
+          field: col_f
+          type: text
+          label: 出票人名称
+        G:
+          field: col_g
+          type: text
+          label: 承兑人名称
+        H:
+          field: col_h
+          type: text
+          label: 票据金额
+        I:
+          field: col_i
+          type: text
+          label: 票据到期日
+        J:
+          field: col_j
+          type: text
+          label: 质押金额
+        K:
+          field: col_k
+          type: text
+          label: 质权人
+        L:
+          field: col_l
+          type: text
+          label: 质押原因
+        M:
+          field: col_m
+          type: text
+          label: 质押条件
+        N:
+          field: col_n
+          type: text
+          label: 质押期限
+        O:
+          field: col_o
+          type: text
+          label: 质押协议
+        P:
+          field: col_p
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - J3
+      - P3
+      - A4
+      - F4
+      - J4
+      - H18
+      - J18
+      _total_count: 9
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A1:P1
+      - A2:P2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  应收票据检查表D1-13:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 抽样总体：
+        B:
+          field: col_b
+          type: text
+          label: 测试总体扣除特定样本以外的样本，共XX笔、金额XX
+        H:
+          field: col_h
+          type: text
+          label: 确定的抽样样本量：
+        I:
+          field: col_i
+          type: text
+          label: 抽取XX笔（如果使用了样本计算器计算样本量，样本量计算过程见
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - I3
+      - Q3
+      - A4
+      - F4
+      - I4
+      - G32
+      - H32
+      - G45
+      - E48
+      - F48
+      - G48
+      - E49
+      - F49
+      - G49
+      - E50
+      - F50
+      - G50
+      _total_count: 19
+    merged_cells:
+      preserve: true
+      count: 25
+      ranges_sample:
+      - P35:P36
+      - H38:I38
+      - Q14:Q15
+      - H43:I43
+      - J14:N14
+      - H41:I41
+      - H44:I44
+      - H40:I40
+      - A1:Q1
+      - H39:I39
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  应收票据坏账准备会计政策检查D1-14:
+    component_type: d-form-paragraph
+    class_code: D-政策检查
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据坏账准备会计政策检查
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      - 11
+      - 15-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - I3
+      - A4
+      - D4
+      - F4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 15
+      ranges_sample:
+      - A7:I7
+      - A2:I2
+      - B29:I29
+      - B39:I39
+      - A5:I5
+      - B38:I38
+      - A36:I36
+      - J31:R31
+      - A1:I1
+      - J22:R22
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  应收票据坏账准备测试表D1-15:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据坏账准备测算表
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 债务人名称
+        B:
+          field: col_b
+          type: text
+          label: 审定应收票据账面余额
+        C:
+          field: col_c
+          type: text
+          label: 预期信用损失率
+        D:
+          field: col_d
+          type: text
+          label: 期末应计提坏账准备
+        E:
+          field: col_e
+          type: text
+          label: 期末坏账准备账面余额
+        F:
+          field: col_f
+          type: text
+          label: 差异
+        G:
+          field: col_g
+          type: text
+          label: 坏账准备计提依据及文件
+        H:
+          field: col_h
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      - 11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - H3
+      - A4
+      - C4
+      - E4
+      - D14
+      - E14
+      - F14
+      - D15
+      - E15
+      - F15
+      - D16
+      - E16
+      - F16
+      - D17
+      - E17
+      - F17
+      - B18
+      - D18
+      - E18
+      - F18
+      - D22
+      - E22
+      - F22
+      - D23
+      - E23
+      - F23
+      - D24
+      _total_count: 37
+    merged_cells:
+      preserve: true
+      count: 4
+      ranges_sample:
+      - A12:A13
+      - A20:A21
+      - A2:H2
+      - A1:H1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  坏账准备转回、核销检查表D1-16:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 应收票据大额坏账准备转回、核销检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 12
+      end_row: dynamic
+      header_row: 11
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 单位名称
+        B:
+          field: col_b
+          type: text
+          label: 转回原因
+        C:
+          field: col_c
+          type: text
+          label: 收回方式
+        D:
+          field: col_d
+          type: text
+          label: 原确定坏账准备的依据
+        E:
+          field: col_e
+          type: text
+          label: 收回或转回金额
+        F:
+          field: col_f
+          type: text
+          label: 收回或转回前累计已计提坏账准备金额
+        G:
+          field: col_g
+          type: text
+          label: 合理性分析
+        H:
+          field: col_h
+          type: text
+          label: 索引号
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      - 10
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - H3
+      - A4
+      - C4
+      - E4
+      - E15
+      - F15
+      - C21
+      _total_count: 10
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:H2
+      - A1:H1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  应收票据业务模式分析提示:
+    component_type: d-form-qa
+    class_code: D-业务模式
+    fixed_cells:
+      A2: 关于应收票据业务模式：
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-6
+      - 8-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 1
+      ranges_sample:
+      - A30:A31
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
