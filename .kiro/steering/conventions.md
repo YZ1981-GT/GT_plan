@@ -662,3 +662,56 @@ powershell 进程异常退出但仍持有 log 文件句柄时，`Get-Content / R
 - Group 2 = 不带引号 sheet 名（必须以字母/中文开头）
 - Group 3 = cell 引用
 - 禁止使用 `[^'!]+` 类字符类（PowerShell 转义 + 回溯风险）
+
+
+## §UI 视觉偏好补充（从 memory 下沉 2026-05-26）
+
+### GtToolbar slot 契约
+
+- GtToolbar 提供 `#left` / `#right` / `#center` 三个 slot
+- Tab 栏右侧工具按钮通过 `#right` slot 注入，不独占行
+- 简单 CRUD 页面不用 GtPageHeader 紫渐变横幅，直接 GtToolbar compact 模式
+
+### 全屏三件套
+
+- `useFullscreen(containerRef)` 返回 `{ isFullscreen, toggle, exit }`
+- 全屏容器加 `.gt-fullscreen` class（z-index: 9999 + fixed + 白色背景）
+- ESC 退出全屏（document keydown 监听）
+
+### Teleport 脱离 transform 祖先
+
+- el-dialog/el-drawer 必须 `append-to-body`（三栏布局 overflow:hidden 截断）
+- Teleport 到 body 的内容脱离组件 scoped style 作用域
+- 需要样式覆盖时用独立全局 `<style>` 块（非 scoped）
+
+### el-table flex 高度
+
+- 表格容器用 `display: flex; flex-direction: column; height: 100%`
+- el-table 加 `flex: 1; min-height: 0`（防止溢出）
+- 配合 `max-height` 实现表头冻结 + 内容滚动
+
+### Tab 栏同行工具按钮
+
+- el-tabs 右侧工具按钮通过绝对定位或 flex 布局实现同行
+- 不允许工具栏独占一行（浪费垂直空间）
+- 按钮组用 `el-button-group` 或 `gap: 8px` flex 容器
+
+### Dashboard 视觉规约
+
+- 5 个 dashboard 统一 `GtPageHeader variant="banner"` + dark 主题
+- DashboardViewSwitcher 共享组件挂 banner `#actions` slot
+- 卡片间距 16px，圆角 12px，阴影 `0 2px 12px rgba(0,0,0,0.08)`
+
+### 借贷成对展示
+
+- 调整分录表格借贷必须成对展示（同一行或相邻行）
+- 借方金额列 + 贷方金额列并排，不合并为单列正负数
+- 合计行分别显示借方合计 / 贷方合计，差额单独一行
+
+### 底稿模块 Tab 顺序（2026-05-24）
+
+生命周期→委派矩阵→列表→工作台→看板→依赖图→手册（生命周期第一位=先裁剪程序）；树默认折叠
+
+### 程序裁剪页面（2026-05-24 重写）
+
+`ProcedureTrimming.vue` 三大功能 = 一键智能裁剪 / 自定义裁剪 / 自定义新增程序；`chain_orchestrator` 步骤 5b 尊重裁剪 + 步骤 5c 加入自定义程序

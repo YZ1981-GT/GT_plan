@@ -2623,3 +2623,84 @@ YG36 重庆医药集团四川物流真实样本导入后发现 `tb_balance` 同 
 
 **测试**：后端 174 passed + 1 skipped（19.56s）+ 前端 38 passed = 212 总计
 **修复中发现 bug**：regex 灾难性回溯（`[^'!\]]+` → 正确 pattern）/ mock proc.wait 挂死 / hypothesis HealthCheck too_slow
+
+
+## 2026-05-26：workpaper-html-renderer spec 完整沉淀（commits fd95ae1+46fa4b5+8fd847d）
+
+### 概述
+
+1788 单体真底稿（A/B/C/D/E 共 1346 sheet）从 Univer 切到 HTML 渲染，F/G 558 sheet 保留 Univer。40/40 tasks 全部完成，413 tests（216 unit + 64 PBT + 74 Vue + 6 perf + 53 e2e）。
+
+### 架构决策
+
+- **9 类 componentType 路由**：a_program_console / b_index / c_note_table / d_form / e_control_test / h_static_doc / skipped_placeholder / traceability_dialog / formula_popover
+- **禁止 Univer 兜底铁律**：HTML 类底稿（A/B/C/D/E）严禁 fallback 到 Univer 实例化，WorkpaperEditor onMounted 中 HTML 类跳过 initUniver 防 Univer 实例泄漏
+- **11 命名空间 4 层级跳转**：wp_render_schema YAML 中 namespace 字段支持 11 种（cycle/phase/category/subcategory/procedure/sheet/cell/formula/cross_ref/note/report），4 层级 = 项目→循环→底稿→sheet
+- **方案 C openpyxl 加载致同模板**：4 路径写入策略（direct_cell / merged_range / named_range / table_ref）1:1 还原 Excel 模板结构到 HTML
+- **YAML schema 驱动**：`backend/data/wp_render_schema/*.yaml` 178 个文件，由 `generate_wp_render_schema.py` 从模板元数据生成
+
+### Phase 实施详情
+
+**Phase 1（数据模型 P0）**：4 Alembic 迁移 + 3 ORM 模型（WpRenderConfig / WpHtmlSnapshot / WpExportJob）+ 3 Service + 3 Router
+
+**Phase 2（A 程序表中控台）**：D2A.yaml + GtAProgramConsole.vue + GtIndexChip.vue + wp_xlsx_export_service + 3 端点
+
+**Phase 3（B 底稿目录）**：B-template.yaml + GtBIndex.vue
+
+**Phase 4（E 控制测试）**：E-C12.yaml / E-C12-1.yaml / E-C11-2.yaml + GtEControlTest.vue（3 模式 + 6 步骤 stepper + 4 互斥结论 + ProcedureTrimming 联动）
+
+**Phase 5（D 检查表 5 子模式）**：D-L5-6 / D-D2-8 / D-D2-13 / D-D0-N0 / D-A22-review YAML + GtDForm.vue + 5 子组件（Table/Paragraph/QA/Confirmation/Review）
+
+**Phase 6（C 附注披露 + 双源同步）**：C-D2-disclosure.yaml + GtCNoteTable.vue + wp_disclosure_sync 端点
+
+**Phase 7（H 静态 + I 跳过 + 辅助）**：GtHStaticDoc.vue + SkippedSheetPlaceholder.vue + GtTraceabilityDialog.vue + GtFormulaPopover.vue + useWpRenderSchema.ts
+
+**Phase 8（集成 + 联调）**：WorkpaperEditor.vue 接入 GtWpRenderer + onMounted async IIFE 顺序修复 + generate_wp_render_schema.py 生成 178 个 YAML
+
+### PBT 属性测试（9 条，64 tests）
+
+1. 归类→componentType 路由（hypothesis）
+2. 方案 C 字符级还原（hypothesis）
+3. 公式合并恒等（hypothesis）
+4. 跨底稿引用传播（hypothesis）
+5. 真假底稿完成率（hypothesis）
+6. 索引解析 11 命名空间（fast-check）
+7. 项目实例覆盖+scope 路由（hypothesis）
+8. 附注双源单向同步（hypothesis）
+9. 行业特定 sheet 可见性（hypothesis）
+
+### 性能基准
+
+- HTML 渲染冷启动：27.7ms（目标 <500ms，×18 余量）
+- xlsx 导出：275.7ms（目标 <5000ms，×18 余量）
+- classification 路由：1.2μs（目标 <10ms，×8333 余量）
+
+### 测试模式沉淀
+
+- **fake-timers**：Vue 组件测试中 `vi.useFakeTimers()` + `vi.advanceTimersByTime()` 控制 debounce/throttle
+- **子组件 stub**：`vi.mock` 替换重型子组件（如 Univer）为轻量 stub，避免 JSDOM 限制
+- **FakeDB**：后端 PBT 用内存 dict 模拟 DB 行为，避免真实 PG 连接开销
+
+### 新增依赖
+
+- **PyYAML**：wp_render_schema YAML 解析
+- **fast-check v4.8.0**：前端 PBT 框架（索引解析属性测试）
+
+### 关键文件清单
+
+- `backend/data/wp_render_schema/*.yaml`（178 个）
+- `backend/app/services/wp_render_config_service.py`
+- `backend/app/services/wp_xlsx_export_service.py`
+- `backend/app/services/wp_html_snapshot_service.py`
+- `backend/scripts/generate_wp_render_schema.py`
+- `frontend/src/components/workpaper/renderer/GtWpRenderer.vue`
+- `frontend/src/components/workpaper/renderer/GtAProgramConsole.vue`
+- `frontend/src/components/workpaper/renderer/GtBIndex.vue`
+- `frontend/src/components/workpaper/renderer/GtCNoteTable.vue`
+- `frontend/src/components/workpaper/renderer/GtDForm.vue`
+- `frontend/src/components/workpaper/renderer/GtEControlTest.vue`
+- `frontend/src/components/workpaper/renderer/GtHStaticDoc.vue`
+- `frontend/src/components/workpaper/renderer/SkippedSheetPlaceholder.vue`
+- `frontend/src/components/workpaper/renderer/GtTraceabilityDialog.vue`
+- `frontend/src/components/workpaper/renderer/GtFormulaPopover.vue`
+- `frontend/src/composables/useWpRenderSchema.ts`
