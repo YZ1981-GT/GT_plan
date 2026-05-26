@@ -5,7 +5,7 @@ inclusion: always
 # 持久记忆
 
 每次对话自动加载。详见 `#architecture` / `#conventions` / `#dev-history`。
-保持本文件 ≤ 100 行：完成事项 → dev-history，技术决策 → architecture，规范/铁律 → conventions。
+保持本文件 ≤ 200 行：完成事项 → dev-history，技术决策 → architecture，规范/铁律 → conventions。
 
 ## 用户偏好
 
