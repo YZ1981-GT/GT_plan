@@ -38,7 +38,7 @@
     - 支持 project_workpaper_sheet_override 优先级合并
     - _Requirements: 1.2（9 类全覆盖）+ 3.9（决策树禁止 Univer 兜底）_
 
-  - [ ]* 1.7 Property 1 PBT 测试：9 类全覆盖归类 → componentType 路由
+  - [x]* 1.7 Property 1 PBT 测试：9 类全覆盖归类 → componentType 路由
     - **Property 1: 9 类全覆盖归类 → componentType 路由**
     - **Validates: Requirements 1.2 + 3.0.1 + 3.9**
     - `backend/tests/properties/test_classification_coverage.py`
@@ -73,13 +73,13 @@
     - 注册到 router_registry
     - _Requirements: 3.0.4_
 
-  - [ ]* 1.13 Property 7 PBT 测试：项目实例覆盖与 scope 路由
+  - [x]* 1.13 Property 7 PBT 测试：项目实例覆盖与 scope 路由
     - **Property 7: 项目实例覆盖与 scope 路由**
     - **Validates: Requirements 3.0.3 + 3.0.5**
     - `backend/tests/properties/test_render_config_merge.py`
     - hypothesis 生成 (override, base_classification) → 断言合并函数确定性 + scope 路由正确
 
-  - [ ]* 1.14 Property 5 PBT 测试：真假底稿与完成率派生
+  - [x]* 1.14 Property 5 PBT 测试：真假底稿与完成率派生
     - **Property 5: 真假底稿与完成率派生**
     - **Validates: Requirements 3.0.2**
     - `backend/tests/properties/test_real_workpaper.py`
@@ -151,7 +151,7 @@
     - schema_version 冲突返回 409
     - _Requirements: 2.2 原则 4（决策可追踪）+ 3.11.4（跨底稿引用传播）_
 
-  - [ ]* 3.11 Property 4 PBT 测试：跨底稿引用传播
+  - [x]* 3.11 Property 4 PBT 测试：跨底稿引用传播
     - **Property 4: 跨底稿引用传播**
     - **Validates: Requirements 3.11.4 + 3.11.5 + 3.11.6**
     - `backend/tests/properties/test_cross_ref_propagation.py`
@@ -169,13 +169,13 @@
     - 返回 attachment xlsx / 模板缺失 500 / 必填字段空 422
     - _Requirements: 2.1（一键导出 Excel）_
 
-  - [ ]* 3.14 Property 2 PBT 测试：方案 C 字符级还原
+  - [x]* 3.14 Property 2 PBT 测试：方案 C 字符级还原
     - **Property 2: 方案 C 字符级还原（导出 xlsx ≡ 致同模板手填）**
     - **Validates: Requirements 4.3.1.a-g + 5.3**
     - `backend/tests/exports/test_xlsx_diff.py`
     - hypothesis 生成 html_data → 导出 xlsx → 与 fixture 字符级 diff = 空集
 
-  - [ ]* 3.15 Property 3 PBT 测试：公式与合并单元格保留不变量
+  - [x]* 3.15 Property 3 PBT 测试：公式与合并单元格保留不变量
     - **Property 3: 公式与合并单元格保留不变量**
     - **Validates: Requirements 4.3.1.b + 4.3.1.c**
     - `backend/tests/exports/test_invariants.py`
@@ -293,7 +293,7 @@
     - disclosure_notes 模块加 banner 提示"此数据由底稿同步"
     - _Requirements: 3.11.5 §4.2（附注双源问题）+ design §12.1 推荐选项 A_
 
-  - [ ]* 10.4 Property 8 PBT 测试：附注双源单向同步
+  - [x]* 10.4 Property 8 PBT 测试：附注双源单向同步
     - **Property 8: 附注双源单向同步**
     - **Validates: Requirements 3.11.5 §4.2 + design §12.1**
     - `backend/tests/integration/test_disclosure_sync.py`
@@ -339,7 +339,7 @@
     - schema 加载 + 校验 + 项目级覆盖合并
     - _Requirements: 2.2 原则 2（配置驱动）_
 
-  - [ ]* 12.7 Property 9 PBT 测试：行业特定 sheet 可见性派生
+  - [x]* 12.7 Property 9 PBT 测试：行业特定 sheet 可见性派生
     - **Property 9: 行业特定 sheet 可见性派生**
     - **Validates: Requirements 6.5 待决策点 4 选项 A**
     - `backend/tests/properties/test_industry_visibility.py`

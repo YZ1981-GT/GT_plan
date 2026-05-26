@@ -320,3 +320,225 @@ describe('NAMESPACE_LAYER_MAP', () => {
     expect(NAMESPACE_LAYER_MAP.Confirm).toBe(4)
   })
 })
+
+// ─── Property-Based Tests (fast-check PBT) ──────────────────────────────────
+// Property 6: 跨底稿索引解析与跳转语义
+// Validates: Requirements 3.11.8 + 3.11.9 + 3.11.10
+//
+// 8 sub-properties:
+// 6a 合法输入返回结构      — `${ns}:${target}` → { ns, layer, target }
+// 6b layer 决定性派生      — result.layer === NAMESPACE_LAYER_MAP[result.ns]
+// 6c 非法输入返回 null     — parseIndexRef never throws on garbage input
+// 6d 幂等性                — re-parsing result.target doesn't break
+// 6e 空白容错              — leading/trailing whitespace preserves result
+// 6f 大小写不敏感          — ns case variation → same canonical ns
+// 6g loose mode 底稿编码   — [A-S]\d+(-\d+)*[A-Z]? → non-null wp/sheet
+// 6h GT_Custom 跳过        — GT_Custom* (case-insensitive) → null
+
+import fc from 'fast-check'
+
+const VALID_NS_LIST = [
+  'wp',
+  'sheet',
+  'cell',
+  'Note',
+  'TB',
+  'Adj',
+  'Att',
+  'EQCR',
+  'Calc',
+  'Sample',
+  'Confirm',
+] as const
+
+// Arbitrary: a valid canonical namespace (case-sensitive form from whitelist)
+const arbNamespace = fc.constantFrom(...VALID_NS_LIST)
+
+// Arbitrary: non-empty target with no colon (avoids strict-mode collision)
+// and no leading/trailing whitespace (so we test trimming separately)
+const arbTarget = fc
+  .string({ minLength: 1, maxLength: 30 })
+  .filter((s) => {
+    const t = s.trim()
+    return t.length > 0 && !t.includes(':')
+  })
+  .map((s) => s.trim())
+
+// Arbitrary: workpaper code matching loose pattern [A-S]\d+(-\d+)*[A-Z]?
+const arbWpCode = fc
+  .tuple(
+    fc.constantFrom('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'S'),
+    fc.integer({ min: 1, max: 99 }),
+    fc.array(fc.integer({ min: 1, max: 99 }), { maxLength: 3 }),
+    fc.option(fc.constantFrom('A', 'B', 'C'), { nil: '' }),
+  )
+  .map(([cycle, num, subs, letter]) => {
+    const subPart = subs.length > 0 ? '-' + subs.join('-') : ''
+    // Letter suffix and hyphen subs are mutually exclusive in real codes,
+    // but parser handles both — pick one to keep generation clean
+    if (subs.length > 0) return `${cycle}${num}${subPart}`
+    return `${cycle}${num}${letter}`
+  })
+
+describe('parseIndexRef - 属性测试 (fast-check PBT)', () => {
+  // ─── Property 6a: 合法输入返回结构 ─────────────────────────────────────
+  it('Property 6a: `${ns}:${target}` returns { ns, layer, target }', () => {
+    fc.assert(
+      fc.property(arbNamespace, arbTarget, (ns, target) => {
+        const result = parseIndexRef(`${ns}:${target}`)
+        expect(result).not.toBeNull()
+        expect(result?.ns).toBe(ns)
+        expect(result?.target).toBe(target)
+        expect(result?.layer).toBe(NAMESPACE_LAYER_MAP[ns])
+      }),
+      { numRuns: 50 },
+    )
+  })
+
+  // ─── Property 6b: layer 决定性派生 ─────────────────────────────────────
+  it('Property 6b: result.layer === NAMESPACE_LAYER_MAP[result.ns]', () => {
+    // Strict-mode inputs
+    fc.assert(
+      fc.property(arbNamespace, arbTarget, (ns, target) => {
+        const result = parseIndexRef(`${ns}:${target}`)
+        if (result !== null) {
+          expect(result.layer).toBe(NAMESPACE_LAYER_MAP[result.ns])
+        }
+      }),
+      { numRuns: 50 },
+    )
+
+    // Loose-mode inputs
+    fc.assert(
+      fc.property(arbWpCode, (code) => {
+        const result = parseIndexRef(code)
+        if (result !== null) {
+          expect(result.layer).toBe(NAMESPACE_LAYER_MAP[result.ns])
+          // Loose mode only ever produces wp/sheet/cell layers
+          expect([1, 2, 3]).toContain(result.layer)
+        }
+      }),
+      { numRuns: 50 },
+    )
+  })
+
+  // ─── Property 6c: 非法输入返回 null（never throws） ────────────────────
+  it('Property 6c: garbage input returns null (never throws)', () => {
+    // Random strings that don't match any valid pattern (fast-check v4: `string` is Unicode-capable)
+    const arbGarbage = fc.string({ maxLength: 40 }).filter((s) => {
+      const t = s.trim()
+      // Exclude strings that would match strict mode
+      if (/^(wp|sheet|cell|Note|TB|Adj|Att|EQCR|Calc|Sample|Confirm):/i.test(t)) return false
+      // Exclude strings that would match loose mode
+      if (/^[A-S]\d+(?:-\d+)*[A-Z]?$/i.test(t)) return false
+      // Exclude cell-with-bang form (e.g., D2-1!B23)
+      if (t.includes('!')) {
+        const parts = t.split('!')
+        if (parts.length === 2 && /^[A-S]\d+(?:-\d+)*[A-Z]?$/i.test(parts[0].trim())) {
+          return false
+        }
+      }
+      return true
+    })
+
+    fc.assert(
+      fc.property(arbGarbage, (input) => {
+        // Should never throw
+        const result = parseIndexRef(input)
+        expect(result).toBeNull()
+      }),
+      { numRuns: 50 },
+    )
+  })
+
+  // ─── Property 6d: 幂等性 — re-parsing result.target is safe ────────────
+  it('Property 6d: re-parsing result.target never throws or recurses', () => {
+    fc.assert(
+      fc.property(fc.string({ maxLength: 40 }), (input) => {
+        // First call: never throws
+        const first = parseIndexRef(input)
+        // Second call on extracted target: never throws (may be null)
+        const second = parseIndexRef(first?.target ?? '')
+        // Either null or a well-formed ResolvedIndexRef
+        if (second !== null) {
+          expect(second.ns).toBeTruthy()
+          expect(second.target).toBeTruthy()
+          expect([1, 2, 3, 4]).toContain(second.layer)
+          expect(second.layer).toBe(NAMESPACE_LAYER_MAP[second.ns])
+        }
+      }),
+      { numRuns: 50 },
+    )
+  })
+
+  // ─── Property 6e: 空白容错 ────────────────────────────────────────────
+  it('Property 6e: leading/trailing whitespace preserves result (after trim)', () => {
+    const arbWhitespace = fc.constantFrom(' ', '  ', '   ', '\t', ' \t ')
+
+    fc.assert(
+      fc.property(arbNamespace, arbTarget, arbWhitespace, arbWhitespace, (ns, target, lead, trail) => {
+        const base = parseIndexRef(`${ns}:${target}`)
+        const padded = parseIndexRef(`${lead}${ns}:${target}${trail}`)
+        expect(padded).toEqual(base)
+      }),
+      { numRuns: 50 },
+    )
+  })
+
+  // ─── Property 6f: 大小写不敏感（命名空间归一化） ───────────────────────
+  it('Property 6f: ns case variations canonicalize to same ns', () => {
+    fc.assert(
+      fc.property(arbNamespace, arbTarget, (ns, target) => {
+        const lower = parseIndexRef(`${ns.toLowerCase()}:${target}`)
+        const upper = parseIndexRef(`${ns.toUpperCase()}:${target}`)
+        const canonical = parseIndexRef(`${ns}:${target}`)
+
+        expect(lower).not.toBeNull()
+        expect(upper).not.toBeNull()
+        expect(canonical).not.toBeNull()
+
+        // All three return the same canonical ns
+        expect(lower?.ns).toBe(canonical?.ns)
+        expect(upper?.ns).toBe(canonical?.ns)
+        // And the same layer (derived from ns)
+        expect(lower?.layer).toBe(canonical?.layer)
+        expect(upper?.layer).toBe(canonical?.layer)
+      }),
+      { numRuns: 50 },
+    )
+  })
+
+  // ─── Property 6g: loose mode 底稿编码 ─────────────────────────────────
+  it('Property 6g: [A-S]\\d+(-\\d+)*[A-Z]? returns non-null with ns ∈ {wp, sheet}', () => {
+    fc.assert(
+      fc.property(arbWpCode, (code) => {
+        const result = parseIndexRef(code)
+        expect(result).not.toBeNull()
+        expect(['wp', 'sheet']).toContain(result?.ns)
+        // Target is always uppercased in loose mode
+        expect(result?.target).toBe(code.toUpperCase())
+      }),
+      { numRuns: 50 },
+    )
+  })
+
+  // ─── Property 6h: GT_Custom 跳过 ──────────────────────────────────────
+  it('Property 6h: GT_Custom* (case-insensitive) returns null', () => {
+    const arbGtCustomSuffix = fc.string({ maxLength: 20 })
+    const arbCasePrefix = fc.constantFrom(
+      'GT_Custom',
+      'gt_custom',
+      'GT_CUSTOM',
+      'Gt_Custom',
+      'gT_cUsToM',
+    )
+
+    fc.assert(
+      fc.property(arbCasePrefix, arbGtCustomSuffix, (prefix, suffix) => {
+        const result = parseIndexRef(`${prefix}${suffix}`)
+        expect(result).toBeNull()
+      }),
+      { numRuns: 50 },
+    )
+  })
+})
