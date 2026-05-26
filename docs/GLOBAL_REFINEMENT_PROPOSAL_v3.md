@@ -1182,3 +1182,174 @@ EQCR 关注：独立性、重大判断复核、备忘录、与项目组的信息
 3. **§12.2 AI 内容溯源闭环薄弱**：后端 wrap_ai_output 已就位、AiContentConfirmDialog 组件已建，但前端仅 1 个视图实际 import——助理生成 AI 内容后审核确认入口极薄弱
 4. **`except Exception` 1162 处、`float()` 420 处**：治理工作量需重估——except 治理约 5-8 天（需逐一判断合理降级 vs 粗糙吞没），float 治理需区分金额计算 vs 非金额用途后针对性处理
 
+
+
+---
+
+## 十七、v3.4 资深合伙人全面复盘（2026-05-26 实测校准）
+
+> 复盘人视角：执业 20+ 年会计师事务所合伙人，亲手带过国企/上市/合并/集团审计  
+> 复盘方法：全部基于 grep/readCode 实测，不引用过时记录  
+> 平台实测规模：99 views / 381 components / 96 composables / 9 stores / 281 routers / 62 models / 369 services
+
+### 17.1 加载体验碎片化（5 种模式并存）🔴 P0
+
+**实测发现**：平台存在 5 种不同的加载状态展示方式，用户在不同页面看到完全不同的加载反馈：
+
+| 模式 | 使用量 | 典型视图 |
+|---|---|---|
+| `v-loading` 指令 | 60+ 视图 | el-table 原生 |
+| `el-skeleton` 骨架屏 | 10 视图 | Dashboard/PartnerProjectDashboard |
+| `GtLoadingOverlay` 全屏蒙层 | 3 视图 | WorkpaperEditor/GtWpRenderer |
+| `LoadingState` 自定义组件 | 1 视图 | — |
+| `GtTableLoading` 表格包装 | 1 视图 | — |
+
+**审计场景影响**：助理在序时账（v-loading 转圈）→ 底稿编辑器（GtLoadingOverlay 蒙层）→ 报表（el-skeleton 骨架）之间切换时，每次加载反馈都不同，无法建立"系统正在工作"的统一心智模型。
+
+**方案**：
+- 统一为 2 种模式：表格内用 `v-loading`（el-table 原生支持好）；页面级/面板级用 `GtLoadingOverlay`
+- 骨架屏仅用于首次加载（无缓存数据时），后续刷新用 v-loading
+- 删除 LoadingState / GtTableLoading 死代码
+- 工时：2 天 / 角色影响：全角色
+
+### 17.2 年度上下文未强制执行 🔴 P0
+
+**实测发现**：`projectStore.changeYear()` emit `year:changed` 事件后，仅 3 个视图订阅（LedgerImportHistory / LedgerPenetration / Materiality）。其余 40+ 依赖年度的视图完全不响应年度切换。
+
+**审计场景影响**：合伙人在顶栏切换"2024→2023"对比上年数据时，Adjustments / Misstatements / ReportView / DisclosureEditor / WorkpaperList 等核心页面数据不变，必须手动 F5 刷新。这在复核签字前对比上年数据时极其影响效率。
+
+**方案**：
+- 新建 `useAuditContext()` composable，封装 projectId + year + standard 三元组
+- 所有依赖年度的视图必须 `const { year } = useAuditContext()`，内部 watch year 自动 refetch
+- CI 卡点：grep 所有含 `year` query 的路由，确认对应视图有 watch 或 useAuditContext
+- 工时：1.5 天 / 角色影响：全角色（合伙人复核时最痛）
+
+### 17.3 穿透导航无面包屑回溯 🔴 P0
+
+**实测发现**：`usePenetrate` 提供 10 种穿透方法（toLedger/toWorkpaper/toReportRow/toAdjustment/toMisstatement/toNote 等），但穿透后用户无法快速回到出发点。`useNavigationStack` composable 已存在但仅用于 DrilldownBreadcrumb 组件，未全局接入。
+
+**审计场景影响**：合伙人复核时典型路径 = 报表行 → 试算表 → 底稿 → 序时账 → 凭证，穿透 4 层后想回到报表行，只能点浏览器后退 4 次或手动导航。这是审计师最高频的操作模式。
+
+**方案**：
+- `usePenetrate` 每次跳转前自动 push 当前路由到 `useNavigationStack`
+- GtPageHeader 统一显示穿透面包屑（已有 DrilldownBreadcrumb，扩展为全局）
+- 支持 Backspace 快捷键回退（DefaultLayout `initGlobalBackspace` 已有基础）
+- 工时：1.5 天 / 角色影响：合伙人（复核效率）、助理（抽凭回溯）
+
+### 17.4 displayPrefs 不持久化到后端 🟡 P1
+
+**实测发现**：`displayPrefs` store 管理金额单位（元/万元）、字号（4 档）、小数位、负数红色、变动高亮阈值，持久化到 localStorage。但换电脑/清缓存后全部丢失。
+
+**审计场景影响**：合伙人习惯看"万元"单位 + 大字号，每次换电脑都要重新设置。6000 人规模下，IT 支持工单会很多。
+
+**方案**：
+- 后端新增 `user_preferences` 表（user_id + key + value JSONB）
+- 前端 displayPrefs store 初始化时从 `/api/users/me/preferences` 拉取，变更时 debounce 500ms 写回
+- localStorage 作为离线 fallback
+- 工时：1 天 / 角色影响：全角色
+
+### 17.5 跨底稿引用系统是静态 JSON 🟡 P1
+
+**实测发现**：`useCrossModuleRefs` 从 `cross_wp_references.json`（400 条）加载引用关系，`useWpRenderer` 订阅 `cross-ref:updated` 事件做刷新。但引用数据本身是静态 JSON 文件，不是实时计算的。
+
+**审计场景影响**：助理修改了 D2 应收账款底稿的审定数，理论上应该自动更新引用它的 A1 报表行和附注"五、3"章节。但由于引用是静态的，只有手动触发"刷新取数"才能同步。
+
+**方案**：
+- 短期：底稿保存时后端自动检测 cross_wp_references.json 中该底稿作为 source 的所有引用，emit `cross-ref:updated` 事件（当前已有此逻辑但触发条件不完整）
+- 中期：cross_wp_references 从 JSON 迁移到 DB 表（已有 `cross_wp_ref` 400 条数据），支持实时查询
+- 工时：2 天 / 角色影响：助理（数据一致性）、经理（复核时发现数据不同步）
+
+### 17.6 WorkpaperEditor 2631 行巨石组件 🟡 P1
+
+**实测发现**：WorkpaperEditor.vue 2631 行，包含 6 个 cycle composable 实例化 + HTML/Univer 双模式切换 + 10 Tab 侧栏 + toolbar 按钮逻辑 + 自动保存 + 公式引擎。任何修改都有高回归风险。
+
+**审计场景影响**：底稿编辑器是助理每天使用 8 小时的核心工具，bug 修复周期长直接影响工作效率。
+
+**方案**（memory.md 已记录目标 ≤1000 行）：
+- useEditorActions let→ref 重构
+- template dialog 配置驱动（toolbar 按钮从 if/else 改为声明式数组）
+- 删冗余别名（多个 computed 指向同一 ref）
+- 工时：3 天 / 角色影响：维护者（开发效率）
+
+### 17.7 statusEnum 硬编码残留 17 视图 🟡 P1
+
+**实测发现**：`statusEnum.ts` 已定义 23 套状态常量，但仍有 17 个视图直接写 `'draft'`/`'approved'`/`'rejected'` 字符串。后端枚举值变更时前端不会编译报错。
+
+**审计场景影响**：如果后端将 `review_passed` 改为 `reviewed`，17 个视图的状态判断全部静默失效，底稿状态显示错误。
+
+**方案**：
+- 机械替换：grep `'draft'|'pending'|'approved'|'rejected'|'archived'` 的 17 个视图，全部改为 import statusEnum 常量
+- CI 卡点：禁止 .vue 文件中出现裸状态字符串（ruff/eslint 自定义规则）
+- 工时：1 天 / 角色影响：维护者
+
+### 17.8 自动保存间隔 120s 过长 🟡 P1
+
+**实测发现**：`useWorkpaperAutoSave.ts` 的 `intervalMs = 120_000`（2 分钟）。Univer 大表格操作频繁，2 分钟内可能有大量编辑丢失。
+
+**审计场景影响**：助理编辑底稿 1 分 50 秒后浏览器崩溃，丢失近 2 分钟工作。审计旺季加班到凌晨时这种情况更常见。
+
+**方案**：
+- 默认间隔改为 60s
+- 检测到大量编辑操作（>10 次 cell 变更）时缩短到 30s
+- 保存失败时立即重试 1 次，仍失败则顶栏红色提示"自动保存失败"
+- 工时：0.5 天 / 角色影响：助理
+
+### 17.9 console.log 74 处生产代码残留 🟡 P1
+
+**实测发现**：74 处 `console.log/error/warn` 散落在 .vue 文件中。审计平台可能在控制台输出敏感信息（项目名、金额、科目编码）。
+
+**审计场景影响**：客户现场演示时，浏览器 F12 控制台可能暴露其他项目数据。合规风险。
+
+**方案**：
+- 全部替换为 `import.meta.env.DEV && console.log(...)` 或直接删除
+- ESLint 规则 `no-console` 设为 error（允许 warn 在 dev 模式）
+- CI 卡点：生产构建后 grep dist/ 确认无 console 输出
+- 工时：0.5 天 / 角色影响：合规
+
+### 17.10 except Exception 1162 处治理 🟢 P2
+
+**实测发现**：`backend/app/` 下 1162 处 `except Exception`。其中大部分是合理的降级（SSE 推送失败不阻断、缓存失效不阻断），但无法区分哪些是粗糙吞没。
+
+**方案**：
+- 分类治理：先 grep 出所有 `except Exception: pass`（无日志的纯吞没），这些是最高优先级
+- 合理降级必须加 `logger.warning(..., exc_info=True)`
+- 新增 ruff 自定义规则：`except Exception` 后必须有 logger 调用或 raise
+- 工时：5 天（分批，每批 200 处）/ 角色影响：维护者
+
+### 17.11 五角色视角补充建议
+
+#### 审计助理视角
+- **底稿编辑器"程序要求"Tab 数据填充**：ProgramRequirementsSidebar 已存在但需确认是否从 `audit_procedure_templates` 真实加载审计程序步骤（而非空壳）
+- **序时账虚拟滚动**：YG2101 65 万行场景 el-table 必卡，需引入 el-table-v2 或 vxe-table
+- **抽凭快捷操作**：序时账右键菜单增加"标记为已抽凭"（写入底稿抽凭记录区）
+
+#### 项目经理视角
+- **ManagerDashboard 已有 1523 行**（非空壳），含待办概览 + 项目卡片 + 工时审批聚合卡片
+- **缺少"全项目复核进度"汇总**：经理无法一眼看到哪些底稿有未解决批注
+
+#### 质控人员视角
+- **QC 规则执行统计已有基础**（QCDashboard），但缺少"规则有效性分析"——从未触发的规则可能条件过严
+
+#### 合伙人视角
+- **PartnerSignDecision 三栏布局已完善**（就绪检查 + 报告预览 + 风险摘要 + 5 指标卡片）
+- **缺少"签字前 checklist"强制确认**：签字按钮前应有 3 项勾选（已阅报告/已确认风险/就绪检查全绿）
+
+#### EQCR 视角
+- **信息隔离设计正确**（EQCR 笔记对项目组不可见）
+- **缺少 KAM 过滤**：EQCR 看到的底稿列表应只显示"关键审计领域"相关底稿
+
+### 17.12 修订后优先级路线图
+
+| 批次 | 主题 | 核心条目 | 工时 |
+|---|---|---|---|
+| M1（高×高） | 体验基础 | 加载统一 + 年度上下文 + 穿透面包屑 + autoSave 60s | 5.5 天 |
+| M2（高×中） | 数据一致 | GtAmountCell 全量 + statusEnum 清零 + console.log 清零 + cross-ref 实时化 | 5 天 |
+| M3（高×中） | 编辑器 | WorkpaperEditor 瘦身 + 虚拟滚动 + displayPrefs 持久化 | 5 天 |
+| M4（中×中） | 角色体验 | 签字 checklist + 复核进度汇总 + EQCR KAM 过滤 | 4 天 |
+| M5（低×中） | 治理 | except 分类治理 + datetime.utcnow 清零 + float Decimal 化 | 8 天 |
+
+**总计约 27.5 天**，与 §1-§16 的 99 天路线图互补（本章聚焦"全局体验一致性"维度，§1-§16 聚焦"功能完整性"维度）。
+
+---
+
+*文档版本：v3.4（2026-05-26 资深合伙人全面复盘，基于 grep 实测）*
