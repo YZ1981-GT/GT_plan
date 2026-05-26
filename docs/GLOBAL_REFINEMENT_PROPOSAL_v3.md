@@ -1760,3 +1760,190 @@ EQCR 关注：独立性、重大判断复核、备忘录、与项目组的信息
 
 *文档版本：v3.6（2026-05-26 六轮复盘最终汇总，190 天总路线图）*
 *下一步：用户决定按"建议执行顺序"启动 spec 三件套，每月一个 Sprint*
+
+
+---
+
+## 二十、v3.7 全平台中文化（2026-05-26 实测）
+
+> 用户明确需求：程序中所有英文 UI 文本（按钮/表头/提示/错误消息）改为中文。技术术语如 SQL/PDF/OCR/LLM/AND/OR 等保留。
+> 范围：前端 UI 文本 + 后端 API 错误消息（用户可见）；后端日志、变量名、代码注释保持原样。
+
+### 20.0 实测数据
+
+| 类别 | 实测数量 | 严重度 |
+|---|---|---|
+| 前端 `label="英文"`（含 el-form-item / el-table-column / el-tab-pane） | 123 处 | 🔴 P0 |
+| el-table-column 表头英文 | 28 处 | 🔴 P0 |
+| el-tab-pane 英文 tab 名 | 4 处 | 🟡 |
+| `<el-button>英文</el-button>` 按钮文字 | 36 处 | 🔴 P0 |
+| `title="英文"` 弹窗/卡片标题 | 44 处 | 🟡 |
+| `placeholder="英文"` 输入提示 | 6 处 | 🟢 |
+| `confirm` 弹窗英文文案 | 12 处 | 🟡 |
+| `ElMessage` 英文 | 0 处 | ✅（已全中文） |
+| 后端 `HTTPException(detail="英文")` 用户可见错误 | 16 处 | 🔴 P0 |
+| 后端日志英文 | 379 处 | ✅ 保留（开发调试用） |
+| i18n `$t()` 接入视图 | 仅 2 视图 | 🟡 框架闲置 |
+
+**典型英文残留示例**：
+- 表头：`ID` / `OCR` / `Ref ID` / `Severity` / `Source` / `SQL` / `Target` / `Token`
+- 标签：`Sheet`（7 处）/ `Info` / `Warning` / `LLM Stub` / `description` / `value` / `high/medium/low`
+- 后端：`Project not found` / `Insufficient permissions` / `Token expired` / `Service temporarily unavailable`
+
+### 20.1 🔴 中文化核心方案
+
+**A. 中文化范围（白名单原则）**
+
+✅ 必须中文化：
+- 所有 `label=` / `title=` / `placeholder=` 中的英文（含 form / table / tab / dialog）
+- 所有 `<el-button>英文</el-button>` 按钮文字
+- 所有 `confirmDelete/ElMessageBox` 等弹窗文案
+- 后端 `HTTPException.detail` / API 返回的 `message` 字段
+- 状态展示文字（如"Pending Review"→"待复核"）
+
+❌ 保留英文（技术术语 / 代码标识符）：
+- 字段技术名（component prop name / 变量名 / API path）
+- 通用技术缩写：SQL / PDF / OCR / LLM / AI / API / URL / UUID / CSV / JSON / YAML / HTTP
+- 文件扩展名：.xlsx / .docx / .pdf
+- 算法/标准名：UTF-8 / RFC / ISO / WCAG / CAS / PCAOB
+- 模型名：Qwen / GPT / Claude / DeepSeek / Ollama / vLLM
+- 业务编码：D2 / E1 / B-100 / Ref ID（编号体系）
+- 后端日志（开发调试用，不影响用户）
+- 代码注释 / docstring
+
+**B. 实施策略：直接改文案 vs 接入 i18n？**
+
+| 方案 | 优点 | 缺点 | 工时 |
+|---|---|---|---|
+| 直接 grep 替换硬编码 | 简单、无运行时开销、无依赖 | 未来若需英文支持需重做 | 5 天 |
+| 全量接入 vue-i18n（已有框架，仅 2 视图用） | 标准做法、未来可扩展 | 需建 zh-CN.json 全量翻译表（200+ key） | 10-15 天 |
+
+**用户偏好中文** + **暂无国际化需求** → **推荐方案 A：直接硬编码中文**。
+
+未来如需英文支持，再做迁移到 i18n。当前不做"为可能的未来需求过度设计"。
+
+**C. 分批执行**
+
+| 批次 | 范围 | 实测数量 | 工时 |
+|---|---|---|---|
+| 第 1 批 | 表头中文化（el-table-column.label） | 28 处 | 0.5 天 |
+| 第 2 批 | 按钮文字（`<el-button>英文</el-button>`） | 36 处 | 0.5 天 |
+| 第 3 批 | 表单 label / placeholder | 123 + 6 处 | 1.5 天 |
+| 第 4 批 | 弹窗 title / Tab 名 | 44 + 4 处 | 0.5 天 |
+| 第 5 批 | confirm 文案 + 状态文字 | 12 处 + 散落状态映射 | 1 天 |
+| 第 6 批 | 后端 HTTPException.detail 中文化 + apiPaths.ts 错误文案映射 | 16 处 | 1 天 |
+| **合计** | | **~270 处** | **5 天** |
+
+### 20.2 🟡 中文化质量铁律（防低质量翻译）
+
+**A. 业务术语统一表（必须建立）**
+
+`docs/i18n/business-glossary.md` 集中定义业务术语中英对照，避免同一概念多种译法：
+- Workpaper → "底稿"（不要"工作底稿"/"工作纸"/"工作文件"）
+- Adjustment / AJE → "调整分录"（RJE → "重分类分录"）
+- Misstatement → "错报"（不要"错误"/"差错"）
+- Reviewer → "复核人"（不要"审阅人"/"审核员"）
+- Sign-off → "签字"（不要"签发"/"签署"）
+- Trial Balance → "试算平衡表"（简称"试算表"）
+- Disclosure → "附注披露"（简称"附注"）
+- Reconciliation → "调节"（不要"对账"）
+- Variance → "差异"（不要"方差"/"波动"）
+- EQCR → "独立复核合伙人"（缩写保留 EQCR 在专业语境）
+
+**B. 通用 UI 术语统一**：
+- Confirm → "确认"（不要"确定"，按钮才用"确定"）
+- Cancel → "取消"
+- Save → "保存"（不要"提交"，提交是 Submit）
+- Submit → "提交"
+- Edit → "编辑"
+- Delete → "删除"（危险按钮用"删除"，归档用"归档"）
+- Export → "导出"
+- Import → "导入"
+- Filter → "筛选"
+- Search → "搜索"
+- Loading → "加载中"
+- No data → "暂无数据"
+- Required → "必填"
+- Optional → "可选"
+
+**C. 状态术语**（statusEnum.ts 配套修订）：
+- draft → "草稿"
+- pending_review / pending → "待复核"
+- under_review / reviewing → "复核中"
+- approved / review_passed → "已通过"
+- rejected → "已退回"
+- archived → "已归档"
+- active → "活动"
+- inactive / disabled → "已禁用"
+- success → "成功"
+- failed → "失败"
+
+### 20.3 🟢 实施细节
+
+**A. 翻译实施工具**
+
+可写一次性脚本 `scripts/_chinese_localize.py`：
+1. 读 `docs/i18n/business-glossary.md` 解析术语表
+2. grep 全量 .vue 文件中的英文 UI 文本
+3. 对照术语表自动替换 + 输出未匹配项清单（人工兜底）
+4. 生成 dry-run diff 供 review
+5. apply 后跑 vue-tsc + 前端单测确认无回归
+
+**B. CI 卡点**
+
+防止后续新代码再引入英文 UI 文本：
+- ESLint 自定义规则：检测 `label="..."` / `title="..."` 等属性中的纯英文（白名单技术术语豁免）
+- 命中即 warning，PR 强制评审
+- baseline 0，只增不减
+
+**C. 后端错误消息双语策略**
+
+后端 HTTPException 的 detail 改为：
+```python
+raise HTTPException(
+    status_code=404,
+    detail={
+        "error_code": "PROJECT_NOT_FOUND",
+        "message": "项目不存在",
+        "message_en": "Project not found"  # 保留供日志/调试用
+    }
+)
+```
+前端 `parseApiError` 优先取 `detail.message`（中文），fallback `detail.message_en`。
+
+### 20.4 中文化路线图汇总
+
+| 阶段 | 任务 | 工时 |
+|---|---|---|
+| 准备 | 编写 business-glossary.md（合伙人确认术语表） | 0.5 天 |
+| 工具 | 写 `_chinese_localize.py` + dry-run 检查 | 0.5 天 |
+| 执行 | 6 批次替换（前端 5 + 后端 1） | 5 天 |
+| 验证 | 全量 Playwright 截图对比 + 真实 UAT | 1 天 |
+| 守护 | ESLint 规则 + CI 卡点 | 0.5 天 |
+| **合计** | | **7.5 天** |
+
+### 20.5 与既有路线图整合
+
+中文化建议放在 §19.13"建议执行顺序"的 **第 3 月（体验一致）末尾**，与 GtEmpty/GtStatusTag 统一一起做（都是"展示一致性"维度）。理由：
+- 中文化是用户最直观感知的"专业感"提升点
+- 必须在 statusEnum 清零（§17.7 / §18.5）之后做，避免重复改
+- 工时 7.5 天，可独立 1.5 周 Sprint 完成
+
+### 20.6 用户验收标准
+
+✅ **正向验收**：
+- 所有页面顶栏 / 表头 / 按钮 / 弹窗 / 状态标签 看不到英文
+- ElMessage 错误提示全中文
+- API 错误消息全中文
+- 业务术语全平台统一（不出现"底稿"和"工作底稿"混用）
+
+✅ **保留英文（属于技术术语，不算违规）**：
+- 编号：D2-1 / E1-2 / B-100
+- 模型：Qwen3.5-27B / GPT-4
+- 缩写：SQL / PDF / OCR / LLM / API
+- 文件名：xxx.xlsx / xxx.pdf
+- 标准：CAS / IFRS / WCAG
+
+---
+
+*文档版本：v3.7（2026-05-26 全平台中文化方案，~270 处英文 UI 文本，7.5 天工时）*
