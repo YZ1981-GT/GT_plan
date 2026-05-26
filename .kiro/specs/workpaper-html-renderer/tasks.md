@@ -198,7 +198,7 @@
     - 索引导航行渲染 GtIndexChip（同底稿 sheet 切换 / 跨底稿 router.push）
     - _Requirements: 3.3（B 类 148 sheet）_
 
-  - [ ]* 5.3 B 类单元测试
+  - [x]* 5.3 B 类单元测试
     - 编制信息自动填充测试（project meta 缺失时友好降级）
     - 索引导航行跳转测试
     - _Requirements: 3.3_
@@ -216,7 +216,7 @@
     - 风险说明长段折叠展开
     - _Requirements: 3.6（E 类 322 sheet）_
 
-  - [ ]* 6.3 E 类单元测试
+  - [x]* 6.3 E 类单元测试
     - 6 步骤决策树 stepper 校验测试
     - 4 互斥结论测试
     - ProcedureTrimming 联动建议写回测试
@@ -264,7 +264,7 @@
     - ~27 sheet 适用
     - _Requirements: 3.5（D 子模式 5）_
 
-  - [ ]* 8.8 D 类单元测试
+  - [x]* 8.8 D 类单元测试
     - 5 子模式分发测试
     - 业务模式判定（D2-13）输出测试
     - 函证/盘点/访谈专属子组件交互测试
@@ -299,7 +299,7 @@
     - `backend/tests/integration/test_disclosure_sync.py`
     - C sheet 保存 → 断言 disclosure_notes 更新 + disclosure_notes 编辑不反向写回 C sheet
 
-  - [ ]* 10.5 C 类单元测试
+  - [x]* 10.5 C 类单元测试
     - 上市 ↔ 国企版本切换时共有字段保留 / 差异字段提示
     - 子表合计变化 → 主表行实时更新（inheritance_rules 校验）
     - _Requirements: 3.4_
@@ -370,12 +370,12 @@
     - 目标覆盖 1346 sheet 的 schema（按 wp_code 去重后约 50-80 份 YAML）
     - _Requirements: 2.2 原则 2_
 
-  - [ ]* 13.5 集成测试：9 类组件 + 真实模板 + 4 项目数据
+  - [x]* 13.5 集成测试：9 类组件 + 真实模板 + 4 项目数据
     - 使用 4 项目实测数据（陕西华氏/和平药房/辽宁卫生/宜宾大药房）
     - 验证 A/B/C/D/E 5 类组件渲染 + 保存 + 导出完整链路
     - _Requirements: 全篇_
 
-  - [ ]* 13.6 性能基准测试
+  - [x]* 13.6 性能基准测试
     - HTML 渲染冷启动 ≤ 500ms（D2 18 sheet 整套）
     - 导出 xlsx ≤ 5s（含模板加载 + openpyxl 写入）
     - openpyxl asyncio.run_in_executor + 信号量 ≤ 10 并发
