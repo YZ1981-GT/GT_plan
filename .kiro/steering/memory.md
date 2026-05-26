@@ -83,6 +83,14 @@ ts 353 / composables 91
 - Sentinel failover 真实验证：phase4 UAT-8
 - WorkpaperEditor 瘦身（当前 2631 行，目标 ≤1000）：useEditorActions let→ref + template dialog 配置驱动 + 删冗余别名
 
+### 本地未提交进展（reset 后保留 untracked，2026-05-26）
+
+- **附注模块改进 v2.0 文档**：`docs/DISCLOSURE_NOTE_IMPROVEMENT_PROPOSAL.md`（67713 字节，untracked）含致同 Word 排版规范单一真源（21 项 + 11 项验收断言）+ 6 Sprint 改进方案（含 Sprint 1.5 公式 DSL 沉淀）+ 工时 18.5-19.5 人天 + 6 项 CI 卡点；针对前后端已有 `_cell_modes` 行级 dict + 三式联动 + DSL（=TB/=ROW/=PRIOR）+ 4 套用户编辑入口的渐进兼容方案
+- **vLLM / httpx 链路 3 个待修复 bug（reset 后丢失，需重做）**：
+  - **httpx 系统代理陷阱**：Windows Clash 类系统代理（127.0.0.1:7897）让 `httpx.AsyncClient()` 默认读取代理把 localhost 请求路由到代理返回 502；修复 = 创建 client 时显式 `mounts={}, trust_env=False`；需修 4 文件：`llm_client.py`（_sync/_stream_completion）/ `ai_service.py`（_get_ollama_client + _get_llm_client + _get_chromadb_client）/ `availability_fallback_service.py`（check_llm_available）/ `routers/system_settings.py`（check_url）
+  - **vLLM `chat_template_kwargs` 必须 payload 顶层**：嵌套 `extra_body.chat_template_kwargs` 被 vLLM 静默忽略，`enable_thinking=False` 不生效导致 content=None reasoning 有值；`llm_client.py:107` 改顶层 `"chat_template_kwargs": {"enable_thinking": settings.LLM_ENABLE_THINKING}`
+  - **LLM thinking content=None 处理**：finish_reason=length 时返回"思考超 token，请简化提问或增大 max_tokens"，**禁止**回退到 reasoning 字段；`llm_client.py:_sync_completion` 需补此分支
+
 ## 关键引用指南
 
 - 详细技术事实 / 端点速查 / PG schema / spec 历史详细 → `#dev-history` grep 关键词
