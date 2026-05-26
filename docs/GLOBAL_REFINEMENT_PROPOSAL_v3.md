@@ -211,16 +211,16 @@
 #### 4.1.1 🔴 底稿编制效率（P0，3 天）
 
 **问题**：
-- WorkpaperEditor 当前只有 Univer 表格编辑器，缺少"程序要求"侧栏（审计程序步骤引导）
+- WorkpaperEditor 已有 Univer/HTML 双模式渲染 + WorkpaperSidePanel 10 Tab（AI/附件/版本/批注/程序/程序要求/依赖/一致性/公式/证据），"程序要求"Tab 已存在（ProgramRequirementsSidebar）
 - 无"上年底稿参考"面板（助理需要对照上年数据填写）
 - 无"科目穿透"快捷入口（编辑底稿时想看某科目明细需要切页面）
-- 自动保存间隔 60s 过长（Univer 大表格操作频繁，30s 更合理）
+- 自动保存间隔 120s 过长（Univer 大表格操作频繁，60s 更合理）
 
 **方案**：
-- WorkpaperSidePanel 已有 9 Tab（R8 落地），确认"程序要求"Tab 是否有真实数据填充
+- 确认"程序要求"Tab（ProgramRequirementsSidebar）是否有真实审计程序数据填充
 - 增加"上年参考"Tab，调用 `get_prior_year_workpaper` 展示上年同编码底稿快照
 - 底稿内金额单元格支持右键"穿透到序时账"（复用 usePenetrate）
-- 自动保存间隔从 60s 改为 30s
+- 自动保存间隔从 120s 改为 60s（useWorkpaperAutoSave.ts `intervalMs`）
 - 角色影响：助理
 
 #### 4.1.2 🟡 抽凭工作流（P1，4 天）
@@ -411,9 +411,9 @@ EQCR 关注：独立性、重大判断复核、备忘录、与项目组的信息
 ### 5.4 🔴 年度切换联动不完整（P0，1.5 天）
 
 **问题**：
-- projectStore.changeYear 已 emit `year:changed` 事件（R8 落地），但只有部分视图订阅了此事件
-- 用户在顶栏切换年度后，部分页面数据不刷新（需要手动 F5）
-- 特别是：LedgerPenetration / Adjustments / Misstatements 切换年度后数据不变
+- projectStore.changeYear 已 emit `year:changed` 事件（R8 落地），但只有 3 个视图订阅了此事件（LedgerImportHistory/LedgerPenetration/Materiality）
+- 用户在顶栏切换年度后，大部分页面数据不刷新（需要手动 F5）
+- 特别是：Adjustments / Misstatements / ReportView / DisclosureEditor 切换年度后数据不变
 
 **方案**：
 - 所有依赖 year 的视图必须 watch `route.query.year` 或订阅 `year:changed` 事件
@@ -428,7 +428,7 @@ EQCR 关注：独立性、重大判断复核、备忘录、与项目组的信息
 ### 6.1 🔴 枚举/状态管理统一（P0，1 天）
 
 **问题**：
-- 前端 `constants/statusEnum.ts` 已有 18 套状态常量，但仍有 5 处视图用硬编码字符串（R9 残留）
+- 前端 `constants/statusEnum.ts` 已有 23 套状态常量，但仍有 17 个视图用硬编码字符串（如 `'draft'`/`'approved'`）
 - 后端枚举与前端常量存在命名差异（如后端 `CompetenceRating.reliable` vs 前端可能写 `'A'`）
 - 新增状态值时前后端容易不同步
 
@@ -886,7 +886,7 @@ EQCR 关注：独立性、重大判断复核、备忘录、与项目组的信息
 
 ### 12.1 🔴 金额精度全面 Decimal 化（B1，P0，5 天）
 
-**问题**：实测 `note_validation_engine.py` / `note_formula_generator.py` / `prefill_engine.py` 等 60+ 处用 `float(...)` 做金额计算，`abs(expected - closing) > 0.01` 这种容差判断。
+**问题**：实测 `note_validation_engine.py` / `note_formula_generator.py` / `prefill_engine.py` 等 420+ 处用 `float(...)` 做计算（含金额和非金额场景），`abs(expected - closing) > 0.01` 这种容差判断。
 
 **审计行业铁律**：
 - 浮点数累加丢分位（10 万行序时账每行 0.01 误差，累加可能差几千元）
@@ -922,7 +922,7 @@ EQCR 关注：独立性、重大判断复核、备忘录、与项目组的信息
 
 ### 12.3 🔴 底稿索引体系前端呈现（B3，P0，3 天）
 
-**问题**：致同有完整索引体系（A 序时表 / B 现金 / C 应收 / D 存货 / F 投资 / K 收入 / N 费用 ...），`backend/data/wp_account_mapping.json` 已有 88 条映射 v2025-R4。但 WorkpaperList **按编码字母排序展示**，索引树未可视化。
+**问题**：致同有完整索引体系（A 序时表 / B 现金 / C 应收 / D 存货 / F 投资 / K 收入 / N 费用 ...），`backend/data/wp_account_mapping.json` 已有 206 条映射 v2025-R5。但 WorkpaperList **按编码字母排序展示**，索引树未可视化。
 
 **实际场景**：审计助理用纸质底稿习惯按索引找（"翻到 B-100 看现金主表"），电子化后反而绕弯。
 
@@ -1151,12 +1151,12 @@ EQCR 关注：独立性、重大判断复核、备忘录、与项目组的信息
 | useEditingLock 接入 | 3 编辑器 | **3** | ✅ |
 | GtEditableTable 接入 | 0/86 | **3 视图** | 🟡 仍极低 |
 | 虚拟滚动（el-table-v2） | 未提 | **0 视图** | 🔴 YG2101 65 万行场景必卡 |
-| el-skeleton 骨架屏 | 未提 | **6 视图** | � 加载体验待改善 |
+| el-skeleton 骨架屏 | 未提 | **10 视图** | 🟡 加载体验待改善 |
 | `<transition>` 路由动效 | 未提 | **21 处** | 🟡 分布零散 |
 | useAiChat 合并接入 | R9 声称合并 | **2 视图实际用** | 🔴 R9 改造未真正全量铺开 |
 | AiContentConfirmDialog 接入 | R3 已实装 | **1 视图 import** | 🔴 前端入口极薄弱 |
 | `console.log/.error/.warn` 残留 | 未提 | **74 处** | 🔴 生产代码不该出现 |
-| `datetime.utcnow()` 残留 | 全局清理已完成 | **14 处** | � 新代码又引入了 |
+| `datetime.utcnow()` 残留 | 全局清理已完成 | **19 处** | 🟡 新代码又引入了 |
 | services 层 `float(...)` | 未量化 | **420 处** | 🔴 印证 §12.1 Decimal 化必要性（含非金额用途） |
 | `except Exception` 数量 | 提"200+" | **1162 处** | 🔴 量级远超预期，治理工时需重估 |
 | 中间件双份 `audit_log.py + audit_log_middleware.py` | 提到但未确认死代码归属 | **`audit_log_middleware.py` 是死代码**（main.py 引用 `audit_log.py`） | ✅ 已确认 |
@@ -1170,11 +1170,13 @@ EQCR 关注：独立性、重大判断复核、备忘录、与项目组的信息
 1. **v3 列出的多项 P0 任务已完成**：GtPageHeader 全量（88%）、handleApiError 全量（59%）、硬编码权限清零、/api/ 硬编码清零、全局搜索、深色模式基础 → R7/R8/R9/Phase1-8 已落地
 2. **仍需关注的真实 P0 隐藏债**：
    - 🔴 **console.log 74 处生产代码残留**（合规隐患：审计平台日志可能含敏感信息）
-   - 🔴 **datetime.utcnow() 14 处回归**（违反全局 timezone-aware 规约）
+   - 🔴 **datetime.utcnow() 19 处回归**（违反全局 timezone-aware 规约）
+   - 🔴 **year:changed 仅 3 视图订阅**（§5.4 年度切换联动严重不足）
+   - 🔴 **statusEnum 硬编码残留 17 视图**（§6.1 枚举统一远未完成）
    - 🔴 **AiContentConfirmDialog 仅 1 视图接入**（§12.2 AI 溯源闭环前端入口极薄弱）
    - 🔴 **useAiChat 仅 2 视图实际用**（R9 声称合并但其他 AI 入口未迁移）
    - 🔴 **el-table-v2 虚拟滚动 0 处**（YG2101 65 万行序时账场景必卡）
-   - � **el-skeleton 仅 6 视图**（加载白屏体验差）
+   - 🟡 **el-skeleton 仅 10 视图**（加载白屏体验待改善）
    - 🟡 **GtAmountCell 仅 5 视图 + 1 组件**（金额展示一致性远未达标）
    - 🟡 **GtEditableTable 仅 3 视图**（仍未推广）
 3. **§12.2 AI 内容溯源闭环薄弱**：后端 wrap_ai_output 已就位、AiContentConfirmDialog 组件已建，但前端仅 1 个视图实际 import——助理生成 AI 内容后审核确认入口极薄弱
