@@ -97,7 +97,7 @@ ts 353 / composables 91
 - **LibreOffice 已装**（`C:\Program Files\LibreOffice\program\soffice.exe`）：后端启动健康检查 15s 超时是 LO 启动慢导致，**不影响附注 docx 导出**（python-docx 不依赖 LO）
 - **D6 迁移系统铁律**（2026-05-27）：启动时跑 `backend/migrations/V*.sql`（MigrationRunner），不是 alembic；新加列/表写 `V0XX__*.sql` + `R0XX__*.sql` 配对；alembic 是历史遗留，schema 漂移走 D6 SQL 修而不去拉通 alembic chain；CREATE TABLE/ALTER COLUMN 必须 `IF NOT EXISTS` idempotent
 - **disclosure-notes format-config 端点 405**（2026-05-27 待修，spec 自带 bug）：`GET /api/disclosure-notes/format-config` 被同 prefix 下其他 router（note_wp_mapping/note_trim/note_ai）的 path 拦截，FastAPI router 注册顺序问题；解决方案 = 把 `dn_router` 提到所有同 prefix router 之前 include
-- **本地 git 状态**（2026-05-27）：master 领先 origin/master 178 commit + 落后 4 commit，**从未 push 过**；远端只有 origin/master + origin/feature/{e2e-business-flow,ledger-import-view-refactor}；按 git_safety 铁律应推到新分支 `feature/disclosure-note-full-revamp` 不直推 master
+- **本地 git 状态**（2026-05-27）：master 领先 origin/master 178 commit + 落后 4 commit，**已 push 到 feature 分支** `feature/disclosure-note-full-revamp`（commit 52885362 含 V018 顺序修正 + memory 沉淀；含 179 commit；按 git_safety 不直推 master）；当前 HEAD 切到该 feature 分支并 tracking origin；PR 链接 = https://github.com/YZ1981-GT/GT_plan/pull/new/feature/disclosure-note-full-revamp
 
 ## 关键引用指南
 
