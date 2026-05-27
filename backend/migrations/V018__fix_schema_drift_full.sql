@@ -25,6 +25,20 @@ CREATE TABLE IF NOT EXISTS event_outbox_dlq (
 CREATE INDEX IF NOT EXISTS idx_event_outbox_dlq_unresolved ON event_outbox_dlq (moved_to_dlq_at) WHERE resolved_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_event_outbox_dlq_project_year ON event_outbox_dlq (project_id, year, moved_to_dlq_at);
 
+CREATE TABLE IF NOT EXISTS workpaper_template_version (
+	id UUID NOT NULL, 
+	version VARCHAR(20) NOT NULL, 
+	release_date DATE NOT NULL, 
+	source VARCHAR(50) DEFAULT '致同总所' NOT NULL, 
+	is_current BOOLEAN DEFAULT false NOT NULL, 
+	parent_version_id UUID, 
+	changelog TEXT, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	UNIQUE (version), 
+	FOREIGN KEY(parent_version_id) REFERENCES workpaper_template_version (id) ON DELETE SET NULL
+);
+
 CREATE TABLE IF NOT EXISTS workpaper_sheet_classification (
 	id UUID NOT NULL, 
 	wp_code VARCHAR(50) NOT NULL, 
@@ -47,20 +61,6 @@ CREATE TABLE IF NOT EXISTS workpaper_sheet_classification (
 );
 CREATE INDEX IF NOT EXISTS idx_wpsc_wp_code_version ON workpaper_sheet_classification (wp_code, template_version_id);
 CREATE INDEX IF NOT EXISTS idx_wpsc_class_scope ON workpaper_sheet_classification (class, scope);
-
-CREATE TABLE IF NOT EXISTS workpaper_template_version (
-	id UUID NOT NULL, 
-	version VARCHAR(20) NOT NULL, 
-	release_date DATE NOT NULL, 
-	source VARCHAR(50) DEFAULT '致同总所' NOT NULL, 
-	is_current BOOLEAN DEFAULT false NOT NULL, 
-	parent_version_id UUID, 
-	changelog TEXT, 
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
-	PRIMARY KEY (id), 
-	UNIQUE (version), 
-	FOREIGN KEY(parent_version_id) REFERENCES workpaper_template_version (id) ON DELETE SET NULL
-);
 
 CREATE TABLE IF NOT EXISTS project_workpaper_sheet_override (
 	id UUID NOT NULL, 
