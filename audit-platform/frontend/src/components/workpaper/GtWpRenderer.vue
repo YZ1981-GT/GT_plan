@@ -29,6 +29,30 @@
 
     <!-- Ready: dispatch by componentType -->
     <template v-if="!loading && !error && renderConfig">
+      <!-- Sheet 选择器（多 sheet 时显示） -->
+      <div v-if="visibleSheets.length > 1" class="gt-wp-renderer__sheet-tabs">
+        <el-tabs
+          v-model="activeSheetName"
+          type="card"
+          class="gt-wp-renderer__sheet-tabs-inner"
+        >
+          <el-tab-pane
+            v-for="sheet in visibleSheets"
+            :key="sheet.sheet_name"
+            :name="sheet.sheet_name"
+          >
+            <template #label>
+              <span class="gt-wp-renderer__tab-label" :title="sheet.sheet_name">
+                <span class="gt-wp-renderer__tab-icon">{{ getSheetIcon(sheet.componentType) }}</span>
+                <span class="gt-wp-renderer__tab-name">{{ sheet.sheet_name }}</span>
+              </span>
+            </template>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+
+      <!-- 内容区域 -->
+      <div class="gt-wp-renderer__content">
       <!-- A 程序表中控台 -->
       <GtAProgramConsole
         v-if="componentType === 'a-program-console'"
@@ -124,6 +148,7 @@
           </template>
         </el-result>
       </div>
+      </div><!-- /.gt-wp-renderer__content -->
     </template>
   </div>
 </template>
@@ -184,20 +209,42 @@ const emit = defineEmits<{
 // ─── Refs ───
 const containerRef = ref<HTMLElement | null>(null)
 const loadingHint = ref('')
+// 内部维护 activeSheetName（支持 sheet 切换）
+const internalActiveSheetName = ref<string>('')
 
 // ─── Composables ───
 const wpIdRef = toRef(props, 'wpId')
-const { renderConfig, loading, error, componentType, reload } = useWpRenderer(wpIdRef)
+const { renderConfig, loading, error, reload } = useWpRenderer(wpIdRef)
 
 // ─── Computed ───
-const activeSheetName = computed(() => {
-  if (!renderConfig.value?.sheets?.length) return ''
-  // 如果指定了 initialSheet，尝试匹配
-  if (props.initialSheet) {
-    const matched = renderConfig.value.sheets.find(s => s.sheet_name === props.initialSheet)
-    if (matched) return matched.sheet_name
-  }
-  return renderConfig.value.sheets[0].sheet_name
+/** 可见 sheet 列表（过滤掉 skip 类，但 skip 仍可在唯一 sheet 时显示） */
+const visibleSheets = computed(() => {
+  const sheets = renderConfig.value?.sheets ?? []
+  // 全部 skip 时仍展示一个；否则过滤 skip
+  const nonSkip = sheets.filter(s => s.componentType !== 'skip')
+  return nonSkip.length > 0 ? nonSkip : sheets
+})
+
+const activeSheetName = computed<string>({
+  get() {
+    if (!renderConfig.value?.sheets?.length) return ''
+    // 优先用内部 ref（用户切换过）
+    if (internalActiveSheetName.value) {
+      const exists = renderConfig.value.sheets.find(s => s.sheet_name === internalActiveSheetName.value)
+      if (exists) return internalActiveSheetName.value
+    }
+    // 否则匹配 initialSheet
+    if (props.initialSheet) {
+      const matched = renderConfig.value.sheets.find(s => s.sheet_name === props.initialSheet)
+      if (matched) return matched.sheet_name
+    }
+    // 兜底：第一个非 skip 的 sheet
+    return visibleSheets.value[0]?.sheet_name ?? renderConfig.value.sheets[0].sheet_name
+  },
+  set(name: string) {
+    internalActiveSheetName.value = name
+    emit('sheet-change', name)
+  },
 })
 
 const activeSheet = computed(() => {
@@ -207,6 +254,29 @@ const activeSheet = computed(() => {
 
 const activeSheetSchema = computed(() => activeSheet.value?.schema ?? {})
 const activeSheetHtmlData = computed(() => activeSheet.value?.html_data ?? {})
+/** 当前 sheet 的 componentType（每个 sheet 独立路由） */
+const componentType = computed<WpComponentType>(() => {
+  return (activeSheet.value?.componentType as WpComponentType) ?? 'skip'
+})
+
+/** componentType → 图标（sheet tab 显示） */
+function getSheetIcon(ct: string): string {
+  const map: Record<string, string> = {
+    'a-program-console': '📋',
+    'b-index': '🗂️',
+    'c-note-table': '📝',
+    'd-form-table': '📑',
+    'd-form-paragraph': '📄',
+    'd-form-qa': '❓',
+    'd-form-confirmation': '✉️',
+    'd-form-review': '✍️',
+    'e-control-test': '🧪',
+    'h-static-doc': '📖',
+    'univer': '📊',
+    'skip': '⏭️',
+  }
+  return map[ct] || '📄'
+}
 
 const errorTitle = computed(() => {
   if (!error.value) return ''
@@ -262,6 +332,61 @@ function onJumpToReference(refCode: string) {
   width: 100%;
   height: 100%;
   min-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.gt-wp-renderer__sheet-tabs {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--el-border-color-light);
+  background: var(--el-bg-color-page);
+  padding: 4px 12px 0;
+}
+
+.gt-wp-renderer__sheet-tabs-inner :deep(.el-tabs__nav-wrap) {
+  margin-bottom: 0;
+}
+
+.gt-wp-renderer__sheet-tabs-inner :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+.gt-wp-renderer__sheet-tabs-inner :deep(.el-tabs__header) {
+  margin-bottom: 0;
+  border-bottom: 0;
+}
+
+.gt-wp-renderer__sheet-tabs-inner :deep(.el-tabs__content) {
+  display: none;
+}
+
+.gt-wp-renderer__sheet-tabs-inner :deep(.el-tabs__item) {
+  height: 36px;
+  line-height: 36px;
+  font-size: 13px;
+}
+
+.gt-wp-renderer__tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 240px;
+}
+
+.gt-wp-renderer__tab-icon {
+  flex: 0 0 auto;
+}
+
+.gt-wp-renderer__tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gt-wp-renderer__content {
+  flex: 1 1 auto;
+  position: relative;
+  overflow: auto;
 }
 
 .gt-wp-renderer__error {

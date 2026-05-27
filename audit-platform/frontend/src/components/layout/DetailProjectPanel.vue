@@ -440,7 +440,6 @@ function typeLabel(t: string) {
   const m: Record<string, string> = { annual: '年度审计', special: '专项审计', ipo: 'IPO审计', internal_control: '内控审计' }
   return m[t] || t || '-'
 }
-}
 function formatDate(d: string) {
   if (!d) return '-'
   return new Date(d).toLocaleDateString('zh-CN')

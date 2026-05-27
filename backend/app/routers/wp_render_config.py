@@ -124,12 +124,19 @@ async def get_render_config(
 
     # ─── Step 3: 获取模板版本 ────────────────────────────────────────────
     # 项目 template_version_id 通过 raw SQL 获取（ORM 模型未定义该列）
-    version_query = sa.text(
-        "SELECT template_version_id FROM projects WHERE id = :pid"
-    )
-    version_result = await db.execute(version_query, {"pid": str(project_id)})
-    version_row = version_result.first()
-    project_template_version_id = version_row[0] if version_row and version_row[0] else None
+    # 注意：该列由 V018 迁移添加，已通过 ALTER TABLE 补齐
+    project_template_version_id = None
+    try:
+        version_query = sa.text(
+            "SELECT template_version_id FROM projects WHERE id = :pid"
+        )
+        version_result = await db.execute(version_query, {"pid": str(project_id)})
+        version_row = version_result.first()
+        project_template_version_id = version_row[0] if version_row and version_row[0] else None
+    except Exception:
+        # 列不存在或其他 DB 错误 → 降级继续（不 rollback，避免 session 失效）
+        logger.warning("projects.template_version_id lookup failed, continuing without version")
+        project_template_version_id = None
 
     # 获取版本字符串
     template_version_str: str | None = None

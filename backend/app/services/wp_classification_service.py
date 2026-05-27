@@ -97,25 +97,43 @@ class WpClassificationService:
 
         流程：
         1. 查 workpaper_sheet_classification 获取模板级归类
-        2. 查 project_workpaper_sheet_override 获取项目级覆盖
-        3. 合并：override 字段优先覆盖 base classification
+        2. 若精确 wp_code 无记录，按以下顺序回退：
+           a. parent code（strip trailing -N，如 D1-1 → D1）
+           b. base code（仅保留首字母+首数字，如 H1-12 → H1）
+        3. 查 project_workpaper_sheet_override 获取项目级覆盖
+        4. 合并：override 字段优先覆盖 base classification
         """
-        # ─── Step 1: 查模板级归类 ────────────────────────────────────────
-        base_query = sa.select(WorkpaperSheetClassification).where(
-            WorkpaperSheetClassification.wp_code == wp_code,
-        )
-        if template_version_id is not None:
-            base_query = base_query.where(
-                WorkpaperSheetClassification.template_version_id == template_version_id
-            )
+        # 候选 wp_code 列表（精确 → 父级 → 基础）
+        candidates = self._build_wp_code_candidates(wp_code)
 
-        base_rows = (await self.db.execute(base_query)).scalars().all()
+        # ─── Step 1: 按候选顺序查模板级归类 ──────────────────────────────
+        base_rows = []
+        matched_code = None
+        for candidate in candidates:
+            base_query = sa.select(WorkpaperSheetClassification).where(
+                WorkpaperSheetClassification.wp_code == candidate,
+            )
+            if template_version_id is not None:
+                base_query = base_query.where(
+                    WorkpaperSheetClassification.template_version_id == template_version_id
+                )
+            rows = (await self.db.execute(base_query)).scalars().all()
+            if rows:
+                base_rows = rows
+                matched_code = candidate
+                if candidate != wp_code:
+                    logger.info(
+                        "[WP_CLASSIFICATION] wp_code=%s fallback → matched parent=%s",
+                        wp_code, candidate,
+                    )
+                break
 
         if not base_rows:
             raise ClassificationNotFoundError(
                 f"No classification found for wp_code='{wp_code}' "
                 f"(template_version_id={template_version_id}). "
-                "Every sheet must have a classification — Univer fallback is prohibited."
+                "Every sheet must have a classification — Univer fallback is prohibited. "
+                "Run: python backend/scripts/seed_workpaper_sheet_classification.py"
             )
 
         # ─── Step 2: 查项目级覆盖 ────────────────────────────────────────
@@ -164,6 +182,35 @@ class WpClassificationService:
             )
 
         return results
+
+    @staticmethod
+    def _build_wp_code_candidates(wp_code: str) -> list[str]:
+        """构建 wp_code 查询候选列表（精确 → 父级 → 基础）
+
+        示例：
+        - "D2-3"   → ["D2-3"]            （精确匹配，模板里就有 D2-3 sheets）
+        - "D2"     → ["D2", "D2-1"]      （umbrella code，回退到 D2-1 模板）
+        - "D1-1"   → ["D1-1", "D1"]      （回退到 D1 父级）
+        - "H1-12"  → ["H1-12", "H1"]     （回退到 H1 父级）
+        - "B22A-4" → ["B22A-4", "B22A", "B22"]  （多级回退）
+        """
+        import re
+
+        candidates = [wp_code]
+
+        # umbrella code（无 dash 的纯字母+数字，如 D2/D4/F2/H1）
+        # → 加上 -1 作为 fallback（致同模板里审定表通常是 -1 编号）
+        if re.match(r"^[A-Z]\d+$", wp_code):
+            candidates.append(f"{wp_code}-1")
+
+        # 逐级 strip trailing "-N"
+        cur = wp_code
+        while "-" in cur:
+            cur = cur.rsplit("-", 1)[0]
+            if cur not in candidates:
+                candidates.append(cur)
+
+        return candidates
 
     async def get_sheet_classification(
         self,

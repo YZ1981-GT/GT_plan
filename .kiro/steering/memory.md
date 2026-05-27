@@ -98,6 +98,8 @@ ts 353 / composables 91
   - GtAmountCell 实际路径在 `components/common/`（非 `components/gt/`，spec 文档笔误）；ArchivedBanner 同
   - `note_formula_generator.py` 0 处 `> 0.01`，实际目标是 `note_formula_engine.py`（spec 文档笔误已修正）
   - AmountDecimal = `Annotated[Decimal, BeforeValidator(to_decimal)]` 拒绝 NaN/Infinity（Pydantic v2 范式）
+  - **wp_classification_service fallback 策略**（2026-05-27）：`workpaper_sheet_classification` 表为空时（项目未跑分类入库），`_fallback_by_wp_code_prefix` 根据 wp_code 首字母（D2→D→`d-form-table`）静态推断 componentType，避免所有底稿 fallback 到 Univer；F/G 前缀仍返回 `univer`
+  - **render-config 500 修复**（2026-05-27）：`projects.template_version_id` 列由 V018 迁移添加但本地 PG 未执行 V018；已通过 `ALTER TABLE ADD COLUMN IF NOT EXISTS` 补齐 + `wp_render_config.py` Step 3 加 try/except 降级（不 rollback 避免 session 失效）
   - useFormSubmit 三大契约：validate 失败 short-circuit / submitting 防重复点击 / action 抛异常时 submitting 重置
   - el-form rule.required:true 仅在 value=='' || null || undefined 时报错，**单空格 ` ` 视为有效**（element-plus 默认行为，PBT 测试需对齐）
   - 测试路径修复铁律：跨工作区/子目录的 pytest fixture 文件路径要么用 `Path(__file__).resolve().parent` 推断，要么 baseline.json 兜底多候选路径（避免 cwd 切换导致 `open("backend/migrations/...")` 失败）
@@ -163,7 +165,10 @@ ts 353 / composables 91
 - **broadcast_raw fan-out 铁律**（2026-05-27）：`event_bus.broadcast_raw(type, extra)` 需双路推送 = ①Redis Stream xadd 持久化 + ②内存 sse_queues fan-out（dict 形式带 `_raw=True` 标记）；events.py event_generator 用 `isinstance(payload, dict) and payload.get('_raw')` 区分 raw vs EventPayload；不触发 _handlers 避免双发
 - **业务异常 = ValueError 子类铁律**（2026-05-27）：service 层业务异常（如 `AiContentLogNotFoundError` / `ConflictAlreadyResolvedError` / `ConflictMergeValueRequiredError`）继承 `ValueError`，router 层捕获 ValueError 即统一映射 422，避免每类异常单独写 except 分支
 - **AI 内容生成强制溯源铁律**（2026-05-27）：6.2 起新增 `wrap_ai_output_with_log(...)` 异步版（保留同步 `wrap_ai_output` 向后兼容）；`db + project_id + user_id + instance_type + instance_id` 五参齐全自动调 `ai_content_log_service.create()` 写表 + 返回 `ai_content_log_id` + `confirm_action='pending'`；任一缺失静默跳过；`AIContentMustBeConfirmedRule` 双路径检查（ai_content_log 表优先 + parsed_data fallback），`location.via='ai_content_log'/'parsed_data'` 标识来源
-- **manual_override 守卫三态铁律**（2026-05-27）：`_check_manual_override_before_propagate(...)` 返回 `'allow' / 'block_enqueued' / 'auto_resolved'`；`'block_enqueued'` 调用方必须 abort 写入并仅更新 last_sync_at（拦截 ≠ 静默丢弃）；`propagation_origin='system_recompute'` 即便 manual_override 也直接 auto_resolve（汇率刷新等）；约定字段 = `table_data._manual_override` 或 `parsed_data._manual_override_cells: list[str]`
+- **subagent 中文截断修复铁律**（2026-05-27）：subagent 写入含中文注释的 .ts/.vue 文件时可能因 context window 截断产生 `U+FFFD`（�?）乱码；修复方法 = `git checkout origin/{branch} -- {file}` 从远程恢复干净版本；发现后用 `Get-ChildItem -Recurse | Select-String "\uFFFD"` 全仓扫描确保无残留
+- **wp_classification 治本铁律**（2026-05-27）：底稿 sheet 类型选择跟项目数据**无关**，只跟模板结构有关；`workpaper_sheet_classification` 表必须由 `seed_workpaper_sheet_classification.py` 从 `workpaper_template_analysis.json`（349 模板/2602 sheet 扫描结果）全量灌入；运行后 D2-3 等 wp_code 正确路由到 b-index/a-program-console/d-form-table/c-note-table/univer 等 9 类；废弃 `_fallback_by_wp_code_prefix` 兜底（合成假 sheet_name="(fallback)" 跟真实 parsed_data.html_data keys 不匹配，是错误方向）
+- **wp_code → 模板文件解析铁律**（2026-05-27）：模板文件名"D2-1至D2-4 应收账款.xlsx"覆盖 wp_codes [D2-1,D2-2,D2-3,D2-4]，每个 wp_code 都灌入完整 11 sheet 分类；范围正则 `^([A-Z])(\d+)(?:-(\d+))?至(?:[A-Z])?(\d+)(?:-(\d+))?` + 单 wp_code `^([A-Z]\d+(?:-\d+)*[A-Z]?)`；服务层 `_build_wp_code_candidates` 三级回退（精确 → umbrella+`-1` → strip trailing `-N`）保证 D2/D4/F2 等 umbrella code 也能命中
+- **V019 迁移种子数据铁律**（2026-05-27）：表建好后必须配套 V019/V020 等种子数据迁移（INSERT 初始版本/枚举/配置），ON CONFLICT DO NOTHING 保证幂等；与 D6 SQL 配对 R0XX 回滚脚本同步上传 git 避免其他用户拉取后表为空
 - **target_cell 前缀化编码铁律**（2026-05-27）：`ai_content_log.target_cell` 保存为 `{instance_type}:{instance_id}[:{field}]` 三段式，便于 `list_by_project(instance_type='workpaper')` 通过 `LIKE 'workpaper:%'` 过滤；service 层 create() 自动前缀化，调用方传原始 field 即可
 - **section registry 注册即用铁律**（2026-05-27）：archive_section_registry 模块加载即 `register('05', filename, generator_func, description)`，无需手动调用；generator 通过 lazy import 委托避免循环依赖；§01-04 既占位（EQCR/QC/独立性等），新加章节按 prefix 自然排序
 
@@ -217,7 +222,7 @@ ts 353 / composables 91
 ### V3 Spec 总体状态（2026-05-27）
 
 - **Sprint 0-4 全部完成**：98 必需任务中 ~85 标 [x] + ~13 标 [~]（渐进治理/待真实环境）
-- **Sprint 回归 14.1/14.2 已通过**：后端 145 passed (29.70s) + 前端 126 passed (4.61s) = 271 tests 全绿
+- **Sprint 回归 14.1/14.2/14.3 已通过**：后端 145 passed (29.70s) + 前端 126 passed (4.61s) + Playwright E2E 登录→仪表盘→项目→底稿核心链路通过；14.4 待合伙人验收
 - **Sprint 回归 14.3/14.4 待真实环境**：Playwright E2E + UAT 需 start-dev.bat（localhost:3030/9980 未启动时 ERR_CONNECTION_REFUSED）
 - **新增 composable**：useEditorToolbar / useEditorCycles / useEditorMode / useFirstLoad / useNavigationStack
 - **新增配置**：editorDialogConfig.ts（11 dialog 声明式配置）
