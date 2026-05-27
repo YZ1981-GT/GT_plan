@@ -448,6 +448,10 @@
     <div class="gt-ucell-ctx-item" @click="onDeCtxViewDataSource">
       <span class="gt-ucell-ctx-icon">🔍</span> 查看数据来源
     </div>
+    <!-- Sprint 2 Task 2.4：CellTrace 单元格溯源 -->
+    <div class="gt-ucell-ctx-item" @click="onDeCtxOpenCellTrace">
+      <span class="gt-ucell-ctx-icon">🔎</span> 溯源到底稿/试算表
+    </div>
   </CellContextMenu>
 
   <!-- Sprint 5.7: 数据来源弹窗 -->
@@ -459,6 +463,16 @@
     :label="cellDetailLabel"
     @update:visible="showCellFormulaDetail = $event"
     @navigate="onCellDetailNavigate"
+  />
+
+  <!-- Sprint 2 Task 2.4: CellTrace 单元格溯源弹窗 -->
+  <CellTraceDialog
+    v-if="showCellTrace"
+    v-model="showCellTrace"
+    :note-id="cellTraceCtx.noteId"
+    :row-idx="cellTraceCtx.rowIdx"
+    :col-idx="cellTraceCtx.colIdx"
+    @penetrate-to-tb="onCellTracePenetrateTb"
   />
 
   <!-- Phase 3 F1: 来源追溯弹窗 (Requirements: F1.1, F1.3, F1.4) -->
@@ -498,7 +512,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, reactive } from 'vue'
 import * as P from '@/services/apiPaths'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useCellSelection } from '@/composables/useCellSelection'
@@ -509,6 +523,7 @@ import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import TraceSourcePopover from '@/components/common/TraceSourcePopover.vue'
 import type { TraceSourceData } from '@/components/common/TraceSourcePopover.vue'
+import CellTraceDialog from '@/components/notes/CellTraceDialog.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
@@ -1846,6 +1861,38 @@ function onDeCtxViewDataSource() {
   cellDetailSheet.value = ''
   cellDetailLabel.value = ''
   showCellFormulaDetail.value = true
+}
+
+// Sprint 2 Task 2.4: CellTrace 单元格溯源
+const showCellTrace = ref(false)
+const cellTraceCtx = reactive<{ noteId: string; rowIdx: number; colIdx: number }>({
+  noteId: '',
+  rowIdx: 0,
+  colIdx: 0,
+})
+
+function onDeCtxOpenCellTrace() {
+  deCtx.closeContextMenu()
+  const note = currentNote.value
+  if (!note?.id) {
+    ElMessage.warning('请先选择附注章节')
+    return
+  }
+  const sel = deCtx.selectedCells.value[0]
+  if (!sel) {
+    ElMessage.warning('请先选中一个单元格')
+    return
+  }
+  cellTraceCtx.noteId = String(note.id)
+  cellTraceCtx.rowIdx = sel.row
+  cellTraceCtx.colIdx = sel.col
+  showCellTrace.value = true
+}
+
+function onCellTracePenetrateTb(payload: { account_code: string }) {
+  if (!payload?.account_code) return
+  showCellTrace.value = false
+  penetrate.toTB(payload.account_code)
 }
 
 function onCellDetailNavigate(uri: string) {

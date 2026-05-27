@@ -1159,3 +1159,101 @@ def register_event_handlers() -> None:
 
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_i_rd_reverse_backfill)
     logger.info("I-F8: I2/I6 RD reverse backfill event handler registered")
+
+    # ------------------------------------------------------------------
+    # Sprint 2 Task 2.5: DisclosureNote 联动 — 3 新事件订阅 (R2.1)
+    #
+    # Spec: .kiro/specs/disclosure-note-full-revamp/ Sprint 2 Task 2.5
+    # Design: D6 联动机制 EventBus 订阅表
+    #
+    # 现状（grep 实测）：
+    #   - LEDGER_DATASET_ROLLED_BACK 已有 _mark_downstream_stale_on_rollback
+    #     handler（F46/Sprint 7.22），本 spec **不动**
+    #   - WORKPAPER_REVIEWED / ADJUSTMENT_APPROVED 在 EventType 中**不存在**
+    #     → 改订阅最接近的现有事件：
+    #       · WORKPAPER_REVIEW_PASSED  （Sprint 10 已有定义；语义最接近）
+    #       · ADJUSTMENT_BATCH_COMMITTED（Enterprise Linkage Sprint 已有）
+    #
+    # 行为：3 个事件共用通用 stale handler — 把 project_id+year 维度
+    # 全部 DisclosureNote.is_stale=True（与现有 rollback 规则一致）。
+    # ------------------------------------------------------------------
+
+    async def _mark_disclosure_notes_stale_for_project_year(
+        payload: EventPayload, *, source_event: str,
+    ) -> None:
+        """通用 helper：把 (project_id, year) 范围内全部附注标 is_stale=True.
+
+        与 _mark_downstream_stale_on_rollback 一致 — 写 update + commit；
+        失败不阻断事件链（参考 F46 模式）。
+        """
+        import sqlalchemy as _sa
+        from app.models.report_models import DisclosureNote
+
+        project_id = payload.project_id
+        year = payload.year
+        if project_id is None or year is None:
+            return
+        async with async_session_factory() as session:
+            try:
+                await session.execute(
+                    _sa.update(DisclosureNote)
+                    .where(
+                        DisclosureNote.project_id == project_id,
+                        DisclosureNote.year == year,
+                        DisclosureNote.is_deleted == False,  # noqa: E712
+                    )
+                    .values(is_stale=True)
+                )
+                await session.commit()
+                logger.info(
+                    "[Sprint2-Task2.5/%s] DisclosureNote marked stale "
+                    "for project=%s year=%s",
+                    source_event, project_id, year,
+                )
+            except Exception:  # pragma: no cover — 失败不阻断
+                await session.rollback()
+                logger.warning(
+                    "[Sprint2-Task2.5/%s] mark stale failed for "
+                    "project=%s year=%s",
+                    source_event, project_id, year,
+                    exc_info=True,
+                )
+
+    async def on_event_ledger_activated(payload: EventPayload) -> None:
+        """LEDGER_DATASET_ACTIVATED → 全部 DisclosureNote.is_stale=True (R2.1).
+
+        语义：账套激活后试算表全量刷新，附注下游视为陈旧。
+        """
+        await _mark_disclosure_notes_stale_for_project_year(
+            payload, source_event="LEDGER_DATASET_ACTIVATED",
+        )
+
+    async def on_event_workpaper_reviewed(payload: EventPayload) -> None:
+        """WORKPAPER_REVIEW_PASSED → 全部 DisclosureNote.is_stale=True (R2.1).
+
+        语义：底稿复核通过 — 审定数已变化，附注需重算（D6 表第 2 行）。
+        实际订阅事件名：WORKPAPER_REVIEW_PASSED（spec 设计名 WORKPAPER_REVIEWED
+        在 EventType 中不存在，订阅最接近的语义事件）。
+        """
+        await _mark_disclosure_notes_stale_for_project_year(
+            payload, source_event="WORKPAPER_REVIEW_PASSED",
+        )
+
+    async def on_event_adjustment_approved(payload: EventPayload) -> None:
+        """ADJUSTMENT_BATCH_COMMITTED → 全部 DisclosureNote.is_stale=True (R2.1).
+
+        语义：调整分录批量提交 — 试算表+报表已变化，附注下游视为陈旧。
+        实际订阅事件名：ADJUSTMENT_BATCH_COMMITTED（spec 设计名 ADJUSTMENT_APPROVED
+        在 EventType 中不存在，订阅最接近的语义事件）。
+        """
+        await _mark_disclosure_notes_stale_for_project_year(
+            payload, source_event="ADJUSTMENT_BATCH_COMMITTED",
+        )
+
+    event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, on_event_ledger_activated)
+    event_bus.subscribe(EventType.WORKPAPER_REVIEW_PASSED, on_event_workpaper_reviewed)
+    event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, on_event_adjustment_approved)
+    logger.info(
+        "Sprint 2 Task 2.5: 3 DisclosureNote stale event handlers registered "
+        "(LEDGER_DATASET_ACTIVATED / WORKPAPER_REVIEW_PASSED / ADJUSTMENT_BATCH_COMMITTED)"
+    )

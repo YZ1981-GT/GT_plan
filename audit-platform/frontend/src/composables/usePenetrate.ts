@@ -32,6 +32,14 @@ export function usePenetrate() {
       })
     },
 
+    /** 穿透到试算表（按科目编码） — Sprint 2 Task 2.4 CellTrace 使用 */
+    toTB(accountCode: string) {
+      router.push({
+        path: `/projects/${pid()}/trial-balance`,
+        query: { code: accountCode, year: String(year()) },
+      })
+    },
+
     /** 穿透到底稿（按底稿编码） */
     toWorkpaper(wpCode: string) {
       router.push({

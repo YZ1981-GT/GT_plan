@@ -109,6 +109,51 @@ async def get_validation_results(
     return NoteValidationResponse.model_validate(result)
 
 
+# ---------------------------------------------------------------------------
+# Sprint 2 Task 2.3 — CellTrace 溯源链端点（R3.1 验收 22）
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{note_id}/cells/{row_idx}/{col_idx}/trace")
+async def trace_cell(
+    note_id: UUID,
+    row_idx: int,
+    col_idx: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """单元格溯源：返回 binding 元数据 + 公式展开 + 命中数据行采样.
+
+    Spec:   .kiro/specs/disclosure-note-full-revamp/ Sprint 2 Task 2.3
+    Design: D5 CellTrace 溯源链 端点 schema
+    Reqs:   R3.1 验收 22
+
+    返回示例：
+    ```json
+    {
+      "binding": {"source": "trial_balance", "field": "audited_amount",
+                  "account_codes": ["1601","1602"], "agg": "sum"},
+      "formula_resolved": "=SUM(TB('1601','audited_amount'), TB('1602','audited_amount'))",
+      "computed_value": 1234.56,
+      "evidence": {
+        "trial_balance_rows": [{"account_code": "1601", "audited": 600.0, ...}],
+        "ledger_sample": [],
+        "aux_balance_sample": []
+      },
+      "computed_at": "2026-..."
+    }
+    ```
+
+    错误语义（始终 200 + ``error`` 字段，前端友好降级）：
+      - ``note_not_found``           — note_id 不存在
+      - ``cell_index_out_of_range``  — row_idx / col_idx 越界
+      - ``no_binding``               — cell_meta 缺 binding_id
+      - ``binding_not_found``        — 反查 binding 失败
+    """
+    engine = DisclosureEngine(db)
+    return await engine.trace_cell(note_id, row_idx, col_idx)
+
+
 @router.get("/{project_id}/{year}/{note_section}/prior-year")
 async def get_prior_year_note(
     project_id: UUID,

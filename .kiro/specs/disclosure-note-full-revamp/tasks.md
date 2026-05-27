@@ -153,17 +153,17 @@
   - `fmt_amount_gt(val)` 空值/零值留白
   - `add_landscape_section(doc)` 章节级横向
 
-- [ ] **2.3** CellTrace 后端端点（R3）
+- [x] **2.3** CellTrace 后端端点（R3）
   - `GET /api/disclosure-notes/{note_id}/cells/{row_idx}/{col_idx}/trace`
   - `disclosure_engine.trace_cell` 实现：binding 反查 + 公式展开 + 证据数据采样（≤ 100 行）
   - 单测：`test_note_cell_trace.py` ≥ 5 用例
 
-- [ ] **2.4** CellTraceDialog.vue 前端组件（R3）
+- [x] **2.4** CellTraceDialog.vue 前端组件（R3）
   - 三栏布局：左 binding 元数据，中 公式展开，右 命中数据行
   - 点击数据行 emit `penetrate-to-tb` → 跳 TrialBalance 页面
   - DisclosureEditor.vue 右键菜单"溯源"打开
 
-- [ ] **2.5** EventBus 订阅 3 类**新增**事件（R2.1）
+- [x] **2.5** EventBus 订阅 3 类**新增**事件（R2.1）
   - 现状：`event_handlers._mark_downstream_stale_on_rollback` 已订阅 `LEDGER_DATASET_ROLLED_BACK`，本 spec **不动**
   - 本 spec 新增 3 个 handler：
     - `disclosure_engine.on_event_ledger_activated`
@@ -175,15 +175,15 @@
   - 11 项断言：字体 / 字号 / 章节缩进 / 段落间距 / 三线表磅数 / 行高 / 留白 / 标题行不重复 / 页眉 / 页边距
   - 每个断言用 OOXML 解析（不依赖人眼）
 
-- [ ] **2.7** 多表 + 多层表头集成测试
+- [x] **2.7** 多表 + 多层表头集成测试
   - 应收票据 12 张表全部出现
   - 固定资产变动表"本期增加→购置/在建转入"二级表头正确合并
 
-- [ ] **2.8** 文档 ADR-008 + ADR-009
+- [x] **2.8** 文档 ADR-008 + ADR-009
   - ADR-008: Note cell mode persistence (auto/manual/locked)
   - ADR-009: GT Word template style namespace (GTNote*)
 
-- [ ] **2.9** Sprint 2 验收
+- [x] **2.9** Sprint 2 验收
   - 11 项视觉断言全绿
   - CellTraceDialog 端到端 Playwright 测试通过
   - CI 卡点：docx 样式名 grep `GTNote*` 前缀
