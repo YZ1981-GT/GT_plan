@@ -15,10 +15,11 @@
         </el-button>
       </div>
 
-      <el-skeleton :loading="loading" :rows="6" animated>
-        <template #default>
-          <!-- 操作手册 -->
-          <el-collapse v-model="activeNames">
+      <!-- 首次加载用 skeleton 占位；后续 refetch 用 v-loading 蒙层（避免内容跳变） -->
+      <el-skeleton v-if="loading && !hasLoaded" :rows="6" animated />
+      <div v-else v-loading="loading" class="sidebar-body">
+        <!-- 操作手册 -->
+        <el-collapse v-model="activeNames">
             <el-collapse-item title="📖 底稿操作手册" name="manual" v-if="data.manual">
               <div class="manual-content">{{ data.manual }}</div>
             </el-collapse-item>
@@ -106,8 +107,7 @@
             description="暂无程序要求数据"
             :image-size="60"
           />
-        </template>
-      </el-skeleton>
+      </div>
     </div>
   </div>
 </template>
@@ -130,6 +130,8 @@ const props = defineProps<{
 // ─── State ───
 const route = useRoute()
 const loading = ref(false)
+/** 首次加载标志：用于区分初次 skeleton 与后续 refetch v-loading（避免内容跳变） */
+const hasLoaded = ref(false)
 const STORAGE_KEY = 'wp_sidebar_collapsed'
 
 const isCollapsed = ref(false)
@@ -227,6 +229,7 @@ async function fetchRequirements() {
     console.warn('[ProgramRequirementsSidebar] 加载失败:', e?.message)
   } finally {
     loading.value = false
+    hasLoaded.value = true
   }
 }
 

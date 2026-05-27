@@ -198,3 +198,29 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §120. MT-8 日志集中查看（admin only） ═══
     from app.routers.logs_viewer import router as logs_viewer_router
     app.include_router(logs_viewer_router, tags=["admin-logs"])
+
+    # ═══ §121. V3 Req 1: 归档项目例外通道 ═══
+    from app.routers.archived_exception import router as archived_exception_router
+    from app.routers.archived_exception import unarchive_router
+    app.include_router(archived_exception_router, tags=["归档例外通道"])
+    app.include_router(unarchive_router, tags=["归档例外通道"])
+
+    # ═══ §122. V3 Req 6.5: AI 内容溯源（pending / confirm / revise / reject） ═══
+    from app.routers.ai_content import router as ai_content_router
+    app.include_router(ai_content_router, tags=["AI 内容溯源"])
+
+    # ═══ §123. V3 Req 7.4: 跨模块冲突调解（list_pending / list / resolve） ═══
+    from app.routers.cross_module_conflicts import router as cross_module_conflicts_router
+    app.include_router(cross_module_conflicts_router, tags=["跨模块冲突调解"])
+
+    # ═══ §124. V3 Req 9.2: 数据信任度聚合查询 ═══
+    from app.routers.trust_score import router as trust_score_router
+    app.include_router(trust_score_router, tags=["数据信任度"])
+
+    # ═══ §125. V3 Req 10.2: 可解释状态机 ═══
+    from app.routers.status_machine import router as status_machine_router
+    app.include_router(status_machine_router, tags=["可解释状态机"])
+
+    # ═══ §126. V3 Req 11.3: 时光机自动快照 ═══
+    from app.routers.time_machine import router as time_machine_router
+    app.include_router(time_machine_router, tags=["时光机"])

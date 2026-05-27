@@ -66,8 +66,8 @@
 
     <!-- 新建评价弹窗 -->
     <el-dialog append-to-body v-model="showEvalDialog" title="新建持续经营评价" width="650px">
-      <el-form :model="evalForm" label-width="130px">
-        <el-form-item label="管理层评价" required>
+      <el-form ref="evalFormRef" :model="evalForm" :rules="evalRules" label-width="130px">
+        <el-form-item label="管理层评价" prop="management_evaluation" required>
           <el-input
             v-model="evalForm.management_evaluation"
             type="textarea"
@@ -75,7 +75,7 @@
             placeholder="管理层对持续经营能力的评价"
           />
         </el-form-item>
-        <el-form-item label="审计师评价" required>
+        <el-form-item label="审计师评价" prop="auditor_evaluation" required>
           <el-input
             v-model="evalForm.auditor_evaluation"
             type="textarea"
@@ -83,7 +83,7 @@
             placeholder="审计师对持续经营能力的独立评价"
           />
         </el-form-item>
-        <el-form-item label="结论类型" required>
+        <el-form-item label="结论类型" prop="conclusion_type" required>
           <el-select v-model="evalForm.conclusion_type" placeholder="请选择结论" style="width: 100%">
             <el-option label="无重大不确定性" value="NO_ISSUES" />
             <el-option label="存在缓解因素" value="MITIGATING_FACTORS" />
@@ -110,8 +110,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { goingConcernApi } from '@/services/collaborationApi'
+import { rules } from '@/utils/formRules'
 
 const projectId = 'current-project-id'
 const gcId = ref('')
@@ -119,6 +121,7 @@ const gcId = ref('')
 const activeTab = ref('indicators')
 const showEvalDialog = ref(false)
 const readonly = ref(false)
+const evalFormRef = ref<FormInstance>()
 
 const indicators = ref<any[]>([])
 const evaluations = ref<any[]>([])
@@ -129,6 +132,12 @@ const evalForm = ref({
   conclusion_type: '',
   report_impact: '',
 })
+
+const evalRules: FormRules = {
+  management_evaluation: [rules.required('管理层评价')],
+  auditor_evaluation: [rules.required('审计师评价')],
+  conclusion_type: [rules.required('结论类型', 'change')],
+}
 
 const completionRate = computed(() => {
   if (indicators.value.length === 0) return 0

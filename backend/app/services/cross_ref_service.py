@@ -4,7 +4,7 @@
   保存时比较 old vs new html_data 中被其他底稿引用的 cell 值，
   检测是否有跨底稿引用变化，若有则通知 SSE 订阅方刷新。
 
-Requirements: 3.11.4（跨底稿引用传播）+ 3.11.5 + 3.11.6
+Requirements: 3.11.4（跨底稿引用传播）+ 3.11.5 + 3.11.6 + Req 7（manual_override 保护）
 """
 
 from __future__ import annotations
@@ -12,13 +12,16 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
 from app.models.workpaper_models import WpCrossRef, WpIndex
+from app.services.conflict_resolution_service import (
+    _check_manual_override_before_propagate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +165,88 @@ class CrossRefService:
         result = await db.execute(query)
         row = result.scalar_one_or_none()
         return row
+
+    @staticmethod
+    def _detect_target_manual_override(
+        target_workpaper: Any,
+        target_field: str | None = None,
+    ) -> bool:
+        """从目标 ``WorkingPaper`` 实例中识别 ``manual_override`` 标记。
+
+        约定 lookup 顺序（任一为 True 即视为 manual_override）：
+          1. ``target_workpaper.parsed_data['_manual_override_cells']`` 列表/集合，
+              其中包含 ``target_field`` 时视为 True
+          2. ``target_workpaper.parsed_data['_manual_override']`` 顶层布尔
+          3. 没有 parsed_data 或字段缺失 → False（默认 allow）
+        """
+        parsed = getattr(target_workpaper, "parsed_data", None)
+        if not isinstance(parsed, dict):
+            return False
+        if parsed.get("_manual_override") is True:
+            return True
+        cells = parsed.get("_manual_override_cells")
+        if isinstance(cells, (list, set, tuple)):
+            if target_field is not None and target_field in cells:
+                return True
+        return False
+
+    async def propagate_with_manual_override_check(
+        self,
+        *,
+        db: AsyncSession,
+        project_id: UUID,
+        source_wp_id: UUID,
+        change: CrossRefChange,
+        target_workpaper: Any,
+        current_value: str | None,
+        new_value: str | None,
+        user_id: UUID | None,
+        propagation_origin: Literal["user_edit", "system_recompute"] = "user_edit",
+    ) -> Literal["allow", "block_enqueued", "auto_resolved"]:
+        """跨底稿引用联动写入前置守卫（Req 7 AC 1/2/6/7）。
+
+        参数:
+            db: 异步数据库会话
+            project_id: 所属项目 UUID
+            source_wp_id: 上游底稿 UUID（``CrossRefChange`` 只带 wp_code，由调用方解析后传入）
+            change: ``detect_changes`` 返回的引用变更项
+            target_workpaper: 目标 ``WorkingPaper`` ORM 实例（用于读 parsed_data 中的
+                ``_manual_override`` / ``_manual_override_cells`` 标记）
+            current_value: 目标当前手工值（用于审计 manual_value）
+            new_value: 上游变更后的新值（用于审计 upstream_value）
+            user_id: 触发上游变更的用户 UUID（system_recompute 时可为 None）
+            propagation_origin: 'user_edit' / 'system_recompute'
+
+        返回:
+            - 'allow':           调用方继续写入 target_workpaper
+            - 'block_enqueued':  调用方必须 abort 写入（已 enqueue 待调解冲突）
+            - 'auto_resolved':   调用方可继续写入（已 auto_resolve 留痕）
+
+        约定字段 lookup 详见 ``_detect_target_manual_override``。
+        """
+        target_field = change.target_cell or change.target_sheet or "value"
+        is_manual_override = self._detect_target_manual_override(
+            target_workpaper, target_field=target_field
+        )
+        target_id_attr = getattr(target_workpaper, "id", None)
+        if not isinstance(target_id_attr, UUID):
+            raise ValueError(
+                "target_workpaper.id 必须是 UUID 实例（无法识别 manual_override 写入路径）"
+            )
+        return await _check_manual_override_before_propagate(
+            db=db,
+            project_id=project_id,
+            source_module="workpaper",
+            source_id=source_wp_id,
+            target_module="workpaper",
+            target_id=target_id_attr,
+            target_field=target_field,
+            new_value=new_value,
+            current_value=current_value,
+            is_manual_override=is_manual_override,
+            user_id=user_id,
+            propagation_origin=propagation_origin,
+        )
 
 
 # 单例

@@ -314,10 +314,11 @@
       <el-form
         ref="saveFormRef"
         :model="saveForm"
+        :rules="saveRules"
         label-width="80px"
         size="small"
       >
-        <el-form-item label="名称" required>
+        <el-form-item label="名称" prop="name" required>
           <el-input v-model="saveForm.name" placeholder="如 应收账款明细查询" />
         </el-form-item>
         <el-form-item label="说明">
@@ -425,6 +426,10 @@ const saveForm = ref({
   description: '',
   scope: 'private' as 'private' | 'global',
 })
+
+const saveRules = {
+  name: [{ required: true, message: '请输入模板名称', trigger: 'blur' }],
+}
 
 const operatorOptions = [
   { label: '等于 (=)', value: 'eq' },

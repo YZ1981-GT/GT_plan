@@ -179,7 +179,7 @@
                 </template>
               </el-table-column>
               <el-table-column prop="opening_balance" label="年初账面余额" min-width="120" align="right">
-                <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.opening_balance) }}</span></template>
+                <template #default="{ row }"><GtAmountCell :value="row.opening_balance" /></template>
               </el-table-column>
               <el-table-column label="本期增加额">
                 <el-table-column prop="provision" label="本期计提额" min-width="110" align="right">
@@ -192,7 +192,7 @@
                   <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.other_add) }}</span></template>
                 </el-table-column>
                 <el-table-column prop="add_total" label="合计" min-width="100" align="right">
-                  <template #default="{ row }"><span class="gt-amt" style="font-weight:600">{{ fmtAmt(row.add_total) }}</span></template>
+                  <template #default="{ row }"><GtAmountCell :value="row.add_total" style="font-weight:600" /></template>
                 </el-table-column>
               </el-table-column>
               <el-table-column label="本期减少额">
@@ -209,11 +209,11 @@
                   <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.other_dec) }}</span></template>
                 </el-table-column>
                 <el-table-column prop="dec_total" label="合计" min-width="100" align="right">
-                  <template #default="{ row }"><span class="gt-amt" style="font-weight:600">{{ fmtAmt(row.dec_total) }}</span></template>
+                  <template #default="{ row }"><GtAmountCell :value="row.dec_total" style="font-weight:600" /></template>
                 </el-table-column>
               </el-table-column>
               <el-table-column prop="closing_balance" label="期末账面余额" min-width="120" align="right">
-                <template #default="{ row }"><span class="gt-amt" style="font-weight:700">{{ fmtAmt(row.closing_balance) }}</span></template>
+                <template #default="{ row }"><GtAmountCell :value="row.closing_balance" style="font-weight:700" /></template>
               </el-table-column>
             </el-table>
           </div>
@@ -333,7 +333,7 @@
           <el-table-column prop="company_code" label="企业代码" width="180" />
           <el-table-column prop="amount" label="金额" width="150" align="right">
             <template #default="{ row }">
-              <span :style="{ color: row.amount < 0 ? '#f56c6c' : '' }">{{ fmtAmt(row.amount) }}</span>
+              <GtAmountCell :value="row.amount" />
             </template>
           </el-table-column>
           <el-table-column prop="ratio" label="占比" width="90" align="right">
@@ -353,7 +353,7 @@
           <el-table-column prop="parent_name" label="上级单位" width="160" />
           <el-table-column prop="amount" label="金额" width="150" align="right">
             <template #default="{ row }">
-              <span :style="{ color: row.amount < 0 ? '#f56c6c' : '' }">{{ fmtAmt(row.amount) }}</span>
+              <GtAmountCell :value="row.amount" />
             </template>
           </el-table-column>
           <el-table-column prop="ratio" label="占比" width="90" align="right">
@@ -436,6 +436,7 @@ import type { ConsolTreeSelectPayload, ConsolCatalogSelectPayload, ConsolRefresh
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 

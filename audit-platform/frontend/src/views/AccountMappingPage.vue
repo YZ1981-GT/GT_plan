@@ -71,14 +71,14 @@
 
     <!-- 手动编辑对话框 -->
     <el-dialog v-model="editDialogVisible" title="编辑科目映射" width="500px" destroy-on-close>
-      <el-form :model="editForm" label-width="120px">
+      <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="120px">
         <el-form-item label="客户科目编码">
           <el-input :model-value="editForm.original_account_code" disabled />
         </el-form-item>
         <el-form-item label="客户科目名称">
           <el-input :model-value="editForm.original_account_name" disabled />
         </el-form-item>
-        <el-form-item label="标准科目编码">
+        <el-form-item label="标准科目编码" prop="standard_account_code">
           <el-input v-model="editForm.standard_account_code" placeholder="输入标准科目编码" />
         </el-form-item>
       </el-form>
@@ -93,11 +93,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { accountMapping } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import { rules } from '@/utils/formRules'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string || route.params.id as string)
@@ -111,12 +113,16 @@ const totalCount = ref(0)
 const mappedCount = ref(0)
 
 const editDialogVisible = ref(false)
+const editFormRef = ref<FormInstance>()
 const editForm = ref({
   id: '',
   original_account_code: '',
   original_account_name: '',
   standard_account_code: '',
 })
+const editRules: FormRules = {
+  standard_account_code: [rules.required('标准科目编码')],
+}
 
 const filteredMappings = computed(() => mappings.value)
 

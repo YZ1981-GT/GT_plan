@@ -1,4 +1,27 @@
 <template>
+  <!-- 归档横幅 -->
+  <ArchivedBanner />
+
+  <!-- AI 内容 pending 顶部 banner（spec global-refinement-v3 Task 6.4） -->
+  <AiContentPendingBanner :project-id="projectId" />
+
+  <!-- 跨模块冲突 banner（spec global-refinement-v3 Task 7.5） -->
+  <ConflictBanner :project-id="projectId" @view="conflictPanelVisible = true" />
+  <ConflictResolutionPanel
+    v-model="conflictPanelVisible"
+    :project-id="projectId"
+    @resolved="onConflictResolved"
+  />
+
+  <!-- V3 Req 9.6: 数字信任度面板 -->
+  <TrustScorePanel ref="trustScorePanelRef" :project-id="projectId" />
+
+  <!-- V3 Req 10.4: 可解释状态机面板 -->
+  <StatusMachinePanel ref="smPanelRef" module="workpaper" :instance-id="wpId" />
+
+  <!-- V3 Req 11.6: 时光机面板 -->
+  <TimeMachineDrawer ref="tmDrawerRef" module="workpaper" :instance-id="wpId" @restored="onTimeMachineRestored" />
+
   <!-- spec workpaper-html-renderer Task 13.1: HTML 渲染器路由分发（A/B/C/D/E/H/skip）
        优先级最高：HTML 类（1346 sheet）走 GtWpRenderer，保留 F/G Univer + form/word/table/hybrid 子编辑器走既有路径 -->
   <GtWpRenderer
@@ -89,6 +112,8 @@
             type="primary"
             @click="onSave"
             :loading="saving"
+            :disabled="!canEdit"
+            :title="!canEdit ? '项目已归档，无法编辑' : ''"
           >💾 保存</el-button>
           <el-tooltip
             placement="bottom"
@@ -113,7 +138,8 @@
               type="warning"
               @click="onSubmitForReview"
               :loading="submitting"
-              :disabled="dirty"
+              :disabled="!canEdit || dirty"
+              :title="!canEdit ? '项目已归档，无法编辑' : ''"
             >⚠️ 提交复核 ({{ fineCheckFailCount }})</el-button>
           </el-tooltip>
           <el-button
@@ -122,7 +148,8 @@
             type="success"
             @click="onSubmitForReview"
             :loading="submitting"
-            :disabled="dirty"
+            :disabled="!canEdit || dirty"
+            :title="!canEdit ? '项目已归档，无法编辑' : ''"
           >📨 提交复核</el-button>
         </el-button-group>
 
@@ -844,24 +871,24 @@
 
     <!-- Task 2.4: Review mark dialog -->
     <el-dialog v-model="showReviewDialog" title="✓ 标记复核" width="400" append-to-body>
-      <el-form label-width="70px">
+      <el-form ref="reviewMarkFormRef" :model="reviewMarkFormModel" :rules="reviewMarkRules" label-width="70px">
         <el-form-item label="单元格">
           <span>{{ reviewDialogCell.sheet }}!{{ reviewDialogCell.cellRef }}</span>
         </el-form-item>
-        <el-form-item label="状态">
+        <el-form-item label="状态" prop="status">
           <el-radio-group v-model="reviewDialogStatus">
             <el-radio value="reviewed">已复核</el-radio>
             <el-radio value="pending">待确认</el-radio>
             <el-radio value="questioned">有疑问</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="reviewDialogComment" type="textarea" :rows="3" placeholder="可选：输入复核意见" />
+        <el-form-item label="备注" prop="comment">
+          <el-input v-model="reviewDialogComment" type="textarea" :rows="3" placeholder="可选：输入复核意见，有疑问时必填" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showReviewDialog = false">取消</el-button>
-        <el-button type="primary" @click="onMarkReview">确认标记</el-button>
+        <el-button type="primary" @click="onMarkReview" :loading="reviewMarkSubmitting">确认标记</el-button>
       </template>
     </el-dialog>
 
@@ -934,7 +961,9 @@ import { ref, computed, onMounted, onUnmounted, watch, defineAsyncComponent } fr
 import { useRoute, useRouter } from 'vue-router'
 import { onBeforeRouteLeave } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import { confirmSubmitReview, confirmLeave, confirmVersionConflict } from '@/utils/confirm'
+import { useFormSubmit } from '@/composables/useFormSubmit'
 import { Loading } from '@element-plus/icons-vue'
 import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets'
 import { UniverSheetsCorePreset } from '@univerjs/preset-sheets-core'
@@ -1002,6 +1031,15 @@ import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
 import { WP_STATUS } from '@/constants/statusEnum'
 import { handleApiError } from '@/utils/errorHandler'
+import { logger } from '@/utils/logger'
+import { useAuditContext } from '@/composables/useAuditContext'
+import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
+import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
+import ConflictBanner from '@/components/conflict/ConflictBanner.vue'
+import ConflictResolutionPanel from '@/components/conflict/ConflictResolutionPanel.vue'
+import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
+import StatusMachinePanel from '@/components/status_machine/StatusMachinePanel.vue'
+import TimeMachineDrawer from '@/components/time_machine/TimeMachineDrawer.vue'
 
 // ─── 动态编辑器组件（按 component_type 路由分发） ───────────────────────────
 
@@ -1029,8 +1067,34 @@ const DIRTY_COMMAND_PATTERNS = [
 
 const route = useRoute()
 const router = useRouter()
+const { canEdit } = useAuditContext()
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
+
+// 跨模块冲突调解（spec global-refinement-v3 Task 7.5）
+const conflictPanelVisible = ref(false)
+function onConflictResolved(_id: string, _resolution: string) {
+  // 调解后 banner 自动从列表移除；此处保留 hook 供后续扩展（如局部 reload）
+}
+
+// V3 Req 9.6: 数字信任度
+const trustScorePanelRef = ref<InstanceType<typeof TrustScorePanel> | null>(null)
+
+// V3 Req 10.4: 可解释状态机
+const smPanelRef = ref<InstanceType<typeof StatusMachinePanel> | null>(null)
+function openStatusMachine() {
+  smPanelRef.value?.open()
+}
+
+// V3 Req 11.6: 时光机
+const tmDrawerRef = ref<InstanceType<typeof TimeMachineDrawer> | null>(null)
+function openTimeMachine() {
+  tmDrawerRef.value?.open()
+}
+function onTimeMachineRestored(_snap: any) {
+  // 恢复后重新加载底稿数据
+  window.location.reload()
+}
 
 // 核心数据 ref（必须在所有依赖它们的 computed/composable 调用前定义，否则触发 ReferenceError）
 const wpDetail = ref<WorkpaperDetail | null>(null)
@@ -1502,6 +1566,31 @@ const crossRefTags = ref<Array<{ id: string; label: string; color: string; x: nu
 const showReviewDialog = ref(false)
 const reviewDialogCell = ref<{ sheet: string; cellRef: string }>({ sheet: '', cellRef: '' })
 const reviewDialogComment = ref('')
+const reviewDialogStatus = ref<ReviewStatus>('reviewed')
+
+// V3 Req 3.3：标记复核表单校验 + 统一提交拦截
+const reviewMarkFormRef = ref<FormInstance>()
+const reviewMarkFormModel = computed(() => ({
+  status: reviewDialogStatus.value,
+  comment: reviewDialogComment.value,
+}))
+const reviewMarkRules = computed<FormRules>(() => ({
+  status: [{ required: true, message: '请选择复核状态', trigger: 'change' }],
+  comment: [
+    {
+      validator: (_rule: unknown, value: string | undefined, callback: (err?: Error) => void) => {
+        // 仅当状态为「有疑问」时强制要求填写备注
+        if (reviewDialogStatus.value === 'questioned' && !(value && value.trim())) {
+          callback(new Error('「有疑问」状态下必须填写备注'))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+}))
+const { submit: submitReviewMark, submitting: reviewMarkSubmitting } = useFormSubmit(reviewMarkFormRef)
 
 // Sprint 5.5: Cell formula detail dialog
 const showCellFormulaDetail = ref(false)
@@ -1519,7 +1608,6 @@ const hasAuditNav = computed(() => {
 })
 const cellDetailSheet = ref('')
 const cellDetailLabel = ref('')
-const reviewDialogStatus = ref<ReviewStatus>('reviewed')
 
 // Sprint 2.6: User override indicators
 const overrideIndicators = ref<Array<{ cellRef: string; sheet: string }>>([])
@@ -1704,10 +1792,10 @@ async function initUniver() {
       workbookData = jsonData
       loadedFromXlsx = true
       fileOpenedAt = Date.now() / 1000
-      console.info(`[WorkpaperEditor] xlsx-to-json loaded: ${Object.keys(jsonData.sheets).length} sheets`)
+      logger.log(`[WorkpaperEditor] xlsx-to-json loaded: ${Object.keys(jsonData.sheets).length} sheets`)
     }
   } catch (e: any) {
-    console.warn('[WorkpaperEditor] xlsx-to-json failed, trying univerData fallback:', e?.message || e)
+    logger.warn('[WorkpaperEditor] xlsx-to-json failed, trying univerData fallback:', e?.message || e)
   }
 
   // 2b. 降级：从后端加载 Univer JSON 数据（parsed_data 存储的 snapshot）
@@ -1777,7 +1865,7 @@ async function initUniver() {
     univerAPI.createWorkbook(workbookData)
   } else {
     // Final fallback: empty workbook（仅当后端也失败时）
-    console.error('[WorkpaperEditor] No workbook data available, creating empty workbook')
+    logger.error('[WorkpaperEditor] No workbook data available, creating empty workbook')
     univerAPI.createWorkbook({
       id: wpDetail.value.wp_code || 'wp',
       name: `${wpDetail.value.wp_code} ${wpDetail.value.wp_name}`,
@@ -1939,7 +2027,7 @@ async function onSave(): Promise<boolean> {
         }
         // If no export API available, just save the JSON snapshot (existing behavior below)
       } catch (e) {
-        console.warn('xlsx export failed (non-blocking):', e)
+        logger.warn('xlsx export failed (non-blocking):', e)
       }
     }
 
@@ -2016,7 +2104,7 @@ async function onSave(): Promise<boolean> {
         showStaleImpactPanel.value = true
       }
     } catch (e) {
-      console.warn('[stale-impact] notify failed (non-blocking):', e)
+      logger.warn('[stale-impact] notify failed (non-blocking):', e)
     }
 
     // 刷新版本信息
@@ -2245,19 +2333,21 @@ async function onMarkReview() {
   const { sheet, cellRef } = reviewDialogCell.value
   if (!sheet || !cellRef || !wpId.value) return
 
-  const mark = await reviewMarksComposable.createReviewMark(
-    wpId.value,
-    sheet,
-    cellRef,
-    reviewDialogStatus.value,
-    reviewDialogComment.value,
-  )
-  if (mark) {
-    ElMessage.success('复核标记已保存')
-    eventBus.emit('review-mark:changed', { projectId: projectId.value, wpId: wpId.value })
-  }
-  showReviewDialog.value = false
-  reviewDialogComment.value = ''
+  await submitReviewMark(async () => {
+    const mark = await reviewMarksComposable.createReviewMark(
+      wpId.value,
+      sheet,
+      cellRef,
+      reviewDialogStatus.value,
+      reviewDialogComment.value,
+    )
+    if (mark) {
+      ElMessage.success('复核标记已保存')
+      eventBus.emit('review-mark:changed', { projectId: projectId.value, wpId: wpId.value })
+    }
+    showReviewDialog.value = false
+    reviewDialogComment.value = ''
+  })
 }
 
 /** Task 2.6: Right-click "恢复预填充" */

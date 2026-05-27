@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -23,8 +23,30 @@ from app.models.report_models import (
     NoteStatus,
     SourceTemplate,
 )
+from app.services.conflict_resolution_service import (
+    _check_manual_override_before_propagate,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _detect_manual_override(table_data: dict[str, Any] | None) -> bool:
+    """读取 disclosure_note.table_data 中的 ``_manual_override`` 标记。
+
+    约定字段位置（任一为 True 即视为 manual_override）：
+      1. ``table_data['_manual_override']``           顶层标记
+      2. ``table_data['sub_table_data']['_manual_override']``  子表标记
+
+    无字段或不为 True 时返回 False（默认 allow，不影响既有写入路径）。
+    """
+    if not isinstance(table_data, dict):
+        return False
+    if table_data.get("_manual_override") is True:
+        return True
+    sub = table_data.get("sub_table_data")
+    if isinstance(sub, dict) and sub.get("_manual_override") is True:
+        return True
+    return False
 
 
 def _count_rows_synced(sub_table_data: dict[str, list[dict]] | None) -> int:
@@ -71,6 +93,7 @@ async def sync_from_workpaper(
     current_standard: str,
     user: User,
     year: int | None = None,
+    propagation_origin: Literal["user_edit", "system_recompute"] = "user_edit",
 ) -> dict[str, Any]:
     """C 类底稿 sheet 保存时，将 sub_table_data 同步到 disclosure_notes 模块对应 section。
 
@@ -79,13 +102,21 @@ async def sync_from_workpaper(
     - 已存在：更新 table_data（merge sub_table_data）+ 同步标记
     - 不存在：新建一条记录（status=draft，content_type=table）+ 同步标记
 
+    manual_override 守卫（Req 7 AC 1/2/6/7）：
+    - 如果目标 disclosure_note 当前 table_data 带有 ``_manual_override=True`` 标记，
+      调用 ``_check_manual_override_before_propagate`` hook：
+        * propagation_origin='user_edit'   → 入队 cross_module_conflict 并跳过 table_data 更新
+        * propagation_origin='system_recompute' → auto_resolve 留痕并继续写入
+    - 如果目标无 manual_override，正常写入（保持既有行为，不影响兼容性）
+
     Returns:
         {
             "success": True,
             "section_id": str,
             "synced_at": ISO timestamp,
             "rows_synced": int,
-            "created": bool,  # 本次是否新建（True=create，False=update）
+            "created": bool,             # 本次是否新建（True=create，False=update）
+            "blocked_by_manual_override": bool,  # 是否被 manual_override 拦截（True=table_data 未更新）
         }
     """
     if not section_id or not section_id.strip():
@@ -118,6 +149,7 @@ async def sync_from_workpaper(
     new_table_data["_last_sync_at"] = now.isoformat()
 
     created = False
+    blocked_by_manual_override = False
 
     if note is None:
         # ─── 新建 ─────────────────────────────────────────────────────
@@ -153,6 +185,45 @@ async def sync_from_workpaper(
         )
     else:
         # ─── 更新 ─────────────────────────────────────────────────────
+        # manual_override 守卫：写入前先看目标是否有 _manual_override 标记
+        is_manual_override = _detect_manual_override(note.table_data)
+        if is_manual_override:
+            decision = await _check_manual_override_before_propagate(
+                db=db,
+                project_id=project_id,
+                source_module="workpaper",
+                source_id=wp_id,
+                target_module="disclosure",
+                target_id=note.id,
+                target_field=f"sub_table_data.{section_id}",
+                new_value=sheet_name,  # 上游标识（具体值由 sub_table_data 表达，过长不入审计 details）
+                current_value=None,
+                is_manual_override=True,
+                user_id=user.id,
+                propagation_origin=propagation_origin,
+            )
+            if decision == "block_enqueued":
+                # 拦截：跳过 table_data 更新，仅记录 last_sync_at（说明同步已被尝试但被守卫拦下）
+                blocked_by_manual_override = True
+                note.last_sync_source = "workpaper"
+                note.last_sync_wp_id = wp_id
+                note.last_sync_at = now
+                note.last_sync_user_id = user.id
+                logger.info(
+                    "wp_disclosure_sync: BLOCKED by manual_override "
+                    "id=%s section=%s wp_id=%s",
+                    note.id, section_id, wp_id,
+                )
+                await db.commit()
+                return {
+                    "success": True,
+                    "section_id": section_id,
+                    "synced_at": now.isoformat(),
+                    "rows_synced": 0,
+                    "created": False,
+                    "blocked_by_manual_override": True,
+                }
+            # decision in ('auto_resolved', 'allow') → 继续走更新分支
         note.table_data = new_table_data
         note.last_sync_source = "workpaper"
         note.last_sync_wp_id = wp_id
@@ -174,4 +245,5 @@ async def sync_from_workpaper(
         "synced_at": now.isoformat(),
         "rows_synced": rows_synced,
         "created": created,
+        "blocked_by_manual_override": blocked_by_manual_override,
     }

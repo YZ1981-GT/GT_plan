@@ -58,11 +58,11 @@
 
     <!-- 新增自定义程序对话框 -->
     <el-dialog v-model="showAddDialog" title="新增自定义程序" width="400px" append-to-body>
-      <el-form label-width="80px">
-        <el-form-item label="描述">
+      <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="80px">
+        <el-form-item label="描述" prop="newDesc">
           <el-input v-model="newDesc" type="textarea" :rows="3" placeholder="请输入程序描述" />
         </el-form-item>
-        <el-form-item label="类别">
+        <el-form-item label="类别" prop="newCategory">
           <el-select v-model="newCategory" style="width: 100%">
             <el-option label="常规" value="routine" />
             <el-option label="自定义" value="custom" />
@@ -78,8 +78,8 @@
 
     <!-- 裁剪原因对话框 -->
     <el-dialog v-model="showTrimDialog" title="裁剪程序" width="400px" append-to-body>
-      <el-form label-width="80px">
-        <el-form-item label="裁剪原因">
+      <el-form ref="trimFormRef" :model="trimFormModel" :rules="trimRules" label-width="80px">
+        <el-form-item label="裁剪原因" prop="trimReason">
           <el-input v-model="trimReason" type="textarea" :rows="3" placeholder="请输入裁剪原因" />
         </el-form-item>
       </el-form>
@@ -92,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useProcedures, type Procedure } from '@/composables/useProcedures'
 import { ElMessage } from 'element-plus'
 
@@ -121,11 +121,21 @@ const {
 const showAddDialog = ref(false)
 const newDesc = ref('')
 const newCategory = ref('custom')
+const addFormRef = ref<any>(null)
+const addForm = computed(() => ({ newDesc: newDesc.value, newCategory: newCategory.value }))
+const addRules = {
+  newDesc: [{ required: true, message: '请输入程序描述', trigger: 'blur' }],
+}
 
 // 裁剪对话框
 const showTrimDialog = ref(false)
 const trimReason = ref('')
 const trimTarget = ref<Procedure | null>(null)
+const trimFormRef = ref<any>(null)
+const trimFormModel = computed(() => ({ trimReason: trimReason.value }))
+const trimRules = {
+  trimReason: [{ required: true, message: '请输入裁剪原因', trigger: 'blur' }],
+}
 
 const CATEGORY_LABELS: Record<string, string> = {
   routine: '常规程序',

@@ -39,7 +39,7 @@
     />
 
     <div class="gt-form-editor-body" v-loading="loading || guard.loading.value">
-      <el-empty v-if="!loading && !formSchema.length" description="暂无表单配置" />
+      <GtEmpty v-if="!loading && !formSchema.length" preset="no-data" title="暂无表单配置" />
       <el-form
         v-else
         ref="formRef"
@@ -103,6 +103,7 @@ import { workpapers as P_wp } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { useWpDetailGuard } from '@/composables/useWpDetailGuard'
 import type { WorkpaperDetail } from '@/services/workpaperApi'
+import GtEmpty from '@/components/common/GtEmpty.vue'
 
 interface FormField {
   key: string

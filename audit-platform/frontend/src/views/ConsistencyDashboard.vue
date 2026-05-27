@@ -69,10 +69,10 @@
         style="width: 100%"
         @row-click="onBreakageRowClick"
       >
-        <el-table-column prop="ref_id" label="Ref ID" width="100" />
-        <el-table-column prop="source_wp_code" label="Source" width="140" />
-        <el-table-column prop="target_wp_code" label="Target" width="140" />
-        <el-table-column label="Severity" width="120">
+        <el-table-column prop="ref_id" label="引用编号" width="100" />
+        <el-table-column prop="source_wp_code" label="来源" width="140" />
+        <el-table-column prop="target_wp_code" label="目标" width="140" />
+        <el-table-column label="严重程度" width="120">
           <template #default="{ row }">
             <el-tag :type="severityTagType(row.severity)" size="small">
               {{ row.severity }}

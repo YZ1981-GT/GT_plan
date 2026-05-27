@@ -108,12 +108,12 @@
                 <span class="gt-amt">{{ $index + 1 }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="value" label="value" min-width="180">
+            <el-table-column prop="value" label="枚举值" min-width="180">
               <template #default="{ row }">
                 <code class="gt-edt-value">{{ row.value }}</code>
               </template>
             </el-table-column>
-            <el-table-column prop="label" label="label" min-width="160" />
+            <el-table-column prop="label" label="显示名称" min-width="160" />
             <el-table-column label="预览" width="120" align="center">
               <template #default="{ row }">
                 <el-tag

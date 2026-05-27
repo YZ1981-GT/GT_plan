@@ -10,7 +10,7 @@
       <div class="gt-wizard-footer-spacer" />
       <el-button
         type="primary"
-        :loading="wizardStore.loading"
+        :loading="wizardStore.loading || submitting"
         @click="handleConfirm"
       >
         {{ wizardStore.projectId ? '确认' : '确认创建' }}
@@ -20,11 +20,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import type { FormInstance } from 'element-plus'
 import { useWizardStore } from '@/stores/wizard'
 import BasicInfoStep from '@/components/wizard/BasicInfoStep.vue'
+import { useFormSubmit } from '@/composables/useFormSubmit'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,9 +34,14 @@ const wizardStore = useWizardStore()
 
 type DataStepRef = {
   validate: () => Promise<Record<string, unknown> | null>
+  formRef: FormInstance | undefined | null
 }
 
 const basicInfoRef = ref<DataStepRef | null>(null)
+
+// V3 Req 3.3：通过 BasicInfoStep 暴露的 formRef 接入统一提交拦截
+const wizardFormRef = computed(() => basicInfoRef.value?.formRef ?? null)
+const { submit: submitWizard, submitting } = useFormSubmit(wizardFormRef)
 
 onMounted(async () => {
   // If editing an existing project, load wizard state
@@ -61,43 +68,45 @@ async function validateAndPersistCurrentStep(): Promise<boolean> {
 }
 
 async function handleConfirm() {
-  const ok = await validateAndPersistCurrentStep()
-  if (!ok) return
+  await submitWizard(async () => {
+    const ok = await validateAndPersistCurrentStep()
+    if (!ok) return
 
-  if (!wizardStore.projectId) {
-    // 新建项目引导
-    const { showGuide } = await import('@/composables/useWorkflowGuide')
-    const proceed = await showGuide(
-      'project_create',
-      '🏢 创建审计项目',
-      `<div style="line-height:1.8;font-size: var(--gt-font-size-sm)">
-        <p>项目创建后，建议按以下顺序开展工作：</p>
-        <ol style="padding-left:18px;margin:6px 0">
-          <li><b>导入账套数据</b> — 上传科目余额表和序时账</li>
-          <li><b>科目映射</b> — 将客户科目对应到标准科目</li>
-          <li><b>生成底稿</b> — 从模板库生成项目底稿</li>
-          <li><b>生成报表</b> — 根据试算表数据生成财务报表</li>
-          <li><b>编写附注</b> — 生成并编辑附注章节</li>
-        </ol>
-        <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">💡 每个步骤都有详细引导，可随时在项目详情页的快捷操作中进入</p>
-      </div>`,
-      '确认创建',
-    )
-    if (!proceed) return
-    ElMessage.success('项目创建成功')
-    wizardStore.reset()
-    router.push('/projects')
-    return
-  }
+    if (!wizardStore.projectId) {
+      // 新建项目引导
+      const { showGuide } = await import('@/composables/useWorkflowGuide')
+      const proceed = await showGuide(
+        'project_create',
+        '🏢 创建审计项目',
+        `<div style="line-height:1.8;font-size: var(--gt-font-size-sm)">
+          <p>项目创建后，建议按以下顺序开展工作：</p>
+          <ol style="padding-left:18px;margin:6px 0">
+            <li><b>导入账套数据</b> — 上传科目余额表和序时账</li>
+            <li><b>科目映射</b> — 将客户科目对应到标准科目</li>
+            <li><b>生成底稿</b> — 从模板库生成项目底稿</li>
+            <li><b>生成报表</b> — 根据试算表数据生成财务报表</li>
+            <li><b>编写附注</b> — 生成并编辑附注章节</li>
+          </ol>
+          <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">💡 每个步骤都有详细引导，可随时在项目详情页的快捷操作中进入</p>
+        </div>`,
+        '确认创建',
+      )
+      if (!proceed) return
+      ElMessage.success('项目创建成功')
+      wizardStore.reset()
+      router.push('/projects')
+      return
+    }
 
-  // 已有项目，确认保存
-  try {
-    await wizardStore.confirmProject()
-    ElMessage.success('项目保存成功')
-    router.push('/projects')
-  } catch {
-    // Error already handled by http interceptor
-  }
+    // 已有项目，确认保存
+    try {
+      await wizardStore.confirmProject()
+      ElMessage.success('项目保存成功')
+      router.push('/projects')
+    } catch {
+      // Error already handled by http interceptor
+    }
+  })
 }
 </script>
 

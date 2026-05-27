@@ -123,7 +123,7 @@
             {{ v.note || '规则更新' }}
           </el-timeline-item>
         </el-timeline>
-        <el-empty v-if="!versionHistory.length" description="暂无历史版本" />
+        <GtEmpty v-if="!versionHistory.length" preset="no-data" title="暂无历史版本" />
       </div>
     </el-drawer>
   </div>
@@ -135,6 +135,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getQcRule, updateQcRule, dryRunQcRule } from '@/services/qcRuleApi'
 import { handleApiError } from '@/utils/errorHandler'
+import GtEmpty from '@/components/common/GtEmpty.vue'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

@@ -173,6 +173,7 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   visible: boolean
@@ -272,7 +273,7 @@ async function onCalc() {
     const total = resp?.monthly_schedule?.length || 0
     ElMessage.success(`计算完成：${methodLabel(resp.method)}，共 ${total} 期`)
   } catch (e: any) {
-    ElMessage.error(e?.message || '折旧计算失败')
+    handleApiError(e, '折旧计算')
   } finally {
     loading.value = false
   }
@@ -310,7 +311,7 @@ async function onApplyToSheet() {
       ElMessage.warning('计算完成但未写回（applied_to_sheet 为空）')
     }
   } catch (e: any) {
-    ElMessage.error(e?.message || '采纳写回失败')
+    handleApiError(e, '采纳写回')
   } finally {
     applying.value = false
   }

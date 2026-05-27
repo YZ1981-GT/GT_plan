@@ -20,11 +20,11 @@
     </el-table>
 
     <el-dialog append-to-body v-model="showInvite" title="邀请成员" width="500px">
-      <el-form :model="inviteForm" label-width="100px">
-        <el-form-item label="用户名">
+      <el-form ref="inviteFormRef" :model="inviteForm" :rules="inviteRules" label-width="100px">
+        <el-form-item label="用户名" prop="username">
           <el-input v-model="inviteForm.username" />
         </el-form-item>
-        <el-form-item label="项目角色">
+        <el-form-item label="项目角色" prop="project_role">
           <el-select v-model="inviteForm.project_role">
             <el-option label="项目经理" value="manager" />
             <el-option label="审计员" value="auditor" />
@@ -49,13 +49,20 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { userApi } from '@/services/collaborationApi'
+import { rules } from '@/utils/formRules'
 
 const teamMembers = ref<any[]>([])
 const showInvite = ref(false)
 const inviteForm = ref({ username: '', project_role: 'auditor', assigned_cycles: [] as string[] })
+const inviteFormRef = ref<FormInstance>()
+const inviteRules: FormRules = {
+  username: [rules.required('用户名')],
+  project_role: [rules.required('项目角色', 'change')],
+}
 
 onMounted(async () => {
   try {

@@ -27,6 +27,7 @@ export interface NavigationEntry {
 }
 
 // Shared stack (singleton)
+export const MAX_STACK_DEPTH = 20
 const stack = ref<NavigationEntry[]>([])
 let _globalListenerInstalled = false
 let _router: Router | null = null
@@ -71,7 +72,13 @@ export function useNavigationStack() {
   const canGoBack = computed(() => stack.value.length > 0)
 
   function push(entry: NavigationEntry) {
-    stack.value = [...stack.value, entry]
+    const newStack = [...stack.value, entry]
+    // Enforce max depth: shift oldest entries if exceeded
+    if (newStack.length > MAX_STACK_DEPTH) {
+      stack.value = newStack.slice(newStack.length - MAX_STACK_DEPTH)
+    } else {
+      stack.value = newStack
+    }
   }
 
   function pop(): NavigationEntry | undefined {
@@ -105,5 +112,10 @@ export function useNavigationStack() {
     }
   }
 
-  return { push, pop, canGoBack, goBack, jumpTo, stack }
+  /** V3 Req 8.3: 清空导航栈 */
+  function clear() {
+    stack.value = []
+  }
+
+  return { push, pop, canGoBack, goBack, jumpTo, clear, stack }
 }

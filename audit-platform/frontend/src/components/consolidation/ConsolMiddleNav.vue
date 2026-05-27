@@ -51,11 +51,11 @@
 
     <!-- 添加企业弹窗 -->
     <el-dialog v-model="showAddDialog" title="添加合并范围企业" width="500px" append-to-body>
-      <el-form label-width="110px" size="small">
-        <el-form-item label="企业名称" required>
+      <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="110px" size="small">
+        <el-form-item label="企业名称" prop="name" required>
           <el-input v-model="addForm.name" placeholder="输入企业全称" />
         </el-form-item>
-        <el-form-item label="企业代码" required>
+        <el-form-item label="企业代码" prop="code" required>
           <el-input v-model="addForm.code" placeholder="如 91500000MA5UQXXX0X（统一社会信用代码）" />
         </el-form-item>
         <el-form-item label="上级单位">
@@ -109,10 +109,12 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { getConsolScope, getWorksheetTree } from '@/services/consolidationApi'
 import { eventBus } from '@/utils/eventBus'
 import * as P from '@/services/apiPaths'
+import { rules } from '@/utils/formRules'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -120,6 +122,11 @@ const loading = ref(false)
 const rawTree = ref<any[]>([])
 const showAddDialog = ref(false)
 const addForm = reactive({ name: '', code: '', parentName: '', parentCode: '', ultimateController: '', ultimateControllerCode: '', ratio: 0 })
+const addFormRef = ref<FormInstance>()
+const addRules: FormRules = {
+  name: [rules.required('企业名称')],
+  code: [rules.required('企业代码')],
+}
 const manualCompanies = ref<any[]>([])
 
 // 已有企业列表（用于上级单位下拉）

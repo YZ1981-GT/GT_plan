@@ -89,8 +89,8 @@
       :title="editingConfig ? '编辑抽样配置' : '新建抽样配置'"
       width="560px"
     >
-      <el-form :model="configForm" label-width="120px" size="small">
-        <el-form-item label="配置名称" required>
+      <el-form ref="configFormRef" :model="configForm" :rules="configRules" label-width="120px" size="small">
+        <el-form-item label="配置名称" prop="config_name" required>
           <el-input v-model="configForm.config_name" />
         </el-form-item>
         <el-form-item label="抽样类型">
@@ -153,11 +153,11 @@
       :title="editingRecord ? '编辑抽样记录' : '新建抽样记录'"
       width="560px"
     >
-      <el-form :model="recordForm" label-width="120px" size="small">
-        <el-form-item label="抽样目的" required>
+      <el-form ref="recordFormRef" :model="recordForm" :rules="recordRules" label-width="120px" size="small">
+        <el-form-item label="抽样目的" prop="sampling_purpose" required>
           <el-input v-model="recordForm.sampling_purpose" type="textarea" :rows="2" />
         </el-form-item>
-        <el-form-item label="总体描述" required>
+        <el-form-item label="总体描述" prop="population_description" required>
           <el-input v-model="recordForm.population_description" type="textarea" :rows="2" />
         </el-form-item>
         <el-form-item label="总体金额">
@@ -166,7 +166,7 @@
         <el-form-item label="总体数量">
           <el-input-number v-model="recordForm.population_total_count" :min="0" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="样本量" required>
+        <el-form-item label="样本量" prop="sample_size" required>
           <el-input-number v-model="recordForm.sample_size" :min="1" style="width: 100%" />
         </el-form-item>
         <el-form-item label="抽样方法说明">
@@ -192,6 +192,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { fmtAmount } from '@/utils/formatters'
@@ -205,6 +206,7 @@ import {
   updateSamplingRecord,
   musSamplingEvaluate,
 } from '@/services/workpaperApi'
+import { rules } from '@/utils/formRules'
 
 const props = defineProps<{
   projectId: string
@@ -218,6 +220,7 @@ const configs = ref<any[]>([])
 const showConfigDialog = ref(false)
 const editingConfig = ref<any>(null)
 const calculatedSize = ref<number | null>(null)
+const configFormRef = ref<FormInstance>()
 const configForm = ref({
   config_name: '',
   sampling_type: 'statistical',
@@ -230,12 +233,16 @@ const configForm = ref({
   population_amount: null as number | null,
   population_count: null as number | null,
 })
+const configRules: FormRules = {
+  config_name: [rules.required('配置名称')],
+}
 
 // --- Record state ---
 const records = ref<any[]>([])
 const showRecordDialog = ref(false)
 const editingRecord = ref<any>(null)
 const musResult = ref<any>(null)
+const recordFormRef = ref<FormInstance>()
 const recordForm = ref({
   sampling_purpose: '',
   population_description: '',
@@ -247,6 +254,11 @@ const recordForm = ref({
   misstatements_found: null as number | null,
   conclusion: '',
 })
+const recordRules: FormRules = {
+  sampling_purpose: [rules.required('抽样目的')],
+  population_description: [rules.required('总体描述')],
+  sample_size: [{ required: true, message: '请输入样本量', trigger: 'blur' }],
+}
 
 const methodLabel = (m: string) => {
   const map: Record<string, string> = {

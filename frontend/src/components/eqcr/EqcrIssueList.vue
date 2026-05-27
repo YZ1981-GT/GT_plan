@@ -114,6 +114,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface EqcrIssue {
   id: string
@@ -165,8 +166,8 @@ async function loadIssues() {
     const res = await axios.get(`/api/projects/${props.projectId}/eqcr-issues`)
     issues.value = res.data.items || []
     summary.value = res.data.summary || { open: 0, in_fix: 0, closed: 0 }
-  } catch {
-    ElMessage.error('加载问题单失败')
+  } catch (e: any) {
+    handleApiError(e, '加载问题单')
   }
 }
 
@@ -188,7 +189,7 @@ async function handleCreate() {
     // Reset form
     newIssue.value = { severity: '', category: '', title: '', description: '', wp_id: '' }
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '创建失败')
+    handleApiError(err, '创建问题单')
   }
 }
 
@@ -209,7 +210,7 @@ async function handleReply() {
     showReplyDialog.value = false
     replyContent.value = ''
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '回复失败')
+    handleApiError(err, '回复问题单')
   }
 }
 

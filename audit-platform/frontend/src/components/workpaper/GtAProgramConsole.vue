@@ -250,11 +250,11 @@
       width="480px"
       :close-on-click-modal="false"
     >
-      <el-form :model="trimForm" label-width="80px">
+      <el-form ref="trimFormRef" :model="trimForm" :rules="trimRules" label-width="80px">
         <el-form-item label="程序">
           <span>{{ trimForm.programDesc }}</span>
         </el-form-item>
-        <el-form-item label="理由" required>
+        <el-form-item label="理由" prop="reason" required>
           <el-input
             v-model="trimForm.reason"
             type="textarea"
@@ -284,11 +284,11 @@
       width="520px"
       :close-on-click-modal="false"
     >
-      <el-form :model="batchTrimForm" label-width="80px">
+      <el-form ref="batchTrimFormRef" :model="batchTrimForm" :rules="batchTrimRules" label-width="80px">
         <el-form-item label="选中程序">
           <span>共 {{ selectedIds.length }} 条程序</span>
         </el-form-item>
-        <el-form-item label="理由" required>
+        <el-form-item label="理由" prop="reason" required>
           <el-input
             v-model="batchTrimForm.reason"
             type="textarea"
@@ -399,12 +399,20 @@ const trimForm = ref({
   programDesc: '',
   reason: '',
 })
+const trimFormRef = ref<any>(null)
+const trimRules = {
+  reason: [{ required: true, message: '请输入裁剪理由', trigger: 'blur' }],
+}
 
 // Batch trim dialog
 const batchTrimDialogVisible = ref(false)
 const batchTrimForm = ref({
   reason: '',
 })
+const batchTrimFormRef = ref<any>(null)
+const batchTrimRules = {
+  reason: [{ required: true, message: '请输入批量裁剪理由', trigger: 'blur' }],
+}
 
 // Auto-save debounce
 let saveTimer: ReturnType<typeof setTimeout> | null = null

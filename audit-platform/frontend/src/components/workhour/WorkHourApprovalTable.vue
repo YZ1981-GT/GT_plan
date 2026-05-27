@@ -55,6 +55,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface ApprovalItem {
   entry_id: string
@@ -108,7 +109,7 @@ async function batchApprove() {
     selectedIds.value = []
     await loadData()
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '审批失败')
+    handleApiError(e, '审批工时')
   }
 }
 
@@ -125,7 +126,7 @@ async function batchReject() {
     showRejectDialog.value = false
     await loadData()
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '退回失败')
+    handleApiError(e, '退回工时')
   }
 }
 

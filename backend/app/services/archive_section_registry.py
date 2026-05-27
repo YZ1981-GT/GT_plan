@@ -287,3 +287,27 @@ register(
     _independence_generator,
     "独立性声明（R1 需求 10，R7 补完）",
 )
+
+
+# ---------------------------------------------------------------------------
+# V3 章节注册：AI 贡献明细（Req 6.6）
+# ---------------------------------------------------------------------------
+
+
+async def _ai_contributions_generator(
+    project_id: UUID, db: AsyncSession
+) -> bytes | Path | None:
+    """归档引擎调用：返回 AI 贡献明细报告文本字节。"""
+    from app.services.archive_generators.ai_contributions_generator import (
+        generate_ai_contributions_report,
+    )
+
+    return await generate_ai_contributions_report(project_id, db)
+
+
+register(
+    "05",
+    "05-AI贡献明细.txt",
+    _ai_contributions_generator,
+    "AI 贡献明细（V3 Req 6.6）",
+)

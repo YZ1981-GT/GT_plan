@@ -287,6 +287,7 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   visible: boolean
@@ -453,7 +454,7 @@ async function onAnalyze() {
     result.value = resp
     ElMessage.success(`分析完成：公允价值 ¥${formatAmount(resp.fair_value)}`)
   } catch (e: any) {
-    ElMessage.error(e?.message || '公允价值测试失败')
+    handleApiError(e, '公允价值测试')
   } finally {
     loading.value = false
   }
@@ -478,7 +479,7 @@ async function onApplyToSheet() {
       ElMessage.warning('分析完成但未写回（applied_to_sheet 为空）')
     }
   } catch (e: any) {
-    ElMessage.error(e?.message || '采纳写回失败')
+    handleApiError(e, '采纳写回')
   } finally {
     applying.value = false
   }

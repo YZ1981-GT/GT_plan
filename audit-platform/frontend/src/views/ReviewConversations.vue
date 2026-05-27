@@ -58,9 +58,9 @@
 
     <!-- 创建对话弹窗 -->
     <el-dialog append-to-body v-model="showCreateDialog" title="发起复核对话" width="480px">
-      <el-form label-width="80px">
-        <el-form-item label="标题"><el-input v-model="createForm.title" /></el-form-item>
-        <el-form-item label="对象类型">
+      <el-form ref="convFormRef" :model="createForm" :rules="convRules" label-width="80px">
+        <el-form-item label="标题" prop="title"><el-input v-model="createForm.title" /></el-form-item>
+        <el-form-item label="对象类型" prop="related_object_type">
           <el-select v-model="createForm.related_object_type">
             <el-option label="底稿" value="workpaper" />
             <el-option label="附注" value="disclosure_note" />
@@ -80,12 +80,14 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import {
   listConversations, getMessages, sendMessage, closeConversation,
   exportConversation, createConversation, type ConversationItem,
 } from '@/services/commonApi'
 import { handleApiError } from '@/utils/errorHandler'
+import { rules } from '@/utils/formRules'
 
 const route = useRoute()
 const projectId = ref(route.params.projectId as string || '')
@@ -99,6 +101,11 @@ const newMessage = ref('')
 const showCreateDialog = ref(false)
 const msgListRef = ref<HTMLElement>()
 const createForm = ref({ title: '', related_object_type: 'workpaper', cell_ref: '' })
+const convFormRef = ref<FormInstance>()
+const convRules: FormRules = {
+  title: [rules.required('标题')],
+  related_object_type: [rules.required('对象类型', 'change')],
+}
 
 async function fetchConversations() {
   if (!projectId.value) return

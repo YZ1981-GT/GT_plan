@@ -48,8 +48,23 @@ export function handleApiError(e: any, context: string): void {
     return
   }
 
-  // 422 — 参数校验失败
+  // 423 — 项目已归档（只读）
+  if (status === 423) {
+    ElMessage.warning(`${context}：项目已归档（只读），无法执行此操作`)
+    return
+  }
+
+  // 422 — 参数校验失败 / 业务规则拦截
   if (status === 422) {
+    const errorCode = detail?.error_code || e?.response?.data?.error_code
+    if (errorCode === 'AI_CONTENT_NOT_CONFIRMED') {
+      ElMessage.warning(`${context}：存在未确认的 AI 内容，请先确认后再操作`)
+      return
+    }
+    if (errorCode === 'CROSS_MODULE_CONFLICT_UNRESOLVED') {
+      ElMessage.warning(`${context}：存在未调解的跨模块冲突，请先调解后再操作`)
+      return
+    }
     const msg = detail?.message || '请求参数有误，请检查输入'
     ElMessage.warning(`${context}：${msg}`)
     return

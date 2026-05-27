@@ -79,6 +79,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   modelValue: boolean
@@ -172,7 +173,7 @@ async function handleSubmit() {
           ? '非底稿数据源不支持编辑'
           : '权限不足'
     } else {
-      ElMessage.error(err?.response?.data?.detail || '保存失败，请重试')
+      handleApiError(err, '保存单元格')
     }
   } finally {
     submitting.value = false

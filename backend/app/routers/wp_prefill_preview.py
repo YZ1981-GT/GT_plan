@@ -22,6 +22,7 @@ from app.core.database import get_db
 from app.deps import require_project_access
 from app.models.core import User
 from app.models.workpaper_models import WorkingPaper
+from app.schemas._common import OptionalAmountDecimal
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +36,8 @@ class PrefillChange(BaseModel):
     sheet: str
     cell_ref: str
     formula: str
-    old_value: float | None
-    new_value: float | None
+    old_value: OptionalAmountDecimal = None
+    new_value: OptionalAmountDecimal = None
     change_pct: float | None  # 变动幅度百分比
     is_highlight: bool  # change_pct >= 20
 

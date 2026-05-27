@@ -105,6 +105,7 @@ from app.models.related_party_models import (
 from app.models.independence_models import AnnualIndependenceDeclaration
 from app.models.qc_rule_models import QcRuleDefinition
 from app.models.enterprise_linkage_models import AdjustmentEditingLock, TbChangeHistory, EventCascadeLog  # noqa: F401
+from app.models.v3_refinement_models import AiContentLog, CrossModuleConflict, TimeMachineSnapshot  # noqa: F401
 
 __all__ = [
     # --- base ---
@@ -213,4 +214,8 @@ __all__ = [
     "AnnualIndependenceDeclaration",
     # --- QC rule definitions (R6) ---
     "QcRuleDefinition",
+    # --- V3 收官增强 (V017) ---
+    "AiContentLog",
+    "CrossModuleConflict",
+    "TimeMachineSnapshot",
 ]

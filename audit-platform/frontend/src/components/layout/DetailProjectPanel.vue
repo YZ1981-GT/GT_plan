@@ -18,9 +18,7 @@
                 <el-tag size="small">{{ typeLabel(project.project_type) }}</el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="当前状态">
-                <el-tag :type="(statusTagType(project.status)) || undefined" size="small">
-                  {{ statusLabel(project.status) }}
-                </el-tag>
+                <GtStatusTag dict-key="project_status" :value="project.status" />
                 <span v-if="project.status === 'planning'" class="gt-status-hint">
                   — 请先导入账套数据，完成后状态将自动推进
                 </span>
@@ -311,6 +309,7 @@ import { api } from '@/services/apiProxy'
 import { projects as P_proj, trialBalance as P_tb, attachments as P_att, accountChart as P_ac, gtCoding as P_gtc } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
+import GtStatusTag from '@/components/common/GtStatusTag.vue'
 
 const props = defineProps<{ project: any | null }>()
 const router = useRouter()
@@ -441,13 +440,6 @@ function typeLabel(t: string) {
   const m: Record<string, string> = { annual: '年度审计', special: '专项审计', ipo: 'IPO审计', internal_control: '内控审计' }
   return m[t] || t || '-'
 }
-function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
-  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { created: 'info', planning: 'warning', execution: '', completion: 'success', archived: 'info' }
-  return m[s] || 'info'
-}
-function statusLabel(s: string) {
-  const m: Record<string, string> = { created: '已创建', planning: '计划中', execution: '执行中', completion: '已完成', archived: '已归档' }
-  return m[s] || s || '-'
 }
 function formatDate(d: string) {
   if (!d) return '-'

@@ -42,7 +42,9 @@ class EventBus:
 
     def __init__(self, debounce_ms: int = 500) -> None:
         self._handlers: dict[EventType, list[EventHandler]] = defaultdict(list)
-        self._sse_queues: list[asyncio.Queue[EventPayload | None]] = []
+        # SSE 队列同时承载强类型 EventPayload（publish 路径）+ raw dict（broadcast_raw 路径）
+        # raw dict 形如 {"_raw": True, "event_type": str, "project_id": str|None, "year": int|None, "extra": {...}}
+        self._sse_queues: list[asyncio.Queue[EventPayload | dict | None]] = []
         self._pending: dict[str, dict] = {}  # debounce 缓冲区
         self._debounce_ms: int = debounce_ms
         self._redis_available: bool | None = None  # 延迟检测
@@ -125,6 +127,23 @@ class EventBus:
             "EventBus.broadcast_raw: %s (project=%s, extra_keys=%s)",
             event_type, extra.get("project_id"), list(extra.keys()),
         )
+        # 推送到所有内存 SSE 队列（让 SSE endpoint 实时感知 raw 事件）
+        # 注意：与 publish/_dispatch 路径并行，不触发 _handlers，避免双发
+        raw_event = {
+            "_raw": True,
+            "event_type": event_type,
+            "project_id": extra.get("project_id"),
+            "year": extra.get("year"),
+            "extra": extra,
+        }
+        for queue in list(self._sse_queues):
+            try:
+                queue.put_nowait(raw_event)
+            except asyncio.QueueFull:
+                logger.warning(
+                    "EventBus.broadcast_raw: SSE queue full, removing zombie queue"
+                )
+                self.remove_sse_queue(queue)
         # 异步持久化到 Redis Stream（不阻断调用方）
         try:
             asyncio.ensure_future(self._persist_raw_to_stream(event_type, extra))
@@ -319,14 +338,22 @@ class EventBus:
     # ------------------------------------------------------------------
     # SSE support
     # ------------------------------------------------------------------
-    def create_sse_queue(self) -> asyncio.Queue[EventPayload | None]:
-        """创建一个 SSE 订阅队列，供 SSE endpoint 使用"""
-        queue: asyncio.Queue[EventPayload | None] = asyncio.Queue(maxsize=100)
+    def create_sse_queue(self) -> asyncio.Queue[EventPayload | dict | None]:
+        """创建一个 SSE 订阅队列，供 SSE endpoint 使用。
+
+        队列同时接收：
+        - EventPayload（publish/publish_immediate 强类型路径）
+        - dict（broadcast_raw 路径，含 ``"_raw": True`` 标记）
+        - None（关闭信号）
+        """
+        queue: asyncio.Queue[EventPayload | dict | None] = asyncio.Queue(maxsize=100)
         self._sse_queues.append(queue)
         logger.info("EventBus: SSE queue created, total=%d", len(self._sse_queues))
         return queue
 
-    def remove_sse_queue(self, queue: asyncio.Queue[EventPayload | None]) -> None:
+    def remove_sse_queue(
+        self, queue: asyncio.Queue[EventPayload | dict | None]
+    ) -> None:
         """移除 SSE 订阅队列"""
         if queue in self._sse_queues:
             self._sse_queues.remove(queue)

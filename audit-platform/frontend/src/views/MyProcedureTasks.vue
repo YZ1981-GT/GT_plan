@@ -8,7 +8,7 @@
       </template>
     </GtPageHeader>
 
-    <el-empty v-if="!tasks.length && !loading" description="暂无被委派的审计程序，请联系项目经理分配" />
+    <GtEmpty v-if="!tasks.length && !loading" preset="no-data" title="暂无被委派的审计程序" description="请联系项目经理分配" />
 
     <div v-for="(group, cycle) in groupedTasks" :key="cycle" style="margin-bottom: 20px">
       <h3 style="font-size: var(--gt-font-size-base); color: var(--gt-color-primary); margin-bottom: 8px">
@@ -49,6 +49,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtEmpty from '@/components/common/GtEmpty.vue'
 import { getMyStaffId, getMyProcedureTasks, updateProcedureTrim } from '@/services/commonApi'
 import { handleApiError } from '@/utils/errorHandler'
 

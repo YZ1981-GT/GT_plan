@@ -52,7 +52,8 @@
               展示喂入此{{ sourceLabel }}的上游底稿单元格（哪些底稿数据汇成此值）
             </p>
 
-            <el-skeleton v-if="upstreamLoading" :rows="3" animated />
+            <!-- 首次加载用 skeleton 占位；后续 refetch 用 v-loading 蒙层 -->
+            <el-skeleton v-if="upstreamLoading && !upstreamHasLoaded" :rows="3" animated />
             <el-alert
               v-else-if="upstreamError"
               :title="upstreamError"
@@ -61,11 +62,11 @@
               show-icon
             />
             <el-empty
-              v-else-if="!upstreamItems.length"
+              v-else-if="!upstreamItems.length && !upstreamLoading"
               description="未找到上游引用"
               :image-size="60"
             />
-            <ul v-else class="gt-trace-dialog__list">
+            <ul v-else v-loading="upstreamLoading" class="gt-trace-dialog__list">
               <li
                 v-for="(item, idx) in upstreamItems"
                 :key="`upstream-${idx}`"
@@ -102,7 +103,8 @@
               展示引用此{{ sourceLabel }}的下游底稿/报表/附注（修改此值会影响哪些位置）
             </p>
 
-            <el-skeleton v-if="downstreamLoading" :rows="3" animated />
+            <!-- 首次加载用 skeleton 占位；后续 refetch 用 v-loading 蒙层 -->
+            <el-skeleton v-if="downstreamLoading && !downstreamHasLoaded" :rows="3" animated />
             <el-alert
               v-else-if="downstreamError"
               :title="downstreamError"
@@ -111,11 +113,11 @@
               show-icon
             />
             <el-empty
-              v-else-if="!downstreamItems.length"
+              v-else-if="!downstreamItems.length && !downstreamLoading"
               description="未找到下游引用"
               :image-size="60"
             />
-            <ul v-else class="gt-trace-dialog__list">
+            <ul v-else v-loading="downstreamLoading" class="gt-trace-dialog__list">
               <li
                 v-for="(item, idx) in downstreamItems"
                 :key="`downstream-${idx}`"
@@ -193,10 +195,12 @@ const activeTab = ref<'upstream' | 'downstream'>('upstream')
 const upstreamItems = ref<TraceItem[]>([])
 const upstreamLoading = ref(false)
 const upstreamError = ref('')
+const upstreamHasLoaded = ref(false)
 
 const downstreamItems = ref<TraceItem[]>([])
 const downstreamLoading = ref(false)
 const downstreamError = ref('')
+const downstreamHasLoaded = ref(false)
 
 // ─── Computed ───
 const visible = computed<boolean>({
@@ -272,6 +276,7 @@ async function loadUpstream() {
     upstreamItems.value = []
   } finally {
     upstreamLoading.value = false
+    upstreamHasLoaded.value = true
   }
 }
 
@@ -293,6 +298,7 @@ async function loadDownstream() {
     downstreamItems.value = []
   } finally {
     downstreamLoading.value = false
+    downstreamHasLoaded.value = true
   }
 }
 

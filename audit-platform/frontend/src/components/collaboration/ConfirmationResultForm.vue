@@ -5,11 +5,11 @@
     width="600px"
     @close="handleClose"
   >
-    <el-form :model="form" label-width="130px">
+    <el-form ref="formRef" :model="form" :rules="formRules" label-width="130px">
       <el-form-item label="函证ID">
         <el-input :model-value="confirmationId" readonly />
       </el-form-item>
-      <el-form-item label="函证状态" required>
+      <el-form-item label="函证状态" prop="confirmation_status" required>
         <el-select v-model="form.confirmation_status" placeholder="请选择状态" style="width: 100%">
           <el-option label="待发送" value="PENDING" />
           <el-option label="已发送" value="SENT" />
@@ -54,8 +54,10 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { confirmationApi } from '@/services/collaborationApi'
+import { rules } from '@/utils/formRules'
 
 const props = defineProps<{
   modelValue: boolean
@@ -71,6 +73,11 @@ const projectId = 'current-project-id'
 
 const visible = ref(false)
 const uploadRef = ref()
+const formRef = ref<FormInstance>()
+
+const formRules: FormRules = {
+  confirmation_status: [rules.required('函证状态', 'change')],
+}
 
 watch(
   () => props.modelValue,

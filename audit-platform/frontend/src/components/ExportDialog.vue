@@ -29,10 +29,10 @@
           🔄 重新检查
         </el-button>
       </div>
-      <div v-if="checkLoading" class="gt-export-checks__loading">
+      <div v-if="checkLoading && checks.length === 0" class="gt-export-checks__loading">
         <el-skeleton :rows="3" animated />
       </div>
-      <div v-else-if="checks.length > 0" class="gt-export-checks__list">
+      <div v-else-if="checks.length > 0" v-loading="checkLoading" class="gt-export-checks__list">
         <div
           v-for="check in checks"
           :key="check.check_name"

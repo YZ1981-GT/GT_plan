@@ -31,13 +31,58 @@ function escapeHtml(str: string): string {
 
 /**
  * 删除确认弹窗（红色确认按钮）
- * @param itemName 被删除项名称，如 "该分录"、"文档「xxx」"
+ *
+ * V3 Req 4 扩展：支持 options 形式传入对象名称 + 影响范围。
+ * 向后兼容：仍允许传 string（按 itemName 处理）。
+ *
+ * @example
+ *   confirmDelete('该分录')                                 // 旧用法
+ *   confirmDelete({ name: '分录 RJE-001', impact: '影响 3 张底稿' })  // 新用法
  */
-export async function confirmDelete(itemName?: string): Promise<void> {
-  const safeName = itemName ? escapeHtml(itemName) : ''
-  const msg = safeName
-    ? `确定删除${safeName}？`
-    : '确定删除该记录？'
+export interface ConfirmDeleteOptions {
+  /** 被删除项名称，如 "分录 RJE-001" / "底稿 D2-1" */
+  name?: string
+  /** 影响范围描述，如 "将同时删除关联的 3 张底稿" / "影响 5 个下游报表" */
+  impact?: string
+  /** 是否软删除可恢复（决定提示话术） */
+  recoverable?: boolean
+}
+
+export async function confirmDelete(target?: string | ConfirmDeleteOptions): Promise<void> {
+  // 向后兼容：单字符串 = 旧 itemName
+  const opts: ConfirmDeleteOptions = typeof target === 'string' ? { name: target } : (target ?? {})
+  const safeName = opts.name ? escapeHtml(opts.name) : ''
+  const safeImpact = opts.impact ? escapeHtml(opts.impact) : ''
+  const recoverableLine = opts.recoverable === false
+    ? '<p style="color: var(--gt-color-coral, #e6443e); font-weight: 600; margin-top: 6px">⚠ 此操作不可恢复</p>'
+    : opts.recoverable === true
+      ? '<p style="color: var(--gt-color-info, #6b3fa0); margin-top: 6px">💡 删除后可在回收站恢复</p>'
+      : ''
+  const impactLine = safeImpact
+    ? `<p style="margin-top: 6px"><b>影响范围：</b>${safeImpact}</p>`
+    : ''
+
+  // 仅在含 impact / recoverable 信息时启用 HTML 渲染，避免大多数简单调用浪费
+  if (safeImpact || opts.recoverable !== undefined) {
+    const html = `
+      <div style="line-height: 1.7">
+        <p>确定删除${safeName ? safeName : '该记录'}？</p>
+        ${impactLine}
+        ${recoverableLine}
+      </div>
+    `
+    await ElMessageBox.confirm(html, '删除确认', {
+      confirmButtonText: '确定删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+      confirmButtonClass: 'el-button--danger',
+      dangerouslyUseHTMLString: true,
+    })
+    return
+  }
+
+  // 简单分支（向后兼容）
+  const msg = safeName ? `确定删除${safeName}？` : '确定删除该记录？'
   await ElMessageBox.confirm(msg, '删除确认', {
     confirmButtonText: '确定删除',
     cancelButtonText: '取消',
@@ -66,13 +111,60 @@ export async function confirmBatch(action: string, count: number): Promise<void>
 
 /**
  * 危险操作确认弹窗（不可恢复操作，红色确认按钮）
- * @param message 自定义提示消息
- * @param title 弹窗标题，默认 "危险操作确认"
+ *
+ * V3 Req 4 扩展：支持传入 options 对象 + 强制输入对象名校验
+ * （如：硬删除归档项目时必须输入项目编码二次确认）。
+ *
+ * 向后兼容：旧调用 `confirmDangerous(message, title)` / `confirmDangerous({ title, message, ... })` 都可用。
  */
-export async function confirmDangerous(message: string, title?: string): Promise<void> {
-  await ElMessageBox.confirm(message, title ?? '危险操作确认', {
-    confirmButtonText: '确定执行',
-    cancelButtonText: '取消',
+export interface ConfirmDangerousOptions {
+  message: string
+  title?: string
+  confirmText?: string
+  cancelText?: string
+  /** 强制用户输入此字符串才能确认（如对象名/项目编码） */
+  requireInputMatch?: string
+  /** 输入框 placeholder，默认基于 requireInputMatch 生成 */
+  inputPlaceholder?: string
+}
+
+export async function confirmDangerous(
+  arg1: string | ConfirmDangerousOptions,
+  title?: string,
+): Promise<void> {
+  // 兼容旧两形参签名
+  const opts: ConfirmDangerousOptions = typeof arg1 === 'string'
+    ? { message: arg1, title: title }
+    : arg1
+
+  const dialogTitle = opts.title ?? '危险操作确认'
+  const confirmText = opts.confirmText ?? '确定执行'
+  const cancelText = opts.cancelText ?? '取消'
+
+  // 需要输入对象名校验时走 prompt
+  if (opts.requireInputMatch) {
+    const expected = opts.requireInputMatch
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const placeholder = opts.inputPlaceholder ?? `请输入 ${expected} 以确认`
+    const { value } = await ElMessageBox.prompt(opts.message, dialogTitle, {
+      confirmButtonText: confirmText,
+      cancelButtonText: cancelText,
+      type: 'warning',
+      confirmButtonClass: 'el-button--danger',
+      inputPattern: new RegExp(`^${escapeRegex(expected)}$`),
+      inputErrorMessage: `请输入精确名称：${expected}`,
+      inputPlaceholder: placeholder,
+    })
+    if (value !== expected) {
+      // 双重防御（inputPattern 已校验，但 prompt 极端情况下可能放行）
+      throw new Error('对象名称校验失败')
+    }
+    return
+  }
+
+  await ElMessageBox.confirm(opts.message, dialogTitle, {
+    confirmButtonText: confirmText,
+    cancelButtonText: cancelText,
     type: 'warning',
     confirmButtonClass: 'el-button--danger',
   })

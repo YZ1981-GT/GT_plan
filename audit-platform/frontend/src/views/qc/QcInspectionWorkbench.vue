@@ -177,7 +177,7 @@
 
     <!-- 录入结论对话框 -->
     <el-dialog v-model="verdictDialogVisible" title="录入抽查结论" width="500px">
-      <el-form :model="verdictForm" label-width="80px">
+      <el-form ref="verdictFormRef" :model="verdictForm" :rules="verdictRules" label-width="80px">
         <el-form-item label="底稿">
           <span>{{ verdictForm.wp_code }} — {{ verdictForm.wp_name }}</span>
         </el-form-item>
@@ -205,8 +205,8 @@
 
     <!-- 新建抽查对话框 -->
     <el-dialog v-model="showNewInspection" title="新建抽查" width="500px">
-      <el-form :model="newForm" label-width="80px">
-        <el-form-item label="项目">
+      <el-form ref="newFormRef" :model="newForm" :rules="newFormRules" label-width="80px">
+        <el-form-item label="项目" prop="project_name">
           <el-input v-model="newForm.project_name" placeholder="输入项目名称" />
         </el-form-item>
         <el-form-item label="策略">
@@ -231,6 +231,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { getInspections, getInspectionDetail, submitVerdict as apiSubmitVerdict, generateReport as genReport } from '@/services/qcInspectionApi'
 import { getAuditLogFindings, runAuditLogCompliance, updateFindingStatus } from '@/services/qcAuditLogComplianceApi'
@@ -291,6 +292,7 @@ const loadingItems = ref(false)
 // Verdict dialog
 const verdictDialogVisible = ref(false)
 const submittingVerdict = ref(false)
+const verdictFormRef = ref<FormInstance>()
 const verdictForm = ref({
   item_id: '',
   wp_code: '',
@@ -298,16 +300,23 @@ const verdictForm = ref({
   verdict: 'pass',
   findings: '',
 })
+const verdictRules: FormRules = {
+  verdict: [{ required: true, message: '请选择结论', trigger: 'change' }],
+}
 
 // New inspection dialog
 const showNewInspection = ref(false)
 const creating = ref(false)
 const generatingReport = ref(false)
+const newFormRef = ref<FormInstance>()
 const newForm = ref({
   project_name: '',
   strategy: 'random',
   reviewer: '',
 })
+const newFormRules: FormRules = {
+  project_name: [{ required: true, message: '请输入项目名称', trigger: 'blur' }],
+}
 
 // Audit log tab state
 const auditLogFindings = ref<AuditLogFinding[]>([])

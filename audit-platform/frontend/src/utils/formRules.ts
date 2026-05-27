@@ -33,6 +33,12 @@ export const rules = {
     { min: 2, max: 100, message: '长度 2-100 字符', trigger: 'blur' },
   ] satisfies FormItemRule[],
 
+  /** 项目名：非空 + 2-200 字符（与 clientName 区分但语义类似） */
+  projectName: [
+    { required: true, message: '项目名不能为空', trigger: 'blur' },
+    { min: 2, max: 200, message: '长度 2-200 字符', trigger: 'blur' },
+  ] satisfies FormItemRule[],
+
   /** 科目编码：4-10 位数字 */
   accountCode: {
     pattern: /^\d{4,10}$/,

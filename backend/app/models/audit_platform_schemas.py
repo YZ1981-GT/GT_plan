@@ -33,6 +33,7 @@ from app.models.audit_platform_models import (
     MappingType,
     ReviewStatus,
 )
+from app.schemas._common import AmountDecimal, OptionalAmountDecimal
 
 
 # ===================================================================
@@ -577,8 +578,8 @@ class AdjustmentLineItem(BaseModel):
     standard_account_code: str
     account_name: str | None = None
     report_line_code: str | None = None
-    debit_amount: Decimal = Decimal("0")
-    credit_amount: Decimal = Decimal("0")
+    debit_amount: AmountDecimal = Decimal("0")
+    credit_amount: AmountDecimal = Decimal("0")
 
 
 class AdjustmentCreate(BaseModel):
@@ -844,7 +845,7 @@ class MisstatementCreate(BaseModel):
     misstatement_description: str
     affected_account_code: str | None = None
     affected_account_name: str | None = None
-    misstatement_amount: Decimal
+    misstatement_amount: AmountDecimal
     misstatement_type: MisstatementType
     management_reason: str | None = None
     auditor_evaluation: str | None = None
@@ -855,7 +856,7 @@ class MisstatementUpdate(BaseModel):
     misstatement_description: str | None = None
     affected_account_code: str | None = None
     affected_account_name: str | None = None
-    misstatement_amount: Decimal | None = None
+    misstatement_amount: OptionalAmountDecimal = None
     misstatement_type: MisstatementType | None = None
     management_reason: str | None = None
     auditor_evaluation: str | None = None

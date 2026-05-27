@@ -307,7 +307,7 @@ async function validate(): Promise<BasicInfo | null> {
   }
 }
 
-defineExpose({ validate })
+defineExpose({ validate, formRef })
 </script>
 
 <style scoped>

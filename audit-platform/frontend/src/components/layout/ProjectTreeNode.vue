@@ -38,9 +38,7 @@
         <div class="gt-node-meta">
           <span>{{ node.client_name || '-' }}</span>
           <span class="gt-node-meta-right">
-            <el-tag v-if="node.status !== 'created'" :type="(statusTagType(node.status)) || undefined" size="small" round>
-              {{ statusLabel(node.status) }}
-            </el-tag>
+            <GtStatusTag v-if="node.status !== 'created'" dict-key="project_status" :value="node.status" />
             <el-button
               class="gt-node-action-inline"
               :icon="EditPen"
@@ -81,6 +79,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { FolderOpened, Delete, EditPen } from '@element-plus/icons-vue'
+import GtStatusTag from '@/components/common/GtStatusTag.vue'
 
 interface ProjectNode {
   id: string
@@ -107,16 +106,6 @@ defineEmits<{
 
 const expanded = ref(true)
 const hasChildren = computed(() => (props.node.children?.length ?? 0) > 0)
-
-function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
-  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { created: 'info', planning: 'warning', execution: '', completion: 'success', archived: 'info' }
-  return m[s] || 'info'
-}
-
-function statusLabel(s: string) {
-  const m: Record<string, string> = { created: '已创建', planning: '计划中', execution: '执行中', completion: '已完成', archived: '已归档' }
-  return m[s] || s || '-'
-}
 </script>
 
 <style scoped>

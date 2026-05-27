@@ -76,7 +76,7 @@
         <!-- 手动覆盖 -->
         <el-collapse v-if="result" style="margin-top: 16px">
           <el-collapse-item title="手动覆盖（可选）" name="override">
-            <el-form label-width="130px">
+            <el-form ref="overrideFormRef" :model="overrideForm" :rules="overrideRules" label-width="130px">
               <el-form-item label="整体重要性">
                 <el-input-number v-model="overrideForm.overall_materiality" :precision="2"
                   :controls="false" placeholder="留空使用计算值" style="width: 100%" />
@@ -89,7 +89,7 @@
                 <el-input-number v-model="overrideForm.trivial_threshold" :precision="2"
                   :controls="false" placeholder="留空使用计算值" style="width: 100%" />
               </el-form-item>
-              <el-form-item label="覆盖原因">
+              <el-form-item label="覆盖原因" prop="reason">
                 <el-input v-model="overrideForm.reason" type="textarea" :rows="2" placeholder="请说明覆盖原因" />
               </el-form-item>
               <el-form-item>
@@ -128,6 +128,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { useEditMode } from '@/composables/useEditMode'
 import { confirmLeave } from '@/utils/confirm'
@@ -173,6 +174,10 @@ const overrideForm = reactive({
   trivial_threshold: undefined as number | undefined,
   reason: '',
 })
+const overrideFormRef = ref<FormInstance>()
+const overrideRules: FormRules = {
+  reason: [{ required: true, message: '请说明覆盖原因', trigger: 'blur' }],
+}
 
 const formatAmt = fmtAmount
 

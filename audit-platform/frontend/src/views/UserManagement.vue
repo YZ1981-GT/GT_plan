@@ -23,11 +23,17 @@
       </el-table-column>
     </el-table>
     <el-dialog append-to-body v-model="showCreate" :title="editingUser ? '编辑用户' : '新增用户'" width="450px">
-      <el-form :model="form" label-width="80px">
-        <el-form-item label="用户名"><el-input v-model="form.username" /></el-form-item>
-        <el-form-item label="邮箱"><el-input v-model="form.email" /></el-form-item>
-        <el-form-item v-if="!editingUser" label="密码"><el-input v-model="form.password" type="password" /></el-form-item>
-        <el-form-item label="角色">
+      <el-form ref="userFormRef" :model="form" :rules="userFormRules" label-width="80px">
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="form.username" />
+        </el-form-item>
+        <el-form-item label="邮箱" prop="email">
+          <el-input v-model="form.email" />
+        </el-form-item>
+        <el-form-item v-if="!editingUser" label="密码" prop="password">
+          <el-input v-model="form.password" type="password" show-password />
+        </el-form-item>
+        <el-form-item label="角色" prop="role">
           <el-select v-model="form.role" style="width: 100%">
             <el-option label="管理员" value="admin" />
             <el-option label="合伙人" value="partner" />
@@ -38,21 +44,46 @@
       </el-form>
       <template #footer>
         <el-button @click="showCreate = false">取消</el-button>
-        <el-button type="primary" @click="saveUser" :loading="saving">保存</el-button>
+        <el-button type="primary" @click="saveUser" :loading="userSubmitting || saving">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import { listUsers, createUser, updateUser } from '@/services/commonApi'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import { rules, makeRules } from '@/utils/formRules'
+import { useFormSubmit } from '@/composables/useFormSubmit'
+
 const users = ref<any[]>([])
 const loading = ref(false)
 const showCreate = ref(false)
 const saving = ref(false)
 const editingUser = ref<any>(null)
 const form = ref({ username: '', email: '', password: '', role: 'auditor' })
+
+// V3 Req 3.3：表单校验 + 统一提交拦截
+const userFormRef = ref<FormInstance>()
+const userFormRules = computed<FormRules>(() => ({
+  username: [
+    rules.required('用户名'),
+    { min: 2, max: 50, message: '长度 2-50 字符', trigger: 'blur' },
+  ],
+  email: makeRules('邮箱', rules.email),
+  // 编辑模式下密码字段不出现，免校验
+  password: editingUser.value
+    ? []
+    : [
+        rules.required('密码'),
+        { min: 6, max: 64, message: '长度 6-64 字符', trigger: 'blur' },
+      ],
+  role: [rules.required('角色', 'change')],
+}))
+const { submit: submitUserForm, submitting: userSubmitting } = useFormSubmit(userFormRef)
+
 async function loadUsers() {
   loading.value = true
   try {
@@ -66,18 +97,20 @@ function editUser(row: any) {
   showCreate.value = true
 }
 async function saveUser() {
-  saving.value = true
-  try {
-    if (editingUser.value) {
-      await updateUser(editingUser.value.id, form.value)
-    } else {
-      await createUser(form.value)
-    }
-    ElMessage.success('保存成功')
-    showCreate.value = false
-    editingUser.value = null
-    await loadUsers()
-  } finally { saving.value = false }
+  await submitUserForm(async () => {
+    saving.value = true
+    try {
+      if (editingUser.value) {
+        await updateUser(editingUser.value.id, form.value)
+      } else {
+        await createUser(form.value)
+      }
+      ElMessage.success('保存成功')
+      showCreate.value = false
+      editingUser.value = null
+      await loadUsers()
+    } finally { saving.value = false }
+  })
 }
 onMounted(loadUsers)
 </script>

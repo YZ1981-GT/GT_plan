@@ -17,13 +17,14 @@
     </div>
 
     <!-- 批注列表 -->
-    <div v-if="loading" class="loading-state">
+    <!-- 首次加载用 skeleton 占位；后续 refetch 用 v-loading 蒙层（避免内容跳变） -->
+    <div v-if="loading && !hasLoaded" class="loading-state">
       <el-skeleton :rows="5" animated />
     </div>
-    <div v-else-if="items.length === 0" class="empty-state">
+    <div v-else-if="items.length === 0 && !loading" class="empty-state">
       <el-empty description="暂无待回复批注" />
     </div>
-    <div v-else class="review-list">
+    <div v-else v-loading="loading" class="review-list">
       <div
         v-for="item in items"
         :key="item.review_id"
@@ -89,6 +90,7 @@ const emit = defineEmits<{
 const items = ref<ReviewItem[]>([])
 const summary = ref<Summary>({ must_fix: 0, suggest: 0, info: 0, total: 0 })
 const loading = ref(false)
+const hasLoaded = ref(false)
 
 async function fetchReviews() {
   if (!props.projectId) return
@@ -103,6 +105,7 @@ async function fetchReviews() {
     console.warn('[MyReviewsPanel] 获取批注失败', err)
   } finally {
     loading.value = false
+    hasLoaded.value = true
   }
 }
 

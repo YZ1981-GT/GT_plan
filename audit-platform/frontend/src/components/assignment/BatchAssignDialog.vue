@@ -9,7 +9,7 @@
   >
     <!-- 步骤 1：选择策略 + 候选人 -->
     <div v-if="step === 1" class="gt-batch-assign-step1">
-      <el-form label-width="100px" :model="form">
+      <el-form ref="batchFormRef" label-width="100px" :model="form" :rules="batchRules">
         <el-form-item label="分配策略">
           <div class="gt-batch-strategy-cards">
             <div class="gt-batch-strategy-card" :class="{ 'is-active': form.strategy === 'smart' }" @click="form.strategy = 'smart'">
@@ -170,11 +170,13 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { User } from '@element-plus/icons-vue'
 import { handleApiError } from '@/utils/errorHandler'
 import http from '@/utils/http'
 import { listAssignments, type Assignment } from '@/services/staffApi'
+import { rules } from '@/utils/formRules'
 
 // ── Props & Emits ──
 
@@ -204,6 +206,11 @@ const submitting = ref(false)
 const candidates = ref<CandidateItem[]>([])
 const selectedCandidates = ref<CandidateItem[]>([])
 const candidateTableRef = ref<any>(null)
+const batchFormRef = ref<FormInstance>()
+
+const batchRules: FormRules = {
+  strategy: [rules.required('分配策略', 'change')],
+}
 
 interface CandidateItem {
   user_id: string

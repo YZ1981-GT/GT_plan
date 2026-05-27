@@ -34,6 +34,36 @@ class AIContentMustBeConfirmedRule(GateRule):
             return None
 
         try:
+            # ── V3 Req 6.3：先查 ai_content_log 表（新机制，统一字段级溯源）──
+            # 优先级高于 parsed_data 扫描：6.2 起 wrap_ai_output_with_log
+            # 强制写入 ai_content_log，pending 即应阻断 sign_off。
+            from app.services import ai_content_log_service
+
+            pending_logs = await ai_content_log_service.list_pending_by_project(
+                db=db, project_id=project_id, limit=5
+            )
+            if pending_logs:
+                pending_count = await ai_content_log_service.count_pending_by_project(
+                    db=db, project_id=project_id
+                )
+                return GateRuleHit(
+                    rule_code=self.rule_code,
+                    error_code=self.error_code,
+                    severity=self.severity,
+                    message=(
+                        f"存在 {pending_count} 段未确认的 AI 生成内容（ai_content_log）"
+                    ),
+                    location={
+                        "project_id": str(project_id),
+                        "section": "ai_content",
+                        "via": "ai_content_log",
+                        "pending_count": pending_count,
+                        "sample_log_ids": [str(log.id) for log in pending_logs],
+                    },
+                    suggested_action="请在 AI 内容审核面板逐一确认或拒绝后再签字",
+                )
+
+            # ── 既有：扫描 parsed_data（保留旧路径，向后兼容历史底稿）──
             from app.models.workpaper_models import WorkingPaper
 
             stmt = select(WorkingPaper).where(
@@ -61,6 +91,7 @@ class AIContentMustBeConfirmedRule(GateRule):
                 location={
                     "project_id": str(project_id),
                     "section": "ai_content",
+                    "via": "parsed_data",
                     "unconfirmed_wp_count": len(unconfirmed_wps),
                     "sample_wp_ids": unconfirmed_wps[:5],
                 },

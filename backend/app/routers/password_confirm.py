@@ -63,7 +63,7 @@ async def verify_password_endpoint(
     锁定: 423 + locked_until
     """
     if redis is None:
-        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
+        raise HTTPException(status_code=503, detail={"message": "服务暂时不可用", "message_en": "Service temporarily unavailable"})
 
     user_id = str(current_user.id)
     fail_key = f"confirm_fail:{user_id}"
@@ -146,7 +146,7 @@ async def require_confirmation_token(
     - 成功/失败均写入 audit_log
     """
     if redis is None:
-        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
+        raise HTTPException(status_code=503, detail={"message": "服务暂时不可用", "message_en": "Service temporarily unavailable"})
 
     token = request.headers.get("X-Confirmation-Token")
     if not token:
@@ -166,7 +166,7 @@ async def require_confirmation_token(
             db, current_user.id, "confirmation_token_invalid",
             {"token_prefix": token[:8], "path": str(request.url.path)},
         )
-        raise HTTPException(status_code=403, detail="Token expired or already consumed")
+        raise HTTPException(status_code=403, detail={"message": "令牌已过期或已使用", "message_en": "Token expired or already consumed"})
 
     # 验证 token 属于当前用户
     if stored_user_id != str(current_user.id):
@@ -174,7 +174,7 @@ async def require_confirmation_token(
             db, current_user.id, "confirmation_token_user_mismatch",
             {"token_prefix": token[:8], "path": str(request.url.path)},
         )
-        raise HTTPException(status_code=403, detail="Token expired or already consumed")
+        raise HTTPException(status_code=403, detail={"message": "令牌已过期或已使用", "message_en": "Token expired or already consumed"})
 
     # 成功 — 写入审计日志
     await _write_audit_log(

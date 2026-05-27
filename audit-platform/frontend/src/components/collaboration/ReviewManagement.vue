@@ -47,8 +47,8 @@
     </el-dialog>
 
     <el-dialog append-to-body v-model="showRejectDialog" title="驳回复核" width="400px">
-      <el-form>
-        <el-form-item label="驳回原因" required>
+      <el-form ref="rejectFormRef" :model="rejectFormModel" :rules="rejectRules">
+        <el-form-item label="驳回原因" prop="rejectComments" required>
           <el-input v-model="rejectComments" type="textarea" :rows="3" />
         </el-form-item>
       </el-form>
@@ -61,10 +61,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { reviewApi } from '@/services/collaborationApi'
+import { rules } from '@/utils/formRules'
 
 const reviewTab = ref('pending')
 const pendingReviews = ref<any[]>([])
@@ -74,6 +76,11 @@ const showRejectDialog = ref(false)
 const currentReview = ref<any>(null)
 const reviewComments = ref('')
 const rejectComments = ref('')
+const rejectFormRef = ref<FormInstance>()
+const rejectFormModel = computed(() => ({ rejectComments: rejectComments.value }))
+const rejectRules: FormRules = {
+  rejectComments: [rules.required('驳回原因')],
+}
 
 const LEVEL_NAMES: Record<number, string> = {
   1: '审计员自复核',

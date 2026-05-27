@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import PresenceAvatars from '@/components/workpaper/PresenceAvatars.vue'
+import PresenceAvatars from '@/components/PresenceAvatars.vue'
 
 const mockUsers = [
   { user_id: '1', user_name: '张三', mode: 'edit' as const },

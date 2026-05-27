@@ -47,7 +47,7 @@ async def get_my_reviews(
         )
     )
     if project_result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail={"message": "项目不存在", "message_en": "Project not found"})
 
     # 查询：JOIN working_paper.assigned_to = current_user.id
     # ReviewRecord → WorkingPaper → WpIndex（获取 wp_code/wp_name）

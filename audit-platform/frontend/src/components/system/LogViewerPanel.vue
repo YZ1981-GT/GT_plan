@@ -132,12 +132,12 @@
             <span class="gt-logs-msg">{{ row.message }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="logger" width="200" show-overflow-tooltip>
+        <el-table-column label="日志器" width="200" show-overflow-tooltip>
           <template #default="{ row }">
             <code class="gt-logs-logger">{{ row.logger }}</code>
           </template>
         </el-table-column>
-        <el-table-column label="request_id" width="140" show-overflow-tooltip>
+        <el-table-column label="请求ID" width="140" show-overflow-tooltip>
           <template #default="{ row }">
             <code v-if="row.request_id && row.request_id !== '-'" class="gt-logs-rid">{{ row.request_id }}</code>
             <span v-else class="gt-logs-rid-empty">—</span>

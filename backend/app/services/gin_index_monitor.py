@@ -24,7 +24,7 @@ INDEX_BUILDING: bool = False
 When True, queries should degrade to sequential scan and add X-Index-Status=building header."""
 
 INDEX_NAME = "idx_wp_parsed_data_gin"
-TABLE_NAME = "working_papers"
+TABLE_NAME = "working_paper"
 
 # Alert threshold for index size (bytes)
 INDEX_SIZE_ALERT_THRESHOLD_BYTES = 500 * 1024 * 1024  # 500MB

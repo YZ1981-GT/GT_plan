@@ -75,6 +75,9 @@
       <WorkflowProgress :project-id="projectId" :year="selectedYear" @step-action="onWorkflowAction" />
     </div>
 
+    <!-- 归档横幅 -->
+    <ArchivedBanner />
+
     <!-- 折叠/展开按钮 -->
     <div class="gt-header-toggle" @click="headerCollapsed = !headerCollapsed">
       <span>{{ headerCollapsed ? '▼ 展开工具栏' : '▲ 收起工具栏' }}</span>
@@ -120,16 +123,16 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" @click="triggerTbSumImport">📥 导入</el-button>
+        <el-button size="small" @click="triggerTbSumImport" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">📥 导入</el-button>
         <input ref="tbSumImportInput" type="file" accept=".xlsx,.xls" style="display:none" @change="onTbSumImportFile" />
-        <el-button size="small" @click="saveTbSummary">💾 保存</el-button>
+        <el-button size="small" @click="saveTbSummary" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">💾 保存</el-button>
         <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);margin-left:12px">{{ tbSummaryRows.length }} 行</span>
       </template>
       <!-- 科目明细工具栏（导出/导入） -->
       <template v-if="tbViewMode === 'detail'">
         <span style="flex:1" />
         <el-button size="small" @click="onExport">📤 导出Excel</el-button>
-        <el-button size="small" @click="onToolbarImport">📥 Excel导入</el-button>
+        <el-button size="small" @click="onToolbarImport" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">📥 Excel导入</el-button>
       </template>
     </div>
 
@@ -456,12 +459,12 @@
           <el-table-column label="审计调整" header-align="center">
             <el-table-column prop="aje_dr" label="借方" width="120" align="right">
               <template #default="{ row }">
-                <span class="gt-tb-readonly gt-amt">{{ fmt(row.aje_dr) }}</span>
+                <GtAmountCell class="gt-tb-readonly" :value="row.aje_dr" />
               </template>
             </el-table-column>
             <el-table-column prop="aje_cr" label="贷方" width="120" align="right">
               <template #default="{ row }">
-                <span class="gt-tb-readonly gt-amt">{{ fmt(row.aje_cr) }}</span>
+                <GtAmountCell class="gt-tb-readonly" :value="row.aje_cr" />
               </template>
             </el-table-column>
           </el-table-column>
@@ -477,7 +480,9 @@
                   @blur="tbSumLazyEdit.stopEdit(); recalcTbSummaryAudited()"
                   autofocus
                 />
-                <span v-else class="gt-tb-editable gt-amt" @click="tbSumLazyEdit.startEdit($index, 2)">{{ fmt(row.rcl_dr) }}</span>
+                <span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit($index, 2)">
+                  <GtAmountCell :value="row.rcl_dr" />
+                </span>
               </template>
             </el-table-column>
             <el-table-column prop="rcl_cr" label="贷方" width="120" align="right">
@@ -491,7 +496,9 @@
                   @blur="tbSumLazyEdit.stopEdit(); recalcTbSummaryAudited()"
                   autofocus
                 />
-                <span v-else class="gt-tb-editable gt-amt" @click="tbSumLazyEdit.startEdit($index, 3)">{{ fmt(row.rcl_cr) }}</span>
+                <span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit($index, 3)">
+                  <GtAmountCell :value="row.rcl_cr" />
+                </span>
               </template>
             </el-table-column>
           </el-table-column>
@@ -544,10 +551,10 @@
         <el-table-column prop="adjustment_no" label="编号" width="120" />
         <el-table-column prop="description" label="摘要" min-width="180" />
         <el-table-column prop="total_debit" label="借方" width="130" align="right">
-          <template #default="{ row }">{{ fmt(row.total_debit) }}</template>
+          <template #default="{ row }"><GtAmountCell :value="row.total_debit" /></template>
         </el-table-column>
         <el-table-column prop="total_credit" label="贷方" width="130" align="right">
-          <template #default="{ row }">{{ fmt(row.total_credit) }}</template>
+          <template #default="{ row }"><GtAmountCell :value="row.total_credit" /></template>
         </el-table-column>
         <el-table-column prop="review_status" label="状态" width="100">
           <template #default="{ row }">
@@ -610,6 +617,7 @@
     :multi-count="tbCtx.selectedCells.value.length"
     @copy="onTbCtxCopy"
     @formula="onTbCtxFormula"
+    @trust-score="onTbCtxTrustScore"
     @sum="onTbCtxSum"
     @compare="onTbCtxCompare"
   >
@@ -620,6 +628,9 @@
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewLinkedWp"><span class="gt-ucell-ctx-icon">🔗</span> 查看关联底稿</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewReferences"><span class="gt-ucell-ctx-icon">🔎</span> 查看引用方</div>
   </CellContextMenu>
+
+  <!-- V3 Req 9.6: 数字信任度面板 -->
+  <TrustScorePanel ref="trustScorePanelRef" :project-id="projectId" />
 
   <!-- Sprint 5.8: 引用方弹窗 -->
   <CellFormulaDetail
@@ -648,6 +659,7 @@ import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
@@ -676,6 +688,7 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import StaleIndicator from '@/components/StaleIndicator.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import DataQualityDialog from '@/components/DataQualityDialog.vue'
 import ReportLineMappingDialog from '@/components/trial-balance/ReportLineMappingDialog.vue'
 import { handleApiError } from '@/utils/errorHandler'
@@ -687,10 +700,13 @@ import { usePermission } from '@/composables/usePermission'
 import * as P from '@/services/apiPaths'
 import LinkageBadge from '@/components/LinkageBadge.vue'
 import { useLinkageIndicator } from '@/composables/useLinkageIndicator'
+import { useAuditContext } from '@/composables/useAuditContext'
+import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
 
 const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
+const { canEdit, onContextChange } = useAuditContext()
 const { add: decAdd, sub: decSub } = useDecimalCalc()
 
 const projectId = computed(() => projectStore.projectId || (route.params.projectId as string) || '')
@@ -1381,36 +1397,40 @@ async function onAdjClick(row: TrialBalanceRow, type: string) {
   }
 }
 
-watch(
-  () => [projectId.value, routeYear.value],
-  async () => {
-    await ensureProjectYear()
-    selectedProjectId.value = projectId.value
-    selectedYear.value = year.value
-    await fetchData()
-    await detectDataState()  // 自动检测步骤状态
-    await loadLatestAdjustmentTime()  // 加载最新调整时间用于新鲜度检测
-    await loadCompanyList()  // Task 3: 加载子公司列表
-    loadFreezeState()  // Task 4: 加载冻结状态
-    if (!projectStore.projectOptions.length) projectStore.loadProjectOptions()
-    // 加载底稿-科目映射
-    try {
-      wpMappings.value = await getAllWpMappings(projectId.value)
-      const idx: Record<string, WpAccountMapping> = {}
-      for (const m of wpMappings.value) {
-        for (const code of m.account_codes) {
-          idx[code] = m
-        }
+async function reloadTrialBalanceContext() {
+  await ensureProjectYear()
+  selectedProjectId.value = projectId.value
+  selectedYear.value = year.value
+  await fetchData()
+  await detectDataState()  // 自动检测步骤状态
+  await loadLatestAdjustmentTime()  // 加载最新调整时间用于新鲜度检测
+  await loadCompanyList()  // Task 3: 加载子公司列表
+  loadFreezeState()  // Task 4: 加载冻结状态
+  if (!projectStore.projectOptions.length) projectStore.loadProjectOptions()
+  // 加载底稿-科目映射
+  try {
+    wpMappings.value = await getAllWpMappings(projectId.value)
+    const idx: Record<string, WpAccountMapping> = {}
+    for (const m of wpMappings.value) {
+      for (const code of m.account_codes) {
+        idx[code] = m
       }
-      wpMappingIndex.value = idx
-    } catch { /* ignore */ }
-    // 加载已生成的底稿列表（用于直接跳转编辑器）
-    try {
-      wpList.value = await listWorkpapers(projectId.value)
-    } catch { /* ignore */ }
-  },
-  { immediate: true }
-)
+    }
+    wpMappingIndex.value = idx
+  } catch { /* ignore */ }
+  // 加载已生成的底稿列表（用于直接跳转编辑器）
+  try {
+    wpList.value = await listWorkpapers(projectId.value)
+  } catch { /* ignore */ }
+}
+
+// 初次加载（替代 onMounted 一次性加载）
+reloadTrialBalanceContext()
+
+// V3 Req 5.1：上下文（projectId/year）变化时自动重载（替代散落的 watch）
+onContextChange(() => {
+  reloadTrialBalanceContext()
+})
 
 // ─── Ctrl+F 快捷键注册 + shortcut:save 监听 ─────────────────────────────────
 onMounted(() => {
@@ -2092,6 +2112,15 @@ function onTbCtxFormula() {
 function onTbCtxOpenWp() {
   tbCtx.closeContextMenu()
   if (tbCtx.contextMenu.rowData?.standard_account_code) onOpenWorkpaper(tbCtx.contextMenu.rowData.standard_account_code)
+}
+
+// V3 Req 9.6: 数字信任度
+const trustScorePanelRef = ref<InstanceType<typeof TrustScorePanel> | null>(null)
+function onTbCtxTrustScore() {
+  tbCtx.closeContextMenu()
+  const row = tbCtx.contextMenu.rowData
+  const context = `tb:${row?.standard_account_code || ''}`
+  trustScorePanelRef.value?.open(context)
 }
 
 function onTbCtxSum() {

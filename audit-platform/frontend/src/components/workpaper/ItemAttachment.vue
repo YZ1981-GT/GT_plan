@@ -36,6 +36,7 @@ import { ref, onMounted, watch } from 'vue'
 import { Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { confirmDelete } from '@/utils/confirm'
 
 interface AttItem {
   id: string
@@ -106,6 +107,12 @@ async function onUpload(req: any) {
 }
 
 async function onDelete(id: string) {
+  const att = attachments.value.find((a) => a.id === id)
+  try {
+    await confirmDelete(att?.filename ? `附件「${att.filename}」` : '该附件')
+  } catch {
+    return
+  }
   try {
     await api.delete(`/api/attachments/${id}`)
     attachments.value = attachments.value.filter((a) => a.id !== id)

@@ -62,6 +62,17 @@
         </template>
       </GtPageHeader>
 
+      <!-- 归档横幅 -->
+      <ArchivedBanner />
+
+      <!-- 跨模块冲突 banner（spec global-refinement-v3 Task 7.5） -->
+      <ConflictBanner :project-id="projectId" @view="conflictPanelVisible = true" />
+      <ConflictResolutionPanel
+        v-model="conflictPanelVisible"
+        :project-id="projectId"
+        @resolved="onConflictResolved"
+      />
+
       <!-- F29: 报表平衡检查结果 -->
       <el-alert
         v-if="balanceCheckResult"
@@ -530,7 +541,7 @@
         </p>
         <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center; flex-wrap: wrap;">
           <el-button size="small" @click="loadPresetMappingAll" :loading="mappingLoading">一键加载全部预设</el-button>
-          <el-button size="small" type="primary" @click="saveMappingRulesAll" :loading="mappingLoading">保存全部规则</el-button>
+          <el-button size="small" type="primary" @click="saveMappingRulesAll" :loading="mappingLoading" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">保存全部规则</el-button>
           <SharedTemplatePicker
             config-type="report_mapping"
             :project-id="projectId"
@@ -726,6 +737,7 @@
     :multi-count="rvCtx.selectedCells.value.length"
     @copy="onRvCtxCopy"
     @formula="onRvCtxFormula"
+    @trust-score="onRvCtxTrustScore"
     @sum="onRvCtxSum"
     @compare="onRvCtxCompare"
   >
@@ -736,6 +748,12 @@
     <div class="gt-ucell-ctx-item" @click="onRvCtxViewAdjustments"><span class="gt-ucell-ctx-icon">🔗</span> 查看调整明细</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxViewFormulaSource"><span class="gt-ucell-ctx-icon">🔍</span> 查看公式来源</div>
   </CellContextMenu>
+
+  <!-- V3 Req 9.6: 数字信任度面板 -->
+  <TrustScorePanel ref="trustScorePanelRef" :project-id="projectId" />
+
+  <!-- V3 Req 10.4: 可解释状态机面板 -->
+  <StatusMachinePanel ref="smPanelRef" module="report" :instance-id="reportInstanceId" />
 
   <!-- Sprint 5.6: 公式来源弹窗 -->
   <CellFormulaDetail
@@ -777,6 +795,12 @@ import { fmtAmount } from '@/utils/formatters'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useProjectStore } from '@/stores/project'
 import { setupPasteListener, pasteToSelection } from '@/composables/useCopyPaste'
+import { useAuditContext } from '@/composables/useAuditContext'
+import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
+import ConflictBanner from '@/components/conflict/ConflictBanner.vue'
+import ConflictResolutionPanel from '@/components/conflict/ConflictResolutionPanel.vue'
+import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
+import StatusMachinePanel from '@/components/status_machine/StatusMachinePanel.vue'
 import { withLoading } from '@/composables/useLoading'
 import { handleApiError } from '@/utils/errorHandler'
 import { usePenetrate } from '@/composables/usePenetrate'
@@ -791,6 +815,7 @@ import { useNavigationStack } from '@/composables/useNavigationStack'
 
 const route = useRoute()
 const router = useRouter()
+const { canEdit, onContextChange } = useAuditContext()
 
 // EQCR 只读访问 (Requirements: 17.1-17.4)
 const authStore = useAuthStore()
@@ -798,6 +823,12 @@ const isEqcrRole = computed(() => authStore.user?.role === 'eqcr')
 const projectStore = useProjectStore()
 
 const projectId = computed(() => projectStore.projectId)
+
+// 跨模块冲突调解（spec global-refinement-v3 Task 7.5）
+const conflictPanelVisible = ref(false)
+function onConflictResolved(_id: string, _resolution: string) {
+  // 调解后 banner 自动从列表移除；此处保留 hook 供后续扩展（如局部 reload）
+}
 
 // ─── 云协同：账套激活/回滚后自动刷新 ─────────────────────────────────────────
 const { onDatasetActivated, onDatasetRolledBack } = useProjectEvents(projectId)
@@ -1602,14 +1633,18 @@ function openWorkpaper(wpId: string) {
   router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId } })
 }
 
-watch(
-  () => [projectId.value, routeYear.value],
-  async () => {
-    await ensureProjectYear()
-    await fetchReport()
-  },
-  { immediate: true }
-)
+async function reloadReportContext() {
+  await ensureProjectYear()
+  await fetchReport()
+}
+
+// 初次加载（替代 onMounted 一次性加载）
+reloadReportContext()
+
+// V3 Req 5.1：上下文（projectId/year）变化时自动重载（替代散落的 watch）
+onContextChange(() => {
+  reloadReportContext()
+})
 
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
 const rvCtx = useCellSelection()
@@ -1830,6 +1865,23 @@ function onRvCtxDrillDown() {
 function onRvCtxFormula() {
   rvCtx.closeContextMenu()
   showFormulaManager.value = true
+}
+
+// V3 Req 9.6: 数字信任度
+const trustScorePanelRef = ref<InstanceType<typeof TrustScorePanel> | null>(null)
+
+// V3 Req 10.4: 可解释状态机
+const smPanelRef = ref<InstanceType<typeof StatusMachinePanel> | null>(null)
+const reportInstanceId = ref('')
+function openStatusMachine() {
+  smPanelRef.value?.open()
+}
+
+function onRvCtxTrustScore() {
+  rvCtx.closeContextMenu()
+  const row = rvCtx.contextMenu.rowData
+  const context = `report:${activeTab.value}|${row?.row_code || ''}`
+  trustScorePanelRef.value?.open(context)
 }
 
 function onRvCtxGoNote() {

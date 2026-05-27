@@ -1,0 +1,8 @@
+{
+  "name": "eslint-plugin-gt-audit",
+  "version": "1.0.0",
+  "description": "审计平台自定义 ESLint 规则插件",
+  "main": "index.cjs",
+  "private": true,
+  "keywords": ["eslint", "eslintplugin", "eslint-plugin"]
+}

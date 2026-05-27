@@ -55,7 +55,7 @@ async def export_excel(
     """
     # Validate mode
     if body.mode not in ("unadjusted", "audited"):
-        raise HTTPException(status_code=400, detail="mode must be 'unadjusted' or 'audited'")
+        raise HTTPException(status_code=400, detail={"message": "mode 必须是 unadjusted 或 audited", "message_en": "mode must be 'unadjusted' or 'audited'"})
 
     # Validate report_types if provided
     valid_types = {"balance_sheet", "income_statement", "cash_flow_statement", "equity_statement"}
@@ -71,7 +71,7 @@ async def export_excel(
     result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail={"message": "项目不存在", "message_en": "Project not found"})
 
     # Generate Excel
     from app.services.report_excel_exporter import ReportExcelExporter

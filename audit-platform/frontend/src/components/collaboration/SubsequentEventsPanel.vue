@@ -8,21 +8,21 @@
         </div>
 
         <el-table :data="events" stripe>
-          <el-table-column prop="event_date" label="event_date" width="120" />
-          <el-table-column prop="event_type" label="event_type" width="140">
+          <el-table-column prop="event_date" label="事项日期" width="120" />
+          <el-table-column prop="event_type" label="事项类型" width="140">
             <template #default="{ row }">
               <el-tag :type="row.event_type === 'ADJUSTING' ? 'warning' : 'info'" size="small">
                 {{ row.event_type }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="description" label="description" />
-          <el-table-column prop="financial_impact" label="financial_impact" width="150">
+          <el-table-column prop="description" label="描述" />
+          <el-table-column prop="financial_impact" label="财务影响" width="150">
             <template #default="{ row }">
               {{ row.financial_impact !== null ? Number(row.financial_impact).toFixed(2) : '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="is_disclosed" width="120">
+          <el-table-column label="已披露" width="120">
             <template #default="{ row }">
               <el-tag :type="row.is_disclosed ? 'success' : 'info'" size="small">
                 {{ row.is_disclosed ? 'Yes' : 'No' }}
@@ -39,16 +39,16 @@
         </div>
 
         <el-table :data="checklistItems" stripe>
-          <el-table-column prop="item_code" label="item_code" width="120" />
-          <el-table-column prop="description" label="description" />
-          <el-table-column label="is_completed" width="120">
+          <el-table-column prop="item_code" label="编号" width="120" />
+          <el-table-column prop="description" label="描述" />
+          <el-table-column label="完成状态" width="120">
             <template #default="{ row }">
               <el-tag :type="row.is_completed ? 'success' : 'info'" size="small">
                 {{ row.is_completed ? '已完成' : '待完成' }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="completed_at" label="completed_at" width="180">
+          <el-table-column prop="completed_at" label="完成时间" width="180">
             <template #default="{ row }">
               {{ row.completed_at || '-' }}
             </template>
@@ -66,8 +66,8 @@
 
     <!-- 新建对话框 -->
     <el-dialog append-to-body v-model="dialogVisible" title="新建期后事项" width="500px">
-      <el-form :model="eventForm" label-width="100px">
-        <el-form-item label="event_date">
+      <el-form ref="eventFormRef" :model="eventForm" :rules="eventRules" label-width="100px">
+        <el-form-item label="事项日期" prop="event_date">
           <el-date-picker
             v-model="eventForm.event_date"
             type="date"
@@ -77,16 +77,16 @@
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="event_type">
+        <el-form-item label="事项类型" prop="event_type">
           <el-select v-model="eventForm.event_type" placeholder="选择类型" style="width: 100%">
-            <el-option label="ADJUSTING" value="ADJUSTING" />
-            <el-option label="NON-ADJUSTING" value="NON_ADJUSTING" />
+            <el-option label="调整事项" value="ADJUSTING" />
+            <el-option label="非调整事项" value="NON_ADJUSTING" />
           </el-select>
         </el-form-item>
-        <el-form-item label="description">
+        <el-form-item label="描述" prop="description">
           <el-input v-model="eventForm.description" type="textarea" :rows="3" />
         </el-form-item>
-        <el-form-item label="financial_impact">
+        <el-form-item label="财务影响">
           <el-input v-model.number="eventForm.financial_impact" type="number" placeholder="0.00" />
         </el-form-item>
       </el-form>
@@ -100,15 +100,18 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { subsequentEventApi } from '@/services/collaborationApi'
+import { rules } from '@/utils/formRules'
 
 const projectId = 'current-project-id'
 const activeTab = ref('events')
 const events = ref<any[]>([])
 const checklistItems = ref<any[]>([])
 const dialogVisible = ref(false)
+const eventFormRef = ref<FormInstance>()
 
 const eventForm = ref({
   event_date: '',
@@ -116,6 +119,11 @@ const eventForm = ref({
   description: '',
   financial_impact: null as number | null,
 })
+
+const eventRules: FormRules = {
+  event_date: [{ required: true, message: '请选择事件日期', trigger: 'change' }],
+  description: [rules.required('描述')],
+}
 
 onMounted(async () => {
   await loadEvents()

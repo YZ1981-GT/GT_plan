@@ -230,7 +230,7 @@ async def update_finding_status(
         finding = next((f for f in _findings_list if f["id"] == finding_id), None)
 
     if not finding:
-        raise HTTPException(status_code=404, detail="Finding not found")
+        raise HTTPException(status_code=404, detail={"message": "审计发现不存在", "message_en": "Finding not found"})
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     finding["review_status"] = body.status

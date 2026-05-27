@@ -375,7 +375,21 @@
         <el-button size="small" plain @click="exportLedgerExcel">导出Excel</el-button>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
+      <!-- V3 Req 12.2.1: 虚拟滚动模式（数据量 > 1000 行时自动切换 el-table-v2） -->
+      <el-table-v2
+        v-if="ledgerTotal > 1000"
+        :columns="ledgerVirtualColumns"
+        :data="ledgerDisplay"
+        :width="tableWidth"
+        :height="tableHeight || 600"
+        :row-height="36"
+        :header-height="40"
+        :row-class="ledgerVirtualRowClass"
+        fixed
+      />
+      <!-- 标准模式（≤1000 行使用 el-table） -->
       <el-table
+        v-else
         :data="ledgerDisplay"
         border
         size="small"
@@ -961,11 +975,14 @@ import { numericSortMethod } from '@/utils/numericSort'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { AMOUNT_DIVISOR_KEY } from '@/constants/amountDivisor'
 import { handleApiError } from '@/utils/errorHandler'
+import { logger } from '@/utils/logger'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const route = useRoute()
 const router = useRouter()
 const penetrate = usePenetrate()
 const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
+const { onContextChange } = useAuditContext()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => {
   const q = Number(route.query.year)
@@ -1814,7 +1831,9 @@ function onImportDone() {
 
 // 路由变化时重新加载（不在初始化时触发，由 onMounted 处理）
 let _initialized = false
-watch([projectId, year], () => {
+
+// V3 Req 5.1：上下文（projectId/year）变化时自动重载（替代原 watch）
+onContextChange(() => {
   if (!_initialized) return
   if (projectId.value) {
     _auxBalanceLoadedKey.value = ''  // 清除辅助余额表缓存
@@ -1927,6 +1946,22 @@ const ledgerTotal = ref(0)
 const ledgerPage = ref(1)
 const ledgerPageSize = ref(100)
 const ledgerPageSizeOptions = [50, 100, 200, 500]
+
+// V3 Req 12.2.1: el-table-v2 虚拟滚动列定义（数据量 > 1000 行时启用）
+const tableWidth = ref(1200)
+const ledgerVirtualColumns = [
+  { key: 'voucher_date', dataKey: 'voucher_date', title: '日期', width: 110 },
+  { key: 'voucher_no', dataKey: 'voucher_no', title: '凭证号', width: 90 },
+  { key: 'summary', dataKey: 'summary', title: '摘要', width: 300, flexGrow: 1 },
+  { key: 'debit_amount', dataKey: 'debit_amount', title: '借方', width: 180, align: 'right' },
+  { key: 'credit_amount', dataKey: 'credit_amount', title: '贷方', width: 180, align: 'right' },
+  { key: 'balance', dataKey: 'balance', title: '余额', width: 180, align: 'right' },
+]
+function ledgerVirtualRowClass({ rowData }: { rowData: any }) {
+  if (rowData._type === 'opening') return 'gt-ledger-opening'
+  if (rowData._type === 'subtotal') return 'gt-ledger-subtotal'
+  return ''
+}
 
 /** 序时账增强显示：期初行 + 每笔余额 + 月小计行 */
 const ledgerDisplay = computed(() => {
@@ -2302,7 +2337,7 @@ function balanceRowStyle({ row }: { row: any }) {
 // ── 加载数据 ──
 async function loadBalance() {
   if (!projectId.value) {
-    console.warn('[Ledger] projectId is empty, skip loading')
+    logger.warn('[Ledger] projectId is empty, skip loading')
     return
   }
   loading.value = true
@@ -2320,7 +2355,7 @@ async function loadBalance() {
       loadAmountUnit()
     }
   } catch (e) {
-    console.error('[Ledger] loadBalance failed:', e)
+    logger.error('[Ledger] loadBalance failed:', e)
     balanceData.value = []
     checkImportActive()
   }
@@ -2820,7 +2855,7 @@ async function loadAllAuxBalance() {
     // 加载扁平视图第一页
     await loadAuxBalancePage()
   } catch (e) {
-    console.error('loadAllAuxBalance error:', e)
+    logger.error('loadAllAuxBalance error:', e)
     auxSummaryData.value = []; auxPagedRows.value = []
   }
   finally {

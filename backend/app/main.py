@@ -86,6 +86,7 @@ def _register_phase_handlers() -> None:
     from app.services.gate_rules_cross_check import register_cross_check_rules
     import app.services.gate_rules_round6  # noqa: F401 — 模块级自动注册
     import app.services.gate_rules_ai_content  # noqa: F401 — R3 AI 内容确认规则自动注册
+    import app.services.gate_rules_cross_module_conflict  # noqa: F401 — V3 7.6 跨模块冲突守门规则自动注册
     from app.services.task_event_handlers import (
         register_event_handlers as register_task_handlers,
     )
@@ -166,6 +167,7 @@ def _start_workers(stop_event):
         sla_worker, import_recover_worker, outbox_replay_worker,
         audit_log_writer_worker, budget_alert_worker, dataset_purge_worker,
         staged_orphan_cleaner, export_cleanup_worker,
+        time_machine_cleanup_worker,
     )
     tasks = [
         asyncio.create_task(sla_worker.run(stop_event)),
@@ -176,6 +178,7 @@ def _start_workers(stop_event):
         asyncio.create_task(dataset_purge_worker.run(stop_event)),
         asyncio.create_task(staged_orphan_cleaner.run(stop_event)),
         asyncio.create_task(export_cleanup_worker.run(stop_event)),
+        asyncio.create_task(time_machine_cleanup_worker.run(stop_event)),
     ]
     # 进程内 ImportJob runner 主循环：写 import_worker 心跳 + 拉 queued 任务
     # 仅当 LEDGER_IMPORT_IN_PROCESS_RUNNER_ENABLED=True 启动（生产模式下应关闭，

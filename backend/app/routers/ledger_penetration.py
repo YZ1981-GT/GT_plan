@@ -111,12 +111,13 @@ async def get_ledger_entries(
     cursor: str | None = Query(None, description="游标分页: date|id 格式"),
     limit: int = Query(100, ge=1, le=1000),
     page: int = 1,
-    page_size: int = 100,
+    page_size: int = Query(100, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """序时账明细（按科目穿透）— 支持游标分页和传统分页
 
+    V3 Req 12.2.3: page_size 强制分页，默认 100，最大 1000。
     当提供 cursor 参数时使用游标分页（推荐大数据量场景），
     否则使用传统 OFFSET 分页。
     """

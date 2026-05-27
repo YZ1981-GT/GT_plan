@@ -57,6 +57,29 @@ async def sse_stream(
                     # Shutdown signal
                     break
 
+                # raw event 路径（broadcast_raw 推送的 dict 形式）
+                if isinstance(payload, dict) and payload.get("_raw"):
+                    raw_project_id = payload.get("project_id")
+                    raw_year = payload.get("year")
+                    # project_id 过滤：未指定 project_id 视为全局事件，不下发到具体项目流
+                    if raw_project_id is None:
+                        continue
+                    if str(raw_project_id) != str(project_id):
+                        continue
+                    if (
+                        year is not None
+                        and raw_year is not None
+                        and int(raw_year) != year
+                    ):
+                        continue
+                    raw_event_type = payload.get("event_type", "raw")
+                    raw_extra = payload.get("extra") or {}
+                    yield (
+                        f"event: {raw_event_type}\n"
+                        f"data: {json.dumps(raw_extra, ensure_ascii=False, default=str)}\n\n"
+                    )
+                    continue
+
                 # Filter by project_id (and optionally year)
                 if str(payload.project_id) != str(project_id):
                     continue

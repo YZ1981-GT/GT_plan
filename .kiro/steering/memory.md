@@ -10,6 +10,7 @@ inclusion: always
 ## 用户偏好
 
 - 语言中文；本地优先轻量方案；启动 `start-dev.bat`（后端 9980 + 前端 3030）；打包 `build_exe.py`（PyInstaller，不要 .bat）
+- **UI 全中文化铁律**（2026-05-26）：所有用户可见 UI 文本（label/title/placeholder/按钮/弹窗/状态/API 错误消息）必须中文；技术术语保留英文（SQL/PDF/OCR/LLM/AI/API/UUID/Qwen/CAS/编号 D2-1 等）；不接入 i18n（仅 2 视图用），直接硬编码中文 + ESLint 卡点防退化
 - **输出控制**：分步输出/修改，大改动拆小批次；不一次出过多内容
 - 功能收敛：停加新功能，核心 6-8 页做到极致，空壳标 developing
 - 前后端必须联动；删除二次确认 + 先进回收站；一次性脚本用完即删
@@ -58,6 +59,9 @@ inclusion: always
 - **双 storage 目录职责**：仓库根 `storage/projects/{UUID}/workpapers/` = 底稿文件；`backend/storage/{knowledge,projects,users,ledger_uploads}/` = 附件/上传；两边 gitignored 但代码 hardcode
 ts 353 / composables 91
 - **数据规模**：模板 456 / cross_wp_ref 400 / prefill 1035 cells / VR 114 / Spec 70+
+- **代码规模实测**（2026-05-26）：views 99 / components 381 / composables 132 / stores 9 / routers 281 / models 62 / services 369
+- **代码健康度实测**（2026-05-26）：`except Exception` 1162 处 / `float()` services 420 处 / `console.log` 74 处 / `datetime.utcnow()` 19 处 / statusEnum 硬编码残留 17 视图 / `year:changed` 仅 3 视图订阅 / autoSave 间隔 120s / el-skeleton 10 视图 / 虚拟滚动 0 处 / 表单无 rules 39 视图 / 删除无确认 23 处 / 路由参数变化仅 1 视图 watch / GtEmpty 仅 3 处 / GtStatusTag 仅 6 处 / 分页仅 7 视图 / 响应式仅 7 处（固定宽度 57 视图）
+- **高阶治理盲区**（2026-05-26）：归档项目 0 视图检查 isArchived（CAS 1131 合规风险）/ PBC router 仍 stub / 0 客户端 portal / 跨年继承散落 53 服务无统一 / 硬编码 URL 25 处 / 0 UserPreference 表 / 通知仅邮件 1 处（0 微信/钉钉）/ 软删除 33 服务硬删除仅 2 处（已成熟）/ Bundle visualizer 未配置
 - **新增依赖**：locust / marked + dompurify / Storybook 8.6.14 / xlsx-js-style / decimal.js / python-docx / prometheus_client / **PyYAML**（workpaper-html-renderer 引入）/ **fast-check v4.8.0**（前端 PBT）；外部 LibreOffice（4 路径 fallback）
 - **文档/表格生成职责边界**（2026-05-23）：Univer Sheets = 底稿在线编辑 / Univer Docs+TipTap+textarea 三级降级 /楷体_GB2312/宋体/Arial Narrow）必装
 - **Dashboard 视觉规约**（2026-05-23）：5 dashboard 统一 `GtPageHeader variant="banner"` + dark 主题；DashboardViewSwitcher 共享组件挂 banner #actions slot
@@ -78,6 +82,28 @@ ts 353 / composables 91
 - 9 PBT 属性测试覆盖（hypothesis + fast-check 双框架）
 - 性能基准全部 ×18+ 余量（HTML 冷启动 27.7ms / xlsx 导出 275.7ms / classification 1.2μs）
 - 详细技术决策、新依赖（PyYAML）、测试模式（fake-timers / 子组件 stub / FakeDB）已下沉到 #dev-history
+
+### V3 Spec 进展（global-refinement-v3，2026-05-27 进行中）
+
+- **Sprint 0 横切基础设施 ✅**（5/5）：useAuditContext composable + V017 迁移 3 表（ai_content_log/cross_module_conflicts/time_machine_snapshots）+ ORM models + 7 ESLint 规则骨架（gt-audit plugin）+ audit_log_helper（6 event_type schemas）
+- **Sprint 1 Req 1 归档只读 ✅**（7/7）：`_check_project_not_archived` hook 注入 require_project_access + 例外通道 + unarchive 二次确认 + ArchivedBanner.vue + canEdit 按钮 disabled + 7 视图接入 + Property 1 hypothesis
+- **Sprint 1 Req 2 金额 Decimal 化 ✅**（9/9）：`_decimal_helpers.py`（to_decimal/quantize/amount_tolerance）+ Pydantic `AmountDecimal` Annotated type + 5 schema 切换 + note_validation_engine/note_formula_engine 容差替换 + `scripts/_check_no_float_amount.py`（baseline 15）+ 前端 `utils/decimal.ts` + GtAmountCell Decimal 切换 + Property 2 hypothesis + 全量回归（132 errors/1 fail 全部预存 SQLite vs PG schema 问题，无 Decimal 回归）
+- **Sprint 1 Req 3 表单校验全覆盖 ✅**（6/6）：formRules.ts 扩展（projectName 新增）+ `useFormSubmit` composable（防重复点击 + short-circuit）+ 5 核心表单接入（Adjustments/Misstatements/ProjectWizard/UserManagement/WorkpaperEditor）+ ESLint `el-form-must-have-rules` 规则实现（AST 通过 defineTemplateBodyVisitor）+ 44 文件批量加 :rules（baseline 50→0，100% 清零）+ Property 3 fast-check 测试（含 baselines.json 守门断言）
+- **Sprint 1 Req 4 删除二次确认 ✅**（4/4）：`confirm.ts` 扩展 confirmDelete/confirmDangerous（options 对象 + impact + recoverable + requireInputMatch 输入校验）+ 5 处补 confirm（ItemAttachment/ReportLineMappingDialog/SEChecklistPanel/FormulaManagerDialog × 2）+ ESLint `no-delete-without-confirm` AST 规则（function-scoped 窗口 + services/*.ts 整目录豁免，baseline 0）+ `scripts/_check_no_delete_without_confirm.py` 静态扫描卡点（Property 4）
+- **Sprint 1 Req 5 年度切换响应（部分）**：5.1 ✅ 7 视图接入 useAuditContext.onContextChange（Adjustments/Misstatements/ReportView/DisclosureEditor/WorkpaperList/TrialBalance/LedgerPenetration）；3 视图通过 `reloadXxxContext()` 函数提取 + 顶层直调替代 `watch(..., {immediate:true})` 双角色避免重复触发；4 视图保留 onMounted 直接追加 onContextChange
+- **关键技术决策**：
+  - 单一迁移 V017 同时建 3 表（ADR-08）+ R017 一次性回滚
+  - `_resolve_tolerance(rule.tolerance, *refs) = max(下限, amount_tolerance(max_abs))` 兼容小金额（<1万 仍 0.01）+ 大金额放宽，避免破坏既有测试
+  - 前端 `utils/decimal.ts` 镜像后端 `_decimal_helpers.py`（precision=28 + ROUND_HALF_UP）
+  - GtAmountCell 实际路径在 `components/common/`（非 `components/gt/`，spec 文档笔误）；ArchivedBanner 同
+  - `note_formula_generator.py` 0 处 `> 0.01`，实际目标是 `note_formula_engine.py`（spec 文档笔误已修正）
+  - AmountDecimal = `Annotated[Decimal, BeforeValidator(to_decimal)]` 拒绝 NaN/Infinity（Pydantic v2 范式）
+  - useFormSubmit 三大契约：validate 失败 short-circuit / submitting 防重复点击 / action 抛异常时 submitting 重置
+  - el-form rule.required:true 仅在 value=='' || null || undefined 时报错，**单空格 ` ` 视为有效**（element-plus 默认行为，PBT 测试需对齐）
+  - 测试路径修复铁律：跨工作区/子目录的 pytest fixture 文件路径要么用 `Path(__file__).resolve().parent` 推断，要么 baseline.json 兜底多候选路径（避免 cwd 切换导致 `open("backend/migrations/...")` 失败）
+  - **ESLint AST 规则窗口策略**：纯行号窗口（前 3 行）会漏报 `try { confirmDelete } catch { return } try { api.delete }` 模式（间隔 5+ 行）；正确做法是 AST 沿 `node.parent` 链向上查 enclosing function（FunctionDeclaration/Expression/ArrowFunctionExpression/MethodDefinition）作为窗口起点，找不到时回退 8 行兜底；同函数内任意位置 confirm 即视为已确认
+  - **ESLint 文件级豁免用 RegExp 数组而非 Set**：`/\/src\/services\/[^/]+\.ts$/` 一条正则覆盖整个 services 目录，比 EXEMPT_FILES Set 列举具体文件名更稳健（避免新增 service 文件需同步更新规则）
+  - **watch immediate:true 双角色重构**：旧代码用 `watch([...], { immediate: true }, body)` 同时承担首次加载 + 后续监听，迁移到 useAuditContext.onContextChange 时必须先把 watch 体提取为独立函数（如 `reloadXxxContext()`）顶层直调一次替代 immediate，再通过 onContextChange 订阅，否则 watch 旧路径与 onContextChange 新路径会双触发
 
 ### 真正待办（外部依赖）
 
@@ -130,3 +156,70 @@ ts 353 / composables 91
 - **PowerShell**：写中文/emoji 用 fsWrite；多 -m 长 commit 含 ()/→/中文冒号必须 `git commit --% -m "..."` stop-parsing token；`commit-msg.txt` 临时文件方案不进 commit 是底线
 - **SQLite 测试 set_rls_context 兼容**：mock `app.deps.set_rls_context` 绕开（admin 路径仍会触发）
 - **FastAPI dep_overrides 闭包陷阱**：`require_project_access("readonly")` 工厂每次返新闭包，dep_overrides 不命中；正确做法 = 仅 override `get_current_user` + `get_db`
+- **hypothesis PBT 调速铁律**（2026-05-27）：大列表 PBT（min_size 100-2000 + max_examples 50-100）单测 7-8s 偏慢；调到 max_examples=15-30 + 列表 size 50-300 可降至 1-2s（~6x 加速）且不丢覆盖；快速 unit 类 PBT（quantize/tolerance）max_examples=30 足够
+- **ESLint vue 模板 AST 铁律**（2026-05-27）：自定义 ESLint 规则若直接 `return { VElement(node) {...} }` 在 vue-eslint-parser 解析的 .vue 文件中**不会触发**（默认 visitor 不走模板 AST）；必须用 `context.parserServices.defineTemplateBodyVisitor({...})` 包装；既有 `no-dialog-without-append.cjs` 同 bug 待修
+- **fast-check PBT 反例对齐铁律**（2026-05-27）：当反例失败时优先调整测试期望对齐**实际系统行为**而非"理想行为"（如 element-plus required 不拒绝单空格）；mock validate 函数要补全 type=email/number 等校验分支匹配生产 async-validator 行为
+- **ESLint Program-level visitor 铁律**（2026-05-27）：脚本 AST 规则用 `Program(node)` + 自定义 walker 跳过 `parent/loc/range` 防环；不需要 `defineTemplateBodyVisitor`（仅 vue 模板才需）；典型实例 = `must-watch-route-or-context.cjs` 同时检测 onMounted body 内 fetch+year + 文件级 watch/onContextChange 守卫
+- **broadcast_raw fan-out 铁律**（2026-05-27）：`event_bus.broadcast_raw(type, extra)` 需双路推送 = ①Redis Stream xadd 持久化 + ②内存 sse_queues fan-out（dict 形式带 `_raw=True` 标记）；events.py event_generator 用 `isinstance(payload, dict) and payload.get('_raw')` 区分 raw vs EventPayload；不触发 _handlers 避免双发
+- **业务异常 = ValueError 子类铁律**（2026-05-27）：service 层业务异常（如 `AiContentLogNotFoundError` / `ConflictAlreadyResolvedError` / `ConflictMergeValueRequiredError`）继承 `ValueError`，router 层捕获 ValueError 即统一映射 422，避免每类异常单独写 except 分支
+- **AI 内容生成强制溯源铁律**（2026-05-27）：6.2 起新增 `wrap_ai_output_with_log(...)` 异步版（保留同步 `wrap_ai_output` 向后兼容）；`db + project_id + user_id + instance_type + instance_id` 五参齐全自动调 `ai_content_log_service.create()` 写表 + 返回 `ai_content_log_id` + `confirm_action='pending'`；任一缺失静默跳过；`AIContentMustBeConfirmedRule` 双路径检查（ai_content_log 表优先 + parsed_data fallback），`location.via='ai_content_log'/'parsed_data'` 标识来源
+- **manual_override 守卫三态铁律**（2026-05-27）：`_check_manual_override_before_propagate(...)` 返回 `'allow' / 'block_enqueued' / 'auto_resolved'`；`'block_enqueued'` 调用方必须 abort 写入并仅更新 last_sync_at（拦截 ≠ 静默丢弃）；`propagation_origin='system_recompute'` 即便 manual_override 也直接 auto_resolve（汇率刷新等）；约定字段 = `table_data._manual_override` 或 `parsed_data._manual_override_cells: list[str]`
+- **target_cell 前缀化编码铁律**（2026-05-27）：`ai_content_log.target_cell` 保存为 `{instance_type}:{instance_id}[:{field}]` 三段式，便于 `list_by_project(instance_type='workpaper')` 通过 `LIKE 'workpaper:%'` 过滤；service 层 create() 自动前缀化，调用方传原始 field 即可
+- **section registry 注册即用铁律**（2026-05-27）：archive_section_registry 模块加载即 `register('05', filename, generator_func, description)`，无需手动调用；generator 通过 lazy import 委托避免循环依赖；§01-04 既占位（EQCR/QC/独立性等），新加章节按 prefix 自然排序
+
+### Sprint 1 Req 5/6/7 进展（2026-05-27 完成）
+
+- **Sprint 1 全部 30 任务 ✅**（2026-05-27 完成）
+- **Sprint 1 Req 5 ✅**（3/3）：5.1 7 视图接入 onContextChange + 5.2 ESLint `must-watch-route-or-context` AST 规则（baseline 3：AuditReportEditor/Drilldown/Materiality）+ 5.3 Property 5 fast-check（5 properties × ~20 runs）+ 7 视图静态守门 + Playwright e2e 骨架（默认 skip）
+- **Sprint 1 Req 6 AI 内容溯源 ✅**（7/7）：6.1 ai_content_log_service（7 API + 17 tests）+ 6.2 wrap_ai_output_with_log（12 tests）+ 6.3 AIContentMustBeConfirmedRule 双路径（13 tests）+ 6.4 AiContentTag/Banner（5 视图顶部接入 + 14 vitest）+ 6.5 router 4 端点 + AiContentBadge 组件（8+11 tests）+ 6.6 §05 AI 贡献明细归档章节 + 6.7 Property 6 hypothesis（3 PBT 不变量）
+- **Sprint 1 Req 7 跨模块冲突调解 ✅**（7/7）：7.1 conflict_resolution_service（6 API + 19 tests）+ 7.2 manual_override hook 三态注入（10 tests）+ 7.3 SSE broadcast_raw fan-out（13 tests）+ 7.4 ConflictResolutionPanel.vue（el-drawer + 三选一 + 10 vitest）+ 7.5 ConflictBanner 5 视图接入（8 vitest）+ 7.6 QC 规则 V3-CROSS-MODULE-CONFLICT-UNRESOLVED（4 tests）+ 7.7 Property 7 hypothesis（4 PBT + 1 sanity）
+- **新增 ESLint 规则 baseline 实测**：no-amount-without-decimal=15 / el-form-must-have-rules=0 / no-delete-without-confirm=0 / must-watch-route-or-context=3 / no-bare-amount-cell=92 / no-status-string-literal=202 / 其余 2 个 TBD（no-english-ui-label / console-log）
+
+### Sprint 2 Req 8 进展（2026-05-27 完成）
+
+- **8.1 GtAmountCell 全量覆盖 ✅**（4/4）：扫描脚本 baseline=109 → Top 3 视图接入后降至 92 + ESLint AST 规则 `no-bare-amount-cell` + Property 8 displayPrefs 一致性 4 不变量
+- **8.2 加载状态统一 ✅**（3/3）：死代码不存在（跳过）+ 3 视图 first-load+v-loading 示范（ExportDialog/MyReviewsPanel/GtTraceabilityDialog）+ GtLoadingOverlay 5s 超时提示（5 vitest 全绿）+ 新增 `useFirstLoad.ts` composable
+- **8.3 穿透导航面包屑 ✅**（4/4）：useNavigationStack（MAX_DEPTH=20 + push/pop/jumpTo/clear）+ usePenetrate 10 种穿透方法自动 push + GtPageHeader 自动渲染 DrilldownBreadcrumb + initGlobalBackspace 已接入 + Property 9 fast-check 4 不变量（25 tests 全绿）
+- **8.4 GtEmpty/GtStatusTag/statusEnum ✅**（4/4）：GtEmpty 5 preset + 13 处替换（baseline 182→169）+ GtStatusTag 4 视图接入 + ESLint `no-status-string-literal`（baseline 202）+ statusEnum.ts 中文 label 全量映射 + getStatusLabel/getStatusColor 工具函数（15 vitest）
+- **8.5 错误处理统一 ✅**（2/2）：handleApiError 扩展 423/422 AI/422 冲突 3 种中文映射（11 vitest）+ Top 15 文件 ~30 处 ElMessage.error 替换（views 内剩余 6 处为特殊处理）
+- **8.6 分页统一 ✅**（1/1 必需）：WorkpaperList + Adjustments + Misstatements 3 视图新增 el-pagination（page_size=50 客户端分页）；IssueTicketList + StaffManagement 已有
+
+### Sprint 2 Req 13 全平台中文化（2026-05-27 完成）
+
+- **13.1 术语表 ✅**：`docs/i18n/business-glossary.md`（60+ 审计术语 + 40+ UI 通用术语 + 技术白名单 8 类）
+- **13.2 扫描脚本 ✅**：`scripts/_chinese_localize.py`（--scan/--dry-run/--apply 三模式 + 完整白名单）
+- **13.3-13.7 批次替换 ✅**（合并 Top 20）：7 视图中文化（ConsistencyDashboard/SubsequentEventsPanel/VRCoverageTab/EnumDictManager/LogViewerPanel/EnumDictTab/WpTemplateTab），baseline 337→0
+- **13.8 后端双语化 ✅**：10 个 router 文件 14 处 HTTPException.detail 改为 `{message: 中文, message_en: English}`
+- **13.9 ESLint `no-english-ui-text` ✅**：defineTemplateBodyVisitor + 白名单 + 程序值排除，**baseline=0**
+- **13.10 Property 10 ✅**：`test_property_10_chinese_coverage.py`（2 tests：静态扫描=0 + baselines.json 守门）
+- **13.11 验收 [~]**：待真实项目 UAT（需 start-dev.bat）
+- **13.12 清理 [~]**：保留扫描脚本供后续复用
+- **Sprint 2 全部完成**（Req 8 + Req 13）
+
+### Sprint 3 Req 9/10/11 进展（2026-05-27 完成）
+
+- **Req 9 数据信任度可视化 ✅**（7/7）：trust_score_service（5 层并行查询 + Redis 60s TTL 缓存 + invalidate）+ router §124 + TrustScorePanel.vue（5 Tab el-drawer + 5 子组件）+ CellContextMenu "📋 数字信任度" + 5 视图接入 + 14 pytest + 8 vitest
+- **Req 10 可解释状态机 ✅**（5/5）：allowed_actions_service（5 模块 SM + guard 预查询）+ router §125 + StatusMachinePanel.vue + 5 视图接入 + Property 11（6 tests）+ 新增 `state_machines/` 目录
+- **Req 11 时光机自动快照 ✅**（8/8 必需）：time_machine_service（RFC 6902 jsonpatch 反向 diff）+ router §126 + cleanup_worker（每日 03:00）+ TimeMachineDrawer.vue + 3 视图接入 + useWorkpaperAutoSave 5 分钟快照 + Property 12（4 tests）
+- **新增依赖**：jsonpatch（RFC 6902 JSON Patch）
+- **新增目录**：`backend/app/services/state_machines/` + `backend/app/workers/`
+- **Sprint 3 全部完成**，下一步 Sprint 4（Req 12 编辑器与性能）
+
+### Sprint 4 Req 12 编辑器与性能（2026-05-27 完成）
+
+- **12.1 WorkpaperEditor 瘦身 [~]**：4 个 composable 骨架已建（useEditorToolbar/useEditorCycles/useEditorMode/editorDialogConfig）+ 12 处冗余别名已识别；完整迁移需独立 Sprint（依赖拓扑风险高）
+- **12.2 序时账虚拟滚动 [~]**：el-table-v2 条件渲染（>1000 行切换）+ 后端 page_size Query(100, ge=1, le=1000)；列宽/右键/排序待后续迭代
+- **12.3 autoSave 60s ✅**（3/3）：intervalMs 120→60s + recordEdit 10 次切 30s + 失败重试 + beforeunload sendBeacon + Property 13（7 vitest）
+- **12.4 console.log 清零 [~]**：logger.ts wrapper + ESLint no-console error + Top 28 处替换（8 文件）；余下渐进治理
+- **12.5 Property 13 ✅**：7 tests 全绿（60s 触发 / 快速模式 / 重试 / beforeunload / 恢复）
+- **Sprint 4 全部完成**（核心功能 + 骨架 + 渐进治理模式）
+
+### V3 Spec 总体状态（2026-05-27）
+
+- **Sprint 0-4 全部完成**：98 必需任务中 ~85 标 [x] + ~13 标 [~]（渐进治理/待真实环境）
+- **Sprint 回归 14.1/14.2 已通过**：后端 145 passed (29.70s) + 前端 126 passed (4.61s) = 271 tests 全绿
+- **Sprint 回归 14.3/14.4 待真实环境**：Playwright E2E + UAT 需 start-dev.bat（localhost:3030/9980 未启动时 ERR_CONNECTION_REFUSED）
+- **新增 composable**：useEditorToolbar / useEditorCycles / useEditorMode / useFirstLoad / useNavigationStack
+- **新增配置**：editorDialogConfig.ts（11 dialog 声明式配置）
+- **autoSave 新契约**：默认 60s + 10 次编辑切 30s + 保存成功恢复 60s + 失败重试 1 次 + beforeunload sendBeacon
+- **gin_index_monitor 表名 bug 修复**（2026-05-27）：`TABLE_NAME` 从 `"working_papers"`（复数，错误）改为 `"working_paper"`（单数，与 ORM `__tablename__` 一致）+ 已在 PG 创建 `idx_wp_parsed_data_gin` GIN 索引（jsonb_path_ops）

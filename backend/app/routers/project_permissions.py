@@ -195,7 +195,7 @@ async def get_my_permissions(
         )
     )
     if project_result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail={"message": "项目不存在", "message_en": "Project not found"})
 
     # 查询项目角色（通过 staff_members 关联）
     from app.models.staff_models import StaffMember
@@ -254,7 +254,7 @@ async def get_my_role(
         )
     )
     if project_result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail={"message": "项目不存在", "message_en": "Project not found"})
 
     # 查询项目角色
     from app.models.staff_models import StaffMember

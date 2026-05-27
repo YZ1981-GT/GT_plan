@@ -84,6 +84,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { WarningFilled } from '@element-plus/icons-vue'
 import axios from 'axios'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface JudgmentDimension {
   key: string
@@ -174,7 +175,7 @@ async function handleSubmit() {
     ElMessage.success(canSign ? '判断已提交，可以签字' : '判断已提交，存在不通过维度，无法签字')
     emit('submitted', { dimensions: dimensions.value, canSign })
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '提交失败')
+    handleApiError(err, '提交判断')
   }
 }
 </script>

@@ -14,7 +14,7 @@
       :risk-level="riskLevel"
     />
 
-    <el-form label-width="100px" size="small" class="gt-bchk-form">
+    <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px" size="small" class="gt-bchk-form">
       <el-form-item label="检查日期">
         <el-date-picker v-model="form.check_date" type="date" value-format="YYYY-MM-DD" />
       </el-form-item>
@@ -114,6 +114,7 @@
  */
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 import AuditContextHeader from './AuditContextHeader.vue'
@@ -122,6 +123,7 @@ import ItemAttachment from '../ItemAttachment.vue'
 import AiConclusionButton from '../AiConclusionButton.vue'
 import SignatureBlock from './SignatureBlock.vue'
 import { confirmLeave } from '@/utils/confirm'
+import { rules } from '@/utils/formRules'
 
 interface Props {
   modelValue: boolean
@@ -155,6 +157,10 @@ const form = ref({
   signature: null as any,
 })
 const saving = ref(false)
+const formRef = ref<FormInstance>()
+const formRules: FormRules = {
+  conclusion: [rules.required('结论')],
+}
 
 async function loadData() {
   try {

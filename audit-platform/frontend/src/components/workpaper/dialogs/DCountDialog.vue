@@ -14,7 +14,7 @@
       :risk-level="riskLevel"
     />
 
-    <el-form label-width="100px" size="small" class="gt-dcount-form">
+    <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px" size="small" class="gt-dcount-form">
       <el-form-item label="盘点日期">
         <el-date-picker v-model="form.count_date" type="date" value-format="YYYY-MM-DD" />
       </el-form-item>
@@ -144,6 +144,7 @@
  */
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 import AuditContextHeader from './AuditContextHeader.vue'
@@ -153,6 +154,7 @@ import AiConclusionButton from '../AiConclusionButton.vue'
 import SignatureBlock from './SignatureBlock.vue'
 import { confirmLeave } from '@/utils/confirm'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
+import { rules } from '@/utils/formRules'
 
 interface Props {
   modelValue: boolean
@@ -184,6 +186,10 @@ const form = ref({
   signatures: {} as any,
 })
 const saving = ref(false)
+const formRef = ref<FormInstance>()
+const formRules: FormRules = {
+  conclusion: [rules.required('结论')],
+}
 const { sum: decSum, sub: decSub } = useDecimalCalc()
 
 const totalCounted = computed(() => {

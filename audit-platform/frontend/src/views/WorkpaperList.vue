@@ -30,6 +30,9 @@
       </template>
     </GtPageHeader>
 
+    <!-- 归档横幅 -->
+    <ArchivedBanner />
+
     <!-- Phase 2 F3: 批量状态变更操作栏 -->
     <BatchActionBar
       v-if="selectedWpIds.length > 0"
@@ -130,7 +133,7 @@
         </div>
       </div>
       <div class="gt-wpb-workbench-list">
-        <el-table :data="workbenchTableData" stripe border style="width: 100%; font-size: 13px" max-height="calc(100vh - 320px)" @row-click="onWorkbenchRowClick">
+        <el-table :data="pagedWorkbenchData" stripe border style="width: 100%; font-size: 13px" max-height="calc(100vh - 320px)" @row-click="onWorkbenchRowClick">
           <el-table-column prop="wp_code" label="编码" min-width="90" sortable resizable />
           <el-table-column prop="wp_name" label="底稿名称" min-width="220" show-overflow-tooltip resizable />
           <el-table-column prop="cycle_name" label="循环" min-width="110" show-overflow-tooltip resizable />
@@ -156,6 +159,16 @@
             </template>
           </el-table-column>
         </el-table>
+        <div class="gt-pagination" v-if="wbTotal > wbPageSize" style="margin-top: 12px; display: flex; justify-content: flex-end;">
+          <el-pagination
+            v-model:current-page="wbPage"
+            :page-size="wbPageSize"
+            :total="wbTotal"
+            layout="total, prev, pager, next"
+            background
+            small
+          />
+        </div>
       </div>
     </div>
     <!-- 生命周期视图：6 阶段流程导航 -->
@@ -627,7 +640,7 @@
               <el-button @click="onUpload">上传</el-button>
               <el-button type="warning" @click="onQCCheck" :loading="qcLoading">自检</el-button>
               <el-tooltip :disabled="!hasBlocking" :content="blockingReasons.join('；')" placement="top">
-                <el-button type="success" @click="onSubmitReview" :disabled="hasBlocking || submitLoading" :loading="submitLoading">提交复核</el-button>
+                <el-button type="success" @click="onSubmitReview" :disabled="!canEdit || hasBlocking || submitLoading" :loading="submitLoading" :title="!canEdit ? '项目已归档，无法编辑' : ''">提交复核</el-button>
               </el-tooltip>
             </div>
 
@@ -739,7 +752,7 @@
                 </h4>
                 <div style="display:flex;gap:6px">
                   <el-button size="small" @click="goToConversation" title="发起复核对话（支持多轮讨论）">💬 对话</el-button>
-                  <el-button size="small" type="primary" @click="showAddAnnotation = true">新增意见</el-button>
+                  <el-button size="small" type="primary" @click="showAddAnnotation = true" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">新增意见</el-button>
                 </div>
               </div>
               <!-- 意见筛选 -->
@@ -794,8 +807,8 @@
 
             <!-- 新增意见弹窗 -->
             <el-dialog append-to-body v-model="showAddAnnotation" title="新增复核意见" width="400px">
-              <el-form label-width="60px">
-                <el-form-item label="内容">
+              <el-form ref="annoFormRef" :model="newAnnotation" :rules="annoRules" label-width="60px">
+                <el-form-item label="内容" prop="content">
                   <el-input v-model="newAnnotation.content" type="textarea" :rows="3" placeholder="输入复核意见" />
                 </el-form-item>
                 <el-form-item label="优先级">
@@ -808,7 +821,7 @@
               </el-form>
               <template #footer>
                 <el-button @click="showAddAnnotation = false">取消</el-button>
-                <el-button type="primary" @click="submitAnnotation" :disabled="!newAnnotation.content">提交</el-button>
+                <el-button type="primary" @click="submitAnnotation" :disabled="!canEdit || !newAnnotation.content" :title="!canEdit ? '项目已归档，无法编辑' : ''">提交</el-button>
               </template>
             </el-dialog>
           </div>
@@ -955,8 +968,8 @@
       <div v-if="assigningItem" style="margin-bottom: 12px; color: var(--gt-color-text-regular); font-size: var(--gt-font-size-sm);">
         底稿：<strong>{{ assigningItem.wp_code }} {{ assigningItem.wp_name }}</strong>
       </div>
-      <el-form :model="assignForm" label-width="70px">
-        <el-form-item label="编制人">
+      <el-form ref="assignFormRef" :model="assignForm" :rules="assignRules" label-width="70px">
+        <el-form-item label="编制人" prop="assigned_to">
           <el-select
             v-model="assignForm.assigned_to"
             placeholder="请选择编制人"
@@ -1046,10 +1059,13 @@ import { api } from '@/services/apiProxy'
 import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
 import { useWpDetailGuard } from '@/composables/useWpDetailGuard'
 import StaleIndicator from '@/components/StaleIndicator.vue'
+import { useAuditContext } from '@/composables/useAuditContext'
+import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
 
 const route = useRoute()
 const router = useRouter()
 const dictStore = useDictStore()
+const { canEdit, onContextChange } = useAuditContext()
 const projectId = computed(() => route.params.projectId as string)
 // Spec A: 当前年度（以 route.query.year 为唯一真源）
 const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear())
@@ -1563,6 +1579,10 @@ const kanbanRef = ref<any>(null)
 const showAssignDialog = ref(false)
 const assigningItem = ref<any>(null)
 const assignForm = ref<{ assigned_to: string | null; reviewer: string | null }>({ assigned_to: null, reviewer: null })
+const assignFormRef = ref<any>(null)
+const assignRules = {
+  assigned_to: [{ required: true, message: '请选择编制人', trigger: 'change' }],
+}
 const assignLoading = ref(false)
 const userOptions = ref<any[]>([])
 
@@ -1756,6 +1776,15 @@ const workbenchTableData = computed(() => {
   })
 })
 
+// ─── 工作台分页 ─────────────────────────────────────────────────────────────────
+const wbPage = ref(1)
+const wbPageSize = ref(50)
+const wbTotal = computed(() => workbenchTableData.value.length)
+const pagedWorkbenchData = computed(() => {
+  const start = (wbPage.value - 1) * wbPageSize.value
+  return workbenchTableData.value.slice(start, start + wbPageSize.value)
+})
+
 function onWorkbenchRowClick(row: any) {
   if (row.id) {
     router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: row.id } })
@@ -1843,6 +1872,10 @@ function goToConversation() {
 const unconfirmedAiCount = ref(0)
 const showAddAnnotation = ref(false)
 const newAnnotation = ref({ content: '', priority: 'medium' })
+const annoFormRef = ref<any>(null)
+const annoRules = {
+  content: [{ required: true, message: '请输入意见内容', trigger: 'blur' }],
+}
 
 // Reject dialog state
 const showRejectDialog = ref(false)
@@ -2868,6 +2901,12 @@ onMounted(async () => {
   // Foundation Task 2.9: 初次加载循环复核状态 + 订阅 review-mark:changed 事件刷新
   await loadCycleReviewStatus()
   eventBus.on('review-mark:changed', _scheduleReviewStatusReload)
+})
+
+// V3 Req 5.1：上下文（projectId/year）变化时自动重载底稿列表
+onContextChange(async () => {
+  await fetchData()
+  await loadCycleReviewStatus()
 })
 </script>
 

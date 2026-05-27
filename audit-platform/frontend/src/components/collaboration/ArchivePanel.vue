@@ -48,11 +48,11 @@
 
     <!-- 密码设置弹窗 -->
     <el-dialog append-to-body v-model="showPasswordDialog" title="导出PDF设置密码" width="400px">
-      <el-form>
-        <el-form-item label="PDF密码">
+      <el-form ref="pdfFormRef" :model="pdfForm" :rules="pdfRules">
+        <el-form-item label="PDF密码" prop="password">
           <el-input v-model="pdfPassword" type="password" show-password placeholder="请输入密码（可选）" />
         </el-form-item>
-        <el-form-item label="确认密码">
+        <el-form-item label="确认密码" prop="confirmPassword">
           <el-input v-model="confirmPassword" type="password" show-password placeholder="请再次输入密码" />
         </el-form-item>
       </el-form>
@@ -66,6 +66,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { archiveApi } from '@/services/collaborationApi'
@@ -77,6 +78,25 @@ const archiveStatus = ref('')
 const showPasswordDialog = ref(false)
 const pdfPassword = ref('')
 const confirmPassword = ref('')
+const pdfFormRef = ref<FormInstance>()
+const pdfForm = computed(() => ({
+  password: pdfPassword.value,
+  confirmPassword: confirmPassword.value,
+}))
+const pdfRules: FormRules = {
+  confirmPassword: [
+    {
+      validator: (_r, value, cb) => {
+        if (pdfPassword.value && value !== pdfPassword.value) {
+          cb(new Error('两次密码不一致'))
+        } else {
+          cb()
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
+}
 
 const archiveStatusLabel = computed(() => {
   const map: Record<string, string> = {

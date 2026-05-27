@@ -41,7 +41,7 @@
 
     <!-- Update Status Dialog -->
     <el-dialog append-to-body v-model="updateDialogVisible" title="更新PBC状态" width="420px">
-      <el-form ref="updateFormRef" :model="updateForm" label-width="100px">
+      <el-form ref="updateFormRef" :model="updateForm" :rules="updateRules" label-width="100px">
         <el-form-item label="PBC名称">
           <span class="form-text">{{ currentItem?.item_name }}</span>
         </el-form-item>
@@ -79,8 +79,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage, type FormInstance } from 'element-plus'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { pbcApi } from '@/services/collaborationApi'
+import { rules } from '@/utils/formRules'
 
 const projectId = 'current-project-id'
 
@@ -95,6 +96,10 @@ const updateForm = reactive({
   status: '',
   received_date: '',
 })
+
+const updateRules: FormRules = {
+  status: [rules.required('新状态', 'change')],
+}
 
 // Mock PBC data
 const mockItems = [
