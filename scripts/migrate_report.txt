@@ -1,0 +1,21 @@
+========================================================================
+DisclosureNote table_data v2 migration  (mode=APPLY)
+========================================================================
+  notes total              : 2
+  notes changed this run   : 0
+  notes unchanged          : 2
+  tables processed         : 3
+  rows total               : 5
+  row_type added           : 0   (already tagged: 5)
+  _cell_meta added         : 0   (already tagged: 5)
+  manual_value backups     : 0
+  row_type distribution:
+    data          :     2  ( 40.0%)
+    header_label  :     0  (  0.0%)
+    subtotal      :     1  ( 20.0%)
+    total         :     2  ( 40.0%)
+    dynamic_detail:     0  (  0.0%)
+    formula       :     0  (  0.0%)
+
+========================================================================
+[OK] DB has been updated.

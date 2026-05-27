@@ -28,24 +28,24 @@
 
 ## Sprint 0：模板治理 + Word P0 修复 + 数据迁移（1 人天）
 
-- [ ] **0.1** `scripts/cleanup_note_templates.py` 一次性治理脚本
+- [x] **0.1** `scripts/cleanup_note_templates.py` 一次性治理脚本
   - 删除 headers 中的空字符串占位（约 800+ 处）
   - 给每个 row 打 `row_type`（按 label vs headers[0] 启发式 + 人工 review）
   - 输出 diff 报告 `cleanup_report.txt`
   - 验收：CI 单测断言模板 JSON 中 row 字段含 row_type
 
-- [ ] **0.2** `scripts/migrate_disclosure_notes_to_v2.py` 数据迁移脚本（幂等）
+- [x] **0.2** `scripts/migrate_disclosure_notes_to_v2.py` 数据迁移脚本（幂等）
   - 历史 DisclosureNote.table_data.row 升级为含 `row_type + _cell_meta`
   - 跳过已升级行（幂等）
   - 验收：3 个真实项目跑迁移后前端零回归
 
-- [ ] **0.3** Word 多表渲染 P0 bug 修复
+- [x] **0.3** Word 多表渲染 P0 bug 修复
   - `note_word_exporter.py` 优先取 `note.table_data._tables` 数组
   - 多表章节加 H3 表名标题
   - 空 header 列裁剪
   - CI 卡点：grep `_tables` 必须出现在 `note_word_exporter.py`
 
-- [ ] **0.4** Sprint 0 验收
+- [-] **0.4** Sprint 0 验收
   - 固定资产/应收票据等多表章节导出 5-12 张表全部出现
   - vue-tsc 0 错误，pytest 全绿
   - 提交 commit「Sprint 0: 模板治理 + Word P0 修复」
