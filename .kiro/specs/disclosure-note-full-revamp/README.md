@@ -33,9 +33,9 @@
 ```
 .kiro/specs/disclosure-note-full-revamp/
 ├── README.md          (本文件，总览 + 范围 + 关键决策)
-├── requirements.md    (~30 个验收标准，5 大需求簇)
-├── design.md          (架构图 + 6 Sprint 拆解 + OOXML 操作 + DSL 规约)
-└── tasks.md           (6 Sprint × ~35 任务，每个 task 含 [x] 完成态)
+├── requirements.md    (59 验收标准，5 大需求簇)
+├── design.md          (架构图 + 8 决策 + 6 Sprint 拆解 + OOXML 操作 + DSL 规约)
+└── tasks.md           (6 Sprint × 47 任务，每个 task 含 [x] 完成态)
 ```
 
 ## 关键设计决策（已锁定）
@@ -56,7 +56,7 @@
 
 ### D3：公式 DSL 沉淀（不重新发明）
 
-`note_formula_generator.execute_note_formulas` 已支持 `=TB("货币资金","期末余额")` / `=ROW(R3,"C2")` / `=PRIOR("货币资金","期末")` 等函数。Sprint 1.5 沉淀文档化 + 补 `=AGING("应收账款","1年以内")` 一个新函数。
+`note_formula_generator.generate_formulas_for_table`（grep 实测入口函数名）已支持 5 个 DSL 函数：`TB / WP / REPORT / cell / SUM`。Sprint 1.5 新建 2 个：`PRIOR / AGING`，并文档化全部 7 个到 `docs/NOTE_FORMULA_DSL.md`。
 
 ### D4：致同 Word 模板由 Python 脚本生成
 
@@ -64,7 +64,7 @@
 
 ### D5：联动走 EventBus + linkage_graph_builder
 
-附注作为 NOTE 模块节点已在 `linkage_graph_builder._from_note_account_mapping` 实装（`note-account-mapping-seed` spec 280 条种子），本 spec 不动 graph，只补 stale 标记 + EventBus 订阅。
+附注作为 NOTE 模块节点已在 `linkage_graph_builder._from_note_account_mapping` 实装（`note-account-mapping-seed` spec 280 条种子）。`DisclosureNote.is_stale` 字段 + `event_handlers._mark_downstream_stale_on_rollback` handler 已存在（F46/Sprint 7.22）。本 spec 不动 graph 与 ROLLED_BACK handler，仅**新增** 3 类事件订阅 + 新建 `useNoteStale.ts` composable。
 
 ## 与现有 spec 的关系
 
@@ -76,16 +76,18 @@
 | `template-library-coordination` | 共享模板版本管理基础设施 |
 | `audit-chain-generation` | 公式 DSL 沿用其设计 |
 
-## CI 防回归卡点（6 项）
+## CI 防回归卡点（8 项）
 
-| Sprint | 卡点 |
+| 阶段 | 卡点 |
 |---|---|
+| 前置 | 50+ 变动表 binding 草稿质量审计师签字 |
 | S0 | grep `_tables` 必须出现在 `note_word_exporter.py`（防 P0 多表渲染复发） |
 | S1 | 模板 JSON `account_codes` 引用 = 0；后端单测断言 `row._cell_modes in {auto, manual, locked}` |
 | S1.5 | `noteFormulaRules.value` 在 `ConsolNoteTab.vue` 应消失（重复 dialog 收敛后） |
 | S2 | 视觉回归 `tests/test_note_export_visual.py` 11 项断言全绿；docx 样式名 grep 必须 `GTNote*` 前缀 |
-| S3 | `auto_trim` 单测覆盖率 ≥ 80%；上年 docx 导入端点单测（10 章节样本） |
+| S3 | `auto_trim` 单测覆盖率 ≥ 80`%`；上年 docx 导入端点单测（10 章节样本） |
 | S4 | `PRESET_TO_RULE` 必须覆盖 `check_presets` 全部 11 个枚举 |
+| 收尾 | 3 真实项目 UAT 数字 95% + 视觉 11 项全绿 |
 
 ## 验收清单（高级别）
 

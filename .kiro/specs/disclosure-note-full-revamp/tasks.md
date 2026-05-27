@@ -1,6 +1,6 @@
 # 附注模块全栈改进 — 任务清单
 
-> **版本**：v1.0（2026-05-26）
+> **版本**：v1.1（2026-05-26 修订：DSL 函数清单与代码事实对齐 + is_stale 字段已存在 + useNoteStale 标新建）
 > **总任务数**：47（前置 3 + Sprint 0×4 + Sprint 1×8 + Sprint 1.5×6 + Sprint 2×9 + Sprint 3×8 + Sprint 4×6 + 收尾 3）
 > **总工时**：18.5-19.5 人天（含前置 1d）
 > **来源**：design.md 6 Sprint 拆解 + requirements.md 59 验收标准
@@ -105,14 +105,15 @@
 ## Sprint 1.5：公式 DSL 沉淀 + 三式联动整合（2 人天）
 
 - [ ] **1.5.1** `docs/NOTE_FORMULA_DSL.md` 完整 DSL 语法参考
-  - =TB / =ROW / =PRIOR / =AGING / =SUM 等 5+ 函数
+  - 已有 5 函数文档化：`TB / WP / REPORT / cell / SUM`（不改实现）
+  - 🆕 本 spec 新建 2 函数：`PRIOR / AGING`
   - 每函数含正常 / 缺数据 / 边界 case
-  - `note_formula_generator.py` 头部 `__doc__` 引用
+  - `note_formula_generator.py`（入口 `generate_formulas_for_table`）头部 `__doc__` 引用
 
-- [ ] **1.5.2** `=AGING(account, bucket)` 函数实现（D4 新建）
-  - 从 TbAuxLedger 反推账龄分桶（5 桶：1 年以内 / 1-2 / 2-3 / 3-5 / 5 年以上）
-  - 客户未提供辅助序时账时返回 None（章节标 not_applicable）
-  - 单测：`test_note_formula_dsl.py` 至少 5 用例
+- [ ] **1.5.2** `=AGING(account, bucket)` + `=PRIOR(account, period)` 函数实现（D4 新建）
+  - **=AGING**：从 TbAuxLedger 反推账龄分桶（5 桶：1 年以内 / 1-2 / 2-3 / 3-5 / 5 年以上）；客户未提供辅助序时账时返回 None（章节标 not_applicable）
+  - **=PRIOR**：上年附注期末值取数，复用 `disclosure_engine._preload_data_for_notes.prior_notes_cache`
+  - 单测：`test_note_formula_dsl.py` 至少 6 用例（=AGING × 3 + =PRIOR × 3）
 
 - [ ] **1.5.3** ConsolNoteTab 重复公式 dialog 收敛
   - 删除 `ConsolNoteTab.vue:424-493` 内置 dialog
@@ -161,12 +162,13 @@
   - 点击数据行 emit `penetrate-to-tb` → 跳 TrialBalance 页面
   - DisclosureEditor.vue 右键菜单"溯源"打开
 
-- [ ] **2.5** EventBus 订阅 4 类事件（R2.1）
-  - `disclosure_engine.on_event_ledger_activated`
-  - `disclosure_engine.on_event_workpaper_reviewed`
-  - `disclosure_engine.on_event_adjustment_approved`
-  - `disclosure_engine.on_event_ledger_rolled_back`
-  - 集成测试：`test_note_stale_event_chain.py` ≥ 8 用例（4 事件 × 2 路径）
+- [ ] **2.5** EventBus 订阅 3 类**新增**事件（R2.1）
+  - 现状：`event_handlers._mark_downstream_stale_on_rollback` 已订阅 `LEDGER_DATASET_ROLLED_BACK`，本 spec **不动**
+  - 本 spec 新增 3 个 handler：
+    - `disclosure_engine.on_event_ledger_activated`
+    - `disclosure_engine.on_event_workpaper_reviewed`
+    - `disclosure_engine.on_event_adjustment_approved`
+  - 集成测试：`test_note_stale_event_chain.py` ≥ 8 用例（3 新事件 × 2 路径 + ROLLED_BACK 兼容性 × 2）
 
 - [ ] **2.6** 视觉回归测试 `tests/test_note_export_visual.py`
   - 11 项断言：字体 / 字号 / 章节缩进 / 段落间距 / 三线表磅数 / 行高 / 留白 / 标题行不重复 / 页眉 / 页边距
@@ -222,11 +224,13 @@
   - 章节列表红点 + tooltip "上游已变更，建议重算"
   - 右键菜单"重算此章节" → 调 `update_note_values`
   - `POST /disclosure-notes/{id}/dismiss-stale` 一键忽略
-  - composable `useNoteStale.ts` 订阅 EventBus
+  - 🆕 新建 composable `audit-platform/frontend/src/composables/useNoteStale.ts`（grep 全仓 0 命中，本 spec 新建）订阅 EventBus
 
 - [ ] **3.7** NoteTrimService.auto_trim 简化版（v2 §5.3）
-  - 检查 binding.skip_if_all_zero 列出科目，TrialBalance 全为 0 → skip
-  - 单测：`test_auto_trim.py` 覆盖率 ≥ 80%
+  - 现有方法 5 个：`get_sections/save_trim/get_trim_scheme/resolve_template_type/_init_from_template`
+  - 🆕 本 spec 新增 `auto_trim(project_id, year, template_type)` 方法
+  - 检查 binding.skip_if_all_zero 列出科目，TrialBalance 全为 0 → 调现有 `save_trim` 标 not_applicable
+  - 单测：`test_note_trim_service_auto.py` 覆盖率 ≥ 80%
 
 - [ ] **3.8** Sprint 3 验收
   - 5 个真实流程 Playwright 端到端测试（新增章节 / 改公式 / 红点重算 / 历史回滚 / auto_trim）

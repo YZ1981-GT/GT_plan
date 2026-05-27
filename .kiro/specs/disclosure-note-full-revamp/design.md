@@ -166,16 +166,19 @@ def merge_templates(baseline_sections: list, custom_sections: list) -> list:
 
 ### D4：公式 DSL 沉淀（不重新发明）
 
-`note_formula_generator.execute_note_formulas` 已支持的函数（grep 自源码 + ConsolNoteTab.vue:1212）：
+`note_formula_generator.generate_formulas_for_table`（grep 实测入口函数名，**不是** `execute_note_formulas`）已支持的函数：
 
-| 函数 | 语法 | 实现入口 | 文档化（R3） |
-|------|------|---------|--------------|
-| `=TB(account, field)` | TB("货币资金", "期末余额") | `_resolve_tb` | ✓ |
-| `=ROW(row_id, col_id)` | ROW(R3, "C2") | `_resolve_row_ref` | ✓ |
-| `=PRIOR(account, field)` | PRIOR("货币资金", "期末") | `_resolve_prior` | ✓ |
-| `=AGING(account, bucket)` | AGING("应收账款", "1年以内") | **本 spec 新建** | ✓ |
-| `=SUM(...)` | SUM(R3:R5) | `_resolve_aggregate` | ✓ |
-| `=AVG(...)` / `=MAX(...)` | 标准 Excel 函数 | `_resolve_aggregate` | ✓ |
+| 函数 | 语法 | 实现入口 | 现状 |
+|------|------|---------|------|
+| `TB(account, period)` | TB("货币资金", "期末余额") | 字符串拼接生成表达式 | ✅ 已存在 |
+| `WP(wp_code, sheet, cell)` | WP("D-1", "main", "B5") | wp_mapping 优先取数 | ✅ 已存在 |
+| `REPORT(row_code, period)` | REPORT("BS-1", "期末") | report_row_code 兜底 | ✅ 已存在 |
+| `cell(row, col)` | cell(3, 2) | 表内单元格引用 | ✅ 已存在 |
+| `SUM(start:end, col)` | SUM(0:3, 1) | 纵向求和 | ✅ 已存在 |
+| `PRIOR(account, field)` | PRIOR("货币资金", "期末") | 上年附注期末值 | 🆕 本 spec Sprint 1.5 新建 |
+| `AGING(account, bucket)` | AGING("应收账款", "1年以内") | 账龄分桶 | 🆕 本 spec Sprint 1.5 新建 |
+
+**注意**：v2 提案文档曾提及 `=ROW(R3, "C2")`，但 grep 实测 `note_formula_generator.py` 没有 ROW 函数（只有 `cell(row, col)`），spec 中所有 `=ROW(...)` 引用应改为 `cell(row, col)` 或视为新建。
 
 **=AGING 实现**（R1.2 新增）：
 
@@ -240,23 +243,30 @@ async def trace_cell(self, note_id, row_idx, col_idx) -> dict:
 
 **事件订阅表**（`disclosure_engine.on_event_*`）：
 
-| 事件 | 处理逻辑 | 影响范围 |
-|------|---------|---------|
-| `LEDGER_DATASET_ACTIVATED` | UPDATE disclosure_notes SET is_stale=true WHERE project_id=? AND year=? | 全部该 project+year 章节 |
-| `WORKPAPER_REVIEWED` | 走 linkage_graph 反查 NOTE 节点 → 标 stale | 该底稿引用的章节 |
-| `ADJUSTMENT_APPROVED` | 同 LEDGER_DATASET_ACTIVATED | 全部该 project+year 章节 |
-| `LEDGER_DATASET_ROLLED_BACK` | 同上 | 全部 |
+| 事件 | 处理逻辑 | 影响范围 | 现状 |
+|------|---------|---------|------|
+| `LEDGER_DATASET_ACTIVATED` | UPDATE disclosure_notes SET is_stale=true WHERE project_id=? AND year=? | 全部该 project+year 章节 | 🆕 本 spec 新增订阅 |
+| `WORKPAPER_REVIEWED` | 走 linkage_graph 反查 NOTE 节点 → 标 stale | 该底稿引用的章节 | 🆕 本 spec 新增订阅 |
+| `ADJUSTMENT_APPROVED` | 同 LEDGER_DATASET_ACTIVATED | 全部该 project+year 章节 | 🆕 本 spec 新增订阅 |
+| `LEDGER_DATASET_ROLLED_BACK` | event_handlers 内既有 `_mark_downstream_stale_on_rollback` 已订阅 | 全部 | ✅ 已有 handler，本 spec **不动** |
+
+**关键事实**（grep 实测）：
+- `DisclosureNote.is_stale` 字段**已存在**（commit 注释 "F46 / Sprint 7.22: 账套 rollback 后由 event_handlers 标 True"），本 spec **扩展现有 stale 机制**而非从零建表
+- `LEDGER_DATASET_ROLLED_BACK` 事件已有 handler，本 spec 仅补 3 个新事件订阅
+- `event_handlers.py::_mark_downstream_stale_on_rollback` 已订阅，本 spec 复用该模式
 
 **前端响应**：
 ```typescript
-// DisclosureEditor.vue
-import { useLinkageEvents } from '@/composables/useLinkageEvents'
-const { onNoteStale } = useLinkageEvents()
+// DisclosureEditor.vue（本 spec 新建 composable）
+import { useNoteStale } from '@/composables/useNoteStale'   // ← 🆕 新建文件
+const { onNoteStale, dismissStale } = useNoteStale()
 onNoteStale((event) => {
   const section = noteList.value.find(n => n.note_section === event.note_section)
   if (section) section.is_stale = true  // 红点显示
 })
 ```
+
+**注意**：`useNoteStale.ts` 是 **本 spec 新建的 composable**（grep 全仓 0 命中），实现方式参考已有 `audit-platform/frontend/src/composables/useEditMode.ts` 等模式。
 
 **重算 != 覆盖**：用户点"重算此章节" → 调 `update_note_values` → 仍走 D1 三态规则，manual/locked 不动。
 
@@ -484,7 +494,12 @@ note.table_data["_formulas"] = [
 - `POST /disclosure-notes/{id}/dismiss-stale`
 
 **3.4 NoteTrimService.auto_trim**（v2 §5.3，本 spec 简化版）：
-- 检查 binding.skip_if_all_zero 列出科目，TrialBalance 全为 0 → skip
+
+**当前现状**（grep 实测 `note_trim_service.py`）：服务已有 5 个方法 = `get_sections / save_trim / get_trim_scheme / resolve_template_type / _init_from_template`，**仅缺 `auto_trim` 一个方法**
+
+**本 spec 新增**：
+- 新增 `auto_trim(project_id, year, template_type)` 方法
+- 检查 binding.skip_if_all_zero 列出科目，TrialBalance 全为 0 → 调现有 `save_trim` 标记 not_applicable
 - 期望中小项目 30%+ 章节自动跳过
 
 **3.5 上年附注引用 UI**：
@@ -578,7 +593,7 @@ PRESET_TO_RULE = {
 ## 六、验收完成标志（Done Definition）
 
 - [ ] requirements.md 全部 59 验收标准 PASS
-- [ ] 6 项 CI 防回归卡点全绿
+- [ ] 8 项 CI 防回归卡点全绿（前置 + S0/1/1.5/2/3/4 + 收尾，详见 README.md）
 - [ ] 至少 3 个真实项目 UAT 通过（数字 95% 准确 + 视觉 11 项断言）
 - [ ] 4 个新增 ADR 入库
 - [ ] vue-tsc 0 错误，pytest 全绿

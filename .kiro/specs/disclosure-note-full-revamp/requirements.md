@@ -1,8 +1,8 @@
 # 附注模块全栈改进 — 需求文档
 
-> **版本**：v1.0（2026-05-26）
+> **版本**：v1.1（2026-05-26 修订：DSL 函数清单与代码事实对齐 + is_stale 字段已存在 + NoteTrimService 已有方法清单）
 > **来源**：`docs/DISCLOSURE_NOTE_IMPROVEMENT_PROPOSAL.md` v2.0
-> **覆盖**：5 大需求簇 / 32 验收标准 / 173 SOE + 187 Listed 章节
+> **覆盖**：5 大需求簇 / 59 验收标准 / 173 SOE + 187 Listed 章节
 
 ## 角色定义
 
@@ -68,15 +68,18 @@
 
 **用户故事**：作为 manager，试算表导入了新的账套或者助理调整了底稿，我希望附注章节自动标记为"待重算"，看到红点提醒，不要悄悄被新数字覆盖。
 
-**当前痛点**：附注仅在用户主动点"生成"时取数，上游变化无任何通知。
+**当前现状**（grep 实测）：
+- `DisclosureNote.is_stale` 字段**已存在**（commit "F46 / Sprint 7.22: 账套 rollback 后由 event_handlers 标 True"）
+- `event_handlers.py::_mark_downstream_stale_on_rollback` 已订阅 `LEDGER_DATASET_ROLLED_BACK` 事件
+- 当前痛点：仅 rollback 触发 stale，**其他 3 类上游事件无任何通知**
 
 **验收标准**：
 
-14. `EventBus` 订阅 4 类事件，触发对应 `DisclosureNote.is_stale=true`：
-    - `LEDGER_DATASET_ACTIVATED`（账套激活）→ 全部该 project+year 的章节
-    - `WORKPAPER_REVIEWED`（底稿复核通过 status→review_passed/archived）→ 该底稿关联章节（走 linkage_graph）
-    - `ADJUSTMENT_APPROVED`（调整审批通过）→ 全部该 project+year 章节
-    - `LEDGER_DATASET_ROLLED_BACK`（账套回滚）→ 全部该 project+year 章节
+14. `EventBus` 在现有 `LEDGER_DATASET_ROLLED_BACK` handler 基础上**新增 3 类事件订阅**，触发对应 `DisclosureNote.is_stale=true`：
+    - `LEDGER_DATASET_ACTIVATED`（账套激活）→ 全部该 project+year 的章节（🆕 新增订阅）
+    - `WORKPAPER_REVIEWED`（底稿复核通过 status→review_passed/archived）→ 该底稿关联章节（走 linkage_graph，🆕 新增订阅）
+    - `ADJUSTMENT_APPROVED`（调整审批通过）→ 全部该 project+year 章节（🆕 新增订阅）
+    - `LEDGER_DATASET_ROLLED_BACK`（账套回滚）→ 已有 `_mark_downstream_stale_on_rollback`，**本 spec 不动**
 15. 前端 `DisclosureEditor.vue` 章节列表显示 `🔴` 红点 + tooltip "上游已变更，建议重算"；右键菜单"重算此章节"
 16. **重算 != 覆盖手工值**：触发 `update_note_values` 时仍走 R1.3 三态规则，`manual/locked` 单元格不动
 17. 用户可一键忽略 stale 标记（`POST /disclosure-notes/{id}/dismiss-stale`），UI 隐藏红点直到下次新事件
@@ -121,18 +124,29 @@
 23. 前端右键菜单"溯源"打开 `CellTraceDialog.vue` 三栏布局：左 = binding 元数据，中 = 公式展开过程，右 = 命中数据行（点击行可跳转到 TrialBalance 页面）
 24. 穿透链支持 4 层级跳转：附注 → 公式 → 试算表 → 底稿（点击试算表行 `account_code` 跳到底稿明细）
 
-### R3.2 公式 DSL 文档化（=TB / =ROW / =PRIOR / =AGING / =SUM）
+### R3.2 公式 DSL 文档化（TB / WP / REPORT / cell / SUM + PRIOR / AGING）
 
 **用户故事**：作为 admin，新增章节时我要写公式，需要完整 DSL 语法手册。
 
+**当前现状**（grep `note_formula_generator.py` 实测）：
+- 入口函数：`generate_formulas_for_table(table_template, check_presets, ...)`（**不是**早期 spec 误写的 `execute_note_formulas`）
+- 已有 5 个 DSL 函数：`TB / WP / REPORT / cell / SUM`
+- 不存在 `=ROW(R3,"C2")` 函数（v2 文档曾误写，实际是 `cell(row, col)`）
+- 不存在 `=PRIOR()` 函数（v2 文档曾误写，本 spec 新建）
+- 不存在 `=AGING()` 函数（本 spec 新建）
+
 **验收标准**：
 
-25. 新建 `docs/NOTE_FORMULA_DSL.md` 完整 DSL 语法参考，至少覆盖：
-    - `=TB("科目名", "期末余额")` / `=TB("应收账款", "本期借方")`：试算表/序时账取数
-    - `=ROW(R3, "C2") - ROW(R3, "C3")`：表内行列引用
-    - `=PRIOR("货币资金", "期末")`：上年附注期末值
-    - `=AGING("应收账款", "1年以内")`：账龄分桶（v2 新增）
-    - `=SUM(...)` / `=AVG(...)` / `=MAX(...)`：标准聚合
+25. 新建 `docs/NOTE_FORMULA_DSL.md` 完整 DSL 语法参考，至少覆盖 7 个函数：
+    - **已有 5 个**（仅文档化，不改实现）：
+      - `TB("科目名", "期末余额")` / `TB("应收账款", "期初")`：试算表取数
+      - `WP("D-1", "main", "B5")`：底稿单元格取数（wp_mapping 优先）
+      - `REPORT("BS-1", "期末")`：报表行码兜底取数
+      - `cell(row, col)`：表内单元格引用（用于横向公式）
+      - `SUM(start:end, col)`：纵向求和
+    - **🆕 本 spec 新建 2 个**：
+      - `PRIOR("货币资金", "期末")`：上年附注期末值（复用 `_preload_data_for_notes.prior_notes_cache`）
+      - `AGING("应收账款", "1年以内")`：账龄分桶（从 TbAuxLedger 反推 voucher_date）
 26. `note_formula_generator.py` 头部 `__doc__` 引用 NOTE_FORMULA_DSL.md
 27. 每个 DSL 函数至少 3 个单测用例（覆盖正常 / 缺数据降级 / 边界）
 28. CI 卡点：grep `noteFormulaRules.value` 在 `ConsolNoteTab.vue` 应消失（公式管理 dialog 收敛到 `FormulaManagerDialog` 后）
