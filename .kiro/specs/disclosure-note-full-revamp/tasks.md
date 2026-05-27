@@ -130,7 +130,7 @@
   - structure.json / xlsx / HTML 三式职责
   - `triple_format_adapter.update_note_from_structure` 单入口规约
 
-- [-] **1.5.6** Sprint 1.5 验收
+- [x] **1.5.6** Sprint 1.5 验收
   - 5 函数 + DSL 文档完整
   - vue-tsc / pytest 全绿
   - 提交 commit「Sprint 1.5: 公式 DSL 沉淀 + 三式联动 ADR」
@@ -139,12 +139,12 @@
 
 ## Sprint 2：Word 真致同样式 + CellTrace + 联动事件（3.5 人天）
 
-- [ ] **2.1** `scripts/build_note_export_template.py` 一次性生成 docx 模板
+- [x] **2.1** `scripts/build_note_export_template.py` 一次性生成 docx 模板
   - D7 完整结构：6 段落样式 + 1 字符样式 + 1 表格样式 + 默认行高 + 页面 + 页眉页脚
   - 输出 `backend/data/note_export_template.docx`
   - 单测断言每个样式的字体名/字号/缩进/边框值
 
-- [ ] **2.2** `NoteWordExporter` 重写（D7 关键 OOXML）
+- [x] **2.2** `NoteWordExporter` 重写（D7 关键 OOXML）
   - 加载 `note_export_template.docx` 而非 `Document()`
   - `apply_gt_dual_font(run)` 双字体 rPr 注入
   - `apply_gt_three_line(table)` 三线表
@@ -171,7 +171,7 @@
     - `disclosure_engine.on_event_adjustment_approved`
   - 集成测试：`test_note_stale_event_chain.py` ≥ 8 用例（3 新事件 × 2 路径 + ROLLED_BACK 兼容性 × 2）
 
-- [ ] **2.6** 视觉回归测试 `tests/test_note_export_visual.py`
+- [x] **2.6** 视觉回归测试 `tests/test_note_export_visual.py`
   - 11 项断言：字体 / 字号 / 章节缩进 / 段落间距 / 三线表磅数 / 行高 / 留白 / 标题行不重复 / 页眉 / 页边距
   - 每个断言用 OOXML 解析（不依赖人眼）
 

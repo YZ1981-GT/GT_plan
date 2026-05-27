@@ -1,6 +1,10 @@
 """附注 Word 导出引擎 — 致同标准格式
 
 Sprint 6 Task 6.1 + 6.2: 重写 NoteWordExporter
+Sprint 2 Task 2.2: 接入 ``backend/data/note_export_template.docx`` GTNote* 模板
+                   + 6 个 D7 helper（GTNote 命名空间）
+                   + D1 sidecar 公式/手工标记可选渲染
+
 致同标准格式：
   - 页面设置：A4、左 3cm/右 3.18cm/上 3.2cm/下 2.54cm、页眉 1.3cm/页脚 1.3cm
   - 字体：中文仿宋_GB2312 小四(12pt)、数字 Arial Narrow
@@ -8,7 +12,7 @@ Sprint 6 Task 6.1 + 6.2: 重写 NoteWordExporter
   - 表格样式：上下边框 1 磅、标题行下边框 1/2 磅、标题行加粗居中、数据行金额右对齐
   - 段落格式：段前 0 行/段后 0.9 行、单倍行距
 
-Requirements: 4.2-4.10, 27.1-27.10
+Requirements: 4.2-4.10, 27.1-27.10, R5.2 致同 21 项排版规范
 """
 
 from __future__ import annotations
@@ -16,12 +20,13 @@ from __future__ import annotations
 import logging
 import re
 from io import BytesIO
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
 from docx import Document
-from docx.enum.section import WD_ORIENT
+from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
@@ -274,6 +279,243 @@ def _add_bookmark(paragraph, bookmark_name: str):
 
 
 # ---------------------------------------------------------------------------
+# GTNote* 模板 docx（Sprint 2 Task 2.1 产出）
+# ---------------------------------------------------------------------------
+
+TEMPLATE_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "note_export_template.docx"
+
+
+def _new_document() -> Document:
+    """优先加载 GTNote 模板 docx；缺失时降级 Document() 兼容.
+
+    Sprint 2 Task 2.2: 模板提供 6 段落 + 1 字符 + 1 表格 + 2 sidecar 共 10 个 GTNote* 样式
+    + 默认 trHeight 397 twip(0.7cm) + 致同 pgMar (3.2/2.54/3/3.18 cm)。
+    """
+    if TEMPLATE_PATH.exists():
+        return Document(str(TEMPLATE_PATH))
+    logger.warning(
+        "note_export_template.docx 不存在，降级用 Document()。"
+        "请运行: python scripts/build_note_export_template.py --apply"
+    )
+    return Document()
+
+
+# ---------------------------------------------------------------------------
+# D7 GTNote helper API（Sprint 2 Task 2.2 — 6 helper）
+# ---------------------------------------------------------------------------
+
+
+def apply_gt_dual_font(
+    run,
+    ascii_font: str = "Arial Narrow",
+    east_asia_font: str = "仿宋_GB2312",
+    size: Pt = Pt(12),
+):
+    """对单个 run 注入致同双字体 rPr.
+
+    中文走 ``w:eastAsia`` (仿宋_GB2312)，数字 / 拉丁字符走 ``w:ascii / w:hAnsi`` (Arial Narrow)。
+    Word 渲染时按 Unicode 段自动分流。
+
+    R5.2 验收 1：字体名 / 验收 2：字号小四 12pt 统一。
+    """
+    run.font.size = size
+    run.font.name = ascii_font  # 默认设为 ascii；下面手动注入 eastAsia/cs
+    rPr = run._r.get_or_add_rPr()
+    rFonts = rPr.find(qn("w:rFonts"))
+    if rFonts is None:
+        rFonts = OxmlElement("w:rFonts")
+        rPr.insert(0, rFonts)
+    rFonts.set(qn("w:ascii"), ascii_font)
+    rFonts.set(qn("w:hAnsi"), ascii_font)
+    rFonts.set(qn("w:eastAsia"), east_asia_font)
+    rFonts.set(qn("w:cs"), ascii_font)
+
+
+def apply_gt_three_line(table) -> None:
+    """对表格应用致同三线表样式：顶/底 1pt + 表头 cell tcBorders.bottom 1/2pt + 其他 nil.
+
+    复用现有 ``_set_table_borders`` (top/bottom sz=8) + ``_set_row_bottom_border`` (sz=4 在表头行)。
+    R5.2 验收 6：三线表磅数。
+    """
+    _set_table_borders(table, top_sz=8, bottom_sz=8, header_bottom_sz=4)
+    if len(table.rows) > 0:
+        _set_row_bottom_border(table.rows[0], sz=4)
+
+
+def fill_multi_header(
+    table,
+    header_rows: list[list[dict]],
+    total_cols: int,
+) -> None:
+    """多层表头 grid 二阶段填充（rowspan/colspan）.
+
+    Args:
+        table: ``docx.table.Table`` 实例（必须已经预分配 ``len(header_rows)`` 行 ×
+               ``total_cols`` 列）
+        header_rows: 二维 dict 列表，每行一个 list，每 cell 形如 ``{"text": str,
+                     "rowspan": int=1, "colspan": int=1}``
+        total_cols: 表格总列数（用于占位检查）
+
+    阶段一：构造 ``grid[r][c] = (text, master_r, master_c)`` 网格，标记主从单元格
+    阶段二：对每个 master 单元格调用 ``cell.merge()`` 合并 rowspan × colspan 区域
+
+    R5.2 验收 11：多层表头正确合并（如固定资产变动表"本期增加→购置/在建转入"二级表头）。
+    """
+    n_rows = len(header_rows)
+    if n_rows == 0:
+        return
+    if len(table.rows) < n_rows or table.rows[0]._tr.tc_lst.__len__() < total_cols:
+        # 调用方未正确预分配，跳过（防御）
+        logger.warning("fill_multi_header: 表格行/列数不足 %dx%d", n_rows, total_cols)
+        return
+
+    # ---- 阶段一：grid 占位 ----
+    # grid[r][c] = master cell ref (主格自指；合并占位指向主格)
+    grid: list[list[tuple[int, int] | None]] = [
+        [None] * total_cols for _ in range(n_rows)
+    ]
+    masters: list[tuple[int, int, int, int, str]] = []  # (r, c, rs, cs, text)
+
+    for r, row_def in enumerate(header_rows):
+        col_cursor = 0
+        for cell_def in row_def:
+            # 跳过已被上方 rowspan 占用的列
+            while col_cursor < total_cols and grid[r][col_cursor] is not None:
+                col_cursor += 1
+            if col_cursor >= total_cols:
+                break
+            rs = max(1, int(cell_def.get("rowspan", 1)))
+            cs = max(1, int(cell_def.get("colspan", 1)))
+            text = str(cell_def.get("text", ""))
+            # 边界裁剪
+            rs = min(rs, n_rows - r)
+            cs = min(cs, total_cols - col_cursor)
+            for dr in range(rs):
+                for dc in range(cs):
+                    grid[r + dr][col_cursor + dc] = (r, col_cursor)
+            masters.append((r, col_cursor, rs, cs, text))
+            col_cursor += cs
+
+    # ---- 阶段二：写文字 + merge ----
+    for r, c, rs, cs, text in masters:
+        master_cell = table.rows[r].cells[c]
+        master_cell.text = ""
+        p = master_cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run(text)
+        _set_run_font(run, bold=True)
+        # 合并：先横（colspan），再纵（rowspan），避免重复合并冲突
+        if cs > 1:
+            target = table.rows[r].cells[c + cs - 1]
+            master_cell.merge(target)
+        if rs > 1:
+            # 合并后 master_cell 引用仍可用
+            bottom = table.rows[r + rs - 1].cells[c]
+            master_cell.merge(bottom)
+
+
+def apply_gt_row_height(row, cm: float = 0.7) -> None:
+    """固定行高（exact）+ cantSplit + 关闭标题行重复（不设 w:tblHeader）.
+
+    R5.2 验收 7：trHeight exact 0.7cm = 397 twip；验收 9：标题行不重复（无 w:tblHeader）.
+    """
+    twip = round(cm * 567)  # 1cm ≈ 567 twip；0.7cm → round(396.9) = 397
+    tr = row._tr
+    trPr = tr.find(qn("w:trPr"))
+    if trPr is None:
+        trPr = OxmlElement("w:trPr")
+        tr.insert(0, trPr)
+
+    # 移除已有 trHeight / cantSplit / tblHeader（幂等 + 强制无 tblHeader）
+    for tag in ("w:trHeight", "w:cantSplit", "w:tblHeader"):
+        for el in trPr.findall(qn(tag)):
+            trPr.remove(el)
+
+    trHeight = OxmlElement("w:trHeight")
+    trHeight.set(qn("w:val"), str(twip))
+    trHeight.set(qn("w:hRule"), "exact")
+    trPr.append(trHeight)
+    cantSplit = OxmlElement("w:cantSplit")
+    trPr.append(cantSplit)
+    # 不添加 w:tblHeader → 标题行不重复（验收 9）
+
+
+def fmt_amount_gt(val: Any) -> str:
+    """致同金额格式：空值/零值留白返回 ``""``（不返 ``"-"``）.
+
+    与现有 ``_format_amount`` 行为差异：
+        ``_format_amount(0)``    → ``"-"``
+        ``fmt_amount_gt(0)``     → ``""``
+        ``fmt_amount_gt(None)``  → ``""``
+        ``fmt_amount_gt("")``    → ``""``
+        ``fmt_amount_gt(1234.5)``→ ``"1,234.50"``
+
+    R5.2 验收 8：空值 / 零值留白。
+    """
+    if val is None or val == "":
+        return ""
+    try:
+        num = float(val)
+    except (ValueError, TypeError):
+        return str(val)
+    if num == 0:
+        return ""
+    return f"{num:,.2f}"
+
+
+def add_landscape_section(doc) -> Any:
+    """章节级横向：next page section break + WD_ORIENT.LANDSCAPE.
+
+    在文档末尾追加一个新 section（next page），将其 orientation 翻转为横向，
+    并交换 page_width / page_height（python-docx 不会自动交换）。
+    返回新 section 对象供后续自定义。
+    """
+    new_section = doc.add_section(WD_SECTION.NEW_PAGE)
+    new_section.orientation = WD_ORIENT.LANDSCAPE
+    # python-docx 翻转 orientation 不自动 swap width/height
+    old_w, old_h = new_section.page_width, new_section.page_height
+    new_section.page_width = old_h
+    new_section.page_height = old_w
+    return new_section
+
+
+# ---------------------------------------------------------------------------
+# D1 sidecar 公式/手工标记 cell tcPr 注入（R5.2 验收 46，可选渲染）
+# ---------------------------------------------------------------------------
+
+
+def _set_cell_shading(cell, fill_hex: str = "E6FFE6") -> None:
+    """对单个 cell 注入背景色 (w:shd)，浅绿 #E6FFE6 表示公式来源."""
+    tc = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    # 移除已有 shd
+    for shd in tcPr.findall(qn("w:shd")):
+        tcPr.remove(shd)
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), fill_hex)
+    tcPr.append(shd)
+
+
+def _set_cell_gray_borders(cell, color: str = "808080", sz: int = 4) -> None:
+    """对单个 cell 注入四边灰色边框（手工标记 cell 视觉提示）."""
+    tc = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    for old in tcPr.findall(qn("w:tcBorders")):
+        tcPr.remove(old)
+    tcBorders = OxmlElement("w:tcBorders")
+    for edge in ("top", "left", "bottom", "right"):
+        e = OxmlElement(f"w:{edge}")
+        e.set(qn("w:val"), "single")
+        e.set(qn("w:sz"), str(sz))
+        e.set(qn("w:space"), "0")
+        e.set(qn("w:color"), color)
+        tcBorders.append(e)
+    tcPr.append(tcBorders)
+
+
+# ---------------------------------------------------------------------------
 # NoteWordExporter class
 # ---------------------------------------------------------------------------
 
@@ -286,6 +528,13 @@ class NoteWordExporter:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+        # Sprint 2 Task 2.2: D1 sidecar 渲染选项（export() 时被覆盖）
+        self._annotate_formulas: bool = False
+        self._annotate_manual: bool = False
+
+    def _new_document(self) -> Document:
+        """优先加载 GTNote 模板 docx；缺失时降级 Document() 兼容（Sprint 2 Task 2.2）."""
+        return _new_document()
 
     async def export(
         self,
@@ -294,6 +543,8 @@ class NoteWordExporter:
         template_type: str = "soe",
         sections: list[str] | None = None,
         skip_empty: bool = False,
+        annotate_formulas: bool = False,
+        annotate_manual: bool = False,
     ) -> BytesIO:
         """导出附注为 Word 文档（致同标准格式）
 
@@ -303,6 +554,8 @@ class NoteWordExporter:
             template_type: 模板类型 (soe/listed)
             sections: 指定导出章节列表（None=全部）
             skip_empty: 是否跳过空章节
+            annotate_formulas: D1 sidecar 渲染——公式 cell 标浅绿背景（默认关闭）
+            annotate_manual:   D1 sidecar 渲染——手工 cell 标灰色边框（默认关闭）
 
         Returns:
             BytesIO containing the docx file
@@ -314,8 +567,12 @@ class NoteWordExporter:
         if skip_empty:
             notes = [n for n in notes if self._has_content(n)]
 
-        # Build document
-        doc = Document()
+        # Build document（Sprint 2 Task 2.2: 优先加载 GTNote* 模板 docx）
+        doc = self._new_document()
+        # 渲染选项透传给 _render_table
+        self._annotate_formulas = annotate_formulas
+        self._annotate_manual = annotate_manual
+
         self._setup_page(doc)
         self._add_title(doc, year)
         _add_toc(doc)
@@ -579,6 +836,11 @@ class NoteWordExporter:
         Sprint 0 / Task 0.3 P0 修复：
         - 空 header 列裁剪：headers 中的空字符串占位过滤掉（v2 模板治理前的兼容措施）
         - 列裁剪后同步裁 cells 数据，避免索引越界
+
+        Sprint 2 Task 2.2 增强：
+        - 应用 ``apply_gt_three_line`` 三线表（替代旧 _set_table_borders/_set_row_bottom_border 调用）
+        - 每行调 ``apply_gt_row_height(cm=0.7)`` 固定行高 + cantSplit + 关闭标题行重复
+        - D1 sidecar 渲染：``self._annotate_formulas`` / ``self._annotate_manual`` 控制公式 / 手工 cell 视觉
         """
         headers_raw = table_data.get("headers", [])
         rows = table_data.get("rows", [])
@@ -598,8 +860,8 @@ class NoteWordExporter:
         table = doc.add_table(rows=num_rows, cols=num_cols)
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-        # Set 致同 table borders
-        _set_table_borders(table)
+        # Sprint 2 Task 2.2: 致同三线表（顶/底 1pt + 表头 cell tcBorders.bottom 1/2pt + 其他 nil）
+        apply_gt_three_line(table)
 
         # Header row
         header_row = table.rows[0]
@@ -611,17 +873,27 @@ class NoteWordExporter:
             run = p.add_run(str(h))
             _set_run_font(run, bold=True)
 
-        # Header row bottom border (0.5pt = 4 half-points)
-        _set_row_bottom_border(header_row, sz=4)
+        # Sprint 2 Task 2.2: 表头行 + 数据行均固定 0.7cm + 关闭标题行重复
+        apply_gt_row_height(header_row, cm=0.7)
+
+        # 表级 sidecar 数据（D1）：_formulas / _cell_modes 优先取 row 级
+        formulas_index: dict[tuple[int, int], dict[str, Any]] = {}
+        for f in (table_data.get("_formulas") or []):
+            if isinstance(f, dict) and "row" in f and "col" in f:
+                formulas_index[(int(f["row"]), int(f["col"]))] = f
 
         # Data rows
         for r_idx, row in enumerate(rows):
             label = row.get("label", "")
             values = row.get("values", [])
             cells_data = row.get("cells", values)
+            cell_modes = row.get("_cell_modes") or []
+
+            data_row = table.rows[r_idx + 1]
+            apply_gt_row_height(data_row, cm=0.7)
 
             # First column: label
-            cell0 = table.rows[r_idx + 1].cells[0]
+            cell0 = data_row.cells[0]
             cell0.text = ""
             p0 = cell0.paragraphs[0]
             run0 = p0.add_run(str(label))
@@ -635,7 +907,7 @@ class NoteWordExporter:
                 if data_idx >= len(cells_data):
                     break
                 val = cells_data[data_idx]
-                cell = table.rows[r_idx + 1].cells[display_col_idx]
+                cell = data_row.cells[display_col_idx]
                 cell.text = ""
                 p = cell.paragraphs[0]
                 p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -646,13 +918,20 @@ class NoteWordExporter:
                 else:
                     cell_val = val
 
-                formatted = _format_amount(cell_val)
+                # Sprint 2 Task 2.2: 使用 fmt_amount_gt（空/零留白）替代 _format_amount（"-"）
+                formatted = fmt_amount_gt(cell_val)
                 run = p.add_run(formatted)
-                # Use Arial Narrow for numbers
+                # 数字走 Arial Narrow + 中文 eastAsia=仿宋
                 if _is_amount(cell_val):
-                    _set_run_font(run, font_name=NUMBER_FONT)
+                    apply_gt_dual_font(run)
                 else:
                     _set_run_font(run)
+
+                # D1 sidecar 渲染：公式 / 手工标记（默认两者都关）
+                if self._annotate_formulas and (r_idx, data_idx) in formulas_index:
+                    _set_cell_shading(cell, fill_hex="E6FFE6")
+                if self._annotate_manual and data_idx < len(cell_modes) and cell_modes[data_idx] == "manual":
+                    _set_cell_gray_borders(cell)
 
         # Add spacing after table
         doc.add_paragraph()
