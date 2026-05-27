@@ -399,7 +399,14 @@ class NoteWordExporter:
                 if note.text_content:
                     html_parts.append(f'<p>{note.text_content}</p>')
                 if note.table_data:
-                    html_parts.append(self._table_to_html(note.table_data))
+                    # Sprint 0 / Task 0.3 P0 修复：HTML 预览也支持多表
+                    tables_to_render = note.table_data.get("_tables") or [note.table_data]
+                    for tbl in tables_to_render:
+                        if not isinstance(tbl, dict):
+                            continue
+                        if len(tables_to_render) > 1 and tbl.get("name"):
+                            html_parts.append(f'<h5 style="margin:8px 0 4px;font-weight:bold;">{tbl["name"]}</h5>')
+                        html_parts.append(self._table_to_html(tbl))
             else:
                 html_parts.append('<p style="color:#999;">本期无此项业务。</p>')
 
@@ -428,24 +435,32 @@ class NoteWordExporter:
         return notes
 
     def _has_content(self, note: DisclosureNote) -> bool:
-        """Check if a note section has any content."""
+        """Check if a note section has any content.
+
+        Sprint 0 / Task 0.3 P0 修复：也识别 table_data._tables 数组中的多表内容
+        """
         if note.text_content and note.text_content.strip():
             return True
-        if note.table_data and isinstance(note.table_data, dict):
-            rows = note.table_data.get("rows", [])
-            if rows:
-                # Check if any row has non-zero values
-                for row in rows:
-                    values = row.get("values", [])
-                    cells = row.get("cells", values)
-                    for cell in cells:
-                        if isinstance(cell, dict):
-                            val = cell.get("value", cell.get("manual_value", 0))
-                        else:
-                            val = cell
-                        if val and val != 0 and val != "0" and val != "-":
-                            return True
+        if not note.table_data or not isinstance(note.table_data, dict):
             return False
+
+        # 收集所有要检查的表（多表 _tables 数组 + 单表降级）
+        tables_to_check = note.table_data.get("_tables") or [note.table_data]
+
+        for tbl in tables_to_check:
+            if not isinstance(tbl, dict):
+                continue
+            rows = tbl.get("rows", [])
+            for row in rows:
+                values = row.get("values", [])
+                cells = row.get("cells", values)
+                for cell in cells:
+                    if isinstance(cell, dict):
+                        val = cell.get("value", cell.get("manual_value", 0))
+                    else:
+                        val = cell
+                    if val and val != 0 and val != "0" and val != "-":
+                        return True
         return False
 
     def _detect_level(self, section_code: str) -> int:
@@ -525,7 +540,14 @@ class NoteWordExporter:
         _add_bookmark(p, f"note_section_{section_code}")
 
     def _render_note_content(self, doc: Document, note: DisclosureNote):
-        """Render note content (text + tables)."""
+        """Render note content (text + tables).
+
+        Sprint 0 / Task 0.3 P0 修复：
+        - 优先取 table_data._tables 数组逐张渲染（多表章节如固定资产 5 表 / 应收票据 12 表）
+        - 多表章节加 H4 表名标题（如有 name 字段）
+        - 空 header 列裁剪（headers 中的空字符串占位过滤掉）
+        - 兼容老结构：无 _tables 时降级到单表渲染
+        """
         # Text content
         if note.text_content and note.text_content.strip():
             p = doc.add_paragraph()
@@ -534,16 +556,41 @@ class NoteWordExporter:
             _set_paragraph_format(p)
 
         # Table data
-        if note.table_data and isinstance(note.table_data, dict):
-            self._render_table(doc, note.table_data)
+        if not note.table_data or not isinstance(note.table_data, dict):
+            return
+
+        # 优先取 _tables 数组（多表章节）；老结构降级到单表
+        tables_to_render = note.table_data.get("_tables") or [note.table_data]
+
+        for tbl in tables_to_render:
+            if not isinstance(tbl, dict):
+                continue
+            # 多表章节加表名 H4 标题
+            if len(tables_to_render) > 1 and tbl.get("name"):
+                p = doc.add_paragraph()
+                run = p.add_run(str(tbl["name"]))
+                _set_run_font(run, bold=True, size=HEADING3_FONT_SIZE)
+                _set_paragraph_format(p, space_before=Pt(6))
+            self._render_table(doc, tbl)
 
     def _render_table(self, doc: Document, table_data: dict):
-        """Render a table with 致同 standard formatting."""
-        headers = table_data.get("headers", [])
+        """Render a table with 致同 standard formatting.
+
+        Sprint 0 / Task 0.3 P0 修复：
+        - 空 header 列裁剪：headers 中的空字符串占位过滤掉（v2 模板治理前的兼容措施）
+        - 列裁剪后同步裁 cells 数据，避免索引越界
+        """
+        headers_raw = table_data.get("headers", [])
         rows = table_data.get("rows", [])
 
-        if not headers or not rows:
+        if not headers_raw or not rows:
             return
+
+        # 空 header 列裁剪 + 记录有效列索引
+        valid_indices = [i for i, h in enumerate(headers_raw) if h and str(h).strip()]
+        if not valid_indices:
+            return
+        headers = [headers_raw[i] for i in valid_indices]
 
         num_cols = len(headers)
         num_rows = len(rows) + 1  # +1 for header row
@@ -581,10 +628,14 @@ class NoteWordExporter:
             _set_run_font(run0)
 
             # Data columns: amounts right-aligned with Arial Narrow
-            for c_idx, val in enumerate(cells_data):
-                if c_idx + 1 >= num_cols:
+            # 按 valid_indices[1:] 取数（跳过 label 列），避免 cells_data 索引与显示列错位
+            for display_col_idx, original_col_idx in enumerate(valid_indices[1:], start=1):
+                # cells_data 通常对齐 headers_raw[1:]（去掉首列 label），按原始索引-1 取
+                data_idx = original_col_idx - 1
+                if data_idx >= len(cells_data):
                     break
-                cell = table.rows[r_idx + 1].cells[c_idx + 1]
+                val = cells_data[data_idx]
+                cell = table.rows[r_idx + 1].cells[display_col_idx]
                 cell.text = ""
                 p = cell.paragraphs[0]
                 p.alignment = WD_ALIGN_PARAGRAPH.RIGHT

@@ -82,7 +82,13 @@ ts 353 / composables 91
 - W-3 钉集成（外部对接）
 - Sentinel failover 真实验证：phase4 UAT-8
 - WorkpaperEditor 瘦身（当前 2631 行，目标 ≤1000）：useEditorActions let→ref + template dialog 配置驱动 + 删冗余别名
-- **附注模块改进 v2.0 实施**（spec 文档已入库 commit ccf92da `docs/DISCLOSURE_NOTE_IMPROVEMENT_PROPOSAL.md`）：6 Sprint / 18.5-19.5 人天 / 6 项 CI 卡点；致同 Word 排版规范单一真源（21 项 + 11 项验收断言）；渐进兼容现有 `_cell_modes` 行级 dict + 三式联动 + DSL（=TB/=ROW/=PRIOR）+ 4 套用户编辑入口；含 Sprint 1.5 公式 DSL 沉淀；**spec 三件套 `.kiro/specs/disclosure-note-full-revamp/` 起草中**：README.md 已建（含 D1-D5 5 项关键设计决策、与 5 个现有 spec 关系、6 项 CI 卡点、依赖风险、3 周时间线），requirements.md/design.md/tasks.md 待续
+- **附注模块改进 v2.0 实施**（spec 文档已入库 commit ccf92da `docs/DISCLOSURE_NOTE_IMPROVEMENT_PROPOSAL.md`）：6 Sprint / 18.5-19.5 人天 / 6 项 CI 卡点；致同 Word 排版规范单一真源（21 项 + 11 项验收断言）；渐进兼容现有 `_cell_modes` 行级 dict + 三式联动 + DSL（=TB/=ROW/=PRIOR）+ 4 套用户编辑入口;含 Sprint 1.5 公式 DSL 沉淀；**spec 三件套 `.kiro/specs/disclosure-note-full-revamp/` 已起草完成**（commit 81c0db1，2026-05-26）：README 119 行 + requirements 312 行（59 验收 / R1 数据绑定层 + R2 联动 + R3 溯源 + R4 自定义编辑 + R5 Word 致同）+ design 587 行（8 决策 + 6 Sprint 拆解 + ADR-007/008/009/010）+ tasks 342 行（47 任务，前置 3 + S0×4 + S1×8 + S1.5×6 + S2×9 + S3×8 + S4×6 + 收尾 3）；**待动手实施**
+- **附注 spec 三件套复盘发现 7 处事实硬错误 + 5 处一致性问题**（2026-05-26，待修订）：
+  - **真实 DSL 函数清单（grep 实测）**：`note_formula_generator.py` 入口函数实际叫 **`generate_formulas_for_table`**（不是 spec 写的 `execute_note_formulas`）；真实 DSL 5 个 = `TB(account, period)` / `WP(wp_code, sheet, cell)` / `REPORT(row_code, period)` / `cell(row, col)` / `SUM(start:end, col)`；**虚构的 `=ROW(R3, "C2")` 和 `=PRIOR()` 不存在**（spec 凭印象写）；新增的 `=PRIOR / =AGING` 是本 spec Sprint 1.5 新建（不是"已有"）
+  - **DisclosureNote.is_stale 字段已存在**（F46/Sprint 7.22 commit 已加）+ `event_handlers._mark_downstream_stale_on_rollback` 已订阅 `LEDGER_DATASET_ROLLED_BACK`；spec R2.1 应描述为"扩展现有 stale 机制 + 补 3 个新事件订阅"，不是从零开始
+  - **`useLinkageEvents` composable 不存在**（grep 0 命中），spec design D6 引用错误，应明确为新建 `useNoteStale.ts`
+  - **NoteTrimService 已有 5 方法**（get_sections/save_trim/get_trim_scheme/resolve_template_type/_init_from_template），本 spec 仅新增 `auto_trim`
+  - 一致性问题：requirements 头部"32 验收标准"实际 59；README "~30 验收 / ~35 任务"实际 59/47；CI 卡点 README/design 列 6 项 tasks 列 8 项（缺前置+收尾）；tasks 3.7 `test_auto_trim.py` 文件名应改 `test_note_trim_service_auto.py` 与项目命名一致
 - **vLLM / httpx 链路 3 个待修复 bug**（spec 已沉淀到本 memory，待动手）：
   - **httpx 系统代理陷阱**：Windows Clash 类系统代理（127.0.0.1:7897）让 `httpx.AsyncClient()` 默认读取代理把 localhost 请求路由到代理返回 502；修复 = 创建 client 时显式 `mounts={}, trust_env=False`；需修 4 文件：`llm_client.py`（_sync/_stream_completion）/ `ai_service.py`（_get_ollama_client + _get_llm_client + _get_chromadb_client）/ `availability_fallback_service.py`（check_llm_available）/ `routers/system_settings.py`（check_url）
   - **vLLM `chat_template_kwargs` 必须 payload 顶层**：嵌套 `extra_body.chat_template_kwargs` 被 vLLM 静默忽略，`enable_thinking=False` 不生效导致 content=None reasoning 有值；`llm_client.py:107` 改顶层 `"chat_template_kwargs": {"enable_thinking": settings.LLM_ENABLE_THINKING}`
