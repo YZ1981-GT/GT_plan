@@ -1,5 +1,10 @@
 # 附注模块改进建议（v2.0）
 
+> **✅ 已实施**（2026-05-27 完成 44/47，剩 F-1 真 UAT / F-2 dev-history 沉淀 / F-3 收口在跑中）
+> commits：`6b6731c` Sprint 0 / `65fc11a` Sprint 1 / `3c5067c` Sprint 1.5 / `e1477b2`+`1729c38f` Sprint 2 / `58cff337` Sprint 3 / `736cf1d4`+`551835b6` Sprint 4
+> spec 三件套：`.kiro/specs/disclosure-note-full-revamp/`
+> 验收：pytest 430/430 全绿（53 新增）
+
 > 编写：2026-05-26 | 范围：财务报表附注的数据绑定、生成、Word 导出全链路 | 适用：国企版（SOE）/ 上市版（Listed）双轨模板
 >
 > 版本说明：v1.0（2026-05-25）的改进方向正确，但字段级实现细节存在 16 处与代码事实不符。v2.0 全部基于 `grepSearch` 代码核验和 `附注模版/*.md` 致同实测规范重写，不再保留"勘误式补丁"格式。

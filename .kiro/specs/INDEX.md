@@ -1,6 +1,6 @@
 # Spec 总索引
 
-**最后更新**：2026-05-24（v3.6 — `advanced-query-enhancements-p1p2` 16 Task 全部完成，212 tests green；15 Req 闭环七条线：查询+写回+追溯+治理+跨模块+联动+入口）
+**最后更新**：2026-05-27（v3.7 — `disclosure-note-full-revamp` Sprint 0~4 全完成 44/47 tasks，pytest 430/430 全绿；剩 F-1 UAT / F-2 dev-history / F-3 收口）
 
 > 此索引追踪所有 spec 的状态、关联文档、commit。
 > **审计原则**：spec 不删，但标"演进/被取代/已合并"避免重复阅读。
@@ -50,6 +50,7 @@
 | `ledger-import-view-refactor/` | 243/243 ✅ | 2026-05-23 完成（9.10 Day 30 索引清理：72.82MB DROP + 38MB REINDEX 共 110MB 回收）|
 | `advanced-query-enhancements-p1p2/` | 16 Tasks ✅ | 2026-05-24 完成（15 Req / 5 Phase / 212 tests：29 PBT + 单测 + e2e；wp_template_registry + GIN + 单源化 + 审计节流 + LO 池化 + 跨模块 cell + 模板联动 + 批量查询 + 写回 + 追溯 + 4 体验组件）|
 | `k-admin-cycle-post-review-fix/` | 18/18 ✅ | 2026-05-20 完成 |
+| `disclosure-note-full-revamp/` | 44/47 ✅ ⚠ | 2026-05-27 完成核心（Sprint 0~4 / 47 tasks 中 4 任务待外部，剩 F-1 UAT 真项目 / F-2 dev-history / F-3 文档；commits 6b6731c+65fc11a+3c5067c+e1477b2+1729c38f+58cff337+736cf1d4+551835b6；pytest 430/430 全绿；致同 21 排版+11 视觉断言+ADR-007/008/009/010；4101 binding cells / 25 列语义 / PRESET_TO_RULE 11 枚举 / NoteFormatConfig 21 字段 frozen / NOTE↔TB 双向边）|
 
 ### 2.2 已被取代（保留 ADR）
 
