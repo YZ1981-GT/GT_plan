@@ -346,6 +346,8 @@ class DisclosureEngine:
         project_id: UUID,
         year: int,
         table_template: dict,
+        *,
+        section_number: str | None = None,
     ) -> dict | None:
         """从模板构建 table_data，动态提取底稿明细行。
 
@@ -357,7 +359,41 @@ class DisclosureEngine:
         - 单元格模式：auto（自动提数）/ manual（手动锁定）/ locked（公式锁定）
 
         取数优先级：底稿fine_summary明细行 > 底稿audited_amount > 试算表 > 模板预设行
+
+        Sprint 1 Task 1.3 binding 分支（向后兼容）：
+        - 当传入 ``section_number`` 且 binding 加载器命中 → 走新路径
+          ``_build_with_binding``（按 binding 字段 7 source 解析器取数）
+        - 未命中 / 不传 section_number → 走原 legacy 路径不变（不污染老代码）
         """
+        # ── Sprint 1 Task 1.3 binding 分支 ─────────────────────────
+        if section_number:
+            try:
+                from app.services.note_template_bindings_loader import (
+                    get_binding_for_section,
+                )
+                sec_binding = get_binding_for_section(section_number)
+            except Exception as _bl_err:
+                logger.warning(
+                    "binding loader failed for %s: %s; "
+                    "falling back to legacy path",
+                    section_number, _bl_err,
+                )
+                sec_binding = None
+            if sec_binding:
+                tables = sec_binding.get("tables") or []
+                if tables and isinstance(tables[0], dict):
+                    try:
+                        return await self._build_with_binding(
+                            project_id, year, section_number,
+                            table_template, tables[0],
+                        )
+                    except Exception as _bind_err:
+                        logger.warning(
+                            "_build_with_binding failed for %s: %s; "
+                            "falling back to legacy path",
+                            section_number, _bind_err,
+                        )
+        # ── 原 legacy 路径（不修改） ───────────────────────────────
         if not table_template:
             return None
 
@@ -478,6 +514,206 @@ class DisclosureEngine:
         return {"headers": headers, "rows": rows}
 
     # ------------------------------------------------------------------
+    # Sprint 1 Task 1.3 / 1.4 — binding 驱动的新路径
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _backfill_totals(rows: list[dict], num_value_cols: int) -> None:
+        """合计/小计行回填：取上一个合计行之后到本行之前的非合计行 sum.
+
+        与 legacy `_build_table_data` 末尾的回填算法等价（抽取为公共逻辑），
+        新 binding 路径与老路径共用同一规则避免行为分裂。
+        """
+        for i, row in enumerate(rows):
+            if not row.get("is_total"):
+                continue
+            if i == 0:
+                continue
+            for ci in range(num_value_cols):
+                # 起点：上一个合计行之后；初始 0
+                start = 0
+                for j in range(i - 1, -1, -1):
+                    if rows[j].get("is_total"):
+                        start = j + 1
+                        break
+                total: float = 0.0
+                has_val = False
+                for r in rows[start:i]:
+                    if r.get("is_total"):
+                        continue
+                    vals = r.get("values") or []
+                    if ci < len(vals) and vals[ci] is not None:
+                        try:
+                            total += float(vals[ci])
+                            has_val = True
+                        except (TypeError, ValueError):
+                            continue
+                if has_val:
+                    cur_vals = row.get("values") or []
+                    if ci < len(cur_vals):
+                        cur_vals[ci] = total
+                        row["values"] = cur_vals
+
+    async def _build_with_binding(
+        self,
+        project_id: UUID,
+        year: int,
+        section_number: str,
+        table_template: dict,
+        table_binding: dict,
+    ) -> dict:
+        """走 binding 驱动路径：按 header_normalize.semantic 调 7 source resolver.
+
+        输出 row 结构兼容前端老代码 — 同时含 ``values`` + ``_cell_modes``
+        + ``_cell_meta`` + ``row_type`` + ``label`` + ``is_total``（D1
+        sidecar 兼容铁律）。
+
+        合计行先 None 占位，最后用 ``_backfill_totals`` 回填。
+
+        Args:
+            project_id: 项目 UUID
+            year:       附注会计年度
+            section_number: 章节号（用于构造 binding_id）
+            table_template: 模板表（含 headers / rows[*].label / row_type）
+            table_binding:  binding json 中对应的表 dict（含 header_normalize /
+                            rows[*].binding / rows[*].formula / row_type）
+
+        Returns:
+            ``{"headers": [...], "rows": [...]}``  与 legacy 同 schema.
+        """
+        from app.services.note_source_resolvers import dispatch_resolver
+
+        headers = table_template.get("headers") or []
+        template_rows = table_template.get("rows") or []
+        if not template_rows:
+            return {"headers": headers, "rows": []}
+
+        # 构造 ctx — 注入预加载缓存 + db + project_id + year + section_number
+        ctx: dict = {
+            "project_id": project_id,
+            "year": year,
+            "db": self.db,
+            "section_number": section_number,
+            "_tb_cache": getattr(self, "_tb_cache", None) or {},
+            "_wp_cache": getattr(self, "_wp_cache", None) or {},
+            "_prior_notes_cache": getattr(self, "_prior_notes_cache", None) or {},
+        }
+
+        # binding.rows 是 dict (label -> row_binding)
+        binding_rows = table_binding.get("rows") or {}
+        if not isinstance(binding_rows, dict):
+            binding_rows = {}
+
+        # header_normalize 与 headers 一一对应（col 0 通常 row_label）
+        header_normalize = table_binding.get("header_normalize") or []
+        if not isinstance(header_normalize, list):
+            header_normalize = []
+
+        num_value_cols = max(0, len(headers) - 1)
+        output_rows: list[dict] = []
+
+        for tr in template_rows:
+            if not isinstance(tr, dict):
+                continue
+            label = tr.get("label", "") or ""
+            row_type_raw = tr.get("row_type")
+            is_total_flag = bool(tr.get("is_total"))
+            is_total = is_total_flag or row_type_raw in {"subtotal", "total"}
+
+            if is_total:
+                # 合计行：先 None 占位，最后回填
+                output_rows.append({
+                    "label": label,
+                    "values": [None] * num_value_cols,
+                    "is_total": True,
+                    "row_type": row_type_raw or "total",
+                    "_cell_modes": {},
+                    "_cell_meta": {},
+                })
+                continue
+
+            # 找到这行的 binding（按 label 精确匹配）
+            row_binding = binding_rows.get(label) or {}
+            cell_bindings = row_binding.get("binding") or {}
+            if not isinstance(cell_bindings, dict):
+                cell_bindings = {}
+
+            values: list = []
+            cell_modes: dict[str, str] = {}
+            cell_meta: dict[str, dict] = {}
+
+            for col_index in range(num_value_cols):
+                actual_col = col_index + 1  # col 0 是行 label
+                # 取该列 semantic
+                semantic: str | None = None
+                if actual_col < len(header_normalize) and isinstance(
+                    header_normalize[actual_col], dict
+                ):
+                    semantic = header_normalize[actual_col].get("semantic")
+                # header_normalize 缺位 → 兜底 manual
+                if not semantic:
+                    values.append(None)
+                    cell_modes[str(col_index)] = "manual"
+                    cell_meta[str(col_index)] = {
+                        "manual_value": None,
+                        "semantic": None,
+                        "binding_id": None,
+                    }
+                    continue
+
+                # 找 cell binding：先精确，再前缀（同 semantic 多列变体）
+                cell = cell_bindings.get(semantic)
+                if not cell:
+                    prefix = semantic + "_col"
+                    for k, v in cell_bindings.items():
+                        if isinstance(k, str) and k.startswith(prefix):
+                            cell = v
+                            break
+                if not isinstance(cell, dict):
+                    # 缺 binding → values=None + manual placeholder
+                    values.append(None)
+                    cell_modes[str(col_index)] = "manual"
+                    cell_meta[str(col_index)] = {
+                        "manual_value": None,
+                        "semantic": semantic,
+                        "binding_id": None,
+                    }
+                    continue
+
+                mode = cell.get("mode") or "auto"
+                if mode not in {"auto", "manual", "locked"}:
+                    mode = "auto"
+
+                # 调 resolver — locked / manual 不走自动取数（值留 None 由后续合并接管）
+                if mode == "locked":
+                    val = None
+                elif mode == "manual":
+                    val = cell.get("manual_value")
+                else:
+                    val = await dispatch_resolver(cell, ctx)
+
+                values.append(val)
+                cell_modes[str(col_index)] = mode
+                cell_meta[str(col_index)] = {
+                    "manual_value": None,
+                    "semantic": semantic,
+                    "binding_id": f"{section_number}.{label}.{semantic}",
+                }
+
+            output_rows.append({
+                "label": label,
+                "values": values,
+                "is_total": False,
+                "row_type": row_type_raw or "data",
+                "_cell_modes": cell_modes,
+                "_cell_meta": cell_meta,
+            })
+
+        # 回填合计行
+        self._backfill_totals(output_rows, num_value_cols)
+
+        return {"headers": list(headers), "rows": output_rows}
+
+    # ------------------------------------------------------------------
     # 生成附注
     # ------------------------------------------------------------------
     @staticmethod
@@ -578,6 +814,7 @@ class DisclosureEngine:
                         built = await self._build_table_data(
                             project_id, year,
                             {"headers": tbl.get("headers", []), "rows": tbl.get("rows", [])},
+                            section_number=note_section,
                         )
                         if built:
                             built["name"] = tbl.get("name", "")
@@ -593,6 +830,7 @@ class DisclosureEngine:
                 elif content_type_str in ("table", "mixed"):
                     table_data = await self._build_table_data(
                         project_id, year, tmpl.get("table_template", {}),
+                        section_number=note_section,
                     )
             except Exception as _tbl_err:
                 logger.warning("build table_data failed for %s: %s", note_section, _tbl_err)
@@ -613,7 +851,19 @@ class DisclosureEngine:
                 note.section_title = section_title
                 note.account_name = account_name
                 note.content_type = ContentType(content_type_str)
-                note.table_data = table_data
+                # D1 三态合并：已存在 note 且历史 table_data 非空 → 走合并保留 manual/locked
+                if table_data is not None and note.table_data:
+                    from sqlalchemy.orm.attributes import flag_modified
+
+                    from app.services.note_cell_merge import (
+                        merge_table_data_preserving_cell_modes,
+                    )
+                    note.table_data = merge_table_data_preserving_cell_modes(
+                        note.table_data, table_data,
+                    )
+                    flag_modified(note, "table_data")
+                else:
+                    note.table_data = table_data
                 note.text_content = text_content
                 note.source_template = source_template
                 note.sort_order = sort_order
@@ -683,8 +933,18 @@ class DisclosureEngine:
         """增量更新受影响附注的数值。
 
         简单实现：重新生成所有附注的 table_data。
-        Validates: Requirements 8.1
+
+        D1 三态合并：通过 ``note_cell_merge.merge_table_data_preserving_cell_modes``
+        保留用户在前端切到 manual / locked 的单元格值，仅 auto 单元格用新算的覆盖。
+
+        Validates: Requirements 8.1, R1.3 验收 10/11/12
         """
+        from sqlalchemy.orm.attributes import flag_modified
+
+        from app.services.note_cell_merge import (
+            merge_table_data_preserving_cell_modes,
+        )
+
         template_type = await self._get_active_template_type(project_id)
         templates = await self._load_templates(project_id, template_type)
         updated = 0
@@ -704,8 +964,9 @@ class DisclosureEngine:
                 if referenced_codes and not referenced_codes.intersection(set(changed_accounts)):
                     continue
 
-            table_data = await self._build_table_data(
+            new_td = await self._build_table_data(
                 project_id, year, table_template,
+                section_number=note_section,
             )
 
             existing = await self.db.execute(
@@ -718,7 +979,13 @@ class DisclosureEngine:
             )
             note = existing.scalar_one_or_none()
             if note:
-                note.table_data = table_data
+                old_td = note.table_data or {}
+                if old_td:
+                    note.table_data = merge_table_data_preserving_cell_modes(old_td, new_td)
+                else:
+                    note.table_data = new_td
+                # JSONB 字段需要显式标记，确保嵌套字段持久化
+                flag_modified(note, "table_data")
                 updated += 1
 
         await self.db.flush()
@@ -792,6 +1059,7 @@ class DisclosureEngine:
                             built = await self._build_table_data(
                                 project_id, year,
                                 {"headers": tbl.get("headers", []), "rows": tbl.get("rows", [])},
+                                section_number=note_section,
                             )
                             if built:
                                 built["name"] = tbl.get("name", "")
@@ -806,6 +1074,7 @@ class DisclosureEngine:
                     elif tmpl.get("table_template"):
                         note.table_data = await self._build_table_data(
                             project_id, year, tmpl["table_template"],
+                            section_number=note_section,
                         )
                     if note.table_data:
                         from sqlalchemy.orm.attributes import flag_modified

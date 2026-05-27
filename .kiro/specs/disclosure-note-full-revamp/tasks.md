@@ -45,7 +45,7 @@
   - 空 header 列裁剪
   - CI 卡点：grep `_tables` 必须出现在 `note_word_exporter.py`
 
-- [-] **0.4** Sprint 0 验收
+- [x] **0.4** Sprint 0 验收
   - 固定资产/应收票据等多表章节导出 5-12 张表全部出现
   - vue-tsc 0 错误，pytest 全绿
   - 提交 commit「Sprint 0: 模板治理 + Word P0 修复」
@@ -54,22 +54,22 @@
 
 ## Sprint 1：数据绑定层 + 列语义识别 + 引擎兼容层（5-6 人天）
 
-- [ ] **1.1** 新建 `backend/data/note_template_bindings.json`
+- [x] **1.1** 新建 `backend/data/note_template_bindings.json`
   - 整合前置 P-1 草稿（50+ 变动表）
   - 自动生成 90 张 3 列标准表绑定（基于 wp_account_mapping.json 88 条）
   - 总覆盖 ≥ 140/173 章节（≥ 80%）
   - 单测：每条 binding 含 source / field / mode / account_codes 必填项
 
-- [ ] **1.2** `backend/app/services/note_column_semantics.py` 新建列语义识别引擎
+- [x] **1.2** `backend/app/services/note_column_semantics.py` 新建列语义识别引擎
   - 实现 `NoteColumnSemantics.identify(header_text)` 模糊匹配 20 个标准语义
   - 单测覆盖：`test_note_column_semantics.py` ≥ 20 用例
 
-- [ ] **1.3** 引擎改造 `disclosure_engine._build_table_data` 加 binding 分支
+- [x] **1.3** 引擎改造 `disclosure_engine._build_table_data` 加 binding 分支
   - 优先读 binding，无绑定降级到 label 字符串匹配（兼容层）
   - 新增 `_build_with_binding` 方法
   - 单测：`test_disclosure_engine_v2.py` 至少 30 用例
 
-- [ ] **1.4** 实现 7 种 source 数据源解析器
+- [x] **1.4** 实现 7 种 source 数据源解析器
   - `_resolve_from_trial_balance(binding, project_id, year)`
   - `_resolve_from_ledger_sum(binding, project_id, year)` + period_filter 三模式
   - `_resolve_from_aux_balance(binding, project_id, year)`
@@ -79,23 +79,23 @@
   - `_resolve_manual(binding)` 直接读 manual_value
   - 单测：每个 source 至少 3 用例
 
-- [ ] **1.5** sidecar 字段持久化（D1）
+- [x] **1.5** sidecar 字段持久化（D1）
   - `DisclosureNote.table_data.row` 新增 `row_type` + `_cell_meta`
   - 引擎重生成规则三态：auto 覆盖 / manual 保留 + manual_value 备份 / locked 跳过
   - 单测：PBT `test_note_persistence_property.py` 4 用例（auto/manual/locked round-trip）
 
-- [ ] **1.6** 数据迁移脚本验证
+- [x] **1.6** 数据迁移脚本验证
   - 跑 0.2 迁移脚本到本地 PG
   - 抽查 20 个章节确认 round-trip 不丢字段
   - 前端 DisclosureEditor.vue 老代码零修改测试
 
-- [ ] **1.7** R1 验收 UAT（3 个真实项目）
+- [~] **1.7** R1 验收 UAT（3 个真实项目）
   - 陕西华氏 SOE / 安徽骨科 SOE / 1 个 Listed 上市样本
   - 53 个变动表"本期增加/减少"列自动取数命中率 ≥ 95%
   - 整体表格数字准确率 ≥ 95%
   - 老审计师 review 20 章节通过
 
-- [ ] **1.8** Sprint 1 验收
+- [-] **1.8** Sprint 1 验收
   - CI 卡点：模板 JSON 中 `account_codes` 引用 = 0；`row._cell_modes` 三态断言通过
   - vue-tsc / pytest 全绿
   - 提交 commit「Sprint 1: 数据绑定层 + 列语义识别 + 引擎兼容层」
