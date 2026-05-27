@@ -420,76 +420,10 @@
     </template>
   </el-dialog>
 
-  <!-- 附注公式管理弹窗 -->
-  <el-dialog v-model="showNoteFormulaDialog" :title="`公式管理 — ${selectedNoteSection?.title || ''}`" width="85%" top="4vh" append-to-body destroy-on-close :z-index="10000">
-    <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
-      <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">共 {{ noteFormulaRules.length }} 条公式规则，点击"执行取数"从试算表自动填充数据</span>
-      <span style="flex:1" />
-      <el-button size="small" @click="addNoteFormulaRule">+ 新增规则</el-button>
-      <el-button size="small" type="primary" @click="applyNoteFormulaRules" :loading="noteRefreshing">▶ 执行取数</el-button>
-    </div>
-    <el-table :data="noteFormulaRules" border size="small" max-height="55vh" style="width:100%"
-      :header-cell-style="{ background: '#f0edf5', fontSize: '11px' }"
-      :cell-style="{ padding: '2px 6px', fontSize: '11px' }">
-      <el-table-column label="行" width="50" align="center">
-        <template #default="{ row }">{{ row.row + 1 }}</template>
-      </el-table-column>
-      <el-table-column prop="itemName" label="项目名称" min-width="160">
-        <template #default="{ row }">
-          <el-input v-model="row.itemName" size="small" placeholder="科目/项目名" />
-        </template>
-      </el-table-column>
-      <el-table-column prop="colName" label="目标列" width="120">
-        <template #default="{ row }">
-          <el-input v-model="row.colName" size="small" placeholder="列名" />
-        </template>
-      </el-table-column>
-      <el-table-column prop="type" label="类型" width="100" align="center">
-        <template #default="{ row }">
-          <el-select v-model="row.type" size="small" style="width:100%">
-            <el-option label="试算表取数" value="TB_REF" />
-            <el-option label="自动求和" value="SUM" />
-            <el-option label="跨表引用" value="CROSS_REF" />
-            <el-option label="手动输入" value="manual" />
-          </el-select>
-        </template>
-      </el-table-column>
-      <el-table-column prop="formula" label="公式表达式" min-width="220">
-        <template #default="{ row }">
-          <el-input v-model="row.formula" size="small" placeholder='如 =TB("货币资金","期末余额")' />
-        </template>
-      </el-table-column>
-      <el-table-column prop="source" label="数据来源" width="90">
-        <template #default="{ row }">
-          <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">{{ row.source }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="currentValue" label="当前值" width="100" align="right">
-        <template #default="{ row }">
-          <span style="font-size: var(--gt-font-size-xs)">{{ row.currentValue || '-' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="50" align="center">
-        <template #default="{ $index }">
-          <el-button size="small" link type="danger" @click="removeNoteFormulaRule($index)">✕</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <div style="margin-top:10px;padding:8px;background: var(--gt-color-primary-bg);border-radius:6px;font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);line-height:1.6">
-      <b>公式类型说明：</b><br/>
-      · <b>TB_REF</b>（试算表取数）：从项目试算表按科目名匹配，提取期末/期初余额。格式：=TB("科目名","期末余额")<br/>
-      · <b>SUM</b>（自动求和）：合计行自动汇总上方明细行数据<br/>
-      · <b>CROSS_REF</b>（跨表引用）：从其他附注表格或报表引用数据。格式：=REF("章节ID","行名","列名")<br/>
-      · <b>manual</b>（手动输入）：不自动计算，由用户手动填写
-    </div>
-    <template #footer>
-      <el-button @click="showNoteFormulaDialog = false">关闭</el-button>
-      <el-button @click="openGlobalFormulaManager">
-        打开全局公式管理器
-      </el-button>
-      <el-button type="primary" @click="applyNoteFormulaRules" :loading="noteRefreshing">▶ 执行取数</el-button>
-    </template>
-  </el-dialog>
+  <!--
+    Sprint 1.5.3：附注公式管理 dialog 已收敛到全局 FormulaManagerDialog（ThreeColumnLayout 顶层挂载）。
+    `openNoteFormula()` 改为发出 EventBus `open-formula-manager` 事件，nodeKey='consol_note'。
+  -->
 </template>
 
 <script setup lang="ts">
@@ -585,9 +519,7 @@ const noteAuditLoading = ref(false)
 const noteAuditResults = ref<any[]>([])
 const noteAuditSummary = reactive({ totalSections: 0, totalChecks: 0, passCount: 0, errorCount: 0, warnCount: 0 })
 
-// ─── 公式编辑弹窗 ────────────────────────────────────────────────────────────
-const showNoteFormulaDialog = ref(false)
-const noteFormulaRules = ref<any[]>([])
+// ─── 公式编辑（已收敛到全局 FormulaManagerDialog，详见 openNoteFormula） ────
 
 // ─── 单元格选中与右键菜单（统一 composable） ──────────────────────────────
 const noteCtx = useCellSelection()
@@ -1151,70 +1083,18 @@ async function onNoteBatchImport(e: Event) {
   }
 }
 
-// ─── 公式管理 ────────────────────────────────────────────────────────────────
-function openGlobalFormulaManager() {
-  eventBus.emit('open-formula-manager', { nodeKey: 'consol_note' })
-  showNoteFormulaDialog.value = false
-}
-
+// ─── 公式管理（Sprint 1.5.3 收敛） ───────────────────────────────────────────
+// ConsolNoteTab 不再自维护公式 dialog，统一走全局 FormulaManagerDialog
+// （由 ThreeColumnLayout 顶层挂载，scope='consol_note'）。
 function openNoteFormula() {
   const sec = selectedNoteSection.value
   if (!sec) { ElMessage.warning('请先选择章节'); return }
-  const rules: any[] = []
-  const headers = sec.headers || []
-  for (let ri = 0; ri < (sec.editRows || []).length; ri++) {
-    const row = sec.editRows[ri]
-    const itemName = row[0] || `行${ri + 1}`
-    const isTotal = String(itemName).includes('合计') || String(itemName).includes('小计')
-    for (let ci = 1; ci < headers.length; ci++) {
-      const h = headers[ci]
-      const hClean = h.replace(/\s/g, '')
-      let formulaType = 'manual'
-      let formula = ''
-      let source = ''
-      if (isTotal) {
-        formulaType = 'SUM'
-        formula = `=SUM(${headers[ci]}列明细行)`
-        source = '自动求和'
-      } else if (hClean.includes('期末') || hClean.includes('本期') || hClean.includes('账面余额')) {
-        formulaType = 'TB_REF'
-        formula = `=TB("${itemName}","期末余额")`
-        source = '试算表'
-      } else if (hClean.includes('期初') || hClean.includes('年初')) {
-        formulaType = 'TB_REF'
-        formula = `=TB("${itemName}","期初余额")`
-        source = '试算表'
-      }
-      if (formulaType !== 'manual') {
-        rules.push({
-          row: ri, col: ci, itemName, colName: h,
-          type: formulaType, formula, source,
-          currentValue: row[ci] || '',
-        })
-      }
-    }
-  }
-  noteFormulaRules.value = rules
-  showNoteFormulaDialog.value = true
-}
-
-async function applyNoteFormulaRules() {
-  const sec = selectedNoteSection.value
-  if (!sec || !props.projectId) return
-  await refreshNoteByFormula()
-  showNoteFormulaDialog.value = false
-}
-
-function addNoteFormulaRule() {
-  noteFormulaRules.value.push({
-    row: 0, col: 1, itemName: '', colName: '',
-    type: 'TB_REF', formula: '=TB("科目名","期末余额")', source: '试算表',
-    currentValue: '',
-  })
-}
-
-function removeNoteFormulaRule(idx: number) {
-  noteFormulaRules.value.splice(idx, 1)
+  // 透传 nodeKey 到全局 FormulaManagerDialog；附带 section_id / section_title 便于扩展
+  eventBus.emit('open-formula-manager', {
+    nodeKey: 'consol_note',
+    section_id: sec.section_id,
+    section_title: sec.title,
+  } as any)
 }
 
 async function exportNoteFormulas() {

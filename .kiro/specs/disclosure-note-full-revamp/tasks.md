@@ -94,8 +94,9 @@
   - 53 个变动表"本期增加/减少"列自动取数命中率 ≥ 95%
   - 整体表格数字准确率 ≥ 95%
   - 老审计师 review 20 章节通过
+  
 
-- [-] **1.8** Sprint 1 验收
+- [x] **1.8** Sprint 1 验收
   - CI 卡点：模板 JSON 中 `account_codes` 引用 = 0；`row._cell_modes` 三态断言通过
   - vue-tsc / pytest 全绿
   - 提交 commit「Sprint 1: 数据绑定层 + 列语义识别 + 引擎兼容层」
@@ -104,32 +105,32 @@
 
 ## Sprint 1.5：公式 DSL 沉淀 + 三式联动整合（2 人天）
 
-- [ ] **1.5.1** `docs/NOTE_FORMULA_DSL.md` 完整 DSL 语法参考
+- [x] **1.5.1** `docs/NOTE_FORMULA_DSL.md` 完整 DSL 语法参考
   - 已有 5 函数文档化：`TB / WP / REPORT / cell / SUM`（不改实现）
   - 🆕 本 spec 新建 2 函数：`PRIOR / AGING`
   - 每函数含正常 / 缺数据 / 边界 case
   - `note_formula_generator.py`（入口 `generate_formulas_for_table`）头部 `__doc__` 引用
 
-- [ ] **1.5.2** `=AGING(account, bucket)` + `=PRIOR(account, period)` 函数实现（D4 新建）
+- [x] **1.5.2** `=AGING(account, bucket)` + `=PRIOR(account, period)` 函数实现（D4 新建）
   - **=AGING**：从 TbAuxLedger 反推账龄分桶（5 桶：1 年以内 / 1-2 / 2-3 / 3-5 / 5 年以上）；客户未提供辅助序时账时返回 None（章节标 not_applicable）
   - **=PRIOR**：上年附注期末值取数，复用 `disclosure_engine._preload_data_for_notes.prior_notes_cache`
   - 单测：`test_note_formula_dsl.py` 至少 6 用例（=AGING × 3 + =PRIOR × 3）
 
-- [ ] **1.5.3** ConsolNoteTab 重复公式 dialog 收敛
+- [x] **1.5.3** ConsolNoteTab 重复公式 dialog 收敛
   - 删除 `ConsolNoteTab.vue:424-493` 内置 dialog
   - `FormulaManagerDialog` 加 `scope: 'note' | 'consol_note' | 'report'` prop
   - CI 卡点：grep `noteFormulaRules.value` 在 ConsolNoteTab.vue 应消失
 
-- [ ] **1.5.4** 单元格级公式 `_formulas` 数组（D4）
+- [x] **1.5.4** 单元格级公式 `_formulas` 数组（D4）
   - `note.table_data._formulas = [{row, col, expr, binding_id, evaluated_at}]`
   - 不污染 row 结构，独立顶层数组
 
-- [ ] **1.5.5** ADR-007 撰写 `docs/adr/ADR-007-note-triple-format-source-of-truth.md`
+- [x] **1.5.5** ADR-007 撰写 `docs/adr/ADR-007-note-triple-format-source-of-truth.md`
   - DisclosureNote.table_data 唯一真源
   - structure.json / xlsx / HTML 三式职责
   - `triple_format_adapter.update_note_from_structure` 单入口规约
 
-- [ ] **1.5.6** Sprint 1.5 验收
+- [-] **1.5.6** Sprint 1.5 验收
   - 5 函数 + DSL 文档完整
   - vue-tsc / pytest 全绿
   - 提交 commit「Sprint 1.5: 公式 DSL 沉淀 + 三式联动 ADR」

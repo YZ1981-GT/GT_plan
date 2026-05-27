@@ -38,6 +38,7 @@
         <!-- 当前选中的路径 + 模板类型切换 -->
         <div class="gt-fm-breadcrumb">
           <div style="display: flex; align-items: center; gap: 8px;">
+            <el-tag size="small" type="info" effect="plain" style="font-weight: 600;">{{ scopeLabel }}</el-tag>
             <el-select v-model="fmTemplateType" size="small" style="width: 100px;" @change="onFmTemplateChange">
               <el-option label="国企版" value="soe" />
               <el-option label="上市版" value="listed" />
@@ -414,17 +415,31 @@ import FormulaEditDialog from './FormulaEditDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 
-const props = defineProps<{
+/**
+ * scope：当前公式管理器的目标范围
+ *  - 'note'        单体附注（DisclosureEditor）
+ *  - 'consol_note' 合并附注（ConsolNoteTab）
+ *  - 'report'      报表（ReportView，默认）
+ *  - 'tb'          试算平衡表
+ * 仅作显式上下文标识（写入面包屑 + sessionStorage `gt-formula-target-node`），
+ * 不改变现有树形导航行为。
+ */
+type FormulaManagerScope = 'note' | 'consol_note' | 'report' | 'tb'
+
+const props = withDefaults(defineProps<{
   modelValue: boolean
   rows: any[]
   projectId?: string
   year?: number
-}>()
+  scope?: FormulaManagerScope
+}>(), {
+  scope: 'report',
+})
 
 const emit = defineEmits<{
-  'update:modelValue': [val: boolean]
-  'saved': []
-  'applied': []
+  (e: 'update:modelValue', val: boolean): void
+  (e: 'saved'): void
+  (e: 'applied'): void
 }>()
 
 const visible = computed({
@@ -439,6 +454,15 @@ const router = useRouter()
 const selectedNodeKey = ref('report_balance_sheet')
 const selectedPath = ref('报表 > 资产负债表')
 const fmTemplateType = ref('soe')
+
+// 当前 scope 对应的中文 tag（仅展示用，不影响树形导航行为）
+const SCOPE_LABEL_MAP: Record<FormulaManagerScope, string> = {
+  note: '单体附注',
+  consol_note: '合并附注',
+  report: '报表',
+  tb: '试算平衡表',
+}
+const scopeLabel = computed(() => SCOPE_LABEL_MAP[props.scope] || '报表')
 
 function onFmTemplateChange() {
   // 切换模板类型后清空缓存，重新加载
@@ -743,6 +767,10 @@ async function loadRowsForNode(nodeKey: string) {
 // 初始加载当前报表的数据
 watch(visible, async (v) => {
   if (v) {
+    // 同步 scope 到 sessionStorage（与 ThreeColumnLayout 全局入口保持一致）
+    try {
+      sessionStorage.setItem('gt-formula-scope', props.scope || 'report')
+    } catch { /* sessionStorage 不可用时忽略 */ }
     // 加载动态附注树
     loadNoteTree()
     // 用传入的 rows 作为当前报表的数据

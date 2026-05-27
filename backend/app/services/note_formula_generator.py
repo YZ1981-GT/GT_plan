@@ -3,19 +3,34 @@
 根据附注模板的 check_presets 和 table_template 结构，
 自动生成每个单元格的计算公式，供前端"应用自动运算"时执行。
 
+参考文档：docs/NOTE_FORMULA_DSL.md（完整 DSL 语法参考 + _formulas schema）
+
 公式类型：
 - vertical_sum: 合计行 = 上方明细行之和
 - horizontal_balance: 期初 + 增加 - 减少 = 期末
 - book_value: 原值 - 累计折旧/摊销 - 减值准备 = 账面价值
 - balance_check: 报表数 = 附注合计数
 
-生成的公式存储在 DisclosureNote.table_data._formulas 中：
+DSL 函数清单（_resolve_single_cross_ref）：
+- TB('account_code','column')        — 试算表取数（已有）
+- WP('wp_code','sheet','cell_ref')   — 底稿单元格取数（已有）
+- REPORT('row_code','period')        — 财报取数（已有）
+- NOTE('section','*','period')       — 当年其他附注合计（已有）
+- cell(row, col) / SUM(start:end,c)  — 表内引用（已有）
+- PRIOR('account_name','期末'|'期初') — 上年附注取数（Sprint 1.5 Task 1.5.2 新增）
+- AGING('account_name','bucket')     — 账龄分桶（Sprint 1.5 Task 1.5.2 新增）
+
+生成的公式存储在 DisclosureNote.table_data._formulas 中（dict[str, dict]，
+key="row_idx:col_idx"，row/col 从 key 解出无需冗余存储）：
 {
   "row_idx:col_idx": {
-    "type": "vertical_sum",
-    "expression": "SUM(0:3, col)",  // 第0-3行同列求和
+    "type": "vertical_sum",          # 公式分类
+    "expression": "SUM(0:3, col)",   # DSL 表达式原文
     "description": "合计 = 子项之和",
-    "category": "auto_calc"
+    "category": "auto_calc",
+    "source": "check_presets.sub_item",  # 公式来源
+    "binding_id": None,              # Sprint 1.5 Task 1.5.4：关联 _cell_meta.binding_id
+    "evaluated_at": "2026-..."       # Sprint 1.5 Task 1.5.4：execute 时写入 ISO timestamp
   }
 }
 """
@@ -23,6 +38,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -117,6 +133,7 @@ def generate_formulas_for_table(
                     "description": f"{label} {period_label}",
                     "category": "auto_calc",
                     "source": source,
+                    "binding_id": None,  # Sprint 1.5 Task 1.5.4 占位，由 _build_with_binding 写实
                 }
 
     # 2. 纵向合计公式（sub_item 预设）
@@ -138,6 +155,7 @@ def generate_formulas_for_table(
                     "description": f"合计 = 第{detail_start+1}~{detail_end+1}行之和",
                     "category": "auto_calc",
                     "source": "check_presets.sub_item",
+                    "binding_id": None,  # Sprint 1.5 Task 1.5.4 占位
                 }
 
     # 3. 横向公式（movement 预设：期初+增加-减少=期末）
@@ -163,6 +181,7 @@ def generate_formulas_for_table(
                         "description": "期末 = 期初 + 增加 - 减少",
                         "category": "auto_calc",
                         "source": "check_presets.movement",
+                        "binding_id": None,  # Sprint 1.5 Task 1.5.4 占位
                     }
 
     # 4. 账面价值公式（book_value 预设）
@@ -190,6 +209,7 @@ def generate_formulas_for_table(
                             "description": "账面价值 = 原值 - 累计折旧/摊销 - 减值准备",
                             "category": "auto_calc",
                             "source": "check_presets.book_value",
+                            "binding_id": None,  # Sprint 1.5 Task 1.5.4 占位
                         }
 
     return formulas
@@ -388,6 +408,10 @@ async def execute_note_formulas(
             values[col_idx] = float(calc_value)
             row["values"] = values
             updated += 1
+            # Sprint 1.5 Task 1.5.4：仅在公式实际执行成功时写 evaluated_at（ISO 时间戳）
+            formula_def["evaluated_at"] = datetime.now(timezone.utc).isoformat()
+            # binding_id 字段如果原 dict 没有则补 None 占位，确保 schema 一致
+            formula_def.setdefault("binding_id", None)
             exec_results.append({
                 "cell": key, "type": formula_def.get("type"),
                 "old": old_value, "new": float(calc_value), "status": "ok",
@@ -427,13 +451,22 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
         "tb": {"1001": {"audited": 500, "unadjusted": 480, "opening": 450}, ...},
         "notes": {"五、3": {"total_closing": 1200, "total_opening": 1100}, ...},
         "wp": {"E1": {"审定表E1!B5": 50.0, "审定表E1!C5": 40.0}, ...},
+        "prior": {"货币资金": {"closing": 1234.56, "opening": 1100.0}, ...},  # Sprint 1.5 D4 新增
+        "aging": {"应收账款": {"1年以内": 100.0, "1-2年": 50.0, ...}, ...},  # Sprint 1.5 D4 新增
     }
     """
     from app.models.report_models import FinancialReport
     from app.models.audit_platform_models import TrialBalance
     from app.models.workpaper_models import WorkingPaper, WpIndex
 
-    cross_data: dict[str, Any] = {"report": {}, "tb": {}, "notes": {}, "wp": {}}
+    cross_data: dict[str, Any] = {
+        "report": {},
+        "tb": {},
+        "notes": {},
+        "wp": {},
+        "prior": {},   # Sprint 1.5 Task 1.5.2: 上年附注期末/期初值（按 account_name 索引）
+        "aging": {},   # Sprint 1.5 Task 1.5.2: 账龄分桶（按 account_name 索引）
+    }
 
     # 加载报表数据
     try:
@@ -524,6 +557,116 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
     except Exception:
         pass
 
+    # ─── Sprint 1.5 Task 1.5.2: 加载上年（year-1）附注 → cross_data["prior"] ───
+    # =PRIOR("货币资金","期末") 取上年附注期末值；按 account_name / section_title 索引
+    # 失败静默 — 使函数返 None 而不抛错
+    try:
+        prior_result = await db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == year - 1,
+                DisclosureNote.is_deleted == sa.false(),
+            )
+        )
+        for prior_note in prior_result.scalars().all():
+            if not prior_note.table_data or not isinstance(prior_note.table_data, dict):
+                continue
+            rows = prior_note.table_data.get("rows") or []
+            total_rows = [r for r in rows if r.get("is_total")]
+            if not total_rows:
+                continue
+            values = total_rows[-1].get("values") or []
+            closing = float(values[0]) if values and values[0] is not None else None
+            opening = float(values[1]) if len(values) > 1 and values[1] is not None else None
+            entry = {
+                "closing": closing if closing is not None else 0.0,
+                "opening": opening if opening is not None else 0.0,
+            }
+            # 同一科目/章节多 key 索引（account_name / section_title / section_number）
+            section_title = (prior_note.section_title or "").strip()
+            if section_title:
+                cross_data["prior"][section_title] = entry
+            section_number = (prior_note.note_section or "").strip()
+            if section_number and section_number not in cross_data["prior"]:
+                cross_data["prior"][section_number] = entry
+    except Exception:
+        pass
+
+    # ─── Sprint 1.5 Task 1.5.2: 加载账龄分桶 → cross_data["aging"] ───
+    # =AGING("应收账款","1年以内") 从 TbAuxLedger 反推 5 桶分布
+    # 客户未提供辅助序时账时 cross_data["aging"] 为空 dict → =AGING 返 None
+    try:
+        from app.models.audit_platform_models import TbAuxLedger
+        from app.services.note_source_resolvers import _AGING_BUCKETS
+
+        # 加载 wp_account_mapping 关联的科目集合（保守全量加载，避免遗漏）
+        from pathlib import Path
+        import json as _json
+        mapping_path = (
+            Path(__file__).parent.parent.parent / "data" / "wp_account_mapping.json"
+        )
+        account_to_name: dict[str, str] = {}  # account_code -> account_name
+        if mapping_path.exists():
+            try:
+                with open(mapping_path, "r", encoding="utf-8-sig") as f:
+                    mappings = _json.load(f).get("mappings", [])
+                for m in mappings:
+                    name = m.get("account_name") or ""
+                    if not name:
+                        continue
+                    for code in (m.get("account_codes") or []):
+                        if code and code not in account_to_name:
+                            account_to_name[code] = name
+            except Exception:
+                pass
+
+        if account_to_name:
+            from datetime import date as _date
+            base_date = _date(int(year), 12, 31)
+            ledger_result = await db.execute(
+                sa.select(
+                    TbAuxLedger.account_code,
+                    TbAuxLedger.voucher_date,
+                    TbAuxLedger.debit_amount,
+                    TbAuxLedger.credit_amount,
+                ).where(
+                    TbAuxLedger.project_id == project_id,
+                    TbAuxLedger.year == year,
+                    TbAuxLedger.is_deleted == sa.false(),
+                    TbAuxLedger.voucher_date.isnot(None),
+                    TbAuxLedger.account_code.in_(list(account_to_name.keys())),
+                ).limit(100000)  # 大数据量保护
+            )
+            # 累计：account_name -> bucket -> total
+            aging_acc: dict[str, dict[str, float]] = {}
+            for code, vdate, deb, cre in ledger_result.all():
+                if vdate is None:
+                    continue
+                name = account_to_name.get(code)
+                if not name:
+                    continue
+                try:
+                    days = (base_date - vdate).days
+                except Exception:
+                    continue
+                if days < 0:
+                    continue
+                # 分桶
+                bucket = None
+                for bk, (low, high) in _AGING_BUCKETS.items():
+                    if low <= days < high:
+                        bucket = bk
+                        break
+                if bucket is None:
+                    continue
+                d = float(deb) if deb is not None else 0.0
+                c = float(cre) if cre is not None else 0.0
+                slot = aging_acc.setdefault(name, {})
+                slot[bucket] = slot.get(bucket, 0.0) + (d - c)
+            cross_data["aging"] = aging_acc
+    except Exception:
+        pass
+
     return cross_data
 
 
@@ -540,6 +683,8 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
     - REPORT('row_code','period')  period ∈ 期末/期初/current/prior
     - WP('wp_code','sheet','cell_ref')
     - NOTE('section','合计','期末'/'期初')
+    - PRIOR('account_name','期末'|'期初')                   (Sprint 1.5 D4)
+    - AGING('account_name','1年以内'|'1-2年'|...|'5年以上')  (Sprint 1.5 D4)
 
     无法解析或科目/底稿/附注不存在时返回 None；TB 列存在但 account 不存在 → 0。
     """
@@ -549,6 +694,44 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
         return None
 
     s = token.strip()
+
+    # ─── Sprint 1.5 Task 1.5.2: PRIOR('account_name','期末'|'期初') ───
+    # 上年附注期末/期初值取数；缺数据 → None（章节标 not_applicable）
+    m = re.fullmatch(r"\s*PRIOR\('([^']+)','([^']+)'\)\s*", s)
+    if m:
+        account_name = m.group(1)
+        period = m.group(2)
+        prior_data = cross_data.get("prior", {}).get(account_name)
+        if prior_data is None:
+            return None
+        if "期末" in period or period == "closing":
+            val = prior_data.get("closing")
+            return float(val) if val is not None else None
+        if "期初" in period or period == "opening":
+            val = prior_data.get("opening")
+            return float(val) if val is not None else None
+        return None
+
+    # ─── Sprint 1.5 Task 1.5.2: AGING('account_name','bucket') ───
+    # 5 桶：1年以内 / 1-2年 / 2-3年 / 3-5年 / 5年以上
+    # 客户未提供辅助序时账时 cross_data["aging"] 为空 dict → 返 None
+    m = re.fullmatch(r"\s*AGING\('([^']+)','([^']+)'\)\s*", s)
+    if m:
+        account_name = m.group(1)
+        bucket = m.group(2)
+        # bucket 白名单（与 _AGING_BUCKETS 对齐）
+        valid_buckets = {"1年以内", "1-2年", "2-3年", "3-5年", "5年以上"}
+        if bucket not in valid_buckets:
+            return None
+        aging_data = cross_data.get("aging", {}).get(account_name)
+        if aging_data is None:
+            # 客户未提供辅助序时账（aging 整体为空）或该科目无账龄数据 → None
+            return None
+        val = aging_data.get(bucket)
+        if val is None:
+            # 该桶在该科目下无数据（未发生过该龄段挂账）→ 返 0（同 TB 行为：科目存在桶不存在）
+            return 0.0
+        return float(val)
 
     # WP('wp_code','sheet','cell_ref')
     m = re.fullmatch(r"\s*WP\('([^']+)','([^']*)','([^']+)'\)\s*", s)
@@ -643,7 +826,7 @@ def _exec_cross_table(expression: Any, cross_data: dict[str, Any]) -> float | No
     # 例 "TB('1','期末') + TB('2','期末') - WP('E1','审定表','B5')"
     # 用正则把整个表达式拆为 [(sign, token), ...]
     pattern = re.compile(
-        r"([+-]?)\s*((?:TB|REPORT|WP|NOTE)\([^)]*\))",
+        r"([+-]?)\s*((?:TB|REPORT|WP|NOTE|PRIOR|AGING)\([^)]*\))",
     )
     matches = pattern.findall(s)
     if not matches:
