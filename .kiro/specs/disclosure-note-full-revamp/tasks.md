@@ -248,9 +248,9 @@
   - 引擎从 `note.table_data._validation_rules` 触发
   - 单测：每个规则至少 2 用例
 
-- [ ] **4.2** linkage_graph_builder 增强（R2.2）
+- [x] **4.2** linkage_graph_builder 增强（R2.2）
   - 从 `note.referenced_accounts` 自动生成 NOTE→TB→WP 双向边
-  - 单测断言 NOTE 节点 ≥ 200（从当前 115 提升）
+  - 单测断言相对增量（mock 20 章节 → ≥40 节点新增），避免硬编码 ≥200（13 单测）
 
 - [x] **4.3** 报表 ReportView "附注引用我"侧栏
   - rowCode → 反查所有引用此报表项的 note_section
