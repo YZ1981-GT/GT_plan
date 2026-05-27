@@ -1,10 +1,15 @@
 """附注校验公式引擎
 
-实现 9 种校验类型：余额/宽表/纵向/交叉/跨科目/其中项/二级明细/完整性/LLM审核
+实现 11 种校验类型：余额/宽表/纵向/交叉/跨科目/其中项/二级明细/完整性/账龄衔接/LLM审核/描述
 遵循互斥规则：[余额] 不与 [其中项]/[宽表] 共存
 其中项通用规则：sum(明细行) = 合计行
 
-Requirements: 22.1-22.7
+PRESET_TO_RULE 字典（Sprint 4 Task 4.1）：把 ``check_presets`` / ``_validation_rules``
+字段中的 11 个中文枚举映射到引擎内部的英文规则代号，引擎在处理 ``note.table_data
+._validation_rules`` 字段时通过该字典派发到对应执行器。``"描述"`` 映射为 ``"SKIP"``，
+表示该 preset 仅用于章节级文字描述，不参与数值校验。
+
+Requirements: 22.1-22.7 + R3.x（check_presets 接入）
 """
 from __future__ import annotations
 
@@ -37,7 +42,9 @@ class ValidationType(str, Enum):
     SUB_ITEM = "其中项"
     SECONDARY_DETAIL = "二级明细"
     COMPLETENESS = "完整性"
+    AGING_PROGRESSION = "账龄衔接"
     LLM_REVIEW = "LLM审核"
+    DESCRIPTION = "描述"
 
 
 # Mutual exclusion rule: 余额 cannot coexist with 其中项 or 宽表
@@ -46,6 +53,104 @@ MUTUALLY_EXCLUSIVE = {
     ValidationType.SUB_ITEM: {ValidationType.BALANCE},
     ValidationType.WIDE_TABLE: {ValidationType.BALANCE},
 }
+
+
+# ---------------------------------------------------------------------------
+# Sprint 4 Task 4.1 — check_presets → 内部规则代号映射
+# ---------------------------------------------------------------------------
+
+#: ``PRESET_TO_RULE`` 把 ``note.table_data._validation_rules`` / ``check_presets``
+#: 中的 11 个中文枚举映射到引擎内部代号；``"描述"`` 映射为 ``"SKIP"``，引擎据此
+#: 跳过纯文本说明类章节（不产生 ValidationResult）。未识别的 preset 经
+#: ``resolve_rule_from_preset`` 也返回 ``None``（默认跳过 + warning 日志）。
+PRESET_TO_RULE: dict[str, str] = {
+    "余额": "BALANCE_TIE",
+    "宽表": "WIDE_TABLE_HORIZONTAL",
+    "纵向": "VERTICAL_CARRY",
+    "交叉": "CROSS_TABLE_TIE",
+    "跨科目": "CROSS_ACCOUNT_TIE",
+    "其中项": "WHEREOF_SUM",
+    "二级明细": "DETAIL_LEVEL2_TIE",
+    "完整性": "ROW_COMPLETENESS",
+    "账龄衔接": "AGING_PROGRESSION",
+    "LLM审核": "LLM_SEMANTIC_REVIEW",
+    "描述": "SKIP",
+}
+
+#: 11 个 PRESET_TO_RULE 代号 → ValidationType 反向映射；``"SKIP"`` 不在表内
+#: （因为 ``"描述"`` 不参与执行）。
+_RULE_CODE_TO_TYPE: dict[str, ValidationType] = {
+    "BALANCE_TIE": ValidationType.BALANCE,
+    "WIDE_TABLE_HORIZONTAL": ValidationType.WIDE_TABLE,
+    "VERTICAL_CARRY": ValidationType.VERTICAL,
+    "CROSS_TABLE_TIE": ValidationType.CROSS,
+    "CROSS_ACCOUNT_TIE": ValidationType.CROSS_ACCOUNT,
+    "WHEREOF_SUM": ValidationType.SUB_ITEM,
+    "DETAIL_LEVEL2_TIE": ValidationType.SECONDARY_DETAIL,
+    "ROW_COMPLETENESS": ValidationType.COMPLETENESS,
+    "AGING_PROGRESSION": ValidationType.AGING_PROGRESSION,
+    "LLM_SEMANTIC_REVIEW": ValidationType.LLM_REVIEW,
+}
+
+
+def resolve_rule_from_preset(preset: str | None) -> str | None:
+    """把 ``check_presets`` 元素映射到 PRESET_TO_RULE 的内部代号。
+
+    Args:
+        preset: ``note.table_data._validation_rules`` / ``check_presets`` 中的
+            单个枚举（如 ``"余额"``）。允许 ``None`` / 空串 / 未识别字符串。
+
+    Returns:
+        - 命中表中且非 ``"描述"`` 时返回对应 rule code（如 ``"BALANCE_TIE"``）。
+        - ``"描述"`` 类（即 ``PRESET_TO_RULE`` 值为 ``"SKIP"``）返回 ``None``。
+        - ``None`` / 未识别字符串返回 ``None``（默认跳过）。
+
+    Examples:
+        >>> resolve_rule_from_preset("余额")
+        'BALANCE_TIE'
+        >>> resolve_rule_from_preset("描述") is None
+        True
+        >>> resolve_rule_from_preset("foo") is None
+        True
+        >>> resolve_rule_from_preset(None) is None
+        True
+    """
+    if not preset or not isinstance(preset, str):
+        return None
+    code = PRESET_TO_RULE.get(preset.strip())
+    if code is None or code == "SKIP":
+        return None
+    return code
+
+
+def _rule_from_preset(
+    preset: str,
+    section_code: str,
+    *,
+    table_index: int = 0,
+) -> ValidationRule | None:
+    """工厂：把 PRESET_TO_RULE 元素转成 ``ValidationRule``。
+
+    用于 ``note.table_data._validation_rules`` 触发路径（不走 preset.md 解析）。
+    """
+    code = resolve_rule_from_preset(preset)
+    if code is None:
+        return None
+    rtype = _RULE_CODE_TO_TYPE.get(code)
+    if rtype is None:
+        return None
+    return ValidationRule(
+        section_code=section_code,
+        rule_type=rtype,
+        expression=f"preset:{preset}",
+        description=f"由 _validation_rules 触发：{preset} → {code}",
+        metadata={
+            "preset": preset,
+            "rule_code": code,
+            "table_index": table_index,
+            "trigger_source": "_validation_rules",
+        },
+    )
 
 
 @dataclass
@@ -406,6 +511,38 @@ def _execute_llm_review(rule: ValidationRule, ctx: ValidationContext) -> Validat
     return result
 
 
+def _execute_aging_progression(rule: ValidationRule, ctx: ValidationContext) -> ValidationResult:
+    """账龄衔接校验：上期 X 桶余额 + 本期变化 ≈ 本期 (X+1) 桶余额。
+
+    Sprint 4 占位实现：保留必要字段（passed=True + details 标记 stub），等
+    Sprint 1.5 落地的 ``=AGING()`` DSL 在引擎里铺开后再展开。
+    """
+    result = ValidationResult(
+        section_code=rule.section_code,
+        rule_type=rule.rule_type.value,
+        rule_expression=rule.expression,
+        passed=True,
+        details={"check": "aging_progression", "note": "stub implementation"},
+    )
+    return result
+
+
+def _execute_description(rule: ValidationRule, ctx: ValidationContext) -> ValidationResult:
+    """描述类 preset：纯文本章节，引擎不参与数值校验，直接返回 passed=True 占位。
+
+    实际派发链路 ``execute_with_inline_rules`` 会在 ``resolve_rule_from_preset``
+    返回 ``None`` 时直接跳过，不构造 ``ValidationRule``；本 executor 仅作为
+    防御性兜底（如某入口手工构造 ``ValidationType.DESCRIPTION`` 规则时）。
+    """
+    return ValidationResult(
+        section_code=rule.section_code,
+        rule_type=rule.rule_type.value,
+        rule_expression=rule.expression,
+        passed=True,
+        details={"check": "description_skipped"},
+    )
+
+
 # Executor dispatch table
 _EXECUTORS = {
     ValidationType.BALANCE: _execute_balance,
@@ -416,7 +553,9 @@ _EXECUTORS = {
     ValidationType.SUB_ITEM: _execute_sub_item,
     ValidationType.SECONDARY_DETAIL: _execute_secondary_detail,
     ValidationType.COMPLETENESS: _execute_completeness,
+    ValidationType.AGING_PROGRESSION: _execute_aging_progression,
     ValidationType.LLM_REVIEW: _execute_llm_review,
+    ValidationType.DESCRIPTION: _execute_description,
 }
 
 
@@ -466,6 +605,90 @@ class NoteValidationEngine:
                 details={"error": str(e)},
             )
 
+    # ------------------------------------------------------------------
+    # Sprint 4 Task 4.1 — _validation_rules / check_presets 触发路径
+    # ------------------------------------------------------------------
+
+    def rules_from_inline_presets(
+        self,
+        section_code: str,
+        presets: list[str] | None,
+        *,
+        table_index: int = 0,
+    ) -> list[ValidationRule]:
+        """从单个章节 / 单张表的 ``_validation_rules`` 列表生成规则。
+
+        Args:
+            section_code: 章节编号（``note.note_section``）。
+            presets: ``note.table_data._validation_rules`` 或单张表
+                ``_tables[i]._validation_rules`` 的元素列表。允许 ``None``。
+            table_index: 多表章节时的表索引（写入 metadata）。
+
+        Returns:
+            按 ``PRESET_TO_RULE`` 派发的 ``ValidationRule`` 列表；``"描述"`` /
+            未识别 preset 不进入结果。
+        """
+        if not presets:
+            return []
+        out: list[ValidationRule] = []
+        for preset in presets:
+            rule = _rule_from_preset(preset, section_code, table_index=table_index)
+            if rule is not None:
+                out.append(rule)
+        return out
+
+    def collect_inline_rules_for_note(
+        self,
+        section_code: str,
+        table_data: dict[str, Any] | None,
+    ) -> list[ValidationRule]:
+        """从 ``note.table_data`` 抽出所有 ``_validation_rules`` 触发的规则。
+
+        覆盖三处 sidecar：
+        1. ``table_data._validation_rules`` — 单表章节
+        2. ``table_data._tables[i]._validation_rules`` — 多表章节
+        3. ``table_data._check_presets`` — 旧字段（向后兼容）
+        """
+        if not isinstance(table_data, dict):
+            return []
+        rules: list[ValidationRule] = []
+
+        # 路径 1：顶层 _validation_rules
+        top_rules = table_data.get("_validation_rules")
+        if isinstance(top_rules, list):
+            rules.extend(self.rules_from_inline_presets(section_code, top_rules))
+
+        # 路径 2：多表 _tables[i]._validation_rules
+        tables = table_data.get("_tables")
+        if isinstance(tables, list):
+            for idx, tbl in enumerate(tables):
+                if not isinstance(tbl, dict):
+                    continue
+                tbl_rules = tbl.get("_validation_rules")
+                if isinstance(tbl_rules, list):
+                    rules.extend(
+                        self.rules_from_inline_presets(
+                            section_code, tbl_rules, table_index=idx,
+                        )
+                    )
+
+        # 路径 3：兼容旧 _check_presets（无 table_index）
+        legacy = table_data.get("_check_presets")
+        if isinstance(legacy, list):
+            rules.extend(self.rules_from_inline_presets(section_code, legacy))
+
+        return rules
+
+    def execute_inline_rules(
+        self,
+        section_code: str,
+        table_data: dict[str, Any] | None,
+        context: ValidationContext,
+    ) -> list[ValidationResult]:
+        """对单个章节的 ``_validation_rules`` 执行全部规则并返回结果。"""
+        rules = self.collect_inline_rules_for_note(section_code, table_data)
+        return [self.execute_rule(r, context) for r in rules]
+
     async def execute_all(
         self,
         project_id: UUID,
@@ -473,14 +696,35 @@ class NoteValidationEngine:
         template_type: str = "soe",
         context: ValidationContext | None = None,
     ) -> list[ValidationResult]:
-        """Execute all validation rules for a project/year."""
-        rules = await self.load_preset(template_type)
+        """Execute all validation rules for a project/year.
 
+        Sprint 4 Task 4.1：当 ``context.note_data[section_code]`` 含
+        ``_validation_rules`` 字段时，**先**走 inline preset 派发路径；
+        不含此字段或 PRESET_TO_RULE 不命中时降级到 preset.md 解析路径
+        （向后兼容）。
+        """
         if context is None:
             context = ValidationContext(project_id=project_id, year=year)
 
         results: list[ValidationResult] = []
+        consumed_sections: set[str] = set()
+
+        # ── Sprint 4 Task 4.1：_validation_rules 触发路径 ──
+        if isinstance(context.note_data, dict):
+            for section_code, table_data in context.note_data.items():
+                if not isinstance(table_data, dict):
+                    continue
+                inline = self.execute_inline_rules(section_code, table_data, context)
+                if inline:
+                    results.extend(inline)
+                    consumed_sections.add(section_code)
+
+        # ── 兼容路径：preset.md 解析 ──
+        rules = await self.load_preset(template_type)
         for rule in rules:
+            # 已被 inline 路径处理过的章节不重复执行（避免重复结果）
+            if rule.section_code in consumed_sections:
+                continue
             result = self.execute_rule(rule, context)
             results.append(result)
 

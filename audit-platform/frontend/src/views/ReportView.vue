@@ -387,6 +387,44 @@
 
     </div><!-- /gt-rv-table-area -->
 
+    <!-- Sprint 4 Task 4.3：附注引用我（侧栏 drawer） -->
+    <el-drawer
+      v-model="noteRefsVisible"
+      :title="`附注引用我 — ${noteRefsRowName || ''}`"
+      direction="rtl"
+      size="380px"
+      append-to-body
+      :destroy-on-close="false"
+    >
+      <div v-loading="noteRefsLoading" class="gt-rv-note-refs">
+        <div class="gt-rv-note-refs__header">
+          <span class="gt-rv-note-refs__label">报表行</span>
+          <code class="gt-rv-note-refs__code">{{ noteRefsRowCode || '—' }}</code>
+        </div>
+        <el-empty
+          v-if="!noteRefsLoading && noteRefsList.length === 0"
+          :image-size="80"
+          description="暂无附注引用此报表项"
+        />
+        <ul v-else class="gt-rv-note-refs__list">
+          <li
+            v-for="(ref, i) in noteRefsList"
+            :key="`${ref.note_section}-${ref.table_index}-${i}`"
+            class="gt-rv-note-refs__item"
+            @click="onJumpToNoteSection(ref)"
+          >
+            <span class="gt-rv-note-refs__sec">{{ ref.note_section }}</span>
+            <span v-if="ref.section_title" class="gt-rv-note-refs__title">{{ ref.section_title }}</span>
+            <span v-if="ref.table_index > 0" class="gt-rv-note-refs__tbl">表 #{{ ref.table_index + 1 }}</span>
+            <span class="gt-rv-note-refs__arrow">→</span>
+          </li>
+        </ul>
+        <div v-if="noteRefsList.length > 0" class="gt-rv-note-refs__footer">
+          共 {{ noteRefsList.length }} 处引用 · 点击跳转到附注编辑器
+        </div>
+      </div>
+    </el-drawer>
+
     <!-- 穿透弹窗 -->
     <el-dialog append-to-body v-model="drilldownVisible" :title="`穿透查询 — ${drilldownData?.row_name || ''}`" width="700px">
       <div v-if="drilldownData" class="gt-rv-drilldown-content">
@@ -693,6 +731,7 @@
   >
     <div class="gt-ucell-ctx-item" @click="onRvCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 查看穿透</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxGoNote"><span class="gt-ucell-ctx-icon">📝</span> 跳转附注</div>
+    <div class="gt-ucell-ctx-item" @click="onRvCtxShowNoteRefs"><span class="gt-ucell-ctx-icon">🔎</span> 附注引用我</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxOpenWorkpaper"><span class="gt-ucell-ctx-icon">📋</span> 打开对应底稿</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxViewAdjustments"><span class="gt-ucell-ctx-icon">🔗</span> 查看调整明细</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxViewFormulaSource"><span class="gt-ucell-ctx-icon">🔍</span> 查看公式来源</div>
@@ -1798,6 +1837,47 @@ function onRvCtxGoNote() {
   if (rvCtx.contextMenu.rowData?.row_code) goToNote(rvCtx.contextMenu.rowData.row_code)
 }
 
+// Sprint 4 Task 4.3：右键"附注引用我" — 反查所有引用此报表行的附注章节
+const noteRefsVisible = ref(false)
+const noteRefsLoading = ref(false)
+const noteRefsRowCode = ref('')
+const noteRefsRowName = ref('')
+const noteRefsList = ref<Array<{ note_section: string; section_title: string; table_index: number }>>([])
+
+async function onRvCtxShowNoteRefs() {
+  rvCtx.closeContextMenu()
+  const row = rvCtx.contextMenu.rowData
+  if (!row?.row_code) {
+    ElMessage.info('该行无 row_code，无法反查附注引用')
+    return
+  }
+  noteRefsRowCode.value = row.row_code
+  noteRefsRowName.value = row.row_name || ''
+  noteRefsList.value = []
+  noteRefsVisible.value = true
+  noteRefsLoading.value = true
+  try {
+    const resp: any = await api.get(P_reports.noteReferences(projectId.value, year.value, row.row_code))
+    noteRefsList.value = (resp?.notes || []) as any[]
+  } catch (e) {
+    handleApiError(e, '反查附注引用')
+  } finally {
+    noteRefsLoading.value = false
+  }
+}
+
+function onJumpToNoteSection(ref: { note_section: string; table_index: number }) {
+  noteRefsVisible.value = false
+  router.push({
+    path: `/projects/${projectId.value}/disclosure-notes`,
+    query: {
+      section: ref.note_section,
+      table_index: String(ref.table_index ?? 0),
+      year: String(year.value),
+    },
+  })
+}
+
 // R7-S3-09 Task 47：右键"打开对应底稿"
 async function onRvCtxOpenWorkpaper() {
   rvCtx.closeContextMenu()
@@ -2307,6 +2387,99 @@ function copyReportTable() {
   text-align: center;
 }
 
+/* ── Sprint 4 Task 4.3: 附注引用我（侧栏 drawer） ── */
+.gt-rv-note-refs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 4px;
+}
+
+.gt-rv-note-refs__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--gt-border-color, #e4e7ed);
+}
+
+.gt-rv-note-refs__label {
+  color: var(--gt-color-text-secondary, #999);
+  font-size: 12px;
+}
+
+.gt-rv-note-refs__code {
+  font-family: var(--gt-font-mono, monospace);
+  background: var(--gt-bg-soft, #f5f5f7);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--gt-color-primary, #5e3499);
+}
+
+.gt-rv-note-refs__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gt-rv-note-refs__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--gt-border-color, #e4e7ed);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  background: var(--gt-bg-base, #fff);
+}
+
+.gt-rv-note-refs__item:hover {
+  background: rgba(94, 52, 153, 0.06);
+  border-color: var(--gt-color-primary, #5e3499);
+  transform: translateX(-2px);
+}
+
+.gt-rv-note-refs__sec {
+  font-weight: 600;
+  color: var(--gt-color-primary, #5e3499);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.gt-rv-note-refs__title {
+  flex: 1;
+  font-size: 12px;
+  color: var(--gt-text-primary, #1a1a1a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gt-rv-note-refs__tbl {
+  font-size: 11px;
+  color: var(--gt-color-text-tertiary, #aaa);
+  background: var(--gt-bg-soft, #f5f5f7);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.gt-rv-note-refs__arrow {
+  color: var(--gt-color-text-tertiary, #aaa);
+  font-size: 14px;
+}
+
+.gt-rv-note-refs__footer {
+  padding-top: 8px;
+  border-top: 1px dashed var(--gt-border-color, #e4e7ed);
+  text-align: center;
+  font-size: 11px;
+  color: var(--gt-color-text-tertiary, #aaa);
+}
 
 </style>
 

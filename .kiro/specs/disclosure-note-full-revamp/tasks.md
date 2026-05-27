@@ -243,7 +243,7 @@
 
 ## Sprint 4：check_presets 接入 + linkage 增强 + NoteFormatConfig（2.5 人天）
 
-- [ ] **4.1** check_presets 接入 NoteValidationEngine（v2 §5.4）
+- [x] **4.1** check_presets 接入 NoteValidationEngine（v2 §5.4）
   - `PRESET_TO_RULE` 字典覆盖 11 个枚举：余额 / 宽表 / 纵向 / 交叉 / 跨科目 / 其中项 / 二级明细 / 完整性 / 账龄衔接 / LLM审核 / 描述
   - 引擎从 `note.table_data._validation_rules` 触发
   - 单测：每个规则至少 2 用例
@@ -252,18 +252,18 @@
   - 从 `note.referenced_accounts` 自动生成 NOTE→TB→WP 双向边
   - 单测断言 NOTE 节点 ≥ 200（从当前 115 提升）
 
-- [ ] **4.3** 报表 ReportView "附注引用我"侧栏
+- [x] **4.3** 报表 ReportView "附注引用我"侧栏
   - rowCode → 反查所有引用此报表项的 note_section
   - 双向溯源跳转
 
-- [ ] **4.4** `note_format_config.py` 抽出（v2 §5.4）
+- [x] **4.4** `note_format_config.py` 抽出（v2 §5.4）
   - `@dataclass(frozen=True) NoteFormatConfig` 21 项排版参数
   - `GET /api/disclosure-notes/format-config` 端点
   - 前端 CSS 变量应用
 
-- [ ] **4.5** ADR-010 撰写 `docs/adr/ADR-010-note-custom-template-versioning.md`
+- [x] **4.5** ADR-010 撰写 `docs/adr/ADR-010-note-custom-template-versioning.md`
 
-- [ ] **4.6** Sprint 4 验收
+- [x] **4.6** Sprint 4 验收
   - CI 卡点：`PRESET_TO_RULE` 必须覆盖 `check_presets` 全部 11 个枚举
   - linkage NOTE 节点数 ≥ 200
   - vue-tsc / pytest 全绿

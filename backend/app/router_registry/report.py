@@ -84,6 +84,10 @@ def register_report_routers(app: FastAPI) -> None:
     from app.routers.reports import line_composition_router
     app.include_router(line_composition_router, tags=["report-line-composition"])
 
+    # ═══ §93b. Sprint 4 Task 4.3：报表行 → 附注引用反向溯源 ═══
+    from app.routers.report_note_references import router as report_note_refs_router
+    app.include_router(report_note_refs_router, tags=["report-note-references"])
+
     # ═══ §94. Phase 4 F2: 多年度对比分析 ═══
     from app.routers.reports import multi_year_router
     app.include_router(multi_year_router, tags=["multi-year-compare"])

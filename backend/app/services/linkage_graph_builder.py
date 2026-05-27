@@ -59,6 +59,7 @@ class LinkageGraphBuilder:
             await self._from_report_config()
             await self._from_note_account_mapping()
             await self._from_account_mapping()
+            await self._from_note_referenced_accounts()  # Sprint 4 Task 4.2
 
         # 3. Formula reverse index (Sprint 3)
         await self._build_formula_reverse_index()
@@ -473,7 +474,132 @@ class LinkageGraphBuilder:
             len(placeholders),
         )
 
-    # ─── Data Source 8: Formula Reverse Index (Sprint 3) ─────────────
+    # ─── Data Source 9: note.referenced_accounts (Sprint 4 Task 4.2) ─
+
+    async def _from_note_referenced_accounts(self) -> None:
+        """从附注章节 binding 反推关联账户码，生成 NOTE↔TB↔WP 双向边.
+
+        Spec: .kiro/specs/disclosure-note-full-revamp/ Sprint 4 Task 4.2 (R2.2)
+
+        实测 ORM `DisclosureNote` 没有 `referenced_accounts` 字段，
+        改为复用 `note_template_bindings.json` 反推：
+        1. 加载 binding（loader 已模块级缓存）
+        2. 查 disclosure_notes 表所有未删除章节
+        3. 对每条 note：
+           - 取 section binding 的 cell.account_codes 并集
+             （复用 NoteTrimService._collect_account_codes_for_section 同款逻辑）
+           - 对每个 account_code 双向连接 NOTE↔TB
+           - account_codes 经 wp_account_mapping 间接对应 WP（WP→TB 已存在
+             于 _from_note_account_mapping，本路径不重复加 WP→NOTE 直接边，
+             避免重复；只加 NOTE↔TB 双向 + TB→WP 反向桥，让 BFS 可回溯）
+
+        缺 binding 的 note 静默跳过（不抛错）。
+        """
+        if not self._db:
+            return
+
+        # 1. 加载 binding
+        try:
+            from app.services.note_template_bindings_loader import _ensure_loaded
+            bindings_index = _ensure_loaded()
+        except Exception as e:
+            logger.warning("Failed to load note_template_bindings.json: %s", e)
+            return
+
+        if not bindings_index:
+            logger.info(
+                "_from_note_referenced_accounts: bindings index empty, skipping"
+            )
+            return
+
+        # 2. 查 disclosure_notes（去重：按 note_section 取一条代表）
+        try:
+            result = await self._db.execute(
+                text(
+                    "SELECT DISTINCT note_section, section_title "
+                    "FROM disclosure_notes "
+                    "WHERE is_deleted = false "
+                    "AND note_section IS NOT NULL AND note_section != ''"
+                )
+            )
+            rows = result.fetchall()
+        except Exception as e:
+            logger.warning("Failed to query disclosure_notes: %s", e)
+            try:
+                await self._db.rollback()
+            except Exception:
+                pass
+            return
+
+        edge_count = 0
+        note_count = 0
+        for row in rows:
+            note_section = row[0] or ""
+            if not note_section:
+                continue
+
+            # 3. 反推 binding（loader 用 section_number 作 key；先按 note_section 直查）
+            binding = bindings_index.get(note_section)
+            # 兼容：note_section 可能是 "五、1 货币资金"，binding key 可能是
+            # "五、1 货币资金" 或缺前缀的章节名。简化：仅按精确 key 查；
+            # 缺 binding 直接跳过（不抛错）。
+            account_codes = self._collect_account_codes_from_binding(binding)
+
+            note_uri = f"NOTE:{note_section}::"
+            self._ensure_node(note_uri, "NOTE", note_section)
+            note_count += 1
+
+            for acct in account_codes:
+                tb_uri = f"TB:{acct}::"
+                self._ensure_node(tb_uri, "TB", acct)
+                # NOTE→TB（附注引用此科目）
+                self._add_edge(note_uri, tb_uri, "data_flow", "info")
+                # TB→NOTE（反向：BFS 可从 TB 找到附注）
+                self._add_edge(tb_uri, note_uri, "reverse_ref", "info")
+                edge_count += 2
+
+        logger.info(
+            "_from_note_referenced_accounts: %d notes processed, %d edges added "
+            "(via binding-derived account_codes)",
+            note_count, edge_count,
+        )
+
+    @staticmethod
+    def _collect_account_codes_from_binding(binding: dict | None) -> set[str]:
+        """从 section binding 取所有 cell.account_codes 并集.
+
+        与 NoteTrimService._collect_account_codes_for_section 同款逻辑（避免循环
+        依赖直接复用纯函数实现）。
+        """
+        if not binding or not isinstance(binding, dict):
+            return set()
+        codes: set[str] = set()
+        tables = binding.get("tables")
+        if not isinstance(tables, list):
+            return set()
+        for tbl in tables:
+            if not isinstance(tbl, dict):
+                continue
+            rows = tbl.get("rows")
+            if not isinstance(rows, dict):
+                continue
+            for row in rows.values():
+                if not isinstance(row, dict):
+                    continue
+                cell_bindings = row.get("binding")
+                if not isinstance(cell_bindings, dict):
+                    continue
+                for cell in cell_bindings.values():
+                    if not isinstance(cell, dict):
+                        continue
+                    cell_codes = cell.get("account_codes")
+                    if isinstance(cell_codes, list):
+                        for c in cell_codes:
+                            if isinstance(c, str) and c:
+                                codes.add(c)
+        return codes
+
+    # ─── Data Source 10: Formula Reverse Index (Sprint 3) ─────────────
 
     async def _build_formula_reverse_index(self) -> None:
         """使用 FormulaReverseIndex 构建反向边（被引用方 → 引用方）。

@@ -17,6 +17,9 @@ export const reports = {
   lineComposition: (pid: string, lineCode: string) => `/api/projects/${pid}/reports/line-composition?line_code=${encodeURIComponent(lineCode)}`,
   multiYear: (pid: string, years: number[], reportType: string) =>
     `/api/projects/${pid}/reports/multi-year?years=${years.join(',')}&report_type=${reportType}`,
+  // Sprint 4 Task 4.3: 反查所有引用此报表行的附注章节
+  noteReferences: (pid: string, year: number, rowCode: string) =>
+    `/api/financial-reports/${pid}/${year}/${encodeURIComponent(rowCode)}/note-references`,
 } as const
 
 // ─── 报表配置 ───────────────────────────────────────────────────────────────
@@ -97,6 +100,8 @@ export const disclosureNotes = {
   priorYear: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/prior-year`,
   relatedWorkpapers: (pid: string, year: number, section: string, rowCode: string) => `/api/notes/${pid}/${year}/${encodeURIComponent(section)}/row/${encodeURIComponent(rowCode)}/related-workpapers`,
   templateStructure: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/template-structure`,
+  // Sprint 4 Task 4.4: 致同附注 Word 排版规范（21 项参数）
+  formatConfig: '/api/disclosure-notes/format-config',
   ai: {
     generatePolicy: (pid: string) => `/api/disclosure-notes/${pid}/ai/generate-policy`,
     generateAnalysis: (pid: string) => `/api/disclosure-notes/${pid}/ai/generate-analysis`,

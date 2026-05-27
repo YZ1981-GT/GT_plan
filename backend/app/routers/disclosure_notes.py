@@ -38,6 +38,31 @@ router = APIRouter(
 )
 
 
+# ---------------------------------------------------------------------------
+# Sprint 4 Task 4.4 — NoteFormatConfig 排版规范端点
+# ---------------------------------------------------------------------------
+
+
+@router.get("/format-config")
+async def get_format_config(
+    current_user: User = Depends(get_current_user),
+):
+    """致同附注 Word 排版规范单一真源（21 项参数）.
+
+    Spec: .kiro/specs/disclosure-note-full-revamp/ Sprint 4 Task 4.4 (R5.2)
+
+    返回 ``DEFAULT_GT_FORMAT`` 的序列化结果，前端 ``useNoteFormatConfig``
+    拉取后注入 CSS 变量。无项目 / 年度参数（全局规范，与项目无关）。
+    """
+    from app.services.note_format_config import DEFAULT_GT_FORMAT
+
+    return {
+        "format_config": DEFAULT_GT_FORMAT.to_dict(),
+        "css_variables": DEFAULT_GT_FORMAT.to_css_variables(),
+        "field_count": len(DEFAULT_GT_FORMAT.field_names()),
+    }
+
+
 @router.post("/generate")
 async def generate_notes(
     data: DisclosureNoteGenerateRequest,
@@ -50,7 +75,6 @@ async def generate_notes(
     check = await PrerequisiteChecker().check(db, data.project_id, data.year, "generate_notes")
     if not check["ok"]:
         raise HTTPException(status_code=400, detail=check)
-
     engine = DisclosureEngine(db)
     try:
         results = await engine.generate_notes(
