@@ -33,6 +33,8 @@ from app.models.report_models import (
     SourceTemplate,
 )
 from app.services.note_template_service import NoteTemplateService
+from app.services.note_template_merge import merge_templates
+from app.services.note_custom_template_service import NoteCustomTemplateService
 
 logger = logging.getLogger(__name__)
 
@@ -132,12 +134,32 @@ class DisclosureEngine:
         try:
             with open(tpl_path, encoding="utf-8-sig") as f:
                 tpl_data = json.load(f)
-            sections = tpl_data.get("sections", [])
+            baseline_sections = tpl_data.get("sections", [])
         except Exception:
             # 降级到旧种子数据
             seed = _load_seed_data()
             sections_raw = seed.get("account_mapping_template", [])
             return sections_raw
+
+        # D3：合并项目级自定义模板（custom 覆盖 baseline，新增按 sort_order 插入）
+        # 仅对 soe / listed 生效；template_type == "custom" 走另一机制（上方 NoteTemplateService）
+        custom_sections: list[dict] = []
+        try:
+            custom_svc = NoteCustomTemplateService(self.db)
+            custom_payload = await custom_svc.load_custom_template(project_id)
+            if custom_payload:
+                cs = custom_payload.get("sections")
+                if isinstance(cs, list):
+                    custom_sections = cs
+        except Exception as err:  # pragma: no cover - graceful
+            logger.warning(
+                "load custom note template failed for project %s: %s; "
+                "falling back to baseline only",
+                project_id, err,
+            )
+            custom_sections = []
+
+        sections = merge_templates(baseline_sections, custom_sections)
 
         return [
             {
@@ -145,7 +167,7 @@ class DisclosureEngine:
                 "section_title": s.get("section_title", ""),
                 "account_name": s.get("account_name") or s.get("section_title", ""),
                 "content_type": s.get("content_type", "table"),
-                "sort_order": idx * 10,
+                "sort_order": s.get("sort_order") if isinstance(s.get("sort_order"), (int, float)) else idx * 10,
                 "table_template": s.get("table_template") or {},
                 "tables": s.get("tables", []),
                 "text_template": s.get("text_template"),
@@ -153,6 +175,7 @@ class DisclosureEngine:
                 "check_presets": s.get("check_presets", []),
                 "wide_table_presets": s.get("wide_table_presets", []),
                 "scope": s.get("scope", "both"),
+                "_custom": s.get("_custom", False),
             }
             for idx, s in enumerate(sections)
         ]

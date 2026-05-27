@@ -194,46 +194,46 @@
 
 ## Sprint 3：自定义编辑 + 联动 UI + 智能裁剪（3.5 人天）
 
-- [ ] **3.1** StructureEditor 新增能力（R4.1）
+- [x] **3.1** StructureEditor 新增能力（R4.1）
   - DisclosureEditor 工具栏"➕ 新增章节"按钮 + 对话框
   - StructureEditor 内"➕ 加表"/"➕ 加列" + 列语义下拉
   - 新增列绑定草稿自动生成（R1.1 列语义识别引擎）
   - 单测：`StructureEditor.add-section.spec.ts` ≥ 5 用例
 
-- [ ] **3.2** 自定义模板存储（D8）
+- [x] **3.2** 自定义模板存储（D8）
   - `backend/storage/projects/{pid}/templates/custom_note_template.json` schema
   - `POST /api/projects/{pid}/note-template/save` 端点
   - 历史版本 snapshot 存于 `v{N}.json`（不可变）
   - 单测：版本 round-trip + 回滚
 
-- [ ] **3.3** 模板 union 算法（D3）
+- [x] **3.3** 模板 union 算法（D3）
   - `disclosure_engine._load_templates` 调 `merge_templates(baseline, custom)`
   - 冲突解决：custom > baseline，按 sort_order 排序
   - 单测：`test_disclosure_engine_v2.py` 加 5 用例（覆盖 / 新增 / 排序）
 
-- [ ] **3.4** 自定义模板版本回滚 UI
+- [x] **3.4** 自定义模板版本回滚 UI
   - `POST /api/projects/{pid}/note-template/restore?version=N`
   - StructureEditor 工具栏"📜 历史版本"按钮 + 列表 dialog
   - 二次确认 + 回滚后产生新版本（不覆盖历史）
 
-- [ ] **3.5** 删除自定义条目 + 回收站（R4.1）
+- [x] **3.5** 删除自定义条目 + 回收站（R4.1）
   - 右键"删除此章节/表格/列"二次确认
   - 进 30 天保留期回收站
   - 复用现有 `RecycleBin.vue` 组件
 
-- [ ] **3.6** 联动 UI 实装（R2.1 前端）
+- [x] **3.6** 联动 UI 实装（R2.1 前端）
   - 章节列表红点 + tooltip "上游已变更，建议重算"
   - 右键菜单"重算此章节" → 调 `update_note_values`
   - `POST /disclosure-notes/{id}/dismiss-stale` 一键忽略
   - 🆕 新建 composable `audit-platform/frontend/src/composables/useNoteStale.ts`（grep 全仓 0 命中，本 spec 新建）订阅 EventBus
 
-- [ ] **3.7** NoteTrimService.auto_trim 简化版（v2 §5.3）
+- [x] **3.7** NoteTrimService.auto_trim 简化版（v2 §5.3）
   - 现有方法 5 个：`get_sections/save_trim/get_trim_scheme/resolve_template_type/_init_from_template`
   - 🆕 本 spec 新增 `auto_trim(project_id, year, template_type)` 方法
   - 检查 binding.skip_if_all_zero 列出科目，TrialBalance 全为 0 → 调现有 `save_trim` 标 not_applicable
   - 单测：`test_note_trim_service_auto.py` 覆盖率 ≥ 80%
 
-- [ ] **3.8** Sprint 3 验收
+- [x] **3.8** Sprint 3 验收
   - 5 个真实流程 Playwright 端到端测试（新增章节 / 改公式 / 红点重算 / 历史回滚 / auto_trim）
   - vue-tsc / pytest 全绿
   - CI 卡点：`auto_trim` 单测覆盖率 ≥ 80%

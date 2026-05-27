@@ -654,3 +654,135 @@ def test_disclosure_engine_imports_clean():
     from app.services import disclosure_engine  # noqa: F401
     from app.services import note_source_resolvers  # noqa: F401
     from app.services import note_template_bindings_loader  # noqa: F401
+
+
+# ===========================================================================
+# Sprint 3 Task 3.3：模板 union 算法接入 _load_templates（5 用例）
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+async def test_load_templates_merges_custom_override(monkeypatch, tmp_path):
+    """custom 覆盖 baseline 同 section_number → _load_templates 输出取 custom 版本."""
+    from app.services import note_custom_template_service as svc_mod
+    from app.services.note_custom_template_service import NoteCustomTemplateService
+
+    monkeypatch.setattr(svc_mod, "STORAGE_ROOT", tmp_path / "storage" / "projects")
+
+    pid = uuid4()
+    custom_svc = NoteCustomTemplateService(db=None, storage_root=tmp_path / "storage" / "projects")
+    await custom_svc.save_custom_template(
+        pid,
+        [{
+            "section_number": "八、1",
+            "section_title": "货币资金（用户自定义）",
+            "sort_order": 100,
+            "tables": [{"table_name": "covered"}],
+        }],
+        uuid4(),
+    )
+
+    eng = _make_engine()
+    sections = await eng._load_templates(pid, "soe")
+
+    overridden = [s for s in sections if s["note_section"] == "八、1"]
+    assert len(overridden) == 1, "应有且仅有一条同 section_number 的章节（custom 覆盖 baseline）"
+    assert overridden[0]["section_title"] == "货币资金（用户自定义）"
+    assert overridden[0]["tables"] == [{"table_name": "covered"}]
+
+
+@pytest.mark.asyncio
+async def test_load_templates_inserts_custom_only_section(monkeypatch, tmp_path):
+    """custom 独有的章节注入并标 _custom: True."""
+    from app.services import note_custom_template_service as svc_mod
+    from app.services.note_custom_template_service import NoteCustomTemplateService
+
+    monkeypatch.setattr(svc_mod, "STORAGE_ROOT", tmp_path / "storage" / "projects")
+
+    pid = uuid4()
+    custom_svc = NoteCustomTemplateService(db=None, storage_root=tmp_path / "storage" / "projects")
+    await custom_svc.save_custom_template(
+        pid,
+        [{
+            "section_number": "九、Z99 用户自定义新增",
+            "section_title": "用户自定义章节",
+            "sort_order": 99999,
+            "tables": [],
+        }],
+        uuid4(),
+    )
+
+    eng = _make_engine()
+    sections = await eng._load_templates(pid, "soe")
+
+    extras = [s for s in sections if s["note_section"] == "九、Z99 用户自定义新增"]
+    assert len(extras) == 1
+    assert extras[0]["_custom"] is True
+    assert extras[0]["section_title"] == "用户自定义章节"
+
+
+@pytest.mark.asyncio
+async def test_load_templates_sorted_by_sort_order(monkeypatch, tmp_path):
+    """custom 按 sort_order 插入到合并集中正确位置."""
+    from app.services import note_custom_template_service as svc_mod
+    from app.services.note_custom_template_service import NoteCustomTemplateService
+
+    monkeypatch.setattr(svc_mod, "STORAGE_ROOT", tmp_path / "storage" / "projects")
+
+    pid = uuid4()
+    custom_svc = NoteCustomTemplateService(db=None, storage_root=tmp_path / "storage" / "projects")
+    await custom_svc.save_custom_template(
+        pid,
+        [
+            {"section_number": "九、Z01 first", "section_title": "first", "sort_order": -100},
+            {"section_number": "九、Z99 last", "section_title": "last", "sort_order": 999999},
+        ],
+        uuid4(),
+    )
+
+    eng = _make_engine()
+    sections = await eng._load_templates(pid, "soe")
+
+    sort_orders = [s["sort_order"] for s in sections]
+    # 输出按 sort_order 升序
+    assert sort_orders == sorted(sort_orders)
+
+    # 自定义章节分别落在头/尾
+    assert sections[0]["note_section"] == "九、Z01 first"
+    assert sections[-1]["note_section"] == "九、Z99 last"
+
+
+@pytest.mark.asyncio
+async def test_load_templates_no_custom_returns_baseline_only(monkeypatch, tmp_path):
+    """缺 custom 文件 → baseline 全量 + 不抛异常 + _custom 全 False."""
+    from app.services import note_custom_template_service as svc_mod
+
+    monkeypatch.setattr(svc_mod, "STORAGE_ROOT", tmp_path / "storage" / "projects")
+
+    pid = uuid4()  # 该 pid 下无 custom 文件
+    eng = _make_engine()
+    sections = await eng._load_templates(pid, "soe")
+
+    assert len(sections) > 0  # baseline 至少几十条
+    assert all(s.get("_custom") is False for s in sections)
+
+
+@pytest.mark.asyncio
+async def test_load_templates_custom_branch_unchanged(monkeypatch, tmp_path):
+    """template_type='custom' 走 NoteTemplateService 旧机制，不调 union."""
+    from app.services import note_custom_template_service as svc_mod
+    monkeypatch.setattr(svc_mod, "STORAGE_ROOT", tmp_path / "storage" / "projects")
+
+    eng = _make_engine()
+
+    async def fake_get_custom(_pid):
+        return [
+            {"section_number": "X1", "section_title": "X1", "table_template": {"headers": ["h"]}},
+        ]
+    eng._get_custom_template_sections = fake_get_custom  # type: ignore[assignment]
+
+    sections = await eng._load_templates(uuid4(), "custom")
+    # custom 分支输出格式与 soe/listed 不同：'note_section' 直接来自 section_number 字段
+    assert sections[0]["note_section"] == "X1"
+    # 旧分支不会带 _custom 字段
+    assert "_custom" not in sections[0]

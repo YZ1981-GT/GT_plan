@@ -44,6 +44,16 @@ export const noteTemplates = {
   presetFormulas: (templateType: string) => `/api/note-templates/preset-formulas/${templateType}`,
 } as const
 
+// ─── 项目级自定义附注模板（Sprint 3 Task 3.2/3.4/3.5） ─────────────────────
+
+export const noteCustomTemplate = {
+  load: (pid: string) => `/api/projects/${pid}/note-template`,
+  save: (pid: string) => `/api/projects/${pid}/note-template/save`,
+  versions: (pid: string) => `/api/projects/${pid}/note-template/versions`,
+  restore: (pid: string, version: number) =>
+    `/api/projects/${pid}/note-template/restore?version=${version}`,
+} as const
+
 // ─── 合并附注 ───────────────────────────────────────────────────────────────
 
 export const consolNoteSections = {

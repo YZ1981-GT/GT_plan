@@ -72,6 +72,10 @@ def register_report_routers(app: FastAPI) -> None:
     from app.routers.note_custom_section import router as note_custom_section_router
     app.include_router(note_custom_section_router, tags=["note-custom-section"])
 
+    # ═══ §52b. Sprint 3 Task 3.2：项目级自定义附注模板存储 + 版本回滚 ═══
+    from app.routers.note_custom_template import router as note_custom_template_router
+    app.include_router(note_custom_template_router, tags=["note-custom-template"])
+
     # ═══ §92. Phase 3 F1 双向穿透：附注来源追溯 ═══
     from app.routers.note_trace import router as note_trace_router
     app.include_router(note_trace_router, tags=["note-trace"])

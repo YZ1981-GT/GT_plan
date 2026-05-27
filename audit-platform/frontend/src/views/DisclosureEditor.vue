@@ -46,6 +46,13 @@
               :get-config-data="getNoteTemplateConfigData"
               @applied="onNoteTemplateApplied"
             />
+            <!-- Sprint 3 Task 3.1: 新增章节 -->
+            <el-button
+              v-if="!isEqcrRole"
+              size="small"
+              data-test="de-add-section"
+              @click="openAddSectionDialog"
+            >➕ 新增章节</el-button>
             <el-button size="small" @click="openStructureEditor">📐 表样编辑</el-button>
             <el-button size="small" @click="showPrintPreview = true">🖨️ 打印预览</el-button>
             <el-button size="small" @click="showNoteMappingDialog = true">🔄 转换规则</el-button>
@@ -103,6 +110,7 @@
             highlight-current
             node-key="id"
             @node-click="onNodeClick"
+            @node-contextmenu="onTreeNodeContextMenu"
             :default-expanded-keys="['chapter_five']"
             ref="noteTreeRef"
           >
@@ -114,6 +122,15 @@
               <div v-else class="gt-de-tree-node" :class="{ 'gt-de-tree-node-active': currentNote?.id === data.id, 'gt-de-tree-node-error': hasSectionValidationError(data.data?.note_section) }">
                 <span class="gt-de-tree-label">{{ data.data?.section_title || data.label }}</span>
                 <span v-if="hasSectionValidationError(data.data?.note_section)" class="gt-de-tree-error-dot" title="校验失败">●</span>
+                <!-- Sprint 3 Task 3.6: 上游变更红点 -->
+                <el-tooltip
+                  v-if="noteStale.isStale(data.data?.note_section)"
+                  content="上游已变更，建议重算"
+                  placement="right"
+                  effect="dark"
+                >
+                  <span class="gt-de-tree-stale-dot" data-test="de-stale-dot">🔴</span>
+                </el-tooltip>
               </div>
             </template>
           </el-tree>
@@ -368,6 +385,9 @@
         :report-scope="'consolidated'"
         :year="year"
         @saved="onStructureEditorSaved"
+        @add-table="onStructureEditorAddTable"
+        @add-column="onStructureEditorAddColumn"
+        @custom-template-restored="onCustomTemplateRestored"
       />
     </el-dialog>
 
@@ -421,6 +441,81 @@
       :year="year"
       @imported="onNoteImported"
     />
+
+    <!-- Sprint 3 Task 3.1: 新增章节 dialog -->
+    <el-dialog
+      v-model="showAddSectionDialog"
+      title="➕ 新增章节"
+      width="540px"
+      append-to-body
+      data-test="de-add-section-dialog"
+    >
+      <el-form label-width="100px" size="small">
+        <el-form-item label="章节编号">
+          <el-input
+            v-model="addSectionForm.section_number"
+            placeholder="如：五、X1"
+            data-test="de-add-section-number"
+          />
+        </el-form-item>
+        <el-form-item label="章节标题">
+          <el-input
+            v-model="addSectionForm.section_title"
+            placeholder="如：递延收益"
+            data-test="de-add-section-title"
+          />
+        </el-form-item>
+        <el-form-item label="科目名">
+          <el-input
+            v-model="addSectionForm.account_name"
+            placeholder="可选"
+            data-test="de-add-section-account"
+          />
+        </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number
+            v-model="addSectionForm.sort_order"
+            :min="0"
+            :max="99999"
+            controls-position="right"
+            style="width: 100%"
+            data-test="de-add-section-sort"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddSectionDialog = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="addSectionLoading"
+          data-test="de-add-section-confirm"
+          @click="onAddSectionConfirm"
+        >确认新增</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Sprint 3 Task 3.5/3.6: 章节列表右键菜单 -->
+    <teleport to="body">
+      <div
+        v-if="treeContextMenu.visible"
+        class="gt-de-tree-ctx-menu"
+        :style="{ top: treeContextMenu.y + 'px', left: treeContextMenu.x + 'px' }"
+        data-test="de-tree-context-menu"
+        @click.stop
+      >
+        <div
+          class="gt-de-tree-ctx-item"
+          data-test="de-tree-recalc"
+          @click="onTreeCtxRecalc"
+        >🔄 重算此章节</div>
+        <div
+          v-if="treeContextMenu.section?._custom"
+          class="gt-de-tree-ctx-item gt-de-tree-ctx-danger"
+          data-test="de-tree-delete-custom"
+          @click="onTreeCtxDeleteCustom"
+        >🗑 删除自定义章节</div>
+      </div>
+    </teleport>
   </div>
 
   <!-- 右键菜单（统一组件 + 查看相关底稿） -->
@@ -594,6 +689,16 @@ async function onStaleRecalc() {
   await stale.recalc()
   await fetchTree()
 }
+
+// Sprint 3 Task 3.6: 附注章节级 stale 状态追踪
+import { useNoteStale } from '@/composables/useNoteStale'
+const noteStale = useNoteStale(projectId)
+
+// Sprint 3 Task 3.1/3.5: 自定义附注模板薄层封装
+import {
+  addOrUpdateCustomSection,
+  removeCustomSection,
+} from '@/composables/useNoteCustomTemplate'
 
 const editLock = useEditingLock({
   resourceId: computed(() => 'disclosure_' + (route.params.projectId as string || '')),
@@ -1342,6 +1447,146 @@ async function onStructureEditorSaved() {
   ElMessage.success('表样编辑已同步')
 }
 
+// ─── Sprint 3 Task 3.1/3.4: 自定义模板编辑事件处理 ─────────────────────────
+
+function onStructureEditorAddTable(payload: { name: string; headers: string[] }) {
+  // R4.1 验收 30: 加表 UI 收到 payload 后传递给后端持久化由表样编辑器内部完成
+  // 此处仅做 UI 反馈（具体写库由 StructureEditor 内部 saveEdits 路径承担）
+  ElMessage.success(`已记录新增表「${payload.name}」(${payload.headers.length} 列)`)
+}
+
+function onStructureEditorAddColumn(payload: { header: string; semantic: string; bindingDraft: any }) {
+  // R4.1 验收 31: 列语义自动生成 binding 草稿，由 StructureEditor 写回 _formulas
+  ElMessage.success(`已记录新增列「${payload.header}」(语义：${payload.semantic})`)
+}
+
+async function onCustomTemplateRestored(payload: { version: number }) {
+  // Sprint 3 Task 3.4: 回滚成功后重新拉树（基线 + 自定义 union 重生成）
+  ElMessage.success(`自定义模板已回滚至 v${payload.version}，正在刷新章节树…`)
+  await fetchTree()
+}
+
+// ─── Sprint 3 Task 3.1: 新增章节 dialog 状态 ────────────────────────────────
+
+const showAddSectionDialog = ref(false)
+const addSectionLoading = ref(false)
+const addSectionForm = ref<{ section_number: string; section_title: string; account_name: string; sort_order: number }>({
+  section_number: '',
+  section_title: '',
+  account_name: '',
+  sort_order: 9000,
+})
+
+function openAddSectionDialog() {
+  addSectionForm.value = {
+    section_number: '',
+    section_title: '',
+    account_name: '',
+    sort_order: 9000,
+  }
+  showAddSectionDialog.value = true
+}
+
+async function onAddSectionConfirm() {
+  const form = addSectionForm.value
+  if (!form.section_number.trim()) {
+    ElMessage.warning('请填写章节编号（如：五、X1）')
+    return
+  }
+  if (!form.section_title.trim()) {
+    ElMessage.warning('请填写章节标题')
+    return
+  }
+  addSectionLoading.value = true
+  try {
+    const newSection = {
+      section_number: form.section_number.trim(),
+      section_title: form.section_title.trim(),
+      account_name: form.account_name.trim() || form.section_title.trim(),
+      sort_order: form.sort_order,
+      _custom: true,
+    }
+    await addOrUpdateCustomSection(projectId.value, newSection)
+    ElMessage.success(`已新增章节「${form.section_title}」`)
+    showAddSectionDialog.value = false
+    await fetchTree()
+  } catch (e: any) {
+    handleApiError(e, '新增章节失败')
+  } finally {
+    addSectionLoading.value = false
+  }
+}
+
+// ─── Sprint 3 Task 3.5/3.6: 章节列表右键菜单 ────────────────────────────────
+
+const treeContextMenu = reactive<{ visible: boolean; x: number; y: number; section: any | null }>({
+  visible: false,
+  x: 0,
+  y: 0,
+  section: null,
+})
+
+function onTreeNodeContextMenu(event: MouseEvent, data: any) {
+  // 分组节点不开右键菜单
+  if (!data || data.isGroup || !data.data?.note_section) return
+  event.preventDefault()
+  treeContextMenu.visible = true
+  treeContextMenu.x = event.clientX
+  treeContextMenu.y = event.clientY
+  treeContextMenu.section = data.data
+}
+
+function _closeTreeContextMenu() {
+  treeContextMenu.visible = false
+  treeContextMenu.section = null
+}
+
+async function onTreeCtxRecalc() {
+  const sec = treeContextMenu.section
+  _closeTreeContextMenu()
+  if (!sec?.note_section) return
+  try {
+    // R2.1：调用现有"从底稿刷新"端点，再 dismiss 红点
+    await refreshDisclosureFromWorkpapers(projectId.value, year.value)
+    noteStale.dismissStale(sec.note_section)
+    ElMessage.success(`章节「${sec.section_title || sec.note_section}」已重算`)
+    if (currentNote.value?.note_section === sec.note_section) {
+      await fetchDetail(sec.note_section)
+    }
+  } catch (e: any) {
+    handleApiError(e, '重算章节失败')
+  }
+}
+
+async function onTreeCtxDeleteCustom() {
+  const sec = treeContextMenu.section
+  _closeTreeContextMenu()
+  if (!sec?.note_section || !sec?._custom) {
+    ElMessage.warning('仅可删除自定义章节')
+    return
+  }
+  try {
+    const { confirmDangerous } = await import('@/utils/confirm')
+    await confirmDangerous(
+      `确认删除自定义章节「${sec.section_title || sec.note_section}」？历史快照保留 30 天，可在「📜 版本历史」回滚。`,
+      '删除自定义章节',
+    )
+  } catch {
+    return // 用户取消
+  }
+  try {
+    const result = await removeCustomSection(projectId.value, sec.note_section)
+    if (result === null) {
+      ElMessage.warning('当前自定义模板未包含此章节（可能已被删除）')
+      return
+    }
+    ElMessage.success(`已删除自定义章节「${sec.section_title || sec.note_section}」`)
+    await fetchTree()
+  } catch (e: any) {
+    handleApiError(e, '删除自定义章节失败')
+  }
+}
+
 // ── 打印预览 (Req 41.1-41.5) ──
 const printPreviewSections = computed(() => {
   if (!noteList.value || noteList.value.length === 0) return []
@@ -1646,14 +1891,31 @@ onMounted(async () => {
   }
   // R8-S2-14：关闭浏览器/刷新前警告
   window.addEventListener('beforeunload', onBeforeUnload)
+  // Sprint 3 Task 3.5/3.6: 全局点击关闭右键菜单
+  window.addEventListener('click', _closeTreeContextMenu)
+  window.addEventListener('contextmenu', _onWindowContextMenuFallback)
 })
 
 onUnmounted(() => {
   eventBus.off('shortcut:save', onShortcutSave)
   eventBus.off('workpaper:saved', onWorkpaperSaved)
   window.removeEventListener('beforeunload', onBeforeUnload)
+  window.removeEventListener('click', _closeTreeContextMenu)
+  window.removeEventListener('contextmenu', _onWindowContextMenuFallback)
   if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
 })
+
+// 右键菜单点开后，再次右键于其他位置 → 关闭旧菜单（el-tree 已自行 emit
+// node-contextmenu 重新打开）
+function _onWindowContextMenuFallback(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  if (!target) return
+  // 树节点上不关闭（el-tree 节点会触发 node-contextmenu 重新定位）
+  if (target.closest('.el-tree-node')) return
+  // 菜单内不关闭
+  if (target.closest('.gt-de-tree-ctx-menu')) return
+  _closeTreeContextMenu()
+}
 
 // R8-S2-14：未保存拦截
 onBeforeRouteLeave(async (_to, _from, next) => {
@@ -2180,6 +2442,14 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
   flex-shrink: 0;
 }
 
+/* ── Sprint 3 Task 3.6: 章节列表 stale 红点 ── */
+.gt-de-tree-stale-dot {
+  font-size: 10px; /* allow-px: special (装饰小图标) */
+  margin-left: 4px;
+  flex-shrink: 0;
+  cursor: help;
+}
+
 /* ── TipTap ── */
 .gt-de-tiptap-wrapper { border: 1px solid var(--gt-color-border-purple); border-radius: 6px; margin-top: 10px; }
 .gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid var(--gt-color-border-purple); background: var(--gt-color-primary-bg); border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
@@ -2220,6 +2490,37 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
   z-index: 2001;
 }
 
+</style>
+
+<!-- 全局样式：teleport 到 body 的右键菜单脱离 scoped 作用域 -->
+<style>
+.gt-de-tree-ctx-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--gt-color-bg-white, #fff);
+  border: 1px solid var(--gt-color-border-purple, #d8caee);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(75, 45, 119, 0.18);
+  padding: 4px 0;
+  min-width: 160px;
+  font-size: var(--gt-font-size-xs, 12px);
+}
+.gt-de-tree-ctx-item {
+  padding: 6px 14px;
+  cursor: pointer;
+  color: var(--gt-color-text-primary, #303133);
+  white-space: nowrap;
+  user-select: none;
+}
+.gt-de-tree-ctx-item:hover {
+  background: var(--gt-color-primary-bg, #f5f0ff);
+}
+.gt-de-tree-ctx-item.gt-de-tree-ctx-danger {
+  color: var(--gt-color-coral, #e6443e);
+}
+.gt-de-tree-ctx-item.gt-de-tree-ctx-danger:hover {
+  background: var(--gt-bg-danger, #fdecea);
+}
 </style>
 
 

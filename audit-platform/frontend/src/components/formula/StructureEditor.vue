@@ -33,13 +33,20 @@
         <el-button @click="deleteCol">删除列</el-button>
       </el-button-group>
       <el-divider direction="vertical" />
+      <!-- Sprint 3 Task 3.1: 加表 / 加列 -->
+      <el-button-group size="small">
+        <el-button data-test="se-add-table" @click="openAddTableDialog">➕ 加表</el-button>
+        <el-button data-test="se-add-column" @click="openAddColumnDialog">➕ 加列</el-button>
+      </el-button-group>
+      <el-divider direction="vertical" />
       <el-button size="small" @click="saveEdits" :loading="saving" type="primary">保存</el-button>
       <el-button size="small" @click="runFormulas" :loading="calculating">执行公式</el-button>
       <el-button size="small" @click="showFormulaManager = true">⚙️ 公式管理</el-button>
       <el-divider direction="vertical" />
       <el-button size="small" @click="$emit('export-excel')">导出Excel</el-button>
       <el-button size="small" @click="$emit('export-word')">导出Word</el-button>
-      <el-button size="small" text @click="showVersions = true">版本历史</el-button>
+      <!-- Sprint 3 Task 3.4: 项目级自定义模板版本历史 -->
+      <el-button data-test="se-version-history" size="small" text @click="onOpenVersions">📜 版本历史</el-button>
       <el-divider direction="vertical" />
       <el-checkbox v-model="showFormulas" size="small">显示公式</el-checkbox>
       <el-checkbox v-model="showSources" size="small">显示数据源</el-checkbox>
@@ -147,19 +154,125 @@
       @confirm="onSelectorConfirm"
     />
 
-    <!-- 版本历史弹窗 -->
-    <el-dialog v-model="showVersions" title="版本历史" width="600px" append-to-body>
-      <el-table :data="versions" size="small" max-height="400">
-        <el-table-column prop="version" label="版本" width="60" />
-        <el-table-column prop="edited_at" label="编辑时间" width="180" />
-        <el-table-column prop="synced_from" label="来源" width="100" />
-        <el-table-column label="操作" width="150">
+    <!-- 版本历史弹窗（Sprint 3 Task 3.4：自定义附注模板版本回滚） -->
+    <el-dialog
+      v-model="showVersions"
+      title="📜 自定义模板版本历史"
+      width="640px"
+      append-to-body
+      data-test="se-version-history-dialog"
+    >
+      <div v-if="versionLoading" style="padding: 20px; text-align: center; color: var(--gt-color-text-tertiary)">
+        加载中…
+      </div>
+      <div v-else-if="!versions.length" style="padding: 20px; text-align: center; color: var(--gt-color-text-tertiary)">
+        暂无历史版本（自定义模板尚未保存过快照）
+      </div>
+      <el-table v-else :data="versions" size="small" max-height="400" data-test="se-version-list">
+        <el-table-column prop="version" label="版本" width="80" align="center">
+          <template #default="{ row }">v{{ row.version }}</template>
+        </el-table-column>
+        <el-table-column prop="updated_at" label="保存时间" width="220" />
+        <el-table-column prop="snapshot_path" label="快照文件" min-width="140" />
+        <el-table-column label="操作" width="120" align="center">
           <template #default="{ row }">
-            <el-button size="small" text @click="diffVersion(row.version)">对比</el-button>
-            <el-button size="small" text type="warning" @click="rollbackVersion(row.version)">回滚</el-button>
+            <el-button
+              size="small"
+              type="warning"
+              text
+              data-test="se-rollback-btn"
+              @click="onRollbackCustomTemplate(row.version)"
+            >回滚</el-button>
           </template>
         </el-table-column>
       </el-table>
+      <template #footer>
+        <el-button @click="showVersions = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Sprint 3 Task 3.1: 加表对话框 -->
+    <el-dialog
+      v-model="showAddTableDialog"
+      title="➕ 加表"
+      width="520px"
+      append-to-body
+      data-test="se-add-table-dialog"
+    >
+      <el-form label-width="80px" size="small">
+        <el-form-item label="表名">
+          <el-input
+            v-model="addTableForm.name"
+            placeholder="如：固定资产变动表"
+            data-test="se-add-table-name"
+          />
+        </el-form-item>
+        <el-form-item label="表头">
+          <el-input
+            v-model="addTableForm.headersText"
+            type="textarea"
+            :rows="3"
+            placeholder='以逗号或换行分隔，如：项目, 期初余额, 本期增加, 本期减少, 期末余额'
+            data-test="se-add-table-headers"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddTableDialog = false">取消</el-button>
+        <el-button
+          type="primary"
+          data-test="se-add-table-confirm"
+          @click="onAddTableConfirm"
+        >确认加表</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Sprint 3 Task 3.1: 加列对话框 -->
+    <el-dialog
+      v-model="showAddColumnDialog"
+      title="➕ 加列"
+      width="520px"
+      append-to-body
+      data-test="se-add-column-dialog"
+    >
+      <el-form label-width="100px" size="small">
+        <el-form-item label="列标题">
+          <el-input
+            v-model="addColumnForm.header"
+            placeholder="如：本期增加"
+            data-test="se-add-column-header"
+          />
+        </el-form-item>
+        <el-form-item label="列语义">
+          <el-select
+            v-model="addColumnForm.semantic"
+            data-test="se-add-column-semantic"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="opt in noteColumnSemanticOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+              :title="opt.description"
+            >
+              <span>{{ opt.label }}</span>
+              <span style="float: right; color: var(--gt-color-text-tertiary); font-size: 11px /* allow-px: special */">{{ opt.value }}</span>
+            </el-option>
+          </el-select>
+          <div style="font-size: 11px /* allow-px: special */; color: var(--gt-color-text-tertiary); margin-top: 4px">
+            列语义用于自动生成 binding 草稿（与后端 25 项标准语义一致）
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddColumnDialog = false">取消</el-button>
+        <el-button
+          type="primary"
+          data-test="se-add-column-confirm"
+          @click="onAddColumnConfirm"
+        >确认加列</el-button>
+      </template>
     </el-dialog>
 
     <!-- 当前表公式管理弹窗（双Tab） -->
@@ -308,6 +421,11 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { confirmRollback } from '@/utils/confirm'
+import {
+  NOTE_COLUMN_SEMANTIC_OPTIONS,
+  DEFAULT_NOTE_COLUMN_SEMANTIC,
+} from '@/constants/noteColumnSemantics'
+import * as P from '@/services/apiPaths'
 import FormulaBar from './FormulaBar.vue'
 import CellSelector from './CellSelector.vue'
 import {
@@ -340,6 +458,21 @@ const emit = defineEmits<{
   'export-excel': []
   'export-word': []
   'saved': [version: number]
+  // Sprint 3 Task 3.1: 父组件接收 add-table / add-column 事件
+  'add-table': [payload: { name: string; headers: string[] }]
+  'add-column': [payload: {
+    header: string
+    semantic: string
+    bindingDraft: {
+      semantic: string
+      source: string
+      field: string
+      mode: string
+      account_codes: string[]
+    }
+  }]
+  // Sprint 3 Task 3.4: 自定义模板回滚成功（父组件需重载）
+  'custom-template-restored': [payload: { version: number }]
 }>()
 
 const htmlContent = ref('')
@@ -365,6 +498,7 @@ const moduleLabel = computed(() => {
 const calculating = ref(false)
 const showSelector = ref(false)
 const showVersions = ref(false)
+const versionLoading = ref(false)
 const showFormulaManager = ref(false)
 const _showInfoPanel = ref(true)
 const showFormulas = ref(false)
@@ -373,6 +507,78 @@ const showStatus = ref(false)
 const versions = ref<any[]>([])
 const currentCellInfo = ref<any>(null)
 const selectedCell = ref('')
+
+// ─── Sprint 3 Task 3.1: 加表 / 加列 dialog 状态 ─────────────────────────────
+const noteColumnSemanticOptions = NOTE_COLUMN_SEMANTIC_OPTIONS
+const showAddTableDialog = ref(false)
+const showAddColumnDialog = ref(false)
+const addTableForm = ref<{ name: string; headersText: string }>({
+  name: '',
+  headersText: '项目, 期初余额, 本期增加, 本期减少, 期末余额',
+})
+const addColumnForm = ref<{ header: string; semantic: string }>({
+  header: '',
+  semantic: DEFAULT_NOTE_COLUMN_SEMANTIC,
+})
+
+function openAddTableDialog() {
+  addTableForm.value = {
+    name: '',
+    headersText: '项目, 期初余额, 本期增加, 本期减少, 期末余额',
+  }
+  showAddTableDialog.value = true
+}
+
+function openAddColumnDialog() {
+  addColumnForm.value = {
+    header: '',
+    semantic: DEFAULT_NOTE_COLUMN_SEMANTIC,
+  }
+  showAddColumnDialog.value = true
+}
+
+function _parseHeaders(text: string): string[] {
+  return text
+    .split(/[,，\n\r]+/g)
+    .map(h => h.trim())
+    .filter(h => h.length > 0)
+}
+
+function onAddTableConfirm() {
+  const name = addTableForm.value.name.trim()
+  const headers = _parseHeaders(addTableForm.value.headersText)
+  if (!name) {
+    ElMessage.warning('请填写表名')
+    return
+  }
+  if (headers.length < 2) {
+    ElMessage.warning('表头至少 2 列（首列为行标识）')
+    return
+  }
+  emit('add-table', { name, headers })
+  ElMessage.success(`已新增表「${name}」共 ${headers.length} 列`)
+  showAddTableDialog.value = false
+}
+
+function onAddColumnConfirm() {
+  const header = addColumnForm.value.header.trim()
+  const semantic = addColumnForm.value.semantic
+  if (!header) {
+    ElMessage.warning('请填写列标题')
+    return
+  }
+  // binding 草稿（R1.1 列语义识别引擎自动生成）
+  const bindingDraft = {
+    semantic,
+    source: 'manual',
+    field: '',
+    mode: 'manual_text',
+    account_codes: [] as string[],
+  }
+  emit('add-column', { header, semantic, bindingDraft })
+  ElMessage.success(`已新增列「${header}」（语义：${semantic}）`)
+  showAddColumnDialog.value = false
+}
 const pendingEdits = ref<any[]>([])
 const tableContainer = ref<HTMLElement>()
 const currentPage = ref(1)
@@ -674,16 +880,62 @@ async function _loadVersions() {
   } catch { versions.value = [] }
 }
 
-async function diffVersion(version: number) {
+async function _diffVersion(version: number) {
   ElMessage.info(`对比版本 ${version} 与当前版本（功能开发中）`)
 }
 
-async function rollbackVersion(version: number) {
+async function _rollbackVersion(version: number) {
   await confirmRollback(version)
   try {
     await rollbackFileVersion(props.projectId, props.fileStem!, version)
     ElMessage.success(`已回滚到版本 ${version}`)
     await loadContent()
+  } catch (e: any) {
+    handleApiError(e, '回滚失败')
+  }
+}
+
+// ─── Sprint 3 Task 3.4: 项目级自定义模板版本历史 + 回滚 ─────────────────────
+
+/** 打开版本历史 dialog 时拉取自定义模板版本清单 */
+async function onOpenVersions() {
+  showVersions.value = true
+  if (!props.projectId) {
+    versions.value = []
+    return
+  }
+  versionLoading.value = true
+  try {
+    const data = await api.get(P.noteCustomTemplate.versions(props.projectId))
+    versions.value = Array.isArray(data) ? data : []
+  } catch (e: any) {
+    handleApiError(e, '加载版本历史失败')
+    versions.value = []
+  } finally {
+    versionLoading.value = false
+  }
+}
+
+/** 回滚到指定版本（产生新版本，不覆盖历史快照） */
+async function onRollbackCustomTemplate(version: number) {
+  if (!props.projectId || !version) return
+  try {
+    await confirmRollback(version)
+  } catch {
+    return // 用户取消
+  }
+  try {
+    const result = await api.post(P.noteCustomTemplate.restore(props.projectId, version))
+    const newVersion = (result && (result as any).version) || 0
+    ElMessage.success(`已回滚到 v${version}（新版本 v${newVersion}）`)
+    emit('custom-template-restored', { version: newVersion })
+    // 刷新版本列表（新增条目应在末尾）
+    try {
+      const fresh = await api.get(P.noteCustomTemplate.versions(props.projectId))
+      versions.value = Array.isArray(fresh) ? fresh : []
+    } catch {
+      // 静默：列表刷新失败不阻断回滚成功提示
+    }
   } catch (e: any) {
     handleApiError(e, '回滚失败')
   }

@@ -14,7 +14,7 @@ export {
 } from './accounting'
 
 export {
-  reports, reportConfig, reportMapping, noteTemplates, consolNoteSections,
+  reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections,
   cfsWorksheet, disclosureNotes, auditReport, exportTask, reportFormatTemplates,
   reportReview, noteLocks, noteGroupTemplate, noteCustomSections,
   consolidation, consolWorksheetData,
@@ -58,7 +58,7 @@ import {
   ledgerImportValidationRules, tAccounts, formula, dataValidation, fineChecks,
 } from './accounting'
 import {
-  reports, reportConfig, reportMapping, noteTemplates, consolNoteSections,
+  reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections,
   cfsWorksheet, disclosureNotes, auditReport, exportTask, reportFormatTemplates,
   reportReview, noteLocks, noteGroupTemplate, noteCustomSections,
   consolidation, consolWorksheetData,
@@ -89,7 +89,7 @@ import {
 
 export const API = {
   projects, trialBalance, adjustments, materiality, misstatements,
-  reports, reportConfig, reportMapping, noteTemplates, consolNoteSections,
+  reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections,
   cfsWorksheet, disclosureNotes, auditReport, exportTask,
   workpaperSummary, events, consolidation, consolWorksheetData,
   workpapers, wpReviews, wpMapping, wpAI, wpFineRules, wpManuals,

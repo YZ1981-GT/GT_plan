@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.core import Project
 from app.models.note_trim_models import NoteSectionInstance, NoteTrimScheme
+from app.services.note_template_bindings_loader import get_binding_for_section
 from app.services.note_template_service import NoteTemplateService
 
 logger = logging.getLogger(__name__)
@@ -205,3 +206,164 @@ class NoteTrimService:
         if not scheme:
             return None
         return {"id": str(scheme.id), "scheme_name": scheme.scheme_name, "trim_data": scheme.trim_data}
+
+    # ------------------------------------------------------------------
+    # Sprint 3 Task 3.7：auto_trim 简化版
+    # ------------------------------------------------------------------
+
+    async def auto_trim(
+        self,
+        project_id: UUID,
+        year: int,
+        template_type: str | None = None,
+    ) -> dict:
+        """自动裁剪：检查每个 section 关联的 account_codes 在 TrialBalance 是否全为 0.
+
+        算法：
+        1. 解析 template_type（默认从 wizard_state 取）
+        2. 通过 ``get_sections`` 拿到所有章节实例（已含 NoteSectionInstance.id）
+        3. 加载 ``note_template_bindings.json``（用 ``get_binding_for_section``）
+        4. 对每个 section：
+           - 收集 binding 中所有 cell.account_codes 的并集
+           - 查 TrialBalance：若 audited_amount + opening_balance 全为 0 / NULL → 标
+             ``status=not_applicable, skip_reason='auto:all_zero'``
+           - 缺 binding 或 account_codes 全空 → 默认保留（不裁剪）
+        5. 调 ``save_trim`` 批量保存
+
+        Returns:
+            ``{"auto_skipped": int, "retained": int, "errors": list[dict]}``
+        """
+        resolved_type = await self.resolve_template_type(project_id, template_type)
+        sections = await self.get_sections(project_id, resolved_type)
+
+        items: list[dict] = []
+        errors: list[dict] = []
+        auto_skipped = 0
+        retained = 0
+
+        for section in sections:
+            section_id = section.get("id")
+            section_number = section.get("section_number")
+            try:
+                binding = get_binding_for_section(section_number)
+                account_codes = self._collect_account_codes_for_section(binding)
+                if not account_codes:
+                    # 缺 binding / 无 account_codes → 默认保留
+                    retained += 1
+                    continue
+
+                all_zero = await self._is_all_zero_for_codes(
+                    project_id, year, list(account_codes)
+                )
+                if all_zero:
+                    items.append({
+                        "id": section_id,
+                        "status": "not_applicable",
+                        "skip_reason": "auto:all_zero",
+                    })
+                    auto_skipped += 1
+                else:
+                    retained += 1
+            except Exception as exc:  # graceful：单个 section 失败不阻塞整体
+                logger.warning(
+                    "auto_trim section %s failed: %s", section_number, exc
+                )
+                errors.append({
+                    "section_id": section_id,
+                    "section_number": section_number,
+                    "error": str(exc),
+                })
+                retained += 1
+
+        if items:
+            try:
+                await self.save_trim(project_id, resolved_type, items)
+            except Exception as exc:
+                logger.exception("auto_trim save_trim failed: %s", exc)
+                errors.append({"phase": "save_trim", "error": str(exc)})
+
+        return {
+            "auto_skipped": auto_skipped,
+            "retained": retained,
+            "errors": errors,
+        }
+
+    @staticmethod
+    def _collect_account_codes_for_section(binding: dict | None) -> set[str]:
+        """从 section binding 的所有 cell.account_codes 并集中收集科目代码."""
+        if not binding or not isinstance(binding, dict):
+            return set()
+        codes: set[str] = set()
+        tables = binding.get("tables")
+        if not isinstance(tables, list):
+            return set()
+        for tbl in tables:
+            if not isinstance(tbl, dict):
+                continue
+            rows = tbl.get("rows")
+            if not isinstance(rows, dict):
+                continue
+            for row in rows.values():
+                if not isinstance(row, dict):
+                    continue
+                cell_bindings = row.get("binding")
+                if not isinstance(cell_bindings, dict):
+                    continue
+                for cell in cell_bindings.values():
+                    if not isinstance(cell, dict):
+                        continue
+                    cell_codes = cell.get("account_codes")
+                    if isinstance(cell_codes, list):
+                        for c in cell_codes:
+                            if isinstance(c, str) and c:
+                                codes.add(c)
+        return codes
+
+    async def _is_all_zero_for_codes(
+        self,
+        project_id: UUID,
+        year: int,
+        account_codes: list[str],
+    ) -> bool:
+        """查 TrialBalance：若指定 account_codes 在 audited + opening 全为 0/NULL → True.
+
+        - 该年度无任何相关试算表行 → True（视为全 0）
+        - 任一行 audited_amount 或 opening_balance 非 0 / 非 None → False
+        """
+        from decimal import Decimal
+
+        from app.models.audit_platform_models import TrialBalance
+
+        if not account_codes:
+            return True
+
+        try:
+            q = sa.select(
+                TrialBalance.audited_amount,
+                TrialBalance.opening_balance,
+            ).where(
+                TrialBalance.project_id == project_id,
+                TrialBalance.year == year,
+                TrialBalance.standard_account_code.in_(account_codes),
+                TrialBalance.is_deleted == sa.false(),
+            )
+            result = await self.db.execute(q)
+            rows = result.all()
+        except Exception as exc:
+            # 缺 TrialBalance 数据 / DB 异常 → graceful 返 True（视作全 0，但可被上层降级）
+            logger.warning(
+                "auto_trim _is_all_zero_for_codes db error for codes=%s: %s",
+                account_codes, exc,
+            )
+            return True
+
+        if not rows:
+            return True
+
+        zero = Decimal("0")
+        for audited, opening in rows:
+            if audited is not None and audited != zero:
+                return False
+            if opening is not None and opening != zero:
+                return False
+        return True

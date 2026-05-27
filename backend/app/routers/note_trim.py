@@ -69,3 +69,21 @@ async def get_trim_scheme(
     scheme = await svc.get_trim_scheme(project_id, resolved_template_type) or {}
     await db.commit()
     return scheme
+
+
+@router.post("/{project_id}/{year}/auto-trim")
+async def auto_trim(
+    project_id: UUID,
+    year: int,
+    template_type: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """自动裁剪：扫描 binding 列出科目，TrialBalance 全 0 → 标 not_applicable.
+
+    Sprint 3 Task 3.7（v2 §5.3 简化版）。
+    """
+    svc = NoteTrimService(db)
+    result = await svc.auto_trim(project_id, year, template_type)
+    await db.commit()
+    return result
