@@ -47,6 +47,10 @@ inclusion: always
 - Python 3.12（.venv），Docker 28.3.3，PG 16（188 表），Redis 6379；后端 9980 / 前端 3030 / vLLM 8100
 - 测试用户 admin/admin123（role=admin）；git 分支 fea2e-business-flow（HEAD）
 - **本地 Docker 容器名**（2026-05-24）：`audit-redis`（端口 6380→6379）/ `audit-postgres` (5432) / `audit-metabase` (3000)；命令 `docker exec audit-redis redis-cli ping`
+- **Playwright MCP 已装**（2026-05-27，workspace 级 `.kiro/settings/mcp.json`）：npx @playwright/mcp@latest，autoApprove 全部 browser_* 工具
+- **5 真项目 PG 数据规模**（2026-05-27 实测）：首汽租车_2025（df5b8403）= tb_balance 1654 / tb_ledger 30324（最完整）/ 重庆和平药房_2025（2aa00f57）= 774 / 52060 / 其他 3 项目（首汽股份×2 + 重庆医药）= 0 / 0；**disclosure_notes / wp_index / ledger_datasets 全为 0**（未走过附注生成 / 底稿生成 / dataset 入库）
+- **后端 health 端点是 `/api/health`**（不是 `/health`，404）
+- **backend/ cwd 跑 python 必须 `..\.venv\Scripts\python.exe`**（仓库根 venv，不在 backend 子目录）
 - **数据库初始化**：`python backend/scripts/init_tables.py` + `python backend/scripts/create_admin.py`
 - **4 项目底稿数据已就位**（2026-05-25）：`python backen year=..., force=True)`
 - **scripts 命名规约**：`_` 前缀 = 一次性脚本（用完即删），无前缀 = 正式工具
@@ -88,6 +92,7 @@ ts 353 / composables 91
   - **httpx 系统代理陷阱**：Windows Clash 类系统代理（127.0.0.1:7897）让 `httpx.AsyncClient()` 默认读取代理把 localhost 请求路由到代理返回 502；修复 = 创建 client 时显式 `mounts={}, trust_env=False`；需修 4 文件：`llm_client.py`（_sync/_stream_completion）/ `ai_service.py`（_get_ollama_client + _get_llm_client + _get_chromadb_client）/ `availability_fallback_service.py`（check_llm_available）/ `routers/system_settings.py`（check_url）
   - **vLLM `chat_template_kwargs` 必须 payload 顶层**：嵌套 `extra_body.chat_template_kwargs` 被 vLLM 静默忽略，`enable_thinking=False` 不生效导致 content=None reasoning 有值；`llm_client.py:107` 改顶层 `"chat_template_kwargs": {"enable_thinking": settings.LLM_ENABLE_THINKING}`
   - **LLM thinking content=None 处理**：finish_reason=length 时返回"思考超 token，请简化提问或增大 max_tokens"，**禁止**回退到 reasoning 字段；`llm_client.py:_sync_completion` 需补此分支
+- **本地 PG schema 漂移严重**（2026-05-27 F-1 UAT 发现，跨多 spec 累积）：alembic 当前 `a2f355648e85`，但多个 head 未跑齐；`alembic upgrade heads` 因不相关 migration 中 `CREATE TYPE IF NOT EXISTS dataset_status ...` 不被 PG 支持而失败；**已知缺列**：`disclosure_notes.is_stale` / `audit_report.is_stale`（已手动 ALTER 补，2026-05-27）/ `import_jobs.{version, retry_count, max_retries, heartbeat_at, timeout_seconds, force_submit, creator_chain}` 等（未补，导致 worker 死循环刷屏 + `/api/projects/*` 全部 500）；后果 = 后端 health=ok 但核心业务 API 全 500，附注 UAT 走不通真实 HTTP 链路；修复属"另立 spec 修 alembic chain"工作（不在附注 spec 范围）；附注 spec F-1 现实状态 = **代码就绪 + 单测全绿 + UAT 阻塞于环境**；可选绕道 = agent 直调 `DisclosureEngine.generate_notes` + `note_word_exporter.export_to_docx` 跑 service 层 UAT（agent 调 service 优于 Playwright UI 铁律）
 
 ## 关键引用指南
 
