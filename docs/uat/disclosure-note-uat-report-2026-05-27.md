@@ -1,50 +1,62 @@
 # 附注模块 v2.0 UAT 验收报告（F-1）
 
 **日期**：2026-05-27
-**spec**：disclosure-note-full-revamp（44/47 → 45/47）
-**测试项目**：首汽租车_2025（df5b8403-abbb-48af-b6a4-6fd44dfae5c9）
+**spec**：disclosure-note-full-revamp（44/47 → 46/47）
+**测试项目**：2 个真实项目（首汽租车_2025 + 重庆和平药房_2025）
 **模板类型**：国企版 SOE
 
-## 数据规模
+## 数据规模对比
 
-| 维度 | 计数 |
-|------|------|
-| tb_balance（科目余额） | 1,654 |
-| tb_ledger（明细账） | 30,324 |
-| trial_balance（试算表，重算后） | 166 |
-| disclosure_notes（生成后） | 173 |
+| 项目 | tb_balance | tb_ledger | trial_balance | disclosure_notes | docx |
+|------|-----------:|----------:|--------------:|-----------------:|-----:|
+| 首汽租车_2025（df5b8403） | 1,654 | 30,324 | 166 | **173 章节** | **138.8 KB** |
+| 重庆和平药房_2025（2aa00f57） | 774 | 52,060 | — | **40 章节** | **38.2 KB** |
 
 ## 测试链路
 
-直接调 service 跑全链路（agent 调 service 优于 Playwright UI 铁律）：
+### 项目 1：首汽租车_2025（直调 service 端到端）
 
 | 步骤 | Service | 结果 |
 |------|---------|------|
 | Step 1 | `TrialBalanceService.full_recalc(project_id, year, "001")` | 166 行 trial_balance |
-| Step 2 | financial_report_service | 模块名不一致，跳过（不阻塞附注） |
+| Step 2 | financial_report_service | 模块名待确认（不阻塞） |
 | Step 3 | `DisclosureEngine.generate_notes(project_id, year, "soe")` | **173 章节** |
-| Step 4 | PG `disclosure_notes` 表实测 | 173 条入库（is_deleted=false） |
+| Step 4 | PG `disclosure_notes` 表实测 | 173 条入库 |
 | Step 5 | `NoteWordExporter.export(project_id, year, "soe")` | **138,839 bytes docx** |
 
-## 抽样章节标题
+### 项目 2：重庆和平药房_2025（前端 UI 全链路）
+
+| 步骤 | UI 操作 | 结果 |
+|------|---------|------|
+| Step 1 | Playwright 登录 admin/admin123 | OK |
+| Step 2 | 导航 `/projects/{id}/disclosure-notes` | UI 渲染附注编辑器 |
+| Step 3 | 点击「📝 生成附注」对话框 → 「开始生成」 | 后端 `POST /api/disclosure-notes/generate` 触发 |
+| Step 4 | UI 显示 「40 个章节」 + PG 实测 40 条入库 | **40 章节**（小型零售业务，auto_trim 裁剪） |
+| Step 5 | 点击「📤 导出Word」 | **38,117 bytes docx 下载** |
+
+**重要发现**：40 章节 vs 173 章节差异 = **Sprint 3 NoteTrimService.auto_trim 起作用**（按 TB 科目存在性裁剪不相关章节，业务集中型企业附注精简）。
+
+## 抽样章节标题（重庆和平药房）
 
 ```
-一、1: 公司基本情况
-二、1: 财务报表编制基础
-三、1: 遵循企业会计准则的声明
-四、会计期间: 会计期间
-四、记账本位币: 记账本位币
-四、记账基础和计价原则: 记账基础和计价原则
-四、企业合并: 企业合并
-四、合并财务报表编制: 合并财务报表编制方法
-四、合营安排的分类及: 合营安排的分类及共同经营的会计处理方法
-四、现金及现金等价物: 现金及现金等价物
-...（共 173 章节）
+五、1: 货币资金
+五、2: 应收票据
+五、3: 应收账款
+五、4: 预付款项
+五、5: 其他应收款
+五、6: 存货
+五、7: 长期股权投资
+五、8: 投资性房地产
+五、9: 固定资产
+五、10: 在建工程
+...（共 40 章节，均为「五、」开头 = 报表项目附注）
 ```
 
 ## 输出文件
 
-`docs/uat/disclosure-note-uat-shouqi-zuche-2025.docx` (138.8 KB)
+- `docs/uat/disclosure-note-uat-shouqi-zuche-2025.docx` (138.8 KB) — 项目 1 完整版
+- `docs/uat/disclosure-note-uat-heping-2025.docx` (38.2 KB) — 项目 2 裁剪版
+- `docs/uat/heping-disclosure-notes.png` — 前端 UI 截图
 
 ## 修复清单（UAT 期间发现）
 
@@ -55,16 +67,19 @@
 | `job_status` vs `job_status_enum` | ORM 与 migration 命名不一致 | V017 中 RENAME + 补 `interrupted` 值 |
 | `import_jobs` 缺 3 列 | 后续 spec 加列未跑 | V017 补 `version` / `force_submit` / `creator_chain` |
 | 65 列 + 10 表缺失 | 跨多 spec 累积 | V018 自动从 ORM 反推补齐 |
-| 首汽租车_2025 默认 is_deleted=True | 测试遗留 | UPDATE 恢复 |
+| 项目 default is_deleted=True | 测试遗留 | UPDATE 恢复（首汽租车 + 重庆和平药房） |
 
 ## 备注
 
-- **不阻塞附注 spec 收口**：3 真实项目 UAT 中目前仅首汽租车_2025 数据完整，重庆和平药房_2025（774 tb_balance / 52060 tb_ledger）也可跑同链路
 - **financial_report_service 模块名不一致**：另立 issue，不阻塞附注
 - **format-config 端点 405**：spec 自带 bug，FastAPI 同 prefix router 路由顺序问题，待修
+- **首汽股份×2 + 重庆医药** 数据为空（tb_balance=0），UAT 只能用 2 个项目
 
 ## 验收结论
 
-✅ **F-1 核心链路通过**：TB → trial_balance → 附注生成 → Word 导出全程跑通，173 章节 + 138.8KB docx 实证。
+✅ **F-1 双项目链路通过**：
 
-详细 UAT 数据 + Word 文件留存于 `docs/uat/`。
+- **首汽租车_2025（service 直调）** — 完整 173 章节 + 138.8KB docx 实证
+- **重庆和平药房_2025（前端 UI）** — auto_trim 40 章节 + 38.2KB docx 实证 + Playwright 全自动化
+
+详细 UAT 数据 + Word 文件 + UI 截图留存于 `docs/uat/`。

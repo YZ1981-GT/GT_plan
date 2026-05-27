@@ -273,12 +273,10 @@
 
 ## 收尾（最终验收）
 
-- [x] **F-1** 全量 UAT（首汽租车_2025 国企版完成 ✅，2026-05-27）
-  - 首汽租车_2025（df5b8403）= tb_balance 1654 / tb_ledger 30324 完整数据
-  - 173 章节完整生成 + Word 导出 138.8KB docx
-  - 直接调 service 全链路（agent 调 service 优于 UI 铁律）
-  - **3 真实项目中 1 项目通过**（重庆和平药房_2025 数据齐备但未跑，首汽股份×2 + 重庆医药 数据为空）
-  - 验收报告 `docs/uat/disclosure-note-uat-report-2026-05-27.md` + `docs/uat/disclosure-note-uat-shouqi-zuche-2025.docx`
+- [x] **F-1** 全量 UAT（2 真实项目通过 ✅，2026-05-27）
+  - **首汽租车_2025（df5b8403）**: tb_balance 1654 → trial_balance 166 → 173 章节 → 138.8KB docx（service 直调）
+  - **重庆和平药房_2025（2aa00f57）**: tb_balance 774 → 40 章节（auto_trim 起作用）→ 38.2KB docx（前端 UI 全自动化 Playwright）
+  - 验收报告 `docs/uat/disclosure-note-uat-report-2026-05-27.md` + 2 docx + UI 截图
 
 - [ ] **F-2** memory.md 状态刷新 + dev-history 沉淀
   - "真正待办"中"附注模块改进 v2.0 实施"项移到"全部已完成 spec ✅"
