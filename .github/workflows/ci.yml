@@ -300,29 +300,56 @@ jobs:
             exit 1
           fi
         working-directory: audit-platform/frontend
-      - name: V3 WorkpaperEditor.vue size guard (Req 12.1)
-        # WorkpaperEditor.vue 是 V3 Sprint 4 重点瘦身对象（2625→2555，目标 ≤1000）
-        # 卡点：行数只减不增（防止重构倒退）
-        run: |
-          LINES=$(wc -l < src/views/WorkpaperEditor.vue)
-          BASELINE=2555
-          echo "WorkpaperEditor.vue lines: $LINES (baseline: $BASELINE, target: ≤1000)"
-          if [ "$LINES" -gt "$BASELINE" ]; then
-            echo "::error::WorkpaperEditor.vue grew from $BASELINE to $LINES lines (target: ≤1000)"
-            exit 1
-          fi
-        working-directory: audit-platform/frontend
-      - name: V3 大型 SFC 行数防膨胀 guard (2026-05-28 复盘)
-        # 底稿模块超级 SFC 清单（仅 only-decrease 防退化，目标见 gaps.md）
+      - name: V3 编辑器瘦身文件行数防膨胀 guard (workpaper-editor-shrink-phase2)
+        # WorkpaperEditor 瘦身后 6 文件 only-decrease 防退化
+        # Shell ≤1000 / UniverEditorCore ≤800 / CycleDialogHost ≤200
+        # CycleTriggerPanel ≤150 / EditorBanners ≤200 / EditorStatusBar ≤120
         run: |
           declare -A BASELINES=(
-            ["src/views/WorkpaperList.vue"]=3238
+            ["src/views/WorkpaperEditor.vue"]=1000
+            ["src/views/workpaper-editor/UniverEditorCore.vue"]=800
+            ["src/views/workpaper-editor/CycleDialogHost.vue"]=200
+            ["src/views/workpaper-editor/CycleTriggerPanel.vue"]=150
+            ["src/views/workpaper-editor/EditorBanners.vue"]=200
+            ["src/views/workpaper-editor/EditorStatusBar.vue"]=120
+          )
+          fail=0
+          for FILE in "${!BASELINES[@]}"; do
+            if [ ! -f "$FILE" ]; then
+              echo "::error::$FILE 不存在 — 编辑器瘦身文件丢失"
+              fail=1
+              continue
+            fi
+            LINES=$(wc -l < "$FILE")
+            BASE=${BASELINES[$FILE]}
+            echo "$FILE: $LINES lines (baseline: $BASE)"
+            if [ "$LINES" -gt "$BASE" ]; then
+              echo "::error::$FILE grew from $BASE to $LINES lines"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] || exit 1
+        working-directory: audit-platform/frontend
+      - name: V3 大型 SFC 行数防膨胀 guard (workpaper-list-shrink 2026-05-28)
+        # 底稿模块 god component 拆分后 6 文件 only-decrease 防退化
+        run: |
+          declare -A BASELINES=(
+            ["src/views/WorkpaperList.vue"]=1000
+            ["src/views/workpaper-list/WorkpaperWorkbenchView.vue"]=700
+            ["src/views/workpaper-list/WorkpaperBoardView.vue"]=700
+            ["src/views/workpaper-list/WorkpaperLifecycleView.vue"]=700
+            ["src/views/workpaper-list/WorkpaperDependencyGraph.vue"]=700
+            ["src/views/workpaper-list/WorkpaperDelegationMatrix.vue"]=700
             ["src/components/workpaper/GtCNoteTable.vue"]=1608
             ["src/components/workpaper/GtEControlTest.vue"]=1125
           )
           fail=0
           for FILE in "${!BASELINES[@]}"; do
-            [ -f "$FILE" ] || continue
+            if [ ! -f "$FILE" ]; then
+              echo "::error::$FILE 不存在 — god component 拆分文件丢失"
+              fail=1
+              continue
+            fi
             LINES=$(wc -l < "$FILE")
             BASE=${BASELINES[$FILE]}
             echo "$FILE: $LINES lines (baseline: $BASE)"

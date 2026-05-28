@@ -23,10 +23,36 @@ TEST_USER = os.getenv("TEST_USER", "admin")
 TEST_PASS = os.getenv("TEST_PASS", "admin123")
 
 
+def _backend_alive() -> bool:
+    """探活后端 9980 端口（trust_env=False 绕开系统代理）。"""
+    try:
+        r = httpx.get(
+            f"{BASE_URL}/api/health",
+            timeout=2,
+            trust_env=False,
+            mounts={},
+        )
+        return r.status_code < 500
+    except Exception:
+        return False
+
+
+# 后端未启动时整模块跳过，避免 14 个 ERROR 污染 pytest 统计
+# （冒烟测试需要真实 HTTP 服务，CI/本地未起 start-dev.bat 时跳过）
+pytestmark = pytest.mark.skipif(
+    not _backend_alive(),
+    reason="backend not running on 127.0.0.1:9980 (start `start-dev.bat` first)",
+)
+
+
 @pytest.fixture(scope="module")
 def client():
-    """创建带认证的 HTTP 客户端"""
-    c = httpx.Client(base_url=BASE_URL, timeout=30)
+    """创建带认证的 HTTP 客户端
+
+    显式 ``trust_env=False`` + ``mounts={}`` 绕开 Windows Clash 类系统代理，
+    避免 localhost 请求被代理路由到 502（vLLM/httpx 链路 bug 同源）。
+    """
+    c = httpx.Client(base_url=BASE_URL, timeout=30, trust_env=False, mounts={})
     # 登录获取 token
     resp = c.post("/api/auth/login", json={"username": TEST_USER, "password": TEST_PASS})
     if resp.status_code == 200:

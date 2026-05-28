@@ -493,19 +493,11 @@ async def test_cash_reconciliation_values(db_session: AsyncSession, seeded_db):
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession, seeded_db):
     """创建测试 HTTP 客户端"""
-    from app.core.database import get_db
     from app.main import app
+    from tests._test_auth_helper import override_auth
 
-    async def override_get_db():
-        yield db_session
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with override_auth(app, db_session=db_session) as c:
         yield c
-
-    app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio

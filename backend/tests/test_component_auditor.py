@@ -42,7 +42,7 @@ async def db_session():
 
 
 async def _create_test_project(db: AsyncSession) -> Project:
-    project = Project(id=uuid.uuid4(), name="Test Project", status="active")
+    project = Project(id=uuid.uuid4(), name="Test Project", client_name="Test Client")
     db.add(project)
     await db.commit()
     await db.refresh(project)

@@ -67,3 +67,13 @@ class WorkHourEntry(Base):
         Index("idx_whe_project_status", "project_id", "status"),
         Index("idx_whe_project_cycle", "project_id", "cycle"),
     )
+
+    # W-4 加班自动识别（与 WorkHour.is_overtime 同语义）
+    @property
+    def is_overtime(self) -> bool:
+        if self.hours is None:
+            return False
+        try:
+            return Decimal(str(self.hours)) > Decimal("8")
+        except (ValueError, TypeError):
+            return False

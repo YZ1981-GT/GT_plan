@@ -52,6 +52,7 @@
 | `k-admin-cycle-post-review-fix/` | 18/18 ✅ | 2026-05-20 完成 |
 | `disclosure-note-full-revamp/` | 44/47 ✅ ⚠ | 2026-05-27 完成核心（Sprint 0~4 / 47 tasks 中 4 任务待外部，剩 F-1 UAT 真项目 / F-2 dev-history / F-3 文档；commits 6b6731c+65fc11a+3c5067c+e1477b2+1729c38f+58cff337+736cf1d4+551835b6；pytest 430/430 全绿；致同 21 排版+11 视觉断言+ADR-007/008/009/010；4101 binding cells / 25 列语义 / PRESET_TO_RULE 11 枚举 / NoteFormatConfig 21 字段 frozen / NOTE↔TB 双向边）|
 | `global-refinement-v3/` | 143/145 ✅ ⚠ | 2026-05-28 完成核心（Sprint 0~4 + 回归 / 13 Req / 13 Property PBT 全绿；后端 145 / 前端 vue-tsc 0 + vitest 2094 passed / 0 failed / 7 skipped；CI 双卡点已上线（vue-tsc 0 errors + vitest 0 failed + GtAmountCell 66 only-increase + el-form :rules 70 only-increase + WorkpaperEditor 2555 only-decrease + no-console strict 0）；剩 14.4 真合伙人 UAT；gaps.md 已建反向记录 GtAmountCell 17%/80% + WorkpaperEditor 2555/1000 等技术债，下一个 spec `gt-amount-cell-rollout` 推进）|
+| `workpaper-list-shrink/` | 0/13 📝 | 2026-05-28 三件套已就绪（requirements 10 stories/61 ACs/1 PBT + design 8 章/5 ADR/7 风险 + tasks 13 父任务/30 子任务/5 可选）；目标 = WorkpaperList.vue **3463**→≤1000 拆 5 子 SFC + 1 shell；实测发现 7 viewMode（含 guide）+ 已有 4 子组件可复用（kanban/lifecycle/graph/matrix）+ 真正需新建仅 Workbench；待执行 Task 1 |
 
 ### 2.2 已被取代（保留 ADR）
 
@@ -67,7 +68,6 @@
 | Spec | 说明 |
 |------|------|
 | `consol-note-three-level-drilldown/` | 合并附注三级穿透；前置=真实合并母子项目数据 |
-| `workpaper-list-shrink/` | README stub（2026-05-28）：WorkpaperList 3238 行拆 5 SFC + shell；触碰时启动完整三件套 |
 | `workpaper-fill-service-split/` | README stub（2026-05-28）：workpaper_fill_service 1587 行拆 4 service；prefill 扩展时启动 |
 | `gt-c-note-table-shrink/` | README stub（2026-05-28）：GtCNoteTable 1608 / GtEControlTest 1125 拆子组件；触碰时启动 |
 

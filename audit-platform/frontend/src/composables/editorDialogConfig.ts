@@ -4,13 +4,29 @@
  * Centralized declaration of all cycle dialog metadata in WorkpaperEditor.vue,
  * providing observability for devtools and documentation navigation.
  *
- * NOTE: this is observational metadata and does NOT replace the existing
- * <XxxDialog> instantiations in WorkpaperEditor.vue (each has unique props).
+ * Phase 2 扩展（workpaper-editor-shrink-phase2 §4.1）：
+ * 新增 component / triggerButton / triggerVisible / propsFactory 字段，
+ * 支持 CycleDialogHost 配置驱动渲染 + CycleTriggerPanel 配置驱动按钮。
+ * 所有新增字段为 optional，既有消费方（devtools 枚举）不受影响。
  *
  * @example
  *   import { TEMPLATE_DIALOGS, getDialogsByCycle } from './editorDialogConfig'
  *   const fDialogs = getDialogsByCycle('F')
  */
+
+import type { Component } from 'vue'
+import type { WorkpaperDetail } from '@/services/workpaperApi'
+
+/**
+ * CycleDialogHost / CycleTriggerPanel 渲染时传入的上下文。
+ * propsFactory 从此 context 派生每个 dialog 的 props。
+ */
+export interface DialogPropsContext {
+  projectId: string
+  wpId: string
+  wpDetail: WorkpaperDetail
+  sheetNavActiveId: string
+}
 
 export interface TemplateDialogConfig {
   key: string
@@ -22,10 +38,24 @@ export interface TemplateDialogConfig {
   width?: string
   appendToBody?: boolean
   fullscreen?: boolean
+  /** 组件 lazy import 工厂（CycleDialogHost 用） */
+  component?: () => Promise<{ default: Component }>
+  /** trigger 按钮配置（CycleTriggerPanel 用） */
+  triggerButton?: {
+    icon: string
+    label: string
+    type?: 'primary' | 'warning'
+    plain?: boolean
+  }
+  /** trigger 可见性判断函数（接收 wp_code + sheetId） */
+  triggerVisible?: (wpCode: string, sheetId: string) => boolean
+  /** dialog props 工厂（从 context 派生 props） */
+  propsFactory?: (ctx: DialogPropsContext) => Record<string, any>
 }
 
 /**
  * 17 dialog entries reconciled with WorkpaperEditor.vue (V3 Sprint 4 12.1.4).
+ * Phase 2 扩展：每条 entry 补充 component + propsFactory，trigger entry 补充 triggerButton + triggerVisible。
  */
 export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
   // ----- F cycle (purchase / inventory) -----
@@ -38,6 +68,15 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'stocktake',
     width: '900px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/InventoryStocktakeDialog.vue'),
+    triggerButton: { icon: '📦', label: '开始监盘', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) => /^F2-(2[1-6])(\b|-|$)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      wpCode: ctx.wpDetail.wp_code || '',
+      stocktakeId: ctx.sheetNavActiveId,
+    }),
   },
   {
     key: 'inventoryImpairment',
@@ -48,6 +87,14 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'impairment',
     width: '800px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/InventoryImpairmentDialog.vue'),
+    triggerButton: { icon: '🤖', label: 'AI 分析跌价', type: 'warning', plain: true },
+    triggerVisible: (wpCode: string) => /^F2-4[7-9](\b|-|$)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   // ----- H cycle (fixed assets / construction in progress) -----
   {
@@ -59,6 +106,15 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'hStocktake',
     width: '900px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/FixedAssetStocktakeDialog.vue'),
+    triggerButton: { icon: '🏗️', label: '固定资产盘点', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) => /^H1-(9|1[0-4])(\b|-|$)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      wpCode: ctx.wpDetail.wp_code || '',
+      stocktakeId: ctx.sheetNavActiveId,
+    }),
   },
   {
     key: 'depreciationCalc',
@@ -69,6 +125,17 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'depreciationCalc',
     width: '900px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/DepreciationCalcDialog.vue'),
+    triggerButton: { icon: '🧮', label: '自动计算', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) =>
+      /^H1-12(\b|-|$)/.test(wpCode.toUpperCase()) ||
+      /^H3-7(\b|-|$)/.test(wpCode.toUpperCase()) ||
+      /^H5-12(\b|-|$)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   {
     key: 'assetImpairment',
@@ -79,6 +146,14 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'assetImpairment',
     width: '900px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/AssetImpairmentDialog.vue'),
+    triggerButton: { icon: '🤖', label: 'AI 辅助分析', type: 'warning', plain: true },
+    triggerVisible: (wpCode: string) => /^H1-14(\b|-|$)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   // ----- I cycle (intangible / goodwill / R&D) -----
   {
@@ -90,6 +165,14 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'goodwillImpairment',
     width: '900px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/GoodwillImpairmentDialog.vue'),
+    triggerButton: { icon: '🤖', label: 'AI 辅助分析', type: 'warning', plain: true },
+    triggerVisible: (wpCode: string) => /^I3-[67](\b|-|$)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   {
     key: 'capitalizationCheck',
@@ -100,6 +183,14 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'capitalizationCheck',
     width: '800px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/CapitalizationCheckDialog.vue'),
+    triggerButton: { icon: '🧮', label: '资本化时点判断', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) => /^I2-6(\b|-|$)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   {
     key: 'amortizationCalc',
@@ -110,6 +201,16 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'amortizationCalc',
     width: '900px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/AmortizationCalcDialog.vue'),
+    triggerButton: { icon: '🧮', label: '自动计算', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) =>
+      /^I1-1[01](\b|-|$)/.test(wpCode.toUpperCase()) ||
+      /^I4-[67](\b|-|$)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   // ----- G cycle (investments) -----
   {
@@ -121,6 +222,17 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'fairValueTest',
     width: '900px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/FairValueTestDialog.vue'),
+    triggerButton: { icon: '📊', label: '公允价值测试', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) =>
+      /^G1(\b|-|$|\d)/.test(wpCode.toUpperCase()) ||
+      /^G6(\b|-|$|\d)/.test(wpCode.toUpperCase()) ||
+      /^G8(\b|-|$|\d)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   {
     key: 'eclCalc',
@@ -131,6 +243,16 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'eclCalc',
     width: '900px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/ECLCalcDialog.vue'),
+    triggerButton: { icon: '🧮', label: 'ECL 计算', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) =>
+      /^G4(\b|-|$|\d)/.test(wpCode.toUpperCase()) ||
+      /^G6(\b|-|$|\d)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   {
     key: 'classificationCheck',
@@ -141,6 +263,16 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'classificationCheck',
     width: '800px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/ClassificationCheckDialog.vue'),
+    triggerButton: { icon: '🏷️', label: '分类辅助', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) =>
+      /^G1-8(\b|-|$)/.test(wpCode.toUpperCase()) ||
+      /^G1-10(\b|-|$)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   // ----- K cycle (admin) -----
   {
@@ -152,6 +284,14 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'expenseAnalysis',
     width: '900px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/ExpenseAnalysisDialog.vue'),
+    triggerButton: { icon: '📊', label: '费用分析', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) => /^K[89](\b|-|$|\d)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   {
     key: 'impairmentSummary',
@@ -162,6 +302,14 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'impairmentSummary',
     width: '900px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/ImpairmentSummaryDialog.vue'),
+    triggerButton: { icon: '📋', label: '减值汇总', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) => /^K11(\b|-|$|\d)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   // ----- L cycle (debt / financing) -----
   {
@@ -173,6 +321,15 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'interestCalc',
     width: '800px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/InterestCalcDialog.vue'),
+    triggerButton: { icon: '🧮', label: '利息测算', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) => /^L[13](\b|-|$|\d)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      workpaperId: ctx.wpId,
+      wpCode: (ctx.wpDetail.wp_code || 'L1').startsWith('L3') ? 'L3' : 'L1',
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   {
     key: 'bondAmortization',
@@ -183,6 +340,14 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'bondAmortization',
     width: '900px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/BondAmortizationDialog.vue'),
+    triggerButton: { icon: '📊', label: '摊余成本', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) => /^L5(\b|-|$|\d)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      workpaperId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   // ----- M cycle (equity) -----
   {
@@ -194,6 +359,14 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'equityMovement',
     width: '900px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/EquityMovementDialog.vue'),
+    triggerButton: { icon: '📊', label: '权益变动', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) => /^M6(\b|-|$|\d)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
   // ----- N cycle (taxes) -----
   {
@@ -205,6 +378,14 @@ export const TEMPLATE_DIALOGS: TemplateDialogConfig[] = [
     dialogStateKey: 'incomeTaxCalc',
     width: '900px',
     appendToBody: true,
+    component: () => import('@/components/workpaper/IncomeTaxCalcDialog.vue'),
+    triggerButton: { icon: '🧮', label: '所得税测算', type: 'primary', plain: true },
+    triggerVisible: (wpCode: string) => /^N5(\b|-|$|\d)/.test(wpCode.toUpperCase()),
+    propsFactory: (ctx: DialogPropsContext) => ({
+      projectId: ctx.projectId,
+      wpId: ctx.wpId,
+      targetSheet: ctx.sheetNavActiveId,
+    }),
   },
 ]
 

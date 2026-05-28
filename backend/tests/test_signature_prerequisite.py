@@ -61,12 +61,9 @@ async def client(db_session: AsyncSession):
     app = FastAPI()
     app.include_router(router)
 
-    async def _override_db():
-        yield db_session
+    from tests._test_auth_helper import override_auth
 
-    app.dependency_overrides[get_db] = _override_db
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with override_auth(app, db_session=db_session) as c:
         yield c
 
 

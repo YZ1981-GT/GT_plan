@@ -493,34 +493,11 @@ async def test_drilldown_nonexistent(db_session: AsyncSession, seeded_db):
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession, seeded_db):
     """创建测试 HTTP 客户端"""
-    from app.core.database import get_db
-    from app.deps import get_current_user
     from app.main import app
-    from app.models.core import User
+    from tests._test_auth_helper import override_auth
 
-    async def override_get_db():
-        yield db_session
-
-    # Create a fake user for auth override
-    fake_user = User(
-        id=FAKE_USER_ID,
-        username="test_user",
-        email="test@example.com",
-        hashed_password="fake",
-        is_active=True,
-    )
-
-    async def override_get_current_user():
-        return fake_user
-
-    app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_current_user] = override_get_current_user
-
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with override_auth(app, db_session=db_session) as c:
         yield c
-
-    app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio

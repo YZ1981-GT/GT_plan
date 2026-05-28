@@ -824,7 +824,10 @@ class AdjustmentService:
         prefix = "AJE" if adj_type == AdjustmentType.aje else "RJE"
         # 使用 advisory lock 防止并发竞争产生重复编号
         lock_key = hash(f"{project_id}:{year}:{prefix}") % (2**31)
-        await self.db.execute(sa_text(f"SELECT pg_advisory_xact_lock({lock_key})"))
+        # SQLite 测试 dialect 没有 pg_advisory_xact_lock，跳过（单进程测试隔离即可）
+        bind = self.db.get_bind()
+        if bind is None or bind.dialect.name != "sqlite":
+            await self.db.execute(sa_text(f"SELECT pg_advisory_xact_lock({lock_key})"))
         adj = Adjustment.__table__
         q = (
             sa.select(sa.func.count(sa.distinct(adj.c.entry_group_id)))

@@ -63,6 +63,10 @@ class _WorkpaperStub(Base):
     id = _sa.Column(_sa.Uuid, primary_key=True)
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
+# PG ARRAY 类型 → SQLite TEXT 兜底（避免 CompileError: can't render element of type ARRAY）
+# 实际查询里 ARRAY 列只读不写就足够，写入需求由真实 PG 测试覆盖
+if not hasattr(SQLiteTypeCompiler, "visit_ARRAY"):
+    SQLiteTypeCompiler.visit_ARRAY = lambda self, type_, **kw: "TEXT"
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 

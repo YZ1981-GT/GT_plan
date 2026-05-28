@@ -3,7 +3,19 @@
 Validates: Requirements 9.1-9.10
 """
 
+from pathlib import Path
+
 import pytest
+
+# 路径相对仓根 vs backend 子目录都能命中（测试路径修复铁律）
+# 002 已归档到 _archived/，这里维持只读断言（结构验证）
+_MIGRATION_FILE = (
+    Path(__file__).resolve().parent.parent
+    / "alembic"
+    / "versions"
+    / "_archived"
+    / "002_mvp_core_tables.py"
+)
 
 
 class TestMigration002Metadata:
@@ -11,7 +23,7 @@ class TestMigration002Metadata:
 
     @pytest.fixture(scope="class")
     def source(self) -> str:
-        with open("alembic/versions/002_mvp_core_tables.py", encoding="utf-8") as f:
+        with open(_MIGRATION_FILE, encoding="utf-8") as f:
             return f.read()
 
     def test_revision_id(self, source):
@@ -32,7 +44,7 @@ class TestMigration002SourceContent:
 
     @pytest.fixture(scope="class")
     def source(self) -> str:
-        with open("alembic/versions/002_mvp_core_tables.py", encoding="utf-8") as f:
+        with open(_MIGRATION_FILE, encoding="utf-8") as f:
             return f.read()
 
     # --- Enum types ---
