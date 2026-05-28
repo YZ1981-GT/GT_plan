@@ -3,6 +3,25 @@
   "template_type": "soe",
   "sections": [
     {
+      "section_id": "chapter-01-gong-si-ji-ben-qing-kuang",
+      "section_number": "一",
+      "section_title": "公司基本情况",
+      "account_name": "公司基本情况",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 1,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 99
+    },
+    {
       "section_number": "一、1",
       "section_title": "公司基本情况",
       "account_name": "公司基本情况",
@@ -20,7 +39,32 @@
         "本公司的母公司为      ，最终控制方为      。",
         "本公司营业期限自XXXX年XX月XX日至XXXX年XX月XX日。（如未限定经营期限，请删除）",
         "本财务报表及财务报表附注业经本公司第届董事会（总经理办公会/或类似机构）第次会议于2023年月日批准报出。"
-      ]
+      ],
+      "section_id": "chapter-01-gong-si-ji-ben-qing-kuang-gong-si-ji-ben-qing-kuang",
+      "level": 2,
+      "parent_section_id": "chapter-01-gong-si-ji-ben-qing-kuang",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
+    },
+    {
+      "section_id": "chapter-02-cai-wu-bao-biao-bian-zhi-ji-chu",
+      "section_number": "二",
+      "section_title": "财务报表编制基础",
+      "account_name": "财务报表编制基础",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 2,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 199
     },
     {
       "section_number": "二、1",
@@ -34,7 +78,32 @@
         "本财务报表以持续经营为基础列报。",
         "（企业应评价自报告期末起12个月的持续经营能力。如果评价结果表明对持续能力产生重大怀疑的，企业应说明导致对持续经营能力产生重大怀疑的因素以及企业拟采取的改善措施。）",
         "（本公司或本公司之xxx子公司本年度进行公司制改制，应披露该公司资产、负债的计量基础。例如：本公司于202X年x月x日由全民所有制企业改制为国有独资公司或国有及国有控股企业全资子公司，以xxx对改制后资产、负债进行初始计量。）"
-      ]
+      ],
+      "section_id": "chapter-02-cai-wu-bao-biao-bian-zhi-ji-chu-cai-wu-bao-biao-bian-zhi-ji-chu",
+      "level": 2,
+      "parent_section_id": "chapter-02-cai-wu-bao-biao-bian-zhi-ji-chu",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
+    },
+    {
+      "section_id": "chapter-03-zun-xun-qi-ye-kuai-ji-zhun-ze-de-sheng-ming",
+      "section_number": "三",
+      "section_title": "遵循企业会计准则的声明",
+      "account_name": "遵循企业会计准则的声明",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 3,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 299
     },
     {
       "section_number": "三、1",
@@ -46,7 +115,32 @@
       "text_sections": [
         "本公司编制的财务报表符合企业会计准则的要求，真实、完整地反映了本公司2025年12月31日的合并及公司财务状况以及2025年度的合并及公司经营成果和合并及公司现金流量等有关信息。",
         "纳入合并范围内的子公司-xxxx执行《xxx会计准则》和《xxxx会计制度》。本财务报表的编制已经对纳入合并范围的xxx公司的财务报表按照财政部发布的企业会计准则及其应用指南、解释及其他有关规定进行了调整。"
-      ]
+      ],
+      "section_id": "chapter-03-zun-xun-qi-ye-kuai-ji-zhun-ze-de-sheng-ming-zun-xun-qi-ye-kuai-ji-zhun-ze-de-sheng-m",
+      "level": 2,
+      "parent_section_id": "chapter-03-zun-xun-qi-ye-kuai-ji-zhun-ze-de-sheng-ming",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
+    },
+    {
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "section_number": "四",
+      "section_title": "重要会计政策、会计估计",
+      "account_name": "重要会计政策、会计估计",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 4,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 399
     },
     {
       "section_number": "四、会计期间",
@@ -60,7 +154,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 400
+      "sort_order": 400,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-kuai-ji-qi-jian",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、记账本位币",
@@ -77,7 +177,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 401
+      "sort_order": 401,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-ji-zhang-ben-wei-bi",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 1,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、记账基础和计价原",
@@ -92,7 +198,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 402
+      "sort_order": 402,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-ji-zhang-ji-chu-he-ji-jia-yuan-ze",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 2,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、企业合并",
@@ -146,7 +258,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 403
+      "sort_order": 403,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-qi-ye-he-bing",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 3,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、合并财务报表编制",
@@ -169,7 +287,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 404
+      "sort_order": 404,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-he-bing-cai-wu-bao-biao-bian-zhi-fang-fa",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 4,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、合营安排的分类及",
@@ -195,7 +319,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 405
+      "sort_order": 405,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-he-ying-an-pai-de-fen-lei-ji-gong-tong-jing",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 5,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、现金及现金等价物",
@@ -214,7 +344,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 406
+      "sort_order": 406,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-xian-jin-ji-xian-jin-deng-jia-wu",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 6,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、外币业务和外币报",
@@ -231,7 +367,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 407
+      "sort_order": 407,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-wai-bi-ye-wu-he-wai-bi-bao-biao-zhe-suan",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 7,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、金融工具",
@@ -254,7 +396,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 408
+      "sort_order": 408,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-jin-rong-gong-ju",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 8,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、套期会计",
@@ -278,7 +426,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 409
+      "sort_order": 409,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-tao-qi-kuai-ji",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 9,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、存货",
@@ -305,7 +459,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 410
+      "sort_order": 410,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-cun-huo",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 10,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、长期股权投资",
@@ -411,7 +571,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 411
+      "sort_order": 411,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-chang-qi-gu-quan-tou-zi",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 11,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、投资性房地产",
@@ -434,7 +600,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 412
+      "sort_order": 412,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-tou-zi-xing-fang-di-chan",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 12,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、固定资产",
@@ -504,7 +676,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 413
+      "sort_order": 413,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-gu-ding-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 13,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、在建工程",
@@ -583,7 +761,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 414
+      "sort_order": 414,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zai-jian-gong-cheng",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 14,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、借款费用",
@@ -764,7 +948,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 415
+      "sort_order": 415,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-jie-kuan-fei-yong",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 15,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、生物资产",
@@ -846,7 +1036,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 416
+      "sort_order": 416,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-sheng-wu-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 16,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、油气资产",
@@ -870,7 +1066,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 417
+      "sort_order": 417,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-you-qi-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 17,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、使用权资产",
@@ -1181,7 +1383,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 418
+      "sort_order": 418,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-shi-yong-quan-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 18,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、无形资产",
@@ -1227,7 +1435,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 419
+      "sort_order": 419,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-wu-xing-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 19,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、研究开发支出",
@@ -1251,7 +1465,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 420
+      "sort_order": 420,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-yan-jiu-kai-fa-zhi-chu",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 20,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、长期待摊费用",
@@ -1312,7 +1532,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 421
+      "sort_order": 421,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-chang-qi-dai-tan-fei-yong",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 21,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、资产减值",
@@ -1336,7 +1562,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 422
+      "sort_order": 422,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zi-chan-jian-zhi",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 22,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、职工薪酬",
@@ -1363,7 +1595,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 423
+      "sort_order": 423,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zhi-gong-xin-chou",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 23,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、股份支付",
@@ -1382,7 +1620,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 424
+      "sort_order": 424,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-gu-fen-zhi-fu",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 24,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、应付债券",
@@ -1443,7 +1687,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 425
+      "sort_order": 425,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-ying-fu-zhai-quan",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 25,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、预计负债",
@@ -1554,7 +1804,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 426
+      "sort_order": 426,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-yu-ji-fu-zhai",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 26,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、优先股、永续债等",
@@ -1569,7 +1825,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 427
+      "sort_order": 427,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-you-xian-gu-yong-xu-zhai-deng-qi-ta-jin-ron",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 27,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、收入的确认原则",
@@ -1609,7 +1871,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 428
+      "sort_order": 428,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-shou-ru-di-que-ren-yuan-ze",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 28,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、合同成本",
@@ -1635,7 +1903,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 429
+      "sort_order": 429,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-he-tong-cheng-ben",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 29,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、政府补助",
@@ -1661,7 +1935,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 430
+      "sort_order": 430,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zheng-fu-bu-zhu",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 30,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、租赁",
@@ -1685,7 +1965,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 431
+      "sort_order": 431,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zu-lin",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 31,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、持有待售及终止经",
@@ -1703,7 +1989,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 432
+      "sort_order": 432,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-chi-you-dai-shou-ji-zhong-zhi-jing-ying",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 32,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、公允价值计量",
@@ -1724,7 +2016,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 433
+      "sort_order": 433,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-gong-yun-jia-zhi-ji-liang",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 33,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、安全生产费用及维",
@@ -1747,7 +2045,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 434
+      "sort_order": 434,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-an-quan-sheng-chan-fei-yong-ji-wei-jian-fei",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 34,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "四、资产证券化业务",
@@ -1766,7 +2070,32 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 435
+      "sort_order": 435,
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zi-chan-zheng-quan-hua-ye-wu",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 35,
+      "auto_numbering": true,
+      "lock_number": false
+    },
+    {
+      "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g",
+      "section_number": "五",
+      "section_title": "重要会计政策、会计估计的变更以及前期差错的更正",
+      "account_name": "重要会计政策、会计估计的变更以及前期差错的更正",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 5,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 499
     },
     {
       "section_number": "五、会计政策变更",
@@ -1787,7 +2116,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 500
+      "sort_order": 500,
+      "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-kua",
+      "level": 2,
+      "parent_section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "五、会计估计变更",
@@ -1824,7 +2159,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 501
+      "sort_order": 501,
+      "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-kua-2",
+      "level": 2,
+      "parent_section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g",
+      "sort_index": 1,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "五、重要前期差错更正",
@@ -1841,7 +2182,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 502
+      "sort_order": 502,
+      "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-zho",
+      "level": 2,
+      "parent_section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g",
+      "sort_index": 2,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "五、其他调整事项【包",
@@ -1855,7 +2202,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 503
+      "sort_order": 503,
+      "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-qi",
+      "level": 2,
+      "parent_section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g",
+      "sort_index": 3,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "五、对期初所有者权益",
@@ -1899,7 +2252,32 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 504
+      "sort_order": 504,
+      "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-dui",
+      "level": 2,
+      "parent_section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g",
+      "sort_index": 4,
+      "auto_numbering": true,
+      "lock_number": false
+    },
+    {
+      "section_id": "chapter-06-shui-xiang",
+      "section_number": "六",
+      "section_title": "税项",
+      "account_name": "税项",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 6,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 599
     },
     {
       "section_number": "六、递延所得税资产及",
@@ -1923,7 +2301,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 600
+      "sort_order": 600,
+      "section_id": "chapter-06-shui-xiang-di-yan-suo-de-shui-zi-chan-ji-di-yan-suo-de-shui-fu-zhai",
+      "level": 2,
+      "parent_section_id": "chapter-06-shui-xiang",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "六、主要税种及税率",
@@ -1960,7 +2344,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 601
+      "sort_order": 601,
+      "section_id": "chapter-06-shui-xiang-zhu-yao-shui-zhong-ji-shui-lv",
+      "level": 2,
+      "parent_section_id": "chapter-06-shui-xiang",
+      "sort_index": 1,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "六、优惠税负及批文",
@@ -1974,7 +2364,32 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 602
+      "sort_order": 602,
+      "section_id": "chapter-06-shui-xiang-you-hui-shui-fu-ji-pi-wen",
+      "level": 2,
+      "parent_section_id": "chapter-06-shui-xiang",
+      "sort_index": 2,
+      "auto_numbering": true,
+      "lock_number": false
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "section_number": "七",
+      "section_title": "合并范围的变化",
+      "account_name": "合并范围的变化",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 7,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 699
     },
     {
       "section_number": "七、本期纳入合并报表",
@@ -2012,7 +2427,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 700
+      "sort_order": 700,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-na-ru-he-bing-bao-biao-fan-wei-de-zi-gong-si-ji-b",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "七、母公司拥有被投资",
@@ -2039,7 +2460,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 701
+      "sort_order": 701,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-mu-gong-si-yong-you-bei-tou-zi-dan-wei-biao-jue-quan-bu",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 1,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "七、母公司直接或通过",
@@ -2066,7 +2493,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 702
+      "sort_order": 702,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-mu-gong-si-zhi-jie-huo-tong-guo-qi-ta-zi-gong-si-jian-ji",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 2,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "七、重要非全资子公司",
@@ -2157,7 +2590,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 703
+      "sort_order": 703,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-zhong-yao-fei-quan-zi-zi-gong-si-qing-kuang",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 3,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "七、本期不再纳入合并",
@@ -2309,7 +2748,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 704
+      "sort_order": 704,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-bu-zai-na-ru-he-bing-fan-wei-de-yuan-zi-gong-si",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 4,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "七、本期新纳入合并范",
@@ -2333,7 +2778,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 705
+      "sort_order": 705,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-xin-na-ru-he-bing-fan-wei-de-zhu-ti",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 5,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "七、本期发生的同一控",
@@ -2365,7 +2816,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 706
+      "sort_order": 706,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-tong-yi-kong-zhi-xia-qi-ye-he-bing-qi",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 6,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "七、本期发生的非同一",
@@ -2406,7 +2863,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 707
+      "sort_order": 707,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-fei-tong-yi-kong-zhi-xia-qi-ye-he-bin",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 7,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "七、本期发生的吸收合",
@@ -2443,7 +2906,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 708
+      "sort_order": 708,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-xi-shou-he-bing",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 8,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "七、子公司使用企业集",
@@ -2459,7 +2928,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 709
+      "sort_order": 709,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-zi-gong-si-shi-yong-qi-ye-ji-tuan-zi-chan-he-qing-chang",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 9,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "七、纳入合并财务报表",
@@ -2476,7 +2951,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 710
+      "sort_order": 710,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-na-ru-he-bing-cai-wu-bao-biao-fan-wei-de-jie-gou-hua-zhu",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 10,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "七、母公司在子公司的",
@@ -2544,7 +3025,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 711
+      "sort_order": 711,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-mu-gong-si-zai-zi-gong-si-de-suo-you-zhe-quan-yi-fen-e-f",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 11,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "七、子公司向母公司转",
@@ -2562,7 +3049,32 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 712
+      "sort_order": 712,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-zi-gong-si-xiang-mu-gong-si-zhuan-yi-zi-jin-de-neng-li-s",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 12,
+      "auto_numbering": true,
+      "lock_number": false
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "section_number": "八",
+      "section_title": "财务报表主要项目注释",
+      "account_name": "财务报表主要项目注释",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 8,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 799
     },
     {
       "section_number": "八、1",
@@ -2659,7 +3171,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 800
+      "sort_order": 800,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-huo-bi-zi-jin",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、2",
@@ -2720,7 +3238,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 801
+      "sort_order": 801,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-jiao-yi-xing-jin-rong-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 1,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、3",
@@ -2753,7 +3277,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 802
+      "sort_order": 802,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yan-sheng-jin-rong-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 2,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、4",
@@ -3082,7 +3612,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 803
+      "sort_order": 803,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-piao-ju",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 3,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、5",
@@ -3392,7 +3928,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 804
+      "sort_order": 804,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 4,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、6",
@@ -3442,7 +3984,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 805
+      "sort_order": 805,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-kuan-xiang-rong-zi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 5,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、7",
@@ -3544,7 +4092,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 806
+      "sort_order": 806,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yu-fu-kuan-xiang",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 6,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、8",
@@ -3574,7 +4128,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 807
+      "sort_order": 807,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-zi-jin-ji-zhong-guan-li-kuan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 7,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、9",
@@ -4109,7 +4669,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 808
+      "sort_order": 808,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-ying-shou-kuan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 8,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、10",
@@ -4357,7 +4923,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 809
+      "sort_order": 809,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-cun-huo",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 9,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、11",
@@ -4439,7 +5011,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 810
+      "sort_order": 810,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-tong-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 10,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、12",
@@ -4623,7 +5201,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 811
+      "sort_order": 811,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chi-you-dai-shou-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 11,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、13",
@@ -4671,7 +5255,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 812
+      "sort_order": 812,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 12,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、14",
@@ -4736,7 +5326,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 813
+      "sort_order": 813,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-liu-dong-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 13,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、15",
@@ -4969,7 +5565,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 814
+      "sort_order": 814,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhai-quan-tou-zi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 14,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、16",
@@ -5027,7 +5629,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 815
+      "sort_order": 815,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-zhai-quan-tou-zi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 15,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、17",
@@ -5143,7 +5751,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 816
+      "sort_order": 816,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chang-qi-ying-shou-kuan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 16,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、18",
@@ -5635,7 +6249,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 817
+      "sort_order": 817,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chang-qi-gu-quan-tou-zi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 17,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、19",
@@ -5689,7 +6309,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 818
+      "sort_order": 818,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-quan-yi-gong-ju-tou-zi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 18,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、20",
@@ -5720,7 +6346,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 819
+      "sort_order": 819,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-fei-liu-dong-jin-rong-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 19,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、21",
@@ -5898,7 +6530,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 820
+      "sort_order": 820,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-tou-zi-xing-fang-di-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 20,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、22",
@@ -6204,7 +6842,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 821
+      "sort_order": 821,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gu-ding-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 21,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、23",
@@ -6347,7 +6991,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 822
+      "sort_order": 822,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zai-jian-gong-cheng",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 22,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、24",
@@ -6500,7 +7150,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 823
+      "sort_order": 823,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-sheng-chan-xing-sheng-wu-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 23,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、25",
@@ -6597,7 +7253,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 824
+      "sort_order": 824,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-you-qi-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 24,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、26",
@@ -6732,7 +7394,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 825
+      "sort_order": 825,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-shi-yong-quan-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 25,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、27",
@@ -7092,7 +7760,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 826
+      "sort_order": 826,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-wu-xing-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 26,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、28",
@@ -7137,7 +7811,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 827
+      "sort_order": 827,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-kai-fa-zhi-chu",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 27,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、29",
@@ -7194,7 +7874,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 828
+      "sort_order": 828,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-shang-yu",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 28,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、30",
@@ -7234,7 +7920,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 829
+      "sort_order": 829,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chang-qi-dai-tan-fei-yong",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 29,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、31",
@@ -7458,7 +8150,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 830
+      "sort_order": 830,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-di-yan-suo-de-shui-zi-chan-he-di-yan-suo-de",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 30,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、32",
@@ -7541,7 +8239,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 831
+      "sort_order": 831,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-fei-liu-dong-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 31,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、33",
@@ -7610,7 +8314,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 832
+      "sort_order": 832,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-duan-qi-jie-kuan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 32,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、34",
@@ -7684,7 +8394,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 833
+      "sort_order": 833,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-jiao-yi-xing-jin-rong-fu-zhai",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 33,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、35",
@@ -7717,7 +8433,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 834
+      "sort_order": 834,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yan-sheng-jin-rong-fu-zhai",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 34,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、36",
@@ -7759,7 +8481,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 835
+      "sort_order": 835,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-fu-piao-ju",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 35,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、37",
@@ -7827,7 +8555,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 836
+      "sort_order": 836,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-fu-zhang-kuan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 36,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、38",
@@ -7887,7 +8621,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 837
+      "sort_order": 837,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yu-shou-kuan-xiang",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 37,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、39",
@@ -7941,7 +8681,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 838
+      "sort_order": 838,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-tong-fu-zhai",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 38,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、40",
@@ -8112,7 +8858,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 839
+      "sort_order": 839,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-fu-zhi-gong-xin-chou",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 39,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、41",
@@ -8187,7 +8939,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 840
+      "sort_order": 840,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-jiao-shui-fei",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 40,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、42",
@@ -8357,7 +9115,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 841
+      "sort_order": 841,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-ying-fu-kuan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 41,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、43",
@@ -8400,7 +9164,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 842
+      "sort_order": 842,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chi-you-dai-shou-fu-zhai",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 42,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、44",
@@ -8457,7 +9227,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 843
+      "sort_order": 843,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-fu-zhai",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 43,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、45",
@@ -8505,7 +9281,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 844
+      "sort_order": 844,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-chang-qi-jie-kuan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 44,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、46",
@@ -8563,7 +9345,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 845
+      "sort_order": 845,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-ying-fu-zhai-quan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 45,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、47",
@@ -8597,7 +9385,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 846
+      "sort_order": 846,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-chang-qi-ying-fu-kuan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 46,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、48",
@@ -8647,7 +9441,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 847
+      "sort_order": 847,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-liu-dong-fu-zhai",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 47,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、49",
@@ -8708,7 +9508,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 848
+      "sort_order": 848,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chang-qi-jie-kuan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 48,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、50",
@@ -8782,7 +9588,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 849
+      "sort_order": 849,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-fu-zhai-quan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 49,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、51",
@@ -8872,7 +9684,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 850
+      "sort_order": 850,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-you-xian-gu-yong-xu-zhai-deng-jin-rong-gong",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 50,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、52",
@@ -8924,7 +9742,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 851
+      "sort_order": 851,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zu-lin-fu-zhai",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 51,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、53",
@@ -9067,7 +9891,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 852
+      "sort_order": 852,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chang-qi-ying-fu-kuan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 52,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、54",
@@ -9429,7 +10259,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 853
+      "sort_order": 853,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chang-qi-ying-fu-zhi-gong-xin-chou",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 53,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、55",
@@ -9496,7 +10332,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 854
+      "sort_order": 854,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yu-ji-fu-zhai",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 54,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、56",
@@ -9563,7 +10405,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 855
+      "sort_order": 855,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-di-yan-shou-yi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 55,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、57",
@@ -9609,7 +10457,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 856
+      "sort_order": 856,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-fei-liu-dong-fu-zhai",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 56,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、58",
@@ -9650,7 +10504,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 857
+      "sort_order": 857,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-shi-shou-zi-ben",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 57,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、59",
@@ -9690,7 +10550,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 858
+      "sort_order": 858,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-quan-yi-gong-ju",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 58,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、60",
@@ -9740,7 +10606,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 859
+      "sort_order": 859,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zi-ben-gong-ji",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 59,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、61",
@@ -9789,7 +10661,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 860
+      "sort_order": 860,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhuan-xiang-chu-bei",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 60,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、62",
@@ -9847,7 +10725,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 861
+      "sort_order": 861,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-yu-gong-ji",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 61,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、63",
@@ -9947,7 +10831,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 862
+      "sort_order": 862,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-wei-fen-pei-li-run",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 62,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、64",
@@ -10149,7 +11039,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 863
+      "sort_order": 863,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-ye-shou-ru-ying-ye-cheng-ben",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 63,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、65",
@@ -10180,7 +11076,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 864
+      "sort_order": 864,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xiao-shou-fei-yong",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 64,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、66",
@@ -10218,7 +11120,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 865
+      "sort_order": 865,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-guan-li-fei-yong",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 65,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、67",
@@ -10269,7 +11177,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 866
+      "sort_order": 866,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yan-fa-fei-yong",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 66,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、68",
@@ -10336,7 +11250,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 867
+      "sort_order": 867,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-cai-wu-fei-yong",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 67,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、69",
@@ -10383,7 +11303,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 868
+      "sort_order": 868,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-shou-yi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 68,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、70",
@@ -10489,7 +11415,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 869
+      "sort_order": 869,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-tou-zi-shou-yi-xia-biao-zhong-bu-shi-yong-d",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 69,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、71",
@@ -10528,7 +11460,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 870
+      "sort_order": 870,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-jing-chang-kou-tao-qi-shou-yi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 70,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、72",
@@ -10597,7 +11535,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 871
+      "sort_order": 871,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gong-yun-jia-zhi-bian-dong-shou-yi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 71,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、73",
@@ -10645,7 +11589,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 872
+      "sort_order": 872,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xin-yong-jian-zhi-sun-shi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 72,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、74",
@@ -10737,7 +11687,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 873
+      "sort_order": 873,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zi-chan-jian-zhi-sun-shi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 73,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、75",
@@ -10801,7 +11757,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 874
+      "sort_order": 874,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zi-chan-chu-zhi-shou-yi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 74,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、76",
@@ -10861,7 +11823,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 875
+      "sort_order": 875,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-ye-wai-shou-ru",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 75,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、77",
@@ -10925,7 +11893,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 876
+      "sort_order": 876,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-ye-wai-zhi-chu",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 76,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、78",
@@ -11023,7 +11997,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 877
+      "sort_order": 877,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-suo-de-shui-fei-yong",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 77,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、79",
@@ -11241,7 +12221,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 878
+      "sort_order": 878,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gui-shu-yu-mu-gong-si-suo-you-zhe-de-qi-ta",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 78,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、80",
@@ -11361,7 +12347,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 879
+      "sort_order": 879,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-mei-gu-shou-yi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 79,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、81",
@@ -11559,7 +12551,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 880
+      "sort_order": 880,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-xiang-mu-zhu-shi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 80,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、82",
@@ -11580,7 +12578,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 881
+      "sort_order": 881,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-fei-huo-bi-xing-zi-chan-jiao-huan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 81,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、83",
@@ -11663,7 +12667,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 882
+      "sort_order": 882,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gu-fen-zhi-fu",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 82,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、84",
@@ -11789,7 +12799,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 883
+      "sort_order": 883,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhai-wu-chong-zu",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 83,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、85",
@@ -11894,7 +12910,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 884
+      "sort_order": 884,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-jie-kuan-fei-yong",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 84,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、86",
@@ -11908,7 +12930,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 885
+      "sort_order": 885,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-wai-bi-zhe-suan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 85,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、87",
@@ -12121,7 +13149,13 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 886
+      "sort_order": 886,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zu-lin",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 86,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、88",
@@ -12144,7 +13178,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 887
+      "sort_order": 887,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-shu-ju-zi-yuan-xiang-guan-xin-xi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 87,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、89",
@@ -12230,7 +13270,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 888
+      "sort_order": 888,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhong-zhi-jing-ying",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 88,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、90",
@@ -12382,7 +13428,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 889
+      "sort_order": 889,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-fen-bu-xin-xi",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 89,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、91",
@@ -12712,7 +13764,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 890
+      "sort_order": 890,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-bing-xian-jin-liu-liang-biao-xiang-guan",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 90,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、92",
@@ -12858,7 +13916,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 891
+      "sort_order": 891,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-wai-bi-huo-bi-xing-xiang-mu",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 91,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "八、93",
@@ -12957,7 +14021,32 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 892
+      "sort_order": 892,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-suo-you-quan-he-shi-yong-quan-shou-dao-xian",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "sort_index": 92,
+      "auto_numbering": true,
+      "lock_number": false
+    },
+    {
+      "section_id": "chapter-09-huo-you-shi-xiang",
+      "section_number": "九",
+      "section_title": "或有事项",
+      "account_name": "或有事项",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 9,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 899
     },
     {
       "section_number": "九、【企业应当在附注",
@@ -12998,7 +14087,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 900
+      "sort_order": 900,
+      "section_id": "chapter-09-huo-you-shi-xiang-qi-ye-ying-dang-zai-fu-zhu-zhong-pi-lu-yu-huo-you-shi-xiang-you-gu",
+      "level": 2,
+      "parent_section_id": "chapter-09-huo-you-shi-xiang",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "九、1、或有负债",
@@ -13064,7 +14159,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 901
+      "sort_order": 901,
+      "section_id": "chapter-09-huo-you-shi-xiang-huo-you-fu-zhai",
+      "level": 2,
+      "parent_section_id": "chapter-09-huo-you-shi-xiang",
+      "sort_index": 1,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "九、2、或有资产",
@@ -13106,7 +14207,32 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 902
+      "sort_order": 902,
+      "section_id": "chapter-09-huo-you-shi-xiang-huo-you-zi-chan",
+      "level": 2,
+      "parent_section_id": "chapter-09-huo-you-shi-xiang",
+      "sort_index": 2,
+      "auto_numbering": true,
+      "lock_number": false
+    },
+    {
+      "section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang",
+      "section_number": "十",
+      "section_title": "资产负债表日后事项",
+      "account_name": "资产负债表日后事项",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 10,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 999
     },
     {
       "section_number": "十、重要的资产负债表",
@@ -13129,7 +14255,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 1000
+      "sort_order": 1000,
+      "section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-de-zi-chan-fu-zhai-biao-ri-hou-shi-x",
+      "level": 2,
+      "parent_section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "十、资产负债表日后利",
@@ -13154,7 +14286,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 1001
+      "sort_order": 1001,
+      "section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zi-chan-fu-zhai-biao-ri-hou-li-run-fen-pei-qin",
+      "level": 2,
+      "parent_section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang",
+      "sort_index": 1,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "十、其他资产负债表日",
@@ -13179,7 +14317,32 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 1002
+      "sort_order": 1002,
+      "section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qi-ta-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-sh",
+      "level": 2,
+      "parent_section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang",
+      "sort_index": 2,
+      "auto_numbering": true,
+      "lock_number": false
+    },
+    {
+      "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi",
+      "section_number": "十一",
+      "section_title": "关联方及关联交易",
+      "account_name": "关联方及关联交易",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 11,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 1099
     },
     {
       "section_number": "十一、本公司的母公司情",
@@ -13220,7 +14383,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 1100
+      "sort_order": 1100,
+      "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-mu-gong-si-qing-kuang",
+      "level": 2,
+      "parent_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "十一、本公司的子公司情",
@@ -13234,7 +14403,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 1101
+      "sort_order": 1101,
+      "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-zi-gong-si-qing-kuang",
+      "level": 2,
+      "parent_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi",
+      "sort_index": 1,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "十一、本公司的合营企业",
@@ -13289,7 +14464,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 1102
+      "sort_order": 1102,
+      "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-he-ying-qi-ye-lian-ying-qi-ye-qin",
+      "level": 2,
+      "parent_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi",
+      "sort_index": 2,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "十一、本公司的其他关联",
@@ -13311,7 +14492,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 1103
+      "sort_order": 1103,
+      "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-qi-ta-guan-lian-fang-qing-kuang",
+      "level": 2,
+      "parent_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi",
+      "sort_index": 3,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "十一、关联交易情况",
@@ -13448,7 +14635,13 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 1104
+      "sort_order": 1104,
+      "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+      "level": 2,
+      "parent_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi",
+      "sort_index": 4,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "十一、关联方应收应付款",
@@ -13500,7 +14693,32 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 1105
+      "sort_order": 1105,
+      "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
+      "level": 2,
+      "parent_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi",
+      "sort_index": 5,
+      "auto_numbering": true,
+      "lock_number": false
+    },
+    {
+      "section_id": "chapter-12-gu-fen-zhi-fu",
+      "section_number": "十二",
+      "section_title": "股份支付",
+      "account_name": "股份支付",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 12,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 1199
     },
     {
       "section_number": "十二、应收账款",
@@ -13798,7 +15016,13 @@
         "（4）本期实际核销的应收账款",
         "（5）按欠款方归集的期末余额前五名的应收账款",
         "（6）由金融资产转移而终止确认的应收账款"
-      ]
+      ],
+      "section_id": "chapter-12-gu-fen-zhi-fu-ying-shou-zhang-kuan",
+      "level": 2,
+      "parent_section_id": "chapter-12-gu-fen-zhi-fu",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "十二、其他应收款",
@@ -14321,7 +15545,13 @@
         "本期实际核销的其他应收款项",
         "按欠款方归集的期末余额前五名的其他应收款项",
         "企业应披露涉及政府补助的应收款项"
-      ]
+      ],
+      "section_id": "chapter-12-gu-fen-zhi-fu-qi-ta-ying-shou-kuan",
+      "level": 2,
+      "parent_section_id": "chapter-12-gu-fen-zhi-fu",
+      "sort_index": 1,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "十二、长期股权投资",
@@ -14438,7 +15668,13 @@
       ],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 1202
+      "sort_order": 1202,
+      "section_id": "chapter-12-gu-fen-zhi-fu-chang-qi-gu-quan-tou-zi",
+      "level": 2,
+      "parent_section_id": "chapter-12-gu-fen-zhi-fu",
+      "sort_index": 2,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "十二、营业收入与营业成本",
@@ -14643,7 +15879,13 @@
         "履约义务相关信息",
         "分摊至剩余履约义务的交易价格",
         "重大合同变更【或重大交易价格调整】"
-      ]
+      ],
+      "section_id": "chapter-12-gu-fen-zhi-fu-ying-ye-shou-ru-yu-ying-ye-cheng-ben",
+      "level": 2,
+      "parent_section_id": "chapter-12-gu-fen-zhi-fu",
+      "sort_index": 3,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "十二、投资收益",
@@ -14753,7 +15995,13 @@
       ],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 1204
+      "sort_order": 1204,
+      "section_id": "chapter-12-gu-fen-zhi-fu-tou-zi-shou-yi",
+      "level": 2,
+      "parent_section_id": "chapter-12-gu-fen-zhi-fu",
+      "sort_index": 4,
+      "auto_numbering": true,
+      "lock_number": false
     },
     {
       "section_number": "十二、现金流量表补充资",
@@ -14902,7 +16150,32 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 1205
+      "sort_order": 1205,
+      "section_id": "chapter-12-gu-fen-zhi-fu-xian-jin-liu-liang-biao-bu-chong-zi-liao",
+      "level": 2,
+      "parent_section_id": "chapter-12-gu-fen-zhi-fu",
+      "sort_index": 5,
+      "auto_numbering": true,
+      "lock_number": false
+    },
+    {
+      "section_id": "chapter-13-cheng-nuo-shi-xiang",
+      "section_number": "十三",
+      "section_title": "承诺事项",
+      "account_name": "承诺事项",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 13,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 1299
     },
     {
       "section_number": "十三、1",
@@ -14917,7 +16190,32 @@
         "2.经济利益流出不确定性的说明。",
         "3.或有负债预计产生的财务影响，以及获得补偿的可能性；无法预计的，应当说明原因。",
         "（二）企业通常不应当披露或有资产。但或有资产很可能会给企业带来经济利益的，应当披露其形成的原因、预计产生的财务影响等。】"
-      ]
+      ],
+      "section_id": "chapter-13-cheng-nuo-shi-xiang-an-zhao-you-guan-cai-wu-kuai-ji-zhi-du-ying-pi-lu-de-qi-ta-nei-r",
+      "level": 2,
+      "parent_section_id": "chapter-13-cheng-nuo-shi-xiang",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
+    },
+    {
+      "section_id": "chapter-14-qi-ta-zhong-yao-shi-xiang",
+      "section_number": "十四",
+      "section_title": "其他重要事项",
+      "account_name": "其他重要事项",
+      "content_type": "text",
+      "scope": "both",
+      "level": 1,
+      "parent_section_id": null,
+      "sort_index": 14,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_synthesized": true,
+      "tables": [],
+      "text_sections": [],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "sort_order": 1399
     },
     {
       "section_number": "十四、1",
@@ -14932,7 +16230,13 @@
         "2.经济利益流出不确定性的说明。",
         "3.或有负债预计产生的财务影响，以及获得补偿的可能性；无法预计的，应当说明原因。",
         "（二）企业通常不应当披露或有资产。但或有资产很可能会给企业带来经济利益的，应当披露其形成的原因、预计产生的财务影响等。】"
-      ]
+      ],
+      "section_id": "chapter-14-qi-ta-zhong-yao-shi-xiang-cai-wu-bao-biao-zhi-pi-zhun",
+      "level": 2,
+      "parent_section_id": "chapter-14-qi-ta-zhong-yao-shi-xiang",
+      "sort_index": 0,
+      "auto_numbering": true,
+      "lock_number": false
     }
   ]
 }

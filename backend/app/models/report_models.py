@@ -11,7 +11,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
-from sqlalchemy import ForeignKey, Index, String, Text, func, text
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, SmallInteger, String, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -273,6 +273,25 @@ class DisclosureNote(Base):
     year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     note_section: Mapped[str] = mapped_column(String, nullable=False)
     section_title: Mapped[str] = mapped_column(String, nullable=False)
+    # D13 章节序号重构（A.0.1 / V019）：稳定 section_id + 树形层级 + 自动/锁定编号
+    # A.0.5 backfill 完成后会把 section_id / level / parent_section_id 收紧为 NOT NULL
+    section_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True
+    )
+    level: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    parent_section_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True
+    )
+    sort_index: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    auto_numbering: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    lock_number: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    locked_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
     account_name: Mapped[str | None] = mapped_column(String, nullable=True)
     content_type: Mapped[ContentType | None] = mapped_column(
         sa.Enum(ContentType, name="content_type", create_type=False),

@@ -39,23 +39,23 @@
 
 ## Sprint A.0：D13 章节序号重构（基础，1.5 人天）⚠ 必须最先做
 
-- [ ] **A.0.1** V022 migration：DisclosureNote 加 section_id / level / parent_section_id / sort_index / auto_numbering / lock_number / locked_number 字段
-- [ ] **A.0.2** 模板 JSON 字段重构（保留 section_number 作为兼容字段）
-- [ ] **A.0.3** `note_section_numbering_service.py` 核心
-- [ ] **A.0.4** 5 级编号格式注册器（一/(一)/1./(1)/①）
-- [ ] **A.0.5** `migrate_section_number_to_section_id.py` 一次性迁移脚本
-- [ ] **A.0.6** Jinja `ref()` 函数（内部引用自动跟随）
-- [ ] **A.0.7** 单元测试 25 用例（含 scope 切换 / 锁定 / 拖拽 / 重排 / 多层级）
-- [ ] **A.0.8** 历史 173 章节迁移落库（首汽租车 + 重庆和平药房 双项目验证）
-- [ ] **A.0.9** 验收（CI-18/CI-19 + ADR-019/020）
+- [ ] **A.0.1** V019 migration（原计划 V022，因 V001-V018 已落地按真实下一编号）：DisclosureNote 加 section_id / level / parent_section_id / sort_index / auto_numbering / lock_number / locked_number 字段
+- [x] **A.0.2** 模板 JSON 字段重构（保留 section_number 作为兼容字段）
+- [x] **A.0.3** `note_section_numbering_service.py` 核心
+- [x] **A.0.4** 5 级编号格式注册器（一/(一)/1./(1)/①）
+- [x] **A.0.5** `migrate_section_number_to_section_id.py` 一次性迁移脚本
+- [x] **A.0.6** Jinja `ref()` 函数（内部引用自动跟随）
+- [x] **A.0.7** 单元测试 25 用例（含 scope 切换 / 锁定 / 拖拽 / 重排 / 多层级）
+- [x] **A.0.8** 历史 173 章节迁移落库（首汽租车 + 重庆和平药房 双项目验证）
+- [x] **A.0.9** 验收（CI-18/CI-19 + ADR-019/020）
 
 ## Sprint A.1：数据模型 + Migration（2 人天）
 
 - [ ] **A.1.1** row_type/列 sidecar 模型
 - [ ] **A.1.2** binding 多源 fallback 模型
 - [ ] **A.1.3** is_empty / lineage / is_local_override / text_template_vars 字段
-- [ ] **A.1.4** group_note_template_baseline 表 V019
-- [ ] **A.1.5** note_section_version_tree 表 V020
+- [ ] **A.1.4** group_note_template_baseline 表 V020
+- [ ] **A.1.5** note_section_version_tree 表 V021
 - [ ] **A.1.6** 验收（CI-1/CI-2/CI-3）
 
 ## Sprint A.2：动态行/列引擎 + wp_data（2.5 人天）
