@@ -1,6 +1,7 @@
 """NoteConversionService — 国企版与上市版互转
 
 Requirements: 47.1, 47.2, 47.3, 47.4, 47.5, 47.6, 47.7
+Sprint A.5: D14 国企↔上市丝滑切换
 
 基于 `审计报告模板/纯报表科目注释/` 对照模板执行行次映射：
 - 报表行次映射：国企版 row_code → 上市版 row_code（保留金额）
@@ -9,6 +10,13 @@ Requirements: 47.1, 47.2, 47.3, 47.4, 47.5, 47.6, 47.7
 - 转换前影响预览（新增/删除/保留数量）
 - 转换操作支持撤销（保留快照 30 天）
 - 转换完成后自动执行全链路刷新
+
+V2 (Sprint A.5):
+- section_id 匹配（不依赖 section_number 字符串）
+- manual cells 保留：用 merge_table_data_preserving_cell_modes 合并
+- SOE 独有 → archive 到 template_lineage.archived_sections
+- Listed 独有 → 创建空 DisclosureNote
+- format_diff → 调 adapt_table_data
 """
 from __future__ import annotations
 
@@ -466,3 +474,265 @@ class NoteConversionService:
             )
             # Don't fail the conversion if refresh fails
             return False
+
+    # ---------------------------------------------------------------------------
+    # Sprint A.5.1 / A.5.2 / A.5.3 — D14 section_id 驱动的章节互转 V2
+    # ---------------------------------------------------------------------------
+
+    async def preview_conversion_v2(
+        self,
+        project_id: UUID,
+        year: int,
+        target_type: str,
+    ) -> dict[str, Any]:
+        """章节级互转预览（D13 section_id 驱动，不依赖 section_number 字符串）.
+
+        返回：
+        {
+          "current_type": str,
+          "target_type": str,
+          "common_sections": list[dict],     # 共有章节（保留数据）
+          "to_archive_sections": list[dict], # 当前独有 → 归档
+          "to_create_sections": list[dict],  # 目标独有 → 新建
+          "format_diff_sections": list[dict],# 格式略不同 → 字段映射
+          "user_edits_preserved": int,       # manual cells 数量
+          "warnings": list[str],
+        }
+        """
+        if target_type not in ("soe", "listed"):
+            raise ValueError("target_type must be 'soe' or 'listed'")
+
+        project = await self._get_project(project_id)
+        current_type = project.template_type or "soe"
+
+        if current_type == target_type:
+            return {
+                "current_type": current_type,
+                "target_type": target_type,
+                "common_sections": [],
+                "to_archive_sections": [],
+                "to_create_sections": [],
+                "format_diff_sections": [],
+                "user_edits_preserved": 0,
+                "warnings": ["当前已是目标版本，无需切换"],
+            }
+
+        from app.services.note_template_diff import load_diff_data
+        diff_data = load_diff_data()
+
+        # 加载现有 disclosure_notes（按 section_id）
+        from app.models.report_models import DisclosureNote
+        result = await self.db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == year,
+                DisclosureNote.is_deleted == sa.false(),
+            )
+        )
+        existing_notes = {n.section_id: n for n in result.scalars().all() if n.section_id}
+
+        common = diff_data.get("common_sections", [])
+        soe_only = diff_data.get("soe_only_sections", [])
+        listed_only = diff_data.get("listed_only_sections", [])
+        format_diffs = diff_data.get("format_diff_sections", [])
+
+        # 判定归档 vs 新建
+        if current_type == "soe" and target_type == "listed":
+            to_archive = soe_only
+            to_create = listed_only
+        else:
+            to_archive = listed_only
+            to_create = soe_only
+
+        # 统计 manual cells
+        user_edits = 0
+        for note in existing_notes.values():
+            if not note.table_data or not isinstance(note.table_data, dict):
+                continue
+            rows = note.table_data.get("rows") or []
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                modes = row.get("_cell_modes") or {}
+                user_edits += sum(1 for v in modes.values() if v == "manual")
+
+        warnings: list[str] = []
+        if diff_data.get("is_mock"):
+            warnings.append("当前使用 mock 差异数据，正式切换前请等待审计师确认 P-7")
+
+        return {
+            "current_type": current_type,
+            "target_type": target_type,
+            "common_sections": common,
+            "to_archive_sections": to_archive,
+            "to_create_sections": to_create,
+            "format_diff_sections": format_diffs,
+            "user_edits_preserved": user_edits,
+            "warnings": warnings,
+        }
+
+    async def convert_disclosure_notes_v2(
+        self,
+        project_id: UUID,
+        year: int,
+        target_type: str,
+    ) -> dict[str, Any]:
+        """D13 section_id 驱动的章节互转（A.5.1 + A.5.2）.
+
+        步骤：
+        1. 加载 diff_data
+        2. 加载现有 disclosure_notes（按 section_id）
+        3. 共有章节 → 保留 cells（merge 保留 manual/locked）
+        4. 当前独有 → archive 到 template_lineage.archived_sections
+        5. 目标独有 → 创建空章节
+        6. format_diff → adapt_table_data 列重映射
+        7. 更新 project.template_type
+
+        返回：
+        {
+          "common_count": int,
+          "archived_count": int,
+          "created_count": int,
+          "format_adapted_count": int,
+          "user_edits_preserved": int,
+          "errors": list[dict],
+        }
+        """
+        if target_type not in ("soe", "listed"):
+            raise ValueError("target_type must be 'soe' or 'listed'")
+
+        project = await self._get_project(project_id)
+        current_type = project.template_type or "soe"
+
+        if current_type == target_type:
+            return {
+                "common_count": 0, "archived_count": 0, "created_count": 0,
+                "format_adapted_count": 0, "user_edits_preserved": 0, "errors": [],
+            }
+
+        from app.services.note_template_diff import load_diff_data, adapt_table_data
+        from app.models.report_models import DisclosureNote
+        from copy import deepcopy
+
+        diff_data = load_diff_data()
+        errors: list[dict] = []
+
+        # 加载现有 notes
+        result = await self.db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == year,
+                DisclosureNote.is_deleted == sa.false(),
+            )
+        )
+        existing_notes = {n.section_id: n for n in result.scalars().all() if n.section_id}
+
+        common = diff_data.get("common_sections", [])
+        soe_only = diff_data.get("soe_only_sections", [])
+        listed_only = diff_data.get("listed_only_sections", [])
+        format_diffs = diff_data.get("format_diff_sections", [])
+
+        if current_type == "soe" and target_type == "listed":
+            to_archive_ids = {s.get("section_id") for s in soe_only}
+            to_create = listed_only
+        else:
+            to_archive_ids = {s.get("section_id") for s in listed_only}
+            to_create = soe_only
+
+        # format_diff section_ids
+        format_diff_ids = {s.get("section_id") for s in format_diffs}
+
+        # 3. 共有章节 — 保留（manual cells 自动保留因为不动 table_data）
+        common_count = 0
+        user_edits_preserved = 0
+        for sec in common:
+            sid = sec.get("soe_section_id") if current_type == "soe" else sec.get("listed_section_id")
+            if sid and sid in existing_notes:
+                common_count += 1
+                note = existing_notes[sid]
+                if note.table_data and isinstance(note.table_data, dict):
+                    for row in (note.table_data.get("rows") or []):
+                        if isinstance(row, dict):
+                            modes = row.get("_cell_modes") or {}
+                            user_edits_preserved += sum(1 for v in modes.values() if v == "manual")
+
+        # 4. 当前独有 → archive（soft delete + 记录到 lineage）
+        archived_count = 0
+        for sid, note in existing_notes.items():
+            if sid in to_archive_ids:
+                try:
+                    note.is_deleted = True
+                    lineage = dict(note.template_lineage or {})
+                    archived = lineage.get("archived_sections") or []
+                    archived.append({
+                        "section_id": sid,
+                        "archived_at": datetime.now(timezone.utc).isoformat(),
+                        "reason": f"template_conversion_{current_type}_to_{target_type}",
+                    })
+                    lineage["archived_sections"] = archived
+                    note.template_lineage = lineage
+                    archived_count += 1
+                except Exception as exc:
+                    errors.append({"section_id": sid, "phase": "archive", "error": str(exc)})
+
+        # 5. 目标独有 → 创建空章节
+        created_count = 0
+        for sec in to_create:
+            sid = sec.get("section_id")
+            title = sec.get("title") or sec.get("section_title") or ""
+            if not sid:
+                continue
+            try:
+                new_note = DisclosureNote(
+                    project_id=project_id,
+                    year=year,
+                    note_section=sid,  # legacy compat
+                    section_title=title,
+                    section_id=sid,
+                    level=2,
+                    sort_index=0,
+                    auto_numbering=True,
+                    lock_number=False,
+                    status="draft",
+                    is_empty=True,
+                )
+                self.db.add(new_note)
+                created_count += 1
+            except Exception as exc:
+                errors.append({"section_id": sid, "phase": "create", "error": str(exc)})
+
+        # 6. format_diff → adapt_table_data
+        format_adapted_count = 0
+        for fd in format_diffs:
+            sid = fd.get("section_id")
+            if not sid or sid not in existing_notes:
+                continue
+            note = existing_notes[sid]
+            if not note.table_data:
+                continue
+            target_format = fd.get("listed_format") if target_type == "listed" else fd.get("soe_format")
+            field_mapping = fd.get("field_mapping") or {}
+            if not target_format and not field_mapping:
+                continue
+            try:
+                adapted = adapt_table_data(note.table_data, target_format or {}, field_mapping)
+                note.table_data = adapted
+                format_adapted_count += 1
+            except Exception as exc:
+                errors.append({"section_id": sid, "phase": "adapt", "error": str(exc)})
+
+        # 7. 更新 project.template_type
+        project.template_type = target_type
+        try:
+            await self.db.flush()
+        except Exception as exc:
+            errors.append({"phase": "flush", "error": str(exc)})
+
+        return {
+            "common_count": common_count,
+            "archived_count": archived_count,
+            "created_count": created_count,
+            "format_adapted_count": format_adapted_count,
+            "user_edits_preserved": user_edits_preserved,
+            "errors": errors,
+        }
