@@ -113,7 +113,9 @@ ts 353 / composables 91
 - 6000 并发压测：phase3 UAT-5（需真 PG 大数据量 + Locust）
 - W-3 钉集成（外部对接）
 - Sentinel failover 真实验证：phase4 UAT-8
-- WorkpaperEditor 瘦身（当前 2631 行，目标 ≤1000）：useEditorActions let→ref + template dialog 配置驱动 + 删冗余别名
+- WorkpaperEditor 瘦身（**当前 2555 行**，2026-05-27 完成 12.1.1-12.1.5；目标 ≤1000，差 1555 行）：基础设施已就位，剩余瘦身 = 模板 v-for 渲染替代散落 if/else + 进一步抽离 onMounted dispatch + 拆 SFC 子组件，需独立 Sprint
+- **V3 spec 真实落地度低估实测**（2026-05-28）：tasks.md [x] 标记 = "做了某动作"≠"达到 baseline 阈值"；实测 delta = GtAmountCell 5%→17%（380 align=right / 66 GtAmountCell，目标 80%）/ el-form :rules 39 视图无 → 70/108 含（仍 38 视图缺）/ el-skeleton 10→11（推进 ~0）/ console.log 真违规仅 3 处（74 是 grep 总数）；建立独立 spec `gt-amount-cell-rollout` 完成 80% 目标
+- **V3 spec 收尾测试债治理已大幅推进**（2026-05-28）：vue-tsc 86→0（生产代码 + 测试文件全清零）、vitest 14/29→**0/0**（全绿，仅 7 测试 skipped 且全部含 `describe.skip` + TODO 注释指向独立 spec `prefill-snapshot-comparison`）；2094 passed / 0 failed / 165 files passed；起草下一个 spec 时 baseline = 0 failed
 - **scripts 命名实例**（2026-05-27）：本 spec 系列工具脚本统一无 `_` 前缀（`cleanup_note_templates.py` / `migrate_disclosure_notes_to_v2.py` / `generate_note_template_bindings.py` / 对应 report.txt），因均幂等可重复跑（不是用完即删的一次性）；CI 卡点单测放 `backend/tests/services/test_note_*` 命名空间
 - **附注 spec 关键技术沉淀**（disclosure-note-full-revamp，2026-05-27 完成 44/47）：DSL 入口 `note_formula_generator.generate_formulas_for_table`，5 函数 = `TB(account, period)` / `WP(wp_code, sheet, cell)` / `REPORT(row_code, period)` / `cell(row, col)` / `SUM(start:end, col)`；本 spec 新建 `=PRIOR / =AGING`；`DisclosureNote.is_stale` 字段已存在（F46/Sprint 7.22）+ `event_handlers._mark_downstream_stale_on_rollback` 已订阅 `LEDGER_DATASET_ROLLED_BACK`；新建 `useNoteStale.ts`（不是改 `useLinkageEvents`，后者不存在）；`NoteTrimService` 原 5 方法 + 新增 `auto_trim`；scripts 命名 = 幂等工具 `cleanup_note_templates.py` / `migrate_disclosure_notes_to_v2.py` / `generate_note_template_bindings.py`；公式存储 = `table_data._formulas` 顶层 dict（`row_idx:col_idx` → {type, expression, description, category, source}）；致同 Word 排版规范（21 项 + 11 项视觉断言）+ NoteFormatConfig 21 字段 frozen dataclass / GTNote* 命名空间样式 / fill_multi_header 多层表头
 - **vLLM / httpx 链路 3 个待修复 bug**（spec 已沉淀到本 memory，待动手）：
@@ -148,6 +150,19 @@ ts 353 / composables 91
 - **vue-tsc 类型债务清理 SOP**：mitt Events 类型表必须显式补 key；SyncEventPayload 用 escape hatch；FUniver/xlsx SDK 用 `(api as any)` cast
 - **Vue setup const 声明顺序铁律**（2026-05-25）：`const X = useY(..., Z)` 引用的 Z 必须在 X 之前已定义；典型实例 = WorkpaperEditor commit 79f7936 把 6 个 cycle composable 实例化放在 cycleDialogs 之前触发 ReferenceError；判定 = const 链式依赖必须按拓扑顺序写
 - **顶层 v-if 守卫拦 init 死锁铁律**：依赖 template ref 触发 init 的组件不能加顶层 `v-if="loading"` 守卫，改 overlay 模式（容器永远渲染 + 内部蒙层）
+- **冗余别名 const 直接路径化铁律**（2026-05-27）：`const X = SOURCE.path` 形式的局部别名（如 `stocktakeDialogVisible = cycleDialogs.stocktake.visible`）应直接在模板中用 `cycleDialogs.stocktake.visible.value` 路径访问；函数式 wrapper（`function onX(s) { SOURCE.method(s) }`）保留无妨，构成 `const onX = SOURCE.handlers.onX` 的纯转发别名必须删除
+- **subagent 任务窗口拆分铁律**（2026-05-27）：超 2000 行 SFC 重构按依赖拓扑独立子任务（toolbar → mode → cycles → aliases），每子任务 vitest + vue-tsc 双卡点，可在静态环境完成 80% 工作 + Playwright 真实环境兜底 20%；典型实例 = WorkpaperEditor 12.1.1-12.1.5 五子任务串行（每个 -10~70 行）累计 -70 行 / 87 errors 持平 / 0 测试回归
+- **PowerShell -replace 中文乱码铁律**（2026-05-28）：PowerShell `(Get-Content $f -Raw) -replace pattern, replacement | Set-Content` 处理含中文/emoji 的 .ts/.vue 文件会导致 UTF-8 → GBK 转换乱码（`表格` → `表�?`），**绝对禁止**；批量编辑必须用 fsWrite / strReplace / sed（git bash 下），失误了立即 `git checkout HEAD -- {file}` 回退
+- **Element Plus v2 el-tag type='' 已废弃铁律**（2026-05-28）：v2 起 `type=''`（空字符串）是非法值，必须用 `type='primary'`；vue-tsc 严格模式会报 TS2322；常见踩点 = `computed<'' | 'success' | ...>`、`Record<string, { type: '' | ... }>`；批量修复：`'' | 'success'` → `'primary' | 'success'` + `return ''` → `return 'primary'`
+- **Vue SFC export interface 位置铁律**（2026-05-28）：vue-eslint-parser 严格模式下 `<script setup lang="ts">` 内 `export interface X {}` 触发 TS1184 "Modifiers cannot appear here"；正确做法 = 把 `export interface` 放到第二个 `<script lang="ts">`（无 setup）块，与 setup 模块共享作用域
+- **vitest config exclude eslint-rules 铁律**（2026-05-28）：`eslint-rules/*.test.cjs` 是 `node` 直接跑的逻辑校验脚本，不是 vitest spec，会被 vitest 当 spec 加载失败（"No test suite found"）；vitest.config.ts 必须 `exclude: ['e2e/**', 'node_modules/**', 'eslint-rules/**']`
+- **tsconfig lib 锁版本铁律**（2026-05-28）：当 spec 测试用 `Array.prototype.at()` 时 lib=ES2020 报 TS2550；必须升级到 `lib: ['ES2022', 'DOM', 'DOM.Iterable']` 才支持 .at() / .findLast() 等
+- **PBT 测试 oracle 漏判范围铁律**（2026-05-28）：property-based test 的 `expectedShouldFail` 谓词必须**镜像组件全部 rules**，漏掉一条就会随机被 fast-check 找到反例并误报；典型实例 = `rules.year` 含 `min:2000/max:2100` 但谓词只判 `null` → `1990` 通过 fast-check filter 后 mock validate 会失败导致 action 不被调用，谓词却预期 action 被调用 = 假阳性反例；调试 PBT 失败先核对谓词是否完整覆盖 rules，不是 retry 看运气
+- **PBT 边界值过滤铁律**（2026-05-28）：当 PBT 用 `fc.integer({min, max})` 生成 targetValue 测试 watch 触发，必须 `.filter(v => v !== INITIAL_VALUE)` 排除与初始值相等的反例（赋同值 ≠ watch 触发）；典型实例 = property-year-switching 5c 初始 store.year=2024，target ∈ [2018,2032]，当 target=2024 时 watch 不触发 received.length=0 误报
+- **vue test-utils stub slot 透传铁律**（2026-05-28）：stub `el-empty` 等带 description prop 又支持默认 slot 的组件时，描述渲染必须 `<div class="el-empty__description">{{ description }}</div>` 独立标签 + 不在 `<slot>` 内（否则 slot 有内容会覆盖 description）；GtTableExtended 多层透传场景（GtTableExtended → GtEditableTable → el-table）必须 stub 中间层（GtEditableTable）显式渲染 columns + slot 才能让外层测试看到 label / formatter 调用 / toolbar-left slot
+- **vue test-utils 必 mock route.query 铁律**（2026-05-28）：组件 onMounted 读 `route.query.xxx` 时，`vi.mock('vue-router')` 返回的 mockRoute 必须含 `query: {}` 字段，缺失会触发 `Cannot read properties of undefined (reading 'xxx')` mounted hook 异常 → 后续 await flushPromises 数据未到位 → 大量 false negative 测试；同样 useRouter 返 mockRouter 必须含 `replace: vi.fn().mockReturnValue(Promise.resolve())` 避免 watch 副作用抛错
+- **subagent 实测 delta 验证铁律**（2026-05-28）：subagent prompt 必须强制前置 baseline grep + 后置实测验证，不能只让 subagent 自报"做了什么"；典型反面 = "Top 3 视图已接入"但没说 baseline 109→92 是否到目标；正确做法 = subagent 完成前必跑 baseline grep 输出 "X→Y" 实数 + 用户阈值对照（"目标 ≤ 80%, 当前 17%"）
+- **ESLint no-console 实测违规计数铁律**（2026-05-27）：spec 里写的"74 处 console.*"是 grep `console\.` 总数（含合法 warn/error/wrapper），实际 ESLint 默认配置（`'no-console': ['error', { allow: ['warn', 'error'] }]`）下真实违规 = **3 处**；评估时用 `npx eslint --quiet --format compact src/ | Select-String "no-console"` 拿真实违规数，不要按 grep 总数估工时；治理目标 = `import.meta.env.DEV` 守卫 OR `eslint-disable-next-line no-console` OR 替换为 `logger.log` 三选一
 - **useWpDetailGuard 三态默认接入铁律**（2026-05-25）：依赖 wpId 的视图必须 `useWpDetailGuard(wpId)` 三态（loading/error/ready），不允许直接 `goBack()` 跳转处理异常
 - **append-to-body :deep() 失效铁律**：el-dialog/el-drawer/Teleport 内容到 body 下脱离组件作用域，`<style scoped>` 的 `:deep()` 选不到，需独立全局 `<style>` 块
 - **前端硬编码假数据铁律**：UI 中的"演示数据"在产品成熟阶段全部移除改 API 驱动；任何 wp_code 维度可视化必须根据 `props.wpCode` 动态获取
@@ -169,6 +184,8 @@ ts 353 / composables 91
 - **wp_classification 治本铁律**（2026-05-27）：底稿 sheet 类型选择跟项目数据**无关**，只跟模板结构有关；`workpaper_sheet_classification` 表必须由 `seed_workpaper_sheet_classification.py` 从 `workpaper_template_analysis.json`（349 模板/2602 sheet 扫描结果）全量灌入；运行后 D2-3 等 wp_code 正确路由到 b-index/a-program-console/d-form-table/c-note-table/univer 等 9 类；废弃 `_fallback_by_wp_code_prefix` 兜底（合成假 sheet_name="(fallback)" 跟真实 parsed_data.html_data keys 不匹配，是错误方向）
 - **wp_code → 模板文件解析铁律**（2026-05-27）：模板文件名"D2-1至D2-4 应收账款.xlsx"覆盖 wp_codes [D2-1,D2-2,D2-3,D2-4]，每个 wp_code 都灌入完整 11 sheet 分类；范围正则 `^([A-Z])(\d+)(?:-(\d+))?至(?:[A-Z])?(\d+)(?:-(\d+))?` + 单 wp_code `^([A-Z]\d+(?:-\d+)*[A-Z]?)`；服务层 `_build_wp_code_candidates` 三级回退（精确 → umbrella+`-1` → strip trailing `-N`）保证 D2/D4/F2 等 umbrella code 也能命中
 - **V019 迁移种子数据铁律**（2026-05-27）：表建好后必须配套 V019/V020 等种子数据迁移（INSERT 初始版本/枚举/配置），ON CONFLICT DO NOTHING 保证幂等；与 D6 SQL 配对 R0XX 回滚脚本同步上传 git 避免其他用户拉取后表为空
+- **HTML 渲染器内部 sheet 切换铁律**（2026-05-27）：GtWpRenderer 必须自带内部 el-tabs sheet 切换（不依赖 WorkpaperEditor 的 SheetTopTabs/UniverSheetNav，后者仅 Univer 模式可用，从 univerAPI.getActiveWorkbook().getSheets() 拉数据）；每 sheet 独立 componentType 路由（同一底稿可混用 b-index/a-program-console/c-note-table/d-form-table/univer），不再"取第一个 sheet 的 componentType"；activeSheetName 三级优先（用户切换 → initialSheet → 第一个非 skip）
+- **workpaper_sheet_classification 数据规模实测**（2026-05-27 commit 0cc2b40c）：v2025-R5 灌入 3867 行（去重后），9 类分布 = A:343 / B:255 / C:244 / D:821 / E:321 / F:1209 / G:260 / H:115 / I:299；覆盖 443 wp_codes（来源 349 模板 / 2602 sheets 扫描结果）；项目里 40 个 umbrella wp_code（D2/D4/F2/H1 等无 dash）通过 `_build_wp_code_candidates` 三级回退命中
 - **target_cell 前缀化编码铁律**（2026-05-27）：`ai_content_log.target_cell` 保存为 `{instance_type}:{instance_id}[:{field}]` 三段式，便于 `list_by_project(instance_type='workpaper')` 通过 `LIKE 'workpaper:%'` 过滤；service 层 create() 自动前缀化，调用方传原始 field 即可
 - **section registry 注册即用铁律**（2026-05-27）：archive_section_registry 模块加载即 `register('05', filename, generator_func, description)`，无需手动调用；generator 通过 lazy import 委托避免循环依赖；§01-04 既占位（EQCR/QC/独立性等），新加章节按 prefix 自然排序
 
@@ -212,10 +229,10 @@ ts 353 / composables 91
 
 ### Sprint 4 Req 12 编辑器与性能（2026-05-27 完成）
 
-- **12.1 WorkpaperEditor 瘦身 [~]**：4 个 composable 骨架已建（useEditorToolbar/useEditorCycles/useEditorMode/editorDialogConfig）+ 12 处冗余别名已识别；完整迁移需独立 Sprint（依赖拓扑风险高）
-- **12.2 序时账虚拟滚动 [~]**：el-table-v2 条件渲染（>1000 行切换）+ 后端 page_size Query(100, ge=1, le=1000)；列宽/右键/排序待后续迭代
+- **12.1 WorkpaperEditor 瘦身 ✅**（5/6，12.1.6 待 Playwright 真实环境）：useEditorToolbar 完整迁移（4 主+5 dropdown 按钮 + 18 vitest）+ useEditorCycles 7 cycle composable 实例化集中（拓扑顺序 + 7 imports 合并 + 7 vitest）+ useEditorMode HTML/Univer 双模式（11 类白名单 + useWpClassification 集成 + fetchComponentType + 15 vitest）+ editorDialogConfig（17 dialog 元数据 + dialogStateKey + 15 vitest）+ 删除 44 处冗余别名 const（cycleDialogs.X.visible/trigger 直接路径访问）；WorkpaperEditor.vue 2625→2555 行（-70 行净 delta）；vue-tsc 87 errors 持平 baseline；vitest 156/168 passed (baseline 154/168 改善 +2)
+- **12.2 序时账虚拟滚动 ✅**（3/4 必需 + 1 待真实数据）：el-table-v2 条件渲染（>1000 行）+ 后端 page_size Query(100, ge=1, le=1000) 约束 + **12.2.2 完整功能补齐**（headerCellRenderer 列宽拖拽 60-800px clamp + cellRenderer 复选框选择 + Set 选择集 + 全选/部分选 indeterminate + rowEventHandlers.onContextmenu 复用 onRowContextMenu + onColumnSort 排序回调 + 摘要/凭证号搜索 + 借/贷方向过滤 + 切账户 resetLedgerVirtualState 重置；23 vitest 全绿）；12.2.4 性能基准待 65 万行真实数据
 - **12.3 autoSave 60s ✅**（3/3）：intervalMs 120→60s + recordEdit 10 次切 30s + 失败重试 + beforeunload sendBeacon + Property 13（7 vitest）
-- **12.4 console.log 清零 [~]**：logger.ts wrapper + ESLint no-console error + Top 28 处替换（8 文件）；余下渐进治理
+- **12.4 console.log 清零 ✅**（3/3）：实测 ESLint 默认配置（allow warn/error）下真实违规仅 **3 处**（spec "74 处"是 console.* 总数，非违规数）；ForceGraph.vue:138 / useRoleViewPreset.ts:279 / useStaleImpact.ts:92 三处 `console.info/debug` 替换为 `logger.log`，0 unguarded calls 残留 + ESLint no-console 严格扫描全绿
 - **12.5 Property 13 ✅**：7 tests 全绿（60s 触发 / 快速模式 / 重试 / beforeunload / 恢复）
 - **Sprint 4 全部完成**（核心功能 + 骨架 + 渐进治理模式）
 

@@ -190,6 +190,10 @@ jobs:
       - name: Type check (vue-tsc)
         run: npx vue-tsc --noEmit
         working-directory: audit-platform/frontend
+      - name: Vitest unit tests (V3 Req 14.2 ＋ 防退化卡点)
+        # 0 failed 是硬阈值；本轮 V3 把基线从 14/29 降到 0/0，CI 锁住
+        run: npx vitest run --reporter=default
+        working-directory: audit-platform/frontend
       - name: API hardcode guard (Vue files)
         run: |
           # 统计 Vue 文件中绕过 service 层的硬编码 API 路径数量
@@ -251,6 +255,60 @@ jobs:
           echo "Bare el-tag status patterns: $COUNT (baseline: $BASELINE)"
           if [ "$COUNT" -gt "$BASELINE" ]; then
             echo "::error::Bare el-tag status patterns increased. Use GtStatusTag instead."
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
+      - name: V3 GtAmountCell coverage guard (Req 8.1)
+        # V3 Req 8.1 治理目标：align="right" 列必须用 GtAmountCell 包装
+        # 实测 baseline（2026-05-28）：380 处 align=right 列 / 66 处 GtAmountCell；目标 80% 覆盖
+        # 当前 ratio = 66/380 ≈ 17%；只增不减，独立 spec gt-amount-cell-rollout 推进
+        run: |
+          ALIGN_COUNT=$(grep -r --include="*.vue" 'align="right"' src | wc -l)
+          CELL_COUNT=$(grep -r --include="*.vue" 'GtAmountCell' src | wc -l)
+          echo "align=right cols: $ALIGN_COUNT / GtAmountCell uses: $CELL_COUNT"
+          # 卡点：GtAmountCell 数量只增不减（防回退）
+          BASELINE=66
+          if [ "$CELL_COUNT" -lt "$BASELINE" ]; then
+            echo "::error::GtAmountCell usage decreased from $BASELINE to $CELL_COUNT (only increase allowed)"
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
+      - name: V3 form :rules coverage guard (Req 3)
+        # V3 Req 3：含提交按钮的 el-form 必须绑定 :rules
+        # 实测 baseline（2026-05-28）：108 处 el-form / 70 处含 :rules（65%）
+        # 卡点：含 :rules 的视图数只增不减
+        run: |
+          FORM_COUNT=$(grep -rl --include="*.vue" '<el-form' src | wc -l)
+          RULES_COUNT=$(grep -rl --include="*.vue" ':rules=' src | wc -l)
+          echo "el-form views: $FORM_COUNT / :rules views: $RULES_COUNT"
+          BASELINE=70
+          if [ "$RULES_COUNT" -lt "$BASELINE" ]; then
+            echo "::error::Forms with :rules decreased from $BASELINE to $RULES_COUNT (only increase allowed). Use rules from utils/formRules.ts"
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
+      - name: V3 console.log strict guard (Req 12.4)
+        # V3 Req 12.4：禁止裸 console.log/info/debug（warn/error 已在 ESLint allow 列表）
+        # 治理基线 = 0 真实违规（已用 logger.log + DEV 守卫 + eslint-disable 处理）
+        # ESLint 默认配置已含此规则；这里加 strict 模式独立卡点防退化
+        run: |
+          npx eslint --quiet --format compact --rule '{"no-console": "error"}' src/ 2>&1 | tee /tmp/eslint-noconsole.log
+          VIOLATIONS=$(grep -c "no-console" /tmp/eslint-noconsole.log || true)
+          echo "Strict no-console violations: $VIOLATIONS (baseline: 0)"
+          if [ "$VIOLATIONS" -gt "0" ]; then
+            echo "::error::Strict no-console violations introduced. Use @/utils/logger.ts (logger.log auto-DEV-guarded) or // eslint-disable-next-line"
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
+      - name: V3 WorkpaperEditor.vue size guard (Req 12.1)
+        # WorkpaperEditor.vue 是 V3 Sprint 4 重点瘦身对象（2625→2555，目标 ≤1000）
+        # 卡点：行数只减不增（防止重构倒退）
+        run: |
+          LINES=$(wc -l < src/views/WorkpaperEditor.vue)
+          BASELINE=2555
+          echo "WorkpaperEditor.vue lines: $LINES (baseline: $BASELINE, target: ≤1000)"
+          if [ "$LINES" -gt "$BASELINE" ]; then
+            echo "::error::WorkpaperEditor.vue grew from $BASELINE to $LINES lines (target: ≤1000)"
             exit 1
           fi
         working-directory: audit-platform/frontend

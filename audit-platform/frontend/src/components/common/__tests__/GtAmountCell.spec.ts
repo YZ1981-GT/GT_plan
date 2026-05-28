@@ -28,7 +28,7 @@ const STUBS = {
 
 function makeWrapper(props: Record<string, unknown> = {}) {
   return mount(GtAmountCell, {
-    props,
+    props: props as any,
     global: { stubs: STUBS },
   })
 }

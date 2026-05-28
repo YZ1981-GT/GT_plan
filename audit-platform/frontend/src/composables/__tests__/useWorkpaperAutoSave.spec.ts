@@ -39,7 +39,7 @@ describe('Property 13: autoSave 不丢失不变量', () => {
       configurable: true,
     })
     // Remove any leftover beforeunload listeners
-    window.removeAllListeners?.('beforeunload')
+    ;(window as any).removeAllListeners?.('beforeunload')
   })
 
   afterEach(() => {

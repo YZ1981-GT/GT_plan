@@ -66,7 +66,7 @@ describe('confirmDelete', () => {
 
     await confirmDelete({ name: '底稿 D2', recoverable: true })
 
-    const [html] = spy.mock.calls[0] as [string]
+    const [html] = spy.mock.calls[0] as unknown as [string]
     expect(html).toContain('删除后可在回收站恢复')
   })
 
@@ -77,7 +77,7 @@ describe('confirmDelete', () => {
 
     await confirmDelete({ name: '永久档案', recoverable: false })
 
-    const [html] = spy.mock.calls[0] as [string]
+    const [html] = spy.mock.calls[0] as unknown as [string]
     expect(html).toContain('此操作不可恢复')
   })
 
@@ -92,7 +92,7 @@ describe('confirmDelete', () => {
     }
     await confirmDelete(opts)
 
-    const [html] = spy.mock.calls[0] as [string]
+    const [html] = spy.mock.calls[0] as unknown as [string]
     expect(html).not.toContain('<script>alert(1)</script>')
     expect(html).toContain('&lt;script&gt;')
     expect(html).toContain('影响 &amp; 关联')

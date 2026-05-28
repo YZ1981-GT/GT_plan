@@ -150,7 +150,7 @@ const localRefs = computed(() => {
 
 const sourceChip = computed(() => {
   if (!props.source) return null
-  const map: Record<string, { type: '' | 'success' | 'warning' | 'info'; label: string }> = {
+  const map: Record<string, { type: 'primary' | 'success' | 'warning' | 'info'; label: string }> = {
     univer_snapshot: { type: 'success', label: '📥 实时' },
     xlsx_recomputed: { type: 'warning', label: '⚙ 重算' },
     xlsx_cache: { type: 'info', label: '📋 模板' },

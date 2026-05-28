@@ -339,7 +339,7 @@ WHERE l.project_id = :pid AND l.year = :yr
 
 ## Subagent 调用约束（spec 工作流，三轮复盘 2026-05-16 沉淀）
 
-每次 invokeSubAgent 的 prompt 必须包含以下 4 类边界子句，避免 subagent 自作主张越权：
+每次 invokeSubAgent 的 prompt 必须包含以下 5 类边界子句，避免 subagent 自作主张越权：
 
 1. **范围锁定**：明确列出"本任务做什么"和"本任务不做什么"。如果发现 spec 范围扩张需求（如测试期望反推 production 加权限守卫），**只报告不实施**——由 orchestrator 决定是否在新任务里处理。
 
@@ -350,7 +350,13 @@ WHERE l.project_id = :pid AND l.year = :yr
 
 3. **状态变更可审计**：TD 项 / UAT 状态 / spec 章节措辞变更必须附 commit-style note：日期 / 触发任务编号 / 测试结果摘要。禁止单方面声明"已重新完成"而无审计痕迹。
 
-4. **结构化返回**：禁止大段总结，强制返回 JSON-style 字段：
+4. **实测 delta 验证**（V3 复盘 2026-05-28 沉淀）：批量治理任务必须前置 baseline grep + 后置实测验证：
+   - 任务起始：跑 baseline grep（如 `grep "align=right" | wc -l = 109`）
+   - 任务结束：再跑同 grep（如得 92），输出 "X→Y" 实数 + 用户阈值对照（"目标 ≤ X%"）
+   - 禁止只汇报"已完成 N 视图"，必须给出**全局命中数变化**和**完成度百分比**
+   - 反例：subagent 报"Top 3 视图已接入示范"但未提"baseline 109→92 仍距目标 60% 远"
+
+5. **结构化返回**：禁止大段总结，强制返回 JSON-style 字段：
    ```
    {
      "files_created": [...],
@@ -359,7 +365,14 @@ WHERE l.project_id = :pid AND l.year = :yr
      "vue_tsc_status": "exit 0 / errors",
      "production_bugs_found": [...],   // 不修，仅列出
      "scope_expansion_requests": [...], // 测试中发现的 spec 扩张需求
-     "td_status_changes": [...]        // 含 commit-style note
+     "td_status_changes": [...],       // 含 commit-style note
+     "delta_measurements": {           // V3 沉淀新字段
+       "baseline_metric": "align=right cols",
+       "before": 109,
+       "after": 92,
+       "target": 22,
+       "completion_ratio": "16%"
+     }
    }
    ```
 
@@ -367,6 +380,11 @@ WHERE l.project_id = :pid AND l.year = :yr
 - subagent 给 `gt_coding.py` mutation 端点加 `require_role` 守卫（任务只要求"核实端点存在性"，是范围扩张）
 - subagent 修复 `gt_coding_service.delete_custom_coding` 的 `soft_delete()` bug 与测试改动混在同一 commit
 - subagent 划掉 tasks.md 的 TD 项 + 改 UAT-9 措辞，无审计痕迹
+
+**反例**（V3 Sprint 4 12.4.1 console.log 治理）：
+- subagent 报"Top 28 处已替换（8 文件）"，未提 ESLint 实际违规仅 3 处（"74 处"是 grep 总数包括合法 warn/error）
+- 导致用户问"完成了吗"我答"渐进治理中"，实际严格违规已经 0 但 spec 标 [~]
+- 用§4 实测 delta 验证可避免：subagent 必须给 `npx eslint --rule '{"no-console": "error"}' src/` 输出 = 0 violation
 
 ## PBT 反模式识别清单（三轮复盘 2026-05-16 沉淀）
 
@@ -408,6 +426,50 @@ WHERE l.project_id = :pid AND l.year = :yr
 - 标 [x] 前必须跑 pytest 验证（"代码文件存在" ≠ "功能可用"）
 - 跨文件字段/枚举假设必须 grep 核对（凭印象写 = runtime 失败）
 - 测试 fixture 复用邻居文件的 `db_session` 模板（conftest.py 不提供 db_session）
+
+### Spec 三件套质量铁律（2026-05-28 V3 复盘沉淀）
+
+**①「3 分钟可行性探测」铁律**：requirements.md 每条 Req 起草前必须做最小可行性证据，写到 design.md 对应章节。具体动作三选一：
+- grep 实测命中数（如"console.log 74 处"实际 ESLint 违规仅 3 处，差 25 倍）
+- 跑 5 行 SDK 原型（如 el-table-v2 是否原生支持行选择/列宽拖拽，结论：全部不支持）
+- 读 1 段官方文档/类型定义（如 el-tag type='' 在 v2 已废弃必须 'primary'）
+- 没探测就估工时 = 工时严重失真（实操中观察到 5x-25x 偏差）
+
+**②「baseline 总数 vs 违规数」严格区分铁律**：requirements.md 实测基线必须区分两类数字，禁止混用：
+- **总数**（grep 物理出现次数）：用于度量代码规模、覆盖面广度
+- **违规数**（ESLint/ruff/policy 实际报错数）：用于度量治理目标
+- 任务描述写"74 处 → 0"易引发"做了几十处都不到目标"的错觉，写"3 处违规 → 0"才是治理终点
+
+**③「TS 类型预演」铁律**：design.md 涉及第三方 SDK / 跨组件 props 时必须写 5-10 行 TypeScript 类型签名片段，不能只写文字。本轮血泪：
+- el-table-v2 `rowEventHandlers` 是对象不是函数（两种签名差异隐藏在 .d.ts 里）
+- `sortBy` prop 类型用 string literal 'asc' 必须 cast 或 import enum
+- `Array.at()` 需 ES2022 lib（tsconfig 升级才能用）
+- 缺类型预演 = 实施时大量临时返工
+
+**④「[~] 状态语义」严格铁律**：tasks.md 里禁止把"渐进治理"和"等真实环境"混用 `[~]`，必须语义化拆分：
+- `[partial]` = 已落实主路径，剩缘 case（不阻塞父任务关闭计算）
+- `[blocked-env]` = 等真实环境（playwright / dev server / 真合伙人，不阻塞 merge）
+- `[ ]` = 真未做（阻塞父任务关闭）
+- `[ ]*` = 可选（独立 Sprint 处理）
+- 用户/Code Review 问"完成了吗"时，`[partial]` 答"主路径完成"、`[blocked-env]` 答"代码完成待真实环境"、`[ ]` 答"未做"，避免"完成了但又没完成"的模糊表述
+
+**⑤「真环境 UAT 拆独立 spec」铁律**：起草阶段把这类任务反向决策：
+- 静态可验证（vitest/pytest/grep/getDiagnostics） = 留在主 spec
+- 必须 dev server 跑 = 拆 `{spec}-uat` 独立 spec（**不阻塞主 spec 关闭**）
+- 必须真合伙人/真大数据 = 拆 `{spec}-acceptance` 独立 spec
+- 否则父任务永远 `[ ]`，INDEX.md 视觉假象"主 spec 未完成"
+
+**⑥「gaps.md 反向记录」铁律**：本轮多次"以为完成实际未完成"的根因 = memory.md 只记我做了什么，缺反向记录。每次 `[x]` 标记前必须问 3 个反向问题：
+- 我跳过了什么 case？（如 12.4.1 跳过了 `console.warn/error` 治理）
+- 我妥协了什么质量？（如 12.1 WorkpaperEditor 2625→2555 仅 -70 行，远未到目标 ≤1000）
+- 我留了什么债？（如 14 个 vitest 失败转入下个 spec）
+- 答案写入 spec 目录下 `gaps.md`（与 requirements.md 平级）；spec 关闭时 gaps.md 自然成为下个 spec 的 input
+
+**⑦「CI 双卡点」立即兜底铁律**：本轮发现 vue-tsc 86 + vitest 14/29 都是长期未发现的债，根因 = CI 没卡点。立即必须建：
+- frontend-ci: `npx vue-tsc --noEmit` errors > 0 → red
+- frontend-ci: `npx vitest run` failed > 0 → red（不允许"基线已知失败"豁免，每个失败强制 .skip + GitHub issue）
+- backend-ci 已做到，frontend 必须立即追上
+
 - 集成测试 docstring 强制 `# Validates: Property X` 反向映射
 - spec 不硬编码数字：task/Property/验收标准必须运行时表达式，narrative 允许快照值
 

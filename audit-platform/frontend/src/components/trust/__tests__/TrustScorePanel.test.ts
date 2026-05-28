@@ -16,7 +16,7 @@ import TrustScorePanel from '../TrustScorePanel.vue'
 import PenetrationTab from '../PenetrationTab.vue'
 import HistoryTab from '../HistoryTab.vue'
 import AiTracesTab from '../AiTracesTab.vue'
-import FormulaTab from '../FormulaTab.vue'
+import FormulaTab from '../TrustFormulaTab.vue'
 import ConsistencyTab from '../ConsistencyTab.vue'
 
 // Mock api

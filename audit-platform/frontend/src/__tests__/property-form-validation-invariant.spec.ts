@@ -92,7 +92,13 @@ describe('Property 3: 表单校验不变量', () => {
     await fc.assert(
       fc.asyncProperty(
         fc.record({
-          username: fc.oneof(fc.constant(''), fc.constant(null), fc.string({ minLength: 1, maxLength: 10 })),
+          // 注：element-plus required 规则只在 '' / null / undefined 时报错，
+          // 单空格 ' ' 等纯空白被视为有效；filter 掉纯空白避免假阳性反例
+          username: fc.oneof(
+            fc.constant(''),
+            fc.constant(null),
+            fc.string({ minLength: 1, maxLength: 10 }).filter(s => s.trim().length > 0),
+          ),
           email: fc.oneof(fc.constant(''), fc.constant('test@x.com'), fc.constant('invalid')),
           year: fc.oneof(fc.constant(null as any), fc.integer({ min: 1990, max: 2100 })),
         }),
@@ -113,7 +119,9 @@ describe('Property 3: 表单校验不变量', () => {
             isEmpty(model.username) ||
             isEmpty(model.email) ||
             model.year === null ||
-            model.email === 'invalid'
+            model.email === 'invalid' ||
+            // year 数字必须在 [2000, 2100]（rules.year 的 type=number+min/max 校验）
+            (typeof model.year === 'number' && (model.year < 2000 || model.year > 2100))
 
           const result = await submit(action)
 

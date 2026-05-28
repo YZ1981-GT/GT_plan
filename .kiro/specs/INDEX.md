@@ -1,6 +1,6 @@
 # Spec 总索引
 
-**最后更新**：2026-05-27（v3.7 — `disclosure-note-full-revamp` Sprint 0~4 全完成 44/47 tasks，pytest 430/430 全绿；剩 F-1 UAT / F-2 dev-history / F-3 收口）
+**最后更新**：2026-05-28（v3.8 — `global-refinement-v3` Sprint 0-4 全完成 143/145 tasks，vue-tsc 0 / vitest 0 failed / 2094 passed；CI 双卡点已上线；剩 14.4 真合伙人 UAT）
 
 > 此索引追踪所有 spec 的状态、关联文档、commit。
 > **审计原则**：spec 不删，但标"演进/被取代/已合并"避免重复阅读。
@@ -51,6 +51,7 @@
 | `advanced-query-enhancements-p1p2/` | 16 Tasks ✅ | 2026-05-24 完成（15 Req / 5 Phase / 212 tests：29 PBT + 单测 + e2e；wp_template_registry + GIN + 单源化 + 审计节流 + LO 池化 + 跨模块 cell + 模板联动 + 批量查询 + 写回 + 追溯 + 4 体验组件）|
 | `k-admin-cycle-post-review-fix/` | 18/18 ✅ | 2026-05-20 完成 |
 | `disclosure-note-full-revamp/` | 44/47 ✅ ⚠ | 2026-05-27 完成核心（Sprint 0~4 / 47 tasks 中 4 任务待外部，剩 F-1 UAT 真项目 / F-2 dev-history / F-3 文档；commits 6b6731c+65fc11a+3c5067c+e1477b2+1729c38f+58cff337+736cf1d4+551835b6；pytest 430/430 全绿；致同 21 排版+11 视觉断言+ADR-007/008/009/010；4101 binding cells / 25 列语义 / PRESET_TO_RULE 11 枚举 / NoteFormatConfig 21 字段 frozen / NOTE↔TB 双向边）|
+| `global-refinement-v3/` | 143/145 ✅ ⚠ | 2026-05-28 完成核心（Sprint 0~4 + 回归 / 13 Req / 13 Property PBT 全绿；后端 145 / 前端 vue-tsc 0 + vitest 2094 passed / 0 failed / 7 skipped；CI 双卡点已上线（vue-tsc 0 errors + vitest 0 failed + GtAmountCell 66 only-increase + el-form :rules 70 only-increase + WorkpaperEditor 2555 only-decrease + no-console strict 0）；剩 14.4 真合伙人 UAT；gaps.md 已建反向记录 GtAmountCell 17%/80% + WorkpaperEditor 2555/1000 等技术债，下一个 spec `gt-amount-cell-rollout` 推进）|
 
 ### 2.2 已被取代（保留 ADR）
 

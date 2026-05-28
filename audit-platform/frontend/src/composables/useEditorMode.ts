@@ -1,104 +1,125 @@
 /**
- * useEditorMode — HTML/Univer 双模式切换逻辑 [V3 Req 12.1.3]
+ * useEditorMode - HTML/Univer dual-mode dispatch [V3 Req 12.1.3]
  *
- * 骨架已建 + 示范提取，完整瘦身需独立 Sprint。
- * 将 WorkpaperEditor.vue 中的 component_type 路由分发逻辑（~300 行）
- * 抽离为独立 composable，主组件仅消费 computed 结果。
+ * Migrates the component_type routing logic out of WorkpaperEditor.vue.
  *
- * 路由优先级：
- * 1. HTML 类（A/B/C/D/E/H/skip 共 1346 sheet）→ GtWpRenderer
- * 2. 子编辑器（form/word/table/hybrid）→ 动态 component
- * 3. Univer 类（F/G 558 sheet）→ 默认 Univer 编辑器
+ * Routing priority (consumed in the host onMounted):
+ *  1. HTML class (A/B/C/D/E/H/skip 1346 sheets) -> GtWpRenderer
+ *  2. Sub-editor (form/word/table/hybrid) -> dispatched by host EDITOR_MAP
+ *  3. Univer class (F/G 558 sheets) -> default Univer editor
+ *
+ * Notes:
+ *  - EDITOR_MAP stays in WorkpaperEditor.vue (defineAsyncComponent is bound to
+ *    the SFC bundle context).
+ *  - This composable owns componentType state, the HTML allowlist,
+ *    useWpClassification wiring, and the fetchComponentType async fetch.
  *
  * @example
- * const { useHtmlRenderer, componentType, editorComponent, fetchComponentType } = useEditorMode({
+ * const { useHtmlRenderer, componentType, fetchComponentType } = useEditorMode({
  *   wpId, projectId, wpDetail,
  * })
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { api as httpApi } from '@/services/apiProxy'
+import { workpapers as P_wp } from '@/services/apiPaths'
+import { useWpClassification } from '@/composables/useWpClassification'
 
-/** HTML 类 componentType 白名单（与 GtWpRenderer 子组件分发一致） */
-export const HTML_COMPONENT_TYPES = new Set([
+/**
+ * HTML class componentType allowlist (matches GtWpRenderer dispatch).
+ * Mirrors the workpaper-html-renderer Task 13.1 list embedded in WorkpaperEditor.vue.
+ */
+export const HTML_COMPONENT_TYPES: ReadonlySet<string> = new Set([
   'a-program-console',
-  'b-control-understanding',
-  'c-control-test',
-  'd-revenue',
-  'e-cash',
-  'h-fixed-asset',
-  'h-rou-asset',
-  'h-lease-liability',
+  'b-index',
+  'c-note-table',
+  'd-form-table',
+  'd-form-paragraph',
+  'd-form-qa',
+  'd-form-confirmation',
+  'd-form-review',
+  'e-control-test',
+  'h-static-doc',
   'skip',
 ])
 
-/** 子编辑器组件映射（非 Univer、非 HTML 的 component_type） */
-export const EDITOR_MAP: Record<string, any> = {
-  // 完整迁移时从 WorkpaperEditor.vue 移入
-  // form: WorkpaperFormEditor,
-  // word: WorkpaperWordEditor,
-  // table: WorkpaperTableEditor,
-  // hybrid: WorkpaperHybridEditor,
-}
-
 export interface EditorModeContext {
+  /** Workpaper id (route param) */
   wpId: Ref<string>
+  /** Project id (route param) */
   projectId: Ref<string>
+  /** Workpaper detail held by the host; this composable writes into it via fetchComponentType */
   wpDetail: Ref<any>
 }
 
 export interface EditorModeReturn {
-  /** 是否使用 HTML 渲染器 */
-  useHtmlRenderer: ComputedRef<boolean>
-  /** 当前 component_type */
+  /** Current componentType (default 'univer', overwritten after fetch). */
   componentType: Ref<string>
-  /** 动态子编辑器组件 */
-  editorComponent: ComputedRef<any>
-  /** 从后端获取 component_type */
+  /** Resolved HTML componentType when whitelisted, otherwise empty string. */
+  htmlComponentType: ComputedRef<string>
+  /** Whether to render via GtWpRenderer. */
+  useHtmlRenderer: ComputedRef<boolean>
+  /** Underlying useWpClassification instance (exposed for host reuse). */
+  wpClassification: ReturnType<typeof useWpClassification>
+  /** Fetch component_type from backend; falls back to 'univer' on error. */
   fetchComponentType: () => Promise<void>
-  /** HTML componentType 白名单 */
-  HTML_COMPONENT_TYPES: Set<string>
+  /** HTML componentType allowlist (read-only). */
+  HTML_COMPONENT_TYPES: ReadonlySet<string>
 }
 
 /**
- * 示范：双模式切换逻辑骨架
- *
- * 完整迁移时，将 WorkpaperEditor.vue 中以下代码块移入：
- * - componentType ref + editorComponent computed
- * - HTML_COMPONENT_TYPES Set
- * - useWpClassification 调用 + htmlComponentType computed
- * - useHtmlRenderer computed
- * - fetchComponentType 函数
- * - onMounted 中的路由分发逻辑
+ * Behaviour parity (must match WorkpaperEditor.vue pre-extraction):
+ *  - componentType.value defaults to 'univer'
+ *  - fetchComponentType prefers detail.component_type, then template_metadata.component_type, else 'univer'
+ *  - fetchComponentType swallows errors and resets componentType to 'univer'
+ *  - useHtmlRenderer is true iff classification loaded + classifications non-empty + ct in allowlist
+ *  - wp_code / projectId changes (including first run) trigger wpClassification.load()
  */
 export function useEditorMode(ctx: EditorModeContext): EditorModeReturn {
   const componentType = ref<string>('univer')
 
-  const editorComponent = computed(() => EDITOR_MAP[componentType.value] || null)
+  // Derive wp_code from the host wpDetail; empty string skips load.
+  const wpCodeRef = computed<string>(() => ctx.wpDetail.value?.wp_code || '')
 
-  const useHtmlRenderer = computed(() => {
-    // 骨架：完整迁移时接入 useWpClassification
-    return false
+  const wpClassification = useWpClassification(wpCodeRef, ctx.projectId)
+
+  const htmlComponentType = computed<string>(() => {
+    if (!wpClassification.classification.value) return ''
+    if (!wpClassification.classification.value.classifications?.length) return ''
+    const ct = wpClassification.componentType.value
+    return HTML_COMPONENT_TYPES.has(ct as string) ? (ct as string) : ''
   })
 
-  async function fetchComponentType() {
-    // 骨架：完整迁移时从 WorkpaperEditor.vue 移入 httpApi.get 逻辑
-    // try {
-    //   const detail = await httpApi.get(P_wp.detail(ctx.projectId.value, ctx.wpId.value))
-    //   componentType.value = detail?.component_type || 'univer'
-    //   if (detail) ctx.wpDetail.value = detail
-    // } catch {
-    //   componentType.value = 'univer'
-    // }
+  const useHtmlRenderer = computed<boolean>(() => !!htmlComponentType.value)
+
+  // Auto-load classification once wp_code / projectId are ready.
+  watch(
+    () => [wpCodeRef.value, ctx.projectId.value] as const,
+    ([code, pid]) => {
+      if (code && pid) {
+        wpClassification.load().catch(() => {
+          /* swallow: classification failure falls back to Univer path */
+        })
+      }
+    },
+    { immediate: true },
+  )
+
+  async function fetchComponentType(): Promise<void> {
+    try {
+      const detail = await httpApi.get(P_wp.detail(ctx.projectId.value, ctx.wpId.value))
+      const ct = detail?.component_type || detail?.template_metadata?.component_type || 'univer'
+      componentType.value = ct
+      if (detail) ctx.wpDetail.value = detail
+    } catch {
+      componentType.value = 'univer'
+    }
   }
 
-  // 骨架：完整迁移时加入 watch(wpCodeRef) 触发 classification load
-  watch(() => ctx.wpDetail.value?.wp_code, () => {
-    // placeholder for classification trigger
-  })
-
   return {
-    useHtmlRenderer,
     componentType,
-    editorComponent,
+    htmlComponentType,
+    useHtmlRenderer,
+    wpClassification,
     fetchComponentType,
     HTML_COMPONENT_TYPES,
   }

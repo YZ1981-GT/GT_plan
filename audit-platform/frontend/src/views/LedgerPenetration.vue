@@ -376,15 +376,50 @@
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
       <!-- V3 Req 12.2.1: 虚拟滚动模式（数据量 > 1000 行时自动切换 el-table-v2） -->
+      <!-- V3 Req 12.2.2: 虚拟滚动模式下提供筛选条 -->
+      <div v-if="ledgerTotal > 1000" class="gt-virtual-toolbar">
+        <el-input
+          v-model="ledgerSearchKeyword"
+          size="small"
+          placeholder="搜索摘要/凭证号"
+          clearable
+          style="width: 200px"
+          :prefix-icon="Search"
+        />
+        <el-select v-model="ledgerAmountDir" size="small" style="width: 120px">
+          <el-option label="全部方向" value="all" />
+          <el-option label="仅借方" value="debit" />
+          <el-option label="仅贷方" value="credit" />
+        </el-select>
+        <el-button
+          v-if="ledgerSort"
+          size="small"
+          plain
+          @click="clearLedgerSort"
+          title="清除排序，恢复原始月份小计视图"
+        >清排序</el-button>
+        <el-button
+          v-if="ledgerSearchKeyword || ledgerAmountDir !== 'all'"
+          size="small"
+          plain
+          @click="clearLedgerFilters"
+        >清筛选</el-button>
+        <span class="gt-virtual-stats">
+          {{ ledgerVirtualDisplay.length }} / {{ ledgerDisplay.length }} 行
+        </span>
+      </div>
       <el-table-v2
         v-if="ledgerTotal > 1000"
         :columns="ledgerVirtualColumns"
-        :data="ledgerDisplay"
+        :data="ledgerVirtualDisplay"
         :width="tableWidth"
         :height="tableHeight || 600"
         :row-height="36"
         :header-height="40"
         :row-class="ledgerVirtualRowClass"
+        :row-event-handlers="virtualRowEventHandlers"
+        :sort-by="(ledgerSort as any) || undefined"
+        :on-column-sort="onLedgerColumnSort"
         fixed
       />
       <!-- 标准模式（≤1000 行使用 el-table） -->
@@ -950,7 +985,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch, provide } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch, provide, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Search, Upload, Loading, Warning, Setting } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
@@ -1948,15 +1983,201 @@ const ledgerPageSize = ref(100)
 const ledgerPageSizeOptions = [50, 100, 200, 500]
 
 // V3 Req 12.2.1: el-table-v2 虚拟滚动列定义（数据量 > 1000 行时启用）
+// V3 Req 12.2.2: 支持列宽拖拽 / 行选择 / 右键菜单 / 排序 / 筛选
 const tableWidth = ref(1200)
-const ledgerVirtualColumns = [
-  { key: 'voucher_date', dataKey: 'voucher_date', title: '日期', width: 110 },
-  { key: 'voucher_no', dataKey: 'voucher_no', title: '凭证号', width: 90 },
-  { key: 'summary', dataKey: 'summary', title: '摘要', width: 300, flexGrow: 1 },
-  { key: 'debit_amount', dataKey: 'debit_amount', title: '借方', width: 180, align: 'right' },
-  { key: 'credit_amount', dataKey: 'credit_amount', title: '贷方', width: 180, align: 'right' },
-  { key: 'balance', dataKey: 'balance', title: '余额', width: 180, align: 'right' },
-]
+
+// 列宽状态（支持拖拽，初始值与默认一致）
+const ledgerColumnWidths = ref<Record<string, number>>({
+  __selection: 44,
+  voucher_date: 110,
+  voucher_no: 100,
+  summary: 320,
+  debit_amount: 160,
+  credit_amount: 160,
+  balance: 160,
+})
+
+// 排序状态（key + order）
+type SortOrderEnum = 'asc' | 'desc'
+const ledgerSort = ref<{ key: string; order: SortOrderEnum } | null>(null)
+
+// 筛选状态（摘要关键字 + 借/贷方向）
+const ledgerSearchKeyword = ref('')
+const ledgerAmountDir = ref<'all' | 'debit' | 'credit'>('all')
+
+// 虚拟滚动列定义（响应式，重算依赖列宽 + 排序态）
+const ledgerVirtualColumns = computed(() => {
+  const w = ledgerColumnWidths.value
+  const sortKey = ledgerSort.value?.key
+  // 选择列（自定义渲染 + 表头全选）
+  const cols: any[] = [
+    {
+      key: '__selection',
+      dataKey: '__selection',
+      title: '',
+      width: w.__selection,
+      align: 'center',
+      cellRenderer: ({ rowData }: any) =>
+        h('input', {
+          type: 'checkbox',
+          class: 'gt-ledger-vrow-checkbox',
+          checked: ledgerSelectedKeys.value.has(rowKeyOf(rowData)),
+          onClick: (e: Event) => e.stopPropagation(),
+          onChange: (e: Event) => toggleVirtualRowSelection(rowData, (e.target as HTMLInputElement).checked),
+        }),
+      headerCellRenderer: () =>
+        h('input', {
+          type: 'checkbox',
+          class: 'gt-ledger-vrow-checkbox',
+          checked: virtualAllSelected.value,
+          indeterminate: virtualPartialSelected.value,
+          onClick: (e: Event) => e.stopPropagation(),
+          onChange: (e: Event) => toggleVirtualSelectAll((e.target as HTMLInputElement).checked),
+        }),
+    },
+    makeResizableCol('voucher_date', '日期', w.voucher_date, sortKey),
+    makeResizableCol('voucher_no', '凭证号', w.voucher_no, sortKey),
+    makeResizableCol('summary', '摘要', w.summary, sortKey, { flexGrow: 1 }),
+    makeResizableCol('debit_amount', '借方', w.debit_amount, sortKey, { align: 'right' }),
+    makeResizableCol('credit_amount', '贷方', w.credit_amount, sortKey, { align: 'right' }),
+    makeResizableCol('balance', '余额', w.balance, sortKey, { align: 'right' }),
+  ]
+  return cols
+})
+
+/** 构造可调整列宽的列定义（headerCellRenderer 注入 resize handle） */
+function makeResizableCol(
+  key: string,
+  label: string,
+  width: number,
+  sortKey: string | undefined,
+  extra: Record<string, any> = {},
+) {
+  return {
+    key,
+    dataKey: key,
+    title: label,
+    width,
+    sortable: true,
+    ...extra,
+    headerCellRenderer: ({ column }: any) =>
+      h(
+        'div',
+        { class: 'gt-vcol-header', style: { textAlign: extra.align || 'left' } },
+        [
+          h('span', { class: 'gt-vcol-title' }, sortHeader(label, sortKey, key)),
+          h('span', {
+            class: 'gt-vcol-resizer',
+            onMousedown: (e: MouseEvent) => startColumnResize(e, key, column?.width || width),
+            onClick: (e: Event) => e.stopPropagation(),
+          }),
+        ],
+      ),
+  }
+}
+
+/** 列宽拖拽：mousedown 起始 → mousemove 计算 delta → mouseup 落定 */
+function startColumnResize(event: MouseEvent, columnKey: string, startWidth: number) {
+  event.preventDefault()
+  event.stopPropagation()
+  const startX = event.clientX
+
+  function onMove(e: MouseEvent) {
+    const delta = e.clientX - startX
+    const next = Math.max(60, Math.min(800, startWidth + delta))
+    ledgerColumnWidths.value = { ...ledgerColumnWidths.value, [columnKey]: next }
+  }
+
+  function onUp() {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    document.body.style.cursor = ''
+  }
+
+  document.body.style.cursor = 'col-resize'
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
+
+/** 表头标题：附加排序箭头指示符 */
+function sortHeader(label: string, currentKey: string | undefined, columnKey: string) {
+  if (currentKey !== columnKey) return label
+  const order = ledgerSort.value?.order
+  return order === 'asc' ? `${label} ▲` : order === 'desc' ? `${label} ▼` : label
+}
+
+/** 行唯一标识（用于选择集去重） */
+function rowKeyOf(row: any): string {
+  if (!row) return ''
+  // 业务行用 id；增强行（期初/小计）用 _type + index 占位（无 id）
+  if (row.id) return `id:${row.id}`
+  if (row._type) return `${row._type}:${row.voucher_date || ''}:${row.summary || ''}`
+  return `${row.voucher_date || ''}:${row.voucher_no || ''}:${row.summary || ''}`
+}
+
+/** 选择行 key 集合（虚拟滚动模式专用，不参与 el-table 的 selection-change） */
+const ledgerSelectedKeys = ref<Set<string>>(new Set())
+
+/** 全选 / 部分选状态（仅业务行可选，期初/小计不算） */
+const virtualSelectableRows = computed(() => ledgerVirtualDisplay.value.filter((r) => r._type === 'normal' || !r._type))
+const virtualAllSelected = computed(() => {
+  const all = virtualSelectableRows.value
+  return all.length > 0 && all.every((r) => ledgerSelectedKeys.value.has(rowKeyOf(r)))
+})
+const virtualPartialSelected = computed(() => {
+  const all = virtualSelectableRows.value
+  const selected = all.filter((r) => ledgerSelectedKeys.value.has(rowKeyOf(r))).length
+  return selected > 0 && selected < all.length
+})
+
+function toggleVirtualRowSelection(row: any, checked: boolean) {
+  const key = rowKeyOf(row)
+  const next = new Set(ledgerSelectedKeys.value)
+  if (checked) next.add(key)
+  else next.delete(key)
+  ledgerSelectedKeys.value = next
+  syncVirtualSelectedRows()
+}
+
+function toggleVirtualSelectAll(checked: boolean) {
+  const next = new Set<string>()
+  if (checked) {
+    for (const r of virtualSelectableRows.value) next.add(rowKeyOf(r))
+  }
+  ledgerSelectedKeys.value = next
+  syncVirtualSelectedRows()
+}
+
+/** 把虚拟滚动选择集同步到 selectedRows（驱动顶栏"复制选中"按钮） */
+function syncVirtualSelectedRows() {
+  const keys = ledgerSelectedKeys.value
+  selectedRows.value = ledgerVirtualDisplay.value.filter((r) => keys.has(rowKeyOf(r)))
+}
+
+/** 虚拟滚动行事件 handlers（右键菜单 + 双击穿透） */
+const virtualRowEventHandlers = {
+  onContextmenu: ({ rowData, event }: { rowData: any; event: Event }) => {
+    onRowContextMenu(rowData, null, event as MouseEvent)
+  },
+  onDblclick: ({ rowData }: { rowData: any }) => {
+    drillToVoucher(rowData)
+  },
+}
+
+/** 列排序：el-table-v2 onColumnSort 回调 */
+function onLedgerColumnSort({ key, order }: { key: string | number | symbol; order: 'asc' | 'desc' }) {
+  ledgerSort.value = { key: String(key), order }
+}
+
+function clearLedgerSort() {
+  ledgerSort.value = null
+}
+
+function clearLedgerFilters() {
+  ledgerSearchKeyword.value = ''
+  ledgerAmountDir.value = 'all'
+}
+
 function ledgerVirtualRowClass({ rowData }: { rowData: any }) {
   if (rowData._type === 'opening') return 'gt-ledger-opening'
   if (rowData._type === 'subtotal') return 'gt-ledger-subtotal'
@@ -2036,6 +2257,54 @@ const ledgerDisplay = computed(() => {
 
   return rows
 })
+
+/**
+ * 虚拟滚动专用展示数据：在 ledgerDisplay 之上叠加排序 + 筛选
+ * 期初/小计行始终保留位置，仅对 normal 业务行排序/筛选
+ */
+const ledgerVirtualDisplay = computed(() => {
+  const all = ledgerDisplay.value
+  if (all.length === 0) return all
+  const kw = ledgerSearchKeyword.value.trim().toLowerCase()
+  const dir = ledgerAmountDir.value
+  const sort = ledgerSort.value
+
+  // 1. 拆分为业务行和锚点行（期初/小计）
+  const normals = all.filter((r) => r._type === 'normal' || !r._type)
+  const anchors = all.filter((r) => r._type === 'opening' || r._type === 'subtotal')
+
+  // 2. 筛选
+  let filtered = normals
+  if (kw) {
+    filtered = filtered.filter((r) => {
+      const summary = String(r.summary || '').toLowerCase()
+      const voucherNo = String(r.voucher_no || '').toLowerCase()
+      return summary.includes(kw) || voucherNo.includes(kw)
+    })
+  }
+  if (dir === 'debit') filtered = filtered.filter((r) => num(r.debit_amount) > 0)
+  else if (dir === 'credit') filtered = filtered.filter((r) => num(r.credit_amount) > 0)
+
+  // 3. 排序（无排序时保留原顺序 + 锚点）
+  if (!sort) {
+    if (kw || dir !== 'all') return filtered // 筛选时只返回业务行（锚点不再有意义）
+    return all // 无筛选无排序，原序返回（含锚点）
+  }
+  const factor = sort.order === 'desc' ? -1 : 1
+  const sorted = filtered.slice().sort((a: any, b: any) => {
+    const av = a[sort.key]
+    const bv = b[sort.key]
+    // 数字优先按数字比较
+    const an = typeof av === 'number' ? av : parseFloat(av)
+    const bn = typeof bv === 'number' ? bv : parseFloat(bv)
+    if (Number.isFinite(an) && Number.isFinite(bn)) return (an - bn) * factor
+    return String(av ?? '').localeCompare(String(bv ?? '')) * factor
+  })
+
+  // 排序时不再展示锚点（小计语义不再成立）
+  return [anchors[0], ...sorted].filter(Boolean)
+})
+
 const voucherItems = ref<any[]>([])
 const auxBalanceItems = ref<any[]>([])
 const auxLedgerItems = ref<any[]>([])
@@ -3067,6 +3336,8 @@ function drillToLedger(row: any) {
   currentLevel.value = 'ledger'
   ledgerPage.value = 1
   dateRange.value = null
+  // V3 Req 12.2.2: 切换账户时清虚拟滚动状态
+  resetLedgerVirtualState()
   const label = hasChildren
     ? `${code} ${row.account_name || ''} (含明细)`
     : `${code} ${row.account_name || ''}`
@@ -3075,6 +3346,14 @@ function drillToLedger(row: any) {
     { label, level: 'ledger', account: currentAccount.value },
   ]
   loadLedger()
+}
+
+/** V3 Req 12.2.2: 重置虚拟滚动模式的临时状态（切换账户/穿透时调用） */
+function resetLedgerVirtualState() {
+  ledgerSort.value = null
+  ledgerSearchKeyword.value = ''
+  ledgerAmountDir.value = 'all'
+  ledgerSelectedKeys.value = new Set()
 }
 
 function drillToVoucher(row: any) {
@@ -3327,6 +3606,62 @@ onBeforeUnmount(() => {
   background: var(--gt-bg-warning) !important;
   font-weight: 600;
   border-top: 1px solid var(--gt-color-wheat);
+}
+
+/* V3 Req 12.2.2: 虚拟滚动模式工具栏 + 选择列样式 */
+.gt-virtual-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--gt-color-bg-soft, #fafafa);
+  border: 1px solid var(--gt-color-border, #e4e7ed);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  font-size: 12px;
+}
+.gt-virtual-toolbar .gt-virtual-stats {
+  margin-left: auto;
+  color: var(--gt-color-text-secondary, #909399);
+  font-size: 12px;
+}
+.gt-ledger-vrow-checkbox {
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--gt-color-primary, #4b2d77);
+}
+
+/* V3 Req 12.2.2: 虚拟滚动表头列宽拖拽 handle */
+.gt-vcol-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding-right: 6px;
+  user-select: none;
+}
+.gt-vcol-title {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gt-vcol-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+}
+.gt-vcol-resizer:hover,
+.gt-vcol-resizer:active {
+  background: var(--gt-color-primary, #4b2d77);
+  opacity: 0.4;
 }
 
 /* 任务 12.8.1：异常凭证视觉标记（需求 25） */

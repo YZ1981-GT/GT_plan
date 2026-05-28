@@ -19,7 +19,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import GtEControlTest from '../GtEControlTest.vue'
+import GtEControlTest, { type EControlTestSchema } from '../GtEControlTest.vue'
 
 // Mock GtIndexChip
 vi.mock('@/components/workpaper/GtIndexChip.vue', () => ({
@@ -121,7 +121,7 @@ const globalStubs = {
 
 // ─── Schema builders ────────────────────────────────────────────────────────
 
-function buildEvaluationStepSchema() {
+function buildEvaluationStepSchema(): EControlTestSchema {
   return {
     test_type: 'evaluation_step',
     fixed_cells: { A3: '宜宾大药房', A4: '2025-12-31', I3: 'C11-2' },
@@ -241,7 +241,7 @@ function buildEvaluationStepSchema() {
   }
 }
 
-function buildSummarySchema() {
+function buildSummarySchema(): EControlTestSchema {
   return {
     test_type: 'summary',
     fixed_cells: { A3: '宜宾大药房', A4: '2025-12-31', O3: 'C12' },
@@ -257,7 +257,7 @@ function buildSummarySchema() {
   }
 }
 
-function buildSingleSchema() {
+function buildSingleSchema(): EControlTestSchema {
   return {
     test_type: 'single',
     fixed_cells: { A3: '宜宾大药房', A4: '2025-12-31', J3: 'C12-1-1' },

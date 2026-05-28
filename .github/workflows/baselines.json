@@ -27,7 +27,22 @@
     "no-status-string-literal-vue-files": 202,
     "no-english-ui-label-vue-files": 0,
     "no-english-ui-button-vue-files": 0,
-    "console-log-vue-files": "<TBD>"
+    "console-log-vue-files": 0
+  },
+  "_v3_coverage_guards": {
+    "_doc": "V3 收尾防退化卡点（2026-05-28 实测）：CI frontend-build 只允许增加（覆盖率提升），不允许减少。下个 spec gt-amount-cell-rollout 把 GtAmountCell ratio 从 17% 推到 80%。",
+    "GtAmountCell-uses": 66,
+    "align-right-cols": 380,
+    "GtAmountCell-coverage-ratio": "17%",
+    "GtAmountCell-target-ratio": "80%",
+    "el-form-with-rules": 70,
+    "el-form-total": 108,
+    "el-form-rules-coverage": "65%",
+    "WorkpaperEditor-vue-lines": 2555,
+    "WorkpaperEditor-vue-target": 1000,
+    "vue-tsc-errors": 0,
+    "vitest-failed-tests": 0,
+    "vitest-skipped-tests": 7
   },
   "_targets": {
     "font-size-prop-px-vue-files": 0,

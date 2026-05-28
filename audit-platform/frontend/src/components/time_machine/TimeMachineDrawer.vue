@@ -122,10 +122,11 @@ async function load() {
 
 async function onRestore(snap: Snapshot) {
   try {
-    await confirmDangerous('恢复快照', {
-      description: '恢复后当前未保存的变更将丢失，确认继续？',
-      impact: '数据将回退到快照时刻',
-      recoverable: false,
+    await confirmDangerous({
+      title: '恢复快照',
+      message: '恢复后当前未保存的变更将丢失。数据将回退到快照时刻，且不可撤销。确认继续？',
+      confirmText: '确定恢复',
+      cancelText: '取消',
     })
   } catch {
     return // 用户取消

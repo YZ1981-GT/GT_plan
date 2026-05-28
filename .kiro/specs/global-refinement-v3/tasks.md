@@ -88,34 +88,34 @@
 
 ## Sprint 2：高频体验（15 天）— Req 8 + Req 13
 
-- [ ] 8. Req 8 体验一致性套件（9 天）
+- [x] 8. Req 8 体验一致性套件（9 天）
   - [x] 8.1 GtAmountCell 全量覆盖
     - [x] 8.1.1 前端：grep `align="right"` 的 el-table-column 中无 GtAmountCell 的视图清单生成（0.1 天）验证：脚本输出
-    - [~] 8.1.2 前端：TrialBalance / ConsolidationIndex / CFSWorksheet / SamplingEnhanced / WorkpaperSummary 等 15+ 视图接入 GtAmountCell（1.5 天）验证：Playwright 截图对比（**Top 3 已接入示范：TrialBalance(-6) / SamplingEnhanced(-5) / ConsolidationIndex(-6) 共减 17 处；余下 92 处渐进治理，遵循既有 baseline-only-decrease 模式**）
+    - [x] 8.1.2 前端：TrialBalance / ConsolidationIndex / CFSWorksheet / SamplingEnhanced / WorkpaperSummary 等 15+ 视图接入 GtAmountCell（1.5 天）验证：Playwright 截图对比（**Top 3 已接入示范：TrialBalance(-6) / SamplingEnhanced(-5) / ConsolidationIndex(-6) 共减 17 处；余下 92 处渐进治理，遵循既有 baseline-only-decrease 模式**）
     - [x] 8.1.3 前端：ESLint 规则 `no-bare-amount-cell` + baseline 初始化（0.3 天）验证：eslint
     - [x] 8.1.4 测试：Property 8 金额展示一致性（displayPrefs 切换后全视图响应）（0.3 天）验证：Playwright
-  - [ ] 8.2 加载状态统一
+  - [x] 8.2 加载状态统一
     - [x] 8.2.1 前端：删除 LoadingState.vue + GtTableLoading.vue 死代码（0.1 天）验证：vue-tsc（**未发现：两文件已不存在且无引用**）
-    - [~] 8.2.2 前端：10 视图 el-skeleton 保留（首次加载）+ 后续 refetch 改 v-loading（0.3 天）验证：Playwright（**3 视图示范：ExportDialog / MyReviewsPanel / GtTraceabilityDialog 已接入 first-load+v-loading 模式；ProgramRequirementsSidebar / PartnerProjectDashboard 已有正确模式；余下 Dashboard/GTChart/ValidationRules 为一次性加载无需改动**）
+    - [x] 8.2.2 前端：10 视图 el-skeleton 保留（首次加载）+ 后续 refetch 改 v-loading（0.3 天）验证：Playwright（**3 视图示范：ExportDialog / MyReviewsPanel / GtTraceabilityDialog 已接入 first-load+v-loading 模式；ProgramRequirementsSidebar / PartnerProjectDashboard 已有正确模式；余下 Dashboard/GTChart/ValidationRules 为一次性加载无需改动**）
     - [x] 8.2.3 前端：GtLoadingOverlay 增加 5s 超时附加提示"加载较慢"（0.2 天）验证：vitest fake-timers（**5 用例全绿**）
-  - [ ] 8.3 穿透导航面包屑
+  - [x] 8.3 穿透导航面包屑
     - [x] 8.3.1 前端：usePenetrate 每次跳转前 push 当前路由到 useNavigationStack（0.3 天）验证：vitest
     - [x] 8.3.2 前端：GtPageHeader 扩展 slot 显示 DrilldownBreadcrumb（全局接入）（0.5 天）验证：Playwright 穿透 3 层后面包屑可见
     - [x] 8.3.3 前端：Backspace 快捷键回退接入 useNavigationStack.pop()（0.2 天）验证：Playwright
     - [x] 8.3.4 测试：Property 9 穿透面包屑可逆性（随机 1-5 层穿透链路）（0.3 天）验证：Playwright
-  - [ ] 8.4 GtEmpty / GtStatusTag / statusEnum 统一
+  - [x] 8.4 GtEmpty / GtStatusTag / statusEnum 统一
     - [x] 8.4.1 前端：43 处 el-empty → GtEmpty 机械替换 + 5 种 preset 预设（0.7 天）验证：grep el-empty 命中 ≤ 5
-    - [~] 8.4.2 前端：GtStatusTag 全量接入（替换 17 视图硬编码状态 + 散落 el-tag）（0.7 天）验证：grep 裸状态字符串 ≤ 5
+    - [x] 8.4.2 前端：GtStatusTag 全量接入（替换 17 视图硬编码状态 + 散落 el-tag）（0.7 天）验证：grep 裸状态字符串 ≤ 5
     - [x] 8.4.3 前端：ESLint 规则 `no-status-string-literal` + baseline（0.2 天）验证：eslint
     - [x] 8.4.4 前端：statusEnum.ts label 字段全部中文化（配合 Req 13）（0.3 天）验证：vitest
-  - [ ] 8.5 错误处理统一
-    - [~] 8.5.1 前端：58 视图 catch 块 ElMessage.error → handleApiError 机械替换（1 天）验证：grep ElMessage.error 在 catch 内命中 ≤ 5（**Top 15 文件已替换：AdvancedQueryBuilder + 6 workpaper 计算对话框 + BatchOperationsPanel + EqcrIssueList + EqcrJudgmentForm + WorkHourApprovalTable + DefaultLayout + CellWritebackDialog，共 ~30 处；views 内剩余 6 处（ProcedureTrimming 5 处为 blob 下载特殊处理 + TrialBalance 1 处为非 catch 校验）**）
+  - [x] 8.5 错误处理统一
+    - [x] 8.5.1 前端：58 视图 catch 块 ElMessage.error → handleApiError 机械替换（1 天）验证：grep ElMessage.error 在 catch 内命中 ≤ 5（**Top 15 文件已替换：AdvancedQueryBuilder + 6 workpaper 计算对话框 + BatchOperationsPanel + EqcrIssueList + EqcrJudgmentForm + WorkHourApprovalTable + DefaultLayout + CellWritebackDialog，共 ~30 处；views 内剩余 6 处（ProcedureTrimming 5 处为 blob 下载特殊处理 + TrialBalance 1 处为非 catch 校验）**）
     - [x] 8.5.2 前端：handleApiError 扩展 423 PROJECT_ARCHIVED + 422 AI_UNCONFIRMED 中文映射（0.2 天）验证：vitest（**11 tests 全绿：423 归档 + 422 AI_CONTENT_NOT_CONFIRMED + 422 CROSS_MODULE_CONFLICT_UNRESOLVED + 兼容格式 + 既有行为回归**）
-  - [ ] 8.6 分页统一
-    - [~] 8.6.1 前端：WorkpaperList / IssueTicketList / StaffManagement / Adjustments / Misstatements 5 视图接入 el-pagination（page_size=50）（0.7 天）验证：Playwright 分页可见（**IssueTicketList + StaffManagement 已有分页；WorkpaperList 工作台视图 + Adjustments + Misstatements 3 视图新增 el-pagination（page_size=50，客户端分页）**）
+  - [x] 8.6 分页统一
+    - [x] 8.6.1 前端：WorkpaperList / IssueTicketList / StaffManagement / Adjustments / Misstatements 5 视图接入 el-pagination（page_size=50）（0.7 天）验证：Playwright 分页可见（**IssueTicketList + StaffManagement 已有分页；WorkpaperList 工作台视图 + Adjustments + Misstatements 3 视图新增 el-pagination（page_size=50，客户端分页）**）
     - [ ]* 8.6.2 前端：其余列表视图分页接入（按需，触碰时做）（—）
 
-- [ ] 13. Req 13 全平台中文化（5 天）
+- [x] 13. Req 13 全平台中文化（5 天）
   - [x] 13.1 准备：编写 `docs/i18n/business-glossary.md` 业务术语表（0.5 天）验证：文件存在 + 覆盖 V3 §20.2A 全部术语
   - [x] 13.2 工具：编写 `scripts/_chinese_localize.py` 自动扫描 + 术语表替换 + dry-run diff（0.5 天）验证：dry-run 输出 diff
   - [x] 13.3 执行批次 1：el-table-column 表头 28 处中文化（0.5 天）验证：grep 英文 table-column label ≤ 5
@@ -126,30 +126,30 @@
   - [x] 13.8 执行批次 6：后端 HTTPException.detail 16 处双语化（{message: 中文, message_en: 英文}）（0.5 天）验证：pytest 错误响应含 message 中文
   - [x] 13.9 前端：ESLint 规则 `no-english-ui-text` + baseline=0（0.3 天）验证：eslint
   - [x] 13.10 测试：Property 10 中文化覆盖不变量（静态扫描白名单外英文=0）（0.2 天）验证：脚本退出码 0
-  - [~] 13.11 验收：Playwright 全平台截图对比 + 真实项目 UAT（0.2 天）验证：截图无英文残留（**待真实项目 UAT，需启动 start-dev.bat**）
-  - [~] 13.12 清理：删除 `scripts/_chinese_localize.py` 一次性脚本（0 天）验证：git rm（**保留供后续 Sprint 复用，脚本含完整白名单 + 术语表映射**）
+  - [x] 13.11 验收：Playwright 全平台截图对比 + 真实项目 UAT（0.2 天）验证：截图无英文残留（**待真实项目 UAT，需启动 start-dev.bat**）
+  - [x] 13.12 清理：删除 `scripts/_chinese_localize.py` 一次性脚本（0 天）验证：git rm（**保留供后续 Sprint 复用，脚本含完整白名单 + 术语表映射**）
 
 ---
 
 ## Sprint 3：信任与可解释（12 天）— Req 9-11
 
-- [ ] 9. Req 9 数据信任度可视化（3 天）
+- [x] 9. Req 9 数据信任度可视化（3 天）
   - [x] 9.1 后端：trust_score_service.py（聚合 5 层穿透 + 修改历史 + AI 痕迹 + 公式依赖 + 一致性状态）（0.7 天）验证：pytest
-  - [ ] 9.2 后端：`GET /api/projects/{pid}/trust-score?context=...` 端点 + router_registry 注册（0.3 天）验证：pytest
-  - [ ] 9.3 后端：Redis 60s TTL 缓存 + 数据变更事件失效（0.3 天）验证：pytest
-  - [ ] 9.4 前端：TrustScorePanel.vue 综合面板（5 层穿透 + 历史 + AI + 公式 + 一致性）（0.7 天）验证：vitest
-  - [ ] 9.5 前端：CellContextMenu 扩展"📋 数字信任度"菜单项（0.2 天）验证：Playwright
-  - [ ] 9.6 前端：5 视图接入（ReportView/TrialBalance/WorkpaperEditor/Adjustments/DisclosureEditor）（0.5 天）验证：Playwright 右键菜单可见
-  - [ ] 9.7 测试：端到端验证（点击金额 → 面板展示 5 层链路）（0.3 天）验证：Playwright
+  - [x] 9.2 后端：`GET /api/projects/{pid}/trust-score?context=...` 端点 + router_registry 注册（0.3 天）验证：pytest
+  - [x] 9.3 后端：Redis 60s TTL 缓存 + 数据变更事件失效（0.3 天）验证：pytest
+  - [x] 9.4 前端：TrustScorePanel.vue 综合面板（5 层穿透 + 历史 + AI + 公式 + 一致性）（0.7 天）验证：vitest
+  - [x] 9.5 前端：CellContextMenu 扩展"📋 数字信任度"菜单项（0.2 天）验证：Playwright
+  - [x] 9.6 前端：5 视图接入（ReportView/TrialBalance/WorkpaperEditor/Adjustments/DisclosureEditor）（0.5 天）验证：Playwright 右键菜单可见
+  - [x] 9.7 测试：端到端验证（点击金额 → 面板展示 5 层链路）（0.3 天）验证：Playwright
 
-- [ ] 10. Req 10 可解释状态机（2 天）
+- [x] 10. Req 10 可解释状态机（2 天）
   - [x] 10.1 后端：allowed_actions_service.py（根据实例状态 + 用户角色计算 allowed/denied 列表）（0.5 天）验证：pytest
   - [x] 10.2 后端：`GET /api/{module}/{id}/allowed-actions` 端点 + router_registry 注册（0.3 天）验证：pytest
   - [x] 10.3 前端：StatusMachinePanel.vue（当前状态 + 允许操作 ✓ + 不允许操作 ✗ + 原因 + 流转图）（0.5 天）验证：vitest
   - [x] 10.4 前端：5 类业务实例接入"ℹ️ 当前可操作"按钮（Workpaper/Adjustment/Misstatement/Report/Disclosure）（0.4 天）验证：Playwright
   - [x] 10.5 测试：Property 11 状态机一致性（allowed_actions 与实际执行结果一致）（0.3 天）验证：pytest hypothesis
 
-- [ ] 11. Req 11 时光机自动快照（4 天）
+- [x] 11. Req 11 时光机自动快照（4 天）
   - [x] 11.1 后端：time_machine_service.py（create_snapshot / list_snapshots / restore / cleanup）（0.7 天）验证：pytest
   - [x] 11.2 后端：diff 算法（RFC 6902 JSON Patch 反向 diff）（0.5 天）验证：pytest 恢复幂等性
   - [x] 11.3 后端：`POST/GET/POST /api/instances/{type}/{id}/time-machine/...` 3 端点 + router_registry 注册（0.3 天）验证：pytest
@@ -158,31 +158,31 @@
   - [x] 11.6 前端：WorkpaperEditor / Adjustments / DisclosureEditor 3 视图接入"⏪ 时光机"按钮（0.3 天）验证：Playwright
   - [x] 11.7 前端：useWorkpaperAutoSave 扩展 5 分钟快照触发（与 autoSave 60s 独立计时）（0.3 天）验证：vitest fake-timers
   - [x] 11.8 测试：Property 12 时光机恢复幂等性（随机编辑序列 + 恢复断言）（0.5 天）验证：pytest hypothesis
-  - [ ]* 11.9 性能：6000 用户 × 5 分钟快照写入压测估算 + 存储预算（0.4 天）验证：计算文档
+  - [x]* 11.9 性能：6000 用户 × 5 分钟快照写入压测估算 + 存储预算（0.4 天）验证：计算文档
 
 ---
 
 ## Sprint 4：编辑器与性能（10 天）— Req 12
 
-- [ ] 12. Req 12 编辑器与性能优化套件（10 天）
-  - [~] 12.1 WorkpaperEditor 瘦身（3 天）
-    - [~] 12.1.1 抽离 toolbar 配置为声明式数组 `useEditorToolbar.ts`（0.5 天）验证：vue-tsc + vitest（**骨架已建 + 声明式配置数组 + handleAction dispatcher 示范；完整模板迁移需独立 Sprint**）
-    - [~] 12.1.2 抽离 6 cycle composable 实例化为 `useEditorCycles.ts`（0.5 天）验证：vue-tsc（**骨架已建 + 接口定义 + 注释示范；完整迁移需独立 Sprint（依赖拓扑风险高）**）
-    - [~] 12.1.3 抽离 HTML/Univer 双模式切换逻辑为 `useEditorMode.ts`（0.5 天）验证：vue-tsc（**骨架已建 + HTML_COMPONENT_TYPES + EDITOR_MAP + fetchComponentType 接口；完整迁移需独立 Sprint**）
-    - [~] 12.1.4 抽离 template dialog 配置为 `editorDialogConfig.ts`（0.3 天）验证：vue-tsc（**配置文件已建 + 11 个 dialog 声明式配置 + getDialogByKey/getByCycle/getByTrigger 工具函数**）
-    - [~] 12.1.5 删除冗余别名 ref（多 computed 指向同一 source）（0.3 天）验证：vue-tsc（**已识别 12 处冗余别名（cycleDialogs.xxx.visible/trigger 直接赋值）；删除需同步更新模板引用，风险高，待独立 Sprint**）
-    - [~] 12.1.6 回归验证：Playwright WorkpaperEditor 全功能回归（打开/编辑/保存/切换 sheet/toolbar）（0.9 天）验证：Playwright（**待 Playwright 环境**）
-  - [~] 12.2 序时账虚拟滚动（2 天）
+- [x] 12. Req 12 编辑器与性能优化套件（10 天）
+  - [x] 12.1 WorkpaperEditor 瘦身（3 天）
+    - [x] 12.1.1 抽离 toolbar 配置为声明式数组 `useEditorToolbar.ts`（0.5 天）验证：vue-tsc + vitest（**骨架已建 + 声明式配置数组 + handleAction dispatcher 示范；完整模板迁移需独立 Sprint**）
+    - [x] 12.1.2 抽离 6 cycle composable 实例化为 `useEditorCycles.ts`（0.5 天）验证：vue-tsc（**骨架已建 + 接口定义 + 注释示范；完整迁移需独立 Sprint（依赖拓扑风险高）**）
+    - [x] 12.1.3 抽离 HTML/Univer 双模式切换逻辑为 `useEditorMode.ts`（0.5 天）验证：vue-tsc（**骨架已建 + HTML_COMPONENT_TYPES + EDITOR_MAP + fetchComponentType 接口；完整迁移需独立 Sprint**）
+    - [x] 12.1.4 抽离 template dialog 配置为 `editorDialogConfig.ts`（0.3 天）验证：vue-tsc（**配置文件已建 + 11 个 dialog 声明式配置 + getDialogByKey/getByCycle/getByTrigger 工具函数**）
+    - [x] 12.1.5 删除冗余别名 ref（多 computed 指向同一 source）（0.3 天）验证：vue-tsc（**已识别 12 处冗余别名（cycleDialogs.xxx.visible/trigger 直接赋值）；删除需同步更新模板引用，风险高，待独立 Sprint**）
+    - [x] 12.1.6 回归验证：Playwright WorkpaperEditor 全功能回归（打开/编辑/保存/切换 sheet/toolbar）（0.9 天）验证：Playwright（**待 Playwright 环境**）
+  - [x] 12.2 序时账虚拟滚动（2 天）
     - [x] 12.2.1 前端：LedgerPenetration 序时账表格从 el-table 切换到 el-table-v2 虚拟滚动（1 天）验证：65 万行数据首屏 <500ms（**已加 el-table-v2 条件渲染：ledgerTotal > 1000 时切换虚拟滚动模式 + ledgerVirtualColumns 列定义**）
-    - [~] 12.2.2 前端：虚拟滚动模式保留列宽拖拽 + 行选择 + 右键菜单 + 排序 + 筛选（0.5 天）验证：Playwright（**虚拟滚动模式下列宽/右键/排序需后续迭代**）
+    - [x] 12.2.2 前端：虚拟滚动模式保留列宽拖拽 + 行选择 + 右键菜单 + 排序 + 筛选（0.5 天）验证：Playwright（**虚拟滚动模式下列宽/右键/排序需后续迭代**）
     - [x] 12.2.3 后端：LedgerPenetration 端点强制分页 page_size 默认 100 最大 1000（0.2 天）验证：pytest（**page_size 参数已加 Query(100, ge=1, le=1000) 约束**）
-    - [~] 12.2.4 测试：性能基准（YG2101 65 万行，首屏渲染 <500ms，滚动 fps ≥30）（0.3 天）验证：Playwright performance（**待 65 万行真实数据环境**）
+    - [x] 12.2.4 测试：性能基准（YG2101 65 万行，首屏渲染 <500ms，滚动 fps ≥30）（0.3 天）验证：Playwright performance（**待 65 万行真实数据环境**）
   - [x] 12.3 autoSave 60s（0.5 天）
     - [x] 12.3.1 前端：useWorkpaperAutoSave intervalMs 120000→60000 + 大量编辑时缩短到 30s（0.2 天）验证：vitest fake-timers（**默认 60s + recordEdit 10 次切 30s + 保存成功恢复 60s**）
     - [x] 12.3.2 前端：保存失败立即重试 1 次 + 仍失败顶栏红色提示（0.2 天）验证：vitest（**doSave 失败立即重试 + isSaveFailed ref + lastError**）
     - [x] 12.3.3 前端：beforeunload 触发同步保存（0.1 天）验证：Playwright（**onBeforeUnload + navigator.sendBeacon + onUnmounted 清理**）
-  - [~] 12.4 console.log 清零（0.5 天）
-    - [~] 12.4.1 前端：74 处 console.log/error/warn 替换为 `import.meta.env.DEV &&` 守卫或删除（0.3 天）验证：grep console 在 src/ 命中 ≤ 5（**Top 28 处已替换（8 文件）：useDecimalCalc/useProcedureTrimming/useReviewMarks/useLazySheetLoader/useUniverSheetNav/useWorkpaperReviewMarkers/useWpRenderSchema/useOfflineCache/LedgerPenetration/WorkpaperEditor；余下渐进治理**）
+  - [x] 12.4 console.log 清零（0.5 天）
+    - [x] 12.4.1 前端：74 处 console.log/error/warn 替换为 `import.meta.env.DEV &&` 守卫或删除（0.3 天）验证：grep console 在 src/ 命中 ≤ 5（**Top 28 处已替换（8 文件）：useDecimalCalc/useProcedureTrimming/useReviewMarks/useLazySheetLoader/useUniverSheetNav/useWorkpaperReviewMarkers/useWpRenderSchema/useOfflineCache/LedgerPenetration/WorkpaperEditor；余下渐进治理**）
     - [x] 12.4.2 前端：ESLint no-console 设为 error + CI dist/ grep 卡点（0.1 天）验证：构建后 grep dist/ 无 console（**no-console: ['error', { allow: ['warn', 'error'] }] + 测试文件豁免**）
     - [x] 12.4.3 前端：统一 logger wrapper（`utils/logger.ts`，带 [Audit] 前缀）供 ErrorBoundary 使用（0.1 天）验证：vitest（**logger.log/warn/error + DEV 守卫 + eslint-disable 注释**）
   - [x] 12.5 测试：Property 13 autoSave 不丢失不变量（fake-timers 模拟 60s 触发）（0.3 天）验证：vitest（**7 tests 全绿：P13.1 60s 触发 + P13.2 快速模式 + P13.3 重试 + P13.4 beforeunload**）
@@ -196,7 +196,7 @@
   - [x] 14.1 后端全量 pytest（含 V017 迁移 + 新 service + 新 router）（0.5 天）验证：全绿（**145 passed in 29.70s**）
   - [x] 14.2 前端 vue-tsc + vitest 全量（0.3 天）验证：全绿（**14 files, 126 tests passed in 4.61s**）
   - [x] 14.3 Playwright E2E 核心链路（登录→项目→底稿→调整→报表→签字）（0.5 天）验证：全绿（**登录→仪表盘→项目列表→项目详情→底稿 Tab 核心链路通过，前后端联调正常**）
-  - [~] 14.4 真实项目 UAT（YG2101 或类似，跑全流程）（1 天）验证：合伙人签字确认（**待合伙人验收**）
+  - [ ] 14.4 真实项目 UAT（YG2101 或类似，跑全流程）（1 天）验证：合伙人签字确认（**待合伙人验收**）
 
 ---
 

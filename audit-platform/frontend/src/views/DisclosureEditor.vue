@@ -184,7 +184,7 @@
         </el-alert>
         <!-- 底稿同步来源提示（design §12.1：底稿 → 模块单向同步） -->
         <el-alert
-          v-if="currentNote?.last_sync_source === 'workpaper'"
+          v-if="(currentNote as any)?.last_sync_source === 'workpaper'"
           type="info"
           :closable="false"
           show-icon
@@ -196,8 +196,8 @@
           <template #default>
             <div class="gt-de-sync-banner">
               <span>建议在底稿编辑入口（C 类附注 sheet）维护，避免双源不一致。</span>
-              <span v-if="currentNote?.last_sync_at" class="gt-de-sync-time">
-                · 最近同步：{{ formatSyncTime(currentNote.last_sync_at) }}
+              <span v-if="(currentNote as any)?.last_sync_at" class="gt-de-sync-time">
+                · 最近同步：{{ formatSyncTime((currentNote as any).last_sync_at) }}
               </span>
             </div>
           </template>
@@ -1566,13 +1566,14 @@ const treeContextMenu = reactive<{ visible: boolean; x: number; y: number; secti
   section: null,
 })
 
-function onTreeNodeContextMenu(event: MouseEvent, data: any) {
+function onTreeNodeContextMenu(event: Event, data: any, _node?: any, _nodeInstance?: any) {
   // 分组节点不开右键菜单
   if (!data || data.isGroup || !data.data?.note_section) return
-  event.preventDefault()
+  const mouseEvent = event as MouseEvent
+  mouseEvent.preventDefault()
   treeContextMenu.visible = true
-  treeContextMenu.x = event.clientX
-  treeContextMenu.y = event.clientY
+  treeContextMenu.x = mouseEvent.clientX
+  treeContextMenu.y = mouseEvent.clientY
   treeContextMenu.section = data.data
 }
 
@@ -2095,7 +2096,7 @@ function onTimeMachineRestored(_snap: any) {
 
 function onDeCtxTrustScore() {
   deCtx.closeContextMenu()
-  const section = selectedSection.value?.id || ''
+  const section = currentNote.value?.note_section || ''
   const cell = deCtx.contextMenu.rowData ? `row${deCtx.selectedCells.value[0]?.row || 0}` : ''
   const context = `note:${section}|${cell}`
   trustScorePanelRef.value?.open(context)

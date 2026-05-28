@@ -68,6 +68,8 @@ interface ApprovalItem {
   description: string | null
   wp_progress_pct: number
   is_warning: boolean
+  /** 是否加班行（hours > 8 通常视为加班，由后端标记） */
+  is_overtime?: boolean
 }
 
 const route = useRoute()
@@ -84,7 +86,10 @@ function onSelectionChange(rows: ApprovalItem[]) {
 }
 
 function rowClassName({ row }: { row: ApprovalItem }) {
-  return row.is_warning ? 'gt-warning-row' : ''
+  const classes: string[] = []
+  if (row.is_overtime) classes.push('gt-overtime-row')
+  if (row.is_warning) classes.push('gt-warning-row')
+  return classes.join(' ')
 }
 
 async function loadData() {
@@ -147,4 +152,5 @@ onMounted(loadData)
 }
 .gt-batch-info { font-size: 13px; font-weight: 500; }
 :deep(.gt-warning-row) { background-color: #fff7e6 !important; }
+:deep(.gt-overtime-row) { background-color: #ffe6e6 !important; }
 </style>

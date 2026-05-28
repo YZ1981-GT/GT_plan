@@ -131,11 +131,11 @@ const displayText = computed(() => {
   return target
 })
 
-const chipType = computed<'' | 'info' | 'success' | 'warning' | 'danger'>(() => {
-  if (resolveStatus.value === 'exists') return ''  // primary/default
+const chipType = computed<'primary' | 'info' | 'success' | 'warning' | 'danger'>(() => {
+  if (resolveStatus.value === 'exists') return 'primary'  // 默认色（element-plus v2 起 '' 已废弃）
   if (resolveStatus.value === 'not_exists' || resolveStatus.value === 'trimmed') return 'info'
   if (resolveStatus.value === 'error') return 'danger'
-  return ''  // pending
+  return 'primary'  // pending
 })
 
 const chipEffect = computed(() => {

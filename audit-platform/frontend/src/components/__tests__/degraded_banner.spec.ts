@@ -78,8 +78,8 @@ describe('DegradedBanner 三档', () => {
     // 触发首次 5xx 刷新
     await vi.advanceTimersByTimeAsync(5_000)
     await flushPromises()
-    // 因为 sticky 行为，文案应该是"服务响应较慢"
-    expect(wrapper.text()).toContain('服务响应较慢')
+    // 因为 sticky 行为，文案应该是 degraded 级别提示（含"响应较慢"）
+    expect(wrapper.text()).toContain('响应较慢')
   })
 
   it('5xx > 60% 触发 critical', async () => {
@@ -87,6 +87,7 @@ describe('DegradedBanner 三档', () => {
     const wrapper = mount(DegradedBanner)
     await vi.advanceTimersByTimeAsync(5_000)
     await flushPromises()
-    expect(wrapper.text()).toContain('部分功能暂时不可用')
+    // critical 级别文案（含"后端服务异常"）
+    expect(wrapper.text()).toContain('后端服务异常')
   })
 })

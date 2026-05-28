@@ -6,6 +6,7 @@
  * Requirements: 1.2, 1.3, 2.1, 2.2, 2.3, 2.4, 7.2, 7.4
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { logger } from '@/utils/logger'
 import {
   type ViewPresetId,
   type ViewPresetConfig,
@@ -276,7 +277,7 @@ export function useRoleViewPreset(
     }
 
     // Debug log
-    console.debug('[useRoleViewPreset] 视图切换', {
+    logger.log('[useRoleViewPreset] 视图切换', {
       from: prev,
       to: id,
       userId: userId.value,

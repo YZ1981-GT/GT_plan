@@ -199,7 +199,8 @@ describe('Property 5: 年度切换响应不变量', () => {
   it('Property 5c: 回调收到的 year 等于触发时刻的最新 year（无 stale closure）', async () => {
     await fc.assert(
       fc.asyncProperty(
-        fc.integer({ min: 2018, max: 2032 }),
+        // targetYear 必须 ≠ 2024（初始值），否则 watch 不会触发
+        fc.integer({ min: 2018, max: 2032 }).filter((y) => y !== 2024),
         async (targetYear) => {
           vi.useFakeTimers()
           testPinia = createPinia()

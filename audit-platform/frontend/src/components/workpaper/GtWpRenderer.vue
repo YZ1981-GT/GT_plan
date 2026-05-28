@@ -253,7 +253,7 @@ const activeSheet = computed(() => {
 })
 
 const activeSheetSchema = computed(() => activeSheet.value?.schema ?? {})
-const activeSheetHtmlData = computed(() => activeSheet.value?.html_data ?? {})
+const activeSheetHtmlData = computed<any>(() => activeSheet.value?.html_data ?? {})
 /** 当前 sheet 的 componentType（每个 sheet 独立路由） */
 const componentType = computed<WpComponentType>(() => {
   return (activeSheet.value?.componentType as WpComponentType) ?? 'skip'

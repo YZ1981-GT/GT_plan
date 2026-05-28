@@ -476,9 +476,9 @@ function progressFormat(percentage: number): string {
   return `${done}/${total} (${percentage}%)`
 }
 
-function categoryTagType(category: string): '' | 'success' | 'warning' | 'danger' | 'info' {
+function categoryTagType(category: string): 'primary' | 'success' | 'warning' | 'danger' | 'info' {
   switch (category) {
-    case '常规★': return ''
+    case '常规★': return 'primary'
     case 'IPO 加项': return 'warning'
     case '备选程序': return 'info'
     case '舞弊应对': return 'danger'
@@ -486,12 +486,12 @@ function categoryTagType(category: string): '' | 'success' | 'warning' | 'danger
   }
 }
 
-function statusTagType(status: string): '' | 'success' | 'warning' | 'danger' | 'info' {
+function statusTagType(status: string): 'primary' | 'success' | 'warning' | 'danger' | 'info' {
   switch (status) {
     case 'completed': return 'success'
     case 'in_progress': return 'warning'
     case 'not_applicable': return 'info'
-    default: return ''
+    default: return 'primary'
   }
 }
 

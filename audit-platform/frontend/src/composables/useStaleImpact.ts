@@ -12,6 +12,7 @@
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import http from '@/utils/http'
+import { logger } from '@/utils/logger'
 import { addressRegistry, linkageBus } from '@/services/apiPaths'
 
 export interface StaleAffectedItem {
@@ -89,7 +90,7 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
     } catch (e: any) {
       // 降级模式：503 时静默（不显示黄条，不阻断保存）
       if (e?.response?.status === 503) {
-        console.info('[useStaleImpact] Engine degraded (503), silently skipping')
+        logger.log('[useStaleImpact] Engine degraded (503), silently skipping')
         return null
       }
       console.warn('[useStaleImpact] notify failed:', e)

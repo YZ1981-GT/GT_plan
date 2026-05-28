@@ -12,7 +12,7 @@
  * ⑥ onSSECrossRefUpdated 忽略非 cross_ref.updated 事件
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, type Ref } from 'vue'
 import { useDCycleEditor } from '@/composables/useDCycleEditor'
 import { eventBus } from '@/utils/eventBus'
 import type { SheetNavFacadeAPI } from '@/composables/useSheetNavFacade'
@@ -57,8 +57,8 @@ function makeSheetNavMock(): SheetNavFacadeAPI {
 }
 
 describe('useDCycleEditor', () => {
-  let wpDetail: ReturnType<typeof ref>
-  let projectId: ReturnType<typeof ref>
+  let wpDetail: Ref<{ wp_code?: string | null } | null>
+  let projectId: Ref<string>
   let sheetNav: SheetNavFacadeAPI
   let onRefreshPrefill: ReturnType<typeof vi.fn>
 

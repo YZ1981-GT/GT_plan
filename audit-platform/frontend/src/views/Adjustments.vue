@@ -9,7 +9,7 @@
         :year-value="selectedYear"
         :badges="[
           { value: `AJE ${summary?.aje_count || 0} 笔 · RJE ${summary?.rje_count || 0} 笔` },
-          ...(currentTemplateType ? [{ value: currentTemplateType === 'soe' ? '📘 国企版' : '📗 上市版', type: currentTemplateType === 'soe' ? 'warning' : 'primary' }] : []),
+          ...(currentTemplateType ? [{ value: currentTemplateType === 'soe' ? '📘 国企版' : '📗 上市版', type: (currentTemplateType === 'soe' ? 'warning' : 'primary') as 'warning' | 'primary' }] : []),
         ]"
         @unit-change="onProjectChange"
         @year-change="onYearChange"
