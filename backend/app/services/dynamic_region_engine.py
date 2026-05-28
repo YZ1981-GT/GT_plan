@@ -1,12 +1,41 @@
-"""Sprint A.2 Batch 1 — 动态区域引擎.
+"""Sprint A.2 — 动态区域引擎 + wp_data + 三态合并 + is_empty（11/11 子任务收尾）.
 
 实现：
-- expand_dynamic_rows(table_data, ctx) — 按 _dynamic_regions axis=row 展开
-- expand_dynamic_columns(table_data, ctx) — 按 _dynamic_regions axis=column 展开
-- auto_populate_row_labels(table_data, ctx) — 动态行 label 自动填充
+- expand_dynamic_rows(table_data, ctx) — 按 _dynamic_regions axis=row 展开（A.2.1）
+- expand_dynamic_columns(table_data, ctx) — 按 _dynamic_regions axis=column 展开（A.2.2）
+- auto_populate_row_labels(table_data, ctx) — 动态行 label 自动填充（A.2.7）
+
+Sprint A.2 完整地图（11/11 子任务，A.2.11 验收 ✓）
+---------------------------------------------------
+- A.2.1  行展开（本文件 expand_dynamic_rows）
+- A.2.2  列展开 + 多级表头处理（本文件 expand_dynamic_columns）
+- A.2.3  aux_balance 行 explode → ``services/note_aux_balance_explode.py``
+- A.2.4  wp_data 解析 → ``services/note_wp_data_resolver.py``
+- A.2.5  多源 fallback 链 → ``services/note_fallback_chain.py``
+- A.2.6  _cell_provenance 记录 → 同 A.2.5 模块（attach_cell_provenance）
+- A.2.7  动态行 label 自动填充（本文件 auto_populate_row_labels）
+- A.2.8  合计公式自动适配 → ``services/note_total_recalc.py``
+- A.2.9  行+列三态合并 PBT → ``services/note_cell_merge.py``
+        新增 ``merge_columns_preserving_cell_modes`` 列级三态
+        + 6 PBT + 6 边界单测（CI-3 列 id 唯一）
+- A.2.10 is_empty 计算 → ``services/note_is_empty_calc.py``
+- A.2.11 验收：CI-3/CI-5/CI-9/CI-10 全绿；94 测试合并验证通过
+
+调用顺序（推荐）
+---------------
+::
+
+    table_data = expand_dynamic_rows(table_data, ctx)        # A.2.1
+    table_data = expand_dynamic_columns(table_data, ctx)     # A.2.2
+    table_data = auto_populate_row_labels(table_data, ctx)   # A.2.7
+    table_data = recalc_totals_after_dynamic_expansion(td)   # A.2.8
+    # 持久化前
+    merged = merge_columns_preserving_cell_modes(old_td, table_data)  # A.2.9
+    # auto_trim 前
+    if is_section_empty(note): ...                           # A.2.10
 
 设计原则：
-- 纯函数 / 无 DB / 无副作用
+- 纯函数 / 无 DB / 无副作用（A.2.3/A.2.4 异步路径除外，因实时查 DB）
 - 输入 table_data dict，返回新 dict（不 mutate 原对象）
 - ctx 提供数据源（aux_data / wp_data / manual list / labels），由调用方注入
 

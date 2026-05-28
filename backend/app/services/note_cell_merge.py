@@ -42,6 +42,7 @@ from typing import Any
 __all__ = [
     "merge_row_preserving_cell_modes",
     "merge_table_data_preserving_cell_modes",
+    "merge_columns_preserving_cell_modes",
 ]
 
 # 三态合并允许值
@@ -376,3 +377,256 @@ def merge_table_data_preserving_cell_modes(
 
     # 单表分支
     return _merge_single_table(old_safe, new_table_data)
+
+
+# ---------------------------------------------------------------------------
+# A.2.9 — 列级三态合并（动态加列时保留旧 cells 的 cell_modes 状态）
+# ---------------------------------------------------------------------------
+
+
+def _columns_meta_index_by_id(meta: list[Any]) -> dict[str, int]:
+    """返回 {col_id: position_index}（_columns_meta 顺序索引）."""
+    out: dict[str, int] = {}
+    for i, c in enumerate(meta):
+        if isinstance(c, dict):
+            cid = c.get("id")
+            if isinstance(cid, str) and cid:
+                out[cid] = i
+    return out
+
+
+def _row_value_at(row: dict[str, Any], idx: int) -> Any:
+    vals = _safe_list(row.get("values"))
+    return vals[idx] if 0 <= idx < len(vals) else None
+
+
+def _row_cell_mode_at(row: dict[str, Any], idx: int) -> str:
+    modes = _safe_dict(row.get("_cell_modes"))
+    return _get_mode(modes, idx)
+
+
+def _row_cell_meta_at(row: dict[str, Any], idx: int) -> dict[str, Any] | None:
+    meta = _safe_dict(row.get("_cell_meta"))
+    slot = meta.get(str(idx))
+    return slot if isinstance(slot, dict) else None
+
+
+def _build_remapped_row(
+    old_row: dict[str, Any] | None,
+    new_row: dict[str, Any],
+    old_meta: list[Any],
+    new_meta: list[Any],
+) -> dict[str, Any]:
+    """根据 new_meta 列顺序重建 row.
+
+    - 对每个 new column：
+        - 若该 col_id 也在 old → 用旧 row 同 col_id 的 (value/_cell_modes/_cell_meta)
+          走行级三态合并（manual/locked 保留旧值）
+        - 若该 col_id 是新列 → 用 new_row 的对应位置值，cell_modes 默认 auto
+    - old 独有的 col_id：把那个 cell 的 (value, _cell_modes, _cell_meta) 暂存到
+      ``_legacy_cells[col_id]``，便于回滚 / 审计追溯（不写入 values）
+    """
+    new_row_safe = _safe_dict(new_row)
+    new_values_in = _safe_list(new_row_safe.get("values"))
+
+    old_idx_by_id = _columns_meta_index_by_id(old_meta)
+    new_idx_by_id = _columns_meta_index_by_id(new_meta)
+
+    n_new = len(new_meta)
+    out_values: list[Any] = [None] * n_new
+    out_modes: dict[str, Any] = {}
+    out_meta_dict: dict[str, Any] = {}
+
+    old_row_safe = _safe_dict(old_row)
+
+    for col in new_meta:
+        if not isinstance(col, dict):
+            continue
+        cid = col.get("id")
+        if not isinstance(cid, str) or not cid:
+            continue
+        new_pos = new_idx_by_id[cid]
+        new_val = new_values_in[new_pos] if new_pos < len(new_values_in) else None
+
+        if cid in old_idx_by_id and old_row_safe:
+            old_pos = old_idx_by_id[cid]
+            mode = _row_cell_mode_at(old_row_safe, old_pos)
+            old_val = _row_value_at(old_row_safe, old_pos)
+            old_slot = _row_cell_meta_at(old_row_safe, old_pos)
+
+            # 复制 mode（用户态权威）
+            out_modes[str(new_pos)] = mode
+
+            # 起始 meta slot：deepcopy 旧 slot；缺则空
+            slot = deepcopy(old_slot) if old_slot is not None else _make_empty_meta_slot()
+            for k in ("manual_value", "semantic", "binding_id"):
+                if k not in slot:
+                    slot[k] = None
+
+            if mode == _MODE_AUTO:
+                out_values[new_pos] = new_val
+                # 更新 binding_id 用 new
+                # （new 通常无 _cell_meta，简化处理）
+            elif mode == _MODE_MANUAL:
+                out_values[new_pos] = old_val
+                if slot.get("manual_value") is None and old_val is not None:
+                    slot["manual_value"] = old_val
+            elif mode == _MODE_LOCKED:
+                out_values[new_pos] = old_val
+                # locked 不动 slot
+            else:
+                out_values[new_pos] = new_val
+
+            out_meta_dict[str(new_pos)] = slot
+        else:
+            # 新列接入 — 直接用 new 值，cell_modes 默认 auto（不显式写）
+            out_values[new_pos] = new_val
+            out_meta_dict[str(new_pos)] = _make_empty_meta_slot()
+
+    # 收集 old 独有 col_id → _legacy_cells（保留以备审计回滚）
+    legacy_cells: dict[str, Any] = {}
+    if old_row_safe:
+        for cid, old_pos in old_idx_by_id.items():
+            if cid in new_idx_by_id:
+                continue
+            legacy_cells[cid] = {
+                "value": _row_value_at(old_row_safe, old_pos),
+                "mode": _row_cell_mode_at(old_row_safe, old_pos),
+                "meta": deepcopy(_row_cell_meta_at(old_row_safe, old_pos))
+                or _make_empty_meta_slot(),
+            }
+
+    # 起始结果 = deepcopy(new_row)；覆盖 values / _cell_modes / _cell_meta
+    merged: dict[str, Any] = deepcopy(new_row_safe)
+    merged["values"] = out_values
+    merged["_cell_modes"] = out_modes
+    merged["_cell_meta"] = out_meta_dict
+    if legacy_cells:
+        merged["_legacy_cells"] = legacy_cells
+
+    # 兜底字段：old 有 / new 无的字段（label / row_type / formula_type / is_total 等）
+    for k, v in old_row_safe.items():
+        if k in (
+            "values",
+            "_cell_modes",
+            "_cell_meta",
+            "_legacy_cells",
+        ):
+            continue
+        if k not in merged or merged.get(k) in (None, ""):
+            merged[k] = deepcopy(v)
+
+    return merged
+
+
+def merge_columns_preserving_cell_modes(
+    old_table_data: dict[str, Any] | None,
+    new_table_data: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """列级三态合并：动态加列时保留旧 cells 的 cell_modes 状态.
+
+    场景：用户在某列手填了值（``_cell_modes[col_id] == "manual"``），
+    动态展开新增列后，旧列的 manual/locked 状态必须保留。
+
+    规则
+    ----
+    - **列对齐**：按 ``_columns_meta[].id`` 对齐（不依赖位置）
+    - **旧列保留**：old 中存在 + new 中也存在的列 → 走行级三态合并
+      （manual 保留旧值；locked 保留旧值；auto 用新值）
+    - **新列接入**：new 独有的列 → 直接插入，cell_modes 默认 auto
+    - **旧列消失**：old 独有的列 → 不写入 values，但写入 row 的
+      ``_legacy_cells[col_id]`` 字段保留 (value, mode, meta) 以备审计回滚
+    - **行对齐**：按现有 ``_merge_rows`` 规则（label 优先 / index 兜底）
+
+    Args:
+        old_table_data: 历史 table_data（含 _columns_meta / rows）
+        new_table_data: 引擎重新算出的表格（含 _columns_meta / rows）
+
+    Returns:
+        新 dict — 独立深拷贝；可直接赋值 note.table_data。
+
+    Notes:
+        - 与 ``merge_table_data_preserving_cell_modes`` 不同：本函数处理
+          列结构变化（加列 / 删列 / 重排），而行级合并函数假设列结构不变。
+        - 若 ``new._columns_meta`` 为空或缺失，退化到行级合并函数（保持兼容）。
+    """
+    if not isinstance(new_table_data, dict) and not isinstance(old_table_data, dict):
+        return {}
+
+    if not isinstance(new_table_data, dict):
+        return deepcopy(_safe_dict(old_table_data))
+
+    new_safe = _safe_dict(new_table_data)
+    old_safe = _safe_dict(old_table_data)
+
+    new_meta = _safe_list(new_safe.get("_columns_meta"))
+    old_meta = _safe_list(old_safe.get("_columns_meta"))
+
+    # 退化：new 没声明 _columns_meta → 行级合并
+    if not new_meta:
+        return merge_table_data_preserving_cell_modes(old_table_data, new_table_data)
+
+    # 验 CI-3：new._columns_meta 中 id 必须全表唯一
+    seen: set[str] = set()
+    for c in new_meta:
+        if isinstance(c, dict):
+            cid = c.get("id")
+            if isinstance(cid, str) and cid:
+                if cid in seen:
+                    raise ValueError(
+                        f"merge_columns_preserving_cell_modes: duplicate column id "
+                        f"'{cid}' in new _columns_meta (CI-3 violation)"
+                    )
+                seen.add(cid)
+
+    # 行对齐：复用 _merge_rows 但每个 row 走列重映射
+    old_rows = _safe_list(old_safe.get("rows"))
+    new_rows = _safe_list(new_safe.get("rows"))
+
+    # 收集 old rows 索引（按 label 对齐）
+    old_by_label: dict[str, dict[str, Any]] = {}
+    old_dict_rows: list[dict[str, Any]] = []
+    for r in old_rows:
+        if isinstance(r, dict):
+            old_dict_rows.append(r)
+            key = _row_key(r)
+            if key is not None and key not in old_by_label:
+                old_by_label[key] = r
+
+    used_old_ids: set[int] = set()
+    merged_rows: list[dict[str, Any]] = []
+
+    for i, new_r in enumerate(new_rows):
+        if not isinstance(new_r, dict):
+            merged_rows.append(deepcopy(new_r) if isinstance(new_r, dict) else new_r)
+            continue
+
+        new_key = _row_key(new_r)
+        old_r: dict[str, Any] | None = None
+        if new_key is not None and new_key in old_by_label:
+            cand = old_by_label[new_key]
+            if id(cand) not in used_old_ids:
+                old_r = cand
+                used_old_ids.add(id(cand))
+        if old_r is None and i < len(old_dict_rows):
+            cand = old_dict_rows[i]
+            if id(cand) not in used_old_ids:
+                cand_key = _row_key(cand)
+                if cand_key is None or cand_key == new_key:
+                    old_r = cand
+                    used_old_ids.add(id(cand))
+
+        merged_rows.append(_build_remapped_row(old_r, new_r, old_meta, new_meta))
+
+    # 老 row 独有 → 追加 + _legacy_row 标记（按 new_meta 列结构对齐）
+    for r in old_dict_rows:
+        if id(r) in used_old_ids:
+            continue
+        # 给老行也走列重映射（生成符合 new_meta 列结构的 row）
+        legacy = _build_remapped_row(r, {"values": [None] * len(new_meta)}, old_meta, new_meta)
+        legacy["_legacy_row"] = True
+        merged_rows.append(legacy)
+
+    out = deepcopy(new_safe)
+    out["rows"] = merged_rows
+    return out
