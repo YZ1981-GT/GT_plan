@@ -130,10 +130,10 @@
 
 ## Sprint A.6：协作锁集成 D9（0.5 人天）
 
-- [ ] **A.6.1** 4 入口集成 NoteSectionLockService（动态行/列/基线/auto_trim/切换）
+- [x] **A.6.1** 4 入口集成 NoteSectionLockService（动态行/列/基线/auto_trim/切换）
 - [ ] **A.6.2** 前端章节列表锁可视化
 - [ ] **A.6.3** 锁冲突弹窗 + 抢占
-- [ ] **A.6.4** 验收（CI-13）
+- [x] **A.6.4** 验收（CI-13）
 
 ## Sprint A.7：集团模板继承（2.5 人天）
 
