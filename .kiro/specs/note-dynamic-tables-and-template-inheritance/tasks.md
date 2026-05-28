@@ -81,13 +81,13 @@
 
 ## Sprint A.4：文字段落 Jinja（1.5 人天）
 
-- [ ] **A.4.1** note_text_template_engine.py（Jinja env + filter format_amount/cn_number/date_cn）
-- [ ] **A.4.2** _render_text_paragraph 接入
-- [ ] **A.4.3** 段落变量自动收集（wizard_state + client master + consolidation + prior_notes）
-- [ ] **A.4.4** 段落 Word 渲染
+- [x] **A.4.1** note_text_template_engine.py（Jinja env + filter format_amount/cn_number/date_cn）
+- [x] **A.4.2** _render_text_paragraph 接入
+- [x] **A.4.3** 段落变量自动收集（wizard_state + client master + consolidation + prior_notes）
+- [x] **A.4.4** 段落 Word 渲染
 - [ ] **A.4.5** 模板 P-3 入库
-- [ ] **A.4.6** CI-11 必有变量声明
-- [ ] **A.4.7** 单测 18 用例
+- [x] **A.4.6** CI-11 必有变量声明
+- [x] **A.4.7** 单测 18 用例
 
 ## Sprint A.5：D14 国企↔上市丝滑切换（v0.6 新增⭐⭐⭐，2.5 人天）
 
