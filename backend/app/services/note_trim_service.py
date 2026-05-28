@@ -288,6 +288,205 @@ class NoteTrimService:
             "errors": errors,
         }
 
+    # ------------------------------------------------------------------
+    # Sprint A.3.3：auto_trim_v2 三级裁剪（章节 / 表格 / 段落，CI-8 互斥）
+    # ------------------------------------------------------------------
+
+    async def auto_trim_v2(
+        self,
+        project_id: UUID,
+        year: int,
+        template_type: str | None = None,
+    ) -> dict:
+        """三级裁剪：章节 / 表格 / 段落。
+
+        互斥优先级（CI-8）：``section > paragraph > table``
+        - 章节级（section_skipped）：TB account_codes 全 0 → ``status='not_applicable'``
+        - 段落级（section_deleted）：``is_section_empty(note)`` → ``is_deleted=true``
+        - 表格级（table_replaced）：``is_table_data_empty`` → ``table_data._render_as='no_business_paragraph'``
+
+        同一章节最多触发一个级别。
+
+        Returns:
+            ``{"section_skipped": int, "section_deleted": int, "table_replaced": int,
+               "retained": int, "errors": list[dict]}``
+        """
+        from app.models.report_models import DisclosureNote
+        from app.services.note_is_empty_calc import (
+            is_section_empty,
+            is_table_data_empty,
+        )
+
+        resolved_type = await self.resolve_template_type(project_id, template_type)
+        sections = await self.get_sections(project_id, resolved_type)
+
+        # ─── Pass 1：章节级（与 auto_trim 同语义）─────────────────────────
+        section_items: list[dict] = []
+        section_skipped_numbers: set[str] = set()  # 已被章节级标的 section_number
+        errors: list[dict] = []
+
+        for section in sections:
+            sid = section.get("id")
+            snum = section.get("section_number")
+            try:
+                binding = get_binding_for_section(snum)
+                account_codes = self._collect_account_codes_for_section(binding)
+                if not account_codes:
+                    continue
+                all_zero = await self._is_all_zero_for_codes(
+                    project_id, year, list(account_codes)
+                )
+                if all_zero:
+                    section_items.append({
+                        "id": sid,
+                        "status": "not_applicable",
+                        "skip_reason": "auto:all_zero",
+                    })
+                    if snum:
+                        section_skipped_numbers.add(snum)
+            except Exception as exc:
+                logger.warning(
+                    "auto_trim_v2 section %s level-1 failed: %s", snum, exc
+                )
+                errors.append({
+                    "section_id": sid,
+                    "section_number": snum,
+                    "phase": "level1_section",
+                    "error": str(exc),
+                })
+
+        if section_items:
+            try:
+                await self.save_trim(project_id, resolved_type, section_items)
+            except Exception as exc:
+                logger.exception("auto_trim_v2 save_trim failed: %s", exc)
+                errors.append({"phase": "save_trim", "error": str(exc)})
+
+        # ─── 加载剩余章节的 DisclosureNote（CI-8：跳过已章节级标的）─────
+        remaining_numbers = [
+            s.get("section_number") for s in sections
+            if s.get("section_number") and s.get("section_number") not in section_skipped_numbers
+        ]
+        notes_by_section: dict[str, list[DisclosureNote]] = {}
+        if remaining_numbers:
+            try:
+                q = sa.select(DisclosureNote).where(
+                    DisclosureNote.project_id == project_id,
+                    DisclosureNote.year == year,
+                    DisclosureNote.note_section.in_(remaining_numbers),
+                    DisclosureNote.is_deleted == sa.false(),
+                )
+                rows = (await self.db.execute(q)).scalars().all()
+                for n in rows:
+                    notes_by_section.setdefault(n.note_section, []).append(n)
+            except Exception as exc:
+                logger.warning("auto_trim_v2 load notes failed: %s", exc)
+                errors.append({"phase": "load_notes", "error": str(exc)})
+
+        # ─── Pass 2：段落级（章节空 → DisclosureNote.is_deleted=true）──
+        section_deleted_numbers: set[str] = set()
+        section_deleted_count = 0
+
+        for snum, notes in notes_by_section.items():
+            if not notes:
+                continue
+            try:
+                # 章节内所有 note 都是空 → 整章节段落级删除
+                if all(is_section_empty(n) for n in notes):
+                    for n in notes:
+                        n.is_deleted = True
+                        # 记录删除原因到 template_lineage（无独立列，避免 schema 改动）
+                        lineage = dict(n.template_lineage or {})
+                        lineage["deletion_reason"] = "auto_trim_v2_empty"
+                        from datetime import datetime as _dt, timezone as _tz
+                        lineage["deletion_at"] = _dt.now(_tz.utc).isoformat()
+                        n.template_lineage = lineage
+                        try:
+                            from sqlalchemy.orm.attributes import flag_modified
+                            flag_modified(n, "template_lineage")
+                        except Exception:
+                            # 非 ORM 实例（测试 mock）— 跳过 flag_modified
+                            pass
+                    section_deleted_numbers.add(snum)
+                    section_deleted_count += 1
+            except Exception as exc:
+                logger.warning(
+                    "auto_trim_v2 section %s level-2 failed: %s", snum, exc
+                )
+                errors.append({
+                    "section_number": snum,
+                    "phase": "level2_paragraph",
+                    "error": str(exc),
+                })
+
+        # ─── Pass 3：表格级（剩余章节内空 table → _render_as 标记）─────
+        table_replaced_count = 0
+        for snum, notes in notes_by_section.items():
+            if snum in section_deleted_numbers:
+                continue  # CI-8：段落级已标，不再标表格级
+            for n in notes:
+                try:
+                    td = n.table_data
+                    if not isinstance(td, dict):
+                        continue
+                    # 单表分支
+                    multi = td.get("_tables") if isinstance(td.get("_tables"), list) else None
+                    if multi:
+                        modified = False
+                        for tbl in multi:
+                            if isinstance(tbl, dict) and is_table_data_empty(tbl):
+                                tbl["_render_as"] = "no_business_paragraph"
+                                modified = True
+                        if modified:
+                            n.table_data = td
+                            try:
+                                from sqlalchemy.orm.attributes import flag_modified
+                                flag_modified(n, "table_data")
+                            except Exception:
+                                pass
+                            table_replaced_count += 1
+                    else:
+                        if is_table_data_empty(td):
+                            # 跳过 text_content 非空 + table 空的场景：让 paragraph 保留正文
+                            td["_render_as"] = "no_business_paragraph"
+                            n.table_data = td
+                            try:
+                                from sqlalchemy.orm.attributes import flag_modified
+                                flag_modified(n, "table_data")
+                            except Exception:
+                                pass
+                            table_replaced_count += 1
+                except Exception as exc:
+                    logger.warning(
+                        "auto_trim_v2 note %s level-3 failed: %s", n.id, exc
+                    )
+                    errors.append({
+                        "note_id": str(n.id),
+                        "section_number": snum,
+                        "phase": "level3_table",
+                        "error": str(exc),
+                    })
+
+        try:
+            await self.db.flush()
+        except Exception as exc:
+            logger.exception("auto_trim_v2 flush failed: %s", exc)
+            errors.append({"phase": "flush", "error": str(exc)})
+
+        retained = max(
+            0,
+            len(sections) - len(section_skipped_numbers) - section_deleted_count,
+        )
+
+        return {
+            "section_skipped": len(section_skipped_numbers),
+            "section_deleted": section_deleted_count,
+            "table_replaced": table_replaced_count,
+            "retained": retained,
+            "errors": errors,
+        }
+
+
     @staticmethod
     def _collect_account_codes_for_section(binding: dict | None) -> set[str]:
         """从 section binding 的所有 cell.account_codes 并集中收集科目代码."""

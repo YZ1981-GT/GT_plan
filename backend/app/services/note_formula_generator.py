@@ -443,6 +443,82 @@ async def execute_note_formulas(
 # 跨表数据加载
 # ---------------------------------------------------------------------------
 
+
+def _index_prior_dynamic_rows(
+    prior_index: dict[str, Any],
+    *,
+    keys: list[str],
+    rows: list[dict],
+) -> None:
+    """把上年附注 dynamic_data 行按 label 索引到 ``prior_index[key][label]``.
+
+    设计（Sprint A.3.2）：
+    - 仅 row_type='dynamic_data' 的行参与索引（跳过 anchor / marker_end / 合计行）
+    - label 取 ``row.label`` (trim 后)，空 label 跳过
+    - 期末 = values[0]，期初 = values[1]（与 2-arg PRIOR total_rows 列对齐）
+    - 同 label 多次出现 → 按累加（同名客户多笔）
+    - 与 2-arg 兼容：``prior_index[key]`` 已有 closing/opening 平铺时不覆盖；额外把
+      label dict 写到同 key 下（嵌套结构），通过 ``isinstance(...,dict) and 'closing'/'opening'``
+      可区分。
+    """
+    if not keys or not isinstance(rows, list):
+        return
+
+    # 关键修复：上层 _load_cross_table_data 把 section_number / section_title 都
+    # 指向同一个 entry dict（aliasing），如果直接按 key 迭代会对同一个 dict 重复
+    # 累加。此处先按身份去重 section_dict（保留首次出现）。
+    seen_ids: set[int] = set()
+    unique_dicts: list[dict] = []
+    for key in keys:
+        section_dict = prior_index.get(key)
+        if not isinstance(section_dict, dict):
+            section_dict = {}
+            prior_index[key] = section_dict
+        if id(section_dict) in seen_ids:
+            continue
+        seen_ids.add(id(section_dict))
+        unique_dicts.append(section_dict)
+
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        if r.get("row_type") != "dynamic_data":
+            continue
+        if r.get("is_total"):
+            continue
+        label = r.get("label")
+        if not isinstance(label, str):
+            continue
+        label = label.strip()
+        if not label:
+            continue
+        vals = r.get("values") or []
+        closing = vals[0] if len(vals) > 0 else None
+        opening = vals[1] if len(vals) > 1 else None
+        try:
+            closing_v = float(closing) if closing is not None else None
+        except (TypeError, ValueError):
+            closing_v = None
+        try:
+            opening_v = float(opening) if opening is not None else None
+        except (TypeError, ValueError):
+            opening_v = None
+
+        for section_dict in unique_dicts:
+            existing = section_dict.get(label)
+            if isinstance(existing, dict) and ("closing" in existing or "opening" in existing):
+                # 同 label 多次出现 → 累加
+                if closing_v is not None:
+                    existing["closing"] = (existing.get("closing") or 0.0) + closing_v
+                if opening_v is not None:
+                    existing["opening"] = (existing.get("opening") or 0.0) + opening_v
+            else:
+                section_dict[label] = {
+                    "closing": closing_v if closing_v is not None else 0.0,
+                    "opening": opening_v if opening_v is not None else 0.0,
+                }
+
+
 async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) -> dict[str, Any]:
     """预加载跨表数据供公式引用。
 
@@ -589,6 +665,19 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
             section_number = (prior_note.note_section or "").strip()
             if section_number and section_number not in cross_data["prior"]:
                 cross_data["prior"][section_number] = entry
+
+            # ─── Sprint A.3.2：动态行 label 索引（按 section_number / section_title 分组）───
+            # 把 dynamic_data 行按 label → {期末: closing, 期初: opening} 写到对应 section dict。
+            # 期末列 = values[0]（首列数据列），期初列 = values[1]，与 2-arg 取 total_rows 列规则一致。
+            try:
+                _index_prior_dynamic_rows(
+                    cross_data["prior"],
+                    keys=[k for k in (section_number, section_title) if k],
+                    rows=rows,
+                )
+            except Exception:
+                # graceful：dynamic 索引失败不影响 2-arg 总行索引
+                pass
     except Exception:
         pass
 
@@ -694,6 +783,30 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
         return None
 
     s = token.strip()
+
+    # ─── Sprint A.3.2: PRIOR('section_number','label','期末'|'期初') ───
+    # 上年附注按章节内动态行 label 匹配（dynamic_data 行）。
+    # 索引：cross_data['prior'][section_number][label] = {'closing': ..., 'opening': ...}
+    # 缺数据 → None；先试 3-arg 再降级到 2-arg 兼容老调用。
+    m = re.fullmatch(r"\s*PRIOR\('([^']+)','([^']+)','([^']+)'\)\s*", s)
+    if m:
+        section = m.group(1)
+        label = m.group(2)
+        period = m.group(3)
+        section_data = cross_data.get("prior", {}).get(section)
+        if not isinstance(section_data, dict):
+            return None
+        # 嵌套 label dict 才算 3-arg 命中（防止与 2-arg 的 closing/opening 平铺结构混淆）
+        label_data = section_data.get(label)
+        if not isinstance(label_data, dict):
+            return None
+        if "期末" in period or period == "closing":
+            val = label_data.get("closing")
+            return float(val) if val is not None else None
+        if "期初" in period or period == "opening":
+            val = label_data.get("opening")
+            return float(val) if val is not None else None
+        return None
 
     # ─── Sprint 1.5 Task 1.5.2: PRIOR('account_name','期末'|'期初') ───
     # 上年附注期末/期初值取数；缺数据 → None（章节标 not_applicable）
@@ -803,6 +916,200 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
         return float(tb_data.get(col_key, 0))
 
     return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sprint A.3.1：REGION('region_name','col_id', agg='sum') — 同表动态区域聚合
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+_REGION_AGG_FUNCS = {
+    "sum": lambda xs: sum(xs),
+    "count": lambda xs: float(len(xs)),
+    "max": lambda xs: max(xs) if xs else None,
+    "min": lambda xs: min(xs) if xs else None,
+    "avg": lambda xs: (sum(xs) / len(xs)) if xs else None,
+}
+
+
+def resolve_region_token(
+    token: str,
+    table_data: dict | None,
+) -> float | None:
+    """解析 REGION('region_name','col_id', agg='sum'|'count'|'max'|'min'|'avg') token.
+
+    引用同表内的动态区域 ``_dynamic_regions[name=region_name]`` 在指定 col_id
+    的聚合值（仅 axis=row 区域 + row_type=dynamic_data 行参与聚合）。
+
+    Args:
+        token: 形如 "REGION('客户','col_amount_end', agg='sum')"
+        table_data: 含 _dynamic_regions / _columns_meta / rows 的 dict
+
+    Returns:
+        聚合值（float），无匹配 region / col / 数据时返 None；
+        agg='count' 始终返非负数（无数据返 0.0）。
+
+    支持 agg：sum / count / max / min / avg；默认 sum。
+
+    无效输入（None / 非字符串 / 解析失败 / 缺 region / 缺 col_id）→ 返 None。
+    """
+    import re
+
+    if not token or not isinstance(token, str):
+        return None
+    if not isinstance(table_data, dict):
+        return None
+
+    s = token.strip()
+    # REGION('name','col', agg='sum')   或   REGION('name','col')
+    m = re.fullmatch(
+        r"\s*REGION\("
+        r"\s*'([^']+)'\s*,"
+        r"\s*'([^']+)'"
+        r"(?:\s*,\s*agg\s*=\s*['\"]([^'\"]+)['\"]\s*)?"
+        r"\)\s*",
+        s,
+    )
+    if not m:
+        return None
+
+    region_name = m.group(1)
+    col_id = m.group(2)
+    agg_raw = (m.group(3) or "sum").strip().lower()
+    agg = _REGION_AGG_FUNCS.get(agg_raw)
+    if agg is None:
+        return None
+
+    # 1. 找到匹配 region（axis=row）
+    regions = table_data.get("_dynamic_regions") or []
+    target_region = None
+    for r in regions:
+        if not isinstance(r, dict):
+            continue
+        if r.get("axis") != "row":
+            continue
+        if r.get("name") == region_name:
+            target_region = r
+            break
+    if target_region is None:
+        return None
+
+    start_idx = target_region.get("start_idx")
+    end_idx = target_region.get("end_idx")
+    if not isinstance(start_idx, int) or not isinstance(end_idx, int):
+        return None
+    if end_idx < start_idx:
+        return None
+
+    # 2. 找到 col_id 在 _columns_meta 中的位置
+    columns_meta = table_data.get("_columns_meta") or []
+    col_pos: int | None = None
+    for idx, col in enumerate(columns_meta):
+        if isinstance(col, dict) and col.get("id") == col_id:
+            col_pos = idx
+            break
+    if col_pos is None:
+        return None
+
+    # 3. 在 [start_idx, end_idx] 范围内迭代 dynamic_data 行
+    rows = table_data.get("rows") or []
+    if not isinstance(rows, list):
+        return None
+
+    nums: list[float] = []
+    for i in range(start_idx, min(end_idx + 1, len(rows))):
+        r = rows[i]
+        if not isinstance(r, dict):
+            continue
+        if r.get("row_type") != "dynamic_data":
+            continue
+        vals = r.get("values")
+        if not isinstance(vals, list) or col_pos >= len(vals):
+            continue
+        v = vals[col_pos]
+        if v is None:
+            continue
+        try:
+            nums.append(float(v))
+        except (TypeError, ValueError):
+            continue
+
+    if agg_raw == "count":
+        # count 始终返非负数；无 dynamic_data 行时返 0
+        return float(len(nums))
+
+    if not nums:
+        return None
+
+    try:
+        result = agg(nums)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+    return float(result) if result is not None else None
+
+
+def exec_with_region(
+    expression: Any,
+    cross_data: dict[str, Any],
+    table_data: dict | None,
+) -> float | None:
+    """REGION-aware 表达式解析：直接迭代 +/- 组合的 REGION + 其他跨表 token.
+
+    支持组合：``REGION('A','col_x') + TB('1001','期末') - REGION('B','col_y')``
+
+    Args:
+        expression: 含 REGION + 其他 token 的表达式
+        cross_data: 跨表数据（TB / WP / REPORT / NOTE / PRIOR / AGING）
+        table_data: 同表内 _dynamic_regions / _columns_meta / rows
+
+    Returns:
+        - 数值（所有 token 解析成功）
+        - None（任一 token 解析失败 / 表达式不合法）
+    """
+    import re
+
+    if expression is None or not isinstance(expression, str):
+        return None
+    s = expression.strip()
+    if not s:
+        return None
+
+    # 整体单 REGION 直接走 resolver（避免 +/- 拆分）
+    region_pattern = re.compile(
+        r"REGION\(\s*'[^']+'\s*,\s*'[^']+'(?:\s*,\s*agg\s*=\s*['\"][^'\"]+['\"])?\s*\)"
+    )
+    if region_pattern.fullmatch(s):
+        return resolve_region_token(s, table_data)
+
+    # 表达式由 +/- 拼接的 token 组成（REGION / TB / REPORT / WP / NOTE / PRIOR / AGING）
+    token_pattern = re.compile(
+        r"([+-]?)\s*("
+        r"REGION\(\s*'[^']+'\s*,\s*'[^']+'(?:\s*,\s*agg\s*=\s*['\"][^'\"]+['\"])?\s*\)"
+        r"|"
+        r"(?:TB|REPORT|WP|NOTE|PRIOR|AGING)\([^)]*\)"
+        r")"
+    )
+    matches = token_pattern.findall(s)
+    if not matches:
+        return None
+
+    # 校验整体由这些 token + +/- 组成（不能混入未识别字符）
+    rebuilt = "".join(f"{sign or '+'}{token}" for sign, token in matches)
+    s_no_space = re.sub(r"\s+", "", s)
+    rec_no_space = re.sub(r"\s+", "", rebuilt)
+    if rec_no_space.lstrip("+") != s_no_space.lstrip("+"):
+        return None
+
+    total = 0.0
+    for sign, token in matches:
+        if token.startswith("REGION("):
+            val = resolve_region_token(token, table_data)
+        else:
+            val = _resolve_single_cross_ref(token, cross_data)
+        if val is None:
+            return None
+        total += -val if sign == "-" else val
+    return total
 
 
 def _exec_cross_table(expression: Any, cross_data: dict[str, Any]) -> float | None:
