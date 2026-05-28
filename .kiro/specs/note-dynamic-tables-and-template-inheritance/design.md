@@ -1,7 +1,7 @@
 # 附注模块全维度增强 — 设计文档
 
-> 版本：v0.6.1（2026-05-28，一致性修复）
-> 关联需求：requirements.md（140 验收 / 14 维度 D1-D14）
+> 版本：v0.6.2（2026-05-28，新增 D15 离线分发）
+> 关联需求：requirements.md（151 验收 / 15 维度 D1-D15）
 > v0.6 关键变更：
 > 1. Phase 化重组：Phase 1 单体修复（主线）/ Phase 2 合并连带 / Phase 3 高级特性
 > 2. D14 国企↔上市丝滑切换独立成项
@@ -10,6 +10,12 @@
 > 1. 影响范围标题 v0.4 → v0.6
 > 2. CI 卡点表加 CI-20（D14 互转 round-trip PBT）
 > 3. ADR 列表加 ADR-021（国企↔上市丝滑切换）
+>
+> v0.6.2 新增：
+> 1. **D15 离线分发与一键导入**（人机互补，xlsx 导出 + 字段级 diff 导回）
+> 2. CI 卡点 +CI-21/CI-22（_meta_ sheet 完整性 + 导出/导入 round-trip PBT）
+> 3. ADR-022（离线分发包格式标准）
+> 4. 影响范围 +1.5 + 0.5 = 2 人天，**总 38.5 人天**
 
 ## 一、设计核心决策
 
@@ -951,7 +957,7 @@ POST /api/disclosure-notes/{note_id}/merge
 GET /api/disclosure-notes/{note_id}/diff?node_a=...&node_b=...
 ```
 
-## 三、CI 卡点（共 20 项）
+## 三、CI 卡点（共 22 项）
 
 - CI-1：`_dynamic_regions` idx/col_id 有效性
 - CI-2：row_type=dynamic_* 在 region 内
@@ -973,8 +979,10 @@ GET /api/disclosure-notes/{note_id}/diff?node_a=...&node_b=...
 - **CI-18：D13 section_id 全局唯一 + level 1-5 范围 + parent_section_id 引用有效**
 - **CI-19：D13 章节序号渲染后 rendered_number 在 scope 内唯一**
 - **CI-20（v0.6）：D14 国企↔上市互转 round-trip PBT（用户编辑 cell 切换两次后必无丢失）**
+- **CI-21（v0.6.2）：D15 离线导出包 _meta_ sheet 必有 section_id + binding hash**
+- **CI-22（v0.6.2）：D15 导入时 section_id 匹配 + 字段级 diff 完整性 PBT（导出→导入 round-trip 无丢失）**
 
-## 四、变更影响范围（v0.6）
+## 四、变更影响范围（v0.6.2）
 
 | 模块 | 改动 | 工作量 |
 |------|------|--------|
@@ -1005,8 +1013,10 @@ GET /api/disclosure-notes/{note_id}/diff?node_a=...&node_b=...
 | **历史模板迁移脚本** | **`migrate_section_number_to_section_id.py`** | **0.5 人天** |
 | **新建 `note_conversion_service` 升级 + `note_template_diff.py`** | **D14 国企↔上市丝滑切换 + 跨模板合并汇总 + 章节差异管理** | **2.5 人天** |
 | **前端切换 UI（D14 切换器 + 预览弹窗 + 进度条）** | **D14 互转 UX** | **1 人天** |
-| 测试 | 单测 + PBT + UAT（含 CI-20 round-trip） | 2.5 人天 |
-| **合计** | | **36.5 人天** + P-1~P-7 共 5 人天 |
+| **新建 `note_offline_export_service.py` + `note_offline_import_service.py`** | **D15 xlsx 导出 + 一键导入字段级 diff** | **1.5 人天** |
+| **前端导入冲突 diff 预览 UI** | **D15 章节级 / cell 级冲突选择** | **0.5 人天** |
+| 测试 | 单测 + PBT + UAT（含 CI-20 / CI-21 / CI-22） | 2.5 人天 |
+| **合计** | | **38.5 人天** + P-1~P-7 共 5 人天 |
 
 ## 五、ADR 新增
 
@@ -1021,6 +1031,7 @@ GET /api/disclosure-notes/{note_id}/diff?node_a=...&node_b=...
 - **ADR-019（v0.4）：附注章节编号体系重构（section_number 字符串 → section_id + level + parent + sort_index）**
 - **ADR-020（v0.4）：章节序号 5 级层级格式注册器**
 - **ADR-021（v0.6）：国企↔上市丝滑切换（差异清单驱动 + 互转 round-trip 数据保留 + 跨模板合并汇总）**
+- **ADR-022（v0.6.2）：附注离线分发包格式（xlsx + _meta_ sheet stable section_id + 4 色单元格语义 + DataValidation 锁定 + 字段级 diff 导回）**
 
 ## 六、回退策略
 
