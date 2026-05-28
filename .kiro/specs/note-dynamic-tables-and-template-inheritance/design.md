@@ -1,7 +1,7 @@
 # 附注模块全维度增强 — 设计文档
 
-> 版本：v0.3（草稿，2026-05-28）
-> 关联需求：requirements.md（92 验收 / 11 维度 D1-D11）
+> 版本：v0.4（草稿，2026-05-28）
+> 关联需求：requirements.md（119 验收 / 13 维度 D1-D13）
 
 ## 一、设计核心决策
 
@@ -291,6 +291,349 @@ class NoteSectionVersionTree(Base):
 - `merge(branch_a, branch_b, strategy='ours'|'theirs'|'manual')` 合并
 - `diff(node_a, node_b)` 对比
 
+### D12 合并↔单体附注映射（v0.4 新增 ⭐）
+
+#### 12.1 模板字段扩展
+
+```json
+// 合并版模板章节示例：
+{
+  "section_id": "consol_section_ar_top5",      // 稳定 ID
+  "section_title": "应收账款 - 按欠款单位列示前五名",
+  "level": 3,
+  "is_consol_only": false,                     // 共有章节，但合并版多列
+  "is_standalone_only": false,
+  "consol_section_mapping": {
+    "child_section_ids": ["section_ar_top5"],   // 单体附注的对应章节 ID
+    "format_diff": {
+      "extra_columns": [                        // 合并版多的列
+        {"column_id": "col_minority_share", "label": "少数股东权益部分"}
+      ]
+    }
+  }
+}
+```
+
+#### 12.2 binding 新 source 类型 `consol_aggregation`
+
+```json
+{
+  "primary": {
+    "source": "consol_aggregation",
+    "child_section_id": "section_ar_top5",
+    "aggregation_method": "top_n_after_elimination",
+    "child_filter": {
+      "scope": "all",                            // all | exclude_inactive | [subsidiary_id_1, ...]
+      "subsidiaries": null
+    },
+    "elimination_rules": [
+      {
+        "type": "internal_ar",
+        "wp_code": "consol_internal_ar",
+        "match_by": "label_fuzzy"
+      }
+    ],
+    "aggregation_config": {
+      "top_n": 5,
+      "merge_same_label_threshold": 0.85         // 模糊合并同名（不同子公司与同一外部客户）
+    }
+  },
+  "fallback": [
+    {"source": "manual"}
+  ]
+}
+```
+
+#### 12.3 聚合算法接入
+
+```python
+# 新增 backend/app/services/consol_note_aggregation_service.py
+class ConsolNoteAggregationService:
+    """合并附注从子公司单体附注汇总核心服务."""
+
+    AGGREGATION_METHODS = {
+        "simple_sum": _simple_sum,
+        "sum_after_elimination": _sum_after_elimination,
+        "top_n_after_elimination": _top_n_after_elimination,
+        "weighted_avg": _weighted_avg,
+        "first_n_concat": _first_n_concat,  # 文字章节拼接
+    }
+
+    async def aggregate_section(
+        self,
+        consol_project_id: UUID,
+        consol_note_section_id: str,
+        year: int,
+    ) -> dict:
+        """从所有子公司单体附注汇总到合并附注章节.
+
+        步骤：
+          1. 拉取合并项目的子公司清单（consolidation_subsidiaries）
+          2. 加载每家子公司单体附注的对应章节（child_section_id）
+          3. 按 aggregation_method 聚合 cells
+          4. 应用 elimination_rules 抵销内部往来
+          5. 按 aggregation_config 重排（如 top_n）
+          6. 写入合并附注 + 记录 _cell_provenance（来自 N 家子公司）
+        """
+        ...
+```
+
+#### 12.4 子公司单体附注更新事件 → 合并 stale
+
+```python
+# 现有 EventBus 已有 NOTE_SECTION_UPDATED 事件
+@on_event("NOTE_SECTION_UPDATED")
+async def handle_child_note_updated(event):
+    project = await load_project(event.project_id)
+    if project.consol_level == 1:  # 是子公司
+        # 找出哪些 parent 项目消费了这个子公司
+        parents = await find_consol_parents(project.id)
+        for parent in parents:
+            # 对 parent 的对应章节标 stale
+            await mark_stale_by_section_mapping(parent.id, event.note_section)
+```
+
+#### 12.5 多层合并 lineage 链
+
+```
+孙公司 N 个 (consol_level=1)
+  → 子合并项目 (consol_level=2)
+    → 总合并项目 (consol_level=3)
+```
+
+每层合并附注的 `consol_aggregation` 都引用下一层的 `child_section_id`，通过 `parent_project_id` 链向上递归。
+
+#### 12.6 内部往来抵销规则注册器
+
+```python
+# backend/app/services/consol_elimination_rules.py
+ELIMINATION_RULES = {
+    "internal_ar": {
+        "name": "内部应收账款抵销",
+        "wp_code": "consol_internal_ar",
+        "match_logic": "by_company_pair",  # 按公司对匹配
+    },
+    "internal_revenue": {...},
+    "internal_inventory_unrealized": {...},
+    "internal_dividend": {...},
+}
+```
+
+### D13 标题序号动态层级（v0.4 新增 ⭐）
+
+#### 13.1 数据模型重构
+
+```python
+# 模板 JSON 字段重构（V021 migration 迁移历史数据）
+
+# 旧格式：
+{
+  "section_number": "八、22",      # 字符串，无法重排
+  "section_title": "固定资产",
+  "sort_order": 822
+}
+
+# 新格式：
+{
+  "section_id": "section_fixed_assets",   # 稳定 ID（不变）
+  "section_title": "固定资产",
+  "level": 2,                              # 层级 1-5
+  "parent_section_id": "section_main_account_notes",  # 父章节 ID
+  "sort_index": 22,                        # 同 parent 同 level 内排序
+  "auto_numbering": true,                  # 自动编号
+  "lock_number": false,                    # 用户锁定
+  "rendered_number": null                  # 渲染时计算（不存）
+}
+
+# DisclosureNote ORM 也加这些字段
+class DisclosureNote(Base):
+    section_id: str = mapped_column(String(100), nullable=False)  # 替代 note_section
+    level: int
+    parent_section_id: str | None
+    sort_index: int
+    auto_numbering: bool = True
+    lock_number: bool = False
+    # 兼容字段（迁移期保留）
+    note_section: str | None  # 旧 section_number
+```
+
+#### 13.2 编号格式注册器
+
+```python
+# backend/app/services/note_section_numbering.py
+
+CN_NUMBERS = "一二三四五六七八九十"
+CIRCLED_NUMBERS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮"
+
+def cn_number(i: int) -> str:
+    """阿拉伯转中文数字（1-99 支持）."""
+    if i <= 10: return CN_NUMBERS[i-1]
+    if i < 20: return f"十{CN_NUMBERS[i-10-1]}" if i > 10 else "十"
+    tens = i // 10
+    ones = i % 10
+    return f"{CN_NUMBERS[tens-1]}十{CN_NUMBERS[ones-1] if ones else ''}"
+
+LEVEL_FORMATS = {
+    1: lambda i: f"{cn_number(i)}、",
+    2: lambda i: f"（{cn_number(i)}）",
+    3: lambda i: f"{i}.",
+    4: lambda i: f"({i})",
+    5: lambda i: CIRCLED_NUMBERS[i-1] if i <= 15 else f"({i})",
+}
+
+def render_section_number(level: int, sort_index: int, custom_format: str | None = None) -> str:
+    """渲染单层级序号."""
+    if custom_format:
+        return custom_format.format(i=sort_index, cn=cn_number(sort_index))
+    return LEVEL_FORMATS[level](sort_index)
+```
+
+#### 13.3 NoteSectionNumberingService 核心
+
+```python
+# backend/app/services/note_section_numbering_service.py
+
+class NoteSectionNumberingService:
+    """章节编号动态计算服务."""
+
+    async def render_all(
+        self,
+        project_id: UUID,
+        year: int,
+        scope: str = "both",  # standalone | consolidated | both
+    ) -> dict[str, str]:
+        """对所有章节重新计算 rendered_number.
+
+        Returns:
+            {section_id: rendered_number}
+        """
+        notes = await self._load_visible_notes(project_id, year, scope)
+
+        # 按 level + parent_section_id 树形分组
+        tree = self._build_section_tree(notes)
+
+        result = {}
+        # DFS 遍历，每层维护 sort_index 计数器
+        def dfs(node, parent_path: str = ""):
+            counter = {}  # level → counter
+            for child in sorted(node.children, key=lambda c: c.sort_index):
+                if child.is_deleted or child.scope not in (scope, 'both'):
+                    continue
+                if child.lock_number and child.locked_number:
+                    # 用户锁定的序号
+                    rendered = child.locked_number
+                elif child.auto_numbering:
+                    counter.setdefault(child.level, 0)
+                    counter[child.level] += 1
+                    rendered = render_section_number(child.level, counter[child.level])
+                else:
+                    rendered = ""
+                full = parent_path + rendered
+                result[child.section_id] = full
+                dfs(child, full)
+
+        for root in tree.roots:
+            dfs(root)
+
+        return result
+```
+
+#### 13.4 内部引用 ref() 函数
+
+```python
+# Jinja filter 注册
+def ref(section_id: str, ctx: dict) -> str:
+    """渲染章节引用为最新序号."""
+    rendered_numbers = ctx['rendered_numbers']
+    return rendered_numbers.get(section_id, f"[未知章节: {section_id}]")
+
+NOTE_TEXT_ENV.globals['ref'] = ref
+```
+
+模板示例：
+
+```jinja
+本期增加情况详见 {{ ref("section_revenue_breakdown") }}。
+```
+
+#### 13.5 表格标题参与编号
+
+```json
+// 表格也有 level
+{
+  "section_id": "section_ar",
+  "level": 2,
+  "tables": [
+    {
+      "table_id": "ar_classification",
+      "title": "应收账款分类",
+      "title_level": 3,                  // 表格标题层级
+      "title_sort_index": 1
+    },
+    {
+      "table_id": "ar_aging",
+      "title": "按账龄披露",
+      "title_level": 3,
+      "title_sort_index": 2
+    }
+  ]
+}
+```
+
+#### 13.6 历史模板迁移策略
+
+```python
+# scripts/migrate_section_number_to_section_id.py（一次性）
+def migrate():
+    """旧 section_number 字符串 → 新 section_id + level + parent_section_id."""
+    for note in load_all_notes():
+        # 解析 "八、22" → level=2, parent="section_main_account_notes", sort_index=22
+        section_id = generate_stable_id(note.section_number, note.section_title)
+        level, parent_id, sort_index = parse_section_number(note.section_number)
+        note.section_id = section_id
+        note.level = level
+        note.parent_section_id = parent_id
+        note.sort_index = sort_index
+        note.note_section_legacy = note.section_number  # 兼容保留
+```
+
+#### 13.7 单体↔合并切换
+
+```python
+# 同一份 sections，scope='standalone' vs scope='consolidated' 重新渲染
+standalone_numbers = await numbering_service.render_all(project_id, year, scope='standalone')
+consolidated_numbers = await numbering_service.render_all(project_id, year, scope='consolidated')
+
+# 单体下：
+#   一、公司基本情况
+#   二、财务报表编制基础
+#   三、遵循企业会计准则的声明
+#   四、重要会计政策
+#   五、税项
+#   六、财务报表主要项目注释
+#   ...
+
+# 合并下：
+#   一、公司基本情况
+#   二、财务报表编制基础
+#   三、遵循企业会计准则的声明
+#   四、重要会计政策
+#   五、合并范围                ← 仅合并
+#   六、合并财务报表的编制方法     ← 仅合并
+#   七、税项
+#   八、财务报表主要项目注释
+#   九、合并财务报表主要项目注释   ← 仅合并
+#   ...
+```
+
+#### 13.8 拖拽排序
+
+```typescript
+// 前端拖拽 → PATCH /sections/:id/move + body: { new_parent_id, new_sort_index }
+// 后端：调整 sort_index → 调用 NoteSectionNumberingService.render_all → 返回新序号字典
+// 前端：实时刷新所有章节序号显示
+```
+
 ## 二、API 变化
 
 ### 新增端点（约 20 个）
@@ -332,7 +675,7 @@ POST /api/disclosure-notes/{note_id}/merge
 GET /api/disclosure-notes/{note_id}/diff?node_a=...&node_b=...
 ```
 
-## 三、CI 卡点（共 14 项）
+## 三、CI 卡点（共 19 项）
 
 - CI-1：`_dynamic_regions` idx/col_id 有效性
 - CI-2：row_type=dynamic_* 在 region 内
@@ -342,18 +685,23 @@ GET /api/disclosure-notes/{note_id}/diff?node_a=...&node_b=...
 - CI-6：round-trip 无丢失 PBT
 - CI-7：apply_baseline 后 lineage 必有 baseline_id
 - CI-8：auto_trim v2 三级互斥
-- **CI-9（v0.3）：fallback 链最多 3 级（防深嵌套性能崩）**
-- **CI-10：`_cell_provenance` 必有 source 字段**
-- **CI-11：D7 段落 Jinja 模板必有变量声明（防 undefined 静默）**
-- **CI-12：D8 合并章节序号不与单体冲突（uniq check）**
-- **CI-13：D9 锁释放必触发（with 退出 + 5min 超时）**
-- **CI-14：D11 版本树无环（DAG 校验）**
+- CI-9：fallback 链最多 3 级（防深嵌套性能崩）
+- CI-10：`_cell_provenance` 必有 source 字段
+- CI-11：D7 段落 Jinja 模板必有变量声明
+- CI-12：D8 合并章节序号不与单体冲突
+- CI-13：D9 锁释放必触发
+- CI-14：D11 版本树无环（DAG 校验）
+- **CI-15：D12 consol_aggregation source 必有 child_section_id**
+- **CI-16：D12 多层合并 lineage 链无环**
+- **CI-17：D12 elimination_rules 引用的 wp_code 必存在**
+- **CI-18：D13 section_id 全局唯一 + level 1-5 范围 + parent_section_id 引用有效**
+- **CI-19：D13 章节序号渲染后 rendered_number 在 scope 内唯一**
 
-## 四、变更影响范围（v0.3）
+## 四、变更影响范围（v0.4）
 
 | 模块 | 改动 | 工作量 |
 |------|------|--------|
-| 模板 JSON 数据 | 60+ 动态 + 30+ wp_data + 20+ Jinja | 2.5 人天（依赖 P-1/P-2/P-3） |
+| 模板 JSON 数据 | 60+ 动态 + 30+ wp_data + 20+ Jinja + **150+ 合并↔单体映射** + **173 章节 section_id 化** | 4.5 人天（依赖 P-1~P-6） |
 | `disclosure_engine.py` | _expand_dynamic + _extract_wp + fallback 链 | 2 人天 |
 | `note_cell_merge.py` | 行+列三态合并 | 0.5 人天 |
 | `note_formula_generator.py` | REGION/WP 函数 | 0.5 人天 |
@@ -361,28 +709,38 @@ GET /api/disclosure-notes/{note_id}/diff?node_a=...&node_b=...
 | 新建 `group_note_baseline_service.py` | 集团基线 | 1 人天 |
 | 新建 `note_text_template_engine.py` | Jinja 渲染 | 0.5 人天 |
 | 改造 `consol_disclosure_service.py` | D8 衔接 | 1 人天 |
+| **新建 `consol_note_aggregation_service.py`** | **D12 合并↔单体汇总** | **1.5 人天** |
+| **新建 `consol_elimination_rules.py`** | **D12 抵销规则注册** | **0.5 人天** |
+| **新建 `note_section_numbering_service.py`** | **D13 序号动态计算** | **1 人天** |
 | 新建 `note_section_lock_integration.py` | D9 集成 | 0.5 人天 |
 | 扩展 `note_ai.py` | D10 三个新接口 | 1 人天 |
 | 新建 `note_section_version_tree_service.py` | D11 版本图 | 1 人天 |
-| `note_word_exporter.py` | 动态行/列 + 空表替换 + Jinja Word + 合并双列 | 1 人天 |
-| 新增 router 文件（4 个） | 20 端点 | 1 人天 |
+| `note_word_exporter.py` | 动态 + 空替换 + Jinja + 合并双列 + **序号自动重排** | 1.2 人天 |
+| 新增 router 文件（5 个） | **25 端点（+5: 汇总/抵销/序号/单体↔合并切换/拖拽排序）** | 1.2 人天 |
 | 前端 `NoteTableEditor.vue` 大改 | 全维度 UI | 2.5 人天 |
-| 前端 6 个新 composable | 调动态/基线/段落/AI/版本/锁 | 1.5 人天 |
+| 前端 8 个新 composable | 调动态/基线/段落/AI/版本/锁 + **汇总/序号** | 2 人天 |
 | 前端段落变量编辑器 | D7 编辑 + 实时预览 | 1 人天 |
 | 前端版本树可视化 | D11 git-like 图 | 1 人天 |
 | 前端 AI 建议侧栏 | D10 集成 | 0.5 人天 |
-| DB migrations（V019/V020/V021） | lineage / baseline / version_tree | 0.5 人天 |
-| 测试 | 单测 + PBT + UAT | 2 人天 |
-| **合计** | | **22 人天** + P-1/P-2/P-3/P-4 共 3 人天 |
+| **前端合并↔单体切换 + 章节树拖拽** | **D12/D13 UI** | **1.5 人天** |
+| **前端章节序号实时渲染** | **D13 实时序号** | **0.5 人天** |
+| DB migrations（V019/V020/V021/**V022**） | lineage / baseline / version_tree + **section_id 重构** | 1 人天 |
+| **历史模板迁移脚本** | **`migrate_section_number_to_section_id.py`** | **0.5 人天** |
+| 测试 | 单测 + PBT + UAT | 2.5 人天 |
+| **合计** | | **30 人天** + P-1~P-6 共 5 人天 |
 
 ## 五、ADR 新增
 
 - ADR-011：附注双 sidecar 设计
 - ADR-012：集团模板 lineage 模型
-- **ADR-013（v0.3）：多源 fallback 链 vs 单源 binding**
-- **ADR-014（v0.3）：文字段落 Jinja 渲染 vs 字符串模板**
-- **ADR-015（v0.3）：合并附注章节序号策略**
-- **ADR-016（v0.3）：章节级版本图 git-like vs 线性**
+- ADR-013：多源 fallback 链 vs 单源 binding
+- ADR-014：文字段落 Jinja 渲染 vs 字符串模板
+- ADR-015：合并附注章节序号策略
+- ADR-016：章节级版本图 git-like vs 线性
+- **ADR-017（v0.4）：合并↔单体附注章节映射（consol_aggregation source 类型）**
+- **ADR-018（v0.4）：内部往来抵销规则注册器（按 wp_code 配置）**
+- **ADR-019（v0.4）：附注章节编号体系重构（section_number 字符串 → section_id + level + parent + sort_index）**
+- **ADR-020（v0.4）：章节序号 5 级层级格式注册器**
 
 ## 六、回退策略
 
@@ -397,10 +755,32 @@ NOTE_FALLBACK_CHAIN_ENABLED: bool = true
 NOTE_AUTO_TRIM_V2_ENABLED: bool = true
 NOTE_GROUP_BASELINE_ENABLED: bool = false  # v1 默认关
 NOTE_TEXT_JINJA_ENABLED: bool = true
-NOTE_CONSOL_INTEGRATION_V2_ENABLED: bool = false  # 待 D8 完成
+NOTE_CONSOL_INTEGRATION_V2_ENABLED: bool = false
 NOTE_SECTION_LOCK_INTEGRATION: bool = true
-NOTE_AI_DYNAMIC_SUGGEST: bool = false  # 依赖 LLM
-NOTE_SECTION_VERSION_TREE: bool = false  # v2 考虑前置
+NOTE_AI_DYNAMIC_SUGGEST: bool = false
+NOTE_SECTION_VERSION_TREE: bool = false
+# v0.4 新增：
+NOTE_CONSOL_AGGREGATION_ENABLED: bool = false  # D12 合并↔单体汇总
+NOTE_DYNAMIC_NUMBERING_ENABLED: bool = false   # D13 动态序号（默认关，迁移期）
 ```
 
 任一维度出问题 → flag 关掉回退。
+
+## 七、实施顺序优化（v0.4 关键路径）
+
+由于 D13 序号重构影响所有现有章节，建议**优先级提到 Sprint 0**（在数据模型之前）：
+
+```
+Sprint 0 (新增, 1.5 人天)：D13 section_id 数据迁移
+  ├─ V022 migration（DisclosureNote 加 section_id/level/parent_section_id/sort_index）
+  ├─ migrate_section_number_to_section_id.py 一次性脚本
+  └─ NoteSectionNumberingService 核心 + 单测
+
+Sprint 1 (1.5 人天)：双 sidecar 数据模型（其他维度）
+Sprint 2-12 (按 v0.3)
+Sprint 13 (新增, 2 人天)：D12 合并↔单体映射
+  ├─ consol_aggregation source 类型
+  ├─ ConsolNoteAggregationService
+  ├─ elimination rules
+  └─ 多层 lineage 链
+```
