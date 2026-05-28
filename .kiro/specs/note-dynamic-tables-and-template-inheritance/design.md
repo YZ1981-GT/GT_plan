@@ -1,7 +1,8 @@
 # 附注模块全维度增强 — 设计文档
 
-> 版本：v0.4（草稿，2026-05-28）
-> 关联需求：requirements.md（119 验收 / 13 维度 D1-D13）
+> 版本：v0.5（草稿，2026-05-28）
+> 关联需求：requirements.md（126 验收 / 13 维度 D1-D13）
+> v0.5 关键变更：D8 升级为合并附注模块完整开发（含子公司汇总链路）
 
 ## 一、设计核心决策
 
@@ -211,30 +212,143 @@ def render_text_paragraph(template_str: str, vars: dict) -> str:
 {% endif %}
 ```
 
-### D8 合并附注衔接
+### D8 合并附注完整开发（v0.5 升级 ⭐⭐⭐）
+
+#### 现状再确认（grep 实测）
+
+| 模块 | 文件 | 状态 |
+|------|------|------|
+| `consol_disclosure_service.py` | 7 章节生成 | ✅ 不消费子公司单体 |
+| `ConsolNoteTab.vue` (1466 行) | UI | ✅ 框架完整 + aggregation 弹窗已就绪 |
+| `consol_tree_service.build_tree` | 子公司树 | ✅ 已存在但未被附注模块调用 |
+| `consol_aggregation_service.query_node` | TB 汇总 | ✅ 已存在（self/children/descendants），**附注未复用** |
+
+#### 改造架构（V2 完整服务）
 
 ```python
-# 改进 ConsolDisclosureService
+# 改造 consol_disclosure_service.py 为 V2
+
 class ConsolDisclosureServiceV2:
-    """合并附注衔接，与单体附注 173 章节深度融合."""
+    """合并附注完整服务（v0.5）.
 
-    async def integrate_with_standalone_notes(
-        self, project_id: UUID, year: int
+    取代 generate_consol_notes 的 7 章节限制，提供：
+    1. generate_full_consol_notes: 173 + 7 = 180 章节完整生成
+    2. aggregate_from_children: 调用 ConsolNoteAggregationService 从子公司汇总
+    3. integrate_consol_specific: 7 个合并专用章节（保留现有逻辑）
+    4. 章节序号按 scope='consolidated' 重排（依赖 D13）
+    5. lineage 链记录（多层合并）
+    """
+
+    async def generate_full_consol_notes(
+        self,
+        parent_project_id: UUID,
+        year: int,
+        template_type: str = "soe",
     ) -> list[DisclosureNote]:
-        """
-        合并项目（consol_level >= 2）独有：
-          1. 单体附注 173 章节生成（基础数据用 parent project 的合并 TB）
-          2. 合并专用 7 章节插入合理位置（不再 sort_order=100 写死）
-          3. 抵销前后双列：内部交易章节自动加「抵销前/抵销后」列
-          4. 多层级 lineage：subsidiaries 列表自动汇总
-        """
-        # 改用 sort_order 的章节序号语义（"五、合并财务报表主要项目注释" 大类下分小类）
-        ...
+        # 1. 加载子公司树
+        tree = await consol_tree_service.build_tree(self.db, parent_project_id)
+        if not tree:
+            raise ValueError("非合并项目或无子公司")
 
-    async def expand_consol_subsidiaries_realtime(self, project_id: UUID, year: int):
-        """每次生成附注时，重新拉取子公司清单（动态行）."""
-        subs = await self.db.execute(...)  # consolidation_subsidiaries
-        return [{'label': s.name, 'col_holding_pct': s.holding_pct, ...} for s in subs]
+        # 2. 加载 P-5 章节映射
+        mapping = await self._load_consol_section_mapping(template_type)
+
+        # 3. 生成共有章节（150+，从子公司汇总）
+        common_sections = []
+        for consol_section_id, mapping_cfg in mapping.items():
+            if mapping_cfg["is_consol_only"]:
+                continue
+            section = await self._aggregate_common_section(
+                parent_project_id, year,
+                consol_section_id, mapping_cfg, tree,
+            )
+            common_sections.append(section)
+
+        # 4. 生成合并专用章节（保留现有 _generate_xxx_section）
+        consol_only = self._generate_consol_only_sections(parent_project_id, year)
+
+        # 5. 章节序号重排（D13）
+        all_sections = common_sections + consol_only
+        rendered_numbers = await NoteSectionNumberingService(self.db).render_all(
+            parent_project_id, year, scope='consolidated'
+        )
+
+        # 6. 文字段落 Jinja 渲染（合并版 vars）
+        for section in all_sections:
+            if section.text_template:
+                section.text_content = render_text_paragraph(
+                    section.text_template,
+                    vars=self._build_consol_vars(parent_project_id, tree),
+                )
+
+        # 7. 写 lineage（多层合并支持）
+        for section in all_sections:
+            section.template_lineage = self._build_lineage_chain(parent_project_id, section)
+
+        return all_sections
+
+
+    async def _aggregate_common_section(
+        self,
+        parent_project_id, year,
+        consol_section_id, mapping_cfg, tree,
+    ) -> DisclosureNote:
+        """从子公司单体附注汇总单个共有章节."""
+        # 子公司列表
+        children = self._get_active_subsidiaries(tree, mapping_cfg.get("child_filter"))
+
+        # 调 ConsolNoteAggregationService.aggregate_section
+        agg_service = ConsolNoteAggregationService(self.db)
+        aggregated = await agg_service.aggregate_section(
+            parent_project_id=parent_project_id,
+            year=year,
+            consol_section_id=consol_section_id,
+            child_section_ids=mapping_cfg["child_section_ids"],
+            child_projects=children,
+            aggregation_method=mapping_cfg["aggregation_method"],
+            elimination_rules=mapping_cfg.get("elimination_rules", []),
+        )
+
+        # 写 _cell_provenance: 每个 cell 来自 N 家子公司 + 各贡献金额
+        return self._build_disclosure_note_with_provenance(aggregated)
+```
+
+#### 8.4 前端 ConsolNoteTab 升级
+
+```vue
+<!-- 章节树新增「来自 N 家子公司」标识 -->
+<el-tree :data="consolNoteTree">
+  <template #default="{ data }">
+    <span>{{ data.title }}</span>
+    <el-tag v-if="data.is_aggregated" size="mini">
+      来自 {{ data.children_count }} 家子公司
+    </el-tag>
+    <el-tag v-if="data.is_consol_only" type="warning">仅合并</el-tag>
+    <el-tag v-if="data.has_local_override" type="danger">已修改</el-tag>
+  </template>
+</el-tree>
+
+<!-- cell 单击 → 溯源对话框 -->
+<ConsolCellProvenanceDialog
+  :provenance="selectedCellProvenance"
+  :child-contributions="cellChildContributions"
+/>
+
+<!-- 工具栏 -->
+<el-button @click="triggerReaggregation">🔄 重新汇总</el-button>
+<el-button @click="showLineageGraph">🗂️ 多层合并 lineage</el-button>
+```
+
+#### 8.5 合并范围变化联动
+
+```python
+@on_event("CONSOL_SUBSIDIARY_CHANGED")  # 新事件
+async def handle_subsidiary_changed(event):
+    """子公司变化（增删/持股变化）→ 触发合并附注 stale."""
+    parent_id = event.parent_project_id
+    affected_sections = await get_aggregated_sections(parent_id)
+    for section in affected_sections:
+        await mark_stale(section, reason="subsidiary_changed")
 ```
 
 ### D9 协作锁集成

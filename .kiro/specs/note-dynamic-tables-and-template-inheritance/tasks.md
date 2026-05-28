@@ -1,9 +1,10 @@
 # 附注模块全维度增强 — 任务列表
 
-> 版本：v0.4（草稿，2026-05-28）
-> 119 验收 / 30 人天 + 外部 5 人天 / **14 Sprint**（v0.3 12 + Sprint 0 + Sprint 13）
+> 版本：v0.5（草稿，2026-05-28）
+> 126 验收 / **34 人天** + 外部 5 人天 / **15 Sprint**（Sprint 6 升级 + Sprint 13 配套加强）
 > 关联：requirements.md / design.md
 > 原则：能不写死就不写死，全部支持动态调整
+> v0.5 关键变更：D8 「合并附注衔接」升级为「合并附注完整开发」，Sprint 6 工作量从 1.5 → 3.5 人天
 
 ## 前置（外部依赖，5 人天）
 
@@ -83,15 +84,25 @@
 - [ ] **5.9** 新 router group_note_baseline.py（5 端点）
 - [ ] **5.10** Sprint 5 验收（CI-7）
 
-## Sprint 6：合并附注衔接 D8（1.5 人天）
+## Sprint 6：合并附注完整开发 D8（**3.5 人天 ⬆ v0.5 升级**）
 
-- [ ] **6.1** 改造 ConsolDisclosureService 不再 sort_order=100
-- [ ] **6.2** 子公司清单实时拉取
-- [ ] **6.3** 抵销前后双列
-- [ ] **6.4** 商誉/MI/外币章节绑 H/G/M wp_data
-- [ ] **6.5** 多层级合并 lineage
-- [ ] **6.6** integrate_with_standalone_notes V2
-- [ ] **6.7** Sprint 6 验收（CI-12）
+⭐ **核心价值**：从「7 个合并专用章节」→「173+7=180 完整章节，全部从子公司单体附注汇总」
+
+- [ ] **6.1** 改造 ConsolDisclosureService 为 V2（generate_full_consol_notes）
+- [ ] **6.2** `_aggregate_common_section` 调 ConsolNoteAggregationService（依赖 Sprint 13）
+- [ ] **6.3** 子公司清单实时拉取（用 consol_tree_service.build_tree）
+- [ ] **6.4** 抵销前后双列
+- [ ] **6.5** 商誉/MI/外币 章节绑 H/G/M wp_data
+- [ ] **6.6** 多层合并 lineage（孙合并 → 子合并 → 总合并）
+- [ ] **6.7** 文字段落合并版 vars（subsidiary_count / consolidated_revenue 等）
+- [ ] **6.8** 章节序号按 scope='consolidated' 重排（依赖 D13/Sprint 0）
+- [ ] **6.9** 7 个合并专用章节用 wp_data 强化（取代写死字符串）
+- [ ] **6.10** 合并范围变化事件 → 自动 stale（CONSOL_SUBSIDIARY_CHANGED 事件）
+- [ ] **6.11** 前端 ConsolNoteTab 升级（章节树 180 章节 + 「来自 N 家子公司」标识）
+- [ ] **6.12** ConsolCellProvenanceDialog（cell 溯源到子公司贡献）
+- [ ] **6.13** 「重新汇总」按钮 + 进度 SSE
+- [ ] **6.14** 多层合并 lineage 可视化（孙→子→总）
+- [ ] **6.15** Sprint 6 验收（CI-12 + Playwright UAT 1 个合并项目）
 
 ## Sprint 7：协作锁集成 D9（0.5 人天）
 
