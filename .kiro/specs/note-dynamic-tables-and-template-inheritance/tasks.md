@@ -60,13 +60,13 @@
 
 ## Sprint A.2：动态行/列引擎 + wp_data（2.5 人天）
 
-- [ ] **A.2.1** _expand_dynamic_regions 行展开
-- [ ] **A.2.2** _expand_dynamic_columns 列展开 + 合并表头处理
+- [x] **A.2.1** _expand_dynamic_regions 行展开
+- [x] **A.2.2** _expand_dynamic_columns 列展开 + 合并表头处理
 - [ ] **A.2.3** aux_balance 行 explode
 - [ ] **A.2.4** **wp_data _extract_wp_table / _extract_wp_cell / _extract_wp_column_sum**（核心）
 - [ ] **A.2.5** 多源 fallback 链（CI-9/CI-10）
 - [ ] **A.2.6** _cell_provenance 记录
-- [ ] **A.2.7** 动态行 label 自动填充
+- [x] **A.2.7** 动态行 label 自动填充
 - [ ] **A.2.8** 合计公式自动适配
 - [ ] **A.2.9** note_cell_merge 行+列三态合并 PBT
 - [ ] **A.2.10** is_empty 计算
