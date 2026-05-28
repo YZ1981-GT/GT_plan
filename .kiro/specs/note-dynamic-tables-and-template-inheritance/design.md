@@ -1,10 +1,15 @@
 # 附注模块全维度增强 — 设计文档
 
-> 版本：v0.6（草稿，2026-05-28）
-> 关联需求：requirements.md（130 验收 / 14 维度 D1-D14）
+> 版本：v0.6.1（2026-05-28，一致性修复）
+> 关联需求：requirements.md（140 验收 / 14 维度 D1-D14）
 > v0.6 关键变更：
 > 1. Phase 化重组：Phase 1 单体修复（主线）/ Phase 2 合并连带 / Phase 3 高级特性
 > 2. D14 国企↔上市丝滑切换独立成项
+>
+> v0.6.1 修复：
+> 1. 影响范围标题 v0.4 → v0.6
+> 2. CI 卡点表加 CI-20（D14 互转 round-trip PBT）
+> 3. ADR 列表加 ADR-021（国企↔上市丝滑切换）
 
 ## 一、设计核心决策
 
@@ -946,7 +951,7 @@ POST /api/disclosure-notes/{note_id}/merge
 GET /api/disclosure-notes/{note_id}/diff?node_a=...&node_b=...
 ```
 
-## 三、CI 卡点（共 19 项）
+## 三、CI 卡点（共 20 项）
 
 - CI-1：`_dynamic_regions` idx/col_id 有效性
 - CI-2：row_type=dynamic_* 在 region 内
@@ -967,8 +972,9 @@ GET /api/disclosure-notes/{note_id}/diff?node_a=...&node_b=...
 - **CI-17：D12 elimination_rules 引用的 wp_code 必存在**
 - **CI-18：D13 section_id 全局唯一 + level 1-5 范围 + parent_section_id 引用有效**
 - **CI-19：D13 章节序号渲染后 rendered_number 在 scope 内唯一**
+- **CI-20（v0.6）：D14 国企↔上市互转 round-trip PBT（用户编辑 cell 切换两次后必无丢失）**
 
-## 四、变更影响范围（v0.4）
+## 四、变更影响范围（v0.6）
 
 | 模块 | 改动 | 工作量 |
 |------|------|--------|
@@ -997,8 +1003,10 @@ GET /api/disclosure-notes/{note_id}/diff?node_a=...&node_b=...
 | **前端章节序号实时渲染** | **D13 实时序号** | **0.5 人天** |
 | DB migrations（V019/V020/V021/**V022**） | lineage / baseline / version_tree + **section_id 重构** | 1 人天 |
 | **历史模板迁移脚本** | **`migrate_section_number_to_section_id.py`** | **0.5 人天** |
-| 测试 | 单测 + PBT + UAT | 2.5 人天 |
-| **合计** | | **30 人天** + P-1~P-6 共 5 人天 |
+| **新建 `note_conversion_service` 升级 + `note_template_diff.py`** | **D14 国企↔上市丝滑切换 + 跨模板合并汇总 + 章节差异管理** | **2.5 人天** |
+| **前端切换 UI（D14 切换器 + 预览弹窗 + 进度条）** | **D14 互转 UX** | **1 人天** |
+| 测试 | 单测 + PBT + UAT（含 CI-20 round-trip） | 2.5 人天 |
+| **合计** | | **36.5 人天** + P-1~P-7 共 5 人天 |
 
 ## 五、ADR 新增
 
@@ -1012,6 +1020,7 @@ GET /api/disclosure-notes/{note_id}/diff?node_a=...&node_b=...
 - **ADR-018（v0.4）：内部往来抵销规则注册器（按 wp_code 配置）**
 - **ADR-019（v0.4）：附注章节编号体系重构（section_number 字符串 → section_id + level + parent + sort_index）**
 - **ADR-020（v0.4）：章节序号 5 级层级格式注册器**
+- **ADR-021（v0.6）：国企↔上市丝滑切换（差异清单驱动 + 互转 round-trip 数据保留 + 跨模板合并汇总）**
 
 ## 六、回退策略
 
