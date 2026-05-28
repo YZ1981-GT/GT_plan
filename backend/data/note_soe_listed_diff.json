@@ -1,0 +1,1529 @@
+{
+  "version": "1.0.0",
+  "is_mock": true,
+  "description": "SOE vs Listed template section diff (auto-generated from template JSONs)",
+  "common_sections": [
+    {
+      "section_title": "一年内到期的非流动负债",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-fu-zhai",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-fu-zhai"
+    },
+    {
+      "section_title": "一年内到期的非流动资产",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-zi-chan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-zi-chan"
+    },
+    {
+      "section_title": "专项储备",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhuan-xiang-chu-bei",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-zhuan-xiang-chu-bei"
+    },
+    {
+      "section_title": "主要税种及税率",
+      "soe_section_id": "chapter-06-shui-xiang-zhu-yao-shui-zhong-ji-shui-lv",
+      "listed_section_id": "chapter-04-shui-xiang-zhu-yao-shui-zhong-ji-shui-lv"
+    },
+    {
+      "section_title": "交易性金融负债",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-jiao-yi-xing-jin-rong-fu-zhai",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-jiao-yi-xing-jin-rong-fu-zhai"
+    },
+    {
+      "section_title": "交易性金融资产",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-jiao-yi-xing-jin-rong-zi-chan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-jiao-yi-xing-jin-rong-zi-chan"
+    },
+    {
+      "section_title": "优先股、永续债等其他金融工具",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-you-xian-gu-yong-xu-zhai-deng-qi-ta-jin-ron",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-you-xian-gu-yong-xu-zhai-deng-qi-ta-jin"
+    },
+    {
+      "section_title": "会计期间",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-kuai-ji-qi-jian",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kuai-ji-qi-jian"
+    },
+    {
+      "section_title": "使用权资产",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-shi-yong-quan-zi-chan",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-shi-yong-quan-zi-chan"
+    },
+    {
+      "section_title": "信用减值损失",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xin-yong-jian-zhi-sun-shi",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-xin-yong-jian-zhi-sun-shi"
+    },
+    {
+      "section_title": "借款费用",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-jie-kuan-fei-yong",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jie-kuan-fei-yong"
+    },
+    {
+      "section_title": "债务重组",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhai-wu-chong-zu",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zhai-wu-chong-zu"
+    },
+    {
+      "section_title": "债权投资",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhai-quan-tou-zi",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-zhai-quan-tou-zi"
+    },
+    {
+      "section_title": "公允价值变动收益",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gong-yun-jia-zhi-bian-dong-shou-yi",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-gong-yun-jia-zhi-bian-dong-shou-yi"
+    },
+    {
+      "section_title": "公允价值计量",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-gong-yun-jia-zhi-ji-liang",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-gong-yun-jia-zhi-ji-liang"
+    },
+    {
+      "section_title": "公司基本情况",
+      "soe_section_id": "chapter-01-gong-si-ji-ben-qing-kuang",
+      "listed_section_id": "chapter-01-gong-si-ji-ben-qing-kuang"
+    },
+    {
+      "section_title": "关联交易情况",
+      "soe_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+      "listed_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang"
+    },
+    {
+      "section_title": "关联方及关联交易",
+      "soe_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi",
+      "listed_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi"
+    },
+    {
+      "section_title": "关联方应收应付款项",
+      "soe_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
+      "listed_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang"
+    },
+    {
+      "section_title": "其他债权投资",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-zhai-quan-tou-zi",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-zhai-quan-tou-zi"
+    },
+    {
+      "section_title": "其他应付款",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-ying-fu-kuan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-ying-fu-kuan"
+    },
+    {
+      "section_title": "其他应收款",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-ying-shou-kuan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-ying-shou-kuan"
+    },
+    {
+      "section_title": "其他收益",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-shou-yi",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-shou-yi"
+    },
+    {
+      "section_title": "其他权益工具",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-quan-yi-gong-ju",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-quan-yi-gong-ju"
+    },
+    {
+      "section_title": "其他权益工具投资",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-quan-yi-gong-ju-tou-zi",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-quan-yi-gong-ju-tou-zi"
+    },
+    {
+      "section_title": "其他流动负债",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-liu-dong-fu-zhai",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-liu-dong-fu-zhai"
+    },
+    {
+      "section_title": "其他流动资产",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-liu-dong-zi-chan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-liu-dong-zi-chan"
+    },
+    {
+      "section_title": "其他资产负债表日后事项说明",
+      "soe_section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qi-ta-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-sh",
+      "listed_section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qi-ta-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-sh"
+    },
+    {
+      "section_title": "其他重要事项",
+      "soe_section_id": "chapter-14-qi-ta-zhong-yao-shi-xiang",
+      "listed_section_id": "chapter-15-qi-ta-zhong-yao-shi-xiang"
+    },
+    {
+      "section_title": "其他非流动负债",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-fei-liu-dong-fu-zhai",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-fei-liu-dong-fu-zhai"
+    },
+    {
+      "section_title": "其他非流动资产",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-fei-liu-dong-zi-chan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-fei-liu-dong-zi-chan"
+    },
+    {
+      "section_title": "其他非流动金融资产",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-fei-liu-dong-jin-rong-zi-chan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-fei-liu-dong-jin-rong-zi-chan"
+    },
+    {
+      "section_title": "净敞口套期收益",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-jing-chang-kou-tao-qi-shou-yi",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-jing-chang-kou-tao-qi-shou-yi"
+    },
+    {
+      "section_title": "合同成本",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-he-tong-cheng-ben",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-he-tong-cheng-ben"
+    },
+    {
+      "section_title": "合同负债",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-tong-fu-zhai",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-he-tong-fu-zhai"
+    },
+    {
+      "section_title": "合同资产",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-tong-zi-chan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-he-tong-zi-chan"
+    },
+    {
+      "section_title": "合营安排的分类及共同经营的会计处理方法",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-he-ying-an-pai-de-fen-lei-ji-gong-tong-jing",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-he-ying-an-pai-de-fen-lei-ji-gong-tong-j"
+    },
+    {
+      "section_title": "商誉",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-shang-yu",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-shang-yu"
+    },
+    {
+      "section_title": "固定资产",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-gu-ding-zi-chan",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-gu-ding-zi-chan"
+    },
+    {
+      "section_title": "在建工程",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zai-jian-gong-cheng",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-jian-gong-cheng"
+    },
+    {
+      "section_title": "外币业务和外币报表折算",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-wai-bi-ye-wu-he-wai-bi-bao-biao-zhe-suan",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-wai-bi-ye-wu-he-wai-bi-bao-biao-zhe-suan"
+    },
+    {
+      "section_title": "外币货币性项目",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-wai-bi-huo-bi-xing-xiang-mu",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-wai-bi-huo-bi-xing-xiang-mu"
+    },
+    {
+      "section_title": "套期会计",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-tao-qi-kuai-ji",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi-kuai-ji"
+    },
+    {
+      "section_title": "存货",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-cun-huo",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-cun-huo"
+    },
+    {
+      "section_title": "安全生产费用及维简费",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-an-quan-sheng-chan-fei-yong-ji-wei-jian-fei",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-an-quan-sheng-chan-fei-yong-ji-wei-jian"
+    },
+    {
+      "section_title": "应交税费",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-jiao-shui-fei",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-jiao-shui-fei"
+    },
+    {
+      "section_title": "应付债券",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-ying-fu-zhai-quan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-fu-zhai-quan"
+    },
+    {
+      "section_title": "应付票据",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-fu-piao-ju",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-fu-piao-ju"
+    },
+    {
+      "section_title": "应付职工薪酬",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-fu-zhi-gong-xin-chou",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-fu-zhi-gong-xin-chou"
+    },
+    {
+      "section_title": "应付账款",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-fu-zhang-kuan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-fu-zhang-kuan"
+    },
+    {
+      "section_title": "应收款项融资",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-kuan-xiang-rong-zi",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-kuan-xiang-rong-zi"
+    },
+    {
+      "section_title": "应收票据",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-piao-ju",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-piao-ju"
+    },
+    {
+      "section_title": "应收账款",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-zhang-kuan"
+    },
+    {
+      "section_title": "开发支出",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-kai-fa-zhi-chu",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kai-fa-zhi-chu"
+    },
+    {
+      "section_title": "或有事项",
+      "soe_section_id": "chapter-09-huo-you-shi-xiang",
+      "listed_section_id": "chapter-13-cheng-nuo-ji-huo-you-shi-xiang-huo-you-shi-xiang"
+    },
+    {
+      "section_title": "所得税费用",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-suo-de-shui-fei-yong",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-suo-de-shui-fei-yong"
+    },
+    {
+      "section_title": "投资性房地产",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-tou-zi-xing-fang-di-chan",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tou-zi-xing-fang-di-chan"
+    },
+    {
+      "section_title": "投资收益",
+      "soe_section_id": "chapter-12-gu-fen-zhi-fu-tou-zi-shou-yi",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-tou-zi-shou-yi"
+    },
+    {
+      "section_title": "政府补助",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zheng-fu-bu-zhu",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zheng-fu-bu-zhu"
+    },
+    {
+      "section_title": "无形资产",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-wu-xing-zi-chan",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-wu-xing-zi-chan"
+    },
+    {
+      "section_title": "未分配利润",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-wei-fen-pei-li-run",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-wei-fen-pei-li-run"
+    },
+    {
+      "section_title": "本公司的其他关联方情况",
+      "soe_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-qi-ta-guan-lian-fang-qing-kuang",
+      "listed_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-qi-ta-guan-lian-fang-qing-kuang"
+    },
+    {
+      "section_title": "本公司的子公司情况",
+      "soe_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-zi-gong-si-qing-kuang",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ben-gong-si-de-zi-gong-si-qing-kuang"
+    },
+    {
+      "section_title": "本公司的母公司情况",
+      "soe_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-mu-gong-si-qing-kuang",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ben-gong-si-de-mu-gong-si-qing-kuang"
+    },
+    {
+      "section_title": "现金流量表补充资料",
+      "soe_section_id": "chapter-12-gu-fen-zhi-fu-xian-jin-liu-liang-biao-bu-chong-zi-liao",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-bu-chong-zi-liao"
+    },
+    {
+      "section_title": "现金流量表项目注释",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-xiang-mu-zhu-shi",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-xian-jin-liu-liang-biao-xiang-mu-zhu-shi"
+    },
+    {
+      "section_title": "生产性生物资产",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-sheng-chan-xing-sheng-wu-zi-chan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-sheng-chan-xing-sheng-wu-zi-chan"
+    },
+    {
+      "section_title": "生物资产",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-sheng-wu-zi-chan",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-sheng-wu-zi-chan"
+    },
+    {
+      "section_title": "盈余公积",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-yu-gong-ji",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-yu-gong-ji"
+    },
+    {
+      "section_title": "短期借款",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-duan-qi-jie-kuan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-duan-qi-jie-kuan"
+    },
+    {
+      "section_title": "研发费用",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yan-fa-fei-yong",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yan-fa-fei-yong"
+    },
+    {
+      "section_title": "租赁",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zu-lin",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zu-lin"
+    },
+    {
+      "section_title": "租赁负债",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zu-lin-fu-zhai",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-zu-lin-fu-zhai"
+    },
+    {
+      "section_title": "税项",
+      "soe_section_id": "chapter-06-shui-xiang",
+      "listed_section_id": "chapter-04-shui-xiang"
+    },
+    {
+      "section_title": "管理费用",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-guan-li-fei-yong",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-guan-li-fei-yong"
+    },
+    {
+      "section_title": "终止经营",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhong-zhi-jing-ying",
+      "listed_section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-zhi-jing-ying"
+    },
+    {
+      "section_title": "职工薪酬",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zhi-gong-xin-chou",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zhi-gong-xin-chou"
+    },
+    {
+      "section_title": "股份支付",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-gu-fen-zhi-fu",
+      "listed_section_id": "chapter-12-gu-fen-zhi-fu"
+    },
+    {
+      "section_title": "营业外支出",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-ye-wai-zhi-chu",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ying-ye-wai-zhi-chu"
+    },
+    {
+      "section_title": "营业外收入",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-ye-wai-shou-ru",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ying-ye-wai-shou-ru"
+    },
+    {
+      "section_title": "营业收入与营业成本",
+      "soe_section_id": "chapter-12-gu-fen-zhi-fu-ying-ye-shou-ru-yu-ying-ye-cheng-ben",
+      "listed_section_id": "chapter-16-mu-gong-si-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-ye-shou-ru-yu-ying-ye-cheng"
+    },
+    {
+      "section_title": "衍生金融负债",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yan-sheng-jin-rong-fu-zhai",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yan-sheng-jin-rong-fu-zhai"
+    },
+    {
+      "section_title": "衍生金融资产",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yan-sheng-jin-rong-zi-chan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yan-sheng-jin-rong-zi-chan"
+    },
+    {
+      "section_title": "记账本位币",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-ji-zhang-ben-wei-bi",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ji-zhang-ben-wei-bi"
+    },
+    {
+      "section_title": "财务费用",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-cai-wu-fei-yong",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-cai-wu-fei-yong"
+    },
+    {
+      "section_title": "货币资金",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-huo-bi-zi-jin",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-huo-bi-zi-jin"
+    },
+    {
+      "section_title": "资产减值",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zi-chan-jian-zhi",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-chan-jian-zhi"
+    },
+    {
+      "section_title": "资产减值损失",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zi-chan-jian-zhi-sun-shi",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-chan-jian-zhi-sun-shi"
+    },
+    {
+      "section_title": "资产处置收益",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zi-chan-chu-zhi-shou-yi",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-chan-chu-zhi-shou-yi"
+    },
+    {
+      "section_title": "资产证券化业务",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zi-chan-zheng-quan-hua-ye-wu",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-chan-zheng-quan-hua-ye-wu"
+    },
+    {
+      "section_title": "资产负债表日后事项",
+      "soe_section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang",
+      "listed_section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang"
+    },
+    {
+      "section_title": "资本公积",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zi-ben-gong-ji",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-zi-ben-gong-ji"
+    },
+    {
+      "section_title": "递延所得税资产及递延所得税负债",
+      "soe_section_id": "chapter-06-shui-xiang-di-yan-suo-de-shui-zi-chan-ji-di-yan-suo-de-shui-fu-zhai",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-di-yan-suo-de-shui-zi-chan-ji-di-yan-suo"
+    },
+    {
+      "section_title": "递延收益",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-di-yan-shou-yi",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-di-yan-shou-yi"
+    },
+    {
+      "section_title": "遵循企业会计准则的声明",
+      "soe_section_id": "chapter-03-zun-xun-qi-ye-kuai-ji-zhun-ze-de-sheng-ming",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zun-xun-qi-ye-kuai-ji-zhun-ze-de-sheng-m"
+    },
+    {
+      "section_title": "金融工具",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-jin-rong-gong-ju",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-gong-ju"
+    },
+    {
+      "section_title": "销售费用",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xiao-shou-fei-yong",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-xiao-shou-fei-yong"
+    },
+    {
+      "section_title": "长期借款",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chang-qi-jie-kuan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-chang-qi-jie-kuan"
+    },
+    {
+      "section_title": "长期应付款",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chang-qi-ying-fu-kuan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-chang-qi-ying-fu-kuan"
+    },
+    {
+      "section_title": "长期应付职工薪酬",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chang-qi-ying-fu-zhi-gong-xin-chou",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-chang-qi-ying-fu-zhi-gong-xin-chou"
+    },
+    {
+      "section_title": "长期应收款",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chang-qi-ying-shou-kuan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-chang-qi-ying-shou-kuan"
+    },
+    {
+      "section_title": "长期待摊费用",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-chang-qi-dai-tan-fei-yong",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chang-qi-dai-tan-fei-yong"
+    },
+    {
+      "section_title": "长期股权投资",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-chang-qi-gu-quan-tou-zi",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chang-qi-gu-quan-tou-zi"
+    },
+    {
+      "section_title": "预付款项",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yu-fu-kuan-xiang",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yu-fu-kuan-xiang"
+    },
+    {
+      "section_title": "预收款项",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yu-shou-kuan-xiang",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yu-shou-kuan-xiang"
+    },
+    {
+      "section_title": "预计负债",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-yu-ji-fu-zhai",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-yu-ji-fu-zhai"
+    }
+  ],
+  "soe_only_sections": [
+    {
+      "section_id": "chapter-09-huo-you-shi-xiang-huo-you-fu-zhai",
+      "title": "1、或有负债"
+    },
+    {
+      "section_id": "chapter-09-huo-you-shi-xiang-huo-you-zi-chan",
+      "title": "2、或有资产"
+    },
+    {
+      "section_id": "chapter-09-huo-you-shi-xiang-qi-ye-ying-dang-zai-fu-zhu-zhong-pi-lu-yu-huo-you-shi-xiang-you-gu",
+      "title": "【企业应当在附注中披露与或有事项有关的下列信息："
+    },
+    {
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-qi-ye-he-bing",
+      "title": "企业合并"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-you-xian-gu-yong-xu-zhai-deng-jin-rong-gong",
+      "title": "优先股、永续债等金融工具"
+    },
+    {
+      "section_id": "chapter-06-shui-xiang-you-hui-shui-fu-ji-pi-wen",
+      "title": "优惠税负及批文"
+    },
+    {
+      "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-kua-2",
+      "title": "会计估计变更"
+    },
+    {
+      "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-kua",
+      "title": "会计政策变更"
+    },
+    {
+      "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-qi",
+      "title": "其他调整事项【包括同一控制下企业合并和清产核资】"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-fen-bu-xin-xi",
+      "title": "分部信息"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-bing-xian-jin-liu-liang-biao-xiang-guan",
+      "title": "合并现金流量表相关事项"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "title": "合并范围的变化"
+    },
+    {
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-he-bing-cai-wu-bao-biao-bian-zhi-fang-fa",
+      "title": "合并财务报表编制方法"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-wai-bi-zhe-suan",
+      "title": "外币折算"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-zi-gong-si-shi-yong-qi-ye-ji-tuan-zi-chan-he-qing-chang",
+      "title": "子公司使用企业集团资产和清偿企业集团债务的重大限制"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-zi-gong-si-xiang-mu-gong-si-zhuan-yi-zi-jin-de-neng-li-s",
+      "title": "子公司向母公司转移资金的能力受到严格限制的情况"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-shi-shou-zi-ben",
+      "title": "实收资本"
+    },
+    {
+      "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-dui",
+      "title": "对期初所有者权益的累积影响"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-zi-jin-ji-zhong-guan-li-kuan",
+      "title": "应收资金集中管理款"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gui-shu-yu-mu-gong-si-suo-you-zhe-de-qi-ta",
+      "title": "归属于母公司所有者的其他综合收益"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-suo-you-quan-he-shi-yong-quan-shou-dao-xian",
+      "title": "所有权和使用权受到限制的资产"
+    },
+    {
+      "section_id": "chapter-13-cheng-nuo-shi-xiang",
+      "title": "承诺事项"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-tou-zi-shou-yi-xia-biao-zhong-bu-shi-yong-d",
+      "title": "投资收益【下表中不适用的项目，删除】"
+    },
+    {
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-chi-you-dai-shou-ji-zhong-zhi-jing-ying",
+      "title": "持有待售及终止经营"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chi-you-dai-shou-fu-zhai",
+      "title": "持有待售负债"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chi-you-dai-shou-zi-chan",
+      "title": "持有待售资产"
+    },
+    {
+      "section_id": "chapter-13-cheng-nuo-shi-xiang-an-zhao-you-guan-cai-wu-kuai-ji-zhi-du-ying-pi-lu-de-qi-ta-nei-r",
+      "title": "按照有关财务会计制度应披露的其他内容"
+    },
+    {
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-shou-ru-di-que-ren-yuan-ze",
+      "title": "收入的确认原则"
+    },
+    {
+      "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-he-ying-qi-ye-lian-ying-qi-ye-qin",
+      "title": "本公司的合营企业、联营企业情况"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-bu-zai-na-ru-he-bing-fan-wei-de-yuan-zi-gong-si",
+      "title": "本期不再纳入合并范围的原子公司"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-tong-yi-kong-zhi-xia-qi-ye-he-bing-qi",
+      "title": "本期发生的同一控制下企业合并情况"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-xi-shou-he-bing",
+      "title": "本期发生的吸收合并"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-fei-tong-yi-kong-zhi-xia-qi-ye-he-bin",
+      "title": "本期发生的非同一控制下企业合并情况"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-xin-na-ru-he-bing-fan-wei-de-zhu-ti",
+      "title": "本期新纳入合并范围的主体"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-na-ru-he-bing-bao-biao-fan-wei-de-zi-gong-si-ji-b",
+      "title": "本期纳入合并报表范围的子公司基本情况"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-mu-gong-si-zai-zi-gong-si-de-suo-you-zhe-quan-yi-fen-e-f",
+      "title": "母公司在子公司的所有者权益份额发生变化的情况"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-mu-gong-si-yong-you-bei-tou-zi-dan-wei-biao-jue-quan-bu",
+      "title": "母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-mu-gong-si-zhi-jie-huo-tong-guo-qi-ta-zi-gong-si-jian-ji",
+      "title": "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-mei-gu-shou-yi",
+      "title": "每股收益"
+    },
+    {
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-you-qi-zi-chan",
+      "title": "油气资产"
+    },
+    {
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-xian-jin-ji-xian-jin-deng-jia-wu",
+      "title": "现金及现金等价物"
+    },
+    {
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-yan-jiu-kai-fa-zhi-chu",
+      "title": "研究开发支出"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-na-ru-he-bing-cai-wu-bao-biao-fan-wei-de-jie-gou-hua-zhu",
+      "title": "纳入合并财务报表范围的结构化主体的相关信息"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-ye-shou-ru-ying-ye-cheng-ben",
+      "title": "营业收入、营业成本"
+    },
+    {
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-ji-zhang-ji-chu-he-ji-jia-yuan-ze",
+      "title": "记账基础和计价原则"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "title": "财务报表主要项目注释"
+    },
+    {
+      "section_id": "chapter-14-qi-ta-zhong-yao-shi-xiang-cai-wu-bao-biao-zhi-pi-zhun",
+      "title": "财务报表之批准"
+    },
+    {
+      "section_id": "chapter-02-cai-wu-bao-biao-bian-zhi-ji-chu",
+      "title": "财务报表编制基础"
+    },
+    {
+      "section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zi-chan-fu-zhai-biao-ri-hou-li-run-fen-pei-qin",
+      "title": "资产负债表日后利润分配情况说明"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-di-yan-suo-de-shui-zi-chan-he-di-yan-suo-de",
+      "title": "递延所得税资产和递延所得税负债"
+    },
+    {
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "title": "重要会计政策、会计估计"
+    },
+    {
+      "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g",
+      "title": "重要会计政策、会计估计的变更以及前期差错的更正"
+    },
+    {
+      "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-zho",
+      "title": "重要前期差错更正"
+    },
+    {
+      "section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-de-zi-chan-fu-zhai-biao-ri-hou-shi-x",
+      "title": "重要的资产负债表日后事项说明"
+    },
+    {
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-zhong-yao-fei-quan-zi-zi-gong-si-qing-kuang",
+      "title": "重要非全资子公司情况"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-fei-huo-bi-xing-zi-chan-jiao-huan",
+      "title": "非货币性资产交换"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-chang-qi-jie-kuan",
+      "title": "（1）一年内到期的长期借款"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-ying-fu-zhai-quan",
+      "title": "（2）一年内到期的应付债券"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-chang-qi-ying-fu-kuan",
+      "title": "（3）一年内到期的长期应付款"
+    },
+    {
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-shu-ju-zi-yuan-xiang-guan-xin-xi",
+      "title": "（3）其他数据资源相关信息"
+    }
+  ],
+  "listed_only_sections": [
+    {
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-ban-feng-xian-zhun-bei",
+      "title": "一般风险准备"
+    },
+    {
+      "section_id": "chapter-12-gu-fen-zhi-fu-yi-quan-yi-jie-suan-de-gu-fen-zhi-fu-qing-kuang",
+      "title": "以权益结算的股份支付情况"
+    },
+    {
+      "section_id": "chapter-12-gu-fen-zhi-fu-yi-xian-jin-jie-suan-de-gu-fen-zhi-fu-qing-kuang",
+      "title": "以现金结算的股份支付情况"
+    },
+    {
+      "section_id": "chapter-10-gong-yun-jia-zhi-pi-lu-gong-yun-jia-zhi",
+      "title": "公允价值"
+    },
+    {
+      "section_id": "chapter-10-gong-yun-jia-zhi-pi-lu",
+      "title": "公允价值披露"
+    },
+    {
+      "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qi-ta",
+      "title": "其他"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-qi-ta-yuan-yin-dao-zhi-de-he-bing-fan-we",
+      "title": "其他原因导致的合并范围的变动"
+    },
+    {
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-zong-he-shou-yi",
+      "title": "其他综合收益"
+    },
+    {
+      "section_id": "chapter-17-bu-chong-zi-liao-jing-zi-chan-shou-yi-lv-he-mei-gu-shou-yi",
+      "title": "净资产收益率和每股收益"
+    },
+    {
+      "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao",
+      "title": "分部报告"
+    },
+    {
+      "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qian-qi-cha-cuo-geng-zheng",
+      "title": "前期差错更正"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-fan-xiang-gou-mai",
+      "title": "反向购买"
+    },
+    {
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
+      "title": "合并财务报表项目注释"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tong-yi-kong-zhi-xia-qi-ye-he-bing",
+      "title": "同一控制下企业合并"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tong-yi-kong-zhi-xia-he-fei-tong-yi-kong",
+      "title": "同一控制下和非同一控制下企业合并的会计处理方法"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-hui-gou-gu-fen",
+      "title": "回购股份"
+    },
+    {
+      "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+      "title": "在其他主体中的权益"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-he-ying-an-pai-huo-lian-ying-qi-ye-z",
+      "title": "在合营安排或联营企业中的权益"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
+      "title": "在子公司中的权益"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-wei-na-ru-he-bing-cai-wu-bao-biao-fa",
+      "title": "在未纳入合并财务报表范围的结构化主体中的权益"
+    },
+    {
+      "section_id": "chapter-17-bu-chong-zi-liao-jing-nei-wai-kuai-ji-zhun-ze-xia-kuai-ji-shu-ju-cha-yi",
+      "title": "境内外会计准则下会计数据差异"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
+      "title": "处置子公司"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-wai-gou-zai-yan-xiang-mu",
+      "title": "外购在研项目"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
+      "title": "套期"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-gong-cheng-wu-zi",
+      "title": "工程物资"
+    },
+    {
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ku-cun-gu",
+      "title": "库存股"
+    },
+    {
+      "section_id": "chapter-17-bu-chong-zi-liao-dang-qi-fei-jing-chang-xing-sun-yi-ming-xi-biao",
+      "title": "当期非经常性损益明细表"
+    },
+    {
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-suo-you-quan-huo-shi-yong-quan-shou-dao-xia",
+      "title": "所有权或使用权受到限制的资产"
+    },
+    {
+      "section_id": "chapter-13-cheng-nuo-ji-huo-you-shi-xiang",
+      "title": "承诺及或有事项"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chi-you-dai-shou-he-zhong-zhi-jing-ying",
+      "title": "持有待售和终止经营"
+    },
+    {
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-chi-you-dai-shou-zi-chan-he-chi-you-dai-sho",
+      "title": "持有待售资产和持有待售负债"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kong-zhi-de-pan-duan-biao-zhun-he-he-bin",
+      "title": "控制的判断标准和合并财务报表编制方法"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-shou-ru-ying-dang-xie-chu-shi-he-qi-ye-t",
+      "title": "收入（应当写出适合企业特点的，尤其是一些特殊业务，以及收入的确认时点）"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ben-gong-si-de-he-ying-qi-ye-he-lian-yin",
+      "title": "本公司的合营企业和联营企业情况"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ben-nian-fan-huan-zheng-fu-bu-zhu-qing-k",
+      "title": "本年返还政府补助情况"
+    },
+    {
+      "section_id": "chapter-12-gu-fen-zhi-fu-ben-qi-gu-fen-zhi-fu-fei-yong",
+      "title": "本期股份支付费用"
+    },
+    {
+      "section_id": "chapter-16-mu-gong-si-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
+      "title": "母公司财务报表主要项目注释"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-xian-jin-ji-xian-jin-deng-jia-wu-di-que",
+      "title": "现金及现金等价物的确定标准"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-yan-fa-zhi-chu",
+      "title": "研发支出"
+    },
+    {
+      "section_id": "chapter-04-shui-xiang-shui-shou-you-hui-ji-pi-wen",
+      "title": "税收优惠及批文"
+    },
+    {
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-shui-jin-ji-fu-jia",
+      "title": "税金及附加"
+    },
+    {
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-gu-dong-quan-yi-bian-dong-biao-xiang-mu-zhu",
+      "title": "股东权益变动表项目注释"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-gu-fen-zhi-fu-ji-quan-yi-gong-ju",
+      "title": "股份支付及权益工具"
+    },
+    {
+      "section_id": "chapter-12-gu-fen-zhi-fu-gu-fen-zhi-fu-zong-ti-qing-kuang",
+      "title": "股份支付总体情况"
+    },
+    {
+      "section_id": "chapter-12-gu-fen-zhi-fu-gu-fen-zhi-fu-de-xiu-gai-zhong-zhi-qing-kuang",
+      "title": "股份支付的修改、终止情况"
+    },
+    {
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-gu-ben",
+      "title": "股本"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ying-ye-zhou-qi",
+      "title": "营业周期"
+    },
+    {
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-ye-shou-ru-he-ying-ye-cheng-ben",
+      "title": "营业收入和营业成本"
+    },
+    {
+      "section_id": "chapter-17-bu-chong-zi-liao",
+      "title": "补充资料"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ji-ru-qi-ta-ying-shou-kuan-de-zheng-fu-b",
+      "title": "计入其他应收款的政府补助"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ji-ru-di-yan-shou-yi-de-zheng-fu-bu-zhu",
+      "title": "计入递延收益的政府补助"
+    },
+    {
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-she-ding-shou-yi-ji-hua-jing-zi-chan",
+      "title": "设定受益计划净资产"
+    },
+    {
+      "section_id": "chapter-02-cai-wu-bao-biao-de-bian-zhi-ji-chu",
+      "title": "财务报表的编制基础"
+    },
+    {
+      "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zi-chan-fu-zhai-biao-ri-hou-li-run-fen-pei-qin",
+      "title": "资产负债表日后利润分配情况（只写现金分配，若仅有转增，则不写）"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-ben-guan-li",
+      "title": "资本管理"
+    },
+    {
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-di-yan-suo-de-shui-zi-chan-yu-di-yan-suo-de",
+      "title": "递延所得税资产与递延所得税负债"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-cai-yong-jing-e-fa-chong-jian-xiang-guan",
+      "title": "采用净额法冲减相关成本费用的政府补助情况"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-cai-yong-zong-e-fa-ji-ru-dang-qi-sun-yi",
+      "title": "采用总额法计入当期损益的政府补助情况"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zhong-da-kuai-ji-pan-duan-he-gu-ji",
+      "title": "重大会计判断和估计"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "title": "重要会计政策、会计估计的变更"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji",
+      "title": "重要会计政策及会计估计"
+    },
+    {
+      "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-zhai-wu-chong-zu",
+      "title": "重要债务重组"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zhong-yao-xing-biao-zhun-que-ding-fang-f",
+      "title": "重要性标准确定方法和选择依据"
+    },
+    {
+      "section_id": "chapter-13-cheng-nuo-ji-huo-you-shi-xiang-zhong-yao-de-cheng-nuo-shi-xiang",
+      "title": "重要的承诺事项"
+    },
+    {
+      "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-de-zi-chan-fu-zhai-biao-ri-hou-fei-t",
+      "title": "重要的资产负债表日后非调整事项说明"
+    },
+    {
+      "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-zi-chan-zhi-huan",
+      "title": "重要资产置换"
+    },
+    {
+      "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-xiao-shou-tui-hui",
+      "title": "重要销售退回"
+    },
+    {
+      "section_id": "chapter-09-jin-rong-gong-ju-feng-xian-guan-li",
+      "title": "金融工具风险管理"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
+      "title": "金融资产转移"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-fei-tong-yi-kong-zhi-xia-qi-ye-he-bing",
+      "title": "非同一控制下企业合并"
+    },
+    {
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-feng-xian-guan-li-mu-biao-he-zheng-ce",
+      "title": "风险管理目标和政策"
+    }
+  ],
+  "format_diff_sections": [
+    {
+      "section_title": "一年内到期的非流动负债",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-fu-zhai",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-fu-zhai",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 5
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "一年内到期的非流动资产",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-zi-chan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-zi-chan",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "主要税种及税率",
+      "soe_section_id": "chapter-06-shui-xiang-zhu-yao-shui-zhong-ji-shui-lv",
+      "listed_section_id": "chapter-04-shui-xiang-zhu-yao-shui-zhong-ji-shui-lv",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "交易性金融负债",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-jiao-yi-xing-jin-rong-fu-zhai",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-jiao-yi-xing-jin-rong-fu-zhai",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 3
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "借款费用",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-jie-kuan-fei-yong",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jie-kuan-fei-yong",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "text",
+        "table_count": 0
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "债务重组",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhai-wu-chong-zu",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zhai-wu-chong-zu",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 4
+      },
+      "listed_format": {
+        "content_type": "text",
+        "table_count": 0
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "债权投资",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhai-quan-tou-zi",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-zhai-quan-tou-zi",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 6
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 13
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "公允价值变动收益",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gong-yun-jia-zhi-bian-dong-shou-yi",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-gong-yun-jia-zhi-bian-dong-shou-yi",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "关联交易情况",
+      "soe_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+      "listed_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 6
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 13
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "其他债权投资",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-zhai-quan-tou-zi",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-zhai-quan-tou-zi",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 14
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "其他应付款",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-ying-fu-kuan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-ying-fu-kuan",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 6
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 7
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "其他应收款",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-ying-shou-kuan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-ying-shou-kuan",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 15
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 18
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "其他权益工具",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-quan-yi-gong-ju",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-quan-yi-gong-ju",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 3
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "其他流动负债",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-liu-dong-fu-zhai",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-liu-dong-fu-zhai",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 3
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "其他流动资产",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-qi-ta-liu-dong-zi-chan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-liu-dong-zi-chan",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 3
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "合同负债",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-tong-fu-zhai",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-he-tong-fu-zhai",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 3
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "合同资产",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-tong-zi-chan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-he-tong-zi-chan",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 3
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 9
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "商誉",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-shang-yu",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-shang-yu",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 4
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "在建工程",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zai-jian-gong-cheng",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-jian-gong-cheng",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "text",
+        "table_count": 0
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "应付债券",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-ying-fu-zhai-quan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-fu-zhai-quan",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 5
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "应收款项融资",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-kuan-xiang-rong-zi",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-kuan-xiang-rong-zi",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 4
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "应收票据",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-piao-ju",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-piao-ju",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 12
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 14
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "应收账款",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 11
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 15
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "开发支出",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-kai-fa-zhi-chu",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kai-fa-zhi-chu",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 3
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "或有事项",
+      "soe_section_id": "chapter-09-huo-you-shi-xiang",
+      "listed_section_id": "chapter-13-cheng-nuo-ji-huo-you-shi-xiang-huo-you-shi-xiang",
+      "soe_format": {
+        "content_type": "text",
+        "table_count": 0
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "投资收益",
+      "soe_section_id": "chapter-12-gu-fen-zhi-fu-tou-zi-shou-yi",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-tou-zi-shou-yi",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "现金流量表补充资料",
+      "soe_section_id": "chapter-12-gu-fen-zhi-fu-xian-jin-liu-liang-biao-bu-chong-zi-liao",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-bu-chong-zi-liao",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 7
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "营业收入与营业成本",
+      "soe_section_id": "chapter-12-gu-fen-zhi-fu-ying-ye-shou-ru-yu-ying-ye-cheng-ben",
+      "listed_section_id": "chapter-16-mu-gong-si-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-ye-shou-ru-yu-ying-ye-cheng",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 5
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 6
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "货币资金",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-huo-bi-zi-jin",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-huo-bi-zi-jin",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "资产处置收益",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zi-chan-chu-zhi-shou-yi",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-chan-chu-zhi-shou-yi",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "递延收益",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-di-yan-shou-yi",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-di-yan-shou-yi",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "长期应收款",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chang-qi-ying-shou-kuan",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-chang-qi-ying-shou-kuan",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 3
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 12
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "预收款项",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yu-shou-kuan-xiang",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yu-shou-kuan-xiang",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 3
+      },
+      "field_mapping": null
+    }
+  ]
+}

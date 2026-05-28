@@ -96,9 +96,9 @@
 ### 14.1 同项目年内切换（已有 note_conversion_service 升级）
 
 - [ ] **A.5.1** 改造 `note_conversion_service.py` 接入 D13 section_id（不依赖 section_number 字符串）
-- [ ] **A.5.2** 互转无数据丢失保证：用户编辑过的 cells（`_cell_modes[i]==manual`）必须保留
-- [ ] **A.5.3** 互转预览：显示「将新增 X 章节、删除 Y 章节、保留 Z 章节」+ 「N 个用户编辑会被保留」+ 「M 个章节因目标版无对应将归档」
-- [ ] **A.5.4** 章节差异表加载：从 P-7 输出 `note_soe_listed_diff.json` 加载映射
+- [~] **A.5.2** 互转无数据丢失保证：用户编辑过的 cells（`_cell_modes[i]==manual`）必须保留
+- [~] **A.5.3** 互转预览：显示「将新增 X 章节、删除 Y 章节、保留 Z 章节」+ 「N 个用户编辑会被保留」+ 「M 个章节因目标版无对应将归档」
+- [~] **A.5.4** 章节差异表加载：从 P-7 输出 `note_soe_listed_diff.json` 加载映射
 
 ### 14.2 集团内子公司不同模板共存
 
@@ -109,13 +109,13 @@
 
 ### 14.3 模板差异管理
 
-- [ ] **A.5.9** `note_template_diff.py` 服务：加载 SOE/Listed 双模板，diff 输出章节级 + 表格级 + 字段级差异
-- [ ] **A.5.10** 章节级映射规则：
+- [~] **A.5.9** `note_template_diff.py` 服务：加载 SOE/Listed 双模板，diff 输出章节级 + 表格级 + 字段级差异
+- [~] **A.5.10** 章节级映射规则：
   - 共有章节（150+）— 直接复制 cells
   - SOE 独有 → Listed：用户决定保留/丢弃
   - Listed 独有 → SOE：用户决定保留/丢弃（带数据归档）
   - 格式略不同（~10）— 列映射 + 字段映射
-- [ ] **A.5.11** 差异表样自动适配（如固定资产 SOE movement → Listed category_sum 列重映射）
+- [~] **A.5.11** 差异表样自动适配（如固定资产 SOE movement → Listed category_sum 列重映射）
 
 ### 14.4 前端切换 UI
 
