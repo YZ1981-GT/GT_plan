@@ -102,10 +102,10 @@
 
 ### 14.2 集团内子公司不同模板共存
 
-- [ ] **A.5.5** 子公司项目 template_type 独立存储（已有 `Project.template_type`，确认 ORM）
-- [ ] **A.5.6** 合并项目模板由 partner 锁定（不跟随子公司变更，避免误改）
-- [ ] **A.5.7** 集团基线（D6）按 template_type 区分（同集团可有 SOE 基线 + Listed 基线两套）
-- [ ] **A.5.8** child apply baseline 时检查 template_type 一致（不一致弹警告 + 自动转换）
+- [x] **A.5.5** 子公司项目 template_type 独立存储（已有 `Project.template_type`，确认 ORM）
+- [x] **A.5.6** 合并项目模板由 partner 锁定（不跟随子公司变更，避免误改）
+- [x] **A.5.7** 集团基线（D6）按 template_type 区分（同集团可有 SOE 基线 + Listed 基线两套）
+- [x] **A.5.8** child apply baseline 时检查 template_type 一致（不一致弹警告 + 自动转换）
 
 ### 14.3 模板差异管理
 
@@ -122,11 +122,11 @@
 - [ ] **A.5.12** DisclosureEditor 顶部「准则」切换器（国企版 ⇆ 上市版）
 - [ ] **A.5.13** 切换前确认弹窗：显示影响章节数 + 用户编辑保留情况
 - [ ] **A.5.14** 切换中进度条 + 切换后 toast 「已切换为 XX 版，保留 N 处用户编辑」
-- [ ] **A.5.15** 单测 12 用例（PBT round-trip：SOE → Listed → SOE 数据无丢失）
+- [x] **A.5.15** 单测 12 用例（PBT round-trip：SOE → Listed → SOE 数据无丢失）
 
 ### 14.5 验收
 
-- [ ] **A.5.16** Sprint A.5 验收（CI-20 模板互转 round-trip 无丢失 PBT）
+- [x] **A.5.16** Sprint A.5 验收（CI-20 模板互转 round-trip 无丢失 PBT）
 
 ## Sprint A.6：协作锁集成 D9（0.5 人天）
 
