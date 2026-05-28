@@ -325,6 +325,15 @@ class DisclosureNote(Base):
     dataset_bound_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), nullable=True
     )
+    # Sprint A.1 / V020：动态模型字段（D1-D7 基础设施）
+    is_empty: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    template_lineage: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    is_local_override: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    text_template_vars: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # workpaper-html-renderer Task 10.3: 附注双源单向同步标记
     # design §12.1 推荐选项 A — 仅记录"最近一次"由底稿 push 同步的来源
     last_sync_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -354,6 +363,106 @@ class DisclosureNote(Base):
             unique=True,
             postgresql_where=text("is_deleted = false"),
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# GroupNoteTemplateBaseline 模型（D6 集团附注模板基线）
+# ---------------------------------------------------------------------------
+
+
+class GroupNoteTemplateBaseline(Base):
+    """集团附注模板基线（D6）
+
+    集团总部维护的附注模板基线，子公司项目可 apply 并 local_override。
+    支持多层级继承（parent_baseline_id 链）和版本管理。
+    """
+
+    __tablename__ = "group_note_template_baseline"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    parent_project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    version: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'v1.0'")
+    )
+    parent_baseline_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("group_note_template_baseline.id"),
+        nullable=True,
+    )
+    template_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'soe'")
+    )
+    sections_data: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_group_baseline_parent_project", "parent_project_id"),
+        Index("ix_group_baseline_parent_baseline", "parent_baseline_id"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# NoteSectionVersionTree 模型（D11 章节版本树）
+# ---------------------------------------------------------------------------
+
+
+class NoteSectionVersionTree(Base):
+    """章节版本树（D11）
+
+    记录章节的版本历史，支持 fork/merge/diff 操作。
+    每个节点是一个快照，parent_node_id 形成 DAG 结构。
+    """
+
+    __tablename__ = "note_section_version_tree"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    note_section_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    branch: Mapped[str] = mapped_column(
+        String(100), nullable=False, server_default=text("'main'")
+    )
+    parent_node_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("note_section_version_tree.id"),
+        nullable=True,
+    )
+    snapshot_data: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    label: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    __table_args__ = (
+        Index("ix_version_tree_project_section", "project_id", "note_section_id"),
+        Index("ix_version_tree_parent_node", "parent_node_id"),
     )
 
 

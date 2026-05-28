@@ -51,12 +51,12 @@
 
 ## Sprint A.1：数据模型 + Migration（2 人天）
 
-- [ ] **A.1.1** row_type/列 sidecar 模型
-- [ ] **A.1.2** binding 多源 fallback 模型
-- [ ] **A.1.3** is_empty / lineage / is_local_override / text_template_vars 字段
-- [ ] **A.1.4** group_note_template_baseline 表 V020
-- [ ] **A.1.5** note_section_version_tree 表 V021
-- [ ] **A.1.6** 验收（CI-1/CI-2/CI-3）
+- [x] **A.1.1** row_type/列 sidecar 模型
+- [x] **A.1.2** binding 多源 fallback 模型
+- [x] **A.1.3** is_empty / lineage / is_local_override / text_template_vars 字段
+- [x] **A.1.4** group_note_template_baseline 表 V020
+- [x] **A.1.5** note_section_version_tree 表 V021
+- [x] **A.1.6** 验收（CI-1/CI-2/CI-3）
 
 ## Sprint A.2：动态行/列引擎 + wp_data（2.5 人天）
 
