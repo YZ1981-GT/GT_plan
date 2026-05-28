@@ -1,8 +1,10 @@
 # 附注模块全维度增强 — 设计文档
 
-> 版本：v0.5（草稿，2026-05-28）
-> 关联需求：requirements.md（126 验收 / 13 维度 D1-D13）
-> v0.5 关键变更：D8 升级为合并附注模块完整开发（含子公司汇总链路）
+> 版本：v0.6（草稿，2026-05-28）
+> 关联需求：requirements.md（130 验收 / 14 维度 D1-D14）
+> v0.6 关键变更：
+> 1. Phase 化重组：Phase 1 单体修复（主线）/ Phase 2 合并连带 / Phase 3 高级特性
+> 2. D14 国企↔上市丝滑切换独立成项
 
 ## 一、设计核心决策
 
@@ -349,6 +351,161 @@ async def handle_subsidiary_changed(event):
     affected_sections = await get_aggregated_sections(parent_id)
     for section in affected_sections:
         await mark_stale(section, reason="subsidiary_changed")
+```
+
+### D14 国企↔上市丝滑切换（v0.6 新增 ⭐⭐⭐）
+
+#### 14.1 改造 note_conversion_service 接入 section_id
+
+```python
+class NoteConversionServiceV2:
+    """国企↔上市互转服务（v0.6 接入 D13 section_id）."""
+
+    async def preview(
+        self,
+        project_id: UUID,
+        year: int,
+        target_type: str,  # 'soe' | 'listed'
+    ) -> dict:
+        """切换前预览：影响章节数 + 用户编辑保留 + diff."""
+        current = await self._load_notes(project_id, year)
+        diff = await self._compute_diff(current.template_type, target_type)
+
+        result = {
+            "common_sections": diff.common_count,           # 共有 ~150
+            "to_archive_sections": diff.target_only_in_current,  # SOE 独有归档
+            "to_create_sections": diff.target_only_in_target,    # Listed 新增
+            "format_changed_sections": diff.format_changed,      # 格式略不同 ~10
+            "user_edits_preserved": self._count_user_edits(current, diff),
+            "warnings": [...],
+        }
+        return result
+
+    async def execute(
+        self,
+        project_id: UUID,
+        year: int,
+        target_type: str,
+        confirmed: bool = False,
+    ) -> dict:
+        """执行互转 — 调用方必须先 preview 确认."""
+        if not confirmed:
+            raise ValueError("Must call preview() and get user confirmation first")
+
+        current = await self._load_notes(project_id, year)
+        target_template = await self._load_template(target_type)
+
+        # 1. 共有章节直接复制（按 section_id 匹配）
+        # 2. 当前独有章节 → archive 表保留 30 天
+        # 3. 目标独有章节 → 创建空章节
+        # 4. 格式不同章节 → 字段映射 + 旧字段归档
+        # 5. 更新 project.template_type
+        # 6. 触发 NOTE_TEMPLATE_TYPE_CHANGED 事件
+```
+
+#### 14.2 章节差异加载（P-7 数据驱动）
+
+```json
+// backend/data/note_soe_listed_diff.json
+{
+  "version": "2025.1",
+  "common_sections": [
+    {"section_id": "section_cash", "title": "货币资金"},
+    ...  // 150+ 共有
+  ],
+  "soe_only_sections": [
+    {"section_id": "section_state_owned_disclosure", "title": "国资委特别披露"}
+  ],
+  "listed_only_sections": [
+    {"section_id": "section_treasury_stock", "title": "库存股"},
+    {"section_id": "section_perpetual_bond", "title": "永续债"}
+  ],
+  "format_diff_sections": [
+    {
+      "section_id": "section_fixed_assets",
+      "soe_format": {"layout": "movement", "columns": [...]},
+      "listed_format": {"layout": "category_sum", "columns": [...]},
+      "field_mapping": {
+        "soe.col_purchase": "listed.col_buildings_increase",
+        ...
+      }
+    }
+  ]
+}
+```
+
+#### 14.3 集团内子公司不同模板共存
+
+```python
+# Project ORM 已有 template_type 字段
+# v0.6 增强：合并项目的 template_type 由 partner 锁定（独立于子公司）
+
+class ProjectTemplateLock(Base):
+    __tablename__ = "project_template_lock"
+    project_id: UUID
+    template_type: str  # soe | listed
+    locked_by: UUID
+    locked_at: datetime
+    lock_reason: str | None  # "合并项目固定上市版" 等
+
+# apply_baseline 时检查
+async def apply_baseline_with_template_check(child_id, baseline_id):
+    child = await load_project(child_id)
+    baseline = await load_baseline(baseline_id)
+    if child.template_type != baseline.template_type:
+        # 弹警告 + 提示用户先转换
+        return {"error": "TEMPLATE_TYPE_MISMATCH", "child": child.template_type, "baseline": baseline.template_type}
+```
+
+#### 14.4 跨模板合并汇总（B.2 联动）
+
+```python
+# ConsolNoteAggregationService.aggregate_section 加 template_translate
+
+async def aggregate_section_cross_template(
+    self,
+    consol_template: str,        # 'soe' | 'listed'
+    child_section_id: str,
+    children: list[Project],
+):
+    """跨模板汇总：子公司模板可能与合并不同."""
+    aggregated = []
+    for child in children:
+        child_notes = await self._load_child_notes(child)
+        if child.template_type != consol_template:
+            # 跨模板：用 P-7 字段映射 translate
+            translated = await self._translate_section(
+                child_notes[child_section_id],
+                from_type=child.template_type,
+                to_type=consol_template,
+            )
+            aggregated.append(translated)
+        else:
+            aggregated.append(child_notes[child_section_id])
+
+    return self._merge(aggregated, ...)
+```
+
+#### 14.5 前端切换器组件
+
+```vue
+<!-- DisclosureEditor.vue 顶部新增 -->
+<el-radio-group v-model="templateType" size="small" @change="onTemplateChange">
+  <el-radio-button label="soe">国企版</el-radio-button>
+  <el-radio-button label="listed">上市版</el-radio-button>
+</el-radio-group>
+
+<TemplateConversionPreviewDialog
+  v-model="showPreview"
+  :preview-data="previewData"
+  @confirm="executeConversion"
+/>
+```
+
+切换流程：
+
+```
+点切换 → preview API → 弹预览框 → 用户确认 → execute API → 切换完成 toast
 ```
 
 ### D9 协作锁集成
