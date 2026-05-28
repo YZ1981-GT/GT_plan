@@ -450,7 +450,7 @@ async def test_manual_type_safe():
 def test_source_resolvers_keys_match_valid_sources():
     """SOURCE_RESOLVERS 与 VALID_SOURCES 对齐 — CI 卡点."""
     assert set(SOURCE_RESOLVERS.keys()) == set(VALID_SOURCES)
-    assert len(VALID_SOURCES) == 8
+    assert len(VALID_SOURCES) == 9
 
 
 def test_all_resolvers_callable():

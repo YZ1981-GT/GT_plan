@@ -182,7 +182,7 @@
 
 ⚠ **必须先于 Sprint B.1**（Sprint B.1 调用此 Service）
 
-- [ ] **B.0.1** binding 新 source 类型 `consol_aggregation` 定义 + 单测
+- [x] **B.0.1** binding 新 source 类型 `consol_aggregation` 定义 + 单测
 - [ ] **B.0.2** `consol_note_aggregation_service.py` 新建（5 种 aggregation_method）
   - simple_sum / sum_after_elimination / top_n_after_elimination / weighted_avg / first_n_concat
 - [ ] **B.0.3** `consol_elimination_rules.py` 抵销规则注册器
@@ -193,7 +193,7 @@
 - [ ] **B.0.7** 模板 P-5 输出（150+ 章节映射）入库
 - [ ] **B.0.8** 「重新汇总」端点 + 进度 SSE
 - [ ] **B.0.9** 单测 + PBT
-- [ ] **B.0.10** 验收（CI-15/CI-16/CI-17 + ADR-017/018）
+- [x] **B.0.10** 验收（CI-15/CI-16/CI-17 + ADR-017/018）
 
 ## Sprint B.1：合并附注完整开发 D8（3.5 人天）
 

@@ -60,6 +60,7 @@ VALID_SOURCES: tuple[str, ...] = (
     "formula",
     "prior_year_note",
     "manual",
+    "consol_aggregation",
 )
 
 
@@ -724,6 +725,71 @@ async def resolve_manual(
 
 
 # ---------------------------------------------------------------------------
+# 8) consol_aggregation — 合并附注从子公司单体附注汇总（D12）
+# ---------------------------------------------------------------------------
+
+
+async def resolve_consol_aggregation(
+    binding: dict[str, Any],
+    ctx: dict[str, Any],
+) -> Any:
+    """从子公司单体附注汇总数据到合并附注.
+
+    binding 字段：
+      - child_section_id: str          子公司单体附注对应章节 ID（CI-15 必有）
+      - aggregation_method: str        聚合方式
+      - aggregation_config: dict       聚合配置（top_n / threshold 等）
+      - elimination_rules: list[dict]  抵销规则列表
+      - child_filter: dict             子公司筛选
+
+    ctx 字段：
+      - project_id: UUID               合并项目 ID
+      - year: int
+      - db: AsyncSession
+
+    返回 dict（聚合结果）或 None.
+    """
+    if not isinstance(binding, dict):
+        return None
+
+    child_section_id = binding.get("child_section_id")
+    if not child_section_id:
+        logger.warning("consol_aggregation binding missing child_section_id")
+        return None
+
+    project_id = ctx.get("project_id")
+    year = ctx.get("year")
+    db = ctx.get("db")
+    if not project_id or not year:
+        return None
+
+    try:
+        from app.services.consol_note_aggregation_service import aggregate_section
+
+        method = binding.get("aggregation_method", "simple_sum")
+        config = binding.get("aggregation_config") or {}
+        elimination_rules = binding.get("elimination_rules") or []
+        child_filter = binding.get("child_filter") or {}
+
+        result = await aggregate_section(
+            consol_project_id=project_id,
+            section_id=child_section_id,
+            year=year,
+            method=method,
+            config=config,
+            elimination_rules=elimination_rules,
+            child_filter=child_filter,
+            db=db,
+        )
+        return result
+    except Exception as err:
+        logger.warning(
+            "resolve_consol_aggregation failed: %s; returning None", err,
+        )
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher — source 字符串到 resolver 的映射
 # ---------------------------------------------------------------------------
 
@@ -737,6 +803,7 @@ SOURCE_RESOLVERS: dict[str, Any] = {
     "formula": resolve_formula,
     "prior_year_note": resolve_prior_year_note,
     "manual": resolve_manual,
+    "consol_aggregation": resolve_consol_aggregation,
 }
 
 # 资源完整性 — 与 VALID_SOURCES 对齐（CI 单测断言）
@@ -777,6 +844,7 @@ __all__ = [
     "dispatch_resolver",
     "resolve_aux_balance",
     "resolve_aux_ledger_aging",
+    "resolve_consol_aggregation",
     "resolve_formula",
     "resolve_ledger_sum",
     "resolve_manual",

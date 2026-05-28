@@ -4,8 +4,9 @@
 - POST /api/consolidation/notes/{project_id}/{year}  生成合并附注
 - GET  /api/consolidation/notes/{project_id}/{year}  获取合并附注
 - POST /api/consolidation/notes/integrate            合并附注与单体附注整合
+- POST /api/consolidation/notes/{project_id}/{year}/reaggregate  重新汇总
 
-Validates: Phase 2 Requirements 8.1, 8.2, 8.3, 8.4, 8.5, 8.6
+Validates: Phase 2 Requirements 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, D12
 """
 
 from __future__ import annotations
@@ -95,3 +96,104 @@ async def save_consol_notes(
         "saved_count": len(saved),
         "sections": [s.section_code for s in sections],
     }
+
+
+# ---------------------------------------------------------------------------
+# B.0.8 重新汇总端点（Sprint B.0）
+# ---------------------------------------------------------------------------
+
+
+class ReaggregateRequest(BaseModel):
+    """重新汇总请求"""
+    section_ids: list[str] | None = None  # None = 全部章节
+    force: bool = False  # True = 忽略 stale 状态强制重算
+
+
+class ReaggregateResponse(BaseModel):
+    """重新汇总响应"""
+    success: bool
+    sections_processed: int
+    sections_updated: int
+    errors: list[str] = []
+
+
+@router.post(
+    "/{project_id}/{year}/reaggregate",
+    response_model=ReaggregateResponse,
+)
+async def reaggregate_consol_notes(
+    project_id: UUID,
+    year: int,
+    request: ReaggregateRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """重新汇总合并附注（同步版，SSE 留 Phase 2 B.1 完善）.
+
+    从子公司单体附注重新聚合数据到合并附注。
+    可指定 section_ids 部分重算，或全部重算。
+    """
+    from app.services.consol_note_aggregation_service import (
+        aggregate_section,
+        validate_lineage_dag,
+    )
+
+    request = request or ReaggregateRequest()
+
+    # CI-16: 校验 lineage 无环
+    is_dag_valid = await validate_lineage_dag(project_id, db)
+    if not is_dag_valid:
+        raise HTTPException(
+            status_code=400,
+            detail="合并层级链存在循环引用，无法汇总",
+        )
+
+    # 确定要处理的章节
+    section_ids = request.section_ids
+    if not section_ids:
+        # 从 CSV 映射加载所有章节
+        section_ids = _load_mapped_section_ids()
+
+    errors: list[str] = []
+    updated = 0
+
+    for sid in section_ids:
+        try:
+            result = await aggregate_section(
+                consol_project_id=project_id,
+                section_id=sid,
+                year=year,
+                db=db,
+            )
+            if result:
+                updated += 1
+        except Exception as err:
+            errors.append(f"{sid}: {err!s}")
+
+    return ReaggregateResponse(
+        success=len(errors) == 0,
+        sections_processed=len(section_ids),
+        sections_updated=updated,
+        errors=errors[:10],  # 最多返回 10 个错误
+    )
+
+
+def _load_mapped_section_ids() -> list[str]:
+    """从 CSV 映射文件加载所有 section_id."""
+    import csv
+    from pathlib import Path
+
+    csv_path = Path(__file__).resolve().parent.parent.parent / "data" / "consol_note_section_mapping.csv"
+    if not csv_path.exists():
+        return []
+
+    section_ids: list[str] = []
+    with open(csv_path, encoding="utf-8") as f:
+        reader = csv.DictReader(
+            (line for line in f if not line.startswith("#")),
+        )
+        for row in reader:
+            sid = row.get("section_id", "").strip()
+            if sid:
+                section_ids.append(sid)
+    return section_ids
