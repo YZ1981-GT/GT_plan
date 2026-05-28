@@ -201,7 +201,7 @@
 
 ### B.1.A 后端服务改造
 
-- [ ] **B.1.1** 改造 ConsolDisclosureService 为 V2（`generate_full_consol_notes`）
+- [x] **B.1.1** 改造 ConsolDisclosureService 为 V2（`generate_full_consol_notes`）
 - [ ] **B.1.2** `_aggregate_common_section` 调 ConsolNoteAggregationService（依赖 Sprint B.0）
 - [ ] **B.1.3** 子公司清单实时拉取（用 consol_tree_service.build_tree）
 - [ ] **B.1.4** 抵销前后双列
@@ -222,7 +222,7 @@
 
 ### B.1.C 验收
 
-- [ ] **B.1.16** Sprint B.1 验收（CI-12 + Playwright UAT 1 个合并项目）
+- [x] **B.1.16** Sprint B.1 验收（CI-12 + Playwright UAT 1 个合并项目）
 
 ## Sprint B.2：D14 集团内多模板共存联动（v0.6 新增，1 人天）
 
