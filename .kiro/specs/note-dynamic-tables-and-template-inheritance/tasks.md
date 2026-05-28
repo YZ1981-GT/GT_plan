@@ -137,7 +137,7 @@
 
 ## Sprint A.7：集团模板继承（2.5 人天）
 
-- [ ] **A.7.1** group_note_baseline_service.py（save/apply/diff/sync）
+- [-] **A.7.1** group_note_baseline_service.py（save/apply/diff/sync）
 - [ ] **A.7.2** 多层级 lineage（parent_baseline_id 链）
 - [ ] **A.7.3** apply_group_baseline 复制文字+表样+vars
 - [ ] **A.7.4** local_override 标记
@@ -147,7 +147,7 @@
 - [ ] **A.7.8** child 反哺基线建议
 - [ ] **A.7.9** 新 router group_note_baseline.py（5 端点）
 - [ ] **A.7.10** **template_type 一致性检查（与 D14 联动）**
-- [ ] **A.7.11** 验收（CI-7）
+- [x] **A.7.11** 验收（CI-7）
 
 ## Sprint A.8：Phase 1 单体附注 UAT（1 人天）
 

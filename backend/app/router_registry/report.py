@@ -91,3 +91,7 @@ def register_report_routers(app: FastAPI) -> None:
     # ═══ §94. Phase 4 F2: 多年度对比分析 ═══
     from app.routers.reports import multi_year_router
     app.include_router(multi_year_router, tags=["multi-year-compare"])
+
+    # ═══ §95. Sprint A.7：集团附注模板基线（D6 升级） ═══
+    from app.routers.group_note_baseline import router as group_note_baseline_router
+    app.include_router(group_note_baseline_router, tags=["group-note-baseline"])
