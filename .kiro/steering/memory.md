@@ -15,6 +15,7 @@ inclusion: always
 - 功能收敛：停加新功能，核心 6-8 页做到极致，空壳标 developing
 - 前后端必须联动；删除二次确认 + 先进回收站；一次性脚本用完即删
 - git 提交不分多区，单 commit 提交所有变更
+- **git push 前必先 fetch 同步铁律**（2026-05-28）：用户明确要求"先同步下来再推送"；workflow = ① stash WIP ② `git fetch origin --prune` ③ 评估 ahead/behind ④ 决定 rebase / 跳过 / 拆分 ⑤ stash pop ⑥ commit + push；本地分支远超 master（如 feature/e2e-business-flow ahead 118）时禁止盲 rebase（中间冲突无意义），改为推到独立 feature/{spec-name}-closure 分支
 - 提建议前先验证（不引用过时记录），反复论证给最仔细可落地方案
 - 判断前端模块存在性必须同时检查 `views/` 根目录 + `components/` 子目录
 - 文档同步：功能变更后同步更新需求文档；死代码立即删除，不留 DEPRECATED/fallback 注释
@@ -162,6 +163,7 @@ ts 353 / composables 91
 - **vue test-utils stub slot 透传铁律**（2026-05-28）：stub `el-empty` 等带 description prop 又支持默认 slot 的组件时，描述渲染必须 `<div class="el-empty__description">{{ description }}</div>` 独立标签 + 不在 `<slot>` 内（否则 slot 有内容会覆盖 description）；GtTableExtended 多层透传场景（GtTableExtended → GtEditableTable → el-table）必须 stub 中间层（GtEditableTable）显式渲染 columns + slot 才能让外层测试看到 label / formatter 调用 / toolbar-left slot
 - **vue test-utils 必 mock route.query 铁律**（2026-05-28）：组件 onMounted 读 `route.query.xxx` 时，`vi.mock('vue-router')` 返回的 mockRoute 必须含 `query: {}` 字段，缺失会触发 `Cannot read properties of undefined (reading 'xxx')` mounted hook 异常 → 后续 await flushPromises 数据未到位 → 大量 false negative 测试；同样 useRouter 返 mockRouter 必须含 `replace: vi.fn().mockReturnValue(Promise.resolve())` 避免 watch 副作用抛错
 - **subagent 实测 delta 验证铁律**（2026-05-28）：subagent prompt 必须强制前置 baseline grep + 后置实测验证，不能只让 subagent 自报"做了什么"；典型反面 = "Top 3 视图已接入"但没说 baseline 109→92 是否到目标；正确做法 = subagent 完成前必跑 baseline grep 输出 "X→Y" 实数 + 用户阈值对照（"目标 ≤ 80%, 当前 17%"）
+- **底稿模块超级 SFC 风险铁律**（2026-05-28）：上帝组件 ≥ 1500 行有显著质量风险（const 顺序铁律 / 测试覆盖断层 / 重构 conflict）；当前清单 = WorkpaperList.vue **3238 行**（未被 V3 spec 覆盖）/ WorkpaperEditor 2555（V3 已建瘦身基础设施）/ GtCNoteTable 1608 / GtEControlTest 1125 / workpaper_fill_service.py 后端 1587；新文件 ≥ 1000 行必拆为多个职责子组件，触碰时机械治理
 - **ESLint no-console 实测违规计数铁律**（2026-05-27）：spec 里写的"74 处 console.*"是 grep `console\.` 总数（含合法 warn/error/wrapper），实际 ESLint 默认配置（`'no-console': ['error', { allow: ['warn', 'error'] }]`）下真实违规 = **3 处**；评估时用 `npx eslint --quiet --format compact src/ | Select-String "no-console"` 拿真实违规数，不要按 grep 总数估工时；治理目标 = `import.meta.env.DEV` 守卫 OR `eslint-disable-next-line no-console` OR 替换为 `logger.log` 三选一
 - **useWpDetailGuard 三态默认接入铁律**（2026-05-25）：依赖 wpId 的视图必须 `useWpDetailGuard(wpId)` 三态（loading/error/ready），不允许直接 `goBack()` 跳转处理异常
 - **append-to-body :deep() 失效铁律**：el-dialog/el-drawer/Teleport 内容到 body 下脱离组件作用域，`<style scoped>` 的 `:deep()` 选不到，需独立全局 `<style>` 块
@@ -236,12 +238,16 @@ ts 353 / composables 91
 - **12.5 Property 13 ✅**：7 tests 全绿（60s 触发 / 快速模式 / 重试 / beforeunload / 恢复）
 - **Sprint 4 全部完成**（核心功能 + 骨架 + 渐进治理模式）
 
-### V3 Spec 总体状态（2026-05-27）
+### V3 Spec 总体状态（2026-05-28）
 
-- **Sprint 0-4 全部完成**：98 必需任务中 ~85 标 [x] + ~13 标 [~]（渐进治理/待真实环境）
-- **Sprint 回归 14.1/14.2/14.3 已通过**：后端 145 passed (29.70s) + 前端 126 passed (4.61s) + Playwright E2E 登录→仪表盘→项目→底稿核心链路通过；14.4 待合伙人验收
-- **Sprint 回归 14.3/14.4 待真实环境**：Playwright E2E + UAT 需 start-dev.bat（localhost:3030/9980 未启动时 ERR_CONNECTION_REFUSED）
-- **新增 composable**：useEditorToolbar / useEditorCycles / useEditorMode / useFirstLoad / useNavigationStack
-- **新增配置**：editorDialogConfig.ts（11 dialog 声明式配置）
-- **autoSave 新契约**：默认 60s + 10 次编辑切 30s + 保存成功恢复 60s + 失败重试 1 次 + beforeunload sendBeacon
-- **gin_index_monitor 表名 bug 修复**（2026-05-27）：`TABLE_NAME` 从 `"working_papers"`（复数，错误）改为 `"working_paper"`（单数，与 ORM `__tablename__` 一致）+ 已在 PG 创建 `idx_wp_parsed_data_gin` GIN 索引（jsonb_path_ops）
+- **Sprint 0-4 全部完成** + 测试债清零：143/145 tasks（剩 14.4 真合伙人 UAT 外部依赖）
+- **CI 双卡点已上线**（commit f8bedc32 / branch `feature/global-refinement-v3-closure`）：vue-tsc 0 errors + vitest 0 failed + 5 个 V3 防退化 grep（GtAmountCell only-increase / el-form :rules only-increase / WorkpaperEditor only-decrease / no-console strict 0）
+- **gaps.md 反向记录已建**：`.kiro/specs/global-refinement-v3/gaps.md` 涵盖 7 章（真未做/部分完成/跳过测试/可选/CI 锁定值/元改进/下个 spec 推荐）
+- **下个 spec 推荐**（gaps.md §G + 底稿模块复盘 2026-05-28）：
+  - **P0** `workpaper-list-shrink`（1 周）：WorkpaperList.vue **3238 行** 比 WorkpaperEditor 2555 还大，未被 V3 spec 覆盖；拆 5 个 SFC（Page/Tree/Board/DelegationMatrix/DependencyGraph）
+  - **P0** `cycle-editor-generic`（0.5 天）：K/L/M/N 4 个 CycleEditor 平均 80 行**纯转发包装**，可合并为 1 个 `useSimpleCycleEditor` generic + config，减 ~250 行 / 4 文件
+  - **P1** `html-renderer-registry`（0.5 天）：HTML componentType 11 类硬编码 4 处同步（useEditorMode Set / GtWpRenderer v-if / useWpClassification fallback / 后端 workpaper_sheet_classification 表），缺 registry 模式
+  - **P1** `workpaper-fill-service-split`（2 天）：`workpaper_fill_service.py` **1587 行**单文件含 6 prefill 函数 + 公式解析 + writeback + snapshot；拆 wp_prefill_engine + wp_formula_parser + wp_cell_writeback + wp_snapshot_diff 4 个 ≤500 行
+  - **P1** `v3-partner-acceptance`(1-2天) / `gt-amount-cell-rollout`(2-3周, 17%→80%) / `workpaper-editor-shrink-phase2`(3-5天, 2555→1000)
+  - **P2** `gt-c-note-table-shrink`（2-3 天）：GtCNoteTable 1608 / GtEControlTest 1125 / GtAProgramConsole 629 共 ~3300 行 SFC（HTML 渲染器拆出后形成的新债）；触碰时做
+  - **P2** `prefill-snapshot-comparison`(2天) / `vllm-httpx-bugfix`(1天) / `posthog-rollout`(3天)

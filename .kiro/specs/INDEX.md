@@ -67,6 +67,9 @@
 | Spec | 说明 |
 |------|------|
 | `consol-note-three-level-drilldown/` | 合并附注三级穿透；前置=真实合并母子项目数据 |
+| `workpaper-list-shrink/` | README stub（2026-05-28）：WorkpaperList 3238 行拆 5 SFC + shell；触碰时启动完整三件套 |
+| `workpaper-fill-service-split/` | README stub（2026-05-28）：workpaper_fill_service 1587 行拆 4 service；prefill 扩展时启动 |
+| `gt-c-note-table-shrink/` | README stub（2026-05-28）：GtCNoteTable 1608 / GtEControlTest 1125 拆子组件；触碰时启动 |
 
 ---
 

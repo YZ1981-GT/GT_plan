@@ -312,6 +312,43 @@ jobs:
             exit 1
           fi
         working-directory: audit-platform/frontend
+      - name: V3 大型 SFC 行数防膨胀 guard (2026-05-28 复盘)
+        # 底稿模块超级 SFC 清单（仅 only-decrease 防退化，目标见 gaps.md）
+        run: |
+          declare -A BASELINES=(
+            ["src/views/WorkpaperList.vue"]=3238
+            ["src/components/workpaper/GtCNoteTable.vue"]=1608
+            ["src/components/workpaper/GtEControlTest.vue"]=1125
+          )
+          fail=0
+          for FILE in "${!BASELINES[@]}"; do
+            [ -f "$FILE" ] || continue
+            LINES=$(wc -l < "$FILE")
+            BASE=${BASELINES[$FILE]}
+            echo "$FILE: $LINES lines (baseline: $BASE)"
+            if [ "$LINES" -gt "$BASE" ]; then
+              echo "::error::$FILE grew from $BASE to $LINES lines"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] || exit 1
+        working-directory: audit-platform/frontend
+      - name: V3 简单循环编辑器去重 guard (cycle-editor-generic 2026-05-28)
+        # K/L/M/N 4 个简单 CycleEditor 已退化为薄包装委托 useSimpleCycleEditor
+        # 卡点：4 文件总行数 ≤ 130 行（防有人复制粘贴回特化实现）
+        run: |
+          TOTAL=0
+          for FILE in src/composables/useKCycleEditor.ts src/composables/useLCycleEditor.ts src/composables/useMCycleEditor.ts src/composables/useNCycleEditor.ts; do
+            LINES=$(wc -l < "$FILE")
+            TOTAL=$((TOTAL + LINES))
+          done
+          BASELINE=130
+          echo "K/L/M/N CycleEditor total: $TOTAL lines (baseline: $BASELINE)"
+          if [ "$TOTAL" -gt "$BASELINE" ]; then
+            echo "::error::Simple cycle editors grew from $BASELINE to $TOTAL. Use useSimpleCycleEditor generic instead."
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
       - name: Display token guard (R10 Spec B / F10)
         # baseline 来自 .github/workflows/baselines.json，由 Sprint 0 实测填入
         # 4 道 grep 卡点：font-size / color / background / 裸 el-table

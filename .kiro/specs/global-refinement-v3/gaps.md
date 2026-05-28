@@ -122,11 +122,16 @@
 
 ## G. 下一步推荐 spec 清单（按 ROI 排序）
 
-| 优先级 | spec 名 | 工时 | 触发条件 |
-|---|---|---|---|
-| P0 | `v3-partner-acceptance` | 1-2 天 | 合伙人有空 |
-| P1 | `gt-amount-cell-rollout` | 2-3 周 | 当前 17% → 80% 覆盖 |
-| P1 | `workpaper-editor-shrink-phase2` | 3-5 天 | 2555 → ≤1000 行 |
-| P2 | `prefill-snapshot-comparison` | 2 天 | L-3 feature 实现 + 启用 4 测试 |
-| P2 | `vllm-httpx-bugfix` | 1 天 | 修 3 个明确方案的 bug（memory 已记）|
-| P3 | `posthog-rollout` | 3 天（可选）| 用户行为可观测性 |
+| 优先级 | spec 名 | 工时 | 触发条件 | 状态 |
+|---|---|---|---|---|
+| ✅ 完成 | `cycle-editor-generic`（K/L/M/N → useSimpleCycleEditor）| 0.5 天 | 直接修 | 2026-05-28 commit f8bedc32+ |
+| ✅ 完成 | `html-renderer-registry`（11 类硬编码 → registry 模式） | 0.5 天 | 直接修 | 2026-05-28 commit f8bedc32+ |
+| P0 | `v3-partner-acceptance` | 1-2 天 | 合伙人有空 | spec 未起 |
+| P0 | `workpaper-list-shrink`（3238→拆 5 SFC + shell）| 1 周 | 触碰列表时 | **README stub** `.kiro/specs/workpaper-list-shrink/README.md` |
+| P1 | `gt-amount-cell-rollout` | 2-3 周 | 当前 17% → 80% 覆盖 | spec 未起 |
+| P1 | `workpaper-editor-shrink-phase2` | 3-5 天 | 2555 → ≤1000 行 | spec 未起 |
+| P1 | `workpaper-fill-service-split`（1587→拆 4 service）| 2 天 | prefill 函数下次扩展时 | **README stub** `.kiro/specs/workpaper-fill-service-split/README.md` |
+| P2 | `prefill-snapshot-comparison` | 2 天 | L-3 feature 实现 + 启用 4 测试 | spec 未起 |
+| P2 | `vllm-httpx-bugfix` | 1 天 | 修 3 个明确方案的 bug（memory 已记）| spec 未起 |
+| P2 | `gt-c-note-table-shrink`（1608+1125 → 拆 5+7） | 2-3 天 | 触碰附注/控制测试时 | **README stub** `.kiro/specs/gt-c-note-table-shrink/README.md` |
+| P3 | `posthog-rollout` | 3 天（可选）| 用户行为可观测性 | spec 未起 |

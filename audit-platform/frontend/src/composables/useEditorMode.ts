@@ -23,24 +23,16 @@ import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { api as httpApi } from '@/services/apiProxy'
 import { workpapers as P_wp } from '@/services/apiPaths'
 import { useWpClassification } from '@/composables/useWpClassification'
+import { HTML_RENDERER_ROUTE_SET } from '@/components/workpaper/htmlRendererRegistry'
 
 /**
  * HTML class componentType allowlist (matches GtWpRenderer dispatch).
- * Mirrors the workpaper-html-renderer Task 13.1 list embedded in WorkpaperEditor.vue.
+ *
+ * 重构 2026-05-28：从硬编码 Set 改为从 htmlRendererRegistry 单一来源派生。
+ * 新增 HTML 渲染器类型只需改 htmlRendererRegistry.ts，本 Set 自动同步。
+ * 包含 skip placeholder（GtWpRenderer 内部 fallback 渲染 SkippedSheetPlaceholder）。
  */
-export const HTML_COMPONENT_TYPES: ReadonlySet<string> = new Set([
-  'a-program-console',
-  'b-index',
-  'c-note-table',
-  'd-form-table',
-  'd-form-paragraph',
-  'd-form-qa',
-  'd-form-confirmation',
-  'd-form-review',
-  'e-control-test',
-  'h-static-doc',
-  'skip',
-])
+export const HTML_COMPONENT_TYPES: ReadonlySet<string> = HTML_RENDERER_ROUTE_SET
 
 export interface EditorModeContext {
   /** Workpaper id (route param) */

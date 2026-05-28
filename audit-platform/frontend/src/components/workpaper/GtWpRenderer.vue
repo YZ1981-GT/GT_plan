@@ -53,76 +53,24 @@
 
       <!-- 内容区域 -->
       <div class="gt-wp-renderer__content">
-      <!-- A 程序表中控台 -->
-      <GtAProgramConsole
-        v-if="componentType === 'a-program-console'"
+      <!-- 注册表分发：HTML 类组件（A/B/C/D 5 种/E/H 共 10 种 componentType） -->
+      <component
+        v-if="rendererEntry"
+        :is="rendererEntry.component"
         :wp-id="wpId"
         :sheet-name="activeSheetName"
         :schema="activeSheetSchema"
         :html-data="activeSheetHtmlData"
         :readonly="readonly"
-        @save="onSave"
-      />
-
-      <!-- B 底稿目录 -->
-      <GtBIndex
-        v-else-if="componentType === 'b-index'"
-        :wp-id="wpId"
-        :sheet-name="activeSheetName"
-        :schema="activeSheetSchema"
-        :html-data="activeSheetHtmlData"
-        :readonly="readonly"
-        @save="onSave"
-      />
-
-      <!-- C 附注披露嵌套表 -->
-      <GtCNoteTable
-        v-else-if="componentType === 'c-note-table'"
-        :wp-id="wpId"
-        :sheet-name="activeSheetName"
-        :schema="activeSheetSchema"
-        :html-data="activeSheetHtmlData"
-        :readonly="readonly"
+        v-bind="extraComponentProps"
         @save="onSave"
         @subtable-toggle="onSubtableToggle"
         @standard-switch="onStandardSwitch"
         @sync-to-disclosure-notes="onSyncToDisclosureNotes"
         @jump-to-reference="onJumpToReference"
-      />
-
-      <!-- D 检查表（5 子模式由 GtDForm 内部路由） -->
-      <GtDForm
-        v-else-if="componentType === 'd-form-table' || componentType === 'd-form-paragraph' || componentType === 'd-form-qa' || componentType === 'd-form-confirmation' || componentType === 'd-form-review'"
-        :wp-id="wpId"
-        :sheet-name="activeSheetName"
-        :schema="activeSheetSchema"
-        :html-data="activeSheetHtmlData"
-        :form-type="componentType"
-        :readonly="readonly"
-        @save="onSave"
-      />
-
-      <!-- E 控制测试 -->
-      <GtEControlTest
-        v-else-if="componentType === 'e-control-test'"
-        :wp-id="wpId"
-        :sheet-name="activeSheetName"
-        :schema="activeSheetSchema"
-        :html-data="activeSheetHtmlData"
-        :readonly="readonly"
-        @save="onSave"
         @trigger-procedure-trimming-suggestion="onTrimmingSuggestion"
         @conclusion-change="onConclusionChange"
         @step-advance="onStepAdvance"
-      />
-
-      <!-- H 辅助说明（只读 markdown） -->
-      <GtHStaticDoc
-        v-else-if="componentType === 'h-static-doc'"
-        :wp-id="wpId"
-        :sheet-name="activeSheetName"
-        :schema="activeSheetSchema"
-        :html-data="activeSheetHtmlData"
       />
 
       <!-- Univer 保留渲染（F/G 类） -->
@@ -157,16 +105,14 @@
 import { ref, computed, toRef } from 'vue'
 import { useWpRenderer, type WpComponentType } from '@/composables/useWpRenderer'
 import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
+import {
+  getRendererEntry,
+  getSheetIcon as registryGetSheetIcon,
+} from '@/components/workpaper/htmlRendererRegistry'
 
-// ─── Sub-components (real + placeholder stubs) ───
-// GtAProgramConsole is the real implementation (Task 3.9)
-// Others will be replaced by real implementations in later tasks
-import GtAProgramConsole from '@/components/workpaper/GtAProgramConsole.vue'
-import GtBIndex from '@/components/workpaper/GtBIndex.vue'
-import GtCNoteTable from '@/components/workpaper/GtCNoteTable.vue'
-import GtDForm from '@/components/workpaper/GtDForm/GtDForm.vue'
-import GtEControlTest from '@/components/workpaper/GtEControlTest.vue'
-import GtHStaticDoc from '@/components/workpaper/GtHStaticDoc.vue'
+// ─── Sub-components (placeholder fallback) ───
+// HTML 类型路由由 htmlRendererRegistry 管理（lazy load 自动）
+// 仅 SkippedSheetPlaceholder 不在 registry 内（特殊占位）
 import SkippedSheetPlaceholder from '@/components/workpaper/SkippedSheetPlaceholder.vue'
 
 // ─── Types ───
@@ -259,23 +205,21 @@ const componentType = computed<WpComponentType>(() => {
   return (activeSheet.value?.componentType as WpComponentType) ?? 'skip'
 })
 
-/** componentType → 图标（sheet tab 显示） */
-function getSheetIcon(ct: string): string {
-  const map: Record<string, string> = {
-    'a-program-console': '📋',
-    'b-index': '🗂️',
-    'c-note-table': '📝',
-    'd-form-table': '📑',
-    'd-form-paragraph': '📄',
-    'd-form-qa': '❓',
-    'd-form-confirmation': '✉️',
-    'd-form-review': '✍️',
-    'e-control-test': '🧪',
-    'h-static-doc': '📖',
-    'univer': '📊',
-    'skip': '⏭️',
+/** 注册表查找：HTML 类型 → component + emit 列表（lazy import） */
+const rendererEntry = computed(() => getRendererEntry(componentType.value))
+
+/** D 子模式需要 form-type prop；其他类型透传空对象 */
+const extraComponentProps = computed<Record<string, unknown>>(() => {
+  const ct = componentType.value
+  if (ct.startsWith('d-form-')) {
+    return { 'form-type': ct }
   }
-  return map[ct] || '📄'
+  return {}
+})
+
+/** componentType → 图标（sheet tab 显示），委托给 registry */
+function getSheetIcon(ct: string): string {
+  return registryGetSheetIcon(ct)
 }
 
 const errorTitle = computed(() => {
