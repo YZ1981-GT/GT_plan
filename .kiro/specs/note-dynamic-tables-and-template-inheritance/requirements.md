@@ -1,261 +1,343 @@
-# 附注模块动态表格 + 模板继承支持 — 需求文档
+# 附注模块全维度增强 — 需求文档
 
-> 版本：v0.2（草稿，2026-05-28 大幅扩展）
+> 版本：v0.3（草稿，2026-05-28 三轮扩展）
 > 编写：2026-05-28
-> 范围：附注模板「动态行 + 动态列 + 底稿数据源 + 空内容剔除 + 集团模板继承」5 维支持
+> 范围：动态表格 + 模板继承 + 合并附注衔接 + 文字段落动态 + 协作锁 + AI 辅助 + 跨年版本 + 多公司基线 11 维全栈增强
 > 前置：disclosure-note-full-revamp（已完成 46/47）
+> 原则：**能不写死就不写死**，全部支持动态调整
 
 ## 一、问题陈述
 
-### 1.1 五维问题
+致同附注模板（国企版 173 章节 / 上市版 187 章节）当前实现存在 **11 个核心维度** 缺陷：
 
-致同附注模板（国企版 173 章节 / 上市版 187 章节）当前实现存在 5 个核心缺陷：
-
-| 维度 | 缺陷 | 用户需求 |
+| 维度 | 缺陷 | 用户优先级 |
 |------|------|---------|
-| **行动态** | rows 数量固定，无法按业务数据 explode | 应收账款前 5 名 / 子公司明细 / 借款明细等需按实际数据动态加行 |
-| **列动态** | headers 固定，无法新增列 | 「合营企业明细」可能需要"持股比例"列，"借款明细"按用户自定义可能加"币种"列 |
-| **数据源** | binding 实际只用 `trial_balance/manual`，**`wp_data` 0 条覆盖** | 用户明确要求「附注核心数据从底稿获取」（如固定资产折旧表 H 循环 / 投资明细 G 循环 / 应付职工薪酬 J 循环） |
-| **空剔除** | auto_trim 只裁章节级，**没有"表内全空 / 文字章节空白"的视觉剔除** | 用户希望最终 Word 不输出"项目 \| 期末 \| 期初"全 `-` 的空表格 + 空白会计政策段落 |
-| **模板继承** | Sprint 3 自定义模板存的是"项目级"，**没有"参照其他单位"机制** | 集团已做好附注模板（含会计政策文字 + 表样裁剪），下属企业一键继承填充 |
+| **D1 行动态** | rows 数量固定，无法按业务数据 explode | P0 |
+| **D2 列动态** | headers 固定，无法新增/删除/调宽列 | P0 |
+| **D3 数据源（wp_data）** | 现有 binding 实测 0 条 wp_data，依赖 trial_balance | P0 |
+| **D4 多源混合** | 单元格无法同时绑多源（TB + WP + 手工 fallback） | P0 |
+| **D5 空内容剔除** | auto_trim 只裁章节，不裁空表/空段 | P0 |
+| **D6 集团模板继承** | Sprint 3 仅项目级，无跨项目基线机制 | P0 |
+| **D7 文字段落动态** | 会计政策段落是写死字符串，无法按企业类型/规模/法人/币种自动适配 | P0 |
+| **D8 合并附注衔接** | `ConsolDisclosureService` 已有 7 章节但与单体附注 173 章节融合粗糙（仅按 sort_order 插入） | P0 |
+| **D9 协作锁** | `note_section_lock` 已建表但未与本 spec 动态 UI 集成 | P1 |
+| **D10 AI 辅助** | `note_ai.py` 政策生成/续写/改写存在但与动态行/列 / wp_data 不打通 | P1 |
+| **D11 跨年版本** | `note_prior_year_import_service` 仅 inherit，无章节级 diff/合并/版本树 | P1 |
 
-### 1.2 三种表格模式（动态行）
+## 二、用户需求（按维度展开）
 
-#### 模式 A：固定行表格
+### D1 行动态（要支持的三种模式）
 
-行数与行标题完全由模板决定。例：
+#### 模式 A：固定行
+货币资金、资产负债表项目分类（行号固定）
 
-- 货币资金（库存现金 / 银行存款 / 其他货币资金 / 数字货币 / 合计 — 4 行+合计）
-- 资产负债表项目分类（项目 / 序号 / 本期金额 / 上期金额 — 行号固定）
+#### 模式 B：动态行（行数与内容均动态）
+应收账款前 N 名 / 子公司明细 / 借款明细 / 关联方清单 / 存货分类 / 预计负债事项
 
-#### 模式 B：动态行表格（行数与内容均动态）
+#### 模式 C：固定+动态混合
+应付职工薪酬（6 类骨架 + 类内动态子项）/ 应交税费（大类固定 + 子项动态）/ 固定资产（7 大类 + "其他"动态）
 
-行标题与数量都由实际业务数据决定。例：
+### D2 列动态（要支持）
 
-- **应收账款 — 按欠款单位列示前五名**（5 行客户 + 1 行合计，客户名数据驱动）
-- **长期股权投资 — 子公司/合营/联营明细**（每被投单位一行）
-- **关联方关系 — 关联方清单**（每个关联方一行）
-- **借款明细**（按贷款单位 × 借款种类一行）
-- **存货分类构成**（按存货类别一行）
-- **预计负债 — 按事项列示**（每项事项一行）
+- 「+ 添加列」用户定义新列（label / value_type / 是否参与合计）
+- 「拖动调宽列」存到 `_columns_meta.width`
+- 「合并表头」二级表头（例：上年/本年下分子列 期初/期末）
+- 「冻结列」固定首列滚动时不移动
 
-#### 模式 C：固定+动态表格（混合）
+### D3 数据源（5 种全支持，能不写死就不写死）
 
-模板有固定的"骨架行"（分类标题 / 合计 / 其中项），中间夹着动态明细行：
+| source | 用法 | 现状 |
+|--------|------|------|
+| `trial_balance` | 试算表科目余额 | ✅ 4101 cells |
+| `aux_balance` | 辅助账（按 aux_type 自动 explode） | ✅ 已支持但未广泛标注 |
+| `aux_ledger_aging` | 辅助序时账反推账龄 | ✅ 已支持 |
+| `wp_data` | 底稿 parsed_data | ❌ **0 条** ← 本 spec 核心 |
+| `formula` | DSL 引用其他 cell | ✅ 部分支持 |
+| `prior_year_note` | 上年附注 | ✅ 已支持 |
+| `manual` | 用户手填 | ✅ 已支持 |
 
-- **应付职工薪酬**：固定 6 类（短期薪酬 / 离职后福利 / 辞退福利 / 其他长期职工福利 / 内退人员费用 / 其中：高管薪酬），每类下动态子项
-- **存货跌价准备变动**：固定列（期初/计提/转回/转销/期末），行是动态存货类别
-- **应交税费明细**：固定大类（应交增值税 / 企业所得税 / ...），增值税下还有动态子项
-- **固定资产分类构成**：固定 7 类，"其他"下可能动态子项
+### D4 多源混合（新增）
 
-### 1.3 动态列（横向扩展）
-
-- **借款明细**：基础列（合同号 / 贷款单位 / 起讫日期 / 利率 / 金额）→ 用户加「币种 / 担保方式」列
-- **合营企业**：基础列（被投单位 / 持股 / 余额）→ 用户加「主营业务 / 注册地」
-- **关联方明细**：基础列（关联方名 / 交易类型 / 金额）→ 用户加「定价依据 / 抵销标记」
-
-### 1.4 底稿数据源（wp_data）
-
-按致同审计循环对应：
-
-| 附注章节 | 底稿来源 | wp_code |
-|---------|---------|---------|
-| 固定资产分类 + 折旧表 | H 循环 H8 / H9 | wp_h08, wp_h09 |
-| 在建工程明细 + 转固 | H 循环 H7 | wp_h07 |
-| 投资明细 + 公允价值变动 | G 循环 G3 / G4 | wp_g03, wp_g04 |
-| 长期股权投资变动 | G 循环 G5 | wp_g05 |
-| 应付职工薪酬明细 | J 循环 J3 | wp_j03 |
-| 借款明细 + 利息 | L 循环 L2 / L3 | wp_l02, wp_l03 |
-| 收入明细（按客户/产品） | D 循环 D2 | wp_d02 |
-| 期间费用明细 | K 循环 K1 | wp_k01 |
-| 关联方交易 | M 循环 M3 | wp_m03 |
-
-**wp_data binding 格式**（待定义）：
+单 cell 可绑「主源 + fallback 链」，按优先级取数：
 
 ```json
 {
-  "source": "wp_data",
-  "wp_code": "h08",
-  "sheet": "分类构成",
-  "extract": "table",  // table | cell | sum_column
-  "row_filter": {"is_total": false}
+  "primary": {"source": "wp_data", "wp_code": "h08", ...},
+  "fallback": [
+    {"source": "trial_balance", "account_codes": ["1601"], "field": "audited_amount"},
+    {"source": "manual", "default_value": 0}
+  ],
+  "show_provenance": true  // 单元格右上角显示数据源 chip（WP/TB/手工）
 }
 ```
 
-### 1.5 空内容视觉剔除（用户明示）
+### D5 空内容三级剔除
+
+| 级别 | 触发 | 行为 |
+|------|------|------|
+| 章节级（已有） | TB 科目全为 0 | 章节 is_deleted=true，不输出 |
+| **表格级（新）** | 单表 rows 数值全为 0/null/'-' | 替换为段落「本期无此项业务」 |
+| **段落级（新）** | text_content 空 + 全部表格 is_empty | 章节标题不输出 + TOC 不显示 |
+
+### D6 集团模板继承
+
+详见原 v0.2 设计：`group_note_template_baseline` 表 + `template_lineage` 字段 + apply/diff/sync API。
+
+### D7 文字段落动态（v0.3 新增维度）
+
+会计政策段落不能是写死字符串，必须按以下变量动态填充：
+
+| 变量 | 来源 | 影响段落 |
+|------|------|---------|
+| `company_type` | wizard_state | "本公司是经...登记成立的有限责任公司" |
+| `industry_code` | client master | 行业特定政策（如金融业适用 IFRS 9） |
+| `currency` | wizard_state | 记账本位币段落 |
+| `consol_level` | project | 单体 vs 合并版本切换 |
+| `is_listed` | client master | 上市公司 vs 国企特定段落 |
+| `subsidiary_count` | consolidation_models | 合并范围说明（动态拼接子公司清单） |
+| `prior_year_data` | prior_notes_cache | "本年度变动情况：..."（自动对比上年） |
+
+设计：政策段落用 **Jinja-like 模板**：
+
+```text
+本公司是经{{ registration_authority }}登记注册的{{ company_type | default("有限责任公司") }}，
+{% if is_listed %}于{{ list_date }}在{{ list_exchange }}上市，{% endif %}
+注册资本为人民币{{ registered_capital | format_amount }}元，
+经营范围：{{ business_scope }}。
+{% if subsidiary_count > 0 %}
+本公司及子公司（以下统称"本集团"）主要从事{{ business_industry }}业务。
+{% endif %}
+```
+
+### D8 合并附注衔接（v0.3 新增维度）
+
+#### 现状问题
+
+- `ConsolDisclosureService` 提供 7 章节（合并范围/重要子公司/范围变动/商誉/少数股东权益/内部交易抵消/外币折算）
+- 与 173 章节融合方式 = 简单按 `sort_order=100+idx` 插入末尾，**章节序号断层**
+- 抵销分录 → 子公司单体 TB 与合并 TB 双源差异未在附注披露
+- 商誉减值表（H 循环商誉子表）→ 合并附注「商誉」章节未联动
+
+#### 目标设计
+
+| 联动点 | 设计 |
+|--------|------|
+| **合并范围列表** 实时同步 | 子公司表（consolidation_subsidiaries）变化 → 合并附注「合并范围」章节自动重算 |
+| **抵销前后对比披露** | 内部往来抵销前 / 抵销后金额双列展示 |
+| **商誉减值与 H 联动** | 合并附注商誉章节 binding 直接绑 wp_h08 商誉子表 |
+| **少数股东权益变动** | 与合并工作底稿少数股东权益子表 binding |
+| **多层级合并** | parent → 子合并 → 孙合并的多层 lineage（子合并附注的「合并范围」自动汇总到 parent） |
+
+#### 「集团合并附注」与「单体附注」分离 + 衔接
 
 ```
-当前 auto_trim：
-  按 TB 科目存在性裁章节 → 剩余章节中仍可能有空表
-
-用户要求：
-  视觉级 + Word 导出时再做 2 道过滤：
-    1. 表格内所有数据行金额都是 0 / null / "-" → 整表标记 "本期无此项业务" 文字替代
-    2. text_content 为空 + 表格全空 → 章节直接跳过不输出
+单体项目 N 个（df5b8403... / 2aa00f57... 等）
+  → 每个项目生成单体附注（173 章节 SOE）
+  ↓
+合并项目 1 个（parent project，consol_level=2）
+  → 合并附注 = 单体附注 ∪ 合并专用 7 章节
+  → 抵销/商誉/MI 等单体没有的章节
+  → 「合并范围」自动列出纳入子公司
 ```
 
-### 1.6 集团模板继承
+### D9 协作锁集成（v0.3 新增维度）
 
-```
-parent (集团总部，已审计师精修)：
-  - 173 章节 → 只保留 60 章节（auto_trim + 手工裁剪 + 加自定义子章节）
-  - 文字部分（公司基本情况外的会计政策、税项政策）已写完
-  - 表样自定义：借款明细加了"担保方式"列，应付职工薪酬加了"高管单列"行
+- 现有 `note_section_lock` 表 + `NoteSectionLockService`
+- **本 spec 集成**：动态行/列编辑器、集团基线 apply、auto_trim v2 都必须先获锁
+- 锁可视化：前端章节列表显示「张三正在编辑」标记
+- 锁过期自动释放（5 分钟无心跳）
 
-child (下属公司)：
-  - 一键「参照集团 XXX 模板」继承
-  - 文字部分自动复制（公司基本情况除外，需 child 改）
-  - 表样裁剪状态继承
-  - 数据 = child 自己的 TB / 底稿
-  - child 仍可独立改某章节（local override）
-```
+### D10 AI 辅助（v0.3 新增维度）
 
-## 二、用户需求（按角色）
+- `note_ai.py` 现有：政策生成 / 续写 / 改写 / 完整性检查 / 表达检查
+- **本 spec 扩展**：
+  - AI 自动建议哪些行该是动态行（基于 TB 辅助账多 aux_code 检测）
+  - AI 自动从底稿摘要生成段落（如「重要会计判断」从 H 减值评估底稿摘要）
+  - AI 校核 wp_data 取数与 TB 的一致性
 
-### 审计助理
+### D11 跨年版本（v0.3 新增维度）
 
-- **U1** 选中动态行区域 → 「+ 添加明细行」一键加行
-- **U2** 行内 label 列手填 + 数值列绑定 wp_data 取数
-- **U3** 删除动态行弹确认，不影响骨架
-- **U4** 按金额降序自动重排（前 N 名）
-- **U5** **「+ 添加列」按钮**新增动态列，列头手输或选预设
-- **U6** 列内格可绑公式 = `WP('h08', 'sheet1', 'D2')`
+- 现有 `note_prior_year_import_service.inherit_from_prior_year` 仅复制
+- **本 spec 扩展**：
+  - 章节级 version tree（v2024 → v2025，每章节独立分支）
+  - 「与上年差异」可视化（章节侧栏显示「7 处变动 / 23 处保留」）
+  - 跨年合并范围变化高亮（新增子公司 / 处置子公司）
 
-### 项目经理
+## 三、验收标准（共 92 项，按 11 维度）
 
-- **U7** 动态行/列与固定区视觉区分（颜色/标记）
-- **U8** 合计行公式自动跨动态区
-- **U9** 上年附注的动态行/列「一键比对」导入
-- **U10** **「应用集团模板」按钮** 选 parent 项目 → 一键继承文字+表样
+### A. 数据模型层（15 项）
 
-### 合伙人
+- A.1 `row.row_type` 加 `dynamic_anchor / dynamic_data / dynamic_marker_end`
+- A.2 `row.is_dynamic` + `row.region_name`
+- A.3 `column.is_dynamic` + `column.column_id` + `column.width` + `column.is_frozen`
+- A.4 `_columns_meta` sidecar（含合并表头 `header_path: list[str]`）
+- A.5 `_dynamic_regions` sidecar（含 axis=row/column）
+- A.6 binding 多源 `primary + fallback` 链
+- A.7 binding 7 source 全支持（trial_balance/aux_balance/aux_ledger_aging/wp_data/formula/prior_year_note/manual）
+- A.8 wp_data binding 详细字段（wp_code/sheet/extract/row_filter/label_col/value_cols）
+- A.9 `note.is_empty` 计算字段（rows 全空 + text 空）
+- A.10 `note.template_lineage` jsonb（多层级合并支持）
+- A.11 `note.is_local_override` bool
+- A.12 `note.text_template_vars` jsonb（D7 段落变量绑定）
+- A.13 新建 `group_note_template_baseline` 表
+- A.14 新建 `note_section_version_tree` 表（章节版本图）
+- A.15 现有 173 章节向后兼容
 
-- **U11** Word 导出后动态区使用与固定区相同的致同三线表样式
-- **U12** 「（不适用的项目请删除）」标识
-- **U13** **空内容章节自动跳过**（含 TOC 不显示空章节）
-- **U14** **空表格自动替换为「本期无此项业务」段落**
+### B. 后端引擎（25 项）
 
-### 集团审计经理（新角色）
+- B.1 `_expand_dynamic_regions` 行展开
+- B.2 `_expand_dynamic_columns` 列展开（含合并表头处理）
+- B.3 `aux_balance` 行 explode
+- B.4 **`wp_data` 数据源 _extract_wp_table / _extract_wp_cell / _extract_wp_column_sum**
+- B.5 多源 fallback 链解析（primary 失败 → fallback 1 → fallback 2 → ...）
+- B.6 数据源溯源记录（每 cell 实际从哪个 source 取的）
+- B.7 动态行 label 自动填充
+- B.8 合计公式自动适配
+- B.9 `update_note_values` 兼容动态行/列增删
+- B.10 `note_cell_merge` 行+列三态合并
+- B.11 `is_empty` 计算
+- B.12 `auto_trim_v2` 三级裁剪（章节+表格+段落）
+- B.13 集团基线 Service（save / apply / diff / sync）
+- B.14 lineage 多层级（parent → 子合并 → 孙合并）
+- B.15 PRIOR 跨年动态匹配
+- B.16 自定义模板存储扩展（动态行/列）
+- B.17 ADR-010 版本化覆盖
+- B.18 **D7 文字段落 Jinja 渲染** `_render_text_paragraph(template, vars)`
+- B.19 **D8 合并附注章节序号自动适配**（不再写死 sort_order=100+idx）
+- B.20 **D8 子公司清单实时拉取**（每次生成附注重新查 consolidation_subsidiaries）
+- B.21 **D8 抵销前后双列**（new column "抵销前" / "抵销后" 自动展开）
+- B.22 **D9 协作锁集成**（动态行/列/基线 apply 调用 NoteSectionLockService）
+- B.23 **D10 AI 自动建议动态行**（service.suggest_dynamic_rows）
+- B.24 **D11 章节级版本图** Service（fork / merge / diff）
+- B.25 **D11 跨年合并范围变化高亮**
 
-- **U15** 把 parent 项目的精修模板「保存为集团基线」
-- **U16** 多个 child 共用一套基线，basinli 升级后 child 可选「同步更新」
-- **U17** 基线版本号管理（v1 / v1.1 / v2）
+### C. 前端编辑器（22 项）
 
-## 三、验收标准（53 项）
+- C.1 行动态视觉（浅黄底色 + ★）
+- C.2 列动态视觉（浅紫底色 + +）
+- C.3 「+ 添加明细行」按钮
+- C.4 「+ 添加列」按钮
+- C.5 列拖动调宽
+- C.6 合并表头多级渲染
+- C.7 冻结列实现
+- C.8 删除右键 + 公式栏多源选项
+- C.9 数据源溯源 chip（WP/TB/手工 颜色区分）
+- C.10 排序 / 自动重新填充
+- C.11 「📦 应用集团基线」对话框 + diff 预览
+- C.12 「💾 保存为集团基线」按钮
+- C.13 「🔄 同步基线」+ lineage 显示
+- C.14 章节级 local override 标记
+- C.15 **D7 文字段落变量编辑器**（修改 vars 实时预览段落变化）
+- C.16 **D8 合并附注独立 tab**（合并项目下专属，单体不显示）
+- C.17 **D8 抵销前后双列折叠展开**
+- C.18 **D9 协作锁可视化** 「张三正在编辑」标识
+- C.19 **D9 锁冲突弹窗** + 等待/抢占选择
+- C.20 **D10 AI 建议侧栏**（AI 建议本章节哪些行该动态化）
+- C.21 **D11 上年对比侧栏**（章节级 diff + 合并范围变化）
+- C.22 **D11 章节版本树可视化**（git-like 分支图）
 
-### A. 数据模型层（10 项）
+### D. Word 导出（12 项）
 
-- A.1 `row.row_type` 枚举扩展：新增 `dynamic_anchor / dynamic_data / dynamic_marker_end`（替代 v0.1 的 floating_*）
-- A.2 `row.is_dynamic: bool` + `row.region_name: str | null`（属于哪个动态区）
-- A.3 `column.is_dynamic: bool` + `column.column_id: str`（避免按 idx 引用列）
-- A.4 `table_data._dynamic_regions` sidecar 描述行/列动态区
-- A.5 `table_data._columns_meta` sidecar 描述列定义（id / label / col_type / is_dynamic / source_binding）
-- A.6 binding 新增 `wp_data` source（含 wp_code / sheet / extract / row_filter）
-- A.7 `note.is_empty` 计算字段（rows 全空 + text_content 空时为 true）
-- A.8 `note.template_lineage`：JSON 数组记录从哪个 parent 继承（含版本号）
-- A.9 `group_note_template_baseline` 表（新建）：集团基线模板存储
-- A.10 现有 173 章节 binding 不破坏（向后兼容）
+- D.1 GTNoteDynamicRow 样式
+- D.2 GTNoteDynamicCol 样式
+- D.3 合并表头 docx 渲染
+- D.4 「（不适用的项目请删除）」灰色提示
+- D.5 **空表替换段落「本期无此项业务」**
+- D.6 **空章节跳过 + TOC 不显示**
+- D.7 19 项视觉断言扩展为 27 项
+- D.8 集团基线 lineage 备注栏
+- D.9 **D7 段落 Jinja 渲染** Word 输出
+- D.10 **D8 合并附注独立章节集 + 与单体融合**
+- D.11 **D8 抵销前后双列 Word 表格**
+- D.12 多公司基线对比 PDF 工具
 
-### B. 后端引擎（15 项）
+### E. 集团模板继承（10 项）
 
-- B.1 `_expand_dynamic_regions` 行展开（按 dynamic_source）
-- B.2 `_expand_dynamic_columns` 列展开（用户加的列追加到 _columns_meta）
-- B.3 `aux_balance` 数据源支持按 aux_code 自动 explode（行）
-- B.4 **`wp_data` 数据源新增**（按 wp_code + sheet + cell/range 取数）
-  - 子函数 `_extract_wp_table` 把整张底稿表格当数据源
-  - 子函数 `_extract_wp_cell` 取单个 cell
-  - 子函数 `_extract_wp_column_sum` 列求和
-- B.5 动态行 label 自动填充（aux_code → desc / wp_data → row label）
-- B.6 动态行/列合计公式自动适配（SUM 范围动态）
-- B.7 `update_note_values` 兼容动态行/列的增删
-- B.8 `note_cell_merge` 三态合并扩展（行+列合并 by region_name + column_id）
-- B.9 `is_empty` 计算（导出/列表时实时）
-- B.10 `auto_trim` v2 = 章节级（已有）+ **表格级**（rows 全空 markin "无此项业务"）+ **段落级**（text_content 空时跳过）
-- B.11 集团模板继承 Service：`apply_group_baseline(child_project, parent_project)` 复制 lineage
-- B.12 lineage version diff：parent 升级时检查 child 是否要同步
-- B.13 PRIOR 跨年动态行/列匹配（label + column_id 双键）
-- B.14 自定义模板存储扩展（保存动态行/列状态）
-- B.15 ADR-010 版本化覆盖动态行/列变更
+- E.1 「保存为集团基线」（partner 权限）
+- E.2 基线版本号 v{major}.{minor}
+- E.3 child apply baseline → 文字+表样+lineage 复制
+- E.4 child local override 标记
+- E.5 基线升级通知
+- E.6 文字段落 vars 由 child 自动填充（D7 联动）
+- E.7 集团/单体模板互转保留 lineage
+- E.8 多 child 批量同步基线
+- E.9 基线 fork & merge（v2 backlog）
+- E.10 child 反哺基线建议（child 改动可建议合并回基线）
 
-### C. 前端编辑器（12 项）
+### F. 合并附注衔接（5 项，v0.3 新增）
 
-- C.1 动态行区背景浅黄底色 (#FFF8E1)
-- C.2 动态列区背景浅紫底色 (#F3E5F5)
-- C.3 「+ 添加明细行」按钮（仅动态区）
-- C.4 「+ 添加列」按钮（仅动态列区）
-- C.5 删除右键菜单：动态行/列可删，固定不可删
-- C.6 行号标 `★` / 列名前缀 `+`（区分动态）
-- C.7 选中动态行/列 → 公式栏显示绑定选项（aux_balance / wp_data / manual）
-- C.8 排序按钮（金额降序 / 标签升序 / 手工）
-- C.9 「应用集团模板」按钮（manager 及以上权限）
-- C.10 集团基线选择对话框 + 版本对比
-- C.11 lineage 显示当前章节继承自哪个 parent
-- C.12 局部 override 标记（child 改了 parent 章节后显示）
+- F.1 ConsolDisclosureService 与 disclosure-note-full-revamp 融合（不再 sort_order=100 写死）
+- F.2 子公司清单实时同步
+- F.3 抵销前后双列
+- F.4 商誉/MI/外币 章节绑 H/G/M 循环底稿（wp_data）
+- F.5 多层级合并 lineage 链（孙合并 → 子合并 → 总合并）
 
-### D. Word 导出（8 项）
+### G. 协作 / AI / 跨年（10 项，v0.3 新增）
 
-- D.1 GTNoteDynamicRow 样式（动态行）
-- D.2 GTNoteDynamicCol 列样式
-- D.3 「（不适用的项目请删除）」灰色提示
-- D.4 **空表格替换为段落「本期无此项业务」**（is_empty=true 时）
-- D.5 **空章节直接跳过**（不出 TOC + 不输出标题）
-- D.6 11 项视觉断言扩展为 19 项（+8）
-- D.7 集团模板 lineage 在 Word 备注栏显示（可选）
-- D.8 多公司基线导出对比 PDF 工具
-
-### E. 集团模板继承（5 项）
-
-- E.1 「保存为集团基线」按钮（partner 权限）
-- E.2 基线版本号 v{major}.{minor}（小改 minor 自动 +1，大改 partner 决定）
-- E.3 child 应用基线 → lineage 字段写入 + 文字章节复制 + 表样裁剪复制
-- E.4 child 章节 local override 标记 + 显示「与基线差异」
-- E.5 基线升级通知：child 列表显示「3 个 child 待同步」
+- G.1 协作锁集成 4 入口（行/列/基线/auto_trim）
+- G.2 锁可视化 + 抢占
+- G.3 AI 建议动态行
+- G.4 AI 段落生成（从底稿摘要）
+- G.5 AI wp_data 一致性校核
+- G.6 章节级版本树
+- G.7 上年差异可视化
+- G.8 跨年合并范围变化高亮
+- G.9 章节 fork（A 章节用 v2024，B 章节用 v2025）
+- G.10 多版本 merge 冲突解决
 
 ### F. 兼容与回退（3 项）
 
-- F.1 旧模板（无动态字段）按固定模式跑
-- F.2 集团模板 feature flag：`settings.NOTE_GROUP_BASELINE_ENABLED`
-- F.3 一键回退：清空 lineage + 移除 _dynamic_regions → 退回纯固定+章节裁剪模式
+- F.1 旧模板按固定模式
+- F.2 各维度 feature flag
+- F.3 一键回退（清 _dynamic_regions / lineage）
 
 ## 四、范围与不做事项
 
 ### 必做（v1）
 
-- 行/列动态（含 wp_data 数据源）
-- 空表/空章节剔除（auto_trim v2）
-- 集团模板继承（含基线版本管理）
-- 173 章节中 60+ 动态表格 binding 标注
-- 30+ 章节绑定 wp_data（H/G/J/L/D/K/M 7 大循环主要底稿）
+- D1 / D2 / D3 / D4 / D5 / D6 / D7 / D8 / D9 / D10 / D11 全部 11 维核心
+- 173 章节中 60+ 动态表 binding
+- 30+ wp_data binding（H/G/J/L/D/K/M）
+- 20+ 段落 Jinja 模板
+- 1 个集团基线 demo（首汽租车 → 重庆和平药房）
 
 ### 不做（v1）
 
-- 跨章节动态行联动（如 A 章节加客户，B 章节自动同步）
-- AI 自动识别哪些行/列该动态（依赖审计师标注）
-- 集团基线 fork & merge（v2 考虑）
-- child 自动同步基线升级（v1 仅通知，需手工触发）
+- AI 全自动撰写整章节（v2）
+- 集团基线 fork & merge（v2）
+- 多版本图形化合并工具（v2）
+- 跨章节联动（A 加客户 B 同步 — v2）
 
-## 五、性能 / 数据量
+## 五、性能预算
 
-- 60+ 动态表 × 平均 5-20 动态行 = 600-1500 cells
-- 30+ wp_data 章节 × 平均查询 < 100ms
-- 集团基线复制章节 < 500ms
-- 全量 173 章节生成 < 12s（基线 8s + 50%）
+- 60+ 动态表生成 < 12s
+- wp_data 提取 < 200ms / 章节
+- 集团基线 apply 60 章节 < 3s
+- 上年 diff 全量 < 2s
+- AI 建议单章节 < 5s
 
 ## 六、依赖与前置
 
 - ✅ disclosure-note-full-revamp 46/47
-- ✅ Sprint 3 自定义模板存储 + ADR-010
-- ✅ note_cell_merge 三态合并
-- ⚠ **P-1**：审计师标注 60+ 章节动态区域（行 + 列） — 1 人天
-- ⚠ **P-2**：审计师标注 30+ 章节 wp_data 绑定（哪个章节绑哪个底稿哪个 sheet） — 1 人天
-- ⚠ **P-3**：致同 PDF 视觉基线（含动态行/列 + 空表替换样式） — 0.5 人天
+- ✅ ConsolDisclosureService 7 章节
+- ✅ note_section_lock 表
+- ✅ note_ai.py 5 端点
+- ✅ note_prior_year_import_service
+- ⚠ **P-1**：审计师标注 60+ 章节动态区域（1 人天）
+- ⚠ **P-2**：审计师标注 30+ 章节 wp_data 绑定（1 人天）
+- ⚠ **P-3**：审计师标注 20+ 段落 Jinja 模板（0.5 人天）
+- ⚠ **P-4**：致同 PDF 视觉基线（0.5 人天）
 
-## 七、与已完成 spec 的关系
+## 七、与已完成/进行中 spec 的关系
 
-| 已完成 | 本 spec 扩展 |
-|-------|------------|
-| auto_trim 章节级裁剪 | 加表格级 + 段落级 |
-| 自定义模板存储（项目级） | 加集团基线（跨项目）+ lineage |
-| 空 header 列裁剪 | 加空数据行/全空表替换 |
-| binding 7 source（含 wp_data 设计） | wp_data **真正接入** + 30+ 章节 |
-| ADR-010 版本化 | 覆盖动态行/列 |
+| 已完成 / 进行中 | 本 spec 扩展 |
+|----------------|------------|
+| auto_trim 章节级 | 加表格级 + 段落级 |
+| 自定义模板（项目级） | 加集团基线（跨项目）+ lineage |
+| 空 header 列裁剪 | 加空数据/全空表替换 |
+| binding 7 source（设计） | wp_data + multi-source 真接入 |
+| ADR-010 版本化 | 覆盖动态 + Jinja 段落 |
+| ConsolDisclosureService 7 章节 | 与 173 章节深度融合 + 多层级 lineage |
+| NoteSectionLockService | 集成动态编辑入口 |
+| note_ai.py 5 端点 | 动态行建议 + 段落生成 + 一致性校核 |
+| note_prior_year_import_service | 章节级版本图 |
