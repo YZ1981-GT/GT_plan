@@ -606,8 +606,8 @@ def test_loader_handles_bindings_not_dict(monkeypatch, tmp_path):
 
 
 def test_seven_sources_have_resolvers():
-    """7 个 source 都有 resolver 函数."""
-    assert len(VALID_SOURCES) == 7
+    """8 个 source 都有 resolver 函数（含 wp_data，Sprint A.2.4 新增）."""
+    assert len(VALID_SOURCES) == 8
     for src in VALID_SOURCES:
         assert src in SOURCE_RESOLVERS
         assert callable(SOURCE_RESOLVERS[src])

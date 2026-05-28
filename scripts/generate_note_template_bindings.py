@@ -89,6 +89,7 @@ VALID_SOURCES: tuple[str, ...] = (
     "ledger_sum",
     "aux_balance",
     "aux_ledger_aging",
+    "wp_data",
     "formula",
     "prior_year_note",
     "manual",

@@ -17,12 +17,13 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BINDINGS_PATH = REPO_ROOT / "backend" / "data" / "note_template_bindings.json"
 
-# 与 generator 同步：7 种合法 source / 3 种合法 mode
+# 与 generator 同步：8 种合法 source（v0.6.2 新增 wp_data）/ 3 种合法 mode
 VALID_SOURCES = {
     "trial_balance",
     "ledger_sum",
     "aux_balance",
     "aux_ledger_aging",
+    "wp_data",
     "formula",
     "prior_year_note",
     "manual",

@@ -56,6 +56,7 @@ VALID_SOURCES: tuple[str, ...] = (
     "ledger_sum",
     "aux_balance",
     "aux_ledger_aging",
+    "wp_data",
     "formula",
     "prior_year_note",
     "manual",
@@ -482,7 +483,167 @@ async def resolve_aux_ledger_aging(
 
 
 # ---------------------------------------------------------------------------
-# 5) formula — 表内单元格引用（Sprint 1.5 实现，1.4 stub）
+# 5) wp_data — 从 WorkingPaper.parsed_data 提数（Sprint A.2.4）
+# ---------------------------------------------------------------------------
+
+
+async def resolve_wp_data(
+    binding: dict[str, Any],
+    ctx: dict[str, Any],
+) -> Any:
+    """从底稿 ``parsed_data`` 取值（cell / table / column_sum 三种模式）.
+
+    binding 字段：
+      - source:    "wp_data"
+      - wp_code:   str             底稿编号（必填，如 "h08"）
+      - sheet:     str             sheet 名（必填）
+      - extract:   str             "cell" | "table" | "column_sum"
+      - cell_ref:  str             extract=cell 用（如 "F5"）
+      - row_filter:dict            extract=table 用
+      - label_col: str             extract=table 用（默认 "A"）
+      - value_cols:dict            extract=table 用 ``{col_id: col_letter}``
+      - col_letter:str             extract=column_sum 用
+      - row_range: [int, int]      extract=column_sum 用
+
+    ctx 用 ``_wp_cache`` 缓存已加载的 WorkingPaper：
+      ctx["_wp_cache"] = {wp_code: WorkingPaper}
+
+    流程：
+    1. ``_wp_cache`` 命中 → 直接调 ``extract_wp_*``
+    2. 未命中且 ``ctx["db"]`` 存在 → 从 DB 加载 → 缓存 → extract
+    3. wp 不存在 / parsed_data 为空 → None
+
+    缺数据返 None — 永不抛异常.
+    """
+    if not isinstance(binding, dict):
+        return None
+
+    wp_code = binding.get("wp_code")
+    sheet = binding.get("sheet")
+    if not isinstance(wp_code, str) or not wp_code:
+        return None
+    if not isinstance(sheet, str) or not sheet:
+        return None
+
+    parsed_data = await _get_wp_parsed_data(wp_code, ctx)
+    if not isinstance(parsed_data, dict) or not parsed_data:
+        return None
+
+    extract = binding.get("extract") or "cell"
+
+    try:
+        from app.services.note_wp_data_resolver import (
+            extract_wp_cell,
+            extract_wp_column_sum,
+            extract_wp_table,
+        )
+    except Exception as err:  # pragma: no cover
+        logger.warning("wp_data: import note_wp_data_resolver failed: %s", err)
+        return None
+
+    if extract == "cell":
+        cell_ref = binding.get("cell_ref")
+        if not isinstance(cell_ref, str) or not cell_ref:
+            return None
+        return extract_wp_cell(parsed_data, sheet, cell_ref)
+
+    if extract == "table":
+        row_filter = binding.get("row_filter")
+        label_col = binding.get("label_col") or "A"
+        value_cols = binding.get("value_cols")
+        return extract_wp_table(
+            parsed_data,
+            sheet,
+            row_filter=row_filter if isinstance(row_filter, dict) else None,
+            label_col=label_col if isinstance(label_col, str) else "A",
+            value_cols=value_cols if isinstance(value_cols, dict) else None,
+        )
+
+    if extract == "column_sum":
+        col_letter = binding.get("col_letter")
+        if not isinstance(col_letter, str) or not col_letter:
+            return None
+        rng = binding.get("row_range")
+        row_range: tuple[int, int] | None = None
+        if isinstance(rng, list | tuple) and len(rng) == 2:
+            try:
+                row_range = (int(rng[0]), int(rng[1]))
+            except (TypeError, ValueError):
+                row_range = None
+        return extract_wp_column_sum(parsed_data, sheet, col_letter, row_range)
+
+    return None
+
+
+async def _get_wp_parsed_data(
+    wp_code: str,
+    ctx: dict[str, Any],
+) -> dict | None:
+    """从 ``ctx["_wp_cache"]`` 取（命中）或从 DB 加载（未命中）.
+
+    缓存的 value 既可以是 ``WorkingPaper`` ORM 对象，也可以是直接的
+    ``parsed_data`` dict（测试场景常用）— 一次兼容两形态。
+
+    DB 加载使用 ``project_id``（必填），匹配 ``parsed_data.wp_code == wp_code``
+    的非删除底稿；找不到则返回 None。
+    """
+    cache = ctx.get("_wp_cache")
+    if isinstance(cache, dict) and wp_code in cache:
+        cached = cache[wp_code]
+        if isinstance(cached, dict):
+            # 直接缓存了 parsed_data（测试场景）
+            return cached
+        # ORM-like 对象：取 .parsed_data
+        pd = getattr(cached, "parsed_data", None)
+        return pd if isinstance(pd, dict) else None
+
+    db = ctx.get("db")
+    if db is None:
+        return None
+    project_id = ctx.get("project_id")
+    if project_id is None:
+        return None
+
+    try:
+        from app.models.workpaper_models import WorkingPaper
+    except Exception as err:  # pragma: no cover
+        logger.warning("wp_data: import WorkingPaper failed: %s", err)
+        return None
+
+    try:
+        result = await db.execute(
+            sa.select(WorkingPaper).where(
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.is_deleted == sa.false(),
+            )
+        )
+        wps = result.scalars().all()
+    except Exception as err:
+        logger.warning("wp_data: db query failed: %s", err)
+        return None
+
+    matched = None
+    for wp in wps:
+        pd = getattr(wp, "parsed_data", None)
+        if isinstance(pd, dict) and pd.get("wp_code") == wp_code:
+            matched = wp
+            break
+
+    if matched is None:
+        return None
+
+    # 写回 cache 供后续 cell 复用
+    if not isinstance(cache, dict):
+        cache = {}
+        ctx["_wp_cache"] = cache
+    cache[wp_code] = matched
+
+    pd = getattr(matched, "parsed_data", None)
+    return pd if isinstance(pd, dict) else None
+
+
+# ---------------------------------------------------------------------------
+# 6) formula — 表内单元格引用（Sprint 1.5 实现，1.4 stub）
 # ---------------------------------------------------------------------------
 
 
@@ -572,6 +733,7 @@ SOURCE_RESOLVERS: dict[str, Any] = {
     "ledger_sum": resolve_ledger_sum,
     "aux_balance": resolve_aux_balance,
     "aux_ledger_aging": resolve_aux_ledger_aging,
+    "wp_data": resolve_wp_data,
     "formula": resolve_formula,
     "prior_year_note": resolve_prior_year_note,
     "manual": resolve_manual,
@@ -620,4 +782,5 @@ __all__ = [
     "resolve_manual",
     "resolve_prior_year_note",
     "resolve_trial_balance",
+    "resolve_wp_data",
 ]
