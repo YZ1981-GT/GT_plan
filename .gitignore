@@ -120,6 +120,8 @@ page-*.png
 audit-platform/frontend/test-results/
 audit-platform/frontend/playwright-uat-report/
 audit-platform/frontend/playwright-report/
+audit-platform/frontend/storybook-static/
+audit-platform/frontend/bare_amount_cells.report.txt
 
 # 备份文件（不入库）
 *.bak
