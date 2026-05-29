@@ -32,7 +32,7 @@ fi
 echo "[pre-push] 分支: $BRANCH | 模式: $GIT_MODE"
 
 # 1. 命名规约
-if ! "$PYTHON" backend/scripts/check_git_branch_naming.py "$BRANCH"; then
+if ! "$PYTHON" backend/scripts/check/check_git_branch_naming.py "$BRANCH"; then
     echo "[pre-push] ❌ 分支命名不合规，拒绝 push"
     echo "          紧急救急：git push --no-verify"
     exit 1
@@ -48,13 +48,13 @@ fi
 
 # 3. 6 维核查（multi 严格 / single 仅警告）
 if [ "$GIT_MODE" = "multi" ]; then
-    if ! "$PYTHON" backend/scripts/check_git_sync_state.py --for-push --quiet; then
+    if ! "$PYTHON" backend/scripts/check/check_git_sync_state.py --for-push --quiet; then
         echo "[pre-push] ❌ 6 维核查失败（multi 模式严格）"
-        "$PYTHON" backend/scripts/check_git_sync_state.py --for-push
+        "$PYTHON" backend/scripts/check/check_git_sync_state.py --for-push
         exit 1
     fi
 else
-    "$PYTHON" backend/scripts/check_git_sync_state.py --quiet || \
+    "$PYTHON" backend/scripts/check/check_git_sync_state.py --quiet || \
         echo "[pre-push] ⚠️ 6 维核查有项不达标（single 模式仅警告）"
 fi
 

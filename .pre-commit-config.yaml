@@ -19,7 +19,7 @@ repos:
       # 退出码 1 (WARN) 不阻断提交（容忍 ±5% 数据漂移）；退出码 2 (FAIL) 阻断（spec 假设错位）
       - id: verify-spec-facts
         name: verify-spec-facts
-        entry: bash -c 'python backend/scripts/verify_spec_facts.py --all || ([ $? -eq 1 ] && echo "WARN: spec narrative 数字与实测有偏差，建议更新 snapshot.json 或修订三件套" && exit 0) || exit $?'
+        entry: bash -c 'python backend/scripts/check/verify_spec_facts.py --all || ([ $? -eq 1 ] && echo "WARN: spec narrative 数字与实测有偏差，建议更新 snapshot.json 或修订三件套" && exit 0) || exit $?'
         language: system
         pass_filenames: false
         files: ^(backend/data/.*\.json|\.kiro/specs/.*/snapshot\.json)$
@@ -29,7 +29,7 @@ repos:
       # 退出码 1 阻断提交（FAIL = Property 编号错位 / design.md 声称已测但 docstring 缺引用）
       - id: check-property-coverage
         name: check-property-coverage
-        entry: python backend/scripts/check_property_coverage.py --all
+        entry: python backend/scripts/check/check_property_coverage.py --all
         language: system
         pass_filenames: false
         files: ^(\.kiro/specs/.*/design\.md|backend/tests/test_.*_integration\.py)$
@@ -39,7 +39,7 @@ repos:
       # whitelist 路径：backend/scripts/file_size_whitelist.txt（每打磨完成一个文件后从中移除）
       - id: check-file-size
         name: check-file-size
-        entry: python backend/scripts/check_file_size.py
+        entry: python backend/scripts/check/check_file_size.py
         language: system
         files: \.(py|vue|ts|tsx)$
         exclude: ^(backend/tests/|backend/scripts/|audit-platform/frontend/src/__tests__/|.*\.d\.ts$)
@@ -48,7 +48,7 @@ repos:
       # 前端唯一路径 = audit-platform/frontend/，避免历史 frontend/ 空壳重新引入二义性
       - id: check-no-root-frontend
         name: check-no-root-frontend
-        entry: python backend/scripts/check_no_root_frontend.py
+        entry: python backend/scripts/check/check_no_root_frontend.py
         language: system
 
       # repo-git-workflow-unification spec：热点文件 pull 检测
@@ -56,6 +56,6 @@ repos:
       # GIT_MODE=multi 阻断 / single 仅警告
       - id: check-hotspot-files
         name: check-hotspot-files
-        entry: python backend/scripts/check_hotspot_files.py
+        entry: python backend/scripts/check/check_hotspot_files.py
         language: system
         files: ^(\.kiro/steering/memory\.md|\.kiro/specs/INDEX\.md|backend/scripts/file_size_whitelist\.txt)$
