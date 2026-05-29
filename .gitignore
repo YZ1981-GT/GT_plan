@@ -75,6 +75,12 @@ test_collab.db
 数据/
 基础数据/
 
+# 致同审计模板原始 xlsx（已迁移到 backend/wp_templates/，不再入库）
+致同通用审计程序及底稿模板（2025年修订）/
+
+# 附注模版 markdown（已迁移到 backend/data/note_template_*.json）
+附注模版/
+
 # 临时文件
 ts_errors.txt
 
