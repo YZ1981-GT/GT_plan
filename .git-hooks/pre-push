@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# pre-push hook - 仓库 git 工作流统一治理
+# repo-git-workflow-unification spec / Task 2.1
+#
+# 检查项：
+# 1. 分支命名规约（main / spec/ / work/ / fix/ / release/）
+# 2. multi 模式禁止直推 main
+# 3. 6 维核查（严格模式）
+
+set -e
+
+# 找 Python 路径（Windows + Linux 兼容）
+if [ -f ".venv/Scripts/python.exe" ]; then
+    PYTHON=".venv/Scripts/python.exe"
+elif [ -f ".venv/bin/python" ]; then
+    PYTHON=".venv/bin/python"
+elif command -v python > /dev/null; then
+    PYTHON="python"
+else
+    echo "[pre-push] ⚠️ 未找到 Python，跳过检查"
+    exit 0
+fi
+
+GIT_MODE="${GIT_MODE:-single}"
+BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
+
+if [ -z "$BRANCH" ]; then
+    echo "[pre-push] 无法获取分支名（detached HEAD？），跳过"
+    exit 0
+fi
+
+echo "[pre-push] 分支: $BRANCH | 模式: $GIT_MODE"
+
+# 1. 命名规约
+if ! "$PYTHON" backend/scripts/check_git_branch_naming.py "$BRANCH"; then
+    echo "[pre-push] ❌ 分支命名不合规，拒绝 push"
+    echo "          紧急救急：git push --no-verify"
+    exit 1
+fi
+
+# 2. multi 模式禁直推 main
+if [ "$GIT_MODE" = "multi" ] && [ "$BRANCH" = "main" ]; then
+    echo "[pre-push] ❌ multi 模式禁止直推 main，必须走 PR"
+    echo "          gh pr create --base main --title '...'"
+    echo "          紧急救急：git push --no-verify"
+    exit 1
+fi
+
+# 3. 6 维核查（multi 严格 / single 仅警告）
+if [ "$GIT_MODE" = "multi" ]; then
+    if ! "$PYTHON" backend/scripts/check_git_sync_state.py --for-push --quiet; then
+        echo "[pre-push] ❌ 6 维核查失败（multi 模式严格）"
+        "$PYTHON" backend/scripts/check_git_sync_state.py --for-push
+        exit 1
+    fi
+else
+    "$PYTHON" backend/scripts/check_git_sync_state.py --quiet || \
+        echo "[pre-push] ⚠️ 6 维核查有项不达标（single 模式仅警告）"
+fi
+
+echo "[pre-push] ✅ 全部通过"
+exit 0

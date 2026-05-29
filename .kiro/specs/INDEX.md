@@ -85,9 +85,11 @@
 
 `ledger-import-unification` → `ledger-import-view-refactor` / `post-enhancement-bugfix` → R9+v3 / `note-account-mapping-seed`（合并入 disclosure-note-full-revamp） / `linkage-panorama-graph`（合并入 enterprise-linkage）
 
-### 3.8 全局结构治理（1 个）
+### 3.8 全局结构治理（2 个）
 
 `repo-frontend-layout-unification`（2026-05-29 完成，9/9 tasks，删仓库根 frontend/ 空壳 + 加 pre-commit hook 防回归）
+
+`repo-git-workflow-unification`（2026-05-29 完成，11/11 tasks / 22 tests，分支命名规约 + GIT_MODE 双模式 + 6 维核查 CLI + pre-push hook + ADR-027/028）
 
 ### 3.9 README stub（待启动）
 

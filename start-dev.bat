@@ -23,6 +23,12 @@ if "%PY%"=="" if exist "%BACKEND_DIR%\.venv\Scripts\python.exe" set "PY=%BACKEND
 if "%PY%"=="" ( where python >nul 2>nul && set "PY=python" )
 if "%PY%"=="" ( echo [ERROR] Python not found & exit /b 1 )
 
+:: --- git mode 提示（repo-git-workflow-unification spec）---
+if not defined GIT_MODE set "GIT_MODE=single"
+echo [GT] GIT_MODE=%GIT_MODE% (single=单用户快节奏 / multi=多用户严格 PR)
+if "%GIT_MODE%"=="multi" echo [GT] 多用户模式：直推 main 拒绝，必走 PR
+
+
 echo.
 echo  ======================================
 echo    GT Audit Platform - Dev Launcher

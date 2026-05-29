@@ -50,3 +50,12 @@ repos:
         name: check-no-root-frontend
         entry: python backend/scripts/check_no_root_frontend.py
         language: system
+
+      # repo-git-workflow-unification spec：热点文件 pull 检测
+      # memory.md / INDEX.md / file_size_whitelist.txt 改动前必须先 pull rebase
+      # GIT_MODE=multi 阻断 / single 仅警告
+      - id: check-hotspot-files
+        name: check-hotspot-files
+        entry: python backend/scripts/check_hotspot_files.py
+        language: system
+        files: ^(\.kiro/steering/memory\.md|\.kiro/specs/INDEX\.md|backend/scripts/file_size_whitelist\.txt)$
