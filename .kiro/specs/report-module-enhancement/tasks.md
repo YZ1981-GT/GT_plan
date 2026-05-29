@@ -67,7 +67,7 @@
     - **Validates: Requirements 3.6, 6.9**
     - _Requirements: 3.6, 6.9_
 
-- [ ] 5. 种子数据公式补全增强
+- [x] 5. 种子数据公式补全增强
   - [x] 5.1 补充 ReportFormulaService 的特殊公式映射
     - 检查 `_BS_SPECIAL` / `_IS_SPECIAL` / `_CFS_INDIRECT_SPECIAL` 中缺失的行名映射
     - 确保 `_CFS_INDIRECT_SPECIAL` 覆盖 Requirement 4 中列出的所有间接法调整项（资产减值损失、处置固定资产损失等）
