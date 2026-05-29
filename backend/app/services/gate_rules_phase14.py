@@ -972,6 +972,9 @@ def register_phase14_rules():
     enabled_rule_codes: set[str] | None = None
     try:
         enabled_rule_codes = _load_enabled_rule_codes_sync()
+    except ModuleNotFoundError as e:
+        # psycopg2 not installed — sync DB query unavailable, register all rules as fallback
+        logger.debug("[GATE] sync DB query unavailable (%s), registering all phase14 rules", e)
     except Exception as e:
         logger.warning("[GATE] Failed to load qc_rule_definitions for phase14 registration, "
                        "registering all rules: %s", e)

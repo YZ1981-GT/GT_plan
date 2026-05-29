@@ -36,7 +36,10 @@
           <template #default="{ data }">
             <span class="cc-tree-node">
               <span class="cc-tree-node-label">{{ data.label }}</span>
-              <el-tag v-if="data.table_count" size="small" type="info" style="margin-left:4px;font-size: var(--gt-font-size-xs)">{{ data.table_count }}表</el-tag>
+              <el-tag v-if="data.children_count" size="small" type="success" style="margin-left:4px;font-size: var(--gt-font-size-xs)">{{ data.children_count }}家</el-tag>
+              <el-tag v-if="data.is_consol_only" size="small" type="warning" style="margin-left:4px;font-size: var(--gt-font-size-xs)">仅合并</el-tag>
+              <el-tag v-if="data.is_stale" size="small" type="danger" style="margin-left:2px;font-size: var(--gt-font-size-xs)">待汇总</el-tag>
+              <el-tag v-else-if="data.table_count" size="small" type="info" style="margin-left:4px;font-size: var(--gt-font-size-xs)">{{ data.table_count }}表</el-tag>
             </span>
           </template>
         </el-tree>

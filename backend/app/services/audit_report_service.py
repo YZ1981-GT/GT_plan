@@ -403,7 +403,7 @@ class AuditReportService:
 
         Validates: Requirements 6.5
         """
-        logger.info(
+        logger.debug(
             "AuditReportService.on_reports_updated: project=%s",
             payload.project_id,
         )

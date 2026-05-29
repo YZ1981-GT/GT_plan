@@ -1,0 +1,100 @@
+# C21-1.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:11:01
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: C21-1
+template_path: backend/wp_templates/C/C21-1  IT审计发现汇总表.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:11:01'
+  source_xlsx: C21-1  IT审计发现汇总表.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  IT 审计发现汇总表:
+    component_type: univer
+    class_code: F-汇总表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 缺陷编号
+        B:
+          field: col_b
+          type: text
+          label: 类别
+        C:
+          field: col_c
+          type: text
+          label: 控制类型
+        D:
+          field: col_d
+          type: text
+          label: 涉及应用程序
+        E:
+          field: col_e
+          type: text
+          label: 问题描述
+        F:
+          field: col_f
+          type: text
+          label: 补偿性控制及有效性
+        G:
+          field: col_g
+          type: text
+          label: 风险及影响
+        H:
+          field: col_h
+          type: text
+          label: 相关报表项目
+        I:
+          field: col_i
+          type: text
+          label: 财务报表认定
+        R:
+          field: col_r
+          type: text
+          label: 对相关的财务报表审计工作的影响
+        S:
+          field: col_s
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1
+      - 5-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 18
+      ranges_sample:
+      - A8:A9
+      - E8:E9
+      - A15:H15
+      - C8:C9
+      - A5:S5
+      - F8:F9
+      - G8:G9
+      - H8:H9
+      - A6:S6
+      - A1:S1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

@@ -1,0 +1,658 @@
+# D4-6.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:11:05
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: D4-6
+template_path: backend/wp_templates/D/D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:11:05'
+  source_xlsx: D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位名称：
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：
+        D:
+          field: col_d
+          type: text
+          label: '3'
+        E:
+          field: col_e
+          type: text
+          label: 重要产品毛利分析
+        F:
+          field: col_f
+          type: text
+          label: D4-8
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A14:A16
+      - A17:A19
+      - A10:A13
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  重要指标分析D4-6:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 重要指标分析表
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 12
+      end_row: dynamic
+      header_row: 11
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 指标名称
+        B:
+          field: col_b
+          type: text
+          label: 本期
+        C:
+          field: col_c
+          type: text
+          label: 上期
+        D:
+          field: col_d
+          type: text
+          label: 差异1
+        E:
+          field: col_e
+          type: text
+          label: 变化原因及合理性分析1
+        F:
+          field: col_f
+          type: text
+          label: 同行业公司平均值
+        G:
+          field: col_g
+          type: text
+          label: 差异2
+        H:
+          field: col_h
+          type: text
+          label: 变化原因及合理性分析2
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - E3
+      - H3
+      - A4
+      - B4
+      - E4
+      - D13
+      - G13
+      - D14
+      - G14
+      - D15
+      - G15
+      - D16
+      - G16
+      - D17
+      - G17
+      - D18
+      - G18
+      - D19
+      - G19
+      - D20
+      - G20
+      - D21
+      - G21
+      - D22
+      - G22
+      - D23
+      - G23
+      - D24
+      _total_count: 31
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A2:H2
+      - A11:A12
+      - A1:H1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  毛利率分析表D4-7:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 主营业务收入毛利率分析表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 12
+      end_row: dynamic
+      header_row: 11
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 月份
+        B:
+          field: col_b
+          type: text
+          label: 1月
+        C:
+          field: col_c
+          type: text
+          label: 2月
+        D:
+          field: col_d
+          type: text
+          label: 3月
+        E:
+          field: col_e
+          type: text
+          label: 4月
+        F:
+          field: col_f
+          type: text
+          label: 5月
+        G:
+          field: col_g
+          type: text
+          label: 6月
+        H:
+          field: col_h
+          type: text
+          label: 7月
+        I:
+          field: col_i
+          type: text
+          label: 8月
+        J:
+          field: col_j
+          type: text
+          label: 9月
+        K:
+          field: col_k
+          type: text
+          label: 10月
+        L:
+          field: col_l
+          type: text
+          label: 11月
+        M:
+          field: col_m
+          type: text
+          label: 12月
+        N:
+          field: col_n
+          type: text
+          label: 合计
+        O:
+          field: col_o
+          type: text
+          label: 上期
+        P:
+          field: col_p
+          type: text
+          label: 变动比例
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      - 10
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - I3
+      - Q3
+      - W3
+      - A4
+      - I4
+      - Q4
+      - N12
+      - P12
+      - N13
+      - P13
+      - B14
+      - C14
+      - D14
+      - E14
+      - F14
+      - G14
+      - H14
+      - I14
+      - J14
+      - K14
+      - L14
+      - M14
+      - N14
+      - O14
+      - P14
+      - B15
+      - C15
+      - D15
+      - E15
+      _total_count: 151
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - B18:I18
+      - W18:W19
+      - A1:W1
+      - A2:W2
+      - J18:Q18
+      - A18:A19
+      - R18:V18
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  重要产品毛利分析D4-8:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 重要产品/服务毛利率分析表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 14
+      end_row: dynamic
+      header_row: 13
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 月份
+        B:
+          field: col_b
+          type: text
+          label: 本期数
+        J:
+          field: col_j
+          type: text
+          label: 上期数
+        R:
+          field: col_r
+          type: text
+          label: 本期比上期增减变动分析
+        X:
+          field: col_x
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      - 12
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - H3
+      - N3
+      - X3
+      - A4
+      - H4
+      - N4
+      - H16
+      - I16
+      - P16
+      - Q16
+      - R16
+      - S16
+      - T16
+      - U16
+      - V16
+      - W16
+      - H17
+      - I17
+      - P17
+      - Q17
+      - R17
+      - S17
+      - T17
+      - U17
+      - V17
+      - W17
+      - H18
+      - I18
+      - P18
+      _total_count: 179
+    merged_cells:
+      preserve: true
+      count: 21
+      ranges_sample:
+      - B14:D14
+      - Q14:Q15
+      - S14:S15
+      - T14:T15
+      - J13:Q13
+      - A13:A15
+      - A2:X2
+      - M14:O14
+      - B13:I13
+      - I14:I15
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  重要客户结构分析D4-9:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 重要客户结构分析表
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 客户名称
+        C:
+          field: col_c
+          type: text
+          label: 销售金额
+        D:
+          field: col_d
+          type: text
+          label: 销售金额占比
+        E:
+          field: col_e
+          type: text
+          label: 销售数量
+        F:
+          field: col_f
+          type: text
+          label: 销售数量占比
+        G:
+          field: col_g
+          type: text
+          label: 上期排名
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      - 11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - G3
+      - A4
+      - C4
+      - E4
+      - D13
+      - F13
+      - D14
+      - F14
+      - D15
+      - F15
+      - D16
+      - F16
+      - D17
+      - F17
+      - D18
+      - F18
+      - D19
+      - F19
+      - D20
+      - F20
+      - D21
+      - F21
+      - D22
+      - F22
+      - C23
+      - D23
+      - E23
+      _total_count: 59
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - A38:B38
+      - A24:B24
+      - A1:G1
+      - A37:B37
+      - A2:G2
+      - A23:B23
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  重要客户销售价格分析D4-10:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 重要客户销售价格分析
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 12
+      end_row: dynamic
+      header_row: 11
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 客户名称
+        C:
+          field: col_c
+          type: text
+          label: 产品种类
+        D:
+          field: col_d
+          type: text
+          label: 销售情况
+        H:
+          field: col_h
+          type: text
+          label: 销售单价分析
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - N3
+      - E13
+      - G13
+      - J13
+      - M13
+      - E14
+      - G14
+      - J14
+      - M14
+      - E15
+      - G15
+      - J15
+      - M15
+      - E16
+      - G16
+      - J16
+      - M16
+      - E17
+      - G17
+      - J17
+      - M17
+      - E18
+      - G18
+      - J18
+      - M18
+      - E19
+      - G19
+      - J19
+      - M19
+      - E20
+      _total_count: 85
+    merged_cells:
+      preserve: true
+      count: 8
+      ranges_sample:
+      - A2:N2
+      - H11:N11
+      - B11:B12
+      - C11:C12
+      - D11:G11
+      - A34:C34
+      - A11:A12
+      - A1:N1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  产品销售价格分析D4-11:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 产品销售价格分析
+      A3: ${entity_name}
+      A4: ${period_end}
+      N3: ${index_no}
+      N4: ${page_no}
+    dynamic_table:
+      start_row: 12
+      end_row: dynamic
+      header_row: 11
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 客户名称
+        C:
+          field: col_c
+          type: text
+          label: 品种/规格
+        D:
+          field: col_d
+          type: text
+          label: 销售单价
+        E:
+          field: col_e
+          type: text
+          label: 销售数量
+        F:
+          field: col_f
+          type: text
+          label: 开票日期
+        G:
+          field: col_g
+          type: text
+          label: '销售订单
+
+            （销售凭证）'
+        H:
+          field: col_h
+          type: text
+          label: 订单日期
+        I:
+          field: col_i
+          type: text
+          label: 商品销售价格表所列单价
+        J:
+          field: col_j
+          type: text
+          label: 与定价政策差异
+        K:
+          field: col_k
+          type: text
+          label: 同期市场价格
+        L:
+          field: col_l
+          type: text
+          label: 与市价差异
+        M:
+          field: col_m
+          type: text
+          label: 差异原因分析
+        N:
+          field: col_n
+          type: text
+          label: 同期市场价格来源（索引号）
+        O:
+          field: col_o
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - J3
+      - O3
+      - A4
+      - F4
+      - J4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A1:O1
+      - A2:O2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

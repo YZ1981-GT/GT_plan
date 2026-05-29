@@ -1,0 +1,250 @@
+# B22A-4-4-1.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:10:59
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: B22A-4-4-1
+template_path: backend/wp_templates/B/B22A-4-4-1 了解IT一般控制.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:10:59'
+  source_xlsx: B22A-4-4-1 了解IT一般控制.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  指引:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A2: 截止日
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      - 10-14
+      - 16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - A4:B4
+      - D21:O25
+      - A5:B5
+      - D17:O17
+      - A8:B8
+      - A3:B3
+      - A6:B6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  ITGC指引:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A2: 删除该工作簿且不要保存在审计底稿中
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 技术引进、开发和维护 -  技术维护
+        B:
+          field: col_b
+          type: text
+          label: 适当地限制和隔离开发和升级程序更新的访问权限。
+        C:
+          field: col_c
+          type: text
+          label: 在应用程序中具有程序开发特权和程序迁移特权的个人报告。
+    static_text:
+      rows:
+      - 1-3
+      - 5-11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 8
+      ranges_sample:
+      - A12:A17
+      - C15:C17
+      - A1:C1
+      - A2:C2
+      - A3:C3
+      - A18:A20
+      - A21:A22
+      - A5:A11
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  安全和维护:
+    component_type: d-form-table
+    class_code: D-业务了解
+    fixed_cells:
+      A2: 被审计单位名称
+      A3: ${entity_name}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: ITGC类别
+        B:
+          field: col_b
+          type: text
+          label: 子类别
+        C:
+          field: col_c
+          type: text
+          label: 信息技术导致的风险
+        D:
+          field: col_d
+          type: text
+          label: ITGC 编号
+        E:
+          field: col_e
+          type: text
+          label: IT 一般控制示例
+        F:
+          field: col_f
+          type: text
+          label: '被审计单位控制设计情况
+
+            （包括：控制频率、谁执行控制（角色/'
+        G:
+          field: col_g
+          type: text
+          label: 控制是否按照既定设计得以执行？
+        N:
+          field: col_n
+          type: text
+          label: 记录如何确定控制的设计和执行
+        O:
+          field: col_o
+          type: text
+          label: 识别的控制问题?
+        P:
+          field: col_p
+          type: text
+          label: 描述问题（如有）
+    static_text:
+      rows:
+      - 1-5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 16
+      ranges_sample:
+      - C2:E2
+      - A5:A6
+      - E5:E6
+      - N5:N6
+      - A2:B2
+      - O5:O6
+      - P5:P6
+      - G5:M5
+      - A15:A20
+      - A8:A14
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  作业调度和接口:
+    component_type: d-form-table
+    class_code: D-业务了解
+    fixed_cells:
+      A2: 被审计单位名称
+      A3: ${entity_name}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: ITGC类别
+        B:
+          field: col_b
+          type: text
+          label: 子类别
+        C:
+          field: col_c
+          type: text
+          label: 信息技术导致的风险
+        D:
+          field: col_d
+          type: text
+          label: ITGC 编号
+        E:
+          field: col_e
+          type: text
+          label: IT 一般控制示例
+        F:
+          field: col_f
+          type: text
+          label: '被审计单位控制设计情况
+
+            （包括：控制频率、谁执行控制（角色/'
+        G:
+          field: col_g
+          type: text
+          label: 控制是否按照既定设计得以执行？
+        N:
+          field: col_n
+          type: text
+          label: 记录如何确定控制的设计和执行
+        O:
+          field: col_o
+          type: text
+          label: 识别的控制问题?
+        P:
+          field: col_p
+          type: text
+          label: 描述问题（如有）
+    static_text:
+      rows:
+      - 1-5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 16
+      ranges_sample:
+      - C2:E2
+      - A5:A6
+      - E5:E6
+      - N5:N6
+      - A2:B2
+      - O5:O6
+      - A8:A10
+      - P5:P6
+      - G5:M5
+      - C3:E3
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  清单:
+    component_type: d-form-table
+    class_code: D-业务了解
+    fixed_cells:
+      A2: 否
+      A3: ${entity_name}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-3
+      - 5-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

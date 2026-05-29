@@ -45,11 +45,14 @@ REDIS_URL=redis://localhost:6379/0
 
 ### 2.4 数据库迁移
 
+D6 自动迁移：后端启动时自动应用 `backend/migrations/V*.sql`，无需手动命令。
+若需诊断单独执行：
+
 ```bash
-python -m alembic upgrade head
+python -m app.core.migration_runner
 ```
 
-迁移内容（034）：`trial_balance.currency_code` VARCHAR(3) 默认 'CNY' + 5 个复合索引。
+迁移内容（V034）：`trial_balance.currency_code` VARCHAR(3) 默认 'CNY' + 5 个复合索引。
 
 ### 2.5 Service Worker
 
@@ -57,8 +60,11 @@ python -m alembic upgrade head
 
 ### 2.6 回滚
 
+执行对应 R*.sql：
+
 ```bash
-python -m alembic downgrade -1
+psql -U postgres -d audit_platform -f backend/migrations/R034__rollback.sql
+psql -U postgres -d audit_platform -c "DELETE FROM schema_version WHERE version='034';"
 ```
 
 ---

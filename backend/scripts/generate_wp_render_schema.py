@@ -81,6 +81,103 @@ from analyze_wp_templates import (  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
+# ─── render 字段 → componentType 映射（analysis JSON 的 render 值 → yaml 的 componentType）───
+_RENDER_TO_COMPONENT: dict[str, str] = {
+    "HTML 中控台": "a-program-console",
+    "HTML 表单（编制信息+索引导航）": "b-index",
+    "HTML 嵌套表（多级子表）": "c-note-table",
+    "HTML 表单（表格型检查）": "d-form-table",
+    "HTML 表单（专属子组件）": "d-form-confirmation",
+    "HTML 表单（电子签）": "d-form-review",
+    "HTML 段落型": "d-form-paragraph",
+    "HTML 是否问答型": "d-form-qa",
+    "HTML 表单": "e-control-test",
+    "HTML stepper": "e-control-test",
+    "保留 Univer": "univer",
+    "保留 Univer（测算）": "univer",
+    "跳过渲染": "skip",
+    "PENDING-待人工归类": "pending",
+}
+
+
+def load_analysis_data(json_path: Path) -> dict[str, dict]:
+    """加载 workpaper_template_analysis.json 作为 ground truth
+
+    返回 {wp_code: {'sheets': {sheet_name: sheet_data}, 'filename': filename}}
+    同一 wp_code 的多个模板合并 sheets（不覆盖已有 sheet）
+    """
+    data = json.loads(json_path.read_text(encoding="utf-8"))
+    result: dict[str, dict] = {}
+    for cycle_data in data["cycles"].values():
+        for template in cycle_data["templates"]:
+            filename = template["filename"]
+            wp_code = extract_wp_code_from_filename(filename)
+            if wp_code:
+                if wp_code not in result:
+                    result[wp_code] = {
+                        "sheets": {s["name"]: s for s in template["sheets"]},
+                        "filename": filename,
+                    }
+                else:
+                    # 合并 sheets（新 sheet 追加，已存在的不覆盖）
+                    for s in template["sheets"]:
+                        if s["name"] not in result[wp_code]["sheets"]:
+                            result[wp_code]["sheets"][s["name"]] = s
+    return result
+
+
+def cross_validate_schema(
+    wp_code: str,
+    schema: dict[str, Any],
+    analysis_data: dict[str, dict],
+) -> dict[str, Any]:
+    """交叉验证生成的 schema 与 analysis JSON ground truth
+
+    Returns:
+        {'matches': int, 'mismatches': list[dict], 'missing': int}
+    """
+    result: dict[str, Any] = {"matches": 0, "mismatches": [], "missing": 0}
+
+    if wp_code not in analysis_data:
+        result["missing"] = len(schema.get("sheets", {}))
+        return result
+
+    gt_sheets = analysis_data[wp_code]["sheets"]
+    generated_sheets = schema.get("sheets", {})
+
+    for sheet_name, sheet_data in generated_sheets.items():
+        if not isinstance(sheet_data, dict):
+            continue
+        generated_type = sheet_data.get("component_type", "")
+
+        if sheet_name not in gt_sheets:
+            result["missing"] += 1
+            continue
+
+        gt_sheet = gt_sheets[sheet_name]
+        gt_render = gt_sheet.get("render", "")
+        expected_type = _RENDER_TO_COMPONENT.get(gt_render, "")
+
+        if not expected_type:
+            # 无法映射的 render 值，跳过
+            result["missing"] += 1
+            continue
+
+        if generated_type == expected_type:
+            result["matches"] += 1
+        else:
+            result["mismatches"].append(
+                {
+                    "sheet": sheet_name,
+                    "generated": generated_type,
+                    "expected": expected_type,
+                    "gt_render": gt_render,
+                }
+            )
+
+    return result
+
+
 # ─── 默认路径 ─────────────────────────────────────────────────────
 WORKSPACE_ROOT = SCRIPT_DIR.parent.parent  # d:/GT_plan
 DEFAULT_TEMPLATE_ROOT = WORKSPACE_ROOT / "backend" / "wp_templates"
@@ -111,7 +208,8 @@ _D_SUB_ROUTING: dict[str, str] = {
 _D_DEFAULT = "d-form-table"
 
 # ─── wp_code 提取（从文件名前缀） ──────────────────────────────
-_WP_CODE_PATTERN = re.compile(r"^([A-Z]\d+(?:[A-Z]?(?:-\d+)?)?)")
+# 支持多级子序号：A17-5-1, B22A-4-4-1, D2-1 等
+_WP_CODE_PATTERN = re.compile(r"^([A-Z]\d+[A-Z]?(?:-\d+)*)")
 
 
 def derive_component_type(class_code: str | None) -> str:
@@ -127,10 +225,10 @@ def derive_component_type(class_code: str | None) -> str:
 
 
 def extract_wp_code_from_filename(filename: str) -> str | None:
-    """从模板文件名提取 wp_code（如 'D2-1至D2-4 应收账款...xlsx' → 'D2'）"""
+    """从模板文件名提取完整 wp_code（保留子序号，如 'A1-11 ...' → 'A1-11'，'D2-1至D2-4 ...' → 'D2-1'）"""
     m = _WP_CODE_PATTERN.match(filename)
     if m:
-        return m.group(1).split("-")[0]  # 去掉子序号，保留主 wp_code
+        return m.group(1)  # 保留完整 wp_code 如 A1-11, D2-1
     return None
 
 
@@ -535,11 +633,11 @@ def collect_handcrafted_wp_codes() -> set[str]:
 def iter_template_files(
     template_dir: Path, wp_code_filter: str | None
 ) -> list[tuple[str, Path]]:
-    """枚举 (wp_code, xlsx_path) 列表（按 wp_code 去重，每个主 wp_code 仅取首个文件）"""
+    """枚举 (wp_code, xlsx_path) 列表 — 不再去重，每个 xlsx 独立生成 yaml"""
     if not template_dir.exists():
         raise FileNotFoundError(f"模板目录不存在: {template_dir}")
 
-    seen_codes: dict[str, Path] = {}
+    results: list[tuple[str, Path]] = []
     for xlsx_path in sorted(template_dir.rglob("*.xlsx")):
         # 跳过临时文件
         if xlsx_path.name.startswith("~$") or xlsx_path.name.startswith("."):
@@ -549,10 +647,8 @@ def iter_template_files(
             continue
         if wp_code_filter and not wp_code.startswith(wp_code_filter):
             continue
-        # 去重：同 wp_code 多个文件（如 D2-1至D2-4 / D2-5 / D2-6至D2-13）只保留第一个
-        # （后续 schema 中 sheets section 是按 sheet_name 区分，不影响）
-        seen_codes.setdefault(wp_code, xlsx_path)
-    return list(seen_codes.items())
+        results.append((wp_code, xlsx_path))
+    return results
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -606,6 +702,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="详细日志",
     )
+    parser.add_argument(
+        "--analysis-json",
+        type=Path,
+        default=None,
+        help="workpaper_template_analysis.json 路径，提供时交叉验证 componentType 与 ground truth",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -626,7 +728,16 @@ def main(argv: list[str] | None = None) -> int:
         logger.error(str(e))
         return 2
 
-    logger.info("发现 %d 个 wp_code 候选（去重后）", len(targets))
+    logger.info("发现 %d 个 (wp_code, xlsx) 候选", len(targets))
+
+    # 加载 analysis JSON（如果提供）
+    analysis_data: dict[str, dict] = {}
+    if args.analysis_json:
+        if not args.analysis_json.exists():
+            logger.error("analysis-json 文件不存在: %s", args.analysis_json)
+            return 2
+        analysis_data = load_analysis_data(args.analysis_json)
+        logger.info("已加载 analysis JSON: %d 个 wp_code ground truth", len(analysis_data))
 
     # 全局统计
     summary: dict[str, Any] = {
@@ -647,11 +758,23 @@ def main(argv: list[str] | None = None) -> int:
             "generated": 0,
             "failed": 0,
         },
+        "validation": {
+            "total_matches": 0,
+            "total_mismatches": 0,
+            "total_missing": 0,
+            "mismatch_details": [],
+        },
         "class_summary": Counter(),
         "files": [],
     }
 
+    # 按 wp_code 分组，同一 wp_code 的多个模板合并 sheets
+    from collections import defaultdict
+    wp_code_groups: dict[str, list[Path]] = defaultdict(list)
     for wp_code, xlsx_path in targets:
+        wp_code_groups[wp_code].append(xlsx_path)
+
+    for wp_code, xlsx_paths in wp_code_groups.items():
         if wp_code in handcrafted:
             summary["stats"]["skipped_handcrafted"] += 1
             logger.debug("[skip 手工] %s", wp_code)
@@ -664,10 +787,28 @@ def main(argv: list[str] | None = None) -> int:
             continue
 
         try:
-            logger.info("生成 %s ← %s", wp_code, xlsx_path.name)
-            schema, stats = build_workbook_schema(
-                xlsx_path, wp_code, args.template_version
-            )
+            # 合并同一 wp_code 下所有模板的 sheets
+            merged_schema = None
+            merged_stats = {"sheets_total": 0, "sheets_classified": 0, "sheets_pending": 0, "errors": []}
+            for xlsx_path in xlsx_paths:
+                logger.info("生成 %s ← %s", wp_code, xlsx_path.name)
+                schema, stats = build_workbook_schema(
+                    xlsx_path, wp_code, args.template_version
+                )
+                if merged_schema is None:
+                    merged_schema = schema
+                else:
+                    # 合并 sheets（新 sheet 追加，已存在的不覆盖）
+                    for sheet_name, sheet_data in schema.get("sheets", {}).items():
+                        if sheet_name not in merged_schema.get("sheets", {}):
+                            merged_schema["sheets"][sheet_name] = sheet_data
+                merged_stats["sheets_total"] += stats["sheets_total"]
+                merged_stats["sheets_classified"] += stats["sheets_classified"]
+                merged_stats["sheets_pending"] += stats["sheets_pending"]
+                merged_stats["errors"].extend(stats["errors"])
+
+            schema = merged_schema
+            stats = merged_stats
 
             # 统计 class_code
             for sheet_data in schema.get("sheets", {}).values():
@@ -701,6 +842,27 @@ def main(argv: list[str] | None = None) -> int:
 
             summary["stats"]["generated"] += 1
             summary["files"].append(file_record)
+
+            # 交叉验证（如果提供了 analysis JSON）
+            if analysis_data:
+                vr = cross_validate_schema(wp_code, schema, analysis_data)
+                summary["validation"]["total_matches"] += vr["matches"]
+                summary["validation"]["total_missing"] += vr["missing"]
+                if vr["mismatches"]:
+                    summary["validation"]["total_mismatches"] += len(vr["mismatches"])
+                    for mm in vr["mismatches"]:
+                        logger.warning(
+                            "  ⚠ componentType 不匹配 [%s] sheet=%s: "
+                            "生成=%s, 预期=%s (ground truth render=%s)",
+                            wp_code,
+                            mm["sheet"],
+                            mm["generated"],
+                            mm["expected"],
+                            mm["gt_render"],
+                        )
+                        summary["validation"]["mismatch_details"].append(
+                            {"wp_code": wp_code, **mm}
+                        )
 
         except Exception as e:
             logger.exception("生成失败 %s: %s", wp_code, e)
@@ -736,6 +898,26 @@ def main(argv: list[str] | None = None) -> int:
             dict(summary["class_summary"]).items(), key=lambda x: -x[1]
         )[:20]:
             print(f"  {cls:30s} {count:5d}")
+
+    # 交叉验证总结
+    v = summary["validation"]
+    if analysis_data:
+        print()
+        print("-" * 60)
+        print("交叉验证总结（vs analysis JSON ground truth）")
+        print("-" * 60)
+        print(f"匹配:    {v['total_matches']}")
+        print(f"不匹配:  {v['total_mismatches']}")
+        print(f"缺失:    {v['total_missing']}（ground truth 中无对应 sheet）")
+        if v["mismatch_details"]:
+            print()
+            print(f"不匹配详情（前 20 条）:")
+            for mm in v["mismatch_details"][:20]:
+                print(
+                    f"  [{mm['wp_code']}] {mm['sheet']}: "
+                    f"生成={mm['generated']} → 预期={mm['expected']}"
+                )
+
     print()
 
     return 0 if s["failed"] == 0 else 1

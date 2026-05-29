@@ -1,0 +1,357 @@
+# F2-18.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:11:09
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: F2-18
+template_path: backend/wp_templates/F/F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:11:09'
+  source_xlsx: F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 5-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - D3
+      - D4
+      _total_count: 2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  存货总体分析表F2-18:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货总体分析表
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 存货项目
+        C:
+          field: col_c
+          type: text
+          label: 20X5/12/31
+        E:
+          field: col_e
+          type: text
+          label: 20X4/12/31
+        G:
+          field: col_g
+          type: text
+          label: 20X3/12/31
+        I:
+          field: col_i
+          type: text
+          label: 是否异常
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - I3
+      - A4
+      - C4
+      - E4
+      - A12
+      - D12
+      - F12
+      - H12
+      - A13
+      - D13
+      - F13
+      - H13
+      - A14
+      - D14
+      - F14
+      - H14
+      - A15
+      - D15
+      - F15
+      - H15
+      - A16
+      - D16
+      - F16
+      - H16
+      - A17
+      - D17
+      - F17
+      _total_count: 103
+    merged_cells:
+      preserve: true
+      count: 35
+      ranges_sample:
+      - I30:I31
+      - C30:D30
+      - A51:A52
+      - A45:B45
+      - A36:B36
+      - H41:H42
+      - I41:I42
+      - A1:H1
+      - C10:D10
+      - E10:F10
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  存货产销量变动分析表F2-19:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货产销量变动分析表
+      A3: ${entity_name}
+      A4: ${period_end}
+      O3: ${index_no}
+      O4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目
+        B:
+          field: col_b
+          type: text
+          label: 1月
+        C:
+          field: col_c
+          type: text
+          label: 2月
+        D:
+          field: col_d
+          type: text
+          label: 3月
+        E:
+          field: col_e
+          type: text
+          label: 4月
+        F:
+          field: col_f
+          type: text
+          label: 5月
+        G:
+          field: col_g
+          type: text
+          label: 6月
+        H:
+          field: col_h
+          type: text
+          label: 7月
+        I:
+          field: col_i
+          type: text
+          label: 8月
+        J:
+          field: col_j
+          type: text
+          label: 9月
+        K:
+          field: col_k
+          type: text
+          label: 10月
+        L:
+          field: col_l
+          type: text
+          label: 11月
+        M:
+          field: col_m
+          type: text
+          label: 12月
+        N:
+          field: col_n
+          type: text
+          label: 合计
+        O:
+          field: col_o
+          type: text
+          label: 上年度
+        P:
+          field: col_p
+          type: text
+          label: 变动率
+    static_text:
+      rows:
+      - 1-2
+      - 5-11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - K3
+      - P3
+      - A4
+      - E4
+      - K4
+      - N13
+      - P13
+      - N14
+      - P14
+      - N15
+      - P15
+      - N16
+      - P16
+      - N17
+      - P17
+      - N18
+      - P18
+      - B19
+      - C19
+      - D19
+      - E19
+      - F19
+      - G19
+      - H19
+      - I19
+      - J19
+      - K19
+      - L19
+      _total_count: 465
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A1:P1
+      - A2:P2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  产品年度成本比较分析F2-20:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 产成品单位成本年度比较分析表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 产成品名称
+        B:
+          field: col_b
+          type: text
+          label: 本年单位成本
+        G:
+          field: col_g
+          type: text
+          label: 上年单位成本
+        L:
+          field: col_l
+          type: text
+          label: 波动比例
+        Q:
+          field: col_q
+          type: text
+          label: 是否存在异常波动
+        R:
+          field: col_r
+          type: text
+          label: 进一步审验底稿索引
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - L3
+      - R3
+      - A4
+      - F4
+      - L4
+      - F7
+      - K7
+      - L7
+      - M7
+      - N7
+      - O7
+      - P7
+      - F8
+      - K8
+      - L8
+      - M8
+      - N8
+      - O8
+      - P8
+      - F9
+      - K9
+      - L9
+      - M9
+      - N9
+      - O9
+      - P9
+      - F10
+      - K10
+      _total_count: 77
+    merged_cells:
+      preserve: true
+      count: 5
+      ranges_sample:
+      - A5:A6
+      - Q5:Q6
+      - R5:R6
+      - A2:R2
+      - A1:R1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

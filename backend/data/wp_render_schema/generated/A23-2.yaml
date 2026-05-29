@@ -1,0 +1,194 @@
+# A23-2.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:10:51
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: A23-2
+template_path: backend/wp_templates/A/A23-2 项目合伙人复核表（适用于内控审计）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:10:51'
+  source_xlsx: A23-2 项目合伙人复核表（适用于内控审计）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：ABC公司
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：2025.XX.XX
+        C:
+          field: col_c
+          type: text
+          label: '1'
+        D:
+          field: col_d
+          type: text
+          label: 项目合伙人复核表（适用于内控审计）
+        E:
+          field: col_e
+          type: text
+          label: A23-2
+    static_text:
+      rows:
+      - 1-3
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - C6
+      _total_count: 1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  A23-2 项目合伙人复核表（适用于内控审计）:
+    component_type: d-form-review
+    class_code: D-复核记录
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 项目组内复核表—内部控制审计
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      I3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目合伙人复核内容
+        F:
+          field: col_f
+          type: text
+          label: 是
+        G:
+          field: col_g
+          type: text
+          label: 否
+        H:
+          field: col_h
+          type: text
+          label: 不适用
+        I:
+          field: col_i
+          type: text
+          label: 相关复核记录索引
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - A4
+      _total_count: 2
+    merged_cells:
+      preserve: true
+      count: 27
+      ranges_sample:
+      - B9:E9
+      - B6:E6
+      - B30:E30
+      - B15:E15
+      - B24:E24
+      - B20:E20
+      - B26:E26
+      - A2:I2
+      - B16:E16
+      - B7:E7
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  复核记录参考模板:
+    component_type: d-form-review
+    class_code: D-复核记录
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 项目组内复核记录-内部控制审计
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      J3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 复核问题
+        E:
+          field: col_e
+          type: text
+          label: 回复
+        I:
+          field: col_i
+          type: text
+          label: 确认复核问题已满意解决
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - A4
+      - D4
+      - G4
+      _total_count: 6
+    merged_cells:
+      preserve: true
+      count: 71
+      ranges_sample:
+      - A5:D5
+      - A17:D17
+      - A23:D23
+      - E26:H26
+      - A8:D8
+      - I6:J6
+      - A22:D22
+      - I15:J15
+      - A20:D20
+      - I11:J11
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

@@ -83,6 +83,13 @@ export interface RenderConfig {
   is_real_workpaper: boolean
   template_version: string
   sheets: SheetRenderConfig[]
+  /** Sprint 4 Task 16: 自动刷数结果 */
+  fill_results?: Record<string, {
+    value: number | string | null
+    source: string
+    label: string
+    status: 'ok' | 'unavailable'
+  }>
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -157,5 +164,16 @@ export function useWpRenderer(wpId: Ref<string>) {
     componentType,
     wpCode,
     reload: load,
+    /** Sprint 4 Task 16: 自动刷数结果 */
+    fillResults: computed(() => renderConfig.value?.fill_results ?? null),
+    /** Sprint 4 Task 10.1: schema 缺失时的 fallback 提示（A~E 类但 componentType 为 univer） */
+    schemaFallbackBanner: computed(() => {
+      if (!renderConfig.value) return null
+      const wpCodeVal = renderConfig.value.wp_code
+      if (wpCodeVal && /^[A-E]/i.test(wpCodeVal) && componentType.value === 'univer') {
+        return '此底稿推荐使用 HTML 渲染器，当前因配置未就绪暂用表格模式'
+      }
+      return null
+    }),
   }
 }

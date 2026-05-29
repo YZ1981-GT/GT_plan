@@ -1,0 +1,517 @@
+# E1-18.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:11:07
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: E1-18
+template_path: backend/wp_templates/E/E1-18至E1-23  货币资金 -检查（Leap应对措施-检查）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:11:07'
+  source_xlsx: E1-18至E1-23  货币资金 -检查（Leap应对措施-检查）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：
+        D:
+          field: col_d
+          type: text
+          label: '3'
+        E:
+          field: col_e
+          type: text
+          label: 银行存款及其他货币资金应计利息测算
+        F:
+          field: col_f
+          type: text
+          label: E1-20
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  企业信用报告信息查询记录E1-18:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业信用报告查询记录
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 三、借款人名称：
+        B:
+          field: col_b
+          type: text
+          label: 征信人代码：
+        E:
+          field: col_e
+          type: text
+          label: 贷款卡编码：
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - B3
+      - D3
+      - G3
+      - A4
+      - B4
+      - D4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 9
+      ranges_sample:
+      - A20:B20
+      - A14:G14
+      - A1:G1
+      - A19:B19
+      - A11:B11
+      - A2:G2
+      - A16:G16
+      - A15:G15
+      - A5:G5
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  企业信用报告信息与账面核对记录E1-19:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 企业信用报告信息与账面核对记录
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 征信报告信息
+        C:
+          field: col_c
+          type: text
+          label: 企业账面
+        E:
+          field: col_e
+          type: text
+          label: 核对
+        F:
+          field: col_f
+          type: text
+          label: 不一致原因
+        G:
+          field: col_g
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - I3
+      - A4
+      - D4
+      - F4
+      - B20
+      - C20
+      - D20
+      - E20
+      - F20
+      - G20
+      - H20
+      - E24
+      - H24
+      - E25
+      - H25
+      - E26
+      - H26
+      - E27
+      - H27
+      - E28
+      - H28
+      - E29
+      - H29
+      - E30
+      - H30
+      - E31
+      - H31
+      _total_count: 30
+    merged_cells:
+      preserve: true
+      count: 10
+      ranges_sample:
+      - A57:I57
+      - E9:E10
+      - A37:I43
+      - A2:I2
+      - F9:F10
+      - G9:G10
+      - A1:I1
+      - A58:I58
+      - C9:D9
+      - A9:B9
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  银行存款及其他货币资金应计利息测算E1-20:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 银行存款及其他货币资金应计利息测算表
+      A3: ${entity_name}
+      A4: ${period_end}
+      L3: ${index_no}
+      L4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 开户银行
+        B:
+          field: col_b
+          type: text
+          label: 银行账号
+        C:
+          field: col_c
+          type: text
+          label: 账户性质/主要用途
+        D:
+          field: col_d
+          type: text
+          label: 原币币种
+        E:
+          field: col_e
+          type: text
+          label: 原币金额
+        F:
+          field: col_f
+          type: text
+          label: 结息日
+        G:
+          field: col_g
+          type: text
+          label: 截止日
+        H:
+          field: col_h
+          type: text
+          label: 应计利息天数
+        I:
+          field: col_i
+          type: text
+          label: 日利率
+        J:
+          field: col_j
+          type: text
+          label: 应计利息（原币金额）
+        K:
+          field: col_k
+          type: text
+          label: 折算汇率
+        L:
+          field: col_l
+          type: text
+          label: 应计利息（人民币金额）
+        M:
+          field: col_m
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - H3
+      - M3
+      - A4
+      - D4
+      - H4
+      - J10
+      - L10
+      - J11
+      - L11
+      - J12
+      - L12
+      - J13
+      - L13
+      - J14
+      - L14
+      - J15
+      - L15
+      - J16
+      - L16
+      - J17
+      - L17
+      - J18
+      - L18
+      - J19
+      - L19
+      - J20
+      - L20
+      - J21
+      _total_count: 38
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A25:D25
+      - A1:M1
+      - A2:M2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  银行存款截止测试表E1-21:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 银行存款截止测试表
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 12
+      end_row: dynamic
+      header_row: 11
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 测试凭证内容
+        F:
+          field: col_f
+          type: text
+          label: 收付款凭单日期
+        G:
+          field: col_g
+          type: text
+          label: 其他原始凭单日期
+        H:
+          field: col_h
+          type: text
+          label: 是否跨期
+    static_text:
+      rows:
+      - 1-2
+      - 5-10
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - D3
+      - H3
+      - A4
+      - C4
+      - D4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 9
+      ranges_sample:
+      - H11:H12
+      - A30:H30
+      - A2:H2
+      - A10:H10
+      - A11:E11
+      - A1:H1
+      - B5:H5
+      - F11:F12
+      - G11:G12
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  其他货币资金截止测试表E1-22:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 其他货币资金截止测试表
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 12
+      end_row: dynamic
+      header_row: 11
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 测试凭证内容
+        F:
+          field: col_f
+          type: text
+          label: 收付款凭单日期
+        G:
+          field: col_g
+          type: text
+          label: 其他原始凭单日期
+        H:
+          field: col_h
+          type: text
+          label: 是否跨期
+    static_text:
+      rows:
+      - 1-2
+      - 5-10
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - D3
+      - H3
+      - A4
+      - C4
+      - D4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 9
+      ranges_sample:
+      - B5:H5
+      - A2:H2
+      - A10:H10
+      - A28:H28
+      - A11:E11
+      - A1:H1
+      - H11:H12
+      - F11:F12
+      - G11:G12
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  货币资金收支检查情况表E1-23:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 货币资金收支检查情况表
+      A3: ${entity_name}
+      A4: ${period_end}
+      O3: ${index_no}
+      O4: ${page_no}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 抽样总体：
+        B:
+          field: col_b
+          type: text
+          label: 测试总体扣除特定样本以外的样本，共XX笔、金额XX
+        H:
+          field: col_h
+          type: text
+          label: 确定的抽样样本量：
+        J:
+          field: col_j
+          type: text
+          label: 抽取XX笔
+        K:
+          field: col_k
+          type: text
+          label: （如果使用了样本计算器计算样本量，样本量计算过程见<XX>底
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - J3
+      - P3
+      - A4
+      - E4
+      - J4
+      - G40
+      - J40
+      - G60
+      - J60
+      - E63
+      - F63
+      - G63
+      - E64
+      - F64
+      - G64
+      _total_count: 17
+    merged_cells:
+      preserve: true
+      count: 69
+      ranges_sample:
+      - K32:M32
+      - A14:P14
+      - N16:N17
+      - C42:C43
+      - M59:N59
+      - K22:M22
+      - M55:N55
+      - K40:M40
+      - E42:E43
+      - M44:N44
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

@@ -1,0 +1,1178 @@
+# F2-38.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:11:10
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: F2-38
+template_path: backend/wp_templates/F/F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:11:10'
+  source_xlsx: F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：
+        D:
+          field: col_d
+          type: text
+          label: '3'
+        E:
+          field: col_e
+          type: text
+          label: 计价方法测试表-标准成本差异
+        F:
+          field: col_f
+          type: text
+          label: F2-40
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  存货计价测试程序G2-8-删除:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货计价测试程序
+      A3: ${entity_name}
+      A4: ${period_end}
+      K3: ${index_no}
+      L3: ${index_no}
+      K4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 审计程序
+        D:
+          field: col_d
+          type: text
+          label: 程序分类
+        E:
+          field: col_e
+          type: text
+          label: 对应账户
+        F:
+          field: col_f
+          type: text
+          label: 对应的认定/风险
+        K:
+          field: col_k
+          type: text
+          label: '执行情况说明
+
+            （含底稿索引）'
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - G3
+      - C4
+      - G4
+      _total_count: 5
+    merged_cells:
+      preserve: true
+      count: 215
+      ranges_sample:
+      - K49:L49
+      - K24:L24
+      - F54:J54
+      - F10:J10
+      - K33:L33
+      - F19:J19
+      - B22:C22
+      - F63:J63
+      - B31:C31
+      - F6:J6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  计价方法测试表-平均F2-38:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货计价方法测试表（月末一次加权平均法适用）
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 月份
+        B:
+          field: col_b
+          type: text
+          label: 本期生产（或购入）
+        E:
+          field: col_e
+          type: text
+          label: 本期销售（或发出）
+        H:
+          field: col_h
+          type: text
+          label: 期末结存
+        K:
+          field: col_k
+          type: text
+          label: 应结转
+        N:
+          field: col_n
+          type: text
+          label: 差异
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      - 9-11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - I3
+      - N3
+      - A4
+      - E4
+      - I4
+      - I14
+      - M14
+      - C15
+      - F15
+      - H15
+      - I15
+      - J15
+      - K15
+      - L15
+      - M15
+      - N15
+      - C16
+      - F16
+      - H16
+      - I16
+      - J16
+      - K16
+      - L16
+      - M16
+      - N16
+      - C17
+      - F17
+      - H17
+      _total_count: 495
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - A12:A13
+      - A2:N2
+      - A29:A30
+      - A46:A47
+      - A63:A64
+      - A1:N1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  计价方法测试表-先进先出F2-39:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货计价方法测试表（先进先出法/移动加权平均法适用）
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      N3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 日期
+        B:
+          field: col_b
+          type: text
+          label: 本期生产（或购入）
+        E:
+          field: col_e
+          type: text
+          label: 本期销售（或发出）
+        H:
+          field: col_h
+          type: text
+          label: 期末结存
+        K:
+          field: col_k
+          type: text
+          label: 应结转
+        N:
+          field: col_n
+          type: text
+          label: 差异
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      - 9-11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - J3
+      - A4
+      - F4
+      - J4
+      - I14
+      - M14
+      - B28
+      - C28
+      - D28
+      - E28
+      - F28
+      - G28
+      - H28
+      - I28
+      - J28
+      - L28
+      - M28
+      - N28
+      - I32
+      - M32
+      - B46
+      - C46
+      - D46
+      - E46
+      - F46
+      - G46
+      - H46
+      - I46
+      _total_count: 48
+    merged_cells:
+      preserve: true
+      count: 5
+      ranges_sample:
+      - A48:A49
+      - A12:A13
+      - A2:N2
+      - A30:A31
+      - A1:N1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  计价方法测试表-标准成本差异F2-40:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 标准成本差异测试表
+      A3: ${entity_name}
+      A4: ${period_end}
+      N3: ${index_no}
+      N4: ${page_no}
+    dynamic_table:
+      start_row: 12
+      end_row: dynamic
+      header_row: 11
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 月份
+        B:
+          field: col_b
+          type: text
+          label: 本期生产（或购入）
+        F:
+          field: col_f
+          type: text
+          label: 本期销售（或发出）应结转
+        I:
+          field: col_i
+          type: text
+          label: 期末应结存
+        L:
+          field: col_l
+          type: text
+          label: 期末实际结存
+        O:
+          field: col_o
+          type: text
+          label: 差异
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      - 9-10
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - G3
+      - J3
+      - O3
+      - A4
+      - G4
+      - J4
+      - D13
+      - I13
+      - J13
+      - K13
+      - O13
+      - D14
+      - G14
+      - H14
+      - I14
+      - J14
+      - K14
+      - O14
+      - D15
+      - G15
+      - H15
+      - I15
+      - J15
+      - K15
+      - O15
+      - D16
+      - G16
+      - H16
+      - I16
+      _total_count: 274
+    merged_cells:
+      preserve: true
+      count: 8
+      ranges_sample:
+      - A27:A28
+      - A43:A44
+      - O43:O44
+      - A2:O2
+      - O11:O12
+      - A1:O1
+      - O27:O28
+      - A11:A12
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  生产成本明细表F2-41:
+    component_type: univer
+    class_code: F-明细表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 生产成本明细表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: '月份
+
+            项目'
+        B:
+          field: col_b
+          type: text
+          label: 1月
+        C:
+          field: col_c
+          type: text
+          label: 2月
+        D:
+          field: col_d
+          type: text
+          label: 3月
+        E:
+          field: col_e
+          type: text
+          label: 4月
+        F:
+          field: col_f
+          type: text
+          label: 5月
+        G:
+          field: col_g
+          type: text
+          label: 6月
+        H:
+          field: col_h
+          type: text
+          label: 7月
+        I:
+          field: col_i
+          type: text
+          label: 8月
+        J:
+          field: col_j
+          type: text
+          label: 9月
+        K:
+          field: col_k
+          type: text
+          label: 10月
+        L:
+          field: col_l
+          type: text
+          label: 11月
+        M:
+          field: col_m
+          type: text
+          label: 12月
+        N:
+          field: col_n
+          type: text
+          label: 合计
+        O:
+          field: col_o
+          type: text
+          label: 上年度
+        P:
+          field: col_p
+          type: text
+          label: 变动率
+        Q:
+          field: col_q
+          type: text
+          label: 变动原因
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - G3
+      - K3
+      - Q3
+      - A4
+      - G4
+      - K4
+      - N6
+      - N8
+      - P8
+      - N9
+      - P9
+      - N10
+      - P10
+      - N11
+      - P11
+      - N12
+      - P12
+      - B13
+      - C13
+      - D13
+      - E13
+      - F13
+      - G13
+      - H13
+      - I13
+      - J13
+      - K13
+      - L13
+      - M13
+      _total_count: 48
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:Q2
+      - A1:Q1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  产品年度成本比较G2-8-4-移至分析类:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 产成品单位成本年度比较表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 产成品名称
+        B:
+          field: col_b
+          type: text
+          label: 本年单位成本
+        G:
+          field: col_g
+          type: text
+          label: 上年单位成本
+        L:
+          field: col_l
+          type: text
+          label: 波动比例
+        Q:
+          field: col_q
+          type: text
+          label: 是否存在异常波动
+        R:
+          field: col_r
+          type: text
+          label: 进一步审验底稿索引
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - L3
+      - A4
+      - F4
+      - L4
+      - F7
+      - K7
+      - L7
+      - M7
+      - N7
+      - O7
+      - P7
+      - F8
+      - K8
+      - L8
+      - M8
+      - N8
+      - O8
+      - P8
+      - F9
+      - K9
+      - L9
+      - M9
+      - N9
+      - O9
+      - P9
+      - F10
+      - K10
+      - L10
+      _total_count: 104
+    merged_cells:
+      preserve: true
+      count: 5
+      ranges_sample:
+      - A5:A6
+      - Q5:Q6
+      - R5:R6
+      - A2:R2
+      - A1:R1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  直接人工分析表F2-42:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 直接人工分析表
+      A3: ${entity_name}
+      A4: ${period_end}
+      O3: ${index_no}
+      O4: ${page_no}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 产品
+        B:
+          field: col_b
+          type: text
+          label: 1月
+        C:
+          field: col_c
+          type: text
+          label: 2月
+        D:
+          field: col_d
+          type: text
+          label: 3月
+        E:
+          field: col_e
+          type: text
+          label: 4月
+        F:
+          field: col_f
+          type: text
+          label: 5月
+        G:
+          field: col_g
+          type: text
+          label: 6月
+        H:
+          field: col_h
+          type: text
+          label: 7月
+        I:
+          field: col_i
+          type: text
+          label: 8月
+        J:
+          field: col_j
+          type: text
+          label: 9月
+        K:
+          field: col_k
+          type: text
+          label: 10月
+        L:
+          field: col_l
+          type: text
+          label: 11月
+        M:
+          field: col_m
+          type: text
+          label: 12月
+        N:
+          field: col_n
+          type: text
+          label: 合计
+        O:
+          field: col_o
+          type: text
+          label: 上年度
+        P:
+          field: col_p
+          type: text
+          label: 变动率
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - K3
+      - P3
+      - A4
+      - F4
+      - K4
+      - N11
+      - P11
+      - N12
+      - P12
+      - N13
+      - P13
+      - N14
+      - P14
+      - N15
+      - P15
+      - N16
+      - P16
+      - N17
+      - P17
+      - N18
+      - P18
+      - N19
+      - P19
+      - N22
+      - P22
+      - N23
+      - P23
+      - N24
+      _total_count: 169
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A1:P1
+      - A2:P2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  制造费用明细表F2-43:
+    component_type: univer
+    class_code: F-明细表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 制造费用明细表
+      A3: ${entity_name}
+      A4: ${period_end}
+      O3: ${index_no}
+      O4: ${page_no}
+    dynamic_table:
+      start_row: 12
+      end_row: dynamic
+      header_row: 11
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: '月份
+
+            项目'
+        B:
+          field: col_b
+          type: text
+          label: 1月
+        C:
+          field: col_c
+          type: text
+          label: 2月
+        D:
+          field: col_d
+          type: text
+          label: 3月
+        E:
+          field: col_e
+          type: text
+          label: 4月
+        F:
+          field: col_f
+          type: text
+          label: 5月
+        G:
+          field: col_g
+          type: text
+          label: 6月
+        H:
+          field: col_h
+          type: text
+          label: 7月
+        I:
+          field: col_i
+          type: text
+          label: 8月
+        J:
+          field: col_j
+          type: text
+          label: 9月
+        K:
+          field: col_k
+          type: text
+          label: 10月
+        L:
+          field: col_l
+          type: text
+          label: 11月
+        M:
+          field: col_m
+          type: text
+          label: 12月
+        N:
+          field: col_n
+          type: text
+          label: 合计
+        O:
+          field: col_o
+          type: text
+          label: 上年度
+        P:
+          field: col_p
+          type: text
+          label: 变动率
+    static_text:
+      rows:
+      - 1-2
+      - 5-10
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - K3
+      - A4
+      - F4
+      - K4
+      - N12
+      - P12
+      - N13
+      - P13
+      - N14
+      - P14
+      - N15
+      - P15
+      - N16
+      - P16
+      - N17
+      - P17
+      - N18
+      - P18
+      - N19
+      - P19
+      - N20
+      - P20
+      - N21
+      - P21
+      - N22
+      - P22
+      - N23
+      - P23
+      _total_count: 47
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A1:P1
+      - A2:P2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  生产成本分配F2-44:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 抽查×月×车间生产成本分配表
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 产成品名称
+        B:
+          field: col_b
+          type: text
+          label: 产量
+        C:
+          field: col_c
+          type: text
+          label: 入库产品成本单价
+        D:
+          field: col_d
+          type: text
+          label: 分配标准（产量、工时、定额成本等）
+        E:
+          field: col_e
+          type: text
+          label: 直接材料分配率
+        F:
+          field: col_f
+          type: text
+          label: 直接材料分配额
+        G:
+          field: col_g
+          type: text
+          label: 直接人工分配率
+        H:
+          field: col_h
+          type: text
+          label: 直接人工分配额
+        I:
+          field: col_i
+          type: text
+          label: 制造费用分配率
+        J:
+          field: col_j
+          type: text
+          label: 制造费用分配额
+        K:
+          field: col_k
+          type: text
+          label: 其他分配率
+        L:
+          field: col_l
+          type: text
+          label: 其他分配额
+        M:
+          field: col_m
+          type: text
+          label: 应计单位成本
+        N:
+          field: col_n
+          type: text
+          label: 核对
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - I3
+      - N3
+      - A4
+      - E4
+      - I4
+      - D9
+      - E11
+      - F11
+      - G11
+      - H11
+      - I11
+      - J11
+      - K11
+      - L11
+      - M11
+      - N11
+      - E12
+      - F12
+      - G12
+      - H12
+      - I12
+      - J12
+      - K12
+      - L12
+      - M12
+      - N12
+      - E13
+      - F13
+      _total_count: 139
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A2:N2
+      - A1:N1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  产品月度成本比较G2-8-5（删除 在舞弊应对单耗分析中）:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 完工产成品月度成本构成比较表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 月份
+        B:
+          field: col_b
+          type: text
+          label: 产量
+        C:
+          field: col_c
+          type: text
+          label: 直接材料
+        F:
+          field: col_f
+          type: text
+          label: 直接人工
+        I:
+          field: col_i
+          type: text
+          label: 制造费用
+        L:
+          field: col_l
+          type: text
+          label: ……
+        O:
+          field: col_o
+          type: text
+          label: ……
+        R:
+          field: col_r
+          type: text
+          label: 合计
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - H3
+      - O3
+      - A4
+      - H4
+      - O4
+      - D8
+      - E8
+      - G8
+      - H8
+      - J8
+      - K8
+      - M8
+      - N8
+      - P8
+      - Q8
+      - R8
+      - S8
+      - T8
+      - D9
+      - E9
+      - G9
+      - H9
+      - J9
+      - K9
+      - M9
+      - N9
+      - P9
+      - Q9
+      - R9
+      _total_count: 345
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - A1:T1
+      - A22:A23
+      - B22:B23
+      - A2:T2
+      - A6:A7
+      - B6:B7
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  产品同行业成本比较G2-8-7-移至舞弊应对单耗分析中:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 同行业产成品单位成本占比比较表
+      A3: ${entity_name}
+      A4: ${period_end}
+      O3: ${index_no}
+      O4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 产成品名称
+        B:
+          field: col_b
+          type: text
+          label: 本公司单位成本
+        G:
+          field: col_g
+          type: text
+          label: 同行业单位成本
+        L:
+          field: col_l
+          type: text
+          label: 占比差异
+        O:
+          field: col_o
+          type: text
+          label: 是否存在异常波动
+        P:
+          field: col_p
+          type: text
+          label: 进一步审验底稿索引
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - L3
+      - A4
+      - F4
+      - L4
+      - F7
+      - K7
+      - L7
+      - M7
+      - N7
+      - F8
+      - K8
+      - L8
+      - M8
+      - N8
+      - F9
+      - K9
+      - L9
+      - M9
+      - N9
+      - F10
+      - K10
+      - L10
+      - M10
+      - N10
+      - F11
+      - K11
+      - L11
+      - M11
+      _total_count: 101
+    merged_cells:
+      preserve: true
+      count: 5
+      ranges_sample:
+      - A5:A6
+      - O5:O6
+      - P5:P6
+      - A1:P1
+      - A2:P2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

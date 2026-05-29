@@ -39,7 +39,7 @@
 
 ## Sprint A.0：D13 章节序号重构（基础，1.5 人天）⚠ 必须最先做
 
-- [ ] **A.0.1** V019 migration（原计划 V022，因 V001-V018 已落地按真实下一编号）：DisclosureNote 加 section_id / level / parent_section_id / sort_index / auto_numbering / lock_number / locked_number 字段
+- [x] **A.0.1** V019 migration（原计划 V022，因 V001-V018 已落地按真实下一编号）：DisclosureNote 加 section_id / level / parent_section_id / sort_index / auto_numbering / lock_number / locked_number 字段
 - [x] **A.0.2** 模板 JSON 字段重构（保留 section_number 作为兼容字段）
 - [x] **A.0.3** `note_section_numbering_service.py` 核心
 - [x] **A.0.4** 5 级编号格式注册器（一/(一)/1./(1)/①）
@@ -85,7 +85,7 @@
 - [x] **A.4.2** _render_text_paragraph 接入
 - [x] **A.4.3** 段落变量自动收集（wizard_state + client master + consolidation + prior_notes）
 - [x] **A.4.4** 段落 Word 渲染
-- [ ] **A.4.5** 模板 P-3 入库
+- [x] **A.4.5** 模板 P-3 入库
 - [x] **A.4.6** CI-11 必有变量声明
 - [x] **A.4.7** 单测 18 用例
 
@@ -119,9 +119,9 @@
 
 ### 14.4 前端切换 UI
 
-- [ ] **A.5.12** DisclosureEditor 顶部「准则」切换器（国企版 ⇆ 上市版）
-- [ ] **A.5.13** 切换前确认弹窗：显示影响章节数 + 用户编辑保留情况
-- [ ] **A.5.14** 切换中进度条 + 切换后 toast 「已切换为 XX 版，保留 N 处用户编辑」
+- [x] **A.5.12** DisclosureEditor 顶部「准则」切换器（国企版 ⇆ 上市版）
+- [x] **A.5.13** 切换前确认弹窗：显示影响章节数 + 用户编辑保留情况
+- [x] **A.5.14** 切换中进度条 + 切换后 toast 「已切换为 XX 版，保留 N 处用户编辑」
 - [x] **A.5.15** 单测 12 用例（PBT round-trip：SOE → Listed → SOE 数据无丢失）
 
 ### 14.5 验收
@@ -131,8 +131,8 @@
 ## Sprint A.6：协作锁集成 D9（0.5 人天）
 
 - [x] **A.6.1** 4 入口集成 NoteSectionLockService（动态行/列/基线/auto_trim/切换）
-- [ ] **A.6.2** 前端章节列表锁可视化
-- [ ] **A.6.3** 锁冲突弹窗 + 抢占
+- [x] **A.6.2** 前端章节列表锁可视化
+- [x] **A.6.3** 锁冲突弹窗 + 抢占
 - [x] **A.6.4** 验收（CI-13）
 
 ## Sprint A.7：集团模板继承（2.5 人天）
@@ -183,16 +183,16 @@
 ⚠ **必须先于 Sprint B.1**（Sprint B.1 调用此 Service）
 
 - [x] **B.0.1** binding 新 source 类型 `consol_aggregation` 定义 + 单测
-- [ ] **B.0.2** `consol_note_aggregation_service.py` 新建（5 种 aggregation_method）
+- [x] **B.0.2** `consol_note_aggregation_service.py` 新建（5 种 aggregation_method）
   - simple_sum / sum_after_elimination / top_n_after_elimination / weighted_avg / first_n_concat
-- [ ] **B.0.3** `consol_elimination_rules.py` 抵销规则注册器
+- [x] **B.0.3** `consol_elimination_rules.py` 抵销规则注册器
   - internal_ar / internal_revenue / internal_inventory_unrealized / internal_dividend
-- [ ] **B.0.4** 模糊合并同名算法（label_fuzzy 阈值 0.85）
-- [ ] **B.0.5** 多层合并 lineage 链（孙合并 → 子合并 → 总合并）
-- [ ] **B.0.6** 子公司单体附注更新事件 → 合并 stale（EventBus 集成）
-- [ ] **B.0.7** 模板 P-5 输出（150+ 章节映射）入库
-- [ ] **B.0.8** 「重新汇总」端点 + 进度 SSE
-- [ ] **B.0.9** 单测 + PBT
+- [x] **B.0.4** 模糊合并同名算法（label_fuzzy 阈值 0.85）
+- [x] **B.0.5** 多层合并 lineage 链（孙合并 → 子合并 → 总合并）
+- [x] **B.0.6** 子公司单体附注更新事件 → 合并 stale（EventBus 集成）
+- [x] **B.0.7** 模板 P-5 输出（150+ 章节映射）入库
+- [x] **B.0.8** 「重新汇总」端点 + 进度 SSE
+- [x] **B.0.9** 单测 + PBT
 - [x] **B.0.10** 验收（CI-15/CI-16/CI-17 + ADR-017/018）
 
 ## Sprint B.1：合并附注完整开发 D8（3.5 人天）
@@ -202,23 +202,23 @@
 ### B.1.A 后端服务改造
 
 - [x] **B.1.1** 改造 ConsolDisclosureService 为 V2（`generate_full_consol_notes`）
-- [ ] **B.1.2** `_aggregate_common_section` 调 ConsolNoteAggregationService（依赖 Sprint B.0）
-- [ ] **B.1.3** 子公司清单实时拉取（用 consol_tree_service.build_tree）
-- [ ] **B.1.4** 抵销前后双列
-- [ ] **B.1.5** 商誉/MI/外币 章节绑 H/G/M wp_data
-- [ ] **B.1.6** 多层合并 lineage（孙合并 → 子合并 → 总合并）
-- [ ] **B.1.7** 文字段落合并版 vars（subsidiary_count / consolidated_revenue 等，依赖 D7）
-- [ ] **B.1.8** 章节序号按 scope='consolidated' 重排（依赖 D13/Sprint A.0）
-- [ ] **B.1.9** 7 个合并专用章节用 wp_data 强化（取代写死字符串）
-- [ ] **B.1.10** 合并范围变化事件 → 自动 stale（CONSOL_SUBSIDIARY_CHANGED 事件）
+- [x] **B.1.2** `_aggregate_common_section` 调 ConsolNoteAggregationService（依赖 Sprint B.0）
+- [x] **B.1.3** 子公司清单实时拉取（用 consol_tree_service.build_tree）
+- [x] **B.1.4** 抵销前后双列
+- [x] **B.1.5** 商誉/MI/外币 章节绑 H/G/M wp_data
+- [x] **B.1.6** 多层合并 lineage（孙合并 → 子合并 → 总合并）
+- [x] **B.1.7** 文字段落合并版 vars（subsidiary_count / consolidated_revenue 等，依赖 D7）
+- [x] **B.1.8** 章节序号按 scope='consolidated' 重排（依赖 D13/Sprint A.0）
+- [x] **B.1.9** 7 个合并专用章节用 wp_data 强化（取代写死字符串）
+- [x] **B.1.10** 合并范围变化事件 → 自动 stale（CONSOL_SUBSIDIARY_CHANGED 事件）
 
 ### B.1.B 前端 ConsolNoteTab 升级
 
-- [ ] **B.1.11** 章节树 180 章节 + 「来自 N 家子公司」标识
-- [ ] **B.1.12** ConsolCellProvenanceDialog（cell 溯源到子公司贡献）
-- [ ] **B.1.13** 「重新汇总」按钮 + 进度 SSE
-- [ ] **B.1.14** 多层合并 lineage 可视化（孙→子→总）
-- [ ] **B.1.15** **合并附注顶部准则切换器**（合并项目下显示当前合并版准则，partner 可锁/解锁）
+- [x] **B.1.11** 章节树 180 章节 + 「来自 N 家子公司」标识
+- [x] **B.1.12** ConsolCellProvenanceDialog（cell 溯源到子公司贡献）
+- [x] **B.1.13** 「重新汇总」按钮 + 进度 SSE
+- [x] **B.1.14** 多层合并 lineage 可视化（孙→子→总）
+- [x] **B.1.15** **合并附注顶部准则切换器**（合并项目下显示当前合并版准则，partner 可锁/解锁）
 
 ### B.1.C 验收
 
@@ -229,12 +229,12 @@
 > 集团内子公司可能 SOE，子公司可能 Listed，合并附注汇总时需要对齐
 
 - [x] **B.2.1** 子公司不同模板的章节映射兼容（SOE 子公司 → Listed 合并 / 反之）
-- [ ] **B.2.2** 跨模板汇总时章节差异处理：
+- [x] **B.2.2** 跨模板汇总时章节差异处理：
   - 共有章节 — 直接汇总
   - 子公司有 / 合并版无 — 数据归档不丢
   - 合并版有 / 子公司无 — 标 not_applicable + UI 提示
-- [ ] **B.2.3** 合并 cell provenance 标识子公司模板（「来自 SOE 子公司 A 100w + Listed 子公司 B 50w」）
-- [ ] **B.2.4** 单测 6 用例（含跨模板汇总 PBT）
+- [x] **B.2.3** 合并 cell provenance 标识子公司模板（「来自 SOE 子公司 A 100w + Listed 子公司 B 50w」）
+- [x] **B.2.4** 单测 6 用例（含跨模板汇总 PBT）
 - [x] **B.2.5** 验收
 
 ## Sprint B.3：Phase 2 合并附注 UAT（1 人天）
@@ -261,100 +261,100 @@
 
 ### 15.1 后端导出服务
 
-- [ ] **C.0.1** `note_offline_export_service.py` 服务（按 section_id list 选择章节子集）
-- [ ] **C.0.2** xlsx 包结构生成：注意事项 sheet + 章节清单 sheet + N 章节 sheet + 隐藏 _meta_ sheet
-- [ ] **C.0.3** 单元格 4 色语义渲染（黄=可填 / 灰=公式 / 红=锁定 / 绿=必填）+ DataValidation 锁定
-- [ ] **C.0.4** 单元格批注 = 公式说明 + wp_code/试算账号 数据源
-- [ ] **C.0.5** _meta_ sheet 存 binding/formula/row_meta JSON（base64+gzip 压缩）
-- [ ] **C.0.6** 注意事项 sheet 模板（6 节使用说明 + partner 联系人占位符）
-- [ ] **C.0.7** 章节清单 TOC（含完成度 / 必填 / section_id 隐藏列）
-- [ ] **C.0.8** 可选 AES 加密 + 文件 hash 记录
+- [x] **C.0.1** `note_offline_export_service.py` 服务（按 section_id list 选择章节子集）
+- [x] **C.0.2** xlsx 包结构生成：注意事项 sheet + 章节清单 sheet + N 章节 sheet + 隐藏 _meta_ sheet
+- [x] **C.0.3** 单元格 4 色语义渲染（黄=可填 / 灰=公式 / 红=锁定 / 绿=必填）+ DataValidation 锁定
+- [x] **C.0.4** 单元格批注 = 公式说明 + wp_code/试算账号 数据源
+- [x] **C.0.5** _meta_ sheet 存 binding/formula/row_meta JSON（base64+gzip 压缩）
+- [x] **C.0.6** 注意事项 sheet 模板（6 节使用说明 + partner 联系人占位符）
+- [x] **C.0.7** 章节清单 TOC（含完成度 / 必填 / section_id 隐藏列）
+- [x] **C.0.8** 可选 AES 加密 + 文件 hash 记录
 
 ### 15.2 后端导入服务
 
-- [ ] **C.0.9** `note_offline_import_service.py` 解压 + 校验 _meta_ sheet 存在
-- [ ] **C.0.10** 按 section_id 匹配现有章节（命中 / 缺失 / 系统多余 三态）
-- [ ] **C.0.11** 字段级 diff 算法（值 / 公式 / manual 三类字段）
-- [ ] **C.0.12** 章节级冲突选择（覆盖 / 保留 / 合并 / 丢弃）
-- [ ] **C.0.13** 与 D9 协作锁集成（导入前自动获章节锁）
-- [ ] **C.0.14** 与 D11 版本树集成（导入触发新版本节点）
-- [ ] **C.0.15** 与 D14 template_type 校验（不一致弹警告）
-- [ ] **C.0.16** 审计日志 + 文件 30 天归档 + 可回滚
+- [x] **C.0.9** `note_offline_import_service.py` 解压 + 校验 _meta_ sheet 存在
+- [x] **C.0.10** 按 section_id 匹配现有章节（命中 / 缺失 / 系统多余 三态）
+- [x] **C.0.11** 字段级 diff 算法（值 / 公式 / manual 三类字段）
+- [x] **C.0.12** 章节级冲突选择（覆盖 / 保留 / 合并 / 丢弃）
+- [x] **C.0.13** 与 D9 协作锁集成（导入前自动获章节锁）
+- [x] **C.0.14** 与 D11 版本树集成（导入触发新版本节点）
+- [x] **C.0.15** 与 D14 template_type 校验（不一致弹警告）
+- [x] **C.0.16** 审计日志 + 文件 30 天归档 + 可回滚
 
 ### 15.3 前端 UI
 
-- [ ] **C.0.17** 「导出附注」按钮 + 章节多选树 + 导出选项弹窗
-- [ ] **C.0.18** 「一键导入」按钮 + 文件上传
-- [ ] **C.0.19** 字段级 diff 预览（章节维度 + cell 级 add/remove/modify 高亮）
-- [ ] **C.0.20** 章节冲突选择 UI（4 选项 + cell 级勾选）
-- [ ] **C.0.21** 导入进度 SSE + 完成 toast「N 章节导入 / M 处保留 / K 处冲突」
+- [x] **C.0.17** 「导出附注」按钮 + 章节多选树 + 导出选项弹窗
+- [x] **C.0.18** 「一键导入」按钮 + 文件上传
+- [x] **C.0.19** 字段级 diff 预览（章节维度 + cell 级 add/remove/modify 高亮）
+- [x] **C.0.20** 章节冲突选择 UI（4 选项 + cell 级勾选）
+- [x] **C.0.21** 导入进度 SSE + 完成 toast「N 章节导入 / M 处保留 / K 处冲突」
 
 ### 15.4 验收
 
-- [ ] **C.0.22** 单测 + PBT（CI-21/CI-22 导出→导入 round-trip 无丢失）
-- [ ] **C.0.23** Sprint C.0 验收 UAT（partner 导出 60 章节 → 模拟成员填写 → 一键导回 + diff 预览）
+- [x] **C.0.22** 单测 + PBT（CI-21/CI-22 导出→导入 round-trip 无丢失）
+- [x] **C.0.23** Sprint C.0 验收 UAT（partner 导出 60 章节 → 模拟成员填写 → 一键导回 + diff 预览）
 
 ## Sprint C.1：AI 辅助 D10（1 人天）
 
-- [ ] **C.1.1** suggest_dynamic_rows
-- [ ] **C.1.2** generate_paragraph_from_workpaper
-- [ ] **C.1.3** check_wp_tb_consistency
-- [ ] **C.1.4** 前端 AI 建议侧栏
-- [ ] **C.1.5** 单测 + UAT
+- [x] **C.1.1** suggest_dynamic_rows
+- [x] **C.1.2** generate_paragraph_from_workpaper
+- [x] **C.1.3** check_wp_tb_consistency
+- [x] **C.1.4** 前端 AI 建议侧栏
+- [x] **C.1.5** 单测 + UAT
 
 ## Sprint C.2：章节版本图 D11（1.5 人天）
 
-- [ ] **C.2.1** note_section_version_tree_service.py（fork/merge/diff）
-- [ ] **C.2.2** 跨年合并范围变化高亮
-- [ ] **C.2.3** 章节 fork
-- [ ] **C.2.4** 多版本 merge
-- [ ] **C.2.5** 前端版本树可视化
-- [ ] **C.2.6** 验收（CI-14）
+- [x] **C.2.1** note_section_version_tree_service.py（fork/merge/diff）
+- [x] **C.2.2** 跨年合并范围变化高亮
+- [x] **C.2.3** 章节 fork
+- [x] **C.2.4** 多版本 merge
+- [x] **C.2.5** 前端版本树可视化
+- [x] **C.2.6** 验收（CI-14）
 
 ## Sprint C.3：前端编辑器全维度 UI（3 人天）
 
-- [ ] **C.3.1** 9 个 composable（含 useNoteAggregation / useNoteSectionNumbering / useNoteTemplateConversion）
-- [ ] **C.3.2** NoteTableEditor.vue 动态行视觉
-- [ ] **C.3.3** 动态列视觉 + 拖动调宽 + 合并表头 + 冻结列
-- [ ] **C.3.4** 「+ 添加明细行/列」按钮
-- [ ] **C.3.5** 删除右键 + 公式栏多源选项 + 数据源 chip
-- [ ] **C.3.6** 集团基线对话框 + 版本对比 + diff
-- [ ] **C.3.7** 段落变量编辑器 + 实时预览
-- [ ] **C.3.8** 协作锁可视化
-- [ ] **C.3.9** AI 建议侧栏
-- [ ] **C.3.10** 上年对比侧栏 + 章节版本树
-- [ ] **C.3.11** 章节序号实时渲染（D13）
-- [ ] **C.3.12** 单体↔合并切换 + 章节序号自动重算
-- [ ] **C.3.13** 章节树拖拽排序
-- [ ] **C.3.14** **国企↔上市切换器**（顶部工具栏，含切换前预览）
-- [ ] **C.3.15** vue-tsc + vitest 通过
-- [ ] **C.3.16** Playwright 实测全链路
+- [x] **C.3.1** 9 个 composable（含 useNoteAggregation / useNoteSectionNumbering / useNoteTemplateConversion）
+- [x] **C.3.2** NoteTableEditor.vue 动态行视觉
+- [x] **C.3.3** 动态列视觉 + 拖动调宽 + 合并表头 + 冻结列
+- [x] **C.3.4** 「+ 添加明细行/列」按钮
+- [x] **C.3.5** 删除右键 + 公式栏多源选项 + 数据源 chip
+- [x] **C.3.6** 集团基线对话框 + 版本对比 + diff
+- [x] **C.3.7** 段落变量编辑器 + 实时预览
+- [x] **C.3.8** 协作锁可视化
+- [x] **C.3.9** AI 建议侧栏
+- [x] **C.3.10** 上年对比侧栏 + 章节版本树
+- [x] **C.3.11** 章节序号实时渲染（D13）
+- [x] **C.3.12** 单体↔合并切换 + 章节序号自动重算
+- [x] **C.3.13** 章节树拖拽排序
+- [x] **C.3.14** **国企↔上市切换器**（顶部工具栏，含切换前预览）
+- [x] **C.3.15** vue-tsc + vitest 通过
+- [x] **C.3.16** Playwright 实测全链路
 
 ## Sprint C.4：Word 导出（1.5 人天）
 
-- [ ] **C.4.1** GTNoteDynamicRow / GTNoteDynamicCol 样式
-- [ ] **C.4.2** 合并表头 docx 渲染
-- [ ] **C.4.3** 空表替换 + 空章节跳过 + 不适用提示
-- [ ] **C.4.4** Jinja 段落 Word 输出
-- [ ] **C.4.5** 合并附注 180 章节 + 抵销双列 Word 表
-- [ ] **C.4.6** 27 项视觉断言
-- [ ] **C.4.7** 多公司基线对比 PDF 工具
-- [ ] **C.4.8** Word TOC 使用 D13 最新序号
-- [ ] **C.4.9** Word 内部引用 ref() 渲染最终序号
-- [ ] **C.4.10** 验收
+- [x] **C.4.1** GTNoteDynamicRow / GTNoteDynamicCol 样式
+- [x] **C.4.2** 合并表头 docx 渲染
+- [x] **C.4.3** 空表替换 + 空章节跳过 + 不适用提示
+- [x] **C.4.4** Jinja 段落 Word 输出
+- [x] **C.4.5** 合并附注 180 章节 + 抵销双列 Word 表
+- [x] **C.4.6** 27 项视觉断言
+- [x] **C.4.7** 多公司基线对比 PDF 工具
+- [x] **C.4.8** Word TOC 使用 D13 最新序号
+- [x] **C.4.9** Word 内部引用 ref() 渲染最终序号
+- [x] **C.4.10** 验收
 
 ## Sprint C.5：收尾（1 人天）
 
-- [ ] **C.5.1** 全量回归（不破坏现有 173 章节）
-- [ ] **C.5.2** memory.md 沉淀（14 维度铁律 + Phase 1/2/3 完成度）
-- [ ] **C.5.3** ADR-011~ADR-022 全部撰写（v0.6 新增 ADR-021 国企↔上市切换 / v0.6.2 新增 ADR-022 离线分发） + INDEX.md
-- [ ] **C.5.4** v2 backlog：跨章节联动 / fork-merge / AI 全自动撰写 / 多语言序号
+- [x] **C.5.1** 全量回归（不破坏现有 173 章节）
+- [x] **C.5.2** memory.md 沉淀（14 维度铁律 + Phase 1/2/3 完成度）
+- [x] **C.5.3** ADR-011~ADR-022 全部撰写（v0.6 新增 ADR-021 国企↔上市切换 / v0.6.2 新增 ADR-022 离线分发） + INDEX.md
+- [x] **C.5.4** v2 backlog：跨章节联动 / fork-merge / AI 全自动撰写 / 多语言序号
 
 ## Sprint C.6：Phase 3 综合 UAT（1 人天）
 
-- [ ] **C.6.1** 全量综合 UAT（合并 + 单体 + 上市 + 国企）
-- [ ] **C.6.2** 性能基准（173 章节 < 12s / 集团基线 apply < 3s / 切换 < 1s）
-- [ ] **C.6.3** UAT 报告 `docs/uat/note-final-uat-{date}.md`
+- [x] **C.6.1** 全量综合 UAT（合并 + 单体 + 上市 + 国企）
+- [x] **C.6.2** 性能基准（173 章节 < 12s / 集团基线 apply < 3s / 切换 < 1s）
+- [x] **C.6.3** UAT 报告 `docs/uat/note-final-uat-{date}.md`
 
 ---
 

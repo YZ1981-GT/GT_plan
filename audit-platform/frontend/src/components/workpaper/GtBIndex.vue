@@ -55,6 +55,10 @@
       <div class="gt-b-index__navigation-header">
         <h4 class="gt-b-index__navigation-title">索引导航</h4>
         <div v-if="!readonly" class="gt-b-index__navigation-actions">
+          <!-- Sprint 4 Task 17.9: 底稿架构折叠按钮 -->
+          <el-button text size="small" @click="archTreeExpanded = !archTreeExpanded" title="底稿架构">
+            🏗️ {{ archTreeExpanded ? '收起' : '底稿架构' }}
+          </el-button>
           <el-button
             v-if="selectedRows.length > 0"
             size="small"
@@ -65,6 +69,15 @@
           </el-button>
         </div>
       </div>
+
+      <!-- Sprint 4 Task 17.9: 底稿架构树 -->
+      <GtBArchitectureTree
+        v-if="wpId && projectId"
+        :wp-id="wpId"
+        :project-id="projectId"
+        :expanded="archTreeExpanded"
+        :html-data="htmlData"
+      />
 
       <el-table
         ref="tableRef"
@@ -136,8 +149,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { useRoute } from 'vue-router'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 
 // ─── Types ───
 interface NavigationRow {
@@ -176,10 +191,15 @@ const emit = defineEmits<{
 }>()
 
 // ─── State ───
+const route = useRoute()
 const preparationInfo = ref<Record<string, string>>({})
 const navigationRows = ref<NavigationRow[]>([])
 const selectedRows = ref<NavigationRow[]>([])
 const tableRef = ref<any>(null)
+
+// Sprint 4 Task 17.9: 底稿架构树展开状态
+const archTreeExpanded = ref(false)
+const projectId = computed(() => (route.params.projectId as string) || '')
 
 // Auto-save debounce
 let saveTimer: ReturnType<typeof setTimeout> | null = null

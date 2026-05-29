@@ -115,6 +115,53 @@ class MigrationFile:
     checksum: str       # SHA-256 of file content
 
 
+@dataclass
+class FailureRecord:
+    """单次迁移失败的记录（运行时返回值）。"""
+
+    version: str
+    filename: str
+    error_type: str
+    error_message: str
+
+
+@dataclass(eq=False)
+class RunPendingResult:
+    """run_pending 的返回值（resilient 模式）。
+
+    - executed: 本次成功执行的版本号列表
+    - failed: 本次失败的迁移列表（已写入 schema_migration_failures 表）
+
+    向后兼容：旧调用 ``executed = await runner.run_pending()`` 仍可工作，
+    因为 RunPendingResult 实现了 ``__iter__`` 返回 executed（list 行为）。
+    """
+
+    executed: list[str]
+    failed: list[FailureRecord]
+
+    def __iter__(self):
+        # 旧调用方 ``for v in await runner.run_pending()`` 兼容
+        return iter(self.executed)
+
+    def __len__(self) -> int:
+        return len(self.executed)
+
+    def __bool__(self) -> bool:
+        return bool(self.executed) or bool(self.failed)
+
+    def __eq__(self, other) -> bool:
+        # 向后兼容：旧测试用 ``executed == []`` / ``executed == ["004"]`` 直接 list 比较
+        if isinstance(other, list):
+            return self.executed == other
+        if isinstance(other, RunPendingResult):
+            return self.executed == other.executed and self.failed == other.failed
+        return NotImplemented
+
+    def __hash__(self):
+        # 不可哈希（运行时容器，含 list）
+        return id(self)
+
+
 class MigrationRunner:
     """扫描 migrations/ 目录，按版本号顺序执行未应用的 SQL 脚本。
 
@@ -153,9 +200,19 @@ class MigrationRunner:
     # 公开 API
     # ------------------------------------------------------------------
 
-    async def run_pending(self) -> list[str]:
-        """执行所有未应用的迁移，返回已执行的版本号列表。"""
+    async def run_pending(self) -> RunPendingResult:
+        """执行所有未应用的迁移，返回 RunPendingResult(executed, failed)。
+
+        Resilient 模式（migration-runner-resilience spec P-1 修复）：
+        - 单文件失败不阻塞后续迁移
+        - 失败写入 schema_migration_failures 表（attempt_count 递增）
+        - 成功的迁移清除 failure 记录
+
+        向后兼容：返回值实现 __iter__/__len__/__bool__，旧调用 ``for v in result``
+        / ``len(result)`` / ``if result`` 仍可工作（语义为 executed list）。
+        """
         await self.ensure_schema_version_table()
+        await self.ensure_failure_table()
 
         all_migrations = self.scan_migrations()
         applied = await self.get_applied_versions()
@@ -163,15 +220,46 @@ class MigrationRunner:
         pending = [m for m in all_migrations if m.version not in applied]
         if not pending:
             logger.info("[Migration] 数据库已是最新版本，无待执行迁移")
-            return []
+            return RunPendingResult(executed=[], failed=[])
 
         executed: list[str] = []
+        failed: list[FailureRecord] = []
         for mig in pending:
-            await self._apply_migration(mig)
-            executed.append(mig.version)
+            try:
+                await self._apply_migration(mig)
+                executed.append(mig.version)
+                # 成功 → 清除失败记录（如果之前曾失败）
+                await self._clear_failure(mig.version)
+            except Exception as exc:
+                logger.error(
+                    "[Migration] ❌ %s 失败: %s（继续后续迁移，不中断）",
+                    mig.filename, exc, exc_info=True,
+                )
+                rec = FailureRecord(
+                    version=mig.version,
+                    filename=mig.filename,
+                    error_type=type(exc).__name__,
+                    error_message=str(exc)[:2000],
+                )
+                failed.append(rec)
+                # 失败记录入库（独立事务，不受外层影响）
+                try:
+                    await self._record_failure(rec)
+                except Exception as record_err:
+                    logger.warning(
+                        "[Migration] 失败记录写入 schema_migration_failures 失败: %s",
+                        record_err,
+                    )
 
-        logger.info("[Migration] 执行了 %d 个迁移: %s", len(executed), executed)
-        return executed
+        if executed:
+            logger.info("[Migration] 执行成功 %d 个: %s", len(executed), executed)
+        if failed:
+            logger.error(
+                "[Migration] 失败 %d 个: %s",
+                len(failed),
+                [f"{f.version}({f.error_type})" for f in failed],
+            )
+        return RunPendingResult(executed=executed, failed=failed)
 
     # ------------------------------------------------------------------
     # 扫描
@@ -496,6 +584,100 @@ class MigrationRunner:
                     )
                     logger.info("[Migration] 首次运行，标记 V001 为已应用基线")
 
+    async def ensure_failure_table(self) -> None:
+        """确保 schema_migration_failures 表存在（V025 由 D6 应用，但此方法兼容
+        V025 尚未应用的场景，直接 CREATE IF NOT EXISTS）。
+
+        SQLite 测试环境也兼容（保留所需列）。
+        """
+        dialect_name = self._engine.dialect.name
+        if dialect_name == "postgresql":
+            ddl = """
+                CREATE TABLE IF NOT EXISTS schema_migration_failures (
+                    version         VARCHAR(20)  PRIMARY KEY,
+                    filename        VARCHAR(255) NOT NULL,
+                    error_type      VARCHAR(100) NOT NULL,
+                    error_message   TEXT         NOT NULL,
+                    attempted_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+                    attempt_count   INTEGER      NOT NULL DEFAULT 1
+                )
+            """
+        else:
+            # SQLite / 其他
+            ddl = """
+                CREATE TABLE IF NOT EXISTS schema_migration_failures (
+                    version         VARCHAR(20)  PRIMARY KEY,
+                    filename        VARCHAR(255) NOT NULL,
+                    error_type      VARCHAR(100) NOT NULL,
+                    error_message   TEXT         NOT NULL,
+                    attempted_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    attempt_count   INTEGER      NOT NULL DEFAULT 1
+                )
+            """
+        async with self._engine.begin() as conn:
+            await conn.execute(text(ddl))
+
+    async def _record_failure(self, rec: FailureRecord) -> None:
+        """记录单次迁移失败。ON CONFLICT 累计 attempt_count。"""
+        dialect_name = self._engine.dialect.name
+        if dialect_name == "postgresql":
+            sql = """
+                INSERT INTO schema_migration_failures
+                  (version, filename, error_type, error_message, attempted_at, attempt_count)
+                VALUES (:version, :filename, :error_type, :error_message, NOW(), 1)
+                ON CONFLICT (version) DO UPDATE
+                  SET error_type = EXCLUDED.error_type,
+                      error_message = EXCLUDED.error_message,
+                      attempted_at = NOW(),
+                      attempt_count = schema_migration_failures.attempt_count + 1
+            """
+        else:
+            # SQLite UPSERT（PG 兼容语法 SQLite 3.24+ 支持）
+            sql = """
+                INSERT INTO schema_migration_failures
+                  (version, filename, error_type, error_message, attempted_at, attempt_count)
+                VALUES (:version, :filename, :error_type, :error_message, CURRENT_TIMESTAMP, 1)
+                ON CONFLICT(version) DO UPDATE SET
+                    error_type = excluded.error_type,
+                    error_message = excluded.error_message,
+                    attempted_at = CURRENT_TIMESTAMP,
+                    attempt_count = attempt_count + 1
+            """
+        async with self._engine.begin() as conn:
+            await conn.execute(text(sql), {
+                "version": rec.version,
+                "filename": rec.filename,
+                "error_type": rec.error_type,
+                "error_message": rec.error_message,
+            })
+
+    async def _clear_failure(self, version: str) -> None:
+        """成功执行后清除该版本的失败记录（如果有）。"""
+        async with self._engine.begin() as conn:
+            await conn.execute(
+                text("DELETE FROM schema_migration_failures WHERE version = :version"),
+                {"version": version},
+            )
+
+    async def get_failures(self) -> list[FailureRecord]:
+        """查询当前所有失败记录（health endpoint 使用）。"""
+        async with self._engine.begin() as conn:
+            try:
+                rows = await conn.execute(text(
+                    "SELECT version, filename, error_type, error_message "
+                    "FROM schema_migration_failures ORDER BY attempted_at DESC"
+                ))
+                return [
+                    FailureRecord(
+                        version=r[0], filename=r[1],
+                        error_type=r[2], error_message=r[3],
+                    )
+                    for r in rows.fetchall()
+                ]
+            except Exception:
+                # 表不存在（早期启动 / 测试环境未跑 ensure_failure_table）
+                return []
+
     # ------------------------------------------------------------------
     # 内部方法
     # ------------------------------------------------------------------
@@ -617,7 +799,14 @@ class MigrationRunner:
     async def _apply_migration(self, mig: MigrationFile) -> None:
         """执行单个迁移脚本并记录到 schema_version。
 
-        按分号分割 SQL 语句逐条执行，正确处理 ``DO $$ ... END $$;`` 块。
+        按分号分割 SQL 语句逐条执行，正确处理 ``DO $body$ ... END $body$;`` 块。
+
+        P-2 修复（migration-runner-resilience spec）：
+        使用 ``exec_driver_sql`` 而非 ``text()`` 执行用户 SQL。
+        ``text()`` 会扫描注释和字符串字面量内的 ``:identifier`` 当成 bind parameter，
+        导致 ``-- 用 :pid 替换`` 这种正常注释报错（V005 历史踩坑根因）。
+        ``exec_driver_sql`` 直接传给 dbapi 不做参数解析，彻底规避问题。
+        仅 ``INSERT INTO schema_version`` 这条仍用 ``text + bind``（系统语句，可控）。
         """
         sql_content = mig.path.read_text(encoding="utf-8")
         logger.info("[Migration] 执行 %s (version=%s) ...", mig.filename, mig.version)
@@ -627,9 +816,10 @@ class MigrationRunner:
 
         async with self._engine.begin() as conn:
             for stmt in statements:
-                await conn.execute(text(stmt))
+                # P-2 修复：exec_driver_sql 跳过 SQLAlchemy bind 解析
+                await conn.exec_driver_sql(stmt)
 
-            # 记录版本
+            # 记录版本（系统语句 / 显式 bind，安全）
             await conn.execute(
                 text(
                     "INSERT INTO schema_version (version, filename, checksum) "
@@ -638,7 +828,8 @@ class MigrationRunner:
                 {"version": mig.version, "filename": mig.filename, "checksum": mig.checksum},
             )
 
-        logger.info("[Migration] ✅ %s 执行成功（%d 条语句）", mig.filename, len(statements))
+        logger.info("[Migration] %s 执行成功（%d 条语句）", mig.filename, len(statements))
+
 
     def _find_v001(self) -> MigrationFile | None:
         """在迁移列表中查找 V001。"""

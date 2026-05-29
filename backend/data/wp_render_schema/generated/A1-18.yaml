@@ -1,0 +1,118 @@
+# A1-18.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:10:49
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: A1-18
+template_path: backend/wp_templates/A/A1-18 采用新金融工具准则衔接影响数核对 N.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:10:49'
+  source_xlsx: A1-18 采用新金融工具准则衔接影响数核对 N.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  表头:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: 客户名称：
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      - 7-8
+      - 10-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  采用新金融工具准则衔接影响数核对A1-18:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 采用新金融工具准则衔接影响数核对
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 17
+      end_row: dynamic
+      header_row: 16
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 项目
+        C:
+          field: col_c
+          type: text
+          label: 留存收益
+        D:
+          field: col_d
+          type: text
+          label: 其他综合收益调整金额
+    static_text:
+      rows:
+      - 1-2
+      - 5-12
+      - 14-15
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - E3
+      - A4
+      - C30
+      - D30
+      - D35
+      - D36
+      - B37
+      - C37
+      - D37
+      - B52
+      - C52
+      - D52
+      - E52
+      - F52
+      - B63
+      - C63
+      - D63
+      - E63
+      _total_count: 20
+    merged_cells:
+      preserve: true
+      count: 25
+      ranges_sample:
+      - C55:D58
+      - C33:C34
+      - A16:A17
+      - B55:B59
+      - A66:A67
+      - D66:D67
+      - F66:F67
+      - A41:A44
+      - D16:D17
+      - A11:G11
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

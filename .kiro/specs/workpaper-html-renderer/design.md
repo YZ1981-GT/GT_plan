@@ -3,7 +3,7 @@
 > 起草日期：2026-05-25
 > 对应需求：`.kiro/specs/workpaper-html-renderer/requirements.md`（1928 行）
 > 渲染范围：1788 单体真底稿（已剔除 450 合并 + 347 假底稿 + 7 合并 pending），单体范围 100% 自动归类
-> 状态：📐 design 阶段
+> 状态：✅ 代码实现完成 | ⚠️ render_schema 覆盖率 55%（修复见 workpaper-editor-slimdown Sprint 1）
 > 关联模块：复用 ProcedureTrimming / chain_orchestrator / cross-ref:updated / report_line_mapping / disclosure_notes / workpaper_attachment / LibreOffice + python-docx + openpyxl
 
 ---

@@ -1,0 +1,84 @@
+# A17-5-2.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:10:50
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: A17-5-2
+template_path: backend/wp_templates/A/A17-5-2 审计工作完成核对表（适用于内控审计）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:10:50'
+  source_xlsx: A17-5-2 审计工作完成核对表（适用于内控审计）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  'A17-5-2审计工作完成核对表-内控 ':
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 审计工作完成核对表 —内部控制审计
+      A3: ${entity_name}
+      A4: ${period_end}
+      G3: ${index_no}
+      G4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 二、核对程序
+        E:
+          field: col_e
+          type: text
+          label: 核对结果[是/否/不适用]
+        F:
+          field: col_f
+          type: text
+          label: 备注
+        G:
+          field: col_g
+          type: text
+          label: 工作底稿索引号
+        H:
+          field: col_h
+          type: text
+          label: 参考底稿索引号
+        I:
+          field: col_i
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 36
+      ranges_sample:
+      - B42:D42
+      - B14:D14
+      - B23:D23
+      - B17:D17
+      - B13:D13
+      - B44:D44
+      - B29:D29
+      - B38:D38
+      - B34:D34
+      - B28:D28
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

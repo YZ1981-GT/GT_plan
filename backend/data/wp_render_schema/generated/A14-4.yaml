@@ -1,0 +1,544 @@
+# A14-4.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:10:50
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: A14-4
+template_path: backend/wp_templates/A/A14-4 业务流程层面控制缺陷评价.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:10:50'
+  source_xlsx: A14-4 业务流程层面控制缺陷评价.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  A14-4 业务流程层面控制缺陷评价 (2):
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 业务流程层面控制缺陷评价
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 评价步骤
+        C:
+          field: col_c
+          type: text
+          label: 是/否
+        D:
+          field: col_d
+          type: text
+          label: 评价分析过程
+        F:
+          field: col_f
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - D12
+      - D14
+      - F15
+      - D16
+      - D18
+      - F18
+      - D20
+      - D22
+      - F22
+      - D24
+      _total_count: 10
+    merged_cells:
+      preserve: true
+      count: 40
+      ranges_sample:
+      - D20:E20
+      - D10:E10
+      - D19:E19
+      - A27:F27
+      - D22:E22
+      - A21:B22
+      - A17:B18
+      - D21:E21
+      - A2:F2
+      - A13:B14
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  一般缺陷示例-业务流程层面控制缺陷评价:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 业务流程层面控制缺陷评价
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 评价步骤
+        C:
+          field: col_c
+          type: text
+          label: 是/否
+        D:
+          field: col_d
+          type: text
+          label: 评价分析过程
+        F:
+          field: col_f
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - D9
+      - D11
+      - F12
+      - D13
+      - D15
+      - F15
+      - D17
+      - D19
+      - F19
+      - D21
+      _total_count: 10
+    merged_cells:
+      preserve: true
+      count: 41
+      ranges_sample:
+      - D20:E20
+      - A12:B13
+      - D10:E10
+      - D19:E19
+      - C20:C21
+      - A27:F27
+      - A18:B19
+      - D22:E22
+      - A14:B15
+      - C10:C11
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  '重要缺陷示例-业务流程层面控制缺陷评价 ':
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 业务流程层面控制缺陷评价
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 评价步骤
+        C:
+          field: col_c
+          type: text
+          label: 是/否
+        D:
+          field: col_d
+          type: text
+          label: 评价分析过程
+        F:
+          field: col_f
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - D9
+      - D11
+      - F12
+      - D13
+      - D15
+      - F15
+      - D17
+      - D19
+      - F19
+      - D21
+      _total_count: 10
+    merged_cells:
+      preserve: true
+      count: 41
+      ranges_sample:
+      - D20:E20
+      - A12:B13
+      - D10:E10
+      - D19:E19
+      - C20:C21
+      - A27:F27
+      - A18:B19
+      - D22:E22
+      - A14:B15
+      - C10:C11
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  '重大缺陷示例-业务流程层面控制缺陷评价 ':
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 业务流程层面控制缺陷评价
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 评价步骤
+        C:
+          field: col_c
+          type: text
+          label: 是/否
+        D:
+          field: col_d
+          type: text
+          label: 评价分析过程
+        F:
+          field: col_f
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - D9
+      - D11
+      - F12
+      - D13
+      - D15
+      - F15
+      - D17
+      - D19
+      - F19
+      - D21
+      _total_count: 10
+    merged_cells:
+      preserve: true
+      count: 41
+      ranges_sample:
+      - D20:E20
+      - A12:B13
+      - D10:E10
+      - D19:E19
+      - C20:C21
+      - A27:F27
+      - A18:B19
+      - D22:E22
+      - A14:B15
+      - C10:C11
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  A14-4 业务流程层面控制缺陷评价:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 业务流程层面控制缺陷评价
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 评价步骤
+        C:
+          field: col_c
+          type: text
+          label: 是/否
+        D:
+          field: col_d
+          type: text
+          label: 评价分析过程
+        F:
+          field: col_f
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - F11
+      - D12
+      - D14
+      - D16
+      - D18
+      - F18
+      - D20
+      - D22
+      - F22
+      - D24
+      _total_count: 10
+    merged_cells:
+      preserve: true
+      count: 34
+      ranges_sample:
+      - D20:E20
+      - D10:E10
+      - D19:E19
+      - D22:E22
+      - A21:B22
+      - A17:B18
+      - D21:E21
+      - A2:F2
+      - A13:B14
+      - A25:B25
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  示例4-业务流程层面控制缺陷评价:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 示例-业务流程层面控制缺陷评价（一般缺陷）
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 16
+      end_row: dynamic
+      header_row: 15
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 评价步骤
+        C:
+          field: col_c
+          type: text
+          label: 是/否
+        D:
+          field: col_d
+          type: text
+          label: 评价分析过程
+        F:
+          field: col_f
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - F16
+      - D17
+      - D19
+      - D21
+      - D23
+      - F23
+      - D25
+      - D27
+      - F27
+      - D29
+      _total_count: 10
+    merged_cells:
+      preserve: true
+      count: 34
+      ranges_sample:
+      - D20:E20
+      - A30:B30
+      - A26:B27
+      - A15:B15
+      - D19:E19
+      - C20:C21
+      - A18:B19
+      - D22:E22
+      - C16:C17
+      - C26:C27
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  示例5-业务流程层面控制缺陷评价:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 示例-业务流程层面控制缺陷评价（重要缺陷）
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 16
+      end_row: dynamic
+      header_row: 15
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 评价步骤
+        C:
+          field: col_c
+          type: text
+          label: 是/否
+        D:
+          field: col_d
+          type: text
+          label: 评价分析过程
+        F:
+          field: col_f
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - F16
+      - D17
+      - D19
+      - D21
+      - D23
+      - F23
+      - D25
+      - D27
+      - D29
+      _total_count: 9
+    merged_cells:
+      preserve: true
+      count: 34
+      ranges_sample:
+      - D20:E20
+      - A30:B30
+      - A26:B27
+      - A15:B15
+      - D19:E19
+      - C20:C21
+      - A18:B19
+      - D22:E22
+      - C16:C17
+      - C26:C27
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  示例6-业务流程层面控制缺陷评价:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 示例-业务流程层面控制缺陷评价（重大缺陷）
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+      F4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 评价步骤
+        C:
+          field: col_c
+          type: text
+          label: 是/否
+        D:
+          field: col_d
+          type: text
+          label: 评价分析过程
+        F:
+          field: col_f
+          type: text
+          label: 备注
+    static_text:
+      rows:
+      - 1-2
+      - 5-11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - F13
+      - D14
+      - D16
+      - D18
+      - D20
+      - F20
+      - D22
+      - D24
+      - F24
+      - D26
+      _total_count: 10
+    merged_cells:
+      preserve: true
+      count: 34
+      ranges_sample:
+      - D20:E20
+      - D19:E19
+      - D22:E22
+      - A21:B22
+      - A17:B18
+      - D21:E21
+      - A2:F2
+      - A13:B14
+      - D13:E13
+      - A23:B24
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

@@ -31,7 +31,10 @@ from app.router_registry import register_all_routers
 async def lifespan(app: FastAPI):
     """应用生命周期：启动时运行迁移 + 注册事件处理器 + 启动后台 Worker"""
     import asyncio
-    setup_logging(level="INFO", json_format=False)
+    import os
+    # 默认 WARNING 级别，启动日志精简；通过 LOG_LEVEL 环境变量调高
+    log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
+    setup_logging(level=log_level, json_format=False)
 
     await _run_migrations()
     register_event_handlers()
@@ -39,9 +42,13 @@ async def lifespan(app: FastAPI):
     await _replay_startup_events()
     await _check_gin_index_status()
     await _check_libreoffice_health()
+    await _run_schema_drift_check()
 
     stop_event = asyncio.Event()
     tasks = _start_workers(stop_event)
+
+    # 启动完成提示（即使在 WARNING 级别也会显示）
+    print(f"[GT-Backend] Ready on port {os.getenv('PORT', '9980')} (log_level={log_level})")
 
     yield
 
@@ -61,21 +68,77 @@ async def lifespan(app: FastAPI):
     await dispose_engine()
 
 
+async def _run_schema_drift_check() -> None:
+    """启动 self-check：ORM ↔ DB schema 漂移检测。
+
+    migration-runner-resilience spec / Sprint 2 / Task 2.3。
+    - 60s timeout（防止漏接表卡住启动）
+    - 失败不阻塞启动（异常吞掉 + WARN）
+    - drift>0 → 启动末尾 print() 兜底（绕过 LOG_LEVEL 过滤）
+    """
+    import logging as _drift_log
+    from app.core.database import engine
+    from app.core.schema_drift_detector import run_drift_check_with_timeout
+
+    log = _drift_log.getLogger("audit_platform")
+    try:
+        items = await run_drift_check_with_timeout(engine, timeout_seconds=60.0)
+        if items:
+            critical_count = sum(
+                1 for it in items if it.drift_type in ("orm_extra", "enum_mismatch")
+            )
+            log.warning(
+                "[启动] 检测到 %d 个 schema 漂移（critical=%d）/ health=degraded",
+                len(items), critical_count,
+            )
+            for it in items[:5]:
+                log.warning(
+                    "  [%s] %s%s: %s",
+                    it.drift_type, it.table,
+                    f".{it.column}" if it.column else "",
+                    it.detail,
+                )
+            if len(items) > 5:
+                log.warning("  ... 还有 %d 项详见 /api/health", len(items) - 5)
+            # 启动末尾用 print 兜底（即使 LOG_LEVEL=WARNING 也可见）
+            print(
+                f"[GT-Backend] WARNING: {len(items)} schema drifts detected "
+                f"(critical={critical_count})"
+            )
+    except Exception as e:
+        log.warning("[启动] schema 漂移检测失败（不阻塞启动）: %s", e)
+
+
 async def _run_migrations() -> None:
-    """数据库版本化迁移（D6：版本化 SQL 脚本）。失败时记录 warning 但不阻断启动。"""
+    """数据库版本化迁移（D6：版本化 SQL 脚本）。
+
+    Resilient 模式（migration-runner-resilience spec）：
+    - 单文件失败不阻塞后续迁移（_apply_migration 内 per-migration 异常隔离）
+    - 失败迁移写入 schema_migration_failures 表 + 启动日志 ERROR 级别
+    - lifespan 不抛出，应用仍继续启动（health endpoint 暴露 degraded）
+    """
     import logging as _mig_log
     from app.core.migration_runner import MigrationRunner
+    log = _mig_log.getLogger("audit_platform")
     try:
         runner = MigrationRunner(database_url=settings.DATABASE_URL)
-        applied = await runner.run_pending()
-        if applied:
-            _mig_log.getLogger("audit_platform").info(
-                "[启动] 数据库迁移完成，执行了版本: %s", applied
+        result = await runner.run_pending()
+        if result.executed:
+            log.info("[启动] 数据库迁移完成，执行了版本: %s", result.executed)
+        if result.failed:
+            for f in result.failed:
+                log.error(
+                    "[启动] 迁移 %s 失败 (%s): %s",
+                    f.filename, f.error_type, f.error_message[:200],
+                )
+            log.error(
+                "[启动] 共 %d 个迁移失败，已写入 schema_migration_failures 表 / health=degraded",
+                len(result.failed),
             )
         await runner.close()
     except Exception as _mig_err:
-        _mig_log.getLogger("audit_platform").warning(
-            "[启动] 数据库迁移失败（应用仍继续启动）: %s", _mig_err
+        log.warning(
+            "[启动] 数据库迁移调度失败（应用仍继续启动）: %s", _mig_err
         )
 
 

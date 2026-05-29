@@ -131,8 +131,8 @@
         </el-table-column>
 
         <!-- 操作列 -->
-        <el-table-column v-if="!readonly" label="操作" width="80" fixed="right">
-          <template #default="{ $index }">
+        <el-table-column v-if="!readonly" label="操作" width="120" fixed="right">
+          <template #default="{ row, $index }">
             <el-button
               link
               type="danger"
@@ -140,6 +140,13 @@
               @click="handleRemoveSummaryRow($index)"
             >
               删除
+            </el-button>
+            <el-button
+              link
+              size="small"
+              @click="openAttachment(`row_${$index}`)"
+            >
+              📎
             </el-button>
           </template>
         </el-table-column>
@@ -149,11 +156,28 @@
     <!-- ───────── single 子模式：7 segments 顺序渲染 ───────── -->
     <section v-else-if="testType === 'single'" class="gt-e__single">
       <div
-        v-for="seg in segments"
+        v-for="(seg, segIdx) in segments"
         :key="seg.id"
         class="gt-e__segment"
       >
-        <h3 class="gt-e__segment-title">{{ seg.title }}</h3>
+        <div class="gt-e__segment-header">
+          <h3 class="gt-e__segment-title">{{ seg.title }}</h3>
+          <div class="gt-e__segment-actions">
+            <el-button
+              v-if="aiEnabled && !readonly"
+              text
+              size="small"
+              :loading="aiLoading"
+              @click="onAiSuggestField(seg.fields?.[0]?.name || seg.id)"
+            >🤖 AI 建议</el-button>
+            <el-button
+              text
+              size="small"
+              class="gt-e__attach-btn"
+              @click="openAttachment(`seg_${segIdx}`)"
+            >📎</el-button>
+          </div>
+        </div>
         <el-form
           :model="singleData"
           label-position="top"
@@ -175,6 +199,21 @@
             <div v-if="field.hint" class="gt-e__field-hint">
               <el-icon><InfoFilled /></el-icon>
               <span>{{ field.hint }}</span>
+            </div>
+            <!-- AI 建议面板 -->
+            <div v-if="showSuggestionPanel && currentSuggestion?.fieldName === ('fields.' + field.name)" class="gt-e__ai-panel">
+              <div class="gt-e__ai-panel-header">
+                <span class="gt-e__ai-panel-title">🤖 AI 建议</span>
+                <el-tag size="small" :type="currentSuggestion.confidence >= 0.7 ? 'success' : 'warning'">
+                  置信度 {{ Math.round(currentSuggestion.confidence * 100) }}%
+                </el-tag>
+              </div>
+              <pre class="gt-e__ai-panel-text">{{ currentSuggestion.text }}</pre>
+              <div class="gt-e__ai-panel-actions">
+                <el-button type="primary" size="small" @click="handleAdoptField(field.name)">✅ 采纳</el-button>
+                <el-button size="small" @click="handleModifyField(field.name)">✏️ 修改后采纳</el-button>
+                <el-button size="small" @click="handleIgnoreE">❌ 忽略</el-button>
+              </div>
             </div>
           </el-form-item>
         </el-form>
@@ -249,6 +288,12 @@
             下一步
           </el-button>
           <el-tag v-else type="success" size="large">已到达终结步骤</el-tag>
+          <el-button
+            text
+            size="small"
+            class="gt-e__attach-btn"
+            @click="openAttachment(`step_${currentStep.step}`)"
+          >📎 附件</el-button>
         </div>
       </div>
     </section>
@@ -332,6 +377,7 @@ import {
 } from 'element-plus'
 import { Plus as PlusIcon, InfoFilled } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import { useWpAiSuggest } from '@/composables/useWpAiSuggest'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -468,6 +514,8 @@ export interface EControlTestData {
   active_step?: number
   // 折叠状态
   active_hint_ids?: string[]
+  // AI 辅助标记
+  ai_assisted_fields?: string[]
   [key: string]: any
 }
 
@@ -497,6 +545,7 @@ const emit = defineEmits<{
   'conclusion-change': [conclusion: string]
   'trigger-procedure-trimming-suggestion': [payload: SuggestionPayload]
   'save': [data: EControlTestData]
+  'open-attachment': [payload: { wpId: string; sheetName: string; rowRef: string }]
 }>()
 
 // ─── Refs（按 setup const 顺序铁律放最前） ────────────────────────────────────
@@ -508,6 +557,54 @@ const conclusionValue = ref<string>('')
 const activeHintIds = ref<string[]>([])
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+// ─── AI 辅助填写（US-5 Task 7.1/7.3/7.4） ───────────────────────────────────
+
+const {
+  aiEnabled,
+  aiLoading,
+  currentSuggestion,
+  showSuggestionPanel,
+  assistedFieldsList,
+  requestSuggestion,
+  adoptSuggestion,
+  modifySuggestion,
+  ignoreSuggestion,
+} = useWpAiSuggest({ wpId: props.wpId, sheetName: props.sheetName })
+
+function onAiSuggestField(fieldName: string) {
+  const ctx = testType.value === 'evaluation_step' ? evalData.value : singleData.value
+  const existingContent = ctx[fieldName] || ''
+  requestSuggestion('fields.' + fieldName, existingContent)
+}
+
+function handleAdoptField(fieldName: string) {
+  const text = adoptSuggestion()
+  if (text) {
+    if (testType.value === 'evaluation_step') {
+      evalData.value[fieldName] = text
+    } else {
+      singleData.value[fieldName] = text
+    }
+    debounceSave()
+  }
+}
+
+function handleModifyField(fieldName: string) {
+  if (currentSuggestion.value) {
+    if (testType.value === 'evaluation_step') {
+      evalData.value[fieldName] = currentSuggestion.value.text
+    } else {
+      singleData.value[fieldName] = currentSuggestion.value.text
+    }
+    modifySuggestion(currentSuggestion.value.text)
+    debounceSave()
+  }
+}
+
+function handleIgnoreE() {
+  ignoreSuggestion()
+}
 
 // ─── Computed ────────────────────────────────────────────────────────────────
 
@@ -812,6 +909,14 @@ function goToStep(idx: number) {
   }
 }
 
+function openAttachment(stepOrRowId: string) {
+  emit('open-attachment', {
+    wpId: props.wpId,
+    sheetName: props.sheetName,
+    rowRef: `${props.sheetName}:${stepOrRowId}`,
+  })
+}
+
 // ─── Summary 子模式：动态行 ──────────────────────────────────────────────────
 
 function buildEmptySummaryRow(): SummaryRow {
@@ -966,6 +1071,7 @@ function buildSavePayload(): EControlTestData {
     active_step: activeStepNo.value,
     active_hint_ids: [...activeHintIds.value],
     conclusion: conclusionValue.value,
+    ai_assisted_fields: assistedFieldsList.value.length > 0 ? assistedFieldsList.value : undefined,
   }
 
   if (testType.value === 'summary') {
@@ -1107,6 +1213,62 @@ onBeforeUnmount(() => {
   color: var(--el-color-primary);
   border-left: 3px solid var(--el-color-primary);
   padding-left: 8px;
+}
+.gt-e__segment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.gt-e__segment-header .gt-e__segment-title {
+  margin: 0;
+}
+.gt-e__segment-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.gt-e__attach-btn {
+  font-size: 14px;
+}
+
+/* ── AI suggest panel ── */
+.gt-e__ai-panel {
+  margin-top: 8px;
+  border: 1px solid var(--el-color-primary-light-5);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--el-color-primary-light-9);
+  width: 100%;
+}
+.gt-e__ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.gt-e__ai-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-color-primary);
+}
+.gt-e__ai-panel-text {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  background: var(--gt-color-bg-white, #fff);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--el-text-color-regular);
+  max-height: 200px;
+  overflow-y: auto;
+}
+.gt-e__ai-panel-actions {
+  display: flex;
+  gap: 8px;
 }
 .gt-e__segment-form {
   display: grid;

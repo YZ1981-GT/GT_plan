@@ -398,3 +398,48 @@
 - 后端 Python 使用 FastAPI + openpyxl + hypothesis（PBT）
 - 前端 TypeScript 使用 Vue 3 + Element Plus + fast-check（PBT）
 - 所有新 router 必须注册到 `backend/app/router_registry/` 对应分组
+
+## 遗留缺口（2026-05-29 复盘）
+
+> 本 spec 40/40 子任务代码层面全部完成，但 render_schema yaml 覆盖率仅 55%（192/349 模板），
+> 导致 HTML 渲染器对 168 个模板仍会 fallback 到 Univer（违反 Requirements 3.9 禁止 Univer 兜底铁律）。
+
+### 缺口根因
+
+`backend/scripts/generate_wp_render_schema.py` 的 `extract_wp_code_from_filename` 函数中 `.split("-")[0]` 将子序号截断（如 `D2-1至D2-4` → `D2`），加上 `iter_template_files` 的 `seen_codes.setdefault` 去重逻辑，导致同一主 wp_code 下多个子模板只生成 1 个 yaml。
+
+### 缺口分布
+
+| 循环 | 缺口数 | 已覆盖 |
+|------|--------|--------|
+| A | 40 | 25 |
+| B | 27 | 22（含 B-template fallback） |
+| C | 15 | 21（含手写） |
+| D | 9 | 8 |
+| E | 3 | 2 |
+| F | 9 | 6 |
+| G | 0 | 15 ✅ |
+| H | 0 | 11 ✅ |
+| I | 0 | 6 ✅ |
+| J | 0 | 3 ✅ |
+| K | 0 | 14 ✅ |
+| L | 0 | 9 ✅ |
+| M | 0 | 10 ✅ |
+| N | 0 | 5 ✅ |
+| S | 65 | 21 |
+| **合计** | **168** | **192** |
+
+### 修复方案
+
+→ 已移交 **workpaper-editor-slimdown** spec Sprint 1（tasks.md 任务 1.1~1.6）：
+1. 修复 `extract_wp_code_from_filename`：去掉 `.split("-")[0]`
+2. 修复 `iter_template_files`：去掉 `seen_codes.setdefault` 去重
+3. 重跑全量生成：预期从 192 → ≥349 个 yaml
+4. 交叉验证：以 `workpaper_template_analysis.json`（2602 sheet）为 ground truth
+
+### 完成标准
+
+render_schema 缺口修复后，本 spec 达到 100% 完成：
+- 349/349 模板有对应 yaml
+- 前端 useWpClassification 对所有 wp_code 返回有效 componentType
+- 无任何底稿 fallback 到 Univer（除 F/G 类设计保留）

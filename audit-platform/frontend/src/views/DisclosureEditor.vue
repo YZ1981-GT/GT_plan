@@ -34,6 +34,14 @@
           @formula="showNoteFormulaManager = true"
         >
           <template #left>
+            <NoteTemplateSwitch
+              v-if="!isEqcrRole"
+              :project-id="projectId"
+              :year="year"
+              :template-type="templateType"
+              @update:template-type="handleTemplateChange"
+              @switched="fetchTree()"
+            />
             <el-button v-if="!isEqcrRole" size="small" @click="onRefreshFromWP" :loading="refreshLoading">🔄 从底稿刷新</el-button>
             <el-button v-if="!isEqcrRole" size="small" @click="onGenerate" :loading="genLoading">📝 生成附注</el-button>
             <el-button v-if="!isEqcrRole" size="small" @click="onValidate" :loading="validateLoading">✅ 执行校验</el-button>
@@ -55,6 +63,17 @@
             >➕ 新增章节</el-button>
             <el-button size="small" @click="openStructureEditor">📐 表样编辑</el-button>
             <el-button size="small" @click="showPrintPreview = true">🖨️ 打印预览</el-button>
+            <el-button size="small" @click="showOfflineExport = true">📦 导出离线包</el-button>
+            <el-button size="small" @click="showOfflineImport = true">📥 一键导入</el-button>
+            <el-button size="small" @click="showAiPanel = true">🤖 AI建议</el-button>
+            <el-button size="small" @click="showVersionTree = true">🗂️ 版本</el-button>
+            <el-button size="small" @click="showGroupBaseline = true">📦 集团基线</el-button>
+            <el-button size="small" @click="showParagraphVars = true">✏️ 段落变量</el-button>
+            <el-button size="small" @click="showPriorYear = true">📅 上年对比</el-button>
+            <el-button-group size="small" style="margin-left: 4px">
+              <el-button :type="numbering.state.value.scope === 'standalone' ? 'primary' : ''" @click="onScopeChange('standalone')">单体</el-button>
+              <el-button :type="numbering.state.value.scope === 'consolidated' ? 'primary' : ''" @click="onScopeChange('consolidated')">合并</el-button>
+            </el-button-group>
             <el-button size="small" @click="showNoteMappingDialog = true">🔄 转换规则</el-button>
           </template>
         </GtToolbar>
@@ -109,8 +128,11 @@
             :indent="10"
             highlight-current
             node-key="id"
+            :draggable="!isEqcrRole"
+            :allow-drop="allowTreeDrop"
             @node-click="onNodeClick"
             @node-contextmenu="onTreeNodeContextMenu"
+            @node-drop="onTreeNodeDrop"
             :default-expanded-keys="['chapter_five']"
             ref="noteTreeRef"
           >
@@ -120,7 +142,10 @@
                 <span v-if="getGroupValidationErrorCount(data)" class="gt-de-tree-error-badge">{{ getGroupValidationErrorCount(data) }}</span>
               </div>
               <div v-else class="gt-de-tree-node" :class="{ 'gt-de-tree-node-active': currentNote?.id === data.id, 'gt-de-tree-node-error': hasSectionValidationError(data.data?.note_section) }">
-                <span class="gt-de-tree-label">{{ data.data?.section_title || data.label }}</span>
+                <span class="gt-de-tree-label">
+                  <span v-if="getRenderedNumber(data.data?.note_section)" class="gt-de-tree-number">{{ getRenderedNumber(data.data?.note_section) }}</span>
+                  {{ data.data?.section_title || data.label }}
+                </span>
                 <span v-if="hasSectionValidationError(data.data?.note_section)" class="gt-de-tree-error-dot" title="校验失败">●</span>
                 <!-- Sprint 3 Task 3.6: 上游变更红点 -->
                 <el-tooltip
@@ -131,6 +156,14 @@
                 >
                   <span class="gt-de-tree-stale-dot" data-test="de-stale-dot">🔴</span>
                 </el-tooltip>
+                <!-- A.6.2: 协作锁可视化 -->
+                <NoteSectionLockBadge
+                  v-if="getSectionLock(data.data?.note_section)"
+                  :lock-info="getSectionLock(data.data?.note_section)"
+                  :project-id="projectId"
+                  :section-id="data.data?.note_section || ''"
+                  @lock-acquired="fetchTree()"
+                />
               </div>
             </template>
           </el-tree>
@@ -442,6 +475,62 @@
       @imported="onNoteImported"
     />
 
+    <!-- D15 离线导出弹窗 -->
+    <NoteOfflineExportDialog
+      v-model="showOfflineExport"
+      :project-id="projectId"
+      :year="year"
+      :sections="noteList.map(n => ({ section_id: n.note_section, title: n.section_title, has_data: !n.is_empty }))"
+    />
+
+    <!-- D15 离线导入弹窗 -->
+    <NoteOfflineImportDialog
+      v-model="showOfflineImport"
+      :project-id="projectId"
+      :year="year"
+      @imported="fetchTree()"
+    />
+
+    <!-- C.1.4: AI 建议侧栏 -->
+    <NoteAiSuggestionPanel
+      v-model="showAiPanel"
+      :project-id="projectId"
+      :year="year"
+      :current-section-id="currentNote?.note_section || ''"
+    />
+
+    <!-- C.2.5: 版本树可视化 -->
+    <NoteVersionTreePanel
+      v-model="showVersionTree"
+      :project-id="projectId"
+      :year="year"
+      :section-id="currentNote?.note_section || ''"
+    />
+
+    <!-- C.3.6: 集团基线对话框 -->
+    <NoteGroupBaselineDialog
+      v-model="showGroupBaseline"
+      :project-id="projectId"
+      :year="year"
+      @applied="fetchTree()"
+    />
+
+    <!-- C.3.7: 段落变量编辑器 -->
+    <NoteParagraphVarsEditor
+      v-model="showParagraphVars"
+      :project-id="projectId"
+      :year="year"
+      :section-id="currentNote?.note_section || ''"
+      @saved="fetchDetail(currentNote?.note_section || '')"
+    />
+
+    <!-- C.3.10: 上年对比侧栏 -->
+    <NotePriorYearPanel
+      v-model="showPriorYear"
+      :prior-year-note="priorYearNote"
+      :current-note="currentNote"
+    />
+
     <!-- Sprint 3 Task 3.1: 新增章节 dialog -->
     <el-dialog
       v-model="showAddSectionDialog"
@@ -665,6 +754,16 @@ import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
 import { useProjectEvents } from '@/composables/useProjectEvents'
 import { handleApiError } from '@/utils/errorHandler'
 import { useNoteTableStructure, type TableData } from '@/composables/useNoteTableStructure'
+import NoteOfflineExportDialog from '@/components/notes/NoteOfflineExportDialog.vue'
+import NoteOfflineImportDialog from '@/components/notes/NoteOfflineImportDialog.vue'
+import NoteTemplateSwitch from '@/components/notes/NoteTemplateSwitch.vue'
+import NoteSectionLockBadge from '@/components/notes/NoteSectionLockBadge.vue'
+import NoteAiSuggestionPanel from '@/components/notes/NoteAiSuggestionPanel.vue'
+import NoteVersionTreePanel from '@/components/notes/NoteVersionTreePanel.vue'
+import NoteGroupBaselineDialog from '@/components/notes/NoteGroupBaselineDialog.vue'
+import NoteParagraphVarsEditor from '@/components/notes/NoteParagraphVarsEditor.vue'
+import NotePriorYearPanel from '@/components/notes/NotePriorYearPanel.vue'
+import { useNoteSectionNumbering } from '@/composables/useNoteSectionNumbering'
 
 const route = useRoute()
 const router = useRouter()
@@ -705,6 +804,14 @@ const editLock = useEditingLock({
   resourceType: 'other',  // 附注无后端锁端点，降级为前端检测
   autoAcquire: false,
 })
+
+// A.6.2: 章节级协作锁状态
+const sectionLocks = ref<Record<string, { locked_by: string; locked_by_name: string; locked_at: string; section_id: string } | null>>({})
+
+function getSectionLock(sectionId: string | undefined) {
+  if (!sectionId) return null
+  return sectionLocks.value[sectionId] || null
+}
 
 // 编辑锁联动 watch 推迟到 useEditMode 定义之后挂载（避免 TDZ）
 
@@ -793,6 +900,59 @@ const treeLoading = ref(false)
 const detailLoading = ref(false)
 const genLoading = ref(false)
 const showNoteImport = ref(false)
+const showOfflineExport = ref(false)
+const showOfflineImport = ref(false)
+const showAiPanel = ref(false)
+const showVersionTree = ref(false)
+const showGroupBaseline = ref(false)
+const showParagraphVars = ref(false)
+const showPriorYear = ref(false)
+
+// C.3.11: 章节序号实时渲染
+const numbering = useNoteSectionNumbering(
+  () => projectId.value,
+  () => year.value
+)
+function getRenderedNumber(sectionId: string | undefined): string {
+  if (!sectionId) return ''
+  return numbering.getNumber(sectionId)
+}
+
+// C.3.12: scope 切换（单体↔合并）+ 章节序号自动重算
+function onScopeChange(scope: 'standalone' | 'consolidated' | 'both') {
+  numbering.setScope(scope)
+}
+
+// C.3.13: 章节树拖拽排序
+function allowTreeDrop(draggingNode: any, dropNode: any, type: 'prev' | 'next' | 'inner'): boolean {
+  // 不允许拖入分组节点（仅同级排序）
+  if (type === 'inner') return false
+  // 不允许拖到章节分组（isGroup）下方
+  if (dropNode.data?.isGroup) return false
+  // 必须同 parent
+  return draggingNode.parent?.data === dropNode.parent?.data
+}
+
+async function onTreeNodeDrop(draggingNode: any, dropNode: any, dropType: 'before' | 'after' | 'inner', _evt: DragEvent) {
+  if (dropType === 'inner') return
+  const sectionId = draggingNode.data?.data?.note_section
+  const targetId = dropNode.data?.data?.note_section
+  if (!sectionId || !targetId) return
+
+  try {
+    await api.put(
+      `/api/disclosure-notes/${projectId.value}/${year.value}/sections/${sectionId}/move`,
+      { target_section_id: targetId, position: dropType }
+    )
+    ElMessage.success('章节排序已更新')
+    // 刷新树以及章节序号
+    await fetchTree()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '排序失败')
+    // 刷新还原
+    await fetchTree()
+  }
+}
 const validateLoading = ref(false)
 const saveLoading = ref(false)
 const refreshLoading = ref(false)
@@ -1667,7 +1827,11 @@ function severityTagType(s: string): '' | 'success' | 'warning' | 'info' | 'dang
 }
 
 const fetchTree = withLoading(treeLoading, async () => {
-  try { noteList.value = await getDisclosureNoteTree(projectId.value, year.value) }
+  try {
+    noteList.value = await getDisclosureNoteTree(projectId.value, year.value)
+    // C.3.11: 刷新章节序号
+    numbering.refreshNumbers()
+  }
   catch { noteList.value = [] }
 })
 

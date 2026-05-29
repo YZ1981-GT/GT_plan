@@ -1229,7 +1229,7 @@ class DisclosureEngine:
 
         Validates: Requirements 8.1
         """
-        logger.info(
+        logger.debug(
             "on_reports_updated: project=%s, accounts=%s",
             payload.project_id, payload.account_codes,
         )

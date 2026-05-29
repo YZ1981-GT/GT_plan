@@ -516,6 +516,16 @@
           <template #default="{ data }">
             <div class="gt-wp-tree-node" :class="{ 'is-trimmed': data.isTrimmed }" :style="getTreeNodeHighlightStyle(data)">
               <span class="gt-wp-tree-node-label">{{ data.label }}</span>
+              <!-- Sprint 4 Task 9.3: 底稿填写完成度小圆环 -->
+              <el-progress
+                v-if="data.completionPercentage != null && data.completionPercentage >= 0"
+                type="circle"
+                :percentage="data.completionPercentage"
+                :width="24"
+                :stroke-width="2"
+                :show-text="false"
+                class="gt-wp-tree-node-completion"
+              />
               <el-tag v-if="data.isTrimmed" size="small" type="info" class="gt-wp-tree-node-trim-tag">已裁剪</el-tag>
               <!-- Task 2.3: 助理视图前置依赖警告图标 -->
               <el-tooltip
@@ -1925,6 +1935,33 @@ interface TreeNode {
   children?: TreeNode[]
 }
 
+/** Sprint 4 Task 9.3: 根据底稿状态推导完成度百分比 */
+function getStatusCompletionPercentage(status: string | null | undefined): number | null {
+  if (!status) return null
+  switch (status) {
+    case 'not_started':
+    case 'pending':
+      return 0
+    case 'in_progress':
+    case 'draft':
+      return 30
+    case 'filled':
+    case 'submitted':
+      return 70
+    case 'review_pending':
+    case 'under_review':
+      return 85
+    case 'review_passed':
+    case 'approved':
+    case 'archived':
+      return 100
+    case 'not_applicable':
+      return null // 已裁剪不显示
+    default:
+      return null
+  }
+}
+
 const treeData = computed<TreeNode[]>(() => {
   const groups: Record<string, TreeNode> = {}
   const CYCLE_GROUPS: Record<string, string> = {
@@ -1988,6 +2025,8 @@ const treeData = computed<TreeNode[]>(() => {
       assigned_to: matchedWorkpaper?.assigned_to ?? wp.assigned_to,
       wpId: matchedWorkpaper?.id || wp.id,
       isTrimmed,
+      // Sprint 4 Task 9.3: 完成度百分比（基于状态推导）
+      completionPercentage: getStatusCompletionPercentage(matchedWorkpaper?.status || wp.status),
     } as any)
   }
 
@@ -2909,6 +2948,7 @@ onMounted(async () => {
 .gt-wp-tree-node-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .gt-wp-tree-node-trim-tag { flex-shrink: 0; font-size: 10px; }
 .gt-wp-tree-node-tag { flex-shrink: 0; }
+.gt-wp-tree-node-completion { flex-shrink: 0; }
 .gt-wp-tree-stale-badge { flex-shrink: 0; font-size: var(--gt-font-size-xs); opacity: 0.85; cursor: help; }
 .gt-wp-tree-cycle-badge { flex-shrink: 0; cursor: pointer; margin-left: 4px; }
 .gt-wp-detail-card { }

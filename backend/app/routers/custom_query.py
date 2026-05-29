@@ -431,16 +431,20 @@ def _load_step_sheet_mapping() -> dict[str, dict]:
         _STEP_SHEET_CACHE = {}
 
     # 双源漂移检测（首次加载时执行一次）
+    # 注意：两个文件设计目的不同，部分 wp_code 单边出现是合理的：
+    # - 程序文档型底稿（如 B22 控制环境/S33 程序修订）只在 step_sheet_mapping
+    # - 纯账户审定型底稿（如 K14-K18 各类收益审定表）只在 wp_account_mapping
+    # 因此 drift 信息记 DEBUG（开发参考），不再 WARNING 刷屏
     try:
         wp_codes_step = {c for c in _STEP_SHEET_CACHE.keys() if "-" not in c}
         wp_codes_acc = {m.get("wp_code") for m in _load_wp_mapping() if m.get("wp_code") and "-" not in m.get("wp_code", "")}
         only_in_step = wp_codes_step - wp_codes_acc
         only_in_acc = wp_codes_acc - wp_codes_step
         if only_in_step or only_in_acc:
-            logger.warning(
-                "wp mapping double-source drift: step_sheet_mapping has %d codes not in wp_account_mapping (%s...), "
-                "wp_account_mapping has %d codes not in step_sheet_mapping (%s...). "
-                "Maintain both files in sync to avoid tree inconsistency.",
+            logger.debug(
+                "wp mapping double-source drift (expected for doc-only/account-only codes): "
+                "step_sheet has %d codes not in wp_account (%s...), "
+                "wp_account has %d codes not in step_sheet (%s...).",
                 len(only_in_step), sorted(list(only_in_step))[:5],
                 len(only_in_acc), sorted(list(only_in_acc))[:5],
             )

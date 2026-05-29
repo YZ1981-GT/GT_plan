@@ -200,6 +200,20 @@ async def save_html_data(
                 affected_targets=[c.target_wp_code for c in changes],
             )
 
+    # ─── Step 9: 报表 stale 联动（US-2）────────────────────────────────────
+    if wp_code:
+        try:
+            from app.services.report_stale_service import report_stale_service
+
+            await report_stale_service.mark_if_mapped(
+                wp_code=wp_code,
+                project_id=working_paper.project_id,
+                db=db,
+            )
+        except Exception as exc:
+            # stale 标记失败不阻断保存主流程
+            logger.warning("report_stale_service.mark_if_mapped failed: %s", exc)
+
     return SaveHtmlDataResponse(
         saved_at=now.isoformat(),
         stale_impact=stale_impact,

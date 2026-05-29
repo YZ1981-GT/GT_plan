@@ -85,6 +85,25 @@
         </el-button>
       </div>
 
+      <!-- US-2：底稿数据更新 → 报表 stale 黄色横幅 -->
+      <el-alert
+        v-if="showReportStaleBanner"
+        title="底稿数据已更新"
+        :description="`${reportStaleRows.length} 个报表行受影响，点击刷新获取最新数据`"
+        type="warning"
+        show-icon
+        :closable="true"
+        style="margin-bottom: 8px"
+        @close="showReportStaleBanner = false"
+      >
+        <template #default>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>{{ reportStaleRows.length }} 个报表行受影响，点击刷新获取最新数据</span>
+            <el-button size="small" type="warning" @click="onReportStaleRefresh">🔄 刷新报表</el-button>
+          </div>
+        </template>
+      </el-alert>
+
       <!-- Tab 切换 -->
       <el-tabs v-model="activeTab" @tab-change="onTabChange">
         <el-tab-pane label="资产负债表" name="balance_sheet" />
@@ -800,7 +819,7 @@ const projectStore = useProjectStore()
 const projectId = computed(() => projectStore.projectId)
 
 // ─── 云协同：账套激活/回滚后自动刷新 ─────────────────────────────────────────
-const { onDatasetActivated, onDatasetRolledBack } = useProjectEvents(projectId)
+const { onDatasetActivated, onDatasetRolledBack, onAnyEvent } = useProjectEvents(projectId)
 onDatasetActivated(() => fetchReport())
 onDatasetRolledBack(() => fetchReport())
 
@@ -808,6 +827,23 @@ onDatasetRolledBack(() => fetchReport())
 import { useStaleStatus } from '@/composables/useStaleStatus'
 import StaleIndicator from '@/components/StaleIndicator.vue'
 const stale = useStaleStatus(projectId)
+
+// US-2：底稿保存后 report.stale SSE 订阅 → 黄色横幅 + 刷新
+const reportStaleRows = ref<string[]>([])
+const showReportStaleBanner = ref(false)
+
+onAnyEvent((evt) => {
+  if (evt.event_type === 'report.stale' && evt.extra?.rows) {
+    reportStaleRows.value = evt.extra.rows as string[]
+    showReportStaleBanner.value = true
+  }
+})
+
+async function onReportStaleRefresh() {
+  showReportStaleBanner.value = false
+  reportStaleRows.value = []
+  await fetchReport()
+}
 async function onStaleRecalc() {
   await stale.recalc()
   // 重算后重新拉取报表数据

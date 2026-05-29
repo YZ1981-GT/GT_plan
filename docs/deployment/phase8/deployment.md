@@ -15,19 +15,24 @@ Phase 8 部署涉及数据库迁移、后端服务更新、前端构建和配置
 
 ## 2. 数据库迁移
 
-### 迁移脚本
+### 迁移系统（D6 版本化 SQL 脚本）
 
-Phase 8 包含 1 个迁移脚本：
+项目使用自研 D6 迁移系统（`backend/migrations/V*.sql` + `R*.sql`），后端启动时由
+`MigrationRunner` 自动检测并应用未执行的版本（per-migration 异常隔离 + 失败追踪）。
+
+Phase 8 历史曾有 alembic 迁移 `034_phase8_currency_and_indexes.py`，已合并到 D6
+体系。当前部署仅需启动后端即触发自动迁移，**无需**手动执行命令。
 
 ```bash
-# 执行迁移
-python -m alembic upgrade head
+# 启动后端会自动跑 backend/migrations/V*.sql 中所有未应用的版本
+start-dev.bat   # 开发
+uvicorn app.main:app --host 0.0.0.0 --port 9980 --workers 10   # 生产
 
-# 或指定版本
-python -m alembic upgrade 034
+# 手动诊断（可选）：
+python -m app.core.migration_runner
 ```
 
-**迁移内容（034_phase8_currency_and_indexes.py）：**
+**Phase 8 涉及的 schema 变更（已收敛进 V*.sql）：**
 - `trial_balance` 表添加 `currency_code` 字段（VARCHAR(3)，默认 'CNY'）
 - 创建 `idx_trial_balance_currency_code` 索引
 - 创建 `idx_trial_balance_project_year_std_code` 复合索引
@@ -37,8 +42,13 @@ python -m alembic upgrade 034
 
 ### 回滚
 
+执行对应版本的 R*.sql 回滚脚本（手动）：
+
 ```bash
-python -m alembic downgrade -1
+# 例：回滚 V034
+psql -U postgres -d audit_platform -f backend/migrations/R034__rollback.sql
+# 同时清除 schema_version 表对应记录
+psql -U postgres -d audit_platform -c "DELETE FROM schema_version WHERE version='034';"
 ```
 
 ---
@@ -155,7 +165,7 @@ print(key.decode())
 
 部署后执行以下验证：
 
-- [ ] 数据库迁移成功（`alembic current` 显示 034）
+- [ ] 数据库迁移成功（`/api/health` JSON 中 `migration.applied_count` 含 V034 + 无 failures）
 - [ ] `trial_balance.currency_code` 字段存在且默认值为 'CNY'
 - [ ] 4 个复合索引已创建（`\di` 查看）
 - [ ] Redis 连接正常
@@ -171,7 +181,7 @@ print(key.decode())
 
 如需回滚 Phase 8：
 
-1. 数据库回滚：`python -m alembic downgrade -1`
+1. 数据库回滚：执行 `backend/migrations/R034__rollback.sql` + 清除 schema_version 记录
 2. 后端回滚：切换到 Phase 7 分支/版本
 3. 前端回滚：部署 Phase 7 构建产物
 4. 配置回滚：移除新增环境变量

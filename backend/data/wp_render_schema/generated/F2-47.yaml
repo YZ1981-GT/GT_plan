@@ -1,0 +1,499 @@
+# F2-47.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:11:10
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: F2-47
+template_path: backend/wp_templates/F/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:11:10'
+  source_xlsx: F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：
+        D:
+          field: col_d
+          type: text
+          label: '3'
+        E:
+          field: col_e
+          type: text
+          label: 存货跌价准备转回核对表
+        F:
+          field: col_f
+          type: text
+          label: F2-49
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  跌价准备测试表F2-47:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货跌价准备测试表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 测试总体：
+        B:
+          field: col_b
+          type: text
+          label: 如存货XX种类、XX数量、XX金额
+        M:
+          field: col_m
+          type: text
+          label: 特定样本：
+        O:
+          field: col_o
+          type: text
+          label: XX金额以上（大额）、XX呆滞存货全部测试
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - K3
+      - U3
+      - AA3
+      - A4
+      - K4
+      - U4
+      - G20
+      - Q20
+      - T20
+      - U20
+      - V20
+      - W20
+      - X20
+      - Z20
+      - G21
+      - Q21
+      - T21
+      - U21
+      - V21
+      - W21
+      - X21
+      - Z21
+      - G22
+      - Q22
+      - T22
+      - U22
+      - V22
+      - W22
+      - X22
+      _total_count: 107
+    merged_cells:
+      preserve: true
+      count: 33
+      ranges_sample:
+      - A30:E30
+      - C34:D34
+      - O18:O19
+      - B18:B19
+      - C33:D33
+      - N18:N19
+      - E33:F33
+      - P18:V18
+      - G36:H36
+      - C35:D35
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  长库龄 呆滞 超过保质期存货明细表F2-48:
+    component_type: univer
+    class_code: F-明细表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 长库龄/呆滞/超过保质期存货明细表
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 存货类别
+        B:
+          field: col_b
+          type: text
+          label: 存货编码
+        C:
+          field: col_c
+          type: text
+          label: 存货名称
+        D:
+          field: col_d
+          type: text
+          label: 存货规格
+        E:
+          field: col_e
+          type: text
+          label: 存货单位
+        F:
+          field: col_f
+          type: text
+          label: 结存数量
+        G:
+          field: col_g
+          type: text
+          label: 结存单价
+        H:
+          field: col_h
+          type: text
+          label: 结存金额
+        I:
+          field: col_i
+          type: text
+          label: 库龄
+        M:
+          field: col_m
+          type: text
+          label: 是否存在过时冷背呆滞等各种减值迹象
+        N:
+          field: col_n
+          type: text
+          label: 计提跌价金额
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - J3
+      - N3
+      - A4
+      - F4
+      - J4
+      - H7
+      - H8
+      - H9
+      - H10
+      - H11
+      - H12
+      - H13
+      - H14
+      - H15
+      - H16
+      - H17
+      - I17
+      - J17
+      - K17
+      - L17
+      - N17
+      _total_count: 23
+    merged_cells:
+      preserve: true
+      count: 13
+      ranges_sample:
+      - A5:A6
+      - G5:G6
+      - N5:N6
+      - E5:E6
+      - H5:H6
+      - A1:N1
+      - A2:N2
+      - C5:C6
+      - F5:F6
+      - D5:D6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  跌价转回F2-49:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货跌价准备转回核对表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 存货类别
+        B:
+          field: col_b
+          type: text
+          label: 存货编码
+        C:
+          field: col_c
+          type: text
+          label: 存货名称
+        D:
+          field: col_d
+          type: text
+          label: 存货规格
+        E:
+          field: col_e
+          type: text
+          label: 存货单位
+        F:
+          field: col_f
+          type: text
+          label: 期初
+        I:
+          field: col_i
+          type: text
+          label: 库龄
+        M:
+          field: col_m
+          type: text
+          label: 是否考虑单独计提跌价
+        N:
+          field: col_n
+          type: text
+          label: 上期末计提跌价金额
+        O:
+          field: col_o
+          type: text
+          label: 本年发出数量
+        P:
+          field: col_p
+          type: text
+          label: 其中：生产领料数量
+        Q:
+          field: col_q
+          type: text
+          label: 其中：销售数量
+        R:
+          field: col_r
+          type: text
+          label: 其中：研发领用数量
+        S:
+          field: col_s
+          type: text
+          label: 其中…
+        T:
+          field: col_t
+          type: text
+          label: 跌价转回金额合计
+        U:
+          field: col_u
+          type: text
+          label: 转回金额科目
+        X:
+          field: col_x
+          type: text
+          label: 转回金额较对
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - I3
+      - P3
+      - X3
+      - A4
+      - I4
+      - P4
+      - T7
+      - X7
+      - T8
+      - X8
+      - T9
+      - X9
+      - T10
+      - X10
+      - T11
+      - X11
+      - T12
+      - X12
+      - T13
+      - X13
+      - T14
+      - X14
+      - T15
+      - X15
+      - H16
+      - I16
+      - J16
+      - K16
+      - L16
+      _total_count: 36
+    merged_cells:
+      preserve: true
+      count: 19
+      ranges_sample:
+      - O5:O6
+      - E5:E6
+      - Q5:Q6
+      - F5:H5
+      - N5:N6
+      - A2:X2
+      - M5:M6
+      - X5:X6
+      - A5:A6
+      - S5:S6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  同行业存货跌价计提情况G2-9-3-删除:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 同行业存货跌价计提情况
+      A3: ${entity_name}
+      A4: ${period_end}
+      J3: ${index_no}
+      J4: ${page_no}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 年度
+        B:
+          field: col_b
+          type: text
+          label: 存货
+        C:
+          field: col_c
+          type: text
+          label: 存货原值
+        D:
+          field: col_d
+          type: text
+          label: 存货跌价准备
+        E:
+          field: col_e
+          type: text
+          label: 指标值
+        F:
+          field: col_f
+          type: text
+          label: 偏离
+        G:
+          field: col_g
+          type: text
+          label: 行业平均
+        H:
+          field: col_h
+          type: text
+          label: 同行业1
+        I:
+          field: col_i
+          type: text
+          label: 同行业2
+        J:
+          field: col_j
+          type: text
+          label: 同行业3
+        K:
+          field: col_k
+          type: text
+          label: 同行业4
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - A4
+      - D4
+      - G4
+      - E7
+      - F7
+      - G7
+      - E8
+      - F8
+      - G8
+      - E9
+      - F9
+      - G9
+      - E10
+      - F10
+      - G10
+      - E11
+      - F11
+      - G11
+      - E12
+      - F12
+      - G12
+      - E13
+      - F13
+      - G13
+      - E14
+      - F14
+      - G14
+      _total_count: 72
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - A2:K2
+      - A1:K1
+      - L1:O1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

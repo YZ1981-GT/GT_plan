@@ -1,0 +1,486 @@
+# F2-21.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:11:09
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: F2-21
+template_path: backend/wp_templates/F/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:11:09'
+  source_xlsx: F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：
+        D:
+          field: col_d
+          type: text
+          label: '4'
+        E:
+          field: col_e
+          type: text
+          label: 存货监盘小结
+        F:
+          field: col_f
+          type: text
+          label: F2-23
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  存货监盘程序表F2-21A:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货监盘程序表
+      A3: ${entity_name}
+      A4: ${period_end}
+      E3: ${index_no}
+      E4: ${page_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 序号
+        B:
+          field: col_b
+          type: text
+          label: 审计程序
+        D:
+          field: col_d
+          type: text
+          label: 程序分类
+        E:
+          field: col_e
+          type: text
+          label: 底稿索引号
+        G:
+          field: col_g
+          type: text
+          label: 根据被审计单位实际情况和风险评估情况裁剪、修改或增加审计程序
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - C3
+      - D3
+      - F3
+      - A4
+      - C4
+      - D4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 68
+      ranges_sample:
+      - E12:F12
+      - B16:C16
+      - B7:C7
+      - B25:C25
+      - E24:F24
+      - E33:F33
+      - E5:F5
+      - E23:F23
+      - B22:C22
+      - E14:F14
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  盘点计划问卷F2-21:
+    component_type: d-form-confirmation
+    class_code: D-盘点
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货盘点计划问卷
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 地点
+        B:
+          field: col_b
+          type: text
+          label: 存货类型
+        C:
+          field: col_c
+          type: text
+          label: 占存货总额的大致比例
+        D:
+          field: col_d
+          type: text
+          label: 盘点时间
+    static_text:
+      rows:
+      - 1-2
+      - 5-6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - I3
+      - A4
+      - D4
+      - F4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 54
+      ranges_sample:
+      - A25:I25
+      - A41:I41
+      - A54:I54
+      - A37:I37
+      - A46:I46
+      - A56:I56
+      - A18:I18
+      - A27:I27
+      - K5:K10
+      - A55:I55
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  监盘计划F2-22:
+    component_type: d-form-confirmation
+    class_code: D-盘点
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 3
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  监盘小结F2-23:
+    component_type: d-form-confirmation
+    class_code: D-盘点
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 3
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  存货账面余额与仓储台账（ERP业务数据)核对记录F2-24:
+    component_type: d-form-table
+    class_code: D-系统核对
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货账面余额与仓储台账（ERP业务数据)核对记录
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 5-7
+      - 14-16
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - I3
+      - A4
+      - D4
+      - F4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A1:I1
+      - A2:I2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  抽盘结果汇总表F2-25:
+    component_type: univer
+    class_code: F-汇总表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货抽盘结果汇总表
+      A3: ${entity_name}
+      A4: ${period_end}
+      L3: ${index_no}
+      L4: ${page_no}
+    dynamic_table:
+      start_row: 15
+      end_row: dynamic
+      header_row: 14
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 存货编码
+        B:
+          field: col_b
+          type: text
+          label: 存货名称/类别
+        C:
+          field: col_c
+          type: text
+          label: 规格
+        D:
+          field: col_d
+          type: text
+          label: 单位
+        E:
+          field: col_e
+          type: text
+          label: 单价
+        F:
+          field: col_f
+          type: text
+          label: 盘点前财务账面记录
+        H:
+          field: col_h
+          type: text
+          label: 企业盘点记录数量
+        I:
+          field: col_i
+          type: text
+          label: 抽盘数量
+        J:
+          field: col_j
+          type: text
+          label: 抽盘与账面差异（+盈-亏）
+        K:
+          field: col_k
+          type: text
+          label: 抽盘与企业盘点差异
+        L:
+          field: col_l
+          type: text
+          label: 企业盘点与账面差异
+        M:
+          field: col_m
+          type: text
+          label: 品质状况（正常/残次/毁损/滞销等）
+    static_text:
+      rows:
+      - 1-2
+      - 5-13
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - H3
+      - M3
+      - A4
+      - D4
+      - H4
+      - J16
+      - K16
+      - L16
+      - J17
+      - K17
+      - L17
+      - J18
+      - K18
+      - L18
+      - J19
+      - K19
+      - L19
+      - J20
+      - K20
+      - L20
+      - J21
+      - K21
+      - L21
+      - J22
+      - K22
+      - L22
+      - J23
+      - K23
+      _total_count: 75
+    merged_cells:
+      preserve: true
+      count: 26
+      ranges_sample:
+      - H29:H30
+      - F29:G29
+      - C29:C30
+      - E29:E30
+      - B14:B15
+      - B29:B30
+      - L14:L15
+      - L29:L30
+      - A14:A15
+      - I14:I15
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  盘点倒轧表F2-26:
+    component_type: d-form-confirmation
+    class_code: D-盘点
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货盘点倒轧表
+      A3: ${entity_name}
+      A4: ${period_end}
+      N3: ${index_no}
+      N4: ${page_no}
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 存货类别
+        B:
+          field: col_b
+          type: text
+          label: 存货编码
+        C:
+          field: col_c
+          type: text
+          label: 品名及规格
+        D:
+          field: col_d
+          type: text
+          label: 单位
+        E:
+          field: col_e
+          type: text
+          label: 单价
+        F:
+          field: col_f
+          type: text
+          label: 仓库
+        G:
+          field: col_g
+          type: text
+          label: 监盘日实存数量
+        H:
+          field: col_h
+          type: text
+          label: 加：资产负债表日至监盘日发出数量（经核对调节后）
+        I:
+          field: col_i
+          type: text
+          label: 减：资产负债表日至监盘日入库数量（经核对调节后）
+        J:
+          field: col_j
+          type: text
+          label: 资产负债表日实存数量
+        K:
+          field: col_k
+          type: text
+          label: 资产负债表日账面数量
+        L:
+          field: col_l
+          type: text
+          label: 数量差异
+        M:
+          field: col_m
+          type: text
+          label: 金额差异
+        N:
+          field: col_n
+          type: text
+          label: 差异原因
+        O:
+          field: col_o
+          type: text
+          label: 是否调整
+    static_text:
+      rows:
+      - 1-2
+      - 5-6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - I3
+      - O3
+      - A4
+      - D4
+      - I4
+      - J8
+      - L8
+      - M8
+      - J9
+      - L9
+      - M9
+      - J10
+      - L10
+      - M10
+      - J11
+      - L11
+      - M11
+      - J12
+      - L12
+      - M12
+      - J13
+      - L13
+      - M13
+      - J14
+      - L14
+      - M14
+      - J17
+      - L17
+      _total_count: 49
+    merged_cells:
+      preserve: true
+      count: 2
+      ranges_sample:
+      - A1:O1
+      - A2:O2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

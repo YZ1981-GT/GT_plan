@@ -189,6 +189,7 @@ class FinancialReport(Base):
     generated_at: Mapped[datetime | None] = mapped_column(nullable=True)
     indent_level: Mapped[int] = mapped_column(sa.Integer, server_default=text("0"), nullable=False)
     is_total_row: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
+    is_stale: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )

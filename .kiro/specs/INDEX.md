@@ -1,10 +1,18 @@
 # Spec 总索引
 
-**最后更新**：2026-05-27（v3.7 — `disclosure-note-full-revamp` Sprint 0~4 全完成 44/47 tasks，pytest 430/430 全绿；剩 F-1 UAT / F-2 dev-history / F-3 收口）
+**最后更新**：2026-05-29（migration-runner-resilience Sprint 4 完成，alembic 残留全清理）
 
 > 此索引追踪所有 spec 的状态、关联文档、commit。
 > **审计原则**：spec 不删，但标"演进/被取代/已合并"避免重复阅读。
 > **实测铁律**：每行的"完成度/日期/commit"列必须有 grep 证据，凭印象写视为漏审。
+
+## 迁移系统（D6 唯一入口）
+
+- **当前迁移系统** = `backend/migrations/V*.sql` + `R*.sql`（D6 版本化 SQL 脚本，启动时 MigrationRunner 自动执行）
+- **alembic 已废弃**（2026-05-29 删除，`backend/alembic/` 目录 + `alembic.ini` + `requirements.txt` 中 `alembic` 依赖已全部移除）
+- **新加迁移**：写 `V0XX__xxx.sql` + `R0XX__rollback_xxx.sql` 配对，必须 `IF NOT EXISTS` / `IF NOT EXISTS` 幂等
+- **失败追踪**：`schema_migration_failures` 表 + `/api/health` 暴露 `migration.failures`
+- **schema 漂移**：启动 self-check `SchemaDriftDetector` 检测 ORM↔DB 4 类漂移，写 `schema_drift_log` 表
 
 ---
 

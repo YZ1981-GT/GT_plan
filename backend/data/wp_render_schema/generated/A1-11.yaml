@@ -1,0 +1,245 @@
+# A1-11.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:10:48
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: A1-11
+template_path: backend/wp_templates/A/A1-11 业务报告签发流转控制表+业务报告文号规则.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:10:48'
+  source_xlsx: A1-11 业务报告签发流转控制表+业务报告文号规则.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  A1-11 报告签发:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 项目负责经理：
+        D:
+          field: col_d
+          type: text
+          label: 项目质量控制复核人：
+        F:
+          field: col_f
+          type: text
+          label: 年　月　日
+    static_text:
+      rows:
+      - 1-9
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 37
+      ranges_sample:
+      - A32:G32
+      - D3:G3
+      - A8:G8
+      - A3:C3
+      - A12:C12
+      - D5:G5
+      - F12:G12
+      - A9:G9
+      - F15:G15
+      - A5:C5
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  1.文号规则:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 业务类型
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: '1、以总部名义出具的鉴证业务报告
+
+            （各地办公室以总部名义签发'
+        B:
+          field: col_b
+          type: text
+          label: 致同会计师事务所（特殊普通合伙）
+        C:
+          field: col_c
+          type: text
+          label: 是
+        D:
+          field: col_d
+          type: text
+          label: 中国•北京
+        E:
+          field: col_e
+          type: text
+          label: 是
+        F:
+          field: col_f
+          type: text
+          label: '审计报告：致同审字（2021）第310A0001号；
+
+            专项报'
+        G:
+          field: col_g
+          type: text
+          label: '审、专、验：业务属性；
+
+            310：上海办公室代码；
+
+            A、B、C'
+    static_text:
+      rows:
+      - 1
+      - 4-5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 11
+      ranges_sample:
+      - A1:G1
+      - A17:G17
+      - A18:G18
+      - B2:F2
+      - A21:G21
+      - A20:G20
+      - A16:G16
+      - A2:A3
+      - A15:G15
+      - A19:G19
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  2.业务约定书和报告文号:
+    component_type: a-program-console
+    class_code: A-一般程序表
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 验资业务
+        C:
+          field: col_c
+          type: text
+          label: 致同约字（2021）第3100001号
+        D:
+          field: col_d
+          type: text
+          label: 致同约字（2021）第1100001号
+        E:
+          field: col_e
+          type: text
+          label: 致同约字（2021）第3100001号
+    static_text:
+      rows:
+      - 1
+      - 3
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 10
+      ranges_sample:
+      - B19:B20
+      - B10:F10
+      - B18:F18
+      - F15:F17
+      - F3:F5
+      - F11:F13
+      - B14:F14
+      - B21:B22
+      - F19:F22
+      - C6:E6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  3.对应报告文号规则:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    fixed_cells:
+      A2: 一、鉴证业务
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 'B类业务，包括：
+
+            1、重要的国际业务,非本所境内上市公司或精'
+        C:
+          field: col_c
+          type: text
+          label: 报表审计业务
+        D:
+          field: col_d
+          type: text
+          label: 致同审字（2021）第310B0001号
+        E:
+          field: col_e
+          type: text
+          label: 致同审字（2021）第110B0001号
+        F:
+          field: col_f
+          type: text
+          label: 致同审字（2021）第310B0001号
+    static_text:
+      rows:
+      - 2
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 15
+      ranges_sample:
+      - B28:B30
+      - B8:B12
+      - A28:A30
+      - B20:B23
+      - A2:A12
+      - A20:A23
+      - B25:B27
+      - G2:G12
+      - A31:A32
+      - B2:B4
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

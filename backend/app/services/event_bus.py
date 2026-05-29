@@ -70,7 +70,7 @@ class EventBus:
         """注册事件处理器"""
         self._handlers[event_type].append(handler)
         handler_name = getattr(handler, "__qualname__", repr(handler))
-        logger.info("EventBus: subscribed %s to %s", handler_name, event_type.value)
+        logger.debug("EventBus: subscribed %s to %s", handler_name, event_type.value)
 
     async def publish(self, payload: EventPayload) -> None:
         """发布事件，相同去重键在 debounce 窗口内合并为一次。"""
@@ -159,7 +159,7 @@ class EventBus:
 
         event_type = payload.event_type
         handlers = self._handlers.get(event_type, [])
-        logger.info(
+        logger.debug(
             "EventBus: dispatching %s (project=%s, accounts=%s), %d handler(s)",
             event_type.value,
             payload.project_id,

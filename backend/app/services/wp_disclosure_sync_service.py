@@ -4,6 +4,7 @@
 当用户在 C 类附注底稿 sheet 保存数据时，自动 push 到 disclosure_notes 表对应 section。
 
 Validates: Requirements 3.11.5 §4.2（附注双源问题）+ design §12.1
+Validates: Requirements US-3（C 类底稿 → 附注自动同步）
 """
 
 from __future__ import annotations
@@ -25,6 +26,22 @@ from app.models.report_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ─── Conflict Error ──────────────────────────────────────────────────────────
+
+
+class ConflictError(Exception):
+    """附注侧有更新的手动编辑，与底稿同步冲突。"""
+
+    def __init__(self, note_id: UUID, note_updated: datetime, last_sync_at: datetime | None = None):
+        self.note_id = note_id
+        self.note_updated = note_updated
+        self.last_sync_at = last_sync_at
+        super().__init__(
+            f"Conflict: note {note_id} updated at {note_updated}, "
+            f"last sync at {last_sync_at}"
+        )
 
 
 def _count_rows_synced(sub_table_data: dict[str, list[dict]] | None) -> int:
@@ -175,3 +192,244 @@ async def sync_from_workpaper(
         "rows_synced": rows_synced,
         "created": created,
     }
+
+
+# ─── US-3: HTML 路径同步服务类 ────────────────────────────────────────────────
+
+
+class WpDisclosureSyncService:
+    """C 类底稿 → disclosure_notes 同步服务（HTML 渲染器路径）。
+
+    Validates: Requirements US-3（C 类底稿 → 附注自动同步）
+    """
+
+    async def sync_from_html(
+        self,
+        db: AsyncSession,
+        wp_id: UUID,
+        sheet_name: str,
+        sub_table_data: dict,
+        *,
+        project_id: UUID,
+        user: User,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        """从 HTML 渲染器的 C 类底稿同步到 disclosure_notes。
+
+        Steps:
+        1. 查 wp_code → 映射到 disclosure_notes.section_id
+        2. 读 disclosure_notes 当前值
+        3. 冲突检测（除非 force=True）
+        4. 写入 table_data + is_stale=False
+        5. 审计日志
+        6. SSE 通知
+
+        Args:
+            db: async DB session
+            wp_id: 底稿 ID
+            sheet_name: C 类附注 sheet 名
+            sub_table_data: 子表数据
+            project_id: 项目 ID
+            user: 当前用户
+            force: 强制覆盖（跳过冲突检测）
+
+        Returns:
+            同步结果 dict
+
+        Raises:
+            ConflictError: 附注侧有更新的手动编辑
+        """
+        now = datetime.now(timezone.utc)
+
+        # 1. 查映射：通过 sheet_name 推导 section_id
+        mapping = await self._get_section_mapping(db, wp_id, sheet_name)
+        if not mapping:
+            logger.debug(
+                "sync_from_html: no mapping for wp_id=%s sheet=%s, skip",
+                wp_id, sheet_name,
+            )
+            return {
+                "success": True,
+                "synced": False,
+                "reason": "no_mapping",
+            }
+
+        section_id = mapping["section_id"]
+        last_sync_at = mapping.get("last_sync_at")
+
+        # 2. 读 disclosure_notes 当前值
+        note = await self._get_note(db, project_id, section_id)
+
+        if note is None:
+            # 无现有记录 → 新建
+            note = DisclosureNote(
+                project_id=project_id,
+                year=now.year,
+                note_section=section_id,
+                section_title=_derive_section_title(section_id),
+                content_type=ContentType.table,
+                table_data={"sub_table_data": sub_table_data},
+                status=NoteStatus.draft,
+                is_stale=False,
+                last_sync_source="workpaper_html",
+                last_sync_wp_id=wp_id,
+                last_sync_at=now,
+                last_sync_user_id=user.id,
+                updated_by=user.id,
+            )
+            db.add(note)
+            await db.flush()
+            try:
+                await self._write_audit_log(db, "disclosure_sync_create", wp_id, section_id, user)
+            except Exception as exc:
+                logger.warning("Audit log write failed (non-blocking): %s", exc)
+            self._broadcast_synced(project_id, section_id)
+            await db.commit()
+            return {
+                "success": True,
+                "synced": True,
+                "section_id": section_id,
+                "synced_at": now.isoformat(),
+                "created": True,
+            }
+
+        # 3. 冲突检测
+        if not force and last_sync_at and note.updated_at:
+            if note.updated_at > last_sync_at:
+                raise ConflictError(
+                    note_id=note.id,
+                    note_updated=note.updated_at,
+                    last_sync_at=last_sync_at,
+                )
+
+        # 4. 写入（原子操作）
+        existing_table_data = dict(note.table_data) if note.table_data else {}
+        existing_table_data["sub_table_data"] = sub_table_data
+        existing_table_data["_source"] = "workpaper_html"
+        existing_table_data["_last_sync_wp_id"] = str(wp_id)
+        existing_table_data["_last_sync_sheet"] = sheet_name
+        existing_table_data["_last_sync_at"] = now.isoformat()
+
+        note.table_data = existing_table_data
+        note.is_stale = False
+        note.last_sync_source = "workpaper_html"
+        note.last_sync_wp_id = wp_id
+        note.last_sync_at = now
+        note.last_sync_user_id = user.id
+        note.updated_by = user.id
+        note.updated_at = now
+
+        # 5. 审计日志（失败不阻断主流程）
+        try:
+            await self._write_audit_log(db, "disclosure_sync_update", wp_id, section_id, user)
+        except Exception as exc:
+            logger.warning("Audit log write failed (non-blocking): %s", exc)
+
+        # 6. SSE 通知
+        self._broadcast_synced(project_id, section_id)
+
+        await db.commit()
+
+        return {
+            "success": True,
+            "synced": True,
+            "section_id": section_id,
+            "synced_at": now.isoformat(),
+            "created": False,
+        }
+
+    async def _get_section_mapping(
+        self, db: AsyncSession, wp_id: UUID, sheet_name: str
+    ) -> dict[str, Any] | None:
+        """查 wp_id + sheet_name → section_id 映射。
+
+        策略：查 disclosure_notes 中 last_sync_wp_id = wp_id 且
+        table_data._last_sync_sheet = sheet_name 的记录。
+        如果找不到，尝试从 sheet_name 推导 section_id（C 类 sheet 命名约定）。
+        """
+        # 方式 1：查已有同步记录
+        stmt = sa.select(DisclosureNote).where(
+            DisclosureNote.last_sync_wp_id == wp_id,
+            DisclosureNote.is_deleted == sa.false(),
+        )
+        result = await db.execute(stmt)
+        notes = result.scalars().all()
+
+        for n in notes:
+            td = n.table_data or {}
+            if td.get("_last_sync_sheet") == sheet_name:
+                return {
+                    "section_id": n.note_section,
+                    "last_sync_at": n.last_sync_at,
+                }
+
+        # 方式 2：从 sheet_name 推导（C 类 sheet 命名约定：如 "应收账款附注C" → "五-1-1 应收账款"）
+        # 简化：用 sheet_name 作为 section_id 查找
+        stmt2 = sa.select(DisclosureNote).where(
+            DisclosureNote.note_section.ilike(f"%{sheet_name.replace('附注C', '').replace('附注', '')}%"),
+            DisclosureNote.is_deleted == sa.false(),
+        ).limit(1)
+        result2 = await db.execute(stmt2)
+        note2 = result2.scalar_one_or_none()
+        if note2:
+            return {
+                "section_id": note2.note_section,
+                "last_sync_at": note2.last_sync_at,
+            }
+
+        return None
+
+    async def _get_note(
+        self, db: AsyncSession, project_id: UUID, section_id: str
+    ) -> DisclosureNote | None:
+        """读 disclosure_notes 当前值。"""
+        stmt = sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.note_section == section_id,
+            DisclosureNote.is_deleted == sa.false(),
+        )
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def _write_audit_log(
+        self, db: AsyncSession, action: str, wp_id: UUID, section_id: str, user: User
+    ) -> None:
+        """写入审计日志。"""
+        try:
+            from app.models.audit_log_models import AuditLogEntry
+
+            log_entry = AuditLogEntry(
+                user_id=user.id,
+                action_type=action,
+                object_type="disclosure_note",
+                object_id=None,
+                payload={
+                    "wp_id": str(wp_id),
+                    "section_id": section_id,
+                    "source": "workpaper_html",
+                },
+            )
+            db.add(log_entry)
+        except Exception as exc:
+            # 审计日志写入失败不阻断主流程
+            logger.warning("Failed to write audit log: %s", exc)
+
+    def _broadcast_synced(self, project_id: UUID, section_id: str) -> None:
+        """发布 note.synced SSE 事件（非阻塞）。"""
+        try:
+            from app.services.event_bus import event_bus
+
+            event_bus.broadcast_raw(
+                event_type="note.synced",
+                extra={
+                    "project_id": str(project_id),
+                    "section_id": section_id,
+                },
+            )
+        except Exception as exc:
+            logger.warning("Failed to broadcast note.synced SSE: %s", exc)
+
+
+# ─── Module-level singleton ──────────────────────────────────────────────────
+
+wp_disclosure_sync_service = WpDisclosureSyncService()

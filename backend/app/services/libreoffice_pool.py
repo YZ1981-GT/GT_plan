@@ -253,42 +253,17 @@ def get_queue_depth_header() -> dict[str, str]:
 async def startup_health_check() -> None:
     """应用启动时探测 LibreOffice 可用性 (Req 8.3)。
 
-    探测 4 路径 + 执行 soffice --version 验证响应。
-    失败时记录 logger.error 但不阻塞应用启动。
+    简化策略：仅检测可执行文件是否存在，不实际运行 --version
+    （Windows 上启动 LO 需要 8-15 秒，会拖慢启动；运行时按需启动）。
     """
     soffice = _find_soffice()
     if soffice is None:
-        logger.error(
-            "[LIBREOFFICE_POOL] 启动健康检查失败：未找到 LibreOffice 可执行文件。"
-            "已探测路径: %s。三级数据源前两级仍可用。",
-            _SOFFICE_CANDIDATE_PATHS,
+        logger.warning(
+            "[LIBREOFFICE_POOL] 未找到 LibreOffice 可执行文件，三级数据源前两级仍可用。",
         )
         return
 
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            soffice, "--version",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=15)
-        version_str = stdout.decode("utf-8", errors="ignore").strip()
-        logger.info(
-            "[LIBREOFFICE_POOL] 启动健康检查通过: path=%s, version=%s",
-            soffice, version_str,
-        )
-    except asyncio.TimeoutError:
-        logger.error(
-            "[LIBREOFFICE_POOL] 启动健康检查超时（15s）: path=%s。"
-            "LibreOffice 可能卡死，三级数据源前两级仍可用。",
-            soffice,
-        )
-    except Exception as e:
-        logger.error(
-            "[LIBREOFFICE_POOL] 启动健康检查异常: path=%s, error=%s。"
-            "三级数据源前两级仍可用。",
-            soffice, e,
-        )
+    logger.info("[LIBREOFFICE_POOL] 检测到 LibreOffice: path=%s（运行时按需启动）", soffice)
 
 
 # ---------------------------------------------------------------------------

@@ -53,17 +53,36 @@
           :required="!!field.required"
           class="gt-dfq__context-item"
         >
-          <el-input
-            v-if="field.type === 'textarea'"
-            v-model="contextData[field.name]"
-            type="textarea"
-            :rows="3"
-            :readonly="!!field.readonly"
-            :maxlength="field.max_length"
-            :show-word-limit="!!field.max_length"
-            :placeholder="field.hint || field.label"
-            @change="onContextFieldChange(field.name)"
-          />
+          <div v-if="field.type === 'textarea'" class="gt-dfq__input-wrapper">
+            <div class="gt-ai-suggest-trigger" v-if="aiEnabled && !readonly && !field.readonly">
+              <el-button text size="small" :loading="aiLoading" @click="onAiSuggestContext(field.name)">🤖 AI 建议</el-button>
+            </div>
+            <el-input
+              v-model="contextData[field.name]"
+              type="textarea"
+              :rows="3"
+              :readonly="!!field.readonly"
+              :maxlength="field.max_length"
+              :show-word-limit="!!field.max_length"
+              :placeholder="field.hint || field.label"
+              @change="onContextFieldChange(field.name)"
+            />
+            <!-- AI 建议面板 -->
+            <div v-if="showSuggestionPanel && currentSuggestion?.fieldName === ('context.' + field.name)" class="gt-dfq__ai-panel">
+              <div class="gt-dfq__ai-panel-header">
+                <span class="gt-dfq__ai-panel-title">🤖 AI 建议</span>
+                <el-tag size="small" :type="currentSuggestion.confidence >= 0.7 ? 'success' : 'warning'">
+                  置信度 {{ Math.round(currentSuggestion.confidence * 100) }}%
+                </el-tag>
+              </div>
+              <pre class="gt-dfq__ai-panel-text">{{ currentSuggestion.text }}</pre>
+              <div class="gt-dfq__ai-panel-actions">
+                <el-button type="primary" size="small" @click="handleAdoptContext(field.name)">✅ 采纳</el-button>
+                <el-button size="small" @click="handleModifyContext(field.name)">✏️ 修改后采纳</el-button>
+                <el-button size="small" @click="handleIgnoreQa">❌ 忽略</el-button>
+              </div>
+            </div>
+          </div>
           <el-input
             v-else
             v-model="contextData[field.name]"
@@ -285,6 +304,7 @@ import {
   Plus as PlusIcon,
   Delete as DeleteIcon,
 } from '@element-plus/icons-vue'
+import { useWpAiSuggest } from '@/composables/useWpAiSuggest'
 import type { DFormSchema, DFormData, FieldChangePayload } from './GtDForm.vue'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -402,6 +422,45 @@ const combinations = ref<CombinationRow[]>([])
 const activeNoteIds = ref<string[]>([])
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+// ─── AI 辅助填写（US-5 Task 7.1/7.3/7.4） ───────────────────────────────────
+
+const {
+  aiEnabled,
+  aiLoading,
+  currentSuggestion,
+  showSuggestionPanel,
+  assistedFieldsList,
+  requestSuggestion,
+  adoptSuggestion,
+  modifySuggestion,
+  ignoreSuggestion,
+} = useWpAiSuggest({ wpId: props.wpId, sheetName: props.sheetName })
+
+function onAiSuggestContext(fieldName: string) {
+  const existingContent = contextData.value[fieldName] || ''
+  requestSuggestion('context.' + fieldName, existingContent)
+}
+
+function handleAdoptContext(fieldName: string) {
+  const text = adoptSuggestion()
+  if (text) {
+    contextData.value[fieldName] = text
+    debounceSave()
+  }
+}
+
+function handleModifyContext(fieldName: string) {
+  if (currentSuggestion.value) {
+    contextData.value[fieldName] = currentSuggestion.value.text
+    modifySuggestion(currentSuggestion.value.text)
+    debounceSave()
+  }
+}
+
+function handleIgnoreQa() {
+  ignoreSuggestion()
+}
 
 // ─── Static ──────────────────────────────────────────────────────────────────
 
@@ -845,7 +904,8 @@ function buildSavePayload(): QaFormData {
     context: { ...contextData.value },
     combinations: enriched,
     active_note_ids: [...activeNoteIds.value],
-  }
+    ai_assisted_fields: assistedFieldsList.value.length > 0 ? assistedFieldsList.value : undefined,
+  } as QaFormData
 }
 
 function debounceSave() {
@@ -1112,5 +1172,53 @@ onBeforeUnmount(() => {
   font-family: inherit;
   font-size: 12px;
   line-height: 1.6;
+}
+
+/* ── AI suggest ── */
+.gt-dfq__input-wrapper {
+  position: relative;
+  width: 100%;
+}
+.gt-ai-suggest-trigger {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  z-index: 5;
+}
+.gt-dfq__ai-panel {
+  margin-top: 8px;
+  border: 1px solid var(--el-color-primary-light-5);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--el-color-primary-light-9);
+}
+.gt-dfq__ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.gt-dfq__ai-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-color-primary);
+}
+.gt-dfq__ai-panel-text {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  background: var(--gt-color-bg-white, #fff);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--el-text-color-regular);
+  max-height: 200px;
+  overflow-y: auto;
+}
+.gt-dfq__ai-panel-actions {
+  display: flex;
+  gap: 8px;
 }
 </style>

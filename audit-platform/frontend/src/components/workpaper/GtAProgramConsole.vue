@@ -64,6 +64,12 @@
         </div>
 
         <div class="gt-a-program-console__actions">
+          <!-- Sprint 4 Task 17.7: 审计逻辑图折叠按钮 -->
+          <el-button text size="small" @click="flowGraphExpanded = !flowGraphExpanded" title="审计逻辑图">
+            🗺️ {{ flowGraphExpanded ? '收起' : '审计逻辑图' }}
+          </el-button>
+          <!-- Sprint 4 Task 14.3: 重新触发引导按钮 -->
+          <el-button text size="small" @click="triggerGuide" title="使用引导">?</el-button>
           <el-button
             v-if="!readonly && selectedIds.length > 0"
             type="warning"
@@ -75,6 +81,15 @@
         </div>
       </div>
     </div>
+
+    <!-- Sprint 4 Task 17.7: 审计逻辑流程图 -->
+    <GtAuditFlowGraph
+      v-if="wpId && projectId"
+      :wp-id="wpId"
+      :project-id="projectId"
+      :expanded="flowGraphExpanded"
+      @scroll-to-program="scrollToProgramRow"
+    />
 
     <!-- ─── 程序清单表格 ─── -->
     <el-table
@@ -233,6 +248,15 @@
         </template>
       </el-table-column>
 
+      <!-- 证据附件 -->
+      <el-table-column label="证据" width="70" align="center">
+        <template #default="{ row }">
+          <el-badge :value="row.attachment_count" :hidden="!row.attachment_count" :max="9">
+            <el-button text size="small" @click="openAttachment(row)">📎</el-button>
+          </el-badge>
+        </template>
+      </el-table-column>
+
       <!-- 裁剪理由（仅裁剪状态显示） -->
       <el-table-column label="裁剪理由" min-width="120">
         <template #default="{ row }">
@@ -310,14 +334,28 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- Sprint 4 Task 14.1: 首次使用引导 el-tour -->
+    <el-tour v-model="showGuide">
+      <el-tour-step
+        v-for="(step, idx) in guideSteps"
+        :key="idx"
+        :target="step.target"
+        :title="step.title"
+        :description="step.description"
+      />
+    </el-tour>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ArrowDown } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import GtAuditFlowGraph from '@/components/workpaper/GtAuditFlowGraph.vue'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
+import { useWpOnboardingGuide } from '@/composables/useWpOnboardingGuide'
 
 // ─── Types ───
 interface ProgramAssertions {
@@ -345,6 +383,7 @@ interface ProgramRow {
   status: string
   trim_reason?: string
   history?: ProgramHistoryItem[]
+  attachment_count?: number
 }
 
 interface TrimDecision {
@@ -383,14 +422,23 @@ const emit = defineEmits<{
   'program-status-change': [payload: { programId: string; status: string }]
   'jump-to-workpaper': [wpCode: string]
   'save': [data: AProgramHtmlData]
+  'open-attachment': [payload: { wpId: string; sheetName: string; rowRef: string }]
 }>()
 
 // ─── State ───
+const route = useRoute()
 const programs = ref<ProgramRow[]>([])
 const activeCategory = ref('')
 const selectedIds = ref<string[]>([])
 const expandedRowKeys = ref<string[]>([])
 const tableRef = ref<any>(null)
+
+// Sprint 4 Task 17.7: 审计逻辑图展开状态
+const flowGraphExpanded = ref(false)
+const projectId = computed(() => (route.params.projectId as string) || '')
+
+// Sprint 4 Task 14.1: 首次使用引导
+const { showGuide, guideSteps, triggerGuide } = useWpOnboardingGuide('a-program-console')
 
 // Trim dialog (single)
 const trimDialogVisible = ref(false)
@@ -518,6 +566,19 @@ function handleExpandChange(row: ProgramRow, expandedRows: ProgramRow[]) {
   expandedRowKeys.value = expandedRows.map(r => r.id)
 }
 
+// Sprint 4 Task 17.7: 滚动到指定程序行
+function scrollToProgramRow(programNo: number) {
+  const row = programs.value.find(p => p.program_no === programNo)
+  if (row && tableRef.value) {
+    tableRef.value.setCurrentRow(row)
+    // 尝试滚动到该行
+    const el = tableRef.value.$el?.querySelector(`[data-row-key="${row.id}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+}
+
 function handleSelectionChange(selection: ProgramRow[]) {
   selectedIds.value = selection.map(r => r.id)
 }
@@ -585,6 +646,14 @@ function handleIndexChipClick(resolved: ResolvedIndexRef) {
   if (resolved.ns === 'wp' && resolved.target) {
     emit('jump-to-workpaper', resolved.target)
   }
+}
+
+function openAttachment(row: ProgramRow) {
+  emit('open-attachment', {
+    wpId: props.wpId,
+    sheetName: props.sheetName,
+    rowRef: `${props.sheetName}:${row.program_no}`,
+  })
 }
 
 function debounceSave() {

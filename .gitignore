@@ -109,3 +109,12 @@ start-dev-log.bat
 .playwright-mcp/
 page-current-state.png
 page-*.png
+
+# Playwright 测试产物（保留 e2e-uat/ 源码 + playwright-uat.config.ts 配置）
+audit-platform/frontend/test-results/
+audit-platform/frontend/playwright-uat-report/
+audit-platform/frontend/playwright-report/
+
+# 备份文件（不入库）
+*.bak
+*.orig

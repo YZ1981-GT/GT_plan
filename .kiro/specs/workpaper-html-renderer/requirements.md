@@ -2,7 +2,7 @@
 
 > 起草日期：2026-05-25
 > 触发场景：D2A 应收账款实质性程序表 Univer 渲染呈现差，进一步分析发现底稿目录、附注披露表等多类底稿存在同样问题
-> 状态：✅ 三件套完成（requirements + design + tasks），进入 implementation 阶段
+> 状态：✅ 代码实现完成（40/40 tasks + 413 tests）| ⚠️ render_schema 覆盖率 55%（192/349），缺口修复见 workpaper-editor-slimdown Sprint 1
 
 ## 一、问题背景
 

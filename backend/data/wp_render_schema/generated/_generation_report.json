@@ -1,50 +1,110 @@
 {
   "tool": "generate_wp_render_schema.py",
   "args": {
-    "template_dir": "D:\\GT_plan\\backend\\wp_templates",
-    "output_dir": "D:\\GT_plan\\backend\\data\\wp_render_schema\\generated",
+    "template_dir": "D:\\GT_workplan\\backend\\wp_templates",
+    "output_dir": "D:\\GT_workplan\\backend\\data\\wp_render_schema\\generated",
     "wp_code_filter": null,
     "dry_run": false,
-    "overwrite": false,
+    "overwrite": true,
     "include_handcrafted": false
   },
-  "generated_at": "2026-05-26T15:58:20",
+  "generated_at": "2026-05-29T01:10:48",
   "stats": {
-    "candidates": 178,
+    "candidates": 346,
     "skipped_handcrafted": 0,
-    "skipped_existing": 1,
-    "generated": 177,
+    "skipped_existing": 0,
+    "generated": 344,
     "failed": 0
   },
+  "validation": {
+    "total_matches": 2470,
+    "total_mismatches": 7,
+    "total_missing": 102,
+    "mismatch_details": [
+      {
+        "wp_code": "A3-3",
+        "sheet": "合并范围判断流程图（举例）",
+        "generated": "univer",
+        "expected": "pending",
+        "gt_render": "PENDING-待人工归类"
+      },
+      {
+        "wp_code": "A3-3",
+        "sheet": "单一控制模型判断流程（参考）",
+        "generated": "univer",
+        "expected": "pending",
+        "gt_render": "PENDING-待人工归类"
+      },
+      {
+        "wp_code": "A3-3",
+        "sheet": "权益与负债的区分的判断框架（参考）",
+        "generated": "univer",
+        "expected": "pending",
+        "gt_render": "PENDING-待人工归类"
+      },
+      {
+        "wp_code": "A6-1",
+        "sheet": "基础信息",
+        "generated": "univer",
+        "expected": "pending",
+        "gt_render": "PENDING-待人工归类"
+      },
+      {
+        "wp_code": "B30-1-2-1",
+        "sheet": "Significant risks - fraud",
+        "generated": "univer",
+        "expected": "pending",
+        "gt_render": "PENDING-待人工归类"
+      },
+      {
+        "wp_code": "B30-1-2-1",
+        "sheet": "Significant risks - other",
+        "generated": "univer",
+        "expected": "pending",
+        "gt_render": "PENDING-待人工归类"
+      },
+      {
+        "wp_code": "B30-13-1",
+        "sheet": "基础信息",
+        "generated": "univer",
+        "expected": "pending",
+        "gt_render": "PENDING-待人工归类"
+      }
+    ]
+  },
   "class_summary": {
-    "A-一般程序表": 60,
-    "I-占位": 118,
-    "B-底稿目录": 115,
-    "F-审定表": 88,
-    "D-访谈": 11,
-    "F-汇总表": 2,
-    "D-检查表": 194,
-    "D-复核记录": 13,
-    "H-辅助说明": 45,
-    "D-风险评估": 4,
-    "D-业务了解": 17,
-    "D-业务模式": 8,
-    "D-政策检查": 17,
-    "F-数据表": 8,
-    "E-控制测试单条": 21,
+    "A-一般程序表": 152,
+    "I-占位": 244,
+    "F-数据表": 268,
+    "H-辅助说明": 102,
+    "F-分析表": 88,
+    "D-访谈": 24,
+    "B-底稿目录": 147,
+    "F-审定表": 98,
+    "F-汇总表": 8,
+    "D-检查表": 247,
+    "D-业务了解": 34,
+    "E-评价控制偏差": 29,
+    "F-CFS 编制": 24,
+    "D-复核记录": 25,
+    "_pending": 7,
+    "G-测算": 155,
+    "C-附注披露": 166,
+    "E-IT 控制测试": 255,
+    "D-风险评估": 17,
+    "D-业务模式": 9,
+    "D-政策检查": 19,
+    "E-控制测试单条": 23,
     "E-控制测试汇总": 14,
-    "E-IT 控制测试": 34,
-    "G-测算": 125,
-    "A-程序表": 25,
-    "F-检查数据表": 2,
-    "D-函证": 56,
+    "A-程序表": 26,
+    "F-检查数据表": 7,
+    "D-函证": 57,
     "A-替代程序": 9,
-    "C-附注披露": 149,
-    "F-明细表": 100,
-    "F-调整分录": 77,
-    "D-盘点": 21,
-    "A-实质性程序": 71,
-    "F-分析表": 30,
+    "F-明细表": 123,
+    "F-调整分录": 81,
+    "D-盘点": 28,
+    "A-实质性程序": 76,
+    "D-系统核对": 4,
     "A-S 议题程序": 13
   },
   "files": [
@@ -58,9 +118,63 @@
       "errors": []
     },
     {
+      "wp_code": "A1-11",
+      "source_xlsx": "A1-11 业务报告签发流转控制表+业务报告文号规则.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A1-11.yaml",
+      "sheets_total": 5,
+      "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A1-13",
+      "source_xlsx": "A1-13 完成阶段分析性复核（母公司）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A1-13.yaml",
+      "sheets_total": 7,
+      "sheets_classified": 7,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A1-14",
+      "source_xlsx": "A1-14 完成阶段分析性复核（合并）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A1-14.yaml",
+      "sheets_total": 10,
+      "sheets_classified": 10,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A1-17",
+      "source_xlsx": "A1-17 对应数据.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A1-17.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A1-18",
+      "source_xlsx": "A1-18 采用新金融工具准则衔接影响数核对 N.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A1-18.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "A10",
       "source_xlsx": "A10 与治理层沟通程序表.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\A10.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A10-2",
+      "source_xlsx": "A10-2 与治理层的沟通记录（通用）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A10-2.yaml",
       "sheets_total": 2,
       "sheets_classified": 2,
       "sheets_pending": 0,
@@ -103,11 +217,74 @@
       "errors": []
     },
     {
+      "wp_code": "A14-1",
+      "source_xlsx": "A14-1  内部控制缺陷汇总表.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A14-1.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A14-2",
+      "source_xlsx": "A14-2 企业层面控制缺陷评价.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A14-2.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A14-3",
+      "source_xlsx": "A14-3  IT缺陷汇总及评价.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A14-3.yaml",
+      "sheets_total": 6,
+      "sheets_classified": 6,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A14-4",
+      "source_xlsx": "A14-4 业务流程层面控制缺陷评价.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A14-4.yaml",
+      "sheets_total": 8,
+      "sheets_classified": 8,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A14-5",
+      "source_xlsx": "A14-5 与其他缺陷一同进行评价.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A14-5.yaml",
+      "sheets_total": 4,
+      "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A14-6",
+      "source_xlsx": "A14-6 非财务报告内部控制缺陷评价.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A14-6.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "A15",
       "source_xlsx": "A15 持续经营假设的考虑程序表.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\A15.yaml",
       "sheets_total": 3,
       "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A15-1",
+      "source_xlsx": "A15-1 持续经营调查表.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A15-1.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
       "sheets_pending": 0,
       "errors": []
     },
@@ -130,6 +307,51 @@
       "errors": []
     },
     {
+      "wp_code": "A17-5-1",
+      "source_xlsx": "A17-5-1 审计工作完成核对表（适用于财报审计）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A17-5-1.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A17-5-2",
+      "source_xlsx": "A17-5-2 审计工作完成核对表（适用于内控审计）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A17-5-2.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A17-5-3",
+      "source_xlsx": "A17-5-3  审计工作完成核对表（IPO业务特别程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A17-5-3.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A17-5-4",
+      "source_xlsx": "A17-5-4  审计工作完成核对表（新三板挂牌业务特别程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A17-5-4.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A17-5-5",
+      "source_xlsx": "A17-5-5  审计工作完成核对表（函证程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A17-5-5.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "A2",
       "source_xlsx": "A2 调整分录程序表.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\A2.yaml",
@@ -139,47 +361,101 @@
       "errors": []
     },
     {
-      "wp_code": "A21",
+      "wp_code": "A2-1",
+      "source_xlsx": "A2-1、A2-2单体报表试算.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A2-1.yaml",
+      "sheets_total": 22,
+      "sheets_classified": 22,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A21-1",
       "source_xlsx": "A21-1 项目现场负责人复核表及复核记录（适用于财报审计）.xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\A21.yaml",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A21-1.yaml",
       "sheets_total": 3,
       "sheets_classified": 3,
       "sheets_pending": 0,
       "errors": []
     },
     {
-      "wp_code": "A22",
+      "wp_code": "A21-2",
+      "source_xlsx": "A21-2 项目现场负责人复核表及复核记录（适用于内控审计）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A21-2.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A22-1",
       "source_xlsx": "A22-1 项目负责经理复核(适用于财报审计).xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\A22.yaml",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A22-1.yaml",
       "sheets_total": 3,
       "sheets_classified": 3,
       "sheets_pending": 0,
       "errors": []
     },
     {
-      "wp_code": "A23",
+      "wp_code": "A22-2",
+      "source_xlsx": "A22-2 项目负责经理复核表（适用于内控审计）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A22-2.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A23-1",
       "source_xlsx": "A23-1 项目合伙人复核(适用于财报审计).xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\A23.yaml",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A23-1.yaml",
       "sheets_total": 3,
       "sheets_classified": 3,
       "sheets_pending": 0,
       "errors": []
     },
     {
-      "wp_code": "A24",
-      "source_xlsx": "A24-1  项目质量复核合伙人复核表及记录（财务报表审计-适用非大型国企）.xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\A24.yaml",
+      "wp_code": "A23-2",
+      "source_xlsx": "A23-2 项目合伙人复核表（适用于内控审计）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A23-2.yaml",
+      "sheets_total": 4,
+      "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A24-1",
+      "source_xlsx": "A24-1 项目质量复核合伙人复核表及记录（财务报表审计-适用大型国企）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A24-1.yaml",
+      "sheets_total": 6,
+      "sheets_classified": 6,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A24-2",
+      "source_xlsx": "A24-2 项目质量复核合伙人复核(适用于内控审计).xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A24-2.yaml",
       "sheets_total": 3,
       "sheets_classified": 3,
       "sheets_pending": 0,
       "errors": []
     },
     {
-      "wp_code": "A25",
-      "source_xlsx": "A25-1 质量控制复核人复核表及复核记录(适用于财报审计-适用大型国企).xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\A25.yaml",
-      "sheets_total": 3,
-      "sheets_classified": 3,
+      "wp_code": "A25-1",
+      "source_xlsx": "A25-1 质量控制复核表及复核记录(适用于财报审计-适用非大型国企).xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A25-1.yaml",
+      "sheets_total": 6,
+      "sheets_classified": 6,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A25-2",
+      "source_xlsx": "A25-2 质量控制复核表及复核记录(适用于内控审计).xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A25-2.yaml",
+      "sheets_total": 6,
+      "sheets_classified": 6,
       "sheets_pending": 0,
       "errors": []
     },
@@ -198,6 +474,60 @@
       "output_path": "backend\\data\\wp_render_schema\\generated\\A3.yaml",
       "sheets_total": 2,
       "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A3-1",
+      "source_xlsx": "A3-1、-2 合并报表试算-2019.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A3-1.yaml",
+      "sheets_total": 43,
+      "sheets_classified": 43,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A3-3",
+      "source_xlsx": "A3-3 结构化主体纳入合并范围的判断.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A3-3.yaml",
+      "sheets_total": 4,
+      "sheets_classified": 1,
+      "sheets_pending": 3,
+      "errors": []
+    },
+    {
+      "wp_code": "A3-4",
+      "source_xlsx": "A3-4 合并报表试算（含金融企业报表项目）-清洁版-2019.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A3-4.yaml",
+      "sheets_total": 43,
+      "sheets_classified": 43,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A3-5",
+      "source_xlsx": "A3-5 合并附注汇总-2019.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A3-5.yaml",
+      "sheets_total": 98,
+      "sheets_classified": 98,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A3-6",
+      "source_xlsx": "A3-6 母公司附注汇总-2019.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A3-6.yaml",
+      "sheets_total": 98,
+      "sheets_classified": 98,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A3-7",
+      "source_xlsx": "A3-7内部往来核对表、A3-8商誉减值测试.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A3-7.yaml",
+      "sheets_total": 5,
+      "sheets_classified": 5,
       "sheets_pending": 0,
       "errors": []
     },
@@ -229,11 +559,56 @@
       "errors": []
     },
     {
+      "wp_code": "A4-1",
+      "source_xlsx": "A4-1 经营分部列报信息2019.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A4-1.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "A5",
       "source_xlsx": "A5 财务报表支持程序表.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\A5.yaml",
       "sheets_total": 2,
       "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A5-1",
+      "source_xlsx": "A5-1 现金流量表审计.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A5-1.yaml",
+      "sheets_total": 9,
+      "sheets_classified": 9,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A5-2",
+      "source_xlsx": "A5-2 承诺事项.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A5-2.yaml",
+      "sheets_total": 4,
+      "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A5-3",
+      "source_xlsx": "A5-3 或有事项.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A5-3.yaml",
+      "sheets_total": 6,
+      "sheets_classified": 6,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A5-4",
+      "source_xlsx": "A5-4 持续经营净利润和终止经营净利润.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A5-4.yaml",
+      "sheets_total": 6,
+      "sheets_classified": 6,
       "sheets_pending": 0,
       "errors": []
     },
@@ -247,11 +622,38 @@
       "errors": []
     },
     {
+      "wp_code": "A6-1",
+      "source_xlsx": "A6-1 财务报告文件包（含经审计的财务报表及附注等）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A6-1.yaml",
+      "sheets_total": 113,
+      "sheets_classified": 112,
+      "sheets_pending": 1,
+      "errors": []
+    },
+    {
       "wp_code": "A7",
       "source_xlsx": "A7 关联交易程序表.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\A7.yaml",
       "sheets_total": 1,
       "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A7-1",
+      "source_xlsx": "A7-1 汇总关联方交易及关联往来.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A7-1.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "A7-2",
+      "source_xlsx": "A7-2 关联方交易附注披露信息.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\A7-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
       "sheets_pending": 0,
       "errors": []
     },
@@ -274,9 +676,27 @@
       "errors": []
     },
     {
-      "wp_code": "B1",
+      "wp_code": "B1-1",
       "source_xlsx": "B1-1 风险评估表（适用于承接）.xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\B1.yaml",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B1-1.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B1-2",
+      "source_xlsx": "B1-2 风险评估表（适用于保持）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B1-2.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B1-5",
+      "source_xlsx": "B1-5 KAA检查程序表.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B1-5.yaml",
       "sheets_total": 1,
       "sheets_classified": 1,
       "sheets_pending": 0,
@@ -319,6 +739,15 @@
       "errors": []
     },
     {
+      "wp_code": "B13-2",
+      "source_xlsx": "B13-2~5未审报表初步分析.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B13-2.yaml",
+      "sheets_total": 8,
+      "sheets_classified": 8,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "B15",
       "source_xlsx": "B15 重要性计算表.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\B15.yaml",
@@ -342,6 +771,15 @@
       "output_path": "backend\\data\\wp_render_schema\\generated\\B19.yaml",
       "sheets_total": 3,
       "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B19-1",
+      "source_xlsx": "B19-1 识别未披露的关联方关系及异常关联交易.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B19-1.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
       "sheets_pending": 0,
       "errors": []
     },
@@ -373,9 +811,99 @@
       "errors": []
     },
     {
-      "wp_code": "B22A",
+      "wp_code": "B2-5",
+      "source_xlsx": "B2-5 与前任注册会计师沟通后的评价（就业务承接事项）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B2-5.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B22A-1",
       "source_xlsx": "B22A-1 了解企业层面控制 - 控制环境.xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\B22A.yaml",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B22A-1.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B22A-2",
+      "source_xlsx": "B22A-2 了解企业层面控制 - 管理层凌驾于控制之上.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B22A-2.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B22A-3",
+      "source_xlsx": "B22A-3 了解企业层面控制 - 风险评估.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B22A-3.yaml",
+      "sheets_total": 4,
+      "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B22A-4",
+      "source_xlsx": "B22A-4 了解企业层面控制 - 信息与沟通.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B22A-4.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B22A-4-1",
+      "source_xlsx": "B22A-4-1 IT概要.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B22A-4-1.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B22A-4-2",
+      "source_xlsx": "B22A-4-2 重大业务流程涉及的信息系统.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B22A-4-2.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B22A-4-4-1",
+      "source_xlsx": "B22A-4-4-1 了解IT一般控制.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B22A-4-4-1.yaml",
+      "sheets_total": 5,
+      "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B22A-4-4-2",
+      "source_xlsx": "B22A-4-4-2 IT一般控制职责分离分析.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B22A-4-4-2.yaml",
+      "sheets_total": 6,
+      "sheets_classified": 6,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B22A-4-5",
+      "source_xlsx": "B22A-4-5 财务报告过程.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B22A-4-5.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B22A-5",
+      "source_xlsx": "B22A-5 了解企业层面控制 - 监督.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B22A-5.yaml",
       "sheets_total": 3,
       "sheets_classified": 3,
       "sheets_pending": 0,
@@ -400,11 +928,20 @@
       "errors": []
     },
     {
-      "wp_code": "B23",
+      "wp_code": "B23-15",
       "source_xlsx": "B23-15 了解信息处理控制.xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\B23.yaml",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B23-15.yaml",
       "sheets_total": 1,
       "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B23",
+      "source_xlsx": "B23-XX-5 职责分离 - 通用模板.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B23.yaml",
+      "sheets_total": 6,
+      "sheets_classified": 6,
       "sheets_pending": 0,
       "errors": []
     },
@@ -427,6 +964,60 @@
       "errors": []
     },
     {
+      "wp_code": "B30-1",
+      "source_xlsx": "B30-1 了解组成部分（2021年6月）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B30-1.yaml",
+      "sheets_total": 5,
+      "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B30-1-2-1",
+      "source_xlsx": "B30-1-2-1 特别风险记录模板.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B30-1-2-1.yaml",
+      "sheets_total": 7,
+      "sheets_classified": 5,
+      "sheets_pending": 2,
+      "errors": []
+    },
+    {
+      "wp_code": "B30-12",
+      "source_xlsx": "B30-12 组成部分已识别错报汇总表（2021年6月）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B30-12.yaml",
+      "sheets_total": 8,
+      "sheets_classified": 8,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B30-13-1",
+      "source_xlsx": "B30-13-1 财务报告文件包（含经审计的财务报表及附注等）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B30-13-1.yaml",
+      "sheets_total": 113,
+      "sheets_classified": 112,
+      "sheets_pending": 1,
+      "errors": []
+    },
+    {
+      "wp_code": "B30-15",
+      "source_xlsx": "B30-15 组成部分预算和实际收费信息（2021年6月）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B30-15.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B30-8",
+      "source_xlsx": "B30-8 了解组成部分注册会计师（2023年6月）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B30-8.yaml",
+      "sheets_total": 5,
+      "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "B40",
       "source_xlsx": "B40 项目组讨论程序表.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\B40.yaml",
@@ -445,11 +1036,65 @@
       "errors": []
     },
     {
+      "wp_code": "B50-1",
+      "source_xlsx": "B50-1 汇总识别的风险因素.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B50-1.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B50-2",
+      "source_xlsx": "B50-2 财务报表层次风险（含财务报表层次特别风险）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B50-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B50-3",
+      "source_xlsx": "B50-3 认定层次重大错报风险.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B50-3.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B50-4",
+      "source_xlsx": "B50-4 汇总认定层次特别风险.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B50-4.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "B51",
       "source_xlsx": "B51 舞弊风险因素（三因素分析）.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\B51.yaml",
       "sheets_total": 4,
       "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B51-3",
+      "source_xlsx": "B51-3 识别对货币资金需保持警觉的情形程序.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B51-3.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "B51-5",
+      "source_xlsx": "B51-5 识别收入确认方面可能存在舞弊风险的迹象程序.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B51-5.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
       "sheets_pending": 0,
       "errors": []
     },
@@ -463,9 +1108,9 @@
       "errors": []
     },
     {
-      "wp_code": "B60",
+      "wp_code": "B60-1",
       "source_xlsx": "B60-1 审计项目工时预算与控制表.xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\B60.yaml",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\B60-1.yaml",
       "sheets_total": 4,
       "sheets_classified": 4,
       "sheets_pending": 0,
@@ -490,11 +1135,29 @@
       "errors": []
     },
     {
+      "wp_code": "C10-2",
+      "source_xlsx": "C10-2 职工薪酬循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C10-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "C11",
       "source_xlsx": "C11 管理循环控制测试.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\C11.yaml",
       "sheets_total": 5,
       "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "C11-2",
+      "source_xlsx": "C11-2 管理循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C11-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
       "sheets_pending": 0,
       "errors": []
     },
@@ -508,11 +1171,29 @@
       "errors": []
     },
     {
+      "wp_code": "C12-2",
+      "source_xlsx": "C12-2 税金循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C12-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "C13",
       "source_xlsx": "C13 债务循环业务层面控制测试.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\C13.yaml",
       "sheets_total": 5,
       "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "C13-2",
+      "source_xlsx": "C13-2 债务循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C13-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
       "sheets_pending": 0,
       "errors": []
     },
@@ -526,11 +1207,29 @@
       "errors": []
     },
     {
+      "wp_code": "C14-2",
+      "source_xlsx": "C14-2 租赁循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C14-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "C15",
       "source_xlsx": "C15 关联方循环控制测试.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\C15.yaml",
       "sheets_total": 5,
       "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "C15-2",
+      "source_xlsx": "C15-2 关联方循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C15-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
       "sheets_pending": 0,
       "errors": []
     },
@@ -544,11 +1243,29 @@
       "errors": []
     },
     {
+      "wp_code": "C2-2",
+      "source_xlsx": "C2-2 销售循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C2-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "C21",
       "source_xlsx": "C21 具有信息技术专业技能的项目组成员.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\C21.yaml",
       "sheets_total": 2,
       "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "C21-1",
+      "source_xlsx": "C21-1  IT审计发现汇总表.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C21-1.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
       "sheets_pending": 0,
       "errors": []
     },
@@ -607,11 +1324,29 @@
       "errors": []
     },
     {
+      "wp_code": "C3-2",
+      "source_xlsx": "C3-2 货币资金循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C3-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "C4",
       "source_xlsx": "C4 存货循环控制测试.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\C4.yaml",
       "sheets_total": 5,
       "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "C4-2",
+      "source_xlsx": "C4-2 存货循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C4-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
       "sheets_pending": 0,
       "errors": []
     },
@@ -625,11 +1360,29 @@
       "errors": []
     },
     {
+      "wp_code": "C5-2",
+      "source_xlsx": "C5-2 投资循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C5-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "C6",
       "source_xlsx": "C6 固定资产循环控制测试.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\C6.yaml",
       "sheets_total": 4,
       "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "C6-2",
+      "source_xlsx": "C6-2 固定资产循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C6-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
       "sheets_pending": 0,
       "errors": []
     },
@@ -643,6 +1396,15 @@
       "errors": []
     },
     {
+      "wp_code": "C7-2",
+      "source_xlsx": "C7-2 在建工程循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C7-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "C8",
       "source_xlsx": "C8 无形资产及其他长期资产循环控制测试.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\C8.yaml",
@@ -652,11 +1414,29 @@
       "errors": []
     },
     {
+      "wp_code": "C8-2",
+      "source_xlsx": "C8-2 无形资产及其他长期资产循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C8-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "C9",
       "source_xlsx": "C9 研发循环控制测试.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\C9.yaml",
       "sheets_total": 5,
       "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "C9-2",
+      "source_xlsx": "C9-2 研发循环评价控制偏差.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\C9-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
       "sheets_pending": 0,
       "errors": []
     },
@@ -679,6 +1459,33 @@
       "errors": []
     },
     {
+      "wp_code": "D2-1",
+      "source_xlsx": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\D2-1.yaml",
+      "sheets_total": 11,
+      "sheets_classified": 11,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "D2-5",
+      "source_xlsx": "D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\D2-5.yaml",
+      "sheets_total": 4,
+      "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "D2-6",
+      "source_xlsx": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\D2-6.yaml",
+      "sheets_total": 12,
+      "sheets_classified": 12,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
       "wp_code": "D3",
       "source_xlsx": "D3 预收账款.xlsx",
       "output_path": "backend\\data\\wp_render_schema\\generated\\D3.yaml",
@@ -688,11 +1495,74 @@
       "errors": []
     },
     {
-      "wp_code": "D4",
+      "wp_code": "D4-12",
       "source_xlsx": "D4-12 营业收入-合同检查（Leap-常规程序）.xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\D4.yaml",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\D4-12.yaml",
       "sheets_total": 1,
       "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "D4-13",
+      "source_xlsx": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\D4-13.yaml",
+      "sheets_total": 9,
+      "sheets_classified": 9,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "D4-1",
+      "source_xlsx": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\D4-1.yaml",
+      "sheets_total": 10,
+      "sheets_classified": 10,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "D4-21",
+      "source_xlsx": "D4-21营业收入-关联方检查（Leap-常规程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\D4-21.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "D4-22",
+      "source_xlsx": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\D4-22.yaml",
+      "sheets_total": 14,
+      "sheets_classified": 14,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "D4-33",
+      "source_xlsx": "D4-33至D4-36 其他业务收入.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\D4-33.yaml",
+      "sheets_total": 5,
+      "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "D4-5",
+      "source_xlsx": "D4-5 营业收入-会计政策（Leap-常规程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\D4-5.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "D4-6",
+      "source_xlsx": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\D4-6.yaml",
+      "sheets_total": 7,
+      "sheets_classified": 7,
       "sheets_pending": 0,
       "errors": []
     },
@@ -733,11 +1603,38 @@
       "errors": []
     },
     {
-      "wp_code": "E1",
+      "wp_code": "E1-14",
       "source_xlsx": "E1-14至E1-15  货币资金 -分析程序（Leap应对措施-分析程序）.xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\E1.yaml",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\E1-14.yaml",
       "sheets_total": 4,
       "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "E1-18",
+      "source_xlsx": "E1-18至E1-23  货币资金 -检查（Leap应对措施-检查）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\E1-18.yaml",
+      "sheets_total": 7,
+      "sheets_classified": 7,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "E1-1",
+      "source_xlsx": "E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\E1-1.yaml",
+      "sheets_total": 16,
+      "sheets_classified": 16,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "E1-26",
+      "source_xlsx": "E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\E1-26.yaml",
+      "sheets_total": 9,
+      "sheets_classified": 9,
       "sheets_pending": 0,
       "errors": []
     },
@@ -760,11 +1657,92 @@
       "errors": []
     },
     {
-      "wp_code": "F2",
+      "wp_code": "F2-16",
       "source_xlsx": "F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\F2.yaml",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\F2-16.yaml",
       "sheets_total": 1,
       "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "F2-18",
+      "source_xlsx": "F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\F2-18.yaml",
+      "sheets_total": 5,
+      "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "F2-1",
+      "source_xlsx": "F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\F2-1.yaml",
+      "sheets_total": 20,
+      "sheets_classified": 20,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "F2-21",
+      "source_xlsx": "F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\F2-21.yaml",
+      "sheets_total": 9,
+      "sheets_classified": 9,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "F2-29",
+      "source_xlsx": "F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\F2-29.yaml",
+      "sheets_total": 9,
+      "sheets_classified": 9,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "F2-38",
+      "source_xlsx": "F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\F2-38.yaml",
+      "sheets_total": 13,
+      "sheets_classified": 13,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "F2-47",
+      "source_xlsx": "F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\F2-47.yaml",
+      "sheets_total": 6,
+      "sheets_classified": 6,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "F2-52",
+      "source_xlsx": "F2-52 存货及跌价准备 -关联交易（Leap-常规程序）.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\F2-52.yaml",
+      "sheets_total": 5,
+      "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "F2-55",
+      "source_xlsx": "F2-55至F2-58 合同履约成本.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\F2-55.yaml",
+      "sheets_total": 7,
+      "sheets_classified": 7,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "F2-61",
+      "source_xlsx": "F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\F2-61.yaml",
+      "sheets_total": 15,
+      "sheets_classified": 15,
       "sheets_pending": 0,
       "errors": []
     },
@@ -1561,20 +2539,200 @@
       "errors": []
     },
     {
-      "wp_code": "S32",
+      "wp_code": "S32-10",
       "source_xlsx": "S32-10专项核查-资产减值估计不足的情形.xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\S32.yaml",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S32-10.yaml",
       "sheets_total": 5,
       "sheets_classified": 5,
       "sheets_pending": 0,
       "errors": []
     },
     {
-      "wp_code": "S33",
-      "source_xlsx": "S33-1财务报告内部控制制度.xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\S33.yaml",
+      "wp_code": "S32-11",
+      "source_xlsx": "S32-11专项核查-延迟资产转固减少折旧的情形.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S32-11.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S32-12",
+      "source_xlsx": "S32-12专项核查-其他粉饰业绩或财务造假的情形.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S32-12.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S32-13",
+      "source_xlsx": "S32-13 专项核查-期后业绩下滑情形.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S32-13.yaml",
       "sheets_total": 1,
       "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S32-1",
+      "source_xlsx": "S32-1专项核查-自我交易虚增利润的情形.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S32-1.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S32-2",
+      "source_xlsx": "S32-2专项核查-与客户或供应商恶意串通提前确认收入虚假增长的情形.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S32-2.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S32-3",
+      "source_xlsx": "S32-3专项核查-关联方代为支付成本费用的情形.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S32-3.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S32-4",
+      "source_xlsx": "S32-4专项检查-保荐机构、PE及其关联方进行利益输送的情形.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S32-4.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S32-5",
+      "source_xlsx": "S32-5 专项核查-体外资金支付货款承担成本的情形.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S32-5.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S32-6",
+      "source_xlsx": "S32-6专项核查-互联网造假虚增收入的情形.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S32-6.yaml",
+      "sheets_total": 5,
+      "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S32-7",
+      "source_xlsx": "S32-7专项核查-成本费用资本化的情形.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S32-7.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S32-8",
+      "source_xlsx": "S32-8 专项核查-压缩员工薪金的情形.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S32-8.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S32-9",
+      "source_xlsx": "S32-9专项核查-延迟成本费用增加利润的情形.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S32-9.yaml",
+      "sheets_total": 5,
+      "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S33-1",
+      "source_xlsx": "S33-1财务报告内部控制制度.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S33-1.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S33-2",
+      "source_xlsx": "S33-2财务与非财务信息印证.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S33-2.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S33-3",
+      "source_xlsx": "S33-3盈利异常增长和异常交易.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S33-3.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S33-4",
+      "source_xlsx": "S33-4关联方关系及其交易.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S33-4.yaml",
+      "sheets_total": 4,
+      "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S33-5",
+      "source_xlsx": "S33-5收入及毛利率.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S33-5.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S33-6",
+      "source_xlsx": "S33-6主要客户和供应商.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S33-6.yaml",
+      "sheets_total": 1,
+      "sheets_classified": 1,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S33-7",
+      "source_xlsx": "S33-7存货及其他资产.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S33-7.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S33-8",
+      "source_xlsx": "S33-8现金收付交易.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S33-8.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S33-9",
+      "source_xlsx": "S33-9财务异常信息.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S33-9.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
       "sheets_pending": 0,
       "errors": []
     },
@@ -1588,11 +2746,416 @@
       "errors": []
     },
     {
-      "wp_code": "S35",
-      "source_xlsx": "S35-1 关联交易.xlsx",
-      "output_path": "backend\\data\\wp_render_schema\\generated\\S35.yaml",
+      "wp_code": "S34-1",
+      "source_xlsx": "S34-1 军工等涉秘业务企业信息披露豁免.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-1.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-10",
+      "source_xlsx": "S34-10 财务性投资.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-10.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-11",
+      "source_xlsx": "S34-11 业务重组.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-11.yaml",
+      "sheets_total": 4,
+      "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-12",
+      "source_xlsx": "S34-12 经营业绩下滑.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-12.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-13",
+      "source_xlsx": "S34-13 持续经营能力.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-13.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-14",
+      "source_xlsx": "S34-14 财务内控.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-14.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-15",
+      "source_xlsx": "S34-15 现金交易.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-15.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-16",
+      "source_xlsx": "S34-16 第三方回款.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-16.yaml",
+      "sheets_total": 5,
+      "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-17",
+      "source_xlsx": "S34-17 会计政策、会计估计变更和差错更正.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-17.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-18",
+      "source_xlsx": "S34-18 引用第三方数据.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-18.yaml",
+      "sheets_total": 4,
+      "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-19",
+      "source_xlsx": "S34-19 经销商模式.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-19.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-2",
+      "source_xlsx": "S34-2 期权激励计划.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-2.yaml",
+      "sheets_total": 4,
+      "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-20",
+      "source_xlsx": "S34-20 劳务外包.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-20.yaml",
+      "sheets_total": 4,
+      "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-21",
+      "source_xlsx": "S34-21 委外加工.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-21.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-22",
+      "source_xlsx": "S34-22 股权集中企业的公司治理有效性、内控规范性与独立性.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-22.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-23",
+      "source_xlsx": "S34-23 通过互联网开展业务相关信息系统核查.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-23.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-24",
+      "source_xlsx": "S34-24 信息系统专项核查.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-24.yaml",
       "sheets_total": 3,
       "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-25",
+      "source_xlsx": "S34-25 资金流水核查.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-25.yaml",
+      "sheets_total": 5,
+      "sheets_classified": 5,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-26",
+      "source_xlsx": "S34-26 尚未盈利或最近一期存在累计未弥补亏损.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-26.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-27",
+      "source_xlsx": "S34-27 研发投入的认定及内控.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-27.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-28",
+      "source_xlsx": "S34-28 研发支出资本化.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-28.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-29",
+      "source_xlsx": "S34-29 科研项目相关政府补助的会计处理.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-29.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-3",
+      "source_xlsx": "S34-3 股份支付.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-3.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-30",
+      "source_xlsx": "S34-30 对赌协议.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-30.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-31",
+      "source_xlsx": "S34-31 存货.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-31.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-32",
+      "source_xlsx": "S34-32 期间费用核查.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-32.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-33",
+      "source_xlsx": "S34-33 商誉减值核查.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-33.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-34",
+      "source_xlsx": "S34-34 涉农企业.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-34.yaml",
+      "sheets_total": 4,
+      "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-35",
+      "source_xlsx": "S34-35 收入核查.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-35.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-36",
+      "source_xlsx": "S34-36 投资收益占比.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-36.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-37",
+      "source_xlsx": "S34-37 现金流异常.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-37.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-38",
+      "source_xlsx": "S34-38 估值调整协议.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-38.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-39",
+      "source_xlsx": "S34-39 应收票据和应收款项融资.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-39.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-4",
+      "source_xlsx": "S34-4 关联交易.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-4.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-40",
+      "source_xlsx": "S34-40 在建工程核查.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-40.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-41",
+      "source_xlsx": "S34-41 主要客户和供应商核查.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-41.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-5",
+      "source_xlsx": "S34-5 应收账款减值.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-5.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-6",
+      "source_xlsx": "S34-6 固定资产使用及减值.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-6.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-7",
+      "source_xlsx": "S34-7 税收优惠.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-7.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-8",
+      "source_xlsx": "S34-8 合并中无形资产认定与客户关系.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-8.yaml",
+      "sheets_total": 4,
+      "sheets_classified": 4,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S34-9",
+      "source_xlsx": "S34-9 共同投资.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S34-9.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S35-1",
+      "source_xlsx": "S35-1 关联交易.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S35-1.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S35-2",
+      "source_xlsx": "S35-2 财务性投资核查.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S35-2.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S35-3",
+      "source_xlsx": "S35-3 现金分红核查.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S35-3.yaml",
+      "sheets_total": 3,
+      "sheets_classified": 3,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S35-4",
+      "source_xlsx": "S35-4 商誉减值.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S35-4.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
+      "sheets_pending": 0,
+      "errors": []
+    },
+    {
+      "wp_code": "S35-5",
+      "source_xlsx": "S35-5 募集资金涉及收购核查要点.xlsx",
+      "output_path": "backend\\data\\wp_render_schema\\generated\\S35-5.yaml",
+      "sheets_total": 2,
+      "sheets_classified": 2,
       "sheets_pending": 0,
       "errors": []
     },

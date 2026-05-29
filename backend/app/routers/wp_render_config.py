@@ -29,6 +29,7 @@ from app.services.wp_classification_service import (
     WpClassificationService,
     derive_component_type,
 )
+from app.services.wp_auto_fill_service import _resolve_auto_fill_values
 from app.services.wp_render_schema_service import WpRenderSchemaService
 from app.services.wp_template_version_service import WpTemplateVersionService
 
@@ -245,6 +246,33 @@ async def get_render_config(
         }
         sheets.append(sheet_config)
 
+    # ─── Step 7: 批量解析 auto-fill 取数值（US-15）────────────────────────
+    fill_results: dict = {}
+    # 获取项目年度
+    year_query = sa.text("SELECT year FROM projects WHERE id = :pid")
+    year_result = await db.execute(year_query, {"pid": str(project_id)})
+    year_row = year_result.first()
+    project_year = year_row[0] if year_row and year_row[0] else None
+
+    if project_year:
+        # 合并所有 sheet 的 schema 用于批量取数
+        combined_schema: dict = {"sheets": {}}
+        for sheet_cfg in sheets:
+            if sheet_cfg.get("schema") and isinstance(sheet_cfg["schema"], dict):
+                combined_schema["sheets"][sheet_cfg["sheet_name"]] = sheet_cfg["schema"].get(
+                    "sheets", {}
+                ).get(sheet_cfg["sheet_name"], sheet_cfg["schema"])
+        try:
+            fill_results = await _resolve_auto_fill_values(
+                schema=combined_schema,
+                project_id=project_id,
+                year=project_year,
+                db=db,
+            )
+        except Exception as e:
+            logger.warning("Auto-fill resolution failed: %s", e)
+            fill_results = {}
+
     return {
         "wp_id": str(wp_id),
         "wp_code": wp_code,
@@ -253,4 +281,5 @@ async def get_render_config(
         "is_real_workpaper": is_real_workpaper,
         "template_version": template_version_str,
         "sheets": sheets,
+        "fill_results": fill_results,
     }

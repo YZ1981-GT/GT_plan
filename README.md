@@ -11,7 +11,7 @@
 - **Phase 0-7**：已完成开发（基础设施、核心功能、底稿管理、报表管理、合并报表、协作功能、AI 辅助、扩展功能、人员管理、深度增强）
 - **Phase 8**：已完成规划（数据模型优化与性能提升，三件套文档已创建）
 - **测试覆盖**：后端约 143 个测试（AI/OCR 相关用例受本地依赖版本影响）
-- **数据库迁移**：34 个 Alembic 迁移脚本（001-034）
+- **数据库迁移**：D6 版本化 SQL 脚本（V001-V026，自动执行于后端启动时；详见 `backend/migrations/`）
 - **前端组件**：50+ Vue 组件
 - **API 端点**：100+ REST API 端点
 
@@ -38,7 +38,7 @@
 - **数据库**: PostgreSQL 16
 - **缓存**: Redis 7
 - **ORM**: SQLAlchemy (async)
-- **迁移**: Alembic（001-034 版本）
+- **迁移**: D6 版本化 SQL 脚本（V001-V026 + per-migration 异常隔离 + schema 漂移自检）
 - **AI**: PaddleOCR、Tesseract、MinerU（可选）
 - **文档编辑**: Univer 纯前端表格编辑器（原 ONLYOFFICE 已迁移）
 - **底稿模板**: 致同 2025 修订版 476 个模板文件（xlsx/xlsm/docx），存储在 `backend/wp_templates/`
@@ -161,8 +161,8 @@ GT_plan/
 │   │   ├── models/        # 数据模型
 │   │   ├── services/      # 业务服务
 │   │   ├── routers/       # API 路由
-│   │   └── core/          # 核心配置
-│   ├── alembic/           # 数据库迁移（001-034）
+│   │   └── core/          # 核心配置（含 migration_runner / schema_drift_detector）
+│   ├── migrations/        # 数据库迁移 V*.sql + R*.sql 回滚（D6 版本化）
 │   ├── tests/             # 测试文件（143个测试）
 │   └── requirements.txt   # Python 依赖
 ├── audit-platform/         # 前端应用
@@ -269,8 +269,11 @@ source .venv/bin/activate  # Linux/Mac
 .venv\Scripts\activate     # Windows
 pip install -r requirements.txt
 
-# 运行迁移
-alembic upgrade head
+# 数据库迁移（D6 版本化 SQL 脚本，启动时自动执行）
+# 项目使用 backend/migrations/V*.sql 作为唯一迁移系统
+# 后端启动时由 MigrationRunner 自动检测并应用未执行的版本
+# 手动执行（仅诊断用）：
+python -m app.core.migration_runner
 
 # 运行测试
 pytest
@@ -348,7 +351,7 @@ For project-year accounting data import (`tb_balance`, `tb_ledger`, `tb_aux_bala
 - Streaming mode processes rows in chunks and avoids router-level full-file loading into memory.
 - `on_duplicate=overwrite` performs soft-delete of existing same-year data before writing new rows.
 - Smart import cleanup now soft-deletes old four-table rows for the same `project_id + year` and marks previous completed batches as `rolled_back`.
-- Run Alembic migrations to apply import hot-path indexes (including revision `035`) before benchmarking.
+- Run database migrations (D6 version SQL, auto-applied on backend startup) to apply import hot-path indexes before benchmarking.
 
 Recommended upload strategy for very large datasets:
 

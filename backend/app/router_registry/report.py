@@ -95,3 +95,7 @@ def register_report_routers(app: FastAPI) -> None:
     # ═══ §95. Sprint A.7：集团附注模板基线（D6 升级） ═══
     from app.routers.group_note_baseline import router as group_note_baseline_router
     app.include_router(group_note_baseline_router, tags=["group-note-baseline"])
+
+    # ═══ §96. Sprint C.0：附注离线导出/导入（D15） ═══
+    from app.routers.note_offline import router as note_offline_router
+    app.include_router(note_offline_router, tags=["note-offline"])

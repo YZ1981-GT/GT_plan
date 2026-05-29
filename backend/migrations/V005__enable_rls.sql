@@ -7,7 +7,7 @@
 -- 4. 应用角色不是表 owner，需要 FORCE ROW LEVEL SECURITY
 --
 -- 应用层 set_rls_context 必须用 set_config('app.current_project_id', value, true)
--- 而非 SET LOCAL ... = :pid（PG 的 SET 命令不支持 prepared statement 绑定参数）
+-- 而非 SET LOCAL ... = $1（PG 的 SET 命令不支持 prepared statement 绑定参数）
 
 -- 1. 启用 RLS（ENABLE + FORCE，幂等保护）
 ALTER TABLE working_paper ENABLE ROW LEVEL SECURITY;

@@ -1,0 +1,522 @@
+# F2-29.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:11:10
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: F2-29
+template_path: backend/wp_templates/F/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:11:09'
+  source_xlsx: F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+    fixed_cells:
+      A2: 被审计单位：
+      A3: ${entity_name}
+      A4: ${period_end}
+      F3: ${index_no}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 编制日期：
+        D:
+          field: col_d
+          type: text
+          label: '3'
+        E:
+          field: col_e
+          type: text
+          label: 存货截止测试-出库（记账凭证至原始凭证）
+        F:
+          field: col_f
+          type: text
+          label: F2-31
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  截止测试-入库（记账凭证至原始凭证）F2-29:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货（原材料/产成品）截止测试-入库（从记账凭证至原始凭证）
+      A3: ${entity_name}
+      A4: ${period_end}
+      K3: ${index_no}
+      K4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 记账凭证
+        F:
+          field: col_f
+          type: text
+          label: 入库单
+        H:
+          field: col_h
+          type: text
+          label: 质检报告
+        J:
+          field: col_j
+          type: text
+          label: ……
+        L:
+          field: col_l
+          type: text
+          label: 是否跨期√（×）
+    static_text:
+      rows:
+      - 1-2
+      - 5-11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - E3
+      - G3
+      - L3
+      - A4
+      - E4
+      - G4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 10
+      ranges_sample:
+      - A2:L2
+      - A12:E12
+      - F12:G12
+      - H12:I12
+      - J12:K12
+      - A11:L11
+      - A1:L1
+      - L12:L13
+      - A9:L9
+      - A27:L27
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  截止测试-入库（原始凭证至记账凭证）F2-30:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货（原材料/产成品）截止测试-入库（从原始凭证至记账凭证）
+      A3: ${entity_name}
+      A4: ${period_end}
+      K3: ${index_no}
+      K4: ${page_no}
+    dynamic_table:
+      start_row: 13
+      end_row: dynamic
+      header_row: 12
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 入库单
+        C:
+          field: col_c
+          type: text
+          label: 质检报告
+        E:
+          field: col_e
+          type: text
+          label: ……
+        G:
+          field: col_g
+          type: text
+          label: 记账凭证
+        L:
+          field: col_l
+          type: text
+          label: 是否跨期√（×）
+    static_text:
+      rows:
+      - 1-2
+      - 5-11
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - H3
+      - L3
+      - A4
+      - D4
+      - H4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - E12:F12
+      - A2:L2
+      - C12:D12
+      - G12:K12
+      - A1:L1
+      - L12:L13
+      - A12:B12
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  截止测试-出库（记账凭证至原始凭证）F2-31:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货（原材料/产成品）截止测试-出库（从记账凭证至原始凭证）
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 14
+      end_row: dynamic
+      header_row: 13
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 记账凭证
+        F:
+          field: col_f
+          type: text
+          label: 出库单/领料单
+        H:
+          field: col_h
+          type: text
+          label: ……
+        J:
+          field: col_j
+          type: text
+          label: 是否跨期√（×）
+    static_text:
+      rows:
+      - 1-2
+      - 5-12
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - J3
+      - A4
+      - D4
+      - F4
+      - A27
+      _total_count: 8
+    merged_cells:
+      preserve: true
+      count: 8
+      ranges_sample:
+      - A1:J1
+      - J13:J14
+      - A9:J9
+      - A12:J12
+      - A13:E13
+      - A2:J2
+      - F13:G13
+      - H13:I13
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  截止测试-出库（原始凭证至记账凭证）F2-32:
+    component_type: univer
+    class_code: G-测算
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货（原材料/产成品）截止测试-出库（从原始凭证至记账凭证）
+      A3: ${entity_name}
+      A4: ${period_end}
+      I3: ${index_no}
+      I4: ${page_no}
+    dynamic_table:
+      start_row: 14
+      end_row: dynamic
+      header_row: 13
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 出库单/领料单
+        C:
+          field: col_c
+          type: text
+          label: ……
+        E:
+          field: col_e
+          type: text
+          label: 记账凭证
+        J:
+          field: col_j
+          type: text
+          label: 是否跨期√（×）
+    static_text:
+      rows:
+      - 1-2
+      - 5-12
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - G3
+      - J3
+      - A4
+      - D4
+      - G4
+      - A27
+      _total_count: 8
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - A1:J1
+      - J13:J14
+      - E13:I13
+      - A13:B13
+      - A12:J12
+      - C13:D13
+      - A2:J2
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  存货采购入库检查表F2-33-新增:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 存货采购入库检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 11
+      end_row: dynamic
+      header_row: 10
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 测试总体：
+        B:
+          field: col_b
+          type: text
+          label: 如存货借方发生额所有凭证共XX笔金额XX
+        J:
+          field: col_j
+          type: text
+          label: 特定样本：
+        K:
+          field: col_k
+          type: text
+          label: XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款
+    static_text:
+      rows:
+      - 1-2
+      - 5-9
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - I3
+      - O3
+      - V3
+      - A4
+      - I4
+      - O4
+      - H36
+      - S36
+      - I39
+      - I40
+      - I41
+      _total_count: 12
+    merged_cells:
+      preserve: true
+      count: 15
+      ranges_sample:
+      - A2:V2
+      - T15:T16
+      - F39:G39
+      - Q15:S15
+      - V15:V16
+      - N15:P15
+      - F38:G38
+      - C15:J15
+      - A1:V1
+      - K15:L15
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  材料领用检查表F2-34-新增:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 材料领用检查表
+      A3: ${entity_name}
+      A4: ${period_end}
+      M3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 测试总体：
+        B:
+          field: col_b
+          type: text
+          label: 如原材料贷方发生额所有凭证共XX笔金额XX
+        F:
+          field: col_f
+          type: text
+          label: 特定样本：
+        G:
+          field: col_g
+          type: text
+          label: XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款
+    static_text:
+      rows:
+      - 1-2
+      - 5-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - F3
+      - I3
+      - N3
+      - A4
+      - F4
+      - I4
+      - F32
+      - G35
+      - H35
+      _total_count: 10
+    merged_cells:
+      preserve: true
+      count: 9
+      ranges_sample:
+      - L14:L15
+      - N14:N15
+      - M14:M15
+      - I14:K14
+      - D34:E34
+      - A2:N2
+      - A14:H14
+      - D35:E35
+      - A1:N1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  委托加工物资核查表F2-35:
+    component_type: d-form-table
+    class_code: D-检查表
+    fixed_cells:
+      A1: 致同会计师事务所
+      A2: 委托加工物资核查表
+      A3: ${entity_name}
+      A4: ${period_end}
+      H3: ${index_no}
+      H4: ${page_no}
+    dynamic_table:
+      start_row: 19
+      end_row: dynamic
+      header_row: 18
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: 年度
+        B:
+          field: col_b
+          type: text
+          label: 期初金额
+        C:
+          field: col_c
+          type: text
+          label: 本期增加
+        D:
+          field: col_d
+          type: text
+          label: 本期减少
+        E:
+          field: col_e
+          type: text
+          label: 期末金额
+        F:
+          field: col_f
+          type: text
+          label: 其中加工费发生额
+    static_text:
+      rows:
+      - 1-2
+      - 5-10
+      - 13-17
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - D3
+      - F3
+      - I3
+      - A4
+      - D4
+      - F4
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 11
+      ranges_sample:
+      - E30:E31
+      - C30:C31
+      - I30:I31
+      - D30:D31
+      - F30:F31
+      - A2:I2
+      - G30:G31
+      - H30:H31
+      - A1:I1
+      - B30:B31
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

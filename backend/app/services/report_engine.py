@@ -1230,7 +1230,7 @@ class ReportEngine:
 
         Validates: Requirements 2.4, 8.1
         """
-        logger.info(
+        logger.debug(
             "on_trial_balance_updated: project=%s, accounts=%s",
             payload.project_id, payload.account_codes,
         )

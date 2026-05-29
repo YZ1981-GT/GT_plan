@@ -4,7 +4,7 @@
   <GtWpRenderer
     v-if="useHtmlRenderer"
     :wp-id="wpId"
-    @save-success="onChildSaved"
+    @save-success="onHtmlSaveSuccess"
     @trigger-procedure-trimming-suggestion="onHtmlTrimmingSuggestion"
     @cross-ref-update="onHtmlCrossRefUpdate"
     @sync-to-disclosure-notes="onHtmlSyncToDisclosureNotes"
@@ -59,13 +59,26 @@
     <!-- 顶部工具栏 -->
     <div class="gt-wp-editor-toolbar">
       <div class="gt-wp-editor-toolbar-left">
-        <el-button text @click="goBack">← 返回</el-button>
+        <!-- Sprint 4 Task 11.3: 底稿间导航返回面包屑 -->
+        <el-button v-if="wpNavHistory.canGoBack.value" text size="small" @click="wpNavHistory.goBack()" class="gt-wp-nav-breadcrumb">
+          ← 返回 {{ wpNavHistory.lastItem.value?.wpCode }} {{ wpNavHistory.lastItem.value?.rowRef || '' }}
+        </el-button>
+        <el-button v-else text @click="goBack">← 返回</el-button>
         <span class="gt-wp-editor-code" v-if="wpDetail">{{ wpDetail.wp_code }}</span>
         <span class="gt-wp-editor-name" v-if="wpDetail">{{ wpDetail.wp_name }}</span>
         <el-tag v-if="wpDetail" :type="(statusTagType(wpDetail.status)) || undefined" size="small">
           {{ statusLabel(wpDetail.status) }}
         </el-tag>
         <span v-if="dirty" class="gt-dirty-indicator">● 有未保存的变更</span>
+        <!-- Sprint 4 Task 9.2: 底稿填写完成度可视化 -->
+        <el-progress
+          v-if="completionRate.total > 0"
+          type="circle"
+          :percentage="completionRate.percentage"
+          :width="36"
+          :stroke-width="3"
+          class="gt-wp-completion-circle"
+        />
       </div>
       <div class="gt-wp-editor-toolbar-right">
         <!-- E1 Sprint 2 Task 2.18: 复核状态 badge（L1-L5 + 专委会/IT/税务） -->
@@ -75,6 +88,13 @@
           :wp-id="wpId"
           :wp-code="wpDetail?.wp_code"
         />
+        <!-- Sprint 4 Task 12.1: 渲染模式手动切换按钮（仅 A/B/D/E 类显示） -->
+        <el-button
+          v-if="canSwitchRenderer"
+          size="small"
+          @click="onToggleRendererMode"
+          style="margin-right: 8px"
+        >{{ useHtmlRenderer ? '切换为表格模式' : '切换为 HTML 模式' }}</el-button>
         <!-- 审计导航图入口：点击弹出全屏抽屉 -->
         <el-button
           v-if="hasAuditNav"
@@ -136,6 +156,8 @@
               <el-dropdown-item @click="onDownload">📥 下载</el-dropdown-item>
               <el-dropdown-item @click="onExportPdf" v-permission="'workpaper:export'">📄 导出 PDF</el-dropdown-item>
               <el-dropdown-item @click="onUpload" divided>📤 上传新版本</el-dropdown-item>
+              <el-dropdown-item @click="showOfflineExportDialog = true" divided>📤 导出填写模板</el-dropdown-item>
+              <el-dropdown-item @click="showOfflineImportDialog = true">📥 导入填写结果</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -304,259 +326,15 @@
           :wp-id="wpId"
           :wp-code="wpDetail.wp_code"
         />
-        <!-- F-purchase-inventory F-F5 Task 2.9: F2-21~F2-26 监盘 sheet 触发按钮 -->
-        <div
-          v-if="showStocktakeTrigger"
-          class="gt-stocktake-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="stocktakeDialogVisible = true"
-          >
-            📦 开始监盘
-          </el-button>
-        </div>
-        <!-- H-fixed-assets-cycle H-F5 Task 2.7: H 循环 13 处监盘类 sheet 触发按钮 -->
-        <div
-          v-if="showHStocktakeTrigger"
-          class="gt-stocktake-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="hStocktakeDialogVisible = true"
-          >
-            🏗️ 固定资产盘点
-          </el-button>
-        </div>
-        <!-- F-purchase-inventory F-F11 Task 3.2: F2-38~F2-44 计价测试自动抽样按钮 -->
-        <div
-          v-if="showValuationTrigger"
-          class="gt-valuation-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            :loading="valuationLoading"
-            @click="onTriggerValuationSample"
-          >
-            🧮 自动抽样
-          </el-button>
-        </div>
-        <!-- F-purchase-inventory F-F12 Task 3.5: F2-47 跌价准备 AI 分析按钮 -->
-        <div
-          v-if="showImpairmentTrigger"
-          class="gt-impairment-trigger"
-        >
-          <el-button
-            size="small"
-            type="warning"
-            plain
-            @click="impairmentDialogVisible = true"
-          >
-            🤖 AI 分析跌价
-          </el-button>
-        </div>
-        <!-- H-fixed-assets-cycle H-F11 Task 3.2: H1-12 折旧测算 sheet 自动计算按钮 -->
-        <div
-          v-if="showDepreciationCalcTrigger"
-          class="gt-depreciation-calc-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="depreciationCalcDialogVisible = true"
-          >
-            🧮 自动计算
-          </el-button>
-        </div>
-        <!-- H-fixed-assets-cycle H-F12 Task 3.4: H1-14 减值测算 sheet AI 辅助分析按钮 -->
-        <div
-          v-if="showAssetImpairmentTrigger"
-          class="gt-asset-impairment-trigger"
-        >
-          <el-button
-            size="small"
-            type="warning"
-            plain
-            @click="assetImpairmentDialogVisible = true"
-          >
-            🤖 AI 辅助分析
-          </el-button>
-        </div>
-        <!-- I-intangible-assets-cycle I-F4 Task 2.8: I3-6/I3-7 商誉减值 DCF 分析按钮 -->
-        <div
-          v-if="showGoodwillImpairmentTrigger"
-          class="gt-goodwill-impairment-trigger"
-        >
-          <el-button
-            size="small"
-            type="warning"
-            plain
-            @click="goodwillImpairmentDialogVisible = true"
-          >
-            🤖 AI 辅助分析
-          </el-button>
-        </div>
-        <!-- G-investment-cycle G-F4 Task 2.6: G1-6/G6/G8 公允价值测试按钮 -->
-        <div
-          v-if="showFairValueTestTrigger"
-          class="gt-fair-value-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="fairValueTestDialogVisible = true"
-          >
-            📊 公允价值测试
-          </el-button>
-        </div>
-        <!-- G-investment-cycle G-F5 Task 2.9: G4/G6 ECL 三阶段计算按钮 -->
-        <div
-          v-if="showECLCalcTrigger"
-          class="gt-ecl-calc-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="eclCalcDialogVisible = true"
-          >
-            🧮 ECL 计算
-          </el-button>
-        </div>
-        <!-- G-investment-cycle G-F11 Task 3.2: G1-8/G1-10 金融资产分类辅助按钮 -->
-        <div
-          v-if="showClassificationCheckTrigger"
-          class="gt-classification-check-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="classificationCheckDialogVisible = true"
-          >
-            🏷️ 分类辅助
-          </el-button>
-        </div>
-        <!-- I-intangible-assets-cycle I-F5 Task 2.10: I2-6 资本化时点判断按钮 -->
-        <div
-          v-if="showCapitalizationCheckTrigger"
-          class="gt-capitalization-check-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="capitalizationCheckDialogVisible = true"
-          >
-            🧮 资本化时点判断
-          </el-button>
-        </div>
-        <!-- I-intangible-assets-cycle I-F2 / Sprint 3 Task 3.2: I1-10/I1-11 + I4-6/I4-7 摊销自动计算按钮 -->
-        <div
-          v-if="amortizationCalcSection"
-          class="gt-amortization-calc-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="amortizationCalcDialogVisible = true"
-          >
-            🧮 自动计算
-          </el-button>
-        </div>
-        <!-- k-admin-cycle-post-review-fix P0 #1: K8/K9 费用分析按钮 -->
-        <div
-          v-if="isKCycle && /^K[89](\b|-|$|\d)/.test((wpDetail?.wp_code || '').toUpperCase())"
-          class="gt-expense-analysis-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="expenseAnalysisDialogVisible = true"
-          >
-            📊 费用分析
-          </el-button>
-        </div>
-        <!-- k-admin-cycle-post-review-fix P0 #2: K11 减值汇总按钮 -->
-        <div
-          v-if="isKCycle && /^K11(\b|-|$|\d)/.test((wpDetail?.wp_code || '').toUpperCase())"
-          class="gt-impairment-summary-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="impairmentSummaryDialogVisible = true"
-          >
-            📋 减值汇总
-          </el-button>
-        </div>
-        <!-- workpaper-l-debt-cycle L-F7: L1/L3 利息测算按钮 -->
-        <div
-          v-if="isLCycle && /^L[13](\b|-|$|\d)/.test((wpDetail?.wp_code || '').toUpperCase())"
-          class="gt-interest-calc-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="interestCalcDialogVisible = true"
-          >
-            🧮 利息测算
-          </el-button>
-        </div>
-        <!-- workpaper-l-debt-cycle L-F8: L5 摊余成本按钮 -->
-        <div
-          v-if="isLCycle && /^L5(\b|-|$|\d)/.test((wpDetail?.wp_code || '').toUpperCase())"
-          class="gt-bond-amortization-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="bondAmortizationDialogVisible = true"
-          >
-            📊 摊余成本
-          </el-button>
-        </div>
-        <!-- workpaper-m-equity-cycle M-F7: M6 权益变动表按钮 -->
-        <div
-          v-if="isMCycle && /^M6(\b|-|$|\d)/.test((wpDetail?.wp_code || '').toUpperCase())"
-          class="gt-equity-movement-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="equityMovementDialogVisible = true"
-          >
-            📊 权益变动
-          </el-button>
-        </div>
-        <!-- workpaper-n-tax-cycle N-F7: N5 所得税费用测算按钮 -->
-        <div
-          v-if="isNCycle && /^N5(\b|-|$|\d)/.test((wpDetail?.wp_code || '').toUpperCase())"
-          class="gt-income-tax-calc-trigger"
-        >
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="incomeTaxCalcDialogVisible = true"
-          >
-            🧮 所得税测算
-          </el-button>
-        </div>
+        <!-- spec workpaper-editor-slimdown Sprint 2 Task 3.4: CycleDialogSlot 配置驱动替代 17 个 trigger + dialog -->
+        <CycleDialogSlot
+          v-if="wpDetail"
+          :wp-detail="wpDetail"
+          :project-id="projectId"
+          :wp-id="wpId"
+          :active-sheet-id="sheetNav.activeSheetId.value || ''"
+          @child-saved="onChildSaved"
+        />
       </div>
       <!-- 中间内容区：顶部 sheet tabs + Univer 画布（垂直布局） -->
       <div class="gt-wp-editor-center-col">
@@ -649,199 +427,6 @@
       </div>
     </el-dialog>
 
-    <!-- F-purchase-inventory F-F5 Task 2.7~2.9: 存货监盘 D 类弹窗 -->
-    <InventoryStocktakeDialog
-      v-if="wpDetail && isFCycle"
-      :visible="stocktakeDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :wp-code="wpDetail.wp_code || ''"
-      :stocktake-id="sheetNav.activeSheetId.value || ''"
-      @update:visible="stocktakeDialogVisible = $event"
-      @saved="onChildSaved"
-    />
-
-    <!-- F-purchase-inventory F-F12 Task 3.5: 跌价准备 AI 分析弹窗 -->
-    <InventoryImpairmentDialog
-      v-if="wpDetail && isFCycle"
-      :visible="impairmentDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      @update:visible="impairmentDialogVisible = $event"
-      @applied="onImpairmentApplied"
-    />
-
-    <!-- H-fixed-assets-cycle H-F5 Task 2.7: 固定资产监盘 D 类弹窗 -->
-    <FixedAssetStocktakeDialog
-      v-if="wpDetail && isHCycle"
-      :visible="hStocktakeDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :wp-code="wpDetail.wp_code || ''"
-      :stocktake-id="sheetNav.activeSheetId.value || ''"
-      @update:visible="hStocktakeDialogVisible = $event"
-      @saved="onChildSaved"
-    />
-
-    <!-- H-fixed-assets-cycle H-F11 Task 3.2: 折旧自动测算弹窗 -->
-    <DepreciationCalcDialog
-      v-if="wpDetail && isHCycle"
-      :visible="depreciationCalcDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      @update:visible="depreciationCalcDialogVisible = $event"
-      @applied="onDepreciationCalcApplied"
-    />
-
-    <!-- H-fixed-assets-cycle H-F12 Task 3.4: 减值 DCF 分析弹窗 -->
-    <AssetImpairmentDialog
-      v-if="wpDetail && isHCycle"
-      :visible="assetImpairmentDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      @update:visible="assetImpairmentDialogVisible = $event"
-      @applied="onAssetImpairmentApplied"
-    />
-
-    <!-- I-intangible-assets-cycle I-F4 Task 2.8: I3-6/I3-7 商誉减值 DCF 分析弹窗 -->
-    <GoodwillImpairmentDialog
-      v-if="wpDetail && isICycle"
-      :visible="goodwillImpairmentDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      @update:visible="goodwillImpairmentDialogVisible = $event"
-      @applied="onGoodwillImpairmentApplied"
-    />
-
-    <!-- I-intangible-assets-cycle I-F5 Task 2.10: I2-6 资本化时点判断弹窗 -->
-    <CapitalizationCheckDialog
-      v-if="wpDetail && isICycle"
-      :visible="capitalizationCheckDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      @update:visible="capitalizationCheckDialogVisible = $event"
-      @applied="onCapitalizationCheckApplied"
-    />
-
-    <!-- I-intangible-assets-cycle I-F2 / Sprint 3 Task 3.2: I1/I4 摊销自动测算弹窗 -->
-    <AmortizationCalcDialog
-      v-if="wpDetail && isICycle && amortizationCalcSection"
-      :visible="amortizationCalcDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :section="amortizationCalcSection"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      @update:visible="amortizationCalcDialogVisible = $event"
-      @applied="onAmortizationCalcApplied"
-    />
-
-    <!-- G-investment-cycle G-F4 Task 2.6: G1-6/G6/G8 公允价值测试弹窗 -->
-    <FairValueTestDialog
-      v-if="wpDetail && isGCycle"
-      :visible="fairValueTestDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      :instrument-type="fairValueInstrumentType"
-      @update:visible="fairValueTestDialogVisible = $event"
-      @applied="onFairValueTestApplied"
-    />
-
-    <!-- G-investment-cycle G-F5 Task 2.9: G4/G6 ECL 三阶段计算弹窗 -->
-    <ECLCalcDialog
-      v-if="wpDetail && isGCycle"
-      :visible="eclCalcDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      :instrument-type="eclInstrumentType"
-      @update:visible="eclCalcDialogVisible = $event"
-      @applied="onECLCalcApplied"
-    />
-
-    <!-- G-investment-cycle G-F11 Task 3.2: G1-8/G1-10 金融资产分类辅助弹窗 -->
-    <ClassificationCheckDialog
-      v-if="wpDetail && isGCycle"
-      :visible="classificationCheckDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      @update:visible="classificationCheckDialogVisible = $event"
-      @applied="onClassificationCheckApplied"
-    />
-
-    <!-- k-admin-cycle-post-review-fix P0 #1: K8/K9 费用分析弹窗 -->
-    <ExpenseAnalysisDialog
-      v-if="wpDetail && isKCycle"
-      :visible="expenseAnalysisDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      @update:visible="expenseAnalysisDialogVisible = $event"
-      @applied="onExpenseAnalysisApplied"
-    />
-
-    <!-- k-admin-cycle-post-review-fix P0 #2: K11 跨循环减值汇总弹窗 -->
-    <ImpairmentSummaryDialog
-      v-if="wpDetail && isKCycle"
-      :visible="impairmentSummaryDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      @update:visible="impairmentSummaryDialogVisible = $event"
-      @applied="onImpairmentSummaryApplied"
-    />
-
-    <!-- workpaper-l-debt-cycle L-F7: L1/L3 利息测算弹窗 -->
-    <InterestCalcDialog
-      v-if="wpDetail && isLCycle"
-      :visible="interestCalcDialogVisible"
-      :project-id="projectId"
-      :workpaper-id="wpId"
-      :wp-code="(wpDetail?.wp_code || 'L1').startsWith('L3') ? 'L3' : 'L1'"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      @update:visible="interestCalcDialogVisible = $event"
-      @applied="onInterestCalcApplied"
-    />
-
-    <!-- workpaper-l-debt-cycle L-F8: L5 摊余成本弹窗 -->
-    <BondAmortizationDialog
-      v-if="wpDetail && isLCycle"
-      :visible="bondAmortizationDialogVisible"
-      :project-id="projectId"
-      :workpaper-id="wpId"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      @update:visible="bondAmortizationDialogVisible = $event"
-      @applied="onBondAmortizationApplied"
-    />
-
-    <!-- workpaper-m-equity-cycle M-F7: M6 权益变动表弹窗 -->
-    <EquityMovementDialog
-      v-if="wpDetail && isMCycle"
-      :visible="equityMovementDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      @update:visible="equityMovementDialogVisible = $event"
-      @applied="onEquityMovementApplied"
-    />
-
-    <!-- workpaper-n-tax-cycle N-F7: N5 所得税费用测算弹窗 -->
-    <IncomeTaxCalcDialog
-      v-if="wpDetail && isNCycle"
-      :visible="incomeTaxCalcDialogVisible"
-      :project-id="projectId"
-      :wp-id="wpId"
-      :target-sheet="sheetNav.activeSheetId.value || ''"
-      @update:visible="incomeTaxCalcDialogVisible = $event"
-      @applied="onIncomeTaxCalcApplied"
-    />
-
     <!-- Task 2.4: Review mark dialog -->
     <el-dialog v-model="showReviewDialog" title="✓ 标记复核" width="400" append-to-body>
       <el-form label-width="70px">
@@ -927,13 +512,25 @@
       @finecheck-update="fineCheckFailCount = $event"
     />
   </el-drawer>
+
+  <!-- Sprint 4 Task 15.13: 底稿离线导出/导入对话框 -->
+  <WpOfflineExportDialog
+    v-model="showOfflineExportDialog"
+    :wp-id="wpId"
+    :available-sheets="availableSheetNames"
+  />
+  <WpOfflineImportDialog
+    v-model="showOfflineImportDialog"
+    :wp-id="wpId"
+    @imported="onOfflineImported"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { onBeforeRouteLeave } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmSubmitReview, confirmLeave, confirmVersionConflict } from '@/utils/confirm'
 import { Loading } from '@element-plus/icons-vue'
 import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets'
@@ -968,29 +565,13 @@ import UniverSheetNav from '@/components/workpaper/UniverSheetNav.vue'
 import SheetTopTabs from '@/components/workpaper/SheetTopTabs.vue'
 import WorkpaperAuditNav from '@/components/workpaper/WorkpaperAuditNav.vue'
 import ProcedureDialogLauncher from '@/components/workpaper/ProcedureDialogLauncher.vue'
-import InventoryStocktakeDialog from '@/components/workpaper/InventoryStocktakeDialog.vue'
-import FixedAssetStocktakeDialog from '@/components/workpaper/FixedAssetStocktakeDialog.vue'
-import DepreciationCalcDialog from '@/components/workpaper/DepreciationCalcDialog.vue'
-import AssetImpairmentDialog from '@/components/workpaper/AssetImpairmentDialog.vue'
-import FairValueTestDialog from '@/components/workpaper/FairValueTestDialog.vue'
-import ECLCalcDialog from '@/components/workpaper/ECLCalcDialog.vue'
-import ClassificationCheckDialog from '@/components/workpaper/ClassificationCheckDialog.vue'
-import GoodwillImpairmentDialog from '@/components/workpaper/GoodwillImpairmentDialog.vue'
-import CapitalizationCheckDialog from '@/components/workpaper/CapitalizationCheckDialog.vue'
-import AmortizationCalcDialog from '@/components/workpaper/AmortizationCalcDialog.vue'
-import InventoryImpairmentDialog from '@/components/workpaper/InventoryImpairmentDialog.vue'
-// k-admin-cycle-post-review-fix P0 #1-2: K 循环弹窗 wiring（K8/K9 费用分析 + K11 减值汇总）
-import ExpenseAnalysisDialog from '@/components/workpaper/ExpenseAnalysisDialog.vue'
-import ImpairmentSummaryDialog from '@/components/workpaper/ImpairmentSummaryDialog.vue'
-// workpaper-l-debt-cycle L-F7/L-F8: L 循环弹窗 wiring（L1/L3 利息测算 + L5 摊余成本）
-import InterestCalcDialog from '@/components/workpaper/InterestCalcDialog.vue'
-import BondAmortizationDialog from '@/components/workpaper/BondAmortizationDialog.vue'
+// spec workpaper-editor-slimdown Sprint 2 Task 3.4: CycleDialogSlot 配置驱动替代 17 个 dialog 组件
+import CycleDialogSlot from '@/components/workpaper/CycleDialogSlot.vue'
+// Sprint 4 Task 15.13: 底稿离线导出/导入对话框
+import WpOfflineExportDialog from '@/components/workpaper/WpOfflineExportDialog.vue'
+import WpOfflineImportDialog from '@/components/workpaper/WpOfflineImportDialog.vue'
 // proposal-remaining-18 task 5.4 (S-4)：历史版本搜索
 import VersionHistorySearch from '@/components/workpaper/VersionHistorySearch.vue'
-// workpaper-m-equity-cycle M-F7: M6 权益变动表弹窗
-import EquityMovementDialog from '@/components/workpaper/EquityMovementDialog.vue'
-// workpaper-n-tax-cycle N-F7: N5 所得税费用测算弹窗
-import IncomeTaxCalcDialog from '@/components/workpaper/IncomeTaxCalcDialog.vue'
 import ReviewLayerBadges from '@/components/workpaper/ReviewLayerBadges.vue'
 import { usePrerequisiteStatus } from '@/composables/usePrerequisiteStatus'
 import { useCycleType } from '@/composables/useCycleType'
@@ -998,6 +579,8 @@ import { useWorkpaperRefresh } from '@/composables/useWorkpaperRefresh'
 // spec workpaper-html-renderer Task 13.1: HTML 渲染器路由分发
 import GtWpRenderer from '@/components/workpaper/GtWpRenderer.vue'
 import { useWpClassification } from '@/composables/useWpClassification'
+import { useWpCompletionRate } from '@/composables/useWpCompletionRate'
+import { useWpNavigationHistory } from '@/composables/useWpNavigationHistory'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
 import { WP_STATUS } from '@/constants/statusEnum'
@@ -1074,6 +657,40 @@ const htmlComponentType = computed(() => {
   return HTML_COMPONENT_TYPES.has(ct as string) ? (ct as string) : ''
 })
 const useHtmlRenderer = computed(() => !!htmlComponentType.value)
+
+// Sprint 4 Task 12: 渲染模式手动切换
+const rendererOverride = ref<string | null>(null)
+const canSwitchRenderer = computed(() => {
+  // 仅 A/B/D/E 类显示切换按钮
+  const code = wpDetail.value?.wp_code || ''
+  return /^[ABDE]/i.test(code)
+})
+
+async function onToggleRendererMode() {
+  const newMode = useHtmlRenderer.value ? 'univer' : (htmlComponentType.value || 'univer')
+  try {
+    await httpApi.post('/api/wp-classifications/override', {
+      project_id: projectId.value,
+      wp_code: wpDetail.value?.wp_code,
+      renderer_override: newMode,
+    })
+    rendererOverride.value = newMode
+    // Reload to apply new mode
+    window.location.reload()
+  } catch (e) {
+    handleApiError(e, '切换渲染模式失败')
+  }
+}
+
+// Sprint 4 Task 9.2: 底稿填写完成度（Univer 路径使用 wpDetail.parsed_data 简化计算）
+const _completionComponentType = computed(() => htmlComponentType.value || componentType.value)
+const _completionSchema = computed(() => ({}))
+const _completionHtmlData = computed(() => wpDetail.value?.parsed_data?.html_data ?? {})
+const { rate: completionRate } = useWpCompletionRate(_completionComponentType, _completionSchema, _completionHtmlData)
+
+// Sprint 4 Task 11: 底稿间导航历史
+const wpNavHistory = useWpNavigationHistory()
+
 // wp_code 就绪后自动加载归类
 watch(
   () => [wpCodeRef.value, projectId.value] as const,
@@ -1105,6 +722,55 @@ function onChildSaved() {
     projectId: projectId.value,
     wpId: wpId.value,
   } as WorkpaperSavedPayload)
+}
+
+/** HTML 渲染器保存成功回调 — 检测 c-note-table 类型触发附注同步（US-3） */
+async function onHtmlSaveSuccess(payload: { sheet_name: string; html_data: Record<string, any> }) {
+  // 先触发通用保存事件
+  onChildSaved()
+
+  // US-3: 检测 c-note-table 类型触发 disclosure_notes 同步
+  if (htmlComponentType.value === 'c-note-table' && payload?.html_data?.sub_table_data) {
+    try {
+      await httpApi.post(
+        `/api/wp-disclosure-sync/${wpId.value}/sync-html`,
+        {
+          sheet_name: payload.sheet_name,
+          sub_table_data: payload.html_data.sub_table_data,
+        },
+      )
+    } catch (e: any) {
+      if (e?.response?.status === 409 || e?.status === 409) {
+        // 冲突弹窗（US-3 验收标准 4）
+        try {
+          await ElMessageBox.confirm(
+            '附注模块有更新的手动编辑，是否覆盖？',
+            '同步冲突',
+            {
+              distinguishCancelAndClose: true,
+              confirmButtonText: '覆盖',
+              cancelButtonText: '保留附注版本',
+              type: 'warning',
+            },
+          )
+          // 用户选择覆盖 → 强制同步
+          await httpApi.post(
+            `/api/wp-disclosure-sync/${wpId.value}/sync-html?force=true`,
+            {
+              sheet_name: payload.sheet_name,
+              sub_table_data: payload.html_data.sub_table_data,
+            },
+          )
+          ElMessage.success('附注已同步')
+        } catch {
+          // 用户取消或关闭 → 保留附注版本，不做任何操作
+        }
+      } else {
+        // 非冲突错误 → 静默记录（不阻断保存主流程）
+        console.warn('[WorkpaperEditor] disclosure sync failed:', e)
+      }
+    }
+  }
 }
 
 // spec workpaper-html-renderer Task 13.1: GtWpRenderer 事件 → 既有 handlers 桥接
@@ -1412,70 +1078,8 @@ const kCycle = useKCycleEditor(wpDetail, cycleDialogs)
 const lCycle = useLCycleEditor(wpDetail, cycleDialogs)
 const mCycle = useMCycleEditor(wpDetail, cycleDialogs)
 const nCycle = useNCycleEditor(wpDetail, cycleDialogs)
-// 向后兼容：模板中仍用原变量名（后续 Phase 6 验收时可统一改为 cycleDialogs.xxx.visible）
-const stocktakeDialogVisible = cycleDialogs.stocktake.visible
-const showStocktakeTrigger = cycleDialogs.stocktake.trigger
-const hStocktakeDialogVisible = cycleDialogs.hStocktake.visible
-const showHStocktakeTrigger = cycleDialogs.hStocktake.trigger
-const valuationLoading = cycleDialogs.valuation.loading
-const showValuationTrigger = cycleDialogs.valuation.trigger
-const impairmentDialogVisible = cycleDialogs.impairment.visible
-const showImpairmentTrigger = cycleDialogs.impairment.trigger
-const depreciationCalcDialogVisible = cycleDialogs.depreciationCalc.visible
-const showDepreciationCalcTrigger = cycleDialogs.depreciationCalc.trigger
-const assetImpairmentDialogVisible = cycleDialogs.assetImpairment.visible
-const showAssetImpairmentTrigger = cycleDialogs.assetImpairment.trigger
-// I 循环弹窗状态（委托 useICycleEditor — Phase 3 Task 3.4）
-const goodwillImpairmentDialogVisible = iCycle.dialogs.goodwillImpairmentDialogVisible
-const showGoodwillImpairmentTrigger = iCycle.triggers.showGoodwillImpairmentTrigger
-const capitalizationCheckDialogVisible = iCycle.dialogs.capitalizationCheckDialogVisible
-const showCapitalizationCheckTrigger = iCycle.triggers.showCapitalizationCheckTrigger
-const amortizationCalcDialogVisible = iCycle.dialogs.amortizationCalcDialogVisible
-const amortizationCalcSection = iCycle.triggers.amortizationCalcSection
-const fairValueTestDialogVisible = gCycle.dialogs.fairValueTestDialogVisible
-const showFairValueTestTrigger = gCycle.triggers.showFairValueTestTrigger
-const fairValueInstrumentType = gCycle.triggers.fairValueInstrumentType
-const eclCalcDialogVisible = gCycle.dialogs.eclCalcDialogVisible
-const showECLCalcTrigger = gCycle.triggers.showECLCalcTrigger
-const eclInstrumentType = gCycle.triggers.eclInstrumentType
-const classificationCheckDialogVisible = gCycle.dialogs.classificationCheckDialogVisible
-const showClassificationCheckTrigger = gCycle.triggers.showClassificationCheckTrigger
-const expenseAnalysisDialogVisible = kCycle.dialogs.expenseAnalysisDialogVisible
-const impairmentSummaryDialogVisible = kCycle.dialogs.impairmentSummaryDialogVisible
-// L 循环 dialogs（委托 useLCycleEditor — Phase 3 Task 3.7）
-const interestCalcDialogVisible = lCycle.dialogs.interestCalcDialogVisible
-const bondAmortizationDialogVisible = lCycle.dialogs.bondAmortizationDialogVisible
-// M 循环 dialogs（委托 useMCycleEditor — Phase 3 Task 3.8）
-const equityMovementDialogVisible = mCycle.dialogs.equityMovementDialogVisible
-// N 循环 dialogs（委托 useNCycleEditor — Phase 3 Task 3.9）
-const incomeTaxCalcDialogVisible = nCycle.dialogs.incomeTaxCalcDialogVisible
-
-// Applied handlers（模板 @applied 绑定）
-// onImpairmentApplied 已迁移到 useFCycleEditor composable
-function onDepreciationCalcApplied(sheet: string) { cycleDialogs.depreciationCalc.onApplied(sheet) }
-function onAssetImpairmentApplied(sheet: string) { cycleDialogs.assetImpairment.onApplied(sheet) }
-// I 循环 handlers（委托 useICycleEditor — Phase 3 Task 3.4）
-const onGoodwillImpairmentApplied = iCycle.handlers.onGoodwillImpairmentApplied
-const onCapitalizationCheckApplied = iCycle.handlers.onCapitalizationCheckApplied
-const onAmortizationCalcApplied = iCycle.handlers.onAmortizationCalcApplied
-// G 循环 handlers（委托 useGCycleEditor — Phase 3 Task 3.5）
-const onFairValueTestApplied = gCycle.handlers.onFairValueTestApplied
-const onECLCalcApplied = gCycle.handlers.onECLCalcApplied
-const onClassificationCheckApplied = gCycle.handlers.onClassificationCheckApplied
-// K 循环 handlers（委托 useKCycleEditor — Phase 3 Task 3.6）
-const onExpenseAnalysisApplied = kCycle.handlers.onExpenseAnalysisApplied
-const onImpairmentSummaryApplied = kCycle.handlers.onImpairmentSummaryApplied
-// L 循环 handlers（委托 useLCycleEditor — Phase 3 Task 3.7）
-const onInterestCalcApplied = lCycle.handlers.onInterestCalcApplied
-const onBondAmortizationApplied = lCycle.handlers.onBondAmortizationApplied
-// M 循环 handlers（委托 useMCycleEditor — Phase 3 Task 3.8）
-const onEquityMovementApplied = mCycle.handlers.onEquityMovementApplied
-// N 循环 handlers（委托 useNCycleEditor — Phase 3 Task 3.9）
-const onIncomeTaxCalcApplied = nCycle.handlers.onIncomeTaxCalcApplied
-
-// F-purchase-inventory F-F11 Task 3.2: 计价测试自动抽样 — 委托 useFCycleEditor composable
-const onTriggerValuationSample = fCycle.handlers.onTriggerValuationSample
-const onImpairmentApplied = fCycle.handlers.onImpairmentApplied
+// spec workpaper-editor-slimdown Sprint 2 Task 3.3: dialog 状态已由 CycleDialogSlot 内部管理
+// 保留 cycleDialogs composable 供 F/I/G/K/L/M/N cycle editor composables 使用
 
 // ─── Sprint 2: Foundation composables ─────────────────────────────────────────
 const prefillMarkers = usePrefillMarkers()
@@ -1509,6 +1113,20 @@ const showCellFormulaDetail = ref(false)
 // 审计导航图抽屉
 const showAuditNavDrawer = ref(false)
 const auditNavFullscreen = ref(true)
+
+// Sprint 4 Task 15.13: 底稿离线导出/导入
+const showOfflineExportDialog = ref(false)
+const showOfflineImportDialog = ref(false)
+const availableSheetNames = computed(() => {
+  return flatSheets.value?.map((s: any) => s.name || s.id || '') || []
+})
+function onOfflineImported() {
+  // Reload workpaper data after import
+  getWorkpaper(projectId.value, wpId.value).then((data) => {
+    if (data) wpDetail.value = data
+  })
+}
+
 const hasAuditNav = computed(() => {
   const code = wpDetail.value?.wp_code || ''
   return !!code && (
@@ -2519,16 +2137,6 @@ function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: stri
   padding: 6px;
   overflow-y: auto;
 }
-.gt-stocktake-trigger {
-  padding: 6px;
-  border: 1px solid var(--gt-color-border-light, #e4e7ed);
-  border-radius: 6px;
-  background: var(--gt-color-bg-white, #fff);
-  text-align: center;
-}
-.gt-stocktake-trigger :deep(.el-button) {
-  width: 100%;
-}
 .gt-wp-editor-loading {
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; height: 100%; gap: 12px; color: var(--gt-color-text-tertiary);
@@ -2589,6 +2197,10 @@ function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: stri
   color: var(--gt-color-wheat);
   font-size: var(--gt-font-size-xs);
   font-weight: 500;
+}
+.gt-wp-completion-circle {
+  flex-shrink: 0;
+  margin-left: 4px;
 }
 
 /* ─── Sprint 2: Prefill tooltip ─── */

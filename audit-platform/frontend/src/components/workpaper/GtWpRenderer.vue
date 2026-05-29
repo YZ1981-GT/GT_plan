@@ -29,6 +29,26 @@
 
     <!-- Ready: dispatch by componentType -->
     <template v-if="!loading && !error && renderConfig">
+      <!-- Sprint 4 Task 9.2: 底稿填写完成度可视化 -->
+      <div v-if="completionRate.total > 0" class="gt-wp-renderer__completion">
+        <el-progress
+          type="circle"
+          :percentage="completionRate.percentage"
+          :width="36"
+          :stroke-width="3"
+        />
+      </div>
+
+      <!-- Sprint 4 Task 10.2: schema 缺失智能提示 banner -->
+      <el-alert
+        v-if="schemaFallbackBanner"
+        type="info"
+        :closable="false"
+        class="gt-wp-renderer__fallback-banner"
+      >
+        {{ schemaFallbackBanner }}
+      </el-alert>
+
       <!-- A 程序表中控台 -->
       <GtAProgramConsole
         v-if="componentType === 'a-program-console'"
@@ -38,6 +58,7 @@
         :html-data="activeSheetHtmlData"
         :readonly="readonly"
         @save="onSave"
+        @open-attachment="onOpenAttachment"
       />
 
       <!-- B 底稿目录 -->
@@ -90,6 +111,7 @@
         @trigger-procedure-trimming-suggestion="onTrimmingSuggestion"
         @conclusion-change="onConclusionChange"
         @step-advance="onStepAdvance"
+        @open-attachment="onOpenAttachment"
       />
 
       <!-- H 辅助说明（只读 markdown） -->
@@ -131,6 +153,7 @@
 <script setup lang="ts">
 import { ref, computed, toRef } from 'vue'
 import { useWpRenderer, type WpComponentType } from '@/composables/useWpRenderer'
+import { useWpCompletionRate } from '@/composables/useWpCompletionRate'
 import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
 
 // ─── Sub-components (real + placeholder stubs) ───
@@ -179,6 +202,7 @@ const emit = defineEmits<{
   'standard-switch': [standard: string]
   'sync-to-disclosure-notes': [payload: Record<string, any>]
   'jump-to-reference': [refCode: string]
+  'open-attachment': [payload: { wpId: string; sheetName: string; rowRef: string }]
 }>()
 
 // ─── Refs ───
@@ -188,6 +212,16 @@ const loadingHint = ref('')
 // ─── Composables ───
 const wpIdRef = toRef(props, 'wpId')
 const { renderConfig, loading, error, componentType, reload } = useWpRenderer(wpIdRef)
+
+// Sprint 4 Task 10.1: schema 缺失智能提示
+const schemaFallbackBanner = computed(() => {
+  if (!renderConfig.value) return null
+  const cls = renderConfig.value.wp_code
+  if (cls && /^[A-E]/i.test(cls) && componentType.value === 'univer') {
+    return '此底稿推荐使用 HTML 渲染器，当前因配置未就绪暂用表格模式'
+  }
+  return null
+})
 
 // ─── Computed ───
 const activeSheetName = computed(() => {
@@ -207,6 +241,9 @@ const activeSheet = computed(() => {
 
 const activeSheetSchema = computed(() => activeSheet.value?.schema ?? {})
 const activeSheetHtmlData = computed(() => activeSheet.value?.html_data ?? {})
+
+// Sprint 4 Task 9.2: 底稿填写完成度
+const { rate: completionRate } = useWpCompletionRate(componentType, activeSheetSchema, activeSheetHtmlData)
 
 const errorTitle = computed(() => {
   if (!error.value) return ''
@@ -254,6 +291,10 @@ function onSyncToDisclosureNotes(payload: Record<string, any>) {
 function onJumpToReference(refCode: string) {
   emit('jump-to-reference', refCode)
 }
+
+function onOpenAttachment(payload: { wpId: string; sheetName: string; rowRef: string }) {
+  emit('open-attachment', payload)
+}
 </script>
 
 <style scoped>
@@ -281,4 +322,48 @@ function onJumpToReference(refCode: string) {
   justify-content: center;
   min-height: 300px;
 }
+
+.gt-wp-renderer__completion {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 10;
+}
+
+.gt-wp-renderer__fallback-banner {
+  margin-bottom: 8px;
+}
 </style>
+
+<!-- Sprint 4 Task 16.4: 自动刷数 cell 全局样式（子组件需要） -->
+<style>
+.gt-auto-fill-cell {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #f0f9ff;
+  border: 1px solid #bae0ff;
+  color: #0958d9;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+  transition: all 0.2s;
+}
+
+.gt-auto-fill-cell:hover {
+  background: #e6f4ff;
+  border-color: #91caff;
+}
+
+.gt-auto-fill-cell--unavailable {
+  background: #fff2f0;
+  border: 1px dashed #ff7875;
+  color: #cf1322;
+}
+
+.gt-auto-fill-cell--unavailable:hover {
+  background: #fff1f0;
+  border-color: #ff4d4f;
+}
+</style>
+

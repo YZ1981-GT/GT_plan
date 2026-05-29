@@ -99,19 +99,40 @@
           </el-collapse-item>
         </el-collapse>
 
-        <!-- 主输入区 -->
-        <el-input
-          v-model="segmentValues[seg.id]"
-          type="textarea"
-          :rows="segmentRows(seg)"
-          :disabled="readonly"
-          :maxlength="seg.max_length"
-          :show-word-limit="!!seg.max_length"
-          :placeholder="seg.hint || ('请填写' + seg.title)"
-          class="gt-dfp__textarea"
-          @change="onSegmentChange(seg.id)"
-          @blur="onSegmentBlur(seg.id)"
-        />
+        <!-- 主输入区 + AI 建议按钮 -->
+        <div class="gt-dfp__input-wrapper">
+          <div class="gt-ai-suggest-trigger" v-if="aiEnabled && !readonly">
+            <el-button text size="small" :loading="aiLoading" @click="onAiSuggest(seg)">🤖 AI 建议</el-button>
+          </div>
+          <el-input
+            v-model="segmentValues[seg.id]"
+            type="textarea"
+            :rows="segmentRows(seg)"
+            :disabled="readonly"
+            :maxlength="seg.max_length"
+            :show-word-limit="!!seg.max_length"
+            :placeholder="seg.hint || ('请填写' + seg.title)"
+            class="gt-dfp__textarea"
+            @change="onSegmentChange(seg.id)"
+            @blur="onSegmentBlur(seg.id)"
+          />
+        </div>
+
+        <!-- AI 建议面板 -->
+        <div v-if="showSuggestionPanel && currentSuggestion?.fieldName === ('segments.' + seg.id)" class="gt-dfp__ai-panel">
+          <div class="gt-dfp__ai-panel-header">
+            <span class="gt-dfp__ai-panel-title">🤖 AI 建议</span>
+            <el-tag size="small" :type="currentSuggestion.confidence >= 0.7 ? 'success' : 'warning'">
+              置信度 {{ Math.round(currentSuggestion.confidence * 100) }}%
+            </el-tag>
+          </div>
+          <pre class="gt-dfp__ai-panel-text">{{ currentSuggestion.text }}</pre>
+          <div class="gt-dfp__ai-panel-actions">
+            <el-button type="primary" size="small" @click="handleAdopt(seg.id)">✅ 采纳</el-button>
+            <el-button size="small" @click="handleModify(seg.id)">✏️ 修改后采纳</el-button>
+            <el-button size="small" @click="handleIgnore">❌ 忽略</el-button>
+          </div>
+        </div>
 
         <!-- hint 行 -->
         <div v-if="seg.hint" class="gt-dfp__field-hint">
@@ -185,6 +206,7 @@ import {
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import { useWpAiSuggest } from '@/composables/useWpAiSuggest'
 import type { DFormSchema, DFormData, FieldChangePayload } from './GtDForm.vue'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -259,6 +281,46 @@ const segmentValues = ref<Record<string, string>>({})
 const conclusionValue = ref<string>('')
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+// ─── AI 辅助填写（US-5 Task 7.1/7.3/7.4） ───────────────────────────────────
+
+const {
+  aiEnabled,
+  aiLoading,
+  currentSuggestion,
+  showSuggestionPanel,
+  assistedFieldsList,
+  requestSuggestion,
+  adoptSuggestion,
+  modifySuggestion,
+  ignoreSuggestion,
+} = useWpAiSuggest({ wpId: props.wpId, sheetName: props.sheetName })
+
+function onAiSuggest(seg: SegmentDef) {
+  const existingContent = segmentValues.value[seg.id] || ''
+  requestSuggestion('segments.' + seg.id, existingContent)
+}
+
+function handleAdopt(segId: string) {
+  const text = adoptSuggestion()
+  if (text) {
+    segmentValues.value[segId] = text
+    debounceSave()
+  }
+}
+
+function handleModify(segId: string) {
+  // 修改后采纳：将建议文本填入，用户可继续编辑
+  if (currentSuggestion.value) {
+    segmentValues.value[segId] = currentSuggestion.value.text
+    modifySuggestion(currentSuggestion.value.text)
+    debounceSave()
+  }
+}
+
+function handleIgnore() {
+  ignoreSuggestion()
+}
 
 // ─── Static maps ─────────────────────────────────────────────────────────────
 
@@ -470,7 +532,8 @@ function buildSavePayload(): ParagraphData {
     ...(props.htmlData || {}),
     segments: { ...segmentValues.value },
     conclusion: conclusionValue.value,
-  }
+    ai_assisted_fields: assistedFieldsList.value.length > 0 ? assistedFieldsList.value : undefined,
+  } as ParagraphData
 }
 
 function debounceSave() {
@@ -632,6 +695,50 @@ onBeforeUnmount(() => {
 .gt-dfp__segment-editable {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+.gt-dfp__input-wrapper {
+  position: relative;
+}
+.gt-ai-suggest-trigger {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  z-index: 5;
+}
+.gt-dfp__ai-panel {
+  border: 1px solid var(--el-color-primary-light-5);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--el-color-primary-light-9);
+}
+.gt-dfp__ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.gt-dfp__ai-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-color-primary);
+}
+.gt-dfp__ai-panel-text {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  background: var(--gt-color-bg-white, #fff);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--el-text-color-regular);
+  max-height: 200px;
+  overflow-y: auto;
+}
+.gt-dfp__ai-panel-actions {
+  display: flex;
   gap: 8px;
 }
 .gt-dfp__placeholder-collapse,

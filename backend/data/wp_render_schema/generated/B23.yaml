@@ -1,6 +1,6 @@
 # B23.yaml
 # 由 backend/scripts/generate_wp_render_schema.py 自动生成
-# 生成时间: 2026-05-26T15:58:23
+# 生成时间: 2026-05-29T01:10:59
 # Requirements: 2.2 原则 2（配置驱动）
 # ⚠️  此文件为草稿，关键字段需人工审核：
 #   - dynamic_table 边界（start_row/end_row/header_row）
@@ -10,7 +10,7 @@
 #   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
 
 wp_code: B23
-template_path: backend/wp_templates/B/B23-15 了解信息处理控制.xlsx
+template_path: backend/wp_templates/B/B23-XX-5 职责分离 - 通用模板.xlsx
 template_version: v2025-R5
 applicable_standards:
 - soe_standalone
@@ -19,88 +19,360 @@ applicable_standards:
 - listed_consolidated
 _generated:
   tool: generate_wp_render_schema.py
-  generated_at: '2026-05-26T15:58:23'
-  source_xlsx: B23-15 了解信息处理控制.xlsx
+  generated_at: '2026-05-29T01:10:59'
+  source_xlsx: B23-XX-5 职责分离 - 通用模板.xlsx
   _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
 sheets:
-  B23-15 了解信息处理控制:
-    component_type: d-form-table
-    class_code: D-业务了解
+  模板 - 职责分离分析表:
+    component_type: univer
+    class_code: F-分析表
     fixed_cells:
-      A2: 了解信息处理控制
-      A3: ${entity_name}
-      A4: ${period_end}
-      J3: ${index_no}
-      K3: ${index_no}
-      J4: ${page_no}
+      H3: ${index_no}
     dynamic_table:
-      start_row: 6
+      start_row: 9
       end_row: dynamic
-      header_row: 5
+      header_row: 8
       columns:
-        A:
-          field: col_a
-          type: text
-          label: 控制类别
         B:
           field: col_b
           type: text
-          label: 信息处理控制索引号
+          label: 人员 (角色)
         C:
           field: col_c
           type: text
-          label: 业务流程和交易
+          label: 授权或批准
         D:
           field: col_d
           type: text
-          label: 财务报表项目
+          label: 记录或报告
         E:
           field: col_e
           type: text
-          label: 财务报表认定
+          label: 资产保管
         F:
           field: col_f
           type: text
-          label: 潜在错报风险
+          label: 存在职责分离问题?
         G:
           field: col_g
           type: text
-          label: 实际控制活动
+          label: 识别出缺陷 ?
         H:
           field: col_h
           type: text
+          label: 描述职责分离问题或已作出的重要判断(如有)
+    static_text:
+      rows:
+      - 2
+      - 6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - F11
+      - F12
+      - F13
+      - F14
+      - F15
+      - C18
+      - D18
+      - E18
+      - F18
+      - C23
+      - D23
+      - E23
+      - F23
+      - C28
+      - D28
+      - E28
+      - F28
+      - C33
+      - D33
+      - E33
+      - F33
+      - C38
+      - D38
+      - E38
+      - F38
+      _total_count: 25
+    merged_cells:
+      preserve: true
+      count: 18
+      ranges_sample:
+      - G28:G31
+      - H18:H21
+      - B17:H17
+      - F39:F41
+      - G18:G21
+      - G33:G36
+      - F34:F36
+      - H23:H26
+      - H38:H41
+      - H33:H36
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  模板 - 职责分离控制测试:
+    component_type: e-control-test
+    class_code: E-控制测试单条
+    fixed_cells:
+      M3: ${index_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 控制
+        C:
+          field: col_c
+          type: text
+          label: 控制编号
+        D:
+          field: col_d
+          type: text
+          label: 控制描述
+        E:
+          field: col_e
+          type: text
+          label: 信息系统控制目标
+        F:
+          field: col_f
+          type: text
+          label: 财务报表认定
+        G:
+          field: col_g
+          type: text
           label: 自动/人工
+        H:
+          field: col_h
+          type: text
+          label: 预防性/检查性
         I:
           field: col_i
           type: text
-          label: 预防性/检查性
+          label: 频率
         J:
           field: col_j
           type: text
-          label: 频率
+          label: 测试步骤
         K:
           field: col_k
           type: text
-          label: 涉及应用程序
+          label: 测试结果
         L:
           field: col_l
           type: text
-          label: 涉及应用程序索引号
+          label: 是否发现例外
         M:
           field: col_m
           type: text
-          label: 是否纳入信息处理控制测试范围
+          label: 支持性文件
     static_text:
       rows:
-      - 1-2
+      - 2
+      - 6
       description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
     merged_cells:
       preserve: true
-      count: 5
+      count: 1
       ranges_sample:
-      - A2:L2
-      - A15:L15
-      - A8:A9
-      - A16:L17
-      - A1:L1
+      - B6:M6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  指引及示例 - 职责分离分析:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1
+      - 3-4
+      - 14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - F29
+      - F30
+      - F31
+      - C35
+      - D35
+      - E35
+      - F35
+      - C38
+      - D38
+      - E38
+      - F38
+      - C41
+      - D41
+      - E41
+      - F41
+      _total_count: 15
+    merged_cells:
+      preserve: true
+      count: 19
+      ranges_sample:
+      - H41:H44
+      - H38:H39
+      - B17:B18
+      - B33:H33
+      - G38:G39
+      - B14:B15
+      - H35:H36
+      - B4:H13
+      - B3:H3
+      - G35:G36
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  示例 - 职责分离控制测试:
+    component_type: e-control-test
+    class_code: E-控制测试单条
+    fixed_cells:
+      M3: ${index_no}
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 控制
+        C:
+          field: col_c
+          type: text
+          label: 控制编号
+        D:
+          field: col_d
+          type: text
+          label: 控制描述
+        E:
+          field: col_e
+          type: text
+          label: 信息系统控制目标
+        F:
+          field: col_f
+          type: text
+          label: 财务报表认定
+        G:
+          field: col_g
+          type: text
+          label: 自动/人工
+        H:
+          field: col_h
+          type: text
+          label: 预防性/检查性
+        I:
+          field: col_i
+          type: text
+          label: 频率
+        J:
+          field: col_j
+          type: text
+          label: 测试步骤
+        K:
+          field: col_k
+          type: text
+          label: 测试结果
+        L:
+          field: col_l
+          type: text
+          label: 是否发现例外
+        M:
+          field: col_m
+          type: text
+          label: 支持性文件
+    static_text:
+      rows:
+      - 2
+      - 6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 11
+      ranges_sample:
+      - B6:M6
+      - C9:C10
+      - B9:B10
+      - G9:G10
+      - D9:D10
+      - E9:E10
+      - H9:H10
+      - F9:F10
+      - I9:I10
+      - L9:L10
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  指引 - 职责分离矩阵:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: ERP系统职责分离矩阵
+        E:
+          field: col_e
+          type: text
+          label: 收入与应收
+        N:
+          field: col_n
+          type: text
+          label: 采购与应付
+        T:
+          field: col_t
+          type: text
+          label: 库存管理
+        AC:
+          field: col_ac
+          type: text
+          label: 财务会计
+        AI:
+          field: col_ai
+          type: text
+          label: 成本会计
+        AK:
+          field: col_ak
+          type: text
+          label: 项目管理
+        AM:
+          field: col_am
+          type: text
+          label: 生产制造管理
+        AO:
+          field: col_ao
+          type: text
+          label: 设备维护
+    static_text:
+      rows:
+      - 2-4
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 18
+      ranges_sample:
+      - B35:B40
+      - B19:B25
+      - AM8:AN8
+      - B47:B48
+      - AO8:AP8
+      - B43:B44
+      - B26:B34
+      - AC8:AH8
+      - AK8:AL8
+      - B11:B18
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  Data:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: '-'
+      A3: ${entity_name}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-3
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
     cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

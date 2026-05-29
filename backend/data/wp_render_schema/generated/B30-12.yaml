@@ -1,0 +1,277 @@
+# B30-12.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:10:59
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: B30-12
+template_path: backend/wp_templates/B/B30-12 组成部分已识别错报汇总表（2021年6月）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:10:59'
+  source_xlsx: B30-12 组成部分已识别错报汇总表（2021年6月）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  Sheet5:
+    component_type: skip
+    class_code: I-占位
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  B30-12 指令—已识别组成部分错报汇总表:
+    component_type: univer
+    class_code: F-汇总表
+    fixed_cells:
+      F3: ${index_no}
+      E4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 6
+      - 8-14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 10
+      ranges_sample:
+      - C13:F13
+      - B6:C6
+      - B1:E1
+      - B10:F10
+      - C12:F12
+      - C11:F11
+      - B2:E2
+      - B8:F8
+      - B9:F9
+      - C14:F14
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  B30-12-1 整体发现:
+    component_type: d-form-table
+    class_code: D-业务了解
+    fixed_cells:
+      E3: ${index_no}
+      E4: ${page_no}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 6
+      - 8-14
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - B1:E1
+      - B6:E6
+      - C19:D19
+      - B2:E2
+      - C18:D18
+      - C17:D17
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  B30-12-2 已更正错报:
+    component_type: d-form-table
+    class_code: D-检查表
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 会计期间：
+        D:
+          field: col_d
+          type: text
+          label: 复核人：
+        E:
+          field: col_e
+          type: text
+          label: 日期：
+        H:
+          field: col_h
+          type: text
+          label: 页    次：
+    static_text:
+      rows:
+      - 2-3
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - C8
+      - C9
+      - C10
+      - C11
+      - C12
+      - C13
+      - C14
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 3
+      ranges_sample:
+      - B3:I3
+      - B2:I2
+      - B6:F6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  B30-12-3 未更正错报:
+    component_type: d-form-table
+    class_code: D-检查表
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 会计期间：
+        E:
+          field: col_e
+          type: text
+          label: 复核人：
+        H:
+          field: col_h
+          type: text
+          label: 日期：
+        M:
+          field: col_m
+          type: text
+          label: 页    次：
+    static_text:
+      rows:
+      - 2-3
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - C8
+      - C9
+      - C10
+      - C11
+      - C12
+      - C13
+      - C14
+      - I30
+      - J30
+      - K30
+      - L30
+      - I32
+      - J32
+      - K32
+      - L32
+      - I35
+      - J35
+      - K35
+      - L35
+      _total_count: 19
+    merged_cells:
+      preserve: true
+      count: 10
+      ranges_sample:
+      - F34:H34
+      - B6:F6
+      - F31:H31
+      - B2:I2
+      - F32:H32
+      - F37:L37
+      - B3:I3
+      - I16:L16
+      - F30:H30
+      - F38:L38
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  B30-12-4 披露错报:
+    component_type: d-form-table
+    class_code: D-检查表
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 会计期间：
+        D:
+          field: col_d
+          type: text
+          label: 复核人：
+        E:
+          field: col_e
+          type: text
+          label: 日期：
+        F:
+          field: col_f
+          type: text
+          label: 页    次：
+    static_text:
+      rows:
+      - 2-3
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - C8
+      - C9
+      - C10
+      - C11
+      - C12
+      - C13
+      - C14
+      _total_count: 7
+    merged_cells:
+      preserve: true
+      count: 12
+      ranges_sample:
+      - D8:E8
+      - B26:E26
+      - B27:E27
+      - D10:E10
+      - D11:E11
+      - B2:I2
+      - B6:E6
+      - D13:E13
+      - B3:I3
+      - D14:E14
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  Lists:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: 'No'
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-2
+      - 4-6
+      - 8-9
+      - 11-13
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

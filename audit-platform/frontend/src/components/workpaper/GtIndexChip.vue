@@ -72,6 +72,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { parseIndexRef, type ResolvedIndexRef } from '@/utils/parseIndexRef'
+import { useWpNavigationHistory } from '@/composables/useWpNavigationHistory'
 
 // ─── Props / Emits ───
 const props = withDefaults(defineProps<{
@@ -89,6 +90,7 @@ const emit = defineEmits<{
 // ─── Router ───
 const route = useRoute()
 const router = useRouter()
+const { push: pushNavHistory } = useWpNavigationHistory()
 
 // ─── State ───
 const parsed = ref<ResolvedIndexRef | null>(null)
@@ -248,6 +250,16 @@ function navigateToTarget(resolved: ResolvedIndexRef) {
   if (!pid) return
 
   const { ns, target } = resolved
+
+  // Task 11.2: push current location to navigation history before jumping
+  const currentWpId = route.params.id as string || route.params.wpId as string || ''
+  if (currentWpId && ns === 'wp') {
+    pushNavHistory({
+      wpId: currentWpId,
+      wpCode: route.query.wp_code as string || '',
+      sheetName: route.query.sheet as string || '',
+    })
+  }
 
   switch (ns) {
     case 'wp':

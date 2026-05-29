@@ -26,6 +26,10 @@
             <el-tooltip content="根据公式从项目数据重新计算" placement="bottom">
               <el-button size="small" @click="refreshNoteByFormula" :loading="noteRefreshing">🔄</el-button>
             </el-tooltip>
+            <!-- B.1.13: 重新汇总按钮 -->
+            <el-tooltip content="从子公司单体附注重新汇总" placement="bottom">
+              <el-button size="small" @click="handleReaggregate" :loading="reaggregating">🔄 重新汇总</el-button>
+            </el-tooltip>
             <el-tooltip content="审核当前表格公式一致性" placement="bottom">
               <el-button size="small" @click="auditCurrentNote" :loading="noteSingleAuditLoading">✅</el-button>
             </el-tooltip>
@@ -443,6 +447,7 @@ import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useTableToolbar } from '@/composables/useTableToolbar'
+import ConsolNoteTreeEnhanced from '@/components/notes/ConsolNoteTreeEnhanced.vue'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { eventBus } from '@/utils/eventBus'
 import type { ConsolCatalogSelectPayload, ConsolTreeAggregatePayload, ConsolNoteAuditAllPayload } from '@/utils/eventBus'
@@ -467,6 +472,7 @@ const selectedNoteSection = ref<any>(null)
 const { isEditing: noteEditMode, isDirty: noteDirty, enterEdit: enterNoteEdit, exitEdit: exitNoteEdit, markDirty: markNoteDirty, clearDirty: clearNoteDirty } = useEditMode({ guardRoute: false })
 const { isFullscreen: noteFullscreen, toggleFullscreen: toggleNoteFullscreen } = useFullscreen()
 const noteRefreshing = ref(false)
+const reaggregating = ref(false)
 const noteSingleAuditLoading = ref(false)
 const noteFileRef = ref<HTMLInputElement | null>(null)
 const noteTableRef = ref<any>(null)
@@ -883,6 +889,29 @@ async function refreshNoteByFormula() {
   } catch (err: any) {
     ElMessage.error(`公式刷新失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
   } finally { noteRefreshing.value = false }
+}
+
+// B.1.13: 重新汇总（从子公司单体附注汇总到合并附注）
+async function handleReaggregate() {
+  if (!props.projectId) return
+  reaggregating.value = true
+  try {
+    await api.post(`/api/disclosure-notes/${props.projectId}/${props.year}/reaggregate`)
+    ElMessage.success('重新汇总完成')
+    // Reload current section
+    if (selectedNoteSection.value?.section_id) {
+      eventBus.emit('consol-catalog-select', {
+        type: 'note',
+        sectionId: selectedNoteSection.value.section_id,
+        title: selectedNoteSection.value.title,
+        standard: props.currentEntity?.code || '',
+      })
+    }
+  } catch (err: any) {
+    ElMessage.error(`汇总失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
+  } finally {
+    reaggregating.value = false
+  }
 }
 
 function addNoteRow() {

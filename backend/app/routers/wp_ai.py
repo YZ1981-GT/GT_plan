@@ -1,20 +1,100 @@
 """AI 辅助底稿 API
 
-Phase 9 Task 9.8
+Phase 9 Task 9.8 + workpaper-editor-slimdown Task 7.2
 """
 
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.services.wp_ai_service import WpAIService
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/workpapers", tags=["wp-ai"])
+
+
+# ─── US-5: LLM 辅助填写 suggest 端点 ─────────────────────────────────────────
+
+
+class SuggestRequest(BaseModel):
+    """AI 建议请求体"""
+    sheet_name: str = Field(..., max_length=200)
+    field_name: str = Field(..., max_length=200)
+    existing_content: str = Field(default="", max_length=5000)
+
+
+class SuggestResponse(BaseModel):
+    """AI 建议响应体"""
+    suggestion: str
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+@router.post("/{wp_id}/ai/suggest", response_model=SuggestResponse)
+async def suggest_fill(
+    wp_id: UUID,
+    body: SuggestRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """US-5: LLM 辅助填写 — 返回 AI 建议文本（≤2000 字符）
+
+    当 WP_AI_SERVICE_ENABLED=false 时返回 403。
+    采纳后前端在保存 payload 中标记 ai_assisted_fields，后端写入审计轨迹。
+    """
+    if not settings.WP_AI_SERVICE_ENABLED:
+        raise HTTPException(status_code=403, detail="AI service disabled")
+
+    # 验证底稿存在
+    import sqlalchemy as sa
+    from app.models.workpaper_models import WorkingPaper
+    wp = (await db.execute(
+        sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+    )).scalar_one_or_none()
+    if not wp:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    # 调用 AI service（stub 模式下返回模板建议）
+    svc = WpAIService(db)
+    result = await svc.suggest_field_content(
+        wp_id=wp_id,
+        sheet_name=body.sheet_name,
+        field_name=body.field_name,
+        existing_content=body.existing_content,
+    )
+
+    # 截断到 2000 字符
+    suggestion_text = (result.get("text") or "")[:2000]
+    confidence = float(result.get("confidence", 0.6))
+
+    # 写入审计轨迹
+    try:
+        from app.services.audit_logger_enhanced import audit_logger
+        await audit_logger.log_action(
+            user_id=user.id,
+            action="workpaper.ai_suggest_requested",
+            object_type="workpaper",
+            object_id=wp_id,
+            project_id=wp.project_id,
+            details={
+                "sheet_name": body.sheet_name,
+                "field_name": body.field_name,
+                "suggestion_length": len(suggestion_text),
+                "confidence": confidence,
+            },
+        )
+    except Exception as e:
+        logger.warning(f"Failed to write audit trail for AI suggest: {e}")
+
+    return SuggestResponse(suggestion=suggestion_text, confidence=confidence)
 
 
 @router.post("/{wp_id}/ai/analytical-review")

@@ -1,0 +1,105 @@
+# B30-15.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:10:59
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: B30-15
+template_path: backend/wp_templates/B/B30-15 组成部分预算和实际收费信息（2021年6月）.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:10:59'
+  source_xlsx: B30-15 组成部分预算和实际收费信息（2021年6月）.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  B30-15 组成部分预算和实际收费信息:
+    component_type: d-form-table
+    class_code: D-业务了解
+    fixed_cells:
+      M3: ${index_no}
+      N3: ${index_no}
+      M4: ${page_no}
+    dynamic_table:
+      start_row: 17
+      end_row: dynamic
+      header_row: 16
+      columns:
+        D:
+          field: col_d
+          type: text
+          label: 小时
+        I:
+          field: col_i
+          type: text
+          label: 成本（本国货币）
+        N:
+          field: col_n
+          type: text
+          label: 超时说明
+    static_text:
+      rows:
+      - 1-2
+      - 6
+      - 8
+      - 10-13
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - G19
+      - L19
+      - G20
+      - L20
+      - G21
+      - L21
+      - G22
+      - L22
+      - G24
+      - L24
+      - D25
+      - E25
+      - F25
+      - G25
+      - I25
+      - J25
+      - L25
+      _total_count: 17
+    merged_cells:
+      preserve: true
+      count: 16
+      ranges_sample:
+      - B13:C13
+      - D13:F13
+      - D11:F11
+      - B11:C11
+      - I9:N11
+      - B8:N8
+      - D10:F10
+      - B2:I2
+      - D16:G16
+      - I13:O14
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  GT_Custom:
+    component_type: skip
+    class_code: I-占位
+    fixed_cells:
+      A2: C2
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1-8
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

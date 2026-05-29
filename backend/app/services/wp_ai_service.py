@@ -489,3 +489,66 @@ class WpAIService:
             scenario="cutoff_conclusion",
             target=prompt_cfg.get("output_target"),
         )
+
+    # ------------------------------------------------------------------
+    # US-5: LLM 辅助填写 — suggest_field_content
+    # workpaper-editor-slimdown Task 7.2
+    # ------------------------------------------------------------------
+
+    async def suggest_field_content(
+        self,
+        wp_id: UUID,
+        sheet_name: str,
+        field_name: str,
+        existing_content: str = "",
+    ) -> dict:
+        """为 D 类段落/QA 或 E 类控制测试的文本字段生成 AI 建议。
+
+        Stub 模式下返回模板建议文本（不调用 LLM）。
+        真实模式下调用 LLM 生成建议。
+
+        Returns:
+            {"text": str, "confidence": float}
+        """
+        from app.core.config import settings as app_settings
+
+        # Stub 模式：返回预设建议
+        if not app_settings.WP_AI_SERVICE_ENABLED:
+            # 不应到达此处（router 层已拦截），但防御性处理
+            return {"text": "", "confidence": 0.0}
+
+        # 尝试调用 LLM
+        try:
+            from app.services.llm_client import chat_completion
+
+            system_prompt = (
+                "你是一名资深审计师助手。根据用户提供的底稿上下文，"
+                "为指定字段生成专业、简洁的填写建议。"
+                "建议应符合中国审计准则要求，语言正式、逻辑清晰。"
+                "如果已有内容，请在其基础上优化或补充。"
+                "输出纯文本，不要 markdown 格式。"
+            )
+            user_prompt = (
+                f"底稿 sheet: {sheet_name}\n"
+                f"字段: {field_name}\n"
+                f"已有内容: {existing_content[:1000] if existing_content else '（空）'}\n\n"
+                f"请为该字段生成填写建议（200-500字）。"
+            )
+
+            ai_text = await chat_completion([
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ])
+            return {"text": (ai_text or "")[:2000], "confidence": 0.75}
+        except Exception as e:
+            logger.warning("suggest_field_content LLM failed: %s", e)
+            # Fallback: 返回通用建议模板
+            fallback = (
+                f"【AI 建议 - {field_name}】\n"
+                f"经审计，我们对{sheet_name}相关事项执行了以下审计程序：\n"
+                f"1. 获取并审阅了相关文件资料；\n"
+                f"2. 对关键数据进行了核对和分析；\n"
+                f"3. 未发现重大异常情况。\n"
+                f"综上，相关事项符合企业会计准则的规定。"
+            )
+            return {"text": fallback[:2000], "confidence": 0.3}

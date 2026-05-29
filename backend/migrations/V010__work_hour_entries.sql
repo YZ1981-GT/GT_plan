@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS work_hour_entries (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_whe_user_date ON work_hour_entries (user_id, date);
-CREATE INDEX idx_whe_project_status ON work_hour_entries (project_id, status);
-CREATE INDEX idx_whe_project_cycle ON work_hour_entries (project_id, cycle);
+CREATE INDEX IF NOT EXISTS idx_whe_user_date ON work_hour_entries (user_id, date);
+CREATE INDEX IF NOT EXISTS idx_whe_project_status ON work_hour_entries (project_id, status);
+CREATE INDEX IF NOT EXISTS idx_whe_project_cycle ON work_hour_entries (project_id, cycle);
 
 COMMENT ON TABLE work_hour_entries IS '工时填报条目（三级粒度：循环/底稿/程序）';

@@ -1,6 +1,6 @@
 # K13.yaml
 # 由 backend/scripts/generate_wp_render_schema.py 自动生成
-# 生成时间: 2026-05-26T15:58:54
+# 生成时间: 2026-05-29T01:11:23
 # Requirements: 2.2 原则 2（配置驱动）
 # ⚠️  此文件为草稿，关键字段需人工审核：
 #   - dynamic_table 边界（start_row/end_row/header_row）
@@ -19,7 +19,7 @@ applicable_standards:
 - listed_consolidated
 _generated:
   tool: generate_wp_render_schema.py
-  generated_at: '2026-05-26T15:58:54'
+  generated_at: '2026-05-29T01:11:23'
   source_xlsx: K13 营业外支出.xlsx
   _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
 sheets:

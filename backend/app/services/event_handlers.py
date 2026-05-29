@@ -48,7 +48,7 @@ def _make_handler(service_class, method_name: str, after_commit_event_type: Even
                         await session.flush()
                     except IntegrityError:
                         await session.rollback()
-                        logger.info("Skip duplicated event delivery: event_id=%s handler=%s", dedup_event_id, handler_key)
+                        logger.debug("Skip duplicated event delivery: event_id=%s handler=%s", dedup_event_id, handler_key)
                         return
                 svc = service_class(session)
                 method = getattr(svc, method_name)
@@ -223,7 +223,7 @@ def register_event_handlers() -> None:
                     session, project_id, year
                 )
                 await session.commit()
-                logger.info(
+                logger.debug(
                     "[F4 B51-5 high-risk trigger] project=%s year=%s "
                     "added=%d skipped=%d errors=%d",
                     project_id,
@@ -284,7 +284,7 @@ def register_event_handlers() -> None:
                     session, project_id, year, wp_code_prefix="F2"
                 )
                 await session.commit()
-                logger.info(
+                logger.debug(
                     "[F-F14 B51-4 high-risk trigger] project=%s year=%s "
                     "added=%d skipped=%d errors=%d",
                     project_id,
@@ -386,7 +386,7 @@ def register_event_handlers() -> None:
                     commenter_id=commenter_id,
                 )
                 await session.commit()
-                logger.info(
+                logger.debug(
                     "[REVIEW_COMPENSATE] IssueTicket compensated for review=%s",
                     review_record_id,
                 )
@@ -471,7 +471,7 @@ def register_event_handlers() -> None:
         _invalidate_formula_cache_on_adjustment,
     )
 
-    logger.info("All event handlers registered successfully (including formula cache invalidation)")
+    logger.debug("All event handlers registered successfully (including formula cache invalidation)")
 
     # ------------------------------------------------------------------
     # Phase 9: 底稿预填过期标记
@@ -483,7 +483,7 @@ def register_event_handlers() -> None:
                 from app.services.prefill_engine import mark_stale
                 count = await mark_stale(session, payload.project_id)
                 await session.commit()
-                logger.info(f"Marked {count} workpapers as stale for project {payload.project_id}")
+                logger.debug(f"Marked {count} workpapers as stale for project {payload.project_id}")
         except Exception:
             logger.warning("Failed to mark workpapers stale")
 
@@ -494,7 +494,7 @@ def register_event_handlers() -> None:
                 from app.services.prefill_engine import mark_stale
                 count = await mark_stale(session, payload.project_id, payload.account_codes)
                 await session.commit()
-                logger.info(f"Marked {count} workpapers as stale (account change)")
+                logger.debug(f"Marked {count} workpapers as stale (account change)")
         except Exception:
             logger.warning("Failed to mark workpapers stale on adjustment change")
 
@@ -507,7 +507,7 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.MAPPING_CHANGED, _mark_workpapers_stale_by_account)
     event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, _mark_workpapers_stale_by_account)
 
-    logger.info("Phase 9 workpaper event handlers registered")
+    logger.debug("Phase 9 workpaper event handlers registered")
 
     # ------------------------------------------------------------------
     # F46 / Sprint 7.22: 账套 rollback → 标下游 Workpaper/AuditReport/DisclosureNote is_stale
@@ -547,7 +547,7 @@ def register_event_handlers() -> None:
                     .values(is_stale=True)
                 )
                 await session.commit()
-                logger.info(
+                logger.debug(
                     "[F46-rollback-stale] AuditReport/DisclosureNote marked stale "
                     "for project=%s year=%s",
                     project_id,
@@ -567,7 +567,7 @@ def register_event_handlers() -> None:
         EventType.LEDGER_DATASET_ROLLED_BACK,
         _mark_downstream_stale_on_rollback,
     )
-    logger.info("F46 rollback downstream stale handler registered")
+    logger.debug("F46 rollback downstream stale handler registered")
 
     # ── 地址坐标注册表缓存失效 ──
     from app.services.address_registry import address_registry
@@ -598,7 +598,7 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.DATA_IMPORTED, _invalidate_addr_all)
     event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, _invalidate_addr_all)
 
-    logger.info("Address registry cache invalidation handlers registered")
+    logger.debug("Address registry cache invalidation handlers registered")
 
     # ------------------------------------------------------------------
     # Enterprise Linkage: 调整分录事件 → SSE 推送给项目组在线成员
@@ -625,7 +625,7 @@ def register_event_handlers() -> None:
             "filter_by": "account_codes",
         }
 
-        logger.info(
+        logger.debug(
             "[enterprise-linkage] Adjustment event %s pushed via SSE for project=%s, "
             "accounts=%s, entry_group=%s",
             payload.event_type.value,
@@ -638,7 +638,7 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _notify_adjustment_event_sse)
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _notify_adjustment_event_sse)
 
-    logger.info("Enterprise Linkage: adjustment SSE push handlers registered")
+    logger.debug("Enterprise Linkage: adjustment SSE push handlers registered")
 
     # ------------------------------------------------------------------
     # Enterprise Linkage Task 2.5: 批量提交单次级联
@@ -649,7 +649,7 @@ def register_event_handlers() -> None:
         EventType.ADJUSTMENT_BATCH_COMMITTED,
         _make_tb_handler("on_adjustment_changed"),
     )
-    logger.info("Enterprise Linkage: batch committed → single TB recalc handler registered")
+    logger.debug("Enterprise Linkage: batch committed → single TB recalc handler registered")
 
     # ------------------------------------------------------------------
     # Sprint 7 Task 7.2: 数据过期级联标记
@@ -694,7 +694,7 @@ def register_event_handlers() -> None:
                     .values(is_stale=True)
                 )
                 await session.commit()
-                logger.info(
+                logger.debug(
                     "[stale-cascade] Reports/Notes marked stale for project=%s year=%s",
                     project_id,
                     year,
@@ -710,7 +710,7 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _mark_reports_stale_on_adjustment)
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _mark_reports_stale_on_adjustment)
     event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, _mark_reports_stale_on_adjustment)
-    logger.info("Sprint 7 Task 7.2: stale cascade handlers registered")
+    logger.debug("Sprint 7 Task 7.2: stale cascade handlers registered")
 
     # ------------------------------------------------------------------
     # Enterprise Linkage Task 2.8: 事件级联日志记录
@@ -746,7 +746,7 @@ def register_event_handlers() -> None:
             logger.warning("[cascade-log] Failed to log cascade: %s", e)
 
     event_bus.subscribe(EventType.TRIAL_BALANCE_UPDATED, _log_cascade_on_tb_updated)
-    logger.info("Enterprise Linkage: cascade logging handler registered")
+    logger.debug("Enterprise Linkage: cascade logging handler registered")
 
     # ------------------------------------------------------------------
     # Enterprise Linkage Task 2.4: 调整分录变更 → 记录 TB 变更历史
@@ -793,7 +793,7 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _record_tb_change_on_adjustment)
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _record_tb_change_on_adjustment)
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _record_tb_change_on_adjustment)
-    logger.info("Enterprise Linkage: TB change history handler registered")
+    logger.debug("Enterprise Linkage: TB change history handler registered")
 
     # ------------------------------------------------------------------
     # Sprint 10 Task 10.11: 底稿深度优化 5 个新事件订阅
@@ -805,14 +805,14 @@ def register_event_handlers() -> None:
     # ------------------------------------------------------------------
     async def _on_workpaper_stale_detected(payload: EventPayload) -> None:
         """底稿 stale 检测 → 传播到依赖底稿"""
-        logger.info(
+        logger.debug(
             "[Sprint10] WORKPAPER_STALE_DETECTED for project=%s",
             payload.project_id,
         )
 
     async def _on_workpaper_audited_confirmed(payload: EventPayload) -> None:
         """审定数确认 → 触发试算表重算"""
-        logger.info(
+        logger.debug(
             "[Sprint10] WORKPAPER_AUDITED_CONFIRMED for project=%s",
             payload.project_id,
         )
@@ -826,21 +826,21 @@ def register_event_handlers() -> None:
 
     async def _on_workpaper_review_passed(payload: EventPayload) -> None:
         """复核通过 → 刷新附注"""
-        logger.info(
+        logger.debug(
             "[Sprint10] WORKPAPER_REVIEW_PASSED for project=%s",
             payload.project_id,
         )
 
     async def _on_workpaper_procedure_completed(payload: EventPayload) -> None:
         """程序完成 → 更新质量评分"""
-        logger.info(
+        logger.debug(
             "[Sprint10] WORKPAPER_PROCEDURE_COMPLETED for project=%s",
             payload.project_id,
         )
 
     async def _on_cross_check_failed(payload: EventPayload) -> None:
         """跨科目校验失败 → 通知"""
-        logger.info(
+        logger.debug(
             "[Sprint10] CROSS_CHECK_FAILED for project=%s",
             payload.project_id,
         )
@@ -850,7 +850,7 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.WORKPAPER_REVIEW_PASSED, _on_workpaper_review_passed)
     event_bus.subscribe(EventType.WORKPAPER_PROCEDURE_COMPLETED, _on_workpaper_procedure_completed)
     event_bus.subscribe(EventType.CROSS_CHECK_FAILED, _on_cross_check_failed)
-    logger.info("Sprint 10: 5 new workpaper event handlers registered")
+    logger.debug("Sprint 10: 5 new workpaper event handlers registered")
 
     # ------------------------------------------------------------------
     # Global Linkage Bus Sprint 2: Stale Propagation Engine 统一入口
@@ -915,7 +915,7 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, _stale_engine_on_data_imported)
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _stale_engine_on_workpaper_saved)
     event_bus.subscribe(EventType.MAPPING_CHANGED, _stale_engine_on_mapping_changed)
-    logger.info("Global Linkage Bus: stale_engine event handlers registered")
+    logger.debug("Global Linkage Bus: stale_engine event handlers registered")
 
     # ------------------------------------------------------------------
     # Global Linkage Bus Sprint 3: 5 个新事件 handler（反向联动）
@@ -997,7 +997,7 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.NOTE_SECTION_SAVED, _stale_engine_on_note_section_saved)
     event_bus.subscribe(EventType.ACCOUNT_MAPPING_CHANGED, _stale_engine_on_account_mapping_changed)
     event_bus.subscribe(EventType.REPORT_ROW_CHANGED, _stale_engine_on_report_row_changed)
-    logger.info("Global Linkage Bus Sprint 3: 5 new reverse-linkage event handlers registered")
+    logger.debug("Global Linkage Bus Sprint 3: 5 new reverse-linkage event handlers registered")
 
     # ------------------------------------------------------------------
     # H-F8: H9→H8 租赁两表反向回填 (ADR-H5)
@@ -1039,7 +1039,7 @@ def register_event_handlers() -> None:
         uri = f"WP:{wp_code}:{sheet}:租赁回填"
         try:
             result = await stale_engine.on_change(uri, project_id, year)
-            logger.info(
+            logger.debug(
                 "[H-F8 lease reverse backfill] wp_code=%s project=%s "
                 "affected=%d degraded=%s",
                 wp_code,
@@ -1076,7 +1076,7 @@ def register_event_handlers() -> None:
             )
 
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_h_lease_reverse_backfill)
-    logger.info("H-F8: H9/H8-7 lease reverse backfill event handler registered")
+    logger.debug("H-F8: H9/H8-7 lease reverse backfill event handler registered")
 
     # ------------------------------------------------------------------
     # I-F8: I6↔I2 研发费用↔开发支出反向回填 (ADR-I4)
@@ -1120,7 +1120,7 @@ def register_event_handlers() -> None:
         uri = f"WP:{wp_code}:{sheet}:研发回填"
         try:
             result = await stale_engine.on_change(uri, project_id, year)
-            logger.info(
+            logger.debug(
                 "[I-F8 RD reverse backfill] wp_code=%s project=%s "
                 "affected=%d degraded=%s",
                 wp_code,
@@ -1158,7 +1158,7 @@ def register_event_handlers() -> None:
             )
 
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_i_rd_reverse_backfill)
-    logger.info("I-F8: I2/I6 RD reverse backfill event handler registered")
+    logger.debug("I-F8: I2/I6 RD reverse backfill event handler registered")
 
     # ------------------------------------------------------------------
     # Sprint 2 Task 2.5: DisclosureNote 联动 — 3 新事件订阅 (R2.1)
@@ -1205,7 +1205,7 @@ def register_event_handlers() -> None:
                     .values(is_stale=True)
                 )
                 await session.commit()
-                logger.info(
+                logger.debug(
                     "[Sprint2-Task2.5/%s] DisclosureNote marked stale "
                     "for project=%s year=%s",
                     source_event, project_id, year,
@@ -1253,7 +1253,11 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, on_event_ledger_activated)
     event_bus.subscribe(EventType.WORKPAPER_REVIEW_PASSED, on_event_workpaper_reviewed)
     event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, on_event_adjustment_approved)
-    logger.info(
+    logger.debug(
         "Sprint 2 Task 2.5: 3 DisclosureNote stale event handlers registered "
         "(LEDGER_DATASET_ACTIVATED / WORKPAPER_REVIEW_PASSED / ADJUSTMENT_BATCH_COMMITTED)"
     )
+
+    # 启动汇总（只打这一行 INFO）
+    total_handlers = sum(len(h) for h in event_bus._handlers.values())
+    logger.info("[EventBus] %d handlers registered across %d event types", total_handlers, len(event_bus._handlers))

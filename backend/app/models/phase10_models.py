@@ -83,6 +83,7 @@ class CellAnnotation(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"), nullable=False)
     object_type: Mapped[str] = mapped_column(String(50), nullable=False)
     object_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    annotation_type: Mapped[str] = mapped_column(String(50), server_default=text("'comment'"))
     cell_ref: Mapped[str | None] = mapped_column(String(100), nullable=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     priority: Mapped[str] = mapped_column(String(10), server_default=text("'medium'"))

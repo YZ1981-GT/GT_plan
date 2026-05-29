@@ -1,0 +1,381 @@
+"""SQL Schema 漂移检测器（migration-runner-resilience spec / Sprint 2）
+
+启动时对比 ORM `Base.metadata` 与实际 PG schema，发现以下 4 类漂移并写入
+`schema_drift_log` 表：
+
+- ``orm_extra``：ORM 定义了但 DB 缺失的列/表（最高优先，业务接口运行时会 500）
+- ``db_extra``：DB 有但 ORM 没定义的列/表（INFO 级，多为历史残留）
+- ``type_mismatch``：列存在但类型/可空性不一致（WARN 级，可能数据不一致）
+- ``enum_mismatch``：PG enum 缺少 Python Enum 中定义的值（WARN，运行时插入会爆）
+
+`/api/health` 端点消费 `schema_drift_log`，drift>0 → status=degraded → 前端
+DegradedBanner 暴露给运维（避免业务 500 才发现）。
+
+设计原则：
+- 纯检测，不自动修复（避免误删 / 误改）
+- 失败不阻塞启动（异常吞掉 + WARN 日志）
+- 60s timeout（防止漏接表卡住启动）
+- KNOWN_ALLOWLIST 屏蔽系统/历史残留表
+"""
+
+from __future__ import annotations
+
+import asyncio
+import enum as _enum_mod
+import logging
+from dataclasses import dataclass
+from typing import Iterable, Literal
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+logger = logging.getLogger("audit_platform.schema_drift")
+
+DriftType = Literal["orm_extra", "db_extra", "type_mismatch", "enum_mismatch"]
+
+
+@dataclass(frozen=True)
+class DriftItem:
+    table: str
+    column: str | None
+    drift_type: DriftType
+    detail: str
+
+
+class SchemaDriftDetector:
+    """启动时扫描 ORM ↔ DB schema 差异。
+
+    使用方法（lifespan 中）::
+
+        from app.core.schema_drift_detector import SchemaDriftDetector
+        detector = SchemaDriftDetector(engine)
+        items = await detector.scan()
+        await detector.write_log(items)
+    """
+
+    # 系统/历史残留表，不参与 drift 计算
+    KNOWN_ALLOWLIST: frozenset[str] = frozenset({
+        # 迁移系统
+        "schema_version",
+        "schema_migration_failures",
+        "schema_drift_log",
+        # alembic 历史残留（spec Sprint 4 删除前会出现在此）
+        "alembic_version",
+        # PG 系统
+        "pg_stat_statements",
+    })
+
+    def __init__(self, engine: AsyncEngine) -> None:
+        self._engine = engine
+
+    # ------------------------------------------------------------------
+    # 公开 API
+    # ------------------------------------------------------------------
+
+    async def scan(self) -> list[DriftItem]:
+        """扫描所有 4 类 drift 并返回（已过滤 allowlist）。"""
+        # 仅 PG 支持 information_schema 完整查询；其他方言（SQLite 测试环境）退化
+        if self._engine.dialect.name != "postgresql":
+            logger.debug("[SchemaDrift] 非 PG 方言，跳过 schema diff（dialect=%s）",
+                         self._engine.dialect.name)
+            return []
+
+        orm_tables = self._collect_orm_tables()
+        db_tables = await self._collect_db_tables()
+
+        items: list[DriftItem] = []
+        items.extend(self._diff_tables(orm_tables, db_tables))
+        items.extend(self._diff_columns(orm_tables, db_tables))
+        items.extend(await self._diff_enums())
+
+        # 过滤 allowlist
+        return [it for it in items if it.table not in self.KNOWN_ALLOWLIST]
+
+    async def write_log(self, items: list[DriftItem]) -> None:
+        """覆盖式写入 schema_drift_log（DELETE + INSERT），保证仅保留当前快照。
+
+        若表不存在（V026 尚未应用），创建 IF NOT EXISTS 兜底。
+        """
+        if self._engine.dialect.name != "postgresql":
+            return
+
+        async with self._engine.begin() as conn:
+            # 兜底创建表（V026 通常已跑，此处冗余安全网）
+            await conn.exec_driver_sql("""
+                CREATE TABLE IF NOT EXISTS schema_drift_log (
+                    id          SERIAL       PRIMARY KEY,
+                    table_name  VARCHAR(100) NOT NULL,
+                    column_name VARCHAR(100),
+                    drift_type  VARCHAR(50)  NOT NULL,
+                    detail      TEXT,
+                    detected_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+                )
+            """)
+            await conn.exec_driver_sql("DELETE FROM schema_drift_log")
+            for it in items:
+                await conn.execute(
+                    text("""
+                        INSERT INTO schema_drift_log
+                          (table_name, column_name, drift_type, detail)
+                        VALUES (:t, :c, :dt, :d)
+                    """),
+                    {"t": it.table, "c": it.column, "dt": it.drift_type, "d": it.detail},
+                )
+
+    @classmethod
+    async def query_drift(cls, engine: AsyncEngine) -> list[DriftItem]:
+        """查询 schema_drift_log（health endpoint 使用）。表不存在返回空列表。"""
+        if engine.dialect.name != "postgresql":
+            return []
+        try:
+            async with engine.begin() as conn:
+                rows = await conn.execute(text(
+                    "SELECT table_name, column_name, drift_type, detail "
+                    "FROM schema_drift_log ORDER BY drift_type, table_name"
+                ))
+                return [
+                    DriftItem(table=r[0], column=r[1], drift_type=r[2], detail=r[3] or "")
+                    for r in rows.fetchall()
+                ]
+        except Exception:
+            return []
+
+    # ------------------------------------------------------------------
+    # 内部方法
+    # ------------------------------------------------------------------
+
+    def _collect_orm_tables(self) -> dict[str, dict]:
+        """从 ORM Base.metadata 收集 {table_name: {col_name: {type, nullable}}}。
+
+        必须先 import 所有 model 模块，让 Base.metadata 收集完整。
+        """
+        # 触发所有 model 注册（__init__.py 已经 import 了大部分）
+        import app.models  # noqa: F401
+        from app.models.base import Base
+
+        result: dict[str, dict] = {}
+        for table in Base.metadata.tables.values():
+            cols: dict[str, dict] = {}
+            for col in table.columns:
+                cols[col.name] = {
+                    "type": str(col.type).upper(),
+                    "nullable": col.nullable,
+                }
+            result[table.name] = cols
+        return result
+
+    async def _collect_db_tables(self) -> dict[str, dict]:
+        """查询 information_schema.columns 收集实际 DB schema。"""
+        result: dict[str, dict] = {}
+        async with self._engine.begin() as conn:
+            rows = await conn.execute(text("""
+                SELECT table_name, column_name, data_type, is_nullable
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                ORDER BY table_name, ordinal_position
+            """))
+            for row in rows.fetchall():
+                table = row[0]
+                col = row[1]
+                if table not in result:
+                    result[table] = {}
+                result[table][col] = {
+                    "type": (row[2] or "").upper(),
+                    "nullable": row[3] == "YES",
+                }
+        return result
+
+    def _diff_tables(
+        self,
+        orm: dict[str, dict],
+        db: dict[str, dict],
+    ) -> list[DriftItem]:
+        """表级差异：ORM 有但 DB 没有 / DB 有但 ORM 没有。"""
+        items: list[DriftItem] = []
+        orm_set = set(orm.keys())
+        db_set = set(db.keys())
+
+        for table in orm_set - db_set:
+            items.append(DriftItem(
+                table=table, column=None,
+                drift_type="orm_extra",
+                detail=f"ORM 定义了表 {table} 但 DB 不存在（迁移可能漏跑）",
+            ))
+        for table in db_set - orm_set:
+            items.append(DriftItem(
+                table=table, column=None,
+                drift_type="db_extra",
+                detail=f"DB 有表 {table} 但 ORM 未定义（历史残留 / 手动建表）",
+            ))
+        return items
+
+    def _diff_columns(
+        self,
+        orm: dict[str, dict],
+        db: dict[str, dict],
+    ) -> list[DriftItem]:
+        """列级差异：ORM 多列 / DB 多列 / 类型不一致。
+
+        类型对比做了简化：仅检测 PG 类型大类（VARCHAR/TEXT/INTEGER/...），
+        不做精度匹配（VARCHAR(100) vs VARCHAR(255) 不报）。
+        """
+        items: list[DriftItem] = []
+        for table in orm.keys() & db.keys():
+            orm_cols = orm[table]
+            db_cols = db[table]
+
+            for col in orm_cols.keys() - db_cols.keys():
+                items.append(DriftItem(
+                    table=table, column=col,
+                    drift_type="orm_extra",
+                    detail=f"ORM 定义了 {table}.{col} 但 DB 不存在（迁移漏跑）",
+                ))
+            for col in db_cols.keys() - orm_cols.keys():
+                items.append(DriftItem(
+                    table=table, column=col,
+                    drift_type="db_extra",
+                    detail=f"DB 有 {table}.{col} 但 ORM 未定义",
+                ))
+            for col in orm_cols.keys() & db_cols.keys():
+                # 类型粗粒度对比（取首词作为类型大类）
+                orm_type = self._normalize_type(orm_cols[col]["type"])
+                db_type = self._normalize_type(db_cols[col]["type"])
+                if orm_type and db_type and orm_type != db_type:
+                    items.append(DriftItem(
+                        table=table, column=col,
+                        drift_type="type_mismatch",
+                        detail=f"{table}.{col}: ORM={orm_type} vs DB={db_type}",
+                    ))
+        return items
+
+    @staticmethod
+    def _normalize_type(t: str) -> str:
+        """归一化类型：取首个空格/括号前的字段大类。
+
+        例：
+            'VARCHAR(100)' → 'VARCHAR'
+            'CHARACTER VARYING' → 'VARCHAR'  # PG information_schema 用 character varying
+            'TIMESTAMP WITH TIME ZONE' → 'TIMESTAMPTZ'
+        """
+        s = (t or "").strip().upper()
+        if not s:
+            return s
+        # PG 别名归一
+        aliases = {
+            "CHARACTER VARYING": "VARCHAR",
+            "CHARACTER": "CHAR",
+            "TIMESTAMP WITHOUT TIME ZONE": "TIMESTAMP",
+            "TIMESTAMP WITH TIME ZONE": "TIMESTAMPTZ",
+            "DOUBLE PRECISION": "FLOAT8",
+            "INT": "INTEGER",
+            "INT4": "INTEGER",
+            "INT8": "BIGINT",
+            "BOOL": "BOOLEAN",
+        }
+        if s in aliases:
+            return aliases[s]
+        # 取首词去括号
+        head = s.split("(")[0].split(" ")[0]
+        return aliases.get(head, head)
+
+    async def _diff_enums(self) -> list[DriftItem]:
+        """对比 PG enum 类型 vs Python Enum 类。
+
+        策略：找所有继承 ``(str, enum.Enum)`` 的类，按类名 snake_case 推断 PG enum 名，
+        若 PG 中存在该 enum 类型，对比值集合。
+        """
+        items: list[DriftItem] = []
+
+        # 收集 Python enum
+        python_enums: dict[str, set[str]] = {}
+        try:
+            import app.models  # noqa: F401
+            for module_name in dir(__import__("app.models", fromlist=["*"])):
+                pass  # __init__.py 已经触发 import
+
+            # 遍历 sys.modules 里以 app.models 开头的模块，找 Enum 子类
+            import sys
+            for mod_name, mod in list(sys.modules.items()):
+                if not mod_name.startswith("app.models"):
+                    continue
+                if mod is None:
+                    continue
+                for attr_name in dir(mod):
+                    obj = getattr(mod, attr_name, None)
+                    if (
+                        isinstance(obj, type)
+                        and issubclass(obj, _enum_mod.Enum)
+                        and obj is not _enum_mod.Enum
+                        and obj.__module__.startswith("app.models")
+                    ):
+                        # 类名（如 OpinionTypeEnum）→ 推断 PG enum 名
+                        # 简单策略：保留原类名 + camel→snake 两版都试
+                        class_name = obj.__name__
+                        pg_candidates = {
+                            class_name,
+                            self._camel_to_snake(class_name),
+                            self._camel_to_snake(class_name).replace("_enum", ""),
+                        }
+                        values = {m.value for m in obj}
+                        for cand in pg_candidates:
+                            python_enums[cand] = values
+        except Exception as e:
+            logger.warning("[SchemaDrift] 收集 Python Enum 失败: %s", e)
+            return items
+
+        if not python_enums:
+            return items
+
+        # 查 PG 所有 enum 类型 + 值
+        async with self._engine.begin() as conn:
+            rows = await conn.execute(text("""
+                SELECT t.typname, e.enumlabel
+                FROM pg_type t
+                JOIN pg_enum e ON t.oid = e.enumtypid
+                ORDER BY t.typname, e.enumsortorder
+            """))
+            db_enums: dict[str, set[str]] = {}
+            for row in rows.fetchall():
+                name = row[0]
+                val = row[1]
+                if name not in db_enums:
+                    db_enums[name] = set()
+                db_enums[name].add(val)
+
+        # 对比：仅在 Python 和 DB 都存在的 enum 名上做 diff
+        for name, py_vals in python_enums.items():
+            if name not in db_enums:
+                continue
+            db_vals = db_enums[name]
+            missing_in_db = py_vals - db_vals
+            if missing_in_db:
+                items.append(DriftItem(
+                    table=name, column=None,
+                    drift_type="enum_mismatch",
+                    detail=f"PG enum {name} 缺少 Python Enum 值: {sorted(missing_in_db)}",
+                ))
+        return items
+
+    @staticmethod
+    def _camel_to_snake(s: str) -> str:
+        import re
+        s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", s)
+        return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+
+
+async def run_drift_check_with_timeout(
+    engine: AsyncEngine,
+    timeout_seconds: float = 60.0,
+) -> list[DriftItem]:
+    """启动时调用：执行 drift 扫描 + 写库，超时不阻塞启动。"""
+    detector = SchemaDriftDetector(engine)
+    try:
+        items = await asyncio.wait_for(detector.scan(), timeout=timeout_seconds)
+        await detector.write_log(items)
+        return items
+    except asyncio.TimeoutError:
+        logger.warning("[SchemaDrift] 扫描超时 %ds，跳过", timeout_seconds)
+        return []
+    except Exception as e:
+        logger.warning("[SchemaDrift] 扫描失败（不阻塞启动）: %s", e)
+        return []

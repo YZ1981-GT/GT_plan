@@ -3,7 +3,7 @@
 Validates: Requirements 4.8, 4.9
 """
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -13,6 +13,12 @@ from httpx import ASGITransport, AsyncClient
 from app.api.health import router
 from app.core.database import get_db
 from app.core.redis import get_redis
+
+
+# migration-runner-resilience spec: health 增加 migration / schema_drift 字段
+# 旧测试默认 mock 为干净状态（无失败 / 无漂移）保持原有 healthy / unhealthy 语义
+_CLEAN_MIGRATION = AsyncMock(return_value={"applied_count": 0, "failures": []})
+_CLEAN_DRIFT = AsyncMock(return_value={"count": 0, "items": []})
 
 
 def _create_app(
@@ -53,8 +59,10 @@ async def test_all_healthy():
     """PG 和 Redis 均可用 → 200 + healthy。"""
     app = _create_app(pg_healthy=True, redis_healthy=True)
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.get("/api/health")
+    with patch("app.api.health._query_migration_status", new=_CLEAN_MIGRATION), \
+         patch("app.api.health._query_schema_drift", new=_CLEAN_DRIFT):
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/health")
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "healthy"
@@ -67,8 +75,10 @@ async def test_pg_down():
     """PG 不可用 → 503 + postgres unavailable。"""
     app = _create_app(pg_healthy=False, redis_healthy=True)
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.get("/api/health")
+    with patch("app.api.health._query_migration_status", new=_CLEAN_MIGRATION), \
+         patch("app.api.health._query_schema_drift", new=_CLEAN_DRIFT):
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/health")
     assert resp.status_code == 503
     body = resp.json()
     assert body["status"] == "unhealthy"
@@ -81,8 +91,10 @@ async def test_redis_down():
     """Redis 不可用 → 503 + redis unavailable。"""
     app = _create_app(pg_healthy=True, redis_healthy=False)
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.get("/api/health")
+    with patch("app.api.health._query_migration_status", new=_CLEAN_MIGRATION), \
+         patch("app.api.health._query_schema_drift", new=_CLEAN_DRIFT):
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/health")
     assert resp.status_code == 503
     body = resp.json()
     assert body["status"] == "unhealthy"
@@ -95,8 +107,10 @@ async def test_both_down():
     """PG 和 Redis 均不可用 → 503 + 两者均 unavailable。"""
     app = _create_app(pg_healthy=False, redis_healthy=False)
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.get("/api/health")
+    with patch("app.api.health._query_migration_status", new=_CLEAN_MIGRATION), \
+         patch("app.api.health._query_schema_drift", new=_CLEAN_DRIFT):
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/health")
     assert resp.status_code == 503
     body = resp.json()
     assert body["status"] == "unhealthy"

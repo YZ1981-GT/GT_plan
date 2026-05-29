@@ -1,0 +1,3462 @@
+# A3-1.yaml
+# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# 生成时间: 2026-05-29T01:10:53
+# Requirements: 2.2 原则 2（配置驱动）
+# ⚠️  此文件为草稿，关键字段需人工审核：
+#   - dynamic_table 边界（start_row/end_row/header_row）
+#   - cross_refs 跨底稿引用（查 cross_wp_references.json）
+#   - applicable_standards 适用准则收窄（4 标准全集 → 实际适用）
+#   - columns 字段名（col_a/col_b/... → 业务字段 snake_case）
+#   - fixed_cells 占位符（${entity_name} 等是否符合实际模板）
+
+wp_code: A3-1
+template_path: backend/wp_templates/A/A3-1、-2 合并报表试算-2019.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+_generated:
+  tool: generate_wp_render_schema.py
+  generated_at: '2026-05-29T01:10:51'
+  source_xlsx: A3-1、-2 合并报表试算-2019.xlsx
+  _note: 此 YAML 由工具自动生成，关键字段（dynamic_table 边界 / cross_refs / applicable_standards 收窄）需人工审核修正
+sheets:
+  temp_temp__:
+    component_type: skip
+    class_code: I-占位
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    formulas:
+      preserve: true
+      cells:
+      - AI36
+      _total_count: 1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  说明:
+    component_type: h-static-doc
+    class_code: H-辅助说明
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: '2'
+        C:
+          field: col_c
+          type: text
+          label: 本工作簿没有颜色的单元格可以根据需要进行修改，
+        L:
+          field: col_l
+          type: text
+          label: '4'
+        M:
+          field: col_m
+          type: text
+          label: 年初BS审定
+    static_text:
+      rows:
+      - 3
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - J31
+      - J32
+      _total_count: 2
+    merged_cells:
+      preserve: true
+      count: 18
+      ranges_sample:
+      - G24:I24
+      - G32:I32
+      - G28:I28
+      - G22:I22
+      - G31:I31
+      - E33:F33
+      - G23:I23
+      - E28:F28
+      - E22:F22
+      - C22:D22
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  TEST:
+    component_type: univer
+    class_code: F-数据表
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 3
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - D5
+      - E5
+      - D6
+      - E6
+      - D7
+      - E7
+      - D8
+      - E8
+      - D9
+      - E9
+      - D10
+      - E10
+      - D11
+      - E11
+      - D12
+      - E12
+      - D13
+      - E13
+      - D14
+      - E14
+      - D15
+      - E15
+      - D16
+      - E16
+      - D17
+      - E17
+      _total_count: 26
+    merged_cells:
+      preserve: true
+      count: 1
+      ranges_sample:
+      - B3:E3
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  报表格式:
+    component_type: univer
+    class_code: F-数据表
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 流动资产：
+        C:
+          field: col_c
+          type: text
+          label: '1'
+        G:
+          field: col_g
+          type: text
+          label: 流动负债：
+        H:
+          field: col_h
+          type: text
+          label: =C51+1
+        L:
+          field: col_l
+          type: text
+          label: 一、营业收入
+        M:
+          field: col_m
+          type: text
+          label: '1'
+        N:
+          field: col_n
+          type: text
+          label: 主营业务收入
+        O:
+          field: col_o
+          type: text
+          label: =IF(N5="",0,CONCATENATE("上年",N
+        Q:
+          field: col_q
+          type: text
+          label: 一、经营活动产生的现金流量
+        R:
+          field: col_r
+          type: text
+          label: '1'
+        U:
+          field: col_u
+          type: text
+          label: 1、将净利润调节为经营活动现金流量：
+        V:
+          field: col_v
+          type: text
+          label: =R54+1
+        AA:
+          field: col_aa
+          type: text
+          label: 流动资产：
+    static_text:
+      rows:
+      - 1-2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - H5
+      - O5
+      - V5
+      - E6
+      - H6
+      - J6
+      - V6
+      - AA6
+      - E7
+      - H7
+      - J7
+      - V7
+      - AA7
+      - E8
+      - H8
+      - J8
+      - O8
+      - V8
+      - AA8
+      - E9
+      - H9
+      - J9
+      - V9
+      - AA9
+      - E10
+      - H10
+      - J10
+      - O10
+      - V10
+      - AA10
+      _total_count: 412
+    merged_cells:
+      preserve: true
+      count: 13
+      ranges_sample:
+      - G3:J3
+      - Q3:S3
+      - K3:K54
+      - L3:O3
+      - A3:A54
+      - P3:P54
+      - U4:W4
+      - F3:F54
+      - T3:T54
+      - Q1:W1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  年初BS审定:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: =报表格式!B4
+        B:
+          field: col_b
+          type: text
+          label: 合并审定数
+        C:
+          field: col_c
+          type: text
+          label: 合并报表调整
+        D:
+          field: col_d
+          type: text
+          label: 合并抵销
+        E:
+          field: col_e
+          type: text
+          label: 合并汇总
+        F:
+          field: col_f
+          type: text
+          label: 母公司审定数
+        G:
+          field: col_g
+          type: text
+          label: 母公司报表调整
+        H:
+          field: col_h
+          type: text
+          label: 母公司账项调整
+        I:
+          field: col_i
+          type: text
+          label: 母公司汇总抵销
+        J:
+          field: col_j
+          type: text
+          label: 母公司汇总
+        K:
+          field: col_k
+          type: text
+          label: 母公司本部
+        L:
+          field: col_l
+          type: text
+          label: 1分公司
+        M:
+          field: col_m
+          type: text
+          label: 2分公司
+        N:
+          field: col_n
+          type: text
+          label: 3分公司
+        O:
+          field: col_o
+          type: text
+          label: 4分公司
+        P:
+          field: col_p
+          type: text
+          label: 5分公司
+        Q:
+          field: col_q
+          type: text
+          label: 6分公司
+        R:
+          field: col_r
+          type: text
+          label: 7分公司
+        S:
+          field: col_s
+          type: text
+          label: 8分公司
+        T:
+          field: col_t
+          type: text
+          label: 9分公司
+        U:
+          field: col_u
+          type: text
+          label: 10分公司
+        W:
+          field: col_w
+          type: text
+          label: XX分公司
+        X:
+          field: col_x
+          type: text
+          label: 子公司1
+        Y:
+          field: col_y
+          type: text
+          label: 子公司2
+        Z:
+          field: col_z
+          type: text
+          label: 子公司3
+        AA:
+          field: col_aa
+          type: text
+          label: 子公司4
+        AB:
+          field: col_ab
+          type: text
+          label: 子公司5
+        AC:
+          field: col_ac
+          type: text
+          label: 子公司6
+        AD:
+          field: col_ad
+          type: text
+          label: 子公司7
+        AE:
+          field: col_ae
+          type: text
+          label: 子公司8
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - A3
+      - A5
+      - A6
+      - A7
+      - B7
+      - E7
+      - F7
+      - J7
+      - A8
+      - B8
+      - E8
+      - F8
+      - J8
+      - A9
+      - B9
+      - E9
+      - F9
+      - J9
+      - A10
+      - B10
+      - E10
+      - F10
+      - J10
+      - A11
+      - B11
+      - E11
+      - F11
+      - J11
+      - A12
+      _total_count: 1064
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  上年PL审定:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: =报表格式!L4
+        B:
+          field: col_b
+          type: text
+          label: 合并审定数
+        C:
+          field: col_c
+          type: text
+          label: 合并报表调整
+        D:
+          field: col_d
+          type: text
+          label: 合并抵销
+        E:
+          field: col_e
+          type: text
+          label: 合并汇总
+        F:
+          field: col_f
+          type: text
+          label: 母公司审定数
+        G:
+          field: col_g
+          type: text
+          label: 母公司报表调整
+        H:
+          field: col_h
+          type: text
+          label: 母公司账项调整
+        I:
+          field: col_i
+          type: text
+          label: 母公司汇总抵销
+        J:
+          field: col_j
+          type: text
+          label: 母公司汇总
+        K:
+          field: col_k
+          type: text
+          label: 母公司本部
+        L:
+          field: col_l
+          type: text
+          label: 1分公司
+        M:
+          field: col_m
+          type: text
+          label: 2分公司
+        N:
+          field: col_n
+          type: text
+          label: 3分公司
+        O:
+          field: col_o
+          type: text
+          label: 4分公司
+        P:
+          field: col_p
+          type: text
+          label: 5分公司
+        Q:
+          field: col_q
+          type: text
+          label: 6分公司
+        R:
+          field: col_r
+          type: text
+          label: 7分公司
+        S:
+          field: col_s
+          type: text
+          label: 8分公司
+        T:
+          field: col_t
+          type: text
+          label: 9分公司
+        U:
+          field: col_u
+          type: text
+          label: 10分公司
+        W:
+          field: col_w
+          type: text
+          label: XX分公司
+        X:
+          field: col_x
+          type: text
+          label: 子公司1
+        Y:
+          field: col_y
+          type: text
+          label: 子公司2
+        Z:
+          field: col_z
+          type: text
+          label: 子公司3
+        AA:
+          field: col_aa
+          type: text
+          label: 子公司4
+        AB:
+          field: col_ab
+          type: text
+          label: 子公司5
+        AC:
+          field: col_ac
+          type: text
+          label: 子公司6
+        AD:
+          field: col_ad
+          type: text
+          label: 子公司7
+        AE:
+          field: col_ae
+          type: text
+          label: 子公司8
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - A3
+      - A5
+      - A6
+      - B6
+      - E6
+      - F6
+      - J6
+      - A7
+      - B7
+      - E7
+      - F7
+      - J7
+      - A8
+      - B8
+      - E8
+      - F8
+      - J8
+      - A9
+      - B9
+      - E9
+      - F9
+      - J9
+      - A10
+      - B10
+      - E10
+      - F10
+      - J10
+      - A11
+      - B11
+      _total_count: 1059
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  期初核对BS:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A2: 资产负债表期初核对
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: =IF(E53<=0.005,"资     产","资产明细
+        B:
+          field: col_b
+          type: text
+          label: 行次
+        C:
+          field: col_c
+          type: text
+          label: 合并数
+        G:
+          field: col_g
+          type: text
+          label: 母公司数
+    static_text:
+      rows:
+      - 2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A1
+      - G1
+      - C3
+      - A4
+      - H4
+      - A5
+      - A7
+      - A8
+      - B8
+      - D8
+      - E8
+      - F8
+      - H8
+      - I8
+      - J8
+      - A9
+      - B9
+      - D9
+      - E9
+      - F9
+      - H9
+      - I9
+      - J9
+      - A10
+      - B10
+      - D10
+      - E10
+      - F10
+      - H10
+      - I10
+      _total_count: 762
+    merged_cells:
+      preserve: true
+      count: 12
+      ranges_sample:
+      - A5:A6
+      - C5:F5
+      - C3:F3
+      - H4:J4
+      - C54:F54
+      - G54:J54
+      - A54:A55
+      - A2:J2
+      - A4:C4
+      - G5:J5
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  期初核对PL:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A2: 利润及利润分配表期初核对－合并
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: =IF(AND(E59<0.005,E60<0.005),"
+        B:
+          field: col_b
+          type: text
+          label: 行次
+        C:
+          field: col_c
+          type: text
+          label: '本年上期数
+
+            ①'
+        D:
+          field: col_d
+          type: text
+          label: '上期审定数
+
+            ②'
+        E:
+          field: col_e
+          type: text
+          label: 辅助列
+        F:
+          field: col_f
+          type: text
+          label: '差异
+
+            ①-②'
+    static_text:
+      rows:
+      - 2
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A1
+      - C1
+      - A4
+      - B4
+      - F4
+      - A5
+      - A6
+      - D6
+      - E6
+      - F6
+      - A7
+      - D7
+      - E7
+      - F7
+      - A8
+      - D8
+      - E8
+      - F8
+      - A9
+      - D9
+      - E9
+      - F9
+      - A10
+      - D10
+      - E10
+      - F10
+      - A11
+      - D11
+      - E11
+      - F11
+      _total_count: 613
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - A2:F2
+      - A82:B82
+      - A3:B3
+      - B4:C4
+      - B83:C83
+      - A81:F81
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母公司BS汇总:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: =报表格式!B4
+        B:
+          field: col_b
+          type: text
+          label: 母公司汇总
+        C:
+          field: col_c
+          type: text
+          label: 母公司本部
+        D:
+          field: col_d
+          type: text
+          label: 1分公司
+        E:
+          field: col_e
+          type: text
+          label: 2分公司
+        F:
+          field: col_f
+          type: text
+          label: 3分公司
+        G:
+          field: col_g
+          type: text
+          label: 4分公司
+        H:
+          field: col_h
+          type: text
+          label: 5分公司
+        I:
+          field: col_i
+          type: text
+          label: 6分公司
+        J:
+          field: col_j
+          type: text
+          label: 7分公司
+        K:
+          field: col_k
+          type: text
+          label: 8分公司
+        L:
+          field: col_l
+          type: text
+          label: 9分公司
+        M:
+          field: col_m
+          type: text
+          label: 10分公司
+        O:
+          field: col_o
+          type: text
+          label: XX分公司
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - A3
+      - A5
+      - A6
+      - A7
+      - B7
+      - A8
+      - B8
+      - A9
+      - B9
+      - A10
+      - B10
+      - A11
+      - B11
+      - A12
+      - B12
+      - A13
+      - B13
+      - A14
+      - B14
+      - A15
+      - B15
+      - A16
+      - B16
+      - A17
+      - B17
+      - A18
+      - B18
+      - A19
+      - B19
+      _total_count: 444
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母公司PL汇总:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: =报表格式!L4
+        B:
+          field: col_b
+          type: text
+          label: 母公司汇总
+        C:
+          field: col_c
+          type: text
+          label: 母公司本部
+        D:
+          field: col_d
+          type: text
+          label: 1分公司
+        E:
+          field: col_e
+          type: text
+          label: 2分公司
+        F:
+          field: col_f
+          type: text
+          label: 3分公司
+        G:
+          field: col_g
+          type: text
+          label: 4分公司
+        H:
+          field: col_h
+          type: text
+          label: 5分公司
+        I:
+          field: col_i
+          type: text
+          label: 6分公司
+        J:
+          field: col_j
+          type: text
+          label: 7分公司
+        K:
+          field: col_k
+          type: text
+          label: 8分公司
+        L:
+          field: col_l
+          type: text
+          label: 9分公司
+        M:
+          field: col_m
+          type: text
+          label: 10分公司
+        O:
+          field: col_o
+          type: text
+          label: XX分公司
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - A3
+      - A5
+      - A6
+      - B6
+      - A7
+      - B7
+      - A8
+      - B8
+      - A9
+      - B9
+      - A10
+      - B10
+      - A11
+      - B11
+      - A12
+      - B12
+      - A13
+      - B13
+      - A14
+      - B14
+      - A15
+      - B15
+      - A16
+      - B16
+      - A17
+      - B17
+      - A18
+      - B18
+      - A19
+      _total_count: 445
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母公司CF汇总:
+    component_type: univer
+    class_code: F-CFS 编制
+    fixed_cells:
+      A3: ${entity_name}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: =报表格式!Q4
+        B:
+          field: col_b
+          type: text
+          label: 母公司汇总
+        C:
+          field: col_c
+          type: text
+          label: 母公司本部
+        D:
+          field: col_d
+          type: text
+          label: 1分公司
+        E:
+          field: col_e
+          type: text
+          label: 2分公司
+        F:
+          field: col_f
+          type: text
+          label: 3分公司
+        G:
+          field: col_g
+          type: text
+          label: 4分公司
+        H:
+          field: col_h
+          type: text
+          label: 5分公司
+        I:
+          field: col_i
+          type: text
+          label: 6分公司
+        J:
+          field: col_j
+          type: text
+          label: 7分公司
+        K:
+          field: col_k
+          type: text
+          label: 8分公司
+        L:
+          field: col_l
+          type: text
+          label: 9分公司
+        M:
+          field: col_m
+          type: text
+          label: 10分公司
+        O:
+          field: col_o
+          type: text
+          label: XX分公司
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - A3
+      - A5
+      - A6
+      - A7
+      - B7
+      - A8
+      - B8
+      - A9
+      - B9
+      - A10
+      - B10
+      - C10
+      - D10
+      - E10
+      - F10
+      - G10
+      - H10
+      - I10
+      - J10
+      - K10
+      - L10
+      - M10
+      - N10
+      - O10
+      - A11
+      - B11
+      - A12
+      - B12
+      - A13
+      _total_count: 522
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母公司汇总抵销:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    formulas:
+      preserve: true
+      cells:
+      - A1
+      - K1
+      - A2
+      - E2
+      - H2
+      - L2
+      - A3
+      - E3
+      - L3
+      - L4
+      - E5
+      - H5
+      - N5
+      - O5
+      - E6
+      - H6
+      - N6
+      - O6
+      - E7
+      - H7
+      - N7
+      - O7
+      - E8
+      - H8
+      - N8
+      - O8
+      - E9
+      - H9
+      - N9
+      - O9
+      _total_count: 744
+    merged_cells:
+      preserve: true
+      count: 87
+      ranges_sample:
+      - B35:B40
+      - B91:B96
+      - A182:A187
+      - C14:C19
+      - C98:C103
+      - C112:C117
+      - B140:B145
+      - A70:A75
+      - C175:C180
+      - B77:B82
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母公司账项调整:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    formulas:
+      preserve: true
+      cells:
+      - A1
+      - K1
+      - N1
+      - O1
+      - A2
+      - E2
+      - H2
+      - L2
+      - N2
+      - O2
+      - A3
+      - E3
+      - L3
+      - N3
+      - O3
+      - L4
+      - N4
+      - O4
+      - E5
+      - H5
+      - N5
+      - O5
+      - E6
+      - H6
+      - N6
+      - O6
+      - E7
+      - H7
+      - N7
+      - O7
+      _total_count: 747
+    merged_cells:
+      preserve: true
+      count: 87
+      ranges_sample:
+      - B194:B199
+      - A61:A66
+      - B117:B122
+      - A54:A59
+      - C54:C59
+      - C47:C52
+      - A145:A150
+      - A26:A31
+      - C201:C206
+      - B103:B108
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母公司报表调整:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    formulas:
+      preserve: true
+      cells:
+      - A1
+      - K1
+      - N1
+      - O1
+      - A2
+      - E2
+      - H2
+      - L2
+      - N2
+      - O2
+      - A3
+      - E3
+      - L3
+      - N3
+      - O3
+      - L4
+      - N4
+      - O4
+      - E5
+      - H5
+      - N5
+      - O5
+      - E6
+      - H6
+      - N6
+      - O6
+      - E7
+      - N7
+      - O7
+      - H8
+      _total_count: 739
+    merged_cells:
+      preserve: true
+      count: 87
+      ranges_sample:
+      - B194:B199
+      - A61:A66
+      - A54:A59
+      - B117:B122
+      - C54:C59
+      - C47:C52
+      - A145:A150
+      - A26:A31
+      - C201:C206
+      - B103:B108
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母公司TB资产:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 借方
+        D:
+          field: col_d
+          type: text
+          label: 贷方
+        E:
+          field: col_e
+          type: text
+          label: 借方
+        F:
+          field: col_f
+          type: text
+          label: 贷方
+        G:
+          field: col_g
+          type: text
+          label: 借方
+        H:
+          field: col_h
+          type: text
+          label: 贷方
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - D2
+      - F2
+      - A3
+      - D3
+      - A4
+      - A6
+      - A7
+      - B7
+      - C7
+      - D7
+      - E7
+      - F7
+      - G7
+      - H7
+      - I7
+      - K7
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - H8
+      - I8
+      - K8
+      - A9
+      - B9
+      - C9
+      _total_count: 469
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - G4:H4
+      - E4:F4
+      - B4:B5
+      - A4:A5
+      - K4:K5
+      - C4:D4
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母公司TB负债:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 借方
+        D:
+          field: col_d
+          type: text
+          label: 贷方
+        E:
+          field: col_e
+          type: text
+          label: 借方
+        F:
+          field: col_f
+          type: text
+          label: 贷方
+        G:
+          field: col_g
+          type: text
+          label: 借方
+        H:
+          field: col_h
+          type: text
+          label: 贷方
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - D2
+      - G2
+      - K2
+      - A3
+      - D3
+      - G3
+      - K3
+      - A4
+      - A6
+      - A7
+      - B7
+      - C7
+      - D7
+      - E7
+      - F7
+      - G7
+      - H7
+      - I7
+      - K7
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - H8
+      - I8
+      - K8
+      _total_count: 465
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - G4:H4
+      - E4:F4
+      - B4:B5
+      - A4:A5
+      - K4:K5
+      - C4:D4
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母公司TB损益:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 借方
+        D:
+          field: col_d
+          type: text
+          label: 贷方
+        E:
+          field: col_e
+          type: text
+          label: 借方
+        F:
+          field: col_f
+          type: text
+          label: 贷方
+        G:
+          field: col_g
+          type: text
+          label: 借方
+        H:
+          field: col_h
+          type: text
+          label: 贷方
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - D2
+      - G2
+      - K2
+      - A3
+      - D3
+      - G3
+      - K3
+      - A4
+      - A6
+      - B6
+      - C6
+      - D6
+      - E6
+      - F6
+      - G6
+      - H6
+      - I6
+      - K6
+      - A7
+      - B7
+      - C7
+      - D7
+      - E7
+      - F7
+      - G7
+      - H7
+      - I7
+      - K7
+      - A8
+      _total_count: 723
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - G4:H4
+      - E4:F4
+      - B4:B5
+      - A4:A5
+      - K4:K5
+      - C4:D4
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  TB母公司CF:
+    component_type: univer
+    class_code: F-CFS 编制
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - B2
+      - F2
+      - A3
+      - B3
+      - A4
+      - A6
+      - A7
+      - B7
+      - G7
+      - I7
+      - A8
+      - B8
+      - G8
+      - I8
+      - A9
+      - B9
+      - G9
+      - I9
+      - A10
+      - B10
+      - C10
+      - D10
+      - E10
+      - F10
+      - G10
+      - H10
+      - I10
+      - A11
+      - B11
+      _total_count: 344
+    merged_cells:
+      preserve: true
+      count: 9
+      ranges_sample:
+      - B4:B5
+      - C4:C5
+      - A4:A5
+      - F4:F5
+      - E4:E5
+      - G4:G5
+      - I4:I5
+      - H4:H5
+      - D4:D5
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  合并BS汇总:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: =报表格式!B4
+        B:
+          field: col_b
+          type: text
+          label: 合计
+        C:
+          field: col_c
+          type: text
+          label: 母公司（审定）
+        D:
+          field: col_d
+          type: text
+          label: 子公司1
+        E:
+          field: col_e
+          type: text
+          label: 子公司2
+        F:
+          field: col_f
+          type: text
+          label: 子公司3
+        G:
+          field: col_g
+          type: text
+          label: 子公司4
+        H:
+          field: col_h
+          type: text
+          label: 子公司5
+        I:
+          field: col_i
+          type: text
+          label: 子公司6
+        J:
+          field: col_j
+          type: text
+          label: 子公司7
+        K:
+          field: col_k
+          type: text
+          label: 子公司8
+        L:
+          field: col_l
+          type: text
+          label: 子公司9
+        M:
+          field: col_m
+          type: text
+          label: 子公司10
+        O:
+          field: col_o
+          type: text
+          label: 子公司XX
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - A3
+      - A5
+      - A6
+      - A7
+      - B7
+      - C7
+      - A8
+      - B8
+      - C8
+      - A9
+      - B9
+      - C9
+      - A10
+      - B10
+      - C10
+      - A11
+      - B11
+      - C11
+      - A12
+      - B12
+      - C12
+      - A13
+      - B13
+      - C13
+      - A14
+      - B14
+      - C14
+      - A15
+      - B15
+      _total_count: 524
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  合并PL汇总:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: =报表格式!L4
+        B:
+          field: col_b
+          type: text
+          label: 合计
+        C:
+          field: col_c
+          type: text
+          label: 母公司（审定）
+        D:
+          field: col_d
+          type: text
+          label: 子公司1
+        E:
+          field: col_e
+          type: text
+          label: 子公司2
+        F:
+          field: col_f
+          type: text
+          label: 子公司3
+        G:
+          field: col_g
+          type: text
+          label: 子公司4
+        H:
+          field: col_h
+          type: text
+          label: 子公司5
+        I:
+          field: col_i
+          type: text
+          label: 子公司6
+        J:
+          field: col_j
+          type: text
+          label: 子公司7
+        K:
+          field: col_k
+          type: text
+          label: 子公司8
+        L:
+          field: col_l
+          type: text
+          label: 子公司9
+        M:
+          field: col_m
+          type: text
+          label: 子公司10
+        O:
+          field: col_o
+          type: text
+          label: 子公司XX
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - A3
+      - A5
+      - A6
+      - B6
+      - C6
+      - A7
+      - B7
+      - C7
+      - A8
+      - B8
+      - C8
+      - A9
+      - B9
+      - C9
+      - A10
+      - B10
+      - C10
+      - A11
+      - B11
+      - C11
+      - A12
+      - B12
+      - C12
+      - A13
+      - B13
+      - C13
+      - A14
+      - B14
+      - C14
+      _total_count: 501
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  合并CF汇总:
+    component_type: univer
+    class_code: F-CFS 编制
+    fixed_cells:
+      A3: ${entity_name}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        A:
+          field: col_a
+          type: text
+          label: =报表格式!Q4
+        B:
+          field: col_b
+          type: text
+          label: 合计
+        C:
+          field: col_c
+          type: text
+          label: 母公司（审定）
+        D:
+          field: col_d
+          type: text
+          label: 子公司1
+        E:
+          field: col_e
+          type: text
+          label: 子公司2
+        F:
+          field: col_f
+          type: text
+          label: 子公司3
+        G:
+          field: col_g
+          type: text
+          label: 子公司4
+        H:
+          field: col_h
+          type: text
+          label: 子公司5
+        I:
+          field: col_i
+          type: text
+          label: 子公司6
+        J:
+          field: col_j
+          type: text
+          label: 子公司7
+        K:
+          field: col_k
+          type: text
+          label: 子公司8
+        L:
+          field: col_l
+          type: text
+          label: 子公司9
+        M:
+          field: col_m
+          type: text
+          label: 子公司10
+        O:
+          field: col_o
+          type: text
+          label: 子公司XX
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - A3
+      - A5
+      - A6
+      - A7
+      - B7
+      - C7
+      - A8
+      - B8
+      - C8
+      - A9
+      - B9
+      - C9
+      - A10
+      - B10
+      - C10
+      - D10
+      - E10
+      - F10
+      - G10
+      - H10
+      - I10
+      - J10
+      - K10
+      - L10
+      - M10
+      - N10
+      - O10
+      - A11
+      - B11
+      _total_count: 778
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  权益抵销:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    formulas:
+      preserve: true
+      cells:
+      - A1
+      - K1
+      - N1
+      - O1
+      - A2
+      - E2
+      - H2
+      - L2
+      - N2
+      - O2
+      - A3
+      - E3
+      - L3
+      - N3
+      - O3
+      - L4
+      - N4
+      - O4
+      - E5
+      - H5
+      - N5
+      - O5
+      - E6
+      - H6
+      - N6
+      - O6
+      - E7
+      - H7
+      - N7
+      - O7
+      _total_count: 745
+    merged_cells:
+      preserve: true
+      count: 86
+      ranges_sample:
+      - C160:C165
+      - C69:C74
+      - A167:A172
+      - A48:A53
+      - A111:A116
+      - B27:B32
+      - A153:A158
+      - A90:A95
+      - C41:C46
+      - B132:B137
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  往来交易抵销:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    formulas:
+      preserve: true
+      cells:
+      - A1
+      - K1
+      - N1
+      - O1
+      - A2
+      - E2
+      - H2
+      - L2
+      - N2
+      - O2
+      - A3
+      - E3
+      - L3
+      - N3
+      - O3
+      - L4
+      - N4
+      - O4
+      - E5
+      - H5
+      - N5
+      - O5
+      - E6
+      - H6
+      - N6
+      - O6
+      - E7
+      - H7
+      - N7
+      - O7
+      _total_count: 741
+    merged_cells:
+      preserve: true
+      count: 87
+      ranges_sample:
+      - B194:B199
+      - A61:A66
+      - A54:A59
+      - B117:B122
+      - C54:C59
+      - C47:C52
+      - A145:A150
+      - A26:A31
+      - C201:C206
+      - B103:B108
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  '合并报表调整 ':
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    formulas:
+      preserve: true
+      cells:
+      - A1
+      - K1
+      - N1
+      - O1
+      - A2
+      - E2
+      - H2
+      - L2
+      - N2
+      - O2
+      - A3
+      - E3
+      - L3
+      - N3
+      - O3
+      - L4
+      - N4
+      - O4
+      - E5
+      - H5
+      - N5
+      - O5
+      - E6
+      - H6
+      - N6
+      - O6
+      - E7
+      - H7
+      - N7
+      - O7
+      _total_count: 743
+    merged_cells:
+      preserve: true
+      count: 87
+      ranges_sample:
+      - B194:B199
+      - A61:A66
+      - B117:B122
+      - A54:A59
+      - C54:C59
+      - C47:C52
+      - A145:A150
+      - A26:A31
+      - C201:C206
+      - B103:B108
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  合并TB资产:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 借方
+        D:
+          field: col_d
+          type: text
+          label: 贷方
+        E:
+          field: col_e
+          type: text
+          label: 借方
+        F:
+          field: col_f
+          type: text
+          label: 贷方
+        G:
+          field: col_g
+          type: text
+          label: 借方
+        H:
+          field: col_h
+          type: text
+          label: 贷方
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - D2
+      - F2
+      - A3
+      - D3
+      - A4
+      - A6
+      - A7
+      - B7
+      - C7
+      - D7
+      - E7
+      - F7
+      - G7
+      - H7
+      - I7
+      - K7
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - H8
+      - I8
+      - K8
+      - A9
+      - B9
+      - C9
+      _total_count: 472
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - G4:H4
+      - E4:F4
+      - B4:B5
+      - A4:A5
+      - K4:K5
+      - C4:D4
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  合并TB负债:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 借方
+        D:
+          field: col_d
+          type: text
+          label: 贷方
+        E:
+          field: col_e
+          type: text
+          label: 借方
+        F:
+          field: col_f
+          type: text
+          label: 贷方
+        G:
+          field: col_g
+          type: text
+          label: 借方
+        H:
+          field: col_h
+          type: text
+          label: 贷方
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - D2
+      - G2
+      - K2
+      - A3
+      - D3
+      - G3
+      - K3
+      - A4
+      - A6
+      - A7
+      - B7
+      - C7
+      - D7
+      - E7
+      - F7
+      - G7
+      - H7
+      - I7
+      - K7
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - H8
+      - I8
+      - K8
+      _total_count: 468
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - G4:H4
+      - E4:F4
+      - B4:B5
+      - A4:A5
+      - K4:K5
+      - C4:D4
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  合并TB损益:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 借方
+        D:
+          field: col_d
+          type: text
+          label: 贷方
+        E:
+          field: col_e
+          type: text
+          label: 借方
+        F:
+          field: col_f
+          type: text
+          label: 贷方
+        G:
+          field: col_g
+          type: text
+          label: 借方
+        H:
+          field: col_h
+          type: text
+          label: 贷方
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - D2
+      - G2
+      - K2
+      - A3
+      - D3
+      - G3
+      - K3
+      - A4
+      - A6
+      - B6
+      - C6
+      - D6
+      - E6
+      - F6
+      - G6
+      - H6
+      - I6
+      - K6
+      - A7
+      - B7
+      - C7
+      - D7
+      - E7
+      - F7
+      - G7
+      - H7
+      - I7
+      - K7
+      - A8
+      _total_count: 720
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - G4:H4
+      - E4:F4
+      - B4:B5
+      - A4:A5
+      - K4:K5
+      - C4:D4
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  ' ':
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    formulas:
+      preserve: true
+      cells:
+      - E1
+      - A3
+      - B3
+      - C3
+      - A5
+      - B5
+      - C5
+      - D5
+      - E5
+      - F5
+      - G5
+      - H5
+      - K5
+      - L5
+      - Q5
+      - S5
+      - U5
+      - A6
+      - I6
+      - J6
+      - N6
+      - A7
+      - A8
+      _total_count: 23
+    merged_cells:
+      preserve: true
+      count: 1
+      ranges_sample:
+      - A6:G6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  TB合并CF:
+    component_type: univer
+    class_code: F-CFS 编制
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - B2
+      - F2
+      - A3
+      - B3
+      - A4
+      - A6
+      - A7
+      - B7
+      - G7
+      - I7
+      - A8
+      - B8
+      - G8
+      - I8
+      - A9
+      - B9
+      - G9
+      - I9
+      - A10
+      - B10
+      - C10
+      - D10
+      - E10
+      - F10
+      - G10
+      - H10
+      - I10
+      - A11
+      - B11
+      _total_count: 345
+    merged_cells:
+      preserve: true
+      count: 9
+      ranges_sample:
+      - B4:B5
+      - C4:C5
+      - A4:A5
+      - F4:F5
+      - E4:E5
+      - G4:G5
+      - I4:I5
+      - H4:H5
+      - D4:D5
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  审定合并BS:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1
+      - 6
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - C2
+      - E2
+      - H2
+      - J2
+      - A3
+      - J3
+      - C5
+      - E5
+      - H5
+      - J5
+      - A7
+      - C7
+      - E7
+      - H7
+      - J7
+      - A8
+      - C8
+      - E8
+      - H8
+      - J8
+      - A9
+      - C9
+      - E9
+      - H9
+      - J9
+      - A10
+      - C10
+      - E10
+      - H10
+      - J10
+      _total_count: 526
+    merged_cells:
+      preserve: true
+      count: 14
+      ranges_sample:
+      - H4:K4
+      - B57:B58
+      - A57:A58
+      - B4:B5
+      - G57:G58
+      - A54:K54
+      - A4:A5
+      - C4:F4
+      - G4:G5
+      - A56:C56
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  审定合并PL:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - J3
+      - C5
+      - E5
+      - H5
+      - J5
+      - A6
+      - C6
+      - E6
+      - H6
+      - J6
+      - A7
+      - C7
+      - E7
+      - H7
+      - J7
+      - A8
+      - C8
+      - E8
+      - H8
+      - J8
+      - A9
+      - C9
+      - E9
+      - H9
+      - J9
+      - A10
+      - C10
+      - E10
+      - H10
+      _total_count: 399
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - H4:K4
+      - A1:J1
+      - B4:B5
+      - A4:A5
+      - G4:G5
+      - C4:F4
+      - A3:C3
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  审定合并CF:
+    component_type: univer
+    class_code: F-CFS 编制
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table: '# TODO: 人工审核 — 未自动检测到表格结构，请手工定义 start_row/header_row/columns'
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A3
+      - J3
+      - C5
+      - E5
+      - H5
+      - J5
+      - A6
+      - A7
+      - C7
+      - H7
+      - A8
+      - C8
+      - H8
+      - A9
+      - C9
+      - H9
+      - A10
+      - C10
+      - E10
+      - H10
+      - J10
+      - A11
+      - C11
+      - H11
+      - A12
+      - C12
+      - H12
+      - A13
+      - C13
+      - H13
+      _total_count: 372
+    merged_cells:
+      preserve: true
+      count: 14
+      ranges_sample:
+      - H4:K4
+      - A53:K53
+      - B4:B5
+      - C56:F56
+      - G56:G57
+      - A56:A57
+      - A54:K54
+      - H56:K56
+      - A4:A5
+      - G4:G5
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  已审横向BS:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        E:
+          field: col_e
+          type: text
+          label: 变动额
+        F:
+          field: col_f
+          type: text
+          label: 变动％
+        M:
+          field: col_m
+          type: text
+          label: 变动额
+        N:
+          field: col_n
+          type: text
+          label: 变动％
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - D2
+      - F2
+      - I2
+      - L2
+      - N2
+      - A3
+      - D3
+      - I3
+      - L3
+      - I4
+      - A7
+      - I7
+      - J7
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - I8
+      - J8
+      - K8
+      - L8
+      - M8
+      - N8
+      - O8
+      - A9
+      - B9
+      _total_count: 648
+    merged_cells:
+      preserve: true
+      count: 14
+      ranges_sample:
+      - J4:J6
+      - H4:H6
+      - A4:A6
+      - O4:O6
+      - P4:P6
+      - B4:B6
+      - C4:C5
+      - D4:D5
+      - K4:K5
+      - I4:I6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  已审纵向BS:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 已审数
+        D:
+          field: col_d
+          type: text
+          label: 比重%
+        E:
+          field: col_e
+          type: text
+          label: 已审数
+        F:
+          field: col_f
+          type: text
+          label: 比重%
+        L:
+          field: col_l
+          type: text
+          label: 已审数
+        M:
+          field: col_m
+          type: text
+          label: 比重%
+        N:
+          field: col_n
+          type: text
+          label: 已审数
+        O:
+          field: col_o
+          type: text
+          label: 比重%
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - E2
+      - G2
+      - J2
+      - N2
+      - P2
+      - A3
+      - E3
+      - J3
+      - N3
+      - J4
+      - A7
+      - J7
+      - K7
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - H8
+      - J8
+      - K8
+      - L8
+      - M8
+      - N8
+      - O8
+      - P8
+      - Q8
+      _total_count: 731
+    merged_cells:
+      preserve: true
+      count: 16
+      ranges_sample:
+      - J4:J6
+      - E4:F4
+      - H4:H6
+      - K4:K6
+      - A4:A6
+      - L4:M4
+      - B4:B6
+      - Q4:Q6
+      - R4:R6
+      - J1:R1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  已审横向PL:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: ①
+        D:
+          field: col_d
+          type: text
+          label: ②
+        E:
+          field: col_e
+          type: text
+          label: ③=②-①
+        F:
+          field: col_f
+          type: text
+          label: ④=③/①
+    static_text:
+      rows:
+      - 1
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - B2
+      - E2
+      - A3
+      - B3
+      - A7
+      - C7
+      - D7
+      - E7
+      - F7
+      - G7
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - A9
+      - B9
+      - C9
+      - D9
+      - E9
+      - F9
+      - G9
+      - A10
+      - B10
+      - C10
+      - D10
+      - E10
+      _total_count: 423
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - H4:H6
+      - A4:A6
+      - B4:B6
+      - C4:C5
+      - D4:D5
+      - A1:H1
+      - G4:G6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  已审纵向PL:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 已审数
+        D:
+          field: col_d
+          type: text
+          label: 比重%
+        E:
+          field: col_e
+          type: text
+          label: 已审数
+        F:
+          field: col_f
+          type: text
+          label: 比重%
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - B2
+      - F2
+      - A3
+      - B3
+      - A7
+      - C7
+      - D7
+      - E7
+      - F7
+      - G7
+      - H7
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - H8
+      - A9
+      - B9
+      - C9
+      - D9
+      - E9
+      - F9
+      - G9
+      - H9
+      - A10
+      - B10
+      _total_count: 479
+    merged_cells:
+      preserve: true
+      count: 8
+      ranges_sample:
+      - E4:F4
+      - H4:H6
+      - A4:A6
+      - B4:B6
+      - G4:G5
+      - A1:I1
+      - I4:I6
+      - C4:D4
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  已审比率分析:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 分子数值
+        D:
+          field: col_d
+          type: text
+          label: 分母数值
+        E:
+          field: col_e
+          type: text
+          label: 指标值
+        F:
+          field: col_f
+          type: text
+          label: 分子数值
+        G:
+          field: col_g
+          type: text
+          label: 分母数值
+        H:
+          field: col_h
+          type: text
+          label: 指标值
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - C2
+      - F2
+      - A3
+      - C3
+      - C4
+      - F4
+      - E7
+      - F7
+      - G7
+      - H7
+      - I7
+      - J7
+      - E8
+      - F8
+      - G8
+      - H8
+      - I8
+      - J8
+      - E9
+      - F9
+      - G9
+      - H9
+      - I9
+      - J9
+      - E10
+      - F10
+      - G10
+      - H10
+      - I10
+      _total_count: 207
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - A1:J1
+      - B4:B5
+      - A4:A5
+      - J4:J5
+      - I4:I5
+      - C4:E4
+      - F4:H4
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  Q2-4 EPS-ROE(新):
+    component_type: univer
+    class_code: F-数据表
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      columns:
+        B:
+          field: col_b
+          type: text
+          label: 项目
+        C:
+          field: col_c
+          type: text
+          label: 本年数据
+        D:
+          field: col_d
+          type: text
+          label: 上年数据
+        F:
+          field: col_f
+          type: text
+          label: 本年数据
+        G:
+          field: col_g
+          type: text
+          label: 上年数据
+    formulas:
+      preserve: true
+      cells:
+      - C4
+      - D4
+      - F4
+      - G4
+      - C5
+      - D5
+      - F5
+      - G5
+      - C9
+      - D9
+      - C11
+      - D11
+      - C12
+      - D12
+      - C15
+      - C16
+      - D16
+      - C17
+      - D17
+      - C18
+      - D18
+      - C19
+      - D19
+      - C26
+      - D26
+      - C28
+      - D30
+      - C36
+      - D36
+      - C45
+      _total_count: 37
+    merged_cells:
+      preserve: true
+      count: 6
+      ranges_sample:
+      - F43:G43
+      - C43:D43
+      - F2:G2
+      - C2:D2
+      - B43:B44
+      - B2:B3
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母已审横向BS:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        E:
+          field: col_e
+          type: text
+          label: 变动额
+        F:
+          field: col_f
+          type: text
+          label: 变动％
+        M:
+          field: col_m
+          type: text
+          label: 变动额
+        N:
+          field: col_n
+          type: text
+          label: 变动％
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - D2
+      - F2
+      - I2
+      - L2
+      - N2
+      - A3
+      - D3
+      - I3
+      - L3
+      - I4
+      - A7
+      - I7
+      - J7
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - I8
+      - J8
+      - K8
+      - L8
+      - M8
+      - N8
+      - O8
+      - A9
+      - B9
+      _total_count: 646
+    merged_cells:
+      preserve: true
+      count: 14
+      ranges_sample:
+      - J4:J6
+      - H4:H6
+      - A4:A6
+      - O4:O6
+      - P4:P6
+      - B4:B6
+      - C4:C5
+      - D4:D5
+      - K4:K5
+      - I4:I6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母已审纵向BS:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 已审数
+        D:
+          field: col_d
+          type: text
+          label: 比重%
+        E:
+          field: col_e
+          type: text
+          label: 已审数
+        F:
+          field: col_f
+          type: text
+          label: 比重%
+        L:
+          field: col_l
+          type: text
+          label: 已审数
+        M:
+          field: col_m
+          type: text
+          label: 比重%
+        N:
+          field: col_n
+          type: text
+          label: 已审数
+        O:
+          field: col_o
+          type: text
+          label: 比重%
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - E2
+      - G2
+      - J2
+      - N2
+      - P2
+      - A3
+      - E3
+      - J3
+      - N3
+      - J4
+      - A7
+      - J7
+      - K7
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - H8
+      - J8
+      - K8
+      - L8
+      - M8
+      - N8
+      - O8
+      - P8
+      - Q8
+      _total_count: 732
+    merged_cells:
+      preserve: true
+      count: 16
+      ranges_sample:
+      - J4:J6
+      - E4:F4
+      - H4:H6
+      - K4:K6
+      - A4:A6
+      - L4:M4
+      - B4:B6
+      - Q4:Q6
+      - R4:R6
+      - J1:R1
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母已审横向PL:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: ①
+        D:
+          field: col_d
+          type: text
+          label: ②
+        E:
+          field: col_e
+          type: text
+          label: ③=②-①
+        F:
+          field: col_f
+          type: text
+          label: ④=③/①
+    static_text:
+      rows:
+      - 1
+      - 5
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - B2
+      - E2
+      - A3
+      - B3
+      - A7
+      - C7
+      - D7
+      - E7
+      - F7
+      - G7
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - A9
+      - B9
+      - C9
+      - D9
+      - E9
+      - F9
+      - G9
+      - A10
+      - B10
+      - C10
+      - D10
+      - E10
+      _total_count: 424
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - H4:H6
+      - A4:A6
+      - B4:B6
+      - C4:C5
+      - D4:D5
+      - A1:H1
+      - G4:G6
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母已审纵向PL:
+    component_type: univer
+    class_code: F-数据表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 已审数
+        D:
+          field: col_d
+          type: text
+          label: 比重%
+        E:
+          field: col_e
+          type: text
+          label: 已审数
+        F:
+          field: col_f
+          type: text
+          label: 比重%
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - B2
+      - F2
+      - A3
+      - B3
+      - A7
+      - C7
+      - D7
+      - E7
+      - F7
+      - G7
+      - H7
+      - A8
+      - B8
+      - C8
+      - D8
+      - E8
+      - F8
+      - G8
+      - H8
+      - A9
+      - B9
+      - C9
+      - D9
+      - E9
+      - F9
+      - G9
+      - H9
+      - A10
+      - B10
+      _total_count: 482
+    merged_cells:
+      preserve: true
+      count: 8
+      ranges_sample:
+      - E4:F4
+      - H4:H6
+      - A4:A6
+      - B4:B6
+      - G4:G5
+      - A1:I1
+      - I4:I6
+      - C4:D4
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+  母已审比率分析:
+    component_type: univer
+    class_code: F-分析表
+    fixed_cells:
+      A3: ${entity_name}
+      A4: ${period_end}
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        C:
+          field: col_c
+          type: text
+          label: 分子数值
+        D:
+          field: col_d
+          type: text
+          label: 分母数值
+        E:
+          field: col_e
+          type: text
+          label: 指标值
+        F:
+          field: col_f
+          type: text
+          label: 分子数值
+        G:
+          field: col_g
+          type: text
+          label: 分母数值
+        H:
+          field: col_h
+          type: text
+          label: 指标值
+    static_text:
+      rows:
+      - 1
+      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+    formulas:
+      preserve: true
+      cells:
+      - A2
+      - C2
+      - F2
+      - A3
+      - C3
+      - C4
+      - F4
+      - E7
+      - F7
+      - G7
+      - H7
+      - I7
+      - J7
+      - E8
+      - F8
+      - G8
+      - H8
+      - I8
+      - J8
+      - E9
+      - F9
+      - G9
+      - H9
+      - I9
+      - J9
+      - E10
+      - F10
+      - G10
+      - H10
+      - I10
+      _total_count: 207
+    merged_cells:
+      preserve: true
+      count: 7
+      ranges_sample:
+      - A1:J1
+      - B4:B5
+      - A4:A5
+      - J4:J5
+      - I4:I5
+      - C4:E4
+      - F4:H4
+    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'

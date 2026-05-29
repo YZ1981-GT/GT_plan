@@ -59,6 +59,12 @@ def get_all_flags(project_id: str | UUID | None = None) -> dict[str, bool]:
         pid = str(project_id)
         if pid in _project_overrides:
             flags.update(_project_overrides[pid])
+    # 从 settings 注入 WP_AI_SERVICE_ENABLED（US-5 feature flag）
+    try:
+        from app.core.config import settings
+        flags["WP_AI_SERVICE_ENABLED"] = settings.WP_AI_SERVICE_ENABLED
+    except Exception:
+        flags["WP_AI_SERVICE_ENABLED"] = False
     return flags
 
 
