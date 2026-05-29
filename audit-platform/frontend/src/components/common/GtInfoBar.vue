@@ -112,7 +112,7 @@ import { useDictStore } from '@/stores/dict'
 export interface InfoBadge {
   label?: string
   value: string
-  type?: 'default' | 'success' | 'warning' | 'danger'
+  type?: 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info'
 }
 
 export interface TemplateOption {

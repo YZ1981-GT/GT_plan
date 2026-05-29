@@ -16,7 +16,7 @@
               <span v-if="p.assigned_cycles?.length" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary)">{{ p.assigned_cycles.join('/') }}</span>
             </div>
           </div>
-          <el-empty v-if="!myProjects.length" :image-size="50" description="暂无委派项目" />
+          <GtEmpty v-if="!myProjects.length" preset="no-data" title="暂无委派项目" />
         </div>
       </el-col>
       <el-col :span="8">
@@ -26,7 +26,7 @@
             <span>{{ t.label }}</span>
             <el-tag :type="t.urgent ? 'danger' : 'info'" size="small">{{ t.type }}</el-tag>
           </div>
-          <el-empty v-if="!todos.length" :image-size="50" description="暂无待办" />
+          <GtEmpty v-if="!todos.length" preset="no-data" title="暂无待办" />
         </div>
       </el-col>
       <el-col :span="8">
@@ -37,7 +37,7 @@
             <span>{{ h.project_name }}</span>
             <span style="font-weight: 600">{{ h.hours }}h</span>
           </div>
-          <el-empty v-if="!weekHours.length" :image-size="50" description="本周暂无工时" />
+          <GtEmpty v-if="!weekHours.length" preset="no-data" title="本周暂无工时" />
           <el-button size="small" style="margin-top: 8px" @click="$router.push('/work-hours')">填报工时</el-button>
         </div>
       </el-col>
@@ -48,6 +48,7 @@
 import { ref, onMounted } from 'vue'
 import { getMyAssignments, listWorkHours } from '@/services/staffApi'
 import { getMyTodos, getMyStaffId } from '@/services/commonApi'
+import GtEmpty from '@/components/common/GtEmpty.vue'
 
 const myProjects = ref<any[]>([])
 const todos = ref<any[]>([])

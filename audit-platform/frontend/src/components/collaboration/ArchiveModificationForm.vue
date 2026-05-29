@@ -4,8 +4,8 @@
       <h3>归档后修改申请</h3>
     </div>
 
-    <el-form :model="form" label-width="130px">
-      <el-form-item label="修改原因" required>
+    <el-form ref="formRef" :model="form" :rules="formRules" label-width="130px">
+      <el-form-item label="修改原因" prop="modification_reason" required>
         <el-input
           v-model="form.modification_reason"
           type="textarea"
@@ -14,7 +14,7 @@
         />
       </el-form-item>
 
-      <el-form-item label="受影响项目" required>
+      <el-form-item label="受影响项目" prop="affected_items" required>
         <el-checkbox-group v-model="form.affected_items">
           <el-checkbox
             v-for="item in availableItems"
@@ -65,9 +65,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { archiveApi } from '@/services/collaborationApi'
+import { rules } from '@/utils/formRules'
 
 const projectId = 'current-project-id'
 
@@ -86,6 +88,13 @@ const form = ref({
   approval_status: 'PENDING',
   submitted_at: '',
 })
+const formRef = ref<FormInstance>()
+const formRules: FormRules = {
+  modification_reason: [rules.required('修改原因')],
+  affected_items: [
+    { type: 'array', required: true, min: 1, message: '请至少选择一个受影响项目', trigger: 'change' },
+  ],
+}
 
 const historyRecords = ref<any[]>([])
 

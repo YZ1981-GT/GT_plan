@@ -117,17 +117,14 @@ async def test_seed_balance_sheet_rows(db_session: AsyncSession):
 
     rows = await svc.list_configs(
         report_type=FinancialReportType.balance_sheet,
+        applicable_standard="soe_standalone",
     )
     row_names = {r.row_name for r in rows}
 
     # 关键行次
-    assert "货币资金" in row_names
-    assert "应收账款" in row_names
-    assert "存货" in row_names
-    assert "固定资产" in row_names
     assert "流动资产合计" in row_names
     assert "非流动资产合计" in row_names
-    assert "资产合计" in row_names
+    assert "资产总计" in row_names
     assert "流动负债合计" in row_names
     assert "负债合计" in row_names
     assert "所有者权益合计" in row_names
@@ -145,6 +142,7 @@ async def test_seed_income_statement_rows(db_session: AsyncSession):
 
     rows = await svc.list_configs(
         report_type=FinancialReportType.income_statement,
+        applicable_standard="soe_standalone",
     )
     row_names = {r.row_name for r in rows}
 
@@ -166,13 +164,13 @@ async def test_seed_cash_flow_rows(db_session: AsyncSession):
 
     rows = await svc.list_configs(
         report_type=FinancialReportType.cash_flow_statement,
+        applicable_standard="soe_standalone",
     )
     row_names = {r.row_name for r in rows}
 
     assert any("经营活动" in n for n in row_names)
     assert any("投资活动" in n for n in row_names)
     assert any("筹资活动" in n for n in row_names)
-    assert any("补充资料" in n for n in row_names)
     assert any("现金及现金等价物净增加额" in n for n in row_names)
 
 
@@ -187,14 +185,14 @@ async def test_seed_equity_statement_rows(db_session: AsyncSession):
 
     rows = await svc.list_configs(
         report_type=FinancialReportType.equity_statement,
+        applicable_standard="soe_standalone",
     )
     row_names = {r.row_name for r in rows}
 
-    assert any("实收资本" in n for n in row_names)
-    assert any("资本公积" in n for n in row_names)
-    assert any("盈余公积" in n for n in row_names)
-    assert any("未分配利润" in n for n in row_names)
-    assert any("所有者权益合计" in n for n in row_names)
+    assert any("上年年末余额" in n for n in row_names)
+    assert any("本年年初余额" in n for n in row_names)
+    assert any("综合收益总额" in n for n in row_names)
+    assert any("本年年末余额" in n for n in row_names)
 
 
 # ===== 公式语法验证 =====
@@ -210,7 +208,7 @@ async def test_formula_syntax_valid(db_session: AsyncSession):
     await svc.load_seed_data()
     await db_session.commit()
 
-    rows = await svc.list_configs()
+    rows = await svc.list_configs(applicable_standard="soe_standalone")
 
     # 合法的公式模式（SUM_TB 必须在 TB 之前匹配）
     sum_tb_pattern = re.compile(r"SUM_TB\('[^']+','[^']+'\)")
@@ -244,7 +242,7 @@ async def test_clone_report_config(db_session: AsyncSession, seeded_db):
     await svc.load_seed_data()
     await db_session.commit()
 
-    count = await svc.clone_report_config(pid)
+    count = await svc.clone_report_config(pid, applicable_standard="soe_standalone")
     await db_session.commit()
 
     assert count > 0
@@ -266,11 +264,11 @@ async def test_clone_duplicate_raises(db_session: AsyncSession, seeded_db):
     await svc.load_seed_data()
     await db_session.commit()
 
-    await svc.clone_report_config(pid)
+    await svc.clone_report_config(pid, applicable_standard="soe_standalone")
     await db_session.commit()
 
     with pytest.raises(ValueError, match="已存在克隆配置"):
-        await svc.clone_report_config(pid)
+        await svc.clone_report_config(pid, applicable_standard="soe_standalone")
 
 
 # ===== 修改配置测试 =====
@@ -287,6 +285,7 @@ async def test_update_config(db_session: AsyncSession):
 
     rows = await svc.list_configs(
         report_type=FinancialReportType.balance_sheet,
+        applicable_standard="soe_standalone",
     )
     first = rows[0]
 
@@ -312,13 +311,8 @@ async def test_update_nonexistent_raises(db_session: AsyncSession):
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession, seeded_db):
     """创建测试 HTTP 客户端"""
-    from app.core.database import get_db
     from app.main import app
-
-    async def override_get_db():
-        yield db_session
-
-    app.dependency_overrides[get_db] = override_get_db
+    from tests._test_auth_helper import override_auth
 
     # 加载种子数据
     from app.services.report_config_service import ReportConfigService
@@ -326,17 +320,14 @@ async def client(db_session: AsyncSession, seeded_db):
     await svc.load_seed_data()
     await db_session.commit()
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with override_auth(app, db_session=db_session) as c:
         yield c
-
-    app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
 async def test_api_list_configs(client: AsyncClient):
     """GET /api/report-config 返回配置列表"""
-    resp = await client.get("/api/report-config")
+    resp = await client.get("/api/report-config", params={"applicable_standard": "soe_standalone"})
     assert resp.status_code == 200
     data = resp.json()
     # ResponseWrapperMiddleware wraps in {"code", "data", "message"}
@@ -349,7 +340,7 @@ async def test_api_list_by_type(client: AsyncClient):
     """GET /api/report-config?report_type=balance_sheet 按类型筛选"""
     resp = await client.get(
         "/api/report-config",
-        params={"report_type": "balance_sheet"},
+        params={"report_type": "balance_sheet", "applicable_standard": "soe_standalone"},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -365,7 +356,7 @@ async def test_api_get_config_detail(client: AsyncClient):
     # 先获取列表
     resp = await client.get(
         "/api/report-config",
-        params={"report_type": "balance_sheet"},
+        params={"report_type": "balance_sheet", "applicable_standard": "soe_standalone"},
     )
     data = resp.json()
     items = data.get("data", data)
@@ -386,7 +377,7 @@ async def test_api_clone(client: AsyncClient):
         "/api/report-config/clone",
         json={
             "project_id": str(FAKE_PROJECT_ID),
-            "applicable_standard": "enterprise",
+            "applicable_standard": "soe_standalone",
         },
     )
     assert resp.status_code == 200
@@ -402,14 +393,14 @@ async def test_api_clone_duplicate(client: AsyncClient):
         "/api/report-config/clone",
         json={
             "project_id": str(FAKE_PROJECT_ID),
-            "applicable_standard": "enterprise",
+            "applicable_standard": "soe_standalone",
         },
     )
     resp = await client.post(
         "/api/report-config/clone",
         json={
             "project_id": str(FAKE_PROJECT_ID),
-            "applicable_standard": "enterprise",
+            "applicable_standard": "soe_standalone",
         },
     )
     assert resp.status_code == 400

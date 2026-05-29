@@ -11,8 +11,8 @@
 
   <!-- 保存为模板弹窗 -->
   <el-dialog v-model="showSaveDialog" title="保存为共享模板" width="480px" append-to-body destroy-on-close>
-    <el-form label-width="80px" size="small">
-      <el-form-item label="模板名称">
+    <el-form ref="saveFormRef" :model="saveForm" :rules="saveRules" label-width="80px" size="small">
+      <el-form-item label="模板名称" prop="name">
         <el-input v-model="saveName" placeholder="如：XX集团公式配置" />
       </el-form-item>
       <el-form-item label="说明">
@@ -80,6 +80,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { Loading } from '@element-plus/icons-vue'
@@ -88,6 +89,7 @@ import {
   type SharedConfigTemplate, getOwnerTypeLabel,
 } from '@/services/sharedConfigApi'
 import { eventBus } from '@/utils/eventBus'
+import { rules } from '@/utils/formRules'
 
 const props = defineProps<{
   configType: string          // report_mapping / account_mapping / formula_config / report_template / workpaper_template
@@ -107,6 +109,12 @@ const saveDesc = ref('')
 const saveOwnerType = ref('personal')
 const savePublic = ref(false)
 const saving = ref(false)
+const saveFormRef = ref<FormInstance>()
+
+const saveForm = computed(() => ({ name: saveName.value }))
+const saveRules: FormRules = {
+  name: [rules.required('模板名称')],
+}
 
 async function onSave() {
   if (!saveName.value.trim()) {

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -52,7 +52,7 @@ class TestAiContentConfirmAcceptFlow:
     @pytest.mark.asyncio
     async def test_sign_off_passes_after_confirm(self):
         """所有 AI 内容确认后 sign_off gate 通过。"""
-        from app.services.gate_rules_phase14 import AIContentMustBeConfirmedRule
+        from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule
 
         rule = AIContentMustBeConfirmedRule()
         db = AsyncMock()
@@ -81,7 +81,9 @@ class TestAiContentConfirmAcceptFlow:
         mock_result.scalars.return_value.all.return_value = [wp]
         db.execute = AsyncMock(return_value=mock_result)
 
-        result = await rule.check(db, {"project_id": uuid.uuid4()})
+        # Patch ai_content_log_service to skip the new log-based path
+        with patch("app.services.ai_content_log_service.list_pending_by_project", new_callable=AsyncMock, return_value=[]):
+            result = await rule.check(db, {"project_id": uuid.uuid4()})
         assert result is None  # 通过，无阻断
 
 
@@ -96,7 +98,7 @@ class TestAiContentUnconfirmedBlocks:
     @pytest.mark.asyncio
     async def test_unconfirmed_ai_content_blocks_sign_off(self):
         """存在未确认的 AI 内容时 sign_off 被阻断。"""
-        from app.services.gate_rules_phase14 import AIContentMustBeConfirmedRule
+        from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule
 
         rule = AIContentMustBeConfirmedRule()
         db = AsyncMock()
@@ -123,7 +125,8 @@ class TestAiContentUnconfirmedBlocks:
         mock_result.scalars.return_value.all.return_value = [wp]
         db.execute = AsyncMock(return_value=mock_result)
 
-        result = await rule.check(db, {"project_id": uuid.uuid4()})
+        with patch("app.services.ai_content_log_service.list_pending_by_project", new_callable=AsyncMock, return_value=[]):
+            result = await rule.check(db, {"project_id": uuid.uuid4()})
         assert result is not None
         assert result.rule_code == "R3-AI-UNCONFIRMED"
         assert result.error_code == "AI_CONTENT_NOT_CONFIRMED"
@@ -133,7 +136,7 @@ class TestAiContentUnconfirmedBlocks:
     @pytest.mark.asyncio
     async def test_mixed_confirmed_and_unconfirmed(self):
         """部分确认部分未确认 → 仍阻断。"""
-        from app.services.gate_rules_phase14 import AIContentMustBeConfirmedRule
+        from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule
 
         rule = AIContentMustBeConfirmedRule()
         db = AsyncMock()
@@ -167,7 +170,8 @@ class TestAiContentUnconfirmedBlocks:
         mock_result.scalars.return_value.all.return_value = [wp]
         db.execute = AsyncMock(return_value=mock_result)
 
-        result = await rule.check(db, {"project_id": uuid.uuid4()})
+        with patch("app.services.ai_content_log_service.list_pending_by_project", new_callable=AsyncMock, return_value=[]):
+            result = await rule.check(db, {"project_id": uuid.uuid4()})
         assert result is not None
         assert result.location["unconfirmed_wp_count"] == 1
 
@@ -345,7 +349,7 @@ class TestEndToEndConfirmFlow:
     @pytest.mark.asyncio
     async def test_full_flow_wrap_block_confirm_pass(self):
         """wrap_ai_output → 未确认阻断 → 确认后通过。"""
-        from app.services.gate_rules_phase14 import AIContentMustBeConfirmedRule
+        from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule
 
         rule = AIContentMustBeConfirmedRule()
 
@@ -369,7 +373,8 @@ class TestEndToEndConfirmFlow:
         mock_result.scalars.return_value.all.return_value = [wp]
         db.execute = AsyncMock(return_value=mock_result)
 
-        result = await rule.check(db, {"project_id": uuid.uuid4()})
+        with patch("app.services.ai_content_log_service.list_pending_by_project", new_callable=AsyncMock, return_value=[]):
+            result = await rule.check(db, {"project_id": uuid.uuid4()})
         assert result is not None
         assert result.error_code == "AI_CONTENT_NOT_CONFIRMED"
 
@@ -385,5 +390,6 @@ class TestEndToEndConfirmFlow:
         mock_result2.scalars.return_value.all.return_value = [wp]
         db.execute = AsyncMock(return_value=mock_result2)
 
-        result = await rule.check(db, {"project_id": uuid.uuid4()})
+        with patch("app.services.ai_content_log_service.list_pending_by_project", new_callable=AsyncMock, return_value=[]):
+            result = await rule.check(db, {"project_id": uuid.uuid4()})
         assert result is None  # 通过

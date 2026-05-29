@@ -55,6 +55,7 @@
 import { ref, watch, onMounted, onBeforeUnmount, computed, reactive } from 'vue'
 import * as d3 from 'd3'
 import type { D3Node, D3Link } from '@/composables/usePanoramaGraph'
+import { logger } from '@/utils/logger'
 import {
   cycleColor,
   severityColor,
@@ -135,7 +136,7 @@ function buildSimulation(nodes: D3Node[], links: D3Link[]): void {
     .alphaMin(0.01)
     .on('end', () => {
       const elapsed = performance.now() - simStart
-      console.info(`[ForceGraph] simulation stable in ${elapsed.toFixed(0)}ms (${nodes.length} nodes, ${links.length} links)`)
+      logger.log(`[ForceGraph] simulation stable in ${elapsed.toFixed(0)}ms (${nodes.length} nodes, ${links.length} links)`)
       if (simulationTimeoutId) {
         clearTimeout(simulationTimeoutId)
         simulationTimeoutId = null

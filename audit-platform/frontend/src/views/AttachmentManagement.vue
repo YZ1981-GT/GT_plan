@@ -69,8 +69,8 @@
 
     <!-- 关联底稿弹窗 -->
     <el-dialog append-to-body v-model="associateVisible" title="关联到底稿" width="480px">
-      <el-form label-width="80px" size="small">
-        <el-form-item label="搜索底稿">
+      <el-form ref="assocFormRef" :model="assocForm" :rules="assocRules" label-width="80px" size="small">
+        <el-form-item label="搜索底稿" prop="associateWpId">
           <el-select
             v-model="associateWpId"
             filterable
@@ -116,6 +116,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { Search, Upload, Document } from '@element-plus/icons-vue'
 import AttachmentPreview from '@/components/extension/AttachmentPreview.vue'
@@ -124,6 +125,7 @@ import { downloadFile } from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { workpapers as P_wp, attachments as P_att } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import { rules } from '@/utils/formRules'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -147,6 +149,11 @@ const associateType = ref('evidence')
 const associateNotes = ref('')
 const wpSearchLoading = ref(false)
 const wpSearchResults = ref<any[]>([])
+const assocFormRef = ref<FormInstance>()
+const assocForm = computed(() => ({ associateWpId: associateWpId.value }))
+const assocRules: FormRules = {
+  associateWpId: [rules.required('底稿', 'change')],
+}
 
 async function searchWorkpapers(query: string) {
   if (!query || query.length < 1) { wpSearchResults.value = []; return }

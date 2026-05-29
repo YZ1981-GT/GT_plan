@@ -33,6 +33,7 @@ export const useProjectStore = defineStore('project', () => {
   const standard = ref<'soe' | 'listed'>('soe')
   const clientName = ref('')
   const auditYear = ref<number | null>(null)
+  const projectStatus = ref<string>('')
 
   // 项目选项列表（供单位切换下拉使用）
   const projectOptions = ref<Array<{ id: string; name: string }>>([])
@@ -77,6 +78,7 @@ export const useProjectStore = defineStore('project', () => {
       try {
         const proj = await getProject(pid)
         clientName.value = (proj as any)?.client_name || (proj as any)?.name || ''
+        projectStatus.value = (proj as any)?.status || ''
         if ((proj as any)?.audit_year) {
           const ay = Number((proj as any).audit_year)
           if (Number.isFinite(ay) && ay > 2000) auditYear.value = ay
@@ -125,6 +127,7 @@ export const useProjectStore = defineStore('project', () => {
     standard,
     clientName,
     auditYear,
+    projectStatus,
     projectOptions,
     yearOptions,
     // 方法

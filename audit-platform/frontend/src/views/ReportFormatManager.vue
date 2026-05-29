@@ -17,9 +17,9 @@
       </el-table-column>
     </el-table>
     <el-dialog append-to-body v-model="showCreate" title="新建排版模板" width="500px">
-      <el-form label-width="80px">
-        <el-form-item label="名称"><el-input v-model="form.template_name" /></el-form-item>
-        <el-form-item label="类型">
+      <el-form ref="rfFormRef" :model="form" :rules="rfRules" label-width="80px">
+        <el-form-item label="名称" prop="template_name"><el-input v-model="form.template_name" /></el-form-item>
+        <el-form-item label="类型" prop="template_type">
           <el-select v-model="form.template_type">
             <el-option label="审计报告" value="audit_report" />
             <el-option label="管理建议书" value="management_letter" />
@@ -38,11 +38,18 @@
 </template>
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { listFormatTemplates, createFormatTemplate } from '@/services/commonApi'
+import { rules } from '@/utils/formRules'
 const templates = ref<any[]>([])
 const showCreate = ref(false)
 const form = ref({ template_name: '', template_type: 'audit_report', config: { font: '仿宋_GB2312', font_size: 12 } })
+const rfFormRef = ref<FormInstance>()
+const rfRules: FormRules = {
+  template_name: [rules.required('模板名称')],
+  template_type: [rules.required('模板类型', 'change')],
+}
 async function fetch() { templates.value = await listFormatTemplates() }
 async function onCreate() {
   if (!form.value.template_name) return ElMessage.warning('请输入名称')

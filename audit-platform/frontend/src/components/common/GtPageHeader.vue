@@ -4,6 +4,7 @@
   包含返回按钮、标题、信息栏插槽（GtInfoBar）、操作按钮插槽（GtToolbar）。
   支持 showSyncStatus prop 显示数据同步状态指示器（监听 sse:sync-event / sse:sync-failed）。
   支持 backMode prop：'route'（默认，触发 back 事件）| 'history'（调用 router.back()）。
+  V3 Req 8.3.2: 自动显示 DrilldownBreadcrumb（当 navigation stack 非空时）。
 
   用法：
     <GtPageHeader title="试算表" :show-sync-status="true" @back="router.push('/projects')">
@@ -14,7 +15,14 @@
     </GtPageHeader>
 -->
 <template>
-  <div class="gt-page-header" :class="{ 'gt-page-header--banner': variant === 'banner' }">
+  <div class="gt-page-header-wrapper">
+    <!-- V3 Req 8.3.2: 穿透面包屑（全局接入，navigation stack 非空时自动显示） -->
+    <DrilldownBreadcrumb
+      v-if="navigationStack.length > 0"
+      :stack="navigationStack"
+      @jump="onBreadcrumbJump"
+    />
+    <div class="gt-page-header" :class="{ 'gt-page-header--banner': variant === 'banner' }">
     <div class="gt-page-header__row1">
       <el-button
         v-if="showBack"
@@ -42,12 +50,22 @@
     <!-- actions 插槽：放 GtToolbar -->
     <slot name="actions" />
   </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { eventBus } from '@/utils/eventBus'
+import DrilldownBreadcrumb from './DrilldownBreadcrumb.vue'
+import { useNavigationStack } from '@/composables/useNavigationStack'
+
+// V3 Req 8.3.2: 全局穿透面包屑
+const { stack: navigationStack, jumpTo: navJumpTo } = useNavigationStack()
+
+function onBreadcrumbJump(index: number) {
+  navJumpTo(index)
+}
 
 const props = withDefaults(defineProps<{
   /** 页面标题 */
@@ -142,6 +160,10 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.gt-page-header-wrapper {
+  margin-bottom: var(--gt-space-5);
+}
+
 .gt-page-header {
   display: flex;
   flex-direction: column;
@@ -149,7 +171,6 @@ onUnmounted(() => {
   background: var(--gt-gradient-primary);
   border-radius: var(--gt-radius-lg);
   padding: 16px 24px;
-  margin-bottom: var(--gt-space-5);
   color: var(--gt-color-text-inverse);
   position: relative;
   overflow: hidden;

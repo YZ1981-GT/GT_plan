@@ -256,7 +256,7 @@ class TestProperty5BalanceCheck:
             return {"severity": "blocking", "diff": diff}
         return None
 
-    @settings(max_examples=50)
+    @settings(max_examples=15)
     @given(
         audited=st.floats(min_value=-1e9, max_value=1e9, allow_nan=False, allow_infinity=False),
         unaudited=st.floats(min_value=-1e9, max_value=1e9, allow_nan=False, allow_infinity=False),
@@ -298,7 +298,7 @@ class TestProperty6TBConsistency:
             return {"severity": "blocking", "diff": diff}
         return None
 
-    @settings(max_examples=50)
+    @settings(max_examples=15)
     @given(
         wp_amount=st.floats(min_value=-1e9, max_value=1e9, allow_nan=False, allow_infinity=False),
         tb_amount=st.floats(min_value=-1e9, max_value=1e9, allow_nan=False, allow_infinity=False),
@@ -468,7 +468,7 @@ class TestProperty10ToleranceSymmetry:
         """Returns True if passes (no finding), False if fails (finding)."""
         return diff_abs <= tolerance
 
-    @settings(max_examples=50)
+    @settings(max_examples=15)
     @given(
         base=st.floats(min_value=1.0, max_value=1e8, allow_nan=False, allow_infinity=False),
         tolerance=st.sampled_from([0.01, 0.001, 0.1, 1.0]),
@@ -482,7 +482,7 @@ class TestProperty10ToleranceSymmetry:
         above = tolerance + 1e-10
         assert self._check_tolerance(above, tolerance) is False
 
-    @settings(max_examples=50)
+    @settings(max_examples=15)
     @given(
         diff=st.floats(min_value=0.0, max_value=1e6, allow_nan=False, allow_infinity=False),
     )

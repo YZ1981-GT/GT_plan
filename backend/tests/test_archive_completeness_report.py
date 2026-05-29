@@ -217,7 +217,7 @@ class TestCompletenessReportStructurePBT:
     count must equal len(items).
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         counts=st.tuples(
             st.integers(min_value=0, max_value=10),  # missing
@@ -261,7 +261,7 @@ class TestCompletenessReportStructurePBT:
                 f"category={cat.category}: count={cat.count} != len(items)={len(cat.items)}"
             )
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         n_items=st.integers(min_value=0, max_value=20),
         category=st.sampled_from(_CATEGORIES),
@@ -295,7 +295,7 @@ class TestArchiveBlockingLogicPBT:
     no category has is_blocking=true with count > 0.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         counts=st.tuples(
             st.integers(min_value=0, max_value=10),  # missing

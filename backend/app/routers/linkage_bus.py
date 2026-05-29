@@ -190,7 +190,7 @@ async def delete_override(
     resolver = LinkageLabelResolver()
     deleted = resolver.delete_override(wp_code, sheet_name, label)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Override not found")
+        raise HTTPException(status_code=404, detail={"message": "覆盖记录不存在", "message_en": "Override not found"})
     return {"message": "Override deleted"}
 
 

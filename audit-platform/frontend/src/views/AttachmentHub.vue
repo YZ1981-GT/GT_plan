@@ -6,7 +6,7 @@
     <p class="gt-hub-desc">管理项目附件文件。选择一个项目查看和管理其附件。</p>
 
     <div v-loading="loading">
-      <el-empty v-if="!loading && projects.length === 0" description="暂无项目" />
+      <GtEmpty v-if="!loading && projects.length === 0" preset="no-data" title="暂无项目" />
 
       <div v-else class="gt-hub-grid">
         <div
@@ -17,7 +17,7 @@
         >
           <div class="gt-hub-card-top">
             <el-icon :size="24" style="color: var(--gt-color-wheat)"><Paperclip /></el-icon>
-            <el-tag :type="(statusType(p.status)) || undefined" size="small">{{ statusLabel(p.status) }}</el-tag>
+            <GtStatusTag dict-key="project_status" :value="p.status" />
           </div>
           <div class="gt-hub-card-name">{{ p.client_name || p.name }}</div>
           <div class="gt-hub-card-meta">
@@ -35,18 +35,13 @@ import { ref, onMounted } from 'vue'
 import { Paperclip } from '@element-plus/icons-vue'
 import { listProjects } from '@/services/commonApi'
 import AttachmentPreviewDrawer from '@/components/common/AttachmentPreviewDrawer.vue'
+import GtEmpty from '@/components/common/GtEmpty.vue'
+import GtStatusTag from '@/components/common/GtStatusTag.vue'
 
 // TODO: replace window.open with AttachmentPreviewDrawer when per-file preview is added to this hub view
 
 const loading = ref(false)
 const projects = ref<any[]>([])
-
-function statusType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
-  return ({ created: 'info', planning: '', execution: 'warning', completion: 'success', archived: 'info' } as Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'>)[s] || 'info'
-}
-function statusLabel(s: string) {
-  return { created: '已创建', planning: '计划中', execution: '执行中', completion: '完成', archived: '已归档' }[s] || s
-}
 
 onMounted(async () => {
   loading.value = true

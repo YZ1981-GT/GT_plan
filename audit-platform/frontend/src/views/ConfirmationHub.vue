@@ -1,7 +1,7 @@
 <template>
   <div class="gt-confirmation-hub gt-fade-in">
     <GtPageHeader title="函证管理" :show-back="false" />
-    <GtEmpty icon="📮" title="函证管理" description="该模块正在开发中，敬请期待" />
+    <GtEmpty preset="developing" />
   </div>
 </template>
 

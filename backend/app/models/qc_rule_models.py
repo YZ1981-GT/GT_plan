@@ -16,10 +16,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 
 
-class QcRuleDefinition(Base, TimestampMixin):
+class QcRuleDefinition(Base, SoftDeleteMixin, TimestampMixin):
     """QC 规则定义表 — 元数据 + 开关
 
     每条规则对应一个可执行的质控检查逻辑。

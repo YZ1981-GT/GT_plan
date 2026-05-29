@@ -18,7 +18,14 @@ Validates: Requirements 9.2, 9.3
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any
+
+from app.services._decimal_helpers import (
+    AmountConversionError,
+    amount_tolerance,
+    to_decimal,
+)
 
 
 @dataclass
@@ -28,6 +35,27 @@ class Finding:
     severity: str  # high / medium / low / info
     message: str
     details: dict = field(default_factory=dict)
+
+
+def _to_decimal_safe(value: Any) -> Decimal | None:
+    """容忍式转换：失败返回 None（保持各 validator 的 except 原语义）。"""
+    if value is None:
+        return None
+    try:
+        return to_decimal(value, allow_none=False)
+    except (AmountConversionError, ValueError, TypeError):
+        return None
+
+
+def _max_abs(*amounts: Decimal | None) -> Decimal | None:
+    """选取参考金额中绝对值最大者，作为 amount_tolerance 输入。"""
+    candidate: Decimal | None = None
+    for amt in amounts:
+        if amt is None:
+            continue
+        if candidate is None or abs(amt) > abs(candidate):
+            candidate = amt
+    return candidate
 
 
 # ---------------------------------------------------------------------------
@@ -52,17 +80,24 @@ class BalanceCheck(BaseValidator):
         note_total = note_data.get("note_total")
         if report_amount is None or note_total is None:
             return findings
-        try:
-            r = float(report_amount)
-            n = float(note_total)
-        except (ValueError, TypeError):
+        r = _to_decimal_safe(report_amount)
+        n = _to_decimal_safe(note_total)
+        if r is None or n is None:
             return findings
-        if abs(r - n) > 0.01:
+        diff = r - n
+        # 动态容差：以参考金额规模为基准，小金额仍为 0.01，大金额按比例放宽
+        tolerance = amount_tolerance(_max_abs(r, n))
+        if abs(diff) > tolerance:
             findings.append(Finding(
                 rule_type=self.rule_type,
                 severity="high",
-                message=f"报表数 {r:,.2f} 与附注合计 {n:,.2f} 不一致，差异 {r - n:,.2f}",
-                details={"report_amount": r, "note_total": n, "diff": r - n},
+                message=f"报表数 {r:,.2f} 与附注合计 {n:,.2f} 不一致，差异 {diff:,.2f}",
+                details={
+                    "report_amount": float(r),
+                    "note_total": float(n),
+                    "diff": float(diff),
+                    "tolerance": float(tolerance),
+                },
             ))
         return findings
 
@@ -80,19 +115,37 @@ class WideTableHorizontal(BaseValidator):
             closing = row.get("closing")
             if opening is None or closing is None:
                 continue
-            try:
-                o = float(opening)
-                c = float(closing)
-                ch = sum(float(x) for x in changes if x is not None)
-            except (ValueError, TypeError):
+            o = _to_decimal_safe(opening)
+            c = _to_decimal_safe(closing)
+            if o is None or c is None:
+                continue
+            ch = Decimal("0")
+            change_failed = False
+            for x in changes:
+                if x is None:
+                    continue
+                xd = _to_decimal_safe(x)
+                if xd is None:
+                    change_failed = True
+                    break
+                ch += xd
+            if change_failed:
                 continue
             expected = o + ch
-            if abs(expected - c) > 0.01:
+            diff = expected - c
+            tolerance = amount_tolerance(_max_abs(o, c, ch, expected))
+            if abs(diff) > tolerance:
                 findings.append(Finding(
                     rule_type=self.rule_type,
                     severity="medium",
                     message=f"行 '{row.get('label', '?')}': 期初({o:,.2f})+变动({ch:,.2f})={expected:,.2f} ≠ 期末({c:,.2f})",
-                    details={"label": row.get("label"), "opening": o, "changes": ch, "closing": c},
+                    details={
+                        "label": row.get("label"),
+                        "opening": float(o),
+                        "changes": float(ch),
+                        "closing": float(c),
+                        "tolerance": float(tolerance),
+                    },
                 ))
         return findings
 
@@ -107,17 +160,34 @@ class VerticalReconcile(BaseValidator):
         total = note_data.get("total")
         if total is None or not items:
             return findings
-        try:
-            t = float(total)
-            s = sum(float(x) for x in items if x is not None)
-        except (ValueError, TypeError):
+        t = _to_decimal_safe(total)
+        if t is None:
             return findings
-        if abs(s - t) > 0.01:
+        s = Decimal("0")
+        item_failed = False
+        for x in items:
+            if x is None:
+                continue
+            xd = _to_decimal_safe(x)
+            if xd is None:
+                item_failed = True
+                break
+            s += xd
+        if item_failed:
+            return findings
+        diff = s - t
+        tolerance = amount_tolerance(_max_abs(s, t))
+        if abs(diff) > tolerance:
             findings.append(Finding(
                 rule_type=self.rule_type,
                 severity="medium",
-                message=f"子项合计 {s:,.2f} ≠ 总计行 {t:,.2f}，差异 {s - t:,.2f}",
-                details={"sum_items": s, "total": t, "diff": s - t},
+                message=f"子项合计 {s:,.2f} ≠ 总计行 {t:,.2f}，差异 {diff:,.2f}",
+                details={
+                    "sum_items": float(s),
+                    "total": float(t),
+                    "diff": float(diff),
+                    "tolerance": float(tolerance),
+                },
             ))
         return findings
 
@@ -132,12 +202,13 @@ class CrossCheck(BaseValidator):
         target_value = note_data.get("target_value")
         if source_value is None or target_value is None:
             return findings
-        try:
-            s = float(source_value)
-            t = float(target_value)
-        except (ValueError, TypeError):
+        s = _to_decimal_safe(source_value)
+        t = _to_decimal_safe(target_value)
+        if s is None or t is None:
             return findings
-        if abs(s - t) > 0.01:
+        diff = s - t
+        tolerance = amount_tolerance(_max_abs(s, t))
+        if abs(diff) > tolerance:
             findings.append(Finding(
                 rule_type=self.rule_type,
                 severity="medium",
@@ -145,7 +216,9 @@ class CrossCheck(BaseValidator):
                 details={
                     "source": note_data.get("source_table", ""),
                     "target": note_data.get("target_table", ""),
-                    "source_value": s, "target_value": t,
+                    "source_value": float(s),
+                    "target_value": float(t),
+                    "tolerance": float(tolerance),
                 },
             ))
         return findings
@@ -161,17 +234,34 @@ class SubItemCheck(BaseValidator):
         sub_items = note_data.get("sub_items", [])
         if total is None or not sub_items:
             return findings
-        try:
-            t = float(total)
-            s = sum(float(x.get("amount", 0)) for x in sub_items if x.get("amount") is not None)
-        except (ValueError, TypeError):
+        t = _to_decimal_safe(total)
+        if t is None:
             return findings
-        if s > t + 0.01:
+        s = Decimal("0")
+        item_failed = False
+        for x in sub_items:
+            amt = x.get("amount") if isinstance(x, dict) else None
+            if amt is None:
+                continue
+            d = _to_decimal_safe(amt)
+            if d is None:
+                item_failed = True
+                break
+            s += d
+        if item_failed:
+            return findings
+        # 其中项不得 > 总额，但保留容差避免微小舍入误判
+        tolerance = amount_tolerance(_max_abs(s, t))
+        if s > t + tolerance:
             findings.append(Finding(
                 rule_type=self.rule_type,
                 severity="medium",
                 message=f"其中项合计 {s:,.2f} 超过总额 {t:,.2f}",
-                details={"sub_total": s, "total": t},
+                details={
+                    "sub_total": float(s),
+                    "total": float(t),
+                    "tolerance": float(tolerance),
+                },
             ))
         return findings
 
@@ -186,17 +276,22 @@ class AgingTransition(BaseValidator):
         current_opening = note_data.get("current_opening")
         if prior_closing is None or current_opening is None:
             return findings
-        try:
-            pc = float(prior_closing)
-            co = float(current_opening)
-        except (ValueError, TypeError):
+        pc = _to_decimal_safe(prior_closing)
+        co = _to_decimal_safe(current_opening)
+        if pc is None or co is None:
             return findings
-        if abs(pc - co) > 0.01:
+        diff = pc - co
+        tolerance = amount_tolerance(_max_abs(pc, co))
+        if abs(diff) > tolerance:
             findings.append(Finding(
                 rule_type=self.rule_type,
                 severity="medium",
                 message=f"账龄衔接不一致: 上期期末 {pc:,.2f} ≠ 本期期初 {co:,.2f}",
-                details={"prior_closing": pc, "current_opening": co},
+                details={
+                    "prior_closing": float(pc),
+                    "current_opening": float(co),
+                    "tolerance": float(tolerance),
+                },
             ))
         return findings
 

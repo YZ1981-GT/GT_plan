@@ -29,8 +29,9 @@ class ReviewTemplate(Base):
     )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # NOTE: 不写 `'[]'::jsonb`（PG 字面 cast）—— SQLite 测试 dialect 不识别 `::`
     applicable_cycles: Mapped[dict] = mapped_column(
-        JSONB, server_default=text("'[]'::jsonb")
+        JSONB, server_default=text("'[]'")
     )
     priority_tag: Mapped[str] = mapped_column(
         String(20), server_default=text("'suggest'")

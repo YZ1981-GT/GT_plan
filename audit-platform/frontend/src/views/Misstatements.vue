@@ -14,12 +14,29 @@
       <template #actions>
         <GtToolbar>
           <template #left>
-            <el-button size="small" type="primary" @click="openCreateDialog">+ 新增错报</el-button>
+            <el-button size="small" type="primary" @click="openCreateDialog" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">+ 新增错报</el-button>
             <el-button size="small" plain @click="toggleFullscreen">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
           </template>
         </GtToolbar>
       </template>
     </GtPageHeader>
+
+    <!-- 归档横幅 -->
+    <ArchivedBanner />
+
+    <!-- AI 内容 pending 顶部 banner（spec global-refinement-v3 Task 6.4） -->
+    <AiContentPendingBanner :project-id="projectId" />
+
+    <!-- 跨模块冲突 banner（spec global-refinement-v3 Task 7.5） -->
+    <ConflictBanner :project-id="projectId" @view="conflictPanelVisible = true" />
+    <ConflictResolutionPanel
+      v-model="conflictPanelVisible"
+      :project-id="projectId"
+      @resolved="onConflictResolved"
+    />
+
+    <!-- V3 Req 10.4: 可解释状态机面板 -->
+    <StatusMachinePanel ref="smPanelRef" module="misstatement" :instance-id="selectedMsId" />
 
     <!-- 重要性水平对比卡片 -->
     <div class="gt-ms-materiality-cards" v-if="summary">
@@ -84,7 +101,7 @@
     </el-alert>
     <el-table
       ref="msTableRef"
-      :data="items"
+      :data="pagedItems"
       v-loading="loading"
       border
       stripe
@@ -128,11 +145,23 @@
       <el-table-column prop="auditor_evaluation" label="审计师评价" min-width="150" show-overflow-tooltip />
       <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="onDelete(row)">删除</el-button>
+          <el-button size="small" @click="openEditDialog(row)" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">编辑</el-button>
+          <el-button size="small" type="danger" @click="onDelete(row)" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 分页 -->
+    <div class="gt-pagination" v-if="msTotal > msPageSize" style="margin-top: 12px; display: flex; justify-content: flex-end;">
+      <el-pagination
+        v-model:current-page="msPage"
+        :page-size="msPageSize"
+        :total="msTotal"
+        layout="total, prev, pager, next"
+        background
+        small
+      />
+    </div>
 
     <!-- R10 Spec B / F7：错报右键菜单 - 查看关联底稿 -->
     <CellContextMenu
@@ -149,24 +178,24 @@
 
     <!-- 新建/编辑弹窗 -->
     <el-dialog append-to-body v-model="formVisible" :title="isEditing ? '编辑错报' : '新增错报'" width="600px" destroy-on-close>
-      <el-form :model="form" label-width="100px">
-        <el-form-item label="错报类型">
+      <el-form ref="missFormRef" :model="form" :rules="missFormRules" label-width="100px">
+        <el-form-item label="错报类型" prop="misstatement_type">
           <el-select v-model="form.misstatement_type" style="width: 100%">
             <el-option label="事实错报" value="factual" />
             <el-option label="判断错报" value="judgmental" />
             <el-option label="推断错报" value="projected" />
           </el-select>
         </el-form-item>
-        <el-form-item label="错报描述">
+        <el-form-item label="错报描述" prop="misstatement_description">
           <el-input v-model="form.misstatement_description" type="textarea" :rows="2" />
         </el-form-item>
-        <el-form-item label="科目编码">
+        <el-form-item label="科目编码" prop="affected_account_code">
           <el-input v-model="form.affected_account_code" />
         </el-form-item>
         <el-form-item label="科目名称">
           <el-input v-model="form.affected_account_name" />
         </el-form-item>
-        <el-form-item label="错报金额">
+        <el-form-item label="错报金额" prop="misstatement_amount">
           <el-input-number v-model="form.misstatement_amount" :precision="2" :controls="false" style="width: 100%" />
         </el-form-item>
         <el-form-item label="管理层原因">
@@ -176,10 +205,12 @@
           <el-input v-model="form.auditor_evaluation" type="textarea" :rows="2" placeholder="审计师对管理层原因的评价" />
         </el-form-item>
       </el-form>
+
       <template #footer>
         <el-button @click="formVisible = false">取消</el-button>
-        <el-button type="primary" @click="onSubmit" :loading="submitLoading"
-          :disabled="!form.misstatement_description || !form.misstatement_amount">
+        <el-button type="primary" @click="onSubmit" :loading="missSubmitting || submitLoading"
+          :disabled="!canEdit"
+          :title="!canEdit ? '项目已归档，无法编辑' : ''">
           {{ isEditing ? '保存' : '创建' }}
         </el-button>
       </template>
@@ -214,10 +245,22 @@ import { fmtAmount } from '@/utils/formatters'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import { useAuditContext } from '@/composables/useAuditContext'
+import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
+import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
+
+import ConflictBanner from '@/components/conflict/ConflictBanner.vue'
+import ConflictResolutionPanel from '@/components/conflict/ConflictResolutionPanel.vue'
+import StatusMachinePanel from '@/components/status_machine/StatusMachinePanel.vue'
+
+import { rules, makeRules } from '@/utils/formRules'
+import { useFormSubmit } from '@/composables/useFormSubmit'
+import type { FormInstance, FormRules } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
 const penetrate = usePenetrate()
+const { canEdit, onContextChange } = useAuditContext()
 const { isFullscreen, toggleFullscreen } = useFullscreen()
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
 
@@ -261,6 +304,19 @@ const {
   onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
 } = useProjectSelector('misstatements')
 
+// 跨模块冲突调解（spec global-refinement-v3 Task 7.5）
+const conflictPanelVisible = ref(false)
+function onConflictResolved(_id: string, _resolution: string) {
+  // 调解后 banner 自动从列表移除；此处保留 hook 供后续扩展（如局部 reload）
+}
+
+// V3 Req 10.4: 可解释状态机
+const smPanelRef = ref<InstanceType<typeof StatusMachinePanel> | null>(null)
+const selectedMsId = ref('')
+function openStatusMachine() {
+  smPanelRef.value?.open()
+}
+
 // Spec A R1：跨视图 stale 摘要（misstatements 模块）
 const { misstatements: missStaleSummary } = useStaleSummaryFull(projectId, year)
 const staleMissIdSet = computed(() => new Set(missStaleSummary.value.items.map((it: any) => it.id)))
@@ -269,6 +325,15 @@ const loading = ref(false)
 const submitLoading = ref(false)
 const items = ref<MisstatementItem[]>([])
 const summary = ref<MisstatementSummaryData | null>(null)
+
+// ─── 分页 ─────────────────────────────────────────────────────────────────────
+const msPage = ref(1)
+const msPageSize = ref(50)
+const msTotal = computed(() => items.value.length)
+const pagedItems = computed(() => {
+  const start = (msPage.value - 1) * msPageSize.value
+  return items.value.slice(start, start + msPageSize.value)
+})
 
 // R7 技术债 5：粘贴入库
 const msTableRef = ref<HTMLElement | null>(null)
@@ -308,6 +373,29 @@ const form = ref({
   management_reason: '',
   auditor_evaluation: '',
 })
+
+// V3 Req 3.3：表单校验 + 统一提交拦截
+const missFormRef = ref<FormInstance>()
+const missFormRules: FormRules = {
+  misstatement_type: [rules.required('错报类型', 'change')],
+  misstatement_description: makeRules('错报描述'),
+  affected_account_code: [rules.required('科目编码'), rules.accountCode],
+  misstatement_amount: [
+    { required: true, message: '错报金额不能为空', trigger: 'blur' },
+    {
+      validator: (_rule: unknown, value: number | string | null | undefined, callback: (err?: Error) => void) => {
+        const num = typeof value === 'number' ? value : parseFloat(String(value ?? ''))
+        if (!Number.isFinite(num) || num === 0) {
+          callback(new Error('错报金额必须为非零数值'))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+}
+const { submit: submitMissForm, submitting: missSubmitting } = useFormSubmit(missFormRef)
 
 const fmtAmt = fmtAmount
 
@@ -367,25 +455,27 @@ function openEditDialog(row: MisstatementItem) {
 }
 
 async function onSubmit() {
-  submitLoading.value = true
-  try {
-    const body = {
-      ...form.value,
-      misstatement_amount: String(form.value.misstatement_amount),
+  await submitMissForm(async () => {
+    submitLoading.value = true
+    try {
+      const body = {
+        ...form.value,
+        misstatement_amount: String(form.value.misstatement_amount),
+      }
+      if (isEditing.value) {
+        await updateMisstatement(projectId.value, editingId.value, body)
+        ElMessage.success('保存成功')
+      } else {
+        await createMisstatement(projectId.value, { ...body, year: year.value })
+        ElMessage.success('创建成功')
+      }
+      formVisible.value = false
+      fetchItems()
+      fetchSummary()
+    } finally {
+      submitLoading.value = false
     }
-    if (isEditing.value) {
-      await updateMisstatement(projectId.value, editingId.value, body)
-      ElMessage.success('保存成功')
-    } else {
-      await createMisstatement(projectId.value, { ...body, year: year.value })
-      ElMessage.success('创建成功')
-    }
-    formVisible.value = false
-    fetchItems()
-    fetchSummary()
-  } finally {
-    submitLoading.value = false
-  }
+  })
 }
 
 async function onDelete(row: MisstatementItem) {
@@ -403,6 +493,12 @@ onMounted(() => {
   loadProjectOptions()
   // R8-S2-13：订阅重要性变更事件，自动刷新阈值和列表
   eventBus.on('materiality:changed', onMaterialityChanged)
+})
+
+// V3 Req 5.1：上下文（projectId/year）变化时自动重载
+onContextChange(() => {
+  fetchItems()
+  fetchSummary()
 })
 
 onUnmounted(() => {

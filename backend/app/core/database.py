@@ -71,12 +71,14 @@ async def set_rls_context(session: AsyncSession, project_id: UUID | str) -> None
     project_id : UUID | str
         项目 ID，将设置为 app.current_project_id session 变量
     """
+    # SQLite 测试 dialect 没有 set_config 函数，直接跳过（生产 PG 路径不受影响）
+    bind = session.get_bind()
+    if bind is not None and bind.dialect.name == "sqlite":
+        return
     await session.execute(
         text("SELECT set_config('app.current_project_id', :pid, true)"),
         {"pid": str(project_id)},
     )
-
-
 async def dispose_engine() -> None:
     """优雅关闭连接池，在应用关闭时调用。"""
     await engine.dispose()

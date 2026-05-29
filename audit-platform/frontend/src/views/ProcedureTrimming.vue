@@ -234,6 +234,7 @@ import {
   getProcedures, updateProcedureTrim, initProcedures,
   addCustomProcedure, applyProcedureScheme, listProjects,
 } from '@/services/commonApi'
+import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()

@@ -33,7 +33,7 @@ vi.mock('vue-router', () => ({
 }))
 
 // Mock apiProxy
-const mockApiPost = vi.fn(() => Promise.resolve({ rows_synced: 5 }))
+const mockApiPost = vi.fn((..._args: any[]) => Promise.resolve({ rows_synced: 5 }))
 vi.mock('@/services/apiProxy', () => ({
   api: {
     post: (...args: any[]) => mockApiPost(...args),
@@ -41,7 +41,7 @@ vi.mock('@/services/apiProxy', () => ({
 }))
 
 // Mock element-plus ElMessageBox + ElMessage
-const mockConfirm = vi.fn(() => Promise.resolve('confirm'))
+const mockConfirm = vi.fn((..._args: any[]) => Promise.resolve('confirm'))
 const mockMessageSuccess = vi.fn()
 const mockMessageError = vi.fn()
 const mockMessageWarning = vi.fn()

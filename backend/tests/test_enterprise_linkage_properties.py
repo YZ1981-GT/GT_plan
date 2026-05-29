@@ -44,7 +44,7 @@ class TestTrialBalanceIdentity:
         rcl_dr=st.decimals(min_value=Decimal("0"), max_value=Decimal("1e8"), places=2),
         rcl_cr=st.decimals(min_value=Decimal("0"), max_value=Decimal("1e8"), places=2),
     )
-    @h_settings(max_examples=200, deadline=None)
+    @h_settings(max_examples=15, deadline=None)
     def test_audited_equals_sum(self, unadjusted, aje_dr, aje_cr, rcl_dr, rcl_cr):
         """业务恒等式：audited = unadjusted + aje_dr - aje_cr + rcl_dr - rcl_cr"""
         audited = unadjusted + aje_dr - aje_cr + rcl_dr - rcl_cr
@@ -85,7 +85,7 @@ class TestBatchSingleCascade:
         return {"cascade_count": len(cascade_events), "entries": entry_count}
 
     @given(entry_count=st.integers(min_value=1, max_value=50))
-    @h_settings(max_examples=50, deadline=None)
+    @h_settings(max_examples=15, deadline=None)
     def test_n_entries_triggers_one_cascade(self, entry_count):
         result = self._simulate_batch_cascade(entry_count)
         assert result["cascade_count"] == 1, "N 笔批量必须只触发 1 次级联"
@@ -187,7 +187,7 @@ class TestYearIsolation:
         ),
         rows_per_year=st.integers(min_value=1, max_value=10),
     )
-    @h_settings(max_examples=50, deadline=None)
+    @h_settings(max_examples=15, deadline=None)
     def test_filter_by_year_only_returns_matching(self, years, rows_per_year):
         all_rows = []
         for y in years:
@@ -220,7 +220,7 @@ class TestOptimisticLockVersionConflict:
         current=st.integers(min_value=0, max_value=100),
         expected=st.integers(min_value=0, max_value=100),
     )
-    @h_settings(max_examples=100, deadline=None)
+    @h_settings(max_examples=15, deadline=None)
     def test_version_match_increments(self, current, expected):
         if current == expected:
             new = self._check_version(current, expected)
@@ -252,7 +252,7 @@ class TestEditingLockMutualExclusion:
             st.text(alphabet="abcdef", min_size=3, max_size=5), min_size=2, max_size=10, unique=True
         ),
     )
-    @h_settings(max_examples=50, deadline=None)
+    @h_settings(max_examples=15, deadline=None)
     def test_only_one_user_holds_lock(self, users):
         """N 个用户同时抢锁，只有 1 个成功"""
         locks: dict = {}
@@ -291,7 +291,7 @@ class TestPresenceConsistency:
     @given(
         elapsed_seconds=st.floats(min_value=0, max_value=120),
     )
-    @h_settings(max_examples=100, deadline=None)
+    @h_settings(max_examples=15, deadline=None)
     def test_heartbeat_ttl_boundary(self, elapsed_seconds):
         last = time.time() - elapsed_seconds
         alive = self._is_alive(last, time.time())

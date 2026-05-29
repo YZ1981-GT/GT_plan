@@ -4,9 +4,7 @@
       <el-button text @click="$emit('back')">← 返回</el-button>
       <span class="gt-editor-code" v-if="wpCode">{{ wpCode }}</span>
       <span class="gt-editor-name" v-if="wpName">{{ wpName }}</span>
-      <el-tag v-if="status" :type="statusTagType(status) || undefined" size="small">
-        {{ statusLabel(status) }}
-      </el-tag>
+      <GtStatusTag v-if="status" dict-key="wp_status" :value="status" />
       <el-tag :type="componentTypeTag.type || undefined" size="small" style="margin-left: 4px">
         {{ componentTypeTag.label }}
       </el-tag>
@@ -26,6 +24,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import GtStatusTag from '@/components/common/GtStatusTag.vue'
 
 const props = defineProps<{
   wpCode?: string
@@ -57,23 +56,6 @@ const componentTypeTag = computed(() => {
   }
   return map[props.componentType || 'univer'] || map.univer
 })
-
-function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
-  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
-    not_started: 'info', in_progress: 'warning', draft: 'warning',
-    draft_complete: '', edit_complete: '', review_passed: 'success', archived: 'info',
-  }
-  return m[s] || 'info'
-}
-
-function statusLabel(s: string) {
-  const m: Record<string, string> = {
-    not_started: '未开始', in_progress: '编制中', draft: '草稿',
-    draft_complete: '初稿完成', edit_complete: '编辑完成',
-    review_passed: '复核通过', archived: '已归档',
-  }
-  return m[s] || s
-}
 </script>
 
 <style scoped>

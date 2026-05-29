@@ -107,8 +107,8 @@
 
     <!-- Reference copy dialog -->
     <el-dialog append-to-body v-model="showReferenceCopy" title="一键参照复制" width="400px">
-      <el-form label-width="100px">
-        <el-form-item label="源企业名称">
+      <el-form ref="refFormRef" :model="refForm" :rules="refRules" label-width="100px">
+        <el-form-item label="源企业名称" prop="sourceCompanyCode">
           <el-input v-model="sourceCompanyCode" placeholder="输入源企业客户名称" />
         </el-form-item>
       </el-form>
@@ -125,7 +125,7 @@
     </el-dialog>
 
     <el-dialog append-to-body v-model="showEditDialog" title="编辑报表行次映射" width="520px">
-      <el-form label-width="110px">
+      <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="110px">
         <el-form-item label="标准科目编码">
           <el-input v-model="editForm.standard_account_code" disabled />
         </el-form-item>
@@ -164,10 +164,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { confirmDelete } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
 import { reportLineMapping as P_rlm } from '@/services/apiPaths'
+import { rules } from '@/utils/formRules'
 
 const props = defineProps<{
   projectId: string
@@ -223,6 +225,18 @@ const editForm = ref<MappingEditForm>({
   parent_line_code: '',
   is_confirmed: false,
 })
+
+const refFormRef = ref<FormInstance>()
+const editFormRef = ref<FormInstance>()
+const refForm = computed(() => ({ sourceCompanyCode: sourceCompanyCode.value }))
+const refRules: FormRules = {
+  sourceCompanyCode: [rules.required('源企业名称')],
+}
+const editRules: FormRules = {
+  report_type: [{ required: true, message: '请选择报表类型', trigger: 'change' }],
+  report_line_code: [rules.required('行次编码')],
+  report_line_name: [rules.required('行次名称')],
+}
 
 // --- Computed ---
 

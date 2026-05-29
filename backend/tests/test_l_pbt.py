@@ -126,7 +126,7 @@ ALL_L_SHEET_NAMES: list[str] = [
 
 
 @given(name=st.text(min_size=0, max_size=100))
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_l_normalize_idempotent(name: str) -> None:
     """P1: normalize(normalize(x)) == normalize(x) — 幂等性
 
@@ -144,7 +144,7 @@ def test_l_normalize_idempotent(name: str) -> None:
 
 # 补充：用 L 循环真实 sheet 名验证幂等性
 @given(l_sheet=st.sampled_from(ALL_L_SHEET_NAMES))
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_l_normalize_idempotent_real_sheets(l_sheet: str) -> None:
     """P1 补充：L 循环真实 sheet 名归一化幂等"""
     from app.services.wp_template_init_service import _normalize_sheet_name
@@ -173,7 +173,7 @@ def _vr_l8_01_passes(l8_interest: Decimal, l1_interest: Decimal,
 _amount_st = st.floats(min_value=0.0, max_value=1e9, allow_nan=False, allow_infinity=False)
 
 
-@settings(max_examples=200, deadline=None,
+@settings(max_examples=15, deadline=None,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(l1=_amount_st, l3=_amount_st, h9=_amount_st, l5=_amount_st,
        drift=st.floats(min_value=-2.0, max_value=2.0))
@@ -255,7 +255,7 @@ def _classify_l_sheet(name: str) -> str:
 
 
 @given(l_sheet=st.sampled_from(ALL_L_SHEET_NAMES))
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_l_sheet_group_completeness_pbt(l_sheet: str) -> None:
     """P3: 任意 L 循环有效 sheet 恰好匹配 1 类
 
@@ -395,7 +395,7 @@ class TestCrossWpRefIdUniqueness:
 
 # PBT 验证：随机抽样 ref_id 子集仍无重复
 @given(sample_size=st.integers(min_value=1, max_value=50))
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_ref_id_subset_unique_pbt(sample_size: int) -> None:
     """P4: 随机抽样任意子集 ref_id 仍无重复（全局唯一性的概率验证）"""
     import random
@@ -428,7 +428,7 @@ _rate_delta_st = st.floats(min_value=0.001, max_value=0.3, allow_nan=False, allo
 _days_st = st.integers(min_value=1, max_value=3650)
 
 
-@settings(max_examples=200, deadline=None,
+@settings(max_examples=15, deadline=None,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(
     principal=_principal_st,

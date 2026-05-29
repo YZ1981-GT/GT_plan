@@ -10,8 +10,8 @@
     <div class="password-confirm-content">
       <p class="hint-text">请输入您的登录密码以确认此操作</p>
 
-      <el-form @submit.prevent="handleSubmit">
-        <el-form-item :error="errorMessage">
+      <el-form :model="formModel" :rules="formRules" @submit.prevent="handleSubmit">
+        <el-form-item :error="errorMessage" prop="password">
           <el-input
             ref="passwordInputRef"
             v-model="password"
@@ -60,8 +60,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, computed } from 'vue'
+import type { FormRules } from 'element-plus'
 import http from '@/utils/http'
+import { rules } from '@/utils/formRules'
 
 const props = withDefaults(defineProps<{
   visible: boolean
@@ -83,6 +85,12 @@ const attemptsRemaining = ref<number | null>(null)
 const locked = ref(false)
 const lockRemainingText = ref('')
 const passwordInputRef = ref<any>(null)
+
+// 表单校验规则（el-form-must-have-rules ESLint 卡点）
+const formModel = computed(() => ({ password: password.value }))
+const formRules: FormRules = {
+  password: [rules.required('密码')],
+}
 
 // 打开时聚焦密码输入框
 watch(() => props.visible, (val) => {

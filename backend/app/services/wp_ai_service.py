@@ -2,12 +2,16 @@
 
 Phase 9 Task 9.8: 分析性复核 + 函证对象提取 + 审定表核对
 R3 Sprint 4 Task 21: AI 内容统一结构化
+V3 Req 6 Task 6.2: wrap_ai_output_with_log 强制溯源
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import uuid as _uuid
 from datetime import datetime
+from datetime import timezone as _tz
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
@@ -76,9 +80,6 @@ def wrap_ai_output(
     Returns:
         统一结构化 dict，含确认状态字段
     """
-    import uuid as _uuid
-    from datetime import timezone as _tz
-
     if source_model is None:
         try:
             from app.core.config import settings
@@ -101,6 +102,147 @@ def wrap_ai_output(
         "confirm_action": None,
         "revised_content": None,
     }
+
+
+async def wrap_ai_output_with_log(
+    *,
+    content: str,
+    confidence: float = 0.0,
+    source_model: str | None = None,
+    target_cell: str | None = None,
+    target_field: str | None = None,
+    source_prompt_version: str | None = None,
+    prompt_hash: str | None = None,
+    prompt_text: str | None = None,
+    # ── V3 Req 6 强制溯源参数（齐全时写 ai_content_log）─────────────
+    db: AsyncSession | None = None,
+    project_id: UUID | None = None,
+    user_id: UUID | None = None,
+    instance_type: str | None = None,
+    instance_id: UUID | None = None,
+    wp_id: UUID | None = None,
+) -> dict:
+    """异步包装 AI 输出（V3 Req 6 Task 6.2 强制溯源版本）。
+
+    与同步 wrap_ai_output 的关键差异：
+    1. **强制写日志**：当 db / project_id / user_id / instance_type / instance_id
+       五个参数齐全时，调用 ai_content_log_service.create() 写入
+       ai_content_log 表（pending 状态）+ 写入审计日志。
+    2. **新增 hash 字段**：返回 dict 含 content_hash（sha256），以及
+       prompt_hash（若调用方提供 prompt_text 则自动计算）。
+    3. **写表后字段**：成功写表时返回 dict 中追加
+       ai_content_log_id（UUID 字符串）+ confirm_action='pending'。
+
+    向后兼容：当上述 5 参数任一缺失时，跳过 DB 写入，返回基础 dict
+    （结构与同步 wrap_ai_output 一致 + content_hash + prompt_hash），
+    既有调用点（wp_llm_prompts.py 4 处 + WpAIService 内部 5 处）
+    无需立即改造。
+
+    参数:
+        content: AI 生成文本
+        confidence: 置信度 [0.0, 1.0]
+        source_model: 模型标识，None=从 settings.DEFAULT_CHAT_MODEL 读取
+        target_cell: 目标单元格引用（如 "E5"）
+        target_field: 目标字段名（如 "conclusion"）
+        source_prompt_version: 提示词版本号
+        prompt_hash: 提示词 SHA-256 哈希（若与 prompt_text 同时提供，
+            优先使用 prompt_hash）
+        prompt_text: 提示词原文，若提供且 prompt_hash 为 None 则自动计算
+        db: 异步数据库会话（强制写日志的 5 必备参数之一）
+        project_id: 项目 UUID
+        user_id: 触发生成的用户 UUID
+        instance_type: 'workpaper' / 'adjustment' / 'misstatement' /
+            'disclosure' / 'risk_assessment' 等
+        instance_id: 业务实例 UUID
+        wp_id: 关联底稿 UUID（可选，仅 instance_type='workpaper' 时建议填）
+
+    返回:
+        统一结构化 dict，含：
+        - id / type / source_model / source_prompt_version
+        - generated_at / confidence / content
+        - target_cell / target_field
+        - confirmed_by / confirmed_at / confirm_action / revised_content
+        - prompt_hash / content_hash（V3 Req 6 新增）
+        - 写表成功时还包含：ai_content_log_id（覆盖 id）+
+          confirm_action='pending'
+
+    Validates: Requirements 6.2 (强制写 ai_content_log + 返回 id /
+        generated_at / confirm_action)
+    """
+    # ── 1. 默认 source_model 从 settings 读取（与同步版本一致） ──
+    if source_model is None:
+        try:
+            from app.core.config import settings
+            source_model = getattr(settings, "DEFAULT_CHAT_MODEL", "Qwen3.5-27B")
+        except Exception:
+            source_model = "Qwen3.5-27B"
+
+    # ── 2. 计算 content_hash（始终）+ prompt_hash（如有 prompt_text）──
+    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    if prompt_hash is None and prompt_text is not None:
+        prompt_hash = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
+
+    # ── 3. 基础 dict（无论是否写表都返回此结构）───────────────────
+    generated_at_iso = datetime.now(_tz.utc).isoformat()
+    base_dict: dict = {
+        "id": str(_uuid.uuid4()),
+        "type": "ai_generated",
+        "source_model": source_model,
+        "source_prompt_version": source_prompt_version,
+        "generated_at": generated_at_iso,
+        "confidence": confidence,
+        "content": content,
+        "target_cell": target_cell,
+        "target_field": target_field,
+        "confirmed_by": None,
+        "confirmed_at": None,
+        "confirm_action": None,
+        "revised_content": None,
+        # V3 Req 6 新增字段
+        "prompt_hash": prompt_hash,
+        "content_hash": content_hash,
+    }
+
+    # ── 4. 强制写日志：5 参齐全才写 ───────────────────────────────
+    write_log_args = {
+        "db": db,
+        "project_id": project_id,
+        "user_id": user_id,
+        "instance_type": instance_type,
+        "instance_id": instance_id,
+    }
+    if all(v is not None for v in write_log_args.values()):
+        # 局部导入避免循环依赖（ai_content_log_service 不依赖 wp_ai_service，
+        # 但此处显式 import 仅在需要时加载）
+        from app.services import ai_content_log_service
+
+        try:
+            ai_log = await ai_content_log_service.create(
+                db=db,
+                project_id=project_id,
+                user_id=user_id,
+                instance_type=instance_type,
+                instance_id=instance_id,
+                target_cell=target_cell,
+                model=source_model,
+                prompt_hash=prompt_hash,
+                content_hash=content_hash,
+                generated_content=content,
+                confidence=confidence,
+                wp_id=wp_id,
+            )
+            # 用 DB 实际写入的 id 覆盖临时 id（保持外部引用一致性）
+            base_dict["ai_content_log_id"] = str(ai_log.id)
+            base_dict["confirm_action"] = "pending"
+        except Exception as e:
+            # 写表失败不应中断 AI 输出返回；记日志便于排查
+            logger.warning(
+                "wrap_ai_output_with_log: ai_content_log.create failed: %s "
+                "(project_id=%s, instance_type=%s, instance_id=%s)",
+                e, project_id, instance_type, instance_id,
+            )
+
+    return base_dict
 
 
 class WpAIService:

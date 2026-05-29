@@ -160,6 +160,7 @@ import { api } from '@/services/apiProxy'
 import { reportLineMapping } from '@/services/apiPaths'
 import { useProjectStore } from '@/stores/project'
 import { handleApiError } from '@/utils/errorHandler'
+import { confirmDelete } from '@/utils/confirm'
 
 const props = defineProps<{ modelValue: boolean; projectId: string; accountRows?: any[] }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: boolean): void }>()
@@ -478,6 +479,11 @@ async function onManualMap(row: any) {
 // ─── 删除 ───
 async function onDelete(row: any) {
   if (!row.id) return
+  try {
+    await confirmDelete(row.account_name ? `科目「${row.account_name}」的映射` : '该映射')
+  } catch {
+    return
+  }
   try {
     await api.delete(reportLineMapping.detail(props.projectId, row.id))
     mappings.value = mappings.value.filter(m => m.id !== row.id)

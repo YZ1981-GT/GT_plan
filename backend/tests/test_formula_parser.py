@@ -124,7 +124,13 @@ class TestParser:
 
 class TestEvaluator:
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        # 创建独立 event loop，避免 pytest-asyncio mode=auto 全局事件循环
+        # 在前面测试关闭/置空后导致 RuntimeError（测试间状态污染铁律）。
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
 
     def test_arithmetic(self):
         result = self._run(evaluate_formula("100 + 200 * 3", db=None, project_id=None, year=2024))

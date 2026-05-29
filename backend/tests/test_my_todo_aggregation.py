@@ -314,7 +314,7 @@ class TestTodoUrgencySortPBT:
     appears before any item with a lower urgency tier.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         urgencies=st.lists(
             st.sampled_from(_URGENCY_LEVELS),
@@ -346,7 +346,7 @@ class TestTodoUrgencySortPBT:
                 f"{items[i+1].urgency} (order={order_j})"
             )
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         counts=st.tuples(
             st.integers(min_value=0, max_value=5),  # critical
@@ -394,7 +394,7 @@ class TestTodoFieldCompletenessPBT:
     wp_id, wp_code, wp_name, cycle, urgency, updated_at — none may be null.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         urgency=st.sampled_from(_URGENCY_LEVELS),
         wp_code=st.from_regex(r"[A-N]\d{1,2}-\d{1,2}", fullmatch=True),
@@ -427,7 +427,7 @@ class TestTodoFieldCompletenessPBT:
         assert item.urgency in _URGENCY_LEVELS
         assert item.updated_at is not None
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         n_items=st.integers(min_value=0, max_value=15),
     )

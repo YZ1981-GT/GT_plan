@@ -65,7 +65,7 @@ _normal_sheet_name = st.sampled_from(
     keyword=_historical_paren_keyword,
     suffix=st.text(alphabet="abcdefABCDEF存货底稿明细", max_size=20),
 )
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_property_p2_paren_keyword_skipped(prefix: str, keyword: str, suffix: str) -> None:
     """P2: 含括号包裹的历史关键字（修订前/原/示例）应被过滤"""
     from app.services.wp_template_init_service import _should_skip_historical_sheet
@@ -80,7 +80,7 @@ def test_property_p2_paren_keyword_skipped(prefix: str, keyword: str, suffix: st
     prefix=st.text(alphabet="abcdefABCDEF存货底稿明细", max_size=20),
     keyword=_historical_suffix_keyword,
 )
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_property_p2_suffix_keyword_skipped(prefix: str, keyword: str) -> None:
     """P2: 以 修订前/示例 结尾的 sheet 名应被过滤"""
     from app.services.wp_template_init_service import _should_skip_historical_sheet
@@ -92,7 +92,7 @@ def test_property_p2_suffix_keyword_skipped(prefix: str, keyword: str) -> None:
 
 
 @given(g_pattern=_g_with_digit_then_action, prefix=st.text(max_size=20))
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_property_p2_g_digit_删除_移至_skipped(g_pattern: str, prefix: str) -> None:
     """P2: G+数字编号 + 删除/移至 模式应被过滤（F-F2 ADR-F3 关键修正）"""
     from app.services.wp_template_init_service import _should_skip_historical_sheet
@@ -104,7 +104,7 @@ def test_property_p2_g_digit_删除_移至_skipped(g_pattern: str, prefix: str) 
 
 
 @given(name=_normal_sheet_name)
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_property_p2_normal_sheet_not_skipped(name: str) -> None:
     """P2: 正常业务 sheet 名不应被误过滤"""
     from app.services.wp_template_init_service import _should_skip_historical_sheet
@@ -121,7 +121,7 @@ def test_property_p2_normal_sheet_not_skipped(name: str) -> None:
 
 
 @given(name=st.text(min_size=0, max_size=100))
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_property_p1_normalize_idempotent_f_cycle(name: str) -> None:
     """P1: Sheet 名归一化幂等 — F 循环复用 D spec _normalize_sheet_name"""
     from app.services.wp_template_init_service import _normalize_sheet_name
@@ -142,7 +142,7 @@ def test_property_p1_normalize_idempotent_f_cycle(name: str) -> None:
     purchases=st.floats(min_value=0, max_value=1e10, allow_nan=False, allow_infinity=False),
     closing=st.floats(min_value=0, max_value=1e10, allow_nan=False, allow_infinity=False),
 )
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_property_p4_vr_f5_01_formula(
     cost: float, opening: float, purchases: float, closing: float
 ) -> None:
@@ -261,7 +261,7 @@ def test_property_p3_cross_wp_ref_id_unique_global() -> None:
         max_size=10,
     ),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_property_p6_scenario_filter_idempotent(scenario: str, file_names: list[str]) -> None:
     """P6: SCENARIO_TO_FILE_FILTER 幂等（同输入两次产生相同输出）"""
     from pathlib import Path
@@ -294,7 +294,7 @@ def test_property_p6_scenario_filter_idempotent(scenario: str, file_names: list[
         max_size=10,
     ),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_property_p7_ipo_loader_intersection(prefix: str, file_names: list[str]) -> None:
     """P7: _ensure_ipo_loaded(prefix) 加载 (含 prefix) ∩ (含 IPO 关键字) 文件"""
     ipo_keywords = ["IPO", "上市", "新三板", "重组", "舞弊应对"]

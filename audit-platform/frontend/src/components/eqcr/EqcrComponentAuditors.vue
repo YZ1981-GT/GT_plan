@@ -51,18 +51,18 @@
 
     <!-- 意见录入弹窗 -->
     <el-dialog v-model="showOpinionDialog" title="录入 EQCR 意见" width="500px" append-to-body>
-      <el-form label-width="80px">
+      <el-form ref="opinionFormRef" :model="opinionForm" :rules="opinionRules" label-width="80px">
         <el-form-item label="审计师">
           <span>{{ selectedAuditor?.firm_name }} ({{ selectedAuditor?.company_code }})</span>
         </el-form-item>
-        <el-form-item label="结论">
+        <el-form-item label="结论" prop="verdict">
           <el-radio-group v-model="opinionForm.verdict">
             <el-radio value="agree">认可</el-radio>
             <el-radio value="disagree">有异议</el-radio>
             <el-radio value="need_more_evidence">需补充证据</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="说明">
+        <el-form-item label="说明" prop="comment">
           <el-input v-model="opinionForm.comment" type="textarea" :rows="3" placeholder="请说明复核意见..." />
         </el-form-item>
       </el-form>
@@ -76,9 +76,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import api from '@/services/apiProxy'
 import { eqcr as P_eqcr } from '@/services/apiPaths'
+import { rules } from '@/utils/formRules'
 
 const props = defineProps<{ projectId: string }>()
 
@@ -88,6 +90,10 @@ const auditors = ref<any[]>([])
 const showOpinionDialog = ref(false)
 const selectedAuditor = ref<any>(null)
 const opinionForm = ref({ verdict: 'agree', comment: '' })
+const opinionFormRef = ref<FormInstance>()
+const opinionRules: FormRules = {
+  verdict: [rules.required('结论', 'change')],
+}
 
 const VERDICT_LABELS: Record<string, string> = {
   agree: '认可',

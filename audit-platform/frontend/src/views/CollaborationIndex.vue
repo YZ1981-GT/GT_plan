@@ -14,7 +14,7 @@
             </el-card>
           </el-timeline-item>
         </el-timeline>
-        <el-empty v-if="!timeline.length" description="暂无时间线数据" />
+        <GtEmpty v-if="!timeline.length" preset="no-data" title="暂无时间线数据" />
       </el-tab-pane>
 
       <el-tab-pane label="工时管理" name="workhours">
@@ -36,7 +36,7 @@
             </template>
           </el-table-column>
         </el-table>
-        <el-empty v-if="!pbcList.length && !loading" description="暂无 PBC 清单" />
+        <GtEmpty v-if="!pbcList.length && !loading" preset="no-data" title="暂无 PBC 清单" />
       </el-tab-pane>
 
       <el-tab-pane label="函证管理" name="confirmations">
@@ -52,7 +52,7 @@
             </template>
           </el-table-column>
         </el-table>
-        <el-empty v-if="!confirmations.length && !loading" description="暂无函证数据" />
+        <GtEmpty v-if="!confirmations.length && !loading" preset="no-data" title="暂无函证数据" />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -63,6 +63,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { pbc as P_pbc, confirmations as P_conf } from '@/services/apiPaths'
+import GtEmpty from '@/components/common/GtEmpty.vue'
 
 const route = useRoute()
 const activeTab = ref('timeline')

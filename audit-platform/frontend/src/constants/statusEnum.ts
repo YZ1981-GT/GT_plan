@@ -218,3 +218,154 @@ export type AnnotationStatus = typeof ANNOTATION_STATUS[keyof typeof ANNOTATION_
 export type IndependenceStatus = typeof INDEPENDENCE_STATUS[keyof typeof INDEPENDENCE_STATUS]
 export type IssueSource = typeof ISSUE_SOURCE[keyof typeof ISSUE_SOURCE]
 export type ProcedureExecutionStatus = typeof PROCEDURE_EXECUTION_STATUS[keyof typeof PROCEDURE_EXECUTION_STATUS]
+
+// ─── 中文 label 映射（Req 8.4.4 + Req 13 中文化前置） ───
+// 与后端 system_dicts._DICTS 保持一致，前端 dictStore 优先从后端加载，
+// 此处作为离线 fallback + 类型安全的单一真源。
+
+export interface StatusDictEntry {
+  label: string
+  color: 'success' | 'warning' | 'danger' | 'info' | 'primary' | ''
+}
+
+/** 底稿状态中文映射 */
+export const WP_STATUS_LABELS: Record<string, StatusDictEntry> = {
+  not_started:          { label: '未开始',       color: 'info' },
+  in_progress:          { label: '编制中',       color: 'warning' },
+  draft:                { label: '草稿',         color: 'warning' },
+  draft_complete:       { label: '初稿完成',     color: '' },
+  edit_complete:        { label: '编制完成',     color: '' },
+  pending_review:       { label: '待复核',       color: 'warning' },
+  under_review:         { label: '复核中',       color: '' },
+  revision_required:    { label: '退回修改',     color: 'danger' },
+  review_passed:        { label: '复核通过',     color: 'success' },
+  review_level1_passed: { label: '一级复核通过', color: 'success' },
+  review_level2_passed: { label: '二级复核通过', color: 'success' },
+  rejected:             { label: '已退回',       color: 'danger' },
+  archived:             { label: '已归档',       color: 'info' },
+}
+
+/** 底稿复核状态中文映射 */
+export const WP_REVIEW_STATUS_LABELS: Record<string, StatusDictEntry> = {
+  not_submitted:      { label: '未提交',     color: 'info' },
+  pending_level1:     { label: '待一级复核', color: 'warning' },
+  level1_in_progress: { label: '一级复核中', color: 'warning' },
+  level1_passed:      { label: '一级通过',   color: 'success' },
+  level1_rejected:    { label: '一级退回',   color: 'danger' },
+  pending_level2:     { label: '待二级复核', color: 'warning' },
+  level2_in_progress: { label: '二级复核中', color: 'warning' },
+  level2_passed:      { label: '二级通过',   color: 'success' },
+  level2_rejected:    { label: '二级退回',   color: 'danger' },
+}
+
+/** 调整分录状态中文映射 */
+export const ADJUSTMENT_STATUS_LABELS: Record<string, StatusDictEntry> = {
+  draft:          { label: '草稿',   color: 'info' },
+  pending_review: { label: '待复核', color: 'warning' },
+  approved:       { label: '已批准', color: 'success' },
+  rejected:       { label: '已驳回', color: 'danger' },
+}
+
+/** 报告状态中文映射 */
+export const REPORT_STATUS_LABELS: Record<string, StatusDictEntry> = {
+  draft:         { label: '草稿',      color: 'info' },
+  review:        { label: '复核中',    color: 'warning' },
+  eqcr_approved: { label: 'EQCR已锁', color: '' },
+  final:         { label: '已定稿',    color: 'success' },
+}
+
+/** 项目状态中文映射 */
+export const PROJECT_STATUS_LABELS: Record<string, StatusDictEntry> = {
+  created:    { label: '已创建', color: 'info' },
+  planning:   { label: '计划中', color: 'warning' },
+  execution:  { label: '执行中', color: '' },
+  completion: { label: '已完成', color: 'success' },
+  reporting:  { label: '报告',   color: '' },
+  archived:   { label: '已归档', color: 'info' },
+}
+
+/** 问题工单状态中文映射 */
+export const ISSUE_STATUS_LABELS: Record<string, StatusDictEntry> = {
+  open:            { label: '待处理', color: 'info' },
+  in_fix:          { label: '修复中', color: 'warning' },
+  pending_recheck: { label: '待复验', color: 'warning' },
+  closed:          { label: '已关闭', color: 'success' },
+  rejected:        { label: '已驳回', color: 'danger' },
+}
+
+/** 模板状态中文映射 */
+export const TEMPLATE_STATUS_LABELS: Record<string, StatusDictEntry> = {
+  draft:      { label: '草稿',   color: 'info' },
+  published:  { label: '已发布', color: 'success' },
+  deprecated: { label: '已废弃', color: 'danger' },
+}
+
+/** 工时状态中文映射 */
+export const WORKHOUR_STATUS_LABELS: Record<string, StatusDictEntry> = {
+  draft:     { label: '草稿',   color: 'info' },
+  tracking:  { label: '计时中', color: 'warning' },
+  confirmed: { label: '已确认', color: '' },
+  approved:  { label: '已审批', color: 'success' },
+  rejected:  { label: '已退回', color: 'danger' },
+}
+
+/** PDF 导出任务状态中文映射 */
+export const PDF_TASK_STATUS_LABELS: Record<string, StatusDictEntry> = {
+  queued:     { label: '排队中', color: 'info' },
+  processing: { label: '处理中', color: 'warning' },
+  completed:  { label: '已完成', color: 'success' },
+  failed:     { label: '失败',   color: 'danger' },
+}
+
+/** 审计程序执行状态中文映射 */
+export const PROCEDURE_STATUS_LABELS: Record<string, StatusDictEntry> = {
+  pending:        { label: '未开始',   color: 'info' },
+  in_progress:    { label: '进行中',   color: 'warning' },
+  completed:      { label: '已完成',   color: 'success' },
+  reviewed:       { label: '已复核',   color: 'success' },
+  not_applicable: { label: '不适用',   color: '' },
+  skip:           { label: '跳过',     color: '' },
+}
+
+/**
+ * 全局状态字典聚合（与后端 /api/system/dicts 结构对齐）
+ * dictStore 加载失败时可作为 fallback
+ */
+export const STATUS_DICT: Record<string, Record<string, StatusDictEntry>> = {
+  wp_status: WP_STATUS_LABELS,
+  wp_review_status: WP_REVIEW_STATUS_LABELS,
+  adjustment_status: ADJUSTMENT_STATUS_LABELS,
+  report_status: REPORT_STATUS_LABELS,
+  project_status: PROJECT_STATUS_LABELS,
+  issue_status: ISSUE_STATUS_LABELS,
+  template_status: TEMPLATE_STATUS_LABELS,
+  workhour_status: WORKHOUR_STATUS_LABELS,
+  pdf_task_status: PDF_TASK_STATUS_LABELS,
+  procedure_status: PROCEDURE_STATUS_LABELS,
+}
+
+/**
+ * 通用 label 查询函数（dictStore 离线 fallback）
+ * @param dictKey 字典键（如 'wp_status'）
+ * @param value 状态值（如 'draft'）
+ * @returns 中文 label，未找到时返回原值
+ */
+export function getStatusLabel(dictKey: string, value: string | null | undefined): string {
+  if (!value) return '—'
+  const dict = STATUS_DICT[dictKey]
+  if (!dict) return value
+  return dict[value]?.label ?? value
+}
+
+/**
+ * 通用 color 查询函数（dictStore 离线 fallback）
+ * @param dictKey 字典键
+ * @param value 状态值
+ * @returns el-tag type 值
+ */
+export function getStatusColor(dictKey: string, value: string | null | undefined): StatusDictEntry['color'] {
+  if (!value) return 'info'
+  const dict = STATUS_DICT[dictKey]
+  if (!dict) return 'info'
+  return dict[value]?.color ?? 'info'
+}

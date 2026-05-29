@@ -6,6 +6,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface WorkpaperItem {
   id: string
@@ -36,8 +37,8 @@ async function batchPrefill() {
     const res = data as any
     resultData.value = { total: res.total, success: res.success, failed: res.failed, details: res.results }
     resultVisible.value = true
-  } catch {
-    ElMessage.error('批量预填充失败')
+  } catch (e: any) {
+    handleApiError(e, '批量预填充')
   } finally {
     operating.value = false
     progressPercent.value = 100
@@ -52,8 +53,8 @@ async function batchExport() {
     const url = `/api/projects/${props.projectId}/workpapers/batch-export`
     ElMessage.info('正在生成导出文件...')
     // In real implementation, use blob download
-  } catch {
-    ElMessage.error('批量导出失败')
+  } catch (e: any) {
+    handleApiError(e, '批量导出')
   } finally {
     operating.value = false
   }
@@ -73,8 +74,8 @@ async function batchSubmit() {
     const res = data as any
     resultData.value = { total: res.total, success: res.submitted, failed: res.skipped, details: res.skipped_reasons }
     resultVisible.value = true
-  } catch {
-    ElMessage.error('批量提交失败')
+  } catch (e: any) {
+    handleApiError(e, '批量提交')
   } finally {
     operating.value = false
   }

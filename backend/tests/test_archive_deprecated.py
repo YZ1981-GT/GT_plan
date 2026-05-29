@@ -103,6 +103,8 @@ async def client(db_session: AsyncSession) -> AsyncClient:
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
 
+    app.dependency_overrides.clear()
+
 
 # ── 场景 1：旧端点 Deprecation 头存在且值为 version="R6" ──────────────
 

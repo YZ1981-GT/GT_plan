@@ -15,7 +15,7 @@
             {{ c.status === 'open' ? '待处理' : c.status === 'resolved' ? '已解决' : '已驳回' }}
           </el-tag>
         </div>
-        <el-empty v-if="!conflicts.length" description="无冲突" />
+        <GtEmpty v-if="!conflicts.length" preset="no-data" title="无冲突" icon="✅" />
       </div>
 
       <!-- 中栏：冲突详情对比 -->
@@ -73,6 +73,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listConflicts, resolveConflict } from '@/services/governanceApi'
 import { handleApiError } from '@/utils/errorHandler'
+import GtEmpty from '@/components/common/GtEmpty.vue'
 
 const route = useRoute()
 const projectId = route.params.projectId as string

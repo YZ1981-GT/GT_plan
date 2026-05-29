@@ -408,6 +408,7 @@ import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
+import { confirmDelete, confirmDangerous } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
 import { reportConfig as P_rc, noteTemplates as P_nt, linkageBus } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
@@ -1668,6 +1669,14 @@ async function loadUserFormulas(wpId: string) {
 async function onRestorePresetFormula(row: UserFormulaItem) {
   if (!wpIdForUserFormulas.value) return
   try {
+    await confirmDangerous(
+      `确认将单元格 ${row.cell_key} 恢复为预设公式？当前自定义公式将被覆盖。`,
+      '恢复预设公式',
+    )
+  } catch {
+    return
+  }
+  try {
     await api.delete(`/api/workpapers/${wpIdForUserFormulas.value}/user-formulas/${encodeURIComponent(row.cell_key)}`)
     userFormulasList.value = userFormulasList.value.filter((u) => u.cell_key !== row.cell_key)
     ElMessage.success(`已恢复 ${row.cell_key} 的预设公式`)
@@ -1678,6 +1687,11 @@ async function onRestorePresetFormula(row: UserFormulaItem) {
 
 async function onDeleteUserFormula(row: UserFormulaItem) {
   if (!wpIdForUserFormulas.value) return
+  try {
+    await confirmDelete(`单元格 ${row.cell_key} 的自定义公式`)
+  } catch {
+    return
+  }
   try {
     await api.delete(`/api/workpapers/${wpIdForUserFormulas.value}/user-formulas/${encodeURIComponent(row.cell_key)}`)
     userFormulasList.value = userFormulasList.value.filter((u) => u.cell_key !== row.cell_key)

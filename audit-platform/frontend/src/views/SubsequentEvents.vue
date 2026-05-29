@@ -21,14 +21,14 @@
       <el-table-column prop="review_status" label="状态" width="100" />
     </el-table>
     <el-dialog append-to-body v-model="showCreate" title="新增后续事项" width="550px">
-      <el-form :model="form" label-width="90px">
-        <el-form-item label="事项类型">
+      <el-form ref="seFormRef" :model="form" :rules="seRules" label-width="90px">
+        <el-form-item label="事项类型" prop="event_type">
           <el-radio-group v-model="form.event_type">
             <el-radio value="adjusting">调整事项</el-radio>
             <el-radio value="non_adjusting">非调整事项</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="事项描述"><el-input v-model="form.event_description" type="textarea" :rows="3" /></el-form-item>
+        <el-form-item label="事项描述" prop="event_description"><el-input v-model="form.event_description" type="textarea" :rows="3" /></el-form-item>
         <el-form-item label="影响金额"><el-input-number v-model="form.impact_amount" :precision="2" style="width: 100%" /></el-form-item>
         <el-form-item label="处理方式">
           <el-select v-model="form.treatment" style="width: 100%">
@@ -48,9 +48,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { listSubsequentEvents, createSubsequentEvent } from '@/services/commonApi'
 import { useEditMode } from '@/composables/useEditMode'
+import { rules } from '@/utils/formRules'
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
 const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
@@ -59,6 +61,11 @@ const loading = ref(false)
 const showCreate = ref(false)
 const saving = ref(false)
 const form = ref({ event_type: 'adjusting', event_description: '', impact_amount: 0, treatment: 'adjusted' })
+const seFormRef = ref<FormInstance>()
+const seRules: FormRules = {
+  event_type: [rules.required('事项类型', 'change')],
+  event_description: [rules.required('事项描述')],
+}
 async function loadEvents() {
   loading.value = true
   try {

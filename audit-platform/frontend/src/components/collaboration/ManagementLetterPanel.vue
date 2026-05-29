@@ -77,15 +77,15 @@
 
     <!-- Add Item Dialog -->
     <el-dialog append-to-body v-model="showAddDialog" title="添加管理建议事项" width="650px">
-      <el-form :model="newItem" label-width="130px">
-        <el-form-item label="缺陷类型">
+      <el-form ref="newItemFormRef" :model="newItem" :rules="newItemRules" label-width="130px">
+        <el-form-item label="缺陷类型" prop="deficiency_type">
           <el-select v-model="newItem.deficiency_type">
             <el-option label="重大缺陷" value="material_weakness" />
             <el-option label="重要缺陷" value="significant_deficiency" />
             <el-option label="其他缺陷" value="other_deficiency" />
           </el-select>
         </el-form-item>
-        <el-form-item label="缺陷描述">
+        <el-form-item label="缺陷描述" prop="deficiency_description">
           <el-input v-model="newItem.deficiency_description" type="textarea" :rows="3" />
         </el-form-item>
         <el-form-item label="潜在影响">
@@ -115,7 +115,7 @@
 
     <!-- Update Follow-up Dialog -->
     <el-dialog append-to-body v-model="showFollowUpDialog" title="更新跟踪状态" width="500px">
-      <el-form label-width="120px">
+      <el-form ref="followUpFormRef" :model="followUpData" :rules="followUpRules" label-width="120px">
         <el-form-item label="当前状态">
           <el-tag :type="(followUpTag(selectedItem?.follow_up_status)) || undefined" size="small">
             {{ followUpLabel(selectedItem?.follow_up_status) }}
@@ -153,8 +153,8 @@
 
     <!-- Carry Forward Dialog -->
     <el-dialog append-to-body v-model="showCarryForwardDialog" title="上年事项结转" width="400px">
-      <el-form label-width="120px">
-        <el-form-item label="来源项目">
+      <el-form ref="cfFormRef" :model="cfForm" :rules="cfRules" label-width="120px">
+        <el-form-item label="来源项目" prop="sourceProjectId">
           <el-input v-model="sourceProjectId" placeholder="请输入上年项目ID" />
         </el-form-item>
         <el-alert
@@ -175,9 +175,11 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { managementLetterApi } from '@/services/collaborationApi'
+import { rules } from '@/utils/formRules'
 
 interface LetterItem {
   id: string
@@ -205,6 +207,21 @@ const showFollowUpDialog = ref(false)
 const showCarryForwardDialog = ref(false)
 const selectedItem = ref<LetterItem | null>(null)
 const sourceProjectId = ref('')
+const newItemFormRef = ref<FormInstance>()
+const followUpFormRef = ref<FormInstance>()
+const cfFormRef = ref<FormInstance>()
+
+const newItemRules: FormRules = {
+  deficiency_type: [rules.required('缺陷类型', 'change')],
+  deficiency_description: [rules.required('缺陷描述')],
+}
+const followUpRules: FormRules = {
+  follow_up_status: [rules.required('跟踪状态', 'change')],
+}
+const cfForm = computed(() => ({ sourceProjectId: sourceProjectId.value }))
+const cfRules: FormRules = {
+  sourceProjectId: [rules.required('来源项目')],
+}
 
 const newItem = ref({
   deficiency_type: 'significant_deficiency',

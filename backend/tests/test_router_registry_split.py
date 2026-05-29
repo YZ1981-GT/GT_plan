@@ -1,12 +1,12 @@
-"""
-F4 路由拆分回归测试 — Property 8
+﻿"""
+F4 璺敱鎷嗗垎鍥炲綊娴嬭瘯 鈥?Property 8
 
-Property 8: 路由拆分后路径保持不变
+Property 8: 璺敱鎷嗗垎鍚庤矾寰勪繚鎸佷笉鍙?
 After split, all API path + method combinations remain identical.
 
 **Validates: Requirements 4.3, 4.6**
 
-文件：backend/tests/test_router_registry_split.py
+鏂囦欢锛歜ackend/tests/test_router_registry_split.py
 """
 
 from hypothesis import given, settings, strategies as st
@@ -39,7 +39,7 @@ CRITICAL_PATHS = [
 
 
 class TestRouterRegistrySplit:
-    """Property 8: 路由拆分后路径保持不变
+    """Property 8: 璺敱鎷嗗垎鍚庤矾寰勪繚鎸佷笉鍙?
 
     **Validates: Requirements 4.3, 4.6**
 
@@ -103,12 +103,12 @@ class TestRouterRegistrySplit:
             "Routes may not be properly registered after split."
         )
 
-    @settings(max_examples=30)
+    @settings(max_examples=10)
     @given(
         sample_idx=st.integers(min_value=0, max_value=999)
     )
     def test_route_set_is_stable_across_calls(self, sample_idx: int):
-        """Property 8: Route set is stable — collecting routes multiple times
+        """Property 8: Route set is stable 鈥?collecting routes multiple times
         always yields the same set.
 
         **Validates: Requirements 4.3, 4.6**

@@ -23,11 +23,13 @@ const mockBack = vi.fn()
 vi.mock('vue-router', () => ({
   useRoute: () => ({
     params: { projectId: 'proj-test-001' },
+    query: {},
     fullPath: '/projects/proj-test-001/linkage-panorama',
   }),
   useRouter: () => ({
     push: mockPush,
     back: mockBack,
+    replace: vi.fn().mockReturnValue(Promise.resolve()),
   }),
 }))
 
@@ -55,6 +57,17 @@ vi.mock('@/components/panorama/SearchLocator.vue', () => ({
   default: { name: 'SearchLocator', template: '<div class="mock-search-locator" />' },
 }))
 
+// Stub Element Plus 组件，避免"Failed to resolve component" + onMounted 异常
+const STUBS = {
+  'el-icon': { template: '<i class="el-icon"><slot /></i>' },
+  'el-switch': { template: '<input type="checkbox" class="el-switch" />', props: ['modelValue'] },
+  'el-button': { template: '<button class="el-button"><slot /></button>' },
+  'el-empty': {
+    template: '<div class="el-empty" :data-description="description"><slot name="image" /><div class="el-empty__description">{{ description }}</div><slot /></div>',
+    props: ['description'],
+  },
+}
+
 import LinkagePanoramaView from '@/views/LinkagePanoramaView.vue'
 
 function fixtureGraphData() {
@@ -81,13 +94,13 @@ function fixtureGraphData() {
 describe('LinkagePanoramaView', () => {
   it('mount 渲染工具栏 + 标题', () => {
     mockGet.mockResolvedValue(fixtureGraphData())
-    const wrapper = mount(LinkagePanoramaView)
+    const wrapper = mount(LinkagePanoramaView, { global: { stubs: STUBS } })
     expect(wrapper.html()).toContain('联动全景图')
   })
 
   it('调用 graph-data API 并展示节点边数统计', async () => {
     mockGet.mockResolvedValue(fixtureGraphData())
-    const wrapper = mount(LinkagePanoramaView)
+    const wrapper = mount(LinkagePanoramaView, { global: { stubs: STUBS } })
     await flushPromises()
     expect(mockGet).toHaveBeenCalled()
     const calls = mockGet.mock.calls
@@ -98,7 +111,7 @@ describe('LinkagePanoramaView', () => {
 
   it('数据加载完成后渲染 ForceGraph 与 GraphLegend', async () => {
     mockGet.mockResolvedValue(fixtureGraphData())
-    const wrapper = mount(LinkagePanoramaView)
+    const wrapper = mount(LinkagePanoramaView, { global: { stubs: STUBS } })
     await flushPromises()
     expect(wrapper.find('.mock-force-graph').exists()).toBe(true)
     expect(wrapper.find('.mock-graph-legend').exists()).toBe(true)
@@ -106,14 +119,14 @@ describe('LinkagePanoramaView', () => {
 
   it('stale 数据时展示 stale 摘要 + 仅过期开关', async () => {
     mockGet.mockResolvedValue(fixtureGraphData())
-    const wrapper = mount(LinkagePanoramaView)
+    const wrapper = mount(LinkagePanoramaView, { global: { stubs: STUBS } })
     await flushPromises()
     expect(wrapper.html()).toContain('过期')
   })
 
   it('API 失败时展示错误占位', async () => {
     mockGet.mockRejectedValue(new Error('Network down'))
-    const wrapper = mount(LinkagePanoramaView)
+    const wrapper = mount(LinkagePanoramaView, { global: { stubs: STUBS } })
     await flushPromises()
     expect(wrapper.html()).toContain('加载失败')
   })
@@ -128,7 +141,7 @@ describe('LinkagePanoramaView', () => {
         severity_distribution: {}, cycle_distribution: {},
       },
     })
-    const wrapper = mount(LinkagePanoramaView)
+    const wrapper = mount(LinkagePanoramaView, { global: { stubs: STUBS } })
     await flushPromises()
     expect(wrapper.html()).toContain('无图数据')
   })

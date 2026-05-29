@@ -9,7 +9,7 @@
         :year-value="selectedYear"
         :badges="[
           { value: `AJE ${summary?.aje_count || 0} 笔 · RJE ${summary?.rje_count || 0} 笔` },
-          ...(currentTemplateType ? [{ value: currentTemplateType === 'soe' ? '📘 国企版' : '📗 上市版', type: currentTemplateType === 'soe' ? 'warning' : 'primary' }] : []),
+          ...(currentTemplateType ? [{ value: currentTemplateType === 'soe' ? '📘 国企版' : '📗 上市版', type: (currentTemplateType === 'soe' ? 'warning' : 'primary') as 'warning' | 'primary' }] : []),
         ]"
         @unit-change="onProjectChange"
         @year-change="onYearChange"
@@ -41,11 +41,11 @@
             </el-dropdown>
           </template>
           <template #left>
-            <el-button size="small" type="primary" v-permission="'adjustment:create'" @click="openCreateDialog">+ 新建分录</el-button>
+            <el-button size="small" type="primary" v-permission="'adjustment:create'" @click="openCreateDialog" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">+ 新建分录</el-button>
             <div class="gt-adj-batch-toggle">
               <el-switch v-model="batchMode" size="small" active-text="批量模式" inactive-text="" />
               <el-badge v-if="batchPendingCount > 0" :value="batchPendingCount" :max="99" class="gt-adj-batch-badge">
-                <el-button size="small" type="success" :loading="batchCommitting" @click="onBatchCommit">
+                <el-button size="small" type="success" :loading="batchCommitting" @click="onBatchCommit" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">
                   📦 批量提交
                 </el-button>
               </el-badge>
@@ -54,6 +54,29 @@
         </GtToolbar>
       </template>
     </GtPageHeader>
+
+    <!-- 归档横幅 -->
+    <ArchivedBanner />
+
+    <!-- AI 内容 pending 顶部 banner（spec global-refinement-v3 Task 6.4） -->
+    <AiContentPendingBanner :project-id="projectId" />
+
+    <!-- 跨模块冲突 banner（spec global-refinement-v3 Task 7.5） -->
+    <ConflictBanner :project-id="projectId" @view="conflictPanelVisible = true" />
+    <ConflictResolutionPanel
+      v-model="conflictPanelVisible"
+      :project-id="projectId"
+      @resolved="onConflictResolved"
+    />
+
+    <!-- V3 Req 9.6: 数字信任度面板 -->
+    <TrustScorePanel ref="trustScorePanelRef" :project-id="projectId" />
+
+    <!-- V3 Req 10.4: 可解释状态机面板 -->
+    <StatusMachinePanel ref="smPanelRef" module="adjustment" :instance-id="selectedAdjId" />
+
+    <!-- V3 Req 11.6: 时光机面板 -->
+    <TimeMachineDrawer ref="tmDrawerRef" module="adjustment" :instance-id="selectedAdjId" @restored="onTimeMachineRestored" />
 
     <!-- 在线成员 [enterprise-linkage 3.2] -->
     <PresenceAvatars :project-id="projectId" view-name="adjustments" />
@@ -120,7 +143,7 @@
     </el-alert>
     <GtEditableTable
       ref="adjTableRef"
-      :model-value="entries"
+      :model-value="pagedEntries"
       :columns="adjColumns"
       :editable="false"
       :show-selection="true"
@@ -245,12 +268,14 @@
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="openEditDialog(row)"
-              :disabled="row.review_status === ADJUSTMENT_STATUS.APPROVED || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW">
+              :disabled="!canEdit || row.review_status === ADJUSTMENT_STATUS.APPROVED || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW"
+              :title="!canEdit ? '项目已归档，无法编辑' : ''">
               编辑
             </el-button>
             <el-button size="small" type="danger" @click="onDelete(row)"
               v-permission="'adjustment:delete'"
-              :disabled="row.review_status === ADJUSTMENT_STATUS.APPROVED || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW">
+              :disabled="!canEdit || row.review_status === ADJUSTMENT_STATUS.APPROVED || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW"
+              :title="!canEdit ? '项目已归档，无法编辑' : ''">
               删除
             </el-button>
           </template>
@@ -265,8 +290,23 @@
         <div class="gt-ucell-ctx-item" @click="onCtxViewImpactScope(selectedCells)">
           <span class="gt-ucell-ctx-icon">🔎</span> 查看影响范围
         </div>
+        <div class="gt-ucell-ctx-item" @click="onCtxTrustScore(selectedCells)">
+          <span class="gt-ucell-ctx-icon">📋</span> 数字信任度
+        </div>
       </template>
     </GtEditableTable>
+
+    <!-- 分页 -->
+    <div class="gt-pagination" v-if="adjTotal > adjPageSize" style="margin-top: 12px; display: flex; justify-content: flex-end;">
+      <el-pagination
+        v-model:current-page="adjPage"
+        :page-size="adjPageSize"
+        :total="adjTotal"
+        layout="total, prev, pager, next"
+        background
+        small
+      />
+    </div>
 
     <!-- 批量复核操作 -->
     <div class="gt-adj-batch-actions" v-if="selectedRows.length > 0">
@@ -282,7 +322,7 @@
         <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-info)">提交后将一次性触发试算表重算</span>
         <span style="flex:1" />
         <el-button size="small" @click="batchMode = false; batchPendingCount = 0">取消全部</el-button>
-        <el-button size="small" type="success" :loading="batchCommitting" @click="onBatchCommit">
+        <el-button size="small" type="success" :loading="batchCommitting" @click="onBatchCommit" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">
           ✓ 提交全部 ({{ batchPendingCount }})
         </el-button>
       </div>
@@ -340,8 +380,8 @@
 
     <!-- 新建/编辑分录弹窗 -->
     <el-dialog append-to-body v-model="formDialogVisible" :title="isEditing ? '编辑分录' : '新建分录'" width="800px" destroy-on-close>
-      <el-form :model="form" label-width="90px">
-        <el-form-item label="类型" v-if="!isEditing">
+      <el-form ref="adjFormRef" :model="form" :rules="adjFormRules" label-width="90px">
+        <el-form-item label="类型" prop="adjustment_type" v-if="!isEditing">
           <el-radio-group v-model="form.adjustment_type">
             <el-radio value="aje">AJE</el-radio>
             <el-radio value="rje">RJE</el-radio>
@@ -363,7 +403,7 @@
             </el-option-group>
           </el-select>
         </el-form-item>
-        <el-form-item label="摘要">
+        <el-form-item label="摘要" prop="description">
           <el-input v-model="form.description" placeholder="调整说明" />
         </el-form-item>
 
@@ -418,7 +458,7 @@
       </el-form>
       <template #footer>
         <el-button @click="formDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="onSubmit" :disabled="balanceDiff !== 0" :loading="submitLoading">
+        <el-button type="primary" @click="onSubmit" :disabled="!canEdit || balanceDiff !== 0" :loading="adjSubmitting || submitLoading">
           {{ isEditing ? '保存' : '创建' }}
         </el-button>
       </template>
@@ -447,7 +487,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
@@ -487,10 +527,22 @@ import ImpactPreviewPanel from '@/components/ImpactPreviewPanel.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import { useImpactPreview } from '@/composables/useImpactPreview'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
+import { useAuditContext } from '@/composables/useAuditContext'
+import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
+import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
+import ConflictBanner from '@/components/conflict/ConflictBanner.vue'
+import ConflictResolutionPanel from '@/components/conflict/ConflictResolutionPanel.vue'
+import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
+import StatusMachinePanel from '@/components/status_machine/StatusMachinePanel.vue'
+import TimeMachineDrawer from '@/components/time_machine/TimeMachineDrawer.vue'
+import { rules, makeRules } from '@/utils/formRules'
+import { useFormSubmit } from '@/composables/useFormSubmit'
+import type { FormInstance, FormRules } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
 const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
+const { canEdit, onContextChange } = useAuditContext()
 const { isEditing: isPageEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 
 /** GtEditableTable 列配置 */
@@ -524,6 +576,12 @@ const projectOptions = computed(() => projectStore.projectOptions)
 const yearOptions = computed(() => projectStore.yearOptions)
 const selectedYear = ref(projectStore.year)
 
+// 跨模块冲突调解（spec global-refinement-v3 Task 7.5）
+const conflictPanelVisible = ref(false)
+function onConflictResolved(_id: string, _resolution: string) {
+  // 调解后 banner 自动从列表移除；此处保留 hook 供后续扩展（如局部 reload）
+}
+
 function onProjectChange(pid: string) {
   router.push({ path: `/projects/${pid}/adjustments`, query: route.query })
 }
@@ -553,6 +611,15 @@ const activeTab = ref('all')
 const entries = ref<any[]>([])
 const summary = ref<AdjustmentSummary | null>(null)
 const selectedRows = ref<any[]>([])
+
+// ─── 分页 ─────────────────────────────────────────────────────────────────────
+const adjPage = ref(1)
+const adjPageSize = ref(50)
+const adjTotal = computed(() => entries.value.length)
+const pagedEntries = computed(() => {
+  const start = (adjPage.value - 1) * adjPageSize.value
+  return entries.value.slice(start, start + adjPageSize.value)
+})
 
 // ─── Impact Preview [enterprise-linkage 3.8] ─────────────────────────────────
 const impactProjectId = projectId
@@ -617,6 +684,31 @@ function onCtxViewImpactScope(_selectedCells: any[]) {
   cellDetailSheet.value = ''
   cellDetailLabel.value = ''
   showCellFormulaDetail.value = true
+}
+
+// V3 Req 9.6: 数字信任度
+const trustScorePanelRef = ref<InstanceType<typeof TrustScorePanel> | null>(null)
+
+// V3 Req 10.4: 可解释状态机
+const smPanelRef = ref<InstanceType<typeof StatusMachinePanel> | null>(null)
+const selectedAdjId = ref('')
+function openStatusMachine() {
+  smPanelRef.value?.open()
+}
+
+// V3 Req 11.6: 时光机
+const tmDrawerRef = ref<InstanceType<typeof TimeMachineDrawer> | null>(null)
+function openTimeMachine() {
+  tmDrawerRef.value?.open()
+}
+function onTimeMachineRestored(_snap: any) {
+  window.location.reload()
+}
+function onCtxTrustScore(_selectedCells: any[]) {
+  const ctxMenu = (adjTableRef.value as any)?.cellSelection?.contextMenu
+  const row = ctxMenu?.row
+  const context = `adj:${row?.adjustment_type || 'aje'}|${row?.standard_account_code || ''}`
+  trustScorePanelRef.value?.open(context)
 }
 
 function onCellDetailNavigate(uri: string) {
@@ -686,6 +778,14 @@ const form = ref({
   description: '',
   line_items: [{ standard_account_code: '', account_name: '', debit_amount: 0, credit_amount: 0 }],
 })
+
+// V3 Req 3.3：表单校验 + 统一提交拦截
+const adjFormRef = ref<FormInstance>()
+const adjFormRules: FormRules = {
+  adjustment_type: [rules.required('类型', 'change')],
+  description: makeRules('摘要'),
+}
+const { submit: submitAdjForm, submitting: adjSubmitting } = useFormSubmit(adjFormRef)
 
 // 分录模板定义
 const ADJUSTMENT_TEMPLATES: Record<string, { type: string; description: string; lines: { code: string; name: string; dr: number; cr: number }[] }> = {
@@ -836,7 +936,7 @@ async function fetchAccountOptions() {
   } catch { /* ignore */ }
 }
 
-function onTabChange() { fetchEntries() }
+function onTabChange() { adjPage.value = 1; fetchEntries() }
 function onSelectionChange(rows: any[]) { selectedRows.value = rows }
 
 function addLine() {
@@ -886,37 +986,39 @@ function openEditDialog(row: any) {
 }
 
 async function onSubmit() {
-  submitLoading.value = true
-  try {
-    if (isEditing.value) {
-      await updateAdjustment(projectId.value, editingGroupId.value, {
-        description: form.value.description,
-        line_items: form.value.line_items,
-      })
-      ElMessage.success('保存成功')
-      _showImpactFeedback()
-    } else {
-      await createAdjustment(projectId.value, {
-        adjustment_type: form.value.adjustment_type,
-        year: year.value,
-        description: form.value.description,
-        line_items: form.value.line_items,
-      }, { batch_mode: batchMode.value })
-      if (batchMode.value) {
-        batchPendingCount.value++
-        ElMessage.success(`创建成功（批量模式，待提交 ${batchPendingCount.value} 笔）`)
-      } else {
-        ElMessage.success('创建成功')
+  await submitAdjForm(async () => {
+    submitLoading.value = true
+    try {
+      if (isEditing.value) {
+        await updateAdjustment(projectId.value, editingGroupId.value, {
+          description: form.value.description,
+          line_items: form.value.line_items,
+        })
+        ElMessage.success('保存成功')
         _showImpactFeedback()
+      } else {
+        await createAdjustment(projectId.value, {
+          adjustment_type: form.value.adjustment_type,
+          year: year.value,
+          description: form.value.description,
+          line_items: form.value.line_items,
+        }, { batch_mode: batchMode.value })
+        if (batchMode.value) {
+          batchPendingCount.value++
+          ElMessage.success(`创建成功（批量模式，待提交 ${batchPendingCount.value} 笔）`)
+        } else {
+          ElMessage.success('创建成功')
+          _showImpactFeedback()
+        }
       }
+      formDialogVisible.value = false
+      clearAutoSaveDraft()
+      fetchEntries()
+      fetchSummary()
+    } finally {
+      submitLoading.value = false
     }
-    formDialogVisible.value = false
-    clearAutoSaveDraft()
-    fetchEntries()
-    fetchSummary()
-  } finally {
-    submitLoading.value = false
-  }
+  })
 }
 
 /** 显示分录对试算表的影响反馈 */
@@ -1104,22 +1206,26 @@ async function onExportTemplate(templateType: 'soe' | 'listed' = 'soe') {
   })
 }
 
-watch(
-  () => [projectId.value, routeYear.value],
-  async () => {
-    await ensureProjectYear()
-    await fetchProjectMeta()
-    projectStore.syncFromRoute(route)
-    selectedYear.value = year.value
-    // 同步科目过滤参数
-    filterAccount.value = typeof route.query.account === 'string' ? route.query.account : ''
-    await fetchEntries()
-    await fetchSummary()
-    await fetchAccountOptions()
-    if (!projectOptions.value.length) projectStore.loadProjectOptions()
-  },
-  { immediate: true }
-)
+async function reloadAdjustmentContext() {
+  await ensureProjectYear()
+  await fetchProjectMeta()
+  projectStore.syncFromRoute(route)
+  selectedYear.value = year.value
+  // 同步科目过滤参数
+  filterAccount.value = typeof route.query.account === 'string' ? route.query.account : ''
+  await fetchEntries()
+  await fetchSummary()
+  await fetchAccountOptions()
+  if (!projectOptions.value.length) projectStore.loadProjectOptions()
+}
+
+// 初次加载（替代 onMounted 一次性加载）
+reloadAdjustmentContext()
+
+// V3 Req 5.1：上下文（projectId/year）变化时自动重载（替代散落的 watch）
+onContextChange(() => {
+  reloadAdjustmentContext()
+})
 </script>
 
 <style scoped>

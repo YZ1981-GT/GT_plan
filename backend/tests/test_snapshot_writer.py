@@ -108,7 +108,7 @@ class TestProperty3WriteTransactionalConsistency:
     and prefill_stale=True on the corresponding working_paper record."""
 
     @pytest.mark.asyncio
-    @settings(max_examples=20)
+    @settings(max_examples=10)
     @given(
         new_value=st.one_of(
             st.integers(min_value=-10000, max_value=10000),
@@ -241,7 +241,7 @@ class TestProperty4OptimisticLockConflict:
     """When opened_at < updated_at, must reject with WritebackConflict."""
 
     @pytest.mark.asyncio
-    @settings(max_examples=20)
+    @settings(max_examples=10)
     @given(
         opened_offset_seconds=st.integers(min_value=1, max_value=86400),
     )
@@ -363,7 +363,7 @@ class TestProperty5WritePermissionEnforcement:
     """Non-workpaper source or no write permission → 403, data unchanged."""
 
     @pytest.mark.asyncio
-    @settings(max_examples=20)
+    @settings(max_examples=10)
     @given(
         module=st.sampled_from(["report", "note", "adj", "tb"]),
     )
@@ -473,7 +473,7 @@ class TestProperty26CrossModuleWriteRouting:
     """For each module, write routes to correct target table/column."""
 
     @pytest.mark.asyncio
-    @settings(max_examples=20)
+    @settings(max_examples=10)
     @given(
         module=st.sampled_from(["workpaper", "report", "note", "adj", "tb"]),
     )

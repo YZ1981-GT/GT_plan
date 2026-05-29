@@ -280,6 +280,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import api from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
@@ -378,11 +379,7 @@ onMounted(async () => {
     schema.value = await api.get<Schema>('/api/query/schema')
     try { sessionStorage.setItem(SCHEMA_CACHE_KEY, JSON.stringify(schema.value)) } catch { /* ignore */ }
   } catch (e: any) {
-    if (e?.response?.status === 403) {
-      ElMessage.error('当前角色无权访问高级查询构建器（仅 admin / manager / partner）')
-    } else {
-      ElMessage.error('加载查询元信息失败')
-    }
+    handleApiError(e, '加载查询元信息')
   }
 })
 
@@ -531,8 +528,7 @@ async function doPreview() {
     )
     sqlPreview.value = resp.sql
   } catch (e: any) {
-    const detail = e?.response?.data?.detail
-    ElMessage.error(detail?.message || '生成 SQL 预览失败')
+    handleApiError(e, '生成 SQL 预览')
   } finally {
     loadingPreview.value = false
   }
@@ -549,8 +545,7 @@ async function doExecute() {
     result.value = resp
     sqlPreview.value = resp.sql
   } catch (e: any) {
-    const detail = e?.response?.data?.detail
-    ElMessage.error(detail?.message || '查询执行失败')
+    handleApiError(e, '查询执行')
   } finally {
     loadingExecute.value = false
   }
@@ -584,7 +579,7 @@ async function doExport() {
     URL.revokeObjectURL(link.href)
     ElMessage.success('导出成功')
   } catch (e: any) {
-    ElMessage.error('导出 Excel 失败')
+    handleApiError(e, '导出 Excel')
   } finally {
     loadingExport.value = false
   }

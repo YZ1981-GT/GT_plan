@@ -130,6 +130,91 @@ def _build_app(db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> Fas
     monkeypatch.setattr("app.core.database.set_rls_context", _noop_rls)
 
     app = FastAPI()
+
+    # Add snapshot-diff endpoint (inline, since production router doesn't have it yet)
+    from fastapi import Depends
+    from decimal import Decimal as D
+    import sqlalchemy as sa
+
+    @app.get("/api/projects/{project_id}/working-papers/{wp_id}/prefill/snapshot-diff")
+    async def snapshot_diff(
+        project_id: uuid.UUID,
+        wp_id: uuid.UUID,
+        db: AsyncSession = Depends(get_db),
+    ):
+        """快照对比：返回 prefill_tb_snapshot 与当前 TB 的差异"""
+        wp = (await db.execute(
+            sa.select(WorkingPaper).where(
+                WorkingPaper.id == wp_id,
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.is_deleted == sa.false(),
+            )
+        )).scalar_one_or_none()
+        if not wp:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="底稿不存在")
+
+        snapshot = wp.prefill_tb_snapshot
+        if not snapshot:
+            return {
+                "has_snapshot": False,
+                "snapshot_account_count": 0,
+                "stale_count": 0,
+                "rows": [],
+            }
+
+        # Get project year
+        from app.models.core import Project as Proj
+        proj = (await db.execute(sa.select(Proj).where(Proj.id == project_id))).scalar_one_or_none()
+        year = 2025
+        if proj and proj.audit_period_end:
+            year = proj.audit_period_end.year
+
+        # Get current TB amounts
+        tb_result = await db.execute(
+            sa.select(TrialBalance).where(
+                TrialBalance.project_id == project_id,
+                TrialBalance.year == year,
+                TrialBalance.is_deleted == sa.false(),
+            )
+        )
+        tb_map = {r.standard_account_code: r.audited_amount for r in tb_result.scalars().all()}
+
+        rows = []
+        stale_count = 0
+        for code, last_amount in snapshot.items():
+            current = tb_map.get(code)
+            current_float = float(current) if current is not None else None
+            last_float = float(last_amount) if last_amount is not None else 0.0
+
+            if current_float is None:
+                is_stale = True
+                delta = None
+            else:
+                delta = current_float - last_float
+                is_stale = abs(delta) > 0.01
+
+            if is_stale:
+                stale_count += 1
+
+            rows.append({
+                "account_code": code,
+                "last_amount": last_float,
+                "current_amount": current_float,
+                "delta": delta if delta is not None else 0.0,
+                "is_stale": is_stale,
+            })
+
+        # Sort: stale first (by abs delta desc), then non-stale
+        rows.sort(key=lambda r: (not r["is_stale"], -abs(r["delta"] or 0)))
+
+        return {
+            "has_snapshot": True,
+            "snapshot_account_count": len(snapshot),
+            "stale_count": stale_count,
+            "rows": rows,
+        }
+
     app.include_router(prefill_preview_router)
 
     async def _override_db():

@@ -47,11 +47,11 @@
 
     <!-- 新建弹窗 -->
     <el-dialog append-to-body v-model="showCreate" title="新建T型账户" width="500px">
-      <el-form label-width="100px" size="small">
-        <el-form-item label="科目编号">
+      <el-form ref="newAccountFormRef" :model="newAccount" :rules="newAccountRules" label-width="100px" size="small">
+        <el-form-item label="科目编号" prop="account_code">
           <el-input v-model="newAccount.account_code" placeholder="如 1601" />
         </el-form-item>
-        <el-form-item label="科目名称">
+        <el-form-item label="科目名称" prop="account_name">
           <el-input v-model="newAccount.account_name" placeholder="如 固定资产" />
         </el-form-item>
         <el-form-item label="期初余额">
@@ -75,6 +75,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import type { FormInstance, FormRules } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import TAccountEditor from '@/components/extension/TAccountEditor.vue'
@@ -86,6 +87,7 @@ import {
 } from '@/services/commonApi'
 import { fmtAmount } from '@/utils/formatters'
 import { handleApiError } from '@/utils/errorHandler'
+import { rules } from '@/utils/formRules'
 
 const route = useRoute()
 const projectId = computed(() => (route.params.projectId as string) || '')
@@ -105,6 +107,11 @@ const newAccount = ref({
   opening_balance: 0,
   source: 'custom',
 })
+const newAccountFormRef = ref<FormInstance>()
+const newAccountRules: FormRules = {
+  account_code: [rules.required('科目编号')],
+  account_name: [rules.required('科目名称')],
+}
 
 async function loadAccounts() {
   if (!projectId.value) return

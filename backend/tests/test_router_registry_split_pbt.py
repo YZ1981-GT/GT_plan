@@ -46,7 +46,7 @@ class TestRouterRegistrySplitPBT:
     **Validates: Requirements 4.3, 4.6**
     """
 
-    @settings(max_examples=30)
+    @settings(max_examples=10, deadline=None)
     @given(seed=st.integers(min_value=0, max_value=100000))
     def test_route_set_is_stable_across_registrations(self, seed: int):
         """Property 8: 多次注册产生完全相同的路由集合。

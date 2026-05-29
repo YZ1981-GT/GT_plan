@@ -78,7 +78,7 @@ const globalStubs = {
   },
 }
 
-// @ts-expect-error — vue-tsc 历史 type 债：vitest spec 文件 import .vue 无类型声明，
+// vue-tsc 历史 type 债：vitest spec 文件 import .vue 无类型声明，
 // 实际 vitest 能解析（已通过 4/4 测试），不影响运行时
 import CellTraceDialog from '../CellTraceDialog.vue'
 

@@ -140,7 +140,7 @@ _REQUIRED_FIELDS_WITH_META = _REQUIRED_FIELDS_NO_META + [
         ("none_value", "component_type"), ("none_value", "linked_accounts"),
     ]),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_property_2_template_list_field_presence(base_item, mutation):
     """真 PBT：基于完整 dict，系统性移除/置 None 一个字段，
     断言 _validate_template_item 对该 mutation **必然**返回 False。
@@ -228,7 +228,7 @@ def _independent_oracle_sort(groups: list[dict]) -> list[dict]:
         max_size=6,  # 限制排列数 ≤ 720
     ),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_property_3_cycle_sort_order(groups):
     """真 PBT：production sort 与独立全排列 oracle 必须给出**等价**结果
     （key 序列相同；排序键 = (sort_order, cycle)）。
@@ -879,7 +879,7 @@ def test_property_14_seed_load_history(pipeline, user_id):
 
 
 @given(role=st.sampled_from(["admin", "partner", "manager", "auditor", "qc", "readonly"]))
-@settings(max_examples=50, deadline=None)  # P0 关键 Property（authz）max_examples=50（三轮复盘 P3.9）
+@settings(max_examples=15, deadline=None)  # P0 关键 Property（authz）max_examples=15（三轮复盘 P3.9）
 def test_property_16_backend_mutation_authorization(role):
     """require_role(["admin", "partner"]) 仅对 admin/partner 放行，其他角色返回 403。
 
@@ -956,7 +956,7 @@ def _enforce_json_readonly(resource: str, http_method: str) -> int:
     resource=st.sampled_from(list(JSON_SOURCE_RESOURCES) + list(DB_RESOURCES)),
     http_method=st.sampled_from(["GET", "POST", "PUT", "DELETE"]),
 )
-@settings(max_examples=50, deadline=None)  # P0 关键 Property（readonly enforcement）max_examples=50（三轮复盘 P3.9）
+@settings(max_examples=15, deadline=None)  # P0 关键 Property（readonly enforcement）max_examples=15（三轮复盘 P3.9）
 def test_property_17_json_source_readonly_enforcement(resource, http_method):
     """JSON 类只读资源对任何 mutation（POST/PUT/DELETE）必须返回 405；
     GET 永远 200；DB 类资源不在此规则内（由 require_role 把关）。

@@ -670,28 +670,11 @@ class TestCompletenessCheck:
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession, seeded_db):
     """Create test HTTP client."""
-    import fakeredis.aioredis
-    from httpx import ASGITransport, AsyncClient
-    from app.core.database import get_db
-    from app.core.redis import get_redis
     from app.main import app
+    from tests._test_auth_helper import override_auth
 
-    fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-
-    async def override_get_db():
-        yield db_session
-
-    async def override_get_redis():
-        yield fake_redis
-
-    app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_redis] = override_get_redis
-
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with override_auth(app, db_session=db_session) as c:
         yield c
-
-    app.dependency_overrides.clear()
 
 
 class TestSamplingConfigAPI:

@@ -74,14 +74,14 @@
 
     <!-- 新建复核意见对话框 -->
     <el-dialog append-to-body v-model="createDialogVisible" title="新建复核意见" width="500px">
-      <el-form :model="reviewForm" label-width="100px">
-        <el-form-item label="复核级别" required>
+      <el-form ref="reviewFormRef" :model="reviewForm" :rules="reviewRules" label-width="100px">
+        <el-form-item label="复核级别" prop="review_level" required>
           <el-select v-model="reviewForm.review_level" placeholder="选择复核级别" style="width: 100%">
             <el-option label="一级复核（经理）" :value="2" />
             <el-option label="二级复核（合伙人）" :value="3" />
           </el-select>
         </el-form-item>
-        <el-form-item label="意见内容" required>
+        <el-form-item label="意见内容" prop="comments" required>
           <el-input
             v-model="reviewForm.comments"
             type="textarea"
@@ -120,9 +120,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { reviewApi } from '@/services/collaborationApi'
+import { rules } from '@/utils/formRules'
 
 interface ReviewRecord {
   id: string
@@ -146,11 +148,17 @@ const reviews = ref<ReviewRecord[]>([])
 const createDialogVisible = ref(false)
 const replyDialogVisible = ref(false)
 const selectedReview = ref<ReviewRecord | null>(null)
+const reviewFormRef = ref<FormInstance>()
 
 const reviewForm = ref({
   review_level: 2 as number,
   comments: '',
 })
+
+const reviewRules: FormRules = {
+  review_level: [{ required: true, message: '请选择复核级别', trigger: 'change' }],
+  comments: [rules.required('意见内容')],
+}
 
 const replyForm = ref({
   response_content: '',

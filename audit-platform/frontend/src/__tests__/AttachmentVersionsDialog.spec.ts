@@ -211,8 +211,8 @@ describe('AttachmentVersionsDialog — AT-3 历史版本列表 + 回滚', () => 
 
     expect(apiMock.post).toHaveBeenCalled()
     const callArgs = apiMock.post.mock.calls[0]
-    // URL 应包含 attachment id 和 v1 版本 id
-    expect(callArgs[0]).toBe('/api/attachments/v3-id/rollback/v1-id')
+    // URL 应包含 attachment id 和 v1 版本 id（端点：/versions/{vid}/rollback）
+    expect(callArgs[0]).toBe('/api/attachments/v3-id/versions/v1-id/rollback')
   })
 
   it('emits rolled-back event after successful rollback', async () => {

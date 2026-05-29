@@ -18,7 +18,7 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-empty v-if="!checkIns.length" description="暂无打卡记录" />
+    <GtEmpty v-if="!checkIns.length" preset="no-data" title="暂无打卡记录" />
   </div>
 </template>
 <script setup lang="ts">
@@ -26,6 +26,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { checkIn, listCheckIns } from '@/services/commonApi'
+import GtEmpty from '@/components/common/GtEmpty.vue'
 const route = useRoute()
 const staffId = ref(route.params.staffId as string || '')
 const checkIns = ref<any[]>([])

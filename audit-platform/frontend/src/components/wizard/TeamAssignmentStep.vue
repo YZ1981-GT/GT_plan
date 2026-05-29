@@ -95,8 +95,8 @@
 
     <!-- 快速创建人员弹窗 -->
     <el-dialog v-model="showQuickCreate" title="快速创建人员" width="450px" append-to-body>
-      <el-form :model="newStaff" label-width="80px">
-        <el-form-item label="姓名" required>
+      <el-form ref="newStaffFormRef" :model="newStaff" :rules="newStaffRules" label-width="80px">
+        <el-form-item label="姓名" prop="name" required>
           <el-input v-model="newStaff.name" />
         </el-form-item>
         <el-form-item label="职级">
@@ -121,11 +121,13 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { User } from '@element-plus/icons-vue'
 import { listStaff, createStaff, listAssignments, saveAssignments, type StaffMember, type Assignment } from '@/services/staffApi'
 import { useWizardStore } from '@/stores/wizard'
+import { rules } from '@/utils/formRules'
 
 const props = defineProps<{ projectId?: string }>()
 const wizardStore = useWizardStore()
@@ -147,6 +149,10 @@ const showAddDialog = ref(false)
 const showQuickCreate = ref(false)
 const creating = ref(false)
 const newStaff = ref({ name: '', title: '', department: '', phone: '' })
+const newStaffFormRef = ref<FormInstance>()
+const newStaffRules: FormRules = {
+  name: [rules.required('姓名')],
+}
 
 // 勾选模式相关
 const staffSearch = ref('')

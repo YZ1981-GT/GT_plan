@@ -1,13 +1,13 @@
 <template>
   <el-dialog append-to-body v-model="visible" :title="`插件配置 - ${plugin?.plugin_name || ''}`" width="600px" @close="$emit('close')">
-    <el-form label-width="100px" size="default" v-if="plugin">
+    <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px" size="default" v-if="plugin">
       <el-form-item label="插件名称">
         <el-input :model-value="plugin.plugin_name" disabled />
       </el-form-item>
       <el-form-item label="版本">
         <el-input :model-value="plugin.version" disabled />
       </el-form-item>
-      <el-form-item label="配置 (JSON)">
+      <el-form-item label="配置 (JSON)" prop="configJson">
         <el-input
           v-model="configJson"
           type="textarea"
@@ -27,9 +27,11 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { aiPlugins as P_aip } from '@/services/apiPaths'
+import { rules } from '@/utils/formRules'
 
 const props = defineProps<{
   modelValue: boolean
@@ -50,6 +52,12 @@ const visible = computed({
 const configJson = ref('')
 const jsonError = ref('')
 const saving = ref(false)
+const formRef = ref<FormInstance>()
+
+const form = computed(() => ({ configJson: configJson.value }))
+const formRules: FormRules = {
+  configJson: [rules.required('配置 JSON')],
+}
 
 watch(() => props.plugin, (p) => {
   if (p?.config) {

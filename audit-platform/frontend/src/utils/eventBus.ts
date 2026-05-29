@@ -127,6 +127,14 @@ export interface YearChangedPayload {
   year: number
 }
 
+/** 审计上下文变更（Req 5：useAuditContext 检测到任一字段变化） */
+export interface AuditContextChangedPayload {
+  projectId: string
+  year: number
+  applicableStandard: 'soe' | 'listed'
+  before: { projectId: string; year: number; applicableStandard: 'soe' | 'listed' }
+}
+
 /** 底稿单元格定位（R8-S2-02：自检失败项 → Univer 定位） */
 export interface WorkpaperLocateCellPayload {
   wpId: string
@@ -264,6 +272,9 @@ export type Events = {
 
   // 年度切换（R8-S1-04）
   'year:changed': YearChangedPayload
+
+  // 审计上下文变更（Req 5）
+  'audit-context:changed': AuditContextChangedPayload
 
   // E1 Sprint 2 Task 2.33: 数据刷新 6 种事件
   'trial-balance:updated': TrialBalanceUpdatedPayload

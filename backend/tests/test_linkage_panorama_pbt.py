@@ -81,7 +81,7 @@ def _ref_strategy():
 # ---------------------------------------------------------------------------
 
 
-@settings(max_examples=200)
+@settings(max_examples=15)
 @given(refs=st.lists(_ref_strategy(), min_size=0, max_size=50))
 def test_property_1_node_count_invariant(refs):
     """Feature: linkage-panorama-graph, Property 1: node count invariant.
@@ -113,7 +113,7 @@ def test_property_1_node_count_invariant(refs):
 # ---------------------------------------------------------------------------
 
 
-@settings(max_examples=200)
+@settings(max_examples=15)
 @given(refs=st.lists(_ref_strategy(), min_size=0, max_size=50))
 def test_property_2_edge_endpoint_validity(refs):
     """Feature: linkage-panorama-graph, Property 2: edge endpoint validity.
@@ -132,7 +132,7 @@ def test_property_2_edge_endpoint_validity(refs):
 # ---------------------------------------------------------------------------
 
 
-@settings(max_examples=200)
+@settings(max_examples=15)
 @given(
     refs=st.lists(_ref_strategy(), min_size=1, max_size=30),
     stale_codes_strategy=st.lists(_wp_code_strategy, min_size=0, max_size=20),

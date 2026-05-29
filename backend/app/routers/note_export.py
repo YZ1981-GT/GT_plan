@@ -49,13 +49,13 @@ async def export_word(
     """
     # Validate template_type
     if body.template_type not in ("soe", "listed"):
-        raise HTTPException(status_code=400, detail="template_type must be 'soe' or 'listed'")
+        raise HTTPException(status_code=400, detail={"message": "template_type 必须是 soe 或 listed", "message_en": "template_type must be 'soe' or 'listed'"})
 
     # Get project for filename
     result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail={"message": "项目不存在", "message_en": "Project not found"})
 
     # Generate Word document
     from app.services.note_word_exporter import NoteWordExporter

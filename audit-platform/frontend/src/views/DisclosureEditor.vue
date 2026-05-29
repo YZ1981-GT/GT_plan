@@ -80,6 +80,20 @@
       </template>
     </GtPageHeader>
 
+    <!-- 归档横幅 -->
+    <ArchivedBanner />
+
+    <!-- AI 内容 pending 顶部 banner（spec global-refinement-v3 Task 6.4） -->
+    <AiContentPendingBanner :project-id="projectId" />
+
+    <!-- 跨模块冲突 banner（spec global-refinement-v3 Task 7.5） -->
+    <ConflictBanner :project-id="projectId" @view="conflictPanelVisible = true" />
+    <ConflictResolutionPanel
+      v-model="conflictPanelVisible"
+      :project-id="projectId"
+      @resolved="onConflictResolved"
+    />
+
     <!-- 工作流进度条 -->
     <WorkflowProgress :project-id="selectedProjectId" :year="selectedYear" />
 
@@ -203,7 +217,7 @@
         </el-alert>
         <!-- 底稿同步来源提示（design §12.1：底稿 → 模块单向同步） -->
         <el-alert
-          v-if="currentNote?.last_sync_source === 'workpaper'"
+          v-if="(currentNote as any)?.last_sync_source === 'workpaper'"
           type="info"
           :closable="false"
           show-icon
@@ -215,8 +229,8 @@
           <template #default>
             <div class="gt-de-sync-banner">
               <span>建议在底稿编辑入口（C 类附注 sheet）维护，避免双源不一致。</span>
-              <span v-if="currentNote?.last_sync_at" class="gt-de-sync-time">
-                · 最近同步：{{ formatSyncTime(currentNote.last_sync_at) }}
+              <span v-if="(currentNote as any)?.last_sync_at" class="gt-de-sync-time">
+                · 最近同步：{{ formatSyncTime((currentNote as any).last_sync_at) }}
               </span>
             </div>
           </template>
@@ -365,12 +379,12 @@
             </div>
 
             <div class="gt-de-editor-footer">
-              <el-button v-if="!editMode" @click="enterEdit()">编辑</el-button>
+              <el-button v-if="!editMode" @click="enterEdit()" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">编辑</el-button>
               <template v-else>
                 <el-button @click="exitEdit(true)">取消</el-button>
-                <el-button type="primary" @click="onSave" :loading="saveLoading">保存</el-button>
-                <el-button type="warning" @click="onClearAllFormulas">一键清除公式</el-button>
-                <el-button @click="onRestoreAutoMode">恢复自动提数</el-button>
+                <el-button type="primary" @click="onSave" :loading="saveLoading" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">保存</el-button>
+                <el-button type="warning" @click="onClearAllFormulas" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">一键清除公式</el-button>
+                <el-button @click="onRestoreAutoMode" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">恢复自动提数</el-button>
               </template>
             </div>
           </template>
@@ -431,7 +445,7 @@
       </p>
       <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;">
         <el-button size="small" @click="loadNoteMappingPreset" :loading="noteMappingLoading">一键加载预设</el-button>
-        <el-button size="small" type="primary" @click="saveNoteMappingRules" :loading="noteMappingLoading">保存规则</el-button>
+        <el-button size="small" type="primary" @click="saveNoteMappingRules" :loading="noteMappingLoading" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">保存规则</el-button>
         <SharedTemplatePicker
           config-type="report_mapping"
           :project-id="projectId"
@@ -617,6 +631,7 @@
     :multi-count="deCtx.selectedCells.value.length"
     @copy="onDeCtxCopy"
     @formula="onDeCtxFormula"
+    @trust-score="onDeCtxTrustScore"
     @sum="onDeCtxSum"
     @compare="onDeCtxCompare"
   >
@@ -637,6 +652,15 @@
       <span class="gt-ucell-ctx-icon">🔎</span> 溯源到底稿/试算表
     </div>
   </CellContextMenu>
+
+  <!-- V3 Req 9.6: 数字信任度面板 -->
+  <TrustScorePanel ref="trustScorePanelRef" :project-id="projectId" />
+
+  <!-- V3 Req 10.4: 可解释状态机面板 -->
+  <StatusMachinePanel ref="smPanelRef" module="disclosure" :instance-id="disclosureInstanceId" />
+
+  <!-- V3 Req 11.6: 时光机面板 -->
+  <TimeMachineDrawer ref="tmDrawerRef" module="disclosure" :instance-id="disclosureInstanceId" @restored="onTimeMachineRestored" />
 
   <!-- Sprint 5.7: 数据来源弹窗 -->
   <CellFormulaDetail
@@ -704,6 +728,9 @@ import { usePenetrate } from '@/composables/usePenetrate'
 import { useEditMode } from '@/composables/useEditMode'
 import { useNavigationStack } from '@/composables/useNavigationStack'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
+import StatusMachinePanel from '@/components/status_machine/StatusMachinePanel.vue'
+import TimeMachineDrawer from '@/components/time_machine/TimeMachineDrawer.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import TraceSourcePopover from '@/components/common/TraceSourcePopover.vue'
 import type { TraceSourceData } from '@/components/common/TraceSourcePopover.vue'
@@ -764,12 +791,25 @@ import NoteGroupBaselineDialog from '@/components/notes/NoteGroupBaselineDialog.
 import NoteParagraphVarsEditor from '@/components/notes/NoteParagraphVarsEditor.vue'
 import NotePriorYearPanel from '@/components/notes/NotePriorYearPanel.vue'
 import { useNoteSectionNumbering } from '@/composables/useNoteSectionNumbering'
+import { useAuditContext } from '@/composables/useAuditContext'
+import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
+import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
+import ConflictBanner from '@/components/conflict/ConflictBanner.vue'
+import ConflictResolutionPanel from '@/components/conflict/ConflictResolutionPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
+const { canEdit, onContextChange } = useAuditContext()
 
 const projectId = computed(() => projectStore.projectId)
+
+// 跨模块冲突调解（spec global-refinement-v3 Task 7.5）
+const conflictPanelVisible = ref(false)
+function onConflictResolved(_id: string, _resolution: string) {
+  // 调解后 banner 自动从列表移除；此处保留 hook 供后续扩展（如局部 reload）
+}
+
 const year = computed(() => {
   const qy = Number(route.query.year)
   return (Number.isFinite(qy) && qy > 2000) ? qy : projectStore.year
@@ -1686,13 +1726,14 @@ const treeContextMenu = reactive<{ visible: boolean; x: number; y: number; secti
   section: null,
 })
 
-function onTreeNodeContextMenu(event: MouseEvent, data: any) {
+function onTreeNodeContextMenu(event: Event, data: any, _node?: any, _nodeInstance?: any) {
   // 分组节点不开右键菜单
   if (!data || data.isGroup || !data.data?.note_section) return
-  event.preventDefault()
+  const mouseEvent = event as MouseEvent
+  mouseEvent.preventDefault()
   treeContextMenu.visible = true
-  treeContextMenu.x = event.clientX
-  treeContextMenu.y = event.clientY
+  treeContextMenu.x = mouseEvent.clientX
+  treeContextMenu.y = mouseEvent.clientY
   treeContextMenu.section = data.data
 }
 
@@ -2060,6 +2101,15 @@ onMounted(async () => {
   window.addEventListener('contextmenu', _onWindowContextMenuFallback)
 })
 
+// V3 Req 5.1：上下文（projectId/year）变化时自动重载附注树
+onContextChange(async () => {
+  selectedProjectId.value = projectId.value
+  selectedProjectIdLocal.value = projectId.value
+  selectedYear.value = year.value
+  await loadProjectTemplateConfig()
+  await fetchTree()
+})
+
 onUnmounted(() => {
   eventBus.off('shortcut:save', onShortcutSave)
   eventBus.off('workpaper:saved', onWorkpaperSaved)
@@ -2187,6 +2237,33 @@ function onDeCtxCopy() {
 function onDeCtxFormula() {
   deCtx.closeContextMenu()
   showNoteFormulaManager.value = true
+}
+
+// V3 Req 9.6: 数字信任度
+const trustScorePanelRef = ref<InstanceType<typeof TrustScorePanel> | null>(null)
+
+// V3 Req 10.4: 可解释状态机
+const smPanelRef = ref<InstanceType<typeof StatusMachinePanel> | null>(null)
+const disclosureInstanceId = ref('')
+function openStatusMachine() {
+  smPanelRef.value?.open()
+}
+
+// V3 Req 11.6: 时光机
+const tmDrawerRef = ref<InstanceType<typeof TimeMachineDrawer> | null>(null)
+function openTimeMachine() {
+  tmDrawerRef.value?.open()
+}
+function onTimeMachineRestored(_snap: any) {
+  window.location.reload()
+}
+
+function onDeCtxTrustScore() {
+  deCtx.closeContextMenu()
+  const section = currentNote.value?.note_section || ''
+  const cell = deCtx.contextMenu.rowData ? `row${deCtx.selectedCells.value[0]?.row || 0}` : ''
+  const context = `note:${section}|${cell}`
+  trustScorePanelRef.value?.open(context)
 }
 
 function onDeCtxSum() {

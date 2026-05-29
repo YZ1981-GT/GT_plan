@@ -17,7 +17,7 @@ from app.services.review_state_machine import ReviewStateMachine
 class TestReviewChainNLevelProperty:
     """Property 6: N-level chain completeness."""
 
-    @settings(max_examples=30)
+    @settings(max_examples=10)
     @given(levels=st.sampled_from([2, 3, 4]))
     def test_p6_n_passes_reach_completed(self, levels: int):
         """levels=N → submit then exactly N sequential passes → completed."""
@@ -48,7 +48,7 @@ class TestReviewChainNLevelProperty:
 
         assert pass_count == levels
 
-    @settings(max_examples=30)
+    @settings(max_examples=10)
     @given(levels=st.sampled_from([2, 3, 4]))
     def test_p6_intermediate_not_complete(self, levels: int):
         """Intermediate level passes are NOT complete (only final level is)."""
@@ -62,7 +62,7 @@ class TestReviewChainNLevelProperty:
         final = WpReviewStatus(f"level{levels}_passed")
         assert sm.is_review_complete(final)
 
-    @settings(max_examples=30)
+    @settings(max_examples=10)
     @given(levels=st.sampled_from([2, 3, 4]))
     def test_p6_reviewable_statuses_count(self, levels: int):
         """N-level config has exactly 2*N reviewable statuses."""

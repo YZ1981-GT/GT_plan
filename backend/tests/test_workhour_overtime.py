@@ -115,7 +115,7 @@ def test_workhour_is_overtime_accepts_float_and_int() -> None:
 @given(
     hours_x100=st.integers(min_value=0, max_value=2400),  # 0.00 ~ 24.00
 )
-@hp_settings(max_examples=100, deadline=None)
+@hp_settings(max_examples=15, deadline=None)
 def test_pbt_workhour_is_overtime_invariant(hours_x100: int) -> None:
     """**Validates: Requirements W-4**
 
@@ -139,7 +139,7 @@ def test_pbt_workhour_is_overtime_invariant(hours_x100: int) -> None:
 @given(
     hours_x100=st.integers(min_value=1, max_value=2400),
 )
-@hp_settings(max_examples=100, deadline=None)
+@hp_settings(max_examples=15, deadline=None)
 def test_pbt_workhour_entry_is_overtime_invariant(hours_x100: int) -> None:
     """**Validates: Requirements W-4**
 

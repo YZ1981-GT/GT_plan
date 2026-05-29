@@ -1,0 +1,38 @@
+RC: 1
+Last 30 lines of stdout:
+FAILED backend\tests\test_sla_worker_q_ticket.py::TestQTicketMandatoryFields::test_missing_fields_raises_422
+FAILED backend\tests\test_sla_worker_q_ticket.py::TestQTicketMandatoryFields::test_partial_fields_raises_422
+FAILED backend\tests\test_sla_worker_q_ticket.py::TestQTicketRecheckNotification::test_pending_recheck_notifies_verifier
+FAILED backend\tests\test_template_config.py::TestProperty29TemplateConfigRoundTrip::test_save_load_round_trip
+FAILED backend\tests\test_template_engine.py::test_delete_template_success - ...
+FAILED backend\tests\test_template_engine.py::test_api_delete_template - Attr...
+FAILED backend\tests\test_template_engine.py::test_api_generate_workpapers - ...
+FAILED backend\tests\test_trial_balance.py::test_recalc_unadjusted_full - Ass...
+FAILED backend\tests\test_wopi_working_paper_qc_review.py::TestWOPIHostService::test_get_file_stub
+FAILED backend\tests\test_wopi_working_paper_qc_review.py::TestQCEngine::test_qc_engine_has_12_rules
+FAILED backend\tests\test_wopi_working_paper_qc_review.py::TestQCEngine::test_qc_rule_severities
+FAILED backend\tests\test_wopi_working_paper_qc_review.py::TestEventHandlers::test_formula_cache_invalidation_handler
+FAILED backend\tests\test_wopi_working_paper_qc_review.py::TestWOPIAPI::test_wopi_check_file_info_uuid
+FAILED backend\tests\test_wopi_working_paper_qc_review.py::TestWOPIAPI::test_wopi_get_file_uuid
+FAILED backend\tests\test_wopi_working_paper_qc_review.py::TestWOPIAPI::test_wopi_put_file_uuid
+FAILED backend\tests\test_wopi_working_paper_qc_review.py::TestWOPIAPI::test_wopi_lock_operations
+FAILED backend\tests\test_wopi_working_paper_qc_review.py::TestWOPIAPI::test_wopi_lock_conflict
+FAILED backend\tests\test_workpaper_fill.py::TestWorkpaperFillService::test_generate_analytical_review
+FAILED backend\tests\test_workpaper_fill.py::TestWorkpaperFillService::test_create_ai_content
+FAILED backend\tests\test_workpaper_fill.py::TestWorkpaperFillService::test_accept_ai_content
+FAILED backend\tests\test_workpaper_fill.py::TestWorkpaperFillService::test_reject_ai_content
+FAILED backend\tests\test_workpaper_fill.py::TestWorkpaperFillService::test_regenerate_content
+FAILED backend\tests\test_workpaper_fill.py::TestWorkpaperFillService::test_critical_workpaper_gate
+FAILED backend\tests\test_workpaper_fill.py::TestWorkpaperFillService::test_stage_transition_gate
+FAILED backend\tests\test_workpaper_fill.py::TestWorkpaperFillService::test_ai_annotation_persistence
+FAILED backend\tests\test_workpaper_fill.py::TestWorkpaperFillService::test_confidence_level_classification
+FAILED backend\tests\test_workpaper_fill.py::TestWorkpaperFillService::test_low_confidence_force_review
+FAILED backend\tests\test_workpaper_fill.py::TestWorkpaperFillService::test_book_data_matching
+FAILED backend\tests\test_workpaper_models.py::test_all_wp_file_statuses - As...
+217 failed, 8479 passed, 55 skipped, 113 warnings in 1642.55s (0:27:22)
+
+Stderr last 10 lines:
+[33mConnectivity check to the model hoster has been skipped because `PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK` is enabled.[0m
+D:\GT_plan\.venv\Lib\site-packages\_pytest\unraisableexception.py:33: RuntimeWarning: coroutine 'Connection._cancel' was never awaited
+  gc.collect()
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback

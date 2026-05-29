@@ -71,6 +71,7 @@ import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 import { useAuthStore } from '@/stores/auth'
 import { projects as P_proj } from '@/services/apiPaths'
+import { confirmDelete } from '@/utils/confirm'
 
 const props = defineProps<{ projectId: string }>()
 const authStore = useAuthStore()
@@ -158,6 +159,11 @@ const handleSave = async () => {
 }
 
 const handleDelete = async (row: any) => {
+  try {
+    await confirmDelete(row?.item_name ? `清单项「${row.item_name}」` : '该清单项')
+  } catch {
+    return
+  }
   try {
     await api.delete(`${P_proj.detail(props.projectId)}/se-checklist/${row.id}`)
     ElMessage.success('已删除')

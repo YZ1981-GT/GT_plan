@@ -209,7 +209,7 @@ async def save_cell_comment(
     )
     row = result.fetchone()
     if not row:
-        raise HTTPException(status_code=500, detail="Save succeeded but read-back failed")
+        raise HTTPException(status_code=500, detail={"message": "保存成功但回读失败", "message_en": "Save succeeded but read-back failed"})
     return _row_to_response(row, project_id, year)
 
 

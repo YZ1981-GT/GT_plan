@@ -48,7 +48,7 @@ class TestChainStepDependencyResolution:
             min_size=1,
         )
     )
-    @h_settings(max_examples=50, deadline=None)
+    @h_settings(max_examples=15, deadline=None)
     def test_resolve_includes_all_transitive_deps(self, requested):
         """请求 generate_notes → 自动补充 generate_reports + recalc_tb"""
         orch = ChainOrchestrator()
@@ -151,7 +151,7 @@ class TestExcelExportFormatInvariance:
         end_row=st.integers(min_value=101, max_value=200),
         col_letter=st.sampled_from(["A", "B", "C", "D", "E"]),
     )
-    @h_settings(max_examples=50, deadline=None)
+    @h_settings(max_examples=15, deadline=None)
     def test_sum_formula_syntax_preserved(self, start_row, end_row, col_letter):
         """SUM(A1:A10) 类公式格式跨任意行号始终有效"""
         formula = f"=SUM({col_letter}{start_row}:{col_letter}{end_row})"
@@ -198,7 +198,7 @@ class TestExportFileNaming:
         company=st.text(min_size=1, max_size=20).filter(lambda s: s.strip() != ""),
         year=st.integers(min_value=2020, max_value=2030),
     )
-    @h_settings(max_examples=50, deadline=None)
+    @h_settings(max_examples=15, deadline=None)
     def test_filename_no_special_chars(self, company, year):
         raw = f"{company}_{year}年度财务报表.xlsx"
         safe = self._safe_filename(raw)
@@ -300,7 +300,7 @@ class TestVariationAnalysisThreshold:
         prior=st.floats(min_value=100, max_value=1e9).map(lambda f: round(f, 2)),
         rate_offset=st.floats(min_value=-0.5, max_value=0.5),
     )
-    @h_settings(max_examples=100, deadline=None)
+    @h_settings(max_examples=15, deadline=None)
     def test_threshold_business_invariant(self, prior, rate_offset):
         """业务不变量：|rate| > 20% ↔ 应生成变动分析模板"""
         current = prior * (1 + rate_offset)

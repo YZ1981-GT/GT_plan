@@ -1,26 +1,67 @@
 {
   "_doc": "R10 Spec B / Spec C baseline 真源。每个值由 Sprint 0 grep 实测填入，迁移过程中只允许减少不允许增加。CI frontend-build job 的 'Display token guard' step 读取此文件做卡点。\n\n[R10 二轮复盘 S6 字段命名统一规约]：所有字段统一格式 `{property}-prop-{format}-vue-files`，明确指代 CSS property 类别+取值格式+扫描范围。旧字段名（font-size-px-vue-files / color-hex-vue-files / background-hex-vue-files）保留为 deprecated alias 1-2 个 sprint 后删除。",
-  "_updated_at": "2026-05-16",
-  "_updated_by": "R10 二轮复盘 S6：CI baseline 字段命名统一为 {property}-prop-{format}-vue-files",
-
+  "_updated_at": "2026-05-27",
+  "_updated_by": "V3 Sprint 2 Req 8.4（4 子任务）：GtEmpty 5 preset 上线 + 13 处 el-empty→GtEmpty 替换（baseline 182→169）；GtStatusTag 4 视图接入（AttachmentHub/ProjectTreeNode/DetailProjectPanel/EditorSharedToolbar）共 14 处使用；ESLint no-status-string-literal 规则实现（baseline 202，仅检测 === 比较）；statusEnum.ts STATUS_DICT 中文 label 全量映射 + getStatusLabel/getStatusColor 工具函数 + 15 vitest 全绿",
   "font-size-prop-px-vue-files": 0,
   "color-prop-hex-vue-files": 0,
   "background-prop-hex-vue-files": 0,
   "border-color-prop-hex-vue-files": 0,
   "el-table-naked-vue-files": 176,
-
   "_deprecated_aliases": {
     "_doc": "旧字段名 1-2 sprint 后删除；过渡期 CI guard 同时读两套字段",
     "font-size-px-vue-files": 0,
     "color-hex-vue-files": 0,
     "background-hex-vue-files": 0
   },
-
   "_allow_px_kept": 69,
   "_font_size_total_inc_allow_px": 69,
   "_color_hex_in_gradients_or_rgba": 23,
   "_bg_hex_in_gradients_or_rgba": 6,
-
+  "_v3_eslint_rules": {
+    "_doc": "V3 Spec 新增 7 条 ESLint 自定义规则 baseline，由实施时跑一次确定，只减不增",
+    "no-amount-without-decimal-services": 15,
+    "el-form-must-have-rules-vue-files": 0,
+    "no-delete-without-confirm-vue-files": 0,
+    "must-watch-route-or-context-vue-files": 3,
+    "no-bare-amount-cell-tables": 92,
+    "no-status-string-literal-vue-files": 202,
+    "no-english-ui-label-vue-files": 0,
+    "no-english-ui-button-vue-files": 0,
+    "console-log-vue-files": 0
+  },
+  "_v3_coverage_guards": {
+    "_doc": "V3 收尾防退化卡点（2026-05-28 实测）：CI frontend-build 只允许增加（覆盖率提升），不允许减少。下个 spec gt-amount-cell-rollout 把 GtAmountCell ratio 从 17% 推到 80%。",
+    "GtAmountCell-uses": 66,
+    "align-right-cols": 380,
+    "GtAmountCell-coverage-ratio": "17%",
+    "GtAmountCell-target-ratio": "80%",
+    "el-form-with-rules": 70,
+    "el-form-total": 108,
+    "el-form-rules-coverage": "65%",
+    "workpaper-editor-shell-lines": 1000,
+    "workpaper-editor-univer-core-lines": 800,
+    "workpaper-editor-cycle-dialog-host-lines": 200,
+    "workpaper-editor-cycle-trigger-panel-lines": 150,
+    "workpaper-editor-banners-lines": 200,
+    "workpaper-editor-status-bar-lines": 120,
+    "WorkpaperList-vue-lines": 519,
+    "WorkpaperList-vue-target": 1000,
+    "workpaper-list-shell-lines": 1000,
+    "workpaper-list-workbench-view-lines": 700,
+    "workpaper-list-board-view-lines": 700,
+    "workpaper-list-lifecycle-view-lines": 700,
+    "workpaper-list-dependency-graph-lines": 700,
+    "workpaper-list-delegation-matrix-lines": 700,
+    "GtCNoteTable-vue-lines": 1608,
+    "GtEControlTest-vue-lines": 1125,
+    "simple-cycle-editor-total-lines": 118,
+    "simple-cycle-editor-target": 130,
+    "html-renderer-registry-types": 10,
+    "html-renderer-route-types": 11,
+    "vue-tsc-errors": 0,
+    "vitest-failed-tests": 0,
+    "vitest-skipped-tests": 7
+  },
   "_targets": {
     "font-size-prop-px-vue-files": 0,
     "color-prop-hex-vue-files": 50,
@@ -28,7 +69,6 @@
     "border-color-prop-hex-vue-files": 0,
     "el-table-naked-vue-files": "持平或减少（GtTableExtended/GtFormTable 上线后逐步迁移）"
   },
-
   "_sprint_milestones": {
     "sprint-1-end": "font-size-prop-px-vue-files: 0 (stylelint font-size 转 error) — DONE 2026-05-16",
     "sprint-2-end": "color-prop-hex-vue-files: 0 raw (实测目标 < 50) — DONE 2026-05-16; background-prop-hex-vue-files: 0 raw (实测目标 < 30) — DONE 2026-05-16; stylelint color/background 转 error 待 Sprint 2.3",

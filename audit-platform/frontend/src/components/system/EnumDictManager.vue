@@ -100,12 +100,12 @@
               <span class="gt-amt">{{ $index + 1 }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="value" label="value" min-width="180">
+          <el-table-column prop="value" label="枚举值" min-width="180">
             <template #default="{ row }">
               <code class="gt-edm-value">{{ row.value }}</code>
             </template>
           </el-table-column>
-          <el-table-column prop="label" label="label" min-width="160" />
+          <el-table-column prop="label" label="显示名称" min-width="160" />
           <el-table-column label="预览" width="120" align="center">
             <template #default="{ row }">
               <el-tag
@@ -118,7 +118,7 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="color" label="color" width="160" align="center">
+          <el-table-column prop="color" label="颜色" width="160" align="center">
             <template #default="{ row }">
               <code class="gt-edm-color">{{ row.color || '(empty)' }}</code>
             </template>
@@ -192,19 +192,19 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="value" prop="value">
+        <el-form-item label="枚举值" prop="value">
           <el-input
             v-model="formState.value"
             :disabled="editingMode === 'edit'"
             placeholder="枚举值，如 draft / approved"
           />
         </el-form-item>
-        <el-form-item label="label" prop="label">
+        <el-form-item label="显示名称" prop="label">
           <el-input v-model="formState.label" placeholder="显示名称" />
         </el-form-item>
-        <el-form-item label="color">
+        <el-form-item label="颜色">
           <el-select v-model="formState.color" clearable style="width: 100%">
-            <el-option label="(default)" value="" />
+            <el-option label="(默认)" value="" />
             <el-option label="success" value="success" />
             <el-option label="warning" value="warning" />
             <el-option label="danger" value="danger" />

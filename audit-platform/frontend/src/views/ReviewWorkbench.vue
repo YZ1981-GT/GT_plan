@@ -9,6 +9,9 @@
       </template>
     </GtPageHeader>
 
+    <!-- AI 内容 pending 顶部 banner（spec global-refinement-v3 Task 6.4；项目维度才展示） -->
+    <AiContentPendingBanner v-if="projectId" :project-id="projectId" />
+
     <!-- 筛选条 -->
     <div class="filter-bar">
       <el-select
@@ -403,6 +406,7 @@ import ReviewTemplatePanel from '@/components/review/ReviewTemplatePanel.vue'
 import { api } from '@/services/apiProxy'
 import GtRowActions from '@/components/common/GtRowActions.vue'
 import type { RowAction } from '@/components/common/GtRowActions.vue'
+import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
 
 const route = useRoute()
 const router = useRouter()

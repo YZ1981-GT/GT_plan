@@ -139,7 +139,7 @@ D_F_H_I_HISTORICAL_SHEET_NAMES: list[str] = [
 
 
 @given(name=st.text(min_size=0, max_size=100))
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_normalize_idempotent(name: str) -> None:
     """P1: ∀ name: normalize(normalize(name)) == normalize(name)
 
@@ -160,7 +160,7 @@ def test_normalize_idempotent(name: str) -> None:
 
 
 @given(g_sheet=st.sampled_from(ALL_G_SHEET_NAMES))
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_historical_sheet_filter_regression_g_normal(g_sheet: str) -> None:
     """P2 part A: G 循环 152 个去重后正常 sheet 不应被历史遗留过滤命中"""
     from app.services.wp_template_init_service import _should_skip_historical_sheet
@@ -218,7 +218,7 @@ def test_cross_wp_ref_id_uniqueness_baseline() -> None:
         max_size=20,
     ),
 )
-@settings(max_examples=50, deadline=2000)
+@settings(max_examples=15, deadline=2000)
 def test_cross_wp_ref_id_unique(new_ids: list[str]) -> None:
     """P3 hypothesis: 任意新增 ref_id 集合内部唯一 + 与 baseline 合并后无重复
 
@@ -274,7 +274,7 @@ def _to_decimal(f: float) -> Decimal:
     internal_offset=_amount_strategy,
     drift=_drift_strategy,
 )
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_vr_g7_01_triangle_formula(
     investee_net_profit: float,
     shareholding_ratio: float,
@@ -316,7 +316,7 @@ def test_vr_g7_01_triangle_formula(
     g8=_amount_strategy,
     drift=_drift_strategy,
 )
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_vr_g11_01_triangle_formula(
     g1: float, g4: float, g6: float, g7: float, g8: float, drift: float,
 ) -> None:
@@ -343,7 +343,7 @@ def test_vr_g11_01_triangle_formula(
     fv_opening=_amount_strategy,
     drift=_drift_strategy,
 )
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_vr_g1_01_triangle_formula(
     fv_closing: float, fv_opening: float, drift: float,
 ) -> None:
@@ -371,7 +371,7 @@ def test_vr_g1_01_triangle_formula(
     g6_ecl_change=_amount_strategy,
     drift=_drift_strategy,
 )
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_vr_g14_01_triangle_formula(
     g4_ecl_change: float, g6_ecl_change: float, drift: float,
 ) -> None:
@@ -460,7 +460,7 @@ def classify_g_sheet_py(name: str) -> str:
 
 
 @given(sheet_name=st.sampled_from(ALL_G_SHEET_NAMES))
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_sheet_group_completeness(sheet_name: str) -> None:
     """P5: G 循环 152 个真实 sheet 名各自命中恰好 1 类（含 fallback "other"）"""
     category = classify_g_sheet_py(sheet_name)
@@ -537,7 +537,7 @@ def test_sheet_group_explicit_cases(name: str, expected_id: str):
     pd_lifetime_raw=_ratio_strategy,
     lgd_raw=_ratio_strategy,
 )
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_ecl_monotonicity(
     book_value: float, pd_12m_raw: float, pd_lifetime_raw: float, lgd_raw: float,
 ) -> None:

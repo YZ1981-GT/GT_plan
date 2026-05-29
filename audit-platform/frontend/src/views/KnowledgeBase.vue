@@ -156,8 +156,8 @@
 
     <!-- 新建文件夹弹窗 -->
     <el-dialog v-model="showCreateFolder" title="新建文件夹" width="400px" append-to-body>
-      <el-form label-width="80px">
-        <el-form-item label="名称">
+      <el-form ref="folderFormRef" :model="folderFormModel" :rules="folderRules" label-width="80px">
+        <el-form-item label="名称" prop="name">
           <el-input v-model="newFolderName" placeholder="文件夹名称" />
         </el-form-item>
         <el-form-item label="位置">
@@ -252,6 +252,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmDelete, confirmBatch, confirmDangerous } from '@/utils/confirm'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
@@ -261,6 +262,7 @@ import { api } from '@/services/apiProxy'
 import { knowledgeLibrary as P_kl } from '@/services/apiPaths'
 import { downloadFile } from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
+import { rules } from '@/utils/formRules'
 
 const router = useRouter()
 const route = useRoute()
@@ -290,6 +292,11 @@ const showCreateFolder = ref(false)
 const newFolderName = ref('')
 const newFolderParent = ref<string | null>(null)
 const newFolderAccess = ref('public')
+const folderFormRef = ref<FormInstance>()
+const folderFormModel = computed(() => ({ name: newFolderName.value }))
+const folderRules: FormRules = {
+  name: [rules.required('文件夹名称')],
+}
 
 // 上传
 const showUpload = ref(false)

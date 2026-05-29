@@ -162,8 +162,9 @@ interface NavigationRow {
   no_print: boolean
 }
 
-interface BIndexSchema {
-  preparation_info_fields?: string[]
+export interface BIndexSchema {
+  /** 编制信息字段（字符串数组或 {field, label} 对象数组） */
+  preparation_info_fields?: Array<string | { field: string; label: string }>
   navigation_table?: { columns: string[] }
   [key: string]: any
 }

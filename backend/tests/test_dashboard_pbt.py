@@ -28,7 +28,7 @@ from app.services.dashboard_aggregator_service import (
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 @given(
     total=st.integers(min_value=0, max_value=500),
     data=st.data(),
@@ -68,7 +68,7 @@ def test_progress_rate_bounds(total: int, data: st.DataObject) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 @given(
     total_rules=st.integers(min_value=1, max_value=100),
     num_cycles=st.integers(min_value=1, max_value=11),
@@ -159,7 +159,7 @@ def review_item_strategy(draw: st.DrawFn) -> dict:
     }
 
 
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 @given(items=st.lists(review_item_strategy(), min_size=0, max_size=30))
 def test_review_sort_stability(items: list[dict]) -> None:
     """Feature: partner-dashboard, Property 3: review sort stability

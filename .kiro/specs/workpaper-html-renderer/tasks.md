@@ -31,7 +31,7 @@
     - 扩展 `backend/app/models/workpaper_models.py` 添加 6 字段 Mapped 声明
     - _Requirements: 3.0.2, 3.0.3, 3.0.4_
 
-  - [x] 1.6 实现 wp_classification_service 扩展
+  - [ ] 1.6 实现 wp_classification_service 扩展
     - 扩展 `backend/app/services/wp_classification_service.py`
     - 新增 `get_classification(wp_code, project_id, template_version_id)` 方法
     - 新增 `derive_component_type(classification)` 方法（9 类 → componentType 白名单映射）

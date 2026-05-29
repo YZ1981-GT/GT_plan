@@ -39,6 +39,10 @@ const emit = defineEmits<{
 
 const editingId = ref<string | null>(null)
 const editForm = ref<Partial<VoucherRow>>({})
+const editFormRef = ref<any>(null)
+const editRules = {
+  voucher_no: [{ required: true, message: '请输入凭证号', trigger: 'blur' }],
+}
 
 const highConfidence = computed(() =>
   props.results.filter(r => r.confidence >= 0.8)
@@ -136,14 +140,14 @@ function batchConfirmAll() {
 
     <!-- 编辑弹窗 -->
     <el-dialog :model-value="!!editingId" title="修正 OCR 结果" width="500px" @close="cancelEdit">
-      <el-form v-if="editForm" label-width="80px" size="small">
-        <el-form-item label="凭证号">
+      <el-form ref="editFormRef" v-if="editForm" :model="editForm" :rules="editRules" label-width="80px" size="small">
+        <el-form-item label="凭证号" prop="voucher_no">
           <el-input v-model="editForm.voucher_no" />
         </el-form-item>
-        <el-form-item label="日期">
+        <el-form-item label="日期" prop="voucher_date">
           <el-input v-model="editForm.voucher_date" placeholder="YYYY-MM-DD" />
         </el-form-item>
-        <el-form-item label="摘要">
+        <el-form-item label="摘要" prop="summary">
           <el-input v-model="editForm.summary" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>

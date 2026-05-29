@@ -38,10 +38,10 @@
         class="gt-wptt-select"
       >
         <el-option label="全部" value="" />
-        <el-option label="univer" value="univer" />
-        <el-option label="form" value="form" />
-        <el-option label="word" value="word" />
-        <el-option label="hybrid" value="hybrid" />
+        <el-option label="表格(Univer)" value="univer" />
+        <el-option label="表单" value="form" />
+        <el-option label="文档(Word)" value="word" />
+        <el-option label="混合" value="hybrid" />
       </el-select>
 
       <el-select

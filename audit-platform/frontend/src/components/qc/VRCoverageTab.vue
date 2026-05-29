@@ -25,19 +25,19 @@
       style="width: 100%; cursor: pointer"
     >
       <el-table-column prop="cycle_name" label="循环" width="120" />
-      <el-table-column prop="blocking_count" label="Blocking" width="100">
+      <el-table-column prop="blocking_count" label="阻断" width="100">
         <template #default="{ row }">
           <span :class="{ 'text-danger': row.blocking_count < 3 }">{{ row.blocking_count }}</span>
           <span v-if="row.gap_blocking > 0" class="gap-badge">缺 {{ row.gap_blocking }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="warning_count" label="Warning" width="100">
+      <el-table-column prop="warning_count" label="警告" width="100">
         <template #default="{ row }">
           <span :class="{ 'text-danger': row.warning_count < 2 }">{{ row.warning_count }}</span>
           <span v-if="row.gap_warning > 0" class="gap-badge">缺 {{ row.gap_warning }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="info_count" label="Info" width="80" />
+      <el-table-column prop="info_count" label="提示" width="80" />
       <el-table-column prop="total_count" label="合计" width="80" />
       <el-table-column label="达标情况" width="200">
         <template #default="{ row }">

@@ -27,7 +27,7 @@
     </el-table>
 
     <!-- 空状态 -->
-    <el-empty v-if="!loading && files.length === 0" description="私人库为空，上传文件开始使用" />
+    <GtEmpty v-if="!loading && files.length === 0" preset="no-data" title="私人库为空" description="上传文件开始使用" />
 
     <!-- 错误提示 -->
     <el-alert v-if="errorMsg" :title="errorMsg" type="error" show-icon closable @close="errorMsg = ''" style="margin-top: 16px" />
@@ -44,6 +44,7 @@ import {
   downloadPrivateFile, deletePrivateFile,
 } from '@/services/commonApi'
 import { handleApiError } from '@/utils/errorHandler'
+import GtEmpty from '@/components/common/GtEmpty.vue'
 
 const authStore = useAuthStore()
 const loading = ref(false)

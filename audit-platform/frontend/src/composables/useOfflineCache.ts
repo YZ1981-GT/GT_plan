@@ -31,10 +31,10 @@ export function registerServiceWorker(): void {
       navigator.serviceWorker
         .register('/sw.js')
         .then((registration) => {
-          console.log('[SW] Registered:', registration.scope)
+          import.meta.env.DEV && console.log('[SW] Registered:', registration.scope) // eslint-disable-line no-console
         })
         .catch((error) => {
-          console.warn('[SW] Registration failed:', error)
+          import.meta.env.DEV && console.warn('[SW] Registration failed:', error) // eslint-disable-line no-console
         })
     })
   }

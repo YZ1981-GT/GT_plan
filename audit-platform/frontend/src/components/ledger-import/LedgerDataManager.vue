@@ -62,8 +62,8 @@
 
         <!-- Tab 2: 删除数据 -->
         <el-tab-pane label="删除数据" name="delete">
-          <el-form label-width="100px" size="default">
-            <el-form-item label="年度" required>
+          <el-form ref="deleteFormRef" :model="deleteForm" :rules="deleteRules" label-width="100px" size="default">
+            <el-form-item label="年度" prop="year" required>
               <el-select v-model="deleteForm.year" placeholder="选择年度" style="width: 200px">
                 <el-option
                   v-for="y in availableYears"
@@ -111,8 +111,8 @@
 
         <!-- Tab 3: 增量追加（12月） -->
         <el-tab-pane label="增量追加" name="incremental">
-          <el-form label-width="100px" size="default">
-            <el-form-item label="年度" required>
+          <el-form ref="incFormRef" :model="incrementalForm" :rules="incRules" label-width="100px" size="default">
+            <el-form-item label="年度" prop="year" required>
               <el-select v-model="incrementalForm.year" placeholder="选择年度" style="width: 200px">
                 <el-option
                   v-for="y in availableYears"
@@ -234,6 +234,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger } from '@/services/apiPaths'
@@ -268,6 +269,15 @@ const incrementalForm = ref<{ year: number | null }>({ year: null })
 const filePeriodsInput = ref('')
 const incrementalDiff = ref<any>(null)
 const overlapStrategy = ref<'skip' | 'overwrite'>('skip')
+
+const deleteFormRef = ref<FormInstance>()
+const incFormRef = ref<FormInstance>()
+const deleteRules: FormRules = {
+  year: [{ required: true, message: '请选择年度', trigger: 'change' }],
+}
+const incRules: FormRules = {
+  year: [{ required: true, message: '请选择年度', trigger: 'change' }],
+}
 
 const tableLabels: Record<string, string> = {
   tb_balance: '科目余额表',

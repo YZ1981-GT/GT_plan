@@ -36,17 +36,17 @@ class TestFormulaTypeToSource:
         assert _FORMULA_TYPE_TO_SOURCE["SUM_TB"] == "trial_balance"
 
     def test_aux_maps_to_ledger(self):
-        assert _FORMULA_TYPE_TO_SOURCE["AUX"] == "ledger"
+        assert _FORMULA_TYPE_TO_SOURCE["AUX"] == "aux_balance"
 
     def test_prev_maps_to_prior_year(self):
         assert _FORMULA_TYPE_TO_SOURCE["PREV"] == "prior_year"
 
     def test_wp_maps_to_formula(self):
-        assert _FORMULA_TYPE_TO_SOURCE["WP"] == "formula"
+        assert _FORMULA_TYPE_TO_SOURCE["WP"] == "workpaper_ref"
 
     def test_all_five_sources_covered(self):
         """确保覆盖需求 7 定义的所有来源类型"""
-        expected_sources = {"trial_balance", "prior_year", "formula", "ledger"}
+        expected_sources = {"trial_balance", "prior_year", "workpaper_ref", "aux_balance", "ledger", "adjustment", "disclosure_note"}
         actual_sources = set(_FORMULA_TYPE_TO_SOURCE.values())
         assert expected_sources == actual_sources
 
@@ -85,9 +85,9 @@ class TestBuildSourceRef:
         assert result == "TB:1001"
 
     def test_wp_source_ref(self):
-        params = {"wp_code": "D-01", "cell_ref": "B5"}
-        result = _build_source_ref("WP", "D-01, B5", params)
-        assert result == "D-01!B5"
+        params = {"wp_code": "D-01", "sheet": "Sheet1", "cell_ref": "B5"}
+        result = _build_source_ref("WP", "D-01, Sheet1, B5", params)
+        assert result == "D-01!Sheet1!B5"
 
     def test_tb_empty_account_code_returns_none(self):
         params = {"account_code": "", "column_name": "audited_amount"}

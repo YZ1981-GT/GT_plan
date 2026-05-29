@@ -103,7 +103,7 @@ async def get_review_config(
     )
     project = result.scalar_one_or_none()
     if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail={"message": "项目不存在", "message_en": "Project not found"})
 
     # Return config or default
     if project.review_config is not None:
@@ -127,7 +127,7 @@ async def update_review_config(
     # RBAC check
     user_role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
     if user_role not in ALLOWED_ROLES:
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
+        raise HTTPException(status_code=403, detail={"message": "权限不足", "message_en": "Insufficient permissions"})
 
     # Verify project exists
     result = await db.execute(
@@ -138,7 +138,7 @@ async def update_review_config(
     )
     project = result.scalar_one_or_none()
     if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail={"message": "项目不存在", "message_en": "Project not found"})
 
     # Validate level_roles must define L1..L{levels}
     required_keys = {f"L{i}" for i in range(1, body.levels + 1)}

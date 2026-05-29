@@ -13,6 +13,7 @@
           <span class="gt-ucell-ctx-icon">📋</span> {{ multiCount > 1 ? `复制选中区域 (${multiCount}格)` : '复制值' }}
         </div>
         <div class="gt-ucell-ctx-item" @click="$emit('formula')"><span class="gt-ucell-ctx-icon">ƒx</span> 查看公式</div>
+        <div class="gt-ucell-ctx-item" @click="$emit('trust-score')"><span class="gt-ucell-ctx-icon">📋</span> 数字信任度</div>
         <!-- 自定义插槽：模块特有的菜单项 -->
         <slot />
         <!-- 多选项 -->
@@ -46,6 +47,7 @@ const props = defineProps<{
 defineEmits<{
   (e: 'copy'): void
   (e: 'formula'): void
+  (e: 'trust-score'): void
   (e: 'sum'): void
   (e: 'compare'): void
 }>()

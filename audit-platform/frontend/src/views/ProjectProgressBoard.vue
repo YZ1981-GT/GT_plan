@@ -155,14 +155,14 @@
 
     <!-- 新增沟通记录弹窗 -->
     <el-dialog v-model="showCommDialog" title="新增客户沟通记录" width="560" append-to-body>
-      <el-form :model="commForm" label-width="80px">
-        <el-form-item label="日期">
+      <el-form ref="commFormRef" :model="commForm" :rules="commRules" label-width="80px">
+        <el-form-item label="日期" prop="date">
           <el-date-picker v-model="commForm.date" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="联系人">
+        <el-form-item label="联系人" prop="contact_person">
           <el-input v-model="commForm.contact_person" placeholder="客户方联系人" />
         </el-form-item>
-        <el-form-item label="主题">
+        <el-form-item label="主题" prop="topic">
           <el-input v-model="commForm.topic" placeholder="沟通主题" />
         </el-form-item>
         <el-form-item label="内容">
@@ -186,6 +186,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import { confirmDelete } from '@/utils/confirm'
@@ -199,6 +200,7 @@ import {
 import CommunicationCommitmentsEditor from '@/components/pm/CommunicationCommitmentsEditor.vue'
 import type { CommitmentItem } from '@/components/pm/CommunicationCommitmentsEditor.vue'
 import { handleApiError } from '@/utils/errorHandler'
+import { rules } from '@/utils/formRules'
 
 const route = useRoute()
 const router = useRouter()
@@ -314,6 +316,7 @@ async function handleCrossRefCheck() {
 // 客户沟通记录
 const communications = ref<CommunicationRecord[]>([])
 const showCommDialog = ref(false)
+const commFormRef = ref<FormInstance>()
 const commForm = reactive<{
   date: string
   contact_person: string
@@ -329,6 +332,9 @@ const commForm = reactive<{
   commitments: [],
   related_wp_codes_str: '',
 })
+const commRules: FormRules = {
+  topic: [rules.required('主题')],
+}
 
 async function loadComms() {
   try {

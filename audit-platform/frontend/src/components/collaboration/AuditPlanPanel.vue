@@ -87,8 +87,8 @@
       :title="plan ? '编辑审计计划' : '创建审计计划'"
       width="700px"
     >
-      <el-form :model="planForm" label-width="120px">
-        <el-form-item label="审计策略">
+      <el-form ref="planFormRef" :model="planForm" :rules="planRules" label-width="120px">
+        <el-form-item label="审计策略" prop="audit_strategy">
           <el-input
             v-model="planForm.audit_strategy"
             type="textarea"
@@ -174,8 +174,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { auditProgramApi } from '@/services/collaborationApi'
+import { rules } from '@/utils/formRules'
 
 interface AuditPlan {
   id: string
@@ -205,6 +207,10 @@ const props = defineProps<{
 
 const plan = ref<AuditPlan | null>(null)
 const editDialogVisible = ref(false)
+const planFormRef = ref<FormInstance>()
+const planRules: FormRules = {
+  audit_strategy: [rules.required('审计策略')],
+}
 
 const planForm = ref<{
   audit_strategy: string

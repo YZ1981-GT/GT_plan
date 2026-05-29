@@ -156,3 +156,14 @@ class WorkHour(Base, SoftDeleteMixin, TimestampMixin):
     # R5 需求 8：工时用途分类（允许值：preparation|review|eqcr|training|admin）
     # 为向后兼容，保持 nullable；前后端约定枚举值，不建 DB enum。
     purpose: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    # W-4 加班自动识别：hours > 8 即视为加班；None/0 视为非加班
+    # 测试环境 hours 可能是 float/int（SQLite 存储），统一通过 Decimal 比较
+    @property
+    def is_overtime(self) -> bool:
+        if self.hours is None:
+            return False
+        try:
+            return Decimal(str(self.hours)) > Decimal("8")
+        except (ValueError, TypeError):
+            return False

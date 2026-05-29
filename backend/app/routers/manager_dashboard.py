@@ -146,7 +146,7 @@ async def get_projects_overview(
     # RBAC check
     user_role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
     if user_role not in ("manager", "admin"):
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
+        raise HTTPException(status_code=403, detail={"message": "权限不足", "message_en": "Insufficient permissions"})
 
     # Query projects where manager_id = current_user.id (admin sees all managed projects)
     stmt = select(Project).where(

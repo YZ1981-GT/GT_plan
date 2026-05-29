@@ -1,6 +1,6 @@
 # Spec 总索引
 
-**最后更新**：2026-05-29（spec 体系归档：71 个已完成 spec 移入 `_archive/`，active 收敛至 6 个）
+**最后更新**：2026-05-29（merge `feature/global-refinement-v3-closure` 后统一基线：active 收敛至 11 个 + archived 71，含报表/编辑器瘦身 phase2/全平台 V3 收尾）
 
 > 此索引追踪所有 spec 状态、关联文档、commit。
 > **审计原则**：spec 不删，但归档已完成且不再演进的；新启动 spec 默认在 active。
@@ -8,15 +8,15 @@
 
 ## 迁移系统（D6 唯一入口）
 
-- **当前迁移系统** = `backend/migrations/V*.sql` + `R*.sql`（D6 版本化 SQL 脚本，启动时 MigrationRunner 自动执行）
-- **alembic 已废弃**（2026-05-29 删除，`backend/alembic/` + `alembic.ini` + `requirements.txt` 中 `alembic` 依赖全部移除）
+- **当前迁移系统** = `backend/migrations/V*.sql` + `R*.sql`(D6 版本化 SQL 脚本，启动时 MigrationRunner 自动执行)
+- **alembic 已废弃**(2026-05-29 删除，`backend/alembic/` + `alembic.ini` + `requirements.txt` 中 `alembic` 依赖全部移除)
 - **新加迁移**：写 `V0XX__xxx.sql` + `R0XX__rollback_xxx.sql` 配对，必须 `IF NOT EXISTS` 幂等
 - **失败追踪**：`schema_migration_failures` 表 + `/api/health` 暴露 `migration.failures`
 - **schema 漂移**：启动 self-check `SchemaDriftDetector` 检测 ORM↔DB 4 类漂移，写 `schema_drift_log` 表
 
 ---
 
-## §1 Active Spec（6 个，待打磨/进行中/外部依赖未完）
+## §1 Active Spec（11 个，待打磨/进行中/外部依赖未完）
 
 | Spec | 状态 | 完成度 | 关键阻塞/下一步 |
 |------|------|-------|----------------|
@@ -24,8 +24,13 @@
 | `disclosure-note-full-revamp/` | ⚠ 外部依赖 | 44/47 | F-1 真项目 UAT / F-2 dev-history / F-3 文档（外部审计师协作） |
 | `note-dynamic-tables-and-template-inheritance/` | 📋 待启动 | 0/151 v0.6.2 | Phase 1 单体附注修复（17 人天，含 D1-D7+D9+D13+D14）；待用户决策启动节奏 |
 | `consol-note-three-level-drilldown/` | 📋 占位 | 0 | 前置 = 真实合并母子项目数据 |
-| `workpaper-editor-slimdown/` | 🚧 部分完成 | 59/59 任务 / 1200 行目标未达成 | WorkpaperEditor 仍 2167 行，剩余 useUniverEditor composable 待抽 |
+| `workpaper-editor-slimdown/` | 🚧 部分完成 | 59/59 任务 / 1200 行目标未达成 | WorkpaperEditor 仍 2167 行，剩余 useUniverEditor composable 待抽（被 workpaper-editor-shrink-phase2 接续） |
 | `workpaper-html-renderer/` | ✅ 完成（保留为打磨基础） | 40/40 | 已闭环，作为 1788 单体真底稿渲染基线保留在 active 供后续 view 打磨参考 |
+| `global-refinement-v3/` | ⚠ 外部依赖 | 143/145 | 2026-05-28 完成核心（Sprint 0-4 + 13 Property PBT + vue-tsc 0 + vitest 2094 passed + CI 双卡点）；剩 14.4 真合伙人 UAT；gaps.md 反向记录 GtAmountCell 17%/80% + WorkpaperEditor 2555/1000 等技术债 |
+| `workpaper-editor-shrink-phase2/` | 🚧 进行中 | 部分完成 | WorkpaperEditor 减 686 行（2748→1481）+ 8 子 SFC + 2 composable + 42 tests + CI 防退化；merge 进基线后继续 |
+| `pytest-residual-failures-cleanup/` | ✅ 已闭环 | 全部执行完毕 | 2026-05-28 commit 7a90c3e9 |
+| `report-module-enhancement/` | 📝 待执行 | 0/10 | 2026-05-29 commit 612c8a79 三件套就绪：7 需求 / 11 PBT / 5 大领域（种子公式补全 + 路由注册 + 覆盖验证 + CFS 规则扩展 + API 测试基础设施） |
+| `workpaper-list-shrink/` | 📝 待执行 | 0/13 | 2026-05-28 三件套就绪（10 stories/61 ACs/1 PBT + 5 ADR）；目标 = WorkpaperList.vue 3463→≤1000 拆 5 子 SFC + 1 shell；已有 4 子组件可复用（kanban/lifecycle/graph/matrix），仅需新建 Workbench |
 
 ---
 
@@ -83,6 +88,13 @@
 ### 3.8 全局结构治理（1 个）
 
 `repo-frontend-layout-unification`（2026-05-29 完成，9/9 tasks，删仓库根 frontend/ 空壳 + 加 pre-commit hook 防回归）
+
+### 3.9 README stub（待启动）
+
+| Spec | 说明 |
+|------|------|
+| `workpaper-fill-service-split/` | README stub（2026-05-28）：workpaper_fill_service 1587 行拆 4 service；prefill 扩展时启动 |
+| `gt-c-note-table-shrink/` | README stub（2026-05-28）：GtCNoteTable 1608 / GtEControlTest 1125 拆子组件；触碰时启动 |
 
 ---
 

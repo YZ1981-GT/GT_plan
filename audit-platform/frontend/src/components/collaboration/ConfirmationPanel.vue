@@ -39,11 +39,11 @@
 
     <!-- 新建函证弹窗 -->
     <el-dialog append-to-body v-model="showCreateDialog" title="新建函证" width="500px">
-      <el-form :model="createForm" label-width="100px">
-        <el-form-item label="交易对手" required>
+      <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="100px">
+        <el-form-item label="交易对手" prop="counterparty" required>
           <el-input v-model="createForm.counterparty" placeholder="请输入交易对手名称" />
         </el-form-item>
-        <el-form-item label="函证类型" required>
+        <el-form-item label="函证类型" prop="type" required>
           <el-select v-model="createForm.type" placeholder="请选择类型">
             <el-option label="银行" value="BANK" />
             <el-option label="应收账款" value="AR" />
@@ -85,8 +85,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { confirmationApi } from '@/services/collaborationApi'
+import { rules } from '@/utils/formRules'
 
 const projectId = 'current-project-id'
 const activeTab = ref('ALL')
@@ -94,6 +96,7 @@ const showCreateDialog = ref(false)
 const showReviewDialog = ref(false)
 const currentRow = ref<any>(null)
 const reviewComments = ref('')
+const createFormRef = ref<FormInstance>()
 
 const confirmations = ref<any[]>([])
 const createForm = ref({
@@ -102,6 +105,10 @@ const createForm = ref({
   amount: 0,
   description: '',
 })
+const createRules: FormRules = {
+  counterparty: [rules.required('交易对手')],
+  type: [rules.required('函证类型', 'change')],
+}
 
 const typeMap: Record<string, string> = {
   BANK: '银行',

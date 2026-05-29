@@ -11,6 +11,8 @@
     "build-storybook": "storybook build",
     "stylelint": "stylelint \"src/**/*.{vue,css,scss}\" --max-warnings=0",
     "stylelint:fix": "stylelint \"src/**/*.{vue,css,scss}\" --fix",
+    "lint": "eslint --ext .vue,.ts,.js src/",
+    "lint:fix": "eslint --ext .vue,.ts,.js src/ --fix",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:wp": "playwright test e2e/workpaper-editor-loading.spec.ts e2e/workpaper-e1-cash-optimization.spec.ts"
@@ -57,8 +59,12 @@
     "@types/d3": "7.4.3",
     "@types/dompurify": "^3.0.5",
     "@types/nprogress": "^0.2.3",
+    "@typescript-eslint/parser": "^8.60.0",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/test-utils": "^2.4.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-gt-audit": "file:./eslint-rules",
+    "eslint-plugin-vue": "^10.9.1",
     "fast-check": "^4.8.0",
     "glob": "^13.0.6",
     "jsdom": "^25.0.0",
@@ -71,6 +77,7 @@
     "unplugin-vue-components": "^32.0.0",
     "vite": "^6.0.5",
     "vitest": "^3.1.0",
+    "vue-eslint-parser": "^10.4.0",
     "vue-tsc": "^2.2.0"
   }
 }

@@ -75,7 +75,7 @@ async def preview_conversion(
     Requirements: 47.4
     """
     if body.target_type not in ("soe", "listed"):
-        raise HTTPException(status_code=400, detail="target_type must be 'soe' or 'listed'")
+        raise HTTPException(status_code=400, detail={"message": "target_type 必须是 soe 或 listed", "message_en": "target_type must be 'soe' or 'listed'"})
 
     from app.services.note_conversion_service import NoteConversionService
 
@@ -115,7 +115,7 @@ async def execute_conversion(
     Requirements: 47.2, 47.3, 47.5, 47.6
     """
     if body.target_type not in ("soe", "listed"):
-        raise HTTPException(status_code=400, detail="target_type must be 'soe' or 'listed'")
+        raise HTTPException(status_code=400, detail={"message": "target_type 必须是 soe 或 listed", "message_en": "target_type must be 'soe' or 'listed'"})
 
     from app.services.note_conversion_service import NoteConversionService
 

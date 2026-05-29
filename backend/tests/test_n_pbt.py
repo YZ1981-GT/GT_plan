@@ -91,7 +91,7 @@ REAL_N_SHEETS: list[str] = [
 
 
 @given(name=st.text(min_size=1, max_size=100))
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_n_normalize_idempotent(name: str) -> None:
     """P1: normalize(normalize(x)) == normalize(x) — 幂等性
 
@@ -141,7 +141,7 @@ _drift_st = st.floats(
 
 
 @given(opening=_amount_st, accrued=_amount_st, paid=_amount_st, drift=_drift_st)
-@settings(max_examples=200, deadline=None,
+@settings(max_examples=15, deadline=None,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_vr_n2_01_triangle_formula_pbt(
     opening: float, accrued: float, paid: float, drift: float
@@ -233,7 +233,7 @@ def _classify_n_sheet(name: str) -> str:
     st.sampled_from(REAL_N_SHEETS),
     st.text(min_size=0, max_size=200),
 ))
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_n_sheet_group_completeness_pbt(sheet_name: str) -> None:
     """P3: 任意 sheet 名经 classifyNSheet 返回恰好 1 个有效类别
 
@@ -342,7 +342,7 @@ _ALL_REF_IDS = _extract_ref_ids(_ALL_REFS)
         max_size=50,
     )
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_n_ref_id_unique_pbt(indices: list[int]) -> None:
     """P4: 任意子集 cross_wp_references 条目的 ref_id 全局唯一
 

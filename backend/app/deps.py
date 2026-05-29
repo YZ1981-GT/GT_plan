@@ -24,7 +24,8 @@ db = get_db
 from app.core.database import get_sync_db  # noqa: E402
 sync_db = get_sync_db
 
-from app.models.core import ProjectUser, User
+from app.models.core import Project, ProjectUser, User
+from app.models.base import ProjectStatus
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +139,36 @@ def require_role(allowed_roles: list[str]) -> Callable:
 
 
 # ---------------------------------------------------------------------------
+# _check_project_not_archived — 归档项目只读守卫
+# ---------------------------------------------------------------------------
+
+
+async def _check_project_not_archived(
+    db: AsyncSession,
+    project_id: UUID,
+    current_user: User,
+    min_permission: str,
+) -> None:
+    """归档项目只读守卫。
+
+    - readonly 权限：跳过（允许只读查询）
+    - editor / admin 权限：检查 project.status，archived 时抛 423
+    """
+    if min_permission == "readonly":
+        return
+    project = await db.get(Project, project_id)
+    if project and project.status == ProjectStatus.archived:
+        raise HTTPException(
+            status_code=423,
+            detail={
+                "error_code": "PROJECT_ARCHIVED",
+                "message": "项目已归档，无法编辑",
+                "message_en": "Project archived (read-only)",
+            },
+        )
+
+
+# ---------------------------------------------------------------------------
 # require_project_access
 # ---------------------------------------------------------------------------
 
@@ -157,6 +188,9 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> User:
+        # 归档项目只读守卫（仅 non-readonly 权限触发）
+        await _check_project_not_archived(db, project_id, current_user, min_permission)
+
         # admin 跳过项目权限检查（不设置 RLS context，admin 使用 bypass 函数）
         if current_user.role.value == "admin":
             # admin 仍设置 RLS context 以便普通查询正常工作

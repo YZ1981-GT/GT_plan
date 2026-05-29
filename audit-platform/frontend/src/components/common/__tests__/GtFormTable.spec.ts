@@ -54,11 +54,30 @@ vi.mock('@/stores/displayPrefs', () => ({
 vi.mock('@/composables/useCopyPaste', () => ({ copySelection: vi.fn(), pasteToSelection: vi.fn(), setupPasteListener: vi.fn() }))
 vi.mock('@/composables/useKeyboardNav', () => ({ useKeyboardNav: vi.fn() }))
 
+// 全局 element-plus stubs（避免 #default scope undefined 报错）
+const STUBS = {
+  'el-table': {
+    template: '<div class="el-table"><slot /></div>',
+    props: ['data', 'border', 'size', 'maxHeight', 'rowKey'],
+  },
+  'el-table-column': {
+    template: '<div class="el-table-column" :data-prop="prop" :data-label="label"><slot v-if="$slots.default" :row="{}" :$index="0" /></div>',
+    props: ['prop', 'label', 'width', 'minWidth', 'align', 'type', 'fixed', 'resizable', 'sortable', 'filters', 'filterMethod', 'filterOptions'],
+  },
+  'el-button': { template: '<button class="el-button"><slot /></button>' },
+  'el-input': { template: '<input class="el-input" />', props: ['modelValue'] },
+  'el-icon': { template: '<i class="el-icon"><slot /></i>' },
+  'el-dropdown': { template: '<div class="el-dropdown"><slot /><slot name="dropdown" /></div>' },
+  'el-dropdown-menu': { template: '<div class="el-dropdown-menu"><slot /></div>' },
+  'el-dropdown-item': { template: '<div class="el-dropdown-item"><slot /></div>' },
+}
+
 import GtFormTable from '../GtFormTable.vue'
 
 describe('GtFormTable 行内编辑型表格', () => {
   it('1. 默认 editable=true：进入编辑模式应展示编辑控件提示', async () => {
     const wrapper = mount(GtFormTable, {
+      global: { stubs: STUBS },
       props: {
         modelValue: [{ name: 'foo' }],
         columns: [{ prop: 'name', label: '名称', editType: 'input' }],
@@ -71,6 +90,7 @@ describe('GtFormTable 行内编辑型表格', () => {
 
   it('2. update:modelValue 事件透传', async () => {
     const wrapper = mount(GtFormTable, {
+      global: { stubs: STUBS },
       props: {
         modelValue: [{ name: 'foo' }],
         columns: [{ prop: 'name', label: '名称' }],
@@ -86,6 +106,7 @@ describe('GtFormTable 行内编辑型表格', () => {
 
   it('3. dirty-change 事件透传', async () => {
     const wrapper = mount(GtFormTable, {
+      global: { stubs: STUBS },
       props: {
         modelValue: [],
         columns: [{ prop: 'name', label: '名称' }],
@@ -100,6 +121,7 @@ describe('GtFormTable 行内编辑型表格', () => {
 
   it('4. show-selection 透传到 GtEditableTable', async () => {
     const wrapper = mount(GtFormTable, {
+      global: { stubs: STUBS },
       props: {
         modelValue: [],
         columns: [{ prop: 'name', label: '名称' }],
@@ -114,6 +136,7 @@ describe('GtFormTable 行内编辑型表格', () => {
   it('5. v-model 绑定双向同步', async () => {
     const data = [{ name: 'foo' }]
     const wrapper = mount(GtFormTable, {
+      global: { stubs: STUBS },
       props: {
         modelValue: data,
         columns: [{ prop: 'name', label: '名称' }],

@@ -1,18 +1,18 @@
 <template>
   <el-card shadow="never" class="gt-api-config">
     <template #header><span class="gt-card-title">外部API配置</span></template>
-    <el-form ref="formRef" :model="form" label-width="100px" size="default">
-      <el-form-item label="API端点">
+    <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px" size="default">
+      <el-form-item label="API端点" prop="endpoint">
         <el-input v-model="form.endpoint" placeholder="https://api.example.com/v1" />
       </el-form-item>
-      <el-form-item label="超时时间">
+      <el-form-item label="超时时间" prop="timeout">
         <el-input-number v-model="form.timeout" :min="1" :max="300" :step="5" />
         <span style="margin-left: 8px; color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm)">秒</span>
       </el-form-item>
-      <el-form-item label="API Key">
+      <el-form-item label="API Key" prop="api_key">
         <el-input v-model="form.api_key" type="password" show-password placeholder="输入API密钥" />
       </el-form-item>
-      <el-form-item label="请求头">
+      <el-form-item label="请求头" prop="headers">
         <el-input v-model="form.headers" type="textarea" :rows="3" placeholder='{"Authorization": "Bearer xxx"}' />
       </el-form-item>
       <el-form-item>
@@ -25,10 +25,13 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
+import { rules } from '@/utils/formRules'
 
 const saving = ref(false)
 const testing = ref(false)
+const formRef = ref<FormInstance>()
 
 const form = ref({
   endpoint: '',
@@ -36,6 +39,11 @@ const form = ref({
   api_key: '',
   headers: '',
 })
+
+const formRules: FormRules = {
+  endpoint: [rules.required('API端点')],
+  api_key: [rules.required('API Key')],
+}
 
 function onSave() {
   saving.value = true

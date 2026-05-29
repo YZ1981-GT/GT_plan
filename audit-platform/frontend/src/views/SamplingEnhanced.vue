@@ -16,8 +16,12 @@
           <el-table-column prop="voucher_date" label="日期" width="100" />
           <el-table-column prop="voucher_no" label="凭证号" width="100" />
           <el-table-column prop="account_code" label="科目" width="100" />
-          <el-table-column prop="debit_amount" label="借方" width="120" align="right" />
-          <el-table-column prop="credit_amount" label="贷方" width="120" align="right" />
+          <el-table-column prop="debit_amount" label="借方" width="120" align="right">
+            <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
+          </el-table-column>
+          <el-table-column prop="credit_amount" label="贷方" width="120" align="right">
+            <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
+          </el-table-column>
           <el-table-column prop="summary" label="摘要" show-overflow-tooltip />
           <el-table-column label="截止" width="80">
             <template #default="{ row }"><el-tag :type="row.is_before_cutoff ? 'success' : 'danger'" size="small">{{ row.is_before_cutoff ? '期内' : '期后' }}</el-tag></template>
@@ -42,7 +46,9 @@
         </el-form>
         <el-table v-if="agingResult" :data="agingResult.details" stripe size="small" style="margin-top: 16px">
           <el-table-column prop="aux_name" label="辅助维度" width="160" />
-          <el-table-column prop="total_balance" label="余额合计" width="120" align="right" />
+          <el-table-column prop="total_balance" label="余额合计" width="120" align="right">
+            <template #default="{ row }"><GtAmountCell :value="row.total_balance" /></template>
+          </el-table-column>
           <el-table-column v-for="b in agingResult.summary" :key="b.label" :label="b.label" align="right">
             <template #default="{ row }">{{ row.brackets?.find((x: any) => x.label === b.label)?.amount ?? '-' }}</template>
           </el-table-column>
@@ -57,10 +63,18 @@
         </el-form>
         <el-table v-if="monthlyResult" :data="monthlyResult.months" stripe size="small" style="margin-top: 16px">
           <el-table-column prop="period" label="月份" width="80" />
-          <el-table-column prop="debit_total" label="借方合计" width="120" align="right" />
-          <el-table-column prop="credit_total" label="贷方合计" width="120" align="right" />
-          <el-table-column prop="net_change" label="净变动" width="120" align="right" />
-          <el-table-column prop="cumulative" label="累计" width="120" align="right" />
+          <el-table-column prop="debit_total" label="借方合计" width="120" align="right">
+            <template #default="{ row }"><GtAmountCell :value="row.debit_total" /></template>
+          </el-table-column>
+          <el-table-column prop="credit_total" label="贷方合计" width="120" align="right">
+            <template #default="{ row }"><GtAmountCell :value="row.credit_total" /></template>
+          </el-table-column>
+          <el-table-column prop="net_change" label="净变动" width="120" align="right">
+            <template #default="{ row }"><GtAmountCell :value="row.net_change" /></template>
+          </el-table-column>
+          <el-table-column prop="cumulative" label="累计" width="120" align="right">
+            <template #default="{ row }"><GtAmountCell :value="row.cumulative" /></template>
+          </el-table-column>
           <el-table-column prop="entry_count" label="笔数" width="80" align="right" />
         </el-table>
       </el-tab-pane>
@@ -73,6 +87,7 @@ import { useRoute } from 'vue-router'
 import { cutoffTest, agingAnalysis, monthlyDetail } from '@/services/commonApi'
 import { useEditMode } from '@/composables/useEditMode'
 import { useProjectStore } from '@/stores/project'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
 const route = useRoute()
 const projectId = ref(route.params.projectId as string || '')
 const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()

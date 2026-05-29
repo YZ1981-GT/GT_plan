@@ -40,15 +40,15 @@
       </el-table-column>
     </el-table>
     <el-dialog append-to-body v-model="showCreate" title="添加批注" width="480px">
-      <el-form label-width="80px">
-        <el-form-item label="对象类型">
+      <el-form ref="annoFormRef" :model="form" :rules="annoRules" label-width="80px">
+        <el-form-item label="对象类型" prop="object_type">
           <el-select v-model="form.object_type">
             <el-option label="底稿" value="workpaper" />
             <el-option label="附注" value="disclosure_note" />
           </el-select>
         </el-form-item>
         <el-form-item label="单元格"><el-input v-model="form.cell_ref" placeholder="如 E9-1!B15" /></el-form-item>
-        <el-form-item label="内容"><el-input v-model="form.content" type="textarea" :rows="3" /></el-form-item>
+        <el-form-item label="内容" prop="content"><el-input v-model="form.content" type="textarea" :rows="3" /></el-form-item>
         <el-form-item label="优先级">
           <el-select v-model="form.priority"><el-option label="高" value="high" /><el-option label="中" value="medium" /><el-option label="低" value="low" /></el-select>
         </el-form-item>
@@ -63,14 +63,21 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { listAnnotations, createAnnotation, updateAnnotation } from '@/services/commonApi'
+import { rules } from '@/utils/formRules'
 const route = useRoute()
 const projectId = ref(route.params.projectId as string || '')
 const annotations = ref<any[]>([])
 const filters = ref({ status: '', priority: '' })
 const showCreate = ref(false)
+const annoFormRef = ref<FormInstance>()
 const form = ref({ object_type: 'workpaper', object_id: '00000000-0000-0000-0000-000000000000', cell_ref: '', content: '', priority: 'medium' })
+const annoRules: FormRules = {
+  object_type: [rules.required('对象类型', 'change')],
+  content: [rules.required('内容')],
+}
 async function fetch() {
   if (!projectId.value) return
   annotations.value = await listAnnotations(projectId.value, { status: filters.value.status || undefined, priority: filters.value.priority || undefined })

@@ -71,12 +71,6 @@ const daysAgo = computed(() => {
   return Math.floor((now.getTime() - saved.getTime()) / (1000 * 60 * 60 * 24))
 })
 
-export interface ChipVariant {
-  type: 'warning' | 'info' | '' | 'primary'
-  effect: 'light' | 'plain' | 'dark'
-  label: string
-}
-
 const chipVariant = computed<ChipVariant | null>(() => {
   return getChipVariant(props.source, props.savedAt ?? null)
 })
@@ -111,10 +105,16 @@ function formatDateTime(iso: string): string {
  * 纯函数：根据 source + saved_at 计算 chip 变体。
  * 导出供测试使用。
  */
+export interface ChipVariant {
+  type: 'warning' | 'info' | 'primary'
+  effect: 'light' | 'plain' | 'dark'
+  label: string
+}
+
 export function getChipVariant(
   source: string,
   savedAt: string | null
-): { type: 'warning' | 'info' | '' | 'primary'; effect: 'light' | 'plain' | 'dark'; label: string } | null {
+): { type: 'warning' | 'info' | 'primary'; effect: 'light' | 'plain' | 'dark'; label: string } | null {
   if (source === 'xlsx_recomputed') {
     return { type: 'primary', effect: 'light', label: '⚙ 重算结果' }
   }

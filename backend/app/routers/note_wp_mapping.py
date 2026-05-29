@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
+from app.schemas._common import OptionalAmountDecimal
 from app.services.note_wp_mapping_service import NoteWpMappingService
 
 router = APIRouter(prefix="/api/disclosure-notes", tags=["note-wp-mapping"])
@@ -58,7 +59,7 @@ class ToggleModeRequest(BaseModel):
     row_label: str
     col_index: int
     mode: str  # auto / manual
-    manual_value: float | None = None
+    manual_value: OptionalAmountDecimal = None
 
 
 @router.post("/{project_id}/{year}/{note_id}/toggle-mode")

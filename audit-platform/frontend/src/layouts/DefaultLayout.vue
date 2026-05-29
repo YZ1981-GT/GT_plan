@@ -85,12 +85,6 @@
       />
       <!-- 具体子页面：右侧全宽显示路由内容 -->
       <div v-else class="gt-detail-content">
-        <!-- Phase 1 F3: 穿透面包屑导航 -->
-        <DrilldownBreadcrumb
-          v-if="navigationStack.length > 0"
-          :stack="navigationStack"
-          @jump="navJumpTo"
-        />
         <!-- R7-S3-10：联动状态横条 -->
         <LinkageStatusBar
           v-if="staleCount > 0"
@@ -128,10 +122,10 @@ import ConsolMiddleNav from '@/components/consolidation/ConsolMiddleNav.vue'
 import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
 import NotificationCenter from '@/components/collaboration/NotificationCenter.vue'
 import GlobalSearchDialog from '@/components/common/GlobalSearchDialog.vue'
-import DrilldownBreadcrumb from '@/components/common/DrilldownBreadcrumb.vue'
 import { Bell, DataAnalysis, DataLine, Lock, CaretBottom } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { initGlobalBackspace, useNavigationStack } from '@/composables/useNavigationStack'
+import { initGlobalBackspace } from '@/composables/useNavigationStack'
+import { handleApiError } from '@/utils/errorHandler'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
 import { getProject } from '@/services/auditPlatformApi'
@@ -140,7 +134,6 @@ import { getGlobalReviewInbox } from '@/services/pmApi'
 const route = useRoute()
 const router = useRouter()
 initGlobalBackspace(router)
-const { stack: navigationStack, jumpTo: navJumpTo } = useNavigationStack()
 
 // UI-1: 方向性页面过渡动画（前进 slide-left，后退 slide-right）
 const transitionName = ref('slide-left')
@@ -187,7 +180,7 @@ async function onRecalcStale() {
     staleCount.value = 0
     ElMessage.success('已触发全量重算')
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail?.message || err?.message || '重算失败')
+    handleApiError(err, '全量重算')
   }
 }
 

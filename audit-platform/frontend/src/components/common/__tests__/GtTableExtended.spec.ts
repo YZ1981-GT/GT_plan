@@ -52,11 +52,48 @@ vi.mock('@/stores/displayPrefs', () => ({
 vi.mock('@/composables/useCopyPaste', () => ({ copySelection: vi.fn(), pasteToSelection: vi.fn(), setupPasteListener: vi.fn() }))
 vi.mock('@/composables/useKeyboardNav', () => ({ useKeyboardNav: vi.fn() }))
 
+// 全局 element-plus stubs
+const STUBS = {
+  'el-table': {
+    template: '<div class="el-table"><slot /></div>',
+    props: ['data', 'border', 'size', 'maxHeight', 'rowKey'],
+  },
+  'el-table-column': {
+    template: '<div class="el-table-column" :data-prop="prop" :data-label="label"><slot v-if="$slots.default" :row="{}" :$index="0" /></div>',
+    props: ['prop', 'label', 'width', 'minWidth', 'align', 'type', 'fixed', 'resizable', 'sortable', 'filters', 'filterMethod', 'filterOptions', 'formatter'],
+  },
+  'el-button': { template: '<button class="el-button"><slot /></button>' },
+  'el-input': { template: '<input class="el-input" />', props: ['modelValue'] },
+  'el-icon': { template: '<i class="el-icon"><slot /></i>' },
+  'el-dropdown': { template: '<div class="el-dropdown"><slot /><slot name="dropdown" /></div>' },
+  'el-dropdown-menu': { template: '<div class="el-dropdown-menu"><slot /></div>' },
+  'el-dropdown-item': { template: '<div class="el-dropdown-item"><slot /></div>' },
+  // 透传 slot + 模拟 formatter 调用 + 渲染 column labels
+  GtEditableTable: {
+    template: `<div class="gt-editable-table">
+      <div class="toolbar"><slot name="toolbar-left" /></div>
+      <div class="columns">
+        <span v-for="(col, idx) in columns" :key="idx" class="column-label">{{ col.label }}</span>
+      </div>
+      <div class="content">
+        <template v-for="(col, idx) in columns" :key="idx">
+          <span v-if="col.formatter && modelValue && modelValue.length > 0" class="formatter-cell">
+            {{ col.formatter(modelValue[0][col.prop], modelValue[0], col, 0) }}
+          </span>
+        </template>
+        <slot />
+      </div>
+    </div>`,
+    props: ['modelValue', 'columns', 'editable', 'showToolbar', 'showFooter', 'showSummary', 'maxHeight', 'defaultSortable', 'groupBy', 'showSelection'],
+  },
+}
+
 import GtTableExtended from '../GtTableExtended.vue'
 
 describe('GtTableExtended 列表展示型表格', () => {
   it('1. 列渲染：visible 列正确传递', async () => {
     const wrapper = mount(GtTableExtended, {
+      global: { stubs: STUBS },
       props: {
         modelValue: [{ name: 'foo', amount: 100 }],
         columns: [
@@ -73,6 +110,7 @@ describe('GtTableExtended 列表展示型表格', () => {
   it('2. 格式化函数被调用', async () => {
     const formatter = vi.fn((v: number) => `¥${v.toFixed(2)}`)
     const wrapper = mount(GtTableExtended, {
+      global: { stubs: STUBS },
       props: {
         modelValue: [{ amount: 1234.5 }],
         columns: [{ prop: 'amount', label: '金额', formatter }],
@@ -84,6 +122,7 @@ describe('GtTableExtended 列表展示型表格', () => {
 
   it('3. 空数据时正常渲染', async () => {
     const wrapper = mount(GtTableExtended, {
+      global: { stubs: STUBS },
       props: {
         modelValue: [],
         columns: [{ prop: 'name', label: '名称' }],
@@ -96,6 +135,7 @@ describe('GtTableExtended 列表展示型表格', () => {
 
   it('4. editable=false：不出现编辑控件', async () => {
     const wrapper = mount(GtTableExtended, {
+      global: { stubs: STUBS },
       props: {
         modelValue: [{ name: 'foo' }],
         columns: [{ prop: 'name', label: '名称', editType: 'input' }],
@@ -108,6 +148,7 @@ describe('GtTableExtended 列表展示型表格', () => {
 
   it('5. 透传 toolbar-left slot', async () => {
     const wrapper = mount(GtTableExtended, {
+      global: { stubs: STUBS },
       props: {
         modelValue: [],
         columns: [{ prop: 'name', label: '名称' }],

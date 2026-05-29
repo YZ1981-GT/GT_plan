@@ -134,6 +134,7 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   visible: boolean
@@ -290,7 +291,7 @@ async function onAnalyze() {
       ElMessage.warning(`不满足资本化条件，缺失 ${resp.missing_conditions.length} 项`)
     }
   } catch (e: any) {
-    ElMessage.error(e?.message || '资本化时点判断失败')
+    handleApiError(e, '资本化时点判断')
   } finally {
     loading.value = false
   }
@@ -315,7 +316,7 @@ async function onApplyToSheet() {
       ElMessage.warning('分析完成但未写回（applied_to_sheet 为空）')
     }
   } catch (e: any) {
-    ElMessage.error(e?.message || '采纳写回失败')
+    handleApiError(e, '采纳写回')
   } finally {
     applying.value = false
   }

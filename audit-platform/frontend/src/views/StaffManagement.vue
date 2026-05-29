@@ -46,8 +46,8 @@
 
     <!-- 创建/编辑弹窗 -->
     <el-dialog append-to-body v-model="showCreateDialog" :title="editingStaff ? '编辑人员' : '新增人员'" width="500px">
-      <el-form :model="formData" label-width="90px">
-        <el-form-item label="姓名" required><el-input v-model="formData.name" /></el-form-item>
+      <el-form ref="staffFormRef" :model="formData" :rules="staffRules" label-width="90px">
+        <el-form-item label="姓名" prop="name" required><el-input v-model="formData.name" /></el-form-item>
         <el-form-item label="工号"><el-input v-model="formData.employee_no" /></el-form-item>
         <el-form-item label="部门"><el-input v-model="formData.department" /></el-form-item>
         <el-form-item label="职级">
@@ -101,11 +101,11 @@
       :close-on-click-modal="false"
       @close="resetHandoverForm"
     >
-      <el-form :model="handoverForm" label-width="100px">
+      <el-form ref="handoverFormRef" :model="handoverForm" :rules="handoverRules" label-width="100px">
         <el-form-item label="交接人">
           <span style="font-weight: 600">{{ handoverTarget?.name }}（{{ handoverTarget?.title || '—' }}）</span>
         </el-form-item>
-        <el-form-item label="目标人" required>
+        <el-form-item label="目标人" prop="target_staff_id" required>
           <el-select
             v-model="handoverForm.target_staff_id"
             filterable
@@ -121,7 +121,7 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="原因" required>
+        <el-form-item label="原因" prop="reason_code" required>
           <el-select v-model="handoverForm.reason_code" placeholder="请选择原因" style="width: 100%">
             <el-option label="离职" value="resignation" />
             <el-option label="长期休假" value="long_leave" />
@@ -137,7 +137,7 @@
             placeholder="可选，补充交接原因"
           />
         </el-form-item>
-        <el-form-item label="生效日期" required>
+        <el-form-item label="生效日期" prop="effective_date" required>
           <el-date-picker
             v-model="handoverForm.effective_date"
             type="date"
@@ -186,6 +186,7 @@
 <script setup lang="ts">
 import * as P from '@/services/apiPaths'
 import { ref, computed, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { confirmDelete, confirmDangerous } from '@/utils/confirm'
 import { useEditMode } from '@/composables/useEditMode'
@@ -194,6 +195,7 @@ import { listStaff, createStaff, updateStaff, getStaffResume, deleteStaff, type 
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
+import { rules } from '@/utils/formRules'
 
 const titles = ['合伙人', '总监', '高级经理', '经理', '高级审计员', '审计员', '实习生']
 
@@ -213,6 +215,10 @@ const saving = ref(false)
 const resumeData = ref<any>(null)
 
 const formData = ref({ name: '', employee_no: '', department: '', title: '', partner_name: '', specialty: '', phone: '', email: '' })
+const staffFormRef = ref<FormInstance>()
+const staffRules: FormRules = {
+  name: [rules.required('姓名')],
+}
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 function debouncedSearch() {
@@ -296,6 +302,12 @@ const handoverForm = ref({
   reason_detail: '',
   effective_date: '',
 })
+const handoverFormRef = ref<FormInstance>()
+const handoverRules: FormRules = {
+  target_staff_id: [rules.required('目标人', 'change')],
+  reason_code: [rules.required('原因', 'change')],
+  effective_date: [{ required: true, message: '请选择生效日期', trigger: 'change' }],
+}
 
 const canSubmitHandover = computed(() => {
   return (

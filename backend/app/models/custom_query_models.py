@@ -42,7 +42,9 @@ class CustomQueryTemplate(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     data_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    config: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=sa.text("'{}'::jsonb"))
+    # NOTE: 不写 `'{}'::jsonb`（PG 字面 cast）—— SQLite 测试 dialect 不识别 `::`
+    # JSON 字面量在 PG/SQLite 双方言下都能解析为合法 JSON 对象
+    config: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=sa.text("'{}'"))
     scope: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default=sa.text("'private'")
     )

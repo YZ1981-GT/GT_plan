@@ -102,14 +102,14 @@
 
     <!-- 新建程序对话框 -->
     <el-dialog append-to-body v-model="createDialogVisible" title="新建审计程序" width="600px">
-      <el-form :model="procedureForm" label-width="110px">
-        <el-form-item label="程序编号" required>
+      <el-form ref="procedureFormRef" :model="procedureForm" :rules="procedureRules" label-width="110px">
+        <el-form-item label="程序编号" prop="procedure_code" required>
           <el-input v-model="procedureForm.procedure_code" placeholder="如：AP-001" />
         </el-form-item>
-        <el-form-item label="程序名称" required>
+        <el-form-item label="程序名称" prop="procedure_name" required>
           <el-input v-model="procedureForm.procedure_name" placeholder="审计程序名称" />
         </el-form-item>
-        <el-form-item label="程序类型" required>
+        <el-form-item label="程序类型" prop="procedure_type" required>
           <el-select v-model="procedureForm.procedure_type" style="width: 100%">
             <el-option label="风险评估程序" value="risk_assessment" />
             <el-option label="控制测试" value="control_test" />
@@ -165,8 +165,8 @@
 
     <!-- 关联底稿对话框 -->
     <el-dialog append-to-body v-model="linkDialogVisible" title="关联底稿" width="400px">
-      <el-form label-width="80px">
-        <el-form-item label="底稿编号">
+      <el-form ref="linkFormRef" :model="linkForm" :rules="linkRules" label-width="80px">
+        <el-form-item label="底稿编号" prop="related_wp_code">
           <el-input v-model="linkForm.related_wp_code" placeholder="输入底稿编号" />
         </el-form-item>
       </el-form>
@@ -180,8 +180,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { auditProgramApi, riskApi } from '@/services/collaborationApi'
+import { rules } from '@/utils/formRules'
 
 interface Procedure {
   id: string
@@ -239,6 +241,17 @@ const procedureForm = ref<{
 const linkForm = ref({
   related_wp_code: '',
 })
+
+const procedureFormRef = ref<FormInstance>()
+const linkFormRef = ref<FormInstance>()
+const procedureRules: FormRules = {
+  procedure_code: [rules.required('程序编号')],
+  procedure_name: [rules.required('程序名称')],
+  procedure_type: [rules.required('程序类型', 'change')],
+}
+const linkRules: FormRules = {
+  related_wp_code: [rules.required('底稿编号')],
+}
 
 const filteredProcedures = computed(() => {
   return procedures.value.filter(p => {

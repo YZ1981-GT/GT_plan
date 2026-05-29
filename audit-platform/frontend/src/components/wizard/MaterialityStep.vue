@@ -110,7 +110,7 @@
       <!-- 手动覆盖 -->
       <el-collapse class="override-section">
         <el-collapse-item title="手动覆盖（可选）" name="override">
-          <el-form label-width="140px">
+          <el-form ref="overrideFormRef" :model="overrideForm" :rules="overrideRules" label-width="140px">
             <el-form-item label="整体重要性">
               <el-input-number
                 v-model="overrideForm.overall_materiality"
@@ -138,7 +138,7 @@
                 style="width: 100%"
               />
             </el-form-item>
-            <el-form-item label="覆盖原因" required>
+            <el-form-item label="覆盖原因" prop="reason" required>
               <el-input
                 v-model="overrideForm.reason"
                 type="textarea"
@@ -205,6 +205,10 @@ const overrideForm = reactive({
   trivial_threshold: undefined as number | undefined,
   reason: '',
 })
+const overrideFormRef = ref<FormInstance>()
+const overrideRules: FormRules = {
+  reason: [{ required: true, message: '请说明覆盖原因', trigger: 'blur' }],
+}
 
 const formatAmount = fmtAmount
 

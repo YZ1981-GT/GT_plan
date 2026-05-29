@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import GtBIndex from '../GtBIndex.vue'
+import GtBIndex, { type BIndexSchema } from '../GtBIndex.vue'
 
 // Mock GtIndexChip - simple stub that emits click on click
 vi.mock('@/components/workpaper/GtIndexChip.vue', () => ({
@@ -52,8 +52,9 @@ const globalStubs = {
       '<div class="el-table-column" :data-label="label" :data-prop="prop"><slot v-if="$slots.default" :row="firstRow" /></div>',
     props: ['type', 'label', 'prop', 'width', 'minWidth', 'align', 'resizable'],
     computed: {
-      firstRow() {
-        const data = this.$parent?.$attrs?.data || this.$parent?.data || []
+      firstRow(): Record<string, any> {
+        const self = this as any
+        const data = self.$parent?.$attrs?.data || self.$parent?.data || []
         return Array.isArray(data) && data.length ? data[0] : {}
       },
     },
@@ -72,7 +73,7 @@ const globalStubs = {
   },
 }
 
-function buildSchema() {
+function buildSchema(): BIndexSchema {
   return {
     component_type: 'b-index',
     preparation_info_fields: [

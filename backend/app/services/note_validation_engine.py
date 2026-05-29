@@ -26,7 +26,27 @@ from uuid import UUID, uuid4
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services._decimal_helpers import amount_tolerance
+
 logger = logging.getLogger(__name__)
+
+
+def _resolve_tolerance(rule_tolerance: Decimal, *reference_amounts: Decimal | None) -> Decimal:
+    """按金额规模动态容差，rule.tolerance 作为下限。
+
+    取 max(rule.tolerance, amount_tolerance(max_abs_reference))：
+    - 小金额（<1万）：保持 rule.tolerance（默认 0.01），避免比硬编码更严格
+    - 大金额（≥1万）：使用 amount_tolerance 动态放宽，避免 1000万 元差 1 元被误判不平衡
+    """
+    # 选取参考金额中绝对值最大者作为容差基准
+    candidate: Decimal | None = None
+    for amt in reference_amounts:
+        if amt is None:
+            continue
+        if candidate is None or abs(amt) > abs(candidate):
+            candidate = amt
+    dynamic = amount_tolerance(candidate)
+    return max(rule_tolerance, dynamic)
 
 
 # ---------------------------------------------------------------------------
@@ -327,7 +347,9 @@ def _execute_balance(rule: ValidationRule, ctx: ValidationContext) -> Validation
     result.actual_value = actual
     diff = abs(expected - actual)
     result.diff_amount = diff
-    result.passed = diff <= rule.tolerance
+    # 动态容差：rule.tolerance 作为下限，大金额按 amount_tolerance 放宽
+    tolerance = _resolve_tolerance(rule.tolerance, expected, actual)
+    result.passed = diff <= tolerance
     result.details = {"check": "report_amount == note_total"}
 
     return result
@@ -355,7 +377,11 @@ def _execute_wide_table(rule: ValidationRule, ctx: ValidationContext) -> Validat
 
         expected_closing = opening + increase - decrease
         diff = abs(expected_closing - closing)
-        if diff > rule.tolerance:
+        # 动态容差：以期末/期初/增减金额规模为基准，rule.tolerance 作为下限
+        tolerance = _resolve_tolerance(
+            rule.tolerance, opening, increase, decrease, closing
+        )
+        if diff > tolerance:
             errors.append({
                 "row_index": i,
                 "expected": float(expected_closing),
@@ -405,7 +431,9 @@ def _execute_vertical(rule: ValidationRule, ctx: ValidationContext) -> Validatio
     result.expected_value = total_value
     result.actual_value = detail_sum
     result.diff_amount = diff
-    result.passed = diff <= rule.tolerance
+    # 动态容差：以合计行金额规模为基准，rule.tolerance 作为下限
+    tolerance = _resolve_tolerance(rule.tolerance, total_value, detail_sum)
+    result.passed = diff <= tolerance
     result.details = {"check": "sum(detail_rows) == total_row"}
 
     return result
@@ -469,7 +497,9 @@ def _execute_sub_item(rule: ValidationRule, ctx: ValidationContext) -> Validatio
     result.expected_value = total_value
     result.actual_value = detail_sum
     result.diff_amount = diff
-    result.passed = diff <= rule.tolerance
+    # 动态容差：以合计行金额规模为基准，rule.tolerance 作为下限
+    tolerance = _resolve_tolerance(rule.tolerance, total_value, detail_sum)
+    result.passed = diff <= tolerance
     result.details = {"check": "sum(sub_items) == total"}
 
     return result

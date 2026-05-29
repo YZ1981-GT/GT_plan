@@ -157,8 +157,12 @@ class TestFrontendIntegrationProperty:
     def test_gt_design_tokens_exist(self):
         """GT 设计令牌 CSS 文件应存在"""
         import os
-        css = os.path.join('..', 'audit-platform', 'frontend', 'src', 'styles', 'gt-tokens.css')
-        assert os.path.exists(css)
+        candidates = [
+            os.path.join('audit-platform', 'frontend', 'src', 'styles', 'gt-tokens.css'),
+            os.path.join('..', 'audit-platform', 'frontend', 'src', 'styles', 'gt-tokens.css'),
+            os.path.join('frontend', 'src', 'styles', 'gt-tokens.css'),
+        ]
+        assert any(os.path.exists(c) for c in candidates), f"gt-tokens.css not found in any of: {candidates}"
 
     def test_router_auth_guard(self):
         """前端路由应有认证守卫"""
@@ -172,8 +176,12 @@ class TestFrontendIntegrationProperty:
     def test_pinia_auth_store(self):
         """Pinia 认证 store 应存在"""
         import os
-        store = os.path.join('..', 'audit-platform', 'frontend', 'src', 'stores', 'auth.ts')
-        assert os.path.exists(store)
+        candidates = [
+            os.path.join('audit-platform', 'frontend', 'src', 'stores', 'auth.ts'),
+            os.path.join('..', 'audit-platform', 'frontend', 'src', 'stores', 'auth.ts'),
+            os.path.join('frontend', 'src', 'stores', 'auth.ts'),
+        ]
+        assert any(os.path.exists(c) for c in candidates), f"auth.ts store not found in any of: {candidates}"
 
     def test_element_plus_integration(self):
         """Element Plus 应在 package.json 中"""

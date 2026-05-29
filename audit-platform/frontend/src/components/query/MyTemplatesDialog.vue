@@ -10,7 +10,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Loading } from '@element-plus/icons-vue'
-import api from '@/services/api'
+import api from '@/services/apiProxy'
 import type { CustomQueryTemplateConfig } from '@/types/custom-query-template'
 
 const props = defineProps<{

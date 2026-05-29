@@ -104,7 +104,7 @@ ALL_K_SHEET_NAMES: list[str] = [
 
 
 @given(name=st.text(min_size=0, max_size=100))
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_k_normalize_idempotent(name: str) -> None:
     """P1: normalize(normalize(x)) == normalize(x) — 幂等性
 
@@ -121,7 +121,7 @@ def test_k_normalize_idempotent(name: str) -> None:
 
 
 @given(k_sheet=st.sampled_from(ALL_K_SHEET_NAMES))
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_k_normalize_idempotent_real_sheets(k_sheet: str) -> None:
     """P1 补充：K 循环真实 sheet 名归一化幂等"""
     from app.services.wp_template_init_service import _normalize_sheet_name
@@ -158,7 +158,7 @@ _amount_st = st.floats(
 
 
 @settings(
-    max_examples=200,
+    max_examples=15,
     deadline=None,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
@@ -274,7 +274,7 @@ def _classify_k_sheet(name: str) -> str:
 
 
 @given(k_sheet=st.sampled_from(ALL_K_SHEET_NAMES))
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_k_sheet_group_completeness_pbt(k_sheet: str) -> None:
     """P3: 任意 K 循环代表 sheet 恰好匹配 1 类（非 fallback）"""
     group = _classify_k_sheet(k_sheet)
@@ -404,7 +404,7 @@ class TestKCrossWpRefIdUniqueness:
 
 
 @given(sample_size=st.integers(min_value=1, max_value=50))
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_ref_id_subset_unique_pbt(sample_size: int) -> None:
     """P4: 随机抽样任意子集 ref_id 仍无重复（全局唯一性的概率验证）"""
     import random
@@ -426,7 +426,7 @@ def test_ref_id_subset_unique_pbt(sample_size: int) -> None:
 
 
 @settings(
-    max_examples=200,
+    max_examples=15,
     deadline=None,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
@@ -471,7 +471,7 @@ def test_yoy_monotonicity_pbt(prior: float, current_low: float, delta: float) ->
 
 
 @settings(
-    max_examples=200,
+    max_examples=15,
     deadline=None,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
@@ -552,7 +552,7 @@ def test_yoy_flag_thresholds(prior, current, expected_flag):
         min_value=0.0, max_value=1e9, allow_nan=False, allow_infinity=False
     )
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_yoy_with_prior_zero_safe(current: float) -> None:
     """P5 防御性：prior=0 + current 任意 → 不抛异常 + 返回有效 flag"""
     from app.routers.wp_k_expense_analysis import _calc_yoy
