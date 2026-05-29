@@ -16,7 +16,7 @@ pip install locust
 ### Web UI 模式（推荐）
 
 ```bash
-locust -f tests/load/locustfile.py --host=http://localhost:9980
+locust -f backend/backend/tests/load/locustfile.py --host=http://localhost:9980
 ```
 
 启动后访问 http://localhost:8089 打开 Locust Web UI，设置并发用户数和加压速率。
@@ -24,7 +24,7 @@ locust -f tests/load/locustfile.py --host=http://localhost:9980
 ### 无头模式（CI/自动化）
 
 ```bash
-locust -f tests/load/locustfile.py --host=http://localhost:9980 --headless -u 100 -r 10 --run-time 60s
+locust -f backend/backend/tests/load/locustfile.py --host=http://localhost:9980 --headless -u 100 -r 10 --run-time 60s
 ```
 
 参数说明：
@@ -37,7 +37,7 @@ locust -f tests/load/locustfile.py --host=http://localhost:9980 --headless -u 10
 直接运行即可，`StepLoadShape` 会自动按阶段加压：
 
 ```bash
-locust -f tests/load/locustfile.py --host=http://localhost:9980 --headless
+locust -f backend/tests/load/locustfile.py --host=http://localhost:9980 --headless
 ```
 
 脚本内置 `StepLoadShape` 类自动控制梯度：
@@ -57,7 +57,7 @@ locust -f tests/load/locustfile.py --host=http://localhost:9980 --headless
 不使用 LoadTestShape，手动指定用户数（适合调试单阶段）：
 
 ```bash
-locust -f tests/load/locustfile.py --host=http://localhost:9980 --headless -u 500 -r 50 --run-time 120s
+locust -f backend/tests/load/locustfile.py --host=http://localhost:9980 --headless -u 500 -r 50 --run-time 120s
 ```
 
 注意：手动模式下 `StepLoadShape` 会被忽略（Locust 优先使用命令行参数覆盖 shape）。
@@ -91,8 +91,8 @@ PUT 返回 409（版本冲突）视为正常业务场景（乐观锁），不计
 
 ## 报告输出
 
-- 基线报告：`tests/load/baseline_report.md`
-- 最终报告：`tests/load/final_report.md`
+- 基线报告：`backend/tests/load/baseline_report.md`
+- 最终报告：`backend/tests/load/final_report.md`
 
 ## 注意事项
 
