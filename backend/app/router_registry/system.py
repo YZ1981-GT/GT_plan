@@ -19,6 +19,7 @@
   §96 Redis 健康检查（Phase 4 F5）
   §118 proposal-remaining-18 AT-2: Office 文件在线预览（LibreOffice）
   §120 MT-8 日志集中查看（admin only）
+  §127 审计日志哈希链校验
 """
 from fastapi import FastAPI
 
@@ -224,3 +225,7 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §126. V3 Req 11.3: 时光机自动快照 ═══
     from app.routers.time_machine import router as time_machine_router
     app.include_router(time_machine_router, tags=["时光机"])
+
+    # ═══ §127. 审计日志哈希链校验 ═══
+    from app.routers.audit_logs import router as audit_logs_router
+    app.include_router(audit_logs_router, prefix="/api", tags=["audit-logs"])

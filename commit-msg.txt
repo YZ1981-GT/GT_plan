@@ -1,6 +1,0 @@
-spec(report-module-enhancement): 报表模块增强 spec 三件套
-
-- requirements.md: 7 需求(公式补全/路由注册/覆盖验证/CFS规则/API测试/DSL健壮性/跨标准一致性)
-- design.md: 架构设计 + 11 正确性属性 + 测试策略
-- tasks.md: 10 顶层任务(含可选 PBT 属性测试)
-- memory.md 更新进行中 spec 列表

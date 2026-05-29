@@ -1,10 +1,11 @@
 """报表生成引擎测试
 
-Validates: Requirements 2.1, 2.2, 2.4, 2.5, 2.6, 2.9, 8.2, 8.5
+Validates: Requirements 2.1, 2.2, 2.4, 2.5, 2.6, 2.9, 5.1, 5.2, 5.3, 5.4, 5.5, 8.2, 8.5
 """
 
 import uuid
 from decimal import Decimal
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -571,12 +572,26 @@ async def test_drilldown_nonexistent(db_session: AsyncSession, seeded_db):
 
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession, seeded_db):
-    """创建测试 HTTP 客户端"""
+    """创建测试 HTTP 客户端
+
+    - 使用 override_auth 注入 get_current_user / get_db / get_redis
+    - Mock prerequisite_checker 绕过前置检查
+    - Mock _resolve_applicable_standard 返回 TEST_STANDARD 匹配 seeded 数据
+    """
     from app.main import app
     from tests._test_auth_helper import override_auth
 
-    async with override_auth(app, db_session=db_session) as c:
-        yield c
+    with patch(
+        "app.services.prerequisite_checker.PrerequisiteChecker.check",
+        new_callable=AsyncMock,
+        return_value={"ok": True, "message": "", "prerequisite_action": None},
+    ), patch(
+        "app.routers.reports._resolve_applicable_standard",
+        new_callable=AsyncMock,
+        return_value=TEST_STANDARD,
+    ):
+        async with override_auth(app, db_session=db_session) as c:
+            yield c
 
 
 @pytest.mark.asyncio
@@ -594,7 +609,6 @@ async def test_api_generate_reports(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Report GET/drilldown routes return 404 - route path mismatch with test URL pattern")
 async def test_api_get_report(client: AsyncClient):
     """GET /api/reports/{project_id}/{year}/{report_type}"""
     # First generate
@@ -613,18 +627,24 @@ async def test_api_get_report(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Report GET route returns 404 - route path mismatch")
 async def test_api_get_report_not_found(client: AsyncClient):
-    """GET 未生成的报表返回 404"""
+    """GET 未生成报表的项目返回模板行次结构（200）或 404（无配置）"""
     fake_id = uuid.uuid4()
     resp = await client.get(
         f"/api/reports/{fake_id}/2025/balance_sheet"
     )
-    assert resp.status_code == 404
+    # 当 report_config 有该标准的行次配置时，返回 200 + 空模板结构
+    # 当 report_config 无配置时，返回 404
+    # 由于 seeded_db 已 seed 了 enterprise 标准的 report_config，此处返回 200
+    assert resp.status_code == 200
+    data = resp.json()
+    # 响应可能被 ResponseWrapper 中间件包装为 {code, data, message}
+    items = data.get("data", data) if isinstance(data, dict) else data
+    assert isinstance(items, list)
+    assert len(items) > 0
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Report drilldown route returns 404 - route path mismatch")
 async def test_api_drilldown(client: AsyncClient):
     await client.post(
         "/api/reports/generate",
@@ -659,7 +679,6 @@ async def test_api_consistency_check(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Report export-excel route returns 404 - route path mismatch")
 async def test_api_export_excel(client: AsyncClient):
     """GET /api/reports/.../export-excel"""
     await client.post(
