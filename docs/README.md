@@ -9,8 +9,8 @@
 
 | 子目录 | 用途 | 文件数 |
 |--------|------|-------|
-| [`adr/`](./adr/) | 架构决策记录（ADR） | 29 |
-| [`architecture/`](./architecture/) | 系统架构与模块设计 | 4 |
+| [`adr/`](./adr/) | 架构决策记录（ADR） | 30 |
+| [`architecture/`](./architecture/) | 系统架构与模块设计 | 5 |
 | [`deployment/`](./deployment/) | 部署与运维手册 | 9 |
 | [`frontend/`](./frontend/) | 前端专项指南 | 4 |
 | [`i18n/`](./i18n/) | 国际化与术语表 | 1 |
@@ -26,11 +26,12 @@
 
 ## 各子目录详情
 
-### `adr/` — 架构决策记录（ADR）（29 个）
+### `adr/` — 架构决策记录（ADR）（30 个）
 
 - `adr/ADR-001-auxiliary-dimension-redundant-storage.md` — ADR-001：辅助维度冗余存储模型
 - `adr/ADR-002-ledger-view-refactor.md` — ADR-002：账表导入可见性视图化重构（B' 架构）
 - `adr/ADR-003-ledger-import-recovery-playbook.md` — ADR-003: Ledger Import Recovery Playbook
+- `adr/ADR-003b-review-issue-transaction-strategy.md` — ADR-003: 复核意见↔工单联动的事务策略差异
 - `adr/ADR-004-ledger-activate-isolation.md` — ADR-004: Ledger Activate Transaction Isolation
 - `adr/ADR-005-async-activate.md` — ADR-005: 异步 Activate — 用户不等 200 万行 metadata 切换
 - `adr/ADR-006-sse-vs-polling-import-progress.md` — ADR-006: SSE vs 轮询 — 导入进度追踪
@@ -58,10 +59,11 @@
 - `adr/ADR-028-default-branch-main-over-master.md` — ADR-028: 默认分支 main 替代 master
 - `adr/INDEX.md` — ADR 索引
 
-### `architecture/` — 系统架构与模块设计（4 个）
+### `architecture/` — 系统架构与模块设计（5 个）
 
 - `architecture/global-linkage-proposal.md` — 全局联动架构改进方案
 - `architecture/ledger-import-v2.md` — 账表导入 v2 引擎架构文档
+- `architecture/parsed-data-compression.md` — parsed_data 压缩存储策略
 - `architecture/penetration-map.md` — 穿透闭环路径文档
 - `architecture/service-dependency.md` — 后端服务依赖图（MT-5）
 
