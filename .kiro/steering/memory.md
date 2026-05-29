@@ -15,7 +15,7 @@ inclusion: always
 - 前后端必须联动；删除二次确认 + 先进回收站；一次性脚本用完即删
 - git 提交不分多区，单 commit 提交所有变更
 - 提建议前先验证（不引用过时记录），反复论证给最仔细可落地方案
-- 判断前端模块存在性必须同时检查 `views/` 根目录 + `components/` 子目录
+- **前端唯一路径铁律**（2026-05-29 落地，repo-frontend-layout-unification spec）：仓库前端路径 = `audit-platform/frontend/`，仓库根**无** `frontend/` 目录（已 git rm + tag `pre-frontend-cleanup-2026-05-29`）；任何文档 / IDE / grep / CI 不再引用 `frontend/src/`；pre-commit hook `check-no-root-frontend` 阻止重新引入；查找前端组件直接 `audit-platform/frontend/src/{views,components,composables}/`，无需双路径兜底
 - 文档同步：功能变更后同步更新需求文档；死代码立即删除，不留 DEPRECATED/fallback 注释
 - 复杂重构先做 spec 三件套（体系化、精准、可回滚，"全部改完再跑一次测试"）
 - 避免折中方案，要"根本解决"

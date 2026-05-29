@@ -33,3 +33,20 @@ repos:
         language: system
         pass_filenames: false
         files: ^(\.kiro/specs/.*/design\.md|backend/tests/test_.*_integration\.py)$
+
+      # 全局改进 #5：文件行数卡点（migration-runner-resilience spec 派生）
+      # backend Python ≤800 / 前端 .vue/.ts ≤1500，超限或 whitelist 文件膨胀 >5% 即阻断
+      # whitelist 路径：backend/scripts/file_size_whitelist.txt（每打磨完成一个文件后从中移除）
+      - id: check-file-size
+        name: check-file-size
+        entry: python backend/scripts/check_file_size.py
+        language: system
+        files: \.(py|vue|ts|tsx)$
+        exclude: ^(backend/tests/|backend/scripts/|audit-platform/frontend/src/__tests__/|.*\.d\.ts$)
+
+      # 全局改进 #2：仓库根禁止 frontend/ 目录（repo-frontend-layout-unification spec）
+      # 前端唯一路径 = audit-platform/frontend/，避免历史 frontend/ 空壳重新引入二义性
+      - id: check-no-root-frontend
+        name: check-no-root-frontend
+        entry: python backend/scripts/check_no_root_frontend.py
+        language: system
