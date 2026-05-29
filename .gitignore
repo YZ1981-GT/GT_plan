@@ -118,3 +118,10 @@ audit-platform/frontend/playwright-report/
 # 备份文件（不入库）
 *.bak
 *.orig
+
+# 测试产物（不入库）
+junit.xml
+pytest_junit.xml
+fullrun_result.txt
+smoke-test-*.png
+backend/.coverage

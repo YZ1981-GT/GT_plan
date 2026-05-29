@@ -60,7 +60,7 @@ inclusion: always
 - **数据库初始化**：`python backend/scripts/init_tables.py` + `python backend/scripts/create_admin.py`
 - **4 项目底稿数据已就位**（2026-05-25）：`python backen year=..., force=True)`
 - **scripts 命名规约**：`_` 前缀 = 一次性脚本（用完即删），无前缀 = 正式工具
-- **docs 目录结构**（2026-05-23 重组）：8 子目录（adr / architecture / deployment / reference / frontend / operations / proposals / templates）+ 顶层 README.md 索引；新增文档按子目录归类
+- **docs 目录结构**（2026-05-29 整体梳理）：10 子目录 = adr (29) / architecture (4) / deployment (9) / frontend (4) / i18n (1) / operations (4) / proposals (8) / reference (5) / templates (1) / uat (4)；顶层仅 `README.md`（**自动生成**）+ `requirements.md`；新增文档按子目录归类，**禁止平铺到 docs/ 根**；**README.md 自动维护** = `python backend/scripts/regen_docs_index.py`（永久工具非 _ 前缀，扫真实文件树 + 提取每文件 `# 标题` 作为说明 + 自动统计文件数 + 顶部 "auto-generated" 警告防手动改）；新加子目录后在脚本 `SUBDIR_DESC` 字典补用途说明
 - **双 storage 目录职责**：仓库根 `storage/projects/{UUID}/workpapers/` = 底稿文件；`backend/storage/{knowledge,projects,users,ledger_uploads}/` = 附件/上传；两边 gitignored 但代码 hardcode
 - **仓库前端路径二义性铁律**（2026-05-29）：仓库根 `frontend/src/` 是空壳（5 .vue 0 .ts），真前端在 `audit-platform/frontend/src/`（498 .vue / 379 .ts）；所有 grep / 路径硬编码 / CI 配置必须用 `audit-platform/frontend/`，禁止再写 `frontend/src/...`；后续可立 spec 做仓库 layout 治理消灭二义性
 - **全仓体检数据快照**（2026-05-29）：backend services 403 文件 / backend py 814 文件 / V 迁移 24（V001~V024）/ backend tests 588 文件 / specs 76 个 / 前端 .vue 498 / 前端 .ts 379；最大 service = smart_import_engine 2786 行 / consistency_gate 2141 / workpaper_fill_service 1587 / disclosure_engine 1504；最大前端 view = WorkpaperList 3241 / LedgerPenetration 3175 / TrialBalance 2494 / DisclosureEditor 2468 / ReportView 2317 / WorkpaperEditor 2167（仍未达 ≤1200 目标）
