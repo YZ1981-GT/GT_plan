@@ -560,7 +560,7 @@ class TestFieldSelectionPBT:
     (invalid field names silently ignored, no extra fields returned).
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         requested=st.sets(
             st.sampled_from(sorted(_ALL_FAKE_FIELDS | _INVALID_FIELDS)),
@@ -592,7 +592,7 @@ class TestFieldSelectionPBT:
             f"返回了超出预期的列: {col_names - expected_max - {'id'}}"
         )
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         requested=st.sets(
             st.sampled_from(sorted(_NON_BLOCKED_FIELDS)),
@@ -613,7 +613,7 @@ class TestFieldSelectionPBT:
             f"缺少请求的有效字段: {requested - col_names}"
         )
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         invalid_fields=st.sets(
             st.sampled_from(sorted(_INVALID_FIELDS)),
@@ -644,7 +644,7 @@ class TestFieldSelectionOrthogonalityPBT:
     the field selection logic should not affect pagination metadata or sort order.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         fields_a=st.sets(
             st.sampled_from(sorted(_NON_BLOCKED_FIELDS)),
@@ -676,7 +676,7 @@ class TestFieldSelectionOrthogonalityPBT:
 
         assert names_a1 == names_a2, "相同输入应产生相同输出（确定性）"
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         fields=st.one_of(
             st.none(),

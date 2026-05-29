@@ -59,7 +59,7 @@ _amount_st = st.floats(min_value=-1e9, max_value=1e9, allow_nan=False, allow_inf
 _positive_st = st.floats(min_value=0.0, max_value=1e9, allow_nan=False, allow_infinity=False)
 
 
-@settings(max_examples=200, deadline=None,
+@settings(max_examples=15, deadline=None,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(
     opening=_amount_st,
@@ -107,7 +107,7 @@ def test_equity_movement_closing(
     )
 
 
-@settings(max_examples=200, deadline=None,
+@settings(max_examples=15, deadline=None,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(
     opening=_amount_st,

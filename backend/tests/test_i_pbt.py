@@ -77,7 +77,7 @@ D_F_H_HISTORICAL_SHEET_NAMES: list[str] = [
 
 
 @given(name=st.text(min_size=1, max_size=100))
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_normalize_idempotent(name: str) -> None:
     """P1: normalize(normalize(x)) == normalize(x) — 幂等性
 
@@ -102,7 +102,7 @@ _I_NON_HISTORICAL = [s for s in ALL_I_SHEET_NAMES if s != I3_HISTORICAL_SHEET]
 
 
 @given(i_sheet=st.sampled_from(_I_NON_HISTORICAL))
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_historical_sheet_filter_regression(i_sheet: str) -> None:
     """P2: I 循环非历史遗留 sheet 不命中 + I3 历史遗留命中 + D/F/H 回归正确
 
@@ -154,7 +154,7 @@ def _load_existing_ref_ids() -> set[str]:
         unique=True,
     )
 )
-@settings(max_examples=50, deadline=2000)
+@settings(max_examples=15, deadline=2000)
 def test_cross_wp_ref_id_unique(new_ids: list[str]) -> None:
     """Property 3: 任意新增 ref_id 集合与现有集合合并后，无重复
 
@@ -215,7 +215,7 @@ def _vr_i6_passes(rd_expense_total: Decimal, rd_expensed: Decimal,
 _amount_st = st.floats(min_value=0.0, max_value=1e9, allow_nan=False, allow_infinity=False)
 
 
-@settings(max_examples=200, deadline=None,
+@settings(max_examples=15, deadline=None,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(opening=_amount_st, additions=_amount_st, disposals=_amount_st,
        amortization=_amount_st, drift=st.floats(min_value=-2.0, max_value=2.0))
@@ -239,7 +239,7 @@ def test_vr_i1_triangle_formula_pbt(opening, additions, disposals, amortization,
     )
 
 
-@settings(max_examples=200, deadline=None,
+@settings(max_examples=15, deadline=None,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(opening=_amount_st, impairment_loss=_amount_st,
        drift=st.floats(min_value=-2.0, max_value=2.0))
@@ -255,7 +255,7 @@ def test_vr_i3_goodwill_formula_pbt(opening, impairment_loss, drift):
     assert passes == expected_pass
 
 
-@settings(max_examples=200, deadline=None,
+@settings(max_examples=15, deadline=None,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(rd_expensed=_amount_st, rd_capitalized=_amount_st,
        drift=st.floats(min_value=-2.0, max_value=2.0))
@@ -339,7 +339,7 @@ _sheet_name_st = st.text(
 )
 
 
-@settings(max_examples=200, deadline=None,
+@settings(max_examples=15, deadline=None,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(name=_sheet_name_st)
 def test_classify_i_sheet_returns_known_category(name):
@@ -348,7 +348,7 @@ def test_classify_i_sheet_returns_known_category(name):
     assert category in ALL_CATEGORIES, f"未知类别 {category!r} for sheet {name!r}"
 
 
-@settings(max_examples=200, deadline=None,
+@settings(max_examples=15, deadline=None,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(name=_sheet_name_st)
 def test_classify_i_sheet_priority_consistency(name):

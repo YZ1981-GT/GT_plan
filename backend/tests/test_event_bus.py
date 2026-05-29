@@ -178,7 +178,7 @@ class TestEventBus:
     @pytest.mark.asyncio
     async def test_publish_calls_handler(self):
         """publish 调用已注册的处理器"""
-        bus = EventBus()
+        bus = EventBus(debounce_ms=0)
         handler = AsyncMock()
         bus.subscribe(EventType.ADJUSTMENT_CREATED, handler)
 
@@ -188,13 +188,13 @@ class TestEventBus:
             year=2025,
             account_codes=["1001"],
         )
-        await bus.publish(payload)
+        await bus.publish_immediate(payload)
         handler.assert_awaited_once_with(payload)
 
     @pytest.mark.asyncio
     async def test_publish_multiple_handlers(self):
         """同一事件类型可注册多个处理器"""
-        bus = EventBus()
+        bus = EventBus(debounce_ms=0)
         h1 = AsyncMock()
         h2 = AsyncMock()
         bus.subscribe(EventType.ADJUSTMENT_CREATED, h1)
@@ -205,7 +205,7 @@ class TestEventBus:
             project_id=uuid.uuid4(),
             year=2025,
         )
-        await bus.publish(payload)
+        await bus.publish_immediate(payload)
         h1.assert_awaited_once()
         h2.assert_awaited_once()
 
@@ -222,7 +222,7 @@ class TestEventBus:
     @pytest.mark.asyncio
     async def test_handler_exception_does_not_break_others(self):
         """一个处理器异常不影响其他处理器"""
-        bus = EventBus()
+        bus = EventBus(debounce_ms=0)
         failing = AsyncMock(side_effect=RuntimeError("boom"))
         success = AsyncMock()
         bus.subscribe(EventType.ADJUSTMENT_CREATED, failing)
@@ -233,13 +233,13 @@ class TestEventBus:
             project_id=uuid.uuid4(),
             year=2025,
         )
-        await bus.publish(payload)
+        await bus.publish_immediate(payload)
         success.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_sse_queue_receives_events(self):
         """SSE 队列接收事件"""
-        bus = EventBus()
+        bus = EventBus(debounce_ms=0)
         queue = bus.create_sse_queue()
 
         payload = EventPayload(
@@ -247,7 +247,7 @@ class TestEventBus:
             project_id=uuid.uuid4(),
             year=2025,
         )
-        await bus.publish(payload)
+        await bus.publish_immediate(payload)
 
         received = queue.get_nowait()
         assert received.event_type == EventType.ADJUSTMENT_CREATED
@@ -380,7 +380,8 @@ class TestOnAdjustmentChanged:
         assert tb_map["1001"].aje_adjustment == Decimal("500")
         assert tb_map["1001"].audited_amount == Decimal("12500")  # 12000 + 500
         assert tb_map["6001"].aje_adjustment == Decimal("-500")
-        assert tb_map["6001"].audited_amount == Decimal("99500")  # 100000 - 500
+        # Revenue stored as negative (credit direction): unadjusted=-100000, aje=-500
+        assert tb_map["6001"].audited_amount == Decimal("-100500")  # -100000 + (-500)
         # 未受影响的科目不变
         assert tb_map["1002"].aje_adjustment == Decimal("0")
         assert tb_map["1002"].audited_amount == Decimal("35000")

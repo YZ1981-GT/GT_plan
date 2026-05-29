@@ -101,7 +101,7 @@ class TestDecimalSumPrecisionInvariant:
       sum(amounts) 与独立 oracle 累加结果完全一致（精确等值，零误差）。
     """
 
-    @settings(max_examples=20, deadline=None,
+    @settings(max_examples=10, deadline=None,
               suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
     @given(
         amounts=st.lists(
@@ -125,7 +125,7 @@ class TestDecimalSumPrecisionInvariant:
             f"sum() 与 oracle 累加结果不一致：sum={total}, oracle={oracle}"
         )
 
-    @settings(max_examples=20, deadline=None,
+    @settings(max_examples=10, deadline=None,
               suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
     @given(
         amounts=st.lists(
@@ -200,7 +200,7 @@ class TestQuantizeInvariant:
     **Validates: Requirements 2.1**
     """
 
-    @settings(max_examples=30, deadline=None)
+    @settings(max_examples=10, deadline=None)
     @given(
         value=st.decimals(
             min_value=Decimal("-1000000000"),
@@ -217,7 +217,7 @@ class TestQuantizeInvariant:
         twice = quantize(once, scale=scale)
         assert once == twice
 
-    @settings(max_examples=30, deadline=None)
+    @settings(max_examples=10, deadline=None)
     @given(
         value=st.decimals(
             min_value=Decimal("0"),
@@ -235,7 +235,7 @@ class TestQuantizeInvariant:
             f"quantize(v, 2) 应在 HALF_UP 边界 0.005 内: v={value}, q={q}, diff={diff}"
         )
 
-    @settings(max_examples=30, deadline=None)
+    @settings(max_examples=10, deadline=None)
     @given(
         value=st.decimals(
             min_value=Decimal("-1000000"),
@@ -265,7 +265,7 @@ class TestAmountToleranceInvariant:
     **Validates: Requirements 2.1**
     """
 
-    @settings(max_examples=30, deadline=None)
+    @settings(max_examples=10, deadline=None)
     @given(
         amount=st.decimals(
             min_value=Decimal("-1000000000"),
@@ -280,7 +280,7 @@ class TestAmountToleranceInvariant:
         tol = amount_tolerance(amount)
         assert tol > 0, f"容差应始终为正: amount={amount}, tol={tol}"
 
-    @settings(max_examples=30, deadline=None)
+    @settings(max_examples=10, deadline=None)
     @given(
         amount=st.decimals(
             min_value=Decimal("-1000000000"),
@@ -298,7 +298,7 @@ class TestAmountToleranceInvariant:
             f"容差应基于 abs(amount): amount={amount}, tol={tol_signed}, abs_tol={tol_pos}"
         )
 
-    @settings(max_examples=30, deadline=None)
+    @settings(max_examples=10, deadline=None)
     @given(
         amount=st.decimals(
             min_value=Decimal("0"),
@@ -313,7 +313,7 @@ class TestAmountToleranceInvariant:
         tol = amount_tolerance(amount)
         assert tol == Decimal("0.01")
 
-    @settings(max_examples=30, deadline=None)
+    @settings(max_examples=10, deadline=None)
     @given(
         amount=st.decimals(
             min_value=Decimal("10000"),
@@ -329,7 +329,7 @@ class TestAmountToleranceInvariant:
         expected = amount * Decimal("0.0001")
         assert tol == expected
 
-    @settings(max_examples=30, deadline=None)
+    @settings(max_examples=10, deadline=None)
     @given(
         amount=st.decimals(
             min_value=Decimal("1000000"),

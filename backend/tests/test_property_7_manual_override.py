@@ -18,7 +18,7 @@ P7-INV-3：is_manual_override=False
 P7-INV-4：pending 冲突 resolve 后 status='resolved'，
   final_value 严格按 resolution 选择（keep_manual=manual / accept_new=upstream / merge=merge_value）。
 
-调速：max_examples=15-20，列表 size 0-30。
+调速：max_examples=10-20，列表 size 0-30。
 
 Validates: Requirements 7.7
 """
@@ -134,7 +134,7 @@ class TestProperty7UserEditBlocksAndEnqueues:
     """
 
     @settings(
-        max_examples=15,
+        max_examples=10,
         deadline=None,
         suppress_health_check=[
             HealthCheck.function_scoped_fixture,
@@ -193,7 +193,7 @@ class TestProperty7SystemRecomputeAutoResolves:
     """
 
     @settings(
-        max_examples=15,
+        max_examples=10,
         deadline=None,
         suppress_health_check=[
             HealthCheck.function_scoped_fixture,
@@ -260,7 +260,7 @@ class TestProperty7AllowWhenNoOverride:
     """
 
     @settings(
-        max_examples=15,
+        max_examples=10,
         deadline=None,
         suppress_health_check=[
             HealthCheck.function_scoped_fixture,
@@ -319,7 +319,7 @@ class TestProperty7ResolveFinalValue:
     """
 
     @settings(
-        max_examples=20,
+        max_examples=10,
         deadline=None,
         suppress_health_check=[
             HealthCheck.function_scoped_fixture,

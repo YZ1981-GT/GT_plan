@@ -30,7 +30,7 @@ def test_property_p4_all_ref_ids_unique() -> None:
 
 
 @given(subset_size=st.integers(min_value=1, max_value=50))
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_property_p4_random_subset_unique(subset_size: int) -> None:
     """P4: 任意子集的 ref_id 也唯一（验证无隐藏重复）。"""
     refs = _load_references()

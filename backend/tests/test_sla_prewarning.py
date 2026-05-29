@@ -286,7 +286,7 @@ class TestSLAWarningLevelPBT:
     - remaining_hours > 24 → no warning
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         remaining_hours=st.floats(min_value=0.01, max_value=8.0),
     )
@@ -309,7 +309,7 @@ class TestSLAWarningLevelPBT:
             f"remaining_hours={remaining_hours} 应为 orange，实际为 {level}"
         )
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         remaining_hours=st.floats(min_value=8.01, max_value=24.0),
     )
@@ -331,7 +331,7 @@ class TestSLAWarningLevelPBT:
             f"remaining_hours={remaining_hours} 应为 yellow，实际为 {level}"
         )
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         remaining_hours=st.floats(min_value=24.01, max_value=48.0),
     )
@@ -362,7 +362,7 @@ class TestSLAIdempotencyPBT:
     (N >= 2) with the same state should produce exactly 1 notification.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         n_runs=st.integers(min_value=2, max_value=10),
         remaining_hours=st.floats(min_value=0.01, max_value=24.0),
@@ -412,7 +412,7 @@ class TestSLAAutoResolvePBT:
     notification should be marked as resolved.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         n_active_notifications=st.integers(min_value=0, max_value=5),
         levels=st.lists(

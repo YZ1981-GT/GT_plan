@@ -146,7 +146,7 @@ async def test_get_templates_filtered(db_session: AsyncSession, seeded_db):
     assert len(templates) == 7  # 7 sections for unqualified non_listed
     section_names = [t.section_name for t in templates]
     assert "审计意见段" in section_names
-    assert "审计师责任段" in section_names
+    assert "注册会计师对财务报表审计的责任段" in section_names
 
 
 # ===== 报告生成测试 =====
@@ -168,7 +168,7 @@ async def test_generate_report_unqualified(db_session: AsyncSession, seeded_db):
     assert report.status == ReportStatus.draft
     assert report.paragraphs is not None
     assert "审计意见段" in report.paragraphs
-    assert "审计师责任段" in report.paragraphs
+    assert "注册会计师对财务报表审计的责任段" in report.paragraphs
     assert len(report.paragraphs) == 7
 
 
@@ -217,7 +217,7 @@ async def test_generate_report_qualified(db_session: AsyncSession, seeded_db):
     assert report.opinion_type == OpinionType.qualified
     assert "审计意见段" in report.paragraphs
     # Should have supplemented sections from unqualified template
-    assert "管理层责任段" in report.paragraphs
+    assert "管理层和治理层对财务报表的责任段" in report.paragraphs
     # Opinion text should mention 保留意见
     assert "保留意见" in report.paragraphs["审计意见段"]
 

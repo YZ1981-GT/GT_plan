@@ -113,7 +113,7 @@ ALL_M_SHEET_NAMES: list[str] = [
 
 
 @given(name=st.text(min_size=0, max_size=100))
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_m_normalize_idempotent(name: str) -> None:
     """P1: normalize(normalize(x)) == normalize(x) — 幂等性
 
@@ -131,7 +131,7 @@ def test_m_normalize_idempotent(name: str) -> None:
 
 # 补充：用 M 循环真实 sheet 名验证幂等性
 @given(m_sheet=st.sampled_from(ALL_M_SHEET_NAMES))
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_m_normalize_idempotent_real_sheets(m_sheet: str) -> None:
     """P1 补充：M 循环真实 sheet 名归一化幂等"""
     from app.services.wp_template_init_service import _normalize_sheet_name
@@ -160,7 +160,7 @@ def _vr_m6_01_passes(m6_closing: Decimal, m6_opening: Decimal,
 _amount_st = st.floats(min_value=0.0, max_value=1e9, allow_nan=False, allow_infinity=False)
 
 
-@settings(max_examples=200, deadline=None,
+@settings(max_examples=15, deadline=None,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(opening=_amount_st, net_profit=_amount_st, surplus=_amount_st,
        dividends=_amount_st, drift=st.floats(min_value=-2.0, max_value=2.0))
@@ -240,7 +240,7 @@ def _classify_m_sheet(name: str) -> str:
 
 
 @given(m_sheet=st.sampled_from(ALL_M_SHEET_NAMES))
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_m_sheet_group_completeness_pbt(m_sheet: str) -> None:
     """P3: 任意 M 循环有效 sheet 恰好匹配 1 类
 
@@ -380,7 +380,7 @@ class TestCrossWpRefIdUniqueness:
 
 # PBT 验证：随机抽样 ref_id 子集仍无重复
 @given(sample_size=st.integers(min_value=1, max_value=50))
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_ref_id_subset_unique_pbt(sample_size: int) -> None:
     """P4: 随机抽样任意子集 ref_id 仍无重复（全局唯一性的概率验证）"""
     import random

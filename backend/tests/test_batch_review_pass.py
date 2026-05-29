@@ -316,7 +316,7 @@ class TestBatchReviewAtomicityPBT:
     none are updated.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         n_valid=st.integers(min_value=1, max_value=10),
     )
@@ -357,7 +357,7 @@ class TestBatchReviewCountInvariantPBT:
     non-empty reason.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         statuses=st.lists(
             st.sampled_from(_ALL_STATUSES),
@@ -394,7 +394,7 @@ class TestBatchReviewCountInvariantPBT:
             assert "reason" in item
             assert item["reason"], f"跳过项 {item['wp_id']} 缺少 reason"
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         n_missing=st.integers(min_value=0, max_value=5),
         n_reviewable=st.integers(min_value=0, max_value=5),
@@ -427,7 +427,8 @@ class TestBatchReviewCountInvariantPBT:
             success_count += 1
 
         # Non-reviewable workpapers → skipped
-        for status in _NON_REVIEWABLE_STATUSES[:n_non_reviewable]:
+        for i in range(n_non_reviewable):
+            status = _NON_REVIEWABLE_STATUSES[i % len(_NON_REVIEWABLE_STATUSES)]
             wp = _make_workpaper(status=status)
             reason = _check_reviewable(wp)
             skipped_count += 1

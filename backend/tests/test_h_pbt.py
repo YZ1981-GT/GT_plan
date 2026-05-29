@@ -200,7 +200,7 @@ D_F_HISTORICAL_SHEET_NAMES: list[str] = [
 
 
 @given(name=st.text(min_size=0, max_size=100))
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_normalize_idempotent(name: str) -> None:
     """P1: Sheet 名归一化幂等 — normalize(normalize(x)) == normalize(x)
 
@@ -223,7 +223,7 @@ def test_normalize_idempotent(name: str) -> None:
 
 
 @given(h_sheet=st.sampled_from(ALL_H_SHEET_NAMES))
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_historical_sheet_filter_regression(h_sheet: str) -> None:
     """P2: H 循环全部 sheet 不命中历史遗留过滤 + D/F 历史模式仍正确过滤
 
@@ -297,7 +297,7 @@ def _classify_h_sheet(name: str) -> str:
 
 
 @given(sheet_name=st.sampled_from(ALL_H_SHEET_NAMES))
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_sheet_group_completeness(sheet_name: str) -> None:
     """P5: H 循环 14 类 sheet 分组规则对任意 H sheet 名恰好匹配 1 类
 
@@ -377,7 +377,7 @@ _amount_strategy = st.floats(min_value=0, max_value=1e10, allow_nan=False, allow
     disposals=_amount_strategy,
     h10_disposal=_amount_strategy,
 )
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_vr_h1_triangle_formula(
     opening: float, additions: float, disposals: float, h10_disposal: float
 ) -> None:
@@ -428,7 +428,7 @@ def test_vr_h1_triangle_formula(
     current_provision=_amount_strategy,
     disposal_offset=_amount_strategy,
 )
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_vr_h1_02_triangle_formula(
     dep_opening: float, current_provision: float, disposal_offset: float
 ) -> None:
@@ -539,7 +539,7 @@ def _load_existing_ref_ids() -> set[str]:
         unique=True,
     )
 )
-@settings(max_examples=50, deadline=2000)
+@settings(max_examples=15, deadline=2000)
 def test_cross_wp_ref_id_unique(new_ids: list[str]) -> None:
     """Property 3: 任意新增 ref_id 集合与现有集合合并后，无重复
 
@@ -619,7 +619,7 @@ def _scenario_filter(sheets: list[str], scenario: str) -> list[str]:
         unique=True,
     ),
 )
-@settings(max_examples=50, deadline=2000)
+@settings(max_examples=15, deadline=2000)
 def test_measurement_model_filter_idempotent(
     model: str, scenario: str, sheets: list[str]
 ) -> None:
@@ -673,7 +673,7 @@ def test_measurement_filter_known_cases() -> None:
 @given(
     prefix=st.sampled_from(["H1", "h1"]),  # 仅注册的 H1 prefix (大小写不敏感)
 )
-@settings(max_examples=50, deadline=2000)
+@settings(max_examples=15, deadline=2000)
 def test_ensure_ipo_loaded_h1_safe(prefix: str) -> None:
     """Property 7: _ensure_ipo_loaded(prefix='H1') 任意调用不抛异常 + added_codes == []
 

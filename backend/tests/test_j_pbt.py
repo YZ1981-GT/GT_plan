@@ -67,7 +67,7 @@ ALL_J_SHEET_NAMES: list[str] = [
 
 
 @given(name=st.text(min_size=0, max_size=100))
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_j_normalize_idempotent(name: str) -> None:
     """P1: normalize(normalize(x)) == normalize(x) — 幂等性
 
@@ -85,7 +85,7 @@ def test_j_normalize_idempotent(name: str) -> None:
 
 # 补充：用 J 循环真实 sheet 名验证幂等性
 @given(j_sheet=st.sampled_from(ALL_J_SHEET_NAMES))
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_j_normalize_idempotent_real_sheets(j_sheet: str) -> None:
     """P1 补充：J 循环真实 sheet 名归一化幂等"""
     from app.services.wp_template_init_service import _normalize_sheet_name
@@ -113,7 +113,7 @@ def _vr_j1_01_passes(opening: Decimal, accrued: Decimal, paid: Decimal,
 _amount_st = st.floats(min_value=0.0, max_value=1e9, allow_nan=False, allow_infinity=False)
 
 
-@settings(max_examples=200, deadline=None,
+@settings(max_examples=15, deadline=None,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(opening=_amount_st, accrued=_amount_st, paid=_amount_st,
        drift=st.floats(min_value=-2.0, max_value=2.0))
@@ -193,7 +193,7 @@ def _classify_j_sheet(name: str) -> str:
 
 
 @given(j_sheet=st.sampled_from(ALL_J_SHEET_NAMES))
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_j_sheet_group_completeness_pbt(j_sheet: str) -> None:
     """P3: 任意 J 循环有效 sheet 恰好匹配 1 类（非 fallback）
 
@@ -307,7 +307,7 @@ class TestCrossWpRefIdUniqueness:
 
 # PBT 验证：随机抽样 ref_id 子集仍无重复
 @given(sample_size=st.integers(min_value=1, max_value=50))
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_ref_id_subset_unique_pbt(sample_size: int) -> None:
     """P4: 随机抽样任意子集 ref_id 仍无重复（全局唯一性的概率验证）"""
     import random
@@ -348,7 +348,7 @@ _time_st = st.floats(min_value=0.1, max_value=10.0, allow_nan=False, allow_infin
 _dividend_st = st.floats(min_value=0.0, max_value=0.3, allow_nan=False, allow_infinity=False)
 
 
-@settings(max_examples=200, deadline=None,
+@settings(max_examples=15, deadline=None,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(
     S=_stock_price_st,

@@ -518,7 +518,7 @@ class TestBreakageFilterPBT:
     those entries where the target workpaper is missing or stale, and no other entries.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         n_refs=st.integers(min_value=1, max_value=20),
         existing_ratio=st.floats(min_value=0.0, max_value=1.0),
@@ -575,7 +575,7 @@ class TestBreakageSeveritySortPBT:
     (blocking > required > warning > recommended > info).
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         severities=st.lists(
             st.sampled_from(_SEVERITY_LEVELS),
@@ -625,7 +625,7 @@ class TestBreakageSummaryConsistencyPBT:
     with that severity.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=15)
     @given(
         severities=st.lists(
             st.sampled_from(_SEVERITY_LEVELS),

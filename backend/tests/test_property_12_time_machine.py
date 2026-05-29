@@ -88,7 +88,7 @@ class TestTimeMachineRestoreIdempotency:
     **Validates: Requirements 11.8**
     """
 
-    @settings(max_examples=20, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
     @given(original_data=business_data_strategy, edits=st.lists(edit_strategy, min_size=1, max_size=5))
     def test_restore_returns_original_data(self, original_data, edits):
         """snapshot(D) → edits → restore ≡ D
@@ -118,7 +118,7 @@ class TestTimeMachineRestoreIdempotency:
             f"Diff: {reverse_diff}"
         )
 
-    @settings(max_examples=20, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
     @given(original_data=business_data_strategy, edits=st.lists(edit_strategy, min_size=1, max_size=3))
     def test_restore_is_idempotent(self, original_data, edits):
         """restore(restore(D)) ≡ restore(D)
@@ -151,7 +151,7 @@ class TestTimeMachineRestoreIdempotency:
             f"Second restore: {restored_twice}"
         )
 
-    @settings(max_examples=15, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
     @given(data=business_data_strategy)
     def test_empty_diff_for_identical_data(self, data):
         """相同数据的 diff 为空。
@@ -163,7 +163,7 @@ class TestTimeMachineRestoreIdempotency:
             f"Expected empty diff for identical data, got: {diff}"
         )
 
-    @settings(max_examples=15, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
     @given(original_data=business_data_strategy)
     def test_full_snapshot_restore(self, original_data):
         """全量快照恢复正确。

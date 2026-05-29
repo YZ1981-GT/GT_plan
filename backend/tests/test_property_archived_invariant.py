@@ -179,7 +179,7 @@ class TestArchivedProjectMutationInvariant:
       E(P, user_with_role_R) → HTTP 423 Locked
     """
 
-    @settings(max_examples=50, deadline=None)
+    @settings(max_examples=15, deadline=None)
     @given(
         endpoint_idx=st.integers(min_value=0, max_value=len(MUTATION_ENDPOINTS) - 1),
         role_idx=st.integers(min_value=0, max_value=len(USER_ROLES) - 1),

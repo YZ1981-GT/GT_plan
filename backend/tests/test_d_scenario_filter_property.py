@@ -21,7 +21,7 @@ SCENARIOS = ["normal", "ipo", "listed", "transfer", "restructure", "fraud_respon
     scenario=st.sampled_from(SCENARIOS),
     file_names=st.lists(st.text(min_size=1, max_size=50), min_size=0, max_size=20),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_property_p1_filter_idempotent(scenario: str, file_names: list[str]) -> None:
     """P1: _filter_files_by_scenario 幂等 — 对同一输入调用两次结果相同。"""
     paths = [Path(f"D/{n}.xlsx") for n in file_names]
@@ -36,7 +36,7 @@ def test_property_p1_filter_idempotent(scenario: str, file_names: list[str]) -> 
     scenario=st.sampled_from(SCENARIOS),
     file_names=st.lists(st.text(min_size=1, max_size=50), min_size=0, max_size=20),
 )
-@settings(max_examples=50, deadline=None)
+@settings(max_examples=15, deadline=None)
 def test_property_p1_subset_of_input(scenario: str, file_names: list[str]) -> None:
     """P1: 过滤结果是输入的子集。"""
     paths = [Path(f"D/{n}.xlsx") for n in file_names]

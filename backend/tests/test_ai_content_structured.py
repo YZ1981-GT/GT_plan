@@ -179,8 +179,16 @@ class TestAIContentMustBeConfirmedRule:
 
     @pytest.fixture
     def rule(self):
-        from app.services.gate_rules_phase14 import AIContentMustBeConfirmedRule
+        from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule
         return AIContentMustBeConfirmedRule()
+
+    @pytest.fixture(autouse=True)
+    def _patch_log_service(self):
+        """Patch ai_content_log_service to skip the new log-based path,
+        so tests exercise the parsed_data fallback path."""
+        with patch("app.services.ai_content_log_service.list_pending_by_project", new_callable=AsyncMock, return_value=[]) as m1, \
+             patch("app.services.ai_content_log_service.count_pending_by_project", new_callable=AsyncMock, return_value=0) as m2:
+            yield
 
     @pytest.mark.asyncio
     async def test_no_project_id(self, rule):
@@ -344,7 +352,7 @@ class TestAIContentMustBeConfirmedRule:
     @pytest.mark.asyncio
     async def test_rule_registered_to_sign_off(self):
         """验证规则注册到 sign_off gate"""
-        from app.services.gate_rules_phase14 import AIContentMustBeConfirmedRule
+        from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule
         from app.models.phase14_enums import GateSeverity
 
         rule = AIContentMustBeConfirmedRule()
