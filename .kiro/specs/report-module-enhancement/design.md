@@ -2,13 +2,15 @@
 
 ## Overview
 
-本设计文档覆盖报表模块从 ~85% 完成度推进到生产就绪的五大增强领域：
+本设计文档覆盖报表模块从 ~85% 完成度推进到生产就绪的七大增强领域：
 
 1. **种子数据公式补全** — 利用 `ReportFormulaService.fill_all_formulas()` 的多策略公式生成管线，将 4 标准 × 4 报表类型的公式覆盖率提升至 95%+
 2. **审计日志路由注册修复** — 在 `router_registry/system.py` 注册已存在的 `audit_logs` router
 3. **多标准公式覆盖验证** — 新建 CLI 验证脚本，扫描 report_config 表并输出覆盖率报告
 4. **CFS 自动调整规则扩展** — 在 `AUTO_ADJUSTMENT_RULES` 中补充行业常见调整项
 5. **报表 API 测试基础设施修复** — 统一测试路径、依赖注入和前置条件处理
+6. **报表公式 DSL 解析器健壮性** — 验证所有合法语法和边界情况的正确处理
+7. **报表生成跨标准一致性** — 验证 4 个标准间行次结构和计算结果的一致性
 
 设计原则：
 - 仅修改后端代码，保持向后兼容
@@ -139,8 +141,7 @@ async def validate_coverage(
 | 描述 | 科目编码 | cf_row_code | category |
 |------|----------|-------------|----------|
 | 资产减值损失 | 6702 | CF-S04 | supplementary |
-| 处置固定资产损失 | 6115 | CF-S11 | supplementary |
-| 处置无形资产损失 | 6115 | CF-S11 | supplementary |
+| 处置长期资产损失 | 6115 | CF-S11 | supplementary |
 | 固定资产报废损失 | 6711 | CF-S11 | supplementary |
 | 存货跌价准备 | 1471 | CF-S04 | supplementary |
 | 坏账准备 | 1231 | CF-S04 | supplementary |
@@ -257,7 +258,7 @@ class AdjustmentRule(TypedDict):
 
 ### Property 7: Auto-adjustment calculation correctness
 
-*For any* AUTO_ADJUSTMENT_RULE and any trial_balance row matching that rule's account_code, the generated adjustment amount should equal `abs(closing_balance - opening_balance)`. If the account_code does not exist in trial_balance, no adjustment should be created for that rule.
+*For any* AUTO_ADJUSTMENT_RULE and any trial_balance row matching that rule's account_code, the generated adjustment amount should equal `abs(audited_amount - opening_balance)` (i.e., the period change). If the account_code does not exist in trial_balance, no adjustment should be created for that rule.
 
 **Validates: Requirements 4.4, 4.6**
 
@@ -327,7 +328,7 @@ class AdjustmentRule(TypedDict):
 
 - **Unit tests**: pytest + pytest-asyncio
 - **Property-based tests**: hypothesis (Python PBT library, already in project)
-- **Minimum iterations**: 100 per property test (hypothesis `settings(max_examples=100)`)
+- **Minimum iterations**: 15 per property test (hypothesis `settings(max_examples=15)`) — 项目约定，保证速度
 - **Tag format**: Comment `# Feature: report-module-enhancement, Property N: {title}`
 
 ### Unit Tests
