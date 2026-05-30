@@ -19,7 +19,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import GtEControlTest, { type EControlTestSchema } from '../GtEControlTest.vue'
+import GtEControlTest from '../GtEControlTest.vue'
+import type { EControlTestSchema } from '../GtEControlTest.types'
 
 // Mock GtIndexChip
 vi.mock('@/components/workpaper/GtIndexChip.vue', () => ({

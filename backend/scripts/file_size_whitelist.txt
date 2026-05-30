@@ -48,5 +48,4 @@ audit-platform/frontend/src/views/WorkpaperEditor.vue 2342
 audit-platform/frontend/src/views/WorkpaperList.vue 3464
 audit-platform/frontend/src/components/formula/FormulaManagerDialog.vue 1884
 audit-platform/frontend/src/components/wizard/AccountImportStep.vue 1911
-audit-platform/frontend/src/components/workpaper/GtCNoteTable.vue 1802
 audit-platform/frontend/src/components/workpaper/GtDForm/GtDFormReview.vue 1670
