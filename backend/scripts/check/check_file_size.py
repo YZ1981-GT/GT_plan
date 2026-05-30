@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-WHITELIST_FILE = Path(__file__).parent / "file_size_whitelist.txt"
+WHITELIST_FILE = ROOT / "backend" / "scripts" / "file_size_whitelist.txt"
 
 # 默认上限（按文件类型）
 LIMITS = {
