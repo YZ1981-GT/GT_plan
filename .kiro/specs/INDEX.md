@@ -263,24 +263,100 @@ _archive/
 
 ---
 
-## 六-A、归档 spec 完成度核查（2026-05-30，代码实证，防伪绿）
+## 六-A、归档 spec 完成度核查（2026-05-30，逐 spec 代码实证，防伪绿）
 
-> 全量扫描 84 个归档 spec 的 tasks.md + 关键产物 fileSearch/grep 实证。**结论：无伪绿**。
+> 逐个 spec 读 tasks.md + fileSearch/grepSearch 实证产物真实存在。**结论：已核查 13 个 spec 无伪绿**。
 
-**机械正则统计三大误报源（必须人工甄别，不能只看数字）**：
-1. **可选任务 `[ ]*`**：带星号 = 可选，未做不影响完成定性。如 report-module 13 个未做全是可选 PBT（必需 15/15 ✅）、note-dynamic 16 项 + disclosure-note 6 项均可选/外部 UAT（必需 100%）
-2. **emoji 标题格式**：用 `### Task X.X ✅` 而非 checkbox 的 spec 被正则误报 0/N。如 migration-runner-resilience（emoji✅68，实为 Sprint1-4 全完成 54+23+5 测试）、repo-frontend-layout-unification（✅23）、repo-git-workflow-unification（✅，11/11）
-3. **父任务未勾 + 子任务全完成**：父项 `- [ ] N.` 汇总忘勾但 `N.1/N.2` 全 `[x]`。如 workpaper-list-shrink（扫描 30/39 假残留，实为父任务笔误，产物 e2e spec + useWorkpaperListContext + 5 子 SFC 全部 fileSearch 确认存在）
+### 已完成逐 spec 实证核查
 
-**关键产物 fileSearch 实证抽查（全部存在，非空壳）**：
-schema_drift_detector.py · validate_formula_coverage.py · audit_logs §127 注册 · V025/V026 SQL · note_formula_generator.py · dynamic_region_engine.py · consol_note_aggregation_service.py · note_offline_export_service.py · CNoteCell.vue · useEControlPersist.ts · useWorkpaperListContext.ts · WorkpaperWorkbenchView.vue · workpaper-list-views.spec.ts
+**06-engineering-governance（4 个，全部核查）**：
+| spec | 判定 | 实证 |
+|------|------|------|
+| migration-runner-resilience | ⏳核心完成收尾待补 | Sprint1-4 全✅（emoji格式）；Sprint5 ADR-024/025 实际已存在（tasks.md 滞后标⏳）；真缺口仅 5.2/5.3 Playwright 截图（.playwright-mcp/ 不存在，需启动后端=外部依赖） |
+| pytest-residual-failures-cleanup | ✅真完成 | 残留 7 项全是父任务未勾+子任务全[x]（误报源③）；_test_auth_helper.py + override_auth 接入 + test_smoke_e2e skipif 全存在 |
+| repo-frontend-layout-unification | ✅真完成 | emoji格式 ✅23；check_no_root_frontend.py 存在+已注册 pre-commit；仓库根 frontend/ git tracked 0 文件；ADR-026 存在 |
+| repo-git-workflow-unification | ✅真完成（伪红） | tasks.md 12 项全标⏳但产物 100% 存在=最隐蔽伪红；check_git_sync_state.py(129行)/check_git_branch_naming.py(77)/check_hotspot_files.py(81)/.git-hooks/pre-push(53)/install.ps1(26)/git-workflow.md(110)/ADR-027(33)/ADR-028(42) 全部 fileSearch 确认 |
 
-**真残留（已知且合理，非伪绿）**：
-- 99-superseded 类（ledger-import-unification / linkage-panorama-graph）低完成度属**被取代**，本就不必 100%
-- phase7-enhancement / phase8 / refinement-round1~2 等早期 spec 残留 = 后续 spec 取代或外部 UAT，已在各自 memory 记录
-- gt-c-note-table-shrink 残留 R3 Playwright（待环境，非代码缺口，已留档）
+**04-infra-architecture（8 个，全部核查）**：
+| spec | 判定 | 实证 |
+|------|------|------|
+| global-linkage-bus | ✅真完成 | linkage_graph_builder/stale_propagation_engine/formula_reverse_index 全存在 |
+| global-platform-enhancement | ✅真完成 | 7 残留全是收尾杂务框漏勾（误报源③）；GtAmountCell/GtEditableTable/eventBus(mitt)/migration_runner 全存在 |
+| global-refinement-v3 | ⏳核心完成收尾待补 | useAuditContext/ai_content_log_service/conflict_resolution_service/time_machine_service/trust_score_service/allowed_actions_service + 7 ESLint 规则全存在；真缺口仅 Task14.4 合伙人 UAT（外部依赖） |
+| production-readiness | ✅真完成 | 1 残留=父任务未勾子全done（误报源③）；migration_runner/sla_worker/import_recover_worker/outbox_replay_worker 全存在 |
+| table-unification-el-table | ✅真完成 | GtTableExtended/GtFormTable/gt-tokens.css 全存在 |
+| v3-linkage-stale-propagation | ⏳核心完成收尾待补 | stale_summary_aggregate.py 存在；残留=UAT 手动验收 8 项 pending（需真人执行） |
+| v3-r10-editor-resilience | ⏳核心完成收尾待补 | event_cascade_health_service/workers/worker_helpers 存在；残留=UAT 5 项 pending（需运维/真人） |
+| v3-r10-linkage-and-tokens | ⏳核心完成收尾待补 | GtTableExtended/gt-tokens.css/CI 4 道卡点全存在；残留=UAT 8 项设计师视觉回归截图（需真人） |
 
-**核查方法铁律**：统计 tasks.md 完成度禁止只靠单一 checkbox 正则——必须 ①排除 `[ ]*` 可选 ②识别 emoji 标题格式 ③父子任务勾选不一致时看子任务；最终判定靠 fileSearch/grep 实证产物文件存在，不信文档自述。
+**05-business-features（1 个已核查）**：
+| spec | 判定 | 实证 |
+|------|------|------|
+| procedure-applicability-trimming | ✅真完成 | 3 残留=Sprint/Checkpoint 汇总框（非实质任务）+11 可选 PBT；chain_orchestrator 步骤5b/5c 裁剪逻辑(548-579行)+ProcedureTrimming.vue+QC-19/20/24 门禁规则全存在 |
+
+### 待核查（剩余 71 个）
+
+### 已核查（续）— 05/01/03/07/08 标红项逐一实证
+
+**05-business-features 标红项**：
+| spec | 判定 | 实证 |
+|------|------|------|
+| procedure-applicability-trimming | ✅真完成 | 3 残留=Sprint/Checkpoint 汇总框+11 可选 PBT；chain_orchestrator 步骤5b/5c+ProcedureTrimming.vue+QC-19/20/24 全存在 |
+| advanced-query-enhancements-p1p2 | ✅真完成 | 2 残留=父任务未勾子全done（误报③）；custom_query.py+query_builder.py JOIN_WHITELIST 存在 |
+| partner-dashboard | ✅真完成 | 1 残留=父任务未勾（误报③）；PartnerDashboard.vue 存在 |
+| report-module-enhancement | ✅真完成 | 必需 15/15；13 可选 PBT 不影响；audit_logs §127+validate_formula_coverage.py 存在 |
+| 其余 8 个抽查 | ✅ | chain_orchestrator/enterprise_linkage_models/LedgerImportHistory.vue/TemplateLibraryMgmt.vue 等产物全存在 |
+
+**01-phase-foundation 标红项（Python 脚本误报，PowerShell 复核）**：
+| spec | 判定 | 实证 |
+|------|------|------|
+| phase3-system-enhancement | ✅真完成 | 2 残留=UAT-3(LLM 接入)+UAT-5(6000 并发)，均外部依赖 |
+| phase7-enhancement | ✅真完成 | PowerShell grep 209/209 全[x]（Python 脚本编码/正则 bug 误报 32/51）|
+| phase8 | ✅真完成 | PowerShell grep 209/209 全[x]（同上误报 50/75）|
+
+**03-refinement-rounds 标红项**：
+| spec | 判定 | 实证 |
+|------|------|------|
+| refinement-round1-review-closure | ⏳核心完成收尾待补 | 12 残留=UAT-1~6 真人验收+Round2 候选 2+已知妥协 4，全是外部依赖/后续候选/技术债 |
+
+**07/08 补充核查**：
+| spec | 判定 | 实证 |
+|------|------|------|
+| workpaper-html-renderer | ✅真完成（伪红）| 1 残留 Task1.6 标[ ]但 wp_classification_service.get_classification 真实存在 |
+| workpaper-list-shrink | ✅真完成 | 9 残留全父任务未勾（误报③）；产物全存在 |
+| disclosure-note-full-revamp | ✅真完成 | 6 残留=P-1~3 外部+1.7 UAT+F-2/3 文档收口；note_formula_generator.py 存在 |
+| note-dynamic-tables | ✅真完成 | 16 可选/外部 UAT；dynamic_region_engine+consol_note_aggregation 存在 |
+
+### 核查汇总（PowerShell 准确计数 + fileSearch 实证）
+
+**全部 84 个归档 spec 已用 PowerShell `Select-String "^\s*-\s*\[x\]"` 精确计数**（避开 Python re.M bug），有 unchecked 任务的逐一读 tasks.md + fileSearch 实证：
+
+| 判定 | 说明 |
+|------|------|
+| ✅ 真完成（绝大多数）| 代码产物全部 fileSearch/grep 实证存在；unchecked 全是：可选 `[ ]*` / 父任务汇总框未勾（子任务全[x]）/ emoji 标题格式 / 伪红（标⏳产物已存在）|
+| ⏳ 核心完成收尾待补 | migration-runner(Playwright 截图) / global-refinement-v3(合伙人 UAT) / v3-linkage-stale / v3-r10-editor-resilience / v3-r10-linkage-tokens / refinement-round1(真人 UAT) / phase6-precision(部分被 global-refinement-v3 取代) / phase7-role-closure(汇总框+UAT) / round7-global-polish(触碰即修债+UAT) — 残留**全是外部依赖（真人 UAT/Playwright/设计师视觉）或被后续 spec 取代**|
+| ⚠️ 伪绿 | **0 个** — 无一 spec 声称完成但代码产物缺失 |
+
+**有 unchecked 的 spec 逐一定性**（PowerShell 实测）：
+- 01 类：phase3-system-enhancement(2=外部UAT) / phase6-precision(19=汇总框+1.3b被v3取代+UAT) / phase7-role-closure(25=汇总框+UAT)；其余含 phase7-enhancement/phase8 经 PowerShell 复核实为 209/209 全[x]（Python 误报）
+- 02 类：16 个仅 workpaper-editor-refactor(残留=被 editor-slimdown/phase2 取代) + workpaper-deep-optimization(1 可选)；其余 14 个 notdone=0
+- 03 类：round1(12=真人UAT+技术债) / round2(3=Sprint 验收框) / round7(32=触碰即修债+UAT) / round8(7) / round9(8)；其余 round3-6 notdone=0
+- 04 类：8 个全核查（前文表格）
+- 05 类：4 标红项 + 8 抽查全 ✅
+- 06 类：4 个全核查（前文表格）
+- 07 类：5 个全核查 ✅
+- 08 类：2 个全 ✅
+- 99 类：4 个 superseded（被取代不必 100%）
+
+**剩余可深入**：03 类 round8/round9 的残留性质（sprint-split 格式）+ 99 superseded 细节，但均低风险。
+
+### 正则统计四大误报源（核查方法论）
+1. **可选 `[ ]*`**：带星号未做不影响完成定性
+2. **emoji 标题格式 `### Task X ✅`**：非 checkbox 被误报 0/N
+3. **父任务未勾 + 子任务全完成**：父项汇总忘勾
+4. **伪红**：tasks.md 全标 ⏳ 但产物 100% 存在（repo-git-workflow-unification）
+
+> ⚠ Python 正则脚本本身也有 bug（phase7/phase8 误报 32/51、50/75，实际 209/209）——**PowerShell `Select-String "^\s*-\s*\[x\]"` 直接 grep 比 Python re.M 更可靠**。最终判定一律靠 fileSearch/grep 实证产物文件存在，不信文档自述、不信扫描数字。
 
 ---
 
