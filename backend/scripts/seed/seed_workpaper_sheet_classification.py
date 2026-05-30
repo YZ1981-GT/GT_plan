@@ -43,7 +43,7 @@ from app.models.workpaper_models import WorkpaperSheetClassification
 from app.models.workpaper_template_version import WorkpaperTemplateVersion
 
 
-ANALYSIS_JSON = Path(__file__).resolve().parent.parent.parent / ".kiro" / "specs" / "workpaper-html-renderer" / "workpaper_template_analysis.json"
+ANALYSIS_JSON = Path(__file__).resolve().parents[3] / ".kiro" / "specs" / "workpaper-html-renderer" / "workpaper_template_analysis.json"
 
 
 # ─── class_code → 字段派生规则 ───────────────────────────────────────────────

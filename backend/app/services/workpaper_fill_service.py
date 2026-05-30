@@ -1667,12 +1667,14 @@ class WorkpaperFillService:
         import re
         import glob
 
-        # 1. 查找 TSJ 目录（支持绝对路径或相对路径）
-        tsj_base = os.environ.get("TSJ_PROMPT_DIR")
+        # 1. 查找 TSJ 目录（程序数据：backend/data/tsj_review_prompts/）
+        # 环境变量 TSJ_PROMPT_DIR / TSJ_KNOWLEDGE_DIR 可覆盖
+        tsj_base = os.environ.get("TSJ_PROMPT_DIR") or os.environ.get("TSJ_KNOWLEDGE_DIR")
         if not tsj_base:
-            # 尝试相对于项目根目录
+            # __file__ = backend/app/services/workpaper_fill_service.py
+            # → 上溯到 backend/ 后定位 data/tsj_review_prompts
             backend_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            tsj_base = os.path.join(backend_root, "..", "TSJ")
+            tsj_base = os.path.join(backend_root, "data", "tsj_review_prompts")
         tsj_base = os.path.abspath(tsj_base)
 
         if not os.path.isdir(tsj_base):

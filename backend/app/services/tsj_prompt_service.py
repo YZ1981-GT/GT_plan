@@ -1,18 +1,25 @@
 """TSJ 提示词库服务
 
-从 TSJ/ 目录加载审计复核提示词 Markdown 文件，
+从 backend/data/tsj_review_prompts/ 目录加载审计复核提示词 Markdown 文件，
 按科目名称匹配，为底稿工作台提供审计要点和复核清单。
+
+提示词库是程序数据的一部分（随仓库版本化 + PyInstaller 打包），
+可用环境变量 TSJ_KNOWLEDGE_DIR 覆盖默认位置。
 """
 from __future__ import annotations
 
 import logging
+import os
 import re
 from functools import lru_cache
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-TSJ_DIR = Path(__file__).resolve().parent.parent.parent.parent / "TSJ"
+# 默认位置：backend/data/tsj_review_prompts/（程序数据，随仓库 + 打包）
+# __file__ = backend/app/services/tsj_prompt_service.py → parents[2] = backend
+_DEFAULT_TSJ_DIR = Path(__file__).resolve().parents[2] / "data" / "tsj_review_prompts"
+TSJ_DIR = Path(os.environ.get("TSJ_KNOWLEDGE_DIR") or _DEFAULT_TSJ_DIR)
 
 # 科目名称 → TSJ 文件名关键词映射
 _NAME_MAP: dict[str, list[str]] = {
