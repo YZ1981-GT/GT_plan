@@ -25,7 +25,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 
 PATTERNS = [
     (re.compile(r"^main$"), "main", "唯一主线"),
