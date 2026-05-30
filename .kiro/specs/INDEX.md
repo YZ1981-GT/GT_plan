@@ -1,106 +1,230 @@
-# Spec 总索引
+# 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-05-29（merge `feature/global-refinement-v3-closure` 后统一基线：active 收敛至 11 个 + archived 71，含报表/编辑器瘦身 phase2/全平台 V3 收尾）
-
-> 此索引追踪所有 spec 状态、关联文档、commit。
-> **审计原则**：spec 不删，但归档已完成且不再演进的；新启动 spec 默认在 active。
-> **实测铁律**：每行的"完成度/日期/commit"列必须有 grep 证据，凭印象写视为漏审。
-
-## 迁移系统（D6 唯一入口）
-
-- **当前迁移系统** = `backend/migrations/V*.sql` + `R*.sql`(D6 版本化 SQL 脚本，启动时 MigrationRunner 自动执行)
-- **alembic 已废弃**(2026-05-29 删除，`backend/alembic/` + `alembic.ini` + `requirements.txt` 中 `alembic` 依赖全部移除)
-- **新加迁移**：写 `V0XX__xxx.sql` + `R0XX__rollback_xxx.sql` 配对，必须 `IF NOT EXISTS` 幂等
-- **失败追踪**：`schema_migration_failures` 表 + `/api/health` 暴露 `migration.failures`
-- **schema 漂移**：启动 self-check `SchemaDriftDetector` 检测 ORM↔DB 4 类漂移，写 `schema_drift_log` 表
+**最后更新**：2026-05-30  
+**当前分支**：`main`（HEAD = 85b362d5）  
+**技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer  
+**目标规模**：6000 并发用户
 
 ---
 
-## §1 Active Spec（11 个，待打磨/进行中/外部依赖未完）
+## 一、平台已实现功能全景
 
-| Spec | 状态 | 完成度 | 关键阻塞/下一步 |
-|------|------|-------|----------------|
-| `migration-runner-resilience/` | 🚧 进行中 | 17/21 | Sprint 5 UAT 实测（Playwright health degraded 截图 + 故意 drift 复测）+ ADR-024/025 |
-| `disclosure-note-full-revamp/` | ⚠ 外部依赖 | 44/47 | F-1 真项目 UAT / F-2 dev-history / F-3 文档（外部审计师协作） |
-| `note-dynamic-tables-and-template-inheritance/` | 📋 待启动 | 0/151 v0.6.2 | Phase 1 单体附注修复（17 人天，含 D1-D7+D9+D13+D14）；待用户决策启动节奏 |
-| `consol-note-three-level-drilldown/` | 📋 占位 | 0 | 前置 = 真实合并母子项目数据 |
-| `workpaper-editor-slimdown/` | 🚧 部分完成 | 59/59 任务 / 1200 行目标未达成 | WorkpaperEditor 仍 2167 行，剩余 useUniverEditor composable 待抽（被 workpaper-editor-shrink-phase2 接续） |
-| `workpaper-html-renderer/` | ✅ 完成（保留为打磨基础） | 40/40 | 已闭环，作为 1788 单体真底稿渲染基线保留在 active 供后续 view 打磨参考 |
-| `global-refinement-v3/` | ⚠ 外部依赖 | 143/145 | 2026-05-28 完成核心（Sprint 0-4 + 13 Property PBT + vue-tsc 0 + vitest 2094 passed + CI 双卡点）；剩 14.4 真合伙人 UAT；gaps.md 反向记录 GtAmountCell 17%/80% + WorkpaperEditor 2555/1000 等技术债 |
-| `workpaper-editor-shrink-phase2/` | 🚧 进行中 | 部分完成 | WorkpaperEditor 减 686 行（2748→1481）+ 8 子 SFC + 2 composable + 42 tests + CI 防退化；merge 进基线后继续 |
-| `pytest-residual-failures-cleanup/` | ✅ 已闭环 | 全部执行完毕 | 2026-05-28 commit 7a90c3e9 |
-| `report-module-enhancement/` | 📝 待执行 | 0/10 | 2026-05-29 commit 612c8a79 三件套就绪：7 需求 / 11 PBT / 5 大领域（种子公式补全 + 路由注册 + 覆盖验证 + CFS 规则扩展 + API 测试基础设施） |
-| `workpaper-list-shrink/` | 📝 待执行 | 0/13 | 2026-05-28 三件套就绪（10 stories/61 ACs/1 PBT + 5 ADR）；目标 = WorkpaperList.vue 3463→≤1000 拆 5 子 SFC + 1 shell；已有 4 子组件可复用（kanban/lifecycle/graph/matrix），仅需新建 Workbench |
+按审计业务流程排列，标注对应 spec 来源。
+
+### 1.1 项目管理与基础设施
+
+| 功能 | 说明 | 来源 spec |
+|------|------|-----------|
+| 项目向导 | 创建项目 → 配置 → 派单 → 启动 | phase0/phase1a |
+| 角色体系 | 6 角色（auditor/manager/qc/partner/eqcr/admin）+ 动态导航 + 权限矩阵 | role-based-view-switching / R5 |
+| 人员档案 | StaffMember + ProjectAssignment + 工时追踪 | phase1a / R4 |
+| 通知中心 | SSE 推送 + 轮询 + 分类 Tab + 免打扰 | R7 / R9 |
+| 编辑锁 | 乐观锁 + heartbeat + 强制接管 | R4 / R7 |
+| 审计日志 | 哈希链 + 事件溯源 + DLQ | phase14 / R3 |
+
+### 1.2 账表数据（四表体系）
+
+| 功能 | 说明 | 来源 spec |
+|------|------|-----------|
+| 智能导入 v2 | 9 家企业验证 / 自动识别表类型 / 7 适配器 / GBK+UTF-8 | ledger-import-unification |
+| B' 视图重构 | activate <1s（metadata 切换替代 200 万行 UPDATE） | ledger-import-view-refactor |
+| 四表联查 | 余额表 / 序时账 / 辅助余额 / 辅助明细 + 全屏 + 右键穿透 | phase1a / R9 |
+| 科目映射 | 自动匹配 + 手动调整 + 跨项目复用 fingerprint | e2e-business-flow |
+| 数据管理 | 软删除回收站 / 增量追加 / 跨年度并存 | ledger-import-view-refactor S7 |
+| 上传安全 | MIME 校验 / zip bomb 检测 / 宏拦截 / 规模预警 | ledger-import-view-refactor S7 |
+
+### 1.3 试算平衡表
+
+| 功能 | 说明 | 来源 spec |
+|------|------|-----------|
+| 自动生成 | 从 tb_balance 聚合 + 父级汇总行补齐 | phase1a / e2e-business-flow |
+| 科目标准库 | CAS 166 标准科目 + 国企/上市版映射 | phase1a |
+| 公式引擎 | TB()/SUM_TB()/ROW() 三类公式 + 全量重算 | report-module-enhancement |
+| 借贷平衡校验 | 含损益结转 + Decimal 精度 | global-refinement-v3 |
+
+### 1.4 报表模块
+
+| 功能 | 说明 | 来源 spec |
+|------|------|-----------|
+| 6 类报表 | BS / IS / CFS / EQ / CFS 附表 / 减值准备 | phase1c / report-module-enhancement |
+| 国企+上市双版 | 303 行 / 214 行配置驱动 | report-module-enhancement |
+| 事件联动 | TB 变更 → 报表自动 stale → 重算 | phase3 / R7 |
+| 签字状态机 | draft → review → eqcr_approved → final | R5 |
+| PDF/Word 导出 | LibreOffice headless 转换 | phase13 / production-readiness |
+
+### 1.5 底稿模块
+
+| 功能 | 说明 | 来源 spec |
+|------|------|-----------|
+| 1788 单体底稿 | 致同 D/F/K/N 等 15 循环全覆盖 | 11 审计循环 spec |
+| HTML 渲染器 | 9 类 componentType + 禁止 Univer 兜底 | workpaper-html-renderer |
+| Univer 在线编辑 | F/G 循环 558 sheet 保留 Univer | workpaper-editor-slimdown |
+| 程序裁剪 | 智能裁剪 + 自定义裁剪 + 自定义新增 | procedure-applicability-trimming |
+| 底稿生命周期 | 生命周期视图 + 委派矩阵 + 依赖图 + 看板 | workpaper-completion-foundation |
+| 预填充 | TB/WP/REPORT 批量取数 + provenance 溯源 | workpaper-editor-slimdown S4 |
+| 离线导出/导入 | 4 色 cell + _meta_ binding + AES 加密 | workpaper-editor-slimdown S4 |
+
+### 1.6 附注模块
+
+| 功能 | 说明 | 来源 spec |
+|------|------|-----------|
+| 单体附注生成 | 173 章节（首汽租车实测）/ 自动裁剪 40 章节 | disclosure-note-full-revamp |
+| 合并附注 | 7 章节基础生成 + 子公司汇总 | disclosure-note-full-revamp B.0-B.2 |
+| Word 导出 | 致同模板 + python-docx | disclosure-note-full-revamp S2 |
+| 离线分发 | xlsx 4 色语义 + _meta_ + AES + 一键导入 diff | note-dynamic-tables D15 |
+| 公式 DSL | REGION/PRIOR/SUM_TB 等 + 三式联动 | disclosure-note-full-revamp S1.5 |
+
+### 1.7 复核与质控
+
+| 功能 | 说明 | 来源 spec |
+|------|------|-----------|
+| 复核工作台 | ReviewWorkbench + 批注 + 工单转换 | R1 / R6 |
+| Gate Engine | 签字门禁 + 22 条规则 + 可配置 | phase14 / R3 / R6 |
+| QC 规则引擎 | 22 条 seed 规则 + DSL(python/jsonpath) | R3 / R6 |
+| EQCR 独立复核 | 5 域聚合 + 影子计算 + 备忘录 + 工时 | R5 |
+| 归档包 | 插件化章节(00-99) + SHA-256 水印 + 断点续传 | R1 / R5 |
+
+### 1.8 高级查询与穿透
+
+| 功能 | 说明 | 来源 spec |
+|------|------|-----------|
+| 高级查询 | 16 表白名单 + JOIN + 底稿树 + 单元格选区 | advanced-query-enhancements-p1p2 |
+| 正向穿透 | 5 套端点（报表→TB→序时账→凭证） | phase1a / R4 |
+| 反向溯源 | report_trace + trace replay | R4 / v4 复盘 |
+| 跨模块跳转 | 11 命名空间 4 层级 + Backspace 返回 | enterprise-linkage |
+
+### 1.9 运维与工程
+
+| 功能 | 说明 | 来源 spec |
+|------|------|-----------|
+| D6 迁移系统 | V*.sql + MigrationRunner + 失败追踪 + schema drift | migration-runner-resilience |
+| CI 卡点 | vue-tsc / vitest / file-size / API hardcode / B' guard | R6 / R9 / ledger-import-view-refactor |
+| Git 工作流 | 5 类分支命名 + pre-push hook + 6 维核查 CLI | repo-git-workflow-unification |
+| 性能基线 | YG2101 128MB/11min / calamine 3.4× 加速 | ledger-import-view-refactor |
 
 ---
 
-## §2 模块打磨待办（结构调整建议落地）
+## 二、进行中 / 待启动 Spec（active，1 个）
 
-按 ROI 排序：
+> 状态图例：📌 占位 stub（仅 README，无 tasks.md，代码未动）
+> 核心已闭环的 spec 均已归档到 `_archive/`，根目录只保留尚未启动的真 stub。
 
-| 优先级 | 模块 | 当前规模 | 目标 | 依赖 |
-|--------|------|---------|------|------|
-| P0 | WorkpaperEditor.vue 瘦身收尾 | 2167 行 | ≤1200 行 | workpaper-editor-slimdown 已闭环，剩抽 useUniverEditor |
-| P1 | WorkpaperList.vue 拆分 | 3241 行 | ≤1500 行 | 需新建 spec / 抽 useStandardTable 复用 6 view |
-| P1 | TrialBalance.vue 拆分 | 2494 行 | ≤1500 行 | 同上 |
-| P2 | DisclosureEditor.vue 拆分 | 2468 行 | ≤1500 行 | C.3 前端组件已加，编辑器主体未拆 |
-| P2 | LedgerPenetration.vue 拆分 | 3175 行 | ≤1500 行 | 需新建 spec |
-| P3 | ReportView.vue 拆分 | 2317 行 | ≤1500 行 | 需新建 spec |
-| P0 | service ≤800 行卡点 | smart_import 2786 / consistency_gate 2141 等 8 个 | pre-commit hook + whitelist | 新加 pre-commit 规则 |
-| P1 | 仓库前端路径消歧 | `frontend/` 5 文件空壳 + `audit-platform/frontend/` 真前端 | 单一来源 | 需新 spec（高侵入） |
-| P2 | 6000 并发压测 | UAT-5（外部依赖） | 真实环境验证 | 需 PG 大数据量 + Locust |
-| P3 | LLM 真实接入 | 6 stub 引擎 H/I/G/K/J/N | 一键切换真服务 | `WP_AI_SERVICE_ENABLED` 已就位，等环境 |
+| Spec | 状态 | 启动条件 / 阻塞 |
+|------|------|----------------|
+| `consol-note-three-level-drilldown/` | 📌 | 合并附注三级穿透；前置 = 真实合并母子项目数据（PG 当前 0 个 consolidated 项目） |
+
+> 注：`workpaper-fill-service-split` 已 `git rm`（目标 WorkpaperFillService 经 grep 实证为 0 业务调用方的死代码，拆分无意义）；`gt-c-note-table-shrink` 已于 2026-05-30 完成并归档至 07-workpaper-slimdown（GtCNoteTable 1803→450 + GtEControlTest 1414→344，90 测试全绿；残留 R3 Playwright 目视待环境，非代码缺口）。
 
 ---
 
-## §3 已归档区（71 个 spec）
+## 三、已归档 Spec（`_archive/`，84 个）
 
-详见 `.kiro/specs/_archive/`，分类如下：
+> 已完成且不再演进的 spec，保留审计轨迹。归档不删文件。
+> **物理结构**：`_archive/` 下按功能 + 开发先后分 9 个分类目录，每个目录含 README 说明。
+> （active spec 保持 `.kiro/specs/` 根目录扁平存放——Kiro spec 工作流依赖固定路径 `.kiro/specs/{name}/`，不可嵌套。）
+> **归档标准**：代码实证核心已闭环（声称产物文件真实存在 + 测试通过），剩余仅外部依赖 UAT/文档的，归档；纯 README stub（代码未动）留 active。
 
-### 3.1 11 审计循环（D~N，548/548 tasks）
+```
+_archive/
+├── 01-phase-foundation/        平台地基（Phase 0~16，24 个）
+├── 02-workpaper-cycles/        审计循环业务内容（11 循环 + 5 底稿基础，16 个）
+├── 03-refinement-rounds/       五角色轮转打磨（R1~R9，9 个）
+├── 04-infra-architecture/      基础设施 / 全局架构（8 个）
+├── 05-business-features/       业务专项功能（12 个）
+├── 06-engineering-governance/  工程治理（4 个）
+├── 07-workpaper-slimdown/      底稿模块瘦身系列（5 个）
+├── 08-disclosure-notes/        附注模块系列（2 个）
+└── 99-superseded/              已被取代 / 合并（4 个）
+```
 
-`workpaper-d-sales-cycle` / `workpaper-e1-cash-optimization` / `workpaper-f-purchase-inventory` / `workpaper-g-investment-cycle` / `workpaper-h-fixed-assets-cycle` / `workpaper-i-intangible-assets-cycle` / `workpaper-j-payroll-cycle` / `workpaper-k-admin-cycle` / `workpaper-l-debt-cycle` / `workpaper-m-equity-cycle` / `workpaper-n-tax-cycle`
+### 3.1 `01-phase-foundation/` — 平台地基建设（24 个）
 
-### 3.2 phase 系列（17 个）
+平台最早期地基（Phase 0~16），按时间顺序构建。
 
-`phase0-infrastructure` / `phase1a-core` / `phase1b-workpaper` / `phase1c-report` / `phase1-experience-gap-fix` / `phase2-consolidation` / `phase2-role-experience-boost` / `phase3-collaboration` / `phase3-system-enhancement` / `phase4-ai` / `phase4-long-term-governance` / `phase5-extension` / `phase5-operational-excellence` / `phase6-integration` / `phase6-precision-and-security` / `phase7-enhancement` / `phase7-role-experience-closure` / `phase8` / `phase11-system-hardening` / `phase12-workpaper-deep` / `phase13-word-export` / `phase14-gate-engine-governance` / `phase15-task-tree-and-event-orchestration` / `phase16-evidence-package-and-versionline`
+`phase0-infrastructure` · `phase1a-core` · `phase1b-workpaper` · `phase1c-report` · `phase1-experience-gap-fix` · `phase2-consolidation` · `phase2-role-experience-boost` · `phase3-collaboration` · `phase3-system-enhancement` · `phase4-ai` · `phase4-long-term-governance` · `phase5-extension` · `phase5-operational-excellence` · `phase6-integration` · `phase6-precision-and-security` · `phase7-enhancement` · `phase7-role-experience-closure` · `phase8` · `phase11-system-hardening` · `phase12-workpaper-deep` · `phase13-word-export` · `phase14-gate-engine-governance` · `phase15-task-tree-and-event-orchestration` · `phase16-evidence-package-and-versionline`
 
-### 3.3 refinement 系列（9 round）
+### 3.2 `02-workpaper-cycles/` — 审计循环业务内容（16 个）
 
-`refinement-round1-review-closure` ~ `refinement-round9-global-deep-review`
+11 审计循环主体 + 5 底稿基础。548/548 tasks 全部完成。
 
-### 3.4 v3 / global / production / table 基础设施（7 个）
+致同审计循环代号：A=报表/调整 · B=控制了解 · C=控制测试 · D=销售收入 · E=货币资金 · F=采购存货 · G=投资 · H=固定资产 · I=无形资产 · J=职工薪酬 · K=管理 · L=筹资 · M=股东权益 · N=税费 · S=专项
 
-`v3-r10-linkage-and-tokens` / `v3-r10-editor-resilience` / `v3-linkage-stale-propagation` / `global-linkage-bus` / `global-platform-enhancement` / `production-readiness` / `table-unification-el-table`
+**11 循环主体**：`workpaper-d-sales-cycle` · `workpaper-e1-cash-optimization` · `workpaper-f-purchase-inventory` · `workpaper-g-investment-cycle` · `workpaper-h-fixed-assets-cycle` · `workpaper-i-intangible-assets-cycle` · `workpaper-j-payroll-cycle` · `workpaper-k-admin-cycle` · `workpaper-l-debt-cycle` · `workpaper-m-equity-cycle` · `workpaper-n-tax-cycle`
 
-### 3.5 workpaper 基础（5 个）
+**5 底稿基础**：`workpaper-completion-foundation` · `workpaper-cycle-d-revenue` · `workpaper-collaboration-presence` · `workpaper-editor-refactor` · `workpaper-deep-optimization`
 
-`workpaper-completion-foundation` / `workpaper-cycle-d-revenue` / `workpaper-collaboration-presence` / `workpaper-editor-refactor` / `workpaper-deep-optimization`
+### 3.3 `03-refinement-rounds/` — 五角色轮转打磨（9 个）
 
-### 3.6 业务专项已完成（11 个）
+合伙人 → 项目经理 → 质控 → 审计助理 → EQCR 独立复核 → 跨角色优化 → 全局打磨 → 深度收口 → 全局深度复盘
 
-`proposal-remaining-18` / `e2e-business-flow` / `template-library-coordination` / `audit-chain-generation` / `enterprise-linkage` / `ledger-import-view-refactor` / `advanced-query-enhancements-p1p2` / `k-admin-cycle-post-review-fix` / `partner-dashboard` / `procedure-applicability-trimming` / `role-based-view-switching`
+`refinement-round1-review-closure` · `refinement-round2-project-manager` · `refinement-round3-quality-control` · `refinement-round4-audit-assistant` · `refinement-round5-independent-review` · `refinement-round6-cross-role-optimization` · `refinement-round7-global-polish` · `refinement-round8-deep-closure` · `refinement-round9-global-deep-review`
 
-### 3.7 已被取代/合并（4 个）
+### 3.4 `04-infra-architecture/` — 基础设施 / 全局架构（8 个）
 
-`ledger-import-unification` → `ledger-import-view-refactor` / `post-enhancement-bugfix` → R9+v3 / `note-account-mapping-seed`（合并入 disclosure-note-full-revamp） / `linkage-panorama-graph`（合并入 enterprise-linkage）
+`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3`（全平台一致性治理：金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动；143/147，剩合伙人 UAT）
 
-### 3.8 全局结构治理（2 个）
+### 3.5 `05-business-features/` — 业务专项功能（12 个）
 
-`repo-frontend-layout-unification`（2026-05-29 完成，9/9 tasks，删仓库根 frontend/ 空壳 + 加 pre-commit hook 防回归）
+`proposal-remaining-18` · `e2e-business-flow` · `template-library-coordination` · `audit-chain-generation` · `enterprise-linkage` · `ledger-import-view-refactor` · `advanced-query-enhancements-p1p2` · `k-admin-cycle-post-review-fix` · `partner-dashboard` · `procedure-applicability-trimming` · `role-based-view-switching` · `report-module-enhancement`
 
-`repo-git-workflow-unification`（2026-05-29 完成，11/11 tasks / 22 tests，分支命名规约 + GIT_MODE 双模式 + 6 维核查 CLI + pre-push hook + ADR-027/028）
+### 3.6 `06-engineering-governance/` — 工程治理（4 个）
 
-### 3.9 README stub（待启动）
+`repo-frontend-layout-unification`（删仓库根 frontend/ 空壳 + pre-commit hook 防回归）  
+`repo-git-workflow-unification`（5 类分支命名 + GIT_MODE 双模式 + 6 维核查 CLI + pre-push hook + ADR-027/028）  
+`pytest-residual-failures-cleanup`（SQLite vs PG 测试残留失败治理，2026-05-28 闭环）  
+`migration-runner-resilience`（D6 MigrationRunner 韧性化：批不中断 + schema drift 自检 + alembic 清理；V025/V026 + schema_drift_detector.py 381 行；Sprint 1-4 完成，剩 Sprint 5 UAT）
 
-| Spec | 说明 |
+### 3.7 `07-workpaper-slimdown/` — 底稿模块瘦身系列（5 个）
+
+底稿渲染 HTML 化 + 超长 .vue 拆分。
+
+| Spec | 成果 |
 |------|------|
-| `workpaper-fill-service-split/` | README stub（2026-05-28）：workpaper_fill_service 1587 行拆 4 service；prefill 扩展时启动 |
-| `gt-c-note-table-shrink/` | README stub（2026-05-28）：GtCNoteTable 1608 / GtEControlTest 1125 拆子组件；触碰时启动 |
+| `workpaper-html-renderer` | 1788 单体底稿切 HTML，9 类组件，40/40 tasks，413 tests |
+| `workpaper-editor-slimdown` | WorkpaperEditor 2748→758 行 + 8 子 SFC + 2 composable，59/59 tasks |
+| `workpaper-list-shrink` | WorkpaperList 3463→1151 行（净减 67%）+ 5 子 SFC，36 vitest + e2e |
+| `workpaper-editor-shrink-phase2` | WorkpaperEditor 收尾瘦身至 837 行 + 8 子 SFC + 2 composable，36/36 tasks |
+| `gt-c-note-table-shrink` | GtCNoteTable 1803→450 行 + GtEControlTest 1414→344 行；C 类 3 子组件 + 3 composable / E 类 5 子组件 + 2 composable；90 测试全绿（36 spec 零断言 + 54 新单测）+ vue-tsc 0；残留 R3 Playwright 目视待环境 |
+
+### 3.8 `08-disclosure-notes/` — 附注模块系列（2 个）
+
+| Spec | 成果 |
+|------|------|
+| `disclosure-note-full-revamp` | 附注重写：173 章节生成 + 自动裁剪 + Word 导出 + 公式 DSL；46/47（剩外部 UAT/文档）；note_formula_generator 1331 行 + 50 note 测试 |
+| `note-dynamic-tables-and-template-inheritance` | 全维度增强 v0.6.2（D1~D15 共 15 维度）；实测 166/182≈90%（剩 16 项外部依赖）；10 核心 service 实跑全绿 |
+
+### 3.9 `99-superseded/` — 已被取代 / 合并（4 个）
+
+| 旧 spec | 取代者 |
+|---------|--------|
+| `ledger-import-unification` | → `ledger-import-view-refactor`（在 05-business-features） |
+| `post-enhancement-bugfix` | → R9 + global-refinement-v3（在 04-infra-architecture） |
+| `note-account-mapping-seed` | → 合并入 `disclosure-note-full-revamp`（在 08-disclosure-notes） |
+| `linkage-panorama-graph` | → 合并入 `enterprise-linkage`（在 05-business-features） |
 
 ---
 
-## §4 程序规模快照（2026-05-29 实测）
+## 四、开发历程时间线
+
+平台采用 PDCA 迭代模式：建议 → spec 三件套（requirements + design + tasks）→ 实施 → 复盘 → 下一轮。
+
+| 阶段 | 主题 | 产出 |
+|------|------|------|
+| **Phase 0-1** | 平台地基 | 基础设施 + 核心数据模型 + 底稿/报表骨架 |
+| **Phase 2-4** | 合并 / 协作 / AI | 合并报表 + 多人协作 + AI 引擎接入框架 |
+| **Phase 5-8** | 扩展 / 集成 / 加固 | 系统扩展 + 第三方集成 + 系统硬化 |
+| **Phase 11-16** | 深度治理 | 底稿深化 + Word 导出 + Gate 引擎 + 任务树 + 证据包 |
+| **11 审计循环** | 业务内容填充 | D~N 全循环 548 任务 + 致同 2025 编码体系 |
+| **Refinement R1-R9** | 五角色轮转打磨 | 合伙人/PM/质控/助理/EQCR 视角逐轮收口 |
+| **账表导入 v2** | 数据引擎重写 | 9 家企业验证 + B' 视图架构（activate <1s） |
+| **底稿渲染器** | HTML 化 | 1788 单体底稿从 Univer 切 HTML + 9 类组件 |
+| **附注全栈** | 附注模块重写 | 173 章节生成 + 离线分发 + Word 导出 |
+| **V3 全平台收尾** | 一致性治理 | 金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动 |
+| **工程治理** | 仓库/迁移/Git | 前端路径统一 + D6 迁移韧性 + Git 工作流规约 |
+
+---
+
+## 五、程序规模快照（2026-05-29 实测）
 
 | 维度 | 值 |
 |------|---|
@@ -118,16 +242,39 @@
 | cross_wp_references | 400 条 |
 | prefill_formula_mapping | 1035 cells |
 | validation_rules | 114 条 |
-| D6 SQL 迁移 | V001-V026（24 历史 + V025/V026 spec 新增） |
-| Spec 总数 | 77（active 6 + archived 71） |
-| git 当前分支 | feature/disclosure-note-full-revamp |
+| D6 SQL 迁移 | V001-V026 |
+| **Spec 总数** | **85（active 1 + archived 84）** |
 
 ---
 
-## §5 索引规约
+## 六、模块打磨待办（按 ROI 排序）
 
-1. 新建 spec 默认放 `.kiro/specs/`（active），完成后审议是否归档
-2. 完成 spec 时填完成日期 + 关键 commit
-3. 归档时直接 `git mv` 到 `_archive/`，不删文件保留审计轨迹
-4. 废弃 spec 标"已被取代" + 记录取代者，仍归档
-5. 凭印象禁令：完成度/日期必须 grep 证据
+| 优先级 | 模块 | 当前 | 目标 | 依赖 |
+|--------|------|------|------|------|
+| P0 | WorkpaperEditor.vue | 2167 行 | ≤1200 | 抽 useUniverEditor composable |
+| P1 | WorkpaperList.vue | 3241 行 | ≤1500 | 抽 useStandardTable 复用 6 view |
+| P1 | TrialBalance.vue | 2494 行 | ≤1500 | 同上 |
+| P2 | DisclosureEditor.vue | 2468 行 | ≤1500 | 编辑器主体未拆 |
+| P2 | LedgerPenetration.vue | 3175 行 | ≤1500 | 需新建 spec |
+| P3 | ReportView.vue | 2317 行 | ≤1500 | 需新建 spec |
+| P0 | service ≤800 行卡点 | smart_import 2786 等 8 个 | pre-commit hook | 已有 check_file_size.py |
+| P2 | 6000 并发压测 | 外部依赖 | 真实验证 | PG 大数据量 + Locust |
+| P3 | LLM 真实接入 | 6 stub 引擎 | 一键切换 | WP_AI_SERVICE_ENABLED 已就位 |
+
+---
+
+## 七、索引规约
+
+1. 新建 spec 默认放 `.kiro/specs/`（active 根目录，**扁平存放**），完成后审议是否归档
+2. **active spec 不可嵌套子目录** —— Kiro spec 工作流依赖固定路径 `.kiro/specs/{name}/tasks.md`
+3. 完成 spec 时填完成日期 + 关键 commit
+4. 归档时 `git mv` 到 `_archive/{分类目录}/`，按功能归入 7 个分类之一，不删文件保留审计轨迹
+5. 归档分类目录：01 地基 / 02 循环 / 03 打磨 / 04 架构 / 05 业务 / 06 工程 / 99 取代
+6. 废弃 spec 移入 `99-superseded/` + 记录取代者
+7. **凭印象禁令**：完成度 / 日期必须有 grep 证据，凭印象写视为漏审
+
+### 迁移系统提示（D6 唯一入口）
+
+- 当前迁移系统 = `backend/migrations/V*.sql` + `R*.sql`（启动时 MigrationRunner 自动执行）
+- alembic 已废弃（2026-05-29 删除）
+- 新加迁移：写 `V0XX__xxx.sql` + `R0XX__rollback_xxx.sql` 配对，必须 `IF NOT EXISTS` 幂等
