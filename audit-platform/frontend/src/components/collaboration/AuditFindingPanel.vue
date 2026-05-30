@@ -242,8 +242,8 @@ async function addFinding() {
     showAddDialog.value = false
     resetNewFinding()
     ElMessage.success('审计发现已添加')
-  } catch {
-    ElMessage.error('添加失败')
+  } catch (e) {
+    handleApiError(e, '保存')
   }
 }
 

@@ -94,7 +94,7 @@
           <div class="gt-ar-edit-hint" v-if="!isLocked">
             直接编辑下方文本，修改单位名称、简称、关键审计事项等内容后点击保存
           </div>
-          <div class="gt-ar-edit-hint" v-else-if="report.status === 'eqcr_approved'" style="background: var(--gt-color-wheat-light); color: var(--gt-color-wheat);">
+          <div class="gt-ar-edit-hint" v-else-if="report.status === REPORT_STATUS.EQCR_APPROVED" style="background: var(--gt-color-wheat-light); color: var(--gt-color-wheat);">
             🔒 EQCR 已锁定审计意见，如需修改请联系独立复核合伙人解锁
           </div>
           <div v-if="knowledgeContextText" class="gt-ar-edit-hint" style="background: var(--gt-color-success-light); color: var(--gt-color-success); margin-bottom: 8px;">
@@ -142,7 +142,7 @@
             <el-option label="否定意见" value="adverse" />
             <el-option label="无法表示意见" value="disclaimer" />
           </el-select>
-          <div v-if="report?.status === 'eqcr_approved'" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-wheat); margin-top: 4px">
+          <div v-if="report?.status === REPORT_STATUS.EQCR_APPROVED" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-wheat); margin-top: 4px">
             🔒 EQCR 已锁定，意见类型不可修改
           </div>
         </el-form-item>

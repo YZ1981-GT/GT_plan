@@ -117,6 +117,13 @@ export const EXPORT_TASK_STATUS = {
   FAILED: 'failed',
 } as const
 
+/** QC 发现审阅状态（QcFinding.review_status） */
+export const QC_FINDING_REVIEW_STATUS = {
+  PENDING: 'pending',
+  REVIEWED: 'reviewed',
+  ESCALATED: 'escalated',
+} as const
+
 /** QC 抽查结论（InspectionItem.verdict） */
 export const QC_INSPECTION_VERDICT = {
   PENDING: 'pending',
@@ -134,6 +141,7 @@ export const ARCHIVE_SCOPE = {
 /** 归档作业状态（ArchiveJob.status） */
 export const ARCHIVE_JOB_STATUS = {
   PENDING: 'pending',
+  QUEUED: 'queued',
   RUNNING: 'running',
   SUCCEEDED: 'succeeded',
   FAILED: 'failed',
@@ -270,7 +278,7 @@ export const ADJUSTMENT_STATUS_LABELS: Record<string, StatusDictEntry> = {
 export const REPORT_STATUS_LABELS: Record<string, StatusDictEntry> = {
   draft:         { label: '草稿',      color: 'info' },
   review:        { label: '复核中',    color: 'warning' },
-  eqcr_approved: { label: 'EQCR已锁', color: '' },
+  eqcr_approved: { label: 'EQCR已锁', color: 'primary' },
   final:         { label: '已定稿',    color: 'success' },
 }
 

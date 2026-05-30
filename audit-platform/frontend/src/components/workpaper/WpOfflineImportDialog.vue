@@ -156,6 +156,7 @@ import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { UploadFilled, Loading } from '@element-plus/icons-vue'
 import { apiProxy } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 import type { UploadFile } from 'element-plus'
 
 interface CellDiff {
@@ -280,7 +281,7 @@ async function handleApply() {
     emit('imported')
     ElMessage.success('导入完成')
   } catch (e: unknown) {
-    ElMessage.error('导入失败: ' + (e instanceof Error ? e.message : '未知错误'))
+    handleApiError(e, '导入')
     step.value = 3
   }
 }

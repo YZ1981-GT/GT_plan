@@ -74,6 +74,7 @@
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { apiProxy } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   modelValue: boolean
@@ -146,7 +147,7 @@ async function handleExport() {
     ElMessage.success('模板导出成功')
     handleClose()
   } catch (e: unknown) {
-    ElMessage.error('导出失败: ' + (e instanceof Error ? e.message : '未知错误'))
+    handleApiError(e, '导出')
   } finally {
     exporting.value = false
   }

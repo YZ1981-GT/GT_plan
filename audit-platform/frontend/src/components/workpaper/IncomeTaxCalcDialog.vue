@@ -164,6 +164,7 @@
 import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   visible: boolean
@@ -276,7 +277,7 @@ async function onCalc() {
     isLlmStub.value = resp.is_llm_stub
     ElMessage.success('所得税费用测算完成')
   } catch (e: any) {
-    ElMessage.error(e?.message || '所得税费用测算失败')
+    handleApiError(e, '所得税费用测算')
   } finally {
     loading.value = false
   }
@@ -302,7 +303,7 @@ async function onApplyToSheet() {
       ElMessage.warning('计算完成但未写回（applied_to_sheet 为空）')
     }
   } catch (e: any) {
-    ElMessage.error(e?.message || '采纳写回失败')
+    handleApiError(e, '采纳写回')
   } finally {
     applying.value = false
   }

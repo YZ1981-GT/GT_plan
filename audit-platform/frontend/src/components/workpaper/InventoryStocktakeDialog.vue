@@ -194,6 +194,7 @@ import type { FormInstance, FormRules, UploadFile, UploadUserFile } from 'elemen
 import { api } from '@/services/apiProxy'
 import AuditContextHeader from './dialogs/AuditContextHeader.vue'
 import { confirmLeave } from '@/utils/confirm'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface StocktakeDiffItem {
   itemName: string
@@ -423,7 +424,7 @@ async function onLlmSummary() {
       ElMessage.warning('风险提示：' + res.risk_alerts.join('; '))
     }
   } catch (err: any) {
-    ElMessage.error('LLM 差异分析失败：' + (err?.message || '请稍后重试'))
+    handleApiError(err, 'LLM 差异分析')
   } finally {
     summarizing.value = false
   }
@@ -465,7 +466,7 @@ async function onSave() {
     emit('saved')
     emit('update:visible', false)
   } catch (err: any) {
-    ElMessage.error('保存失败：' + (err?.message || '请稍后重试'))
+    handleApiError(err, '保存')
   } finally {
     saving.value = false
   }

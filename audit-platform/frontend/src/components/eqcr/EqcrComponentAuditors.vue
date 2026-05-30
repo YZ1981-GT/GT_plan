@@ -81,6 +81,7 @@ import { ElMessage } from 'element-plus'
 import api from '@/services/apiProxy'
 import { eqcr as P_eqcr } from '@/services/apiPaths'
 import { rules } from '@/utils/formRules'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{ projectId: string }>()
 
@@ -162,7 +163,7 @@ async function submitOpinion() {
     showOpinionDialog.value = false
     await fetchData()
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '提交失败')
+    handleApiError(e, '提交')
   } finally {
     submitting.value = false
   }
@@ -173,8 +174,8 @@ async function fetchData() {
   try {
     const data = await api.get(P_eqcr.componentAuditors(props.projectId))
     auditors.value = data.auditors || []
-  } catch {
-    ElMessage.error('获取组成部分审计师数据失败')
+  } catch (e) {
+    handleApiError(e, '获取组成部分审计师数据')
   } finally {
     loading.value = false
   }

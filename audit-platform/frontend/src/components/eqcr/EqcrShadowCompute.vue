@@ -187,6 +187,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import {
   eqcrApi,
   type ShadowComputeResult,
@@ -246,7 +247,7 @@ async function executeCompute() {
     if (status === 429) {
       rateLimited.value = true
     } else {
-      ElMessage.error(err?.response?.data?.detail || '影子计算执行失败')
+      handleApiError(err, '影子计算执行')
     }
   } finally {
     executing.value = false
@@ -260,7 +261,7 @@ async function loadHistory() {
   try {
     history.value = await eqcrApi.listShadowComputations(props.projectId)
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '加载影子计算历史失败')
+    handleApiError(err, '加载影子计算历史')
     history.value = []
   } finally {
     loadingHistory.value = false

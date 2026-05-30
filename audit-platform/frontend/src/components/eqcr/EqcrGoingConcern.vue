@@ -160,7 +160,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import {
   eqcrApi,
   type EqcrDomainPayload,
@@ -170,6 +169,7 @@ import {
   type EqcrOpinion,
 } from '@/services/eqcrService'
 import EqcrOpinionForm from './EqcrOpinionForm.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{ projectId: string }>()
 
@@ -197,7 +197,7 @@ async function load() {
   try {
     payload.value = await eqcrApi.getGoingConcern(props.projectId)
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '加载持续经营数据失败')
+    handleApiError(err, '加载持续经营数据')
     payload.value = null
   } finally {
     loading.value = false

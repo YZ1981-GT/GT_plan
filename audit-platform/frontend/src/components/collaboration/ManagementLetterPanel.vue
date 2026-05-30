@@ -180,6 +180,7 @@ import { Plus, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { managementLetterApi } from '@/services/collaborationApi'
 import { rules } from '@/utils/formRules'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface LetterItem {
   id: string
@@ -301,8 +302,8 @@ async function addItem() {
     showAddDialog.value = false
     resetNewItem()
     ElMessage.success('事项已添加')
-  } catch {
-    ElMessage.error('添加失败')
+  } catch (e) {
+    handleApiError(e, '保存')
   }
 }
 
@@ -331,8 +332,8 @@ async function confirmFollowUp() {
     }
     showFollowUpDialog.value = false
     ElMessage.success('跟踪状态已更新')
-  } catch {
-    ElMessage.error('更新失败')
+  } catch (e) {
+    handleApiError(e, '删除')
   }
 }
 
@@ -356,8 +357,8 @@ async function confirmCarryForward() {
     }
     showCarryForwardDialog.value = false
     ElMessage.success(`已结转 ${data?.carried_items?.length || 0} 个事项`)
-  } catch {
-    ElMessage.error('结转失败')
+  } catch (e) {
+    handleApiError(e, '更新状态')
   }
 }
 

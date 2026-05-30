@@ -308,6 +308,7 @@ import { confirmForceReset, confirmDangerous } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
 import { projects as P_proj, trialBalance as P_tb, attachments as P_att, accountChart as P_ac, gtCoding as P_gtc } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
+import { handleApiError } from '@/utils/errorHandler'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 
@@ -429,7 +430,7 @@ async function onCreateNextYear() {
     router.push(`/projects/new?projectId=${result.new_project_id}`)
   } catch (err: any) {
     if (err !== 'cancel') {
-      ElMessage.error(err?.response?.data?.detail || '创建失败')
+      handleApiError(err, '创建')
     }
   }
 }

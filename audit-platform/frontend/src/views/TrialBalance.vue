@@ -312,35 +312,30 @@
       <el-table-column label="未审数" width="160" align="right" class-name="gt-amt-col">
         <template #default="{ row, $index }">
           <CommentTooltip :comment="tbComments.getComment('trial_balance', $index, 2)">
-          <span v-if="!row._isSubtotal && !row._isTotal"
-            class="clickable gt-amt" @click="onUnadjustedClick(row)"
-            :class="displayPrefs.amountClass(row.unadjusted_amount)">
-            {{ fmtDir(row, 'unadjusted_amount') }}
-          </span>
-          <span v-else class="subtotal-val gt-amt" :class="displayPrefs.amountClass(row.unadjusted_amount)">{{ fmtDir(row, 'unadjusted_amount') }}</span>
+          <GtAmountCell v-if="!row._isSubtotal && !row._isTotal"
+            :value="row.unadjusted_amount"
+            clickable @click="onUnadjustedClick(row)"
+          />
+          <GtAmountCell v-else :value="row.unadjusted_amount" />
           </CommentTooltip>
         </template>
       </el-table-column>
       <el-table-column label="RJE调整" width="150" align="right" class-name="gt-amt-col">
         <template #default="{ row }">
-          <span v-if="!row._isSubtotal && !row._isTotal && row.rje_adjustment !== '0'"
-            class="clickable gt-amt" @click="onAdjClick(row, 'rje')">
-            {{ fmt(row.rje_adjustment) }}
-          </span>
-          <span v-else class="gt-amt" :class="{ 'subtotal-val': row._isSubtotal || row._isTotal }">
-            {{ fmt(row.rje_adjustment) }}
-          </span>
+          <GtAmountCell v-if="!row._isSubtotal && !row._isTotal && row.rje_adjustment !== '0'"
+            :value="row.rje_adjustment"
+            clickable @click="onAdjClick(row, 'rje')"
+          />
+          <GtAmountCell v-else :value="row.rje_adjustment" />
         </template>
       </el-table-column>
       <el-table-column label="AJE调整" width="150" align="right" class-name="gt-amt-col">
         <template #default="{ row }">
-          <span v-if="!row._isSubtotal && !row._isTotal && row.aje_adjustment !== '0'"
-            class="clickable gt-amt" @click="onAdjClick(row, 'aje')">
-            {{ fmt(row.aje_adjustment) }}
-          </span>
-          <span v-else class="gt-amt" :class="{ 'subtotal-val': row._isSubtotal || row._isTotal }">
-            {{ fmt(row.aje_adjustment) }}
-          </span>
+          <GtAmountCell v-if="!row._isSubtotal && !row._isTotal && row.aje_adjustment !== '0'"
+            :value="row.aje_adjustment"
+            clickable @click="onAdjClick(row, 'aje')"
+          />
+          <GtAmountCell v-else :value="row.aje_adjustment" />
         </template>
       </el-table-column>
       <el-table-column label="联动" width="100" align="center">
@@ -351,12 +346,7 @@
       <el-table-column label="审定数" width="160" align="right" class-name="gt-amt-col">
         <template #default="{ row, $index }">
           <CommentTooltip :comment="tbComments.getComment('trial_balance', $index, 5)">
-          <span :class="['subtotal-val', 'gt-amt', displayPrefs.amountClass(row.audited_amount)]" v-if="row._isSubtotal || row._isTotal">
-            {{ fmtDir(row, 'audited_amount') }}
-          </span>
-          <span v-else :class="['gt-amt', displayPrefs.amountClass(row.audited_amount)]">
-            {{ fmtDir(row, 'audited_amount') }}
-          </span>
+          <GtAmountCell :value="row.audited_amount" />
           </CommentTooltip>
         </template>
       </el-table-column>
@@ -504,7 +494,7 @@
           </el-table-column>
           <el-table-column prop="audited" label="审定数" width="140" align="right" class-name="gt-tb-sum-audited-col">
             <template #default="{ row }">
-              <span class="gt-amt" style="font-weight:700;color: var(--gt-color-primary)">{{ fmt(row.audited) }}</span>
+              <GtAmountCell :value="row.audited" />
             </template>
           </el-table-column>
         </el-table>

@@ -133,6 +133,7 @@
 import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   visible: boolean
@@ -234,7 +235,7 @@ async function onAnalyze() {
       ElMessage.success('AI 分析完成')
     }
   } catch (e: any) {
-    ElMessage.error(e?.message || 'AI 分析失败')
+    handleApiError(e, 'AI 分析')
   } finally {
     loading.value = false
   }
@@ -275,7 +276,7 @@ async function onApplyToSheet() {
       ElMessage.warning('分析完成但未写回（applied_to_sheet 为空）')
     }
   } catch (e: any) {
-    ElMessage.error(e?.message || '采纳写回失败')
+    handleApiError(e, '采纳写回')
   } finally {
     applying.value = false
   }

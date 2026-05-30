@@ -70,6 +70,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
 import { authApi } from '@/services/collaborationApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{ projectId: string }>()
 
@@ -106,8 +107,8 @@ const loadMembers = async () => {
     const usersRes = await (authApi as any).getUsers()
     const memberIds = new Set(members.value.map((m: any) => m.user_id))
     availableUsers.value = usersRes.data.filter((u: any) => !memberIds.has(u.id) && u.is_active)
-  } catch {
-    ElMessage.error('加载成员失败')
+  } catch (e) {
+    handleApiError(e, '添加成员')
   } finally {
     loading.value = false
   }
@@ -127,8 +128,8 @@ const handleAdd = async () => {
       ElMessage.success('成员已添加')
       addDialogVisible.value = false
       loadMembers()
-    } catch {
-      ElMessage.error('添加失败')
+    } catch (e) {
+      handleApiError(e, '移除成员')
     }
   })
 }
@@ -138,8 +139,8 @@ const handleRemove = async (row: any) => {
     await (authApi as any).removeProjectMember(props.projectId, row.user_id)
     ElMessage.success('成员已移除')
     loadMembers()
-  } catch {
-    ElMessage.error('移除失败')
+  } catch (e) {
+    handleApiError(e, '更新角色')
   }
 }
 

@@ -125,6 +125,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface ColumnDef {
   id: string
@@ -385,8 +386,8 @@ async function handleCopyCell() {
   try {
     await navigator.clipboard.writeText(String(value ?? ''))
     ElMessage.success('已复制')
-  } catch {
-    ElMessage.error('复制失败')
+  } catch (e) {
+    handleApiError(e, '保存')
   }
 }
 

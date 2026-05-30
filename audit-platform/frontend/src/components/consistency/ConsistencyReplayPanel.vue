@@ -60,9 +60,9 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import { replayConsistency } from '@/services/governanceApi'
 import { fmtAmountWithZero } from '@/utils/formatters'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{ projectId: string }>()
 
@@ -75,7 +75,7 @@ async function runReplay() {
   try {
     result.value = await replayConsistency(props.projectId)
   } catch (e: any) {
-    ElMessage.error('一致性复算失败')
+    handleApiError(e, '一致性复算')
   } finally { loading.value = false }
 }
 </script>

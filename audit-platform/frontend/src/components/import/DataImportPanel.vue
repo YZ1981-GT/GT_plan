@@ -157,6 +157,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmDuplicateAction, confirmDangerous } from '@/utils/confirm'
+import { handleApiError } from '@/utils/errorHandler'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { projects as P_proj } from '@/services/apiPaths'
@@ -249,8 +250,7 @@ async function doImport(onDuplicate: string) {
     selectedFile.value = null
     uploadRef.value?.clearFiles()
   } catch (err: any) {
-    const msg = err.response?.data?.detail || err.response?.data?.message || '导入失败'
-    ElMessage.error(msg)
+    handleApiError(err, '导入')
   } finally {
     importing.value = false
   }

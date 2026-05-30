@@ -84,7 +84,7 @@
         </el-table-column>
         <el-table-column prop="count" label="数量" width="80" align="center" />
         <el-table-column label="小计金额" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.total_amount) }}</template>
+          <template #default="{ row }"><GtAmountCell :value="row.total_amount" /></template>
         </el-table-column>
       </el-table>
     </div>

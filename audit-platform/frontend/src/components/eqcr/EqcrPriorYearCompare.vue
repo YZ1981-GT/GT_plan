@@ -95,6 +95,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '@/services/apiProxy'
 import { eqcr as P_eqcr } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{ projectId: string }>()
 
@@ -162,8 +163,8 @@ async function fetchComparison() {
   loading.value = true
   try {
     data.value = await api.get(P_eqcr.priorYearComparison(props.projectId))
-  } catch {
-    ElMessage.error('获取历年对比数据失败')
+  } catch (e) {
+    handleApiError(e, '加载上年数据')
   } finally {
     loading.value = false
   }
@@ -192,8 +193,8 @@ async function onLinkPriorYear() {
       ElMessage.success('已关联上年项目')
       showLinkDialog.value = false
     }
-  } catch {
-    ElMessage.error('关联失败，请检查项目 ID')
+  } catch (e) {
+    handleApiError(e, '加载对比数据')
   } finally {
     linkLoading.value = false
   }

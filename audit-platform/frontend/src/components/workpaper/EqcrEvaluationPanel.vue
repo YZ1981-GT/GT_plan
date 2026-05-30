@@ -6,6 +6,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface WorkpaperItem {
   id: string
@@ -48,8 +49,8 @@ async function submitVerdict(wp: WorkpaperItem, verdict: string) {
     })
     wp.verdict = verdict
     ElMessage.success('评价已提交')
-  } catch {
-    ElMessage.error('提交失败')
+  } catch (e) {
+    handleApiError(e, '加载评价')
   } finally {
     evaluating.value = null
   }

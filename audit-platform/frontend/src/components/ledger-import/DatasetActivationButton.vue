@@ -15,6 +15,7 @@ import { ref } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{
   projectId: string
@@ -62,8 +63,7 @@ async function onActivate() {
     ElMessage.success('数据集已激活')
     emit('activated', props.datasetId)
   } catch (e: any) {
-    const msg = e?.detail?.message || e?.message || '激活失败'
-    ElMessage.error(msg)
+    handleApiError(e, '激活')
     emit('error', e)
   } finally {
     activating.value = false

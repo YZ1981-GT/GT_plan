@@ -82,6 +82,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { pbcApi } from '@/services/collaborationApi'
 import { rules } from '@/utils/formRules'
+import { handleApiError } from '@/utils/errorHandler'
 
 const projectId = 'current-project-id'
 
@@ -185,7 +186,7 @@ async function handleUpdateStatus() {
     }
     updateDialogVisible.value = false
   } catch (e: any) {
-    ElMessage.error(e?.message ?? '更新失败')
+    handleApiError(e, '更新')
   } finally {
     updating.value = false
   }

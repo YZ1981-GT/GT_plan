@@ -185,6 +185,7 @@ import { ref, computed } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { auditProgramApi } from '@/services/collaborationApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Procedure {
   id: string
@@ -311,8 +312,8 @@ async function addProcedure() {
       related_risk_id: '',
     }
     ElMessage.success('程序已添加')
-  } catch {
-    ElMessage.error('添加失败')
+  } catch (e) {
+    handleApiError(e, '保存')
   }
 }
 
@@ -324,8 +325,8 @@ async function updateStatus(proc: Procedure, status: string) {
   try {
     await auditProgramApi.updateProcedureStatus(props.projectId, proc.id, { status, conclusion: '' })
     ElMessage.success('状态已更新')
-  } catch {
-    ElMessage.error('更新失败')
+  } catch (e) {
+    handleApiError(e, '删除')
   }
 }
 
@@ -346,8 +347,8 @@ async function confirmLinkWorkpaper() {
     selectedProcedure.value.related_wp_code = linkWorkpaperCode.value
     showLinkDialog.value = false
     ElMessage.success('底稿已关联')
-  } catch {
-    ElMessage.error('关联失败')
+  } catch (e) {
+    handleApiError(e, '更新状态')
   }
 }
 

@@ -14,6 +14,7 @@
  */
 import { onMounted, onUnmounted, type Ref } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 
 export interface PasteImportColumn {
   key: string
@@ -66,7 +67,7 @@ export function usePasteImport(options: PasteImportOptions) {
         await options.onInsert(rows)
         ElMessage.success(`已追加 ${rows.length} 行`)
       } catch (err: any) {
-        ElMessage.error(`追加失败：${err?.message || '未知错误'}`)
+        handleApiError(err, '追加')
       }
     }).catch(() => { /* 用户取消 */ })
 

@@ -12,6 +12,7 @@
 import { ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 import type { CustomQueryTemplateConfig } from '@/types/custom-query-template'
 
 const props = defineProps<{
@@ -73,7 +74,7 @@ async function onSave() {
     ElMessage.success(`已保存模板「${name}」`)
   } catch (err: any) {
     if (err === 'cancel' || err?.action === 'cancel') return
-    ElMessage.error('保存失败: ' + (err?.response?.data?.detail || err?.message || '未知错误'))
+    handleApiError(err, '保存')
   } finally {
     saving.value = false
   }

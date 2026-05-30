@@ -220,15 +220,38 @@ jobs:
             exit 1
           fi
         working-directory: audit-platform/frontend
-      - name: Catch block bare ElMessage.error guard (R9-F21)
+      - name: Catch block bare ElMessage.error guard (M1 T2)
         run: |
           # catch 块内禁止裸 ElMessage.error，必须使用 handleApiError
-          # 基线：11（Login/Register + 非 catch 块业务校验，只减不增）
-          BASELINE=11
+          # baselines.json._v3_coverage_guards.elmessage-error-in-catch 为真源（目标 0，只减不增）
+          BASELINE=$(jq -r '._v3_coverage_guards["elmessage-error-in-catch"]' ../../.github/workflows/baselines.json)
           COUNT=$(grep -r --include="*.vue" -c "ElMessage\.error" src/views | awk -F: '{s+=$2}END{print s}')
           echo "Bare ElMessage.error in views: $COUNT (baseline: $BASELINE)"
           if [ "$COUNT" -gt "$BASELINE" ]; then
             echo "::error::Bare ElMessage.error usage increased from $BASELINE to $COUNT. Use handleApiError() instead."
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
+      - name: Status hardcoding guard (M1 T4)
+        run: |
+          # 5 文件状态硬编码只减不增（目标 0）
+          # baselines.json._v3_coverage_guards.status-hardcoding-5files 为真源
+          BASELINE=$(jq -r '._v3_coverage_guards["status-hardcoding-5files"]' ../../.github/workflows/baselines.json)
+          COUNT=0
+          # 注意：QcInspectionWorkbench.vue 在 src/views/qc/ 子目录（非扁平 src/views/）
+          # 缺失文件视为错误而非静默跳过，避免路径漂移导致卡点失效
+          for FILE in src/views/qc/QcInspectionWorkbench.vue src/views/ArchiveWizard.vue src/views/AuditReportEditor.vue src/views/IssueTicketList.vue src/views/PDFExportPanel.vue; do
+            if [ -f "$FILE" ]; then
+              HITS=$(grep -cE "===\s*['\"]" "$FILE" || true)
+              COUNT=$((COUNT + HITS))
+            else
+              echo "::error::Status hardcoding guard 目标文件缺失：$FILE（路径漂移？请更新 ci.yml）"
+              exit 1
+            fi
+          done
+          echo "Status hardcoding in 5 files: $COUNT (baseline: $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Status hardcoding increased from $BASELINE to $COUNT. Use statusEnum constants instead."
             exit 1
           fi
         working-directory: audit-platform/frontend
@@ -258,18 +281,29 @@ jobs:
             exit 1
           fi
         working-directory: audit-platform/frontend
-      - name: V3 GtAmountCell coverage guard (Req 8.1)
-        # V3 Req 8.1 治理目标：align="right" 列必须用 GtAmountCell 包装
-        # 实测 baseline（2026-05-28）：380 处 align=right 列 / 66 处 GtAmountCell；目标 80% 覆盖
-        # 当前 ratio = 66/380 ≈ 17%；只增不减，独立 spec gt-amount-cell-rollout 推进
+      - name: V3 GtAmountCell coverage guard (Req 8.1 + M1 T1)
+        # M1 T1 治理后（2026-05-30）：GtAmountCell-uses 105（grep 行数口径）/ no-bare-amount-cell 精确违规 88
+        # 卡点方向：
+        #   ① GtAmountCell-uses 只增不减（grep "GtAmountCell" | wc -l 口径，与 baselines.json 同口径）
+        #   ② no-bare-amount-cell（精确 ESLint 规则）只减不增 —— 替代旧的 align-right-cols 粗口径
+        #      旧口径含百分比/序号/数量列，零容差易误伤；改用 ESLint AST 精确识别"金额列裸用"
+        # baselines.json._v3_coverage_guards 为真源
         run: |
-          ALIGN_COUNT=$(grep -r --include="*.vue" 'align="right"' src | wc -l)
+          # ① GtAmountCell-uses（行数口径，与 baselines.json GtAmountCell-uses 字段同口径）
           CELL_COUNT=$(grep -r --include="*.vue" 'GtAmountCell' src | wc -l)
-          echo "align=right cols: $ALIGN_COUNT / GtAmountCell uses: $CELL_COUNT"
-          # 卡点：GtAmountCell 数量只增不减（防回退）
-          BASELINE=66
-          if [ "$CELL_COUNT" -lt "$BASELINE" ]; then
-            echo "::error::GtAmountCell usage decreased from $BASELINE to $CELL_COUNT (only increase allowed)"
+          CELL_BASELINE=$(jq -r '._v3_coverage_guards["GtAmountCell-uses"]' ../../.github/workflows/baselines.json)
+          echo "GtAmountCell uses (grep line count): $CELL_COUNT (baseline: $CELL_BASELINE)"
+          if [ "$CELL_COUNT" -lt "$CELL_BASELINE" ]; then
+            echo "::error::GtAmountCell usage decreased from $CELL_BASELINE to $CELL_COUNT (only increase allowed)"
+            exit 1
+          fi
+          # ② no-bare-amount-cell 精确违规数（ESLint AST，只减不增）
+          npx eslint --quiet --format json --rule '{"gt-audit/no-bare-amount-cell": "error"}' src 2>/dev/null > /tmp/bare.json || true
+          BARE_COUNT=$(node -e "const d=require('/tmp/bare.json');let c=0;for(const f of d)c+=f.messages.filter(m=>m.ruleId==='gt-audit/no-bare-amount-cell').length;console.log(c)")
+          BARE_BASELINE=$(jq -r '._v3_coverage_guards["no-bare-amount-cell-violations"]' ../../.github/workflows/baselines.json)
+          echo "no-bare-amount-cell violations (ESLint): $BARE_COUNT (baseline: $BARE_BASELINE)"
+          if [ "$BARE_COUNT" -gt "$BARE_BASELINE" ]; then
+            echo "::error::Bare amount columns increased from $BARE_BASELINE to $BARE_COUNT. Use <GtAmountCell> instead of raw fmt/toFixed."
             exit 1
           fi
         working-directory: audit-platform/frontend

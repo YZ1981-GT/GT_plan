@@ -360,6 +360,7 @@ import {
 } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { formatAmount } from '@/utils/formatAmount'
+import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1365,7 +1366,7 @@ async function onSyncToDisclosureNotes() {
     ElMessage.success(`已同步 ${rows} 行到附注模块「${sectionId.value}」`)
   } catch (err: any) {
     const detail = err?.response?.data?.detail ?? err?.message ?? '未知错误'
-    ElMessage.error(`同步附注失败：${detail}`)
+    handleApiError(err, '同步附注')
   } finally {
     isSyncing.value = false
   }

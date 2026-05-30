@@ -41,6 +41,7 @@ import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { regulatory as P_reg } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -83,7 +84,7 @@ async function onSubmit() {
     ElMessage.success('备案提交成功')
     emit('submitted')
     visible.value = false
-  } catch { ElMessage.error('备案提交失败') }
+  } catch (e) { handleApiError(e, '备案提交') }
   finally { submitting.value = false }
 }
 

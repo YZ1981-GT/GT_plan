@@ -32,6 +32,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { aiPlugins as P_aip } from '@/services/apiPaths'
 import { rules } from '@/utils/formRules'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{
   modelValue: boolean
@@ -83,7 +84,7 @@ async function onSave() {
     ElMessage.success('配置已保存')
     emit('saved')
     visible.value = false
-  } catch { ElMessage.error('保存失败') }
+  } catch (e) { handleApiError(e, '保存配置') }
   finally { saving.value = false }
 }
 </script>

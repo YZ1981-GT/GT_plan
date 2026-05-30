@@ -64,6 +64,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 import { useNoteTemplateConversion } from '@/composables/useNoteTemplateConversion'
 
 interface Props {
@@ -109,7 +110,7 @@ async function onTemplateChange(val: string | number | boolean | undefined) {
     }
     showPreview.value = true
   } catch (e: any) {
-    ElMessage.error(e?.message || '预览失败')
+    handleApiError(e, '预览')
   }
 }
 
@@ -140,7 +141,7 @@ async function confirmSwitch() {
     }, 500)
   } catch (e: any) {
     showProgress.value = false
-    ElMessage.error(e?.message || '切换失败')
+    handleApiError(e, '切换')
   } finally {
     switching.value = false
   }

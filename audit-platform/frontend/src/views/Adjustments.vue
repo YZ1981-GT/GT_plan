@@ -183,10 +183,10 @@
                   </span>
                 </td>
                 <td style="text-align:right" class="gt-amt">
-                  {{ Number(li.debit_amount) > 0 ? fmtAmt(li.debit_amount) : '' }}
+                  <GtAmountCell v-if="Number(li.debit_amount) > 0" :value="li.debit_amount" />
                 </td>
                 <td style="text-align:right" class="gt-amt">
-                  {{ Number(li.credit_amount) > 0 ? fmtAmt(li.credit_amount) : '' }}
+                  <GtAmountCell v-if="Number(li.credit_amount) > 0" :value="li.credit_amount" />
                 </td>
               </tr>
             </tbody>

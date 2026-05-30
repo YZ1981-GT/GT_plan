@@ -68,6 +68,7 @@ import { ElMessage } from 'element-plus'
 import { Bell, Warning, CircleCheckFilled, InfoFilled } from '@element-plus/icons-vue'
 import { notificationApi } from '@/services/collaborationApi'
 import { useCollaborationStore } from '@/stores/collaboration'
+import { handleApiError } from '@/utils/errorHandler'
 
 const collaborationStore = useCollaborationStore()
 
@@ -148,8 +149,8 @@ async function handleRead(n: any) {
     await notificationApi.markRead(n.id)
     n.is_read = true
     unreadCount.value = Math.max(0, unreadCount.value - 1)
-  } catch {
-    ElMessage.error('操作失败')
+  } catch (e) {
+    handleApiError(e, '标记已读')
   }
 }
 
@@ -159,8 +160,8 @@ async function markAllRead() {
     notifications.value.forEach((n) => { n.is_read = true })
     unreadCount.value = 0
     ElMessage.success('已全部标为已读')
-  } catch {
-    ElMessage.error('操作失败')
+  } catch (e) {
+    handleApiError(e, '全部已读')
   }
 }
 

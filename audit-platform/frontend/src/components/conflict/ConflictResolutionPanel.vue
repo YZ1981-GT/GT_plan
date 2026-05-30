@@ -137,6 +137,7 @@
 import { onMounted, ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface ConflictItem {
   id: string
@@ -225,7 +226,7 @@ async function load() {
       selected.value = items[0] || null
     }
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || e?.message || '加载冲突列表失败')
+    handleApiError(e, '加载冲突列表')
     conflicts.value = []
     selected.value = null
   } finally {
@@ -265,8 +266,7 @@ async function onResolve(resolution: 'keep_manual' | 'accept_new' | 'merge') {
     showMergeInput.value = false
     mergeValue.value = ''
   } catch (e: any) {
-    const detail = e?.response?.data?.detail || e?.message || '调解失败'
-    ElMessage.error(detail)
+    handleApiError(e, '调解')
   } finally {
     resolving.value = false
   }

@@ -114,6 +114,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { goingConcernApi } from '@/services/collaborationApi'
 import { rules } from '@/utils/formRules'
+import { handleApiError } from '@/utils/errorHandler'
 
 const projectId = 'current-project-id'
 const gcId = ref('')
@@ -223,8 +224,8 @@ async function handleCreateEval() {
     ElMessage.success('评价已创建')
     showEvalDialog.value = false
     evalForm.value = { management_evaluation: '', auditor_evaluation: '', conclusion_type: '', report_impact: '' }
-  } catch {
-    ElMessage.error('创建失败')
+  } catch (e) {
+    handleApiError(e, '保存')
   }
 }
 </script>

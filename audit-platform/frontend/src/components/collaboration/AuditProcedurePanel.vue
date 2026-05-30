@@ -184,6 +184,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { auditProgramApi, riskApi } from '@/services/collaborationApi'
 import { rules } from '@/utils/formRules'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Procedure {
   id: string
@@ -334,7 +335,7 @@ async function submitProcedure() {
     createDialogVisible.value = false
     await loadProcedures()
   } catch (e) {
-    ElMessage.error('创建失败')
+    handleApiError(e, '创建')
   }
 }
 
@@ -348,7 +349,7 @@ async function onStatusChange(row: Procedure, newStatus: string) {
     row.execution_status = newStatus
     ElMessage.success('状态已更新')
   } catch (e) {
-    ElMessage.error('更新状态失败')
+    handleApiError(e, '更新状态')
   }
 }
 
@@ -370,7 +371,7 @@ async function confirmLink() {
     linkDialogVisible.value = false
     ElMessage.success('关联成功')
   } catch (e) {
-    ElMessage.error('关联失败')
+    handleApiError(e, '关联')
   }
 }
 

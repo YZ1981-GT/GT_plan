@@ -263,6 +263,7 @@ import {
   type LedgerBalanceTreeResponse,
 } from '@/services/commonApi'
 import { fmtAmount } from '@/utils/formatters'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{
   projectId: string
@@ -370,7 +371,7 @@ async function fetchData() {
       onlyWithActivity: filterMode.value === 'with_activity' || undefined,
     })
   } catch (e: any) {
-    ElMessage.error(e?.message || '加载科目余额树失败')
+    handleApiError(e, '加载科目余额树')
   } finally {
     loading.value = false
   }

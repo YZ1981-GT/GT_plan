@@ -4,10 +4,10 @@
  * Sprint 10 Task 10.3
  */
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useRoute } from 'vue-router'
 import { eventBus } from '@/utils/eventBus'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Annotation {
   id: string
@@ -37,8 +37,8 @@ async function loadAnnotations() {
     const params = statusFilter.value ? { status: statusFilter.value } : {}
     const data = await api.get(`/api/workpapers/${props.wpId}/annotations`, { params })
     annotations.value = data as Annotation[]
-  } catch {
-    ElMessage.error('加载批注失败')
+  } catch (e) {
+    handleApiError(e, '加载批注')
   } finally {
     loading.value = false
   }

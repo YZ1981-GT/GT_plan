@@ -15,6 +15,7 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 
 // ─── 常量 ─────────────────────────────────────────────────────────────────────
 
@@ -211,8 +212,8 @@ export function useWpOfflineCache(wpId: string, sheetName: string) {
       await saveFn(cached.data)
       clearOffline()
       ElMessage.success('离线暂存数据已成功同步到服务端')
-    } catch {
-      ElMessage.error('自动重试保存失败，暂存数据仍保留在本地')
+    } catch (e) {
+      handleApiError(e, '自动重试保存')
     } finally {
       retrying.value = false
     }

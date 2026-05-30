@@ -37,6 +37,7 @@ import { Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { confirmDelete } from '@/utils/confirm'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface AttItem {
   id: string
@@ -100,7 +101,7 @@ async function onUpload(req: any) {
     ElMessage.success('附件已上传')
     await loadList()
   } catch (err: any) {
-    ElMessage.error('上传失败：' + (err?.message || '未知错误'))
+    handleApiError(err, '上传')
   } finally {
     uploading.value = false
   }
@@ -117,7 +118,7 @@ async function onDelete(id: string) {
     await api.delete(`/api/attachments/${id}`)
     attachments.value = attachments.value.filter((a) => a.id !== id)
   } catch (err: any) {
-    ElMessage.error('删除失败')
+    handleApiError(err, '删除')
   }
 }
 

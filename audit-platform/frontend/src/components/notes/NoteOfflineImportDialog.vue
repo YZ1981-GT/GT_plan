@@ -148,6 +148,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   modelValue: boolean
@@ -242,7 +243,7 @@ async function handleValidate() {
 
     step.value = 'preview'
   } catch (e: any) {
-    ElMessage.error(e?.message || '校验失败')
+    handleApiError(e, '校验')
   } finally {
     validating.value = false
   }
@@ -281,7 +282,7 @@ async function handleImport() {
       `导入完成：${resp.sections_imported} 章节导入 / ${resp.sections_kept} 处保留 / ${resp.conflicts} 处冲突`
     )
   } catch (e: any) {
-    ElMessage.error(e?.message || '导入失败')
+    handleApiError(e, '导入')
     step.value = 'preview'
   } finally {
     importing.value = false

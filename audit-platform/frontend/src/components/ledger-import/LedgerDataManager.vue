@@ -238,6 +238,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 import { useProjectStore } from '@/stores/project'
 
 const props = defineProps<{
@@ -338,7 +339,7 @@ async function refreshSummary() {
       .map(Number)
       .sort((a, b) => b - a)
   } catch (exc: any) {
-    ElMessage.error('查询失败: ' + (exc.message || exc))
+    handleApiError(exc, '查询')
   } finally {
     loading.value = false
   }
@@ -409,7 +410,7 @@ async function onDelete() {
     // Reset form
     deleteForm.value = { year: null, tables: [], periods: [] }
   } catch (exc: any) {
-    ElMessage.error('删除失败: ' + (exc.message || exc))
+    handleApiError(exc, '删除')
   } finally {
     loading.value = false
   }
@@ -445,7 +446,7 @@ async function onDetectIncremental() {
       overlapStrategy.value = 'skip'
     }
   } catch (exc: any) {
-    ElMessage.error('检测失败: ' + (exc.message || exc))
+    handleApiError(exc, '检测')
   } finally {
     loading.value = false
   }
@@ -494,7 +495,7 @@ async function onApplyIncremental() {
     // 清空检测结果，鼓励用户上传新文件
     incrementalDiff.value = null
   } catch (exc: any) {
-    ElMessage.error('清理失败: ' + (exc.message || exc))
+    handleApiError(exc, '清理')
   } finally {
     loading.value = false
   }

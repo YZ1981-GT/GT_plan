@@ -91,6 +91,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import { reports as reportsApi } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 import { exportData, type ExcelColumn } from '@/composables/useExcelIO'
 
 /* ── Props ── */
@@ -139,8 +140,7 @@ async function fetchData() {
     const resp = await axios.get(url)
     tableData.value = resp.data.rows || []
   } catch (err: any) {
-    const msg = err?.response?.data?.detail || '查询失败'
-    ElMessage.error(msg)
+    handleApiError(err, '查询')
     tableData.value = []
   } finally {
     loading.value = false
@@ -236,7 +236,7 @@ async function onExport() {
       fileName: `${label}_多年度对比_${yearsStr}.xlsx`,
     })
   } catch (err: any) {
-    ElMessage.error('导出失败：' + (err.message || '未知错误'))
+    handleApiError(err, '导出')
   } finally {
     exporting.value = false
   }

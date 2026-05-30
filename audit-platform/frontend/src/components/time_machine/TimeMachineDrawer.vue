@@ -65,6 +65,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { confirmDangerous } from '@/utils/confirm'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Snapshot {
   id: string
@@ -140,8 +141,7 @@ async function onRestore(snap: Snapshot) {
     visible.value = false
     emit('restored', snap)
   } catch (e: any) {
-    const msg = e?.response?.data?.message || e?.message || '恢复失败'
-    ElMessage.error(msg)
+    handleApiError(e, '恢复')
   }
 }
 

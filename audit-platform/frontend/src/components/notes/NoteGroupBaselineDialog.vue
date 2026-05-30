@@ -105,6 +105,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 interface Props {
@@ -179,7 +180,7 @@ async function handleApply() {
     emit('applied')
     visible.value = false
   } catch (e: any) {
-    ElMessage.error(e?.message || '应用失败')
+    handleApiError(e, '应用')
   } finally {
     applying.value = false
   }
@@ -198,7 +199,7 @@ async function handleSave() {
     saveForm.value = { name: '', template_type: 'soe' }
     loadBaselines()
   } catch (e: any) {
-    ElMessage.error(e?.message || '保存失败')
+    handleApiError(e, '保存')
   } finally {
     saving.value = false
   }
@@ -213,7 +214,7 @@ async function computeDiff() {
     )
     diffData.value = resp?.diffs || []
   } catch (e: any) {
-    ElMessage.error(e?.message || '对比失败')
+    handleApiError(e, '对比')
   } finally {
     diffing.value = false
   }

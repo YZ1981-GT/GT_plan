@@ -47,8 +47,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { api } from '@/services/apiProxy'
-import { ElMessage } from 'element-plus'
-
+import { handleApiError } from '@/utils/errorHandler'
 interface Props {
   modelValue: boolean
   projectId: string
@@ -89,7 +88,7 @@ async function fetchSuggestions() {
       (i: any) => i.section_id === props.currentSectionId
     )
   } catch (e: any) {
-    ElMessage.error(e?.message || 'AI 分析失败')
+    handleApiError(e, 'AI 分析')
   } finally {
     loading.value = false
   }

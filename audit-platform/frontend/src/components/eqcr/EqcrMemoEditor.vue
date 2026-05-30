@@ -91,6 +91,7 @@ import { ref, computed, onMounted, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '@/services/apiProxy'
 import { eqcr as P_eqcr } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{ projectId: string }>()
 
@@ -163,7 +164,7 @@ async function loadMemo() {
     if (e?.response?.status === 404) {
       memo.value = null
     } else {
-      ElMessage.error('加载备忘录失败')
+      handleApiError(e, '加载备忘录')
     }
   } finally {
     loading.value = false
@@ -183,7 +184,7 @@ async function onGenerate() {
     }
     ElMessage.success('备忘录生成完成')
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '生成失败')
+    handleApiError(e, '生成')
   } finally {
     generating.value = false
   }
@@ -197,7 +198,7 @@ async function onSave() {
     })
     ElMessage.success('备忘录已保存')
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '保存失败')
+    handleApiError(e, '保存')
   } finally {
     saving.value = false
   }
@@ -225,7 +226,7 @@ async function doFinalize() {
     showFinalizeConfirm.value = false
     ElMessage.success('备忘录已定稿，PDF 将在归档时自动生成')
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '定稿失败')
+    handleApiError(e, '定稿')
   } finally {
     finalizing.value = false
   }
@@ -254,7 +255,7 @@ async function onExportWord() {
     URL.revokeObjectURL(url)
     ElMessage.success('导出成功')
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '导出失败')
+    handleApiError(e, '导出')
   } finally {
     exportingWord.value = false
   }

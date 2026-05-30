@@ -22,12 +22,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed } from 'vue'
 import Decimal from 'decimal.js'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import type { CellComment } from '@/composables/useCellComments'
-import { AMOUNT_DIVISOR_KEY } from '@/constants/amountDivisor'
 import { toDecimal } from '@/utils/decimal'
 import { AMOUNT_UNITS } from '@/utils/formatters'
 
@@ -54,13 +53,6 @@ const emit = defineEmits<{
 }>()
 
 const displayPrefs = useDisplayPrefsStore()
-
-/** 注入的除数（父组件 provide AMOUNT_DIVISOR_KEY，预留扩展，本组件未做二次除法） */
-const injectedDivisor = inject(AMOUNT_DIVISOR_KEY, 1) as number | (() => number)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _divisor = computed(() =>
-  typeof injectedDivisor === 'function' ? injectedDivisor() : injectedDivisor,
-)
 
 /**
  * 安全地将任意值转为 Decimal；非法值返回 null（不抛异常）。

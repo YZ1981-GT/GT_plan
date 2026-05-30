@@ -36,6 +36,7 @@
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { aiPlugins as P_aip } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 defineProps<{
   plugins: any[]
@@ -57,7 +58,7 @@ async function togglePlugin(plugin: any, enabled: boolean) {
     plugin.is_enabled = enabled
     ElMessage.success(`插件已${enabled ? '启用' : '禁用'}`)
     emit('toggled')
-  } catch { ElMessage.error('操作失败') }
+  } catch (e) { handleApiError(e, '加载插件') }
   finally { plugin._toggling = false }
 }
 </script>

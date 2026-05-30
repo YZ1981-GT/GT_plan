@@ -141,6 +141,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useLazyEdit } from '@/composables/useLazyEdit'
 import { fmtAmount } from '@/utils/formatters'
+import { handleApiError } from '@/utils/errorHandler'
 import * as P from '@/services/apiPaths'
 
 const props = defineProps<{
@@ -270,7 +271,7 @@ async function saveConsolTb() {
     const { saveWorksheetData } = await import('@/services/consolWorksheetDataApi')
     await saveWorksheetData(props.projectId, props.year, `consol_tb_${consolTbType.value}_${tbPeriod.value}`, { rows })
     ElMessage.success('试算平衡表已保存')
-  } catch { ElMessage.error('保存失败') }
+  } catch (e) { handleApiError(e, '加载') }
 }
 
 async function exportConsolTb() {
@@ -326,7 +327,7 @@ async function importPriorYearTb() {
     }
     ElMessage.success(`已从 ${result.source_year} 年度期末数据提取 ${matched} 行作为本年期初`)
   } catch (err: any) {
-    ElMessage.error(`提取上年数失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
+    handleApiError(err, '提取上年数')
   } finally { consolTbLoading.value = false }
 }
 
@@ -361,7 +362,7 @@ async function fillConsolTb() {
       ElMessage.info('未提取到数据，请确认子企业已有试算表数据')
     }
   } catch (err: any) {
-    ElMessage.error(`提取填充失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
+    handleApiError(err, '提取填充')
   } finally { consolTbLoading.value = false }
 }
 
@@ -396,7 +397,7 @@ async function generateReportFromTb() {
     // 通知父组件清除报表缓存
     emit('generate-report-done')
   } catch (err: any) {
-    ElMessage.error(`报表生成失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
+    handleApiError(err, '报表生成')
   } finally { consolTbLoading.value = false }
 }
 
