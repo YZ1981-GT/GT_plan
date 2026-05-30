@@ -111,6 +111,7 @@
 import { ref, computed } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { usePermission } from '@/composables/usePermission'
 import { useProcedureTrimming } from '@/composables/useProcedureTrimming'
 import TrimReasonDialog from './TrimReasonDialog.vue'
@@ -155,7 +156,7 @@ async function handleReasonConfirm(payload: { reason_code: string; reason_text: 
   if (result.ok) {
     ElMessage.success(`已标记 ${result.succeeded.length} 行为 N/A`)
   } else {
-    ElMessage.error(result.message || '操作失败')
+    handleApiError({ message: result.message || '操作失败' }, '程序裁剪')
   }
   pendingTrimRow.value = null
 }
@@ -166,7 +167,7 @@ async function handleRevert(row: TrimRow) {
   if (result.ok) {
     ElMessage.success(`已恢复 ${result.succeeded.length} 行`)
   } else {
-    ElMessage.error(result.message || '恢复失败')
+    handleApiError({ message: result.message || '恢复失败' }, '程序恢复')
   }
 }
 
@@ -180,7 +181,7 @@ async function handleBatchTrim(payload: { rowIds: string[]; reason_code: string;
     const msg = `批量裁剪完成：成功 ${result.succeeded.length} / 跳过 ${result.skipped.length} / 失败 ${result.failed.length}`
     ElMessage.success(msg)
   } else {
-    ElMessage.error(result.message || '批量操作失败')
+    handleApiError({ message: result.message || '批量操作失败' }, '批量裁剪')
   }
 }
 

@@ -551,6 +551,7 @@ class WorkpaperSheetClassification(Base):
         nullable=True,
     )
     render_schema_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    functional_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), server_default=func.now()

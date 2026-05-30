@@ -26,10 +26,30 @@
         <span v-if="sourceFile" class="gt-side-standards-source"
           >📄 {{ sourceFile }}</span
         >
+        <el-button
+          type="primary"
+          size="small"
+          :loading="reviewing"
+          :disabled="reviewing || !wpId"
+          @click="handleTsjReview"
+        >
+          🤖 用此提示词复核当前底稿
+        </el-button>
       </div>
       <div
         class="gt-side-standards-md gt-markdown-body"
         v-html="renderedMarkdown"
+      />
+      <!-- 复核发现列表（review-complete 后显示） -->
+      <TsjReviewFindings
+        v-if="reviewFindings.length > 0"
+        :findings="reviewFindings"
+        :wp-id="wpId || ''"
+        :wp-code="wpCode || ''"
+        @finding-confirmed="onFindingConfirmed"
+        @finding-rejected="onFindingRejected"
+        @locate-cell="onLocateCell"
+        @open-evidence="onOpenEvidence"
       />
     </div>
   </div>
@@ -39,11 +59,24 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
+import TsjReviewFindings from './TsjReviewFindings.vue'
+import type { TsjFinding } from './TsjReviewFindings.vue'
 
 const props = defineProps<{
   /** 底稿 wp_code（如 D2-1 / E1 / F2-2 等） */
   wpCode?: string
+  /** 底稿 ID，用于调用 AI 复核端点 */
+  wpId?: string
+}>()
+
+const emit = defineEmits<{
+  (e: 'review-complete', data: any): void
+  // TODO: 依赖 wp-locate-foundation 的 useCellLocate 实现实际跳转
+  (e: 'locate-cell', target: { wpCode: string; sheet: string; cellRange: string }): void
+  (e: 'open-evidence', evidenceRef: string): void
 }>()
 
 const loading = ref(false)
@@ -122,8 +155,8 @@ async function loadStandards() {
       source_file: data.source_file,
     })
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : '请稍后重试'
-    error.value = `加载失败：${msg}`
+    handleApiError(e, '加载审计准则')
+    error.value = '加载失败'
     markdown.value = ''
     sourceFile.value = ''
   } finally {
@@ -137,6 +170,44 @@ const renderedMarkdown = computed(() => {
   const html = marked(markdown.value, { async: false }) as string
   return DOMPurify.sanitize(html)
 })
+
+/** AI 复核 loading 状态 */
+const reviewing = ref(false)
+
+/** 复核发现列表 */
+const reviewFindings = ref<TsjFinding[]>([])
+
+/** 调用 TSJ LLM 复核端点 */
+async function handleTsjReview() {
+  if (!props.wpId || reviewing.value) return
+  reviewing.value = true
+  try {
+    const data = await api.post(`/api/workpapers/${encodeURIComponent(props.wpId)}/ai/tsj-review`)
+    reviewFindings.value = data?.findings || []
+    emit('review-complete', data)
+  } catch (e: unknown) {
+    handleApiError(e, 'AI 复核')
+  } finally {
+    reviewing.value = false
+  }
+}
+
+function onFindingConfirmed(_finding: TsjFinding) {
+  // 父组件可监听 review-complete 后续状态变化
+}
+
+function onFindingRejected(_finding: TsjFinding) {
+  // 父组件可监听 review-complete 后续状态变化
+}
+
+// TODO: 依赖 wp-locate-foundation 的 useCellLocate 实现实际跳转
+function onLocateCell(target: { wpCode: string; sheet: string; cellRange: string }) {
+  emit('locate-cell', target)
+}
+
+function onOpenEvidence(evidenceRef: string) {
+  emit('open-evidence', evidenceRef)
+}
 
 watch(
   () => props.wpCode,

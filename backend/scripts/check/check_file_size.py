@@ -9,6 +9,8 @@ migration-runner-resilience / 全局改进 #5 落地。
 - 新加文件强制不超限（不在 whitelist 即检查）
 - whitelist 中文件**仍然**检查"是否变得更大"：若行数 > whitelist 记录值 +5%，仍报错
   （防止"打磨倒退"）
+- HARD_CAPS：已瘦身文件登记显式 ceiling，防止后续功能追加悄悄回弹膨胀
+  （优先级高于 whitelist / 默认上限）
 
 退出码：
 - 0 = 通过
@@ -27,8 +29,8 @@ import argparse
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-WHITELIST_FILE = Path(__file__).parent / "file_size_whitelist.txt"
+ROOT = Path(__file__).resolve().parents[3]
+WHITELIST_FILE = ROOT / "backend" / "scripts" / "file_size_whitelist.txt"
 
 # 默认上限（按文件类型）
 LIMITS = {
@@ -36,6 +38,16 @@ LIMITS = {
     ".vue": 1500,
     ".ts": 1500,
     ".tsx": 1500,
+}
+
+# 硬上限（hard cap）：已完成瘦身的文件登记显式 ceiling，
+# 即使远低于默认 LIMITS 也强制不得回弹超过该值，防止后续功能追加悄悄膨胀。
+# gtdform-test-and-shrink（2026-05-30）：3 个 D 类 shell 拆分后登记 hard cap
+# （实测 390/366/345 + ~15% 余量），后续触碰若超限必须再拆而非直接放宽。
+HARD_CAPS = {
+    "audit-platform/frontend/src/components/workpaper/GtDForm/GtDFormReview.vue": 450,
+    "audit-platform/frontend/src/components/workpaper/GtDForm/GtDFormConfirmation.vue": 420,
+    "audit-platform/frontend/src/components/workpaper/GtDForm/GtDFormParagraph.vue": 400,
 }
 
 EXCLUDE_PARTS = {".git", ".venv", "__pycache__", "node_modules", "dist", "build",
@@ -76,6 +88,16 @@ def check_file(rel_path: str, abs_path: Path, whitelist: dict[str, int]) -> tupl
     if limit is None:
         return 0, ""
     lines = count_lines(abs_path)
+
+    # hard cap 优先：已瘦身文件登记的显式 ceiling，防退化
+    if rel_path in HARD_CAPS:
+        cap = HARD_CAPS[rel_path]
+        if lines > cap:
+            return 1, (
+                f"❌ [硬上限] {rel_path}: {lines} 行 > hard cap {cap}；"
+                f"该文件已瘦身登记 ceiling，新增逻辑请继续拆分而非放宽上限"
+            )
+        return 0, ""
 
     if rel_path in whitelist:
         baseline = whitelist[rel_path]

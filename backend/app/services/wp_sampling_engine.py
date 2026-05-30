@@ -1,291 +1,258 @@
-"""统一抽样引擎
+"""底稿抽凭引擎 — 从 tb_ledger 按方式抽样
 
-Sprint 8 Task 8.9: 统计抽样/非统计抽样/MUS 三种方法。
-实现样本量计算公式 + 随机选样。
+支持 4 种抽样方式：
+  - random: 随机抽样
+  - stratified: 分层抽样（按金额区间）
+  - top_n: 大额抽样（超阈值全查）
+  - mus: 货币单位抽样（固定间距）
+
+wp-functional-actions spec Task 5.2
 """
-
 from __future__ import annotations
 
 import logging
-import math
 import random
-from dataclasses import dataclass
-from decimal import Decimal
-from typing import Optional
+from typing import Any
+from uuid import UUID
+
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.audit_platform_models import TbLedger
+from app.services.dataset_query import get_active_filter
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class SamplingParams:
-    """抽样参数"""
-    method: str  # statistical / non_statistical / mus
-    population_size: int = 0
-    population_value: float = 0.0
-    confidence_level: float = 0.95  # 置信水平
-    tolerable_misstatement: float = 0.0  # 可容忍错报
-    expected_misstatement: float = 0.0  # 预期错报
-    tolerable_rate: float = 0.05  # 可容忍偏差率（属性抽样）
-    expected_rate: float = 0.01  # 预期偏差率
-    materiality: float = 0.0  # 重要性水平
+class WpSamplingEngine:
+    """底稿抽凭引擎"""
 
+    async def execute_sampling(
+        self,
+        db: AsyncSession,
+        project_id: UUID,
+        year: int,
+        account_codes: list[str],
+        method: str = "random",
+        sample_size: int = 25,
+        amount_threshold: float | None = None,
+        sampling_interval: float | None = None,
+    ) -> dict[str, Any]:
+        """执行抽样并返回结果"""
+        # 查询候选凭证
+        entries = await self._fetch_candidates(db, project_id, year, account_codes)
 
-@dataclass
-class SamplingResult:
-    """抽样结果"""
-    sample_size: int = 0
-    sampling_interval: float = 0.0
-    method: str = ""
-    formula_used: str = ""
-    selected_indices: list[int] = None  # type: ignore
-    selected_items: list[dict] = None  # type: ignore
+        if not entries:
+            return {
+                "method": method,
+                "total_population": 0,
+                "sample_size": 0,
+                "entries": [],
+            }
 
-    def __post_init__(self):
-        if self.selected_indices is None:
-            self.selected_indices = []
-        if self.selected_items is None:
-            self.selected_items = []
+        # 按方式抽样
+        if method == "random":
+            sampled = self._random_sample(entries, sample_size)
+        elif method == "stratified":
+            sampled = self._stratified_sample(entries, sample_size)
+        elif method == "top_n":
+            sampled = self._top_n_sample(entries, amount_threshold or 100000)
+        elif method == "mus":
+            sampled = self._mus_sample(entries, sampling_interval or 50000, sample_size)
+        else:
+            sampled = self._random_sample(entries, sample_size)
 
+        return {
+            "method": method,
+            "total_population": len(entries),
+            "sample_size": len(sampled),
+            "entries": sampled,
+        }
 
-# ─── Z 值表（置信水平→Z 值）───────────────────────────────────
-
-Z_TABLE = {
-    0.80: 1.28,
-    0.85: 1.44,
-    0.90: 1.645,
-    0.95: 1.96,
-    0.99: 2.576,
-}
-
-
-def calculate_sample_size(params: SamplingParams) -> SamplingResult:
-    """计算样本量
-
-    Args:
-        params: 抽样参数
-
-    Returns:
-        SamplingResult 含 sample_size 和使用的公式
-    """
-    if params.method == "statistical":
-        return _calc_statistical(params)
-    elif params.method == "mus":
-        return _calc_mus(params)
-    else:
-        return _calc_non_statistical(params)
-
-
-def _calc_statistical(params: SamplingParams) -> SamplingResult:
-    """统计抽样（属性抽样）
-
-    公式：n = (Z² × p × (1-p)) / E²
-    其中 Z=置信水平对应Z值, p=预期偏差率, E=可容忍偏差率-预期偏差率
-    有限总体修正：n' = n / (1 + n/N)
-    """
-    z = Z_TABLE.get(params.confidence_level, 1.96)
-    p = max(params.expected_rate, 0.005)  # 最低 0.5%
-    e = params.tolerable_rate - params.expected_rate
-
-    if e <= 0:
-        return SamplingResult(
-            sample_size=params.population_size,
-            method="statistical",
-            formula_used="E≤0, 全量检查",
+    async def _fetch_candidates(
+        self,
+        db: AsyncSession,
+        project_id: UUID,
+        year: int,
+        account_codes: list[str],
+    ) -> list[dict[str, Any]]:
+        """从 tb_ledger 获取候选凭证"""
+        stmt = (
+            sa.select(TbLedger)
+            .where(
+                await get_active_filter(db, TbLedger.__table__, project_id, year),
+                TbLedger.account_code.in_(account_codes),
+            )
+            .order_by(TbLedger.voucher_date, TbLedger.voucher_no)
         )
+        result = await db.execute(stmt)
+        rows = result.scalars().all()
 
-    # 无限总体样本量
-    n_infinite = math.ceil((z ** 2 * p * (1 - p)) / (e ** 2))
+        entries = []
+        for r in rows:
+            amount = float(r.debit_amount or 0) + float(r.credit_amount or 0)
+            entries.append({
+                "voucher_no": r.voucher_no,
+                "voucher_date": r.voucher_date.isoformat() if r.voucher_date else None,
+                "account_code": r.account_code,
+                "account_name": r.account_name or "",
+                "debit_amount": float(r.debit_amount or 0),
+                "credit_amount": float(r.credit_amount or 0),
+                "amount": amount,
+                "summary": r.summary or "",
+            })
+        return entries
 
-    # 有限总体修正
-    if params.population_size > 0:
-        n = math.ceil(n_infinite / (1 + n_infinite / params.population_size))
-    else:
-        n = n_infinite
+    def _random_sample(
+        self, entries: list[dict], sample_size: int
+    ) -> list[dict]:
+        """随机抽样"""
+        n = min(sample_size, len(entries))
+        return random.sample(entries, n)
 
-    n = max(n, 1)
+    def _stratified_sample(
+        self, entries: list[dict], sample_size: int
+    ) -> list[dict]:
+        """分层抽样 — 按金额区间分 3 层，每层按比例抽取"""
+        if not entries:
+            return []
 
-    return SamplingResult(
-        sample_size=n,
-        method="statistical",
-        formula_used=f"n = Z²×p×(1-p)/E² = {z}²×{p}×{1-p}/{e}² = {n_infinite}, 修正后={n}",
-    )
+        amounts = [e["amount"] for e in entries]
+        max_amt = max(amounts) if amounts else 0
 
+        # 分 3 层
+        thresholds = [max_amt * 0.33, max_amt * 0.66]
+        layers: list[list[dict]] = [[], [], []]
 
-def _calc_mus(params: SamplingParams) -> SamplingResult:
-    """货币单位抽样 (MUS / PPS)
+        for e in entries:
+            if e["amount"] <= thresholds[0]:
+                layers[0].append(e)
+            elif e["amount"] <= thresholds[1]:
+                layers[1].append(e)
+            else:
+                layers[2].append(e)
 
-    公式：n = 总体金额 / 抽样间距
-    抽样间距 = 可容忍错报 / 可靠性因子
-    可靠性因子 R = -ln(1 - 置信水平)（预期错报为 0 时）
-    调整：R = R + 预期错报数 × 扩展因子
-    """
-    if params.tolerable_misstatement <= 0:
-        return SamplingResult(
-            sample_size=0,
-            method="mus",
-            formula_used="可容忍错报为0，无法计算",
-        )
+        # 按比例分配样本量（高层多抽）
+        weights = [0.2, 0.3, 0.5]
+        sampled = []
+        for i, layer in enumerate(layers):
+            n = max(1, int(sample_size * weights[i]))
+            n = min(n, len(layer))
+            sampled.extend(random.sample(layer, n))
 
-    # 可靠性因子
-    r_factor = -math.log(1 - params.confidence_level)
+        return sampled[:sample_size]
 
-    # 如果有预期错报，调整可靠性因子
-    if params.expected_misstatement > 0 and params.tolerable_misstatement > 0:
-        expansion = 1.6  # 标准扩展因子
-        expected_count = params.expected_misstatement / params.tolerable_misstatement
-        r_factor += expected_count * expansion
+    def _top_n_sample(
+        self, entries: list[dict], threshold: float
+    ) -> list[dict]:
+        """大额抽样 — 超阈值全查"""
+        return [e for e in entries if e["amount"] >= threshold]
 
-    # 抽样间距
-    interval = params.tolerable_misstatement / r_factor
+    def _mus_sample(
+        self, entries: list[dict], interval: float, max_samples: int
+    ) -> list[dict]:
+        """货币单位抽样 — 固定间距从累计金额中抽取"""
+        if not entries or interval <= 0:
+            return []
 
-    # 样本量
-    if interval > 0 and params.population_value > 0:
-        n = math.ceil(params.population_value / interval)
-    else:
-        n = 0
-
-    n = max(n, 1)
-
-    return SamplingResult(
-        sample_size=n,
-        sampling_interval=round(interval, 2),
-        method="mus",
-        formula_used=f"间距 = TM/R = {params.tolerable_misstatement}/{r_factor:.3f} = {interval:.2f}, n = PV/间距 = {n}",
-    )
-
-
-def _calc_non_statistical(params: SamplingParams) -> SamplingResult:
-    """非统计抽样
-
-    基于审计判断的经验公式：
-    - 低风险：总体 × 5-10%
-    - 中风险：总体 × 15-25%
-    - 高风险：总体 × 30-50%
-
-    简化：n = max(25, population_size × risk_factor)
-    risk_factor 由 confidence_level 推导
-    """
-    if params.population_size <= 0:
-        return SamplingResult(sample_size=0, method="non_statistical", formula_used="总体为空")
-
-    # 置信水平→风险因子
-    if params.confidence_level >= 0.95:
-        factor = 0.30
-    elif params.confidence_level >= 0.90:
-        factor = 0.20
-    elif params.confidence_level >= 0.85:
-        factor = 0.15
-    else:
-        factor = 0.10
-
-    n = max(25, math.ceil(params.population_size * factor))
-    n = min(n, params.population_size)  # 不超过总体
-
-    return SamplingResult(
-        sample_size=n,
-        method="non_statistical",
-        formula_used=f"n = max(25, N×{factor}) = max(25, {params.population_size}×{factor}) = {n}",
-    )
-
-
-def random_select(
-    population: list[dict],
-    sample_size: int,
-    method: str = "simple_random",
-    value_field: Optional[str] = None,
-    interval: Optional[float] = None,
-    seed: Optional[int] = None,
-) -> list[dict]:
-    """执行随机选样
-
-    Args:
-        population: 总体数据列表
-        sample_size: 样本量
-        method: 选样方法 (simple_random / systematic / mus_cumulative)
-        value_field: MUS 时的金额字段名
-        interval: MUS 抽样间距
-        seed: 随机种子（可复现）
-
-    Returns:
-        选中的样本列表
-    """
-    if not population or sample_size <= 0:
-        return []
-
-    rng = random.Random(seed)
-
-    if method == "simple_random":
-        # 简单随机抽样
-        n = min(sample_size, len(population))
-        indices = rng.sample(range(len(population)), n)
-        return [population[i] for i in sorted(indices)]
-
-    elif method == "systematic":
-        # 系统抽样（等距）
-        if len(population) <= sample_size:
-            return population[:]
-        step = len(population) / sample_size
-        start = rng.uniform(0, step)
-        indices = [int(start + i * step) for i in range(sample_size)]
-        indices = [i for i in indices if i < len(population)]
-        return [population[i] for i in indices]
-
-    elif method == "mus_cumulative" and value_field and interval:
-        # MUS 累计金额法
-        selected = []
+        # 随机起点
+        start = random.uniform(0, interval)
         cumulative = 0.0
-        start = rng.uniform(0, interval)
-        next_threshold = start
+        next_hit = start
+        sampled = []
 
-        for item in population:
-            val = abs(float(item.get(value_field, 0)))
-            cumulative += val
-            while cumulative >= next_threshold and len(selected) < sample_size:
-                selected.append(item)
-                next_threshold += interval
+        for e in entries:
+            cumulative += e["amount"]
+            while cumulative >= next_hit and len(sampled) < max_samples:
+                sampled.append(e)
+                next_hit += interval
 
-        return selected
-
-    return []
+        return sampled
 
 
-def evaluate_results(
-    sample_errors: list[float],
-    sample_size: int,
-    population_value: float,
-    method: str,
-    tolerable_misstatement: float = 0.0,
-) -> dict:
-    """评价抽样结果
+    async def fill_sampling_to_workpaper(
+        self,
+        db: AsyncSession,
+        wp_id: UUID,
+        sampling_result: dict[str, Any],
+    ) -> int:
+        """将抽样结果填回抽凭表 parsed_data
 
-    Args:
-        sample_errors: 样本中发现的错报金额列表
-        sample_size: 样本量
-        population_value: 总体金额
-        method: 抽样方法
-        tolerable_misstatement: 可容忍错报
+        填充策略：append_rows — 追加到 parsed_data.action_data.entries
+        """
+        import json
+        from sqlalchemy import text
 
-    Returns:
-        评价结果
-    """
-    total_error = sum(abs(e) for e in sample_errors)
-    error_count = sum(1 for e in sample_errors if e != 0)
+        result = await db.execute(text(
+            "SELECT parsed_data FROM working_papers WHERE id = :wp_id"
+        ), {"wp_id": str(wp_id)})
+        row = result.fetchone()
+        if not row:
+            return 0
 
-    if method == "mus" and population_value > 0 and sample_size > 0:
-        # MUS 推断：错报推断到总体
-        projected = total_error * (population_value / sample_size) if sample_size > 0 else 0
-        conclusion = "accept" if projected <= tolerable_misstatement else "reject"
-    else:
-        # 非 MUS：简单比率推断
-        error_rate = error_count / sample_size if sample_size > 0 else 0
-        projected = total_error * (population_value / sample_size) if sample_size > 0 else 0
-        conclusion = "accept" if projected <= tolerable_misstatement else "reject"
+        parsed_data = row[0] or {}
+        if isinstance(parsed_data, str):
+            parsed_data = json.loads(parsed_data)
 
-    return {
-        "sample_errors_count": error_count,
-        "sample_errors_total": round(total_error, 2),
-        "projected_misstatement": round(projected, 2),
-        "tolerable_misstatement": tolerable_misstatement,
-        "conclusion": conclusion,
-        "conclusion_label": "可接受" if conclusion == "accept" else "需扩大样本或追加程序",
-    }
+        # 追加抽样结果
+        existing_action = parsed_data.get("action_data", {})
+        existing_entries = existing_action.get("entries", []) if isinstance(existing_action, dict) else []
+        new_entries = sampling_result.get("entries", [])
+
+        parsed_data["action_data"] = {
+            "method": sampling_result.get("method"),
+            "total_population": sampling_result.get("total_population"),
+            "sample_size": sampling_result.get("sample_size"),
+            "entries": existing_entries + new_entries,
+        }
+
+        await db.execute(text(
+            "UPDATE working_papers SET parsed_data = :pd::jsonb WHERE id = :wp_id"
+        ), {"pd": json.dumps(parsed_data, ensure_ascii=False, default=str), "wp_id": str(wp_id)})
+        await db.flush()
+
+        return len(new_entries)
+
+    async def associate_ocr_evidence(
+        self,
+        db: AsyncSession,
+        wp_id: UUID,
+        entry_index: int,
+        attachment_id: UUID,
+    ) -> bool:
+        """关联 OCR 照片到抽凭条目（复用 wp_ocr_fill 模式）
+
+        LLM 链路待接入 — 当前仅记录 attachment_id 关联
+        """
+        import json
+        from sqlalchemy import text
+
+        result = await db.execute(text(
+            "SELECT parsed_data FROM working_papers WHERE id = :wp_id"
+        ), {"wp_id": str(wp_id)})
+        row = result.fetchone()
+        if not row:
+            return False
+
+        parsed_data = row[0] or {}
+        if isinstance(parsed_data, str):
+            parsed_data = json.loads(parsed_data)
+
+        action_data = parsed_data.get("action_data", {})
+        entries = action_data.get("entries", [])
+
+        if 0 <= entry_index < len(entries):
+            # 记录 evidence_group 关联
+            evidence = entries[entry_index].get("evidence_group", [])
+            evidence.append(str(attachment_id))
+            entries[entry_index]["evidence_group"] = evidence
+            action_data["entries"] = entries
+            parsed_data["action_data"] = action_data
+
+            await db.execute(text(
+                "UPDATE working_papers SET parsed_data = :pd::jsonb WHERE id = :wp_id"
+            ), {"pd": json.dumps(parsed_data, ensure_ascii=False, default=str), "wp_id": str(wp_id)})
+            await db.flush()
+            return True
+
+        return False

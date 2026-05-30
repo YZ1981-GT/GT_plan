@@ -6,7 +6,8 @@ from sqlalchemy import create_engine, text
 from app.models.base import Base
 
 # 自动扫描 app/models/ 下所有 Python 模块并导入（触发 ORM 注册到 Base.metadata）
-models_dir = pathlib.Path(__file__).parent.parent / "app" / "models"
+ROOT = pathlib.Path(__file__).resolve().parents[3]
+models_dir = ROOT / "backend" / "app" / "models"
 loaded, skipped = [], []
 for f in sorted(models_dir.glob("*.py")):
     mod_name = f.stem

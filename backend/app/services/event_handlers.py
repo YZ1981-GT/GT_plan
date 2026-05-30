@@ -1258,6 +1258,77 @@ def register_event_handlers() -> None:
         "(LEDGER_DATASET_ACTIVATED / WORKPAPER_REVIEW_PASSED / ADJUSTMENT_BATCH_COMMITTED)"
     )
 
+    # ------------------------------------------------------------------
+    # multi-standard-unification 需求 3：STANDARD_CHANGED → 附注层联动
+    # 复用 note_conversion_service.execute_conversion 执行附注切换
+    # ------------------------------------------------------------------
+    async def _on_standard_changed_notes(payload: EventPayload) -> None:
+        """准则切换 → 附注层自动跟随（需求 3.1/3.2/3.3）。
+
+        复用 note_conversion_service 已验证的切换逻辑（section_id 保留 +
+        共有章节不丢编辑 + soe_only 归档 / listed_only 创建）。execute_conversion
+        内部已把 project.template_type 对齐到新 entity_type，使 current_standard
+        与 applicable_standard_v2 保持一致（需求 3.3）。
+        """
+        if not payload.project_id:
+            return
+        new_standard = (payload.extra or {}).get("new_standard") or {}
+        target_type = new_standard.get("entity_type")
+        # 本 spec 只支持 SOE↔Listed 附注切换；其他 entity_type（如 private）跳过
+        if target_type not in ("soe", "listed"):
+            return
+        year = payload.year
+        if year is None:
+            # 附注切换需要年度；缺失时跳过（记录 warning）
+            logger.warning("STANDARD_CHANGED 缺少 year，跳过附注切换: project=%s", payload.project_id)
+            return
+        async with async_session_factory() as session:
+            try:
+                from app.services.note_conversion_service import NoteConversionService
+                svc = NoteConversionService(session)
+                await svc.execute_conversion(payload.project_id, year, target_type)
+                await session.commit()
+            except Exception as e:
+                await session.rollback()
+                logger.warning("STANDARD_CHANGED 附注切换失败: project=%s: %s", payload.project_id, e)
+
+    event_bus.subscribe(EventType.STANDARD_CHANGED, _on_standard_changed_notes)
+    logger.debug("multi-standard-unification 需求 3: STANDARD_CHANGED → 附注切换 handler registered")
+
+    # ------------------------------------------------------------------
+    # multi-standard-unification 需求 4：STANDARD_CHANGED → 报表层联动
+    # ------------------------------------------------------------------
+    async def _on_standard_changed_reports(payload: EventPayload) -> None:
+        """准则切换 → 报表层标记 stale（需求 4.1/4.2）。
+
+        需求 4.1（更新 applicable_standard）：报表的 applicable_standard 是在报表
+        生成时从 project.template_type + report_scope 派生的（无独立列）；set_standard
+        已双写这两个字段，故派生口径在下次生成时自动更新——此处无需改报表列。
+        需求 4.2：把现有报表标记为 stale（需重新生成）。
+        """
+        import sqlalchemy as sa
+        from app.models.report_models import FinancialReport
+
+        if not payload.project_id:
+            return
+        async with async_session_factory() as session:
+            try:
+                stmt = sa.update(FinancialReport).where(
+                    FinancialReport.project_id == payload.project_id,
+                    FinancialReport.is_deleted == sa.false(),
+                )
+                if payload.year is not None:
+                    stmt = stmt.where(FinancialReport.year == payload.year)
+                stmt = stmt.values(is_stale=True)
+                await session.execute(stmt)
+                await session.commit()
+            except Exception as e:
+                await session.rollback()
+                logger.warning("STANDARD_CHANGED 报表 stale 标记失败: project=%s: %s", payload.project_id, e)
+
+    event_bus.subscribe(EventType.STANDARD_CHANGED, _on_standard_changed_reports)
+    logger.debug("multi-standard-unification 需求 4: STANDARD_CHANGED → 报表 stale handler registered")
+
     # 启动汇总（只打这一行 INFO）
     total_handlers = sum(len(h) for h in event_bus._handlers.values())
     logger.info("[EventBus] %d handlers registered across %d event types", total_handlers, len(event_bus._handlers))

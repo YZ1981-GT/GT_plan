@@ -29,24 +29,6 @@
     @jump-to-reference="onHtmlJumpToReference"
   />
 
-  <!-- 路由分发：非 univer 类型使用对应子编辑器（须等 wpDetail 加载完成） -->
-  <component
-    v-else-if="componentType && componentType !== 'univer' && wpDetail"
-    :is="editorComponent"
-    :project-id="projectId"
-    :wp-id="wpId"
-    :wp-detail="wpDetail"
-    @show-versions="onShowVersions"
-    @toggle-panel="showSidePanel = !showSidePanel"
-    @saved="onChildSaved"
-  />
-
-  <!-- 子编辑器加载中占位 -->
-  <div v-else-if="componentType && componentType !== 'univer' && !wpDetail" class="gt-wp-editor-loading">
-    <el-icon class="is-loading" :size="32" color="var(--gt-color-primary)"><Loading /></el-icon>
-    <div style="margin-top: 12px; font-size: 13px; color: var(--gt-color-text-secondary)">加载底稿中...</div>
-  </div>
-
   <!-- 默认 Univer 编辑器（component_type='univer' 或未配置时） -->
   <div v-else class="gt-wp-editor gt-fade-in">
     <!-- 顶部工具栏 -->
@@ -276,9 +258,8 @@
  *
  * @see .kiro/specs/workpaper-editor-shrink-phase2/design.md §4.2
  */
-import { ref, computed, provide, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
+import { ref, computed, provide, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
-import { Loading } from '@element-plus/icons-vue'
 import { confirmLeave } from '@/utils/confirm'
 import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
 import { useAuditContext } from '@/composables/useAuditContext'
@@ -310,19 +291,6 @@ import VersionHistoryDrawer from './workpaper-editor/VersionHistoryDrawer.vue'
 import AuditNavDialog from './workpaper-editor/AuditNavDialog.vue'
 import ReviewMarkDialog from './workpaper-editor/ReviewMarkDialog.vue'
 
-// ─── 动态编辑器组件（按 component_type 路由分发） ───────────────────────────
-const WorkpaperFormEditor = defineAsyncComponent(() => import('./WorkpaperFormEditor.vue'))
-const WorkpaperWordEditor = defineAsyncComponent(() => import('./WorkpaperWordEditor.vue'))
-const WorkpaperTableEditor = defineAsyncComponent(() => import('./WorkpaperTableEditor.vue'))
-const WorkpaperHybridEditor = defineAsyncComponent(() => import('./WorkpaperHybridEditor.vue'))
-
-const EDITOR_MAP: Record<string, any> = {
-  form: WorkpaperFormEditor,
-  word: WorkpaperWordEditor,
-  table: WorkpaperTableEditor,
-  hybrid: WorkpaperHybridEditor,
-}
-
 // ─── 路由解析 ────────────────────────────────────────────────────────────────
 const route = useRoute()
 const router = useRouter()
@@ -353,8 +321,6 @@ const {
   wpClassification,
   fetchComponentType,
 } = useEditorMode({ wpId, projectId, wpDetail })
-
-const editorComponent = computed(() => EDITOR_MAP[componentType.value] || null)
 
 // ─── 循环类型 ────────────────────────────────────────────────────────────────
 const cycleType = useCycleType(wpDetail)
@@ -729,6 +695,22 @@ onMounted(() => {
   // 订阅 workpaper:locate-cell 事件
   eventBus.on('workpaper:locate-cell', onLocateCellEvent)
 
+  // wp-locate-foundation Task 4.2: 读 route.query.sheet / cell → 触发定位
+  // 使用 nextTick + 短延迟确保 GtWpRenderer 已挂载
+  const querySheet = route.query.sheet as string | undefined
+  const queryCell = route.query.cell as string | undefined
+  if (querySheet || queryCell) {
+    nextTick(() => {
+      setTimeout(() => {
+        eventBus.emit('workpaper:locate-cell', {
+          wpId: wpId.value,
+          sheetName: querySheet || undefined,
+          cellRef: queryCell || '',
+        })
+      }, 300)
+    })
+  }
+
   // 浏览器关闭/刷新前警告
   window.addEventListener('beforeunload', onBeforeUnload)
 })
@@ -792,10 +774,6 @@ function onLocateCellEvent(payload: { wpId: string; sheetName?: string; cellRef:
 .gt-wp-toolbar-primary { margin-right: 4px; }
 .gt-wp-editor-code { font-weight: 700; color: var(--gt-color-primary); font-size: var(--gt-font-size-md); white-space: nowrap; }
 .gt-wp-editor-name { color: var(--gt-color-text); font-size: var(--gt-font-size-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
-.gt-wp-editor-loading {
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; height: 100%; gap: 12px; color: var(--gt-color-text-tertiary);
-}
 .gt-dirty-indicator { color: var(--gt-color-wheat); font-size: var(--gt-font-size-xs); font-weight: 500; }
 </style>
 

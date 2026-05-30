@@ -303,6 +303,9 @@ class BudgetHourUpdate(BaseModel):
 class PBCItemCreate(BaseModel):
     item_name: str
     category: Optional[str] = None
+    wp_id: Optional[str] = None
+    cycle_code: Optional[str] = None
+    due_date: Optional[date] = None
     requested_date: Optional[date] = None
     notes: Optional[str] = None
 
@@ -310,6 +313,9 @@ class PBCItemCreate(BaseModel):
 class PBCItemUpdate(BaseModel):
     item_name: Optional[str] = None
     category: Optional[str] = None
+    wp_id: Optional[str] = None
+    cycle_code: Optional[str] = None
+    due_date: Optional[date] = None
     status: Optional[str] = None
     received_date: Optional[date] = None
     notes: Optional[str] = None
@@ -322,6 +328,9 @@ class PBCItemResponse(BaseModel):
     project_id: str
     item_name: str
     category: Optional[str] = None
+    wp_id: Optional[str] = None
+    cycle_code: Optional[str] = None
+    due_date: Optional[date] = None
     requested_date: Optional[date] = None
     received_date: Optional[date] = None
     status: str

@@ -16,11 +16,12 @@ import { mount, flushPromises } from '@vue/test-utils'
 import SideStandardsTab from '../SideStandardsTab.vue'
 
 const mockGet = vi.fn()
+const mockPost = vi.fn()
 
 vi.mock('@/services/apiProxy', () => ({
   api: {
     get: (...args: unknown[]) => mockGet(...args),
-    post: vi.fn(),
+    post: (...args: unknown[]) => mockPost(...args),
   },
 }))
 
@@ -29,6 +30,11 @@ const globalStubs = {
     'el-tag': {
       template: '<span class="stub-tag" :data-type="type"><slot /></span>',
       props: ['type', 'size', 'round'],
+    },
+    'el-button': {
+      template: '<button class="stub-btn" :disabled="disabled" :data-loading="loading" @click="$emit(\'click\')"><slot /></button>',
+      props: ['type', 'size', 'loading', 'disabled'],
+      emits: ['click'],
     },
   },
   directives: {
@@ -185,5 +191,91 @@ describe('SideStandardsTab — 缓存与切换', () => {
     const urls = mockGet.mock.calls.map((c) => c[0])
     expect(urls).toContain('/api/knowledge/tsj/D')
     expect(urls).toContain('/api/knowledge/tsj/E')
+  })
+})
+
+describe('SideStandardsTab — AI 复核按钮', () => {
+  beforeEach(() => {
+    mockGet.mockReset()
+    mockPost.mockReset()
+  })
+
+  it('markdown 加载成功后显示复核按钮', async () => {
+    mockGet.mockResolvedValueOnce({
+      cycle_name: 'D',
+      source_file: '收入审计复核提示词.md',
+      markdown: '# 收入审计复核提示词',
+    })
+
+    const wrapper = mount(SideStandardsTab, {
+      props: { wpCode: 'D2-1', wpId: 'wp-123' },
+      global: globalStubs,
+    })
+    await flushPromises()
+
+    const btn = wrapper.find('.stub-btn')
+    expect(btn.exists()).toBe(true)
+    expect(btn.text()).toContain('用此提示词复核当前底稿')
+  })
+
+  it('点击按钮调用 POST /api/workpapers/{wpId}/ai/tsj-review', async () => {
+    mockGet.mockResolvedValueOnce({
+      cycle_name: 'D',
+      source_file: '收入审计复核提示词.md',
+      markdown: '# D',
+    })
+    mockPost.mockResolvedValueOnce({ findings: [] })
+
+    const wrapper = mount(SideStandardsTab, {
+      props: { wpCode: 'D2-1', wpId: 'wp-456' },
+      global: globalStubs,
+    })
+    await flushPromises()
+
+    await wrapper.find('.stub-btn').trigger('click')
+    await flushPromises()
+
+    expect(mockPost).toHaveBeenCalledTimes(1)
+    expect(mockPost).toHaveBeenCalledWith('/api/workpapers/wp-456/ai/tsj-review')
+  })
+
+  it('成功时 emit review-complete 事件', async () => {
+    mockGet.mockResolvedValueOnce({
+      cycle_name: 'D',
+      source_file: '收入审计复核提示词.md',
+      markdown: '# D',
+    })
+    const mockFindings = { findings: [{ issue_type: '数值错误', severity: 'high' }] }
+    mockPost.mockResolvedValueOnce(mockFindings)
+
+    const wrapper = mount(SideStandardsTab, {
+      props: { wpCode: 'D2-1', wpId: 'wp-789' },
+      global: globalStubs,
+    })
+    await flushPromises()
+
+    await wrapper.find('.stub-btn').trigger('click')
+    await flushPromises()
+
+    const emitted = wrapper.emitted('review-complete')
+    expect(emitted).toHaveLength(1)
+    expect(emitted![0][0]).toEqual(mockFindings)
+  })
+
+  it('wpId 为空时按钮 disabled', async () => {
+    mockGet.mockResolvedValueOnce({
+      cycle_name: 'D',
+      source_file: '收入审计复核提示词.md',
+      markdown: '# D',
+    })
+
+    const wrapper = mount(SideStandardsTab, {
+      props: { wpCode: 'D2-1' },
+      global: globalStubs,
+    })
+    await flushPromises()
+
+    const btn = wrapper.find('.stub-btn')
+    expect(btn.attributes('disabled')).toBeDefined()
   })
 })

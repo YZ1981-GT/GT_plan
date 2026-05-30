@@ -9,14 +9,14 @@ import sys
 from pathlib import Path
 
 # 让脚本可以作为 __main__ 直接跑
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from app.services.ledger_import.detector import detect_file_from_path  # noqa: E402
 from app.services.ledger_import.identifier import identify  # noqa: E402
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 DATA_DIR = REPO_ROOT / "数据"
-OUT = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "header_snapshots.json"
+OUT = REPO_ROOT / "backend" / "tests" / "fixtures" / "header_snapshots.json"
 
 SAMPLES = [
     ("YG36 四川物流", "YG36-重庆医药集团四川物流有限公司2025.xlsx"),

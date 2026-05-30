@@ -15,7 +15,8 @@
 import json
 from pathlib import Path
 
-OUTPUT_PATH = Path(__file__).parent.parent / "data" / "report_config_seed.json"
+ROOT = Path(__file__).resolve().parents[3]
+OUTPUT_PATH = ROOT / "backend" / "data" / "report_config_seed.json"
 
 
 # ═══════════════════════════════════════════════════════════════════

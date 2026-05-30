@@ -424,3 +424,124 @@ async def ai_review_reply(
         "evidence_refs": [],
         "wp_code": wp_index.wp_code,
     }
+
+
+# ─── TSJ 提示词驱动 LLM 复核（wp-tsj-llm-review spec Task 1.1） ───
+
+
+class TsjReviewItem(BaseModel):
+    """单条复核发现"""
+    id: str
+    content_type: str
+    content_text: str
+    confidence_level: str | None = None
+    confirmation_status: str
+    issue_type: str = ""
+    severity: str = "medium"
+    sheet: str = ""
+    cell_range: str = ""
+    description: str = ""
+    remediation: str = ""
+
+
+class TsjReviewResponse(BaseModel):
+    """TSJ 复核响应"""
+    findings: list[TsjReviewItem]
+    workpaper_id: str
+    audit_cycle: str | None = None
+
+
+@router.post("/{wp_id}/ai/tsj-review", response_model=TsjReviewResponse)
+async def tsj_review(
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """TSJ 提示词驱动 LLM 复核 — 调用 review_workpaper_with_prompt
+
+    当 WP_AI_SERVICE_ENABLED=False 时返回 403。
+    """
+    if not settings.WP_AI_SERVICE_ENABLED:
+        raise HTTPException(status_code=403, detail="AI 服务未启用")
+
+    # 验证底稿存在
+    import sqlalchemy as sa
+    from app.models.workpaper_models import WorkingPaper
+
+    wp = (await db.execute(
+        sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+    )).scalar_one_or_none()
+    if not wp:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    # 实例化服务并调用复核
+    from app.services.workpaper_fill_service import WorkpaperFillService
+    from app.services.ai_service import AIService
+
+    svc = WorkpaperFillService(db)
+    ai_service = AIService(db)
+    results = await svc.review_workpaper_with_prompt(
+        project_id=wp.project_id,
+        workpaper_id=wp_id,
+        ai_service=ai_service,
+    )
+
+    # 写入审计轨迹
+    try:
+        from app.services.audit_logger_enhanced import audit_logger
+        await audit_logger.log_action(
+            user_id=user.id,
+            action="workpaper.tsj_review_requested",
+            object_type="workpaper",
+            object_id=wp_id,
+            project_id=wp.project_id,
+            details={
+                "findings_count": len(results) if results else 0,
+            },
+        )
+    except Exception as e:
+        logger.warning(f"Failed to write audit trail for TSJ review: {e}")
+
+    # 构建响应
+    findings = []
+    for item in (results or []):
+        ds = getattr(item, "data_sources", None) or {}
+        description = ds.get("description", "") or getattr(item, "content_text", "")
+        remediation = ds.get("remediation", "")
+        # content_text 格式: "{description}\n整改建议：{remediation}"
+        ct = getattr(item, "content_text", "")
+        if not remediation and "\n整改建议：" in ct:
+            parts = ct.split("\n整改建议：", 1)
+            description = parts[0]
+            remediation = parts[1] if len(parts) > 1 else ""
+        elif not description:
+            description = ct
+
+        findings.append(TsjReviewItem(
+            id=str(getattr(item, "id", "")),
+            content_type=str(getattr(item, "content_type", "risk_alert")),
+            content_text=ct,
+            confidence_level=str(getattr(item, "confidence_level", None) or ""),
+            confirmation_status=str(
+                getattr(item, "confirmation_status", "pending") or "pending"
+            ),
+            issue_type=ds.get("issue_type", ""),
+            severity=ds.get("severity", "medium"),
+            sheet=ds.get("sheet", ""),
+            cell_range=ds.get("cell_range", ""),
+            description=description,
+            remediation=remediation,
+        ))
+
+    # 获取 audit_cycle 信息
+    audit_cycle = None
+    if results and hasattr(results[0], "data_sources"):
+        ds = getattr(results[0], "data_sources", None)
+        if isinstance(ds, dict):
+            audit_cycle = ds.get("audit_cycle")
+
+    return TsjReviewResponse(
+        findings=findings,
+        workpaper_id=str(wp_id),
+        audit_cycle=audit_cycle,
+    )

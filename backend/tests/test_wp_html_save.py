@@ -473,3 +473,101 @@ async def test_save_schema_version_none_allows_any():
             )
 
     assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_save_409_data_version_conflict():
+    """data_version mismatch returns 409 with conflict info (Requirement 6.3)."""
+    app = _make_app()
+
+    # Server has version 3
+    fake_wp = _FakeWorkingPaper(
+        parsed_data={"schema_version": "v2025-R5", "_version": 3}
+    )
+
+    mock_db = AsyncMock(spec=AsyncSession)
+    mock_result = MagicMock()
+    mock_scalars = MagicMock()
+    mock_scalars.first.return_value = fake_wp
+    mock_result.scalars.return_value = mock_scalars
+    mock_db.execute.return_value = mock_result
+
+    async def _db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = _db
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.post(
+            f"/api/workpapers/{_WP_ID}/save",
+            json={
+                "sheet_name": "测试sheet",
+                "html_data": {"rows": []},
+                "schema_version": "v2025-R5",
+                "data_version": 2,  # Client has older version
+            },
+        )
+    assert resp.status_code == 409
+    data = resp.json()
+    assert data["detail"]["error"] == "data_version_conflict"
+    assert data["detail"]["server_version"] == 3
+    assert data["detail"]["client_version"] == 2
+
+
+@pytest.mark.asyncio
+async def test_save_200_force_overwrite_bypasses_version_check():
+    """force_overwrite=True bypasses data_version conflict (Requirement 6.3)."""
+    app = _make_app()
+
+    # Server has version 3
+    fake_wp = _FakeWorkingPaper(
+        parsed_data={"schema_version": "v2025-R5", "_version": 3}
+    )
+
+    call_count = [0]
+    mock_db = AsyncMock(spec=AsyncSession)
+
+    def _execute_side_effect(*args, **kwargs):
+        call_count[0] += 1
+        mock_result = MagicMock()
+        if call_count[0] == 1:
+            mock_scalars = MagicMock()
+            mock_scalars.first.return_value = fake_wp
+            mock_result.scalars.return_value = mock_scalars
+        elif call_count[0] == 2:
+            mock_result.scalar_one_or_none.return_value = "D2"
+        else:
+            pass
+        return mock_result
+
+    mock_db.execute.side_effect = _execute_side_effect
+    mock_db.commit = AsyncMock()
+
+    async def _db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = _db
+
+    with patch(
+        "app.routers.wp_html_save.cross_ref_service"
+    ) as mock_crs:
+        mock_crs.get_wp_code_for_wp_id = AsyncMock(return_value="D2")
+        mock_crs.detect_changes.return_value = []
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post(
+                f"/api/workpapers/{_WP_ID}/save",
+                json={
+                    "sheet_name": "测试sheet",
+                    "html_data": {"rows": []},
+                    "schema_version": "v2025-R5",
+                    "data_version": 2,  # Older version
+                    "force_overwrite": True,  # Force overwrite
+                },
+            )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["data_version"] == 4  # 3 + 1

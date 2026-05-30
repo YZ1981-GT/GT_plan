@@ -3,6 +3,7 @@
 Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.7, 1.8
 """
 
+import logging
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -20,6 +21,8 @@ from app.models.audit_platform_schemas import (
     WizardStepData,
 )
 from app.services.note_template_service import NoteTemplateService
+
+logger = logging.getLogger(__name__)
 
 # 步骤依赖链：每个步骤的前置步骤必须已完成
 STEP_ORDER: list[WizardStep] = [
@@ -362,10 +365,18 @@ async def validate_step(
 # ---------------------------------------------------------------------------
 
 
-async def confirm_project(project_id: UUID, db: AsyncSession) -> Project:
+async def confirm_project(
+    project_id: UUID,
+    db: AsyncSession,
+    changed_by: UUID | None = None,
+) -> Project:
     """确认创建，状态 created → planning。
 
-    Validates: Requirements 1.7
+    确认后从向导状态派生结构化"适用准则"并写入统一准则源
+    （applicable_standard_v2），同时发出 STANDARD_CHANGED 事件。
+    准则派生失败不影响向导确认本身（次要关注点，须保持向导确认稳健）。
+
+    Validates: Requirements 1.7, 1.2
     """
     project = await _get_project_or_404(db, project_id)
 
@@ -392,4 +403,30 @@ async def confirm_project(project_id: UUID, db: AsyncSession) -> Project:
 
     await db.commit()
     await db.refresh(project)
+
+    # 向导确认后派生并写入统一准则源（需求 1.2）。
+    # 局部导入避免模块加载期的循环依赖（StandardUnificationService
+    # 依赖 event_bus / models）。准则派生失败不阻断向导确认。
+    try:
+        from app.services.standard_unification_service import (
+            StandardUnificationService,
+        )
+
+        svc = StandardUnificationService(db)
+        derived = svc.derive_from_wizard(project.wizard_state)
+        await svc.set_standard(
+            project.id,
+            derived,
+            changed_by=changed_by or project.manager_id or project.id,
+        )
+        # set_standard 只 flush 不 commit，由调用方统一提交事务
+        await db.commit()
+        await db.refresh(project)
+    except Exception:  # noqa: BLE001 — 派生为次要关注点，不应使向导确认失败
+        logger.warning(
+            "确认项目 %s 后派生统一准则源失败（向导确认本身已成功）",
+            project_id,
+            exc_info=True,
+        )
+
     return project

@@ -43,6 +43,12 @@ class SaveHtmlDataRequest(BaseModel):
     changed_cells: list[str] | None = Field(
         None, description="变更的 cell 列表（可选，用于优化跨底稿引用检测）"
     )
+    data_version: int | None = Field(
+        None, description="乐观锁版本号（parsed_data._version）。提交时与服务端比对，不一致返回 409"
+    )
+    force_overwrite: bool = Field(
+        False, description="强制覆盖（忽略版本冲突）"
+    )
 
 
 class StaleImpactItem(BaseModel):
@@ -56,6 +62,7 @@ class StaleImpactItem(BaseModel):
 class SaveHtmlDataResponse(BaseModel):
     """保存成功响应"""
     saved_at: str
+    data_version: int = Field(0, description="保存后的新版本号")
     stale_impact: list[StaleImpactItem] = []
 
 
@@ -110,6 +117,29 @@ async def save_html_data(
             },
         )
 
+    # ─── Step 2b: 乐观锁版本校验（Requirement 6.3）────────────────────────
+    server_version: int = parsed_data.get("_version", 0)
+    if (
+        body.data_version is not None
+        and not body.force_overwrite
+        and body.data_version != server_version
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "data_version_conflict",
+                "message": (
+                    f"数据版本冲突：您的版本为 {body.data_version}，"
+                    f"服务端当前版本为 {server_version}。"
+                    "其他用户可能已修改此 sheet，请选择覆盖或合并。"
+                ),
+                "server_version": server_version,
+                "client_version": body.data_version,
+                "last_modified_by": parsed_data.get("last_modified_by"),
+                "last_modified_at": parsed_data.get("last_modified_at"),
+            },
+        )
+
     # ─── Step 3: JSON Schema 基础校验 ─────────────────────────────────────
     # 校验 html_data 必须是 dict 且 sheet_name 非空
     if not isinstance(body.html_data, dict):
@@ -150,6 +180,10 @@ async def save_html_data(
     parsed_data["schema_version"] = body.schema_version
     parsed_data["last_modified_by"] = str(current_user.id)
     parsed_data["last_modified_at"] = now.isoformat()
+
+    # 乐观锁版本自增（Requirement 6.3）
+    new_version = server_version + 1
+    parsed_data["_version"] = new_version
 
     # 记录变更的 sheets
     changed_sheets = parsed_data.get("changed_sheets_last_save", [])
@@ -216,6 +250,7 @@ async def save_html_data(
 
     return SaveHtmlDataResponse(
         saved_at=now.isoformat(),
+        data_version=new_version,
         stale_impact=stale_impact,
     )
 

@@ -413,6 +413,18 @@ async function onSyncToDisclosureNotes() {
 
 function onContextChange(_name: string) { debounceSave() }
 
+// ─── wp-locate-foundation Task 3.2: 暴露 scrollToRow 定位接口 ───
+function scrollToRow(index: number) {
+  const container = document.querySelector('.gt-c-note-table')
+  if (!container) return
+  const rows = container.querySelectorAll('.el-table__body .el-table__row')
+  if (index >= 0 && index < rows.length) {
+    rows[index].scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+}
+
+defineExpose({ scrollToRow })
+
 initData()
 watch(() => props.htmlData, () => { initData() }, { deep: true })
 watch(() => props.schema, () => { initData() }, { deep: true })

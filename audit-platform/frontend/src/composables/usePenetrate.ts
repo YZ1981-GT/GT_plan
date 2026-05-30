@@ -104,11 +104,15 @@ export function usePenetrate() {
       })
     },
 
-    /** 穿透到底稿编辑器 */
-    toWorkpaperEditor(wpId: string) {
+    /** 穿透到底稿编辑器（可选带定位上下文） */
+    toWorkpaperEditor(wpId: string, locate?: { sheet?: string; cell?: string }) {
       _pushCurrentRoute(undefined, 'down')
+      const query: Record<string, string> = {}
+      if (locate?.sheet) query.sheet = locate.sheet
+      if (locate?.cell) query.cell = locate.cell
       router.push({
         path: `/projects/${pid()}/workpapers/${wpId}/edit`,
+        query: Object.keys(query).length > 0 ? query : undefined,
       })
     },
 
@@ -147,6 +151,18 @@ export function usePenetrate() {
       router.push({
         path: `/projects/${pid()}/adjustments`,
         query: { impact: adjustmentId, year: String(year()) },
+      })
+    },
+
+    /** 附注 → 底稿 cell 直达（wp-traceability-panel Task 4.1） */
+    toWorkpaperFromNote(wpCode: string, locate?: { sheet?: string; cell?: string }) {
+      _pushCurrentRoute(undefined, 'up')
+      const query: Record<string, string> = { code: wpCode, year: String(year()) }
+      if (locate?.sheet) query.sheet = locate.sheet
+      if (locate?.cell) query.cell = locate.cell
+      router.push({
+        path: `/projects/${pid()}/workpapers`,
+        query,
       })
     },
   }

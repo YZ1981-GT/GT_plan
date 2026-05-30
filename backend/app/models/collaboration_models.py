@@ -744,6 +744,10 @@ class PBCChecklist(Base):
         default=PbcStatus.PENDING,
         nullable=False,
     )
+    category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    wp_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    cycle_code: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     requested_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     received_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     requested_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)

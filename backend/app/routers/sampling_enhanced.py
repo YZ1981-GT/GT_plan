@@ -97,3 +97,37 @@ async def monthly_detail(
     return await svc.generate_monthly_detail(
         db, project_id, req.account_code, req.year,
     )
+
+
+# ── 抽凭执行（wp-functional-actions spec） ────────────────
+
+class SamplingExecuteRequest(BaseModel):
+    method: str  # random / stratified / top_n / mus
+    account_codes: list[str]
+    year: int
+    sample_size: int = 25
+    amount_threshold: float | None = None
+    sampling_interval: float | None = None
+
+
+@router.post("/{project_id}/sampling/execute")
+async def sampling_execute(
+    project_id: UUID,
+    req: SamplingExecuteRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """从 tb_ledger 按方式抽样 — 支持随机/分层/大额/MUS"""
+    from app.services.wp_sampling_engine import WpSamplingEngine
+
+    engine = WpSamplingEngine()
+    return await engine.execute_sampling(
+        db=db,
+        project_id=project_id,
+        year=req.year,
+        account_codes=req.account_codes,
+        method=req.method,
+        sample_size=req.sample_size,
+        amount_threshold=req.amount_threshold,
+        sampling_interval=req.sampling_interval,
+    )

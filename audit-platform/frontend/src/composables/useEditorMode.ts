@@ -5,12 +5,9 @@
  *
  * Routing priority (consumed in the host onMounted):
  *  1. HTML class (A/B/C/D/E/H/skip 1346 sheets) -> GtWpRenderer
- *  2. Sub-editor (form/word/table/hybrid) -> dispatched by host EDITOR_MAP
- *  3. Univer class (F/G 558 sheets) -> default Univer editor
+ *  2. Univer class (F/G 558 sheets) -> default Univer editor
  *
  * Notes:
- *  - EDITOR_MAP stays in WorkpaperEditor.vue (defineAsyncComponent is bound to
- *    the SFC bundle context).
  *  - This composable owns componentType state, the HTML allowlist,
  *    useWpClassification wiring, and the fetchComponentType async fetch.
  *

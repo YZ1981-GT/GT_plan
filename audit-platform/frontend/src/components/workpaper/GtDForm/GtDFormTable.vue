@@ -783,6 +783,18 @@ onBeforeUnmount(() => {
     saveTimer = null
   }
 })
+
+// ─── wp-locate-foundation Task 3.2: 暴露 scrollToRow 定位接口 ───
+function scrollToRow(index: number) {
+  const container = document.querySelector('.gt-d-form-table')
+  if (!container) return
+  const rows = container.querySelectorAll('.el-table__body .el-table__row')
+  if (index >= 0 && index < rows.length) {
+    rows[index].scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+}
+
+defineExpose({ scrollToRow })
 </script>
 
 

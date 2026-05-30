@@ -135,11 +135,19 @@ export interface AuditContextChangedPayload {
   before: { projectId: string; year: number; applicableStandard: 'soe' | 'listed' }
 }
 
-/** 底稿单元格定位（R8-S2-02：自检失败项 → Univer 定位） */
+/** 底稿单元格定位（R8-S2-02：自检失败项 → Univer 定位 / wp-locate-foundation: 穿透定位） */
 export interface WorkpaperLocateCellPayload {
   wpId: string
   sheetName?: string
   cellRef: string
+  /** wp-locate-foundation 扩展字段：componentType 辅助定位策略选择 */
+  componentType?: string
+  /** 目标值（辅助定位） */
+  value?: string
+  /** 人类可读标签 */
+  label?: string
+  /** 底稿编码（如 D2-1） */
+  wpCode?: string
 }
 
 /** 复核标记变更（Foundation Task 2.9：触发循环徽章刷新） */

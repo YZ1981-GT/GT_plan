@@ -814,6 +814,10 @@ class EventType(str, enum.Enum):
     EXPORT_COMPLETE = "export.complete"
     EXPORT_FAILED = "export.failed"
 
+    # multi-standard-unification 需求 1.5: 适用准则统一源变更事件
+    # payload: {project_id, year, old_standard: dict, new_standard: dict, changed_by: UUID}
+    STANDARD_CHANGED = "standard_changed"
+
 
 class EventPayload(BaseModel):
     """事件载荷"""

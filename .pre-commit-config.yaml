@@ -59,3 +59,13 @@ repos:
         entry: python backend/scripts/check/check_hotspot_files.py
         language: system
         files: ^(\.kiro/steering/memory\.md|\.kiro/specs/INDEX\.md|backend/scripts/file_size_whitelist\.txt)$
+
+      # workpaper-guardrail-cleanup spec：float 金额防退化卡点
+      # 扫描 wp_*.py / workpaper_*.py 中 float() 调用，超 baseline 即阻断
+      # baseline 路径：backend/scripts/check/float_amount_baseline.txt
+      - id: check-no-float-amount
+        name: check-no-float-amount
+        entry: python backend/scripts/check/check_no_float_amount.py
+        language: system
+        pass_filenames: false
+        files: ^backend/app/services/(wp_|workpaper_).*\.py$

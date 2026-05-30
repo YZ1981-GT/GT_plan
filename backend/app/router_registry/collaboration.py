@@ -111,6 +111,10 @@ def register_collaboration_routers(app: FastAPI) -> None:
     app.include_router(pbc_router, prefix="/api", tags=["PBC清单"])
     app.include_router(confirmations_router, prefix="/api", tags=["函证管理"])
 
+    # ═══ §12b. 原始凭证 LLM 识别 ═══
+    from app.routers.wp_document_recognize import router as doc_recognize_router
+    app.include_router(doc_recognize_router, prefix="/api", tags=["原始凭证识别"])
+
     # ═══ §13. Round 4：审计助理增强 ═══
     from app.routers.workpaper_requirements import router as wpreq_router
     from app.routers.workpaper_prior_year import router as wppy_router
