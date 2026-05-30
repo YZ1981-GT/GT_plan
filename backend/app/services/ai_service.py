@@ -80,6 +80,8 @@ async def _get_ollama_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(
         base_url=settings.OLLAMA_BASE_URL,
         timeout=httpx.Timeout(60.0, connect=10.0),
+        mounts={},
+        trust_env=False,
     )
 
 
@@ -89,6 +91,8 @@ async def _get_llm_client() -> httpx.AsyncClient:
         base_url=settings.LLM_BASE_URL,
         headers={"Authorization": f"Bearer {settings.LLM_API_KEY}"},
         timeout=httpx.Timeout(120.0, connect=10.0),
+        mounts={},
+        trust_env=False,
     )
 
 
@@ -97,6 +101,8 @@ async def _get_chromadb_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(
         base_url=settings.CHROMADB_URL,
         timeout=httpx.Timeout(30.0, connect=10.0),
+        mounts={},
+        trust_env=False,
     )
 
 

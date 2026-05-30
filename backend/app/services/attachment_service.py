@@ -336,7 +336,7 @@ class AttachmentService:
             return None
         try:
             import httpx
-            async with httpx.AsyncClient(timeout=settings.PAPERLESS_TIMEOUT) as client:
+            async with httpx.AsyncClient(timeout=settings.PAPERLESS_TIMEOUT, mounts={}, trust_env=False) as client:
                 with open(file_path, "rb") as f:
                     files = {"document": (os.path.basename(file_path), f)}
                     data = {
@@ -365,7 +365,7 @@ class AttachmentService:
             return None
         try:
             import httpx
-            async with httpx.AsyncClient(timeout=settings.PAPERLESS_TIMEOUT) as client:
+            async with httpx.AsyncClient(timeout=settings.PAPERLESS_TIMEOUT, mounts={}, trust_env=False) as client:
                 resp = await client.get(
                     f"{self.paperless_url}/api/documents/{document_id}/",
                     headers={"Authorization": f"Token {self.paperless_token}"},
@@ -382,7 +382,7 @@ class AttachmentService:
             return []
         try:
             import httpx
-            async with httpx.AsyncClient(timeout=settings.PAPERLESS_TIMEOUT) as client:
+            async with httpx.AsyncClient(timeout=settings.PAPERLESS_TIMEOUT, mounts={}, trust_env=False) as client:
                 resp = await client.get(
                     f"{self.paperless_url}/api/documents/",
                     params={"query": query},

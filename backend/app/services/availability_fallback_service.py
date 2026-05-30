@@ -21,7 +21,7 @@ class AvailabilityFallbackService:
     async def check_llm_available() -> bool:
         """检测 vLLM 服务是否可用。"""
         try:
-            async with httpx.AsyncClient(timeout=3.0) as client:
+            async with httpx.AsyncClient(timeout=3.0, mounts={}, trust_env=False) as client:
                 resp = await client.get(f"{settings.LLM_BASE_URL}/models")
                 return resp.status_code == 200
         except Exception:

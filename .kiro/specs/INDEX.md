@@ -117,7 +117,7 @@
 
 ---
 
-## 三、已归档 Spec（`_archive/`，84 个）
+## 三、已归档 Spec（`_archive/`，85 个）
 
 > 已完成且不再演进的 spec，保留审计轨迹。归档不删文件。
 > **物理结构**：`_archive/` 下按功能 + 开发先后分 9 个分类目录，每个目录含 README 说明。
@@ -129,7 +129,7 @@ _archive/
 ├── 01-phase-foundation/        平台地基（Phase 0~16，24 个）
 ├── 02-workpaper-cycles/        审计循环业务内容（11 循环 + 5 底稿基础，16 个）
 ├── 03-refinement-rounds/       五角色轮转打磨（R1~R9，9 个）
-├── 04-infra-architecture/      基础设施 / 全局架构（8 个）
+├── 04-infra-architecture/      基础设施 / 全局架构（9 个）
 ├── 05-business-features/       业务专项功能（12 个）
 ├── 06-engineering-governance/  工程治理（4 个）
 ├── 07-workpaper-slimdown/      底稿模块瘦身系列（5 个）
@@ -159,9 +159,9 @@ _archive/
 
 `refinement-round1-review-closure` · `refinement-round2-project-manager` · `refinement-round3-quality-control` · `refinement-round4-audit-assistant` · `refinement-round5-independent-review` · `refinement-round6-cross-role-optimization` · `refinement-round7-global-polish` · `refinement-round8-deep-closure` · `refinement-round9-global-deep-review`
 
-### 3.4 `04-infra-architecture/` — 基础设施 / 全局架构（8 个）
+### 3.4 `04-infra-architecture/` — 基础设施 / 全局架构（9 个）
 
-`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3`（全平台一致性治理：金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动；143/147，剩合伙人 UAT）
+`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3`（全平台一致性治理：金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动；143/147，剩合伙人 UAT） · `vllm-httpx-bugfix`（2026-05-30，httpx trust_env=False 全仓 20 处 + chat_template_kwargs 顶层 + finish_reason=length 处理；12 测试全绿 + vLLM 直调验证通过）
 
 ### 3.5 `05-business-features/` — 业务专项功能（12 个）
 
@@ -243,7 +243,7 @@ _archive/
 | prefill_formula_mapping | 1035 cells |
 | validation_rules | 114 条 |
 | D6 SQL 迁移 | V001-V026 |
-| **Spec 总数** | **85（active 1 + archived 84）** |
+| **Spec 总数** | **86（active 1 + archived 85）** |
 
 ---
 

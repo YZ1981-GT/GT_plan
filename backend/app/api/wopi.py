@@ -401,7 +401,7 @@ async def ds_callback(
     if status in (2, 6) and download_url:
         try:
             # 从 DS 下载修改后的文件
-            async with httpx.AsyncClient(timeout=30) as client:
+            async with httpx.AsyncClient(timeout=30, mounts={}, trust_env=False) as client:
                 resp = await client.get(download_url)
             if resp.status_code != 200:
                 _log.error(f"[DS Callback] download failed: {resp.status_code}")
