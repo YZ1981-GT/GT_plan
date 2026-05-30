@@ -1,8 +1,8 @@
 # 合并附注三级穿透（合并附注 → 单体附注 → 单体底稿）
 
-**状态**：占位待办（未启动实施）
+**状态**：占位待办（未启动实施 · 2026-05-30 代码实证复核确认核心 20% 全未做）
 **档位**：档 3 三件套（建议）/ 工时 3-4 天
-**前置条件**：必须有真实合并母子项目数据
+**前置条件**：必须有真实合并母子项目数据（PG 当前 0 个 consolidated 项目，阻塞中）
 
 ## 业务诉求（用户 2026-05-17）
 
@@ -36,6 +36,25 @@
 | ConsolBreakdown 弹窗 | ⚠ 缺组件 |
 | `linkage_graph_builder` 父子边 | ⚠ 当前 NOTE 节点不区分合并/单体 |
 | 真实合并母子项目数据 | ⚠ PG 实测：0 个项目走 consolidated 模式 |
+
+### 2026-05-30 代码实证复核（grep + Test-Path）
+
+确认 README 现状盘点准确：**80% 基础就绪属实，20% 穿透功能一项未做**。
+
+| 核查项 | 方法 | 结果 |
+|--------|------|------|
+| `consol_tree_service.py` | Test-Path | ✅ 存在（128 行）|
+| `consol_drilldown_service.py` | Test-Path | ✅ 存在（131 行）|
+| `consol_aggregation_service.py` | Test-Path | ✅ 存在（139 行）|
+| `consol_disclosure_service.py` | Test-Path | ✅ 存在（1267 行）|
+| `note_consol_drilldown_service.py`（要新建）| Test-Path | ❌ MISSING |
+| `consolidation_breakdown` / `source_project_id` 字段 | grep models/ | ❌ 0 命中（未加）|
+| `consol-breakdown` 端点 | grep app/ | ❌ 0 命中（未建）|
+| `ConsolBreakdownDialog.vue`（要新建）| fileSearch | ❌ 不存在 |
+| DisclosureEditor 右键"查看合并明细" | grep .vue | ❌ 0 命中（未加）|
+
+**定性**：纯 README stub，无 tasks.md，核心穿透代码完全未实施。留 active 不归档。
+**唯一阻塞**：启动前置"真实合并母子项目数据"未满足（PG 5 项目全单体，0 个 consolidated），即使开发也无法验收 UAT-1~5。
 
 ## 范围
 
