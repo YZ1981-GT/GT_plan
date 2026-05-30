@@ -263,6 +263,27 @@ _archive/
 
 ---
 
+## 六-A、归档 spec 完成度核查（2026-05-30，代码实证，防伪绿）
+
+> 全量扫描 84 个归档 spec 的 tasks.md + 关键产物 fileSearch/grep 实证。**结论：无伪绿**。
+
+**机械正则统计三大误报源（必须人工甄别，不能只看数字）**：
+1. **可选任务 `[ ]*`**：带星号 = 可选，未做不影响完成定性。如 report-module 13 个未做全是可选 PBT（必需 15/15 ✅）、note-dynamic 16 项 + disclosure-note 6 项均可选/外部 UAT（必需 100%）
+2. **emoji 标题格式**：用 `### Task X.X ✅` 而非 checkbox 的 spec 被正则误报 0/N。如 migration-runner-resilience（emoji✅68，实为 Sprint1-4 全完成 54+23+5 测试）、repo-frontend-layout-unification（✅23）、repo-git-workflow-unification（✅，11/11）
+3. **父任务未勾 + 子任务全完成**：父项 `- [ ] N.` 汇总忘勾但 `N.1/N.2` 全 `[x]`。如 workpaper-list-shrink（扫描 30/39 假残留，实为父任务笔误，产物 e2e spec + useWorkpaperListContext + 5 子 SFC 全部 fileSearch 确认存在）
+
+**关键产物 fileSearch 实证抽查（全部存在，非空壳）**：
+schema_drift_detector.py · validate_formula_coverage.py · audit_logs §127 注册 · V025/V026 SQL · note_formula_generator.py · dynamic_region_engine.py · consol_note_aggregation_service.py · note_offline_export_service.py · CNoteCell.vue · useEControlPersist.ts · useWorkpaperListContext.ts · WorkpaperWorkbenchView.vue · workpaper-list-views.spec.ts
+
+**真残留（已知且合理，非伪绿）**：
+- 99-superseded 类（ledger-import-unification / linkage-panorama-graph）低完成度属**被取代**，本就不必 100%
+- phase7-enhancement / phase8 / refinement-round1~2 等早期 spec 残留 = 后续 spec 取代或外部 UAT，已在各自 memory 记录
+- gt-c-note-table-shrink 残留 R3 Playwright（待环境，非代码缺口，已留档）
+
+**核查方法铁律**：统计 tasks.md 完成度禁止只靠单一 checkbox 正则——必须 ①排除 `[ ]*` 可选 ②识别 emoji 标题格式 ③父子任务勾选不一致时看子任务；最终判定靠 fileSearch/grep 实证产物文件存在，不信文档自述。
+
+---
+
 ## 七、索引规约
 
 1. 新建 spec 默认放 `.kiro/specs/`（active 根目录，**扁平存放**），完成后审议是否归档
