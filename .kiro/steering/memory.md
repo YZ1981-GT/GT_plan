@@ -45,10 +45,12 @@ inclusion: always
 - **4 Phase spec 全 ✅ 代码+测试**（2026-05-31 merge 后四阶段套件 **147 passed/0 failed**）：Phase0 核心管线（B1 汇总/B2 对账/schema 基线/锁定闭环）+ Phase1 架构锁定（AmountResolver 统一引擎/ELIMINATION_APPROVED 事件重算/全端点锁定+ConsolLockedBanner/B6 负商誉/B7 少数股东/A3 async）+ Phase2 编排接线（cascade_refresh/refresh-all SSE/V2 附注 flag/自动抵销 draft/报表穿透/cross_template/公式联动/签字冻结）+ Phase3 前端穿透（ConsolBreakdownDialog/provenance/双向导航/自动建树）
 - **16 ADR**（CONSOL-001~003/101~106/201~206/301~304）+ 24 consol service
 - **🔴 四阶段最大盲区 = 无全链路集成测试**（各阶段 mock 掉相邻阶段，merge 已两次咬人：async 签名漂移 + Phase1 删 _execute_formula 令 Phase2 测试失效）；**统一卡点 = PG 0 个 consolidated 项目**（真实 UAT 全 data-blocked）
+- **四阶段三件套完整性实证核查（2026-05-31）**：①4 phase 目录 requirements+design+tasks **全齐**②关键产物 Test-Path 真实存在（consol_audit_helper/cascade_refresh_service/ConsolBreakdownDialog.vue/ADR-CONSOL-201/V034-036+V039 迁移含 R 回滚）③实跑 consol phase0/2/3 测试 **78 passed** + phase1 套件 = 四阶段 147+ 全绿 + app import OK 1312 路由；**结论=代码+单元/属性测试层面全完成，但未封板**④**tasks.md 大量未勾 checkbox 是"假红"**（phase0 task5-11 等产物已存在测试已过，是 merge 带入 checkbox 未同步实际状态，非真残留）⑤真残留=全链路集成测试缺失(task12)+Playwright 实测(待环境)+真实集团数据 UAT(`*` 卡 0 consolidated 项目)+审计专业复核(B6/B7 CAS20)+文档收尾
 - **封板待办（按 ROI）**：①🔴 全链路集成测试（合成母子数据跑 建树→recalc→trial→对账→报表→附注→穿透）②🟠 `seed_consol_uat.py` 幂等造最小合成集团一脚本解锁四阶段 UAT ③🟡 Phase2/3 Playwright 复用 Phase1 已跑通环境补实测；**收手判断：地基已正确，无真实集团客户前不深做打磨，封板做①②后转回核心模块**
 
 ### git 当前状态（2026-05-31）
-- 当前分支 `work/2026-05-30-wp-specs`，已 merge origin/main 的 Phase1（merge commit `60088d42`）+ 后续 fix（`398dc5ab`），**ahead origin/work 未推送**
+- 当前分支 `main`，已 merge `origin/work/2026-05-30-wp-specs`（merge commit `66e734a3`，consol phase2/3 全套 + V039 迁移 + 10 ADR-CONSOL-201~304 + 25 consol service）；**ahead origin/main 8 commit 未推送**（按"协作走 PR 不直推 main"待用户决定推送）
+- **merge 唯一冲突 memory.md**：远程精简到 70 行（详细 sprint 日志下沉 dev-history/conventions），用 `git checkout --theirs` 取精简版作基底 + 补回本地新增（文档级 LLM 对话偏好 + 全局 7 模块多源治理 + 底稿 AI 复核 UX）；consol 代码全自动合并干净；merge 后 `app import OK` 1312 路由 + consol 关键字段（consolidation_type/consol_lock/consolidation_breakdown/is_stale）全幸存
 - 历史已闭环：合并模块 Phase0~3 全在 main / 底稿模块 14 spec 已实施归档 / schema drift 三层修复 / git 治理 spec（GIT_MODE 双模式 + 分支命名 hook + 6 维核查 CLI `check_git_sync_state.py`）
 
 ### 已完成 spec 总览
