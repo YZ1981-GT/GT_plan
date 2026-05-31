@@ -58,7 +58,7 @@ async def test_clean_state_returns_healthy():
     with patch("app.api.health._query_migration_status", new=AsyncMock(
         return_value={"applied_count": 26, "failures": []}
     )), patch("app.api.health._query_schema_drift", new=AsyncMock(
-        return_value={"count": 0, "items": []}
+        return_value={"count": 0, "critical_count": 0, "items": []}
     )):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -82,7 +82,7 @@ async def test_migration_failure_triggers_degraded():
              "error_message": "table does not exist", "attempt_count": 1}
         ]}
     )), patch("app.api.health._query_schema_drift", new=AsyncMock(
-        return_value={"count": 0, "items": []}
+        return_value={"count": 0, "critical_count": 0, "items": []}
     )):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -103,6 +103,7 @@ async def test_schema_drift_triggers_degraded():
     )), patch("app.api.health._query_schema_drift", new=AsyncMock(
         return_value={
             "count": 2,
+            "critical_count": 2,
             "items": [
                 {"table": "financial_report", "column": "is_stale",
                  "drift_type": "orm_extra", "detail": "ORM 定义但 DB 缺"},
@@ -133,7 +134,7 @@ async def test_pg_unhealthy_overrides_degraded():
              "error_type": "X", "error_message": "y", "attempt_count": 1}
         ]}
     )), patch("app.api.health._query_schema_drift", new=AsyncMock(
-        return_value={"count": 0, "items": []}
+        return_value={"count": 0, "critical_count": 0, "items": []}
     )):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -150,7 +151,7 @@ async def test_response_schema_contract_stable():
     with patch("app.api.health._query_migration_status", new=AsyncMock(
         return_value={"applied_count": 26, "failures": []}
     )), patch("app.api.health._query_schema_drift", new=AsyncMock(
-        return_value={"count": 0, "items": []}
+        return_value={"count": 0, "critical_count": 0, "items": []}
     )):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

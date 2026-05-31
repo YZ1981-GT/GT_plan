@@ -65,6 +65,69 @@ class SchemaDriftDetector:
         "pg_stat_statements",
     })
 
+    # 外部租户表前缀（与业务共用 audit_platform 库的第三方工具表）。
+    #
+    # 本机 audit-metabase 容器与业务后端共用同一 PG 库，导致 Metabase 自身的
+    # ~180 张表（core_*/collection*/dashboard*/pulse*/query_*/transform*/
+    # workspace*/qrtz_*（Quartz 调度器）/metabase_*/report_card*/v_* 视图等）
+    # 全被 drift detector 当成「DB 多出来的表」误报为 db_extra，污染 health。
+    #
+    # 这些前缀下的表一律视为外部租户表，跳过 drift 计算（既非业务表也无需 ORM 映射）。
+    # 若将来 Metabase 迁到独立 schema/库，可移除本过滤。
+    EXTERNAL_TENANT_PREFIXES: tuple[str, ...] = (
+        "metabase_",
+        "qrtz_",          # Quartz 调度器
+        "core_",          # core_user / core_session
+        "v_",             # Metabase 视图（v_users / v_tables / v_query_log ...）
+        "report_card",    # report_card / report_cardfavorite / report_dashboard*
+        "pulse",          # pulse / pulse_card / pulse_channel*
+        "collection",     # collection / collection_bookmark / collection_permission*
+        "dashboard",      # dashboard_bookmark / dashboard_tab / dashboard_favorite
+        "transform",      # transform / transform_job* / transform_run*
+        "workspace",      # workspace / workspace_graph / workspace_*
+        "query_",         # query_action / query_cache / query_execution / query_field / query_table
+        "report_dashboard",  # report_dashboard / report_dashboardcard（Metabase 仪表盘）
+        "permissions",    # permissions / permissions_group* / permissions_revision
+        "notification",   # notification / notification_card / notification_*
+        "search_index",   # search_index__* / search_index_metadata
+        "moderation_",
+        "metabot",        # metabot / metabot_conversation / metabot_message / metabot_prompt
+        "timeline",       # timeline / timeline_event
+        "remote_sync_",
+        "model_index",
+        "user_parameter_",
+        "user_key_value",
+        "parameter_card",
+        "comment",        # comment / comment_reaction（Metabase 评论，非业务批注表）
+    )
+
+    # 精确名单（无统一前缀的 Metabase/外部单表）
+    EXTERNAL_TENANT_EXACT: frozenset[str] = frozenset({
+        "action", "http_action", "implicit_action", "query_action",
+        "analysis_finding", "analysis_finding_error",
+        "api_key", "application_permissions_revision",
+        "audit_log", "auth_identity", "bookmark_ordering",
+        "cache_config", "card_bookmark", "card_label",
+        "channel", "channel_template", "cloud_migration",
+        "connection_impersonations", "content_translation",
+        "data_edit_undo_chain", "data_permissions", "databasechangelog",
+        "db_router", "dependency", "dimension", "document", "document_bookmark",
+        "field_usage", "glossary", "label", "login_history",
+        "measure", "metric", "metric_important_field", "native_query_snippet",
+        "persisted_info", "premium_features_token_cache",
+        "python_library", "recent_views", "revision", "sandboxes",
+        "secret", "segment", "semantic_search_token_tracking",
+        "semantic_search_token_tracking", "sequences", "setting",
+        "support_access_grant_log", "table_privileges", "task_history",
+        "task_run", "tenant", "view_log", "query",
+    })
+
+    def _is_external_tenant_table(self, table: str) -> bool:
+        """判断表是否属于外部租户（Metabase/Quartz 等共库工具），跳过 drift 计算。"""
+        if table in self.EXTERNAL_TENANT_EXACT:
+            return True
+        return any(table.startswith(p) for p in self.EXTERNAL_TENANT_PREFIXES)
+
     def __init__(self, engine: AsyncEngine) -> None:
         self._engine = engine
 
@@ -88,8 +151,12 @@ class SchemaDriftDetector:
         items.extend(self._diff_columns(orm_tables, db_tables))
         items.extend(await self._diff_enums())
 
-        # 过滤 allowlist
-        return [it for it in items if it.table not in self.KNOWN_ALLOWLIST]
+        # 过滤 allowlist + 外部租户表（Metabase/Quartz 共库污染）
+        return [
+            it for it in items
+            if it.table not in self.KNOWN_ALLOWLIST
+            and not self._is_external_tenant_table(it.table)
+        ]
 
     async def write_log(self, items: list[DriftItem]) -> None:
         """覆盖式写入 schema_drift_log（DELETE + INSERT），保证仅保留当前快照。
@@ -147,10 +214,16 @@ class SchemaDriftDetector:
     def _collect_orm_tables(self) -> dict[str, dict]:
         """从 ORM Base.metadata 收集 {table_name: {col_name: {type, nullable}}}。
 
-        必须先 import 所有 model 模块，让 Base.metadata 收集完整。
+        必须先 import **所有** model 子模块，否则 Base.metadata 不完整
+        （``app.models.__init__`` 只显式 import 了约 30 个模块 / 88 张表，
+        而 ``backend/app/models/`` 下实际有 60+ 个模块）。不完整的 metadata
+        会把大量真实业务表（staff_members / issue_tickets / work_hours 等）
+        误判为 db_extra（DB 有但 ORM 未定义）。
+
+        解决：用 pkgutil 遍历 app.models 包，import 每个子模块，
+        触发所有 ``class Xxx(Base)`` 注册到 Base.metadata。
         """
-        # 触发所有 model 注册（__init__.py 已经 import 了大部分）
-        import app.models  # noqa: F401
+        self._import_all_models()
         from app.models.base import Base
 
         result: dict[str, dict] = {}
@@ -163,6 +236,29 @@ class SchemaDriftDetector:
                 }
             result[table.name] = cols
         return result
+
+    @staticmethod
+    def _import_all_models() -> None:
+        """遍历 app.models 包，import 所有子模块，确保 Base.metadata 完整。
+
+        幂等：重复 import 已加载模块由 Python import 缓存兜底。
+        单个子模块 import 失败不阻塞（记 WARN 继续），避免某个坏模块拖垮整个扫描。
+        """
+        import importlib
+        import pkgutil
+
+        import app.models as models_pkg
+
+        for mod_info in pkgutil.walk_packages(
+            models_pkg.__path__, prefix="app.models."
+        ):
+            try:
+                importlib.import_module(mod_info.name)
+            except Exception as e:  # noqa: BLE001 — 坏模块不应阻塞 drift 扫描
+                logger.warning(
+                    "[SchemaDrift] import model 模块 %s 失败（跳过）: %s",
+                    mod_info.name, e,
+                )
 
     async def _collect_db_tables(self) -> dict[str, dict]:
         """查询 information_schema.columns 收集实际 DB schema。"""

@@ -229,3 +229,30 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §127. 审计日志哈希链校验 ═══
     from app.routers.audit_logs import router as audit_logs_router
     app.include_router(audit_logs_router, prefix="/api", tags=["audit-logs"])
+
+    # ═══ §128. Refinement Round 1/2 补注册（此前漏注册导致端点 404） ═══
+    # 这些 router 文件早已存在且功能完整，但从未在 router_registry 注册。
+    # check_router_registration.py pre-commit hook 检出后统一补齐。
+    from app.routers.archive import router as archive_router
+    from app.routers.batch_assign_enhanced import router as batch_assign_enhanced_router
+    from app.routers.batch_brief import router as batch_brief_router
+    from app.routers.cost_overview import router as cost_overview_router
+    from app.routers.knowledge_tsj import router as knowledge_tsj_router
+    from app.routers.rotation import router as rotation_router
+    from app.routers.workhour_approve import router as workhour_approve_router
+    from app.routers.workpaper_remind import router as workpaper_remind_router
+
+    # 自带完整 /api 前缀的 router（直接注册，不加额外前缀）
+    for r in [
+        archive_router,              # /api/projects/{project_id}/archive/*
+        batch_assign_enhanced_router,  # /api/workpapers/batch-assign-enhanced
+        batch_brief_router,          # /api/projects/briefs/batch
+        cost_overview_router,        # /api/projects/{project_id}/cost-overview
+        knowledge_tsj_router,        # /api/knowledge/tsj/*
+        workhour_approve_router,     # /api/workhours/batch-approve
+        workpaper_remind_router,     # /api/projects/{project_id}/workpapers/*
+    ]:
+        app.include_router(r)
+
+    # rotation_router 内部 prefix="/rotation"，需补 /api 前缀 → /api/rotation/*
+    app.include_router(rotation_router, prefix="/api")
