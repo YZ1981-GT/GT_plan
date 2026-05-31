@@ -1,18 +1,21 @@
 """扫描致同底稿模板目录，生成完整的 gt_template_library.json
 
-用法：python backend/scripts/scan_wp_templates.py
+用法：python backend/scripts/analyze/scan_wp_templates.py
 
-扫描 `致同通用审计程序及底稿模板（2025年修订）/` 目录下所有 Excel 文件，
+扫描 `backend/wp_templates/` 目录下所有 Excel 文件，
 从文件名解析底稿编码、循环、程序类型，更新 gt_template_library.json。
+扫描完成后幂等 upsert wp_template_registry 表（JSON 是权威源，registry 是派生）。
 """
+import asyncio
 import json
+import logging
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-TEMPLATE_DIR = ROOT / "致同通用审计程序及底稿模板（2025年修订）"
-OUTPUT_PATH = ROOT / "backend" / "data" / "gt_template_library.json"
+TEMPLATE_DIR = ROOT / "wp_templates"
+OUTPUT_PATH = ROOT / "data" / "gt_template_library.json"
 
 # 循环前缀 → 循环名称
 CYCLE_MAP = {
@@ -151,5 +154,74 @@ def scan():
         name = CYCLE_MAP.get(prefix, prefix)
         print(f"  {prefix} ({name}): {cycle_counts[prefix]} 个")
 
+async def sync_registry_from_json(db=None):
+    """JSON 生成后幂等 upsert wp_template_registry（JSON 是权威源，registry 是派生）。
+
+    读取 gt_template_library.json（utf-8-sig 兼容 BOM），对每条 template 执行
+    INSERT ... ON CONFLICT(wp_code) DO UPDATE，确保 registry 表与 JSON 完全同步。
+
+    Args:
+        db: 可选的 AsyncSession。若不传则自行创建会话。
+    """
+    from sqlalchemy import text
+
+    # ROOT = backend/ 目录 (parent×3 from scripts/analyze/scan_wp_templates.py)
+    # JSON 位于 backend/data/gt_template_library.json → ROOT / "data" / ...
+    library_path = ROOT / "data" / "gt_template_library.json"
+    if not library_path.exists():
+        print(f"gt_template_library.json 不存在: {library_path}")
+        return
+
+    # utf-8-sig 读取以兼容 BOM
+    raw = library_path.read_bytes()
+    library = json.loads(raw.decode("utf-8-sig"))
+    templates = library.get("templates", [])
+    if not templates:
+        print("JSON 中无 templates，跳过 registry 同步")
+        return
+
+    own_session = False
+    if db is None:
+        # 延迟导入避免脚本独立运行时路径问题
+        sys.path.insert(0, str(ROOT / "backend"))
+        from app.core.database import async_session
+        db = async_session()
+        own_session = True
+
+    try:
+        upsert_sql = text("""
+            INSERT INTO wp_template_registry (wp_code, wp_name, cycle, source_origin)
+            VALUES (:wp_code, :wp_name, :cycle, :source_origin)
+            ON CONFLICT (wp_code) DO UPDATE SET
+                wp_name = EXCLUDED.wp_name,
+                cycle = EXCLUDED.cycle,
+                source_origin = EXCLUDED.source_origin
+        """)
+
+        count = 0
+        for tpl in templates:
+            code = tpl.get("code", tpl.get("wp_code", ""))
+            if not code:
+                continue
+            await db.execute(upsert_sql, {
+                "wp_code": code,
+                "wp_name": tpl.get("name", tpl.get("wp_name", "")),
+                "cycle": tpl.get("cycle_prefix", code[0] if code else ""),
+                "source_origin": "gt_template_library_json",
+            })
+            count += 1
+
+        await db.commit()
+        print(f"registry 同步完成：{count} 条 upsert → wp_template_registry")
+    finally:
+        if own_session:
+            await db.close()
+
+
 if __name__ == "__main__":
     scan()
+    # scan 完成后同步 registry（需要数据库连接）
+    try:
+        asyncio.run(sync_registry_from_json())
+    except Exception as e:
+        logging.warning(f"registry 同步跳过（数据库不可用）: {e}")

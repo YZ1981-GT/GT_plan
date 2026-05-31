@@ -180,6 +180,7 @@ class KnowledgeSourceType(str, enum.Enum):
     confirmation = "confirmation"
     review_comment = "review_comment"
     prior_year_summary = "prior_year_summary"
+    knowledge_doc = "knowledge_doc"
 
 
 class ChatRole(str, enum.Enum):

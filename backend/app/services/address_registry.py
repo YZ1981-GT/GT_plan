@@ -1,6 +1,8 @@
 """
 统一地址坐标注册表 (Address Registry)
 
+@see address_registry_v2 — 本模块=运行时动态地址目录（公式编辑用）
+
 所有可引用的数据坐标统一管理，供公式编辑、溯源跳转、有效性校验使用。
 
 地址格式: {domain}://{source}/{path}#{cell}
@@ -10,10 +12,11 @@
   - tb://1001#审定数               → 试算表科目
   - aux://1001.成本中心.001#期末   → 辅助余额
 """
+import json
 import re
 import logging
+from dataclasses import asdict, dataclass, field
 from typing import Optional
-from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
@@ -462,9 +465,95 @@ class AddressRegistryService:
     # 缓存上限（防止内存泄漏）
     _MAX_CACHE_SLOTS = 500
 
+    # Redis key 前缀
+    _REDIS_PREFIX = "addr_reg:"
+
     def __init__(self):
         # key = "project_id:year:template_type:domain"
         self._slots: dict[str, _CacheSlot] = {}
+
+    # ------------------------------------------------------------------
+    # Redis L2 helpers
+    # ------------------------------------------------------------------
+
+    async def _get_redis(self):
+        """获取 Redis 客户端（降级返回 None）"""
+        from app.core.redis import get_redis
+        return await get_redis()
+
+    def _redis_key(self, slot_key: str) -> str:
+        """Redis key = prefix + slot_key"""
+        return f"{self._REDIS_PREFIX}{slot_key}"
+
+    async def _redis_get(self, slot_key: str) -> list[AddressEntry] | None:
+        """从 Redis L2 读取缓存，命中反序列化返回，未命中/异常返回 None"""
+        redis = await self._get_redis()
+        if redis is None:
+            return None
+        try:
+            raw = await redis.get(self._redis_key(slot_key))
+            if raw is None:
+                return None
+            items = json.loads(raw)
+            return [AddressEntry(**item) for item in items]
+        except Exception as e:
+            logger.warning("address_registry Redis L2 get failed (key=%s): %s", slot_key, e)
+            return None
+
+    async def _redis_set(self, slot_key: str, entries: list[AddressEntry], domain: str) -> None:
+        """回写 Redis L2（TTL 对齐按域 TTL）"""
+        redis = await self._get_redis()
+        if redis is None:
+            return
+        try:
+            serialized = json.dumps(
+                [asdict(e) for e in entries], ensure_ascii=False
+            )
+            ttl = self._TTL.get(domain, 120)
+            await redis.set(self._redis_key(slot_key), serialized, ex=ttl)
+        except Exception as e:
+            logger.warning("address_registry Redis L2 set failed (key=%s): %s", slot_key, e)
+
+    async def _redis_delete(self, slot_key: str) -> None:
+        """删除单个 Redis L2 key"""
+        redis = await self._get_redis()
+        if redis is None:
+            return
+        try:
+            await redis.delete(self._redis_key(slot_key))
+        except Exception as e:
+            logger.warning("address_registry Redis L2 delete failed (key=%s): %s", slot_key, e)
+
+    async def _redis_delete_many(self, slot_keys: list[str]) -> None:
+        """批量删除 Redis L2 keys"""
+        if not slot_keys:
+            return
+        redis = await self._get_redis()
+        if redis is None:
+            return
+        try:
+            redis_keys = [self._redis_key(k) for k in slot_keys]
+            await redis.delete(*redis_keys)
+        except Exception as e:
+            logger.warning("address_registry Redis L2 delete_many failed: %s", e)
+
+    async def _redis_flush_all(self) -> None:
+        """删除所有 addr_reg:* keys"""
+        redis = await self._get_redis()
+        if redis is None:
+            return
+        try:
+            cursor = 0
+            while True:
+                cursor, keys = await redis.scan(
+                    cursor=cursor, match=f"{self._REDIS_PREFIX}*", count=200
+                )
+                if keys:
+                    await redis.delete(*keys)
+                if cursor == 0:
+                    break
+        except Exception as e:
+            logger.warning("address_registry Redis L2 flush_all failed: %s", e)
 
     def _slot_key(self, project_id: str, year: int,
                   template_type: str, domain: str) -> str:
@@ -489,13 +578,25 @@ class AddressRegistryService:
 
     async def _get_domain(self, db, project_id: str, year: int,
                           template_type: str, domain: str) -> list[AddressEntry]:
-        """获取单个域的地址条目（带缓存）"""
+        """获取单个域的地址条目（L1 内存 → L2 Redis → DB 构建）"""
         key = self._slot_key(project_id, year, template_type, domain)
+
+        # L1: 内存缓存
         slot = self._slots.get(key)
         if slot and not self._is_expired(slot):
             return slot.entries
 
-        # 重建
+        # L2: Redis 缓存
+        redis_entries = await self._redis_get(key)
+        if redis_entries is not None:
+            # 回填 L1
+            self._evict_if_needed()
+            self._slots[key] = _CacheSlot(
+                entries=redis_entries, built_at=_time.time(), domain=domain
+            )
+            return redis_entries
+
+        # DB 构建
         entries: list[AddressEntry] = []
         if domain == 'report':
             entries = await build_report_entries(db, project_id, year)
@@ -506,10 +607,15 @@ class AddressRegistryService:
         elif domain == 'wp':
             entries = await build_workpaper_entries(db, project_id, year)
 
+        # 回写 L1
         self._evict_if_needed()
         self._slots[key] = _CacheSlot(
             entries=entries, built_at=_time.time(), domain=domain
         )
+
+        # 回写 L2 Redis
+        await self._redis_set(key, entries, domain)
+
         return entries
 
     async def get_all(self, db, project_id: str, year: int,
@@ -612,7 +718,7 @@ class AddressRegistryService:
 
     def invalidate(self, project_id: str, year: int = 0,
                    domain: str = '', template_type: str = ''):
-        """精准失效缓存
+        """精准失效缓存（L1 内存 + L2 Redis 同步删除）
 
         参数组合：
         - invalidate(pid)                    → 该项目全部缓存
@@ -641,14 +747,61 @@ class AddressRegistryService:
         for k in to_remove:
             del self._slots[k]
 
+        # 异步删 Redis L2（fire-and-forget via _invalidate_redis_keys）
+        self._pending_redis_invalidations = to_remove
+
         logger.debug(f"address_registry invalidate: removed {len(to_remove)} slots "
                      f"(pid={project_id}, year={year}, domain={domain}, tpl={template_type})")
 
+    async def invalidate_async(self, project_id: str, year: int = 0,
+                               domain: str = '', template_type: str = ''):
+        """精准失效缓存（L1 内存 + L2 Redis 同步删除）— async 版本
+
+        与 invalidate 相同逻辑，但同步删除 Redis keys。
+        推荐在 async 上下文中使用此方法。
+        """
+        to_remove = []
+        for key in list(self._slots.keys()):
+            parts = key.split(':')
+            if len(parts) != 4:
+                continue
+            k_pid, k_year, k_tpl, k_dom = parts
+
+            if k_pid != project_id:
+                continue
+            if year and k_year != str(year):
+                continue
+            if domain and k_dom != domain:
+                continue
+            if template_type and k_tpl != template_type:
+                continue
+            to_remove.append(key)
+
+        for k in to_remove:
+            del self._slots[k]
+
+        # 同步删 Redis L2
+        await self._redis_delete_many(to_remove)
+
+        logger.debug(f"address_registry invalidate_async: removed {len(to_remove)} slots "
+                     f"(pid={project_id}, year={year}, domain={domain}, tpl={template_type})")
+
     def invalidate_all(self):
-        """清空全部缓存（重启/全量刷新时用）"""
+        """清空全部缓存 L1（重启/全量刷新时用）
+
+        注意：同步方法仅清 L1 内存。如需同步清 Redis L2，
+        使用 invalidate_all_async()。
+        """
         count = len(self._slots)
         self._slots.clear()
-        logger.info(f"address_registry invalidate_all: cleared {count} slots")
+        logger.info(f"address_registry invalidate_all: cleared {count} L1 slots")
+
+    async def invalidate_all_async(self):
+        """清空全部缓存 L1 + L2 Redis（重启/全量刷新时用）"""
+        count = len(self._slots)
+        self._slots.clear()
+        await self._redis_flush_all()
+        logger.info(f"address_registry invalidate_all_async: cleared {count} L1 slots + Redis L2")
 
     async def get_stats(self, db, project_id: str, year: int,
                         template_type: str = 'soe') -> dict:

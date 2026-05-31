@@ -39,6 +39,11 @@ async_session = async_sessionmaker(
     expire_on_commit=False,
 )
 
+# 别名：部分 worker/router（dataset_purge / recycle_bin / ledger_import_health）
+# 历史上 import `async_engine`，但本模块导出名为 `engine`，导致 PG 下 ImportError
+# （功能静默失效）。提供别名统一指向同一异步引擎，避免散落改 4 处。
+async_engine = engine
+
 # 同步引擎和会话工厂（供同步 service 函数使用）
 _sync_engine = engine.sync_engine
 SyncSession = sessionmaker(bind=_sync_engine, expire_on_commit=False)

@@ -66,6 +66,7 @@
             <el-button size="small" @click="showOfflineExport = true">📦 导出离线包</el-button>
             <el-button size="small" @click="showOfflineImport = true">📥 一键导入</el-button>
             <el-button size="small" @click="showAiPanel = true">🤖 AI建议</el-button>
+            <el-button size="small" @click="showDocAiChat = true">💬 AI 对话</el-button>
             <el-button size="small" @click="showVersionTree = true">🗂️ 版本</el-button>
             <el-button size="small" @click="showGroupBaseline = true">📦 集团基线</el-button>
             <el-button size="small" @click="showParagraphVars = true">✏️ 段落变量</el-button>
@@ -731,6 +732,18 @@
     @close="showPrintPreview = false"
     @insert-page-break="onInsertPageBreak"
   />
+
+  <!-- AI 文档对话面板 -->
+  <DocAiChatPanel
+    :doc-type="'note'"
+    :doc-id="currentNote?.id || currentNote?.note_section || ''"
+    :project-id="projectId"
+    :year="year"
+    :visible="showDocAiChat"
+    @update:visible="showDocAiChat = $event"
+    @close="showDocAiChat = false"
+    @adopt="onDocAiAdopt"
+  />
 </template>
 
 <script setup lang="ts">
@@ -806,6 +819,7 @@ import NoteVersionTreePanel from '@/components/notes/NoteVersionTreePanel.vue'
 import NoteGroupBaselineDialog from '@/components/notes/NoteGroupBaselineDialog.vue'
 import NoteParagraphVarsEditor from '@/components/notes/NoteParagraphVarsEditor.vue'
 import NotePriorYearPanel from '@/components/notes/NotePriorYearPanel.vue'
+import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
 import { useNoteSectionNumbering } from '@/composables/useNoteSectionNumbering'
 import { useAuditContext } from '@/composables/useAuditContext'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
@@ -825,6 +839,16 @@ const projectId = computed(() => projectStore.projectId)
 const conflictPanelVisible = ref(false)
 function onConflictResolved(_id: string, _resolution: string) {
   // 调解后 banner 自动从列表移除；此处保留 hook 供后续扩展（如局部 reload）
+}
+
+// ─── AI 文档对话采纳 ─────────────────────────────────────────────────────────
+function onDocAiAdopt(_payload: { content: string; messageId: string }) {
+  // 采纳事件由 DocAiChatPanel 内部调用 adoptContent API（走确认流）
+  // D4: AI 内容已经过 wrap_ai_output_with_log → pending 状态，不直接写入
+  // 父组件在确认流完成后可刷新附注内容
+  if (currentNote.value?.note_section) {
+    fetchDetail(currentNote.value.note_section)
+  }
 }
 
 const year = computed(() => {
@@ -960,6 +984,7 @@ const showNoteImport = ref(false)
 const showOfflineExport = ref(false)
 const showOfflineImport = ref(false)
 const showAiPanel = ref(false)
+const showDocAiChat = ref(false)
 const showVersionTree = ref(false)
 const showGroupBaseline = ref(false)
 const showParagraphVars = ref(false)

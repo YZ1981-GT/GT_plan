@@ -95,10 +95,10 @@ async def save_structure(
     await db.flush()
     await db.commit()
 
-    # 失效地址缓存
+    # 失效地址缓存（L1 + L2 Redis）
     try:
         from app.services.address_registry import address_registry
-        address_registry.invalidate(str(project_id), domain="wp")
+        await address_registry.invalidate_async(str(project_id), domain="wp")
     except Exception:
         pass
 

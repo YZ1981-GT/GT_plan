@@ -442,6 +442,8 @@ class TsjReviewItem(BaseModel):
     cell_range: str = ""
     description: str = ""
     remediation: str = ""
+    wp_code: str | None = None
+    wp_name: str | None = None
 
 
 class TsjReviewResponse(BaseModel):
@@ -449,6 +451,8 @@ class TsjReviewResponse(BaseModel):
     findings: list[TsjReviewItem]
     workpaper_id: str
     audit_cycle: str | None = None
+    wp_code: str | None = None
+    wp_name: str | None = None
 
 
 @router.post("/{wp_id}/ai/tsj-review", response_model=TsjReviewResponse)
@@ -464,15 +468,22 @@ async def tsj_review(
     if not settings.WP_AI_SERVICE_ENABLED:
         raise HTTPException(status_code=403, detail="AI 服务未启用")
 
-    # 验证底稿存在
+    # 验证底稿存在 & 查底稿编号/名称
     import sqlalchemy as sa
-    from app.models.workpaper_models import WorkingPaper
+    from app.models.workpaper_models import WorkingPaper, WpIndex
 
     wp = (await db.execute(
         sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
     )).scalar_one_or_none()
     if not wp:
         raise HTTPException(status_code=404, detail="底稿不存在")
+
+    # 从 WpIndex 获取 wp_code / wp_name
+    wp_index = (await db.execute(
+        sa.select(WpIndex).where(WpIndex.id == wp.wp_index_id)
+    )).scalar_one_or_none()
+    wp_code_val: str | None = getattr(wp_index, "wp_code", None) if wp_index else None
+    wp_name_val: str | None = getattr(wp_index, "wp_name", None) if wp_index else None
 
     # 实例化服务并调用复核
     from app.services.workpaper_fill_service import WorkpaperFillService
@@ -531,6 +542,8 @@ async def tsj_review(
             cell_range=ds.get("cell_range", ""),
             description=description,
             remediation=remediation,
+            wp_code=wp_code_val,
+            wp_name=wp_name_val,
         ))
 
     # 获取 audit_cycle 信息
@@ -544,4 +557,6 @@ async def tsj_review(
         findings=findings,
         workpaper_id=str(wp_id),
         audit_cycle=audit_cycle,
+        wp_code=wp_code_val,
+        wp_name=wp_name_val,
     )

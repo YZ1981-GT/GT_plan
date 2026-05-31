@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/system", tags=["system-dicts"])
 
 
-# ── 字典定义（与前端 statusMaps.ts 保持一致） ──
+# ── 字典定义（与前端 `constants/statusEnum.ts`（dictStore 加载失败时的 fallback）保持一致；API `/api/system/dicts` 为运行时主源） ──
 
 _DICTS: dict[str, list[dict[str, str]]] = {
     # 底稿状态
@@ -112,6 +112,39 @@ _DICTS: dict[str, list[dict[str, str]]] = {
         {"value": "confirmed", "label": "已确认", "color": ""},
         {"value": "approved",  "label": "已审批", "color": "success"},
         {"value": "rejected",  "label": "已退回", "color": "danger"},
+    ],
+    # ── 以下为 P2-6 扩展的核心业务枚举（value 硬编码锁死，仅 label/color 可治理） ──
+    # 抵销分录类型（EliminationEntryType，合并模块）
+    "elimination_entry_type": [
+        {"value": "equity",            "label": "权益抵销",       "color": ""},
+        {"value": "internal_trade",    "label": "内部交易抵销",   "color": "warning"},
+        {"value": "internal_ar_ap",    "label": "内部往来抵销",   "color": "warning"},
+        {"value": "unrealized_profit", "label": "未实现利润抵销", "color": "danger"},
+        {"value": "other",             "label": "其他抵销",       "color": "info"},
+    ],
+    # 审计循环代号 A~N + S
+    "audit_cycle": [
+        {"value": "A", "label": "报表/调整",   "color": ""},
+        {"value": "B", "label": "控制了解",     "color": ""},
+        {"value": "C", "label": "控制测试",     "color": ""},
+        {"value": "D", "label": "销售收入",     "color": "success"},
+        {"value": "E", "label": "货币资金",     "color": "success"},
+        {"value": "F", "label": "采购存货",     "color": "success"},
+        {"value": "G", "label": "投资",         "color": "warning"},
+        {"value": "H", "label": "固定资产",     "color": "warning"},
+        {"value": "I", "label": "无形资产",     "color": "warning"},
+        {"value": "J", "label": "职工薪酬",     "color": "info"},
+        {"value": "K", "label": "管理",         "color": "info"},
+        {"value": "L", "label": "筹资",         "color": "info"},
+        {"value": "M", "label": "股东权益",     "color": ""},
+        {"value": "N", "label": "税费",         "color": ""},
+        {"value": "S", "label": "专项",         "color": "danger"},
+    ],
+    # 风险等级（RiskLevel）
+    "risk_level": [
+        {"value": "high",   "label": "高风险", "color": "danger"},
+        {"value": "medium", "label": "中风险", "color": "warning"},
+        {"value": "low",    "label": "低风险", "color": "success"},
     ],
 }
 
@@ -211,6 +244,22 @@ _USAGE_COUNT_QUERIES: dict[str, dict[str, str]] = {
         "column": "",
         "where": "",
     },
+    # P2-6 扩展业务枚举
+    "elimination_entry_type": {
+        "table": "elimination_entries",
+        "column": "entry_type",
+        "where": "",
+    },
+    "audit_cycle": {
+        "table": "",
+        "column": "",
+        "where": "",
+    },
+    "risk_level": {
+        "table": "",
+        "column": "",
+        "where": "",
+    },
 }
 
 
@@ -293,6 +342,17 @@ async def update_dict_item(
             detail={
                 "error_code": "ENUM_DICT_FORBIDDEN",
                 "message": "仅 admin 可修改枚举字典展示属性",
+            },
+        )
+
+    # P2-6: value 硬编码锁死 — 尝试修改 value 返 405
+    if payload.value is not None:
+        raise HTTPException(
+            status_code=405,
+            detail={
+                "error_code": "ENUM_DICT_VALUE_LOCKED",
+                "message": "枚举字典 value 由代码硬编码锁死，不允许修改",
+                "hint": _DICT_HARDCODED_HINT,
             },
         )
 
@@ -418,6 +478,9 @@ class EnumDictItemUpdate(BaseModel):
         None,
         description="el-tag type，必须 ∈ {success, warning, danger, info, ''}（None 表示不改）",
     )
+    value: str | None = Field(None, description="value 字段锁死，传入即拒绝")
+
+    model_config = {"extra": "ignore"}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -988,6 +988,20 @@ async def execute_query(
     filters = body.filters
     limit = min(body.limit, 2000)
 
+    # ─── Redis 短 TTL 缓存（dashboard 卡片高频查询）────────────────────
+    # 缓存发生在安全校验之后（不动白名单安全模型）
+    from app.services.query_cache import compute_cache_key, get_cached_result, set_cached_result
+
+    cache_key = compute_cache_key(
+        user_id=str(current_user.id),
+        project_id=pid,
+        query_params={"source": source, "year": year, "filters": filters, "limit": limit},
+    )
+    cached = await get_cached_result(cache_key)
+    if cached is not None:
+        response.headers["X-Cache"] = "HIT"
+        return cached
+
     result: dict = {"rows": [], "columns": [], "total": 0}
     try:
         # ─── 跨模块 cell 级查询路由（Req 13）─────────────────────────────
@@ -1057,6 +1071,9 @@ async def execute_query(
         except Exception:
             pass
         result = {"rows": [], "columns": [], "total": 0, "error": str(e)}
+
+    # ─── 回写 Redis 缓存（仅成功结果，短 TTL）────────────────────────────
+    await set_cached_result(cache_key, result)
 
     # 审计日志（关键路径：底稿/合并/附注/调整 写日志，普通试算/报表/工时跳过避免噪声）
     # 节流：相同 (user_id, source, filters) 5s 窗口内只记 1 条

@@ -32,38 +32,6 @@ class WorksheetDataResponse(BaseModel):
     updated_at: str | None = None
 
 
-# ─── 确保表存在 ──────────────────────────────────────────────────────────────
-_table_created = False
-
-async def ensure_table(db: AsyncSession):
-    """首次调用时自动建表"""
-    global _table_created
-    if _table_created:
-        return
-    try:
-        await db.execute(text("""
-            CREATE TABLE IF NOT EXISTS consol_worksheet_data (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                project_id UUID NOT NULL,
-                year INT NOT NULL,
-                sheet_key VARCHAR(100) NOT NULL,
-                data JSONB NOT NULL DEFAULT '{}',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                created_by UUID,
-                UNIQUE(project_id, year, sheet_key)
-            )
-        """))
-        await db.execute(text(
-            "CREATE INDEX IF NOT EXISTS ix_cwd_project_year ON consol_worksheet_data(project_id, year)"
-        ))
-        await db.commit()
-        _table_created = True
-    except Exception:
-        await db.rollback()
-        _table_created = True  # 表可能已存在，忽略错误
-
-
 # ─── GET: 加载某张表的数据 ────────────────────────────────────────────────────
 @router.get("/{project_id}/{year}/{sheet_key}", response_model=WorksheetDataResponse)
 async def get_worksheet_data(
@@ -71,7 +39,6 @@ async def get_worksheet_data(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
-    await ensure_table(db)
     result = await db.execute(
         text("SELECT data, updated_at FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = :sk"),
         {"pid": str(project_id), "y": year, "sk": sheet_key},
@@ -96,7 +63,6 @@ async def save_worksheet_data(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
 ):
-    await ensure_table(db)
     now = datetime.now(timezone.utc)
     try:
         await db.execute(
@@ -129,7 +95,6 @@ async def get_all_worksheet_data(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
-    await ensure_table(db)
     result = await db.execute(
         text("SELECT sheet_key, data, updated_at FROM consol_worksheet_data WHERE project_id = :pid AND year = :y"),
         {"pid": str(project_id), "y": year},
@@ -157,8 +122,6 @@ async def get_prior_year_data(
     例如：请求 /proj/2025/prior-year/consol_tb_balance_sheet_opening
     → 查找 year=2024, sheet_key=consol_tb_balance_sheet_closing 的数据
     """
-    await ensure_table(db)
-
     # 将 opening 替换为 closing，查上一年度的期末数据
     prior_year = year - 1
     prior_key = sheet_key.replace('_opening', '_closing')

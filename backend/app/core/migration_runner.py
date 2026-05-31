@@ -284,6 +284,21 @@ class MigrationRunner:
                     checksum=checksum,
                 ))
 
+        # 同号冲突检测：两个 V0XX__*.sql 共用同一 version 时，run_pending 的
+        # ``version not in applied`` 去重会静默跳过字母序靠后者（历史 V040 双文件踩坑）。
+        # 此处主动抛错，让冲突在启动期立即暴露，而非运行时功能静默失效。
+        _by_version: dict[str, list[str]] = {}
+        for mig in result:
+            _by_version.setdefault(mig.version, []).append(mig.filename)
+        _dupes = {v: names for v, names in _by_version.items() if len(names) > 1}
+        if _dupes:
+            detail = "; ".join(
+                f"V{v}: {sorted(names)}" for v, names in sorted(_dupes.items())
+            )
+            raise RuntimeError(
+                f"[Migration] 检测到重复版本号迁移文件（须重编号，否则靠后者被静默跳过）：{detail}"
+            )
+
         # 按版本号数值排序
         result.sort(key=lambda x: int(x.version))
         return result

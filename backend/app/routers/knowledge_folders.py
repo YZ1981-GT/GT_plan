@@ -1,8 +1,10 @@
 """知识库文件夹与文档管理 API
 
 支持树形目录、文档 CRUD、项目组权限、批量操作。
+CRUD 钩子：upload/update/delete 后触发向量索引联动（修 §21.3.1 断裂）。
 """
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -17,7 +19,75 @@ from app.services.knowledge_folder_service import (
     KnowledgeFolderService,
 )
 
+_logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/knowledge-library", tags=["知识库管理"])
+
+
+# ---------------------------------------------------------------------------
+# 向量索引联动钩子（修 §21.3.1 联动断裂）
+# ---------------------------------------------------------------------------
+
+async def _trigger_index_update(
+    db: AsyncSession,
+    project_ids: list | None,
+    doc_id: UUID,
+    content_text: str | None,
+) -> None:
+    """CRUD 后触发 incremental_update 建向量索引。
+
+    非阻塞：失败仅 log 不影响 CRUD 主流程。
+    幂等（R3）：incremental_update 内部 upsert，多次调用收敛一致。
+    """
+    if not content_text:
+        return
+    if not project_ids:
+        return
+
+    from app.services.knowledge_index_service import KnowledgeIndexService
+
+    index_svc = KnowledgeIndexService(db)
+    for pid in project_ids:
+        try:
+            await index_svc.incremental_update(
+                project_id=UUID(str(pid)),
+                source_type="knowledge_doc",
+                source_id=doc_id,
+                content=content_text,
+            )
+        except Exception as exc:
+            _logger.warning(
+                "[KB Hook] incremental_update failed for doc=%s project=%s: %s",
+                doc_id, pid, exc,
+            )
+
+
+async def _trigger_index_delete(
+    db: AsyncSession,
+    doc_id: UUID,
+) -> None:
+    """删除文档后同步删除向量索引条目。
+
+    非阻塞：失败仅 log 不影响 CRUD 主流程。
+    """
+    from sqlalchemy import update, func
+    from app.models.ai_models import KnowledgeIndex, KnowledgeSourceType
+
+    try:
+        await db.execute(
+            update(KnowledgeIndex)
+            .where(
+                KnowledgeIndex.source_type == KnowledgeSourceType.knowledge_doc,
+                KnowledgeIndex.source_id == doc_id,
+                KnowledgeIndex.is_deleted == False,  # noqa: E712
+            )
+            .values(is_deleted=True, updated_at=func.now())
+        )
+        await db.flush()
+    except Exception as exc:
+        _logger.warning(
+            "[KB Hook] index delete failed for doc=%s: %s", doc_id, exc,
+        )
 
 
 class FolderCreateRequest(BaseModel):
@@ -109,7 +179,75 @@ async def create_document(
         created_by=current_user.id,
     )
     await db.commit()
+
+    # §21.3.1 联动钩子：创建文档后触发向量索引
+    await _trigger_index_update(db, data.project_ids, doc.id, data.content_text)
+
     return {"id": str(doc.id), "name": doc.name, "message": "文档创建成功"}
+
+
+async def _extract_text_with_ocr(
+    file_path: str, content: bytes, filename_lower: str
+) -> str | None:
+    """提取 PDF/docx 全文——优先 MinerU OCR，降级 PyPDF2/python-docx。
+
+    MinerU recognize_for_ocr 返回 {"text": 完整文本}，适合扫描件/复杂排版。
+    若 MinerU 不可用或失败，回退到 PyPDF2（PDF）/ python-docx（docx）。
+    """
+    import logging
+
+    _log = logging.getLogger(__name__)
+
+    # ── 尝试 MinerU OCR（全文识别，非 wp_document_recognizer 结构化字段提取） ──
+    try:
+        from app.services.mineru_service import MinerUService
+
+        mineru = MinerUService()
+        if await mineru.is_available():
+            result = await mineru.recognize_for_ocr(file_path)
+            text = (result.get("text") or "").strip()
+            if text:
+                _log.info(
+                    "[KB OCR] MinerU extracted %d chars from %s",
+                    len(text),
+                    file_path,
+                )
+                return text[:50000]
+            # MinerU 返回空文本，降级
+            _log.warning("[KB OCR] MinerU returned empty text, falling back for %s", file_path)
+    except Exception as exc:
+        _log.warning("[KB OCR] MinerU failed (%s), falling back for %s", exc, file_path)
+
+    # ── 降级：PyPDF2 / python-docx ──
+    try:
+        if filename_lower.endswith(".pdf"):
+            import io
+            import PyPDF2
+
+            reader = PyPDF2.PdfReader(io.BytesIO(content))
+            pages_text = []
+            for page in reader.pages[:50]:
+                text = page.extract_text()
+                if text:
+                    pages_text.append(text)
+            fallback_text = "\n".join(pages_text).strip()
+            if fallback_text:
+                _log.info("[KB OCR] PyPDF2 fallback extracted %d chars", len(fallback_text))
+                return fallback_text[:50000]
+        elif filename_lower.endswith(".docx"):
+            import io
+            from docx import Document as DocxDocument
+
+            doc_obj = DocxDocument(io.BytesIO(content))
+            paragraphs = [p.text for p in doc_obj.paragraphs if p.text.strip()]
+            fallback_text = "\n".join(paragraphs).strip()
+            if fallback_text:
+                _log.info("[KB OCR] python-docx fallback extracted %d chars", len(fallback_text))
+                return fallback_text[:50000]
+    except Exception as exc:
+        _log.warning("[KB OCR] Fallback extraction also failed: %s", exc)
+
+    return None
 
 
 @router.post("/folders/{folder_id}/upload")
@@ -152,27 +290,17 @@ async def upload_documents(
                 f.write(content)
 
             # 提取文本内容（可选，失败不阻断）
+            # PDF/docx 优先使用 MinerU OCR 全文识别（保障 spec B 向量索引有内容）
+            # 降级路径：MinerU 不可用时回退 PyPDF2/python-docx
             content_text = None
             filename_lower = file.filename.lower()
             try:
                 if filename_lower.endswith((".txt", ".md")):
                     content_text = content.decode("utf-8", errors="ignore")[:50000]
-                elif filename_lower.endswith(".docx"):
-                    import io
-                    from docx import Document as DocxDocument
-                    doc_obj = DocxDocument(io.BytesIO(content))
-                    paragraphs = [p.text for p in doc_obj.paragraphs if p.text.strip()]
-                    content_text = "\n".join(paragraphs)[:50000]
-                elif filename_lower.endswith(".pdf"):
-                    import io
-                    import PyPDF2
-                    reader = PyPDF2.PdfReader(io.BytesIO(content))
-                    pages_text = []
-                    for page in reader.pages[:50]:
-                        text = page.extract_text()
-                        if text:
-                            pages_text.append(text)
-                    content_text = "\n".join(pages_text)[:50000]
+                elif filename_lower.endswith((".pdf", ".docx")):
+                    content_text = await _extract_text_with_ocr(
+                        str(file_path), content, filename_lower
+                    )
             except Exception:
                 pass  # 文本提取失败不阻断文件保存
 
@@ -192,6 +320,39 @@ async def upload_documents(
             continue  # 单个文件失败不阻断其他文件
 
     await db.commit()
+
+    # §21.3.1 联动钩子：上传文档后触发向量索引
+    # 获取文件夹的 project_ids 用于索引关联
+    try:
+        from app.models.knowledge_models import KnowledgeFolder as _KF
+        import sqlalchemy as _sa
+
+        folder_result = await db.execute(
+            _sa.select(_KF.project_ids).where(_KF.id == folder_id)
+        )
+        folder_project_ids = folder_result.scalar_one_or_none()
+    except Exception:
+        folder_project_ids = None
+
+    for file_info in uploaded:
+        try:
+            doc_uuid = UUID(file_info["id"])
+            if file_info.get("text_extracted"):
+                # 获取文档的 content_text
+                from app.models.knowledge_models import KnowledgeDocument as _KD
+
+                doc_result = await db.execute(
+                    _sa.select(_KD.content_text, _KD.project_ids).where(_KD.id == doc_uuid)
+                )
+                row = doc_result.one_or_none()
+                if row:
+                    doc_content, doc_project_ids = row
+                    # 优先使用文档级 project_ids，否则继承文件夹级
+                    effective_pids = doc_project_ids or folder_project_ids
+                    await _trigger_index_update(db, effective_pids, doc_uuid, doc_content)
+        except Exception as exc:
+            _logger.warning("[KB Hook] upload index hook failed for doc=%s: %s", file_info.get("id"), exc)
+
     return {"uploaded": len(uploaded), "files": uploaded}
 
 
@@ -217,6 +378,10 @@ async def delete_document(
     """删除文档"""
     svc = KnowledgeDocumentService(db)
     await svc.delete_document(doc_id)
+
+    # §21.3.1 联动钩子：删除文档后同步删向量索引
+    await _trigger_index_delete(db, doc_id)
+
     await db.commit()
     return {"message": "文档已删除"}
 

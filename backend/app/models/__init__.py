@@ -107,6 +107,10 @@ from app.models.independence_models import AnnualIndependenceDeclaration
 from app.models.qc_rule_models import QcRuleDefinition
 from app.models.enterprise_linkage_models import AdjustmentEditingLock, TbChangeHistory, EventCascadeLog  # noqa: F401
 from app.models.v3_refinement_models import AiContentLog, CrossModuleConflict, TimeMachineSnapshot  # noqa: F401
+from app.models.account_note_mapping_models import AccountNoteMapping  # noqa: F401
+from app.models.consol_cell_comment_models import ConsolCellComment  # noqa: F401
+from app.models.consol_worksheet_data_models import ConsolWorksheetData  # noqa: F401
+from app.models.consol_note_data_models import ConsolNoteData  # noqa: F401
 
 __all__ = [
     # --- base ---
@@ -220,4 +224,9 @@ __all__ = [
     "AiContentLog",
     "CrossModuleConflict",
     "TimeMachineSnapshot",
+    # --- 懒建表入 D6 (V040/V041) ---
+    "AccountNoteMapping",
+    "ConsolCellComment",
+    "ConsolWorksheetData",
+    "ConsolNoteData",
 ]

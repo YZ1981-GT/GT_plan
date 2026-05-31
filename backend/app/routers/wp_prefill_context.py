@@ -17,10 +17,11 @@ async def get_prefill_context(
     """获取项目级预填充上下文（公司名/年度/合伙人/重要性等）"""
 
     # Get project info
+    # 注：projects 表无 year 列，年度从 audit_period_end 提取（系统标准做法）。
     result = await db.execute(
         text("""
-            SELECT name, year, template_type, report_scope,
-                   wizard_state
+            SELECT name, EXTRACT(YEAR FROM audit_period_end)::int AS year,
+                   template_type, report_scope, wizard_state
             FROM projects WHERE id = :pid
         """),
         {"pid": project_id},
@@ -31,9 +32,10 @@ async def get_prefill_context(
         return {"context": {}, "message": "项目未找到"}
 
     # Get materiality from materiality table
+    # 注：materiality 表列名为 overall_materiality（非 materiality_level）。
     mat_result = await db.execute(
         text("""
-            SELECT materiality_level, performance_materiality, trivial_threshold
+            SELECT overall_materiality, performance_materiality, trivial_threshold
             FROM materiality WHERE project_id = :pid
             ORDER BY created_at DESC LIMIT 1
         """),
@@ -42,10 +44,12 @@ async def get_prefill_context(
     mat_row = mat_result.fetchone()
 
     # Get partner info
+    # 注：project_assignments.staff_id → staff_members.id，姓名在 staff_members.name
+    #     （非 users.display_name，该列不存在）。
     partner_result = await db.execute(
         text("""
-            SELECT u.display_name FROM project_assignments pa
-            JOIN users u ON u.id = pa.user_id
+            SELECT s.name FROM project_assignments pa
+            JOIN staff_members s ON s.id = pa.staff_id
             WHERE pa.project_id = :pid AND pa.role = 'partner'
             LIMIT 1
         """),
@@ -56,8 +60,8 @@ async def get_prefill_context(
     # Get manager info
     manager_result = await db.execute(
         text("""
-            SELECT u.display_name FROM project_assignments pa
-            JOIN users u ON u.id = pa.user_id
+            SELECT s.name FROM project_assignments pa
+            JOIN staff_members s ON s.id = pa.staff_id
             WHERE pa.project_id = :pid AND pa.role = 'manager'
             LIMIT 1
         """),

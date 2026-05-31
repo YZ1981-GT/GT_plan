@@ -104,6 +104,8 @@
         <el-badge :value="fineCheckFailCount" :max="99" :hidden="fineCheckFailCount === 0" type="danger">
           <el-button size="small" @click="showSidePanel = !showSidePanel">📋 面板</el-button>
         </el-badge>
+        <!-- AI 文档对话入口 -->
+        <el-button size="small" @click="showDocAiChat = true">💬 AI 对话</el-button>
         <!-- 独立按钮组（刷新取数等） -->
         <el-tooltip
           v-for="btn in toolbarButtons.filter((b) => b.group === 'standalone')"
@@ -247,6 +249,18 @@
       @finecheck-update="fineCheckFailCount = $event"
     />
   </el-drawer>
+
+  <!-- AI 文档对话面板 -->
+  <DocAiChatPanel
+    :doc-type="'workpaper'"
+    :doc-id="wpId"
+    :project-id="projectId"
+    :year="projectYear || new Date().getFullYear() - 1"
+    :visible="showDocAiChat"
+    @update:visible="showDocAiChat = $event"
+    @close="showDocAiChat = false"
+    @adopt="onDocAiAdopt"
+  />
 </template>
 
 <script setup lang="ts">
@@ -290,6 +304,7 @@ import CycleDialogHost from './workpaper-editor/CycleDialogHost.vue'
 import VersionHistoryDrawer from './workpaper-editor/VersionHistoryDrawer.vue'
 import AuditNavDialog from './workpaper-editor/AuditNavDialog.vue'
 import ReviewMarkDialog from './workpaper-editor/ReviewMarkDialog.vue'
+import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
 
 // ─── 路由解析 ────────────────────────────────────────────────────────────────
 const route = useRoute()
@@ -312,6 +327,7 @@ const showCellFormulaDetail = ref(false)
 const cellDetailSheet = ref('')
 const cellDetailLabel = ref('')
 const showStaleImpactPanel = ref(false)
+const showDocAiChat = ref(false)
 const univerEditorCoreRef = ref<InstanceType<typeof UniverEditorCore> | null>(null)
 
 // ─── 模式分发（useEditorMode） ──────────────────────────────────────────────
@@ -329,6 +345,7 @@ const { isDCycle, isFCycle, isGCycle, isHCycle, isICycle, isKCycle, isLCycle, is
 // ─── Sheet 导航 facade ──────────────────────────────────────────────────────
 const univerAPIRef = ref<any>(null)
 const projectMeta = ref<{ scenario: string; has_foreign_currency: boolean; measurement_model?: string } | null>(null)
+const projectYear = ref<number | null>(null)
 const scenarioFilter = computed(() => {
   if (!projectMeta.value) return null
   return {
@@ -527,6 +544,14 @@ function onVersionSearchJump(payload: { versionId: string; sheet: string; cellRe
 
 function onReviewMarked() {
   eventBus.emit('review-mark:changed', { projectId: projectId.value, wpId: wpId.value })
+}
+
+// ─── AI 文档对话采纳 ─────────────────────────────────────────────────────────
+function onDocAiAdopt(payload: { content: string; messageId: string }) {
+  // 采纳事件由 DocAiChatPanel 内部调用 adoptContent API（走确认流）
+  // 父组件可在此做额外处理（如刷新底稿内容）
+  // D4: AI 内容已经过 wrap_ai_output_with_log → pending 状态，不直接写入
+  onChildSaved()
 }
 
 function onConflictResolved(_id: string, _resolution: string) {
@@ -730,6 +755,7 @@ async function loadProjectMeta() {
       has_foreign_currency: !!proj?.has_foreign_currency,
       measurement_model: proj?.measurement_model || 'cost',
     }
+    projectYear.value = Number(proj?.audit_year) || null
   } catch {
     projectMeta.value = { scenario: 'normal', has_foreign_currency: false, measurement_model: 'cost' }
   }

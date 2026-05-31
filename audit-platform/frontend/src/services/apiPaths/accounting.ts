@@ -212,6 +212,17 @@ export const formula = {
   batchExecute: '/api/formula/batch-execute',
 } as const
 
+// ─── 公式审计日志（变更时间线） ──────────────────────────────────────────────
+
+export const formulaAuditLog = {
+  /** GET /api/formula-audit-log/{project_id}/{year}?module=&row_code=&limit= */
+  list: (pid: string, year: number) => `/api/formula-audit-log/${pid}/${year}`,
+  /** POST /api/formula-audit-log/{project_id}/{year} — 记录一条日志 */
+  create: (pid: string, year: number) => `/api/formula-audit-log/${pid}/${year}`,
+  /** POST /api/formula-audit-log/{project_id}/{year}/rollback — 一键回滚 */
+  rollback: (pid: string, year: number) => `/api/formula-audit-log/${pid}/${year}/rollback`,
+} as const
+
 // ─── 数据校验 ───────────────────────────────────────────────────────────────
 
 export const dataValidation = {
