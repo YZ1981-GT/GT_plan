@@ -296,7 +296,7 @@ async def check_consol_lock(
     """检查项目是否被合并锁定，锁定时返回 423。
 
     Phase 0 修复（consol-phase0-core-pipeline Task 8.1）：
-    consol_lock 列已通过 V027 迁移就位 + ORM Project 模型声明，
+    consol_lock 列已通过 V034 迁移就位 + ORM Project 模型声明，
     移除旧的"列可能不存在"SAVEPOINT 静默 pass，改用 ORM select。
     锁定态直接抛 423，真实异常暴露而非吞掉。
     """
