@@ -1,5 +1,17 @@
 <template>
   <div class="cw-layout">
+    <!-- 总分汇总模式提示：无需抵销底稿 -->
+    <el-alert
+      v-if="isBranchMode"
+      type="info"
+      :closable="false"
+      show-icon
+      class="cw-branch-notice"
+    >
+      <template #title>
+        <span>当前为<b>总分汇总</b>模式：分公司为非独立法人，直接加总各分公司试算表即可，<b>无需填写以下抵销底稿</b>（合并数 = 各分公司本体加总）。如需母子合并请在顶部切换合并类型。</span>
+      </template>
+    </el-alert>
     <!-- 左侧：表样导航 -->
     <aside class="cw-nav" :style="{ width: navWidth + 'px' }">
       <div class="cw-nav-header">
@@ -104,6 +116,7 @@ import { ElMessage } from 'element-plus'
 import { List, Coin, TrendCharts, DataBoard, SetUp, Tickets, PieChart } from '@element-plus/icons-vue'
 import { getConsolScope } from '@/services/consolidationApi'
 import { loadAllWorksheetData, saveWorksheetData } from '@/services/consolWorksheetDataApi'
+import { api } from '@/services/apiProxy'
 import SubsidiaryInfoSheet from './SubsidiaryInfoSheet.vue'
 import InvestmentCostSheet from './InvestmentCostSheet.vue'
 import InvestmentEquitySheet from './InvestmentEquitySheet.vue'
@@ -254,6 +267,17 @@ const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
 const scopeCompanies = ref<{ name: string; code: string; ratio: number }[]>([])
 
+// 合并类型：branch=总分汇总（无需抵销底稿）/ subsidiary=母子合并
+const isBranchMode = ref(false)
+
+async function loadConsolidationType() {
+  if (!projectId.value) return
+  try {
+    const cfg = await api.get(`/api/projects/${projectId.value}/config`)
+    isBranchMode.value = cfg?.consolidation_type === 'branch'
+  } catch { /* 静默忽略，默认母子合并 */ }
+}
+
 async function loadConsolScope() {
   if (!projectId.value) return
   try {
@@ -286,6 +310,7 @@ async function loadConsolScope() {
 
 onMounted(async () => {
   loadConsolScope()
+  loadConsolidationType()
   eventBus.on('formula-changed', onFormulaChanged)
   // 从后端加载已保存的工作底稿数据
   if (projectId.value) {

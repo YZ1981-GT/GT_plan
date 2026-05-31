@@ -59,8 +59,7 @@ async def upsert_trial_row(
             existing.account_name = account_name
         if account_category:
             existing.account_category = account_category
-        await db.commit()
-        await db.refresh(existing)
+        await db.flush()
         return existing
 
     trial = ConsolTrial(
@@ -71,48 +70,75 @@ async def upsert_trial_row(
         account_category=account_category,
     )
     db.add(trial)
-    await db.commit()
-    await db.refresh(trial)
+    await db.flush()
     return trial
 
 
 async def recalculate_trial(db: AsyncSession, project_id: UUID, year: int) -> list[ConsolTrial]:
-    """重新计算合并试算表"""
+    """重新计算合并试算表
+
+    B1 接入：先汇总各子公司本体审定数到 individual_sum（之前完全缺失这一步，
+    导致 consol_amount 实际只剩抵销额），再叠加 consol_adjustment + consol_elimination，
+    落实合并恒等式 consol_amount == individual_sum + consol_adjustment + consol_elimination。
+
+    母分合并（consolidation_type == "branch"）：直接加总，无抵销，
+    consol_amount = individual_sum（跳过 elimination 步骤）。
+    """
+    # ① B1：先汇总各子公司本体审定数写入 individual_sum + consolidation_breakdown。
+    #    延迟 import 打破与 consol_individual_sum_service 的循环依赖。
+    from app.services.consol_individual_sum_service import aggregate_individual_sum
+
+    await aggregate_individual_sum(db, project_id, year)
+
+    # ② 重新加载试算表，确保拿到 aggregate 刚写入的 individual_sum
     trials = await get_trial_balance(db, project_id, year)
 
-    # 获取所有已审批的抵消分录
-    result = await db.execute(
-        sa.select(EliminationEntry).where(
-            EliminationEntry.project_id == project_id,
-            EliminationEntry.year == year,
-            EliminationEntry.review_status == ReviewStatusEnum.APPROVED,
-            EliminationEntry.is_deleted.is_(False),
-        )
+    # ③ 判断合并类型：母分汇总（branch）跳过抵销
+    from app.models.core import Project
+    proj_result = await db.execute(
+        sa.select(Project.consolidation_type).where(Project.id == project_id)
     )
-    elim_entries = list(result.scalars().all())
+    consolidation_type = proj_result.scalar_one_or_none()
 
-    # 按科目代码汇总抵消金额
-    elim_debits: dict[str, Decimal] = {}
-    elim_credits: dict[str, Decimal] = {}
-    for entry in elim_entries:
-        for line in (entry.lines or []):
-            code = line.get("account_code", "")
-            debit = Decimal(str(line.get("debit_amount") or 0))
-            credit = Decimal(str(line.get("credit_amount") or 0))
-            if code:
-                elim_debits[code] = elim_debits.get(code, Decimal("0")) + debit
-                elim_credits[code] = elim_credits.get(code, Decimal("0")) + credit
+    if consolidation_type == "branch":
+        # 母分汇总：直接加总，无调整无抵销
+        for trial in trials:
+            trial.consol_adjustment = Decimal("0")
+            trial.consol_elimination = Decimal("0")
+            trial.consol_amount = trial.individual_sum
+            trial.is_stale = False  # 重算后清除陈旧标记（P1）
+    else:
+        # 母子合并（默认）：叠加已审批抵销
+        result = await db.execute(
+            sa.select(EliminationEntry).where(
+                EliminationEntry.project_id == project_id,
+                EliminationEntry.year == year,
+                EliminationEntry.review_status == ReviewStatusEnum.APPROVED,
+                EliminationEntry.is_deleted.is_(False),
+            )
+        )
+        elim_entries = list(result.scalars().all())
 
-    # 更新试算表
-    for trial in trials:
-        code = trial.standard_account_code
-        trial.consol_adjustment = Decimal("0")
-        trial.consol_elimination = (elim_debits.get(code, Decimal("0")) - elim_credits.get(code, Decimal("0")))
-        trial.consol_amount = trial.individual_sum + trial.consol_adjustment + trial.consol_elimination
+        # 按科目代码汇总抵消金额
+        elim_debits: dict[str, Decimal] = {}
+        elim_credits: dict[str, Decimal] = {}
+        for entry in elim_entries:
+            for line in (entry.lines or []):
+                code = line.get("account_code", "")
+                debit = Decimal(str(line.get("debit_amount") or 0))
+                credit = Decimal(str(line.get("credit_amount") or 0))
+                if code:
+                    elim_debits[code] = elim_debits.get(code, Decimal("0")) + debit
+                    elim_credits[code] = elim_credits.get(code, Decimal("0")) + credit
 
-    await db.commit()
-    for trial in trials:
-        await db.refresh(trial)
+        for trial in trials:
+            code = trial.standard_account_code
+            trial.consol_adjustment = Decimal("0")
+            trial.consol_elimination = (elim_debits.get(code, Decimal("0")) - elim_credits.get(code, Decimal("0")))
+            trial.consol_amount = trial.individual_sum + trial.consol_adjustment + trial.consol_elimination
+            trial.is_stale = False  # 重算后清除陈旧标记（P1）
+
+    await db.flush()
     return trials
 
 

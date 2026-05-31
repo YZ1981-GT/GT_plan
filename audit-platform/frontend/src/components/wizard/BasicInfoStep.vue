@@ -95,6 +95,16 @@
               <el-radio-button value="consolidated">合并报表</el-radio-button>
             </el-radio-group>
           </el-form-item>
+
+          <el-form-item v-if="form.report_scope === 'consolidated'" label="合并类型" prop="consolidation_type">
+            <el-radio-group v-model="form.consolidation_type">
+              <el-radio-button value="subsidiary">母子合并</el-radio-button>
+              <el-radio-button value="branch">总分汇总</el-radio-button>
+            </el-radio-group>
+            <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 4px; line-height: 1.4">
+              母子合并：独立法人子公司，含内部交易/投资抵销；总分汇总：非独立法人分支机构，直接加总无抵销
+            </div>
+          </el-form-item>
         </div>
 
         <!-- 右栏：项目团队 + 预算合同 + 集团架构 -->
@@ -190,6 +200,7 @@ const form = reactive<BasicInfo>({
   custom_template_name: '',
   custom_template_version: '',
   report_scope: 'standalone',
+  consolidation_type: 'subsidiary',
   parent_company_name: '',
   parent_company_code: '',
   ultimate_company_name: '',

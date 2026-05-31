@@ -47,7 +47,7 @@ async def handle_child_note_updated(event: Any) -> None:
         return
 
     try:
-        from app.core.database import async_session_factory
+        from app.core.database import async_session as async_session_factory
 
         async with async_session_factory() as db:
             # 查找 parent 合并项目

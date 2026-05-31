@@ -15,6 +15,7 @@ API:
 import json
 import uuid
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -22,6 +23,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
+from app.models.core import User
 
 router = APIRouter(prefix="/api/account-note-mapping", tags=["account-note-mapping"])
 
@@ -76,17 +79,17 @@ async def ensure_table(db: AsyncSession):
 
 
 @router.get("/{project_id}", response_model=list[MappingResponse])
-async def get_mappings(project_id: str, db: AsyncSession = Depends(get_db)):
+async def get_mappings(project_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(require_project_access("readonly"))):
     await ensure_table(db)
     result = await db.execute(
         text("SELECT id, project_id, account_name, section_id, row_name, col_index, mapping_type, created_at FROM account_note_mapping WHERE project_id = :pid ORDER BY account_name"),
-        {"pid": project_id},
+        {"pid": str(project_id)},
     )
     return [MappingResponse(id=str(r[0]), project_id=str(r[1]), account_name=r[2], section_id=r[3], row_name=r[4], col_index=r[5], mapping_type=r[6], created_at=str(r[7]) if r[7] else None) for r in result.fetchall()]
 
 
 @router.put("/{project_id}", response_model=MappingResponse)
-async def save_mapping(project_id: str, body: MappingSave, db: AsyncSession = Depends(get_db)):
+async def save_mapping(project_id: UUID, body: MappingSave, db: AsyncSession = Depends(get_db), user: User = Depends(require_project_access("edit"))):
     await ensure_table(db)
     now = datetime.now(timezone.utc)
     new_id = str(uuid.uuid4())
@@ -96,24 +99,24 @@ async def save_mapping(project_id: str, body: MappingSave, db: AsyncSession = De
             VALUES (:id, :pid, :an, :sid, :rn, :ci, :mt, :now)
             ON CONFLICT (project_id, account_name, section_id, row_name)
             DO UPDATE SET col_index = :ci, mapping_type = :mt
-        """), {"id": new_id, "pid": project_id, "an": body.account_name, "sid": body.section_id, "rn": body.row_name, "ci": body.col_index, "mt": body.mapping_type, "now": now})
+        """), {"id": new_id, "pid": str(project_id), "an": body.account_name, "sid": body.section_id, "rn": body.row_name, "ci": body.col_index, "mt": body.mapping_type, "now": now})
         await db.commit()
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    return MappingResponse(id=new_id, project_id=project_id, account_name=body.account_name, section_id=body.section_id, row_name=body.row_name, col_index=body.col_index, mapping_type=body.mapping_type, created_at=str(now))
+    return MappingResponse(id=new_id, project_id=str(project_id), account_name=body.account_name, section_id=body.section_id, row_name=body.row_name, col_index=body.col_index, mapping_type=body.mapping_type, created_at=str(now))
 
 
 @router.delete("/{project_id}/{mapping_id}")
-async def delete_mapping(project_id: str, mapping_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_mapping(project_id: UUID, mapping_id: str, db: AsyncSession = Depends(get_db), user: User = Depends(require_project_access("edit"))):
     await ensure_table(db)
-    await db.execute(text("DELETE FROM account_note_mapping WHERE id = :mid AND project_id = :pid"), {"mid": mapping_id, "pid": project_id})
+    await db.execute(text("DELETE FROM account_note_mapping WHERE id = :mid AND project_id = :pid"), {"mid": mapping_id, "pid": str(project_id)})
     await db.commit()
     return {"ok": True}
 
 
 @router.post("/{project_id}/auto-generate")
-async def auto_generate_mappings(project_id: str, body: dict, db: AsyncSession = Depends(get_db)):
+async def auto_generate_mappings(project_id: UUID, body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(require_project_access("edit"))):
     """自动生成映射：从试算表科目名和附注模板行名进行模糊匹配"""
     await ensure_table(db)
     year = body.get("year", datetime.now(timezone.utc).year - 1)
@@ -122,7 +125,7 @@ async def auto_generate_mappings(project_id: str, body: dict, db: AsyncSession =
     # 1. 获取试算表所有科目名
     result = await db.execute(
         text("SELECT DISTINCT account_name FROM trial_balance_entries WHERE project_id = :pid AND year = :y"),
-        {"pid": project_id, "y": year},
+        {"pid": str(project_id), "y": year},
     )
     account_names = [r[0] for r in result.fetchall() if r[0]]
 
@@ -163,7 +166,7 @@ async def auto_generate_mappings(project_id: str, body: dict, db: AsyncSession =
                             INSERT INTO account_note_mapping (id, project_id, account_name, section_id, row_name, col_index, mapping_type, created_at)
                             VALUES (:id, :pid, :an, :sid, :rn, 1, :mt, :now)
                             ON CONFLICT (project_id, account_name, section_id, row_name) DO NOTHING
-                        """), {"id": str(uuid.uuid4()), "pid": project_id, "an": acc_name, "sid": sec["section_id"], "rn": row_name, "mt": mtype, "now": datetime.now(timezone.utc)})
+                        """), {"id": str(uuid.uuid4()), "pid": str(project_id), "an": acc_name, "sid": sec["section_id"], "rn": row_name, "mt": mtype, "now": datetime.now(timezone.utc)})
                         generated += 1
                     except Exception:
                         pass

@@ -1,5 +1,18 @@
 <template>
   <div class="gt-consol gt-fade-in">
+    <!-- P3 防误用标记：开发中警告 banner -->
+    <el-alert
+      v-if="consolDevMode"
+      type="warning"
+      :closable="false"
+      show-icon
+      style="margin-bottom: 12px"
+    >
+      <template #title>
+        <span style="font-weight: 600">开发中，不可用于正式合并报告</span>
+      </template>
+    </el-alert>
+
     <!-- 横幅：单位名称 + 年度 + 准则类型 -->
     <GtPageHeader title="合并报表" @back="$router.push('/consolidation')">
       <GtInfoBar
@@ -17,6 +30,18 @@
           @formula="onOpenFormula"
         >
           <template #left>
+            <el-tooltip content="母子合并：独立法人子公司，含内部交易/投资抵销；总分汇总：非独立法人分支机构，直接加总无抵销" placement="bottom">
+              <el-radio-group
+                v-model="consolidationType"
+                size="small"
+                :disabled="consolTypeSaving"
+                style="margin-right: 8px"
+                @change="onConsolidationTypeChange"
+              >
+                <el-radio-button label="subsidiary">母子合并</el-radio-button>
+                <el-radio-button label="branch">总分汇总</el-radio-button>
+              </el-radio-group>
+            </el-tooltip>
             <SharedTemplatePicker
               config-type="consol_scope"
               :project-id="projectId"
@@ -452,6 +477,27 @@ const consolComments = useCellComments(() => projectId.value, () => year.value, 
 const activeTab = ref('worksheets')
 const consolNoteTabRef = ref<InstanceType<typeof ConsolNoteTab> | null>(null)
 const consolTbTabRef = ref<InstanceType<typeof ConsolTrialBalanceTab> | null>(null)
+
+// ─── P3 防误用标记 ────────────────────────────────────────────────────────────
+const consolDevMode = ref(false)
+
+// ─── 合并类型（subsidiary 母子合并 / branch 母分汇总）──────────────────────────
+const consolidationType = ref<'subsidiary' | 'branch'>('subsidiary')
+const consolTypeSaving = ref(false)
+
+async function onConsolidationTypeChange(val: 'subsidiary' | 'branch') {
+  consolTypeSaving.value = true
+  try {
+    await api.put(`/api/projects/${projectId.value}/config`, {
+      consolidation_type: val,
+    })
+    ElMessage.success(val === 'branch' ? '已切换为总分汇总（直接加总，无抵销）' : '已切换为母子合并（含抵销）')
+  } catch {
+    ElMessage.error('合并类型保存失败')
+  } finally {
+    consolTypeSaving.value = false
+  }
+}
 
 // ─── 项目基本信息 ─────────────────────────────────────────────────────────────
 const projectInfo = reactive({
@@ -1198,6 +1244,22 @@ onMounted(async () => {
   // 默认合并主体为项目本身（集团层面）
   currentConsolEntity.value = { code: '', name: projectInfo.clientName || '' }
   await loadGroupTree()
+  // P3 防误用标记：获取模块开发状态
+  try {
+    const status = await api.get(`/api/consolidation/${projectId.value}/module-status`)
+    consolDevMode.value = !!status?.dev_mode
+  } catch {
+    // 静默忽略（端点不可用时不影响页面）
+  }
+  // 加载合并类型（subsidiary / branch）
+  try {
+    const cfg = await api.get(`/api/projects/${projectId.value}/config`)
+    if (cfg?.consolidation_type === 'branch' || cfg?.consolidation_type === 'subsidiary') {
+      consolidationType.value = cfg.consolidation_type
+    }
+  } catch {
+    // 静默忽略，保持默认 subsidiary
+  }
   eventBus.on('consol-tree-select', onConsolTreeSelect)
   eventBus.on('consol-catalog-select', onConsolCatalogSelect)
   eventBus.on('consol-refresh-entity', onConsolRefreshEntity)

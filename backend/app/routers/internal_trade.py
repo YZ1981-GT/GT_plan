@@ -5,8 +5,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.core.database import get_db
+from app.models.core import User
 from app.models.consolidation_schemas import (
     InternalTradeCreate,
     InternalTradeResponse,
@@ -39,7 +40,7 @@ async def list_trades(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     return await get_trades(db, project_id, year)
 
@@ -49,7 +50,7 @@ async def create_trade_route(
     project_id: UUID,
     data: InternalTradeCreate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     return await create_trade(db, project_id, data)
 
@@ -60,7 +61,7 @@ async def update_trade_route(
     project_id: UUID,
     data: InternalTradeUpdate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     trade = await update_trade(db, trade_id, project_id, data)
     if not trade:
@@ -73,7 +74,7 @@ async def delete_trade_route(
     trade_id: UUID,
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     if not await delete_trade(db, trade_id, project_id):
         raise HTTPException(status_code=404, detail="内部交易不存在")
@@ -85,7 +86,7 @@ async def list_arap(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     return await get_arap_list(db, project_id, year)
 
@@ -95,7 +96,7 @@ async def create_arap_route(
     project_id: UUID,
     data: InternalArApCreate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     return await create_arap(db, project_id, data)
 
@@ -106,7 +107,7 @@ async def update_arap_route(
     project_id: UUID,
     data: InternalArApUpdate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     arap = await update_arap(db, arap_id, project_id, data)
     if not arap:
@@ -119,7 +120,7 @@ async def delete_arap_route(
     arap_id: UUID,
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     if not await delete_arap(db, arap_id, project_id):
         raise HTTPException(status_code=404, detail="内部往来不存在")
@@ -131,6 +132,6 @@ async def get_matrix(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     return await get_transaction_matrix(db, project_id, year)

@@ -634,6 +634,15 @@ attachments / KnowledgeDocument 类版本链 service 同时支持两种调用契
 
 任一层缺失即伪绿。AT-3 实战中 V014 迁移已写但 Attachment 模型 + service 都没补，pytest 设施齐备反而掩盖缺陷（fixture create_all 自动建表）。
 
+### service 层禁止裸 SQL 操作 ORM 未声明列（ADR-CONSOL-002，2026-05-31）
+
+- **规约**：service 层禁止用裸 SQL（`text("UPDATE/SELECT ... consol_lock ...")`）操作未在 ORM `Mapped[]` 声明的列
+- **根因**：`schema_drift_detector` 只对比 ORM `Base.metadata` vs DB；裸 SQL 操作的列两边都看不到 = 自动化安全网盲区
+- **后果**：列不存在时 UPDATE 静默失败 / SELECT 抛异常被 try/except 吞掉 → 功能"假成功"
+- **正确做法**：所有字段必须先在 ORM 模型声明 `Mapped[]`，service 通过 ORM `select(Model.field)` / `setattr(obj, field, value)` 操作
+- **审查方法**：`grep "UPDATE \w+ SET" backend/app/services/` + `grep "text(" backend/app/services/consol*` 定期扫描
+- **适用范围**：所有 service（不限 consol），尤其新增字段时必须同步三层（DB 迁移 + ORM + service）
+
 ## §PG / 运维操作铁律（2026-05-23 ledger-import-view-refactor 9.8/9.9/9.10 沉淀）
 
 ### PG SET 命令不支持 prepared statement 绑定参数

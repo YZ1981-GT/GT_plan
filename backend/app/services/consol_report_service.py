@@ -245,13 +245,11 @@ class ConsolReportService:
             expression = expression.replace(match.group(0), str(val), 1)
 
         # Step 4: Evaluate arithmetic expression safely
+        # P2/A1：复用 report_engine 的 ast 安全求值器（支持 ABS/IF/ROUND/MAX/MIN/比较），
+        # 替代裸 eval —— 消除单体/合并公式语义不一致（审计准确性）+ 去 eval 反模式。
+        from app.services.report_engine import _safe_eval_expr
         try:
-            safe_expr = expression.strip()
-            if not re.match(r'^[\d\.\+\-\*\/\(\)\s]+$', safe_expr):
-                logger.warning("Unsafe expression: %s", safe_expr)
-                return Decimal("0")
-            result = eval(safe_expr, {"__builtins__": {}}, {})
-            return Decimal(str(result))
+            return _safe_eval_expr(expression.strip())
         except (SyntaxError, ZeroDivisionError, InvalidOperation, TypeError) as e:
             logger.warning("Formula eval error: %s (expr: %s)", e, expression)
             return Decimal("0")

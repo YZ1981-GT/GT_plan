@@ -27,7 +27,7 @@ import sqlalchemy as sa
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.field_selection import parse_fields, DEFAULT_SUMMARY_FIELDS, BLOCKED_FIELDS
-from app.deps import require_project_access
+from app.deps import require_project_access, check_consol_lock
 from app.models.ai_models import AIConfirmationStatus, AIContent
 from app.models.core import User
 from app.models.phase10_schemas import DownloadPackRequest
@@ -254,6 +254,7 @@ async def save_univer_data(
     body: dict,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """Univer 编辑器保存 — 完整保存链路
 
@@ -544,6 +545,7 @@ async def upload_workpaper(
     data: UploadRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """上传离线编辑的底稿"""
     svc = WorkingPaperService()
@@ -566,6 +568,7 @@ async def upload_workpaper_file(
     force_overwrite: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """上传离线编辑后的底稿文件（正式主链路）。"""
     svc = WpUploadService()
@@ -594,6 +597,7 @@ async def update_status(
     data: StatusUpdateRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """更新底稿编制生命周期状态
 
@@ -980,6 +984,7 @@ async def prefill_workpaper(
     year: int = 2025,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """手动触发预填充（需编辑权限）— 真正打开 .xlsx 扫描公式并写入
 

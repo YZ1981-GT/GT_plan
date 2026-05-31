@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, check_consol_lock
 from app.models.audit_platform_schemas import (
     ReferenceCopyRequest,
     ReferenceCopyResult,
@@ -198,6 +198,7 @@ async def update_mapping(
     body: ReportLineMappingUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _lock_check=Depends(check_consol_lock),
 ) -> ReportLineMappingResponse:
     return await svc.update_mapping(project_id, mapping_id, body, db)
 
@@ -246,6 +247,7 @@ async def delete_mapping(
     mapping_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _lock_check=Depends(check_consol_lock),
 ) -> dict:
     await svc.delete_mapping(project_id, mapping_id, db)
     return {"deleted": True, "id": str(mapping_id)}

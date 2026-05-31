@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, check_consol_lock
 from app.models.core import User
 from app.services.report_mapping_service import ReportMappingService
 
@@ -56,6 +56,7 @@ async def save_mapping(
     body: dict,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _lock_check=Depends(check_consol_lock),
 ):
     """保存映射规则"""
     svc = ReportMappingService(db)

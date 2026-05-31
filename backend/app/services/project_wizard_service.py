@@ -42,9 +42,14 @@ STEP_DEPENDENCIES: dict[WizardStep, list[WizardStep]] = {
     WizardStep.materiality: [WizardStep.basic_info],
     WizardStep.team_assignment: [WizardStep.basic_info],
     WizardStep.template_set: [WizardStep.basic_info, WizardStep.materiality],
-    # 确认只需要 basic_info 完成（其他步骤在项目创建后独立完成）
+    # 确认前必须完成核心步骤（账表导入/科目映射/重要性/团队分工）；
+    # template_set 非强制（可后续补），与测试 _complete_confirmation_steps 口径一致
     WizardStep.confirmation: [
         WizardStep.basic_info,
+        WizardStep.account_import,
+        WizardStep.account_mapping,
+        WizardStep.materiality,
+        WizardStep.team_assignment,
     ],
 }
 
@@ -89,6 +94,10 @@ def _sync_basic_info_to_project(project: Project, data: BasicInfoSchema) -> None
     project.company_code = data.company_code
     project.template_type = data.template_type
     project.report_scope = data.report_scope
+    # 合并类型仅在合并报表项目下有意义；单户报表清空避免误导
+    project.consolidation_type = (
+        data.consolidation_type if data.report_scope == "consolidated" else None
+    )
     project.parent_company_name = data.parent_company_name
     project.parent_company_code = data.parent_company_code
     project.ultimate_company_name = data.ultimate_company_name
@@ -380,10 +389,10 @@ async def confirm_project(
     """
     project = await _get_project_or_404(db, project_id)
 
-    if project.status not in (ProjectStatus.created, ProjectStatus.planning):
+    if project.status != ProjectStatus.created:
         raise HTTPException(
             status_code=400,
-            detail=f"项目状态为 {project.status.value}，无法确认（仅 created/planning 状态可确认）",
+            detail=f"项目状态为 {project.status.value}，无法确认（仅 created 状态可确认；planning 项目已确认无需重复）",
         )
 
     # 校验确认步骤

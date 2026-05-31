@@ -295,25 +295,16 @@ async def check_consol_lock(
 ):
     """检查项目是否被合并锁定，锁定时返回 423。
 
-    F6 修复（v3 P0-1 / Q1）：用 SAVEPOINT 包住 SELECT，列不存在时
-    回滚 SAVEPOINT 不破坏外层事务（避免下游 user 对象 expired 引发 MissingGreenlet）。
+    Phase 0 修复（consol-phase0-core-pipeline Task 8.1）：
+    consol_lock 列已通过 V034 迁移就位 + ORM Project 模型声明，
+    移除旧的"列可能不存在"SAVEPOINT 静默 pass，改用 ORM select。
+    锁定态直接抛 423，真实异常暴露而非吞掉。
     """
-    from sqlalchemy import text as sa_text
-    try:
-        async with db.begin_nested():  # SAVEPOINT
-            result = await db.execute(
-                sa_text("SELECT consol_lock FROM projects WHERE id = :pid"),
-                {"pid": str(project_id)},
-            )
-            row = result.first()
-            if row and row[0]:
-                raise HTTPException(status_code=423, detail="项目已被合并锁定，请等待合并完成后再操作")
-    except HTTPException:
-        raise
-    except Exception:
-        # Column may not exist — SAVEPOINT 已自动回滚，外层事务无影响
-        # 不再 await db.rollback()（这是 F6 根因：让所有已 SELECT 对象 expired）
-        pass
+    result = await db.execute(
+        select(Project.consol_lock).where(Project.id == project_id)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=423, detail="项目已被合并锁定，无法修改")
 
 
 # ---------------------------------------------------------------------------

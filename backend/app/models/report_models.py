@@ -400,7 +400,7 @@ class GroupNoteTemplateBaseline(Base):
         String(20), nullable=False, server_default=text("'soe'")
     )
     sections_data: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+        JSONB, nullable=False, server_default=text("'[]'")
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("true")
@@ -451,7 +451,7 @@ class NoteSectionVersionTree(Base):
         nullable=True,
     )
     snapshot_data: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+        JSONB, nullable=False, server_default=text("'{}'")
     )
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True

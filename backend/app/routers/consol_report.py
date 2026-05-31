@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.core.database import get_db
 from app.models.consolidation_schemas import (
     BalanceCheckResult,
@@ -45,8 +45,9 @@ router = APIRouter(
 @router.post("/generate")
 async def generate_consol_reports(
     data: ConsolReportGenerateRequest,
+    project_id: UUID = Query(..., description="项目ID（用于权限校验）"),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("edit")),
 ):
     """生成合并报表"""
     try:
@@ -66,7 +67,7 @@ async def get_consol_report(
     year: int,
     report_type: FinancialReportType = Query(..., description="报表类型"),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("readonly")),
 ):
     """获取合并报表数据"""
     result = await db.execute(
@@ -103,7 +104,7 @@ async def balance_check(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("readonly")),
 ):
     """合并资产负债表平衡校验"""
     return verify_balance_sync(db, project_id, year)
@@ -114,7 +115,7 @@ async def create_consol_workpaper(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("edit")),
 ):
     """生成合并底稿.xlsx"""
     try:
@@ -131,7 +132,7 @@ async def download_consol_workpaper(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("readonly")),
 ):
     """下载合并底稿.xlsx"""
     try:

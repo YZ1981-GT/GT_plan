@@ -5,8 +5,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.core.database import get_db
+from app.models.core import User
 from app.models.consolidation_schemas import GoodwillInput, GoodwillCalcResponse
 from app.services.goodwill_service import (
     create_goodwill,
@@ -25,7 +26,7 @@ async def list_goodwill(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     return await get_goodwill_list(db, project_id, year)
 
@@ -35,7 +36,7 @@ async def create_goodwill_route(
     project_id: UUID,
     data: GoodwillInput,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     return await create_goodwill(db, project_id, data)
 
@@ -46,7 +47,7 @@ async def update_goodwill_route(
     project_id: UUID,
     data: GoodwillInput,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     goodwill = await update_goodwill(db, goodwill_id, project_id, data)
     if not goodwill:
@@ -60,7 +61,7 @@ async def record_impairment_route(
     project_id: UUID,
     impairment_amount: float,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     goodwill = await record_impairment(db, goodwill_id, project_id, impairment_amount)
     if not goodwill:
@@ -73,7 +74,7 @@ async def delete_goodwill_route(
     goodwill_id: UUID,
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     if not await delete_goodwill(db, goodwill_id, project_id):
         raise HTTPException(status_code=404, detail="商誉记录不存在")
