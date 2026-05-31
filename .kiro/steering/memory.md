@@ -52,8 +52,8 @@ inclusion: always
 - **四阶段三件套已归档 `_archive/09-consolidation-phases/`**（work commit `375edd8d`，封板①②完成后归档，非空归档）；**tasks.md 残留未勾项全是外部依赖**（真实集团数据 UAT `*` 卡 PG 0 consolidated + Playwright 待环境 + B6/B7 CAS20 审计专业复核），代码+测试层面已封板
 
 ### git 当前状态（2026-06-01）
-- 当前分支 `spec/global-modules-AD-implementation`，已 push origin（HEAD `1fe58697`，55 files +8496/-573）；基于 main `0dae057c`；待 PR 合入 main
-- 内容：spec A（formula-engine-unification 19 任务）+ spec D（report-config-baseline 11 任务）全量实施
+- 当前分支 `main`，已 push origin/main（HEAD `f073e167`）；spec/global-modules-AD-implementation 已 fast-forward merge 入 main
+- 内容：spec A（formula-engine-unification 19 任务）+ spec D（report-config-baseline 11 任务）全量实施（55 files +8496/-573）
 - 历史已闭环：合并模块 Phase0~3 全在 main / 底稿模块 14 spec 已实施归档 / schema drift 三层修复 / git 治理 spec（GIT_MODE 双模式 + 分支命名 hook + 6 维核查 CLI `check_git_sync_state.py`）
 
 ### 已完成 spec 总览
