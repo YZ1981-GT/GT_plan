@@ -7,7 +7,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, Index, String, func
+from sqlalchemy import Index, String, func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,7 +23,7 @@ class AttachmentLineage(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     attachment_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("wp_attachments.id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), nullable=False
     )
     target_type: Mapped[str] = mapped_column(
         String(50), nullable=False

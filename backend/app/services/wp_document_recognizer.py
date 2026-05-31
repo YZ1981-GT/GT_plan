@@ -322,7 +322,7 @@ class WpDocumentRecognizer:
     ) -> dict[str, Any] | None:
         """获取附件基本信息"""
         result = await db.execute(text(
-            "SELECT id, filename, file_path, mime_type "
+            "SELECT id, file_name, file_path, file_type "
             "FROM attachments WHERE id = :att_id"
         ), {"att_id": str(attachment_id)})
         row = result.fetchone()
@@ -332,7 +332,7 @@ class WpDocumentRecognizer:
             "id": str(row[0]),
             "filename": row[1],
             "file_path": row[2],
-            "mime_type": row[3],
+            "file_type": row[3],
         }
 
 

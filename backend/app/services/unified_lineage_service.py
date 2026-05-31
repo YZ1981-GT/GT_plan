@@ -191,7 +191,7 @@ class UnifiedLineageService:
                 "SELECT al.id, al.attachment_id, al.target_type, al.target_id, "
                 "al.target_ref, al.created_at, wa.file_name, wa.file_type "
                 "FROM attachment_lineage al "
-                "LEFT JOIN wp_attachments wa ON wa.id = al.attachment_id "
+                "LEFT JOIN attachments wa ON wa.id = al.attachment_id "
                 "WHERE al.target_type = :target_type AND al.target_ref LIKE :ref_pattern "
                 "ORDER BY al.created_at DESC LIMIT 20"
             ), {

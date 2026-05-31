@@ -8,10 +8,11 @@ CREATE TABLE IF NOT EXISTS attachment_lineage (
     target_type VARCHAR(50) NOT NULL,   -- wp_cell / report_row / note_section
     target_id UUID,                      -- 关联对象的 UUID（可选）
     target_ref VARCHAR(200),             -- 精确位置引用，如 "D2-3!B5"
-    created_at TIMESTAMP DEFAULT now(),
-    CONSTRAINT fk_attachment_lineage_attachment
-        FOREIGN KEY (attachment_id) REFERENCES wp_attachments(id) ON DELETE CASCADE
+    created_at TIMESTAMP DEFAULT now()
 );
+
+-- 注意：attachment_id 逻辑关联 attachments 表，但不加 FK 约束
+-- （attachments 表结构可能变化，且 attachment_id 也可能来自其他附件存储）
 
 -- 索引：按 attachment_id 查询
 CREATE INDEX IF NOT EXISTS idx_attachment_lineage_attachment_id
