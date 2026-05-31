@@ -33,7 +33,7 @@
           :disabled="reviewing || !wpId"
           @click="handleTsjReview"
         >
-          🤖 用此提示词复核当前底稿
+          🤖 复核 {{ wpCode || '当前底稿' }}
         </el-button>
       </div>
       <div
@@ -46,6 +46,7 @@
         :findings="reviewFindings"
         :wp-id="wpId || ''"
         :wp-code="wpCode || ''"
+        :component-type="componentType"
         @finding-confirmed="onFindingConfirmed"
         @finding-rejected="onFindingRejected"
         @locate-cell="onLocateCell"
@@ -64,18 +65,22 @@ import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 import TsjReviewFindings from './TsjReviewFindings.vue'
 import type { TsjFinding } from './TsjReviewFindings.vue'
+import { useCellLocate } from '@/composables/useCellLocate'
+
+const { locateCell } = useCellLocate()
 
 const props = defineProps<{
   /** 底稿 wp_code（如 D2-1 / E1 / F2-2 等） */
   wpCode?: string
   /** 底稿 ID，用于调用 AI 复核端点 */
   wpId?: string
+  /** 当前底稿 HTML 组件类型（如 c-note-table / e-control-test），用于定位策略分派 */
+  componentType?: string
 }>()
 
 const emit = defineEmits<{
   (e: 'review-complete', data: any): void
-  // TODO: 依赖 wp-locate-foundation 的 useCellLocate 实现实际跳转
-  (e: 'locate-cell', target: { wpCode: string; sheet: string; cellRange: string }): void
+  (e: 'locate-cell', target: { wpCode: string; sheet: string; cellRange: string; componentType?: string }): void
   (e: 'open-evidence', evidenceRef: string): void
 }>()
 
@@ -200,8 +205,13 @@ function onFindingRejected(_finding: TsjFinding) {
   // 父组件可监听 review-complete 后续状态变化
 }
 
-// TODO: 依赖 wp-locate-foundation 的 useCellLocate 实现实际跳转
-function onLocateCell(target: { wpCode: string; sheet: string; cellRange: string }) {
+function onLocateCell(target: { wpCode: string; sheet: string; cellRange: string; componentType?: string }) {
+  locateCell({
+    wp_code: target.wpCode,
+    sheet_name: target.sheet,
+    cell_ref: target.cellRange,
+    component_type: target.componentType || props.componentType || null,
+  })
   emit('locate-cell', target)
 }
 

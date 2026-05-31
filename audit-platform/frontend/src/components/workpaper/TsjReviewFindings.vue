@@ -21,6 +21,7 @@
     >
       <template #header>
         <div class="gt-tsj-finding-header">
+          <el-tag v-if="wpCode" size="small" type="primary" effect="plain">📋 {{ wpCode }}</el-tag>
           <el-tag :type="severityTagType(item.severity)" size="small" effect="dark">
             {{ severityLabel(item.severity) }}
           </el-tag>
@@ -103,19 +104,22 @@ export interface TsjFinding {
   description: string
   remediation: string
   evidence_ref?: string
+  wp_code?: string
+  wp_name?: string
 }
 
 const props = defineProps<{
   findings: TsjFinding[]
   wpId: string
   wpCode?: string
+  /** 当前底稿 HTML 组件类型（如 c-note-table / e-control-test），用于定位策略分派 */
+  componentType?: string
 }>()
 
 const emit = defineEmits<{
   (e: 'finding-confirmed', finding: TsjFinding): void
   (e: 'finding-rejected', finding: TsjFinding): void
-  // TODO: 依赖 wp-locate-foundation 的 useCellLocate 实现实际跳转
-  (e: 'locate-cell', target: { wpCode: string; sheet: string; cellRange: string }): void
+  (e: 'locate-cell', target: { wpCode: string; sheet: string; cellRange: string; componentType?: string }): void
   (e: 'open-evidence', evidenceRef: string): void
 }>()
 
@@ -136,12 +140,12 @@ function severityLabel(severity: string): string {
   return '低风险'
 }
 
-// TODO: 依赖 wp-locate-foundation 的 useCellLocate 实现实际跳转
 function handleLocateCell(item: TsjFinding) {
   emit('locate-cell', {
     wpCode: props.wpCode || '',
     sheet: item.sheet,
     cellRange: item.cell_range,
+    componentType: props.componentType,
   })
 }
 

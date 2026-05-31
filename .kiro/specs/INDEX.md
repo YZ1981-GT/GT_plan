@@ -1,6 +1,6 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-05-30  
+**最后更新**：2026-06-01  
 **当前分支**：`main`（HEAD = 85b362d5）  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer  
 **目标规模**：6000 并发用户
@@ -111,6 +111,10 @@
 
 | Spec | 状态 | 说明 |
 |------|------|------|
+| `doc-level-ai-chat/` | ✅ | 文档/文件夹级 LLM 知识库对话；ContextBuilder + 对话端点 + 前端面板 + 采纳确认流；72 测试全绿（含 D1~D4 PBT + 全链路集成）；残留仅 Playwright UAT 待环境 |
+| `global-modules-cleanup/` | ✅ | 全局模块多源澄清+死文件清理+联动补全（6 小修打包）：F1 删 33MB 死文件 L1 + F2 V1/V2 命名澄清 + F3 底稿模板 JSON→registry 联动 + F4 枚举字典陈旧注释 + F5 懒建表入 D6（V040 迁移）；35 测试全绿（H1~H4 PBT + 确定性）+ app import OK |
+| `global-modules-p2-polish/` | ✅ | 全局模块 P2/P3 体验与性能增强（文档改进项 100% 覆盖）：地址库 Redis 二级缓存 + 地址校验接公式保存流 + 公式变更时间线 UI + 枚举扩展业务枚举（EliminationEntryType/审计循环代号/风险等级）+ 高级查询 Redis 缓存+流式导出 + enum_dict_overrides 入 D6（V042）+ content_text 填充保障（MinerU OCR）+ note_template DB 化评估暂缓；57 测试全绿（P1~P4 PBT + 确定性）+ app import OK；完成日期 2026-06 |
+| `wp-ai-review-ux-fix/` | ✅ | 底稿 AI 复核弹窗 UX 缺陷修复：C1 复核发现卡片显示底稿编号 tag + C2 useCellLocate 定位跳转接线 + C3 复核按钮显示底稿名 + 后端 wp_code 注入；36 vitest 全绿（含 TsjReviewFindings + SideStandardsTab）；残留仅 Playwright 实测待环境 |
 | `consol-note-three-level-drilldown/` | 📌 | 合并附注三级穿透；前置 = 真实合并母子项目数据（PG 当前 0 个 consolidated 项目）；待并入 Phase 3 |
 
 > 注：`workpaper-fill-service-split` 已 `git rm`（目标 WorkpaperFillService 经 grep 实证为 0 业务调用方的死代码，拆分无意义）；`gt-c-note-table-shrink` 已于 2026-05-30 完成并归档至 07-workpaper-slimdown（GtCNoteTable 1803→450 + GtEControlTest 1414→344，90 测试全绿；残留 R3 Playwright 目视待环境，非代码缺口）。
@@ -257,8 +261,8 @@ _archive/
 | cross_wp_references | 400 条 |
 | prefill_formula_mapping | 1035 cells |
 | validation_rules | 114 条 |
-| D6 SQL 迁移 | V001-V039（V039 = disclosure_notes provenance / Phase 3） |
-| **Spec 总数** | **active 1（consol-note stub）+ archived 94（详见 §三）** |
+| D6 SQL 迁移 | V001-V040（V040 = account_note_mapping + consol_cell_comments 懒建表入 D6） |
+| **Spec 总数** | **active 2（consol-note stub + global-modules-p2-polish ✅）+ archived 94（详见 §三）** |
 
 ---
 
