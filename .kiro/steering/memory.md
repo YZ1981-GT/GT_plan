@@ -51,9 +51,9 @@ inclusion: always
 - **✅ 预存 worksheet 测试失败已修（commit `ce898e83`）**：`test_consol_worksheet.py` 2 红根因 = seeded_db fixture 抵销用 `review_status=draft`，但 Phase1 引擎改为**只消费 APPROVED**（ADR-CONSOL-102）→ 抵销不生效；**引擎本身正确**（差额表中间节点 consolidated=Σ子节点 consolidated + 本级抵销/调整，不含本级个别数，非"丢本体"bug）；修复=fixture 改 approved；**教训：先读设计文档确认是引擎错还是 fixture 过时，不预设引擎会计 bug**
 - **四阶段三件套已归档 `_archive/09-consolidation-phases/`**（work commit `375edd8d`，封板①②完成后归档，非空归档）；**tasks.md 残留未勾项全是外部依赖**（真实集团数据 UAT `*` 卡 PG 0 consolidated + Playwright 待环境 + B6/B7 CAS20 审计专业复核），代码+测试层面已封板
 
-### git 当前状态（2026-05-31）
-- 当前分支 `main`，已 push origin/main（HEAD `e2729355`，6 维核查全绿 0/0 工作树干净）；连续 merge `origin/spec/frontend-consistency-m1`（`9b6434b6`：GtAmountCell 全量化 + ElMessage.error→handleApiError + 5 PBT + 70 TSJ 复核提示词 + check_file_size 路径修复）+ `origin/work/2026-05-30-wp-specs`（consol 封板集成测试 + seed_consol_uat + PK uuid bug 修复 + worksheet fixture 修复 + 四阶段归档）；merge 后实测 consol 23 测试通过（非只信 commit message）
-- **多轮 merge 冲突均 memory.md**：处理原则=consol 取 work 侧（更新更准，封板+bug修复）+ frontend/7 spec 取我侧；consol 业务逻辑零变化（前端组件仅 handleApiError 治理）
+### git 当前状态（2026-06-01）
+- 当前分支 `spec/global-modules-AD-implementation`，已 push origin（HEAD `1fe58697`，55 files +8496/-573）；基于 main `0dae057c`；待 PR 合入 main
+- 内容：spec A（formula-engine-unification 19 任务）+ spec D（report-config-baseline 11 任务）全量实施
 - 历史已闭环：合并模块 Phase0~3 全在 main / 底稿模块 14 spec 已实施归档 / schema drift 三层修复 / git 治理 spec（GIT_MODE 双模式 + 分支命名 hook + 6 维核查 CLI `check_git_sync_state.py`）
 
 ### 已完成 spec 总览
