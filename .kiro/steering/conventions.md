@@ -552,6 +552,10 @@ WHERE l.project_id = :pid AND l.year = :yr
 - **task 标 [x] 铁律**：只有跑过 pytest/vitest 且全绿才能标 [x]；"假设复用已有逻辑 = 0 改动"不等于验证通过
 - **大 spec 拆分铁律**：把异质度极大的 N 项功能塞进单 spec 会导致 30/30 标 ✓ 假象 + 复盘工作量 = N × 单 spec 复盘；判定信号：spec 内 ADR 数 ≥ 6 且彼此无依赖时一定要拆
 - **router_registry 注册必须验证铁律**：新建 router 必须有对应 `test_router_registered_in_*` 测试 + 主 agent 跑通验证 §N 字符串
+- **xfail reason 写"XXX doesn't exist - production code bug"= 根因修复信号**（2026-05-31）：不是绕开——先验证真实定义（枚举大小写/字段是否存在，`python -c "getattr(Enum,'X','MISSING')"`，不信测试与代码哪个对），修根因后去 xfail 让其真实通过，不留假绿
+- **merge 跨阶段签名变更必 grep 全部调用方铁律**（2026-05-31 实证，两次咬人）：merge 带入相邻阶段的 sync↔async 改 / 删公开方法时，必须全仓 grep 调用点同步改+跑 import 冒烟——单阶段 mock 测试全绿不代表跨阶段不断裂（实例：Phase1 改 async 令 Phase2 cascade 静默失败 / Phase1 删 _execute_formula 令 Phase2 测试全红）
+- **多阶段 spec 并行开发盲区 = 无全链路集成测试**（2026-05-31）：各阶段单元/PBT 充分但都 mock 掉相邻阶段，接口契约无守门 → merge 时签名漂移咬人；下游阶段应基于上游真实代码而非"上游待做"假设开发；"先行止血"stopgap 代码（顶上游未做）应明确标"临时，上游来了要删"并连带删其测试
+- **复盘必跑全套测试不信文档自述**（2026-05-31）：声称"全绿"前实际跑套件——本轮正是跑 147 consol 套件抓到 merge 后 7 个失效测试；"全绿"含金量受数据限制时必诚实标明（如合并模块全合成/mock 数据，真实数据正确性 0 验证 ≠ 可生产）
 
 ## §migration / SQL 铁律
 

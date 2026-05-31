@@ -76,6 +76,7 @@ inclusion: always
 - 详细规约（UI 视觉 17 条 / ESLint AST / 测试 fixture / 启动 lifecycle / CI 卡点 / EventBus / 中间件 等）→ `#conventions` + `#dev-history`
 
 ## 关键引用指南
+- **仅 memory.md 是 `inclusion: always`（≤200 行约束只针对它）**；architecture/conventions/dev-history 均 `inclusion: manual` 仅 `#` 引用时加载，体量符合参考文档定位**无需裁剪**（dev-history 还是 append-only 审计轨迹）
 - 技术事实 / 端点速查 / PG schema / spec 历史详细 → `#dev-history` grep 关键词
 - 架构 / 系统规模 / 数据流 → `#architecture`
 - 编码规范 / UI 视觉补充 / 操作铁律详解 / PG 运维 → `#conventions`

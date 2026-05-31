@@ -15,6 +15,15 @@ inclusion: manual
 
 ## 关键里程碑索引
 
+### 2026-05-31（晚）：合并模块 Phase 1 merge 进 work + 跨阶段 regression 修复
+- **Phase 1 merge**（merge commit `60088d42`）：`origin/main` 的 Phase 1（consol-phase1-arch-lock：AmountResolver 统一引擎/ELIMINATION_APPROVED 事件重算/全端点锁定+ConsolLockedBanner/B6 负商誉 CAS20/B7 少数股东/A3 async）merge 进本地 work 分支（与本地 Phase 2/3 从 `0b5749bb` 分叉）；5 冲突解决=INDEX.md/memory.md 文档 union + audit_platform_schemas.py EventType 两成员都留（CONSOL_SCOPE_CHANGED+ELIMINATION_APPROVED）+ consolidation.py/consol_report.py 取 Phase 1 版
+- **🔴 跨阶段 regression #1（merge 时抓到）**：Phase 1 把 `generate_consol_reports_sync` 改 async（A3），但 Phase 2 cascade 编排者仍同步调用 → 永不执行协程 report 步静默失败 → 修 `await` + PBT mock 改 AsyncMock；consol_report 路由同补 await
+- **🔴 跨阶段 regression #2（复盘跑测试抓到，fix commit `398dc5ab`）**：Phase 1 A1/A2 重构**删除** `consol_report_service._execute_formula`（统一改 evaluate_formula+ConsolTrialResolver），但 Phase 2 P2-partial 先行写的 `test_consol_report_formula_eval.py`（7 测试）针对已删方法 → merge 后全红 → 重定向到真实入口（`_safe_eval_expr` 纯函数 + `evaluate_formula` async/ROW token，resolver double 需带 db/project_id/year），11 测试全绿
+- **Task 4.4 经 merge 闭环**：Phase 1 实装 ELIMINATION_APPROVED 事件 + 审批端点发事件，正是 Phase 2 当时留 NOTE 占位的依赖；merge 时用真实事件发布替换占位
+- **四阶段套件实测 147 passed / 0 failed**（Phase0 PBT+集成 / Phase1 PBT+集成 / Phase2 6 PBT / completeness/stale/scope/trial_stale/formula_eval + elimination）；24 consol service + 16 ADR（001~003/101~106/201~206/301~304）
+- **🔴 四阶段共同盲区 = 无全链路集成测试**（各阶段 mock 相邻阶段，merge 两次咬人即此类）；**统一卡点 = PG 0 个 consolidated 项目**（真实 UAT 全 data-blocked）；**封板待办**：①全链路集成测试（合成母子数据）②`seed_consol_uat.py` 幂等造最小合成集团 ③Phase2/3 Playwright 复用 Phase1 已跑通环境；**收手判断不变**：地基已正确，无真实集团客户前不深做打磨
+- **memory.md 精简 493→83 行**（commit `56e31beb`）：完成事项 sprint 日志下沉到 git 历史+dev-history+INDEX.md+proposals；仅 memory.md 是 `inclusion: always` 受 ≤200 约束，architecture/conventions/dev-history 均 manual 仅按需加载无需裁剪
+
 ### 2026-05-31：合并模块 Phase 2 编排 + 接线（consol-phase2-orchestration ✅ 代码+测试完成）
 - **A6/C2 cascade_refresh 编排者**：新建 `consol_cascade_refresh_service.refresh_all`（DAG 单一入口 tree→worksheet→trial→reconcile→report→notes，重建被删 orchestrator，只编排复用既有 service；失败隔离关键步中断/下游继续；trial 步后统一 commit；progress_cb 上报）
 - **refresh-all 后台 worker + SSE**：`consol_refresh_job_service`（进程内内存 job 注册表 + asyncio.create_task worker，自带 db session）+ `consol_refresh.py` 路由（POST refresh-all 返 job_id / GET refresh-status 兜底 EH6）；进度走 `event_bus.broadcast_raw` → 既有 events/stream（不占 asyncpg pool，R5）；router_registry §6 注册
