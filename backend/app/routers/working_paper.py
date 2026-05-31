@@ -695,6 +695,7 @@ async def assign_workpaper(
     data: AssignRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("review")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """分配编制人/复核人（需 review 权限）
 
@@ -754,6 +755,7 @@ async def submit_review(
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """专用提交复核端点 — 统一校验 5 项门禁后流转复核状态
 
@@ -957,6 +959,7 @@ async def update_review_status(
     data: ReviewStatusRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("review")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """更新底稿复核任务状态（需 review 权限）
 
@@ -1021,6 +1024,7 @@ async def parse_workpaper(
     dry_run: bool = Query(False, description="仅预览解析结果，不写入 parsed_data"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """手动触发解析回写（需编辑权限）— 真正打开 .xlsx 提取关键数据
 
@@ -1497,6 +1501,7 @@ async def sync_procedure_status(
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """底稿状态与审计程序联动
 

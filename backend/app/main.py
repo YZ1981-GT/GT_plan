@@ -166,8 +166,12 @@ def _register_phase_handlers() -> None:
         from app.services.consol_trial_stale_handler import (
             register_consol_trial_stale_handler,
         )
+        from app.services.consol_elimination_recalc_handler import (
+            register_consol_elimination_recalc_handler,
+        )
         register_stale_handler(event_bus)              # NOTE_UPDATED → 合并附注 stale
         register_consol_trial_stale_handler(event_bus)  # TRIAL_BALANCE_UPDATED → 合并 trial stale（P1）
+        register_consol_elimination_recalc_handler(event_bus)  # ELIMINATION_APPROVED → worksheet + trial 重算（衔接2）
     except Exception as e:
         _log.getLogger("audit_platform").warning(
             "[启动] 合并 stale handler 注册失败: %s", e

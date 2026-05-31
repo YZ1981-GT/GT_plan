@@ -133,6 +133,21 @@ async def review_elimination(
                 after={"review_status": entry.review_status.value if entry.review_status else None},
             )
             await db.flush()
+            await db.commit()
+
+            # 衔接2：审批 → 发 ELIMINATION_APPROVED 事件触发 worksheet + trial 重算
+            # （审批已落库 commit，重算为下游派生，失败不影响审批本身，EH3）
+            try:
+                from app.models.audit_platform_schemas import EventPayload, EventType
+                from app.services.event_bus import event_bus
+                await event_bus.publish(EventPayload(
+                    event_type=EventType.ELIMINATION_APPROVED,
+                    project_id=project_id,
+                    year=entry.year,
+                    extra={"entry_id": str(entry_id)},
+                ))
+            except Exception:
+                pass  # 事件发布失败不阻断审批
 
         return entry
     except ValueError as e:

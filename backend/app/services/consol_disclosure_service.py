@@ -373,8 +373,10 @@ class ConsolDisclosureService:
             total_mi += equity
             total_mi_profit += profit
 
-            # 计算少数股东持股比例
-            minority_ratio = (1 - float(mi.minority_share_ratio or Decimal("1"))) * 100
+            # 少数股东持股比例（B7 / ADR-CONSOL-105）：minority_share_ratio 字段语义即
+            # "少数股东持股比例"（与 minority_interest_service.calculate_mi 一致），直接用，不求补数。
+            # 母 80%/子 20% → 此处显示 20.00%。
+            minority_ratio = float(mi.minority_share_ratio or Decimal("0"))
             rows.append({
                 "子公司": mi.subsidiary_company_code,
                 "少数股东持股比例": f"{minority_ratio:.2f}%",

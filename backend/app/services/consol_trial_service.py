@@ -113,7 +113,7 @@ async def recalculate_trial(db: AsyncSession, project_id: UUID, year: int) -> li
             sa.select(EliminationEntry).where(
                 EliminationEntry.project_id == project_id,
                 EliminationEntry.year == year,
-                EliminationEntry.review_status == ReviewStatusEnum.APPROVED,
+                EliminationEntry.review_status == ReviewStatusEnum.approved,
                 EliminationEntry.is_deleted.is_(False),
             )
         )

@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TrialBalance
-from app.models.consolidation_models import ConsolWorksheet, EliminationEntry
+from app.models.consolidation_models import ConsolWorksheet, EliminationEntry, ReviewStatusEnum
 from app.services.consol_tree_service import TreeNode, build_tree, get_descendants
 
 
@@ -126,6 +126,7 @@ async def _get_elimination_map(
         sa.select(EliminationEntry).where(
             EliminationEntry.project_id == project_id,
             EliminationEntry.year == year,
+            EliminationEntry.review_status == ReviewStatusEnum.approved,
             EliminationEntry.is_deleted == sa.false(),
         )
     )
@@ -284,6 +285,7 @@ async def _batch_load_eliminations(
         sa.select(EliminationEntry).where(
             EliminationEntry.project_id == project_id,
             EliminationEntry.year == year,
+            EliminationEntry.review_status == ReviewStatusEnum.approved,
             EliminationEntry.is_deleted == sa.false(),
         )
     )

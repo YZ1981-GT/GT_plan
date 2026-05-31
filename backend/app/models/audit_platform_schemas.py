@@ -819,6 +819,10 @@ class EventType(str, enum.Enum):
     # payload: {project_id, year, old_standard: dict, new_standard: dict, changed_by: UUID}
     STANDARD_CHANGED = "standard_changed"
 
+    # consol-phase1-arch-lock 需求 2.3: 抵销分录审批 → worksheet + trial 重算
+    # payload: {project_id, year, extra: {entry_id}}
+    ELIMINATION_APPROVED = "elimination.approved"
+
 
 class EventPayload(BaseModel):
     """事件载荷"""

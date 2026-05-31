@@ -72,6 +72,9 @@ async def generate_notes(
     """生成附注初稿"""
     from app.services.prerequisite_checker import PrerequisiteChecker
 
+    # 合并锁定检查（project_id 在 body）— Phase 1 Task 5
+    await check_consol_lock(project_id=data.project_id, db=db)
+
     check = await PrerequisiteChecker().check(db, data.project_id, data.year, "generate_notes")
     if not check["ok"]:
         raise HTTPException(status_code=400, detail=check)
@@ -214,6 +217,7 @@ async def update_note(
     data: DisclosureNoteUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """更新附注章节内容"""
     engine = DisclosureEngine(db)

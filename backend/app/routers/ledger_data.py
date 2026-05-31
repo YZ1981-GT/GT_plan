@@ -160,6 +160,7 @@ async def restore_ledger(
     request: RestoreLedgerRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _lock_check=Depends(check_consol_lock),
 ) -> dict:
     """S7-10: 从回收站恢复数据（is_deleted=true → false）。"""
     if current_user.role not in ("admin", "partner", "manager"):

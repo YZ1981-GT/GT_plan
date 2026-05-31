@@ -15,15 +15,26 @@ def calculate_goodwill(
     identifiable_net_assets_fv: Decimal | None,
     parent_share_ratio: Decimal | None,
 ) -> tuple[Decimal | None, bool, str | None]:
-    """计算商誉/负商誉"""
+    """计算商誉/负商誉。
+
+    商誉 = 合并成本 − 可辨认净资产公允价值 × 母公司持股比例（公式不变）。
+
+    负商誉处理（B6 / ADR-CONSOL-104，符合 CAS 20《企业合并》现行规定）：
+    经复核合并成本与可辨认净资产公允价值的计量后，**全额计入当期损益
+    （营业外收入）**。删除原"25% 阈值 + 递延收益摊销"编造分支（递延收益
+    摊销是已废止做法）。负商誉计量符合性最终须由懂 CAS 20 的审计专业人员
+    复核（标 `[ ]* 待审计专业确认`）。
+    """
     if acquisition_cost is None or identifiable_net_assets_fv is None or parent_share_ratio is None:
         return None, False, None
 
     goodwill = acquisition_cost - (identifiable_net_assets_fv * parent_share_ratio / Decimal("100"))
     is_negative = goodwill < 0
-    treatment = None
     if is_negative:
-        treatment = "计入损益" if abs(goodwill) < acquisition_cost * Decimal("0.25") else "递延收益摊销"
+        # CAS 20：负商誉经复核后全额计入当期损益（营业外收入）
+        treatment = "计入当期损益（营业外收入）；需复核合并成本与可辨认净资产公允价值的计量"
+    else:
+        treatment = "确认为商誉"
     return goodwill, is_negative, treatment
 
 

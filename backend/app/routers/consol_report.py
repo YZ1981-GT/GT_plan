@@ -51,7 +51,7 @@ async def generate_consol_reports(
 ):
     """生成合并报表"""
     try:
-        results = generate_consol_reports_sync(db, data.project_id, data.year, data.applicable_standard)
+        results = await generate_consol_reports_sync(db, data.project_id, data.year, data.applicable_standard)
         return {
             "message": "合并报表生成成功",
             "report_types": list(results.keys()),
@@ -107,7 +107,7 @@ async def balance_check(
     user=Depends(require_project_access("readonly")),
 ):
     """合并资产负债表平衡校验"""
-    return verify_balance_sync(db, project_id, year)
+    return await verify_balance_sync(db, project_id, year)
 
 
 @router.post("/{project_id}/{year}/workpaper")
@@ -119,7 +119,7 @@ async def create_consol_workpaper(
 ):
     """生成合并底稿.xlsx"""
     try:
-        result = generate_consol_workpaper_sync(db, project_id, year)
+        result = await generate_consol_workpaper_sync(db, project_id, year)
         return {"message": "合并底稿生成成功", "file_name": result.file_name}
     except ImportError as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -136,7 +136,7 @@ async def download_consol_workpaper(
 ):
     """下载合并底稿.xlsx"""
     try:
-        result = generate_consol_workpaper_sync(db, project_id, year)
+        result = await generate_consol_workpaper_sync(db, project_id, year)
         if not result.file_data:
             raise HTTPException(status_code=500, detail="未生成底稿文件")
         output = BytesIO(result.file_data)

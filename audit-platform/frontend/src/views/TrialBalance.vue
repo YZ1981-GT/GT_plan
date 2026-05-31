@@ -77,6 +77,7 @@
 
     <!-- 归档横幅 -->
     <ArchivedBanner />
+    <ConsolLockedBanner />
 
     <!-- 折叠/展开按钮 -->
     <div class="gt-header-toggle" @click="headerCollapsed = !headerCollapsed">
@@ -702,6 +703,7 @@ import LinkageBadge from '@/components/LinkageBadge.vue'
 import { useLinkageIndicator } from '@/composables/useLinkageIndicator'
 import { useAuditContext } from '@/composables/useAuditContext'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
+import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
 
 const route = useRoute()
 const router = useRouter()

@@ -786,3 +786,13 @@ powershell 进程异常退出但仍持有 log 文件句柄时，`Get-Content / R
 ### 程序裁剪页面（2026-05-24 重写）
 
 `ProcedureTrimming.vue` 三大功能 = 一键智能裁剪 / 自定义裁剪 / 自定义新增程序；`chain_orchestrator` 步骤 5b 尊重裁剪 + 步骤 5c 加入自定义程序
+
+## 合并模块规范（consol）
+
+- **抵销分录消费口径统一为 APPROVED**（consol-phase1-arch-lock / ADR-CONSOL-102，2026-05-31）：worksheet（`consol_worksheet_engine`）与 trial（`consol_trial_service.recalculate_trial`）两条计算路径**只消费 `review_status == approved` 的 `EliminationEntry`**（draft/pending_review/rejected 不进合并数）。这是预期修正——**口径变更需通知用户**：未审批的草稿抵销不再影响正式合并报表。抵销审批（→approved）发 `ELIMINATION_APPROVED` 事件自动触发 worksheet + trial 重算（幂等）。
+- **ReviewStatusEnum 成员全小写**：`draft/pending_review/approved/rejected`，禁止写 `.APPROVED/.DRAFT` 大写（会 AttributeError）。
+- **合并公式引擎复用 report_engine**（ADR-CONSOL-101）：合并报表取数经 `AmountResolver` 注入（`ConsolTrialResolver` 读 consol_trial.consol_amount），公式解析/求值统一走 `report_engine.evaluate_formula`，禁止在 consol 侧复制公式引擎。
+- **consol service 全 async**（ADR-CONSOL-106）：`AsyncSession` 上禁止 `self.db.query()`，统一 `await self.db.execute(sa.select(...))`。
+- **锁定全端点覆盖**（ADR-CONSOL-103）：子公司写端点（底稿/附注/序时账/报表）必须挂 `Depends(check_consol_lock)`；端点仅含 wp_id/note_id 时 check_consol_lock 自动反查 project_id；project_id 在 body 的端点（reports/notes generate）需在 handler 内 `await check_consol_lock(project_id=..., db=db)`。前端子公司编辑视图挂 `<ConsolLockedBanner />`。
+- **负商誉按 CAS 20**（ADR-CONSOL-104）：负商誉全额计入当期损益（营业外收入），无 25% 阈值/递延摊销。
+- **minority_share_ratio = 少数股东持股比例**（ADR-CONSOL-105）：附注直接展示，禁止 `(1 - ratio) * 100` 求补数。

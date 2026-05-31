@@ -112,7 +112,7 @@
 | Spec | 状态 | 说明 |
 |------|------|------|
 | `consol-phase0-core-pipeline/` | ✅ 核心完成 | Phase 0 止血：B1 汇总 + B2 对账 + C1/C3 schema 基线 V027 + A4 下线 + P1 留痕 + P5 权限 + P3 防误用 + F2 锁定闭环 + ADR-CONSOL-001/002/003；PBT P1~P7 全绿；真实 UAT（任务14）卡 PG 合并数据 |
-| `consol-phase1-arch-lock/` | 📌 待启动 | Phase 1 架构修复：A1 公式引擎统一 + 衔接2 抵销口径 + B6/B7 准则修正 + A3 async；前置 = Phase 0 |
+| `consol-phase1-arch-lock/` | ✅ 核心完成 | Phase 1 架构修复：A1/A2 公式引擎统一（AmountResolver 注入复用 report_engine，删重复）+ 衔接2 抵销 APPROVED + 事件驱动重算 + 锁定全端点 + ConsolLockedBanner + 423 拦截 + B6 负商誉 CAS20 + B7 少数股东比例 + A3 async；ADR-CONSOL-101~106；Q1~Q7 PBT + 锁定 423 参数化全绿；6A.3*/6B.4* 待审计专业确认 / 任务9 Playwright 待环境 / 任务10* 真实 UAT 卡 PG 合并数据 |
 | `consol-phase2-orchestration/` | 📌 待启动 | Phase 2 编排接线：cascade_refresh + V2 附注 + cross_template + 报表穿透；前置 = Phase 1 |
 | `consol-phase3-frontend-drilldown/` | 📌 待启动 | Phase 3 前端联动：ConsolBreakdownDialog + 附注穿透 + 自动建树 + stale SSE；前置 = Phase 2 |
 | `consol-note-three-level-drilldown/` | 📌 | 合并附注三级穿透；前置 = 真实合并母子项目数据（PG 当前 0 个 consolidated 项目）；待并入 Phase 3 |
