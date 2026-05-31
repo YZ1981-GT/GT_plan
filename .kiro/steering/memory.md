@@ -49,8 +49,8 @@ inclusion: always
 - **封板待办（按 ROI）**：①🔴 全链路集成测试（合成母子数据跑 建树→recalc→trial→对账→报表→附注→穿透）②🟠 `seed_consol_uat.py` 幂等造最小合成集团一脚本解锁四阶段 UAT ③🟡 Phase2/3 Playwright 复用 Phase1 已跑通环境补实测；**收手判断：地基已正确，无真实集团客户前不深做打磨，封板做①②后转回核心模块**
 
 ### git 当前状态（2026-05-31）
-- 当前分支 `main`，已 merge `origin/work/2026-05-30-wp-specs`（merge commit `66e734a3`，consol phase2/3 全套 + V039 迁移 + 10 ADR-CONSOL-201~304 + 25 consol service）；**ahead origin/main 8 commit 未推送**（按"协作走 PR 不直推 main"待用户决定推送）
-- **merge 唯一冲突 memory.md**：远程精简到 70 行（详细 sprint 日志下沉 dev-history/conventions），用 `git checkout --theirs` 取精简版作基底 + 补回本地新增（文档级 LLM 对话偏好 + 全局 7 模块多源治理 + 底稿 AI 复核 UX）；consol 代码全自动合并干净；merge 后 `app import OK` 1312 路由 + consol 关键字段（consolidation_type/consol_lock/consolidation_breakdown/is_stale）全幸存
+- 当前分支 `main`，已 push origin/main（HEAD `587e70d6`，6 维核查全绿 ahead/behind 0/0 工作树干净）；含 consol phase2/3 全套 + V039 迁移 + 10 ADR-CONSOL-201~304 + 25 consol service + 全局 7 模块盘点文档 + memory 精简版
+- **本次直推 main 经用户拍板（选 A）**：GIT_MODE 未设=默认 single 允许直推；fast-forward 无冲突（behind=0）；内容本是 work 分支已验证工作，直推让主线立即拿到
 - 历史已闭环：合并模块 Phase0~3 全在 main / 底稿模块 14 spec 已实施归档 / schema drift 三层修复 / git 治理 spec（GIT_MODE 双模式 + 分支命名 hook + 6 维核查 CLI `check_git_sync_state.py`）
 
 ### 已完成 spec 总览
@@ -60,6 +60,14 @@ inclusion: always
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
 - 待捞回：`origin/spec/frontend-consistency-m1` 4 commit（GtAmountCell 全量化/状态硬编码消除/6 PBT，待用户评估）
+
+### 全局 7 模块改进 6 spec 三件套已建（2026-05-31，待实施）
+- 据盘点文档生成 6 个 active spec（全 Design-First/bugfix，三件套齐全 0 diagnostics）：**A `formula-engine-unification`**（feature，4套求值器→单内核+审计收口哈希链，4阶段19任务）/ **B `retrieval-kernel-unification`**（feature，检索3套→单内核+pgvector+知识文件入网，3阶段12任务）/ **C `doc-level-ai-chat`**（feature，文档级LLM对话，**依赖B**，4阶段12任务）/ **D `report-config-baseline`**（feature，报表主模板回填+克隆stale通知，3阶段11任务）/ **E `wp-ai-review-ux-fix`**（bugfix，复核显底稿编号+接useCellLocate，8任务）/ **F `global-modules-cleanup`**（bugfix，地址库澄清+33MB死文件+模板JSON→registry+懒建表，10任务）
+- 用户拍板**全部 6 个按梯队顺序 A→B→C→D→E→F 实施**；依赖链仅 B→C；尚未开始实施（仅三件套就位）；下一步从 A 或 E/F 起步
+- **第 7 个 spec G `global-modules-p2-polish` 已建（2026-05-31，实现文档 100% 覆盖）**：收口全部 P2/P3 = 地址库 Redis 二级缓存 + 地址校验接公式保存流 + 公式变更时间线 UI(依赖A) + 高级查询 Redis 缓存+流式导出 + 枚举扩展业务枚举(EliminationEntryType/审计循环代号/风险等级，与F协调) + enum_dict_overrides 入 D6 + content_text 填充(保障B向量索引) + note_template DB 化(标`*`评估后做)；design-first/feature，4阶段11任务 0 diagnostics；**A~F 落地后启动**；承重锚点实证（AddressRegistryService._slots+invalidate / validate_formula_refs / EliminationEntryType / disclosure_engine._load_templates / wp_document_recognizer / time_machine_service 全在）；**7 spec 实现盘点文档改进项 100% 覆盖，唯一例外=国企/上市 diff 去 mock（卡审计师真实数据，外部依赖非工程可独立完成）**；文档 §二十四 对照表已更新
+- **7 spec 跨 spec 一致性复盘修正 2 偏差（2026-05-31）**：①🔴 spec G content_text 提取工具引用错——`wp_document_recognizer` 实为 LLM 结构化凭证字段提取(DocType.VOUCHER 返结构化字段)**不产全文**，改为 `mineru_service.recognize_for_ocr`(返 `{"text":全文}`)/`unified_ocr_service.recognize` ②🔴 spec D 审计 event_type 歧义——"复用 formula-engine 哈希链收口"被误读会把报表配置变更记成公式变更，澄清为复用 `append_audit_log` 机制但用**独立 event_type `report_config_changed`**(非 A 的 formula_changed)；跨 spec 协调点核查通过=B↔C semantic_search 签名一致 / A↔G FormulaManagerDialog 改不同部分且 G 在 A 后 / E↔C useCellLocate 签名统一；**教训：单 spec 复盘抓不到跨 spec 问题，必须查"工具真实产出物"+"schema 复用边界"**
+- **6 spec 三件套复盘实证（2026-05-31，承重锚点全属实，修正 4 处偏差）**：✅ formula_engine.execute/FormulaContext/FormulaResult + amount_resolver Protocol + report_engine.evaluate_formula + knowledge_index_service + report_config_service + GroupNoteTemplateBaseline + useCellLocate + 两懒建表 全 readCode 实证存在；🔴 修正 = ①spec B `incremental_update` 真实参 `source_id`(非doc_id) + `KnowledgeSourceType` 枚举无 `knowledge_doc` 需先加成员 ②spec B `semantic_search(project_id,query,top_k)` 无 scope/user 需新增 + "6类"实为"11类"业务数据 ③spec E `useCellLocate` 真实签名 snake_case `{wp_code,sheet_name,cell_ref,component_type}` 且 component_type 必传(非camelCase) ④spec F 死文件/模板 JSON 真实路径 `backend/data/`(非 backend/app/data/)
+- **6 spec 覆盖度核查（2026-05-31，两轮复盘）**：完整覆盖文档 P0+P1 核心（单源/联动/澄清）；**P1-7「公式管理覆盖合并+底稿」已补进 spec A 需求8+task17b**——实证发现 `FormulaManagerScope` 现已有 6 scope（note/consol_note/consol_worksheet/consol_report/report/tb，**合并部分已由 consol Phase2 ADR-205 完成**），仅剩"底稿 workpaper scope"半条（需 readCode 定底稿公式语法域归内核 or cell_formula_evaluator）；**第二轮发现文档优先级自相矛盾**（地址库 Redis 缓存 §一标 P1 但 §九 路线图标 P2）→ 已修正 §一 对齐 P2；**未纳入 6 spec 的全是 P2 体验性能（地址库 Redis/公式时间线 UI/高级查询缓存/note_template DB 化/枚举扩展）+ P3 + 外部依赖（diff 去 mock）+ 已属既存 spec（生成链路 populate_parsed_data 归 wp-generation-pipeline）**，非遗漏；文档 §二十四 固化覆盖度对照表 + 建议 P2 批次另起 `global-modules-p2-polish` spec
 
 ### 全局 7 模块盘点 + 多源治理（2026-05-31，文档 `docs/proposals/global-modules-status-and-improvement-2026-05-31.md` 六轮代码实证复盘）
 - **7 横切支撑模块**=地址库/公式管理/高级查询/枚举字典/底稿模板库/报告模板库/知识库；ROI 高于合并模块（天天用不卡真实数据）

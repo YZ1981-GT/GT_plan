@@ -57,7 +57,7 @@
 
 - **P0 统一为单一地址服务**：明确 L1/L2/L3（设计期静态分析产物）vs 内存版（运行时动态）的边界 —— 建议 V2 三级文件**仅用于 linkage_graph 离线构建**，运行时一律走内存版 `address_registry`；在两个文件头部互相 `@see` 标注职责，避免误用。
 - **P0 核实并清理 33MB 死文件**：grep 确认 `address_registry_l1_physical.json` 无运行时加载 → 若仅构建期用，移出 git tracked（生成物）或 gzip 压缩（同 `.hypothesis` 处理）。
-- **P1 内存版加 Redis 二级缓存**：AddressEntry 按 `project:year:domain` 缓存到 Redis（TTL 对齐现有），冷启动/多 worker 共享，避免每 worker 各自重建。
+- **P2 内存版加 Redis 二级缓存**：AddressEntry 按 `project:year:domain` 缓存到 Redis（TTL 对齐现有），冷启动/多 worker 共享，避免每 worker 各自重建。（与 §九 路线图 P2-9 一致归 P2 体验性能批次，不在本轮 6 spec P0+P1 范围）
 - **P2 地址有效性校验接入公式管理保存流**：`validate_formula_refs` 已实现但需确认公式编辑保存时强制调用（防止存入悬空引用）。
 
 ---
@@ -1214,4 +1214,53 @@ function onLocateCell(target: { wpCode: string; sheet: string; cellRange: string
 | D. 跨底稿分组 | ~1 天 | P1（依赖 §二十二） |
 
 **建议纳入 `doc-level-ai-chat` spec 或独立小 bugfix spec `wp-ai-review-ux-fix`**。A/B/C 可立即做（无外部依赖），D 等 §二十二 落地后做。
+
+
+---
+
+## 二十四、6 spec 覆盖度对照（2026-05-31，两轮遗漏复盘后固化）
+
+> 据本文档生成 6 个 spec（A formula-engine-unification / B retrieval-kernel-unification / C doc-level-ai-chat / D report-config-baseline / E wp-ai-review-ux-fix / F global-modules-cleanup），按梯队 A→F 实施。本节固化"哪条改进项进了哪个 spec / 未纳入及理由"，两轮逐条复盘确认。
+
+### 已覆盖（P0 + P1 核心 = 单源/联动/澄清）
+
+| 文档改进项 | 优先级 | spec |
+|-----------|--------|------|
+| 公式 4 引擎收敛单内核 + 收敛盘点 ADR | P0 | A |
+| 公式审计留痕收口哈希链 | P0 | A 阶段3 |
+| 公式管理覆盖底稿（合并部分已由 consol Phase2 ADR-205 完成） | P1 | A 需求8 |
+| 知识库清 B 旧服务 | P0 | B 阶段1 |
+| 知识文件→向量索引联动（A 接入 C） | P1 | B 阶段2 |
+| 向量存储选型 pgvector | P1 | B 阶段3 |
+| 文档级 LLM 对话 | 新功能 | C |
+| 报表主模板回填 + 覆盖率 CI + 主模板→克隆 stale | P1 | D |
+| 底稿 AI 复核 UX（编号/定位/按钮名） | bugfix | E |
+| 地址库 V1/V2 澄清 + 33MB 死文件 | P0 | F |
+| 底稿模板 JSON→registry 联动 + 边界澄清 | P1 | F |
+| 枚举字典 _DICTS 陈旧注释 | P1 | F |
+| 懒建表入 D6（account_note_mapping/consol_cell_comments） | §20.6 | F |
+
+### 未纳入 6 spec → 已收进 spec G（global-modules-p2-polish，2026-05-31 补建）
+
+> 为实现文档 100% 覆盖，新建第 7 个 spec **G `global-modules-p2-polish`** 收口全部 P2/P3 项（A~F 落地后启动）。
+
+| 文档改进项 | 优先级 | 归属 |
+|-----------|--------|------|
+| 地址库 Redis 二级缓存 | P2 | G 阶段1（需求1） |
+| 地址有效性校验接入公式保存流 | P2 | G 阶段1（需求2，与 A 互补） |
+| 公式变更时间线 UI + 回滚 | P2 | G 阶段2（需求3，依赖 A） |
+| 高级查询 Redis 缓存 + 流式导出 | P2/P3 | G 阶段3（需求4） |
+| 枚举字典 扩展业务枚举 | P2 | G 阶段2（需求5，与 F 协调） |
+| 枚举 enum_dict_overrides 入 D6 | P3 | G 阶段4（需求6.2） |
+| note_template 大文件 DB 化 | P2 | G 阶段4（需求6.1，标 `*` 评估后做） |
+| content_text 填充保障 | P2 | G 阶段4（需求6.3，保障 B 向量索引） |
+| 底稿模板 接通生成链路 populate_parsed_data | P1 | **既存 `wp-generation-pipeline` spec**（非本批） |
+| 底稿模板 入知识库 / version 联动 | P2 | version 联动已实现；入知识库归 B/G content_text |
+| 国企/上市 diff 去 mock | 外部 | 卡审计师真实数据（关联 consol P-7），唯一不进 spec 项 |
+
+### 最终覆盖结论（7 spec）
+
+- **7 个 spec（A~G）实现盘点文档改进项 100% 覆盖**，唯一例外是「国企/上市 diff 去 mock」——卡审计师真实数据（外部依赖，文档已标"不投全力"），非工程可独立完成。
+- 实施次序：A→B→C→D→E→F（核心，P0+P1）→ **G（P2/P3 体验性能，A~F 落地后）**。
+- spec G 的需求3（公式时间线 UI）依赖 spec A 哈希链；需求5（枚举扩展）与 spec F 同 system_dicts.py 协调；其余互相独立。
 
