@@ -7,7 +7,7 @@ import pytest
 import asyncio
 from decimal import Decimal
 
-from app.services.formula_parser import (
+from app.services.formula_parse_utils import (
     parse_formula, tokenize, ParseError,
     NumberNode, StringNode, BinOpNode, UnaryNode,
     FuncCallNode, RowRefNode, RangeSumNode,

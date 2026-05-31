@@ -33,7 +33,7 @@
 2. WHEN 事件触发 THEN handler 标记引用该行的已克隆项目 `report_config.is_stale=True`
 3. WHEN 克隆项目 is_stale THEN 前端 banner 提示"主模板已更新 N 行，是否同步"
 4. WHEN 用户选择同步 THEN apply_master_update 保留项目本地覆盖（keep_local）
-5. IF 主模板某行更新 THEN 只标记引用该行的克隆项目（不误标无关项目）
+5. WHEN 主模板某行更新 THEN 未引用该行的克隆项目不显示 stale 提示（用户可观测：无 banner）
 
 ### 需求 3：standard 覆盖率 CI 校验
 
@@ -67,4 +67,4 @@
 - **E1 受控传播**：项目→主模板必经 admin 审核（pending→approved 才合并）
 - **E2 本地覆盖保留**：apply_master_update(keep_local=True) 不覆盖项目已自定义行
 - **E3 stale 准确**：主模板某行更新恰好标记引用该行的克隆项目（不误标）
-- **E4 覆盖率完整**：四组合 standard × 四表行次无缺漏
+- **E4 结构完整性**：四组合 standard × 四表 seed 数据结构完整（行号连续、row_code 非空唯一、16 组合全覆盖）；V2 对照 CAS 准则校验业务覆盖率

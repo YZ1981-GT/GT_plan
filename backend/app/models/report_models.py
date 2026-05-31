@@ -143,6 +143,10 @@ class ReportConfig(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    # D spec report-config-baseline / V040: 主模板更新→克隆项目标脏
+    is_stale: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -153,6 +157,46 @@ class ReportConfig(Base):
             unique=True,
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# ReportConfigBaseline 模型（报表配置主模板回填候选）
+# ---------------------------------------------------------------------------
+
+
+class ReportConfigBaseline(Base):
+    """报表配置主模板回填候选（项目优化→主模板评审通道）
+
+    仿附注 GroupNoteTemplateBaseline 范式：项目级配置可"提交为主模板候选"，
+    admin 审核通过后合并回 standard 级（带版本号 + 审计留痕）。
+    对应迁移 V040__report_config_baseline.sql。
+    """
+
+    __tablename__ = "report_config_baseline"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    standard: Mapped[str] = mapped_column(String(40), nullable=False)
+    report_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    row_code: Mapped[str] = mapped_column(String(40), nullable=False)
+    candidate_formula: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_project_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), server_default=text("'pending'"), nullable=False
+    )
+    version: Mapped[int] = mapped_column(
+        Integer, server_default=text("1"), nullable=False
+    )
+    submitted_by: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
 # ---------------------------------------------------------------------------

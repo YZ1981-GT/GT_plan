@@ -13,13 +13,11 @@ Validates: Requirements 2.1, 2.2, 2.4, 2.5, 2.6, 2.7, 2.9, 8.2, 8.5
 
 from __future__ import annotations
 
-import ast
 import json
 import logging
-import operator
 import re
 from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -64,84 +62,10 @@ _COLUMN_MAP = {
 }
 
 # ---------------------------------------------------------------------------
-# 安全算术表达式求值（替代 eval）
+# _safe_eval_expr: 薄 re-export，委托 L1 内核 formula_engine.safe_eval_expr
+# （保留导出名以兼容 test_formula_engine_baseline / test_consol_report_formula_eval 的 import）
 # ---------------------------------------------------------------------------
-
-_SAFE_OPS = {
-    ast.Add: operator.add,
-    ast.Sub: operator.sub,
-    ast.Mult: operator.mul,
-    ast.Div: operator.truediv,
-    ast.USub: operator.neg,
-    ast.UAdd: operator.pos,
-}
-
-
-def _safe_eval_expr(expr: str) -> Decimal:
-    """安全求值纯算术表达式（仅支持 +−×÷ 和括号），不使用 eval。
-
-    基于 ast.parse 解析表达式树，递归求值。
-    """
-    try:
-        tree = ast.parse(expr.strip(), mode="eval")
-    except SyntaxError:
-        return Decimal("0")
-
-    def _eval_node(node: ast.expr) -> Decimal:
-        if isinstance(node, ast.Expression):
-            return _eval_node(node.body)
-        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
-            return Decimal(str(node.value))
-        if isinstance(node, ast.BinOp):
-            left = _eval_node(node.left)
-            right = _eval_node(node.right)
-            op_func = _SAFE_OPS.get(type(node.op))
-            if op_func is None:
-                raise ValueError(f"Unsupported operator: {type(node.op).__name__}")
-            if isinstance(node.op, ast.Div) and right == 0:
-                return Decimal("0")
-            return Decimal(str(op_func(float(left), float(right))))
-        if isinstance(node, ast.UnaryOp):
-            operand = _eval_node(node.operand)
-            op_func = _SAFE_OPS.get(type(node.op))
-            if op_func is None:
-                raise ValueError(f"Unsupported unary operator: {type(node.op).__name__}")
-            return Decimal(str(op_func(float(operand))))
-        # 支持函数调用：IF/ABS/ROUND/MAX/MIN
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            fn = node.func.id
-            args = [_eval_node(a) for a in node.args]
-            if fn == "ABS" and len(args) == 1:
-                return abs(args[0])
-            if fn == "ROUND" and len(args) >= 1:
-                ndigits = int(args[1]) if len(args) > 1 else 2
-                return round(args[0], ndigits)
-            if fn == "MAX" and len(args) >= 2:
-                return max(args)
-            if fn == "MIN" and len(args) >= 2:
-                return min(args)
-            if fn == "IF" and len(args) == 3:
-                return args[1] if args[0] != 0 else args[2]
-            raise ValueError(f"Unsupported function: {fn}")
-        # 支持比较运算（用于 IF 条件）
-        if isinstance(node, ast.Compare):
-            left = _eval_node(node.left)
-            for op, comparator in zip(node.ops, node.comparators):
-                right = _eval_node(comparator)
-                if isinstance(op, ast.Eq) and left != right: return Decimal("0")
-                if isinstance(op, ast.NotEq) and left == right: return Decimal("0")
-                if isinstance(op, ast.Gt) and not (left > right): return Decimal("0")
-                if isinstance(op, ast.GtE) and not (left >= right): return Decimal("0")
-                if isinstance(op, ast.Lt) and not (left < right): return Decimal("0")
-                if isinstance(op, ast.LtE) and not (left <= right): return Decimal("0")
-                left = right
-            return Decimal("1")
-        raise ValueError(f"Unsupported AST node: {type(node).__name__}")
-
-    try:
-        return _eval_node(tree)
-    except (ValueError, InvalidOperation, ZeroDivisionError, TypeError):
-        return Decimal("0")
+from app.services.formula_engine import safe_eval_expr as _safe_eval_expr  # noqa: E402
 
 
 class ReportFormulaParser:
@@ -252,6 +176,14 @@ class ReportFormulaParser:
 
         return total
 
+    async def resolve_tb(self, account_code: str, column_name: str) -> Decimal:
+        """AmountResolver Protocol 公开方法：委托内部 _resolve_tb。"""
+        return await self._resolve_tb(account_code, column_name)
+
+    async def resolve_sum(self, code_range: str, column_name: str) -> Decimal:
+        """AmountResolver Protocol 公开方法：委托内部 _resolve_sum_tb。"""
+        return await self._resolve_sum_tb(code_range, column_name)
+
     async def execute(
         self,
         formula: str | None,
@@ -259,60 +191,13 @@ class ReportFormulaParser:
     ) -> Decimal:
         """解析并执行公式，返回计算结果。
 
-        1. 用 regex 找到 SUM_TB/TB/ROW tokens
-        2. 替换为 Decimal 值
-        3. 用 eval 计算算术表达式
+        委托模块级 evaluate_formula（L1 内核路径），以 self 作为 resolver。
+        保留原有取数语义（含 _use_unadjusted 未审模式）。
         """
         if not formula or not formula.strip():
             return Decimal("0")
 
-        expression = formula
-
-        # Step 1: Replace SUM_TB tokens (must be before TB to avoid partial match)
-        for match in _SUM_TB_PATTERN.finditer(formula):
-            code_range, col = match.group(1), match.group(2)
-            val = await self._resolve_sum_tb(code_range, col)
-            expression = expression.replace(match.group(0), str(val), 1)
-
-        # Step 2: Replace TB tokens
-        for match in _TB_PATTERN.finditer(formula):
-            account_code, col = match.group(1), match.group(2)
-            val = await self._resolve_tb(account_code, col)
-            expression = expression.replace(match.group(0), str(val), 1)
-
-        # Step 3: Replace ROW tokens
-        for match in _ROW_PATTERN.finditer(formula):
-            row_code = match.group(1)
-            val = row_cache.get(row_code, Decimal("0"))
-            expression = expression.replace(match.group(0), str(val), 1)
-
-        # Step 3a: Replace SUM_ROW tokens (range of ROW values)
-        for match in _SUM_ROW_PATTERN.finditer(formula):
-            start_code, end_code = match.group(1), match.group(2)
-            total = Decimal("0")
-            for code, val in row_cache.items():
-                if start_code <= code <= end_code:
-                    total += val
-            expression = expression.replace(match.group(0), str(total), 1)
-
-        # Step 3b: Replace REPORT tokens (cross-report reference)
-        for match in _REPORT_PATTERN.finditer(formula):
-            row_code, period = match.group(1), match.group(2)
-            val = row_cache.get(row_code, Decimal("0"))
-            expression = expression.replace(match.group(0), str(val), 1)
-
-        # Step 3c: Replace NOTE/WP/AUX/PREV tokens (resolve to 0 if not in cache)
-        for pattern in [_NOTE_PATTERN, _WP_PATTERN, _AUX_PATTERN, _PREV_PATTERN]:
-            for match in pattern.finditer(formula):
-                # These require cross-module data; default to 0 in report context
-                expression = expression.replace(match.group(0), "0", 1)
-
-        # Step 4: Evaluate arithmetic expression safely (no eval)
-        try:
-            return _safe_eval_expr(expression)
-        except Exception as e:
-            logger.warning("Formula eval error: %s (expr: %s, formula: %s)", e, expression, formula)
-            return Decimal("0")
+        return await evaluate_formula(formula, resolver=self, row_cache=row_cache)
 
     def extract_account_codes(self, formula: str | None) -> list[str]:
         """从公式中提取所有引用的科目代码"""
@@ -341,18 +226,57 @@ async def evaluate_formula(
     resolver: AmountResolver,
     row_cache: dict[str, Decimal] | None = None,
 ) -> Decimal:
-    """统一公式求值入口（A1/A2）。
+    """L2 编排层：预载数据 → 构建 FormulaContext → 委托 L1 内核 execute → 返回 Decimal。
 
-    解析 TB()/SUM_TB()/ROW()/ABS()/IF()/比较 等 token → 经注入的 resolver 取数 →
-    _safe_eval_expr 安全求值。单体注入 TrialBalanceResolver，合并注入 ConsolTrialResolver。
+    签名向后兼容（reports + consol 调用方零改）。
+    单体注入 TrialBalanceResolver，合并注入 ConsolTrialResolver，
     解析与求值路径对两种 resolver 完全一致，仅取数值不同（关联属性 Q1）。
 
-    Validates: Requirements 1.1, 1.4, 1.5
+    阶段 1 改造（Task 7）：不再自带 _safe_eval_expr/ReportFormulaParser 求值逻辑，
+    改为委托 formula_engine.execute（L1 唯一内核）。
+
+    Validates: Requirements 1.1, 1.3, 1.4, 7.4
     """
-    parser = ReportFormulaParser(
-        resolver.db, resolver.project_id, resolver.year, resolver=resolver
+    from app.services.formula_engine import execute as fe_execute, FormulaContext
+
+    if not formula or not formula.strip():
+        return Decimal("0")
+
+    # ── L2 编排：经 resolver 预载数据 token → 构建 FormulaContext → 委托 L1 内核 ──
+    row_values = row_cache or {}
+
+    # Step 1: 预替换所有数据 token 为 Decimal 值（经 resolver 取数，保持原有取数语义）
+    expression = formula
+
+    # SUM_TB（必须在 TB 之前替换，避免部分匹配）
+    for match in _SUM_TB_PATTERN.finditer(formula):
+        code_range, col = match.group(1), match.group(2)
+        val = await resolver.resolve_sum(code_range, col)
+        expression = expression.replace(match.group(0), str(val), 1)
+
+    # TB
+    for match in _TB_PATTERN.finditer(formula):
+        account_code, col = match.group(1), match.group(2)
+        val = await resolver.resolve_tb(account_code, col)
+        expression = expression.replace(match.group(0), str(val), 1)
+
+    # PREV/NOTE/WP/AUX — 报表域默认置 0（与原行为一致）
+    for match in _PREV_PATTERN.finditer(formula):
+        expression = expression.replace(match.group(0), "0", 1)
+    for pattern in [_NOTE_PATTERN, _WP_PATTERN, _AUX_PATTERN]:
+        for match in pattern.finditer(formula):
+            expression = expression.replace(match.group(0), "0", 1)
+
+    # Step 2: 构建 FormulaContext（ROW 数据；TB/SUM_TB 已预替换为数值无需再入 ctx）
+    ctx = FormulaContext(
+        tb_data={},
+        row_cache={k: Decimal(str(v)) for k, v in row_values.items()},
+        prior_tb_data={},
     )
-    return await parser.execute(formula, row_cache or {})
+
+    # Step 3: 委托 L1 内核求值（expression 中只剩 ROW/SUM_ROW/REPORT + 算术 + 内置函数）
+    result = fe_execute(expression, ctx)
+    return result.value
 
 
 class _DecimalEncoder(json.JSONEncoder):

@@ -229,6 +229,12 @@ async def update_user_formulas(
     now_iso = datetime.now(timezone.utc).isoformat()
     updated = 0
     deleted = 0
+    # 记录变更前的旧公式（审计留痕用）
+    _old_formulas: dict[str, str] = {}
+    for cell_key, formula in payload.formulas.items():
+        existing_entry = user_formulas.get(cell_key) or {}
+        _old_formulas[cell_key] = existing_entry.get("formula", "")
+
     for cell_key, formula in payload.formulas.items():
         if not formula:
             if cell_key in user_formulas:
@@ -257,6 +263,38 @@ async def update_user_formulas(
     wp.parsed_data = parsed_data
     # 强制 SQLAlchemy 检测 JSONB 修改(否则不脏)
     sa.orm.attributes.flag_modified(wp, "parsed_data")
+
+    # ── 底稿公式变更走哈希链 formula.changed 留痕（需求 8.4 / Q5）──
+    if updated > 0 or deleted > 0:
+        try:
+            from app.services.audit_log_helper import append_audit_log
+
+            for cell_key, formula in payload.formulas.items():
+                old_formula = _old_formulas.get(cell_key, "")
+                # 跳过无实际变更的条目
+                if formula == old_formula:
+                    continue
+                action = "delete" if not formula else "update"
+                await append_audit_log(db, {
+                    "user_id": user.id if hasattr(user, "id") else None,
+                    "project_id": wp.project_id,
+                    "action": "formula.changed",
+                    "resource_type": "workpaper",
+                    "resource_id": cell_key,
+                    "details": {
+                        "event_type": "formula_changed",
+                        "module": "workpaper",
+                        "row_code": cell_key,
+                        "action": action,
+                        "old_formula": old_formula,
+                        "new_formula": formula,
+                        "result_value": "",
+                    },
+                })
+        except Exception as e:
+            # 审计写入失败仅 warning，不影响公式保存
+            logger.warning("底稿公式审计留痕写入失败: %s", e)
+
     await db.commit()
 
     return {
@@ -289,6 +327,30 @@ async def restore_preset_formula(
     parsed_data["user_formulas"] = user_formulas
     wp.parsed_data = parsed_data
     sa.orm.attributes.flag_modified(wp, "parsed_data")
+
+    # ── 底稿公式恢复预设走哈希链 formula.changed 留痕 ──
+    try:
+        from app.services.audit_log_helper import append_audit_log
+
+        await append_audit_log(db, {
+            "user_id": _user.id if hasattr(_user, "id") else None,
+            "project_id": wp.project_id,
+            "action": "formula.changed",
+            "resource_type": "workpaper",
+            "resource_id": cell_key,
+            "details": {
+                "event_type": "formula_changed",
+                "module": "workpaper",
+                "row_code": cell_key,
+                "action": "restore_preset",
+                "old_formula": removed.get("formula", ""),
+                "new_formula": removed.get("original_preset", ""),
+                "result_value": "",
+            },
+        })
+    except Exception as e:
+        logger.warning("底稿公式审计留痕写入失败: %s", e)
+
     await db.commit()
 
     return {

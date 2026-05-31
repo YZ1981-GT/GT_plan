@@ -36,6 +36,14 @@
 - [ADR-022: 附注离线分发与一键导入](./ADR-022-note-offline-distribution.md)（D15，Sprint C.0）
 - [ADR-023: 合并附注 V2 完整章节集（180 章节）](./ADR-023-consol-disclosure-v2-full-section-set.md)（D8，Sprint B.1）
 
+### 公式引擎统一（FORMULA-001）
+
+- [ADR-FORMULA-001: 单内核 + 三层架构 + AmountResolver Protocol](./ADR-FORMULA-001-single-kernel-three-layer-architecture.md)（公式引擎统一，4 套→单内核）
+
+### 报表配置主模板（REPORT-CONFIG-001）
+
+- [ADR-REPORT-CONFIG-001: 报表配置主模板回填 + 联动设计](./ADR-REPORT-CONFIG-001.md)（仿附注 GroupNoteTemplateBaseline 范式，受控双向传播）
+
 ## CI 卡点 22 项汇总
 
 | CI ID | 描述 | ADR | Sprint |

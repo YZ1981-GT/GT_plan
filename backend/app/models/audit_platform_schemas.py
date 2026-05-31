@@ -830,6 +830,10 @@ class EventType(str, enum.Enum):
     # payload: {project_id, year, extra: {entry_id}}
     ELIMINATION_APPROVED = "elimination.approved"
 
+    # report-config-baseline 需求 2.1: 主模板更新 → 克隆项目 stale 通知
+    # payload: {project_id (placeholder), extra: {standard, report_type, row_code, config_id}}
+    REPORT_CONFIG_MASTER_UPDATED = "report_config.master_updated"
+
 
 class EventPayload(BaseModel):
     """事件载荷"""

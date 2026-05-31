@@ -103,3 +103,7 @@ def register_report_routers(app: FastAPI) -> None:
     # ═══ §97. wp-traceability-panel：统一溯源端点 ═══
     from app.routers.lineage import router as lineage_router
     app.include_router(lineage_router, tags=["lineage"])
+
+    # ═══ §98. report-config-baseline：主模板回填 + 联动 ═══
+    from app.routers.report_config_baseline import router as report_config_baseline_router
+    app.include_router(report_config_baseline_router, tags=["report-config-baseline"])

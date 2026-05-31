@@ -116,6 +116,8 @@
 | `global-modules-p2-polish/` | ✅ | 全局模块 P2/P3 体验与性能增强（文档改进项 100% 覆盖）：地址库 Redis 二级缓存 + 地址校验接公式保存流 + 公式变更时间线 UI + 枚举扩展业务枚举（EliminationEntryType/审计循环代号/风险等级）+ 高级查询 Redis 缓存+流式导出 + enum_dict_overrides 入 D6（V042）+ content_text 填充保障（MinerU OCR）+ note_template DB 化评估暂缓；57 测试全绿（P1~P4 PBT + 确定性）+ app import OK；完成日期 2026-06 |
 | `wp-ai-review-ux-fix/` | ✅ | 底稿 AI 复核弹窗 UX 缺陷修复：C1 复核发现卡片显示底稿编号 tag + C2 useCellLocate 定位跳转接线 + C3 复核按钮显示底稿名 + 后端 wp_code 注入；36 vitest 全绿（含 TsjReviewFindings + SideStandardsTab）；残留仅 Playwright 实测待环境 |
 | `consol-note-three-level-drilldown/` | 📌 | 合并附注三级穿透；前置 = 真实合并母子项目数据（PG 当前 0 个 consolidated 项目）；待并入 Phase 3 |
+| `formula-engine-unification/` | ✅ | 4 套报表公式求值器→单内核 + 审计收口哈希链；4 阶段 19 任务全部完成；Q1~Q5 PBT 全绿；剩 Task 19 Playwright 待环境 |
+| `report-config-baseline/` | ✅ | 报表配置主模板回填 + 克隆项目 stale 联动；3 阶段 11 任务完成；E1~E4 PBT 全绿；ADR-REPORT-CONFIG-001；剩 Task 11 Playwright 待环境 |
 
 > 注：`workpaper-fill-service-split` 已 `git rm`（目标 WorkpaperFillService 经 grep 实证为 0 业务调用方的死代码，拆分无意义）；`gt-c-note-table-shrink` 已于 2026-05-30 完成并归档至 07-workpaper-slimdown（GtCNoteTable 1803→450 + GtEControlTest 1414→344，90 测试全绿；残留 R3 Playwright 目视待环境，非代码缺口）。
 > 注（2026-05-31）：merge work 分支带入 13 个底稿 spec 的 active 双份残留，经代码实证全部完成度 100%，已 `git rm` 删除 active 残留，仅保留 `_archive/` 权威版。

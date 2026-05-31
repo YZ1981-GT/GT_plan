@@ -680,7 +680,7 @@ async def execute_formulas(
 
     遍历所有含 formula 的单元格，调用 execute_formula 计算值并写回。
     """
-    from app.services.formula_unified import execute_formula
+    from app.services.cell_formula_evaluator import execute_formula
     from app.services.excel_html_converter import save_version_snapshot
 
     project_dir = Path("storage") / "projects" / str(project_id) / "excel_html"

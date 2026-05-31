@@ -6,7 +6,7 @@
 调用方：deps.py / time_machine_service / conflict_resolution_service / consol_audit_helper / ...
 内部：复用既有 hash_chain 逻辑（audit_log_writer_worker._compute_entry_hash）
 
-7 种 event_type schema（存储在 details JSONB 中）：
+9 种 event_type schema（存储在 details JSONB 中）：
 - archived_exception_access: 归档项目例外通道触发
 - archive_unarchive: 解除归档
 - delete_with_confirm: 删除二次确认通过
@@ -14,6 +14,8 @@
 - cross_module_conflict_resolved: 用户调解冲突
 - time_machine_restore: 时光机恢复
 - consol_lifecycle: 合并关键操作留痕（lock/unlock/抵销审批/recalc/scope变更）
+- formula_changed: 公式变更/执行留痕（report/consol 统一入口）
+- report_config_changed: 报表配置主模板回填审核留痕（spec D report-config-baseline）
 """
 
 from __future__ import annotations
@@ -41,6 +43,8 @@ EventType = Literal[
     "cross_module_conflict_resolved",
     "time_machine_restore",
     "consol_lifecycle",
+    "formula_changed",
+    "report_config_changed",
 ]
 
 
@@ -55,7 +59,7 @@ class AuditLogPayload(TypedDict):
     details: dict  # 含 event_type 字段
 
 
-# 6 种 event_type 的 details 必需字段定义
+# 8 种 event_type 的 details 必需字段定义
 EVENT_TYPE_SCHEMAS: dict[str, set[str]] = {
     "archived_exception_access": {"reason", "approver_id", "endpoint", "original_status"},
     "archive_unarchive": {"reason", "previous_status"},
@@ -75,6 +79,8 @@ EVENT_TYPE_SCHEMAS: dict[str, set[str]] = {
         "instance_id",
     },
     "consol_lifecycle": {"sub_action", "before", "after"},
+    "formula_changed": {"module", "row_code", "action", "old_formula", "new_formula", "result_value"},
+    "report_config_changed": {"sub_action", "standard", "report_type", "row_code", "candidate_id"},
 }
 
 # 创世哈希（与 audit_log_writer_worker 保持一致）
@@ -233,6 +239,14 @@ async def append_audit_log(db: AsyncSession, payload: AuditLogPayload) -> uuid.U
 
     # 构建 ORM 对象
     entry_id = uuid.uuid4()
+
+    # object_id 是 UUID 列；resource_id 可能是非 UUID 字符串（如 row_code）
+    # 非 UUID 时 object_id 设 None，但 resource_id_str 仍参与 hash 计算保证完整性
+    try:
+        object_id_val = uuid.UUID(resource_id_str) if resource_id_str else None
+    except (ValueError, AttributeError):
+        object_id_val = None
+
     log_entry = AuditLogEntry(
         id=entry_id,
         ts=now,
@@ -240,7 +254,7 @@ async def append_audit_log(db: AsyncSession, payload: AuditLogPayload) -> uuid.U
         session_id=None,
         action_type=payload["action"],
         object_type=payload["resource_type"],
-        object_id=uuid.UUID(resource_id_str) if resource_id_str else None,
+        object_id=object_id_val,
         payload=log_payload,
         ip=None,
         ua=None,

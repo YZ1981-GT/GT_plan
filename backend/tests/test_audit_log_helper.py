@@ -1,7 +1,8 @@
 """审计日志统一写入 helper 单元测试
 
-验证 append_audit_log 函数 + 6 种 event_type schema 校验。
+验证 append_audit_log 函数 + 8 种 event_type schema 校验。
 Task 0.5: audit_log_helper 统一写入
+Task 14: formula_changed schema + 写入收口
 """
 
 from __future__ import annotations
@@ -310,6 +311,112 @@ class TestEventTypeWrite:
         entry_id = await append_audit_log(db_session, payload)
         assert isinstance(entry_id, uuid.UUID)
 
+    @pytest.mark.asyncio
+    async def test_formula_changed(self, db_session: AsyncSession):
+        """formula_changed 事件写入 — 公式变更/执行留痕。"""
+        project_id = uuid.uuid4()
+        payload: AuditLogPayload = {
+            "user_id": uuid.uuid4(),
+            "project_id": project_id,
+            "action": "formula.changed",
+            "resource_type": "report_config",
+            "resource_id": "BS-002",
+            "details": {
+                "event_type": "formula_changed",
+                "module": "report",
+                "row_code": "BS-002",
+                "action": "execute",
+                "old_formula": "",
+                "new_formula": "TB('1001','期末余额')",
+                "result_value": "12345.67",
+                "trace": ["TB(1001, 期末余额) = 12345.67"],
+            },
+        }
+        entry_id = await append_audit_log(db_session, payload)
+        assert isinstance(entry_id, uuid.UUID)
+
+        # 验证持久化内容
+        await db_session.commit()
+        from sqlalchemy import select
+        stmt = select(AuditLogEntry).where(AuditLogEntry.id == entry_id)
+        result = await db_session.execute(stmt)
+        entry = result.scalar_one()
+
+        assert entry.action_type == "formula.changed"
+        assert entry.object_type == "report_config"
+        assert entry.payload["event_type"] == "formula_changed"
+        assert entry.payload["module"] == "report"
+        assert entry.payload["row_code"] == "BS-002"
+        assert entry.payload["new_formula"] == "TB('1001','期末余额')"
+        assert entry.payload["result_value"] == "12345.67"
+        assert entry.payload["trace"] == ["TB(1001, 期末余额) = 12345.67"]
+
+    @pytest.mark.asyncio
+    async def test_formula_changed_consol_module(self, db_session: AsyncSession):
+        """formula_changed 事件写入 — consol 模块公式执行留痕。"""
+        project_id = uuid.uuid4()
+        payload: AuditLogPayload = {
+            "user_id": uuid.uuid4(),
+            "project_id": project_id,
+            "action": "formula.changed",
+            "resource_type": "report_config",
+            "resource_id": "PL-001",
+            "details": {
+                "event_type": "formula_changed",
+                "module": "consol",
+                "row_code": "PL-001",
+                "action": "execute",
+                "old_formula": "",
+                "new_formula": "SUM_TB('6001~6099','本期发生额')",
+                "result_value": "500000.00",
+                "trace": ["report_type=income_statement", "row_name=营业收入"],
+            },
+        }
+        entry_id = await append_audit_log(db_session, payload)
+        assert isinstance(entry_id, uuid.UUID)
+
+    @pytest.mark.asyncio
+    async def test_formula_changed_update_action(self, db_session: AsyncSession):
+        """formula_changed 事件写入 — update 动作（公式编辑）含 old/new 对比。"""
+        payload: AuditLogPayload = {
+            "user_id": uuid.uuid4(),
+            "project_id": uuid.uuid4(),
+            "action": "formula.changed",
+            "resource_type": "report_config",
+            "resource_id": str(uuid.uuid4()),
+            "details": {
+                "event_type": "formula_changed",
+                "module": "report",
+                "row_code": "BS-010",
+                "action": "update",
+                "old_formula": "TB('1001','期末余额')",
+                "new_formula": "TB('1001','期末余额')+TB('1002','期末余额')",
+                "result_value": "",
+                "trace": [],
+            },
+        }
+        entry_id = await append_audit_log(db_session, payload)
+        assert isinstance(entry_id, uuid.UUID)
+
+    @pytest.mark.asyncio
+    async def test_formula_changed_missing_field_raises(self, db_session: AsyncSession):
+        """formula_changed 缺少必需字段时抛出 ValueError。"""
+        payload: AuditLogPayload = {
+            "user_id": uuid.uuid4(),
+            "project_id": uuid.uuid4(),
+            "action": "formula.changed",
+            "resource_type": "report_config",
+            "resource_id": "BS-002",
+            "details": {
+                "event_type": "formula_changed",
+                "module": "report",
+                "row_code": "BS-002",
+                # 缺少 action, old_formula, new_formula, result_value
+            },
+        }
+        with pytest.raises(ValueError, match="缺少必需字段"):
+            await append_audit_log(db_session, payload)
+
 
 # --------------------------------------------------------------------------
 # event_type schema 校验测试
@@ -373,7 +480,7 @@ class TestEventTypeValidation:
         validate_event_type_details(details)
 
     def test_all_event_type_schemas_defined(self):
-        """确认 7 种 event_type 的 schema 均已定义。"""
+        """确认 9 种 event_type 的 schema 均已定义。"""
         expected_types = {
             "archived_exception_access",
             "archive_unarchive",
@@ -382,5 +489,7 @@ class TestEventTypeValidation:
             "cross_module_conflict_resolved",
             "time_machine_restore",
             "consol_lifecycle",
+            "formula_changed",
+            "report_config_changed",
         }
         assert set(EVENT_TYPE_SCHEMAS.keys()) == expected_types
