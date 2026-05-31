@@ -132,9 +132,22 @@ event_bus.subscribe(EventType.REPORT_CONFIG_MASTER_UPDATED, _mark_cloned_configs
 
 ---
 
-## 五、正确性属性（PBT 守护）
+## 五、边界条件与冲突处理
+
+| 场景 | 处理策略 | 版本 |
+|------|---------|------|
+| 同一 (standard, report_type, row_code) 重复提交候选 | V1 允许多个 pending 共存（admin 逐一审核）；V2 可加唯一约束或自动合并最新 | V1 |
+| 候选审核通过时 standard 行已被其他候选更新（并发冲突） | V1 后到的 approved 直接覆盖（last-write-wins）；V2 可加乐观锁 version 校验 | V1 |
+| `apply_master_update` 遇到 project_only 行（项目有但主模板没有） | 保留不动（不删除项目独有行），仅同步 master_only + modified | V1 |
+| `_mark_cloned_configs_stale` 时项目已被删除（is_deleted=True） | WHERE is_deleted=false 过滤，已删项目不标 stale | V1 |
+| 主模板行被删除后克隆项目如何感知 | V1 不处理（stale 只标公式变更）；V2 可加 DELETE 事件 | V1 延后 |
+| 回滚 R040 后 service 方法调用 | is_stale 列不存在时 ORM 报错；需确保回滚前先停用相关端点或做版本检测 | V1 声明 |
+
+---
+
+## 六、正确性属性（PBT 守护）
 
 - **E1 受控传播**：项目→主模板必经 admin 审核（pending→approved 才合并，无自动双写）
 - **E2 本地覆盖保留**：apply_master_update(keep_local=True) 不覆盖项目已自定义的行
 - **E3 stale 准确**：主模板某行更新 → 恰好标记引用该行的克隆项目 is_stale（不误标无关项目）
-- **E4 覆盖率完整**：四组合 standard × 四表行次无缺漏（CI 守门）
+- **E4 结构完整性**：四组合 standard × 四表 seed 数据结构完整（行号连续、row_code 非空且唯一、16 组合全覆盖）。注：V1 校验 seed JSON 结构完整性；V2 对照 CAS 准则校验业务行次覆盖率

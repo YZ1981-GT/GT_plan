@@ -427,7 +427,7 @@ import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
  * 仅作显式上下文标识（写入面包屑 + sessionStorage `gt-formula-target-node`），
  * 不改变现有树形导航行为。
  */
-type FormulaManagerScope = 'note' | 'consol_note' | 'consol_worksheet' | 'consol_report' | 'report' | 'tb'
+type FormulaManagerScope = 'note' | 'consol_note' | 'consol_worksheet' | 'consol_report' | 'report' | 'tb' | 'workpaper'
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
@@ -466,6 +466,7 @@ const SCOPE_LABEL_MAP: Record<FormulaManagerScope, string> = {
   consol_report: '合并报表',
   report: '报表',
   tb: '试算平衡表',
+  workpaper: '底稿',
 }
 const scopeLabel = computed(() => SCOPE_LABEL_MAP[props.scope] || '报表')
 

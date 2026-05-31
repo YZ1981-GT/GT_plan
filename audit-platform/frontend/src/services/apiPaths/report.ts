@@ -31,6 +31,13 @@ export const reportConfig = {
   create: '/api/report-config',
   executeFormulasBatch: '/api/report-config/execute-formulas-batch',
   batchUpdate: '/api/report-config/batch-update',
+  // 主模板回填 + 联动
+  suggestToMaster: '/api/report-config/suggest-to-master',
+  reviewCandidate: '/api/report-config/review-candidate',
+  diffVsMaster: (projectId: string) => `/api/report-config/diff-vs-master/${projectId}`,
+  applyMasterUpdate: '/api/report-config/apply-master-update',
+  candidates: '/api/report-config/candidates',
+  staleStatus: (projectId: string) => `/api/report-config/stale-status/${projectId}`,
 } as const
 
 // ─── 报表映射 ───────────────────────────────────────────────────────────────

@@ -1,17 +1,15 @@
 """公式审计日志 API — 记录公式变更历史，满足审计留痕要求
 
-表结构：formula_audit_log
-  - project_id + year + module + row_code 定位公式
-  - action: 'create' | 'update' | 'delete' | 'execute'
-  - old_formula / new_formula: 变更前后的公式
-  - result_value: 执行结果（execute 类型）
-  - created_by: 操作人
+数据源：audit_log_entries 哈希链（action_type='formula.changed'）
+  - payload JSONB 含 project_id / module / row_code / action / old_formula / new_formula / result_value / trace
+  - 写入统一走 audit_log_helper.append_audit_log（Task 14 已收口）
 
 API:
-  GET  /api/formula-audit-log/{project_id}/{year}  — 查询公式变更历史
-  POST /api/formula-audit-log/{project_id}/{year}  — 记录一条日志
+  GET  /api/formula-audit-log/{project_id}/{year}  — 查询公式变更历史（前端零改动）
+  POST /api/formula-audit-log/{project_id}/{year}  — 记录一条日志（委托 append_audit_log）
 """
 
+import json
 import uuid
 from datetime import datetime, timezone
 
@@ -23,38 +21,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 
 router = APIRouter(prefix="/api/formula-audit-log", tags=["formula-audit-log"])
-
-_table_created = False
-
-async def ensure_table(db: AsyncSession):
-    global _table_created
-    if _table_created:
-        return
-    try:
-        await db.execute(text("""
-            CREATE TABLE IF NOT EXISTS formula_audit_log (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                project_id UUID NOT NULL,
-                year INT NOT NULL,
-                module VARCHAR(50) NOT NULL DEFAULT 'report',
-                row_code VARCHAR(100) NOT NULL,
-                action VARCHAR(20) NOT NULL,
-                old_formula TEXT,
-                new_formula TEXT,
-                result_value NUMERIC,
-                trace JSONB,
-                created_by UUID,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-            )
-        """))
-        await db.execute(text(
-            "CREATE INDEX IF NOT EXISTS ix_fal_proj_year ON formula_audit_log(project_id, year)"
-        ))
-        await db.commit()
-        _table_created = True
-    except Exception:
-        await db.rollback()
-        _table_created = True
 
 
 class LogEntry(BaseModel):
@@ -75,27 +41,108 @@ async def get_audit_log(
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
 ):
-    await ensure_table(db)
-    query = "SELECT id, module, row_code, action, old_formula, new_formula, result_value, trace, created_at FROM formula_audit_log WHERE project_id = :pid AND year = :y"
-    params: dict = {"pid": project_id, "y": year}
+    """查询公式变更历史 — 改查 audit_log_entries WHERE action_type='formula.changed'。
+
+    payload JSONB 过滤 project_id / module / row_code。
+    返回结构与旧 formula_audit_log 表完全一致（前端零改动）。
+    year 参数保留（API 路径兼容）但新哈希链不存 year 字段。
+    """
+    # 检测数据库方言（PG 用 ->>，SQLite 用 json_extract）
+    is_pg = _is_postgres(db)
+
+    if is_pg:
+        # PostgreSQL: payload JSONB ->> 操作符
+        query = """
+            SELECT id, payload, ts
+            FROM audit_log_entries
+            WHERE action_type = 'formula.changed'
+              AND payload->>'project_id' = :pid
+        """
+    else:
+        # SQLite: json_extract 函数
+        query = """
+            SELECT id, payload, ts
+            FROM audit_log_entries
+            WHERE action_type = 'formula.changed'
+              AND json_extract(payload, '$.project_id') = :pid
+        """
+    params: dict = {"pid": project_id}
+
+    # payload JSONB 过滤 module
     if module:
-        query += " AND module = :mod"
+        if is_pg:
+            query += " AND payload->>'module' = :mod"
+        else:
+            query += " AND json_extract(payload, '$.module') = :mod"
         params["mod"] = module
+
+    # payload JSONB 过滤 row_code
     if row_code:
-        query += " AND row_code = :rc"
+        if is_pg:
+            query += " AND payload->>'row_code' = :rc"
+        else:
+            query += " AND json_extract(payload, '$.row_code') = :rc"
         params["rc"] = row_code
-    query += " ORDER BY created_at DESC LIMIT :lim"
+
+    query += " ORDER BY ts DESC LIMIT :lim"
     params["lim"] = limit
+
     result = await db.execute(text(query), params)
+    rows = result.fetchall()
+
+    # 映射为与旧表完全一致的返回结构
     return [
         {
-            "id": str(r[0]), "module": r[1], "row_code": r[2], "action": r[3],
-            "old_formula": r[4], "new_formula": r[5],
-            "result_value": float(r[6]) if r[6] is not None else None,
-            "trace": r[7], "created_at": str(r[8]) if r[8] else None,
+            "id": str(r[0]),
+            "module": _parse_payload(r[1]).get("module", "report"),
+            "row_code": _parse_payload(r[1]).get("row_code", ""),
+            "action": _parse_payload(r[1]).get("action", ""),
+            "old_formula": _parse_payload(r[1]).get("old_formula", ""),
+            "new_formula": _parse_payload(r[1]).get("new_formula", ""),
+            "result_value": _safe_float(_parse_payload(r[1]).get("result_value")),
+            "trace": _parse_payload(r[1]).get("trace"),
+            "created_at": str(r[2]) if r[2] else None,
         }
-        for r in result.fetchall()
+        for r in rows
     ]
+
+
+def _safe_float(val) -> float | None:
+    """安全转换 result_value 为 float，无效值返回 None。"""
+    if val is None or val == "":
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_payload(raw) -> dict:
+    """将 payload 解析为 dict（兼容 PG JSONB 返回 dict / SQLite 返回 JSON 字符串）。"""
+    if raw is None:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    return {}
+
+
+def _is_postgres(db: AsyncSession) -> bool:
+    """检测当前数据库方言是否为 PostgreSQL。"""
+    try:
+        dialect_name = db.bind.dialect.name if db.bind else ""
+        return dialect_name == "postgresql"
+    except Exception:
+        # 回退：尝试从 settings 判断
+        try:
+            from app.core.config import settings
+            return settings.DATABASE_URL.startswith("postgresql")
+        except Exception:
+            return True  # 默认假设 PG（生产环境）
 
 
 @router.post("/{project_id}/{year}")
@@ -104,18 +151,31 @@ async def add_audit_log(
     body: LogEntry,
     db: AsyncSession = Depends(get_db),
 ):
-    await ensure_table(db)
-    import json
-    now = datetime.now(timezone.utc)
-    trace_json = json.dumps(body.trace, ensure_ascii=False) if body.trace else None
-    await db.execute(text("""
-        INSERT INTO formula_audit_log (id, project_id, year, module, row_code, action, old_formula, new_formula, result_value, trace, created_at)
-        VALUES (:id, :pid, :y, :mod, :rc, :act, :of, :nf, :rv, CAST(:tr AS jsonb), :now)
-    """), {
-        "id": str(uuid.uuid4()), "pid": project_id, "y": year,
-        "mod": body.module, "rc": body.row_code, "act": body.action,
-        "of": body.old_formula, "nf": body.new_formula,
-        "rv": body.result_value, "tr": trace_json, "now": now,
+    """记录公式变更日志 — 委托 append_audit_log 写入哈希链。"""
+    from app.services.audit_log_helper import append_audit_log
+
+    try:
+        pid = uuid.UUID(project_id)
+    except ValueError:
+        pid = None
+
+    await append_audit_log(db, {
+        "user_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),  # POST 端点无 current_user 上下文
+        "project_id": pid,
+        "action": "formula.changed",
+        "resource_type": "report_config",
+        "resource_id": body.row_code,
+        "details": {
+            "event_type": "formula_changed",
+            "module": body.module,
+            "row_code": body.row_code,
+            "action": body.action,
+            "old_formula": body.old_formula,
+            "new_formula": body.new_formula,
+            "result_value": str(body.result_value) if body.result_value is not None else "",
+            "trace": body.trace or [],
+        },
     })
     await db.commit()
+    now = datetime.now(timezone.utc)
     return {"ok": True, "created_at": str(now)}

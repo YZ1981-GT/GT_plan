@@ -67,6 +67,7 @@ from app.models.report_models import (
     NoteValidationResult,
     OpinionType,
     ReportConfig,
+    ReportConfigBaseline,
     ReportStatus,
     SourceTemplate,
 )
@@ -167,6 +168,7 @@ __all__ = [
     "ExportTaskStatus",
     # --- report models ---
     "ReportConfig",
+    "ReportConfigBaseline",
     "FinancialReport",
     "CfsAdjustment",
     "DisclosureNote",

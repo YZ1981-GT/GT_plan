@@ -566,7 +566,7 @@ async def _import_workpapers(
 async def _import_formulas(
     rows: list[dict], project_id: UUID, year: int, sub_type: str | None, db: AsyncSession,
 ) -> dict:
-    from app.services.formula_unified import save_formula_batch
+    from app.services.cell_formula_evaluator import save_formula_batch
     formulas = []
     for row in rows:
         formulas.append({

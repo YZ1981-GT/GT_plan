@@ -76,6 +76,11 @@ const router = createRouter({
           component: () => import('@/views/ReportConfigEditor.vue'),
         },
         {
+          path: 'projects/:projectId/report-config-baseline',
+          name: 'ReportConfigBaseline',
+          component: () => import('@/views/ReportConfigBaselineTab.vue'),
+        },
+        {
           path: 'projects/:projectId/audit-checks',
           name: 'AuditCheckDashboard',
           component: () => import('@/views/AuditCheckDashboard.vue'),

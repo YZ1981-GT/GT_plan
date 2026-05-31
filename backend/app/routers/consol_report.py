@@ -12,17 +12,14 @@ Validates: Phase 2 Requirements (合并报表)
 
 from __future__ import annotations
 
-import json as _json
 import logging
 import uuid as _uuid
-from datetime import datetime, timezone
 from io import BytesIO
 from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -63,10 +60,10 @@ async def generate_consol_reports(
         # 报表行由 service flush（未 commit）。按"service 只 flush，router 统一 commit"铁律，
         # 此处先 commit 让报表行持久化，再独立写审计 —— 确保审计失败回滚绝不波及已落库的报表。
         await db.commit()
-        # 5D.2 / 需求 7.2：合并公式审计纳入 formula_audit_log（module='consol'）。
+        # 5D.2 / 需求 7.2：合并公式审计纳入哈希链（module='consol'）。
         # 与单体报表（report_config.py，module='report'）同源留痕。
         # 审计写入独立事务 + try/except，失败仅告警不影响报表生成主流程。
-        await _write_consol_formula_audit(db, str(data.project_id), data.year, results)
+        await _write_consol_formula_audit(db, str(data.project_id), data.year, results, user_id=user.id if hasattr(user, "id") else None)
         return {
             "message": "合并报表生成成功",
             "report_types": list(results.keys()),
@@ -81,19 +78,20 @@ async def _write_consol_formula_audit(
     project_id_str: str,
     year: int,
     results: dict[str, list[dict]],
+    user_id: _uuid.UUID | None = None,
 ) -> None:
-    """将合并报表公式执行结果写入 formula_audit_log（module='consol'）。
+    """将合并报表公式执行结果写入哈希链 audit_log_entries（module='consol'）。
 
-    每个含公式的报表行写一条 action='execute' 记录，trace 记录 report_type，
-    与单体报表 report_config.py 的留痕模式一致。
+    统一调 append_audit_log(action='formula.changed')，与单体报表同源留痕。
+    FormulaResult.trace 入留痕 details。
 
     前置：调用方已 commit 报表行 —— 故本函数内的 rollback 只会丢弃审计 INSERT，
     绝不波及已落库的报表（满足"审计失败不得破坏报表生成"约束）。
     """
     try:
-        from app.routers.formula_audit_log import ensure_table as ensure_fal_table
-        await ensure_fal_table(db)
-        now = datetime.now(timezone.utc)
+        from app.services.audit_log_helper import append_audit_log
+
+        pid = _uuid.UUID(project_id_str) if project_id_str else None
         for report_type, rows in results.items():
             for r in rows:
                 formula_str = r.get("formula_used") or ""
@@ -101,32 +99,32 @@ async def _write_consol_formula_audit(
                     continue
                 result_value = r.get("current_period_amount")
                 try:
-                    rv = float(result_value) if result_value is not None else None
+                    rv = str(float(result_value)) if result_value is not None else ""
                 except (TypeError, ValueError):
-                    rv = None
-                await db.execute(
-                    text(
-                        """INSERT INTO formula_audit_log
-                        (id, project_id, year, module, row_code, action, new_formula, result_value, trace, created_at)
-                        VALUES (:id, :pid, :y, 'consol', :rc, 'execute', :nf, :rv, CAST(:tr AS jsonb), :now)"""
-                    ),
-                    {
-                        "id": str(_uuid.uuid4()),
-                        "pid": project_id_str,
-                        "y": year,
-                        "rc": r.get("row_code") or "",
-                        "nf": formula_str,
-                        "rv": rv,
-                        "tr": _json.dumps(
-                            {"report_type": report_type, "row_name": r.get("row_name", "")},
-                            ensure_ascii=False,
-                        ),
-                        "now": now,
+                    rv = ""
+                trace = r.get("trace", [])
+                if not trace:
+                    trace = [f"report_type={report_type}", f"row_name={r.get('row_name', '')}"]
+                await append_audit_log(db, {
+                    "user_id": user_id or _uuid.UUID("00000000-0000-0000-0000-000000000000"),
+                    "project_id": pid,
+                    "action": "formula.changed",
+                    "resource_type": "report_config",
+                    "resource_id": r.get("row_code") or "",
+                    "details": {
+                        "event_type": "formula_changed",
+                        "module": "consol",
+                        "row_code": r.get("row_code") or "",
+                        "action": "execute",
+                        "old_formula": "",
+                        "new_formula": formula_str,
+                        "result_value": rv,
+                        "trace": trace,
                     },
-                )
+                })
         await db.commit()
     except Exception as exc:  # 审计失败不影响主流程（报表已 commit）
-        logger.warning("合并公式审计写入 formula_audit_log 失败（不影响报表生成）: %s", exc)
+        logger.warning("合并公式审计写入哈希链失败（不影响报表生成）: %s", exc)
         try:
             await db.rollback()
         except Exception:

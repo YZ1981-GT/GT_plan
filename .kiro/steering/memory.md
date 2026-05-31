@@ -65,7 +65,11 @@ inclusion: always
 
 ### 全局 7 模块改进 6 spec 三件套已建（2026-05-31，待实施）
 - 据盘点文档生成 6 个 active spec（全 Design-First/bugfix，三件套齐全 0 diagnostics）：**A `formula-engine-unification`**（feature，4套求值器→单内核+审计收口哈希链，4阶段19任务）/ **B `retrieval-kernel-unification`**（feature，检索3套→单内核+pgvector+知识文件入网，3阶段12任务）/ **C `doc-level-ai-chat`**（feature，文档级LLM对话，**依赖B**，4阶段12任务）/ **D `report-config-baseline`**（feature，报表主模板回填+克隆stale通知，3阶段11任务）/ **E `wp-ai-review-ux-fix`**（bugfix，复核显底稿编号+接useCellLocate，8任务）/ **F `global-modules-cleanup`**（bugfix，地址库澄清+33MB死文件+模板JSON→registry+懒建表，10任务）
-- 用户拍板**全部 6 个按梯队顺序 A→B→C→D→E→F 实施**；依赖链仅 B→C；尚未开始实施（仅三件套就位）；下一步从 A 或 E/F 起步
+- 用户拍板**全部 6 个按梯队顺序 A→B→C→D→E→F 实施**；依赖链仅 B→C
+- **✅ A `formula-engine-unification` 已实施完成（2026-06-01）**：19 任务全绿（Task 19 Playwright 代码已写待环境实测）；核心产出=L1 单内核(formula_engine.py 递归下降 AST+FunctionRegistry 14 函数)+L2 编排(report_engine 委托)+L3 取数(NoteResolver/WPResolver/DisplayResolver)+审计哈希链收口(formula_changed schema)+cell_formula_evaluator 改名+ADR-FORMULA-001+AddressValidator Protocol+FormulaManagerScope workpaper scope；Q1~Q5 PBT 全绿
+- **✅ D `report-config-baseline` 已实施完成（2026-06-01）**：11 任务全绿（Task 11 Playwright stub 待环境）；核心产出=V040 迁移(report_config_baseline 表+is_stale 列)+ORM+4 service 方法(suggest_to_master/review_candidate/diff_vs_master/apply_master_update)+EventBus REPORT_CONFIG_MASTER_UPDATED+_mark_cloned_configs_stale handler+覆盖率 CI 脚本+6 API 端点+前端 ReportConfigBaselineTab+ADR-REPORT-CONFIG-001；E1~E4 PBT 全绿+5 集成测试；**修复联动断裂③（update_config→克隆项目 stale 通知）**
+- **下一步 = B `retrieval-kernel-unification`**（A→B→C→D→E→F→G 中 A/D 已完成）
+- **🟡 spec A 实施后遗留技术债（复盘 2026-06-01）**：P0=`_PARSE_MODE` 默认切 `"ast"`+修 `safe_eval_expr` float 中间态（commit 前做）；P1=`report_engine._generate_report` 内部求值仍走 ReportFormulaParser 未收口 L1（并入 spec G）；P2=`formula_parser.py` FormulaEvaluator 标 deprecated/改名（spec F）；P2=NoteResolver/WPResolver 缺集成测试（spec B 时顺带）；P3=ADR-FORMULA-001 补底稿语法域裁定段落
 - **第 7 个 spec G `global-modules-p2-polish` 已建（2026-05-31，实现文档 100% 覆盖）**：收口全部 P2/P3 = 地址库 Redis 二级缓存 + 地址校验接公式保存流 + 公式变更时间线 UI(依赖A) + 高级查询 Redis 缓存+流式导出 + 枚举扩展业务枚举(EliminationEntryType/审计循环代号/风险等级，与F协调) + enum_dict_overrides 入 D6 + content_text 填充(保障B向量索引) + note_template DB 化(标`*`评估后做)；design-first/feature，4阶段11任务 0 diagnostics；**A~F 落地后启动**；承重锚点实证（AddressRegistryService._slots+invalidate / validate_formula_refs / EliminationEntryType / disclosure_engine._load_templates / wp_document_recognizer / time_machine_service 全在）；**7 spec 实现盘点文档改进项 100% 覆盖，唯一例外=国企/上市 diff 去 mock（卡审计师真实数据，外部依赖非工程可独立完成）**；文档 §二十四 对照表已更新
 - **7 spec 跨 spec 一致性复盘修正 2 偏差（2026-05-31）**：①🔴 spec G content_text 提取工具引用错——`wp_document_recognizer` 实为 LLM 结构化凭证字段提取(DocType.VOUCHER 返结构化字段)**不产全文**，改为 `mineru_service.recognize_for_ocr`(返 `{"text":全文}`)/`unified_ocr_service.recognize` ②🔴 spec D 审计 event_type 歧义——"复用 formula-engine 哈希链收口"被误读会把报表配置变更记成公式变更，澄清为复用 `append_audit_log` 机制但用**独立 event_type `report_config_changed`**(非 A 的 formula_changed)；跨 spec 协调点核查通过=B↔C semantic_search 签名一致 / A↔G FormulaManagerDialog 改不同部分且 G 在 A 后 / E↔C useCellLocate 签名统一；**教训：单 spec 复盘抓不到跨 spec 问题，必须查"工具真实产出物"+"schema 复用边界"**
 - **6 spec 三件套复盘实证（2026-05-31，承重锚点全属实，修正 4 处偏差）**：✅ formula_engine.execute/FormulaContext/FormulaResult + amount_resolver Protocol + report_engine.evaluate_formula + knowledge_index_service + report_config_service + GroupNoteTemplateBaseline + useCellLocate + 两懒建表 全 readCode 实证存在；🔴 修正 = ①spec B `incremental_update` 真实参 `source_id`(非doc_id) + `KnowledgeSourceType` 枚举无 `knowledge_doc` 需先加成员 ②spec B `semantic_search(project_id,query,top_k)` 无 scope/user 需新增 + "6类"实为"11类"业务数据 ③spec E `useCellLocate` 真实签名 snake_case `{wp_code,sheet_name,cell_ref,component_type}` 且 component_type 必传(非camelCase) ④spec F 死文件/模板 JSON 真实路径 `backend/data/`(非 backend/app/data/)
@@ -73,9 +77,9 @@ inclusion: always
 
 ### 全局 7 模块盘点 + 多源治理（2026-05-31，文档 `docs/proposals/global-modules-status-and-improvement-2026-05-31.md` 六轮代码实证复盘）
 - **7 横切支撑模块**=地址库/公式管理/高级查询/枚举字典/底稿模板库/报告模板库/知识库；ROI 高于合并模块（天天用不卡真实数据）
-- **必须单源（删旧代码）**：①公式求值 3 套报表 DSL（formula_engine+report_engine+formula_parser，formula_engine 升级为唯一内核，其余委托/删求值器）②审计留痕 3 处（formula_audit_log 懒建表+core.Log+哈希链 → 只写哈希链）③知识库旧 KnowledgeService（仅 1 处降级调用，删）
+- **必须单源（删旧代码）**：①公式求值 ~~3 套~~→**已收口为单内核 formula_engine.py**（report_engine 委托 L1/formula_parser 求值器已删/formula_unified→cell_formula_evaluator 改名独立）②审计留痕 ~~3 处~~→**已收口为唯一哈希链**（formula_audit_log 懒建表已废/core.Log formula_updated 已删/统一 append_audit_log action='formula.changed'）③知识库旧 KnowledgeService（仅 1 处降级调用，删）
 - **多源但正交（不合并只澄清）**：地址库 V1(公式编辑目录)/V2(stale 影响图) 正交；formula_unified 实际是底稿 Cell 公式（Excel 语法非报表 DSL，改名 cell_formula_evaluator 保持独立）；note_formula_engine 是 validator 非 evaluator（排除收敛）
-- **🔴 3 处联动断裂必修**：①知识文件→向量索引（KnowledgeDocument CRUD 不触发 incremental_update，上传后 AI 搜不到）②底稿模板 JSON→registry（scan 不写 wp_template_registry 表）③报表主模板→已克隆项目（update_config 不通知 project:{pid} 克隆）；正解=单一权威源+EventBus 单向派生（平台已有 stale 传播骨架）
+- **🔴 3 处联动断裂必修**：①知识文件→向量索引（KnowledgeDocument CRUD 不触发 incremental_update，上传后 AI 搜不到）②底稿模板 JSON→registry（scan 不写 wp_template_registry 表）③~~报表主模板→已克隆项目~~**已修复（spec D，EventBus+handler+is_stale）**；正解=单一权威源+EventBus 单向派生（平台已有 stale 传播骨架）
 - **删旧代码铁律**：删前 grep 0 调用方 + 删前后测试全绿 + 独立 commit+tag 防回滚 + deprecated 超 1 sprint 必删
 - **向量存储选型裁定 pgvector**（同库事务一致+零运维+数据量数千条；ChromaDB 现仅 health check 闲置，留 Plan B）；三大内核统一（公式/检索/审计）各立 Design-First spec
 - **底稿 AI 复核弹窗 UX 缺陷（待修）**：TsjReviewFindings 不显示底稿编号 + SideStandardsTab onLocateCell 只 emit 未接 useCellLocate（wp-locate-foundation 已实现）+ 复核按钮无底稿名；~1 天，并入 `doc-level-ai-chat` 或 `wp-ai-review-ux-fix`
@@ -94,7 +98,8 @@ inclusion: always
 - **xfail 标"production code bug"= 根因修复信号**：先验证真实定义，修根因后去 xfail 让其真实通过，不留假绿
 - **merge 跨阶段签名变更必 grep 调用方**：sync↔async 改 / 删公开方法时全仓 grep 调用点同步改（单阶段 mock 测试全绿不代表跨阶段不断裂）
 - **改动后必 Playwright 实测**（运行时 bug 单测/getDiagnostics 抓不到，如包装体解包/CSS 样式孤儿）；改动前后 6 维 git 核查
-- **hypothesis PBT 调速**：max_examples 10~15（禁默认 100）
+- **hypothesis PBT 调速**：max_examples 10~15（禁默认 100）；async+SQLite schema 重建场景必加 `deadline=None, suppress_health_check=[HealthCheck.too_slow]`（单次迭代 ~700ms 超默认 200ms deadline）
+- **spec 三件套改进（D 复盘）**：①design.md 加"边界条件与冲突处理"段落（哪怕 V1 不处理也显式声明）②跨前后端任务必须拆为纯后端+纯前端两个子任务（避免 Task 9 式大任务）③集成测试至少一条走真实 EventBus 分发路径④"仿成熟范式"策略优先：先找系统中最接近的已有模式映射，再补差异
 - 详细规约（UI 视觉 17 条 / ESLint AST / 测试 fixture / 启动 lifecycle / CI 卡点 / EventBus / 中间件 等）→ `#conventions` + `#dev-history`
 
 ## 关键引用指南

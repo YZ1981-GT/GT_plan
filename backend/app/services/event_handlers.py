@@ -1329,6 +1329,66 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.STANDARD_CHANGED, _on_standard_changed_reports)
     logger.debug("multi-standard-unification 需求 4: STANDARD_CHANGED → 报表 stale handler registered")
 
+    # ------------------------------------------------------------------
+    # report-config-baseline 需求 2.2: 主模板更新 → 克隆项目 is_stale
+    # REPORT_CONFIG_MASTER_UPDATED → 查 applicable_standard LIKE 'project:%'
+    # 且 report_type + row_code 匹配 → 标 is_stale=True
+    # 属性 E3: 只标引用该行的克隆项目，不误标无关
+    # Validates: Requirements 2.2
+    # ------------------------------------------------------------------
+    async def _mark_cloned_configs_stale(payload: EventPayload) -> None:
+        """主模板更新 → 标记引用该行的克隆项目 report_config.is_stale=True。
+
+        只标记 applicable_standard 以 'project:' 开头且 report_type + row_code
+        与更新行匹配的克隆配置行（E3 属性：不误标无关项目）。
+        """
+        import sqlalchemy as sa
+        from app.models.report_models import ReportConfig
+
+        extra = payload.extra or {}
+        report_type = extra.get("report_type")
+        row_code = extra.get("row_code")
+        if not report_type or not row_code:
+            return
+
+        async with async_session_factory() as session:
+            try:
+                stmt = (
+                    sa.update(ReportConfig)
+                    .where(
+                        ReportConfig.applicable_standard.like("project:%"),
+                        ReportConfig.row_code == row_code,
+                        ReportConfig.is_deleted == sa.false(),
+                    )
+                    .values(is_stale=True)
+                )
+                # report_type 在 DB 中是 enum 列；payload 传来的是字符串值
+                # 使用 cast 确保类型匹配
+                stmt = stmt.where(
+                    sa.cast(ReportConfig.report_type, sa.String) == report_type
+                )
+                result = await session.execute(stmt)
+                await session.commit()
+                logger.debug(
+                    "[report-config-baseline] Marked %d cloned configs stale "
+                    "for report_type=%s row_code=%s",
+                    result.rowcount,
+                    report_type,
+                    row_code,
+                )
+            except Exception:
+                await session.rollback()
+                logger.warning(
+                    "[report-config-baseline] Failed to mark cloned configs stale "
+                    "for report_type=%s row_code=%s",
+                    report_type,
+                    row_code,
+                    exc_info=True,
+                )
+
+    event_bus.subscribe(EventType.REPORT_CONFIG_MASTER_UPDATED, _mark_cloned_configs_stale)
+    logger.debug("report-config-baseline 需求 2.2: REPORT_CONFIG_MASTER_UPDATED → cloned configs stale handler registered")
+
     # 启动汇总（只打这一行 INFO）
     total_handlers = sum(len(h) for h in event_bus._handlers.values())
     logger.info("[EventBus] %d handlers registered across %d event types", total_handlers, len(event_bus._handlers))
