@@ -41,6 +41,7 @@ inclusion: always
 ## 任务状态
 
 ### 合并模块（consolidation）四阶段 — 代码+测试完成，未见真实数据
+- **🧮 合并核心会计模型（用户 2026-05-31 明确，已对照代码验证）**：**合并数 = 各子企业个别数据汇总（individual_sum）+ 差额表**；差额表与其他子企业列类似，是专门填调整分录 + 抵销分录（以及同控合并重复部分处理）的"虚拟列"，**一般以负数填列**；代码实现 = `consol_amount = individual_sum + consol_adjustment + consol_elimination`（trial 路径）/ 差额表引擎中间节点 = Σ子节点 consolidated + 本级抵销调整（差额表只记调整抵销不含个别数）——两路径同此模型
 - **4 Phase spec 全 ✅ 代码+测试**（2026-05-31 merge 后四阶段套件 **147 passed/0 failed**）：Phase0 核心管线（B1 汇总/B2 对账/schema 基线/锁定闭环）+ Phase1 架构锁定（AmountResolver 统一引擎/ELIMINATION_APPROVED 事件重算/全端点锁定+ConsolLockedBanner/B6 负商誉/B7 少数股东/A3 async）+ Phase2 编排接线（cascade_refresh/refresh-all SSE/V2 附注 flag/自动抵销 draft/报表穿透/cross_template/公式联动/签字冻结）+ Phase3 前端穿透（ConsolBreakdownDialog/provenance/双向导航/自动建树）
 - **16 ADR**（CONSOL-001~003/101~106/201~206/301~304）+ 24 consol service
 - **🔴 四阶段曾最大盲区 = 无全链路集成测试**（各阶段 mock 掉相邻阶段，merge 两次咬人：async 签名漂移 + Phase1 删 _execute_formula + **PK 缺 uuid default 致 B1 链路从未真实落库**）→ 封板①已补 `test_consol_full_chain_integration.py` 守护；**统一卡点 = PG 0 个 consolidated 项目**（真实 UAT 全 data-blocked，封板②seed 脚本待 live PG 解锁）
@@ -53,8 +54,8 @@ inclusion: always
 - 历史已闭环：合并模块 Phase0~3 全在 main / 底稿模块 14 spec 已实施归档 / schema drift 三层修复 / git 治理 spec（GIT_MODE 双模式 + 分支命名 hook + 6 维核查 CLI `check_git_sync_state.py`）
 
 ### 已完成 spec 总览
-- 详见 `.kiro/specs/INDEX.md`（active + _archive 9 分类）；归档/状态核实必须 grep/fileSearch 实证产物存在，不信 README/INDEX 自述
-- active 仅剩合并 4 Phase + consol-note stub；底稿模块（wp-* / gtdform / multi-standard 等 13 spec）+ V3 + 附注 spec + 11 审计循环 + phase1~8 全已归档
+- 详见 `.kiro/specs/INDEX.md`（active + _archive 10 分类 94 个）；归档/状态核实必须 grep/fileSearch 实证产物存在，不信 README/INDEX 自述
+- active 仅剩 `consol-note-three-level-drilldown`（stub，待真实合并数据）；合并四阶段已归档至 `_archive/09-consolidation-phases/`
 
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT

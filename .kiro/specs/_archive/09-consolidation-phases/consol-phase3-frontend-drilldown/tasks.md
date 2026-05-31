@@ -129,10 +129,10 @@
 
 ## 阶段 7：收尾
 
-- [ ] 10. 文档与沉淀
+- [x] 10. 文档与沉淀
   - [x] 10.1 ADR-CONSOL-301/302/303/304 落地 `docs/adr/`（注册前查编号防冲突）
-  - [ ] 10.2 更新 INDEX.md + memory Phase 3 完成记录 + 合并模块 4 Phase 全貌
-  - [ ] 10.3 单 commit（commit 前 git status 确认无其他 staged）
+  - [x] 10.2 更新 INDEX.md + memory Phase 3 完成记录 + 合并模块 4 Phase 全貌
+  - [x] 10.3 单 commit（commit 前 git status 确认无其他 staged）
   - _铁律：单 commit / ADR 编号防冲突_
 
 ---
