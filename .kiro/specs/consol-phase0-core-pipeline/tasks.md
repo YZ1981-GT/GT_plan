@@ -136,16 +136,17 @@
 
 ## 阶段 9：集成测试 + 真实 UAT（边界清晰，不伪绿）
 
-- [ ] 12. 合成母子数据集成测试
+- [x] 12. 合成母子数据集成测试
   - [x] 12.1 构造 1 母 N 子合成数据集（含"子公司无 TB""负数科目""未审批抵销"分支）
   - [x] 12.2 端到端 `recalculate_trial → reconcile` 全链路断言（恒等式 + provenance + 对账）
   - [x] 12.3 锁定前后端契约：后端锁 → 子公司写端点返 423 → 解锁后可写
   - [x] 12.4 权限：`require_project_access` 命中放行 / 无权返 403
   - [x] 12.5 审计留痕：关键操作后 `audit_log` +1 且哈希链连续
   - [x] 12.6 PG-only SQL（GIN/JSONB）在 SQLite 测试库加 `bind.dialect.name=="sqlite"` 兜底（关联 E7）
+  - [x] 12.7 **全链路集成测试**（封板①，2026-05-31）：`test_consol_full_chain_integration.py` 真 SQLite+真 ORM 行+真 service 跑 aggregate→trial→reconcile + branch 跳抵销 + draft/approved 过滤 + refresh_all report-await 跨阶段回归守卫（4 passed）；**抓到真 bug**：consolidation_models 全 14 主键缺 `default=uuid.uuid4` 致 B1 链路从未真实落库（147 旧测试全 mock 漏网）→ 根因修复全列补 default，280 consol 测试全绿
   - _需求：1/2/3/5/7/8_ _铁律：任务标记不能假绿（链路通才算完成）_
 
-- [ ] 13. F2 锁定前后端联调 Playwright 实测
+- [x] 13. F2 锁定前后端联调 Playwright 实测
   - [x] 13.1 真闭环：补列 → 后端锁 → 前端点锁定 → 真改子公司被拦 423 → 前端显示锁定态 banner（关联 R2，须 Playwright 证据）
   - [x] 13.2 P3 dev_mode banner 前端目视确认
   - _需求：5.6 / 9.3_ _铁律：改动后必 Playwright 实测（getDiagnostics 通过 ≠ 运行时无错）_
@@ -154,6 +155,7 @@
   - [ ] 14.1* 真实集团母子项目 + 审计师确认科目映射 + 端到端合并报告产出 + worksheet/trial/report 三者一致性专业复核
   - [ ] 14.2* 通过后人工置 `CONSOL_MODULE_DEV_MODE=False` 解除防误用标记
   - _需求：NFR-1.3_ _阻塞：PG `consolidated` 项目数为 0，无真实合并母子数据；**显式标"待数据"不用合成数据冒充**_
+  - _解锁路径（封板②，2026-05-31）：`backend/scripts/seed/seed_consol_uat.py` 幂等造最小合成集团（1母2子+TB+draft/approved抵销+内部交易）；`start-dev.bat` 起 PG 后 `python backend/scripts/seed/seed_consol_uat.py` → 取打印的 CONSOL_PROJECT_ID → 跑四阶段 Playwright UAT。注：合成数据可跑通链路验证，但审计师映射/专业复核仍卡真实集团数据_
 
 ---
 
