@@ -15,6 +15,22 @@ inclusion: manual
 
 ## 关键里程碑索引
 
+### 2026-05-31：合并模块 Phase 2 编排 + 接线（consol-phase2-orchestration ✅ 代码+测试完成）
+- **A6/C2 cascade_refresh 编排者**：新建 `consol_cascade_refresh_service.refresh_all`（DAG 单一入口 tree→worksheet→trial→reconcile→report→notes，重建被删 orchestrator，只编排复用既有 service；失败隔离关键步中断/下游继续；trial 步后统一 commit；progress_cb 上报）
+- **refresh-all 后台 worker + SSE**：`consol_refresh_job_service`（进程内内存 job 注册表 + asyncio.create_task worker，自带 db session）+ `consol_refresh.py` 路由（POST refresh-all 返 job_id / GET refresh-status 兜底 EH6）；进度走 `event_bus.broadcast_raw` → 既有 events/stream（不占 asyncpg pool，R5）；router_registry §6 注册
+- **V2 附注 feature flag**：`CONSOL_NOTES_V2_ENABLED`（默认 False）+ `generate_consol_notes_with_flag` + `_adapt_v2_sections_to_schema`（V2 list[dict]→Pydantic ConsolDisclosureSection 归一化，S4 契约层）+ V2 异常回退老版（EH3）；consol_notes 3 端点改调 flag 入口
+- **B3 自动抵销 draft**：`consol_auto_elimination_service.auto_generate_draft_eliminations`（接通孤儿 4 规则引擎 calculate_elimination_amount，强制 review_status=draft 不触发重算 S3，无数据返 0 不报错 EH4）；端点改调
+- **报表穿透后端**：`consol_report_breakdown_service` + `consol_report_breakdown.py`（GET report/.../consol-breakdown，读 Phase 0 consolidation_breakdown 不重算，Σby_company==individual_sum S5，无数据友好空态 EH5）
+- **cross_template 孤儿接线**：`apply_cross_template_to_children` + `_maybe_apply_cross_template` 接入 V2 path（`CONSOL_CROSS_TEMPLATE_ENABLED` 双开关，translate_child_section live 调用消除孤儿，无映射降级 warning 不丢章节 S7）；`_fetch_subsidiary_list` 补 template_type
+- **公式管理联动**：FormulaManagerDialog treeData 补「合并报表」节点 + 既有 consolidation 节点纠正标签为「合并工作底稿」（消除重名）；FormulaManagerScope 扩展；consol_report generate 端点写 formula_audit_log module='consol'；consol 公式求值复用 report_engine._safe_eval_expr（Phase 1）
+- **P2 签字冻结**：`consol_snapshot_service`（序列化 trial/worksheet/report/notes 全量 + SHA256 + base64+gzip 存 ConsolSnapshot.snapshot_data，_locked 标志免迁移；restore 还原+哈希校验 S8；compare 签字时 vs 当前；审计留痕 log_consol_action）；report_trace 端点改调 + restore/compare 只读端点
+- **F3 前端**：apiPaths 补 refreshAll/refreshStatus/notes.reaggregate；ConsolidationIndex「🔄一键刷新全部」（createSSE 订阅 consol.refresh.* 进度 + 轮询兜底）+「📝重新汇总附注」按钮
+- **测试**：6 个 PBT 文件 55 测试全绿（S1~S8 + EH1~EH8 边界，hypothesis max_examples 15）
+- **根因修复（触类旁通）**：①`ReviewStatusEnum` 成员实为小写但 consol_trial_service/elimination_service 引用大写 `.APPROVED/.DRAFT`（运行时 AttributeError 潜伏 bug，cascade trial 步会触发）→ 全部改小写 ②`elimination_service.create_entry` 未设 id/entry_group_id/account_code/lines（NOT NULL IntegrityError）→ 补全；二者解除 `test_elimination.py` 5 个 xfail（现真实通过）
+- **ADR-CONSOL-201~206** 落地 docs/adr/
+- **未完成**：Task 7 Playwright 脚本就绪（`e2e/consol-phase2-orchestration.spec.ts` RUN_FULL_E2E 门控）但执行待 start-dev.bat 重启（运行中后端为旧进程，新路由 refresh-all/refresh-status/report consol-breakdown 实测 404，FastAPI 不热加载 router）；Task 8 真实 UAT 卡 PG 0 个 consolidated 项目
+- **依赖说明**：Phase 1 多数未完成，但 Phase 2 大部分独立；4.4（ELIMINATION_APPROVED 事件链）+ 5D.3（report_engine 安全解析器，已满足）是仅有的 Phase 1 触点，已防御处理
+
 ### 2026-04-12 ~ 04-14：Phase 0-1 基础建设
 - 数据库迁移 10 张表 + ORM 模型 + 项目向导 + 科目管理 + 映射引擎
 - 四表穿透查询 + 试算表计算引擎 + 调整分录管理

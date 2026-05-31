@@ -70,6 +70,11 @@
             </el-tooltip>
           </template>
           <template #right-extra>
+            <el-button size="small" type="primary" :loading="refreshAllLoading" @click="onRefreshAll">🔄 一键刷新全部</el-button>
+            <span v-if="refreshProgress.visible && refreshProgress.total" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin: 0 8px;">
+              {{ refreshProgress.current }}/{{ refreshProgress.total }} {{ refreshProgress.step }}
+            </span>
+            <el-button size="small" :loading="reaggregateLoading" @click="onReaggregateNotes">📝 重新汇总附注</el-button>
             <el-button size="small" @click="showConsolConversion = true">🔄 转换规则</el-button>
           </template>
         </GtToolbar>
@@ -462,13 +467,14 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import {
   getWorksheetTree,
 } from '@/services/consolidationApi'
 import { listChildProjects } from '@/services/commonApi'
 import { api } from '@/services/apiProxy'
-import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, consolNoteSections as P_cn, reports } from '@/services/apiPaths'
+import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, consolNoteSections as P_cn, reports, consolidation as P_consol, events as P_events } from '@/services/apiPaths'
+import { createSSE, type SSEConnection } from '@/utils/sse'
 import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
 import ConsolNoteTab from '@/components/consolidation/ConsolNoteTab.vue'
 import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalanceTab.vue'
@@ -514,6 +520,144 @@ const consolDevMode = ref(false)
 
 // ─── F5 合并页 stale 实时感知（需求 7 / ADR-CONSOL-304）────────────────────────
 const consolStale = ref(false)
+
+// ─── F3 一键刷新全部 + 重新汇总附注（需求 9 / Phase 2 A5 + V2 接线）──────────────
+const refreshAllLoading = ref(false)
+const reaggregateLoading = ref(false)
+const refreshProgress = reactive({ visible: false, step: '', current: 0, total: 0, node: '' })
+// 一键刷新进度 SSE 连接（用 createSSE 直接订阅 events/stream，按 project_id/year 过滤 consol.refresh.* 事件；
+// 全局 ThreeColumnLayout 的 SSE 处理器会丢弃 broadcast_raw 的无 event_type 裸事件，故此处独立订阅）
+let refreshSSE: SSEConnection | null = null
+let refreshPollTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 关闭一键刷新进度 SSE + 轮询兜底连接 */
+function _stopRefreshTracking() {
+  if (refreshSSE) { refreshSSE.close(); refreshSSE = null }
+  if (refreshPollTimer) { clearTimeout(refreshPollTimer); refreshPollTimer = null }
+}
+
+/**
+ * 一键级联刷新全部（需求 9 / Phase 2 A5）。
+ * POST refresh-all 入队后台 worker 返回 job_id；进度经既有 events/stream SSE
+ * 推送（consol.refresh.progress/completed/error），SSE 不可用时轮询 refresh-status 兜底（EH6）。
+ */
+async function onRefreshAll() {
+  if (refreshAllLoading.value) return
+  refreshAllLoading.value = true
+  refreshProgress.visible = true
+  refreshProgress.step = ''
+  refreshProgress.current = 0
+  refreshProgress.total = 0
+  refreshProgress.node = ''
+  let jobId = ''
+  try {
+    const res: any = await api.post(P_consol.refreshAll(projectId.value, year.value))
+    jobId = res?.job_id || ''
+    ElMessage.success('已开始一键刷新，正在更新整棵树的报表与附注…')
+    _startRefreshTracking(jobId)
+  } catch (e) {
+    refreshAllLoading.value = false
+    refreshProgress.visible = false
+    handleApiError(e, '一键刷新全部')
+  }
+}
+
+/** 订阅 SSE 进度；同时启动轮询兜底（SSE 断开时仍能感知完成）。 */
+function _startRefreshTracking(jobId: string) {
+  _stopRefreshTracking()
+
+  const finish = (ok: boolean, msg?: string) => {
+    _stopRefreshTracking()
+    refreshAllLoading.value = false
+    refreshProgress.visible = false
+    if (ok) {
+      ElMessage.success(msg || '一键刷新完成')
+      // 刷新当前 tab 数据
+      if (activeTab.value === 'consol_report') loadConsolReport()
+      else if (activeTab.value === 'consol_note') loadConsolNoteTree(true)
+      eventBus.emit('consol-refresh-done', { projectId: projectId.value, year: year.value })
+    } else if (msg) {
+      ElMessage.error(msg)
+    }
+  }
+
+  // SSE 进度订阅（按 project_id/year 过滤 consol.refresh.* 事件）
+  try {
+    refreshSSE = createSSE(`${P_events.stream(projectId.value)}?year=${year.value}`)
+    refreshSSE.onMessage((data: any, event?: string) => {
+      if (!data || (data.job_id && jobId && data.job_id !== jobId)) return
+      if (event === 'consol.refresh.progress') {
+        refreshProgress.step = data.step || ''
+        refreshProgress.current = data.current || 0
+        refreshProgress.total = data.total || 0
+        refreshProgress.node = data.current_node || ''
+      } else if (event === 'consol.refresh.completed') {
+        const errCount = Array.isArray(data.errors) ? data.errors.length : 0
+        finish(true, errCount > 0 ? `一键刷新完成（${errCount} 步部分失败，请检查）` : '一键刷新完成')
+      } else if (event === 'consol.refresh.error') {
+        finish(false, `一键刷新失败：${data.error || '未知错误'}`)
+      }
+    })
+  } catch {
+    // SSE 创建失败不致命，靠轮询兜底
+  }
+
+  // 轮询兜底（EH6）：SSE 断开也能感知最终状态
+  if (!jobId) return
+  let polls = 0
+  const poll = async () => {
+    polls += 1
+    try {
+      const st: any = await api.get(P_consol.refreshStatus(projectId.value, year.value, jobId))
+      if (st?.status === 'completed') {
+        const errCount = Array.isArray(st.errors) ? st.errors.length : 0
+        finish(true, errCount > 0 ? `一键刷新完成（${errCount} 步部分失败，请检查）` : '一键刷新完成')
+        return
+      }
+      if (st?.status === 'failed') {
+        const errMsg = Array.isArray(st.errors) && st.errors.length ? st.errors[st.errors.length - 1]?.error : ''
+        finish(false, `一键刷新失败：${errMsg || '未知错误'}`)
+        return
+      }
+    } catch {
+      // 单次轮询失败忽略，继续下一轮
+    }
+    if (polls < 120 && refreshAllLoading.value) {
+      refreshPollTimer = setTimeout(poll, 3000)
+    } else if (refreshAllLoading.value) {
+      // 超时保护：停止 loading（结果可经 SSE 或手动刷新查看）
+      refreshAllLoading.value = false
+      refreshProgress.visible = false
+    }
+  }
+  refreshPollTimer = setTimeout(poll, 3000)
+}
+
+/**
+ * 重新汇总合并附注（需求 9 / V2 接线）。
+ * POST notes/reaggregate 消费子公司单体附注重新汇总，完成后切到附注 tab 并刷新。
+ */
+async function onReaggregateNotes() {
+  if (reaggregateLoading.value) return
+  reaggregateLoading.value = true
+  try {
+    const res: any = await api.post(P_consol.notes.reaggregate(projectId.value, year.value))
+    const updated = res?.sections_updated ?? res?.sections_processed ?? 0
+    const errCount = Array.isArray(res?.errors) ? res.errors.length : 0
+    if (errCount > 0) {
+      ElMessage.warning(`附注重新汇总完成（更新 ${updated} 个章节，${errCount} 个章节有告警）`)
+    } else {
+      ElMessage.success(`附注重新汇总完成（更新 ${updated} 个章节）`)
+    }
+    consolStale.value = false
+    activeTab.value = 'consol_note'
+    loadConsolNoteTree(true)
+  } catch (e) {
+    handleApiError(e, '重新汇总附注')
+  } finally {
+    reaggregateLoading.value = false
+  }
+}
 
 // ─── 合并类型（subsidiary 母子合并 / branch 母分汇总）──────────────────────────
 const consolidationType = ref<'subsidiary' | 'branch'>('subsidiary')
@@ -1367,6 +1511,7 @@ onUnmounted(() => {
   eventBus.off('consol-tree-select', onConsolTreeSelect)
   eventBus.off('consol-catalog-select', onConsolCatalogSelect)
   eventBus.off('consol-refresh-entity', onConsolRefreshEntity)
+  _stopRefreshTracking()
 })
 
 // 监听树形节点刷新事件

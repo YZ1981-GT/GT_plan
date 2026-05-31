@@ -418,14 +418,16 @@ import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 
 /**
  * scope：当前公式管理器的目标范围
- *  - 'note'        单体附注（DisclosureEditor）
- *  - 'consol_note' 合并附注（ConsolNoteTab）
- *  - 'report'      报表（ReportView，默认）
- *  - 'tb'          试算平衡表
+ *  - 'note'             单体附注（DisclosureEditor）
+ *  - 'consol_note'      合并附注（ConsolNoteTab）
+ *  - 'consol_worksheet' 合并工作底稿（ConsolWorksheetTabs，需求 7.4）
+ *  - 'consol_report'    合并报表（ConsolReport，需求 7.4）
+ *  - 'report'           报表（ReportView，默认）
+ *  - 'tb'               试算平衡表
  * 仅作显式上下文标识（写入面包屑 + sessionStorage `gt-formula-target-node`），
  * 不改变现有树形导航行为。
  */
-type FormulaManagerScope = 'note' | 'consol_note' | 'report' | 'tb'
+type FormulaManagerScope = 'note' | 'consol_note' | 'consol_worksheet' | 'consol_report' | 'report' | 'tb'
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
@@ -460,6 +462,8 @@ const fmTemplateType = ref('soe')
 const SCOPE_LABEL_MAP: Record<FormulaManagerScope, string> = {
   note: '单体附注',
   consol_note: '合并附注',
+  consol_worksheet: '合并工作底稿',
+  consol_report: '合并报表',
   report: '报表',
   tb: '试算平衡表',
 }
@@ -667,7 +671,13 @@ const treeData = computed(() => [
     ],
   },
   {
-    key: 'consolidation', label: '合并报表', icon: '🏢', children: [
+    key: 'consol_report', label: '合并报表', icon: '🔗', children: [
+      { key: 'consol_report_bs', label: '合并资产负债表', icon: '' },
+      { key: 'consol_report_is', label: '合并利润表', icon: '' },
+    ],
+  },
+  {
+    key: 'consolidation', label: '合并工作底稿', icon: '🔗', children: [
       { key: 'consol_info', label: '基本信息表', icon: '', _consolSheet: 'info' },
       { key: 'consol_cost', label: '投资明细-成本法和公允值', icon: '', _consolSheet: 'cost' },
       { key: 'consol_equity_inv', label: '投资明细-权益法', icon: '', _consolSheet: 'equity_inv' },

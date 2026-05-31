@@ -40,7 +40,6 @@ class TestEliminationService:
     """抵消分录 CRUD 测试"""
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="Service uses ReviewStatusEnum.DRAFT which doesn't exist - production code bug")
     async def test_create_elimination_entry(self, db_session: AsyncSession):
         project = await _create_test_project(db_session)
         data = EliminationCreate(
@@ -59,7 +58,6 @@ class TestEliminationService:
         assert len(entry.lines) == 2
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="Service uses ReviewStatusEnum.DRAFT which doesn't exist - production code bug")
     async def test_get_entries_by_year(self, db_session: AsyncSession):
         project = await _create_test_project(db_session)
         data = EliminationCreate(
@@ -77,7 +75,6 @@ class TestEliminationService:
         assert len(entries) == 1
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="Service uses ReviewStatusEnum.DRAFT + test has unbalanced lines - production code bug")
     async def test_update_elimination(self, db_session: AsyncSession):
         project = await _create_test_project(db_session)
         data = EliminationCreate(
@@ -87,6 +84,7 @@ class TestEliminationService:
             description="未实现利润",
             lines=[
                 EliminationEntryLine(account_code="1301", account_name="存货", debit_amount=Decimal("20"), credit_amount=Decimal("0")),
+                EliminationEntryLine(account_code="6401", account_name="主营业务成本", debit_amount=Decimal("0"), credit_amount=Decimal("20")),
             ],
         )
         entry = await svc.create_entry(db_session, project.id, data)
@@ -95,7 +93,6 @@ class TestEliminationService:
         assert updated.description == "更新：期末未实现利润"
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="Service uses uppercase ReviewStatusEnum values that don't exist - production code bug")
     async def test_review_workflow(self, db_session: AsyncSession):
         project = await _create_test_project(db_session)
         data = EliminationCreate(
@@ -115,7 +112,6 @@ class TestEliminationService:
         assert submitted.review_status == ReviewStatusEnum.approved
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="Service uses ReviewStatusEnum.DRAFT which doesn't exist - production code bug")
     async def test_get_summary_by_type(self, db_session: AsyncSession):
         project = await _create_test_project(db_session)
         data = EliminationCreate(

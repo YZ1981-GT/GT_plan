@@ -113,7 +113,7 @@
 |------|------|------|
 | `consol-phase0-core-pipeline/` | ✅ 核心完成 | Phase 0 止血：B1 汇总 + B2 对账 + C1/C3 schema 基线 V027 + A4 下线 + P1 留痕 + P5 权限 + P3 防误用 + F2 锁定闭环 + ADR-CONSOL-001/002/003；PBT P1~P7 全绿；真实 UAT（任务14）卡 PG 合并数据 |
 | `consol-phase1-arch-lock/` | 📌 待启动 | Phase 1 架构修复：A1 公式引擎统一 + 衔接2 抵销口径 + B6/B7 准则修正 + A3 async；前置 = Phase 0 |
-| `consol-phase2-orchestration/` | 📌 待启动 | Phase 2 编排接线：cascade_refresh + V2 附注 + cross_template + 报表穿透；前置 = Phase 1 |
+| `consol-phase2-orchestration/` | ✅ 代码+测试完成 | Phase 2 编排接线：cascade_refresh 编排者（DAG 单一入口，重建被删 orchestrator）+ refresh-all 后台 worker + SSE 进度（broadcast_raw 不占 asyncpg pool）+ V2 附注 feature flag CONSOL_NOTES_V2_ENABLED + dict→Pydantic 适配器（S4）+ B3 自动抵销只产 draft（接通 4 规则引擎）+ 报表穿透 consol-breakdown + cross_template 孤儿接线（CONSOL_CROSS_TEMPLATE_ENABLED，S7 不丢章节）+ 公式管理联动（合并工作底稿/报表节点 + formula_audit_log module='consol'）+ P2 签字冻结 ConsolSnapshot 存真实数据（base64+gzip+SHA256，S8）+ F3 前端一键刷新/重新汇总入口；S1~S8 共 55 PBT 全绿 + ADR-CONSOL-201~206；附带根因修复 ReviewStatusEnum 大小写 bug + elimination create_entry NOT NULL 缺陷（解除 5 xfail）；Playwright 脚本就绪执行待 start-dev.bat 重启（新路由热加载 404）；真实 UAT（任务8）卡 PG 0 个合并数据 |
 | `consol-phase3-frontend-drilldown/` | ✅ 代码完成 | Phase 3 前端联动：ConsolBreakdownDialog 统一穿透（report+note）+ disclosure_notes provenance V039 + 附注穿透端点 + 双向导航 + 自动建树 CONSOL_SCOPE_CHANGED + wizard 配置合并范围 + 完整度校验 + F5 stale SSE；T1 vitest 7 + 后端 26 测试全绿 + ADR-CONSOL-301~304；Playwright 实测刷新树/进入项目/菜单门控通过；深度穿透 + UAT（8.1/8.4/9）卡 PG 0 个真实合并母子数据 |
 | `consol-note-three-level-drilldown/` | 📌 | 合并附注三级穿透；前置 = 真实合并母子项目数据（PG 当前 0 个 consolidated 项目）；待并入 Phase 3 |
 

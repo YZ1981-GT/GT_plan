@@ -278,15 +278,57 @@ async def create_snapshot(
     db: AsyncSession = Depends(get_db),
 current_user: User = Depends(require_project_access("edit")),
 ):
-    from app.models.phase10_models import ConsolSnapshot
-    snap = ConsolSnapshot(
-        project_id=project_id, year=year,
-        snapshot_data={"created_at": datetime.now(timezone.utc).isoformat()},
-        trigger_reason=reason,
+    """创建合并签字冻结快照（ADR-CONSOL-206 / 需求 8 / 5E.2+5E.4）。
+
+    序列化签字时刻 consol_trial/worksheet/report/notes 全量结果 + 哈希
+    （base64+gzip 压缩），而非旧的 {created_at} 空壳。reason 为 sign/signed/lock
+    时快照锁定只读（签字冻结）。创建写审计留痕。
+    """
+    from app.services.consol_snapshot_service import create_consol_snapshot
+    return await create_consol_snapshot(
+        db, project_id, year, reason, user_id=current_user.id,
     )
-    db.add(snap)
-    await db.commit()
-    return {"id": str(snap.id), "year": year}
+
+
+async def _load_snapshot_or_404(db: AsyncSession, project_id: UUID, snapshot_id: UUID):
+    """按 id 加载 ConsolSnapshot，校验归属项目，找不到返回 404。"""
+    import sqlalchemy as sa
+    from app.models.phase10_models import ConsolSnapshot
+    stmt = sa.select(ConsolSnapshot).where(
+        ConsolSnapshot.id == snapshot_id,
+        ConsolSnapshot.project_id == project_id,
+    )
+    snap = (await db.execute(stmt)).scalar_one_or_none()
+    if snap is None:
+        raise HTTPException(status_code=404, detail="快照不存在")
+    return snap
+
+
+@router.get("/api/consolidation/{project_id}/snapshots/{snapshot_id}/restore")
+async def restore_snapshot(
+    project_id: UUID, snapshot_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """还原"签字时合并数" + SHA-256 完整性校验（只读，5E.3 / S8）。
+
+    即使签字后子公司数据/抵销被改，仍能从快照反序列化还原签字时刻全量数据。
+    """
+    from app.services.consol_snapshot_service import restore_consol_snapshot
+    snap = await _load_snapshot_or_404(db, project_id, snapshot_id)
+    return restore_consol_snapshot(snap)
+
+
+@router.get("/api/consolidation/{project_id}/snapshots/{snapshot_id}/compare")
+async def compare_snapshot(
+    project_id: UUID, snapshot_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """对比"签字时合并数" vs 当前实时合并数，逐科目展示差异（只读，5E.3）。"""
+    from app.services.consol_snapshot_service import compare_snapshot_to_current
+    snap = await _load_snapshot_or_404(db, project_id, snapshot_id)
+    return await compare_snapshot_to_current(db, snap)
 
 
 # ── 底稿推荐 (Task 17.1) ─────────────────────────────────

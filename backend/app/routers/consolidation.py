@@ -133,6 +133,12 @@ async def review_elimination(
                 after={"review_status": entry.review_status.value if entry.review_status else None},
             )
             await db.flush()
+            # NOTE (Phase 2 Task 4.4 — BLOCKED on Phase 1): 抵销草稿审批通过（→APPROVED）后，
+            # Phase 1（consol-phase1-arch-lock）将在此处发布 `ELIMINATION_APPROVED` 事件，
+            # 由 EventBus handler 触发 worksheet + trial 重算（见 Phase 1 需求 3 / ADR-CONSOL-102）。
+            # 该事件类型当前尚不存在（Phase 1 交付物），本 Phase 不实现事件基础设施。
+            # 即便没有该事件，recalculate_trial 已仅消费 review_status==APPROVED 的抵销分录
+            # （Task 0 确认），故 APPROVED 分录会在下次重算时被正确纳入合并数。
 
         return entry
     except ValueError as e:
@@ -168,14 +174,40 @@ async def auto_generate_eliminations(
     user: User = Depends(require_project_access("edit")),
 ):
     """
-    内部抵消表自动汇总 [R11.3]
+    内部抵消表自动汇总 [R11.3 / Phase 2 B3]
 
-    从内部交易表、内部往来表自动生成合并抵消分录（预览模式，不直接写入）。
-    前端确认后再调用 POST /api/consolidation/eliminations 逐条创建。
+    接通 4 类预设抵销规则（consol_elimination_rules.calculate_elimination_amount：
+    internal_ar / internal_revenue / internal_inventory_unrealized / internal_dividend），
+    从子公司内部交易/往来数据自动生成抵销分录**草稿**（review_status=draft）。
+
+    铁律（S3 / ADR-CONSOL-203）：
+    - 生成的所有分录强制 review_status=draft，本端点不触发任何重算。
+    - 审计师复核草稿（→APPROVED）后，经 Phase 1 ELIMINATION_APPROVED 事件触发
+      worksheet + trial 重算才进合并数。
+    - 无匹配内部交易数据的规则返回 0，跳过不生成、不报错（EH4）。
     """
-    from app.services.internal_trade_service import auto_generate_elimination_entries
-    entries = await auto_generate_elimination_entries(db, project_id, year)
-    return {"generated_entries": entries, "count": len(entries)}
+    from app.services.consol_auto_elimination_service import (
+        auto_generate_draft_eliminations,
+    )
+
+    entries = await auto_generate_draft_eliminations(db, project_id, year)
+    serialized = [
+        {
+            "id": str(e.id),
+            "entry_no": e.entry_no,
+            "entry_type": e.entry_type.value if e.entry_type else None,
+            "description": e.description,
+            "account_code": e.account_code,
+            "account_name": e.account_name,
+            "debit_amount": str(e.debit_amount),
+            "credit_amount": str(e.credit_amount),
+            "review_status": e.review_status.value if e.review_status else None,
+            "entry_group_id": str(e.entry_group_id) if e.entry_group_id else None,
+            "related_company_codes": e.related_company_codes,
+        }
+        for e in entries
+    ]
+    return {"generated_entries": serialized, "count": len(serialized)}
 
 
 @router.post("/equity-method/calculate")

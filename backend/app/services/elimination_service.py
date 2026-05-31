@@ -1,7 +1,7 @@
 """抵消分录服务 — 异步 ORM"""
 
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime, timezone
 
 import sqlalchemy as sa
@@ -61,14 +61,31 @@ async def create_entry(db: AsyncSession, project_id: UUID, data: EliminationCrea
 
     entry_no = await _generate_entry_no(db, project_id, data.year, data.entry_type)
 
+    # 序列化分录明细行（JSONB），并以首行科目作为分录代表性科目（account_code NOT NULL）
+    lines = [
+        {
+            "account_code": l.account_code,
+            "account_name": l.account_name,
+            "debit_amount": str(l.debit_amount or Decimal("0")),
+            "credit_amount": str(l.credit_amount or Decimal("0")),
+        }
+        for l in data.lines
+    ]
+    first_line = data.lines[0] if data.lines else None
+
     entry = EliminationEntry(
+        id=uuid4(),
         project_id=project_id,
         entry_no=entry_no,
         year=data.year,
         entry_type=data.entry_type,
         description=data.description,
+        account_code=(first_line.account_code if first_line else ""),
+        account_name=(first_line.account_name if first_line else None),
+        lines=lines,
+        entry_group_id=uuid4(),
         related_company_codes=data.related_company_codes,
-        review_status=ReviewStatusEnum.DRAFT,
+        review_status=ReviewStatusEnum.draft,
         debit_amount=total_debit,
         credit_amount=total_credit,
     )
@@ -116,7 +133,7 @@ async def update_entry(
     entry = await get_entry(db, entry_id, project_id)
     if not entry:
         return None
-    if entry.review_status not in (ReviewStatusEnum.DRAFT, ReviewStatusEnum.REJECTED):
+    if entry.review_status not in (ReviewStatusEnum.draft, ReviewStatusEnum.rejected):
         raise ValueError("只有草稿或已驳回状态的分录可以修改")
 
     if data.lines is not None:
@@ -140,7 +157,7 @@ async def delete_entry(db: AsyncSession, entry_id: UUID, project_id: UUID) -> bo
     entry = await get_entry(db, entry_id, project_id)
     if not entry:
         return False
-    if entry.review_status == ReviewStatusEnum.APPROVED:
+    if entry.review_status == ReviewStatusEnum.approved:
         raise ValueError("已审批的分录不能删除")
     entry.soft_delete()
     await db.commit()
@@ -158,13 +175,13 @@ async def change_review_status(
 
     current = entry.review_status
     if action.action == "approve":
-        if current not in (ReviewStatusEnum.DRAFT, ReviewStatusEnum.PENDING_REVIEW):
+        if current not in (ReviewStatusEnum.draft, ReviewStatusEnum.pending_review):
             raise ValueError(f"当前状态 {current.value} 不能审批")
-        entry.review_status = ReviewStatusEnum.APPROVED
+        entry.review_status = ReviewStatusEnum.approved
     elif action.action == "reject":
-        if current not in (ReviewStatusEnum.DRAFT, ReviewStatusEnum.PENDING_REVIEW):
+        if current not in (ReviewStatusEnum.draft, ReviewStatusEnum.pending_review):
             raise ValueError(f"当前状态 {current.value} 不能驳回")
-        entry.review_status = ReviewStatusEnum.REJECTED
+        entry.review_status = ReviewStatusEnum.rejected
         if action.rejection_reason:
             entry.description = (entry.description or "") + f"\n驳回原因: {action.rejection_reason}"
 

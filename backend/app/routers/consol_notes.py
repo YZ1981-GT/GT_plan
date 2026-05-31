@@ -21,7 +21,7 @@ from app.deps import require_project_access
 from app.core.database import get_db
 from app.models.consolidation_schemas import ConsolDisclosureSection
 from app.services.consol_disclosure_service import (
-    generate_consol_notes_sync,
+    generate_consol_notes_with_flag,
     integrate_consol_notes_sync,
     save_consol_notes_sync,
 )
@@ -53,7 +53,7 @@ async def create_consol_notes(
     user=Depends(require_project_access("edit")),
 ):
     """生成合并附注"""
-    sections = generate_consol_notes_sync(db, project_id, year)
+    sections = await generate_consol_notes_with_flag(db, project_id, year)
     return sections
 
 
@@ -65,7 +65,7 @@ async def get_consol_notes(
     user=Depends(require_project_access("readonly")),
 ):
     """获取合并附注"""
-    sections = generate_consol_notes_sync(db, project_id, year)
+    sections = await generate_consol_notes_with_flag(db, project_id, year)
     return sections
 
 
@@ -91,7 +91,7 @@ async def save_consol_notes(
     user=Depends(require_project_access("edit")),
 ):
     """保存合并附注到数据库"""
-    sections = generate_consol_notes_sync(db, project_id, year)
+    sections = await generate_consol_notes_with_flag(db, project_id, year)
     saved = save_consol_notes_sync(db, project_id, year, sections)
     return {
         "message": "合并附注保存成功",
