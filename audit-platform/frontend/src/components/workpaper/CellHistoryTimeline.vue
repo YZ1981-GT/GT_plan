@@ -64,7 +64,7 @@ import { User } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
 
-export interface CellHistoryEntry {
+interface CellHistoryEntry {
   id: string
   action: string
   user_id: string
