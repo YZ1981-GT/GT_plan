@@ -55,12 +55,12 @@ inclusion: always
 - **四阶段三件套已归档 `_archive/09-consolidation-phases/`**（work commit `375edd8d`，封板①②完成后归档，非空归档）；**tasks.md 残留未勾项全是外部依赖**（真实集团数据 UAT `*` 卡 PG 0 consolidated + Playwright 待环境 + B6/B7 CAS20 审计专业复核），代码+测试层面已封板
 
 ### git 当前状态（2026-06-01）
-- 当前分支 `work/2026-05-30-wp-specs`，ahead of origin；已 merge `origin/spec/global-modules-AD-implementation`（A+D spec 实施，55 文件 +8496 行）；本地含 B/C/E/F/G spec 改动（stash pop 后 memory.md 冲突已解决）；**待 commit + push 后走 PR 合入 main**
+- 当前分支 `main`，已 push origin/main（HEAD `732ddbbd`）；已 merge `origin/work/2026-05-30-wp-specs`（bb7ea6cf，含 B/C/E/F/G 全量实施）
+- 工作树干净，本地=远程完全同步
 
 ### 已完成 spec 总览
-- 详见 `.kiro/specs/INDEX.md`（active + _archive 10 分类）
-- **全局模块 7 spec 全部 ✅ 已实施完成（2026-06-01）**：A formula-engine-unification / B retrieval-kernel-unification / C doc-level-ai-chat / D report-config-baseline / E wp-ai-review-ux-fix / F global-modules-cleanup / G global-modules-p2-polish；残留仅 Playwright E2E 待 start-dev.bat 环境
-- active 仅剩 `consol-note-three-level-drilldown`（stub 待真实合并数据）+ frontend-consistency-m1；**合并四阶段已归档 `_archive/09-consolidation-phases/`**
+- **全局模块 7 spec + frontend-consistency-m1 = 8 个 active spec 全部 ✅ 完成（2026-06-01，121 任务全绿）**：A formula-engine-unification(20/20) / B retrieval-kernel-unification(12/12) / C doc-level-ai-chat(12/12) / D report-config-baseline(12/12) / E wp-ai-review-ux-fix(8/8) / F global-modules-cleanup(10/10) / G global-modules-p2-polish(11/11) / frontend-consistency-m1(36/36)；残留仅 Playwright E2E 待 start-dev.bat 环境
+- active 仅剩 `consol-note-three-level-drilldown`（stub 无 tasks.md，待真实合并数据）；**合并四阶段已归档 `_archive/09-consolidation-phases/`**
 
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
