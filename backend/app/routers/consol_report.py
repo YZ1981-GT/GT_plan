@@ -58,8 +58,9 @@ async def generate_consol_reports(
 ):
     """生成合并报表"""
     try:
-        results = generate_consol_reports_sync(db, data.project_id, data.year, data.applicable_standard)
-        # 报表行由 sync service flush（未 commit）。按"service 只 flush，router 统一 commit"铁律，
+        # Phase 1 A3：generate_consol_reports_sync 已改 async（sync→async 统一），需 await。
+        results = await generate_consol_reports_sync(db, data.project_id, data.year, data.applicable_standard)
+        # 报表行由 service flush（未 commit）。按"service 只 flush，router 统一 commit"铁律，
         # 此处先 commit 让报表行持久化，再独立写审计 —— 确保审计失败回滚绝不波及已落库的报表。
         await db.commit()
         # 5D.2 / 需求 7.2：合并公式审计纳入 formula_audit_log（module='consol'）。
@@ -178,7 +179,7 @@ async def balance_check(
     user=Depends(require_project_access("readonly")),
 ):
     """合并资产负债表平衡校验"""
-    return verify_balance_sync(db, project_id, year)
+    return await verify_balance_sync(db, project_id, year)
 
 
 @router.post("/{project_id}/{year}/workpaper")
@@ -190,7 +191,7 @@ async def create_consol_workpaper(
 ):
     """生成合并底稿.xlsx"""
     try:
-        result = generate_consol_workpaper_sync(db, project_id, year)
+        result = await generate_consol_workpaper_sync(db, project_id, year)
         return {"message": "合并底稿生成成功", "file_name": result.file_name}
     except ImportError as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -207,7 +208,7 @@ async def download_consol_workpaper(
 ):
     """下载合并底稿.xlsx"""
     try:
-        result = generate_consol_workpaper_sync(db, project_id, year)
+        result = await generate_consol_workpaper_sync(db, project_id, year)
         if not result.file_data:
             raise HTTPException(status_code=500, detail="未生成底稿文件")
         output = BytesIO(result.file_data)

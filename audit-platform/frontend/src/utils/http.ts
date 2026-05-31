@@ -348,6 +348,14 @@ http.interceptors.response.use(
     // 423 锁定详情：显示锁定人/时间/解锁方式
     if (status === 423) {
       let lockInfo = detail || '资源已锁定'
+      // 合并锁定（consol-phase1-arch-lock 需求 4.3）：统一提示 + 触发锁定态刷新
+      const isConsolLock = typeof detail === 'string' && detail.includes('合并锁定')
+      if (isConsolLock) {
+        const { eventBus } = await import('./eventBus')
+        eventBus.emit('consol-lock:detected', {})
+        ElMessage.warning({ message: '项目已被合并锁定，无法修改', duration: 5000, showClose: true })
+        return Promise.reject(error)
+      }
       try {
         const lockData = error.response?.data as any
         const payload = lockData?.data ?? lockData

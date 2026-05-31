@@ -300,6 +300,9 @@ export type Events = {
   // D 销售循环 F6: 跨底稿引用更新（D0→D2 反向回填）
   'cross-ref:updated': CrossRefUpdatedPayload
 
+  // consol-phase1-arch-lock 需求 4.3: 后端返回 423 合并锁定 → 刷新前端锁定态
+  'consol-lock:detected': { projectId?: string }
+
   // 快捷键（shortcuts.ts 发出）
   'shortcut:save': void
   'shortcut:undo': void

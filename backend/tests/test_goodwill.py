@@ -49,11 +49,11 @@ class TestGoodwillService:
         )
         assert goodwill == Decimal("360")
         assert is_neg is False
-        assert treatment is None
+        assert treatment == "确认为商誉"
 
     @pytest.mark.asyncio
     async def test_calculate_negative_goodwill(self):
-        """负商誉计算"""
+        """负商誉计算（B6 / CAS 20：全额计入当期损益，无 25% 阈值/递延摊销）"""
         goodwill, is_neg, treatment = svc.calculate_goodwill(
             acquisition_cost=Decimal("500"),
             identifiable_net_assets_fv=Decimal("800"),
@@ -61,6 +61,22 @@ class TestGoodwillService:
         )
         assert goodwill == Decimal("-140")
         assert is_neg is True
+        # CAS 20：负商誉计入当期损益（营业外收入），禁止递延摊销编造逻辑
+        assert "当期损益" in treatment
+        assert "递延" not in treatment
+
+    @pytest.mark.asyncio
+    async def test_negative_goodwill_no_25pct_threshold(self):
+        """B6：大额负商誉也不再走"递延收益摊销"（删除 25% 阈值分支）"""
+        # 负商誉绝对值远超合并成本 25%，旧逻辑会判"递延收益摊销"
+        goodwill, is_neg, treatment = svc.calculate_goodwill(
+            acquisition_cost=Decimal("100"),
+            identifiable_net_assets_fv=Decimal("800"),
+            parent_share_ratio=Decimal("80"),
+        )
+        assert is_neg is True
+        assert "递延" not in treatment
+        assert "当期损益" in treatment
 
     @pytest.mark.asyncio
     async def test_calculate_with_none_inputs(self):

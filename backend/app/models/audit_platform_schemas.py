@@ -826,6 +826,10 @@ class EventType(str, enum.Enum):
     # payload: {project_id, year}；前端 ConsolidationIndex 监听后自动刷新企业树（ADR-CONSOL-303）
     CONSOL_SCOPE_CHANGED = "consol.scope_changed"
 
+    # consol-phase1-arch-lock 需求 2.3: 抵销分录审批 → worksheet + trial 重算
+    # payload: {project_id, year, extra: {entry_id}}
+    ELIMINATION_APPROVED = "elimination.approved"
+
 
 class EventPayload(BaseModel):
     """事件载荷"""

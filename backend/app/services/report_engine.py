@@ -33,6 +33,7 @@ from app.models.report_models import (
     FinancialReportType,
     ReportConfig,
 )
+from app.services.amount_resolver import AmountResolver
 
 logger = logging.getLogger(__name__)
 
@@ -149,13 +150,22 @@ class ReportFormulaParser:
     使用 regex 提取 token，替换为 Decimal 值，然后用 eval 计算算术表达式。
     """
 
-    def __init__(self, db: AsyncSession, project_id: UUID, year: int):
+    def __init__(
+        self,
+        db: AsyncSession,
+        project_id: UUID,
+        year: int,
+        resolver: "AmountResolver | None" = None,
+    ):
         self.db = db
         self.project_id = project_id
         self.year = year
         self._use_unadjusted = False  # Phase 9: 未审模式标志
         # Cache: standard_account_code -> TrialBalance row
         self._tb_cache: dict[str, TrialBalance | None] = {}
+        # A1/A2：可注入金额解析器。None → 默认走内部 trial_balance 取数（单体行为 100% 不变，R1）；
+        # 注入 ConsolTrialResolver 时 TB()/SUM_TB() 改走 consol_trial.consol_amount（合并）。
+        self.resolver = resolver
 
     async def _get_tb_row(self, account_code: str) -> TrialBalance | None:
         """从缓存或数据库获取试算表行"""
@@ -175,6 +185,9 @@ class ReportFormulaParser:
 
     async def _resolve_tb(self, account_code: str, column_name: str) -> Decimal:
         """解析 TB('account_code','column_name') → Decimal 值"""
+        # A1/A2：注入了 resolver（如 ConsolTrialResolver）时改走注入数据源
+        if self.resolver is not None:
+            return await self.resolver.resolve_tb(account_code, column_name)
         row = await self._get_tb_row(account_code)
         if row is None:
             return Decimal("0")
@@ -198,6 +211,9 @@ class ReportFormulaParser:
 
     async def _resolve_sum_tb(self, code_range: str, column_name: str) -> Decimal:
         """解析 SUM_TB('start~end','column_name') → Decimal 值"""
+        # A1/A2：注入了 resolver（如 ConsolTrialResolver）时改走注入数据源
+        if self.resolver is not None:
+            return await self.resolver.resolve_sum(code_range, column_name)
         parts = code_range.split("~")
         if len(parts) != 2:
             logger.warning("Invalid SUM_TB range: %s", code_range)
@@ -317,6 +333,26 @@ class ReportFormulaParser:
         if not formula:
             return []
         return [m.group(1) for m in _ROW_PATTERN.finditer(formula)]
+
+
+async def evaluate_formula(
+    formula: str | None,
+    *,
+    resolver: AmountResolver,
+    row_cache: dict[str, Decimal] | None = None,
+) -> Decimal:
+    """统一公式求值入口（A1/A2）。
+
+    解析 TB()/SUM_TB()/ROW()/ABS()/IF()/比较 等 token → 经注入的 resolver 取数 →
+    _safe_eval_expr 安全求值。单体注入 TrialBalanceResolver，合并注入 ConsolTrialResolver。
+    解析与求值路径对两种 resolver 完全一致，仅取数值不同（关联属性 Q1）。
+
+    Validates: Requirements 1.1, 1.4, 1.5
+    """
+    parser = ReportFormulaParser(
+        resolver.db, resolver.project_id, resolver.year, resolver=resolver
+    )
+    return await parser.execute(formula, row_cache or {})
 
 
 class _DecimalEncoder(json.JSONEncoder):

@@ -64,6 +64,7 @@
 
       <!-- 归档横幅 -->
       <ArchivedBanner />
+      <ConsolLockedBanner />
 
       <!-- 跨模块冲突 banner（spec global-refinement-v3 Task 7.5） -->
       <ConflictBanner :project-id="projectId" @view="conflictPanelVisible = true" />
@@ -827,6 +828,7 @@ import { useProjectStore } from '@/stores/project'
 import { setupPasteListener, pasteToSelection } from '@/composables/useCopyPaste'
 import { useAuditContext } from '@/composables/useAuditContext'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
+import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
 import ConflictBanner from '@/components/conflict/ConflictBanner.vue'
 import ConflictResolutionPanel from '@/components/conflict/ConflictResolutionPanel.vue'
 import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'

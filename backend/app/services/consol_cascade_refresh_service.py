@@ -185,10 +185,10 @@ async def refresh_all(
         logger.exception("级联刷新对账失败（下游步，继续）：项目=%s 年度=%s", parent_project_id, year)
         _emit(progress_cb, STEP_RECONCILE, 4, TOTAL_STEPS, root_node_label, "error")
 
-    # ---- 步骤 5：report 生成（下游步，SYNC 调用，失败记录后继续）------------
+    # ---- 步骤 5：report 生成（下游步，Phase 1 A3 后已 async，需 await；失败记录后继续）----
     _emit(progress_cb, STEP_REPORT, 5, TOTAL_STEPS, root_node_label, "running")
     try:
-        generate_consol_reports_sync(db, parent_project_id, year)
+        await generate_consol_reports_sync(db, parent_project_id, year)
         result.steps_completed.append(STEP_REPORT)
         _emit(progress_cb, STEP_REPORT, 5, TOTAL_STEPS, root_node_label, "completed")
     except Exception as exc:  # noqa: BLE001 - 失败隔离（下游步：记录后继续）

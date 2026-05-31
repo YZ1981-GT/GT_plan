@@ -22,7 +22,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import get_current_user, require_project_access, check_consol_lock
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
 from app.models.report_models import FinancialReport, FinancialReportType
@@ -53,6 +53,9 @@ async def generate_reports(
 ):
     """生成/重新生成四张报表"""
     from app.services.prerequisite_checker import PrerequisiteChecker
+
+    # 合并锁定检查（project_id 在 body，显式调用反查）— Phase 1 Task 5
+    await check_consol_lock(project_id=data.project_id, db=db)
 
     check = await PrerequisiteChecker().check(db, data.project_id, data.year, "generate_reports")
     if not check["ok"]:

@@ -82,6 +82,7 @@
 
     <!-- 归档横幅 -->
     <ArchivedBanner />
+    <ConsolLockedBanner />
 
     <!-- AI 内容 pending 顶部 banner（spec global-refinement-v3 Task 6.4） -->
     <AiContentPendingBanner :project-id="projectId" />
@@ -807,6 +808,7 @@ import NotePriorYearPanel from '@/components/notes/NotePriorYearPanel.vue'
 import { useNoteSectionNumbering } from '@/composables/useNoteSectionNumbering'
 import { useAuditContext } from '@/composables/useAuditContext'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
+import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
 import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
 import ConflictBanner from '@/components/conflict/ConflictBanner.vue'
 import ConflictResolutionPanel from '@/components/conflict/ConflictResolutionPanel.vue'

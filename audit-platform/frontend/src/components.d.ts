@@ -96,6 +96,7 @@ declare module 'vue' {
     ConsistencyTab: typeof import('./components/trust/ConsistencyTab.vue')['default']
     ConsolBreakdownDialog: typeof import('./components/consolidation/ConsolBreakdownDialog.vue')['default']
     ConsolCatalog: typeof import('./components/consolidation/ConsolCatalog.vue')['default']
+    ConsolLockedBanner: typeof import('./components/common/ConsolLockedBanner.vue')['default']
     ConsolMiddleNav: typeof import('./components/consolidation/ConsolMiddleNav.vue')['default']
     ConsolNoteTab: typeof import('./components/consolidation/ConsolNoteTab.vue')['default']
     ConsolNoteTreeEnhanced: typeof import('./components/notes/ConsolNoteTreeEnhanced.vue')['default']

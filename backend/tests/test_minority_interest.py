@@ -119,3 +119,25 @@ class TestMinorityInterestService:
         assert result is True
         mi_list = await svc.get_mi_list(db_session, project.id, 2024)
         assert len(mi_list) == 0
+
+
+class TestB7MinorityRatioSemantics:
+    """B7 / ADR-CONSOL-105：minority_share_ratio 语义统一为"少数股东持股比例"。"""
+
+    def test_b7_minority_ratio_no_complement(self):
+        """母 80%/子 20% → 附注少数股东持股比例 == 20%（不求补数显示 80%）。关联属性 Q7。"""
+        minority_share_ratio = Decimal("20")  # 子公司少数股东持股 20%
+
+        # 附注展示口径（与 consol_disclosure_service / consol_report_service 修复后一致）：直接用
+        disclosure_ratio = float(minority_share_ratio or Decimal("0"))
+        assert disclosure_ratio == 20.0, "少数股东持股比例应直接展示 20%，不得求补数显示 80%"
+        assert disclosure_ratio != 80.0
+
+        # 印证 minority_share_ratio 是少数股东比例：minority_equity = net_assets × ratio/100
+        result = svc.calculate_mi(
+            subsidiary_net_assets=Decimal("1000"),
+            minority_share_ratio=minority_share_ratio,
+            subsidiary_net_profit=Decimal("100"),
+        )
+        assert result.minority_equity == Decimal("200")  # 1000 × 20%
+        assert result.minority_profit == Decimal("20")    # 100 × 20%

@@ -12,7 +12,6 @@ Validates: Requirements (Phase 2 合并报表)
 from __future__ import annotations
 
 import logging
-import re
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
@@ -20,7 +19,6 @@ from pathlib import Path
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consolidation_models import (
@@ -46,11 +44,6 @@ from app.services.goodwill_service import get_goodwill_list
 from app.services.minority_interest_service import get_mi_list
 
 logger = logging.getLogger(__name__)
-
-# Regex patterns for formula tokens (Phase 1 patterns)
-_TB_PATTERN = re.compile(r"TB\('([^']+)','([^']+)'\)")
-_SUM_TB_PATTERN = re.compile(r"SUM_TB\('([^']+)','([^']+)'\)")
-_ROW_PATTERN = re.compile(r"ROW\('([^']+)'\)")
 
 
 # ============================================================================
@@ -95,7 +88,7 @@ class ConsolReportService:
     # 核心方法：生成合并报表
     # ------------------------------------------------------------------
 
-    def generate_consol_reports(
+    async def generate_consol_reports(
         self,
         project_id: UUID,
         year: int,
@@ -104,25 +97,27 @@ class ConsolReportService:
         """
         生成合并报表（资产负债表、利润表）。
 
-        复用 Phase 1 Report_Engine 公式解析逻辑：
-        - 取数公式中的 TB()/SUM_TB()/ROW() 改为读取 consol_trial.consol_amount
-        - 新增合并特有行次：商誉、少数股东权益、少数股东损益
+        A1/A2：复用 report_engine.evaluate_formula 公式解析逻辑，
+        经注入 ConsolTrialResolver 把取数源切换为 consol_trial.consol_amount。
+        单体/合并公式语义完全一致（仅取数源不同，关联属性 Q1）。
 
         Returns:
             dict: {report_type: [row_dicts]}
         """
         from app.models.report_models import ReportConfig
+        from app.services.report_engine import evaluate_formula, ReportFormulaParser
+        from app.services.amount_resolver import ConsolTrialResolver
 
         # 加载报表配置
-        configs = (
-            self.db.query(ReportConfig)
-            .filter(
+        result = await self.db.execute(
+            sa.select(ReportConfig)
+            .where(
                 ReportConfig.applicable_standard == applicable_standard,
                 ReportConfig.is_deleted.is_(False),
             )
             .order_by(ReportConfig.report_type, ReportConfig.row_number)
-            .all()
         )
+        configs = list(result.scalars().all())
 
         # 按报表类型分组
         configs_by_type: dict[FinancialReportType, list[ReportConfig]] = {}
@@ -132,6 +127,12 @@ class ConsolReportService:
         results: dict[str, list[dict]] = {}
         global_row_cache: dict[str, Decimal] = {}
         now = datetime.now(timezone.utc)
+
+        # 注入合并数据源（current = 本年，prior = 上年）
+        resolver_current = ConsolTrialResolver(self.db, project_id, year)
+        resolver_prior = ConsolTrialResolver(self.db, project_id, year - 1)
+        # 纯函数提取器（extract_account_codes 不触 DB）
+        extractor = ReportFormulaParser(self.db, project_id, year)
 
         # 处理顺序（支持跨报表 ROW() 引用）
         type_order = [
@@ -146,32 +147,31 @@ class ConsolReportService:
 
             report_rows = []
             for config in sorted(config_rows, key=lambda r: r.row_number):
-                # 执行公式（使用 consol_trial 数据源）
-                current_amount = self._execute_formula(
-                    project_id, year, config.formula, global_row_cache,
+                # 执行公式（合并数据源，复用统一引擎）
+                current_amount = await evaluate_formula(
+                    config.formula, resolver=resolver_current, row_cache=global_row_cache,
                 )
-                prior_amount = self._execute_formula(
-                    project_id, year - 1, config.formula, {}, is_prior=True,
+                prior_amount = await evaluate_formula(
+                    config.formula, resolver=resolver_prior, row_cache={},
                 )
 
                 # 更新全局行缓存
                 global_row_cache[config.row_code] = current_amount
 
                 # 提取源科目
-                source_accounts = self._extract_account_codes(config.formula)
+                source_accounts = extractor.extract_account_codes(config.formula)
 
                 # 写入/更新 financial_report 表
-                existing = (
-                    self.db.query(FinancialReport)
-                    .filter(
+                existing_result = await self.db.execute(
+                    sa.select(FinancialReport).where(
                         FinancialReport.project_id == project_id,
                         FinancialReport.year == year,
                         FinancialReport.report_type == report_type,
                         FinancialReport.row_code == config.row_code,
                         FinancialReport.is_deleted.is_(False),
                     )
-                    .first()
                 )
+                existing = existing_result.scalar_one_or_none()
 
                 if existing:
                     existing.row_name = config.row_name
@@ -206,134 +206,15 @@ class ConsolReportService:
 
             results[report_type.value] = report_rows
 
-        self.db.flush()
+        await self.db.flush()
         return results
 
-    def _execute_formula(
-        self,
-        project_id: UUID,
-        year: int,
-        formula: str | None,
-        row_cache: dict[str, Decimal],
-        is_prior: bool = False,
-    ) -> Decimal:
-        """解析并执行公式，返回计算结果。
-
-        关键区别：数据源从 trial_balance 切换为 consol_trial.consol_amount。
-        """
-        if not formula or not formula.strip():
-            return Decimal("0")
-
-        expression = formula
-
-        # Step 1: Replace SUM_TB tokens
-        for match in _SUM_TB_PATTERN.finditer(formula):
-            code_range, col = match.group(1), match.group(2)
-            val = self._resolve_sum_consol(project_id, year, code_range, is_prior)
-            expression = expression.replace(match.group(0), str(val), 1)
-
-        # Step 2: Replace TB tokens
-        for match in _TB_PATTERN.finditer(formula):
-            account_code, col = match.group(1), match.group(2)
-            val = self._resolve_consol_tb(project_id, year, account_code, is_prior)
-            expression = expression.replace(match.group(0), str(val), 1)
-
-        # Step 3: Replace ROW tokens
-        for match in _ROW_PATTERN.finditer(formula):
-            row_code = match.group(1)
-            val = row_cache.get(row_code, Decimal("0"))
-            expression = expression.replace(match.group(0), str(val), 1)
-
-        # Step 4: Evaluate arithmetic expression safely
-        # P2/A1：复用 report_engine 的 ast 安全求值器（支持 ABS/IF/ROUND/MAX/MIN/比较），
-        # 替代裸 eval —— 消除单体/合并公式语义不一致（审计准确性）+ 去 eval 反模式。
-        from app.services.report_engine import _safe_eval_expr
-        try:
-            return _safe_eval_expr(expression.strip())
-        except (SyntaxError, ZeroDivisionError, InvalidOperation, TypeError) as e:
-            logger.warning("Formula eval error: %s (expr: %s)", e, expression)
-            return Decimal("0")
-
-    def _resolve_consol_tb(
-        self,
-        project_id: UUID,
-        year: int,
-        account_code: str,
-        is_prior: bool = False,
-    ) -> Decimal:
-        """从合并试算表获取科目金额"""
-        query_year = year - 1 if is_prior else year
-
-        row = (
-            self.db.query(ConsolTrial)
-            .filter(
-                ConsolTrial.project_id == project_id,
-                ConsolTrial.year == query_year,
-                ConsolTrial.standard_account_code == account_code,
-                ConsolTrial.is_deleted.is_(False),
-            )
-            .first()
-        )
-
-        if row is None:
-            return Decimal("0")
-
-        return row.consol_amount if row.consol_amount is not None else Decimal("0")
-
-    def _resolve_sum_consol(
-        self,
-        project_id: UUID,
-        year: int,
-        code_range: str,
-        is_prior: bool = False,
-    ) -> Decimal:
-        """从合并试算表汇总范围内科目金额"""
-        parts = code_range.split("~")
-        if len(parts) != 2:
-            logger.warning("Invalid SUM_TB range: %s", code_range)
-            return Decimal("0")
-
-        start_code, end_code = parts[0].strip(), parts[1].strip()
-        query_year = year - 1 if is_prior else year
-
-        rows = (
-            self.db.query(ConsolTrial)
-            .filter(
-                ConsolTrial.project_id == project_id,
-                ConsolTrial.year == query_year,
-                ConsolTrial.standard_account_code >= start_code,
-                ConsolTrial.standard_account_code <= end_code,
-                ConsolTrial.is_deleted.is_(False),
-            )
-            .all()
-        )
-
-        total = Decimal("0")
-        for row in rows:
-            total += row.consol_amount if row.consol_amount else Decimal("0")
-
-        return total
-
-    def _extract_account_codes(self, formula: str | None) -> list[str]:
-        """从公式中提取所有引用的科目代码"""
-        if not formula:
-            return []
-
-        codes = set()
-        for match in _TB_PATTERN.finditer(formula):
-            codes.add(match.group(1))
-        for match in _SUM_TB_PATTERN.finditer(formula):
-            code_range = match.group(1)
-            parts = code_range.split("~")
-            if len(parts) == 2:
-                codes.add(f"{parts[0].strip()}~{parts[1].strip()}")
-        return sorted(codes)
 
     # ------------------------------------------------------------------
     # 合并资产负债表平衡校验
     # ------------------------------------------------------------------
 
-    def verify_balance(
+    async def verify_balance(
         self,
         project_id: UUID,
         year: int,
@@ -349,21 +230,21 @@ class ConsolReportService:
             BalanceCheckResult: 校验结果
         """
         # 从 financial_report 表获取合并报表数据
-        bs_rows = (
-            self.db.query(FinancialReport)
-            .filter(
+        bs_result = await self.db.execute(
+            sa.select(FinancialReport)
+            .where(
                 FinancialReport.project_id == project_id,
                 FinancialReport.year == year,
                 FinancialReport.report_type == FinancialReportType.balance_sheet,
                 FinancialReport.is_deleted.is_(False),
             )
             .order_by(FinancialReport.row_code)
-            .all()
         )
+        bs_rows = list(bs_result.scalars().all())
 
         if not bs_rows:
             # 如果报表不存在，尝试从合并试算表计算
-            return self._verify_balance_from_consol_trial(project_id, year)
+            return await self._verify_balance_from_consol_trial(project_id, year)
 
         # 解析资产负债表行
         total_assets = Decimal("0")
@@ -419,21 +300,20 @@ class ConsolReportService:
             issues=issues,
         )
 
-    def _verify_balance_from_consol_trial(
+    async def _verify_balance_from_consol_trial(
         self,
         project_id: UUID,
         year: int,
     ) -> BalanceCheckResult:
         """从合并试算表计算平衡校验"""
-        consol_rows = (
-            self.db.query(ConsolTrial)
-            .filter(
+        consol_result = await self.db.execute(
+            sa.select(ConsolTrial).where(
                 ConsolTrial.project_id == project_id,
                 ConsolTrial.year == year,
                 ConsolTrial.is_deleted.is_(False),
             )
-            .all()
         )
+        consol_rows = list(consol_result.scalars().all())
 
         if not consol_rows:
             return BalanceCheckResult(
@@ -460,7 +340,7 @@ class ConsolReportService:
                 total_equity += amount
 
         # 获取少数股东权益
-        mi_records = get_mi_list(self.db, project_id, year)
+        mi_records = await get_mi_list(self.db, project_id, year)
         mi_total = sum(
             (r.minority_equity or Decimal("0")) for r in mi_records
         )
@@ -468,7 +348,7 @@ class ConsolReportService:
         equity_with_mi = total_equity + mi_total
 
         # 获取商誉
-        gw_records = get_goodwill_list(self.db, project_id, year)
+        gw_records = await get_goodwill_list(self.db, project_id, year)
         gw_total = sum(
             (r.carrying_amount or Decimal("0")) for r in gw_records
         )
@@ -503,7 +383,7 @@ class ConsolReportService:
     # 生成合并底稿
     # ------------------------------------------------------------------
 
-    def generate_consol_workpaper(
+    async def generate_consol_workpaper(
         self,
         project_id: UUID,
         year: int,
@@ -530,16 +410,16 @@ class ConsolReportService:
         wb = openpyxl.Workbook()
 
         # Sheet 1: 各公司审定数并列
-        self._create_company_trial_sheet(wb, project_id, year)
+        await self._create_company_trial_sheet(wb, project_id, year)
 
         # Sheet 2: 抵消分录汇总
-        self._create_elimination_sheet(wb, project_id, year)
+        await self._create_elimination_sheet(wb, project_id, year)
 
         # Sheet 3: 合并试算表
-        self._create_consol_trial_sheet(wb, project_id, year)
+        await self._create_consol_trial_sheet(wb, project_id, year)
 
         # Sheet 4: 勾稽校验
-        self._create_verification_sheet(wb, project_id, year)
+        await self._create_verification_sheet(wb, project_id, year)
 
         # 保存到 BytesIO
         output = BytesIO()
@@ -553,45 +433,65 @@ class ConsolReportService:
             message="合并底稿生成成功",
         )
 
-    def _create_company_trial_sheet(
+    async def _create_company_trial_sheet(
         self,
-        wb: openpyxl.Workbook,
+        wb: "openpyxl.Workbook",
         project_id: UUID,
         year: int,
     ) -> None:
         """Sheet 1: 各公司审定数并列"""
+        from openpyxl.utils import get_column_letter
+
         ws = wb.active
         ws.title = "各公司审定数"
 
         # 获取合并范围内的公司
-        companies = (
-            self.db.query(Company)
+        companies_result = await self.db.execute(
+            sa.select(Company)
             .join(ConsolScope, sa.and_(
                 ConsolScope.company_code == Company.company_code,
                 ConsolScope.project_id == project_id,
                 ConsolScope.year == year,
                 ConsolScope.is_included.is_(True),
             ))
-            .filter(
+            .where(
                 Company.project_id == project_id,
                 Company.is_active.is_(True),
                 Company.is_deleted.is_(False),
             )
-            .all()
         )
+        companies = list(companies_result.scalars().all())
 
         # 获取所有试算表科目
-        all_codes = (
-            self.db.query(TrialBalance.standard_account_code)
-            .filter(
+        codes_result = await self.db.execute(
+            sa.select(TrialBalance.standard_account_code)
+            .where(
                 TrialBalance.project_id == project_id,
                 TrialBalance.year == year,
                 TrialBalance.is_deleted.is_(False),
             )
             .distinct()
             .order_by(TrialBalance.standard_account_code)
-            .all()
         )
+        all_codes = list(codes_result.all())
+
+        # 批量预加载 (company_code, account_code) → audited_amount，避免 N×M 查询
+        company_codes = [c.company_code for c in companies]
+        tb_result = await self.db.execute(
+            sa.select(
+                TrialBalance.company_code,
+                TrialBalance.standard_account_code,
+                TrialBalance.audited_amount,
+            ).where(
+                TrialBalance.project_id == project_id,
+                TrialBalance.year == year,
+                TrialBalance.company_code.in_(company_codes) if company_codes else sa.false(),
+                TrialBalance.is_deleted.is_(False),
+            )
+        )
+        tb_map: dict[tuple[str, str], Decimal] = {}
+        for cc, code, amount in tb_result.all():
+            tb_map[(cc, code)] = amount if amount is not None else Decimal("0")
 
         # 表头：公司名称
         ws.cell(row=1, column=1, value="科目代码")
@@ -605,18 +505,7 @@ class ConsolReportService:
 
             # 获取该科目在每个公司的审定数
             for col_idx, company in enumerate(companies, start=3):
-                tb = (
-                    self.db.query(TrialBalance)
-                    .filter(
-                        TrialBalance.project_id == project_id,
-                        TrialBalance.year == year,
-                        TrialBalance.standard_account_code == code,
-                        TrialBalance.company_code == company.company_code,
-                        TrialBalance.is_deleted.is_(False),
-                    )
-                    .first()
-                )
-                amount = tb.audited_amount if tb else Decimal("0")
+                amount = tb_map.get((company.company_code, code), Decimal("0"))
                 ws.cell(row=row_idx, column=col_idx, value=float(amount))
 
             # 汇总数列
@@ -634,9 +523,9 @@ class ConsolReportService:
         for i in range(3, len(companies) + 4):
             ws.column_dimensions[get_column_letter(i)].width = 15
 
-    def _create_elimination_sheet(
+    async def _create_elimination_sheet(
         self,
-        wb: openpyxl.Workbook,
+        wb: "openpyxl.Workbook",
         project_id: UUID,
         year: int,
     ) -> None:
@@ -649,16 +538,16 @@ class ConsolReportService:
             ws.cell(row=1, column=col, value=header)
 
         # 获取抵消分录
-        entries = (
-            self.db.query(EliminationEntry)
-            .filter(
+        entries_result = await self.db.execute(
+            sa.select(EliminationEntry)
+            .where(
                 EliminationEntry.project_id == project_id,
                 EliminationEntry.year == year,
                 EliminationEntry.is_deleted.is_(False),
             )
             .order_by(EliminationEntry.entry_no, EliminationEntry.id)
-            .all()
         )
+        entries = list(entries_result.scalars().all())
 
         for row_idx, entry in enumerate(entries, start=2):
             ws.cell(row=row_idx, column=1, value=entry.entry_no or "")
@@ -688,9 +577,9 @@ class ConsolReportService:
         ws.column_dimensions['H'].width = 12
         ws.column_dimensions['I'].width = 15
 
-    def _create_consol_trial_sheet(
+    async def _create_consol_trial_sheet(
         self,
-        wb: openpyxl.Workbook,
+        wb: "openpyxl.Workbook",
         project_id: UUID,
         year: int,
     ) -> None:
@@ -703,16 +592,16 @@ class ConsolReportService:
             ws.cell(row=1, column=col, value=header)
 
         # 获取合并试算表数据
-        consol_rows = (
-            self.db.query(ConsolTrial)
-            .filter(
+        consol_result = await self.db.execute(
+            sa.select(ConsolTrial)
+            .where(
                 ConsolTrial.project_id == project_id,
                 ConsolTrial.year == year,
                 ConsolTrial.is_deleted.is_(False),
             )
             .order_by(ConsolTrial.standard_account_code)
-            .all()
         )
+        consol_rows = list(consol_result.scalars().all())
 
         for row_idx, ct_row in enumerate(consol_rows, start=2):
             ws.cell(row=row_idx, column=1, value=ct_row.standard_account_code)
@@ -732,17 +621,19 @@ class ConsolReportService:
         ws.column_dimensions['F'].width = 15
         ws.column_dimensions['G'].width = 18
 
-    def _create_verification_sheet(
+    async def _create_verification_sheet(
         self,
-        wb: openpyxl.Workbook,
+        wb: "openpyxl.Workbook",
         project_id: UUID,
         year: int,
     ) -> None:
         """Sheet 4: 勾稽校验"""
+        from openpyxl.styles import Font
+
         ws = wb.create_sheet(title="勾稽校验")
 
         # 获取平衡校验结果
-        balance_result = self.verify_balance(project_id, year)
+        balance_result = await self.verify_balance(project_id, year)
 
         # 校验项目
         ws.cell(row=1, column=1, value="合并报表勾稽校验")
@@ -768,15 +659,14 @@ class ConsolReportService:
         ws.cell(row=row_idx, column=1, value="2. 抵消分录借贷平衡校验")
         ws.cell(row=row_idx, column=1).font = Font(bold=True)
 
-        entries = (
-            self.db.query(EliminationEntry)
-            .filter(
+        entries_result = await self.db.execute(
+            sa.select(EliminationEntry).where(
                 EliminationEntry.project_id == project_id,
                 EliminationEntry.year == year,
                 EliminationEntry.is_deleted.is_(False),
             )
-            .all()
         )
+        entries = list(entries_result.scalars().all())
 
         total_debit = sum(e.debit_amount or Decimal("0") for e in entries)
         total_credit = sum(e.credit_amount or Decimal("0") for e in entries)
@@ -809,7 +699,7 @@ class ConsolReportService:
     # 生成合并附注
     # ------------------------------------------------------------------
 
-    def generate_consol_notes(
+    async def generate_consol_notes(
         self,
         project_id: UUID,
         year: int,
@@ -832,63 +722,63 @@ class ConsolReportService:
         sections: list[ConsolDisclosureSection] = []
 
         # 1. 合并范围说明
-        scope_section = self._generate_scope_section(project_id, year)
+        scope_section = await self._generate_scope_section(project_id, year)
         sections.append(scope_section)
 
         # 2. 重要子公司信息表
-        subsidiary_section = self._generate_subsidiary_section(project_id, year)
+        subsidiary_section = await self._generate_subsidiary_section(project_id, year)
         sections.append(subsidiary_section)
 
         # 3. 商誉披露
-        goodwill_section = self._generate_goodwill_section(project_id, year)
+        goodwill_section = await self._generate_goodwill_section(project_id, year)
         sections.append(goodwill_section)
 
         # 4. 少数股东权益披露
-        mi_section = self._generate_minority_interest_section(project_id, year)
+        mi_section = await self._generate_minority_interest_section(project_id, year)
         sections.append(mi_section)
 
         # 5. 内部交易抵消说明
-        trade_section = self._generate_internal_trade_section(project_id, year)
+        trade_section = await self._generate_internal_trade_section(project_id, year)
         sections.append(trade_section)
 
         return sections
 
-    def _generate_scope_section(
+    async def _generate_scope_section(
         self,
         project_id: UUID,
         year: int,
     ) -> ConsolDisclosureSection:
         """生成合并范围说明"""
         # 获取合并范围内的公司
-        included = (
-            self.db.query(Company, ConsolScope)
+        included_result = await self.db.execute(
+            sa.select(Company, ConsolScope)
             .join(ConsolScope, sa.and_(
                 ConsolScope.company_code == Company.company_code,
                 ConsolScope.project_id == project_id,
                 ConsolScope.year == year,
             ))
-            .filter(
+            .where(
                 Company.project_id == project_id,
                 ConsolScope.is_included.is_(True),
                 Company.is_deleted.is_(False),
             )
-            .all()
         )
+        included = included_result.all()
 
-        excluded = (
-            self.db.query(Company, ConsolScope)
+        excluded_result = await self.db.execute(
+            sa.select(Company, ConsolScope)
             .join(ConsolScope, sa.and_(
                 ConsolScope.company_code == Company.company_code,
                 ConsolScope.project_id == project_id,
                 ConsolScope.year == year,
             ))
-            .filter(
+            .where(
                 Company.project_id == project_id,
                 ConsolScope.is_included.is_(False),
                 Company.is_deleted.is_(False),
             )
-            .all()
         )
+        excluded = excluded_result.all()
 
         rows = []
         for company, scope in included:
@@ -919,28 +809,28 @@ class ConsolReportService:
             summary=f"本期纳入合并范围的子公司共 {len(included)} 家，未纳入合并范围的共 {len(excluded)} 家",
         )
 
-    def _generate_subsidiary_section(
+    async def _generate_subsidiary_section(
         self,
         project_id: UUID,
         year: int,
     ) -> ConsolDisclosureSection:
         """生成重要子公司信息表"""
         # 获取重要子公司（持股 50% 以上或全额合并）
-        subsidiaries = (
-            self.db.query(Company)
+        subsidiaries_result = await self.db.execute(
+            sa.select(Company)
             .join(ConsolScope, sa.and_(
                 ConsolScope.company_code == Company.company_code,
                 ConsolScope.project_id == project_id,
                 ConsolScope.year == year,
                 ConsolScope.is_included.is_(True),
             ))
-            .filter(
+            .where(
                 Company.project_id == project_id,
                 Company.is_deleted.is_(False),
                 Company.is_active.is_(True),
             )
-            .all()
         )
+        subsidiaries = list(subsidiaries_result.scalars().all())
 
         rows = []
         for sub in subsidiaries:
@@ -961,13 +851,13 @@ class ConsolReportService:
             summary=f"共有 {len(subsidiaries)} 家重要子公司",
         )
 
-    def _generate_goodwill_section(
+    async def _generate_goodwill_section(
         self,
         project_id: UUID,
         year: int,
     ) -> ConsolDisclosureSection:
         """生成商誉披露"""
-        goodwill_records = get_goodwill_list(self.db, project_id, year)
+        goodwill_records = await get_goodwill_list(self.db, project_id, year)
 
         rows = []
         total_goodwill = Decimal("0")
@@ -992,13 +882,13 @@ class ConsolReportService:
             summary=f"期末商誉账面价值合计 {total_goodwill} 元",
         )
 
-    def _generate_minority_interest_section(
+    async def _generate_minority_interest_section(
         self,
         project_id: UUID,
         year: int,
     ) -> ConsolDisclosureSection:
         """生成少数股东权益披露"""
-        mi_records = get_mi_list(self.db, project_id, year)
+        mi_records = await get_mi_list(self.db, project_id, year)
 
         rows = []
         total_mi = Decimal("0")
@@ -1010,8 +900,8 @@ class ConsolReportService:
             total_mi_profit += profit
             rows.append({
                 "子公司": mi.subsidiary_company_code,
-                "少数股东持股比例": f"{(1 - (mi.minority_share_ratio or Decimal("1"))) * 100:.2f}%"
-                    if mi.minority_share_ratio else "N/A",
+                "少数股东持股比例": f"{(mi.minority_share_ratio or Decimal('0')):.2f}%"
+                    if mi.minority_share_ratio is not None else "N/A",
                 "期末少数股东权益": float(equity),
                 "本期少数股东损益": float(profit),
                 "超额亏损标识": "是" if mi.is_excess_loss else "否",
@@ -1026,7 +916,7 @@ class ConsolReportService:
             summary=f"期末少数股东权益合计 {total_mi} 元，本期少数股东损益合计 {total_mi_profit} 元",
         )
 
-    def _generate_internal_trade_section(
+    async def _generate_internal_trade_section(
         self,
         project_id: UUID,
         year: int,
@@ -1035,15 +925,14 @@ class ConsolReportService:
         # 获取内部交易汇总
         from app.models.consolidation_models import InternalTrade
 
-        trades = (
-            self.db.query(InternalTrade)
-            .filter(
+        trades_result = await self.db.execute(
+            sa.select(InternalTrade).where(
                 InternalTrade.project_id == project_id,
                 InternalTrade.year == year,
                 InternalTrade.is_deleted.is_(False),
             )
-            .all()
         )
+        trades = list(trades_result.scalars().all())
 
         total_trade = sum(t.trade_amount or Decimal("0") for t in trades)
         total_unrealized = sum(t.unrealized_profit or Decimal("0") for t in trades)
@@ -1071,45 +960,47 @@ class ConsolReportService:
 
 
 # ============================================================================
-# 便捷函数（同步风格，供路由层调用）
+# 便捷函数（async 风格，供路由层 await 调用）
+# A3：统一 async，消除在 AsyncSession 上调同步 Session API 的 MissingGreenlet 风险。
+# 保留 *_sync 名称以兼容既有 import，但实现为 async（路由层需 await）。
 # ============================================================================
 
-def generate_consol_reports_sync(
+async def generate_consol_reports_sync(
     db: AsyncSession,
     project_id: UUID,
     year: int,
     applicable_standard: str = "enterprise",
 ) -> dict[str, list[dict]]:
-    """同步封装：生成合并报表"""
+    """生成合并报表（async）"""
     service = ConsolReportService(db)
-    return service.generate_consol_reports(project_id, year, applicable_standard)
+    return await service.generate_consol_reports(project_id, year, applicable_standard)
 
 
-def verify_balance_sync(
+async def verify_balance_sync(
     db: AsyncSession,
     project_id: UUID,
     year: int,
 ) -> BalanceCheckResult:
-    """同步封装：资产负债表平衡校验"""
+    """资产负债表平衡校验（async）"""
     service = ConsolReportService(db)
-    return service.verify_balance(project_id, year)
+    return await service.verify_balance(project_id, year)
 
 
-def generate_consol_workpaper_sync(
+async def generate_consol_workpaper_sync(
     db: AsyncSession,
     project_id: UUID,
     year: int,
 ) -> ConsolWorkpaperResult:
-    """同步封装：生成合并底稿"""
+    """生成合并底稿（async）"""
     service = ConsolReportService(db)
-    return service.generate_consol_workpaper(project_id, year)
+    return await service.generate_consol_workpaper(project_id, year)
 
 
-def generate_consol_notes_sync(
+async def generate_consol_notes_sync(
     db: AsyncSession,
     project_id: UUID,
     year: int,
 ) -> list[ConsolDisclosureSection]:
-    """同步封装：生成合并附注"""
+    """生成合并附注（async）"""
     service = ConsolReportService(db)
-    return service.generate_consol_notes(project_id, year)
+    return await service.generate_consol_notes(project_id, year)

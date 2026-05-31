@@ -133,12 +133,22 @@ async def review_elimination(
                 after={"review_status": entry.review_status.value if entry.review_status else None},
             )
             await db.flush()
-            # NOTE (Phase 2 Task 4.4 — BLOCKED on Phase 1): 抵销草稿审批通过（→APPROVED）后，
-            # Phase 1（consol-phase1-arch-lock）将在此处发布 `ELIMINATION_APPROVED` 事件，
-            # 由 EventBus handler 触发 worksheet + trial 重算（见 Phase 1 需求 3 / ADR-CONSOL-102）。
-            # 该事件类型当前尚不存在（Phase 1 交付物），本 Phase 不实现事件基础设施。
-            # 即便没有该事件，recalculate_trial 已仅消费 review_status==APPROVED 的抵销分录
-            # （Task 0 确认），故 APPROVED 分录会在下次重算时被正确纳入合并数。
+            await db.commit()
+
+            # 衔接2 / Phase 2 Task 4.4：审批 → 发 ELIMINATION_APPROVED 事件触发 worksheet + trial 重算
+            # （Phase 1 实装了该事件，填补了 Phase 2 自动抵销审批后重算的依赖；
+            # 审批已落库 commit，重算为下游派生，失败不影响审批本身，EH3）
+            try:
+                from app.models.audit_platform_schemas import EventPayload, EventType
+                from app.services.event_bus import event_bus
+                await event_bus.publish(EventPayload(
+                    event_type=EventType.ELIMINATION_APPROVED,
+                    project_id=project_id,
+                    year=entry.year,
+                    extra={"entry_id": str(entry_id)},
+                ))
+            except Exception:
+                pass  # 事件发布失败不阻断审批
 
         return entry
     except ValueError as e:

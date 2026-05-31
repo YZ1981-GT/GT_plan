@@ -28,6 +28,7 @@
 
     <!-- 归档横幅 -->
     <ArchivedBanner />
+    <ConsolLockedBanner />
 
     <!-- 批量状态变更操作栏 -->
     <BatchActionBar
@@ -131,6 +132,7 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
+import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
 import BatchActionBar from '@/components/workpaper/BatchActionBar.vue'
 import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'

@@ -79,8 +79,7 @@ def _patch_all(
 
     - build_tree: AsyncMock 返回 fake tree
     - get_descendants: MagicMock 返回 node_count-1 个占位后代
-    - recalc_full / recalculate_trial / reconcile / generate_full_consol_notes: AsyncMock
-    - generate_consol_reports_sync: MagicMock（同步）
+    - recalc_full / recalculate_trial / reconcile / generate_consol_reports_sync / generate_full_consol_notes: AsyncMock
     - settings.CONSOL_NOTES_V2_ENABLED: 控制 notes 是否真正执行 V2
     """
     descendants = [object()] * max(node_count - 1, 0)
@@ -95,7 +94,7 @@ def _patch_all(
             f"{_MODULE}.reconcile_worksheet_vs_trial", new=AsyncMock(return_value=MagicMock())
         ),
         "generate_consol_reports_sync": patch(
-            f"{_MODULE}.generate_consol_reports_sync", new=MagicMock(return_value=None)
+            f"{_MODULE}.generate_consol_reports_sync", new=AsyncMock(return_value=None)
         ),
         "generate_full_consol_notes": patch(
             f"{_MODULE}.generate_full_consol_notes", new=AsyncMock(return_value=[])
@@ -228,11 +227,8 @@ class TestS2FailureIsolation:
         """reconcile/report/notes 抛错 → 记 errors 但不中断，关键步保留、后续下游仍尝试。"""
         patchers = _patch_all(node_count=3, notes_v2_enabled=True)
         symbol = _DOWNSTREAM_STEP_TO_SYMBOL[downstream_step]
-        # generate_consol_reports_sync 是同步 → MagicMock side_effect；其余 async
-        if downstream_step == STEP_REPORT:
-            boom = MagicMock(side_effect=RuntimeError("report boom"))
-        else:
-            boom = AsyncMock(side_effect=RuntimeError(f"{downstream_step} boom"))
+        # 全部下游步现均 async（Phase 1 A3 后 generate_consol_reports_sync 也改 async）→ AsyncMock side_effect
+        boom = AsyncMock(side_effect=RuntimeError(f"{downstream_step} boom"))
         patchers[symbol] = patch(f"{_MODULE}.{symbol}", new=boom)
 
         with patchers["build_tree"], patchers["get_descendants"], patchers["recalc_full"], \

@@ -290,7 +290,9 @@ async def invalidate_permission_cache(user_id: UUID, project_id: UUID) -> None:
 
 
 async def check_consol_lock(
-    project_id: UUID,
+    project_id: UUID | None = None,
+    wp_id: UUID | None = None,
+    note_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     """检查项目是否被合并锁定，锁定时返回 423。
@@ -299,9 +301,42 @@ async def check_consol_lock(
     consol_lock 列已通过 V034 迁移就位 + ORM Project 模型声明，
     移除旧的"列可能不存在"SAVEPOINT 静默 pass，改用 ORM select。
     锁定态直接抛 423，真实异常暴露而非吞掉。
+
+    Phase 1（consol-phase1-arch-lock Task 5.2/5.3）：全端点覆盖。
+    端点路径含 project_id 时直接判锁；仅含资源 id（wp_id/note_id）时
+    反查所属 project_id 再判锁。反查失败放行不误拦 + 记 warning（EH4）。
     """
+    resolved_pid = project_id
+
+    # EH4：路径仅含资源 id 时反查所属 project_id（走主键索引，写端点低频）
+    if resolved_pid is None and wp_id is not None:
+        try:
+            from app.models.workpaper_models import WorkingPaper
+            res = await db.execute(
+                select(WorkingPaper.project_id).where(WorkingPaper.id == wp_id)
+            )
+            resolved_pid = res.scalar_one_or_none()
+        except Exception as err:
+            logger.warning("check_consol_lock 反查 project_id (wp_id=%s) 失败，放行: %s", wp_id, err)
+            return
+
+    if resolved_pid is None and note_id is not None:
+        try:
+            from app.models.report_models import DisclosureNote
+            res = await db.execute(
+                select(DisclosureNote.project_id).where(DisclosureNote.id == note_id)
+            )
+            resolved_pid = res.scalar_one_or_none()
+        except Exception as err:
+            logger.warning("check_consol_lock 反查 project_id (note_id=%s) 失败，放行: %s", note_id, err)
+            return
+
+    # 无法确定项目（既无 project_id 也反查不到）→ 放行不误拦（EH4）
+    if resolved_pid is None:
+        return
+
     result = await db.execute(
-        select(Project.consol_lock).where(Project.id == project_id)
+        select(Project.consol_lock).where(Project.id == resolved_pid)
     )
     if result.scalar_one_or_none():
         raise HTTPException(status_code=423, detail="项目已被合并锁定，无法修改")
