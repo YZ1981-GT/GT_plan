@@ -46,9 +46,10 @@ inclusion: always
 - **🔴 四阶段曾最大盲区 = 无全链路集成测试**（各阶段 mock 掉相邻阶段，merge 两次咬人：async 签名漂移 + Phase1 删 _execute_formula + **PK 缺 uuid default 致 B1 链路从未真实落库**）→ 封板①已补 `test_consol_full_chain_integration.py` 守护；**统一卡点 = PG 0 个 consolidated 项目**（真实 UAT 全 data-blocked，封板②seed 脚本待 live PG 解锁）
 - **封板待办（按 ROI）**：①✅ 全链路集成测试 `test_consol_full_chain_integration.py`（真 SQLite+真 ORM 行+真 service 跑 aggregate→trial→reconcile + refresh_all report-await 回归守卫 + branch/draft-vs-approved，4 passed）②✅ `seed_consol_uat.py` 幂等造最小合成集团（1母2子+TB+draft/approved抵销+内部交易，--dry-run 离线可验）③🟡 Phase2/3 Playwright 复用 Phase1 已跑通环境补实测（待环境）；**收手判断：地基已正确，①②已封板转回核心模块**
 - **🐛 封板①抓到真 bug 并修复**：`consolidation_models.py` 全部 14 个主键 `id` 列 `primary_key=True` 但缺 `default=uuid.uuid4`（V034 迁移 `id UUID NOT NULL` 也无 server default），导致 `upsert_trial_row` 等不传 id 的 ORM 插入 NULL 主键 → PG/SQLite 均 NOT NULL 违约；147 旧测试全 mock/纯函数从未真实落库故漏网。根因修复=全列补 `default=uuid.uuid4`（统一全仓其它模型写法），280 consol 测试全绿无回归
+- **✅ 预存 worksheet 测试失败已修（2026-05-31，commit `ce898e83`）**：`test_consol_worksheet.py::test_recalc_full`/`test_intermediate_node_children_sum` 2 红根因 = seeded_db fixture 的 2 条 EliminationEntry 用 `review_status=draft`，但 Phase1 把差额表引擎改为**只消费 APPROVED**（ADR-CONSOL-102）→ 抵销不生效，期望 elimination_debit=100/consolidated=400/ROOT children_sum=2400 全落空；**引擎本身正确**（按 consolidation-deep-dev 设计：中间节点 consolidated=Σ子节点 consolidated + 本级抵销/调整，**差额表不含本级个别数**，非"丢本体"bug——我初判会计逻辑缺陷有误）；修复=fixture 抵销改 approved 恢复测试原意，worksheet 19 + consol 78 全绿；**教训：先读设计文档确认是引擎错还是测试 fixture 过时，不预设是引擎会计 bug**
 
 ### git 当前状态（2026-05-31）
-- 当前分支 `work/2026-05-30-wp-specs`，已 merge origin/main 的 Phase1（merge `60088d42`）+ fix（`398dc5ab`）+ memory 精简（`56e31beb`）+ steering 三文档补全（`7eff78b6`），**已推送 origin/work（ahead=behind=0 同步）**
+- 当前分支 `work/2026-05-30-wp-specs`，**ahead origin/work 多个未推送**（封板代码 `546a35f7` + phase0 tasks `0bc2e089` + worksheet fixture 修复 `ce898e83` + memory）；之前已推送到 `7eff78b6`
 - 历史已闭环：合并模块 Phase0~3 全在 main / 底稿模块 14 spec 已实施归档 / schema drift 三层修复 / git 治理 spec（GIT_MODE 双模式 + 分支命名 hook + 6 维核查 CLI `check_git_sync_state.py`）
 
 ### 已完成 spec 总览
