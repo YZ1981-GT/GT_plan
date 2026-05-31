@@ -33,6 +33,12 @@
               </el-descriptions-item>
               <el-descriptions-item label="企业代码">{{ project.company_code || project.client_code || '-' }}</el-descriptions-item>
               <el-descriptions-item label="创建时间">{{ formatDate(project.created_at) }}</el-descriptions-item>
+              <!-- 双向导航 4.1：单体项目所属集团链接 → 跳合并项目 -->
+              <el-descriptions-item v-if="project.parent_project_id" label="所属集团">
+                <el-link type="primary" @click="goToParentConsol">
+                  {{ project.parent_project_name || '查看合并项目' }}
+                </el-link>
+              </el-descriptions-item>
             </el-descriptions>
 
             <!-- 配置缺失提示 -->
@@ -310,9 +316,11 @@ import { projects as P_proj, trialBalance as P_tb, attachments as P_att, account
 import { fmtAmount } from '@/utils/formatters'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import { useNavigationStack } from '@/composables/useNavigationStack'
 
 const props = defineProps<{ project: any | null }>()
 const router = useRouter()
+const { push: navPush } = useNavigationStack()
 const activeTab = ref('overview')
 const showTeamAssign = ref(false)
 const projectYear = computed(() => Number(props.project?.audit_year) || new Date().getFullYear())
@@ -369,6 +377,23 @@ function goTo(page: string) {
     path: `/projects/${props.project.id}/${page}`,
     query: { year: String(projectYear.value) },
   })
+}
+
+/**
+ * 双向导航 4.1：跳转到所属集团（合并项目）。
+ * 跳转前 push 当前路由到导航栈（direction:'up' 上钻），支持 Backspace 返回（T3）。
+ */
+function goToParentConsol() {
+  if (!props.project?.parent_project_id) return
+  const cur = router.currentRoute.value
+  navPush({
+    source_view: cur.path,
+    label: props.project.name || '单体项目',
+    direction: 'up',
+    scroll_position: window.scrollY,
+    query: cur.query as Record<string, string>,
+  })
+  router.push({ path: `/projects/${props.project.parent_project_id}/consolidation` })
 }
 
 async function goToLedgerImport() {

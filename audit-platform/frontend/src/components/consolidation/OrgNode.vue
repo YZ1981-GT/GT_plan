@@ -10,20 +10,28 @@
         <span v-if="node.company_code" class="org-card-code">{{ node.company_code }}</span>
         <span v-if="node.shareholding" class="org-card-ratio">{{ node.shareholding }}%</span>
         <span v-if="node.children?.length" class="org-card-count">{{ node.children.length }}家</span>
+        <!-- 双向导航 4.2：进入对应单体项目（阻止冒泡，避免触发卡片 select） -->
+        <el-link
+          v-if="node.project_id || node.id"
+          type="primary"
+          class="org-card-enter"
+          @click.stop="$emit('enter-project', node)"
+        >进入项目</el-link>
       </div>
     </div>
     <!-- 子节点 -->
     <div v-if="node.children?.length && depth < 14" class="org-children">
       <org-node v-for="(child, ci) in node.children" :key="child.company_code || ci"
         :node="child" :depth="depth + 1" :selected-code="selectedCode"
-        @select="$emit('select', $event)" />
+        @select="$emit('select', $event)"
+        @enter-project="$emit('enter-project', $event)" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 defineProps<{ node: any; depth: number; selectedCode?: string }>()
-defineEmits<{ (e: 'select', node: any): void }>()
+defineEmits<{ (e: 'select', node: any): void; (e: 'enter-project', node: any): void }>()
 </script>
 
 <style scoped>
@@ -47,6 +55,8 @@ defineEmits<{ (e: 'select', node: any): void }>()
 .org-card-code { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 .org-card-ratio { font-size: var(--gt-font-size-xs); color: var(--gt-color-primary); font-weight: 600; background: var(--gt-color-primary-bg); padding: 1px 4px; border-radius: 3px; }
 .org-card-count { font-size: var(--gt-font-size-xs); color: var(--gt-color-success); }
+.org-card-enter { font-size: var(--gt-font-size-xs); }
+.org-card-enter :deep(.el-link__inner) { font-size: var(--gt-font-size-xs); }
 
 /* 子节点容器 + 连接线 */
 .org-children {

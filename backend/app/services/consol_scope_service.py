@@ -1,5 +1,6 @@
 """合并范围服务 — 异步 ORM"""
 
+import logging
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -13,6 +14,26 @@ from app.models.consolidation_schemas import (
     ConsolScopeUpdate,
     ConsolScopeSummary,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _emit_scope_changed(project_id: UUID, year: int | None) -> None:
+    """合并范围增删改后广播 CONSOL_SCOPE_CHANGED（需求 5.2 / ADR-CONSOL-303）。
+
+    走 event_bus.broadcast_raw（同步、轻量）推 SSE，前端 ConsolidationIndex 监听后
+    自动刷新企业树（失效/重建树缓存）。无 event_bus / 无 event loop 时静默回退到 logger，
+    不阻断业务（EH4：事件丢失由前端"刷新树"按钮兜底）。
+    """
+    try:
+        from app.services.event_bus import event_bus
+
+        event_bus.broadcast_raw(
+            "consol.scope_changed",
+            {"project_id": str(project_id), "year": year},
+        )
+    except Exception as exc:  # pragma: no cover - 兜底，不阻断业务
+        logger.debug("broadcast consol.scope_changed failed (non-blocking): %s", exc)
 
 
 async def get_scope_list(db: AsyncSession, project_id: UUID, year: int) -> list[ConsolScope]:
@@ -53,6 +74,7 @@ async def create_scope_item(db: AsyncSession, project_id: UUID, data: ConsolScop
     db.add(scope)
     await db.commit()
     await db.refresh(scope)
+    _emit_scope_changed(project_id, getattr(data, "year", None))
     return scope
 
 
@@ -66,6 +88,7 @@ async def update_scope_item(
         setattr(scope, key, value)
     await db.commit()
     await db.refresh(scope)
+    _emit_scope_changed(project_id, scope.year)
     return scope
 
 
@@ -73,8 +96,10 @@ async def delete_scope_item(db: AsyncSession, scope_id: UUID, project_id: UUID) 
     scope = await get_scope_item(db, scope_id, project_id)
     if not scope:
         return False
+    scope_year = scope.year
     scope.soft_delete()
     await db.commit()
+    _emit_scope_changed(project_id, scope_year)
     return True
 
 
@@ -105,6 +130,7 @@ async def batch_update_scope(
     await db.commit()
     for r in results:
         await db.refresh(r)
+    _emit_scope_changed(project_id, data.scope_items[0].year if data.scope_items else None)
     return results
 
 

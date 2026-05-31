@@ -155,6 +155,9 @@ class ProjectCreateResponse(BaseModel):
     report_scope: str | None = None
     parent_project_id: UUID | None = None
     consol_level: int = 1
+    # 合并锁定态（Phase 0 consol_lock 列）：子公司被母项目锁定后单体不可改
+    # 前端合并项目列表据此显示"🔒 已锁定"标签（Phase 3 需求 4.3）
+    consol_lock: bool = False
     created_at: datetime
 
 
@@ -818,6 +821,10 @@ class EventType(str, enum.Enum):
     # multi-standard-unification 需求 1.5: 适用准则统一源变更事件
     # payload: {project_id, year, old_standard: dict, new_standard: dict, changed_by: UUID}
     STANDARD_CHANGED = "standard_changed"
+
+    # consol-phase3-frontend-drilldown 需求 5.2: 合并范围增删 → 失效/重建树缓存
+    # payload: {project_id, year}；前端 ConsolidationIndex 监听后自动刷新企业树（ADR-CONSOL-303）
+    CONSOL_SCOPE_CHANGED = "consol.scope_changed"
 
 
 class EventPayload(BaseModel):

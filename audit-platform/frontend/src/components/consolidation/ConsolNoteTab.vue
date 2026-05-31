@@ -202,6 +202,7 @@
     @compare="onNoteCtxCompare"
   >
     <div class="gt-ucell-ctx-item" @click="drillDownFromCell"><span class="gt-ucell-ctx-icon">📊</span> 查看汇总穿透</div>
+    <div class="gt-ucell-ctx-item" @click="onCtxViewConsolBreakdown"><span class="gt-ucell-ctx-icon">🔗</span> 查看合并明细</div>
     <div class="gt-ucell-ctx-item" @click="addCellComment"><span class="gt-ucell-ctx-icon">💬</span> 添加批注</div>
     <div class="gt-ucell-ctx-item" @click="markCellReviewed"><span class="gt-ucell-ctx-icon">✅</span> 标记已复核</div>
     <div class="gt-ucell-ctx-divider" />
@@ -428,6 +429,15 @@
     Sprint 1.5.3：附注公式管理 dialog 已收敛到全局 FormulaManagerDialog（ThreeColumnLayout 顶层挂载）。
     `openNoteFormula()` 改为发出 EventBus `open-formula-manager` 事件，nodeKey='consol_note'。
   -->
+
+  <!-- 合并附注穿透弹窗（统一组件，source=note）：右键"查看合并明细"打开 -->
+  <ConsolBreakdownDialog
+    v-model="consolBreakdownVisible"
+    source="note"
+    :project-id="props.projectId"
+    :year="props.year"
+    :section-id="consolBreakdownSectionId"
+  />
 </template>
 
 <script setup lang="ts">
@@ -448,6 +458,7 @@ import { useTableSearch } from '@/composables/useTableSearch'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useTableToolbar } from '@/composables/useTableToolbar'
 import ConsolNoteTreeEnhanced from '@/components/notes/ConsolNoteTreeEnhanced.vue'
+import ConsolBreakdownDialog from '@/components/consolidation/ConsolBreakdownDialog.vue'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { eventBus } from '@/utils/eventBus'
 import type { ConsolCatalogSelectPayload, ConsolTreeAggregatePayload, ConsolNoteAuditAllPayload } from '@/utils/eventBus'
@@ -476,6 +487,10 @@ const reaggregating = ref(false)
 const noteSingleAuditLoading = ref(false)
 const noteFileRef = ref<HTMLInputElement | null>(null)
 const noteTableRef = ref<any>(null)
+
+// ─── 合并明细穿透（统一组件 ConsolBreakdownDialog，source=note） ──────────────
+const consolBreakdownVisible = ref(false)
+const consolBreakdownSectionId = ref('')
 // useTableToolbar 管理选中行状态（editRows 是动态嵌套属性，用 computed 桥接）
 const noteEditRows = computed({
   get: () => selectedNoteSection.value?.editRows ?? [],
@@ -681,6 +696,17 @@ function drillDownFromCell() {
   if (noteCtx.selectedCells.value.length) {
     emit('note-node-click', { section_id: '__drill_down__' })
   }
+}
+
+/** 右键"查看合并明细"：打开统一穿透弹窗（source=note），以当前选中附注章节的 section_id 穿透 */
+function onCtxViewConsolBreakdown() {
+  noteCtx.closeContextMenu()
+  consolBreakdownSectionId.value = selectedNoteSection.value?.section_id || ''
+  if (!consolBreakdownSectionId.value) {
+    ElMessage.info('请先选择附注章节')
+    return
+  }
+  consolBreakdownVisible.value = true
 }
 
 function addCellComment() {

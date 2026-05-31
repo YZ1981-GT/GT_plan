@@ -224,11 +224,17 @@ export const consolidation = {
   notes: {
     list: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}`,
     save: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}/save`,
+    // Phase 3：附注级合并穿透明细（disclosure_notes.consolidation_breakdown provenance）
+    consolBreakdown: (pid: string, year: number, sectionId: string) =>
+      `/api/consolidation/notes/${pid}/${year}/${sectionId}/consol-breakdown`,
   },
   reports: {
     list: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}`,
     generate: '/api/consolidation/reports/generate',
     balanceCheck: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}/balance-check`,
+    // 报表级合并穿透明细（前瞻定义，依赖 Phase 2 后端端点；未就绪时组件降级为友好空态）
+    consolBreakdown: (pid: string, year: number, accountCode: string) =>
+      `/api/consolidation/report/${pid}/${year}/${accountCode}/consol-breakdown`,
   },
   worksheet: {
     tree: '/api/consolidation/worksheet/tree',

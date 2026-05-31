@@ -765,6 +765,7 @@
     <div class="gt-ucell-ctx-item" @click="onRvCtxShowNoteRefs"><span class="gt-ucell-ctx-icon">🔎</span> 附注引用我</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxOpenWorkpaper"><span class="gt-ucell-ctx-icon">📋</span> 打开对应底稿</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxViewAdjustments"><span class="gt-ucell-ctx-icon">🔗</span> 查看调整明细</div>
+    <div v-if="isConsolidated" class="gt-ucell-ctx-item" @click="onRvCtxViewConsolBreakdown"><span class="gt-ucell-ctx-icon">🔗</span> 查看合并明细</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxViewFormulaSource"><span class="gt-ucell-ctx-icon">🔍</span> 查看公式来源</div>
   </CellContextMenu>
 
@@ -784,6 +785,15 @@
     @update:visible="showCellFormulaDetail = $event"
     @navigate="onCellDetailNavigate"
   />
+
+  <!-- 合并报表穿透弹窗（统一组件，source=report）：右键"查看合并明细"打开 -->
+  <ConsolBreakdownDialog
+    v-model="consolBreakdownVisible"
+    source="report"
+    :project-id="projectId"
+    :year="year"
+    :account-code="consolBreakdownAccountCode"
+  />
 </template>
 
 <script setup lang="ts">
@@ -799,6 +809,7 @@ import MultiYearCompare from '@/components/report/MultiYearCompare.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
+import ConsolBreakdownDialog from '@/components/consolidation/ConsolBreakdownDialog.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
@@ -1996,6 +2007,22 @@ function onRvCtxViewAdjustments() {
     path: `/projects/${projectId.value}/trial-balance`,
     query: { highlight_row: row.row_code, year: String(year.value) },
   })
+}
+
+// 合并报表穿透（统一组件 ConsolBreakdownDialog，source=report）：右键"查看合并明细"打开。
+// row_code 即报表行编码，作为 report 端点的 accountCode。仅合并报表（isConsolidated）显示该菜单项。
+const consolBreakdownVisible = ref(false)
+const consolBreakdownAccountCode = ref('')
+
+function onRvCtxViewConsolBreakdown() {
+  rvCtx.closeContextMenu()
+  const row = rvCtx.contextMenu.rowData
+  if (!row?.row_code) {
+    ElMessage.info('请在数据行上右键')
+    return
+  }
+  consolBreakdownAccountCode.value = row.row_code
+  consolBreakdownVisible.value = true
 }
 
 // Sprint 5.6: 查看公式来源

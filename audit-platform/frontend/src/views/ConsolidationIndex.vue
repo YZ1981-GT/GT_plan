@@ -13,6 +13,23 @@
       </template>
     </el-alert>
 
+    <!-- F5 合并页 stale 实时感知（需求 7 / ADR-CONSOL-304）：子公司数据变更后 SSE 提示，warning 不阻断 -->
+    <el-alert
+      v-if="consolStale"
+      type="warning"
+      :closable="true"
+      show-icon
+      style="margin-bottom: 12px"
+      @close="consolStale = false"
+    >
+      <template #title>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span>子公司数据已更新，建议重新汇总以获取最新合并结果</span>
+          <el-button size="small" type="primary" @click="onReaggregateNow">立即重新汇总</el-button>
+        </div>
+      </template>
+    </el-alert>
+
     <!-- 横幅：单位名称 + 年度 + 准则类型 -->
     <GtPageHeader title="合并报表" @back="$router.push('/consolidation')">
       <GtInfoBar
@@ -79,14 +96,16 @@
               <el-button size="small" @click="orgZoom = 1">1:1</el-button>
             </div>
             <div class="gt-ctb-toolbar-right">
-              <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary)">{{ orgNodeCount }} 个节点 · 最大 {{ orgMaxDepth }} 层</span>
+              <!-- 自动建树 5.4：手动刷新树兜底（CONSOL_SCOPE_CHANGED 事件丢失时，EH4） -->
+              <el-button size="small" :loading="treeRefreshing" @click="refreshGroupTree">🔄 刷新树</el-button>
+              <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin-left:8px">{{ orgNodeCount }} 个节点 · 最大 {{ orgMaxDepth }} 层</span>
             </div>
           </div>
 
           <!-- 组织结构图模式 -->
           <div v-if="orgViewMode === 'chart'" class="org-chart-wrapper" :style="{ transform: `scale(${orgZoom})`, transformOrigin: 'top left' }">
             <div v-if="groupTree.length" class="org-chart">
-              <org-node :node="groupTree[0]" :depth="0" @select="onTreeNodeClick" :selected-code="selectedNode?.company_code" />
+              <org-node :node="groupTree[0]" :depth="0" @select="onTreeNodeClick" @enter-project="onEnterProject" :selected-code="selectedNode?.company_code" />
             </div>
             <el-empty v-else description="暂无集团架构数据，请先配置合并范围" />
           </div>
@@ -100,6 +119,13 @@
                   <span class="gt-tree-node">
                     <span>{{ data.company_name || data.name }}</span>
                     <el-tag v-if="data.shareholding" size="small" type="info" style="margin-left:8px">{{ data.shareholding }}%</el-tag>
+                    <!-- 双向导航 4.2：进入对应单体项目（阻止冒泡，避免触发 node-click） -->
+                    <el-link
+                      v-if="data.project_id || data.id"
+                      type="primary"
+                      style="margin-left:8px;font-size: var(--gt-font-size-xs)"
+                      @click.stop="onEnterProject(data)"
+                    >进入项目</el-link>
                   </span>
                 </template>
               </el-tree>
@@ -464,11 +490,16 @@ import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
+import { useNavigationStack } from '@/composables/useNavigationStack'
+import { useProjectEvents } from '@/composables/useProjectEvents'
 
 const route = useRoute()
 const router = useRouter()
+const { push: navPush } = useNavigationStack()
 const { mul: decMul, div: decDiv } = useDecimalCalc()
 const projectId = computed(() => route.params.projectId as string)
+// 自动建树 5.3：项目级事件流（含 CONSOL_SCOPE_CHANGED）
+const consolEvents = useProjectEvents(projectId)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
 
 // ─── 批注与复核持久化（合并报表/试算表共用） ─────────────────────────────────
@@ -480,6 +511,9 @@ const consolTbTabRef = ref<InstanceType<typeof ConsolTrialBalanceTab> | null>(nu
 
 // ─── P3 防误用标记 ────────────────────────────────────────────────────────────
 const consolDevMode = ref(false)
+
+// ─── F5 合并页 stale 实时感知（需求 7 / ADR-CONSOL-304）────────────────────────
+const consolStale = ref(false)
 
 // ─── 合并类型（subsidiary 母子合并 / branch 母分汇总）──────────────────────────
 const consolidationType = ref<'subsidiary' | 'branch'>('subsidiary')
@@ -824,6 +858,45 @@ function maxDepth(node: any, d = 1): number {
 const orgNodeCount = computed(() => groupTree.value.length ? countNodes(groupTree.value[0]) : 0)
 const orgMaxDepth = computed(() => groupTree.value.length ? maxDepth(groupTree.value[0]) : 0)
 
+// 自动建树 5.3/5.4：手动刷新 + CONSOL_SCOPE_CHANGED 事件自动刷新的状态标记
+const treeRefreshing = ref(false)
+
+/**
+ * 自动建树 5.4：手动刷新企业树（EH4 兜底，事件丢失时用户可手动触发）。
+ * 同时复用为 5.3 SSE 事件回调的实现。
+ */
+async function refreshGroupTree() {
+  treeRefreshing.value = true
+  try {
+    await loadGroupTree()
+  } finally {
+    treeRefreshing.value = false
+  }
+}
+
+/**
+ * 自动建树 5.3：CONSOL_SCOPE_CHANGED 事件回调 → 自动刷新企业树。
+ * F5 6A.2：consol.note_stale 事件 → 显示"建议重新汇总"提示（warning 不阻断）。
+ * 仅响应合并相关事件（其他项目事件忽略；项目过滤由 useProjectEvents 完成）。
+ */
+function onConsolScopeChanged(evt: { event_type: string }) {
+  if (evt.event_type === 'consol.scope_changed') {
+    refreshGroupTree()
+  } else if (evt.event_type === 'consol.note_stale') {
+    // F5：子公司数据变更导致母项目 stale → 提示重新汇总
+    consolStale.value = true
+  }
+}
+
+/**
+ * F5 6A.3：立即重新汇总快捷入口 → 跳合并附注 Tab 并触发重新汇总（Phase 2 一键刷新）。
+ * 复用 ConsolNoteTab 的"重新汇总"链路（consol-catalog-select 事件 + reaggregate 端点）。
+ */
+function onReaggregateNow() {
+  consolStale.value = false
+  activeTab.value = 'consol_note'
+}
+
 async function loadGroupTree() {
   try {
     const res = await getWorksheetTree(projectId.value)
@@ -867,6 +940,29 @@ function onConsolScopeTemplateApplied(data: Record<string, any>) {
 
 function goToProject(_node: any) {
   router.push('/consolidation')
+}
+
+/**
+ * 双向导航 4.2：从合并树节点进入对应单体项目。
+ * 跳转前 push 当前路由到导航栈（direction:'down' 下钻），支持 Backspace 返回（T3）。
+ * 目标项目 id 优先取 worksheet tree 的 project_id，回退 listChildProjects 的 id。
+ */
+function onEnterProject(node: any) {
+  const targetId = node?.project_id || node?.id
+  if (!targetId) {
+    ElMessage.info('该节点无对应项目')
+    return
+  }
+  const cur = router.currentRoute.value
+  navPush({
+    source_view: cur.path,
+    label: '合并项目',
+    direction: 'down',
+    scroll_position: window.scrollY,
+    query: cur.query as Record<string, string>,
+  })
+  // 单体项目默认落地页：entry 路由按角色重定向到仪表盘/试算表
+  router.push({ path: `/projects/${targetId}/entry` })
 }
 
 function fmtAmt(v: any): string {
@@ -1263,6 +1359,8 @@ onMounted(async () => {
   eventBus.on('consol-tree-select', onConsolTreeSelect)
   eventBus.on('consol-catalog-select', onConsolCatalogSelect)
   eventBus.on('consol-refresh-entity', onConsolRefreshEntity)
+  // 自动建树 5.3：监听 CONSOL_SCOPE_CHANGED（SSE）→ 自动刷新企业树（ADR-CONSOL-303）
+  consolEvents.onAnyEvent(onConsolScopeChanged)
 })
 
 onUnmounted(() => {

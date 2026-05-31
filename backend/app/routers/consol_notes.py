@@ -25,6 +25,7 @@ from app.services.consol_disclosure_service import (
     integrate_consol_notes_sync,
     save_consol_notes_sync,
 )
+from app.services.note_consol_drilldown_service import get_note_consol_breakdown
 
 router = APIRouter(
     prefix="/api/consolidation/notes",
@@ -198,3 +199,29 @@ def _load_mapped_section_ids() -> list[str]:
             if sid:
                 section_ids.append(sid)
     return section_ids
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 附注级穿透端点（consol-phase3-frontend-drilldown / 需求 2.3）
+# ---------------------------------------------------------------------------
+#
+# 路由顺序说明：本端点路径 {year}/{section_id}/consol-breakdown 与既有
+# {year}/save、{year}/reaggregate 不冲突（后者第二段是静态 save/reaggregate，
+# 本端点第二段是动态 {section_id}）。为稳妥放在所有既有路由之后注册。
+
+
+@router.get("/{project_id}/{year}/{section_id}/consol-breakdown")
+async def get_consol_note_breakdown(
+    project_id: UUID,
+    year: int,
+    section_id: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("readonly")),
+):
+    """获取某合并附注章节的子公司贡献明细（附注级穿透）.
+
+    数据来自 disclosure_notes.consolidation_breakdown（V2 汇总时写入）。
+    无明细时返回空 by_company + has_breakdown=false + 中文友好提示（HTTP 200，
+    不 404/500），见错误场景 EH1/EH3。
+    """
+    return await get_note_consol_breakdown(db, project_id, year, section_id)

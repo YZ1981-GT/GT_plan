@@ -17,6 +17,7 @@ Validates: Phase 2 Requirements 8.1, 8.2, 8.3, 8.4, 8.5, 8.6
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
@@ -911,6 +912,19 @@ async def _aggregate_common_section(
     # B.1.4 抵销前后双列标记
     result = _add_elimination_columns(result, elimination_rule)
 
+    # Phase 3（consol-phase3-frontend-drilldown / T2 / ADR-CONSOL-302）：
+    # 汇总每章节时同步写 consolidation_breakdown provenance（哪些子公司贡献多少），
+    # 供附注穿透端点直接读，无需事后重算。
+    # 注：V2 generate_full_consol_notes 输出目前尚未接 disclosure_notes 落库路径
+    # （依赖 Phase 2 V2 接线）；这里先把 provenance + source_project_id 附在返回的
+    # 章节 dict 上，供端点（note_consol_drilldown_service）与未来落库逻辑读取。
+    section_title = mapping.get("section_title") or consol_section_id
+    consolidation_breakdown = _build_section_consolidation_breakdown(
+        section_title=section_title,
+        result=result,
+        subsidiaries=subsidiaries,
+    )
+
     return {
         "section_id": consol_section_id,
         "source_section_id": section_id,
@@ -920,7 +934,92 @@ async def _aggregate_common_section(
         "scope": "consolidated",
         "level": 3,
         "auto_numbering": True,
+        # Phase 3 附注级穿透 provenance（落 disclosure_notes.consolidation_breakdown）
+        "source_project_id": str(consol_project_id),
+        "consolidation_breakdown": consolidation_breakdown,
     }
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 附注级穿透 provenance 构建（consol-phase3-frontend-drilldown / T2）
+# ---------------------------------------------------------------------------
+
+
+def _build_section_consolidation_breakdown(
+    section_title: str,
+    result: dict,
+    subsidiaries: list[dict],
+) -> dict:
+    """构建附注合并章节的 consolidation_breakdown provenance.
+
+    形态与 Phase 0 consol_trial.consolidation_breakdown 对称（V034 / B1）：
+        {
+          "by_company": [
+            {"company_code", "company_name", "section_title", "amount"(str Decimal)}
+          ],
+          "computed_at": "<iso>",
+        }
+
+    各子公司贡献金额 = 该子公司所有行的全部数值单元格之和（按 source_project 归并）。
+    section 汇总值 == Σ by_company[*].amount（同一批单元格按来源子公司的划分，
+    自洽性见属性 T2）。amount == 0 的子公司仍保留（便于穿透展示"贡献为 0"）。
+
+    无法归属来源（source_project 缺失，如已模糊合并的行）的金额走 best-effort：
+    不计入 by_company（避免错误归属），故仅在所有行均带 source_project 时
+    Σ by_company == section 汇总值严格成立。
+    """
+    # project_id(str) -> {company_code, company_name}
+    company_map: dict[str, dict] = {}
+    for sub in subsidiaries:
+        pid = sub.get("project_id")
+        if pid is None:
+            continue
+        company_map[str(pid)] = {
+            "company_code": sub.get("company_code"),
+            "company_name": sub.get("company_name"),
+        }
+
+    amounts: dict[str, Decimal] = {}
+    for row in (result.get("rows") or []):
+        if not isinstance(row, dict):
+            continue
+        source_project = row.get("source_project")
+        if source_project is None:
+            # 已合并/无来源行：best-effort 不归属（避免错误归属，见 docstring）
+            continue
+        pid_str = str(source_project)
+        row_total = _sum_row_numeric_values(row.get("values") or {})
+        amounts[pid_str] = amounts.get(pid_str, Decimal("0")) + row_total
+
+    by_company: list[dict] = []
+    for pid_str, amount in amounts.items():
+        meta = company_map.get(pid_str, {})
+        by_company.append({
+            # source_project_id 供前端 ConsolBreakdownDialog 跨项目跳转单体附注（T3）
+            "source_project_id": pid_str,
+            "company_code": meta.get("company_code"),
+            "company_name": meta.get("company_name"),
+            "section_title": section_title,
+            "amount": str(amount),
+        })
+
+    return {
+        "by_company": by_company,
+        "computed_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _sum_row_numeric_values(values: dict) -> Decimal:
+    """对一行的全部数值单元格求和（Decimal，跳过非数值/None）."""
+    total = Decimal("0")
+    for val in (values or {}).values():
+        if val is None:
+            continue
+        try:
+            total += Decimal(str(val))
+        except (InvalidOperation, ValueError, TypeError):
+            continue
+    return total
 
 
 # ---------------------------------------------------------------------------

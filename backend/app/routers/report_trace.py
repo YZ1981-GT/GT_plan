@@ -108,6 +108,22 @@ async def get_module_status(
     return result
 
 
+@router.get("/api/consolidation/{project_id}/completeness-check")
+async def consol_completeness_check(
+    project_id: UUID,
+    year: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """子公司数据完整度前置校验（需求 6 / T5 / EH5）.
+
+    一键刷新前调用：检查各子公司 TB 审定数 + 附注生成状态。
+    warning 不阻断（can_refresh 恒 True），子公司过多时超时降级返回部分结果。
+    """
+    from app.services.consol_completeness_service import check_subsidiary_completeness
+    return await check_subsidiary_completeness(db, project_id, year)
+
+
 # ── 独立模块 (Task 7.3) ──────────────────────────────────
 
 class TempProjectRequest(BaseModel):

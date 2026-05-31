@@ -114,7 +114,7 @@
 | `consol-phase0-core-pipeline/` | ✅ 核心完成 | Phase 0 止血：B1 汇总 + B2 对账 + C1/C3 schema 基线 V027 + A4 下线 + P1 留痕 + P5 权限 + P3 防误用 + F2 锁定闭环 + ADR-CONSOL-001/002/003；PBT P1~P7 全绿；真实 UAT（任务14）卡 PG 合并数据 |
 | `consol-phase1-arch-lock/` | 📌 待启动 | Phase 1 架构修复：A1 公式引擎统一 + 衔接2 抵销口径 + B6/B7 准则修正 + A3 async；前置 = Phase 0 |
 | `consol-phase2-orchestration/` | 📌 待启动 | Phase 2 编排接线：cascade_refresh + V2 附注 + cross_template + 报表穿透；前置 = Phase 1 |
-| `consol-phase3-frontend-drilldown/` | 📌 待启动 | Phase 3 前端联动：ConsolBreakdownDialog + 附注穿透 + 自动建树 + stale SSE；前置 = Phase 2 |
+| `consol-phase3-frontend-drilldown/` | ✅ 代码完成 | Phase 3 前端联动：ConsolBreakdownDialog 统一穿透（report+note）+ disclosure_notes provenance V039 + 附注穿透端点 + 双向导航 + 自动建树 CONSOL_SCOPE_CHANGED + wizard 配置合并范围 + 完整度校验 + F5 stale SSE；T1 vitest 7 + 后端 26 测试全绿 + ADR-CONSOL-301~304；Playwright 实测刷新树/进入项目/菜单门控通过；深度穿透 + UAT（8.1/8.4/9）卡 PG 0 个真实合并母子数据 |
 | `consol-note-three-level-drilldown/` | 📌 | 合并附注三级穿透；前置 = 真实合并母子项目数据（PG 当前 0 个 consolidated 项目）；待并入 Phase 3 |
 
 > 注：`workpaper-fill-service-split` 已 `git rm`（目标 WorkpaperFillService 经 grep 实证为 0 业务调用方的死代码，拆分无意义）；`gt-c-note-table-shrink` 已于 2026-05-30 完成并归档至 07-workpaper-slimdown（GtCNoteTable 1803→450 + GtEControlTest 1414→344，90 测试全绿；残留 R3 Playwright 目视待环境，非代码缺口）。
@@ -248,7 +248,7 @@ _archive/
 | cross_wp_references | 400 条 |
 | prefill_formula_mapping | 1035 cells |
 | validation_rules | 114 条 |
-| D6 SQL 迁移 | V001-V036 |
+| D6 SQL 迁移 | V001-V039（V039 = disclosure_notes provenance / Phase 3） |
 | **Spec 总数** | **active 18（5 合并 Phase/note + 13 底稿）+ archived（详见 §三）** |
 
 ---

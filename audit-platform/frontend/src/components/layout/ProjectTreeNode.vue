@@ -38,6 +38,7 @@
         <div class="gt-node-meta">
           <span>{{ node.client_name || '-' }}</span>
           <span class="gt-node-meta-right">
+            <el-tag v-if="node.consol_lock" size="small" type="warning">🔒 已锁定</el-tag>
             <GtStatusTag v-if="node.status !== 'created'" dict-key="project_status" :value="node.status" />
             <el-button
               class="gt-node-action-inline"
@@ -87,6 +88,7 @@ interface ProjectNode {
   client_name: string
   status: string
   report_scope: string | null
+  consol_lock?: boolean
   children?: ProjectNode[]
 }
 

@@ -10,6 +10,9 @@ export const projects = {
   detail: (id: string) => `/api/projects/${id}`,
   wizard: (id: string) => `/api/projects/${id}/wizard`,
   childCompanies: (id: string) => `/api/projects/${id}/child-companies`,
+  // Phase 3 需求 5.1：配置合并范围（把已有单体项目挂为子公司）
+  availableSubsidiaries: (id: string) => `/api/projects/${id}/available-subsidiaries`,
+  attachSubsidiaries: (id: string) => `/api/projects/${id}/attach-subsidiaries`,
   signReadiness: (id: string) => `/api/projects/${id}/sign-readiness`,
   consistencyCheck: {
     run: (id: string) => `/api/projects/${id}/consistency-check/run`,
