@@ -240,7 +240,7 @@ class SchemaDriftDetector:
                 # 类型粗粒度对比（取首词作为类型大类）
                 orm_type = self._normalize_type(orm_cols[col]["type"])
                 db_type = self._normalize_type(db_cols[col]["type"])
-                if orm_type and db_type and orm_type != db_type:
+                if orm_type and db_type and not self._types_compatible(orm_type, db_type):
                     items.append(DriftItem(
                         table=table, column=col,
                         drift_type="type_mismatch",
@@ -256,6 +256,7 @@ class SchemaDriftDetector:
             'VARCHAR(100)' → 'VARCHAR'
             'CHARACTER VARYING' → 'VARCHAR'  # PG information_schema 用 character varying
             'TIMESTAMP WITH TIME ZONE' → 'TIMESTAMPTZ'
+            'DATETIME' → 'TIMESTAMP'  # SQLAlchemy DateTime = PG TIMESTAMP
         """
         s = (t or "").strip().upper()
         if not s:
@@ -271,12 +272,38 @@ class SchemaDriftDetector:
             "INT4": "INTEGER",
             "INT8": "BIGINT",
             "BOOL": "BOOLEAN",
+            # SQLAlchemy ORM 类型 → PG 实际类型归一化（消除 type_mismatch 假阳性）
+            "DATETIME": "TIMESTAMP",  # SA DateTime = PG TIMESTAMP/TIMESTAMPTZ
         }
         if s in aliases:
             return aliases[s]
         # 取首词去括号
         head = s.split("(")[0].split(" ")[0]
         return aliases.get(head, head)
+
+    @staticmethod
+    def _types_compatible(orm_type: str, db_type: str) -> bool:
+        """判断两个归一化后的类型是否兼容（消除假阳性）。
+
+        以下组合视为兼容（不报 type_mismatch）：
+        - TIMESTAMP ↔ TIMESTAMPTZ（时区差异不影响数据存取）
+        - CHAR ↔ UUID（SQLAlchemy UUID 报为 CHAR，PG 存为 UUID）
+        - VARCHAR ↔ USER-DEFINED（Enum 列：ORM 用 VARCHAR，PG 用自定义 enum 类型）
+        - FLOAT ↔ FLOAT8（同义）
+        """
+        if orm_type == db_type:
+            return True
+        # 定义兼容组（组内任意两个类型视为兼容）
+        compat_groups = [
+            {"TIMESTAMP", "TIMESTAMPTZ"},
+            {"CHAR", "UUID"},
+            {"VARCHAR", "USER-DEFINED"},
+            {"FLOAT", "FLOAT8"},
+        ]
+        for group in compat_groups:
+            if orm_type in group and db_type in group:
+                return True
+        return False
 
     async def _diff_enums(self) -> list[DriftItem]:
         """对比 PG enum 类型 vs Python Enum 类。
