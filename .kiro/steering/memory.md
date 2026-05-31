@@ -58,7 +58,10 @@ inclusion: always
 
 ### 已完成 spec 总览
 - 详见 `.kiro/specs/INDEX.md`（active + _archive 10 分类）；归档/状态核实必须 grep/fileSearch 实证产物存在，不信 README/INDEX 自述
-- active = `consol-note-three-level-drilldown`（stub 待真实合并数据）+ **全局模块 7 spec（A formula-engine-unification/B retrieval-kernel/C doc-level-ai-chat/D report-config-baseline/E wp-ai-review-ux-fix/F global-modules-cleanup/G global-modules-p2-polish，A→G 顺序待实施）** + frontend-consistency-m1（merge 带入）；**合并四阶段已归档 `_archive/09-consolidation-phases/`**；底稿模块 13 spec + V3 + 附注 spec + 11 审计循环 + phase1~8 全已归档
+- **已完成 active spec**：✅ `formula-engine-unification`(20/20) + ✅ `report-config-baseline`(12/12) + ✅ `frontend-consistency-m1`(36/36)
+- **待实施 active spec**：B `retrieval-kernel-unification`(0/12) → C `doc-level-ai-chat`(0/12，依赖B) → E `wp-ai-review-ux-fix`(0/8) → F `global-modules-cleanup`(0/10) → G `global-modules-p2-polish`(0/11，A~F后启动)
+- **stub**：`consol-note-three-level-drilldown`（无 tasks.md，待真实合并数据）
+- **合并四阶段已归档 `_archive/09-consolidation-phases/`**；底稿模块 13 spec + V3 + 附注 spec + 11 审计循环 + phase1~8 全已归档
 
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
