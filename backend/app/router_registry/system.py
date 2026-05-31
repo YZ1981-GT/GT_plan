@@ -213,6 +213,10 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.ai_content import router as ai_content_router
     app.include_router(ai_content_router, tags=["AI 内容溯源"])
 
+    # ═══ §130. doc-level-ai-chat: 文档级 AI 对话（streaming + 留痕 + 采纳确认流） ═══
+    from app.routers.doc_ai_chat import router as doc_ai_chat_router
+    app.include_router(doc_ai_chat_router, tags=["文档级AI对话"])
+
     # ═══ §123. V3 Req 7.4: 跨模块冲突调解（list_pending / list / resolve） ═══
     from app.routers.cross_module_conflicts import router as cross_module_conflicts_router
     app.include_router(cross_module_conflicts_router, tags=["跨模块冲突调解"])

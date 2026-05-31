@@ -1,5 +1,7 @@
 """单元格批注与复核标记 API — 支持所有模块的单元格级批注和复核状态持久化
 
+TODO: 后续迭代时将 raw SQL text() 迁移到 ORM（ConsolCellComment 模型已就绪）
+
 表结构：consol_cell_comments
   - project_id + year + module + sheet_key + row_idx + col_idx 唯一定位一个单元格
   - comment_type: 'comment' | 'review'
@@ -63,43 +65,7 @@ class CellCommentResponse(BaseModel):
     updated_at: Optional[str] = None
 
 
-# ─── 确保表存在 ──────────────────────────────────────────────────────────────
-_table_created = False
 
-
-async def ensure_table(db: AsyncSession):
-    global _table_created
-    if _table_created:
-        return
-    try:
-        await db.execute(text("""
-            CREATE TABLE IF NOT EXISTS consol_cell_comments (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                project_id UUID NOT NULL,
-                year INT NOT NULL,
-                module VARCHAR(50) NOT NULL,
-                sheet_key VARCHAR(100) NOT NULL,
-                row_idx INT NOT NULL,
-                col_idx INT NOT NULL,
-                comment_type VARCHAR(20) NOT NULL DEFAULT 'comment',
-                comment TEXT NOT NULL DEFAULT '',
-                status VARCHAR(20) NOT NULL DEFAULT '',
-                row_name VARCHAR(200) NOT NULL DEFAULT '',
-                col_name VARCHAR(200) NOT NULL DEFAULT '',
-                created_by UUID,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                UNIQUE(project_id, year, module, sheet_key, row_idx, col_idx, comment_type)
-            )
-        """))
-        await db.execute(text(
-            "CREATE INDEX IF NOT EXISTS ix_cc_proj_year_mod ON consol_cell_comments(project_id, year, module)"
-        ))
-        await db.commit()
-        _table_created = True
-    except Exception:
-        await db.rollback()
-        _table_created = True
 
 
 def _row_to_response(row, project_id: str, year: int) -> CellCommentResponse:
@@ -128,7 +94,6 @@ async def get_module_comments(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
-    await ensure_table(db)
     result = await db.execute(
         text("""
             SELECT id, module, sheet_key, row_idx, col_idx, comment_type,
@@ -149,7 +114,6 @@ async def get_sheet_comments(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
-    await ensure_table(db)
     result = await db.execute(
         text("""
             SELECT id, module, sheet_key, row_idx, col_idx, comment_type,
@@ -171,7 +135,6 @@ async def save_cell_comment(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
 ):
-    await ensure_table(db)
     now = datetime.now(timezone.utc)
     new_id = str(uuid.uuid4())
     try:
@@ -226,7 +189,6 @@ async def delete_cell_comment(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
 ):
-    await ensure_table(db)
     try:
         result = await db.execute(
             text("DELETE FROM consol_cell_comments WHERE id = :cid AND project_id = :pid AND year = :y"),

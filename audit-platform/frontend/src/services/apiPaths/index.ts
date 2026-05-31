@@ -10,7 +10,7 @@ export {
   trialBalance, adjustments, materiality, misstatements,
   sampling, aging, ledger, accountChart, accountMapping,
   reportLineMapping, columnMappings, dataLifecycle, importIntelligence,
-  ledgerImportValidationRules, tAccounts, formula, dataValidation, fineChecks,
+  ledgerImportValidationRules, tAccounts, formula, formulaAuditLog, dataValidation, fineChecks,
 } from './accounting'
 
 export {
@@ -55,7 +55,7 @@ import {
   trialBalance, adjustments, materiality, misstatements,
   sampling, aging, ledger, accountChart, accountMapping,
   reportLineMapping, columnMappings, dataLifecycle, importIntelligence,
-  ledgerImportValidationRules, tAccounts, formula, dataValidation, fineChecks,
+  ledgerImportValidationRules, tAccounts, formula, formulaAuditLog, dataValidation, fineChecks,
 } from './accounting'
 import {
   reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections,
@@ -93,7 +93,7 @@ export const API = {
   cfsWorksheet, disclosureNotes, auditReport, exportTask,
   workpaperSummary, events, consolidation, consolWorksheetData,
   workpapers, wpReviews, wpMapping, wpAI, wpFineRules, wpManuals,
-  wpDependencies, templates, formula, sampling, staff, users, auth,
+  wpDependencies, templates, formula, formulaAuditLog, sampling, staff, users, auth,
   notifications, system, recycleBin, knowledge, knowledgeLibrary, dashboard, annotations,
   procedures, reviews, sync, auditLogs, projectMgmt, archive,
   subsequentEvents, pbc, confirmations, goingConcern, riskAssessments,

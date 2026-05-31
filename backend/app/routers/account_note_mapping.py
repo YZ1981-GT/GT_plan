@@ -1,5 +1,7 @@
 """科目→附注行映射 API — 维护科目名称到附注表格行的映射关系，提高自动取数匹配率
 
+TODO: 后续迭代时将 raw SQL text() 迁移到 ORM（AccountNoteMapping 模型已就绪）
+
 表结构：account_note_mapping
   - project_id + account_name + section_id + row_name 唯一
   - mapping_type: 'exact'（精确匹配）| 'contains'（包含匹配）| 'regex'（正则匹配）
@@ -48,39 +50,11 @@ class MappingResponse(BaseModel):
     created_at: str | None = None
 
 
-_table_created = False
 
-async def ensure_table(db: AsyncSession):
-    global _table_created
-    if _table_created:
-        return
-    try:
-        await db.execute(text("""
-            CREATE TABLE IF NOT EXISTS account_note_mapping (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                project_id UUID NOT NULL,
-                account_name VARCHAR(200) NOT NULL,
-                section_id VARCHAR(50) NOT NULL,
-                row_name VARCHAR(200) NOT NULL,
-                col_index INT NOT NULL DEFAULT 1,
-                mapping_type VARCHAR(20) NOT NULL DEFAULT 'exact',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                UNIQUE(project_id, account_name, section_id, row_name)
-            )
-        """))
-        await db.execute(text(
-            "CREATE INDEX IF NOT EXISTS ix_anm_proj ON account_note_mapping(project_id)"
-        ))
-        await db.commit()
-        _table_created = True
-    except Exception:
-        await db.rollback()
-        _table_created = True
 
 
 @router.get("/{project_id}", response_model=list[MappingResponse])
 async def get_mappings(project_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(require_project_access("readonly"))):
-    await ensure_table(db)
     result = await db.execute(
         text("SELECT id, project_id, account_name, section_id, row_name, col_index, mapping_type, created_at FROM account_note_mapping WHERE project_id = :pid ORDER BY account_name"),
         {"pid": str(project_id)},
@@ -90,7 +64,6 @@ async def get_mappings(project_id: UUID, db: AsyncSession = Depends(get_db), use
 
 @router.put("/{project_id}", response_model=MappingResponse)
 async def save_mapping(project_id: UUID, body: MappingSave, db: AsyncSession = Depends(get_db), user: User = Depends(require_project_access("edit"))):
-    await ensure_table(db)
     now = datetime.now(timezone.utc)
     new_id = str(uuid.uuid4())
     try:
@@ -109,7 +82,6 @@ async def save_mapping(project_id: UUID, body: MappingSave, db: AsyncSession = D
 
 @router.delete("/{project_id}/{mapping_id}")
 async def delete_mapping(project_id: UUID, mapping_id: str, db: AsyncSession = Depends(get_db), user: User = Depends(require_project_access("edit"))):
-    await ensure_table(db)
     await db.execute(text("DELETE FROM account_note_mapping WHERE id = :mid AND project_id = :pid"), {"mid": mapping_id, "pid": str(project_id)})
     await db.commit()
     return {"ok": True}
@@ -118,7 +90,6 @@ async def delete_mapping(project_id: UUID, mapping_id: str, db: AsyncSession = D
 @router.post("/{project_id}/auto-generate")
 async def auto_generate_mappings(project_id: UUID, body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(require_project_access("edit"))):
     """自动生成映射：从试算表科目名和附注模板行名进行模糊匹配"""
-    await ensure_table(db)
     year = body.get("year", datetime.now(timezone.utc).year - 1)
     standard = body.get("standard", "soe")
 

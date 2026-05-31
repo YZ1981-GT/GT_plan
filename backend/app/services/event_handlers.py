@@ -576,19 +576,19 @@ def register_event_handlers() -> None:
         """调整/导入变更 → 失效试算表域缓存"""
         pid = getattr(payload, 'project_id', '')
         if pid:
-            address_registry.invalidate(pid, domain='tb')
+            await address_registry.invalidate_async(pid, domain='tb')
 
     async def _invalidate_addr_report(payload):
         """报表更新 → 失效报表域缓存"""
         pid = getattr(payload, 'project_id', '')
         if pid:
-            address_registry.invalidate(pid, domain='report')
+            await address_registry.invalidate_async(pid, domain='report')
 
     async def _invalidate_addr_all(payload):
         """数据导入 → 失效该项目全部缓存"""
         pid = getattr(payload, 'project_id', '')
         if pid:
-            address_registry.invalidate(pid)
+            await address_registry.invalidate_async(pid)
 
     event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _invalidate_addr_tb)
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _invalidate_addr_tb)

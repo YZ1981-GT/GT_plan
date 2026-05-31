@@ -30,6 +30,7 @@
             <el-button size="small" @click="onCreateFolder">新建文件夹</el-button>
             <el-button size="small" @click="onUploadDocs">上传文档</el-button>
             <el-button size="small" @click="onUploadFolder">上传文件夹</el-button>
+            <el-button size="small" :disabled="!selectedFolder" @click="showDocAiChat = true">💬 AI 对话</el-button>
             <el-button size="small" @click="loadTree" :loading="treeLoading">刷新</el-button>
           </template>
         </GtToolbar>
@@ -246,6 +247,18 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- AI 文档对话面板（文件夹级） -->
+    <DocAiChatPanel
+      :doc-type="'knowledge_folder'"
+      :doc-id="selectedFolder?.id || ''"
+      :project-id="''"
+      :year="new Date().getFullYear()"
+      :visible="showDocAiChat"
+      @update:visible="showDocAiChat = $event"
+      @close="showDocAiChat = false"
+      @adopt="onDocAiAdopt"
+    />
   </div>
 </template>
 
@@ -263,6 +276,7 @@ import { knowledgeLibrary as P_kl } from '@/services/apiPaths'
 import { downloadFile } from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
 import { rules } from '@/utils/formRules'
+import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -278,6 +292,13 @@ function goHome() {
   router.push('/projects')
 }
 
+// ─── AI 文档对话采纳 ─────────────────────────────────────────────────────────
+function onDocAiAdopt(_payload: { content: string; messageId: string }) {
+  // 知识库文件夹级对话采纳：由 DocAiChatPanel 内部调用 adoptContent API（走确认流）
+  // D4: AI 内容已经过 wrap_ai_output_with_log → pending 状态，不直接写入
+  // 知识库无需回写文档，仅记录采纳事件
+}
+
 const folderTree = ref<any[]>([])
 const documents = ref<any[]>([])
 const selectedFolder = ref<any>(null)
@@ -286,7 +307,7 @@ const docLoading = ref(false)
 const searchKeyword = ref('')
 const searchLoading = ref(false)
 const _searchResults = ref<any[]>([])
-
+const showDocAiChat = ref(false)
 // 新建文件夹
 const showCreateFolder = ref(false)
 const newFolderName = ref('')

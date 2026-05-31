@@ -107,6 +107,28 @@ class TestScanMigrations:
             expected = hashlib.sha256(content.encode("utf-8")).hexdigest()
             assert f.checksum == expected
 
+    def test_scan_raises_on_duplicate_version(self, tmp_migrations: Path):
+        """两个文件共用同一 version → 必须抛错（防 V040 同号静默跳过复发）。"""
+        # 制造与 V003 同号的冲突文件（字母序靠后）
+        (tmp_migrations / "V003__zzz_other.sql").write_text(
+            "CREATE TABLE IF NOT EXISTS other (id INTEGER PRIMARY KEY);\n",
+            encoding="utf-8",
+        )
+        runner = MigrationRunner(
+            database_url="sqlite+aiosqlite:///:memory:", migrations_dir=tmp_migrations
+        )
+        with pytest.raises(RuntimeError, match="重复版本号"):
+            runner.scan_migrations()
+
+    def test_scan_no_false_positive_on_unique_versions(self, tmp_migrations: Path):
+        """唯一版本号不应误报（去重检测无回归）。"""
+        (tmp_migrations / "V044__unique.sql").write_text("-- ok\n", encoding="utf-8")
+        runner = MigrationRunner(
+            database_url="sqlite+aiosqlite:///:memory:", migrations_dir=tmp_migrations
+        )
+        files = runner.scan_migrations()
+        assert "044" in [f.version for f in files]
+
 
 class TestEnsureSchemaVersionTable:
     """ensure_schema_version_table() 测试。"""

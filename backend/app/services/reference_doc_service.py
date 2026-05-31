@@ -143,69 +143,84 @@ class ReferenceDocService:
         max_docs: int = 3,
         db: AsyncSession | None = None,
     ) -> list[str]:
-        """从知识库加载参照文档（优先新模型，降级旧服务）"""
+        """从知识库加载参照文档
 
-        # 优先从新知识库模型（KnowledgeDocument.content_text）检索
-        if db:
-            try:
-                from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
-                import sqlalchemy as _sa
+        主路径：semantic_search(scope=knowledge_doc) 向量语义检索
+        降级路径：ilike 朴素匹配（semantic_search 返回空或异常时）
+        """
 
-                query = (
-                    _sa.select(KnowledgeDocument.name, KnowledgeDocument.content_text)
-                    .join(KnowledgeFolder, KnowledgeDocument.folder_id == KnowledgeFolder.id)
-                    .where(
-                        KnowledgeDocument.is_deleted == _sa.false(),
-                        KnowledgeDocument.content_text.isnot(None),
-                        KnowledgeFolder.is_deleted == _sa.false(),
-                    )
-                )
-                # 按分类过滤
-                if category:
-                    query = query.where(KnowledgeFolder.category == category)
-                # 按关键词过滤（文档名或内容包含关键词）
-                if keywords:
-                    keyword_filters = []
-                    for kw in keywords:
-                        keyword_filters.append(KnowledgeDocument.name.ilike(f"%{kw}%"))
-                        keyword_filters.append(KnowledgeDocument.content_text.ilike(f"%{kw}%"))
-                    query = query.where(_sa.or_(*keyword_filters))
-
-                query = query.limit(max_docs)
-                result = await db.execute(query)
-                rows = result.all()
-
-                if rows:
-                    return [f"【知识库 - {name}】\n{(text or '')[:2000]}" for name, text in rows]
-            except Exception as e:
-                logger.debug(f"新知识库检索失败，降级到旧服务: {e}")
-
-        # 降级：从旧 KnowledgeService（文件系统）加载
-        try:
-            from app.services.knowledge_service import KnowledgeService
-
-            docs_list = KnowledgeService.list_documents(category)
-            if not docs_list:
-                return []
-
-            if keywords:
-                filtered = []
-                for doc in docs_list:
-                    doc_name = doc.get("name", "").lower()
-                    if any(kw.lower() in doc_name for kw in keywords):
-                        filtered.append(doc)
-                docs_list = filtered or docs_list[:max_docs]
-
-            results: list[str] = []
-            for doc in docs_list[:max_docs]:
-                content = KnowledgeService.get_document_content(category, doc.get("name", ""))
-                if content:
-                    results.append(f"【知识库 - {doc.get('name', '')}】\n{content[:2000]}")
-
-            return results
-        except Exception as e:
-            logger.debug(f"知识库加载失败: {e}")
+        if not db:
             return []
+
+        # ── 主路径：semantic_search 向量语义检索 ──
+        if keywords:
+            try:
+                from app.services.knowledge_index_service import KnowledgeIndexService
+
+                query_text = " ".join(keywords)
+                svc = KnowledgeIndexService(db)
+                results = await svc.semantic_search(
+                    project_id, query_text, top_k=max_docs, scope="knowledge_doc"
+                )
+                if results:
+                    # 查询文档名称（source_id → name）
+                    from app.models.knowledge_models import KnowledgeDocument
+                    import sqlalchemy as _sa
+
+                    source_ids = [r["source_id"] for r in results]
+                    name_result = await db.execute(
+                        _sa.select(
+                            _sa.cast(KnowledgeDocument.id, _sa.String),
+                            KnowledgeDocument.name,
+                        ).where(
+                            _sa.cast(KnowledgeDocument.id, _sa.String).in_(source_ids)
+                        )
+                    )
+                    id_to_name = {str(row[0]): row[1] for row in name_result.all()}
+
+                    return [
+                        f"【知识库 - {id_to_name.get(r['source_id'], r['source_id'])}】\n"
+                        f"{(r.get('content') or '')[:2000]}"
+                        for r in results
+                    ]
+            except Exception as e:
+                logger.debug(f"semantic_search 检索失败，降级 ilike: {e}")
+
+        # ── 降级路径：ilike 朴素匹配 ──
+        try:
+            from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
+            import sqlalchemy as _sa
+
+            query = (
+                _sa.select(KnowledgeDocument.name, KnowledgeDocument.content_text)
+                .join(KnowledgeFolder, KnowledgeDocument.folder_id == KnowledgeFolder.id)
+                .where(
+                    KnowledgeDocument.is_deleted == _sa.false(),
+                    KnowledgeDocument.content_text.isnot(None),
+                    KnowledgeFolder.is_deleted == _sa.false(),
+                )
+            )
+            # 按分类过滤
+            if category:
+                query = query.where(KnowledgeFolder.category == category)
+            # 按关键词过滤（文档名或内容包含关键词）
+            if keywords:
+                keyword_filters = []
+                for kw in keywords:
+                    keyword_filters.append(KnowledgeDocument.name.ilike(f"%{kw}%"))
+                    keyword_filters.append(KnowledgeDocument.content_text.ilike(f"%{kw}%"))
+                query = query.where(_sa.or_(*keyword_filters))
+
+            query = query.limit(max_docs)
+            result = await db.execute(query)
+            rows = result.all()
+
+            if rows:
+                return [f"【知识库 - {name}】\n{(text or '')[:2000]}" for name, text in rows]
+        except Exception as e:
+            logger.debug(f"知识库 ilike 检索失败: {e}")
+
+        return []
 
     @staticmethod
     async def load_context(

@@ -1,6 +1,8 @@
 """
 统一地址坐标注册表 API
 
+@see address_registry_v2 — 本模块=运行时动态地址目录（公式编辑用）
+
 GET  /api/address-registry          — 搜索地址（keyword/domain过滤）
 GET  /api/address-registry/stats    — 注册表统计
 GET  /api/address-registry/resolve  — 解析单个URI
@@ -148,7 +150,7 @@ async def invalidate_cache(
     body: dict,
     _user=Depends(get_current_user),
 ):
-    """精准失效地址缓存
+    """精准失效地址缓存（L1 内存 + L2 Redis 同步删除）
 
     支持参数组合：
     - project_id 必填
@@ -158,14 +160,14 @@ async def invalidate_cache(
     - all 可选：true时清空全部缓存
     """
     if body.get('all'):
-        address_registry.invalidate_all()
+        await address_registry.invalidate_all_async()
         return {'ok': True, 'scope': 'all'}
 
     project_id = body.get('project_id', '')
     if not project_id:
         return {'ok': False, 'error': 'project_id required'}
 
-    address_registry.invalidate(
+    await address_registry.invalidate_async(
         project_id,
         year=body.get('year', 0),
         domain=body.get('domain', ''),

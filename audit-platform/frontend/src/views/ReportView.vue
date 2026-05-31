@@ -57,6 +57,7 @@
               <el-tooltip content="配置国企版↔上市版报表行次映射规则" placement="bottom">
                 <el-button size="small" @click="showMappingDialog = true">🔄 转换规则</el-button>
               </el-tooltip>
+              <el-button size="small" @click="showDocAiChat = true">💬 AI 对话</el-button>
             </template>
           </GtToolbar>
         </template>
@@ -785,6 +786,18 @@
     :year="year"
     :account-code="consolBreakdownAccountCode"
   />
+
+  <!-- AI 文档对话面板 -->
+  <DocAiChatPanel
+    :doc-type="'report'"
+    :doc-id="projectId"
+    :project-id="projectId"
+    :year="year"
+    :visible="showDocAiChat"
+    @update:visible="showDocAiChat = $event"
+    @close="showDocAiChat = false"
+    @adopt="onDocAiAdopt"
+  />
 </template>
 
 <script setup lang="ts">
@@ -834,6 +847,7 @@ import {
 } from '@/services/auditPlatformApi'
 import { useAuthStore } from '@/stores/auth'
 import { useNavigationStack } from '@/composables/useNavigationStack'
+import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -850,6 +864,14 @@ const projectId = computed(() => projectStore.projectId)
 const conflictPanelVisible = ref(false)
 function onConflictResolved(_id: string, _resolution: string) {
   // 调解后 banner 自动从列表移除；此处保留 hook 供后续扩展（如局部 reload）
+}
+
+// ─── AI 文档对话采纳 ─────────────────────────────────────────────────────────
+function onDocAiAdopt(_payload: { content: string; messageId: string }) {
+  // 采纳事件由 DocAiChatPanel 内部调用 adoptContent API（走确认流）
+  // D4: AI 内容已经过 wrap_ai_output_with_log → pending 状态，不直接写入
+  // 报表视图在确认流完成后刷新数据
+  fetchReport()
 }
 
 // ─── 云协同：账套激活/回滚后自动刷新 ─────────────────────────────────────────
@@ -929,6 +951,7 @@ async function onTemplateTypeChange(val: string) {
 
 // 转换规则 — 按报表类型分组
 const showMappingDialog = ref(false)
+const showDocAiChat = ref(false)
 const mappingLoading = ref(false)
 const mappingTab = ref('balance_sheet')
 const mappingReportTypes = [

@@ -169,7 +169,7 @@ class ReportConfigBaseline(Base):
 
     仿附注 GroupNoteTemplateBaseline 范式：项目级配置可"提交为主模板候选"，
     admin 审核通过后合并回 standard 级（带版本号 + 审计留痕）。
-    对应迁移 V040__report_config_baseline.sql。
+    对应迁移 V044__report_config_baseline.sql（原 V040，因同号冲突重编号）。
     """
 
     __tablename__ = "report_config_baseline"

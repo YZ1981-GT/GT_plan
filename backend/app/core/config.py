@@ -134,6 +134,10 @@ class Settings(BaseSettings):
     # 当 wp_ai_service 升级真实接入 LLM 后改为 True，前端 is_llm_stub 字段自动反映
     WP_AI_SERVICE_ENABLED: bool = False
 
+    # 向量存储后端切换（pgtext=现状降级 | pgvector=原生向量列+ivfflat）
+    # 默认 pgtext（安全，现有行为不变）；pgvector 需 V043 迁移 + CREATE EXTENSION vector
+    VECTOR_STORE_BACKEND: str = "pgtext"
+
     # 合并模块开发中标记（Phase 0 防误用 P3）
     # True = 合并模块处于开发中，前端展示警告 banner；端到端验证通过后人工置 False
     CONSOL_MODULE_DEV_MODE: bool = True

@@ -124,33 +124,21 @@ async def get_render_config(
     wp_code = wp_index.wp_code
 
     # ─── Step 3: 获取模板版本 ────────────────────────────────────────────
-    # 项目 template_version_id 通过 raw SQL 获取（ORM 模型未定义该列）
-    # 注意：该列由 V018 迁移添加，已通过 ALTER TABLE 补齐
+    # 注：projects 表无 template_version_id 列（该列属于 workpaper_sheet_classification，
+    #     从无 projects 级定义）。历史代码曾 SELECT projects.template_version_id，
+    #     在 PG 中该语句失败会使整个事务进入 aborted 状态，后续查询全部 500
+    #     （render-config 对所有底稿普适 500 的根因）。故移除该探测查询，
+    #     统一按 current version 解析（项目级版本绑定由 classification 层承担）。
     project_template_version_id = None
-    try:
-        version_query = sa.text(
-            "SELECT template_version_id FROM projects WHERE id = :pid"
-        )
-        version_result = await db.execute(version_query, {"pid": str(project_id)})
-        version_row = version_result.first()
-        project_template_version_id = version_row[0] if version_row and version_row[0] else None
-    except Exception:
-        # 列不存在或其他 DB 错误 → 降级继续（不 rollback，避免 session 失效）
-        logger.warning("projects.template_version_id lookup failed, continuing without version")
-        project_template_version_id = None
 
     # 获取版本字符串
     template_version_str: str | None = None
     version_service = WpTemplateVersionService(db)
     try:
-        if project_template_version_id:
-            version_obj = await version_service.get_version_by_id(project_template_version_id)
-            template_version_str = version_obj.version
-        else:
-            # 默认按 current version
-            version_obj = await version_service.get_current_version()
-            template_version_str = version_obj.version
-            project_template_version_id = version_obj.id
+        # 默认按 current version
+        version_obj = await version_service.get_current_version()
+        template_version_str = version_obj.version
+        project_template_version_id = version_obj.id
     except HTTPException:
         # 版本表可能未初始化，降级继续
         logger.warning("Template version lookup failed, continuing without version info")
@@ -255,11 +243,20 @@ async def get_render_config(
 
     # ─── Step 7: 批量解析 auto-fill 取数值（US-15）────────────────────────
     fill_results: dict = {}
-    # 获取项目年度
-    year_query = sa.text("SELECT year FROM projects WHERE id = :pid")
-    year_result = await db.execute(year_query, {"pid": str(project_id)})
-    year_row = year_result.first()
-    project_year = year_row[0] if year_row and year_row[0] else None
+    # 获取项目年度：projects 表无 year 列，年度从 audit_period_end 提取年份
+    # （系统标准做法，见 rotation_check/client_quality_trend 等）。
+    # 该字段可能为 NULL → project_year=None → 跳过 auto-fill（降级，不报错）。
+    project_year = None
+    try:
+        year_query = sa.text(
+            "SELECT EXTRACT(YEAR FROM audit_period_end)::int FROM projects WHERE id = :pid"
+        )
+        year_result = await db.execute(year_query, {"pid": str(project_id)})
+        year_row = year_result.first()
+        project_year = year_row[0] if year_row and year_row[0] else None
+    except Exception as e:
+        logger.warning("项目年度解析失败，跳过 auto-fill: %s", e)
+        project_year = None
 
     if project_year:
         # 合并所有 sheet 的 schema 用于批量取数

@@ -111,6 +111,7 @@
 
 | Spec | 状态 | 说明 |
 |------|------|------|
+| `retrieval-kernel-unification/` | ✅ | 检索/知识层统一架构：三套收敛为单内核（C 升级）+ 知识文件接入向量索引 + VectorStore Protocol + pgvector 迁移（ivfflat）+ feature flag 切换；阶段 1 删 B + 阶段 2 IndexSource 注册表+联动钩子+权限过滤 + 阶段 3 pgvector 等价验证；PBT R1~R4 全绿；ADR-RETRIEVAL-001（pgvector vs ChromaDB）；完成日期 2026-06-01 |
 | `doc-level-ai-chat/` | ✅ | 文档/文件夹级 LLM 知识库对话；ContextBuilder + 对话端点 + 前端面板 + 采纳确认流；72 测试全绿（含 D1~D4 PBT + 全链路集成）；残留仅 Playwright UAT 待环境 |
 | `global-modules-cleanup/` | ✅ | 全局模块多源澄清+死文件清理+联动补全（6 小修打包）：F1 删 33MB 死文件 L1 + F2 V1/V2 命名澄清 + F3 底稿模板 JSON→registry 联动 + F4 枚举字典陈旧注释 + F5 懒建表入 D6（V040 迁移）；35 测试全绿（H1~H4 PBT + 确定性）+ app import OK |
 | `global-modules-p2-polish/` | ✅ | 全局模块 P2/P3 体验与性能增强（文档改进项 100% 覆盖）：地址库 Redis 二级缓存 + 地址校验接公式保存流 + 公式变更时间线 UI + 枚举扩展业务枚举（EliminationEntryType/审计循环代号/风险等级）+ 高级查询 Redis 缓存+流式导出 + enum_dict_overrides 入 D6（V042）+ content_text 填充保障（MinerU OCR）+ note_template DB 化评估暂缓；57 测试全绿（P1~P4 PBT + 确定性）+ app import OK；完成日期 2026-06 |

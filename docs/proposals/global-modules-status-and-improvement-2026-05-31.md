@@ -1264,3 +1264,103 @@ function onLocateCell(target: { wpCode: string; sheet: string; cellRange: string
 - 实施次序：A→B→C→D→E→F（核心，P0+P1）→ **G（P2/P3 体验性能，A~F 落地后）**。
 - spec G 的需求3（公式时间线 UI）依赖 spec A 哈希链；需求5（枚举扩展）与 spec F 同 system_dicts.py 协调；其余互相独立。
 
+
+---
+
+## 二十五、实施后全面复盘（2026-06-01，7 spec 落地 + 真实环境实证）
+
+> 应"全面完整分析程序实际情况"要求，对 7 个 spec（A~G）落地**之后**的真实代码状态做一轮实证复盘（readCode + grep + 真实 PG 连库复现），如实记录：①文档前述判断哪些已被实施推翻/过时 ②实施留下的残留瑕疵 ③真实环境跑起来才暴露的 bug。本节是文档从"提案"到"实施后体检"的闭环。
+>
+> **方法**：Docker 容器全在线（audit-postgres/redis/backend/vllm 等 7 个），用本地 venv 连真实 PG（首汽租车_2025 df5b8403，tb 最全）直接调端点函数抓 Python 层真实堆栈，不靠日志猜测。
+>
+> **证据等级声明（诚实标注）**：本节结论分两类——①**本轮亲手实证**（4 类运行时 bug + rollback 残留 + 公式/审计收口状态）：readCode 读实现 + grep 全仓 + 真实 PG 连库复现/修复后复跑，证据最强；②**沿用 spec/INDEX 记录后补验**（spec F 死文件删除、spec G 枚举扩展、模板联动等）：先据 INDEX「✅ 完成」记录撰写，再 fileSearch/grep 抽验确认属实（如 `address_registry_l1_physical` 全仓 0 命中、`_DICTS` 确含 elimination_entry_type/audit_cycle/risk_level）。两类已分别核实，未掺入未经验证的推断。
+
+### 25.1 文档前述判断的实施后更正（已过时项）
+
+| 文档原判断（章节） | 实施后真实状态（实证） | 结论 |
+|-------------------|----------------------|------|
+| 公式求值器"4 套并行 🔴，谁都没统一"（§二/§十四） | `formula_engine` 已成唯一内核；`formula_parser.FormulaEvaluator` 已**改名 `formula_parse_utils.py` 并标 DEPRECATED + 委托 `formula_engine.execute`**（删独立求值逻辑）；`report_engine.evaluate_formula` 已委托内核；`formula_unified`→`cell_formula_evaluator`（独立 Excel 语法） | ✅ spec A 已收敛，🔴→🟢，文档原状态是 spec 前快照 |
+| 报表生成 report_engine vs report_formula_service vs cfs_worksheet_engine "可能重叠"（§十四 声明盲区） | grep `report_formula_service`/`cfs_worksheet_engine` 中 `eval`/`_safe_eval`/`compile(`/`ast.` **0 命中** | ✅ 无第 N 套求值器，盲区已澄清干净 |
+| 高级查询"是否还有第三套查询路径"（§十四 声明盲区） | custom_query/query_builder 无独立公式求值器；安全模型（白名单）保持 | ✅ 干净，无隐藏并行实现 |
+| 公式审计"三处分裂"（§二/§12.1） | 写入主路径已收口哈希链 `formula.changed`（report_config/consol_report/wp_user_formulas/POST 端点全走 `append_audit_log`）；`audit_log_helper` 已注册 `formula_changed` + `report_config_changed` schema；**rollback 端点残留旧表写入本轮已一并收口（见 25.2）** | ✅ 已完全收口（含 rollback），grep `INSERT INTO formula_audit_log`/`ensure_table` 全仓 0 命中 |
+
+**方法论印证**：文档反复强调的"评估前 grep 全部同类服务"在实施后依然成立——但反过来，**实施后也必须重新 grep 确认收敛真的落地**，否则文档的"现状描述"会与已实施代码脱节（本节即修正这种脱节）。
+
+### 25.2 实施残留瑕疵（spec 标"完成"但有尾巴 → 本轮已修复并验证）
+
+#### ✅ 公式审计收口不彻底：rollback 端点漏网（已修 + 已验证，2026-06-01）
+
+**实证**：spec A Task 14/16 把公式审计写入收口到哈希链，但 `routers/formula_audit_log.py` 的 `POST /{project_id}/{year}/rollback`（一键回滚）端点**仍写旧 `formula_audit_log` 表 + 调 `ensure_table` 懒建**，与已收口的哈希链分裂；且 `ensure_table` 在该文件无定义（潜在 NameError）。
+
+**根因**：收口时只改了"主写入路径"（create/update/execute/POST），漏了 rollback 这条次要写入路径——典型"收敛覆盖不全"。
+
+**修复**：rollback 端点改走 `append_audit_log(action='formula.changed', details={action:'rollback', ...})`，删 `ensure_table` 调用 + 旧表 INSERT，与文档头 docstring 自述"数据源=哈希链"对齐。
+
+**验证（2026-06-01 复核）**：①grep 全仓 `INSERT INTO formula_audit_log` + `ensure_table` **0 命中** ②`test_formula_audit_log_get.py` / `test_workpaper_formula_scope.py` 全绿 ③同步更新 `test_cleanup_h4_lazy_table_scan.py`（formula_audit_log 从 KNOWN_LAZY_TABLES 移入新 `ELIMINATED_LAZY_TABLES`，新增 `test_eliminated_tables_no_longer_lazy_created` 守护）④app import OK。
+
+**教训**：审计/公式这类"单源收口"spec，验收必须 grep **全部写入点**（含 rollback/恢复/批量等次要路径），不能只测主流程；"标 completed 必须有实际证据"应包含"grep 0 残留旧写入"。
+
+### 25.3 真实环境才暴露的 bug（单测/getDiagnostics 抓不到 → 本轮已逐一复现根因 + 修复 + 真实 PG/测试验证）
+
+> 这批 bug 的共性：**SQLite 单测 + create_all 兜底**让它们全程绿灯，只有连真实 PG 跑端点才暴露——印证 memory 铁律"getDiagnostics 过 ≠ 运行时无错"。
+
+#### B1：V040 迁移同号冲突（会炸全新 PG 部署）→ ✅ 已修复 + 已验证
+
+- **实证**：`backend/migrations/` 两个 V040（`account_note_mapping_and_consol_cell_comments` + `report_config_baseline`）。读 `MigrationRunner.scan_migrations`：按 `int(version)` 排序但**不去重**，`run_pending` 的 `version not in applied` 去重使**字母序靠后的 `report_config_baseline` 被静默跳过**；main.py 启动**仅 run_pending 无 create_all 兜底**。
+- **后果**：全新 PG 库永不创建 `report_config_baseline` 表 + `report_config.is_stale` 列 → spec D（主模板回填/克隆联动）全链路 500；本地现有 PG 因历史已建而看不出，**任何全新部署/打包 exe 首启必中**。
+- **修复**：①`report_config_baseline` 重编号 V040→**V044/R044** + 修 ORM 注释 ②**MigrationRunner.scan_migrations 加同号检测**（重复 version 直接抛 RuntimeError，不再静默丢弃）+ 2 个防御测试（同号抛错 + 唯一不误报）——根因修复，杜绝复发。
+- **验证（2026-06-01 复核）**：①列迁移目录确认 V040 仅剩 account_note_mapping、report_config_baseline 已是 V044/R044、旧 V040/R040 已删 ②真实 PG `scan_migrations` 加载 44 迁移、最高 V44、去重检测不误报 ③`test_migration_runner.py` 31 passed（含同号检测 2 测试）。
+
+#### B2：V043 pgvector 迁移硬失败（health 长期 degraded）→ ✅ 已修复 + 已验证
+
+- **实证**：`/api/health` 显示 V043 失败 **11 次**（`extension "vector" is not available`）——`audit-postgres` 标准镜像无 pgvector 扩展，`CREATE EXTENSION vector` 直接报错，V043 永不进 schema_version。
+- **后果**：health 长期 degraded；spec B 设计本有 feature flag（`VECTOR_STORE_BACKEND` 默认 pgtext 降级），但**迁移无条件 `CREATE EXTENSION` 没有降级**。
+- **修复**：V043 用 `DO $pgvector$ ... EXCEPTION WHEN OTHERS THEN RAISE NOTICE ... RETURN` 包裹，扩展不可用时**优雅跳过整个迁移**（列+索引一并跳过，因 `vector(768)` 类型依赖扩展无法分离），降级 pgtext。装 pgvector 后重跑即启用（注释已注明）。
+- **验证（2026-06-01 复核，真实 PG 实测）**：①后端已重启重跑迁移，`schema_version` 含 043 **且 `schema_migration_failures` 已无 043 记录**（不再硬失败）②`knowledge_index.embedding` 列**确实未创建**（pgvector 缺失，V043 优雅跳过了列+索引）——符合"架构对、高性能后端 pgtext 降级"的预期 ③同时确认 V044 已应用、`report_config_baseline` 表 + `report_config.is_stale` 列**真实存在**（B1 修复连带验证通过）。
+
+#### B3：render-config 端点对所有底稿普适 500（底稿编辑器总闸）→ ✅ 已修复 + 真实 PG 验证返回 200
+
+- **背景**：wp-ai-review-ux-fix task 8 记录"render-config 所有底稿 500，预存后端问题"——它是底稿编辑器加载总闸，500 导致**所有底稿打不开**（比 UX 改进严重得多）。
+- **实证**：本地代码连真实 PG 复现，抓到 `InFailedSQLTransactionError: current transaction is aborted`。根因链：`wp_render_config.py` Step 3 `SELECT template_version_id FROM projects` 查**projects 表不存在的列**（迁移中 `template_version_id` 只属于 `workpaper_sheet_classification`，**projects 从无此列**——是代码写错表，非 schema 漂移）；PG 中首条 UndefinedColumn 使整个事务 aborted，且 except 注释明写"不 rollback 避免 session 失效"（**错误假设**，PG 恰恰相反必须 rollback）→ 后续 `get_current_version` 查询在 aborted 事务里必失败 → 未捕获 → 500。所有项目都缺这列 → 普适 500。
+- **修复 + 触类旁通**（grep `FROM projects` 全仓查同类）：
+  - render-config Step 3：删错误的 `SELECT template_version_id FROM projects` 探测查询，统一走 `get_current_version()`（projects 级版本绑定本就由 classification 层承担）
+  - render-config Step 7：`SELECT year FROM projects`（projects 无 year 列）→ `EXTRACT(YEAR FROM audit_period_end)::int` + try/except 降级
+  - **同类连环 bug `wp_prefill_context.py`**：`SELECT name, year FROM projects`（无 year）+ `materiality.materiality_level`（实为 `overall_materiality`）+ `users.display_name`（不存在，姓名在 `staff_members.name`）+ `project_assignments.user_id`（实为 `staff_id`，应 JOIN staff_members）——4 处错误列/表全修
+  - 两端点真实 PG 复现均返回 200（render-config: wp_code=A1/scope=standalone/v2025-R5；prefill: 首汽租车_2025）
+- **防御**：新增 `test_render_config_schema_contract.py`（6 个源码契约测试，锁定不得再 SELECT projects 不存在的列）——因 SQLite 无法复现 PG 事务 aborted 语义，故用源码级契约守护。
+- **验证（2026-06-01 二次复核）**：grep 确认两端点错误查询已消失（`template_version_id FROM projects`/`SELECT year FROM projects`/`name, year,`/`u.display_name` 全 0 命中，均改 `EXTRACT(YEAR FROM audit_period_end)`）；真实 PG 端到端复跑 render-config 返回 `wp_code=A1/scope=standalone/2 sheets`、prefill-context 返回 `首汽租车_2025`；6 契约测试全绿。
+
+#### B4：async_engine ImportError（3 文件 4 处，PG 下功能静默失效）→ ✅ 已修复 + 已验证
+
+- **实证**：backend 容器日志 `ImportError: cannot import name 'async_engine' from 'app.core.database'`。grep：`dataset_purge_worker`(2)/`recycle_bin`/`ledger_import_health` 共 4 处 import `async_engine`，但 `database.py` 只导出 `engine`。
+- **后果**：数据集清理 worker、回收站彻底删除、导入健康检查在 PG 下全部 ImportError 失效。
+- **修复**：`database.py` 加 `async_engine = engine` 别名，一处修好全部 4 个调用方（不散落改 4 文件）。
+- **验证（2026-06-01 复核）**：`from app.core.database import async_engine, engine; async_engine is engine` 返回 True；app import OK。
+
+### 25.4 真实环境暴露的数据/schema 现状（非代码 bug，但需知晓）
+
+- **首汽租车_2025 `audit_period_end` 为 NULL**：导致 render-config/prefill 的 project_year=None（已降级跳过 auto-fill，正确）。这是**数据录入缺口**（项目未填审计期间），非代码问题，但影响所有依赖年度的取数。
+- **本地 PG schema 漂移 48 项（critical=0）**：health 显示多为 `db_extra`（DB 有列/表但 ORM 未定义，如各表 deleted_at、review_conversations 系列），不影响功能（drift detector 按 critical_count 判 degraded，当前 critical=0，degraded 真因是 B2 的 V043 失败）。
+- **ChromaDB 容器在线但仍仅 health check 闲置**：与 §七/§20.4 判断一致，向量存储实际走 PG（pgvector 不可用时降级 pgtext numpy）。
+
+### 25.5 实施后健康度再评（7 模块 + 三大内核）
+
+| 项 | 文档原判 | 实施后实证 | 变化 |
+|----|---------|-----------|------|
+| 公式内核 | 🔴 4 套并行 | 🟢 单内核 formula_engine + cell_formula_evaluator 独立（语法域不同）；DEPRECATED 委托落地 | 🔴→🟢 |
+| 检索内核 | 🟠 3 套 | 🟡 单内核 + IndexSource 注册 + VectorStore Protocol 已落地（spec B），**但 pgvector 后端在标准 PG 不可用（V043 扩展缺失），实际跑 pgtext numpy 降级**——架构对、高性能后端未真正启用 | 🟠→🟡（架构 🟢/运行降级） |
+| 审计内核 | 🔴 三处分裂 | 🟢 收口哈希链（rollback 残留已补） | 🔴→🟢 |
+| 地址库 | 🟠 双系统+33MB | 🟢 死文件已删 + V1/V2 命名澄清（spec F） | 🟠→🟢 |
+| 报表模板回填 | 🟠 无回填 | 🟢 ReportConfigBaseline 回填+stale 联动（spec D）；曾因 V040 同号迁移永不生效（B1），**已重编号 V044 修复，真实 PG 确认表+is_stale 列存在** | 🟠→🟢 |
+| 枚举字典 | 🟢 | 🟢 注释已修 + 业务枚举扩展（spec F/G） | 保持 |
+| 底稿模板库 | 🟠 真源未拍板 | 🟢 JSON→registry 联动 + 边界澄清（spec F） | 🟠→🟢 |
+
+### 25.6 实施后真正待办（更新版，2026-06-01 复核后）
+
+1. **本轮修复已全部验证，仅待统一 commit**：B1~B4 + rollback 收口共改 7 个生产文件（migrations 重编号 V040→V044 / migration_runner 同号检测 / V043 容错 / wp_render_config / wp_prefill_context / database.py / formula_audit_log）+ 3 个测试文件（迁移同号 2 测试 / render-config 契约 6 测试 / H4 懒建表扫描更新）。验证状态：真实 PG 表/列存在性核对通过 + 两端点端到端 200 + 相关测试全绿 + app import OK。**待按惯例 push 前先 fetch 同步，再统一 commit 走 PR。**
+2. **底稿渲染链路缺端点级测试**（系统性缺口，未做）：render-config/prefill-context 全程无端点测试，是 B3 普适 500 漏到 UAT 的根因——本轮补了源码契约测试（防列名回归），但**真正的端点冒烟测试（真 PG fixture 验 200）尚未建**，建议后续补。
+3. **pgvector 真实启用**（外部依赖，未做）：当前真实 PG 确认 `knowledge_index.embedding` 列未建、走 pgtext numpy 降级；待运维在 PG 装 pgvector 扩展后重跑 V043（容错版会真正建列+索引），PgVectorStore 才生效（6000 并发下 §20.4 预警的瓶颈届时才解除）。
+4. **首汽租车 audit_period_end 数据补录**（数据缺口，未做）：该项目审计期间为 NULL，导致按年度取数端点 project_year=None 降级；影响 auto-fill 等。
+5. **外部依赖不变**：LLM 真实接入 / 6000 并发压测 / 合并模块真实集团数据 UAT / 国企上市 diff 去 mock。
+
+> **本节定位**：文档历经六轮提案复盘（§十一~二十四）后，本节是**实施落地后的第一轮真实环境体检**。核心结论：7 spec 的架构收敛（公式/检索/审计单内核 + 模板联动）**代码层面真实落地**，但**真实 PG 跑起来暴露了 4 类被 SQLite 单测掩盖的运行时 bug**（迁移同号/扩展缺失/查错列/import 错名）+ 1 处审计收口残留——**本轮已全部复现根因、修复、并经真实 PG 表/列核对 + 端点端到端 200 + 测试全绿验证闭环**（仅剩统一 commit + 3 项外部依赖待办，见 25.6）。这再次印证"改动后必连真实 PG/Playwright 实测"不是口号——单测全绿的 7 个 spec 仍藏着会炸生产的真 bug。

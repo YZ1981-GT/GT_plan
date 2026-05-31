@@ -144,6 +144,16 @@
               </el-table>
             </div>
           </el-tab-pane>
+          <!-- P2-3: 公式变更历史 Tab -->
+          <el-tab-pane name="history">
+            <template #label>📜 历史</template>
+            <FormulaHistoryTab
+              v-if="activeCategory === 'history' && projectId"
+              :project-id="projectId"
+              :year="year || new Date().getFullYear()"
+              @rollback-applied="onHistoryRollbackApplied"
+            />
+          </el-tab-pane>
         </el-tabs>
 
         <!-- 批量操作栏 -->
@@ -410,9 +420,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { confirmDelete, confirmDangerous } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
-import { reportConfig as P_rc, noteTemplates as P_nt, linkageBus } from '@/services/apiPaths'
+import { reportConfig as P_rc, noteTemplates as P_nt, linkageBus, formulaAuditLog } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
 import FormulaEditDialog from './FormulaEditDialog.vue'
+import FormulaHistoryTab from './FormulaHistoryTab.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 
@@ -1719,6 +1730,18 @@ watch(activeCategory, (v) => {
     if (wpId) loadUserFormulas(String(wpId))
   }
 })
+
+// ─── P2-3: 公式变更历史回滚回调 ──────────────────────────────────────────────
+
+function onHistoryRollbackApplied(rowCode: string, formula: string) {
+  // 回滚成功后，更新当前显示的行数据
+  const rows = currentRows.value
+  const target = rows.find((r: any) => r.row_code === rowCode)
+  if (target) {
+    target.formula = formula
+  }
+  emit('saved')
+}
 </script>
 
 <style scoped>

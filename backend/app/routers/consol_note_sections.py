@@ -92,34 +92,6 @@ async def get_section_detail(standard: str, section_id: str):
 
 # ─── 用户数据存储（按项目+年度+章节） ─────────────────────────────────────────
 
-_table_created = False
-
-
-async def _ensure_table(db: AsyncSession):
-    global _table_created
-    if _table_created:
-        return
-    try:
-        await db.execute(text("""
-            CREATE TABLE IF NOT EXISTS consol_note_data (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                project_id UUID NOT NULL,
-                year INT NOT NULL,
-                section_id VARCHAR(50) NOT NULL,
-                data JSONB NOT NULL DEFAULT '{}',
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                UNIQUE(project_id, year, section_id)
-            )
-        """))
-        await db.execute(text(
-            "CREATE INDEX IF NOT EXISTS ix_cnd_proj_year ON consol_note_data(project_id, year)"
-        ))
-        await db.commit()
-        _table_created = True
-    except Exception:
-        await db.rollback()
-        _table_created = True
-
 
 @router.get("/data/{project_id}/{year}/{section_id}")
 async def get_note_data(
@@ -128,7 +100,6 @@ async def get_note_data(
     user: User = Depends(require_project_access("readonly")),
 ):
     """加载用户已保存的附注数据"""
-    await _ensure_table(db)
     result = await db.execute(
         text("SELECT data, updated_at FROM consol_note_data WHERE project_id = :pid AND year = :y AND section_id = :sid"),
         {"pid": project_id, "y": year, "sid": section_id},
@@ -147,7 +118,6 @@ async def save_note_data(
     user: User = Depends(require_project_access("edit")),
 ):
     """保存用户编辑的附注数据"""
-    await _ensure_table(db)
     import uuid
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)

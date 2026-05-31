@@ -66,4 +66,6 @@ async function download(url: string, filename: string): Promise<void> {
 }
 
 export const api = { get, post, put, patch, delete: del, download }
+/** 兼容别名：部分组件 import { apiProxy } from '@/services/apiProxy' */
+export const apiProxy = api
 export default api

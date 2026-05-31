@@ -204,6 +204,34 @@ async def update_user_formulas(
         if formula:  # 空字符串 = 删除
             _parse_formula_or_raise(formula)
 
+    # P2-2: 公式保存前校验地址有效性（悬空引用拒绝保存）
+    non_empty_formulas = [f for f in payload.formulas.values() if f]
+    if non_empty_formulas:
+        from app.models.core import Project
+        from app.services.address_registry import address_registry
+
+        project = (await db.execute(
+            sa.select(Project).where(Project.id == wp.project_id)
+        )).scalar_one_or_none()
+        if project:
+            year = project.audit_period_end.year if project.audit_period_end else 0
+            template_type = project.template_type or "soe"
+            all_issues: list[dict] = []
+            for formula in non_empty_formulas:
+                issues = await address_registry.validate_formula_refs(
+                    db, str(wp.project_id), year, formula, template_type
+                )
+                all_issues.extend(issues)
+            if all_issues:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "error_code": "FORMULA_DANGLING_REFS",
+                        "message": "公式含悬空引用，拒绝保存",
+                        "issues": all_issues,
+                    },
+                )
+
     parsed_data = dict(wp.parsed_data or {})
     user_formulas: dict[str, dict] = dict(parsed_data.get("user_formulas") or {})
 

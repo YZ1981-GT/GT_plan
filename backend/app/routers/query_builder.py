@@ -26,7 +26,7 @@ import io
 import logging
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import Column, and_, asc, desc, func, or_, select
@@ -829,12 +829,28 @@ async def preview_query(
 @router.post("/execute")
 async def execute_query(
     body: QueryDSL,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """执行查询，返回结构化结果。"""
     _require_admin_or_manager(current_user)
     stmt, column_names = _build_select(body)
+
+    # ─── Redis 短 TTL 缓存（dashboard 卡片高频查询）────────────────────
+    # 缓存发生在白名单安全校验之后（_build_select 已完成白名单验证）
+    from app.services.query_cache import compute_cache_key, get_cached_result, set_cached_result
+
+    cache_key = compute_cache_key(
+        user_id=str(current_user.id),
+        project_id="__query_builder__",
+        query_params=body.model_dump(),
+    )
+    cached = await get_cached_result(cache_key)
+    if cached is not None:
+        response.headers["X-Cache"] = "HIT"
+        return cached
+
     try:
         result = await db.execute(stmt)
         rows = result.fetchall()
@@ -858,13 +874,21 @@ async def execute_query(
             obj[col_name] = _serialize_cell(v)
         rows_serialized.append(obj)
 
-    return {
+    query_result = {
         "rows": rows_serialized,
         "columns": column_names,
         "total": len(rows_serialized),
         "table": body.table,
         "sql": _stmt_to_sql(stmt),
     }
+
+    # 回写 Redis 缓存（短 TTL）
+    await set_cached_result(cache_key, query_result)
+
+    return query_result
+
+
+_EXPORT_FETCH_SIZE = 2000  # 每批从 DB 拉取的行数，避免全量加载
 
 
 @router.post("/export-excel")
@@ -873,12 +897,11 @@ async def export_excel(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """执行查询并生成 Excel 流。"""
+    """执行查询并以流式/分页方式生成 Excel（write_only 模式避免全量内存峰值）。"""
     _require_admin_or_manager(current_user)
     stmt, column_names = _build_select(body)
     try:
         result = await db.execute(stmt)
-        rows = result.fetchall()
     except SQLAlchemyError as exc:
         try:
             await db.rollback()
@@ -890,28 +913,35 @@ async def export_excel(
                     "message": f"查询执行失败：{exc}"},
         )
 
-    import openpyxl
+    from openpyxl import Workbook
+    from openpyxl.cell import WriteOnlyCell
     from openpyxl.styles import Alignment, Font, PatternFill
 
-    wb = openpyxl.Workbook()
-    ws = wb.active
+    wb = Workbook(write_only=True)
     table_label = TABLE_WHITELIST[body.table]["label"]
-    ws.title = table_label[:31]  # Excel sheet 名 ≤31 字符
+    ws = wb.create_sheet(title=table_label[:31])
 
-    # 表头
+    # 表头（write_only 模式通过 WriteOnlyCell 设置样式）
     header_font = Font(bold=True)
     header_fill = PatternFill(start_color="F0EDF5", end_color="F0EDF5", fill_type="solid")
-    for ci, name in enumerate(column_names, 1):
-        cell = ws.cell(row=1, column=ci, value=name)
+    header_alignment = Alignment(horizontal="center")
+    header_cells = []
+    for name in column_names:
+        cell = WriteOnlyCell(ws, value=name)
         cell.font = header_font
         cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center")
+        cell.alignment = header_alignment
+        header_cells.append(cell)
+    ws.append(header_cells)
 
-    # 数据行
-    for ri, row in enumerate(rows, 2):
-        for ci, _ in enumerate(column_names, 1):
-            v = row[ci - 1] if ci - 1 < len(row) else None
-            ws.cell(row=ri, column=ci, value=_excel_cell_value(v))
+    # 分页读取数据行并逐批写入（避免全量加载到内存）
+    while True:
+        batch = result.fetchmany(_EXPORT_FETCH_SIZE)
+        if not batch:
+            break
+        for row in batch:
+            ws.append([_excel_cell_value(row[i] if i < len(row) else None)
+                       for i in range(len(column_names))])
 
     output = io.BytesIO()
     wb.save(output)

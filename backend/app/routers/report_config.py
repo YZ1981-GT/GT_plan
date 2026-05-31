@@ -99,6 +99,32 @@ async def update_report_config(
         old_row = await svc.get_config(config_id)
         old_formula = old_row.formula if old_row else None
 
+        # P2-2: 公式保存前校验地址有效性（悬空引用拒绝保存）
+        new_formula = updates.get("formula")
+        if new_formula and new_formula != old_formula:
+            project_id = updates.get("project_id", "")
+            year = updates.get("year", 0)
+            template_type = updates.get("template_type", "soe")
+            # 尝试从 applicable_standard 推导 project_id
+            if not project_id and old_row:
+                std = old_row.applicable_standard or ""
+                if std.startswith("project:"):
+                    project_id = std.removeprefix("project:")
+            if project_id and year:
+                from app.services.address_registry import address_registry
+                issues = await address_registry.validate_formula_refs(
+                    db, str(project_id), int(year), new_formula, template_type
+                )
+                if issues:
+                    raise HTTPException(
+                        status_code=422,
+                        detail={
+                            "error_code": "FORMULA_DANGLING_REFS",
+                            "message": "公式含悬空引用，拒绝保存",
+                            "issues": issues,
+                        },
+                    )
+
         row = await svc.update_config(config_id, updates, user_id=current_user.id)
         await db.commit()
 

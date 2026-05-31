@@ -1,5 +1,7 @@
 """Address Registry V2: 三级地址解析 + stale 传播链路
 
+@see address_registry — 本模块=静态依赖图（stale 影响分析用，linkage_graph 离线产物）
+
 提供：
 - GET /api/address-registry/v2/resolve?wp_code=...&sheet=...&cell_desc=...   语义→物理
 - GET /api/address-registry/v2/stale-impact?wp_code=...&sheet=...&cell=...   单元格变更影响范围（BFS下游）
@@ -15,7 +17,7 @@ from typing import Any, Optional
 
 from app.deps import get_current_user
 
-router = APIRouter(prefix="/api/address-registry/v2", tags=["address-registry-v2"])
+router = APIRouter(prefix="/api/address-registry/v2", tags=["linkage-analysis"])
 
 # 模块级缓存
 _L2_CACHE: Optional[dict] = None
