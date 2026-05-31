@@ -144,7 +144,7 @@ def main():
 
 async def _run(dry_run: bool, cycle_filter: str | None):
     from sqlalchemy import text
-    from app.core.database import async_engine
+    from app.core.database import engine as async_engine
 
     async with async_engine.begin() as conn:
         # 查询所有行

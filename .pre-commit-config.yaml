@@ -69,3 +69,21 @@ repos:
         language: system
         pass_filenames: false
         files: ^backend/app/services/(wp_|workpaper_).*\.py$
+
+      # P1 改进：路由注册完整性检查
+      # 新建 router 文件后必须在 router_registry/ 注册，否则端点 404
+      - id: check-router-registration
+        name: check-router-registration
+        entry: python backend/scripts/check/check_router_registration.py
+        language: system
+        pass_filenames: false
+        files: ^backend/app/routers/
+
+      # P1 改进：迁移版本冲突检查
+      # D6 MigrationRunner 按版本号顺序执行，重复版本号导致管线中断
+      - id: check-migration-versions
+        name: check-migration-versions
+        entry: python backend/scripts/check/check_migration_versions.py
+        language: system
+        pass_filenames: false
+        files: ^backend/migrations/

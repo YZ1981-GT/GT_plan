@@ -1,4 +1,4 @@
-"""底稿生成管线端到端验证脚本（正式可重复工具）
+r"""底稿生成管线端到端验证脚本（正式可重复工具）
 
 用法:
     ..\.venv\Scripts\python.exe scripts/verify_wp_generation_pipeline.py \
@@ -37,19 +37,39 @@ async def run_verification(project_id: str, year: int, report: bool = False):
     import sqlalchemy as sa
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.core.database import get_async_session_factory
+    import app.models  # noqa: F401 — 注册 FK metadata
+    import app.models.extension_models  # noqa: F401
+    from app.core.database import async_session as session_factory
     from app.models.workpaper_models import WpIndex, WorkingPaper
     from app.models.audit_platform_models import TrialBalance
+    from app.models.core import Project
     from app.services.prerequisite_checker import PrerequisiteChecker
 
-    pid = UUID(project_id)
+    # 支持 UUID 前缀（如 df5b8403）→ 查 DB 匹配完整 UUID
+    pid: UUID | None = None
+    try:
+        pid = UUID(project_id)
+    except ValueError:
+        pass  # 前缀模式，下面查 DB
+
     results: dict = {"project_id": project_id, "year": year, "timestamp": datetime.now().isoformat()}
     diagnostics: list[str] = []
 
-    session_factory = get_async_session_factory()
     async with session_factory() as db:
+        # 如果是前缀，查 DB 获取完整 UUID
+        if pid is None:
+            row = (await db.execute(sa.text(
+                "SELECT id FROM projects WHERE id::text LIKE :prefix LIMIT 1"
+            ), {"prefix": f"{project_id}%"})).first()
+            if row:
+                pid = UUID(str(row[0]))
+                print(f"  [INFO] 前缀 {project_id} → 完整 UUID {pid}")
+            else:
+                print(f"  [ERROR] 未找到匹配前缀 {project_id} 的项目")
+                return results
+
         print(f"\n{'='*60}")
-        print(f"  底稿生成管线验证 - project={project_id}, year={year}")
+        print(f"  底稿生成管线验证 - project={pid}, year={year}")
         print(f"{'='*60}\n")
 
         # Step 1: Recommend

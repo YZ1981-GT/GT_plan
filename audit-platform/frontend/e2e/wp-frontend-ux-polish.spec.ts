@@ -11,7 +11,7 @@
 import { test, expect, type Page } from '@playwright/test'
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3030'
-const PROJECT_ID = process.env.TEST_PROJECT_ID || '37814426-a29e-4fc2-9313-a59d229bf7b0'
+const PROJECT_ID = process.env.TEST_PROJECT_ID || 'df5b8403-abbb-48af-b6a4-6fd44dfae5c9'
 
 // 跳过条件：后端未启动
 test.beforeAll(async ({ request }) => {
