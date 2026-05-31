@@ -49,17 +49,17 @@ inclusion: always
 - **封板待办（按 ROI）**：①🔴 全链路集成测试（合成母子数据跑 建树→recalc→trial→对账→报表→附注→穿透）②🟠 `seed_consol_uat.py` 幂等造最小合成集团一脚本解锁四阶段 UAT ③🟡 Phase2/3 Playwright 复用 Phase1 已跑通环境补实测；**收手判断：地基已正确，无真实集团客户前不深做打磨，封板做①②后转回核心模块**
 
 ### git 当前状态（2026-05-31）
-- 当前分支 `main`，已 push origin/main（HEAD `587e70d6`，6 维核查全绿 ahead/behind 0/0 工作树干净）；含 consol phase2/3 全套 + V039 迁移 + 10 ADR-CONSOL-201~304 + 25 consol service + 全局 7 模块盘点文档 + memory 精简版
-- **本次直推 main 经用户拍板（选 A）**：GIT_MODE 未设=默认 single 允许直推；fast-forward 无冲突（behind=0）；内容本是 work 分支已验证工作，直推让主线立即拿到
+- 当前分支 `main`，已 merge `origin/spec/frontend-consistency-m1`（merge commit `9b6434b6`）：含 GtAmountCell 全量化 + ElMessage.error→handleApiError 治理 + 5 PBT + CI 卡点 + **70 个 TSJ 复核提示词**（backend/data/tsj_review_prompts/）+ check_file_size 路径修复 + 底稿 proposal；本地 7 spec 已先提交（93e49c42）保护
+- **merge 2 冲突已解决**：①GtCNoteTable.vue=采纳对方 handleApiError 治理 + 保留我的 scrollToRow(wp-locate) + 合并 import ②memory.md=取我 HEAD 精简版(对方是旧完整版，详情已在 dev-history/proposal)；7 spec 全幸存 + consol 4 phase spec 三件套零变化
+- **合并模块 spec 三件套 merge 零变化实证**：merge 只改 4 个 consol 前端组件（ConsolNoteTab/ConsolTrialBalanceTab/ConsolWorksheetTabs/ShareChangeSheet）做 ElMessage.error→handleApiError 纯错误处理治理，consol 业务逻辑 + spec 文档一行没动，0 diagnostics
 - 历史已闭环：合并模块 Phase0~3 全在 main / 底稿模块 14 spec 已实施归档 / schema drift 三层修复 / git 治理 spec（GIT_MODE 双模式 + 分支命名 hook + 6 维核查 CLI `check_git_sync_state.py`）
 
 ### 已完成 spec 总览
 - 详见 `.kiro/specs/INDEX.md`（active + _archive 9 分类）；归档/状态核实必须 grep/fileSearch 实证产物存在，不信 README/INDEX 自述
-- active 仅剩合并 4 Phase + consol-note stub；底稿模块（wp-* / gtdform / multi-standard 等 13 spec）+ V3 + 附注 spec + 11 审计循环 + phase1~8 全已归档
+- active = 合并 4 Phase + consol-note stub + **全局模块 7 spec（A formula-engine-unification/B retrieval-kernel/C doc-level-ai-chat/D report-config-baseline/E wp-ai-review-ux-fix/F global-modules-cleanup/G global-modules-p2-polish，A→G 顺序待实施）** + frontend-consistency-m1（merge 带入）；底稿模块 13 spec + V3 + 附注 spec + 11 审计循环 + phase1~8 全已归档
 
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
-- 待捞回：`origin/spec/frontend-consistency-m1` 4 commit（GtAmountCell 全量化/状态硬编码消除/6 PBT，待用户评估）
 
 ### 全局 7 模块改进 6 spec 三件套已建（2026-05-31，待实施）
 - 据盘点文档生成 6 个 active spec（全 Design-First/bugfix，三件套齐全 0 diagnostics）：**A `formula-engine-unification`**（feature，4套求值器→单内核+审计收口哈希链，4阶段19任务）/ **B `retrieval-kernel-unification`**（feature，检索3套→单内核+pgvector+知识文件入网，3阶段12任务）/ **C `doc-level-ai-chat`**（feature，文档级LLM对话，**依赖B**，4阶段12任务）/ **D `report-config-baseline`**（feature，报表主模板回填+克隆stale通知，3阶段11任务）/ **E `wp-ai-review-ux-fix`**（bugfix，复核显底稿编号+接useCellLocate，8任务）/ **F `global-modules-cleanup`**（bugfix，地址库澄清+33MB死文件+模板JSON→registry+懒建表，10任务）
