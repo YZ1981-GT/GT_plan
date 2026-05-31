@@ -18,6 +18,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -25,6 +26,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
+from app.models.core import User
 
 router = APIRouter(prefix="/api/cell-comments", tags=["cell-comments"])
 
@@ -121,8 +124,9 @@ def _row_to_response(row, project_id: str, year: int) -> CellCommentResponse:
 # ─── GET: 加载模块下所有批注/复核 ─────────────────────────────────────────────
 @router.get("/{project_id}/{year}/{module}", response_model=list[CellCommentResponse])
 async def get_module_comments(
-    project_id: str, year: int, module: str,
+    project_id: UUID, year: int, module: str,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
 ):
     await ensure_table(db)
     result = await db.execute(
@@ -133,16 +137,17 @@ async def get_module_comments(
             WHERE project_id = :pid AND year = :y AND module = :mod
             ORDER BY sheet_key, row_idx, col_idx
         """),
-        {"pid": project_id, "y": year, "mod": module},
+        {"pid": str(project_id), "y": year, "mod": module},
     )
-    return [_row_to_response(r, project_id, year) for r in result.fetchall()]
+    return [_row_to_response(r, str(project_id), year) for r in result.fetchall()]
 
 
 # ─── GET: 加载某表的批注/复核 ─────────────────────────────────────────────────
 @router.get("/{project_id}/{year}/{module}/{sheet_key}", response_model=list[CellCommentResponse])
 async def get_sheet_comments(
-    project_id: str, year: int, module: str, sheet_key: str,
+    project_id: UUID, year: int, module: str, sheet_key: str,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
 ):
     await ensure_table(db)
     result = await db.execute(
@@ -153,17 +158,18 @@ async def get_sheet_comments(
             WHERE project_id = :pid AND year = :y AND module = :mod AND sheet_key = :sk
             ORDER BY row_idx, col_idx
         """),
-        {"pid": project_id, "y": year, "mod": module, "sk": sheet_key},
+        {"pid": str(project_id), "y": year, "mod": module, "sk": sheet_key},
     )
-    return [_row_to_response(r, project_id, year) for r in result.fetchall()]
+    return [_row_to_response(r, str(project_id), year) for r in result.fetchall()]
 
 
 # ─── PUT: 保存单个批注/复核（upsert） ─────────────────────────────────────────
 @router.put("/{project_id}/{year}", response_model=CellCommentResponse)
 async def save_cell_comment(
-    project_id: str, year: int,
+    project_id: UUID, year: int,
     body: CellCommentSave,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
 ):
     await ensure_table(db)
     now = datetime.now(timezone.utc)
@@ -182,7 +188,7 @@ async def save_cell_comment(
                               row_name = :rn, col_name = :cn, updated_at = :now
             """),
             {
-                "id": new_id, "pid": project_id, "y": year,
+                "id": new_id, "pid": str(project_id), "y": year,
                 "mod": body.module, "sk": body.sheet_key,
                 "ri": body.row_idx, "ci": body.col_idx,
                 "ct": body.comment_type, "comment": body.comment,
@@ -204,26 +210,27 @@ async def save_cell_comment(
             WHERE project_id = :pid AND year = :y AND module = :mod
               AND sheet_key = :sk AND row_idx = :ri AND col_idx = :ci AND comment_type = :ct
         """),
-        {"pid": project_id, "y": year, "mod": body.module, "sk": body.sheet_key,
+        {"pid": str(project_id), "y": year, "mod": body.module, "sk": body.sheet_key,
          "ri": body.row_idx, "ci": body.col_idx, "ct": body.comment_type},
     )
     row = result.fetchone()
     if not row:
         raise HTTPException(status_code=500, detail={"message": "保存成功但回读失败", "message_en": "Save succeeded but read-back failed"})
-    return _row_to_response(row, project_id, year)
+    return _row_to_response(row, str(project_id), year)
 
 
 # ─── DELETE: 删除单个批注 ─────────────────────────────────────────────────────
 @router.delete("/{project_id}/{year}/{comment_id}")
 async def delete_cell_comment(
-    project_id: str, year: int, comment_id: str,
+    project_id: UUID, year: int, comment_id: str,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
 ):
     await ensure_table(db)
     try:
         result = await db.execute(
             text("DELETE FROM consol_cell_comments WHERE id = :cid AND project_id = :pid AND year = :y"),
-            {"cid": comment_id, "pid": project_id, "y": year},
+            {"cid": comment_id, "pid": str(project_id), "y": year},
         )
         await db.commit()
         deleted = result.rowcount

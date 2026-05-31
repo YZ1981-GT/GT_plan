@@ -5,8 +5,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.core.database import get_db
+from app.models.core import User
 from app.models.consolidation_schemas import MinorityInterestResult
 from app.services.minority_interest_service import (
     calculate_mi,
@@ -24,7 +25,7 @@ async def list_mi(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     return await get_mi_list(db, project_id, year)
 
@@ -47,7 +48,7 @@ async def create_or_update_mi_route(
     company_code: str,
     data: MinorityInterestResult,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     return await create_or_update_mi(db, project_id, year, company_code, data)
 
@@ -57,7 +58,7 @@ async def delete_mi_route(
     mi_id: UUID,
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     if not await delete_mi(db, mi_id, project_id):
         raise HTTPException(status_code=404, detail="少数股东权益记录不存在")

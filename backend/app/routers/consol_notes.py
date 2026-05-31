@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.core.database import get_db
 from app.models.consolidation_schemas import ConsolDisclosureSection
 from app.services.consol_disclosure_service import (
@@ -49,7 +49,7 @@ async def create_consol_notes(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("edit")),
 ):
     """生成合并附注"""
     sections = generate_consol_notes_sync(db, project_id, year)
@@ -61,7 +61,7 @@ async def get_consol_notes(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("readonly")),
 ):
     """获取合并附注"""
     sections = generate_consol_notes_sync(db, project_id, year)
@@ -71,8 +71,9 @@ async def get_consol_notes(
 @router.post("/integrate", response_model=list[ConsolDisclosureSection])
 async def integrate_notes(
     data: ConsolNotesIntegrateRequest,
+    project_id: UUID = Query(..., description="项目ID（用于权限校验）"),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("edit")),
 ):
     """将合并附注与 Phase 1 单体附注整合"""
     sections = integrate_consol_notes_sync(
@@ -86,7 +87,7 @@ async def save_consol_notes(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("edit")),
 ):
     """保存合并附注到数据库"""
     sections = generate_consol_notes_sync(db, project_id, year)
@@ -126,7 +127,7 @@ async def reaggregate_consol_notes(
     year: int,
     request: ReaggregateRequest | None = None,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("edit")),
 ):
     """重新汇总合并附注（同步版，SSE 留 Phase 2 B.1 完善）.
 

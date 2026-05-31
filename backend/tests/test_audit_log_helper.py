@@ -373,7 +373,7 @@ class TestEventTypeValidation:
         validate_event_type_details(details)
 
     def test_all_event_type_schemas_defined(self):
-        """确认 6 种 event_type 的 schema 均已定义。"""
+        """确认 7 种 event_type 的 schema 均已定义。"""
         expected_types = {
             "archived_exception_access",
             "archive_unarchive",
@@ -381,5 +381,6 @@ class TestEventTypeValidation:
             "ai_content_lifecycle",
             "cross_module_conflict_resolved",
             "time_machine_restore",
+            "consol_lifecycle",
         }
         assert set(EVENT_TYPE_SCHEMAS.keys()) == expected_types

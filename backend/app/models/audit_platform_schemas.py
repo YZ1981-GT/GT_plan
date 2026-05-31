@@ -97,6 +97,7 @@ class BasicInfoSchema(BaseModel):
     custom_template_name: str | None = None
     custom_template_version: str | None = None
     report_scope: str | None = None  # 报表类型：standalone（单户）/ consolidated（合并）
+    consolidation_type: str | None = None  # 合并类型：subsidiary（母子合并）/ branch（母分汇总）
     parent_company_name: str | None = None  # 上级企业名称（合并报表时填写）
     parent_company_code: str | None = None  # 上级企业代码
     ultimate_company_name: str | None = None  # 最终控制方名称

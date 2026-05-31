@@ -8,12 +8,15 @@ GET /api/consol-note-sections/{project_id}/{year}/{section_id}/data — 加载�
 
 import json
 from pathlib import Path
+from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
+from app.models.core import User
 
 router = APIRouter(prefix="/api/consol-note-sections", tags=["consol-note-sections"])
 
@@ -120,8 +123,9 @@ async def _ensure_table(db: AsyncSession):
 
 @router.get("/data/{project_id}/{year}/{section_id}")
 async def get_note_data(
-    project_id: str, year: int, section_id: str,
+    project_id: UUID, year: int, section_id: str,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
 ):
     """加载用户已保存的附注数据"""
     await _ensure_table(db)
@@ -137,9 +141,10 @@ async def get_note_data(
 
 @router.put("/data/{project_id}/{year}/{section_id}")
 async def save_note_data(
-    project_id: str, year: int, section_id: str,
+    project_id: UUID, year: int, section_id: str,
     body: dict,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
 ):
     """保存用户编辑的附注数据"""
     await _ensure_table(db)
@@ -168,9 +173,10 @@ async def save_note_data(
 
 @router.post("/refresh/{project_id}/{year}/{section_id}")
 async def refresh_note_by_formula(
-    project_id: str, year: int, section_id: str,
+    project_id: UUID, year: int, section_id: str,
     body: dict,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
 ):
     """根据公式从项目试算表/报表数据重新计算附注表格内容
     
@@ -283,9 +289,10 @@ async def refresh_note_by_formula(
 
 @router.post("/audit-all/{project_id}/{year}")
 async def audit_all_notes(
-    project_id: str, year: int,
+    project_id: UUID, year: int,
     body: dict,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
 ):
     """对所有附注表格执行公式审核
     
@@ -447,9 +454,10 @@ async def audit_all_notes(
 
 @router.post("/audit/{project_id}/{year}/{section_id}")
 async def audit_single_note(
-    project_id: str, year: int, section_id: str,
+    project_id: UUID, year: int, section_id: str,
     body: dict,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
 ):
     """对指定附注表格执行公式审核（前端传入当前编辑的数据）"""
     standard = body.get("standard", "soe")
@@ -663,9 +671,10 @@ async def audit_single_note(
 
 @router.post("/apply-formulas/{project_id}/{year}")
 async def apply_all_formulas(
-    project_id: str, year: int,
+    project_id: UUID, year: int,
     body: dict,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
 ):
     """对所有附注表格执行公式取数计算，从试算表提取数据填充"""
     standard = body.get("standard", "soe")
@@ -759,9 +768,10 @@ async def apply_all_formulas(
 
 @router.post("/aggregate/{project_id}/{year}")
 async def aggregate_data(
-    project_id: str, year: int,
+    project_id: UUID, year: int,
     body: dict,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
 ):
     """汇总指定单位的数据到目标单元格
     
@@ -875,9 +885,10 @@ async def aggregate_data(
 
 @router.post("/fill-tb/{project_id}/{year}")
 async def fill_trial_balance(
-    project_id: str, year: int,
+    project_id: UUID, year: int,
     body: dict,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
 ):
     """自动填充合并试算平衡表
     

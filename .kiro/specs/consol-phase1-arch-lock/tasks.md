@@ -22,6 +22,8 @@
 
 ## 阶段 1：A1/A2 公式引擎统一
 
+> 📌 P2 部分先行（2026-05-31）：`consol_report_service._execute_formula` 的**裸 eval 已替换为复用 `report_engine._safe_eval_expr`**（ast 安全求值，支持 ABS/IF/ROUND/MAX/MIN/比较）——A1 的"安全+语义不一致"硬伤已消除（7 测试 test_consol_report_formula_eval 守护）。**剩余**：完整 AmountResolver 注入抽象 + 删除 `_resolve_consol_tb`/`_resolve_sum_consol` 重复取数逻辑（任务 1/2 的架构重构部分仍待做）。
+
 - [ ] 1. AmountResolver 抽象 + report_engine 注入
   - [ ] 1.1 新建 `AmountResolver` Protocol（`resolve_tb` / `resolve_sum`）+ `TrialBalanceResolver`（读 trial_balance.audited_amount）+ `ConsolTrialResolver`（读 consol_trial.consol_amount）
   - [ ] 1.2 `report_engine` 公式求值入口改造为接受 `resolver` 注入（`evaluate_formula(formula, *, resolver, year, is_prior)`），取数走 resolver

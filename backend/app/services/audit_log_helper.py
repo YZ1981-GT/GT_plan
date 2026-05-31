@@ -3,16 +3,17 @@
 提供 append_audit_log 函数作为统一审计日志写入入口，
 自动维护 hash_chain（复用 V007 引入的哈希链逻辑）。
 
-调用方：deps.py / time_machine_service / conflict_resolution_service / ...
+调用方：deps.py / time_machine_service / conflict_resolution_service / consol_audit_helper / ...
 内部：复用既有 hash_chain 逻辑（audit_log_writer_worker._compute_entry_hash）
 
-6 种 event_type schema（存储在 details JSONB 中）：
+7 种 event_type schema（存储在 details JSONB 中）：
 - archived_exception_access: 归档项目例外通道触发
 - archive_unarchive: 解除归档
 - delete_with_confirm: 删除二次确认通过
 - ai_content_lifecycle: AI 内容生成/确认/修订/拒绝
 - cross_module_conflict_resolved: 用户调解冲突
 - time_machine_restore: 时光机恢复
+- consol_lifecycle: 合并关键操作留痕（lock/unlock/抵销审批/recalc/scope变更）
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ EventType = Literal[
     "ai_content_lifecycle",
     "cross_module_conflict_resolved",
     "time_machine_restore",
+    "consol_lifecycle",
 ]
 
 
@@ -72,6 +74,7 @@ EVENT_TYPE_SCHEMAS: dict[str, set[str]] = {
         "instance_type",
         "instance_id",
     },
+    "consol_lifecycle": {"sub_action", "before", "after"},
 }
 
 # 创世哈希（与 audit_log_writer_worker 保持一致）

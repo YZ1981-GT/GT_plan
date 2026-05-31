@@ -176,6 +176,11 @@ class ConsolTrial(Base, SoftDeleteMixin, TimestampMixin):
     consol_adjustment: Mapped[Decimal] = mapped_column(Numeric(20, 2), server_default="0", nullable=False)
     consol_elimination: Mapped[Decimal] = mapped_column(Numeric(20, 2), server_default="0", nullable=False)
     consol_amount: Mapped[Decimal] = mapped_column(Numeric(20, 2), server_default="0", nullable=False)
+    # 合并溯源 provenance（Phase 0 — consol-phase0-core-pipeline / B1）
+    # {"by_company": [{company_code, company_name, amount}], "individual_sum": "...", "computed_at": "..."}
+    consolidation_breakdown: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # 数据陈旧标记（P1 — 子公司 TB 变更后母公司 trial 需重算时置 true）
+    is_stale: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), nullable=False)
 
 
 class EliminationEntry(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):

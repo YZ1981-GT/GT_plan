@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Index, Numeric, String, Text, func, text
+from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -85,6 +85,19 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         ForeignKey("projects.id"), nullable=True
     )
     consol_level: Mapped[int] = mapped_column(default=1)
+    # 合并类型：subsidiary=母子合并（需抵销）/ branch=母分汇总（直接加总，无抵销）
+    consolidation_type: Mapped[str | None] = mapped_column(
+        String(20), nullable=True, default=None
+    )
+
+    # 合并锁定（Phase 0 — consol-phase0-core-pipeline / C3 三层一致 + F2 锁定闭环）
+    consol_lock: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), nullable=False
+    )
+    consol_lock_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    consol_lock_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     # Round 1 需求 11：归档保留期
     archived_at: Mapped[datetime | None] = mapped_column(nullable=True)

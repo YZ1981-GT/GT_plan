@@ -158,6 +158,21 @@ def _register_phase_handlers() -> None:
     register_cross_check_rules()
     register_task_handlers()
 
+    # 合并模块 stale 传播 handler（子公司变更 → 母合并项目标 stale）
+    import logging as _log
+    try:
+        from app.services.event_bus import event_bus
+        from app.services.consol_note_stale_handler import register_stale_handler
+        from app.services.consol_trial_stale_handler import (
+            register_consol_trial_stale_handler,
+        )
+        register_stale_handler(event_bus)              # NOTE_UPDATED → 合并附注 stale
+        register_consol_trial_stale_handler(event_bus)  # TRIAL_BALANCE_UPDATED → 合并 trial stale（P1）
+    except Exception as e:
+        _log.getLogger("audit_platform").warning(
+            "[启动] 合并 stale handler 注册失败: %s", e
+        )
+
 
 async def _check_gin_index_status() -> None:
     """Startup check: detect if parsed_data GIN index is building → set global flag."""

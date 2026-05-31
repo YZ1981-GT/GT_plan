@@ -5,8 +5,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.core.database import get_db
+from app.models.core import User
 from app.models.consolidation_schemas import (
     ComponentAuditorCreate,
     ComponentAuditorUpdate,
@@ -46,7 +47,7 @@ router = APIRouter(prefix="/api/consolidation/component-auditor", tags=["组成�
 async def list_auditors(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     return await get_auditors(db, project_id)
 
@@ -56,7 +57,7 @@ async def create_auditor_route(
     project_id: UUID,
     data: ComponentAuditorCreate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     return await create_auditor(db, project_id, data)
 
@@ -67,7 +68,7 @@ async def update_auditor_route(
     project_id: UUID,
     data: ComponentAuditorUpdate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     auditor = await update_auditor(db, auditor_id, project_id, data)
     if not auditor:
@@ -80,7 +81,7 @@ async def delete_auditor_route(
     auditor_id: UUID,
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     if not await delete_auditor(db, auditor_id, project_id):
         raise HTTPException(status_code=404, detail="组成部分审计师不存在")
@@ -92,7 +93,7 @@ async def list_instructions(
     project_id: UUID,
     auditor_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     return await get_instructions(db, project_id, auditor_id)
 
@@ -102,7 +103,7 @@ async def create_instruction_route(
     project_id: UUID,
     data: InstructionCreate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     return await create_instruction(db, project_id, data)
 
@@ -113,7 +114,7 @@ async def update_instruction_route(
     project_id: UUID,
     data: InstructionUpdate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     instruction = await update_instruction(db, instruction_id, project_id, data)
     if not instruction:
@@ -126,7 +127,7 @@ async def delete_instruction_route(
     instruction_id: UUID,
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     if not await delete_instruction(db, instruction_id, project_id):
         raise HTTPException(status_code=404, detail="组成部分指令不存在")
@@ -138,7 +139,7 @@ async def list_results(
     project_id: UUID,
     auditor_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     return await get_results(db, project_id, auditor_id)
 
@@ -148,7 +149,7 @@ async def create_result_route(
     project_id: UUID,
     data: ResultCreate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     return await create_result(db, project_id, data)
 
@@ -159,7 +160,7 @@ async def update_result_route(
     project_id: UUID,
     data: ResultUpdate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     result = await update_result(db, result_id, project_id, data)
     if not result:
@@ -172,7 +173,7 @@ async def delete_result_route(
     result_id: UUID,
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     if not await delete_result(db, result_id, project_id):
         raise HTTPException(status_code=404, detail="组成部分结果不存在")
@@ -183,6 +184,6 @@ async def delete_result_route(
 async def get_dashboard_route(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     return await get_dashboard(db, project_id)

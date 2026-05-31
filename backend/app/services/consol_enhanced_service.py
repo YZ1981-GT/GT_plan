@@ -1,4 +1,11 @@
-"""合并报表增强服务 — Phase 10 Task 7.1-7.3"""
+"""合并报表增强服务 — Phase 10 Task 7.1-7.3
+
+Phase 0 修复（consol-phase0-core-pipeline Task 8.2）：
+ConsolLockService 改用 ORM select/update 替代裸 SQL（ADR-CONSOL-002）。
+状态机不变量：
+  locked  <=> consol_lock == True AND consol_lock_by != None AND consol_lock_at != None
+  unlocked <=> consol_lock == False AND consol_lock_by == None AND consol_lock_at == None
+"""
 
 from __future__ import annotations
 
@@ -7,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-import sqlalchemy as sa
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.core import Project
@@ -16,127 +23,67 @@ logger = logging.getLogger(__name__)
 
 
 class ConsolLockService:
-    """合并锁定同步"""
+    """合并锁定同步 — ORM 实现，保证状态机不变量（三字段原子设置）"""
 
     async def lock_project(
         self, db: AsyncSession, project_id: UUID, locked_by: UUID,
     ) -> dict[str, Any]:
-        """锁定单体试算表"""
-        await db.execute(sa.text(
-            "UPDATE projects SET consol_lock = true, consol_lock_by = :by, "
-            "consol_lock_at = :at WHERE id = :pid"
-        ), {"by": str(locked_by), "at": datetime.now(timezone.utc), "pid": str(project_id)})
+        """锁定项目 — 原子设置三字段（consol_lock + consol_lock_by + consol_lock_at）"""
+        result = await db.execute(
+            select(Project).where(Project.id == project_id)
+        )
+        project = result.scalar_one_or_none()
+        if project is None:
+            return {"locked": False, "project_id": str(project_id), "error": "项目不存在"}
+
+        now = datetime.now(timezone.utc)
+        project.consol_lock = True
+        project.consol_lock_by = locked_by
+        project.consol_lock_at = now
         await db.flush()
-        return {"locked": True, "project_id": str(project_id)}
+        return {
+            "locked": True,
+            "project_id": str(project_id),
+            "locked_by": str(locked_by),
+            "locked_at": now.isoformat(),
+        }
 
     async def unlock_project(
         self, db: AsyncSession, project_id: UUID,
     ) -> dict[str, Any]:
-        """解锁"""
-        await db.execute(sa.text(
-            "UPDATE projects SET consol_lock = false, consol_lock_by = NULL, "
-            "consol_lock_at = NULL WHERE id = :pid"
-        ), {"pid": str(project_id)})
+        """解锁项目 — 原子清除三字段"""
+        result = await db.execute(
+            select(Project).where(Project.id == project_id)
+        )
+        project = result.scalar_one_or_none()
+        if project is None:
+            return {"locked": False, "project_id": str(project_id), "error": "项目不存在"}
+
+        project.consol_lock = False
+        project.consol_lock_by = None
+        project.consol_lock_at = None
         await db.flush()
         return {"locked": False, "project_id": str(project_id)}
 
     async def check_lock(
         self, db: AsyncSession, project_id: UUID,
     ) -> dict[str, Any]:
-        """检查锁定状态"""
-        result = await db.execute(sa.text(
-            "SELECT consol_lock, consol_lock_by, consol_lock_at "
-            "FROM projects WHERE id = :pid"
-        ), {"pid": str(project_id)})
+        """检查锁定状态 — 使用 ORM select"""
+        result = await db.execute(
+            select(
+                Project.consol_lock,
+                Project.consol_lock_by,
+                Project.consol_lock_at,
+            ).where(Project.id == project_id)
+        )
         row = result.first()
         if not row:
             return {"locked": False}
         return {
-            "locked": bool(row.consol_lock) if row.consol_lock else False,
-            "locked_by": str(row.consol_lock_by) if row.consol_lock_by else None,
-            "locked_at": row.consol_lock_at.isoformat() if row.consol_lock_at else None,
+            "locked": bool(row[0]) if row[0] else False,
+            "locked_by": str(row[1]) if row[1] else None,
+            "locked_at": row[2].isoformat() if row[2] else None,
         }
-
-
-class ExternalReportImportService:
-    """外部单位报表导入"""
-
-    async def import_external_report(
-        self, db: AsyncSession, project_id: UUID, data: dict[str, Any],
-    ) -> dict[str, Any]:
-        """导入其他审计师审计的单位报表
-
-        解析上传的 Excel 文件，提取试算表数据写入 trial_balance。
-        """
-        import logging
-        _logger = logging.getLogger(__name__)
-
-        try:
-            # 实际实现：从上传文件解析试算表数据
-            # 这里提供框架，具体解析逻辑依赖文件格式
-            from sqlalchemy import text
-
-            # 检查项目是否存在
-            proj_check = await self.db.execute(
-                text("SELECT id FROM projects WHERE id = :pid"),
-                {"pid": str(project_id)}
-            )
-            if not proj_check.fetchone():
-                return {
-                    "project_id": str(project_id),
-                    "imported": False,
-                    "message": "项目不存在",
-                }
-
-            # 如果有 file_content（bytes），解析 Excel
-            file_content = kwargs.get("file_content")
-            if file_content:
-                import openpyxl
-                from io import BytesIO
-
-                wb = openpyxl.load_workbook(BytesIO(file_content), data_only=True)
-                ws = wb.active
-                imported_count = 0
-
-                for row in ws.iter_rows(min_row=2, values_only=True):
-                    if not row or not row[0]:
-                        continue
-                    account_code = str(row[0]).strip()
-                    amount = float(row[1] or 0) if len(row) > 1 else 0
-
-                    # 写入或更新 trial_balance
-                    await self.db.execute(text("""
-                        INSERT INTO trial_balance (id, project_id, year, standard_account_code, unadjusted_amount, audited_amount, is_deleted, created_at, updated_at)
-                        VALUES (gen_random_uuid(), :pid, :year, :code, :amt, :amt, false, NOW(), NOW())
-                        ON CONFLICT (project_id, year, standard_account_code)
-                        DO UPDATE SET unadjusted_amount = :amt, audited_amount = :amt, updated_at = NOW()
-                    """), {"pid": str(project_id), "year": year, "code": account_code, "amt": amount})
-                    imported_count += 1
-
-                wb.close()
-                await self.db.flush()
-
-                _logger.info(f"[CONSOL] external report imported: project={project_id} company={company_code} rows={imported_count}")
-                return {
-                    "project_id": str(project_id),
-                    "company_code": company_code,
-                    "imported": True,
-                    "imported_count": imported_count,
-                    "message": f"外部报表导入成功，{imported_count} 行数据",
-                }
-
-            return {
-                "project_id": str(project_id),
-                "imported": False,
-                "message": "未提供文件内容（file_content 参数缺失）",
-            }
-        except Exception as e:
-            _logger.error(f"[CONSOL] external report import failed: {e}")
-            return {
-                "project_id": str(project_id),
-                "imported": False,
-                "message": f"导入失败: {str(e)[:200]}",
-            }
 
 
 class IndependentModuleService:

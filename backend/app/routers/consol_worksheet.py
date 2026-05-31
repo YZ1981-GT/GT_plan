@@ -25,7 +25,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.models.core import User
 
 router = APIRouter(
@@ -76,7 +76,7 @@ class TemplateCreateRequest(BaseModel):
 async def get_tree(
     project_id: UUID = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """返回完整企业树 JSON"""
     from app.services.consol_tree_service import build_tree, to_dict
@@ -90,8 +90,9 @@ async def get_tree(
 @router.post("/recalc")
 async def recalc_worksheet(
     body: RecalcRequest,
+    project_id: UUID = Query(..., description="项目ID（用于权限校验）"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """全量重算差额表"""
     from app.services.consol_worksheet_engine import recalc_full
@@ -107,7 +108,7 @@ async def aggregate_node(
     node_code: str = Query(...),
     mode: str = Query("self"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """节点汇总查询（mode=self|children|descendants）"""
     from app.services.consol_aggregation_service import query_node
@@ -125,7 +126,7 @@ async def drill_companies(
     node_code: str = Query(...),
     account_code: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """穿透到企业构成"""
     from app.services.consol_drilldown_service import drill_to_companies
@@ -141,7 +142,7 @@ async def drill_eliminations(
     company_code: str = Query(...),
     account_code: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """穿透到抵消分录"""
     from app.services.consol_drilldown_service import drill_to_eliminations
@@ -155,7 +156,7 @@ async def drill_trial_balance(
     project_id: UUID = Query(...),
     company_code: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """穿透到末端企业试算表"""
     from app.services.consol_drilldown_service import drill_to_trial_balance
@@ -167,8 +168,9 @@ async def drill_trial_balance(
 @router.post("/pivot")
 async def pivot_query(
     body: PivotRequest,
+    project_id: UUID = Query(..., description="项目ID（用于权限校验）"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """透视查询"""
     from app.services.consol_pivot_service import execute_query
@@ -192,7 +194,7 @@ async def pivot_export(
     node_company_code: str | None = Query(None),
     aggregation_mode: str = Query("self"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """Excel 导出透视表"""
     from app.services.consol_pivot_service import export_excel
@@ -212,8 +214,9 @@ async def pivot_export(
 @router.post("/pivot/templates")
 async def create_template(
     body: TemplateCreateRequest,
+    project_id: UUID = Query(..., description="项目ID（用于权限校验）"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """保存查询模板"""
     from app.services.consol_pivot_service import save_template
@@ -230,7 +233,7 @@ async def create_template(
 async def get_templates(
     project_id: UUID = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """列出查询模板"""
     from app.services.consol_pivot_service import list_templates

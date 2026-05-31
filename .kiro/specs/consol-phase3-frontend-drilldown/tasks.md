@@ -72,7 +72,18 @@
 
 ---
 
-## 阶段 5：子公司完整度校验
+## 阶段 4B：母分合并（总分汇总）前端收尾
+
+> 背景：母分合并核心计算 + 合并页类型切换已在 Phase 0 闭环（`consolidation_type` subsidiary/branch + project_config 读写 API + ConsolidationIndex 顶部单选）；本阶段补剩余 UX 缺口，使总分汇总语义完整。
+
+- [x] 5B. 母分合并 UX 完整化
+  - [x] 5B.1 总分汇总模式（`consolidation_type=="branch"`）合并工作底稿顶部显示"总分汇总无需抵销"提示条（ConsolWorksheetTabs 读 config 判断 isBranchMode）
+  - [x] 5B.2 建项目向导（BasicInfoStep）report_scope=consolidated 时增加"合并类型"单选（母子合并/总分汇总），写入 `consolidation_type`（BasicInfoSchema + _sync_basic_info_to_project，单户报表清空）
+  - [x] 5B.3 合并模块页面顶部（ConsolidationIndex GtToolbar）显示当前合并类型单选标识，所有 Tab 之上随时可见可切
+  - [ ] 5B.4 Playwright 实测：建总分项目 → 抵销入口隐藏 → 重算 consol_amount==individual_sum（无抵销）（待 start-dev.bat 环境）
+  - _需求：母分合并（consolidation_type）_ _铁律：UI 全中文化 / 改动后必 Playwright 实测_
+
+---
 
 - [ ] 6. check_subsidiary_completeness
   - [ ] 6.1 一键刷新前检查各子公司 TB 审定数 + 附注生成状态

@@ -166,6 +166,7 @@ const basicInfo = computed<BasicInfo>(() => {
     custom_template_name: '',
     custom_template_version: '',
     report_scope: 'standalone',
+    consolidation_type: 'subsidiary',
     parent_company_name: '',
     parent_company_code: '',
     ultimate_company_name: '',

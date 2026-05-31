@@ -5,8 +5,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.core.database import get_db
+from app.models.core import User
 from app.models.consolidation_models import EliminationEntryType, ReviewStatusEnum
 from app.models.consolidation_schemas import (
     EliminationCreate,
@@ -36,7 +37,7 @@ async def list_eliminations(
     entry_type: EliminationEntryType | None = None,
     review_status: ReviewStatusEnum | None = None,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     return await get_entries(db, project_id, year, entry_type, review_status)
 
@@ -46,7 +47,7 @@ async def create_elimination(
     project_id: UUID,
     data: EliminationCreate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     try:
         return await create_entry(db, project_id, data)
@@ -59,7 +60,7 @@ async def get_elimination(
     entry_id: UUID,
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     entry = await get_entry(db, entry_id, project_id)
     if not entry:
@@ -73,7 +74,7 @@ async def update_elimination(
     project_id: UUID,
     data: EliminationEntryUpdate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     try:
         entry = await update_entry(db, entry_id, project_id, data)
@@ -89,7 +90,7 @@ async def delete_elimination(
     entry_id: UUID,
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     try:
         if not await delete_entry(db, entry_id, project_id):
@@ -104,12 +105,35 @@ async def review_elimination(
     project_id: UUID,
     action: EliminationReviewAction,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     try:
+        before_status = None
+        # Capture before state for audit
+        from app.services.elimination_service import get_entry
+        existing = await get_entry(db, entry_id, project_id)
+        if existing:
+            before_status = existing.review_status.value if existing.review_status else None
+
         entry = await change_review_status(db, entry_id, project_id, action, user.id)
         if not entry:
             raise HTTPException(status_code=404, detail="抵消分录不存在")
+
+        # Audit log for approval actions
+        if action.action == "approve":
+            from app.services.consol_audit_helper import log_consol_action
+            await log_consol_action(
+                db,
+                user_id=user.id,
+                project_id=project_id,
+                action="consol.elimination.approve",
+                resource_type="elimination_entry",
+                resource_id=str(entry_id),
+                before={"review_status": before_status},
+                after={"review_status": entry.review_status.value if entry.review_status else None},
+            )
+            await db.flush()
+
         return entry
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -120,7 +144,7 @@ async def elimination_summary(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     return await get_summary(db, project_id, year)
 
@@ -130,7 +154,7 @@ async def elimination_summary_center(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     """合并抵消分录表汇总中心 [R11.2] — 5 个区域分类汇总"""
     return await get_summary_center(db, project_id, year)
@@ -141,7 +165,7 @@ async def auto_generate_eliminations(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
     """
     内部抵消表自动汇总 [R11.3]
@@ -157,7 +181,8 @@ async def auto_generate_eliminations(
 @router.post("/equity-method/calculate")
 async def calculate_equity_method_route(
     data: dict,
-    user=Depends(get_current_user),
+    project_id: UUID = Query(...),
+    user: User = Depends(require_project_access("edit")),
 ):
     """
     模拟权益法计算 [R11.1]

@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access, get_user_scope_cycles
+from app.deps import get_current_user, require_project_access, get_user_scope_cycles, check_consol_lock
 from app.models.core import User
 from app.models.report_schemas import (
     DisclosureNoteDetail,
@@ -364,6 +364,7 @@ async def clear_formulas(
     note_section: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """一键清除指定附注章节的所有自动公式，切换为手动编辑模式。
 
@@ -388,6 +389,7 @@ async def restore_auto_mode(
     note_section: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """恢复指定附注章节的自动提数模式。
 
@@ -411,6 +413,7 @@ async def apply_formulas(
     note_section: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
     """执行附注表格中的自动运算公式，回填计算结果。
 

@@ -3,13 +3,16 @@
 import json
 import uuid
 from datetime import datetime, timezone
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
+from app.models.core import User
 
 router = APIRouter(prefix="/api/consol-worksheet-data", tags=["consolidation-worksheet-data"])
 
@@ -64,21 +67,22 @@ async def ensure_table(db: AsyncSession):
 # ─── GET: 加载某张表的数据 ────────────────────────────────────────────────────
 @router.get("/{project_id}/{year}/{sheet_key}", response_model=WorksheetDataResponse)
 async def get_worksheet_data(
-    project_id: str, year: int, sheet_key: str,
+    project_id: UUID, year: int, sheet_key: str,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
 ):
     await ensure_table(db)
     result = await db.execute(
         text("SELECT data, updated_at FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = :sk"),
-        {"pid": project_id, "y": year, "sk": sheet_key},
+        {"pid": str(project_id), "y": year, "sk": sheet_key},
     )
     row = result.fetchone()
     if not row:
         return WorksheetDataResponse(
-            project_id=project_id, year=year, sheet_key=sheet_key, content={},
+            project_id=str(project_id), year=year, sheet_key=sheet_key, content={},
         )
     return WorksheetDataResponse(
-        project_id=project_id, year=year, sheet_key=sheet_key,
+        project_id=str(project_id), year=year, sheet_key=sheet_key,
         content=row[0] if isinstance(row[0], dict) else {},
         updated_at=str(row[1]) if row[1] else None,
     )
@@ -87,9 +91,10 @@ async def get_worksheet_data(
 # ─── PUT: 保存某张表的数据（upsert） ─────────────────────────────────────────
 @router.put("/{project_id}/{year}/{sheet_key}", response_model=WorksheetDataResponse)
 async def save_worksheet_data(
-    project_id: str, year: int, sheet_key: str,
+    project_id: UUID, year: int, sheet_key: str,
     body: WorksheetDataSave,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
 ):
     await ensure_table(db)
     now = datetime.now(timezone.utc)
@@ -102,7 +107,7 @@ async def save_worksheet_data(
                 DO UPDATE SET data = CAST(:data AS jsonb), updated_at = :now
             """),
             {
-                "id": str(uuid.uuid4()), "pid": project_id, "y": year,
+                "id": str(uuid.uuid4()), "pid": str(project_id), "y": year,
                 "sk": sheet_key, "data": json.dumps(body.data, ensure_ascii=False),
                 "now": now,
             },
@@ -112,7 +117,7 @@ async def save_worksheet_data(
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Save failed: {str(e)}")
     return WorksheetDataResponse(
-        project_id=project_id, year=year, sheet_key=sheet_key,
+        project_id=str(project_id), year=year, sheet_key=sheet_key,
         content=body.data, updated_at=str(now),
     )
 
@@ -120,18 +125,19 @@ async def save_worksheet_data(
 # ─── GET: 加载项目所有表的数据（批量） ────────────────────────────────────────
 @router.get("/{project_id}/{year}", response_model=list[WorksheetDataResponse])
 async def get_all_worksheet_data(
-    project_id: str, year: int,
+    project_id: UUID, year: int,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
 ):
     await ensure_table(db)
     result = await db.execute(
         text("SELECT sheet_key, data, updated_at FROM consol_worksheet_data WHERE project_id = :pid AND year = :y"),
-        {"pid": project_id, "y": year},
+        {"pid": str(project_id), "y": year},
     )
     rows = result.fetchall()
     return [
         WorksheetDataResponse(
-            project_id=project_id, year=year, sheet_key=r[0],
+            project_id=str(project_id), year=year, sheet_key=r[0],
             content=r[1] if isinstance(r[1], dict) else {},
             updated_at=str(r[2]) if r[2] else None,
         )
@@ -142,8 +148,9 @@ async def get_all_worksheet_data(
 # ─── GET: 提取上年数（从上一年度的期末试算平衡表作为本年期初） ─────────────────
 @router.get("/{project_id}/{year}/prior-year/{sheet_key}")
 async def get_prior_year_data(
-    project_id: str, year: int, sheet_key: str,
+    project_id: UUID, year: int, sheet_key: str,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
 ):
     """提取上年数：从 year-1 的期末数据中提取，作为本年期初
 
@@ -158,7 +165,7 @@ async def get_prior_year_data(
 
     result = await db.execute(
         text("SELECT data, updated_at FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = :sk"),
-        {"pid": project_id, "y": prior_year, "sk": prior_key},
+        {"pid": str(project_id), "y": prior_year, "sk": prior_key},
     )
     row = result.fetchone()
     if not row:

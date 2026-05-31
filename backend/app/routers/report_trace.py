@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.services.report_trace_service import ReportTraceService
 from app.services.consol_enhanced_service import ConsolLockService, IndependentModuleService
@@ -46,26 +46,66 @@ async def findings_summary(project_id: UUID, db: AsyncSession = Depends(get_db),
 # ── 合并锁定 (Task 7.1) ──────────────────────────────────
 
 @router.post("/api/consolidation/{project_id}/lock")
-async def lock_project(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def lock_project(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_project_access("edit"))):
     svc = ConsolLockService()
     user_id = current_user.id
+    before = await svc.check_lock(db, project_id)
     result = await svc.lock_project(db, project_id, user_id)
+    from app.services.consol_audit_helper import log_consol_action
+    await log_consol_action(
+        db,
+        user_id=user_id,
+        project_id=project_id,
+        action="consol.lock",
+        resource_type="project",
+        resource_id=str(project_id),
+        before=before,
+        after=result,
+    )
     await db.commit()
     return result
 
 
 @router.post("/api/consolidation/{project_id}/unlock")
-async def unlock_project(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def unlock_project(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_project_access("edit"))):
     svc = ConsolLockService()
+    user_id = current_user.id
+    before = await svc.check_lock(db, project_id)
     result = await svc.unlock_project(db, project_id)
+    from app.services.consol_audit_helper import log_consol_action
+    await log_consol_action(
+        db,
+        user_id=user_id,
+        project_id=project_id,
+        action="consol.unlock",
+        resource_type="project",
+        resource_id=str(project_id),
+        before=before,
+        after=result,
+    )
     await db.commit()
     return result
 
 
 @router.get("/api/consolidation/{project_id}/lock-status")
-async def check_lock(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def check_lock(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_project_access("readonly"))):
     svc = ConsolLockService()
     return await svc.check_lock(db, project_id)
+
+
+@router.get("/api/consolidation/{project_id}/module-status")
+async def get_module_status(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """合并模块开发状态（P3 防误用标记）"""
+    from app.core.config import settings
+    dev_mode = settings.CONSOL_MODULE_DEV_MODE
+    result: dict[str, Any] = {"dev_mode": dev_mode}
+    if dev_mode:
+        result["warning"] = "开发中，不可用于正式合并报告"
+    return result
 
 
 # ── 独立模块 (Task 7.3) ──────────────────────────────────
@@ -199,7 +239,7 @@ current_user: User = Depends(get_current_user),
 # ── 合并快照 (Task 16.1) ─────────────────────────────────
 
 @router.get("/api/consolidation/{project_id}/snapshots")
-async def list_snapshots(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def list_snapshots(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_project_access("readonly"))):
     import sqlalchemy as sa
     from app.models.phase10_models import ConsolSnapshot
     stmt = (
@@ -220,7 +260,7 @@ async def list_snapshots(project_id: UUID, db: AsyncSession = Depends(get_db), c
 async def create_snapshot(
     project_id: UUID, year: int = 2025, reason: str = "manual",
     db: AsyncSession = Depends(get_db),
-current_user: User = Depends(get_current_user),
+current_user: User = Depends(require_project_access("edit")),
 ):
     from app.models.phase10_models import ConsolSnapshot
     snap = ConsolSnapshot(
