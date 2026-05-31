@@ -118,6 +118,7 @@
 | `consol-note-three-level-drilldown/` | 📌 | 合并附注三级穿透；前置 = 真实合并母子项目数据（PG 当前 0 个 consolidated 项目）；待并入 Phase 3 |
 
 > 注：`workpaper-fill-service-split` 已 `git rm`（目标 WorkpaperFillService 经 grep 实证为 0 业务调用方的死代码，拆分无意义）；`gt-c-note-table-shrink` 已于 2026-05-30 完成并归档至 07-workpaper-slimdown（GtCNoteTable 1803→450 + GtEControlTest 1414→344，90 测试全绿；残留 R3 Playwright 目视待环境，非代码缺口）。
+> 注（2026-05-31）：merge work 分支带入 13 个底稿 spec（wp-* / gtdform-test-and-shrink / multi-standard-unification / vllm-httpx-bugfix / workpaper-guardrail-cleanup）的 active 双份残留（work 作者归档时 active 副本未删干净，疑 taskStatus 残留），经代码实证全部完成度 100%（核心产物 fileSearch 实证存在 + active/archived 归一化 checkbox 后正文相同零信息损失），已 `git rm` 删除 active 残留，仅保留 `_archive/` 权威版。
 
 ---
 
