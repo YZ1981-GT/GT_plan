@@ -26,6 +26,7 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { regulatory as P_reg } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{
   modelValue: boolean
@@ -53,7 +54,7 @@ async function onRetry() {
     ElMessage.success('重试请求已提交')
     emit('retried')
     visible.value = false
-  } catch { ElMessage.error('重试失败') }
+  } catch (e) { handleApiError(e, '提交') }
   finally { retrying.value = false }
 }
 

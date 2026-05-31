@@ -5,6 +5,7 @@
  */
 import { ref, computed } from 'vue'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 import { ElMessage } from 'element-plus'
 
 export interface AggregationState {
@@ -28,7 +29,7 @@ export function useNoteAggregation(projectId: () => string, year: () => number) 
       state.value.lastAggregatedAt = new Date().toISOString()
       ElMessage.success('重新汇总完成')
     } catch (e: any) {
-      ElMessage.error(e?.message || '汇总失败')
+      handleApiError(e, '汇总')
     } finally {
       state.value.isAggregating = false
     }

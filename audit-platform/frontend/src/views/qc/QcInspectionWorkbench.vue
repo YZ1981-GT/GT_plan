@@ -135,7 +135,7 @@
             <el-table-column label="状态" width="100" align="center">
               <template #default="{ row }">
                 <el-tag
-                  :type="row.review_status === 'reviewed' ? 'success' : (row.review_status === 'escalated' ? 'danger' : 'info')"
+                  :type="row.review_status === QC_FINDING_REVIEW_STATUS.REVIEWED ? 'success' : (row.review_status === QC_FINDING_REVIEW_STATUS.ESCALATED ? 'danger' : 'info')"
                   size="small"
                 >
                   {{ reviewStatusLabel(row.review_status) }}
@@ -145,7 +145,7 @@
             <el-table-column label="操作" width="120" align="center" fixed="right">
               <template #default="{ row }">
                 <el-button
-                  v-if="row.review_status === 'pending'"
+                  v-if="row.review_status === QC_FINDING_REVIEW_STATUS.PENDING"
                   size="small"
                   type="success"
                   link
@@ -242,7 +242,7 @@ import QcCaseLibraryEmbed from '@/components/qc/QcCaseLibraryEmbed.vue'
 import QcAnnualReportsEmbed from '@/components/qc/QcAnnualReportsEmbed.vue'
 import QcClientTrendEmbed from '@/components/qc/QcClientTrendEmbed.vue'
 import { handleApiError } from '@/utils/errorHandler'
-import { QC_INSPECTION_VERDICT } from '@/constants/statusEnum'
+import { QC_INSPECTION_VERDICT, QC_FINDING_REVIEW_STATUS } from '@/constants/statusEnum'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

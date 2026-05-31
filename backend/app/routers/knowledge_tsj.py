@@ -33,9 +33,9 @@ router = APIRouter(tags=["knowledge-tsj"])
 
 # ─── 路径解析 ────────────────────────────────────────────────────────────────
 
-# 仓库根 / TSJ 目录（默认）
-# backend/app/routers/knowledge_tsj.py → parents[3] = 仓库根
-_TSJ_DIR_DEFAULT = Path(__file__).resolve().parents[3] / "TSJ"
+# 默认位置：backend/data/tsj_review_prompts/（程序数据，随仓库 + 打包）
+# backend/app/routers/knowledge_tsj.py → parents[2] = backend
+_TSJ_DIR_DEFAULT = Path(__file__).resolve().parents[2] / "data" / "tsj_review_prompts"
 
 
 def _resolve_tsj_dir() -> Path:
@@ -43,7 +43,7 @@ def _resolve_tsj_dir() -> Path:
 
     覆盖优先级：
       1. 环境变量 TSJ_KNOWLEDGE_DIR
-      2. <仓库根>/TSJ (默认)
+      2. backend/data/tsj_review_prompts/ (默认，程序数据)
     """
     env_path = os.environ.get("TSJ_KNOWLEDGE_DIR")
     if env_path:

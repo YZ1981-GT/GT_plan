@@ -26,8 +26,8 @@
  * 输出经 AiContentConfirmDialog 确认后通过 emit('apply', text) 让父组件填入结论。
  */
 import { ref, computed } from 'vue'
-import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 import AiContentConfirmDialog, { type AiContentItemForConfirm } from '@/components/ai/AiContentConfirmDialog.vue'
 
 interface Props {
@@ -71,7 +71,7 @@ async function onClick() {
     aiResult.value = data
     dialogVisible.value = true
   } catch (err: any) {
-    ElMessage.error('AI 生成失败：' + (err?.message || '请稍后重试'))
+    handleApiError(err, 'AI 生成')
   } finally {
     loading.value = false
   }

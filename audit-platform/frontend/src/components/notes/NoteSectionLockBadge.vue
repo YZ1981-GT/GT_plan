@@ -27,6 +27,7 @@
 import { ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface LockInfo {
   locked_by: string
@@ -65,7 +66,7 @@ async function handleForceAcquire() {
     ElMessage.success('已获取编辑锁')
   } catch (e: any) {
     if (e !== 'cancel') {
-      ElMessage.error(e?.message || '抢占失败')
+      handleApiError(e, '抢占')
     }
   }
 }

@@ -66,6 +66,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmDelete } from '@/utils/confirm'
+import { handleApiError } from '@/utils/errorHandler'
 import {
   eqcrApi,
   type EqcrDomainPayload,
@@ -122,7 +123,7 @@ async function load() {
   try {
     payload.value = await eqcrApi.getRelatedParties(props.projectId)
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '加载关联方数据失败')
+    handleApiError(err, '加载关联方数据')
     payload.value = null
   } finally {
     loading.value = false
@@ -158,7 +159,7 @@ async function submitRegistry(form: { name: string; relation_type: string; is_co
     registryDialogVisible.value = false
     await load()
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '操作失败')
+    handleApiError(err, '操作')
   } finally {
     saving.value = false
   }
@@ -175,7 +176,7 @@ async function confirmDeleteRegistry(row: EqcrRelatedPartyRegistry) {
     ElMessage.success('已删除')
     await load()
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '删除失败')
+    handleApiError(err, '删除')
   }
 }
 
@@ -208,7 +209,7 @@ async function submitTxn(form: {
     txnDialogVisible.value = false
     await load()
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '操作失败')
+    handleApiError(err, '操作')
   } finally {
     saving.value = false
   }
@@ -226,7 +227,7 @@ async function confirmDeleteTxn(row: EqcrRelatedPartyTransaction) {
     ElMessage.success('已删除')
     await load()
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '删除失败')
+    handleApiError(err, '删除')
   }
 }
 </script>

@@ -121,7 +121,7 @@ function handlePageChange(p: number) { page.value = p; loadData() }
 
 async function onCloseTicket(row: IssueTicket) {
   try {
-    await api.patch(P.projectIssues.detail(projectId, row.id), { status: 'closed' })
+    await api.patch(P.projectIssues.detail(projectId, row.id), { status: ISSUE_STATUS.CLOSED })
     ElMessage.success('工单已关闭')
     await loadData()
   } catch (e: any) {
@@ -131,7 +131,7 @@ async function onCloseTicket(row: IssueTicket) {
 
 // ── GtRowActions 行操作 ──
 function getTicketRowActions(row: IssueTicket): RowAction[] {
-  const isClosed = row.status === 'closed' || row.status === 'rejected'
+  const isClosed = row.status === ISSUE_STATUS.CLOSED || row.status === ISSUE_STATUS.REJECTED
   return [
     { key: 'view', label: '查看', priority: 1 },
     { key: 'close', label: '关闭', priority: 2, danger: true, disabled: isClosed, hidden: isClosed },

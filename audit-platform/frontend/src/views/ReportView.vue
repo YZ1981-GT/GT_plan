@@ -189,10 +189,8 @@
         <el-table-column label="本年金额">
           <el-table-column v-for="col in eqColumns" :key="'cv-' + col.key" :label="col.label" width="110" align="right" :resizable="true">
             <template #default="{ row }">
-              <span class="gt-amt">
-                <template v-if="col.key === 'total'">{{ fmt(row.current_period_amount) }}</template>
-                <template v-else>{{ fmt(0) }}</template>
-              </span>
+              <GtAmountCell v-if="col.key === 'total'" :value="row.current_period_amount" />
+              <GtAmountCell v-else :value="0" />
             </template>
           </el-table-column>
         </el-table-column>
@@ -200,10 +198,8 @@
         <el-table-column label="上年金额">
           <el-table-column v-for="col in eqColumns" :key="'pv-' + col.key" :label="col.label" width="110" align="right" :resizable="true">
             <template #default="{ row }">
-              <span class="gt-amt" style="color: var(--gt-color-text-tertiary)">
-                <template v-if="col.key === 'total'">{{ fmt(row.prior_period_amount) }}</template>
-                <template v-else>{{ fmt(0) }}</template>
-              </span>
+              <GtAmountCell v-if="col.key === 'total'" :value="row.prior_period_amount" />
+              <GtAmountCell v-else :value="0" />
             </template>
           </el-table-column>
         </el-table-column>
@@ -223,14 +219,14 @@
         </el-table-column>
         <el-table-column label="年初账面余额" width="130" align="right" :resizable="true">
           <template #default="{ row }">
-            <span class="gt-amt">{{ fmt(row.prior_period_amount) }}</span>
+            <GtAmountCell :value="row.prior_period_amount" />
           </template>
         </el-table-column>
         <!-- 本期增加额 — 嵌套列 -->
         <el-table-column label="本期增加额">
           <el-table-column v-for="col in impIncCols" :key="'inc-' + col.key" :label="col.label" width="110" align="right" :resizable="true">
             <template #default>
-              <span class="gt-amt">{{ fmt(0) }}</span>
+              <GtAmountCell :value="0" />
             </template>
           </el-table-column>
         </el-table-column>
@@ -238,13 +234,13 @@
         <el-table-column label="本期减少额">
           <el-table-column v-for="col in impDecCols" :key="'dec-' + col.key" :label="col.label" width="110" align="right" :resizable="true">
             <template #default>
-              <span class="gt-amt">{{ fmt(0) }}</span>
+              <GtAmountCell :value="0" />
             </template>
           </el-table-column>
         </el-table-column>
         <el-table-column label="期末账面余额" width="130" align="right" :resizable="true">
           <template #default="{ row }">
-            <span class="gt-amt" style="font-weight: 600">{{ fmt(row.current_period_amount) }}</span>
+            <GtAmountCell :value="row.current_period_amount" />
           </template>
         </el-table-column>
       </el-table>
@@ -330,31 +326,29 @@
       </el-table-column>
       <el-table-column label="未审金额" min-width="130" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
-          <span class="gt-rv-amount-cell-readonly">{{ fmt(row.unadjusted_amount) }}</span>
+          <GtAmountCell :value="row.unadjusted_amount" />
         </template>
       </el-table-column>
       <el-table-column label="调整影响" min-width="130" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
-          <span :class="['gt-rv-adjustment', { 'has-diff': row.adjustment && row.adjustment !== 0 }]">{{ fmt(row.adjustment) }}</span>
+          <GtAmountCell :value="row.adjustment" />
         </template>
       </el-table-column>
       <el-table-column label="已审金额" min-width="130" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
-          <span class="gt-rv-amount-cell-readonly" style="font-weight: 600;">{{ fmt(row.audited_amount) }}</span>
+          <GtAmountCell :value="row.audited_amount" />
         </template>
       </el-table-column>
       <!-- 任务 12.7.1：对比视图新增"上年审定数"列（需求 24.1/24.2） -->
       <el-table-column label="上年审定数" min-width="130" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
-          <span class="gt-rv-amount-cell-readonly" style="color: var(--gt-color-text-secondary);">{{ fmt(row.prior_period_amount) }}</span>
+          <GtAmountCell :value="row.prior_period_amount" />
         </template>
       </el-table-column>
       <!-- Sprint 11 Task 11.6：变动额+变动率列（需求 33.2/33.3） -->
       <el-table-column label="变动额" min-width="120" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
-          <span :class="['gt-rv-amount-cell-readonly', { 'gt-rv-change-negative': (row.audited_amount || 0) - (row.prior_period_amount || 0) < 0 }]">
-            {{ fmt((row.audited_amount || 0) - (row.prior_period_amount || 0)) }}
-          </span>
+          <GtAmountCell :value="(row.audited_amount || 0) - (row.prior_period_amount || 0)" />
         </template>
       </el-table-column>
       <el-table-column label="变动率" width="90" align="right" header-align="center" :resizable="true">
@@ -385,16 +379,14 @@
         </el-table-column>
         <el-table-column label="核对等式" prop="description" min-width="300" />
         <el-table-column label="左值" prop="leftValue" width="140" align="right">
-          <template #default="{ row }">{{ fmtAmount(row.leftValue) }}</template>
+          <template #default="{ row }"><GtAmountCell :value="row.leftValue" /></template>
         </el-table-column>
         <el-table-column label="右值" prop="rightValue" width="140" align="right">
-          <template #default="{ row }">{{ fmtAmount(row.rightValue) }}</template>
+          <template #default="{ row }"><GtAmountCell :value="row.rightValue" /></template>
         </el-table-column>
         <el-table-column label="差异" width="120" align="right">
           <template #default="{ row }">
-            <span :style="{ color: row.diff !== 0 ? 'var(--gt-color-coral)' : 'var(--gt-color-success)', fontWeight: 600 }">
-              {{ fmtAmount(row.diff) }}
-            </span>
+            <GtAmountCell :value="row.diff" />
           </template>
         </el-table-column>
         <el-table-column label="状态" width="80" align="center">
@@ -467,7 +459,7 @@
           <el-table-column prop="code" label="科目编码" width="120" />
           <el-table-column prop="name" label="科目名称" min-width="200" />
           <el-table-column label="金额" width="150" align="right">
-            <template #default="{ row }">{{ fmt(row.amount) }}</template>
+            <template #default="{ row }"><GtAmountCell :value="row.amount" /></template>
           </el-table-column>
           <el-table-column label="底稿" width="100" align="center">
             <template #default="{ row }">
@@ -494,7 +486,7 @@
           <span class="gt-rv-line-comp-label">报表行次</span>
           <div class="gt-rv-line-comp-summary">
             <span class="gt-rv-line-comp-name">{{ lineCompData.item_name }}</span>
-            <span class="gt-amt">{{ fmt(lineCompData.total_amount) }}</span>
+            <GtAmountCell :value="lineCompData.total_amount" />
           </div>
         </div>
 
@@ -517,7 +509,7 @@
             <el-table-column prop="name" label="科目名称" min-width="180" />
             <el-table-column label="期末余额" width="150" align="right">
               <template #default="{ row }">
-                <span class="gt-amt">{{ fmt(row.closing_balance) }}</span>
+                <GtAmountCell :value="row.closing_balance" />
               </template>
             </el-table-column>
             <el-table-column label="占比" width="90" align="right">
@@ -665,19 +657,17 @@
           </el-table-column>
           <el-table-column label="期望值" width="120" align="right">
             <template #default="{ row }">
-              <span class="gt-rv-amount-cell-readonly">{{ fmt(row.expected) }}</span>
+              <GtAmountCell :value="row.expected" />
             </template>
           </el-table-column>
           <el-table-column label="实际值" width="120" align="right">
             <template #default="{ row }">
-              <span class="gt-rv-amount-cell-readonly">{{ fmt(row.actual) }}</span>
+              <GtAmountCell :value="row.actual" />
             </template>
           </el-table-column>
           <el-table-column label="差额" width="110" align="right">
             <template #default="{ row }">
-              <span :style="{ color: row.diff && row.diff !== '0' && row.diff !== '0.00' ? '#d94840' : '#999', fontSize: '12px', fontWeight: row.diff && row.diff !== '0' ? 600 : 400 }">
-                {{ fmt(row.diff) }}
-              </span>
+              <GtAmountCell :value="row.diff" />
             </template>
           </el-table-column>
           <el-table-column label="类型" width="100" align="center">

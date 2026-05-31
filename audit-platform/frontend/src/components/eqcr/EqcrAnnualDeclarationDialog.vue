@@ -51,6 +51,7 @@ import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '@/services/apiProxy'
 import { eqcr as P_eqcr } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -87,8 +88,8 @@ async function loadQuestions() {
   try {
     const data = await api.get(P_eqcr.independence.questions)
     questions.value = data.questions || []
-  } catch {
-    ElMessage.error('加载声明问题失败')
+  } catch (e) {
+    handleApiError(e, '保存')
   } finally {
     loadingQuestions.value = false
   }
@@ -105,7 +106,7 @@ async function onSubmit() {
     emit('submitted')
     visible.value = false
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '提交失败')
+    handleApiError(e, '提交')
   } finally {
     submitting.value = false
   }

@@ -74,12 +74,12 @@
           align="right"
         >
           <template #default="{ row }">
-            {{ fmtAmt(row.values[cc]) }}
+            <GtAmountCell :value="row.values[cc]" />
           </template>
         </el-table-column>
         <el-table-column label="合计" min-width="140" align="right" fixed="right">
           <template #default="{ row }">
-            <span style="font-weight: 600">{{ fmtAmt(row.total) }}</span>
+            <span style="font-weight: 600"><GtAmountCell :value="row.total" /></span>
           </template>
         </el-table-column>
       </el-table>
@@ -97,6 +97,7 @@ import { getChildCompanies, generateWorkpaperSummary, exportWorkpaperSummary } f
 import { fmtAmount } from '@/utils/formatters'
 import { useProjectStore } from '@/stores/project'
 import { handleApiError } from '@/utils/errorHandler'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
 
 const route = useRoute()
 const projectId = route.params.projectId as string

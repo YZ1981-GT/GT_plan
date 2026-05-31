@@ -11,6 +11,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Loading } from '@element-plus/icons-vue'
 import api from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 import type { CustomQueryTemplateConfig } from '@/types/custom-query-template'
 
 const props = defineProps<{
@@ -65,7 +66,7 @@ async function loadTemplates() {
     // Cache to sessionStorage
     sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }))
   } catch (err: any) {
-    ElMessage.error('加载模板列表失败')
+    handleApiError(err, '加载模板列表')
   } finally {
     loading.value = false
   }
@@ -105,7 +106,7 @@ async function onDeleteTemplate(tpl: TemplateItem) {
     invalidateTemplateCache()
     ElMessage.success('已删除')
   } catch (err: any) {
-    ElMessage.error('删除失败')
+    handleApiError(err, '删除')
   }
 }
 

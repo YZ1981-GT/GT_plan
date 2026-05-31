@@ -103,6 +103,7 @@ import { ref, computed, onMounted } from 'vue'
 import { CircleCheck, Warning, QuestionFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { enhanceColumnMapping } from '@/services/commonApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface MappingRow {
   header: string
@@ -249,8 +250,8 @@ async function autoMatchAll() {
     }
 
     ElMessage.success(`自动匹配完成：${Object.keys(result.enhanced).length} 个确认，${result.suggestions.length} 个建议`)
-  } catch {
-    ElMessage.error('自动匹配失败')
+  } catch (e) {
+    handleApiError(e, '保存映射')
   }
 }
 

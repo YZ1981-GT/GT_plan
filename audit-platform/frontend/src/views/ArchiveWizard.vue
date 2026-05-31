@@ -164,7 +164,7 @@
       <div v-if="isExecuting || jobData" class="gt-archive-step gt-archive-progress">
         <template v-if="jobData">
           <!-- 成功 -->
-          <div v-if="jobData.status === 'succeeded'" class="gt-archive-result gt-archive-success">
+          <div v-if="jobData.status === ARCHIVE_JOB_STATUS.SUCCEEDED" class="gt-archive-result gt-archive-success">
             <el-result icon="success" title="归档完成" sub-title="项目已成功归档。">
               <template #extra>
                 <el-button
@@ -180,7 +180,7 @@
           </div>
 
           <!-- 失败 -->
-          <div v-else-if="jobData.status === 'failed'" class="gt-archive-result gt-archive-failed">
+          <div v-else-if="jobData.status === ARCHIVE_JOB_STATUS.FAILED" class="gt-archive-result gt-archive-failed">
             <el-result icon="error" title="归档失败">
               <template #sub-title>
                 <div class="gt-archive-fail-detail">
@@ -228,9 +228,9 @@
                 class="gt-archive-section-item"
                 :class="`section-${section.status}`"
               >
-                <el-icon v-if="section.status === 'succeeded'"><CircleCheck /></el-icon>
-                <el-icon v-else-if="section.status === 'running'" class="is-loading"><Loading /></el-icon>
-                <el-icon v-else-if="section.status === 'failed'"><CircleClose /></el-icon>
+                <el-icon v-if="section.status === ARCHIVE_JOB_STATUS.SUCCEEDED"><CircleCheck /></el-icon>
+                <el-icon v-else-if="section.status === ARCHIVE_JOB_STATUS.RUNNING" class="is-loading"><Loading /></el-icon>
+                <el-icon v-else-if="section.status === ARCHIVE_JOB_STATUS.FAILED"><CircleClose /></el-icon>
                 <el-icon v-else><Clock /></el-icon>
                 <span class="gt-archive-section-order">{{ section.order }}</span>
                 <span class="gt-archive-section-name">{{ section.name }}</span>
@@ -275,7 +275,7 @@ import {
 import type { ArchiveJob } from '@/services/archiveApi'
 import { showApiError } from '@/composables/useApiError'
 import { handleApiError } from '@/utils/errorHandler'
-import { ARCHIVE_SCOPE } from '@/constants/statusEnum'
+import { ARCHIVE_SCOPE, ARCHIVE_JOB_STATUS } from '@/constants/statusEnum'
 import { api } from '@/services/apiProxy'
 
 const route = useRoute()
@@ -388,19 +388,19 @@ const progressPercent = computed(() => {
   if (sp && Object.keys(sp).length) {
     const total = Object.keys(sp).length
     const done = Object.values(sp).filter(
-      (v: any) => v && v.status === 'succeeded',
+      (v: any) => v && v.status === ARCHIVE_JOB_STATUS.SUCCEEDED,
     ).length
     return total > 0 ? Math.round((done / total) * 100) : 0
   }
   const sections = jobData.value.sections
   if (!sections || sections.length === 0) {
     // 无章节信息时按状态估算
-    if (jobData.value.status === 'queued') return 5
-    if (jobData.value.status === 'running') return 50
-    if (jobData.value.status === 'succeeded') return 100
+    if (jobData.value.status === ARCHIVE_JOB_STATUS.QUEUED) return 5
+    if (jobData.value.status === ARCHIVE_JOB_STATUS.RUNNING) return 50
+    if (jobData.value.status === ARCHIVE_JOB_STATUS.SUCCEEDED) return 100
     return 0
   }
-  const done = sections.filter(s => s.status === 'succeeded').length
+  const done = sections.filter(s => s.status === ARCHIVE_JOB_STATUS.SUCCEEDED).length
   return Math.round((done / sections.length) * 100)
 })
 
@@ -460,9 +460,9 @@ async function pollJob(jobId: string) {
     const data = await getArchiveJob(projectId.value, jobId)
     jobData.value = data
     // 终态停止轮询
-    if (data.status === 'succeeded' || data.status === 'failed') {
+    if (data.status === ARCHIVE_JOB_STATUS.SUCCEEDED || data.status === ARCHIVE_JOB_STATUS.FAILED) {
       stopPolling()
-      if (data.status === 'succeeded') {
+      if (data.status === ARCHIVE_JOB_STATUS.SUCCEEDED) {
         ElMessage.success('归档完成！')
       }
     }

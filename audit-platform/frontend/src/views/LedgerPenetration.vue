@@ -1008,7 +1008,7 @@ import { useFullscreen } from '@/composables/useFullscreen'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { numericSortMethod } from '@/utils/numericSort'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
-import { AMOUNT_DIVISOR_KEY } from '@/constants/amountDivisor'
+
 import { handleApiError } from '@/utils/errorHandler'
 import { logger } from '@/utils/logger'
 import { useAuditContext } from '@/composables/useAuditContext'

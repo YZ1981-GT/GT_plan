@@ -178,6 +178,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { auditProgramApi } from '@/services/collaborationApi'
 import { rules } from '@/utils/formRules'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface AuditPlan {
   id: string
@@ -302,7 +303,7 @@ async function savePlan() {
     await loadPlan()
   } catch (e) {
     console.error('保存审计计划失败', e)
-    ElMessage.error('保存失败')
+    handleApiError(e, '保存')
   }
 }
 
@@ -312,7 +313,7 @@ async function submitForApproval() {
     ElMessage.success('已提交审批')
     await loadPlan()
   } catch (e) {
-    ElMessage.error('提交审批失败')
+    handleApiError(e, '提交审批')
   }
 }
 

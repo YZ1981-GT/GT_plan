@@ -124,6 +124,7 @@ import AiConclusionButton from '../AiConclusionButton.vue'
 import SignatureBlock from './SignatureBlock.vue'
 import { confirmLeave } from '@/utils/confirm'
 import { rules } from '@/utils/formRules'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   modelValue: boolean
@@ -202,7 +203,7 @@ async function onSave() {
     emit('saved')
     visible.value = false
   } catch (err: any) {
-    ElMessage.error('保存失败：' + (err?.message || '请稍后重试'))
+    handleApiError(err, '保存')
   } finally {
     saving.value = false
   }

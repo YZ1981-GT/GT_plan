@@ -58,6 +58,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { confirmationApi } from '@/services/collaborationApi'
 import { rules } from '@/utils/formRules'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{
   modelValue: boolean
@@ -107,8 +108,8 @@ async function handleSave() {
     ElMessage.success('结果已保存')
     emit('saved')
     handleClose()
-  } catch {
-    ElMessage.error('保存失败')
+  } catch (e) {
+    handleApiError(e, '保存')
   }
 }
 </script>

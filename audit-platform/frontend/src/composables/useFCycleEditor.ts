@@ -23,6 +23,7 @@ import { computed, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api as httpApi } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { handleApiError } from '@/utils/errorHandler'
 import type { CycleDialogsAPI } from './useCycleDialogs'
 import type { SheetNavFacadeAPI } from './useSheetNavFacade'
 
@@ -125,7 +126,7 @@ export function useFCycleEditor(
         ElMessage.success(`已抽样 ${resp?.total_samples || 0} 笔（${resp?.method}），未写回`)
       }
     } catch (e: any) {
-      ElMessage.error(e?.message || '抽样失败')
+      handleApiError(e, '抽样')
     } finally {
       cycleDialogs.valuation.loading.value = false
     }

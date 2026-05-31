@@ -147,6 +147,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import { handleApiError } from '@/utils/errorHandler'
 import {
   Refresh,
   WarningFilled,
@@ -466,7 +467,7 @@ async function handleRefresh() {
       await (r as Promise<void>)
     }
   } catch (err: any) {
-    ElMessage.error(err?.message || '刷新失败')
+    handleApiError(err, '刷新')
   }
 }
 

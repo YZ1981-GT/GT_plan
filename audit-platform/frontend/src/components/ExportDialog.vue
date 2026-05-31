@@ -216,7 +216,7 @@ async function onExport() {
     if (err?.response?.status === 400) {
       const detail = err?.response?.data
       if (detail?.checks) {
-        ElMessage.error('一致性检查未通过，请修复后重试')
+        handleApiError(err, '一致性检查')
       } else {
         handleApiError(err, '导出')
       }

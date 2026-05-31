@@ -5,6 +5,7 @@
  */
 import { ref } from 'vue'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 import { ElMessage } from 'element-plus'
 
 export interface ConversionPreview {
@@ -31,7 +32,7 @@ export function useNoteTemplateConversion(projectId: () => string, year: () => n
       preview.value = resp
       return resp
     } catch (e: any) {
-      ElMessage.error(e?.message || '预览失败')
+      handleApiError(e, '预览')
       return null
     } finally {
       previewing.value = false
@@ -48,7 +49,7 @@ export function useNoteTemplateConversion(projectId: () => string, year: () => n
       ElMessage.success('准则切换完成')
       return true
     } catch (e: any) {
-      ElMessage.error(e?.message || '切换失败')
+      handleApiError(e, '切换')
       return false
     } finally {
       converting.value = false

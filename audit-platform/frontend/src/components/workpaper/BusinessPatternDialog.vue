@@ -104,6 +104,7 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface CustomerPattern {
   customer: string
@@ -160,7 +161,7 @@ async function onAnalyze() {
     llmSuggestion.value = res.llm_suggestion || '暂无建议'
     analyzed.value = true
   } catch (err: any) {
-    ElMessage.error('分析失败：' + (err?.message || '请稍后重试'))
+    handleApiError(err, '分析')
   } finally {
     loading.value = false
   }

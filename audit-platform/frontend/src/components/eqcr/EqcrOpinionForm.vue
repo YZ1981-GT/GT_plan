@@ -124,6 +124,7 @@
 <script setup lang="ts">
 import { computed, inject, reactive, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import {
   eqcrApi,
   type EqcrOpinion,
@@ -266,7 +267,7 @@ async function onSubmit() {
     editing.value = false
     emit('saved', saved)
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '保存失败')
+    handleApiError(err, '保存')
   } finally {
     saving.value = false
   }

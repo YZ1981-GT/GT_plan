@@ -381,22 +381,7 @@ async function downloadBlankTemplate() {
     URL.revokeObjectURL(url)
     ElMessage.success('模板已下载，编辑后可上传回来')
   } catch (e: any) {
-    // 如果是 blob 错误响应，尝试读取错误信息
-    if (e?.response?.data instanceof Blob) {
-      try {
-        const text = await e.response.data.text()
-        const json = JSON.parse(text)
-        ElMessage.error(`下载模板失败：${json.detail || '未知错误'}`)
-      } catch {
-        ElMessage.error(`下载模板失败（HTTP ${e?.response?.status || '?'}）`)
-      }
-    } else if (e?.response?.status === 404) {
-      ElMessage.error('下载模板：接口不存在，请重启后端服务使新端点生效')
-    } else if (e?.response?.status) {
-      ElMessage.error(`下载模板失败（HTTP ${e.response.status}）：${e.response.data?.detail || '请检查后端日志'}`)
-    } else {
-      ElMessage.error('下载模板：网络请求失败，请确认后端服务已重启')
-    }
+    handleApiError(e, '下载模板')
   } finally {
     downloadingTemplate.value = false
   }

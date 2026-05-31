@@ -65,6 +65,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 interface Props {
@@ -144,7 +145,7 @@ async function computeDiff() {
     )
     diffResult.value = resp || []
   } catch (e: any) {
-    ElMessage.error(e?.message || '对比失败')
+    handleApiError(e, '对比')
   } finally {
     diffLoading.value = false
   }
@@ -166,7 +167,7 @@ async function handleFork() {
     ElMessage.success(`分支 "${branchName}" 创建成功`)
     loadTree()
   } catch (e: any) {
-    ElMessage.error(e?.message || '创建失败')
+    handleApiError(e, '创建')
   }
 }
 

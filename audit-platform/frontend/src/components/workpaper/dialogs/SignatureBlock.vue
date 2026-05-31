@@ -27,6 +27,7 @@ import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 import { confirmSign } from '@/utils/confirm'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   projectId: string
@@ -87,7 +88,7 @@ async function onSign() {
       signerId: data?.signer_id || data?.signer || '',
     })
   } catch (err: any) {
-    ElMessage.error('签字失败：' + (err?.message || '请稍后重试'))
+    handleApiError(err, '签字')
   } finally {
     loading.value = false
   }

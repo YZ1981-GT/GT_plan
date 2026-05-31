@@ -209,6 +209,7 @@ import { useRoute } from 'vue-router'
 import { Right } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { SheetDetection, LedgerDetectionResult, ConfirmedMapping } from './LedgerImportDialog.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 // ─── Props & Emits ──────────────────────────────────────────────────────────
 
@@ -387,8 +388,8 @@ async function importMappingFromProject() {
     await ledgerImportV2Api.copyMappingFromProject(pid, selectedReferenceProject.value)
     showImportMappingDialog.value = false
     ElMessage.success('映射模板已保存，下次导入相同格式文件时将自动应用')
-  } catch {
-    ElMessage.error('导入映射失败')
+  } catch (e) {
+    handleApiError(e, '保存映射')
   } finally {
     importingMapping.value = false
   }

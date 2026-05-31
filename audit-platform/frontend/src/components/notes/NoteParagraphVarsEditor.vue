@@ -48,6 +48,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, reactive } from 'vue'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 interface Props {
@@ -134,7 +135,7 @@ async function handleSave() {
     emit('saved')
     visible.value = false
   } catch (e: any) {
-    ElMessage.error(e?.message || '保存失败')
+    handleApiError(e, '保存')
   } finally {
     saving.value = false
   }

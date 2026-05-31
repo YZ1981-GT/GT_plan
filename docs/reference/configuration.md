@@ -346,8 +346,8 @@
 
 | 变量名 | 默认值 | 影响范围 |
 |--------|--------|----------|
-| `TSJ_PROMPT_DIR` | unset → 自动查找 `<repo>/TSJ` | `workpaper_fill_service` 加载审计复核提示词 |
-| `TSJ_KNOWLEDGE_DIR` | unset → 自动查找 `<repo>/TSJ` | `knowledge_tsj` router 提供"准则"侧栏 |
+| `TSJ_PROMPT_DIR` | unset → `backend/data/tsj_review_prompts/` | `workpaper_fill_service` 加载审计复核提示词 |
+| `TSJ_KNOWLEDGE_DIR` | unset → `backend/data/tsj_review_prompts/` | `knowledge_tsj` router + `tsj_prompt_service` 提供"准则"侧栏 |
 | `CROSS_WP_REF_PATH` | unset → `backend/data/cross_wp_references.json` | `cross_cycle_breakage_service` 加载跨底稿引用 |
 | `LINKAGE_PANORAMA_CWR_PATH` | unset → 同上 | `linkage_panorama` router |
 | `VR_RULES_DATA_DIR` | unset → `backend/data/` | `vr_coverage` router |

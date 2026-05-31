@@ -193,6 +193,7 @@ import { ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { parseFile } from '@/composables/useExcelIO'
+import { handleApiError } from '@/utils/errorHandler'
 
 const EQUITY_ITEMS = ['实收资本（或股本）','其他权益工具','资本公积','减：库存股','其他综合收益','专项储备','盈余公积','△一般风险准备','未分配利润']
 
@@ -547,7 +548,7 @@ async function onFileSelected(e: Event) {
       }
     }
     ElMessage.success(`已导入，匹配 ${matched} 行`)
-  } catch (err: any) { ElMessage.error('解析失败：' + (err.message || '')) }
+  } catch (err: any) { handleApiError(err, '解析') }
   finally { if (fileInputRef.value) fileInputRef.value.value = '' }
 }
 

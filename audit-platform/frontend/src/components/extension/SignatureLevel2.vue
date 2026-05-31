@@ -30,6 +30,7 @@ import { ref, computed, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { signatures as P_sig } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{
   modelValue: boolean
@@ -130,7 +131,7 @@ async function onSign() {
     ElMessage.success('手写签名成功')
     emit('signed', data)
     visible.value = false
-  } catch { ElMessage.error('签名失败') }
+  } catch (e) { handleApiError(e, '签名') }
   finally { signing.value = false }
 }
 

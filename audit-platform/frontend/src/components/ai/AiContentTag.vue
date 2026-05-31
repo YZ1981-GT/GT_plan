@@ -44,6 +44,7 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 import AiContentConfirmDialog, { type AiContentItemForConfirm } from '@/components/ai/AiContentConfirmDialog.vue'
 
 interface AiContentTagItem extends AiContentItemForConfirm {
@@ -128,7 +129,7 @@ async function onDialogConfirm(action: 'accept' | 'revise' | 'reject', revisedCo
   } catch (err: any) {
     // 后端 router 可能尚未挂载（404）— 静默 catch + 中文错误
     const msg = err?.response?.data?.detail || err?.message || '操作失败，请稍后重试'
-    ElMessage.error('AI 内容确认失败：' + msg)
+    handleApiError(err, 'AI 内容确认')
   } finally {
     submitting.value = false
     dialogVisible.value = false

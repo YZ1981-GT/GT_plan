@@ -113,6 +113,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 
 /* ── Props ── */
 const props = withDefaults(defineProps<{
@@ -264,7 +265,7 @@ async function onFileChange(e: Event) {
       emit('update:visible', true)
     }
   } catch (err: any) {
-    ElMessage.error('文件解析失败：' + (err.message || '格式错误'))
+    handleApiError(err, '文件解析')
   } finally {
     // 重置 input 以便重复选择同一文件
     if (fileInputRef.value) fileInputRef.value.value = ''

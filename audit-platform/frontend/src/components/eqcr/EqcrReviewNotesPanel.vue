@@ -153,6 +153,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmDelete, confirmShare } from '@/utils/confirm'
+import { handleApiError } from '@/utils/errorHandler'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
   eqcrApi,
@@ -194,7 +195,7 @@ async function loadNotes() {
   try {
     notes.value = await eqcrApi.listNotes(props.projectId)
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '加载笔记列表失败')
+    handleApiError(err, '加载笔记列表')
     notes.value = []
   } finally {
     loading.value = false
@@ -246,7 +247,7 @@ async function handleSubmit() {
     dialogVisible.value = false
     await loadNotes()
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '操作失败')
+    handleApiError(err, '操作')
   } finally {
     submitting.value = false
   }
@@ -266,7 +267,7 @@ async function handleDelete(note: EqcrReviewNote) {
     ElMessage.success('笔记已删除')
     await loadNotes()
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '删除失败')
+    handleApiError(err, '删除')
   }
 }
 
@@ -284,7 +285,7 @@ async function handleShare(note: EqcrReviewNote) {
     ElMessage.success('笔记已分享给项目组')
     await loadNotes()
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '分享失败')
+    handleApiError(err, '分享')
   }
 }
 

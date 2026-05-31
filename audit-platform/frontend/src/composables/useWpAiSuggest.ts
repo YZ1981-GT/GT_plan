@@ -9,6 +9,7 @@
 
 import { ref, computed } from 'vue'
 import { apiProxy } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 import { ElMessage } from 'element-plus'
 
 export interface AiSuggestion {
@@ -82,7 +83,7 @@ export function useWpAiSuggest(options: UseWpAiSuggestOptions) {
         ElMessage.warning('AI 服务未启用')
         aiEnabled.value = false
       } else {
-        ElMessage.error('AI 建议请求失败')
+        handleApiError(err, 'AI 建议请求')
       }
     } finally {
       aiLoading.value = false

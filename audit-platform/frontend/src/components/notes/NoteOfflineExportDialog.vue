@@ -61,6 +61,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   modelValue: boolean
@@ -128,7 +129,7 @@ async function handleExport() {
     ElMessage.success('导出成功')
     visible.value = false
   } catch (e: any) {
-    ElMessage.error(e?.message || '导出失败')
+    handleApiError(e, '导出')
   } finally {
     exporting.value = false
   }

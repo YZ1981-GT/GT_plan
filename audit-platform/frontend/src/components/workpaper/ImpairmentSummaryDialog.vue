@@ -98,6 +98,7 @@
 import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   visible: boolean
@@ -167,7 +168,7 @@ async function onCalc() {
       `汇总完成：合计 ¥${formatAmount(resp.total_impairment)}，来源 ${resp.sources_found.length}/4`,
     )
   } catch (e: any) {
-    ElMessage.error(e?.message || '汇总查询失败')
+    handleApiError(e, '汇总查询')
   } finally {
     loading.value = false
   }
@@ -192,7 +193,7 @@ async function onApplyToSheet() {
       ElMessage.warning('计算完成但未写回')
     }
   } catch (e: any) {
-    ElMessage.error(e?.message || '写回失败')
+    handleApiError(e, '写回')
   } finally {
     applying.value = false
   }

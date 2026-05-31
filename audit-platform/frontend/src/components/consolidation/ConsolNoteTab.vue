@@ -462,6 +462,7 @@ import ConsolBreakdownDialog from '@/components/consolidation/ConsolBreakdownDia
 import { useAutoSave } from '@/composables/useAutoSave'
 import { eventBus } from '@/utils/eventBus'
 import type { ConsolCatalogSelectPayload, ConsolTreeAggregatePayload, ConsolNoteAuditAllPayload } from '@/utils/eventBus'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{
   projectId: string
@@ -866,7 +867,7 @@ async function executeAggregate() {
     }
     showAggregateDialog.value = false
   } catch (err: any) {
-    ElMessage.error(`汇总失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
+    handleApiError(err, '汇总')
   } finally { aggLoading.value = false }
 }
 
@@ -913,7 +914,7 @@ async function refreshNoteByFormula() {
       ElMessage.info('暂无可计算的公式数据，请确认项目中已有对应科目的试算表数据')
     }
   } catch (err: any) {
-    ElMessage.error(`公式刷新失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
+    handleApiError(err, '公式刷新')
   } finally { noteRefreshing.value = false }
 }
 
@@ -934,7 +935,7 @@ async function handleReaggregate() {
       })
     }
   } catch (err: any) {
-    ElMessage.error(`汇总失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
+    handleApiError(err, '汇总')
   } finally {
     reaggregating.value = false
   }
@@ -964,7 +965,7 @@ async function saveNoteData() {
     ElMessage.success('附注数据已保存')
     clearNoteDirty()
     clearAutoSaveDraft()
-  } catch { ElMessage.error('保存失败') }
+  } catch (err) { handleApiError(err, '保存') }
 }
 
 async function exportNoteTemplate() {
@@ -1021,7 +1022,7 @@ async function onNoteFileSelected(e: Event) {
     } else {
       ElMessage.warning('未解析到有效数据')
     }
-  } catch (err: any) { ElMessage.error('导入失败：' + (err.message || '')) }
+  } catch (err: any) { handleApiError(err, '导入') }
   finally { if (noteFileRef.value) noteFileRef.value.value = '' }
 }
 
@@ -1061,7 +1062,7 @@ async function batchExportAllData() {
     }
     XLSX.writeFile(wb, `合并附注_全部数据_${props.standard}.xlsx`)
     ElMessage.success(`已导出 ${sheetCount} 个附注表格`)
-  } catch (e: any) { ElMessage.error('导出失败：' + (e?.message || '')) }
+  } catch (e: any) { handleApiError(e, '导出') }
   finally { noteBatchLoading.value = false; showNoteBatchDialog.value = false }
 }
 
@@ -1092,7 +1093,7 @@ async function batchExportAllTemplates() {
     }
     XLSX.writeFile(wb, `合并附注_模板_${props.standard}.xlsx`)
     ElMessage.success(`已导出 ${sheetCount} 个附注模板`)
-  } catch (e: any) { ElMessage.error('导出失败：' + (e?.message || '')) }
+  } catch (e: any) { handleApiError(e, '导出') }
   finally { noteBatchLoading.value = false; showNoteBatchDialog.value = false }
 }
 
@@ -1130,7 +1131,7 @@ async function onNoteBatchImport(e: Event) {
       matched++
     }
     ElMessage.success(`已导入 ${matched} 个附注表格（共 ${wb.SheetNames.length} 个 Sheet）`)
-  } catch (e: any) { ElMessage.error('导入失败：' + (e?.message || '')) }
+  } catch (e: any) { handleApiError(e, '导入') }
   finally {
     noteBatchLoading.value = false
     showNoteBatchDialog.value = false
@@ -1175,7 +1176,7 @@ async function exportNoteFormulas() {
     XLSX.utils.book_append_sheet(wb, ws, '公式规则')
     XLSX.writeFile(wb, `合并附注_公式模板_${props.standard}.xlsx`)
     ElMessage.success(`已导出公式模板`)
-  } catch (e: any) { ElMessage.error('导出失败：' + (e?.message || '')) }
+  } catch (e: any) { handleApiError(e, '导出') }
   finally { noteBatchLoading.value = false }
 }
 
@@ -1196,7 +1197,7 @@ async function onNoteFormulaImport(e: Event) {
       const ruleCount = Math.max(0, json.length - 1)
       ElMessage.success(`已解析 ${ruleCount} 条公式规则（需后端配合存储）`)
     }
-  } catch (e: any) { ElMessage.error('导入失败：' + (e?.message || '')) }
+  } catch (e: any) { handleApiError(e, '导入') }
   finally {
     noteBatchLoading.value = false
     if (noteFormulaFileRef.value) noteFormulaFileRef.value.value = ''
@@ -1218,7 +1219,7 @@ async function applyAllNoteFormulas() {
       onNoteNodeClick({ section_id: selectedNoteSection.value.section_id })
     }
   } catch (err: any) {
-    ElMessage.error(`一键取数计算失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
+    handleApiError(err, '一键取数计算')
   } finally { noteBatchLoading.value = false; showNoteBatchDialog.value = false }
 }
 
@@ -1241,7 +1242,7 @@ async function onNoteAuditAll(_e?: Event) {
     noteAuditSummary.errorCount = noteAuditResults.value.filter((r: any) => r.level === 'error').length
     noteAuditSummary.warnCount = noteAuditResults.value.filter((r: any) => r.level === 'warn').length
   } catch (err: any) {
-    ElMessage.error(`全审失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
+    handleApiError(err, '全审')
   } finally { noteAuditLoading.value = false }
 }
 
@@ -1290,7 +1291,7 @@ async function auditCurrentNote() {
     noteAuditSummary.warnCount = noteAuditResults.value.filter((r: any) => r.level === 'warn').length
     showNoteAuditDialog.value = true
   } catch (err: any) {
-    ElMessage.error(`单表审核失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
+    handleApiError(err, '单表审核')
   } finally { noteSingleAuditLoading.value = false }
 }
 

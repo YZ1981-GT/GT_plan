@@ -83,6 +83,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ledgerImportV2Api } from '@/services/ledgerImportV2Api'
+import { handleApiError } from '@/utils/errorHandler'
 
 // ─── Props & Emits ──────────────────────────────────────────────────────────
 
@@ -131,7 +132,7 @@ async function onResume() {
     ElMessage.success('已恢复导入任务')
     emit('resumed', props.entry.job_id)
   } catch (e: any) {
-    ElMessage.error(e?.message || '恢复导入失败')
+    handleApiError(e, '恢复导入')
   } finally {
     resumeLoading.value = false
   }
@@ -169,7 +170,7 @@ async function onTakeover() {
     emit('taken-over', props.entry.job_id)
   } catch (e: any) {
     if (e !== 'cancel' && e?.message !== 'cancel') {
-      ElMessage.error(e?.message || '接管失败')
+      handleApiError(e, '接管')
     }
   } finally {
     takeoverLoading.value = false

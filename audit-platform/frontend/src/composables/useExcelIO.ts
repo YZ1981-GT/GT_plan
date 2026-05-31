@@ -18,6 +18,7 @@
  */
 
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 
 /**
  * 加载 xlsx-js-style 并兼容 CJS/ESM 互操作
@@ -539,7 +540,7 @@ export async function onFileSelected(
     const result = await parseFile(file, options)
     callback(result)
   } catch (err: any) {
-    ElMessage.error('解析失败：' + (err.message || '格式错误'))
+    handleApiError(err, '解析')
   } finally {
     // 重置 input 以便重复选择同一文件
     input.value = ''

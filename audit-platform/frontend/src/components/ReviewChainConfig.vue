@@ -80,6 +80,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { handleApiError } from '@/utils/errorHandler'
 
 export interface ReviewConfig {
   levels: 2 | 3 | 4
@@ -188,14 +189,7 @@ async function handleSave() {
     emit('saved', savedConfig)
     ElMessage.success('复核链配置已保存')
   } catch (err: any) {
-    const status = err?.response?.status
-    if (status === 409) {
-      ElMessage.error('存在进行中的复核，无法修改配置')
-    } else if (status === 422) {
-      ElMessage.error(err?.response?.data?.detail || '配置验证失败')
-    } else {
-      ElMessage.error(err?.response?.data?.detail || '保存失败')
-    }
+    handleApiError(err, '保存复核链配置')
   } finally {
     saving.value = false
   }

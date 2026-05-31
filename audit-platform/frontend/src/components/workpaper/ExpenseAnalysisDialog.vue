@@ -221,6 +221,7 @@ import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   visible: boolean
@@ -406,7 +407,7 @@ async function onCalc() {
     result.value = resp
     ElMessage.success(`分析完成，发现 ${resp.anomaly_flags?.length || 0} 项异常`)
   } catch (e: any) {
-    ElMessage.error(e?.message || '分析失败')
+    handleApiError(e, '分析')
   } finally {
     loading.value = false
   }
@@ -431,7 +432,7 @@ async function onApplyToSheet() {
       ElMessage.warning('计算完成但未写回')
     }
   } catch (e: any) {
-    ElMessage.error(e?.message || '写回失败')
+    handleApiError(e, '写回')
   } finally {
     applying.value = false
   }

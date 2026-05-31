@@ -214,6 +214,8 @@ import {
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import CNoteSubTableCard from './cnote/CNoteSubTableCard.vue'
 import CNoteInheritanceBadge from './cnote/CNoteInheritanceBadge.vue'
+import { formatAmount } from '@/utils/formatAmount'
+import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 import type {
   SubClass,
@@ -407,7 +409,7 @@ async function onSyncToDisclosureNotes() {
     const result: any = await api.post(`/api/projects/${projectId}/disclosure-notes/sync-from-workpaper`, payload)
     ElMessage.success(`已同步 ${Number(result?.rows_synced ?? 0)} 行到附注模块「${sectionId.value}」`)
   } catch (err: any) {
-    ElMessage.error(`同步附注失败：${err?.response?.data?.detail ?? err?.message ?? '未知错误'}`)
+    handleApiError(err, '同步附注')
   } finally { isSyncing.value = false }
 }
 

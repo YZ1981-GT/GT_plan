@@ -55,13 +55,13 @@
             </div>
             <el-progress :percentage="currentTask.progress_percentage"
               :status="progressStatus(currentTask.status)" :stroke-width="12" />
-            <div v-if="currentTask.status === 'completed'" class="gt-pe-download-link">
+            <div v-if="currentTask.status === EXPORT_TASK_STATUS.COMPLETED" class="gt-pe-download-link">
               <el-button type="success" @click="onDownload(currentTask.id)">下载 PDF</el-button>
               <span v-if="currentTask.file_size" class="gt-pe-file-size">
                 {{ formatFileSize(currentTask.file_size) }}
               </span>
             </div>
-            <div v-if="currentTask.status === 'failed'" class="gt-pe-error-msg">
+            <div v-if="currentTask.status === EXPORT_TASK_STATUS.FAILED" class="gt-pe-error-msg">
               {{ currentTask.error_message || '导出失败' }}
             </div>
           </div>
@@ -94,7 +94,7 @@
             </el-table-column>
             <el-table-column label="操作" width="100" fixed="right">
               <template #default="{ row }">
-                <el-button v-if="row.status === 'completed'" size="small" type="primary"
+                <el-button v-if="row.status === EXPORT_TASK_STATUS.COMPLETED" size="small" type="primary"
                   @click="onDownload(row.id)">下载</el-button>
               </template>
             </el-table-column>
@@ -170,7 +170,7 @@ function startPolling(taskId: string) {
     try {
       const status = await getExportTaskStatus(taskId)
       currentTask.value = status
-      if (status.status === 'completed' || status.status === 'failed') {
+      if (status.status === EXPORT_TASK_STATUS.COMPLETED || status.status === EXPORT_TASK_STATUS.FAILED) {
         stopPolling()
         fetchHistory()
       }

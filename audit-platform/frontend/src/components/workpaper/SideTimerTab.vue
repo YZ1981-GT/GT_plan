@@ -75,6 +75,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { handleApiError } from '@/utils/errorHandler'
 
 type TimerStatus = 'idle' | 'running' | 'paused'
 
@@ -274,7 +275,7 @@ async function submitWorkhour(hours: number) {
     clearPersist()
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : '请稍后重试'
-    ElMessage.error(`工时提交失败：${msg}`)
+    handleApiError(e, '工时提交')
     // 失败保留状态以便重试
     status.value = 'paused'
     persist()

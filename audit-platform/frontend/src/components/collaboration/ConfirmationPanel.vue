@@ -89,6 +89,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { confirmationApi } from '@/services/collaborationApi'
 import { rules } from '@/utils/formRules'
+import { handleApiError } from '@/utils/errorHandler'
 
 const projectId = 'current-project-id'
 const activeTab = ref('ALL')
@@ -167,8 +168,8 @@ async function handleCreate() {
     ElMessage.success('函证创建成功')
     showCreateDialog.value = false
     createForm.value = { counterparty: '', type: '', amount: 0, description: '' }
-  } catch {
-    ElMessage.error('创建失败')
+  } catch (e) {
+    handleApiError(e, '发送函证')
   }
 }
 
@@ -194,8 +195,8 @@ async function generateLetter(row: any) {
   try {
     await confirmationApi.generateLetter(projectId, row.id, {})
     ElMessage.success('询证函已生成')
-  } catch {
-    ElMessage.error('生成失败，请稍后重试')
+  } catch (e) {
+    handleApiError(e, '更新状态')
   }
 }
 </script>

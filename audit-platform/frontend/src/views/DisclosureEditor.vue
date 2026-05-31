@@ -290,10 +290,10 @@
                           size="small" style="width: 100%; height: 22px"
                           @change="onCellValueChange($index, Number(hiRaw) - 1, $event)" />
                         <span v-else-if="row.is_total" :class="['gt-amt', { 'gt-formula-mismatch': isFormulaMismatch(row, Number(hiRaw) - 1) }]">
-                          {{ fmt(getCellValue(row, Number(hiRaw) - 1)) }}
+                          <GtAmountCell :value="getCellValue(row, Number(hiRaw) - 1)" />
                         </span>
                         <span v-else :class="['gt-amt', { 'total-val': row.is_total }]">
-                          {{ fmt(getCellValue(row, Number(hiRaw) - 1)) }}
+                          <GtAmountCell :value="getCellValue(row, Number(hiRaw) - 1)" />
                         </span>
                         <span v-if="getCellMode(row, Number(hiRaw) - 1) === 'auto'" class="gt-cell-source gt-cell-trace-trigger" title="点击追溯来源" @click.stop="onAutoCellTraceClick($index, Number(hiRaw) - 1, $event)">📊</span>
                         <span v-else-if="getCellMode(row, Number(hiRaw) - 1) === 'manual'" class="gt-cell-manual" title="手动编辑">✏️</span>
@@ -742,6 +742,7 @@ import { usePenetrate } from '@/composables/usePenetrate'
 import { useEditMode } from '@/composables/useEditMode'
 import { useNavigationStack } from '@/composables/useNavigationStack'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
 import StatusMachinePanel from '@/components/status_machine/StatusMachinePanel.vue'
 import TimeMachineDrawer from '@/components/time_machine/TimeMachineDrawer.vue'
@@ -1004,7 +1005,7 @@ async function onTreeNodeDrop(draggingNode: any, dropNode: any, dropType: 'befor
     // 刷新树以及章节序号
     await fetchTree()
   } catch (e: any) {
-    ElMessage.error(e?.message || '排序失败')
+    handleApiError(e, '排序')
     // 刷新还原
     await fetchTree()
   }

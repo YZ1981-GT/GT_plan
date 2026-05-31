@@ -92,6 +92,7 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   visible: boolean
@@ -146,7 +147,7 @@ async function onCalc() {
     const resp = await api.post<BSResponse>(`/api/projects/${props.projectId}/workpapers/${props.wpId}/j3/share-payment-calc`, buildBody())
     result.value = resp
     ElMessage.success(`计算完成：期权价值 ¥${resp.option_value.toFixed(4)}`)
-  } catch (e: any) { ElMessage.error(e?.message || '计算失败') }
+  } catch (e: any) { handleApiError(e, '计算') }
   finally { loading.value = false }
 }
 
@@ -158,7 +159,7 @@ async function onApplyToSheet() {
     result.value = resp
     if (resp?.applied_to_sheet) { ElMessage.success(`已写回 ${resp.applied_to_sheet}`); emit('applied', resp.applied_to_sheet) }
     else { ElMessage.warning('计算完成但未写回') }
-  } catch (e: any) { ElMessage.error(e?.message || '写回失败') }
+  } catch (e: any) { handleApiError(e, '写回') }
   finally { applying.value = false }
 }
 

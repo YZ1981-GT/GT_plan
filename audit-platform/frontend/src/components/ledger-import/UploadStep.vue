@@ -80,9 +80,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { UploadFilled, Document, Close } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import type { UploadFile, UploadInstance } from 'element-plus'
 import type { LedgerDetectionResult } from './LedgerImportDialog.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 // ─── Props & Emits ──────────────────────────────────────────────────────────
 
@@ -184,8 +184,7 @@ async function startDetect() {
     uploadProgress.value = 100
     emit('detect-complete', result)
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : '预检失败'
-    ElMessage.error(msg)
+    handleApiError(err, '预检')
   } finally {
     detecting.value = false
     uploading.value = false

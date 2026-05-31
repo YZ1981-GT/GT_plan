@@ -192,6 +192,7 @@ import { ElMessage } from 'element-plus'
 import { Download, UploadFilled, Loading, CircleClose, Warning } from '@element-plus/icons-vue'
 import type { UploadInstance } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{
   modelValue: boolean
@@ -275,8 +276,8 @@ async function downloadTemplate() {
     a.download = `${typeLabel.value}导入模板.xlsx`
     a.click()
     URL.revokeObjectURL(url)
-  } catch {
-    ElMessage.error('模板下载失败')
+  } catch (e) {
+    handleApiError(e, '导入')
   } finally {
     downloading.value = false
   }

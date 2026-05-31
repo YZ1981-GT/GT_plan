@@ -133,6 +133,7 @@ import InternalTradeSheet from './InternalTradeSheet.vue'
 import InternalCashFlowSheet from './InternalCashFlowSheet.vue'
 import { eventBus } from '@/utils/eventBus'
 import type { FormulaChangedPayload } from '@/utils/eventBus'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface SubsidiaryInfoRow {
   company_name: string; company_code: string; parent_code: string
@@ -579,7 +580,7 @@ async function doSave(sheetKey: string, payload: any) {
       ElMessage.error(`${sheetKey} 保存失败，请检查后端服务`)
     }
   } catch (err: any) {
-    ElMessage.error('保存异常：' + (err.message || '网络错误'))
+    handleApiError(err, '保存异常')
   }
 }
 
