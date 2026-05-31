@@ -6,6 +6,7 @@ Validates: Requirements 1.1-1.8
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -83,6 +84,7 @@ def _to_project_response(project: Project) -> ProjectCreateResponse:
         report_scope=project.report_scope,
         parent_project_id=project.parent_project_id,
         consol_level=project.consol_level or 1,
+        consol_lock=bool(project.consol_lock),
         created_at=project.created_at,
     )
 
@@ -275,7 +277,113 @@ async def create_project(
     return _to_project_response(project)
 
 
-@router.get("/{project_id}/wizard", response_model=WizardState)
+# ---------------------------------------------------------------------------
+# Phase 3 需求 5.1: 配置合并范围 — 把已有单体项目挂为子公司（attach subsidiaries）
+# ---------------------------------------------------------------------------
+
+
+class AttachSubsidiariesRequest(BaseModel):
+    """配置合并范围请求：把若干已有单体项目挂到本合并项目下作子公司。"""
+    child_project_ids: list[UUID]
+
+
+@router.get("/{project_id}/available-subsidiaries", response_model=list[ProjectCreateResponse])
+async def list_available_subsidiaries(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[ProjectCreateResponse]:
+    """列出可挂为子公司的候选单体项目（需求 5.1）。
+
+    候选 = 用户可见 + 非本项目 + report_scope != consolidated +
+    （未挂到其他集团 或 已挂到本项目）。仅 consolidated 项目可调（R3：不影响非合并流程）。
+    """
+    from sqlalchemy import select, or_
+    from app.models.core import ProjectUser
+
+    parent = await db.get(Project, project_id)
+    if parent is None or parent.is_deleted:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    if parent.report_scope != "consolidated":
+        raise HTTPException(status_code=400, detail="仅合并项目可配置合并范围")
+
+    query = select(Project).where(
+        Project.is_deleted == False,  # noqa: E712
+        Project.id != project_id,
+        or_(Project.report_scope != "consolidated", Project.report_scope.is_(None)),
+        or_(
+            Project.parent_project_id.is_(None),
+            Project.parent_project_id == project_id,
+        ),
+    )
+    if current_user.role.value not in ("admin", "partner"):
+        query = query.join(ProjectUser, ProjectUser.project_id == Project.id).where(
+            ProjectUser.user_id == current_user.id,
+            ProjectUser.is_deleted == False,  # noqa: E712
+        )
+    result = await db.execute(query)
+    return [_to_project_response(p) for p in result.scalars().all()]
+
+
+@router.post("/{project_id}/attach-subsidiaries", response_model=list[ProjectCreateResponse])
+async def attach_subsidiaries(
+    project_id: UUID,
+    body: AttachSubsidiariesRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[ProjectCreateResponse]:
+    """把选中的已有单体项目挂为本合并项目的子公司（需求 5.1）。
+
+    - 仅 consolidated 项目可调（R3：非合并项目流程不变）。
+    - 设置子项目 parent_project_id = 本项目；consol_level = 母 + 1。
+    - 成功后广播 CONSOL_SCOPE_CHANGED（需求 5.2）→ 前端树自动刷新。
+    - 仅 admin/partner 或有写权限者可操作（沿用项目可见性，权限不足的子项目跳过）。
+    """
+    from sqlalchemy import select
+    from app.models.core import ProjectUser
+
+    parent = await db.get(Project, project_id)
+    if parent is None or parent.is_deleted:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    if parent.report_scope != "consolidated":
+        raise HTTPException(status_code=400, detail="仅合并项目可配置合并范围")
+
+    # 可写项目集合（admin/partner 全可写，其他角色仅自己参与的项目）
+    allowed_ids: set[UUID] | None = None
+    if current_user.role.value not in ("admin", "partner"):
+        mine = await db.execute(
+            select(ProjectUser.project_id).where(
+                ProjectUser.user_id == current_user.id,
+                ProjectUser.is_deleted == False,  # noqa: E712
+            )
+        )
+        allowed_ids = {r[0] for r in mine.all()}
+
+    attached: list[Project] = []
+    for child_id in body.child_project_ids:
+        if child_id == project_id:
+            continue
+        if allowed_ids is not None and child_id not in allowed_ids:
+            continue
+        child = await db.get(Project, child_id)
+        if child is None or child.is_deleted:
+            continue
+        if child.report_scope == "consolidated":
+            continue  # 不允许把合并项目挂为子公司
+        child.parent_project_id = project_id
+        child.consol_level = (parent.consol_level or 1) + 1
+        attached.append(child)
+
+    await db.commit()
+    for c in attached:
+        await db.refresh(c)
+
+    # 需求 5.2：合并范围变更广播，前端树自动刷新（ADR-CONSOL-303）
+    if attached:
+        from app.services.consol_scope_service import _emit_scope_changed
+        _emit_scope_changed(project_id, _extract_project_audit_year(parent))
+
+    return [_to_project_response(c) for c in attached]
 async def get_wizard_state(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),

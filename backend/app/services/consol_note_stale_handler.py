@@ -125,11 +125,41 @@ async def mark_consol_sections_stale(
                 "Marked %d sections stale for consol project %s (trigger: %s)",
                 count, parent_project_id, section_id,
             )
+            # 6A.1：标记母项目 stale 后发 SSE 事件，合并页实时感知（ADR-CONSOL-304）
+            # 复用既有 SSE 基础设施（broadcast_raw），不新增轮询（呼应 Phase 2 R5 打爆 pool 教训）
+            _emit_consol_note_stale(parent_project_id, year, section_id, count)
         return count
 
     except Exception as err:
         logger.warning("mark_consol_sections_stale failed: %s", err)
         return 0
+
+
+def _emit_consol_note_stale(
+    parent_project_id: UUID,
+    year: int,
+    section_id: str | None,
+    count: int,
+) -> None:
+    """广播 consol.note_stale SSE 事件（合并页 F5 实时感知，ADR-CONSOL-304）。
+
+    走 event_bus.broadcast_raw（轻量、同步）推 SSE；无 event_bus / 无 event loop 时
+    静默回退到 logger，不阻断业务（下次进合并页读最新 stale 态兜底）。
+    """
+    try:
+        from app.services.event_bus import event_bus
+
+        event_bus.broadcast_raw(
+            "consol.note_stale",
+            {
+                "project_id": str(parent_project_id),
+                "year": year,
+                "section_id": section_id,
+                "stale_count": count,
+            },
+        )
+    except Exception as exc:  # pragma: no cover - 兜底，不阻断业务
+        logger.debug("broadcast consol.note_stale failed (non-blocking): %s", exc)
 
 
 def register_stale_handler(event_bus: Any) -> None:

@@ -13,6 +13,23 @@
       </template>
     </el-alert>
 
+    <!-- F5 合并页 stale 实时感知（需求 7 / ADR-CONSOL-304）：子公司数据变更后 SSE 提示，warning 不阻断 -->
+    <el-alert
+      v-if="consolStale"
+      type="warning"
+      :closable="true"
+      show-icon
+      style="margin-bottom: 12px"
+      @close="consolStale = false"
+    >
+      <template #title>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span>子公司数据已更新，建议重新汇总以获取最新合并结果</span>
+          <el-button size="small" type="primary" @click="onReaggregateNow">立即重新汇总</el-button>
+        </div>
+      </template>
+    </el-alert>
+
     <!-- 横幅：单位名称 + 年度 + 准则类型 -->
     <GtPageHeader title="合并报表" @back="$router.push('/consolidation')">
       <GtInfoBar
@@ -53,6 +70,11 @@
             </el-tooltip>
           </template>
           <template #right-extra>
+            <el-button size="small" type="primary" :loading="refreshAllLoading" @click="onRefreshAll">🔄 一键刷新全部</el-button>
+            <span v-if="refreshProgress.visible && refreshProgress.total" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin: 0 8px;">
+              {{ refreshProgress.current }}/{{ refreshProgress.total }} {{ refreshProgress.step }}
+            </span>
+            <el-button size="small" :loading="reaggregateLoading" @click="onReaggregateNotes">📝 重新汇总附注</el-button>
             <el-button size="small" @click="showConsolConversion = true">🔄 转换规则</el-button>
           </template>
         </GtToolbar>
@@ -79,14 +101,16 @@
               <el-button size="small" @click="orgZoom = 1">1:1</el-button>
             </div>
             <div class="gt-ctb-toolbar-right">
-              <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary)">{{ orgNodeCount }} 个节点 · 最大 {{ orgMaxDepth }} 层</span>
+              <!-- 自动建树 5.4：手动刷新树兜底（CONSOL_SCOPE_CHANGED 事件丢失时，EH4） -->
+              <el-button size="small" :loading="treeRefreshing" @click="refreshGroupTree">🔄 刷新树</el-button>
+              <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin-left:8px">{{ orgNodeCount }} 个节点 · 最大 {{ orgMaxDepth }} 层</span>
             </div>
           </div>
 
           <!-- 组织结构图模式 -->
           <div v-if="orgViewMode === 'chart'" class="org-chart-wrapper" :style="{ transform: `scale(${orgZoom})`, transformOrigin: 'top left' }">
             <div v-if="groupTree.length" class="org-chart">
-              <org-node :node="groupTree[0]" :depth="0" @select="onTreeNodeClick" :selected-code="selectedNode?.company_code" />
+              <org-node :node="groupTree[0]" :depth="0" @select="onTreeNodeClick" @enter-project="onEnterProject" :selected-code="selectedNode?.company_code" />
             </div>
             <el-empty v-else description="暂无集团架构数据，请先配置合并范围" />
           </div>
@@ -100,6 +124,13 @@
                   <span class="gt-tree-node">
                     <span>{{ data.company_name || data.name }}</span>
                     <el-tag v-if="data.shareholding" size="small" type="info" style="margin-left:8px">{{ data.shareholding }}%</el-tag>
+                    <!-- 双向导航 4.2：进入对应单体项目（阻止冒泡，避免触发 node-click） -->
+                    <el-link
+                      v-if="data.project_id || data.id"
+                      type="primary"
+                      style="margin-left:8px;font-size: var(--gt-font-size-xs)"
+                      @click.stop="onEnterProject(data)"
+                    >进入项目</el-link>
                   </span>
                 </template>
               </el-tree>
@@ -436,13 +467,14 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import {
   getWorksheetTree,
 } from '@/services/consolidationApi'
 import { listChildProjects } from '@/services/commonApi'
 import { api } from '@/services/apiProxy'
-import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, consolNoteSections as P_cn, reports } from '@/services/apiPaths'
+import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, consolNoteSections as P_cn, reports, consolidation as P_consol, events as P_events } from '@/services/apiPaths'
+import { createSSE, type SSEConnection } from '@/utils/sse'
 import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
 import ConsolNoteTab from '@/components/consolidation/ConsolNoteTab.vue'
 import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalanceTab.vue'
@@ -464,11 +496,16 @@ import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
+import { useNavigationStack } from '@/composables/useNavigationStack'
+import { useProjectEvents } from '@/composables/useProjectEvents'
 
 const route = useRoute()
 const router = useRouter()
+const { push: navPush } = useNavigationStack()
 const { mul: decMul, div: decDiv } = useDecimalCalc()
 const projectId = computed(() => route.params.projectId as string)
+// 自动建树 5.3：项目级事件流（含 CONSOL_SCOPE_CHANGED）
+const consolEvents = useProjectEvents(projectId)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
 
 // ─── 批注与复核持久化（合并报表/试算表共用） ─────────────────────────────────
@@ -480,6 +517,147 @@ const consolTbTabRef = ref<InstanceType<typeof ConsolTrialBalanceTab> | null>(nu
 
 // ─── P3 防误用标记 ────────────────────────────────────────────────────────────
 const consolDevMode = ref(false)
+
+// ─── F5 合并页 stale 实时感知（需求 7 / ADR-CONSOL-304）────────────────────────
+const consolStale = ref(false)
+
+// ─── F3 一键刷新全部 + 重新汇总附注（需求 9 / Phase 2 A5 + V2 接线）──────────────
+const refreshAllLoading = ref(false)
+const reaggregateLoading = ref(false)
+const refreshProgress = reactive({ visible: false, step: '', current: 0, total: 0, node: '' })
+// 一键刷新进度 SSE 连接（用 createSSE 直接订阅 events/stream，按 project_id/year 过滤 consol.refresh.* 事件；
+// 全局 ThreeColumnLayout 的 SSE 处理器会丢弃 broadcast_raw 的无 event_type 裸事件，故此处独立订阅）
+let refreshSSE: SSEConnection | null = null
+let refreshPollTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 关闭一键刷新进度 SSE + 轮询兜底连接 */
+function _stopRefreshTracking() {
+  if (refreshSSE) { refreshSSE.close(); refreshSSE = null }
+  if (refreshPollTimer) { clearTimeout(refreshPollTimer); refreshPollTimer = null }
+}
+
+/**
+ * 一键级联刷新全部（需求 9 / Phase 2 A5）。
+ * POST refresh-all 入队后台 worker 返回 job_id；进度经既有 events/stream SSE
+ * 推送（consol.refresh.progress/completed/error），SSE 不可用时轮询 refresh-status 兜底（EH6）。
+ */
+async function onRefreshAll() {
+  if (refreshAllLoading.value) return
+  refreshAllLoading.value = true
+  refreshProgress.visible = true
+  refreshProgress.step = ''
+  refreshProgress.current = 0
+  refreshProgress.total = 0
+  refreshProgress.node = ''
+  let jobId = ''
+  try {
+    const res: any = await api.post(P_consol.refreshAll(projectId.value, year.value))
+    jobId = res?.job_id || ''
+    ElMessage.success('已开始一键刷新，正在更新整棵树的报表与附注…')
+    _startRefreshTracking(jobId)
+  } catch (e) {
+    refreshAllLoading.value = false
+    refreshProgress.visible = false
+    handleApiError(e, '一键刷新全部')
+  }
+}
+
+/** 订阅 SSE 进度；同时启动轮询兜底（SSE 断开时仍能感知完成）。 */
+function _startRefreshTracking(jobId: string) {
+  _stopRefreshTracking()
+
+  const finish = (ok: boolean, msg?: string) => {
+    _stopRefreshTracking()
+    refreshAllLoading.value = false
+    refreshProgress.visible = false
+    if (ok) {
+      ElMessage.success(msg || '一键刷新完成')
+      // 刷新当前 tab 数据
+      if (activeTab.value === 'consol_report') loadConsolReport()
+      else if (activeTab.value === 'consol_note') loadConsolNoteTree(true)
+      eventBus.emit('consol-refresh-done', { projectId: projectId.value, year: year.value })
+    } else if (msg) {
+      ElMessage.error(msg)
+    }
+  }
+
+  // SSE 进度订阅（按 project_id/year 过滤 consol.refresh.* 事件）
+  try {
+    refreshSSE = createSSE(`${P_events.stream(projectId.value)}?year=${year.value}`)
+    refreshSSE.onMessage((data: any, event?: string) => {
+      if (!data || (data.job_id && jobId && data.job_id !== jobId)) return
+      if (event === 'consol.refresh.progress') {
+        refreshProgress.step = data.step || ''
+        refreshProgress.current = data.current || 0
+        refreshProgress.total = data.total || 0
+        refreshProgress.node = data.current_node || ''
+      } else if (event === 'consol.refresh.completed') {
+        const errCount = Array.isArray(data.errors) ? data.errors.length : 0
+        finish(true, errCount > 0 ? `一键刷新完成（${errCount} 步部分失败，请检查）` : '一键刷新完成')
+      } else if (event === 'consol.refresh.error') {
+        finish(false, `一键刷新失败：${data.error || '未知错误'}`)
+      }
+    })
+  } catch {
+    // SSE 创建失败不致命，靠轮询兜底
+  }
+
+  // 轮询兜底（EH6）：SSE 断开也能感知最终状态
+  if (!jobId) return
+  let polls = 0
+  const poll = async () => {
+    polls += 1
+    try {
+      const st: any = await api.get(P_consol.refreshStatus(projectId.value, year.value, jobId))
+      if (st?.status === 'completed') {
+        const errCount = Array.isArray(st.errors) ? st.errors.length : 0
+        finish(true, errCount > 0 ? `一键刷新完成（${errCount} 步部分失败，请检查）` : '一键刷新完成')
+        return
+      }
+      if (st?.status === 'failed') {
+        const errMsg = Array.isArray(st.errors) && st.errors.length ? st.errors[st.errors.length - 1]?.error : ''
+        finish(false, `一键刷新失败：${errMsg || '未知错误'}`)
+        return
+      }
+    } catch {
+      // 单次轮询失败忽略，继续下一轮
+    }
+    if (polls < 120 && refreshAllLoading.value) {
+      refreshPollTimer = setTimeout(poll, 3000)
+    } else if (refreshAllLoading.value) {
+      // 超时保护：停止 loading（结果可经 SSE 或手动刷新查看）
+      refreshAllLoading.value = false
+      refreshProgress.visible = false
+    }
+  }
+  refreshPollTimer = setTimeout(poll, 3000)
+}
+
+/**
+ * 重新汇总合并附注（需求 9 / V2 接线）。
+ * POST notes/reaggregate 消费子公司单体附注重新汇总，完成后切到附注 tab 并刷新。
+ */
+async function onReaggregateNotes() {
+  if (reaggregateLoading.value) return
+  reaggregateLoading.value = true
+  try {
+    const res: any = await api.post(P_consol.notes.reaggregate(projectId.value, year.value))
+    const updated = res?.sections_updated ?? res?.sections_processed ?? 0
+    const errCount = Array.isArray(res?.errors) ? res.errors.length : 0
+    if (errCount > 0) {
+      ElMessage.warning(`附注重新汇总完成（更新 ${updated} 个章节，${errCount} 个章节有告警）`)
+    } else {
+      ElMessage.success(`附注重新汇总完成（更新 ${updated} 个章节）`)
+    }
+    consolStale.value = false
+    activeTab.value = 'consol_note'
+    loadConsolNoteTree(true)
+  } catch (e) {
+    handleApiError(e, '重新汇总附注')
+  } finally {
+    reaggregateLoading.value = false
+  }
+}
 
 // ─── 合并类型（subsidiary 母子合并 / branch 母分汇总）──────────────────────────
 const consolidationType = ref<'subsidiary' | 'branch'>('subsidiary')
@@ -824,6 +1002,45 @@ function maxDepth(node: any, d = 1): number {
 const orgNodeCount = computed(() => groupTree.value.length ? countNodes(groupTree.value[0]) : 0)
 const orgMaxDepth = computed(() => groupTree.value.length ? maxDepth(groupTree.value[0]) : 0)
 
+// 自动建树 5.3/5.4：手动刷新 + CONSOL_SCOPE_CHANGED 事件自动刷新的状态标记
+const treeRefreshing = ref(false)
+
+/**
+ * 自动建树 5.4：手动刷新企业树（EH4 兜底，事件丢失时用户可手动触发）。
+ * 同时复用为 5.3 SSE 事件回调的实现。
+ */
+async function refreshGroupTree() {
+  treeRefreshing.value = true
+  try {
+    await loadGroupTree()
+  } finally {
+    treeRefreshing.value = false
+  }
+}
+
+/**
+ * 自动建树 5.3：CONSOL_SCOPE_CHANGED 事件回调 → 自动刷新企业树。
+ * F5 6A.2：consol.note_stale 事件 → 显示"建议重新汇总"提示（warning 不阻断）。
+ * 仅响应合并相关事件（其他项目事件忽略；项目过滤由 useProjectEvents 完成）。
+ */
+function onConsolScopeChanged(evt: { event_type: string }) {
+  if (evt.event_type === 'consol.scope_changed') {
+    refreshGroupTree()
+  } else if (evt.event_type === 'consol.note_stale') {
+    // F5：子公司数据变更导致母项目 stale → 提示重新汇总
+    consolStale.value = true
+  }
+}
+
+/**
+ * F5 6A.3：立即重新汇总快捷入口 → 跳合并附注 Tab 并触发重新汇总（Phase 2 一键刷新）。
+ * 复用 ConsolNoteTab 的"重新汇总"链路（consol-catalog-select 事件 + reaggregate 端点）。
+ */
+function onReaggregateNow() {
+  consolStale.value = false
+  activeTab.value = 'consol_note'
+}
+
 async function loadGroupTree() {
   try {
     const res = await getWorksheetTree(projectId.value)
@@ -867,6 +1084,29 @@ function onConsolScopeTemplateApplied(data: Record<string, any>) {
 
 function goToProject(_node: any) {
   router.push('/consolidation')
+}
+
+/**
+ * 双向导航 4.2：从合并树节点进入对应单体项目。
+ * 跳转前 push 当前路由到导航栈（direction:'down' 下钻），支持 Backspace 返回（T3）。
+ * 目标项目 id 优先取 worksheet tree 的 project_id，回退 listChildProjects 的 id。
+ */
+function onEnterProject(node: any) {
+  const targetId = node?.project_id || node?.id
+  if (!targetId) {
+    ElMessage.info('该节点无对应项目')
+    return
+  }
+  const cur = router.currentRoute.value
+  navPush({
+    source_view: cur.path,
+    label: '合并项目',
+    direction: 'down',
+    scroll_position: window.scrollY,
+    query: cur.query as Record<string, string>,
+  })
+  // 单体项目默认落地页：entry 路由按角色重定向到仪表盘/试算表
+  router.push({ path: `/projects/${targetId}/entry` })
 }
 
 function fmtAmt(v: any): string {
@@ -1263,12 +1503,15 @@ onMounted(async () => {
   eventBus.on('consol-tree-select', onConsolTreeSelect)
   eventBus.on('consol-catalog-select', onConsolCatalogSelect)
   eventBus.on('consol-refresh-entity', onConsolRefreshEntity)
+  // 自动建树 5.3：监听 CONSOL_SCOPE_CHANGED（SSE）→ 自动刷新企业树（ADR-CONSOL-303）
+  consolEvents.onAnyEvent(onConsolScopeChanged)
 })
 
 onUnmounted(() => {
   eventBus.off('consol-tree-select', onConsolTreeSelect)
   eventBus.off('consol-catalog-select', onConsolCatalogSelect)
   eventBus.off('consol-refresh-entity', onConsolRefreshEntity)
+  _stopRefreshTracking()
 })
 
 // 监听树形节点刷新事件

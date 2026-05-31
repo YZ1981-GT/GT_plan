@@ -113,8 +113,8 @@
 |------|------|------|
 | `consol-phase0-core-pipeline/` | ✅ 核心完成 | Phase 0 止血：B1 汇总 + B2 对账 + C1/C3 schema 基线 V027 + A4 下线 + P1 留痕 + P5 权限 + P3 防误用 + F2 锁定闭环 + ADR-CONSOL-001/002/003；PBT P1~P7 全绿；真实 UAT（任务14）卡 PG 合并数据 |
 | `consol-phase1-arch-lock/` | ✅ 核心完成 | Phase 1 架构修复：A1/A2 公式引擎统一（AmountResolver 注入复用 report_engine，删重复）+ 衔接2 抵销 APPROVED + 事件驱动重算 + 锁定全端点 + ConsolLockedBanner + 423 拦截 + B6 负商誉 CAS20 + B7 少数股东比例 + A3 async；ADR-CONSOL-101~106；Q1~Q7 PBT + 锁定 423 参数化全绿；6A.3*/6B.4* 待审计专业确认 / 任务9 Playwright 待环境 / 任务10* 真实 UAT 卡 PG 合并数据 |
-| `consol-phase2-orchestration/` | 📌 待启动 | Phase 2 编排接线：cascade_refresh + V2 附注 + cross_template + 报表穿透；前置 = Phase 1 |
-| `consol-phase3-frontend-drilldown/` | 📌 待启动 | Phase 3 前端联动：ConsolBreakdownDialog + 附注穿透 + 自动建树 + stale SSE；前置 = Phase 2 |
+| `consol-phase2-orchestration/` | ✅ 代码+测试完成 | Phase 2 编排接线：cascade_refresh 编排者（DAG 单一入口，重建被删 orchestrator）+ refresh-all 后台 worker + SSE 进度（broadcast_raw 不占 asyncpg pool）+ V2 附注 feature flag CONSOL_NOTES_V2_ENABLED + dict→Pydantic 适配器（S4）+ B3 自动抵销只产 draft（接通 4 规则引擎，审批后经 Phase 1 ELIMINATION_APPROVED 事件重算）+ 报表穿透 consol-breakdown + cross_template 孤儿接线（CONSOL_CROSS_TEMPLATE_ENABLED，S7 不丢章节）+ 公式管理联动（合并工作底稿/报表节点 + formula_audit_log module='consol'）+ P2 签字冻结 ConsolSnapshot 存真实数据（base64+gzip+SHA256，S8）+ F3 前端一键刷新/重新汇总入口；S1~S8 共 55 PBT 全绿 + ADR-CONSOL-201~206；附带根因修复 ReviewStatusEnum 大小写 bug + elimination create_entry NOT NULL 缺陷（解除 5 xfail）；Playwright 脚本就绪执行待 start-dev.bat 重启（新路由热加载 404）；真实 UAT（任务8）卡 PG 0 个合并数据 |
+| `consol-phase3-frontend-drilldown/` | ✅ 代码完成 | Phase 3 前端联动：ConsolBreakdownDialog 统一穿透（report+note）+ disclosure_notes provenance V039 + 附注穿透端点 + 双向导航 + 自动建树 CONSOL_SCOPE_CHANGED + wizard 配置合并范围 + 完整度校验 + F5 stale SSE；T1 vitest 7 + 后端 26 测试全绿 + ADR-CONSOL-301~304；Playwright 实测刷新树/进入项目/菜单门控通过；深度穿透 + UAT（8.1/8.4/9）卡 PG 0 个真实合并母子数据 |
 | `consol-note-three-level-drilldown/` | 📌 | 合并附注三级穿透；前置 = 真实合并母子项目数据（PG 当前 0 个 consolidated 项目）；待并入 Phase 3 |
 
 > 注：`workpaper-fill-service-split` 已 `git rm`（目标 WorkpaperFillService 经 grep 实证为 0 业务调用方的死代码，拆分无意义）；`gt-c-note-table-shrink` 已于 2026-05-30 完成并归档至 07-workpaper-slimdown（GtCNoteTable 1803→450 + GtEControlTest 1414→344，90 测试全绿；残留 R3 Playwright 目视待环境，非代码缺口）。
@@ -248,7 +248,7 @@ _archive/
 | cross_wp_references | 400 条 |
 | prefill_formula_mapping | 1035 cells |
 | validation_rules | 114 条 |
-| D6 SQL 迁移 | V001-V036 |
+| D6 SQL 迁移 | V001-V039（V039 = disclosure_notes provenance / Phase 3） |
 | **Spec 总数** | **active 18（5 合并 Phase/note + 13 底稿）+ archived（详见 §三）** |
 
 ---

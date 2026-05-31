@@ -335,6 +335,9 @@ class DisclosureNote(Base):
         Boolean, nullable=False, server_default=text("false")
     )
     text_template_vars: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # Phase 3 附注级穿透 provenance（consol-phase3-frontend-drilldown / T6 / V039）
+    source_project_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    consolidation_breakdown: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # workpaper-html-renderer Task 10.3: 附注双源单向同步标记
     # design §12.1 推荐选项 A — 仅记录"最近一次"由底稿 push 同步的来源
     last_sync_source: Mapped[str | None] = mapped_column(String(50), nullable=True)

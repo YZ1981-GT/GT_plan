@@ -5,6 +5,14 @@
       <BasicInfoStep ref="basicInfoRef" />
     </div>
 
+    <!-- Phase 3 需求 5.1：合并项目创建后配置合并范围（选已有单体挂子公司） -->
+    <ConsolScopeConfigDialog
+      v-model="showScopeConfig"
+      :project-id="scopeConfigProjectId"
+      @attached="onSubsidiariesAttached"
+      @update:model-value="onScopeConfigClosed"
+    />
+
     <!-- Navigation Buttons -->
     <div class="gt-wizard-footer">
       <div class="gt-wizard-footer-spacer" />
@@ -26,11 +34,16 @@ import { ElMessage } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { useWizardStore } from '@/stores/wizard'
 import BasicInfoStep from '@/components/wizard/BasicInfoStep.vue'
+import ConsolScopeConfigDialog from '@/components/wizard/ConsolScopeConfigDialog.vue'
 import { useFormSubmit } from '@/composables/useFormSubmit'
 
 const route = useRoute()
 const router = useRouter()
 const wizardStore = useWizardStore()
+
+// Phase 3 需求 5.1：配置合并范围弹窗状态
+const showScopeConfig = ref(false)
+const scopeConfigProjectId = ref('')
 
 type DataStepRef = {
   validate: () => Promise<Record<string, unknown> | null>
@@ -93,6 +106,14 @@ async function handleConfirm() {
       )
       if (!proceed) return
       ElMessage.success('项目创建成功')
+      // Phase 3 需求 5.1：合并项目创建后弹"配置合并范围"步骤（R3：仅 consolidated 触发，非合并项目流程不变）
+      const createdId = wizardStore.projectId
+      const isConsolidated = (data as any)?.report_scope === 'consolidated'
+      if (isConsolidated && createdId) {
+        scopeConfigProjectId.value = createdId
+        showScopeConfig.value = true
+        return
+      }
       wizardStore.reset()
       router.push('/projects')
       return
@@ -107,6 +128,22 @@ async function handleConfirm() {
       // Error already handled by http interceptor
     }
   })
+}
+
+/** 5.1：纳入子公司成功后，结束向导并跳转项目列表 */
+function onSubsidiariesAttached(_count: number) {
+  scopeConfigProjectId.value = ''
+  wizardStore.reset()
+  router.push('/projects')
+}
+
+/** 5.1：关闭"配置合并范围"弹窗（含"暂不配置"）后，结束向导并跳转项目列表 */
+function onScopeConfigClosed(visible: boolean) {
+  if (!visible && scopeConfigProjectId.value) {
+    scopeConfigProjectId.value = ''
+    wizardStore.reset()
+    router.push('/projects')
+  }
 }
 </script>
 

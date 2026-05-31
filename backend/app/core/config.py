@@ -138,6 +138,20 @@ class Settings(BaseSettings):
     # True = 合并模块处于开发中，前端展示警告 banner；端到端验证通过后人工置 False
     CONSOL_MODULE_DEV_MODE: bool = True
 
+    # 合并附注 V2 灰度开关（Phase 2 接线 / ADR-CONSOL-202）
+    # False = 老版兼容（generate_consol_notes_sync，7 骨架章节，默认）
+    # True  = V2（generate_full_consol_notes，消费子公司单体附注汇总）
+    # 默认 False：V2 真实数据验证通过后（Phase 4）再默认开启；V2 异常自动回退老版
+    CONSOL_NOTES_V2_ENABLED: bool = False
+
+    # 国企↔上市跨模板章节翻译接线开关（Phase 2 / ADR-CONSOL-204）
+    # consol_cross_template_service（translate_child_section 等 3 API）原为孤儿
+    # （0 router 引用），Phase 2 随 V2 附注汇总路径接线。
+    # 双开关防御：仅当 CONSOL_NOTES_V2_ENABLED AND CONSOL_CROSS_TEMPLATE_ENABLED
+    # 同时为 True 时才对 template_type 不同的子公司章节做跨模板翻译；
+    # False（默认）= 即使 V2 开启也跳过跨模板翻译，原样汇总（老版兼容、灰度防御）。
+    CONSOL_CROSS_TEMPLATE_ENABLED: bool = False
+
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 
     @property

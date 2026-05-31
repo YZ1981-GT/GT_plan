@@ -1,7 +1,7 @@
 """抵消分录服务 — 异步 ORM"""
 
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime, timezone
 
 import sqlalchemy as sa
@@ -61,12 +61,29 @@ async def create_entry(db: AsyncSession, project_id: UUID, data: EliminationCrea
 
     entry_no = await _generate_entry_no(db, project_id, data.year, data.entry_type)
 
+    # 序列化分录明细行（JSONB），并以首行科目作为分录代表性科目（account_code NOT NULL）
+    lines = [
+        {
+            "account_code": l.account_code,
+            "account_name": l.account_name,
+            "debit_amount": str(l.debit_amount or Decimal("0")),
+            "credit_amount": str(l.credit_amount or Decimal("0")),
+        }
+        for l in data.lines
+    ]
+    first_line = data.lines[0] if data.lines else None
+
     entry = EliminationEntry(
+        id=uuid4(),
         project_id=project_id,
         entry_no=entry_no,
         year=data.year,
         entry_type=data.entry_type,
         description=data.description,
+        account_code=(first_line.account_code if first_line else ""),
+        account_name=(first_line.account_name if first_line else None),
+        lines=lines,
+        entry_group_id=uuid4(),
         related_company_codes=data.related_company_codes,
         review_status=ReviewStatusEnum.draft,
         debit_amount=total_debit,

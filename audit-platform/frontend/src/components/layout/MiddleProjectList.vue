@@ -83,6 +83,7 @@ interface ProjectItem {
   report_scope: string | null
   parent_project_id: string | null
   consol_level: number
+  consol_lock?: boolean
   children?: ProjectItem[]
 }
 

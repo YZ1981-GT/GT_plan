@@ -17,6 +17,7 @@ Validates: Phase 2 Requirements 8.1, 8.2, 8.3, 8.4, 8.5, 8.6
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
@@ -32,7 +33,7 @@ from app.models.consolidation_models import (
     InternalTrade,
     InternalArAp,
 )
-from app.models.consolidation_schemas import ConsolDisclosureSection
+from app.models.consolidation_schemas import ConsolDisclosureSection, ConsolDisclosureRow
 from app.models.report_models import DisclosureNote, ContentType, SourceTemplate, NoteStatus
 from app.services.goodwill_service import get_goodwill_list
 from app.services.minority_interest_service import get_mi_list
@@ -777,6 +778,129 @@ def save_consol_notes_sync(
 
 
 # ============================================================================
+# Phase 2：V2 附注 feature flag 灰度接线（ADR-CONSOL-202 / 需求 3 / 属性 S4）
+# ============================================================================
+
+
+def _adapt_v2_row_to_schema(row) -> ConsolDisclosureRow:
+    """将单个 V2 行（dict 或 list）映射到 ConsolDisclosureRow（最多 6 列）.
+
+    防御性处理：
+    - dict 形态：按 col_1..col_6 / col1..col6 键取值（任一命名都接受）；
+    - list 形态：按位置映射到 col_1..col_6（多余的截断，缺的留 None）；
+    - 其他/None：返回空行。
+    所有单元格值统一 stringify（None 保持 None）。
+    """
+    def _stringify(v):
+        return None if v is None else str(v)
+
+    if isinstance(row, dict):
+        data: dict = {}
+        row_index = row.get("row_index")
+        if isinstance(row_index, int):
+            data["row_index"] = row_index
+        for i in range(1, 7):
+            # 同时兼容 col_1 / col1 两种命名
+            val = row.get(f"col_{i}")
+            if val is None:
+                val = row.get(f"col{i}")
+            if val is not None:
+                data[f"col_{i}"] = _stringify(val)
+        return ConsolDisclosureRow(**data)
+
+    if isinstance(row, (list, tuple)):
+        data = {}
+        for i, val in enumerate(row[:6], start=1):
+            data[f"col_{i}"] = _stringify(val)
+        return ConsolDisclosureRow(**data)
+
+    return ConsolDisclosureRow()
+
+
+def _adapt_v2_sections_to_schema(
+    v2_sections: list[dict],
+) -> list[ConsolDisclosureSection]:
+    """S4 归一化层：将 V2 dict 章节列表适配为 ConsolDisclosureSection（与老版契约一致）.
+
+    V2 章节是 plain dict（section_id / section_title / section_type / table_data{rows,summary} ...），
+    老版返回 Pydantic ConsolDisclosureSection。本适配器保证无论数据来源如何，
+    路由 response_model=list[ConsolDisclosureSection] 的契约都成立。
+
+    映射规则：
+    - section_code  <- section_id / section_code / ""
+    - section_title <- section_title / ""
+    - content       <- summary / table_data.summary / None
+    - rows          <- table_data.rows 逐行映射为 ConsolDisclosureRow（最多 6 列）
+    - is_editable   <- is_editable（默认 True）
+    - is_group_header <- is_group_header 或 section_type == "group_header"
+    """
+    adapted: list[ConsolDisclosureSection] = []
+    for raw in v2_sections or []:
+        if not isinstance(raw, dict):
+            continue
+
+        table_data = raw.get("table_data") or {}
+        if not isinstance(table_data, dict):
+            table_data = {}
+
+        content = raw.get("summary") or table_data.get("summary") or None
+
+        raw_rows = table_data.get("rows")
+        if not isinstance(raw_rows, (list, tuple)):
+            raw_rows = []
+        rows = [_adapt_v2_row_to_schema(r) for r in raw_rows]
+
+        is_group_header = bool(
+            raw.get("is_group_header")
+            or raw.get("section_type") == "group_header"
+        )
+
+        adapted.append(
+            ConsolDisclosureSection(
+                section_code=raw.get("section_id") or raw.get("section_code") or "",
+                section_title=raw.get("section_title") or "",
+                content=content,
+                rows=rows,
+                is_editable=bool(raw.get("is_editable", True)),
+                is_group_header=is_group_header,
+            )
+        )
+    return adapted
+
+
+async def generate_consol_notes_with_flag(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+) -> list[ConsolDisclosureSection]:
+    """合并附注生成统一入口（feature flag 灰度，ADR-CONSOL-202）.
+
+    - CONSOL_NOTES_V2_ENABLED == True：调 V2 generate_full_consol_notes（消费子公司
+      单体附注汇总），经 _adapt_v2_sections_to_schema 归一化为 ConsolDisclosureSection；
+      V2 任意异常（EH3/R2）→ logger.warning + 回退老版 generate_consol_notes_sync，
+      不破坏既有可用性。
+    - 否则：直接返回老版 generate_consol_notes_sync（7 骨架章节）。
+
+    返回结构契约与老版一致（list[ConsolDisclosureSection]，属性 S4）。
+    """
+    from app.core.config import settings
+
+    if getattr(settings, "CONSOL_NOTES_V2_ENABLED", False):
+        try:
+            v2_sections = await generate_full_consol_notes(db, project_id, year)
+            return _adapt_v2_sections_to_schema(v2_sections)
+        except Exception as err:  # EH3/R2：V2 失败回退老版兼容
+            logger.warning(
+                "generate_full_consol_notes (V2) failed, falling back to legacy "
+                "generate_consol_notes_sync: project_id=%s year=%s err=%s",
+                project_id, year, err,
+            )
+            return generate_consol_notes_sync(db, project_id, year)
+
+    return generate_consol_notes_sync(db, project_id, year)
+
+
+# ============================================================================
 # V2：合并附注完整生成（Sprint B.1.1~B.1.10）
 # ============================================================================
 
@@ -832,6 +956,7 @@ async def generate_full_consol_notes(
             year=year,
             mapping=mapping,
             subsidiaries=subsidiaries,
+            consol_type=template_type,
         )
         if section_result is not None:
             common_sections.append(section_result)
@@ -870,6 +995,7 @@ async def _aggregate_common_section(
     year: int,
     mapping: dict,
     subsidiaries: list[dict],
+    consol_type: str = "soe",
 ) -> dict | None:
     """调 consol_note_aggregation_service.aggregate_section 汇总单个共有章节.
 
@@ -913,7 +1039,33 @@ async def _aggregate_common_section(
     # B.1.4 抵销前后双列标记
     result = _add_elimination_columns(result, elimination_rule)
 
-    return {
+    # Phase 3（consol-phase3-frontend-drilldown / T2 / ADR-CONSOL-302）：
+    # 汇总每章节时同步写 consolidation_breakdown provenance（哪些子公司贡献多少），
+    # 供附注穿透端点直接读，无需事后重算。
+    # 注：V2 generate_full_consol_notes 输出目前尚未接 disclosure_notes 落库路径
+    # （依赖 Phase 2 V2 接线）；这里先把 provenance + source_project_id 附在返回的
+    # 章节 dict 上，供端点（note_consol_drilldown_service）与未来落库逻辑读取。
+    section_title = mapping.get("section_title") or consol_section_id
+    consolidation_breakdown = _build_section_consolidation_breakdown(
+        section_title=section_title,
+        result=result,
+        subsidiaries=subsidiaries,
+    )
+
+    # 5C cross_template 孤儿接线（ADR-CONSOL-204 / 需求 6 / S7 / EH7）：
+    # 当 V2 + cross_template 双开关开启且子公司模板与合并模板不同时，
+    # 调 consol_cross_template_service.translate_child_section 翻译后汇总，
+    # 并把 provenance（含降级 warning）附在章节 dict 上。无需翻译时返回 None。
+    cross_template = await _maybe_apply_cross_template(
+        db=db,
+        parent_project_id=consol_project_id,
+        year=year,
+        consol_type=consol_type,
+        mapping=mapping,
+        subsidiaries=subsidiaries,
+    )
+
+    section_out = {
         "section_id": consol_section_id,
         "source_section_id": section_id,
         "section_type": "common",
@@ -922,7 +1074,95 @@ async def _aggregate_common_section(
         "scope": "consolidated",
         "level": 3,
         "auto_numbering": True,
+        # Phase 3 附注级穿透 provenance（落 disclosure_notes.consolidation_breakdown）
+        "source_project_id": str(consol_project_id),
+        "consolidation_breakdown": consolidation_breakdown,
     }
+    if cross_template is not None:
+        section_out["cross_template"] = cross_template
+    return section_out
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 附注级穿透 provenance 构建（consol-phase3-frontend-drilldown / T2）
+# ---------------------------------------------------------------------------
+
+
+def _build_section_consolidation_breakdown(
+    section_title: str,
+    result: dict,
+    subsidiaries: list[dict],
+) -> dict:
+    """构建附注合并章节的 consolidation_breakdown provenance.
+
+    形态与 Phase 0 consol_trial.consolidation_breakdown 对称（V034 / B1）：
+        {
+          "by_company": [
+            {"company_code", "company_name", "section_title", "amount"(str Decimal)}
+          ],
+          "computed_at": "<iso>",
+        }
+
+    各子公司贡献金额 = 该子公司所有行的全部数值单元格之和（按 source_project 归并）。
+    section 汇总值 == Σ by_company[*].amount（同一批单元格按来源子公司的划分，
+    自洽性见属性 T2）。amount == 0 的子公司仍保留（便于穿透展示"贡献为 0"）。
+
+    无法归属来源（source_project 缺失，如已模糊合并的行）的金额走 best-effort：
+    不计入 by_company（避免错误归属），故仅在所有行均带 source_project 时
+    Σ by_company == section 汇总值严格成立。
+    """
+    # project_id(str) -> {company_code, company_name}
+    company_map: dict[str, dict] = {}
+    for sub in subsidiaries:
+        pid = sub.get("project_id")
+        if pid is None:
+            continue
+        company_map[str(pid)] = {
+            "company_code": sub.get("company_code"),
+            "company_name": sub.get("company_name"),
+        }
+
+    amounts: dict[str, Decimal] = {}
+    for row in (result.get("rows") or []):
+        if not isinstance(row, dict):
+            continue
+        source_project = row.get("source_project")
+        if source_project is None:
+            # 已合并/无来源行：best-effort 不归属（避免错误归属，见 docstring）
+            continue
+        pid_str = str(source_project)
+        row_total = _sum_row_numeric_values(row.get("values") or {})
+        amounts[pid_str] = amounts.get(pid_str, Decimal("0")) + row_total
+
+    by_company: list[dict] = []
+    for pid_str, amount in amounts.items():
+        meta = company_map.get(pid_str, {})
+        by_company.append({
+            # source_project_id 供前端 ConsolBreakdownDialog 跨项目跳转单体附注（T3）
+            "source_project_id": pid_str,
+            "company_code": meta.get("company_code"),
+            "company_name": meta.get("company_name"),
+            "section_title": section_title,
+            "amount": str(amount),
+        })
+
+    return {
+        "by_company": by_company,
+        "computed_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _sum_row_numeric_values(values: dict) -> Decimal:
+    """对一行的全部数值单元格求和（Decimal，跳过非数值/None）."""
+    total = Decimal("0")
+    for val in (values or {}).values():
+        if val is None:
+            continue
+        try:
+            total += Decimal(str(val))
+        except (InvalidOperation, ValueError, TypeError):
+            continue
+    return total
 
 
 # ---------------------------------------------------------------------------
@@ -939,21 +1179,248 @@ async def _fetch_subsidiary_list(
     B.1.3 实现。
     """
     from app.services.consol_tree_service import build_tree, get_descendants
+    from app.models.core import Project
 
     tree = await build_tree(db, parent_project_id)
     if tree is None:
         return []
 
     descendants = get_descendants(tree)
+
+    # 批量读取各子公司 Project.template_type（国企/上市 跨模板翻译用，ADR-CONSOL-204）。
+    # build_tree 的 TreeNode 不带 template_type，这里单独一次性 IN 查询补齐，
+    # 失败时降级为 None（视为未知 → 翻译路径按"同模板"处理，不丢章节）。
+    template_type_map: dict[UUID, str | None] = {}
+    try:
+        node_ids = [node.project_id for node in descendants]
+        if node_ids:
+            rows = await db.execute(
+                sa.select(Project.id, Project.template_type).where(
+                    Project.id.in_(node_ids),
+                )
+            )
+            template_type_map = {row[0]: row[1] for row in rows.all()}
+    except Exception as err:  # 降级：template_type 读取失败不阻断附注生成
+        logger.warning(
+            "Failed to load subsidiary template_type (cross_template will treat as "
+            "same-type): parent_project_id=%s err=%s",
+            parent_project_id, err,
+        )
+
     return [
         {
             "project_id": node.project_id,
             "company_code": node.company_code,
             "company_name": node.company_name,
             "consol_level": node.consol_level,
+            "template_type": template_type_map.get(node.project_id),
         }
         for node in descendants
     ]
+
+
+# ---------------------------------------------------------------------------
+# 5C cross_template 孤儿接线（ADR-CONSOL-204 / 需求 6 / 属性 S7 / EH7）
+# ---------------------------------------------------------------------------
+
+
+def apply_cross_template_to_children(
+    section_id: str,
+    children: list[dict],
+    consol_type: str,
+) -> tuple[list[dict], list[str]]:
+    """对各子公司章节做国企↔上市跨模板翻译（feature flag 受控）.
+
+    把孤立的 `consol_cross_template_service.translate_child_section` 接入 V2 附注
+    汇总的 live 路径（消除孤儿，需求 6.1/6.2）。
+
+    Args:
+        section_id: 章节标识（用于回填 child section_id，便于映射查找）
+        children: 子公司章节列表，每项形如
+            ``{"project_id", "company_name", "template_type", "section_data": dict}``
+        consol_type: 合并项目模板类型（soe/listed），即翻译目标 to_type
+
+    Returns:
+        ``(translated_children, warnings)``：
+        - translated_children：与输入**等长**的列表（S7 不丢章节），每项的
+          ``section_data`` 被替换为翻译结果；同模板/未知模板原样透传。
+        - warnings：降级（无匹配映射 / 翻译异常）时累计的中文 warning（EH7）。
+
+    保证（属性 S7 / 错误场景 EH7）：
+    - 输出章节数 == 输入章节数（``len(out) == len(children)``），任何情况下不丢章节。
+    - 子公司 template_type 与 consol_type 相同（或未知 None）→ 原样汇总，不翻译。
+    - 不同 → 调 translate_child_section 翻译后汇总。
+    - 翻译异常 / 无匹配映射 → 降级为原样章节 + 累计 warning（不让翻译缺失丢章节）。
+    """
+    from app.services.consol_cross_template_service import translate_child_section
+
+    translated_children: list[dict] = []
+    warnings: list[str] = []
+
+    for child in children:
+        child_template = child.get("template_type") or consol_type
+        section_data = child.get("section_data")
+        company_name = child.get("company_name", "")
+
+        # 同模板 / 未知模板 / section_data 非 dict → 原样透传（不翻译，不丢）
+        if (
+            child_template == consol_type
+            or not isinstance(section_data, dict)
+        ):
+            translated_children.append(child)
+            continue
+
+        try:
+            # 回填 section_id 便于 classify_section_mapping 命中映射
+            payload = dict(section_data)
+            payload.setdefault("section_id", section_id)
+            translated = translate_child_section(
+                payload,
+                from_type=child_template,
+                to_type=consol_type,
+            )
+            translation_type = translated.get("_translation_type")
+            # EH7：无匹配映射（unknown / target_only / 子公司无数据）→ warning，
+            # 但仍保留章节（translate_child_section 永不返回 None，保证不丢）。
+            if translation_type in ("unknown", "target_only") or translated.get(
+                "_not_applicable"
+            ):
+                warnings.append(
+                    f"章节 {section_id} 子公司「{company_name}」"
+                    f"（{child_template}→{consol_type}）无匹配跨模板映射，已降级原样汇总"
+                )
+                # target_only/not_applicable：子公司本无此章节数据，保留原始 section_data
+                new_child = dict(child)
+                new_child["section_data"] = section_data
+                translated_children.append(new_child)
+                continue
+
+            new_child = dict(child)
+            new_child["section_data"] = translated
+            translated_children.append(new_child)
+        except Exception as err:  # EH7：翻译异常 → 降级原样汇总 + warning，绝不丢章节
+            logger.warning(
+                "cross_template translate_child_section failed, degrade to passthrough: "
+                "section_id=%s company=%s %s→%s err=%s",
+                section_id, company_name, child_template, consol_type, err,
+            )
+            warnings.append(
+                f"章节 {section_id} 子公司「{company_name}」跨模板翻译异常，已降级原样汇总"
+            )
+            translated_children.append(child)
+
+    return translated_children, warnings
+
+
+async def _maybe_apply_cross_template(
+    db: AsyncSession,
+    parent_project_id: UUID,
+    year: int,
+    consol_type: str,
+    mapping: dict,
+    subsidiaries: list[dict],
+) -> dict | None:
+    """读取各子公司单体附注章节并做跨模板翻译，返回 cross_template provenance.
+
+    仅当 `CONSOL_NOTES_V2_ENABLED AND CONSOL_CROSS_TEMPLATE_ENABLED` 同时为 True，
+    且子公司中存在与 consol_type 不同的 template_type 时才真正执行（避免影响
+    老版/同模板路径，需求 6.3 feature flag 受控）。
+
+    返回值挂在章节 dict 的 `cross_template` 字段，作为孤儿服务被 live 路径调用的
+    真实证据（build_cross_template_provenance 标识 has_cross_template）。
+    无需翻译时返回 None（调用方据此不附加该字段）。
+    """
+    from app.core.config import settings
+    from app.services.consol_cross_template_service import (
+        build_cross_template_provenance,
+    )
+
+    if not (
+        getattr(settings, "CONSOL_NOTES_V2_ENABLED", False)
+        and getattr(settings, "CONSOL_CROSS_TEMPLATE_ENABLED", False)
+    ):
+        return None
+
+    # 仅当存在跨模板子公司时才介入（同模板集团跳过，零开销）
+    differing = [
+        s for s in subsidiaries
+        if (s.get("template_type") or consol_type) != consol_type
+    ]
+    if not differing:
+        return None
+
+    section_id = mapping.get("section_id", "")
+
+    # 读取各子公司该章节的单体附注数据（与 aggregation_service 同源 disclosure_notes）
+    children: list[dict] = []
+    try:
+        for sub in subsidiaries:
+            section_data = await _load_child_section_data(
+                db, sub["project_id"], year, section_id,
+            )
+            children.append({
+                "project_id": str(sub["project_id"]),
+                "company_name": sub.get("company_name", ""),
+                "template_type": sub.get("template_type") or consol_type,
+                "section_data": section_data or {"section_id": section_id},
+            })
+    except Exception as err:  # 读取失败不阻断附注生成（降级：不附加 cross_template）
+        logger.warning(
+            "cross_template child section load failed, skip translation: "
+            "section_id=%s err=%s", section_id, err,
+        )
+        return None
+
+    translated_children, warnings = apply_cross_template_to_children(
+        section_id, children, consol_type,
+    )
+
+    # S7 不变量：翻译前后章节数恒等（断言式防御，永不丢章节）
+    if len(translated_children) != len(children):  # pragma: no cover - 防御
+        logger.error(
+            "cross_template section loss detected (in=%d out=%d), aborting translation "
+            "for section_id=%s", len(children), len(translated_children), section_id,
+        )
+        return None
+
+    contributions = [
+        {
+            "project_id": c.get("project_id", ""),
+            "company_name": c.get("company_name", ""),
+            "template_type": c.get("template_type", consol_type),
+        }
+        for c in translated_children
+    ]
+    provenance = build_cross_template_provenance(contributions)
+    provenance["warnings"] = warnings
+    provenance["child_count"] = len(translated_children)
+    return provenance
+
+
+async def _load_child_section_data(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    section_id: str,
+) -> dict | None:
+    """读取单个子公司单体附注章节的 table_data（供跨模板翻译用）."""
+    try:
+        row = await db.execute(
+            sa.text(
+                "SELECT table_data FROM disclosure_notes "
+                "WHERE project_id = :pid AND year = :year "
+                "AND section_id = :sid AND is_deleted = false LIMIT 1"
+            ),
+            {"pid": str(project_id), "year": year, "sid": section_id},
+        )
+        record = row.first()
+        if record and isinstance(record[0], dict):
+            data = dict(record[0])
+            data.setdefault("section_id", section_id)
+            return data
+    except Exception:
+        pass
+    return None
 
 
 # ---------------------------------------------------------------------------

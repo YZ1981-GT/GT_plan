@@ -224,11 +224,19 @@ export const consolidation = {
   notes: {
     list: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}`,
     save: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}/save`,
+    // Phase 2 F3：重新汇总合并附注（消费子公司单体附注，V2 接线 → ReaggregateResponse）
+    reaggregate: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}/reaggregate`,
+    // Phase 3：附注级合并穿透明细（disclosure_notes.consolidation_breakdown provenance）
+    consolBreakdown: (pid: string, year: number, sectionId: string) =>
+      `/api/consolidation/notes/${pid}/${year}/${sectionId}/consol-breakdown`,
   },
   reports: {
     list: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}`,
     generate: '/api/consolidation/reports/generate',
     balanceCheck: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}/balance-check`,
+    // 报表级合并穿透明细（前瞻定义，依赖 Phase 2 后端端点；未就绪时组件降级为友好空态）
+    consolBreakdown: (pid: string, year: number, accountCode: string) =>
+      `/api/consolidation/report/${pid}/${year}/${accountCode}/consol-breakdown`,
   },
   worksheet: {
     tree: '/api/consolidation/worksheet/tree',
@@ -245,6 +253,11 @@ export const consolidation = {
   unlock: (pid: string) => `/api/consolidation/${pid}/unlock`,
   lockStatus: (pid: string) => `/api/consolidation/${pid}/lock-status`,
   snapshots: (pid: string) => `/api/consolidation/${pid}/snapshots`,
+  // Phase 2 F3（A5 一键级联刷新）：refresh-all 入队后台 worker 返回 job_id；
+  // refresh-status 为 SSE 断开时的兜底查询（EH6）。SSE 进度走既有 events/stream。
+  refreshAll: (pid: string, year: number) => `/api/consolidation/${pid}/${year}/refresh-all`,
+  refreshStatus: (pid: string, year: number, jobId: string) =>
+    `/api/consolidation/${pid}/${year}/refresh-status/${jobId}`,
 } as const
 
 // ─── 合并工作底稿数据 ───────────────────────────────────────────────────────

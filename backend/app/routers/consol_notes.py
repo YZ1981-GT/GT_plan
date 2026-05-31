@@ -21,10 +21,11 @@ from app.deps import require_project_access
 from app.core.database import get_db
 from app.models.consolidation_schemas import ConsolDisclosureSection
 from app.services.consol_disclosure_service import (
-    generate_consol_notes_sync,
+    generate_consol_notes_with_flag,
     integrate_consol_notes_sync,
     save_consol_notes_sync,
 )
+from app.services.note_consol_drilldown_service import get_note_consol_breakdown
 
 router = APIRouter(
     prefix="/api/consolidation/notes",
@@ -52,7 +53,7 @@ async def create_consol_notes(
     user=Depends(require_project_access("edit")),
 ):
     """生成合并附注"""
-    sections = generate_consol_notes_sync(db, project_id, year)
+    sections = await generate_consol_notes_with_flag(db, project_id, year)
     return sections
 
 
@@ -64,7 +65,7 @@ async def get_consol_notes(
     user=Depends(require_project_access("readonly")),
 ):
     """获取合并附注"""
-    sections = generate_consol_notes_sync(db, project_id, year)
+    sections = await generate_consol_notes_with_flag(db, project_id, year)
     return sections
 
 
@@ -90,7 +91,7 @@ async def save_consol_notes(
     user=Depends(require_project_access("edit")),
 ):
     """保存合并附注到数据库"""
-    sections = generate_consol_notes_sync(db, project_id, year)
+    sections = await generate_consol_notes_with_flag(db, project_id, year)
     saved = save_consol_notes_sync(db, project_id, year, sections)
     return {
         "message": "合并附注保存成功",
@@ -198,3 +199,29 @@ def _load_mapped_section_ids() -> list[str]:
             if sid:
                 section_ids.append(sid)
     return section_ids
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 附注级穿透端点（consol-phase3-frontend-drilldown / 需求 2.3）
+# ---------------------------------------------------------------------------
+#
+# 路由顺序说明：本端点路径 {year}/{section_id}/consol-breakdown 与既有
+# {year}/save、{year}/reaggregate 不冲突（后者第二段是静态 save/reaggregate，
+# 本端点第二段是动态 {section_id}）。为稳妥放在所有既有路由之后注册。
+
+
+@router.get("/{project_id}/{year}/{section_id}/consol-breakdown")
+async def get_consol_note_breakdown(
+    project_id: UUID,
+    year: int,
+    section_id: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("readonly")),
+):
+    """获取某合并附注章节的子公司贡献明细（附注级穿透）.
+
+    数据来自 disclosure_notes.consolidation_breakdown（V2 汇总时写入）。
+    无明细时返回空 by_company + has_breakdown=false + 中文友好提示（HTTP 200，
+    不 404/500），见错误场景 EH1/EH3。
+    """
+    return await get_note_consol_breakdown(db, project_id, year, section_id)
