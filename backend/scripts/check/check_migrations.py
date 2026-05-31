@@ -13,7 +13,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
-VERSIONS_DIR = Path(__file__).parent.parent / "alembic" / "versions"
+ROOT = Path(__file__).resolve().parents[3]
+VERSIONS_DIR = ROOT / "backend" / "alembic" / "versions"
 ARCHIVED_DIR = VERSIONS_DIR / "_archived"
 
 

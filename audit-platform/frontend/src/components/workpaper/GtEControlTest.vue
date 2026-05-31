@@ -313,6 +313,18 @@ initData()
 
 watch(() => props.htmlData, () => { initData() }, { deep: true })
 watch(() => props.schema, () => { activeStepNo.value = steps.value[0]?.step ?? 1 }, { deep: true })
+
+// ─── wp-locate-foundation Task 3.2: 暴露 scrollToRow 定位接口 ───
+function scrollToRow(index: number) {
+  const container = document.querySelector('.gt-e-control-test')
+  if (!container) return
+  const rows = container.querySelectorAll('.el-table__body .el-table__row')
+  if (index >= 0 && index < rows.length) {
+    rows[index].scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+}
+
+defineExpose({ scrollToRow })
 </script>
 
 <style scoped>

@@ -61,7 +61,7 @@ class MinerUService:
         else:
             # HTTP 模式：检查 API 服务是否可用
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=10.0, mounts={}, trust_env=False) as client:
                     response = await client.get(f"{self.api_url}/health")
                     return response.status_code == 200
             except Exception as exc:
@@ -167,7 +167,7 @@ class MinerUService:
     ) -> dict[str, Any]:
         """使用 HTTP 模式解析文档"""
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, mounts={}, trust_env=False) as client:
                 # 调用 MinerU API
                 with open(file_path, "rb") as f:
                     files = {"file": f}
@@ -207,7 +207,7 @@ class MinerUService:
         else:
             # HTTP 模式：调用 API
             try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                async with httpx.AsyncClient(timeout=self.timeout, mounts={}, trust_env=False) as client:
                     with open(file_path, "rb") as f:
                         files = {"file": f}
                         response = await client.post(
@@ -236,7 +236,7 @@ class MinerUService:
         else:
             # HTTP 模式：调用 API
             try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                async with httpx.AsyncClient(timeout=self.timeout, mounts={}, trust_env=False) as client:
                     with open(file_path, "rb") as f:
                         files = {"file": f}
                         response = await client.post(

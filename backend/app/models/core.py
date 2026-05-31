@@ -130,6 +130,11 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         comment="是否有外币业务（驱动 E1-1 双区显隐 + E1-3 双版本二选一）",
     )
 
+    # multi-standard-unification 需求 1.1: 结构化统一准则状态源（单一真理源）
+    # {entity_type: "soe"|"listed"|"private", scope: "standalone"|"consolidated",
+    #  stage: "normal"|"ipo"|"transfer"|"restructure"|"fraud_response"}
+    applicable_standard_v2: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
     # Phase 6 F8: 复核链配置（2-4 级可配置状态机）
     review_config: Mapped[dict | None] = mapped_column(
         JSONB,

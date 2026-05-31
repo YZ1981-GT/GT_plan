@@ -300,10 +300,29 @@ async def generate_from_codes(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """从推荐的底稿编码列表直接生成底稿文件（不需要模板集）"""
+    """从推荐的底稿编码列表直接生成底稿文件（不需要模板集）
+
+    改造要点（wp-generation-pipeline spec）：
+    - 前置门禁：trial_balance > 0 行
+    - savepoint 隔离：单条失败不影响整批
+    - populate_parsed_data：填充 html_data 供渲染器消费
+    - 结构化返回：created/skipped/failures + codes 列表
+    """
     import json
+    import logging
+    import os
     import shutil
     from pathlib import Path
+
+    from app.services.prerequisite_checker import PrerequisiteChecker
+    from app.services.wp_parsed_data_service import populate_parsed_data
+
+    _logger = logging.getLogger(__name__)
+
+    # [新增] 前置门禁
+    check = await PrerequisiteChecker().check(db, project_id, data.year, "generate_from_codes")
+    if not check["ok"]:
+        raise HTTPException(status_code=422, detail=check)
 
     lib_path = Path(__file__).parent.parent.parent / "data" / "gt_template_library.json"
     template_lib: dict[str, dict] = {}
@@ -319,6 +338,9 @@ async def generate_from_codes(
     project_wp_dir = Path("storage") / "projects" / str(project_id) / "workpapers"
     created = 0
     skipped = 0
+    failures: list[dict] = []
+    created_codes: list[str] = []
+    skipped_codes: list[str] = []
 
     for code in data.wp_codes:
         # 检查是否已存在
@@ -331,112 +353,123 @@ async def generate_from_codes(
         )
         if existing.scalar_one_or_none():
             skipped += 1
+            skipped_codes.append(code)
             continue
 
-        lib_entry = template_lib.get(code, {})
-        wp_name = lib_entry.get("name", lib_entry.get("wp_name", f"底稿{code}"))
-        cycle = lib_entry.get("cycle_prefix", code[0] if code else "X")
-
-        # 创建 wp_index
-        wp_index = WpIndex(
-            project_id=project_id,
-            wp_code=code,
-            wp_name=wp_name,
-            audit_cycle=cycle,
-            status=WpStatus.not_started,
-        )
-        db.add(wp_index)
-        await db.flush()
-
-        # 文件目录
-        cycle_dir = project_wp_dir / cycle
-        cycle_dir.mkdir(parents=True, exist_ok=True)
-        dest_file = cycle_dir / f"{code}.xlsx"
-
-        # 复制模板文件（优先从知识库底稿模板目录查找）
-        copied = False
-        src_path = lib_entry.get("file_path", "")
-        template_name = lib_entry.get("name", "") or wp_name
-
-        # 1. 知识库底稿模板目录: ~/.gt_audit_helper/knowledge/workpaper_templates/{cycle}/
-        import os
-        kb_base = Path(os.path.expanduser("~/.gt_audit_helper/knowledge/workpaper_templates"))
-        kb_file = kb_base / cycle / f"{template_name}.xlsx" if template_name else None
-        # 也尝试用原始文件名
-        if src_path:
-            kb_file_by_name = kb_base / cycle / Path(src_path).name
-        else:
-            kb_file_by_name = None
-
-        for candidate in [kb_file, kb_file_by_name]:
-            if candidate and candidate.exists():
-                shutil.copy2(candidate, dest_file)
-                copied = True
-                break
-
-        # 2. 回退：从原始模板路径查找（项目根目录）
-        if not copied and src_path:
-            src = Path(src_path)
-            if not src.exists():
-                root_src = Path(__file__).resolve().parent.parent.parent.parent / src_path
-                if root_src.exists():
-                    src = root_src
-            if src.exists():
-                shutil.copy2(src, dest_file)
-                copied = True
-
-        if not copied:
-            try:
-                import openpyxl
-                wb = openpyxl.Workbook()
-                ws = wb.active
-                ws.title = code
-                ws["A1"] = f"底稿编号: {code}"
-                ws["A2"] = f"底稿名称: {wp_name}"
-                ws["A3"] = f"审计年度: {data.year}"
-                wb.save(str(dest_file))
-                wb.close()
-            except Exception:
-                dest_file.write_bytes(b"")
-
-        # 创建 working_paper
-        wp = WorkingPaper(
-            project_id=project_id,
-            wp_index_id=wp_index.id,
-            file_path=str(dest_file),
-            source_type=WpSourceType.template,
-            file_version=1,
-            created_by=current_user.id,
-        )
-        db.add(wp)
-
-        # F50 / Sprint 8.17: 底稿快照绑定 —— 绑定当前 active dataset
+        # [新增] savepoint 隔离单条处理
         try:
-            from app.services.dataset_query import bind_to_active_dataset
-            await bind_to_active_dataset(db, wp, project_id, data.year)
-        except Exception as _bind_err:
-            import logging
-            logging.getLogger(__name__).warning(
-                "dataset binding failed for wp %s: %s", code, _bind_err
-            )
+            async with db.begin_nested():
+                lib_entry = template_lib.get(code, {})
+                wp_name = lib_entry.get("name", lib_entry.get("wp_name", f"底稿{code}"))
+                cycle = lib_entry.get("cycle_prefix", code[0] if code else "X")
 
-        # 填充底稿表头（编制单位/审计期间/索引号/交叉索引等）
-        try:
-            from app.services.wp_header_service import fill_workpaper_header
-            await fill_workpaper_header(
-                db=db, project_id=project_id, wp_id=wp.id,
-                file_path=str(dest_file), wp_code=code, wp_name=wp_name,
-                cycle=cycle,
-            )
-        except Exception as _e:
-            import logging
-            logging.getLogger(__name__).warning("fill header failed for %s: %s", code, _e)
+                # 创建 wp_index
+                wp_index = WpIndex(
+                    project_id=project_id,
+                    wp_code=code,
+                    wp_name=wp_name,
+                    audit_cycle=cycle,
+                    status=WpStatus.not_started,
+                )
+                db.add(wp_index)
+                await db.flush()
 
-        created += 1
+                # 文件目录
+                cycle_dir = project_wp_dir / cycle
+                cycle_dir.mkdir(parents=True, exist_ok=True)
+                dest_file = cycle_dir / f"{code}.xlsx"
 
-    await db.flush()
+                # 复制模板文件（优先从知识库底稿模板目录查找）
+                copied = False
+                src_path = lib_entry.get("file_path", "")
+                template_name = lib_entry.get("name", "") or wp_name
+
+                # 1. 知识库底稿模板目录
+                kb_base = Path(os.path.expanduser("~/.gt_audit_helper/knowledge/workpaper_templates"))
+                kb_file = kb_base / cycle / f"{template_name}.xlsx" if template_name else None
+                if src_path:
+                    kb_file_by_name = kb_base / cycle / Path(src_path).name
+                else:
+                    kb_file_by_name = None
+
+                for candidate in [kb_file, kb_file_by_name]:
+                    if candidate and candidate.exists():
+                        shutil.copy2(candidate, dest_file)
+                        copied = True
+                        break
+
+                # 2. 回退：从原始模板路径查找（项目根目录）
+                if not copied and src_path:
+                    src = Path(src_path)
+                    if not src.exists():
+                        root_src = Path(__file__).resolve().parent.parent.parent.parent / src_path
+                        if root_src.exists():
+                            src = root_src
+                    if src.exists():
+                        shutil.copy2(src, dest_file)
+                        copied = True
+
+                if not copied:
+                    try:
+                        import openpyxl
+                        wb = openpyxl.Workbook()
+                        ws = wb.active
+                        ws.title = code
+                        ws["A1"] = f"底稿编号: {code}"
+                        ws["A2"] = f"底稿名称: {wp_name}"
+                        ws["A3"] = f"审计年度: {data.year}"
+                        wb.save(str(dest_file))
+                        wb.close()
+                    except Exception:
+                        dest_file.write_bytes(b"")
+
+                # 创建 working_paper
+                wp = WorkingPaper(
+                    project_id=project_id,
+                    wp_index_id=wp_index.id,
+                    file_path=str(dest_file),
+                    source_type=WpSourceType.template,
+                    file_version=1,
+                    created_by=current_user.id,
+                )
+                db.add(wp)
+
+                # 底稿快照绑定
+                try:
+                    from app.services.dataset_query import bind_to_active_dataset
+                    await bind_to_active_dataset(db, wp, project_id, data.year)
+                except Exception as _bind_err:
+                    _logger.warning("dataset binding failed for wp %s: %s", code, _bind_err)
+
+                # 填充底稿表头
+                try:
+                    from app.services.wp_header_service import fill_workpaper_header
+                    await fill_workpaper_header(
+                        db=db, project_id=project_id, wp_id=wp.id,
+                        file_path=str(dest_file), wp_code=code, wp_name=wp_name,
+                        cycle=cycle,
+                    )
+                except Exception as _e:
+                    _logger.warning("fill header failed for %s: %s", code, _e)
+
+                # [新增] 填充 parsed_data（核心产物）
+                await populate_parsed_data(db, wp, code, wp_name, cycle)
+
+            created += 1
+            created_codes.append(code)
+        except Exception as e:
+            failures.append({"wp_code": code, "error": str(e)})
+            _logger.warning("generate failed for %s: %s", code, e)
+
     await db.commit()
-    return {"created": created, "skipped": skipped, "message": f"已生成 {created} 个底稿，跳过 {skipped} 个已存在"}
+    return {
+        "created": created,
+        "skipped": skipped,
+        "created_codes": created_codes,
+        "skipped_codes": skipped_codes,
+        "failures": failures,
+        "message": f"已生成 {created} 个底稿，跳过 {skipped} 个，失败 {len(failures)} 个",
+    }
 
 
 class CreateCustomWorkpaperRequest(BaseModel):

@@ -104,7 +104,7 @@
 
 ---
 
-## 二、进行中 / 待启动 Spec（active，5 个）
+## 二、进行中 / 待启动 Spec（active）
 
 > 状态图例：📌 占位 stub（仅 README，无 tasks.md，代码未动）/ ⏳ 实施中 / ✅ 核心完成
 > 核心已闭环的 spec 均已归档到 `_archive/`，根目录只保留尚未启动的真 stub 或进行中 spec。
@@ -121,7 +121,7 @@
 
 ---
 
-## 三、已归档 Spec（`_archive/`，84 个）
+## 三、已归档 Spec（`_archive/`，90 个）
 
 > 已完成且不再演进的 spec，保留审计轨迹。归档不删文件。
 > **物理结构**：`_archive/` 下按功能 + 开发先后分 9 个分类目录，每个目录含 README 说明。
@@ -133,10 +133,10 @@ _archive/
 ├── 01-phase-foundation/        平台地基（Phase 0~16，24 个）
 ├── 02-workpaper-cycles/        审计循环业务内容（11 循环 + 5 底稿基础，16 个）
 ├── 03-refinement-rounds/       五角色轮转打磨（R1~R9，9 个）
-├── 04-infra-architecture/      基础设施 / 全局架构（8 个）
+├── 04-infra-architecture/      基础设施 / 全局架构（9 个）
 ├── 05-business-features/       业务专项功能（12 个）
 ├── 06-engineering-governance/  工程治理（4 个）
-├── 07-workpaper-slimdown/      底稿模块瘦身系列（5 个）
+├── 07-workpaper-slimdown/      底稿模块瘦身系列（6 个）
 ├── 08-disclosure-notes/        附注模块系列（2 个）
 └── 99-superseded/              已被取代 / 合并（4 个）
 ```
@@ -163,9 +163,9 @@ _archive/
 
 `refinement-round1-review-closure` · `refinement-round2-project-manager` · `refinement-round3-quality-control` · `refinement-round4-audit-assistant` · `refinement-round5-independent-review` · `refinement-round6-cross-role-optimization` · `refinement-round7-global-polish` · `refinement-round8-deep-closure` · `refinement-round9-global-deep-review`
 
-### 3.4 `04-infra-architecture/` — 基础设施 / 全局架构（8 个）
+### 3.4 `04-infra-architecture/` — 基础设施 / 全局架构（9 个）
 
-`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3`（全平台一致性治理：金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动；143/147，剩合伙人 UAT）
+`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3`（全平台一致性治理：金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动；143/147，剩合伙人 UAT） · `vllm-httpx-bugfix`（2026-05-30，httpx trust_env=False 全仓 20 处 + chat_template_kwargs 顶层 + finish_reason=length 处理；12 测试全绿 + vLLM 直调验证通过）
 
 ### 3.5 `05-business-features/` — 业务专项功能（12 个）
 
@@ -178,7 +178,7 @@ _archive/
 `pytest-residual-failures-cleanup`（SQLite vs PG 测试残留失败治理，2026-05-28 闭环）  
 `migration-runner-resilience`（D6 MigrationRunner 韧性化：批不中断 + schema drift 自检 + alembic 清理；V025/V026 + schema_drift_detector.py 381 行；Sprint 1-4 完成，剩 Sprint 5 UAT）
 
-### 3.7 `07-workpaper-slimdown/` — 底稿模块瘦身系列（5 个）
+### 3.7 `07-workpaper-slimdown/` — 底稿模块瘦身系列（6 个）
 
 底稿渲染 HTML 化 + 超长 .vue 拆分。
 
@@ -189,6 +189,7 @@ _archive/
 | `workpaper-list-shrink` | WorkpaperList 3463→1151 行（净减 67%）+ 5 子 SFC，36 vitest + e2e |
 | `workpaper-editor-shrink-phase2` | WorkpaperEditor 收尾瘦身至 837 行 + 8 子 SFC + 2 composable，36/36 tasks |
 | `gt-c-note-table-shrink` | GtCNoteTable 1803→450 行 + GtEControlTest 1414→344 行；C 类 3 子组件 + 3 composable / E 类 5 子组件 + 2 composable；90 测试全绿（36 spec 零断言 + 54 新单测）+ vue-tsc 0；残留 R3 Playwright 目视待环境 |
+| `gtdform-test-and-shrink` | D 类「先测后拆」：GtDFormReview 1670→390 / GtDFormConfirmation 1434→366 / GtDFormParagraph 878→345 行 + 6 composable；9/9 tasks + 116 vitest 全绿（含集成 + 边界 + 真实 markdown/XSS）+ vue-tsc 0 + HARD_CAPS 防退化 + evalFormula 安全解析器（复盘 6 改进已落地）|
 
 ### 3.8 `08-disclosure-notes/` — 附注模块系列（2 个）
 
@@ -246,8 +247,8 @@ _archive/
 | cross_wp_references | 400 条 |
 | prefill_formula_mapping | 1035 cells |
 | validation_rules | 114 条 |
-| D6 SQL 迁移 | V001-V027 |
-| **Spec 总数** | **89（active 5 + archived 84）** |
+| D6 SQL 迁移 | V001-V036 |
+| **Spec 总数** | **active 18（5 合并 Phase/note + 13 底稿）+ archived（详见 §三）** |
 
 ---
 
@@ -255,11 +256,11 @@ _archive/
 
 | 优先级 | 模块 | 当前 | 目标 | 依赖 |
 |--------|------|------|------|------|
-| P0 | WorkpaperEditor.vue | 2167 行 | ≤1200 | 抽 useUniverEditor composable |
-| P1 | WorkpaperList.vue | 3241 行 | ≤1500 | 抽 useStandardTable 复用 6 view |
+| P0 | WorkpaperEditor.vue | 815 行 | ≤1200 | 抽 useUniverEditor composable |
+| P1 | WorkpaperList.vue | 519 行 | ≤1500 | 抽 useStandardTable 复用 6 view |
 | P1 | TrialBalance.vue | 2494 行 | ≤1500 | 同上 |
 | P2 | DisclosureEditor.vue | 2468 行 | ≤1500 | 编辑器主体未拆 |
-| P2 | LedgerPenetration.vue | 3175 行 | ≤1500 | 需新建 spec |
+| P2 | LedgerPenetration.vue | 3794 行 | ≤1500 | 需新建 spec |
 | P3 | ReportView.vue | 2317 行 | ≤1500 | 需新建 spec |
 | P0 | service ≤800 行卡点 | smart_import 2786 等 8 个 | pre-commit hook | 已有 check_file_size.py |
 | P2 | 6000 并发压测 | 外部依赖 | 真实验证 | PG 大数据量 + Locust |

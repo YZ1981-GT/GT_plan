@@ -66,6 +66,16 @@ async def _do_cleanup() -> None:
         from app.services.time_machine_service import cleanup
 
         async with async_session() as db:
+            # 表不存在时静默跳过（新部署/未跑迁移场景）
+            table_check = await db.execute(
+                __import__('sqlalchemy').text(
+                    "SELECT EXISTS (SELECT FROM information_schema.tables "
+                    "WHERE table_name = 'time_machine_snapshots')"
+                )
+            )
+            if not table_check.scalar():
+                return
+
             deleted = await cleanup(db, older_than_days=OLDER_THAN_DAYS)
             if deleted > 0:
                 logger.info("[time_machine_cleanup] 清理完成: 删除 %d 个过期快照", deleted)

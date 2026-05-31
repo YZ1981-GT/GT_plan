@@ -170,7 +170,7 @@ async def check_services_health(
 
     async def check_url(name: str, url: str, path: str = ""):
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=5.0, mounts={}, trust_env=False) as client:
                 r = await client.get(url + path)
                 results[name] = {"status": "ok", "code": r.status_code, "url": url}
         except Exception as e:

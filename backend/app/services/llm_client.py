@@ -107,7 +107,7 @@ async def chat_completion(
         "temperature": temperature,
         "max_tokens": max_tokens,
         "stream": stream,
-        "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},
+        "chat_template_kwargs": {"enable_thinking": settings.LLM_ENABLE_THINKING},
     }
 
     if stream:
@@ -122,7 +122,7 @@ async def _sync_completion(payload: dict) -> str:
         return "[LLM 服务熔断中，请稍后重试]"
 
     try:
-        async with httpx.AsyncClient(timeout=_LLM_TIMEOUT_SYNC) as client:
+        async with httpx.AsyncClient(timeout=_LLM_TIMEOUT_SYNC, mounts={}, trust_env=False) as client:
             resp = await client.post(
                 f"{_BASE_URL}/chat/completions",
                 json=payload,
@@ -131,7 +131,14 @@ async def _sync_completion(payload: dict) -> str:
             resp.raise_for_status()
             data = resp.json()
             _breaker.record_success()
-            return data["choices"][0]["message"]["content"]
+            choice = data["choices"][0]
+            content = choice["message"].get("content")
+            finish_reason = choice.get("finish_reason")
+            if content is None and finish_reason == "length":
+                return "⚠️ 思考超出 token 限制，请简化提问或增大 max_tokens 设置。"
+            if content is None:
+                return "⚠️ LLM 未返回有效内容，请重试。"
+            return content
     except httpx.ConnectError:
         _breaker.record_failure()
         logger.warning("LLM 服务不可用（连接失败），返回占位回复")
@@ -153,7 +160,7 @@ async def _stream_completion(payload: dict) -> AsyncGenerator[str, None]:
         return
 
     try:
-        async with httpx.AsyncClient(timeout=_LLM_TIMEOUT_STREAM) as client:
+        async with httpx.AsyncClient(timeout=_LLM_TIMEOUT_STREAM, mounts={}, trust_env=False) as client:
             async with client.stream(
                 "POST",
                 f"{_BASE_URL}/chat/completions",

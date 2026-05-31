@@ -48,6 +48,7 @@ class PrerequisiteChecker:
             "generate_reports": self._check_report_prerequisites,
             "generate_workpapers": self._check_workpaper_prerequisites,
             "generate_notes": self._check_notes_prerequisites,
+            "generate_from_codes": self._check_generate_from_codes_prerequisites,
         }
         checker = checks.get(action)
         if not checker:
@@ -172,6 +173,32 @@ class PrerequisiteChecker:
                 "ok": False,
                 "message": "请先生成财务报表",
                 "prerequisite_action": "generate_reports",
+            }
+
+        return {"ok": True, "message": "", "prerequisite_action": None}
+
+    async def _check_generate_from_codes_prerequisites(
+        self, db: AsyncSession, project_id: UUID, year: int
+    ) -> dict:
+        """generate-from-codes 前置：trial_balance > 0 行（与推荐链数据源一致）
+
+        语义纠正：generate-from-codes 不需要 template_set（它从 wp_codes 直接生成，
+        模板文件走三级查找）。正确前置是「有可取数的 trial_balance 数据」。
+        """
+        tb_count_result = await db.execute(
+            sa.select(sa.func.count()).select_from(TrialBalance).where(
+                TrialBalance.project_id == project_id,
+                TrialBalance.year == year,
+                TrialBalance.is_deleted == sa.false(),
+            )
+        )
+        tb_count = tb_count_result.scalar_one() or 0
+
+        if tb_count == 0:
+            return {
+                "ok": False,
+                "message": "请先执行试算表重算（当前无标准试算表数据，无法生成底稿）",
+                "prerequisite_action": "recalc",
             }
 
         return {"ok": True, "message": "", "prerequisite_action": None}

@@ -18,7 +18,7 @@ import re
 from datetime import date
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 DOCS = ROOT / "docs"
 
 # 子目录用途说明（手动维护，新加子目录时补）

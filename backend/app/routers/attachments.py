@@ -285,7 +285,7 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
         paperless_url = os.environ.get("PAPERLESS_URL", "http://localhost:8010")
         paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            async with httpx.AsyncClient(timeout=30, mounts={}, trust_env=False) as client:
                 resp = await client.get(
                     f"{paperless_url}/api/documents/{doc_id}/download/",
                     headers={"Authorization": f"Token {paperless_token}"} if paperless_token else {},
@@ -351,7 +351,7 @@ async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get
         paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
         endpoint = "download" if ext in {".doc", ".docx", ".xls", ".xlsx", ".csv"} else "preview"
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            async with httpx.AsyncClient(timeout=30, mounts={}, trust_env=False) as client:
                 resp = await client.get(
                     f"{paperless_url}/api/documents/{doc_id}/{endpoint}/",
                     headers={"Authorization": f"Token {paperless_token}"} if paperless_token else {},
@@ -392,7 +392,7 @@ async def check_paperless_health(current_user: User = Depends(get_current_user))
     paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
 
     try:
-        async with httpx.AsyncClient(timeout=5) as client:
+        async with httpx.AsyncClient(timeout=5, mounts={}, trust_env=False) as client:
             resp = await client.get(
                 f"{paperless_url}/api/",
                 headers={"Authorization": f"Token {paperless_token}"} if paperless_token else {},

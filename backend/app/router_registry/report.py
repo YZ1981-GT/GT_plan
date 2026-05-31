@@ -99,3 +99,7 @@ def register_report_routers(app: FastAPI) -> None:
     # ═══ §96. Sprint C.0：附注离线导出/导入（D15） ═══
     from app.routers.note_offline import router as note_offline_router
     app.include_router(note_offline_router, tags=["note-offline"])
+
+    # ═══ §97. wp-traceability-panel：统一溯源端点 ═══
+    from app.routers.lineage import router as lineage_router
+    app.include_router(lineage_router, tags=["lineage"])

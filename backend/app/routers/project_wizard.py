@@ -330,7 +330,9 @@ async def confirm_project(
 
     Validates: Requirements 1.7
     """
-    project = await project_wizard_service.confirm_project(project_id, db)
+    project = await project_wizard_service.confirm_project(
+        project_id, db, changed_by=current_user.id
+    )
     return _to_project_response(project)
 
 

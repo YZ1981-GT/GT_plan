@@ -123,9 +123,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef } from 'vue'
+import { ref, computed, toRef, onMounted, onUnmounted, nextTick } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useWpRenderer, type WpComponentType } from '@/composables/useWpRenderer'
 import { useWpCompletionRate } from '@/composables/useWpCompletionRate'
+import { useCellLocate, type LocateTarget } from '@/composables/useCellLocate'
+import { eventBus, type WorkpaperLocateCellPayload } from '@/utils/eventBus'
 import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
 import {
   getRendererEntry,
@@ -257,6 +260,66 @@ function getSheetIcon(ct: string): string {
 
 // Sprint 4 Task 9.2: 底稿填写完成度
 const { rate: completionRate } = useWpCompletionRate(componentType, activeSheetSchema, activeSheetHtmlData)
+
+// ─── wp-locate-foundation Task 3.1: 监听 workpaper:locate-cell 事件 ───
+const { locateCell } = useCellLocate()
+
+function onLocateCell(payload: WorkpaperLocateCellPayload) {
+  // 仅处理当前底稿的定位事件
+  if (payload.wpId !== props.wpId) return
+  // 如果渲染配置未就绪，忽略
+  if (!renderConfig.value) return
+
+  const targetSheet = payload.sheetName
+  const sheets = renderConfig.value.sheets ?? []
+  const sheetExists = targetSheet
+    ? sheets.some(s => s.sheet_name === targetSheet)
+    : false
+  const needSwitchSheet = targetSheet && sheetExists && targetSheet !== activeSheetName.value
+
+  // 构建 LocateTarget
+  const target: LocateTarget = {
+    wp_code: payload.wpCode || '',
+    wp_id: payload.wpId,
+    sheet_name: targetSheet || activeSheetName.value,
+    cell_ref: payload.cellRef || null,
+    component_type: payload.componentType || componentType.value || null,
+    value: payload.value || null,
+    label: payload.label || null,
+  }
+
+  if (needSwitchSheet) {
+    // 切换 sheet，等 DOM 更新后再定位
+    activeSheetName.value = targetSheet!
+    nextTick(() => {
+      const success = locateCell(target)
+      if (!success) {
+        // cell 级定位失败，但 sheet 切换已成功（sheet 级降级）
+        ElMessage.info('已切换到目标 sheet，但未能精确定位到目标位置')
+      }
+    })
+  } else if (targetSheet && !sheetExists) {
+    // 目标 sheet 不存在，sheet 级也失败
+    ElMessage.info('已打开底稿但未能定位到目标位置（可能已变更）')
+  } else {
+    // 同 sheet，直接定位
+    nextTick(() => {
+      const success = locateCell(target)
+      if (!success) {
+        // cell 级定位失败，无 sheet 切换可降级
+        ElMessage.info('已打开底稿但未能定位到目标位置（可能已变更）')
+      }
+    })
+  }
+}
+
+onMounted(() => {
+  eventBus.on('workpaper:locate-cell', onLocateCell)
+})
+
+onUnmounted(() => {
+  eventBus.off('workpaper:locate-cell', onLocateCell)
+})
 
 const errorTitle = computed(() => {
   if (!error.value) return ''

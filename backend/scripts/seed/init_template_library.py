@@ -13,6 +13,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from pathlib import Path
 from sqlalchemy import create_engine, text
+
+ROOT = Path(__file__).resolve().parents[3]
 from sqlalchemy.orm import Session
 
 DB_URL = "postgresql+psycopg2://postgres:postgres@localhost:5432/audit_platform"
@@ -31,7 +33,7 @@ REPORT_TEMPLATE_DIR = KNOWLEDGE_ROOT / "report_templates"
 
 def load_workpaper_templates():
     """从 gt_template_library.json 加载底稿模板"""
-    lib_path = Path(__file__).parent.parent / "data" / "gt_template_library.json"
+    lib_path = ROOT / "backend" / "data" / "gt_template_library.json"
     if not lib_path.exists():
         print(f"  gt_template_library.json not found, skipping workpaper templates")
         return []

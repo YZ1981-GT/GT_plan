@@ -108,7 +108,7 @@ class LLMService:
         start_time = time.perf_counter()
 
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
+            async with httpx.AsyncClient(timeout=timeout, mounts={}, trust_env=False) as client:
                 resp = await client.post(
                     f"{self.BASE_URL}/chat/completions",
                     json={
