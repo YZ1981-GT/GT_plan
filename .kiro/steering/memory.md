@@ -43,11 +43,12 @@ inclusion: always
 ### 合并模块（consolidation）四阶段 — 代码+测试完成，未见真实数据
 - **4 Phase spec 全 ✅ 代码+测试**（2026-05-31 merge 后四阶段套件 **147 passed/0 failed**）：Phase0 核心管线（B1 汇总/B2 对账/schema 基线/锁定闭环）+ Phase1 架构锁定（AmountResolver 统一引擎/ELIMINATION_APPROVED 事件重算/全端点锁定+ConsolLockedBanner/B6 负商誉/B7 少数股东/A3 async）+ Phase2 编排接线（cascade_refresh/refresh-all SSE/V2 附注 flag/自动抵销 draft/报表穿透/cross_template/公式联动/签字冻结）+ Phase3 前端穿透（ConsolBreakdownDialog/provenance/双向导航/自动建树）
 - **16 ADR**（CONSOL-001~003/101~106/201~206/301~304）+ 24 consol service
-- **🔴 四阶段最大盲区 = 无全链路集成测试**（各阶段 mock 掉相邻阶段，merge 已两次咬人：async 签名漂移 + Phase1 删 _execute_formula 令 Phase2 测试失效）；**统一卡点 = PG 0 个 consolidated 项目**（真实 UAT 全 data-blocked）
-- **封板待办（按 ROI）**：①🔴 全链路集成测试（合成母子数据跑 建树→recalc→trial→对账→报表→附注→穿透）②🟠 `seed_consol_uat.py` 幂等造最小合成集团一脚本解锁四阶段 UAT ③🟡 Phase2/3 Playwright 复用 Phase1 已跑通环境补实测；**收手判断：地基已正确，无真实集团客户前不深做打磨，封板做①②后转回核心模块**
+- **🔴 四阶段曾最大盲区 = 无全链路集成测试**（各阶段 mock 掉相邻阶段，merge 两次咬人：async 签名漂移 + Phase1 删 _execute_formula + **PK 缺 uuid default 致 B1 链路从未真实落库**）→ 封板①已补 `test_consol_full_chain_integration.py` 守护；**统一卡点 = PG 0 个 consolidated 项目**（真实 UAT 全 data-blocked，封板②seed 脚本待 live PG 解锁）
+- **封板待办（按 ROI）**：①✅ 全链路集成测试 `test_consol_full_chain_integration.py`（真 SQLite+真 ORM 行+真 service 跑 aggregate→trial→reconcile + refresh_all report-await 回归守卫 + branch/draft-vs-approved，4 passed）②✅ `seed_consol_uat.py` 幂等造最小合成集团（1母2子+TB+draft/approved抵销+内部交易，--dry-run 离线可验）③🟡 Phase2/3 Playwright 复用 Phase1 已跑通环境补实测（待环境）；**收手判断：地基已正确，①②已封板转回核心模块**
+- **🐛 封板①抓到真 bug 并修复**：`consolidation_models.py` 全部 14 个主键 `id` 列 `primary_key=True` 但缺 `default=uuid.uuid4`（V034 迁移 `id UUID NOT NULL` 也无 server default），导致 `upsert_trial_row` 等不传 id 的 ORM 插入 NULL 主键 → PG/SQLite 均 NOT NULL 违约；147 旧测试全 mock/纯函数从未真实落库故漏网。根因修复=全列补 `default=uuid.uuid4`（统一全仓其它模型写法），280 consol 测试全绿无回归
 
 ### git 当前状态（2026-05-31）
-- 当前分支 `work/2026-05-30-wp-specs`，已 merge origin/main 的 Phase1（merge commit `60088d42`）+ 后续 fix（`398dc5ab`），**ahead origin/work 未推送**
+- 当前分支 `work/2026-05-30-wp-specs`，已 merge origin/main 的 Phase1（merge `60088d42`）+ fix（`398dc5ab`）+ memory 精简（`56e31beb`）+ steering 三文档补全（`7eff78b6`），**已推送 origin/work（ahead=behind=0 同步）**
 - 历史已闭环：合并模块 Phase0~3 全在 main / 底稿模块 14 spec 已实施归档 / schema drift 三层修复 / git 治理 spec（GIT_MODE 双模式 + 分支命名 hook + 6 维核查 CLI `check_git_sync_state.py`）
 
 ### 已完成 spec 总览

@@ -3,6 +3,7 @@
 import enum
 from datetime import date, datetime
 from decimal import Decimal
+import uuid
 from uuid import UUID
 
 from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, Text, text
@@ -127,7 +128,7 @@ class Company(Base, SoftDeleteMixin, TimestampMixin):
     """公司信息表"""
     __tablename__ = "companies"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     company_code: Mapped[str] = mapped_column(String, nullable=False)
     company_name: Mapped[str] = mapped_column(String, nullable=False)
@@ -146,7 +147,7 @@ class ConsolScope(Base, SoftDeleteMixin, TimestampMixin):
     """合并范围表"""
     __tablename__ = "consol_scope"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     company_code: Mapped[str] = mapped_column(String, nullable=False)
@@ -166,7 +167,7 @@ class ConsolTrial(Base, SoftDeleteMixin, TimestampMixin):
     """合并试算表"""
     __tablename__ = "consol_trial"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     standard_account_code: Mapped[str] = mapped_column(String, nullable=False)
@@ -187,7 +188,7 @@ class EliminationEntry(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     """抵消分录表"""
     __tablename__ = "elimination_entries"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     entry_no: Mapped[str] = mapped_column(String, nullable=False)
@@ -213,7 +214,7 @@ class InternalTrade(Base, SoftDeleteMixin, TimestampMixin):
     """内部交易表"""
     __tablename__ = "internal_trade"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     seller_company_code: Mapped[str] = mapped_column(String, nullable=False)
@@ -230,7 +231,7 @@ class InternalArAp(Base, SoftDeleteMixin, TimestampMixin):
     """内部往来表"""
     __tablename__ = "internal_ar_ap"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     debtor_company_code: Mapped[str] = mapped_column(String, nullable=False)
@@ -248,7 +249,7 @@ class GoodwillCalc(Base, SoftDeleteMixin, TimestampMixin):
     """商誉计算表"""
     __tablename__ = "goodwill_calc"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     subsidiary_company_code: Mapped[str] = mapped_column(String, nullable=False)
@@ -268,7 +269,7 @@ class MinorityInterest(Base, SoftDeleteMixin, TimestampMixin):
     """少数股东权益表"""
     __tablename__ = "minority_interest"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     subsidiary_company_code: Mapped[str] = mapped_column(String, nullable=False)
@@ -287,7 +288,7 @@ class ForexTranslation(Base, SoftDeleteMixin, TimestampMixin):
     """外币折算表"""
     __tablename__ = "forex_translation"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     company_code: Mapped[str] = mapped_column(String, nullable=False)
@@ -305,7 +306,7 @@ class ComponentAuditor(Base, SoftDeleteMixin, TimestampMixin):
     """组成部分审计师表"""
     __tablename__ = "component_auditors"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     company_code: Mapped[str] = mapped_column(String, nullable=False)
     firm_name: Mapped[str] = mapped_column(String, nullable=False)
@@ -321,7 +322,7 @@ class ComponentInstruction(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     """组成部分审计指令表"""
     __tablename__ = "component_instructions"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     component_auditor_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("component_auditors.id"), nullable=False
@@ -343,7 +344,7 @@ class ComponentResult(Base, SoftDeleteMixin, TimestampMixin):
     """组成部分审计结果表"""
     __tablename__ = "component_results"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     component_auditor_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("component_auditors.id"), nullable=False
@@ -369,7 +370,7 @@ class ConsolWorksheet(Base, SoftDeleteMixin, TimestampMixin):
     """合并差额表 — 每个节点(company_code)×科目×年度一行"""
     __tablename__ = "consol_worksheet"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     node_company_code: Mapped[str] = mapped_column(String(50), nullable=False)
     account_code: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -396,7 +397,7 @@ class ConsolQueryTemplate(Base, SoftDeleteMixin, TimestampMixin):
     """自定义查询模板"""
     __tablename__ = "consol_query_template"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     row_dimension: Mapped[str] = mapped_column(String(50), nullable=False)
