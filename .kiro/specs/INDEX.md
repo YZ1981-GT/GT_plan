@@ -111,21 +111,18 @@
 
 | Spec | 状态 | 说明 |
 |------|------|------|
-| `consol-phase0-core-pipeline/` | ✅ 核心完成 | Phase 0 止血：B1 汇总 + B2 对账 + C1/C3 schema 基线 V027 + A4 下线 + P1 留痕 + P5 权限 + P3 防误用 + F2 锁定闭环 + ADR-CONSOL-001/002/003；PBT P1~P7 全绿；真实 UAT（任务14）卡 PG 合并数据 |
-| `consol-phase1-arch-lock/` | ✅ 核心完成 | Phase 1 架构修复：A1/A2 公式引擎统一（AmountResolver 注入复用 report_engine，删重复）+ 衔接2 抵销 APPROVED + 事件驱动重算 + 锁定全端点 + ConsolLockedBanner + 423 拦截 + B6 负商誉 CAS20 + B7 少数股东比例 + A3 async；ADR-CONSOL-101~106；Q1~Q7 PBT + 锁定 423 参数化全绿；6A.3*/6B.4* 待审计专业确认 / 任务9 Playwright 待环境 / 任务10* 真实 UAT 卡 PG 合并数据 |
-| `consol-phase2-orchestration/` | ✅ 代码+测试完成 | Phase 2 编排接线：cascade_refresh 编排者（DAG 单一入口，重建被删 orchestrator）+ refresh-all 后台 worker + SSE 进度（broadcast_raw 不占 asyncpg pool）+ V2 附注 feature flag CONSOL_NOTES_V2_ENABLED + dict→Pydantic 适配器（S4）+ B3 自动抵销只产 draft（接通 4 规则引擎，审批后经 Phase 1 ELIMINATION_APPROVED 事件重算）+ 报表穿透 consol-breakdown + cross_template 孤儿接线（CONSOL_CROSS_TEMPLATE_ENABLED，S7 不丢章节）+ 公式管理联动（合并工作底稿/报表节点 + formula_audit_log module='consol'）+ P2 签字冻结 ConsolSnapshot 存真实数据（base64+gzip+SHA256，S8）+ F3 前端一键刷新/重新汇总入口；S1~S8 共 55 PBT 全绿 + ADR-CONSOL-201~206；附带根因修复 ReviewStatusEnum 大小写 bug + elimination create_entry NOT NULL 缺陷（解除 5 xfail）；Playwright 脚本就绪执行待 start-dev.bat 重启（新路由热加载 404）；真实 UAT（任务8）卡 PG 0 个合并数据 |
-| `consol-phase3-frontend-drilldown/` | ✅ 代码完成 | Phase 3 前端联动：ConsolBreakdownDialog 统一穿透（report+note）+ disclosure_notes provenance V039 + 附注穿透端点 + 双向导航 + 自动建树 CONSOL_SCOPE_CHANGED + wizard 配置合并范围 + 完整度校验 + F5 stale SSE；T1 vitest 7 + 后端 26 测试全绿 + ADR-CONSOL-301~304；Playwright 实测刷新树/进入项目/菜单门控通过；深度穿透 + UAT（8.1/8.4/9）卡 PG 0 个真实合并母子数据 |
 | `consol-note-three-level-drilldown/` | 📌 | 合并附注三级穿透；前置 = 真实合并母子项目数据（PG 当前 0 个 consolidated 项目）；待并入 Phase 3 |
 
 > 注：`workpaper-fill-service-split` 已 `git rm`（目标 WorkpaperFillService 经 grep 实证为 0 业务调用方的死代码，拆分无意义）；`gt-c-note-table-shrink` 已于 2026-05-30 完成并归档至 07-workpaper-slimdown（GtCNoteTable 1803→450 + GtEControlTest 1414→344，90 测试全绿；残留 R3 Playwright 目视待环境，非代码缺口）。
-> 注（2026-05-31）：merge work 分支带入 13 个底稿 spec（wp-* / gtdform-test-and-shrink / multi-standard-unification / vllm-httpx-bugfix / workpaper-guardrail-cleanup）的 active 双份残留（work 作者归档时 active 副本未删干净，疑 taskStatus 残留），经代码实证全部完成度 100%（核心产物 fileSearch 实证存在 + active/archived 归一化 checkbox 后正文相同零信息损失），已 `git rm` 删除 active 残留，仅保留 `_archive/` 权威版。
+> 注（2026-05-31）：merge work 分支带入 13 个底稿 spec 的 active 双份残留，经代码实证全部完成度 100%，已 `git rm` 删除 active 残留，仅保留 `_archive/` 权威版。
+> 注（2026-05-31）：合并模块四阶段 spec（consol-phase0~3）全部代码+测试完成（147 passed/0 failed + 封板全链路集成测试 4 passed），归档至 `_archive/09-consolidation-phases/`。
 
 ---
 
-## 三、已归档 Spec（`_archive/`，90 个）
+## 三、已归档 Spec（`_archive/`，94 个）
 
 > 已完成且不再演进的 spec，保留审计轨迹。归档不删文件。
-> **物理结构**：`_archive/` 下按功能 + 开发先后分 9 个分类目录，每个目录含 README 说明。
+> **物理结构**：`_archive/` 下按功能 + 开发先后分 10 个分类目录，每个目录含 README 说明。
 > （active spec 保持 `.kiro/specs/` 根目录扁平存放——Kiro spec 工作流依赖固定路径 `.kiro/specs/{name}/`，不可嵌套。）
 > **归档标准**：代码实证核心已闭环（声称产物文件真实存在 + 测试通过），剩余仅外部依赖 UAT/文档的，归档；纯 README stub（代码未动）留 active。
 
@@ -139,6 +136,7 @@ _archive/
 ├── 06-engineering-governance/  工程治理（4 个）
 ├── 07-workpaper-slimdown/      底稿模块瘦身系列（6 个）
 ├── 08-disclosure-notes/        附注模块系列（2 个）
+├── 09-consolidation-phases/    合并模块四阶段（4 个）
 └── 99-superseded/              已被取代 / 合并（4 个）
 ```
 
@@ -199,7 +197,18 @@ _archive/
 | `disclosure-note-full-revamp` | 附注重写：173 章节生成 + 自动裁剪 + Word 导出 + 公式 DSL；46/47（剩外部 UAT/文档）；note_formula_generator 1331 行 + 50 note 测试 |
 | `note-dynamic-tables-and-template-inheritance` | 全维度增强 v0.6.2（D1~D15 共 15 维度）；实测 166/182≈90%（剩 16 项外部依赖）；10 核心 service 实跑全绿 |
 
-### 3.9 `99-superseded/` — 已被取代 / 合并（4 个）
+### 3.9 `09-consolidation-phases/` — 合并模块四阶段（4 个）
+
+合并报表模块完整开发周期，从止血到前端穿透。147 测试全绿 + 封板全链路集成测试 4 passed + 16 ADR + 24 consol service。
+
+| Spec | 成果 |
+|------|------|
+| `consol-phase0-core-pipeline` | Phase 0 止血：B1 汇总 + B2 对账 + schema 基线 V027 + 锁定闭环 + ADR-CONSOL-001~003；PBT P1~P7 全绿 |
+| `consol-phase1-arch-lock` | Phase 1 架构锁定：AmountResolver 统一引擎 + ELIMINATION_APPROVED 事件重算 + 全端点锁定 + B6 负商誉 + B7 少数股东 + A3 async；ADR-CONSOL-101~106；Q1~Q7 PBT 全绿 |
+| `consol-phase2-orchestration` | Phase 2 编排接线：cascade_refresh DAG + refresh-all SSE + V2 附注 flag + 自动抵销 draft + 报表穿透 + cross_template + 公式联动 + 签字冻结；S1~S8 共 55 PBT + ADR-CONSOL-201~206 |
+| `consol-phase3-frontend-drilldown` | Phase 3 前端穿透：ConsolBreakdownDialog + provenance V039 + 双向导航 + 自动建树 + 完整度校验 + stale SSE；vitest 7 + 后端 26 测试 + ADR-CONSOL-301~304 |
+
+### 3.10 `99-superseded/` — 已被取代 / 合并（4 个）
 
 | 旧 spec | 取代者 |
 |---------|--------|
@@ -249,7 +258,7 @@ _archive/
 | prefill_formula_mapping | 1035 cells |
 | validation_rules | 114 条 |
 | D6 SQL 迁移 | V001-V039（V039 = disclosure_notes provenance / Phase 3） |
-| **Spec 总数** | **active 18（5 合并 Phase/note + 13 底稿）+ archived（详见 §三）** |
+| **Spec 总数** | **active 1（consol-note stub）+ archived 94（详见 §三）** |
 
 ---
 

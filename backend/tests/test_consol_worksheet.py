@@ -141,6 +141,8 @@ async def seeded_db(db_session: AsyncSession):
             ))
 
     # Elimination entry: ROOT level, affects A001, account 1001
+    # review_status=approved（Phase 1 起差额表引擎只消费 APPROVED 抵销；
+    # 本 fixture 验证抵销生效，故用 approved 而非 draft）
     db_session.add(EliminationEntry(
         id=uuid.uuid4(), project_id=ROOT_ID, year=YEAR,
         entry_no="EQ-2025-001", entry_type=EliminationEntryType.equity,
@@ -148,7 +150,7 @@ async def seeded_db(db_session: AsyncSession):
         debit_amount=Decimal("100"), credit_amount=Decimal("0"),
         entry_group_id=uuid.uuid4(),
         related_company_codes=["A001"],
-        review_status=ReviewStatusEnum.draft,
+        review_status=ReviewStatusEnum.approved,
     ))
     # Another elimination for B001
     db_session.add(EliminationEntry(
@@ -158,7 +160,7 @@ async def seeded_db(db_session: AsyncSession):
         debit_amount=Decimal("0"), credit_amount=Decimal("50"),
         entry_group_id=uuid.uuid4(),
         related_company_codes=["B001"],
-        review_status=ReviewStatusEnum.draft,
+        review_status=ReviewStatusEnum.approved,
     ))
 
     await db_session.commit()

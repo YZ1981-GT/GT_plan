@@ -42,21 +42,23 @@ inclusion: always
 ## 任务状态
 
 ### 合并模块（consolidation）四阶段 — 代码+测试完成，未见真实数据
+- **🧮 合并核心会计模型（用户 2026-05-31 明确，已对照代码验证）**：**合并数 = 各子企业个别数据汇总（individual_sum）+ 差额表**；差额表与其他子企业列类似，是专门填调整分录 + 抵销分录（以及同控合并重复部分处理）的"虚拟列"，**一般以负数填列**；代码实现 = `consol_amount = individual_sum + consol_adjustment + consol_elimination`（trial 路径）/ 差额表引擎中间节点 = Σ子节点 consolidated + 本级抵销调整（差额表只记调整抵销不含个别数）——两路径同此模型
 - **4 Phase spec 全 ✅ 代码+测试**（2026-05-31 merge 后四阶段套件 **147 passed/0 failed**）：Phase0 核心管线（B1 汇总/B2 对账/schema 基线/锁定闭环）+ Phase1 架构锁定（AmountResolver 统一引擎/ELIMINATION_APPROVED 事件重算/全端点锁定+ConsolLockedBanner/B6 负商誉/B7 少数股东/A3 async）+ Phase2 编排接线（cascade_refresh/refresh-all SSE/V2 附注 flag/自动抵销 draft/报表穿透/cross_template/公式联动/签字冻结）+ Phase3 前端穿透（ConsolBreakdownDialog/provenance/双向导航/自动建树）
 - **16 ADR**（CONSOL-001~003/101~106/201~206/301~304）+ 24 consol service
-- **🔴 四阶段最大盲区 = 无全链路集成测试**（各阶段 mock 掉相邻阶段，merge 已两次咬人：async 签名漂移 + Phase1 删 _execute_formula 令 Phase2 测试失效）；**统一卡点 = PG 0 个 consolidated 项目**（真实 UAT 全 data-blocked）
-- **四阶段三件套完整性实证核查（2026-05-31）**：①4 phase 目录 requirements+design+tasks **全齐**②关键产物 Test-Path 真实存在（consol_audit_helper/cascade_refresh_service/ConsolBreakdownDialog.vue/ADR-CONSOL-201/V034-036+V039 迁移含 R 回滚）③实跑 consol phase0/2/3 测试 **78 passed** + phase1 套件 = 四阶段 147+ 全绿 + app import OK 1312 路由；**结论=代码+单元/属性测试层面全完成，但未封板**④**tasks.md 大量未勾 checkbox 是"假红"**（phase0 task5-11 等产物已存在测试已过，是 merge 带入 checkbox 未同步实际状态，非真残留）⑤真残留=全链路集成测试缺失(task12)+Playwright 实测(待环境)+真实集团数据 UAT(`*` 卡 0 consolidated 项目)+审计专业复核(B6/B7 CAS20)+文档收尾
-- **封板待办（按 ROI）**：①🔴 全链路集成测试（合成母子数据跑 建树→recalc→trial→对账→报表→附注→穿透）②🟠 `seed_consol_uat.py` 幂等造最小合成集团一脚本解锁四阶段 UAT ③🟡 Phase2/3 Playwright 复用 Phase1 已跑通环境补实测；**收手判断：地基已正确，无真实集团客户前不深做打磨，封板做①②后转回核心模块**
+- **🔴 四阶段曾最大盲区 = 无全链路集成测试**（各阶段 mock 掉相邻阶段，merge 两次咬人：async 签名漂移 + Phase1 删 _execute_formula + **PK 缺 uuid default 致 B1 链路从未真实落库**）→ 封板①已补 `test_consol_full_chain_integration.py` 守护；**统一卡点 = PG 0 个 consolidated 项目**（真实 UAT 全 data-blocked，封板②seed 脚本待 live PG 解锁）
+- **封板已完成（work 分支补，2026-05-31 merge 入 main）**：①✅ 全链路集成测试 `test_consol_full_chain_integration.py`（真 SQLite+真 ORM 行+真 service 跑 aggregate→trial→reconcile + refresh_all report-await 回归守卫 + branch/draft-vs-approved，4 passed）②✅ `seed_consol_uat.py` 幂等造最小合成集团（1母2子+TB+draft/approved抵销+内部交易，--dry-run 离线可验）③🟡 Phase2/3 Playwright 待环境；**收手判断：地基已正确，①②已封板转回核心模块**
+- **🐛 封板①抓到真 bug 并修复**：`consolidation_models.py` 全部 14 个主键 `id` 列 `primary_key=True` 但缺 `default=uuid.uuid4`（V034 迁移 `id UUID NOT NULL` 也无 server default），导致 `upsert_trial_row` 等不传 id 的 ORM 插入 NULL 主键 → PG/SQLite 均 NOT NULL 违约；147 旧测试全 mock/纯函数从未真实落库故漏网。根因修复=全列补 `default=uuid.uuid4`，280 consol 测试全绿无回归
+- **✅ 预存 worksheet 测试失败已修（commit `ce898e83`）**：`test_consol_worksheet.py` 2 红根因 = seeded_db fixture 抵销用 `review_status=draft`，但 Phase1 引擎改为**只消费 APPROVED**（ADR-CONSOL-102）→ 抵销不生效；**引擎本身正确**（差额表中间节点 consolidated=Σ子节点 consolidated + 本级抵销/调整，不含本级个别数，非"丢本体"bug）；修复=fixture 改 approved；**教训：先读设计文档确认是引擎错还是 fixture 过时，不预设引擎会计 bug**
+- **四阶段三件套已归档 `_archive/09-consolidation-phases/`**（work commit `375edd8d`，封板①②完成后归档，非空归档）；**tasks.md 残留未勾项全是外部依赖**（真实集团数据 UAT `*` 卡 PG 0 consolidated + Playwright 待环境 + B6/B7 CAS20 审计专业复核），代码+测试层面已封板
 
 ### git 当前状态（2026-05-31）
-- 当前分支 `main`，已 merge `origin/spec/frontend-consistency-m1`（merge commit `9b6434b6`）：含 GtAmountCell 全量化 + ElMessage.error→handleApiError 治理 + 5 PBT + CI 卡点 + **70 个 TSJ 复核提示词**（backend/data/tsj_review_prompts/）+ check_file_size 路径修复 + 底稿 proposal；本地 7 spec 已先提交（93e49c42）保护
-- **merge 2 冲突已解决**：①GtCNoteTable.vue=采纳对方 handleApiError 治理 + 保留我的 scrollToRow(wp-locate) + 合并 import ②memory.md=取我 HEAD 精简版(对方是旧完整版，详情已在 dev-history/proposal)；7 spec 全幸存 + consol 4 phase spec 三件套零变化
-- **合并模块 spec 三件套 merge 零变化实证**：merge 只改 4 个 consol 前端组件（ConsolNoteTab/ConsolTrialBalanceTab/ConsolWorksheetTabs/ShareChangeSheet）做 ElMessage.error→handleApiError 纯错误处理治理，consol 业务逻辑 + spec 文档一行没动，0 diagnostics
+- 当前分支 `main`，已 merge `origin/spec/frontend-consistency-m1`（`9b6434b6`：GtAmountCell 全量化 + ElMessage.error→handleApiError + 5 PBT + 70 TSJ 复核提示词 + check_file_size 路径修复）+ `origin/work/2026-05-30-wp-specs`（consol 封板集成测试 + seed_consol_uat + PK uuid bug 修复 + worksheet fixture 修复 + 四阶段归档）
+- **多轮 merge 冲突均 memory.md**：处理原则=consol 取 work 侧（更新更准，封板+bug修复）+ frontend/7 spec 取我侧；consol 业务逻辑零变化（前端组件仅 handleApiError 治理）
 - 历史已闭环：合并模块 Phase0~3 全在 main / 底稿模块 14 spec 已实施归档 / schema drift 三层修复 / git 治理 spec（GIT_MODE 双模式 + 分支命名 hook + 6 维核查 CLI `check_git_sync_state.py`）
 
 ### 已完成 spec 总览
-- 详见 `.kiro/specs/INDEX.md`（active + _archive 9 分类）；归档/状态核实必须 grep/fileSearch 实证产物存在，不信 README/INDEX 自述
-- active = 合并 4 Phase + consol-note stub + **全局模块 7 spec（A formula-engine-unification/B retrieval-kernel/C doc-level-ai-chat/D report-config-baseline/E wp-ai-review-ux-fix/F global-modules-cleanup/G global-modules-p2-polish，A→G 顺序待实施）** + frontend-consistency-m1（merge 带入）；底稿模块 13 spec + V3 + 附注 spec + 11 审计循环 + phase1~8 全已归档
+- 详见 `.kiro/specs/INDEX.md`（active + _archive 10 分类）；归档/状态核实必须 grep/fileSearch 实证产物存在，不信 README/INDEX 自述
+- active = `consol-note-three-level-drilldown`（stub 待真实合并数据）+ **全局模块 7 spec（A formula-engine-unification/B retrieval-kernel/C doc-level-ai-chat/D report-config-baseline/E wp-ai-review-ux-fix/F global-modules-cleanup/G global-modules-p2-polish，A→G 顺序待实施）** + frontend-consistency-m1（merge 带入）；**合并四阶段已归档 `_archive/09-consolidation-phases/`**；底稿模块 13 spec + V3 + 附注 spec + 11 审计循环 + phase1~8 全已归档
 
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
