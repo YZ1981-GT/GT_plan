@@ -1,9 +1,3 @@
-/**
- * CellHistoryTimeline.vue — 单元格编辑历史时间线 [wp-frontend-ux-polish Task 8]
- *
- * 点击底稿单元格后查看"谁何时改了什么"。
- * 接入 wp_audit_trail_service.get_cell_history 后端能力。
- */
 <template>
   <el-drawer
     :model-value="visible"
@@ -61,6 +55,10 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * CellHistoryTimeline — 单元格编辑历史时间线 [wp-frontend-ux-polish Task 8]
+ * 点击底稿单元格后查看"谁何时改了什么"。
+ */
 import { ref, watch } from 'vue'
 import { User } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
