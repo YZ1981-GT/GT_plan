@@ -380,20 +380,20 @@ class EqcrShadowComputeService:
                 }
 
             elif computation_type == "intercompany_elimination":
-                # 合并抵消：查询合并调整分录
+                # 合并抵消：查询抵消分录（真实表 elimination_entries）
                 from sqlalchemy import text
                 stmt = text("""
                     SELECT COUNT(*) as entry_count,
-                           COALESCE(SUM(ABS(amount)), 0) as total_abs_amount
-                    FROM consolidation_adjustments
-                    WHERE project_id = :pid
+                           COALESCE(SUM(ABS(debit_amount)), 0) as total_abs_amount
+                    FROM elimination_entries
+                    WHERE project_id = :pid AND is_deleted = false
                 """)
                 try:
                     result = await self.db.execute(stmt, {"pid": str(project_id)})
                     row = result.fetchone()
                     if row:
                         return {
-                            "source": "consolidation_adjustments",
+                            "source": "elimination_entries",
                             "entry_count": int(row[0] or 0),
                             "total_abs_amount": float(row[1] or 0),
                         }

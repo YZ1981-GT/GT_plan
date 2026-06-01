@@ -95,7 +95,7 @@ async def auto_generate_mappings(project_id: UUID, body: dict, db: AsyncSession 
 
     # 1. 获取试算表所有科目名
     result = await db.execute(
-        text("SELECT DISTINCT account_name FROM trial_balance_entries WHERE project_id = :pid AND year = :y"),
+        text("SELECT DISTINCT account_name FROM trial_balance WHERE project_id = :pid AND year = :y"),
         {"pid": str(project_id), "y": year},
     )
     account_names = [r[0] for r in result.fetchall() if r[0]]

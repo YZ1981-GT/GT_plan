@@ -843,7 +843,7 @@ async def _exec_seed(seed_name: str, db: AsyncSession, current_user: User) -> di
                 result = {}
         except ImportError:
             result = {}
-        row = (await db.execute(text("SELECT COUNT(*) AS c FROM template_sets"))).mappings().first()
+        row = (await db.execute(text("SELECT COUNT(*) AS c FROM wp_template_set"))).mappings().first()
         record_count = int(row["c"] or 0) if row else 0
         return {
             "seed_name": seed_name,

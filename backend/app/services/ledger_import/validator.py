@@ -654,7 +654,7 @@ async def validate_l2(
     result = await db.execute(
         text("""
             SELECT COUNT(*) AS cnt
-            FROM tb_account_chart
+            FROM account_chart
             WHERE dataset_id = :dataset_id
         """),
         {"dataset_id": str(dataset_id)},
@@ -667,7 +667,7 @@ async def validate_l2(
             text("""
                 SELECT DISTINCT l.account_code
                 FROM tb_ledger l
-                LEFT JOIN tb_account_chart c
+                LEFT JOIN account_chart c
                     ON c.dataset_id = l.dataset_id
                     AND c.account_code = l.account_code
                 WHERE l.dataset_id = :dataset_id

@@ -5,12 +5,12 @@
 跨模块路由写入（workpaper / report / note / adj / tb）。
 
 Algorithm (design.md 6.2):
-  1. SELECT updated_at, parsed_data FROM working_papers WHERE id = wp_id FOR UPDATE
+  1. SELECT updated_at, parsed_data FROM working_paper WHERE id = wp_id FOR UPDATE
   2. IF opened_at < updated_at → raise WritebackConflict(updated_at, last_editor)
   3. 定位 parsed_data['univer_snapshot']['sheets'][sheet_name]['cellData'][row][col]
   4. old_value = cellData[row][col].get('v')
   5. cellData[row][col]['v'] = new_value
-  6. UPDATE working_papers SET parsed_data = :new_pd, updated_at = NOW(), prefill_stale = True
+  6. UPDATE working_paper SET parsed_data = :new_pd, updated_at = NOW(), prefill_stale = True
   7. 同步更新 xlsx cache（run_in_executor + openpyxl write）
   8. emit event_bus('cross-ref:updated', {wp_code, sheet, cell_ref, new_value})
   9. audit_logger.log_action('custom_query.cell_writeback', ...)  # 不节流
@@ -174,7 +174,7 @@ class SnapshotWriter:
         result = await db.execute(
             text("""
                 SELECT updated_at, parsed_data, wp_code, file_path
-                FROM working_papers
+                FROM working_paper
                 WHERE id = :wp_id
                 FOR UPDATE
             """),
@@ -240,7 +240,7 @@ class SnapshotWriter:
         now = datetime.now(timezone.utc)
         await db.execute(
             text("""
-                UPDATE working_papers
+                UPDATE working_paper
                 SET parsed_data = :new_pd,
                     updated_at = :now,
                     prefill_stale = true

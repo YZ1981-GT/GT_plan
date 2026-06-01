@@ -55,7 +55,7 @@ class ReportTraceService:
                 }
                 # 2. 查底稿 parsed_data
                 wp_result = await db.execute(sa.text(
-                    "SELECT wp.parsed_data FROM working_papers wp "
+                    "SELECT wp.parsed_data FROM working_paper wp "
                     "JOIN wp_index wi ON wp.wp_index_id = wi.id "
                     "WHERE wi.project_id = :pid AND wi.wp_code = :code "
                     "LIMIT 1"
@@ -126,7 +126,7 @@ class ReportTraceService:
         try:
             # AI 内容 findings
             ai_result = await db.execute(sa.text(
-                "SELECT COUNT(*) FROM ai_contents "
+                "SELECT COUNT(*) FROM ai_content_log "
                 "WHERE project_id = :pid AND confirmation_status = 'pending'"
             ), {"pid": str(project_id)})
             summary["llm_findings"] = ai_result.scalar() or 0

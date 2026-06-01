@@ -187,7 +187,7 @@ async def _get_functional_type(
     """查询底稿的 functional_type（通过 wp_code 关联 classification 表）"""
     # 先获取底稿的 wp_code
     result = await db.execute(text(
-        "SELECT wp_code FROM working_papers WHERE id = :wp_id AND project_id = :pid"
+        "SELECT wp_code FROM working_paper WHERE id = :wp_id AND project_id = :pid"
     ), {"wp_id": str(wp_id), "pid": str(project_id)})
     row = result.fetchone()
     if not row:
@@ -295,7 +295,7 @@ async def _fill_parsed_data(
 
     # 读取当前 parsed_data
     result = await db.execute(text(
-        "SELECT parsed_data FROM working_papers WHERE id = :wp_id"
+        "SELECT parsed_data FROM working_paper WHERE id = :wp_id"
     ), {"wp_id": str(wp_id)})
     row = result.fetchone()
     if not row:
@@ -320,7 +320,7 @@ async def _fill_parsed_data(
 
     # 写回
     await db.execute(text(
-        "UPDATE working_papers SET parsed_data = :pd::jsonb WHERE id = :wp_id"
+        "UPDATE working_paper SET parsed_data = :pd::jsonb WHERE id = :wp_id"
     ), {"pd": json.dumps(parsed_data, ensure_ascii=False, default=str), "wp_id": str(wp_id)})
     await db.flush()
 

@@ -27,6 +27,7 @@ pytest-asyncio
 fakeredis
 aiosqlite
 hypothesis==6.152.4
+sqlglot>=27  # 裸 SQL 列级契约测试静态解析（test_raw_sql_schema_contract）
 ruff==0.11.12
 jsonpath-ng
 pypinyin

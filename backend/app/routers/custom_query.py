@@ -1190,7 +1190,7 @@ async def _query_report(db, pid, year, filters, limit):
 
 
 async def _query_trial_balance(db, pid, year, filters, limit):
-    query = "SELECT account_code, account_name, opening_balance, closing_balance, debit_amount, credit_amount FROM trial_balance_entries WHERE project_id = :pid AND year = :y"
+    query = "SELECT account_code, account_name, opening_balance, closing_balance, debit_amount, credit_amount FROM trial_balance WHERE project_id = :pid AND year = :y"
     params: dict = {"pid": pid, "y": year, "lim": limit}
     if filters.get("account_name"):
         query += " AND account_name LIKE :an"
@@ -2112,7 +2112,7 @@ async def cell_writeback(
     # 查找 wp_id（workpaper 模块通过 wp_code 查找）
     if body.module == "workpaper":
         result = await db.execute(
-            text("SELECT id FROM working_papers WHERE wp_code = :code LIMIT 1"),
+            text("SELECT id FROM working_paper WHERE wp_code = :code LIMIT 1"),
             {"code": body.wp_code},
         )
         wp_row = result.first()
@@ -2245,7 +2245,7 @@ async def cross_sheet_trace(
 
     # 查找 working_paper 的 parsed_data
     result = await db.execute(
-        text("SELECT id, parsed_data FROM working_papers WHERE wp_code = :code LIMIT 1"),
+        text("SELECT id, parsed_data FROM working_paper WHERE wp_code = :code LIMIT 1"),
         {"code": wp_code},
     )
     wp_row = result.first()

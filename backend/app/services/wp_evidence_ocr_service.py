@@ -108,7 +108,7 @@ class WpEvidenceOcrService:
         import json
 
         result = await db.execute(text(
-            "SELECT parsed_data FROM working_papers WHERE id = :wp_id"
+            "SELECT parsed_data FROM working_paper WHERE id = :wp_id"
         ), {"wp_id": str(wp_id)})
         row = result.fetchone()
         if not row:
@@ -137,7 +137,7 @@ class WpEvidenceOcrService:
             parsed_data["action_data"] = action_data
 
             await db.execute(text(
-                "UPDATE working_papers SET parsed_data = :pd::jsonb WHERE id = :wp_id"
+                "UPDATE working_paper SET parsed_data = :pd::jsonb WHERE id = :wp_id"
             ), {"pd": json.dumps(parsed_data, ensure_ascii=False, default=str), "wp_id": str(wp_id)})
             await db.flush()
             return True

@@ -137,11 +137,11 @@ class DataValidationEngine:
             from sqlalchemy import text
             # 查询报表行与附注关键科目的金额比对
             stmt = text("""
-                SELECT fr.line_code, fr.line_name, fr.amount as report_amount,
+                SELECT fr.row_code, fr.row_name, fr.current_period_amount as report_amount,
                        dn.account_name, (dn.table_data->0->>'closing_balance')::numeric as note_amount
                 FROM financial_report fr
                 JOIN disclosure_notes dn ON dn.project_id = fr.project_id
-                    AND dn.account_name = fr.line_name
+                    AND dn.account_name = fr.row_name
                     AND dn.year = :year
                     AND dn.is_deleted = false
                 WHERE fr.project_id = :pid
@@ -168,43 +168,14 @@ class DataValidationEngine:
         return findings
 
     async def _validate_workpaper_tb(self, project_id: UUID, year: int) -> list[ValidationFinding]:
-        """底稿与试算表一致性校验：parsed_data.audited_amount vs trial_balance.audited_amount"""
-        findings = []
-        if not self.db:
-            return findings
-        try:
-            from sqlalchemy import text
-            stmt = text("""
-                SELECT wp.wp_code,
-                       (wp.parsed_data->>'audited_amount')::numeric as wp_amount,
-                       tb.audited_amount as tb_amount
-                FROM working_paper wp
-                JOIN wp_account_mapping wam ON wam.wp_code = wp.wp_code AND wam.project_id = wp.project_id
-                JOIN trial_balance tb ON tb.project_id = wp.project_id
-                    AND tb.standard_account_code = wam.standard_account_code
-                    AND tb.year = :year
-                    AND tb.is_deleted = false
-                WHERE wp.project_id = :pid
-                    AND wp.is_deleted = false
-                    AND wp.parsed_data->>'audited_amount' IS NOT NULL
-                LIMIT 100
-            """)
-            result = await self.db.execute(stmt, {"pid": str(project_id), "year": year})
-            for row in result.fetchall():
-                wp_amt = float(row[1] or 0)
-                tb_amt = float(row[2] or 0)
-                diff = abs(wp_amt - tb_amt)
-                if diff > 0.01:
-                    findings.append(ValidationFinding(
-                        check_type="workpaper_tb_consistency",
-                        severity="high",
-                        message=f"底稿「{row[0]}」审定数({wp_amt:.2f})与试算表({tb_amt:.2f})不一致，差异 {diff:.2f}",
-                        details={"wp_code": row[0], "wp_amount": wp_amt, "tb_amount": tb_amt, "diff": diff},
-                        fix_suggestion="刷新底稿预填充或手动修正审定数",
-                    ))
-        except Exception as e:
-            logger.debug("workpaper_tb validation skipped: %s", e)
-        return findings
+        """底稿与试算表一致性校验：parsed_data.audited_amount vs trial_balance.audited_amount
+
+        注：底稿↔标准科目映射无独立 DB 表（wp_account_mapping 不存在），映射在
+        backend/data/wp_account_mapping.json + wp_mapping 服务层，working_paper 亦无
+        wp_code 列（在 wp_index）。故纯 SQL join 无法实现，返回空（待服务层映射接入）。
+        与 consistency_replay_engine layer5 同源处理。
+        """
+        return []
 
     async def _validate_adjustment_report(self, project_id: UUID, year: int) -> list[ValidationFinding]:
         """调整分录与报表一致性校验：adjustments AJE 合计 vs trial_balance AJE 列"""
@@ -215,22 +186,22 @@ class DataValidationEngine:
             from sqlalchemy import text
             # 按科目汇总 AJE 调整金额
             stmt = text("""
-                SELECT ae.account_code,
+                SELECT ae.standard_account_code,
                        SUM(ae.debit_amount) - SUM(ae.credit_amount) as aje_net,
-                       tb.aje_amount as tb_aje
+                       tb.aje_adjustment as tb_aje
                 FROM adjustment_entries ae
                 JOIN adjustments a ON a.id = ae.adjustment_id
                     AND a.project_id = :pid
                     AND a.year = :year
-                    AND a.entry_type = 'aje'
+                    AND a.adjustment_type = 'aje'
                     AND a.is_deleted = false
                 JOIN trial_balance tb ON tb.project_id = a.project_id
-                    AND tb.standard_account_code = ae.account_code
+                    AND tb.standard_account_code = ae.standard_account_code
                     AND tb.year = :year
                     AND tb.is_deleted = false
                 WHERE ae.is_deleted = false
-                GROUP BY ae.account_code, tb.aje_amount
-                HAVING ABS(SUM(ae.debit_amount) - SUM(ae.credit_amount) - COALESCE(tb.aje_amount, 0)) > 0.01
+                GROUP BY ae.standard_account_code, tb.aje_adjustment
+                HAVING ABS(SUM(ae.debit_amount) - SUM(ae.credit_amount) - COALESCE(tb.aje_adjustment, 0)) > 0.01
                 LIMIT 50
             """)
             result = await self.db.execute(stmt, {"pid": str(project_id), "year": year})
@@ -372,7 +343,7 @@ class DataValidationEngine:
             # 检查试算表：审定数 = 未审数 + AJE + RJE
             stmt = text("""
                 SELECT standard_account_code,
-                       unadjusted_amount, aje_amount, rje_amount, audited_amount
+                       unadjusted_amount, aje_adjustment, rje_adjustment, audited_amount
                 FROM trial_balance
                 WHERE project_id = :pid AND year = :year AND is_deleted = false
                 LIMIT 500

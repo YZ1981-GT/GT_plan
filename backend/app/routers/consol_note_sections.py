@@ -177,7 +177,7 @@ async def refresh_note_by_formula(
     try:
         # 查询该企业的试算表数据
         params = {"pid": project_id, "y": year}
-        query = "SELECT account_code, account_name, opening_balance, closing_balance, debit_amount, credit_amount FROM trial_balance_entries WHERE project_id = :pid AND year = :y"
+        query = "SELECT account_code, account_name, opening_balance, closing_balance, debit_amount, credit_amount FROM trial_balance WHERE project_id = :pid AND year = :y"
         if company_code:
             query += " AND company_code = :cc"
             params["cc"] = company_code
@@ -294,7 +294,7 @@ async def audit_all_notes(
     tb_map = {}
     try:
         params = {"pid": project_id, "y": year}
-        query = "SELECT account_name, closing_balance, opening_balance FROM trial_balance_entries WHERE project_id = :pid AND year = :y"
+        query = "SELECT account_name, closing_balance, opening_balance FROM trial_balance WHERE project_id = :pid AND year = :y"
         if company_code:
             query += " AND company_code = :cc"
             params["cc"] = company_code
@@ -578,7 +578,7 @@ async def audit_single_note(
     tb_map = {}
     try:
         params = {"pid": project_id, "y": year}
-        query = "SELECT account_name, closing_balance, opening_balance FROM trial_balance_entries WHERE project_id = :pid AND year = :y"
+        query = "SELECT account_name, closing_balance, opening_balance FROM trial_balance WHERE project_id = :pid AND year = :y"
         if company_code:
             query += " AND company_code = :cc"
             params["cc"] = company_code
@@ -656,7 +656,7 @@ async def apply_all_formulas(
     tb_map = {}
     try:
         params = {"pid": project_id, "y": year}
-        query = "SELECT account_name, opening_balance, closing_balance, debit_amount, credit_amount FROM trial_balance_entries WHERE project_id = :pid AND year = :y"
+        query = "SELECT account_name, opening_balance, closing_balance, debit_amount, credit_amount FROM trial_balance WHERE project_id = :pid AND year = :y"
         if company_code:
             query += " AND company_code = :cc"
             params["cc"] = company_code
@@ -825,7 +825,7 @@ async def aggregate_data(
                     try:
                         params = {"pid": project_id, "y": year, "cc": code, "name": item_name.strip()}
                         result = await db.execute(
-                            text("SELECT closing_balance, opening_balance FROM trial_balance_entries WHERE project_id = :pid AND year = :y AND company_code = :cc AND account_name = :name"),
+                            text("SELECT closing_balance, opening_balance FROM trial_balance WHERE project_id = :pid AND year = :y AND company_code = :cc AND account_name = :name"),
                             params,
                         )
                         row = result.fetchone()
@@ -893,7 +893,7 @@ async def fill_trial_balance(
         try:
             for code in child_codes:
                 result = await db.execute(
-                    text(f"SELECT account_name, {balance_field} FROM trial_balance_entries WHERE project_id = :pid AND year = :y AND company_code = :cc"),
+                    text(f"SELECT account_name, {balance_field} FROM trial_balance WHERE project_id = :pid AND year = :y AND company_code = :cc"),
                     {"pid": project_id, "y": year, "cc": code},
                 )
                 for r in result.fetchall():
@@ -906,7 +906,7 @@ async def fill_trial_balance(
         # 没有子企业代码，尝试不按企业筛选
         try:
             result = await db.execute(
-                text(f"SELECT account_name, SUM({balance_field}) FROM trial_balance_entries WHERE project_id = :pid AND year = :y GROUP BY account_name"),
+                text(f"SELECT account_name, SUM({balance_field}) FROM trial_balance WHERE project_id = :pid AND year = :y GROUP BY account_name"),
                 {"pid": project_id, "y": year},
             )
             for r in result.fetchall():

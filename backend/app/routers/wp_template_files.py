@@ -785,11 +785,10 @@ async def _get_tb_data_for_prefill(
     try:
         result = await db.execute(text("""
             SELECT
-                tb.account_code,
+                tb.standard_account_code,
                 tb.opening_balance,
-                tb.closing_balance,
-                tb.debit_amount,
-                tb.credit_amount
+                tb.unadjusted_amount,
+                tb.audited_amount
             FROM trial_balance tb
             WHERE tb.project_id = :pid
             LIMIT 5000
@@ -807,12 +806,13 @@ async def _get_tb_data_for_prefill(
         code = row[0]
         if not code:
             continue
+        # trial_balance 无 closing_balance/借贷发生额列：期末余额/未审数取 unadjusted_amount，
+        # 审定数取 audited_amount；发生额明细在 tb_balance（此处不取）。
         tb_data[code] = {
             "期初余额": float(row[1] or 0),
             "期末余额": float(row[2] or 0),
-            "未审数": float(row[2] or 0),  # 未审数 = 期末余额
-            "借方发生额": float(row[3] or 0),
-            "贷方发生额": float(row[4] or 0),
+            "未审数": float(row[2] or 0),
+            "审定数": float(row[3] or 0),
         }
     return tb_data
 

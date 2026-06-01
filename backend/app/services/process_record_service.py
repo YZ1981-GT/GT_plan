@@ -123,7 +123,7 @@ class AttachmentLinkService:
             "SELECT a.reference_id as wp_id, w.wp_code, w.wp_name "
             "FROM attachments a "
             "LEFT JOIN wp_index w ON w.id = ("
-            "  SELECT wp_index_id FROM working_papers WHERE id = a.reference_id LIMIT 1"
+            "  SELECT wp_index_id FROM working_paper WHERE id = a.reference_id LIMIT 1"
             ") "
             "WHERE a.id = :att_id "
             "AND a.reference_type = 'working_paper' "

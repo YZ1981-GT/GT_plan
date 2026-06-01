@@ -27,10 +27,10 @@ async def generate_evidence_index(db: AsyncSession, project_id: UUID) -> bytes:
     Returns:
         bytes: xlsx 文件内容
     """
-    # 查询该项目所有底稿的证据链接（通过 working_paper.project_id 关联）
+    # 查询该项目所有底稿的证据链接（wp_code 在 wp_index，经 wp_index_id 关联）
     q = sa.text("""
         SELECT
-            wp.wp_code,
+            i.wp_code,
             el.sheet_name,
             el.cell_ref,
             a.file_name,
@@ -40,9 +40,10 @@ async def generate_evidence_index(db: AsyncSession, project_id: UUID) -> bytes:
             el.created_at
         FROM evidence_links el
         JOIN working_paper wp ON wp.id = el.wp_id
+        JOIN wp_index i ON i.id = wp.wp_index_id
         LEFT JOIN attachments a ON a.id = el.attachment_id
         WHERE wp.project_id = :pid
-        ORDER BY wp.wp_code, el.sheet_name, el.cell_ref
+        ORDER BY i.wp_code, el.sheet_name, el.cell_ref
     """)
     rows = (await db.execute(q, {"pid": str(project_id)})).fetchall()
 

@@ -302,7 +302,7 @@ class QualityRatingService:
         try:
             result = await db.execute(
                 sa_text(
-                    "SELECT COUNT(*) FROM gate_evaluations "
+                    "SELECT COUNT(*) FROM gate_decisions "
                     "WHERE project_id = :pid AND decision = 'block'"
                 ),
                 {"pid": str(project_id)},

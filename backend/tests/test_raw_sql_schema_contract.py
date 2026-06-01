@@ -62,16 +62,8 @@ _INFRA_TABLES = {
 # 每条需后续确认：改正表名 / 补迁移建表 / 删死代码。
 # TODO(schema-debt): 逐个消除，清零后删除本白名单。
 _KNOWN_PHANTOM_DEBT = {
-    "ai_contents",                # report_trace_service.py — 疑应为 ai_content_log
-    "consolidation_adjustments",  # eqcr_shadow_compute_service.py — 疑应为 consol_* 表
-    "gate_evaluations",           # quality_rating_service.py — 疑应为 gate_decisions
-    "report_snapshots",           # gate_rules_phase14.py(QC-25) — 已加 to_regclass 守卫不崩，表仍未建
-    "tb_account_chart",           # ledger_import/validator.py
-    "template_sets",              # template_library_mgmt.py
-    "trial_balance_entries",      # account_note_mapping.py / consol_note_sections.py — 疑应为 trial_balance
-    "working_papers",             # 多处 — 真实表名是单数 working_paper（复数是误写/视图假设）
-    "wp_account_mapping",         # data_validation_engine.py — 映射在 JSON+服务层，无此表
-    "wp_template_registry",       # custom_query.py/wp_template_registry.py — 服务层 table_exists 懒判，未迁移
+    "report_snapshots",           # gate_rules_phase14.py(QC-25) — 已加 to_regclass 守卫不崩，表仍未建（功能债务）
+    "wp_template_registry",       # custom_query.py/wp_template_registry.py — 服务层 table_exists 懒判，未迁移（功能债务）
 }
 
 # PG 函数式表源（FROM 后跟函数，非真实表）
