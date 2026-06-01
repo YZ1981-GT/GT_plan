@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.app.services.note_column_semantics import (
+from app.services.note_column_semantics import (
     DEFAULT_SEMANTIC,
     STANDARD_SEMANTICS,
     VALID_SEMANTICS,

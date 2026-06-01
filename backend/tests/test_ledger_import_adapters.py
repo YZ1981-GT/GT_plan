@@ -16,14 +16,14 @@ from pathlib import Path
 
 import pytest
 
-from backend.app.services.ledger_import.adapters import (
+from app.services.ledger_import.adapters import (
     AdapterRegistry,
     JsonDrivenAdapter,
     registry as module_registry,
 )
-from backend.app.services.ledger_import.adapters.base import BaseAdapter
-from backend.app.services.ledger_import.adapters.generic import GenericAdapter
-from backend.app.services.ledger_import.detection_types import (
+from app.services.ledger_import.adapters.base import BaseAdapter
+from app.services.ledger_import.adapters.generic import GenericAdapter
+from app.services.ledger_import.detection_types import (
     ColumnMatch,
     FileDetection,
     SheetDetection,
