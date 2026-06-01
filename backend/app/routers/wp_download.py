@@ -73,11 +73,17 @@ async def download_single(
         info = await svc.download_single(db=db, project_id=project_id, wp_id=wp_id)
         from pathlib import Path
         file_path = Path(info["file_path"])
+        # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
+        from urllib.parse import quote
+        _fname = info["file_name"]
+        ascii_name = _fname.encode("ascii", "ignore").decode() or "workpaper.xlsx"
+        utf8_name = quote(_fname, safe="")
+        disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
         return StreamingResponse(
             open(file_path, "rb"),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={
-                "Content-Disposition": f'attachment; filename="{info["file_name"]}"',
+                "Content-Disposition": disposition,
                 "X-WP-Version": str(info["file_version"]),
             },
         )

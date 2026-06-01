@@ -95,12 +95,17 @@ async def export_excel(
     filename = f"{company_short}_{body.year}年度财务报表({mode_label}).xlsx"
     # Sanitize filename
     filename = _sanitize_filename(filename)
+    # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
+    from urllib.parse import quote
+    ascii_name = filename.encode("ascii", "ignore").decode() or "report_export.xlsx"
+    utf8_name = quote(filename, safe="")
+    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
 
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": disposition,
             "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         },
     )

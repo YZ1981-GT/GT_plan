@@ -60,7 +60,7 @@ class NoteCrossReferenceService:
                 DisclosureNote.year == year,
             ).order_by(
                 DisclosureNote.sort_order.asc(),
-                DisclosureNote.section_code.asc(),
+                DisclosureNote.note_section.asc(),
             )
         )
         notes = result.scalars().all()
@@ -74,11 +74,11 @@ class NoteCrossReferenceService:
         # Build row_code → note number mapping
         references: dict[str, str] = {}
         for note in notes:
-            if not note.section_code:
+            if not note.note_section:
                 continue
             # Extract row_code from section_code mapping
             row_codes = self._get_linked_row_codes(note)
-            number_str = note_numbers.get(note.section_code, "")
+            number_str = note_numbers.get(note.note_section, "")
             for rc in row_codes:
                 if number_str:
                     references[rc] = number_str
@@ -187,10 +187,10 @@ class NoteCrossReferenceService:
         note_numbers = self._build_section_numbers(notes)
 
         for note in notes:
-            if note.section_code:
+            if note.note_section:
                 # Bookmark name: _Note_<section_code>
-                bookmark_name = f"_Note_{note.section_code.replace('-', '_')}"
-                bookmarks[note.section_code] = bookmark_name
+                bookmark_name = f"_Note_{note.note_section.replace('-', '_')}"
+                bookmarks[note.note_section] = bookmark_name
 
         return bookmarks
 
@@ -212,7 +212,7 @@ class NoteCrossReferenceService:
 
         for note in notes:
             level = getattr(note, 'level', 1) or 1
-            section_code = note.section_code or ""
+            section_code = note.note_section or ""
 
             if level == 1:
                 level1_counter += 1
@@ -245,7 +245,7 @@ class NoteCrossReferenceService:
         # Common pattern: section_code like "NOTE-BS-001" or metadata
         row_codes: list[str] = []
 
-        section_code = note.section_code or ""
+        section_code = note.note_section or ""
 
         # Check if section_code contains a report row reference
         match = re.search(r'(BS|IS|CFS|EQ)-\d+', section_code)

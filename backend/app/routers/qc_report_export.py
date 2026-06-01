@@ -201,7 +201,7 @@ async def export_qc_report(
                 COUNT(*) FILTER (WHERE severity = 'major') as warning,
                 COUNT(*) FILTER (WHERE severity IN ('minor', 'suggestion')) as info
             FROM issue_tickets
-            WHERE project_id = :pid AND source = 'qc_inspection' AND is_deleted = FALSE
+            WHERE project_id = :pid AND source = 'qc_inspection'
             GROUP BY category
             ORDER BY category
         """),
@@ -218,7 +218,7 @@ async def export_qc_report(
         sql_text("""
             SELECT id, severity, category, title, status, created_at
             FROM issue_tickets
-            WHERE project_id = :pid AND source = 'qc_inspection' AND is_deleted = FALSE
+            WHERE project_id = :pid AND source = 'qc_inspection'
             ORDER BY severity DESC, created_at ASC
             LIMIT 200
         """),
@@ -241,12 +241,12 @@ async def export_qc_report(
     rect_result = await db.execute(
         sql_text("""
             SELECT it.id, it.title, it.status,
-                   COALESCE(u.display_name, u.username, '') as assignee,
+                   COALESCE(u.username, '') as assignee,
                    it.updated_at
             FROM issue_tickets it
-            LEFT JOIN users u ON it.assigned_to = u.id
+            LEFT JOIN users u ON it.owner_id = u.id
             WHERE it.project_id = :pid AND it.source = 'qc_inspection'
-                  AND it.status IN ('in_fix', 'closed') AND it.is_deleted = FALSE
+                  AND it.status IN ('in_fix', 'closed')
             ORDER BY it.updated_at DESC
             LIMIT 200
         """),
@@ -292,9 +292,14 @@ async def export_qc_report(
         pass  # audit_log failure should not block export
 
     filename = f"QC_Report_{project_name}_{datetime.now().strftime('%Y%m%d')}.docx"
+    # 中文文件名需 RFC 5987 编码（HTTP 头按 latin-1 编码，直接放中文会 UnicodeEncodeError）
+    from urllib.parse import quote
+    ascii_name = filename.encode("ascii", "ignore").decode() or "QC_Report.docx"
+    utf8_name = quote(filename, safe="")
+    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
 
     return StreamingResponse(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": disposition},
     )

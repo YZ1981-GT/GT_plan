@@ -273,10 +273,14 @@ async def export_report_excel(
         output.seek(0)
 
         filename = f"{report_type.value}_{year}.xlsx"
+        # 统一 RFC5987 编码（防御：report_type 未来可能含非 ASCII）
+        from urllib.parse import quote
+        ascii_name = filename.encode("ascii", "ignore").decode() or "report.xlsx"
+        disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename, safe='')}"
         return StreamingResponse(
             output,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
+            headers={"Content-Disposition": disposition},
         )
     except ImportError:
         raise HTTPException(status_code=500, detail="openpyxl 未安装，无法导出 Excel")

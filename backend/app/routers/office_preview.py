@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import shutil
 import subprocess
 import tempfile
@@ -55,11 +56,10 @@ def _resolve_cache_dir() -> Path:
     优先环境变量 OFFICE_PREVIEW_CACHE_DIR，
     否则 settings.STORAGE_ROOT / preview_cache。
     """
-    import os
+    storage_root = Path(settings.STORAGE_ROOT)
     env_dir = os.environ.get("OFFICE_PREVIEW_CACHE_DIR")
     if env_dir:
         return Path(env_dir)
-    storage_root = Path(settings.STORAGE_ROOT)
     return storage_root / "preview_cache"
 
 
@@ -263,11 +263,16 @@ async def preview_office_as_pdf(
         except OSError as e:
             logger.warning("[OFFICE_PREVIEW] cache write failed: %s", e)
 
+    # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
+    from urllib.parse import quote as _quote
+    _stem = f"{src_path.stem}.pdf"
+    _ascii_stem = _stem.encode("ascii", "ignore").decode() or "preview.pdf"
+    _disposition = f"inline; filename=\"{_ascii_stem}\"; filename*=UTF-8''{_quote(_stem, safe='')}"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'inline; filename="{src_path.stem}.pdf"',
+            "Content-Disposition": _disposition,
             "X-Preview-Cache": "hit" if cache_path.exists() else "miss",
         },
     )

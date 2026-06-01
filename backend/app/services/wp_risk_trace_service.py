@@ -52,7 +52,7 @@ class WpRiskTraceService:
         risks = (await self.db.execute(sa.text("""
             SELECT id, title, description, severity
             FROM issue_tickets
-            WHERE project_id = :pid AND source = 'risk' AND is_deleted = false
+            WHERE project_id = :pid AND source = 'risk'
             ORDER BY severity DESC, created_at
         """), {"pid": str(project_id)})).fetchall()
 

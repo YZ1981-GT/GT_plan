@@ -125,14 +125,27 @@ class TestDiffColumns:
         assert items[0].column == "deprecated_col"
 
     def test_type_mismatch(self, sqlite_engine):
+        """真实类型不一致（如 INTEGER vs VARCHAR）应报 type_mismatch。
+
+        注：TIMESTAMP↔TIMESTAMPTZ 被 _types_compatible 刻意视为兼容（消除假阳性），
+        故此处用 INTEGER vs VARCHAR 这种真正不兼容的组合验证 mismatch 检出。
+        """
+        det = SchemaDriftDetector(sqlite_engine)
+        orm = {"users": {"age": {"type": "INTEGER", "nullable": True}}}
+        db = {"users": {"age": {"type": "VARCHAR", "nullable": True}}}
+        items = det._diff_columns(orm, db)
+        assert len(items) == 1
+        assert items[0].drift_type == "type_mismatch"
+        assert "INTEGER" in items[0].detail
+        assert "VARCHAR" in items[0].detail
+
+    def test_timestamp_tz_compatible_no_false_positive(self, sqlite_engine):
+        """TIMESTAMP ↔ TIMESTAMPTZ 视为兼容（时区差异不影响存取），不报 mismatch。"""
         det = SchemaDriftDetector(sqlite_engine)
         orm = {"users": {"created_at": {"type": "TIMESTAMP", "nullable": True}}}
         db = {"users": {"created_at": {"type": "TIMESTAMPTZ", "nullable": True}}}
         items = det._diff_columns(orm, db)
-        assert len(items) == 1
-        assert items[0].drift_type == "type_mismatch"
-        assert "TIMESTAMP" in items[0].detail
-        assert "TIMESTAMPTZ" in items[0].detail
+        assert items == []
 
     def test_alias_normalized_no_false_positive(self, sqlite_engine):
         """VARCHAR(100) vs CHARACTER VARYING 应归一，不报 mismatch。"""

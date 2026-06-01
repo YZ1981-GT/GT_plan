@@ -208,7 +208,7 @@ class ReviewIssueTracker:
                 CellAnnotation.object_id,
                 CellAnnotation.content,
                 CellAnnotation.status,
-                CellAnnotation.created_by,
+                CellAnnotation.author_id,
                 CellAnnotation.created_at,
                 CellAnnotation.cell_ref,
             )
@@ -222,12 +222,12 @@ class ReviewIssueTracker:
         rows = (await self.db.execute(q)).all()
 
         issues = []
-        for obj_id, content, status, created_by, created_at, cell_ref in rows:
+        for obj_id, content, status, author_id, created_at, cell_ref in rows:
             issues.append({
                 "wp_id": str(obj_id) if obj_id else None,
                 "content": content,
                 "status": status,
-                "created_by": str(created_by) if created_by else None,
+                "created_by": str(author_id) if author_id else None,
                 "created_at": created_at.isoformat() if created_at else None,
                 "cell_ref": cell_ref,
             })

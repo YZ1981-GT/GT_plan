@@ -160,7 +160,7 @@ async def get_qc_trend(
     weeks: int = 4,
 ) -> dict[str, Any]:
     """QC问题趋势分析（按周统计各类问题数量变化）"""
-    from app.models.workpaper_models import WpQcResult
+    from app.models.workpaper_models import WpQcResult, WorkingPaper, WpIndex
 
     today = date.today()
     trend_data = []
@@ -171,10 +171,14 @@ async def get_qc_trend(
         ws = datetime.combine(week_start, datetime.min.time())
         we = datetime.combine(week_end, datetime.min.time())
 
-        # 该周的 QC 结果
+        # 该周的 QC 结果（WpQcResult 无 project_id，经 working_paper→wp_index 关联项目）
         result = await db.execute(
-            sa.select(sa.func.count()).select_from(WpQcResult).where(
-                WpQcResult.project_id == project_id,
+            sa.select(sa.func.count())
+            .select_from(WpQcResult)
+            .join(WorkingPaper, WpQcResult.working_paper_id == WorkingPaper.id)
+            .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+            .where(
+                WpIndex.project_id == project_id,
                 WpQcResult.created_at >= ws,
                 WpQcResult.created_at < we,
             )

@@ -285,13 +285,21 @@ class QC25ReportNoteVersionStaleRule(GateRule):
             return None
         try:
             # 检查审计报告段落引用的附注版本是否过期
-            # 简化实现：检查 report_snapshots 是否有 stale 标记
+            # report_snapshots 表可能不存在（Phase 13 才创建）→ to_regclass 安全探测，
+            # 避免对不存在表的查询失败污染外层事务（InFailedSQLTransactionError 级联）。
             stmt = text("""
                 SELECT rs.id FROM report_snapshots rs
                 WHERE rs.project_id = :project_id
                   AND rs.is_stale = true
+                  AND to_regclass('public.report_snapshots') IS NOT NULL
                 LIMIT 1
             """)
+            # 先确认表存在，不存在直接跳过（连 SELECT 都不发，杜绝污染）
+            exists = (await db.execute(
+                text("SELECT to_regclass('public.report_snapshots')")
+            )).scalar()
+            if exists is None:
+                return None
             result = await db.execute(stmt, {"project_id": str(project_id)})
             row = result.fetchone()
             if row:
@@ -322,6 +330,19 @@ class QC26NoteSourceMappingMissingRule(GateRule):
         if not project_id:
             return None
         try:
+            # disclosure_notes 真实 schema 无 is_key_disclosure / source_cells 列
+            # （历史设计漂移）→ 先校验列存在再查，缺列直接跳过，杜绝
+            # UndefinedColumn 失败污染外层事务（InFailedSQLTransactionError 级联）。
+            cols_exist = (await db.execute(text("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name = 'disclosure_notes'
+                  AND column_name IN ('is_key_disclosure', 'source_cells')
+            """))).scalar() or 0
+            if cols_exist < 2:
+                logger.debug(
+                    "[QC-26] check skipped: disclosure_notes 缺 is_key_disclosure/source_cells 列"
+                )
+                return None
             # 检查附注关键披露是否缺少 source_cells 映射
             stmt = text("""
                 SELECT dn.id, dn.title FROM disclosure_notes dn

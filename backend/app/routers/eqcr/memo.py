@@ -133,15 +133,24 @@ async def export_eqcr_memo(
     if not sections:
         raise HTTPException(status_code=404, detail="备忘录尚未生成")
 
-    # 生成 Word 文档
+    # 生成 Word 文档（签名：build_memo_docx_bytes(project_name, client_name, sections)）
     from app.services.eqcr_memo_service import build_memo_docx_bytes
-    docx_bytes = build_memo_docx_bytes(sections, project_name=memo_data.get("project_name", ""))
+    docx_bytes = build_memo_docx_bytes(
+        memo_data.get("project_name", ""),
+        memo_data.get("client_name", ""),
+        sections,
+    )
 
     filename = f"EQCR备忘录_{memo_data.get('project_name', project_id)}.docx"
+    # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
+    from urllib.parse import quote
+    ascii_name = filename.encode("ascii", "ignore").decode() or "EQCR_memo.docx"
+    utf8_name = quote(filename, safe="")
+    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
     return Response(
         content=docx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": disposition},
     )
 
 

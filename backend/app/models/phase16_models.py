@@ -36,7 +36,9 @@ class EvidenceHashCheck(Base):
     __tablename__ = "evidence_hash_checks"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    export_id = Column(UUID(as_uuid=True), nullable=False)
+    # export_id 业务上是字符串标识符（rc_enhanced 生成 `exp_rc_日期_hex` / archive 用 str(job.id)），
+    # DB 实为 VARCHAR；曾误定义为 UUID 致 schema drift type_mismatch + UUID(export_id) 对非 UUID 串崩。
+    export_id = Column(String(64), nullable=False)
     file_path = Column(Text, nullable=False)
     sha256 = Column(String(64), nullable=False)
     signature_digest = Column(String(128), nullable=True)

@@ -20,6 +20,7 @@ inclusion: always
 - **spec 设计阶段必做"现状 grep 确认"**（G spec 复盘教训）：每项改进先确认迁移/端点/依赖 spec 是否已有产物；外部依赖标明降级方案+切换点；`*` 评估任务在设计阶段直接做 ROI 判断（列改动文件数/收益/风险）
 - **改动后必 Playwright 实测**：getDiagnostics 过 ≠ 运行时无错
 - **UI 全中文化**：所有用户可见文本中文（技术术语 SQL/PDF/LLM/API/UUID/CAS/编号 保留英文）；不接入 i18n 硬编码 + ESLint 卡点
+- **中文场景必须支持（用户 2026-06-01 强调）**：功能/数据层中文全链路不能崩——中文文件名下载（Content-Disposition 必 RFC5987）、中文项目名/客户名/底稿名导出、中文数据查询导出均须实测过；区别于"UI 全中文化"（界面文本层）
 - 功能收敛停加新功能，核心 6-8 页做到极致，空壳标 developing；前后端必须联动；删除二次确认+先进回收站；一次性脚本用完即删
 - **文档/文件夹级 LLM 对话是最实用核心功能（2026-05-31 用户强调）**：平台任意文档/文件夹都能发起 AI 对话，自动注入当前文档+关联知识库（同行业/同模板/同科目）作 RAG 上下文；把知识库从"存文件"变"随时可问的专家"；详见 `docs/proposals/global-modules-status-and-improvement-2026-05-31.md` §二十二（spec 名 `doc-level-ai-chat`）
 - git 单 commit 提交所有变更；**push 前必先 fetch 同步**（stash → fetch --prune → 评估 ahead/behind → 决策 → pop → commit/push）
@@ -55,7 +56,11 @@ inclusion: always
 - **四阶段三件套已归档 `_archive/09-consolidation-phases/`**（work commit `375edd8d`，封板①②完成后归档，非空归档）；**tasks.md 残留未勾项全是外部依赖**（真实集团数据 UAT `*` 卡 PG 0 consolidated + Playwright 待环境 + B6/B7 CAS20 审计专业复核），代码+测试层面已封板
 
 ### git 当前状态（2026-06-01）
-- 当前分支 `work/2026-05-30-wp-specs`，ahead of origin；已 merge `origin/spec/global-modules-AD-implementation`（A+D spec 实施，55 文件 +8496 行）；本地含 B/C/E/F/G spec 改动（stash pop 后 memory.md 冲突已解决）；**待 commit + push 后走 PR 合入 main**
+- 当前分支 `work/2026-05-30-wp-specs`，已与 `origin/work/2026-05-30-wp-specs` 同步（ahead 0）；最新 commit `bb7ea6cf`（107 文件 +14635/-465 = B/C/E/F/G spec 实施 + 实施后真实 PG 复盘 4 类 bug 修复 + rollback 收口 + 防御测试）；**已 push，尚未建 PR**（待走 PR 合入 main）
+- **协作态势实证（2026-06-01）**：work→main 纯快进零分叉（main 落后 4，无冲突可合）；feature/disclosure-note + spec/frontend-consistency-m1 均已并入 main（领先 main 0=陈旧分支可删）；当前无他人未合改动
+- **🔴 远程默认分支隐患**：`origin/HEAD → origin/master`，但 **master 落后 main 298 commit**（master 是陈旧遗留，实际活跃主干是 main）；新人克隆默认 checkout master 会严重过时，误在 master 开发合回会巨量冲突 → 需在 GitHub Settings 改默认分支为 main（Agent 无法改远程仓库设置）
+- **文档类冲突预防策略**：memory.md / INDEX.md / append-only 复盘文档是多人必改高发区，冲突时取并集（保留双方），走 PR 让 GitHub 先暴露冲突，不本地直推 main 覆盖
+- **git 工具环境（2026-06-01 实证）**：远程 `origin = https://github.com/YZ1981-GT/GT_plan.git`（HTTPS，非 SSH，每次推拉可能要凭证）；**gh CLI 已装(2.89.0)但未登录**（`gh auth login` 需用户本人浏览器授权，Agent 无法代登）→ 建 PR 当前只能走网页 compare 链接或先登录；提速可选 `git config --global credential.helper manager` 或换 SSH；**work→main 零分叉时直推快进 `git push origin work:main` 最快但违"不直推 main"铁律，仅用户拍板例外可用**
 
 ### 已完成 spec 总览
 - 详见 `.kiro/specs/INDEX.md`（active + _archive 10 分类）
@@ -65,10 +70,39 @@ inclusion: always
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
 
-### 待修 bug（2026-06-01 grep 实证，与已修 render-config 同源：查 users 不存在的 display_name 列）
-- 🔴 `project_wizard.py:207` `select(UserModel.display_name)` — User ORM 无此字段 → AttributeError，项目向导仪表盘聚合崩（user_ids 非空时）；修 → username
-- 🔴 `qc_report_export.py:244` 裸 SQL `COALESCE(u.display_name, u.username)` — 真实 PG users 无 display_name → UndefinedColumn 500；修 → 删 display_name
-- 系统性防御建议：加 CI「SQL 列引用 ⊆ 真实 schema」契约检查，一次兜住整类「查不存在列」bug（render-config/prefill/wizard/qc 已 4 处同源）
+### ✅ display_name + issue_tickets + 中文文件名 三类 bug 已实测修复（2026-06-01，真实 PG HTTP 端到端验证）
+- ✅ `project_wizard.py:207`（list-with-progress）+ `qc_report_export.py:244` display_name → username（实测 9981 端到端 200）
+- 🔴 **新发现并修**：`issue_tickets` 表**无 is_deleted/deleted_at/assigned_to 列**（负责人=`owner_id`，这张表根本不做软删除）；`qc_report_export.py` 3 段 SQL 都有 `AND is_deleted=FALSE`（首条 UndefinedColumn→事务 aborted→连带全 500）+ rect 段 JOIN `it.assigned_to` 应为 `it.owner_id`；`wp_risk_trace_service.py:56` 同样 `is_deleted=false` → 已全修
+- 🔴 **新发现并修**：`qc_report_export.py` 中文文件名直塞 `Content-Disposition` → Starlette latin-1 编码 HTTP 头 `UnicodeEncodeError` → 500（SQL 全过、docx 生成成功后崩在最后响应头）；修=RFC5987 `filename*=UTF-8''{quote(name)}`（范例 `working_paper.py:529`/`wp_template_download.py:77`）
+- ✅ **Content-Disposition 中文文件名全仓修复（2026-06-01，触类旁通 grep 一次清完 + HTTP 实测）**：中文直塞 header → latin-1 编码崩 500。统一改 RFC5987 `filename="{ascii回退}"; filename*=UTF-8''{quote(name)}`，修复 10 处含中文来源端点（qc_report_export/note_export/eqcr·memo/report_export·reports·export-excel/procedures/wp_download/chain_workflow·审计终稿zip/attachments附件名×2/office_preview·inline/wp_template_download·inline）+ reports.py 防御统一；ASCII 安全的（adjustment/validation/wp_offline/{uuid}/枚举）未动；**HTTP 实测 9981：qc-export + reports/export-excel 均 200，CD 头正确编码 首汽租车/年度财务报表(未审)**
+- **实测教训（2026-06-01）**：①`audit-backend` 容器跑 6 天**旧代码**（无 list-with-progress 路由，请求 fallback 到 `/{project_id}` 当 UUID 解析→422）——实测必须用加载新代码的实例 ②start-dev 的 uvicorn `--reload` 父子进程互拉，taskkill 端口立即被接管 kill 不净 ③**干净验证法 = venv 另起端口（9981）`python -m uvicorn ... --port 9981`**，绕开纠缠的 reloader ④500 被 generic_exception_handler 吞 body，定位根因用脚本**直接调用端点函数**捕完整栈（`_diag_qc_endpoint.py` mock user+真 session）
+- 系统性防御建议：加 CI「SQL 列引用 ⊆ 真实 schema」+「Content-Disposition 含非 ASCII 必经 RFC5987」契约检查
+- 🟡 `docker-compose.yml` 注释整段 GBK 乱码（疑历史 Set-Content/-replace 写中文）；README 信息过时（V001-V026/143 测试 → 实际 V044/682 测试文件）
+
+### ✅ 模块巡检 + 2 个 500 + ORM 类型漂移修复（2026-06-01，9981 真实 PG 巡检 25 端点）
+- **巡检法**：venv 起 9981，admin 登录后逐打各模块代表性只读端点，按状态码筛 500（422=缺必填 query 参数非 bug / 405=方法不符非 bug）；最终 500 清单清零
+- ✅ **schema drift type_mismatch 归零**：`evidence_hash_checks.export_id` ORM=UUID 但 DB=VARCHAR + 真实值是 `exp_rc_日期_hex`/`str(job.id)` 非 UUID → ORM 改 `String(64)` + `export_integrity_service` 去掉 `UUID(export_id)` 转换 + trace 调用用 uuid5 派生（48→47 drift，critical 类彻底归零）
+- ✅ **qc_open_issues 500**：`qc_dashboard_service.get_open_issues` 查 `CellAnnotation.created_by`，真实字段是 `author_id`（ORM 无 created_by）→ 已修
+- ✅ **sign_readiness 500（耗时最久，多轮定位）**：根因 = R4-CROSS-CHECK gate 规则查 `SELECT year FROM working_paper`（**working_paper 无 year 列**），首条 SQL 失败 → PG 事务 aborted → 后续所有 rule 的 `SAVEPOINT`/gate_decisions INSERT 全级联崩 500。改用 `trial_balance.year`。**连带修** consistency_replay_engine（layer2 financial_report 用虚构列 fr.amount/line_code/account_code→真实 current_period_amount+source_accounts JSONB；layer5 wp_account_mapping 表不存在→改空占位）+ QC-25(report_snapshots 表不存在→to_regclass 守卫)/QC-26(disclosure_notes 无 is_key_disclosure/source_cells→列存在性守卫) + cross_check_service 全量列修正（trial_balance 无 closing_balance→audited_amount/unadjusted_amount；adjustment_entries.account_code→standard_account_code；adjustments.status→review_status）
+- 🔴 **关键技术发现（asyncpg 事务污染）**：①PG 事务一旦 aborted，**连 `SAVEPOINT` 命令都被拒**，故 gate_engine 给 rule.check 加 savepoint 隔离**无法挽救已被前序 rule 污染的事务**（savepoint 须在失败 SQL 前成功建立才有效）②根治之道 = 修最先失败的那条 SQL 让其不污染（不是兜异常）③规则内 `try/except` 吞 SQL 异常但不 rollback = 反模式：吞掉的是 Python 异常，PG 连接仍 aborted，后续全崩 ④定位法 = 拦 `db.execute` 记**第一个**失败 SQL（cascade 的 InFailedSQLTransaction 都是噪音）⑤service 直接调用过但 HTTP 500 = 多 rule 共享同一 session 致污染跨 rule 传播，单 rule 独立 session 测不出
+- gate_engine 已加 rule.check savepoint 隔离（commit 失败则 rollback savepoint）作纵深防御，但**首要仍是修根因 SQL**
+
+### ✅ 广覆盖 GET 巡检 + 14 个 500 全清零（2026-06-01，429 个仅 project_id 的 GET 端点）
+- **巡检法升级**：从 OpenAPI 自动取「路径参数仅 {project_id}」的 GET 端点（429 个），httpx 逐打筛 500，结果写文件防 PowerShell 截断；最终 500 清单清零（仅剩 events/stream SSE ReadTimeout 非 bug）
+- **批量定位法**：in-process ASGI httpx（`httpx.ASGITransport(app=app)`）+ logging 一次命中拿全部根因；或拦 `db.execute` 记第一个失败 SQL
+- **14 个 500 分 6 类**：①缺列：prior-year-data(projects 无 prior_year_project_id→**V045 补列**)/qc-trend(WpQcResult 无 project_id→JOIN working_paper→wp_index)/batch-extract(Adjustment.entry_number/entry_type→adjustment_no/adjustment_type，AdjustmentEntry.account_code→standard_account_code)/cross-references(DisclosureNote.section_code→note_section) ②缺表：notes group-template/custom-sections/locks-active/data-lock-snapshots(4 表从未迁移但有 INSERT 路径→**V046 补建**) ③SQL 逻辑：import-intelligence quality-check/overview(HAVING 无 GROUP BY→改 WHERE) ④代码错：office-preview/health(模块缺 `import os`)/parse-all-workpapers(缺 `import sqlalchemy as sa`)/qc-rotation(import `app.models.project_models` 不存在→core)/eqcr memo-export(`build_memo_docx_bytes(sections, project_name=)` 传参错，签名实为 `(project_name, client_name, sections)`) ⑤类型不匹配：notes/locks/active(V046 建表用 TIMESTAMP 但 service 传 tz-aware datetime→asyncpg "offset-naive vs aware"→**V047 改 TIMESTAMPTZ**) ⑥事务污染：cost-overview(`_get_hourly_rates` 查 system_settings 缺表→吞异常但污染事务→后续 work_hours 查询级联崩→加 to_regclass 守卫)
+- **新增迁移 V045/V046/V047**（均配 R 回滚）；当前最高迁移 **V047**
+- 🔴 **system_settings 表不存在**（cost-overview 已 to_regclass 绕过，但该表被多处引用，是潜在隐患——可能其它端点也踩）
+- **巡检教训**：①429 端点串行巡检超 180s，需调 per-request timeout=25s + 写文件 ②events/stream 是 SSE 长连接，巡检会 ReadTimeout 属正常 ③"缺表但有 INSERT 路径"=曾设计懒建表但从未真正建（同 wp_template_registry 模式），补迁移是正解 ④422(缺必填 query)/405(方法不符)非 bug，巡检要排除
+
+### 🔴 GET 巡检复盘暴露的待办与风险（2026-06-01，诚实不粉饰）
+- **🔴 本轮 31 文件+3 迁移全程零测试**：仅靠"启动后端 HTTP 命中 200"冒烟验证，违反自身铁律"标 completed 须有测试证据"+"修主代码加防御测试"——字段名修正(如 Adjustment.entry_number→adjustment_no)正是契约测试该守护的，一个都没补
+- **✅ 已补契约测试 + V048 根治 system_settings（2026-06-01）**：①`test_raw_sql_schema_contract.py`（3 测试全绿）= 纯静态扫全仓 `text()` 裸 SQL 的 FROM/JOIN 表引用，比对「ORM metadata ∪ 迁移 CREATE TABLE ∪ 懒建 ∪ 基础设施」权威表集，CI 阶段无需 live DB 一次兜住整类「查不存在表」500（drift detector 只比对 ORM↔DB 抓不到裸 SQL）②**V048 建 system_settings 键值表**根治 cost/rotation/quality 三处缺表事务污染（cost-overview 实测 200）③修一处既存假红 `test_schema_drift_detector.test_type_mismatch`（TIMESTAMP↔TIMESTAMPTZ 被 detector 刻意判兼容，测试却期望 mismatch→改用 INTEGER vs VARCHAR + 补兼容用例）
+- **🔴 契约测试揪出 10 个存量 phantom 表引用债务**（登记进测试 `_KNOWN_PHANTOM_DEBT` 白名单守增量，存量待逐个清零）：`ai_contents`(疑→ai_content_log)/`consolidation_adjustments`/`gate_evaluations`(疑→gate_decisions)/`report_snapshots`(已 to_regclass 守卫不崩但表未建)/`tb_account_chart`/`template_sets`/`trial_balance_entries`(疑→trial_balance)/`working_papers`(真实表是单数 working_paper)/`wp_account_mapping`(映射在 JSON+服务层无表)/`wp_template_registry`(服务层 table_exists 懒判未迁移)——均真实 PG 不存在，对应代码多被 try/except 包裹故未在巡检命中，是定时炸弹
+- **🟡 200≠逻辑正确**：很多端点返 200 因首汽租车数据稀疏(financial_report 0行/QC 0条)走空路径；重写的 consistency layer2(source_accounts JSONB join)+cross_check 列映射在真实数据下算得对否未验证
+- **🟡 改动未提交**：本轮累计 ~34 文件+V045/46/47/48(配R)+2 测试全在工作区未 commit，当前分支 `work/2026-05-30-wp-specs`，该独立成 commit 走 PR；components.d.ts 被工具改(无害)提交前 checkout 掉
+- **当前最高迁移 V048**（V045 prior_year_project_id / V046 4 张附注懒建表 / V047 note_locks TIMESTAMPTZ / V048 system_settings）
+- **元反思（系统性根因）**：连续多轮逐个救火 500，根因是"代码库大量基于想象 schema 写的查询，ORM/裸 SQL 列名与真实 PG 长期漂移无人发现——因这些端点从未被测试覆盖也没真实数据跑过"。**真正根治 = CI「SQL/ORM 列引用 ⊆ 真实 schema」契约检查**（一次兜住整类，ROI 远高于逐个修），否则下批同类 bug 还会冒
 
 
 ### 全局 7 模块改进 7 spec 全部完成（2026-06-01）

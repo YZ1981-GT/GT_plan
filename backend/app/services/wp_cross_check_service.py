@@ -374,16 +374,18 @@ class CrossCheckService:
     ) -> Decimal | None:
         """从底稿 parsed_data 取值"""
         try:
+            # working_paper 无 year 列（年度经由 project / wp_index 维度），不可按 wp.year 过滤
             q = sa.text("""
                 SELECT wp.parsed_data
                 FROM working_paper wp
                 JOIN wp_index wi ON wi.id = wp.wp_index_id
-                WHERE wi.project_id = :pid AND wp.year = :year
+                WHERE wi.project_id = :pid
                   AND wi.wp_code = :wp_code
+                  AND wp.is_deleted = false
                 LIMIT 1
             """)
             result = await self.db.execute(q, {
-                "pid": str(project_id), "year": year, "wp_code": wp_code
+                "pid": str(project_id), "wp_code": wp_code
             })
             row = result.first()
             if not row or not row[0]:
@@ -407,13 +409,15 @@ class CrossCheckService:
     ) -> Decimal | None:
         """从试算表取值"""
         try:
+            # trial_balance 真实列：unadjusted_amount/aje_adjustment/rje_adjustment/
+            # audited_amount/opening_balance（无 closing_balance）。
             col_map = {
-                "审定数": "closing_balance",
-                "期末余额": "closing_balance",
-                "未审数": "closing_balance",
+                "审定数": "audited_amount",
+                "期末余额": "audited_amount",
+                "未审数": "unadjusted_amount",
                 "期初余额": "opening_balance",
             }
-            db_col = col_map.get(column, "closing_balance")
+            db_col = col_map.get(column, "audited_amount")
 
             q = sa.text(f"""
                 SELECT {db_col}
@@ -439,12 +443,12 @@ class CrossCheckService:
         """从试算表范围求和"""
         try:
             col_map = {
-                "审定数": "closing_balance",
-                "期末余额": "closing_balance",
-                "未审数": "closing_balance",
+                "审定数": "audited_amount",
+                "期末余额": "audited_amount",
+                "未审数": "unadjusted_amount",
                 "期初余额": "opening_balance",
             }
-            db_col = col_map.get(column, "closing_balance")
+            db_col = col_map.get(column, "audited_amount")
 
             # 解析范围 "1001~1999"
             parts = range_str.split("~")
@@ -482,9 +486,9 @@ class CrossCheckService:
                     FROM adjustment_entries ae
                     JOIN adjustments a ON a.id = ae.adjustment_id
                     WHERE a.project_id = :pid AND a.year = :year
-                      AND ae.account_code = :code
+                      AND ae.standard_account_code = :code
                       AND a.adjustment_type = 'aje'
-                      AND a.status != 'rejected'
+                      AND a.review_status != 'rejected'
                 """)
             else:
                 q = sa.text("""
@@ -492,9 +496,9 @@ class CrossCheckService:
                     FROM adjustment_entries ae
                     JOIN adjustments a ON a.id = ae.adjustment_id
                     WHERE a.project_id = :pid AND a.year = :year
-                      AND ae.account_code = :code
+                      AND ae.standard_account_code = :code
                       AND a.adjustment_type = 'rje'
-                      AND a.status != 'rejected'
+                      AND a.review_status != 'rejected'
                 """)
             result = await self.db.execute(q, {
                 "pid": str(project_id), "year": year, "code": account_code,
@@ -515,7 +519,7 @@ class CrossCheckService:
         """获取试算表审定余额（标准科目编码→金额）"""
         try:
             q = sa.text("""
-                SELECT standard_account_code, closing_balance
+                SELECT standard_account_code, audited_amount
                 FROM trial_balance
                 WHERE project_id = :pid AND year = :year
             """)
@@ -533,7 +537,8 @@ class CrossCheckService:
         """获取试算表完整数据（含未审数/AJE/RJE/审定数）"""
         try:
             q = sa.text("""
-                SELECT standard_account_code, closing_balance, opening_balance
+                SELECT standard_account_code, unadjusted_amount, opening_balance,
+                       aje_adjustment, rje_adjustment, audited_amount
                 FROM trial_balance
                 WHERE project_id = :pid AND year = :year
             """)
@@ -544,10 +549,10 @@ class CrossCheckService:
                 if not code:
                     continue
                 data[code] = {
-                    "audited": row[1] or 0,
-                    "unadjusted": row[1] or 0,  # 简化：未审数≈审定数
-                    "aje_net": 0,
-                    "rje_net": 0,
+                    "audited": row[5] or 0,
+                    "unadjusted": row[1] or 0,
+                    "aje_net": row[3] or 0,
+                    "rje_net": row[4] or 0,
                 }
             return data
         except Exception:

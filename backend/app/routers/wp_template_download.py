@@ -439,11 +439,16 @@ async def preview_template_as_pdf(
             logger.warning("[TPL_PREVIEW] cache write failed: %s", e)
         cache_status = "miss"
 
+    # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
+    from urllib.parse import quote as _quote
+    _stem = f"{src_path.stem}.pdf"
+    _ascii_stem = _stem.encode("ascii", "ignore").decode() or "preview.pdf"
+    _disposition = f"inline; filename=\"{_ascii_stem}\"; filename*=UTF-8''{_quote(_stem, safe='')}"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'inline; filename="{src_path.stem}.pdf"',
+            "Content-Disposition": _disposition,
             "X-Preview-Cache": cache_status,
         },
     )

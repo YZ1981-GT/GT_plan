@@ -271,6 +271,10 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
 
     file_path = att.get("file_path", "")
     file_name = att.get("file_name", "attachment")
+    # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
+    from urllib.parse import quote as _quote
+    _ascii_name = file_name.encode("ascii", "ignore").decode() or "attachment"
+    _disposition = f"attachment; filename=\"{_ascii_name}\"; filename*=UTF-8''{_quote(file_name, safe='')}"
 
     # 审计日志：记录敏感下载操作
     logger.info(
@@ -294,7 +298,7 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
                     return Response(
                         content=resp.content,
                         media_type=resp.headers.get("content-type", "application/octet-stream"),
-                        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+                        headers={"Content-Disposition": _disposition},
                     )
         except httpx.RequestError:
             pass
@@ -307,7 +311,7 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
         return StreamingResponse(
             open(local_path, "rb"),
             media_type="application/octet-stream",
-            headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+            headers={"Content-Disposition": _disposition},
         )
 
     raise HTTPException(status_code=404, detail="文件不存在")

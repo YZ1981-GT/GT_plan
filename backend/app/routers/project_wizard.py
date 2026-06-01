@@ -140,7 +140,7 @@ async def list_projects_with_progress(
       - due_date   = (audit_year+1)-04-30（典型审计报告截止）
       - overall_progress = sum(已完成 wp count) / sum(wp count) * 100
         已完成 = WorkingPaper.status in (locked, archived)；空集时为 0
-      - partner_name / manager_name = JOIN users.display_name
+      - partner_name / manager_name = JOIN users.username
 
     单次 SQL 聚合（项目数 N）+ 单次 SQL 取 wp 进度（GROUP BY project_id）+ 单次 users JOIN，
     总计 3 次 IO，不会随 N 退化。
@@ -198,16 +198,16 @@ async def list_projects_with_progress(
         for row in progress_rows
     }
 
-    # 3. 一次性取 partner/manager display_name
+    # 3. 一次性取 partner/manager 名称（users 表无 display_name 列，用 username）
     user_ids = {p.partner_id for p in projects if p.partner_id} | {p.manager_id for p in projects if p.manager_id}
     name_map: dict = {}
     if user_ids:
         from app.models.core import User as UserModel
         user_rows = (await db.execute(
-            select(UserModel.id, UserModel.display_name, UserModel.username).where(UserModel.id.in_(list(user_ids)))
+            select(UserModel.id, UserModel.username).where(UserModel.id.in_(list(user_ids)))
         )).all()
-        for uid, dname, uname in user_rows:
-            name_map[uid] = dname or uname
+        for uid, uname in user_rows:
+            name_map[uid] = uname
 
     # 4. 组装
     out: list[dict] = []

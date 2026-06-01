@@ -256,7 +256,7 @@ async def _resolve_adj_formula(
         Adjustment.project_id == project_id,
         Adjustment.year == year,
         Adjustment.is_deleted == False,  # noqa: E712
-        AdjustmentEntry.account_code == account_code,
+        AdjustmentEntry.standard_account_code == account_code,
     )
     if adj_type.upper() in ("AJE", "审计调整"):
         q = q.where(Adjustment.adjustment_type == "aje")

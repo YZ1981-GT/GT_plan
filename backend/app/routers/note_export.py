@@ -76,12 +76,17 @@ async def export_word(
     # Build filename per 致同 naming convention
     company_short = _get_company_short_name(project)
     filename = sanitize_export_filename(f"{company_short}_{body.year}年度财务报表附注.docx")
+    # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
+    from urllib.parse import quote
+    ascii_name = filename.encode("ascii", "ignore").decode() or "note_export.docx"
+    utf8_name = quote(filename, safe="")
+    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
 
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": disposition,
             "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         },
     )

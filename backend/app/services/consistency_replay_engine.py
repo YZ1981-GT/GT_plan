@@ -137,8 +137,10 @@ class ConsistencyReplayEngine:
                 HAVING ABS(COALESCE(SUM(tb.closing_balance), 0) - COALESCE(t.unadjusted_amount, 0)) > 0.01
                 LIMIT 20
             """)
-            result = await db.execute(stmt, {"pid": str(project_id)})
-            rows = result.fetchall()
+            # savepoint 隔离：SQL 失败仅回滚本层，不污染外层事务（防 InFailedSQLTransactionError 级联）
+            async with db.begin_nested():
+                result = await db.execute(stmt, {"pid": str(project_id)})
+                rows = result.fetchall()
             for row in rows:
                 diff_val = abs(float(row[1] or 0) - float(row[2] or 0))
                 layer.diffs.append(ConsistencyDiff(
@@ -157,21 +159,36 @@ class ConsistencyReplayEngine:
         return layer
 
     async def _check_layer2(self, db, project_id, year) -> ConsistencyLayer:
-        """Layer 2: trial_balance → financial_report"""
+        """Layer 2: trial_balance → financial_report
+
+        真实 schema：financial_report 无 account_code 直连列，报表行通过
+        ``source_accounts`` (JSONB 账户码数组) 关联 trial_balance；金额列为
+        ``current_period_amount``。比对"报表行金额 vs 其来源科目审定数之和"。
+        """
         layer = ConsistencyLayer(from_table="trial_balance", to_table="financial_report")
         try:
             stmt = text("""
-                SELECT fr.line_code, fr.amount as report_amount,
-                       t.audited_amount as trial_amount
+                SELECT fr.row_code,
+                       COALESCE(fr.current_period_amount, 0) AS report_amount,
+                       COALESCE(SUM(t.audited_amount), 0) AS trial_amount
                 FROM financial_report fr
-                JOIN trial_balance t ON t.project_id = fr.project_id
-                    AND t.standard_account_code = fr.account_code
-                WHERE fr.project_id = :pid
-                    AND ABS(COALESCE(fr.amount, 0) - COALESCE(t.audited_amount, 0)) > 0.01
+                LEFT JOIN LATERAL jsonb_array_elements_text(
+                    CASE WHEN jsonb_typeof(fr.source_accounts) = 'array'
+                         THEN fr.source_accounts ELSE '[]'::jsonb END
+                ) AS sa(account_code) ON TRUE
+                LEFT JOIN trial_balance t ON t.project_id = fr.project_id
+                    AND t.standard_account_code = sa.account_code
+                    AND t.is_deleted = FALSE
+                WHERE fr.project_id = :pid AND fr.is_deleted = FALSE
+                    AND fr.source_accounts IS NOT NULL
+                GROUP BY fr.row_code, fr.current_period_amount
+                HAVING ABS(COALESCE(fr.current_period_amount, 0) - COALESCE(SUM(t.audited_amount), 0)) > 0.01
                 LIMIT 20
             """)
-            result = await db.execute(stmt, {"pid": str(project_id)})
-            rows = result.fetchall()
+            # savepoint 隔离：SQL 失败仅回滚本层，不污染外层事务
+            async with db.begin_nested():
+                result = await db.execute(stmt, {"pid": str(project_id)})
+                rows = result.fetchall()
             for row in rows:
                 diff_val = abs(float(row[1] or 0) - float(row[2] or 0))
                 layer.diffs.append(ConsistencyDiff(
@@ -203,41 +220,15 @@ class ConsistencyReplayEngine:
         return layer
 
     async def _check_layer5(self, db, project_id, year) -> ConsistencyLayer:
-        """Layer 5: working_papers → trial_balance (反向校验)"""
-        layer = ConsistencyLayer(from_table="working_papers", to_table="trial_balance")
-        try:
-            stmt = text("""
-                SELECT wp.wp_code,
-                       (wp.parsed_data->>'audited_amount')::numeric as wp_amount,
-                       t.audited_amount as trial_amount
-                FROM working_paper wp
-                JOIN wp_account_mapping wam ON wam.wp_code = wp.wp_code
-                    AND wam.project_id = wp.project_id
-                JOIN trial_balance t ON t.project_id = wp.project_id
-                    AND t.standard_account_code = wam.standard_account_code
-                WHERE wp.project_id = :pid
-                    AND wp.parsed_data->>'audited_amount' IS NOT NULL
-                    AND ABS((wp.parsed_data->>'audited_amount')::numeric - COALESCE(t.audited_amount, 0)) > 0.01
-                LIMIT 20
-            """)
-            result = await db.execute(stmt, {"pid": str(project_id)})
-            rows = result.fetchall()
-            for row in rows:
-                diff_val = abs(float(row[1] or 0) - float(row[2] or 0))
-                layer.diffs.append(ConsistencyDiff(
-                    object_type="workpaper",
-                    object_id=str(row[0]),
-                    field_name="wp_audited vs trial_audited",
-                    expected=float(row[2] or 0),
-                    actual=float(row[1] or 0),
-                    diff=diff_val,
-                    severity="blocking",
-                ))
-            if layer.diffs:
-                layer.status = "inconsistent"
-        except Exception as e:
-            logger.debug(f"[CONSISTENCY] Layer 5 skipped: {e}")
-        return layer
+        """Layer 5: working_papers → trial_balance (反向校验)
+
+        说明：底稿↔标准科目映射在 DB 层无对应表 —— ``wp_account_mapping`` 表不存在，
+        ``note_account_mappings`` 是模板级配置(无 project_id/account_code)，真实映射
+        在 ``backend/data/wp_account_mapping.json`` (206 条 v2025-R5) + wp_mapping 服务层。
+        因此本层无法用纯 SQL 实现，返回空 layer（consistent）占位；需经服务层映射后
+        在应用层比对，留待 wp-mapping 服务接入（避免执行注定失败的 SQL 污染事务）。
+        """
+        return ConsistencyLayer(from_table="working_papers", to_table="trial_balance")
 
     async def generate_consistency_report(
         self,

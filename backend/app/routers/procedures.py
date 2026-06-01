@@ -396,10 +396,15 @@ async def download_blank_template(
     buf.seek(0)
 
     filename = f"blank_template_{cycle}_{procedure_name}.xlsx"
+    # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
+    from urllib.parse import quote
+    ascii_name = filename.encode("ascii", "ignore").decode() or "blank_template.xlsx"
+    utf8_name = quote(filename, safe="")
+    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": disposition},
     )
 
 

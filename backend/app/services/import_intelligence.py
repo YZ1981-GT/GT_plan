@@ -340,7 +340,7 @@ async def deep_quality_check(
                 SELECT 1 FROM ledger_datasets d
                 WHERE d.id = b.dataset_id AND d.status = 'active'
               )
-            HAVING ABS(COALESCE(b.debit_amount,0) - COALESCE(l.ledger_debit,0)) > 1
+              AND ABS(COALESCE(b.debit_amount,0) - COALESCE(l.ledger_debit,0)) > 1
             ORDER BY diff DESC
             LIMIT 5
         """).bindparams(pid=project_id, yr=year)
