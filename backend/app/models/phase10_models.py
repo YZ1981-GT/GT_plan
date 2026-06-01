@@ -31,6 +31,13 @@ class ReviewConversation(Base):
     is_deleted: Mapped[bool] = mapped_column(server_default=text("false"))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # V033 扩展列
+    resolved_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    resolution_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sla_due_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    priority: Mapped[str | None] = mapped_column(String(20), server_default=text("'medium'"))
+    resolved_by: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
 
 class ReviewMessage(Base):
@@ -44,6 +51,14 @@ class ReviewMessage(Base):
     attachment_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     finding_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # V033 扩展列
+    trace_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    reply_to: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    redaction_flag: Mapped[bool] = mapped_column(server_default=text("false"))
+    edited_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    reason_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    message_version: Mapped[int] = mapped_column(sa.Integer, server_default=text("1"))
+    mentions: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 
 # ── 论坛 ──────────────────────────────────────────────────

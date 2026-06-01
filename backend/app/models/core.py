@@ -5,7 +5,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, Text, func, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import (
@@ -129,6 +129,9 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         server_default=text("false"),
         comment="是否有外币业务（驱动 E1-1 双区显隐 + E1-3 双版本二选一）",
     )
+    # V045 扩展列
+    prior_year_project_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    migration_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # multi-standard-unification 需求 1.1: 结构化统一准则状态源（单一真理源）
     # {entity_type: "soe"|"listed"|"private", scope: "standalone"|"consolidated",

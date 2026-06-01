@@ -68,7 +68,9 @@ inclusion: always
 - 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
 ### git 状态（2026-06-01）
-- 分支 `work/2026-05-30-wp-specs` 已与 origin 同步；最新含 500 全清零 + 契约测试 + LLM/回收站修复；**已 push 待走 PR 合 main**
+- 分支 `work/2026-05-30-wp-specs` 已与 origin 同步（最新 `fb58ac77`）；本批含 LLM 多system合并+工作台/手册孤儿CSS全补+回收站 app_audit_log V050+CORS/307+V049 QC25+**手册体系总览底稿数改真实计算**；**已 push 待走 PR 合 main**
+- **🟡 手册视图仍含静态展示数据**：审计流程(5步)/底稿关系(数据流链) 是纯科普图非项目真实数据（可接受）；**体系总览 count 已改真实 wpIndex 计算**（原硬编码 20/15/14 假数字与循环详解真实数不一致已修）
+- **🔴 分叉分支隐患 `feature/report-module-enhancement-closure`(3df0fd61)**：含 WorkpaperWorkbenchView.vue **旧版**（365 行/41 guide CSS 类残缺/count 硬编码假数字），缺 work 分支的工作台+手册孤儿CSS全补(761c320a)和真实计数(fb58ac77)修复 → 合并时勿用其覆盖 work 版（726 行/79 CSS），否则回归
 - **🔴 远程默认分支隐患**：`origin/HEAD→origin/master` 但 master 落后 main 298 commit（活跃主干是 main）→ 需 GitHub Settings 改默认分支（Agent 无法改远程设置）
 - 远程 `origin = https://github.com/YZ1981-GT/GT_plan.git`（HTTPS）；gh CLI 已装(2.89.0)未登录（需用户本人浏览器授权）→ 建 PR 走网页 compare
 - 文档类（memory/INDEX/复盘）冲突取并集，走 PR 让 GitHub 先暴露冲突，不本地直推 main

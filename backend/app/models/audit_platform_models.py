@@ -130,6 +130,11 @@ class ImportBatch(Base):
         ForeignKey("users.id"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    is_deleted: Mapped[bool | None] = mapped_column(
+        server_default=text("false"), nullable=True
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     __table_args__ = (
         Index("idx_import_batches_project_year", "project_id", "year"),
@@ -181,6 +186,7 @@ class AccountChart(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -224,6 +230,7 @@ class AccountMapping(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )
@@ -287,6 +294,7 @@ class TbBalance(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -361,6 +369,7 @@ class TbLedger(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -441,6 +450,8 @@ class TbAuxBalance(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    accounting_period: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
     aux_dimensions_raw: Mapped[str | None] = mapped_column(Text, nullable=True)  # 原始维度组合字符串
@@ -529,6 +540,7 @@ class TbAuxLedger(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
     aux_dimensions_raw: Mapped[str | None] = mapped_column(Text, nullable=True)  # 原始维度组合字符串
@@ -608,6 +620,7 @@ class Adjustment(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id"), nullable=False
     )
@@ -682,6 +695,7 @@ class TrialBalance(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -749,6 +763,7 @@ class Materiality(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -842,6 +857,7 @@ class AdjustmentEntry(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -896,6 +912,7 @@ class UnadjustedMisstatement(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     # F50 / Sprint 8.16: 下游快照绑定（创建时绑定当前 active dataset）
     bound_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),

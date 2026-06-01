@@ -63,6 +63,18 @@ class SchemaDriftDetector:
         "alembic_version",
         # PG 系统
         "pg_stat_statements",
+        # 业务基础设施表（裸 SQL / 迁移管理，无 ORM 映射）
+        "app_audit_log",
+        "data_snapshots",
+        "group_note_templates",
+        "note_section_locks",
+        "note_section_templates",
+        "review_conversation_exports",
+        "review_conversation_participants",
+        "system_settings",
+        "tb_aux_balance_summary",
+        "wp_migration_snapshots",
+        "wp_sheet_locks",
     })
 
     # 外部租户表前缀（与业务共用 audit_platform 库的第三方工具表）。

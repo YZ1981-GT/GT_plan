@@ -66,6 +66,9 @@ class AttachmentWorkingPaper(Base):
     row_ref: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # DB 扩展列
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    working_paper_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
     __table_args__ = (
         Index("idx_attachment_wp_attachment", "attachment_id"),

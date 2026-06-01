@@ -166,6 +166,7 @@ class ReportSnapshot(Base):
     created_by: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id"), nullable=False
     )
+    is_stale: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
 
     __table_args__ = (
         Index(

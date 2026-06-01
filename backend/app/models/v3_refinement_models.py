@@ -103,3 +103,8 @@ class TimeMachineSnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(
         server_default=text("now()"), nullable=False
     )
+    # DB 扩展列
+    diff_patch: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    module: Mapped[str] = mapped_column(String(50), nullable=False, server_default=text("''"))
+    snapshot_data: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)

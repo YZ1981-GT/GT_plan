@@ -87,9 +87,10 @@ async def _run_schema_drift_check() -> None:
             critical_count = sum(
                 1 for it in items if it.drift_type in ("orm_extra", "enum_mismatch")
             )
+            health_status = "degraded" if critical_count > 0 else "healthy"
             log.warning(
-                "[启动] 检测到 %d 个 schema 漂移（critical=%d）/ health=degraded",
-                len(items), critical_count,
+                "[启动] 检测到 %d 个 schema 漂移（critical=%d）/ health=%s",
+                len(items), critical_count, health_status,
             )
             for it in items[:5]:
                 log.warning(
@@ -100,11 +101,12 @@ async def _run_schema_drift_check() -> None:
                 )
             if len(items) > 5:
                 log.warning("  ... 还有 %d 项详见 /api/health", len(items) - 5)
-            # 启动末尾用 print 兜底（即使 LOG_LEVEL=WARNING 也可见）
-            print(
-                f"[GT-Backend] WARNING: {len(items)} schema drifts detected "
-                f"(critical={critical_count})"
-            )
+            # 启动末尾用 print 兜底（仅 critical>0 时告警）
+            if critical_count > 0:
+                print(
+                    f"[GT-Backend] WARNING: {len(items)} schema drifts detected "
+                    f"(critical={critical_count})"
+                )
     except Exception as e:
         log.warning("[启动] schema 漂移检测失败（不阻塞启动）: %s", e)
 

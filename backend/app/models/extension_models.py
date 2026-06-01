@@ -79,6 +79,7 @@ class WpTemplateCustom(Base):
     is_deleted: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    formula_valid: Mapped[bool | None] = mapped_column(nullable=True)
 
     __table_args__ = (
         Index("idx_wp_template_custom_user", "user_id"),

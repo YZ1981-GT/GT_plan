@@ -67,6 +67,7 @@ class GateDecision(Base):
     actor_id = Column(UUID(as_uuid=True), nullable=False)
     trace_id = Column(String(64), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    context = Column(JSONB, nullable=True)
 
     __table_args__ = (
         Index("idx_gate_decisions_project_gate", "project_id", "gate_type", created_at.desc()),
