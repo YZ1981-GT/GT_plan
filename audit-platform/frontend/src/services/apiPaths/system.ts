@@ -15,7 +15,7 @@ export const auth = {
 // ─── 用户 ───────────────────────────────────────────────────────────────────
 
 export const users = {
-  list: '/api/users',
+  list: '/api/users/',
   me: '/api/users/me',
   detail: (id: string) => `/api/users/${id}`,
   privateStorage: {

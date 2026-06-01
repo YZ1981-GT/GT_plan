@@ -189,11 +189,11 @@ async def submit_judgment(
         },
     )
 
-    # Write to audit_log
+    # Write to app_audit_log
     try:
         await db.execute(
             sql_text(
-                "INSERT INTO audit_log (id, user_id, action, resource_type, resource_id, details, created_at) "
+                "INSERT INTO app_audit_log (id, user_id, action, resource_type, resource_id, details, created_at) "
                 "VALUES (:id, :uid, :action, :rtype, :rid, :details::jsonb, :now)"
             ),
             {

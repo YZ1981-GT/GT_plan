@@ -263,7 +263,7 @@ class WpDocumentRecognizer:
           5. 解析并返回字段
         """
         try:
-            from app.services.llm_client import get_llm_client
+            from app.services.llm_client import chat_completion
 
             # 获取 OCR 文本（简化：直接用文件名作为上下文）
             ocr_text = f"[附件: {att_info.get('filename', '')}]"
@@ -271,18 +271,15 @@ class WpDocumentRecognizer:
             prompt = _PROMPT_TEMPLATES.get(doc_type, _PROMPT_TEMPLATES[DocType.VOUCHER])
             prompt = prompt.format(text=ocr_text)
 
-            client = get_llm_client()
-            response = await client.chat_completion(
-                messages=[{"role": "user", "content": prompt}],
+            content = await chat_completion(
+                [{"role": "user", "content": prompt}],
                 max_tokens=1000,
                 temperature=0.1,
             )
 
-            # 解析 JSON 响应
+            # 解析 JSON 响应（chat_completion 返回纯文本）
             import json
-            content = response.get("content", "")
-            # 尝试提取 JSON
-            if "{" in content:
+            if content and "{" in content:
                 json_str = content[content.index("{"):content.rindex("}") + 1]
                 return json.loads(json_str)
             return None

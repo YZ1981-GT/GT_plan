@@ -196,17 +196,18 @@ async def _write_audit_log(
 ) -> None:
     """写入审计日志（best-effort，不阻断主流程）。"""
     try:
+        import json
         from sqlalchemy import text
         await db.execute(
             text(
-                "INSERT INTO audit_log (id, user_id, action, details, created_at) "
-                "VALUES (:id, :user_id, :action, :details, NOW())"
+                "INSERT INTO app_audit_log (id, user_id, action, details, created_at) "
+                "VALUES (:id, :user_id, :action, CAST(:details AS JSONB), NOW())"
             ),
             {
                 "id": str(uuid.uuid4()),
                 "user_id": str(user_id),
                 "action": action,
-                "details": str(details),
+                "details": json.dumps(details, ensure_ascii=False, default=str),
             },
         )
         await db.commit()

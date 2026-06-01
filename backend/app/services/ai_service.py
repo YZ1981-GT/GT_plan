@@ -96,6 +96,28 @@ async def _get_llm_client() -> httpx.AsyncClient:
     )
 
 
+def _merge_system_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    """合并多条 system 消息为一条（vLLM + Qwen3.5 仅允许开头一条 system）。
+
+    规则：将所有 role=system 的消息内容用换行合并，放在最前面；
+    其余消息保持原序。
+    """
+    system_parts: list[str] = []
+    other_msgs: list[dict[str, str]] = []
+    for msg in messages:
+        if msg.get("role") == "system":
+            content = msg.get("content", "")
+            if content:
+                system_parts.append(content)
+        else:
+            other_msgs.append(msg)
+    result: list[dict[str, str]] = []
+    if system_parts:
+        result.append({"role": "system", "content": "\n\n".join(system_parts)})
+    result.extend(other_msgs)
+    return result
+
+
 async def _get_chromadb_client() -> httpx.AsyncClient:
     """获取 ChromaDB HTTP 客户端"""
     return httpx.AsyncClient(
@@ -286,7 +308,7 @@ class AIService:
         async with await _get_llm_client() as client:
             payload: dict[str, Any] = {
                 "model": model,
-                "messages": messages,
+                "messages": _merge_system_messages(messages),
                 "temperature": temperature,
                 "max_tokens": max_tokens or settings.LLM_MAX_TOKENS,
                 "stream": False,
@@ -318,7 +340,7 @@ class AIService:
         async with await _get_llm_client() as client:
             payload: dict[str, Any] = {
                 "model": model,
-                "messages": messages,
+                "messages": _merge_system_messages(messages),
                 "temperature": temperature,
                 "max_tokens": max_tokens or settings.LLM_MAX_TOKENS,
                 "stream": True,

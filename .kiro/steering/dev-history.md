@@ -2729,3 +2729,48 @@ YG36 重庆医药集团四川物流真实样本导入后发现 `tb_balance` 同 
 - `frontend/src/components/workpaper/renderer/GtTraceabilityDialog.vue`
 - `frontend/src/components/workpaper/renderer/GtFormulaPopover.vue`
 - `frontend/src/composables/useWpRenderSchema.ts`
+
+
+## 2026-06-01 真实 PG 巡检 + 500 全清零 + LLM/回收站修复（从 memory.md 归档）
+
+> 本节为 memory.md 精简时归档的完整复盘明细，append-only。memory.md 仅保留结论行。
+
+### display_name + issue_tickets + 中文文件名三类 bug（真实 PG HTTP 端到端）
+- `project_wizard.py:207`(list-with-progress) + `qc_report_export.py:244` display_name → username（实测 9981 端到端 200）
+- `issue_tickets` 表无 is_deleted/deleted_at/assigned_to 列（负责人=`owner_id`，不做软删除）；qc_report_export 3 段 SQL 的 `AND is_deleted=FALSE` 首条 UndefinedColumn→事务 aborted→连带全 500 + rect 段 JOIN `it.assigned_to` 应为 `it.owner_id`；`wp_risk_trace_service.py:56` 同样 → 已全修
+- Content-Disposition 中文文件名全仓修复（触类旁通 grep 一次清完 + HTTP 实测）：中文直塞 header → latin-1 编码崩 500，统一改 RFC5987 `filename="{ascii回退}"; filename*=UTF-8''{quote(name)}`，修 10 处含中文来源端点（qc_report_export/note_export/eqcr·memo/report_export·reports·export-excel/procedures/wp_download/chain_workflow·审计终稿zip/attachments×2/office_preview·inline/wp_template_download·inline）+ reports.py 防御统一
+- 实测教训：①audit-backend 容器跑旧代码（请求 fallback 到 `/{project_id}` 当 UUID→422）必须用加载新代码的实例 ②start-dev uvicorn `--reload` 父子进程互拉 kill 不净 ③干净验证 = venv 另起端口 9981 绕开 reloader ④500 被 generic_exception_handler 吞 body，定位用脚本直接调端点函数捕完整栈
+
+### 模块巡检 + sign_readiness 500 + ORM 类型漂移（9981 真实 PG）
+- schema drift type_mismatch 归零：`evidence_hash_checks.export_id` ORM=UUID 但 DB=VARCHAR + 真实值 `exp_rc_日期_hex` 非 UUID → ORM 改 `String(64)` + export_integrity_service 去 UUID() 转换 + trace 用 uuid5 派生
+- qc_open_issues 500：`CellAnnotation.created_by` 真实字段是 `author_id`
+- sign_readiness 500：R4-CROSS-CHECK gate 查 `SELECT year FROM working_paper`（无 year 列）首条 SQL 失败→事务 aborted→后续 rule SAVEPOINT/INSERT 级联崩。改 `trial_balance.year`。连带修 consistency_replay_engine（financial_report 虚构列→current_period_amount/source_accounts；wp_account_mapping 表不存在→空占位）+ QC-25/26 守卫 + cross_check_service 列修正
+- 🔴 asyncpg 事务污染关键发现：①事务 aborted 后连 SAVEPOINT 都被拒，savepoint 须在失败 SQL 前建才有效 ②根治=修最先失败的 SQL（非兜异常）③规则内 try/except 吞 SQL 异常不 rollback=反模式（PG 连接仍 aborted）④定位=拦 db.execute 记第一个失败 SQL ⑤多 rule 共享 session 致污染跨 rule 传播
+
+### 广覆盖 GET 巡检 + 14 个 500（429 个仅 project_id 的 GET 端点）
+- 巡检法：OpenAPI 自动取「路径参数仅 {project_id}」GET 端点，in-process ASGI httpx 逐打筛 500，结果写文件防截断
+- 14 个 500 分 6 类：①缺列：prior-year-data(V045 补 prior_year_project_id)/qc-trend(WpQcResult 无 project_id→JOIN)/batch-extract(Adjustment 列名)/cross-references(DisclosureNote.section_code→note_section) ②缺表：notes 4 表(V046 补建) ③SQL 逻辑：import-intelligence(HAVING 无 GROUP BY) ④代码错：office-preview(缺 import os)/parse-all-workpapers(缺 import sa)/qc-rotation(import project_models 不存在→core)/eqcr memo-export(传参错) ⑤类型：notes/locks(V047 TIMESTAMP→TIMESTAMPTZ) ⑥事务污染：cost-overview(system_settings 缺表→to_regclass 守卫)
+- 巡检教训：429 端点串行超 180s 需 per-request timeout=25s；events/stream SSE 长连接 ReadTimeout 正常；"缺表但有 INSERT 路径"=曾设计懒建表从未建，补迁移是正解；422/405 非 bug
+
+### 契约测试落地（CI「SQL 引用 ⊆ 真实 schema」根治整类 500）
+- `test_raw_sql_schema_contract.py`（表级，纯静态）：扫全仓 text() 裸 SQL FROM/JOIN 表引用，比对「ORM ∪ 迁移 CREATE TABLE ∪ 懒建 ∪ 基础设施」权威表集，无需 live DB
+- `test_raw_sql_column_contract.py`（列级，pg_only，sqlglot 依赖）：解析裸 SQL→别名映射→校验每个 `别名.列` 在真实表存在（只校验带别名限定列，保守零误报）
+- phantom 表债务清零：修 7 个 phantom 表名(working_papers→working_paper 14处/trial_balance_entries→trial_balance/gate_evaluations→gate_decisions/ai_contents→ai_content_log/consolidation_adjustments→elimination_entries/tb_account_chart→account_chart/template_sets→wp_template_set)；QC-25 report_snapshots 真相=双 bug（表名应单数 report_snapshot + 无 is_stale 列）→ V049 补列+改名；剩 1 功能债务 wp_template_registry（懒判守卫未迁移）登记 _KNOWN_PHANTOM_DEBT
+- phantom 列债务 18 个清零：data_validation_engine/linkage_service/wp_template_files/report_trace/wp_evidence_index 列名修正；QC-19/20/26 登记 _COLUMN_ALLOWLIST
+- 契约测试自带 stale-debt 守护：白名单条目不再被引用时 test_phantom_debt_not_growing_and_still_real 自动报错催删
+- CI 接线：ci.yml 触发分支 master→master+main；backend-tests + backend-tests-pg 加 Run migrations 步骤
+- 元反思：连续多轮救火 500 根因=代码库大量基于想象 schema 写查询，ORM/裸 SQL 列名与真实 PG 长期漂移无人发现（端点从未被测试覆盖也没真实数据跑过）；根治=CI 契约检查一次兜整类
+
+### LLM 端到端实测跑通（本地 vLLM 真实调用）
+- 环境：vLLM `localhost:8100`，`/models` 返 200 唯一模型 Kbenkhaled/Qwen3.5-27B-NVFP4；`.env` WP_AI_SERVICE_ENABLED=True
+- chat 链路全绿：llm_client.chat_completion()（流式+非流式）/ AIService(db).chat_completion()（需真实 DB 会话，db=None 会 AttributeError）/ WpAIService._execute_llm_with_mask()（source_model=qwen3.5-27b 真实生成）
+- get_llm_client bug 已修：wp_chat_service/wp_document_recognizer 改用 chat_completion
+- vLLM 多 system 消息 bug：`"System message must be at the beginning"` 400 拒绝 ≥2 条 system；ai_service.py 加 `_merge_system_messages()`（_chat_sync/_chat_stream 发送前合并）；llm_client.py RAG 注入改追加到首条 system content；HTTP 实测 doc_ai_chat + wp_chat 均通
+- 孤儿代码 AIChatService(ai_chat_service.py)：0 router 引用且调不存在的 ai_service.chat()/chat_stream()，接线即 500
+- embedding 404：vLLM serve chat 模型不带 embed task，semantic_search 优雅降级 ilike（不崩），build_index/incremental_update 无降级会抛错→RAG 向量索引构建不可用
+
+### 回收站删不掉 + 工作台 UI + CORS（Playwright 实测）
+- CORS/Network Error：前端 3030 但 CORS_ORIGINS 只列 5173；FastAPI `/api/users` 无尾斜杠返 307 重定向绝对 URL→浏览器直连 9980 跨域拒绝。修=.env CORS_ORIGINS 加 3030 + apiPaths/system.ts users.list 加尾斜杠
+- 回收站"删不掉"双根因：①软删除项目需 X-Confirmation-Token（先 POST verify-password 拿 token，by design）②password_confirm._write_audit_log + eqcr_judgment + qc_report_export 三处 `INSERT INTO audit_log` 写的表被 Metabase 共库占用（真实 schema id integer/topic/model 无 action 列）→ UndefinedColumn 污染事务。修=V050 建独立表 app_audit_log + 三处改名 + details 改 CAST(:x AS JSONB)
+- ⚠️ `CREATE TABLE IF NOT EXISTS audit_log` 是 no-op（名被 Metabase 占）；查 to_regclass + information_schema.columns 看真实 schema 才发现
+- 工作台 UI 简陋：WorkpaperWorkbenchView.vue 的 `<style scoped>` 只定义 1 个类，进度卡片 gt-wpb-* 类全无 CSS→无样式堆叠 div。修=补 grid 卡片样式（auto-fill minmax 200px + 紫色 code 徽章 + hover + is-active），用 --gt-* 令牌

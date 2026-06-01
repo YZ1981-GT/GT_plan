@@ -91,15 +91,12 @@ async def chat_completion(
         if len(context_text) > max_context_chars:
             context_text = context_text[:max_context_chars] + "\n\n[...参照文档已截断...]"
 
-        context_msg = {
-            "role": "system",
-            "content": f"以下是参照文档，请在生成内容时参考：\n\n{context_text}",
-        }
-        # 插入到 messages 的第一条 system 消息之后（或最前面）
+        context_suffix = f"\n\n以下是参照文档，请在生成内容时参考：\n\n{context_text}"
+        # 合并到第一条 system 消息（vLLM + Qwen3.5 仅允许一条 system）
         if messages and messages[0].get("role") == "system":
-            messages = [messages[0], context_msg] + messages[1:]
+            messages = [{"role": "system", "content": messages[0]["content"] + context_suffix}] + messages[1:]
         else:
-            messages = [context_msg] + messages
+            messages = [{"role": "system", "content": context_suffix.strip()}] + messages
 
     payload = {
         "model": model or _MODEL,

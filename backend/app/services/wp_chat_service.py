@@ -41,24 +41,16 @@ class WpChatService:
         wp_info = await self._load_wp_context(db, wp_id)
         # 2. 构建 system prompt
         system_prompt = self._build_system_prompt(wp_info, context)
-        # 3. 调用 LLM
+        # 3. 调用 LLM（项目自研 chat_completion 流式，连本地 vLLM）
         try:
-            from app.services.llm_client import get_llm_client
-            client = get_llm_client()
+            from app.services.llm_client import chat_completion
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": message},
             ]
-            stream = client.chat.completions.create(
-                model=client._default_model if hasattr(client, "_default_model") else "default",
-                messages=messages,
-                stream=True,
-                max_tokens=4096,
-            )
             full_response = ""
-            for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    text = chunk.choices[0].delta.content
+            async for text in await chat_completion(messages, stream=True, max_tokens=4096):
+                if text:
                     full_response += text
                     yield f"data: {json.dumps({'type': 'content', 'text': text}, ensure_ascii=False)}\n\n"
 
@@ -204,8 +196,7 @@ class WpChatService:
     async def _llm_analyze_ledger(self, entries: list) -> str | None:
         """LLM 分析序时账"""
         try:
-            from app.services.llm_client import get_llm_client
-            client = get_llm_client()
+            from app.services.llm_client import chat_completion
             summary_lines = []
             for e in entries[:50]:
                 line = f"{e.voucher_date} {e.voucher_no} {e.account_code} D:{e.debit_amount} C:{e.credit_amount} {e.summary or ''}"
@@ -214,12 +205,11 @@ class WpChatService:
                 "以下是部分序时账数据，请分析大额交易、异常交易和可能的关联方交易：\n\n"
                 + "\n".join(summary_lines)
             )
-            resp = client.chat.completions.create(
-                model=client._default_model if hasattr(client, "_default_model") else "default",
-                messages=[{"role": "user", "content": prompt}],
+            resp = await chat_completion(
+                [{"role": "user", "content": prompt}],
                 max_tokens=2048,
             )
-            return resp.choices[0].message.content
+            return resp
         except Exception as e:
             logger.warning("LLM 台账分析失败: %s", e)
             return None

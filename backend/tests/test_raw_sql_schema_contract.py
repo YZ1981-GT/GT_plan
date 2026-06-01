@@ -62,7 +62,6 @@ _INFRA_TABLES = {
 # 每条需后续确认：改正表名 / 补迁移建表 / 删死代码。
 # TODO(schema-debt): 逐个消除，清零后删除本白名单。
 _KNOWN_PHANTOM_DEBT = {
-    "report_snapshots",           # gate_rules_phase14.py(QC-25) — 已加 to_regclass 守卫不崩，表仍未建（功能债务）
     "wp_template_registry",       # custom_query.py/wp_template_registry.py — 服务层 table_exists 懒判，未迁移（功能债务）
 }
 

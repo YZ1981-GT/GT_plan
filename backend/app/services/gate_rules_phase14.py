@@ -284,19 +284,18 @@ class QC25ReportNoteVersionStaleRule(GateRule):
         if not project_id:
             return None
         try:
-            # 检查审计报告段落引用的附注版本是否过期
-            # report_snapshots 表可能不存在（Phase 13 才创建）→ to_regclass 安全探测，
-            # 避免对不存在表的查询失败污染外层事务（InFailedSQLTransactionError 级联）。
+            # 检查审计报告段落引用的附注版本是否过期（真实表 report_snapshot 单数；
+            # is_stale 列由 V049 补齐）。保留 to_regclass 守卫作防御（测试环境未跑迁移时优雅跳过）。
             stmt = text("""
-                SELECT rs.id FROM report_snapshots rs
+                SELECT rs.id FROM report_snapshot rs
                 WHERE rs.project_id = :project_id
                   AND rs.is_stale = true
-                  AND to_regclass('public.report_snapshots') IS NOT NULL
+                  AND to_regclass('public.report_snapshot') IS NOT NULL
                 LIMIT 1
             """)
             # 先确认表存在，不存在直接跳过（连 SELECT 都不发，杜绝污染）
             exists = (await db.execute(
-                text("SELECT to_regclass('public.report_snapshots')")
+                text("SELECT to_regclass('public.report_snapshot')")
             )).scalar()
             if exists is None:
                 return None

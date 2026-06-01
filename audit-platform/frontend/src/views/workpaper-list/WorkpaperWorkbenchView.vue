@@ -393,4 +393,368 @@ function onGuideWpClick(wpCode: string) {
   display: flex;
   flex-direction: column;
 }
+
+/* ─── 循环进度概览：标题行 ─── */
+.gt-wpb-progress-header {
+  display: flex;
+  align-items: center;
+  gap: var(--gt-space-sm, 8px);
+  padding: 4px 2px 10px;
+}
+.gt-wpb-progress-header__title {
+  font-size: var(--gt-font-size-md, 14px);
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+.gt-wpb-progress-header__filter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--gt-font-size-xs, 11px);
+  color: var(--gt-color-primary, #4b2d77);
+  background: var(--gt-color-primary-light, #f0ecf7);
+  border-radius: 10px;
+  padding: 2px 10px;
+}
+.gt-wpb-progress-header__clear {
+  cursor: pointer;
+  font-weight: 700;
+  opacity: 0.6;
+}
+.gt-wpb-progress-header__clear:hover { opacity: 1; }
+
+/* ─── 循环进度卡片网格 ─── */
+.gt-wpb-progress-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 2px 2px 16px;
+}
+.gt-wpb-prog-card {
+  background: var(--el-bg-color, #fff);
+  border: 1px solid var(--gt-color-border-lighter, #ebeef5);
+  border-radius: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.gt-wpb-prog-card:hover {
+  border-color: var(--gt-color-primary, #4b2d77);
+  box-shadow: 0 4px 14px rgba(75, 45, 119, 0.12);
+  transform: translateY(-2px);
+}
+.gt-wpb-prog-card.is-active {
+  border-color: var(--gt-color-primary, #4b2d77);
+  background: var(--gt-color-primary-light, #f0ecf7);
+  box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77) inset;
+}
+.gt-wpb-prog-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.gt-wpb-prog-card__code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  font-size: var(--gt-font-size-sm, 12px);
+  font-weight: 700;
+  color: #fff;
+  background: var(--gt-color-primary, #4b2d77);
+  border-radius: 6px;
+}
+.gt-wpb-prog-card__name {
+  font-size: var(--gt-font-size-base, 13px);
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gt-wpb-prog-card__detail {
+  margin-top: 8px;
+  font-size: var(--gt-font-size-xs, 11px);
+  color: var(--gt-color-text-secondary, #909399);
+  text-align: right;
+}
+
+/* ─── 工作台底稿列表 ─── */
+.gt-wpb-workbench-list {
+  flex: 1;
+  min-height: 0;
+}
+.gt-wpb-workbench-list :deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+.gt-wpb-workbench-list :deep(.el-table__row) {
+  cursor: pointer;
+}
+
+/* ─── 默认列表视图 ─── */
+.gt-wp-list-default {
+  flex: 1;
+  min-height: 0;
+}
+.gt-wp-list-default :deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+.gt-wp-list-default :deep(.el-table__row) {
+  cursor: pointer;
+}
+
+/* ─── 手册视图：容器 + 导航 ─── */
+.gt-wp-guide-view {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px;
+}
+.gt-wp-guide-view__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gt-space-sm, 8px);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.gt-wp-guide-section {
+  background: var(--el-bg-color, #fff);
+  border: 1px solid var(--gt-color-border-lighter, #ebeef5);
+  border-radius: 12px;
+  padding: 20px 24px;
+}
+.gt-wp-guide-section__title {
+  margin: 0 0 6px;
+  font-size: var(--gt-font-size-lg, 16px);
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+.gt-wp-guide-section__desc {
+  margin: 0 0 18px;
+  font-size: var(--gt-font-size-base, 13px);
+  color: var(--gt-color-text-secondary, #909399);
+  line-height: 1.6;
+}
+
+/* ─── 手册：体系总览卡片网格 ─── */
+.gt-wp-guide-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.gt-wp-guide-overview-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--gt-color-border-lighter, #ebeef5);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+.gt-wp-guide-overview-card:hover {
+  border-color: var(--gt-color-primary, #4b2d77);
+  box-shadow: 0 4px 14px rgba(75, 45, 119, 0.12);
+  transform: translateY(-2px);
+}
+.gt-wp-guide-overview-card__badge {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--gt-font-size-lg, 16px);
+  font-weight: 700;
+  color: #fff;
+  border-radius: 8px;
+}
+.gt-wp-guide-overview-card__info {
+  flex: 1;
+  min-width: 0;
+}
+.gt-wp-guide-overview-card__name {
+  font-size: var(--gt-font-size-base, 13px);
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+.gt-wp-guide-overview-card__meta {
+  margin-top: 2px;
+  font-size: var(--gt-font-size-xs, 11px);
+  color: var(--gt-color-text-secondary, #909399);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gt-wp-guide-overview-card__arrow {
+  flex-shrink: 0;
+  font-size: 20px;
+  color: var(--gt-color-text-placeholder, #c0c4cc);
+}
+
+/* ─── 手册：审计流程横向链 ─── */
+.gt-wp-guide-flow-chart {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 10px 0;
+}
+.gt-wp-guide-flow-step {
+  display: flex;
+  align-items: center;
+}
+.gt-wp-guide-flow-step__node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 96px;
+  padding: 14px 12px;
+  border: 2px solid var(--gt-color-primary, #4b2d77);
+  border-radius: 10px;
+  background: var(--el-bg-color, #fff);
+}
+.gt-wp-guide-flow-step__icon { font-size: 22px; }
+.gt-wp-guide-flow-step__label {
+  font-size: var(--gt-font-size-sm, 12px);
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+.gt-wp-guide-flow-step__arrow {
+  padding: 0 6px;
+  font-size: 18px;
+  color: var(--gt-color-text-placeholder, #c0c4cc);
+}
+
+/* ─── 手册：数据关系链 ─── */
+.gt-wp-guide-dataflow {
+  padding: 10px 0;
+  overflow-x: auto;
+}
+.gt-wp-guide-dataflow__chain {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.gt-wp-guide-dataflow__step {
+  display: flex;
+  align-items: center;
+}
+.gt-wp-guide-dataflow__node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--gt-color-border-lighter, #ebeef5);
+  border-radius: 8px;
+  background: var(--gt-color-primary-light, #f0ecf7);
+}
+.gt-wp-guide-dataflow__icon { font-size: 16px; }
+.gt-wp-guide-dataflow__name {
+  font-size: var(--gt-font-size-sm, 12px);
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+.gt-wp-guide-dataflow__arrow {
+  padding: 0 6px;
+  font-size: 16px;
+  color: var(--gt-color-text-placeholder, #c0c4cc);
+}
+
+/* ─── 手册：循环详解卡片 ─── */
+.gt-wp-guide-cycles-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gt-wp-guide-cycle-card {
+  border: 1px solid var(--gt-color-border-lighter, #ebeef5);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.gt-wp-guide-cycle-card.is-active {
+  border-color: var(--gt-color-primary, #4b2d77);
+  box-shadow: 0 2px 10px rgba(75, 45, 119, 0.1);
+}
+.gt-wp-guide-cycle-card__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+}
+.gt-wp-guide-cycle-card__badge {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--gt-font-size-sm, 12px);
+  font-weight: 700;
+  color: #fff;
+  border-radius: 6px;
+}
+.gt-wp-guide-cycle-card__name {
+  flex: 1;
+  font-size: var(--gt-font-size-base, 13px);
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+.gt-wp-guide-cycle-card__count {
+  font-size: var(--gt-font-size-xs, 11px);
+  color: var(--gt-color-text-secondary, #909399);
+}
+.gt-wp-guide-cycle-card__body {
+  padding: 0 16px 12px;
+  border-top: 1px solid var(--gt-color-border-lighter, #ebeef5);
+}
+.gt-wp-guide-cycle-card__wp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+}
+.gt-wp-guide-cycle-card__wp-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.gt-wp-guide-cycle-card__wp-item:hover {
+  background: var(--gt-color-primary-light, #f0ecf7);
+}
+.gt-wp-guide-cycle-card__wp-code {
+  flex-shrink: 0;
+  font-size: var(--gt-font-size-xs, 11px);
+  font-weight: 700;
+  color: var(--gt-color-primary, #4b2d77);
+  min-width: 48px;
+}
+.gt-wp-guide-cycle-card__wp-name {
+  flex: 1;
+  font-size: var(--gt-font-size-sm, 12px);
+  color: var(--gt-color-text-regular, #606266);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gt-wp-guide-cycle-card__wp-arrow {
+  flex-shrink: 0;
+  color: var(--gt-color-text-placeholder, #c0c4cc);
+}
 </style>
+
