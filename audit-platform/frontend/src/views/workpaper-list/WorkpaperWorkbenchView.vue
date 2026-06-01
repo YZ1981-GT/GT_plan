@@ -315,23 +315,31 @@ const guideSection = ref<'overview' | 'flow' | 'relation' | 'cycles'>('overview'
 const guideBreadcrumb = ref<string[]>(['体系总览'])
 const guideFocusCycle = ref('')
 
-const guideOverviewData = [
-  { code: 'A', name: '报表与调整', color: '#6750A4', count: 20, desc: '总括性程序、报表编制、调整分录' },
-  { code: 'B', name: '风险评估', color: '#6750A4', count: 15, desc: '穿行测试、了解内控、风险识别' },
-  { code: 'C', name: '控制测试', color: '#6750A4', count: 14, desc: '控制有效性测试、偏差评估' },
-  { code: 'D', name: '销售收入', color: '#E8590C', count: 8, desc: '收入确认、应收账款、信用减值' },
-  { code: 'E', name: '货币资金', color: '#E8590C', count: 7, desc: '银行存款、现金、银行函证' },
-  { code: 'F', name: '采购存货', color: '#E8590C', count: 9, desc: '采购循环、存货计价、跌价准备' },
-  { code: 'G', name: '投资', color: '#E8590C', count: 6, desc: '长期股权投资、金融资产分类' },
-  { code: 'H', name: '固定资产', color: '#E8590C', count: 8, desc: '固定资产、在建工程、使用权资产' },
-  { code: 'I', name: '无形资产', color: '#E8590C', count: 5, desc: '无形资产、商誉、开发支出' },
-  { code: 'J', name: '职工薪酬', color: '#E8590C', count: 4, desc: '薪酬计提、股份支付' },
-  { code: 'K', name: '管理费用', color: '#E8590C', count: 3, desc: '费用分析、跨循环减值汇总' },
-  { code: 'L', name: '筹资', color: '#E8590C', count: 4, desc: '借款、债券、利息计算' },
-  { code: 'M', name: '股东权益', color: '#E8590C', count: 3, desc: '权益变动、利润分配' },
-  { code: 'N', name: '税费', color: '#E8590C', count: 3, desc: '所得税、递延税项' },
-  { code: 'S', name: '专项程序', color: '#2E7D32', count: 5, desc: '持续经营、关联方、期后事项' },
+const guideCycleMeta = [
+  { code: 'A', name: '报表与调整', color: '#6750A4', desc: '总括性程序、报表编制、调整分录' },
+  { code: 'B', name: '风险评估', color: '#6750A4', desc: '穿行测试、了解内控、风险识别' },
+  { code: 'C', name: '控制测试', color: '#6750A4', desc: '控制有效性测试、偏差评估' },
+  { code: 'D', name: '销售收入', color: '#E8590C', desc: '收入确认、应收账款、信用减值' },
+  { code: 'E', name: '货币资金', color: '#E8590C', desc: '银行存款、现金、银行函证' },
+  { code: 'F', name: '采购存货', color: '#E8590C', desc: '采购循环、存货计价、跌价准备' },
+  { code: 'G', name: '投资', color: '#E8590C', desc: '长期股权投资、金融资产分类' },
+  { code: 'H', name: '固定资产', color: '#E8590C', desc: '固定资产、在建工程、使用权资产' },
+  { code: 'I', name: '无形资产', color: '#E8590C', desc: '无形资产、商誉、开发支出' },
+  { code: 'J', name: '职工薪酬', color: '#E8590C', desc: '薪酬计提、股份支付' },
+  { code: 'K', name: '管理费用', color: '#E8590C', desc: '费用分析、跨循环减值汇总' },
+  { code: 'L', name: '筹资', color: '#E8590C', desc: '借款、债券、利息计算' },
+  { code: 'M', name: '股东权益', color: '#E8590C', desc: '权益变动、利润分配' },
+  { code: 'N', name: '税费', color: '#E8590C', desc: '所得税、递延税项' },
+  { code: 'S', name: '专项程序', color: '#2E7D32', desc: '持续经营、关联方、期后事项' },
 ]
+
+// 体系总览：count 用真实 wpIndex 计算（与循环详解一致，不再用硬编码假数字）
+const guideOverviewData = computed(() =>
+  guideCycleMeta.map(cycle => ({
+    ...cycle,
+    count: ctx.wpIndex.value.filter((w: WpIndexItem) => w.wp_code?.startsWith(cycle.code)).length,
+  }))
+)
 
 const guideFlowSteps = [
   { id: 'plan', icon: '📋', label: '审计计划', color: '#6750A4' },
@@ -352,7 +360,7 @@ const guideDataFlowPaths = [
 ]
 
 const guideCycleDetails = computed(() => {
-  return guideOverviewData.map(cycle => {
+  return guideOverviewData.value.map(cycle => {
     const wps = ctx.wpIndex.value
       .filter((w: WpIndexItem) => w.wp_code?.startsWith(cycle.code))
       .map((w: WpIndexItem) => ({ code: w.wp_code, name: w.wp_name }))
