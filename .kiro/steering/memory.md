@@ -78,7 +78,7 @@ ts 353 / composables 91
 ### 进行中 Spec
 
 - **`report-module-enhancement` ✅**（2026-05-29 必需任务全部完成）：①audit_logs router §127 注册完成 ②AUTO_ADJUSTMENT_RULES 6→15 条 ③_CFS_INDIRECT_SPECIAL 23 条覆盖全部间接法调整项 ④validate_formula_coverage.py CLI 脚本就绪 ⑤test_report_engine 28 tests 全绿（原 4 xfail→0）；77 tests 总计通过（report_engine 28 + cfs_worksheet 24+2xfail + formula_coverage 25）；可选 PBT 属性测试（P1-P11）未执行
-- **`workpaper-list-shrink` ✅**（2026-05-28 全部完成含 e2e）：WorkpaperList.vue 3463→519 行（Shell）+ 5 子 SFC 632 行 = 总计 1151 行（净减 67%）；36 vitest 全绿 / 0 type errors / CI baseline 6 entry 已更新；Playwright e2e 8 用例已建（`e2e/workpaper-list-views.spec.ts`，RUN_FULL_E2E=1 触发）
+- **`workpaper-list-shrink` ✅**（2026-05-28 全部完成含 e2e）：WorkpaperList.vue 3463→519 行（Shell）+ 5 子 SFC 632 行 = 总计 1151 行（净减 67%）；36 vitest 全绿 / 0 type errors / CI baseline 6 entry 已更新；Playwright e2e 8 用例已建（`e2e/workpaper-list-views.spec.ts`，RUN_FULL_E2E=1 触发）；**手册视图回归已修复**（2026-06-01）：WorkpaperWorkbenchView.vue guide 部分从 73 行恢复到 251 行完整版（体系总览图例 + 审计流程详解 + 模块关系图 + 关键说明 + 循环核心底稿/关联循环），数据从 commit 18344aca 恢复（guideOverviewData 含 coreWps/relatedTo/relDesc + guideFlowSteps 含 sub/riskFocus/detail/keyActions/wpLinks/outputs/nextStageLink + guideFullRelations 6 模块）
 - **`workpaper-editor-shrink-phase2` ✅**（2026-05-29 全部完成含可选 + Playwright 实测）：WorkpaperEditor.vue **2748→758 行**（Shell，72% 净减）+ 8 子 SFC 1007 行 + 2 composable 483 行 = 总计 2248 行（预算 3298）；**42 vitest**（含 8 composable spec + 2 fast-check PBT 200 runs）全绿 / 0 type errors / CI 6 道防退化卡点已更新；Playwright smoke test 通过（D2 HTML 渲染器 + F1 HTML 渲染器 + 底稿列表分页 + 0 console errors）；关键 ADR = ①useEditorSave 在 UniverEditorCore 内部实例化 ②CycleTriggerPanel 是 UniverEditorCore 子组件 ③单一 EDITOR_CONTEXT_KEY provide/inject ④editorDialogConfig 原地扩展（17 dialog 配置驱动渲染）⑤Shell 替换原文件保留文件名
 
 ### 全部已完成 spec ✅
