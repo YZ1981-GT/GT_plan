@@ -202,3 +202,99 @@ describe('LedgerPenetration virtual mode — filter', () => {
     expect(filterRows(rows, '   ', 'all')).toEqual(rows)
   })
 })
+
+// ─── 月小计 + 运行余额（明细账核心计算）回归测试 ──────────────────────────
+// 复制 ledgerDisplay 的纯逻辑（与生产实现 1:1 对齐）。
+// 守护 bug：月合计累加必须在「月份边界结算之后」，否则上月小计会并入本月首笔。
+
+interface RawEntry { voucher_date: string; debit_amount: number; credit_amount: number }
+
+function buildLedgerDisplay(items: RawEntry[], opening: number): any[] {
+  const rows: any[] = []
+  let balance = opening
+  let monthDebit = 0
+  let monthCredit = 0
+  let lastMonth = ''
+
+  rows.push({ _type: 'opening', summary: '期初余额', debit_amount: null, credit_amount: null, balance })
+
+  for (const item of items) {
+    const d = Number(item.debit_amount || 0)
+    const c = Number(item.credit_amount || 0)
+    const month = (item.voucher_date || '').substring(0, 7)
+    if (!lastMonth) lastMonth = month
+
+    if (month !== lastMonth) {
+      rows.push({ _type: 'subtotal', summary: `${lastMonth} 本月合计`, debit_amount: monthDebit, credit_amount: monthCredit, balance })
+      monthDebit = 0
+      monthCredit = 0
+      lastMonth = month
+    }
+
+    balance = balance + d - c
+    monthDebit += d
+    monthCredit += c
+    rows.push({ ...item, _type: 'normal', balance })
+  }
+
+  if (items.length > 0) {
+    rows.push({ _type: 'subtotal', summary: `${lastMonth} 本月合计`, debit_amount: monthDebit, credit_amount: monthCredit, balance })
+  }
+  return rows
+}
+
+describe('LedgerPenetration — 月小计 + 运行余额', () => {
+  const items: RawEntry[] = [
+    { voucher_date: '2025-01-10', debit_amount: 100, credit_amount: 0 },
+    { voucher_date: '2025-01-20', debit_amount: 40, credit_amount: 0 },
+    { voucher_date: '2025-02-05', debit_amount: 0, credit_amount: 30 },
+    { voucher_date: '2025-02-15', debit_amount: 70, credit_amount: 0 },
+    { voucher_date: '2025-03-01', debit_amount: 0, credit_amount: 50 },
+  ]
+
+  it('每月小计精确按月分组（不并入下月首笔）', () => {
+    const rows = buildLedgerDisplay(items, 1000)
+    const subtotals = rows.filter((r) => r._type === 'subtotal')
+    expect(subtotals).toHaveLength(3)
+    // 1月：借 140 贷 0
+    expect(subtotals[0].debit_amount).toBe(140)
+    expect(subtotals[0].credit_amount).toBe(0)
+    // 2月：借 70 贷 30
+    expect(subtotals[1].debit_amount).toBe(70)
+    expect(subtotals[1].credit_amount).toBe(30)
+    // 3月：借 0 贷 50
+    expect(subtotals[2].debit_amount).toBe(0)
+    expect(subtotals[2].credit_amount).toBe(50)
+  })
+
+  it('月小计借贷合计 = 全期借贷总额（守恒）', () => {
+    const rows = buildLedgerDisplay(items, 1000)
+    const subs = rows.filter((r) => r._type === 'subtotal')
+    const sumD = subs.reduce((s, r) => s + r.debit_amount, 0)
+    const sumC = subs.reduce((s, r) => s + r.credit_amount, 0)
+    expect(sumD).toBe(210) // 100+40+70
+    expect(sumC).toBe(80)  // 30+50
+  })
+
+  it('期初行余额 = 期初；末行运行余额 = 期初 + Σ借 − Σ贷', () => {
+    const rows = buildLedgerDisplay(items, 1000)
+    expect(rows[0]._type).toBe('opening')
+    expect(rows[0].balance).toBe(1000)
+    const lastNormal = [...rows].reverse().find((r) => r._type === 'normal')
+    expect(lastNormal.balance).toBe(1000 + 210 - 80) // 1130
+  })
+
+  it('月小计的 balance = 该月末运行余额', () => {
+    const rows = buildLedgerDisplay(items, 1000)
+    const subs = rows.filter((r) => r._type === 'subtotal')
+    expect(subs[0].balance).toBe(1140) // 1月末: 1000+140
+    expect(subs[1].balance).toBe(1180) // 2月末: 1140+70-30
+    expect(subs[2].balance).toBe(1130) // 3月末: 1180-50
+  })
+
+  it('空数据不产生小计行', () => {
+    const rows = buildLedgerDisplay([], 500)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]._type).toBe('opening')
+  })
+})

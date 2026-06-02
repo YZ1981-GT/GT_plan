@@ -2212,15 +2212,13 @@ const ledgerDisplay = computed(() => {
     const item = items[i]
     const d = num(item.debit_amount)
     const c = num(item.credit_amount)
-    balance = Number(decSub(String(decAdd(String(balance), String(d))), String(c)))
-    monthDebit = Number(decAdd(String(monthDebit), String(d)))
-    monthCredit = Number(decAdd(String(monthCredit), String(c)))
 
     const month = (item.voucher_date || '').substring(0, 7) // "2025-01"
     if (!lastMonth) lastMonth = month
 
-    // 月份变化时插入上月小计
-    if (month !== lastMonth && lastMonth) {
+    // 月份变化时先结算上月小计 —— 必须在累加当前行之前，
+    // 否则上月「本月合计」会错误并入本月第一笔（借/贷/余额均偏移）。
+    if (month !== lastMonth) {
       rows.push({
         _type: 'subtotal',
         voucher_date: '',
@@ -2228,14 +2226,19 @@ const ledgerDisplay = computed(() => {
         summary: `${lastMonth} 本月合计`,
         debit_amount: monthDebit,
         credit_amount: monthCredit,
-        balance,
+        balance, // 上月末余额（尚未并入本月首笔）
         counterpart_account: '',
         account_code: '',
       })
-      monthDebit = d
-      monthCredit = c
+      monthDebit = 0
+      monthCredit = 0
       lastMonth = month
     }
+
+    // 累加当前行：先更新运行余额，再累加本月借贷合计
+    balance = Number(decSub(String(decAdd(String(balance), String(d))), String(c)))
+    monthDebit = Number(decAdd(String(monthDebit), String(d)))
+    monthCredit = Number(decAdd(String(monthCredit), String(c)))
 
     rows.push({ ...item, _type: 'normal', balance })
   }
@@ -2331,23 +2334,27 @@ const auxLedgerDisplay = computed(() => {
   for (const item of items) {
     const d = num(item.debit_amount)
     const c = num(item.credit_amount)
-    balance = Number(decSub(String(decAdd(String(balance), String(d))), String(c)))
-    monthDebit = Number(decAdd(String(monthDebit), String(d)))
-    monthCredit = Number(decAdd(String(monthCredit), String(c)))
 
     const month = (item.voucher_date || '').substring(0, 7)
     if (!lastMonth) lastMonth = month
 
-    if (month !== lastMonth && lastMonth) {
+    // 月份变化时先结算上月小计 —— 必须在累加当前行之前，
+    // 否则上月「本月合计」会错误并入本月第一笔（借/贷/余额均偏移）。
+    if (month !== lastMonth) {
       rows.push({
         _type: 'subtotal', voucher_date: '', voucher_no: '', aux_name: '',
         summary: `${lastMonth} 本月合计`, debit_amount: monthDebit,
         credit_amount: monthCredit, balance, account_code: '',
       })
-      monthDebit = d
-      monthCredit = c
+      monthDebit = 0
+      monthCredit = 0
       lastMonth = month
     }
+
+    // 累加当前行：先更新运行余额，再累加本月借贷合计
+    balance = Number(decSub(String(decAdd(String(balance), String(d))), String(c)))
+    monthDebit = Number(decAdd(String(monthDebit), String(d)))
+    monthCredit = Number(decAdd(String(monthCredit), String(c)))
 
     rows.push({ ...item, _type: 'normal', balance })
   }
