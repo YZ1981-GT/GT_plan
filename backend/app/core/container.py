@@ -58,20 +58,9 @@ async def get_container(
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
 ) -> ServiceContainer:
-    """FastAPI 依赖：创建不含用户的服务容器（公开端点使用）"""
-    return ServiceContainer(db=db, redis=redis)
+    """FastAPI 依赖：创建不含用户的服务容器（公开端点使用）
 
-
-async def get_authenticated_container(
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-) -> ServiceContainer:
-    """FastAPI 依赖：创建含当前用户的服务容器（认证端点使用）
-
-    注意：需要在路由中额外调用 get_current_user 并赋值到 ctx.user，
-    或者使用 get_container_with_user 依赖。
+    认证端点请直接使用 app.deps.get_current_user（已支持嵌套 Depends），
+    需要 db/redis 时再各自 Depends 注入即可。
     """
-    from app.deps import get_current_user
-    # 这里不能直接调用 get_current_user（它需要 Request），
-    # 所以提供不含 user 的容器，路由中自行注入 user
     return ServiceContainer(db=db, redis=redis)

@@ -31,6 +31,7 @@ import logging
 import os
 import re
 import subprocess
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -40,6 +41,12 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 logger = logging.getLogger("audit_platform.migration")
+
+# PG advisory lock key — 全局唯一 64 位整数，多 worker/多进程启动时串行化迁移。
+# 任意常量即可，只要全仓迁移路径统一用这一把锁。取 "GTMIG" 的 ASCII 拼读派生值。
+# 多 worker 部署（gunicorn -w N / 多容器）时：仅抢到锁的进程跑迁移，
+# 其余进程阻塞等锁释放后再查 schema_version，发现已最新 → pending 为空直接返回。
+_MIGRATION_ADVISORY_LOCK_KEY = 0x47544D4947  # b"GTMIG" 大端拼读
 
 # 匹配 V001__xxx.sql 格式
 _VERSION_RE = re.compile(r"^V(\d+)__.*\.sql$", re.IGNORECASE)
@@ -208,9 +215,20 @@ class MigrationRunner:
         - 失败写入 schema_migration_failures 表（attempt_count 递增）
         - 成功的迁移清除 failure 记录
 
+        并发安全（migration-concurrency-lock / 多 worker 前置阻断 ①）：
+        PostgreSQL 下用 ``pg_advisory_lock`` 在独立 session 持锁，全程串行化迁移——
+        多 worker（gunicorn -w N / 多容器）同时启动时仅持锁进程跑迁移，
+        其余进程阻塞等锁释放，释放后查 schema_version 发现已最新 → pending 为空直接返回。
+        SQLite / 非 PG 方言无 advisory lock 概念 → 跳过加锁直接执行（单测/单进程场景）。
+
         向后兼容：返回值实现 __iter__/__len__/__bool__，旧调用 ``for v in result``
         / ``len(result)`` / ``if result`` 仍可工作（语义为 executed list）。
         """
+        async with self._advisory_lock():
+            return await self._run_pending_inner()
+
+    async def _run_pending_inner(self) -> RunPendingResult:
+        """run_pending 的实际迁移逻辑（已在 advisory lock 保护下调用）。"""
         await self.ensure_schema_version_table()
         await self.ensure_failure_table()
 
@@ -260,6 +278,69 @@ class MigrationRunner:
                 [f"{f.version}({f.error_type})" for f in failed],
             )
         return RunPendingResult(executed=executed, failed=failed)
+
+    @asynccontextmanager
+    async def _advisory_lock(self):
+        """PG session 级 advisory lock 上下文管理器。
+
+        - PostgreSQL：在一条**独立**连接上 ``pg_advisory_lock(key)`` 阻塞获取，
+          退出时 ``pg_advisory_unlock(key)``。advisory lock 绑定 session（连接），
+          故必须在同一连接 acquire/release，且持锁期间该连接保持打开。
+          锁是"建议性"的：不阻塞其他连接执行迁移 SQL，只阻塞其他同样想拿这把锁的进程，
+          从而把多 worker 的迁移串行化。
+        - 非 PG（SQLite 等）：无 advisory lock 概念，直接 yield（不加锁）。
+
+        失败兜底：获取锁过程出现异常时记 WARNING 并降级为不加锁执行（不阻塞启动，
+        与 lifespan 整体"迁移失败不阻塞"策略一致）。
+        """
+        if self._engine.dialect.name != "postgresql":
+            # SQLite / 其他方言：无 advisory lock，直接执行
+            yield
+            return
+
+        conn = None
+        locked = False
+        try:
+            conn = await self._engine.connect()
+            await conn.execute(
+                text("SELECT pg_advisory_lock(:k)"),
+                {"k": _MIGRATION_ADVISORY_LOCK_KEY},
+            )
+            locked = True
+            logger.info(
+                "[Migration] 已获取 advisory lock(%s)，开始串行迁移",
+                _MIGRATION_ADVISORY_LOCK_KEY,
+            )
+            yield
+        except Exception as lock_err:
+            # 获取锁失败 → 降级不加锁（保持启动不阻塞）。
+            # 注意：若 yield 内部（迁移本身）抛错，run_pending 内层已自行兜住，
+            # 不会到这里；这里只兜"加锁机制本身"的异常。
+            if not locked:
+                logger.warning(
+                    "[Migration] advisory lock 获取失败，降级为不加锁执行: %s", lock_err
+                )
+                yield
+            else:
+                raise
+        finally:
+            if conn is not None:
+                if locked:
+                    try:
+                        await conn.execute(
+                            text("SELECT pg_advisory_unlock(:k)"),
+                            {"k": _MIGRATION_ADVISORY_LOCK_KEY},
+                        )
+                        logger.info(
+                            "[Migration] 已释放 advisory lock(%s)",
+                            _MIGRATION_ADVISORY_LOCK_KEY,
+                        )
+                    except Exception as unlock_err:
+                        logger.warning(
+                            "[Migration] advisory unlock 失败（连接关闭后会话锁自动释放）: %s",
+                            unlock_err,
+                        )
+                await conn.close()
 
     # ------------------------------------------------------------------
     # 扫描

@@ -75,6 +75,16 @@ class SchemaDriftDetector:
         "tb_aux_balance_summary",
         "wp_migration_snapshots",
         "wp_sheet_locks",
+        # 历史残留表（一次性脚本产物 / 联动审计日志）
+        "linkage_audit_log",
+        "seed_load_history",
+    })
+
+    # 列级 allowlist：DB 有但 ORM 不需映射的列（历史残留 / 已弃用）
+    KNOWN_COLUMN_ALLOWLIST: frozenset[tuple[str, str]] = frozenset({
+        ("cell_annotations", "sheet_name"),       # 旧版列，已被 sheet_id 取代
+        ("adjustments", "status"),                # 旧 status 列，业务改用 review_status
+        ("projects", "template_version_id"),      # 旧关联列，不再 ORM 映射
     })
 
     # 外部租户表前缀（与业务共用 audit_platform 库的第三方工具表）。
@@ -163,11 +173,12 @@ class SchemaDriftDetector:
         items.extend(self._diff_columns(orm_tables, db_tables))
         items.extend(await self._diff_enums())
 
-        # 过滤 allowlist + 外部租户表（Metabase/Quartz 共库污染）
+        # 过滤 allowlist + 外部租户表（Metabase/Quartz 共库污染）+ 列级 allowlist
         return [
             it for it in items
             if it.table not in self.KNOWN_ALLOWLIST
             and not self._is_external_tenant_table(it.table)
+            and (it.table, it.column) not in self.KNOWN_COLUMN_ALLOWLIST
         ]
 
     async def write_log(self, items: list[DriftItem]) -> None:

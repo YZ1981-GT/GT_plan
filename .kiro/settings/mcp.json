@@ -1,8 +1,37 @@
 {
   "mcpServers": {
+    "codegraph": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@colbymchenry/codegraph",
+        "serve",
+        "--mcp",
+        "--no-watch",
+        "-p",
+        "D:/GT_plan"
+      ],
+      "env": {},
+      "disabled": false,
+      "autoApprove": [
+        "codegraph_search",
+        "codegraph_context",
+        "codegraph_trace",
+        "codegraph_callers",
+        "codegraph_callees",
+        "codegraph_impact",
+        "codegraph_node",
+        "codegraph_explore",
+        "codegraph_files",
+        "codegraph_status"
+      ]
+    },
     "playwright": {
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"],
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
       "env": {},
       "disabled": false,
       "autoApprove": [
@@ -27,13 +56,6 @@
         "browser_file_upload",
         "browser_fill_form"
       ]
-    },
-    "codegraph": {
-      "command": "node",
-      "args": ["C:/tools/codegraph/dist/bin/codegraph.js", "serve", "--mcp", "--no-watch", "-p", "D:/GT_workplan"],
-      "env": {},
-      "disabled": false,
-      "autoApprove": []
     }
   }
 }
