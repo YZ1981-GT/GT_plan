@@ -11,6 +11,7 @@
  * 直接测试纯函数逻辑（避免 mount el-table-v2，CI 稳定）
  */
 import { describe, it, expect } from 'vitest'
+import { buildLedgerDisplay } from '@/utils/ledgerDisplay'
 
 // ─── 复制被测的纯函数（保持与生产实现 1:1 对齐） ────────────────────────────
 
@@ -204,44 +205,11 @@ describe('LedgerPenetration virtual mode — filter', () => {
 })
 
 // ─── 月小计 + 运行余额（明细账核心计算）回归测试 ──────────────────────────
-// 复制 ledgerDisplay 的纯逻辑（与生产实现 1:1 对齐）。
+// 直接 import 生产实现 buildLedgerDisplay（@/utils/ledgerDisplay），
+// 不再 copy 副本——确保测试真正守护生产代码（改生产即影响测试）。
 // 守护 bug：月合计累加必须在「月份边界结算之后」，否则上月小计会并入本月首笔。
 
 interface RawEntry { voucher_date: string; debit_amount: number; credit_amount: number }
-
-function buildLedgerDisplay(items: RawEntry[], opening: number): any[] {
-  const rows: any[] = []
-  let balance = opening
-  let monthDebit = 0
-  let monthCredit = 0
-  let lastMonth = ''
-
-  rows.push({ _type: 'opening', summary: '期初余额', debit_amount: null, credit_amount: null, balance })
-
-  for (const item of items) {
-    const d = Number(item.debit_amount || 0)
-    const c = Number(item.credit_amount || 0)
-    const month = (item.voucher_date || '').substring(0, 7)
-    if (!lastMonth) lastMonth = month
-
-    if (month !== lastMonth) {
-      rows.push({ _type: 'subtotal', summary: `${lastMonth} 本月合计`, debit_amount: monthDebit, credit_amount: monthCredit, balance })
-      monthDebit = 0
-      monthCredit = 0
-      lastMonth = month
-    }
-
-    balance = balance + d - c
-    monthDebit += d
-    monthCredit += c
-    rows.push({ ...item, _type: 'normal', balance })
-  }
-
-  if (items.length > 0) {
-    rows.push({ _type: 'subtotal', summary: `${lastMonth} 本月合计`, debit_amount: monthDebit, credit_amount: monthCredit, balance })
-  }
-  return rows
-}
 
 describe('LedgerPenetration — 月小计 + 运行余额', () => {
   const items: RawEntry[] = [

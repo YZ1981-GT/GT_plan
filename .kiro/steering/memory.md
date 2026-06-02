@@ -50,6 +50,7 @@ inclusion: always
 - **🔴 真实列速查**：trial_balance 金额=unadjusted_amount/aje_adjustment/rje_adjustment/audited_amount/opening_balance（无 closing_balance，科目列=standard_account_code）；financial_report=row_code/row_name/current_period_amount/source_accounts（无 amount/line_code）；adjustments=adjustment_no/adjustment_type/account_code/review_status（无 status/entry_type/summary）；adjustment_entries=standard_account_code；working_paper 无 year/wp_code（wp_code 在 wp_index，JOIN wp_index_id）；issue_tickets 负责人=owner_id 不软删；CellAnnotation 作者=author_id
 - **🟢 序时账/明细账数据干净**：tb_ledger(82384 行)+tb_aux_ledger 借贷双非零行=0（每分录行单边，converter `safe_decimal` 空→None 非 0）；序时账明细唯一同时显示借+贷的是合成的「N月 本月合计」小计行（正常明细账格式，应显示借贷各自合计）
 - **🟢 明细账月小计 off-by-one 已修（2026-06-02）**：`LedgerPenetration.vue` 的 `ledgerDisplay`+`auxLedgerDisplay` 两处月小计 bug——累加 monthDebit/Credit 在月份边界判断**之前**→上月「本月合计」错并入本月首笔（实测 1 月应 140094.82 算成 188423.58）；修复=边界结算移到累加前 + 归零（非赋当前行值）；加 5 条回归测试守护（月分组/守恒/运行余额）
+- **🔴 明细账改进待办（2026-06-02 分析，未修）**：①**运行余额/月小计按页算→第2页起全错**（loadLedger offset 分页 page_size=100，但 ledgerDisplay 每页都从整期 currentAccountOpening 重算余额；期初接口只传 year 不传页码）——科目本期>100 笔翻页即余额错+跨页月小计被拆；②筛选/排序后小计对不上（锚点行滤掉但小计按整页原始数据算）；③回归测试是 copy 生产函数到测试里测（改 .vue 忘同步副本仍绿）→建议抽 `utils/ledgerDisplay.ts` 组件+测试共用；④账务计算应下沉后端（已有 get_ledger_entries_cursor 游标接口但 loadLedger 没用，理想后端直接返 running_balance+插好小计行）；⑤主表缺 counterpart_account(对方科目)列+本年累计借贷列；⑥虚拟滚动名不副实（>1000 切 el-table-v2 但仍每页 100 行加载）；**优先级 ①(正确性)+③(让测试真生效)**
 - **🔴 system_settings 已建(V048)**；真实 PG 5 项目多 standalone，**0 个 consolidated 项目**（合并 UAT 全卡此）；首汽租车_2025(df5b8403) tb 最全但 audit_period_end 为 NULL
 - **契约测试守护**（CI 根治整类 schema 漂移 500）：`test_raw_sql_schema_contract.py`(表级纯静态)+`test_raw_sql_column_contract.py`(列级 pg_only sqlglot)；新增裸 SQL 引用不存在表/列即 CI 红；存量债务登记 `_KNOWN_PHANTOM_DEBT`/`_COLUMN_ALLOWLIST`（剩 wp_template_registry）
 
@@ -78,8 +79,8 @@ inclusion: always
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、知识库删旧 KnowledgeService；向量存储选 pgvector；3 处联动断裂已修（知识文件→索引/模板 JSON→registry/报表主模板→克隆 stale）
 - 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
-### git 状态（2026-06-02，最新 `59994536` 已 push）
-- 分支 `work/2026-05-30-wp-specs`（最新 `59994536`，已 push origin）；本批 = **知识库收口**（删 knowledge_service/ai_chat_service 孤儿 + doc_chat_persistence DB 持久化 + 修前端 fetchHistory 信封解析 + codegraph MCP 配置）；上批 `f34a515a` 含 schema drift 55→0 + 手册视图 ca713614 完整版 + wp_index 24 条占位名修复；**待走 PR 合 main**
+### git 状态（2026-06-02，最新 `cf69e50c` 已 push）
+- 分支 `work/2026-05-30-wp-specs`（最新 `cf69e50c`，已 push origin）；本批 = **明细账月小计 off-by-one 修复**（LedgerPenetration.vue 两处 + 5 回归测试）；上批 `59994536` 知识库收口（删孤儿 + doc_chat_persistence + 前端信封解析 + codegraph MCP）；`f34a515a` schema drift 55→0 + 手册视图 ca713614；**待走 PR 合 main**
 - **schema drift 修复细节**：55 项全 db_extra（DB 有 ORM 无），18 deleted_at（软删表）+ 其余按真实 PG 类型补 ORM Mapped[]；11 张基础设施表（app_audit_log/system_settings/note_section_*/review_conversation_*/wp_sheet_locks/wp_migration_snapshots/data_snapshots/group_note_templates/tb_aux_balance_summary）裸 SQL 管理无 ORM→加 KNOWN_ALLOWLIST；drift detector in-process 验证 TOTAL=0
 - **🟢 手册视图已用 ca713614 完整版**（1201 行）：4 子页签全丰富 + count 真实计算 + 工作台/列表/手册 CSS 全（孤儿扫描 0）；ca713614 父=3df0fd61，merge-base=ea788c24；切勿被旧版覆盖
 - **🔴 分叉分支隐患 `feature/report-module-enhancement-closure`(3df0fd61)**：含 WorkpaperWorkbenchView.vue **旧版**（365 行/41 guide CSS 类残缺/count 硬编码假数字），缺 work 分支的工作台+手册孤儿CSS全补(761c320a)和真实计数(fb58ac77)修复 → 合并时勿用其覆盖 work 版（726 行/79 CSS），否则回归

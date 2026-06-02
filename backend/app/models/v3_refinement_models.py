@@ -106,5 +106,8 @@ class TimeMachineSnapshot(Base):
     # DB 扩展列
     diff_patch: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     module: Mapped[str] = mapped_column(String(50), nullable=False, server_default=text("''"))
-    snapshot_data: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    # NOTE: 不写 `'{}'::jsonb`（PG 字面 cast）—— SQLite 测试 dialect 不识别 `::`
+    # 会导致建表 DDL 报 "unrecognized token"。`'{}'` 在 PG/SQLite 双方言下
+    # 都能解析为合法空 JSON 对象（同 report_models / custom_query_models 约定）。
+    snapshot_data: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'"))
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)

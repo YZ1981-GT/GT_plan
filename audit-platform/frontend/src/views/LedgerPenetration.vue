@@ -460,18 +460,8 @@
           </template>
         </el-table-column>
       </el-table>
-      <div class="gt-pagination" v-if="ledgerTotal > ledgerPageSize">
-        <el-pagination
-          v-model:current-page="ledgerPage"
-          v-model:page-size="ledgerPageSize"
-          :page-sizes="ledgerPageSizeOptions"
-          :total="ledgerTotal"
-          layout="sizes, total, prev, pager, next, jumper"
-          size="small"
-          @size-change="onLedgerPageSizeChange"
-          @current-change="onLedgerPageChange"
-        />
-      </div>
+      <!-- 明细账已全量加载（运行余额/月小计需跨整账计算），≤1000 行用普通表，
+           >1000 行自动切虚拟滚动；不再做服务端分页（按页算余额会错）。 -->
     </template>
 
     <!-- ═══ 第三层：凭证分录 ═══ -->
@@ -587,16 +577,7 @@
           </template>
         </el-table-column>
       </el-table>
-      <div class="gt-pagination" v-if="auxLedgerTotal > 100">
-        <el-pagination
-          v-model:current-page="auxLedgerPage"
-          :page-size="100"
-          :total="auxLedgerTotal"
-          layout="prev, pager, next, total"
-          size="small"
-          @current-change="loadAuxLedger"
-        />
-      </div>
+      <!-- 辅助明细账已全量加载（运行余额/月小计需跨整账计算），不再做服务端分页。 -->
     </template>
 
   </div>
@@ -1007,6 +988,7 @@ import { usePenetrate } from '@/composables/usePenetrate'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { numericSortMethod } from '@/utils/numericSort'
+import { buildLedgerDisplay } from '@/utils/ledgerDisplay'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 
 import { handleApiError } from '@/utils/errorHandler'
@@ -1980,7 +1962,6 @@ const ledgerItems = ref<any[]>([])
 const ledgerTotal = ref(0)
 const ledgerPage = ref(1)
 const ledgerPageSize = ref(100)
-const ledgerPageSizeOptions = [50, 100, 200, 500]
 
 // V3 Req 12.2.1: el-table-v2 虚拟滚动列定义（数据量 > 1000 行时启用）
 // V3 Req 12.2.2: 支持列宽拖拽 / 行选择 / 右键菜单 / 排序 / 筛选
@@ -2185,81 +2166,11 @@ function ledgerVirtualRowClass({ rowData }: { rowData: any }) {
 }
 
 /** 序时账增强显示：期初行 + 每笔余额 + 月小计行 */
-const ledgerDisplay = computed(() => {
-  const items = ledgerItems.value
-  if (items.length === 0) return []
-
-  const rows: any[] = []
-  let balance = currentAccountOpening.value
-  let monthDebit = 0
-  let monthCredit = 0
-  let lastMonth = ''
-
-  // 期初余额行
-  rows.push({
-    _type: 'opening',
-    voucher_date: '',
-    voucher_no: '',
-    summary: '期初余额',
-    debit_amount: null,
-    credit_amount: null,
-    balance,
-    counterpart_account: '',
-    account_code: '',
-  })
-
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i]
-    const d = num(item.debit_amount)
-    const c = num(item.credit_amount)
-
-    const month = (item.voucher_date || '').substring(0, 7) // "2025-01"
-    if (!lastMonth) lastMonth = month
-
-    // 月份变化时先结算上月小计 —— 必须在累加当前行之前，
-    // 否则上月「本月合计」会错误并入本月第一笔（借/贷/余额均偏移）。
-    if (month !== lastMonth) {
-      rows.push({
-        _type: 'subtotal',
-        voucher_date: '',
-        voucher_no: '',
-        summary: `${lastMonth} 本月合计`,
-        debit_amount: monthDebit,
-        credit_amount: monthCredit,
-        balance, // 上月末余额（尚未并入本月首笔）
-        counterpart_account: '',
-        account_code: '',
-      })
-      monthDebit = 0
-      monthCredit = 0
-      lastMonth = month
-    }
-
-    // 累加当前行：先更新运行余额，再累加本月借贷合计
-    balance = Number(decSub(String(decAdd(String(balance), String(d))), String(c)))
-    monthDebit = Number(decAdd(String(monthDebit), String(d)))
-    monthCredit = Number(decAdd(String(monthCredit), String(c)))
-
-    rows.push({ ...item, _type: 'normal', balance })
-  }
-
-  // 最后一个月的小计
-  if (items.length > 0) {
-    rows.push({
-      _type: 'subtotal',
-      voucher_date: '',
-      voucher_no: '',
-      summary: `${lastMonth} 本月合计`,
-      debit_amount: monthDebit,
-      credit_amount: monthCredit,
-      balance,
-      counterpart_account: '',
-      account_code: '',
-    })
-  }
-
-  return rows
-})
+const ledgerDisplay = computed(() =>
+  buildLedgerDisplay(ledgerItems.value, currentAccountOpening.value, {
+    syntheticExtra: { counterpart_account: '', account_code: '' },
+  }),
+)
 
 /**
  * 虚拟滚动专用展示数据：在 ledgerDisplay 之上叠加排序 + 筛选
@@ -2315,60 +2226,11 @@ const auxLedgerTotal = ref(0)
 const auxLedgerPage = ref(1)
 
 /** 辅助明细账增强显示：期初行 + 每笔余额 + 月小计行 */
-const auxLedgerDisplay = computed(() => {
-  const items = auxLedgerItems.value
-  if (items.length === 0) return []
-
-  const rows: any[] = []
-  let balance = currentAuxOpening.value
-  let monthDebit = 0
-  let monthCredit = 0
-  let lastMonth = ''
-
-  rows.push({
-    _type: 'opening', voucher_date: '', voucher_no: '', aux_name: '',
-    summary: '期初余额', debit_amount: null, credit_amount: null,
-    balance, account_code: '',
-  })
-
-  for (const item of items) {
-    const d = num(item.debit_amount)
-    const c = num(item.credit_amount)
-
-    const month = (item.voucher_date || '').substring(0, 7)
-    if (!lastMonth) lastMonth = month
-
-    // 月份变化时先结算上月小计 —— 必须在累加当前行之前，
-    // 否则上月「本月合计」会错误并入本月第一笔（借/贷/余额均偏移）。
-    if (month !== lastMonth) {
-      rows.push({
-        _type: 'subtotal', voucher_date: '', voucher_no: '', aux_name: '',
-        summary: `${lastMonth} 本月合计`, debit_amount: monthDebit,
-        credit_amount: monthCredit, balance, account_code: '',
-      })
-      monthDebit = 0
-      monthCredit = 0
-      lastMonth = month
-    }
-
-    // 累加当前行：先更新运行余额，再累加本月借贷合计
-    balance = Number(decSub(String(decAdd(String(balance), String(d))), String(c)))
-    monthDebit = Number(decAdd(String(monthDebit), String(d)))
-    monthCredit = Number(decAdd(String(monthCredit), String(c)))
-
-    rows.push({ ...item, _type: 'normal', balance })
-  }
-
-  if (items.length > 0) {
-    rows.push({
-      _type: 'subtotal', voucher_date: '', voucher_no: '', aux_name: '',
-      summary: `${lastMonth} 本月合计`, debit_amount: monthDebit,
-      credit_amount: monthCredit, balance, account_code: '',
-    })
-  }
-
-  return rows
-})
+const auxLedgerDisplay = computed(() =>
+  buildLedgerDisplay(auxLedgerItems.value, currentAuxOpening.value, {
+    syntheticExtra: { aux_name: '', account_code: '' },
+  }),
+)
 
 // ── 余额表筛选 + 树形构建 ──
 const balanceTableRef = ref<any>(null)
@@ -2664,37 +2526,52 @@ async function checkImportActive() {
   }
 }
 
-async function loadLedger() {
-  loading.value = true
-  try {
-    const params: any = { year: year.value, page: ledgerPage.value, page_size: ledgerPageSize.value }
+/**
+ * 全量拉取某科目的序时账（游标分页循环）。
+ *
+ * 明细账的运行余额/月小计必须基于**整个科目本期全部分录**计算，
+ * 不能按页（offset 分页第 2 页起会从期初重算余额→全错）。
+ * 后端 get_ledger_entries_cursor 是 keyset 分页，10 万+行性能稳定；
+ * 首页返回 total，后续页靠 next_cursor 续取。
+ */
+async function fetchAllLedgerEntries(
+  account: string,
+): Promise<{ items: any[]; total: number }> {
+  const all: any[] = []
+  let cursor: string | null = null
+  let total = 0
+  const PAGE = 1000
+  const MAX_PAGES = 200 // 安全上限 20 万行，防异常数据死循环
+  for (let i = 0; i < MAX_PAGES; i++) {
+    const params: any = { year: year.value, limit: PAGE }
+    if (cursor) params.cursor = cursor
     if (dateRange.value?.length === 2) {
       params.date_from = dateRange.value[0]
       params.date_to = dateRange.value[1]
     }
-    // 首次加载时从后端获取期初余额（确保 running_balance 准确）
-    const [data, obData] = await Promise.all([
-      api.get(P_ledger.entries(projectId.value, currentAccount.value), { params }),
+    const data: any = await api.get(P_ledger.entries(projectId.value, account), { params })
+    const items = data?.items ?? []
+    all.push(...items)
+    if (data?.total != null) total = data.total
+    if (!data?.has_more || !data?.next_cursor) break
+    cursor = data.next_cursor
+  }
+  return { items: all, total: total || all.length }
+}
+
+async function loadLedger() {
+  loading.value = true
+  try {
+    // 先取期初余额（整期，确保运行余额起点准确），再全量取该科目分录
+    const [obData, { items, total }] = await Promise.all([
       api.get(P_ledger.openingBalance(projectId.value, currentAccount.value), { params: { year: year.value } }),
+      fetchAllLedgerEntries(currentAccount.value),
     ])
-    const result = data
-    const obResult = obData
-    currentAccountOpening.value = num(obResult?.opening_balance)
-    ledgerItems.value = result.items ?? result ?? []
-    ledgerTotal.value = result.total ?? ledgerItems.value.length
+    currentAccountOpening.value = num((obData as any)?.opening_balance)
+    ledgerItems.value = items
+    ledgerTotal.value = total
   } catch { ledgerItems.value = [] }
   finally { loading.value = false }
-}
-
-function onLedgerPageChange(page: number) {
-  ledgerPage.value = page
-  loadLedger()
-}
-
-function onLedgerPageSizeChange(size: number) {
-  ledgerPageSize.value = size
-  ledgerPage.value = 1
-  loadLedger()
 }
 
 async function loadVoucher() {
@@ -3319,13 +3196,28 @@ function drillToAuxLedgerFromBalance(row: any) {
 async function loadAuxLedger() {
   loading.value = true
   try {
-    const data = await api.get(
-      P_ledger.auxEntries(projectId.value, currentAccount.value),
-      { params: { year: year.value, aux_type: currentAuxType.value, aux_code: currentAuxCode.value, page: auxLedgerPage.value, page_size: 100 } }
-    )
-    const result = data
-    auxLedgerItems.value = result.items ?? result ?? []
-    auxLedgerTotal.value = result.total ?? 0
+    // 全量拉取（运行余额/月小计需跨整账计算，不能按页）
+    const all: any[] = []
+    let cursor: string | null = null
+    let total = 0
+    const PAGE = 1000
+    const MAX_PAGES = 200
+    for (let i = 0; i < MAX_PAGES; i++) {
+      const params: any = {
+        year: year.value, aux_type: currentAuxType.value,
+        aux_code: currentAuxCode.value, limit: PAGE,
+      }
+      if (cursor) params.cursor = cursor
+      const data: any = await api.get(
+        P_ledger.auxEntries(projectId.value, currentAccount.value), { params },
+      )
+      all.push(...(data?.items ?? []))
+      if (data?.total != null) total = data.total
+      if (!data?.has_more || !data?.next_cursor) break
+      cursor = data.next_cursor
+    }
+    auxLedgerItems.value = all
+    auxLedgerTotal.value = total || all.length
   } catch { auxLedgerItems.value = [] }
   finally { loading.value = false }
 }

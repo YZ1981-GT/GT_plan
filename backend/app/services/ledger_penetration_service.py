@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -81,6 +82,25 @@ def _get_level(code: str) -> int:
     if len(code) <= 6:
         return 2
     return 3
+
+
+def _parse_cursor_date(value: str) -> date | str:
+    """把游标中的日期串解析成 Python date 对象。
+
+    游标 WHERE 比较 voucher_date(date 列) 时，必须绑定 date 对象——
+    不能用 SQL CAST(literal AS Date)：
+    - PG 下 `date > 'str'` 报 "operator does not exist: date > character varying"；
+    - SQLite 下 CAST('2025-01-05' AS DATE) 走 NUMERIC affinity 变成 2025，
+      text>numeric 恒真 → 游标失效（每页都从头返回，死循环）。
+    绑定 Python date 对象后 SQLAlchemy 按各方言正确序列化，两边都对。
+    解析失败则原样返回字符串（调用方 try/except 兜底）。
+    """
+    for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(value, fmt).date()
+        except ValueError:
+            continue
+    return value
 
 
 class LedgerPenetrationService:
@@ -539,11 +559,13 @@ class LedgerPenetrationService:
                 parts = cursor.split("|", 1)
                 cursor_date = parts[0]
                 cursor_id = parts[1] if len(parts) > 1 else ""
+                # voucher_date 是 date 列：绑定 Python date 对象（跨 PG/SQLite 正确）。
+                cursor_date_val = _parse_cursor_date(cursor_date)
                 cursor_clauses.append(
                     sa.or_(
-                        tbl.c.voucher_date > cursor_date,
+                        tbl.c.voucher_date > cursor_date_val,
                         sa.and_(
-                            tbl.c.voucher_date == cursor_date,
+                            tbl.c.voucher_date == cursor_date_val,
                             sa.cast(tbl.c.id, sa.String) > cursor_id,
                         ),
                     )
@@ -560,7 +582,9 @@ class LedgerPenetrationService:
                 tbl.c.accounting_period, tbl.c.voucher_type,
             )
             .where(*cursor_clauses)
-            .order_by(tbl.c.voucher_date, tbl.c.id)
+            # ORDER BY 必须与游标 tiebreaker 用同一表达式 cast(id, String)，
+            # 否则 UUID 原生序 ≠ 字符串序，同日期多行在翻页边界会漏/重。
+            .order_by(tbl.c.voucher_date, sa.cast(tbl.c.id, sa.String))
             .limit(limit + 1)
         )
 
@@ -609,11 +633,13 @@ class LedgerPenetrationService:
                 parts = cursor.split("|", 1)
                 cursor_date = parts[0]
                 cursor_id = parts[1] if len(parts) > 1 else ""
+                # voucher_date 是 date 列：绑定 Python date 对象（同主序时账游标）。
+                cursor_date_val = _parse_cursor_date(cursor_date)
                 where_clauses.append(
                     sa.or_(
-                        tbl.c.voucher_date > cursor_date,
+                        tbl.c.voucher_date > cursor_date_val,
                         sa.and_(
-                            tbl.c.voucher_date == cursor_date,
+                            tbl.c.voucher_date == cursor_date_val,
                             sa.cast(tbl.c.id, sa.String) > cursor_id,
                         ),
                     )
@@ -629,7 +655,8 @@ class LedgerPenetrationService:
                 tbl.c.summary,
             )
             .where(*where_clauses)
-            .order_by(tbl.c.voucher_date, tbl.c.id)
+            # 同主序时账游标：ORDER BY 与 tiebreaker 用同一 cast(id, String) 表达式。
+            .order_by(tbl.c.voucher_date, sa.cast(tbl.c.id, sa.String))
             .limit(limit + 1)
         )
 
