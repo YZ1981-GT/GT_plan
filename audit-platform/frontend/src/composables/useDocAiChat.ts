@@ -129,9 +129,15 @@ export function useDocAiChat(options: UseDocAiChatOptions) {
         },
       )
       if (res.ok) {
-        const data = await res.json()
-        if (data.messages && data.messages.length > 0) {
-          messages.value = data.messages.map((m: any, idx: number) => ({
+        const body = await res.json()
+        // 后端 ResponseWrapperMiddleware 把 2xx 包装成 {code,message,data}
+        // 此处用原生 fetch（非 apiProxy），需手动解信封；兼容未包装的情况
+        const payload = (body && typeof body === 'object' && 'data' in body && body.data)
+          ? body.data
+          : body
+        const list = payload?.messages
+        if (list && list.length > 0) {
+          messages.value = list.map((m: any, idx: number) => ({
             id: m.id || `hist_${idx}`,
             role: m.role,
             text: m.content || m.text,

@@ -27,6 +27,13 @@
         "browser_file_upload",
         "browser_fill_form"
       ]
+    },
+    "codegraph": {
+      "command": "node",
+      "args": ["C:/tools/codegraph/dist/bin/codegraph.js", "serve", "--mcp", "--no-watch", "-p", "D:/GT_workplan"],
+      "env": {},
+      "disabled": false,
+      "autoApprove": []
     }
   }
 }

@@ -24,6 +24,7 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
 from app.services.ai_service import AIService
+from app.services import doc_chat_persistence
 from app.services.doc_ai_context_builder import ContextBuilder, ChatContext
 
 logger = logging.getLogger(__name__)
@@ -56,30 +57,10 @@ class AdoptRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# 内存对话历史（简单实现，后续可迁移到 DB）
+# 对话历史：DB 持久化（doc_chat_persistence，替代原内存字典 _chat_history）
 # ---------------------------------------------------------------------------
 
-# key: "{doc_type}:{doc_id}:{user_id}" → list of messages
-_chat_history: dict[str, list[dict]] = {}
-
 _MAX_HISTORY_PER_DOC = 50
-
-
-def _history_key(doc_type: str, doc_id: str, user_id: UUID) -> str:
-    return f"{doc_type}:{doc_id}:{user_id}"
-
-
-def _append_history(key: str, role: str, content: str) -> None:
-    if key not in _chat_history:
-        _chat_history[key] = []
-    _chat_history[key].append({"role": role, "content": content})
-    # 限制历史长度
-    if len(_chat_history[key]) > _MAX_HISTORY_PER_DOC:
-        _chat_history[key] = _chat_history[key][-_MAX_HISTORY_PER_DOC:]
-
-
-def _get_history(key: str) -> list[dict]:
-    return _chat_history.get(key, [])
 
 
 # ---------------------------------------------------------------------------
@@ -140,64 +121,81 @@ async def doc_ai_chat(
         )
 
     return StreamingResponse(
-        _stream_chat(db, doc_type, doc_id, req.query, context, current_user),
+        _stream_chat(doc_type, doc_id, req.query, context, current_user, project_id),
         media_type="text/event-stream",
     )
 
 
 async def _stream_chat(
-    db: AsyncSession,
     doc_type: str,
     doc_id: str,
     query: str,
     context: ChatContext,
     user: User,
+    project_id: UUID,
 ) -> AsyncGenerator[str, None]:
-    """SSE streaming 生成器：构建 messages → ai_service streaming → 收集完整回复 → 留痕"""
+    """SSE streaming 生成器：构建 messages → ai_service streaming → 收集完整回复 → 留痕
 
-    # 构建 LLM messages
-    messages = _build_messages(doc_type, doc_id, query, context, user)
+    ⚠️ 自建独立 session：FastAPI 在端点 return StreamingResponse 时即关闭 get_db
+    的请求级 session，而本生成器在 response 返回后才被 ASGI 消费执行——若复用请求
+    session，commit 会作用在已关闭 session 上（历史写入时序不可控，紧随的 GET
+    history 读到 0 条）。故用独立 async_session 管理完整事务。
+    """
+    from app.core.database import async_session
 
-    # 记录用户消息到历史
-    history_key = _history_key(doc_type, doc_id, user.id)
-    _append_history(history_key, "user", query)
-
-    # 发送引用来源（作为第一个 SSE 事件）
-    if context.citations:
-        citations_data = [
-            {
-                "source_type": c.source_type,
-                "source_id": c.source_id,
-                "source_name": c.source_name,
-                "paragraph_index": c.paragraph_index,
-            }
-            for c in context.citations
-        ]
-        yield f"data: {json.dumps({'type': 'citations', 'data': citations_data}, ensure_ascii=False)}\n\n"
-
-    # 流式调用 ai_service
-    ai_service = AIService(db)
-    full_response = ""
-
-    try:
-        stream_gen = await ai_service.chat_completion(
-            messages=messages,
-            stream=True,
-            temperature=0.3,
+    async with async_session() as db:
+        # 获取/创建文档级会话 + 读历史（DB 持久化）
+        session = await doc_chat_persistence.get_or_create_session(
+            db, doc_type, doc_id, user.id, project_id
         )
-        async for chunk in stream_gen:
-            full_response += chunk
-            yield f"data: {json.dumps({'type': 'content', 'data': chunk}, ensure_ascii=False)}\n\n"
-    except Exception as e:
-        logger.exception("doc_ai_chat streaming 失败")
-        yield f"data: {json.dumps({'type': 'error', 'data': f'AI 服务暂不可用: {e}'}, ensure_ascii=False)}\n\n"
+        history = await doc_chat_persistence.get_history(
+            db, doc_type, doc_id, user.id, limit=_MAX_HISTORY_PER_DOC
+        )
 
-    # 记录助手回复到历史
-    if full_response:
-        _append_history(history_key, "assistant", full_response)
+        # 构建 LLM messages
+        messages = _build_messages(doc_type, doc_id, query, context, history)
 
-    # 发送完成事件
-    yield f"data: {json.dumps({'type': 'done', 'data': {'token_estimate': context.token_estimate}}, ensure_ascii=False)}\n\n"
+        # 记录用户消息到 DB + 提交（确保用户消息先落库）
+        await doc_chat_persistence.append_message(db, session, "user", query)
+        await db.commit()
+
+        # 发送引用来源（作为第一个 SSE 事件）
+        if context.citations:
+            citations_data = [
+                {
+                    "source_type": c.source_type,
+                    "source_id": c.source_id,
+                    "source_name": c.source_name,
+                    "paragraph_index": c.paragraph_index,
+                }
+                for c in context.citations
+            ]
+            yield f"data: {json.dumps({'type': 'citations', 'data': citations_data}, ensure_ascii=False)}\n\n"
+
+        # 流式调用 ai_service
+        ai_service = AIService(db)
+        full_response = ""
+
+        try:
+            stream_gen = await ai_service.chat_completion(
+                messages=messages,
+                stream=True,
+                temperature=0.3,
+            )
+            async for chunk in stream_gen:
+                full_response += chunk
+                yield f"data: {json.dumps({'type': 'content', 'data': chunk}, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            logger.exception("doc_ai_chat streaming 失败")
+            yield f"data: {json.dumps({'type': 'error', 'data': f'AI 服务暂不可用: {e}'}, ensure_ascii=False)}\n\n"
+
+        # 记录助手回复到 DB + 提交
+        if full_response:
+            await doc_chat_persistence.append_message(db, session, "assistant", full_response)
+        await db.commit()
+
+        # 发送完成事件
+        yield f"data: {json.dumps({'type': 'done', 'data': {'token_estimate': context.token_estimate}}, ensure_ascii=False)}\n\n"
 
 
 def _build_messages(
@@ -205,7 +203,7 @@ def _build_messages(
     doc_id: str,
     query: str,
     context: ChatContext,
-    user: User,
+    history: list[dict[str, str]],
 ) -> list[dict[str, str]]:
     """构建 LLM 消息列表（system + context + history + user）"""
     messages: list[dict[str, str]] = [
@@ -232,8 +230,6 @@ def _build_messages(
         })
 
     # 添加历史消息（最近 10 轮）
-    history_key = _history_key(doc_type, doc_id, user.id)
-    history = _get_history(history_key)
     for msg in history[-10:]:
         messages.append({"role": msg["role"], "content": msg["content"]})
 
@@ -252,15 +248,32 @@ def _build_messages(
 async def get_chat_history(
     doc_type: str,
     doc_id: str,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取文档级对话历史
+    """获取文档级对话历史（DB 持久化，重启不丢）
 
     需求: 5.2（本地缓存断网可查历史）
     """
-    history_key = _history_key(doc_type, doc_id, current_user.id)
-    history = _get_history(history_key)
+    history = await doc_chat_persistence.get_history(
+        db, doc_type, doc_id, current_user.id, limit=_MAX_HISTORY_PER_DOC
+    )
     return {"messages": history, "total": len(history)}
+
+
+@router.delete("/doc/{doc_type}/{doc_id}/history")
+async def clear_chat_history(
+    doc_type: str,
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """清除文档级对话历史（前端 clearHistory 调用，DB 持久化清除）"""
+    cleared = await doc_chat_persistence.clear_history(
+        db, doc_type, doc_id, current_user.id
+    )
+    await db.commit()
+    return {"success": True, "cleared": cleared}
 
 
 # ---------------------------------------------------------------------------

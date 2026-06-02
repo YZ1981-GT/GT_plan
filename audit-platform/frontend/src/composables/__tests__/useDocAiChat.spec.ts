@@ -76,14 +76,15 @@ describe('useDocAiChat', () => {
     expect(messages.value).toEqual([])
   })
 
-  it('fetchHistory 拉取服务端历史并更新 messages', async () => {
+  it('fetchHistory 拉取服务端历史并更新 messages（真实信封 {code,message,data}）', async () => {
     const serverMessages = [
       { role: 'user', content: '服务端问题', citations: [] },
       { role: 'assistant', content: '服务端回答', citations: [{ source_type: 'knowledge_doc', source_id: 'kd-1', source_name: '文件1' }] },
     ]
+    // 后端 ResponseWrapperMiddleware 会把 2xx 响应包装成 {code,message,data}
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ messages: serverMessages }),
+      json: async () => ({ code: 200, message: 'success', data: { messages: serverMessages, total: 2 } }),
     })
 
     const { messages, fetchHistory } = useDocAiChat(defaultOptions)
