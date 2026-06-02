@@ -76,8 +76,8 @@ inclusion: always
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、知识库删旧 KnowledgeService；向量存储选 pgvector；3 处联动断裂已修（知识文件→索引/模板 JSON→registry/报表主模板→克隆 stale）
 - 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
-### git 状态（2026-06-01，最新 `f34a515a` 已 push）
-- 分支 `work/2026-05-30-wp-specs`（最新 `f34a515a`，已 push origin）；本批含 **schema drift 55→0**（44 列补 ORM + 11 基础设施表加白名单）+ 启动日志 health=degraded 文案修正（critical=0 时显 healthy）+ **手册视图丰富化**（checkout ca713614 的 1066 行版：审计流程每阶段详解/底稿关系模块网格/循环详解核心底稿，count 改回真实 wpIndex 计算）+ 工作台 12 个 gt-wpb-* CSS 补全 + **wp_index 24 条占位名修复** + gt_template_library 重扫描（331 条，路径更新）；**待走 PR 合 main**
+### git 状态（2026-06-02，最新 `59994536` 已 push）
+- 分支 `work/2026-05-30-wp-specs`（最新 `59994536`，已 push origin）；本批 = **知识库收口**（删 knowledge_service/ai_chat_service 孤儿 + doc_chat_persistence DB 持久化 + 修前端 fetchHistory 信封解析 + codegraph MCP 配置）；上批 `f34a515a` 含 schema drift 55→0 + 手册视图 ca713614 完整版 + wp_index 24 条占位名修复；**待走 PR 合 main**
 - **schema drift 修复细节**：55 项全 db_extra（DB 有 ORM 无），18 deleted_at（软删表）+ 其余按真实 PG 类型补 ORM Mapped[]；11 张基础设施表（app_audit_log/system_settings/note_section_*/review_conversation_*/wp_sheet_locks/wp_migration_snapshots/data_snapshots/group_note_templates/tb_aux_balance_summary）裸 SQL 管理无 ORM→加 KNOWN_ALLOWLIST；drift detector in-process 验证 TOTAL=0
 - **🟢 手册视图已用 ca713614 完整版**（1201 行）：4 子页签全丰富 + count 真实计算 + 工作台/列表/手册 CSS 全（孤儿扫描 0）；ca713614 父=3df0fd61，merge-base=ea788c24；切勿被旧版覆盖
 - **🔴 分叉分支隐患 `feature/report-module-enhancement-closure`(3df0fd61)**：含 WorkpaperWorkbenchView.vue **旧版**（365 行/41 guide CSS 类残缺/count 硬编码假数字），缺 work 分支的工作台+手册孤儿CSS全补(761c320a)和真实计数(fb58ac77)修复 → 合并时勿用其覆盖 work 版（726 行/79 CSS），否则回归
