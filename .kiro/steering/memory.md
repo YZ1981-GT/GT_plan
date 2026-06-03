@@ -10,136 +10,89 @@ inclusion: always
 
 - 语言中文；本地优先轻量方案；启动 `start-dev.bat`（后端 9980 + 前端 3030）；打包 `build_exe.py`（PyInstaller 不要 .bat）
 - **输出分步但连续做完**：一次不要太长、大改动拆小批次，但要做完整个任务不要每段停问（只在真正需决策时停）
-- **任务标记不能假绿**：标 completed 必须有实际代码+测试通过证据；外部依赖如实标 `[ ]*`，用"代码已改未实测"措辞；`*` 可选任务也要做完（除非明确跳过）
+- **任务标记不能假绿**：标 completed 必须有实际代码+测试通过证据；外部依赖如实标 `[ ]*`
 - **彻底解决不绕开**：错误必复现+定位根因+修主代码+加防御测试，绝不"换参数避开"
 - **触类旁通 grep**：发现一处反模式立即 grep 全仓找同类一次修完
-- **优先用 codegraph**：改动前先 `node C:\tools\codegraph\dist\bin\codegraph.js impact "符号"` 看影响面；理解调用链用 `callers`/`callees`；搜符号用 `query`；AI 任务上下文用 `context "描述"`——比手动 grep 快且全，能用则必用
-- **改动前先 spec 三件套**：>500 行文件 / 3+ 组件 / 跨前后端；设计阶段必做"现状 grep 确认"（迁移/端点/依赖是否已有产物，外部依赖标降级方案+切换点）
+- **优先用 codegraph MCP**：改动前先看影响面（impact/callers/callees），比手动 grep 快且全
+- **改动前先 spec 三件套**：>500 行文件 / 3+ 组件 / 跨前后端
 - **改动后必 Playwright 实测**：getDiagnostics 过 ≠ 运行时无错
-- **UI 全中文化**：用户可见文本中文（技术术语 SQL/PDF/LLM/API/UUID/CAS/编号 保留英文）；硬编码不接 i18n + ESLint 卡点
-- **中文场景全链路不能崩**：中文文件名下载（Content-Disposition 必 RFC5987）、中文项目名/客户名/底稿名导出、中文数据查询导出均须实测过
-- 功能收敛停加新功能，核心 6-8 页做到极致，空壳标 developing；前后端必须联动；删除二次确认+先进回收站；一次性脚本用完即删
-- **文档/文件夹级 LLM 对话是最实用核心功能**：任意文档/文件夹发起 AI 对话，自动注入当前文档+关联知识库作 RAG 上下文（spec `doc-level-ai-chat`）
-- git 单 commit 提交所有变更；**push 前必先 fetch 同步**（stash→fetch --prune→评估 ahead/behind→决策→pop→commit/push）；**协作走 PR 不直推 main**（紧急例外需用户拍板）；默认分支 `main`（非 master）
-- 提建议前先验证不引用过时记录；完整复盘诚实暴露问题不粉饰；PDCA：建议→spec→实施→复盘；5 角色轮转（合伙人/项目经理/质控/审计助理/EQCR）
-- 目标并发 6000 人；底稿编码致同 2025 修订版（`backend/data/wp_account_mapping.json` 206 条 v2025-R5）
-- 审计循环代号：A 报表/调整 B 控制了解 C 控制测试 D 销售收入 E 货币资金 F 采购存货 G 投资 H 固定资产 I 无形资产 J 职工薪酬 K 管理 L 筹资 M 股东权益 N 税费 S 专项
+- **UI 全中文化**：用户可见文本中文（技术术语保留英文）；硬编码不接 i18n
+- **中文场景全链路不能崩**：中文文件名下载（RFC5987）、中文项目名/客户名导出均须实测
+- 功能收敛核心 6-8 页做到极致；前后端必须联动；删除二次确认+先进回收站；一次性脚本用完即删
+- git 单 commit；**push 前必先 fetch 同步**；**协作走 PR 不直推 main**；默认分支 `main`
+- 目标并发 6000 人；底稿编码致同 2025 修订版（206 条 v2025-R5）
+- 审计循环代号：A 报表 B 控制了解 C 控制测试 D 销售 E 货币 F 采购存货 G 投资 H 固资 I 无形 J 薪酬 K 管理 L 筹资 M 股东权益 N 税费 S 专项
 
 ## 环境配置
 
 - Python 3.12（仓库根 `.venv`）/ Docker / PG 16 / Redis；后端 9980 / 前端 3030 / vLLM 8100；DB `audit_platform`；测试用户 admin/admin123
-- **venv 路径**：backend cwd 用 `..\.venv\Scripts\python.exe`；仓库根 cwd 用 `.venv\Scripts\python.exe`（勿混）
-- Docker：`audit-postgres`(5432)/`audit-redis`(6379)/`audit-metabase`(3000)；health `/api/health`
-- **前端唯一路径**：`audit-platform/frontend/`（仓库根无 `frontend/`）；views/components/composables 在其 `src/`
-- **MCP 已接入 7 个（2026-06-02 实测全 Connected，共 67 工具）**：
-  - **codegraph**(10)：`codegraph_context`(首选，任务上下文一次出) / `codegraph_search`(符号定位) / `codegraph_callers`/`codegraph_callees`(调用链) / `codegraph_impact`(重构影响面) / `codegraph_trace`(A→B 路径) / `codegraph_explore`(多符号源码) / `codegraph_node`(单符号详情) / `codegraph_files`(项目文件树) / `codegraph_status`(索引健康)
-  - **playwright**(23)：`browser_navigate`/`browser_snapshot`(优于截图，可交互)/`browser_click`/`browser_type`/`browser_fill_form`/`browser_evaluate`(执行 JS)/`browser_network_requests`(抓包)/`browser_console_messages`/`browser_take_screenshot`/`browser_wait_for`/`browser_tabs`/`browser_select_option`/`browser_hover`/`browser_drag`/`browser_file_upload`/`browser_drop`/`browser_press_key`/`browser_handle_dialog`/`browser_navigate_back`/`browser_resize`/`browser_close`/`browser_network_request`(单请求详情)/`browser_run_code_unsafe`
-  - **js-reverse**(21)：`set_breakpoint_on_text`/`step`(over/into/out)/`get_paused_info`/`evaluate_script`(断点内求值)/`search_in_sources`(全源码搜索)/`get_script_source`/`save_script_source`(美化保存)/`list_scripts`/`list_network_requests`/`get_request_initiator`(请求调用栈)/`list_console_messages`/`get_websocket_messages`/`navigate_page`/`new_page`/`select_page`/`select_frame`/`take_screenshot`/`list_breakpoints`/`remove_breakpoint`/`break_on_xhr`/`pause_or_resume`
-  - **context7**(2)：`resolve_library_id`(库名→ID) + `query_docs`(查官方文档/代码示例，比 web 搜索权威)
-  - **fetch**(1)：`fetch`(URL→markdown，max_length/start_index 分页)
-  - **thinking**(1)：`sequentialthinking`(复杂竞态/多步推理，可分支/修正)
-  - **memory**(9)：`create_entities`/`create_relations`/`add_observations`/`search_nodes`/`read_graph`/`open_nodes`/`delete_entities`/`delete_relations`/`delete_observations`——**与 memory.md 文件体系是两套，勿混用**
-- **MCP 工具选用决策**：改动前理解代码→`codegraph_context`；查第三方库用法→`context7`；前端 E2E 实测→`playwright browser_snapshot`+交互；前端 runtime bug→`js-reverse set_breakpoint_on_text`+`step`+`evaluate_script`；复杂逻辑推演→`thinking sequentialthinking`；跨对话存结论→`memory create_entities`
-- **codegraph 已装（2026-06-02 重装 v0.9.8 官方 npm 包）**：`npm i -g @colbymchenry/codegraph`（自带 Node runtime 免编译，旧的 `C:\tools` clone+build 路径已不存在）；CLI 在 `~/AppData/Roaming/npm/codegraph`；项目已 `codegraph init -i D:/GT_plan` 索引（59540 节点/131401 边/3205 文件）；CLI 支持 query/callers/callees/impact/affected/context/trace/explore/files/status/serve(MCP)
-- **⚠️ codegraph MCP 配置（已修 2026-06-02）**：`.kiro/settings/mcp.json` 用 `command:"npx"` args=`["-y","@colbymchenry/codegraph","serve","--mcp","--no-watch","-p","D:/GT_plan"]`（**勿用 node+绝对路径**：用户名 `杨志` 非 ASCII 易碎；**路径是 `D:/GT_plan` 不是 `D:/GT_workplan`**——旧配置两处错误致 "Connection closed"，真因是包根本没装+路径错，非缺 `--mcp`）；`serve` 必加 `--mcp` 才走 stdio；启动后常驻+stderr "Attached to shared daemon" 即正常；autoApprove 已列全 10 个 codegraph_* 工具
-- **callers 对 Python class 引用检测偏弱**（class 无"调用"语义，查模块名常显示无 caller，需配 grep 二次确认，勿仅凭 codegraph 判孤儿）
-- **✅ codegraph MCP 全工具链路实测通（2026-06-02）**：status/context/files/explore/callers 均正常返回（59540 节点/131401 边/WAL+FTS5）；explore 每 project 限 2 次调用且每次约 6 文件，超范围用 Read；分析确认 `get_authenticated_container`(core/container.py:65) 是死代码（0 引用 + docstring 自承认无法注入 user，应删，认证容器用 deps.get_current_user 路径）
-- **scripts 规约**：`_` 前缀=一次性用完即删，无前缀=正式工具；`backend/scripts/` 分 8 子目录（check/seed/gen/analyze/ops/fix/migrate/e2e）
-- **底稿模板源**：`backend/wp_templates/`（按循环 A~S 分目录），`scripts/analyze/scan_wp_templates.py` 扫描输出 `backend/data/gt_template_library.json`
-- **干净验证法**：start-dev uvicorn `--reload` 父子进程互拉 kill 不净 → venv 另起端口（如 9981）`python -m uvicorn ... --port 9981` 绕开 reloader；in-process ASGI httpx（`httpx.ASGITransport(app=app)`）直调端点最快
+- **venv 路径**：backend cwd 用 `..\.venv\Scripts\python.exe`；仓库根 cwd 用 `.venv\Scripts\python.exe`
+- Docker：`audit-postgres`(5432)/`audit-redis`(6379)/`audit-metabase`(3000)
+- **前端唯一路径**：`audit-platform/frontend/`（仓库根无 `frontend/`）
+- **MCP 7 个已接入（67 工具）**：codegraph(10) / playwright(23) / js-reverse(21) / context7(2) / fetch(1) / thinking(1) / memory(9)
+- **codegraph MCP**：`npx -y @colbymchenry/codegraph serve --mcp --no-watch -p D:/GT_plan`；路径 `D:/GT_plan`（非 D:/GT_workplan）；callers 对 Python class 偏弱需配 grep
+- **scripts 规约**：`_` 前缀=一次性用完即删；`backend/scripts/` 分 8 子目录
+- **底稿模板源**：`backend/wp_templates/`→`backend/data/gt_template_library.json`（331 条）
+- **干净验证法**：in-process ASGI httpx（`httpx.ASGITransport(app=app)`）直调端点最快
 
-## 迁移与 PG schema（D6 MigrationRunner 运行时迁移，非 alembic）
+## 迁移与 PG schema（D6 MigrationRunner，非 alembic）
 
-- 启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞号字母序靠后者静默丢失，scan_migrations 已加同号检测抛 RuntimeError）；**当前最高 V052**（生产库须手工跑 V052）
-- V040 冲突已修(重编号→V044)；V043 pgvector 容错化；V045~V051 见上行；**V052 `wp_formula`**（自定义底稿公式绑定，R052 回滚配对）
-- **⚠️ `CREATE TABLE IF NOT EXISTS audit_log` 是 no-op**：该名被 Metabase 共库占用（真实 schema 无 action 列）→ 应用审计写独立表 `app_audit_log`；建表前先 `to_regclass`+`information_schema.columns` 查真实 schema
-- **本地 PG schema 漂移已修**（critical=0）：drift detector pkgutil walk import 全 model + 过滤 Metabase 共库污染 + 按 critical_count 判 degraded
-- **🔴 projects 表无 year/template_version_id 列**：年度用 `EXTRACT(YEAR FROM audit_period_end)::int`；materiality 年度列=`overall_materiality`；人员姓名在 `staff_members.name`（users 无 display_name），JOIN 用 `project_assignments.staff_id`；database.py 已加 `async_engine = engine` 别名
-- **🟡 底稿名占位脏数据已修（24 条）**：项目 df5b8403 的 wp_index 有 24 条 `底稿{code}` 占位名（B1/D2-2/E1/K14 等细分编码），根因=`wp_standard_conversion_service._generate_one_workpaper` + `chain_orchestrator` 用 `lib_entry.get('name') or f"底稿{code}"` 兜底，而 gt_template_library.json(331条) 不覆盖这些细分编码→兜底成占位；已 UPDATE 真名（按致同体系+wp_templates 文件名推导）；**根治待办**：scan 脚本编码提取正则只取首段编码，细分 sheet 级编码(D2-2/E1-1)未进库→生成时取不到真名（CODE_PATTERN 只匹配文件名首编码）
-- **🔴 wp_template_registry 表实际不存在**：gt_template_library.json（331条，scan 重生成路径已更新为 backend/wp_templates/）是唯一权威源；scan 脚本末尾 sync_registry 因表不存在静默跳过（已加白名单不报 drift）
-- **🔴 真实列速查**：trial_balance 金额=unadjusted_amount/aje_adjustment/rje_adjustment/audited_amount/opening_balance（无 closing_balance，科目列=standard_account_code）；financial_report=row_code/row_name/current_period_amount/source_accounts（无 amount/line_code）；adjustments=adjustment_no/adjustment_type/account_code/review_status（无 status/entry_type/summary）；adjustment_entries=standard_account_code；working_paper 无 year/wp_code（wp_code 在 wp_index，JOIN wp_index_id）；issue_tickets 负责人=owner_id 不软删；CellAnnotation 作者=author_id
-- **🟢 序时账/明细账数据干净**：tb_ledger(82384 行)+tb_aux_ledger 借贷双非零行=0（每分录行单边，converter `safe_decimal` 空→None 非 0）；序时账明细唯一同时显示借+贷的是合成的「N月 本月合计」小计行（正常明细账格式，应显示借贷各自合计）
-- **🟢 明细账月小计 off-by-one 已修（2026-06-02）**：`LedgerPenetration.vue` 的 `ledgerDisplay`+`auxLedgerDisplay` 两处月小计 bug——累加 monthDebit/Credit 在月份边界判断**之前**→上月「本月合计」错并入本月首笔（实测 1 月应 140094.82 算成 188423.58）；修复=边界结算移到累加前 + 归零（非赋当前行值）；加 5 条回归测试守护（月分组/守恒/运行余额）
-- **🔴 明细账改进待办（2026-06-02 分析，未修）**：①**运行余额/月小计按页算→第2页起全错**（loadLedger offset 分页 page_size=100，但 ledgerDisplay 每页都从整期 currentAccountOpening 重算余额；期初接口只传 year 不传页码）——科目本期>100 笔翻页即余额错+跨页月小计被拆；②筛选/排序后小计对不上（锚点行滤掉但小计按整页原始数据算）；③回归测试是 copy 生产函数到测试里测（改 .vue 忘同步副本仍绿）→建议抽 `utils/ledgerDisplay.ts` 组件+测试共用；④账务计算应下沉后端（已有 get_ledger_entries_cursor 游标接口但 loadLedger 没用，理想后端直接返 running_balance+插好小计行）；⑤主表缺 counterpart_account(对方科目)列+本年累计借贷列；⑥虚拟滚动名不副实（>1000 切 el-table-v2 但仍每页 100 行加载）；**优先级 ①(正确性)+③(让测试真生效)**
-- **🔴 system_settings 已建(V048)**；真实 PG 5 项目多 standalone，**0 个 consolidated 项目**（合并 UAT 全卡此）；首汽租车_2025(df5b8403) tb 最全但 audit_period_end 为 NULL
-- **契约测试守护**（CI 根治整类 schema 漂移 500）：`test_raw_sql_schema_contract.py`(表级纯静态)+`test_raw_sql_column_contract.py`(列级 pg_only sqlglot)；新增裸 SQL 引用不存在表/列即 CI 红；存量债务登记 `_KNOWN_PHANTOM_DEBT`/`_COLUMN_ALLOWLIST`（剩 wp_template_registry）
+- 启动跑 `backend/migrations/V*.sql`+`R*.sql` 配对；CREATE/ALTER 必 `IF NOT EXISTS`；**当前最高 V052**
+- **真实列速查**：trial_balance=unadjusted/aje/rje/audited/opening_balance（无 closing）；financial_report=row_code/current_period_amount（无 amount）；adjustments=adjustment_no/review_status（无 status）；working_paper 无 year/wp_code（wp_code 在 wp_index）
+- **🔴 projects 表无 year 列**：年度用 `EXTRACT(YEAR FROM audit_period_end)::int`
+- **🔴 wp_template_registry 表不存在**：gt_template_library.json 是唯一权威源
+- **🔴 明细账翻页余额错**：ledgerDisplay 按页重算余额，>100 笔第 2 页起全错（待修）
+- **🔴 0 个 consolidated 项目**：合并 UAT 全 data-blocked
+- **契约测试守护**：`test_raw_sql_schema_contract.py` + `test_raw_sql_column_contract.py`；裸 SQL 引用不存在表/列即 CI 红
+- schema drift critical=0（V051 修复 51 列 + 2 enum）
 
 ## 任务状态
 
-### LLM（本地 vLLM 已跑通，2026-06-01 实测）
-- vLLM `localhost:8100` 模型 `Kbenkhaled/Qwen3.5-27B-NVFP4`；`.env` `WP_AI_SERVICE_ENABLED=True`（默认 False）
-- **两套 LLM 客户端**：①`llm_client.chat_completion()`（httpx+熔断器，多数 wp_llm_prompts/role_ai/pm 用）②`AIService(db).chat_completion()`（OCR/knowledge/contract/wp_fill 用，需真实 DB 会话查 active model）
-- **✅ 已修 bug**：get_llm_client 不存在（wp_chat_service/wp_document_recognizer 改用 chat_completion）+ vLLM 拒多条 system 消息（ai_service 加 `_merge_system_messages()`，llm_client RAG 注入改追加首条 system）；doc_ai_chat + wp_chat 端到端实测通
-- **🔴 embedding 404**：vLLM 未起 embed task → RAG 向量召回降级 ilike（semantic_search 不崩，build_index 会抛错）；恢复语义检索需另起 vLLM embed 实例
-- **🔴 孤儿代码 AIChatService**(ai_chat_service.py)：0 router 引用，被 doc_ai_chat 取代；内部实际用 `KnowledgeIndexService(db).search()` + `AIService(db)`（非"调不存在方法"，旧记录有误）；配套 `AIChatSession`/`AIChatMessage` ORM(ai_models.py)+表 = 完整 DB 持久化方案但全孤儿
-- **🟢 知识库收口完成（2026-06-02）**：①旧 `KnowledgeService`(knowledge_service.py)已删（全仓 0 引用）；②孤儿 `AIChatService`(ai_chat_service.py)已删（其 AIChatMessage 用 content/token_count 字段名但模型实为 message_text/tokens_used，接线即崩）；③**doc_ai_chat 内存历史→DB 持久化**：新建 `doc_chat_persistence.py` 复用现成 `ai_chat_session`/`ai_chat_message` 表（用 `context_summary` 存 `{doc_type}:{doc_id}:{user_id}` 定位键，零新增列零漂移），doc_ai_chat 的 `_chat_history` 字典已替换，history 端点改 async DB 读；实测持久化往返+幂等通过（重启不丢历史）
-- **🟢 doc-chat "GET history=0" 真因（2026-06-02 实测闭环）**：后端持久化+_stream_chat 自建 `async_session` 全对（in-process ASGI 实测 GET=2/DELETE 后=0）；之前"问题依旧"是 ①stale uvicorn 跑旧代码（FastAPI 不热加载）②**前端 `useDocAiChat.fetchHistory` 读 `data.messages` 顶层，但 `ResponseWrapperMiddleware` 把所有 2xx JSON 包成 `{code,message,data}`→服务端历史永远加载不出**（已修：解信封读 `body.data.messages`，原生 fetch 非 apiProxy 需手动解）；旧单测 mock 的是未包装 shape 从没守住该契约→已改 mock 真实信封；**铁律：原生 fetch 调后端必手动解 `{code,message,data}` 信封**
-- **doc-chat 干净验证法**：`httpx.ASGITransport(app=app)` in-process 直调最可靠（跑磁盘当前代码，无 stale server 风险）；隔离测持久化层用两个独立 `async_session`（A 写+commit / B 读）验跨 session 可见性
-- `reference_doc_service.load_from_knowledge_base` 已接 `semantic_search(scope=knowledge_doc)` 主路径 + ilike 降级；service-dependency.md 是过时生成物（仍显示已断的边如 reference_doc→knowledge_service / ai_chat_service）
-- **部署**：本机既是 vLLM GPU 节点又是后端机，后端内 `LLM_BASE_URL=localhost:8100` 天然可用；多用户访问只需 9980 对外、8100 不对外
+### LLM（vLLM localhost:8100，Qwen3.5-27B-NVFP4）
+- `.env` `WP_AI_SERVICE_ENABLED=True`；两套客户端：`llm_client`（httpx+熔断）/ `AIService(db)`
+- **🔴 embedding 404**：RAG 降级 ilike；恢复需另起 embed 实例
+- 知识库收口完成：旧 KnowledgeService/AIChatService 已删；doc_ai_chat 用 DB 持久化
+- **铁律：原生 fetch 调后端必手动解 `{code,message,data}` 信封**
 
-### 合并模块（4 Phase 代码+测试完成，归档 `_archive/09-consolidation-phases/`）
-- **合并核心模型**：合并数 = 各子企业个别数据汇总 + 差额表（差额表是专填调整+抵销分录的虚拟列，一般负数填列）；代码 `consol_amount = individual_sum + consol_adjustment + consol_elimination`
-- 4 Phase 全 ✅ 代码+测试（merge 后 147+ passed）+ 16 ADR + 24 service + 全链路集成测试 `test_consol_full_chain_integration.py` + seed `seed_consol_uat.py`
-- **统一卡点 = PG 0 个 consolidated 项目**（真实 UAT 全 data-blocked）+ Phase2/3 Playwright 待环境
-- 详细复盘（PK 缺 uuid default bug / worksheet fixture 教训等）→ `#dev-history`
+### 合并模块（4 Phase 全完成，归档 09）
+- 代码 147+ tests passed + 16 ADR + 24 service；**卡点 = 0 个 consolidated 项目**
 
-### 全局 7 模块改进 7 spec 全部 ✅ 实施完成（2026-06-01）
-- A formula-engine-unification / B retrieval-kernel-unification / C doc-level-ai-chat / D report-config-baseline / E wp-ai-review-ux-fix / F global-modules-cleanup / G global-modules-p2-polish；残留仅 Playwright E2E 待环境
-- 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、知识库删旧 KnowledgeService；向量存储选 pgvector；3 处联动断裂已修（知识文件→索引/模板 JSON→registry/报表主模板→克隆 stale）
-- 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
-
-### git 状态（2026-06-02，最新 `b0756b35` 已 push）
-- 分支 `work/2026-05-30-wp-specs`（最新 `b0756b35`，已 push origin）；本批 = **schema drift 60→0 (V051) + advisory lock + 删死代码 + codegraph MCP 修复**；上批 `95abdf1e` 明细账月小计 off-by-one；`59994536` 知识库收口；`f34a515a` schema drift 55→0 + 手册视图 ca713614；**待走 PR 合 main**
-- **schema drift 二次修复（V051）**：方向=orm_extra（ORM 有 DB 缺），51 列 ALTER ADD + 2 enum ADD VALUE + 列级 KNOWN_COLUMN_ALLOWLIST（cell_annotations.sheet_name/adjustments.status/projects.template_version_id）+ 表级加 linkage_audit_log/seed_load_history；evidence_hash_checks.export_id 保持 VARCHAR（ORM 业务定义非 UUID）
-- **🟢 B-Index 底稿目录"No Data"修复（2026-06-02，Playwright 实测通过）**：`wp_render_config.py` 新增 `_generate_b_index_data()`——当 B-Index sheet html_data 为空时自动从项目元数据生成 preparation_info（entity_name/period_end/preparer/reviewer）+ navigation_rows（同底稿其他 sheet 列表）；GtBIndex.vue 加 `empty-text="暂无索引数据"` 中文化
-- **🟢 底稿全页签空态中文化（2026-06-02）**：GtAProgramConsole 加 empty-text / GtWpRenderer univer placeholder 改"表格底稿…数据尚未导入" / GtCNoteTable 加 el-empty 空态 / D-form 系列已有中文无需改
-- **前端富文本编辑器现状（2026-06-02 grep 实证）**：已用 **TipTap 3**（`@tiptap/vue-3`+`starter-kit`+`extension-placeholder` 全 `^3.22.3`）；三块文字编辑区——附注 `DisclosureEditor.vue`→`NoteRichTextEditor.vue`（StarterKit 文字/混合型）、文字底稿 `WorkpaperWordEditor.vue`（三级降级 Univer Docs→mammoth→TipTap→textarea）、审计报告 `AuditReportEditor.vue`（报告状态+后端 PDF 导出任务+`@vue-office/docx` 预览+mammoth 解析）；表格底稿走 Univer（`@univerjs/preset-*`）；导出依赖 mammoth/xlsx/`@vue-office`；**均无 Word 式 A4 分页**。调研过 Umo Editor（`@umoteam/editor`，Vue3+Tiptap3，要求界面保留版权标识否则侵权，完整 Office 导入导出/协作属付费 Next/Server）拟补分页导出，**用户已决定暂不引入**
-- **🟢 B-Index 索引导航改架构流程图（2026-06-02，Playwright 实测通过）**：删表格式索引导航（GtBIndex el-table+多选/无需打印逻辑全移除），重写 `GtBArchitectureTree.vue` 为流程图卡片（默认展示+完整 20 节点+点击跳转）；修 3 个原 bug：①原 v-show 默认折叠 ②原 buildTreeFromHtmlData 找 wp_code/wp_name 字段名不匹配致树空 ③原 onNodeClick 用 wpCode 当 wpId 跳转会 404→改 emit navigate(sheetName) 冒泡到 GtWpRenderer 切 activeSheetName（jump-to-section 事件之前根本没接线，已在 component 上补 @jump-to-section）
-- **🟢 sheet 级索引号提取（2026-06-02）**：`_generate_b_index_data` 原用 `cls.wp_code`（永远父级 D1）→ 改用正则 `([A-Z]\d+[A-Z]?(?:-\d+)*)\s*$` 从 sheet_name **末尾**提取真实索引（审定表D1-1→D1-1 / 应收票据审计程序表D1A→D1A），提取不到回退父 wp_code（如「附注披露信息（国企）」无尾码→D1，正确）；与 `_WP_CODE_PATTERN`（匹配文件名首段）方向相反——sheet 名索引在尾部
-- **🟢 手册视图已用 ca713614 完整版**（1201 行）：4 子页签全丰富 + count 真实计算 + 工作台/列表/手册 CSS 全（孤儿扫描 0）；ca713614 父=3df0fd61，merge-base=ea788c24；切勿被旧版覆盖
-- **🔴 分叉分支隐患 `feature/report-module-enhancement-closure`(3df0fd61)**：含 WorkpaperWorkbenchView.vue **旧版**（365 行/41 guide CSS 类残缺/count 硬编码假数字），缺 work 分支的工作台+手册孤儿CSS全补(761c320a)和真实计数(fb58ac77)修复 → 合并时勿用其覆盖 work 版（726 行/79 CSS），否则回归
-- **🔴 远程默认分支隐患**：`origin/HEAD→origin/master` 但 master 落后 main 298 commit（活跃主干是 main）→ 需 GitHub Settings 改默认分支（Agent 无法改远程设置）
-- 远程 `origin = https://github.com/YZ1981-GT/GT_plan.git`（HTTPS）；gh CLI 已装(2.89.0)未登录（需用户本人浏览器授权）→ 建 PR 走网页 compare
-- 文档类（memory/INDEX/复盘）冲突取并集，走 PR 让 GitHub 先暴露冲突，不本地直推 main
+### git 状态（2026-06-03）
+- 分支 `work/2026-05-30-wp-specs`（最新 `9712c6a7`，已 push）；**待走 PR 合 main**
+- **specs 全部归档/清零**：active=0，archived=103；所有功能已实现或被覆盖
+- **🔴 远程默认分支隐患**：`origin/HEAD→origin/master` 但活跃主干是 main（需 GitHub Settings 改）
+- **🔴 分叉分支 `feature/report-module-enhancement-closure`**：含旧版 WorkpaperWorkbenchView，合并时勿覆盖 work 版
+- 远程 `origin = https://github.com/YZ1981-GT/GT_plan.git`（HTTPS）
 
 ### 真正待办（外部依赖）
-- LLM embedding 实例（恢复 RAG 语义检索）/ 6000 并发压测（Locust+真 PG）/ 钉集成 / 合并模块真实集团数据 UAT / GitHub 默认分支改 main / 走 PR 合入
-- **🟢 审计程序裁剪两层粒度已打通（2026-06-02，Playwright 实测通过）**：①底稿级粗筛（`ProcedureTrimming.vue` 开关裁整个 Excel）保留；②新增委派执行人列（el-select 选项目团队成员，变更即时 `assignProcedures` 持久化）；③新增「程序裁剪 ›」操作：底稿已生成行跳转 `/workpapers/{wp_id}/edit` 进 a-program-console 逐条细裁，未生成行显示禁用「未生成」+tooltip；④后端 `procedure_service.get_procedures` 回填 wp_id（wp_code JOIN working_paper/wp_index）+assigned_to_name（JOIN staff_members.name），`_to_dict` 输出 wp_id，新增 `_resolve_wp_ids`/`_resolve_staff_names`；委派端点 `PUT /procedures/assign` 复用现成；⑤前端路由 `/projects/:pid/procedures`，apiPaths 加 `procedures.assign`，commonApi 加 `assignProcedures`；**已知数据约束**：范围型 procedure（D2-1至D2-4 等）wp_code 非单一 sheet→映射不到 wp_id→显示"未生成"（正确降级）；测试项目 005a6f2d 无团队成员故委派下拉空（数据非功能问题）；**隔离测试坑**：单独脚本 import 部分 ORM 会触发 `staff_members` FK NoReferencedTableError，须用 in-process ASGI（全 app 加载所有 model）测
-- **🟢 自定义新增程序修复（2026-06-02，in-process+Playwright 实测）**：①根因=`add_custom` 用 `data.get("procedure_code", default)` 前端传 None 时不回退致 procedure_code null 违反 NOT NULL→500"增加不进来"；改 `(data.get() or "").strip()` 兜底+自动编号 `{cycle}-C{NN}`（D-C01）+回填 wp_code；②空白模板（procedures.py blank-template）数据表顶部自动配齐**编制信息表头**（被审计单位/截止日 自动填项目名+audit_period_end，编制人 填 project_assignments preparer，复核人/编制日期/复核日期/索引号/审计循环），下方才是审计程序明细表头（科目编码~备注）+freeze_panes 随表头下移；下载模板功能本就正常
-- **🟢 A 程序表中控台"暂无审计程序"修复（2026-06-02，in-process+Playwright 实测）**：根因=render-config 对 `a-program-console` **从不生成 programs**（不像 b-index 有 `_generate_b_index_data`）+ 该底稿 `parsed_data` 为空→模板里 18 条审计程序完全不体现。修复：①新建 `backend/app/services/wp_program_extract.py`（`extract_program_rows` 纯函数从模板 xlsx 解析程序行：定位"序号"表头行+"审计程序"/"分类"/"索引"列+认定子表头映射 existence/completeness/rights/accuracy/presentation，**布局解耦不硬编码行号**，降级返 []）②`wp_render_config.py` 仿 B-Index 加 `_generate_a_program_data()`——sheet 无持久化 programs 时自动从模板生成，持久化优先/自动生成兜底 ③`GtAProgramConsole.vue` 补「+新增程序」按钮+弹窗（empty-text 早承诺但缺失）emit `program-add` ④**HTML 渲染器保存链之前只刷新不落库**（A~E 类共性 bug）：`WorkpaperEditor.onChildSaved` 补 POST `/api/workpapers/{id}/save` 持久化 html_data，`GtWpRenderer.onSave` 带上 `schema_version`。新增 `test_wp_program_extract.py`(6) + GtAProgramConsole.spec 补 3 测试**并补了缺失的 useRoute mock**（该 spec 之前 18 全红，route.params 未 mock）
-- **🟢 univer 类底稿"数据尚未导入"死占位修复（2026-06-02，Playwright 实测通过）**：根因=**混合底稿**（D1 同时含 b-index/a-program-console/univer sheet）首 sheet 是 HTML→`useEditorMode.useHtmlRenderer=true`→整本走 GtWpRenderer，但其 univer 分支**只是死占位**「数据尚未导入」从不渲染网格（真 Univer 编辑器在 WorkpaperEditor 的 `v-else`/UniverEditorCore 分支，混合底稿永不触发）；审定表D1-1 class_code=`F-审定表`→`univer`（F/G 前缀 blanket 映射）。修复（仿 A 程序表/B-Index 第 3 个自动生成）：①新建 `backend/app/services/wp_grid_extract.py`（`extract_grid` 提取 cells{coord:{v,r,c}}+merged_cells[{s,e}]+col_widths+max_row/col，降级返空网格）②`wp_render_config.py` 加 `_generate_grid_data()`+`_has_grid_cells()`——univer sheet 无持久化 cells 时从模板 xlsx 提取只读网格 ③新建 `GtGridSheet.vue`（只读 HTML `<table>`，isCovered/spanOf 处理合并单元格+合计/小计/分节行高亮+列宽）④`GtWpRenderer` univer 分支：`hasGridCells` 真→渲染 GtGridSheet 否则保留占位。实测审定表D1-1 显示 35 行/494 td 完整网格（项目/期初/期末/审定数表头+原值/坏账/净值/合计/差异数行+合并正确）；新增 `test_wp_grid_extract.py`(6)；只读展示，TB 取数后续填
-- **🟢 univer 网格样式还原 Excel（2026-06-02，用户要求审定表按 Excel 模板样式）**：`wp_grid_extract` 从模板提取**真实样式**（非文字正则启发式）——`fill`(rgb 直取 / theme+tint 经 `_resolve_theme_color` 解析，工作簿 theme clrScheme 顺序 dk1/lt1/dk2/lt2/accent1-6/hlink，**注意 openpyxl theme idx 与 XML 顺序差 2**：theme0=lt1/theme1=dk1 互换，theme7=accent4=8064A2 紫)、`bold`/`align`/`font_size`/`number_format`；`GtGridSheet.vue` 按 cell.style 渲染（背景/加粗/对齐/字号），数值列空值按会计格式显示「-」；致同审定表头band=theme7/tint0.8 淡紫、分节行(一/二/三)=FFE4DFEC 淡紫填充
-- **🟢 GtGridSheet 第二轮精简（2026-06-02 用户要求）**：①去掉所有背景色（fill 不输出、前端不渲染 backgroundColor）②跳过标题行（致同/表名/索引号/页次→后续 GtWpPreparationHeader 统一处理）③裁剪空列（仅输出有内容的列范围 max_col=12）④裁剪尾部空行（max_row=24）⑤数据起始行自动探测（找"项目"/"序号"关键词行）→行号偏移重编号（data_start_row→row 1）；会计格式空值显示「-」（207 cells）
-- **🟢 GtGridSheet 第三轮 UI 重做 + 公式标注（2026-06-02）**：①类 Excel 美观界面：粘顶表头（#f7f5fa+致同紫字）、分节行(一/二/三)粗体+紫底线、合计行双底线、项目列固定宽+右粗线分隔、行 hover 紫浅底、紧凑 12px+tabular-nums ②公式标注：后端 `column_meta`{B:tb_fetch/C:adj_sum/D:reclass_sum/E:computed_sum/J:computed_diff/K:computed_rate/L:user_input} + 每数据单元格 `formula_hint`；前端按 hint 渲染不同虚线色（紫=TB/橙=调整/绿=公式/灰实线=手填）+ tooltip 说明 + 空值单元格小图标(📊/📝/ƒ/%/✏️) + 底部图例 ③`header_rows` 字段使前端分离 thead/tbody（粘顶表头不随滚动）④spec 实施时直接复用 formula_hint 作为执行目标——把「-」替换为真实计算值即可，UI 无需再改
-- **🟢 底稿编制信息 + 自定义底稿公式绑定 spec `custom-workpaper-formula-binding`（2026-06-03，MVP+补强）**：群 A 编制信息表头；群 B=V052 `wp_formula`+注册表 WP 域+`GtCustomWpEditor`+`WP()` 单元格读值；**补强**：`PUT /formulas` 保存后 `evaluate_wp_formula_expression` 求值并 `write_cell_to_parsed_data` 写回目标格 + `propagate_stale_by_wp_code`（best-effort）+ 前端 `formula-saved`→`reload`；URI `wp://{wp_code}/{cell}`。测试：spec pytest 集 + Playwright 3 passed。**2026-06-03 独立核验非假绿**：三层产物齐全（V052+R052 不撞号/ORM WpFormula/wp_formula_service+eval+linkage+generation service）+ router 已注册 router_registry「数据」组 + 前端 componentType=`custom` 已注册 htmlRendererRegistry；三层实跑全绿（后端 spec 21 文件 43 passed/2 skipped + vitest wpFormulaPicker 4 passed + Playwright custom-wp 6 passed，9980/3030 探活 200）。**残留**：生产 V052 手工迁移；自定义 WP 联动=动态 wp_formula 扫描+静态图 BFS（非运行时向 unified_dependency_graph 注册每条 custom 边）；service 层裸 SQL 写 parsed_data 仍靠 TTL
-- **🟢 架构 review 4 条收口 + migration advisory lock ①完成（2026-06-02）**：死代码 `get_authenticated_container` 已删；`run_pending` 已 `pg_advisory_lock`(GTMIG) 真 PG 竞态测过；多 worker 第②③步（迁移移出 lifespan）仍待上 gunicorn 时 → `#dev-history`
+- LLM embedding 实例 / 6000 并发压测 / 钉集成 / 合并模块真实集团数据 UAT / GitHub 默认分支改 main / 走 PR 合入 / 生产 V052 手工迁移
 
-### 已清零的近期修复（明细 → `#dev-history` 2026-06-01 节）
-- 14 个 GET 500 全清零（429 端点巡检）+ sign_readiness/qc_open_issues/cost-overview 等 500 + ORM 类型漂移 + Content-Disposition 中文文件名全仓 RFC5987 + 回收站删不掉(app_audit_log V050)+ CORS(3030 白名单+尾斜杠)
-- **WorkpaperWorkbenchView.vue 孤儿 CSS 全修**（Playwright 实测）：`<style scoped>` 原只定义 container 一个类，工作台进度卡片 + 手册视图 4 子页签(体系总览/审计流程/底稿关系/循环详解) + 默认列表共 ~40 个 gt-wp* 类无 CSS→无样式堆叠 div；已用 --gt-* 令牌补全；**教训：补孤儿样式必脚本扫"模板用到但 CSS 未定义"的类一次兜全，勿只看当前可视区**
+### 近期已完成（明细→`#dev-history`）
+- 底稿渲染三自动生成（B-Index/A-Program/GtGridSheet）+ 公式标注 UI
+- 审计程序裁剪两层粒度 + 自定义新增程序修复 + 底稿编制信息表头
+- custom-workpaper-formula-binding spec（V052 wp_formula + WP() 求值 + 联动）
+- frontend-consistency-m1（GtAmountCell 全量化 + handleApiError + 死代码删除 + statusEnum）
+- 全局 7 模块改进 spec 全部完成 + 14 个 GET 500 清零 + schema drift 0
+- 明细账月小计 off-by-one 修复 + 知识库收口 + doc-chat DB 持久化
+- migration advisory lock + V051 schema drift 二次修复
 
 ## 操作铁律（详见 `#conventions`）
 
 - **三层一致校验**：DB 迁移 + ORM `Mapped[]` + service 方法，任一缺失即伪绿
-- **router_registry 必查**：新建 router 必在 `backend/app/router_registry/{group}.py` 注册否则前端 404；FastAPI 不热加载 router（改后重启）
-- **service 只 flush 不 commit**：跨 service 编排由 router 统一 commit 保原子
-- **asyncpg 事务污染**：事务 aborted 后连 SAVEPOINT 都被拒 → 根治=修最先失败的 SQL（非兜异常）；规则内 try/except 吞 SQL 异常不 rollback=反模式
-- **PG 运维**：SET 不支持绑定参数（用 set_config）/ ALTER TYPE ADD VALUE 不可事务内即用 / PG-only SQL 必加 SQLite dialect 检测
-- **历史档案不回填修改**：dev-history / spec-tasks 是 append-only
-- **PowerShell**：写中文/emoji 用 fsWrite（禁 `-replace`/`Set-Content` 处理中文）；长 commit msg 用 `git commit --% -m "..."`；读中文输出先 `chcp 65001 + [Console]::OutputEncoding=UTF8`
+- **router_registry 必查**：新建 router 必注册否则前端 404
+- **service 只 flush 不 commit**：router 统一 commit 保原子
+- **PG 运维**：SET 不支持绑定参数 / ALTER TYPE ADD VALUE 不可事务内即用
+- **PowerShell**：写中文用 fsWrite；长 commit msg 用 `git commit --% -m "..."`
 - **fsWrite ≥100 行会截断**：大文件分 fsWrite(≤50)+多次小 fsAppend
-- **apiProxy 单层解构**：`api.get/post` 已返业务数据不再 `const {data}=`；`http.get/post`（utils/http）返完整响应体需 `.data`
-- **枚举成员引用前实证**：`python -c "getattr(Enum,'X','MISSING')"` 核对大小写（小写 draft/approved）
-- **`dict.get(k, default)` 陷阱**：key 存在但值为 None 时返回 None 不返回 default（Pydantic 可选字段未填即 None）→ NOT NULL 列插入崩。写库前必用 `(data.get(k) or fallback)` 显式兜底，勿依赖 `.get(k, default)`（已咬过：procedure custom add 的 procedure_code=None 致 500）
-- **merge 跨阶段签名变更必 grep 调用方**（sync↔async / 删公开方法）
-- **CORS/307**：前端 3030 须在 CORS_ORIGINS；FastAPI 无尾斜杠路由 307 重定向绝对 URL 会跨域→前端路径匹配后端尾斜杠
-- **UI 必用 GT 紫令牌**（`styles/gt-tokens.css`）：核心紫 `--gt-color-primary:#4b2d77` / 浅紫底 `--gt-color-primary-bg:#f4f0fa` / 紫边框 `--gt-color-border-purple` / 浅紫边框 `--gt-color-border-purple-light:#d8b8ee`；**禁用 Element 默认蓝 `--el-color-primary`/#409eff 作 fallback**；global.css 已映射 `--el-color-primary→GT紫`，但 `el-tag type="primary"` 仍渲染默认蓝（light-9 变量未全量重映）→ 需组件内 `:deep(.el-tag--primary)` scoped 覆盖三色，勿动全局级联
-- **hypothesis PBT 调速**：max_examples 5（用户明确要求，禁默认 100）
+- **apiProxy 单层解构**：`api.get/post` 已返业务数据；`http.get/post` 需 `.data`
+- **`dict.get(k, default)` 陷阱**：key=None 时不返回 default→写库前用 `(data.get(k) or fallback)`
+- **CORS/307**：前端 3030 须在 CORS_ORIGINS；FastAPI 无尾斜杠 307 会跨域
+- **UI 必用 GT 紫令牌**：`--gt-color-primary:#4b2d77`；禁用 Element 默认蓝
+- **hypothesis PBT**：max_examples=5
 
 ## 关键引用指南
 
-- **仅 memory.md 是 `inclusion: always`（≤200 行约束只针对它）**；architecture/conventions/dev-history 均 `inclusion: manual` 仅 `#` 引用时加载，无需裁剪（dev-history 是 append-only 审计轨迹）
-- 技术事实/端点速查/PG schema/spec 历史/近期修复明细 → `#dev-history` grep 关键词
-- 架构/系统规模/数据流 → `#architecture`；编码规范/UI 视觉/操作铁律详解/PG 运维 → `#conventions`
-- spec 状态 → `.kiro/specs/INDEX.md`；合并模块体检 → `docs/proposals/consolidation-module-status-and-proposal.md`；全局 7 模块 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
+- **仅 memory.md 是 `inclusion: always`（≤200 行）**；其余 steering 均 manual
+- 端点速查/PG schema/修复明细 → `#dev-history`
+- 架构/数据流 → `#architecture`；编码规范/铁律详解 → `#conventions`
+- spec 索引 → `.kiro/specs/INDEX.md`
