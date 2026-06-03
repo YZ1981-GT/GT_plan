@@ -57,6 +57,7 @@ export type WpComponentType =
   | 'e-control-test'
   | 'h-static-doc'
   | 'custom'
+  | 'audit-sheet'
   | 'univer'
   | 'skip'
 

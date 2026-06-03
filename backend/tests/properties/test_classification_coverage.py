@@ -26,8 +26,10 @@ import pytest
 from hypothesis import HealthCheck, given, settings as h_settings
 from hypothesis import strategies as st
 
-# ─── 让 backend/scripts/analyze_wp_templates.py 可被 import ──────────────────
-_SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent / "scripts"
+# ─── 让 backend/scripts/analyze/analyze_wp_templates.py 可被 import ──────────
+_SCRIPTS_DIR = (
+    Path(__file__).resolve().parent.parent.parent / "scripts" / "analyze"
+)
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
@@ -69,6 +71,12 @@ NON_D_EXPECTED: dict[str, str] = {
     "G-": "univer",
     "H-": "h-static-doc",
     "I-": "skip",
+}
+
+# 精确匹配优先于前缀（与 wp_classification_service._F_SUB_ROUTING 对齐）
+# F-审定表 拆分到独立的可编辑审定表组件，不再走 F- 前缀的 univer fallback
+EXACT_EXPECTED: dict[str, str] = {
+    "F-审定表": "audit-sheet",
 }
 
 
@@ -297,7 +305,8 @@ def test_property_1d_non_d_class_routing_deterministic_idempotent(
         f"非 D 类 class_code={class_code!r} 前缀 {prefix!r} 不在预期 "
         f"NON_D_EXPECTED={list(NON_D_EXPECTED.keys())}"
     )
-    expected_component = NON_D_EXPECTED[prefix]
+    # 精确匹配优先于前缀（如 F-审定表 → audit-sheet，不走 F- 前缀的 univer）
+    expected_component = EXACT_EXPECTED.get(class_code, NON_D_EXPECTED[prefix])
 
     cls_result = _make_classification_result(class_code)
 

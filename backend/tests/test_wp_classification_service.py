@@ -112,6 +112,17 @@ class TestDeriveComponentType:
         result = derive_component_type(_make_classification("F-数据表"))
         assert result == "univer"
 
+    def test_f_审定表_audit_sheet(self):
+        """F-审定表 → audit-sheet（精确匹配优先于 F- 前缀 fallback）。"""
+        result = derive_component_type(_make_classification("F-审定表"))
+        assert result == "audit-sheet"
+
+    def test_f_明细表_still_univer(self):
+        """其余 F- class_code 仍 fallback 到 univer。"""
+        assert derive_component_type(_make_classification("F-明细表")) == "univer"
+        assert derive_component_type(_make_classification("F-分析表")) == "univer"
+        assert derive_component_type(_make_classification("F-汇总表")) == "univer"
+
     def test_g_univer(self):
         result = derive_component_type(_make_classification("G-测算"))
         assert result == "univer"
@@ -171,6 +182,7 @@ class TestComponentTypeWhitelist:
             "D-复核记录",
             "E-控制测试",
             "F-数据表",
+            "F-审定表",
             "G-测算",
             "H-辅助说明",
             "I-占位",

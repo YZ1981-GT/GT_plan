@@ -38,6 +38,7 @@ export type HtmlComponentType =
   | 'e-control-test'
   | 'h-static-doc'
   | 'custom'
+  | 'audit-sheet'
 
 /** 注册表条目：包含 lazy component / 图标 / emits / 描述 */
 export interface HtmlRendererEntry {
@@ -62,6 +63,7 @@ const GtDForm = defineAsyncComponent(() => import('./GtDForm/GtDForm.vue'))
 const GtEControlTest = defineAsyncComponent(() => import('./GtEControlTest.vue'))
 const GtHStaticDoc = defineAsyncComponent(() => import('./GtHStaticDoc.vue'))
 const GtCustomWpEditor = defineAsyncComponent(() => import('./GtCustomWpEditor.vue'))
+const GtAuditSheet = defineAsyncComponent(() => import('./GtAuditSheet.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -143,6 +145,13 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📎',
     label: '自定义底稿',
     emits: ['save'],
+  },
+  {
+    componentType: 'audit-sheet',
+    component: GtAuditSheet,
+    icon: '📊',
+    label: '审定表',
+    emits: ['save', 'field-change', 'open-formula', 'restore'],
   },
 ]
 

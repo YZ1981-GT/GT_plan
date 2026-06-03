@@ -97,6 +97,8 @@
         @step-advance="onStepAdvance"
         @open-attachment="onOpenAttachment"
         @formula-saved="reload"
+        @open-formula="onOpenFormula"
+        @restore="reload"
       />
 
       <!-- Univer 类（F/G）：有模板网格数据时只读展示，否则占位 -->
@@ -193,6 +195,8 @@ const emit = defineEmits<{
   'sync-to-disclosure-notes': [payload: Record<string, any>]
   'jump-to-reference': [refCode: string]
   'open-attachment': [payload: { wpId: string; sheetName: string; rowRef: string }]
+  /** 审定表（audit-sheet）公式按钮 → 转发给上层（后续接 FormulaEditDialog） */
+  'open-formula': [payload: { wpId: string; sheetName: string }]
 }>()
 
 // ─── Refs ───
@@ -415,6 +419,14 @@ function onJumpToSection(sheetName: string) {
 
 function onOpenAttachment(payload: { wpId: string; sheetName: string; rowRef: string }) {
   emit('open-attachment', payload)
+}
+
+/**
+ * 审定表公式按钮：子组件 emit('open-formula', { sheetName }) → 补全 wpId 转发上层。
+ * 后续由 WorkpaperEditor 监听打开 FormulaEditDialog（当前仅冒泡，不在本任务范围）。
+ */
+function onOpenFormula(payload: { sheetName: string }) {
+  emit('open-formula', { wpId: props.wpId, sheetName: payload?.sheetName ?? activeSheetName.value })
 }
 </script>
 

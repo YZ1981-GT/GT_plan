@@ -770,6 +770,7 @@ class TestComponentTypeWhitelistCoverage:
             "d-form-review",
             "e-control-test",
             "h-static-doc",
+            "audit-sheet",  # F-审定表 可编辑审定表组件
             "univer",   # F/G 类回退
             "skip",     # I 类占位
         }
@@ -792,6 +793,8 @@ class TestComponentTypeWhitelistCoverage:
             "d-form-review",
             "e-control-test",
             "h-static-doc",
+            "custom",       # 自定义底稿公式绑定组件
+            "audit-sheet",  # F-审定表 可编辑审定表组件
             "univer",
             "skip",
         }

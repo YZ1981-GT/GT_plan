@@ -60,8 +60,8 @@ function withSetup(refs: HarnessRefs) {
 }
 
 describe('useEditorMode - HTML_COMPONENT_TYPES allowlist', () => {
-  it('contains exactly 12 entries (HTML registry + skip)', () => {
-    expect(HTML_COMPONENT_TYPES.size).toBe(12)
+  it('contains exactly 13 entries (HTML registry + skip)', () => {
+    expect(HTML_COMPONENT_TYPES.size).toBe(13)
   })
 
   it('includes the documented HTML class types', () => {
@@ -77,6 +77,7 @@ describe('useEditorMode - HTML_COMPONENT_TYPES allowlist', () => {
       'e-control-test',
       'h-static-doc',
       'custom',
+      'audit-sheet',
       'skip',
     ]
     for (const ct of expected) {

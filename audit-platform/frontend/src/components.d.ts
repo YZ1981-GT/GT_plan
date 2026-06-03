@@ -266,6 +266,7 @@ declare module 'vue' {
     GtAProgramConsole: typeof import('./components/workpaper/GtAProgramConsole.vue')['default']
     GtAProgramConsoleStub: typeof import('./components/workpaper/stubs/GtAProgramConsoleStub.vue')['default']
     GtAuditFlowGraph: typeof import('./components/workpaper/GtAuditFlowGraph.vue')['default']
+    GtAuditSheet: typeof import('./components/workpaper/GtAuditSheet.vue')['default']
     GtBArchitectureTree: typeof import('./components/workpaper/GtBArchitectureTree.vue')['default']
     GtBIndex: typeof import('./components/workpaper/GtBIndex.vue')['default']
     GtBIndexStub: typeof import('./components/workpaper/stubs/GtBIndexStub.vue')['default']

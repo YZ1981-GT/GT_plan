@@ -32,6 +32,7 @@ VALID_COMPONENT_TYPES: set[str] = {
     "e-control-test",
     "h-static-doc",
     "custom",
+    "audit-sheet",
     "univer",
     "skip",
 }
@@ -63,6 +64,12 @@ _D_SUB_ROUTING: dict[str, str] = {
 
 # D 类默认 componentType（表格型检查表）
 _D_DEFAULT = "d-form-table"
+
+# F 类子路由映射（精确匹配优先于 _CLASS_TO_COMPONENT["F-"] 前缀 fallback）
+# 仅 F-审定表 → audit-sheet（可编辑审定表组件）；其余 F- 仍 fallback 到 univer
+_F_SUB_ROUTING: dict[str, str] = {
+    "F-审定表": "audit-sheet",
+}
 
 
 @dataclass
@@ -288,7 +295,9 @@ def derive_component_type(classification: ClassificationResult) -> str:
         - D-复核记录/D-复核 → 'd-form-review'
         - 其他 D- → 'd-form-table' (默认)
     - E- (控制测试) → 'e-control-test'
-    - F- (数据表) → 'univer'
+    - F- (数据表) → 需 sub-routing:
+        - F-审定表 → 'audit-sheet'（可编辑审定表组件）
+        - 其他 F- → 'univer' (默认)
     - G- (测算表) → 'univer'
     - H- (辅助说明) → 'h-static-doc'
     - I- (占位) → 'skip'
@@ -311,6 +320,16 @@ def derive_component_type(classification: ClassificationResult) -> str:
     if class_code.startswith("D-"):
         component_type = _D_SUB_ROUTING.get(class_code, _D_DEFAULT)
         return component_type
+
+    # 检查 F 类 sub-routing（精确匹配优先于前缀 fallback）
+    # F- 是 _CLASS_TO_COMPONENT 的前缀键（→ univer），若直接走下方前缀循环
+    # 会把所有 F- 一律映射到 univer，因此必须在前缀匹配前先查 _F_SUB_ROUTING。
+    if class_code.startswith("F-"):
+        component_type = _F_SUB_ROUTING.get(class_code)
+        if component_type:
+            return component_type
+        # fallback: 其余 F-（F-明细表/F-分析表/F-汇总表 等）仍返回 univer
+        return "univer"
 
     # 其他类按前缀匹配
     for prefix, component_type in _CLASS_TO_COMPONENT.items():
