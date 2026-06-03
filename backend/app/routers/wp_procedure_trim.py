@@ -86,6 +86,9 @@ async def patch_procedure_trim(
         )
 
     await db.commit()
+    from app.services.wp_parsed_data_service import touch_after_parsed_data_commit
+
+    await touch_after_parsed_data_commit(project_id=project_uuid, source="wp_procedure_trim")
     return result.to_response().model_dump()
 
 

@@ -118,6 +118,13 @@ async def confirm_ai_content(
     await db.flush()
     await db.commit()
 
+    try:
+        from app.services.wp_parsed_data_service import touch_wp_registry
+
+        await touch_wp_registry(wp.project_id)
+    except Exception as touch_err:
+        logger.warning("touch_wp_registry after ai_confirm: %s", touch_err)
+
     action_labels = {"accept": "采纳", "reject": "拒绝", "revise": "修订"}
     return AiConfirmResponse(
         cell_ref=cell_ref,

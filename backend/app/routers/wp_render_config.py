@@ -9,6 +9,7 @@ Requirements: 1.2, 3.0.3, 3.0.5
 from __future__ import annotations
 
 import logging
+import re
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,13 +20,16 @@ import sqlalchemy as sa
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.models.procedure_models import ProcedureInstance
 from app.models.workpaper_models import (
     WpCrossRef,
     WpIndex,
     WorkingPaper,
+    WpSourceType,
 )
 from app.services.wp_classification_service import (
     ClassificationNotFoundError,
+    ClassificationResult,
     WpClassificationService,
     derive_component_type,
 )
@@ -42,6 +46,64 @@ router = APIRouter(
 
 # ─── Singleton schema service (stateless + cache) ────────────────────────────
 _schema_service = WpRenderSchemaService()
+
+# 标准底稿编号：A~I + 数字（D1-1、E11）；CUST-01 等字母后非数字则视为自建
+_STANDARD_WP_CODE = re.compile(r"^[A-I]\d", re.IGNORECASE)
+
+
+async def _has_custom_procedure(
+    db: AsyncSession, project_id: UUID, wp_code: str
+) -> bool:
+    n = (
+        await db.execute(
+            sa.select(sa.func.count())
+            .select_from(ProcedureInstance)
+            .where(
+                ProcedureInstance.project_id == project_id,
+                ProcedureInstance.wp_code == wp_code,
+                ProcedureInstance.is_custom == True,  # noqa: E712
+                ProcedureInstance.is_deleted == False,  # noqa: E712
+            )
+        )
+    ).scalar() or 0
+    return n > 0
+
+
+def _looks_like_standard_wp_code(wp_code: str) -> bool:
+    return bool(_STANDARD_WP_CODE.search((wp_code or "").strip()))
+
+
+async def _maybe_custom_classifications(
+    db: AsyncSession,
+    project_id: UUID,
+    wp_code: str,
+    wp_name: str | None,
+    classifications: list,
+    working_paper: WorkingPaper,
+) -> list:
+    """无模板归类时，为自定义程序/自建底稿合成 CUSTOM → componentType=custom。"""
+    if classifications:
+        return classifications
+    use_custom = await _has_custom_procedure(db, project_id, wp_code)
+    if not use_custom and working_paper.source_type == WpSourceType.manual:
+        use_custom = not _looks_like_standard_wp_code(wp_code)
+    if not use_custom:
+        return classifications
+    # sheet_name 与 parsed_data.html_data 的键一致（保存时用 wp_code 作 sheet 名）
+    sheet_name = wp_code
+    return [
+        ClassificationResult(
+            wp_code=wp_code,
+            sheet_name=sheet_name,
+            class_code="CUSTOM",
+            class_="自定义底稿",
+            scope="standalone",
+            is_real_workpaper=True,
+            delegated_module=None,
+            render_schema_path=None,
+            template_version_id=None,
+        )
+    ]
 
 
 # ─── Response schemas ────────────────────────────────────────────────────────
@@ -80,7 +142,272 @@ class RenderConfigResponse(BaseModel):
     sheets: list[dict]  # Use dict to allow custom 'schema' key
 
 
-# ─── Endpoint ────────────────────────────────────────────────────────────────
+# ─── B-Index 自动生成辅助 ─────────────────────────────────────────────────
+
+
+async def _build_preparation_info(
+    db: AsyncSession,
+    project_id: UUID,
+    wp_id: UUID,
+) -> dict[str, str]:
+    """编制信息 JOIN（workpaper 级表头 + B-Index 共用）。无 accounting_period。"""
+    info: dict[str, str] = {
+        "entity_name": "",
+        "period_end": "",
+        "preparer": "",
+        "prep_date": "",
+        "reviewer": "",
+        "review_date": "",
+        "index_no": "",
+    }
+    try:
+        proj_result = await db.execute(
+            sa.text("SELECT name, audit_period_end FROM projects WHERE id = :pid"),
+            {"pid": str(project_id)},
+        )
+        proj_row = proj_result.first()
+        if proj_row:
+            info["entity_name"] = proj_row[0] or ""
+            info["period_end"] = str(proj_row[1])[:10] if proj_row[1] else ""
+    except Exception as e:
+        logger.warning("preparation_info: 项目信息失败: %s", e)
+
+    if not info["entity_name"]:
+        try:
+            from app.models.core import Project
+
+            proj = await db.get(Project, project_id)
+            if proj:
+                info["entity_name"] = proj.name or ""
+                if not info["period_end"] and getattr(proj, "audit_period_end", None):
+                    info["period_end"] = str(proj.audit_period_end)[:10]
+        except Exception as e:
+            logger.warning("preparation_info: ORM 项目信息降级失败: %s", e)
+
+    try:
+        staff_result = await db.execute(
+            sa.text("""
+                SELECT pa.role, s.name
+                FROM project_assignments pa
+                JOIN staff_members s ON s.id = pa.staff_id
+                WHERE pa.project_id = :pid
+                  AND pa.role IN ('preparer', 'reviewer', 'partner', 'manager')
+            """),
+            {"pid": str(project_id)},
+        )
+        for role, name in staff_result:
+            if role == "preparer":
+                info["preparer"] = name or ""
+            elif role in ("reviewer", "manager"):
+                if not info["reviewer"] or role == "reviewer":
+                    info["reviewer"] = name or ""
+    except Exception as e:
+        logger.warning("preparation_info: 人员信息失败: %s", e)
+
+    try:
+        wp_row = (
+            await db.execute(
+                sa.select(WorkingPaper.created_at, WpIndex.wp_code)
+                .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+                .where(WorkingPaper.id == wp_id)
+            )
+        ).first()
+        if wp_row:
+            if wp_row[0]:
+                info["prep_date"] = str(wp_row[0])[:10]
+            info["index_no"] = wp_row[1] or ""
+    except Exception as e:
+        logger.warning("preparation_info: 底稿信息失败: %s", e)
+
+    return info
+
+
+async def _generate_b_index_data(
+    db: AsyncSession,
+    project_id: UUID,
+    wp_id: UUID,
+    classifications: list,
+) -> dict:
+    """当 B-Index sheet 无持久化 html_data 时，从项目元数据 + 同底稿 sheets 自动生成。
+
+    返回结构与 GtBIndex.vue 的 BIndexHtmlData 接口一致：
+    {
+      preparation_info: { entity_name, period_end, preparer, prep_date, reviewer, review_date, index_no },
+      navigation_rows: [ { seq, content, index_ref, no_print } ]
+    }
+    """
+    preparation_info = await _build_preparation_info(db, project_id, wp_id)
+
+    # ─── 索引导航行（同底稿其他 sheet → 行） ─────────────────────────────
+    # sheet 级索引号嵌在 sheet_name 末尾（如「审定表D1-1」→ D1-1，
+    # 「应收票据审计程序表D1A」→ D1A）；wp_code 仅父级（D1），不能用作 index_ref。
+    _SHEET_INDEX_PATTERN = re.compile(r"([A-Z]\d+[A-Z]?(?:-\d+)*)\s*$")
+
+    navigation_rows: list[dict] = []
+    seq = 1
+    for cls in classifications:
+        # 跳过 B-Index 自身
+        try:
+            ct = derive_component_type(cls)
+        except Exception:
+            ct = "skip"
+        if ct == "b-index":
+            continue
+
+        # 从 sheet_name 末尾提取该 sheet 的真实索引号；提取不到则回退父 wp_code
+        sheet_index = ""
+        m = _SHEET_INDEX_PATTERN.search(cls.sheet_name or "")
+        if m:
+            sheet_index = m.group(1)
+        else:
+            sheet_index = getattr(cls, "wp_code", "") or ""
+
+        navigation_rows.append({
+            "seq": seq,
+            "content": cls.sheet_name,
+            "index_ref": sheet_index,
+            "component_type": ct,
+            "no_print": False,
+        })
+        seq += 1
+
+    return {
+        "preparation_info": preparation_info,
+        "navigation_rows": navigation_rows,
+    }
+
+
+# ─── A-程序表中控台自动生成辅助 ────────────────────────────────────────────
+
+
+async def _generate_a_program_data(
+    file_path: str | None,
+    sheet_name: str,
+    existing: dict | None = None,
+) -> dict:
+    """当 a-program-console sheet 无持久化 programs 时，从模板 xlsx 提取程序清单。
+
+    返回结构与 GtAProgramConsole.vue 的 AProgramHtmlData 接口一致：
+    {
+      programs: [ { id, program_no, program_desc, program_category,
+                    assertions, linked_workpapers, status } ],
+      trim_decisions: [],
+      signatures: [...]（保留 existing 中的签字信息）
+    }
+
+    解析失败 / 文件缺失 → programs 为空列表（前端仍显示空态，不报错）。
+    """
+    from app.services.wp_program_extract import extract_program_rows
+
+    programs: list[dict] = []
+    if file_path:
+        try:
+            programs = extract_program_rows(file_path, sheet_name)
+        except Exception as e:  # noqa: BLE001 — 降级不阻塞渲染
+            logger.warning("A-程序表提取失败 %s/%s: %s", file_path, sheet_name, e)
+            programs = []
+
+    result: dict = {
+        "programs": programs,
+        "trim_decisions": [],
+    }
+    # 保留已有签字信息（若 sheet 之前存过部分数据）
+    if existing and isinstance(existing.get("signatures"), list):
+        result["signatures"] = existing["signatures"]
+    return result
+
+
+# ─── univer 表格类底稿网格自动生成辅助 ─────────────────────────────────────
+
+
+def _has_grid_cells(html_data: dict | None) -> bool:
+    """判断 sheet html_data 是否已含可渲染的网格 cells。"""
+    if not isinstance(html_data, dict):
+        return False
+    cells = html_data.get("cells")
+    return isinstance(cells, dict) and len(cells) > 0
+
+
+async def _generate_grid_data(
+    file_path: str | None,
+    sheet_name: str,
+    existing: dict | None = None,
+) -> dict:
+    """当 univer 类 sheet 无持久化网格数据时，从模板 xlsx 提取只读网格。
+
+    返回结构与 GtGridSheet.vue 的 GridHtmlData 接口一致：
+    { cells, merged_cells, col_widths, max_row, max_col }
+
+    解析失败 / 文件缺失 → 空网格（前端显示空态，不报错）。
+    """
+    from app.services.wp_grid_extract import extract_grid
+
+    grid: dict = {"cells": {}, "merged_cells": [], "col_widths": {}, "max_row": 0, "max_col": 0}
+    if file_path:
+        try:
+            grid = extract_grid(file_path, sheet_name)
+        except Exception as e:  # noqa: BLE001 — 降级不阻塞渲染
+            logger.warning("univer 网格提取失败 %s/%s: %s", file_path, sheet_name, e)
+
+    # 合并已有持久化数据（若用户曾编辑过部分单元格）
+    if existing and isinstance(existing.get("cells"), dict) and existing["cells"]:
+        grid = {**grid, **existing}
+    return grid
+
+
+@router.get("/{wp_id}/preparation-info")
+async def get_preparation_info(
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """workpaper 级编制信息（7 字段，无 accounting_period）。"""
+    wp = (
+        await db.execute(
+            sa.select(WorkingPaper).where(
+                WorkingPaper.id == wp_id,
+                WorkingPaper.is_deleted == False,  # noqa: E712
+            )
+        )
+    ).scalars().first()
+    if wp is None:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+    return await _build_preparation_info(db, wp.project_id, wp_id)
+
+
+@router.post("/generate-from-index")
+async def generate_workpaper_from_index(
+    wp_index_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """手动从 wp_index 幂等生成 working_paper。"""
+    from app.services.workpaper_generation_service import workpaper_generation_service
+
+    wp_index = (
+        await db.execute(
+            sa.select(WpIndex).where(
+                WpIndex.id == wp_index_id,
+                WpIndex.is_deleted == False,  # noqa: E712
+            )
+        )
+    ).scalars().first()
+    if wp_index is None:
+        raise HTTPException(status_code=404, detail="底稿索引不存在")
+
+    wp = await workpaper_generation_service.ensure_working_paper(
+        db,
+        wp_index.project_id,
+        wp_index_id,
+        created_by=user.id,
+    )
+    await db.commit()
+    return {
+        "working_paper_id": str(wp.id),
+        "wp_index_id": str(wp_index_id),
+        "wp_code": wp_index.wp_code,
+        "file_path": wp.file_path,
+    }
 
 
 @router.get("/{wp_id}/render-config")
@@ -161,6 +488,15 @@ async def get_render_config(
         )
         classifications = []
 
+    classifications = await _maybe_custom_classifications(
+        db,
+        project_id,
+        wp_code,
+        wp_index.wp_name,
+        classifications,
+        working_paper,
+    )
+
     # ─── Step 5: 检查 scope（EARS: consolidated/parent_only → redirect） ──
     # 取第一个 sheet 的 scope 作为底稿级 scope
     scope = "standalone"
@@ -231,6 +567,40 @@ async def get_render_config(
 
         # 获取 sheet 级 html_data
         sheet_html_data = html_data_all.get(classification.sheet_name)
+
+        # ─── B-Index 自动生成逻辑：编制信息 + 索引导航 ─────────────────
+        if component_type == "b-index" and not sheet_html_data:
+            sheet_html_data = await _generate_b_index_data(
+                db=db,
+                project_id=project_id,
+                wp_id=wp_id,
+                classifications=classifications,
+            )
+
+        # ─── A-程序表中控台自动生成：从模板 xlsx 提取审计程序行 ─────────
+        # GtAProgramConsole 消费 html_data.programs；当 sheet 无持久化 programs
+        # 时，从底稿模板 xlsx 解析程序清单（序号/描述/分类/5项认定/底稿索引），
+        # 否则中控台永远显示「暂无审计程序」（模板里的程序内容无法体现）。
+        if component_type == "a-program-console" and not (
+            isinstance(sheet_html_data, dict) and sheet_html_data.get("programs")
+        ):
+            sheet_html_data = await _generate_a_program_data(
+                file_path=working_paper.file_path,
+                sheet_name=classification.sheet_name,
+                existing=sheet_html_data if isinstance(sheet_html_data, dict) else None,
+            )
+
+        # ─── univer 表格类底稿网格自动生成：从模板 xlsx 提取只读网格 ──────
+        # 混合底稿（含 HTML sheet + univer sheet）整本走 GtWpRenderer 时，
+        # univer sheet（审定表/明细表/测算表）之前只显示死占位「数据尚未导入」，
+        # 模板网格结构完全不体现。此处补 cells/merged_cells 让模板内容可见（只读），
+        # TB 取数后续再填。
+        if component_type == "univer" and not _has_grid_cells(sheet_html_data):
+            sheet_html_data = await _generate_grid_data(
+                file_path=working_paper.file_path,
+                sheet_name=classification.sheet_name,
+                existing=sheet_html_data if isinstance(sheet_html_data, dict) else None,
+            )
 
         sheet_config = {
             "sheet_name": classification.sheet_name,

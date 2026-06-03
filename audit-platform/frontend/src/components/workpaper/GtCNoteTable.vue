@@ -2,6 +2,15 @@
 
 <template>
   <div class="gt-c-note-table">
+    <!-- 空态：schema 未配置时显示提示 -->
+    <el-empty
+      v-if="!allSubTables.length && !contextFields.length"
+      :image-size="80"
+      description="附注披露表尚未配置，请等待模板初始化完成"
+      class="gt-cnt__empty"
+    />
+
+    <template v-else>
     <header class="gt-cnt__header">
       <div class="gt-cnt__header-meta">
         <span v-if="entityName" class="gt-cnt__entity">{{ entityName }}</span>
@@ -197,6 +206,7 @@
         <el-icon class="gt-cnt__hint-icon"><InfoFilled /></el-icon>
       </el-tooltip>
     </footer>
+    </template>
   </div>
 </template>
 

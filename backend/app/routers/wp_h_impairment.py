@@ -290,4 +290,7 @@ async def _maybe_apply_impairment_to_workpaper(
     wp.parsed_data = pd
     await db.flush()
     await db.commit()
+    from app.services.wp_parsed_data_service import touch_after_parsed_data_commit
+
+    await touch_after_parsed_data_commit(wp, source="wp_h_impairment")
     return payload.apply_to_sheet

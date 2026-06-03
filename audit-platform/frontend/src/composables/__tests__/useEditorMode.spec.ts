@@ -60,8 +60,8 @@ function withSetup(refs: HarnessRefs) {
 }
 
 describe('useEditorMode - HTML_COMPONENT_TYPES allowlist', () => {
-  it('contains exactly 11 entries (parity with WorkpaperEditor.vue pre-extraction)', () => {
-    expect(HTML_COMPONENT_TYPES.size).toBe(11)
+  it('contains exactly 12 entries (HTML registry + skip)', () => {
+    expect(HTML_COMPONENT_TYPES.size).toBe(12)
   })
 
   it('includes the documented HTML class types', () => {
@@ -76,6 +76,7 @@ describe('useEditorMode - HTML_COMPONENT_TYPES allowlist', () => {
       'd-form-review',
       'e-control-test',
       'h-static-doc',
+      'custom',
       'skip',
     ]
     for (const ct of expected) {

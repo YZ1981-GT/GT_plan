@@ -71,6 +71,14 @@
           <!-- Sprint 4 Task 14.3: 重新触发引导按钮 -->
           <el-button text size="small" @click="triggerGuide" title="使用引导">?</el-button>
           <el-button
+            v-if="!readonly"
+            type="primary"
+            size="small"
+            @click="openAddDialog"
+          >
+            + 新增程序
+          </el-button>
+          <el-button
             v-if="!readonly && selectedIds.length > 0"
             type="warning"
             size="small"
@@ -97,6 +105,7 @@
       :data="filteredPrograms"
       border
       row-key="id"
+      empty-text="暂无审计程序，请点击上方「+ 新增程序」添加"
       :expand-row-keys="expandedRowKeys"
       @expand-change="handleExpandChange"
       @selection-change="handleSelectionChange"
@@ -335,6 +344,50 @@
       </template>
     </el-dialog>
 
+    <!-- ─── 新增程序弹窗 ─── -->
+    <el-dialog
+      v-model="addDialogVisible"
+      title="新增审计程序"
+      width="560px"
+      :close-on-click-modal="false"
+    >
+      <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="90px">
+        <el-form-item label="程序描述" prop="desc" required>
+          <el-input
+            v-model="addForm.desc"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入审计程序描述（必填）"
+            maxlength="1000"
+            show-word-limit
+          />
+        </el-form-item>
+        <el-form-item label="类别">
+          <el-select v-model="addForm.category" placeholder="选择类别" style="width: 100%">
+            <el-option label="常规★" value="常规★" />
+            <el-option label="备选" value="备选" />
+            <el-option label="IPO/上市公司/新三板/舞弊应对" value="IPO/上市公司/新三板/舞弊应对" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="关联底稿">
+          <el-input
+            v-model="addForm.linkedWorkpapers"
+            placeholder="可选，多个底稿索引用 / 分隔，如 D1-1/D1-2"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="addDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :disabled="!addForm.desc.trim()"
+          @click="confirmAdd"
+        >
+          确认新增
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- Sprint 4 Task 14.1: 首次使用引导 el-tour -->
     <el-tour v-model="showGuide">
       <el-tour-step
@@ -423,6 +476,7 @@ const emit = defineEmits<{
   'jump-to-workpaper': [wpCode: string]
   'save': [data: AProgramHtmlData]
   'open-attachment': [payload: { wpId: string; sheetName: string; rowRef: string }]
+  'program-add': [payload: { programId: string; description: string }]
 }>()
 
 // ─── State ───
@@ -460,6 +514,18 @@ const batchTrimForm = ref({
 const batchTrimFormRef = ref<any>(null)
 const batchTrimRules = {
   reason: [{ required: true, message: '请输入批量裁剪理由', trigger: 'blur' }],
+}
+
+// Add program dialog
+const addDialogVisible = ref(false)
+const addForm = ref({
+  desc: '',
+  category: '常规★',
+  linkedWorkpapers: '',
+})
+const addFormRef = ref<any>(null)
+const addRules = {
+  desc: [{ required: true, message: '请输入审计程序描述', trigger: 'blur' }],
 }
 
 // Auto-save debounce
@@ -630,6 +696,34 @@ function confirmTrim() {
 function openBatchTrimDialog() {
   batchTrimForm.value.reason = ''
   batchTrimDialogVisible.value = true
+}
+
+function openAddDialog() {
+  addForm.value = { desc: '', category: '常规★', linkedWorkpapers: '' }
+  addDialogVisible.value = true
+}
+
+function confirmAdd() {
+  const desc = addForm.value.desc.trim()
+  if (!desc) return
+
+  // 生成新程序行：序号取当前最大值 +1，id 用自定义前缀避免与模板行冲突
+  const maxNo = programs.value.reduce((m, p) => Math.max(m, p.program_no || 0), 0)
+  const newId = `custom-${Date.now()}`
+  const newRow: ProgramRow = {
+    id: newId,
+    program_no: maxNo + 1,
+    program_desc: desc,
+    program_category: addForm.value.category || '常规★',
+    assertions: {},
+    linked_workpapers: addForm.value.linkedWorkpapers.trim(),
+    status: 'pending',
+  }
+  programs.value.push(newRow)
+
+  emit('program-add', { programId: newId, description: desc })
+  addDialogVisible.value = false
+  debounceSave()
 }
 
 function confirmBatchTrim() {

@@ -44,106 +44,26 @@
         <el-descriptions-item label="复核日期">
           {{ preparationInfo.review_date || '—' }}
         </el-descriptions-item>
-        <el-descriptions-item label="会计期间" :span="2">
-          {{ preparationInfo.accounting_period || '—' }}
+        <el-descriptions-item label="索引号" :span="2">
+          {{ preparationInfo.index_no || '—' }}
         </el-descriptions-item>
       </el-descriptions>
     </div>
 
-    <!-- ─── 索引导航表 ─── -->
+    <!-- ─── 底稿架构导航（流程图，取代表格式索引导航） ─── -->
     <div class="gt-b-index__navigation">
       <div class="gt-b-index__navigation-header">
-        <h4 class="gt-b-index__navigation-title">索引导航</h4>
-        <div v-if="!readonly" class="gt-b-index__navigation-actions">
-          <!-- Sprint 4 Task 17.9: 底稿架构折叠按钮 -->
-          <el-button text size="small" @click="archTreeExpanded = !archTreeExpanded" title="底稿架构">
-            🏗️ {{ archTreeExpanded ? '收起' : '底稿架构' }}
-          </el-button>
-          <el-button
-            v-if="selectedRows.length > 0"
-            size="small"
-            type="warning"
-            @click="batchToggleNoPrint"
-          >
-            批量切换"无需打印" ({{ selectedRows.length }})
-          </el-button>
-        </div>
+        <h4 class="gt-b-index__navigation-title">底稿架构</h4>
+        <span class="gt-b-index__navigation-hint">点击程序卡片可跳转至对应底稿</span>
       </div>
 
-      <!-- Sprint 4 Task 17.9: 底稿架构树 -->
       <GtBArchitectureTree
-        v-if="wpId && projectId"
         :wp-id="wpId"
         :project-id="projectId"
-        :expanded="archTreeExpanded"
+        :active-sheet="sheetName"
         :html-data="htmlData"
+        @navigate="handleNavigate"
       />
-
-      <el-table
-        ref="tableRef"
-        :data="navigationRows"
-        border
-        row-key="seq"
-        @selection-change="handleSelectionChange"
-        class="gt-b-index__table"
-      >
-        <!-- 多选列（非只读时显示） -->
-        <el-table-column
-          v-if="!readonly"
-          type="selection"
-          width="40"
-        />
-
-        <!-- 序号 -->
-        <el-table-column
-          label="序号"
-          prop="seq"
-          width="60"
-          align="center"
-          resizable
-        />
-
-        <!-- 内容 -->
-        <el-table-column
-          label="内容"
-          prop="content"
-          min-width="280"
-          resizable
-        />
-
-        <!-- 索引号（GtIndexChip 渲染） -->
-        <el-table-column
-          label="索引号"
-          min-width="160"
-          resizable
-        >
-          <template #default="{ row }">
-            <GtIndexChip
-              v-if="row.index_ref"
-              :value="row.index_ref"
-              @click="handleIndexChipClick(row.index_ref)"
-            />
-            <span v-else class="gt-b-index__empty-ref">—</span>
-          </template>
-        </el-table-column>
-
-        <!-- 无需打印 -->
-        <el-table-column
-          label="无需打印"
-          width="100"
-          align="center"
-          resizable
-        >
-          <template #default="{ row }">
-            <el-switch
-              v-model="row.no_print"
-              :disabled="readonly"
-              size="small"
-              @change="handleNoPrintChange(row)"
-            />
-          </template>
-        </el-table-column>
-      </el-table>
     </div>
   </div>
 </template>
@@ -151,7 +71,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
-import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 
 // ─── Types ───
@@ -195,11 +114,6 @@ const emit = defineEmits<{
 const route = useRoute()
 const preparationInfo = ref<Record<string, string>>({})
 const navigationRows = ref<NavigationRow[]>([])
-const selectedRows = ref<NavigationRow[]>([])
-const tableRef = ref<any>(null)
-
-// Sprint 4 Task 17.9: 底稿架构树展开状态
-const archTreeExpanded = ref(false)
 const projectId = computed(() => (route.params.projectId as string) || '')
 
 // Auto-save debounce
@@ -227,37 +141,9 @@ watch(() => props.htmlData, () => {
 }, { deep: true })
 
 // ─── Methods ───
-function handleSelectionChange(selection: NavigationRow[]) {
-  selectedRows.value = selection
-}
-
-function handleNoPrintChange(_row: NavigationRow) {
-  debounceSave()
-}
-
-function batchToggleNoPrint() {
-  // Toggle: if any selected row has no_print=false, set all to true; otherwise set all to false
-  const anyNotMarked = selectedRows.value.some(r => !r.no_print)
-  const targetValue = anyNotMarked
-
-  selectedRows.value.forEach(selected => {
-    const idx = navigationRows.value.findIndex(r => r.seq === selected.seq)
-    if (idx >= 0) {
-      navigationRows.value[idx].no_print = targetValue
-    }
-  })
-
-  // Clear selection
-  selectedRows.value = []
-  if (tableRef.value) {
-    tableRef.value.clearSelection()
-  }
-
-  debounceSave()
-}
-
-function handleIndexChipClick(indexRef: string) {
-  emit('jump-to-section', indexRef)
+function handleNavigate(sheetName: string) {
+  // 架构图节点点击 → 冒泡给父组件切换 sheet
+  emit('jump-to-section', sheetName)
 }
 
 function debounceSave() {
@@ -296,8 +182,8 @@ onBeforeUnmount(() => {
 
 .gt-b-index__navigation-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
@@ -308,16 +194,8 @@ onBeforeUnmount(() => {
   color: var(--gt-color-text-primary, #303133);
 }
 
-.gt-b-index__navigation-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.gt-b-index__table {
-  width: 100%;
-}
-
-.gt-b-index__empty-ref {
+.gt-b-index__navigation-hint {
+  font-size: 12px;
   color: var(--gt-color-text-tertiary, #909399);
 }
 </style>

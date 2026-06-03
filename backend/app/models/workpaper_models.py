@@ -716,3 +716,52 @@ class SamplingRecord(Base):
     __table_args__ = (
         Index("idx_sampling_records_project_wp", "project_id", "working_paper_id"),
     )
+
+
+# ---------------------------------------------------------------------------
+# WpFormula 模型（自定义底稿公式绑定，独立表）
+# ---------------------------------------------------------------------------
+
+
+class WpFormula(Base):
+    """自定义底稿公式绑定（独立表，custom-workpaper-formula-binding）
+
+    与 V052__wp_formula.sql 三层一致：表名/列名/索引名完全对应。
+    UUID 主键由 ORM 端 default=uuid.uuid4 兜底赋值（DDL 的 gen_random_uuid()
+    仅作裸 SQL 插入兜底），避免 PK 缺 default bug。
+    """
+
+    __tablename__ = "wp_formula"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    wp_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("working_paper.id"), nullable=False
+    )
+    sheet_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    target_cell: Mapped[str] = mapped_column(String(50), nullable=False)
+    expression: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index(
+            "uq_wp_formula_wp_sheet_cell",
+            "wp_id", "sheet_name", "target_cell",
+            unique=True,
+        ),
+        Index("idx_wp_formula_project", "project_id"),
+    )

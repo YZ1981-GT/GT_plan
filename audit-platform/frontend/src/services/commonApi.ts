@@ -369,6 +369,15 @@ export async function applyProcedureScheme(projectId: string, cycle: string, sou
   return data
 }
 
+/** 委派审计程序给执行人（裁剪后分配） */
+export async function assignProcedures(
+  projectId: string,
+  assignments: { procedure_id: string; staff_id: string }[],
+): Promise<{ assigned: number }> {
+  const { data } = await http.put(P_proc.assign(projectId), { assignments })
+  return data
+}
+
 // ── 知识库（全局+项目级） ──
 
 export async function listKnowledgeLibraries(): Promise<any[]> {

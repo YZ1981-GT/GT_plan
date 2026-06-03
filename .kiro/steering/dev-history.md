@@ -2774,3 +2774,38 @@ YG36 重庆医药集团四川物流真实样本导入后发现 `tb_balance` 同 
 - 回收站"删不掉"双根因：①软删除项目需 X-Confirmation-Token（先 POST verify-password 拿 token，by design）②password_confirm._write_audit_log + eqcr_judgment + qc_report_export 三处 `INSERT INTO audit_log` 写的表被 Metabase 共库占用（真实 schema id integer/topic/model 无 action 列）→ UndefinedColumn 污染事务。修=V050 建独立表 app_audit_log + 三处改名 + details 改 CAST(:x AS JSONB)
 - ⚠️ `CREATE TABLE IF NOT EXISTS audit_log` 是 no-op（名被 Metabase 占）；查 to_regclass + information_schema.columns 看真实 schema 才发现
 - 工作台 UI 简陋：WorkpaperWorkbenchView.vue 的 `<style scoped>` 只定义 1 个类，进度卡片 gt-wpb-* 类全无 CSS→无样式堆叠 div。修=补 grid 卡片样式（auto-fill minmax 200px + 紫色 code 徽章 + hover + is-active），用 --gt-* 令牌
+
+
+## 2026-06-03：custom-workpaper-formula-binding spec 落地（编制信息 + 自定义底稿公式）
+
+### 概述
+
+spec `custom-workpaper-formula-binding` tasks 13 组（①~⑧ + PBT/Playwright）全 [x]。两条线：群 A 编制信息表头 workpaper 级共享；群 B 自定义底稿单元格进 address_registry + `wp_formula` 表 + 公式编辑器 WP 选址 + `WP()` 求值。
+
+### 后端
+
+- **V052/R052**：`wp_formula` 表 + `WpFormula` ORM + `wp_formula_service` + `routers/wp_formula.py`（router_registry 已注册）
+- **address_registry**：`extract_custom_cells`（`wp_parsed_data_service` 统一读 parsed_data）；`touch_wp_registry` 扩展至 wp_formula / wp_fine_rules / wp_procedure_status / wp_html_save / wp_user_formulas / working_paper 解析等（**未**覆盖全部 H/J/K 等写路径，依赖 TTL 120s）
+- **working_paper 生成**：`WorkpaperGenerationService.ensure_working_paper`；程序 `assign` + `generate-from-index` 钩子
+- **编制信息**：`_build_preparation_info` + `GET /api/workpapers/{wp_id}/preparation-info`（7 字段， deliberately 无 `accounting_period`）
+- **WP 求值**：`formula_engine.WPExecutor` 单元格地址 `^[A-Z]+\d+$` + `extract_custom_cells` 数据源
+- **URI 修正**：生产 bug `wp://D11#B5` 被解析为 source=`D11#B5` → 规范为 **`wp://{wp_code}/{cell}`**（path 段为 cell）；`formula_ref_to_uri` / `uri_to_formula_ref` 更新，`#` 仅 legacy 回退
+
+### 前端
+
+- `GtWpPreparationHeader.vue` 挂 `GtWpRenderer` 内容区上方（与 GtGridSheet 标题行裁剪分工：网格跳过致同标题行）
+- `componentType=custom`：`derive_component_type` + `wp_render_config` / `wp_classification` 双路径 `_maybe_custom_classifications`；**`sheet_name` 必须 = `wp_code`**（曾误用 `wp_name` 导致编辑器无 cells）
+- `GtCustomWpEditor.vue` + `htmlRendererRegistry` 注册
+- `FormulaEditDialog`：`targetPickerMode` `'wp' | 'report'`；wp 模式表格行点击选址（report 保留期末/期初列）
+
+### 测试（实测证据）
+
+- 后端：`test_custom_wp_formula_full_chain` + `test_extract_custom_cells` + `test_wp_formula_endpoint` + `test_preparation_info` + `test_render_config_custom_component` + P1~P14 PBT 等 ~50 passed（全链 2 skipped：paddle/app.main 冷启动慢）
+- 前端 vitest：`wpFormulaPicker.spec.ts` 4 passed
+- Playwright：`audit-platform/frontend/e2e/custom-workpaper-formula-binding.spec.ts`，`npm run test:e2e:custom-wp`（`PW_API_BASE=http://localhost:9980`）**3 passed**；前置 PG:5432 + 9980 + 3030 + admin/admin123
+
+### 残留 / 非代码缺口
+
+- **生产库**：V052 须 DBA/运维手工执行（本地 docker PG 已验证）
+- **touch_wp_registry 全覆盖**：其余 parsed_data 写路由待补（当前部分路径 + TTL 兜底）
+- requirements 术语表仍可能写旧 `#` URI 格式（实现以 `/` 为准）

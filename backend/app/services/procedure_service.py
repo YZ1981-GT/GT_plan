@@ -23,7 +23,7 @@ class ProcedureService:
         self.db = db
 
     async def get_procedures(self, project_id: UUID, cycle: str) -> list[dict]:
-        """获取该循环的程序列表"""
+        """获取该循环的程序列表（含 wp_id 回填 + 委派人姓名）"""
         q = (
             sa.select(ProcedureInstance)
             .where(
@@ -34,7 +34,52 @@ class ProcedureService:
             .order_by(ProcedureInstance.sort_order)
         )
         rows = (await self.db.execute(q)).scalars().all()
-        return [self._to_dict(r) for r in rows]
+        result = [self._to_dict(r) for r in rows]
+
+        # ── wp_code → wp_id 回填（跳转底稿程序表控制台用）──
+        wp_codes = {r["wp_code"] for r in result if r.get("wp_code")}
+        if wp_codes:
+            wp_map = await self._resolve_wp_ids(project_id, wp_codes)
+            for r in result:
+                if not r.get("wp_id") and r.get("wp_code"):
+                    r["wp_id"] = wp_map.get(r["wp_code"])
+
+        # ── assigned_to → staff 姓名回填（委派显示用）──
+        staff_ids = {r["assigned_to"] for r in result if r.get("assigned_to")}
+        if staff_ids:
+            name_map = await self._resolve_staff_names(staff_ids)
+            for r in result:
+                if r.get("assigned_to"):
+                    r["assigned_to_name"] = name_map.get(r["assigned_to"])
+
+        return result
+
+    async def _resolve_wp_ids(self, project_id: UUID, wp_codes: set[str]) -> dict[str, str]:
+        """按 wp_code 查本项目 working_paper 的 wp_id（JOIN wp_index）。"""
+        from app.models.workpaper_models import WorkingPaper, WpIndex
+        q = (
+            sa.select(WpIndex.wp_code, WorkingPaper.id)
+            .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
+            .where(
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.is_deleted == False,  # noqa: E712
+                WpIndex.is_deleted == False,  # noqa: E712
+                WpIndex.wp_code.in_(wp_codes),
+            )
+        )
+        rows = (await self.db.execute(q)).all()
+        return {code: str(wid) for code, wid in rows}
+
+    async def _resolve_staff_names(self, staff_ids: set[str]) -> dict[str, str]:
+        """按 staff_id 查 staff_members.name。"""
+        from app.models.staff_models import StaffMember
+        try:
+            uuid_ids = [UUID(s) for s in staff_ids]
+        except (ValueError, TypeError):
+            return {}
+        q = sa.select(StaffMember.id, StaffMember.name).where(StaffMember.id.in_(uuid_ids))
+        rows = (await self.db.execute(q)).all()
+        return {str(sid): name for sid, name in rows}
 
     async def init_from_templates(self, project_id: UUID, cycle: str) -> list[dict]:
         """从模板初始化程序实例
@@ -165,15 +210,33 @@ class ProcedureService:
         return updated
 
     async def add_custom(self, project_id: UUID, cycle: str, data: dict) -> dict:
-        """新增自定义程序步骤"""
+        """新增自定义程序步骤
+
+        procedure_code 为 NOT NULL 列；前端可能传 None（key 存在但值为 None），
+        `.get(k, default)` 不会回退 default，故此处显式 `or` 兜底 + 自动编号去重。
+        """
+        # 显式兜底：None / 空串都回退到自动生成编码
+        proc_code = (data.get("procedure_code") or "").strip()
+        if not proc_code:
+            # 统计已有自定义程序数，生成 {cycle}-C{序号}（如 D-C01）
+            existing = (await self.db.execute(
+                sa.select(sa.func.count()).select_from(ProcedureInstance).where(
+                    ProcedureInstance.project_id == project_id,
+                    ProcedureInstance.audit_cycle == cycle,
+                    ProcedureInstance.is_custom == True,  # noqa: E712
+                    ProcedureInstance.is_deleted == False,  # noqa: E712
+                )
+            )).scalar() or 0
+            proc_code = f"{cycle}-C{existing + 1:02d}"
+
         pi = ProcedureInstance(
             project_id=project_id,
             audit_cycle=cycle,
-            procedure_code=data.get("procedure_code", f"CUSTOM-{cycle}"),
+            procedure_code=proc_code,
             procedure_name=data["procedure_name"],
-            sort_order=data.get("sort_order", 999),
+            sort_order=data.get("sort_order") or 999,
             is_custom=True,
-            wp_code=data.get("wp_code"),
+            wp_code=data.get("wp_code") or proc_code,
         )
         self.db.add(pi)
         await self.db.flush()
@@ -181,15 +244,61 @@ class ProcedureService:
 
     async def assign_procedures(self, project_id: UUID, assignments: list[dict]) -> int:
         """批量委派"""
+        from app.models.workpaper_models import WorkingPaper, WpIndex
+        from app.services.workpaper_generation_service import workpaper_generation_service
+
         now = datetime.now(timezone.utc)
         updated = 0
         for a in assignments:
+            proc_id = a["procedure_id"]
             await self.db.execute(
                 sa.update(ProcedureInstance)
-                .where(ProcedureInstance.id == a["procedure_id"])
+                .where(ProcedureInstance.id == proc_id)
                 .values(assigned_to=a["staff_id"], assigned_at=now)
             )
             updated += 1
+
+            proc = (
+                await self.db.execute(
+                    sa.select(ProcedureInstance).where(ProcedureInstance.id == proc_id)
+                )
+            ).scalar_one_or_none()
+            if not proc or not proc.is_custom or not proc.wp_code:
+                continue
+
+            wp_index = (
+                await self.db.execute(
+                    sa.select(WpIndex).where(
+                        WpIndex.project_id == project_id,
+                        WpIndex.wp_code == proc.wp_code,
+                        WpIndex.is_deleted == False,  # noqa: E712
+                    )
+                )
+            ).scalar_one_or_none()
+            if wp_index is None:
+                continue
+
+            has_wp = (
+                await self.db.execute(
+                    sa.select(sa.func.count())
+                    .select_from(WorkingPaper)
+                    .where(
+                        WorkingPaper.project_id == project_id,
+                        WorkingPaper.wp_index_id == wp_index.id,
+                        WorkingPaper.is_deleted == False,  # noqa: E712
+                    )
+                )
+            ).scalar()
+            if not has_wp:
+                wp = await workpaper_generation_service.ensure_working_paper(
+                    self.db, project_id, wp_index.id
+                )
+                await self.db.execute(
+                    sa.update(ProcedureInstance)
+                    .where(ProcedureInstance.id == proc_id)
+                    .values(wp_id=wp.id)
+                )
+
         await self.db.flush()
         return updated
 
@@ -279,4 +388,5 @@ class ProcedureService:
             "assigned_to": str(p.assigned_to) if p.assigned_to else None,
             "execution_status": p.execution_status,
             "wp_code": p.wp_code,
+            "wp_id": str(p.wp_id) if p.wp_id else None,
         }

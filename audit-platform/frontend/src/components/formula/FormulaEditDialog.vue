@@ -380,7 +380,40 @@
       <div style="margin-bottom: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">
         💡 点击表格中的单元格，将其设为公式的写入目标位置
       </div>
+      <!-- 自定义底稿：单元格 + 说明，整行可点选 -->
       <el-table
+        v-if="targetPickerMode === 'wp'"
+        :data="targetPickerRows"
+        border
+        size="small"
+        max-height="55vh"
+        highlight-current-row
+        :header-cell-style="{ background: '#f0edf5', whiteSpace: 'nowrap', fontSize: '12px' }"
+        style="width: 100%; cursor: pointer;"
+        @row-click="handleWpTargetRowClick"
+      >
+        <el-table-column label="#" width="50" align="center">
+          <template #default="{ $index }">
+            <span style="color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs);">{{ $index + 1 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="单元格" width="120">
+          <template #default="{ row }">
+            <span
+              class="gt-fe-target-cell"
+              :class="{ 'gt-fe-target-cell-selected': targetSelectedCell === String(row[0]) }"
+            >{{ row[0] }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="说明" min-width="200">
+          <template #default="{ row }">
+            <span style="font-size: var(--gt-font-size-xs);">{{ row[1] }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <!-- 报表行：行次 + 期末/期初列点选 -->
+      <el-table
+        v-else
         :data="targetPickerRows"
         border
         size="small"
@@ -441,9 +474,15 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
+import type { WpFormulaContext } from '@/components/workpaper/GtCustomWpEditor.vue'
+import { filterWpBrowserRows, mapRegistryToPickerRows } from '@/utils/wpFormulaPicker'
+
+const route = useRoute()
 
 interface FormulaItem {
   expression: string
@@ -458,11 +497,14 @@ const props = defineProps<{
   row: any
   sourceRows?: any[]
   applicableStandard?: string
+  projectId?: string
+  year?: number
+  wpContext?: WpFormulaContext
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [val: boolean]
-  'save': [data: { formula: string; category: string; description: string }]
+  'save': [data: { formula: string; category: string; description: string; target_cell?: string }]
 }>()
 
 const visible = computed({
@@ -759,21 +801,23 @@ async function openSourceBrowserForNote() {
   }
 }
 
-// ── 底稿浏览 ──
-async function openSourceBrowserForWP() {
-  sourceBrowserTitle.value = '底稿列表'
-  sourceBrowserSearch.value = ''
-  showSourceBrowser.value = true
-  sourceBrowserLoading.value = true
+function resolveProjectId(): string {
+  return props.projectId || (route.params.projectId as string) || ''
+}
+
+function resolveYear(): number {
+  return props.year ?? new Date().getFullYear()
+}
+
+async function loadWorkingPapersFallback() {
+  sourceBrowserTitle.value = '底稿列表（标准列）'
   sourceBrowserRefBuilder.value = (r: any) => {
     const code = r.wp_code || r.row_code || ''
     return `WP('${code}','审定数')`
   }
   try {
-    const resp = await api.get('/api/working-papers', {
-      validateStatus: (s: number) => s < 600,
-    })
-    const items = resp?.data ?? resp ?? []
+    const resp = await api.get('/api/working-papers')
+    const items = (resp as any)?.items ?? (Array.isArray(resp) ? resp : [])
     sourceBrowserRows.value = items.map((r: any) => ({
       row_code: r.wp_code || '',
       row_name: r.wp_name || r.name || '',
@@ -781,8 +825,41 @@ async function openSourceBrowserForWP() {
       formula: '',
       _ref: sourceBrowserRefBuilder.value(r),
     }))
+    if (!sourceBrowserRows.value.length) {
+      ElMessage.info('地址注册表暂无条目，已回退底稿列表也为空')
+    }
   } catch {
     sourceBrowserRows.value = []
+  }
+}
+
+// ── 底稿浏览（地址注册表 WP 域，失败则降级） ──
+async function openSourceBrowserForWP() {
+  sourceBrowserTitle.value = '底稿单元格'
+  sourceBrowserSearch.value = ''
+  showSourceBrowser.value = true
+  sourceBrowserLoading.value = true
+  sourceBrowserRefBuilder.value = (r: any) =>
+    r._ref || `WP('${r.row_code || ''}','审定数')`
+  const pid = resolveProjectId()
+  if (!pid) {
+    await loadWorkingPapersFallback()
+    sourceBrowserLoading.value = false
+    return
+  }
+  try {
+    const resp = await api.get<{ items?: any[]; total?: number }>('/api/address-registry', {
+      params: { project_id: pid, year: resolveYear(), domain: 'wp', limit: 5000 },
+    })
+    const items = resp?.items ?? (Array.isArray(resp) ? resp : [])
+    sourceBrowserRows.value = mapRegistryToPickerRows(items, (e) =>
+      sourceBrowserRefBuilder.value({ row_code: e.wp_code, cell: e.cell }),
+    )
+    if (!sourceBrowserRows.value.length) {
+      await loadWorkingPapersFallback()
+    }
+  } catch {
+    await loadWorkingPapersFallback()
   } finally {
     sourceBrowserLoading.value = false
   }
@@ -792,19 +869,25 @@ function onSave() {
   const validFormulas = formulas.value.filter(f => f.expression.trim())
   if (!validFormulas.length) {
     const first = formulas.value[0]
-    emit('save', { formula: '', category: first?.category || 'auto_calc', description: first?.description || '' })
+    emit('save', {
+      formula: '',
+      category: first?.category || 'auto_calc',
+      description: first?.description || '',
+      target_cell: first?.target_cell,
+    })
   } else if (validFormulas.length === 1) {
     emit('save', {
       formula: validFormulas[0].expression,
       category: validFormulas[0].category,
       description: validFormulas[0].description,
+      target_cell: validFormulas[0].target_cell,
     })
   } else {
-    // 多条公式用换行拼接，分类取第一条的
     emit('save', {
       formula: validFormulas.map(f => f.expression).join('\n'),
       category: validFormulas[0].category,
       description: validFormulas.map(f => f.description || f.expression.substring(0, 30)).join('；'),
+      target_cell: validFormulas[0].target_cell,
     })
   }
   visible.value = false
@@ -825,13 +908,9 @@ const sourceBrowserLoading = ref(false)
 const sourceBrowserSearch = ref('')
 const sourceBrowserRefBuilder = ref<(r: any) => string>(() => '')
 
-const filteredBrowserRows = computed(() => {
-  const kw = sourceBrowserSearch.value.toLowerCase()
-  if (!kw) return sourceBrowserRows.value
-  return sourceBrowserRows.value.filter((r: any) =>
-    (r.row_code || '').toLowerCase().includes(kw) || (r.row_name || '').toLowerCase().includes(kw)
-  )
-})
+const filteredBrowserRows = computed(() =>
+  filterWpBrowserRows(sourceBrowserRows.value, sourceBrowserSearch.value),
+)
 
 function onBrowserRowClick(row: any) {
   const idx = activeFormulaIdx.value
@@ -874,24 +953,51 @@ const targetSelectedCell = ref('')
 const targetSelectedLabel = ref('')
 const targetFormulaIdx = ref(0)
 const targetPickerRawRows = ref<any[]>([])
+const targetPickerMode = ref<'wp' | 'report'>('report')
+
+function handleWpTargetRowClick(row: unknown) {
+  const cells = row as unknown[]
+  const idx = targetPickerRows.value.findIndex((r) => r[0] === cells[0])
+  if (idx >= 0) onTargetCellClick(idx, 0, null)
+}
 
 function openTargetPicker(idx: number) {
   targetFormulaIdx.value = idx
   const r = props.row
   if (r?.row_code && !r.row_code.startsWith('CUSTOM')) {
-    // 报表行——目标就是当前行本身
     const f = formulas.value[idx]
     f.target_cell = `${r.row_code} ${r.row_name}`
     return
   }
-  // 自定义公式——弹出表格让用户选择目标行
+  if (props.wpContext?.cells?.length) {
+    targetPickerTitle.value = '选择公式写入的目标单元格'
+    targetSelectedCell.value = ''
+    targetSelectedLabel.value = ''
+    loadWpCellTargetRows()
+    return
+  }
   targetPickerTitle.value = '选择公式写入的目标行'
   targetSelectedCell.value = ''
   targetSelectedLabel.value = ''
   loadTargetRows()
 }
 
+function loadWpCellTargetRows() {
+  targetPickerMode.value = 'wp'
+  showTargetPicker.value = true
+  targetPickerLoading.value = false
+  const ctx = props.wpContext!
+  targetPickerHeaders.value = ['单元格', '说明']
+  targetPickerRows.value = ctx.cells.map((c) => [c.cell, c.label])
+  targetPickerRawRows.value = ctx.cells.map((c) => ({
+    row_code: c.cell,
+    row_name: c.label,
+    sheet_name: ctx.sheetName,
+  }))
+}
+
 async function loadTargetRows() {
+  targetPickerMode.value = 'report'
   showTargetPicker.value = true
   targetPickerLoading.value = true
   try {
@@ -920,7 +1026,13 @@ async function loadTargetRows() {
 const periodLabels: Record<number, string> = { 2: '期末', 3: '期初' }
 
 function onTargetCellClick(ri: number, ci: number, _cell: any) {
-  // 只允许点击期末(ci=2)或期初(ci=3)列
+  if (props.wpContext?.cells?.length) {
+    const raw = targetPickerRawRows.value[ri]
+    if (!raw) return
+    targetSelectedCell.value = raw.row_code || ''
+    targetSelectedLabel.value = `${raw.row_code} ${raw.row_name || ''}`.trim()
+    return
+  }
   if (ci < 2) return
   targetSelectedCell.value = `R${ri}C${ci}`
   const raw = targetPickerRawRows.value[ri]

@@ -399,6 +399,8 @@
       :row="editingRow"
       :source-rows="currentRows"
       :applicable-standard="`${fmTemplateType}_standalone`"
+      :project-id="props.projectId"
+      :year="props.year"
       @save="onFormulaEditSave"
     />
 

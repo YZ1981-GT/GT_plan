@@ -17,6 +17,25 @@ import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import GtAProgramConsole from '../GtAProgramConsole.vue'
 
+// Mock vue-router useRoute（组件用 route.params.projectId 派生 projectId）
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ params: { projectId: 'proj-001' } }),
+}))
+
+// Mock useWpOnboardingGuide（避免引导逻辑依赖）
+vi.mock('@/composables/useWpOnboardingGuide', () => ({
+  useWpOnboardingGuide: () => ({
+    showGuide: { value: false },
+    guideSteps: { value: [] },
+    triggerGuide: vi.fn(),
+  }),
+}))
+
+// Mock GtAuditFlowGraph（子组件依赖 API，测试中 stub 掉）
+vi.mock('@/components/workpaper/GtAuditFlowGraph.vue', () => ({
+  default: { name: 'GtAuditFlowGraph', template: '<div class="gt-audit-flow-graph-mock" />' },
+}))
+
 // Mock GtIndexChip
 vi.mock('@/components/workpaper/GtIndexChip.vue', () => ({
   default: {
@@ -451,5 +470,81 @@ describe('GtAProgramConsole — readonly 模式', () => {
     const buttons = wrapper.findAll('.el-button')
     const batchBtn = buttons.find(b => b.text().includes('批量裁剪'))
     expect(batchBtn).toBeUndefined()
+  })
+})
+
+describe('GtAProgramConsole — 新增程序', () => {
+  it('确认新增后追加程序行 + emit program-add', async () => {
+    const wrapper = mount(GtAProgramConsole, {
+      props: {
+        wpId: 'wp-001',
+        sheetName: '应收账款实质性程序表D2A',
+        schema: {},
+        htmlData: createMockHtmlData(),
+      },
+      global: { stubs: globalStubs },
+    })
+
+    const vm = wrapper.vm as any
+    const beforeCount = vm.programs.length
+    vm.openAddDialog()
+    await nextTick()
+    expect(vm.addDialogVisible).toBe(true)
+
+    vm.addForm = { desc: '新增专项核查程序', category: '备选', linkedWorkpapers: 'D2-9' }
+    vm.confirmAdd()
+    await nextTick()
+
+    expect(vm.programs.length).toBe(beforeCount + 1)
+    const last = vm.programs[vm.programs.length - 1]
+    expect(last.program_desc).toBe('新增专项核查程序')
+    expect(last.program_category).toBe('备选')
+    expect(last.linked_workpapers).toBe('D2-9')
+    expect(last.status).toBe('pending')
+    // 序号递增（取当前最大 +1）
+    expect(last.program_no).toBe(5)
+    expect(vm.addDialogVisible).toBe(false)
+
+    const emitted = wrapper.emitted('program-add')
+    expect(emitted).toBeDefined()
+    expect(emitted![0][0]).toMatchObject({ description: '新增专项核查程序' })
+  })
+
+  it('空描述不允许新增', async () => {
+    const wrapper = mount(GtAProgramConsole, {
+      props: {
+        wpId: 'wp-001',
+        sheetName: '应收账款实质性程序表D2A',
+        schema: {},
+        htmlData: createMockHtmlData(),
+      },
+      global: { stubs: globalStubs },
+    })
+
+    const vm = wrapper.vm as any
+    const beforeCount = vm.programs.length
+    vm.addForm = { desc: '   ', category: '常规★', linkedWorkpapers: '' }
+    vm.confirmAdd()
+    await nextTick()
+
+    expect(vm.programs.length).toBe(beforeCount)
+    expect(wrapper.emitted('program-add')).toBeUndefined()
+  })
+
+  it('readonly 模式下不显示新增程序按钮', () => {
+    const wrapper = mount(GtAProgramConsole, {
+      props: {
+        wpId: 'wp-001',
+        sheetName: '应收账款实质性程序表D2A',
+        schema: {},
+        htmlData: createMockHtmlData(),
+        readonly: true,
+      },
+      global: { stubs: globalStubs },
+    })
+
+    const buttons = wrapper.findAll('.el-button')
+    const addBtn = buttons.find(b => b.text().includes('新增程序'))
+    expect(addBtn).toBeUndefined()
   })
 })

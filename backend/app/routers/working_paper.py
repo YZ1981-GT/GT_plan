@@ -414,6 +414,10 @@ async def save_univer_data(
 
     await db.commit()
 
+    from app.services.wp_parsed_data_service import touch_after_parsed_data_commit
+
+    await touch_after_parsed_data_commit(wp, source="univer_save", project_id=project_id)
+
     # 获取索引信息
     idx_result = await db.execute(
         sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
@@ -1033,7 +1037,19 @@ async def parse_workpaper(
     """
     from app.services.prefill_engine import parse_workpaper_real
     result = await parse_workpaper_real(db=db, project_id=project_id, wp_id=wp_id, dry_run=dry_run)
-    if not dry_run:
+    if not dry_run and result.get("status") == "ok":
+        await db.commit()
+        try:
+            from app.services.wp_parsed_data_service import touch_wp_registry
+
+            await touch_wp_registry(project_id)
+        except Exception as exc:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "touch_wp_registry after parse: %s", exc
+            )
+    elif not dry_run:
         await db.commit()
     return result
 

@@ -119,6 +119,7 @@
 | `consol-note-three-level-drilldown/` | 📌 | 合并附注三级穿透；前置 = 真实合并母子项目数据（PG 当前 0 个 consolidated 项目）；待并入 Phase 3 |
 | `formula-engine-unification/` | ✅ | 4 套报表公式求值器→单内核 + 审计收口哈希链；4 阶段 19 任务全部完成；Q1~Q5 PBT 全绿；剩 Task 19 Playwright 待环境 |
 | `report-config-baseline/` | ✅ | 报表配置主模板回填 + 克隆项目 stale 联动；3 阶段 11 任务完成；E1~E4 PBT 全绿；ADR-REPORT-CONFIG-001；剩 Task 11 Playwright 待环境 |
+| `custom-workpaper-formula-binding/` | ✅ | 编制信息表头 + 自定义底稿公式（V052 `wp_formula`、保存求值写回、`wp_formula_linkage`、router touch）；URI `wp://{wp_code}/{cell}`；pytest 44/2skip + Playwright 3 + vitest 4（2026-06-03）；三件套已对齐；残留=生产 V052 手工迁移+service 裸 SQL touch 未接 |
 
 > 注：`workpaper-fill-service-split` 已 `git rm`（目标 WorkpaperFillService 经 grep 实证为 0 业务调用方的死代码，拆分无意义）；`gt-c-note-table-shrink` 已于 2026-05-30 完成并归档至 07-workpaper-slimdown（GtCNoteTable 1803→450 + GtEControlTest 1414→344，90 测试全绿；残留 R3 Playwright 目视待环境，非代码缺口）。
 > 注（2026-05-31）：merge work 分支带入 13 个底稿 spec 的 active 双份残留，经代码实证全部完成度 100%，已 `git rm` 删除 active 残留，仅保留 `_archive/` 权威版。

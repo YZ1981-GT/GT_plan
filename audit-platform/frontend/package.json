@@ -15,7 +15,8 @@
     "lint:fix": "eslint --ext .vue,.ts,.js src/ --fix",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
-    "test:e2e:wp": "playwright test e2e/workpaper-editor-loading.spec.ts e2e/workpaper-e1-cash-optimization.spec.ts"
+    "test:e2e:wp": "playwright test e2e/workpaper-editor-loading.spec.ts e2e/workpaper-e1-cash-optimization.spec.ts",
+    "test:e2e:custom-wp": "playwright test e2e/custom-workpaper-formula-binding.spec.ts"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",

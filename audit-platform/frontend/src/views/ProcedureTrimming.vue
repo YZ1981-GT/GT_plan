@@ -101,6 +101,28 @@
           </template>
         </el-table-column>
         <el-table-column prop="wp_code" label="关联底稿" width="100" resizable />
+        <el-table-column label="委派执行人" width="160" align="center">
+          <template #default="{ row }">
+            <el-select
+              v-if="row._applicable"
+              v-model="row.assigned_to"
+              placeholder="选择执行人"
+              size="small"
+              clearable
+              filterable
+              style="width: 100%"
+              @change="onAssigneeChange(row)"
+            >
+              <el-option
+                v-for="m in teamMembers"
+                :key="m.staff_id"
+                :label="m.staff_name + (m.role_label ? ` (${m.role_label})` : '')"
+                :value="m.staff_id"
+              />
+            </el-select>
+            <span v-else class="gt-proc-text-muted">—</span>
+          </template>
+        </el-table-column>
         <el-table-column label="来源" width="80" align="center">
           <template #default="{ row }">
             <el-tag size="small" :type="row.is_custom ? 'success' : 'info'">
@@ -108,8 +130,24 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="70" align="center" fixed="right">
+        <el-table-column label="操作" width="150" align="center" fixed="right">
           <template #default="{ row }">
+            <el-button
+              v-if="row._applicable && row.wp_id"
+              size="small"
+              text
+              type="primary"
+              @click="enterProgramConsole(row)"
+            >
+              程序裁剪 ›
+            </el-button>
+            <el-tooltip
+              v-else-if="row._applicable && !row.wp_id"
+              content="该程序底稿尚未生成，请先生成底稿"
+              placement="top"
+            >
+              <el-button size="small" text disabled>未生成</el-button>
+            </el-tooltip>
             <el-button v-if="row.is_custom" size="small" text type="danger" @click="removeCustom(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -118,7 +156,7 @@
 
     <!-- 底部提示 -->
     <div class="gt-proc-footer-tip">
-      💡 保存后，"保留执行"的程序将作为待执行底稿库，可在委派矩阵中分配给团队成员开始项目
+      💡 双层裁剪：此处粗筛底稿是否执行 + 委派执行人；点「程序裁剪 ›」进入底稿程序表控制台对每条审计程序细裁。保存后保留执行的程序即进入待执行底稿库。
     </div>
 
     <!-- 新增自定义程序弹窗 -->
@@ -147,7 +185,7 @@
             </el-button>
           </div>
           <div style="font-size: 11px; color: var(--gt-color-text-tertiary); margin-top: 6px">
-            下载空白模板包含：编制要求说明 + 数据表（预填试算表科目余额）
+            下载空白模板包含：编制要求说明 + 数据表（顶部编制信息表头已自动配齐：被审计单位/编制人/复核人/截止日/索引号，并预填试算表科目余额）
           </div>
         </el-form-item>
       </el-form>
@@ -228,16 +266,19 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getProcedures, updateProcedureTrim, initProcedures,
   addCustomProcedure, applyProcedureScheme, listProjects,
+  assignProcedures,
 } from '@/services/commonApi'
+import { listAssignments } from '@/services/staffApi'
 import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
+const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 
 const cycles = [
@@ -262,6 +303,7 @@ const smartTrimCycles = ref<string[]>([])
 const refProjectId = ref('')
 const projectOptions = ref<any[]>([])
 const statsFilter = ref('') // '' | 'execute' | 'trimmed' | 'custom'
+const teamMembers = ref<{ staff_id: string; staff_name: string; role_label?: string }[]>([])
 let originalSnapshot: any[] = [] // 用于恢复初始状态
 
 const filteredProcedures = computed(() => {
@@ -293,6 +335,8 @@ async function loadProcedures() {
       ...p,
       _applicable: p.status !== 'not_applicable' && p.status !== 'skip',
       is_custom: p.is_custom || p.source === 'custom',
+      assigned_to: p.assigned_to || null,
+      wp_id: p.wp_id || null,
     }))
     // 保存初始快照用于恢复
     originalSnapshot = JSON.parse(JSON.stringify(procedures.value))
@@ -445,6 +489,49 @@ function removeCustom(row: any) {
   if (idx >= 0) procedures.value.splice(idx, 1)
 }
 
+// 加载项目团队成员（委派候选人）
+async function loadTeamMembers() {
+  try {
+    const list = await listAssignments(projectId.value)
+    const ROLE_LABELS: Record<string, string> = {
+      partner: '合伙人', signing_partner: '签字合伙人', manager: '项目经理',
+      auditor: '审计员', reviewer: '复核', eqcr: 'EQCR',
+    }
+    teamMembers.value = (Array.isArray(list) ? list : [])
+      .filter((a: any) => a.staff_id)
+      .map((a: any) => ({
+        staff_id: a.staff_id,
+        staff_name: a.staff_name || a.staff_id.slice(0, 8),
+        role_label: ROLE_LABELS[a.role] || a.role || '',
+      }))
+  } catch {
+    teamMembers.value = []
+  }
+}
+
+// 委派执行人变更 → 立即持久化
+async function onAssigneeChange(row: any) {
+  if (!row.id) return
+  try {
+    await assignProcedures(projectId.value, [{ procedure_id: row.id, staff_id: row.assigned_to }])
+    const member = teamMembers.value.find(m => m.staff_id === row.assigned_to)
+    ElMessage.success(row.assigned_to ? `已委派给 ${member?.staff_name || '执行人'}` : '已取消委派')
+  } catch (e: any) {
+    handleApiError(e, '委派')
+  }
+}
+
+// 进入该底稿的程序表控制台做逐条程序裁剪
+function enterProgramConsole(row: any) {
+  if (!row.wp_id) {
+    ElMessage.warning('该程序底稿尚未生成，请先生成底稿')
+    return
+  }
+  router.push({
+    path: `/projects/${projectId.value}/workpapers/${row.wp_id}/edit`,
+  })
+}
+
 // 智能裁剪
 function onSmartTrim() {
   showSmartTrimDialog.value = true
@@ -519,6 +606,7 @@ async function applyRef() {
 
 onMounted(async () => {
   await loadProcedures()
+  await loadTeamMembers()
   try {
     const list = await listProjects()
     projectOptions.value = Array.isArray(list) ? list : []

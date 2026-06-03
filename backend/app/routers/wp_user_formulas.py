@@ -325,6 +325,13 @@ async def update_user_formulas(
 
     await db.commit()
 
+    try:
+        from app.services.wp_parsed_data_service import touch_wp_registry
+
+        await touch_wp_registry(wp.project_id)
+    except Exception as e:
+        logger.warning("touch_wp_registry after user-formulas: %s", e)
+
     return {
         "wp_id": str(wp_id),
         "updated": updated,
@@ -380,6 +387,13 @@ async def restore_preset_formula(
         logger.warning("底稿公式审计留痕写入失败: %s", e)
 
     await db.commit()
+
+    try:
+        from app.services.wp_parsed_data_service import touch_wp_registry
+
+        await touch_wp_registry(wp.project_id)
+    except Exception as e:
+        logger.warning("touch_wp_registry after user-formulas delete: %s", e)
 
     return {
         "wp_id": str(wp_id),

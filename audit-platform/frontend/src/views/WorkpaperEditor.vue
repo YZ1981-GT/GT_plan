@@ -500,7 +500,19 @@ provide(EDITOR_CONTEXT_KEY, {
 
 // ─── Event handlers ─────────────────────────────────────────────────────────
 
-function onChildSaved() {
+function onChildSaved(payload?: { sheet_name: string; html_data: Record<string, any>; schema_version?: string }) {
+  // HTML 渲染器（A~E 类）保存：持久化 html_data 到后端 parsed_data
+  // （Univer/子编辑器走自身保存通道，调用本函数时不带 payload，仅刷新）
+  if (payload && payload.sheet_name) {
+    httpApi.post(`/api/workpapers/${wpId.value}/save`, {
+      sheet_name: payload.sheet_name,
+      html_data: payload.html_data,
+      schema_version: payload.schema_version || 'v2025-R5',
+    }).catch((e) => {
+      // 保存失败不阻断 UI，记录告警
+      console.warn('[WorkpaperEditor] HTML 底稿保存失败:', e)
+    })
+  }
   eventBus.emit('workpaper:saved', {
     projectId: projectId.value,
     wpId: wpId.value,

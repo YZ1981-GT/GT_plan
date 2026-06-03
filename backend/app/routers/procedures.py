@@ -225,17 +225,42 @@ async def download_blank_template(
     # 获取项目年度（防御性）
     from datetime import datetime
     year = datetime.now().year - 1
+    entity_name = ""
+    period_end = ""
+    preparer_name = ""
+    reviewer_name = ""
     try:
         from app.models.core import Project
         proj = (await db.execute(sa.select(Project).where(Project.id == project_id))).scalar_one_or_none()
         if proj:
+            entity_name = getattr(proj, "name", "") or ""
+            pe = getattr(proj, "audit_period_end", None)
+            if pe:
+                period_end = str(pe)[:10]
+                year = int(str(pe)[:4])
             ws = getattr(proj, 'wizard_state', None)
             if isinstance(ws, dict):
                 y = ws.get("steps", {}).get("basic_info", {}).get("data", {}).get("audit_year")
                 if y:
                     year = int(y)
     except Exception as e:
-        log.warning("blank-template: 获取项目年度失败: %s", e)
+        log.warning("blank-template: 获取项目信息失败: %s", e)
+
+    # 获取编制人/复核人（项目派单人员）
+    try:
+        staff_q = sa.text("""
+            SELECT pa.role, s.name FROM project_assignments pa
+            JOIN staff_members s ON s.id = pa.staff_id
+            WHERE pa.project_id = :pid AND pa.role IN ('preparer','auditor','reviewer','manager')
+        """)
+        staff_rows = (await db.execute(staff_q, {"pid": str(project_id)})).all()
+        for role, name in staff_rows:
+            if role in ("preparer", "auditor") and not preparer_name:
+                preparer_name = name or ""
+            elif role in ("reviewer", "manager") and not reviewer_name:
+                reviewer_name = name or ""
+    except Exception as e:
+        log.warning("blank-template: 获取编制/复核人失败: %s", e)
 
     # 获取试算表余额
     tb_rows = []
@@ -290,10 +315,11 @@ async def download_blank_template(
         ("记录审计程序的执行过程、获取的审计证据和形成的审计结论。", ""),
         ("", ""),
         ("二、编制要求", "section"),
-        ("1. 在「数据表」sheet 中填写审计程序执行结果", ""),
-        ("2. 科目余额已从试算表预填（未审数/审定数），请勿修改", ""),
-        ("3. 需要填写的列：审计程序描述、执行结果、审计结论、发现问题", ""),
-        ("4. 如有调整建议，请在「调整建议」列填写金额和方向", ""),
+        ("1. 「数据表」顶部为编制信息表头（被审计单位/编制人/复核人/截止日/索引号），已自动配齐，编制/复核人及日期请签署", ""),
+        ("2. 在表头下方的明细区填写审计程序执行结果", ""),
+        ("3. 科目余额已从试算表预填（未审数/审定数），请勿修改", ""),
+        ("4. 需要填写的列：审计程序描述、执行结果、审计结论、发现问题", ""),
+        ("5. 如有调整建议，请在「调整建议」列填写金额和方向", ""),
         ("", ""),
         ("三、数据表字段说明", "section"),
         ("• 科目编码：标准科目编码（自动填充）", ""),
@@ -325,17 +351,37 @@ async def download_blank_template(
 
     # ─── Sheet 2: 数据表 ───
     ws2 = wb.create_sheet("数据表")
-    headers = ["科目编码", "科目名称", "未审余额", "审定余额", "审计程序", "执行结果", "审计结论", "调整建议", "备注"]
     header_fill = PatternFill(start_color="F4F0FA", end_color="F4F0FA", fill_type="solid")
+    label_font = Font(bold=True, size=10, color="4B2D77")
+
+    # ── 编制信息表头（自动配齐，从项目信息填充）──
+    # 索引号 = procedure_code（自定义程序编码）；空值留「—」供编制人手填
+    prep_info = [
+        ("被审计单位", entity_name or "—", "截止日", period_end or "—"),
+        ("编制人", preparer_name or "—", "编制日期", "—"),
+        ("复核人", reviewer_name or "—", "复核日期", "—"),
+        ("索引号", "—", "审计循环", f"{cycle} {cycle_name}"),
+    ]
+    for r, (l1, v1, l2, v2) in enumerate(prep_info, 1):
+        c1 = ws2.cell(row=r, column=1, value=l1); c1.font = label_font; c1.fill = header_fill; c1.border = thin_border
+        c2 = ws2.cell(row=r, column=2, value=v1); c2.border = thin_border
+        ws2.merge_cells(start_row=r, start_column=2, end_row=r, end_column=4)
+        c3 = ws2.cell(row=r, column=5, value=l2); c3.font = label_font; c3.fill = header_fill; c3.border = thin_border
+        c4 = ws2.cell(row=r, column=6, value=v2); c4.border = thin_border
+        ws2.merge_cells(start_row=r, start_column=6, end_row=r, end_column=9)
+
+    # ── 审计程序明细表头（编制信息下方）──
+    data_header_row = len(prep_info) + 2  # 空 1 行
+    headers = ["科目编码", "科目名称", "未审余额", "审定余额", "审计程序", "执行结果", "审计结论", "调整建议", "备注"]
     for col, h in enumerate(headers, 1):
-        c = ws2.cell(row=1, column=col, value=h)
+        c = ws2.cell(row=data_header_row, column=col, value=h)
         c.font = Font(bold=True, size=11)
         c.fill = header_fill
         c.alignment = Alignment(horizontal="center")
         c.border = thin_border
 
     # 预填试算表余额
-    row_idx = 2
+    row_idx = data_header_row + 1
     for code, unadj, audited, aje, rje in tb_rows:
         if not code:
             continue
@@ -358,8 +404,8 @@ async def download_blank_template(
         row_idx += 1
 
     # 如果没有试算表数据，留 20 行空行
-    if row_idx == 2:
-        for r in range(2, 22):
+    if row_idx == data_header_row + 1:
+        for r in range(data_header_row + 1, data_header_row + 21):
             for col in range(1, 10):
                 ws2.cell(row=r, column=col).border = thin_border
 
@@ -372,7 +418,8 @@ async def download_blank_template(
     ws2.column_dimensions["G"].width = 20
     ws2.column_dimensions["H"].width = 14
     ws2.column_dimensions["I"].width = 20
-    ws2.freeze_panes = "A2"
+    # 冻结编制信息表头 + 明细表头（数据从 data_header_row+1 起滚动）
+    ws2.freeze_panes = f"A{data_header_row + 1}"
 
     # ─── Sheet 3: 科目参考 ───
     ws3 = wb.create_sheet("科目参考")

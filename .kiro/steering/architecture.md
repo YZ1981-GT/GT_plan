@@ -385,6 +385,7 @@ where.append(sa.or_(loss_gain_active, other_active))
 - 预填充双路径：生成时用 `prefill_formula_mapping.json`（119 条语义映射）；编辑时扫 xlsx 内嵌 `=TB()/=WP()` 公式执行
 - 公式引擎类型 10 种：TB / SUM_TB / WP / AUX / PREV / ADJ / LEDGER / NOTE / TB_AUX / LEDGER_DETAIL
 - 地址坐标 URI 格式：`{wp_code}:{sheet_name}:{label}`（语义描述稳定标识，物理坐标运行时动态解析）
+- **自定义底稿公式（2026-06-03，`custom-workpaper-formula-binding`）**：持久化表 `wp_formula`（V052，`wp_formula_service`+`wp_formula` router）；`extract_custom_cells` 从 `parsed_data`（html_data[sheet].cells + 扁平）注册 address_registry **WP 域**；公式引用 URI **`wp://{wp_code}/{cell}`**（`wp_formula_service` 往返，legacy `#` 仍解析）；`WPExecutor` 对自定义 sheet 用 Excel 坐标 `^[A-Z]+\d+$` 直读 cell；`WorkpaperGenerationService.ensure_working_paper` 在程序指派/手动 generate-from-index 触发；`componentType=custom`→`GtCustomWpEditor`（classification/render-config 双路径，`sheet_name=wp_code`）；编制信息 `GET /api/workpapers/{wp_id}/preparation-info` + `GtWpPreparationHeader`（无 accounting_period）；registry 失效 `touch_wp_registry` 已接部分写路径（公式/精细化规则/程序状态等），非全量
 - 全局联动：Unified Linkage Bus + 统一依赖图 46K 节点 / 36K 边 + Stale Propagation Engine BFS（spec 三件套已完成）
 
 ## 关键 PG 事实

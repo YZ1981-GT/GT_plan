@@ -133,3 +133,6 @@ pytest_junit.xml
 fullrun_result.txt
 smoke-test-*.png
 backend/.coverage
+
+# CodeGraph 本地索引（机器本地，不入库）
+.codegraph/

@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "自动续跑 Spec 任务",
+  "description": "每当 Agent 停止时，自动检查正在执行的 spec 任务清单（tasks.md）。若仍有未完成的必做任务（[ ] 且无 * 标记），且本会话处于 run all tasks 模式，则自动继续执行下一个任务并在报错时修复重试；全部完成则不做任何动作。",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "检查本会话是否正处于\"run all tasks / 执行 spec 全部任务\"模式。如果不是（即用户最近的请求与执行 spec 任务无关，或没有正在跑的 tasks.md），则什么都不做，直接结束。\n\n如果是 run all tasks 模式：\n1. 读取正在执行的 spec 的 tasks.md（如 .kiro/specs/custom-workpaper-formula-binding/tasks.md）\n2. 找出所有未完成的必做任务：复选框为 [ ]（空格）且关闭括号后无星号（* 或 \\*）的叶子任务\n3. 如果存在这样的未完成必做任务：\n   - 自动从下一个未完成任务继续执行，无需询问用户\n   - 委派给 spec-task-execution 子代理实现\n   - 子代理遇到测试/编译报错时，必须自动定位根因、修复主代码、重跑验证，不得停下来问用户，也不得用\"换参数避开\"方式绕过\n   - 每完成一个任务用 taskStatus 标记 completed，再继续下一个\n4. 如果所有必做任务都已完成（无 [ ] 必做任务），则什么都不做，告知已全部完成\n\n重要约束：\n- 仅在确有未完成必做任务时才继续，全部完成后必须停止，禁止无限循环\n- 不要重复执行已标记 [x] completed 的任务\n- 检测到同一任务连续失败 2 次以上仍无法通过时，停止并向用户说明根因，不要无限重试同一处"
+  }
+}

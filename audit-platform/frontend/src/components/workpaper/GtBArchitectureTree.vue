@@ -1,46 +1,72 @@
 <!--
-  GtBArchitectureTree.vue — B 类目录的底稿架构树
+  GtBArchitectureTree.vue — B 类目录的底稿审计工作流图
 
-  按 design §11.9 实现：
-  - el-tree 展示底稿层级结构
-  - 每个节点使用 GtIndexChip 显示索引号
-  - 节点状态标签（完成/进行中/待执行）
-  - 点击节点跳转到对应底稿
+  按 design §11.9 实现（2026-06-02 重构 v2）：
+  - 按审计逻辑分 4 阶段泳道：① 程序计划 → ② 科目审定 → ③ 实质性程序 → ④ 披露与调整
+  - 阶段间向下流程箭头串联（体现审计先后逻辑）
+  - 阶段内 sheet 用多栏卡片 grid（紧凑 + 响应式）
+  - 点击卡片 emit navigate(sheetName) → 父组件切换 sheet
+  - 全 GT 紫令牌；当前激活 sheet 高亮
 
-  锚定 spec workpaper-editor-slimdown Task 17.8
-  Validates: US-16（程序表流程导航图 — B 类架构树）
+  数据源：B-Index sheet 的 navigation_rows（content / index_ref / component_type）
+  锚定 spec workpaper-editor-slimdown Task 17.8 / US-16
 -->
 
 <template>
-  <div class="gt-b-architecture-tree" v-show="expanded">
-    <el-tree
-      v-if="treeData.length > 0"
-      :data="treeData"
-      :props="treeProps"
-      default-expand-all
-      :expand-on-click-node="false"
-      node-key="id"
-      @node-click="onNodeClick"
-    >
-      <template #default="{ data }">
-        <span class="gt-b-tree-node">
-          <GtIndexChip
-            :value="data.wpCode"
-            :validate="false"
-            class="gt-b-tree-node__chip"
-          />
-          <span class="gt-b-tree-node__name">{{ data.name }}</span>
-          <el-tag
-            v-if="data.status"
-            :type="statusType(data.status)"
-            size="small"
-            effect="plain"
+  <div class="gt-b-arch">
+    <template v-if="stages.length > 0">
+      <div
+        v-for="(stage, sIdx) in stages"
+        :key="stage.key"
+        class="gt-b-arch__stage"
+      >
+        <!-- 阶段标题 -->
+        <div class="gt-b-arch__stage-head">
+          <span class="gt-b-arch__stage-badge">{{ sIdx + 1 }}</span>
+          <span class="gt-b-arch__stage-title">{{ stage.title }}</span>
+          <span class="gt-b-arch__stage-count">{{ stage.nodes.length }} 项</span>
+        </div>
+
+        <!-- 阶段内 sheet 卡片网格 -->
+        <div class="gt-b-arch__grid">
+          <div
+            v-for="node in stage.nodes"
+            :key="node.id"
+            class="gt-b-arch__card"
+            :class="{ 'is-active': node.sheetName === activeSheet }"
+            @click="onNodeClick(node)"
           >
-            {{ statusLabel(data.status) }}
-          </el-tag>
-        </span>
-      </template>
-    </el-tree>
+            <div class="gt-b-arch__card-top">
+              <span class="gt-b-arch__card-icon">{{ node.icon }}</span>
+              <GtIndexChip
+                v-if="node.indexRef"
+                :value="node.indexRef"
+                :validate="false"
+                class="gt-b-arch__chip"
+              />
+            </div>
+            <span class="gt-b-arch__name" :title="node.name">{{ node.name }}</span>
+            <el-tag
+              v-if="node.status"
+              :type="statusType(node.status)"
+              size="small"
+              effect="plain"
+              class="gt-b-arch__status"
+            >
+              {{ statusLabel(node.status) }}
+            </el-tag>
+          </div>
+        </div>
+
+        <!-- 阶段间流程箭头 -->
+        <div
+          v-if="sIdx < stages.length - 1"
+          class="gt-b-arch__flow-arrow"
+        >
+          <el-icon><Bottom /></el-icon>
+        </div>
+      </div>
+    </template>
 
     <el-empty
       v-else
@@ -51,35 +77,115 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { api } from '@/services/apiProxy'
+import { computed } from 'vue'
+import { Bottom } from '@element-plus/icons-vue'
 import GtIndexChip from './GtIndexChip.vue'
 
-// ─── Props ───
+// ─── Props / Emits ───
 const props = defineProps<{
-  wpId: string
-  projectId: string
-  expanded: boolean
+  wpId?: string
+  projectId?: string
+  /** 当前激活的 sheet（高亮用） */
+  activeSheet?: string
+  /** B-Index sheet 的 html_data（含 navigation_rows） */
   htmlData?: Record<string, any>
 }>()
 
+const emit = defineEmits<{
+  navigate: [sheetName: string]
+}>()
+
 // ─── Types ───
-interface TreeNode {
+interface ArchNode {
   id: string
-  wpCode: string
+  sheetName: string
+  indexRef: string
   name: string
   status?: string
-  children?: TreeNode[]
+  componentType: string
+  icon: string
 }
 
-// ─── State ───
-const router = useRouter()
-const treeData = ref<TreeNode[]>([])
-const treeProps = {
-  label: 'name',
-  children: 'children',
+interface Stage {
+  key: string
+  title: string
+  nodes: ArchNode[]
 }
+
+// ─── componentType → 图标 ───
+const ICON_MAP: Record<string, string> = {
+  'a-program-console': '📋',
+  'b-index': '🗂️',
+  'c-note-table': '📝',
+  'd-form-table': '📑',
+  'd-form-paragraph': '📄',
+  'd-form-qa': '❓',
+  'd-form-confirmation': '✉️',
+  'd-form-review': '✍️',
+  'e-control-test': '🧪',
+  'h-static-doc': '📖',
+  univer: '📊',
+  skip: '⏭️',
+}
+
+// ─── 解析 navigation_rows → 节点 ───
+const allNodes = computed<ArchNode[]>(() => {
+  const rows = props.htmlData?.navigation_rows
+  if (!Array.isArray(rows)) return []
+
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .map((row, i) => {
+      const ct = row.component_type || 'skip'
+      const name = row.content || row.sheet_name || row.label || ''
+      return {
+        id: `arch-${i}`,
+        sheetName: row.content || row.sheet_name || '',
+        indexRef: row.index_ref || row.wp_code || '',
+        name,
+        status: row.status || '',
+        componentType: ct,
+        icon: ICON_MAP[ct] || '📄',
+      }
+    })
+    .filter((n) => n.name)
+})
+
+// ─── 按审计阶段分组（4 泳道） ───
+//   ① 程序计划：a-program-console
+//   ② 科目审定：sheet 名含「审定表」
+//   ③ 实质性程序：明细表/检查表/分析（univer + d-form-* 等，排除审定/调整）
+//   ④ 披露与调整：c-note-table（附注）+ sheet 名含「调整分录」
+function classifyStage(node: ArchNode): 'plan' | 'finalize' | 'substantive' | 'disclosure' {
+  const name = node.name
+  if (node.componentType === 'a-program-console') return 'plan'
+  if (name.includes('审定表')) return 'finalize'
+  if (node.componentType === 'c-note-table' || name.includes('附注') || name.includes('披露')) {
+    return 'disclosure'
+  }
+  if (name.includes('调整分录') || name.includes('调整汇总')) return 'disclosure'
+  return 'substantive'
+}
+
+const STAGE_META: { key: string; title: string }[] = [
+  { key: 'plan', title: '审计计划' },
+  { key: 'finalize', title: '科目审定' },
+  { key: 'substantive', title: '实质性程序' },
+  { key: 'disclosure', title: '披露与调整' },
+]
+
+const stages = computed<Stage[]>(() => {
+  const buckets: Record<string, ArchNode[]> = {
+    plan: [], finalize: [], substantive: [], disclosure: [],
+  }
+  for (const node of allNodes.value) {
+    buckets[classifyStage(node)].push(node)
+  }
+  // 仅返回非空阶段，保持固定顺序
+  return STAGE_META
+    .map((m) => ({ key: m.key, title: m.title, nodes: buckets[m.key] }))
+    .filter((s) => s.nodes.length > 0)
+})
 
 // ─── Methods ───
 function statusType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' {
@@ -102,127 +208,155 @@ function statusLabel(status: string): string {
   }
 }
 
-function onNodeClick(data: TreeNode) {
-  if (data.wpCode) {
-    router.push({
-      path: `/projects/${props.projectId}/workpapers/${data.wpCode}/edit`,
-    })
+function onNodeClick(node: ArchNode) {
+  if (node.sheetName) {
+    emit('navigate', node.sheetName)
   }
 }
-
-function buildTreeFromHtmlData() {
-  if (!props.htmlData) {
-    treeData.value = []
-    return
-  }
-
-  // 从 B 类底稿的 navigation rows 构建树
-  const nodes: TreeNode[] = []
-
-  // 遍历所有 sheet 的 html_data 寻找导航行
-  for (const [sheetName, sheetData] of Object.entries(props.htmlData)) {
-    if (!sheetData || typeof sheetData !== 'object') continue
-    const navRows = (sheetData as any).navigation_rows || (sheetData as any).rows || []
-
-    if (Array.isArray(navRows)) {
-      for (const row of navRows) {
-        if (!row || typeof row !== 'object') continue
-        const wpCode = row.wp_code || row.index_ref || ''
-        const name = row.wp_name || row.description || row.label || wpCode
-        const status = row.status || ''
-
-        if (wpCode) {
-          nodes.push({
-            id: `${sheetName}-${wpCode}`,
-            wpCode,
-            name,
-            status,
-          })
-        }
-      }
-    }
-  }
-
-  // 按 wpCode 前缀分组构建层级
-  treeData.value = buildHierarchy(nodes)
-}
-
-function buildHierarchy(nodes: TreeNode[]): TreeNode[] {
-  if (nodes.length === 0) return []
-
-  // 简单分组：按 wpCode 的第一个字母+数字分组
-  const groups: Record<string, TreeNode[]> = {}
-
-  for (const node of nodes) {
-    // 提取前缀如 "D2" from "D2-1", "D2A" etc.
-    const match = node.wpCode.match(/^([A-Z]\d+)/i)
-    const prefix = match ? match[1] : 'other'
-
-    if (!groups[prefix]) {
-      groups[prefix] = []
-    }
-    groups[prefix].push(node)
-  }
-
-  // 如果只有一个组或节点少于 10 个，直接返回扁平列表
-  if (Object.keys(groups).length <= 1 || nodes.length < 10) {
-    return nodes
-  }
-
-  // 构建分组树
-  return Object.entries(groups).map(([prefix, children]) => ({
-    id: `group-${prefix}`,
-    wpCode: prefix,
-    name: `${prefix} 系列`,
-    children,
-  }))
-}
-
-// ─── Lifecycle ───
-onMounted(() => {
-  if (props.expanded) {
-    buildTreeFromHtmlData()
-  }
-})
-
-watch(() => props.expanded, (val) => {
-  if (val) {
-    buildTreeFromHtmlData()
-  }
-})
-
-watch(() => props.htmlData, () => {
-  if (props.expanded) {
-    buildTreeFromHtmlData()
-  }
-}, { deep: true })
 </script>
 
 <style scoped>
-.gt-b-architecture-tree {
-  padding: 12px 16px;
-  background: var(--el-bg-color-page);
-  border-radius: 8px;
-  margin-bottom: 12px;
+.gt-b-arch {
+  padding: 8px 4px;
 }
 
-.gt-b-tree-node {
+/* ─── 阶段泳道 ─── */
+.gt-b-arch__stage {
+  position: relative;
+}
+
+.gt-b-arch__stage-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 2px 0;
-  font-size: 13px;
+  margin-bottom: 10px;
 }
 
-.gt-b-tree-node__chip {
+.gt-b-arch__stage-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--gt-color-primary, #4b2d77);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
   flex-shrink: 0;
 }
 
-.gt-b-tree-node__name {
-  flex: 1;
+.gt-b-arch__stage-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gt-color-primary, #4b2d77);
+}
+
+.gt-b-arch__stage-count {
+  font-size: 12px;
+  color: var(--gt-color-text-tertiary, #909399);
+  background: var(--gt-color-primary-bg, #f4f0fa);
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+
+/* ─── 卡片网格（多栏响应式） ─── */
+.gt-b-arch__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  padding-left: 30px;
+  position: relative;
+}
+
+/* 阶段左侧引导竖线 */
+.gt-b-arch__grid::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--gt-color-border-purple, #e8e4f0);
+}
+
+.gt-b-arch__card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--gt-color-border-purple, #e8e4f0);
+  border-radius: 8px;
+  background: var(--gt-color-bg-white, #fff);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gt-b-arch__card:hover {
+  border-color: var(--gt-color-primary, #4b2d77);
+  box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12);
+  transform: translateY(-2px);
+}
+
+.gt-b-arch__card.is-active {
+  border-color: var(--gt-color-primary, #4b2d77);
+  background: var(--gt-color-primary-bg, #f4f0fa);
+  box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77);
+}
+
+.gt-b-arch__card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gt-b-arch__card-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.gt-b-arch__chip {
+  flex-shrink: 0;
+}
+
+/* 索引号 chip 强制 GT 紫（el-tag--primary 默认蓝，按致同规范覆盖） */
+.gt-b-arch__card :deep(.el-tag),
+.gt-b-arch__card :deep(.el-tag--primary) {
+  --el-tag-bg-color: var(--gt-color-primary-bg, #f4f0fa);
+  --el-tag-border-color: var(--gt-color-border-purple-light, #d8b8ee);
+  --el-tag-text-color: var(--gt-color-primary, #4b2d77);
+  background-color: var(--gt-color-primary-bg, #f4f0fa) !important;
+  border-color: var(--gt-color-border-purple-light, #d8b8ee) !important;
+  color: var(--gt-color-primary, #4b2d77) !important;
+}
+
+/* 状态标签保留语义色（不强制紫） */
+.gt-b-arch__status {
+  align-self: flex-start;
+}
+.gt-b-arch__card :deep(.gt-b-arch__status.el-tag) {
+  --el-tag-bg-color: unset;
+  background-color: unset !important;
+}
+
+.gt-b-arch__name {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--gt-color-text-primary, #303133);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--el-text-color-regular);
+}
+
+/* ─── 阶段间流程箭头 ─── */
+.gt-b-arch__flow-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 4px;
+  margin: 6px 0 10px;
+  color: var(--gt-color-primary-light, #a06dff);
+  font-size: 18px;
 }
 </style>

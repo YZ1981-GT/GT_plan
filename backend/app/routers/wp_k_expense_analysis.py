@@ -647,4 +647,7 @@ async def _maybe_apply_analysis_to_workpaper(
     wp.parsed_data = pd
     await db.flush()
     await db.commit()
+    from app.services.wp_parsed_data_service import touch_after_parsed_data_commit
+
+    await touch_after_parsed_data_commit(wp, source="wp_k_expense_analysis")
     return sheet

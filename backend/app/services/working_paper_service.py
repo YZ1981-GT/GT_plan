@@ -100,6 +100,7 @@ class WorkingPaperService:
                 "file_version": wp.file_version,
                 "file_path": wp.file_path,
                 "source_type": wp.source_type.value if wp.source_type else None,
+                "prefill_stale": bool(wp.prefill_stale),
                 "created_at": wp.created_at.isoformat() if wp.created_at else None,
                 "updated_at": wp.updated_at.isoformat() if wp.updated_at else None,
             })
@@ -155,6 +156,7 @@ class WorkingPaperService:
             "file_version": wp.file_version,
             "file_path": wp.file_path,
             "source_type": wp.source_type.value if wp.source_type else None,
+            "prefill_stale": bool(wp.prefill_stale),
             "last_parsed_at": wp.last_parsed_at.isoformat() if wp.last_parsed_at else None,
             "qc_passed": qc.passed if qc else None,
             "qc_blocking_count": qc.blocking_count if qc else 0,

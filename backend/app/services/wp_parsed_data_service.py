@@ -1,98 +1,98 @@
-"""底稿 parsed_data 填充服务
+"""working_paper.parsed_data 变更后的地址注册表缓存失效钩子。
 
-从底稿的 xlsx 模板文件读取 sheet 结构，写入 WorkingPaper.parsed_data，
-结构对齐 HTML 渲染器消费的 parsed_data['html_data'][sheet_name] 形态。
+custom-workpaper-formula-binding 任务 4.3：统一在 commit 之后调用，
+避免 invalidate 散落在各写 parsed_data 路径。
 
-Feature: wp-generation-pipeline
+已接线：wp_formula / wp_html_save / wp_user_formulas / working_paper（解析+univer_save）/
+wp_fine_rules / wp_procedure_status / wp_ai_confirm / 各专题计算路由（wp_g_* / wp_h_* / wp_i_* / wp_j_* / wp_k_* / wp_l_* / wp_m_* / wp_f2_*）/ wp_procedure_trim。
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from pathlib import Path
+import uuid
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
+
+from app.models.workpaper_models import WorkingPaper
+from app.services.address_registry import address_registry
 
 logger = logging.getLogger(__name__)
 
 
-def _read_xlsx_structure(file_path: str | Path) -> dict[str, dict[str, Any]]:
-    """纯函数：openpyxl 读 xlsx 各 sheet → 构建 {sheet_name: {cells, columns}}
-
-    无 DB、无副作用，便于测试。
-
-    Returns:
-        dict: {sheet_name: {"cells": {"A1": {"v": value}, ...}, "columns": [...]}}
-    """
-    import openpyxl
-
-    file_path = Path(file_path)
-    if not file_path.exists() or file_path.stat().st_size == 0:
-        return {}
-
-    try:
-        wb = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
-    except Exception as e:
-        logger.warning("Failed to load workbook %s: %s", file_path, e)
-        return {}
-
-    structure: dict[str, dict[str, Any]] = {}
-
-    for sheet_name in wb.sheetnames:
-        ws = wb[sheet_name]
-        cells: dict[str, dict[str, Any]] = {}
-        columns: list[str] = []
-
-        # 读取所有有值的单元格
-        for row in ws.iter_rows():
-            for cell in row:
-                if cell.value is not None:
-                    coord = cell.coordinate  # e.g. "A1"
-                    cells[coord] = {"v": cell.value}
-                    # 收集列字母
-                    col_letter = cell.column_letter
-                    if col_letter not in columns:
-                        columns.append(col_letter)
-
-        structure[sheet_name] = {
-            "cells": cells,
-            "columns": sorted(columns),
-        }
-
-    wb.close()
-    return structure
-
-
-async def populate_parsed_data(
-    db: AsyncSession,
-    wp: Any,
-    wp_code: str,
-    wp_name: str,
-    cycle: str,
+def write_cell_to_parsed_data(
+    wp: WorkingPaper,
+    *,
+    sheet_name: str,
+    cell_ref: str,
+    value: Any,
 ) -> None:
-    """读取 wp.file_path 的 xlsx，构建 parsed_data.html_data。
-
-    结构（对齐 GtWpRenderer / wp_html_save 的 html_data 形态）：
-    parsed_data = {
-        "html_data": {
-            "<sheet_name>": {
-                "cells": { "A1": {"v": ...}, ... },
-                "columns": [...],
-            },
-            ...
-        },
-        "wp_code": wp_code,
-        "generated_at": iso8601,
-    }
-    """
-    structure = _read_xlsx_structure(wp.file_path)
-
-    wp.parsed_data = {
-        "html_data": structure,
-        "wp_code": wp_code,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-    }
+    """将求值结果写入 parsed_data.html_data[sheet].cells[cell]（保留 dict 结构）。"""
+    cell_up = cell_ref.strip().upper()
+    parsed = dict(wp.parsed_data or {})
+    html_data = parsed.get("html_data")
+    if not isinstance(html_data, dict):
+        html_data = {}
+    sheet_data = html_data.get(sheet_name)
+    if not isinstance(sheet_data, dict):
+        sheet_data = {}
+    cells = sheet_data.get("cells")
+    if not isinstance(cells, dict):
+        cells = {}
+    existing = cells.get(cell_up)
+    if isinstance(existing, dict):
+        existing = {**existing, "value": value, "v": value}
+    elif existing is not None:
+        existing = {"value": value, "v": value}
+    else:
+        existing = value
+    cells[cell_up] = existing
+    sheet_data["cells"] = cells
+    html_data[sheet_name] = sheet_data
+    parsed["html_data"] = html_data
+    wp.parsed_data = parsed
     flag_modified(wp, "parsed_data")
+
+
+def format_cell_display_value(value: Decimal | Any) -> Any:
+    """网格展示：会计空值习惯显示为数字或原样。"""
+    if value is None:
+        return None
+    if isinstance(value, Decimal):
+        if value == 0:
+            return 0
+        return float(value) if value % 1 else int(value)
+    return value
+
+
+async def touch_wp_registry(project_id: uuid.UUID | str) -> None:
+    """使项目 WP 域地址注册表缓存失效（L1 + L2）。
+
+    失败仅 warning，不阻断主流程；TTL 120s 为最终兜底。
+    """
+    try:
+        await address_registry.invalidate_async(str(project_id), domain="wp")
+    except Exception as e:
+        logger.warning(
+            "touch_wp_registry 失败 project_id=%s: %s", project_id, e
+        )
+
+
+async def touch_after_parsed_data_commit(
+    wp: WorkingPaper | None = None,
+    *,
+    project_id: uuid.UUID | str | None = None,
+    source: str = "parsed_data",
+) -> None:
+    """parsed_data 写入并 commit 之后调用（统一 WP 域缓存失效）。"""
+    pid = project_id if project_id is not None else (wp.project_id if wp else None)
+    if pid is None:
+        return
+    try:
+        await touch_wp_registry(pid)
+    except Exception as e:
+        logger.warning(
+            "touch_wp_registry after %s project_id=%s: %s", source, pid, e
+        )

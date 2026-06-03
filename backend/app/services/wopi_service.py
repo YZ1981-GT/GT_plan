@@ -422,6 +422,14 @@ class WOPIHostService:
                                     _wp_obj.parsed_data = pd
                                     flag_modified(_wp_obj, "parsed_data")
                                     await fine_db.commit()
+                                    from app.services.wp_parsed_data_service import (
+                                        touch_after_parsed_data_commit,
+                                    )
+
+                                    await touch_after_parsed_data_commit(
+                                        _wp_obj,
+                                        source="wopi_fine_extract",
+                                    )
                                     logger.info("auto fine-extract after WOPI save: wp=%s checks=%d",
                                                 file_id, len(data.get("checks", [])))
                     except Exception as _fe:

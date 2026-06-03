@@ -37,6 +37,7 @@ export type HtmlComponentType =
   | 'd-form-review'
   | 'e-control-test'
   | 'h-static-doc'
+  | 'custom'
 
 /** 注册表条目：包含 lazy component / 图标 / emits / 描述 */
 export interface HtmlRendererEntry {
@@ -60,6 +61,7 @@ const GtCNoteTable = defineAsyncComponent(() => import('./GtCNoteTable.vue'))
 const GtDForm = defineAsyncComponent(() => import('./GtDForm/GtDForm.vue'))
 const GtEControlTest = defineAsyncComponent(() => import('./GtEControlTest.vue'))
 const GtHStaticDoc = defineAsyncComponent(() => import('./GtHStaticDoc.vue'))
+const GtCustomWpEditor = defineAsyncComponent(() => import('./GtCustomWpEditor.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -134,6 +136,13 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📖',
     label: 'H 辅助说明',
     emits: [], // 只读
+  },
+  {
+    componentType: 'custom',
+    component: GtCustomWpEditor,
+    icon: '📎',
+    label: '自定义底稿',
+    emits: ['save'],
   },
 ]
 

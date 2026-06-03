@@ -56,6 +56,7 @@ export type WpComponentType =
   | 'd-form-review'
   | 'e-control-test'
   | 'h-static-doc'
+  | 'custom'
   | 'univer'
   | 'skip'
 

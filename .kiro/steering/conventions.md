@@ -713,7 +713,8 @@ powershell 进程异常退出但仍持有 log 文件句柄时，`Get-Content / R
 
 ### Source URI 格式（5 命名空间）
 
-- `workpaper:{wp_code}|{sheet_name}|{cell_range}` — 底稿 cell 级查询
+- `workpaper:{wp_code}|{sheet_name}|{cell_range}` — 底稿 cell 级查询（高级查询 SheetCellRangePicker）
+- **`wp://{wp_code}/{cell}`** — 公式引擎 WP 域单元格引用（`wp_formula` 持久化；**勿用** `wp://{wp_code}#{cell}` 作新数据，仅 `uri_to_formula_ref` 兼容旧 `#`）
 - `report:{report_type}|{cell_range}` — 报表虚拟 sheet（A=row_code, B=row_name, C=current_period_amount, D=prior_period_amount, E=formula）
 - `note:{section_id}|{cell_range}` — 附注虚拟 sheet（A=code, B=name, C=year_end, D=year_begin, E=formula）
 - `adj:{adjustment_type}|{cell_range}` — 调整分录虚拟 sheet（A=entry_no, B=account_code, C=account_name, D=debit_amount, E=credit_amount, F=description）

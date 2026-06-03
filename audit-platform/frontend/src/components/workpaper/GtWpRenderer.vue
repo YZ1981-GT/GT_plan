@@ -49,6 +49,9 @@
         {{ schemaFallbackBanner }}
       </el-alert>
 
+      <!-- 编制信息表头（workpaper 级，所有 sheet 共享） -->
+      <GtWpPreparationHeader :wp-id="wpId" :readonly="readonly" />
+
       <!-- Sheet 选择器（多 sheet 时显示） -->
       <div v-if="visibleSheets.length > 1" class="gt-wp-renderer__sheet-tabs">
         <el-tabs
@@ -88,17 +91,29 @@
         @standard-switch="onStandardSwitch"
         @sync-to-disclosure-notes="onSyncToDisclosureNotes"
         @jump-to-reference="onJumpToReference"
+        @jump-to-section="onJumpToSection"
         @trigger-procedure-trimming-suggestion="onTrimmingSuggestion"
         @conclusion-change="onConclusionChange"
         @step-advance="onStepAdvance"
         @open-attachment="onOpenAttachment"
+        @formula-saved="reload"
       />
 
-      <!-- Univer 保留渲染（F/G 类） -->
+      <!-- Univer 类（F/G）：有模板网格数据时只读展示，否则占位 -->
+      <GtGridSheet
+        v-else-if="componentType === 'univer' && hasGridCells"
+        :wp-id="wpId"
+        :sheet-name="activeSheetName"
+        :schema="activeSheetSchema"
+        :html-data="activeSheetHtmlData"
+        :readonly="readonly"
+      />
+
+      <!-- Univer 占位（无模板网格数据时） -->
       <div v-else-if="componentType === 'univer'" class="gt-wp-renderer__univer-placeholder">
-        <el-result icon="info" title="Univer 渲染">
+        <el-result icon="info" title="表格底稿">
           <template #sub-title>
-            <span>此底稿使用 Univer Sheets 渲染，请通过底稿编辑器打开。</span>
+            <span>此底稿为表格类型，数据尚未导入。请先在项目中导入账套数据，系统将自动填充。</span>
           </template>
         </el-result>
       </div>
@@ -113,7 +128,7 @@
       <div v-else class="gt-wp-renderer__unknown-placeholder">
         <el-result icon="info" :title="`组件类型: ${componentType}`">
           <template #sub-title>
-            <span>该组件类型尚未实现，将在后续版本中支持。</span>
+            <span>该底稿类型尚未支持渲染，将在后续版本中实现。</span>
           </template>
         </el-result>
       </div>
@@ -139,6 +154,8 @@ import {
 // HTML 类型路由由 htmlRendererRegistry 管理（lazy load 自动）
 // 仅 SkippedSheetPlaceholder 不在 registry 内（特殊占位）
 import SkippedSheetPlaceholder from '@/components/workpaper/SkippedSheetPlaceholder.vue'
+import GtGridSheet from '@/components/workpaper/GtGridSheet.vue'
+import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.vue'
 
 // ─── Types ───
 export interface SavePayload {
@@ -236,6 +253,11 @@ const activeSheet = computed(() => {
 
 const activeSheetSchema = computed(() => activeSheet.value?.schema ?? {})
 const activeSheetHtmlData = computed<any>(() => activeSheet.value?.html_data ?? {})
+/** univer 类底稿：html_data 是否含可渲染网格 cells（决定走只读网格还是占位） */
+const hasGridCells = computed<boolean>(() => {
+  const hd = activeSheetHtmlData.value
+  return !!hd && typeof hd === 'object' && hd.cells && Object.keys(hd.cells).length > 0
+})
 /** 当前 sheet 的 componentType（每个 sheet 独立路由） */
 const componentType = computed<WpComponentType>(() => {
   return (activeSheet.value?.componentType as WpComponentType) ?? 'skip'
@@ -244,14 +266,25 @@ const componentType = computed<WpComponentType>(() => {
 /** 注册表查找：HTML 类型 → component + emit 列表（lazy import） */
 const rendererEntry = computed(() => getRendererEntry(componentType.value))
 
-/** D 子模式需要 form-type prop；其他类型透传空对象 */
+/** D 子模式需要 form-type prop；custom 需要项目上下文 */
 const extraComponentProps = computed<Record<string, unknown>>(() => {
   const ct = componentType.value
   if (ct.startsWith('d-form-')) {
     return { 'form-type': ct }
   }
+  if (ct === 'custom') {
+    return {
+      'wp-generated': renderConfig.value?.is_real_workpaper ?? true,
+      'project-id': renderConfig.value?.project_id ?? '',
+      'wp-code': renderConfig.value?.wp_code ?? '',
+      year: preparationYear.value,
+    }
+  }
   return {}
 })
+
+/** 公式校验/注册表用年度（缺省当前年） */
+const preparationYear = computed(() => new Date().getFullYear())
 
 /** componentType → 图标（sheet tab 显示），委托给 registry */
 function getSheetIcon(ct: string): string {
@@ -336,6 +369,7 @@ function onSave(data: Record<string, any>) {
   const payload: SavePayload = {
     sheet_name: activeSheetName.value,
     html_data: data,
+    schema_version: renderConfig.value?.template_version || 'v2025-R5',
   }
   emit('save-success', payload)
 }
@@ -366,6 +400,17 @@ function onSyncToDisclosureNotes(payload: Record<string, any>) {
 
 function onJumpToReference(refCode: string) {
   emit('jump-to-reference', refCode)
+}
+
+function onJumpToSection(sheetName: string) {
+  // B-Index 架构图节点点击 → 切换到对应 sheet（同底稿内 sheet 切换）
+  if (!sheetName || !renderConfig.value) return
+  const exists = renderConfig.value.sheets?.some(s => s.sheet_name === sheetName)
+  if (exists) {
+    activeSheetName.value = sheetName
+  } else {
+    ElMessage.info('未找到对应底稿 sheet')
+  }
 }
 
 function onOpenAttachment(payload: { wpId: string; sheetName: string; rowRef: string }) {

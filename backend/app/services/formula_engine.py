@@ -729,12 +729,17 @@ def _handle_note(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Deci
 
 
 def _handle_wp(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """WP('wp_code','column') — 底稿数据取值"""
+    """WP('wp_code','column') — 底稿数据取值（列名或单元格地址 B5）"""
     str_args = _extract_string_args(args, ctx, trace)
     wp_code = str_args[0] if str_args else ''
     col_name = str_args[1] if len(str_args) > 1 else ctx.default_column
     wp_data = ctx.wp_data.get(wp_code, {})
-    val = wp_data.get(col_name, Decimal("0"))
+    col = (col_name or "").strip()
+    if re.match(r"^[A-Z]+\d+$", col, re.IGNORECASE):
+        cell_up = col.upper()
+        val = wp_data.get(cell_up, wp_data.get(col_name, Decimal("0")))
+    else:
+        val = wp_data.get(col_name, Decimal("0"))
     trace.append(f"WP('{wp_code}','{col_name}') = {val}")
     return val
 
@@ -1359,7 +1364,10 @@ class WPExecutor:
         from decimal import Decimal as D
 
         try:
+            import sqlalchemy as sa
+
             from app.models.workpaper_models import WorkingPaper, WpIndex
+            from app.services.address_registry import extract_custom_cells
 
             result = await db.execute(
                 sa.select(WorkingPaper.parsed_data)
@@ -1376,13 +1384,29 @@ class WPExecutor:
                 return D("0")
 
             parsed_data = row or {}
+            col = (column or "").strip()
+
+            # 单元格地址（B5/C12）→ extract_custom_cells
+            if re.match(r"^[A-Z]+\d+$", col, re.IGNORECASE):
+                cell_up = col.upper()
+                for rec in extract_custom_cells(parsed_data):
+                    if rec.cell == cell_up:
+                        v = rec.value
+                        if v is None or v == "":
+                            return D("0")
+                        try:
+                            return D(str(v))
+                        except Exception:
+                            return D("0")
+                return D("0")
+
             col_map = {
                 "审定数": "audited_amount",
                 "未审数": "unadjusted_amount",
                 "期初余额": "opening_balance",
                 "期末余额": "audited_amount",
             }
-            key = col_map.get(column, column)
+            key = col_map.get(col, col)
             value = parsed_data.get(key, 0)
             return D(str(value)) if value is not None else D("0")
         except Exception:

@@ -121,7 +121,8 @@ def formula_ref_to_uri(formula_ref: str) -> Optional[str]:
             col_label = groups[2] if len(groups) > 2 else '期末'
             return build_uri('note', section, row_label, col_label)
         elif fn_name == 'WP':
-            return build_uri('wp', groups[0], cell=groups[1])
+            # 单元格/列名走 path，避免 wp://D11#B5 被解析为 source=D11#B5
+            return build_uri('wp', groups[0], path=groups[1])
         elif fn_name == 'AUX':
             account = groups[0]
             dim = groups[1] if len(groups) > 1 else ''
@@ -157,7 +158,15 @@ def uri_to_formula_ref(uri: str) -> Optional[str]:
         else:
             return f"NOTE('{source}','{path}')"
     elif domain == 'wp':
-        return f"WP('{source}','{cell}')"
+        if path == 'xref' and cell:
+            return None
+        if not path and not cell:
+            rest = uri.split('://', 1)[-1]
+            if '#' in rest and '/' not in rest.split('#', 1)[0]:
+                wp_source, _, addr = rest.partition('#')
+                return f"WP('{wp_source}','{addr}')"
+        addr = cell or path
+        return f"WP('{source}','{addr}')"
     elif domain == 'aux':
         return f"AUX('{source}','{path}','{cell}')"
     return None
@@ -356,6 +365,243 @@ async def build_note_entries(db, project_id: str, year: int,
     return entries
 
 
+# ── 自定义底稿 parsed_data 单元格提取（custom-workpaper-formula-binding）──
+
+_CELL_ADDRESS_RE = re.compile(r"^[A-Z]+\d+$")
+
+_PARSED_DATA_META_KEYS = frozenset({
+    "html_data",
+    "user_formulas",
+    "conclusion",
+    "schema_version",
+    "_version",
+    "last_modified_by",
+    "last_modified_at",
+    "changed_sheets_last_save",
+    "cells",
+})
+
+
+@dataclass
+class CellRecord:
+    """parsed_data 提取出的单元格（集成点 2 纯函数产物）。"""
+    sheet: str
+    cell: str
+    row_label: str
+    value: object = None
+
+
+def _cell_scalar_value(raw: object) -> object:
+    """标量或 dict cell 取值。"""
+    if isinstance(raw, dict):
+        for key in ("v", "value", "val"):
+            if key in raw:
+                return raw[key]
+        label = raw.get("label") or raw.get("name")
+        if label is not None:
+            return label
+        return None
+    return raw
+
+
+def _row_label_for_cell(
+    cells_map: dict,
+    sheet: str,
+    cell_ref: str,
+) -> str:
+    """同行 A 列文本作 row_label；cell 自带 label/name 优先。"""
+    from app.services.note_wp_data_resolver import _split_cell_ref
+
+    parsed = _split_cell_ref(cell_ref)
+    if parsed is None:
+        return ""
+    _col, row_num = parsed
+    a_ref = f"A{row_num}"
+
+    def _lookup(ref: str) -> str:
+        flat_key = f"{sheet}!{ref}"
+        if flat_key in cells_map:
+            v = _cell_scalar_value(cells_map[flat_key])
+            return str(v).strip() if v is not None else ""
+        sheet_block = cells_map.get(sheet)
+        if isinstance(sheet_block, dict) and ref in sheet_block:
+            v = _cell_scalar_value(sheet_block[ref])
+            return str(v).strip() if v is not None else ""
+        return ""
+
+    nested_html = cells_map.get("__html_sheet_cells__")
+    if isinstance(nested_html, dict):
+        sheet_cells = nested_html.get(sheet)
+        if isinstance(sheet_cells, dict):
+            if cell_ref in sheet_cells:
+                raw = sheet_cells[cell_ref]
+                if isinstance(raw, dict):
+                    lbl = raw.get("label") or raw.get("name")
+                    if lbl:
+                        return str(lbl).strip()
+            if a_ref in sheet_cells:
+                v = _cell_scalar_value(sheet_cells[a_ref])
+                if v is not None:
+                    return str(v).strip()
+
+    return _lookup(a_ref)
+
+
+def _append_cell_record(
+    out: list[CellRecord],
+    seen: set[tuple[str, str]],
+    sheet: str,
+    cell_ref: str,
+    raw: object,
+    cells_lookup: dict,
+) -> None:
+    cell_up = cell_ref.strip().upper()
+    if not _CELL_ADDRESS_RE.match(cell_up):
+        return
+    key = (sheet, cell_up)
+    if key in seen:
+        return
+    seen.add(key)
+    row_label = ""
+    if isinstance(raw, dict):
+        row_label = str(raw.get("label") or raw.get("name") or "").strip()
+    if not row_label:
+        row_label = _row_label_for_cell(cells_lookup, sheet, cell_up)
+    out.append(
+        CellRecord(
+            sheet=sheet,
+            cell=cell_up,
+            row_label=row_label,
+            value=_cell_scalar_value(raw),
+        )
+    )
+
+
+def extract_custom_cells(parsed_data: dict | None) -> list[CellRecord]:
+    """从 working_paper.parsed_data 提取自定义底稿单元格坐标。
+
+    兼容：
+    - 嵌套：``html_data[sheet].cells[cell]``（标量或 ``{value,v,label,name}``）
+    - 扁平：``parsed_data[sheet][field]``（field 为单元格地址）
+    - 顶层 ``cells`` 扁平/嵌套（与 note_wp_data_resolver 对齐）
+
+    None / {} / 结构异常 → 返回 []，不抛异常。
+    """
+    if not parsed_data or not isinstance(parsed_data, dict):
+        return []
+
+    records: list[CellRecord] = []
+    seen: set[tuple[str, str]] = set()
+    cells_lookup: dict = {}
+
+    if isinstance(parsed_data.get("cells"), dict):
+        cells_lookup.update(parsed_data["cells"])
+
+    html_data = parsed_data.get("html_data")
+    if isinstance(html_data, dict):
+        nested_store: dict[str, dict] = {}
+        for sheet_name, sheet_data in html_data.items():
+            if not isinstance(sheet_name, str) or not sheet_name:
+                continue
+            if not isinstance(sheet_data, dict):
+                continue
+            sheet_cells = sheet_data.get("cells")
+            if isinstance(sheet_cells, dict):
+                nested_store[sheet_name] = sheet_cells
+                # 须在遍历 cells 前写入，供 _row_label_for_cell 读同行 A 列
+                cells_lookup["__html_sheet_cells__"] = nested_store
+                for cell_ref, raw in sheet_cells.items():
+                    if isinstance(cell_ref, str):
+                        _append_cell_record(
+                            records, seen, sheet_name, cell_ref, raw, cells_lookup
+                        )
+
+    for sheet_name, sheet_data in parsed_data.items():
+        if sheet_name in _PARSED_DATA_META_KEYS:
+            continue
+        if not isinstance(sheet_name, str) or not sheet_name:
+            continue
+        if not isinstance(sheet_data, dict):
+            continue
+        for field, raw in sheet_data.items():
+            if isinstance(field, str) and _CELL_ADDRESS_RE.match(field.strip().upper()):
+                _append_cell_record(
+                    records, seen, sheet_name, field, raw, cells_lookup
+                )
+
+    return records
+
+
+async def _build_custom_wp_cell_entries(
+    db, project_id: str, year: int
+) -> list[AddressEntry]:
+    """从 working_paper.parsed_data 构建自定义底稿 WP 域条目。"""
+    import uuid as _uuid
+
+    import sqlalchemy as sa
+
+    from app.models.workpaper_models import WorkingPaper, WpIndex
+
+    entries: list[AddressEntry] = []
+    try:
+        pid = _uuid.UUID(str(project_id))
+    except (ValueError, TypeError):
+        return entries
+
+    try:
+        rows = (
+            await db.execute(
+                sa.select(
+                    WorkingPaper.parsed_data,
+                    WpIndex.wp_code,
+                    WpIndex.wp_name,
+                )
+                .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+                .where(
+                    WorkingPaper.project_id == pid,
+                    WorkingPaper.is_deleted == False,  # noqa: E712
+                    WpIndex.is_deleted == False,  # noqa: E712
+                )
+            )
+        ).all()
+    except Exception as e:
+        logger.warning("_build_custom_wp_cell_entries query error: %s", e)
+        return entries
+
+    for parsed_data, wp_code, wp_name in rows:
+        if not wp_code:
+            continue
+        try:
+            for rec in extract_custom_cells(parsed_data):
+                uri = build_uri("wp", wp_code, path=rec.cell)
+                wp_display = (wp_name or wp_code).strip()
+                label_parts = [f"底稿 > {wp_code} {wp_display}"]
+                if rec.row_label:
+                    label_parts.append(f"> {rec.row_label}")
+                label_parts.append(f"（{rec.cell}）")
+                entries.append(
+                    AddressEntry(
+                        uri=uri,
+                        domain="wp",
+                        source=wp_code,
+                        path=rec.cell,
+                        cell=rec.cell,
+                        label=" ".join(label_parts),
+                        wp_code=wp_code,
+                        formula_ref=f"WP('{wp_code}','{rec.cell}')",
+                        jump_route=build_jump_route(uri, project_id, year),
+                        tags=["底稿", "自定义", rec.row_label] if rec.row_label else ["底稿", "自定义"],
+                    )
+                )
+        except Exception as e:
+            logger.warning(
+                "custom wp cell entries skip wp_code=%s: %s", wp_code, e
+            )
+            continue
+
+    return entries
+
+
 async def build_workpaper_entries(db, project_id: str, year: int) -> list[AddressEntry]:
     """从底稿映射构建地址条目"""
     import json
@@ -377,7 +623,7 @@ async def build_workpaper_entries(db, project_id: str, year: int) -> list[Addres
             wp_code = m.get('wp_code', '')
             wp_name = m.get('wp_name', '')
             for col in columns:
-                uri = build_uri('wp', wp_code, cell=col)
+                uri = build_uri('wp', wp_code, path=col)
                 entries.append(AddressEntry(
                     uri=uri,
                     domain='wp',
@@ -424,6 +670,12 @@ async def build_workpaper_entries(db, project_id: str, year: int) -> list[Addres
                     ))
     except Exception as e:
         logger.warning(f"build_workpaper_entries xref error: {e}")
+
+    try:
+        custom_entries = await _build_custom_wp_cell_entries(db, project_id, year)
+        entries.extend(custom_entries)
+    except Exception as e:
+        logger.warning(f"build_workpaper_entries custom cells error: {e}")
 
     return entries
 

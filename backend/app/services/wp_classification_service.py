@@ -31,6 +31,7 @@ VALID_COMPONENT_TYPES: set[str] = {
     "d-form-review",
     "e-control-test",
     "h-static-doc",
+    "custom",
     "univer",
     "skip",
 }
@@ -295,6 +296,9 @@ def derive_component_type(classification: ClassificationResult) -> str:
     CRITICAL: 禁止 Univer 兜底！无归类时抛异常而非返回 'univer'。
     """
     class_code = classification.class_code
+
+    if class_code and class_code.upper().startswith("CUSTOM"):
+        return "custom"
 
     if not class_code:
         raise ClassificationNotFoundError(

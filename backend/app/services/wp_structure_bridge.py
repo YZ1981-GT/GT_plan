@@ -474,7 +474,7 @@ def get_workpaper_addresses(
 
             # 有公式的单元格注册为可引用地址
             addr = cell.get("address", f"{_col_letter(ci)}{ri + 1}")
-            uri = build_uri("wp", wp_code, cell=addr)
+            uri = build_uri("wp", wp_code, path=addr)
             addresses.append({
                 "uri": uri,
                 "domain": "wp",

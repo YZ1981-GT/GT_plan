@@ -172,6 +172,7 @@ export const procedures = {
   init: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}/init`,
   custom: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}/custom`,
   applyScheme: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}/apply-scheme`,
+  assign: (pid: string) => `/api/projects/${pid}/procedures/assign`,
 } as const
 
 // ─── 复核 ───────────────────────────────────────────────────────────────────
