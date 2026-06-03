@@ -111,7 +111,7 @@
 
 | Spec | 状态 | 说明 |
 |------|------|------|
-| `consol-note-three-level-drilldown/` | 📌 | 合并附注三级穿透；前置 = 真实合并母子项目数据（PG 当前 0 个 consolidated 项目）；待并入 Phase 3 |
+| （无） | — | 全部已归档或删除；`consol-note-three-level-drilldown` 功能已被 `consol-phase3-frontend-drilldown`（归档 09）完整覆盖，stub 已删 |
 
 > 注：`workpaper-fill-service-split` 已 `git rm`（目标 WorkpaperFillService 经 grep 实证为 0 业务调用方的死代码，拆分无意义）；`gt-c-note-table-shrink` 已于 2026-05-30 完成并归档至 07-workpaper-slimdown（GtCNoteTable 1803→450 + GtEControlTest 1414→344，90 测试全绿；残留 R3 Playwright 目视待环境，非代码缺口）。
 > 注（2026-05-31）：merge work 分支带入 13 个底稿 spec 的 active 双份残留，经代码实证全部完成度 100%，已 `git rm` 删除 active 残留，仅保留 `_archive/` 权威版。
@@ -261,7 +261,7 @@ _archive/
 | prefill_formula_mapping | 1035 cells |
 | validation_rules | 114 条 |
 | D6 SQL 迁移 | V001-V040（V040 = account_note_mapping + consol_cell_comments 懒建表入 D6） |
-| **Spec 总数** | **active 1（consol-note stub 📌）+ archived 103（详见 §三）** |
+| **Spec 总数** | **active 0 + archived 103（详见 §三）** |
 
 ---
 
