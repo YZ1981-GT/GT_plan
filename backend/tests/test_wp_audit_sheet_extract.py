@@ -21,6 +21,7 @@ import pytest
 from app.services.wp_audit_sheet_extract import (
     extract_audit_rows,
     extract_audit_rows_from_sheet,
+    extract_audit_sections,
 )
 
 # 真实模板（cwd=backend 运行；以测试文件定位 backend 根，路径稳定）
@@ -63,8 +64,12 @@ def _build_audit_sheet(tmp_path, sheet_name="审定表D1-1"):
     ws["A13"] = "小计"
     ws["A14"] = "三、应收票据净值"          # 分节行
     ws["A15"] = "合计"                     # 合计 → isComputed
-    # 表体后说明区（应被首个空行截断：row16 空，row17 说明）
-    ws["A17"] = "审计说明：本表数据来源于试算平衡表。"
+    # 表体后说明区（应被首个空行截断：row16 空，row17 起为说明/结论区）
+    ws["A17"] = "1.审计说明"
+    ws["A18"] = "（1）期末净值较期初变动："
+    ws["A19"] = "主要原因（比例超过30%的）："
+    ws["A20"] = "2.审计结论"
+    ws["A21"] = "经审计，认可被审计单位列报金额。"
 
     # 分节行/合计行加粗
     for coord in ("A7", "A11", "A14", "A10", "A13", "A15"):
@@ -114,8 +119,10 @@ def test_section_total_flags(tmp_path):
     assert rows[0]["item"] == "一、应收票据原值"
     assert rows[0]["isSection"] is True
     assert rows[0]["isComputed"] is False
-    # 说明区被空行截断
-    assert "审计说明：本表数据来源于试算平衡表。" not in items
+    # 说明区被空行截断（说明/结论标题及正文不进入行项目）
+    assert "1.审计说明" not in items
+    assert "2.审计结论" not in items
+    assert "经审计，认可被审计单位列报金额。" not in items
 
     # 分节行
     sec = next(r for r in rows if r["item"] == "二、应收票据坏账准备")
@@ -194,6 +201,73 @@ def test_real_template_d1():
             "id", "item", "indent", "bold", "isSection", "isComputed",
             "account_code", "adj_amount", "reclass_amount", "reason",
         }
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 审计说明 / 审计结论区提取（extract_audit_sections）
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def test_extract_sections_basic(tmp_path):
+    """合成模板：审计说明正文 + 审计结论正文均被提取，标题保留。"""
+    fp, sn = _build_audit_sheet(tmp_path)
+    secs = extract_audit_sections(fp, sn)
+    assert secs["notes_label"] == "审计说明"
+    assert secs["conclusion_label"] == "审计结论"
+    # 说明区正文（标题「1.审计说明」自身不计入正文）
+    assert "1.审计说明" not in secs["notes"]
+    assert "期末净值较期初变动" in secs["notes"]
+    assert "比例超过30%" in secs["notes"]
+    # 结论区正文
+    assert "认可被审计单位列报金额" in secs["conclusion"]
+    assert "2.审计结论" not in secs["conclusion"]
+
+
+def test_extract_sections_schema(tmp_path):
+    """返回结构含 4 个键，均为字符串。"""
+    fp, sn = _build_audit_sheet(tmp_path)
+    secs = extract_audit_sections(fp, sn)
+    for key in ("notes", "conclusion", "notes_label", "conclusion_label"):
+        assert key in secs
+        assert isinstance(secs[key], str)
+
+
+def test_extract_sections_missing_file(tmp_path):
+    """文件不存在 → 返回空区块（默认标题，正文为空）。"""
+    secs = extract_audit_sections(tmp_path / "nope.xlsx", "X")
+    assert secs == {
+        "notes": "", "conclusion": "",
+        "notes_label": "审计说明", "conclusion_label": "审计结论",
+    }
+
+
+def test_extract_sections_no_section_headings(tmp_path):
+    """模板无说明/结论标题 → 正文空，标题回退默认。"""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "审定表X"
+    ws["A5"] = "项目"
+    ws["A6"] = "银行存款"
+    fp = tmp_path / "nosec.xlsx"
+    wb.save(str(fp))
+    wb.close()
+    secs = extract_audit_sections(fp, "审定表X")
+    assert secs["notes"] == ""
+    assert secs["conclusion"] == ""
+
+
+@pytest.mark.skipif(
+    not _REAL_TEMPLATE.exists(),
+    reason=f"真实模板缺失：{_REAL_TEMPLATE}",
+)
+def test_extract_sections_real_template_d1():
+    """真实 D1：审计说明区含变动/质押贴现说明，标题为审计说明/审计结论。"""
+    secs = extract_audit_sections(_REAL_TEMPLATE, _REAL_SHEET)
+    assert secs["notes_label"] == "审计说明"
+    assert secs["conclusion_label"] == "审计结论"
+    # 说明区含期末净值变动 + 质押贴现说明（模板默认文本）
+    assert "净值" in secs["notes"]
+    assert "质押" in secs["notes"] or "贴现" in secs["notes"]
 
 
 # ─────────────────────────────────────────────────────────────────────────

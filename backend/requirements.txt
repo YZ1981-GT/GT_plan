@@ -33,4 +33,16 @@ jsonpath-ng
 pypinyin
 locust
 python-docx
+instructor>=1.5,<2
+openai>=1.0,<2
+schemathesis>=3.36,<4
+bm25s
+opentelemetry-api>=1.20,<2
+opentelemetry-sdk>=1.20,<2
+opentelemetry-instrumentation-fastapi>=0.41b0,<1
+opentelemetry-instrumentation-asyncpg>=0.41b0,<1
+opentelemetry-instrumentation-redis>=0.41b0,<1
+opentelemetry-instrumentation-httpx>=0.41b0,<1
+opentelemetry-exporter-otlp>=1.20,<2
+sqlfluff
 prometheus_client==0.25.0

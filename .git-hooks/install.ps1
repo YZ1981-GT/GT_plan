@@ -10,7 +10,7 @@ if (-not (Test-Path $hooksDir)) {
     exit 1
 }
 
-$hooks = @("pre-push")
+$hooks = @("pre-push", "pre-commit")
 foreach ($h in $hooks) {
     $src = "$sourceDir/$h"
     $dst = "$hooksDir/$h"

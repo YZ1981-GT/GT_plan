@@ -119,7 +119,17 @@ class WpRenderSchemaService:
         if exact.is_file():
             return exact
 
-        # 2. 前缀 fallback（如 B-template.yaml）
+        # 2. 附注披露专属 schema（C-{wp_code}-disclosure.yaml）
+        #    附注披露 sheet 的 wp_code 与主底稿相同（如 D1 的「附注披露信息（上市公司）」
+        #    其 wp_code 仍是 D1），但需要一套独立于审定表/程序表的 C 类嵌套表 schema。
+        #    命名约定 C-{wp_code}-disclosure.yaml（如 C-D1-disclosure / C-D2-disclosure），
+        #    内部 sheets: 仅声明附注披露 sheet，其余 sheet（审定表/程序表/网格）取不到
+        #    对应键 → 各自走 render-config 的自动生成兜底（互不干扰）。
+        disclosure = _SCHEMA_DIR / f"C-{wp_code}-disclosure.yaml"
+        if disclosure.is_file():
+            return disclosure
+
+        # 3. 前缀 fallback（如 B-template.yaml）
         prefix = self._extract_prefix(wp_code)
         if prefix:
             fallback = _SCHEMA_DIR / f"{prefix}-template.yaml"

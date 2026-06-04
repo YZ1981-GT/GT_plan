@@ -131,7 +131,7 @@ _PROJECTS = [
 _HANDCRAFTED_YAMLS = {
     "A": ["D2A.yaml", "E1A.yaml", "G7A.yaml"],
     "B": ["B-template.yaml"],
-    "C": ["C-D2-disclosure.yaml", "C-L-disclosure.yaml"],
+    "C": ["C-D1-disclosure.yaml", "C-D2-disclosure.yaml", "C-L-disclosure.yaml"],
     "D": [
         "D-D2-8.yaml",       # paragraph
         "D-D2-13.yaml",      # qa
@@ -642,10 +642,62 @@ class TestCClassDisclosureSchema:
         assert "listed" in variants, "version_variants 必须含 listed"
         assert "soe" in variants, "version_variants 必须含 soe"
 
+    def test_c_d1_disclosure_two_sheets_separated_subtables_and_tips(self) -> None:
+        """C-D1-disclosure（应收票据）必须：
+        - 含上市公司 + 国企两个附注披露 sheet，均 c-note-table；
+        - 每个 sheet 的 sub_tables 多张独立子表（不混成一张大表）；
+        - 含 ⚠ 提示卡（模板【提示...】→ description）；
+        - 含 cross_refs（从 D1-1/D1-4 等底稿取数）。
+        """
+        service = WpRenderSchemaService()
+        schema = service.load_schema("D1")  # 经 C-D1-disclosure.yaml 解析
 
-# ────────────────────────────────────────────────────────────────────────
-# Test 7: 全部 192 schemas 加载冒烟（14 + 178）
-# ────────────────────────────────────────────────────────────────────────
+        assert schema["wp_code"] == "C-D1-disclosure"
+        sheets = schema["sheets"]
+        assert "附注披露信息（上市公司）" in sheets
+        assert "附注披露信息（国企）" in sheets
+
+        for sheet_name in ("附注披露信息（上市公司）", "附注披露信息（国企）"):
+            c_sheet = sheets[sheet_name]
+            assert c_sheet["component_type"] == "c-note-table"
+
+            sub_tables = c_sheet.get("sub_tables", [])
+            assert isinstance(sub_tables, list)
+            # 多张独立子表（分类/质押/贴现/坏账分类/计提变动/核销...）
+            assert len(sub_tables) >= 10, (
+                f"{sheet_name} 应有 ≥10 张独立子表，实际 {len(sub_tables)}"
+            )
+
+            ids = set()
+            for st in sub_tables:
+                assert "id" in st and "type" in st and "title" in st
+                assert st["type"] in {"static_rows", "dynamic_rows"}
+                assert st["id"] not in ids, f"重复子表 id: {st['id']}"
+                ids.add(st["id"])
+                # 每张子表必须有 columns（结构化，非空网格）
+                assert st.get("columns"), f"{st['id']} 缺少 columns"
+
+            # 至少一张提示卡（title 以 ⚠ 提示 开头，且有 description）
+            tip_cards = [
+                st for st in sub_tables
+                if st.get("title", "").startswith("⚠ 提示")
+            ]
+            assert tip_cards, f"{sheet_name} 缺少提示卡"
+            for tip in tip_cards:
+                assert st.get("description") is not None
+
+            # 含可自定义填充的动态行子表
+            dynamic = [st for st in sub_tables if st["type"] == "dynamic_rows"]
+            assert dynamic, f"{sheet_name} 应含可自定义填充的 dynamic_rows 子表"
+
+            # cross_refs 从其他底稿取数
+            cross_refs = c_sheet.get("cross_refs", [])
+            assert cross_refs, f"{sheet_name} 应含 cross_refs（从其他底稿取数）"
+            assert any(r.get("auto_pull") for r in cross_refs), (
+                f"{sheet_name} 至少一条 cross_ref 应 auto_pull"
+            )
+
+
 
 
 class TestAllSchemasSmokeLoad:

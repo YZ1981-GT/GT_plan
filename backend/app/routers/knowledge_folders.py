@@ -189,36 +189,60 @@ async def create_document(
 async def _extract_text_with_ocr(
     file_path: str, content: bytes, filename_lower: str
 ) -> str | None:
-    """提取 PDF/docx 全文——优先 MinerU OCR，降级 PyPDF2/python-docx。
+    """提取文档全文 → Markdown 文本
 
-    MinerU recognize_for_ocr 返回 {"text": 完整文本}，适合扫描件/复杂排版。
-    若 MinerU 不可用或失败，回退到 PyPDF2（PDF）/ python-docx（docx）。
+    多级降级链：
+      1. **MarkItDown**（本地纯 Python，覆盖 PDF/Word/Excel/PPT/HTML/CSV/JSON/EPub）—— 主路径
+      2. **MinerU OCR**（PDF 扫描件兜底，复杂排版/表格识别）—— PDF 专用
+      3. **PyPDF2 / python-docx** —— 最后兜底
+
+    设计：
+      - 文本类（.pdf/.docx/.xlsx/.pptx/.html/.csv/.json/...）优先 markitdown，输出就是 Markdown
+        天然适合 LLM 上下文 + 向量索引。
+      - 扫描件 PDF（markitdown 输出空或全是图片 placeholder）自动降级到 MinerU OCR。
+      - 其它扩展名（.txt/.md）由调用方直读，不进本函数。
     """
     import logging
 
     _log = logging.getLogger(__name__)
 
-    # ── 尝试 MinerU OCR（全文识别，非 wp_document_recognizer 结构化字段提取） ──
+    # ── 主路径：MarkItDown ──
     try:
-        from app.services.mineru_service import MinerUService
+        from app.services.markitdown_service import convert_bytes_to_markdown
 
-        mineru = MinerUService()
-        if await mineru.is_available():
-            result = await mineru.recognize_for_ocr(file_path)
-            text = (result.get("text") or "").strip()
-            if text:
-                _log.info(
-                    "[KB OCR] MinerU extracted %d chars from %s",
-                    len(text),
-                    file_path,
-                )
-                return text[:50000]
-            # MinerU 返回空文本，降级
-            _log.warning("[KB OCR] MinerU returned empty text, falling back for %s", file_path)
+        md_text = convert_bytes_to_markdown(content, filename_lower)
+        if md_text:
+            _log.info(
+                "[KB Extract] MarkItDown extracted %d chars from %s",
+                len(md_text),
+                file_path,
+            )
+            return md_text
+        _log.info("[KB Extract] MarkItDown empty/unsupported, trying fallback for %s", file_path)
     except Exception as exc:
-        _log.warning("[KB OCR] MinerU failed (%s), falling back for %s", exc, file_path)
+        _log.warning("[KB Extract] MarkItDown failed (%s), trying fallback for %s", exc, file_path)
 
-    # ── 降级：PyPDF2 / python-docx ──
+    # ── 降级 1：MinerU OCR（仅 PDF，扫描件兜底） ──
+    if filename_lower.endswith(".pdf"):
+        try:
+            from app.services.mineru_service import MinerUService
+
+            mineru = MinerUService()
+            if await mineru.is_available():
+                result = await mineru.recognize_for_ocr(file_path)
+                text = (result.get("text") or "").strip()
+                if text:
+                    _log.info(
+                        "[KB Extract] MinerU OCR extracted %d chars from %s",
+                        len(text),
+                        file_path,
+                    )
+                    return text[:50000]
+                _log.warning("[KB Extract] MinerU returned empty text, falling back for %s", file_path)
+        except Exception as exc:
+            _log.warning("[KB Extract] MinerU failed (%s), falling back for %s", exc, file_path)
+
+    # ── 降级 2：PyPDF2 / python-docx ──
     try:
         if filename_lower.endswith(".pdf"):
             import io
@@ -232,7 +256,7 @@ async def _extract_text_with_ocr(
                     pages_text.append(text)
             fallback_text = "\n".join(pages_text).strip()
             if fallback_text:
-                _log.info("[KB OCR] PyPDF2 fallback extracted %d chars", len(fallback_text))
+                _log.info("[KB Extract] PyPDF2 fallback extracted %d chars", len(fallback_text))
                 return fallback_text[:50000]
         elif filename_lower.endswith(".docx"):
             import io
@@ -242,10 +266,10 @@ async def _extract_text_with_ocr(
             paragraphs = [p.text for p in doc_obj.paragraphs if p.text.strip()]
             fallback_text = "\n".join(paragraphs).strip()
             if fallback_text:
-                _log.info("[KB OCR] python-docx fallback extracted %d chars", len(fallback_text))
+                _log.info("[KB Extract] python-docx fallback extracted %d chars", len(fallback_text))
                 return fallback_text[:50000]
     except Exception as exc:
-        _log.warning("[KB OCR] Fallback extraction also failed: %s", exc)
+        _log.warning("[KB Extract] Fallback extraction also failed: %s", exc)
 
     return None
 
@@ -290,14 +314,16 @@ async def upload_documents(
                 f.write(content)
 
             # 提取文本内容（可选，失败不阻断）
-            # PDF/docx 优先使用 MinerU OCR 全文识别（保障 spec B 向量索引有内容）
-            # 降级路径：MinerU 不可用时回退 PyPDF2/python-docx
+            # 文本类（.txt/.md）直接 utf-8 decode
+            # 其它支持格式（PDF/Word/Excel/PPT/HTML/CSV/JSON/EPub 等）→ MarkItDown 主路径
+            #   PDF 扫描件无文本层时自动降级 MinerU OCR / PyPDF2
             content_text = None
             filename_lower = file.filename.lower()
             try:
                 if filename_lower.endswith((".txt", ".md")):
                     content_text = content.decode("utf-8", errors="ignore")[:50000]
-                elif filename_lower.endswith((".pdf", ".docx")):
+                else:
+                    # 由 _extract_text_with_ocr 内部判断扩展名是否支持，不支持返 None
                     content_text = await _extract_text_with_ocr(
                         str(file_path), content, filename_lower
                     )

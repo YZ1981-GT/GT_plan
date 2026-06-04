@@ -329,6 +329,87 @@ describe('GtAuditSheet — 保存（持久化分层）', () => {
 })
 
 /**
+ * 审计说明 / 审计结论区（数据表体之后的可编辑说明段落）
+ *
+ * 验证：
+ * 1. 从 htmlData.audit_sections 构建说明/结论正文 + 标题；缺失时回退默认标题
+ * 2. 保存载荷含 audit_sections（notes/conclusion/notes_label/conclusion_label）
+ * 3. 用户编辑说明/结论文本反映到保存载荷
+ * 4. readonly 时 onSectionChange 不修改
+ */
+describe('GtAuditSheet — 审计说明 / 审计结论区', () => {
+  it('从 audit_sections 构建说明/结论正文与标题', () => {
+    const wrapper = mountSheet({
+      audit_rows: [{ id: 'row-1', item: '原值', indent: 1 }],
+      tb_values: {},
+      audit_sections: {
+        notes: '期末净值较期初增长 35%，主因业务规模扩大。',
+        conclusion: '经审计，认可被审计单位列报金额。',
+        notes_label: '审计说明',
+        conclusion_label: '审计结论',
+      },
+    })
+    const vm = wrapper.vm as any
+    expect(vm.auditSections.notes).toContain('35%')
+    expect(vm.auditSections.conclusion).toContain('认可')
+    expect(vm.auditSections.notes_label).toBe('审计说明')
+    expect(vm.auditSections.conclusion_label).toBe('审计结论')
+  })
+
+  it('audit_sections 缺失时标题回退默认（审计说明/审计结论）', () => {
+    const wrapper = mountSheet({ audit_rows: [{ id: 'row-1', item: '原值' }], tb_values: {} })
+    const vm = wrapper.vm as any
+    expect(vm.auditSections.notes).toBe('')
+    expect(vm.auditSections.conclusion).toBe('')
+    expect(vm.auditSections.notes_label).toBe('审计说明')
+    expect(vm.auditSections.conclusion_label).toBe('审计结论')
+  })
+
+  it('保存载荷含 audit_sections', () => {
+    const wrapper = mountSheet({
+      audit_rows: [{ id: 'row-1', item: '原值' }],
+      tb_values: {},
+      audit_sections: { notes: '说明A', conclusion: '结论B' },
+    })
+    const vm = wrapper.vm as any
+    const payload = vm.buildSavePayload() as AuditSheetHtmlData
+    expect(payload.audit_sections).toBeDefined()
+    expect(payload.audit_sections!.notes).toBe('说明A')
+    expect(payload.audit_sections!.conclusion).toBe('结论B')
+    expect(payload.audit_sections!.notes_label).toBe('审计说明')
+  })
+
+  it('用户编辑说明/结论反映到保存载荷', () => {
+    const wrapper = mountSheet({ audit_rows: [{ id: 'row-1', item: '原值' }], tb_values: {} })
+    const vm = wrapper.vm as any
+    vm.onSectionChange('notes', '变动率 42%，主因新增大额订单。')
+    vm.onSectionChange('conclusion', '认可列报金额。')
+    const payload = vm.buildSavePayload() as AuditSheetHtmlData
+    expect(payload.audit_sections!.notes).toContain('42%')
+    expect(payload.audit_sections!.conclusion).toContain('认可')
+  })
+
+  it('readonly 时 onSectionChange 不修改文本', () => {
+    const wrapper = mountSheet(
+      {
+        audit_rows: [{ id: 'row-1', item: '原值' }],
+        tb_values: {},
+        audit_sections: { notes: '原说明', conclusion: '原结论' },
+      },
+      true,
+    )
+    const vm = wrapper.vm as any
+    vm.onSectionChange('notes', '试图篡改')
+    expect(vm.auditSections.notes).toBe('原说明')
+  })
+
+  it('渲染说明/结论两个 textarea 区块', () => {
+    const wrapper = mountSheet({ audit_rows: [{ id: 'row-1', item: '原值' }], tb_values: {} })
+    expect(wrapper.findAll('.gas-section').length).toBe(2)
+  })
+})
+
+/**
  * Task 14 — TB 消费 + 用户覆盖回退逻辑
  *
  * audited = current_unadjusted + (adj_amount ?? sys_aje ?? 0) + (reclass_amount ?? sys_rje ?? 0)

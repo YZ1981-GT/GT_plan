@@ -29,16 +29,6 @@
 
     <!-- Ready: dispatch by componentType -->
     <template v-if="!loading && !error && renderConfig">
-      <!-- Sprint 4 Task 9.2: 底稿填写完成度可视化 -->
-      <div v-if="completionRate.total > 0" class="gt-wp-renderer__completion">
-        <el-progress
-          type="circle"
-          :percentage="completionRate.percentage"
-          :width="36"
-          :stroke-width="3"
-        />
-      </div>
-
       <!-- Sprint 4 Task 10.2: schema 缺失智能提示 banner -->
       <el-alert
         v-if="schemaFallbackBanner"
@@ -49,8 +39,15 @@
         {{ schemaFallbackBanner }}
       </el-alert>
 
-      <!-- 编制信息表头（workpaper 级，所有 sheet 共享） -->
-      <GtWpPreparationHeader :wp-id="wpId" :readonly="readonly" />
+      <!-- 编制信息表头（workpaper 级，所有 sheet 共享）
+           b-index sheet 自带等价编制信息块（GtBIndex 内置），此处跳过避免重复
+           index-no-override：传当前 sheet 级索引号（如 D1A），表头右上角随 sheet 切换更新 -->
+      <GtWpPreparationHeader
+        v-if="componentType !== 'b-index'"
+        :wp-id="wpId"
+        :readonly="readonly"
+        :index-no-override="activeSheetIndexNo"
+      />
 
       <!-- Sheet 选择器（多 sheet 时显示） -->
       <div v-if="visibleSheets.length > 1" class="gt-wp-renderer__sheet-tabs">
@@ -101,9 +98,9 @@
         @restore="reload"
       />
 
-      <!-- Univer 类（F/G）：有模板网格数据时只读展示，否则占位 -->
+      <!-- Univer 类（F/G）有模板网格数据时只读展示；C-附注披露无 schema 时也走只读网格兜底 -->
       <GtGridSheet
-        v-else-if="componentType === 'univer' && hasGridCells"
+        v-else-if="(componentType === 'univer' && hasGridCells) || cNoteGridFallback"
         :wp-id="wpId"
         :sheet-name="activeSheetName"
         :schema="activeSheetSchema"
@@ -143,7 +140,6 @@
 import { ref, computed, toRef, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useWpRenderer, type WpComponentType } from '@/composables/useWpRenderer'
-import { useWpCompletionRate } from '@/composables/useWpCompletionRate'
 import { useCellLocate, type LocateTarget } from '@/composables/useCellLocate'
 import { eventBus, type WorkpaperLocateCellPayload } from '@/utils/eventBus'
 import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
@@ -257,6 +253,19 @@ const activeSheet = computed(() => {
 
 const activeSheetSchema = computed(() => activeSheet.value?.schema ?? {})
 const activeSheetHtmlData = computed<any>(() => activeSheet.value?.html_data ?? {})
+
+/**
+ * 当前 sheet 的索引号（sheet 级，传给编制信息表头右上角）。
+ * 从 sheet_name 末尾正则提取真实索引（如「应收票据审计程序表D1A」→ D1A、
+ * 「审定表D1-1」→ D1-1），与后端 _generate_b_index_data 的 sheet 级提取口径一致；
+ * 提取不到时回退 workpaper 级 wp_code（renderConfig.wp_code）。
+ */
+const activeSheetIndexNo = computed<string>(() => {
+  const name = activeSheetName.value || ''
+  const m = name.match(/([A-Z]\d+[A-Z]?(?:-\d+)*)\s*$/)
+  if (m) return m[1]
+  return renderConfig.value?.wp_code ?? ''
+})
 /** univer 类底稿：html_data 是否含可渲染网格 cells（决定走只读网格还是占位） */
 const hasGridCells = computed<boolean>(() => {
   const hd = activeSheetHtmlData.value
@@ -267,8 +276,24 @@ const componentType = computed<WpComponentType>(() => {
   return (activeSheet.value?.componentType as WpComponentType) ?? 'skip'
 })
 
-/** 注册表查找：HTML 类型 → component + emit 列表（lazy import） */
-const rendererEntry = computed(() => getRendererEntry(componentType.value))
+/**
+ * C-附注披露无 schema 的只读网格兜底判定。
+ * GtCNoteTable 是 schema 驱动；当某附注披露 sheet 无配套 schema.sub_tables 时，
+ * 后端会回退提取模板网格（html_data.cells），此时改用 GtGridSheet 只读还原模板外观，
+ * 避免 GtCNoteTable 永远显示「附注披露表尚未配置」空态。
+ */
+const cNoteGridFallback = computed<boolean>(() => {
+  if (componentType.value !== 'c-note-table') return false
+  const schema = activeSheetSchema.value as any
+  const hasSubTables = !!schema && Array.isArray(schema.sub_tables) && schema.sub_tables.length > 0
+  return !hasSubTables && hasGridCells.value
+})
+
+/** 注册表查找：HTML 类型 → component + emit 列表（lazy import）。
+ *  C-附注披露走网格兜底时不用注册表组件（GtCNoteTable），改由 GtGridSheet 渲染。 */
+const rendererEntry = computed(() =>
+  cNoteGridFallback.value ? undefined : getRendererEntry(componentType.value),
+)
 
 /** D 子模式需要 form-type prop；custom 需要项目上下文 */
 const extraComponentProps = computed<Record<string, unknown>>(() => {
@@ -294,9 +319,6 @@ const preparationYear = computed(() => new Date().getFullYear())
 function getSheetIcon(ct: string): string {
   return registryGetSheetIcon(ct)
 }
-
-// Sprint 4 Task 9.2: 底稿填写完成度
-const { rate: completionRate } = useWpCompletionRate(componentType, activeSheetSchema, activeSheetHtmlData)
 
 // ─── wp-locate-foundation Task 3.1: 监听 workpaper:locate-cell 事件 ───
 const { locateCell } = useCellLocate()
@@ -509,13 +531,6 @@ function onOpenFormula(payload: { sheetName: string }) {
   align-items: center;
   justify-content: center;
   min-height: 300px;
-}
-
-.gt-wp-renderer__completion {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  z-index: 10;
 }
 
 .gt-wp-renderer__fallback-banner {

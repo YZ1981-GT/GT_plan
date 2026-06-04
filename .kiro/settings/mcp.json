@@ -1,14 +1,15 @@
 {
   "mcpServers": {
     "codegraph": {
-      "command": "npx",
+      "type": "stdio",
+      "command": "C:\\Program Files\\nodejs\\npx.cmd",
       "args": [
         "-y",
         "@colbymchenry/codegraph",
         "serve",
         "--mcp",
         "--no-watch",
-        "-p",
+        "--path",
         "D:/GT_plan"
       ],
       "env": {},

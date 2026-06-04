@@ -7,6 +7,7 @@
     <div class="gt-wp-prep__bar" @click="collapsed = !collapsed">
       <span class="gt-wp-prep__title">编制信息</span>
       <span class="gt-wp-prep__summary" v-if="collapsed">{{ summaryText }}</span>
+      <span class="gt-wp-prep__index" v-if="indexNo">索引号：{{ indexNo }}</span>
       <el-button
         class="gt-wp-prep__toggle"
         link
@@ -18,14 +19,13 @@
       </el-button>
     </div>
     <div v-show="!collapsed" class="gt-wp-prep__body" v-loading="loading">
-      <el-descriptions :column="4" border size="small" class="gt-wp-prep__desc">
+      <el-descriptions :column="3" border size="small" class="gt-wp-prep__desc">
         <el-descriptions-item label="被审计单位">{{ field('entity_name') }}</el-descriptions-item>
         <el-descriptions-item label="截止日">{{ field('period_end') }}</el-descriptions-item>
         <el-descriptions-item label="编制人">{{ field('preparer') }}</el-descriptions-item>
-        <el-descriptions-item label="编制时间">{{ field('prep_date') }}</el-descriptions-item>
+        <el-descriptions-item label="编制日期">{{ field('prep_date') }}</el-descriptions-item>
         <el-descriptions-item label="复核人">{{ field('reviewer') }}</el-descriptions-item>
         <el-descriptions-item label="复核日期">{{ field('review_date') }}</el-descriptions-item>
-        <el-descriptions-item label="索引号" :span="2">{{ field('index_no') }}</el-descriptions-item>
       </el-descriptions>
     </div>
   </div>
@@ -48,6 +48,8 @@ interface PreparationInfo {
 const props = defineProps<{
   wpId: string
   readonly?: boolean
+  /** sheet 级索引号覆盖（如 D1A）：父组件按当前激活 sheet 传入，优先于 workpaper 级 index_no */
+  indexNoOverride?: string
 }>()
 
 const collapsed = ref(false)
@@ -62,6 +64,15 @@ function field(key: keyof PreparationInfo): string {
 const summaryText = computed(() => {
   const parts = [field('entity_name'), field('index_no')].filter(p => p !== '—')
   return parts.length ? parts.join(' · ') : '—'
+})
+
+// 索引号置于标题栏右上角常显（取代表内单独索引号行）
+// 优先用父组件传入的 sheet 级覆盖（如 D1A），否则回退 workpaper 级 index_no
+const indexNo = computed(() => {
+  const override = props.indexNoOverride
+  if (override != null && String(override).trim() !== '') return String(override)
+  const v = info.value.index_no
+  return v != null && String(v).trim() !== '' ? String(v) : ''
 })
 
 async function load() {
@@ -114,8 +125,19 @@ watch(() => props.wpId, (id) => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.gt-wp-prep__toggle {
+/* 索引号常显于标题栏右上角（取代表内单独索引号行） */
+.gt-wp-prep__index {
   margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gt-color-primary, #4b2d77);
+  white-space: nowrap;
+}
+.gt-wp-prep__summary ~ .gt-wp-prep__index {
+  margin-left: 8px;
+}
+.gt-wp-prep__toggle {
+  margin-left: 8px;
 }
 .gt-wp-prep__body {
   padding: 0 12px 10px;

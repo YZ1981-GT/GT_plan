@@ -27,6 +27,7 @@
     @cross-ref-update="onHtmlCrossRefUpdate"
     @sync-to-disclosure-notes="onHtmlSyncToDisclosureNotes"
     @jump-to-reference="onHtmlJumpToReference"
+    @open-formula="onHtmlOpenFormula"
   />
 
   <!-- 默认 Univer 编辑器（component_type='univer' 或未配置时） -->
@@ -177,6 +178,16 @@
       @navigate="onCellDetailNavigate"
     />
 
+    <!-- 公式编辑弹窗（HTML 渲染器子组件 open-formula 事件触发） -->
+    <FormulaEditDialog
+      v-model="showHtmlFormulaDialog"
+      :row="htmlFormulaDialogRow"
+      :project-id="projectId"
+      :year="currentYear"
+      :wp-context="htmlFormulaWpContext"
+      @save="onHtmlFormulaSave"
+    />
+
     <!-- R7-S3-05 Task 25：底稿右栏面板（抽屉模式） -->
     <el-drawer
       v-model="showSidePanel"
@@ -276,6 +287,8 @@ import { ref, computed, provide, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { confirmLeave } from '@/utils/confirm'
 import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
+import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useCycleType } from '@/composables/useCycleType'
 import { useEditorMode } from '@/composables/useEditorMode'
@@ -297,6 +310,7 @@ import GtWpRenderer from '@/components/workpaper/GtWpRenderer.vue'
 import WorkpaperSidePanel from '@/components/workpaper/WorkpaperSidePanel.vue'
 import ReviewLayerBadges from '@/components/workpaper/ReviewLayerBadges.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
+import FormulaEditDialog from '@/components/formula/FormulaEditDialog.vue'
 import TimeMachineDrawer from '@/components/time_machine/TimeMachineDrawer.vue'
 import UniverEditorCore from './workpaper-editor/UniverEditorCore.vue'
 import EditorBanners from './workpaper-editor/EditorBanners.vue'
@@ -326,6 +340,22 @@ const reviewDialogCell = ref<{ sheet: string; cellRef: string }>({ sheet: '', ce
 const showCellFormulaDetail = ref(false)
 const cellDetailSheet = ref('')
 const cellDetailLabel = ref('')
+
+// ─── HTML 渲染器公式编辑弹窗状态（open-formula 事件触发）───
+const showHtmlFormulaDialog = ref(false)
+const htmlFormulaDialogRow = ref<Record<string, string>>({})
+const currentYear = computed(() => new Date().getFullYear())
+const htmlFormulaWpContext = computed(() => {
+  if (!projectId.value) return undefined
+  return {
+    wpId: wpId.value,
+    wpCode: wpDetail.value?.wp_code || '',
+    sheetName: htmlFormulaDialogRow.value.sheet_name || '',
+    projectId: projectId.value,
+    year: currentYear.value,
+    cells: [],
+  }
+})
 const showStaleImpactPanel = ref(false)
 const showDocAiChat = ref(false)
 const univerEditorCoreRef = ref<InstanceType<typeof UniverEditorCore> | null>(null)
@@ -647,6 +677,51 @@ function onUpload() {
     params: { projectId: projectId.value },
     query: { upload: wpId.value },
   })
+}
+
+// ─── HTML 渲染器公式编辑（open-formula 事件）─────────────────────────────
+
+function onHtmlOpenFormula(payload: { wpId: string; sheetName: string }) {
+  htmlFormulaDialogRow.value = {
+    row_code: `WP:${payload.wpId}:${payload.sheetName}`,
+    row_name: payload.sheetName,
+    sheet_name: payload.sheetName,
+  }
+  showHtmlFormulaDialog.value = true
+}
+
+async function onHtmlFormulaSave(payload: {
+  formula: string
+  category: string
+  description: string
+  target_cell?: string
+}) {
+  if (!payload.formula?.trim()) {
+    ElMessage.warning('公式表达式不能为空')
+    return
+  }
+  const target = (payload.target_cell || '').trim()
+  const cellMatch = target.match(/([A-Z]+\d+)/i)
+  const targetCell = cellMatch ? cellMatch[1].toUpperCase() : ''
+  if (!targetCell) {
+    ElMessage.warning('请先选择目标单元格（如 B5）')
+    return
+  }
+  try {
+    await httpApi.put(`/api/workpapers/${wpId.value}/formulas`, {
+      sheet_name: htmlFormulaDialogRow.value.sheet_name || '',
+      target_cell: targetCell,
+      expression: payload.formula,
+      year: currentYear.value,
+      template_type: 'soe',
+      category: payload.category || '',
+      description: payload.description || '',
+    })
+    ElMessage.success('公式已保存')
+    showHtmlFormulaDialog.value = false
+  } catch (e) {
+    handleApiError(e, '保存公式失败')
+  }
 }
 
 // ─── Cell formula detail ────────────────────────────────────────────────────

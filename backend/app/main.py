@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
 from app.core.config import settings
+from app.core.tracing import setup_tracing
 from app.core.logging_config import setup_logging
 from app.middleware.audit_log import AuditLogMiddleware
 from app.middleware.error_handler import (
@@ -279,6 +280,8 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+setup_tracing(app)
 
 
 @app.get("/api/version")

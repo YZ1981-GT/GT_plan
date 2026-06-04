@@ -58,6 +58,13 @@
           :disabled="readonly"
           @click="onRestore"
         >🔄 还原</el-button>
+        <!-- 一键刷新：从四表库预填充数据 -->
+        <el-button
+          size="small"
+          class="gas-btn-refresh"
+          :disabled="readonly"
+          @click="onRefreshFromLedger"
+        >📊 一键刷新</el-button>
         <span class="gas-btn-sep"></span>
         <!-- 导入导出（Task 16，复用 useExcelIO）：
              导出模板=行项目名+列标题供离线填写（只读操作，readonly 仍可用）；
@@ -67,6 +74,11 @@
           class="gas-btn-export"
           @click="onExportTemplate"
         >📥 导出模板</el-button>
+        <el-button
+          size="small"
+          class="gas-btn-export-data"
+          @click="onExportData"
+        >📥 导出数据</el-button>
         <el-button
           size="small"
           class="gas-btn-import"
@@ -158,28 +170,28 @@
       </el-table-column>
 
       <!-- 期初未审（只读，TB；合计行汇总） -->
-      <el-table-column label="期初未审" width="120" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="期初未审" width="120" align="right">
         <template #default="{ row }">
           <span v-if="!row.isSection" class="gas-readonly-cell">{{ fmtNum(displayOpeningUnadjusted(row)) }}</span>
         </template>
       </el-table-column>
 
       <!-- 期初审定（只读，computed = 期初未审 ?? 0） -->
-      <el-table-column label="期初审定" width="120" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="期初审定" width="120" align="right">
         <template #default="{ row }">
           <span v-if="!row.isSection" class="gas-readonly-cell">{{ fmtNum(openingAudited(row)) }}</span>
         </template>
       </el-table-column>
 
       <!-- 本期未审（只读，TB；合计行汇总） -->
-      <el-table-column label="本期未审" width="120" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="本期未审" width="120" align="right">
         <template #default="{ row }">
           <span v-if="!row.isSection" class="gas-readonly-cell">{{ fmtNum(displayCurrentUnadjusted(row)) }}</span>
         </template>
       </el-table-column>
 
       <!-- 账项调整（可编辑；合计行汇总只读） -->
-      <el-table-column label="账项调整" width="130" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="账项调整" width="130" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="isEditableRow(row)"
@@ -197,7 +209,7 @@
       </el-table-column>
 
       <!-- 重分类（可编辑；合计行汇总只读） -->
-      <el-table-column label="重分类" width="130" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="重分类" width="130" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="isEditableRow(row)"
@@ -215,28 +227,28 @@
       </el-table-column>
 
       <!-- 审定数（自动计算，紫色） -->
-      <el-table-column label="审定数" width="120" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="审定数" width="120" align="right">
         <template #default="{ row }">
           <span v-if="!row.isSection" class="gas-auto-cell">{{ fmtNum(auditedAmount(row)) }}</span>
         </template>
       </el-table-column>
 
       <!-- 变动额（自动计算，紫色） -->
-      <el-table-column label="变动额" width="120" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="变动额" width="120" align="right">
         <template #default="{ row }">
           <span v-if="!row.isSection" class="gas-auto-cell">{{ fmtNum(changeAmount(row)) }}</span>
         </template>
       </el-table-column>
 
       <!-- 变动率（自动计算，紫色，百分比） -->
-      <el-table-column label="变动率" width="100" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="变动率" width="100" align="right">
         <template #default="{ row }">
           <span v-if="!row.isSection" class="gas-auto-cell">{{ fmtRate(changeRate(row)) }}</span>
         </template>
       </el-table-column>
 
       <!-- 原因分析（可编辑） -->
-      <el-table-column label="原因" min-width="180">
+      <el-table-column v-if="!isDynamicColumns" label="原因" min-width="180">
         <template #default="{ row }">
           <el-input
             v-if="isEditableRow(row)"
@@ -249,7 +261,138 @@
           <span v-else-if="!row.isSection" class="gas-readonly-cell">{{ row.reason || '—' }}</span>
         </template>
       </el-table-column>
+
+      <!-- 动态列（多列明细表，列分组折叠） -->
+      <!-- 期初区折叠按钮（折叠时显示，点击展开） -->
+      <el-table-column
+        v-if="isDynamicColumns && columnGroups.opening.length && openingGroupCollapsed"
+        width="36"
+        align="center"
+        class-name="gas-col-expand-btn"
+      >
+        <template #header>
+          <span class="gas-col-group-toggle" title="展开期初区" @click.stop="openingGroupCollapsed = false">▶</span>
+        </template>
+        <template #default>
+          <span class="gas-col-group-toggle-cell">⋯</span>
+        </template>
+      </el-table-column>
+
+      <!-- 期初区列（展开时显示） -->
+      <el-table-column
+        v-for="col in (isDynamicColumns && !openingGroupCollapsed ? columnGroups.opening : [])"
+        :key="col.key"
+        :label="col.label"
+        :width="110"
+        align="right"
+      >
+        <template #header>
+          <span>{{ col.label }}</span>
+          <span
+            v-if="col === columnGroups.opening[columnGroups.opening.length - 1]"
+            class="gas-col-group-toggle"
+            title="收起期初区"
+            @click.stop="openingGroupCollapsed = true"
+          > ◀</span>
+        </template>
+        <template #default="{ row }">
+          <el-input-number
+            v-if="isEditableRow(row)"
+            v-model="row[col.key]"
+            size="small"
+            :precision="2"
+            :controls="false"
+            :disabled="readonly"
+            placeholder="—"
+            style="width: 100%"
+            @change="(v: number | undefined) => onFieldChange(row, col.key, v)"
+          />
+          <span v-else-if="!row.isSection" class="gas-readonly-cell">{{ fmtNum(row[col.key]) }}</span>
+        </template>
+      </el-table-column>
+
+      <!-- 本期变动区（始终展开，核心编辑区） -->
+      <el-table-column
+        v-for="col in (isDynamicColumns ? columnGroups.current : [])"
+        :key="col.key"
+        :label="col.label"
+        :width="110"
+        align="right"
+      >
+        <template #default="{ row }">
+          <el-input-number
+            v-if="isEditableRow(row)"
+            v-model="row[col.key]"
+            size="small"
+            :precision="2"
+            :controls="false"
+            :disabled="readonly"
+            placeholder="—"
+            style="width: 100%"
+            @change="(v: number | undefined) => onFieldChange(row, col.key, v)"
+          />
+          <span v-else-if="!row.isSection" class="gas-readonly-cell">{{ fmtNum(row[col.key]) }}</span>
+        </template>
+      </el-table-column>
+
+      <!-- 期末区（始终展开，最终关注区） -->
+      <el-table-column
+        v-for="col in (isDynamicColumns ? columnGroups.closing : [])"
+        :key="col.key"
+        :label="col.label"
+        :width="110"
+        align="right"
+      >
+        <template #default="{ row }">
+          <el-input-number
+            v-if="isEditableRow(row)"
+            v-model="row[col.key]"
+            size="small"
+            :precision="2"
+            :controls="false"
+            :disabled="readonly"
+            placeholder="—"
+            style="width: 100%"
+            @change="(v: number | undefined) => onFieldChange(row, col.key, v)"
+          />
+          <span v-else-if="!row.isSection" class="gas-readonly-cell">{{ fmtNum(row[col.key]) }}</span>
+        </template>
+      </el-table-column>
     </el-table>
+
+    <!-- 审计说明 / 审计结论区 -->
+    <div v-if="tableData.length" class="gas-sections">
+      <div class="gas-section">
+        <div class="gas-section__title">
+          <span class="gas-section__badge">审计说明</span>
+        </div>
+        <p class="gas-section__hint">对期末与期初变动较大的项目（如变动率超过 30%）说明主要原因；记录质押、贴现、背书等特殊事项及其对财务报表的影响。</p>
+        <el-input
+          v-model="auditSections.notes"
+          type="textarea"
+          :rows="4"
+          :disabled="readonly"
+          :autosize="{ minRows: 3, maxRows: 12 }"
+          placeholder="示例：本期应收票据期末净值较期初增加 XX 万元，增幅 XX%，主要原因为……；期末已质押票据 XX 万元，用途为……"
+          @change="(v: string) => onSectionChange('notes', v)"
+        />
+      </div>
+      <div class="gas-section">
+        <div class="gas-section__title">
+          <span class="gas-section__badge gas-section__badge--conclusion">审计结论</span>
+        </div>
+        <p class="gas-section__hint">明确发表是否认可被审计单位在财务报表中列报的本科目金额，如存在差异需说明原因及影响。</p>
+        <el-input
+          v-model="auditSections.conclusion"
+          type="textarea"
+          :rows="3"
+          :disabled="readonly"
+          :autosize="{ minRows: 2, maxRows: 10 }"
+          placeholder="示例：经审计，我们认可被审计单位列报的应收票据期末余额 XX 万元，该金额与审定数一致，不存在需要调整的事项。"
+          @change="(v: string) => onSectionChange('conclusion', v)"
+        />
+      </div>
+    </div>
 
     <!-- 隐藏文件选择器（导入 Excel 触发） -->
     <input
@@ -315,7 +458,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmDangerous } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
@@ -362,9 +505,28 @@ export interface AuditSheetTbValue {
   sys_rje?: number | null
 }
 
+/**
+ * 审计说明 / 审计结论区（持久化）。
+ */
+export interface AuditSheetSections {
+  notes?: string
+  conclusion?: string
+  notes_label?: string
+  conclusion_label?: string
+}
+
+/** 动态列定义（多列明细表用） */
+export interface AuditSheetColumnDef {
+  key: string
+  label: string
+  col_idx: number
+}
+
 export interface AuditSheetHtmlData {
   audit_rows?: AuditSheetRow[]
+  audit_sections?: AuditSheetSections
   tb_values?: Record<string, AuditSheetTbValue>
+  column_defs?: AuditSheetColumnDef[]
   [key: string]: any
 }
 
@@ -426,7 +588,63 @@ function buildTableData() {
 }
 
 buildTableData()
-watch(() => props.htmlData, () => buildTableData(), { deep: true })
+watch(() => props.htmlData, () => { buildTableData(); buildSections() }, { deep: true })
+
+// ─── 审计说明 / 审计结论区 ───
+const auditSections = ref<Required<AuditSheetSections>>({
+  notes: '', conclusion: '', notes_label: '审计说明', conclusion_label: '审计结论',
+})
+function buildSections() {
+  const s = props.htmlData?.audit_sections || {}
+  auditSections.value = {
+    notes: s.notes ?? '', conclusion: s.conclusion ?? '',
+    notes_label: s.notes_label || '审计说明', conclusion_label: s.conclusion_label || '审计结论',
+  }
+}
+buildSections()
+function onSectionChange(field: 'notes' | 'conclusion', value: string) {
+  if (props.readonly) return
+  auditSections.value[field] = value ?? ''
+}
+
+// ─── 动态列模式（多列明细表）───
+const isDynamicColumns = computed<boolean>(() => {
+  const defs = props.htmlData?.column_defs
+  return Array.isArray(defs) && defs.length > 0
+})
+const dynamicColumnDefs = computed(() => isDynamicColumns.value ? (props.htmlData?.column_defs ?? []) : [])
+
+/** 期初区折叠状态（默认收起，减少水平滚动） */
+const openingGroupCollapsed = ref(true)
+
+/**
+ * 列分组：按列位置自动分为期初区/本期变动区/期末区。
+ * 规则：找到"期初审定数"列 → 其及之前的列全为期初区；
+ *       找到"期末未审数"/"期末余额" → 其及之后的列全为期末区；
+ *       中间的列为本期变动区。
+ * 如果找不到分界点 → 全部放 current 不折叠。
+ */
+const columnGroups = computed(() => {
+  const cols = dynamicColumnDefs.value
+  if (cols.length <= 8) {
+    // 列数不多不需要折叠
+    return { opening: [] as typeof cols, current: cols, closing: [] as typeof cols }
+  }
+  // 找期初审定数列（期初区的最后一列）
+  const openingEndIdx = cols.findIndex(c => c.label.includes('期初审定'))
+  // 找期末未审数/期末余额列（期末区的第一列）
+  const closingStartIdx = cols.findIndex(c => c.label.includes('期末未审') || c.label.includes('期末余额'))
+
+  if (openingEndIdx < 0 || closingStartIdx < 0 || closingStartIdx <= openingEndIdx) {
+    // 找不到有效分界点 → 不折叠
+    return { opening: [] as typeof cols, current: cols, closing: [] as typeof cols }
+  }
+
+  const opening = cols.slice(0, openingEndIdx + 1)
+  const current = cols.slice(openingEndIdx + 1, closingStartIdx)
+  const closing = cols.slice(closingStartIdx)
+  return { opening, current, closing }
+})
 
 // ─── 行类型判定 ───
 /** 分节行/合计行/标记 bold 的行加粗 */
@@ -611,9 +829,22 @@ function buildSavePayload(): AuditSheetHtmlData {
     for (const key of PERSISTED_ROW_KEYS) {
       if (row[key] !== undefined) stripped[key] = row[key]
     }
+    // 动态列字段也持久化
+    if (isDynamicColumns.value) {
+      for (const col of dynamicColumnDefs.value) {
+        if (row[col.key] !== undefined) stripped[col.key] = row[col.key]
+      }
+    }
     return stripped as AuditSheetRow
   })
-  return { audit_rows: auditRows }
+  const payload: AuditSheetHtmlData = {
+    audit_rows: auditRows,
+    audit_sections: { ...auditSections.value },
+  }
+  if (isDynamicColumns.value) {
+    payload.column_defs = dynamicColumnDefs.value
+  }
+  return payload
 }
 
 /** 保存：emit 剥离后的 audit_rows，落库（POST /save）由父组件链路完成。 */
@@ -647,6 +878,51 @@ async function onRestore() {
   }
   emit('restore')
   ElMessage.success('正在恢复模板默认行…')
+}
+
+/**
+ * 一键刷新：从四表库（辅助余额表/试算表）预填充数据到当前表格。
+ * 调用后端 POST /api/workpapers/{wpId}/audit-sheet-refresh，返回预填充行，
+ * 合并到 tableData（在合计行之前插入，替换现有空白占位行）。
+ */
+async function onRefreshFromLedger() {
+  if (props.readonly) return
+  try {
+    const result: any = await (await import('@/services/apiProxy')).api.post(
+      `/api/workpapers/${props.wpId}/audit-sheet-refresh`,
+    )
+    const rows = result?.rows ?? []
+    if (!rows.length) {
+      ElMessage.info(result?.message || '四表库中未找到可预填充的数据')
+      return
+    }
+    // 找到合计行位置，在其之前插入预填充行（替换空白占位行）
+    const totalIdx = tableData.value.findIndex(r => r.isComputed)
+    // 移除已有的空白占位行（isCustom 且 item 为空）
+    tableData.value = tableData.value.filter(r => !(r.isCustom && !r.item))
+    // 重新定位合计行
+    const newTotalIdx = tableData.value.findIndex(r => r.isComputed)
+    const insertAt = newTotalIdx >= 0 ? newTotalIdx : tableData.value.length
+    // 插入预填充行
+    const newRows: AuditSheetRow[] = rows.map((r: any, i: number) => ({
+      id: r.id || `refresh-${Date.now()}-${i}`,
+      item: r.item || '',
+      indent: 0,
+      bold: false,
+      isSection: false,
+      isComputed: false,
+      isCustom: true,
+      account_code: null,
+      adj_amount: null,
+      reclass_amount: null,
+      reason: '',
+      ...r,
+    }))
+    tableData.value.splice(insertAt, 0, ...newRows)
+    ElMessage.success(result?.message || `已预填充 ${rows.length} 行数据，请核对后保存`)
+  } catch (e: any) {
+    ElMessage.error(`刷新失败：${e?.message || '网络错误'}`)
+  }
 }
 
 // ─── 导入导出（Task 16，复用 useExcelIO）───────────────────────────────────
@@ -719,6 +995,74 @@ async function onExportTemplate() {
       ['3. 仅「账项调整 / 重分类调整 / 原因分析」三列会被导入，其余列为只读/自动计算'],
       ['4. 金额填数字，不要带逗号或货币符号'],
     ],
+  })
+}
+
+/**
+ * 导出数据：完整底稿 xlsx（含表头编制信息 + 列标题 + 当前金额数据 + 审计说明/结论）。
+ * 导出格式贴近致同模板样式，可直接归档或提交复核。
+ */
+async function onExportData() {
+  const allRows: any[][] = []
+  // 表头区（编制信息）
+  allRows.push(['致同会计师事务所'])
+  allRows.push([props.sheetName || '审定表'])
+  allRows.push([`被审计单位：`, '', '', `编制人：`, '', `编制日期：`, '', `索引号：${props.sheetName || ''}`])
+  allRows.push([])
+  // 列标题行
+  if (isDynamicColumns.value) {
+    allRows.push(['项目', ...dynamicColumnDefs.value.map(c => c.label)])
+  } else {
+    allRows.push(EXPORT_COLUMNS.map(c => c.header))
+  }
+  // 数据行
+  for (const row of tableData.value) {
+    if (isDynamicColumns.value) {
+      allRows.push([row.item ?? '', ...dynamicColumnDefs.value.map(c => row[c.key] ?? '')])
+    } else {
+      allRows.push([
+        row.item ?? '',
+        row.opening_unadjusted ?? '',
+        openingAudited(row),
+        row.current_unadjusted ?? '',
+        row.adj_amount ?? '',
+        row.reclass_amount ?? '',
+        auditedAmount(row),
+        changeAmount(row),
+        changeRate(row) != null ? (changeRate(row)! * 100).toFixed(2) + '%' : '',
+        row.reason ?? '',
+      ])
+    }
+  }
+  // 审计说明/结论
+  allRows.push([])
+  if (auditSections.value.notes) {
+    allRows.push(['审计说明：'])
+    allRows.push([auditSections.value.notes])
+  }
+  if (auditSections.value.conclusion) {
+    allRows.push(['审计结论：'])
+    allRows.push([auditSections.value.conclusion])
+  }
+  // 构建列定义（按实际最大宽度）
+  const maxCols = Math.max(...allRows.map(r => r.length), 1)
+  // 补齐每行长度
+  for (const row of allRows) {
+    while (row.length < maxCols) row.push('')
+  }
+  const columns: ExcelColumn[] = Array.from({ length: maxCols }, (_, i) => ({
+    key: String.fromCharCode(65 + (i % 26)) + (i >= 26 ? String(Math.floor(i / 26)) : ''),
+    header: '',
+    width: i === 0 ? 24 : 14,
+  }))
+  await _exportTemplate({
+    columns,
+    sheetName: props.sheetName || '审定表',
+    fileName: `${props.sheetName || '审定表'}_数据导出.xlsx`,
+    existingData: allRows,
+    includeNoteRow: false,
+    includeInstructions: false,
+    applyStyles: false,
   })
 }
 
@@ -1040,4 +1384,18 @@ defineExpose({
 .gas-table :deep(.el-table__body tr:hover > td) {
   background: var(--gt-color-bg-purple-hover) !important;
 }
+
+/* 审计说明/结论区 */
+.gas-sections { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
+.gas-section { border: 1px solid var(--gt-color-border-purple-light); border-radius: 6px; padding: 10px 12px; }
+.gas-section__title { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--gt-color-primary); margin-bottom: 8px; }
+.gas-section__badge { padding: 1px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: #fff; background: var(--gt-color-primary); }
+.gas-section__badge--conclusion { background: var(--gt-color-warning, #e6a23c); }
+.gas-section__hint { font-size: 12px; color: var(--gt-color-text-secondary, #909399); margin: 0 0 8px 0; line-height: 1.5; }
+
+/* 列分组折叠 */
+.gas-col-group-toggle { cursor: pointer; font-size: 12px; color: var(--gt-color-primary); user-select: none; padding: 0 2px; }
+.gas-col-group-toggle:hover { color: var(--gt-color-primary-dark, #3a1f5e); }
+.gas-col-group-toggle-cell { color: var(--gt-color-text-placeholder, #c0c4cc); font-size: 11px; }
+.gas-table :deep(.gas-col-expand-btn) { padding: 0 !important; min-width: 36px !important; }
 </style>

@@ -226,7 +226,7 @@ async def test_generate_audit_sheet_data_persisted_rows_with_tb():
 
 @pytest.mark.asyncio
 async def test_generate_audit_sheet_data_no_file_no_db_degrades():
-    """无模板 + 无 db → audit_rows=[] + tb_values={}（全降级，不抛异常）。"""
+    """无模板 + 无 db → audit_rows=[] + tb_values={} + 空说明区（全降级，不抛异常）。"""
     result = await _generate_audit_sheet_data(
         file_path=None,
         sheet_name="审定表D1-1",
@@ -235,7 +235,13 @@ async def test_generate_audit_sheet_data_no_file_no_db_degrades():
         project_id=None,
         wp_code="D1",
     )
-    assert result == {"audit_rows": [], "tb_values": {}}
+    assert result["audit_rows"] == []
+    assert result["tb_values"] == {}
+    # 无模板 → 说明/结论区降级为空正文 + 默认标题（不丢键，对齐审计说明/结论改造）
+    assert result["audit_sections"] == {
+        "notes": "", "conclusion": "",
+        "notes_label": "审计说明", "conclusion_label": "审计结论",
+    }
 
 
 # ─── 属性测试：tb_values 键集合 ⊆ 含 TB 匹配的行（Validates: Requirements 3.1, 3.3）──

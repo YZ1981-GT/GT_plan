@@ -18,10 +18,24 @@
 
 <template>
   <div class="gt-b-index">
-    <!-- ─── 编制信息区 ─── -->
-    <div class="gt-b-index__preparation">
+    <!-- ─── 编制信息区（可折叠） ─── -->
+    <div class="gt-b-index__preparation" :class="{ 'is-collapsed': prepCollapsed }">
+      <div class="gt-b-index__preparation-bar" @click="prepCollapsed = !prepCollapsed">
+        <span class="gt-b-index__preparation-title">编制信息</span>
+        <span v-if="prepCollapsed" class="gt-b-index__preparation-summary">{{ prepSummary }}</span>
+        <span v-if="indexNo" class="gt-b-index__preparation-index">索引号：{{ indexNo }}</span>
+        <el-button
+          class="gt-b-index__preparation-toggle"
+          link
+          type="primary"
+          size="small"
+          @click.stop="prepCollapsed = !prepCollapsed"
+        >
+          {{ prepCollapsed ? '展开' : '收起' }}
+        </el-button>
+      </div>
       <el-descriptions
-        title="编制信息"
+        v-show="!prepCollapsed"
         :column="2"
         border
         size="default"
@@ -43,9 +57,6 @@
         </el-descriptions-item>
         <el-descriptions-item label="复核日期">
           {{ preparationInfo.review_date || '—' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="索引号" :span="2">
-          {{ preparationInfo.index_no || '—' }}
         </el-descriptions-item>
       </el-descriptions>
     </div>
@@ -116,6 +127,20 @@ const preparationInfo = ref<Record<string, string>>({})
 const navigationRows = ref<NavigationRow[]>([])
 const projectId = computed(() => (route.params.projectId as string) || '')
 
+// 编制信息折叠状态（默认展开）；收起时在标题栏显示概要
+const prepCollapsed = ref(false)
+// 索引号置于标题栏右上角常显（取代表内单独的索引号行）
+const indexNo = computed(() => {
+  const v = preparationInfo.value.index_no
+  return v != null && String(v).trim() !== '' ? String(v) : ''
+})
+const prepSummary = computed(() => {
+  const parts = [preparationInfo.value.entity_name, preparationInfo.value.index_no].filter(
+    (p) => p != null && String(p).trim() !== '',
+  )
+  return parts.length ? parts.join(' · ') : '—'
+})
+
 // Auto-save debounce
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -174,6 +199,60 @@ onBeforeUnmount(() => {
 
 .gt-b-index__preparation {
   margin-bottom: 24px;
+  border: 1px solid var(--gt-color-border-purple-light, #d8b8ee);
+  border-radius: 6px;
+  background: var(--gt-color-primary-bg, #f4f0fa);
+  overflow: hidden;
+}
+.gt-b-index__preparation.is-collapsed {
+  min-height: 36px;
+}
+.gt-b-index__preparation-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.gt-b-index__preparation-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--gt-color-primary, #4b2d77);
+}
+.gt-b-index__preparation-summary {
+  flex: 1;
+  font-size: 12px;
+  color: var(--gt-color-text-secondary, #606266);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 索引号常显于标题栏右上角（取代表内单独索引号行）；用 margin-left:auto 顶到右侧、紧邻收起按钮 */
+.gt-b-index__preparation-index {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gt-color-primary, #4b2d77);
+  white-space: nowrap;
+}
+/* 概要已占据 flex:1 时，索引号紧随其后即可，无需再 auto 顶（避免双 auto 冲突） */
+.gt-b-index__preparation-summary ~ .gt-b-index__preparation-index {
+  margin-left: 8px;
+}
+.gt-b-index__preparation-toggle {
+  margin-left: 8px;
+}
+/* el-descriptions 嵌入折叠容器：去掉自身外边距，留出内边距 */
+.gt-b-index__preparation :deep(.el-descriptions) {
+  padding: 0 12px 10px;
+}
+.gt-b-index__preparation :deep(.el-descriptions__label) {
+  color: var(--gt-color-primary, #4b2d77);
+  background: var(--gt-color-primary-bg, #f4f0fa);
+}
+.gt-b-index__preparation :deep(.gt-b-index__preparation-toggle.el-button.is-link) {
+  color: var(--gt-color-primary, #4b2d77);
 }
 
 .gt-b-index__navigation {

@@ -65,32 +65,35 @@ def _map_assertion_key(header_text: str) -> str | None:
     return None
 
 
-def extract_program_rows_from_sheet(ws: Any) -> list[dict]:
-    """从 openpyxl worksheet 提取程序行列表。
+def _grid_cell(grid: list[list[Any]], row: int, col: int) -> Any:
+    """1-based row/col，与 openpyxl 坐标一致。"""
+    if row < 1 or col < 1:
+        return None
+    r_idx = row - 1
+    if r_idx >= len(grid):
+        return None
+    row_data = grid[r_idx] or []
+    c_idx = col - 1
+    if c_idx >= len(row_data):
+        return None
+    return row_data[c_idx]
 
-    Returns:
-        list[dict]: 每个元素结构对齐 GtAProgramConsole 的 ProgramRow：
-        {
-            "id": "row-{n}",
-            "program_no": int,
-            "program_desc": str,
-            "program_category": str,
-            "assertions": {existence/completeness/rights/accuracy/presentation: bool},
-            "linked_workpapers": str,
-            "status": "pending",
-        }
-    """
-    max_row = ws.max_row or 0
-    max_col = ws.max_column or 0
+
+def extract_program_rows_from_grid(grid: list[list[Any]]) -> list[dict]:
+    """从二维值数组提取程序行（openpyxl / calamine 共用）。"""
+    if not grid:
+        return []
+
+    max_row = len(grid)
+    max_col = max((len(r or []) for r in grid), default=0)
     if max_row == 0 or max_col == 0:
         return []
 
-    # ─── 1. 定位表头行（含「序号」的行）+ 序号列 ────────────────────────
     header_row = None
     no_col = 1
     for r in range(1, min(max_row, 60) + 1):
         for c in range(1, max_col + 1):
-            if _cell_text(ws.cell(row=r, column=c).value) == "序号":
+            if _cell_text(_grid_cell(grid, r, c)) == "序号":
                 header_row = r
                 no_col = c
                 break
@@ -100,12 +103,11 @@ def extract_program_rows_from_sheet(ws: Any) -> list[dict]:
     if header_row is None:
         return []
 
-    # ─── 2. 定位描述列 / 分类列 / 索引列 ──────────────────────────────
     desc_col = None
     category_col = None
     idx_col = None
     for c in range(1, max_col + 1):
-        txt = _cell_text(ws.cell(row=header_row, column=c).value)
+        txt = _cell_text(_grid_cell(grid, header_row, c))
         if not txt:
             continue
         if desc_col is None and "审计程序" in txt:
@@ -115,53 +117,47 @@ def extract_program_rows_from_sheet(ws: Any) -> list[dict]:
         if idx_col is None and "索引" in txt:
             idx_col = c
 
-    # 兜底：描述列默认序号列右一列；分类列默认描述列右一列
     if desc_col is None:
         desc_col = no_col + 1
     if category_col is None:
         category_col = desc_col + 1
 
-    # ─── 3. 认定列映射（分类列与索引列之间）────────────────────────────
     sub_header_row = header_row + 1
     assertion_end = (idx_col - 1) if idx_col and idx_col > category_col else min(category_col + 5, max_col)
     assertion_cols: list[tuple[int, str]] = []
     fallback_idx = 0
     for c in range(category_col + 1, assertion_end + 1):
-        sub_txt = _cell_text(ws.cell(row=sub_header_row, column=c).value)
+        sub_txt = _cell_text(_grid_cell(grid, sub_header_row, c))
         key = _map_assertion_key(sub_txt)
         if key is None and fallback_idx < len(_ASSERTION_ORDER):
-            # 子表头无文字时按固定顺序兜底
             key = _ASSERTION_ORDER[fallback_idx]
         if key is not None:
             assertion_cols.append((c, key))
         fallback_idx += 1
 
-    # ─── 4. 提取数据行（序号列为整数）────────────────────────────────
     programs: list[dict] = []
-    # 数据起始行：跳过认定子表头行（若其序号列非整数）
     start_row = header_row + 1
-    if not _is_int_like(ws.cell(row=start_row, column=no_col).value):
+    if not _is_int_like(_grid_cell(grid, start_row, no_col)):
         start_row = header_row + 2
 
     for r in range(start_row, max_row + 1):
-        no_val = ws.cell(row=r, column=no_col).value
+        no_val = _grid_cell(grid, r, no_col)
         if not _is_int_like(no_val):
             continue
 
         program_no = int(float(no_val)) if not isinstance(no_val, str) else int(no_val.strip())
-        desc = _cell_text(ws.cell(row=r, column=desc_col).value)
-        category = _cell_text(ws.cell(row=r, column=category_col).value)
+        desc = _cell_text(_grid_cell(grid, r, desc_col))
+        category = _cell_text(_grid_cell(grid, r, category_col))
 
         assertions: dict[str, bool] = {}
         for col, key in assertion_cols:
-            mark = _cell_text(ws.cell(row=r, column=col).value)
+            mark = _cell_text(_grid_cell(grid, r, col))
             if mark:
                 assertions[key] = True
 
         linked = ""
         if idx_col:
-            raw = _cell_text(ws.cell(row=r, column=idx_col).value)
-            # 模板里索引常含换行，统一转 / 分隔
+            raw = _cell_text(_grid_cell(grid, r, idx_col))
             linked = raw.replace("\n", "/").replace("//", "/").strip("/ ")
 
         programs.append({
@@ -177,30 +173,33 @@ def extract_program_rows_from_sheet(ws: Any) -> list[dict]:
     return programs
 
 
+def extract_program_rows_from_sheet(ws: Any) -> list[dict]:
+    """从 openpyxl worksheet 提取程序行列表（兼容测试/旧调用）。"""
+    max_row = ws.max_row or 0
+    max_col = ws.max_column or 0
+    grid: list[list[Any]] = []
+    for r in range(1, max_row + 1):
+        grid.append([ws.cell(row=r, column=c).value for c in range(1, max_col + 1)])
+    return extract_program_rows_from_grid(grid)
+
+
 def extract_program_rows(file_path: str | Path, sheet_name: str) -> list[dict]:
     """读取 xlsx 文件指定 sheet，提取程序行列表（纯函数，无 DB）。
 
     文件不存在 / 空 / sheet 缺失 / 解析失败 → 返回 []（降级，不抛异常）。
     """
-    import openpyxl
+    from app.services.xlsx_read_adapter import list_sheet_names, read_sheet_values
 
     fp = Path(file_path)
     if not fp.exists() or fp.stat().st_size == 0:
         return []
 
     try:
-        wb = openpyxl.load_workbook(str(fp), read_only=False, data_only=True)
-    except Exception as e:
-        logger.warning("extract_program_rows: 加载 xlsx 失败 %s: %s", fp, e)
-        return []
-
-    try:
-        if sheet_name not in wb.sheetnames:
+        names = list_sheet_names(fp)
+        if sheet_name not in names:
             return []
-        ws = wb[sheet_name]
-        return extract_program_rows_from_sheet(ws)
+        grid = read_sheet_values(fp, sheet_name)
+        return extract_program_rows_from_grid(grid)
     except Exception as e:
         logger.warning("extract_program_rows: 解析 sheet 失败 %s/%s: %s", fp, sheet_name, e)
         return []
-    finally:
-        wb.close()

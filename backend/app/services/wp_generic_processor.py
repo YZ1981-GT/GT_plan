@@ -71,7 +71,7 @@ def parse_workpaper_generic(file_path: str, wp_code: str | None = None) -> dict[
             ]
         }
     """
-    import openpyxl
+    from app.services.xlsx_read_adapter import list_sheet_names, read_sheet_values
 
     fp = Path(file_path)
     if not fp.exists():
@@ -81,7 +81,7 @@ def parse_workpaper_generic(file_path: str, wp_code: str | None = None) -> dict[
     rules = _load_rules_for_wp(wp_code) if wp_code else None
 
     try:
-        wb = openpyxl.load_workbook(str(fp), data_only=True, read_only=True)
+        sheet_names = list_sheet_names(fp)
     except Exception as e:
         return {"error": f"打开文件失败: {e}"}
 
@@ -91,13 +91,89 @@ def parse_workpaper_generic(file_path: str, wp_code: str | None = None) -> dict[
         "sheets": [],
     }
 
-    for ws in wb.worksheets:
-        sheet_data = _parse_sheet_generic(ws, rules)
+    for sheet_name in sheet_names:
+        try:
+            rows_data = read_sheet_values(fp, sheet_name)
+        except Exception:
+            continue
+        # Limit to 500 rows (same as old iter_rows max_row=500)
+        rows_data = rows_data[:500]
+        sheet_data = _parse_sheet_generic_from_grid(sheet_name, rows_data, rules)
         if sheet_data:
             result["sheets"].append(sheet_data)
 
-    wb.close()
     return result
+
+
+def _parse_sheet_generic_from_grid(sheet_name: str, rows_data: list[list], rules: dict | None) -> dict | None:
+    """通用Sheet解析（从 grid 数据）"""
+    # 如果有规则，匹配Sheet
+    sheet_rule = None
+    if rules:
+        for sr in rules.get("sheets", []):
+            pattern = sr.get("name_pattern", "")
+            if pattern and re.search(pattern, sheet_name):
+                sheet_rule = sr
+                break
+
+    if not rows_data:
+        return None
+
+    # 检测表头行
+    header_row_idx = _detect_header_row(rows_data, sheet_rule)
+    if header_row_idx is None:
+        return None
+
+    headers = [str(c).strip() if c else "" for c in rows_data[header_row_idx]]
+    # 去掉全空的尾部列
+    while headers and not headers[-1]:
+        headers.pop()
+
+    if len(headers) < 2:
+        return None
+
+    # 确定数据起始行
+    data_start = header_row_idx + 1 + (sheet_rule.get("data_start_offset", 0) if sheet_rule else 0)
+
+    # 列含义映射
+    col_mapping = _map_columns(headers, sheet_rule)
+
+    # 提取数据行
+    data_rows = []
+    totals = {}
+    for i in range(data_start, len(rows_data)):
+        row = rows_data[i]
+        if not row or all(c is None for c in row):
+            continue
+
+        # 提取行数据
+        row_data = _extract_row_data(row, headers, col_mapping)
+        if not row_data:
+            continue
+
+        # 检测是否为合计行
+        label = row_data.get("label", "")
+        if _is_total_row(label):
+            row_data["is_total"] = True
+            totals[label] = row_data
+        else:
+            row_data["is_total"] = False
+
+        data_rows.append(row_data)
+
+    # 确定Sheet类型
+    sheet_type = _detect_sheet_type(sheet_name, headers, sheet_rule)
+
+    return {
+        "name": sheet_name,
+        "type": sheet_type,
+        "header_row": header_row_idx,
+        "headers": headers,
+        "col_mapping": col_mapping,
+        "data_rows": data_rows,
+        "row_count": len(data_rows),
+        "totals": totals,
+    }
 
 
 def _parse_sheet_generic(ws, rules: dict | None) -> dict | None:

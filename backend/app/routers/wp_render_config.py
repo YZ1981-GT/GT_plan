@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -497,18 +498,46 @@ async def _generate_audit_sheet_data(
       不影响编辑（graceful degradation，对齐 Req 3.3）。
     """
     # ─── 1. 行结构：持久化优先（Req 4.3），否则从模板提取 ─────────────────
+    # 多列明细表（如 D1-2 有 10 数据列）也需要列定义供前端动态渲染。
+    column_defs: list[dict] | None = existing.get("column_defs") if existing else None
     if existing and existing.get("audit_rows"):
         audit_rows: list[dict] = existing["audit_rows"]
     else:
-        from app.services.wp_audit_sheet_extract import extract_audit_rows
+        from app.services.wp_audit_sheet_extract import (
+            extract_audit_rows_with_values_from_file,
+        )
 
         audit_rows = []
         if file_path:
             try:
-                audit_rows = extract_audit_rows(file_path, sheet_name)
+                audit_rows, col_defs = extract_audit_rows_with_values_from_file(
+                    file_path, sheet_name
+                )
+                if col_defs and not column_defs:
+                    column_defs = col_defs
             except Exception as e:  # noqa: BLE001 — 降级不阻塞渲染
                 logger.warning("审定表行提取失败 %s/%s: %s", file_path, sheet_name, e)
                 audit_rows = []
+
+    # ─── 1b. 审计说明 / 审计结论区：持久化优先，否则从模板提取默认文本 ────
+    # 审定表数据网格之后有「审计说明」（变动大科目原因+质押/贴现说明）+「审计结论」
+    # （是否认可列报）两块说明区，旧逻辑随表体截断丢失。此处单独提取作为默认占位，
+    # 用户编辑后持久化（existing.audit_sections 优先，不被模板覆盖）。
+    audit_sections: dict
+    if existing and isinstance(existing.get("audit_sections"), dict):
+        audit_sections = existing["audit_sections"]
+    else:
+        from app.services.wp_audit_sheet_extract import extract_audit_sections
+
+        audit_sections = {
+            "notes": "", "conclusion": "",
+            "notes_label": "审计说明", "conclusion_label": "审计结论",
+        }
+        if file_path:
+            try:
+                audit_sections = extract_audit_sections(file_path, sheet_name)
+            except Exception as e:  # noqa: BLE001 — 降级不阻塞渲染
+                logger.warning("审定表说明区提取失败 %s/%s: %s", file_path, sheet_name, e)
 
     # ─── 2. TB 取数：实时查 trial_balance（Req 3.1~3.3），不持久化 ─────────
     tb_values = await _fetch_audit_sheet_tb_values(
@@ -518,8 +547,153 @@ async def _generate_audit_sheet_data(
     # 保留 existing 中的其他键（若有），覆盖 audit_rows + tb_values（tb 永远实时）
     result: dict = dict(existing) if isinstance(existing, dict) else {}
     result["audit_rows"] = audit_rows
+    result["audit_sections"] = audit_sections
     result["tb_values"] = tb_values
+    # 多列明细表列定义（前端 GtAuditSheet 动态渲染，标准审定表为 None → 走默认列）
+    if column_defs:
+        result["column_defs"] = column_defs
     return result
+
+
+@router.post("/{wp_id}/audit-sheet-refresh")
+async def refresh_audit_sheet_from_ledger(
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """一键刷新：从四表库（试算表/辅助余额表）预填充审定表/明细表数据。
+
+    对于按客户明细表（如 D1-3），从 tb_aux_balance 按 account_code 查询辅助余额，
+    按 aux_name（客户名称）聚合为行，填入 column_defs 对应列。
+    对于按类别明细表（如 D1-2），从 trial_balance 按 account_code 查询余额。
+
+    返回预填充后的 audit_rows（前端可直接覆盖 tableData）。
+    """
+    # 查 working_paper → wp_index → wp_code + project_id
+    wp = (
+        await db.execute(
+            sa.select(WorkingPaper).where(
+                WorkingPaper.id == wp_id,
+                WorkingPaper.is_deleted == False,  # noqa: E712
+            )
+        )
+    ).scalars().first()
+    if wp is None:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    wp_index = (
+        await db.execute(
+            sa.select(WpIndex).where(WpIndex.id == wp.wp_index_id)
+        )
+    ).scalars().first()
+    wp_code = wp_index.wp_code if wp_index else ""
+    project_id = wp.project_id
+
+    # 获取年度
+    year_result = await db.execute(
+        sa.text("SELECT EXTRACT(YEAR FROM audit_period_end)::int FROM projects WHERE id = :pid"),
+        {"pid": str(project_id)},
+    )
+    year_row = year_result.first()
+    project_year = year_row[0] if year_row and year_row[0] else None
+
+    if not project_year:
+        return {"rows": [], "message": "项目未设置审计期间，无法取数"}
+
+    # 确定科目编码（从 wp_account_mapping 或直接根据 wp_code）
+    import json
+    from pathlib import Path as _Path
+
+    mapping_file = _Path(__file__).resolve().parent.parent.parent / "data" / "wp_account_mapping.json"
+    account_codes: list[str] = []
+    try:
+        with open(mapping_file, "r", encoding="utf-8") as f:
+            mappings = json.load(f)
+        for m in mappings:
+            if m.get("wp_code") == wp_code:
+                account_codes = m.get("account_codes", [])
+                break
+    except Exception:
+        pass
+
+    if not account_codes:
+        # D1 系列默认 1121（应收票据）
+        if wp_code.startswith("D1"):
+            account_codes = ["1121"]
+        else:
+            return {"rows": [], "message": f"未找到 {wp_code} 的科目映射"}
+
+    # 从辅助余额表查询按客户/辅助核算维度的余额
+    try:
+        aux_result = await db.execute(
+            sa.text("""
+                SELECT aux_name, opening_balance, debit_amount, credit_amount, closing_balance
+                FROM tb_aux_balance
+                WHERE project_id = :pid
+                  AND year = :year
+                  AND account_code = ANY(:codes)
+                  AND is_deleted = false
+                  AND aux_name IS NOT NULL AND aux_name != ''
+                ORDER BY closing_balance DESC NULLS LAST
+            """),
+            {"pid": str(project_id), "year": project_year, "codes": account_codes},
+        )
+        aux_rows = aux_result.all()
+    except Exception as e:
+        logger.warning("audit-sheet-refresh 辅助余额查询失败: %s", e)
+        aux_rows = []
+
+    if not aux_rows:
+        # 回退到试算表查询
+        try:
+            tb_result = await db.execute(
+                sa.text("""
+                    SELECT standard_account_code, opening_balance, unadjusted_amount,
+                           aje_adjustment, rje_adjustment
+                    FROM trial_balance
+                    WHERE project_id = :pid
+                      AND year = :year
+                      AND standard_account_code = ANY(:codes)
+                      AND is_deleted = false
+                """),
+                {"pid": str(project_id), "year": project_year, "codes": account_codes},
+            )
+            tb_rows = tb_result.all()
+        except Exception as e:
+            logger.warning("audit-sheet-refresh TB 查询失败: %s", e)
+            tb_rows = []
+
+        if not tb_rows:
+            return {"rows": [], "message": "四表库中未找到该科目数据"}
+
+        # TB 数据返回（简单行）
+        rows = []
+        for i, tr in enumerate(tb_rows):
+            rows.append({
+                "id": f"refresh-{i+1}",
+                "item": tr[0] or "",
+                "isCustom": True,
+                "opening_unadjusted": float(tr[1]) if tr[1] else None,
+                "current_unadjusted": float(tr[2]) if tr[2] else None,
+                "sys_aje": float(tr[3]) if tr[3] else None,
+                "sys_rje": float(tr[4]) if tr[4] else None,
+            })
+        return {"rows": rows, "message": f"已从试算表预填充 {len(rows)} 行"}
+
+    # 辅助余额数据 → 明细行
+    rows = []
+    for i, ar in enumerate(aux_rows):
+        rows.append({
+            "id": f"refresh-{i+1}",
+            "item": ar[0] or "",  # 客户名称
+            "isCustom": True,
+            "col_opening": float(ar[1]) if ar[1] else None,
+            "col_debit": float(ar[2]) if ar[2] else None,
+            "col_credit": float(ar[3]) if ar[3] else None,
+            "col_closing": float(ar[4]) if ar[4] else None,
+        })
+
+    return {"rows": rows, "message": f"已从辅助余额表预填充 {len(rows)} 行（按客户）"}
 
 
 @router.get("/{wp_id}/preparation-info")
@@ -706,6 +880,27 @@ async def get_render_config(
     ]
 
     sheets: list[dict] = []
+
+    # 模板文件路径解析：优先用 working_paper.file_path（项目已生成的底稿文件），
+    # 缺失/不存在时回退到 wp_templates/ 标准模板库（按 wp_code 查找）。
+    # 这样即使底稿未初始化文件（file_path 为空），A-程序表/审定表/网格仍能从
+    # 标准模板提取内容展示（修复「暂无审计程序」等空态回归）。
+    def _resolve_template_file_path() -> str | None:
+        fp = working_paper.file_path
+        if fp and Path(fp).is_file():
+            return fp
+        try:
+            from app.services.wp_template_init_service import find_template_file_any
+
+            tpl = find_template_file_any(wp_code)
+            if tpl is not None:
+                return str(tpl)
+        except Exception as e:  # noqa: BLE001 — 模板回退失败不阻塞渲染
+            logger.warning("模板文件回退解析失败 wp_code=%s: %s", wp_code, e)
+        return fp  # 兜底返回原值（可能为 None，下游各生成器自行降级）
+
+    _template_file_path = _resolve_template_file_path()
+
     for classification in classifications:
         # 如果指定了 sheet_name，只返回匹配的 sheet
         if sheet_name and classification.sheet_name != sheet_name:
@@ -732,6 +927,27 @@ async def get_render_config(
                 wp_code, classification.sheet_name,
             )
 
+        # ─── 按 sheet 名解包 schema（前端组件读顶层 sub_tables/fields）────────
+        # schema YAML 用 `sheets: { <sheet_name>: {...} }` 嵌套承载多 sheet 配置，
+        # 但 GtCNoteTable / GtDForm 等组件读的是 props.schema 顶层的 sub_tables /
+        # fields / version_variants 等键。故此处把当前 sheet 对应的子配置解包到顶层，
+        # 同时保留 wp_code/template_version 等公共元信息。匹配不到当前 sheet（如审定表
+        # sheet 在 C-disclosure schema 里无对应键）→ sheet_schema 置 None，走各自兜底。
+        sheet_schema: dict | None = None
+        if isinstance(schema_data, dict):
+            nested = schema_data.get("sheets")
+            if isinstance(nested, dict) and classification.sheet_name in nested:
+                per_sheet = nested[classification.sheet_name]
+                if isinstance(per_sheet, dict):
+                    # 合并公共元信息（不覆盖 per_sheet 已有键）
+                    sheet_schema = {
+                        k: v for k, v in schema_data.items() if k != "sheets"
+                    }
+                    sheet_schema.update(per_sheet)
+            elif schema_data.get("sub_tables") or schema_data.get("fields"):
+                # 无 sheets 嵌套但顶层直接是单 sheet 配置（兼容旧格式）
+                sheet_schema = schema_data
+
         # 获取 sheet 级 html_data
         sheet_html_data = html_data_all.get(classification.sheet_name)
 
@@ -752,7 +968,7 @@ async def get_render_config(
             isinstance(sheet_html_data, dict) and sheet_html_data.get("programs")
         ):
             sheet_html_data = await _generate_a_program_data(
-                file_path=working_paper.file_path,
+                file_path=_template_file_path,
                 sheet_name=classification.sheet_name,
                 existing=sheet_html_data if isinstance(sheet_html_data, dict) else None,
             )
@@ -762,7 +978,7 @@ async def get_render_config(
         # TB 取数在组④填充 tb_values。
         if component_type == "audit-sheet":
             sheet_html_data = await _generate_audit_sheet_data(
-                file_path=working_paper.file_path,
+                file_path=_template_file_path,
                 sheet_name=classification.sheet_name,
                 existing=sheet_html_data if isinstance(sheet_html_data, dict) else None,
                 db=db,
@@ -777,15 +993,59 @@ async def get_render_config(
         # TB 取数后续再填。
         if component_type == "univer" and not _has_grid_cells(sheet_html_data):
             sheet_html_data = await _generate_grid_data(
-                file_path=working_paper.file_path,
+                file_path=_template_file_path,
                 sheet_name=classification.sheet_name,
                 existing=sheet_html_data if isinstance(sheet_html_data, dict) else None,
             )
 
+        # ─── C-附注披露无 schema 时的只读网格兜底 ──────────────────────────
+        # GtCNoteTable 是 schema 驱动（需手工编排 sub_tables/fields）；当某附注披露
+        # sheet 没有配套 render schema（如尚未编写 C-{wp_code}-disclosure.yaml 的循环），
+        # 组件只会显示「附注披露表尚未配置」空态，模板里的多级披露表格完全不可见。
+        # 此处与 univer 同款：无解包后的 sheet_schema.sub_tables 且无持久化网格时，
+        # 从模板 xlsx 提取只读网格（cells/merged_cells/样式），前端 GtWpRenderer 用
+        # GtGridSheet 还原模板外观（只读）。已有配套 disclosure schema 的附注（如
+        # C-D1-disclosure / C-D2-disclosure）走 GtCNoteTable 结构化卡片渲染，不进此兜底。
+        if (
+            component_type == "c-note-table"
+            and not (isinstance(sheet_schema, dict) and sheet_schema.get("sub_tables"))
+            and not _has_grid_cells(sheet_html_data)
+        ):
+            sheet_html_data = await _generate_grid_data(
+                file_path=_template_file_path,
+                sheet_name=classification.sheet_name,
+                existing=sheet_html_data if isinstance(sheet_html_data, dict) else None,
+            )
+
+        # ─── 解析 fixed_cells 中的 ${...} 占位（附注披露表头实体名/截止日/索引号）──
+        # schema.fixed_cells 用 ${entity_name}/${period_end}/${index_no} 等占位，
+        # GtCNoteTable 直接读 fixed_cells.A3/A4/I3 渲染表头，故此处用编制信息实际值替换，
+        # 避免界面显示字面量 "${entity_name}"。仅 c-note-table 且有 fixed_cells 时解析。
+        if (
+            component_type == "c-note-table"
+            and isinstance(sheet_schema, dict)
+            and isinstance(sheet_schema.get("fixed_cells"), dict)
+        ):
+            prep_info = await _build_preparation_info(db, project_id, wp_id)
+            subst = {
+                "${entity_name}": prep_info.get("entity_name", ""),
+                "${period_end}": prep_info.get("period_end", ""),
+                "${index_no}": prep_info.get("index_no", "") or wp_code,
+                "${page_no}": "1",
+            }
+            resolved_cells = {}
+            for cell, val in sheet_schema["fixed_cells"].items():
+                if isinstance(val, str) and val in subst:
+                    resolved_cells[cell] = subst[val]
+                else:
+                    resolved_cells[cell] = val
+            # 浅拷贝避免污染 schema service 缓存
+            sheet_schema = {**sheet_schema, "fixed_cells": resolved_cells}
+
         sheet_config = {
             "sheet_name": classification.sheet_name,
             "componentType": component_type,
-            "schema": schema_data,
+            "schema": sheet_schema,
             "html_data": sheet_html_data,
             "cross_refs": [item.model_dump() for item in cross_ref_items],
         }
@@ -809,13 +1069,12 @@ async def get_render_config(
         project_year = None
 
     if project_year:
-        # 合并所有 sheet 的 schema 用于批量取数
+        # 合并所有 sheet 的 schema 用于批量取数（schema 已在上方按 sheet 解包到顶层，
+        # 直接以 sheet_name 为键组装即可，无需再 .get("sheets")）。
         combined_schema: dict = {"sheets": {}}
         for sheet_cfg in sheets:
             if sheet_cfg.get("schema") and isinstance(sheet_cfg["schema"], dict):
-                combined_schema["sheets"][sheet_cfg["sheet_name"]] = sheet_cfg["schema"].get(
-                    "sheets", {}
-                ).get(sheet_cfg["sheet_name"], sheet_cfg["schema"])
+                combined_schema["sheets"][sheet_cfg["sheet_name"]] = sheet_cfg["schema"]
         try:
             fill_results = await _resolve_auto_fill_values(
                 schema=combined_schema,

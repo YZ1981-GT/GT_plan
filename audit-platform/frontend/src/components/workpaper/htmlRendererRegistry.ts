@@ -102,6 +102,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
       'standard-switch',
       'sync-to-disclosure-notes',
       'jump-to-reference',
+      'open-formula',
     ],
   },
   // D 子模式（5 种）共享 GtDForm，差异由 form-type prop 控制

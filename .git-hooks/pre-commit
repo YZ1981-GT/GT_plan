@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# pre-commit hook - gitleaks secret 扫描（暂存区）
+# dev-tooling-modernization spec / Task 2
+#
+# 检查项：
+# 1. gitleaks protect --staged 拦截暂存区密钥泄漏
+
+set -e
+
+# 检测 gitleaks 二进制
+if ! command -v gitleaks > /dev/null 2>&1; then
+    echo "[pre-commit] ⚠️ gitleaks 未安装，跳过（CI 兜底）"
+    exit 0
+fi
+
+echo "[pre-commit] 执行 gitleaks 暂存区扫描..."
+
+if ! gitleaks protect --staged --config .gitleaks.toml --redact; then
+    echo ""
+    echo "[pre-commit] ❌ gitleaks 检测到暂存区存在疑似密钥泄漏"
+    echo "          请移除敏感信息后重新提交"
+    echo "          紧急救急：git commit --no-verify"
+    exit 1
+fi
+
+echo "[pre-commit] ✅ gitleaks 扫描通过"
+exit 0

@@ -1,6 +1,6 @@
 {
   "_doc": "R10 Spec B / Spec C baseline 真源。每个值由 Sprint 0 grep 实测填入，迁移过程中只允许减少不允许增加。CI frontend-build job 的 'Display token guard' step 读取此文件做卡点。\n\n[R10 二轮复盘 S6 字段命名统一规约]：所有字段统一格式 `{property}-prop-{format}-vue-files`，明确指代 CSS property 类别+取值格式+扫描范围。旧字段名（font-size-px-vue-files / color-hex-vue-files / background-hex-vue-files）保留为 deprecated alias 1-2 个 sprint 后删除。",
-  "_updated_at": "2026-05-30",
+  "_updated_at": "2026-06-04",
   "_updated_by": "frontend-consistency-m1 复盘修订（2026-05-30）：①GtAmountCell-uses 口径统一为 105（grep 行数，与 CI 同口径，原 94 是 <GtAmountCell 标签口径，并存歧义已消除）②新增 no-bare-amount-cell-violations=88（ESLint AST 精确金额列裸用）替代 align-right-cols 粗口径卡点（后者降级 informational）③CI status-hardcoding guard 修正 QcInspectionWorkbench 路径 src/views/→src/views/qc/ 并对缺失文件 fail（防路径漂移）。T1 GtAmountCell 全量化 + T2 catch 裸用 0 + T4 状态硬编码 0",
   "font-size-prop-px-vue-files": 0,
   "color-prop-hex-vue-files": 0,
@@ -67,6 +67,14 @@
     "vue-tsc-errors": 0,
     "vitest-failed-tests": 0,
     "vitest-skipped-tests": 7
+  },
+  "_sqlfluff_migration_baseline": {
+    "_doc": "SQLFluff lint baseline for backend/migrations/*.sql (V001~V052 + R*.sql). 增量收敛——新增迁移不得引入新告警，存量逐步修复只减不增。sqlfluff 4.2.1 / dialect=postgres / 2026-06-04 首次计量。",
+    "sqlfluff-migration-violations": 1718,
+    "sqlfluff-migration-files-with-violations": 47,
+    "sqlfluff-migration-total-files": 98,
+    "sqlfluff-version": "4.2.1",
+    "measured-at": "2026-06-04"
   },
   "_targets": {
     "font-size-prop-px-vue-files": 0,

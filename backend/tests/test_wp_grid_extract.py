@@ -6,7 +6,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import openpyxl
+import pytest
 
 from app.services.wp_grid_extract import extract_grid, extract_grid_from_sheet
 
@@ -140,3 +143,33 @@ def test_empty_sheet_returns_empty_grid(tmp_path):
     wb.close()
     g = extract_grid(fp, "空表")
     assert g["cells"] == {}
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 真实模板：C-附注披露（上市公司 / 国企）只读网格兜底
+# （render-config 对无 schema 的 c-note-table 用本提取做兜底，避免「尚未配置」空态）
+# ─────────────────────────────────────────────────────────────────────────
+
+_REAL_TEMPLATE = Path(__file__).resolve().parents[1] / "wp_templates" / "D" / "D1 应收票据.xlsx"
+
+
+@pytest.mark.skipif(
+    not _REAL_TEMPLATE.exists(),
+    reason=f"真实模板缺失：{_REAL_TEMPLATE}",
+)
+@pytest.mark.parametrize(
+    "sheet_name",
+    ["附注披露信息（上市公司）", "附注披露信息（国企）"],
+)
+def test_real_disclosure_sheets_extract_grid(sheet_name):
+    """D1 应收票据两个附注披露 sheet 提取出非空只读网格（含合并单元格）。"""
+    g = extract_grid(str(_REAL_TEMPLATE), sheet_name)
+    # 多级披露表格 → 大量单元格
+    assert len(g["cells"]) > 100, f"{sheet_name} 提取单元格过少：{len(g['cells'])}"
+    assert g["max_row"] > 20
+    # 含合并区域（披露表头跨列/跨行合并）
+    assert len(g["merged_cells"]) > 0
+    # 关键披露行存在（票据种类 / 银行承兑汇票 / 合计 等任一）
+    texts = {str(c.get("v", "")).strip() for c in g["cells"].values()}
+    assert any("承兑汇票" in t for t in texts)
+

@@ -52,7 +52,25 @@ services:
 
       start_period: 10s
 
-
+  # ----------------------------------------------------------
+  # PgBouncer — transaction pooling (pg-pooling-and-load-test spec)
+  # ----------------------------------------------------------
+  pgbouncer:
+    image: edoburu/pgbouncer:1.22.1-p0
+    container_name: audit-pgbouncer
+    restart: unless-stopped
+    ports:
+      - "${PGBOUNCER_PORT:-6432}:5432"
+    environment:
+      DATABASE_URL: postgres://${PG_USER:-postgres}:${PG_PASSWORD:-postgres}@postgres:5432/${PG_DB:-audit_platform}
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 10000
+      DEFAULT_POOL_SIZE: 50
+      RESERVE_POOL_SIZE: 10
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # ----------------------------------------------------------
 

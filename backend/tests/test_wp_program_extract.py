@@ -121,3 +121,56 @@ def test_program_no_monotonic(tmp_path):
     nos = [p["program_no"] for p in programs]
     assert nos == sorted(nos)
     assert nos == [1, 2, 3]
+
+
+# ─── render-config 模板路径回退（修复「暂无审计程序」回归）─────────────────
+
+
+@pytest.mark.asyncio
+async def test_generate_a_program_data_from_template_path(tmp_path):
+    """_generate_a_program_data 用解析到的模板路径能提取出程序行。
+
+    回归守护：当 working_paper.file_path 为空时，render-config 回退到
+    wp_templates/ 标准模板（find_template_file_any），A 程序表中控台不再空。
+    """
+    from app.routers.wp_render_config import _generate_a_program_data
+
+    fp, sn = _build_program_sheet(tmp_path)
+    result = await _generate_a_program_data(file_path=str(fp), sheet_name=sn)
+    assert isinstance(result, dict)
+    assert len(result["programs"]) == 3
+    assert result["programs"][0]["program_no"] == 1
+    assert result["trim_decisions"] == []
+
+
+@pytest.mark.asyncio
+async def test_generate_a_program_data_none_path_degrades():
+    """file_path 为 None（模板也找不到）→ programs 空列表，不抛异常。"""
+    from app.routers.wp_render_config import _generate_a_program_data
+
+    result = await _generate_a_program_data(file_path=None, sheet_name="X")
+    assert result["programs"] == []
+    assert result["trim_decisions"] == []
+
+
+def test_find_template_file_any_resolves_d1():
+    """标准模板库能按 wp_code 解析出 D1 主模板（回退源存在性守护）。
+
+    若该断言失败说明 wp_templates/ 缺 D1 模板或索引未含 D1 —— render-config
+    的模板回退将取不到文件，A 程序表/网格会退回空态。
+    """
+    from app.services.wp_template_init_service import find_template_file_any
+
+    p = find_template_file_any("D1")
+    # 环境缺模板库时跳过（CI 可能不含全量 wp_templates）
+    if p is None:
+        pytest.skip("wp_templates D1 模板不存在（环境未铺模板库）")
+    assert p.is_file()
+    # 含 D1A 审计程序表 sheet
+    import openpyxl
+
+    wb = openpyxl.load_workbook(str(p), read_only=True)
+    try:
+        assert any("D1A" in s for s in wb.sheetnames)
+    finally:
+        wb.close()

@@ -1,0 +1,613 @@
+# backend/data/wp_render_schema/C-D1-disclosure.yaml
+# 应收票据附注披露 — C 类附注嵌套表渲染 schema（上市公司版 + 国企版两 sheet）
+# Template: backend/wp_templates/D/D1 应收票据.xlsx
+#   - sheet「附注披露信息（上市公司）」119×7
+#   - sheet「附注披露信息（国企）」89×8
+# 适用范围：D1 应收票据底稿的两个附注披露 sheet（class_code=C-附注披露 → c-note-table）
+# 设计要点（用户 2026-06-04 要求）：
+#   1) 各披露小表必须独立成卡片（GtCNoteTable 折叠卡），不混在一张大表里；
+#   2) 模板里的【提示...】整段作为 description 显示为关注提示；
+#   3) 每张小表的数据从其他底稿取数（cross_refs auto_pull）或支持自定义填充（dynamic_rows）。
+
+wp_code: C-D1-disclosure
+template_path: backend/wp_templates/D/D1 应收票据.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+shared: false
+related_accounts:
+  - { code: '1121', name: 应收票据 }
+  - { code: '1121-bad', name: 坏账准备-应收票据 }
+
+sheets:
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 上市公司版
+  # ═══════════════════════════════════════════════════════════════════════
+  附注披露信息（上市公司）:
+    component_type: c-note-table
+
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '附注披露信息（上市公司）'
+      A3: '${entity_name}'
+      A4: '${period_end}'
+      G3: '${index_no}'
+
+    fields:
+      - { name: section_id, label: '附注章节号', type: text, readonly: true,
+          default: '应收票据' }
+      - { name: monetary_unit, label: '金额单位', type: enum, default: '元',
+          enum: ['元', '千元', '万元', '百万元'] }
+
+    sub_tables:
+
+      # ━━━ 1. 应收票据分类（期末/期初对照）━━━━━━━━━━━━━━━━━━━━━━━━━
+      - id: notes_classification
+        title: '一、应收票据分类（期末数 / 上年年末数）'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 1
+        description: >-
+          按票据种类列示期末/期初的账面余额、坏账准备、账面价值。账面价值 = 账面余额 − 坏账准备。
+          数据自 D1-1 审定表与 D1-4 坏账准备明细表取数，可手工覆盖。
+        columns:
+          A: { field: bill_type, type: text, label: '票据种类', readonly: true, width: 200 }
+          B: { field: end_balance, type: number, label: '期末余额', render: 'amount', width: 130 }
+          C: { field: end_provision, type: number, label: '期末坏账准备', render: 'amount', width: 130 }
+          D: { field: end_book_value, type: number, label: '期末账面价值', render: 'amount_formula', formula: '=B-C', width: 130 }
+          E: { field: begin_balance, type: number, label: '期初余额', render: 'amount', width: 130 }
+          F: { field: begin_provision, type: number, label: '期初坏账准备', render: 'amount', width: 130 }
+          G: { field: begin_book_value, type: number, label: '期初账面价值', render: 'amount_formula', formula: '=E-F', width: 130 }
+        static_rows:
+          - { id: bank_acceptance, label: '银行承兑汇票' }
+          - { id: commercial_acceptance, label: '商业承兑汇票' }
+          - { id: cls_total, label: '合计', is_grand_total: true }
+        footer_total: { enabled: false }
+
+      # ━━━ 提示卡：列报口径（云信/融信/供应链票据）━━━━━━━━━━━━━━━━━
+      - id: notes_tip_scope
+        title: '⚠ 提示：应收票据列报口径'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 2
+        description: >-
+          企业因销售商品、提供服务等取得的、不属于《票据法》规范票据的"云信""融信"等数字化应收账款债权凭证，
+          不应在"应收票据"项目列示：业务模式以收取合同现金流量为目标的应在"应收账款"列示；既收取现金流量又以
+          出售为目标的应在"应收款项融资"列示。若法律认定供应链票据属于《商业汇票承兑、贴现与再贴现管理办法》范围
+          且具备《票据法》要件，则自 2023-01-01 起按"应收票据"处理，无需追溯调整。
+        columns:
+          A: { field: note, type: textarea, label: '本公司适用情况说明', width: 600,
+               hint: '说明本公司是否持有云信/融信/供应链票据及其列报判断' }
+        static_rows:
+          - { id: scope_note, label: '' }
+        footer_total: { enabled: false }
+
+      # ━━━ 2. 期末已质押的应收票据（动态行）━━━━━━━━━━━━━━━━━━━━━━━
+      - id: pledged
+        title: '（1）期末已质押的应收票据'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 3
+        max_rows: 100
+        add_row_button: true
+        description: '按种类列示期末已质押金额，可自定义增行。'
+        columns:
+          A: { field: bill_type, type: text, label: '种类', width: 220, required: true,
+               hint: '银行承兑票据 / 商业承兑票据 / 自定义' }
+          B: { field: pledged_amount, type: number, label: '期末已质押金额', render: 'amount', width: 180 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [B] }
+
+      # ━━━ 3. 期末已背书或贴现但尚未到期（动态行）━━━━━━━━━━━━━━━━━
+      - id: endorsed_discounted
+        title: '（2）期末已背书或贴现但尚未到期的应收票据'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 4
+        max_rows: 100
+        add_row_button: true
+        description: >-
+          按种类列示期末终止确认金额与未终止确认金额。如根据《企业会计准则第23号——金融资产转移》终止确认，
+          列示其终止确认金额及与终止确认相关的利得和损失。
+        columns:
+          A: { field: bill_type, type: text, label: '种类', width: 220, required: true }
+          B: { field: derecognized_amount, type: number, label: '期末终止确认金额', render: 'amount', width: 170 }
+          C: { field: not_derecognized_amount, type: number, label: '期末未终止确认金额', render: 'amount', width: 180 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [B, C] }
+
+      # ━━━ 提示卡：贴现票据信用风险说明（上市监管）━━━━━━━━━━━━━━━━
+      - id: tip_discount_credit_risk
+        title: '⚠ 提示：贴现/背书票据终止确认与信用风险披露（证监会监管要求）'
+        type: static_rows
+        applicable_to_sub_class: [listed]
+        order: 5
+        description: >-
+          证监会《2014 年上市公司年报会计监管报告》要求：对已背书或贴现且尚未到期的银行承兑汇票予以终止确认后，
+          需在报表中补充披露终止确认的票据及票据被追索时可能存在的支付风险。参考披露：①用于贴现的银行承兑汇票
+          由信用等级较高的银行承兑，信用风险和延期付款风险很小，票据相关利率风险已转移给银行，所有权上主要风险
+          和报酬已转移，故终止确认；②或：由信用等级不高的银行承兑，贴现不影响追索权，信用风险和延期付款风险未
+          转移，故未终止确认。
+        columns:
+          A: { field: note, type: textarea, label: '本公司终止确认判断及风险说明', width: 600 }
+        static_rows:
+          - { id: discount_note, label: '' }
+        footer_total: { enabled: false }
+
+      # ━━━ 4. 期末因出票人未履约转应收账款（动态行）━━━━━━━━━━━━━━━
+      - id: defaulted_to_ar
+        title: '（3）期末因出票人未履约而转应收账款的票据'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 6
+        max_rows: 100
+        add_row_button: true
+        description: '出票人未履约、已从应收票据转入应收账款的票据，按种类列示期末转应收账款金额。'
+        columns:
+          A: { field: bill_type, type: text, label: '种类', width: 220, required: true }
+          B: { field: transferred_amount, type: number, label: '期末转应收账款金额', render: 'amount', width: 180 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [B] }
+
+      # ━━━ 5. 按坏账计提方法分类（期末）━━━━━━━━━━━━━━━━━━━━━━━━━
+      - id: provision_method_end
+        title: '（4）按坏账计提方法分类（期末数）'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 7
+        description: >-
+          按"单项计提 / 组合计提"两大类列示账面余额、计提比例、坏账准备、预期信用损失率、账面价值。
+          组合下按银行承兑/商业承兑细分。账面价值 = 金额 − 坏账准备。
+        columns:
+          A: { field: category, type: text, label: '类别', readonly: true, width: 240 }
+          B: { field: amount, type: number, label: '金额', render: 'amount', width: 130 }
+          C: { field: amount_pct, type: number, label: '比例(%)', render: 'percent', width: 100 }
+          D: { field: provision, type: number, label: '坏账准备', render: 'amount', width: 130 }
+          E: { field: ecl_rate, type: number, label: '预期信用损失率(%)', render: 'percent', width: 150 }
+          F: { field: book_value, type: number, label: '账面价值', render: 'amount_formula', formula: '=B-D', width: 130 }
+        static_rows:
+          - { id: single, label: '按单项计提坏账准备', is_subtotal: true }
+          - { id: single_detail, label: '  其中：（逐项）', indent: 1 }
+          - { id: portfolio, label: '按组合计提坏账准备', is_subtotal: true }
+          - { id: portfolio_bank, label: '  银行承兑汇票', indent: 1 }
+          - { id: portfolio_commercial, label: '  商业承兑汇票', indent: 1 }
+          - { id: pm_total, label: '合计', is_grand_total: true }
+        footer_total: { enabled: false }
+
+      # ━━━ 6. 按坏账计提方法分类（期初/上年）━━━━━━━━━━━━━━━━━━━━━
+      - id: provision_method_begin
+        title: '（4 续）按坏账计提方法分类（上年年末数）'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 8
+        description: '与期末数对应的上年年末分类披露，结构相同。'
+        columns:
+          A: { field: category, type: text, label: '类别', readonly: true, width: 240 }
+          B: { field: amount, type: number, label: '金额', render: 'amount', width: 130 }
+          C: { field: amount_pct, type: number, label: '比例(%)', render: 'percent', width: 100 }
+          D: { field: provision, type: number, label: '坏账准备', render: 'amount', width: 130 }
+          E: { field: ecl_rate, type: number, label: '预期信用损失率(%)', render: 'percent', width: 150 }
+          F: { field: book_value, type: number, label: '账面价值', render: 'amount_formula', formula: '=B-D', width: 130 }
+        static_rows:
+          - { id: single, label: '按单项计提坏账准备', is_subtotal: true }
+          - { id: portfolio, label: '按组合计提坏账准备', is_subtotal: true }
+          - { id: portfolio_bank, label: '  银行承兑汇票', indent: 1 }
+          - { id: portfolio_commercial, label: '  商业承兑汇票', indent: 1 }
+          - { id: pm_total, label: '合计', is_grand_total: true }
+        footer_total: { enabled: false }
+
+      # ━━━ 7. 单项计提坏账准备明细（动态行）━━━━━━━━━━━━━━━━━━━━━━
+      - id: single_provision_detail
+        title: '按单项计提坏账准备的应收票据（逐项披露）'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 9
+        max_rows: 200
+        add_row_button: true
+        description: '对单项计提坏账准备的票据逐项披露账面余额、坏账准备、预期信用损失率及计提理由。'
+        columns:
+          A: { field: name, type: text, label: '名称', width: 220, required: true }
+          B: { field: book_balance, type: number, label: '账面余额', render: 'amount', width: 130 }
+          C: { field: provision, type: number, label: '坏账准备', render: 'amount', width: 130 }
+          D: { field: ecl_rate, type: number, label: '预期信用损失率(%)', render: 'percent', width: 150 }
+          E: { field: reason, type: textarea, label: '计提理由', width: 280, max_length: 1000 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [B, C] }
+
+      # ━━━ 8. 组合计提坏账准备明细（动态行）━━━━━━━━━━━━━━━━━━━━━━
+      - id: portfolio_provision_detail
+        title: '按组合计提坏账准备的应收票据'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 10
+        max_rows: 100
+        add_row_button: true
+        description: >-
+          按组合（银行承兑/商业承兑/出票人类型或账龄）披露期末与上年年末的账面余额、坏账准备、预期信用损失率。
+          组合判定依据可在"名称"列注明。
+        columns:
+          A: { field: name, type: text, label: '名称/组合', width: 220, required: true,
+               hint: '如 银行承兑汇票小计 / 出票人类型或账龄' }
+          B: { field: end_balance, type: number, label: '期末账面余额', render: 'amount', width: 140 }
+          C: { field: end_provision, type: number, label: '期末坏账准备', render: 'amount', width: 130 }
+          D: { field: end_ecl_rate, type: number, label: '期末预期信用损失率(%)', render: 'percent', width: 170 }
+          E: { field: begin_balance, type: number, label: '上年账面余额', render: 'amount', width: 140 }
+          F: { field: begin_provision, type: number, label: '上年坏账准备', render: 'amount', width: 130 }
+          G: { field: begin_ecl_rate, type: number, label: '上年预期信用损失率(%)', render: 'percent', width: 170 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [B, C, E, F] }
+
+      # ━━━ 提示卡：组合坏账准备 + 账龄连续计算 ━━━━━━━━━━━━━━━━━━━━
+      - id: tip_portfolio_aging
+        title: '⚠ 提示：组合计提原因与账龄连续计算'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 11
+        description: >-
+          说明按组合计提坏账准备的原因。此处仅披露未逾期的应收票据计提的坏账准备；若票据逾期，则应转入应收账款
+          并计提坏账准备，账龄应连续计算。
+        columns:
+          A: { field: note, type: textarea, label: '组合计提原因说明', width: 600 }
+        static_rows:
+          - { id: portfolio_note, label: '' }
+        footer_total: { enabled: false }
+
+      # ━━━ 9. 本期计提/收回/转回/核销坏账准备（变动表）━━━━━━━━━━━━━
+      - id: provision_movement
+        title: '（5）本期计提、收回或转回的坏账准备情况'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 12
+        description: '坏账准备本期变动：上年年末 + 本期计提 − 收回/转回 − 核销 ± 其他 = 期末。'
+        columns:
+          A: { field: movement_item, type: text, label: '变动项目', readonly: true, width: 280 }
+          B: { field: provision_amount, type: number, label: '坏账准备金额', render: 'amount', width: 160 }
+        static_rows:
+          - { id: mv_begin, label: '上年年末数' }
+          - { id: mv_provision, label: '本期计提' }
+          - { id: mv_recover_reverse, label: '本期收回或转回' }
+          - { id: mv_writeoff, label: '本期核销' }
+          - { id: mv_transfer, label: '[本期转销]' }
+          - { id: mv_other, label: '[其他]' }
+          - { id: mv_end, label: '期末数', is_grand_total: true }
+        footer_total: { enabled: false }
+
+      # ━━━ 10. 本期转回/收回金额重要的坏账准备（动态行）━━━━━━━━━━━━
+      - id: material_reversal
+        title: '其中：本期转回或收回金额重要的坏账准备'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 13
+        max_rows: 100
+        add_row_button: true
+        description: '逐项披露本期转回或收回金额重要的坏账准备：单位名称、原确定依据、转回/收回方式及金额。'
+        columns:
+          A: { field: unit_name, type: text, label: '单位名称', width: 220, required: true }
+          B: { field: reverse_reason, type: textarea, label: '转回原因', width: 200 }
+          C: { field: recover_method, type: text, label: '收回方式', width: 140 }
+          D: { field: original_basis, type: textarea, label: '原确定坏账准备的依据', width: 220 }
+          E: { field: amount, type: number, label: '转回或收回金额', render: 'amount', width: 150 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [E] }
+
+      # ━━━ 11. 本期实际核销的应收票据（动态行 + 逐项）━━━━━━━━━━━━━━
+      - id: writeoff_detail
+        title: '（6）本期实际核销的应收票据情况'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 14
+        max_rows: 100
+        add_row_button: true
+        description: >-
+          对重要的应收票据逐项披露：单位名称、款项性质、核销金额、核销原因、履行的核销程序，
+          及是否由关联交易产生。实际核销的款项由关联交易产生的，应单独披露。
+        columns:
+          A: { field: unit_name, type: text, label: '单位名称', width: 200, required: true }
+          B: { field: nature, type: text, label: '应收票据的性质/款项性质', width: 180 }
+          C: { field: writeoff_amount, type: number, label: '核销金额', render: 'amount', width: 130 }
+          D: { field: reason, type: textarea, label: '核销原因', width: 220 }
+          E: { field: procedure, type: textarea, label: '履行的核销程序', width: 220 }
+          F: { field: related_party, type: boolean, label: '是否由关联交易产生', render: 'checkmark', width: 140 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [C] }
+
+    # ─── 跨底稿取数（GtCNoteTable 加载时显示数据来源 + 可跳转）─────────────
+    cross_refs:
+      - ref_id: CW-C-D1-disclosure-001
+        source: { sub_table: notes_classification, row: cls_total, column: end_balance }
+        target_wp: D1-1
+        target_sheet: '审定表D1-1'
+        target_field: '审定数(期末)'
+        description: '分类表合计期末余额 ← D1-1 审定表期末审定数'
+        severity: required
+        direction: inbound
+        auto_pull: true
+      - ref_id: CW-C-D1-disclosure-002
+        source: { sub_table: notes_classification, column: end_provision }
+        target_wp: D1-4
+        target_sheet: '坏账准备明细表D1-4'
+        target_field: '坏账准备(期末)'
+        description: '分类表坏账准备 ← D1-4 坏账准备明细表'
+        severity: required
+        direction: inbound
+        auto_pull: true
+      - ref_id: CW-C-D1-disclosure-003
+        source: { sub_table: pledged }
+        target_wp: D1-12
+        target_sheet: '应收票据质押检查表D1-12'
+        target_field: 'pledged_bills'
+        description: '期末已质押明细 ← D1-12 质押检查表'
+        severity: optional
+        direction: inbound
+        auto_pull: true
+      - ref_id: CW-C-D1-disclosure-004
+        source: { sub_table: endorsed_discounted }
+        target_wp: D1-8
+        target_sheet: '应收票据贴现、票据已背书未到期明细表D1-8'
+        target_field: 'endorsed_discounted_bills'
+        description: '已背书/贴现明细 ← D1-8 贴现背书明细表'
+        severity: optional
+        direction: inbound
+        auto_pull: true
+
+    linkage:
+      downstream:
+        - target: disclosure_notes
+          condition: 'on_save'
+          action: 'sync_to_disclosure_notes'
+          description: 'C 类附注保存 → 单向同步到 disclosure_notes 模块"应收票据"章节'
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 国有企业版
+  # ═══════════════════════════════════════════════════════════════════════
+  附注披露信息（国企）:
+    component_type: c-note-table
+
+    fixed_cells:
+      A1: '致同会计师事务所'
+      A2: '附注披露信息（国有企业）'
+      A3: '${entity_name}'
+      A4: '${period_end}'
+      H3: '${index_no}'
+
+    fields:
+      - { name: section_id, label: '附注章节号', type: text, readonly: true,
+          default: '应收票据' }
+      - { name: monetary_unit, label: '金额单位', type: enum, default: '元',
+          enum: ['元', '千元', '万元', '百万元'] }
+
+    sub_tables:
+
+      # ━━━ 1. 应收票据分类（期末/期初）━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      - id: soe_classification
+        title: '（1）应收票据分类（期末数 / 期初数）'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 1
+        description: '按票据种类列示期末/期初的账面余额、坏账准备、账面价值。账面价值 = 账面余额 − 坏账准备。'
+        columns:
+          A: { field: bill_type, type: text, label: '票据种类', readonly: true, width: 200 }
+          B: { field: end_balance, type: number, label: '期末余额', render: 'amount', width: 130 }
+          C: { field: end_provision, type: number, label: '期末坏账准备', render: 'amount', width: 130 }
+          D: { field: end_book_value, type: number, label: '期末账面价值', render: 'amount_formula', formula: '=B-C', width: 130 }
+          E: { field: begin_balance, type: number, label: '年初余额', render: 'amount', width: 130 }
+          F: { field: begin_provision, type: number, label: '年初坏账准备', render: 'amount', width: 130 }
+          G: { field: begin_book_value, type: number, label: '年初账面价值', render: 'amount_formula', formula: '=E-F', width: 130 }
+        static_rows:
+          - { id: bank_acceptance, label: '银行承兑汇票' }
+          - { id: commercial_acceptance, label: '商业承兑汇票' }
+          - { id: cls_total, label: '合计', is_grand_total: true }
+        footer_total: { enabled: false }
+
+      # ━━━ 2. 坏账准备计提情况（期末）━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      - id: soe_provision_method_end
+        title: '（2）坏账准备计提情况 — 按计提方法分类（期末数）'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 2
+        description: '按"单项/组合"分类披露期末账面余额、计提比例、坏账准备、预期信用损失率、账面价值。'
+        columns:
+          A: { field: category, type: text, label: '类别', readonly: true, width: 240 }
+          B: { field: amount, type: number, label: '账面余额金额', render: 'amount', width: 130 }
+          C: { field: amount_pct, type: number, label: '比例(%)', render: 'percent', width: 100 }
+          D: { field: provision, type: number, label: '坏账准备金额', render: 'amount', width: 130 }
+          E: { field: ecl_rate, type: number, label: '预期信用损失率(%)', render: 'percent', width: 150 }
+          F: { field: book_value, type: number, label: '账面价值', render: 'amount_formula', formula: '=B-D', width: 130 }
+        static_rows:
+          - { id: single, label: '按单项计提坏账准备', is_subtotal: true }
+          - { id: portfolio, label: '按组合计提坏账准备', is_subtotal: true }
+          - { id: pm_total, label: '合计', is_grand_total: true }
+        footer_total: { enabled: false }
+
+      # ━━━ 3. 坏账准备计提情况（期初）━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      - id: soe_provision_method_begin
+        title: '（2 续）按计提方法分类（期初数）'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 3
+        description: '与期末数对应的期初分类披露，结构相同。'
+        columns:
+          A: { field: category, type: text, label: '类别', readonly: true, width: 240 }
+          B: { field: amount, type: number, label: '账面余额金额', render: 'amount', width: 130 }
+          C: { field: amount_pct, type: number, label: '比例(%)', render: 'percent', width: 100 }
+          D: { field: provision, type: number, label: '坏账准备金额', render: 'amount', width: 130 }
+          E: { field: ecl_rate, type: number, label: '预期信用损失率(%)', render: 'percent', width: 150 }
+          F: { field: book_value, type: number, label: '账面价值', render: 'amount_formula', formula: '=B-D', width: 130 }
+        static_rows:
+          - { id: single, label: '按单项计提坏账准备', is_subtotal: true }
+          - { id: portfolio, label: '按组合计提坏账准备', is_subtotal: true }
+          - { id: pm_total, label: '合计', is_grand_total: true }
+        footer_total: { enabled: false }
+
+      # ━━━ 4. 单项计提坏账准备明细（动态行）━━━━━━━━━━━━━━━━━━━━━━
+      - id: soe_single_provision_detail
+        title: '按单项计提坏账准备的应收票据（逐项披露）'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 4
+        max_rows: 200
+        add_row_button: true
+        description: '对单项计提坏账准备的票据逐项披露账面余额、坏账准备、预期信用损失率及计提理由。'
+        columns:
+          A: { field: name, type: text, label: '名称', width: 220, required: true }
+          B: { field: book_balance, type: number, label: '账面余额', render: 'amount', width: 130 }
+          C: { field: provision, type: number, label: '坏账准备', render: 'amount', width: 130 }
+          D: { field: ecl_rate, type: number, label: '预期信用损失率(%)', render: 'percent', width: 150 }
+          E: { field: reason, type: textarea, label: '计提理由', width: 280, max_length: 1000 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [B, C] }
+
+      # ━━━ 5. 组合计提坏账准备明细（动态行）━━━━━━━━━━━━━━━━━━━━━━
+      - id: soe_portfolio_provision_detail
+        title: '按组合计提坏账准备的应收票据'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 5
+        max_rows: 100
+        add_row_button: true
+        description: '按组合（银行承兑/商业承兑/出票人类型或账龄）披露期末与上年年末的账面余额、坏账准备、预期信用损失率。'
+        columns:
+          A: { field: name, type: text, label: '名称/组合', width: 220, required: true,
+               hint: '如 银行承兑汇票小计 / 出票人类型或账龄' }
+          B: { field: end_balance, type: number, label: '期末账面余额', render: 'amount', width: 140 }
+          C: { field: end_provision, type: number, label: '期末坏账准备', render: 'amount', width: 130 }
+          D: { field: end_ecl_rate, type: number, label: '期末预期信用损失率(%)', render: 'percent', width: 170 }
+          E: { field: begin_balance, type: number, label: '上年账面余额', render: 'amount', width: 140 }
+          F: { field: begin_provision, type: number, label: '上年坏账准备', render: 'amount', width: 130 }
+          G: { field: begin_ecl_rate, type: number, label: '上年预期信用损失率(%)', render: 'percent', width: 170 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [B, C, E, F] }
+
+      # ━━━ 提示卡：组合计提原因 + 账龄连续计算 ━━━━━━━━━━━━━━━━━━━━
+      - id: soe_tip_portfolio_aging
+        title: '⚠ 提示：组合计提原因与账龄连续计算'
+        type: static_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 6
+        description: >-
+          说明按组合计提坏账准备的原因。此处仅披露未逾期的应收票据计提的坏账准备；若票据逾期，则应转入应收账款
+          并计提坏账准备，账龄应连续计算。
+        columns:
+          A: { field: note, type: textarea, label: '组合计提原因说明', width: 600 }
+        static_rows:
+          - { id: portfolio_note, label: '' }
+        footer_total: { enabled: false }
+
+      # ━━━ 6. 本期计提/收回/转回坏账准备（变动表，动态行）━━━━━━━━━━━
+      - id: soe_provision_movement
+        title: '（3）本期计提、收回或转回的应收票据坏账准备情况'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 7
+        max_rows: 50
+        add_row_button: true
+        description: '按类别列示期初数、本期计提/收回或转回/核销/其他变动及期末数。'
+        columns:
+          A: { field: category, type: text, label: '类别', width: 240, required: true,
+               hint: '单项计提预期信用损失 / 按组合计提预期信用损失' }
+          B: { field: begin, type: number, label: '期初数', render: 'amount', width: 120 }
+          C: { field: provision, type: number, label: '本期计提', render: 'amount', width: 120 }
+          D: { field: recover_reverse, type: number, label: '收回或转回', render: 'amount', width: 120 }
+          E: { field: writeoff, type: number, label: '核销', render: 'amount', width: 110 }
+          F: { field: other, type: number, label: '其他变动', render: 'amount', width: 110 }
+          G: { field: end, type: number, label: '期末数', render: 'amount_formula', formula: '=B+C-D-E+F', width: 120 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [B, C, D, E, F] }
+
+      # ━━━ 7. 本期转回/收回金额重要的坏账准备（动态行）━━━━━━━━━━━━━
+      - id: soe_material_reversal
+        title: '其中：本期转回或收回金额重要的应收票据坏账准备'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 8
+        max_rows: 100
+        add_row_button: true
+        description: '逐项披露债务人名称、转回或收回金额、转回前累计已计提坏账准备金额、转回/收回原因及方式。'
+        columns:
+          A: { field: debtor_name, type: text, label: '债务人名称', width: 220, required: true }
+          B: { field: amount, type: number, label: '转回或收回金额', render: 'amount', width: 150 }
+          C: { field: accumulated_provision, type: number, label: '转回或收回前累计已计提坏账准备', render: 'amount', width: 220 }
+          D: { field: reason_method, type: textarea, label: '转回或收回原因、方式', width: 240 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [B, C] }
+
+      # ━━━ 8. 期末已质押的应收票据（动态行）━━━━━━━━━━━━━━━━━━━━━━
+      - id: soe_pledged
+        title: '（4）期末已质押的应收票据'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 9
+        max_rows: 100
+        add_row_button: true
+        description: '按种类列示期末已质押金额，可自定义增行。'
+        columns:
+          A: { field: bill_type, type: text, label: '种类', width: 220, required: true }
+          B: { field: pledged_amount, type: number, label: '期末已质押金额', render: 'amount', width: 180 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [B] }
+
+      # ━━━ 9. 期末已背书或贴现但尚未到期（动态行）━━━━━━━━━━━━━━━━━
+      - id: soe_endorsed_discounted
+        title: '（5）期末已背书或贴现但尚未到期的应收票据'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 10
+        max_rows: 100
+        add_row_button: true
+        description: >-
+          按种类列示期末终止确认金额与未终止确认金额。如根据《企业会计准则第23号——金融资产转移》终止确认，
+          列示其终止确认金额及与终止确认相关的利得和损失。
+        columns:
+          A: { field: bill_type, type: text, label: '种类', width: 220, required: true }
+          B: { field: derecognized_amount, type: number, label: '期末终止确认金额', render: 'amount', width: 170 }
+          C: { field: not_derecognized_amount, type: number, label: '期末未终止确认金额', render: 'amount', width: 180 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [B, C] }
+
+      # ━━━ 10. 期末因出票人未履约转应收账款（动态行）━━━━━━━━━━━━━━
+      - id: soe_defaulted_to_ar
+        title: '（6）期末因出票人未履约而转为应收账款的票据'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 11
+        max_rows: 100
+        add_row_button: true
+        description: '出票人未履约、已从应收票据转入应收账款的票据，按种类列示期末转应收账款金额。'
+        columns:
+          A: { field: bill_type, type: text, label: '种类', width: 220, required: true }
+          B: { field: transferred_amount, type: number, label: '期末转应收账款金额', render: 'amount', width: 180 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [B] }
+
+      # ━━━ 11. 本期实际核销的应收票据（动态行）━━━━━━━━━━━━━━━━━━━━
+      - id: soe_writeoff_detail
+        title: '（7）本期实际核销的应收票据'
+        type: dynamic_rows
+        applicable_to_sub_class: [listed, soe]
+        order: 12
+        max_rows: 100
+        add_row_button: true
+        description: >-
+          对重要的应收票据逐项披露：单位名称、应收票据的性质、核销金额、核销原因、履行的核销程序，
+          及是否由关联交易产生。
+        columns:
+          A: { field: unit_name, type: text, label: '单位名称', width: 200, required: true }
+          B: { field: nature, type: text, label: '应收票据的性质', width: 180 }
+          C: { field: writeoff_amount, type: number, label: '核销金额', render: 'amount', width: 130 }
+          D: { field: reason, type: textarea, label: '核销原因', width: 220 }
+          E: { field: procedure, type: textarea, label: '履行的核销程序', width: 220 }
+          F: { field: related_party, type: boolean, label: '是否由关联交易产生', render: 'checkmark', width: 140 }
+        footer_total: { enabled: true, label: '合计', sum_columns: [C] }
+
+    cross_refs:
+      - ref_id: CW-C-D1-soe-001
+        source: { sub_table: soe_classification, row: cls_total, column: end_balance }
+        target_wp: D1-1
+        target_sheet: '审定表D1-1'
+        target_field: '审定数(期末)'
+        description: '分类表合计期末余额 ← D1-1 审定表期末审定数'
+        severity: required
+        direction: inbound
+        auto_pull: true
+      - ref_id: CW-C-D1-soe-002
+        source: { sub_table: soe_classification, column: end_provision }
+        target_wp: D1-4
+        target_sheet: '坏账准备明细表D1-4'
+        target_field: '坏账准备(期末)'
+        description: '分类表坏账准备 ← D1-4 坏账准备明细表'
+        severity: required
+        direction: inbound
+        auto_pull: true
+
+    linkage:
+      downstream:
+        - target: disclosure_notes
+          condition: 'on_save'
+          action: 'sync_to_disclosure_notes'
+          description: 'C 类附注保存 → 单向同步到 disclosure_notes 模块"应收票据"章节'

@@ -1,0 +1,60 @@
+# ============================================================
+# gitleaks 配置 — 审计作业平台 secret 扫描
+# 继承默认规则（覆盖 sk- / ghp_ / AKIA / PEM / postgresql://user:pass@ 等）
+# + 项目特定 allowlist（开发占位符 / 测试 fixture / 生成物豁免）
+# ============================================================
+
+title = "GT_plan secret scanning"
+
+[extend]
+# 继承 gitleaks 内置规则集，自动覆盖：
+# - AWS Access Key (AKIA...)
+# - GitHub Personal Access Token (ghp_...)
+# - OpenAI/Anthropic API Key (sk-...)
+# - PEM Private Keys (-----BEGIN * PRIVATE KEY-----)
+# - PostgreSQL Connection URI (postgresql://user:pass@...)
+# - Generic High Entropy strings
+# 无需手写上述规则，useDefault = true 已全部包含
+useDefault = true
+
+# ============================================================
+# 全局 allowlist — 按路径豁免（整个文件/目录不扫描）
+# ============================================================
+[allowlist]
+description = "安全豁免：示例文件、测试 fixture、生成物、依赖目录"
+paths = [
+  # .env.example 仅含占位符，不是真实密钥
+  '''(?i)\.env\.example$''',
+  # spec 文档可能引用示例 secret 做说明
+  '''(?i)\.kiro/specs/''',
+  # Hypothesis 测试框架生成物（数据库/临时文件）
+  '''(?i)\.hypothesis/''',
+  # 依赖目录（不应扫描第三方代码）
+  '''(?i)node_modules/''',
+  '''(?i)\.venv/''',
+  # 后端测试目录（fixture 可能含假密钥）
+  '''(?i)backend/tests/''',
+  # gitleaks 自身配置（本文件含规则示例字符串）
+  '''(?i)\.gitleaks\.toml$''',
+]
+
+# ============================================================
+# 全局 allowlist — 按正则豁免（匹配到的值视为安全）
+# 覆盖 .env.example 中的所有已知占位符和开发默认值
+# ============================================================
+regexes = [
+  # JWT_SECRET_KEY 占位符
+  '''change-me-to-a-random-secret''',
+  # 旧版开发密钥占位符（若存在）
+  '''dev-secret-key-change-in-production''',
+  # 通用占位符
+  '''not-needed''',
+  # 测试用户密码（admin/admin123）
+  '''admin123''',
+  # 开发环境 PG 连接（postgres:postgres@localhost）
+  '''postgres:postgres@''',
+  # SFTP 用户名（非密码，仅标识）
+  '''audit_archive''',
+  # 空值 token / key（=后无内容或仅空白）
+  '''(?i)(PAPERLESS_TOKEN|HF_TOKEN|CLOUD_S3_ACCESS_KEY|CLOUD_S3_SECRET_KEY|CLOUD_SMB_PASSWORD|CLOUD_SFTP_PASSWORD|CLOUD_S3_REGION)=\s*$''',
+]

@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     # JWT
     JWT_SECRET_KEY: str = "dev-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 小时（开发环境）
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3030"
     # 登录安全
@@ -155,6 +155,29 @@ class Settings(BaseSettings):
     # 同时为 True 时才对 template_type 不同的子公司章节做跨模板翻译；
     # False（默认）= 即使 V2 开启也跳过跨模板翻译，原样汇总（老版兼容、灰度防御）。
     CONSOL_CROSS_TEMPLATE_ENABLED: bool = False
+
+    # --- llm-structured-output ---
+    LLM_STRUCTURED_OUTPUT_ENABLED: bool = True
+    LLM_GUIDED_DECODING_ENABLED: bool = True
+    LLM_STRUCTURED_MAX_RETRIES: int = 2
+
+    # --- endpoint-fuzz-and-tracing ---
+    OTEL_ENABLED: bool = False
+    OTEL_EXPORTER: str = "console"  # console | otlp
+    OTEL_OTLP_ENDPOINT: str = "http://localhost:4317"
+    RETRIEVAL_BM25_FALLBACK_ENABLED: bool = True
+    SCHEMATHESIS_MAX_EXAMPLES: int = 5
+
+    # --- pg-pooling-and-load-test ---
+    DB_USE_PGBOUNCER: bool = False
+    DB_PGBOUNCER_HOST: str = "localhost"
+    DB_PGBOUNCER_PORT: int = 6432
+
+    # --- xlsx-read-acceleration ---
+    XLSX_READ_USE_CALAMINE: bool = True
+
+    # --- dev-tooling-modernization ---
+    DOCLING_ENABLED: bool = False
 
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 

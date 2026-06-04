@@ -31,8 +31,10 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install dependencies
-        run: pip install -r backend/requirements.txt
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
       - name: Run migrations (populate PG schema for contract tests)
         run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://test:test@localhost:5432/audit_test').run_pending())"
         working-directory: backend
@@ -63,9 +65,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install dependencies
-        run: pip install -r backend/requirements.txt
-        working-directory: .
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
       - name: Run migrations (populate PG schema for column contract test)
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_audit
@@ -90,8 +93,10 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install dependencies
-        run: pip install -r backend/requirements.txt
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
       - name: Run ledger_import full suite (含最小合成样本 smoke)
         run: |
           python -m pytest backend/tests/ledger_import/ \
@@ -115,8 +120,10 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install dependencies
-        run: pip install -r backend/requirements.txt
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
       - name: Ruff check
         run: python -m ruff check backend/
       - name: Check signature_level usage
@@ -165,6 +172,30 @@ jobs:
           # 每个值都在 error_hints.py 有 ErrorHint 注册
           python -m pytest backend/tests/ledger_import/test_error_hints.py -v --tb=short
 
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  sqlfluff-lint:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install sqlfluff
+        run: pip install sqlfluff
+      - name: Lint migration SQL (warning only)
+        run: sqlfluff lint backend/migrations/*.sql || true
+
   seed-validate:
     runs-on: ubuntu-latest
     steps:
@@ -176,8 +207,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Install dependencies
-        run: pip install -r backend/requirements.txt
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
       - name: Validate seed files
         run: python scripts/validate_seed_files.py
       - name: Dead link check (apiPaths ↔ router_registry)

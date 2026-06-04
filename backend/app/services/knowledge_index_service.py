@@ -12,6 +12,7 @@ Provides vector index capabilities for audit project knowledge base:
 
 from __future__ import annotations
 
+import time
 import uuid
 from typing import Any
 from uuid import UUID
@@ -33,6 +34,23 @@ logger = logging.getLogger(__name__)
 
 # Fixed chunk size (character count)
 _CHUNK_SIZE = 500
+
+# BM25 索引缓存：key=(project_id, scope), value=(bm25_index, chunks_list, build_timestamp)
+# 模块级缓存，跨请求共享（同一进程内）；TTL 60s 或 incremental_update 时失效
+_BM25_CACHE: dict[tuple, tuple] = {}
+_BM25_CACHE_TTL = 60  # seconds
+
+
+def _invalidate_bm25_cache(project_id: UUID) -> None:
+    """Invalidate all BM25 cache entries for a given project (all scopes).
+
+    Called by incremental_update / build_index / update_index / delete_index
+    to ensure stale indices are not served after document changes.
+    """
+    pid_str = str(project_id)
+    keys_to_remove = [k for k in _BM25_CACHE if k[0] == pid_str]
+    for k in keys_to_remove:
+        del _BM25_CACHE[k]
 
 
 def _chunk_text(text: str, chunk_size: int = _CHUNK_SIZE) -> list[str]:
@@ -185,6 +203,9 @@ class KnowledgeIndexService:
         Full build of project knowledge base index.
         Returns total number of indexed documents (chunks).
         """
+        # Invalidate BM25 cache — full rebuild means old cache is stale
+        _invalidate_bm25_cache(project_id)
+
         texts = await self._fetch_project_texts(project_id)
         total_chunks = 0
 
@@ -213,6 +234,9 @@ class KnowledgeIndexService:
         content: str,
     ) -> None:
         """Incremental update index when data changes (upsert new chunks)."""
+        # Invalidate BM25 cache for this project (all scopes)
+        _invalidate_bm25_cache(project_id)
+
         st = KnowledgeSourceType(source_type)
         for idx, chunk_text in enumerate(_chunk_text(content)):
             embedding = await self._ai_svc.embedding(chunk_text)
@@ -258,9 +282,16 @@ class KnowledgeIndexService:
 
         try:
             results = await self._vector_search(project_id, query, top_k, scope)
+            # TODO: hybrid retrieval 预留接口——_vector_search 成功时可选融合 bm25 分数
+            # 当 embed 恢复后，可在此融合向量分数 + BM25 分数实现 hybrid retrieval
         except Exception as e:
-            logger.warning(f"向量召回失败，降级 ilike: {e}")
-            results = await self._ilike_fallback(project_id, query, top_k, scope)
+            logger.warning(f"向量召回失败，降级检索: {e}")
+            from app.core.config import settings as app_settings
+
+            if app_settings.RETRIEVAL_BM25_FALLBACK_ENABLED:
+                results = await self._bm25_fallback(project_id, query, top_k, scope)
+            else:
+                results = await self._ilike_fallback(project_id, query, top_k, scope)
 
         # 权限过滤：当 user 提供时，过滤 knowledge_doc 结果
         if user is not None:
@@ -322,6 +353,123 @@ class KnowledgeIndexService:
             }
             for score, chunk in top_results
         ]
+
+    async def _bm25_fallback(
+        self,
+        project_id: UUID,
+        query: str,
+        top_k: int,
+        scope: str,
+    ) -> list[dict[str, Any]]:
+        """向量召回失败时的 BM25 词法检索（bm25s，纯 Python）。
+
+        中文分词用 _zh_tokenize 模块（2-gram bigram + 英文 split，不引 jieba）。
+        bm25s 未安装或索引构建异常时降级 _ilike_fallback。
+        返回与 _ilike_fallback 相同的 dict 结构（score 用 BM25 归一化分数，非 0.0）。
+
+        带模块级缓存：key=(project_id, scope)，value=(bm25_index, chunks_list, build_time)。
+        TTL 60s 或 incremental_update 调用时失效。避免每次查询重建索引。
+        """
+        try:
+            import bm25s
+        except ImportError:
+            logger.warning("bm25s 未安装，降级 ilike")
+            return await self._ilike_fallback(project_id, query, top_k, scope)
+
+        from app.services._zh_tokenize import zh_tokenize
+
+        query_tokens = zh_tokenize(query)
+        if not query_tokens:
+            return await self._ilike_fallback(project_id, query, top_k, scope)
+
+        # 缓存检查：(project_id, scope) → (retriever, chunks, build_time)
+        cache_key = (str(project_id), scope)
+        now = time.time()
+        cached = _BM25_CACHE.get(cache_key)
+
+        if cached is not None:
+            retriever, chunks, build_time = cached
+            if (now - build_time) < _BM25_CACHE_TTL:
+                # 缓存有效，直接检索
+                return self._bm25_retrieve(retriever, chunks, query_tokens, top_k)
+            else:
+                # TTL 过期，移除缓存
+                del _BM25_CACHE[cache_key]
+
+        # 缓存 miss 或过期：从 DB 加载候选文档，构建索引
+        conditions = [
+            KnowledgeIndex.project_id == project_id,
+            KnowledgeIndex.is_deleted == False,
+        ]
+        if scope == "project_data":
+            conditions.append(
+                KnowledgeIndex.source_type != KnowledgeSourceType.knowledge_doc
+            )
+        elif scope == "knowledge_doc":
+            conditions.append(
+                KnowledgeIndex.source_type == KnowledgeSourceType.knowledge_doc
+            )
+
+        result = await self._db.execute(select(KnowledgeIndex).where(*conditions))
+        chunks = result.scalars().all()
+        if not chunks:
+            return []
+
+        # 分词 + 构建索引
+        from app.services._zh_tokenize import zh_tokenize_batch
+
+        corpus_texts = [c.content_text or "" for c in chunks]
+        corpus_tokens = zh_tokenize_batch(corpus_texts)
+
+        try:
+            retriever = bm25s.BM25()
+            retriever.index(corpus_tokens)
+        except Exception as exc:
+            logger.warning("BM25 索引构建失败，降级 ilike: %s", exc)
+            return await self._ilike_fallback(project_id, query, top_k, scope)
+
+        # 存入缓存
+        _BM25_CACHE[cache_key] = (retriever, chunks, now)
+
+        return self._bm25_retrieve(retriever, chunks, query_tokens, top_k)
+
+    @staticmethod
+    def _bm25_retrieve(
+        retriever: Any,
+        chunks: list,
+        query_tokens: list[str],
+        top_k: int,
+    ) -> list[dict[str, Any]]:
+        """从已构建的 BM25 索引中检索 top_k 结果。
+
+        提取为静态方法，缓存命中和新建索引后共用。
+        """
+        try:
+            k = min(top_k, len(chunks))
+            indices, scores = retriever.retrieve([query_tokens], k=k)
+            idx_list = indices[0].tolist() if hasattr(indices[0], "tolist") else list(indices[0])
+            score_list = scores[0].tolist() if hasattr(scores[0], "tolist") else list(scores[0])
+        except Exception:
+            return []
+
+        # 归一化分数：除以最大分数（max > 0 时）
+        max_score = max(score_list) if score_list else 0.0
+
+        out: list[dict[str, Any]] = []
+        for rank, idx in enumerate(idx_list):
+            if idx < 0 or idx >= len(chunks):
+                continue
+            chunk = chunks[int(idx)]
+            raw_score = float(score_list[rank]) if rank < len(score_list) else 0.0
+            normalized_score = (raw_score / max_score) if max_score > 0 else 0.0
+            out.append({
+                "source_type": chunk.source_type.value,
+                "source_id": str(chunk.source_id),
+                "content": chunk.content_text,
+                "score": round(normalized_score, 4),
+                "chunk_index": chunk.chunk_index,
+            })
+        return out[:top_k]
 
     async def _ilike_fallback(
         self,
@@ -512,6 +660,9 @@ class KnowledgeIndexService:
 
     async def delete_index(self, project_id: UUID) -> None:
         """Delete project index (soft delete all chunks)."""
+        # Invalidate BM25 cache — documents deleted
+        _invalidate_bm25_cache(project_id)
+
         await self._db.execute(
             update(KnowledgeIndex)
             .where(KnowledgeIndex.project_id == project_id)
@@ -598,6 +749,9 @@ class KnowledgeIndexService:
             Dict with updated_chunk_count, status
         """
         import datetime
+
+        # Invalidate BM25 cache — document content changed
+        _invalidate_bm25_cache(project_id)
 
         # Soft-delete old chunks for this source_id
         await self._db.execute(

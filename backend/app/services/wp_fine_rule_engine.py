@@ -105,10 +105,7 @@ def extract_with_fine_rule(
         "cross_refs": [{"from": "...", "to": "...", "matched": true}],
     }
     """
-    try:
-        import openpyxl
-    except ImportError:
-        return {"error": "openpyxl not installed"}
+    from app.services.xlsx_read_adapter import list_sheet_names, read_sheet_values
 
     rule = load_fine_rule(wp_code)
     if not rule:
@@ -131,16 +128,14 @@ def extract_with_fine_rule(
             if sf_path.exists():
                 files_to_open[sf] = sf_path
 
-    # 打开所有工作簿
-    workbooks: dict[str, Any] = {}
-    try:
-        for key, path in files_to_open.items():
-            try:
-                workbooks[key] = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
-            except Exception as e:
-                logger.warning("Cannot open %s: %s", path, e)
-    except Exception as e:
-        return {"error": f"Cannot open files: {e}"}
+    # 获取所有工作簿的 sheet 名列表
+    workbook_sheets: dict[str, list[str]] = {}
+    for key, path in files_to_open.items():
+        try:
+            workbook_sheets[key] = list_sheet_names(path)
+        except Exception as e:
+            logger.warning("Cannot list sheets from %s: %s", path, e)
+            workbook_sheets[key] = []
 
     result: dict[str, Any] = {
         "wp_code": rule["wp_code"],
@@ -161,42 +156,43 @@ def extract_with_fine_rule(
 
         # 确定在哪个工作簿中查找
         source_file = sheet_rule.get("source_file", "")
-        wb = workbooks.get(source_file) or workbooks.get("_main")
-        if not wb:
+        wb_key = source_file if source_file in workbook_sheets else "_main"
+        wb_path = files_to_open.get(wb_key) or files_to_open.get("_main")
+        available_sheets = workbook_sheets.get(wb_key, [])
+
+        if not wb_path or not available_sheets:
             result["sheets"][code] = {"found": False, "reason": "workbook not available"}
             continue
 
-        # 匹配Sheet
-        ws = _find_sheet(wb, pattern)
-        if not ws:
+        # 匹配Sheet名
+        matched_sheet = _find_sheet_name(available_sheets, pattern)
+        if not matched_sheet:
             result["sheets"][code] = {"found": False}
+            continue
+
+        # 读取 sheet 数据为 grid
+        try:
+            grid = read_sheet_values(wb_path, matched_sheet)
+        except Exception as e:
+            logger.warning("Cannot read sheet %s from %s: %s", matched_sheet, wb_path, e)
+            result["sheets"][code] = {"found": False, "reason": str(e)}
             continue
 
         sheet_data: dict[str, Any] = {"found": True, "type": sheet_type, "rows": {}}
 
         # 按类型提取 — 兼容新旧两种列定义格式
-        # 旧格式: sheet_rule["layout"]["columns"]
-        # 新格式: sheet_rule["columns"]
         effective_rule = sheet_rule
         if "layout" in sheet_rule and "columns" not in sheet_rule:
-            # 旧格式转换：将 layout.columns 提升到 sheet_rule 级别供提取函数使用
             effective_rule = {**sheet_rule, "columns": sheet_rule["layout"]["columns"]}
 
         if sheet_type == "summary" and "key_rows" in effective_rule:
-            sheet_data["rows"] = _extract_summary_rows(ws, effective_rule)
+            sheet_data["rows"] = _extract_summary_rows_grid(grid, effective_rule)
         elif sheet_type == "detail":
-            sheet_data["detail_rows"] = _extract_detail_rows(ws, effective_rule)
+            sheet_data["detail_rows"] = _extract_detail_rows_grid(grid, effective_rule)
         elif sheet_type == "adjustment":
-            sheet_data["adjustments"] = _extract_adjustments(ws, effective_rule)
+            sheet_data["adjustments"] = _extract_adjustments_grid(grid, effective_rule)
 
         result["sheets"][code] = sheet_data
-
-    # 关闭所有工作簿
-    for wb in workbooks.values():
-        try:
-            wb.close()
-        except Exception:
-            pass
 
     # 构建摘要
     summary_code = f"{rule['wp_code']}-1"
@@ -220,8 +216,24 @@ def extract_with_fine_rule(
     return result
 
 
+def _find_sheet_name(sheet_names: list[str], pattern: str) -> str | None:
+    """根据精确名称或模式匹配Sheet名。"""
+    import re
+    # 优先精确匹配
+    for name in sheet_names:
+        if name == pattern:
+            return name
+    # 降级模式匹配
+    parts = pattern.split("|")
+    for name in sheet_names:
+        for p in parts:
+            if p in name or re.search(p, name, re.IGNORECASE):
+                return name
+    return None
+
+
 def _find_sheet(wb, pattern: str):
-    """根据精确名称或模式匹配Sheet"""
+    """根据精确名称或模式匹配Sheet（旧 openpyxl 接口，保留用于 _run_audit_checks 等）"""
     import re
     # 优先精确匹配
     for ws in wb.worksheets:
@@ -235,6 +247,164 @@ def _find_sheet(wb, pattern: str):
             if p in title or re.search(p, title, re.IGNORECASE):
                 return ws
     return None
+
+
+def _grid_cell(grid: list[list], row: int, col: int) -> Any:
+    """1-based row/col access into grid."""
+    ri, ci = row - 1, col - 1
+    if ri < 0 or ri >= len(grid):
+        return None
+    row_data = grid[ri] or []
+    if ci < 0 or ci >= len(row_data):
+        return None
+    return row_data[ci]
+
+
+def _extract_summary_rows_grid(grid: list[list], sheet_rule: dict) -> dict[str, dict]:
+    """从审定表 grid 提取关键行数据（替代 _extract_summary_rows）。"""
+    key_rows = sheet_rule.get("key_rows", {})
+    columns = sheet_rule.get("layout", {}).get("columns", sheet_rule.get("columns", {}))
+    detail_discovery = sheet_rule.get("detail_discovery", {})
+    result = {}
+
+    for key, row_def in key_rows.items():
+        if isinstance(row_def, int):
+            row_num = row_def
+            row_data: dict[str, Any] = {
+                "label": str(_grid_cell(grid, row_num, 1) or ""),
+                "row": row_num,
+                "is_total": "total" in key.lower(),
+            }
+            for col_key, col_def in columns.items():
+                if col_key == "label":
+                    continue
+                col_num = col_def.get("col", 0) if isinstance(col_def, dict) else 0
+                if col_num > 0:
+                    row_data[col_key] = _safe_num(_grid_cell(grid, row_num, col_num))
+            result[key] = row_data
+            continue
+
+        if isinstance(row_def, list):
+            for i, rn in enumerate(row_def):
+                if not isinstance(rn, int):
+                    continue
+                item_key = f"{key}_{i}"
+                item_data: dict[str, Any] = {
+                    "label": str(_grid_cell(grid, rn, 1) or ""),
+                    "row": rn,
+                }
+                for col_key, col_def in columns.items():
+                    if col_key == "label":
+                        continue
+                    col_num = col_def.get("col", 0) if isinstance(col_def, dict) else 0
+                    if col_num > 0:
+                        item_data[col_key] = _safe_num(_grid_cell(grid, rn, col_num))
+                result[item_key] = item_data
+            continue
+
+        if not isinstance(row_def, dict):
+            continue
+        row_num = row_def.get("row", 0)
+        if row_num <= 0:
+            continue
+
+        row_data = {
+            "label": row_def.get("label", ""),
+            "row": row_num,
+            "is_total": row_def.get("is_total", False),
+            "account_code": row_def.get("account_code", ""),
+        }
+        if row_def.get("report_row"):
+            row_data["report_row"] = row_def["report_row"]
+
+        for col_key, col_def in columns.items():
+            if col_key == "label":
+                continue
+            col_num = col_def.get("col", 0) if isinstance(col_def, dict) else 0
+            if col_num > 0:
+                row_data[col_key] = _safe_num(_grid_cell(grid, row_num, col_num))
+
+        result[key] = row_data
+
+    # 动态发现明细行
+    if detail_discovery.get("mode") == "auto":
+        start_row = detail_discovery.get("start_row", 7)
+        total_row = None
+        for val in result.values():
+            if isinstance(val, dict) and val.get("is_total"):
+                total_row = val.get("row")
+                break
+        end_row = (total_row - 1) if total_row else start_row + 50
+
+        detail_idx = 0
+        for row_num in range(start_row, end_row + 1):
+            if any(isinstance(v, dict) and v.get("row") == row_num for v in result.values()):
+                continue
+            label = str(_grid_cell(grid, row_num, 1) or "").strip()
+            if not label:
+                continue
+            detail_data: dict[str, Any] = {
+                "label": label,
+                "row": row_num,
+                "is_detail": True,
+            }
+            for col_key, col_def in columns.items():
+                if col_key == "label":
+                    continue
+                col_num = col_def.get("col", 0) if isinstance(col_def, dict) else 0
+                if col_num > 0:
+                    detail_data[col_key] = _safe_num(_grid_cell(grid, row_num, col_num))
+            result[f"detail_{detail_idx}"] = detail_data
+            detail_idx += 1
+
+    return result
+
+
+def _extract_detail_rows_grid(grid: list[list], sheet_rule: dict) -> list[dict]:
+    """从明细表 grid 提取数据行（替代 _extract_detail_rows）。"""
+    data_start = sheet_rule.get("data_start_row", 1)
+    columns = sheet_rule.get("layout", {}).get("columns", sheet_rule.get("columns", {}))
+    max_row = len(grid)
+    rows = []
+
+    for r in range(data_start, min(max_row + 1, data_start + 200)):
+        row_data = {}
+        has_data = False
+        for col_key, col_def in columns.items():
+            col_num = col_def.get("col", 0) if isinstance(col_def, dict) else 0
+            if col_num > 0:
+                val = _grid_cell(grid, r, col_num)
+                if val is not None:
+                    has_data = True
+                row_data[col_key] = val
+        if has_data:
+            row_data["_row"] = r
+            rows.append(row_data)
+
+    return rows
+
+
+def _extract_adjustments_grid(grid: list[list], sheet_rule: dict) -> list[dict]:
+    """从调整分录表 grid 提取（替代 _extract_adjustments）。"""
+    data_start = sheet_rule.get("data_start_row", 1)
+    columns = sheet_rule.get("layout", {}).get("columns", sheet_rule.get("columns", {}))
+    max_row = len(grid)
+    items = []
+
+    for r in range(data_start, min(max_row + 1, data_start + 100)):
+        row_data = {}
+        has_data = False
+        for col_key, col_def in columns.items():
+            col_num = col_def.get("col", 0) if isinstance(col_def, dict) else 0
+            if col_num > 0:
+                val = _grid_cell(grid, r, col_num)
+                if val is not None:
+                    has_data = True
+                row_data[col_key] = val
+        if has_data:
+            items.append(row_data)
+
+    return items
 
 
 def _safe_num(val) -> Optional[float]:

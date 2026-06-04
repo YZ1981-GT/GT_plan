@@ -4,17 +4,35 @@ from collections.abc import AsyncGenerator
 from uuid import UUID
 
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
 # 任务 14.1：根据数据库类型配置不同的连接池参数
 # - PostgreSQL 生产：pool_size=20 / max_overflow=80（总计 100 连接），recycle 30 分钟
 # - SQLite 开发：轻量配置，recycle 1 小时
+# - PgBouncer：NullPool + statement_cache_size=0（pg-pooling-and-load-test spec）
 _is_postgres = settings.DATABASE_URL.startswith("postgresql")
 
-if _is_postgres:
+if _is_postgres and settings.DB_USE_PGBOUNCER:
+    _pg_url = make_url(settings.DATABASE_URL).set(
+        host=settings.DB_PGBOUNCER_HOST,
+        port=settings.DB_PGBOUNCER_PORT,
+    )
+    engine = create_async_engine(
+        _pg_url,
+        poolclass=NullPool,
+        connect_args={
+            "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+        },
+        pool_pre_ping=True,
+        echo=False,
+    )
+elif _is_postgres:
     engine = create_async_engine(
         settings.DATABASE_URL,
         pool_size=max(settings.DB_POOL_SIZE, 20),

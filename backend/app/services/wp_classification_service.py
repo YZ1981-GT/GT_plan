@@ -66,9 +66,11 @@ _D_SUB_ROUTING: dict[str, str] = {
 _D_DEFAULT = "d-form-table"
 
 # F 类子路由映射（精确匹配优先于 _CLASS_TO_COMPONENT["F-"] 前缀 fallback）
-# 仅 F-审定表 → audit-sheet（可编辑审定表组件）；其余 F- 仍 fallback 到 univer
+# F-审定表 / F-明细表 → audit-sheet（可编辑表格组件，列结构从模板动态解析）；
+# 其余 F-（F-分析表/F-汇总表 等）仍 fallback 到 univer
 _F_SUB_ROUTING: dict[str, str] = {
     "F-审定表": "audit-sheet",
+    "F-明细表": "audit-sheet",
 }
 
 
