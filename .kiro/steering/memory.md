@@ -97,8 +97,8 @@ inclusion: always
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、知识库删旧 KnowledgeService；向量存储选 pgvector；3 处联动断裂已修（知识文件→索引/模板 JSON→registry/报表主模板→克隆 stale）
 - 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
-### git 状态（2026-06-04，最新 `fcb7c6c3` 已 pull）
-- 分支 `work/2026-05-30-wp-specs`（最新 `fcb7c6c3`，本地与远程同步）；`fcb7c6c3` = report_line_mapping_service + account_to_report_line_seed 扩充；`efdff106` = audit-sheet-editable spec 全 18 任务落地；上批 `d5bb82e4` 归档 spec + memory 精简；`e81fea54` = custom-workpaper-formula-binding；`b0756b35` schema drift 60→0 (V051)；`95abdf1e` 明细账月小计；**待走 PR 合 main**（gh CLI 未登录，走网页 compare）
+### git 状态（2026-06-05，最新 `0c0bae1a` 已 push）
+- 分支 `work/2026-05-30-wp-specs`（最新 `0c0bae1a`，本地与远程同步）；`0c0bae1a` = 5 tech specs 实施（llm-structured-output/pg-pooling/xlsx-acceleration/endpoint-fuzz-tracing/dev-tooling，83 files +8690/-529）；`fcb7c6c3` = report_line_mapping_service；`efdff106` = audit-sheet-editable；**待走 PR 合 main**（gh CLI 未登录，走网页 compare）
 - **schema drift 二次修复（V051）**：方向=orm_extra（ORM 有 DB 缺），51 列 ALTER ADD + 2 enum ADD VALUE + 列级 KNOWN_COLUMN_ALLOWLIST（cell_annotations.sheet_name/adjustments.status/projects.template_version_id）+ 表级加 linkage_audit_log/seed_load_history；evidence_hash_checks.export_id 保持 VARCHAR（ORM 业务定义非 UUID）
 - **🟢 B-Index 底稿目录"No Data"修复（2026-06-02，Playwright 实测通过）**：`wp_render_config.py` 新增 `_generate_b_index_data()`——当 B-Index sheet html_data 为空时自动从项目元数据生成 preparation_info（entity_name/period_end/preparer/reviewer）+ navigation_rows（同底稿其他 sheet 列表）；GtBIndex.vue 加 `empty-text="暂无索引数据"` 中文化
 - **🟢 底稿全页签空态中文化（2026-06-02）**：GtAProgramConsole 加 empty-text / GtWpRenderer univer placeholder 改"表格底稿…数据尚未导入" / GtCNoteTable 加 el-empty 空态 / D-form 系列已有中文无需改
