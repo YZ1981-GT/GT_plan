@@ -1,7 +1,7 @@
 {
   "description": "标准科目 → 报表行次映射 seed (按 4 套维度独立映射 + 客户常用别名 + r4: 4401 工程施工→合同资产)",
   "data_source": "backend/data/standard_account_chart.json + backend/data/report_config_seed.json",
-  "version": "v2026-05-24-r4",
+  "version": "v2026-06-04-r5",
   "mappings": {
     "soe_standalone": [
       {
@@ -57,6 +57,18 @@
         "report_type": "balance_sheet",
         "report_line_code": "BS-015",
         "report_line_name": "应收利息"
+      },
+      {
+        "standard_account_code": "1141",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-021",
+        "report_line_name": "合同资产"
+      },
+      {
+        "standard_account_code": "1142",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-021",
+        "report_line_name": "合同资产"
       },
       {
         "standard_account_code": "1221",
@@ -919,6 +931,18 @@
         "report_line_name": "应收利息"
       },
       {
+        "standard_account_code": "1141",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-021",
+        "report_line_name": "合同资产"
+      },
+      {
+        "standard_account_code": "1142",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-021",
+        "report_line_name": "合同资产"
+      },
+      {
         "standard_account_code": "1221",
         "report_type": "balance_sheet",
         "report_line_code": "BS-015",
@@ -1779,6 +1803,18 @@
         "report_line_name": "应收利息"
       },
       {
+        "standard_account_code": "1141",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-021",
+        "report_line_name": "合同资产"
+      },
+      {
+        "standard_account_code": "1142",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-021",
+        "report_line_name": "合同资产"
+      },
+      {
         "standard_account_code": "1221",
         "report_type": "balance_sheet",
         "report_line_code": "BS-009",
@@ -2637,6 +2673,18 @@
         "report_type": "balance_sheet",
         "report_line_code": "BS-010",
         "report_line_name": "应收利息"
+      },
+      {
+        "standard_account_code": "1141",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-021",
+        "report_line_name": "合同资产"
+      },
+      {
+        "standard_account_code": "1142",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-021",
+        "report_line_name": "合同资产"
       },
       {
         "standard_account_code": "1221",

@@ -33,7 +33,7 @@ inclusion: always
 - **venv 路径**：backend cwd 用 `..\.venv\Scripts\python.exe`；仓库根 cwd 用 `.venv\Scripts\python.exe`（勿混）
 - Docker：`audit-postgres`(5432)/`audit-redis`(6379)/`audit-metabase`(3000)；health `/api/health`
 - **前端唯一路径**：`audit-platform/frontend/`（仓库根无 `frontend/`）；views/components/composables 在其 `src/`
-- **MCP 已接入 7 个（2026-06-02 实测全 Connected，共 67 工具）**：
+- **MCP 配置 7 个，2026-06-04 实测仅 Playwright+Codegraph 在线（js-reverse/context7/fetch/thinking/memory 未连接，待排查 mcp.json）**：
   - **codegraph**(10)：`codegraph_context`(首选，任务上下文一次出) / `codegraph_search`(符号定位) / `codegraph_callers`/`codegraph_callees`(调用链) / `codegraph_impact`(重构影响面) / `codegraph_trace`(A→B 路径) / `codegraph_explore`(多符号源码) / `codegraph_node`(单符号详情) / `codegraph_files`(项目文件树) / `codegraph_status`(索引健康)
   - **playwright**(23)：`browser_navigate`/`browser_snapshot`(优于截图，可交互)/`browser_click`/`browser_type`/`browser_fill_form`/`browser_evaluate`(执行 JS)/`browser_network_requests`(抓包)/`browser_console_messages`/`browser_take_screenshot`/`browser_wait_for`/`browser_tabs`/`browser_select_option`/`browser_hover`/`browser_drag`/`browser_file_upload`/`browser_drop`/`browser_press_key`/`browser_handle_dialog`/`browser_navigate_back`/`browser_resize`/`browser_close`/`browser_network_request`(单请求详情)/`browser_run_code_unsafe`
   - **js-reverse**(21)：`set_breakpoint_on_text`/`step`(over/into/out)/`get_paused_info`/`evaluate_script`(断点内求值)/`search_in_sources`(全源码搜索)/`get_script_source`/`save_script_source`(美化保存)/`list_scripts`/`list_network_requests`/`get_request_initiator`(请求调用栈)/`list_console_messages`/`get_websocket_messages`/`navigate_page`/`new_page`/`select_page`/`select_frame`/`take_screenshot`/`list_breakpoints`/`remove_breakpoint`/`break_on_xhr`/`pause_or_resume`
@@ -91,8 +91,8 @@ inclusion: always
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、知识库删旧 KnowledgeService；向量存储选 pgvector；3 处联动断裂已修（知识文件→索引/模板 JSON→registry/报表主模板→克隆 stale）
 - 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
-### git 状态（2026-06-03，最新 `d5bb82e4` 已 pull）
-- 分支 `work/2026-05-30-wp-specs`（最新 `d5bb82e4`，本地与远程同步）；远程 3 commit 已 ff-pull：归档 9 个已完成 spec 到 `_archive/`（04-infra/05-business/06-governance/07-workpaper）+ 删过时 consol-note stub + memory.md 精简至 98 行；上批 `e81fea54` = custom-workpaper-formula-binding 三件套落地(110 files) + .gitignore 加 `.codegraph/`；push 前清理不该入库产物：`.codegraph/`（机器本地索引，已忽略且原未跟踪）+ `backend/fullrun-now.txt`（临时测试输出，UTF-16 乱码）；上批 `b0756b35` schema drift 60→0 (V051) + advisory lock；`95abdf1e` 明细账月小计；**待走 PR 合 main**（gh CLI 未登录，走网页 compare）
+### git 状态（2026-06-04，最新 `efdff106` 已 pull）
+- 分支 `work/2026-05-30-wp-specs`（最新 `efdff106` 审定表 spec，本地与远程同步）；上批 `d5bb82e4` 归档 spec + memory 精简；`e81fea54` = custom-workpaper-formula-binding；`b0756b35` schema drift 60→0 (V051)；`95abdf1e` 明细账月小计；**待走 PR 合 main**（gh CLI 未登录，走网页 compare）
 - **schema drift 二次修复（V051）**：方向=orm_extra（ORM 有 DB 缺），51 列 ALTER ADD + 2 enum ADD VALUE + 列级 KNOWN_COLUMN_ALLOWLIST（cell_annotations.sheet_name/adjustments.status/projects.template_version_id）+ 表级加 linkage_audit_log/seed_load_history；evidence_hash_checks.export_id 保持 VARCHAR（ORM 业务定义非 UUID）
 - **🟢 B-Index 底稿目录"No Data"修复（2026-06-02，Playwright 实测通过）**：`wp_render_config.py` 新增 `_generate_b_index_data()`——当 B-Index sheet html_data 为空时自动从项目元数据生成 preparation_info（entity_name/period_end/preparer/reviewer）+ navigation_rows（同底稿其他 sheet 列表）；GtBIndex.vue 加 `empty-text="暂无索引数据"` 中文化
 - **🟢 底稿全页签空态中文化（2026-06-02）**：GtAProgramConsole 加 empty-text / GtWpRenderer univer placeholder 改"表格底稿…数据尚未导入" / GtCNoteTable 加 el-empty 空态 / D-form 系列已有中文无需改
@@ -119,6 +119,7 @@ inclusion: always
 - **🟢 架构 review 4 条收口 + migration advisory lock ①完成（2026-06-02）**：死代码 `get_authenticated_container` 已删；`run_pending` 已 `pg_advisory_lock`(GTMIG) 真 PG 竞态测过；多 worker 第②③步（迁移移出 lifespan）仍待上 gunicorn 时 → `#dev-history`
 
 ### 已清零的近期修复（明细 → `#dev-history` 2026-06-01 节）
+- **🟢 一键预设映射 29/131 科目未映射修复（2026-06-04）**：根因=`ai_suggest_mappings` 只遍历 `AccountMapping`(114条) 而前端按 TB 一级科目展示(131条)，差值 29 个在种子表有覆盖却从不被尝试；修复=补充从 TB 取前4位去重一级科目追加到待映射列表+种子表补 1141/1142(合同资产)→BS-021；验证 143 条建议 0 未映射；**教训：前后端"科目列表来源"必须一致，不能依赖中间表 AccountMapping 作为全量科目源**
 - 14 个 GET 500 全清零（429 端点巡检）+ sign_readiness/qc_open_issues/cost-overview 等 500 + ORM 类型漂移 + Content-Disposition 中文文件名全仓 RFC5987 + 回收站删不掉(app_audit_log V050)+ CORS(3030 白名单+尾斜杠)
 - **WorkpaperWorkbenchView.vue 孤儿 CSS 全修**（Playwright 实测）：`<style scoped>` 原只定义 container 一个类，工作台进度卡片 + 手册视图 4 子页签(体系总览/审计流程/底稿关系/循环详解) + 默认列表共 ~40 个 gt-wp* 类无 CSS→无样式堆叠 div；已用 --gt-* 令牌补全；**教训：补孤儿样式必脚本扫"模板用到但 CSS 未定义"的类一次兜全，勿只看当前可视区**
 

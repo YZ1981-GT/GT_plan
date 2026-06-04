@@ -212,6 +212,30 @@ async def ai_suggest_mappings(
     )
     mapped_std_codes = [row[0] for row in mapped_result.all()]
 
+    # 2b. 补充: 从 TrialBalance 获取所有一级科目(前4位去重),
+    #     确保与前端展示的科目列表一致——前端按 TB 科目展示映射状态,
+    #     即使某些科目未进入 AccountMapping 表也应尝试映射
+    from app.models.audit_platform_models import TrialBalance
+    tb_result = await db.execute(
+        select(TrialBalance.standard_account_code, TrialBalance.account_name).where(
+            TrialBalance.project_id == project_id,
+            TrialBalance.is_deleted == False,  # noqa: E712
+            TrialBalance.standard_account_code.isnot(None),
+        ).distinct()
+    )
+    tb_level1_seen: set[str] = set()
+    mapped_std_set = set(mapped_std_codes)
+    for row in tb_result.all():
+        code = row[0]
+        if not code:
+            continue
+        level1 = code[:4] if len(code) >= 4 else code
+        if level1 not in mapped_std_set and level1 not in tb_level1_seen:
+            tb_level1_seen.add(level1)
+            mapped_std_codes.append(level1)
+    if tb_level1_seen:
+        logger.info(f"ai_suggest_mappings: 从 TB 补充 {len(tb_level1_seen)} 个未在 AccountMapping 中的一级科目")
+
     # 构建科目编码→名称映射（从 AccountChart 获取）
     code_name_map: dict[str, str] = {}
     if mapped_std_codes:
