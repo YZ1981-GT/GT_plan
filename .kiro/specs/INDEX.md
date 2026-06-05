@@ -1,7 +1,7 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-06-01  
-**当前分支**：`main`（HEAD = 85b362d5）  
+**最后更新**：2026-06-05  
+**当前分支**：`work/2026-05-30-wp-specs`（HEAD = ea6fe261）  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer  
 **目标规模**：6000 并发用户
 
@@ -111,21 +111,14 @@
 
 | Spec | 状态 | 说明 |
 |------|------|------|
-| `llm-structured-output` | 📌 占位 | Instructor + vLLM guided decoding(guided_json)，本地 LLM 结构化输出失败率 20-30%→<2%；覆盖 wp_document_recognizer/wp_evidence_ocr_service/tsj_structured_output；三件套已生成待实施 |
-| `pg-pooling-and-load-test` | 📌 占位 | PgBouncer transaction pooling（asyncpg statement_cache_size=0）+ Locust 6000 并发压测脚本+基线报告；三件套已生成待实施 |
-| `xlsx-read-acceleration` | 📌 占位 | calamine 只读取值从 ledger import 推广到底稿提取点（wp_program_extract/wp_audit_sheet_extract 等纯取值点，不含样式依赖的 wp_grid_extract 与写路径）；三件套已生成待实施 |
-| `endpoint-fuzz-and-tracing` | 📌 占位 | Schemathesis 端点 fuzz + OpenTelemetry 全链路 trace + bm25s 检索降级（向量→bm25→ilike）；三件套已生成待实施 |
+| `llm-structured-output` | ✅ 完成 | Instructor+guided_json 双层+熔断对齐+recognizer 活链路接入；8 tests passed；2026-06-04 |
+| `pg-pooling-and-load-test` | ✅ 完成 | PgBouncer NullPool+make_url DSN改写+docker-compose+Locust 6000脚本+seed用户；8 tests passed；2026-06-04 |
+| `xlsx-read-acceleration` | ✅ 完成 | xlsx_read_adapter calamine/openpyxl 双路径+6 迁移点切换+等价测试+benchmark脚本；22 tests passed；2026-06-04 |
+| `endpoint-fuzz-and-tracing` | ✅ 完成 | Schemathesis 662 GET fuzz+OTel tracing+bm25s 三级降级链；8 tests passed；2026-06-04 |
 | `dev-tooling-modernization` | ✅ 完成 | gitleaks pre-commit+CI / SQLFluff 基线 1718 / uv CI 加速 / Docling 裁掉 / DSPy 仅文档；2026-06-04 全 20 任务实施完成 |
-| `project-creation-enhancement` | ⏳ 实施中 | 建项流程增强：USCC 企业代码必填+模31校验/项目简称必填/唯一性三元组校验/合并单户后缀显示/批量建项(模板+导入+导出)/独立账套导入页；11 任务组 spec 已建(2026-06-05) |
+| `project-creation-enhancement` | ✅ 完成 | 建项流程增强：USCC 企业代码校验/项目简称必填/唯一性三元组/合并单户后缀/批量建项/独立账套导入页；12 task 32 子任务全完成+两轮补强（auto_commit原子性/O(1)后缀/Property 12 并发PBT）；87 backend + 68 frontend tests 全绿；2026-06-05 |
 
-> 注（2026-06-04）：上述 5 个 spec 由"候选技术调研清单"（memory.md 🔵）转化生成，均 design-first，三件套（design+requirements+tasks）齐全，**代码未动**，等用户排期实施。
->
-> **实施顺序建议（spec 间依赖）**：
-> - `spec-1 llm-structured-output` 先行（产出 `TsjReviewResult` 等 Pydantic 模型，spec-5 DSPy 依赖）
-> - `spec-4 endpoint-fuzz-and-tracing` 次之（独立，但 OTel/bm25s 依赖会进 requirements.txt）
-> - `spec-5 dev-tooling` 的 uv 子任务（验证"全装成功"）应在 spec-1/4 依赖落定后做；gitleaks/SQLFluff 子任务可随时
-> - `spec-2 pg-pooling`、`spec-3 xlsx-acceleration` **完全独立**，可任意顺序/并行
-> - 跨 spec 累计新依赖（instructor/schemathesis/opentelemetry 全家桶/bm25s/可能 docling）需一次"打包体积回归"检查（见 spec-5 组⑥）
+> 注（2026-06-05）：6 个 spec 全部实施完成（含 project-creation-enhancement 两轮补强）。待归档到 `_archive/`（走 PR 合 main 后统一 git mv）。残留仅 `[ ]*` 外部依赖项（jaeger容器/PgBouncer端到端/vLLM集成测试/压测执行报告）。
 
 > 注：`workpaper-fill-service-split` 已 `git rm`（目标 WorkpaperFillService 经 grep 实证为 0 业务调用方的死代码，拆分无意义）；`gt-c-note-table-shrink` 已于 2026-05-30 完成并归档至 07-workpaper-slimdown（GtCNoteTable 1803→450 + GtEControlTest 1414→344，90 测试全绿；残留 R3 Playwright 目视待环境，非代码缺口）。
 > 注（2026-05-31）：merge work 分支带入 13 个底稿 spec 的 active 双份残留，经代码实证全部完成度 100%，已 `git rm` 删除 active 残留，仅保留 `_archive/` 权威版。
@@ -275,7 +268,7 @@ _archive/
 | prefill_formula_mapping | 1035 cells |
 | validation_rules | 114 条 |
 | D6 SQL 迁移 | V001-V040（V040 = account_note_mapping + consol_cell_comments 懒建表入 D6） |
-| **Spec 总数** | **active 0 + archived 103（详见 §三）** |
+| **Spec 总数** | **active 6（全完成待归档） + archived 103（详见 §三）** |
 
 ---
 

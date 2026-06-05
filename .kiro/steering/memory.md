@@ -59,7 +59,7 @@ inclusion: always
 
 ## 迁移与 PG schema（D6 MigrationRunner 运行时迁移，非 alembic）
 
-- 启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞号字母序靠后者静默丢失，scan_migrations 已加同号检测抛 RuntimeError）；**当前最高 V054**（生产库须手工跑 V052~V054）
+- 启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞号字母序靠后者静默丢失，scan_migrations 已加同号检测抛 RuntimeError）；**当前最高 V055**（生产库须手工跑 V052~V055）
 - V040 冲突已修(重编号→V044)；V043 pgvector 容错化；V045~V051 见上行；**V052 `wp_formula`**（自定义底稿公式绑定，R052 回滚配对）；**V053 `projecttype` 枚举加 `capital_verification`/`tax_audit`**（前端向导有验资/税审选项但 PG 枚举缺值→创建项目 500）；**V054 `projects.is_deleted SET DEFAULT false`**（ORM 声明 server_default 但手工迁移从未应用 DDL→INSERT 不带该列时 NOT NULL violation 500）
 - **⚠️ `CREATE TABLE IF NOT EXISTS audit_log` 是 no-op**：该名被 Metabase 共库占用（真实 schema 无 action 列）→ 应用审计写独立表 `app_audit_log`；建表前先 `to_regclass`+`information_schema.columns` 查真实 schema
 - **本地 PG schema 漂移已修**（critical=0）：drift detector pkgutil walk import 全 model + 过滤 Metabase 共库污染 + 按 critical_count 判 degraded
@@ -98,8 +98,8 @@ inclusion: always
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、知识库删旧 KnowledgeService；向量存储选 pgvector；3 处联动断裂已修（知识文件→索引/模板 JSON→registry/报表主模板→克隆 stale）
 - 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
-### git 状态（2026-06-05，最新 `350ff25d` 已 push）
-- 分支 `work/2026-05-30-wp-specs`（最新 `350ff25d`，本地与远程同步）；`350ff25d` = 5 tech specs 归档（Playwright E2E 验证通过后归入 _archive/04+06）；`0c0bae1a` = 5 tech specs 实施代码（83 files +8690/-529）；`fcb7c6c3` = report_line_mapping_service；**待走 PR 合 main**（gh CLI 未登录，走网页 compare）
+### git 状态（2026-06-05，最新 `ea6fe261` 已 push）
+- 分支 `work/2026-05-30-wp-specs`（最新 `ea6fe261`，本地与远程同步）；`ea6fe261` = 建项流程增强 spec 全量实施+两轮补强（35 files +3388）；`350ff25d` = 5 tech specs 归档；**待走 PR 合 main**（gh CLI 未登录，走网页 compare）
 - **schema drift 二次修复（V051）**：方向=orm_extra（ORM 有 DB 缺），51 列 ALTER ADD + 2 enum ADD VALUE + 列级 KNOWN_COLUMN_ALLOWLIST（cell_annotations.sheet_name/adjustments.status/projects.template_version_id）+ 表级加 linkage_audit_log/seed_load_history；evidence_hash_checks.export_id 保持 VARCHAR（ORM 业务定义非 UUID）
 - **🟢 B-Index 底稿目录"No Data"修复（2026-06-02，Playwright 实测通过）**：`wp_render_config.py` 新增 `_generate_b_index_data()`——当 B-Index sheet html_data 为空时自动从项目元数据生成 preparation_info（entity_name/period_end/preparer/reviewer）+ navigation_rows（同底稿其他 sheet 列表）；GtBIndex.vue 加 `empty-text="暂无索引数据"` 中文化
 - **🟢 底稿全页签空态中文化（2026-06-02）**：GtAProgramConsole 加 empty-text / GtWpRenderer univer placeholder 改"表格底稿…数据尚未导入" / GtCNoteTable 加 el-empty 空态 / D-form 系列已有中文无需改
