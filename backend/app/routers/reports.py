@@ -291,8 +291,9 @@ async def export_report_excel(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 from pydantic import BaseModel
+from datetime import datetime
 
-from app.models.audit_platform_models import ReportLineMapping, TbBalance
+from app.models.audit_platform_models import ReportLineMapping, TbBalance, TrialBalance
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -495,31 +496,31 @@ async def get_line_composition(
     # 提取所有科目编号
     account_codes = list({m.standard_account_code for m in mappings})
 
-    # 3. 查询 tb_balance 获取各科目余额
+    # 3. 查询 trial_balance 获取各科目审定余额（与报表数据源一致）
     tb_result = await db.execute(
-        sa.select(TbBalance).where(
-            TbBalance.project_id == project_id,
-            TbBalance.year == year,
-            TbBalance.account_code.in_(account_codes),
-            TbBalance.is_deleted == sa.false(),
+        sa.select(TrialBalance).where(
+            TrialBalance.project_id == project_id,
+            TrialBalance.year == year,
+            TrialBalance.standard_account_code.in_(account_codes),
+            TrialBalance.is_deleted == sa.false(),
         )
     )
     tb_rows = tb_result.scalars().all()
 
-    # 4. 计算总金额和各科目占比
+    # 4. 计算总金额和各科目占比（使用 audited_amount 与报表保持一致）
     accounts: list[LineCompositionAccount] = []
     total_amount = 0.0
 
     for tb in tb_rows:
-        balance = float(tb.closing_balance) if tb.closing_balance is not None else 0.0
+        balance = float(tb.audited_amount) if tb.audited_amount is not None else 0.0
         total_amount += abs(balance)
 
     # 按金额绝对值降序排列，计算占比
-    for tb in sorted(tb_rows, key=lambda t: abs(float(t.closing_balance) if t.closing_balance is not None else 0.0), reverse=True):
-        balance = float(tb.closing_balance) if tb.closing_balance is not None else 0.0
+    for tb in sorted(tb_rows, key=lambda t: abs(float(t.audited_amount) if t.audited_amount is not None else 0.0), reverse=True):
+        balance = float(tb.audited_amount) if tb.audited_amount is not None else 0.0
         pct = (abs(balance) / total_amount * 100.0) if total_amount != 0 else 0.0
         accounts.append(LineCompositionAccount(
-            code=tb.account_code,
+            code=tb.standard_account_code,
             name=tb.account_name or "",
             closing_balance=balance,
             pct=round(pct, 1),
@@ -527,7 +528,7 @@ async def get_line_composition(
 
     # total_amount 使用实际余额之和（非绝对值），用于显示
     actual_total = sum(
-        float(tb.closing_balance) if tb.closing_balance is not None else 0.0
+        float(tb.audited_amount) if tb.audited_amount is not None else 0.0
         for tb in tb_rows
     )
 
@@ -536,4 +537,84 @@ async def get_line_composition(
         item_name=item_name,
         total_amount=actual_total,
         accounts=accounts,
+    )
+
+
+# ─── 报表单元格编辑（权益表/减值表矩阵编辑） ─────────────────────────────────
+
+class CellEditRequest(BaseModel):
+    row_code: str
+    column_key: str
+    value: float | None = None
+
+
+class CellEditResponse(BaseModel):
+    success: bool
+    row_code: str
+    column_key: str
+    value: float | None
+
+
+@line_composition_router.put("/cell", response_model=CellEditResponse)
+async def update_report_cell(
+    project_id: UUID,
+    body: CellEditRequest,
+    year: int | None = Query(None),
+    report_type: str = Query("equity_statement"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """更新报表单元格值（权益表/减值表矩阵编辑）。
+
+    将值存入 financial_report 表的 JSON metadata 字段或更新 current_period_amount。
+    对于权益表矩阵，用 row_code + column_key 定位唯一单元格。
+    """
+    from app.models.report_models import FinancialReport, FinancialReportType
+
+    if year is None:
+        year = datetime.now().year - 1
+
+    # 查找或创建该行
+    result = await db.execute(
+        sa.select(FinancialReport).where(
+            FinancialReport.project_id == project_id,
+            FinancialReport.year == year,
+            FinancialReport.report_type == FinancialReportType(report_type),
+            FinancialReport.row_code == body.row_code,
+            FinancialReport.is_deleted == sa.false(),
+        )
+    )
+    row = result.scalar_one_or_none()
+
+    if row:
+        # 更新：如果是主金额列用 current_period_amount，否则存 source_accounts JSON
+        if body.column_key in ('current_period_amount', 'total'):
+            row.current_period_amount = str(body.value) if body.value is not None else None
+        else:
+            # 存入 source_accounts JSON（复用现有 JSONB 列存储矩阵各列值）
+            sa_data = row.source_accounts or {}
+            sa_data[body.column_key] = body.value
+            row.source_accounts = sa_data
+        await db.flush()
+    else:
+        # 创建新行
+        new_row = FinancialReport(
+            project_id=project_id,
+            year=year,
+            report_type=FinancialReportType(report_type),
+            row_code=body.row_code,
+            row_name=body.row_code,
+            current_period_amount=str(body.value) if body.value is not None and body.column_key in ('current_period_amount', 'total') else None,
+            source_accounts={body.column_key: body.value} if body.column_key not in ('current_period_amount', 'total') else None,
+        )
+        db.add(new_row)
+        await db.flush()
+
+    await db.commit()
+
+    return CellEditResponse(
+        success=True,
+        row_code=body.row_code,
+        column_key=body.column_key,
+        value=body.value,
     )

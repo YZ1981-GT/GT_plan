@@ -150,8 +150,7 @@ function handleClick() {
   padding: 2px 8px;
   color: var(--gt-color-text-regular);
   display: inline-block;
-  border-radius: var(--gt-radius-sm, 4px);
-  transition: all 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .gt-amount-cell--clickable {
@@ -162,7 +161,6 @@ function handleClick() {
 
 .gt-amount-cell--clickable:hover {
   color: var(--gt-color-primary, #4b2d77);
-  background: var(--gt-color-primary-bg, #f4f0fa);
 }
 </style>
 
@@ -173,7 +171,7 @@ function handleClick() {
 }
 
 .gt-amount--highlight {
-  background: var(--gt-color-wheat-light) !important;
-  border-radius: 3px;
+  color: var(--gt-color-primary) !important;
+  font-weight: 600;
 }
 </style>

@@ -410,6 +410,63 @@ async def restore_auto_mode(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/{project_id}/{year}/{note_section}/auto-pull")
+async def get_auto_pull(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取附注章节的 cross_ref auto_pull 只读联动值.
+
+    从来源底稿/报表/试算表拉取 schema 中 auto_pull=true && direction=inbound
+    的 cross_ref 真实值。只读查询，不写入 table_data，无需 commit。
+
+    Spec:   .kiro/specs/disclosure-note-linkage-and-slimdown/
+    Design: 缺口 2 — cross_ref auto_pull 真实取数
+    Reqs:   3.1, 3.2, 3.3, 3.4
+    """
+    from dataclasses import asdict
+
+    import sqlalchemy as sa
+
+    from app.models.report_models import DisclosureNote
+    from app.services.note_auto_pull_service import NoteAutoPullService
+    from app.services.note_wp_mapping_service import DEFAULT_WP_MAPPING
+    from app.services.wp_render_schema_service import WpRenderSchemaService
+
+    # 1. 加载该章节对应的 schema
+    #    note_section → wp_code 映射（如 "五、3" → "D1"）
+    wp_code = DEFAULT_WP_MAPPING.get(note_section)
+    schema: dict = {}
+    if wp_code:
+        try:
+            schema_service = WpRenderSchemaService()
+            schema = schema_service.load_schema(wp_code)
+        except FileNotFoundError:
+            schema = {}
+
+    # 2. 加载该 note 的 table_data
+    result = await db.execute(
+        sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.note_section == note_section,
+            DisclosureNote.is_deleted == sa.false(),
+        )
+    )
+    note = result.scalar_one_or_none()
+    note_table_data = note.table_data if note else None
+
+    # 3. 调 NoteAutoPullService 取数（只读，无需 commit）
+    results = await NoteAutoPullService(db).pull_for_section(
+        project_id, year, schema, note_table_data=note_table_data,
+    )
+
+    return {"refs": [asdict(r) for r in results]}
+
+
 @router.post("/{project_id}/{year}/{note_section}/apply-formulas")
 async def apply_formulas(
     project_id: UUID,

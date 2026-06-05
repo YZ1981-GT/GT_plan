@@ -77,50 +77,43 @@ class NoteWpMappingService:
             return mapping
 
     async def refresh_from_workpapers(self, project_id: UUID, year: int) -> dict:
-        """从底稿重新提数到附注"""
-        from app.models.workpaper_models import WorkingPaper, WpIndex
+        """从底稿重新提数到附注 — 委托 DisclosureEngine.refill_sections 真实重算。
 
-        # 获取所有有 parsed_data 的底稿
-        wp_q = (
-            sa.select(WpIndex.wp_code, WorkingPaper.parsed_data)
-            .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
-            .where(
-                WpIndex.project_id == project_id,
-                WpIndex.is_deleted == False,  # noqa
-                WorkingPaper.is_deleted == False,  # noqa
-                WorkingPaper.parsed_data.isnot(None),
-            )
-        )
-        wps = (await self.db.execute(wp_q)).all()
-        wp_data = {r.wp_code: r.parsed_data for r in wps}
+        按 DEFAULT_WP_MAPPING 命中的 sections 委托填充链重算，
+        返回向后兼容的响应体（保留 refreshed/total_notes 键）。
+        只 flush 不 commit（铁律：router 统一 commit）。
 
-        # 获取附注
-        note_q = sa.select(DisclosureNote).where(
+        Validates: Requirements 2.1, 2.2, 2.7, 1.3
+        """
+        from app.services.disclosure_engine import DisclosureEngine
+
+        # 1. 获取映射，确定受影响的 note_section 列表
+        mapping = await self.get_mapping(project_id)
+
+        # 收集映射中有底稿前缀的所有 section
+        affected_sections: list[str] = list(mapping.keys())
+
+        # 2. 获取附注总数（向后兼容 total_notes）
+        note_count_q = sa.select(sa.func.count()).select_from(DisclosureNote).where(
             DisclosureNote.project_id == project_id,
             DisclosureNote.year == year,
         )
-        notes = (await self.db.execute(note_q)).scalars().all()
+        total_notes = (await self.db.execute(note_count_q)).scalar() or 0
 
-        refreshed = 0
-        mapping = await self.get_mapping(project_id)
+        # 3. 委托 DisclosureEngine.refill_sections 执行真实重算
+        engine = DisclosureEngine(self.db)
+        report = await engine.refill_sections(
+            project_id, year, affected_sections, skip_manual=True
+        )
 
-        for note in notes:
-            section = note.note_section
-            wp_prefix = mapping.get(section)
-            if not wp_prefix:
-                continue
-
-            # 查找匹配的底稿数据
-            for wp_code, pd in wp_data.items():
-                if wp_code.startswith(wp_prefix):
-                    # 更新附注 table_data 中的自动提数单元格
-                    # 保留 mode=manual 的单元格不覆盖
-                    if note.table_data and isinstance(note.table_data, dict):
-                        # 简化：标记为已刷新
-                        refreshed += 1
-                    break
-
-        return {"refreshed": refreshed, "total_notes": len(notes)}
+        # 4. 构造向后兼容的响应体
+        return {
+            "refreshed": report.cells_updated,
+            "total_notes": total_notes,
+            "sections_recomputed": report.sections_recomputed,
+            "text_only_sections": report.text_only_sections,
+            "errors": report.errors,
+        }
 
     async def toggle_cell_mode(
         self, note_id: UUID, row_label: str, col_index: int, mode: str, manual_value: float | None = None

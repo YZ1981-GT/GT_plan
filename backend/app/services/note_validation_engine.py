@@ -28,6 +28,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services._decimal_helpers import amount_tolerance
 
+from app.models.report_models import DisclosureNote
+
 logger = logging.getLogger(__name__)
 
 
@@ -811,3 +813,183 @@ class NoteValidationEngine:
                 await self.db.flush()
         except Exception as e:
             logger.warning("Failed to persist validation results: %s", e)
+
+    # ------------------------------------------------------------------
+    # Router-facing aliases (bridging router calls to internal methods)
+    # ------------------------------------------------------------------
+
+    async def validate_all(
+        self,
+        project_id: UUID,
+        year: int,
+        *,
+        template_type: str = "soe",
+    ) -> dict:
+        """Execute all validation rules and return structured result.
+
+        This is the router-facing entry point that wraps execute_all
+        and returns a response dict compatible with NoteValidationResponse.
+        """
+        context = ValidationContext(project_id=project_id, year=year)
+
+        # Load note data from DB for inline rules path
+        if self.db:
+            try:
+                result = await self.db.execute(
+                    sa.select(DisclosureNote).where(
+                        DisclosureNote.project_id == str(project_id),
+                        DisclosureNote.year == year,
+                        DisclosureNote.is_deleted == sa.false(),
+                    )
+                )
+                notes = result.scalars().all()
+                context.note_data = {
+                    n.note_section: n.table_data
+                    for n in notes
+                    if n.table_data and isinstance(n.table_data, dict)
+                }
+            except Exception as e:
+                logger.warning("validate_all: failed to load note_data: %s", e)
+
+        results = await self.execute_all(
+            project_id, year, template_type=template_type, context=context
+        )
+
+        # Build response
+        findings = []
+        for r in results:
+            if not r.passed:
+                findings.append({
+                    "note_section": r.section_code,
+                    "check_type": r.rule_type,
+                    "severity": "error" if r.diff_amount and abs(float(r.diff_amount)) > 0.01 else "warning",
+                    "message": r.rule_expression,
+                    "expected_value": float(r.expected_value) if r.expected_value is not None else None,
+                    "actual_value": float(r.actual_value) if r.actual_value is not None else None,
+                    "table_name": r.details.get("table_name", "") if r.details else "",
+                })
+
+        return {
+            "project_id": str(project_id),
+            "year": year,
+            "template_type": template_type,
+            "total_rules": len(results),
+            "passed": sum(1 for r in results if r.passed),
+            "failed": len(findings),
+            "findings": findings,
+        }
+
+    async def get_latest_results(
+        self,
+        project_id: UUID,
+        year: int,
+    ) -> dict | None:
+        """Get the latest validation results from DB.
+
+        Returns None if no results exist yet.
+        """
+        if not self.db:
+            return None
+
+        try:
+            table = sa.table(
+                "note_validation_results",
+                sa.column("id", sa.String),
+                sa.column("project_id", sa.String),
+                sa.column("year", sa.Integer),
+                sa.column("section_code", sa.String),
+                sa.column("rule_type", sa.String),
+                sa.column("rule_expression", sa.Text),
+                sa.column("passed", sa.Boolean),
+                sa.column("expected_value", sa.Numeric),
+                sa.column("actual_value", sa.Numeric),
+                sa.column("diff_amount", sa.Numeric),
+                sa.column("details", sa.JSON),
+                sa.column("executed_at", sa.DateTime),
+            )
+
+            result = await self.db.execute(
+                sa.select(table).where(
+                    table.c.project_id == str(project_id),
+                    table.c.year == year,
+                ).order_by(table.c.executed_at.desc())
+            )
+            rows = result.fetchall()
+
+            if not rows:
+                return None
+
+            findings = []
+            for row in rows:
+                if not row.passed:
+                    findings.append({
+                        "note_section": row.section_code,
+                        "check_type": row.rule_type,
+                        "severity": "error" if row.diff_amount and abs(float(row.diff_amount)) > 0.01 else "warning",
+                        "message": row.rule_expression,
+                        "expected_value": float(row.expected_value) if row.expected_value is not None else None,
+                        "actual_value": float(row.actual_value) if row.actual_value is not None else None,
+                        "table_name": "",
+                    })
+
+            return {
+                "project_id": str(project_id),
+                "year": year,
+                "total_rules": len(rows),
+                "passed": sum(1 for r in rows if r.passed),
+                "failed": len(findings),
+                "findings": findings,
+            }
+        except Exception as e:
+            logger.warning("get_latest_results failed: %s", e)
+            return None
+
+    async def confirm_finding(
+        self,
+        validation_id: UUID,
+        finding_index: int,
+        reason: str,
+    ) -> bool:
+        """Confirm a validation finding as 'acknowledged - no fix needed'.
+
+        Returns True if confirmation succeeded, False if not found.
+        """
+        if not self.db:
+            return False
+
+        try:
+            table = sa.table(
+                "note_validation_results",
+                sa.column("id", sa.String),
+                sa.column("details", sa.JSON),
+            )
+
+            result = await self.db.execute(
+                sa.select(table).where(table.c.id == str(validation_id))
+            )
+            row = result.fetchone()
+            if row is None:
+                return False
+
+            # Update details to mark as confirmed
+            details = row.details or {}
+            if not isinstance(details, dict):
+                details = {}
+            confirmations = details.get("confirmations", [])
+            confirmations.append({
+                "finding_index": finding_index,
+                "reason": reason,
+                "confirmed_at": datetime.now(timezone.utc).isoformat(),
+            })
+            details["confirmations"] = confirmations
+
+            await self.db.execute(
+                sa.update(table).where(table.c.id == str(validation_id)).values(
+                    details=details
+                )
+            )
+            await self.db.flush()
+            return True
+        except Exception as e:
+            logger.warning("confirm_finding failed: %s", e)
+            return False

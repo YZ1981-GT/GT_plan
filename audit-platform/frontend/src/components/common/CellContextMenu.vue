@@ -98,7 +98,7 @@ const formattedValue = computed(() => {
 /* 选中单元格：淡紫色背景，不显示边框 */
 .gt-ucell--selected {
   position: relative;
-  background: rgba(75, 45, 119, 0.08) !important;
+  background: rgba(75, 45, 119, 0.12) !important;
   z-index: 1;
   border-color: transparent !important;
 }
@@ -108,7 +108,7 @@ const formattedValue = computed(() => {
   border-color: transparent !important;
 }
 
-/* 单选时（只有一个单元格）：稍深背景，无边框 */
+/* 单选时（只有一个单元格）：同样背景 */
 .gt-ucell--single-selected {
   background: rgba(75, 45, 119, 0.12) !important;
   border-color: transparent !important;

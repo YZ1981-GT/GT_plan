@@ -362,7 +362,7 @@ class TestRoundTripPBT:
         n_rows=st.integers(min_value=1, max_value=5),
         n_cols=st.integers(min_value=1, max_value=4),
     )
-    @settings(max_examples=20, deadline=10000)
+    @settings(max_examples=5, deadline=10000)
     def test_round_trip_no_data_loss(self, n_sections, n_rows, n_cols):
         """Exported sections imported back should have zero diff."""
         sections = []

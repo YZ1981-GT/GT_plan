@@ -204,6 +204,21 @@
             @click="onJumpToReference(refItem.target_wp || '')"
           />
           <span class="gt-cnt__ref-desc">{{ refItem.description }}</span>
+          <!-- auto_pull 拉取值展示 -->
+          <template v-if="autoPullData[refItem.ref_id]">
+            <span
+              v-if="autoPullData[refItem.ref_id].available"
+              class="gt-cnt__ref-pulled"
+              :title="`来源: ${autoPullData[refItem.ref_id].source_label}`"
+            >
+              <span class="gt-cnt__ref-pulled-label">自动取数</span>
+              <span class="gt-cnt__ref-pulled-value">{{ autoPullData[refItem.ref_id].value ?? '-' }}</span>
+            </span>
+            <span v-else class="gt-cnt__ref-unavailable">
+              取数不可用：{{ autoPullData[refItem.ref_id].reason || '来源缺失' }}
+            </span>
+          </template>
+          <span v-else-if="isAutoPullLoading" class="gt-cnt__ref-loading">加载中…</span>
         </li>
       </ul>
     </section>
@@ -265,7 +280,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, toRef } from 'vue'
+import { ref, computed, watch, toRef, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   ElMessageBox,
@@ -281,6 +296,7 @@ import CNoteInheritanceBadge from './cnote/CNoteInheritanceBadge.vue'
 import { formatAmount } from '@/utils/formatAmount'
 import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
+import { fetchNoteAutoPull } from '@/services/commonApi'
 import type {
   SubClass,
   ColumnDefWithKey,
@@ -409,6 +425,34 @@ function getStaticRowsView(st: SubTableSchema): RowData[] {
 function dynamicRowsView(st: SubTableSchema): RowData[] { return subTableData.value[st.id] ?? [] }
 
 const { initData, buildSavePayload, debounceSave } = useCNotePersist({ props, subTableData, hiddenSubtables, currentStandardSubClass, contextData, activeCollapse, sectionId, allSubTables, contextFields, visibleSubTables, labelColumnField: (st: SubTableSchema) => labelColumnField(st, visibleColumns(st)), emit })
+
+// ─── auto_pull 取数：加载时自动从后端拉取联动值 ─────────────────────────
+const autoPullData = ref<Record<string, { value: any; source_label: string; available: boolean; reason: string }>>({})
+const isAutoPullLoading = ref(false)
+
+async function loadAutoPullValues() {
+  const projectId = route.params?.projectId as string | undefined
+  const yearRaw = Number(route.query?.year)
+  const yearVal = Number.isFinite(yearRaw) && yearRaw > 2000 ? yearRaw : new Date().getFullYear()
+  const section = sectionId.value
+  if (!projectId || !section || autoPullRefs.value.length === 0) return
+  isAutoPullLoading.value = true
+  try {
+    const refs = await fetchNoteAutoPull(projectId, yearVal, section)
+    const map: Record<string, { value: any; source_label: string; available: boolean; reason: string }> = {}
+    for (const r of refs) {
+      map[r.ref_id] = { value: r.value, source_label: r.source_label, available: r.available, reason: r.reason }
+    }
+    autoPullData.value = map
+  } catch {
+    // 取数失败静默降级，不阻断渲染
+  } finally {
+    isAutoPullLoading.value = false
+  }
+}
+
+onMounted(() => { loadAutoPullValues() })
+watch(() => sectionId.value, () => { loadAutoPullValues() })
 
 // ─── 工具栏：全屏 / 公式 / 导入导出 ─────────────────────────────────────
 const { isFullscreen, toggleFullscreen } = useFullscreen()
@@ -804,8 +848,13 @@ watch(() => props.schema, () => { initData() }, { deep: true })
 .gt-cnt__refs { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 10px 14px; background: var(--el-color-info-light-9); }
 .gt-cnt__refs-title { margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: var(--el-text-color-regular); }
 .gt-cnt__refs-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
-.gt-cnt__ref-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--el-text-color-regular); }
+.gt-cnt__ref-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--el-text-color-regular); flex-wrap: wrap; }
 .gt-cnt__ref-desc { flex: 1; }
+.gt-cnt__ref-pulled { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; background: var(--gt-color-primary-bg, #f4f0fa); border: 1px solid var(--gt-color-border-purple-light, #d8b8ee); font-size: 12px; white-space: nowrap; }
+.gt-cnt__ref-pulled-label { color: var(--gt-color-primary, #4b2d77); font-size: 11px; font-weight: 500; }
+.gt-cnt__ref-pulled-value { color: var(--gt-color-primary, #4b2d77); font-weight: 600; font-variant-numeric: tabular-nums; }
+.gt-cnt__ref-unavailable { color: var(--el-text-color-placeholder, #a8abb2); font-size: 11px; font-style: italic; }
+.gt-cnt__ref-loading { color: var(--el-text-color-placeholder, #a8abb2); font-size: 11px; }
 .gt-cnt__footer-actions { display: flex; align-items: center; gap: 8px; padding-top: 8px; }
 .gt-cnt__hint-icon { color: var(--el-color-info); font-size: 14px; }
 </style>

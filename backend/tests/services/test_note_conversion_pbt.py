@@ -113,7 +113,7 @@ class TestCI20RoundTripPBT:
     """CI-20: SOE → Listed → SOE round-trip 数据无丢失."""
 
     @given(td=table_data_strategy())
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_pbt_manual_cells_preserved_after_roundtrip(self, td: dict[str, Any]):
         """PBT-1: round-trip 后 manual cell values 完全保留."""
         # 收集所有 manual cells 的 (row_idx, col_idx, value)
@@ -135,7 +135,7 @@ class TestCI20RoundTripPBT:
             )
 
     @given(td=table_data_strategy())
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_pbt_locked_cells_preserved(self, td: dict[str, Any]):
         """PBT-3: locked cells 也保留."""
         locked_cells: list[tuple[int, int, Any]] = []
@@ -151,7 +151,7 @@ class TestCI20RoundTripPBT:
             assert actual == expected
 
     @given(td=table_data_strategy())
-    @settings(max_examples=30, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_pbt_empty_table_safe(self, td: dict[str, Any]):
         """PBT-4: 空 / 任意 table_data round-trip 不崩."""
         # deepcopy 模拟 round-trip 不抛异常

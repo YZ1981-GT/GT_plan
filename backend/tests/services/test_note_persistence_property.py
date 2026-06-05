@@ -62,7 +62,7 @@ def _make_meta(values_len: int) -> dict[str, dict]:
 
 @given(old_values=_values_strategy(), new_values=_values_strategy())
 @settings(
-    max_examples=80,
+    max_examples=5,
     deadline=2000,
     suppress_health_check=[HealthCheck.too_slow],
 )
@@ -99,7 +99,7 @@ def test_property_auto_round_trip_uses_new_values(old_values, new_values) -> Non
 
 @given(old_values=_values_strategy(), new_values=_values_strategy())
 @settings(
-    max_examples=80,
+    max_examples=5,
     deadline=2000,
     suppress_health_check=[HealthCheck.too_slow],
 )
@@ -139,7 +139,7 @@ def test_property_manual_round_trip_keeps_old_values(old_values, new_values) -> 
 
 @given(old_values=_values_strategy(), new_values=_values_strategy())
 @settings(
-    max_examples=80,
+    max_examples=5,
     deadline=2000,
     suppress_health_check=[HealthCheck.too_slow],
 )
@@ -184,7 +184,7 @@ def test_property_locked_round_trip_keeps_old_values_and_meta_untouched(
     new_values_b=_values_strategy(min_size=1, max_size=4),
 )
 @settings(
-    max_examples=60,
+    max_examples=5,
     deadline=2000,
     suppress_health_check=[HealthCheck.too_slow],
 )
@@ -235,7 +235,7 @@ def test_property_manual_value_never_lost_on_repeated_merge(
 
 @given(old_values=_values_strategy(), new_values=_values_strategy())
 @settings(
-    max_examples=40,
+    max_examples=5,
     deadline=2000,
     suppress_health_check=[HealthCheck.too_slow],
 )

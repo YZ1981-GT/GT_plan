@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "codegraph": {
+      "type": "stdio",
+      "command": "C:\\Program Files\\nodejs\\npx.cmd",
+      "args": [
+        "-y",
+        "@colbymchenry/codegraph",
+        "serve",
+        "--mcp",
+        "--no-watch",
+        "--path",
+        "D:/GT_plan"
+      ]
+    },
+    "playwright": {
+      "command": "C:\\Program Files\\nodejs\\npx.cmd",
+      "args": ["-y", "@playwright/mcp@latest"]
+    }
+  }
+}

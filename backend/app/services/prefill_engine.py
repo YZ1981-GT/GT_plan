@@ -274,19 +274,19 @@ async def _resolve_note_formula(
     if len(args) < 3:
         return None
     section, row_key, col_key = args[0], args[1], args[2]
-    from app.models.phase15_models import DisclosureNote
+    from app.models.report_models import DisclosureNote
 
     result = await db.execute(
         sa.select(DisclosureNote).where(
             DisclosureNote.project_id == project_id,
             DisclosureNote.year == year,
-            DisclosureNote.section_code == section,
+            DisclosureNote.note_section == section,
         )
     )
     note = result.scalar_one_or_none()
-    if note and note.content_data:
-        # content_data 是 JSONB，按 row/col 索引取值
-        rows = note.content_data.get("rows", [])
+    if note and note.table_data:
+        # table_data 是 JSONB，按 row/col 索引取值
+        rows = note.table_data.get("rows", [])
         for r in rows:
             if str(r.get("key", "")) == row_key or str(r.get("label", "")) == row_key:
                 val = r.get("values", {}).get(col_key)

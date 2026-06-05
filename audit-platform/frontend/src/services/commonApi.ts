@@ -125,8 +125,43 @@ export async function getConsistencyCheck(projectId: string, year = 2025): Promi
 
 // ── 附注 ──
 
-export async function refreshDisclosureFromWorkpapers(projectId: string, year: number): Promise<void> {
-  await http.post(P_dn.refreshFromWorkpapers(projectId, year))
+export interface RefreshFromWorkpapersResult {
+  refreshed: number
+  total_notes: number
+  sections_recomputed: string[]
+  text_only_sections: string[]
+  errors: string[]
+  cells_updated: number
+}
+
+export async function refreshDisclosureFromWorkpapers(projectId: string, year: number): Promise<RefreshFromWorkpapersResult> {
+  const { data } = await http.post(P_dn.refreshFromWorkpapers(projectId, year))
+  return data as RefreshFromWorkpapersResult
+}
+
+/**
+ * 获取附注章节的 auto_pull 联动取数结果。
+ * 原生 http 调用，手动解 {code,message,data} 信封取 body.data（铁律）。
+ */
+export interface AutoPullRefResult {
+  ref_id: string
+  target_wp: string | null
+  source_label: string
+  value: number | string | null
+  available: boolean
+  reason: string
+}
+
+export async function fetchNoteAutoPull(
+  projectId: string,
+  year: number,
+  section: string,
+): Promise<AutoPullRefResult[]> {
+  const { data: body } = await http.get(P_dn.autoPull(projectId, year, section))
+  // 手动解 {code, message, data} 信封
+  const envelope = body as any
+  const payload = envelope?.data ?? envelope
+  return payload?.refs ?? []
 }
 
 // ── 附注 LLM 辅助 ──

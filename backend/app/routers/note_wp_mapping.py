@@ -52,6 +52,10 @@ async def refresh_from_workpapers(
     svc = NoteWpMappingService(db)
     result = await svc.refresh_from_workpapers(project_id, year)
     await db.commit()
+    # 透传更丰富返回体：显式添加 cells_updated 便于前端消费
+    # service 返回 refreshed=cells_updated（向后兼容旧键名），
+    # 同时增加 cells_updated 明确语义供前端区分提示文案（Req 2.7, 2.8）
+    result["cells_updated"] = result.get("refreshed", 0)
     return result
 
 

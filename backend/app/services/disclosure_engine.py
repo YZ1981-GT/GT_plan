@@ -4,6 +4,7 @@
 - generate_notes: 根据附注模版种子数据生成附注初稿
 - populate_table_data: 从试算表取数填充附注表格
 - update_note_values: 增量更新受影响附注数值
+- refill_sections: 窄接口，复用填充链重算指定章节单元格
 - on_reports_updated: EventBus 事件处理器
 
 Validates: Requirements 4.2, 4.3, 4.4, 4.7, 4.8, 4.9, 4.10, 8.1
@@ -13,8 +14,10 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -54,6 +57,30 @@ def _extract_basic_info(wizard_state: dict | None) -> dict:
         or state.get("basic_info", {}).get("data")
         or {}
     )
+
+
+# ---------------------------------------------------------------------------
+# refill_sections 数据类
+# ---------------------------------------------------------------------------
+
+@dataclass
+class CellRefillRecord:
+    """单元格重算变更记录"""
+    section: str          # note_section
+    row_index: int
+    col_index: int
+    old_value: Any
+    new_value: Any
+
+
+@dataclass
+class RefillReport:
+    """refill_sections 返回的重算报告"""
+    sections_recomputed: list[str] = field(default_factory=list)
+    text_only_sections: list[str] = field(default_factory=list)
+    cells_updated: int = 0
+    records: list[CellRefillRecord] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class DisclosureEngine:
@@ -1013,6 +1040,252 @@ class DisclosureEngine:
 
         await self.db.flush()
         return updated
+
+    # ------------------------------------------------------------------
+    # refill_sections — 窄接口，复用填充链重算指定章节
+    # ------------------------------------------------------------------
+    async def refill_sections(
+        self,
+        project_id: UUID,
+        year: int,
+        section_codes: list[str] | None = None,
+        *,
+        skip_manual: bool = True,
+    ) -> RefillReport:
+        """复用 _preload_data_for_notes + 逐 cell dispatch_resolver 重算指定章节。
+
+        - 只处理 content_type 含表格的章节；纯文本章节计入 text_only_sections。
+        - 仅写 _cell_modes[str(col)]=='auto' 的单元格（skip_manual=True 时）。
+        - 逐格比较 old vs new，变化才计 cells_updated 并写回。
+        - flag_modified(note,'table_data')；只 flush 不 commit。
+        - 取数失败的章节记入 errors，不抛异常。
+
+        Validates: Requirements 2.1, 2.2, 2.4, 2.5, 2.6, 2.7, 1.3
+        """
+        from sqlalchemy.orm.attributes import flag_modified
+
+        from app.services.note_source_resolvers import dispatch_resolver
+        from app.services.note_template_bindings_loader import (
+            get_binding_for_section,
+        )
+
+        report = RefillReport()
+
+        # 1. 预加载缓存
+        self._wp_cache = {}
+        self._tb_cache = {}
+        self._wp_account_cache = {}
+        self._wp_fine_cache = {}
+        self._prior_notes_cache = {}
+        try:
+            await self._preload_data_for_notes(project_id, year)
+        except Exception as pre_err:
+            logger.warning("refill_sections: preload failed: %s", pre_err)
+            try:
+                await self.db.rollback()
+            except Exception:
+                pass
+
+        # 2. 查询待处理的附注
+        where_clauses = [
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.is_deleted == sa.false(),
+        ]
+        if section_codes:
+            where_clauses.append(DisclosureNote.note_section.in_(section_codes))
+
+        result = await self.db.execute(
+            sa.select(DisclosureNote).where(*where_clauses)
+        )
+        notes = result.scalars().all()
+
+        # 构造 resolver ctx
+        ctx: dict[str, Any] = {
+            "project_id": project_id,
+            "year": year,
+            "db": self.db,
+            "_tb_cache": self._tb_cache,
+            "_wp_cache": self._wp_cache,
+            "_prior_notes_cache": getattr(self, "_prior_notes_cache", {}),
+        }
+
+        for note in notes:
+            section = note.note_section or ""
+
+            # 3. 纯文本/叙述章节 → 跳过
+            ct = note.content_type
+            if ct not in (ContentType.table, ContentType.mixed):
+                report.text_only_sections.append(section)
+                continue
+
+            td = note.table_data
+            if not td or not isinstance(td, dict):
+                report.text_only_sections.append(section)
+                continue
+
+            rows = td.get("rows")
+            if not rows or not isinstance(rows, list):
+                report.text_only_sections.append(section)
+                continue
+
+            # 4. 获取 binding
+            sec_binding = get_binding_for_section(section)
+            tables = (sec_binding.get("tables") or []) if sec_binding else []
+            table_binding = tables[0] if tables and isinstance(tables[0], dict) else {}
+            binding_rows = table_binding.get("rows") or {}
+            if not isinstance(binding_rows, dict):
+                binding_rows = {}
+            header_normalize = table_binding.get("header_normalize") or []
+            if not isinstance(header_normalize, list):
+                header_normalize = []
+
+            headers = td.get("headers") or []
+            num_value_cols = max(0, len(headers) - 1)
+
+            # 更新 ctx section_number
+            ctx["section_number"] = section
+
+            section_had_error = False
+            section_touched = False
+
+            try:
+                for row_idx, row in enumerate(rows):
+                    if not isinstance(row, dict):
+                        continue
+                    if row.get("is_total"):
+                        continue  # 合计行由 _backfill_totals 处理
+
+                    values = row.get("values")
+                    if not isinstance(values, list):
+                        continue
+
+                    cell_modes = row.get("_cell_modes") or {}
+                    cell_meta = row.get("_cell_meta") or {}
+                    label = row.get("label", "")
+
+                    for col_idx in range(min(num_value_cols, len(values))):
+                        mode = cell_modes.get(str(col_idx), "auto")
+
+                        # skip_manual: 仅处理 auto 单元格
+                        if skip_manual and mode != "auto":
+                            continue
+
+                        # 从 binding 获取 cell 定义
+                        cell_binding = self._resolve_cell_binding(
+                            label, col_idx, binding_rows, header_normalize,
+                            cell_meta,
+                        )
+                        if cell_binding is None:
+                            # 无 binding → 无法重算，跳过
+                            continue
+
+                        # 调 dispatch_resolver
+                        new_val = await dispatch_resolver(cell_binding, ctx)
+
+                        old_val = values[col_idx]
+
+                        # 比较 old vs new（规范化比较）
+                        if not self._values_differ(old_val, new_val):
+                            continue
+
+                        # 写回
+                        values[col_idx] = new_val
+                        section_touched = True
+                        report.cells_updated += 1
+                        report.records.append(CellRefillRecord(
+                            section=section,
+                            row_index=row_idx,
+                            col_index=col_idx,
+                            old_value=old_val,
+                            new_value=new_val,
+                        ))
+
+                # 重算合计行
+                if section_touched:
+                    self._backfill_totals(rows, num_value_cols)
+
+            except Exception as err:
+                section_had_error = True
+                report.errors.append(f"{section}: {err}")
+                logger.warning("refill_sections: section %s failed: %s", section, err)
+
+            if section_had_error:
+                continue
+
+            if section_touched:
+                flag_modified(note, "table_data")
+                report.sections_recomputed.append(section)
+
+        # 5. flush（不 commit）
+        await self.db.flush()
+
+        return report
+
+    @staticmethod
+    def _resolve_cell_binding(
+        label: str,
+        col_idx: int,
+        binding_rows: dict,
+        header_normalize: list,
+        cell_meta: dict,
+    ) -> dict | None:
+        """从 binding json 还原单个单元格的 resolver binding dict。
+
+        优先级：
+        1. cell_meta 中记录的 binding 信息（semantic → binding_rows[label].binding[semantic]）
+        2. header_normalize 定位 semantic → binding_rows[label].binding[semantic]
+        3. 都没有 → None（跳过该单元格）
+        """
+        # 确定 semantic
+        semantic: str | None = None
+        meta_entry = cell_meta.get(str(col_idx))
+        if isinstance(meta_entry, dict):
+            semantic = meta_entry.get("semantic")
+
+        if not semantic:
+            actual_col = col_idx + 1  # col 0 is row label
+            if actual_col < len(header_normalize) and isinstance(
+                header_normalize[actual_col], dict
+            ):
+                semantic = header_normalize[actual_col].get("semantic")
+
+        if not semantic:
+            return None
+
+        # 查 binding_rows
+        row_binding = binding_rows.get(label) or {}
+        cell_bindings = row_binding.get("binding") or {}
+        if not isinstance(cell_bindings, dict):
+            return None
+
+        # 精确匹配
+        cell = cell_bindings.get(semantic)
+        if not cell:
+            # 前缀匹配
+            prefix = semantic + "_col"
+            for k, v in cell_bindings.items():
+                if isinstance(k, str) and k.startswith(prefix):
+                    cell = v
+                    break
+
+        if not isinstance(cell, dict):
+            return None
+
+        return cell
+
+    @staticmethod
+    def _values_differ(old_val: Any, new_val: Any) -> bool:
+        """比较两个值是否不同（规范化 None/Decimal/float 比较）。"""
+        if old_val is None and new_val is None:
+            return False
+        if old_val is None or new_val is None:
+            return True
+        # 数值比较：统一 float
+        try:
+            return float(old_val) != float(new_val)
+        except (TypeError, ValueError):
+            return str(old_val) != str(new_val)
 
     # ------------------------------------------------------------------
     # 获取附注

@@ -174,9 +174,16 @@ export const useWizardStore = defineStore('wizard', {
     async loadWizardState(projectId: string) {
       this.loading = true
       try {
-        const { data } = await http.get(`/api/projects/${projectId}/wizard`)
-        const state: WizardState = data
+        // validateStatus: 404 不触发 http.ts 拦截器弹窗（项目已完成向导时 404 正常）
+        const resp = await http.get(`/api/projects/${projectId}/wizard`, {
+          validateStatus: (s: number) => s < 400 || s === 404,
+        })
+        if (resp.status === 404) return // 无向导状态，静默
+        const state: WizardState = resp.data
         this.applyWizardState(state)
+      } catch (e: any) {
+        // 其他错误静默（不阻塞页面加载）
+        console.warn('[wizard] loadWizardState failed:', e?.message)
       } finally {
         this.loading = false
       }

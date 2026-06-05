@@ -683,6 +683,18 @@ body {
 .el-message--error { background: linear-gradient(90deg, #fff0ef, #fff9f8) !important; }
 .el-message--info { background: linear-gradient(90deg, #e6f7fa, #f5fdfe) !important; }
 
+/* ── GT 紫令牌消息样式（附注刷新等场景，Req 1.4） ── */
+.el-message.gt-msg-purple {
+  background: linear-gradient(90deg, var(--gt-color-primary-bg, #f4f0fa), #faf8fd) !important;
+  border-left: 3px solid var(--gt-color-primary, #4b2d77) !important;
+}
+.el-message.gt-msg-purple .el-message__content {
+  color: var(--gt-color-primary-dark, #2B1D4D) !important;
+}
+.el-message.gt-msg-purple .el-message__icon {
+  color: var(--gt-color-primary, #4b2d77) !important;
+}
+
 /* ── 工作流引导弹窗 ── */
 .gt-workflow-guide-dialog {
   border-radius: 12px !important;
@@ -744,8 +756,8 @@ body {
   color: #d94840 !important;
 }
 .gt-amount--highlight {
-  background: #fff8e6 !important;
-  border-bottom: 2px solid #e6a23c;
+  color: var(--gt-color-primary) !important;
+  font-weight: 600;
 }
 
 /* ═══════════════════════════════════════════════════════════════

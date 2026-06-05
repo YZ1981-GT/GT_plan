@@ -53,7 +53,7 @@
               <span class="gt-ack-check-desc">{{ chk.description }}</span>
               <span class="gt-ack-check-severity">
                 <el-tag :type="chk.severity === 'blocking' ? 'danger' : chk.severity === 'warning' ? 'warning' : 'info'" size="small">
-                  {{ chk.severity }}
+                  {{ { blocking: '阻断', warning: '警告', info: '提示' }[chk.severity] || chk.severity }}
                 </el-tag>
               </span>
               <span class="gt-ack-check-result">

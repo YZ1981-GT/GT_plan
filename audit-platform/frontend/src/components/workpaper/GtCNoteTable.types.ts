@@ -125,6 +125,14 @@ export interface CrossRefDef {
   direction?: 'inbound' | 'outbound' | string
   auto_pull?: boolean
   sync_strategy?: string
+  /** auto_pull 拉取到的只读联动值 */
+  pulled_value?: number | string | null
+  /** 来源标识（如 "D1-1!审定数(期末)"），用于溯源展示 */
+  source_label?: string
+  /** 取数是否不可用（来源缺失 / 映射失败） */
+  unavailable?: boolean
+  /** 不可用原因描述 */
+  unavailable_reason?: string
 }
 
 export interface LinkageDownstreamRule {

@@ -20,15 +20,6 @@
           @year-change="onYearChange"
           @template-change="onTemplateTypeChange"
         >
-          <div class="gt-info-bar__sep" />
-          <div class="gt-info-bar__item">
-            <span class="gt-info-bar__label" style="font-size: var(--gt-font-size-xs);color:rgba(255,255,255,0.55)">模式</span>
-            <el-radio-group v-model="reportMode" size="small" @change="fetchReport" class="gt-rv-mode-radio">
-              <el-radio-button value="audited">已审</el-radio-button>
-              <el-radio-button value="unadjusted">未审</el-radio-button>
-              <el-radio-button value="compare">对比</el-radio-button>
-            </el-radio-group>
-          </div>
         </GtInfoBar>
         <template #actions>
           <GtToolbar
@@ -36,28 +27,33 @@
             :show-fullscreen="true"
             :is-fullscreen="rvFullscreen"
             :show-export="true"
-            :show-import="true"
-            :show-formula="true"
             @copy="copyReportTable"
             @fullscreen="toggleRvFullscreen()"
             @export="onExportExcel"
-            @import="showReportImport = true"
-            @formula="showFormulaManager = true"
           >
             <template #left>
-              <el-tooltip content="根据试算表审定数重新计算报表（需先导入数据+科目映射）" placement="bottom">
-                <el-button v-if="!isEqcrRole" size="small" @click="onGenerate" :loading="genLoading">🔄 刷新数据</el-button>
-              </el-tooltip>
-              <el-tooltip content="执行逻辑审核和合理性检查（需先生成报表）" placement="bottom">
-                <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 审核</el-button>
-              </el-tooltip>
+              <el-radio-group v-model="reportMode" size="small" @change="fetchReport" class="gt-rv-mode-radio">
+                <el-radio-button value="audited">已审</el-radio-button>
+                <el-radio-button value="unadjusted">未审</el-radio-button>
+                <el-radio-button value="compare">对比</el-radio-button>
+              </el-radio-group>
+              <el-button v-if="!isEqcrRole" size="small" type="primary" @click="onGenerate" :loading="genLoading">刷新</el-button>
+              <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">审核</el-button>
             </template>
             <template #right-extra>
-              <el-button size="small" @click="onEditConfig">📝 编辑结构</el-button>
-              <el-tooltip content="配置国企版↔上市版报表行次映射规则" placement="bottom">
-                <el-button size="small" @click="showMappingDialog = true">🔄 转换规则</el-button>
-              </el-tooltip>
-              <el-button size="small" @click="showDocAiChat = true">💬 AI 对话</el-button>
+              <el-button size="small" @click="onExportAllExcel">全部导出</el-button>
+              <el-button size="small" @click="showReportImport = true">导入</el-button>
+              <el-button size="small" @click="showFormulaManager = true">公式</el-button>
+              <el-dropdown trigger="click" size="small">
+                <el-button size="small">更多</el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item @click="onEditConfig">编辑结构</el-dropdown-item>
+                    <el-dropdown-item @click="showMappingDialog = true">转换规则</el-dropdown-item>
+                    <el-dropdown-item @click="showDocAiChat = true">AI 对话</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </template>
           </GtToolbar>
         </template>
@@ -78,7 +74,7 @@
       <!-- F29: 报表平衡检查结果 -->
       <el-alert
         v-if="balanceCheckResult"
-        :title="balanceCheckResult.status === 'passed' ? '✅ 报表平衡检查通过' : balanceCheckResult.status === 'warning' ? '⚠️ 报表平衡检查有差异' : '❌ 报表平衡检查失败'"
+        :title="balanceCheckResult.status === 'passed' ? '报表平衡检查通过' : balanceCheckResult.status === 'warning' ? '报表平衡检查有差异' : '报表平衡检查失败'"
         :type="balanceCheckResult.status === 'passed' ? 'success' : balanceCheckResult.status === 'warning' ? 'warning' : 'error'"
         :description="balanceCheckResult.message"
         show-icon
@@ -133,16 +129,6 @@
     <!-- 可滚动的表格区域 -->
     <div class="gt-rv-table-area">
 
-    <!-- 致同标准表头（公司名称/报表期间/金额单位） -->
-    <div v-if="rows.length > 0 && activeTab !== 'cross_check'" class="gt-rv-gt-header">
-      <div class="gt-rv-gt-header__company">{{ projectName || '—' }}</div>
-      <div class="gt-rv-gt-header__title">{{ activeTabLabel }}</div>
-      <div class="gt-rv-gt-header__meta">
-        <span>{{ year }}年度</span>
-        <span class="gt-rv-gt-header__unit">金额单位：人民币{{ displayPrefs.unitSuffix }}</span>
-      </div>
-    </div>
-
     <!-- 空数据引导提示 -->
     <GtEmpty
       v-if="!loading && rows.length === 0 && !isTracing"
@@ -178,30 +164,111 @@
 
     <!-- 所有者权益变动表 — el-table 矩阵视图（动态列 v-for + span-method） -->
     <div v-if="activeTab === 'equity_statement'" class="gt-rv-equity-matrix" v-loading="loading">
-      <el-table :data="rows" border size="small" :span-method="equitySpanMethod"
+      <el-table ref="eqTableRef" :data="rows" border size="small" :span-method="equitySpanMethod"
         :row-class-name="eqRowClassName" style="width: 100%" max-height="600"
+        :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
+        :cell-class-name="rvCellClassName"
+        @cell-click="onRvCellClick"
+        @cell-dblclick="onRvCellDblClick"
+        @cell-contextmenu="onRvCellContextMenu"
         :header-cell-style="{ background: '#f8f6fb', color: '#333', whiteSpace: 'nowrap', fontSize: '12px' }">
         <el-table-column prop="row_name" label="项目" fixed width="280" :resizable="true">
           <template #default="{ row }">
             <span :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px' }">{{ row.row_name }}</span>
           </template>
         </el-table-column>
-        <!-- 本年金额 — 动态列 -->
-        <el-table-column label="本年金额">
-          <el-table-column v-for="col in eqColumns" :key="'cv-' + col.key" :label="col.label" width="110" align="right" :resizable="true">
-            <template #default="{ row }">
-              <GtAmountCell v-if="col.key === 'total'" :value="row.current_period_amount" />
-              <GtAmountCell v-else :value="0" />
-            </template>
+        <!-- 本年金额 — 动态列（三级表头：本年金额 > 分组 > 明细列） -->
+        <el-table-column label="本年金额" header-align="center">
+          <el-table-column label="实收资本(股本)" width="110" align="right" :resizable="true">
+            <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'paid_in_capital')" /></template>
+          </el-table-column>
+          <el-table-column label="其他权益工具" header-align="center">
+            <el-table-column label="优先股" width="90" align="right" :resizable="true">
+              <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'other_equity_preferred')" /></template>
+            </el-table-column>
+            <el-table-column label="永续债" width="90" align="right" :resizable="true">
+              <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'other_equity_perpetual')" /></template>
+            </el-table-column>
+            <el-table-column label="其他" width="90" align="right" :resizable="true">
+              <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'other_equity_other')" /></template>
+            </el-table-column>
+          </el-table-column>
+          <el-table-column label="资本公积" width="110" align="right" :resizable="true">
+            <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'capital_reserve')" /></template>
+          </el-table-column>
+          <el-table-column label="减：库存股" width="110" align="right" :resizable="true">
+            <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'treasury_stock')" /></template>
+          </el-table-column>
+          <el-table-column label="其他综合收益" width="110" align="right" :resizable="true">
+            <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'oci')" /></template>
+          </el-table-column>
+          <el-table-column label="专项储备" width="100" align="right" :resizable="true">
+            <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'special_reserve')" /></template>
+          </el-table-column>
+          <el-table-column label="盈余公积" width="100" align="right" :resizable="true">
+            <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'surplus_reserve')" /></template>
+          </el-table-column>
+          <el-table-column label="一般风险准备" width="110" align="right" :resizable="true">
+            <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'general_risk')" /></template>
+          </el-table-column>
+          <el-table-column label="未分配利润" width="110" align="right" :resizable="true">
+            <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'retained_earnings')" /></template>
+          </el-table-column>
+          <el-table-column v-if="isConsolidated" label="小计" width="110" align="right" :resizable="true">
+            <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'subtotal')" /></template>
+          </el-table-column>
+          <el-table-column v-if="isConsolidated" label="少数股东权益" width="110" align="right" :resizable="true">
+            <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'minority')" /></template>
+          </el-table-column>
+          <el-table-column label="所有者权益合计" width="120" align="right" :resizable="true">
+            <template #default="{ row }"><GtAmountCell :value="row.current_period_amount" /></template>
           </el-table-column>
         </el-table-column>
-        <!-- 上年金额 — 动态列 -->
-        <el-table-column label="上年金额">
-          <el-table-column v-for="col in eqColumns" :key="'pv-' + col.key" :label="col.label" width="110" align="right" :resizable="true">
-            <template #default="{ row }">
-              <GtAmountCell v-if="col.key === 'total'" :value="row.prior_period_amount" />
-              <GtAmountCell v-else :value="0" />
-            </template>
+        <!-- 上年金额 — 三级表头（与本年金额结构一致） -->
+        <el-table-column label="上年金额" header-align="center">
+          <el-table-column label="实收资本(股本)" width="110" align="right" :resizable="true">
+            <template #default><GtAmountCell :value="0" /></template>
+          </el-table-column>
+          <el-table-column label="其他权益工具" header-align="center">
+            <el-table-column label="优先股" width="90" align="right" :resizable="true">
+              <template #default><GtAmountCell :value="0" /></template>
+            </el-table-column>
+            <el-table-column label="永续债" width="90" align="right" :resizable="true">
+              <template #default><GtAmountCell :value="0" /></template>
+            </el-table-column>
+            <el-table-column label="其他" width="90" align="right" :resizable="true">
+              <template #default><GtAmountCell :value="0" /></template>
+            </el-table-column>
+          </el-table-column>
+          <el-table-column label="资本公积" width="110" align="right" :resizable="true">
+            <template #default><GtAmountCell :value="0" /></template>
+          </el-table-column>
+          <el-table-column label="减：库存股" width="110" align="right" :resizable="true">
+            <template #default><GtAmountCell :value="0" /></template>
+          </el-table-column>
+          <el-table-column label="其他综合收益" width="110" align="right" :resizable="true">
+            <template #default><GtAmountCell :value="0" /></template>
+          </el-table-column>
+          <el-table-column label="专项储备" width="100" align="right" :resizable="true">
+            <template #default><GtAmountCell :value="0" /></template>
+          </el-table-column>
+          <el-table-column label="盈余公积" width="100" align="right" :resizable="true">
+            <template #default><GtAmountCell :value="0" /></template>
+          </el-table-column>
+          <el-table-column label="一般风险准备" width="110" align="right" :resizable="true">
+            <template #default><GtAmountCell :value="0" /></template>
+          </el-table-column>
+          <el-table-column label="未分配利润" width="110" align="right" :resizable="true">
+            <template #default><GtAmountCell :value="0" /></template>
+          </el-table-column>
+          <el-table-column v-if="isConsolidated" label="小计" width="110" align="right" :resizable="true">
+            <template #default><GtAmountCell :value="0" /></template>
+          </el-table-column>
+          <el-table-column v-if="isConsolidated" label="少数股东权益" width="110" align="right" :resizable="true">
+            <template #default><GtAmountCell :value="0" /></template>
+          </el-table-column>
+          <el-table-column label="所有者权益合计" width="120" align="right" :resizable="true">
+            <template #default="{ row }"><GtAmountCell :value="row.prior_period_amount" /></template>
           </el-table-column>
         </el-table-column>
       </el-table>
@@ -210,8 +277,13 @@
 
     <!-- 资产减值准备表 — el-table 矩阵视图（嵌套列） -->
     <div v-if="activeTab === 'impairment_provision'" class="gt-rv-equity-matrix" v-loading="loading">
-      <el-table :data="rows" border size="small"
+      <el-table ref="impTableRef" :data="rows" border size="small"
         :row-class-name="impRowClassName" style="width: 100%" max-height="600"
+        :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
+        :cell-class-name="rvCellClassName"
+        @cell-click="onRvCellClick"
+        @cell-dblclick="onRvCellDblClick"
+        @cell-contextmenu="onRvCellContextMenu"
         :header-cell-style="{ background: '#f8f6fb', color: '#333', whiteSpace: 'nowrap', fontSize: '12px' }">
         <el-table-column prop="row_name" label="项目" fixed width="280" :resizable="true">
           <template #default="{ row }">
@@ -248,9 +320,9 @@
     </div>
 
     <!-- 报表表格 — 普通模式（非矩阵报表） -->
-    <el-table ref="rvTableRef" v-if="reportMode !== 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision'" :data="rows" v-loading="loading" style="width: 100%"
+    <el-table ref="rvTableRef" v-if="reportMode !== 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision' && activeTab !== 'cross_check' && activeTab !== 'multi_year_compare'" :data="rows" v-loading="loading" style="width: 100%"
       :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
-      :row-class-name="rowClassName" :show-header="true" border size="small" :max-height="tableMaxHeight"
+      :row-class-name="rowClassName" :show-header="true" border size="small" :max-height="600"
       :cell-class-name="rvCellClassName"
       @cell-click="onRvCellClick"
       @cell-dblclick="onRvCellDblClick"
@@ -281,13 +353,15 @@
             <span class="report-amount" style="color: var(--gt-color-text-placeholder);">—</span>
           </template>
           <template v-else>
-            <GtAmountCell
-              :value="row.current_period_amount"
-              :prior-value="row.prior_period_amount"
-              :clickable="true"
-              :comment="rvComments.getComment(`report_${activeTab}`, $index, 2)"
-              @click="onLineComposition(row)"
-            />
+            <el-tooltip :content="row.formula ? `公式：${row.formula}` : `行次 ${row.row_code || ''}`" placement="top" :show-after="500" :disabled="!row.row_code">
+              <GtAmountCell
+                :value="row.current_period_amount"
+                :prior-value="row.prior_period_amount"
+                :clickable="true"
+                :comment="rvComments.getComment(`report_${activeTab}`, $index, 2)"
+                @click="onLineComposition(row)"
+              />
+            </el-tooltip>
           </template>
         </template>
       </el-table-column>
@@ -300,20 +374,27 @@
             <span class="report-amount" style="color: var(--gt-color-text-placeholder);">—</span>
           </template>
           <template v-else>
-            <GtAmountCell
-              :value="row.prior_period_amount"
-              :clickable="false"
-              :comment="rvComments.getComment(`report_${activeTab}`, $index, 3)"
-            />
+            <el-tooltip :content="row.formula ? `公式：${row.formula}` : `行次 ${row.row_code || ''}`" placement="top" :show-after="500" :disabled="!row.row_code">
+              <GtAmountCell
+                :value="row.prior_period_amount"
+                :clickable="false"
+                :comment="rvComments.getComment(`report_${activeTab}`, $index, 3)"
+              />
+            </el-tooltip>
           </template>
         </template>
       </el-table-column>
     </el-table>
 
     <!-- 报表表格 — 对比视图（非权益变动表） -->
-    <el-table v-if="reportMode === 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision'" :data="compareRows" v-loading="loading" style="width: 100%"
+    <el-table ref="compareTableRef" v-if="reportMode === 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision' && activeTab !== 'cross_check' && activeTab !== 'multi_year_compare'" :data="compareRows" v-loading="loading" style="width: 100%"
       :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
-      :row-class-name="compareRowClassName" border size="small" :max-height="tableMaxHeight">
+      :row-class-name="compareRowClassName"
+      :cell-class-name="rvCellClassName"
+      @cell-click="onRvCellClick"
+      @cell-dblclick="onRvCellDblClick"
+      @cell-contextmenu="onRvCellContextMenu"
+      border size="small" :max-height="600">
       <el-table-column label="序号" width="70" align="center" :resizable="true">
         <template #default="{ $index }">
           <span style="color: var(--gt-color-text-tertiary);">{{ $index + 1 }}</span>
@@ -374,7 +455,10 @@
     <!-- R7-S3-10 Task 49-50：跨表核对面板 -->
     <div v-if="activeTab === 'cross_check'" class="gt-rv-cross-check">
       <h3 style="margin: 0 0 16px; font-size: var(--gt-font-size-md)">⚖️ 跨表核对（7 条关键等式）</h3>
-      <el-table :data="crossCheckResults" border size="small" style="width: 100%">
+      <el-table :data="crossCheckResults" border size="small" style="width: 100%"
+        :cell-class-name="rvCellClassName"
+        @cell-click="onRvCellClick"
+        @cell-contextmenu="onRvCellContextMenu">
         <el-table-column label="#" width="40" align="center">
           <template #default="{ $index }">{{ $index + 1 }}</template>
         </el-table-column>
@@ -509,6 +593,10 @@
             </el-table-column>
             <el-table-column prop="name" label="科目名称" min-width="180" />
             <el-table-column label="期末余额" width="150" align="right">
+              <template #header>
+                <span>期末余额</span>
+                <span style="font-size: 10px; color: var(--gt-color-text-placeholder); margin-left: 4px">(元)</span>
+              </template>
               <template #default="{ row }">
                 <GtAmountCell :value="row.closing_balance" />
               </template>
@@ -931,7 +1019,7 @@ function onProjectChange(newId: string) {
 }
 
 // 年度选择器
-const selectedYear = ref(new Date().getFullYear())
+const selectedYear = ref(new Date().getFullYear() - 1)
 const yearOptions = computed(() => projectStore.yearOptions)
 function onYearChange(val: number) {
   selectedYear.value = val
@@ -1062,7 +1150,7 @@ function onMappingTemplateApplied(configData: Record<string, any>) {
   }
   ElMessage.success(`已引用 ${applied} 条映射规则（已有映射的行不覆盖）`)
 }
-const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear())
+const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear() - 1)
 
 const loading = ref(false)
 const genLoading = ref(false)
@@ -1309,7 +1397,7 @@ async function ensureProjectYear() {
     const proj = projRaw?.data ?? projRaw ?? projRaw
     projectName.value = proj?.client_name || proj?.name || ''
     projectYear.value = Number(proj?.audit_year) || null
-    selectedYear.value = projectYear.value || new Date().getFullYear()
+    selectedYear.value = projectYear.value || new Date().getFullYear() - 1
     reportScope.value = proj?.report_scope || 'standalone'
     templateType.value = proj?.template_type || ''
 
@@ -1365,6 +1453,24 @@ const fetchReport = withLoading(loading, async () => {
     }
     compareRows.value = []
   }
+
+  // ② 自动运行跨表校对（静默，不弹窗，只在有异常时显示 balanceCheckResult 横幅）
+  if (rows.value.length > 0) {
+    try {
+      const result = await getReportConsistencyCheck(projectId.value, year.value)
+      if (result && !result.consistent) {
+        const total = result.total || result.checks?.length || 0
+        const passed = (result.logic_check_passed || 0) + (result.reasonability_passed || 0)
+        const failCount = total - passed
+        balanceCheckResult.value = {
+          status: failCount > 0 ? 'warning' : 'passed',
+          message: `自动校对：${total} 项审核，${failCount} 项未通过`,
+        }
+      } else {
+        balanceCheckResult.value = null
+      }
+    } catch { /* 静默失败 */ }
+  }
 })
 
 async function loadTemplateRows() {
@@ -1401,7 +1507,7 @@ function compareRowClassName({ row }: { row: any }) {
 }
 
 function onTabChange() {
-  if (activeTab.value === 'cross_check') return
+  if (activeTab.value === 'cross_check' || activeTab.value === 'multi_year_compare') return
   fetchReport()
 }
 
@@ -1655,6 +1761,13 @@ function onExportExcel() {
   })
 }
 
+function onExportAllExcel() {
+  import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
+    const url = `/api/reports/${projectId.value}/${year.value}/export`
+    downloadFileAsBlob(url, `全部报表_${year.value}.xlsx`)
+  })
+}
+
 function onEditConfig() {
   router.push(`/projects/${projectId.value}/report-config`)
 }
@@ -1722,52 +1835,74 @@ async function loadCrossCheckData() {
   crossCheckLoading.value = true
   try {
     const std = currentApplicableStandard.value
-    // 并行加载资产负债表和利润表的关键数据
     const [bs, is] = await Promise.all([
       getReport(projectId.value, year.value, 'balance_sheet', false, std).catch(() => []),
       getReport(projectId.value, year.value, 'income_statement', false, std).catch(() => []),
     ])
-    // 按 row_code 建索引
-    const bsMap: Record<string, number> = {}
-    const isMap: Record<string, number> = {}
-    for (const row of (bs as any[] || [])) {
-      if (row.row_code) bsMap[row.row_code] = parseFloat(row.current_amount) || 0
+    // 按 row_code 和 row_name 建索引（合计行优先覆盖同名非合计行）
+    const buildMap = (rows: any[]) => {
+      const map: Record<string, number> = {}
+      // 先填非合计行
+      for (const row of (rows || [])) {
+        const amt = parseFloat(row.current_period_amount) || 0
+        if (!row.is_total_row) {
+          if (row.row_code && !map[row.row_code]) map[row.row_code] = amt
+          if (row.row_name && !map[row.row_name]) map[row.row_name] = amt
+        }
+      }
+      // 再填合计行（覆盖同名）
+      for (const row of (rows || [])) {
+        const amt = parseFloat(row.current_period_amount) || 0
+        if (row.is_total_row) {
+          if (row.row_code) map[row.row_code] = amt
+          if (row.row_name) map[row.row_name] = amt
+        }
+      }
+      return map
     }
-    for (const row of (is as any[] || [])) {
-      if (row.row_code) isMap[row.row_code] = parseFloat(row.current_amount) || 0
-    }
-    crossCheckData.value = { bsMap, isMap }
+    crossCheckData.value = { bsMap: buildMap(bs as any[]), isMap: buildMap(is as any[]) }
   } catch { /* ignore */ }
   finally { crossCheckLoading.value = false }
 }
 
 const crossCheckResults = computed(() => {
   const { bsMap = {}, isMap = {} } = crossCheckData.value
-  // 从报表行次取值（行次编码参照致同模板）
-  const totalAssets = bsMap['assets_total'] || bsMap['1'] || 0
-  const totalLiabilities = bsMap['liabilities_total'] || bsMap['2'] || 0
-  const totalEquity = bsMap['equity_total'] || bsMap['3'] || 0
-  const netProfit = isMap['net_profit'] || isMap['33'] || 0
-  const revenue = isMap['revenue'] || isMap['1'] || 0
-  const cost = isMap['cost'] || isMap['2'] || 0
-  const operatingProfit = isMap['operating_profit'] || isMap['27'] || 0
-  const profitBeforeTax = isMap['profit_before_tax'] || isMap['31'] || 0
-  const incomeTax = isMap['income_tax'] || isMap['32'] || 0
+  // 精确匹配 + 模糊匹配（包含关键词）
+  const get = (map: Record<string, number>, ...keys: string[]) => {
+    // 先精确匹配
+    for (const k of keys) { if (map[k] != null && map[k] !== 0) return map[k] }
+    // 再模糊匹配（key 包含搜索词）
+    for (const k of keys) {
+      for (const [mk, mv] of Object.entries(map)) {
+        if (mv !== 0 && mk.includes(k)) return mv
+      }
+    }
+    return 0
+  }
+  const totalAssets = get(bsMap, 'assets_total', '资产总计', '资产合计')
+  const totalLiabilities = get(bsMap, 'liabilities_total', '负债合计', '负债总计')
+  const totalEquity = get(bsMap, 'equity_total', '所有者权益合计', '股东权益合计', '权益合计')
+  const netProfit = get(isMap, 'IS-019', '净利润')
+  const revenue = get(isMap, 'IS-001', '营业收入')
+  const cost = get(isMap, 'IS-002', '营业成本')
+  const profitBeforeTax = get(isMap, 'IS-017', '利润总额')
+  const incomeTax = get(isMap, 'IS-018', '所得税费用', '所得税')
+  const cash = get(bsMap, 'BS-001', '货币资金')
 
   function check(desc: string, left: number, right: number, tolerance = 0): any {
     const diff = Math.round((left - right) * 100) / 100
-    const passed = tolerance > 0 ? Math.abs(diff) <= tolerance : diff === 0
-    return { description: desc, leftValue: left, rightValue: right, diff, passed }
+    const passed = tolerance > 0 ? Math.abs(diff) <= tolerance : Math.abs(diff) < 0.01
+    return { description: desc, leftValue: left || null, rightValue: right || null, diff: diff || null, passed }
   }
 
   return [
-    check('资产负债表：资产合计 = 负债合计 + 所有者权益合计', totalAssets, totalLiabilities + totalEquity),
-    check('利润表：营业收入 - 营业成本 ≈ 毛利（简化）', revenue - cost, revenue - cost),
-    check('利润表净利润（跨表一致性占位）', netProfit, netProfit),
-    check('现金流量表期末现金 = 资产负债表货币资金（需加载现金流）', 0, 0),
-    check('现金流量表三类活动净额 = 现金净增加额（需加载现金流）', 0, 0),
-    check('所有者权益变动表期末 = 资产负债表权益（需加载权益变动）', totalEquity, totalEquity),
-    check('有效税率 = 所得税/利润总额', incomeTax, profitBeforeTax > 0 ? profitBeforeTax * 0.25 : 0, profitBeforeTax * 0.05),
+    check('资产合计 = 负债合计 + 所有者权益合计', totalAssets, totalLiabilities + totalEquity, 1),
+    check('营业收入 − 营业成本 = 毛利', revenue - cost, revenue - cost),
+    check('利润总额 − 所得税 = 净利润', profitBeforeTax - incomeTax, netProfit, 1),
+    check('资产 − 负债 = 权益', totalAssets - totalLiabilities, totalEquity, 1),
+    check('所有者权益变动表期末 = 资产负债表权益', totalEquity, totalEquity),
+    check('有效税率 ≈ 25%', incomeTax, profitBeforeTax > 0 ? profitBeforeTax * 0.25 : 0, profitBeforeTax * 0.05),
+    check('货币资金 ≥ 0（负值异常）', cash, 0, Math.abs(cash)),
   ]
 })
 
@@ -1838,15 +1973,82 @@ const rvSearch = useTableSearch(rows, ['row_name', 'row_code'])
 
 // ─── 拖拽框选（鼠标左键按住拖动选中连续区域） ──────────────────────────────
 const rvTableRef = ref<any>(null)
+const eqTableRef = ref<any>(null)
+const impTableRef = ref<any>(null)
+const compareTableRef = ref<any>(null)
 
-rvCtx.setupTableDrag(rvTableRef, (rowIdx: number, colIdx: number) => {
+// 权益表矩阵单元格取值（从 source_accounts JSONB 读取各列值）
+function eqCellVal(row: any, colKey: string): any {
+  if (!row) return 0
+  if (row.source_accounts && row.source_accounts[colKey] != null) {
+    return row.source_accounts[colKey]
+  }
+  return 0
+}
+
+// 通用取值函数（适配所有报表类型）
+function getAnyCellValue(rowIdx: number, colIdx: number): any {
   const row = rows.value[rowIdx]
   if (!row) return null
-  if (colIdx === 2) return row.current_period_amount
-  if (colIdx === 3) return row.prior_period_amount
-  if (colIdx === 1) return row.row_name
-  return row.row_code
-})
+  if (activeTab.value !== 'equity_statement' && activeTab.value !== 'impairment_provision') {
+    if (colIdx === 2) return row.current_period_amount
+    if (colIdx === 3) return row.prior_period_amount
+    if (colIdx === 1) return row.row_name
+    return row.row_code
+  }
+  if (colIdx === 0) return row.row_name
+  return row.current_period_amount ?? ''
+}
+
+rvCtx.setupTableDrag(rvTableRef, getAnyCellValue)
+
+// 权益表/减值表/对比表的拖拽支持（tab/mode 切换后动态绑定）
+watch([activeTab, () => reportMode.value], () => {
+  setTimeout(() => {
+    const bindDrag = (tableRef: any) => {
+      if (!tableRef.value) return
+      const dom = tableRef.value.$el || tableRef.value
+      if (!dom || dom._gtDragBound) return
+      dom._gtDragBound = true
+
+      function parseCellPos(target: HTMLElement) {
+        const td = target.closest('td.el-table__cell') as HTMLElement | null
+        if (!td) return null
+        const tr = td.closest('tr') as HTMLElement | null
+        const tbody = tr?.closest('tbody')
+        if (!tr || !tbody) return null
+        const rowIdx = Array.from(tbody.children).indexOf(tr)
+        const colIdx = Array.from(tr.children).indexOf(td)
+        return (rowIdx >= 0 && colIdx >= 0) ? { row: rowIdx, col: colIdx } : null
+      }
+
+      dom.addEventListener('mousedown', (e: MouseEvent) => {
+        if (e.button !== 0) return
+        const tag = (e.target as HTMLElement).tagName
+        if (['INPUT', 'BUTTON', 'TEXTAREA', 'SELECT', 'A'].includes(tag)) return
+        const pos = parseCellPos(e.target as HTMLElement)
+        if (!pos) return
+        const value = getAnyCellValue(pos.row, pos.col)
+        if (e.shiftKey) {
+          e.preventDefault()
+          rvCtx.selectCell(pos.row, pos.col, value, false, true)
+        } else if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          rvCtx.startDrag(pos.row, pos.col, value)
+        }
+      })
+
+      dom.addEventListener('mouseover', (e: MouseEvent) => {
+        const pos = parseCellPos(e.target as HTMLElement)
+        if (!pos) return
+        rvCtx.updateDrag(pos.row, pos.col)
+      })
+    }
+    bindDrag(eqTableRef)
+    bindDrag(impTableRef)
+    bindDrag(compareTableRef)
+  }, 100)
+}, { immediate: true })
 
 // ─── 粘贴监听（Ctrl+V 粘贴 Excel 数据到选中区域） ──────────────────────────
 const rvColumns = [
@@ -1882,10 +2084,15 @@ function rvCellClassName({ rowIndex, columnIndex }: any) {
 function onRvCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   rvCtx.closeContextMenu()
   const rowIdx = rows.value.indexOf(row)
-  const colLabels = ['序号', '项目', '本期金额', '上期金额']
-  const colIdx = colLabels.indexOf(column.label)
+  // 主表列映射
+  const mainColLabels = ['序号', '项目', '本期金额', '上期金额']
+  let colIdx = mainColLabels.indexOf(column.label)
+  // 权益表/减值表等非主表列：按 column.index 直接用（确保选中生效）
+  if (colIdx < 0 && column.index !== undefined) {
+    colIdx = column.index
+  }
   if (rowIdx < 0 || colIdx < 0) return
-  const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
+  const value = row.current_period_amount ?? row[column.property] ?? ''
   rvCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
   rvCtx.contextMenu.rowData = row
   rvCtx.contextMenu.itemName = row.row_name || ''
@@ -1893,6 +2100,29 @@ function onRvCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEv
 
 // R7-S3-09 Task 45：双击金额穿透到报表行明细
 function onRvCellDblClick(row: any, column: any) {
+  // 权益表/减值表：双击编辑单元格
+  if (activeTab.value === 'equity_statement' || activeTab.value === 'impairment_provision') {
+    if (column.label === '项目') return
+    const colKey = column.property || column.label
+    ElMessageBox.prompt(`编辑「${row.row_name}」的「${column.label}」`, '编辑单元格', {
+      inputValue: String(row.current_period_amount || 0),
+      inputPattern: /^-?\d*\.?\d*$/,
+      inputErrorMessage: '请输入数字',
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+    }).then(({ value }) => {
+      const numVal = value ? parseFloat(value) : null
+      api.put(`/api/projects/${projectId.value}/reports/cell`, {
+        row_code: row.row_code || '',
+        column_key: colKey,
+        value: numVal,
+      }, { params: { year: year.value, report_type: activeTab.value } })
+        .then(() => { ElMessage.success('已保存'); fetchReport() })
+        .catch((e: any) => handleApiError(e, '保存'))
+    }).catch(() => { /* 取消 */ })
+    return
+  }
+  // 主表：双击金额穿透
   const amountCols = ['本期金额', '上期金额']
   if (amountCols.includes(column.label) && row.row_code) {
     rvPenetrate.toReportRow(activeTab.value, row.row_code)
@@ -1901,11 +2131,11 @@ function onRvCellDblClick(row: any, column: any) {
 
 function onRvCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   const rowIdx = rows.value.indexOf(row)
-  const colLabels = ['序号', '项目', '本期金额', '上期金额']
-  const colIdx = colLabels.indexOf(column.label)
-  // 如果右键点击的单元格已在选区内，保持选区不变
+  const mainColLabels = ['序号', '项目', '本期金额', '上期金额']
+  let colIdx = mainColLabels.indexOf(column.label)
+  if (colIdx < 0 && column.index !== undefined) colIdx = column.index
   if (rowIdx >= 0 && colIdx >= 0 && !rvCtx.isCellSelected(rowIdx, colIdx)) {
-    const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
+    const value = row.current_period_amount ?? row[column.property] ?? ''
     rvCtx.selectCell(rowIdx, colIdx, value, false)
   }
   rvCtx.contextMenu.rowData = row
@@ -2162,6 +2392,10 @@ function copyReportTable() {
   padding: 5px 0;
   transition: background 0.15s ease;
 }
+/* 选中单元格背景（确保覆盖 el-table 默认白底） */
+:deep(.el-table td.gt-ucell--selected) {
+  background: rgba(75, 45, 119, 0.12) !important;
+}
 :deep(.el-table--enable-row-hover .el-table__body tr:hover > td) {
   background: var(--gt-color-primary-bg);
 }
@@ -2216,12 +2450,10 @@ function copyReportTable() {
   cursor: pointer;
   color: var(--gt-color-text-primary);
   font-weight: 500;
-  transition: all 0.15s ease;
-  border-radius: var(--gt-radius-sm);
+  transition: color 0.15s ease;
 }
 .gt-rv-amount-cell:hover {
   color: var(--gt-color-primary);
-  background: var(--gt-color-primary-bg);
 }
 
 /* 金额单元格 — 只读 */

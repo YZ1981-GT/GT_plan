@@ -39,7 +39,9 @@
           <span>{{ node.client_name || '-' }}</span>
           <span class="gt-node-meta-right">
             <el-tag v-if="node.consol_lock" size="small" type="warning">🔒 已锁定</el-tag>
-            <GtStatusTag v-if="node.status !== 'created'" dict-key="project_status" :value="node.status" />
+            <el-tooltip v-if="node.status !== 'created'" :content="statusHint(node.status)" placement="top" :show-after="300">
+              <GtStatusTag dict-key="project_status" :value="node.status" style="cursor: help" />
+            </el-tooltip>
             <el-button
               class="gt-node-action-inline"
               :icon="EditPen"
@@ -108,6 +110,17 @@ defineEmits<{
 
 const expanded = ref(true)
 const hasChildren = computed(() => (props.node.children?.length ?? 0) > 0)
+
+function statusHint(s: string): string {
+  const tips: Record<string, string> = {
+    planning: '计划中：请导入账套并完成科目映射',
+    execution: '执行中：编制底稿、录入调整分录',
+    completion: '完成阶段：生成报表、复核底稿',
+    reporting: '报告阶段：编辑附注、出具报告',
+    archived: '已归档：项目已锁定',
+  }
+  return tips[s] || s
+}
 </script>
 
 <style scoped>

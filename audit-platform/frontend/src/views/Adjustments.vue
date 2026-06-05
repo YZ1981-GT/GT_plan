@@ -8,7 +8,7 @@
         :unit-value="selectedProjectId"
         :year-value="selectedYear"
         :badges="[
-          { value: `AJE ${summary?.aje_count || 0} 笔 · RJE ${summary?.rje_count || 0} 笔` },
+          { value: `审计调整 ${summary?.aje_count || 0} 笔 · 重分类 ${summary?.rje_count || 0} 笔` },
           ...(currentTemplateType ? [{ value: currentTemplateType === 'soe' ? '📘 国企版' : '📗 上市版', type: (currentTemplateType === 'soe' ? 'warning' : 'primary') as 'warning' | 'primary' }] : []),
         ]"
         @unit-change="onProjectChange"
@@ -85,12 +85,12 @@
     <!-- 汇总面板 -->
     <div class="gt-summary-panel" v-if="summary">
       <div class="gt-summary-card">
-        <span class="gt-summary-label">AJE</span>
+        <span class="gt-summary-label">审计调整</span>
         <span class="gt-summary-value">{{ summary.aje_count }} 笔</span>
         <span class="gt-summary-sub">借 {{ fmtAmt(summary.aje_total_debit) }} / 贷 {{ fmtAmt(summary.aje_total_credit) }}</span>
       </div>
       <div class="gt-summary-card">
-        <span class="gt-summary-label">RJE</span>
+        <span class="gt-summary-label">重分类</span>
         <span class="gt-summary-value">{{ summary.rje_count }} 笔</span>
         <span class="gt-summary-sub">借 {{ fmtAmt(summary.rje_total_debit) }} / 贷 {{ fmtAmt(summary.rje_total_credit) }}</span>
       </div>
@@ -104,8 +104,8 @@
     <div class="gt-adj-tabs-row">
       <el-tabs v-model="activeTab" class="gt-adj-tabs" @tab-change="onTabChange">
         <el-tab-pane label="全部" name="all" />
-        <el-tab-pane label="AJE" name="aje" />
-        <el-tab-pane label="RJE" name="rje" />
+        <el-tab-pane label="审计调整" name="aje" />
+        <el-tab-pane label="重分类" name="rje" />
       </el-tabs>
       <el-tooltip content="全屏查看（ESC 退出）" placement="bottom">
         <el-button size="small" plain class="gt-adj-fs-btn" @click="onToggleFullscreen">
@@ -384,20 +384,20 @@
       <el-form ref="adjFormRef" :model="form" :rules="adjFormRules" label-width="90px">
         <el-form-item label="类型" prop="adjustment_type" v-if="!isEditing">
           <el-radio-group v-model="form.adjustment_type">
-            <el-radio value="aje">AJE</el-radio>
-            <el-radio value="rje">RJE</el-radio>
+            <el-radio value="aje">审计调整</el-radio>
+            <el-radio value="rje">重分类</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="快捷模板" v-if="!isEditing">
           <el-select v-model="selectedTemplate" placeholder="选择常用模板快速填充" clearable size="small" style="width:100%" @change="onTemplateSelect">
-            <el-option-group label="AJE 常用">
+            <el-option-group label="审计调整常用">
               <el-option value="bad_debt" label="坏账准备计提" />
               <el-option value="depreciation" label="固定资产折旧" />
               <el-option value="amortization" label="无形资产摊销" />
               <el-option value="accrued_expense" label="预提费用" />
               <el-option value="revenue_cutoff" label="收入截止调整" />
             </el-option-group>
-            <el-option-group label="RJE 常用">
+            <el-option-group label="重分类常用">
               <el-option value="rcl_current_noncurrent" label="流动/非流动重分类" />
               <el-option value="rcl_ar_prepay" label="应收/预付重分类" />
               <el-option value="rcl_ap_advance" label="应付/预收重分类" />
@@ -877,7 +877,8 @@ function normalizeAdjustmentType(type: string) {
 }
 
 function formatAdjustmentType(type: string) {
-  return normalizeAdjustmentType(type).toUpperCase()
+  const n = normalizeAdjustmentType(type)
+  return n === 'aje' ? '审计调整' : '重分类'
 }
 
 async function ensureProjectYear() {

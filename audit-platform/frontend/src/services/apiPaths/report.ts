@@ -102,6 +102,7 @@ export const disclosureNotes = {
   validate: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/validate`,
   validationResults: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/validation-results`,
   refreshFromWorkpapers: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/refresh-from-workpapers`,
+  autoPull: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${encodeURIComponent(section)}/auto-pull`,
   clearFormulas: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/clear-formulas`,
   exportWord: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/export-word`,
   priorYear: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/prior-year`,

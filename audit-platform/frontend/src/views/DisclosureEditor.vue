@@ -441,46 +441,17 @@
     </el-dialog>
 
     <!-- 附注转换规则弹窗（国企↔上市） -->
-    <el-dialog v-model="showNoteMappingDialog" title="附注 国企版 ↔ 上市版 转换规则" width="75%" top="5vh" append-to-body destroy-on-close>
-      <p style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); margin-bottom: 10px;">
-        配置国企版与上市版附注章节的映射关系。切换模板类型时，系统将按此规则自动转换附注内容。
-      </p>
-      <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;">
-        <el-button size="small" @click="loadNoteMappingPreset" :loading="noteMappingLoading">一键加载预设</el-button>
-        <el-button size="small" type="primary" @click="saveNoteMappingRules" :loading="noteMappingLoading" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">保存规则</el-button>
-        <SharedTemplatePicker
-          config-type="report_mapping"
-          :project-id="projectId"
-          :get-config-data="getNoteMappingData"
-          @applied="onNoteMappingApplied"
-        />
-        <span style="flex: 1;" />
-        <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">{{ noteMappingRules.length }} 条规则</span>
-      </div>
-      <el-table :data="noteMappingRules" size="small" border max-height="55vh"
-        :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', whiteSpace: 'nowrap' }">
-        <el-table-column label="国企版章节" min-width="200">
-          <template #default="{ row }">
-            <span style="font-size: var(--gt-font-size-xs);">{{ row.soe_section }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="→" width="40" align="center">
-          <template #default><span style="color: var(--gt-color-text-placeholder);">→</span></template>
-        </el-table-column>
-        <el-table-column label="上市版章节" min-width="200">
-          <template #default="{ row }">
-            <el-input v-if="row._editing" v-model="row.listed_section" size="small" />
-            <span v-else style="font-size: var(--gt-font-size-xs);">{{ row.listed_section || '—' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="60" align="center">
-          <template #default="{ row }">
-            <span v-if="row.listed_section" style="color: var(--gt-color-success);">✓</span>
-            <span v-else style="color: var(--gt-color-text-placeholder);">—</span>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-dialog>
+    <NoteMappingDialog
+      v-model="showNoteMappingDialog"
+      :project-id="projectId"
+      :loading="noteMappingLoading"
+      :can-edit="canEdit"
+      :rules="noteMappingRules"
+      :get-mapping-data="getNoteMappingData"
+      @load-preset="loadNoteMappingPreset"
+      @save-rules="saveNoteMappingRules"
+      @mapping-applied="onNoteMappingApplied"
+    />
 
     <!-- 统一导入弹窗 -->
     <UnifiedImportDialog
@@ -747,13 +718,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, reactive } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
 import * as P from '@/services/apiPaths'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useCellSelection } from '@/composables/useCellSelection'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useEditMode } from '@/composables/useEditMode'
-import { useNavigationStack } from '@/composables/useNavigationStack'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
@@ -762,7 +732,6 @@ import TimeMachineDrawer from '@/components/time_machine/TimeMachineDrawer.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import ConsolBreakdownDialog from '@/components/consolidation/ConsolBreakdownDialog.vue'
 import TraceSourcePopover from '@/components/common/TraceSourcePopover.vue'
-import type { TraceSourceData } from '@/components/common/TraceSourcePopover.vue'
 import CellTraceDialog from '@/components/notes/CellTraceDialog.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
@@ -784,8 +753,8 @@ import StructureEditor from '@/components/formula/StructureEditor.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import NoteRichTextEditor from '@/components/NoteRichTextEditor.vue'
 import NotesPrintPreview from '@/components/notes/NotesPrintPreview.vue'
-import { refreshDisclosureFromWorkpapers, getProjectWizardState, noteAiRewrite, noteAiContinueWrite, noteAiGeneratePolicy, noteAiGenerateAnalysis } from '@/services/commonApi'
-import { useEditor, EditorContent } from '@tiptap/vue-3'
+import { refreshDisclosureFromWorkpapers, getProjectWizardState } from '@/services/commonApi'
+import { useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import { useAuthStore } from '@/stores/auth'
 
@@ -794,14 +763,14 @@ const authStore = useAuthStore()
 const isEqcrRole = computed(() => authStore.user?.role === 'eqcr')
 import Placeholder from '@tiptap/extension-placeholder'
 import {
-  generateDisclosureNotes, getDisclosureNoteTree, getDisclosureNoteDetail,
-  updateDisclosureNote, validateDisclosureNotes, getValidationResults,
-  type DisclosureNoteTreeItem, type DisclosureNoteDetail, type NoteValidationFinding,
+  generateDisclosureNotes, getDisclosureNoteDetail,
+  validateDisclosureNotes, getValidationResults,
+  type DisclosureNoteDetail, type NoteValidationFinding,
 } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
 import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
 import { useProjectStore } from '@/stores/project'
-import { useKnowledge, knowledgePickerVisible } from '@/composables/useKnowledge'
+import { knowledgePickerVisible } from '@/composables/useKnowledge'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { withLoading } from '@/composables/useLoading'
 import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue'
@@ -821,7 +790,15 @@ import NoteParagraphVarsEditor from '@/components/notes/NoteParagraphVarsEditor.
 import NotePriorYearPanel from '@/components/notes/NotePriorYearPanel.vue'
 import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
 import { useNoteSectionNumbering } from '@/composables/useNoteSectionNumbering'
+import { useNoteTree, type TreeNode } from '@/views/composables/useNoteTree'
+import { useNoteDetail } from '@/views/composables/useNoteDetail'
+import { useNotePersist } from '@/views/composables/useNotePersist'
+import { useNoteRefresh } from '@/views/composables/useNoteRefresh'
+import { useNoteTemplate } from '@/views/composables/useNoteTemplate'
+import { useNoteExport } from '@/views/composables/useNoteExport'
+import { useNoteAi } from '@/views/composables/useNoteAi'
 import { useAuditContext } from '@/composables/useAuditContext'
+import NoteMappingDialog from '@/views/components/NoteMappingDialog.vue'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
 import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
 import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
@@ -865,20 +842,13 @@ onDatasetRolledBack(() => fetchTree())
 import { useStaleStatus } from '@/composables/useStaleStatus'
 import StaleIndicator from '@/components/StaleIndicator.vue'
 const stale = useStaleStatus(projectId)
-async function onStaleRecalc() {
-  await stale.recalc()
-  await fetchTree()
-}
+// onStaleRecalc provided by useNoteRefresh composable below
 
 // Sprint 3 Task 3.6: 附注章节级 stale 状态追踪
 import { useNoteStale } from '@/composables/useNoteStale'
 const noteStale = useNoteStale(projectId)
 
-// Sprint 3 Task 3.1/3.5: 自定义附注模板薄层封装
-import {
-  addOrUpdateCustomSection,
-  removeCustomSection,
-} from '@/composables/useNoteCustomTemplate'
+// Sprint 3 Task 3.1/3.5: 自定义附注模板（now in useNoteSectionManage composable）
 
 const editLock = useEditingLock({
   resourceId: computed(() => 'disclosure_' + (route.params.projectId as string || '')),
@@ -919,56 +889,8 @@ function onYearChange() {
   currentNote.value = null
 }
 
-// 转换规则弹窗
-const showNoteMappingDialog = ref(false)
-const noteMappingLoading = ref(false)
-const noteMappingRules = ref<any[]>([])
-
-function loadNoteMappingPreset() {
-  // 从当前附注章节列表生成映射规则
-  noteMappingRules.value = noteList.value.map(n => ({
-    soe_section: `${n.note_section} ${n.section_title}`,
-    listed_section: `${n.note_section} ${n.section_title}`,  // 默认同名
-    _editing: false,
-  }))
-}
-
-function saveNoteMappingRules() {
-  ElMessage.success('转换规则已保存')
-  showNoteMappingDialog.value = false
-}
-
-function getNoteMappingData(): Record<string, any> {
-  return { note_mapping_rules: noteMappingRules.value }
-}
-
-function onNoteMappingApplied(data: Record<string, any>) {
-  const rules = data?.note_mapping_rules || []
-  if (rules.length) {
-    noteMappingRules.value = rules
-    ElMessage.success(`已引用 ${rules.length} 条映射规则`)
-  }
-}
-
-// ── 附注模板保存/引用 ──
-function getNoteTemplateConfigData(): Record<string, any> {
-  return {
-    template_type: templateType.value,
-    note_sections: noteList.value.map(n => ({
-      note_section: n.note_section,
-      section_title: n.section_title,
-    })),
-  }
-}
-
-function onNoteTemplateApplied(data: Record<string, any>) {
-  if (data?.template_type) {
-    templateType.value = data.template_type
-  }
-  // 重新加载附注树以应用模板
-  fetchTree()
-  ElMessage.success('附注模板已应用')
-}
+// templateType 提前声明：useNoteTemplate + useNoteTree 均依赖它
+const templateType = ref('soe')
 
 // 当前项目名称
 const currentProjectName = computed(() => {
@@ -977,8 +899,38 @@ const currentProjectName = computed(() => {
   return p?.name || ''
 })
 
-const treeLoading = ref(false)
-const detailLoading = ref(false)
+// C.3.11: 章节序号实时渲染
+const numbering = useNoteSectionNumbering(
+  () => projectId.value,
+  () => year.value
+)
+
+// ─── 章节树 composable（useNoteTree 抽取） ──────────────────────────────────
+const {
+  noteList, treeLoading, treeSearch, noteTreeRef, treeViewMode,
+  treeData, filteredTreeData, flatNoteList,
+  fetchTree, allowTreeDrop, onTreeNodeDrop, expandAll, collapseAll,
+} = useNoteTree({
+  projectId,
+  year,
+  templateType,
+  isEqcrRole,
+  onTreeLoaded: () => numbering.refreshNumbers(),
+})
+
+// ── 转换规则（useNoteTemplate composable 提供，须在 useNoteTree 之后，依赖 noteList/fetchTree） ──
+const {
+  showNoteMappingDialog, noteMappingLoading, noteMappingRules,
+  loadNoteMappingPreset, saveNoteMappingRules, getNoteMappingData, onNoteMappingApplied: onNoteMappingApplied,
+  getNoteTemplateConfigData, onNoteTemplateApplied,
+} = useNoteTemplate({
+  projectId,
+  templateType,
+  noteList,
+  fetchTree,
+  onGenerate,
+})
+
 const genLoading = ref(false)
 const showNoteImport = ref(false)
 const showOfflineExport = ref(false)
@@ -990,11 +942,6 @@ const showGroupBaseline = ref(false)
 const showParagraphVars = ref(false)
 const showPriorYear = ref(false)
 
-// C.3.11: 章节序号实时渲染
-const numbering = useNoteSectionNumbering(
-  () => projectId.value,
-  () => year.value
-)
 function getRenderedNumber(sectionId: string | undefined): string {
   if (!sectionId) return ''
   return numbering.getNumber(sectionId)
@@ -1004,50 +951,13 @@ function getRenderedNumber(sectionId: string | undefined): string {
 function onScopeChange(scope: 'standalone' | 'consolidated' | 'both') {
   numbering.setScope(scope)
 }
-
-// C.3.13: 章节树拖拽排序
-function allowTreeDrop(draggingNode: any, dropNode: any, type: 'prev' | 'next' | 'inner'): boolean {
-  // 不允许拖入分组节点（仅同级排序）
-  if (type === 'inner') return false
-  // 不允许拖到章节分组（isGroup）下方
-  if (dropNode.data?.isGroup) return false
-  // 必须同 parent
-  return draggingNode.parent?.data === dropNode.parent?.data
-}
-
-async function onTreeNodeDrop(draggingNode: any, dropNode: any, dropType: 'before' | 'after' | 'inner', _evt: DragEvent) {
-  if (dropType === 'inner') return
-  const sectionId = draggingNode.data?.data?.note_section
-  const targetId = dropNode.data?.data?.note_section
-  if (!sectionId || !targetId) return
-
-  try {
-    await api.put(
-      `/api/disclosure-notes/${projectId.value}/${year.value}/sections/${sectionId}/move`,
-      { target_section_id: targetId, position: dropType }
-    )
-    ElMessage.success('章节排序已更新')
-    // 刷新树以及章节序号
-    await fetchTree()
-  } catch (e: any) {
-    handleApiError(e, '排序')
-    // 刷新还原
-    await fetchTree()
-  }
-}
 const validateLoading = ref(false)
-const saveLoading = ref(false)
-const refreshLoading = ref(false)
-const exportLoading = ref(false)
+const detailLoading = ref(false)
 const showNoteFormulaManager = ref(false)
 const showStructureEditor = ref(false)
 const showPrintPreview = ref(false)
 
-// 底稿保存事件防抖同步
-let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
-const syncError = ref(false)
-
-// design §12.1: 同步时间相对显示格式化
+// design §12.1: 同步时间相对显示
 function formatSyncTime(iso: string | Date | null | undefined): string {
   if (!iso) return ''
   try {
@@ -1058,9 +968,7 @@ function formatSyncTime(iso: string | Date | null | undefined): string {
     if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
     if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
     return d.toLocaleString('zh-CN', { hour12: false })
-  } catch {
-    return String(iso)
-  }
+  } catch { return String(iso) }
 }
 
 const { isEditing: editMode, isDirty: editDirty, enterEdit, exitEdit, markDirty: markEditDirty, clearDirty: clearEditDirty } = useEditMode()
@@ -1073,8 +981,6 @@ watch(() => editMode.value, async (editing) => {
 watch(() => editLock.isMine.value, (mine) => {
   if (!mine && editMode.value) exitEdit()
 })
-const templateType = ref('soe')
-const justSaved = ref(false)
 const customTemplateId = ref('')
 const customTemplateName = ref('')
 const customTemplateVersion = ref('')
@@ -1091,7 +997,6 @@ const deTemplateOptions = computed(() => {
   return opts
 })
 
-const noteList = ref<DisclosureNoteTreeItem[]>([])
 const currentNote = ref<DisclosureNoteDetail | null>(null)
 const textContent = ref('')
 const validationFindings = ref<NoteValidationFinding[]>([])
@@ -1139,141 +1044,13 @@ const { clearDraft: clearAutoSaveDraft } = useAutoSave(
   { enabled: editMode },
 )
 
-// ── LLM 辅助状态 ──
-const aiLoading = ref(false)
-const aiRewriteDialogVisible = ref(false)
-const aiRewriteInstruction = ref('请改写以下文本，使其更加专业规范')
-const aiSelectedText = ref('')
-
-// ── 知识库上下文 [R3.7] ──
-const { pickDocuments, buildContext } = useKnowledge()
-const knowledgeContextText = ref('')
-const knowledgeDocCount = ref(0)
-
-async function onPickKnowledge() {
-  const docs = await pickDocuments({ title: '选择参考文档（AI续写/改写时使用）', maxSelect: 5 })
-  if (docs.length) {
-    knowledgeContextText.value = await buildContext(docs)
-    knowledgeDocCount.value = docs.length
-    ElMessage.success(`已加载 ${docs.length} 篇参考文档`)
-  }
-}
-
-function clearKnowledgeContext() {
-  knowledgeContextText.value = ''
-  knowledgeDocCount.value = 0
-}
-
-function getSelectedText(): string {
-  if (!editor.value) return ''
-  const { from, to } = editor.value.state.selection
-  if (from === to) return ''
-  return editor.value.state.doc.textBetween(from, to, ' ')
-}
-
-function getFullText(): string {
-  return editor.value?.getText() || ''
-}
-
-async function onAiContinueWrite() {
-  const text = getFullText()
-  if (!text.trim()) { ElMessage.warning('请先输入一些内容再续写'); return }
-  aiLoading.value = true
-  try {
-    const res = await noteAiContinueWrite(projectId.value, {
-      text,
-      section_number: currentNote.value?.note_section || '',
-      year: year.value,
-      knowledge_context: knowledgeContextText.value || undefined,
-    })
-    if (res.error) { ElMessage.warning(res.error); return }
-    if (res.appended) {
-      editor.value?.commands.insertContent(res.appended)
-      ElMessage.success('续写完成')
-    }
-  } catch (e: any) {
-    handleApiError(e, 'AI续写')
-  } finally {
-    aiLoading.value = false
-  }
-}
-
-function onAiRewriteOpen() {
-  const sel = getSelectedText()
-  if (!sel.trim()) { ElMessage.warning('请先选中要改写的文本'); return }
-  aiSelectedText.value = sel
-  aiRewriteInstruction.value = '请改写以下文本，使其更加专业规范'
-  aiRewriteDialogVisible.value = true
-}
-
-async function onAiRewriteConfirm() {
-  if (!aiSelectedText.value.trim()) return
-  aiLoading.value = true
-  try {
-    const res = await noteAiRewrite(projectId.value, {
-      text: aiSelectedText.value,
-      instruction: aiRewriteInstruction.value,
-      section_number: currentNote.value?.note_section || '',
-      year: year.value,
-      knowledge_context: knowledgeContextText.value || undefined,
-    })
-    if (res.error) { ElMessage.warning(res.error); return }
-    if (res.rewritten && res.rewritten !== res.original) {
-      // 替换选中文本
-      const { from, to } = editor.value!.state.selection
-      editor.value!.chain().focus().deleteRange({ from, to }).insertContent(res.rewritten).run()
-      ElMessage.success('改写完成')
-    }
-  } catch (e: any) {
-    handleApiError(e, 'AI改写')
-  } finally {
-    aiLoading.value = false
-    aiRewriteDialogVisible.value = false
-  }
-}
-
-async function onAiGeneratePolicy() {
-  aiLoading.value = true
-  try {
-    const res = await noteAiGeneratePolicy(projectId.value, {
-      section_number: currentNote.value?.note_section || '',
-      template_type: templateType.value || 'soe',
-      year: year.value,
-    })
-    if (res.generated_text) {
-      editor.value?.commands.setContent(res.generated_text)
-      ElMessage.success(`会计政策已生成（参照${res.reference_count}篇文档）`)
-    }
-  } catch (e: any) {
-    handleApiError(e, '生成会计政策')
-  } finally {
-    aiLoading.value = false
-  }
-}
-
-async function onAiGenerateAnalysis() {
-  aiLoading.value = true
-  try {
-    const res = await noteAiGenerateAnalysis(projectId.value, {
-      section_number: currentNote.value?.note_section || '',
-      year: year.value,
-    })
-    if (res.generated_text) {
-      editor.value?.commands.insertContent('\n\n' + res.generated_text)
-      ElMessage.success('变动分析已生成')
-    }
-  } catch (e: any) {
-    handleApiError(e, '生成变动分析')
-  } finally {
-    aiLoading.value = false
-  }
-}
-interface TreeNode { id: string; label: string; data?: any; children?: TreeNode[]; isGroup?: boolean }
-
-const treeSearch = ref('')
-const noteTreeRef = ref<any>(null)
-const treeViewMode = ref<'tree' | 'flat'>('tree')
-
+// ── AI 功能（useNoteAi composable）──
+const {
+  aiLoading, aiRewriteDialogVisible, aiRewriteInstruction, aiSelectedText,
+  knowledgeContextText, knowledgeDocCount,
+  onAiContinueWrite, onAiRewriteOpen, onAiRewriteConfirm,
+  onAiGeneratePolicy, onAiGenerateAnalysis, onPickKnowledge, clearKnowledgeContext, getSelectedText,
+} = useNoteAi({ projectId, year, templateType, currentNote, editor })
 // 单位切换（侧边栏）
 const selectedProjectIdLocal = ref('')
 
@@ -1283,219 +1060,9 @@ function onSwitchProjectLocal(newId: string) {
   }
 }
 
-function expandAll() {
-  const tree = noteTreeRef.value
-  if (!tree) return
-  const nodes = tree.store?.nodesMap
-  if (nodes) {
-    Object.values(nodes).forEach((node: any) => { node.expanded = true })
-  }
-}
-
-function collapseAll() {
-  const tree = noteTreeRef.value
-  if (!tree) return
-  const nodes = tree.store?.nodesMap
-  if (nodes) {
-    Object.values(nodes).forEach((node: any) => { node.expanded = false })
-  }
-}
-
-// 平铺视图数据
-const flatNoteList = computed(() => {
-  const kw = treeSearch.value.toLowerCase()
-  let list = noteList.value
-  if (kw) {
-    list = list.filter(n => (n.section_title || '').toLowerCase().includes(kw) || (n.note_section || '').toLowerCase().includes(kw))
-  }
-  return list
-})
-
 function onFlatItemClick(note: any) {
   currentNote.value = note
 }
-
-// 按大类分组的树形结构
-const CHAPTER_GROUPS = [
-  { prefix: '一' },
-  { prefix: '二' },
-  { prefix: '三' },
-  { prefix: '四' },
-  { prefix: '五' },
-  { prefix: '六' },
-  { prefix: '七' },
-  { prefix: '八' },
-  { prefix: '九' },
-  { prefix: '十' },
-  { prefix: '十一' },
-  { prefix: '十二' },
-  { prefix: '十三' },
-  { prefix: '十四' },
-  { prefix: '十五' },
-  { prefix: '十六' },
-  { prefix: '十七' },
-]
-
-// 国企版14章标题
-const SOE_LABELS: Record<string, string> = {
-  '一': '公司基本情况', '二': '财务报表编制基础', '三': '遵循企业会计准则的声明',
-  '四': '重要会计政策、会计估计', '五': '会计政策变更及差错更正', '六': '税项',
-  '七': '企业合并及合并财务报表', '八': '财务报表主要项目注释',
-  '九': '或有事项', '十': '资产负债表日后事项', '十一': '关联方关系及其交易',
-  '十二': '母公司财务报表附注', '十三': '其他披露内容', '十四': '财务报表之批准',
-}
-// 上市版17章标题
-const LISTED_LABELS: Record<string, string> = {
-  '一': '公司基本情况', '二': '财务报表的编制基础', '三': '重要会计政策及会计估计',
-  '四': '税项', '五': '合并财务报表项目附注', '六': '研发支出',
-  '七': '在其他主体中的权益', '八': '政府补助', '九': '金融工具风险管理',
-  '十': '公允价值', '十一': '关联方及关联交易', '十二': '股份支付',
-  '十三': '承诺及或有事项', '十四': '资产负债表日后事项', '十五': '其他重要事项',
-  '十六': '公司财务报表主要项目注释', '十七': '补充资料',
-}
-
-// 五章内按资产/负债/权益/损益/其他分组
-const SECTION_GROUPS: Record<string, { label: string; range: [number, number] }> = {
-  'asset': { label: '流动资产 + 非流动资产', range: [1, 15] },
-  'liability': { label: '流动负债 + 非流动负债', range: [16, 23] },
-  'equity': { label: '所有者权益', range: [24, 28] },
-  'income': { label: '损益类', range: [29, 35] },
-  'other': { label: '其他科目注释', range: [36, 79] },
-  'disclosure': { label: '补充披露事项', range: [80, 199] },
-}
-
-const treeData = computed<TreeNode[]>(() => {
-  const notes = noteList.value
-  if (!notes.length) return []
-
-  const result: TreeNode[] = []
-
-  // 会计政策分组关键词
-  const POLICY_GROUPS: Record<string, { label: string; keywords: string[] }> = {
-    'basic': { label: '基础政策', keywords: ['会计期间', '记账本位币', '记账基础', '现金及现金等价物', '公允价值', '营业周期', '遵循'] },
-    'consolidation': { label: '合并与合营', keywords: ['企业合并', '合并财务报表', '合营安排', '同一控制', '非同一控制', '控制的判断', '子公司'] },
-    'financial': { label: '金融工具与外币', keywords: ['金融工具', '套期', '外币', '应付债券', '优先股', '永续债', '资产证券化'] },
-    'asset': { label: '资产类政策', keywords: ['存货', '长期股权', '投资性房地产', '固定资产', '在建工程', '生物资产', '油气资产', '使用权资产', '无形资产', '研究开发', '长期待摊', '资产减值', '借款费用', '商誉'] },
-    'liability_income': { label: '负债与收入', keywords: ['职工薪酬', '股份支付', '预计负债', '收入', '合同成本', '合同履约', '政府补助', '递延所得税', '安全生产', '应付债券'] },
-    'lease_other': { label: '租赁与其他', keywords: ['租赁', '持有待售', '终止经营'] },
-  }
-
-  // 企业合并分组关键词
-  const MERGE_GROUPS: Record<string, { label: string; keywords: string[] }> = {
-    'scope': { label: '合并范围', keywords: ['纳入合并', '不再纳入', '新纳入', '子公司基本'] },
-    'control': { label: '控制与表决权', keywords: ['表决权不足', '直接或通过', '非全资', '所有者权益份额'] },
-    'transaction': { label: '合并交易', keywords: ['同一控制下企业合并', '非同一控制下企业合并', '吸收合并'] },
-    'restriction': { label: '限制与结构化主体', keywords: ['重大限制', '结构化主体', '转移资金'] },
-  }
-
-  // 关联方分组关键词
-  const RELATED_GROUPS: Record<string, { label: string; keywords: string[] }> = {
-    'party': { label: '关联方情况', keywords: ['母公司', '子公司情况', '合营企业', '联营企业', '其他关联方'] },
-    'transaction': { label: '关联交易', keywords: ['关联交易', '应收应付'] },
-  }
-
-  // 通用分组函数
-  function buildGroupedChildren(items: typeof notes, groups: Record<string, { label: string; keywords: string[] }>, idPrefix: string): TreeNode[] {
-    const children: TreeNode[] = []
-    const used = new Set<string>()
-    for (const [gk, gv] of Object.entries(groups)) {
-      const matched = items.filter(n => gv.keywords.some(kw => (n.section_title || '').includes(kw)))
-      if (matched.length) {
-        matched.forEach(n => used.add(n.id))
-        children.push({ id: `${idPrefix}_${gk}`, label: gv.label, isGroup: true,
-          children: matched.map(n => ({ id: n.id, label: n.section_title, data: n })) })
-      }
-    }
-    const ungrouped = items.filter(n => !used.has(n.id))
-    if (ungrouped.length) {
-      children.push({ id: `${idPrefix}_other`, label: '其他', isGroup: true,
-        children: ungrouped.map(n => ({ id: n.id, label: n.section_title, data: n })) })
-    }
-    return children
-  }
-
-  for (const ch of CHAPTER_GROUPS) {
-    const prefix = ch.prefix + '、'
-    const items = notes.filter(n => n.note_section.startsWith(prefix))
-    if (!items.length) continue  // 空章节不显示
-
-    // 动态获取章节标题（根据模板类型）
-    const labels = templateType.value === 'listed' ? LISTED_LABELS : SOE_LABELS
-    const chLabel = `${ch.prefix}、${labels[ch.prefix] || items[0]?.section_title || ''}`
-
-    // 会计政策（国企四/上市三）：>10个子章节时分组
-    if ((ch.prefix === '三' || ch.prefix === '四') && items.length > 10) {
-      result.push({ id: `chapter_${ch.prefix}`, label: `${chLabel}（${items.length}）`, isGroup: true,
-        children: buildGroupedChildren(items, POLICY_GROUPS, `ch_${ch.prefix}`) })
-
-    // 报表注释（国企八/上市五）：按资产/负债/权益/损益分组
-    } else if ((ch.prefix === '五' || ch.prefix === '八') && items.length > 10) {
-      const subChildren: TreeNode[] = []
-      for (const [gKey, gInfo] of Object.entries(SECTION_GROUPS)) {
-        const matched = items.filter(n => {
-          const num = parseInt(n.note_section.replace(prefix, ''))
-          return num >= gInfo.range[0] && num <= gInfo.range[1]
-        })
-        if (matched.length) {
-          subChildren.push({ id: `group_${ch.prefix}_${gKey}`, label: gInfo.label, isGroup: true,
-            children: matched.map(n => ({ id: n.id, label: n.section_title, data: n })) })
-        }
-      }
-      result.push({ id: `chapter_${ch.prefix}`, label: `${chLabel}（${items.length}）`, isGroup: true, children: subChildren })
-
-    // 企业合并（国企七）：>5个子章节时分组
-    } else if (ch.prefix === '七' && items.length > 5) {
-      result.push({ id: `chapter_${ch.prefix}`, label: `${chLabel}（${items.length}）`, isGroup: true,
-        children: buildGroupedChildren(items, MERGE_GROUPS, 'ch7') })
-
-    // 关联方（国企十一/上市十一）：>3个子章节时分组
-    } else if (ch.prefix === '十一' && items.length > 3) {
-      result.push({ id: `chapter_${ch.prefix}`, label: `${chLabel}（${items.length}）`, isGroup: true,
-        children: buildGroupedChildren(items, RELATED_GROUPS, 'ch11') })
-
-    // 其他章节：直接平铺
-    } else {
-      result.push({
-        id: `chapter_${ch.prefix}`,
-        label: items.length > 3 ? `${chLabel}（${items.length}）` : chLabel,
-        isGroup: true,
-        children: items.map(n => ({ id: n.id, label: n.section_title, data: n })),
-      })
-    }
-  }
-
-  return result
-})
-
-const filteredTreeData = computed(() => {
-  const kw = treeSearch.value.toLowerCase()
-  if (!kw) return treeData.value
-  // 搜索时展平到叶子节点过滤
-  return treeData.value.map(group => {
-    if (!group.children?.length) return group
-    const filtered = group.children.map(child => {
-      if (child.children) {
-        // 二级分组
-        const subFiltered = child.children.filter(n =>
-          (n.label || '').toLowerCase().includes(kw) || (n.data?.account_name || '').toLowerCase().includes(kw)
-        )
-        return subFiltered.length ? { ...child, children: subFiltered } : null
-      }
-      // 叶子节点
-      return (child.label || '').toLowerCase().includes(kw) || (child.data?.account_name || '').toLowerCase().includes(kw) ? child : null
-    }).filter(Boolean) as TreeNode[]
-    return filtered.length ? { ...group, children: filtered } : null
-  }).filter(Boolean) as TreeNode[]
-})
-
-const _templateTypeLabel = computed(() => {
-  if (templateType.value === 'custom') {
-    return customTemplateVersion.value && customTemplateName.value
-      ? `自定义：${customTemplateName.value}（${customTemplateVersion.value}）`
-      : customTemplateName.value || '自定义模板'
-  }
-  return templateType.value === 'listed' ? '上市版' : '国企版'
-})
 
 // 多表格支持
 const activeTableTab = ref('0')
@@ -1562,14 +1129,6 @@ function getCellMode(row: any, colIdx: number): string {
   return ''
 }
 
-function _getPriorYearValue(_row: any, rowIndex: number): any {
-  if (!priorYearNote.value?.table_data?.rows) return null
-  const priorRow = priorYearNote.value.table_data.rows[rowIndex]
-  if (!priorRow) return null
-  const values = priorRow.values || priorRow.cells || []
-  return values[0] ?? null
-}
-
 function onCellValueChange(rowIndex: number, colIndex: number, _newValue: number | undefined) {
   markEditDirty()
   autoSave.markDirty()
@@ -1617,42 +1176,19 @@ function isFormulaMismatch(row: any, colIdx: number): boolean {
   return Math.abs(expected - actual) > 0.01
 }
 
-async function onRefreshFromWP() {
-  refreshLoading.value = true
-  try {
-    await refreshDisclosureFromWorkpapers(projectId.value, year.value)
-    ElMessage.success('已从底稿刷新数据')
-    if (currentNote.value) await fetchDetail(currentNote.value.note_section)
-  } catch (e) { handleApiError(e, '刷新附注') }
-  finally { refreshLoading.value = false }
-}
-
-// ── 底稿保存事件监听（自动同步附注数据） ──────────────────────────────────────
-function onWorkpaperSaved(payload: WorkpaperSavedPayload) {
-  if (payload.projectId !== projectId.value) return
-  if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
-  syncDebounceTimer = setTimeout(async () => {
-    syncError.value = false
-    try {
-      await refreshDisclosureFromWorkpapers(projectId.value, year.value)
-      if (currentNote.value) await fetchDetail(currentNote.value.note_section)
-    } catch {
-      syncError.value = true
-    }
-  }, 1000)
-}
-
-async function onManualRefresh() {
-  syncError.value = false
-  try {
-    await refreshDisclosureFromWorkpapers(projectId.value, year.value)
-    if (currentNote.value) await fetchDetail(currentNote.value.note_section)
-    ElMessage.success('手动刷新成功')
-  } catch (e) {
-    syncError.value = true
-    handleApiError(e, '刷新附注')
-  }
-}
+// ── 刷新功能（useNoteRefresh composable）──
+const {
+  refreshLoading, syncError,
+  onRefreshFromWP, onManualRefresh, onStaleRecalc,
+  showRefreshResultMessage, onWorkpaperSaved,
+} = useNoteRefresh({
+  projectId,
+  year,
+  currentNote,
+  fetchDetail,
+  fetchTree,
+  staleRecalc: () => stale.recalc(),
+})
 
 async function onFormulaApplied() {
   // 公式应用后刷新当前附注数据
@@ -1708,127 +1244,14 @@ async function onCustomTemplateRestored(payload: { version: number }) {
   await fetchTree()
 }
 
-// ─── Sprint 3 Task 3.1: 新增章节 dialog 状态 ────────────────────────────────
-
-const showAddSectionDialog = ref(false)
-const addSectionLoading = ref(false)
-const addSectionForm = ref<{ section_number: string; section_title: string; account_name: string; sort_order: number }>({
-  section_number: '',
-  section_title: '',
-  account_name: '',
-  sort_order: 9000,
-})
-
-function openAddSectionDialog() {
-  addSectionForm.value = {
-    section_number: '',
-    section_title: '',
-    account_name: '',
-    sort_order: 9000,
-  }
-  showAddSectionDialog.value = true
-}
-
-async function onAddSectionConfirm() {
-  const form = addSectionForm.value
-  if (!form.section_number.trim()) {
-    ElMessage.warning('请填写章节编号（如：五、X1）')
-    return
-  }
-  if (!form.section_title.trim()) {
-    ElMessage.warning('请填写章节标题')
-    return
-  }
-  addSectionLoading.value = true
-  try {
-    const newSection = {
-      section_number: form.section_number.trim(),
-      section_title: form.section_title.trim(),
-      account_name: form.account_name.trim() || form.section_title.trim(),
-      sort_order: form.sort_order,
-      _custom: true,
-    }
-    await addOrUpdateCustomSection(projectId.value, newSection)
-    ElMessage.success(`已新增章节「${form.section_title}」`)
-    showAddSectionDialog.value = false
-    await fetchTree()
-  } catch (e: any) {
-    handleApiError(e, '新增章节失败')
-  } finally {
-    addSectionLoading.value = false
-  }
-}
-
-// ─── Sprint 3 Task 3.5/3.6: 章节列表右键菜单 ────────────────────────────────
-
-const treeContextMenu = reactive<{ visible: boolean; x: number; y: number; section: any | null }>({
-  visible: false,
-  x: 0,
-  y: 0,
-  section: null,
-})
-
-function onTreeNodeContextMenu(event: Event, data: any, _node?: any, _nodeInstance?: any) {
-  // 分组节点不开右键菜单
-  if (!data || data.isGroup || !data.data?.note_section) return
-  const mouseEvent = event as MouseEvent
-  mouseEvent.preventDefault()
-  treeContextMenu.visible = true
-  treeContextMenu.x = mouseEvent.clientX
-  treeContextMenu.y = mouseEvent.clientY
-  treeContextMenu.section = data.data
-}
-
-function _closeTreeContextMenu() {
-  treeContextMenu.visible = false
-  treeContextMenu.section = null
-}
-
-async function onTreeCtxRecalc() {
-  const sec = treeContextMenu.section
-  _closeTreeContextMenu()
-  if (!sec?.note_section) return
-  try {
-    // R2.1：调用现有"从底稿刷新"端点，再 dismiss 红点
-    await refreshDisclosureFromWorkpapers(projectId.value, year.value)
-    noteStale.dismissStale(sec.note_section)
-    ElMessage.success(`章节「${sec.section_title || sec.note_section}」已重算`)
-    if (currentNote.value?.note_section === sec.note_section) {
-      await fetchDetail(sec.note_section)
-    }
-  } catch (e: any) {
-    handleApiError(e, '重算章节失败')
-  }
-}
-
-async function onTreeCtxDeleteCustom() {
-  const sec = treeContextMenu.section
-  _closeTreeContextMenu()
-  if (!sec?.note_section || !sec?._custom) {
-    ElMessage.warning('仅可删除自定义章节')
-    return
-  }
-  try {
-    const { confirmDangerous } = await import('@/utils/confirm')
-    await confirmDangerous(
-      `确认删除自定义章节「${sec.section_title || sec.note_section}」？历史快照保留 30 天，可在「📜 版本历史」回滚。`,
-      '删除自定义章节',
-    )
-  } catch {
-    return // 用户取消
-  }
-  try {
-    const result = await removeCustomSection(projectId.value, sec.note_section)
-    if (result === null) {
-      ElMessage.warning('当前自定义模板未包含此章节（可能已被删除）')
-      return
-    }
-    ElMessage.success(`已删除自定义章节「${sec.section_title || sec.note_section}」`)
-    await fetchTree()
-  } catch (e: any) {
-    handleApiError(e, '删除自定义章节失败')
-  }
-}
+// ─── 章节管理（useNoteSectionManage composable）──────────────────────────────
+import { useNoteSectionManage } from '@/views/composables/useNoteSectionManage'
+const {
+  showAddSectionDialog, addSectionLoading, addSectionForm,
+  openAddSectionDialog, onAddSectionConfirm,
+  treeContextMenu, onTreeNodeContextMenu, closeTreeContextMenu: _closeTreeContextMenu,
+  onTreeCtxRecalc, onTreeCtxDeleteCustom,
+} = useNoteSectionManage({ projectId, year, currentNote, fetchTree, fetchDetail, noteStale })
 
 // ── 打印预览 (Req 41.1-41.5) ──
 const printPreviewSections = computed(() => {
@@ -1881,42 +1304,13 @@ async function onRestoreAutoMode() {
   }
 }
 
-async function onExportWord() {
-  exportLoading.value = true
-  try {
-    const { default: http } = await import('@/utils/http')
-    const resp = await http.post(
-      P.disclosureNotes.exportWord(projectId.value, year.value),
-      {},
-      { responseType: 'blob' }
-    )
-    // 下载 blob
-    const blob = new Blob([resp.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `附注_${year.value}.docx`
-    a.click()
-    URL.revokeObjectURL(url)
-    ElMessage.success('附注 Word 导出成功')
-  } catch (e: any) {
-    handleApiError(e, '导出附注 Word')
-  } finally { exportLoading.value = false }
-}
+// ── 导出功能（useNoteExport composable）──
+const { exportLoading, onExportWord } = useNoteExport({ projectId, year })
 
 function severityTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { error: 'danger', warning: 'warning', info: 'info' }
   return m[s] || 'info'
 }
-
-const fetchTree = withLoading(treeLoading, async () => {
-  try {
-    noteList.value = await getDisclosureNoteTree(projectId.value, year.value)
-    // C.3.11: 刷新章节序号
-    numbering.refreshNumbers()
-  }
-  catch { noteList.value = [] }
-})
 
 async function loadProjectTemplateConfig() {
   try {
@@ -1953,7 +1347,6 @@ async function fetchDetail(noteSection: string) {
   currentNote.value = await getDisclosureNoteDetail(projectId.value, year.value, noteSection)
   textContent.value = currentNote.value.text_content || ''
   if (editor.value) {
-    // 将纯文本段落转为HTML段落供TipTap渲染
     const raw = textContent.value
     if (raw && !raw.startsWith('<')) {
       const html = raw.split(/\n\n+/).filter(Boolean).map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
@@ -1982,22 +1375,9 @@ async function onGenerate() {
   }
   const { showGuide } = await import('@/composables/useWorkflowGuide')
   const tplLabel = templateType.value === 'listed' ? '上市版' : '国企版'
-  const ok = await showGuide(
-    'note_generate',
-    '📝 生成附注',
-    `<div style="line-height:1.8;font-size: var(--gt-font-size-sm)">
-      <p>将根据 <b>${tplLabel}</b> 模板生成全部附注章节。</p>
-      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">请确认以下准备工作已完成：</p>
-      <ul style="padding-left:18px;margin:4px 0">
-        <li><span style="color: var(--gt-color-wheat)">⚠</span> 已选择正确的模板类型（当前：${tplLabel}）</li>
-        <li><span style="color: var(--gt-color-wheat)">⚠</span> 建议先完成报表生成，附注表格将自动从试算表取数</li>
-        <li><span style="color: var(--gt-color-wheat)">⚠</span> 如有上年附注，建议先上传到知识库供 AI 参照</li>
-      </ul>
-      <p style="color: var(--gt-color-success);font-size: var(--gt-font-size-xs);margin-top:6px">✓ 将生成 170+ 个附注章节（含表格和正文），已有数据将被重新生成</p>
-      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs)">💡 生成后可使用 AI 续写/改写功能辅助编写会计政策等文字内容</p>
-    </div>`,
-    '开始生成',
-  )
+  const ok = await showGuide('note_generate', '📝 生成附注',
+    `<div style="line-height:1.8;font-size:var(--gt-font-size-sm)"><p>将根据 <b>${tplLabel}</b> 模板生成全部附注章节。</p><p style="color:var(--gt-color-info);font-size:var(--gt-font-size-xs);margin-top:6px">请确认以下准备工作已完成：</p><ul style="padding-left:18px;margin:4px 0"><li>⚠ 已选择正确的模板类型（当前：${tplLabel}）</li><li>⚠ 建议先完成报表生成</li><li>⚠ 如有上年附注，建议先上传到知识库供 AI 参照</li></ul><p style="color:var(--gt-color-success);font-size:var(--gt-font-size-xs);margin-top:6px">✓ 将生成 170+ 个附注章节</p></div>`,
+    '开始生成')
   if (!ok) return
   await withLoading(genLoading, async () => {
     try {
@@ -2011,6 +1391,7 @@ async function onGenerate() {
   })()
 }
 
+// ── 模板切换（已定义在 useNoteTemplate 中但此处保留简化版调用 onGenerate）──
 async function handleTemplateChange(value: string) {
   if (value === 'custom' && !customTemplateId.value) {
     ElMessage.warning('当前项目未绑定自定义附注模板，请先在项目基本信息中选择')
@@ -2026,27 +1407,15 @@ const onValidate = withLoading(validateLoading, async () => {
   ElMessage.success(`校验完成，发现 ${validationFindings.value.length} 项`)
 })
 
-async function onSave() {
-  if (!currentNote.value) return
-  await withLoading(saveLoading, async () => {
-    const body: Record<string, any> = {}
-    if (currentNote.value!.content_type === 'text' || currentNote.value!.content_type === 'mixed') {
-      body.text_content = textContent.value
-    }
-    if (currentNote.value!.content_type === 'table' || currentNote.value!.content_type === 'mixed') {
-      body.table_data = currentNote.value!.table_data
-    }
-    await updateDisclosureNote(currentNote.value!.id, body)
-    ElMessage.success('保存成功')
-    editMode.value = false
-    clearEditDirty()
-    autoSave.clearDirty()
-    clearAutoSaveDraft()
-    currentNote.value!.status = 'confirmed'
-    justSaved.value = true
-    setTimeout(() => { justSaved.value = false }, 2500)
-  })()
-}
+// ── 保存功能（useNotePersist composable）──
+const { saveLoading, justSaved, onSave } = useNotePersist({
+  currentNote,
+  textContent,
+  editMode,
+  clearEditDirty,
+  autoSaveClearDirty: () => autoSave.clearDirty(),
+  clearAutoSaveDraft,
+})
 
 /** 快捷键保存：保存当前附注 */
 function onShortcutSave() {
@@ -2158,7 +1527,6 @@ onUnmounted(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   window.removeEventListener('click', _closeTreeContextMenu)
   window.removeEventListener('contextmenu', _onWindowContextMenuFallback)
-  if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
 })
 
 // 右键菜单点开后，再次右键于其他位置 → 关闭旧菜单（el-tree 已自行 emit
@@ -2222,8 +1590,6 @@ deCtx.setupTableDrag(deTableRef, (rowIdx: number, colIdx: number) => {
 const deComments = useCellComments(() => projectId.value, () => year.value, 'disclosure')
 
 const displayPrefs = useDisplayPrefsStore()
-/** 格式化金额（跟随全局单位设置） */
-const fmt = (v: any) => displayPrefs.fmt(v)
 
 // ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
 const deSearch = useTableSearch(
@@ -2287,15 +1653,9 @@ const trustScorePanelRef = ref<InstanceType<typeof TrustScorePanel> | null>(null
 // V3 Req 10.4: 可解释状态机
 const smPanelRef = ref<InstanceType<typeof StatusMachinePanel> | null>(null)
 const disclosureInstanceId = ref('')
-function openStatusMachine() {
-  smPanelRef.value?.open()
-}
 
 // V3 Req 11.6: 时光机
 const tmDrawerRef = ref<InstanceType<typeof TimeMachineDrawer> | null>(null)
-function openTimeMachine() {
-  tmDrawerRef.value?.open()
-}
 function onTimeMachineRestored(_snap: any) {
   window.location.reload()
 }
@@ -2322,211 +1682,17 @@ function onDeCtxCompare() {
   ElMessage.info(`差异：${fmtAmount(diff)}`)
 }
 
-/**
- * R8-S2-12：查看附注行关联的底稿
- * 单底稿直接跳转，多底稿弹列表让用户选择
- */
-async function onDeCtxRelatedWp() {
-  deCtx.closeContextMenu()
-  const note = currentNote.value
-  if (!note?.note_section) {
-    ElMessage.warning('请先选择附注章节')
-    return
-  }
-  // 用当前选中单元格所在行作为 row_code（简化：用行 index 或项目名）
-  const sel = deCtx.selectedCells.value[0]
-  if (!sel) return
-  const rowCode = `row_${sel.row}`
-  try {
-    const data: any = await api.get(
-      P.disclosureNotes.relatedWorkpapers(projectId.value, year.value, note.note_section, rowCode),
-      { validateStatus: (s: number) => s < 600 },
-    )
-    const wps = data?.workpapers || []
-    if (!wps.length) {
-      ElMessage.info('该附注行暂无关联底稿')
-      return
-    }
-    if (wps.length === 1) {
-      // 单底稿直接跳转
-      const wp = wps[0]
-      router.push({
-        name: 'WorkpaperEditor',
-        params: { projectId: projectId.value, wpId: wp.id },
-      })
-      return
-    }
-    // 多底稿：提示用户选择（简化弹 list）
-    const list = wps.map((w: any) => `${w.wp_code} ${w.wp_name}`).join('\n')
-    ElMessage.info(`该行关联 ${wps.length} 张底稿：\n${list}`)
-  } catch (e: any) {
-    handleApiError(e, '查看相关底稿')
-  }
-}
-
-/**
- * R9-F5：穿透到序时账
- * 从附注单元格穿透到对应科目的序时账
- */
-function onDeCtxPenetrateToLedger() {
-  deCtx.closeContextMenu()
-  const note = currentNote.value
-  if (!note?.note_section) {
-    ElMessage.warning('请先选择附注章节')
-    return
-  }
-  // 尝试从选中行获取科目编码（第一列通常是科目名/编码）
-  const sel = deCtx.selectedCells.value[0]
-  if (!sel) return
-  const tableRows = activeTableData.value?.rows || []
-  const row = tableRows[sel.row]
-  // 优先取 account_code 字段，否则取第一列值作为科目标识
-  const accountCode = row?.account_code || row?.values?.[0] || row?.cells?.[0] || ''
-  if (accountCode) {
-    penetrate.toLedger(String(accountCode))
-  } else {
-    ElMessage.warning('无法识别当前行的科目编码')
-  }
-}
-
-// Sprint 5.7: 查看数据来源
-const showCellFormulaDetail = ref(false)
-const cellDetailWpCode = ref('')
-const cellDetailSheet = ref('')
-const cellDetailLabel = ref('')
-
-function onDeCtxViewDataSource() {
-  deCtx.closeContextMenu()
-  const note = currentNote.value
-  if (!note?.note_section) {
-    ElMessage.warning('请先选择附注章节')
-    return
-  }
-  cellDetailWpCode.value = note.note_section
-  cellDetailSheet.value = ''
-  cellDetailLabel.value = ''
-  showCellFormulaDetail.value = true
-}
-
-// 合并附注穿透（统一组件 ConsolBreakdownDialog，source=note）：右键"查看合并明细"打开。
-// 以当前附注章节 note_section 作为 sectionId 穿透；合并附注最相关，单体附注无 breakdown 时弹窗友好降级。
-const consolBreakdownVisible = ref(false)
-const consolBreakdownSectionId = ref('')
-
-function onDeCtxViewConsolBreakdown() {
-  deCtx.closeContextMenu()
-  const note = currentNote.value
-  if (!note?.note_section) {
-    ElMessage.warning('请先选择附注章节')
-    return
-  }
-  consolBreakdownSectionId.value = note.note_section
-  consolBreakdownVisible.value = true
-}
-
-// Sprint 2 Task 2.4: CellTrace 单元格溯源
-const showCellTrace = ref(false)
-const cellTraceCtx = reactive<{ noteId: string; rowIdx: number; colIdx: number }>({
-  noteId: '',
-  rowIdx: 0,
-  colIdx: 0,
-})
-
-function onDeCtxOpenCellTrace() {
-  deCtx.closeContextMenu()
-  const note = currentNote.value
-  if (!note?.id) {
-    ElMessage.warning('请先选择附注章节')
-    return
-  }
-  const sel = deCtx.selectedCells.value[0]
-  if (!sel) {
-    ElMessage.warning('请先选中一个单元格')
-    return
-  }
-  cellTraceCtx.noteId = String(note.id)
-  cellTraceCtx.rowIdx = sel.row
-  cellTraceCtx.colIdx = sel.col
-  showCellTrace.value = true
-}
-
-function onCellTracePenetrateTb(payload: { account_code: string }) {
-  if (!payload?.account_code) return
-  showCellTrace.value = false
-  penetrate.toTB(payload.account_code)
-}
-
-function onCellDetailNavigate(uri: string) {
-  showCellFormulaDetail.value = false
-  const parts = uri.split(':')
-  const mod = parts[0]?.toUpperCase()
-  if (mod === 'WP' && parts[1]) {
-    router.push({ name: 'WorkpaperEditor', params: { id: projectId.value }, query: { wp: parts[1] } })
-  } else if (mod === 'REPORT') {
-    router.push({ name: 'ReportView', params: { id: projectId.value } })
-  } else if (mod === 'TB') {
-    router.push({ path: `/projects/${projectId.value}/trial-balance` })
-  }
-}
-
-// ─── Phase 3 F1: 来源追溯 (Requirements: F1.1, F1.3, F1.4) ─────────────────
-const { push: navPush } = useNavigationStack()
-const tracePopoverVisible = ref(false)
-const traceLoading = ref(false)
-const traceData = ref<TraceSourceData | null>(null)
-const tracePopoverPos = ref({ x: 0, y: 0 })
-
-/**
- * auto 模式 cell 的 📊 图标点击 → 调用 trace-source API → 显示 TraceSourcePopover
- */
-async function onAutoCellTraceClick(rowIndex: number, colIndex: number, event: MouseEvent) {
-  const note = currentNote.value
-  if (!note?.note_section) return
-
-  // 构建 cell_id: "{note_section}:{row_index}:{col_index}"
-  const cellId = `${note.note_section}:${rowIndex}:${colIndex}`
-
-  // 定位弹窗位置
-  tracePopoverPos.value = { x: event.clientX, y: event.clientY + 8 }
-  tracePopoverVisible.value = true
-  traceLoading.value = true
-  traceData.value = null
-
-  try {
-    const resp: any = await api.get(P.disclosureNotes.traceSource(projectId.value, cellId))
-    traceData.value = resp as TraceSourceData
-  } catch (e) {
-    handleApiError(e, '追溯来源')
-    tracePopoverVisible.value = false
-  } finally {
-    traceLoading.value = false
-  }
-}
-
-/**
- * 跳转到试算表：记录到 useNavigationStack 后 router.push
- */
-function onTraceJumpToTB(accountCode?: string) {
-  tracePopoverVisible.value = false
-
-  // F1.4: 记录到 useNavigationStack（支持 Backspace 返回）
-  navPush({
-    source_view: route.fullPath,
-    label: `附注 ${currentNote.value?.section_title || ''}`,
-    direction: 'up',
-  })
-
-  // F1.3: 跳转到 TrialBalance 并定位到该科目行
-  const query: Record<string, string> = {}
-  if (accountCode) {
-    query.account_code = accountCode
-  }
-  router.push({
-    name: 'TrialBalance',
-    params: { projectId: projectId.value },
-    query,
-  })
-}
+// ─── 单元格右键动作（useNoteCellActions composable）─────────────────────────
+import { useNoteCellActions } from '@/views/composables/useNoteCellActions'
+const {
+  showCellFormulaDetail, cellDetailWpCode, cellDetailSheet, cellDetailLabel,
+  consolBreakdownVisible, consolBreakdownSectionId,
+  showCellTrace, cellTraceCtx,
+  tracePopoverVisible, traceLoading, traceData, tracePopoverPos,
+  onDeCtxRelatedWp, onDeCtxPenetrateToLedger, onDeCtxViewDataSource,
+  onDeCtxViewConsolBreakdown, onDeCtxOpenCellTrace, onCellTracePenetrateTb,
+  onCellDetailNavigate, onAutoCellTraceClick, onTraceJumpToTB,
+} = useNoteCellActions({ projectId, year, currentNote, activeTableData, deCtx, router, route })
 
 // ─── 校验错误标记（左侧目录树红色标记 + 单元格红色边框） ─────────────────────
 /** 判断某章节是否有校验错误 */
@@ -2577,249 +1743,16 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
 </script>
 
 <style scoped>
-.gt-disclosure-editor { padding: 16px; }
-
-/* ── GtPageHeader 已替换横幅样式 ── */
-
-/* ── 三栏布局 ── */
-.gt-de-body {
-  display: flex; gap: 12px; height: calc(100vh - 180px);
-}
-.gt-de-sidebar {
-  width: 220px; flex-shrink: 0;
-  background: var(--gt-color-bg-white); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-  display: flex; flex-direction: column; overflow: hidden;
-}
-.gt-de-sidebar-title {
-  padding: 10px 14px 6px; font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-text-secondary);
-  text-transform: uppercase; letter-spacing: 1px;
-}
-
-/* 单位切换栏 */
-.gt-de-unit-bar {
-  padding: 8px 12px; border-bottom: 1px solid var(--gt-color-border-light);
-}
-.gt-de-unit-name {
-  font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;
-}
-
-/* 视图切换 */
-.gt-de-view-toggle {
-  display: flex; align-items: center; gap: 6px; padding: 6px 10px;
-}
-.gt-de-view-toggle .el-radio-group { flex-shrink: 0; }
-.gt-de-view-toggle .el-button { font-size: var(--gt-font-size-xs); padding: 0 4px; }
-
-/* 平铺视图 */
-.gt-de-flat-list { flex: 1; overflow-y: auto; padding: 0 4px 8px; }
-.gt-de-flat-item {
-  display: flex; align-items: center; gap: 6px;
-  padding: 6px 10px; font-size: var(--gt-font-size-xs); cursor: pointer;
-  border-radius: 4px; color: var(--gt-color-text);
-  transition: background 0.15s;
-}
-.gt-de-flat-item:hover { background: var(--gt-color-primary-bg); }
-.gt-de-flat-item--active { background: var(--gt-color-primary-bg); font-weight: 600; color: var(--gt-color-primary); }
-.gt-de-flat-item-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gt-de-tree-search { margin: 0 10px 8px; width: calc(100% - 20px); }
-.gt-de-tree-wrap { flex: 1; overflow-y: auto; padding: 0 4px 8px; }
-.gt-de-tree-wrap :deep(.el-tree) { background: transparent; --el-tree-node-hover-bg-color: #f5f0ff; }
-.gt-de-tree-wrap :deep(.el-tree-node__content) { height: 32px; border-radius: 4px; }
-.gt-de-tree-wrap :deep(.el-tree-node.is-current > .el-tree-node__content) { background: var(--gt-color-primary-bg); }
-.gt-de-tree-node {
-  display: flex; align-items: center; gap: 6px; width: 100%; font-size: var(--gt-font-size-xs); padding: 0 4px;
-}
-.gt-de-tree-num {
-  font-size: var(--gt-font-size-xs); color: var(--gt-color-primary); background: var(--gt-color-primary-bg); padding: 1px 5px;
-  border-radius: 3px; font-weight: 600; min-width: 36px; text-align: center; white-space: nowrap;
-}
-.gt-de-tree-label { color: var(--gt-color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gt-de-tree-node-active .gt-de-tree-num { background: var(--gt-color-primary); color: var(--gt-color-text-inverse); }
-.gt-de-tree-node-active .gt-de-tree-label { color: var(--gt-color-primary); font-weight: 600; }
-.gt-de-tree-group {
-  font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-text-regular); padding: 2px 0;
-}
-.gt-de-tree-group-label { white-space: nowrap; }
-.gt-de-tree-wrap :deep(.el-tree-node__children) { padding-left: 2px; }
-
-/* ── 中间编辑区 ── */
-.gt-de-main {
-  flex: 1; min-width: 0;
-  background: var(--gt-color-bg-white); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-  padding: 16px; overflow-y: auto;
-}
-.gt-de-editor-header {
-  display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;
-  padding-bottom: 10px; border-bottom: 1px solid var(--gt-color-border-purple);
-}
-.gt-de-section-title { margin: 0; font-size: var(--gt-font-size-base); font-weight: 600; color: var(--gt-color-text-primary); }
-.gt-de-section-account { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px; display: block; }
-.gt-de-editor-footer { margin-top: 12px; text-align: right; padding-top: 10px; border-top: 1px solid var(--gt-color-border-purple); }
-
-/* ── 右侧校验 ── */
-.gt-de-validation {
-  width: 240px; flex-shrink: 0;
-  background: var(--gt-color-bg-white); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-  overflow-y: auto; padding-bottom: 8px;
-}
-.gt-de-empty-hint { color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs); text-align: center; padding: 30px 10px; }
-.gt-de-finding-item { padding: 8px 12px; border-bottom: 1px solid var(--gt-color-border-purple); font-size: var(--gt-font-size-xs); }
-.gt-de-finding-item.gt-de-severity-error { border-left: 3px solid var(--gt-color-coral); }
-.gt-de-finding-item.gt-de-severity-warning { border-left: 3px solid var(--gt-color-wheat); }
-.gt-de-finding-item.gt-de-severity-info { border-left: 3px solid var(--gt-color-border-light); }
-.gt-de-finding-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.gt-de-finding-type { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
-.gt-de-finding-section { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); }
-.gt-de-finding-msg { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); margin-top: 2px; }
-.gt-de-finding-values { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px; }
-
-/* ── 表格 ── */
-.gt-de-main :deep(.el-table) { --el-table-border-color: var(--gt-color-border-purple); }
-.gt-de-main :deep(.el-table th.el-table__cell) {
-  background: var(--gt-color-primary-bg) !important; font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-text-regular); white-space: nowrap;
-}
-.gt-de-main :deep(.el-table td.el-table__cell) { font-size: var(--gt-font-size-xs); padding: 6px 0; }
-.total-label { font-weight: 700; }
-.total-val { font-weight: 700; }
-.gt-cell-wrapper { display: flex; align-items: center; gap: 4px; }
-.gt-cell-source { font-size: var(--gt-font-size-xs); cursor: help; }
-.gt-cell-manual { font-size: var(--gt-font-size-xs); cursor: help; }
-
-/* Phase 3 F1: 来源追溯触发器 */
-.gt-cell-trace-trigger {
-  cursor: pointer !important;
-  transition: transform 0.15s ease;
-}
-.gt-cell-trace-trigger:hover {
-  transform: scale(1.3);
-}
-.gt-prior-year-val { color: var(--gt-color-text-placeholder); font-style: italic; font-size: var(--gt-font-size-xs); }
-.gt-formula-mismatch { color: var(--gt-color-coral) !important; font-weight: 700; text-decoration: underline wavy #FF5149; }
-
-/* 自动填充单元格浅蓝色背景 */
-.gt-cell-auto-fill {
-  background-color: var(--gt-bg-info);
-  border-radius: 2px;
-  padding: 1px 4px;
-}
-
-/* 校验失败单元格红色边框 */
-.gt-cell-validation-error {
-  border: 1.5px solid var(--gt-color-coral);
-  border-radius: 3px;
-  padding: 1px 3px;
-}
-
-/* 金额列统一 Arial Narrow + 右对齐 + tabular-nums */
-.gt-de-main :deep(.el-table td .gt-amt) {
-  font-family: 'Arial Narrow', Arial, monospace;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── 左侧目录树校验错误标记 ── */
-.gt-de-tree-error-dot {
-  color: var(--gt-color-coral);
-  font-size: 8px; /* allow-px: special (tree-error-dot 装饰圆点，小于最小 token 12px) */
-  margin-left: 4px;
-  flex-shrink: 0;
-}
-.gt-de-tree-node-error .gt-de-tree-label {
-  color: var(--gt-color-coral);
-}
-.gt-de-tree-error-badge {
-  background: var(--gt-color-coral);
-  color: var(--gt-color-text-inverse);
-  font-size: var(--gt-font-size-xs);
-  padding: 0 5px;
-  border-radius: 8px;
-  margin-left: 6px;
-  min-width: 16px;
-  text-align: center;
-  line-height: 16px;
-  flex-shrink: 0;
-}
-
-/* ── Sprint 3 Task 3.6: 章节列表 stale 红点 ── */
-.gt-de-tree-stale-dot {
-  font-size: 10px; /* allow-px: special (装饰小图标) */
-  margin-left: 4px;
-  flex-shrink: 0;
-  cursor: help;
-}
-
-/* ── TipTap ── */
-.gt-de-tiptap-wrapper { border: 1px solid var(--gt-color-border-purple); border-radius: 6px; margin-top: 10px; }
-.gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid var(--gt-color-border-purple); background: var(--gt-color-primary-bg); border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.gt-de-toolbar-divider { width: 1px; height: 20px; background: var(--gt-color-primary-lighter); margin: 0 6px; }
-.gt-de-ai-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-primary-lighter); margin-left: 8px; white-space: nowrap; }
-.gt-de-saved-badge { font-size: var(--gt-font-size-xs); color: var(--gt-color-success); font-weight: 400; margin-left: 8px; background: var(--gt-bg-success); padding: 1px 8px; border-radius: 10px; }
-.gt-de-sync-banner { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: var(--gt-font-size-sm); }
-.gt-de-sync-time { color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-xs); }
-.gt-de-tiptap-content { padding: 12px; min-height: 200px; font-size: var(--gt-font-size-sm); line-height: 1.8; }
-.gt-de-tiptap-content :deep(.ProseMirror) { outline: none; min-height: 180px; }
-.gt-de-tiptap-content :deep(.ProseMirror p) { margin-bottom: 10px; text-indent: 2em; }
-.gt-de-tiptap-content :deep(.ProseMirror p.is-editor-empty:first-child::before) { color: var(--gt-color-text-placeholder); content: attr(data-placeholder); float: left; height: 0; pointer-events: none; text-indent: 0; }
-
-/* ── AI 工具栏 (Req 48) ── */
-.gt-de-ai-toolbar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-top: 1px solid var(--gt-color-border-lighter); background: var(--gt-color-primary-bg); flex-wrap: wrap; }
-
-/* ── 表格结构编辑工具栏 (Req 38) ── */
-.gt-de-structure-toolbar {
-  display: flex;
-  align-items: center;
-  padding: 6px 0;
-  margin-top: 4px;
-  border-top: 1px dashed var(--gt-color-border-purple);
-}
-
-/* ── Phase 3 F1: 来源追溯弹窗定位 ── */
-.gt-trace-popover-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 2000;
-  background: transparent;
-}
-.gt-trace-popover-container {
-  position: absolute;
-  z-index: 2001;
-}
-
+@import './DisclosureEditor.css';
 </style>
 
 <!-- 全局样式：teleport 到 body 的右键菜单脱离 scoped 作用域 -->
 <style>
-.gt-de-tree-ctx-menu {
-  position: fixed;
-  z-index: 9999;
-  background: var(--gt-color-bg-white, #fff);
-  border: 1px solid var(--gt-color-border-purple, #d8caee);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(75, 45, 119, 0.18);
-  padding: 4px 0;
-  min-width: 160px;
-  font-size: var(--gt-font-size-xs, 12px);
-}
-.gt-de-tree-ctx-item {
-  padding: 6px 14px;
-  cursor: pointer;
-  color: var(--gt-color-text-primary, #303133);
-  white-space: nowrap;
-  user-select: none;
-}
-.gt-de-tree-ctx-item:hover {
-  background: var(--gt-color-primary-bg, #f5f0ff);
-}
-.gt-de-tree-ctx-item.gt-de-tree-ctx-danger {
-  color: var(--gt-color-coral, #e6443e);
-}
-.gt-de-tree-ctx-item.gt-de-tree-ctx-danger:hover {
-  background: var(--gt-bg-danger, #fdecea);
-}
+.gt-de-tree-ctx-menu { position: fixed; z-index: 9999; background: var(--gt-color-bg-white, #fff); border: 1px solid var(--gt-color-border-purple, #d8caee); border-radius: 6px; box-shadow: 0 4px 16px rgba(75, 45, 119, 0.18); padding: 4px 0; min-width: 160px; font-size: var(--gt-font-size-xs, 12px); }
+.gt-de-tree-ctx-item { padding: 6px 14px; cursor: pointer; color: var(--gt-color-text-primary, #303133); white-space: nowrap; user-select: none; }
+.gt-de-tree-ctx-item:hover { background: var(--gt-color-primary-bg, #f5f0ff); }
+.gt-de-tree-ctx-item.gt-de-tree-ctx-danger { color: var(--gt-color-coral, #e6443e); }
+.gt-de-tree-ctx-item.gt-de-tree-ctx-danger:hover { background: var(--gt-bg-danger, #fdecea); }
 </style>
 
 

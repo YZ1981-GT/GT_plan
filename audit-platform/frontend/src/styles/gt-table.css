@@ -77,16 +77,20 @@
    6. 选中样式（配合 useCellSelection）
    ═══════════════════════════════════════════════════════════════ */
 .gt-ucell--selected {
-  background: rgba(75, 45, 119, 0.08) !important;
+  position: relative;
+  background: rgba(75, 45, 119, 0.12) !important;
   border-color: transparent !important;
+  z-index: 1;
 }
 
 .gt-ucell--single-selected {
+  position: relative;
   background: rgba(75, 45, 119, 0.12) !important;
   border-color: transparent !important;
+  z-index: 1;
 }
 
 /* 试算平衡表行选中 */
 .gt-tb-sum-selected td {
-  background: rgba(75, 45, 119, 0.08) !important;
+  background: rgba(75, 45, 119, 0.12) !important;
 }

@@ -350,6 +350,14 @@
               </template>
             </el-table-column>
             <el-table-column prop="formula_description" label="说明" min-width="140" show-overflow-tooltip />
+            <el-table-column label="当前值" width="100" align="right">
+              <template #default="{ row }">
+                <span v-if="row.current_period_amount != null" style="font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-primary-dark); font-variant-numeric: tabular-nums;">
+                  {{ Number(row.current_period_amount).toLocaleString('zh-CN', { maximumFractionDigits: 2 }) }}
+                </span>
+                <span v-else style="color: var(--gt-color-text-placeholder);">-</span>
+              </template>
+            </el-table-column>
             <el-table-column label="来源" width="80" align="center">
               <template #default="{ row }">
                 <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">{{ row._source_type || '报表' }}</span>

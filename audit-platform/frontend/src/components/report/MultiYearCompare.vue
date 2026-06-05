@@ -21,6 +21,14 @@
           />
         </el-select>
       </div>
+      <div class="gt-myc-controls__center">
+        <el-select v-model="rowFilter" size="small" style="width: 160px" @change="onFilterChange">
+          <el-option label="显示全部行" value="all" />
+          <el-option label="仅有数据行" value="nonzero" />
+          <el-option label="仅合计行" value="total" />
+          <el-option label="仅变动行" value="changed" />
+        </el-select>
+      </div>
       <div class="gt-myc-controls__right">
         <el-radio-group v-model="reportType" size="small" @change="fetchData">
           <el-radio-button value="balance_sheet">资产负债表</el-radio-button>
@@ -36,13 +44,18 @@
     <!-- 数据表格 -->
     <el-table
       v-loading="loading"
-      :data="tableData"
+      ref="mycTableRef"
+      :data="filteredTableData"
       border
       size="small"
       style="width: 100%"
       :max-height="600"
       :header-cell-style="{ background: '#f8f6fb', color: '#333', whiteSpace: 'nowrap', fontSize: '12px' }"
       :row-class-name="rowClassName"
+      :cell-class-name="cellClassName"
+      @cell-click="onCellClick"
+      @cell-dblclick="onCellDblClick"
+      @cell-contextmenu="onCellContextMenu"
     >
       <!-- 项目名称列 (fixed) -->
       <el-table-column prop="item_name" label="项目" fixed min-width="260" :resizable="true">
@@ -62,9 +75,9 @@
         <!-- YoY 变动列（第一年无变动率） -->
         <el-table-column
           v-if="idx > 0"
-          :label="`${yr} YoY`"
+          :label="`${yr}年同比`"
           align="right"
-          width="110"
+          width="200"
           :resizable="true"
         >
           <template #default="{ row }">
@@ -80,24 +93,49 @@
     </el-table>
 
     <!-- 空状态 -->
-    <div v-if="!loading && tableData.length === 0 && selectedYears.length > 0" class="gt-myc-empty">
+    <div v-if="!loading && filteredTableData.length === 0 && selectedYears.length > 0" class="gt-myc-empty">
       <span>暂无数据，请确认已生成对应年度的报表</span>
     </div>
+
+    <!-- 右键菜单 -->
+    <teleport to="body">
+      <div
+        v-if="ctxMenu.visible"
+        class="gt-myc-ctx-menu"
+        :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }"
+        @click.stop
+      >
+        <div class="gt-myc-ctx-item" @click="onCtxCopy">📋 复制</div>
+        <div class="gt-myc-ctx-item" @click="onCtxSum">∑ 求和</div>
+        <div class="gt-myc-ctx-item" @click="onCtxCompare">📊 对比差异</div>
+        <div class="gt-myc-ctx-divider" />
+        <div class="gt-myc-ctx-item" @click="onCtxDrill">🔍 查看穿透</div>
+        <div class="gt-myc-ctx-item" @click="onCtxGoReport">📈 跳转报表</div>
+        <div class="gt-myc-ctx-item" @click="onCtxViewFormula">ƒx 查看公式</div>
+        <div class="gt-myc-ctx-divider" />
+        <div class="gt-myc-ctx-item" @click="onCtxExportSelection">📥 导出选区</div>
+      </div>
+    </teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import axios from 'axios'
-import { reports as reportsApi } from '@/services/apiPaths'
+import http from '@/utils/http'
+import { reports as reportsApi, reportConfig as rcApi } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { exportData, type ExcelColumn } from '@/composables/useExcelIO'
+import { useCellSelection } from '@/composables/useCellSelection'
 
 /* ── Props ── */
 const props = defineProps<{
   projectId: string
   currentYear: number
+}>()
+
+const emit = defineEmits<{
+  drill: [payload: { reportType: string; rowCode: string }]
 }>()
 
 /* ── State ── */
@@ -106,7 +144,112 @@ const exporting = ref(false)
 const reportType = ref<string>('balance_sheet')
 const selectedYears = ref<number[]>([])
 const tableData = ref<any[]>([])
+const rowFilter = ref<string>('all')
+const mycTableRef = ref<any>(null)
 
+// 单元格选中支持
+const cellSel = useCellSelection()
+
+function cellClassName({ rowIndex, columnIndex }: any) {
+  return cellSel.cellClassName({ rowIndex, columnIndex })
+}
+
+function onCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
+  ctxMenu.value.visible = false
+  const rowIdx = filteredTableData.value.indexOf(row)
+  const colIdx = column.index ?? 0
+  if (rowIdx < 0) return
+  const value = row.values?.[String(sortedYears.value[colIdx - 1])] ?? row.item_name ?? ''
+  cellSel.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
+}
+
+// 右键菜单
+const ctxMenu = ref({ visible: false, x: 0, y: 0 })
+
+function onCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
+  event.preventDefault()
+  const rowIdx = filteredTableData.value.indexOf(row)
+  const colIdx = column.index ?? 0
+  if (rowIdx >= 0 && !cellSel.isCellSelected(rowIdx, colIdx)) {
+    const value = row.values?.[String(sortedYears.value[colIdx - 1])] ?? row.item_name ?? ''
+    cellSel.selectCell(rowIdx, colIdx, value, false)
+  }
+  ctxMenu.value = { visible: true, x: event.clientX, y: event.clientY }
+}
+
+function onCellDblClick(row: any, column: any) {
+  // 双击金额列 → emit 穿透事件让父组件跳转到对应报表
+  if (column.index > 0 && row.row_code) {
+    emit('drill', { reportType: reportType.value, rowCode: row.row_code })
+  }
+}
+
+function onCtxCopy() {
+  const cells = cellSel.selectedCells.value
+  if (!cells.length) return
+  const text = cells.map(c => c.value ?? '-').join('\t')
+  navigator.clipboard.writeText(text)
+  ElMessage.success('已复制')
+  ctxMenu.value.visible = false
+}
+
+function onCtxSum() {
+  const cells = cellSel.selectedCells.value
+  const nums = cells.map(c => Number(c.value)).filter(n => !isNaN(n) && n !== 0)
+  const sum = nums.reduce((s, n) => s + n, 0)
+  ElMessage.info(`选中 ${cells.length} 格，合计：${sum.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`)
+  ctxMenu.value.visible = false
+}
+
+function onCtxCompare() {
+  const cells = cellSel.selectedCells.value
+  if (cells.length < 2) { ElMessage.warning('请选中至少 2 个单元格'); ctxMenu.value.visible = false; return }
+  const vals = cells.map(c => Number(c.value) || 0)
+  const diff = vals[0] - vals[1]
+  const pct = vals[1] !== 0 ? ((diff / Math.abs(vals[1])) * 100).toFixed(2) + '%' : '-'
+  ElMessage.info(`差异：${diff.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}，变动率：${pct}`)
+  ctxMenu.value.visible = false
+}
+
+function onCtxDrill() {
+  const cells = cellSel.selectedCells.value
+  if (!cells.length) { ctxMenu.value.visible = false; return }
+  const row = filteredTableData.value[cells[0].row]
+  if (row?.row_code) {
+    emit('drill', { reportType: reportType.value, rowCode: row.row_code })
+  }
+  ctxMenu.value.visible = false
+}
+
+function onCtxGoReport() {
+  emit('drill', { reportType: reportType.value, rowCode: '' })
+  ctxMenu.value.visible = false
+}
+
+function onCtxViewFormula() {
+  const cells = cellSel.selectedCells.value
+  if (!cells.length) { ctxMenu.value.visible = false; return }
+  const row = filteredTableData.value[cells[0].row]
+  ElMessage.info(`行次 ${row?.row_code || '-'}，公式需在公式管理器中查看`)
+  ctxMenu.value.visible = false
+}
+
+function onCtxExportSelection() {
+  const cells = cellSel.selectedCells.value
+  if (!cells.length) { ElMessage.warning('请先选中单元格'); ctxMenu.value.visible = false; return }
+  const text = cells.map(c => c.value ?? '-').join('\n')
+  navigator.clipboard.writeText(text)
+  ElMessage.success(`已导出 ${cells.length} 个单元格到剪贴板`)
+  ctxMenu.value.visible = false
+}
+
+// 拖选绑定
+cellSel.setupTableDrag(mycTableRef, (rowIdx: number, colIdx: number) => {
+  const row = filteredTableData.value[rowIdx]
+  if (!row) return null
+  if (colIdx === 0) return row.item_name
+  return row.values?.[String(sortedYears.value[colIdx - 1])] ?? null
+})
 /* ── Computed ── */
 const availableYears = computed(() => {
   const current = props.currentYear || new Date().getFullYear()
@@ -118,6 +261,29 @@ const availableYears = computed(() => {
 })
 
 const sortedYears = computed(() => [...selectedYears.value].sort((a, b) => a - b))
+
+// 筛选后的表格数据
+const filteredTableData = computed(() => {
+  if (rowFilter.value === 'all') return tableData.value
+  return tableData.value.filter((row: any) => {
+    if (rowFilter.value === 'nonzero') {
+      // 任一年度有非零值
+      if (!row.values) return false
+      return Object.values(row.values).some((v: any) => v != null && v !== 0)
+    }
+    if (rowFilter.value === 'total') {
+      return row.is_total_row
+    }
+    if (rowFilter.value === 'changed') {
+      // 有同比变动数据
+      if (!row.yoy_changes) return false
+      return Object.values(row.yoy_changes).some((v: any) => v != null && v !== 0)
+    }
+    return true
+  })
+})
+
+function onFilterChange() { /* reactive, no action needed */ }
 
 /* ── Methods ── */
 function onYearsChange() {
@@ -137,8 +303,29 @@ async function fetchData() {
   loading.value = true
   try {
     const url = reportsApi.multiYear(props.projectId, sortedYears.value, reportType.value)
-    const resp = await axios.get(url)
-    tableData.value = resp.data.rows || []
+    const resp = await http.get(url)
+    const rows = resp.data?.rows || resp.data?.data?.rows || resp.data || []
+    if (Array.isArray(rows) && rows.length > 0) {
+      tableData.value = rows
+    } else {
+      // Fallback：从 report_config 加载行结构（始终有行次定义）
+      try {
+        const configResp = await http.get(rcApi.list, {
+          params: { report_type: reportType.value, applicable_standard: 'soe_standalone' },
+        })
+        const configs = configResp.data?.data || configResp.data || []
+        tableData.value = (Array.isArray(configs) ? configs : []).map((r: any) => ({
+          item_name: r.row_name || '',
+          row_code: r.row_code || '',
+          indent_level: r.indent_level || 0,
+          is_total_row: r.is_total_row || false,
+          values: sortedYears.value.map(() => null),
+          yoy: sortedYears.value.slice(1).map(() => null),
+        }))
+      } catch {
+        tableData.value = []
+      }
+    }
   } catch (err: any) {
     handleApiError(err, '查询')
     tableData.value = []
@@ -148,7 +335,7 @@ async function fetchData() {
 }
 
 function formatAmount(val: number | null | undefined): string {
-  if (val == null) return '-'
+  if (val == null || val === 0) return '-'
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
@@ -244,10 +431,13 @@ async function onExport() {
 
 /* ── Lifecycle ── */
 onMounted(() => {
-  // 默认选中当前年度 + 前一年度
   const current = props.currentYear || new Date().getFullYear()
   selectedYears.value = [current - 1, current]
   fetchData()
+  document.addEventListener('click', () => { ctxMenu.value.visible = false })
+})
+onUnmounted(() => {
+  document.removeEventListener('click', () => { ctxMenu.value.visible = false })
 })
 
 /* ── Expose for parent ── */
@@ -275,6 +465,11 @@ defineExpose({ fetchData, onExport })
 }
 
 .gt-myc-controls__right {
+  display: flex;
+  align-items: center;
+}
+
+.gt-myc-controls__center {
   display: flex;
   align-items: center;
 }
@@ -320,5 +515,34 @@ defineExpose({ fetchData, onExport })
 
 :deep(.gt-myc-row--highlight td) {
   background-color: rgba(231, 76, 60, 0.06) !important;
+}
+</style>
+
+<style>
+/* 右键菜单（teleport to body，非 scoped） */
+.gt-myc-ctx-menu {
+  position: fixed;
+  z-index: 10001;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(75, 45, 119, 0.175);
+  padding: 6px 0;
+  min-width: 140px;
+  border: 1px solid #f0f0f5;
+}
+.gt-myc-ctx-item {
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.gt-myc-ctx-item:hover {
+  background: #f4f0fa;
+  color: #4b2d77;
+}
+.gt-myc-ctx-divider {
+  height: 1px;
+  background: #f0f0f5;
+  margin: 4px 8px;
 }
 </style>
