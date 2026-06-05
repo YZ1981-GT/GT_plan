@@ -1,0 +1,252 @@
+[
+  {
+    "input": "000000000000000000",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "111111111111111115",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "99999999999999999E",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "AAAAAAAAAAAAAAAAAK",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "YYYYYYYYYYYYYYYYYT",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "XXXXXXXXXXXXXXXXXM",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "91110000710930451D",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "12440300MB2XY197AQ",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "511000005000001629",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "91320000MA1MKGQ49E",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "A1B2C3D4E5F6G7H8JG",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "9XYWU1234567890A13",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "KLMNPQRT0123456785",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "123456789012345678",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "98765432109876543N",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "10101010101010101K",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "ABCDEFGH012345678D",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "000000000000000013",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "YXYXYXYXYXYXYXYXY9",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "11100000MB2XY197AP",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "31000000000000001W",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "44000000000000001J",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "50000000000000001X",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "GHJKLMNPQRTUWXY01R",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "01234567890ABCDEFX",
+    "expected_valid": true,
+    "expected_message": null
+  },
+  {
+    "input": "",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码必须为 18 位"
+  },
+  {
+    "input": "9",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码必须为 18 位"
+  },
+  {
+    "input": "91110000710930",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码必须为 18 位"
+  },
+  {
+    "input": "9111000071093045",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码必须为 18 位"
+  },
+  {
+    "input": "91110000710930451",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码必须为 18 位"
+  },
+  {
+    "input": "911100007109304510A",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码必须为 18 位"
+  },
+  {
+    "input": "91110000710930451012345",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码必须为 18 位"
+  },
+  {
+    "input": "9111000071093045101234567890",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码必须为 18 位"
+  },
+  {
+    "input": "91110000I109304510",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码只能包含数字与大写字母（不含 I、O、Z、S、V）"
+  },
+  {
+    "input": "91110000O109304510",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码只能包含数字与大写字母（不含 I、O、Z、S、V）"
+  },
+  {
+    "input": "91110000Z109304510",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码只能包含数字与大写字母（不含 I、O、Z、S、V）"
+  },
+  {
+    "input": "91110000S109304510",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码只能包含数字与大写字母（不含 I、O、Z、S、V）"
+  },
+  {
+    "input": "91110000V109304510",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码只能包含数字与大写字母（不含 I、O、Z、S、V）"
+  },
+  {
+    "input": "91110000a109304510",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码只能包含数字与大写字母（不含 I、O、Z、S、V）"
+  },
+  {
+    "input": "abcdefghjklmnpqrtu",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码只能包含数字与大写字母（不含 I、O、Z、S、V）"
+  },
+  {
+    "input": "91110000710930451!",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码只能包含数字与大写字母（不含 I、O、Z、S、V）"
+  },
+  {
+    "input": "000000000000000001",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码校验码错误"
+  },
+  {
+    "input": "111111111111111110",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码校验码错误"
+  },
+  {
+    "input": "999999999999999990",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码校验码错误"
+  },
+  {
+    "input": "AAAAAAAAAAAAAAAAA0",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码校验码错误"
+  },
+  {
+    "input": "911100007109304510",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码校验码错误"
+  },
+  {
+    "input": "12440300MB2XY197A0",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码校验码错误"
+  },
+  {
+    "input": "A1B2C3D4E5F6G7H8J0",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码校验码错误"
+  },
+  {
+    "input": "XXXXXXXXXXXXXXXXX0",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码校验码错误"
+  },
+  {
+    "input": "123456789012345670",
+    "expected_valid": false,
+    "expected_message": "统一社会信用代码校验码错误"
+  }
+]

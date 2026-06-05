@@ -21,6 +21,11 @@ from app.models.audit_platform_schemas import (
     WizardStepData,
 )
 from app.services.note_template_service import NoteTemplateService
+from app.services.uscc_validator import validate_uscc
+from app.services.uniqueness_checker import check_uniqueness
+
+# 默认报表类型（与 batch_project_service.DEFAULT_REPORT_SCOPE 保持一致）
+DEFAULT_REPORT_SCOPE = "standalone"
 
 logger = logging.getLogger(__name__)
 
@@ -42,15 +47,8 @@ STEP_DEPENDENCIES: dict[WizardStep, list[WizardStep]] = {
     WizardStep.materiality: [WizardStep.basic_info],
     WizardStep.team_assignment: [WizardStep.basic_info],
     WizardStep.template_set: [WizardStep.basic_info, WizardStep.materiality],
-    # 确认前必须完成核心步骤（账表导入/科目映射/重要性/团队分工）；
-    # template_set 非强制（可后续补），与测试 _complete_confirmation_steps 口径一致
-    WizardStep.confirmation: [
-        WizardStep.basic_info,
-        WizardStep.account_import,
-        WizardStep.account_mapping,
-        WizardStep.materiality,
-        WizardStep.team_assignment,
-    ],
+    # 确认无前置依赖——基本信息在 create_project 时已自动保存，直接可确认
+    WizardStep.confirmation: [],
 }
 
 # basic_info 步骤的必填字段
@@ -92,6 +90,8 @@ def _sync_basic_info_to_project(project: Project, data: BasicInfoSchema) -> None
     project.manager_id = data.manager_id
     project.partner_id = data.signing_partner_id
     project.company_code = data.company_code
+    project.short_name = data.short_name
+    project.audit_year = data.audit_year
     project.template_type = data.template_type
     project.report_scope = data.report_scope
     # 合并类型仅在合并报表项目下有意义；单户报表清空避免误导
@@ -189,11 +189,45 @@ async def _backfill_locked_custom_template_snapshot(project: Project, db: AsyncS
 # ---------------------------------------------------------------------------
 
 
-async def create_project(data: BasicInfoSchema, db: AsyncSession) -> Project:
+async def create_project(
+    data: BasicInfoSchema, db: AsyncSession, *, auto_commit: bool = True
+) -> Project:
     """创建项目记录，状态=created，初始化 wizard_state JSONB。
 
     Validates: Requirements 1.2, 1.3
+    校验链：short_name 非空 → company_code 非空 → USCC 格式 → 唯一性
+
+    Args:
+        data: 基本信息 Schema
+        db: 数据库会话
+        auto_commit: 是否自动 commit。批量导入传 False 由调用方统一 commit。
     """
+    # --- 校验链 ---
+    # 1. short_name 非空
+    short_name = (data.short_name or "").strip() if data.short_name else ""
+    if not short_name:
+        raise HTTPException(status_code=422, detail="项目简称为必填项")
+
+    # 2. company_code 非空
+    company_code = (data.company_code or "").strip() if data.company_code else ""
+    if not company_code:
+        raise HTTPException(status_code=422, detail="企业代码为必填项")
+
+    # 3. USCC 格式校验
+    uscc_valid, uscc_error = validate_uscc(company_code)
+    if not uscc_valid:
+        raise HTTPException(status_code=422, detail=uscc_error)
+
+    # 4. 唯一性校验
+    audit_year = data.audit_year
+    report_scope = data.report_scope or DEFAULT_REPORT_SCOPE
+    is_unique, uniqueness_error = await check_uniqueness(
+        company_code, audit_year, report_scope, db
+    )
+    if not is_unique:
+        raise HTTPException(status_code=409, detail=uniqueness_error)
+
+    # --- 创建项目 ---
     data, custom_template_snapshot = _normalize_basic_info(data)
     project = Project(status=ProjectStatus.created)
     _sync_basic_info_to_project(project, data)
@@ -217,8 +251,10 @@ async def create_project(data: BasicInfoSchema, db: AsyncSession) -> Project:
         completed=False,
     )
     project.wizard_state = state.model_dump(mode="json")
-    await db.commit()
-    await db.refresh(project)
+
+    if auto_commit:
+        await db.commit()
+        await db.refresh(project)
     return project
 
 

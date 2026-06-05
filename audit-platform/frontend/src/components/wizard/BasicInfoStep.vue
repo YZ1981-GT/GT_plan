@@ -24,6 +24,10 @@
             <el-input v-model="form.company_code" placeholder="统一社会信用代码" maxlength="18" />
           </el-form-item>
 
+          <el-form-item label="项目简称" prop="short_name">
+            <el-input v-model="form.short_name" placeholder="请输入项目简称" maxlength="100" />
+          </el-form-item>
+
           <el-form-item label="审计年度" prop="audit_year">
             <el-date-picker
               v-model="auditYearDate"
@@ -182,6 +186,7 @@ import { ref, reactive, onMounted, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useWizardStore, type BasicInfo } from '@/stores/wizard'
+import { validateUSCC } from '@/utils/uscc_validator'
 
 const wizardStore = useWizardStore()
 const formRef = ref<FormInstance>()
@@ -191,6 +196,7 @@ const customTemplates = ref<Array<{ id: string; name: string; version?: string }
 
 const form = reactive<BasicInfo>({
   client_name: '',
+  short_name: '',
   audit_year: null,
   project_type: '',
   accounting_standard: '',
@@ -213,6 +219,25 @@ const form = reactive<BasicInfo>({
 
 const rules: FormRules = {
   client_name: [{ required: true, message: '请输入客户名称', trigger: 'blur' }],
+  short_name: [{ required: true, message: '项目简称为必填项', trigger: 'blur' }],
+  company_code: [
+    { required: true, message: '企业代码为必填项', trigger: 'blur' },
+    {
+      validator: (_rule, value: string, callback) => {
+        if (!value) {
+          callback()
+          return
+        }
+        const result = validateUSCC(value)
+        if (!result.valid) {
+          callback(new Error(result.message))
+        } else {
+          callback()
+        }
+      },
+      trigger: ['blur', 'change'],
+    },
+  ],
   audit_year: [{ required: true, message: '请选择审计年度', trigger: 'change' }],
   project_type: [{ required: true, message: '请选择项目类型', trigger: 'change' }],
   accounting_standard: [{ required: true, message: '请选择会计准则', trigger: 'change' }],

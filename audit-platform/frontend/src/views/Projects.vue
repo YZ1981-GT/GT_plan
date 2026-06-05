@@ -6,6 +6,9 @@
         <el-button type="primary" size="small" @click="goToCreateProject">
           <el-icon><Plus /></el-icon> 新建项目
         </el-button>
+        <el-button type="primary" size="small" plain @click="showBatchImport = true">
+          <el-icon><Upload /></el-icon> 批量建项
+        </el-button>
       </template>
     </GtPageHeader>
 
@@ -41,7 +44,7 @@
           <template #default="{ row }">
             <div class="project-name-cell">
               <div class="project-dot" :class="'dot-' + (row.status || 'created')"></div>
-              <span class="project-name-text">{{ row.name || '—' }}</span>
+              <span class="project-name-text">{{ getProjectDisplayName(row, projects, consolidatedKeys) || '—' }}</span>
             </div>
           </template>
         </el-table-column>
@@ -94,19 +97,31 @@
         </el-table-column>
       </el-table>
     </el-card>
+
+    <!-- 批量建项弹窗 -->
+    <BatchImportDialog
+      v-model="showBatchImport"
+      @success="loadProjectList"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listProjects } from '@/services/commonApi'
 import { FolderOpened, Plus, Right, Upload } from '@element-plus/icons-vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import { getProjectDisplayName, buildConsolidatedKeySet } from '@/utils/project_display'
+import BatchImportDialog from '@/components/wizard/BatchImportDialog.vue'
 
 const router = useRouter()
 const loading = ref(false)
 const projects = ref<any[]>([])
+const showBatchImport = ref(false)
+
+// 预计算合并项目 key 集合，避免每行 O(N) 扫描
+const consolidatedKeys = computed(() => buildConsolidatedKeySet(projects.value))
 
 // R7-S3-06 Task 33：筛选状态
 const viewMode = ref<'list' | 'client'>('list')
@@ -128,7 +143,7 @@ async function loadProjectList() {
 function goToCreateProject() { router.push('/projects/new') }
 function openProject(id: string) { router.push({ name: 'ProjectEntry', params: { projectId: id } }) }
 function openImport(id: string) {
-  router.push({ path: `/projects/${id}/ledger`, query: { import: '1' } })
+  router.push({ path: `/projects/${id}/ledger-import` })
 }
 
 function formatDate(d: string) {

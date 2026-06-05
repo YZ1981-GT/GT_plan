@@ -91,7 +91,8 @@ class BasicInfoSchema(BaseModel):
     audit_year: int
     project_type: str  # annual / special / ipo / internal_control
     accounting_standard: str  # enterprise / small_enterprise / financial / government
-    company_code: str | None = None  # 企业代码（统一社会信用代码）
+    company_code: str = Field(min_length=18, max_length=18)  # 企业代码（统一社会信用代码，18位必填）
+    short_name: str = Field(min_length=1, max_length=100)  # 项目简称（必填）
     template_type: str | None = None  # 附注模板类型：soe（国企版）/ listed（上市版）
     custom_template_id: str | None = None
     custom_template_name: str | None = None
@@ -148,6 +149,8 @@ class ProjectCreateResponse(BaseModel):
     id: UUID
     name: str | None = None
     client_name: str
+    short_name: str | None = None
+    company_code: str | None = None
     audit_year: int | None = None
     project_type: str | None = None
     status: str

@@ -116,6 +116,7 @@
 | `xlsx-read-acceleration` | 📌 占位 | calamine 只读取值从 ledger import 推广到底稿提取点（wp_program_extract/wp_audit_sheet_extract 等纯取值点，不含样式依赖的 wp_grid_extract 与写路径）；三件套已生成待实施 |
 | `endpoint-fuzz-and-tracing` | 📌 占位 | Schemathesis 端点 fuzz + OpenTelemetry 全链路 trace + bm25s 检索降级（向量→bm25→ilike）；三件套已生成待实施 |
 | `dev-tooling-modernization` | ✅ 完成 | gitleaks pre-commit+CI / SQLFluff 基线 1718 / uv CI 加速 / Docling 裁掉 / DSPy 仅文档；2026-06-04 全 20 任务实施完成 |
+| `project-creation-enhancement` | ⏳ 实施中 | 建项流程增强：USCC 企业代码必填+模31校验/项目简称必填/唯一性三元组校验/合并单户后缀显示/批量建项(模板+导入+导出)/独立账套导入页；11 任务组 spec 已建(2026-06-05) |
 
 > 注（2026-06-04）：上述 5 个 spec 由"候选技术调研清单"（memory.md 🔵）转化生成，均 design-first，三件套（design+requirements+tasks）齐全，**代码未动**，等用户排期实施。
 >

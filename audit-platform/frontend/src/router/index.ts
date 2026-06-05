@@ -190,6 +190,11 @@ const router = createRouter({
           component: () => import('@/views/AccountMappingPage.vue'),
         },
         {
+          path: 'projects/:projectId/ledger-import',
+          name: 'LedgerImport',
+          component: () => import('@/views/LedgerImportPage.vue'),
+        },
+        {
           path: 'projects/:projectId/ledger/import-history',
           name: 'LedgerImportHistory',
           component: () => import('@/views/LedgerImportHistory.vue'),

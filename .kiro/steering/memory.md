@@ -19,6 +19,7 @@ inclusion: always
 - **UI 全中文化**：用户可见文本中文（技术术语 SQL/PDF/LLM/API/UUID/CAS/编号 保留英文）；硬编码不接 i18n + ESLint 卡点
 - **中文场景全链路不能崩**：中文文件名下载（Content-Disposition 必 RFC5987）、中文项目名/客户名/底稿名导出、中文数据查询导出均须实测过
 - 功能收敛停加新功能，核心 6-8 页做到极致，空壳标 developing；前后端必须联动；删除二次确认+先进回收站；一次性脚本用完即删
+- **项目向导已简化（2026-06-05 用户要求）**：`STEP_DEPENDENCIES[confirmation]=[]`（无前置步骤依赖），基本信息填完直接可确认创建，account_import/mapping/materiality/team_assignment 全部改为项目内后续补充，不阻塞创建
 - **文档/文件夹级 LLM 对话是最实用核心功能**：任意文档/文件夹发起 AI 对话，自动注入当前文档+关联知识库作 RAG 上下文（spec `doc-level-ai-chat`）
 - git 单 commit 提交所有变更；**push 前必先 fetch 同步**（stash→fetch --prune→评估 ahead/behind→决策→pop→commit/push）；**协作走 PR 不直推 main**（紧急例外需用户拍板）；默认分支 `main`（非 master）
 - 提建议前先验证不引用过时记录；完整复盘诚实暴露问题不粉饰；PDCA：建议→spec→实施→复盘；5 角色轮转（合伙人/项目经理/质控/审计助理/EQCR）
@@ -29,7 +30,7 @@ inclusion: always
 
 - Python 3.12（仓库根 `.venv`）/ Docker / PG 16 / Redis；后端 9980 / 前端 3030 / vLLM 8100；DB `audit_platform`；测试用户 admin/admin123
 - **JWT 有效期**：access_token 1440 分钟（24h）/ refresh_token 30 天（开发环境，config.py 已改，旧默认 30min/7d 太短导致频繁踢登录）
-- **rtk 0.42.1 已装**（`C:\Users\杨志\.local\bin\rtk.exe`，已加用户 PATH）：CLI token 压缩代理，Windows 原生无 hook 自动重写（需手动 `rtk` 前缀或 WSL）；`rtk git status` 节省 ~80%；pytest 全 pass 时回退 fallback 不额外压缩（正确）；用 `rtk gain` 看统计
+- **rtk 0.42.1 已装**（winget 安装，Administrator 用户 PATH 已含；`rtk init -g` 全局 hook 已注册）：CLI token 压缩代理；`rtk git status` 节省 ~42%；pytest 全 pass 时回退 fallback 不额外压缩（正确）；用 `rtk gain` 看统计
 - **rtk steering 规则已建**（`.kiro/steering/rtk-proxy.md`，inclusion: always）：executePwsh 跑 git/pytest/vitest/playwright/eslint/tsc/docker 时自动加 `rtk` 前缀；管道/重定向/fetch/stash/需精确解析的除外
 - **venv 路径**：backend cwd 用 `..\.venv\Scripts\python.exe`；仓库根 cwd 用 `.venv\Scripts\python.exe`（勿混）
 - Docker：`audit-postgres`(5432)/`audit-redis`(6379)/`audit-metabase`(3000)/`audit-pgbouncer`(6432, DB_USE_PGBOUNCER=True 时启用)；health `/api/health`
@@ -44,7 +45,7 @@ inclusion: always
   - **thinking**(1)：`sequentialthinking`(复杂竞态/多步推理，可分支/修正)
   - **memory**(9)：`create_entities`/`create_relations`/`add_observations`/`search_nodes`/`read_graph`/`open_nodes`/`delete_entities`/`delete_relations`/`delete_observations`——**与 memory.md 文件体系是两套，勿混用**
 - **MCP 工具选用决策**：改动前理解代码→`codegraph_context`；查第三方库用法→`context7`；前端 E2E 实测→`playwright browser_snapshot`+交互；前端 runtime bug→`js-reverse set_breakpoint_on_text`+`step`+`evaluate_script`；复杂逻辑推演→`thinking sequentialthinking`；跨对话存结论→`memory create_entities`
-- **codegraph 已装（2026-06-02 重装 v0.9.8 官方 npm 包）**：`npm i -g @colbymchenry/codegraph`（自带 Node runtime 免编译，旧的 `C:\tools` clone+build 路径已不存在）；CLI 在 `~/AppData/Roaming/npm/codegraph`；项目已 `codegraph init -i D:/GT_plan` 索引（59540 节点/131401 边/3205 文件）；CLI 支持 query/callers/callees/impact/affected/context/trace/explore/files/status/serve(MCP)
+- **codegraph 已装（2026-06-05 Administrator 用户重装 v0.9.9）**：`npm i -g @colbymchenry/codegraph`；bin stubs 在 `C:\Users\Administrator\AppData\Roaming\npm\codegraph.cmd`；项目已索引（59540 节点/131278 边/3205 文件）；**MCP 配置已修正**：command 用全局 codegraph.cmd（非 npx），`--path D:/GT_workplan`（非旧 GT_plan）；agentStop hook `codegraph-auto-sync` 自动 sync 索引
 - **⚠️ codegraph MCP 配置（Cursor 2026-06-04）**：**Cursor 只读 `.cursor/mcp.json`**（非 `.kiro/settings/mcp.json`）；`codegraph install --target cursor --location local` 生成；`command:"codegraph"`（全局 npm，勿 npx 每次拉包）+ `args:["serve","--mcp","--no-watch","--path","D:/GT_plan"]` + `"type":"stdio"`；**勿用 `-p`**（仅 `serve` 子命令支持 `--path`）；Kiro 侧 `.kiro/settings/mcp.json` 已同步；改后 **重启 Cursor / Reload MCP** 才挂载 `codegraph_*` 工具
 - **callers 对 Python class 引用检测偏弱**（class 无"调用"语义，查模块名常显示无 caller，需配 grep 二次确认，勿仅凭 codegraph 判孤儿）
 - **✅ codegraph MCP 全工具链路实测通（2026-06-02）**：status/context/files/explore/callers 均正常返回（59540 节点/131401 边/WAL+FTS5）；explore 每 project 限 2 次调用且每次约 6 文件，超范围用 Read；分析确认 `get_authenticated_container`(core/container.py:65) 是死代码（0 引用 + docstring 自承认无法注入 user，应删，认证容器用 deps.get_current_user 路径）
@@ -58,8 +59,8 @@ inclusion: always
 
 ## 迁移与 PG schema（D6 MigrationRunner 运行时迁移，非 alembic）
 
-- 启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞号字母序靠后者静默丢失，scan_migrations 已加同号检测抛 RuntimeError）；**当前最高 V052**（生产库须手工跑 V052）
-- V040 冲突已修(重编号→V044)；V043 pgvector 容错化；V045~V051 见上行；**V052 `wp_formula`**（自定义底稿公式绑定，R052 回滚配对）
+- 启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞号字母序靠后者静默丢失，scan_migrations 已加同号检测抛 RuntimeError）；**当前最高 V054**（生产库须手工跑 V052~V054）
+- V040 冲突已修(重编号→V044)；V043 pgvector 容错化；V045~V051 见上行；**V052 `wp_formula`**（自定义底稿公式绑定，R052 回滚配对）；**V053 `projecttype` 枚举加 `capital_verification`/`tax_audit`**（前端向导有验资/税审选项但 PG 枚举缺值→创建项目 500）；**V054 `projects.is_deleted SET DEFAULT false`**（ORM 声明 server_default 但手工迁移从未应用 DDL→INSERT 不带该列时 NOT NULL violation 500）
 - **⚠️ `CREATE TABLE IF NOT EXISTS audit_log` 是 no-op**：该名被 Metabase 共库占用（真实 schema 无 action 列）→ 应用审计写独立表 `app_audit_log`；建表前先 `to_regclass`+`information_schema.columns` 查真实 schema
 - **本地 PG schema 漂移已修**（critical=0）：drift detector pkgutil walk import 全 model + 过滤 Metabase 共库污染 + 按 critical_count 判 degraded
 - **🔴 projects 表无 year/template_version_id 列**：年度用 `EXTRACT(YEAR FROM audit_period_end)::int`；materiality 年度列=`overall_materiality`；人员姓名在 `staff_members.name`（users 无 display_name），JOIN 用 `project_assignments.staff_id`；database.py 已加 `async_engine = engine` 别名
@@ -78,7 +79,7 @@ inclusion: always
 - vLLM `localhost:8100` 模型 `Kbenkhaled/Qwen3.5-27B-NVFP4`；`.env` `WP_AI_SERVICE_ENABLED=True`（默认 False）
 - **两套 LLM 客户端**：①`llm_client.chat_completion()`（httpx+熔断器，多数 wp_llm_prompts/role_ai/pm 用）②`AIService(db).chat_completion()`（OCR/knowledge/contract/wp_fill 用，需真实 DB 会话查 active model）
 - **✅ 已修 bug**：get_llm_client 不存在（wp_chat_service/wp_document_recognizer 改用 chat_completion）+ vLLM 拒多条 system 消息（ai_service 加 `_merge_system_messages()`，llm_client RAG 注入改追加首条 system）；doc_ai_chat + wp_chat 端到端实测通
-- **🔴 embedding 404**：vLLM 未起 embed task → RAG 向量召回降级 ilike（semantic_search 不崩，build_index 会抛错）；恢复语义检索需另起 vLLM embed 实例
+- **🟢 embedding 服务修复完成（2026-06-05 实测双服务 200）**：`BAAI/bge-m3`(1024 维,中文多语言) 独立容器 `audit-vllm-embed`(端口 8101)；后端 `ai_service._get_embedding_client()`+`LLM_EMBEDDING_BASE_URL=localhost:8101/v1`；`.env` `DEFAULT_EMBEDDING_MODEL=BAAI/bge-m3`。**关键约束**：①vLLM nightly v0.17.2rc0 用 `--runner=pooling --convert=embed`（非 `--task`）②chat 容器 `--gpu-memory-utilization=0.93`（Windows 桌面进程占 ~1.6G，0.95 报 free memory 不足）③embed 容器 `--gpu-memory-utilization=0.12 --enforce-eager`+`restart:"no"`——**必须 chat healthy 后再 `docker compose --profile gpu up -d vllm-embed`**（两容器同时启动导致 chat KV cache=0 崩溃）④docker-compose command 必须写单行字符串（`>-` 折叠标量在双空行文件里被 bash 当多条命令）⑤embed 容器 proxy 用 `http_proxy=http://host.docker.internal:7897`（镜像内置小写 proxy 指向 127.0.0.1 容器内不通）
 - **🔴 孤儿代码 AIChatService**(ai_chat_service.py)：0 router 引用，被 doc_ai_chat 取代；内部实际用 `KnowledgeIndexService(db).search()` + `AIService(db)`（非"调不存在方法"，旧记录有误）；配套 `AIChatSession`/`AIChatMessage` ORM(ai_models.py)+表 = 完整 DB 持久化方案但全孤儿
 - **🟢 知识库收口完成（2026-06-02）**：①旧 `KnowledgeService`(knowledge_service.py)已删（全仓 0 引用）；②孤儿 `AIChatService`(ai_chat_service.py)已删（其 AIChatMessage 用 content/token_count 字段名但模型实为 message_text/tokens_used，接线即崩）；③**doc_ai_chat 内存历史→DB 持久化**：新建 `doc_chat_persistence.py` 复用现成 `ai_chat_session`/`ai_chat_message` 表（用 `context_summary` 存 `{doc_type}:{doc_id}:{user_id}` 定位键，零新增列零漂移），doc_ai_chat 的 `_chat_history` 字典已替换，history 端点改 async DB 读；实测持久化往返+幂等通过（重启不丢历史）
 - **🟢 doc-chat "GET history=0" 真因（2026-06-02 实测闭环）**：后端持久化+_stream_chat 自建 `async_session` 全对（in-process ASGI 实测 GET=2/DELETE 后=0）；之前"问题依旧"是 ①stale uvicorn 跑旧代码（FastAPI 不热加载）②**前端 `useDocAiChat.fetchHistory` 读 `data.messages` 顶层，但 `ResponseWrapperMiddleware` 把所有 2xx JSON 包成 `{code,message,data}`→服务端历史永远加载不出**（已修：解信封读 `body.data.messages`，原生 fetch 非 apiProxy 需手动解）；旧单测 mock 的是未包装 shape 从没守住该契约→已改 mock 真实信封；**铁律：原生 fetch 调后端必手动解 `{code,message,data}` 信封**
@@ -115,6 +116,7 @@ inclusion: always
 - 文档类（memory/INDEX/复盘）冲突取并集，走 PR 让 GitHub 先暴露冲突，不本地直推 main
 
 ### 真正待办（外部依赖）
+- **🟢 建项流程增强 spec `project-creation-enhancement`（2026-06-05 全部实施+两轮补强完成，87 backend tests + 68 frontend tests 全绿）**：USCC 前后端双校验+golden file 一致性 / short_name 必填+唯一性三元组(V055 partial unique index) / 批量建项(模板+导入+导出) / 独立 LedgerImportPage / 查账页 404 静默+空态引导 / 项目列表后缀显示。**补强已落地**：`create_project(auto_commit=False)` 原子批量导入 / USCC trigger=['blur','change'] / Property 11 补 accounting_standard 列断言 / `DEFAULT_REPORT_SCOPE` 常量统一 / `buildConsolidatedKeySet` O(1) lookup / LedgerImportPage GtPageHeader 返回 / BatchImportDialog clearFiles / Property 12 并发 PBT(pg_only) / 导出文件名带日期戳
 - LLM embedding 实例（恢复 RAG 语义检索）/ 6000 并发压测（Locust+真 PG）/ 钉集成 / 合并模块真实集团数据 UAT / GitHub 默认分支改 main / 走 PR 合入
 - **🔴 所有底稿组件统一导入导出（2026-06-04 用户要求，待建 spec）**：用户要求全部底稿组件统一具备"导出模板/导出数据/导入"三功能（当前仅 GtAuditSheet + GtCNoteTable 有）。待覆盖：GtAProgramConsole / GtBIndex / GtDForm(5 类) / GtEControlTest / GtGridSheet / GtCustomWpEditor；每个组件数据结构不同需定义各自的导出格式+导入匹配策略；建议建 spec `workpaper-unified-import-export`
 - **🟡 markitdown 接入收尾（2026-06-04 已写代码未补测/未提交）**：service + 知识库上传链路改造完成；剩余=requirements.txt 加 `markitdown[all]` + 写 `tests/test_markitdown_service.py`(html/csv/xlsx 三类小样本) + 知识库实测上传 .xlsx/.pptx 验证 content_text 入库

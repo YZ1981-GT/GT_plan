@@ -133,8 +133,16 @@
           <el-button size="small" style="margin-top: 12px" @click="refresh">刷新查看</el-button>
         </template>
         <template v-else>
-          <p style="font-size: var(--gt-font-size-base); color: var(--gt-color-text-tertiary)">暂无科目余额数据</p>
-          <p style="font-size: var(--gt-font-size-sm); color: var(--gt-color-text-placeholder)">请点击右上角「导入数据」上传包含余额表的 Excel/CSV 文件</p>
+          <el-empty description="暂无账套数据，请先导入账套" :image-size="120">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+              <el-button type="primary" @click="navigateToLedgerImport">
+                <el-icon style="margin-right: 4px"><Upload /></el-icon> 前往导入账套
+              </el-button>
+              <p style="font-size: var(--gt-font-size-sm); color: var(--gt-color-text-placeholder); margin: 0">
+                支持上传包含科目余额表和序时账的 Excel/CSV 文件
+              </p>
+            </div>
+          </el-empty>
         </template>
       </div>
 
@@ -254,8 +262,11 @@
             <el-button size="small" style="margin-top: 12px" @click="loadAllAuxBalance">刷新查看</el-button>
           </template>
           <template v-else>
-            <p style="font-size: var(--gt-font-size-base); color: var(--gt-color-text-tertiary)">暂无辅助余额数据</p>
-            <p style="font-size: var(--gt-font-size-sm); color: var(--gt-color-text-placeholder)">请点击右上角「导入数据」重新上传包含辅助账的 Excel/CSV 文件</p>
+            <el-empty description="暂无辅助余额数据，请先导入账套" :image-size="100">
+              <el-button type="primary" size="small" @click="navigateToLedgerImport">
+                <el-icon style="margin-right: 4px"><Upload /></el-icon> 前往导入账套
+              </el-button>
+            </el-empty>
           </template>
         </div>
 
@@ -1037,7 +1048,14 @@ const availableYears = ref<number[]>([])
 async function loadAvailableYears() {
   if (!projectId.value) return
   try {
-    const data = await api.get(P_ledger.years(projectId.value))
+    const data = await api.get(P_ledger.years(projectId.value), {
+      validateStatus: (s: number) => s === 200 || s === 404,
+    })
+    // 404 = 新项目无数据，静默处理
+    if (!data || data?.detail) {
+      availableYears.value = []
+      return
+    }
     const result = data
     availableYears.value = result?.years ?? []
   } catch {
@@ -1114,6 +1132,11 @@ function onYearChange(newYear: number) {
 
 function goToImport() {
   openImportDialog()
+}
+
+/** 跳转到独立账套导入页 */
+function navigateToLedgerImport() {
+  router.push(`/projects/${projectId.value}/ledger-import`)
 }
 
 function goToImportHistory() {
@@ -2482,7 +2505,14 @@ async function loadBalance() {
   try {
     const data = await api.get(P_ledger.balance(projectId.value), {
       params: { year: year.value },
+      validateStatus: (s: number) => s === 200 || s === 404,
     })
+    // 404 = 新项目无账套数据，静默处理（不弹 toast）
+    if (!data || data?.detail || (data?.status === 404)) {
+      balanceData.value = []
+      checkImportActive()
+      return
+    }
     balanceData.value = data ?? []
     // 数据为空时检测是否有正在进行的导入
     if (balanceData.value.length === 0) {
@@ -2492,7 +2522,13 @@ async function loadBalance() {
       // 加载金额单位（从 active dataset 的 source_summary 读取）
       loadAmountUnit()
     }
-  } catch (e) {
+  } catch (e: any) {
+    // 404 静默处理（新项目无数据）
+    if (e?.response?.status === 404 || e?.status === 404) {
+      balanceData.value = []
+      checkImportActive()
+      return
+    }
     logger.error('[Ledger] loadBalance failed:', e)
     balanceData.value = []
     checkImportActive()
@@ -2519,7 +2555,13 @@ async function checkImportActive() {
   try {
     const resp: any = await api.get(
       P_ledger.import.activeJob(projectId.value),
+      { validateStatus: (s: number) => s === 200 || s === 404 },
     )
+    // 404 = 新项目无导入任务，静默处理
+    if (!resp || resp?.detail) {
+      isImportActive.value = false
+      return
+    }
     isImportActive.value = resp?.status === 'processing' || resp?.status === 'queued'
   } catch {
     isImportActive.value = false
@@ -2992,8 +3034,14 @@ async function loadAllAuxBalance() {
     // 只加载维度类型列表（轻量，不加载全部汇总行）
     const summaryData = await api.get(
       P_ledger.auxBalanceSummary(projectId.value),
-      { params: { year: year.value, dim_type: '__types_only__' } }
+      { params: { year: year.value, dim_type: '__types_only__' }, validateStatus: (s: number) => s === 200 || s === 404 }
     )
+    // 404 = 新项目无数据，静默处理
+    if (!summaryData || summaryData?.detail) {
+      auxDimTypesFromServer.value = []
+      auxSummaryData.value = []; auxPagedRows.value = []
+      return
+    }
     const summary = summaryData
     auxDimTypesFromServer.value = summary.dim_types || []
 
@@ -3007,7 +3055,12 @@ async function loadAllAuxBalance() {
     await loadAuxSummaryForDim()
     // 加载扁平视图第一页
     await loadAuxBalancePage()
-  } catch (e) {
+  } catch (e: any) {
+    // 404 静默处理（新项目无数据）
+    if (e?.response?.status === 404 || e?.status === 404) {
+      auxSummaryData.value = []; auxPagedRows.value = []
+      return
+    }
     logger.error('loadAllAuxBalance error:', e)
     auxSummaryData.value = []; auxPagedRows.value = []
   }
@@ -3034,8 +3087,13 @@ async function loadAuxSummaryForDim() {
     loading.value = true
     const data = await api.get(
       P_ledger.auxBalanceSummary(projectId.value),
-      { params }
+      { params, validateStatus: (s: number) => s === 200 || s === 404 }
     )
+    // 404 = 新项目无数据，静默处理
+    if (!data || data?.detail) {
+      auxSummaryData.value = []
+      return
+    }
     const result = data
     auxSummaryData.value = result.rows || []
     // 同时更新维度类型列表
@@ -3065,8 +3123,14 @@ async function loadAuxBalancePage() {
 
     const data = await api.get(
       P_ledger.auxBalancePaged(projectId.value),
-      { params }
+      { params, validateStatus: (s: number) => s === 200 || s === 404 }
     )
+    // 404 = 新项目无数据，静默处理
+    if (!data || data?.detail) {
+      auxPagedRows.value = []
+      auxPagedTotal.value = 0
+      return
+    }
     const result = data
     auxPagedRows.value = result.rows || []
     auxPagedTotal.value = result.total || 0

@@ -73,11 +73,15 @@ def _extract_project_audit_year(project: Project) -> int | None:
 
 
 def _to_project_response(project: Project) -> ProjectCreateResponse:
+    # 优先使用物化列 audit_year（Task 4.3），缺失时回退提取逻辑
+    audit_year = project.audit_year or _extract_project_audit_year(project)
     return ProjectCreateResponse(
         id=project.id,
         name=project.name,
         client_name=project.client_name,
-        audit_year=_extract_project_audit_year(project),
+        short_name=project.short_name,
+        company_code=project.company_code,
+        audit_year=audit_year,
         project_type=project.project_type.value if project.project_type else None,
         status=project.status.value,
         template_type=project.template_type,

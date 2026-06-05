@@ -12,6 +12,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      '@fixtures': resolve(__dirname, '../../backend/tests/fixtures'),
     },
   },
 })

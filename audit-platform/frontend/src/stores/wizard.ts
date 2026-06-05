@@ -3,6 +3,7 @@ import http from '@/utils/http'
 
 export interface BasicInfo {
   client_name: string
+  short_name: string
   audit_year: number | null
   project_type: string
   accounting_standard: string
@@ -118,12 +119,11 @@ export const useWizardStore = defineStore('wizard', {
         // Filter out null values for optional fields
         const payload: Record<string, unknown> = {
           client_name: basicInfo.client_name,
+          short_name: basicInfo.short_name,
           audit_year: basicInfo.audit_year,
           project_type: basicInfo.project_type,
           accounting_standard: basicInfo.accounting_standard,
-        }
-        if (basicInfo.company_code) {
-          payload.company_code = basicInfo.company_code
+          company_code: basicInfo.company_code,
         }
         if (basicInfo.template_type) {
           payload.template_type = basicInfo.template_type

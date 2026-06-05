@@ -75,6 +75,8 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         ForeignKey("accounting_standards.id"), nullable=True
     )
     company_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    short_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    audit_year: Mapped[int | None] = mapped_column(nullable=True, comment="审计年度（物化列，唯一性索引依赖）")
     template_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     report_scope: Mapped[str | None] = mapped_column(String(20), nullable=True)
     parent_company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
