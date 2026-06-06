@@ -135,4 +135,48 @@ describe('handleApiError', () => {
       expect.objectContaining({ title: '导出报表失败', type: 'error' }),
     )
   })
+
+  // ── 503 服务降级 ──
+  it('503 → 服务降级通知（含重试提示）', () => {
+    const err = { response: { status: 503, data: {} } }
+    handleApiError(err, '加载数据')
+    expect(ElNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '加载数据：服务降级',
+        message: '服务暂时不可用，请稍后重试',
+        type: 'warning',
+      }),
+    )
+  })
+
+  it('503 + detail.message → 展示后端降级原因', () => {
+    const err = {
+      response: { status: 503, data: { detail: { message: '数据库维护中' } } },
+    }
+    handleApiError(err, '保存')
+    expect(ElNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '保存：服务降级',
+        message: '数据库维护中',
+        type: 'warning',
+      }),
+    )
+  })
+
+  // ── 400 请求错误（后端 detail）──
+  it('400 + detail 字符串 → 展示后端 detail', () => {
+    const err = {
+      response: { status: 400, data: { detail: '日期格式不正确' } },
+    }
+    handleApiError(err, '创建项目')
+    expect(ElMessage.warning).toHaveBeenCalledWith('创建项目：日期格式不正确')
+  })
+
+  it('400 + detail.message → 展示 message', () => {
+    const err = {
+      response: { status: 400, data: { detail: { message: '缺少必填字段' } } },
+    }
+    handleApiError(err, '提交')
+    expect(ElMessage.warning).toHaveBeenCalledWith('提交：缺少必填字段')
+  })
 })

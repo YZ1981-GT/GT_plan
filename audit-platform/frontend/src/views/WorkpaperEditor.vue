@@ -1,4 +1,6 @@
 <template>
+  <!-- [platform-ui-editing-consistency MVP-4]
+       TODO: Replace manual dirty/saving state with useEditStateMachine() -->
   <!-- 横幅区（归档/AI/冲突/信任度/状态机/编辑锁/前置状态/stale） -->
   <EditorBanners
     :project-id="projectId"

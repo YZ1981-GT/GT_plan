@@ -303,6 +303,7 @@ declare module 'vue' {
     GtInfoBar: typeof import('./components/common/GtInfoBar.vue')['default']
     GtLoadingOverlay: typeof import('./components/common/GtLoadingOverlay.vue')['default']
     GtPageHeader: typeof import('./components/common/GtPageHeader.vue')['default']
+    GtPageShell: typeof import('./components/common/GtPageShell.vue')['default']
     GtPrintPreview: typeof import('./components/common/GtPrintPreview.vue')['default']
     GtRowActions: typeof import('./components/common/GtRowActions.vue')['default']
     GtSimpleToolbar: typeof import('./components/common/GtSimpleToolbar.vue')['default']

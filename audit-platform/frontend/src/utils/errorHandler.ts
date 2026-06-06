@@ -70,6 +70,24 @@ export function handleApiError(e: any, context: string): void {
     return
   }
 
+  // 503 — 服务降级
+  if (status === 503) {
+    ElNotification({
+      title: `${context}：服务降级`,
+      message: detail?.message || '服务暂时不可用，请稍后重试',
+      type: 'warning',
+      duration: 8000,
+    })
+    return
+  }
+
+  // 400 — 请求错误（含后端 detail）
+  if (status === 400) {
+    const msg = typeof detail === 'string' ? detail : detail?.message || '请求参数错误'
+    ElMessage.warning(`${context}：${msg}`)
+    return
+  }
+
   // 5xx — 服务端错误
   const traceId = getLastTraceId()
   ElNotification({

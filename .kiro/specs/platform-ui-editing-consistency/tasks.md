@@ -63,11 +63,11 @@
 
 ### P0-MVP：一周内最小可交付
 
-- [ ] MVP-1. `GtPageShell` 在 1 个页面试点接入
-- [ ] MVP-2. `GtAmountCell` + Decimal 测试覆盖展示/复制/解析
-- [ ] MVP-3. `handleApiError` 覆盖权限、网络、后端 detail、degraded
-- [ ] MVP-4. `useEditStateMachine` 在 `WorkpaperEditor` 跑通 dirty/saving/saved
-- [ ] MVP-5. 测试文件落地：
+- [x] MVP-1. `GtPageShell` 在 1 个页面试点接入
+- [x] MVP-2. `GtAmountCell` + Decimal 测试覆盖展示/复制/解析
+- [x] MVP-3. `handleApiError` 覆盖权限、网络、后端 detail、degraded
+- [x] MVP-4. `useEditStateMachine` 在 `WorkpaperEditor` 跑通 dirty/saving/saved
+- [x] MVP-5. 测试文件落地：
   - `audit-platform/frontend/src/components/common/__tests__/GtPageShell.spec.ts`
   - `audit-platform/frontend/src/components/common/__tests__/GtAmountCell.spec.ts`
   - `audit-platform/frontend/src/__tests__/useEditStateMachine.spec.ts`

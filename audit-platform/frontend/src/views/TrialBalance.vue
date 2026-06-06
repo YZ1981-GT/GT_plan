@@ -1,4 +1,6 @@
 <template>
+  <!-- [platform-ui-editing-consistency MVP-1]
+       TODO: Wrap page content with <GtPageShell> to unify header/toolbar/banners -->
   <div class="gt-trial-balance gt-fade-in" :class="{ 'gt-fullscreen': tbFullscreen }">
     <!-- 顶部区域（可折叠） -->
     <div v-show="!headerCollapsed">
