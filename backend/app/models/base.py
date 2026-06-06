@@ -31,6 +31,8 @@ class ProjectType(str, enum.Enum):
     special = "special"
     ipo = "ipo"
     internal_control = "internal_control"
+    capital_verification = "capital_verification"
+    tax_audit = "tax_audit"
 
 
 class ProjectStatus(str, enum.Enum):

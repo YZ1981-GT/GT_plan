@@ -713,33 +713,7 @@ services:
 
     command:
 
-      - >-
-
-        vllm serve Kbenkhaled/Qwen3.5-27B-NVFP4
-
-        --host=0.0.0.0
-
-        --port=8000
-
-        --max-model-len=${VLLM_MAX_MODEL_LEN:-32768}
-
-        --gpu-memory-utilization=${VLLM_GPU_MEM:-0.95}
-
-        --max-num-seqs=4
-
-        --max-num-batched-tokens=32768
-
-        --kv-cache-dtype=fp8
-
-        --reasoning-parser=qwen3
-
-        --enable-auto-tool-choice
-
-        --enable-prefix-caching
-
-        --tool-call-parser=qwen3_coder
-
-        --language-model-only
+      - "vllm serve Kbenkhaled/Qwen3.5-27B-NVFP4 --host=0.0.0.0 --port=8000 --max-model-len=32768 --gpu-memory-utilization=0.93 --max-num-seqs=4 --max-num-batched-tokens=32768 --kv-cache-dtype=fp8 --reasoning-parser=qwen3 --enable-auto-tool-choice --enable-prefix-caching --tool-call-parser=qwen3_coder --language-model-only"
 
     profiles:
 
@@ -756,6 +730,96 @@ services:
       retries: 5
 
       start_period: 120s
+
+
+
+  # ----------------------------------------------------------
+
+  # vLLM Embedding — BAAI/bge-m3 (中文多语言 embedding)
+
+  # 独立容器，与 chat 模型共享 GPU（各自限制显存）
+
+  # API：http://localhost:8101/v1 (OpenAI 兼容 /embeddings)
+
+  # ----------------------------------------------------------
+
+  vllm-embed:
+
+    image: vllm/vllm-openai:cu130-nightly
+
+    container_name: audit-vllm-embed
+
+    restart: "no"
+
+    ports:
+
+      - "${VLLM_EMBED_PORT:-8101}:8000"
+
+    ipc: host
+
+    runtime: nvidia
+
+    deploy:
+
+      resources:
+
+        reservations:
+
+          devices:
+
+            - driver: nvidia
+
+              count: all
+
+              capabilities: [gpu]
+
+    volumes:
+
+      - ${VLLM_HF_CACHE:-D:/vllm/hf-cache}:/root/.cache/huggingface
+
+    environment:
+
+      - HF_HUB_OFFLINE=0
+
+      - TRANSFORMERS_OFFLINE=0
+
+      - HTTP_PROXY=http://host.docker.internal:7897
+
+      - HTTPS_PROXY=http://host.docker.internal:7897
+
+      - http_proxy=http://host.docker.internal:7897
+
+      - https_proxy=http://host.docker.internal:7897
+
+      - NO_PROXY=localhost,127.0.0.1
+
+      - no_proxy=localhost,127.0.0.1
+
+    extra_hosts:
+
+      - "host.docker.internal:host-gateway"
+
+    entrypoint: ["/bin/bash", "-c"]
+
+    command:
+
+      - "vllm serve BAAI/bge-m3 --host=0.0.0.0 --port=8000 --runner=pooling --convert=embed --max-model-len=8192 --gpu-memory-utilization=0.12 --dtype=float16 --enforce-eager"
+
+    profiles:
+
+      - gpu
+
+    healthcheck:
+
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+
+      interval: 30s
+
+      timeout: 10s
+
+      retries: 5
+
+      start_period: 60s
 
 
 

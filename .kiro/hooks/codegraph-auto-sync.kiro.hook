@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "Codegraph Auto Sync",
+  "description": "每次 agent 执行结束后自动同步 codegraph 索引，确保后续代码查询反映最新改动",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "codegraph sync",
+    "timeout": 30
+  }
+}

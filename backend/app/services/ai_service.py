@@ -96,6 +96,17 @@ async def _get_llm_client() -> httpx.AsyncClient:
     )
 
 
+async def _get_embedding_client() -> httpx.AsyncClient:
+    """获取 Embedding HTTP 客户端（独立 bge-m3 服务，端口 8101）"""
+    return httpx.AsyncClient(
+        base_url=settings.LLM_EMBEDDING_BASE_URL,
+        headers={"Authorization": f"Bearer {settings.LLM_API_KEY}"},
+        timeout=httpx.Timeout(30.0, connect=5.0),
+        mounts={},
+        trust_env=False,
+    )
+
+
 def _merge_system_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     """合并多条 system 消息为一条（vLLM + Qwen3.5 仅允许开头一条 system）。
 
@@ -396,7 +407,7 @@ class AIService:
             else:
                 model = settings.DEFAULT_EMBEDDING_MODEL
 
-        async with await _get_llm_client() as client:
+        async with await _get_embedding_client() as client:
             response = await client.post(
                 "/embeddings",
                 json={

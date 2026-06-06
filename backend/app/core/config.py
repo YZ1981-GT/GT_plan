@@ -95,7 +95,8 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str = "http://localhost:8100/v1"  # vLLM OpenAI 兼容 API
     LLM_API_KEY: str = "not-needed"  # vLLM 本地不需要 API Key
     DEFAULT_CHAT_MODEL: str = "Kbenkhaled/Qwen3.5-27B-NVFP4"
-    DEFAULT_EMBEDDING_MODEL: str = "Kbenkhaled/Qwen3.5-27B-NVFP4"
+    DEFAULT_EMBEDDING_MODEL: str = "BAAI/bge-m3"
+    LLM_EMBEDDING_BASE_URL: str = "http://localhost:8101/v1"  # 独立 embedding 服务（bge-m3）
     LLM_TEMPERATURE: float = 0.3
     LLM_MAX_TOKENS: int = 4096
     LLM_ENABLE_THINKING: bool = False  # Qwen3.5 thinking 模式，审计场景默认关闭

@@ -298,6 +298,7 @@ class TestValidateStep:
 
     @pytest.mark.asyncio
     async def test_validate_confirmation_all_steps_needed(self, db_session: AsyncSession):
+        """确认只需 basic_info（其他步骤可后续补充，不阻塞创建）"""
         from app.services import project_wizard_service as svc
 
         project = await svc.create_project(_make_basic_info(), db_session)
@@ -305,13 +306,8 @@ class TestValidateStep:
             project.id, WizardStep.confirmation, db_session
         )
 
-        assert result.valid is False
-        assert {m.field for m in result.messages} >= {
-            "account_import",
-            "account_mapping",
-            "materiality",
-            "team_assignment",
-        }
+        # basic_info 在 create_project 时已自动保存，所以确认应直接通过
+        assert result.valid is True
 
     @pytest.mark.asyncio
     async def test_validate_confirmation_ready_after_required_steps(self, db_session: AsyncSession):
@@ -351,27 +347,27 @@ class TestConfirmProject:
 
     @pytest.mark.asyncio
     async def test_confirm_project_missing_required_steps(self, db_session: AsyncSession):
+        """basic_info 已有时确认应成功（其他步骤不再阻塞）"""
         from app.services import project_wizard_service as svc
 
         project = await svc.create_project(_make_basic_info(), db_session)
 
-        with pytest.raises(Exception) as exc_info:
-            await svc.confirm_project(project.id, db_session)
-        assert exc_info.value.status_code == 400
-        assert "account_import" in str(exc_info.value.detail)
+        # basic_info 在 create 时自动保存，所以确认不应报错
+        result = await svc.confirm_project(project.id, db_session)
+        assert result.status.value == "planning"
 
     @pytest.mark.asyncio
     async def test_confirm_project_missing_basic_info_step(self, db_session: AsyncSession):
-        """缺少基本信息步骤时确认应失败。"""
+        """即使 wizard_state.steps 为空，确认也应成功（向导已简化，无前置依赖）"""
         from app.services import project_wizard_service as svc
 
         project = await svc.create_project(_make_basic_info(), db_session)
         project.wizard_state = {**project.wizard_state, "steps": {}}
         await db_session.commit()
 
-        with pytest.raises(Exception) as exc_info:
-            await svc.confirm_project(project.id, db_session)
-        assert exc_info.value.status_code == 400
+        # 确认不再阻塞（无前置步骤依赖）
+        result = await svc.confirm_project(project.id, db_session)
+        assert result.status.value == "planning"
 
     @pytest.mark.asyncio
     async def test_confirm_project_already_planning(self, db_session: AsyncSession):
