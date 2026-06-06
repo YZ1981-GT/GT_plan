@@ -63,7 +63,7 @@ audit-platform/frontend/src/services/commonApi.ts 1516
 audit-platform/frontend/src/views/ConsolidationIndex.vue 1717
 audit-platform/frontend/src/views/LedgerPenetration.vue 3757
 audit-platform/frontend/src/views/ManagerDashboard.vue 1523
-audit-platform/frontend/src/views/ReportView.vue 2848
+audit-platform/frontend/src/views/ReportView.vue 975
 audit-platform/frontend/src/views/TrialBalance.vue 2758
 audit-platform/frontend/src/views/WorkpaperEditor.vue 928
 audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue 1522

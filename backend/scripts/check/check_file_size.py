@@ -49,6 +49,7 @@ HARD_CAPS = {
     "audit-platform/frontend/src/components/workpaper/GtDForm/GtDFormConfirmation.vue": 420,
     "audit-platform/frontend/src/components/workpaper/GtDForm/GtDFormParagraph.vue": 400,
     "audit-platform/frontend/src/views/DisclosureEditor.vue": 1800,
+    "audit-platform/frontend/src/views/ReportView.vue": 1110,  # report-view-slimdown spec
 }
 
 EXCLUDE_PARTS = {".git", ".venv", "__pycache__", "node_modules", "dist", "build",

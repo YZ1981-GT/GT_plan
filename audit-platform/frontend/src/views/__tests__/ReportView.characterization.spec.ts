@@ -7,117 +7,15 @@
  * - getRowType: 行类型判定 6 种（header/total/special/manual/zero/data）
  * - equitySpanMethod: 权益表 span-method（分类行返回 colspan）
  * - crossCheckResults: 跨表核对 7 条等式计算
- * - formatReportAmount: 千分位 + 负数括号
+ * - formatReportAmount: 千分位 + 负数红色括号
  *
  * Validates: Requirements 1.1, 6.1, 6.2
  */
 import { describe, it, expect, test } from 'vitest'
 import fc from 'fast-check'
-
-// ─── 从 ReportView.vue 复制的纯函数逻辑（抽取前锁定行为） ─────────────────────
-
-interface ReportRow {
-  row_code: string
-  row_name: string
-  current_period_amount: string | null
-  prior_period_amount: string | null
-  formula_used: string | null
-  source_accounts: string[] | null
-  indent_level: number
-  is_total_row: boolean
-}
-
-/**
- * F27/D9: 行类型判定逻辑（6 种行类型）
- * 从 ReportView.vue ~1423 行复制
- */
-function getRowType(row: ReportRow): string {
-  if (row.row_name && (row.row_name.includes('：') || row.row_name.includes(':'))) return 'header'
-  if (row.is_total_row) return 'total'
-  if (row.row_name && (row.row_name.startsWith('△') || row.row_name.startsWith('▲'))) return 'special'
-  if (!row.formula_used && row.current_period_amount === '0') return 'manual'
-  if (parseFloat(row.current_period_amount || '0') === 0 && !row.current_period_amount?.includes('.')) return 'zero'
-  return 'data'
-}
-
-/**
- * 权益变动表 span-method（合并单元格：分类标题行横跨所有列）
- * 从 ReportView.vue ~1375 行复制
- * eqColumnsCount 模拟 eqColumns.value.length
- */
-function equitySpanMethod(
-  { row, columnIndex }: { row: any; column: any; rowIndex: number; columnIndex: number },
-  eqColumnsCount: number,
-) {
-  if (row.indent_level === 0 && !row.is_total_row && columnIndex === 0) {
-    return { rowspan: 1, colspan: 1 + eqColumnsCount * 2 }
-  }
-  if (row.indent_level === 0 && !row.is_total_row && columnIndex > 0) {
-    return { rowspan: 0, colspan: 0 }
-  }
-  return { rowspan: 1, colspan: 1 }
-}
-
-
-/**
- * F27: 金额格式化——千分位 + 负数红色括号
- * 从 ReportView.vue ~1974 行复制
- */
-function formatReportAmount(value: any): { text: string; isNegative: boolean } {
-  if (value === null || value === undefined || value === '') return { text: '', isNegative: false }
-  const num = typeof value === 'string' ? parseFloat(value) : Number(value)
-  if (isNaN(num)) return { text: String(value), isNegative: false }
-  if (num === 0) return { text: '0.00', isNegative: false }
-  const isNeg = num < 0
-  const abs = Math.abs(num)
-  const parts = abs.toFixed(2).split('.')
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-  const formatted = parts.join('.')
-  const text = isNeg ? `(${formatted})` : formatted
-  return { text, isNegative: isNeg }
-}
-
-/**
- * 跨表核对 7 条等式计算逻辑
- * 从 ReportView.vue ~1918 行复制
- */
-function computeCrossCheckResults(crossCheckData: Record<string, any>) {
-  const { bsMap = {}, isMap = {} } = crossCheckData
-  const get = (map: Record<string, number>, ...keys: string[]) => {
-    for (const k of keys) { if (map[k] != null && map[k] !== 0) return map[k] }
-    for (const k of keys) {
-      for (const [mk, mv] of Object.entries(map)) {
-        if (mv !== 0 && mk.includes(k)) return mv as number
-      }
-    }
-    return 0
-  }
-  const totalAssets = get(bsMap, 'assets_total', '资产总计', '资产合计')
-  const totalLiabilities = get(bsMap, 'liabilities_total', '负债合计', '负债总计')
-  const totalEquity = get(bsMap, 'equity_total', '所有者权益合计', '股东权益合计', '权益合计')
-  const netProfit = get(isMap, 'IS-019', '净利润')
-  const revenue = get(isMap, 'IS-001', '营业收入')
-  const cost = get(isMap, 'IS-002', '营业成本')
-  const profitBeforeTax = get(isMap, 'IS-017', '利润总额')
-  const incomeTax = get(isMap, 'IS-018', '所得税费用', '所得税')
-  const cash = get(bsMap, 'BS-001', '货币资金')
-
-  function check(desc: string, left: number, right: number, tolerance = 0): any {
-    const diff = Math.round((left - right) * 100) / 100
-    const passed = tolerance > 0 ? Math.abs(diff) <= tolerance : Math.abs(diff) < 0.01
-    return { description: desc, leftValue: left || null, rightValue: right || null, diff: diff || null, passed }
-  }
-
-  return [
-    check('资产合计 = 负债合计 + 所有者权益合计', totalAssets, totalLiabilities + totalEquity, 1),
-    check('营业收入 − 营业成本 = 毛利', revenue - cost, revenue - cost),
-    check('利润总额 − 所得税 = 净利润', profitBeforeTax - incomeTax, netProfit, 1),
-    check('资产 − 负债 = 权益', totalAssets - totalLiabilities, totalEquity, 1),
-    check('所有者权益变动表期末 = 资产负债表权益', totalEquity, totalEquity),
-    check('有效税率 ≈ 25%', incomeTax, profitBeforeTax > 0 ? profitBeforeTax * 0.25 : 0, profitBeforeTax * 0.05),
-    check('货币资金 ≥ 0（负值异常）', cash, 0, Math.abs(cash)),
-  ]
-}
+import { getRowType, formatReportAmount, equitySpanMethod } from '../composables/useReportColumns'
+import { computeCrossCheckResults } from '../composables/useReportCrossCheck'
+import type { ReportRow } from '@/services/auditPlatformApi'
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
@@ -455,13 +353,6 @@ describe('ReportView PBT — getRowType returns valid enum', () => {
 // Feature: report-view-slimdown, Property 1: Behavioral Equivalence
 // **Validates: Requirements 1.1**
 describe('ReportView PBT — formatReportAmount behavioral equivalence', () => {
-  const arbInput = fc.oneof(
-    fc.integer(),
-    fc.double({ noNaN: true, noDefaultInfinity: true }),
-    fc.constant(null),
-    fc.constant(undefined),
-  )
-
   test('null/undefined input → text is empty string, isNegative is false', () => {
     fc.assert(
       fc.property(

@@ -89,7 +89,7 @@
   - [x] 5.2 验证抽取后 vue-tsc + vitest 通过
     - _Requirements: 1.2, 1.3_
 
-  - [~]* 5.3 编写 useReportData 单元测试
+  - [x]* 5.3 编写 useReportData 单元测试
     - 创建 `src/views/composables/__tests__/useReportData.spec.ts`
     - Mock API，验证 fetchReport / onGenerate / loadTemplateRows 调用和状态变化
     - 含原特征测试移来的 mount 类用例：Tab 切换触发 fetchReport（API 参数正确）、刷新按钮调 generateReports（API + ElMessage）、对比视图合并逻辑（compareRows 结构）
@@ -105,7 +105,7 @@
   - [x] 6.2 验证抽取后 vue-tsc + vitest 通过
     - _Requirements: 1.2, 1.3_
 
-  - [~]* 6.3 编写 useReportMapping 单元测试
+  - [x]* 6.3 编写 useReportMapping 单元测试
     - 创建 `src/views/composables/__tests__/useReportMapping.spec.ts`
     - Mock API，验证 loadPreset / save / templateApply
     - _Requirements: 3.2_
@@ -120,12 +120,12 @@
   - [x] 7.2 验证抽取后 vue-tsc + vitest 通过
     - _Requirements: 1.2, 1.3_
 
-  - [~]* 7.3 编写 useReportCrossCheck 单元测试
+  - [x]* 7.3 编写 useReportCrossCheck 单元测试
     - 创建 `src/views/composables/__tests__/useReportCrossCheck.spec.ts`
     - Mock API，验证 7 条等式计算逻辑
     - _Requirements: 3.4_
 
-  - [~]* 7.4 编写 crossCheckResults 计算 property-based test
+  - [x]* 7.4 编写 crossCheckResults 计算 property-based test
     - **Property 1: Behavioral Equivalence — 跨表核对等式**
     - fast-check 生成随机 BS/IS 行数据，验证 diff = leftValue - rightValue 且 passed = (diff === 0)
     - `numRuns: 5`
@@ -141,7 +141,7 @@
   - [x] 8.2 验证抽取后 vue-tsc + vitest 通过
     - _Requirements: 1.2, 1.3_
 
-  - [~]* 8.3 编写 useReportExport 单元测试
+  - [x]* 8.3 编写 useReportExport 单元测试
     - 创建 `src/views/composables/__tests__/useReportExport.spec.ts`
     - Mock downloadFileAsBlob，验证 export URL 拼接正确
     - _Requirements: 3.5_
@@ -158,7 +158,7 @@
     - 重点验证右键菜单选中/框选/穿透/批注交互无回归（实例传递正确）
     - _Requirements: 1.2, 1.3_
 
-  - [~]* 9.3 编写 useReportCellActions 单元测试
+  - [x]* 9.3 编写 useReportCellActions 单元测试
     - 创建 `src/views/composables/__tests__/useReportCellActions.spec.ts`
     - Mock router/API，验证 click/dblclick/contextmenu handlers + onDrilldown API 调用（含原特征测试移来的 mount 类用例）
     - _Requirements: 3.3_
@@ -212,7 +212,7 @@
   - [x] 13.3 验证抽取后 vue-tsc + vitest 通过
     - _Requirements: 1.2, 1.3_
 
-- [-] 14. Checkpoint — 确认全部子组件抽取完成无回归
+- [x] 14. Checkpoint — 确认全部子组件抽取完成无回归
   - `npx vitest run` 全部通过 + `npx tsc --noEmit` 零错误
   - 若 ReportDialogs.vue 超 600 行，拆为 2-3 个独立弹窗组件（ReportDrilldownDialogs / ReportTraceDialogs / ReportMappingDialog）
   - 确认主文件总行数（含模板+script+style 引用）≤1500
@@ -220,31 +220,31 @@
   - _Requirements: 1.2, 1.3, 2.1, 4.3_
 
 - [ ] 15. 最终验证 + whitelist 基线下调 + HARD_CAP 登记
-  - [~] 15.1 确认 ReportView.vue 行数 ≤1500
+  - [x] 15.1 确认 ReportView.vue 行数 ≤1500
     - 运行 `wc -l` 或等效命令确认主文件行数
     - 确认所有抽取文件均 ≤1500 行
     - _Requirements: 2.1, 2.4_
 
-  - [~] 15.2 运行 `python backend/scripts/check/check_file_size.py` 确认 exit 0
+  - [x] 15.2 运行 `python backend/scripts/check/check_file_size.py` 确认 exit 0
     - _Requirements: 2.1_
 
-  - [~] 15.3 下调 `backend/scripts/file_size_whitelist.txt` 中 ReportView.vue 基线
+  - [x] 15.3 下调 `backend/scripts/file_size_whitelist.txt` 中 ReportView.vue 基线
     - 将 `audit-platform/frontend/src/views/ReportView.vue 2848` 改为实际瘦身后行数（±10 行余量）
     - _Requirements: 2.2_
 
-  - [~] 15.4 在 `HARD_CAPS` 字典中登记 ReportView.vue
+  - [x] 15.4 在 `HARD_CAPS` 字典中登记 ReportView.vue
     - 在 `backend/scripts/check/check_file_size.py` 的 `HARD_CAPS` dict 中添加 `"audit-platform/frontend/src/views/ReportView.vue": <实际行数+15%余量>`
     - 添加注释说明来源 spec
     - _Requirements: 2.3_
 
-  - [~] 15.5 全量最终验证
+  - [x] 15.5 全量最终验证
     - `npx tsc --noEmit` 零错误
     - `npx vitest run` 全部通过（含特征测试 + composable 单测）
     - `python backend/scripts/check/check_file_size.py` exit 0
     - 确认零功能回归、零 UI 文本变化
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3_
 
-  - [~]* 15.6 编写 file-size invariant property test
+  - [x]* 15.6 编写 file-size invariant property test
     - **Property 2: File Size Invariant**
     - 静态检查：遍历所有抽取文件路径，断言每个文件 ≤1500 行
     - `numRuns: 5`（对路径列表随机排列验证）

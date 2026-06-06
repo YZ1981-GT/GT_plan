@@ -32,6 +32,56 @@ export interface UseReportColumnsReturn {
   goToNote: (rowCode: string) => void
 }
 
+// ─── Standalone pure functions (module-level exports) ────────────────────────
+
+/**
+ * Row type detection (6 types): header / total / special / manual / zero / data
+ * Pure function — no Vue reactivity needed.
+ */
+export function getRowType(row: ReportRow): string {
+  if (row.row_name && (row.row_name.includes('：') || row.row_name.includes(':'))) return 'header'
+  if (row.is_total_row) return 'total'
+  if (row.row_name && (row.row_name.startsWith('△') || row.row_name.startsWith('▲'))) return 'special'
+  if (!row.formula_used && row.current_period_amount === '0') return 'manual'
+  if (parseFloat(row.current_period_amount || '0') === 0 && !row.current_period_amount?.includes('.')) return 'zero'
+  return 'data'
+}
+
+/**
+ * Amount formatting — thousands separator + negative brackets.
+ * Pure function — no Vue reactivity needed.
+ */
+export function formatReportAmount(value: any): { text: string; isNegative: boolean } {
+  if (value === null || value === undefined || value === '') return { text: '', isNegative: false }
+  const num = typeof value === 'string' ? parseFloat(value) : Number(value)
+  if (isNaN(num)) return { text: String(value), isNegative: false }
+  if (num === 0) return { text: '0.00', isNegative: false }
+  const isNeg = num < 0
+  const abs = Math.abs(num)
+  const parts = abs.toFixed(2).split('.')
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  const formatted = parts.join('.')
+  const text = isNeg ? `(${formatted})` : formatted
+  return { text, isNegative: isNeg }
+}
+
+/**
+ * Equity span-method — merges category row cells across all equity columns.
+ * Pure function — eqColumnsCount is passed as parameter instead of closure.
+ */
+export function equitySpanMethod(
+  { row, columnIndex }: { row: any; column: any; rowIndex: number; columnIndex: number },
+  eqColumnsCount: number,
+): { rowspan: number; colspan: number } {
+  if (row.indent_level === 0 && !row.is_total_row && columnIndex === 0) {
+    return { rowspan: 1, colspan: 1 + eqColumnsCount * 2 }
+  }
+  if (row.indent_level === 0 && !row.is_total_row && columnIndex > 0) {
+    return { rowspan: 0, colspan: 0 }
+  }
+  return { rowspan: 1, colspan: 1 }
+}
+
 // ─── Implementation ─────────────────────────────────────────────────────────
 
 const eqColumnsBase = [
@@ -96,15 +146,9 @@ export function useReportColumns(options: UseReportColumnsOptions): UseReportCol
 
   const eqTotalCols = computed(() => eqColumns.value.length)
 
-  // ─── Equity span-method ─────────────────────────────────────────────────────
-  function equitySpanMethod({ row, columnIndex }: { row: any; column: any; rowIndex: number; columnIndex: number }) {
-    if (row.indent_level === 0 && !row.is_total_row && columnIndex === 0) {
-      return { rowspan: 1, colspan: 1 + eqColumns.value.length * 2 }
-    }
-    if (row.indent_level === 0 && !row.is_total_row && columnIndex > 0) {
-      return { rowspan: 0, colspan: 0 }
-    }
-    return { rowspan: 1, colspan: 1 }
+  // ─── Equity span-method (wraps standalone function with closure eqColumns count) ──
+  function _equitySpanMethod(params: { row: any; column: any; rowIndex: number; columnIndex: number }) {
+    return equitySpanMethod(params, eqColumns.value.length)
   }
 
   // ─── Equity row class ───────────────────────────────────────────────────────
@@ -129,15 +173,7 @@ export function useReportColumns(options: UseReportColumnsOptions): UseReportCol
     return ''
   }
 
-  // ─── Row type detection (6 types) ──────────────────────────────────────────
-  function getRowType(row: ReportRow): string {
-    if (row.row_name && (row.row_name.includes('：') || row.row_name.includes(':'))) return 'header'
-    if (row.is_total_row) return 'total'
-    if (row.row_name && (row.row_name.startsWith('△') || row.row_name.startsWith('▲'))) return 'special'
-    if (!row.formula_used && row.current_period_amount === '0') return 'manual'
-    if (parseFloat(row.current_period_amount || '0') === 0 && !row.current_period_amount?.includes('.')) return 'zero'
-    return 'data'
-  }
+  // ─── Row type detection (delegates to module-level export) ───────────────────
 
   // ─── Row class name ─────────────────────────────────────────────────────────
   function rowClassName({ row }: { row: ReportRow }) {
@@ -152,20 +188,7 @@ export function useReportColumns(options: UseReportColumnsOptions): UseReportCol
     return `report-row--${type}`
   }
 
-  // ─── Amount formatting (thousands separator + negative brackets) ─────────────
-  function formatReportAmount(value: any): { text: string; isNegative: boolean } {
-    if (value === null || value === undefined || value === '') return { text: '', isNegative: false }
-    const num = typeof value === 'string' ? parseFloat(value) : Number(value)
-    if (isNaN(num)) return { text: String(value), isNegative: false }
-    if (num === 0) return { text: '0.00', isNegative: false }
-    const isNeg = num < 0
-    const abs = Math.abs(num)
-    const parts = abs.toFixed(2).split('.')
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-    const formatted = parts.join('.')
-    const text = isNeg ? `(${formatted})` : formatted
-    return { text, isNegative: isNeg }
-  }
+  // ─── Amount formatting (delegates to module-level export) ────────────────────
 
   // ─── Note section mapping ───────────────────────────────────────────────────
   function getNoteSection(rowCode: string): string | null {
@@ -182,7 +205,7 @@ export function useReportColumns(options: UseReportColumnsOptions): UseReportCol
   return {
     eqColumns,
     eqTotalCols,
-    equitySpanMethod,
+    equitySpanMethod: _equitySpanMethod,
     eqRowClassName,
     eqCellVal,
     impIncCols,
