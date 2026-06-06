@@ -53,40 +53,40 @@
     - `numRuns: 5`（对随机子集抽样比对）
     - **Validates: Requirements 5.3, 5.4**
 
-- [-] 3. Checkpoint — 确认 CSS 外置无回归
+- [x] 3. Checkpoint — 确认 CSS 外置无回归
   - `npx vitest run` 全部通过 + `npx tsc --noEmit` 零错误 + ReportView.vue 行数已减 ~484 行
   - git 单 commit 提交进度（便于二分定位回归）
   - _Requirements: 1.2, 1.3, 5.1_
 
 - [ ] 4. 抽取 `useReportColumns` composable
-  - [~] 4.1 创建 `src/views/composables/useReportColumns.ts`
+  - [x] 4.1 创建 `src/views/composables/useReportColumns.ts`
     - 从 ReportView.vue ~1350–1500 行抽取：eqColumns / eqTotalCols / equitySpanMethod / eqRowClassName / eqCellVal / impIncCols / impDecCols / impRowClassName / getRowType / rowClassName / compareRowClassName / formatReportAmount / getNoteSection / goToNote
     - 定义 `UseReportColumnsOptions` 和 `UseReportColumnsReturn` 接口（按 design 文档）
     - 主文件 import 并调用，仅做编排
     - _Requirements: 3.6, 3.7, 3.8_
 
-  - [~] 4.2 验证抽取后 vue-tsc + vitest 通过
+  - [x] 4.2 验证抽取后 vue-tsc + vitest 通过
     - _Requirements: 1.2, 1.3_
 
-  - [~]* 4.3 编写 useReportColumns 单元测试
+  - [x]* 4.3 编写 useReportColumns 单元测试
     - 创建 `src/views/composables/__tests__/useReportColumns.spec.ts`
     - 测试 equitySpanMethod / getRowType / formatReportAmount / eqColumns 计算
     - _Requirements: 3.6_
 
-  - [~]* 4.4 编写 equitySpanMethod property-based test
+  - [x]* 4.4 编写 equitySpanMethod property-based test
     - **Property 1: Behavioral Equivalence — equitySpanMethod**
     - fast-check 生成随机 `{row, column, rowIndex, columnIndex}`，验证返回 `{rowspan, colspan}` 值合法（≥0）
     - `numRuns: 5`
     - **Validates: Requirements 1.1, 3.6**
 
 - [ ] 5. 抽取 `useReportData` composable
-  - [~] 5.1 创建 `src/views/composables/useReportData.ts`
+  - [x] 5.1 创建 `src/views/composables/useReportData.ts`
     - 从 ReportView.vue ~1200–1810 行抽取：fetchReport / onGenerate / onConsistencyCheck / runBalanceCheck / loadTemplateRows / ensureProjectYear / reloadReportContext / rows / compareRows / loading / genLoading / checkLoading / syncLoading / balanceCheckResult / consistencyResult / tableMaxHeight / activeTabLabel / coverageSummary / projectName / reportScope / templateType / isConsolidated
     - 定义 `UseReportDataOptions` 和 `UseReportDataReturn` 接口
     - 主文件 import 并调用
     - _Requirements: 3.1, 3.7, 3.8_
 
-  - [~] 5.2 验证抽取后 vue-tsc + vitest 通过
+  - [x] 5.2 验证抽取后 vue-tsc + vitest 通过
     - _Requirements: 1.2, 1.3_
 
   - [~]* 5.3 编写 useReportData 单元测试
@@ -96,13 +96,13 @@
     - _Requirements: 3.1_
 
 - [ ] 6. 抽取 `useReportMapping` composable
-  - [~] 6.1 创建 `src/views/composables/useReportMapping.ts`
+  - [x] 6.1 创建 `src/views/composables/useReportMapping.ts`
     - 从 ReportView.vue ~1070–1200 行抽取：showMappingDialog / mappingLoading / mappingTab / allMappingRules / allListedOptions / mappingReportTypes / mappingTabLabel / currentMappingRules / currentListedOptions / totalMappedCount / totalRuleCount / loadPresetMappingAll / saveMappingRulesAll / getMappingConfigData / onMappingTemplateApplied
     - 定义 `UseReportMappingOptions` 和 `UseReportMappingReturn` 接口
     - 主文件 import 并调用
     - _Requirements: 3.2, 3.7, 3.8_
 
-  - [~] 6.2 验证抽取后 vue-tsc + vitest 通过
+  - [x] 6.2 验证抽取后 vue-tsc + vitest 通过
     - _Requirements: 1.2, 1.3_
 
   - [~]* 6.3 编写 useReportMapping 单元测试
@@ -111,13 +111,13 @@
     - _Requirements: 3.2_
 
 - [ ] 7. 抽取 `useReportCrossCheck` composable
-  - [~] 7.1 创建 `src/views/composables/useReportCrossCheck.ts`
+  - [x] 7.1 创建 `src/views/composables/useReportCrossCheck.ts`
     - 从 ReportView.vue ~1880–2000 行抽取：crossCheckData / crossCheckLoading / crossCheckResults / loadCrossCheckData
     - 定义 `UseReportCrossCheckOptions` 和 `UseReportCrossCheckReturn` 接口
     - 主文件 import 并调用
     - _Requirements: 3.4, 3.7, 3.8_
 
-  - [~] 7.2 验证抽取后 vue-tsc + vitest 通过
+  - [x] 7.2 验证抽取后 vue-tsc + vitest 通过
     - _Requirements: 1.2, 1.3_
 
   - [~]* 7.3 编写 useReportCrossCheck 单元测试
@@ -132,13 +132,13 @@
     - **Validates: Requirements 1.1, 3.4**
 
 - [ ] 8. 抽取 `useReportExport` composable
-  - [~] 8.1 创建 `src/views/composables/useReportExport.ts`
+  - [x] 8.1 创建 `src/views/composables/useReportExport.ts`
     - 从 ReportView.vue ~2400–2460 行抽取：onExportExcel / onExportAllExcel / copyReportTable / showReportImport / onReportImported
     - 定义 `UseReportExportOptions` 和 `UseReportExportReturn` 接口
     - 主文件 import 并调用
     - _Requirements: 3.5, 3.7, 3.8_
 
-  - [~] 8.2 验证抽取后 vue-tsc + vitest 通过
+  - [x] 8.2 验证抽取后 vue-tsc + vitest 通过
     - _Requirements: 1.2, 1.3_
 
   - [~]* 8.3 编写 useReportExport 单元测试
@@ -147,14 +147,14 @@
     - _Requirements: 3.5_
 
 - [ ] 9. 抽取 `useReportCellActions` composable
-  - [~] 9.1 创建 `src/views/composables/useReportCellActions.ts`
+  - [x] 9.1 创建 `src/views/composables/useReportCellActions.ts`
     - 从 ReportView.vue ~1860–2400 行抽取：全部 drilldown / lineComp / noteRefs / rvTrace / audit / traceSelect / consolBreakdown / cellFormulaDetail 相关 state + 全部 onRvCell* / onRvCtx* handlers
     - **🔴 关键约束**：`rvCtx`(useCellSelection) / `rvPenetrate`(usePenetrate) / `rvComments`(useCellComments) 三个已有实例**必须从主文件作为参数传入** `UseReportCellActionsOptions`，composable 内部**不可重新 new**（否则单元格选中态/穿透态/批注态分裂，右键菜单失效）
     - 定义 `UseReportCellActionsOptions`（含 rvCtx/rvPenetrate/rvComments 实例）和 `UseReportCellActionsReturn` 接口
     - 主文件 import 并调用
     - _Requirements: 3.3, 3.7, 3.8_
 
-  - [~] 9.2 验证抽取后 vue-tsc + vitest 通过
+  - [x] 9.2 验证抽取后 vue-tsc + vitest 通过
     - 重点验证右键菜单选中/框选/穿透/批注交互无回归（实例传递正确）
     - _Requirements: 1.2, 1.3_
 
@@ -163,7 +163,7 @@
     - Mock router/API，验证 click/dblclick/contextmenu handlers + onDrilldown API 调用（含原特征测试移来的 mount 类用例）
     - _Requirements: 3.3_
 
-- [ ] 10. Checkpoint — 确认全部 composable 抽取完成无回归
+- [-] 10. Checkpoint — 确认全部 composable 抽取完成无回归
   - `npx vitest run` 全部通过 + `npx tsc --noEmit` 零错误
   - 确认主文件 script 部分已大幅缩减（仅剩 import + composable 调用编排）
   - 若 useReportData.ts 超 400 行，评估是否二次拆分（useReportFetch + useReportGeneration）

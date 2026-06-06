@@ -38,7 +38,7 @@
                 <el-radio-button value="compare">对比</el-radio-button>
               </el-radio-group>
               <el-button v-if="!isEqcrRole" size="small" type="primary" @click="onGenerate" :loading="genLoading">刷新</el-button>
-              <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">审核</el-button>
+              <el-button size="small" @click="_onConsistencyCheckWrapper" :loading="checkLoading">审核</el-button>
             </template>
             <template #right-extra>
               <el-button size="small" @click="onExportAllExcel">全部导出</el-button>
@@ -930,11 +930,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, watchEffect, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { api } from '@/services/apiProxy'
-import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, reports as P_reports } from '@/services/apiPaths'
+import { ElMessage } from 'element-plus'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
@@ -948,13 +946,11 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
-import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import GtEmpty from '@/components/common/GtEmpty.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
-import { fmtAmount } from '@/utils/formatters'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useProjectStore } from '@/stores/project'
 import { setupPasteListener, pasteToSelection } from '@/composables/useCopyPaste'
@@ -966,18 +962,17 @@ import ConflictResolutionPanel from '@/components/conflict/ConflictResolutionPan
 import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
 import StatusMachinePanel from '@/components/status_machine/StatusMachinePanel.vue'
 import { withLoading } from '@/composables/useLoading'
-import { handleApiError } from '@/utils/errorHandler'
-import { eventBus } from '@/utils/eventBus'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useProjectEvents } from '@/composables/useProjectEvents'
 import { useStaleRefresh } from '@/composables/useStaleRefresh'
-import {
-  generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
-  getReportExcelUrl,
-  type ReportRow, type ReportDrilldownData, type ReportConsistencyCheck,
-} from '@/services/auditPlatformApi'
+import { recalcTrialBalance } from '@/services/auditPlatformApi'
 import { useAuthStore } from '@/stores/auth'
-import { useNavigationStack } from '@/composables/useNavigationStack'
+import { useReportColumns } from './composables/useReportColumns'
+import { useReportCrossCheck } from './composables/useReportCrossCheck'
+import { useReportData } from './composables/useReportData'
+import { useReportExport } from './composables/useReportExport'
+import { useReportMapping } from './composables/useReportMapping'
+import { useReportCellActions } from './composables/useReportCellActions'
 import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
 
 const route = useRoute()
@@ -1053,12 +1048,8 @@ const routeYear = computed(() => {
   return Number.isFinite(value) && value > 2000 ? value : null
 })
 const projectYear = ref<number | null>(null)
-const reportScope = ref<string>('standalone')
-const templateType = ref<string>('soe')
-const projectName = ref<string>('')
-const isConsolidated = computed(() => reportScope.value === 'consolidated')
-const _templateTypeLabel = computed(() => templateType.value === 'listed' ? '上市版' : '国企版')
-const scopeLabel = computed(() => reportScope.value === 'consolidated' ? '合并' : '单体')
+const _templateTypeLabel = computed(() => reportData.templateType.value === 'listed' ? '上市版' : '国企版')
+const scopeLabel = computed(() => reportData.reportScope.value === 'consolidated' ? '合并' : '单体')
 
 // 单位（项目）选择器 — 使用 projectStore
 const selectedProjectId = ref('')
@@ -1079,154 +1070,61 @@ function onYearChange(val: number) {
 
 // 模板类型切换
 const selectedTemplateType = ref('soe')
-const currentApplicableStandard = computed(() => `${selectedTemplateType.value}_${reportScope.value}`)
+const _rdReportScope = ref('standalone')
+const currentApplicableStandard = computed(() => `${selectedTemplateType.value}_${_rdReportScope.value}`)
 
 async function onTemplateTypeChange(val: string) {
   selectedTemplateType.value = val
-  templateType.value = val
-  await fetchReport()
+  reportData.templateType.value = val
+  await reportData.fetchReport()
 }
 
-// 转换规则 — 按报表类型分组
-const showMappingDialog = ref(false)
+// ─── Other UI state ─────────────────────────────────────────────────────────
 const showDocAiChat = ref(false)
-const mappingLoading = ref(false)
-const mappingTab = ref('balance_sheet')
-const mappingReportTypes = [
-  { key: 'balance_sheet', label: '资产负债表' },
-  { key: 'income_statement', label: '利润表' },
-  { key: 'cash_flow_statement', label: '现金流量表' },
-  { key: 'equity_statement', label: '权益变动表' },
-  { key: 'cash_flow_supplement', label: '现金流附表' },
-]
-const mappingTabLabel = computed(() => mappingReportTypes.find(r => r.key === mappingTab.value)?.label || '')
 
-// 每个报表类型独立存储映射规则和上市版选项
-const allMappingRules = ref<Record<string, Array<{ soe_row_code: string; soe_row_name: string; listed_row_code: string }>>>({})
-const allListedOptions = ref<Record<string, Array<{ code: string; name: string }>>>({})
-
-const currentMappingRules = computed(() => allMappingRules.value[mappingTab.value] || [])
-const currentListedOptions = computed(() => allListedOptions.value[mappingTab.value] || [])
-const totalMappedCount = computed(() => Object.values(allMappingRules.value).flat().filter(r => r.listed_row_code).length)
-const totalRuleCount = computed(() => Object.values(allMappingRules.value).flat().length)
-
-async function loadPresetForType(rt: string) {
-  // 用后端 preset API（含同义词表+模糊匹配）
-  const presetData = await api.get(P_rm.preset(projectId.value), {
-    params: { report_type: rt, scope: reportScope.value },
-    validateStatus: (s: number) => s < 600,
-  })
-  const preset = presetData ?? []
-
-  // 同时加载上市版行次作为下拉选项
-  const listedData = await api.get(P_rc.list, {
-    params: { applicable_standard: `listed_${reportScope.value}`, report_type: rt },
-    validateStatus: (s: number) => s < 600,
-  })
-  const listedRows = listedData ?? []
-  allListedOptions.value[rt] = listedRows.map((r: any) => ({ code: r.row_code, name: r.row_name }))
-
-  allMappingRules.value[rt] = preset.map((p: any) => ({
-    soe_row_code: p.soe_row_code,
-    soe_row_name: p.soe_row_name,
-    listed_row_code: p.listed_row_code || '',
-  }))
-}
-
-async function loadPresetMappingAll() {
-  mappingLoading.value = true
-  try {
-    for (const rt of mappingReportTypes) {
-      await loadPresetForType(rt.key)
-    }
-    ElMessage.success(`已加载全部预设规则，自动匹配 ${totalMappedCount.value} 项`)
-  } catch {
-    ElMessage.warning('加载预设规则失败')
-  } finally {
-    mappingLoading.value = false
-  }
-}
-
-async function saveMappingRulesAll() {
-  mappingLoading.value = true
-  try {
-    for (const rt of mappingReportTypes) {
-      const rules = allMappingRules.value[rt.key] || []
-      const mapped = rules.filter(r => r.listed_row_code)
-      if (mapped.length > 0) {
-        await api.post(P_rm.save(projectId.value), {
-          report_type: rt.key,
-          scope: reportScope.value,
-          rules: mapped.map(r => ({ soe_row_code: r.soe_row_code, listed_row_code: r.listed_row_code })),
-        }, { validateStatus: (s: number) => s < 600 })
-      }
-    }
-    ElMessage.success('全部转换规则已保存')
-    showMappingDialog.value = false
-  } catch (e) {
-    handleApiError(e, '保存转换规则')
-  } finally {
-    mappingLoading.value = false
-  }
-}
-
-// ── 转换规则共享模板 ──
-function getMappingConfigData(): Record<string, any> {
-  const data: Record<string, any[]> = {}
-  for (const rt of mappingReportTypes) {
-    const rules = allMappingRules.value[rt.key] || []
-    data[rt.key] = rules.filter(r => r.listed_row_code).map(r => ({
-      soe_row_code: r.soe_row_code,
-      soe_row_name: r.soe_row_name,
-      listed_row_code: r.listed_row_code,
-    }))
-  }
-  return { mapping_rules: data, scope: reportScope.value }
-}
-
-function onMappingTemplateApplied(configData: Record<string, any>) {
-  const rules = configData?.mapping_rules || {}
-  let applied = 0
-  for (const [rtKey, rtRules] of Object.entries(rules)) {
-    const existing = allMappingRules.value[rtKey]
-    if (!existing || !Array.isArray(rtRules)) continue
-    for (const tplRule of rtRules as any[]) {
-      const target = existing.find((r: any) => r.soe_row_code === tplRule.soe_row_code)
-      if (target && !target.listed_row_code) {
-        target.listed_row_code = tplRule.listed_row_code
-        applied++
-      }
-    }
-  }
-  ElMessage.success(`已引用 ${applied} 条映射规则（已有映射的行不覆盖）`)
-}
 const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear() - 1)
 
-const loading = ref(false)
-const genLoading = ref(false)
-const checkLoading = ref(false)
-const showReportImport = ref(false)
-const syncLoading = ref(false)
 const activeTab = ref('balance_sheet')
-const reportMode = ref('audited')
+const reportMode = ref<'audited' | 'unadjusted' | 'compare'>('audited')
 
-// F29/D10: 报表平衡检查结果
-const balanceCheckResult = ref<{ status: string; message: string } | null>(null)
+// ─── useReportData composable ───────────────────────────────────────────────
+const reportData = useReportData({
+  projectId,
+  year,
+  activeTab,
+  reportMode,
+  currentApplicableStandard,
+})
 
-async function runBalanceCheck() {
-  try {
-    const res = await api.get(`/api/projects/${projectId.value}/data-quality/check?checks=report_balance&year=${year.value}`)
-    const rb = res?.results?.report_balance
-    if (rb) {
-      balanceCheckResult.value = { status: rb.status, message: rb.message || '' }
-    }
-  } catch {
-    // 静默失败，不阻断
-  }
-}
+const {
+  rows,
+  compareRows,
+  loading,
+  genLoading,
+  checkLoading,
+  syncLoading,
+  balanceCheckResult,
+  consistencyResult,
+  tableMaxHeight,
+  fetchReport,
+  onGenerate,
+  onConsistencyCheck,
+  runBalanceCheck,
+  loadTemplateRows,
+  ensureProjectYear,
+  reloadReportContext,
+  activeTabLabel,
+  coverageSummary,
+  projectName,
+  reportScope,
+  templateType,
+  isConsolidated,
+} = reportData
+
+// Sync composable's reportScope → local proxy for currentApplicableStandard
+watchEffect(() => { _rdReportScope.value = reportScope.value })
 
 // 动态计算表格最大高度（窗口高度 - 顶部固定区域）
-const tableMaxHeight = ref(500)
 function updateTableHeight() {
   const headerEl = document.querySelector('.gt-rv-sticky-header')
   const headerH = headerEl ? headerEl.getBoundingClientRect().height : 200
@@ -1243,317 +1141,173 @@ onUnmounted(() => {
   window.removeEventListener('resize', updateTableHeight)
   document.removeEventListener('keydown', onKeydown)
 })
-const rows = ref<ReportRow[]>([])
 
-const activeTabLabel = computed(() => {
-  const m: Record<string, string> = { balance_sheet: '资产负债表', income_statement: '利润表', cash_flow_statement: '现金流量表', equity_statement: '所有者权益变动表', cash_flow_supplement: '现金流附表', impairment_provision: '资产减值准备表' }
-  return m[activeTab.value] || ''
-})
+// ─── useReportColumns composable ────────────────────────────────────────────
+const {
+  eqColumns,
+  eqTotalCols,
+  equitySpanMethod,
+  eqRowClassName,
+  eqCellVal,
+  impIncCols,
+  impDecCols,
+  impRowClassName,
+  getRowType,
+  rowClassName,
+  compareRowClassName,
+  formatReportAmount,
+  getNoteSection,
+  goToNote,
+} = useReportColumns({ isConsolidated, activeTab, rows })
+
+// ─── useReportMapping composable ────────────────────────────────────────────
+const {
+  showMappingDialog,
+  mappingLoading,
+  mappingTab,
+  allMappingRules,
+  allListedOptions,
+  mappingReportTypes,
+  mappingTabLabel,
+  currentMappingRules,
+  currentListedOptions,
+  totalMappedCount,
+  totalRuleCount,
+  loadPresetMappingAll,
+  saveMappingRulesAll,
+  getMappingConfigData,
+  onMappingTemplateApplied,
+} = useReportMapping({ projectId, reportScope })
+
+// ─── useReportCrossCheck composable ─────────────────────────────────────────
+const {
+  crossCheckData,
+  crossCheckLoading,
+  crossCheckResults,
+  loadCrossCheckData,
+} = useReportCrossCheck({ projectId, year, activeTab, currentApplicableStandard })
+
+// ─── useReportExport composable ─────────────────────────────────────────────
+const {
+  onExportExcel,
+  onExportAllExcel,
+  copyReportTable,
+  showReportImport,
+  onReportImported,
+} = useReportExport({ projectId, year, activeTab, rows, activeTabLabel, fetchReport })
+
 const _reportModeLabel = computed(() => {
   const m: Record<string, string> = { audited: '已审报表', unadjusted: '未审报表', compare: '对比视图' }
   return m[reportMode.value] || ''
 })
-const compareRows = ref<any[]>([])
-const consistencyResult = ref<ReportConsistencyCheck | null>(null)
 
-// Drilldown
-const drilldownVisible = ref(false)
-const drilldownLoading = ref(false)
-const drilldownData = ref<ReportDrilldownData | null>(null)
+// Drilldown + Formula Manager (kept in main file for template binding)
 const showFormulaManager = ref(false)
 
-// ─── Phase 3 F1.2/F1.3: 报表行构成科目弹窗 ─────────────────────────────────
-const { push: navPush } = useNavigationStack()
-
-interface LineCompositionAccount {
-  code: string
-  name: string
-  closing_balance: number
-  pct: number
+// V3 Req 9.6: 数字信任度
+const trustScorePanelRef = ref<InstanceType<typeof TrustScorePanel> | null>(null)
+function openTrustScore(context: string) {
+  trustScorePanelRef.value?.open(context)
 }
 
-interface LineCompositionData {
-  line_code: string
-  item_name: string
-  total_amount: number
-  accounts: LineCompositionAccount[]
+// V3 Req 10.4: 可解释状态机
+const smPanelRef = ref<InstanceType<typeof StatusMachinePanel> | null>(null)
+const reportInstanceId = ref('')
+function openStatusMachine() {
+  smPanelRef.value?.open()
 }
 
-const lineCompVisible = ref(false)
-const lineCompLoading = ref(false)
-const lineCompData = ref<LineCompositionData | null>(null)
-
-/**
- * F1.2: 点击报表行金额 → 调用 line-composition API → 显示构成科目弹窗
- */
-async function onLineComposition(row: ReportRow) {
-  if (!row.row_code || row.is_total_row || getRowType(row) === 'header') return
-  lineCompVisible.value = true
-  lineCompLoading.value = true
-  lineCompData.value = null
-  try {
-    const resp: any = await api.get(P_reports.lineComposition(projectId.value, row.row_code))
-    lineCompData.value = resp as LineCompositionData
-  } catch (e) {
-    handleApiError(e, '构成科目查询')
-    lineCompVisible.value = false
-  } finally {
-    lineCompLoading.value = false
-  }
-}
-
-/**
- * F1.3: 构成科目列表中点击某科目 → 跳转到 TrialBalance 并定位
- * F1.4: 跳转前记录到 useNavigationStack（支持 Backspace 返回）
- */
-function onLineCompJumpToTB(accountCode: string) {
-  lineCompVisible.value = false
-
-  // 记录到 useNavigationStack（direction: 'down' — 报表→TB 为下钻）
-  navPush({
-    source_view: route.fullPath,
-    label: `报表 ${activeTabLabel.value}`,
-    direction: 'down',
-  })
-
-  // 跳转到 TrialBalance 并定位到该科目行
-  router.push({
-    name: 'TrialBalance',
-    params: { projectId: projectId.value },
-    query: { account_code: accountCode },
-  })
-}
-
-// 权益变动表列定义 — 根据合并/单体动态切换
-const eqColumnsBase = [
-  { key: 'paid_in_capital', label: '实收资本' },
-  { key: 'other_equity_preferred', label: '优先股' },
-  { key: 'other_equity_perpetual', label: '永续债' },
-  { key: 'other_equity_other', label: '其他' },
-  { key: 'capital_reserve', label: '资本公积' },
-  { key: 'treasury_stock', label: '减：库存股' },
-  { key: 'oci', label: '其他综合收益' },
-  { key: 'special_reserve', label: '专项储备' },
-  { key: 'surplus_reserve', label: '盈余公积' },
-  { key: 'general_risk', label: '一般风险准备' },
-  { key: 'retained_earnings', label: '未分配利润' },
-]
-// 合并版额外列
-const eqConsolExtra = [
-  { key: 'subtotal', label: '小计' },
-  { key: 'minority', label: '少数股东权益' },
-]
-const eqColumns = computed(() => {
-  const base = [...eqColumnsBase]
-  if (isConsolidated.value) {
-    base.push(...eqConsolExtra)
-  }
-  base.push({ key: 'total', label: '所有者权益合计' })
-  return base
+// ─── useReportCellActions composable ────────────────────────────────────────
+const cellActions = useReportCellActions({
+  projectId,
+  year,
+  activeTab,
+  rows,
+  reportMode,
+  isConsolidated,
+  fetchReport,
+  activeTabLabel,
+  getRowType,
+  goToNote,
+  consistencyResult,
+  showFormulaManager,
+  openTrustScore,
+  rvCtx,
+  rvPenetrate,
+  rvComments,
 })
-// 权益变动表第1行 colspan（本年/上年各自的总列数）
-const eqTotalCols = computed(() => eqColumns.value.length)
-// 归属于母公司的列数（不含少数股东和合计）
-const _eqParentColCount = computed(() => eqColumnsBase.length + (isConsolidated.value ? 1 : 0))
 
-// 资产减值准备表列定义（国企版企财06表）
-const impIncCols = [
-  { key: 'provision', label: '本期计提额' },
-  { key: 'merge_add', label: '合并增加额' },
-  { key: 'other_add', label: '其他原因增加额' },
-  { key: 'add_total', label: '合计' },
-]
-const impDecCols = [
-  { key: 'reversal', label: '转回额' },
-  { key: 'writeoff', label: '转销额' },
-  { key: 'merge_dec', label: '合并减少额' },
-  { key: 'other_dec', label: '其他原因减少额' },
-  { key: 'dec_total', label: '合计' },
-]
+const {
+  drilldownVisible,
+  drilldownLoading,
+  drilldownData,
+  onDrilldown,
+  lineCompVisible,
+  lineCompLoading,
+  lineCompData,
+  onLineComposition,
+  onLineCompJumpToTB,
+  noteRefsVisible,
+  noteRefsLoading,
+  noteRefsList,
+  noteRefsRowCode,
+  noteRefsRowName,
+  onRvCtxShowNoteRefs,
+  onJumpToNoteSection,
+  rvTraceDialogVisible,
+  rvTraceLoading,
+  rvTraceResult,
+  onRvCtxCellTrace,
+  onRvTraceLocate,
+  showAuditDialog,
+  auditTab,
+  filteredAuditChecks,
+  onExportAuditExcel,
+  onAuditDrilldown: _onAuditDrilldown,
+  showTraceSelectDialog,
+  traceSelectOptions,
+  traceSelectCheck,
+  isTracing,
+  onTraceJump,
+  onTraceReturn,
+  consolBreakdownVisible,
+  consolBreakdownAccountCode,
+  onRvCtxViewConsolBreakdown,
+  showCellFormulaDetail,
+  cellDetailWpCode,
+  cellDetailSheet,
+  cellDetailLabel,
+  onRvCtxViewFormulaSource,
+  onCellDetailNavigate,
+  onRvCellClick,
+  onRvCellDblClick,
+  onRvCellContextMenu,
+  onRvCtxCopy,
+  onRvCtxDrillDown,
+  onRvCtxFormula,
+  onRvCtxTrustScore,
+  onRvCtxGoNote,
+  onRvCtxOpenWorkpaper,
+  onRvCtxViewAdjustments,
+  onRvCtxSum,
+  onRvCtxCompare,
+  onRowNameClick,
+  parseTraceLocations,
+  openWorkpaper,
+} = cellActions
 
-// 权益变动表 span-method（合并单元格：分类标题行横跨所有列）
-function equitySpanMethod({ row, columnIndex }: { row: any; column: any; rowIndex: number; columnIndex: number }) {
-  if (row.indent_level === 0 && !row.is_total_row && columnIndex === 0) {
-    // 分类标题行：项目列横跨所有列
-    return { rowspan: 1, colspan: 1 + eqColumns.value.length * 2 }
-  }
-  if (row.indent_level === 0 && !row.is_total_row && columnIndex > 0) {
-    return { rowspan: 0, colspan: 0 }
-  }
-  return { rowspan: 1, colspan: 1 }
-}
 
-// 权益变动表行样式
-function eqRowClassName({ row }: { row: any }) {
-  if (row.is_total_row) return 'gt-rv-eq-total-row'
-  if (row.indent_level === 0) return 'gt-rv-eq-category'
-  return ''
-}
-
-// 减值准备表行样式
-function impRowClassName({ row }: { row: any }) {
-  if (row.is_total_row) return 'gt-rv-eq-total-row'
-  return ''
-}
-
-// 报表行→附注跳转
-const _ROW_NOTE_MAP: Record<string, string> = {
-  'BS-002': '五、1', 'BS-003': '五、2', 'BS-004': '五、2', 'BS-005': '五、3',
-  'BS-006': '五、4', 'BS-007': '五、5', 'BS-008': '五、6', 'BS-012': '五、7',
-  'BS-013': '五、8', 'BS-014': '五、9', 'BS-015': '五、10', 'BS-016': '五、12',
-  'BS-017': '五、14', 'BS-018': '五、15', 'BS-031': '五、16', 'BS-033': '五、17',
-  'BS-034': '五、18', 'BS-035': '五、19', 'BS-036': '五、20', 'BS-037': '五、21',
-  'BS-041': '五、22', 'BS-051': '五、24', 'BS-052': '五、25', 'BS-053': '五、26',
-  'BS-054': '五、27', 'BS-055': '五、28',
-  'IS-001': '五、29', 'IS-002': '五、29',
-}
-
-function getNoteSection(rowCode: string): string | null {
-  return _ROW_NOTE_MAP[rowCode] || null
-}
-
-function goToNote(rowCode: string) {
-  const section = getNoteSection(rowCode)
-  if (section) {
-    router.push({ path: `/projects/${projectId.value}/disclosure-notes`, query: { section } })
-  }
-}
-
-// ─── F27/D9: 行类型判定逻辑（6 种行类型） ─────────────────────────────────────
-function getRowType(row: ReportRow): string {
-  if (row.row_name && (row.row_name.includes('：') || row.row_name.includes(':'))) return 'header'
-  if (row.is_total_row) return 'total'
-  if (row.row_name && (row.row_name.startsWith('△') || row.row_name.startsWith('▲'))) return 'special'
-  if (!row.formula_used && row.current_period_amount === '0') return 'manual'
-  if (parseFloat(row.current_period_amount || '0') === 0 && !row.current_period_amount?.includes('.')) return 'zero'
-  return 'data'
-}
-
-function rowClassName({ row }: { row: ReportRow }) {
-  const type = getRowType(row)
-  return `report-row--${type}`
-}
-
-async function ensureProjectYear() {
+async function _ensureProjectYearWrapper() {
   if (routeYear.value !== null) {
     projectYear.value = null
     return
   }
-  try {
-    // 直接调用项目详情 + wizard 获取完整信息
-    const projRaw = await api.get(P_proj.detail(projectId.value), {
-      validateStatus: (s: number) => s < 600,
-    })
-    const proj = projRaw?.data ?? projRaw ?? projRaw
-    projectName.value = proj?.client_name || proj?.name || ''
-    projectYear.value = Number(proj?.audit_year) || null
-    selectedYear.value = projectYear.value || new Date().getFullYear() - 1
-    reportScope.value = proj?.report_scope || 'standalone'
-    templateType.value = proj?.template_type || ''
-
-    // 从 wizard_state 补充 template_type
-    const wizRaw = await api.get(P_proj.wizard(projectId.value), {
-      validateStatus: (s: number) => s < 600,
-    })
-    const ws = wizRaw?.data ?? wizRaw
-    const bi = ws?.steps?.basic_info?.data
-    if (bi?.template_type) templateType.value = bi.template_type
-    if (bi?.report_scope) reportScope.value = bi.report_scope
-    if (bi?.client_name && !projectName.value) projectName.value = bi.client_name
-
-    if (!templateType.value) templateType.value = 'soe'
-    selectedTemplateType.value = templateType.value
-  } catch {
-    projectYear.value = null
-  }
-}
-
-const fetchReport = withLoading(loading, async () => {
-  const std = currentApplicableStandard.value
-  try {
-    if (reportMode.value === 'compare') {
-      const [audited, unadjusted] = await Promise.all([
-        getReport(projectId.value, year.value, activeTab.value, false, std),
-        getReport(projectId.value, year.value, activeTab.value, true, std),
-      ])
-      // 合并为对比行
-      const uMap = new Map(unadjusted.map((r: any) => [r.row_code, r]))
-      compareRows.value = audited.map((r: any) => {
-        const u = uMap.get(r.row_code)
-        const uAmt = parseFloat(u?.current_period_amount || '0')
-        const aAmt = parseFloat(r.current_period_amount || '0')
-        return {
-          ...r,
-          unadjusted_amount: uAmt,
-          audited_amount: aAmt,
-          adjustment: Math.round((aAmt - uAmt) * 100) / 100,
-        }
-      })
-      rows.value = audited
-    } else {
-      rows.value = await getReport(projectId.value, year.value, activeTab.value, reportMode.value === 'unadjusted', std)
-      compareRows.value = []
-    }
-  } catch (err: any) {
-    // 404 = 报表未生成，加载预设模板结构显示空表格框架
-    if (err?.response?.status === 404) {
-      await loadTemplateRows()
-    } else {
-      rows.value = []
-    }
-    compareRows.value = []
-  }
-
-  // ② 自动运行跨表校对（静默，不弹窗，只在有异常时显示 balanceCheckResult 横幅）
-  if (rows.value.length > 0) {
-    try {
-      const result = await getReportConsistencyCheck(projectId.value, year.value)
-      if (result && !result.consistent) {
-        const total = result.total || result.checks?.length || 0
-        const passed = (result.logic_check_passed || 0) + (result.reasonability_passed || 0)
-        const failCount = total - passed
-        balanceCheckResult.value = {
-          status: failCount > 0 ? 'warning' : 'passed',
-          message: `自动校对：${total} 项审核，${failCount} 项未通过`,
-        }
-      } else {
-        balanceCheckResult.value = null
-      }
-    } catch { /* 静默失败 */ }
-  }
-})
-
-async function loadTemplateRows() {
-  // 从报表配置加载预设行次（显示空值的模板框架）
-  try {
-    const data = await api.get(P_rc.list, {
-      params: { report_type: activeTab.value, project_id: projectId.value, applicable_standard: currentApplicableStandard.value }
-    })
-    const configs = data
-    if (Array.isArray(configs) && configs.length > 0) {
-      rows.value = configs.map((r: any) => ({
-        row_code: r.row_code || '',
-        row_name: r.row_name || '',
-        current_period_amount: null as string | null,
-        prior_period_amount: null as string | null,
-        indent_level: r.indent_level || 0,
-        is_total_row: r.is_total || false,
-        formula_used: r.formula || null,
-        source_accounts: null as string[] | null,
-      }))
-    } else {
-      rows.value = []
-    }
-  } catch {
-    // 配置也没有，显示空
-    rows.value = []
-  }
-}
-
-function compareRowClassName({ row }: { row: any }) {
-  const type = getRowType(row)
-  if (row.adjustment && row.adjustment !== 0) return `report-row--${type} diff-row`
-  return `report-row--${type}`
+  // Delegate to composable (sets projectName, reportScope, templateType, _fetchedAuditYear via API)
+  await ensureProjectYear()
+  // Sync main-file-owned state from composable results
+  projectYear.value = reportData._fetchedAuditYear.value
+  selectedYear.value = projectYear.value || new Date().getFullYear() - 1
+  selectedTemplateType.value = templateType.value
 }
 
 function onTabChange() {
@@ -1567,308 +1321,30 @@ const _onSyncUnadjusted = withLoading(syncLoading, async () => {
   ElMessage.success('未审数已按四表账套科目重新同步')
 })
 
-// F26: 前置条件错误处理——显示错误信息 + "去完成"跳转按钮
-const PREREQUISITE_ROUTE_MAP: Record<string, string> = {
-  recalc: 'trial-balance',
-  auto_match: 'mapping',
-  generate_reports: 'reports',
-  select_template: 'settings',
-}
-
-async function handlePrerequisiteError(message: string, action: string | null) {
-  const routeKey = action ? PREREQUISITE_ROUTE_MAP[action] : null
-  if (routeKey) {
-    try {
-      await ElMessageBox.confirm(
-        message,
-        '前置条件未满足',
-        {
-          confirmButtonText: '去完成',
-          cancelButtonText: '取消',
-          type: 'warning',
-        },
-      )
-      // Navigate to the prerequisite page
-      const targetPath = `/projects/${projectId.value}/${routeKey}`
-      router.push(targetPath)
-    } catch {
-      // User cancelled
-    }
-  } else {
-    ElMessage.warning(message || '前置条件未满足')
-  }
-}
-
-async function onGenerate() {
-  const { showGuide } = await import('@/composables/useWorkflowGuide')
-  const ok = await showGuide(
-    'report_generate',
-    '📊 刷新报表数据',
-    `<div style="line-height:1.8;font-size: var(--gt-font-size-sm)">
-      <p>将根据试算表审定数重新计算生成六张财务报表。</p>
-      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">请确认以下准备工作已完成：</p>
-      <ul style="padding-left:18px;margin:4px 0">
-        <li><span style="color: var(--gt-color-wheat)">⚠</span> 已完成账套数据导入（科目余额表、序时账）</li>
-        <li><span style="color: var(--gt-color-wheat)">⚠</span> 已完成科目映射（客户科目 → 标准科目）</li>
-        <li><span style="color: var(--gt-color-wheat)">⚠</span> 调整分录已录入并审批（如有）</li>
-      </ul>
-      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">💡 如果试算表数据为空，报表金额将全部为零</p>
-    </div>`,
-    '开始生成',
-  )
-  if (!ok) return
-  await withLoading(genLoading, async () => {
-    try {
-      const result = await generateReports(projectId.value, year.value)
-      const summary = result?.summary
-      if (summary && summary.total_rows > 0) {
-        ElMessage.success(`报表生成完成：${summary.total_rows} 行，${summary.non_zero_rows} 行有数据`)
-      } else {
-        ElMessage.success('报表生成完成')
-      }
-      await fetchReport()
-      // F29/D10: 报表生成后自动执行报表平衡检查
-      await runBalanceCheck()
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail || err?.response?.data?.message
-      if (err?.response?.status === 400 && detail) {
-        const msg = typeof detail === 'object' ? detail.message : detail
-        const action = typeof detail === 'object' ? detail.prerequisite_action : null
-        await handlePrerequisiteError(msg, action)
-      } else {
-        handleApiError(err, '报表生成')
-      }
-    }
-  })()
-}
-
-const showAuditDialog = ref(false)
-const auditTab = ref('all')
-
-const filteredAuditChecks = computed(() => {
-  const checks = consistencyResult.value?.checks || []
-  if (auditTab.value === 'all') return checks
-  return checks.filter((c: any) => c.category === auditTab.value)
-})
-
-async function onConsistencyCheck() {
-  const { showGuide } = await import('@/composables/useWorkflowGuide')
-  const ok = await showGuide(
-    'report_audit',
-    '✅ 报表审核校验',
-    `<div style="line-height:1.8;font-size: var(--gt-font-size-sm)">
-      <p>将对报表执行逻辑审核和合理性检查。</p>
-      <ul style="padding-left:18px;margin:4px 0">
-        <li><span style="color: var(--gt-color-wheat)">⚠</span> 请先确认报表数据已生成（点击"刷新数据"）</li>
-      </ul>
-      <p style="color: var(--gt-color-success);font-size: var(--gt-font-size-xs);margin-top:6px">✓ 校验结果将按公式分类展示，可点击溯源跳转到具体位置</p>
-    </div>`,
-    '开始审核',
-  )
-  if (!ok) return
-  await withLoading(checkLoading, async () => {
-    consistencyResult.value = await getReportConsistencyCheck(projectId.value, year.value)
+// Wrapper: composable's onConsistencyCheck + open dialog
+async function _onConsistencyCheckWrapper() {
+  await onConsistencyCheck()
+  if (consistencyResult.value) {
     showAuditDialog.value = true
-  })()
-}
-
-function _onAuditDrilldown(check: any) {
-  const locs = parseTraceLocations(check)
-  if (locs.length === 1) {
-    onTraceJump(locs[0])
-  } else if (locs.length > 1) {
-    // 多个定位——弹窗让用户选择
-    showTraceSelectDialog.value = true
-    traceSelectOptions.value = locs
-    traceSelectCheck.value = check
-  } else {
-    ElMessage.info('该审核项无可溯源的定位信息')
   }
-}
-
-interface TraceLocation {
-  label: string
-  tab: string
-  rowCode: string
-}
-
-const showTraceSelectDialog = ref(false)
-const traceSelectOptions = ref<TraceLocation[]>([])
-const traceSelectCheck = ref<any>(null)
-
-function parseTraceLocations(check: any): TraceLocation[] {
-  const locs: TraceLocation[] = []
-  const formula = check.formula || ''
-  const source = check.source || ''
-  const name = check.name || ''
-
-  // 从 source 中提取 row_code（如 "BS-039 试算表审定数"）
-  const codeMatch = source.match(/^([A-Z]+-\d+)/)
-  if (codeMatch) {
-    const code = codeMatch[1]
-    const tab = codeToTab(code)
-    locs.push({ label: `${code} (${tabLabel(tab)})`, tab, rowCode: code })
-  }
-
-  // 从公式中提取引用的 row_code
-  const refs = formula.matchAll(/([A-Z]+-\d+)/g)
-  for (const m of refs) {
-    const code = m[1]
-    if (!locs.find(l => l.rowCode === code)) {
-      const tab = codeToTab(code)
-      locs.push({ label: `${code} (${tabLabel(tab)})`, tab, rowCode: code })
-    }
-  }
-
-  // 从审核项名称推断
-  if (!locs.length) {
-    if (name.includes('资产负债表')) locs.push({ label: '资产负债表', tab: 'balance_sheet', rowCode: '' })
-    else if (name.includes('利润')) locs.push({ label: '利润表', tab: 'income_statement', rowCode: '' })
-    else if (name.includes('现金')) locs.push({ label: '现金流量表', tab: 'cash_flow_statement', rowCode: '' })
-  }
-
-  return locs
-}
-
-function codeToTab(code: string): string {
-  if (code.startsWith('BS-')) return 'balance_sheet'
-  if (code.startsWith('IS-')) return 'income_statement'
-  if (code.startsWith('CFS-')) return 'cash_flow_statement'
-  if (code.startsWith('EQ-')) return 'equity_statement'
-  if (code.startsWith('CFSS-')) return 'cash_flow_supplement'
-  if (code.startsWith('IMP-')) return 'impairment_provision'
-  return 'balance_sheet'
-}
-
-function tabLabel(tab: string): string {
-  const m: Record<string, string> = {
-    balance_sheet: '资产负债表', income_statement: '利润表',
-    cash_flow_statement: '现金流量表', equity_statement: '权益变动表',
-    cash_flow_supplement: '现金流附表', impairment_provision: '资产减值准备表',
-  }
-  return m[tab] || tab
-}
-
-const isTracing = ref(false)
-const traceFromTab = ref('')
-
-function onTraceJump(loc: TraceLocation) {
-  traceFromTab.value = activeTab.value
-  activeTab.value = loc.tab
-  showTraceSelectDialog.value = false
-  showAuditDialog.value = false  // 先关闭弹窗让用户看报表
-  isTracing.value = true
-  fetchReport()
-}
-
-function onTraceReturn() {
-  isTracing.value = false
-  showAuditDialog.value = true  // 重新打开审核弹窗
-  if (traceFromTab.value) {
-    activeTab.value = traceFromTab.value
-    fetchReport()
-  }
-}
-
-function onExportAuditExcel() {
-  const checks = filteredAuditChecks.value
-  if (!checks.length) {
-    ElMessage.warning('无审核数据可导出')
-    return
-  }
-  const BOM = '\uFEFF'
-  const header = '结果,审核项目,期望值,实际值,差额,类型,公式/来源\n'
-  const csvRows = checks.map((c: any) =>
-    [
-      c.passed ? '通过' : '未通过',
-      `"${(c.name || '').replace(/"/g, '""')}"`,
-      c.expected || '',
-      c.actual || '',
-      c.diff || '',
-      c.category_label || '',
-      `"${(c.formula || c.source || '').replace(/"/g, '""')}"`,
-    ].join(',')
-  ).join('\n')
-  const blob = new Blob([BOM + header + csvRows], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `审核报告_${activeTabLabel.value}_${year.value}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-  ElMessage.success('审核报告已导出')
-}
-
-function onReportImported() {
-  showReportImport.value = false
-  fetchReport()
-}
-
-function onExportExcel() {
-  import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
-    const url = getReportExcelUrl(projectId.value, year.value, activeTab.value)
-    downloadFileAsBlob(url, `报表_${activeTab.value}_${year.value}.xlsx`)
-  })
-}
-
-function onExportAllExcel() {
-  import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
-    const url = `/api/reports/${projectId.value}/${year.value}/export`
-    downloadFileAsBlob(url, `全部报表_${year.value}.xlsx`)
-  })
 }
 
 function onEditConfig() {
   router.push(`/projects/${projectId.value}/report-config`)
 }
 
-async function onDrilldown(row: ReportRow) {
-  if (!row.row_code || row.is_total_row) return
-  drilldownVisible.value = true
-  drilldownLoading.value = true
-  drilldownData.value = null
-  try {
-    const result = await getReportDrilldown(projectId.value, year.value, activeTab.value, row.row_code)
-    drilldownData.value = {
-      ...result,
-      accounts: result.accounts.map((item: any) => ({
-        ...item,
-        amount: reportMode.value === 'unadjusted'
-          ? (item.unadjusted_amount ?? item.amount ?? '0')
-          : (item.audited_amount ?? item.amount ?? '0'),
-      })),
-    }
-  } catch (e) {
-    handleApiError(e, '穿透查询')
-  } finally {
-    drilldownLoading.value = false
-  }
-}
-
-/** 行名点击穿透到试算表对应科目（需求 19.8） */
-function onRowNameClick(row: ReportRow) {
-  if (!row.row_code || row.is_total_row || getRowType(row) === 'header') return
-  router.push({
-    path: `/projects/${projectId.value}/trial-balance`,
-    query: { highlight_row: row.row_code, year: String(year.value) },
-  })
-}
-
-function openWorkpaper(wpId: string) {
-  router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId } })
-}
-
-async function reloadReportContext() {
-  await ensureProjectYear()
+// Wrapper: calls composable's reloadReportContext + syncs main-file state
+async function _reloadReportContextWrapper() {
+  await _ensureProjectYearWrapper()
   await fetchReport()
 }
 
 // 初次加载（替代 onMounted 一次性加载）
-reloadReportContext()
+_reloadReportContextWrapper()
 
 // V3 Req 5.1：上下文（projectId/year）变化时自动重载（替代散落的 watch）
 onContextChange(() => {
-  reloadReportContext()
+  _reloadReportContextWrapper()
 })
 
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
@@ -1876,147 +1352,10 @@ const rvCtx = useCellSelection()
 const rvPenetrate = usePenetrate()
 const rvComments = useCellComments(() => projectId.value, () => year.value, 'report')
 
-// R7-S3-10 Task 49-50：跨表核对 7 条等式
-const crossCheckData = ref<Record<string, any>>({})
-const crossCheckLoading = ref(false)
-
-async function loadCrossCheckData() {
-  if (crossCheckLoading.value) return
-  crossCheckLoading.value = true
-  try {
-    const std = currentApplicableStandard.value
-    const [bs, is] = await Promise.all([
-      getReport(projectId.value, year.value, 'balance_sheet', false, std).catch(() => []),
-      getReport(projectId.value, year.value, 'income_statement', false, std).catch(() => []),
-    ])
-    // 按 row_code 和 row_name 建索引（合计行优先覆盖同名非合计行）
-    const buildMap = (rows: any[]) => {
-      const map: Record<string, number> = {}
-      // 先填非合计行
-      for (const row of (rows || [])) {
-        const amt = parseFloat(row.current_period_amount) || 0
-        if (!row.is_total_row) {
-          if (row.row_code && !map[row.row_code]) map[row.row_code] = amt
-          if (row.row_name && !map[row.row_name]) map[row.row_name] = amt
-        }
-      }
-      // 再填合计行（覆盖同名）
-      for (const row of (rows || [])) {
-        const amt = parseFloat(row.current_period_amount) || 0
-        if (row.is_total_row) {
-          if (row.row_code) map[row.row_code] = amt
-          if (row.row_name) map[row.row_name] = amt
-        }
-      }
-      return map
-    }
-    crossCheckData.value = { bsMap: buildMap(bs as any[]), isMap: buildMap(is as any[]) }
-  } catch { /* ignore */ }
-  finally { crossCheckLoading.value = false }
-}
-
-const crossCheckResults = computed(() => {
-  const { bsMap = {}, isMap = {} } = crossCheckData.value
-  // 精确匹配 + 模糊匹配（包含关键词）
-  const get = (map: Record<string, number>, ...keys: string[]) => {
-    // 先精确匹配
-    for (const k of keys) { if (map[k] != null && map[k] !== 0) return map[k] }
-    // 再模糊匹配（key 包含搜索词）
-    for (const k of keys) {
-      for (const [mk, mv] of Object.entries(map)) {
-        if (mv !== 0 && mk.includes(k)) return mv
-      }
-    }
-    return 0
-  }
-  const totalAssets = get(bsMap, 'assets_total', '资产总计', '资产合计')
-  const totalLiabilities = get(bsMap, 'liabilities_total', '负债合计', '负债总计')
-  const totalEquity = get(bsMap, 'equity_total', '所有者权益合计', '股东权益合计', '权益合计')
-  const netProfit = get(isMap, 'IS-019', '净利润')
-  const revenue = get(isMap, 'IS-001', '营业收入')
-  const cost = get(isMap, 'IS-002', '营业成本')
-  const profitBeforeTax = get(isMap, 'IS-017', '利润总额')
-  const incomeTax = get(isMap, 'IS-018', '所得税费用', '所得税')
-  const cash = get(bsMap, 'BS-001', '货币资金')
-
-  function check(desc: string, left: number, right: number, tolerance = 0): any {
-    const diff = Math.round((left - right) * 100) / 100
-    const passed = tolerance > 0 ? Math.abs(diff) <= tolerance : Math.abs(diff) < 0.01
-    return { description: desc, leftValue: left || null, rightValue: right || null, diff: diff || null, passed }
-  }
-
-  return [
-    check('资产合计 = 负债合计 + 所有者权益合计', totalAssets, totalLiabilities + totalEquity, 1),
-    check('营业收入 − 营业成本 = 毛利', revenue - cost, revenue - cost),
-    check('利润总额 − 所得税 = 净利润', profitBeforeTax - incomeTax, netProfit, 1),
-    check('资产 − 负债 = 权益', totalAssets - totalLiabilities, totalEquity, 1),
-    check('所有者权益变动表期末 = 资产负债表权益', totalEquity, totalEquity),
-    check('有效税率 ≈ 25%', incomeTax, profitBeforeTax > 0 ? profitBeforeTax * 0.25 : 0, profitBeforeTax * 0.05),
-    check('货币资金 ≥ 0（负值异常）', cash, 0, Math.abs(cash)),
-  ]
-})
-
-// 切换到跨表核对 Tab 时自动加载数据
-watch(activeTab, (tab) => {
-  if (tab === 'cross_check' && !crossCheckData.value.bsMap) {
-    loadCrossCheckData()
-  }
-})
 
 const displayPrefs = useDisplayPrefsStore()
 /** 格式化金额（跟随全局单位设置） */
 const fmt = (v: any) => displayPrefs.fmt(v)
-
-/**
- * F27: 金额格式化——千分位 + 负数红色括号
- * 返回 { text, isNegative } 用于模板渲染
- */
-function formatReportAmount(value: any): { text: string; isNegative: boolean } {
-  if (value === null || value === undefined || value === '') return { text: '', isNegative: false }
-  const num = typeof value === 'string' ? parseFloat(value) : Number(value)
-  if (isNaN(num)) return { text: String(value), isNegative: false }
-  if (num === 0) return { text: '0.00', isNegative: false }
-  const isNeg = num < 0
-  const abs = Math.abs(num)
-  // 千分位格式化
-  const parts = abs.toFixed(2).split('.')
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-  const formatted = parts.join('.')
-  // 负数用括号表示
-  const text = isNeg ? `(${formatted})` : formatted
-  return { text, isNegative: isNeg }
-}
-
-/**
- * F28: 计算报表数据覆盖率摘要
- */
-const coverageSummary = computed(() => {
-  if (!rows.value || rows.value.length === 0) return null
-  const total = rows.value.length
-  let withData = 0
-  let headerRows = 0
-  let manualRows = 0
-
-  for (const row of rows.value) {
-    const type = getRowType(row)
-    if (type === 'header') {
-      headerRows++
-    } else if (type === 'manual') {
-      manualRows++
-    } else {
-      const amt = parseFloat(row.current_period_amount || '0')
-      if (amt !== 0) withData++
-    }
-  }
-
-  return {
-    total,
-    withData,
-    headerRows,
-    manualRows,
-    text: `${total} 行，${withData} 行有数据，${headerRows} 行标题行，${manualRows} 行待填列`
-  }
-})
 
 // ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
 const rvSearch = useTableSearch(rows, ['row_name', 'row_code'])
@@ -2026,15 +1365,6 @@ const rvTableRef = ref<any>(null)
 const eqTableRef = ref<any>(null)
 const impTableRef = ref<any>(null)
 const compareTableRef = ref<any>(null)
-
-// 权益表矩阵单元格取值（从 source_accounts JSONB 读取各列值）
-function eqCellVal(row: any, colKey: string): any {
-  if (!row) return 0
-  if (row.source_accounts && row.source_accounts[colKey] != null) {
-    return row.source_accounts[colKey]
-  }
-  return 0
-}
 
 // 通用取值函数（适配所有报表类型）
 function getAnyCellValue(rowIdx: number, colIdx: number): any {
@@ -2131,305 +1461,8 @@ function rvCellClassName({ rowIndex, columnIndex }: any) {
   return classes.join(' ')
 }
 
-function onRvCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
-  rvCtx.closeContextMenu()
-  const rowIdx = rows.value.indexOf(row)
-  // 主表列映射
-  const mainColLabels = ['序号', '项目', '本期金额', '上期金额']
-  let colIdx = mainColLabels.indexOf(column.label)
-  // 权益表/减值表等非主表列：按 column.index 直接用（确保选中生效）
-  if (colIdx < 0 && column.index !== undefined) {
-    colIdx = column.index
-  }
-  if (rowIdx < 0 || colIdx < 0) return
-  const value = row.current_period_amount ?? row[column.property] ?? ''
-  rvCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
-  rvCtx.contextMenu.rowData = row
-  rvCtx.contextMenu.itemName = row.row_name || ''
-}
-
-// R7-S3-09 Task 45：双击金额穿透到报表行明细
-function onRvCellDblClick(row: any, column: any) {
-  // 权益表/减值表：双击编辑单元格
-  if (activeTab.value === 'equity_statement' || activeTab.value === 'impairment_provision') {
-    if (column.label === '项目') return
-    const colKey = column.property || column.label
-    ElMessageBox.prompt(`编辑「${row.row_name}」的「${column.label}」`, '编辑单元格', {
-      inputValue: String(row.current_period_amount || 0),
-      inputPattern: /^-?\d*\.?\d*$/,
-      inputErrorMessage: '请输入数字',
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
-    }).then(({ value }) => {
-      const numVal = value ? parseFloat(value) : null
-      api.put(`/api/projects/${projectId.value}/reports/cell`, {
-        row_code: row.row_code || '',
-        column_key: colKey,
-        value: numVal,
-      }, { params: { year: year.value, report_type: activeTab.value } })
-        .then(() => { ElMessage.success('已保存'); fetchReport() })
-        .catch((e: any) => handleApiError(e, '保存'))
-    }).catch(() => { /* 取消 */ })
-    return
-  }
-  // 主表：双击金额穿透
-  const amountCols = ['本期金额', '上期金额']
-  if (amountCols.includes(column.label) && row.row_code) {
-    rvPenetrate.toReportRow(activeTab.value, row.row_code)
-  }
-}
-
-function onRvCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
-  const rowIdx = rows.value.indexOf(row)
-  const mainColLabels = ['序号', '项目', '本期金额', '上期金额']
-  let colIdx = mainColLabels.indexOf(column.label)
-  if (colIdx < 0 && column.index !== undefined) colIdx = column.index
-  if (rowIdx >= 0 && colIdx >= 0 && !rvCtx.isCellSelected(rowIdx, colIdx)) {
-    const value = row.current_period_amount ?? row[column.property] ?? ''
-    rvCtx.selectCell(rowIdx, colIdx, value, false)
-  }
-  rvCtx.contextMenu.rowData = row
-  rvCtx.contextMenu.itemName = row.row_name || ''
-  rvCtx.openContextMenu(event, rvCtx.contextMenu.itemName, row)
-}
-
-function onRvCtxCopy() {
-  rvCtx.closeContextMenu()
-  rvCtx.copySelectedValues()
-  ElMessage.success('已复制')
-}
-
-function onRvCtxDrillDown() {
-  rvCtx.closeContextMenu()
-  if (rvCtx.contextMenu.rowData) onDrilldown(rvCtx.contextMenu.rowData)
-}
-
-function onRvCtxFormula() {
-  rvCtx.closeContextMenu()
-  showFormulaManager.value = true
-}
-
-// V3 Req 9.6: 数字信任度
-const trustScorePanelRef = ref<InstanceType<typeof TrustScorePanel> | null>(null)
-
-// V3 Req 10.4: 可解释状态机
-const smPanelRef = ref<InstanceType<typeof StatusMachinePanel> | null>(null)
-const reportInstanceId = ref('')
-function openStatusMachine() {
-  smPanelRef.value?.open()
-}
-
-function onRvCtxTrustScore() {
-  rvCtx.closeContextMenu()
-  const row = rvCtx.contextMenu.rowData
-  const context = `report:${activeTab.value}|${row?.row_code || ''}`
-  trustScorePanelRef.value?.open(context)
-}
-
-function onRvCtxGoNote() {
-  rvCtx.closeContextMenu()
-  if (rvCtx.contextMenu.rowData?.row_code) goToNote(rvCtx.contextMenu.rowData.row_code)
-}
-
-// Sprint 4 Task 4.3：右键"附注引用我" — 反查所有引用此报表行的附注章节
-const noteRefsVisible = ref(false)
-const noteRefsLoading = ref(false)
-const noteRefsRowCode = ref('')
-const noteRefsRowName = ref('')
-const noteRefsList = ref<Array<{ note_section: string; section_title: string; table_index: number }>>([])
-
-async function onRvCtxShowNoteRefs() {
-  rvCtx.closeContextMenu()
-  const row = rvCtx.contextMenu.rowData
-  if (!row?.row_code) {
-    ElMessage.info('该行无 row_code，无法反查附注引用')
-    return
-  }
-  noteRefsRowCode.value = row.row_code
-  noteRefsRowName.value = row.row_name || ''
-  noteRefsList.value = []
-  noteRefsVisible.value = true
-  noteRefsLoading.value = true
-  try {
-    const resp: any = await api.get(P_reports.noteReferences(projectId.value, year.value, row.row_code))
-    noteRefsList.value = (resp?.notes || []) as any[]
-  } catch (e) {
-    handleApiError(e, '反查附注引用')
-  } finally {
-    noteRefsLoading.value = false
-  }
-}
-
-function onJumpToNoteSection(ref: { note_section: string; table_index: number }) {
-  noteRefsVisible.value = false
-  router.push({
-    path: `/projects/${projectId.value}/disclosure-notes`,
-    query: {
-      section: ref.note_section,
-      table_index: String(ref.table_index ?? 0),
-      year: String(year.value),
-    },
-  })
-}
-
-// R7-S3-09 Task 47：右键"打开对应底稿"
-async function onRvCtxOpenWorkpaper() {
-  rvCtx.closeContextMenu()
-  const row = rvCtx.contextMenu.rowData
-  if (!row?.row_code) return
-  try {
-    const data = await api.get(P_reports.relatedWorkpapers(projectId.value, year.value, activeTab.value, row.row_code))
-    const wps = (data as any)?.workpapers || []
-    if (wps.length === 1) {
-      rvPenetrate.toWorkpaperEditor(wps[0].id)
-    } else if (wps.length > 1) {
-      ElMessage.info(`该行关联 ${wps.length} 个底稿：${wps.map((w: any) => w.wp_code).join(', ')}`)
-    } else {
-      ElMessage.info('该行暂无关联底稿')
-    }
-  } catch { ElMessage.warning('查询关联底稿失败') }
-}
-
-// enterprise-linkage 3.10：右键"查看调整明细" → 跳转试算表高亮对应行
-function onRvCtxViewAdjustments() {
-  rvCtx.closeContextMenu()
-  const row = rvCtx.contextMenu.rowData
-  if (!row?.row_code) {
-    ElMessage.info('请在数据行上右键')
-    return
-  }
-  router.push({
-    path: `/projects/${projectId.value}/trial-balance`,
-    query: { highlight_row: row.row_code, year: String(year.value) },
-  })
-}
-
-// 合并报表穿透（统一组件 ConsolBreakdownDialog，source=report）：右键"查看合并明细"打开。
-// row_code 即报表行编码，作为 report 端点的 accountCode。仅合并报表（isConsolidated）显示该菜单项。
-const consolBreakdownVisible = ref(false)
-const consolBreakdownAccountCode = ref('')
-
-function onRvCtxViewConsolBreakdown() {
-  rvCtx.closeContextMenu()
-  const row = rvCtx.contextMenu.rowData
-  if (!row?.row_code) {
-    ElMessage.info('请在数据行上右键')
-    return
-  }
-  consolBreakdownAccountCode.value = row.row_code
-  consolBreakdownVisible.value = true
-}
-
-// Sprint 5.6: 查看公式来源
-const showCellFormulaDetail = ref(false)
-const cellDetailWpCode = ref('')
-const cellDetailSheet = ref('')
-const cellDetailLabel = ref('')
-
-function onRvCtxViewFormulaSource() {
-  rvCtx.closeContextMenu()
-  const row = rvCtx.contextMenu.rowData
-  if (!row?.row_code) {
-    ElMessage.info('请在数据行上右键')
-    return
-  }
-  cellDetailWpCode.value = row.row_code
-  cellDetailSheet.value = ''
-  cellDetailLabel.value = ''
-  showCellFormulaDetail.value = true
-}
-
-function onCellDetailNavigate(uri: string) {
-  showCellFormulaDetail.value = false
-  const parts = uri.split(':')
-  const mod = parts[0]?.toUpperCase()
-  if (mod === 'WP' && parts[1]) {
-    router.push({ name: 'WorkpaperEditor', params: { id: projectId.value }, query: { wp: parts[1] } })
-  } else if (mod === 'NOTE') {
-    router.push({ name: 'DisclosureEditor', params: { id: projectId.value } })
-  } else if (mod === 'TB') {
-    router.push({ path: `/projects/${projectId.value}/trial-balance` })
-  }
-}
-
-// ─── 数字溯源：调 lineage 端点展示 upstream/downstream ───
-const rvTraceDialogVisible = ref(false)
-const rvTraceLoading = ref(false)
-const rvTraceResult = ref<{ upstream: any[]; downstream: any[] } | null>(null)
-
-async function onRvCtxCellTrace() {
-  rvCtx.closeContextMenu()
-  const row = rvCtx.contextMenu.rowData
-  if (!row?.row_code) {
-    ElMessage.info('请在数据行上右键')
-    return
-  }
-  rvTraceDialogVisible.value = true
-  rvTraceLoading.value = true
-  rvTraceResult.value = null
-  try {
-    const data: any = await api.get(
-      `/api/projects/${projectId.value}/lineage`,
-      { params: { object_type: 'report_row', object_id: row.row_code, direction: 'both' } },
-    )
-    const upstream = data?.upstream || []
-    const downstream = data?.downstream || []
-    rvTraceResult.value = { upstream, downstream }
-    if (!upstream.length && !downstream.length) {
-      rvTraceDialogVisible.value = false
-      ElMessage.info('该数字暂无溯源信息')
-    }
-  } catch (e: any) {
-    rvTraceDialogVisible.value = false
-    handleApiError(e, '数字溯源')
-  } finally {
-    rvTraceLoading.value = false
-  }
-}
-
-function onRvTraceLocate(node: any) {
-  rvTraceDialogVisible.value = false
-  if (node.wp_code) {
-    eventBus.emit('workpaper:locate-cell', {
-      wpId: node.wp_code,
-      sheetName: node.sheet_name || undefined,
-      cellRef: node.cell_ref || '',
-    })
-  }
-}
-
-
-function onRvCtxSum() {
-  rvCtx.closeContextMenu()
-  const sum = rvCtx.sumSelectedValues()
-  ElMessage.info(`选中 ${rvCtx.selectedCells.value.length} 格，合计：${fmtAmount(sum)}`)
-}
-
-function onRvCtxCompare() {
-  rvCtx.closeContextMenu()
-  if (rvCtx.selectedCells.value.length < 2) return
-  const vals = rvCtx.selectedCells.value.map(c => Number(c.value) || 0)
-  const diff = vals[0] - vals[1]
-  ElMessage.info(`差异：${fmtAmount(diff)}`)
-}
-
 // ─── 全屏与复制 ──────────────────────────────────────────────────────────────
 const { isFullscreen: rvFullscreen, toggleFullscreen: toggleRvFullscreen } = useFullscreen()
-
-function copyReportTable() {
-  if (!rows.value.length) { ElMessage.warning('无数据可复制'); return }
-  const headers = ['行次', '项目', '本期金额', '上期金额']
-  const dataRows = rows.value.map((r: any) => [r.row_code || '', r.row_name || '', r.current_period_amount ?? '', r.prior_period_amount ?? ''])
-  const text = [headers.join('\t'), ...dataRows.map(r => r.join('\t'))].join('\n')
-  const html = `<table border="1"><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>${dataRows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`
-  try {
-    navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })])
-    ElMessage.success(`已复制 ${dataRows.length} 行，可粘贴到 Word/Excel`)
-  } catch {
-    navigator.clipboard?.writeText(text)
-    ElMessage.success('已复制为文本格式')
-  }
-}
 </script>
 
 <style scoped src="./report-view.css" />
