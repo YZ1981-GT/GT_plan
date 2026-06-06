@@ -63,11 +63,11 @@
 
 ### P0-MVP：一周内最小可交付
 
-- [ ] MVP-1. 前后端 `LinkageContract` 类型定义一致
-- [ ] MVP-2. `wp_code` → `wp_id` route resolver 可用
-- [ ] MVP-3. stale 更新失败不再静默吞错，写入 degraded 记录
-- [ ] MVP-4. 试算表金额 → 底稿目标的单向 LinkageContract 可返回
-- [ ] MVP-5. 测试文件落地：
+- [x] MVP-1. 前后端 `LinkageContract` 类型定义一致
+- [x] MVP-2. `wp_code` → `wp_id` route resolver 可用
+- [x] MVP-3. stale 更新失败不再静默吞错，写入 degraded 记录
+- [x] MVP-4. 试算表金额 → 底稿目标的单向 LinkageContract 可返回
+- [x] MVP-5. 测试文件落地：
   - `backend/tests/test_linkage_contract_schema.py`
   - `backend/tests/test_linkage_route_resolver.py`
   - `backend/tests/test_stale_degraded_contract.py`
