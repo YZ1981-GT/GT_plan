@@ -1,0 +1,25 @@
+{
+  "role": "auditor",
+  "project_id": "proj-001",
+  "sections": [
+    {
+      "id": "todo",
+      "title": "今日待办",
+      "items": [
+        {
+          "id": "todo-1",
+          "label": "D1 底稿待编",
+          "route": "/projects/proj-001/workpapers/wp-001",
+          "due_date": "2025-12-15",
+          "priority": "high",
+          "source": "review_return"
+        }
+      ]
+    },
+    {
+      "id": "ai_pending",
+      "title": "AI 待确认",
+      "items": []
+    }
+  ]
+}

@@ -65,11 +65,11 @@
 
 ### P0-MVP：开工前置与最小验证
 
-- [ ] MVP-1. 完成数据来源盘点，不开发新 dashboard
-- [ ] MVP-2. 冻结 5 个核心指标口径：完成率、Aging、预算消耗率、质量分、签发阻断项
-- [ ] MVP-3. 定义 RoleWorkbench DTO 示例
-- [ ] MVP-4. 仅实现后端 facade mock/fixture 测试，不接页面
-- [ ] MVP-5. 测试文件落地：
+- [x] MVP-1. 完成数据来源盘点，不开发新 dashboard
+- [x] MVP-2. 冻结 5 个核心指标口径：完成率、Aging、预算消耗率、质量分、签发阻断项
+- [x] MVP-3. 定义 RoleWorkbench DTO 示例
+- [x] MVP-4. 仅实现后端 facade mock/fixture 测试，不接页面
+- [x] MVP-5. 测试文件落地：
   - `backend/tests/test_role_workbench_facade.py`
   - `audit-platform/frontend/src/views/__tests__/RoleWorkbench.spec.ts`
   - **验收标准**：后端 pytest mock DB in-memory 可跑；前端 vitest mock API shallow mount；核心 Property 对应 case 必须覆盖
