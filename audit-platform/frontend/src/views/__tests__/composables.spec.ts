@@ -66,7 +66,7 @@ vi.mock('@/utils/errorHandler', () => ({
 }))
 
 vi.mock('element-plus', () => {
-  const elMessageFn = vi.fn()
+  const elMessageFn = vi.fn() as any
   elMessageFn.success = vi.fn()
   elMessageFn.warning = vi.fn()
   elMessageFn.info = vi.fn()
@@ -92,6 +92,7 @@ import { useNoteAi } from '../composables/useNoteAi'
 function makeTreeItem(overrides: Record<string, any> = {}) {
   return {
     id: 'note-1', note_section: '五、1', section_title: '货币资金',
+    account_name: null, status: 'draft', sort_order: 0,
     content_type: 'table', is_stale: false, ...overrides,
   }
 }

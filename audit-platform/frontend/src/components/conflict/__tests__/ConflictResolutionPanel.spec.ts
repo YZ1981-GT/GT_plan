@@ -15,10 +15,11 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { nextTick } from 'vue'
 
-const { mockGet, mockPost, mockMessage } = vi.hoisted(() => ({
+const { mockGet, mockPost, mockMessage, mockHandleApiError } = vi.hoisted(() => ({
   mockGet: vi.fn(),
   mockPost: vi.fn(),
   mockMessage: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
+  mockHandleApiError: vi.fn(),
 }))
 
 vi.mock('@/services/apiProxy', () => ({
@@ -26,6 +27,10 @@ vi.mock('@/services/apiProxy', () => ({
     get: (...args: any[]) => mockGet(...args),
     post: (...args: any[]) => mockPost(...args),
   },
+}))
+
+vi.mock('@/utils/errorHandler', () => ({
+  handleApiError: (...args: any[]) => mockHandleApiError(...args),
 }))
 
 vi.mock('element-plus', async () => {
@@ -87,6 +92,7 @@ describe('ConflictResolutionPanel', () => {
     mockMessage.error.mockReset()
     mockMessage.success.mockReset()
     mockMessage.warning.mockReset()
+    mockHandleApiError.mockReset()
   })
 
   it('0 conflicts → 显示空态', async () => {
@@ -200,17 +206,17 @@ describe('ConflictResolutionPanel', () => {
     expect(mockPost).not.toHaveBeenCalled()
   })
 
-  it('API 错误时 ElMessage.error 显示加载错误', async () => {
+  it('API 错误时 handleApiError 处理加载错误', async () => {
     mockGet.mockRejectedValue({
       response: { data: { detail: '加载失败：网络错误' } },
     })
     makePanel()
     await flushPromises()
 
-    expect(mockMessage.error).toHaveBeenCalledWith('加载失败：网络错误')
+    expect(mockHandleApiError).toHaveBeenCalledWith(expect.anything(), '加载冲突列表')
   })
 
-  it('后端返回 422 时显示中文 error detail', async () => {
+  it('后端返回 422 时 handleApiError 处理调解错误', async () => {
     mockGet.mockResolvedValue({ count: 1, items: [SAMPLE_CONFLICT] })
     mockPost.mockRejectedValue({
       response: { status: 422, data: { detail: '冲突已调解过，不可重复操作' } },
@@ -222,7 +228,7 @@ describe('ConflictResolutionPanel', () => {
     await buttons[0].trigger('click')
     await flushPromises()
 
-    expect(mockMessage.error).toHaveBeenCalledWith('冲突已调解过，不可重复操作')
+    expect(mockHandleApiError).toHaveBeenCalledWith(expect.anything(), '调解')
     // 不 emit resolved
     expect(wrapper.emitted('resolved')).toBeFalsy()
   })

@@ -351,8 +351,9 @@ defineOptions({ name: 'WorkpaperWorkbenchView' })
 const props = defineProps<WpChildProps>()
 const emit = defineEmits<WpChildEmits>()
 
-const ctx = inject(WP_LIST_CONTEXT_KEY)
-if (!ctx) throw new ReferenceError('WpListContext not provided — must be used inside WorkpaperList Shell')
+const _ctx = inject(WP_LIST_CONTEXT_KEY)
+if (!_ctx) throw new ReferenceError('WpListContext not provided — must be used inside WorkpaperList Shell')
+const ctx = _ctx
 
 // ─── 工作台私有状态 ─────────────────────────────────────────────────────────────
 const workbenchProgressCollapsed = ref(false)

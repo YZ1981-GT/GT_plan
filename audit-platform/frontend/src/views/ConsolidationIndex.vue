@@ -663,13 +663,14 @@ async function onReaggregateNotes() {
 const consolidationType = ref<'subsidiary' | 'branch'>('subsidiary')
 const consolTypeSaving = ref(false)
 
-async function onConsolidationTypeChange(val: 'subsidiary' | 'branch') {
+async function onConsolidationTypeChange(val: string | number | boolean | undefined) {
+  const t = String(val)
   consolTypeSaving.value = true
   try {
     await api.put(`/api/projects/${projectId.value}/config`, {
-      consolidation_type: val,
+      consolidation_type: t,
     })
-    ElMessage.success(val === 'branch' ? '已切换为总分汇总（直接加总，无抵销）' : '已切换为母子合并（含抵销）')
+    ElMessage.success(t === 'branch' ? '已切换为总分汇总（直接加总，无抵销）' : '已切换为母子合并（含抵销）')
   } catch {
     ElMessage.error('合并类型保存失败')
   } finally {

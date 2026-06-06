@@ -213,8 +213,8 @@ export async function createSubsequentEvent(projectId: string, body: any): Promi
 
 // ── 用户管理 ──
 
-export async function listUsers(): Promise<any[]> {
-  const { data } = await http.get(P_usr.list)
+export async function listUsers(projectId?: string): Promise<any[]> {
+  const { data } = await http.get(P_usr.list, projectId ? { params: { project_id: projectId } } : undefined)
   return Array.isArray(data) ? data : []
 }
 

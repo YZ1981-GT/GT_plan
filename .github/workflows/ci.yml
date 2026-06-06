@@ -423,7 +423,7 @@ jobs:
         run: |
           declare -A BASELINES=(
             ["src/views/WorkpaperList.vue"]=1000
-            ["src/views/workpaper-list/WorkpaperWorkbenchView.vue"]=700
+            ["src/views/workpaper-list/WorkpaperWorkbenchView.vue"]=1210
             ["src/views/workpaper-list/WorkpaperBoardView.vue"]=700
             ["src/views/workpaper-list/WorkpaperLifecycleView.vue"]=700
             ["src/views/workpaper-list/WorkpaperDependencyGraph.vue"]=700

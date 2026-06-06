@@ -382,7 +382,8 @@ function navigateToWorkpaper(cite: Citation) {
 // @mention 逻辑
 // ---------------------------------------------------------------------------
 
-function handleInputKeydown(e: KeyboardEvent) {
+function handleInputKeydown(evt: Event | KeyboardEvent) {
+  const e = evt as KeyboardEvent
   if (e.key === 'Enter' && e.ctrlKey) {
     e.preventDefault()
     sendMessage()

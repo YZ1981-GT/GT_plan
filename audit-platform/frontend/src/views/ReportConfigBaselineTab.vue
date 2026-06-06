@@ -332,11 +332,11 @@ function statusLabel(status: string) {
   return status
 }
 
-function diffTagType(diffType: string) {
+function diffTagType(diffType: string): 'success' | 'warning' | 'info' | 'danger' | undefined {
   if (diffType === 'modified') return 'warning'
   if (diffType === 'project_only') return 'info'
   if (diffType === 'master_only') return 'danger'
-  return ''
+  return undefined
 }
 
 function diffLabel(diffType: string) {

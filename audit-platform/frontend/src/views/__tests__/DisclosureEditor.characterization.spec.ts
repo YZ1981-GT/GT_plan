@@ -73,7 +73,7 @@ vi.mock('@/utils/errorHandler', () => ({
 }))
 
 vi.mock('element-plus', () => {
-  const elMessageFn = vi.fn()
+  const elMessageFn = vi.fn() as any
   elMessageFn.success = vi.fn()
   elMessageFn.warning = vi.fn()
   elMessageFn.info = vi.fn()

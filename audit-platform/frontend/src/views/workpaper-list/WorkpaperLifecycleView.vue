@@ -29,8 +29,9 @@ defineOptions({ name: 'WorkpaperLifecycleView' })
 const props = defineProps<WpChildProps>()
 const emit = defineEmits<WpChildEmits>()
 
-const ctx = inject(WP_LIST_CONTEXT_KEY)
-if (!ctx) throw new ReferenceError('WpListContext not provided — must be used inside WorkpaperList Shell')
+const _ctx = inject(WP_LIST_CONTEXT_KEY)
+if (!_ctx) throw new ReferenceError('WpListContext not provided — must be used inside WorkpaperList Shell')
+const ctx = _ctx
 
 /** 给 LifecycleView 提供合并好的 wp 列表（含 wp_code/wp_name） */
 const lifecycleWpItems = computed(() =>

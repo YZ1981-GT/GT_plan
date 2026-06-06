@@ -63,6 +63,12 @@ export interface ConsolRefreshEntityPayload {
   types: string[]
 }
 
+/** 合并一键刷新完成（通知各 tab 刷新缓存） */
+export interface ConsolRefreshDonePayload {
+  projectId: string
+  year: number
+}
+
 /** 合并树汇总 */
 export interface ConsolTreeAggregatePayload {
   mode: 'direct' | 'custom'
@@ -235,6 +241,7 @@ export type Events = {
   'consol-tree-select': ConsolTreeSelectPayload
   'consol-catalog-select': ConsolCatalogSelectPayload
   'consol-refresh-entity': ConsolRefreshEntityPayload
+  'consol-refresh-done': ConsolRefreshDonePayload
   'consol-tree-aggregate': ConsolTreeAggregatePayload
   'consol-note-audit-all': ConsolNoteAuditAllPayload
 

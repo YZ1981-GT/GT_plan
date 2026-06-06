@@ -7,7 +7,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    exclude: ['e2e/**', 'node_modules/**', 'eslint-rules/**'],
+    exclude: ['e2e/**', 'e2e-uat/**', 'node_modules/**', 'eslint-rules/**'],
   },
   resolve: {
     alias: {

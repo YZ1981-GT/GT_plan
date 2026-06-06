@@ -67,23 +67,23 @@ onMounted(async () => {
   }
 })
 
-async function validateAndPersistCurrentStep(): Promise<boolean> {
-  if (!basicInfoRef.value) return false
+async function validateAndPersistCurrentStep(): Promise<Record<string, unknown> | null> {
+  if (!basicInfoRef.value) return null
   const data = await basicInfoRef.value.validate()
-  if (!data) return false
+  if (!data) return null
 
   if (!wizardStore.projectId) {
     await wizardStore.createProject(data as any)
   } else {
     await wizardStore.saveStep('basic_info', data)
   }
-  return true
+  return data
 }
 
 async function handleConfirm() {
   await submitWizard(async () => {
-    const ok = await validateAndPersistCurrentStep()
-    if (!ok) return
+    const data = await validateAndPersistCurrentStep()
+    if (!data) return
 
     if (!wizardStore.projectId) {
       // 新建项目引导

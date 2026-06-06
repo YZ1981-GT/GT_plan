@@ -233,7 +233,7 @@ export async function downloadWorkpaper(projectId: string, wpId: string) {
   return downloadFile(P_wp.download(projectId, wpId))
 }
 
-export async function downloadWorkpaperPack(projectId: string, wpIds: string[], includePrefill: boolean = true) {
+export async function downloadWorkpaperPack(projectId: string, wpIds?: string[], includePrefill: boolean = true) {
   return downloadFile(P_wp.downloadPack(projectId), {
     method: 'post',
     data: { wp_ids: wpIds, include_prefill: includePrefill },

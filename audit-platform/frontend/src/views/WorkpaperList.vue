@@ -92,8 +92,9 @@
     <UnifiedImportDialog
       v-if="showWpImport"
       v-model="showWpImport"
+      import-type="workpaper"
       :project-id="projectId"
-      @success="fetchWpIndex"
+      @imported="fetchWpIndex"
     />
   </div>
 </template>
@@ -190,7 +191,7 @@ const ALL_TABS: TabDef[] = [
 ]
 
 const visibleTabs = computed(() => {
-  const role = authStore.role
+  const role = authStore.user?.role
   // auditor / qc 隐藏 DelegationMatrix
   if (role === 'auditor' || role === 'qc') {
     return ALL_TABS.filter(t => t.value !== 'matrix')

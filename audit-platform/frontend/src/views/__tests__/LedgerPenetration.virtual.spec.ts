@@ -238,8 +238,8 @@ describe('LedgerPenetration — 月小计 + 运行余额', () => {
   it('月小计借贷合计 = 全期借贷总额（守恒）', () => {
     const rows = buildLedgerDisplay(items, 1000)
     const subs = rows.filter((r) => r._type === 'subtotal')
-    const sumD = subs.reduce((s, r) => s + r.debit_amount, 0)
-    const sumC = subs.reduce((s, r) => s + r.credit_amount, 0)
+    const sumD = subs.reduce((s, r) => s + (r.debit_amount ?? 0), 0)
+    const sumC = subs.reduce((s, r) => s + (r.credit_amount ?? 0), 0)
     expect(sumD).toBe(210) // 100+40+70
     expect(sumC).toBe(80)  // 30+50
   })
@@ -249,7 +249,7 @@ describe('LedgerPenetration — 月小计 + 运行余额', () => {
     expect(rows[0]._type).toBe('opening')
     expect(rows[0].balance).toBe(1000)
     const lastNormal = [...rows].reverse().find((r) => r._type === 'normal')
-    expect(lastNormal.balance).toBe(1000 + 210 - 80) // 1130
+    expect(lastNormal!.balance).toBe(1000 + 210 - 80) // 1130
   })
 
   it('月小计的 balance = 该月末运行余额', () => {

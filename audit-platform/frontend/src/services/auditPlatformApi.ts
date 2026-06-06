@@ -508,6 +508,10 @@ export interface DisclosureNoteTreeItem {
   content_type: string
   status: string
   sort_order: number
+  /** 是否过期（stale 标记，后端 query_builder 路径下发；树端点可能不含 → 可选） */
+  is_stale?: boolean
+  /** 是否空章节（前端离线导出按此判定 has_data；后端树端点可能不含 → 可选） */
+  is_empty?: boolean
 }
 
 export interface DisclosureNoteDetail {

@@ -13,6 +13,7 @@ export interface BasicInfo {
   custom_template_name: string
   custom_template_version: string
   report_scope: string
+  consolidation_type: string
   parent_company_name: string
   parent_company_code: string
   ultimate_company_name: string

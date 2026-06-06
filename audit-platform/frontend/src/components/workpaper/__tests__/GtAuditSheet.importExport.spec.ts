@@ -23,7 +23,7 @@ import GtAuditSheet, { type AuditSheetHtmlData } from '../GtAuditSheet.vue'
 // ─── mock useExcelIO（隔离 xlsx 动态 import） ───
 const { mockExportTemplate, mockOnFileSelected, parseResultRef } = vi.hoisted(() => {
   return {
-    mockExportTemplate: vi.fn(async () => {}),
+    mockExportTemplate: vi.fn(async (_opts?: any) => {}),
     // onFileSelected(event, callback, options) → 用可设值的解析结果调用回调
     parseResultRef: { value: { rows: [] as any[], headers: [] as string[] } },
     mockOnFileSelected: vi.fn(async (_e: Event, cb: (r: any) => void) => {
@@ -169,7 +169,7 @@ describe('GtAuditSheet — 导出模板（Task 16）', () => {
     const wrapper = mountSheet(buildHtmlData())
     const vm = wrapper.vm as any
     await vm.onExportTemplate()
-    const opts = mockExportTemplate.mock.calls[0][0]
+    const opts = mockExportTemplate.mock.calls[0]![0]
     // sheetName 与导入解析一致
     expect(opts.sheetName).toBe('审定表')
     // 文件名含当前 sheetName

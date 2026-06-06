@@ -122,7 +122,7 @@ const SAME_BY_COMPANY = [
 
 function mountDialog(props: Record<string, any>) {
   return mount(ConsolBreakdownDialog, {
-    props: { modelValue: true, projectId: 'parent-001', year: 2024, ...props },
+    props: { modelValue: true, source: 'note', projectId: 'parent-001', year: 2024, ...props },
     global: { stubs, directives },
   })
 }

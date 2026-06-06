@@ -206,14 +206,14 @@
               <div class="gt-board-card" @dblclick="goTo('audit-checks')">
                 <div class="gt-board-card__icon" style="background: #fde8e8">⚠️</div>
                 <div class="gt-board-card__body">
-                  <span class="gt-board-card__value" :style="{ color: metrics.openIssues > 0 ? 'var(--gt-color-coral)' : '' }">{{ metrics.openIssues ?? '-' }}</span>
+                  <span class="gt-board-card__value" :style="{ color: (metrics.openIssues ?? 0) > 0 ? 'var(--gt-color-coral)' : '' }">{{ metrics.openIssues ?? '-' }}</span>
                   <span class="gt-board-card__label">未决问题</span>
                 </div>
               </div>
               <div class="gt-board-card" @dblclick="goTo('workpapers')">
                 <div class="gt-board-card__icon" style="background: #fde8e8">🕐</div>
                 <div class="gt-board-card__body">
-                  <span class="gt-board-card__value" :style="{ color: metrics.staleCount > 0 ? 'var(--gt-color-coral)' : '' }">{{ metrics.staleCount ?? '-' }}</span>
+                  <span class="gt-board-card__value" :style="{ color: (metrics.staleCount ?? 0) > 0 ? 'var(--gt-color-coral)' : '' }">{{ metrics.staleCount ?? '-' }}</span>
                   <span class="gt-board-card__label">数据过期</span>
                 </div>
               </div>
@@ -255,7 +255,7 @@
                 <el-table-column prop="staff_name" label="姓名" width="90" />
                 <el-table-column prop="role_label" label="角色" width="80">
                   <template #default="{ row }">
-                    <el-tag size="small" :type="row.role === 'preparer' ? '' : row.role === 'reviewer' ? 'success' : 'info'">
+                    <el-tag size="small" :type="row.role === 'preparer' ? undefined : row.role === 'reviewer' ? 'success' : 'info'">
                       {{ row.role_label }}
                     </el-tag>
                   </template>
@@ -915,9 +915,9 @@ function wpStatusLabel(s: string) {
   return m[s] || s || '草稿'
 }
 
-function wpStatusType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' {
+function wpStatusType(s: string): 'success' | 'warning' | 'info' | 'danger' | undefined {
   if (s === 'reviewed' || s === 'archived' || s === 'completed' || s === 'signed_off') return 'success'
-  if (s === 'prepared') return ''
+  if (s === 'prepared') return undefined
   if (s === 'in_progress') return 'warning'
   return 'info'
 }

@@ -188,7 +188,7 @@ const stages = computed<Stage[]>(() => {
 })
 
 // ─── Methods ───
-function statusType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' {
+function statusType(status: string): 'success' | 'warning' | 'info' | 'danger' | undefined {
   switch (status) {
     case 'completed': return 'success'
     case 'in_progress': return 'warning'
