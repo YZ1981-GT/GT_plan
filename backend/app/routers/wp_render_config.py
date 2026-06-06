@@ -229,14 +229,20 @@ async def _generate_b_index_data(
     project_id: UUID,
     wp_id: UUID,
     classifications: list,
+    audit_cycle: str | None = None,
 ) -> dict:
     """当 B-Index sheet 无持久化 html_data 时，从项目元数据 + 同底稿 sheets 自动生成。
 
     返回结构与 GtBIndex.vue 的 BIndexHtmlData 接口一致：
     {
       preparation_info: { entity_name, period_end, preparer, prep_date, reviewer, review_date, index_no },
-      navigation_rows: [ { seq, content, index_ref, no_print } ]
+      navigation_rows: [ { seq, content, index_ref, no_print } ],
+      cycle_workpapers: [ { wp_code, wp_name, wp_id, status, is_current } ]
     }
+
+    - navigation_rows：当前底稿内部各 sheet（同 xlsx 内 sheet 切换）。
+    - cycle_workpapers：同一审计循环的所有底稿（跨底稿 router.push 跳转），
+      使「底稿目录」覆盖整个循环（如 D 循环含 D0~D7），而非仅当前 xlsx。
     """
     preparation_info = await _build_preparation_info(db, project_id, wp_id)
 
@@ -273,9 +279,20 @@ async def _generate_b_index_data(
         })
         seq += 1
 
+    # ─── 循环底稿目录（跨底稿，同 audit_cycle 全部底稿） ──────────────────
+    from app.services.wp_cycle_directory import build_cycle_workpapers
+
+    cycle_workpapers = await build_cycle_workpapers(
+        db=db,
+        project_id=project_id,
+        audit_cycle=audit_cycle,
+        current_wp_id=wp_id,
+    )
+
     return {
         "preparation_info": preparation_info,
         "navigation_rows": navigation_rows,
+        "cycle_workpapers": cycle_workpapers,
     }
 
 
@@ -958,6 +975,7 @@ async def get_render_config(
                 project_id=project_id,
                 wp_id=wp_id,
                 classifications=classifications,
+                audit_cycle=wp_index.audit_cycle,
             )
 
         # ─── A-程序表中控台自动生成：从模板 xlsx 提取审计程序行 ─────────

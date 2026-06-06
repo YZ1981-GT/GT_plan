@@ -27,9 +27,11 @@ vi.mock('@/components/workpaper/GtBArchitectureTree.vue', () => ({
   },
 }))
 
-// useRoute stub（组件用 route.params.projectId）
+// useRoute stub（组件用 route.params.projectId）；useRouter（循环目录跨底稿跳转用）
+const _pushSpy = vi.fn()
 vi.mock('vue-router', () => ({
   useRoute: () => ({ params: { projectId: 'proj-001' } }),
+  useRouter: () => ({ push: _pushSpy }),
 }))
 
 const globalStubs = {
@@ -249,5 +251,59 @@ describe('GtBIndex — htmlData 响应式同步', () => {
     expect(vm.preparationInfo.entity_name).toBe('新单位')
     expect(vm.navigationRows.length).toBe(1)
     expect(vm.navigationRows[0].index_ref).toBe('X1')
+  })
+})
+
+describe('GtBIndex — 循环底稿目录（跨底稿）', () => {
+  beforeEach(() => {
+    _pushSpy.mockClear()
+  })
+
+  function htmlDataWithCycle() {
+    return {
+      ...buildHtmlData(),
+      cycle_workpapers: [
+        { wp_code: 'D0', wp_name: '收入循环函证', wp_id: null, status: 'not_started', is_current: false },
+        { wp_code: 'D1', wp_name: '应收票据审定表', wp_id: 'wp-001', status: 'not_started', is_current: true },
+        { wp_code: 'D2', wp_name: '应收账款审定表', wp_id: 'wp-002', status: 'in_progress', is_current: false },
+      ],
+    }
+  }
+
+  it('cycle_workpapers 渲染为跨底稿目录卡片', () => {
+    const wrapper = mountIndex(htmlDataWithCycle())
+    const cards = wrapper.findAll('.gt-b-index__cycle-card')
+    expect(cards.length).toBe(3)
+    expect(wrapper.html()).toContain('本循环底稿目录')
+    expect(wrapper.html()).toContain('应收账款审定表')
+  })
+
+  it('无 cycle_workpapers 时不渲染目录区', () => {
+    const wrapper = mountIndex(buildHtmlData())
+    expect(wrapper.find('.gt-b-index__cycle').exists()).toBe(false)
+  })
+
+  it('点击其他底稿卡片 → router.push 到对应 WorkpaperEditor', async () => {
+    const wrapper = mountIndex(htmlDataWithCycle())
+    const vm = wrapper.vm as any
+    vm.onCycleCardClick({ wp_code: 'D2', wp_name: '应收账款审定表', wp_id: 'wp-002', status: 'in_progress', is_current: false })
+    expect(_pushSpy).toHaveBeenCalledWith({
+      name: 'WorkpaperEditor',
+      params: { projectId: 'proj-001', wpId: 'wp-002' },
+    })
+  })
+
+  it('点击当前底稿卡片不跳转', () => {
+    const wrapper = mountIndex(htmlDataWithCycle())
+    const vm = wrapper.vm as any
+    vm.onCycleCardClick({ wp_code: 'D1', wp_name: '应收票据审定表', wp_id: 'wp-001', status: 'not_started', is_current: true })
+    expect(_pushSpy).not.toHaveBeenCalled()
+  })
+
+  it('点击未生成文件（wp_id 为空）的底稿不跳转', () => {
+    const wrapper = mountIndex(htmlDataWithCycle())
+    const vm = wrapper.vm as any
+    vm.onCycleCardClick({ wp_code: 'D0', wp_name: '收入循环函证', wp_id: null, status: 'not_started', is_current: false })
+    expect(_pushSpy).not.toHaveBeenCalled()
   })
 })

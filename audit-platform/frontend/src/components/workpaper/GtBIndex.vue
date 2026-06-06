@@ -76,12 +76,43 @@
         @navigate="handleNavigate"
       />
     </div>
+
+    <!-- ─── 循环底稿目录（跨底稿，同审计循环全部底稿） ─── -->
+    <div v-if="cycleWorkpapers.length > 0" class="gt-b-index__cycle">
+      <div class="gt-b-index__cycle-header">
+        <h4 class="gt-b-index__cycle-title">本循环底稿目录</h4>
+        <span class="gt-b-index__cycle-hint">点击可跳转至同循环其他底稿（灰色表示尚未生成）</span>
+      </div>
+      <div class="gt-b-index__cycle-grid">
+        <div
+          v-for="wp in cycleWorkpapers"
+          :key="wp.wp_code"
+          class="gt-b-index__cycle-card"
+          :class="{
+            'is-current': wp.is_current,
+            'is-disabled': !wp.wp_id,
+          }"
+          @click="onCycleCardClick(wp)"
+        >
+          <div class="gt-b-index__cycle-card-top">
+            <span class="gt-b-index__cycle-code">{{ wp.wp_code }}</span>
+            <el-tag
+              v-if="wp.is_current"
+              size="small"
+              effect="plain"
+              class="gt-b-index__cycle-current-tag"
+            >当前</el-tag>
+          </div>
+          <span class="gt-b-index__cycle-name" :title="wp.wp_name">{{ wp.wp_name }}</span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 
 // ─── Types ───
@@ -102,6 +133,15 @@ export interface BIndexSchema {
 interface BIndexHtmlData {
   preparation_info: Record<string, string>
   navigation_rows: NavigationRow[]
+  cycle_workpapers?: CycleWorkpaper[]
+}
+
+interface CycleWorkpaper {
+  wp_code: string
+  wp_name: string
+  wp_id: string | null
+  status: string
+  is_current: boolean
 }
 
 // ─── Props / Emits ───
@@ -123,9 +163,15 @@ const emit = defineEmits<{
 
 // ─── State ───
 const route = useRoute()
+const router = useRouter()
 const preparationInfo = ref<Record<string, string>>({})
 const navigationRows = ref<NavigationRow[]>([])
 const projectId = computed(() => (route.params.projectId as string) || '')
+
+// 循环底稿目录（跨底稿）——同审计循环全部底稿，点击 router.push 跳转
+const cycleWorkpapers = computed<CycleWorkpaper[]>(
+  () => props.htmlData?.cycle_workpapers ?? [],
+)
 
 // 编制信息折叠状态（默认展开）；收起时在标题栏显示概要
 const prepCollapsed = ref(false)
@@ -169,6 +215,18 @@ watch(() => props.htmlData, () => {
 function handleNavigate(sheetName: string) {
   // 架构图节点点击 → 冒泡给父组件切换 sheet
   emit('jump-to-section', sheetName)
+}
+
+function onCycleCardClick(wp: CycleWorkpaper) {
+  // 跨底稿跳转：同循环其他底稿用 router.push 打开对应 WorkpaperEditor。
+  // wp_id 为空（底稿未生成文件）→ 不可跳转。当前底稿 → 不重复跳。
+  if (!wp.wp_id || wp.is_current) return
+  const pid = projectId.value
+  if (!pid) return
+  router.push({
+    name: 'WorkpaperEditor',
+    params: { projectId: pid, wpId: wp.wp_id },
+  })
 }
 
 function debounceSave() {
@@ -276,5 +334,92 @@ onBeforeUnmount(() => {
 .gt-b-index__navigation-hint {
   font-size: 12px;
   color: var(--gt-color-text-tertiary, #909399);
+}
+
+/* ─── 循环底稿目录（跨底稿） ─── */
+.gt-b-index__cycle {
+  margin-top: 28px;
+}
+.gt-b-index__cycle-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.gt-b-index__cycle-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+.gt-b-index__cycle-hint {
+  font-size: 12px;
+  color: var(--gt-color-text-tertiary, #909399);
+}
+.gt-b-index__cycle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.gt-b-index__cycle-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--gt-color-border-purple, #e8e4f0);
+  border-radius: 8px;
+  background: var(--gt-color-bg-white, #fff);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.gt-b-index__cycle-card:hover {
+  border-color: var(--gt-color-primary, #4b2d77);
+  box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12);
+  transform: translateY(-2px);
+}
+.gt-b-index__cycle-card.is-current {
+  border-color: var(--gt-color-primary, #4b2d77);
+  background: var(--gt-color-primary-bg, #f4f0fa);
+  box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77);
+  cursor: default;
+}
+.gt-b-index__cycle-card.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.gt-b-index__cycle-card.is-disabled:hover {
+  border-color: var(--gt-color-border-purple, #e8e4f0);
+  box-shadow: none;
+  transform: none;
+}
+.gt-b-index__cycle-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gt-b-index__cycle-code {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gt-color-primary, #4b2d77);
+}
+.gt-b-index__cycle-current-tag {
+  margin-left: auto;
+}
+.gt-b-index__cycle-card :deep(.gt-b-index__cycle-current-tag.el-tag) {
+  --el-tag-bg-color: var(--gt-color-primary-bg, #f4f0fa);
+  --el-tag-border-color: var(--gt-color-border-purple-light, #d8b8ee);
+  --el-tag-text-color: var(--gt-color-primary, #4b2d77);
+  background-color: var(--gt-color-primary-bg, #f4f0fa) !important;
+  border-color: var(--gt-color-border-purple-light, #d8b8ee) !important;
+  color: var(--gt-color-primary, #4b2d77) !important;
+}
+.gt-b-index__cycle-name {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--gt-color-text-primary, #303133);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>
