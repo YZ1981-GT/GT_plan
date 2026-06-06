@@ -64,11 +64,11 @@
 
 ### P0-MVP：一周内最小可交付
 
-- [ ] MVP-1. EvidenceRef schema 先作为 API DTO，不立即入库
-- [ ] MVP-2. 附件删除/替换前展示已知影响范围
-- [ ] MVP-3. AI 内容状态映射 suggestion/draft/confirmed/rejected
-- [ ] MVP-4. confirmed 前进入报告/附注正式导出先 warning，后续切 blocking
-- [ ] MVP-5. 测试文件落地：
+- [x] MVP-1. EvidenceRef schema 先作为 API DTO，不立即入库
+- [x] MVP-2. 附件删除/替换前展示已知影响范围
+- [x] MVP-3. AI 内容状态映射 suggestion/draft/confirmed/rejected
+- [x] MVP-4. confirmed 前进入报告/附注正式导出先 warning，后续切 blocking
+- [x] MVP-5. 测试文件落地：
   - `backend/tests/test_evidence_ref_schema.py`
   - `backend/tests/test_attachment_impact_service.py`
   - `backend/tests/test_ai_content_confirmation_gate.py`
