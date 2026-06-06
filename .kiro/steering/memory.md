@@ -122,7 +122,9 @@ inclusion: always
 
 ### 真正待办
 - **外部依赖**：LLM embedding 实例 / 6000 并发压测 / 钉集成 / 合并 UAT / GitHub 默认分支改 main / 走 PR 合入 / V052~V058 生产迁移
-- **待建 spec**：底稿统一导入导出(`workpaper-unified-import-export`) / D1-4 坏账嵌套结构（枚举+auto-SUM+辅助预填）/ 审计报告交付件管理中心(`audit-report-deliverable-center`) / consol_disclosure_service 瘦身(1736行) / migration_runner 瘦身(1026行)
+- **待建 spec**：底稿统一导入导出(`workpaper-unified-import-export`) / D1-4 坏账嵌套结构（枚举+auto-SUM+辅助预填）/ consol_disclosure_service 瘦身(1736行) / migration_runner 瘦身(1026行) / `disclosure-note-semantic-structure-and-presentation`（附注语义结构，复盘文档已给框架）
+- **已建 spec 待执行（6 平台级）**：`platform-maintenance-governance`(最先) → `platform-context-permission-foundation` + `platform-ui-editing-consistency`(并行) → `platform-linkage-contract-stale` → `platform-evidence-knowledge-ai-governance` → `platform-role-workbench-quality-loop`；共享原子表+缓存策略+数据可用性审计+边界澄清已补（commit 2f6ce373）
+- **已建 spec 已执行**：`audit-report-deliverable-center`（前后端+V059 迁移+5 测试文件，已 merge）
 - **✅ 已完成 spec**：`report-view-slimdown`（2944→965 行，15 任务全部完成+3 项技术债已清，HARD_CAP 1110 已登记）；技术债修复：①纯函数(getRowType/formatReportAmount/equitySpanMethod/computeCrossCheckResults)提升为模块级 export ②useReportCellActions→aggregator+useReportDrilldown/useReportTrace/useReportContextMenu 三子 composable ③ReportDialogs→wrapper+ReportDrilldownDialogs/ReportTraceDialogs/ReportMappingDialog 三子组件
 - **瘦身已完成**：disclosure_engine 1949→1601 / note_validation_engine 995→740 / 明细账翻页余额 P0 已修 / 功能空洞全消除 / 前端 CI 门禁失真已修回绿
 - **铁律补充**：composable 抽取后必同步改其单测；spec 改一个文档必同步检查其余两个一致性；死代码删前必查 spec 历史决策；composable 实例传递不可重新 new（否则状态分裂）；4 个 Workpaper*Editor 故意保留素材勿删

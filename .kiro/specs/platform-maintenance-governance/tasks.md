@@ -60,12 +60,12 @@
 
 ### P0-MVP：三天内最小可交付
 
-- [ ] MVP-1. 四本账骨架文件创建完成
-- [ ] MVP-2. `snapshot_scale.py` 可输出 JSON，不要求自动写回
-- [ ] MVP-3. `check_sql_column_contract.py` 先 report 模式运行，不接 CI fail
-- [ ] MVP-4. PR checklist 增加全局治理项
-- [ ] MVP-5. 本地 smoke checklist 覆盖 backend/frontend/OnlyOffice/WOPI/Postgres/Redis
-- [ ] MVP-6. 测试文件落地：
+- [x] MVP-1. 四本账骨架文件创建完成
+- [x] MVP-2. `snapshot_scale.py` 可输出 JSON，不要求自动写回
+- [x] MVP-3. `check_sql_column_contract.py` 先 report 模式运行，不接 CI fail
+- [x] MVP-4. PR checklist 增加全局治理项
+- [x] MVP-5. 本地 smoke checklist 覆盖 backend/frontend/OnlyOffice/WOPI/Postgres/Redis
+- [x] MVP-6. 测试文件落地：
   - `backend/tests/scripts/test_snapshot_scale.py`
   - `backend/tests/scripts/test_check_sql_column_contract.py`
   - **验收标准**：后端 pytest mock DB in-memory 可跑；前端 vitest mock API shallow mount；核心 Property 对应 case 必须覆盖
