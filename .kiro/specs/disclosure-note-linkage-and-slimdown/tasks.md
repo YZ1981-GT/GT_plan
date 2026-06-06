@@ -24,7 +24,7 @@
   - 取数失败的章节不抛异常，记入 `RefillReport.errors`（`{section}: {reason}`）
   - _Requirements: 2.1, 2.2, 2.4, 2.5, 2.6, 2.7, 1.3_
 
-- [ ] 2. 修复并重写 note_stale_service 的刷新方法
+- [x] 2. 修复并重写 note_stale_service 的刷新方法
   - [x] 2.1 修复 note_stale_service 两处致命 bug（触类旁通 grep 全文同类）
     - 将 `from app.models.phase13_models import DisclosureNote`（该类不存在 → ImportError 被宽 `except` 静默吞）改为 `from app.models.report_models import DisclosureNote`
     - 将字段引用 `DisclosureNote.section_code` 改为真实字段 `note_section`（grep 全文件确认 `:88,148,306,97` 等所有引用点一次改全）
@@ -65,7 +65,7 @@
   - 原生 http 调用手动解 `{code,message,data}` 信封取 `body.data`
   - _Requirements: 2.8, 2.9, 1.4_
 
-- [ ]* 6. 编写组① 属性测试（刷新侧 P1/P2/P3/P4）
+- [x]* 6. 编写组① 属性测试（刷新侧 P1/P2/P3/P4）
   - [x]* 6.1 Property 1：从底稿刷新后金额等价
     - **Property 1: 从底稿刷新后金额等价**
     - **Validates: Requirements 2.1, 2.2, 2.10**
@@ -100,7 +100,7 @@
 
 ### 组② 缺口2 P1：cross_ref auto_pull 真实取数
 
-- [ ] 8. 新建 NoteAutoPullService（复用 note_source_resolvers 取数内核）
+- [x] 8. 新建 NoteAutoPullService（复用 note_source_resolvers 取数内核）
   - [x] 8.1 创建 service 骨架与数据类
     - 新建 `backend/app/services/note_auto_pull_service.py`
     - `@dataclass AutoPullResult`(ref_id/target_wp/source_label/value/available/reason)
@@ -130,7 +130,7 @@
   - 只读查询，无需 commit；确认 router 已在 `router_registry` 注册（否则前端 404）
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 10. 前端 CrossRefDef 扩展 + 数据来源卡片展示拉到的值
+- [x] 10. 前端 CrossRefDef 扩展 + 数据来源卡片展示拉到的值
   - [x] 10.1 扩展 CrossRefDef 类型
     - `GtCNoteTable.types.ts` 新增 `pulled_value?: number | string | null`、`source_label?: string`、`unavailable?: boolean`、`unavailable_reason?: string`
     - _Requirements: 3.3, 3.4_
@@ -145,7 +145,7 @@
     - 附注表加载时触发，把结果回填到 CrossRefDef 展示
     - _Requirements: 3.1, 3.4_
 
-- [ ]* 11. 编写组② 属性测试（auto_pull 侧 P5/P6/P7/P8 + P4 auto_pull 分支）
+- [x]* 11. 编写组② 属性测试（auto_pull 侧 P5/P6/P7/P8 + P4 auto_pull 分支）
   - [x]* 11.1 Property 5：auto_pull 取数与来源值一致
     - **Property 5: auto_pull 取数与来源值一致**
     - **Validates: Requirements 3.1, 3.2, 3.9**
@@ -189,7 +189,7 @@
 
 ### 组③ 缺口3 P1：DisclosureEditor.vue 瘦身（纯重构，先测后拆）
 
-- [ ] 13. 先补特征测试锁定现有行为（拆前必做）
+- [x] 13. 先补特征测试锁定现有行为（拆前必做）
   - [x]* 13.1 编写 DisclosureEditor.characterization.spec.ts（Property 9 特征快照）
     - **Property 9: 瘦身行为与契约不变**
     - **Validates: Requirements 4.4, 4.9**
@@ -199,7 +199,7 @@
     - 标签注释 `// Feature: disclosure-note-linkage-and-slimdown, Property 9: 瘦身行为与契约不变`
     - _Requirements: 4.2, 4.4, 4.6, 4.9_
 
-- [ ] 14. 按 composable 清单逐个抽取（每抽一个跑特征测试）
+- [x] 14. 按 composable 清单逐个抽取（每抽一个跑特征测试）
   - [x] 14.1 抽取 useNoteTree（章节树加载/拖拽排序/节点选中）
     - 搬 `fetchTree/onTreeNodeDrop/allowTreeDrop`（`:914,1018,1952`），只搬逻辑不改语义；抽完跑特征测试维持绿
     - _Requirements: 4.3, 4.4, 4.7_
@@ -225,7 +225,7 @@
     - 覆盖每个 composable 关键分支与边界；前端 fast-check `numRuns: 100`（涉随机时）
     - _Requirements: 4.6_
 
-- [ ] 15. 抽取子组件（SFC）
+- [x] 15. 抽取子组件（SFC）
   - [x] 15.1 抽取 NoteEditorToolbar.vue（顶部工具栏按钮区）
     - 模板切换/刷新/生成/校验/导出/EQCR（模板 `:31-50`），通过 props/emit 与父通信，父保留编排；抽完跑特征测试
     - _Requirements: 4.3, 4.4, 4.7_
@@ -233,7 +233,7 @@
     - 搬转换规则弹窗（`:923-952`），props/emit 通信；抽完跑特征测试
     - _Requirements: 4.3, 4.4, 4.7_
 
-- [ ] 16. HARD_CAPS 登记 + 类型检查
+- [x] 16. HARD_CAPS 登记 + 类型检查
   - [x] 16.1 登记 check_file_size.py HARD_CAPS
     - 在 `backend/scripts/check/check_file_size.py` 的 `HARD_CAPS` 新增 `"audit-platform/frontend/src/views/DisclosureEditor.vue": 1500`
     - 确认 `DisclosureEditor.vue` 瘦身后实际行数 ≤ 1500，跑 `check_file_size.py` 通过
