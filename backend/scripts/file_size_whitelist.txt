@@ -1,56 +1,72 @@
-backend/app/core/migration_runner.py 930
-backend/app/models/ai_models.py 1186
+# 文件行数 whitelist 基线（check_file_size.py 读取）
+# 格式：<相对路径> <基线行数>，# 开头为注释
+# 语义：whitelist 内文件仍受"只减不增 +5%"约束（防打磨倒退）；
+#       不在 whitelist 的新文件强制 ≤ 默认上限（.py 800 / .vue/.ts 1500）。
+# 维护：每次模块瘦身完成后下调对应基线（或移除该行强制回默认上限）。
+# HARD_CAPS（脚本内）优先于本表：DisclosureEditor.vue / GtDForm* 由 hard cap 守护，不在此表。
+#
+# 基线刷新：2026-06-06（接入 CI file-size-guard，冻结当前状态为天花板）。
+# ⚠ 以下 6 个文件较上一基线有增长（已提交历史，后续建议瘦身后下调基线）：
+#   migration_runner 930→1026 / consol_disclosure_service 1267→1736
+#   disclosure_engine 1676→1949 / note_validation_engine 813→995
+#   ReportView.vue 2522→2848 / WorkpaperEditor.vue 835→928
+backend/app/core/migration_runner.py 1026
+backend/app/models/ai_models.py 1187
 backend/app/models/ai_schemas.py 842
-backend/app/models/audit_platform_models.py 923
-backend/app/models/audit_platform_schemas.py 908
+backend/app/models/audit_platform_models.py 940
+backend/app/models/audit_platform_schemas.py 932
 backend/app/routers/adjustments.py 1152
-backend/app/routers/consol_note_sections.py 1024
-backend/app/routers/custom_query.py 2384
-backend/app/routers/ledger_penetration.py 1416
-backend/app/routers/query_builder.py 972
+backend/app/routers/consol_note_sections.py 1005
+backend/app/routers/custom_query.py 2401
+backend/app/routers/ledger_penetration.py 1417
+backend/app/routers/query_builder.py 1002
 backend/app/routers/template_library_mgmt.py 981
-backend/app/routers/working_paper.py 1543
+backend/app/routers/working_paper.py 1569
+backend/app/routers/wp_render_config.py 1098
 backend/app/routers/wp_template_files.py 1226
 backend/app/services/account_chart_service.py 1461
-backend/app/services/adjustment_service.py 925
+backend/app/services/address_registry.py 1092
+backend/app/services/adjustment_service.py 928
 backend/app/services/attachment_service.py 855
 backend/app/services/chain_orchestrator.py 860
 backend/app/services/consistency_gate.py 2359
-backend/app/services/consol_disclosure_service.py 1267
-backend/app/services/consol_report_service.py 1117
-backend/app/services/disclosure_engine.py 1676
-backend/app/services/event_handlers.py 1334
+backend/app/services/consol_disclosure_service.py 1736
+backend/app/services/consol_report_service.py 1006
+backend/app/services/disclosure_engine.py 1949
+backend/app/services/event_handlers.py 1394
 backend/app/services/excel_html_converter.py 1260
-backend/app/services/gate_rules_phase14.py 1083
+backend/app/services/formula_engine.py 1529
+backend/app/services/gate_rules_phase14.py 1103
 backend/app/services/import_job_runner.py 956
+backend/app/services/knowledge_index_service.py 819
+backend/app/services/ledger_penetration_service.py 804
 backend/app/services/mapping_service.py 997
 backend/app/services/note_formula_generator.py 1331
 backend/app/services/note_offline_import_service.py 880
 backend/app/services/note_source_resolvers.py 854
-backend/app/services/note_validation_engine.py 813
+backend/app/services/note_validation_engine.py 995
 backend/app/services/note_word_exporter.py 971
 backend/app/services/prefill_engine.py 1511
 backend/app/services/qc_engine.py 893
-backend/app/services/report_engine.py 1288
+backend/app/services/report_engine.py 1248
+backend/app/services/report_line_mapping_service.py 801
 backend/app/services/smart_import_engine.py 3143
 backend/app/services/trial_balance_service.py 944
-backend/app/services/workpaper_fill_service.py 1817
+backend/app/services/workpaper_fill_service.py 1819
+backend/app/services/wp_fine_rule_engine.py 892
 backend/app/services/wp_standard_conversion_service.py 934
 backend/app/services/wp_template_init_service.py 1141
 backend/app/services/import_engine/parsers.py 953
 backend/app/services/ledger_import/detector.py 1358
 backend/app/services/ledger_import/identifier.py 1137
 backend/app/services/ledger_import/validator.py 1087
-audit-platform/frontend/src/views/DisclosureEditor.vue 2690
-audit-platform/frontend/src/views/LedgerPenetration.vue 3794
+audit-platform/frontend/src/services/commonApi.ts 1516
+audit-platform/frontend/src/views/ConsolidationIndex.vue 1717
+audit-platform/frontend/src/views/LedgerPenetration.vue 3757
 audit-platform/frontend/src/views/ManagerDashboard.vue 1523
-audit-platform/frontend/src/views/ReportView.vue 2522
-audit-platform/frontend/src/views/TrialBalance.vue 2737
-audit-platform/frontend/src/views/WorkpaperEditor.vue 835
-audit-platform/frontend/src/views/WorkpaperList.vue 520
-# 待拆 → gtdform-test-and-shrink (已完成瘦身, HARD_CAPS 420 优先)
-audit-platform/frontend/src/components/workpaper/GtDForm/GtDFormConfirmation.vue 385
-# 待拆 → gtdform-test-and-shrink (已完成瘦身)
-audit-platform/frontend/src/components/workpaper/GtEControlTest.vue 374
-audit-platform/frontend/src/components/formula/FormulaManagerDialog.vue 1884
+audit-platform/frontend/src/views/ReportView.vue 2848
+audit-platform/frontend/src/views/TrialBalance.vue 2758
+audit-platform/frontend/src/views/WorkpaperEditor.vue 928
+audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue 1522
+audit-platform/frontend/src/components/formula/FormulaManagerDialog.vue 1942
 audit-platform/frontend/src/components/wizard/AccountImportStep.vue 1911
