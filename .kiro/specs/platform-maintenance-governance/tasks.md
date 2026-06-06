@@ -103,7 +103,8 @@
 - [ ] P0-4. PR checklist
   - [ ] P0-4.1 新建或更新 `.github/pull_request_template.md`
   - [ ] P0-4.2 加入全局组件、Decimal、枚举、权限、AI、LinkageContract 检查项
-  - [ ] P0-4.3 在 `docs/operations/git-workflow.md` 引用
+  - [ ] P0-4.3 加入跨 spec 接口冻结检查项："如果本 PR 依赖跨 spec 共享原子（ProjectContext/PermissionMatrix/LinkageContract/EvidenceRef/useEditStateMachine），确认该原子已 merge main 且测试绿"
+  - [ ] P0-4.4 在 `docs/operations/git-workflow.md` 引用
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
 - [ ] P0-5. 上线 smoke checklist

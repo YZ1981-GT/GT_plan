@@ -92,6 +92,7 @@ platform-maintenance-governance
 | `RoleWorkbenchDTO` (schema) | role-workbench | 前端 workbench | P1 交付时 |
 
 > 规则：消费方 spec 开工前，必须确认归属 spec 的对应原子已冻结接口。接口冻结 = 类型文件 merge 到 main 且有测试守护。
+> 检查机制：`platform-maintenance-governance` 的 PR checklist（P0-4.3）强制要求：依赖跨 spec 共享原子的 PR 必须声明原子是否已冻结，未冻结则阻断 merge。
 
 ## 6. 统一验收口径
 
