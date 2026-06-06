@@ -72,6 +72,7 @@
   - `backend/tests/test_linkage_route_resolver.py`
   - `backend/tests/test_stale_degraded_contract.py`
   - `audit-platform/frontend/src/__tests__/resolveLinkageRoute.spec.ts`
+  - **验收标准**：后端 pytest mock DB in-memory 可跑；前端 vitest mock API shallow mount；核心 Property 对应 case 必须覆盖
 
 ### P0：LinkageContract 与 stale 最小闭环
 

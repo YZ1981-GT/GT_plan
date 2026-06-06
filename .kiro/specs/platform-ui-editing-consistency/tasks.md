@@ -72,6 +72,7 @@
   - `audit-platform/frontend/src/components/common/__tests__/GtAmountCell.spec.ts`
   - `audit-platform/frontend/src/__tests__/useEditStateMachine.spec.ts`
   - `audit-platform/frontend/src/utils/__tests__/errorHandler.spec.ts`
+  - **验收标准**：后端 pytest mock DB in-memory 可跑；前端 vitest mock API shallow mount；核心 Property 对应 case 必须覆盖
 
 ### P0：页面骨架、金额、错误处理、编辑状态
 

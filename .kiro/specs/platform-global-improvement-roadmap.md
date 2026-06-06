@@ -78,6 +78,21 @@ platform-maintenance-governance
 - `platform-role-workbench-quality-loop` 不建议早于 Context / Linkage / Evidence P0。
 - 所有涉及 DB 的任务必须遵守：migration + ORM + schema + service + 契约测试。
 
+## 5.5 跨 Spec 共享原子清单
+
+| 原子 | 归属 spec | 消费方 | 接口冻结时间点 |
+|------|-----------|--------|---------------|
+| `ProjectContext` (store/facade) | context-permission | 所有 6 spec | P0-MVP 交付时 |
+| `PermissionMatrix` (service + types) | context-permission | role-workbench, evidence, ui-consistency | P0 交付时 |
+| `LinkageContract` (schema + facade) | linkage-contract-stale | evidence, role-workbench, ui-consistency | P0-MVP 交付时 |
+| `EvidenceRef` (schema) | evidence-knowledge-ai | role-workbench | P0-MVP 交付时 |
+| `useEditStateMachine` (composable) | ui-editing-consistency | 所有编辑页 | P0 交付时 |
+| `handleApiError` (util) | ui-editing-consistency | 所有前端页面 | 已有，P0 扩展 |
+| `GtPageShell` (component) | ui-editing-consistency | 所有项目内页面 | P0 试点后冻结 |
+| `RoleWorkbenchDTO` (schema) | role-workbench | 前端 workbench | P1 交付时 |
+
+> 规则：消费方 spec 开工前，必须确认归属 spec 的对应原子已冻结接口。接口冻结 = 类型文件 merge 到 main 且有测试守护。
+
 ## 6. 统一验收口径
 
 每个 spec 至少需要：

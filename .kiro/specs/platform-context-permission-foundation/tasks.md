@@ -71,6 +71,7 @@
   - `backend/tests/test_permission_matrix_service.py`
   - `audit-platform/frontend/src/__tests__/usePermissionMatrix.spec.ts`
   - `audit-platform/frontend/src/stores/__tests__/projectContext.spec.ts`
+  - **验收标准**：后端 pytest mock DB in-memory 可跑；前端 vitest mock API shallow mount；核心 Property 对应 case 必须覆盖
 
 ### P0：上下文与权限最小闭环
 

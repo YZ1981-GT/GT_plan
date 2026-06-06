@@ -68,6 +68,7 @@
 - [ ] MVP-6. 测试文件落地：
   - `backend/tests/scripts/test_snapshot_scale.py`
   - `backend/tests/scripts/test_check_sql_column_contract.py`
+  - **验收标准**：后端 pytest mock DB in-memory 可跑；前端 vitest mock API shallow mount；核心 Property 对应 case 必须覆盖
 
 ### P0：账本、快照、SQL 契约、smoke 最小闭环
 
@@ -89,6 +90,7 @@
   - _Requirements: 2.1, 2.2_
 
 - [ ] P0-3. SQL 列契约
+  - **⚠️ 注意**：仓库已有 `test_raw_sql_schema_contract.py`（表级）+ `test_raw_sql_column_contract.py`（列级 sqlglot），先确认覆盖范围再决定是否新建或扩展
   - [ ] P0-3.1 新建 `backend/scripts/check/check_sql_column_contract.py`
   - [ ] P0-3.2 收集 ORM mapped columns
   - [ ] P0-3.3 扫描 `select(Model.column)` 与 `Model.column`

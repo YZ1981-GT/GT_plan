@@ -73,6 +73,7 @@
   - `backend/tests/test_attachment_impact_service.py`
   - `backend/tests/test_ai_content_confirmation_gate.py`
   - `audit-platform/frontend/src/components/ai/__tests__/AiContentPendingBanner.spec.ts`
+  - **验收标准**：后端 pytest mock DB in-memory 可跑；前端 vitest mock API shallow mount；核心 Property 对应 case 必须覆盖
 
 ### P0：EvidenceRef、AI 确认与附件影响范围
 
@@ -127,6 +128,7 @@
   - _Requirements: 3.1, 3.2, 3.3_
 
 - [ ] P1-2. 交付件中心对齐
+  - **边界澄清**：本 spec 不新建版本模型，只做引用接入（EvidenceRef 指向 deliverable-center 的版本 ID）。版本链、生成、签发、归档逻辑归 `audit-report-deliverable-center` spec
   - [ ] P1-2.1 复用 `audit-report-deliverable-center` 的版本链
   - [ ] P1-2.2 报告、附注、PDF、签发文件进入交付件中心
   - [ ] P1-2.3 终态再导出新建版本或交付物

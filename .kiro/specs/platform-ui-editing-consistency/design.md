@@ -21,6 +21,13 @@ GtPageShell
 
 业务页面优先组合该骨架，不再手写各自的 header/action row。
 
+**GtPageShell 与 GtPageHeader 的关系**：
+
+- `GtPageShell` 是 `GtPageHeader` 的上层容器，不是替代品
+- `GtPageShell` = `GtPageHeader` + `ProjectContextBar` + `StatusBanners`（归档/锁定/stale/conflict）+ content slot
+- 迁移方式：旧页面把独立的 `<GtPageHeader>` + 散落的 banner 组件收进 `<GtPageShell>`，一步完成
+- 非项目内页面（登录、系统管理、首页）不使用 `GtPageShell`，继续用 `GtPageHeader` 或无 header
+
 ### 2. 表格决策树
 
 延续 `docs/frontend/component-usage.md`：

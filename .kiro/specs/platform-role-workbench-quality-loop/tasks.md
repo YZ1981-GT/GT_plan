@@ -72,6 +72,7 @@
 - [ ] MVP-5. 测试文件落地：
   - `backend/tests/test_role_workbench_facade.py`
   - `audit-platform/frontend/src/views/__tests__/RoleWorkbench.spec.ts`
+  - **验收标准**：后端 pytest mock DB in-memory 可跑；前端 vitest mock API shallow mount；核心 Property 对应 case 必须覆盖
 
 ### P0：前置依赖检查与数据口径冻结
 
@@ -89,6 +90,7 @@
   - [ ] P0-2.4 定义签发阻断项口径
   - [ ] P0-2.5 形成 `docs/reference/workbench-metric-semantics.md`
   - [ ] P0-2.6 定义 `RoleWorkbenchDTO` JSON 示例
+  - [ ] P0-2.7 数据可用性审计：确认每个指标依赖的 DB 字段非空（workhour.budget、qc_score、task_due_date 等），字段缺失的指标标记"待补数据"
   - _Requirements: 2.2, 4.2_
 
 ### P1：三类高频角色入口
