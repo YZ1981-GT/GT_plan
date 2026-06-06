@@ -683,6 +683,10 @@
 </template>
 
 <script setup lang="ts">
+// [platform-context-permission-foundation MVP-5]
+// TODO: Replace manual projectId/year resolution with useProjectContext()
+// TODO: Replace role checks with usePermissionMatrix().can()
+
 import { ref, computed, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'

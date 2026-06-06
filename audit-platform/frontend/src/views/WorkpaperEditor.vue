@@ -281,6 +281,10 @@
 </template>
 
 <script setup lang="ts">
+// [platform-context-permission-foundation MVP-5]
+// TODO: Replace manual projectId/year resolution with useProjectContext()
+// TODO: Replace role checks with usePermissionMatrix().can()
+
 /**
  * WorkpaperEditor — 底稿编辑器 Shell 容器
  *

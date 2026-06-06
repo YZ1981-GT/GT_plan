@@ -120,6 +120,36 @@ export const useProjectStore = defineStore('project', () => {
     } catch { /* ignore */ }
   }
 
+  // ─── MVP-1: currentProjectContext facade ───
+  // 统一暴露项目上下文，页面不再自行从 route/query/localStorage 多处解析
+  const currentProjectContext = computed(() => ({
+    projectId: projectId.value,
+    projectName: clientName.value,
+    year: year.value,
+    applicableStandard: standard.value as string,
+    auditScope: 'standalone' as 'standalone' | 'consolidated', // placeholder: 后续从项目数据获取
+    projectStatus: projectStatus.value || 'draft',
+    roleInProject: null as string | null, // placeholder: 后续从 project assignment 获取
+  }))
+
+  // ─── MVP-2: setCurrentYear() 触发核心缓存清理 ───
+  function setCurrentYear(y: number, options?: { reload?: boolean }) {
+    const prev = year.value
+    year.value = y
+
+    if (prev !== y && projectId.value) {
+      // 清理项目域缓存（MVP: 重置本地响应式状态）
+      auditYear.value = y
+      projectStatus.value = '' // 触发重新加载
+
+      // 发布年度切换事件，通知订阅视图
+      eventBus.emit('year:changed', {
+        projectId: projectId.value,
+        year: y,
+      })
+    }
+  }
+
   return {
     // 状态
     projectId,
@@ -130,9 +160,12 @@ export const useProjectStore = defineStore('project', () => {
     projectStatus,
     projectOptions,
     yearOptions,
+    // MVP-1: 项目上下文 facade
+    currentProjectContext,
     // 方法
     syncFromRoute,
     changeYear,
+    setCurrentYear,
     changeStandard,
     loadProjectOptions,
   }

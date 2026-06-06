@@ -62,12 +62,12 @@
 
 ### P0-MVP：一周内最小可交付
 
-- [ ] MVP-1. `stores/project.ts` 暴露 `currentProjectContext`
-- [ ] MVP-2. `setCurrentYear()` 触发核心缓存清理
-- [ ] MVP-3. 后端 `permission_matrix_service.py` 支持首批 7 个 operation code
-- [ ] MVP-4. 前端 `usePermissionMatrix` 支持 `can()` / `whyCannot()`
-- [ ] MVP-5. `WorkpaperEditor` 与 `TrialBalance` 两个页面完成试点接入
-- [ ] MVP-6. 测试文件落地：
+- [x] MVP-1. `stores/project.ts` 暴露 `currentProjectContext`
+- [x] MVP-2. `setCurrentYear()` 触发核心缓存清理
+- [x] MVP-3. 后端 `permission_matrix_service.py` 支持首批 7 个 operation code
+- [x] MVP-4. 前端 `usePermissionMatrix` 支持 `can()` / `whyCannot()`
+- [x] MVP-5. `WorkpaperEditor` 与 `TrialBalance` 两个页面完成试点接入
+- [x] MVP-6. 测试文件落地：
   - `backend/tests/test_permission_matrix_service.py`
   - `audit-platform/frontend/src/__tests__/usePermissionMatrix.spec.ts`
   - `audit-platform/frontend/src/stores/__tests__/projectContext.spec.ts`
