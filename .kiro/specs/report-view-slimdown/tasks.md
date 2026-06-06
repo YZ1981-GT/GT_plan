@@ -163,7 +163,7 @@
     - Mock router/API，验证 click/dblclick/contextmenu handlers + onDrilldown API 调用（含原特征测试移来的 mount 类用例）
     - _Requirements: 3.3_
 
-- [-] 10. Checkpoint — 确认全部 composable 抽取完成无回归
+- [x] 10. Checkpoint — 确认全部 composable 抽取完成无回归
   - `npx vitest run` 全部通过 + `npx tsc --noEmit` 零错误
   - 确认主文件 script 部分已大幅缩减（仅剩 import + composable 调用编排）
   - 若 useReportData.ts 超 400 行，评估是否二次拆分（useReportFetch + useReportGeneration）
@@ -171,7 +171,7 @@
   - _Requirements: 1.2, 1.3, 2.1_
 
 - [ ] 11. 抽取 `ReportEquityTable.vue` 子组件
-  - [~] 11.1 创建 `src/components/report/ReportEquityTable.vue`
+  - [x] 11.1 创建 `src/components/report/ReportEquityTable.vue`
     - 从 ReportView.vue 模板 ~141–295 行抽取：权益变动表 el-table 矩阵（含本年/上年动态列、三级表头）
     - 通过 props 接收数据（rows / eqColumns / eqTotalCols / year / tableMaxHeight / cellClassName / fontSize）
     - 通过 emit 上报事件（cell-click / cell-dblclick / cell-contextmenu）
@@ -179,40 +179,40 @@
     - 保持 GT 紫令牌样式和 GtAmountCell 使用
     - _Requirements: 4.1, 4.4, 4.5, 4.6_
 
-  - [~] 11.2 在主文件中替换原模板片段为 `<ReportEquityTable />` 组件调用
+  - [x] 11.2 在主文件中替换原模板片段为 `<ReportEquityTable />` 组件调用
     - _Requirements: 4.1_
 
-  - [~] 11.3 验证抽取后 vue-tsc + vitest 通过
+  - [x] 11.3 验证抽取后 vue-tsc + vitest 通过
     - _Requirements: 1.2, 1.3_
 
 - [ ] 12. 抽取 `ReportImpairmentTable.vue` 子组件
-  - [~] 12.1 创建 `src/components/report/ReportImpairmentTable.vue`
+  - [x] 12.1 创建 `src/components/report/ReportImpairmentTable.vue`
     - 从 ReportView.vue 模板 ~296–340 行抽取：减值准备表 el-table 矩阵（含增加/减少嵌套列）
     - 通过 props 接收数据（rows / impIncCols / impDecCols / tableMaxHeight / cellClassName / fontSize）
     - 通过 emit 上报事件（cell-click / cell-dblclick / cell-contextmenu）
     - expose tableRef
     - _Requirements: 4.2, 4.4, 4.5, 4.6_
 
-  - [~] 12.2 在主文件中替换原模板片段为 `<ReportImpairmentTable />` 组件调用
+  - [x] 12.2 在主文件中替换原模板片段为 `<ReportImpairmentTable />` 组件调用
     - _Requirements: 4.2_
 
-  - [~] 12.3 验证抽取后 vue-tsc + vitest 通过
+  - [x] 12.3 验证抽取后 vue-tsc + vitest 通过
     - _Requirements: 1.2, 1.3_
 
 - [ ] 13. 抽取 `ReportDialogs.vue` 子组件
-  - [~] 13.1 创建 `src/components/report/ReportDialogs.vue`
+  - [x] 13.1 创建 `src/components/report/ReportDialogs.vue`
     - 从 ReportView.vue 模板 ~571–930 行抽取：穿透弹窗、构成科目弹窗、审核结果弹窗、溯源弹窗、转换规则弹窗、溯源选择弹窗、附注引用 Drawer、合并明细弹窗
     - 通过 props 接收所有 dialog 的 visibility + data（按 design 文档 ReportDialogsProps 接口）
     - 通过 emit 上报所有事件（按 design 文档 ReportDialogsEmits 接口）
     - _Requirements: 4.3, 4.4, 4.5, 4.6_
 
-  - [~] 13.2 在主文件中替换原模板片段为 `<ReportDialogs />` 组件调用
+  - [x] 13.2 在主文件中替换原模板片段为 `<ReportDialogs />` 组件调用
     - _Requirements: 4.3_
 
-  - [~] 13.3 验证抽取后 vue-tsc + vitest 通过
+  - [x] 13.3 验证抽取后 vue-tsc + vitest 通过
     - _Requirements: 1.2, 1.3_
 
-- [ ] 14. Checkpoint — 确认全部子组件抽取完成无回归
+- [-] 14. Checkpoint — 确认全部子组件抽取完成无回归
   - `npx vitest run` 全部通过 + `npx tsc --noEmit` 零错误
   - 若 ReportDialogs.vue 超 600 行，拆为 2-3 个独立弹窗组件（ReportDrilldownDialogs / ReportTraceDialogs / ReportMappingDialog）
   - 确认主文件总行数（含模板+script+style 引用）≤1500
