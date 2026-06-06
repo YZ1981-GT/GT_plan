@@ -458,8 +458,10 @@ services:
 
   # ----------------------------------------------------------
 
-  # ONLYOFFICE Document Server 8.2（向后兼容，底稿编辑已迁移至 Univer 纯前端方案）
-  # 如不需要 WOPI 协议兼容，可注释掉此服务节省资源
+  # ONLYOFFICE Document Server（开源 Community 版，GitHub 最新 v9.4.0）
+  # 镜像：onlyoffice/documentserver:latest ← ONLYOFFICE/Docker-DocumentServer
+  # 源码：https://github.com/ONLYOFFICE/DocumentServer （AGPL-3.0）
+  # 底稿主编辑已迁移至 Univer；本服务保留 WOPI/附件 Office 预览兼容
 
   # ----------------------------------------------------------
 
@@ -476,7 +478,7 @@ services:
 
   onlyoffice:
 
-    image: onlyoffice/documentserver:8.2
+    image: onlyoffice/documentserver:latest
 
     container_name: audit-onlyoffice
 
@@ -493,8 +495,8 @@ services:
     volumes:
 
       - office_data:/var/lib/onlyoffice
-      - ./onlyoffice/plugins/audit-formula:/var/www/onlyoffice/documentserver/sdkjs-plugins/audit-formula
-      - ./onlyoffice/plugins/audit-review:/var/www/onlyoffice/documentserver/sdkjs-plugins/audit-review
+      - office_logs:/var/log/onlyoffice
+      - office_data_certs:/var/www/onlyoffice/Data
 
     depends_on:
 
@@ -506,13 +508,13 @@ services:
 
       test: ["CMD-SHELL", "curl -f http://localhost/healthcheck || exit 1"]
 
-      interval: 15s
+      interval: 30s
 
       timeout: 10s
 
       retries: 5
 
-      start_period: 60s
+      start_period: 120s
 
     profiles:
       - onlyoffice
@@ -946,6 +948,10 @@ volumes:
   redis_data:
 
   office_data:
+
+  office_logs:
+
+  office_data_certs:
 
   metabase_data:
 

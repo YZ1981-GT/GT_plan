@@ -34,7 +34,7 @@ export async function listProjectsWithProgress(): Promise<any[]> {
 }
 
 export async function getProjectWizardState(projectId: string): Promise<any> {
-  const { data } = await http.get(P_proj.wizard(projectId))
+  const { data } = await http.get(P_proj.wizard(projectId), { _silent: true } as any)
   return data
 }
 

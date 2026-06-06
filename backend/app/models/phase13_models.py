@@ -18,10 +18,10 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 import sqlalchemy as sa
-from sqlalchemy import ForeignKey, Index, String, Text, func, text
+from sqlalchemy import BigInteger, ForeignKey, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -46,8 +46,10 @@ class WordExportStatus(str, enum.Enum):
     generating = "generating"
     generated = "generated"
     editing = "editing"
+    pending_approval = "pending_approval"
     confirmed = "confirmed"
     signed = "signed"
+    archived = "archived"
 
 
 # ---------------------------------------------------------------------------
@@ -58,9 +60,11 @@ VALID_STATUS_TRANSITIONS: dict[str, list[str]] = {
     "draft": ["generating"],
     "generating": ["generated"],
     "generated": ["editing"],
-    "editing": ["confirmed"],
-    "confirmed": ["signed", "editing"],  # confirmed 可 reopen 回 editing
-    "signed": [],
+    "editing": ["pending_approval", "confirmed"],
+    "pending_approval": ["confirmed", "editing"],
+    "confirmed": ["signed", "editing", "archived"],
+    "signed": ["archived"],
+    "archived": ["confirmed"],  # 仅 admin 解除归档
 }
 
 
@@ -103,6 +107,32 @@ class WordExportTask(Base):
     # Batch 3 Fix 2: 专用缓存键字段，不再复用 template_type
     cache_key: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="批量简报缓存键 MD5")
 
+    # deliverable-center V059
+    file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    html_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    report_body_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    opinion_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    company_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    doc_subtype: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    is_pie: Mapped[bool | None] = mapped_column(
+        server_default=text("false"), nullable=True
+    )
+    source_snapshot_refs: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    selected_sections: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
+    report_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
+    prior_period_info: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    approval_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    approval_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    reject_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    signed_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    signed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    sign_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
     __table_args__ = (
         Index("idx_word_export_task_project", "project_id", "doc_type"),
         Index("idx_word_export_task_status", "project_id", "status"),
@@ -132,6 +162,19 @@ class WordExportTaskVersion(Base):
         ForeignKey("users.id"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    # deliverable-center V059
+    html_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    file_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    hash_chain_entry_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    source_snapshot_refs: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    selected_sections: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
+    created_via: Mapped[str | None] = mapped_column(
+        String(20), server_default=text("'generate'"), nullable=True
+    )
 
     __table_args__ = (
         Index(

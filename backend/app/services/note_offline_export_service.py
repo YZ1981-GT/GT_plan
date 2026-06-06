@@ -428,6 +428,44 @@ def _build_meta_sheet(ws: Worksheet, sections: list[dict[str, Any]]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Navigation Hyperlinks (TOC ↔ Section sheets)
+# ---------------------------------------------------------------------------
+
+FONT_LINK = Font(color="0000FF", underline="single", size=10)
+FONT_BACK_LINK = Font(color="0000FF", underline="single", size=9)
+
+
+def _add_navigation_links(
+    ws_toc: Worksheet,
+    section_sheet_names: list[str],
+    sections: list[dict[str, Any]],
+) -> None:
+    """Add bidirectional hyperlinks between TOC and section sheets.
+
+    - TOC: title column cells link to corresponding section sheet A1
+    - Each section sheet: row 1 right side gets a "← 返回目录" link back to TOC
+    """
+    from openpyxl.utils import quote_sheetname
+
+    # TOC → section sheets (title is column B, starting row 2)
+    for idx, sheet_name in enumerate(section_sheet_names):
+        toc_row = idx + 2  # row 1 is header
+        cell = ws_toc.cell(row=toc_row, column=2)
+        # Internal hyperlink format: #'Sheet Name'!A1
+        cell.hyperlink = f"#'{sheet_name}'!A1"
+        cell.font = FONT_LINK
+
+    # Section sheets → back to TOC
+    for sheet_name in section_sheet_names:
+        # Find the worksheet by name
+        ws = ws_toc.parent[sheet_name]
+        # Add "← 返回目录" in column D row 1 (after the title)
+        back_cell = ws.cell(row=1, column=4, value="← 返回目录")
+        back_cell.hyperlink = "#'章节清单'!A1"
+        back_cell.font = FONT_BACK_LINK
+
+
+# ---------------------------------------------------------------------------
 # Core Export Function (C.0.1 + C.0.2 orchestration)
 # ---------------------------------------------------------------------------
 
@@ -494,19 +532,26 @@ def export_sections_to_xlsx(
     ws_toc = wb.create_sheet("章节清单")
     _build_toc_sheet(ws_toc, filtered)
 
-    # C.0.2: Section sheets
-    for section in filtered:
+    # C.0.2: Section sheets — track sheet_name mapping for hyperlinks
+    section_sheet_names: list[str] = []
+    for idx, section in enumerate(filtered, start=1):
         section_id = section.get("section_id", "unknown")
         title = section.get("section_title", section_id)
-        sheet_name = _truncate_sheet_name(title)
+        # 使用序号+标题作为 sheet 名，更直观
+        numbered_title = f"{idx:02d}_{title}"
+        sheet_name = _truncate_sheet_name(numbered_title)
 
         # Ensure unique sheet name
         existing_names = [ws.title for ws in wb.worksheets]
         if sheet_name in existing_names:
             sheet_name = _truncate_sheet_name(f"{title[:25]}_{section_id[:5]}")
 
+        section_sheet_names.append(sheet_name)
         ws_section = wb.create_sheet(sheet_name)
         _build_section_sheet(ws_section, section, include_formulas, include_provenance)
+
+    # Add hyperlinks: TOC → section sheets, section sheets → TOC
+    _add_navigation_links(ws_toc, section_sheet_names, filtered)
 
     # C.0.5: _meta_ sheet (last, hidden)
     ws_meta = wb.create_sheet("_meta_")
@@ -593,7 +638,7 @@ class NoteOfflineExportService:
             DisclosureNote.project_id == project_id,
             DisclosureNote.year == year,
             DisclosureNote.is_deleted == False,  # noqa: E712
-        )
+        ).order_by(DisclosureNote.sort_order.asc().nulls_last(), DisclosureNote.note_section.asc())
         if section_ids:
             query = query.where(DisclosureNote.section_id.in_(section_ids))
 

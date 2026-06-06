@@ -34,11 +34,14 @@ def register_report_routers(app: FastAPI) -> None:
     from app.routers.report_trace import router as rt_router
     from app.routers.word_export import router as word_export_router
     from app.routers.report_mapping import router as report_mapping_router
+    from app.routers.deliverable import router as deliverable_router
 
     for r in [rc_router, reports_router, cfs_router, dn_router, ar_router,
               export_router, nt_router, nwm_router, ntr_router, nai_router,
               rt_router, word_export_router, report_mapping_router]:
         app.include_router(r, tags=["报表与附注"])
+
+    app.include_router(deliverable_router, tags=["deliverable-center"])
 
     # ═══ §44. 报表 Excel 导出 ═══
     from app.routers.report_export import router as report_export_router

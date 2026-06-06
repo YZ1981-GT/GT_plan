@@ -413,6 +413,13 @@ class AuditReportService:
             return
 
         await self.refresh_financial_data(payload.project_id, year)
+        # deliverable-center: 同步刷新 report_body_json 财务占位符
+        try:
+            from app.services.report_body_service import ReportBodyService
+            rbs = ReportBodyService(self.db)
+            await rbs.refresh_financial_placeholders(payload.project_id, year)
+        except Exception as _rbs_err:
+            logger.debug("report_body_json 财务占位符刷新跳过: %s", _rbs_err)
         await self.db.flush()
 
     # ------------------------------------------------------------------
@@ -467,15 +474,39 @@ class AuditReportService:
     def _validate_finalize(self, report: AuditReport) -> str | None:
         """finalize 前校验。
 
-        Validates: Requirements 6.7
+        上市公司或 PIE（公共利益实体）审计报告 KAM 必填（需求 23.4）。
+        优先校验结构化主源 report_body_json 的 KAM 段，回退到 paragraphs。
+
+        Validates: Requirements 6.7, 23.4
         """
-        if report.company_type == CompanyType.listed:
-            paragraphs = report.paragraphs or {}
-            kam_content = paragraphs.get("关键审计事项段", "")
-            # Check if KAM section has actual content beyond the template boilerplate
-            if not kam_content or "[请在此处添加关键审计事项]" in kam_content:
+        # 无法表示意见不要求 KAM
+        if report.opinion_type == OpinionType.disclaimer:
+            return None
+
+        if report.company_type == CompanyType.listed or bool(report.is_pie):
+            if self._kam_is_empty(report):
                 return (
-                    "上市公司审计报告必须包含至少一个关键审计事项(KAM)，"
+                    "上市公司或公共利益实体审计报告必须包含至少一个关键审计事项(KAM)，"
                     "请编辑「关键审计事项段」后再定稿"
                 )
         return None
+
+    @staticmethod
+    def _kam_is_empty(report: AuditReport) -> bool:
+        """判定报告 KAM 是否为空（结构化主源优先，回退 paragraphs）。"""
+        body = report.report_body_json or {}
+        for section in body.get("sections", []):
+            if section.get("section_id") == "kam" or section.get("section_name") == "关键审计事项段":
+                items = section.get("items") or []
+                if items:
+                    return False
+                content = section.get("content", "") or ""
+                if content and "[请在此处添加关键审计事项" not in content:
+                    return False
+                return True
+        # 回退到旧 paragraphs 结构
+        paragraphs = report.paragraphs or {}
+        kam_content = paragraphs.get("关键审计事项段", "")
+        if not kam_content or "[请在此处添加关键审计事项]" in kam_content:
+            return True
+        return False

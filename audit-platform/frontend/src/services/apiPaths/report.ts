@@ -142,6 +142,48 @@ export const auditReport = {
   exportWord: (pid: string, year: number) => `/api/audit-report/${pid}/${year}/export-word`,
 } as const
 
+// ─── 交付件管理中心 ─────────────────────────────────────────────────────────
+
+export const deliverables = {
+  list: (pid: string) => `/api/projects/${pid}/deliverables`,
+  versions: (pid: string, taskId: string) => `/api/projects/${pid}/deliverables/${taskId}/versions`,
+  compare: (pid: string, taskId: string) => `/api/projects/${pid}/deliverables/${taskId}/versions/compare`,
+  download: (pid: string, taskId: string, versionNo: number) =>
+    `/api/projects/${pid}/deliverables/${taskId}/versions/${versionNo}/download`,
+  previewUrl: (pid: string, taskId: string, versionNo: number) =>
+    `/api/projects/${pid}/deliverables/${taskId}/versions/${versionNo}/preview-url`,
+  loadReportTemplate: (pid: string) => `/api/projects/${pid}/deliverables/report-body/load-template`,
+  renderReportBody: (pid: string) => `/api/projects/${pid}/deliverables/report-body/render`,
+  renderDisclosureNotes: (pid: string) => `/api/projects/${pid}/deliverables/disclosure-notes/render`,
+  renderFinancialReports: (pid: string) => `/api/projects/${pid}/deliverables/financial-reports/render`,
+  previewReportHtml: (pid: string, year: number) =>
+    `/api/projects/${pid}/deliverables/report-body/preview-html?year=${year}`,
+  completeness: (pid: string, year: number) =>
+    `/api/projects/${pid}/deliverables/completeness?year=${year}`,
+  snapshotStale: (pid: string, taskId: string, year: number) =>
+    `/api/projects/${pid}/deliverables/${taskId}/snapshot-stale?year=${year}`,
+  sign: (pid: string, taskId: string) =>
+    `/api/projects/${pid}/deliverables/${taskId}/sign`,
+  onlyofficeHealth: (pid: string) =>
+    `/api/projects/${pid}/deliverables/onlyoffice/health`,
+  onlyofficeConfig: (pid: string, taskId: string, versionNo: number, year: number) =>
+    `/api/projects/${pid}/deliverables/onlyoffice/config/${taskId}/${versionNo}?year=${year}`,
+  submitApproval: (pid: string, taskId: string) =>
+    `/api/projects/${pid}/deliverables/${taskId}/submit-approval`,
+  approve: (pid: string, taskId: string, year: number) =>
+    `/api/projects/${pid}/deliverables/${taskId}/approve?year=${year}`,
+  reject: (pid: string, taskId: string) =>
+    `/api/projects/${pid}/deliverables/${taskId}/reject`,
+  archive: (pid: string) => `/api/projects/${pid}/deliverables/archive`,
+  unarchive: (pid: string, taskId: string) =>
+    `/api/projects/${pid}/deliverables/${taskId}/unarchive`,
+  integrityVerify: (pid: string, taskId: string) =>
+    `/api/projects/${pid}/deliverables/${taskId}/integrity-verify`,
+  packageDownload: (pid: string) => `/api/projects/${pid}/deliverables/package`,
+  packageFile: (pid: string, jobId: string) =>
+    `/api/projects/${pid}/deliverables/package/${jobId}/download`,
+} as const
+
 // ─── 导出 ───────────────────────────────────────────────────────────────────
 
 export const exportTask = {

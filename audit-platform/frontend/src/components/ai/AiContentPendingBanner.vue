@@ -56,7 +56,7 @@ async function load() {
     return
   }
   try {
-    const data: any = await api.get(`/api/projects/${props.projectId}/ai-content/pending`)
+    const data: any = await api.get(`/api/projects/${props.projectId}/ai-content/pending`, { _silent: true } as any)
     // 兼容多种返回形态：{items: [...], count: N} 或 [...] 或 { pending: N }
     if (Array.isArray(data)) {
       pendingCount.value = data.length

@@ -68,6 +68,32 @@ class GroupNoteBaselineService:
         self.db = db
 
     # -----------------------------------------------------------------------
+    # list_baselines: 列出所有可用基线
+    # -----------------------------------------------------------------------
+
+    async def list_baselines(self) -> list[dict[str, Any]]:
+        """List all available group note baselines (active only)."""
+        stmt = (
+            select(GroupNoteTemplateBaseline)
+            .where(GroupNoteTemplateBaseline.is_active == True)  # noqa: E712
+            .order_by(GroupNoteTemplateBaseline.created_at.desc())
+        )
+        result = await self.db.execute(stmt)
+        baselines = result.scalars().all()
+        return [
+            {
+                "id": str(b.id),
+                "name": b.name,
+                "version": b.version,
+                "template_type": b.template_type,
+                "parent_project_id": str(b.parent_project_id) if b.parent_project_id else None,
+                "created_at": b.created_at.isoformat() if b.created_at else None,
+                "sections_count": len(b.sections_data) if isinstance(b.sections_data, list) else 0,
+            }
+            for b in baselines
+        ]
+
+    # -----------------------------------------------------------------------
     # A.7.1 + A.7.5: save_baseline
     # -----------------------------------------------------------------------
 

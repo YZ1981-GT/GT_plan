@@ -26,6 +26,9 @@ export const NOTIFICATION_TYPES = {
   WORKHOUR_REJECTED: 'workhour_rejected',
   ASSIGNMENT_CREATED: 'assignment_created',
   COMMITMENT_DUE: 'commitment_due',
+  DELIVERABLE_APPROVAL_SUBMITTED: 'deliverable_approval_submitted',
+  DELIVERABLE_APPROVAL_DONE: 'deliverable_approval_done',
+  DELIVERABLE_APPROVAL_REJECTED: 'deliverable_approval_rejected',
 } as const
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES]
@@ -44,6 +47,9 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   [NOTIFICATION_TYPES.WORKHOUR_REJECTED]: '工时已退回',
   [NOTIFICATION_TYPES.ASSIGNMENT_CREATED]: '新委派',
   [NOTIFICATION_TYPES.COMMITMENT_DUE]: '承诺到期',
+  [NOTIFICATION_TYPES.DELIVERABLE_APPROVAL_SUBMITTED]: '交付物待审批',
+  [NOTIFICATION_TYPES.DELIVERABLE_APPROVAL_DONE]: '交付物审批通过',
+  [NOTIFICATION_TYPES.DELIVERABLE_APPROVAL_REJECTED]: '交付物审批驳回',
 }
 
 // ── 跳转规则 ──────────────────────────────────────────────────
@@ -81,6 +87,13 @@ export const NOTIFICATION_JUMP_ROUTES: Record<string, (meta: Record<string, any>
 
   [NOTIFICATION_TYPES.COMMITMENT_DUE]: (m) =>
     `/projects/${m.project_id}/communications`,
+
+  [NOTIFICATION_TYPES.DELIVERABLE_APPROVAL_SUBMITTED]: (m) =>
+    `/projects/${m.project_id}/deliverable-center`,
+  [NOTIFICATION_TYPES.DELIVERABLE_APPROVAL_DONE]: (m) =>
+    `/projects/${m.project_id}/deliverable-center`,
+  [NOTIFICATION_TYPES.DELIVERABLE_APPROVAL_REJECTED]: (m) =>
+    `/projects/${m.project_id}/deliverable-center`,
 }
 
 /**

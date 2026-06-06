@@ -103,6 +103,17 @@
         </div>
       </section>
 
+      <!-- A 循环：交付物快捷入口 -->
+      <section v-if="isCycleA" class="gt-audit-nav-section">
+        <h4 class="gt-audit-nav-section-title">📦 核心交付物</h4>
+        <router-link
+          class="gt-deliverable-link"
+          :to="`/projects/${props.projectId}/deliverable-center`"
+        >
+          打开交付件管理中心 →
+        </router-link>
+      </section>
+
       <!-- 2.4e 程序适用性裁剪 tab -->
       <section class="gt-audit-nav-section">
         <h4 class="gt-audit-nav-section-title" style="cursor: pointer" @click="showTrimmingPanel = !showTrimmingPanel">
@@ -229,6 +240,9 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const collapsed = ref(props.defaultCollapsed)
+const isCycleA = computed(
+  () => (props.wpCode || '').charAt(0).toUpperCase() === 'A',
+)
 function toggleCollapsed() {
   collapsed.value = !collapsed.value
 }
@@ -619,6 +633,16 @@ onMounted(() => {
   border-left: 3px solid var(--gt-color-primary, #4b2d77);
   border-radius: 3px;
   white-space: pre-wrap;
+}
+.gt-deliverable-link {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--gt-color-primary, #4b2d77);
+  text-decoration: none;
+  padding: 4px 0;
+}
+.gt-deliverable-link:hover {
+  text-decoration: underline;
 }
 .gt-ai-tip-empty {
   font-size: 12px;

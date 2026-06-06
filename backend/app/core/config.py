@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     LOGIN_LOCK_MINUTES: int = 30
     # ONLYOFFICE（向后兼容，底稿编辑已迁移至 Univer）
     ONLYOFFICE_URL: str = "http://onlyoffice:80"
+    ONLYOFFICE_JWT_SECRET: str = ""
+    ONLYOFFICE_CALLBACK_BASE: str = ""
     WOPI_BASE_URL: str = "http://backend:8000/wopi"
     # 文件存储
     STORAGE_ROOT: str = "./storage"

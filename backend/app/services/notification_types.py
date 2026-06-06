@@ -33,6 +33,11 @@ BUDGET_ALERT_80 = "budget_alert_80"
 BUDGET_OVERRUN = "budget_overrun"
 HANDOVER_RECEIVED = "handover_received"
 
+# deliverable-center P2
+DELIVERABLE_APPROVAL_SUBMITTED = "deliverable_approval_submitted"
+DELIVERABLE_APPROVAL_DONE = "deliverable_approval_done"
+DELIVERABLE_APPROVAL_REJECTED = "deliverable_approval_rejected"
+
 # ── 通知元数据字典 ──────────────────────────────────────────────
 # 每个类型对应 title_template / content_template / jump_route
 # title_template 和 content_template 支持 Python str.format() 占位符
@@ -107,6 +112,21 @@ NOTIFICATION_META: dict[str, dict[str, str]] = {
         "content_template": "有 {workpapers_moved} 张底稿、{issues_moved} 张工单、{assignments_moved} 个项目委派已转交给您",
         "jump_route": "/staff-management",
     },
+    DELIVERABLE_APPROVAL_SUBMITTED: {
+        "title_template": "交付物待审批",
+        "content_template": "项目「{project_name}」的 {doc_type} 交付物已提交审批，请处理",
+        "jump_route": "/projects/{project_id}/deliverable-center",
+    },
+    DELIVERABLE_APPROVAL_DONE: {
+        "title_template": "交付物审批通过",
+        "content_template": "项目「{project_name}」的 {doc_type} 交付物已审批通过",
+        "jump_route": "/projects/{project_id}/deliverable-center",
+    },
+    DELIVERABLE_APPROVAL_REJECTED: {
+        "title_template": "交付物审批驳回",
+        "content_template": "项目「{project_name}」的 {doc_type} 交付物已被驳回：{reason}",
+        "jump_route": "/projects/{project_id}/deliverable-center",
+    },
 }
 
 # ── 所有通知类型列表（便于校验） ──────────────────────────────────
@@ -126,6 +146,9 @@ ALL_NOTIFICATION_TYPES = [
     BUDGET_ALERT_80,
     BUDGET_OVERRUN,
     HANDOVER_RECEIVED,
+    DELIVERABLE_APPROVAL_SUBMITTED,
+    DELIVERABLE_APPROVAL_DONE,
+    DELIVERABLE_APPROVAL_REJECTED,
 ]
 
 
@@ -149,6 +172,9 @@ REQUIRED_METADATA_FIELDS: dict[str, list[str]] = {
     BUDGET_ALERT_80: ["object_type", "object_id", "project_id", "project_name", "threshold", "utilization_pct"],
     BUDGET_OVERRUN: ["object_type", "object_id", "project_id", "project_name", "threshold", "utilization_pct"],
     HANDOVER_RECEIVED: ["workpapers_moved", "issues_moved", "assignments_moved"],
+    DELIVERABLE_APPROVAL_SUBMITTED: ["object_type", "object_id", "project_name", "doc_type"],
+    DELIVERABLE_APPROVAL_DONE: ["object_type", "object_id", "project_name", "doc_type"],
+    DELIVERABLE_APPROVAL_REJECTED: ["object_type", "object_id", "project_name", "doc_type", "reason"],
 }
 
 

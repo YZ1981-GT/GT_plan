@@ -20,62 +20,89 @@
       />
       <template #actions>
         <GtToolbar
-          :show-copy="true"
-          :show-fullscreen="true"
+          :show-copy="false"
+          :show-fullscreen="false"
           :is-fullscreen="deFullscreen"
-          :show-export="true"
-          export-label="导出Word"
-          :show-import="true"
-          :show-formula="true"
-          @copy="copyNoteTable"
-          @fullscreen="toggleDeFullscreen()"
-          @export="onExportWord"
-          @import="showNoteImport = true"
-          @formula="showNoteFormulaManager = true"
+          :show-export="false"
+          :show-import="false"
+          :show-formula="false"
         >
           <template #left>
-            <NoteTemplateSwitch
-              v-if="!isEqcrRole"
-              :project-id="projectId"
-              :year="year"
-              :template-type="templateType"
-              @update:template-type="handleTemplateChange"
-              @switched="fetchTree()"
-            />
-            <el-button v-if="!isEqcrRole" size="small" @click="onRefreshFromWP" :loading="refreshLoading">🔄 从底稿刷新</el-button>
-            <el-button v-if="!isEqcrRole" size="small" @click="onGenerate" :loading="genLoading">📝 生成附注</el-button>
-            <el-button v-if="!isEqcrRole" size="small" @click="onValidate" :loading="validateLoading">✅ 执行校验</el-button>
-            <el-button v-if="isEqcrRole" size="small" type="info">📋 导出只读副本</el-button>
-          </template>
-          <template #right-extra>
-            <SharedTemplatePicker
-              config-type="note_template"
-              :project-id="projectId"
-              :get-config-data="getNoteTemplateConfigData"
-              @applied="onNoteTemplateApplied"
-            />
-            <!-- Sprint 3 Task 3.1: 新增章节 -->
-            <el-button
-              v-if="!isEqcrRole"
-              size="small"
-              data-test="de-add-section"
-              @click="openAddSectionDialog"
-            >➕ 新增章节</el-button>
-            <el-button size="small" @click="openStructureEditor">📐 表样编辑</el-button>
-            <el-button size="small" @click="showPrintPreview = true">🖨️ 打印预览</el-button>
-            <el-button size="small" @click="showOfflineExport = true">📦 导出离线包</el-button>
-            <el-button size="small" @click="showOfflineImport = true">📥 一键导入</el-button>
-            <el-button size="small" @click="showAiPanel = true">🤖 AI建议</el-button>
-            <el-button size="small" @click="showDocAiChat = true">💬 AI 对话</el-button>
-            <el-button size="small" @click="showVersionTree = true">🗂️ 版本</el-button>
-            <el-button size="small" @click="showGroupBaseline = true">📦 集团基线</el-button>
-            <el-button size="small" @click="showParagraphVars = true">✏️ 段落变量</el-button>
-            <el-button size="small" @click="showPriorYear = true">📅 上年对比</el-button>
-            <el-button-group size="small" style="margin-left: 4px">
-              <el-button :type="numbering.state.value.scope === 'standalone' ? 'primary' : ''" @click="onScopeChange('standalone')">单体</el-button>
-              <el-button :type="numbering.state.value.scope === 'consolidated' ? 'primary' : ''" @click="onScopeChange('consolidated')">合并</el-button>
-            </el-button-group>
-            <el-button size="small" @click="showNoteMappingDialog = true">🔄 转换规则</el-button>
+            <div class="gt-de-actions-row">
+              <!-- 数据操作 -->
+              <el-button-group v-if="!isEqcrRole" size="small">
+                <el-tooltip content="从底稿同步最新数据到附注" placement="bottom" :show-after="400">
+                  <el-button @click="onRefreshFromWP" :loading="refreshLoading">🔄 刷新</el-button>
+                </el-tooltip>
+                <el-tooltip content="根据模板生成全部附注章节" placement="bottom" :show-after="400">
+                  <el-button @click="onGenerate" :loading="genLoading">📝 生成</el-button>
+                </el-tooltip>
+                <el-tooltip content="校验附注数据完整性与勾稽关系" placement="bottom" :show-after="400">
+                  <el-button @click="onValidate" :loading="validateLoading">✅ 校验</el-button>
+                </el-tooltip>
+              </el-button-group>
+              <!-- 编辑 -->
+              <el-button-group size="small">
+                <el-tooltip content="新增自定义附注章节" placement="bottom" :show-after="400">
+                  <el-button v-if="!isEqcrRole" data-test="de-add-section" @click="openAddSectionDialog">➕ 新增</el-button>
+                </el-tooltip>
+                <el-tooltip content="编辑表格结构" placement="bottom" :show-after="400">
+                  <el-button @click="openStructureEditor">📐 表样</el-button>
+                </el-tooltip>
+              </el-button-group>
+              <!-- 版本/范围 -->
+              <el-button-group size="small">
+                <el-tooltip content="查看版本历史" placement="bottom" :show-after="400">
+                  <el-button @click="showVersionTree = true">🗂️ 版本</el-button>
+                </el-tooltip>
+                <el-tooltip content="与上年对比" placement="bottom" :show-after="400">
+                  <el-button @click="showPriorYear = true">📅 上年</el-button>
+                </el-tooltip>
+                <el-tooltip content="切换为单体附注" placement="bottom" :show-after="400">
+                  <el-button :type="numbering.state.value.scope === 'standalone' ? 'primary' : ''" @click="onScopeChange('standalone')">单体</el-button>
+                </el-tooltip>
+                <el-tooltip content="切换为合并附注" placement="bottom" :show-after="400">
+                  <el-button :type="numbering.state.value.scope === 'consolidated' ? 'primary' : ''" @click="onScopeChange('consolidated')">合并</el-button>
+                </el-tooltip>
+              </el-button-group>
+              <!-- AI -->
+              <el-button-group size="small">
+                <el-tooltip content="AI 智能建议" placement="bottom" :show-after="400">
+                  <el-button @click="showAiPanel = true">🤖 AI</el-button>
+                </el-tooltip>
+                <el-tooltip content="与 AI 对话" placement="bottom" :show-after="400">
+                  <el-button @click="showDocAiChat = true">💬 对话</el-button>
+                </el-tooltip>
+              </el-button-group>
+              <!-- 全屏 -->
+              <el-tooltip :content="deFullscreen ? '退出全屏（ESC）' : '全屏查看'" placement="bottom" :show-after="400">
+                <el-button size="small" @click="toggleDeFullscreen()">{{ deFullscreen ? '↙ 退出' : '↗ 全屏' }}</el-button>
+              </el-tooltip>
+              <!-- 更多操作下拉 -->
+              <el-dropdown trigger="click" size="small">
+                <el-button size="small">更多 ▾</el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item @click="showParagraphVars = true" title="段落变量（自动替换占位符）">✏️ 段落变量</el-dropdown-item>
+                    <el-dropdown-item @click="showNoteMappingDialog = true" title="国企↔上市附注模板转换规则">🔄 国企↔上市转换</el-dropdown-item>
+                    <el-dropdown-item @click="showGroupBaseline = true" title="集团基线管理：应用/保存/对比集团统一附注模板结构，确保子企业附注章节一致">🏢 集团基线</el-dropdown-item>
+                    <el-dropdown-item divided @click="onExportWord" title="导出 Word 格式附注文档">📤 导出 Word</el-dropdown-item>
+                    <el-dropdown-item @click="showPrintPreview = true" title="打印预览当前附注">🖨️ 打印预览</el-dropdown-item>
+                    <el-dropdown-item @click="showNoteImport = true" title="导入外部 Excel 附注数据（通用格式）">📥 Excel 导入</el-dropdown-item>
+                    <el-dropdown-item @click="showOfflineExport = true" title="导出系统格式离线编辑包（可再导回）">📦 离线导出</el-dropdown-item>
+                    <el-dropdown-item @click="showOfflineImport = true" title="导入系统导出的离线编辑包">📥 离线导入</el-dropdown-item>
+                    <el-dropdown-item divided @click="showNoteFormulaManager = true" title="配置附注取数公式规则">⚙️ 公式管理</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              <SharedTemplatePicker
+                config-type="note_template"
+                :project-id="projectId"
+                :get-config-data="getNoteTemplateConfigData"
+                @applied="onNoteTemplateApplied"
+              />
+              <el-button v-if="isEqcrRole" size="small" type="info">📋 只读副本</el-button>
+            </div>
           </template>
         </GtToolbar>
       </template>
@@ -125,13 +152,6 @@
     <div class="gt-de-body">
       <!-- 左侧：目录树 -->
       <div class="gt-de-sidebar">
-        <!-- 单位切换 -->
-        <div class="gt-de-unit-bar">
-          <span class="gt-de-unit-name">{{ currentProjectName || '—' }}</span>
-          <el-select v-if="projectOptions.length > 1" v-model="selectedProjectIdLocal" size="small" style="width: 100%; margin-top: 4px" @change="onSwitchProjectLocal">
-            <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
-          </el-select>
-        </div>
         <!-- 视图切换 -->
         <div class="gt-de-view-toggle">
           <el-radio-group v-model="treeViewMode" size="small">
@@ -1067,13 +1087,7 @@ const {
   onAiGeneratePolicy, onAiGenerateAnalysis, onPickKnowledge, clearKnowledgeContext, getSelectedText,
 } = useNoteAi({ projectId, year, templateType, currentNote, editor })
 // 单位切换（侧边栏）
-const selectedProjectIdLocal = ref('')
 
-function onSwitchProjectLocal(newId: string) {
-  if (newId && newId !== projectId.value) {
-    router.push(`/projects/${newId}/disclosure-notes`)
-  }
-}
 
 function onFlatItemClick(note: any) {
   currentNote.value = note
@@ -1509,7 +1523,6 @@ async function onRestoreTemplateStructure() {
 
 onMounted(async () => {
   selectedProjectId.value = projectId.value
-  selectedProjectIdLocal.value = projectId.value
   selectedYear.value = year.value
   projectStore.loadProjectOptions()
   eventBus.on('shortcut:save', onShortcutSave)
@@ -1530,7 +1543,6 @@ onMounted(async () => {
 // V3 Req 5.1：上下文（projectId/year）变化时自动重载附注树
 onContextChange(async () => {
   selectedProjectId.value = projectId.value
-  selectedProjectIdLocal.value = projectId.value
   selectedYear.value = year.value
   await loadProjectTemplateConfig()
   await fetchTree()

@@ -1,5 +1,5 @@
 <template>
-  <div class="workflow-progress" v-if="loaded">
+  <div class="workflow-progress" v-if="loaded && !dismissed">
     <div class="workflow-progress__steps">
       <template v-for="(step, idx) in steps" :key="step.key">
         <span
@@ -26,6 +26,7 @@
     >
       {{ nextAction.label }}
     </el-button>
+    <span class="workflow-progress__close" title="关闭工作流进度条" @click="onDismiss">✕</span>
   </div>
 </template>
 
@@ -62,6 +63,30 @@ const loaded = ref(false)
 const currentStep = ref(0)
 const nextAction = ref<NextAction | null>(null)
 
+// 用户可关闭进度条，状态按项目持久化到 localStorage
+const DISMISS_KEY = 'gt_workflow_progress_dismissed'
+const dismissed = ref(false)
+
+function _loadDismissed() {
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY)
+    if (raw) {
+      const map = JSON.parse(raw)
+      dismissed.value = !!map[props.projectId]
+    }
+  } catch { /* ignore */ }
+}
+
+function onDismiss() {
+  dismissed.value = true
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY)
+    const map = raw ? JSON.parse(raw) : {}
+    map[props.projectId] = true
+    localStorage.setItem(DISMISS_KEY, JSON.stringify(map))
+  } catch { /* ignore */ }
+}
+
 // 步骤定义：每步对应一个路由或动作
 const steps = [
   { key: 'import', label: '导入', route: (pid: string) => `/projects/${pid}/trial-balance`, action: 'import' },
@@ -76,7 +101,7 @@ async function fetchStatus() {
   if (!props.projectId) return
   try {
     const yr = props.year || 2025
-    const res = await api.get(`/api/projects/${props.projectId}/workflow-status?year=${yr}`) as WorkflowStatusResponse
+    const res = await api.get(`/api/projects/${props.projectId}/workflow-status?year=${yr}`, { _silent: true } as any) as WorkflowStatusResponse
     currentStep.value = res.current_step
     nextAction.value = res.next_action
     loaded.value = true
@@ -105,9 +130,15 @@ function onNext() {
   }
 }
 
-onMounted(fetchStatus)
+onMounted(() => {
+  _loadDismissed()
+  fetchStatus()
+})
 
-watch(() => [props.projectId, props.year], fetchStatus)
+watch(() => [props.projectId, props.year], () => {
+  _loadDismissed()
+  fetchStatus()
+})
 </script>
 
 <style scoped>
@@ -131,6 +162,25 @@ watch(() => [props.projectId, props.year], fetchStatus)
 
 .workflow-progress__next-btn {
   flex-shrink: 0;
+}
+
+.workflow-progress__close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--gt-color-text-tertiary, #999);
+  transition: all 0.2s;
+  margin-left: 4px;
+}
+.workflow-progress__close:hover {
+  background: rgba(75, 45, 119, 0.1);
+  color: var(--gt-color-primary, #4b2d77);
 }
 
 .wf-step {

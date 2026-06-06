@@ -575,6 +575,12 @@ class AuditReport(Base):
     updated_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )
+    # deliverable-center V059
+    report_body_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    is_pie: Mapped[bool | None] = mapped_column(
+        server_default=text("false"), nullable=True
+    )
+    prior_period_info: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
     __table_args__ = (
         Index(

@@ -1,7 +1,7 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-06-05  
-**当前分支**：`work/2026-05-30-wp-specs`（HEAD = 8ed2d45c）  
+**最后更新**：2026-06-06  
+**当前分支**：`work/2026-05-30-wp-specs`（HEAD = c20a6ae4）  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer  
 **目标规模**：6000 并发用户
 
@@ -106,25 +106,25 @@
 
 ## 二、进行中 / 待启动 Spec（active）
 
-> 状态图例：📌 占位 stub（仅 README，无 tasks.md，代码未动）/ ⏳ 实施中 / ✅ 核心完成
+> 状态图例：📌 占位 stub（仅三件套文档，代码未动）/ ⏳ 实施中 / ✅ 核心完成（已归档）
 > 核心已闭环的 spec 均已归档到 `_archive/`，根目录只保留尚未启动的真 stub 或进行中 spec。
 
 | Spec | 状态 | 说明 |
 |------|------|------|
-| `project-workspace-overview-revamp` | ⏳ 代码完成/E2E 待补 | 详情面板重构（注册表驱动+健康卡+WorkflowStepper）；125 vitest + 10 后端 tests 全绿；Playwright E2E 待在线环境 |
-| `disclosure-note-linkage-and-slimdown` | ✅ 全部完成 | P0 假性刷新修复+P1 auto_pull 取数+P1 瘦身（2662→1757 行）；62 新测试+9 PBT；Playwright 实测通过 |
-| `global-refinement-v5-closure` | ⏳ requirements 待审阅 | v5.0 统一收口 4 缺口：T5 单元格右键溯源+T5/T6 stale 全局刷新及年度联动+T8 通用编辑锁(resource_type)+T12 函证模块；需求文档已就绪 |
+| `audit-report-deliverable-center` | ⏳ P0 完成/P1-P2 实施中 | 交付件管理中心（选择性导出→双路径存储→版本→预览→报告正文生成）；P0 Task 0-8 全绿（42 后端+11 前端 tests passed），Task 9+ P1/P2 进行中 |
+| `disclosure-note-semantic-structure-and-presentation` | 📌 待启动 | 附注语义结构与呈现原型（sidecar 类型/row_type/table_id/政策条款审阅/数据披露上下文栏） |
+| `platform-context-permission-foundation` | 📌 待启动 | 项目上下文单一真源+年度切换+权限矩阵+项目设置中心+枚举字典 |
+| `platform-evidence-knowledge-ai-governance` | 📌 待启动 | 证据包/知识库/AI 治理路线图 |
+| `platform-linkage-contract-stale` | 📌 待启动 | 联动契约与 stale 传播治理 |
+| `platform-maintenance-governance` | 📌 待启动 | 平台维护治理（迁移/监控/告警） |
+| `platform-role-workbench-quality-loop` | 📌 待启动 | 角色工作台与质量闭环 |
+| `platform-ui-editing-consistency` | 📌 待启动 | UI 编辑一致性（页面骨架/表格/金额/复制粘贴/编辑状态机/加载空态） |
 
-> 注（2026-06-05）：5 个候选技术 spec + audit-sheet-editable 全部实施完成（70+ 必选任务 + 46 tests passed + Playwright E2E 验证通过），已归档至 `_archive/04-infra-architecture/`（llm-structured-output / pg-pooling-and-load-test / xlsx-read-acceleration / endpoint-fuzz-and-tracing）+ `_archive/06-engineering-governance/`（dev-tooling-modernization）+ `_archive/07-workpaper-slimdown/`（audit-sheet-editable）。
-
-> 注：`workpaper-fill-service-split` 已 `git rm`（目标 WorkpaperFillService 经 grep 实证为 0 业务调用方的死代码，拆分无意义）；`gt-c-note-table-shrink` 已于 2026-05-30 完成并归档至 07-workpaper-slimdown（GtCNoteTable 1803→450 + GtEControlTest 1414→344，90 测试全绿；残留 R3 Playwright 目视待环境，非代码缺口）。
-> 注（2026-05-31）：merge work 分支带入 13 个底稿 spec 的 active 双份残留，经代码实证全部完成度 100%，已 `git rm` 删除 active 残留，仅保留 `_archive/` 权威版。
-> 注（2026-05-31）：合并模块四阶段 spec（consol-phase0~3）全部代码+测试完成（147 passed/0 failed + 封板全链路集成测试 4 passed），归档至 `_archive/09-consolidation-phases/`。
-> 注（2026-06-03）：9 个已完成 spec 批量归档（retrieval-kernel-unification / doc-level-ai-chat / global-modules-cleanup / global-modules-p2-polish / formula-engine-unification / report-config-baseline → 04 / wp-ai-review-ux-fix → 05 / frontend-consistency-m1 → 06 / custom-workpaper-formula-binding → 07）。active 仅余 1 个 stub `consol-note-three-level-drilldown`。
+> 注（2026-06-06）：`report-view-slimdown` / `global-refinement-v5-closure` / `project-creation-enhancement` / `disclosure-note-linkage-and-slimdown` 4 个已完成 spec 归档至 `_archive/`。
 
 ---
 
-## 三、已归档 Spec（`_archive/`，109 个）
+## 三、已归档 Spec（`_archive/`，113 个）
 
 > 已完成且不再演进的 spec，保留审计轨迹。归档不删文件。
 > **物理结构**：`_archive/` 下按功能 + 开发先后分 10 个分类目录，每个目录含 README 说明。
@@ -167,9 +167,9 @@ _archive/
 
 `refinement-round1-review-closure` · `refinement-round2-project-manager` · `refinement-round3-quality-control` · `refinement-round4-audit-assistant` · `refinement-round5-independent-review` · `refinement-round6-cross-role-optimization` · `refinement-round7-global-polish` · `refinement-round8-deep-closure` · `refinement-round9-global-deep-review`
 
-### 3.4 `04-infra-architecture/` — 基础设施 / 全局架构（19 个）
+### 3.4 `04-infra-architecture/` — 基础设施 / 全局架构（21 个）
 
-`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3`（全平台一致性治理：金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动；143/147，剩合伙人 UAT） · `vllm-httpx-bugfix`（2026-05-30，httpx trust_env=False 全仓 20 处 + chat_template_kwargs 顶层 + finish_reason=length 处理；12 测试全绿 + vLLM 直调验证通过） · `retrieval-kernel-unification`（检索/知识层单内核 + pgvector；PBT R1~R4 全绿；2026-06-01） · `doc-level-ai-chat`（文档/文件夹级 LLM 对话；72 测试全绿；2026-06-01） · `global-modules-cleanup`（多源澄清+死文件清理；35 测试全绿） · `global-modules-p2-polish`（P2/P3 体验增强；57 测试全绿） · `formula-engine-unification`（公式单内核；Q1~Q5 PBT 全绿） · `report-config-baseline`（报表配置回填+联动；E1~E4 PBT 全绿） · `llm-structured-output`（Instructor+guided_json 双层+熔断；8 tests；2026-06-05） · `pg-pooling-and-load-test`（PgBouncer NullPool+Locust 6000；8 tests；2026-06-05） · `xlsx-read-acceleration`（calamine adapter+6 迁移点；22 tests；2026-06-05） · `endpoint-fuzz-and-tracing`（Schemathesis+OTel+bm25s；8 tests；2026-06-05）
+`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3`（全平台一致性治理：金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动；143/147，剩合伙人 UAT） · `vllm-httpx-bugfix`（2026-05-30，httpx trust_env=False 全仓 20 处 + chat_template_kwargs 顶层 + finish_reason=length 处理；12 测试全绿 + vLLM 直调验证通过） · `retrieval-kernel-unification`（检索/知识层单内核 + pgvector；PBT R1~R4 全绿；2026-06-01） · `doc-level-ai-chat`（文档/文件夹级 LLM 对话；72 测试全绿；2026-06-01） · `global-modules-cleanup`（多源澄清+死文件清理；35 测试全绿） · `global-modules-p2-polish`（P2/P3 体验增强；57 测试全绿） · `formula-engine-unification`（公式单内核；Q1~Q5 PBT 全绿） · `report-config-baseline`（报表配置回填+联动；E1~E4 PBT 全绿） · `llm-structured-output`（Instructor+guided_json 双层+熔断；8 tests；2026-06-05） · `pg-pooling-and-load-test`（PgBouncer NullPool+Locust 6000；8 tests；2026-06-05） · `xlsx-read-acceleration`（calamine adapter+6 迁移点；22 tests；2026-06-05） · `endpoint-fuzz-and-tracing`（Schemathesis+OTel+bm25s；8 tests；2026-06-05） · `global-refinement-v5-closure`（v5 收口：溯源+stale 全局刷新+编辑锁+函证；2026-06-06） · `project-creation-enhancement`（项目创建向导增强；2026-06-06）
 
 ### 3.5 `05-business-features/` — 业务专项功能（13 个）
 
@@ -184,9 +184,9 @@ _archive/
 `frontend-consistency-m1`（v4 M1 一致性收口：T1 GtAmountCell 六大核心页 100% + T2 catch ElMessage.error→handleApiError 175→0 + T3 AMOUNT_DIVISOR_KEY 死代码删除 + T4 状态硬编码→statusEnum；6 PBT + CI baselines 4 项卡点；2026-05-30）  
 `dev-tooling-modernization`（gitleaks pre-commit+CI / SQLFluff 基线 / uv CI 加速 / Docling 裁掉 / DSPy 仅文档；20/20 tasks；2026-06-05）
 
-### 3.7 `07-workpaper-slimdown/` — 底稿模块瘦身系列（8 个）
+### 3.7 `07-workpaper-slimdown/` — 底稿模块瘦身系列（9 个）
 
-底稿渲染 HTML 化 + 超长 .vue 拆分 + 自定义底稿公式 + 审定表可编辑。
+底稿渲染 HTML 化 + 超长 .vue 拆分 + 自定义底稿公式 + 审定表可编辑 + 报表视图瘦身。
 
 | Spec | 成果 |
 |------|------|
@@ -194,12 +194,13 @@ _archive/
 | `workpaper-editor-slimdown` | WorkpaperEditor 2748→758 行 + 8 子 SFC + 2 composable，59/59 tasks |
 | `workpaper-list-shrink` | WorkpaperList 3463→1151 行（净减 67%）+ 5 子 SFC，36 vitest + e2e |
 | `workpaper-editor-shrink-phase2` | WorkpaperEditor 收尾瘦身至 837 行 + 8 子 SFC + 2 composable，36/36 tasks |
-| `gt-c-note-table-shrink` | GtCNoteTable 1803→450 行 + GtEControlTest 1414→344 行；C 类 3 子组件 + 3 composable / E 类 5 子组件 + 2 composable；90 测试全绿（36 spec 零断言 + 54 新单测）+ vue-tsc 0；残留 R3 Playwright 目视待环境 |
-| `gtdform-test-and-shrink` | D 类「先测后拆」：GtDFormReview 1670→390 / GtDFormConfirmation 1434→366 / GtDFormParagraph 878→345 行 + 6 composable；9/9 tasks + 116 vitest 全绿（含集成 + 边界 + 真实 markdown/XSS）+ vue-tsc 0 + HARD_CAPS 防退化 + evalFormula 安全解析器（复盘 6 改进已落地）|
+| `gt-c-note-table-shrink` | GtCNoteTable 1803→450 行 + GtEControlTest 1414→344 行；C 类 3 子组件 + 3 composable / E 类 5 子组件 + 2 composable；90 测试全绿 |
+| `gtdform-test-and-shrink` | D 类「先测后拆」：GtDFormReview 1670→390 / GtDFormConfirmation 1434→366 / GtDFormParagraph 878→345 行 + 6 composable；116 vitest 全绿 + HARD_CAPS 防退化 |
 | `custom-workpaper-formula-binding` | 编制信息表头 + 自定义底稿公式 V052 + WP() 求值 + 联动；pytest 44/2skip + Playwright 6 + vitest 4；2026-06-03 |
 | `audit-sheet-editable` | GtGridSheet→GtAuditSheet(el-table 可编辑)；F-审定表 componentType 精确匹配；TB 取数+自动计算+导入导出+行操作；18/18 tasks + 79 vitest + 后端 121 passed；2026-06-05 |
+| `report-view-slimdown` | ReportView.vue 2944→1053 行（瘦身 64%）+ 6 composable + 6 子组件 + CSS 外置 + 8 测试文件；15/15 tasks；HARD_CAP 1110 已登记；2026-06-06 |
 
-### 3.8 `08-disclosure-notes/` — 附注模块系列（2 个）
+### 3.8 `08-disclosure-notes/` — 附注模块系列（3 个）
 
 | Spec | 成果 |
 |------|------|
@@ -268,7 +269,7 @@ _archive/
 | prefill_formula_mapping | 1035 cells |
 | validation_rules | 114 条 |
 | D6 SQL 迁移 | V001-V040（V040 = account_note_mapping + consol_cell_comments 懒建表入 D6） |
-| **Spec 总数** | **active 0 + archived 109（详见 §三）** |
+| **Spec 总数** | **active 8 + archived 113（详见 §三）** |
 
 ---
 
@@ -281,7 +282,7 @@ _archive/
 | P1 | TrialBalance.vue | 2494 行 | ≤1500 | 同上 |
 | P2 | DisclosureEditor.vue | 1757 行 | ≤1800 | ✅ 已瘦身（disclosure-note-linkage-and-slimdown） |
 | P2 | LedgerPenetration.vue | 3794 行 | ≤1500 | 需新建 spec |
-| P3 | ReportView.vue | 2317 行 | ≤1500 | 需新建 spec |
+| P3 | ReportView.vue | 1053 行 | ≤1500 | ✅ 已瘦身（report-view-slimdown，HARD_CAP 1110） |
 | P0 | service ≤800 行卡点 | smart_import 2786 等 8 个 | pre-commit hook | 已有 check_file_size.py |
 | P2 | 6000 并发压测 | 外部依赖 | 真实验证 | PG 大数据量 + Locust |
 | P3 | LLM 真实接入 | 6 stub 引擎 | 一键切换 | WP_AI_SERVICE_ENABLED 已就位 |

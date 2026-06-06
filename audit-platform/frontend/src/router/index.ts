@@ -101,6 +101,11 @@ const router = createRouter({
           component: () => import('@/views/AuditReportEditor.vue'),
         },
         {
+          path: 'projects/:projectId/deliverable-center',
+          name: 'DeliverableCenter',
+          component: () => import('@/views/DeliverableCenter.vue'),
+        },
+        {
           path: 'projects/:projectId/pdf-export',
           name: 'PDFExport',
           component: () => import('@/views/PDFExportPanel.vue'),

@@ -1,10 +1,21 @@
 .gt-disclosure-editor { padding: 16px; }
+/* ── 工具栏单行布局 ── */
+.gt-de-actions-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; justify-content: space-evenly; }
+.gt-de-actions-row .el-button { font-size: 12px; padding: 4px 8px; }
+.gt-de-actions-row .el-button-group { border-radius: 4px; overflow: hidden; }
+.gt-disclosure-editor :deep(.gt-toolbar) { width: 100%; }
+.gt-disclosure-editor :deep(.gt-toolbar__left) { width: 100%; flex: 1; }
+.gt-de-actions-row--secondary .el-button:hover { opacity: 1; }
+.gt-de-actions-row--secondary .el-button-group { border-radius: 4px; overflow: hidden; }
+.gt-de-actions-row--secondary .el-button-group .el-button { border-radius: 0; border-right-color: rgba(255,255,255,0.15); }
+.gt-de-actions-row--secondary .el-button-group .el-button:first-child { border-radius: 4px 0 0 4px; }
+.gt-de-actions-row--secondary .el-button-group .el-button:last-child { border-radius: 0 4px 4px 0; border-right-color: rgba(255,255,255,0.25); }
+/* 分隔符 */
+.gt-de-actions-sep { width: 1px; height: 18px; background: rgba(255,255,255,0.3); margin: 0 6px; flex-shrink: 0; }
 /* ── 三栏布局 ── */
 .gt-de-body { display: flex; gap: 12px; height: calc(100vh - 180px); }
 .gt-de-sidebar { width: 220px; flex-shrink: 0; background: var(--gt-color-bg-white); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); display: flex; flex-direction: column; overflow: hidden; }
 .gt-de-sidebar-title { padding: 10px 14px 6px; font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-text-secondary); text-transform: uppercase; letter-spacing: 1px; }
-.gt-de-unit-bar { padding: 8px 12px; border-bottom: 1px solid var(--gt-color-border-light); }
-.gt-de-unit-name { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 .gt-de-view-toggle { display: flex; align-items: center; gap: 6px; padding: 6px 10px; }
 .gt-de-view-toggle .el-radio-group { flex-shrink: 0; }
 .gt-de-view-toggle .el-button { font-size: var(--gt-font-size-xs); padding: 0 4px; }

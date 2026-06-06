@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -152,3 +152,192 @@ class FullPackageRequest(BaseModel):
     """全套导出请求"""
     year: int
     template_type: str | None = None
+
+
+# ===================================================================
+# 交付件管理中心 (deliverable-center)
+# ===================================================================
+
+class DeliverableDTOSchema(BaseModel):
+    """交付物列表 DTO"""
+    task_id: UUID
+    project_id: UUID
+    doc_type: str
+    status: str
+    file_name: str | None = None
+    version_no: int
+    file_size: int | None = None
+    exporter_name: str | None = None
+    exported_at: datetime | None = None
+    template_type: str | None = None
+    selected_sections: list | None = None
+
+
+class DeliverableListResponse(BaseModel):
+    items: list[DeliverableDTOSchema] = []
+    grouped: dict[str, list[DeliverableDTOSchema]] = {}
+
+
+class DeliverableVersionSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    word_export_task_id: UUID
+    version_no: int
+    file_path: str | None = None
+    html_path: str | None = None
+    file_size: int | None = None
+    created_by: UUID
+    created_at: datetime | None = None
+    selected_sections: list | None = None
+    created_via: str | None = None
+
+
+class VersionCompareRequest(BaseModel):
+    version_a: int
+    version_b: int
+
+
+class VersionCompareResponse(BaseModel):
+    version_a: int
+    version_b: int
+    exported_at_diff: dict | None = None
+    file_size_diff: dict | None = None
+    selected_sections_diff: dict | None = None
+
+
+class ReportBodyLoadTemplateRequest(BaseModel):
+    opinion_type: str
+    company_type: str = "non_listed"
+    include_emphasis: bool = False
+
+
+class ReportBodyRenderRequest(BaseModel):
+    year: int
+    opinion_type: str
+    company_type: str = "non_listed"
+    is_pie: bool = False
+    include_emphasis: bool = False
+    selected_sections: list[str] | None = None
+    prior_period_info: str | None = None
+
+
+class ReportBodyRenderResponse(BaseModel):
+    task_id: UUID
+    version_no: int
+    download_url: str
+    html_preview: str
+    platform_persist_failed: bool = False
+    report_body_json: dict | None = None
+    validation_warning: str | None = None
+
+
+class DeliverableExportRequest(BaseModel):
+    year: int
+    template_type: str = "soe"
+    selected_sections: list[str] | None = None
+    report_types: list[str] | None = None
+
+
+class DeliverableExportResponse(BaseModel):
+    task_id: UUID
+    version_no: int
+    download_url: str
+    platform_persist_failed: bool = False
+    file_name: str | None = None
+
+
+class CompletenessResponse(BaseModel):
+    passed: bool
+    missing_doc_types: list[str] = []
+    missing_financial_reports: list[str] = []
+    has_confirmed: bool = False
+    trio_consistent: bool = True
+    trio_message: str | None = None
+    warnings: list[str] = []
+
+
+class SnapshotStaleResponse(BaseModel):
+    stale: bool
+    bound_tb_hash: str | None = None
+    current_tb_hash: str | None = None
+    message: str | None = None
+
+
+class DeliverableSignRequest(BaseModel):
+    sign_type: str = Field(..., description="项目合伙人 / 复核合伙人")
+    year: int
+
+
+class DeliverableSignResponse(BaseModel):
+    task_id: UUID
+    status: str
+    signed_by: UUID
+    signed_at: datetime | None = None
+    sign_type: str | None = None
+
+
+class ReportDateComplianceRequest(BaseModel):
+    year: int
+    report_date: date
+
+
+class ReportDateComplianceResponse(BaseModel):
+    compliant: bool
+    warnings: list[str] = []
+    floor_date: str | None = None
+
+
+class OnlyOfficeHealthResponse(BaseModel):
+    available: bool
+    enabled: bool
+    message: str | None = None
+
+
+class DeliverableApprovalRejectRequest(BaseModel):
+    reason: str
+
+
+class DeliverableApprovalResponse(BaseModel):
+    task_id: UUID
+    status: str
+    approval_by: UUID | None = None
+    approval_at: datetime | None = None
+    reject_reason: str | None = None
+
+
+class DeliverableArchiveRequest(BaseModel):
+    year: int
+    force: bool = False
+
+
+class DeliverableArchiveResponse(BaseModel):
+    archived_count: int
+
+
+class DeliverableUnarchiveRequest(BaseModel):
+    reason: str
+
+
+class IntegrityVerifyResponse(BaseModel):
+    valid: bool
+    tampered_versions: list[int] = []
+    checked_count: int = 0
+    message: str | None = None
+
+
+class DeliverablePackageRequest(BaseModel):
+    year: int
+    ignore_incomplete: bool = False
+
+
+class DeliverablePackageResponse(BaseModel):
+    job_id: UUID
+    warnings: list[str] = []
+
+
+class OnlyOfficeConfigResponse(BaseModel):
+    config: dict
+    token: str
+    mode: str
+    documentType: str

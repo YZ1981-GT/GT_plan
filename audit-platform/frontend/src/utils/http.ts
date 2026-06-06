@@ -246,6 +246,9 @@ http.interceptors.response.use(
     // 请求被取消（去重导致）不弹错误
     if (axios.isCancel(error)) return Promise.reject(error)
 
+    // _silent 模式：调用方自行处理错误，不弹全局 toast
+    if ((error.config as any)?._silent) return Promise.reject(error)
+
     // R8-S1-05：超时专门处理
     if (error.code === 'ECONNABORTED') {
       const { feedback } = await import('./feedback')

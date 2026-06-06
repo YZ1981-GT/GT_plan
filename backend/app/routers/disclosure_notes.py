@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -179,6 +179,32 @@ async def trace_cell(
     """
     engine = DisclosureEngine(db)
     return await engine.trace_cell(note_id, row_idx, col_idx)
+
+
+@router.get("/{project_id}/{year}/section-numbers")
+async def get_section_numbers(
+    project_id: UUID,
+    year: int,
+    scope: str = Query("both", description="standalone/consolidated/both"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """获取附注章节编号映射（供前端渲染序号）。
+
+    返回 {note_section: rendered_number} 映射，如 {"五、1": "1", "五、2": "2"}.
+    当后端尚无编号规则时返回空字典（前端降级为不显示序号）。
+    """
+    engine = DisclosureEngine(db)
+    tree = await engine.get_notes_tree(project_id, year)
+    if not tree:
+        return {}
+    # 简单实现：按 note_section 中的数字部分返回序号
+    result: dict[str, str] = {}
+    for idx, item in enumerate(tree, 1):
+        section = item.get("note_section", "")
+        if section:
+            result[section] = str(idx)
+    return result
 
 
 @router.get("/{project_id}/{year}/{note_section}/prior-year")
