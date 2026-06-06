@@ -110,6 +110,13 @@
       </el-button>
     </div>
 
+    <!-- useStaleRefresh：上游变更事件横幅（与已有 stale 互斥显示） -->
+    <div v-if="deStaleRefresh.isStale.value && !stale.isStale.value" class="gt-stale-banner">
+      <StaleIndicator :stale="true" tooltip="上游数据已变更" />
+      <span class="gt-stale-text">上游数据已变更，建议刷新附注数据</span>
+      <el-button size="small" type="primary" @click="deStaleRefresh.refresh()">刷新数据</el-button>
+    </div>
+
     <!-- 编辑锁提示 -->
     <el-alert v-if="editLock.locked.value && !editLock.isMine.value" type="warning" :closable="false" style="margin-bottom: 8px">
       {{ editLock.lockedBy.value || '其他用户' }} 正在编辑，当前为只读模式
@@ -777,6 +784,7 @@ import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue
 import { useEditingLock } from '@/composables/useEditingLock'
 import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
 import { useProjectEvents } from '@/composables/useProjectEvents'
+import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import { handleApiError } from '@/utils/errorHandler'
 import { useNoteTableStructure, type TableData } from '@/composables/useNoteTableStructure'
 import NoteOfflineExportDialog from '@/components/notes/NoteOfflineExportDialog.vue'
@@ -838,6 +846,13 @@ const { onDatasetActivated, onDatasetRolledBack } = useProjectEvents(projectId)
 onDatasetActivated(() => fetchTree())
 onDatasetRolledBack(() => fetchTree())
 
+// ─── useStaleRefresh：补充上游变更事件（dataset 已由 useProjectEvents 覆盖） ────
+const deStaleRefresh = useStaleRefresh(projectId, {
+  events: ['trial-balance:updated', 'adjustment:saved', 'year:changed', 'project:updated'],
+  mode: 'prompt',
+  onRefresh: () => fetchTree(),
+})
+
 // R8-S2-03：Stale 状态追踪
 import { useStaleStatus } from '@/composables/useStaleStatus'
 import StaleIndicator from '@/components/StaleIndicator.vue'
@@ -851,8 +866,8 @@ const noteStale = useNoteStale(projectId)
 // Sprint 3 Task 3.1/3.5: 自定义附注模板（now in useNoteSectionManage composable）
 
 const editLock = useEditingLock({
-  resourceId: computed(() => 'disclosure_' + (route.params.projectId as string || '')),
-  resourceType: 'other',  // 附注无后端锁端点，降级为前端检测
+  resourceId: computed(() => (route.params.projectId as string || '') + '_note'),
+  resourceType: 'disclosure_note',  // 走通用编辑锁端点 /api/editing-locks/disclosure_note/{id}
   autoAcquire: false,
 })
 

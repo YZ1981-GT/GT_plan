@@ -215,8 +215,8 @@ async function onStaleRecalc() {
 }
 
 const editLock = useEditingLock({
-  resourceId: computed(() => 'report_' + (route.params.projectId as string || '')),
-  resourceType: 'other',  // 审计报告无后端锁端点，降级为前端检测
+  resourceId: computed(() => (route.params.projectId as string || '') + '_report'),
+  resourceType: 'audit_report',  // 走通用编辑锁端点 /api/editing-locks/audit_report/{id}
   autoAcquire: false,
 })
 

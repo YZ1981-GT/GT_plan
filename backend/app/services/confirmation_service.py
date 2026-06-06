@@ -1,71 +1,207 @@
-"""
-confirmation_service — 函证管理服务（stub）
+"""函证管理服务
 
-当前为 stub 实现，后续 O1 spec（7 循环函证统一管理中心）将完善。
-F6 spec workpaper-d-sales-cycle task 2.11: 函证回函 → 触发 D2 stale 传播
-F spec workpaper-f-purchase-inventory task 2.20: 通用化 wp_code 参数,
-支持 F0 函证 → F2 反向回填 (经 cross_wp_references CW-176 触发 stale 传播).
-G spec workpaper-g-investment-cycle task 2.21: 注册 G0 函证 → G7 长期股权投资反向回填
-(经 cross_wp_references CW-267 触发 stale 传播 / 与 D0/F0 同模式).
+能力域 D — global-refinement-v5-closure：
+CRUD + 状态机 transition_status。
+service 只 flush 不 commit（项目铁律，router 统一 commit）。
 """
+
 from __future__ import annotations
 
-from uuid import UUID
+import uuid
+from datetime import datetime, timezone
 
-from app.services.event_bus import event_bus
-from app.models.audit_platform_schemas import EventPayload, EventType
+from sqlalchemy import select, delete as sa_delete
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.confirmation_models import Confirmation
 
 
-async def apply_confirmation_result(
-    project_id: UUID,
-    year: int,
-    confirmation_id: UUID,
-    *,
-    reply_status: str = "confirmed_match",
-    reply_amount: float | None = None,
-    wp_code: str = "D0",
-) -> dict:
-    """
-    应用函证回函结果。
+# ─── 状态机合法转换表 ───────────────────────────────────────────────────────
+_ALLOWED_TRANSITIONS: dict[str, set[str]] = {
+    "pending": {"sent"},
+    "sent": {"returned"},
+    "returned": {"matched", "discrepancy"},
+    "matched": set(),
+    "discrepancy": set(),
+}
 
-    当前为 stub 实现：
-    - 真实业务逻辑（更新 confirmation_result 表、计算差异等）待 O1 spec 实现
-    - 本方法末尾 emit CONFIRMATION_RECEIVED 事件，触发下游 stale 传播链路
+# 中文状态名映射（用于错误提示）
+_STATUS_CN: dict[str, str] = {
+    "pending": "待发函",
+    "sent": "已发函",
+    "returned": "已回函",
+    "matched": "相符",
+    "discrepancy": "差异",
+}
 
-    Args:
-        project_id: 项目 ID
-        year: 审计年度
-        confirmation_id: 函证记录 ID
-        reply_status: 回函状态（confirmed_match/confirmed_mismatch/no_reply/returned）
-        reply_amount: 回函确认金额
-        wp_code: 函证来源底稿编码 (D0=应收函证 / F0=采购存货函证 / E0=货币资金函证
-                 / G0=投资函证 ...).
-                 默认 "D0" 保持向下兼容; F0/G0 函证场景需显式传入对应 wp_code,
-                 stale 传播将沿 cross_wp_references 中 source_wp=对应 wp_code 的条目下游进行
-                 (含 CW-176 F0→F2 反向回填 / CW-267 G0→G7 反向回填).
 
-    Returns:
-        dict with status info
-    """
-    # TODO: O1 spec 实现真实业务逻辑（更新 DB、计算差异、生成差异调节表等）
-    result = {
-        "confirmation_id": str(confirmation_id),
-        "reply_status": reply_status,
-        "reply_amount": reply_amount,
-        "wp_code": wp_code,
-        "applied": True,
+def _to_dict(record: Confirmation) -> dict:
+    """将 ORM 实例转为 dict 输出"""
+    return {
+        "id": str(record.id),
+        "project_id": str(record.project_id),
+        "confirm_type": record.confirm_type,
+        "counterparty": record.counterparty,
+        "status": record.status,
+        "wp_id": str(record.wp_id) if record.wp_id else None,
+        "account_code": record.account_code,
+        "book_amount": float(record.book_amount) if record.book_amount is not None else None,
+        "confirmed_amount": float(record.confirmed_amount) if record.confirmed_amount is not None else None,
+        "diff_amount": float(record.diff_amount) if record.diff_amount is not None else None,
+        "diff_note": record.diff_note,
+        "created_by": str(record.created_by) if record.created_by else None,
+        "created_at": record.created_at.isoformat() if record.created_at else None,
+        "updated_at": record.updated_at.isoformat() if record.updated_at else None,
     }
 
-    # F6 spec workpaper-d-sales-cycle task 2.11: 函证回函 → 触发 D2 stale 传播
-    # F spec workpaper-f-purchase-inventory task 2.20: 通用化 wp_code,
-    # 同一事件类型也用于 F0 → F2 反向回填.
-    # G spec workpaper-g-investment-cycle task 2.21: G0 → G7 长期股权投资反向回填
-    # 同样复用 CONFIRMATION_RECEIVED 事件 + wp_code='G0' 路由分发.
-    await event_bus.publish_immediate(EventPayload(
-        event_type=EventType.CONFIRMATION_RECEIVED,
-        project_id=project_id,
-        year=year,
-        extra={"wp_code": wp_code, "confirmation_id": str(confirmation_id)},
-    ))
 
-    return result
+async def create_confirmation(
+    db: AsyncSession,
+    project_id: uuid.UUID,
+    data: dict,
+) -> dict:
+    """创建函证记录
+
+    必填: confirm_type, counterparty
+    可选: wp_id, account_code, book_amount, confirmed_amount, diff_amount, diff_note, created_by
+    """
+    now = datetime.now(timezone.utc)
+    record = Confirmation(
+        id=uuid.uuid4(),
+        project_id=project_id,
+        confirm_type=data.get("confirm_type") or "",
+        counterparty=data.get("counterparty") or "",
+        status="pending",
+        wp_id=(data.get("wp_id") or None),
+        account_code=(data.get("account_code") or None),
+        book_amount=(data.get("book_amount") if data.get("book_amount") is not None else None),
+        confirmed_amount=(data.get("confirmed_amount") if data.get("confirmed_amount") is not None else None),
+        diff_amount=(data.get("diff_amount") if data.get("diff_amount") is not None else None),
+        diff_note=(data.get("diff_note") or None),
+        created_by=(data.get("created_by") or None),
+    )
+    db.add(record)
+    await db.flush()
+    # refresh to get server defaults (created_at, updated_at)
+    await db.refresh(record)
+    return _to_dict(record)
+
+
+async def list_confirmations(
+    db: AsyncSession,
+    project_id: uuid.UUID,
+) -> list[dict]:
+    """列出项目下所有函证"""
+    stmt = (
+        select(Confirmation)
+        .where(Confirmation.project_id == project_id)
+        .order_by(Confirmation.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    records = result.scalars().all()
+    return [_to_dict(r) for r in records]
+
+
+async def get_confirmation(
+    db: AsyncSession,
+    confirmation_id: uuid.UUID,
+) -> dict:
+    """获取单条函证详情（含关联+差异）
+
+    Raises:
+        ValueError: 函证记录不存在
+    """
+    stmt = select(Confirmation).where(Confirmation.id == confirmation_id)
+    result = await db.execute(stmt)
+    record = result.scalar_one_or_none()
+    if record is None:
+        raise ValueError("函证记录不存在")
+    return _to_dict(record)
+
+
+async def update_confirmation(
+    db: AsyncSession,
+    confirmation_id: uuid.UUID,
+    data: dict,
+) -> dict:
+    """更新函证记录
+
+    Raises:
+        ValueError: 函证记录不存在
+    """
+    stmt = select(Confirmation).where(Confirmation.id == confirmation_id)
+    result = await db.execute(stmt)
+    record = result.scalar_one_or_none()
+    if record is None:
+        raise ValueError("函证记录不存在")
+
+    # 可更新字段
+    updatable_fields = [
+        "confirm_type", "counterparty", "wp_id", "account_code",
+        "book_amount", "confirmed_amount", "diff_amount", "diff_note",
+    ]
+    for field in updatable_fields:
+        if field in data:
+            value = data[field]
+            # 对可选字段用 (value or None) 兜底
+            if field in ("wp_id", "account_code", "diff_note"):
+                value = (value or None)
+            setattr(record, field, value)
+
+    record.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    await db.refresh(record)
+    return _to_dict(record)
+
+
+async def delete_confirmation(
+    db: AsyncSession,
+    confirmation_id: uuid.UUID,
+) -> dict:
+    """删除函证记录
+
+    Raises:
+        ValueError: 函证记录不存在
+    """
+    stmt = select(Confirmation).where(Confirmation.id == confirmation_id)
+    result = await db.execute(stmt)
+    record = result.scalar_one_or_none()
+    if record is None:
+        raise ValueError("函证记录不存在")
+
+    await db.delete(record)
+    await db.flush()
+    return {"deleted": True, "id": str(confirmation_id)}
+
+
+async def transition_status(
+    db: AsyncSession,
+    confirmation_id: uuid.UUID,
+    target_status: str,
+) -> dict:
+    """函证状态机推进
+
+    仅允许合法转换（_ALLOWED_TRANSITIONS），非法转换抛中文 ValueError。
+
+    Raises:
+        ValueError: 函证记录不存在 / 非法状态转换
+    """
+    stmt = select(Confirmation).where(Confirmation.id == confirmation_id)
+    result = await db.execute(stmt)
+    record = result.scalar_one_or_none()
+    if record is None:
+        raise ValueError("函证记录不存在")
+
+    current = record.status
+    allowed = _ALLOWED_TRANSITIONS.get(current, set())
+
+    if target_status not in allowed:
+        current_cn = _STATUS_CN.get(current, current)
+        target_cn = _STATUS_CN.get(target_status, target_status)
+        raise ValueError(f"不能从『{current_cn}』直接转为『{target_cn}』")
+
+    record.status = target_status
+    record.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    await db.refresh(record)
+    return _to_dict(record)

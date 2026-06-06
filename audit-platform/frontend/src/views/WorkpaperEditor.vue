@@ -15,6 +15,12 @@
     @update:show-stale-impact-panel="showStaleImpactPanel = $event"
   />
 
+  <!-- useStaleRefresh：上游变更事件横幅 -->
+  <div v-if="wpStaleRefresh.isStale.value" class="gt-stale-banner" style="margin: 4px 12px 8px">
+    <span class="gt-stale-text">上游数据已变更，底稿取数可能过时</span>
+    <el-button size="small" type="primary" @click="wpStaleRefresh.refresh()">刷新数据</el-button>
+  </div>
+
   <!-- V3 Req 11.6: 时光机面板 -->
   <TimeMachineDrawer ref="tmDrawerRef" module="workpaper" :instance-id="wpId" @restored="onTimeMachineRestored" />
 
@@ -290,6 +296,7 @@ import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import { useCycleType } from '@/composables/useCycleType'
 import { useEditorMode } from '@/composables/useEditorMode'
 import { useEditorToolbar } from '@/composables/useEditorToolbar'
@@ -326,6 +333,13 @@ const router = useRouter()
 const { canEdit } = useAuditContext()
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
+
+// ─── useStaleRefresh：试算表/调整变更后提示底稿数据可能过时 ──────────────────
+const wpStaleRefresh = useStaleRefresh(projectId, {
+  events: ['trial-balance:updated', 'adjustment:saved'],
+  mode: 'prompt',
+  onRefresh: () => onManualRefresh(),
+})
 
 // ─── 核心数据 ref ────────────────────────────────────────────────────────────
 const wpDetail = ref<WorkpaperDetail | null>(null)

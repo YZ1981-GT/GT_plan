@@ -94,6 +94,13 @@
         </el-button>
       </div>
 
+      <!-- useStaleRefresh：上游变更事件横幅 -->
+      <div v-if="staleRefresh.isStale.value && !stale.isStale.value" class="gt-stale-banner">
+        <StaleIndicator :stale="true" tooltip="上游数据已变更" />
+        <span class="gt-stale-text">上游数据已变更，建议重新加载报表</span>
+        <el-button size="small" type="primary" @click="staleRefresh.refresh()">刷新数据</el-button>
+      </div>
+
       <!-- US-2：底稿数据更新 → 报表 stale 黄色横幅 -->
       <el-alert
         v-if="showReportStaleBanner"
@@ -847,6 +854,7 @@
     <div class="gt-ucell-ctx-item" @click="onRvCtxViewAdjustments"><span class="gt-ucell-ctx-icon">🔗</span> 查看调整明细</div>
     <div v-if="isConsolidated" class="gt-ucell-ctx-item" @click="onRvCtxViewConsolBreakdown"><span class="gt-ucell-ctx-icon">🔗</span> 查看合并明细</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxViewFormulaSource"><span class="gt-ucell-ctx-icon">🔍</span> 查看公式来源</div>
+    <div class="gt-ucell-ctx-item" @click="onRvCtxCellTrace"><span class="gt-ucell-ctx-icon">🔍</span> 数字溯源</div>
   </CellContextMenu>
 
   <!-- V3 Req 9.6: 数字信任度面板 -->
@@ -886,6 +894,39 @@
     @close="showDocAiChat = false"
     @adopt="onDocAiAdopt"
   />
+
+  <!-- 数字溯源弹窗（lineage endpoint） -->
+  <el-dialog v-model="rvTraceDialogVisible" title="🔍 数字溯源" width="700px" append-to-body destroy-on-close>
+    <div v-loading="rvTraceLoading" style="min-height:120px">
+      <template v-if="rvTraceResult">
+        <div v-if="rvTraceResult.upstream.length || rvTraceResult.downstream.length">
+          <h4 style="margin:0 0 8px">上游来源</h4>
+          <el-table v-if="rvTraceResult.upstream.length" :data="rvTraceResult.upstream" size="small" border stripe max-height="200">
+            <el-table-column prop="wp_code" label="底稿编码" width="120" />
+            <el-table-column prop="label" label="描述" min-width="200" />
+            <el-table-column label="操作" width="80">
+              <template #default="{ row }">
+                <el-button size="small" link type="primary" @click="onRvTraceLocate(row)">定位</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-else description="无上游来源" :image-size="40" />
+          <h4 style="margin:16px 0 8px">下游引用</h4>
+          <el-table v-if="rvTraceResult.downstream.length" :data="rvTraceResult.downstream" size="small" border stripe max-height="200">
+            <el-table-column prop="wp_code" label="底稿编码" width="120" />
+            <el-table-column prop="label" label="描述" min-width="200" />
+            <el-table-column label="操作" width="80">
+              <template #default="{ row }">
+                <el-button size="small" link type="primary" @click="onRvTraceLocate(row)">定位</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-else description="无下游引用" :image-size="40" />
+        </div>
+        <el-empty v-else description="该数字暂无溯源信息" :image-size="60" />
+      </template>
+    </div>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -926,8 +967,10 @@ import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
 import StatusMachinePanel from '@/components/status_machine/StatusMachinePanel.vue'
 import { withLoading } from '@/composables/useLoading'
 import { handleApiError } from '@/utils/errorHandler'
+import { eventBus } from '@/utils/eventBus'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useProjectEvents } from '@/composables/useProjectEvents'
+import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import {
   generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
   getReportExcelUrl,
@@ -966,6 +1009,13 @@ function onDocAiAdopt(_payload: { content: string; messageId: string }) {
 const { onDatasetActivated, onDatasetRolledBack, onAnyEvent } = useProjectEvents(projectId)
 onDatasetActivated(() => fetchReport())
 onDatasetRolledBack(() => fetchReport())
+
+// ─── useStaleRefresh：补充上游变更事件（dataset 已由 useProjectEvents 覆盖） ────
+const staleRefresh = useStaleRefresh(projectId, {
+  events: ['trial-balance:updated', 'adjustment:saved', 'year:changed', 'project:updated'],
+  mode: 'prompt',
+  onRefresh: () => fetchReport(),
+})
 
 // R8-S2-03：Stale 状态追踪（上游数据变更提示）
 import { useStaleStatus } from '@/composables/useStaleStatus'
@@ -2299,6 +2349,52 @@ function onCellDetailNavigate(uri: string) {
     router.push({ name: 'DisclosureEditor', params: { id: projectId.value } })
   } else if (mod === 'TB') {
     router.push({ path: `/projects/${projectId.value}/trial-balance` })
+  }
+}
+
+// ─── 数字溯源：调 lineage 端点展示 upstream/downstream ───
+const rvTraceDialogVisible = ref(false)
+const rvTraceLoading = ref(false)
+const rvTraceResult = ref<{ upstream: any[]; downstream: any[] } | null>(null)
+
+async function onRvCtxCellTrace() {
+  rvCtx.closeContextMenu()
+  const row = rvCtx.contextMenu.rowData
+  if (!row?.row_code) {
+    ElMessage.info('请在数据行上右键')
+    return
+  }
+  rvTraceDialogVisible.value = true
+  rvTraceLoading.value = true
+  rvTraceResult.value = null
+  try {
+    const data: any = await api.get(
+      `/api/projects/${projectId.value}/lineage`,
+      { params: { object_type: 'report_row', object_id: row.row_code, direction: 'both' } },
+    )
+    const upstream = data?.upstream || []
+    const downstream = data?.downstream || []
+    rvTraceResult.value = { upstream, downstream }
+    if (!upstream.length && !downstream.length) {
+      rvTraceDialogVisible.value = false
+      ElMessage.info('该数字暂无溯源信息')
+    }
+  } catch (e: any) {
+    rvTraceDialogVisible.value = false
+    handleApiError(e, '数字溯源')
+  } finally {
+    rvTraceLoading.value = false
+  }
+}
+
+function onRvTraceLocate(node: any) {
+  rvTraceDialogVisible.value = false
+  if (node.wp_code) {
+    eventBus.emit('workpaper:locate-cell', {
+      wpId: node.wp_code,
+      sheetName: node.sheet_name || undefined,
+      cellRef: node.cell_ref || '',
+    })
   }
 }
 

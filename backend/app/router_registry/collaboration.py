@@ -115,6 +115,10 @@ def register_collaboration_routers(app: FastAPI) -> None:
     from app.routers.wp_document_recognize import router as doc_recognize_router
     app.include_router(doc_recognize_router, prefix="/api", tags=["原始凭证识别"])
 
+    # ═══ §12c. 通用编辑锁（global-refinement-v5-closure 能力域 C） ═══
+    from app.routers.editing_locks import router as editing_locks_router
+    app.include_router(editing_locks_router, tags=["editing-locks"])
+
     # ═══ §13. Round 4：审计助理增强 ═══
     from app.routers.workpaper_requirements import router as wpreq_router
     from app.routers.workpaper_prior_year import router as wppy_router

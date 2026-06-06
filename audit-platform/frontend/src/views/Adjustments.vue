@@ -529,6 +529,7 @@ import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
 import { useImpactPreview } from '@/composables/useImpactPreview'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
 import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
 import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
@@ -577,6 +578,13 @@ const selectedProjectId = ref(projectStore.projectId)
 const projectOptions = computed(() => projectStore.projectOptions)
 const yearOptions = computed(() => projectStore.yearOptions)
 const selectedYear = ref(projectStore.year)
+
+// ─── useStaleRefresh：试算表变更后自动刷新调整分录 ────────────────────────────
+const adjStaleRefresh = useStaleRefresh(projectId, {
+  events: ['trial-balance:updated'],
+  mode: 'auto',
+  onRefresh: () => { fetchEntries(); fetchSummary() },
+})
 
 // 跨模块冲突调解（spec global-refinement-v3 Task 7.5）
 const conflictPanelVisible = ref(false)

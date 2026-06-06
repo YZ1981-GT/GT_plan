@@ -113,6 +113,7 @@
 |------|------|------|
 | `project-workspace-overview-revamp` | ⏳ 代码完成/E2E 待补 | 详情面板重构（注册表驱动+健康卡+WorkflowStepper）；125 vitest + 10 后端 tests 全绿；Playwright E2E 待在线环境 |
 | `disclosure-note-linkage-and-slimdown` | ✅ 全部完成 | P0 假性刷新修复+P1 auto_pull 取数+P1 瘦身（2662→1757 行）；62 新测试+9 PBT；Playwright 实测通过 |
+| `global-refinement-v5-closure` | ⏳ requirements 待审阅 | v5.0 统一收口 4 缺口：T5 单元格右键溯源+T5/T6 stale 全局刷新及年度联动+T8 通用编辑锁(resource_type)+T12 函证模块；需求文档已就绪 |
 
 > 注（2026-06-05）：5 个候选技术 spec + audit-sheet-editable 全部实施完成（70+ 必选任务 + 46 tests passed + Playwright E2E 验证通过），已归档至 `_archive/04-infra-architecture/`（llm-structured-output / pg-pooling-and-load-test / xlsx-read-acceleration / endpoint-fuzz-and-tracing）+ `_archive/06-engineering-governance/`（dev-tooling-modernization）+ `_archive/07-workpaper-slimdown/`（audit-sheet-editable）。
 

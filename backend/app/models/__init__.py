@@ -111,6 +111,8 @@ from app.models.account_note_mapping_models import AccountNoteMapping  # noqa: F
 from app.models.consol_cell_comment_models import ConsolCellComment  # noqa: F401
 from app.models.consol_worksheet_data_models import ConsolWorksheetData  # noqa: F401
 from app.models.consol_note_data_models import ConsolNoteData  # noqa: F401
+from app.models.editing_lock_models import EditingLock  # noqa: F401
+from app.models.confirmation_models import Confirmation, ConfirmationType, ConfirmationStatus  # noqa: F401
 
 __all__ = [
     # --- base ---
@@ -229,4 +231,10 @@ __all__ = [
     "ConsolCellComment",
     "ConsolWorksheetData",
     "ConsolNoteData",
+    # --- 通用编辑锁 (V057) ---
+    "EditingLock",
+    # --- 函证管理 (V058) ---
+    "Confirmation",
+    "ConfirmationType",
+    "ConfirmationStatus",
 ]

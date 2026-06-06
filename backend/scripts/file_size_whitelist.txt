@@ -32,7 +32,7 @@ backend/app/services/chain_orchestrator.py 860
 backend/app/services/consistency_gate.py 2359
 backend/app/services/consol_disclosure_service.py 1736
 backend/app/services/consol_report_service.py 1006
-backend/app/services/disclosure_engine.py 1949
+backend/app/services/disclosure_engine.py 1601
 backend/app/services/event_handlers.py 1394
 backend/app/services/excel_html_converter.py 1260
 backend/app/services/formula_engine.py 1529
@@ -44,7 +44,6 @@ backend/app/services/mapping_service.py 997
 backend/app/services/note_formula_generator.py 1331
 backend/app/services/note_offline_import_service.py 880
 backend/app/services/note_source_resolvers.py 854
-backend/app/services/note_validation_engine.py 995
 backend/app/services/note_word_exporter.py 971
 backend/app/services/prefill_engine.py 1511
 backend/app/services/qc_engine.py 893

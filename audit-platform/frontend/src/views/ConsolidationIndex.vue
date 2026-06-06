@@ -456,10 +456,44 @@
       @compare="onConsolCtxCompare"
     >
       <div class="gt-ucell-ctx-item" @click="onConsolCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 汇总穿透</div>
+      <div class="gt-ucell-ctx-item" @click="onConsolCtxCellTrace"><span class="gt-ucell-ctx-icon">🔍</span> 数字溯源</div>
     </CellContextMenu>
 
     <!-- 选中区域状态栏 -->
     <SelectionBar :stats="consolCtx.selectionStats()" />
+
+    <!-- 数字溯源弹窗（lineage endpoint） -->
+    <el-dialog v-model="consolTraceDialogVisible" title="🔍 数字溯源" width="700px" append-to-body destroy-on-close>
+      <div v-loading="consolTraceLoading" style="min-height:120px">
+        <template v-if="consolTraceResult">
+          <div v-if="consolTraceResult.upstream.length || consolTraceResult.downstream.length">
+            <h4 style="margin:0 0 8px">上游来源</h4>
+            <el-table v-if="consolTraceResult.upstream.length" :data="consolTraceResult.upstream" size="small" border stripe max-height="200">
+              <el-table-column prop="wp_code" label="底稿编码" width="120" />
+              <el-table-column prop="label" label="描述" min-width="200" />
+              <el-table-column label="操作" width="80">
+                <template #default="{ row }">
+                  <el-button size="small" link type="primary" @click="onConsolTraceLocate(row)">定位</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else description="无上游来源" :image-size="40" />
+            <h4 style="margin:16px 0 8px">下游引用</h4>
+            <el-table v-if="consolTraceResult.downstream.length" :data="consolTraceResult.downstream" size="small" border stripe max-height="200">
+              <el-table-column prop="wp_code" label="底稿编码" width="120" />
+              <el-table-column prop="label" label="描述" min-width="200" />
+              <el-table-column label="操作" width="80">
+                <template #default="{ row }">
+                  <el-button size="small" link type="primary" @click="onConsolTraceLocate(row)">定位</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else description="无下游引用" :image-size="40" />
+          </div>
+          <el-empty v-else description="该数字暂无溯源信息" :image-size="60" />
+        </template>
+      </div>
+    </el-dialog>
 
   </div>
 </template>
@@ -1267,6 +1301,54 @@ function onConsolCtxCopy() {
 function onConsolCtxDrillDown() {
   consolCtx.closeContextMenu()
   openCellDrillDown()
+}
+
+// ─── 数字溯源：调 lineage 端点展示 upstream/downstream ───
+const consolTraceDialogVisible = ref(false)
+const consolTraceLoading = ref(false)
+const consolTraceResult = ref<{ upstream: any[]; downstream: any[] } | null>(null)
+
+async function onConsolCtxCellTrace() {
+  consolCtx.closeContextMenu()
+  const row = consolCtx.contextMenu.rowData as any
+  const objectType = row?.row_code ? 'report_row' : row?.standard_account_code ? 'tb_row' : null
+  const objectId = row?.row_code || row?.standard_account_code
+  if (!objectType || !objectId) {
+    ElMessage.info('请在数据行上右键')
+    return
+  }
+  consolTraceDialogVisible.value = true
+  consolTraceLoading.value = true
+  consolTraceResult.value = null
+  try {
+    const data: any = await api.get(
+      `/api/projects/${projectId.value}/lineage`,
+      { params: { object_type: objectType, object_id: objectId, direction: 'both' } },
+    )
+    const upstream = data?.upstream || []
+    const downstream = data?.downstream || []
+    consolTraceResult.value = { upstream, downstream }
+    if (!upstream.length && !downstream.length) {
+      consolTraceDialogVisible.value = false
+      ElMessage.info('该数字暂无溯源信息')
+    }
+  } catch (e: any) {
+    consolTraceDialogVisible.value = false
+    handleApiError(e, '数字溯源')
+  } finally {
+    consolTraceLoading.value = false
+  }
+}
+
+function onConsolTraceLocate(node: any) {
+  consolTraceDialogVisible.value = false
+  if (node.wp_code) {
+    eventBus.emit('workpaper:locate-cell', {
+      wpId: node.wp_code,
+      sheetName: node.sheet_name || undefined,
+      cellRef: node.cell_ref || '',
+    })
+  }
 }
 
 function onConsolCtxFormula() {

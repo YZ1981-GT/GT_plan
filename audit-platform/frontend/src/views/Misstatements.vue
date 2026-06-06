@@ -25,6 +25,12 @@
     <ArchivedBanner />
     <ConsolLockedBanner />
 
+    <!-- useStaleRefresh：上游变更事件横幅 -->
+    <div v-if="msStaleRefresh.isStale.value" class="gt-stale-banner">
+      <span class="gt-stale-text">上游数据已变更，建议刷新错报列表</span>
+      <el-button size="small" type="primary" @click="msStaleRefresh.refresh()">刷新数据</el-button>
+    </div>
+
     <!-- AI 内容 pending 顶部 banner（spec global-refinement-v3 Task 6.4） -->
     <AiContentPendingBanner :project-id="projectId" />
 
@@ -175,6 +181,9 @@
       <div class="gt-ucell-ctx-item" @click="onCtxRelatedWp">
         <span class="gt-ucell-ctx-icon">📝</span> 查看关联底稿
       </div>
+      <div class="gt-ucell-ctx-item" @click="onMsCtxCellTrace">
+        <span class="gt-ucell-ctx-icon">🔍</span> 数字溯源
+      </div>
     </CellContextMenu>
 
     <!-- 新建/编辑弹窗 -->
@@ -216,6 +225,39 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 数字溯源弹窗（lineage endpoint） -->
+    <el-dialog v-model="msTraceDialogVisible" title="🔍 数字溯源" width="700px" append-to-body destroy-on-close>
+      <div v-loading="msTraceLoading" style="min-height:120px">
+        <template v-if="msTraceResult">
+          <div v-if="msTraceResult.upstream.length || msTraceResult.downstream.length">
+            <h4 style="margin:0 0 8px">上游来源</h4>
+            <el-table v-if="msTraceResult.upstream.length" :data="msTraceResult.upstream" size="small" border stripe max-height="200">
+              <el-table-column prop="wp_code" label="底稿编码" width="120" />
+              <el-table-column prop="label" label="描述" min-width="200" />
+              <el-table-column label="操作" width="80">
+                <template #default="{ row }">
+                  <el-button size="small" link type="primary" @click="onMsTraceLocate(row)">定位</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else description="无上游来源" :image-size="40" />
+            <h4 style="margin:16px 0 8px">下游引用</h4>
+            <el-table v-if="msTraceResult.downstream.length" :data="msTraceResult.downstream" size="small" border stripe max-height="200">
+              <el-table-column prop="wp_code" label="底稿编码" width="120" />
+              <el-table-column prop="label" label="描述" min-width="200" />
+              <el-table-column label="操作" width="80">
+                <template #default="{ row }">
+                  <el-button size="small" link type="primary" @click="onMsTraceLocate(row)">定位</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else description="无下游引用" :image-size="40" />
+          </div>
+          <el-empty v-else description="该数字暂无溯源信息" :image-size="60" />
+        </template>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -247,6 +289,7 @@ import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
 import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
 import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
@@ -301,10 +344,62 @@ async function onCtxRelatedWp() {
   }
 }
 
+// ─── 数字溯源：调 lineage 端点展示 upstream/downstream ───
+const msTraceDialogVisible = ref(false)
+const msTraceLoading = ref(false)
+const msTraceResult = ref<{ upstream: any[]; downstream: any[] } | null>(null)
+
+async function onMsCtxCellTrace() {
+  msCtx.closeContextMenu()
+  const m = _ctxRow
+  if (!m?.id) {
+    ElMessage.info('请在错报行上右键')
+    return
+  }
+  msTraceDialogVisible.value = true
+  msTraceLoading.value = true
+  msTraceResult.value = null
+  try {
+    const data: any = await api.get(
+      `/api/projects/${projectId.value}/lineage`,
+      { params: { object_type: 'adjustment', object_id: m.id, direction: 'both' } },
+    )
+    const upstream = data?.upstream || []
+    const downstream = data?.downstream || []
+    msTraceResult.value = { upstream, downstream }
+    if (!upstream.length && !downstream.length) {
+      msTraceDialogVisible.value = false
+      ElMessage.info('该数字暂无溯源信息')
+    }
+  } catch (e: any) {
+    msTraceDialogVisible.value = false
+    handleApiError(e, '数字溯源')
+  } finally {
+    msTraceLoading.value = false
+  }
+}
+
+function onMsTraceLocate(node: any) {
+  msTraceDialogVisible.value = false
+  if (node.wp_code) {
+    eventBus.emit('workpaper:locate-cell', {
+      wpId: node.wp_code,
+      sheetName: node.sheet_name || undefined,
+      cellRef: node.cell_ref || '',
+    })
+  }
+}
+
 const {
   projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
   onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
 } = useProjectSelector('misstatements')
+
+// ─── useStaleRefresh：上游变更后提示刷新错报列表 ──────────────────────────────
+const msStaleRefresh = useStaleRefresh(projectId, {
+  mode: 'prompt',
+  onRefresh: () => { fetchItems(); fetchSummary() },
+})
 
 // 跨模块冲突调解（spec global-refinement-v3 Task 7.5）
 const conflictPanelVisible = ref(false)

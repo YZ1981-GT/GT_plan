@@ -173,6 +173,13 @@
       </div>
     </div>
 
+    <!-- useStaleRefresh：上游变更事件横幅 -->
+    <div v-if="staleRefresh.isStale.value && !isStale" class="gt-stale-banner">
+      <StaleIndicator :stale="true" tooltip="上游数据已变更" />
+      <span class="gt-stale-text">上游数据已变更，建议重新加载试算表</span>
+      <el-button size="small" type="primary" @click="staleRefresh.refresh()">刷新数据</el-button>
+    </div>
+
     <!-- 空数据引导：只在 setup-guide 前简要说明（不重复步骤） -->
     <el-alert
       v-if="!loading && rows.length === 0 && !dataState.hasBalance"
@@ -618,6 +625,7 @@
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewAdj"><span class="gt-ucell-ctx-icon">📋</span> 查看调整分录</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewLinkedWp"><span class="gt-ucell-ctx-icon">🔗</span> 查看关联底稿</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewReferences"><span class="gt-ucell-ctx-icon">🔎</span> 查看引用方</div>
+    <div class="gt-ucell-ctx-item" @click="onTbCtxCellTrace"><span class="gt-ucell-ctx-icon">🔍</span> 数字溯源</div>
   </CellContextMenu>
 
   <!-- V3 Req 9.6: 数字信任度面板 -->
@@ -633,6 +641,39 @@
     @update:visible="showCellFormulaDetail = $event"
     @navigate="onCellDetailNavigate"
   />
+
+  <!-- 数字溯源弹窗（lineage endpoint） -->
+  <el-dialog v-model="tbTraceDialogVisible" title="🔍 数字溯源" width="700px" append-to-body destroy-on-close>
+    <div v-loading="tbTraceLoading" style="min-height:120px">
+      <template v-if="tbTraceResult">
+        <div v-if="tbTraceResult.upstream.length || tbTraceResult.downstream.length">
+          <h4 style="margin:0 0 8px">上游来源</h4>
+          <el-table v-if="tbTraceResult.upstream.length" :data="tbTraceResult.upstream" size="small" border stripe max-height="200">
+            <el-table-column prop="wp_code" label="底稿编码" width="120" />
+            <el-table-column prop="label" label="描述" min-width="200" />
+            <el-table-column label="操作" width="80">
+              <template #default="{ row }">
+                <el-button size="small" link type="primary" @click="onTbTraceLocate(row)">定位</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-else description="无上游来源" :image-size="40" />
+          <h4 style="margin:16px 0 8px">下游引用</h4>
+          <el-table v-if="tbTraceResult.downstream.length" :data="tbTraceResult.downstream" size="small" border stripe max-height="200">
+            <el-table-column prop="wp_code" label="底稿编码" width="120" />
+            <el-table-column prop="label" label="描述" min-width="200" />
+            <el-table-column label="操作" width="80">
+              <template #default="{ row }">
+                <el-button size="small" link type="primary" @click="onTbTraceLocate(row)">定位</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-else description="无下游引用" :image-size="40" />
+        </div>
+        <el-empty v-else description="该数字暂无溯源信息" :image-size="60" />
+      </template>
+    </div>
+  </el-dialog>
 
   <DataQualityDialog
     v-model="showDataQualityDialog"
@@ -686,6 +727,7 @@ import { handleApiError } from '@/utils/errorHandler'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { useProjectEvents } from '@/composables/useProjectEvents'
+import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import { usePasteImport } from '@/composables/usePasteImport'
 import { usePermission } from '@/composables/usePermission'
 import * as P from '@/services/apiPaths'
@@ -711,6 +753,13 @@ const yearOptions = computed(() => projectStore.yearOptions)
 const { onDatasetActivated, onDatasetRolledBack } = useProjectEvents(projectId)
 onDatasetActivated(() => fetchData())
 onDatasetRolledBack(() => fetchData())
+
+// ─── useStaleRefresh：补充上游变更事件（dataset 已由 useProjectEvents 覆盖） ────
+const staleRefresh = useStaleRefresh(projectId, {
+  events: ['trial-balance:updated', 'adjustment:saved', 'year:changed', 'project:updated'],
+  mode: 'prompt',
+  onRefresh: () => fetchData(),
+})
 
 // ─── 联动徽章 [enterprise-linkage 3.6] ─────────────────────────────────────────
 const linkageProjectId = projectId
@@ -2040,6 +2089,52 @@ async function onTbCtxTrace() {
     path: `/projects/${projectId.value}/ledger`,
     query: { year: String(year.value), account: row.standard_account_code },
   })
+}
+
+// ─── 数字溯源：调 lineage 端点展示 upstream/downstream ───
+const tbTraceDialogVisible = ref(false)
+const tbTraceLoading = ref(false)
+const tbTraceResult = ref<{ upstream: any[]; downstream: any[] } | null>(null)
+
+async function onTbCtxCellTrace() {
+  tbCtx.closeContextMenu()
+  const row = tbCtx.contextMenu.rowData
+  if (!row?.standard_account_code) {
+    ElMessage.info('请在科目行上右键')
+    return
+  }
+  tbTraceDialogVisible.value = true
+  tbTraceLoading.value = true
+  tbTraceResult.value = null
+  try {
+    const data: any = await api.get(
+      `/api/projects/${projectId.value}/lineage`,
+      { params: { object_type: 'tb_row', object_id: row.standard_account_code, direction: 'both' } },
+    )
+    const upstream = data?.upstream || []
+    const downstream = data?.downstream || []
+    tbTraceResult.value = { upstream, downstream }
+    if (!upstream.length && !downstream.length) {
+      tbTraceDialogVisible.value = false
+      ElMessage.info('该数字暂无溯源信息')
+    }
+  } catch (e: any) {
+    tbTraceDialogVisible.value = false
+    handleApiError(e, '数字溯源')
+  } finally {
+    tbTraceLoading.value = false
+  }
+}
+
+function onTbTraceLocate(node: any) {
+  tbTraceDialogVisible.value = false
+  if (node.wp_code) {
+    eventBus.emit('workpaper:locate-cell', {
+      wpId: node.wp_code,
+      sheetName: node.sheet_name || undefined,
+      cellRef: node.cell_ref || '',
+    })
+  }
 }
 
 function onTbCtxFormula() {

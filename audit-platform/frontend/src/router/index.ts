@@ -551,12 +551,11 @@ const router = createRouter({
           component: () => import('@/views/qc/QcAnnualReports.vue'),
           meta: { permission: 'qc:initiate' },
         },
-        // ── R7-S1-06：函证占位路由 ──
+        // ── R7-S1-06：函证管理路由（已实现 global-refinement-v5-closure） ──
         {
-          path: 'confirmation',
+          path: 'projects/:projectId/confirmation',
           name: 'ConfirmationHub',
           component: () => import('@/views/ConfirmationHub.vue'),
-          meta: { developing: true },
         },
         // ── 账表导入校验规则说明页 (8.9) ──
         {
