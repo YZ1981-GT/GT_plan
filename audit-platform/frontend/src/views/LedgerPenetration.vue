@@ -978,7 +978,7 @@ import { Search, Upload, Loading, Warning, Setting } from '@element-plus/icons-v
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger as P_ledger, projects as P_proj, materiality as P_mat } from '@/services/apiPaths'
-import { fmtAmount } from '@/utils/formatters'
+import { fmtAmount, fmtAmountUnit } from '@/utils/formatters'
 import { IMPORT_JOB_STATUS } from '@/constants/statusEnum'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
 import LedgerDataManager from '@/components/ledger-import/LedgerDataManager.vue'
@@ -2037,12 +2037,30 @@ const ledgerVirtualColumns = computed(() => {
     makeResizableCol('voucher_date', '日期', w.voucher_date, sortKey),
     makeResizableCol('voucher_no', '凭证号', w.voucher_no, sortKey),
     makeResizableCol('summary', '摘要', w.summary, sortKey, { flexGrow: 1 }),
-    makeResizableCol('debit_amount', '借方', w.debit_amount, sortKey, { align: 'right' }),
-    makeResizableCol('credit_amount', '贷方', w.credit_amount, sortKey, { align: 'right' }),
-    makeResizableCol('balance', '余额', w.balance, sortKey, { align: 'right' }),
+    makeResizableCol('debit_amount', '借方', w.debit_amount, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
+    makeResizableCol('credit_amount', '贷方', w.credit_amount, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
+    makeResizableCol('balance', '余额', w.balance, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
   ]
   return cols
 })
+
+/**
+ * 虚拟滚动金额单元格渲染器：千分位 + 跟随 displayPrefs 单位/小数位。
+ * el-table-v2 不走 <template>，必须用 cellRenderer 显式格式化，
+ * 否则直接渲染原始数值（无千分符）。与标准表 GtAmountCell 口径一致。
+ */
+function amountCellRenderer({ cellData }: any) {
+  const txt = fmtAmountUnit(cellData, displayPrefs.amountUnit as any, displayPrefs.decimals, displayPrefs.showZero)
+  const negative = typeof cellData === 'number' ? cellData < 0 : Number(cellData) < 0
+  return h(
+    'span',
+    {
+      class: ['gt-amt', { 'gt-amount--negative': displayPrefs.negativeRed && negative }],
+      style: { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+    },
+    txt,
+  )
+}
 
 /** 构造可调整列宽的列定义（headerCellRenderer 注入 resize handle） */
 function makeResizableCol(
