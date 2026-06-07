@@ -833,22 +833,7 @@ function goToParentConsol() {
 
 async function goToLedgerImport() {
   if (!props.project) return
-  // 检查是否已有账套数据：有数据跳查账页，无数据跳导入页
-  try {
-    const res: any = await api.get(
-      `/api/projects/${props.project.id}/trial-balance/`,
-      { params: { page: 1, page_size: 1 }, _silent: true } as any,
-    )
-    const rows = res?.items ?? res?.data ?? res
-    if (Array.isArray(rows) && rows.length > 0) {
-      // 已有数据：直接跳查账页面
-      router.push({ path: `/projects/${props.project.id}/ledger` })
-      return
-    }
-  } catch {
-    // 查询失败（404/401/无数据）不阻塞，继续走导入流程
-  }
-  // 无数据或查询失败：直接跳导入页面（不再弹引导弹窗，减少点击）
+  // 直接跳导入页面（不做 async 数据检查以保持用户手势链，否则浏览器会阻止文件选择器弹出）
   router.push({ path: `/projects/${props.project.id}/ledger-import` })
 }
 
