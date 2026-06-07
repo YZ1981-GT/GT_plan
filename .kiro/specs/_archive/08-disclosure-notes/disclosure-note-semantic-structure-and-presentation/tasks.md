@@ -185,17 +185,17 @@
 
 ## 验收
 
-- [ ] UAT-1 会计政策：只看有差异条款并批量确认未变条款。
-- [ ] UAT-2 科目注释：按单位、年度、科目、金额口径切换并查看表格。
-- [ ] UAT-3 单元格：点击金额看到公式、来源、manual 状态和跳转。
-- [ ] UAT-4 关联方：表格标题行不被普通编辑误改。
-- [ ] UAT-5 离线模板：用户能根据说明页完成填报并导入。
-- [ ] UAT-6 关联方：查看主体、交易、余额、证据和报表差异。
-- [ ] CI-1 `backend/tests/test_note_semantic_schema.py` 通过。
-- [ ] CI-2 `test_note_binding_registry_service.py` 通过。
-- [ ] CI-3 `test_note_disclosure_balance_service.py` 通过。
-- [ ] CI-4 前端 notes 组件 Vitest 通过。
-- [ ] CI-5 附注既有测试全集不回归。
-- [ ] CI-6 `check_note_binding_registry.py` 通过。
-- [ ] CI-7 新旧离线包导入兼容测试通过。
-- [ ] CI-8 附注既有测试范围至少包括：`backend/tests/services/test_note_*.py`、离线导入导出测试、`DisclosureEditor` / `GtCNoteTable` / notes components Vitest。
+- [x] UAT-1 会计政策：只看有差异条款并批量确认未变条款。
+- [x] UAT-2 科目注释：按单位、年度、科目、金额口径切换并查看表格。
+- [x] UAT-3 单元格：点击金额看到公式、来源、manual 状态和跳转。
+- [x] UAT-4 关联方：表格标题行不被普通编辑误改。
+- [x] UAT-5 离线模板：用户能根据说明页完成填报并导入。
+- [x] UAT-6 关联方：查看主体、交易、余额、证据和报表差异。
+- [x] CI-1 `backend/tests/test_note_semantic_schema.py` 通过。
+- [x] CI-2 `test_note_binding_registry_service.py` 通过。
+- [x] CI-3 `test_note_disclosure_balance_service.py` 通过。
+- [x] CI-4 前端 notes 组件 Vitest 通过。
+- [x] CI-5 附注既有测试全集不回归。
+- [x] CI-6 `check_note_binding_registry.py` 通过。
+- [x] CI-7 新旧离线包导入兼容测试通过。
+- [x] CI-8 附注既有测试范围至少包括：`backend/tests/services/test_note_*.py`、离线导入导出测试、`DisclosureEditor` / `GtCNoteTable` / notes components Vitest。

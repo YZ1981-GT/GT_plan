@@ -112,7 +112,7 @@
 | Spec | 状态 | 说明 |
 |------|------|------|
 | `audit-report-deliverable-center` | ✅ 全量完成（归档） | 交付件管理中心（选择性导出→双路径存储→版本→预览→报告正文生成→审批→归档→OnlyOffice）；P0+P1+P2 全部 25 任务完成；93 后端+42 前端 tests passed；5 bug PBT 发现修复；2026-06-07 |
-| `disclosure-note-semantic-structure-and-presentation` | ⏳ 实施中 | 附注语义结构与呈现原型（131/145 完成，14 项进行中） |
+| `disclosure-note-semantic-structure-and-presentation` | ✅ 全量完成（归档） | 附注语义结构与呈现原型（145/145，含 sidecar/row_type/table_id/政策条款/数据披露/质量清单/离线/绑定注册/公式依赖/模板变体）；301 后端+105 前端 tests；2026-06-07 |
 | `platform-context-permission-foundation` | ✅ 全量完成（归档） | 项目上下文单一真源+年度切换+权限矩阵+项目设置中心+枚举字典；111/111；2026-06-07 |
 | `platform-evidence-knowledge-ai-governance` | ✅ 全量完成（归档） | 证据包/知识库/AI 治理路线图；101/101；2026-06-07 |
 | `platform-linkage-contract-stale` | ✅ 全量完成（归档） | 联动契约与 stale 传播治理；104/104；2026-06-07 |
@@ -127,7 +127,7 @@
 
 ---
 
-## 三、已归档 Spec（`_archive/`，120 个）
+## 三、已归档 Spec（`_archive/`，121 个）
 
 > 已完成且不再演进的 spec，保留审计轨迹。归档不删文件。
 > **物理结构**：`_archive/` 下按功能 + 开发先后分 10 个分类目录，每个目录含 README 说明。
@@ -203,13 +203,14 @@ _archive/
 | `audit-sheet-editable` | GtGridSheet→GtAuditSheet(el-table 可编辑)；F-审定表 componentType 精确匹配；TB 取数+自动计算+导入导出+行操作；18/18 tasks + 79 vitest + 后端 121 passed；2026-06-05 |
 | `report-view-slimdown` | ReportView.vue 2944→1053 行（瘦身 64%）+ 6 composable + 6 子组件 + CSS 外置 + 8 测试文件；15/15 tasks；HARD_CAP 1110 已登记；2026-06-06 |
 
-### 3.8 `08-disclosure-notes/` — 附注模块系列（3 个）
+### 3.8 `08-disclosure-notes/` — 附注模块系列（4 个）
 
 | Spec | 成果 |
 |------|------|
 | `disclosure-note-full-revamp` | 附注重写：173 章节生成 + 自动裁剪 + Word 导出 + 公式 DSL；46/47（剩外部 UAT/文档）；note_formula_generator 1331 行 + 50 note 测试 |
 | `note-dynamic-tables-and-template-inheritance` | 全维度增强 v0.6.2（D1~D15 共 15 维度）；实测 166/182≈90%（剩 16 项外部依赖）；10 核心 service 实跑全绿 |
 | `disclosure-note-linkage-and-slimdown` | 联动修复+瘦身：P0 假性刷新+P1 auto_pull+DisclosureEditor 瘦身；19 任务全完成+62 新测试+9 PBT；2026-06-05 |
+| `disclosure-note-semantic-structure-and-presentation` | 语义结构与呈现原型：sidecar/row_type/table_id/政策条款审阅/数据披露上下文/单元格来源/质量清单/绑定注册表/公式依赖图/披露平衡/模板变体/离线增强；145/145 tasks；301 后端+105 前端 tests；2026-06-07 |
 
 ### 3.9 `09-consolidation-phases/` — 合并模块四阶段（4 个）
 
@@ -272,7 +273,7 @@ _archive/
 | prefill_formula_mapping | 1035 cells |
 | validation_rules | 114 条 |
 | D6 SQL 迁移 | V001-V040（V040 = account_note_mapping + consol_cell_comments 懒建表入 D6） |
-| **Spec 总数** | **active 5 + archived 120（详见 §三）** |
+| **Spec 总数** | **active 4 + archived 121（详见 §三）** |
 
 ---
 
