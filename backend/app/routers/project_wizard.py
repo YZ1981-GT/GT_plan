@@ -465,14 +465,17 @@ async def delete_project(
     current_user: User = Depends(get_current_user),
     _token: None = Depends(require_confirmation_token),
 ):
-    """软删除单个项目（需二次密码确认）"""
+    """软删除单个项目（需二次密码确认，仅 admin/partner/manager 可操作）"""
+    from fastapi import HTTPException
+    # 权限校验：仅 admin/partner/manager 可删除项目
+    if current_user.role.value not in ("admin", "partner", "manager"):
+        raise HTTPException(status_code=403, detail="权限不足，仅管理员/合伙人/项目经理可删除项目")
     from sqlalchemy import select
     result = await db.execute(
         select(Project).where(Project.id == project_id, Project.is_deleted == False)  # noqa: E712
     )
     project = result.scalar_one_or_none()
     if not project:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="项目不存在")
     project.is_deleted = True
     await db.commit()
@@ -486,7 +489,10 @@ async def batch_delete_projects(
     current_user: User = Depends(get_current_user),
     _token: None = Depends(require_confirmation_token),
 ):
-    """批量软删除项目（需二次密码确认）"""
+    """批量软删除项目（需二次密码确认，仅 admin/partner/manager 可操作）"""
+    from fastapi import HTTPException
+    if current_user.role.value not in ("admin", "partner", "manager"):
+        raise HTTPException(status_code=403, detail="权限不足，仅管理员/合伙人/项目经理可删除项目")
     from sqlalchemy import select, update
     count = 0
     for pid in body.project_ids:
