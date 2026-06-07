@@ -837,7 +837,7 @@ async function goToLedgerImport() {
   try {
     const res: any = await api.get(
       `/api/projects/${props.project.id}/trial-balance/`,
-      { params: { page: 1, page_size: 1 } },
+      { params: { page: 1, page_size: 1 }, _silent: true } as any,
     )
     const rows = res?.items ?? res?.data ?? res
     if (Array.isArray(rows) && rows.length > 0) {
@@ -846,26 +846,9 @@ async function goToLedgerImport() {
       return
     }
   } catch {
-    // 查询失败不阻塞，继续走导入流程
+    // 查询失败（404/401/无数据）不阻塞，继续走导入流程
   }
-  // 无数据：跳到专门的导入页面
-  const { showGuide } = await import('@/composables/useWorkflowGuide')
-  const ok = await showGuide(
-    'ledger_import',
-    '📥 账套数据导入',
-    `<div style="line-height:1.8;font-size: var(--gt-font-size-sm)">
-      <p>将导入企业财务数据到当前项目。</p>
-      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">请确认以下准备工作：</p>
-      <ul style="padding-left:18px;margin:4px 0">
-        <li><span style="color: var(--gt-color-wheat)">⚠</span> 已准备好企业导出的 Excel 或 CSV 文件</li>
-        <li><span style="color: var(--gt-color-wheat)">⚠</span> 文件应包含：科目余额表（必需）、序时账（建议）</li>
-        <li><span style="color: var(--gt-color-wheat)">⚠</span> 确认文件中的年度与当前项目年度一致</li>
-      </ul>
-      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">💡 支持多 Sheet 的 Excel 文件，系统会自动识别各表类型</p>
-    </div>`,
-    '前往导入',
-  )
-  if (!ok) return
+  // 无数据或查询失败：直接跳导入页面（不再弹引导弹窗，减少点击）
   router.push({ path: `/projects/${props.project.id}/ledger-import` })
 }
 
