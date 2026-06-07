@@ -110,3 +110,7 @@ def register_report_routers(app: FastAPI) -> None:
     # ═══ §98. report-config-baseline：主模板回填 + 联动 ═══
     from app.routers.report_config_baseline import router as report_config_baseline_router
     app.include_router(report_config_baseline_router, tags=["report-config-baseline"])
+
+    # ═══ §99. P2-2: 签发一致性清单 ═══
+    from app.routers.signoff_checklist import router as signoff_checklist_router
+    app.include_router(signoff_checklist_router, tags=["signoff-checklist"])

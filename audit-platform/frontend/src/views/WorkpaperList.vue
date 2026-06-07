@@ -130,6 +130,9 @@ import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
 import { useAuthStore } from '@/stores/auth'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { useProjectStore } from '@/stores/project'
+import { useDictStore } from '@/stores/dict'
+import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
@@ -145,6 +148,12 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const { onContextChange } = useAuditContext()
+
+// ─── P0-6.2: ProjectContext + PermissionMatrix facade ────────────────────────
+const projectStore = useProjectStore()
+const projectContext = computed(() => projectStore.currentProjectContext)
+const { can: canOp, whyCannot } = usePermissionMatrix()
+// DEPRECATED: 旧 authStore.user?.role 直接判断仍保留，后续逐步替换为 canOp()
 
 const projectId = computed(() => route.params.projectId as string)
 const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear())
@@ -448,14 +457,22 @@ const cycleOptions = [
   { value: 'S', label: 'S类 专项程序' },
 ]
 
-const statusOptions = [
-  { value: 'draft', label: '待编' },
-  { value: 'in_progress', label: '编制中' },
-  { value: 'edit_complete', label: '已完成' },
-  { value: 'pending_review', label: '待复核' },
-  { value: 'reviewed', label: '已复核' },
-  { value: 'approved', label: '已通过' },
-]
+const statusOptions = computed(() => {
+  const dictStore = useDictStore()
+  const dictOptions = dictStore.options('wp_status')
+  if (dictOptions.length > 0) {
+    return dictOptions.map(e => ({ value: e.value, label: e.label }))
+  }
+  // fallback 硬编码（字典未加载时）
+  return [
+    { value: 'draft', label: '待编' },
+    { value: 'in_progress', label: '编制中' },
+    { value: 'edit_complete', label: '已完成' },
+    { value: 'pending_review', label: '待复核' },
+    { value: 'reviewed', label: '已复核' },
+    { value: 'approved', label: '已通过' },
+  ]
+})
 
 // ─── 生命周期 ─────────────────────────────────────────────────────────────────
 watch([filterCycle, filterStatus, filterAssignee], () => fetchWpIndex())

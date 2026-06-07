@@ -24,6 +24,21 @@
 - [ ] **跨 spec 共享原子**：如果依赖 ProjectContext/PermissionMatrix/LinkageContract/EvidenceRef/useEditStateMachine，确认该原子已 merge main 且测试绿
 - [ ] **数据库三层一致**：如涉及 DB 变更，migration + ORM + service 三层是否一致？
 
+## 模块注册表更新（涉及新增 composable/service 时必填）
+
+- [ ] **Composable 注册表**：新增 composable 是否已在 `docs/frontend/composable-ledger.md` 注册？是否说明了与同族的关系？
+- [ ] **Service 注册表**：新增 service 是否已在 `docs/architecture/service-capability-ledger.md` 注册？是否说明了复用/替代关系？
+
+## 表格组件选择声明（新增含表格页面必填）
+
+> 参考 `docs/frontend/ui-consistency-migration-inventory.md` 第 5 节豁免白名单。
+> 不涉及表格的 PR 全部勾选最后一项。
+
+- [ ] 使用 `GtTableExtended`（展示型：排序/筛选/复制/只读）
+- [ ] 使用 `GtFormTable`（编辑型：行内编辑/dirty/校验/撤销）
+- [ ] 使用裸 `el-table` + 豁免注释（说明原因：___________）
+- [ ] 本 PR 不涉及表格
+
 ## 测试
 
 - [ ] 新增/修改的代码有对应测试

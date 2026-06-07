@@ -146,6 +146,20 @@ _DICTS: dict[str, list[dict[str, str]]] = {
         {"value": "medium", "label": "中风险", "color": "warning"},
         {"value": "low",    "label": "低风险", "color": "success"},
     ],
+    # ── P1-3.1: AI 内容确认状态 ──
+    "ai_content_status": [
+        {"value": "pending",   "label": "待确认", "color": "warning"},
+        {"value": "confirmed", "label": "已确认", "color": "success"},
+        {"value": "rejected",  "label": "已拒绝", "color": "danger"},
+        {"value": "expired",   "label": "已过期", "color": "info"},
+    ],
+    # ── P1-3.1: 归档状态 ──
+    "archive_status": [
+        {"value": "not_archived",    "label": "未归档",   "color": "info"},
+        {"value": "archiving",       "label": "归档中",   "color": "warning"},
+        {"value": "archived",        "label": "已归档",   "color": "success"},
+        {"value": "archive_failed",  "label": "归档失败", "color": "danger"},
+    ],
 }
 
 
@@ -256,6 +270,17 @@ _USAGE_COUNT_QUERIES: dict[str, dict[str, str]] = {
         "where": "",
     },
     "risk_level": {
+        "table": "",
+        "column": "",
+        "where": "",
+    },
+    # P1-3.1 扩展
+    "ai_content_status": {
+        "table": "",
+        "column": "",
+        "where": "",
+    },
+    "archive_status": {
         "table": "",
         "column": "",
         "where": "",

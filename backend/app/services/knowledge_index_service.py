@@ -104,12 +104,15 @@ class KnowledgeIndexService:
         content_text: str,
         embedding: np.ndarray,
         chunk_index: int,
+        doc_version: int | None = None,
     ) -> None:
         """Upsert single chunk (source_id + chunk_index unique)."""
         values = {
             "content_text": content_text,
             "embedding_vector": self._vector_to_str(embedding),
             "is_deleted": False,
+            "is_stale": False,
+            "doc_version": doc_version,
             "updated_at": func.now(),
         }
         stmt = (
@@ -123,6 +126,8 @@ class KnowledgeIndexService:
                 embedding_vector=self._vector_to_str(embedding),
                 chunk_index=chunk_index,
                 is_deleted=False,
+                is_stale=False,
+                doc_version=doc_version,
             )
             .on_conflict_do_update(
                 index_elements=["project_id", "source_id", "chunk_index"],
@@ -202,9 +207,22 @@ class KnowledgeIndexService:
         """
         Full build of project knowledge base index.
         Returns total number of indexed documents (chunks).
+
+        P2-2.3: After full rebuild, all stale marks for this project are cleared.
         """
         # Invalidate BM25 cache — full rebuild means old cache is stale
         _invalidate_bm25_cache(project_id)
+
+        # Clear all stale marks on existing non-deleted index entries for this project
+        await self._db.execute(
+            update(KnowledgeIndex)
+            .where(
+                KnowledgeIndex.project_id == project_id,
+                KnowledgeIndex.is_deleted == False,  # noqa: E712
+                KnowledgeIndex.is_stale == True,  # noqa: E712
+            )
+            .values(is_stale=False, updated_at=func.now())
+        )
 
         texts = await self._fetch_project_texts(project_id)
         total_chunks = 0
@@ -232,8 +250,12 @@ class KnowledgeIndexService:
         source_type: str,
         source_id: UUID,
         content: str,
+        doc_version: int | None = None,
     ) -> None:
-        """Incremental update index when data changes (upsert new chunks)."""
+        """Incremental update index when data changes (upsert new chunks).
+
+        After successful re-indexing, clears any stale marks on this source.
+        """
         # Invalidate BM25 cache for this project (all scopes)
         _invalidate_bm25_cache(project_id)
 
@@ -248,7 +270,12 @@ class KnowledgeIndexService:
                 content_text=chunk_text,
                 embedding=vec,
                 chunk_index=idx,
+                doc_version=doc_version,
             )
+
+        # P2-2.3: 重建索引后解除 stale
+        await self.clear_index_stale(source_id)
+
         await self._db.commit()
 
     async def semantic_search(
@@ -350,6 +377,8 @@ class KnowledgeIndexService:
                 "content": chunk.content_text,
                 "score": round(score, 4),
                 "chunk_index": chunk.chunk_index,
+                "doc_version": chunk.doc_version,
+                "is_stale": chunk.is_stale,
             }
             for score, chunk in top_results
         ]
@@ -468,6 +497,8 @@ class KnowledgeIndexService:
                 "content": chunk.content_text,
                 "score": round(normalized_score, 4),
                 "chunk_index": chunk.chunk_index,
+                "doc_version": getattr(chunk, "doc_version", None),
+                "is_stale": getattr(chunk, "is_stale", False),
             })
         return out[:top_k]
 
@@ -508,6 +539,8 @@ class KnowledgeIndexService:
                 "content": chunk.content_text,
                 "score": 0.0,  # ilike 无相似度分数
                 "chunk_index": chunk.chunk_index,
+                "doc_version": chunk.doc_version,
+                "is_stale": chunk.is_stale,
             }
             for chunk in chunks
         ]
@@ -669,6 +702,73 @@ class KnowledgeIndexService:
             .values(is_deleted=True, updated_at=func.now())
         )
         await self._db.commit()
+
+    # ------------------------------------------------------------------
+    # Stale 索引管理（P2-2: 知识引用与索引 stale）
+    # ------------------------------------------------------------------
+
+    async def mark_index_stale(self, source_id: UUID) -> int:
+        """标记指定文档的所有索引条目为 stale。
+
+        当文档更新（新版本创建）时调用，使旧索引不可作为 confirmed AI 来源。
+
+        Returns:
+            标记为 stale 的 chunk 数量
+        """
+        from sqlalchemy import literal_column
+
+        result = await self._db.execute(
+            update(KnowledgeIndex)
+            .where(
+                KnowledgeIndex.source_id == source_id,
+                KnowledgeIndex.is_deleted == False,  # noqa: E712
+                KnowledgeIndex.is_stale == False,  # noqa: E712
+            )
+            .values(is_stale=True, updated_at=func.now())
+        )
+        return result.rowcount  # type: ignore[return-value]
+
+    async def clear_index_stale(self, source_id: UUID) -> int:
+        """清除指定文档索引的 stale 标记。
+
+        当 incremental_update 或 build_index 成功重建索引后调用。
+
+        Returns:
+            清除 stale 标记的 chunk 数量
+        """
+        result = await self._db.execute(
+            update(KnowledgeIndex)
+            .where(
+                KnowledgeIndex.source_id == source_id,
+                KnowledgeIndex.is_deleted == False,  # noqa: E712
+                KnowledgeIndex.is_stale == True,  # noqa: E712
+            )
+            .values(is_stale=False, updated_at=func.now())
+        )
+        return result.rowcount  # type: ignore[return-value]
+
+    async def is_source_stale(self, source_id: UUID) -> bool:
+        """检查指定文档的索引是否处于 stale 状态。
+
+        Returns:
+            True 如果存在 stale 索引且无 fresh 索引
+        """
+        result = await self._db.execute(
+            select(
+                func.count().filter(KnowledgeIndex.is_stale == True),  # noqa: E712
+                func.count().filter(KnowledgeIndex.is_stale == False),  # noqa: E712
+            )
+            .where(
+                KnowledgeIndex.source_id == source_id,
+                KnowledgeIndex.is_deleted == False,  # noqa: E712
+            )
+        )
+        row = result.one_or_none()
+        if not row:
+            return False
+        stale_count, fresh_count = row
+        # stale if there are stale chunks and no fresh ones
+        return stale_count > 0 and fresh_count == 0
 
     async def add_document(
         self,

@@ -1,11 +1,13 @@
 /**
- * usePermissionMatrix — 统一权限矩阵 composable (MVP)
+ * usePermissionMatrix — 统一权限矩阵 composable (P0-5)
  *
  * 与后端 permission_matrix_service.py 保持同一份操作 code 定义。
  * 提供 can() / whyCannot() 作为前端按钮显隐和操作可用性的单一判断入口。
  *
- * MVP 阶段使用静态映射（镜像后端 7 个 operation code + 6 角色），
- * 后续 P0 阶段接入 API 动态加载。
+ * P0-5 增强：
+ * - 支持项目职责叠加（PROJECT_ROLE_OPERATIONS）
+ * - 兼容旧 usePermission 调用模式
+ * - 可选传入 projectId 从 store 获取项目角色
  *
  * @example
  * ```ts
@@ -16,6 +18,7 @@
  */
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useProjectStore } from '@/stores/project'
 
 // ─── 首批 7 个 Operation Codes（与后端保持一致） ─────────────────────────────
 export const OPERATION_CODES = [
@@ -65,6 +68,15 @@ const ROLE_OPERATIONS: Record<string, Set<string>> = {
   ]),
 }
 
+// ─── P0-5: 项目职责 → 额外操作映射（镜像后端 PROJECT_ROLE_OPERATIONS） ──────
+const PROJECT_ROLE_OPERATIONS: Record<string, Set<string>> = {
+  preparer: new Set(['project:view', 'wp:edit', 'note:edit']),
+  reviewer: new Set(['project:view', 'wp:review', 'report:edit']),
+  manager: new Set(['project:view', 'wp:edit', 'wp:review', 'report:edit', 'note:edit']),
+  partner: new Set(OPERATION_CODES),
+  eqcr: new Set(['project:view', 'wp:review']),
+}
+
 /**
  * 标准化角色名（兼容旧别名）
  */
@@ -72,19 +84,33 @@ function normalizeRole(role: string): string {
   const r = role.toLowerCase().trim()
   if (r === 'assistant') return 'auditor'
   if (r === 'quality_control') return 'qc'
+  if (r === 'signing_partner') return 'partner'
   return r
 }
 
 /**
  * 权限矩阵 composable
+ *
+ * @param _projectId - 可选，传入时会从项目 store 获取 roleInProject
  */
-export function usePermissionMatrix() {
+export function usePermissionMatrix(_projectId?: string) {
   const authStore = useAuthStore()
+  const projectStore = useProjectStore()
 
   const currentRole = computed(() => normalizeRole(authStore.user?.role ?? ''))
 
+  const projectRole = computed(() => {
+    const r = projectStore.roleInProject
+    return r ? normalizeRole(r) : null
+  })
+
   const allowedOperations = computed(() => {
-    return ROLE_OPERATIONS[currentRole.value] ?? new Set<string>()
+    const base = ROLE_OPERATIONS[currentRole.value] ?? new Set<string>()
+    if (projectRole.value) {
+      const extra = PROJECT_ROLE_OPERATIONS[projectRole.value] ?? new Set<string>()
+      return new Set([...base, ...extra])
+    }
+    return base
   })
 
   /**
@@ -106,13 +132,23 @@ export function usePermissionMatrix() {
       return '未登录，无法执行操作'
     }
 
-    return `角色 ${currentRole.value} 无 ${operationCode} 权限`
+    const roleDesc = projectRole.value
+      ? `${currentRole.value}(项目职责: ${projectRole.value})`
+      : currentRole.value
+
+    return `角色 ${roleDesc} 无 ${operationCode} 权限`
   }
 
   return {
     can,
     whyCannot,
     currentRole,
+    projectRole,
     allowedOperations,
+    /** P0-5.3: 兼容旧 usePermission 的 can(roleName) 调用模式 */
+    canRole: (roleName: string) => {
+      const normalized = normalizeRole(roleName)
+      return currentRole.value === normalized || currentRole.value === 'admin'
+    },
   }
 }

@@ -245,6 +245,10 @@ def register_collaboration_routers(app: FastAPI) -> None:
     from app.routers.project_permissions import router as project_permissions_router
     app.include_router(project_permissions_router, tags=["project-permissions"])
 
+    # ═══ §101b. P0-4: 权限矩阵 API ═══
+    from app.routers.permission_matrix import router as permission_matrix_router
+    app.include_router(permission_matrix_router, tags=["permission-matrix"])
+
     # ═══ §102. Phase 6 F5: 待回复批注聚合 ═══
     from app.routers.my_reviews import router as my_reviews_router
     app.include_router(my_reviews_router, tags=["my-reviews"])
@@ -300,6 +304,14 @@ def register_collaboration_routers(app: FastAPI) -> None:
     # ═══ §115. Phase 7 F12: 多项目紧急度评分 ═══
     from app.routers.partner_urgency import router as partner_urgency_router
     app.include_router(partner_urgency_router, tags=["partner-urgency"])
+
+    # ═══ §120. P1: 角色作业台 ═══
+    from app.routers.role_workbench import router as role_workbench_router
+    app.include_router(role_workbench_router, tags=["role-workbench"])
+
+    # ═══ §121. P2: 临时授权 ═══
+    from app.routers.temporary_grants import router as temporary_grants_router
+    app.include_router(temporary_grants_router, tags=["temporary-grants"])
 
     # ═══ §116. proposal-remaining-18 C-3: 批量导出 SSE 进度推送 ═══
     from app.routers.batch_export_progress import (

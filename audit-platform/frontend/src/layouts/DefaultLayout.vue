@@ -85,6 +85,8 @@
       />
       <!-- 具体子页面：右侧全宽显示路由内容 -->
       <div v-else class="gt-detail-content">
+        <!-- P1-1.4：项目上下文信息条（项目子页面自动显示） -->
+        <ProjectContextBar v-if="route.params.projectId" />
         <!-- R7-S3-10：联动状态横条 -->
         <LinkageStatusBar
           v-if="staleCount > 0"
@@ -118,6 +120,7 @@ import FourColumnCatalog from '@/components/layout/FourColumnCatalog.vue'
 import FourColumnContent from '@/components/layout/FourColumnContent.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import LinkageStatusBar from '@/components/common/LinkageStatusBar.vue'
+import ProjectContextBar from '@/components/common/ProjectContextBar.vue'
 import ConsolMiddleNav from '@/components/consolidation/ConsolMiddleNav.vue'
 import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
 import NotificationCenter from '@/components/collaboration/NotificationCenter.vue'

@@ -485,6 +485,24 @@ class ReviewRecord(Base):
         nullable=True,
         comment="复核层级: L1/L2/L3/L4/L5/committee/it/tax",
     )
+    # P1-1: 复核意见证据链
+    evidence_refs: Mapped[list | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=list,
+        comment="关联的 EvidenceRef 列表（底稿单元格、附件、报告段落、附注表格）",
+    )
+    close_evidence_refs: Mapped[list | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=list,
+        comment="关闭依据 EvidenceRef 列表（重大复核意见关闭时必填）",
+    )
+    close_reason: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="关闭说明（重大复核意见关闭时必填）",
+    )
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )

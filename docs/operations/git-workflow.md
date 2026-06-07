@@ -151,8 +151,28 @@ mkdir .kiro/specs/my-new-spec
 git checkout -b spec/my-new-spec
 ```
 
-## 八、参考
+## 八、PR Checklist 治理
+
+每个 PR 自动填充 `.github/pull_request_template.md` 中的全局治理自检清单。
+
+提交 PR 时必须逐项确认（不涉及的打 N/A）：
+
+| 检查项 | 说明 |
+|--------|------|
+| 全局组件 | 新增页面是否复用已有全局组件 |
+| 金额 Decimal | 新增金额字段是否使用 Decimal 序列化 |
+| 枚举字典 | 新增状态/类型是否进入 `system_dicts` |
+| 路由权限 | 新增 API 是否在 `router_registry` 注册 + 配权限和错误码 |
+| AI 确认 | 新增 AI 输出是否有人工确认流程 |
+| 穿透契约 | 跨模块引用是否使用 LinkageContract |
+| 跨 spec 共享原子 | 依赖 ProjectContext/PermissionMatrix/LinkageContract/EvidenceRef/useEditStateMachine 时，确认该原子已 merge main 且测试绿 |
+| 数据库三层一致 | migration + ORM + service 三层是否对齐 |
+
+详见模板文件：[`.github/pull_request_template.md`](../../.github/pull_request_template.md)
+
+## 九、参考
 
 - 三件套：`.kiro/specs/repo-git-workflow-unification/`
 - 检测脚本：`backend/scripts/check_git_*.py`
 - Hook：`.git-hooks/pre-push` + `.pre-commit-config.yaml`
+- PR 模板：`.github/pull_request_template.md`

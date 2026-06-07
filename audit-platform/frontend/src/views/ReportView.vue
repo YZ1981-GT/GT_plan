@@ -552,6 +552,7 @@ import { useProjectEvents } from '@/composables/useProjectEvents'
 import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import { recalcTrialBalance } from '@/services/auditPlatformApi'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useReportColumns } from './composables/useReportColumns'
 import { useReportCrossCheck } from './composables/useReportCrossCheck'
 import { useReportData } from './composables/useReportData'
@@ -568,6 +569,11 @@ const { canEdit, onContextChange } = useAuditContext()
 const authStore = useAuthStore()
 const isEqcrRole = computed(() => authStore.user?.role === 'eqcr')
 const projectStore = useProjectStore()
+
+// ─── P0-6.4: ProjectContext + PermissionMatrix facade ────────────────────────
+const projectContext = computed(() => projectStore.currentProjectContext)
+const { can: canOp, whyCannot } = usePermissionMatrix()
+// DEPRECATED: 旧 isEqcrRole 判断仍保留，后续替换为 !canOp('report:edit')
 
 const projectId = computed(() => projectStore.projectId)
 

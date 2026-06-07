@@ -1,51 +1,81 @@
 # 质量账
 
-> 登记平台测试体系、PBT 覆盖、压测基线、线上缺陷和回归范围。确保质量可追溯、可度量。
+> 登记测试覆盖、PBT（Property-Based Testing）、压测、线上缺陷和回归范围。
 
-## 登记规则
+## 使用说明
 
-- 新增模块必须配对测试文件
-- PBT（Property-Based Testing）覆盖核心不变量
-- 线上缺陷必须登记回归测试范围
-- 压测基线每季度更新
+- 新增模块必须说明测试策略
+- PBT 测试记录对应的不变量（Property）
+- 线上缺陷记录根因和修复 PR
+- 回归范围记录关键路径的测试文件
 
-## 测试体系总览
+## 测试规模概览
 
-| 测试类型 | 框架 | 位置 | 用途 |
-|----------|------|------|------|
-| 后端单元测试 | pytest | `backend/tests/` | service/router 逻辑 |
-| 后端 PBT | hypothesis | `backend/tests/` | 核心不变量验证 |
-| API 契约测试 | schemathesis | `backend/tests/test_api_schemathesis.py` | 全端点无 5xx |
-| SQL schema 契约 | pytest + sqlglot | `backend/tests/test_raw_sql_*_contract.py` | 列/表引用正确性 |
-| 前端单元测试 | vitest | `frontend/src/**/*.spec.ts` | composable/组件逻辑 |
-| 前端 E2E | playwright | `frontend/e2e/` | 页面流程验证 |
-| 检查脚本 | pytest | `backend/tests/scripts/` | CI 卡点脚本测试 |
+| 类别 | 数量 | 位置 |
+|------|------|------|
+| 后端测试文件 | 400+ | `backend/tests/` |
+| PBT 测试 | 50+ | `backend/tests/test_*_pbt.py` / `test_*_property*.py` |
+| 前端单测 | 100+ | `audit-platform/frontend/src/**/__tests__/` |
+| E2E 测试 | 10+ | `audit-platform/frontend/e2e/` |
+| 压测 | 1 | `backend/tests/load_test.py` |
+| Schema 契约测试 | 2 | `test_raw_sql_schema_contract.py` / `test_raw_sql_column_contract.py` |
 
-## 高频测试套件
+## 高频 PBT 测试登记
 
-| 套件 | 文件 | 覆盖范围 | 状态 |
-|------|------|----------|------|
-| 附注单元格合并 PBT | `test_note_cell_merge_pbt.py` | 列增减/行对齐/幂等性 | ✅ |
-| 附注单元格合并单测 | `test_note_cell_merge.py` | 14 场景边界 | ✅ |
-| 公式追踪 | `test_note_cell_trace.py` | 公式展开/来源解析 | ✅ |
-| AI 内容门禁 | `test_ai_content_gate_rule.py` | AI 输出必须人工确认 | ✅ |
-| JWT 配置 | `test_config_jwt_validation.py` | 环境×密钥强度组合 | ✅ |
-| API 无 5xx | `test_api_schemathesis.py` | 全 GET 端点 | ✅ |
-| SQL 列契约 | `test_raw_sql_column_contract.py` | 裸 SQL 列引用 | ✅ |
-| SQL 表契约 | `test_raw_sql_schema_contract.py` | 裸 SQL 表引用 | ✅ |
-| 迁移幂等 | `test_migration_idempotent.py` | 迁移脚本重跑不报错 | ✅ |
-| 底稿渲染 | `test_wp_render_config.py` | 模板路径/程序表生成 | ✅ |
+| # | 测试文件 | 守护的不变量 | 模块 |
+|---|---------|------------|------|
+| 1 | `test_formula_engine_phase0_pbt.py` | 公式求值确定性、解析往返一致 | 公式引擎 |
+| 2 | `test_property_decimal_precision.py` | 金额计算 Decimal 精度不丢失 | 全局金额 |
+| 3 | `test_raw_sql_column_contract.py` | ORM/裸 SQL 引用列在 DB 中存在 | Schema 契约 |
+| 4 | `test_eqcr_state_machine_properties.py` | EQCR 状态机转换合法性 | 质控 |
+| 5 | `test_archive_completeness_pbt.py` | 归档文件完整性 | 归档 |
+| 6 | `test_linkage_panorama_pbt.py` | 穿透路径可达、无环 | 联动穿透 |
+| 7 | `test_report_stale_property.py` | 报表 stale 传播完整性 | 报表 |
+| 8 | `test_wp_formula_roundtrip_pbt.py` | 底稿公式序列化/反序列化一致 | 底稿公式 |
+| 9 | `test_password_verification_pbt.py` | 密码校验安全性 | 认证 |
+| 10 | `test_project_permissions_pbt.py` | 权限矩阵一致性 | 权限 |
 
-## 线上缺陷回归
+## 回归范围（关键路径）
 
-| 缺陷 | 根因 | 回归测试 | 修复日期 |
-|------|------|----------|----------|
-| 明细账月小计 off-by-one | 累加在边界判断前 | `test_ledger_display.spec.ts` 5 条 | 2026-06-02 |
-| 底稿目录 No Data | B-Index 只查当前 wp | `test_wp_cycle_directory.py` 5 条 | 2026-06-06 |
-| schema drift 500 | ORM↔DDL 不一致 | `test_raw_sql_*_contract.py` | 2026-05-30 |
+| 关键路径 | 测试文件 | 触发条件 |
+|---------|---------|---------|
+| 报表金额正确性 | `test_report_engine.py`, `test_report_line_mapping.py` | TB/调整变更 |
+| 穿透链路完整 | `test_drilldown.py`, `test_ledger_penetration.py` | 报表行点击 |
+| 导入数据一致 | `test_import_engine.py`, `test_ledger_import_*.py` | 文件导入 |
+| 公式求值 | `test_formula_engine.py`, `test_wp_eval_cell.py` | 底稿公式执行 |
+| 权限隔离 | `test_auth_permission.py`, `test_project_permissions.py` | 多角色访问 |
+| 归档完整 | `test_archive_orchestrator.py`, `test_archive_completeness_*.py` | 项目归档 |
 
-## 变更历史
+## 线上缺陷登记
 
-| 日期 | 变更 | PR |
-|------|------|----|
-| 2025-01-01 | 初始骨架创建 | — |
+| # | 日期 | 缺陷描述 | 根因 | 修复文件 | 回归测试 |
+|---|------|---------|------|---------|---------|
+| 1 | 2026-06-02 | 明细账月小计 off-by-one | 累加在月界判断之前 | `LedgerPenetration.vue` | 5 条回归用例 |
+| 2 | 2026-06-02 | doc-chat GET history 返回 0 | ResponseWrapperMiddleware 信封未解 | `useDocAiChat.ts` | mock 信封测试 |
+| 3 | 2026-06-04 | 审计程序表"暂无审计程序" | file_path 为空无模板回退 | `wp_render_config.py` | 3 条回退回归 |
+| 4 | 2026-06-06 | editing_locks 缺 TimestampMixin 列 | DDL 未同步 ORM mixin | `V057__editing_locks.sql` | schema drift 检测 |
+| （后续补登）| | | | | |
+
+## 压测记录
+
+| 日期 | 场景 | 并发 | 结果 | 工具 |
+|------|------|------|------|------|
+| （待执行） | 目标并发 6000 | — | — | locust / k6 |
+
+## CI 检查脚本
+
+| 脚本 | 路径 | 作用 | CI 状态 |
+|------|------|------|--------|
+| check_hotspot_files | `backend/scripts/check/check_hotspot_files.py` | 超大文件检测 | ✅ 接入 |
+| check_router_registration | `backend/scripts/check/check_router_registration.py` | 路由注册检查 | ✅ 接入 |
+| check_no_float_amount | `backend/scripts/check/check_no_float_amount.py` | 禁止 float 金额 | ✅ 接入 |
+| check_migrations | `backend/scripts/check/check_migrations.py` | 迁移文件一致性 | ✅ 接入 |
+| check_property_coverage | `backend/scripts/check/check_property_coverage.py` | PBT 覆盖率 | ✅ 接入 |
+| gitleaks | `.gitleaks.toml` + pre-commit | 密钥泄漏扫描 | ✅ 接入 |
+| SQLFluff | `.sqlfluff` | SQL 规范（baseline 1718） | ⚠️ warning 级 |
+
+## 变更记录
+
+| 日期 | 变更人 | 内容 |
+|------|--------|------|
+| 2026-06-06 | 初始化 | 创建账本骨架，登记 10 条 PBT + 缺陷 + 回归范围 |

@@ -784,10 +784,14 @@ import { refreshDisclosureFromWorkpapers, getProjectWizardState } from '@/servic
 import { useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 
 // EQCR 只读访问 (Requirements: 17.1-17.4)
 const authStore = useAuthStore()
 const isEqcrRole = computed(() => authStore.user?.role === 'eqcr')
+// ─── P0-6.5: PermissionMatrix facade ────────────────────────────────────────
+const { can: canOp, whyCannot } = usePermissionMatrix()
+// DEPRECATED: 旧 isEqcrRole 判断仍保留，后续替换为 !canOp('note:edit')
 import Placeholder from '@tiptap/extension-placeholder'
 import {
   generateDisclosureNotes, getDisclosureNoteDetail,
@@ -837,6 +841,10 @@ const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
 const { canEdit, onContextChange } = useAuditContext()
+
+// ─── P0-6.5: ProjectContext facade ───────────────────────────────────────────
+const projectContext = computed(() => projectStore.currentProjectContext)
+// DEPRECATED: 旧 projectStore.projectId 直接用仍保留，后续通过 projectContext 统一
 
 const projectId = computed(() => projectStore.projectId)
 

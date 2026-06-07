@@ -62,7 +62,7 @@ inclusion: always
 
 ## 迁移与 PG schema（D6 MigrationRunner 运行时迁移，非 alembic）
 
-- 启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞号字母序靠后者静默丢失，scan_migrations 已加同号检测抛 RuntimeError）；**当前最高 V058**（V057=editing_locks / V058=confirmations；生产库须手工跑 V052~V058）
+- 启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞号字母序靠后者静默丢失，scan_migrations 已加同号检测抛 RuntimeError）；**当前最高 V062**（V059=deliverable_center / V060=temporary_grants / V061=knowledge_index_stale / V062=review_records_evidence_cols；生产库须手工跑 V052~V062）
 - V040 冲突已修(重编号→V044)；V043 pgvector 容错化；V045~V051 见上行；**V052 `wp_formula`**（自定义底稿公式绑定，R052 回滚配对）；**V053/V054 已启用**（2026-06-06 远程 commit 21520278：V053 projecttype enum 加值+R053 回滚 / V054 projects.is_deleted 默认值，原"V053-054 未用"已过时）；**V055 `project_creation_enhancement`**（projects 表加 3 列+unique 约束，R055 回滚配对）
 - **⚠️ `CREATE TABLE IF NOT EXISTS audit_log` 是 no-op**：该名被 Metabase 共库占用（真实 schema 无 action 列）→ 应用审计写独立表 `app_audit_log`；建表前先 `to_regclass`+`information_schema.columns` 查真实 schema
 - **本地 PG schema 漂移已修**（critical=0）：drift detector pkgutil walk import 全 model + 过滤 Metabase 共库污染 + 按 critical_count 判 degraded
@@ -123,11 +123,12 @@ inclusion: always
 ### 真正待办
 - **外部依赖**：LLM embedding 实例 / 6000 并发压测 / 钉集成 / 合并 UAT / GitHub 默认分支改 main / 走 PR 合入 / V052~V058 生产迁移
 - **待建 spec**：底稿统一导入导出(`workpaper-unified-import-export`) / D1-4 坏账嵌套结构（枚举+auto-SUM+辅助预填）/ consol_disclosure_service 瘦身(1736行) / migration_runner 瘦身(1026行) / `disclosure-note-semantic-structure-and-presentation`（附注语义结构，复盘文档已给框架）
-- **已建 spec 待执行（6 平台级）**：`platform-maintenance-governance`(**MVP done**) → `platform-context-permission-foundation`(**MVP done**) + `platform-ui-editing-consistency`(**MVP done**) → `platform-linkage-contract-stale`(**MVP done**) → `platform-evidence-knowledge-ai-governance`(MVP 待执行) → `platform-role-workbench-quality-loop`(MVP 待执行)；共享原子表+缓存策略+数据可用性审计+边界澄清+接口冻结检查机制已补
+- **✅ 6 平台级 spec P0+P1+P2+UAT 全部完成（2026-06-07）**：UAT 通过 Playwright API 验证（signoff/checklist 200+5items / role-workbench auditor/qc/eqcr 3组 sections 正确隔离 / permission-matrix 200 / system/dicts 14个）+ 245 后端 + 140 前端测试全绿；修复启动 import 错误 `app.core.deps→app.deps`+`app.models.user→app.models.core`（signoff_checklist.py/role_workbench.py）；V059 冲突重编号为 V061；V062 补 review_records 3 列；**下一步=commit+push 走 PR 合 main**
 - **已建 spec 已执行**：`audit-report-deliverable-center`（前后端+V059 迁移+5 测试文件，已 merge）
 - **✅ 已完成 spec**：`report-view-slimdown`（2944→965 行，15 任务全部完成+3 项技术债已清，HARD_CAP 1110 已登记）；技术债修复：①纯函数(getRowType/formatReportAmount/equitySpanMethod/computeCrossCheckResults)提升为模块级 export ②useReportCellActions→aggregator+useReportDrilldown/useReportTrace/useReportContextMenu 三子 composable ③ReportDialogs→wrapper+ReportDrilldownDialogs/ReportTraceDialogs/ReportMappingDialog 三子组件
 - **瘦身已完成**：disclosure_engine 1949→1601 / note_validation_engine 995→740 / 明细账翻页余额 P0 已修 / 功能空洞全消除 / 前端 CI 门禁失真已修回绿
 - **铁律补充**：composable 抽取后必同步改其单测；spec 改一个文档必同步检查其余两个一致性；死代码删前必查 spec 历史决策；composable 实例传递不可重新 new（否则状态分裂）；4 个 Workpaper*Editor 故意保留素材勿删
+- **🟢 6 spec P2 复盘缺口已修复（2026-06-07）**：①`temporary_grants` router 已建（POST/GET/DELETE 3端点，§121 注册）②`SignoffChecklist` 已接入 `PartnerSignDecision.vue` 左栏③`useCopyPaste.pasteToSelection` ElMessage 改 optional `onNotify` 回调→24/24 测试全绿（原 5 个失败根因=element-plus 模块加载时序）；遗留 3 个无关测试失败（useEditingLock 1 + ConflictBanner 2）
 
 > 2026-06-02~06-06 已完成修复/spec 详细明细已归档 → `#dev-history` grep 关键词查阅
 

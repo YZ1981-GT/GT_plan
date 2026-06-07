@@ -1,15 +1,18 @@
 """
-Tests for permission_matrix_service.py
+Tests for permission_matrix_service.py (P0-4.5)
 
-验证 7 个 operation code × 6 个系统角色的权限映射正确性。
+验证 7 个 operation code × 6 个系统角色 × 5 个项目职责的权限映射正确性。
 """
 import pytest
 
 from app.services.permission_matrix_service import (
     OPERATION_CODES,
     ROLE_OPERATIONS,
+    PROJECT_ROLE_OPERATIONS,
     get_allowed_operations,
     can,
+    why_cannot,
+    get_permission_matrix,
 )
 
 
@@ -44,6 +47,10 @@ class TestRoleOperations:
 
     def test_admin_has_all_operations(self):
         assert ROLE_OPERATIONS["admin"] == set(OPERATION_CODES)
+
+    def test_project_role_operations_has_5_roles(self):
+        expected = {"preparer", "reviewer", "manager", "partner", "eqcr"}
+        assert set(PROJECT_ROLE_OPERATIONS.keys()) == expected
 
 
 # ─── get_allowed_operations 测试 ─────────────────────────────────────────────
@@ -94,12 +101,25 @@ class TestGetAllowedOperations:
         assert ops == set(OPERATION_CODES)
 
     def test_project_role_union(self):
-        """project_role 提供时，权限为系统角色 + 项目角色的并集"""
-        ops = get_allowed_operations("auditor", project_role="manager")
+        """P0-4.3: project_role 叠加时，权限为系统角色 + 项目角色的并集"""
+        ops = get_allowed_operations("auditor", project_role="reviewer")
         # auditor: project:view, wp:edit, note:edit
-        # manager: project:view, wp:edit, wp:review, report:edit, note:edit
+        # reviewer: project:view, wp:review, report:edit
         assert "wp:review" in ops
         assert "report:edit" in ops
+        assert "wp:edit" in ops  # from system role
+        assert "note:edit" in ops  # from system role
+
+    def test_project_role_preparer_adds_edit(self):
+        """preparer 项目职责给 eqcr 额外的 wp:edit"""
+        ops = get_allowed_operations("eqcr", project_role="preparer")
+        assert "wp:edit" in ops
+        assert "note:edit" in ops
+
+    def test_project_role_partner_gives_all(self):
+        """partner 项目职责给所有权限"""
+        ops = get_allowed_operations("auditor", project_role="partner")
+        assert ops == set(OPERATION_CODES)
 
 
 # ─── can() 测试 ──────────────────────────────────────────────────────────────
@@ -140,9 +160,63 @@ class TestCan:
 
     def test_invalid_operation_code(self):
         assert can("admin", None, "nonexistent:op") is False
-        # admin 实际上只对 OPERATION_CODES 内的才返回 True
-        # 但 admin 检查是 role == admin 且 operation in allowed_set
-        # admin 的 allowed_set 是 set(OPERATION_CODES)，所以非法 op 应返回 False
+
+    def test_project_role_grants_additional(self):
+        """P0-4.5: 项目职责可以叠加额外权限"""
+        assert can("auditor", None, "wp:review") is False
+        assert can("auditor", "reviewer", "wp:review") is True
+
+
+# ─── why_cannot() 测试 ───────────────────────────────────────────────────────
+
+class TestWhyCannot:
+    """验证 why_cannot() 原因说明"""
+
+    def test_returns_none_when_allowed(self):
+        assert why_cannot("admin", None, "wp:edit") is None
+
+    def test_returns_reason_when_denied(self):
+        reason = why_cannot("auditor", None, "report:sign")
+        assert reason is not None
+        assert "auditor" in reason
+        assert "report:sign" in reason
+
+    def test_includes_project_role_in_reason(self):
+        reason = why_cannot("eqcr", "reviewer", "report:sign")
+        assert reason is not None
+        assert "reviewer" in reason
+
+
+# ─── get_permission_matrix() 测试 ────────────────────────────────────────────
+
+class TestGetPermissionMatrix:
+    """验证 P0-4.4 API 响应格式"""
+
+    def test_admin_matrix(self):
+        matrix = get_permission_matrix("admin")
+        assert set(matrix["operations"]) == set(OPERATION_CODES)
+        assert matrix["denied_operations"] == []
+        assert matrix["system_role"] == "admin"
+        assert matrix["all_operation_codes"] == OPERATION_CODES
+
+    def test_auditor_matrix(self):
+        matrix = get_permission_matrix("auditor")
+        assert "wp:edit" in matrix["operations"]
+        assert "report:sign" in matrix["denied_operations"]
+        assert matrix["system_role"] == "auditor"
+        assert matrix["project_role"] is None
+
+    def test_matrix_with_project_role(self):
+        matrix = get_permission_matrix("auditor", "reviewer")
+        assert "wp:review" in matrix["operations"]
+        assert matrix["project_role"] == "reviewer"
+
+    def test_operations_and_denied_are_complementary(self):
+        """operations + denied_operations = all_operation_codes"""
+        for role in ROLE_OPERATIONS:
+            matrix = get_permission_matrix(role)
+            all_ops = set(matrix["operations"]) | set(matrix["denied_operations"])
+            assert all_ops == set(OPERATION_CODES)
 
 
 # ─── 继承关系验证 ─────────────────────────────────────────────────────────────

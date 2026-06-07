@@ -1,8 +1,14 @@
 /**
- * errorHandler.ts — 统一 API 错误处理 [R7-S2-10]
+ * errorHandler.ts — 统一 API 错误处理 [P0-4]
  *
  * 提供 handleApiError(e, context) 替代各视图手搓 ElMessage.error。
  * 按 HTTP 状态码分级处理：网络错误/401/403/404/409/5xx。
+ *
+ * 错误分类（四类）：
+ * - permission: 403/401 权限相关
+ * - network: 无 status（网络不通）
+ * - backend_detail: 400/404/409/422/423 带后端 detail
+ * - degraded: 503 服务降级 / 5xx 服务端错误
  *
  * @example
  * try { await api.post(...) }
@@ -10,6 +16,21 @@
  */
 import { ElMessage, ElNotification } from 'element-plus'
 import { getLastTraceId } from '@/utils/http'
+
+/** 错误分类枚举 */
+export type ApiErrorCategory = 'permission' | 'network' | 'backend_detail' | 'degraded'
+
+/**
+ * 解析错误的分类（不弹提示，仅返回分类）
+ * 适用于需要程序化处理错误的场景
+ */
+export function classifyApiError(e: any): ApiErrorCategory {
+  const status = e?.response?.status || e?.status || 0
+  if (!status) return 'network'
+  if (status === 401 || status === 403) return 'permission'
+  if (status >= 500) return 'degraded'
+  return 'backend_detail'
+}
 
 /**
  * 统一 API 错误处理

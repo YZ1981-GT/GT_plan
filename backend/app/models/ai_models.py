@@ -676,6 +676,10 @@ class KnowledgeIndex(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    is_stale: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
+    doc_version: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now()

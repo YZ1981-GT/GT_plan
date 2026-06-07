@@ -31,6 +31,28 @@ export interface DictEntry {
 
 export type DictData = Record<string, DictEntry[]>
 
+/**
+ * 系统枚举字典 key 类型定义 [P1-3.2]
+ *
+ * 覆盖所有后端 _DICTS 中定义的 dict_key，
+ * 用于 label() / type() / options() 方法的类型安全调用。
+ */
+export type DictKey =
+  | 'wp_status'
+  | 'wp_review_status'
+  | 'adjustment_status'
+  | 'report_status'
+  | 'template_status'
+  | 'project_status'
+  | 'issue_status'
+  | 'pdf_task_status'
+  | 'workhour_status'
+  | 'elimination_entry_type'
+  | 'audit_cycle'
+  | 'risk_level'
+  | 'ai_content_status'
+  | 'archive_status'
+
 const CACHE_KEY = 'gt_dict_cache'
 const CACHE_VERSION_KEY = 'gt_dict_cache_v'
 const CACHE_SAVED_AT_KEY = 'gt_dict_cache_ts'
@@ -106,7 +128,7 @@ export const useDictStore = defineStore('dict', () => {
   }
 
   // ─── 获取标签文本 ───
-  function label(dictKey: string, value: string | undefined | null): string {
+  function label(dictKey: DictKey | string, value: string | undefined | null): string {
     if (!value) return '—'
     const entries = data.value[dictKey]
     if (!entries) return value
@@ -115,7 +137,7 @@ export const useDictStore = defineStore('dict', () => {
   }
 
   // ─── 获取 el-tag type ───
-  function type(dictKey: string, value: string | undefined | null): 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  function type(dictKey: DictKey | string, value: string | undefined | null): 'success' | 'warning' | 'info' | 'danger' | 'primary' {
     if (!value) return 'info'
     const entries = data.value[dictKey]
     if (!entries) return 'info'
@@ -124,7 +146,7 @@ export const useDictStore = defineStore('dict', () => {
   }
 
   // ─── 获取某个字典的全部选项 ───
-  function options(dictKey: string): DictEntry[] {
+  function options(dictKey: DictKey | string): DictEntry[] {
     return data.value[dictKey] ?? []
   }
 

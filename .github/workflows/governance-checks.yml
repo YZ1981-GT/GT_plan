@@ -1,0 +1,166 @@
+name: Governance Checks
+
+# P2-1: 平台治理检查 CI 集成
+# 所有新增检查先 warning 两周，再 fail 新增违规。
+# 历史债务只走 baseline，不阻塞当期 PR。
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+env:
+  # 强制执行日期：此日期之后，新增违规从 warning 切换为 fail
+  # 格式 YYYY-MM-DD，修改此值即可延长 warning 期
+  GOVERNANCE_ENFORCE_DATE: "2026-07-01"
+
+jobs:
+  scale-snapshot-check:
+    # P2-1.1: 规模快照检查
+    # 验证 docs/architecture/scale-snapshot.md 是否与脚本输出一致
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check scale snapshot freshness
+        run: |
+          set -e
+          SNAPSHOT_FILE="docs/architecture/scale-snapshot.md"
+
+          # 如果快照文件不存在，提示但不阻断
+          if [ ! -f "$SNAPSHOT_FILE" ]; then
+            echo "::warning::规模快照文件 $SNAPSHOT_FILE 不存在，请运行 python backend/scripts/analyze/snapshot_scale.py --write"
+            exit 0
+          fi
+
+          # 生成当前快照到临时文件
+          python backend/scripts/analyze/snapshot_scale.py --write 2>/dev/null
+          CURRENT_JSON=$(python backend/scripts/analyze/snapshot_scale.py 2>/dev/null)
+
+          # 提取后端和前端数字进行比对（忽略 timestamp 差异）
+          ROUTERS=$(echo "$CURRENT_JSON" | python -c "import sys,json; d=json.load(sys.stdin); print(d['backend']['routers'])")
+          SERVICES=$(echo "$CURRENT_JSON" | python -c "import sys,json; d=json.load(sys.stdin); print(d['backend']['services'])")
+          MODELS=$(echo "$CURRENT_JSON" | python -c "import sys,json; d=json.load(sys.stdin); print(d['backend']['models'])")
+          VIEWS=$(echo "$CURRENT_JSON" | python -c "import sys,json; d=json.load(sys.stdin); print(d['frontend']['views'])")
+          COMPONENTS=$(echo "$CURRENT_JSON" | python -c "import sys,json; d=json.load(sys.stdin); print(d['frontend']['components'])")
+
+          # 检查文档中的数字是否匹配
+          DOC_ROUTERS=$(grep -oP "Routers \| \K[0-9]+" "$SNAPSHOT_FILE" || echo "0")
+          DOC_SERVICES=$(grep -oP "Services \| \K[0-9]+" "$SNAPSHOT_FILE" || echo "0")
+          DOC_MODELS=$(grep -oP "Models \| \K[0-9]+" "$SNAPSHOT_FILE" || echo "0")
+          DOC_VIEWS=$(grep -oP "Views \| \K[0-9]+" "$SNAPSHOT_FILE" || echo "0")
+          DOC_COMPONENTS=$(grep -oP "Components \| \K[0-9]+" "$SNAPSHOT_FILE" || echo "0")
+
+          MISMATCH=0
+          if [ "$ROUTERS" != "$DOC_ROUTERS" ]; then
+            echo "Routers: 实际=$ROUTERS 文档=$DOC_ROUTERS"
+            MISMATCH=1
+          fi
+          if [ "$SERVICES" != "$DOC_SERVICES" ]; then
+            echo "Services: 实际=$SERVICES 文档=$DOC_SERVICES"
+            MISMATCH=1
+          fi
+          if [ "$MODELS" != "$DOC_MODELS" ]; then
+            echo "Models: 实际=$MODELS 文档=$DOC_MODELS"
+            MISMATCH=1
+          fi
+          if [ "$VIEWS" != "$DOC_VIEWS" ]; then
+            echo "Views: 实际=$VIEWS 文档=$DOC_VIEWS"
+            MISMATCH=1
+          fi
+          if [ "$COMPONENTS" != "$DOC_COMPONENTS" ]; then
+            echo "Components: 实际=$COMPONENTS 文档=$DOC_COMPONENTS"
+            MISMATCH=1
+          fi
+
+          if [ "$MISMATCH" -eq 1 ]; then
+            # 判断是否已过强制执行日期
+            TODAY=$(date +%Y-%m-%d)
+            if [[ "$TODAY" > "$GOVERNANCE_ENFORCE_DATE" || "$TODAY" == "$GOVERNANCE_ENFORCE_DATE" ]]; then
+              echo "::error::规模快照过期！请运行 python backend/scripts/analyze/snapshot_scale.py --write 更新"
+              exit 1
+            else
+              echo "::warning::规模快照过期（warning 期，$GOVERNANCE_ENFORCE_DATE 后将 fail）。请运行 python backend/scripts/analyze/snapshot_scale.py --write 更新"
+              exit 0
+            fi
+          fi
+
+          echo "✅ 规模快照与脚本输出一致"
+
+  sql-column-contract:
+    # P2-1.2: SQL 列契约检查
+    # 检测新增的不存在列引用（基于 allowlist baseline，历史债务不阻塞）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
+      - name: Run SQL column contract check
+        run: |
+          set -e
+
+          # 判断是否已过强制执行日期
+          TODAY=$(date +%Y-%m-%d)
+          if [[ "$TODAY" > "$GOVERNANCE_ENFORCE_DATE" || "$TODAY" == "$GOVERNANCE_ENFORCE_DATE" ]]; then
+            echo "强制执行模式：新增违规将阻塞 PR"
+            python backend/scripts/check/check_sql_column_contract.py --strict
+          else
+            echo "Warning 模式（$GOVERNANCE_ENFORCE_DATE 后切换为 fail）"
+            python backend/scripts/check/check_sql_column_contract.py || true
+            # 即使有违规也只输出 warning
+            RESULT=$(python backend/scripts/check/check_sql_column_contract.py --strict 2>&1 || true)
+            if echo "$RESULT" | grep -q "检测到违规"; then
+              echo "::warning::SQL 列契约检测到新增违规（warning 期，$GOVERNANCE_ENFORCE_DATE 后将 fail）"
+            fi
+            exit 0
+          fi
+
+  hotspot-baseline-check:
+    # P2-1.3: 新增裸组件/重复能力/超大文件检查
+    # 对比 baseline，只有新增超标文件才触发（历史债务不阻塞）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check hotspot baseline
+        run: |
+          set -e
+
+          # 如果 baseline 文件不存在，生成后跳过（首次运行）
+          BASELINE_VUE="backend/scripts/check/baselines/vue_file_lines_baseline.json"
+          BASELINE_PY="backend/scripts/check/baselines/python_service_lines_baseline.json"
+
+          if [ ! -f "$BASELINE_VUE" ] || [ ! -f "$BASELINE_PY" ]; then
+            echo "::warning::Baseline 文件不存在，请先运行 python backend/scripts/check/check_hotspot_files.py --baseline"
+            exit 0
+          fi
+
+          # 运行 baseline 检查
+          TODAY=$(date +%Y-%m-%d)
+          RESULT=$(python backend/scripts/check/check_hotspot_files.py --check-baseline 2>&1 || true)
+          EXIT_CODE=$?
+
+          echo "$RESULT"
+
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            if [[ "$TODAY" > "$GOVERNANCE_ENFORCE_DATE" || "$TODAY" == "$GOVERNANCE_ENFORCE_DATE" ]]; then
+              echo "::error::检测到新增超标文件（超过 baseline）！请拆分或登记到 baseline。"
+              exit 1
+            else
+              echo "::warning::检测到新增超标文件（warning 期，$GOVERNANCE_ENFORCE_DATE 后将 fail）"
+              exit 0
+            fi
+          fi
+
+          echo "✅ 无新增超标文件"

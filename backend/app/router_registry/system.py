@@ -264,3 +264,11 @@ def register_system_routers(app: FastAPI) -> None:
 
     # rotation_router 内部 prefix="/rotation"，需补 /api 前缀 → /api/rotation/*
     app.include_router(rotation_router, prefix="/api")
+
+    # ═══ §131. platform-linkage-contract-stale P0-3: 路由解析 ═══
+    from app.routers.linkage_resolve import router as linkage_resolve_router
+    app.include_router(linkage_resolve_router, tags=["linkage"])
+
+    # ═══ §132. platform-linkage-contract-stale P1-1: 统一穿透查询 ═══
+    from app.routers.linkage_trace import router as linkage_trace_router
+    app.include_router(linkage_trace_router, tags=["linkage"])

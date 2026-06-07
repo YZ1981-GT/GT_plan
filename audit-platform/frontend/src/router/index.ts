@@ -111,6 +111,11 @@ const router = createRouter({
           component: () => import('@/views/PDFExportPanel.vue'),
         },
         {
+          path: 'projects/:projectId/settings',
+          name: 'ProjectSettingsCenter',
+          component: () => import('@/views/ProjectSettingsCenter.vue'),
+        },
+        {
           path: 'projects/:projectId/workpapers',
           name: 'WorkpaperList',
           component: () => import(/* webpackPrefetch: true */ '@/views/WorkpaperList.vue'),
@@ -355,6 +360,12 @@ const router = createRouter({
           path: 'projects/:projectId/dashboard',
           name: 'PartnerProjectDashboard',
           component: () => import('@/views/PartnerProjectDashboard.vue'),
+        },
+        {
+          path: 'projects/:projectId/workbench',
+          name: 'RoleWorkbench',
+          component: () => import('@/views/RoleWorkbench.vue'),
+          meta: { permission: 'project:view' },
         },
         {
           path: 'projects/:projectId/linkage-panorama',

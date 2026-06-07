@@ -81,6 +81,7 @@ class WpReviewService:
         cell_reference: str | None = None,
         *,
         is_reject: bool = False,
+        evidence_refs: list[dict] | None = None,
     ) -> dict:
         """添加复核意见。
 
@@ -92,6 +93,8 @@ class WpReviewService:
             当复核人退回底稿并附意见时（R1 需求 2），传 ``True`` 将同步创建
             关联 ``IssueTicket(source='review_comment')``。工单创建失败不
             阻断本方法（复核意见仍成功写入），由事件补偿兜底。
+        evidence_refs : list[dict] | None
+            P1-1: 关联的 EvidenceRef 列表（底稿单元格、附件、报告段落、附注表格）
         """
         record = ReviewRecord(
             working_paper_id=working_paper_id,
@@ -99,6 +102,7 @@ class WpReviewService:
             comment_text=comment_text,
             commenter_id=commenter_id,
             status=ReviewCommentStatus.open,
+            evidence_refs=evidence_refs or [],
         )
         db.add(record)
         await db.flush()
@@ -212,10 +216,14 @@ class WpReviewService:
         db: AsyncSession,
         review_id: UUID,
         resolved_by: UUID,
+        *,
+        close_reason: str | None = None,
+        close_evidence_refs: list[dict] | None = None,
     ) -> dict:
         """标记为已解决 (open/replied → resolved)。
 
         Validates: Requirements 5.4
+        P1-1.3: 重大复核意见（priority=must_fix）关闭必须填写关闭依据。
         """
         result = await db.execute(
             sa.select(ReviewRecord).where(ReviewRecord.id == review_id)
@@ -227,10 +235,19 @@ class WpReviewService:
         if record.status == ReviewCommentStatus.resolved:
             raise ValueError("复核意见已解决，不可重复操作")
 
+        # P1-1.3: 重大复核意见关闭必须提供关闭依据
+        if record.priority == "must_fix":
+            if not close_reason and not close_evidence_refs:
+                raise ValueError("重大复核意见（must_fix）关闭必须填写关闭依据或关联整改证据")
+
         record.status = ReviewCommentStatus.resolved
         record.resolved_by = resolved_by
         record.resolved_at = datetime.now(timezone.utc)
         record.updated_at = datetime.now(timezone.utc)
+        if close_reason:
+            record.close_reason = close_reason
+        if close_evidence_refs:
+            record.close_evidence_refs = close_evidence_refs
         await db.flush()
         return self._to_dict(record)
 
@@ -243,13 +260,132 @@ class WpReviewService:
             "comment_text": record.comment_text,
             "commenter_id": str(record.commenter_id),
             "status": record.status.value if record.status else None,
+            "priority": record.priority if record.priority else "suggest",
             "reply_text": record.reply_text,
             "replier_id": str(record.replier_id) if record.replier_id else None,
             "replied_at": record.replied_at.isoformat() if record.replied_at else None,
             "resolved_by": str(record.resolved_by) if record.resolved_by else None,
             "resolved_at": record.resolved_at.isoformat() if record.resolved_at else None,
+            "evidence_refs": record.evidence_refs or [],
+            "close_evidence_refs": record.close_evidence_refs or [],
+            "close_reason": record.close_reason,
             "created_at": record.created_at.isoformat() if record.created_at else None,
             "updated_at": record.updated_at.isoformat() if record.updated_at else None,
+        }
+
+    async def get_review_stats(
+        self,
+        db: AsyncSession,
+        project_id: UUID,
+        *,
+        sla_hours: int = _REVIEW_COMMENT_SLA_HOURS,
+    ) -> dict:
+        """P1-1.4: 统计 Aging、重复问题、逾期未回复。
+
+        Returns
+        -------
+        dict with keys:
+            - total_open: 未解决复核意见数
+            - overdue_count: 超过 SLA 未回复的意见数
+            - aging_buckets: {0-24h, 24-72h, >72h} 分桶统计
+            - duplicate_count: 同一 working_paper + cell_reference 重复出现数
+        """
+        now = datetime.now(timezone.utc)
+        sla_cutoff = now - timedelta(hours=sla_hours)
+
+        # 查找项目下所有 open 状态复核意见（需 JOIN working_paper 取 project_id）
+        from app.models.workpaper_models import WorkingPaper
+
+        base_cond = [
+            ReviewRecord.is_deleted == sa.false(),
+            ReviewRecord.status == ReviewCommentStatus.open,
+            WorkingPaper.project_id == project_id,
+        ]
+
+        # Total open
+        total_stmt = (
+            sa.select(sa.func.count())
+            .select_from(ReviewRecord)
+            .join(WorkingPaper, WorkingPaper.id == ReviewRecord.working_paper_id)
+            .where(*base_cond)
+        )
+        total_result = await db.execute(total_stmt)
+        total_open = total_result.scalar() or 0
+
+        # Overdue (open + created > SLA hours ago)
+        overdue_stmt = (
+            sa.select(sa.func.count())
+            .select_from(ReviewRecord)
+            .join(WorkingPaper, WorkingPaper.id == ReviewRecord.working_paper_id)
+            .where(*base_cond, ReviewRecord.created_at < sla_cutoff)
+        )
+        overdue_result = await db.execute(overdue_stmt)
+        overdue_count = overdue_result.scalar() or 0
+
+        # Aging buckets
+        bucket_24h = now - timedelta(hours=24)
+        bucket_72h = now - timedelta(hours=72)
+
+        aging_0_24_stmt = (
+            sa.select(sa.func.count())
+            .select_from(ReviewRecord)
+            .join(WorkingPaper, WorkingPaper.id == ReviewRecord.working_paper_id)
+            .where(*base_cond, ReviewRecord.created_at >= bucket_24h)
+        )
+        aging_24_72_stmt = (
+            sa.select(sa.func.count())
+            .select_from(ReviewRecord)
+            .join(WorkingPaper, WorkingPaper.id == ReviewRecord.working_paper_id)
+            .where(
+                *base_cond,
+                ReviewRecord.created_at < bucket_24h,
+                ReviewRecord.created_at >= bucket_72h,
+            )
+        )
+        aging_gt72_stmt = (
+            sa.select(sa.func.count())
+            .select_from(ReviewRecord)
+            .join(WorkingPaper, WorkingPaper.id == ReviewRecord.working_paper_id)
+            .where(*base_cond, ReviewRecord.created_at < bucket_72h)
+        )
+
+        r1 = await db.execute(aging_0_24_stmt)
+        r2 = await db.execute(aging_24_72_stmt)
+        r3 = await db.execute(aging_gt72_stmt)
+
+        aging_buckets = {
+            "0_24h": r1.scalar() or 0,
+            "24_72h": r2.scalar() or 0,
+            "gt_72h": r3.scalar() or 0,
+        }
+
+        # Duplicate issues: same working_paper_id + cell_reference appears > 1 time
+        dup_stmt = (
+            sa.select(sa.func.count())
+            .select_from(
+                sa.select(
+                    ReviewRecord.working_paper_id,
+                    ReviewRecord.cell_reference,
+                )
+                .join(WorkingPaper, WorkingPaper.id == ReviewRecord.working_paper_id)
+                .where(
+                    ReviewRecord.is_deleted == sa.false(),
+                    WorkingPaper.project_id == project_id,
+                    ReviewRecord.cell_reference.isnot(None),
+                )
+                .group_by(ReviewRecord.working_paper_id, ReviewRecord.cell_reference)
+                .having(sa.func.count() > 1)
+                .subquery()
+            )
+        )
+        dup_result = await db.execute(dup_stmt)
+        duplicate_count = dup_result.scalar() or 0
+
+        return {
+            "total_open": total_open,
+            "overdue_count": overdue_count,
+            "aging_buckets": aging_buckets,
+            "duplicate_count": duplicate_count,
         }
 
 

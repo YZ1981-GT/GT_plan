@@ -1,6 +1,10 @@
-"""EvidenceRef schema 序列化与类型覆盖测试."""
+"""EvidenceRef schema 序列化、类型覆盖与路由解析测试 (P0-2)."""
 import pytest
-from backend.app.schemas.evidence_ref import EvidenceRef, EvidenceType
+from backend.app.schemas.evidence_ref import (
+    EvidenceRef,
+    EvidenceType,
+    resolve_evidence_route,
+)
 
 
 class TestEvidenceType:
@@ -61,3 +65,50 @@ class TestEvidenceRefSerialization:
         json_str = ref.model_dump_json()
         restored = EvidenceRef.model_validate_json(json_str)
         assert restored == ref
+
+
+class TestEvidenceRefRouteResolve:
+    """P0-2.4: EvidenceRef 可跳转测试。"""
+
+    @pytest.mark.parametrize("etype,expected_pattern", [
+        (EvidenceType.attachment, "/projects/p1/attachments/e1"),
+        (EvidenceType.workpaper_cell, "/projects/p1/workpapers/e1"),
+        (EvidenceType.report_paragraph, "/projects/p1/report/e1"),
+        (EvidenceType.note_table, "/projects/p1/notes/e1"),
+        (EvidenceType.ai_output, "/projects/p1/ai-content/e1"),
+        (EvidenceType.deliverable, "/projects/p1/deliverables/e1"),
+    ])
+    def test_auto_route_generation(self, etype: EvidenceType, expected_pattern: str):
+        """各 evidence_type 自动生成正确路由。"""
+        ref = EvidenceRef(
+            evidence_type=etype,
+            evidence_id="e1",
+            project_id="p1",
+        )
+        assert ref.route == expected_pattern
+
+    def test_explicit_route_preserved(self):
+        """显式指定 route 时不被自动生成覆盖。"""
+        ref = EvidenceRef(
+            evidence_type=EvidenceType.attachment,
+            evidence_id="e1",
+            project_id="p1",
+            route="/custom/path",
+        )
+        assert ref.route == "/custom/path"
+
+    def test_resolve_route_method(self):
+        ref = EvidenceRef(
+            evidence_type=EvidenceType.note_table,
+            evidence_id="nt-5",
+            project_id="proj-99",
+        )
+        assert ref.resolve_route() == "/projects/proj-99/notes/nt-5"
+
+    def test_resolve_evidence_route_utility(self):
+        ref = EvidenceRef(
+            evidence_type=EvidenceType.ai_output,
+            evidence_id="ai-7",
+            project_id="proj-42",
+        )
+        assert resolve_evidence_route(ref) == "/projects/proj-42/ai-content/ai-7"

@@ -484,8 +484,16 @@ def register_event_handlers() -> None:
                 count = await mark_stale(session, payload.project_id)
                 await session.commit()
                 logger.debug(f"Marked {count} workpapers as stale for project {payload.project_id}")
-        except Exception:
-            logger.warning("Failed to mark workpapers stale")
+        except Exception as e:
+            # P0-4: stale 非静默治理 — 记录 degraded
+            from app.services.stale_degraded_logger import log_stale_degraded
+            log_stale_degraded(
+                source=f"data_imported:{payload.event_type.value}",
+                target=f"workpapers:project={payload.project_id}",
+                error=f"底稿 stale 全量标记失败: {type(e).__name__}: {e}",
+                context={"project_id": str(payload.project_id)},
+            )
+            logger.warning("Failed to mark workpapers stale: %s", e)
 
     async def _mark_workpapers_stale_by_account(payload: EventPayload) -> None:
         """调整分录变更 → 标记关联科目底稿预填数据为过期"""
@@ -495,8 +503,16 @@ def register_event_handlers() -> None:
                 count = await mark_stale(session, payload.project_id, payload.account_codes)
                 await session.commit()
                 logger.debug(f"Marked {count} workpapers as stale (account change)")
-        except Exception:
-            logger.warning("Failed to mark workpapers stale on adjustment change")
+        except Exception as e:
+            # P0-4: stale 非静默治理 — 记录 degraded
+            from app.services.stale_degraded_logger import log_stale_degraded
+            log_stale_degraded(
+                source=f"adjustment:{payload.event_type.value}",
+                target=f"workpapers:accounts={payload.account_codes}",
+                error=f"底稿 stale 按科目标记失败: {type(e).__name__}: {e}",
+                context={"project_id": str(payload.project_id), "account_codes": payload.account_codes},
+            )
+            logger.warning("Failed to mark workpapers stale on adjustment change: %s", e)
 
     event_bus.subscribe(EventType.DATA_IMPORTED, _mark_workpapers_stale_all)
     event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, _mark_workpapers_stale_all)
@@ -680,8 +696,15 @@ def register_event_handlers() -> None:
                         )
                         .values(is_stale=True)
                     )
-                except Exception:
-                    pass  # AuditReport 可能没有 is_stale 字段
+                except Exception as e:
+                    # P0-4: stale 非静默治理 — 不再静默 pass，记录 degraded
+                    from app.services.stale_degraded_logger import log_stale_degraded
+                    log_stale_degraded(
+                        source=f"adjustment:{payload.event_type.value}",
+                        target=f"AuditReport:project={project_id},year={year}",
+                        error=f"AuditReport is_stale 更新失败: {type(e).__name__}: {e}",
+                        context={"project_id": str(project_id), "year": year},
+                    )
 
                 # 标记附注 stale
                 await session.execute(
@@ -699,8 +722,16 @@ def register_event_handlers() -> None:
                     project_id,
                     year,
                 )
-            except Exception:
+            except Exception as e:
                 await session.rollback()
+                # P0-4: stale 非静默治理 — 记录 degraded
+                from app.services.stale_degraded_logger import log_stale_degraded
+                log_stale_degraded(
+                    source=f"adjustment:{payload.event_type.value}",
+                    target=f"DisclosureNote:project={project_id},year={year}",
+                    error=f"stale 级联标记失败: {type(e).__name__}: {e}",
+                    context={"project_id": str(project_id), "year": year},
+                )
                 logger.warning(
                     "[stale-cascade] Failed to mark reports/notes stale",
                     exc_info=True,

@@ -180,6 +180,89 @@ class WorkHourService:
         return warnings
 
     # ------------------------------------------------------------------
+    # P1-4.5: 工时预算消耗率聚合
+    # ------------------------------------------------------------------
+    async def budget_consumption_rate(self, project_id: UUID) -> dict:
+        """计算项目工时预算消耗率。
+
+        Returns:
+            {
+                "consumed_hours": float,
+                "budget_hours": float | None,
+                "rate": float | None,  # 0~100, None 表示预算数据缺失
+                "staff_summary": [...],
+            }
+        """
+        summary = await self.project_summary(project_id)
+        consumed = sum(s["total_hours"] for s in summary) if summary else 0.0
+
+        # 尝试获取 budget_hours（可能字段不存在）
+        budget_hours = None
+        try:
+            stmt = sa.select(Project.budget_hours).where(Project.id == project_id)
+            result = await self.db.execute(stmt)
+            budget_hours = result.scalar_one_or_none()
+        except Exception:
+            pass
+
+        rate = None
+        if budget_hours and float(budget_hours) > 0:
+            rate = round(consumed / float(budget_hours) * 100, 1)
+
+        return {
+            "consumed_hours": consumed,
+            "budget_hours": float(budget_hours) if budget_hours else None,
+            "rate": rate,
+            "staff_summary": summary,
+        }
+
+    # ------------------------------------------------------------------
+    # P1-4.2: 人员负荷聚合（未来 7 天任务预计工时 / 可用工时）
+    # ------------------------------------------------------------------
+    async def personnel_load(self, project_id: UUID) -> list[dict]:
+        """聚合项目人员负荷。
+
+        简化版：统计每人已记录总工时 + 近 7 天工时密度。
+        """
+        from datetime import timedelta
+
+        summary = await self.project_summary(project_id)
+        now = datetime.now(timezone.utc).date()
+        week_ago = now - timedelta(days=7)
+
+        # 获取近 7 天分人工时
+        q = (
+            sa.select(
+                StaffMember.name,
+                sa.func.sum(WorkHour.hours).label("week_hours"),
+            )
+            .join(StaffMember, WorkHour.staff_id == StaffMember.id)
+            .where(
+                WorkHour.project_id == project_id,
+                WorkHour.work_date >= week_ago,
+                WorkHour.is_deleted == False,  # noqa
+            )
+            .group_by(StaffMember.id, StaffMember.name)
+        )
+        rows = (await self.db.execute(q)).all()
+        week_map = {r.name: float(r.week_hours) for r in rows}
+
+        result = []
+        for s in summary:
+            name = s["staff_name"]
+            week_hours = week_map.get(name, 0.0)
+            # 标准周工时 40h，负荷 = 实际/标准 * 100
+            load_pct = round(week_hours / 40 * 100, 1) if week_hours else 0.0
+            result.append({
+                "staff_name": name,
+                "total_hours": s["total_hours"],
+                "week_hours": week_hours,
+                "load_percent": load_pct,
+                "overloaded": load_pct > 100,
+            })
+        return result
+
+    # ------------------------------------------------------------------
     # LLM 智能预填（优先 vLLM 推理，降级为均分策略）
     # ------------------------------------------------------------------
     async def ai_suggest(self, staff_id: UUID, target_date: date) -> list[dict]:

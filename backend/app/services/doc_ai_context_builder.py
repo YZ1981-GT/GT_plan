@@ -63,17 +63,24 @@ class SearchHit:
     score: float              # 相似度分数
     chunk_index: int | None   # 段落/chunk 索引（可定位）
     source_name: str = ""     # 来源名称（用于前端展示）
+    doc_version: int | None = None  # 文档版本号（P2-2.1）
+    is_stale: bool = False    # 索引是否过期（P2-2.2）
 
 
 @dataclass
 class Citation:
-    """引用来源（可追溯 — D3 属性）"""
+    """引用来源（可追溯 — D3 属性）
+
+    P2-2.1: 增加 doc_version 和 is_stale 字段，AI 引用必须返回版本信息。
+    """
 
     source_type: str          # 来源类型
     source_id: str            # 来源文件 UUID
     source_name: str          # 来源名称（文件名/底稿编号）
     paragraph_index: int | None  # 段落索引（精确定位）
     excerpt: str = ""         # 引用片段摘要
+    doc_version: int | None = None  # 文档版本号（P2-2.1）
+    is_stale: bool = False    # 索引是否过期（P2-2.2）
 
 
 @dataclass
@@ -405,6 +412,8 @@ class ContextBuilder:
                 content=r.get("content", ""),
                 score=r.get("score", 0.0),
                 chunk_index=r.get("chunk_index"),
+                doc_version=r.get("doc_version"),
+                is_stale=r.get("is_stale", False),
             ))
 
         # extra_scopes：额外检索指定文件夹下的知识文档
@@ -668,7 +677,10 @@ class ContextBuilder:
         return f"项目：{name}，客户：{client_name}{period_str}"
 
     def _build_citations(self, knowledge_hits: list[SearchHit]) -> list[Citation]:
-        """从 knowledge_hits 构建引用列表（D3：每条必带可定位 source）"""
+        """从 knowledge_hits 构建引用列表（D3：每条必带可定位 source）
+
+        P2-2.1: 每条 citation 包含 doc_version 和 is_stale 信息。
+        """
         citations: list[Citation] = []
         seen: set[tuple[str, str, int | None]] = set()
 
@@ -684,6 +696,8 @@ class ContextBuilder:
                 source_name=hit.source_name or f"{hit.source_type}:{hit.source_id[:8]}",
                 paragraph_index=hit.chunk_index,
                 excerpt=hit.content[:100] if hit.content else "",
+                doc_version=hit.doc_version,
+                is_stale=hit.is_stale,
             ))
 
         return citations

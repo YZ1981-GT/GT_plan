@@ -73,6 +73,38 @@ vi.mock('@/composables/useAuditContext', () => ({
   }),
 }))
 
+// ─── Mock useProjectStore (P0-6.1) ──────────────────────────────────────────
+vi.mock('@/stores/project', () => ({
+  useProjectStore: () => ({
+    projectId: 'proj-1',
+    year: 2025,
+    clientName: 'Test Corp',
+    projectStatus: 'active',
+    auditScope: 'standalone',
+    roleInProject: null,
+    currentProjectContext: {
+      projectId: 'proj-1',
+      projectName: 'Test Corp',
+      year: 2025,
+      applicableStandard: 'soe',
+      auditScope: 'standalone',
+      projectStatus: 'active',
+      roleInProject: null,
+    },
+  }),
+}))
+
+// ─── Mock usePermissionMatrix (P0-6.1) ──────────────────────────────────────
+vi.mock('@/composables/usePermissionMatrix', () => ({
+  usePermissionMatrix: () => ({
+    can: () => true,
+    whyCannot: () => null,
+    currentRole: computed(() => 'admin'),
+    allowedOperations: computed(() => new Set()),
+    canRole: () => true,
+  }),
+}))
+
 // ─── Mock useCycleType ───────────────────────────────────────────────────────
 vi.mock('@/composables/useCycleType', () => ({
   useCycleType: () => ({

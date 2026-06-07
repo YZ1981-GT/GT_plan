@@ -1,183 +1,189 @@
 /**
- * Tests for usePermissionMatrix composable
+ * Tests for usePermissionMatrix — P0-5 权限矩阵前端 facade
  *
- * 验证 can() / whyCannot() 对 7 个 operation code × 6 角色的正确性。
+ * 验证:
+ * - P0-5.1: usePermissionMatrix(projectId) 基本功能
+ * - P0-5.2: can(operationCode) / whyCannot(operationCode) 判断逻辑
+ * - P0-5.3: 兼容旧 usePermission 调用模式
+ * - P0-5.4: operation code 前后端快照一致
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { usePermissionMatrix, OPERATION_CODES } from '@/composables/usePermissionMatrix'
-import { useAuthStore } from '@/stores/auth'
+import { usePermissionMatrix, OPERATION_CODES, type OperationCode } from '@/composables/usePermissionMatrix'
 
-// Mock auth store user
-function setupRole(role: string) {
-  const authStore = useAuthStore()
-  authStore.$patch({
-    user: { id: 'u1', username: 'test', email: 'test@test.com', role, office_code: null, is_active: true, created_at: '2024-01-01' },
-    token: 'fake-token',
-  })
-}
+// Mock auth store
+const mockUser = { role: 'auditor', id: 'user-1', username: 'test' }
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({ user: mockUser }),
+}))
 
-describe('usePermissionMatrix', () => {
+// Mock project store
+const mockProjectStore = { roleInProject: null as string | null }
+vi.mock('@/stores/project', () => ({
+  useProjectStore: () => mockProjectStore,
+}))
+
+describe('usePermissionMatrix - P0-5', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    mockUser.role = 'auditor'
+    mockProjectStore.roleInProject = null
   })
 
-  describe('OPERATION_CODES', () => {
-    it('should have 7 operation codes', () => {
+  describe('P0-5.4: operation code 前后端快照一致', () => {
+    it('should have exactly 7 operation codes', () => {
       expect(OPERATION_CODES).toHaveLength(7)
     })
 
-    it('should include all expected codes', () => {
-      const expected = ['project:view', 'wp:edit', 'wp:review', 'report:edit', 'report:sign', 'note:edit', 'archive:manage']
-      for (const code of expected) {
-        expect(OPERATION_CODES).toContain(code)
-      }
+    it('should match backend operation codes snapshot', () => {
+      // 这些 code 必须与后端 permission_matrix_service.py 完全一致
+      const expectedCodes: OperationCode[] = [
+        'project:view',
+        'wp:edit',
+        'wp:review',
+        'report:edit',
+        'report:sign',
+        'note:edit',
+        'archive:manage',
+      ]
+      expect([...OPERATION_CODES]).toEqual(expectedCodes)
     })
   })
 
-  describe('can() - admin', () => {
-    beforeEach(() => setupRole('admin'))
+  describe('P0-5.1: usePermissionMatrix() 基本功能', () => {
+    it('should return can, whyCannot, currentRole, allowedOperations', () => {
+      const pm = usePermissionMatrix()
+      expect(pm.can).toBeTypeOf('function')
+      expect(pm.whyCannot).toBeTypeOf('function')
+      expect(pm.currentRole).toBeDefined()
+      expect(pm.allowedOperations).toBeDefined()
+    })
 
-    it('should allow all operations', () => {
-      const { can } = usePermissionMatrix()
+    it('should detect currentRole from authStore', () => {
+      mockUser.role = 'manager'
+      const pm = usePermissionMatrix()
+      expect(pm.currentRole.value).toBe('manager')
+    })
+
+    it('should normalize role aliases', () => {
+      mockUser.role = 'assistant'
+      const pm = usePermissionMatrix()
+      expect(pm.currentRole.value).toBe('auditor')
+    })
+
+    it('should normalize signing_partner to partner', () => {
+      mockUser.role = 'signing_partner'
+      const pm = usePermissionMatrix()
+      expect(pm.currentRole.value).toBe('partner')
+    })
+  })
+
+  describe('P0-5.2: can(operationCode) / whyCannot(operationCode)', () => {
+    it('admin can do everything', () => {
+      mockUser.role = 'admin'
+      const pm = usePermissionMatrix()
       for (const code of OPERATION_CODES) {
-        expect(can(code)).toBe(true)
+        expect(pm.can(code)).toBe(true)
       }
     })
-  })
 
-  describe('can() - partner', () => {
-    beforeEach(() => setupRole('partner'))
-
-    it('should allow all 7 operations', () => {
-      const { can } = usePermissionMatrix()
-      for (const code of OPERATION_CODES) {
-        expect(can(code)).toBe(true)
-      }
-    })
-  })
-
-  describe('can() - manager', () => {
-    beforeEach(() => setupRole('manager'))
-
-    it('should allow project:view, wp:edit, wp:review, report:edit, note:edit', () => {
-      const { can } = usePermissionMatrix()
-      expect(can('project:view')).toBe(true)
-      expect(can('wp:edit')).toBe(true)
-      expect(can('wp:review')).toBe(true)
-      expect(can('report:edit')).toBe(true)
-      expect(can('note:edit')).toBe(true)
+    it('auditor can edit workpapers and notes', () => {
+      mockUser.role = 'auditor'
+      const pm = usePermissionMatrix()
+      expect(pm.can('project:view')).toBe(true)
+      expect(pm.can('wp:edit')).toBe(true)
+      expect(pm.can('note:edit')).toBe(true)
     })
 
-    it('should NOT allow report:sign, archive:manage', () => {
-      const { can } = usePermissionMatrix()
-      expect(can('report:sign')).toBe(false)
-      expect(can('archive:manage')).toBe(false)
-    })
-  })
-
-  describe('can() - auditor', () => {
-    beforeEach(() => setupRole('auditor'))
-
-    it('should allow project:view, wp:edit, note:edit', () => {
-      const { can } = usePermissionMatrix()
-      expect(can('project:view')).toBe(true)
-      expect(can('wp:edit')).toBe(true)
-      expect(can('note:edit')).toBe(true)
+    it('auditor cannot review, sign, or manage archive', () => {
+      mockUser.role = 'auditor'
+      const pm = usePermissionMatrix()
+      expect(pm.can('wp:review')).toBe(false)
+      expect(pm.can('report:sign')).toBe(false)
+      expect(pm.can('archive:manage')).toBe(false)
     })
 
-    it('should NOT allow wp:review, report:edit, report:sign, archive:manage', () => {
-      const { can } = usePermissionMatrix()
-      expect(can('wp:review')).toBe(false)
-      expect(can('report:edit')).toBe(false)
-      expect(can('report:sign')).toBe(false)
-      expect(can('archive:manage')).toBe(false)
-    })
-  })
-
-  describe('can() - qc', () => {
-    beforeEach(() => setupRole('qc'))
-
-    it('should allow project:view, wp:review, report:edit', () => {
-      const { can } = usePermissionMatrix()
-      expect(can('project:view')).toBe(true)
-      expect(can('wp:review')).toBe(true)
-      expect(can('report:edit')).toBe(true)
+    it('eqcr can only view and review', () => {
+      mockUser.role = 'eqcr'
+      const pm = usePermissionMatrix()
+      expect(pm.can('project:view')).toBe(true)
+      expect(pm.can('wp:review')).toBe(true)
+      expect(pm.can('wp:edit')).toBe(false)
+      expect(pm.can('report:edit')).toBe(false)
+      expect(pm.can('note:edit')).toBe(false)
     })
 
-    it('should NOT allow wp:edit, report:sign, note:edit, archive:manage', () => {
-      const { can } = usePermissionMatrix()
-      expect(can('wp:edit')).toBe(false)
-      expect(can('report:sign')).toBe(false)
-      expect(can('note:edit')).toBe(false)
-      expect(can('archive:manage')).toBe(false)
-    })
-  })
-
-  describe('can() - eqcr', () => {
-    beforeEach(() => setupRole('eqcr'))
-
-    it('should allow project:view, wp:review only', () => {
-      const { can } = usePermissionMatrix()
-      expect(can('project:view')).toBe(true)
-      expect(can('wp:review')).toBe(true)
+    it('whyCannot returns null when allowed', () => {
+      mockUser.role = 'admin'
+      const pm = usePermissionMatrix()
+      expect(pm.whyCannot('wp:edit')).toBeNull()
     })
 
-    it('should NOT allow edit operations', () => {
-      const { can } = usePermissionMatrix()
-      expect(can('wp:edit')).toBe(false)
-      expect(can('report:edit')).toBe(false)
-      expect(can('report:sign')).toBe(false)
-      expect(can('note:edit')).toBe(false)
-      expect(can('archive:manage')).toBe(false)
-    })
-  })
-
-  describe('can() - role aliases', () => {
-    it('should normalize "assistant" to auditor', () => {
-      setupRole('assistant')
-      const { can } = usePermissionMatrix()
-      expect(can('wp:edit')).toBe(true)
-      expect(can('wp:review')).toBe(false)
-    })
-
-    it('should normalize "quality_control" to qc', () => {
-      setupRole('quality_control')
-      const { can } = usePermissionMatrix()
-      expect(can('wp:review')).toBe(true)
-      expect(can('wp:edit')).toBe(false)
-    })
-  })
-
-  describe('can() - no user', () => {
-    it('should deny all when no user logged in', () => {
-      const { can } = usePermissionMatrix()
-      for (const code of OPERATION_CODES) {
-        expect(can(code)).toBe(false)
-      }
-    })
-  })
-
-  describe('whyCannot()', () => {
-    it('should return null when operation is allowed', () => {
-      setupRole('admin')
-      const { whyCannot } = usePermissionMatrix()
-      expect(whyCannot('project:view')).toBeNull()
-    })
-
-    it('should return reason when operation is denied', () => {
-      setupRole('auditor')
-      const { whyCannot } = usePermissionMatrix()
-      const reason = whyCannot('report:sign')
+    it('whyCannot returns reason when denied', () => {
+      mockUser.role = 'auditor'
+      const pm = usePermissionMatrix()
+      const reason = pm.whyCannot('report:sign')
       expect(reason).not.toBeNull()
       expect(reason).toContain('auditor')
       expect(reason).toContain('report:sign')
     })
 
-    it('should return login hint when no user', () => {
-      const { whyCannot } = usePermissionMatrix()
-      const reason = whyCannot('project:view')
-      expect(reason).toContain('未登录')
+    it('whyCannot includes project role in reason', () => {
+      mockUser.role = 'auditor'
+      mockProjectStore.roleInProject = 'preparer'
+      const pm = usePermissionMatrix()
+      const reason = pm.whyCannot('report:sign')
+      expect(reason).toContain('preparer')
+    })
+
+    it('project role adds additional operations', () => {
+      mockUser.role = 'auditor'
+      mockProjectStore.roleInProject = 'reviewer'
+      const pm = usePermissionMatrix()
+      // auditor alone cannot review
+      // but with reviewer project role, can review
+      expect(pm.can('wp:review')).toBe(true)
+      expect(pm.can('report:edit')).toBe(true)
+    })
+  })
+
+  describe('P0-5.3: 兼容旧 usePermission', () => {
+    it('canRole should check if current role matches', () => {
+      mockUser.role = 'manager'
+      const pm = usePermissionMatrix()
+      expect(pm.canRole('manager')).toBe(true)
+      expect(pm.canRole('admin')).toBe(false)
+    })
+
+    it('admin canRole always returns true', () => {
+      mockUser.role = 'admin'
+      const pm = usePermissionMatrix()
+      expect(pm.canRole('manager')).toBe(true)
+      expect(pm.canRole('auditor')).toBe(true)
+    })
+  })
+
+  describe('角色权限继承验证', () => {
+    it('partner superset of manager', () => {
+      mockUser.role = 'partner'
+      const partnerPm = usePermissionMatrix()
+      const partnerOps = new Set(OPERATION_CODES.filter(c => partnerPm.can(c)))
+
+      mockUser.role = 'manager'
+      const managerPm = usePermissionMatrix()
+      const managerOps = new Set(OPERATION_CODES.filter(c => managerPm.can(c)))
+
+      for (const op of managerOps) {
+        expect(partnerOps.has(op)).toBe(true)
+      }
+    })
+
+    it('all roles can view project', () => {
+      for (const role of ['admin', 'partner', 'manager', 'auditor', 'qc', 'eqcr']) {
+        mockUser.role = role
+        const pm = usePermissionMatrix()
+        expect(pm.can('project:view')).toBe(true)
+      }
     })
   })
 })

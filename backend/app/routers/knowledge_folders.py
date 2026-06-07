@@ -33,11 +33,16 @@ async def _trigger_index_update(
     project_ids: list | None,
     doc_id: UUID,
     content_text: str | None,
+    doc_version: int | None = None,
+    mark_previous_stale: bool = False,
+    previous_doc_id: UUID | None = None,
 ) -> None:
     """CRUD 后触发 incremental_update 建向量索引。
 
     非阻塞：失败仅 log 不影响 CRUD 主流程。
     幂等（R3）：incremental_update 内部 upsert，多次调用收敛一致。
+
+    P2-2.2: mark_previous_stale=True 时，先将旧版本索引标记 stale。
     """
     if not content_text:
         return
@@ -47,6 +52,17 @@ async def _trigger_index_update(
     from app.services.knowledge_index_service import KnowledgeIndexService
 
     index_svc = KnowledgeIndexService(db)
+
+    # P2-2.2: 文档更新后标记旧索引 stale
+    if mark_previous_stale and previous_doc_id:
+        try:
+            await index_svc.mark_index_stale(previous_doc_id)
+        except Exception as exc:
+            _logger.warning(
+                "[KB Hook] mark_index_stale failed for prev_doc=%s: %s",
+                previous_doc_id, exc,
+            )
+
     for pid in project_ids:
         try:
             await index_svc.incremental_update(
@@ -54,6 +70,7 @@ async def _trigger_index_update(
                 source_type="knowledge_doc",
                 source_id=doc_id,
                 content=content_text,
+                doc_version=doc_version,
             )
         except Exception as exc:
             _logger.warning(
@@ -339,7 +356,14 @@ async def upload_documents(
                 content_text=content_text,
                 created_by=current_user.id,
             )
-            uploaded.append({"id": str(doc.id), "name": doc.name, "size": len(content), "text_extracted": content_text is not None})
+            uploaded.append({
+                "id": str(doc.id),
+                "name": doc.name,
+                "size": len(content),
+                "text_extracted": content_text is not None,
+                "version": doc.version,
+                "previous_version_id": str(doc.previous_version_id) if doc.previous_version_id else None,
+            })
         except Exception as e:
             import logging
             logging.getLogger(__name__).warning(f"Upload file failed: {file.filename}: {e}")
@@ -375,7 +399,16 @@ async def upload_documents(
                     doc_content, doc_project_ids = row
                     # 优先使用文档级 project_ids，否则继承文件夹级
                     effective_pids = doc_project_ids or folder_project_ids
-                    await _trigger_index_update(db, effective_pids, doc_uuid, doc_content)
+                    # P2-2.2: 文档新版本创建时标记旧版本索引 stale
+                    prev_id_str = file_info.get("previous_version_id")
+                    prev_id = UUID(prev_id_str) if prev_id_str else None
+                    is_version_update = (file_info.get("version") or 1) > 1
+                    await _trigger_index_update(
+                        db, effective_pids, doc_uuid, doc_content,
+                        doc_version=file_info.get("version"),
+                        mark_previous_stale=is_version_update,
+                        previous_doc_id=prev_id,
+                    )
         except Exception as exc:
             _logger.warning("[KB Hook] upload index hook failed for doc=%s: %s", file_info.get("id"), exc)
 

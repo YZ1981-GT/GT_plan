@@ -21,7 +21,7 @@ vi.mock('@/utils/http', () => ({
 }))
 
 import { ElMessage, ElNotification } from 'element-plus'
-import { handleApiError } from '../errorHandler'
+import { handleApiError, classifyApiError } from '../errorHandler'
 
 describe('handleApiError', () => {
   beforeEach(() => {
@@ -178,5 +178,42 @@ describe('handleApiError', () => {
     }
     handleApiError(err, '提交')
     expect(ElMessage.warning).toHaveBeenCalledWith('提交：缺少必填字段')
+  })
+})
+
+
+describe('classifyApiError — 错误分类', () => {
+  it('无 status → network', () => {
+    expect(classifyApiError({})).toBe('network')
+    expect(classifyApiError(null)).toBe('network')
+    expect(classifyApiError(undefined)).toBe('network')
+  })
+
+  it('401 → permission', () => {
+    expect(classifyApiError({ response: { status: 401 } })).toBe('permission')
+  })
+
+  it('403 → permission', () => {
+    expect(classifyApiError({ response: { status: 403 } })).toBe('permission')
+  })
+
+  it('404 → backend_detail', () => {
+    expect(classifyApiError({ response: { status: 404 } })).toBe('backend_detail')
+  })
+
+  it('422 → backend_detail', () => {
+    expect(classifyApiError({ response: { status: 422 } })).toBe('backend_detail')
+  })
+
+  it('500 → degraded', () => {
+    expect(classifyApiError({ response: { status: 500 } })).toBe('degraded')
+  })
+
+  it('503 → degraded', () => {
+    expect(classifyApiError({ response: { status: 503 } })).toBe('degraded')
+  })
+
+  it('400 → backend_detail', () => {
+    expect(classifyApiError({ response: { status: 400 } })).toBe('backend_detail')
   })
 })

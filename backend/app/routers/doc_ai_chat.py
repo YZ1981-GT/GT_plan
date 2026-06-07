@@ -167,6 +167,8 @@ async def _stream_chat(
                     "source_id": c.source_id,
                     "source_name": c.source_name,
                     "paragraph_index": c.paragraph_index,
+                    "doc_version": c.doc_version,
+                    "is_stale": c.is_stale,
                 }
                 for c in context.citations
             ]

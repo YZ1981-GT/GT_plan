@@ -1,0 +1,157 @@
+{
+  "version": "1.0.0",
+  "description": "审计质量问题类型配置 — 用于复核/QC问题归类、培训和规则优化",
+  "adr": "docs/adr/ADR-032-quality-issue-type-config-vs-table.md",
+  "types": [
+    {
+      "code": "procedure_omission",
+      "name_zh": "程序遗漏",
+      "name_en": "Procedure Omission",
+      "category": "execution",
+      "severity_default": "high",
+      "description": "应执行的审计程序未执行或执行不完整",
+      "examples": [
+        "函证程序未执行",
+        "截止测试遗漏",
+        "重大科目未执行分析性复核"
+      ],
+      "training_hint": "强化审计程序清单管理，关注 ISA 要求的必要程序"
+    },
+    {
+      "code": "insufficient_evidence",
+      "name_zh": "证据不足",
+      "name_en": "Insufficient Evidence",
+      "category": "documentation",
+      "severity_default": "high",
+      "description": "审计证据不足以支持审计结论",
+      "examples": [
+        "附件缺失或不完整",
+        "替代程序未获取充分证据",
+        "电子证据未保存原始截图"
+      ],
+      "training_hint": "完善证据获取标准，建立附件完整性检查清单"
+    },
+    {
+      "code": "amount_inconsistency",
+      "name_zh": "金额不一致",
+      "name_en": "Amount Inconsistency",
+      "category": "accuracy",
+      "severity_default": "critical",
+      "description": "底稿金额与报表/试算平衡表/附件不一致",
+      "examples": [
+        "底稿审定数与报表不符",
+        "调整分录金额与底稿计算不一致",
+        "附件金额与底稿记录差异未说明"
+      ],
+      "training_hint": "建立金额一致性勾稽规则，利用自动化工具检测"
+    },
+    {
+      "code": "inadequate_response",
+      "name_zh": "回复不充分",
+      "name_en": "Inadequate Response",
+      "category": "communication",
+      "severity_default": "medium",
+      "description": "对复核意见的回复不充分或未正面回应问题",
+      "examples": [
+        "未针对复核问题逐条回复",
+        "回复内容未提供补充证据",
+        "仅修改底稿但未说明修改原因"
+      ],
+      "training_hint": "培训复核意见回复规范，强调逐条对应和证据补充"
+    },
+    {
+      "code": "documentation_insufficient",
+      "name_zh": "底稿说明不足",
+      "name_en": "Insufficient Documentation",
+      "category": "documentation",
+      "severity_default": "medium",
+      "description": "底稿记录不完整，缺乏必要的说明或分析",
+      "examples": [
+        "审计结论缺乏分析过程",
+        "异常事项未记录职业判断依据",
+        "样本选取标准未记录"
+      ],
+      "training_hint": "建立底稿编制标准模板，确保关键判断有书面记录"
+    },
+    {
+      "code": "ai_content_unconfirmed",
+      "name_zh": "AI 内容未确认",
+      "name_en": "AI Content Unconfirmed",
+      "category": "governance",
+      "severity_default": "medium",
+      "description": "AI 生成的内容未经人工确认即用于最终底稿",
+      "examples": [
+        "AI 预填内容未复核",
+        "AI 建议的审计程序未经专业判断确认",
+        "AI 分析结论直接引用未验证"
+      ],
+      "training_hint": "强化 AI 辅助内容确认流程，建立人工验证检查点"
+    },
+    {
+      "code": "scope_limitation",
+      "name_zh": "范围受限未恰当处理",
+      "name_en": "Scope Limitation Not Addressed",
+      "category": "judgment",
+      "severity_default": "high",
+      "description": "审计范围受限时未采取替代程序或未恰当评估影响",
+      "examples": [
+        "无法函证时未执行替代程序",
+        "存货监盘受限但未评估对审计意见的影响",
+        "客户限制获取信息但底稿未记录"
+      ],
+      "training_hint": "建立范围受限应对决策树，确保评估对报告意见的影响"
+    },
+    {
+      "code": "timeliness_issue",
+      "name_zh": "时效性问题",
+      "name_en": "Timeliness Issue",
+      "category": "process",
+      "severity_default": "low",
+      "description": "审计程序执行时间不当或证据获取时点不恰当",
+      "examples": [
+        "函证日期距资产负债表日过远",
+        "期后事项复核截止日过早",
+        "分析性程序使用非最新数据"
+      ],
+      "training_hint": "明确各程序执行时间窗口，建立时效性检查清单"
+    },
+    {
+      "code": "professional_skepticism",
+      "name_zh": "职业怀疑不足",
+      "name_en": "Insufficient Professional Skepticism",
+      "category": "judgment",
+      "severity_default": "high",
+      "description": "对管理层声明或异常事项缺乏必要的质疑和追踪",
+      "examples": [
+        "管理层解释未经验证即接受",
+        "异常波动未追查原因",
+        "关联方交易未深入核实商业实质"
+      ],
+      "training_hint": "强化职业怀疑意识培训，建立异常事项追踪机制"
+    },
+    {
+      "code": "disclosure_deficiency",
+      "name_zh": "披露缺陷",
+      "name_en": "Disclosure Deficiency",
+      "category": "reporting",
+      "severity_default": "medium",
+      "description": "对财务报表披露的充分性和恰当性审计不足",
+      "examples": [
+        "新准则要求的披露项未核查",
+        "关联方交易披露完整性未验证",
+        "或有事项披露恰当性未评估"
+      ],
+      "training_hint": "对照准则核查清单逐项确认披露要求"
+    }
+  ],
+  "categories": {
+    "execution": "执行类",
+    "documentation": "文档类",
+    "accuracy": "准确性",
+    "communication": "沟通类",
+    "governance": "治理类",
+    "judgment": "判断类",
+    "process": "流程类",
+    "reporting": "报告类"
+  }
+}

@@ -685,9 +685,9 @@
 </template>
 
 <script setup lang="ts">
-// [platform-context-permission-foundation MVP-5]
-// TODO: Replace manual projectId/year resolution with useProjectContext()
-// TODO: Replace role checks with usePermissionMatrix().can()
+// [platform-context-permission-foundation P0-6.3]
+// ProjectContext + 年度切换协议已接入
+// TODO(P1): 逐步替换 selectedYear 本地 ref 为 projectStore.year 直取
 
 import { ref, computed, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -736,6 +736,7 @@ import { useProjectEvents } from '@/composables/useProjectEvents'
 import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import { usePasteImport } from '@/composables/usePasteImport'
 import { usePermission } from '@/composables/usePermission'
+import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import * as P from '@/services/apiPaths'
 import LinkageBadge from '@/components/LinkageBadge.vue'
 import { useLinkageIndicator } from '@/composables/useLinkageIndicator'
@@ -748,6 +749,11 @@ const router = useRouter()
 const projectStore = useProjectStore()
 const { canEdit, onContextChange } = useAuditContext()
 const { add: decAdd, sub: decSub } = useDecimalCalc()
+
+// ─── P0-6.3: ProjectContext + PermissionMatrix facade ────────────────────────
+const projectContext = computed(() => projectStore.currentProjectContext)
+const { can: canOp, whyCannot } = usePermissionMatrix()
+// DEPRECATED: 旧 usePermission().can() 仍保留，后续逐步替换为 canOp()
 
 const projectId = computed(() => projectStore.projectId || (route.params.projectId as string) || '')
 const selectedProjectId = ref(projectStore.projectId)

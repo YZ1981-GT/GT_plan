@@ -283,9 +283,9 @@
 </template>
 
 <script setup lang="ts">
-// [platform-context-permission-foundation MVP-5]
-// TODO: Replace manual projectId/year resolution with useProjectContext()
-// TODO: Replace role checks with usePermissionMatrix().can()
+// [platform-context-permission-foundation P0-6.1]
+// ProjectContext + PermissionMatrix facade 已接入
+// TODO(P1): 逐步替换下方 route.params 直接解析为 projectContext 读取
 
 /**
  * WorkpaperEditor — 底稿编辑器 Shell 容器
@@ -296,6 +296,8 @@
  * @see .kiro/specs/workpaper-editor-shrink-phase2/design.md §4.2
  */
 import { ref, computed, provide, onMounted, onUnmounted, nextTick } from 'vue'
+import { useProjectStore } from '@/stores/project'
+import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { confirmLeave } from '@/utils/confirm'
 import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
@@ -339,6 +341,13 @@ const router = useRouter()
 const { canEdit } = useAuditContext()
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
+
+// ─── P0-6.1: ProjectContext + PermissionMatrix facade ────────────────────────
+const projectStore = useProjectStore()
+const projectContext = computed(() => projectStore.currentProjectContext)
+const { can: canOp, whyCannot } = usePermissionMatrix()
+// DEPRECATED: 旧 canEdit 仍保留，后续逐步替换为 canOp('wp:edit')
+
 
 // ─── useStaleRefresh：试算表/调整变更后提示底稿数据可能过时 ──────────────────
 const wpStaleRefresh = useStaleRefresh(projectId, {
