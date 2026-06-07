@@ -609,6 +609,7 @@ async def bulk_copy_staged(
     idx_updated = col_index.get("updated_at")
     idx_company = col_index.get("company_code")
     idx_currency = col_index.get("currency_code")
+    idx_tenant = col_index.get("tenant_id")
 
     num_cols = len(valid_col_names)
 
@@ -645,6 +646,8 @@ async def bulk_copy_staged(
             row_list[idx_company] = default_company_code
         if idx_currency is not None and not row_list[idx_currency]:
             row_list[idx_currency] = "CNY"
+        if idx_tenant is not None and not row_list[idx_tenant]:
+            row_list[idx_tenant] = "default"
 
         # JSONB 列：B3-F 优化——跳过 _sanitize_raw_extra 递归，直接 json.dumps(default=)
         # _json_default 在编码时现场处理 datetime/Decimal 等非标类型，免去递归构造中间 dict。
