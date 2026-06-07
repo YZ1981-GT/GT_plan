@@ -169,6 +169,31 @@
               </div>
             </div>
           </div>
+
+          <!-- 导入进度实时面板 -->
+          <div v-if="importStatus" class="gt-detail-section gt-import-progress-panel">
+            <h4 class="gt-import-progress-panel__title">
+              <el-icon :size="16" color="var(--gt-color-primary)"><Loading /></el-icon>
+              导入进度
+            </h4>
+            <div class="gt-import-progress-panel__card">
+              <div class="gt-import-progress-panel__header">
+                <el-tag :type="importPhaseTagType" size="small">{{ importPhaseLabel }}</el-tag>
+                <span class="gt-import-progress-panel__pct">{{ importStatus.progress }}%</span>
+              </div>
+              <el-progress
+                :percentage="importStatus.progress"
+                :stroke-width="10"
+                :color="importPhaseColor"
+                style="margin: 8px 0"
+              />
+              <div class="gt-import-progress-panel__message">{{ importStatus.message }}</div>
+              <div v-if="importStatus.eta" class="gt-import-progress-panel__eta">
+                预计剩余：{{ importStatus.eta }}
+              </div>
+            </div>
+          </div>
+
         </el-tab-pane>
 
         <!-- 项目看板（指标 + 团队 + 底稿分配） -->
@@ -534,10 +559,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck, Finished,
+  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck, Finished, Loading,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { confirmForceReset, confirmDangerous } from '@/utils/confirm'
@@ -1080,6 +1105,85 @@ watch(showAttUpload, async (open) => {
     }))
   }
 })
+
+// ===== 导入进度实时轮询 =====
+interface ImportStatusInfo {
+  progress: number
+  phase: string
+  message: string
+  eta: string
+}
+const importStatus = ref<ImportStatusInfo | null>(null)
+let importPollTimer: ReturnType<typeof setInterval> | null = null
+
+const IMPORT_PHASE_LABEL: Record<string, string> = {
+  bootstrap: '启动', parsing: '解析', validating: '校验',
+  writing: '写入', activating: '激活', completed: '完成',
+  failed: '失败', canceled: '已取消', pending: '排队', queued: '排队',
+}
+const IMPORT_PHASE_COLORS: Record<string, string> = {
+  bootstrap: '#909399', queued: '#909399', pending: '#909399',
+  parsing: '#409eff', validating: '#e6a23c',
+  writing: 'var(--gt-color-primary)', activating: '#67c23a',
+}
+
+const importPhaseLabel = computed(() => {
+  if (!importStatus.value) return ''
+  return IMPORT_PHASE_LABEL[importStatus.value.phase] || importStatus.value.phase
+})
+const importPhaseColor = computed(() => {
+  if (!importStatus.value) return '#409eff'
+  return IMPORT_PHASE_COLORS[importStatus.value.phase] || '#409eff'
+})
+const importPhaseTagType = computed<'success' | 'warning' | 'info' | 'danger' | undefined>(() => {
+  if (!importStatus.value) return 'info'
+  const p = importStatus.value.phase
+  if (p === 'activating') return 'success'
+  if (p === 'validating') return 'warning'
+  if (p === 'failed') return 'danger'
+  if (p === 'writing') return undefined
+  return 'info'
+})
+
+async function pollImportStatus() {
+  const pid = props.project?.id
+  if (!pid) { importStatus.value = null; return }
+  try {
+    const data: any = await api.get(
+      `/api/projects/${pid}/ledger-import/active-job`,
+      { validateStatus: (s: number) => s < 600 },
+    )
+    if (data && data.status === 'processing') {
+      const phase = data.phase || data.current_phase || 'writing'
+      const pct = data.progress ?? 0
+      const msg = data.message || `${IMPORT_PHASE_LABEL[phase] || phase}中`
+      const eta = data.estimated_remaining_seconds as number | null | undefined
+      const etaText = typeof eta === 'number' && eta > 0 && eta <= 3600
+        ? (eta < 60 ? `约 ${eta} 秒` : `约 ${Math.round(eta / 60)} 分钟`)
+        : ''
+      importStatus.value = { progress: pct, phase, message: msg, eta: etaText }
+    } else {
+      importStatus.value = null
+    }
+  } catch {
+    importStatus.value = null
+  }
+}
+
+function startImportPoll() {
+  stopImportPoll()
+  pollImportStatus()
+  importPollTimer = setInterval(pollImportStatus, 5000)
+}
+function stopImportPoll() {
+  if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
+}
+
+watch(() => props.project?.id, (newId) => {
+  if (newId) { startImportPoll() } else { stopImportPoll(); importStatus.value = null }
+}, { immediate: true })
+
+onUnmounted(() => { stopImportPoll() })
 </script>
 
 <style scoped>
@@ -1384,5 +1488,49 @@ watch(showAttUpload, async (open) => {
   font-size: 10px; font-weight: 700; color: var(--gt-color-primary);
   background: var(--gt-color-primary-bg); padding: 2px 6px; border-radius: 4px;
   white-space: nowrap;
+}
+
+/* 导入进度面板 */
+.gt-import-progress-panel {
+  margin-top: var(--gt-space-4);
+  padding: var(--gt-space-3) var(--gt-space-4);
+  border: 1px solid var(--gt-color-border-purple-light, #d8b8ee);
+  border-radius: 8px;
+  background: var(--gt-color-primary-bg, #f4f0fa);
+}
+.gt-import-progress-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gt-color-primary, #4b2d77);
+}
+.gt-import-progress-panel__card {
+  padding: 10px 12px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid var(--gt-color-border-light, #eee);
+}
+.gt-import-progress-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.gt-import-progress-panel__pct {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gt-color-primary, #4b2d77);
+}
+.gt-import-progress-panel__message {
+  font-size: 12px;
+  color: var(--gt-color-text-secondary, #666);
+  margin-top: 4px;
+}
+.gt-import-progress-panel__eta {
+  font-size: 12px;
+  color: var(--gt-color-text-tertiary, #999);
+  margin-top: 2px;
 }
 </style>

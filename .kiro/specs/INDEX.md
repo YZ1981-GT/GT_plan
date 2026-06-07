@@ -119,9 +119,12 @@
 | `platform-maintenance-governance` | ✅ 全量完成（归档） | 平台维护治理（迁移/监控/告警）；108/108；2026-06-07 |
 | `platform-role-workbench-quality-loop` | ✅ 全量完成（归档） | 角色工作台与质量闭环；111/111；2026-06-07 |
 | `platform-ui-editing-consistency` | ✅ 全量完成（归档） | UI 编辑一致性（页面骨架/表格/金额/复制粘贴/编辑状态机/加载空态）；106/106；2026-06-07 |
-| `workpaper-account-package-d1-d2-pilot` | 📌 待启动 | 底稿科目工作包 D1/D2 试点 |
-| `workpaper-ai-conclusion-copilot` | 📌 待启动 | 底稿 AI 结论副驾驶 |
-| `workpaper-content-semantic-contract` | 📌 待启动 | 底稿内容语义契约 |
+| `workpaper-account-package-d1-d2-pilot` | ✅ 全量完成（待归档） | D1/D2 科目工作包试点；8 组任务+MVP-8+P1-7+CI/UAT 全 done；后端 services/models/router/V063+前端 views/composables/components+24 关键产物实证；2026-06-07 他人合入 |
+| `workpaper-ai-conclusion-copilot` | ✅ 全量完成（待归档） | 底稿 AI 结论副驾驶；5 组任务+MVP-7+P1-5+CI/UAT；context/draft/prompts/validator/audit_trail 5 service+前端 panel+3 pytest+vitest；2026-06-07 他人合入 |
+| `workpaper-content-semantic-contract` | ✅ 全量完成（待归档） | 底稿内容语义契约；7 组任务+MVP-7+CI/UAT；后端 schema+check 脚本+4 pytest+前端 types/composable/FieldSourcePanel+3 vitest+d1_d2_semantic_registry+inventory 文档；2026-06-07 他人合入 |
+| `ledger-import-header-adapter-contract` | 📌 待启动 | 表头识别、Adapter 选优/显式选择、JSON 驱动适配器、人工列映射 DTO、低置信度后端 gate 与历史映射复用 |
+| `ledger-import-sign-convention-migration` | 📌 待启动 | 净额借方为正/贷方为负的符号约定、方向来源字段、Converter 结果结构、历史 dry-run/迁移、试算表展示去补救化 |
+| `ledger-balance-diagnostics-report-line-coverage` | 📌 待启动 | 借贷不平衡统一诊断 DTO、DataQualityService 口径统一、ReportLineMapping 跳转、account_to_report_line_seed 四维度覆盖治理 |
 
 > 注（2026-06-06）：`report-view-slimdown` / `global-refinement-v5-closure` / `project-creation-enhancement` / `disclosure-note-linkage-and-slimdown` 4 个已完成 spec 归档至 `_archive/`。
 

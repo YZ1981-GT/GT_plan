@@ -63,7 +63,7 @@ inclusion: always
 
 ## 迁移与 PG schema（D6 MigrationRunner 运行时迁移，非 alembic）
 
-- 启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞号字母序靠后者静默丢失，scan_migrations 已加同号检测抛 RuntimeError）；**当前最高 V062**（V059=deliverable_center / V060=temporary_grants / V061=knowledge_index_stale_tracking / V062=review_records_evidence_cols）
+- 启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞号字母序靠后者静默丢失，scan_migrations 已加同号检测抛 RuntimeError）；**当前最高 V063**（V059=deliverable_center / V060=temporary_grants / V061=knowledge_index_stale_tracking / V062=review_records_evidence_cols / V063=account_package_program_status）
 - V040 冲突已修(重编号→V044)；V043 pgvector 容错化；V045~V051 见上行；**V052 `wp_formula`**（自定义底稿公式绑定，R052 回滚配对）；**V053/V054 已启用**（2026-06-06 远程 commit 21520278：V053 projecttype enum 加值+R053 回滚 / V054 projects.is_deleted 默认值，原"V053-054 未用"已过时）；**V055 `project_creation_enhancement`**（projects 表加 3 列+unique 约束，R055 回滚配对）
 - **⚠️ `CREATE TABLE IF NOT EXISTS audit_log` 是 no-op**：该名被 Metabase 共库占用（真实 schema 无 action 列）→ 应用审计写独立表 `app_audit_log`；建表前先 `to_regclass`+`information_schema.columns` 查真实 schema
 - **本地 PG schema 漂移已修**（critical=0）：drift detector pkgutil walk import 全 model + 过滤 Metabase 共库污染 + 按 critical_count 判 degraded
@@ -104,8 +104,8 @@ inclusion: always
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、知识库删旧 KnowledgeService；向量存储选 pgvector；3 处联动断裂已修（知识文件→索引/模板 JSON→registry/报表主模板→克隆 stale）
 - 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
-### git 状态（2026-06-07，HEAD `a60198b6` 已拉取远程最新）
-- 分支 `work/2026-05-30-wp-specs`；已同步远程（含 deliverable-center P1/P2 + note-semantic + onlyoffice 集成）；**可走 PR 合 main**
+### git 状态（2026-06-07，HEAD `8d17ec7b` 已 ff 拉取远程最新）
+- 分支 `work/2026-05-30-wp-specs`；2026-06-07 二次拉取远程合入他人 3 个 workpaper spec（account-package-d1-d2-pilot / ai-conclusion-copilot / content-semantic-contract，含 account_package 后端 services+models+V063 迁移+大量测试）；**🔴 目录迁移：`backend/data/wp_render_schema/` → `backend/data/ledger_adapters/wp_render_schema/`**（涉该路径引用按新路径）；本地未提交 ledger-import spec 文档与 3 处 bug 修复 stash→ff→pop 无冲突保留
 - 旧里程碑：`8ed2d45c`=audit-sheet-editable 归档 / `350ff25d`=5 tech specs 归档 / `0c0bae1a`=5 tech specs 实施代码
 - **schema drift 二次修复（V051）**：方向=orm_extra（ORM 有 DB 缺），51 列 ALTER ADD + 2 enum ADD VALUE + 列级 KNOWN_COLUMN_ALLOWLIST（cell_annotations.sheet_name/adjustments.status/projects.template_version_id）+ 表级加 linkage_audit_log/seed_load_history；evidence_hash_checks.export_id 保持 VARCHAR（ORM 业务定义非 UUID）
 - **🟢 B-Index 底稿目录"No Data"修复（2026-06-02，Playwright 实测通过）**：`wp_render_config.py` 新增 `_generate_b_index_data()`——当 B-Index sheet html_data 为空时自动从项目元数据生成 preparation_info（entity_name/period_end/preparer/reviewer）+ navigation_rows（同底稿其他 sheet 列表）；GtBIndex.vue 加 `empty-text="暂无索引数据"` 中文化
@@ -121,6 +121,16 @@ inclusion: always
 - **🔴 远程默认分支隐患**：`origin/HEAD→origin/master` 但 master 落后 main 298 commit（活跃主干是 main）→ 需 GitHub Settings 改默认分支（Agent 无法改远程设置）
 - 远程 `origin = https://github.com/YZ1981-GT/GT_plan.git`（HTTPS）；gh CLI 已装(2.89.0)未登录（需用户本人浏览器授权）→ 建 PR 走网页 compare
 - 文档类（memory/INDEX/复盘）冲突取并集，走 PR 让 GitHub 先暴露冲突，不本地直推 main
+
+### 2026-06-07 三处回归修复（用户手动报 bug，Playwright 实测通过）
+- **查账页"Not Found (ID:xxx)" toast**：`project_wizard.py` 的 `get_wizard_state` 丢了 `@router.get("/{project_id}/wizard")` 装饰器（编辑 attach_subsidiaries 时连同前一空行删掉）→GET /wizard 未注册命中 FastAPI 默认 404 `{"detail":"Not Found"}`，前端 http 拦截器 404 走 ElMessage.warning 拼 `（ID:{x-request-id}）`（request_id 是 uuid[:12]）。已补回装饰器
+- **报表页 Vite 编译错 v-model on prop**：`ReportDialogs.vue:88` `v-model="consolBreakdownVisible"`（prop 不可写）→改 `:model-value`+已有的 `@update:model-value` emit
+- **报表页"页面渲染出错 Cannot read 'isStale'"**：`ReportView.vue` 的 `rvCtx/rvPenetrate/rvComments` 声明在第 942 行却在第 812 行传入 `useReportCellActions` → TDZ `Cannot access 'rvCtx' before initialization` 致 setup 中断、模板读 undefined.isStale。修复=三 const 上移到调用前。**铁律：`<script setup>` 中 composable 入参必须先于调用声明（const 无 hoisting，TDZ 连带整个 setup 崩）**
+
+### 试算表借贷方向规则（2026-06-07，方向已修对，平衡差额另查）
+- **TrialBalance.vue `getDirection` 原靠金额正负猜方向**（正→借/负→贷）→应交税费贷方正常余额是正数被误判"借"致借贷不平衡。已改**类别感知**：负债/权益/收入恒"贷"，资产/成本/费用"借"，资产备抵（累计折旧/摊销、坏账/减值/跌价准备、折耗 名称正则）反向"贷"，无类别才回退正负猜测；`getActualCat`(编码首位+名称双保险)是类别源
+- **🔴 仍差 44,030,236.47（资产 2,546,171,215.70 − 负债权益 2,502,140,979.23）= 真实数据不平衡非方向 bug**：可疑 2221 应交税费原始 +14,203,492（贷方存正数=实为借方留抵）、4003 其他综合收益 +2,373,000；存储符号约定（负债贷方正常存负数）与这两条正数冲突，待定位源数据 vs audited_amount 取数/符号 — **待续**
+- **🔴 `backend/data/account_to_report_line_seed.json` 模板科目不全（一键预设映射数据源）**：4 套维度(soe/listed×standalone/consolidated)各仅 145 条，缺标准科目→科目查不到报表行次被跳过→不进报表/平衡校验，是不平衡来源之一。已实证缺失：2705 长期应付职工薪酬 / 2922 特准储备基金 / 4003 其他综合收益 / 4104 利润分配（仅一个项目样本就查出 4 个）。spec `ledger-import-smart-header-recognition` 将补全（参照财会〔2019〕6号一般企业报表格式+上市格式）+ 加未匹配科目检测/借贷不平衡弹窗诊断跳转
 
 ### 真正待办
 - **外部依赖**：LLM embedding 实例 / 6000 并发压测 / 钉集成 / 合并 UAT / GitHub 默认分支改 main / 走 PR 合入 / V052~V062 生产迁移
@@ -158,6 +168,7 @@ inclusion: always
 - **hypothesis PBT 调速**：max_examples 5（用户明确要求，禁默认 100）
 - **TimestampMixin 列必须同步到手写 DDL**：ORM 继承 `TimestampMixin` 自动加 `created_at`/`updated_at` Mapped 列，但手写 V*.sql CREATE TABLE 不会自动加→漏写就 schema drift critical。铁律：凡 ORM 用 TimestampMixin 的表，DDL 必须显式写 `created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`（V057 editing_locks 踩过此坑 2026-06-06）
 - **useExcelIO.exportTemplate existingData 必须等宽**：`existingData: any[][]` 所有行必须 pad 到相同列数（maxCols），否则 `xlsx-js-style` 写 cell 引用越界致 xlsx 损坏打不开；多子表导出用 `applyStyles: false`（style template 迭代 columns×rows 在非均匀数据上越界）
+- **底稿生成跳过 wizard 前置（2026-06-07）**：`wp_template.py` `generate_project_workpapers` 改为请求体带 `template_set_id` 时跳过 `PrerequisiteChecker`（不强制要求 wizard_state.template_set 已配）；前端 `WorkpaperList.vue` 新增"生成底稿"按钮→弹窗 select 选模板集→选完直接调 API 生成；**BUILTIN_TEMPLATE_SETS 改为动态读取 `wp_account_mapping.json` 206 条致同编码**（标准年审/上市/IPO=全量206，精简版=核心循环一级无dash，附注=仅A循环）；seed 幂等逻辑改为"已存在但 codes 变化则更新"覆盖旧占位；前端点生成前先自动调 seed 确保编码最新；`workpaper_template_analysis.json`(349模板/2602sheet)证实 206 wp_code 全有效（占位 sheet 在渲染层跳过不影响生成）
 
 ## 关键引用指南
 

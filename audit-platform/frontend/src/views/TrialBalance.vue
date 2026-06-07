@@ -535,10 +535,7 @@
 
     <!-- 借贷平衡指示器 -->
     <div class="gt-tb-balance-indicator" v-if="!loading">
-      <el-tooltip
-        :content="isBalanced ? '资产小计 = 负债和权益合计' : `差额：${fmt(Math.abs(balanceDiff))} 元（资产 - 负债权益）`"
-        placement="top"
-      >
+      <el-tooltip :content="balanceTooltip" placement="top">
         <span :class="isBalanced ? 'gt-tb-balanced' : 'gt-tb-unbalanced'">
           {{ isBalanced ? '✓ 借贷平衡' : '✗ 借贷不平衡' }}
         </span>
@@ -836,10 +833,32 @@ function getDirection(row: any): string {
     return directionOverrides.value[code]
   }
 
-  // 默认推断：根据余额正负判断（正数=借方余额，负数=贷方余额）
+  // 按科目类别判断方向（会计准则）：
+  // - 负债/权益类：贷方科目，余额无论正负方向恒为"贷"
+  //   （如应交税费贷方正常余额为正数，仍是贷方，不能因正数误判为借方）
+  // - 资产类：借方科目，方向为"借"；资产备抵科目（累计折旧/摊销、坏账/减值准备等）方向相反为"贷"
+  // - 损益类（收入/成本/费用，编码 5/6 开头）：科目编码段无法可靠区分收入与费用，
+  //   且常有冲回/调整，统一按余额符号判断（负数=贷=收入方向，正数=借=费用方向）
+  const actualCat = getActualCat(row)
+  const name = (row.account_name || '').replace(/_/g, '')
+  const first = code.charAt(0)
+  const isPnl = first === '5' || first === '6' || ['revenue', 'cost', 'expense'].includes(actualCat)
   const val = Number(row.unadjusted_amount || 0)
-  if (val < 0) return '贷'
-  return '借'
+
+  if (isPnl) {
+    // 损益类：按余额符号（贷方余额存负数 → 贷；借方余额存正数 → 借）
+    return val < 0 ? '贷' : '借'
+  }
+  if (['liability', 'equity'].includes(actualCat)) {
+    return '贷'
+  }
+  if (actualCat === 'asset') {
+    const isContraAsset = /累计折旧|累计摊销|坏账准备|减值准备|跌价准备|折耗/.test(name)
+    return isContraAsset ? '贷' : '借'
+  }
+
+  // 兜底：无类别信息时按余额正负推断（正数=借方余额，负数=贷方余额）
+  return val < 0 ? '贷' : '借'
 }
 
 function getDirectionClass(row: any): string {
@@ -1137,6 +1156,34 @@ const liabEquityTotal = computed(() => {
 // 差额（资产 - 负债和权益），用于平衡校验
 const balanceDiff = computed(() => assetTotal.value - liabEquityTotal.value)
 
+// ── 完整试算平衡（全科目借贷合计，含损益类） ──
+// 资产负债表恒等式「资产=负债+权益」仅在结账后成立；
+// 若余额表含未结转的损益类科目（5/6 开头），此式必然不平，差额=本期利润。
+// 真正普适的平衡校验是「全部科目借方合计 = 贷方合计」。
+const trialBalanceTotals = computed(() => {
+  let debit = 0
+  let credit = 0
+  for (const r of rows.value) {
+    if (!r.standard_account_code) continue  // 跳过小计/合计行
+    const val = Math.abs(num(r.audited_amount))
+    if (val === 0) continue
+    const dir = getDirection(r)
+    if (dir === '贷') {
+      credit = Number(decAdd(String(credit), String(val)))
+    } else {
+      debit = Number(decAdd(String(debit), String(val)))
+    }
+  }
+  return { debit, credit, diff: debit - credit }
+})
+// 是否含未结转损益类科目（影响平衡口径解释）
+const hasPnlRows = computed(() =>
+  rows.value.some(r => {
+    const f = (r.standard_account_code || '').charAt(0)
+    return (f === '5' || f === '6') && Math.abs(num(r.audited_amount)) > 0
+  })
+)
+
 // ── 数据新鲜度 ──
 const lastRecalcAt = computed(() => {
   const times = rows.value.map(r => r.updated_at).filter(Boolean) as string[]
@@ -1173,9 +1220,28 @@ async function loadLatestAdjustmentTime() {
 }
 
 const isBalanced = computed(() => {
-  // 正确逻辑：资产类合计 = 负债类合计 + 权益类合计，允许 1 元浮点误差
   if (!rows.value.length) return true
+  // 含未结转损益类科目时：用完整试算平衡口径（全科目借方合计=贷方合计）
+  // 否则（纯资产负债表）：用资产=负债+权益口径
+  // 允许 1 元浮点误差
+  if (hasPnlRows.value) {
+    return Math.abs(trialBalanceTotals.value.diff) < 1
+  }
   return Math.abs(balanceDiff.value) < 1
+})
+
+// 平衡指示器悬浮提示文案
+const balanceTooltip = computed(() => {
+  if (hasPnlRows.value) {
+    const { debit, credit, diff } = trialBalanceTotals.value
+    if (isBalanced.value) {
+      return `试算平衡：借方合计 ${fmt(debit)} = 贷方合计 ${fmt(credit)}`
+    }
+    return `试算不平衡：借方合计 ${fmt(debit)}，贷方合计 ${fmt(credit)}，差额 ${fmt(Math.abs(diff))} 元（含未结转损益类科目，请核对源数据）`
+  }
+  return isBalanced.value
+    ? '资产小计 = 负债和权益合计'
+    : `差额：${fmt(Math.abs(balanceDiff.value))} 元（资产 - 负债权益）`
 })
 
 // Task 2: Identify stale rows (updated_at older than latest adjustment)

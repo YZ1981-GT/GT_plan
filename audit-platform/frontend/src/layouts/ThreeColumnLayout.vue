@@ -724,11 +724,19 @@ async function pollImportQueue() {
 function navigateToImport() {
   const pid = bgImportStatus.value?.projectId || trackedProjectId.value || route.params.projectId
   if (!pid) return
-  // 跳转到导入历史页面（能看到当前 job 进度），而非账表查询页面
+  // 如果当前在项目列表页（概览面板可见），滚动到进度面板区域
+  const progressPanel = document.querySelector('.gt-import-progress-panel')
+  if (progressPanel) {
+    progressPanel.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // 闪烁高亮提示
+    progressPanel.classList.add('gt-import-progress-panel--highlight')
+    setTimeout(() => progressPanel.classList.remove('gt-import-progress-panel--highlight'), 1500)
+    return
+  }
+  // 否则跳转到导入历史页面
   const targetPath = `/projects/${pid}/ledger/import-history`
   const currentPath = route.path
   if (currentPath === targetPath) {
-    // 已在目标页，强制刷新
     router.replace({ path: targetPath, query: { ...route.query, t: String(Date.now()) } })
   } else {
     router.push({ path: targetPath })
@@ -1333,5 +1341,14 @@ onUnmounted(() => {
 .gt-dp-row :deep(.el-radio-button__inner) {
   padding: 4px 10px;
   font-size: var(--gt-font-size-xs);
+}
+
+/* 进度面板高亮闪烁 */
+:deep(.gt-import-progress-panel--highlight) {
+  animation: gt-progress-highlight 1.5s ease;
+}
+@keyframes gt-progress-highlight {
+  0%, 100% { box-shadow: none; }
+  25%, 75% { box-shadow: 0 0 0 3px var(--gt-color-primary, #4b2d77); }
 }
 </style>

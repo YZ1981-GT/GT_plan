@@ -388,6 +388,9 @@ async def attach_subsidiaries(
         _emit_scope_changed(project_id, _extract_project_audit_year(parent))
 
     return [_to_project_response(c) for c in attached]
+
+
+@router.get("/{project_id}/wizard", response_model=WizardState)
 async def get_wizard_state(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),

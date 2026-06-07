@@ -15,6 +15,9 @@
           </template>
           <template #right>
             <el-button @click="fetchWpIndex" :loading="loading" size="small">刷新</el-button>
+            <el-button type="success" size="small" @click="onGenerateWorkpapers" :loading="generateLoading">
+              生成底稿
+            </el-button>
             <el-button type="primary" size="small" @click="onBatchDownload" :loading="downloadLoading">
               批量下载 ({{ selectedWpIds.length || '全部' }})
             </el-button>
@@ -112,7 +115,7 @@
  *
  * Requirements: 1.1-1.8, 4.1-4.5, 5.1-5.6
  */
-import { ref, computed, provide, watch, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, provide, watch, onMounted, defineAsyncComponent, h } from 'vue'
 import type { Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -174,6 +177,7 @@ const userOptions = ref<any[]>([])
 const showWpImport = ref(false)
 const showBatchAssign = ref(false)
 const downloadLoading = ref(false)
+const generateLoading = ref(false)
 
 const hasData = computed(() => wpIndex.value.length > 0 || wpList.value.length > 0)
 
@@ -396,6 +400,71 @@ const batchAssignWpList = computed(() => {
 
 function onBatchAssigned() {
   fetchWpIndex()
+}
+
+async function onGenerateWorkpapers() {
+  generateLoading.value = true
+  try {
+    // 0. 确保模板集编码是最新的（幂等 seed，会自动更新旧的占位编码）
+    try { await api.post('/api/template-sets/seed') } catch { /* ignore */ }
+    // 1. 获取模板集列表
+    const { listTemplateSets } = await import('@/services/workpaperApi')
+    let sets = await listTemplateSets()
+    if (!sets || sets.length === 0) {
+      // 尝试自动初始化内置模板集（国企版+上市版）
+      try {
+        await api.post('/api/template-sets/seed')
+        sets = await listTemplateSets()
+      } catch { /* ignore */ }
+      if (!sets || sets.length === 0) {
+        ElMessage.warning('暂无可用模板集，请在「模板库」中创建')
+        return
+      }
+    }
+    // 2. 弹窗让用户选择模板集
+    const options = sets.map(s => ({ label: s.set_name, value: s.id }))
+    const selectedSetId = await new Promise<string>((resolve, reject) => {
+      ElMessageBox({
+        title: '选择底稿模板集',
+        message: () => {
+          return h('div', { style: 'padding: 8px 0' }, [
+            h('p', { style: 'margin: 0 0 12px; color: var(--gt-color-text-secondary); font-size: 13px' },
+              `共 ${sets.length} 个模板集可选（含系统内置国企版/上市版 + 项目组自定义）`),
+            h('select', {
+              id: '__wp_tpl_select',
+              style: 'width: 100%; padding: 8px 12px; border: 1px solid var(--gt-color-border-purple-light, #d8b8ee); border-radius: 6px; font-size: 14px; outline: none;',
+            }, options.map(o => h('option', { value: o.value }, o.label))),
+          ])
+        },
+        confirmButtonText: '生成',
+        cancelButtonText: '取消',
+        showCancelButton: true,
+        beforeClose: (action, instance, done) => {
+          if (action === 'confirm') {
+            const el = document.getElementById('__wp_tpl_select') as HTMLSelectElement | null
+            const val = el?.value || options[0]?.value
+            if (val) { resolve(val); done() }
+          } else {
+            reject('cancel'); done()
+          }
+        },
+      }).catch(() => reject('cancel'))
+    })
+    // 3. 调用生成 API
+    const result = await api.post(
+      `/api/projects/${projectId.value}/working-papers/generate`,
+      { template_set_id: selectedSetId, year: currentYear.value },
+    )
+    const created = (result as any)?.created || 0
+    ElMessage.success(`底稿生成完成，共创建 ${created} 份底稿`)
+    // 4. 刷新列表
+    await fetchWpIndex()
+  } catch (e: any) {
+    if (String(e).includes('cancel')) return
+    handleApiError(e, '生成底稿')
+  } finally {
+    generateLoading.value = false
+  }
 }
 
 async function onBatchDownload() {

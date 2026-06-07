@@ -85,7 +85,7 @@
 
   <!-- 合并报表穿透弹窗（统一组件，source=report）：右键"查看合并明细"打开 -->
   <ConsolBreakdownDialog
-    v-model="consolBreakdownVisible"
+    :model-value="consolBreakdownVisible"
     source="report"
     :project-id="projectId"
     :year="year"

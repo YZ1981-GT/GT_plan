@@ -5,8 +5,10 @@ Validates: Requirements 1.1-1.8, 6.2, 6.3
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -32,50 +34,81 @@ logger = logging.getLogger(__name__)
 # 6 built-in seed template sets
 # ---------------------------------------------------------------------------
 
-BUILTIN_TEMPLATE_SETS: list[dict[str, Any]] = [
-    {
-        "set_name": "标准年审",
-        "template_codes": ["B1-1", "C1-1", "D1-1", "E1-1", "F1-1", "G1-1"],
-        "applicable_audit_type": "annual",
-        "applicable_standard": "CAS",
-        "description": "适用于一般企业年度审计的标准底稿模板集",
-    },
-    {
-        "set_name": "精简版",
-        "template_codes": ["B1-1", "E1-1", "F1-1"],
-        "applicable_audit_type": "annual",
-        "applicable_standard": "CAS",
-        "description": "适用于小型企业年度审计的精简底稿模板集",
-    },
-    {
-        "set_name": "上市公司",
-        "template_codes": ["B1-1", "C1-1", "D1-1", "E1-1", "F1-1", "G1-1", "H1-1"],
-        "applicable_audit_type": "annual",
-        "applicable_standard": "CAS",
-        "description": "适用于上市公司年度审计的底稿模板集",
-    },
-    {
-        "set_name": "IPO",
-        "template_codes": ["B1-1", "C1-1", "D1-1", "E1-1", "F1-1", "G1-1", "H1-1", "S1-1"],
-        "applicable_audit_type": "ipo",
-        "applicable_standard": "CAS",
-        "description": "适用于IPO审计的底稿模板集",
-    },
-    {
-        "set_name": "国企附注",
-        "template_codes": ["N1-1", "N2-1", "N3-1"],
-        "applicable_audit_type": "annual",
-        "applicable_standard": "CAS_SOE",
-        "description": "适用于国有企业附注编制的底稿模板集",
-    },
-    {
-        "set_name": "上市附注",
-        "template_codes": ["N1-1", "N2-1", "N3-1", "N4-1"],
-        "applicable_audit_type": "annual",
-        "applicable_standard": "CAS_LISTED",
-        "description": "适用于上市公司附注编制的底稿模板集",
-    },
-]
+BUILTIN_TEMPLATE_SETS: list[dict[str, Any]] = []  # 延迟加载，见下方 _load_builtin_sets()
+
+
+def _load_builtin_sets() -> list[dict[str, Any]]:
+    """从 wp_account_mapping.json 读取完整底稿编码表，构建内置模板集。
+
+    - 标准年审（国企）：全量 206 条致同底稿编码
+    - 上市公司：全量 206 条 + 上市专用标记（共享同一编码表，applicable_standard 区分）
+    - 精简版：仅核心循环一级底稿（A/B/D/E/F，不含子编码和专项 S 循环）
+    - IPO：全量 + S 专项循环
+    - 国企附注 / 上市附注：仅 A 循环报表类底稿（附注由独立模块管理）
+    """
+    mapping_path = Path(__file__).resolve().parent.parent.parent / "data" / "wp_account_mapping.json"
+    all_codes: list[str] = []
+    if mapping_path.exists():
+        try:
+            raw = json.loads(mapping_path.read_text(encoding="utf-8"))
+            all_codes = sorted(set(m["wp_code"] for m in raw.get("mappings", []) if m.get("wp_code")))
+        except Exception:
+            pass
+    if not all_codes:
+        # 兜底：最小 stub（不应发生）
+        all_codes = ["A1", "B1", "C1", "D1", "E1", "F1", "G1", "H1", "I1", "J1", "K1", "L1", "M1", "N1", "S1"]
+
+    # 精简版：仅一级编码（无 dash）且核心循环 A/B/D/E/F
+    compact_codes = sorted(c for c in all_codes if "-" not in c and c[0] in "ABDEF")
+
+    return [
+        {
+            "set_name": "标准年审",
+            "template_codes": all_codes,
+            "applicable_audit_type": "annual",
+            "applicable_standard": "CAS",
+            "description": "适用于一般企业（国企）年度审计的完整底稿模板集（致同2025修订版）",
+        },
+        {
+            "set_name": "上市公司",
+            "template_codes": all_codes,
+            "applicable_audit_type": "annual",
+            "applicable_standard": "CAS_LISTED",
+            "description": "适用于上市公司年度审计的完整底稿模板集（致同2025修订版）",
+        },
+        {
+            "set_name": "精简版",
+            "template_codes": compact_codes,
+            "applicable_audit_type": "annual",
+            "applicable_standard": "CAS",
+            "description": "适用于小型企业年度审计的精简底稿模板集（仅核心循环一级底稿）",
+        },
+        {
+            "set_name": "IPO",
+            "template_codes": all_codes,
+            "applicable_audit_type": "ipo",
+            "applicable_standard": "CAS",
+            "description": "适用于IPO审计的底稿模板集（全量+专项循环）",
+        },
+        {
+            "set_name": "国企附注",
+            "template_codes": sorted(c for c in all_codes if c[0] == "A"),
+            "applicable_audit_type": "annual",
+            "applicable_standard": "CAS_SOE",
+            "description": "适用于国有企业附注编制的底稿模板集",
+        },
+        {
+            "set_name": "上市附注",
+            "template_codes": sorted(c for c in all_codes if c[0] == "A"),
+            "applicable_audit_type": "annual",
+            "applicable_standard": "CAS_LISTED",
+            "description": "适用于上市公司附注编制的底稿模板集",
+        },
+    ]
+
+
+# 模块加载时初始化
+BUILTIN_TEMPLATE_SETS = _load_builtin_sets()
 
 
 class TemplateEngine:
@@ -367,18 +400,26 @@ class TemplateEngine:
         """
         created = []
         for data in BUILTIN_TEMPLATE_SETS:
-            existing = await db.execute(
+            existing_result = await db.execute(
                 sa.select(WpTemplateSet).where(
                     WpTemplateSet.set_name == data["set_name"]
                 )
             )
-            if existing.scalar_one_or_none() is not None:
+            existing = existing_result.scalar_one_or_none()
+            if existing is not None:
+                # 已存在：如果编码数量变化则更新（保证 seed 后编码总是最新）
+                old_codes = existing.template_codes or []
+                new_codes = data["template_codes"]
+                if len(old_codes) != len(new_codes) or set(old_codes) != set(new_codes):
+                    existing.template_codes = new_codes
+                    existing.description = data["description"]
+                    created.append(existing)
                 continue
             ts = WpTemplateSet(
                 set_name=data["set_name"],
                 template_codes=data["template_codes"],
                 applicable_audit_type=data["applicable_audit_type"],
-                applicable_standard=data["applicable_standard"],
+                applicable_standard=data.get("applicable_standard"),
                 description=data["description"],
             )
             db.add(ts)
@@ -474,33 +515,66 @@ class TemplateEngine:
         project_wp_dir = Path("storage") / "projects" / str(project_id) / "workpapers"
         project_wp_dir.mkdir(parents=True, exist_ok=True)
 
+        # ── 性能优化：批量预加载 WpTemplate（避免 N+1 查询） ──
+        from sqlalchemy import func as sa_func
+        # 子查询：每个 template_code 的最新版本 id
+        latest_subq = (
+            sa.select(
+                WpTemplate.template_code,
+                sa_func.max(WpTemplate.id).label("max_id"),
+            )
+            .where(
+                WpTemplate.template_code.in_(template_codes),
+                WpTemplate.is_deleted == sa.false(),
+            )
+            .group_by(WpTemplate.template_code)
+            .subquery()
+        )
+        tpl_result = await db.execute(
+            sa.select(WpTemplate).join(
+                latest_subq, WpTemplate.id == latest_subq.c.max_id
+            )
+        )
+        tpl_map: dict[str, Any] = {t.template_code: t for t in tpl_result.scalars().all()}
+
+        # ── 批量检查已存在的 wp_index（幂等：跳过已有编码） ──
+        existing_codes_result = await db.execute(
+            sa.select(WpIndex.wp_code).where(
+                WpIndex.project_id == project_id,
+                WpIndex.wp_code.in_(template_codes),
+            )
+        )
+        existing_codes = set(r[0] for r in existing_codes_result.all())
+
         for code in template_codes:
             # 跳过被裁剪的底稿
             if code in trimmed_codes:
-                logger.info("skip trimmed workpaper: %s", code)
+                continue
+            # 幂等：跳过已存在的
+            if code in existing_codes:
                 continue
 
-            # Find latest template for this code
-            tpl_result = await db.execute(
-                sa.select(WpTemplate)
-                .where(
-                    WpTemplate.template_code == code,
-                    WpTemplate.is_deleted == sa.false(),
-                )
-                .order_by(
-                    WpTemplate.version_major.desc(),
-                    WpTemplate.version_minor.desc(),
-                )
-                .limit(1)
-            )
-            tpl = tpl_result.scalar_one_or_none()
+            # 从预加载 map 取模板（无 N+1）
+            tpl = tpl_map.get(code)
 
             # Determine wp_name from template or fallback
             lib_entry = template_lib.get(code, {})
             wp_name = tpl.template_name if tpl else lib_entry.get("name", lib_entry.get("wp_name", f"底稿{code}"))
             audit_cycle = (tpl.audit_cycle if tpl else lib_entry.get("cycle_prefix", lib_entry.get("audit_cycle"))) or None
+            # 确定循环代号（从编码首字母推导）
+            if not audit_cycle:
+                audit_cycle = code[0] if code and code[0].isalpha() else None
 
-            # Create wp_index
+            # 模板文件路径（引用模板库原始路径，不复制到项目目录）
+            template_file_path: str | None = None
+            if code in project_template_map:
+                template_file_path = project_template_map[code]
+            elif lib_entry.get("file_path"):
+                template_file_path = lib_entry["file_path"]
+            elif tpl and tpl.file_path:
+                template_file_path = tpl.file_path
+
+            # Create wp_index（批量 add，延迟 flush）
             wp_index = WpIndex(
                 project_id=project_id,
                 wp_code=code,
@@ -509,144 +583,27 @@ class TemplateEngine:
                 status=WpStatus.not_started,
             )
             db.add(wp_index)
-            await db.flush()
+            # 暂存到列表，flush 后再创建 working_paper
+            _pending_wps.append((wp_index, template_file_path))
 
-            # 目标文件路径（按循环分子目录）
-            cycle_dir = project_wp_dir / (audit_cycle or "OTHER")
-            cycle_dir.mkdir(parents=True, exist_ok=True)
-            dest_file = cycle_dir / f"{code}.xlsx"
-            file_path = str(dest_file)
+        # ── 批量 flush 所有 wp_index（一次 round-trip） ──
+        await db.flush()
 
-            # 尝试复制模板文件
-            copied = False
-            # 优先从项目已选择的模板库复制
-            if code in project_template_map:
-                src_path = Path(project_template_map[code])
-                if src_path.exists():
-                    shutil.copy2(src_path, dest_file)
-                    copied = True
-                    logger.info("copied from template_library: %s → %s", src_path, dest_file)
-
-            # 其次从模板库索引的 file_path 复制
-            if not copied:
-                src_path_str = lib_entry.get("file_path", "")
-                if src_path_str:
-                    src = Path(src_path_str)
-                    if src.exists() and src.is_file():
-                        shutil.copy2(src, dest_file)
-                        copied = True
-                    else:
-                        logger.debug("template source not found: %s (code=%s)", src_path_str, code)
-
-            # 其次从 WpTemplate.file_path 复制
-            if not copied and tpl and tpl.file_path:
-                tpl_src = Path(tpl.file_path)
-                if tpl_src.exists() and tpl_src.is_file():
-                    shutil.copy2(tpl_src, dest_file)
-                    copied = True
-                else:
-                    logger.debug("WpTemplate file not found: %s (code=%s)", tpl.file_path, code)
-
-            # 如果都没有源文件，创建空白 xlsx（含标准表头）
-            if not copied:
-                logger.info("no template source for %s, creating blank workpaper with header", code)
-                try:
-                    import openpyxl
-                    wb = openpyxl.Workbook()
-                    ws = wb.active
-                    ws.title = code
-                    ws["A1"] = f"底稿编号: {code}"
-                    ws["A2"] = f"底稿名称: {wp_name}"
-                    ws["A3"] = f"审计年度: {year}"
-                    wb.save(str(dest_file))
-                    wb.close()
-                except Exception:
-                    # openpyxl 不可用时写空文件
-                    dest_file.write_bytes(b"")
-
-            # Create working_paper
+        # ── 批量创建 working_paper（引用 wp_index.id） ──
+        for wp_index, template_file_path in _pending_wps:
             wp = WorkingPaper(
                 project_id=project_id,
                 wp_index_id=wp_index.id,
-                file_path=file_path,
+                file_path=template_file_path,  # 引用模板库路径，不复制文件
                 source_type=WpSourceType.template,
                 file_version=1,
                 created_by=created_by,
             )
             db.add(wp)
-
-            # 填充底稿表头（编制单位/审计期间/索引号/交叉索引等）
-            try:
-                from app.services.wp_header_service import fill_workpaper_header
-                await fill_workpaper_header(
-                    db=db, project_id=project_id, wp_id=wp.id,
-                    file_path=file_path, wp_code=code, wp_name=wp_name,
-                    cycle=audit_cycle,
-                )
-            except Exception as _e:
-                logger.warning("fill header failed for %s: %s", code, _e)
-
             workpapers.append(wp)
 
-            # ── 多文件底稿：从精细化规则复制关联文件 ──
-            try:
-                from app.services.wp_fine_rule_engine import load_fine_rule
-                fine_rule = load_fine_rule(code)
-                if fine_rule and fine_rule.get("source_files"):
-                    src_files = fine_rule["source_files"]
-                    # 主文件已复制（上面的逻辑），处理其余文件
-                    for sf_idx, sf in enumerate(src_files):
-                        sf_name = sf.get("file", "")
-                        if not sf_name or sf_idx == 0:
-                            continue  # 跳过主文件（已处理）
-                        # 从模板目录查找源文件
-                        sf_src = None
-                        if lib_entry.get("file_path"):
-                            sf_src = Path(lib_entry["file_path"]).parent / sf_name
-                        if not sf_src or not sf_src.exists():
-                            # 尝试从模板根目录查找
-                            for search_dir in [
-                                Path("致同通用审计程序及底稿模板（2025年修订）"),
-                            ]:
-                                for found in search_dir.rglob(sf_name):
-                                    sf_src = found
-                                    break
-                                if sf_src and sf_src.exists():
-                                    break
-                        if not sf_src or not sf_src.exists():
-                            logger.debug("companion file not found: %s for %s", sf_name, code)
-                            continue
-                        # 生成伴随底稿编码（如 E0, E1-14）
-                        companion_code = sf_name.split(" ")[0].split("至")[0].strip()
-                        if companion_code == code or companion_code in trimmed_codes:
-                            continue
-                        # 复制文件
-                        companion_dest = cycle_dir / f"{companion_code}.xlsx"
-                        if not companion_dest.exists():
-                            shutil.copy2(sf_src, companion_dest)
-                            # 创建伴随底稿的 wp_index + working_paper
-                            comp_index = WpIndex(
-                                project_id=project_id,
-                                wp_code=companion_code,
-                                wp_name=sf.get("description", sf_name),
-                                audit_cycle=audit_cycle,
-                                status=WpStatus.not_started,
-                            )
-                            db.add(comp_index)
-                            await db.flush()
-                            comp_wp = WorkingPaper(
-                                project_id=project_id,
-                                wp_index_id=comp_index.id,
-                                file_path=str(companion_dest),
-                                source_type=WpSourceType.template,
-                                file_version=1,
-                                created_by=created_by,
-                            )
-                            db.add(comp_wp)
-                            workpapers.append(comp_wp)
-                            logger.info("companion workpaper generated: %s → %s", code, companion_code)
-            except Exception as _mf_err:
-                logger.debug("multi-file generation for %s: %s", code, _mf_err)
+        # 二次 flush working_paper 批量
+        await db.flush()
 
         # F50 / Sprint 8.17: 底稿快照绑定 — 所有新建底稿都绑定当前 active dataset
         # 没有 active dataset（账套未导入）时，字段保持 None；允许先建底稿后导账套

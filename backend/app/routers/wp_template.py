@@ -264,12 +264,18 @@ async def generate_project_workpapers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """从模板集生成项目底稿"""
+    """从模板集生成项目底稿
+
+    如果请求体已携带 template_set_id（用户在前端弹窗选择了模板集），
+    跳过 wizard_state 的前置检查——因为用户已做出选择，不强制要求走向导步骤。
+    """
     from app.services.prerequisite_checker import PrerequisiteChecker
 
-    check = await PrerequisiteChecker().check(db, project_id, data.year, "generate_workpapers")
-    if not check["ok"]:
-        raise HTTPException(status_code=400, detail=check)
+    # 仅在请求未携带 template_set_id 时检查 wizard 前置条件
+    if not data.template_set_id:
+        check = await PrerequisiteChecker().check(db, project_id, data.year, "generate_workpapers")
+        if not check["ok"]:
+            raise HTTPException(status_code=400, detail=check)
 
     engine = TemplateEngine()
     try:
@@ -282,6 +288,7 @@ async def generate_project_workpapers(
         await db.commit()
         return {
             "message": f"已生成 {len(workpapers)} 个底稿",
+            "created": len(workpapers),
             "count": len(workpapers),
         }
     except ValueError as e:

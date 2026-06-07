@@ -22,6 +22,22 @@
       </template>
     </el-upload>
 
+    <!-- 兜底：原生文件选择（绕过 el-upload 拖拽区事件，确保任意浏览器都能弹出选择框） -->
+    <div class="native-pick">
+      <input
+        ref="nativeInputRef"
+        type="file"
+        multiple
+        accept=".xlsx,.xlsm,.csv,.tsv,.zip"
+        style="display: none"
+        @change="onNativeChange"
+      />
+      <el-button :icon="FolderOpened" @click="triggerNativePick">
+        选择文件
+      </el-button>
+      <span class="native-pick__hint">若上方拖拽区点击无反应，请用此按钮选择文件</span>
+    </div>
+
     <!-- 文件列表 -->
     <div v-if="selectedFiles.length > 0" class="file-list">
       <div v-for="(file, idx) in selectedFiles" :key="idx" class="file-item">
@@ -79,7 +95,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { UploadFilled, Document, Close } from '@element-plus/icons-vue'
+import { UploadFilled, Document, Close, FolderOpened } from '@element-plus/icons-vue'
 import type { UploadFile, UploadInstance } from 'element-plus'
 import type { LedgerDetectionResult } from './LedgerImportDialog.vue'
 import { handleApiError } from '@/utils/errorHandler'
@@ -99,6 +115,7 @@ const emit = defineEmits<{
 const uploadRef = ref<UploadInstance>()
 const fileList = ref<UploadFile[]>([])
 const selectedFiles = ref<File[]>([])
+const nativeInputRef = ref<HTMLInputElement>()
 const uploading = ref(false)
 const uploadProgress = ref(0)
 const detecting = ref(false)
@@ -137,8 +154,30 @@ const alertLevel = computed<'info' | 'warning'>(() => isLargeFile.value ? 'warni
 
 function onFileChange(uploadFile: UploadFile) {
   if (uploadFile.raw) {
-    selectedFiles.value.push(uploadFile.raw)
+    addFile(uploadFile.raw)
   }
+}
+
+/** 兜底原生选择：避免与 el-upload 重复添加 */
+function addFile(file: File) {
+  const exists = selectedFiles.value.some(
+    f => f.name === file.name && f.size === file.size,
+  )
+  if (!exists) selectedFiles.value.push(file)
+}
+
+function triggerNativePick() {
+  nativeInputRef.value?.click()
+}
+
+function onNativeChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (!input.files) return
+  for (const f of Array.from(input.files)) {
+    addFile(f)
+  }
+  // 允许重复选择同名文件
+  input.value = ''
 }
 
 function onFileRemove(uploadFile: UploadFile) {
@@ -199,6 +238,18 @@ async function startDetect() {
 
 .upload-area {
   width: 100%;
+}
+
+.native-pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.native-pick__hint {
+  font-size: var(--gt-font-size-xs);
+  color: var(--el-text-color-secondary);
 }
 
 .file-list {

@@ -808,6 +808,12 @@ function openStatusMachine() {
   smPanelRef.value?.open()
 }
 
+// ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
+// NOTE: 必须在 useReportCellActions 之前声明（被作为参数传入）
+const rvCtx = useCellSelection()
+const rvPenetrate = usePenetrate()
+const rvComments = useCellComments(() => projectId.value, () => year.value, 'report')
+
 // ─── useReportCellActions composable ────────────────────────────────────────
 const cellActions = useReportCellActions({
   projectId,
@@ -937,11 +943,6 @@ _reloadReportContextWrapper()
 onContextChange(() => {
   _reloadReportContextWrapper()
 })
-
-// ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
-const rvCtx = useCellSelection()
-const rvPenetrate = usePenetrate()
-const rvComments = useCellComments(() => projectId.value, () => year.value, 'report')
 
 
 const displayPrefs = useDisplayPrefsStore()
