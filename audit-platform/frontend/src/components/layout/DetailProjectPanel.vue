@@ -833,6 +833,22 @@ function goToParentConsol() {
 
 async function goToLedgerImport() {
   if (!props.project) return
+  // 检查是否已有账套数据：有数据跳查账页，无数据跳导入页
+  try {
+    const res: any = await api.get(
+      `/api/projects/${props.project.id}/trial-balance/`,
+      { params: { page: 1, page_size: 1 } },
+    )
+    const rows = res?.items ?? res?.data ?? res
+    if (Array.isArray(rows) && rows.length > 0) {
+      // 已有数据：直接跳查账页面
+      router.push({ path: `/projects/${props.project.id}/ledger` })
+      return
+    }
+  } catch {
+    // 查询失败不阻塞，继续走导入流程
+  }
+  // 无数据：跳到专门的导入页面
   const { showGuide } = await import('@/composables/useWorkflowGuide')
   const ok = await showGuide(
     'ledger_import',
@@ -850,7 +866,7 @@ async function goToLedgerImport() {
     '前往导入',
   )
   if (!ok) return
-  router.push({ path: `/projects/${props.project.id}/ledger`, query: { import: '1' } })
+  router.push({ path: `/projects/${props.project.id}/ledger-import` })
 }
 
 async function handleResetImport() {
