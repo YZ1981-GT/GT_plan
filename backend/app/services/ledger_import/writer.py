@@ -534,6 +534,9 @@ async def bulk_insert_staged(
                 # currency_code 默认 CNY
                 if "currency_code" in valid_cols and not rec.get("currency_code"):
                     rec["currency_code"] = "CNY"
+                # tenant_id NOT NULL 兜底（与 bulk_copy_staged 一致，防御性显式注入）
+                if "tenant_id" in valid_cols and not rec.get("tenant_id"):
+                    rec["tenant_id"] = "default"
                 # raw_extra JSONB 安全序列化：datetime/date/Decimal 等非 JSON 原生类型转 str
                 if "raw_extra" in rec and rec["raw_extra"] is not None:
                     rec["raw_extra"] = _sanitize_raw_extra(rec["raw_extra"])
