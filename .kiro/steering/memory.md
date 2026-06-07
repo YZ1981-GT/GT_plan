@@ -105,7 +105,8 @@ inclusion: always
 - 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
 ### git 状态（2026-06-07，HEAD `8d17ec7b` 已 ff 拉取远程最新）
-- 分支 `work/2026-05-30-wp-specs`；2026-06-07 二次拉取远程合入他人 3 个 workpaper spec（account-package-d1-d2-pilot / ai-conclusion-copilot / content-semantic-contract，含 account_package 后端 services+models+V063 迁移+大量测试）；**🔴 目录迁移：`backend/data/wp_render_schema/` → `backend/data/ledger_adapters/wp_render_schema/`**（涉该路径引用按新路径）；本地未提交 ledger-import spec 文档与 3 处 bug 修复 stash→ff→pop 无冲突保留
+- 分支 `work/2026-05-30-wp-specs`；2026-06-07 三次拉取远程（HEAD `dd72db2c`），合入 sign-convention 借贷方向（V064 direction_fields + DirectionOverride ORM + sign_convention router + direction_derivation/sign_anomaly_detector）+ balance-diagnostics 平衡诊断（cause_builders/diagnostics_service/report_line_jump/unmatched_preset + BalanceDiagnosticsDialog.vue）+ ledger-import P1（adapter_selection/confirmed_mapping_dto/submit_gate/converter/writer + ColumnMappingEditor 重构）；**当前最高迁移 V064**
+- **✅ wp_render_schema_service.py `_SCHEMA_DIR` 路径已修正**：远程迁移后该 service 仍引用旧路径导致底稿渲染 schema 全部 FileNotFoundError（C-D1-disclosure 等 yaml 找不到）→ 改为 `data/ledger_adapters/wp_render_schema`；其余 tests/scripts 引用旧路径仅影响开发不影响运行时
 - 旧里程碑：`8ed2d45c`=audit-sheet-editable 归档 / `350ff25d`=5 tech specs 归档 / `0c0bae1a`=5 tech specs 实施代码
 - **schema drift 二次修复（V051）**：方向=orm_extra（ORM 有 DB 缺），51 列 ALTER ADD + 2 enum ADD VALUE + 列级 KNOWN_COLUMN_ALLOWLIST（cell_annotations.sheet_name/adjustments.status/projects.template_version_id）+ 表级加 linkage_audit_log/seed_load_history；evidence_hash_checks.export_id 保持 VARCHAR（ORM 业务定义非 UUID）
 - **🟢 B-Index 底稿目录"No Data"修复（2026-06-02，Playwright 实测通过）**：`wp_render_config.py` 新增 `_generate_b_index_data()`——当 B-Index sheet html_data 为空时自动从项目元数据生成 preparation_info（entity_name/period_end/preparer/reviewer）+ navigation_rows（同底稿其他 sheet 列表）；GtBIndex.vue 加 `empty-text="暂无索引数据"` 中文化
@@ -171,6 +172,8 @@ inclusion: always
 - **TimestampMixin 列必须同步到手写 DDL**：ORM 继承 `TimestampMixin` 自动加 `created_at`/`updated_at` Mapped 列，但手写 V*.sql CREATE TABLE 不会自动加→漏写就 schema drift critical。铁律：凡 ORM 用 TimestampMixin 的表，DDL 必须显式写 `created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`（V057 editing_locks 踩过此坑 2026-06-06）
 - **useExcelIO.exportTemplate existingData 必须等宽**：`existingData: any[][]` 所有行必须 pad 到相同列数（maxCols），否则 `xlsx-js-style` 写 cell 引用越界致 xlsx 损坏打不开；多子表导出用 `applyStyles: false`（style template 迭代 columns×rows 在非均匀数据上越界）
 - **底稿生成跳过 wizard 前置（2026-06-07）**：`wp_template.py` `generate_project_workpapers` 改为请求体带 `template_set_id` 时跳过 `PrerequisiteChecker`（不强制要求 wizard_state.template_set 已配）；前端 `WorkpaperList.vue` 新增"生成底稿"按钮→弹窗 select 选模板集→选完直接调 API 生成；**BUILTIN_TEMPLATE_SETS 改为动态读取 `wp_account_mapping.json` 206 条致同编码**（标准年审/上市/IPO=全量206，精简版=核心循环一级无dash，附注=仅A循环）；seed 幂等逻辑改为"已存在但 codes 变化则更新"覆盖旧占位；前端点生成前先自动调 seed 确保编码最新；`workpaper_template_analysis.json`(349模板/2602sheet)证实 206 wp_code 全有效（占位 sheet 在渲染层跳过不影响生成）
+- **底稿生成性能重写（2026-06-07）**：`template_engine.py` `generate_project_workpapers` 从逐个查 DB+复制文件（206 次 flush+文件 IO=30s+）改为纯元数据批量 INSERT（批量预加载 WpTemplate map+幂等跳过已存在 wp_code+循环内只 add 不 flush+结束后 2 次批量 flush=<2s）；**不再复制模板文件到项目目录**（file_path 直接引用模板库原始路径或空串兜底，打开底稿时按需加载）；砍掉 fill_workpaper_header/多文件底稿 rglob 等非关键路径；**修复 2 个 500**：①`max(uuid)` PG 不支持→改 `max(created_at)` + wp_template 表空时跳过 ②`file_path NOT NULL` 约束→空串兜底；seed 只保留"标准年审"1 个内置模板集（206 条），其余 5 个占位删除；前端弹窗过滤只显示标准年审+用户自建；**in-process 实测 206 份生成成功**
+- **🟡 account_package_registry 兼容缺口**：注册表 D2 工作包依赖 wp_code D2-5/D2-6，但 `wp_account_mapping.json` 206 条里只有 D2/D2-2/D2-3/D2-4 无 D2-5/D2-6 → 工作包摘要会标 `missing_sources` 不阻塞使用；后续 `ledger-import-smart-header-recognition` spec 需求 11（seed 全覆盖）一并补全
 
 ## 关键引用指南
 

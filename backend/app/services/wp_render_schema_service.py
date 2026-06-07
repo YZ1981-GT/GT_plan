@@ -17,8 +17,8 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-# schema 文件根目录
-_SCHEMA_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "wp_render_schema"
+# schema 文件根目录（2026-06-07 迁移至 ledger_adapters/ 子目录）
+_SCHEMA_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "ledger_adapters" / "wp_render_schema"
 
 
 class WpRenderSchemaService:

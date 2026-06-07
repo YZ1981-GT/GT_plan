@@ -60,6 +60,41 @@ def _extract_basic_info(wizard_state: dict | None) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Markdown 标题转中文序号
+# ---------------------------------------------------------------------------
+
+_CN_NUMBERS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
+               '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十']
+
+
+def _convert_md_headings_to_numbered(text: str) -> str:
+    """将模板中的 ## / ### markdown 标题转为中文序号格式。
+
+    ## 标题  → （一）标题、（二）标题 ...
+    ### 标题 → 1. 标题、2. 标题 ...（在每个 ## 下重新计数）
+    """
+    import re
+    lines = text.split('\n')
+    result = []
+    h2_counter = 0
+    h3_counter = 0
+    for line in lines:
+        m2 = re.match(r'^##\s+(.+)$', line)
+        m3 = re.match(r'^###\s+(.+)$', line)
+        if m2:
+            h2_counter += 1
+            h3_counter = 0  # 重置三级计数
+            label = _CN_NUMBERS[h2_counter - 1] if h2_counter <= len(_CN_NUMBERS) else str(h2_counter)
+            result.append(f'（{label}）{m2.group(1)}')
+        elif m3:
+            h3_counter += 1
+            result.append(f'{h3_counter}. {m3.group(1)}')
+        else:
+            result.append(line)
+    return '\n'.join(result)
+
+
+# ---------------------------------------------------------------------------
 # refill_sections 数据类
 # ---------------------------------------------------------------------------
 
@@ -848,7 +883,9 @@ class DisclosureEngine:
 
             # 优先级3：模板默认文字
             if not text_content:
-                text_content = "\n\n".join(text_sections) if text_sections else tmpl.get("text_template")
+                text_content = _convert_md_headings_to_numbered(
+                    "\n\n".join(text_sections)
+                ) if text_sections else tmpl.get("text_template")
 
             if text_content and content_type_str == "table":
                 content_type_str = "mixed"  # 有正文就升级为 mixed
@@ -1313,7 +1350,7 @@ class DisclosureEngine:
                 "section_title": n.section_title,
                 "account_name": n.account_name,
                 "content_type": n.content_type.value if n.content_type else None,
-                "status": n.status.value if n.status else "draft",
+                "status": "not_applicable" if n.is_empty else (n.status.value if n.status else "draft"),
                 "sort_order": n.sort_order,
             }
             for n in notes

@@ -333,6 +333,16 @@ onMounted(async () => {
   }
 })
 
+// 兜底：store 异步加载完成后填充表单（解决组件挂载时 store 还在 loading 的时序问题）
+watch(() => wizardStore.stepData.basic_info, (newVal) => {
+  if (newVal && !form.client_name) {
+    Object.assign(form, newVal as any)
+    if ((newVal as any).audit_year) {
+      auditYearDate.value = String((newVal as any).audit_year)
+    }
+  }
+}, { immediate: false })
+
 async function validate(): Promise<BasicInfo | null> {
   if (!formRef.value) return null
   try {

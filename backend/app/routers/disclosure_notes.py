@@ -16,12 +16,14 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user, require_project_access, get_user_scope_cycles, check_consol_lock
 from app.models.core import User
+from app.models.report_models import DisclosureNote, NoteStatus
 from app.models.report_schemas import (
     DisclosureNoteDetail,
     DisclosureNoteGenerateRequest,
@@ -192,18 +194,36 @@ async def get_section_numbers(
     """获取附注章节编号映射（供前端渲染序号）。
 
     返回 {note_section: rendered_number} 映射，如 {"五、1": "1", "五、2": "2"}.
-    当后端尚无编号规则时返回空字典（前端降级为不显示序号）。
+    规则：按章节前缀分组，组内连续编号；若组内仅 1 个条目则不编号。
     """
     engine = DisclosureEngine(db)
     tree = await engine.get_notes_tree(project_id, year)
     if not tree:
         return {}
-    # 简单实现：按 note_section 中的数字部分返回序号
-    result: dict[str, str] = {}
-    for idx, item in enumerate(tree, 1):
+
+    # 按章节前缀分组（"一、" "二、" ...）
+    from collections import OrderedDict
+    groups: dict[str, list[dict]] = OrderedDict()
+    for item in tree:
         section = item.get("note_section", "")
-        if section:
-            result[section] = str(idx)
+        if not section:
+            continue
+        # 提取前缀：取"、"之前的部分作为分组 key
+        sep_idx = section.find("、")
+        prefix = section[:sep_idx] if sep_idx > 0 else ""
+        if prefix not in groups:
+            groups[prefix] = []
+        groups[prefix].append(item)
+
+    result: dict[str, str] = {}
+    for _prefix, items in groups.items():
+        # 组内仅 1 个条目不编号
+        if len(items) <= 1:
+            continue
+        for idx, item in enumerate(items, 1):
+            section = item.get("note_section", "")
+            if section:
+                result[section] = str(idx)
     return result
 
 
@@ -274,6 +294,110 @@ async def update_note(
         pass  # Never block main operation
 
     return DisclosureNoteDetail.model_validate(note)
+
+
+@router.delete("/{project_id}/{year}/sections/{note_section:path}")
+async def delete_section(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("editor")),
+):
+    """软删除指定附注章节。"""
+    result = await db.execute(
+        sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.note_section == note_section,
+            DisclosureNote.is_deleted == sa.false(),
+        )
+    )
+    note = result.scalar_one_or_none()
+    if not note:
+        raise HTTPException(status_code=404, detail="章节不存在")
+    note.is_deleted = True
+    await db.flush()
+    return {"ok": True}
+
+
+@router.patch("/{project_id}/{year}/sections/{note_section:path}")
+async def patch_section(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("editor")),
+):
+    """部分更新附注章节字段（如 status → 用 is_empty 标记排除导出）。"""
+    result = await db.execute(
+        sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.note_section == note_section,
+            DisclosureNote.is_deleted == sa.false(),
+        )
+    )
+    note = result.scalar_one_or_none()
+    if not note:
+        raise HTTPException(status_code=404, detail="章节不存在")
+    # 用 is_empty 标记"不导出"（Word export 已有 skip empty 逻辑）
+    if "status" in body:
+        if body["status"] == "not_applicable":
+            note.is_empty = True
+        else:
+            note.is_empty = False
+    await db.flush()
+    status_val = "not_applicable" if note.is_empty else (note.status.value if note.status else "draft")
+    return {"ok": True, "status": status_val}
+
+
+@router.get("/{project_id}/{year}/deleted")
+async def list_deleted_sections(
+    project_id: UUID,
+    year: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """列出已软删除的附注章节，供恢复使用。"""
+    result = await db.execute(
+        sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.is_deleted == sa.true(),
+        ).order_by(DisclosureNote.sort_order)
+    )
+    notes = result.scalars().all()
+    return [
+        {"id": str(n.id), "note_section": n.note_section, "section_title": n.section_title}
+        for n in notes
+    ]
+
+
+@router.patch("/{project_id}/{year}/restore/{note_id}")
+async def restore_section(
+    project_id: UUID,
+    year: int,
+    note_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("editor")),
+):
+    """恢复已删除的附注章节。"""
+    result = await db.execute(
+        sa.select(DisclosureNote).where(
+            DisclosureNote.id == note_id,
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.is_deleted == sa.true(),
+        )
+    )
+    note = result.scalar_one_or_none()
+    if not note:
+        raise HTTPException(status_code=404, detail="章节不存在或未被删除")
+    note.is_deleted = False
+    await db.flush()
+    return {"ok": True}
 
 
 @router.post("/{project_id}/{year}/validate")

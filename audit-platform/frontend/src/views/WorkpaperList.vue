@@ -421,15 +421,24 @@ async function onGenerateWorkpapers() {
         return
       }
     }
-    // 2. 弹窗让用户选择模板集
-    const options = sets.map(s => ({ label: s.set_name, value: s.id }))
+    // 2. 过滤：只显示"标准年审" + 用户自建模板集（去掉 IPO/上市/附注/精简等内置占位）
+    const SHOW_BUILTIN = new Set(['标准年审'])
+    const filteredSets = sets.filter(s =>
+      SHOW_BUILTIN.has(s.set_name) || !['IPO', '上市公司', '上市附注', '国企附注', '精简版'].includes(s.set_name)
+    )
+    if (filteredSets.length === 0) {
+      ElMessage.warning('暂无可用模板集')
+      return
+    }
+    // 3. 弹窗让用户选择模板集
+    const options = filteredSets.map(s => ({ label: s.set_name, value: s.id }))
     const selectedSetId = await new Promise<string>((resolve, reject) => {
       ElMessageBox({
         title: '选择底稿模板集',
         message: () => {
           return h('div', { style: 'padding: 8px 0' }, [
             h('p', { style: 'margin: 0 0 12px; color: var(--gt-color-text-secondary); font-size: 13px' },
-              `共 ${sets.length} 个模板集可选（含系统内置国企版/上市版 + 项目组自定义）`),
+              `共 ${filteredSets.length} 个模板集可选（标准年审 + 项目组自定义）`),
             h('select', {
               id: '__wp_tpl_select',
               style: 'width: 100%; padding: 8px 12px; border: 1px solid var(--gt-color-border-purple-light, #d8b8ee); border-radius: 6px; font-size: 14px; outline: none;',
@@ -451,11 +460,36 @@ async function onGenerateWorkpapers() {
       }).catch(() => reject('cancel'))
     })
     // 3. 调用生成 API
-    const result = await api.post(
-      `/api/projects/${projectId.value}/working-papers/generate`,
-      { template_set_id: selectedSetId, year: currentYear.value },
-    )
-    const created = (result as any)?.created || 0
+    let result: any
+    try {
+      // 优先走 generate（模板集路径），500 时降级到 generate-from-codes
+      result = await api.post(
+        `/api/projects/${projectId.value}/working-papers/generate`,
+        { template_set_id: selectedSetId, year: currentYear.value },
+      )
+    } catch (genErr: any) {
+      // generate 500 时降级：取模板集编码走 generate-from-codes
+      if (genErr?.response?.status >= 500) {
+        try {
+          const { getTemplateSet } = await import('@/services/workpaperApi')
+          const selectedSet = await getTemplateSet(selectedSetId)
+          const wpCodes = selectedSet?.template_codes || []
+          if (wpCodes.length > 0) {
+            result = await api.post(
+              `/api/projects/${projectId.value}/working-papers/generate-from-codes`,
+              { wp_codes: wpCodes, year: currentYear.value },
+            )
+          } else {
+            throw genErr
+          }
+        } catch {
+          throw genErr
+        }
+      } else {
+        throw genErr
+      }
+    }
+    const created = (result as any)?.created || (result as any)?.count || 0
     ElMessage.success(`底稿生成完成，共创建 ${created} 份底稿`)
     // 4. 刷新列表
     await fetchWpIndex()

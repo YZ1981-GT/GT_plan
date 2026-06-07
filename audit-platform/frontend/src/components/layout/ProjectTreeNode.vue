@@ -36,7 +36,7 @@
           {{ node.name || node.client_name || '未命名项目' }}
         </div>
         <div class="gt-node-meta">
-          <span>{{ node.client_name || '-' }}</span>
+          <span>{{ node.short_name || node.client_name || '-' }}</span>
           <span class="gt-node-meta-right">
             <el-tag v-if="node.consol_lock" size="small" type="warning">🔒 已锁定</el-tag>
             <el-tooltip v-if="node.status !== 'created'" :content="statusHint(node.status)" placement="top" :show-after="300">
@@ -88,6 +88,7 @@ interface ProjectNode {
   id: string
   name: string | null
   client_name: string
+  short_name?: string
   status: string
   report_scope: string | null
   consol_lock?: boolean

@@ -74,6 +74,10 @@
                   <el-button @click="showDocAiChat = true">💬 对话</el-button>
                 </el-tooltip>
               </el-button-group>
+              <!-- 公式管理 -->
+              <el-tooltip content="配置附注取数公式规则" placement="bottom" :show-after="400">
+                <el-button size="small" @click="showNoteFormulaManager = true">⚙️ 公式管理</el-button>
+              </el-tooltip>
               <!-- 全屏 -->
               <el-tooltip :content="deFullscreen ? '退出全屏（ESC）' : '全屏查看'" placement="bottom" :show-after="400">
                 <el-button size="small" @click="toggleDeFullscreen()">{{ deFullscreen ? '↙ 退出' : '↗ 全屏' }}</el-button>
@@ -86,12 +90,11 @@
                     <el-dropdown-item @click="showParagraphVars = true" title="段落变量（自动替换占位符）">✏️ 段落变量</el-dropdown-item>
                     <el-dropdown-item @click="showNoteMappingDialog = true" title="国企↔上市附注模板转换规则">🔄 国企↔上市转换</el-dropdown-item>
                     <el-dropdown-item @click="showGroupBaseline = true" title="集团基线管理：应用/保存/对比集团统一附注模板结构，确保子企业附注章节一致">🏢 集团基线</el-dropdown-item>
-                    <el-dropdown-item divided @click="onExportWord" title="导出 Word 格式附注文档">📤 导出 Word</el-dropdown-item>
+                    <el-dropdown-item divided @click="onExportWithConfirm" title="导出 Word 格式附注文档">📤 导出 Word</el-dropdown-item>
                     <el-dropdown-item @click="showPrintPreview = true" title="打印预览当前附注">🖨️ 打印预览</el-dropdown-item>
                     <el-dropdown-item @click="showNoteImport = true" title="导入外部 Excel 附注数据（通用格式）">📥 Excel 导入</el-dropdown-item>
                     <el-dropdown-item @click="showOfflineExport = true" title="导出系统格式离线编辑包（可再导回）">📦 离线导出</el-dropdown-item>
                     <el-dropdown-item @click="showOfflineImport = true" title="导入系统导出的离线编辑包">📥 离线导入</el-dropdown-item>
-                    <el-dropdown-item divided @click="showNoteFormulaManager = true" title="配置附注取数公式规则">⚙️ 公式管理</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
@@ -151,15 +154,31 @@
 
     <div class="gt-de-body">
       <!-- 左侧：目录树 -->
-      <div class="gt-de-sidebar">
+      <div class="gt-de-sidebar" :style="{ width: sidebarWidth + 'px' }">
         <!-- 视图切换 -->
         <div class="gt-de-view-toggle">
           <el-radio-group v-model="treeViewMode" size="small">
             <el-radio-button value="tree">树形</el-radio-button>
             <el-radio-button value="flat">平铺</el-radio-button>
           </el-radio-group>
-          <el-button size="small" text @click="expandAll" title="全部展开">展开</el-button>
-          <el-button size="small" text @click="collapseAll" title="全部收起">收起</el-button>
+        </div>
+        <!-- 第二行：操作图标 -->
+        <div class="gt-de-sidebar-icons">
+          <el-tooltip content="全部展开" placement="top" :show-after="400">
+            <span class="gt-de-sidebar-icon" @click="expandAll">+</span>
+          </el-tooltip>
+          <el-tooltip content="全部收起" placement="top" :show-after="400">
+            <span class="gt-de-sidebar-icon" @click="collapseAll">−</span>
+          </el-tooltip>
+          <el-tooltip content="导出设置" placement="top" :show-after="400">
+            <span class="gt-de-sidebar-icon" @click="showExportSettingDialog = true">📤</span>
+          </el-tooltip>
+          <el-tooltip content="批量删除" placement="top" :show-after="400">
+            <span class="gt-de-sidebar-icon" @click="showBatchDeleteDialog = true">🗑</span>
+          </el-tooltip>
+          <el-tooltip content="恢复已删除" placement="top" :show-after="400">
+            <span class="gt-de-sidebar-icon" @click="showRestoreDialog = true">♻</span>
+          </el-tooltip>
         </div>
         <el-input v-model="treeSearch" size="small" placeholder="搜索章节..." clearable class="gt-de-tree-search" />
         <div class="gt-de-tree-wrap">
@@ -184,10 +203,20 @@
                 <span class="gt-de-tree-group-label">{{ data.label }}</span>
                 <span v-if="getGroupValidationErrorCount(data)" class="gt-de-tree-error-badge">{{ getGroupValidationErrorCount(data) }}</span>
               </div>
-              <div v-else class="gt-de-tree-node" :class="{ 'gt-de-tree-node-active': currentNote?.id === data.id, 'gt-de-tree-node-error': hasSectionValidationError(data.data?.note_section) }">
+              <div v-else class="gt-de-tree-node" :class="{ 'gt-de-tree-node-active': currentNote?.id === data.id, 'gt-de-tree-node-error': hasSectionValidationError(data.data?.note_section), 'gt-de-tree-node-excluded': data.data?.status === 'not_applicable' }">
                 <span class="gt-de-tree-label">
                   <span v-if="getRenderedNumber(data.data?.note_section)" class="gt-de-tree-number">{{ getRenderedNumber(data.data?.note_section) }}</span>
                   {{ data.data?.section_title || data.label }}
+                </span>
+                <span class="gt-de-tree-actions">
+                  <el-tooltip :content="data.data?.status === 'not_applicable' ? '恢复生成' : '不导出'" placement="top" :show-after="500">
+                    <span class="gt-de-tree-action-icon" @click.stop="onToggleExclude(data.data)">
+                      {{ data.data?.status === 'not_applicable' ? '👁' : '🚫' }}
+                    </span>
+                  </el-tooltip>
+                  <el-tooltip content="删除章节" placement="top" :show-after="500">
+                    <span class="gt-de-tree-action-icon gt-de-tree-action-del" @click.stop="onDeleteSection(data.data)">✕</span>
+                  </el-tooltip>
                 </span>
                 <span v-if="hasSectionValidationError(data.data?.note_section)" class="gt-de-tree-error-dot" title="校验失败">●</span>
                 <!-- Sprint 3 Task 3.6: 上游变更红点 -->
@@ -227,6 +256,12 @@
           </div>
         </div>
       </div>
+
+      <!-- 拖拽调整侧栏宽度 -->
+      <div
+        class="gt-de-resize-handle"
+        @mousedown="onResizeStart"
+      />
 
       <!-- 中间：编辑区 -->
       <div class="gt-de-main" v-loading="detailLoading">
@@ -273,7 +308,7 @@
                   <span v-if="justSaved" class="gt-de-saved-badge">✓ 已保存</span>
                 </transition>
               </h4>
-              <span class="gt-de-section-account">{{ currentNote.account_name }}</span>
+              <span class="gt-de-section-account" v-if="currentNote.account_name && currentNote.account_name !== currentNote.section_title">{{ currentNote.account_name }}</span>
             </div>
             <div style="display: flex; gap: 6px; align-items: center;">
               <el-tag :type="currentNote.status === 'confirmed' ? 'success' : 'info'" size="small">
@@ -420,8 +455,15 @@
           <div v-else class="gt-de-empty-hint">请从左侧目录选择章节</div>
       </div>
 
+      <!-- 右侧拖拽调整校验栏宽度 -->
+      <div
+        v-if="!deFullscreen"
+        class="gt-de-resize-handle gt-de-resize-handle--right"
+        @mousedown="onRightResizeStart"
+      />
+
       <!-- 右侧：校验面板 -->
-      <div class="gt-de-validation">
+      <div v-if="!deFullscreen" class="gt-de-validation" :style="{ width: validationWidth + 'px' }">
         <div class="gt-de-sidebar-title">校验结果</div>
         <div v-if="validationFindings.length === 0" class="gt-de-empty-hint">暂无校验结果</div>
         <div v-for="(f, fi) in validationFindings" :key="fi" class="gt-de-finding-item"
@@ -438,6 +480,78 @@
         </div>
       </div>
     </div>
+
+    <!-- 导出确认弹窗 -->
+    <el-dialog v-model="showExportDialog" title="导出 Word 附注" width="560px" append-to-body destroy-on-close>
+      <div style="margin-bottom: 12px; font-size: 13px; color: var(--gt-color-text-regular);">
+        将导出 <strong>{{ exportableSections.length }}</strong> 个章节到 Word 文档。
+        <span v-if="excludedSections.length" style="color: var(--gt-color-text-tertiary);">
+          （{{ excludedSections.length }} 个章节已排除）
+        </span>
+      </div>
+      <div v-if="excludedSections.length" style="margin-bottom: 12px;">
+        <div style="font-size: 12px; color: var(--gt-color-text-secondary); margin-bottom: 6px;">已排除章节：</div>
+        <el-tag v-for="s in excludedSections" :key="(s as any).note_section" size="small" type="info" style="margin: 2px 4px;">
+          {{ (s as any).section_title }}
+        </el-tag>
+      </div>
+      <template #footer>
+        <el-button @click="showExportDialog = false">取消</el-button>
+        <el-button type="primary" :loading="exportLoading" @click="showExportDialog = false; onExportWord()">确认导出</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 导出设置弹窗：树形勾选哪些章节导出 -->
+    <el-dialog v-model="showExportSettingDialog" title="导出章节设置" width="500px" append-to-body destroy-on-close>
+      <div style="font-size: 12px; color: var(--gt-color-text-secondary); margin-bottom: 10px;">勾选的章节将导出到 Word，取消勾选的不导出。</div>
+      <el-tree
+        :data="exportSettingTreeData"
+        :props="{ label: 'label', children: 'children' }"
+        show-checkbox
+        node-key="id"
+        :default-checked-keys="exportCheckedKeys"
+        ref="exportTreeRef"
+        style="max-height: 400px; overflow-y: auto;"
+      />
+      <template #footer>
+        <el-button @click="showExportSettingDialog = false">取消</el-button>
+        <el-button type="primary" @click="onSaveExportSettings">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量删除弹窗：树形勾选要删除的章节 -->
+    <el-dialog v-model="showBatchDeleteDialog" title="批量删除章节" width="500px" append-to-body destroy-on-close>
+      <div style="font-size: 12px; color: var(--gt-color-text-secondary); margin-bottom: 10px;">勾选要删除的章节（删除后可通过"恢复"找回）。</div>
+      <el-tree
+        :data="exportSettingTreeData"
+        :props="{ label: 'label', children: 'children' }"
+        show-checkbox
+        node-key="id"
+        ref="batchDeleteTreeRef"
+        style="max-height: 400px; overflow-y: auto;"
+      />
+      <template #footer>
+        <el-button @click="showBatchDeleteDialog = false">取消</el-button>
+        <el-button type="danger" @click="onBatchDelete">确认删除</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 恢复已删除章节弹窗 -->
+    <el-dialog v-model="showRestoreDialog" title="恢复已删除章节" width="500px" append-to-body destroy-on-close @open="loadDeletedSections">
+      <div v-if="deletedSections.length === 0" style="text-align: center; padding: 30px; color: var(--gt-color-text-placeholder);">暂无已删除章节</div>
+      <div v-else>
+        <div style="font-size: 12px; color: var(--gt-color-text-secondary); margin-bottom: 10px;">选择要恢复的章节：</div>
+        <el-checkbox-group v-model="restoreChecked">
+          <div v-for="s in deletedSections" :key="s.id" style="padding: 4px 0;">
+            <el-checkbox :value="s.id">{{ s.section_title }}（{{ s.note_section }}）</el-checkbox>
+          </div>
+        </el-checkbox-group>
+      </div>
+      <template #footer>
+        <el-button @click="showRestoreDialog = false">取消</el-button>
+        <el-button type="primary" :disabled="restoreChecked.length === 0" @click="onRestoreSections">恢复选中</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 公式管理弹窗（与报表页统一） -->
     <FormulaManagerDialog
@@ -773,7 +887,7 @@ import { fmtAmount } from '@/utils/formatters'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
@@ -961,6 +1075,60 @@ const {
   onTreeLoaded: () => numbering.refreshNumbers(),
 })
 
+// ─── 侧栏拖拽调整宽度 ─────────────────────────────────────────────────────────
+const sidebarWidth = ref(220)
+const isResizing = ref(false)
+let _resizeStartX = 0
+let _resizeStartW = 0
+
+function onResizeStart(e: MouseEvent) {
+  e.preventDefault()
+  isResizing.value = true
+  _resizeStartX = e.clientX
+  _resizeStartW = sidebarWidth.value
+  document.addEventListener('mousemove', onResizeMove)
+  document.addEventListener('mouseup', onResizeEnd)
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+}
+function onResizeMove(e: MouseEvent) {
+  const delta = e.clientX - _resizeStartX
+  sidebarWidth.value = Math.max(160, Math.min(500, _resizeStartW + delta))
+}
+function onResizeEnd() {
+  isResizing.value = false
+  document.removeEventListener('mousemove', onResizeMove)
+  document.removeEventListener('mouseup', onResizeEnd)
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+}
+
+// ─── 右侧校验栏拖拽调整宽度 ───────────────────────────────────────────────────
+const validationWidth = ref(240)
+let _rightResizeStartX = 0
+let _rightResizeStartW = 0
+
+function onRightResizeStart(e: MouseEvent) {
+  e.preventDefault()
+  _rightResizeStartX = e.clientX
+  _rightResizeStartW = validationWidth.value
+  document.addEventListener('mousemove', onRightResizeMove)
+  document.addEventListener('mouseup', onRightResizeEnd)
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+}
+function onRightResizeMove(e: MouseEvent) {
+  // 向左拖动增大宽度（右侧面板在右边，鼠标左移 = delta 负 = 宽度增）
+  const delta = _rightResizeStartX - e.clientX
+  validationWidth.value = Math.max(120, Math.min(500, _rightResizeStartW + delta))
+}
+function onRightResizeEnd() {
+  document.removeEventListener('mousemove', onRightResizeMove)
+  document.removeEventListener('mouseup', onRightResizeEnd)
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+}
+
 // ── 转换规则（useNoteTemplate composable 提供，须在 useNoteTree 之后，依赖 noteList/fetchTree） ──
 const {
   showNoteMappingDialog, noteMappingLoading, noteMappingRules,
@@ -1139,9 +1307,11 @@ const noteTableStructure = useNoteTableStructure({
 const _GENERIC_NAMES = new Set(['项  目', '项 目', '项目', '类  别', '类别', ''])
 function getTableTabLabel(tbl: any, idx: number): string {
   const name = (tbl.name || '').trim()
-  if (!name || _GENERIC_NAMES.has(name)) {
-    // 用 headers 中第二列（通常是"期末余额"/"本期金额"等）区分
-    const headers = tbl.headers || []
+  const headers = tbl.headers || []
+  const firstHeader = (String(headers[0] || '')).replace(/\s+/g, '').trim()
+  const nameNorm = name.replace(/\s+/g, '')
+  // name 为空、通用名称、或等于第一列表头（提取错误）时用序号
+  if (!name || _GENERIC_NAMES.has(name) || (firstHeader && nameNorm === firstHeader)) {
     if (headers.length > 1) {
       const h1 = String(headers[1] || '').trim()
       if (h1 && h1.length <= 8) return `表${idx + 1}·${h1}`
@@ -1343,6 +1513,134 @@ async function onRestoreAutoMode() {
 
 // ── 导出功能（useNoteExport composable）──
 const { exportLoading, onExportWord } = useNoteExport({ projectId, year })
+
+// ── 章节管理：删除 + 排除导出 ──────────────────────────────────────────────────
+const showExportDialog = ref(false)
+
+async function onDeleteSection(noteData: any) {
+  if (!noteData?.note_section) return
+  try {
+    await ElMessageBox.confirm(
+      `确定删除章节「${noteData.section_title}」？删除后可通过重新生成恢复。`,
+      '删除确认',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
+    )
+    const sec = encodeURIComponent(noteData.note_section)
+    await api.delete(`/api/disclosure-notes/${projectId.value}/${year.value}/sections/${sec}`)
+    ElMessage.success('章节已删除')
+    await fetchTree()
+  } catch (e: any) {
+    if (e !== 'cancel' && e?.toString?.() !== 'cancel') {
+      handleApiError(e, '删除失败')
+    }
+  }
+}
+
+async function onToggleExclude(noteData: any) {
+  if (!noteData?.note_section) return
+  const newStatus = noteData.status === 'not_applicable' ? 'draft' : 'not_applicable'
+  try {
+    const sec = encodeURIComponent(noteData.note_section)
+    await api.patch(`/api/disclosure-notes/${projectId.value}/${year.value}/sections/${sec}`, {
+      status: newStatus,
+    })
+    noteData.status = newStatus
+    ElMessage.success(newStatus === 'not_applicable' ? '该章节将不导出到 Word' : '已恢复导出')
+  } catch (e: any) {
+    handleApiError(e, '操作失败')
+  }
+}
+
+function onExportWithConfirm() {
+  showExportDialog.value = true
+}
+
+const exportableSections = computed(() => {
+  return noteList.value.filter(n => n.status !== 'not_applicable')
+})
+const excludedSections = computed(() => {
+  return noteList.value.filter(n => (n as any).status === 'not_applicable')
+})
+
+// ── 导出设置弹窗 ──────────────────────────────────────────────────────────────
+const showExportSettingDialog = ref(false)
+const exportTreeRef = ref<any>(null)
+
+const exportSettingTreeData = computed(() => {
+  // 复用 treeData 结构但只取叶子节点的 id
+  return treeData.value
+})
+const exportCheckedKeys = computed(() => {
+  return noteList.value.filter(n => n.status !== 'not_applicable').map(n => n.id)
+})
+
+async function onSaveExportSettings() {
+  const tree = exportTreeRef.value
+  if (!tree) return
+  const checkedIds = new Set(tree.getCheckedKeys(true) as string[])
+  // 对比变化，批量更新
+  for (const note of noteList.value) {
+    const shouldExport = checkedIds.has(note.id)
+    const currentlyExcluded = note.status === 'not_applicable'
+    if (shouldExport && currentlyExcluded) {
+      const sec = encodeURIComponent(note.note_section)
+      await api.patch(`/api/disclosure-notes/${projectId.value}/${year.value}/sections/${sec}`, { status: 'draft' })
+    } else if (!shouldExport && !currentlyExcluded) {
+      const sec = encodeURIComponent(note.note_section)
+      await api.patch(`/api/disclosure-notes/${projectId.value}/${year.value}/sections/${sec}`, { status: 'not_applicable' })
+    }
+  }
+  ElMessage.success('导出设置已保存')
+  showExportSettingDialog.value = false
+  await fetchTree()
+}
+
+// ── 批量删除弹窗 ──────────────────────────────────────────────────────────────
+const showBatchDeleteDialog = ref(false)
+const batchDeleteTreeRef = ref<any>(null)
+
+async function onBatchDelete() {
+  const tree = batchDeleteTreeRef.value
+  if (!tree) return
+  const checkedIds = new Set(tree.getCheckedKeys(true) as string[])
+  if (checkedIds.size === 0) {
+    ElMessage.warning('请先选择要删除的章节')
+    return
+  }
+  const toDelete = noteList.value.filter(n => checkedIds.has(n.id))
+  for (const note of toDelete) {
+    const sec = encodeURIComponent(note.note_section)
+    await api.delete(`/api/disclosure-notes/${projectId.value}/${year.value}/sections/${sec}`)
+  }
+  ElMessage.success(`已删除 ${toDelete.length} 个章节`)
+  showBatchDeleteDialog.value = false
+  await fetchTree()
+}
+
+// ── 恢复已删除章节弹窗 ────────────────────────────────────────────────────────
+const showRestoreDialog = ref(false)
+const deletedSections = ref<any[]>([])
+const restoreChecked = ref<string[]>([])
+
+async function loadDeletedSections() {
+  restoreChecked.value = []
+  try {
+    const data = await api.get(`/api/disclosure-notes/${projectId.value}/${year.value}/deleted`)
+    deletedSections.value = data || []
+  } catch {
+    deletedSections.value = []
+  }
+}
+
+async function onRestoreSections() {
+  if (restoreChecked.value.length === 0) return
+  for (const id of restoreChecked.value) {
+    await api.patch(`/api/disclosure-notes/${projectId.value}/${year.value}/restore/${id}`, {})
+  }
+  ElMessage.success(`已恢复 ${restoreChecked.value.length} 个章节`)
+  showRestoreDialog.value = false
+  await fetchTree()
+}
 
 function severityTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { error: 'danger', warning: 'warning', info: 'info' }

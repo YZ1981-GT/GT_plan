@@ -67,42 +67,7 @@ def _load_builtin_sets() -> list[dict[str, Any]]:
             "template_codes": all_codes,
             "applicable_audit_type": "annual",
             "applicable_standard": "CAS",
-            "description": "适用于一般企业（国企）年度审计的完整底稿模板集（致同2025修订版）",
-        },
-        {
-            "set_name": "上市公司",
-            "template_codes": all_codes,
-            "applicable_audit_type": "annual",
-            "applicable_standard": "CAS_LISTED",
-            "description": "适用于上市公司年度审计的完整底稿模板集（致同2025修订版）",
-        },
-        {
-            "set_name": "精简版",
-            "template_codes": compact_codes,
-            "applicable_audit_type": "annual",
-            "applicable_standard": "CAS",
-            "description": "适用于小型企业年度审计的精简底稿模板集（仅核心循环一级底稿）",
-        },
-        {
-            "set_name": "IPO",
-            "template_codes": all_codes,
-            "applicable_audit_type": "ipo",
-            "applicable_standard": "CAS",
-            "description": "适用于IPO审计的底稿模板集（全量+专项循环）",
-        },
-        {
-            "set_name": "国企附注",
-            "template_codes": sorted(c for c in all_codes if c[0] == "A"),
-            "applicable_audit_type": "annual",
-            "applicable_standard": "CAS_SOE",
-            "description": "适用于国有企业附注编制的底稿模板集",
-        },
-        {
-            "set_name": "上市附注",
-            "template_codes": sorted(c for c in all_codes if c[0] == "A"),
-            "applicable_audit_type": "annual",
-            "applicable_standard": "CAS_LISTED",
-            "description": "适用于上市公司附注编制的底稿模板集",
+            "description": "适用于一般企业年度审计的完整底稿模板集（致同2025修订版，206条编码）",
         },
     ]
 
@@ -516,26 +481,39 @@ class TemplateEngine:
         project_wp_dir.mkdir(parents=True, exist_ok=True)
 
         # ── 性能优化：批量预加载 WpTemplate（避免 N+1 查询） ──
-        from sqlalchemy import func as sa_func
-        # 子查询：每个 template_code 的最新版本 id
-        latest_subq = (
-            sa.select(
-                WpTemplate.template_code,
-                sa_func.max(WpTemplate.id).label("max_id"),
-            )
-            .where(
-                WpTemplate.template_code.in_(template_codes),
-                WpTemplate.is_deleted == sa.false(),
-            )
-            .group_by(WpTemplate.template_code)
-            .subquery()
-        )
-        tpl_result = await db.execute(
-            sa.select(WpTemplate).join(
-                latest_subq, WpTemplate.id == latest_subq.c.max_id
-            )
-        )
-        tpl_map: dict[str, Any] = {t.template_code: t for t in tpl_result.scalars().all()}
+        # 注意：wp_template 表可能为空（模板尚未上传），此时跳过
+        tpl_map: dict[str, Any] = {}
+        try:
+            tpl_count = (await db.execute(
+                sa.select(sa.func.count()).select_from(WpTemplate).where(WpTemplate.is_deleted == sa.false())
+            )).scalar() or 0
+            if tpl_count > 0:
+                # 用 created_at 取最新版（避免 max(uuid) 不支持）
+                from sqlalchemy import func as sa_func
+                latest_subq = (
+                    sa.select(
+                        WpTemplate.template_code,
+                        sa_func.max(WpTemplate.created_at).label("max_created"),
+                    )
+                    .where(
+                        WpTemplate.template_code.in_(template_codes),
+                        WpTemplate.is_deleted == sa.false(),
+                    )
+                    .group_by(WpTemplate.template_code)
+                    .subquery()
+                )
+                tpl_result = await db.execute(
+                    sa.select(WpTemplate).join(
+                        latest_subq,
+                        sa.and_(
+                            WpTemplate.template_code == latest_subq.c.template_code,
+                            WpTemplate.created_at == latest_subq.c.max_created,
+                        )
+                    ).where(WpTemplate.is_deleted == sa.false())
+                )
+                tpl_map = {t.template_code: t for t in tpl_result.scalars().all()}
+        except Exception:
+            pass  # wp_template 表不存在或查询失败时降级为空 map
 
         # ── 批量检查已存在的 wp_index（幂等：跳过已有编码） ──
         existing_codes_result = await db.execute(
@@ -545,6 +523,8 @@ class TemplateEngine:
             )
         )
         existing_codes = set(r[0] for r in existing_codes_result.all())
+
+        _pending_wps: list[tuple] = []  # (wp_index, template_file_path)
 
         for code in template_codes:
             # 跳过被裁剪的底稿
@@ -594,7 +574,7 @@ class TemplateEngine:
             wp = WorkingPaper(
                 project_id=project_id,
                 wp_index_id=wp_index.id,
-                file_path=template_file_path,  # 引用模板库路径，不复制文件
+                file_path=template_file_path or "",  # NOT NULL 约束兜底
                 source_type=WpSourceType.template,
                 file_version=1,
                 created_by=created_by,

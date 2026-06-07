@@ -17,19 +17,7 @@
               <el-descriptions-item label="项目类型">
                 <el-tag size="small">{{ typeLabel(project.project_type) }}</el-tag>
               </el-descriptions-item>
-              <el-descriptions-item label="当前状态">
-                <el-tooltip :content="statusTooltip" placement="bottom" :show-after="200">
-                  <span style="cursor: help">
-                    <GtStatusTag dict-key="project_status" :value="project.status" />
-                  </span>
-                </el-tooltip>
-                <span v-if="project.status === 'planning'" class="gt-status-hint">
-                  — 请先导入账套数据，完成后状态将自动推进
-                </span>
-                <span v-else-if="project.status === 'created'" class="gt-status-hint">
-                  — 新建项目，请开始配置
-                </span>
-              </el-descriptions-item>
+              <el-descriptions-item label="公司简称">{{ project.short_name || '-' }}</el-descriptions-item>
               <el-descriptions-item label="报表准则">
                 <el-tag :type="project.template_type === 'soe' ? 'warning' : 'primary'" size="small">
                   {{ project.template_type === 'soe' ? '国企版' : project.template_type === 'listed' ? '上市版' : '未设置' }}

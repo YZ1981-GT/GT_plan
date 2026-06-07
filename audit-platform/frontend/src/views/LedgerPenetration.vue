@@ -1,11 +1,6 @@
 <template>
   <div class="gt-penetration" :class="{ 'gt-penetration--fullscreen': isFullscreen }" ref="penetrationRef">
     <!-- 全屏模式下的退出提示 -->
-    <div v-if="isFullscreen" class="gt-fullscreen-topbar">
-      <span>{{ currentProject?.client_name || '—' }} · 账簿查询</span>
-      <div style="flex:1" />
-      <el-button size="small" @click="toggleFullscreen">退出全屏</el-button>
-    </div>
     <!-- 账套信息栏 -->
     <div class="gt-ledger-header">
       <div class="gt-ledger-title">

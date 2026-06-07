@@ -270,7 +270,7 @@ const catalogTitle = computed(() => {
 // 浏览模式：首页/项目列表/其他一级模块（非具体项目子页面和新建向导）
 // 全宽模式路径（不显示中间栏项目列表）
 const FULLWIDTH_PATHS = [
-  '/', '/projects/new', '/recycle-bin', '/forum', '/private-storage',
+  '/', '/projects/new', '/projects/full', '/recycle-bin', '/forum', '/private-storage',
   '/knowledge', '/consolidation', '/attachments', '/confirmation',
   '/archive', '/work-hours',
   '/template-library', '/custom-query',

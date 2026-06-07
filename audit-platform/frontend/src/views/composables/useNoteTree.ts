@@ -184,11 +184,11 @@ export function useNoteTree(options: UseNoteTreeOptions): UseNoteTreeReturn {
       const labels = templateType.value === 'listed' ? LISTED_LABELS : SOE_LABELS
       const chLabel = `${ch.prefix}、${labels[ch.prefix] || items[0]?.section_title || ''}`
 
-      // 会计政策（国企四/上市三）：>10个子章节时分组
+      // 会计政策（国企四/上市三）：直接按模板顺序平铺，不分大类
       if ((ch.prefix === '三' || ch.prefix === '四') && items.length > 10) {
         result.push({
           id: `chapter_${ch.prefix}`, label: `${chLabel}（${items.length}）`, isGroup: true,
-          children: buildGroupedChildren(items, POLICY_GROUPS, `ch_${ch.prefix}`),
+          children: items.map(n => ({ id: n.id, label: n.section_title, data: n })),
         })
 
       // 报表注释（国企八/上市五）：按资产/负债/权益/损益分组

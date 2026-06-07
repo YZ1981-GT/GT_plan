@@ -179,72 +179,28 @@
               </span>
             </transition>
           </div>
-        </nav>
-        <div class="gt-sidebar-bottom">
-          <!-- 工具簇（按职能分组，扁平不折叠便于一击即达）-->
-          <div class="gt-sidebar-tools-title" v-if="!sidebarCollapsed">工具</div>
-
-          <!-- 知识 -->
-          <div class="gt-tool-group-label" v-if="!sidebarCollapsed">📚 知识</div>
-          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': route.path.startsWith('/knowledge') }" @click="router.push('/knowledge')" title="知识库">
-            <el-icon :size="18"><Reading /></el-icon>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">知识库</span>
-            </transition>
-          </div>
-          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/private-storage' }" @click="router.push('/private-storage')" title="私人库">
-            <el-icon :size="18"><Suitcase /></el-icon>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">私人库</span>
-            </transition>
-          </div>
-          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/settings/report-format' }" @click="router.push('/settings/report-format')" title="排版模板">
-            <el-icon :size="18"><Document /></el-icon>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">排版模板</span>
-            </transition>
-          </div>
-
-          <!-- AI -->
-          <div class="gt-tool-group-label" v-if="!sidebarCollapsed">🤖 AI</div>
-          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/settings/ai-models' }" @click="router.push('/settings/ai-models')" title="AI 模型">
-            <el-icon :size="18"><Cpu /></el-icon>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">AI 模型</span>
-            </transition>
-          </div>
-          <div class="gt-nav-item gt-nav-item--tool" @click="showFormulaManager = true" title="公式管理">
-            <span class="gt-tool-text-icon" style="font-style:italic;font-weight:700">ƒx</span>
+          <!-- 公式管理（弹窗触发，非路由） -->
+          <div class="gt-nav-item" @click="showFormulaManager = true" title="公式管理">
+            <span class="gt-tool-text-icon" style="font-style:italic;font-weight:700;width:20px;text-align:center;display:inline-block">ƒx</span>
             <transition name="gt-fade">
               <span v-if="!sidebarCollapsed" class="gt-nav-label">公式管理</span>
             </transition>
           </div>
-
-          <!-- 查询 -->
-          <div class="gt-tool-group-label" v-if="!sidebarCollapsed">🔎 查询</div>
-          <div class="gt-nav-item gt-nav-item--tool" @click="showCustomQuery = true" title="高级查询">
-            <el-icon :size="18"><Search /></el-icon>
+          <!-- 高级查询（弹窗触发，非路由） -->
+          <div class="gt-nav-item" @click="showCustomQuery = true" title="高级查询">
+            <el-icon :size="20"><Search /></el-icon>
             <transition name="gt-fade">
               <span v-if="!sidebarCollapsed" class="gt-nav-label">高级查询</span>
             </transition>
           </div>
-
-          <!-- 反馈 -->
-          <div class="gt-tool-group-label" v-if="!sidebarCollapsed">💬 反馈</div>
-          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/forum' }" @click="router.push('/forum')" title="吐槽求助">
-            <el-icon :size="18"><ChatDotSquare /></el-icon>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">吐槽求助</span>
-            </transition>
-          </div>
-
+          <!-- 收起 -->
           <div class="gt-nav-item" @click="sidebarCollapsed = !sidebarCollapsed" title="折叠">
-            <el-icon :size="18"><DArrowLeft v-if="!sidebarCollapsed" /><DArrowRight v-else /></el-icon>
+            <el-icon :size="20"><DArrowLeft v-if="!sidebarCollapsed" /><DArrowRight v-else /></el-icon>
             <transition name="gt-fade">
               <span v-if="!sidebarCollapsed" class="gt-nav-label">收起</span>
             </transition>
           </div>
-        </div>
+        </nav>
       </aside>
 
       <!-- 左侧拖拽分隔线（始终显示，用于调整左侧栏宽度） -->
@@ -392,11 +348,14 @@ const FALLBACK_NAV = [
   { key: 'workhours', label: '工时', icon: Timer, path: '/work-hours', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'eqcr'] },
   { key: 'mgmt-dashboard', label: '看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
   { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
-  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'developing', roles: null },
+  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'production', roles: null },
   { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
   { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor'] },
   { key: 'template-library', label: '模板库', icon: Document, path: '/template-library', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
   { key: 'users', label: '账号权限', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
+  { key: 'knowledge', label: '知识库', icon: Reading, path: '/knowledge', maturity: 'production', roles: null },
+  { key: 'private-storage', label: '私人库', icon: Suitcase, path: '/private-storage', maturity: 'production', roles: null },
+  { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
 ]
 
 /**
@@ -1082,11 +1041,16 @@ onUnmounted(() => {
 .gt-maturity-dev { background: var(--gt-color-border-light); color: var(--gt-color-info); }
 
 .gt-sidebar-bottom {
-  border-top: 1px solid var(--gt-color-border-light);
   padding: var(--gt-space-1);
-  flex-shrink: 0; /* 工具区不被压缩，主导航区滚动 */
-  max-height: 45vh; /* 窗口极小时工具区也不能占满，留空间给主导航 */
+  flex-shrink: 0;
+  max-height: 45vh;
   overflow-y: auto;
+}
+.gt-sidebar-divider {
+  height: 1px;
+  background: var(--gt-color-border-purple-light, #d8b8ee);
+  margin: 8px 12px;
+  opacity: 0.6;
 }
 
 /* 工具簇（侧栏底部） */

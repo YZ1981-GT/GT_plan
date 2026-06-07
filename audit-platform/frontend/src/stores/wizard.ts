@@ -179,14 +179,46 @@ export const useWizardStore = defineStore('wizard', {
         const resp = await http.get(`/api/projects/${projectId}/wizard`, {
           validateStatus: (s: number) => s < 400 || s === 404,
         })
-        if (resp.status === 404) return // 无向导状态，静默
+        if (resp.status === 404) {
+          // 无向导状态 → 从项目详情回填基本信息（兼容批量导入项目）
+          await this._fallbackFromProjectDetail(projectId)
+          return
+        }
         const state: WizardState = resp.data
         this.applyWizardState(state)
+        // 如果 wizard_state 存在但 basic_info 为空（批量导入项目），从项目详情回填
+        if (!this.stepData.basic_info || !Object.keys(this.stepData.basic_info).length) {
+          await this._fallbackFromProjectDetail(projectId)
+        }
       } catch (e: any) {
         // 其他错误静默（不阻塞页面加载）
         console.warn('[wizard] loadWizardState failed:', e?.message)
+        // 尝试从项目详情回填
+        await this._fallbackFromProjectDetail(projectId)
       } finally {
         this.loading = false
+      }
+    },
+
+    /** 从项目详情 API 回填 basic_info（批量导入项目的兜底） */
+    async _fallbackFromProjectDetail(projectId: string) {
+      try {
+        const { data } = await http.get(`/api/projects/${projectId}`)
+        const proj = data
+        this.projectId = projectId
+        this.stepData.basic_info = {
+          client_name: proj.client_name || '',
+          short_name: proj.short_name || '',
+          company_code: proj.company_code || '',
+          audit_year: proj.audit_year || null,
+          project_type: proj.project_type || 'annual',
+          accounting_standard: 'CAS',
+          template_type: proj.template_type || 'soe',
+          report_scope: proj.report_scope || 'standalone',
+        }
+        this.completedSteps.basic_info = true
+      } catch {
+        // 项目详情也失败则放弃
       }
     },
 

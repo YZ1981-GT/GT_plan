@@ -2,7 +2,7 @@
   <div class="gt-project-wizard gt-fade-in">
     <!-- Content Area -->
     <div v-loading="wizardStore.loading" class="gt-wizard-content">
-      <BasicInfoStep ref="basicInfoRef" />
+      <BasicInfoStep ref="basicInfoRef" :key="wizardStore.projectId || 'new'" />
     </div>
 
     <!-- Phase 3 需求 5.1：合并项目创建后配置合并范围（选已有单体挂子公司） -->
@@ -17,11 +17,19 @@
     <div class="gt-wizard-footer">
       <div class="gt-wizard-footer-spacer" />
       <el-button
+        v-if="wizardStore.projectId"
+        :loading="wizardStore.loading || submitting"
+        @click="handleSave"
+      >
+        保存
+      </el-button>
+      <el-button
         type="primary"
         :loading="wizardStore.loading || submitting"
         @click="handleConfirm"
+        :disabled="isAlreadyConfirmed"
       >
-        {{ wizardStore.projectId ? '确认' : '确认创建' }}
+        {{ isAlreadyConfirmed ? '已确认' : wizardStore.projectId ? '确认' : '确认创建' }}
       </el-button>
     </div>
   </div>
@@ -56,6 +64,13 @@ const basicInfoRef = ref<DataStepRef | null>(null)
 const wizardFormRef = computed(() => basicInfoRef.value?.formRef ?? null)
 const { submit: submitWizard, submitting } = useFormSubmit(wizardFormRef)
 
+// 项目是否已确认（planning 及之后状态不能重复确认）
+const isAlreadyConfirmed = computed(() => {
+  const state = wizardStore.stepData?.basic_info
+  // 如果 wizardStore 已加载且项目存在，检查状态
+  return !!(wizardStore.projectId && wizardStore.currentStepIndex >= 0 && state)
+})
+
 onMounted(async () => {
   // If editing an existing project, load wizard state
   const projectId = route.query.projectId as string | undefined
@@ -78,6 +93,15 @@ async function validateAndPersistCurrentStep(): Promise<Record<string, unknown> 
     await wizardStore.saveStep('basic_info', data)
   }
   return data
+}
+
+async function handleSave() {
+  await submitWizard(async () => {
+    const data = await validateAndPersistCurrentStep()
+    if (!data) return
+    ElMessage.success('项目信息已保存')
+    router.push('/projects')
+  })
 }
 
 async function handleConfirm() {
