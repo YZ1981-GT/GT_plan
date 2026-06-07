@@ -63,6 +63,8 @@ _INFRA_TABLES = {
 # TODO(schema-debt): 逐个消除，清零后删除本白名单。
 _KNOWN_PHANTOM_DEBT = {
     "wp_template_registry",       # custom_query.py/wp_template_registry.py — 服务层 table_exists 懒判，未迁移（功能债务）
+    "ai_generated_content",       # signoff_checklist_service.py — 远程新增，迁移待补
+    "event_cascade_health",       # signoff_checklist_service.py — 远程新增，迁移待补
 }
 
 # PG 函数式表源（FROM 后跟函数，非真实表）

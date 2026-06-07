@@ -291,6 +291,13 @@ class TbBalance(Base):
     dataset_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True, index=True
     )  # Phase 17: 关联 ledger_datasets，读路径统一后用此字段过滤
+    # V064: 符号约定方向字段
+    opening_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    opening_direction_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    closing_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    closing_direction_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sign_convention_version: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    sign_anomaly_flags: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -366,6 +373,9 @@ class TbLedger(Base):
     dataset_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True, index=True
     )  # Phase 17: 关联 ledger_datasets
+    # V064: 符号约定方向字段
+    entry_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    entry_direction_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -447,6 +457,13 @@ class TbAuxBalance(Base):
     dataset_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True, index=True
     )  # Phase 17: 关联 ledger_datasets
+    # V064: 符号约定方向字段
+    opening_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    opening_direction_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    closing_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    closing_direction_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sign_convention_version: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    sign_anomaly_flags: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -537,6 +554,9 @@ class TbAuxLedger(Base):
     dataset_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True, index=True
     )  # Phase 17: 关联 ledger_datasets
+    # V064: 符号约定方向字段
+    entry_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    entry_direction_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -569,6 +589,45 @@ class TbAuxLedger(Base):
             "idx_tb_aux_ledger_tenant_project_year",
             "tenant_id", "project_id", "year",
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# DirectionOverride 模型 (V064)
+# ---------------------------------------------------------------------------
+
+
+class DirectionOverride(Base):
+    """方向覆盖 overlay 表 — 用户确认/修正方向时记录，不改写原始四表导入行。"""
+
+    __tablename__ = "direction_override"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    dataset_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    table_name: Mapped[str] = mapped_column(String(30), nullable=False)
+    record_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    original_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    override_direction: Mapped[str] = mapped_column(String(10), nullable=False)
+    override_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    override_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("staff_members.id"), nullable=True
+    )
+    override_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_direction_override_project_table", "project_id", "table_name"),
+        Index("idx_direction_override_record", "record_id"),
     )
 
 
