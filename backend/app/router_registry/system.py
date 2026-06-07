@@ -160,6 +160,10 @@ def register_system_routers(app: FastAPI) -> None:
     app.include_router(ledger_import_v2_router, tags=["ledger-import-v2"])
     app.include_router(ledger_raw_extra_router, tags=["ledger-import-v2"])
 
+    # ═══ §24b. 符号约定方向 API ═══
+    from app.routers.sign_convention import router as sign_convention_router
+    app.include_router(sign_convention_router, tags=["符号约定"])
+
     # ═══ §25. 账表数据管理 ═══
     from app.routers.ledger_data import router as ledger_data_router
     app.include_router(ledger_data_router, tags=["ledger-data"])

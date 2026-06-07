@@ -114,6 +114,73 @@ function inferDirectionByCategory(
   return null
 }
 
+/**
+ * 获取方向来源的显示标签。
+ *
+ * Task 7.5: 历史 fallback 显示 `legacy_inferred` / "推断方向"
+ */
+export function getDirectionSourceLabel(source: DirectionSource): string {
+  const labels: Record<DirectionSource, string> = {
+    explicit_direction: '显式方向',
+    split_columns: '借贷分列',
+    account_category_inferred: '类别推断',
+    account_category_inferred_low_confidence: '低置信推断',
+    user_override: '用户覆盖',
+    legacy_inferred: '推断方向',
+    unknown: '未知',
+  }
+  return labels[source] || source
+}
+
+/**
+ * 判断是否应显示"推断方向"徽标。
+ *
+ * Task 7.5: direction_source === 'legacy_inferred' 时显示 "(推断方向)" badge
+ */
+export function shouldShowInferredBadge(result: DirectionResult): boolean {
+  return result.source === 'legacy_inferred'
+    || result.source === 'account_category_inferred_low_confidence'
+}
+
+/**
+ * 调用后端 overlay 持久化接口保存方向覆盖。
+ *
+ * Task 7.4: 本地 directionOverrides 改为调用后端 overlay 持久化接口
+ */
+export async function saveDirectionOverride(
+  projectId: string,
+  datasetId: string,
+  recordId: string,
+  direction: 'debit' | 'credit',
+  reason: string,
+): Promise<{ id: string; override_at: string }> {
+  const url = `/api/projects/${projectId}/datasets/${datasetId}/sign-convention/direction-override`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      table_name: 'tb_balance',
+      record_id: recordId,
+      override_direction: direction,
+      override_reason: reason,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`方向覆盖保存失败: ${response.status}`)
+  }
+
+  const body = await response.json()
+  // 处理 ResponseWrapperMiddleware 信封
+  const data = body.data ?? body
+  return { id: data.id, override_at: data.override_at }
+}
+
 export function useTrialBalanceDirection() {
-  return { getDirection }
+  return {
+    getDirection,
+    getDirectionSourceLabel,
+    shouldShowInferredBadge,
+    saveDirectionOverride,
+  }
 }

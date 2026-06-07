@@ -10,7 +10,13 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { getDirection, type TrialBalanceRow } from '../useTrialBalanceDirection'
+import {
+  getDirection,
+  getDirectionSourceLabel,
+  shouldShowInferredBadge,
+  saveDirectionOverride,
+  type TrialBalanceRow,
+} from '../useTrialBalanceDirection'
 
 describe('getDirection — 方向来源优先级', () => {
   it('优先使用后端权威方向 (backend field)', () => {
@@ -145,5 +151,53 @@ describe('getDirection — 编码前缀 fallback', () => {
     const result = getDirection(row)
     expect(result.direction).toBe('debit')
     expect(result.source).toBe('legacy_inferred')
+  })
+})
+
+
+describe('getDirectionSourceLabel — Task 7.5 推断方向标签', () => {
+  it('legacy_inferred 显示"推断方向"', () => {
+    expect(getDirectionSourceLabel('legacy_inferred')).toBe('推断方向')
+  })
+
+  it('explicit_direction 显示"显式方向"', () => {
+    expect(getDirectionSourceLabel('explicit_direction')).toBe('显式方向')
+  })
+
+  it('user_override 显示"用户覆盖"', () => {
+    expect(getDirectionSourceLabel('user_override')).toBe('用户覆盖')
+  })
+})
+
+describe('shouldShowInferredBadge — Task 7.5 推断方向徽标', () => {
+  it('legacy_inferred 来源应显示徽标', () => {
+    const result = { direction: 'credit' as const, source: 'legacy_inferred' as const }
+    expect(shouldShowInferredBadge(result)).toBe(true)
+  })
+
+  it('account_category_inferred_low_confidence 也显示徽标', () => {
+    const result = { direction: 'debit' as const, source: 'account_category_inferred_low_confidence' as const }
+    expect(shouldShowInferredBadge(result)).toBe(true)
+  })
+
+  it('explicit_direction 不显示徽标', () => {
+    const result = { direction: 'debit' as const, source: 'explicit_direction' as const }
+    expect(shouldShowInferredBadge(result)).toBe(false)
+  })
+
+  it('user_override 不显示徽标', () => {
+    const result = { direction: 'credit' as const, source: 'user_override' as const }
+    expect(shouldShowInferredBadge(result)).toBe(false)
+  })
+})
+
+describe('saveDirectionOverride — Task 7.4 后端持久化接口调用', () => {
+  it('函数存在且可调用', () => {
+    expect(typeof saveDirectionOverride).toBe('function')
+  })
+
+  it('参数签名正确（5 个参数）', () => {
+    // saveDirectionOverride(projectId, datasetId, recordId, direction, reason)
+    expect(saveDirectionOverride.length).toBe(5)
   })
 })

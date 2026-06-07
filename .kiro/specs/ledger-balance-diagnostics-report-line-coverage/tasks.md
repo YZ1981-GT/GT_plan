@@ -40,7 +40,7 @@
   - [x] 4.6 测试：每个 caliber 的数据源和公式输出与设计一致
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 5. 前端统一诊断弹窗
+- [x] 5. 前端统一诊断弹窗
   - [x] 5.1 新增 `BalanceDiagnosticsDialog.vue`
   - [x] 5.2 展示差额、口径、原因、样本、修复入口
   - [x] 5.3 `DiagnosticPanel.vue` 对平衡类 finding 打开统一弹窗
