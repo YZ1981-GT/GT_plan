@@ -802,6 +802,21 @@ class ImportJobRunner:
             for attempt in range(3):
                 try:
                     async with async_session() as db:
+                        # 幂等保护：作业可能已被超时检测器置为终态（timed_out/canceled/
+                        # completed）。此时不能再转 failed（状态机禁止 timed_out→failed，
+                        # 会徒劳重试 3 次）。先读当前状态，已是终态则只记录+释放锁。
+                        existing = await ImportJobService.get_job(db, job_id)
+                        if existing and existing.status in (
+                            JobStatus.timed_out,
+                            JobStatus.canceled,
+                            JobStatus.completed,
+                            JobStatus.failed,
+                        ):
+                            logger.info(
+                                "ImportJob %s already terminal (%s), skip failed transition",
+                                job_id, existing.status.value,
+                            )
+                            break
                         # P1: canceled 时不标 failed
                         target_status = (
                             JobStatus.canceled if is_canceled else JobStatus.failed
