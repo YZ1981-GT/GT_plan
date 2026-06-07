@@ -27,7 +27,9 @@ from .aux_dimension import parse_aux_dimension
 
 __all__ = [
     "convert_balance_rows",
+    "convert_balance_rows_v2",
     "convert_ledger_rows",
+    "convert_ledger_rows_v2",
     "safe_decimal",
     "parse_date_val",
     "parse_period_str",
@@ -393,3 +395,87 @@ def convert_ledger_rows(
         })
 
     return ledger_rows, aux_ledger_rows, aux_stats
+
+
+# ---------------------------------------------------------------------------
+# 结构化结果 v2 接口
+# ---------------------------------------------------------------------------
+
+
+def convert_balance_rows_v2(
+    rows: list[dict],
+    *,
+    default_company: str = "default",
+) -> "BalanceConversionResult":
+    """余额表转换 — 返回结构化 BalanceConversionResult。
+
+    保持纯函数特性，不访问 DB。新增：
+    - warnings: 转换警告（如借贷两方同时非零）
+    - sign_anomalies: 暂为空列表（待 Task 4 方向推导规则实现后填充）
+    - stats: 转换统计摘要
+
+    与 convert_balance_rows 行为一致，仅返回类型不同。
+    """
+    from .conversion_result import BalanceConversionResult
+    from .sign_convention_types import CURRENT_SIGN_CONVENTION
+
+    balance_rows, aux_balance_rows = convert_balance_rows(
+        rows, default_company=default_company
+    )
+
+    stats = {
+        "total_input_rows": len(rows),
+        "balance_rows": len(balance_rows),
+        "aux_balance_rows": len(aux_balance_rows),
+        "sign_convention_version": CURRENT_SIGN_CONVENTION,
+        "rows_with_direction": 0,
+        "anomaly_count": 0,
+    }
+
+    return BalanceConversionResult(
+        rows=balance_rows,
+        aux_rows=aux_balance_rows,
+        warnings=[],
+        sign_anomalies=[],
+        stats=stats,
+    )
+
+
+def convert_ledger_rows_v2(
+    rows: list[dict],
+    *,
+    default_company: str = "default",
+) -> "LedgerConversionResult":
+    """序时账转换 — 返回结构化 LedgerConversionResult。
+
+    保持纯函数特性，不访问 DB。新增：
+    - warnings: 转换警告
+    - sign_anomalies: 暂为空列表
+    - stats: 转换统计摘要
+
+    与 convert_ledger_rows 行为一致，仅返回类型不同。
+    """
+    from .conversion_result import LedgerConversionResult
+    from .sign_convention_types import CURRENT_SIGN_CONVENTION
+
+    ledger_rows, aux_ledger_rows, aux_stats = convert_ledger_rows(
+        rows, default_company=default_company
+    )
+
+    stats = {
+        "total_input_rows": len(rows),
+        "ledger_rows": len(ledger_rows),
+        "aux_ledger_rows": len(aux_ledger_rows),
+        "sign_convention_version": CURRENT_SIGN_CONVENTION,
+        "rows_with_direction": 0,
+        "anomaly_count": 0,
+    }
+
+    return LedgerConversionResult(
+        rows=ledger_rows,
+        aux_rows=aux_ledger_rows,
+        aux_stats=aux_stats,
+        warnings=[],
+        sign_anomalies=[],
+        stats=stats,
+    )

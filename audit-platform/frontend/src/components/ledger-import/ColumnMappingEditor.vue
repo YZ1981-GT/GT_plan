@@ -361,17 +361,30 @@ function onConfirm() {
   const mappings: ConfirmedMapping[] = props.sheets.map((sheet, idx) => {
     const rows = sheetMappings.value.get(idx) || []
     const columnMapping: Record<string, string> = {}
+    const mappingEntries: { column_index: number; original_header: string; canonical_header: string; standard_field: string }[] = []
     for (const row of rows) {
       if (row.mappedField) {
         columnMapping[String(row.column_index)] = row.mappedField
+        mappingEntries.push({
+          column_index: row.column_index,
+          original_header: row.column_header || '',
+          canonical_header: row.column_header || '',
+          standard_field: row.mappedField,
+        })
       }
     }
+    const sheetKey = `${sheet.file_name}:${sheet.sheet_name}`
     return {
+      file_name: sheet.file_name,
+      sheet_name: sheet.sheet_name,
+      sheet_key: sheetKey,
+      table_type: sheet.table_type,
+      mapping_entries: mappingEntries,
+      aux_dimension_columns: sheet.aux_dimension_columns,
+      // 旧格式兼容（submit gate 兼容期间保留）
       file: sheet.file_name,
       sheet: sheet.sheet_name,
-      table_type: sheet.table_type,
       column_mapping: columnMapping,
-      aux_dimension_columns: sheet.aux_dimension_columns,
     }
   })
   emit('confirm', mappings)

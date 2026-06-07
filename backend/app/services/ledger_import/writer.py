@@ -273,10 +273,92 @@ async def activate_dataset(
     )
 
 
+def prepare_rows_from_normalized_mapping(
+    raw_rows: list[dict[str, Any]],
+    mapping_entries: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[LedgerImportError]]:
+    """Pipeline 消费规范化 DTO：按 column_index 取原始列值。
+
+    见 design §4.1 / Task 5.5 + 5.6：
+    - pipeline 只消费 NormalizedMappingDTO 的 mapping_entries[]
+    - 按 column_index 从原始行取值（原始行为 list 或 按 canonical_header 索引的 dict）
+    - canonical_header 作为 raw_extra key（保证唯一，重复原始表头不覆盖）
+
+    Args:
+        raw_rows: 原始行列表。每行为 dict，key 为 canonical_header 或 column_index。
+                  如果 key 是整数则按 column_index 取值；如果 key 是字符串则按
+                  canonical_header 取值。
+        mapping_entries: NormalizedMappingDTO.mapping_entries 的 dict 表示。
+                        每条包含 column_index, original_header, canonical_header, standard_field。
+
+    Returns:
+        (transformed_rows, warnings)
+        - 每个 transformed row 有 standard_field key + 可选 'raw_extra' key
+        - raw_extra 使用 canonical_header 作为 key（保证唯一，重复表头不覆盖）
+    """
+    transformed: list[dict[str, Any]] = []
+    warnings: list[LedgerImportError] = []
+
+    # 建立 canonical_header → standard_field 索引
+    mapped_canonical_headers: set[str] = set()
+    canonical_to_std: dict[str, str] = {}
+    for entry in mapping_entries:
+        ch = entry["canonical_header"]
+        mapped_canonical_headers.add(ch)
+        canonical_to_std[ch] = entry["standard_field"]
+
+    # 识别所有 canonical headers（排序按 column_index 保持稳定）
+    sorted_entries = sorted(mapping_entries, key=lambda e: e["column_index"])
+    all_canonical_headers = [e["canonical_header"] for e in sorted_entries]
+
+    for raw_row in raw_rows:
+        std_row: dict[str, Any] = {}
+
+        # 按 mapping_entries 取值
+        for entry in mapping_entries:
+            col_idx = entry["column_index"]
+            canonical = entry["canonical_header"]
+            std_field = entry["standard_field"]
+
+            # 尝试按 canonical_header key 取值（dict row）
+            val = raw_row.get(canonical)
+            if val is None and isinstance(col_idx, int):
+                # 备选：按 column_index 取值（list-like row 转 dict 时 key 可能是 int）
+                val = raw_row.get(col_idx)
+
+            # 多对一处理：首个非空值保留
+            existing = std_row.get(std_field)
+            existing_str = str(existing).strip() if existing is not None else ""
+            val_str = str(val).strip() if val is not None else ""
+
+            if not existing_str:
+                std_row[std_field] = val
+            # 后续非空值忽略（简化版本，pipeline 阶段不做 discarded 保留）
+
+        # raw_extra：使用 canonical_header 作为 key（保证唯一，不覆盖）
+        extra: dict[str, Any] = {}
+        for key in raw_row:
+            # 只保留未映射到 standard_field 的列
+            if key not in mapped_canonical_headers:
+                value = raw_row[key]
+                if value is not None and str(value).strip():
+                    extra[str(key)] = value
+
+        if extra:
+            std_row["raw_extra"] = _sanitize_raw_extra(extra)
+        else:
+            std_row["raw_extra"] = None
+
+        transformed.append(std_row)
+
+    return transformed, warnings
+
+
 __all__ = [
     "write_chunk",
     "build_raw_extra",
     "prepare_rows_with_raw_extra",
+    "prepare_rows_from_normalized_mapping",
     "activate_dataset",
     "clear_project_year",
     "bulk_insert_staged",

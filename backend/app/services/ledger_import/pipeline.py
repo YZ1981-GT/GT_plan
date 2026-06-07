@@ -264,7 +264,7 @@ async def execute_pipeline(
     from app.services.dataset_service import DatasetService
     from app.services.smart_import_engine import rebuild_aux_balance_summary
 
-    from .converter import convert_balance_rows, convert_ledger_rows
+    from .converter import convert_balance_rows, convert_balance_rows_v2, convert_ledger_rows, convert_ledger_rows_v2
     from .detector import detect_file_from_path
     from .identifier import identify
     from .parsers.csv_parser import iter_csv_rows_from_path
@@ -582,7 +582,11 @@ async def execute_pipeline(
                     balance_cleaned_accumulated.extend(cleaned)
                 elif sheet.table_type in ("ledger", "aux_ledger"):
                     _t = _time.time()
-                    ledger, aux_ledger, _stats = convert_ledger_rows(cleaned)
+                    ledger_result_v2 = convert_ledger_rows_v2(cleaned)
+                    ledger = ledger_result_v2.rows
+                    aux_ledger = ledger_result_v2.aux_rows
+                    # 合并 v2 warnings 到 all_findings
+                    all_findings.extend(ledger_result_v2.warnings)
                     _t_convert += _time.time() - _t
                     _t = _time.time()
                     await _insert(TbLedger, ledger)
@@ -618,7 +622,11 @@ async def execute_pipeline(
             # Balance sheet 累积完毕，统一 convert + 写入
             if is_balance_sheet and balance_cleaned_accumulated:
                 _t = _time.time()
-                bal, aux_bal = convert_balance_rows(balance_cleaned_accumulated)
+                result_v2 = convert_balance_rows_v2(balance_cleaned_accumulated)
+                bal = result_v2.rows
+                aux_bal = result_v2.aux_rows
+                # 合并 v2 warnings 到 all_findings
+                all_findings.extend(result_v2.warnings)
                 _t_convert += _time.time() - _t
                 logger.info(
                     "Pipeline %s balance sheet %s: cleaned=%d dedup→balance=%d aux=%d",

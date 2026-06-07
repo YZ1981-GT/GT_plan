@@ -2,42 +2,42 @@
 
 ## 任务总览
 
-- [ ] 1. 定义统一诊断 DTO
-  - [ ] 1.1 后端新增 `BalanceDiagnosticsResult`、`DiagnosticCause`、`DiagnosticJumpTarget`
-  - [ ] 1.2 前端新增对应 TypeScript 类型
-  - [ ] 1.3 明确 `caliber` 枚举与中文展示文案
-  - [ ] 1.4 增加 DTO fixture，确保前后端字段一致
-  - [ ] 1.5 为每个 `caliber` 定义数据源、公式和 top_contributors 来源
-  - [ ] 1.6 `DiagnosticJumpTarget` 增加 transport 字段，明确 route query / dialog prop / event payload
+- [x] 1. 定义统一诊断 DTO
+  - [x] 1.1 后端新增 `BalanceDiagnosticsResult`、`DiagnosticCause`、`DiagnosticJumpTarget`
+  - [x] 1.2 前端新增对应 TypeScript 类型
+  - [x] 1.3 明确 `caliber` 枚举与中文展示文案
+  - [x] 1.4 增加 DTO fixture，确保前后端字段一致
+  - [x] 1.5 为每个 `caliber` 定义数据源、公式和 top_contributors 来源
+  - [x] 1.6 `DiagnosticJumpTarget` 增加 transport 字段，明确 route query / dialog prop / event payload
   - _Requirements: 1.1, 1.3, 1.4, 1.5, 6.5_
 
-- [ ] 2. 新增 `BalanceDiagnosticsService`
-  - [ ] 2.1 将 `validator.py` 的 `BALANCE_UNBALANCED` / `BALANCE_LEDGER_MISMATCH` findings 转为诊断 DTO
-  - [ ] 2.2 将 `DataQualityService` 检查结果转为诊断 DTO
-  - [ ] 2.3 查询未匹配报表行次科目并输出 `Unmatched_Account`
-  - [ ] 2.4 查询符号异常并输出 `sign_anomalies`
-  - [ ] 2.5 生成 `report_line_mapping`、`sign_anomaly_review`、`ledger_penetration` 跳转目标
-  - [ ] 2.6 `sign_anomaly_flags` 字段缺失或未上线时 graceful degrade，不阻断其他诊断
-  - [ ] 2.7 测试：符号异常不可用时仍能输出未匹配科目和源数据不平原因
+- [x] 2. 新增 `BalanceDiagnosticsService`
+  - [x] 2.1 将 `validator.py` 的 `BALANCE_UNBALANCED` / `BALANCE_LEDGER_MISMATCH` findings 转为诊断 DTO
+  - [x] 2.2 将 `DataQualityService` 检查结果转为诊断 DTO
+  - [x] 2.3 查询未匹配报表行次科目并输出 `Unmatched_Account`
+  - [x] 2.4 查询符号异常并输出 `sign_anomalies`
+  - [x] 2.5 生成 `report_line_mapping`、`sign_anomaly_review`、`ledger_penetration` 跳转目标
+  - [x] 2.6 `sign_anomaly_flags` 字段缺失或未上线时 graceful degrade，不阻断其他诊断
+  - [x] 2.7 测试：符号异常不可用时仍能输出未匹配科目和源数据不平原因
   - _Requirements: 1.2, 2.1, 2.2, 2.3, 2.4, 2.6_
 
-- [ ] 3. 诊断原因排序与解释
-  - [ ] 3.1 定义 `report_line_unmatched` 原因
-  - [ ] 3.2 定义 `sign_convention_anomaly` 原因
-  - [ ] 3.3 定义 `pnl_not_closed_or_caliber_gap` 原因
-  - [ ] 3.4 定义 `source_data_unbalanced` 原因
-  - [ ] 3.5 自动判断不足时加入 `manual_review_required`
-  - [ ] 3.6 为 `ledger_debit_credit`、`balance_vs_ledger`、`trial_balance_debit_credit`、`balance_sheet_equation` 分别定义 top_contributors 结构
-  - [ ] 3.7 测试：原因按 severity 和 confidence 排序
+- [x] 3. 诊断原因排序与解释
+  - [x] 3.1 定义 `report_line_unmatched` 原因
+  - [x] 3.2 定义 `sign_convention_anomaly` 原因
+  - [x] 3.3 定义 `pnl_not_closed_or_caliber_gap` 原因
+  - [x] 3.4 定义 `source_data_unbalanced` 原因
+  - [x] 3.5 自动判断不足时加入 `manual_review_required`
+  - [x] 3.6 为 `ledger_debit_credit`、`balance_vs_ledger`、`trial_balance_debit_credit`、`balance_sheet_equation` 分别定义 top_contributors 结构
+  - [x] 3.7 测试：原因按 severity 和 confidence 排序
   - _Requirements: 2.1, 2.5, 2.7_
 
-- [ ] 4. DataQualityService 口径统一
-  - [ ] 4.1 拆分 `ledger_debit_credit_balance` 与 `trial_balance_debit_credit`
-  - [ ] 4.2 明确 `report_balance` 只表示资产负债表生成后的 BS 勾稽
-  - [ ] 4.3 `debit_credit_balance` 兼容旧入口，但内部映射到新口径并提示口径
-  - [ ] 4.4 返回 details 可转换为 `BalanceDiagnosticsResult`
-  - [ ] 4.5 测试：损益未结转时不使用 "资产=负债+权益" 作为通用试算平衡
-  - [ ] 4.6 测试：每个 caliber 的数据源和公式输出与设计一致
+- [x] 4. DataQualityService 口径统一
+  - [x] 4.1 拆分 `ledger_debit_credit_balance` 与 `trial_balance_debit_credit`
+  - [x] 4.2 明确 `report_balance` 只表示资产负债表生成后的 BS 勾稽
+  - [x] 4.3 `debit_credit_balance` 兼容旧入口，但内部映射到新口径并提示口径
+  - [x] 4.4 返回 details 可转换为 `BalanceDiagnosticsResult`
+  - [x] 4.5 测试：损益未结转时不使用 "资产=负债+权益" 作为通用试算平衡
+  - [x] 4.6 测试：每个 caliber 的数据源和公式输出与设计一致
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
 - [ ] 5. 前端统一诊断弹窗

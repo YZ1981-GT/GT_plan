@@ -152,12 +152,27 @@ export interface ImportError {
   } | null
 }
 
+/**
+ * @deprecated 使用 `@/types/ledger-import` 中的 `ConfirmedMapping` 代替。
+ * 此接口保留兼容现有 submit 流程，Task 5.2 将完成迁移。
+ */
 export interface ConfirmedMapping {
-  file: string
-  sheet: string
+  file_name: string
+  sheet_name: string
   table_type: string
-  column_mapping: Record<string, string>
+  mapping_entries: import('@/types/ledger-import').MappingEntry[]
   aux_dimension_columns: number[]
+  sheet_key: string
+  detection_id?: string
+  file_fingerprint?: string
+  software_fingerprint?: string
+  confirmed_by_user?: boolean
+  /** @deprecated 旧格式兼容字段，submit gate 将自动转换 */
+  file?: string
+  /** @deprecated 旧格式兼容字段 */
+  sheet?: string
+  /** @deprecated 旧格式兼容字段 */
+  column_mapping?: Record<string, string>
 }
 
 // ─── Props & Emits ──────────────────────────────────────────────────────────

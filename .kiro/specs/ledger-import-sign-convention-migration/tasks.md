@@ -2,29 +2,29 @@
 
 ## 任务总览
 
-- [ ] 1. 定义符号与方向契约
-  - [ ] 1.1 后端新增 `DirectionSource`、`SignConventionVersion`、`SignAnomaly` 类型
-  - [ ] 1.2 前端新增对应 TypeScript 类型
-  - [ ] 1.3 定义 `v1_net_debit_positive` 符号约定常量
-  - [ ] 1.4 增加前后端枚举一致性 fixture
-  - [ ] 1.5 增加 `account_category_inferred_low_confidence` 与迁移安全等级枚举
+- [x] 1. 定义符号与方向契约
+  - [x] 1.1 后端新增 `DirectionSource`、`SignConventionVersion`、`SignAnomaly` 类型
+  - [x] 1.2 前端新增对应 TypeScript 类型
+  - [x] 1.3 定义 `v1_net_debit_positive` 符号约定常量
+  - [x] 1.4 增加前后端枚举一致性 fixture
+  - [x] 1.5 增加 `account_category_inferred_low_confidence` 与迁移安全等级枚举
   - _Requirements: 1.1, 1.3, 2.2_
 
-- [ ] 2. 数据库字段与迁移
-  - [ ] 2.1 为 `tb_balance` / `tb_aux_balance` 增加期初/期末方向、方向来源、符号版本和异常 JSONB 字段
-  - [ ] 2.2 为 `tb_ledger` / `tb_aux_ledger` 增加发生方向和来源字段
-  - [ ] 2.3 新增独立方向覆盖 overlay 表，记录原始方向、覆盖方向、原因、覆盖人和时间
-  - [ ] 2.4 编写配对 `V0XX__*.sql` / `R0XX__*.sql`，DDL 使用 `IF NOT EXISTS`
-  - [ ] 2.5 测试：迁移幂等、字段可空、旧数据可读
-  - [ ] 2.6 测试：用户覆盖不改写原始四表导入行
+- [x] 2. 数据库字段与迁移
+  - [x] 2.1 为 `tb_balance` / `tb_aux_balance` 增加期初/期末方向、方向来源、符号版本和异常 JSONB 字段
+  - [x] 2.2 为 `tb_ledger` / `tb_aux_ledger` 增加发生方向和来源字段
+  - [x] 2.3 新增独立方向覆盖 overlay 表，记录原始方向、覆盖方向、原因、覆盖人和时间
+  - [x] 2.4 编写配对 `V0XX__*.sql` / `R0XX__*.sql`，DDL 使用 `IF NOT EXISTS`
+  - [x] 2.5 测试：迁移幂等、字段可空、旧数据可读
+  - [x] 2.6 测试：用户覆盖不改写原始四表导入行
   - _Requirements: 2.1, 3.3, 5.3, 6.6_
 
-- [ ] 3. Converter 结果结构改造
-  - [ ] 3.1 定义 `BalanceConversionResult` / `LedgerConversionResult`
-  - [ ] 3.2 `convert_balance_rows` 输出 rows、aux rows、warnings、sign anomalies、stats
-  - [ ] 3.3 保留兼容 wrapper，避免一次性破坏旧测试
-  - [ ] 3.4 pipeline 消费新结果并合并 warnings
-  - [ ] 3.5 writer 持久化方向字段和异常字段
+- [x] 3. Converter 结果结构改造
+  - [x] 3.1 定义 `BalanceConversionResult` / `LedgerConversionResult`
+  - [x] 3.2 `convert_balance_rows` 输出 rows、aux rows、warnings、sign anomalies、stats
+  - [x] 3.3 保留兼容 wrapper，避免一次性破坏旧测试
+  - [x] 3.4 pipeline 消费新结果并合并 warnings
+  - [x] 3.5 writer 持久化方向字段和异常字段
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
 - [ ] 4. 方向推导规则

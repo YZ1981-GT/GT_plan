@@ -2,29 +2,29 @@
 
 ## 任务总览
 
-- [ ] 1. 定义识别与映射契约
-  - [ ] 1.1 后端新增 `ConfirmedMappingDTO` / `NormalizedMappingDTO`
-  - [ ] 1.2 前端更新 `ConfirmedMapping` 类型，统一字段为 `file_name`、`sheet_name`、`mappings`
-  - [ ] 1.3 增加前后端 DTO fixture，确保字段名和枚举一致
-  - [ ] 1.4 将 `mappings` 升级为 `mapping_entries[]`，每条包含 `column_index`、`original_header`、`canonical_header`、`standard_field`
-  - [ ] 1.5 定义稳定 `sheet_key` / `detection_id`，submit 阶段用于校验 detect artifact
+- [x] 1. 定义识别与映射契约
+  - [x] 1.1 后端新增 `ConfirmedMappingDTO` / `NormalizedMappingDTO`
+  - [x] 1.2 前端更新 `ConfirmedMapping` 类型，统一字段为 `file_name`、`sheet_name`、`mappings`
+  - [x] 1.3 增加前后端 DTO fixture，确保字段名和枚举一致
+  - [x] 1.4 将 `mappings` 升级为 `mapping_entries[]`，每条包含 `column_index`、`original_header`、`canonical_header`、`standard_field`
+  - [x] 1.5 定义稳定 `sheet_key` / `detection_id`，submit 阶段用于校验 detect artifact
   - _Requirements: 4.1, 4.2, 4.3, 4.6_
 
-- [ ] 2. 接入 Adapter 自动选优
-  - [ ] 2.1 detect 先用 generic/global aliases 做 provisional `identify`
-  - [ ] 2.2 支持 `adapter_hint` 覆盖自动选优
-  - [ ] 2.3 在 provisional mappings 生成后调用 `AdapterRegistry.detect_best(fd)`
-  - [ ] 2.4 用选中 adapter aliases + generic aliases 进行 final `identify`
-  - [ ] 2.5 将 `adapter_id`、`adapter_score`、匹配证据写入 `detection_evidence.adapter_match`
-  - [ ] 2.6 adapter 分数低但 table_type 高置信时，保留表类型、列映射进入人工确认
-  - [ ] 2.7 测试：vendor adapter 分数高于 generic 时自动命中，低分 adapter 不自动通过关键列 gate
+- [x] 2. 接入 Adapter 自动选优
+  - [x] 2.1 detect 先用 generic/global aliases 做 provisional `identify`
+  - [x] 2.2 支持 `adapter_hint` 覆盖自动选优
+  - [x] 2.3 在 provisional mappings 生成后调用 `AdapterRegistry.detect_best(fd)`
+  - [x] 2.4 用选中 adapter aliases + generic aliases 进行 final `identify`
+  - [x] 2.5 将 `adapter_id`、`adapter_score`、匹配证据写入 `detection_evidence.adapter_match`
+  - [x] 2.6 adapter 分数低但 table_type 高置信时，保留表类型、列映射进入人工确认
+  - [x] 2.7 测试：vendor adapter 分数高于 generic 时自动命中，低分 adapter 不自动通过关键列 gate
   - _Requirements: 2.1, 2.2, 2.3, 2.5, 2.6, 2.7_
 
-- [ ] 3. JSON 驱动适配器加载
-  - [ ] 3.1 明确启动加载 `backend/data/ledger_adapters/*.json` 的入口
-  - [ ] 3.2 非法 JSON / 缺 `id` / regex 错误记录 warning 并跳过
-  - [ ] 3.3 同 `id` adapter 覆盖时记录来源
-  - [ ] 3.4 测试：`sample.json` 可加载并参与 alias 映射
+- [x] 3. JSON 驱动适配器加载
+  - [x] 3.1 明确启动加载 `backend/data/ledger_adapters/*.json` 的入口
+  - [x] 3.2 非法 JSON / 缺 `id` / regex 错误记录 warning 并跳过
+  - [x] 3.3 同 `id` adapter 覆盖时记录来源
+  - [x] 3.4 测试：`sample.json` 可加载并参与 alias 映射
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
 - [ ] 4. 表头识别增强
@@ -35,14 +35,14 @@
   - [ ] 4.5 测试：方括号、组合表头、横幅跳过、skip_reason 稳定
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 5. Submit gate 与 mapping normalization
-  - [ ] 5.1 submit 入口读取 detect artifact，校验 sheet key
-  - [ ] 5.2 兼容旧 `{column_index: standard_field}` 输入并转换为 `mapping_entries[]`
-  - [ ] 5.3 无法转换旧格式时返回 400，不创建 ImportJob
-  - [ ] 5.4 低置信度未确认、关键列缺失、unknown 未改类型时阻断 submit
-  - [ ] 5.5 pipeline 只消费规范化 DTO，并按 `column_index` 取原始列值
-  - [ ] 5.6 `prepare_rows_with_raw_extra` 支持 canonical header，重复原始表头不得覆盖
-  - [ ] 5.7 测试：重复"借方/贷方/金额"表头都能保留并正确映射
+- [x] 5. Submit gate 与 mapping normalization
+  - [x] 5.1 submit 入口读取 detect artifact，校验 sheet key
+  - [x] 5.2 兼容旧 `{column_index: standard_field}` 输入并转换为 `mapping_entries[]`
+  - [x] 5.3 无法转换旧格式时返回 400，不创建 ImportJob
+  - [x] 5.4 低置信度未确认、关键列缺失、unknown 未改类型时阻断 submit
+  - [x] 5.5 pipeline 只消费规范化 DTO，并按 `column_index` 取原始列值
+  - [x] 5.6 `prepare_rows_with_raw_extra` 支持 canonical header，重复原始表头不得覆盖
+  - [x] 5.7 测试：重复"借方/贷方/金额"表头都能保留并正确映射
   - _Requirements: 4.3, 4.4, 4.5, 4.6, 5.1, 5.3_
 
 - [ ] 6. 前端人工确认流程
