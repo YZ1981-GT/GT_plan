@@ -63,18 +63,18 @@
 
 ## P0-MVP
 
-- [ ] MVP-1. `ConfirmedMappingDTO` 前后端一致
-- [ ] MVP-2. submit gate 能阻断低置信度未确认与关键列缺失
-- [ ] MVP-3. pipeline 消费 `mapping_entries[]` 单一格式，重复表头不丢列
-- [ ] MVP-4. Adapter 自动选优或显式 hint 口径落地并有 evidence
-- [ ] MVP-5. unknown sheet 可人工改类型并补映射
+- [x] MVP-1. `ConfirmedMappingDTO` 前后端一致
+- [x] MVP-2. submit gate 能阻断低置信度未确认与关键列缺失
+- [x] MVP-3. pipeline 消费 `mapping_entries[]` 单一格式，重复表头不丢列
+- [x] MVP-4. Adapter 自动选优或显式 hint 口径落地并有 evidence
+- [x] MVP-5. unknown sheet 可人工改类型并补映射
 
 ## 验收与回归
 
-- [ ] CI-1 pytest：AdapterRegistry / JSON adapter / alias merge 通过
-- [ ] CI-2 pytest：submit mapping normalization 和低置信度 gate 通过
-- [ ] CI-3 pytest：9 家样本 header snapshot 不回退
-- [ ] CI-4 Vitest：ColumnMappingEditor 输出新 DTO
-- [ ] CI-5 手工 UAT：上传未知格式余额表，人工确认后可导入
-- [ ] CI-6 回归：历史 mapping 30 天内自动预填，修改后形成父子链
-- [ ] CI-7 pytest：重复表头 canonical header 与 raw_extra 保留通过
+- [x] CI-1 pytest：AdapterRegistry / JSON adapter / alias merge 通过
+- [x] CI-2 pytest：submit mapping normalization 和低置信度 gate 通过
+- [x] CI-3 pytest：9 家样本 header snapshot 不回退
+- [x] CI-4 Vitest：ColumnMappingEditor 输出新 DTO
+- [x] CI-5 手工 UAT：上传未知格式余额表，人工确认后可导入
+- [x] CI-6 回归：历史 mapping 30 天内自动预填，修改后形成父子链
+- [x] CI-7 pytest：重复表头 canonical header 与 raw_extra 保留通过

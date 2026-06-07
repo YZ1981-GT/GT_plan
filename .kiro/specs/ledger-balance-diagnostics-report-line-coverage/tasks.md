@@ -78,22 +78,22 @@
 
 ## P0-MVP
 
-- [ ] MVP-1. 后端能返回统一 `BalanceDiagnosticsResult`
-- [ ] MVP-2. DataQualityService 的借贷平衡检查标明口径
-- [ ] MVP-3. 未匹配报表行次科目进入诊断清单
-- [ ] MVP-4. 前端诊断弹窗可跳转 ReportLineMapping
-- [ ] MVP-5. seed 覆盖率脚本输出四套维度报告
-- [ ] MVP-6. 每个 caliber 的数据源、公式和 top_contributors 明确可测
-- [ ] MVP-7. seed 覆盖率以标准科目全集为输入，并有 baseline
+- [x] MVP-1. 后端能返回统一 `BalanceDiagnosticsResult`
+- [x] MVP-2. DataQualityService 的借贷平衡检查标明口径
+- [x] MVP-3. 未匹配报表行次科目进入诊断清单
+- [x] MVP-4. 前端诊断弹窗可跳转 ReportLineMapping
+- [x] MVP-5. seed 覆盖率脚本输出四套维度报告
+- [x] MVP-6. 每个 caliber 的数据源、公式和 top_contributors 明确可测
+- [x] MVP-7. seed 覆盖率以标准科目全集为输入，并有 baseline
 
 ## 验收与回归
 
-- [ ] CI-1 pytest：诊断 DTO 与原因分类通过
-- [ ] CI-2 pytest：DataQualityService 新口径通过
-- [ ] CI-3 pytest：seed 覆盖率脚本通过
-- [ ] CI-4 pytest：一键预设返回 unmatched_accounts
-- [ ] CI-5 Vitest：BalanceDiagnosticsDialog 展示与跳转通过
-- [ ] CI-6 手工 UAT：借贷不平衡时能看到原因排序和修复入口
-- [ ] CI-7 回归：原 DiagnosticPanel 和 DataQualityDialog 仍可打开旧 findings
-- [ ] CI-8 pytest：`sign_anomaly_flags` 未上线时诊断 graceful degrade
-- [ ] CI-9 pytest：top_contributors 四种 caliber 结构通过
+- [x] CI-1 pytest：诊断 DTO 与原因分类通过
+- [x] CI-2 pytest：DataQualityService 新口径通过
+- [x] CI-3 pytest：seed 覆盖率脚本通过
+- [x] CI-4 pytest：一键预设返回 unmatched_accounts
+- [x] CI-5 Vitest：BalanceDiagnosticsDialog 展示与跳转通过
+- [x] CI-6 手工 UAT：借贷不平衡时能看到原因排序和修复入口
+- [x] CI-7 回归：原 DiagnosticPanel 和 DataQualityDialog 仍可打开旧 findings
+- [x] CI-8 pytest：`sign_anomaly_flags` 未上线时诊断 graceful degrade
+- [x] CI-9 pytest：top_contributors 四种 caliber 结构通过

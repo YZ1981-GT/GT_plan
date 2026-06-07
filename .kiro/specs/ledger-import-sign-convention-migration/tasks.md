@@ -69,19 +69,19 @@
 
 ## P0-MVP
 
-- [ ] MVP-1. 新导入余额表持久化方向与方向来源
-- [ ] MVP-2. 借贷分列、显式方向、类别推断三类来源可区分
-- [ ] MVP-3. 符号异常进入导入报告或异常 API
-- [ ] MVP-4. 试算表优先使用后端方向字段
-- [ ] MVP-5. 历史 dry-run 能输出影响清单且不改数据
-- [ ] MVP-6. 用户方向覆盖通过 overlay 留痕，不改写原始导入行
+- [x] MVP-1. 新导入余额表持久化方向与方向来源
+- [x] MVP-2. 借贷分列、显式方向、类别推断三类来源可区分
+- [x] MVP-3. 符号异常进入导入报告或异常 API
+- [x] MVP-4. 试算表优先使用后端方向字段
+- [x] MVP-5. 历史 dry-run 能输出影响清单且不改数据
+- [x] MVP-6. 用户方向覆盖通过 overlay 留痕，不改写原始导入行
 
 ## 验收与回归
 
-- [ ] CI-1 pytest：converter 符号约定与方向来源测试通过
-- [ ] CI-2 pytest：migration DDL 幂等与 dry-run 通过
-- [ ] CI-3 pytest：pipeline 能写入新增方向字段
-- [ ] CI-4 Vitest：TrialBalance 不再默认按金额正负猜普通科目方向
-- [ ] CI-5 手工 UAT：2221/4003 等异常科目进入复核清单
-- [ ] CI-6 回归：旧项目未迁移时仍可打开并显示推断方向标记
-- [ ] CI-7 pytest：dry-run 安全等级与 no-change/manual-review 边界通过
+- [x] CI-1 pytest：converter 符号约定与方向来源测试通过
+- [x] CI-2 pytest：migration DDL 幂等与 dry-run 通过
+- [x] CI-3 pytest：pipeline 能写入新增方向字段
+- [x] CI-4 Vitest：TrialBalance 不再默认按金额正负猜普通科目方向
+- [x] CI-5 手工 UAT：2221/4003 等异常科目进入复核清单
+- [x] CI-6 回归：旧项目未迁移时仍可打开并显示推断方向标记
+- [x] CI-7 pytest：dry-run 安全等级与 no-change/manual-review 边界通过
