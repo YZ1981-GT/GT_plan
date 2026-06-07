@@ -23,6 +23,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useDictStore } from '@/stores/dict'
+import { getStatusLabel, getStatusColor } from '@/constants/statusEnum'
 
 const props = withDefaults(defineProps<{
   /** dictStore 字典键（如 'wp_status'、'adjustment_status'） */
@@ -45,7 +46,8 @@ const tagType = computed(() => {
   if (dictStore.loaded) {
     return dictStore.type(props.dictKey, props.value)
   }
-  return 'info'
+  // fallback: 前端硬编码映射
+  return getStatusColor(props.dictKey, props.value) || 'info'
 })
 
 const tagLabel = computed(() => {
@@ -54,7 +56,9 @@ const tagLabel = computed(() => {
     const l = dictStore.label(props.dictKey, props.value)
     if (l && l !== props.value) return l
   }
-  return props.value
+  // fallback: 前端硬编码映射（dictStore 未加载时仍显示中文）
+  const fallback = getStatusLabel(props.dictKey, props.value)
+  return fallback || props.value
 })
 
 // ─── flip 动画触发（gt-polish.css .is-flipping，400ms）───
