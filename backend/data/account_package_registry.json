@@ -1,0 +1,85 @@
+{
+  "_description": "科目工作包注册表：定义 D 循环科目工作包的结构、sheet 清单、生产 schema 引用和映射状态。",
+  "_spec": "workpaper-account-package-d1-d2-pilot",
+  "_version": "2026-06-07-v1",
+  "_rules": {
+    "generated_is_not_production": true,
+    "production_schema_dir": "backend/data/ledger_adapters/wp_render_schema/",
+    "generated_schema_dir": "backend/data/ledger_adapters/wp_render_schema/generated/",
+    "valid_mapping_statuses": [
+      "confirmed_production",
+      "pending_inventory_reconciliation",
+      "conflict_requires_review"
+    ]
+  },
+  "packages": [
+    {
+      "account_package_id": "D1_notes_receivable",
+      "cycle": "D",
+      "account_code": "1121",
+      "account_name": "应收票据",
+      "report_row": null,
+      "note_section": null,
+      "mapping_status": "pending_inventory_reconciliation",
+      "primary_wp_code": "D1",
+      "control_panel_sheet": "D1A",
+      "source_wp_codes": ["D1"],
+      "schema_refs": ["C-D1-disclosure.yaml"],
+      "generated_inventory_refs": ["generated/D1.yaml"],
+      "sheets": [
+        { "sheet_name": "D1A 应收票据审计程序表", "sheet_type": "procedure", "source_wp_code": "D1" },
+        { "sheet_name": "审定表D1-1", "sheet_type": "audit_sheet", "source_wp_code": "D1" },
+        { "sheet_name": "应收票据明细表D1-2", "sheet_type": "detail_table", "source_wp_code": "D1" },
+        { "sheet_name": "坏账准备明细表D1-4", "sheet_type": "detail_table", "source_wp_code": "D1" },
+        { "sheet_name": "应收票据账龄分析表D1-5", "sheet_type": "analysis", "source_wp_code": "D1" },
+        { "sheet_name": "应收票据贴现背书明细表D1-8", "sheet_type": "detail_table", "source_wp_code": "D1" },
+        { "sheet_name": "应收票据质押检查表D1-12", "sheet_type": "procedure", "source_wp_code": "D1" },
+        { "sheet_name": "调整分录汇总表D1-15", "sheet_type": "adjustment", "source_wp_code": "D1" },
+        { "sheet_name": "附注披露信息（上市公司）", "sheet_type": "disclosure", "source_wp_code": "D1", "schema_ref": "C-D1-disclosure.yaml" },
+        { "sheet_name": "附注披露信息（国企）", "sheet_type": "disclosure", "source_wp_code": "D1", "schema_ref": "C-D1-disclosure.yaml" },
+        { "sheet_name": "D1-16 科目结论表", "sheet_type": "conclusion", "source_wp_code": "D1" }
+      ],
+      "external_cards": ["confirmation_summary"],
+      "downstream": ["report", "disclosure_note", "sign_off"],
+      "known_conflicts": [
+        "report_row: mapping=BS-004 vs cross_ref=BS-003",
+        "note_section: mapping=五、2 vs cross_ref=5.3 (编号体系不统一)"
+      ]
+    },
+    {
+      "account_package_id": "D2_accounts_receivable",
+      "cycle": "D",
+      "account_code": "1122",
+      "account_name": "应收账款",
+      "report_row": null,
+      "note_section": null,
+      "mapping_status": "pending_inventory_reconciliation",
+      "primary_wp_code": "D2",
+      "control_panel_sheet": "D2A",
+      "source_wp_codes": ["D0", "D2", "D2-5", "D2-6"],
+      "schema_refs": ["D2A.yaml", "D-D2-8.yaml", "D-D2-13.yaml", "C-D2-disclosure.yaml"],
+      "generated_inventory_refs": ["generated/D2.yaml", "generated/D2-1.yaml", "generated/D2-5.yaml", "generated/D2-6.yaml"],
+      "sheets": [
+        { "sheet_name": "D2A 应收账款实质性程序表", "sheet_type": "control_panel", "source_wp_code": "D2", "schema_ref": "D2A.yaml" },
+        { "sheet_name": "审定表D2-1", "sheet_type": "audit_sheet", "source_wp_code": "D2" },
+        { "sheet_name": "应收账款明细表D2-2", "sheet_type": "detail_table", "source_wp_code": "D2" },
+        { "sheet_name": "坏账准备明细表D2-3", "sheet_type": "analysis", "source_wp_code": "D2" },
+        { "sheet_name": "调整分录汇总表D2-4", "sheet_type": "adjustment", "source_wp_code": "D2" },
+        { "sheet_name": "应收账款分析表D2-5", "sheet_type": "analysis", "source_wp_code": "D2-5" },
+        { "sheet_name": "关联方及交易检查表D2-6", "sheet_type": "procedure", "source_wp_code": "D2-6" },
+        { "sheet_name": "应收账款检查表D2-7", "sheet_type": "procedure", "source_wp_code": "D2-6" },
+        { "sheet_name": "坏账准备计提会计政策检查D2-8", "sheet_type": "procedure", "source_wp_code": "D2-6", "schema_ref": "D-D2-8.yaml" },
+        { "sheet_name": "应收坏账准备测算D2-9", "sheet_type": "analysis", "source_wp_code": "D2-6" },
+        { "sheet_name": "预期信用损失的计量测试D2-10", "sheet_type": "analysis", "source_wp_code": "D2-6" },
+        { "sheet_name": "应收账款业务模式分析D2-13", "sheet_type": "analysis", "source_wp_code": "D2-6", "schema_ref": "D-D2-13.yaml" },
+        { "sheet_name": "应收账款附注披露信息", "sheet_type": "disclosure", "source_wp_code": "D2", "schema_ref": "C-D2-disclosure.yaml" },
+        { "sheet_name": "D2-C 科目结论", "sheet_type": "conclusion", "source_wp_code": "D2" }
+      ],
+      "external_cards": ["confirmation_summary", "adjustment_impact", "note_disclosure"],
+      "downstream": ["report", "disclosure_note", "sign_off"],
+      "known_conflicts": [
+        "note_section: mapping=五、3 vs cross_ref=5.7 (编号体系不统一)"
+      ]
+    }
+  ]
+}

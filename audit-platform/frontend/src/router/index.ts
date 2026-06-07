@@ -126,6 +126,11 @@ const router = createRouter({
           component: () => import('@/views/WorkpaperEditor.vue'),
         },
         {
+          path: 'projects/:projectId/account-packages/:packageId',
+          name: 'AccountPackage',
+          component: () => import('@/views/AccountPackageView.vue'),
+        },
+        {
           path: 'projects/:projectId/workpaper-bench',
           name: 'WorkpaperWorkbench',
           redirect: (to) => ({

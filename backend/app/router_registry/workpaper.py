@@ -83,6 +83,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.attachment_lineage import router as attachment_lineage
     from app.routers.wp_functional_actions import router as wp_functional_actions
     from app.routers.wp_formula import router as wp_formula
+    from app.routers.account_packages import router as account_packages
 
     groups = {
         # ── 6 大聚合组（design §7.1）──
@@ -96,6 +97,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
         "程序管理": [wp_procedures, wp_procedure_trim, wp_step_mapping, wp_evidence],
         "AI与辅助": [wp_ai, wp_ai_confirm, wp_chat, wp_explanation],
         "其他": [qc, wp_storage, wp_download, workpaper_summary, process_record, review_conversations, annotations, background_jobs, excel_html, wp_structure, wp_manuals, wp_fine_rules, wp_offline, wp_audit_flow_graph, wp_sheet_lock, standard_conversion, attachment_lineage, wp_functional_actions],
+        "科目工作包": [account_packages],
     }
 
     for tag, routers in groups.items():

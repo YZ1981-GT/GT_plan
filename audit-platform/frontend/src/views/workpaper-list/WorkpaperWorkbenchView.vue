@@ -510,9 +510,9 @@ const guideOverviewMeta = [
     relDesc: '依据 B 风险评估 → 测试关键控制 → 影响 D~N 实质性程序范围' },
   { code: 'D', name: '销售收入', color: '#E8590C', count: 8, desc: '收入确认、应收账款、信用减值',
     coreWps: [
-      { code: 'D1', name: '收入循环总控台', role: '总控台', detail: '统筹收入确认测试、应收账款函证、信用减值计算' },
-      { code: 'D2', name: '应收账款明细表', role: '核心', detail: '编制应收账款余额明细，执行账龄分析和函证程序' },
-      { code: 'D4', name: '收入截止测试', role: '测试', detail: '验证收入确认时点的准确性，检查跨期收入' },
+      { code: 'D1', name: '应收票据', role: '核心', detail: '应收票据审计程序、账龄分析、贴现背书检查、坏账准备' },
+      { code: 'D2', name: '应收账款', role: '核心', detail: '应收账款实质性程序、函证、坏账/ECL、账龄分析' },
+      { code: 'D4', name: '营业收入/收入审定', role: '测试', detail: '收入确认测试、截止测试、收入审定表' },
     ],
     relatedTo: ['A', 'E', 'F', 'N'],
     relDesc: '从 TB 取应收/收入余额 → 函证+截止测试 → 调整分录回写 A2' },

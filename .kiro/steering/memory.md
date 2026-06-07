@@ -76,6 +76,7 @@ inclusion: always
 - **🟢 明细账月小计 off-by-one 已修（2026-06-02）**：`LedgerPenetration.vue` 的 `ledgerDisplay`+`auxLedgerDisplay` 两处月小计 bug——累加 monthDebit/Credit 在月份边界判断**之前**→上月「本月合计」错并入本月首笔（实测 1 月应 140094.82 算成 188423.58）；修复=边界结算移到累加前 + 归零（非赋当前行值）；加 5 条回归测试守护（月分组/守恒/运行余额）
 - **🔴 明细账改进待办（2026-06-02 分析，未修）**：①**运行余额/月小计按页算→第2页起全错**（loadLedger offset 分页 page_size=100，但 ledgerDisplay 每页都从整期 currentAccountOpening 重算余额；期初接口只传 year 不传页码）——科目本期>100 笔翻页即余额错+跨页月小计被拆；②筛选/排序后小计对不上（锚点行滤掉但小计按整页原始数据算）；③回归测试是 copy 生产函数到测试里测（改 .vue 忘同步副本仍绿）→建议抽 `utils/ledgerDisplay.ts` 组件+测试共用；④账务计算应下沉后端（已有 get_ledger_entries_cursor 游标接口但 loadLedger 没用，理想后端直接返 running_balance+插好小计行）；⑤主表缺 counterpart_account(对方科目)列+本年累计借贷列；⑥虚拟滚动名不副实（>1000 切 el-table-v2 但仍每页 100 行加载）；**优先级 ①(正确性)+③(让测试真生效)**
 - **🔴 system_settings 已建(V048)**；真实 PG 5 项目多 standalone，**0 个 consolidated 项目**（合并 UAT 全卡此）；首汽租车_2025(df5b8403) tb 最全但 audit_period_end 为 NULL
+- **✅ V063 account_package_program_status 已实测（2026-06-07）**：15 列/PK/2 索引/3 FK 与 ORM 零 drift；schema_version checksum 已修正为文件真实值；前端路由 `/projects/:id/account-packages/:packageId` 联通确认（AccountPackageView 正常渲染）
 - **契约测试守护**（CI 根治整类 schema 漂移 500）：`test_raw_sql_schema_contract.py`(表级纯静态)+`test_raw_sql_column_contract.py`(列级 pg_only sqlglot)；新增裸 SQL 引用不存在表/列即 CI 红；存量债务登记 `_KNOWN_PHANTOM_DEBT`/`_COLUMN_ALLOWLIST`（剩 wp_template_registry）
 
 ## 任务状态
@@ -124,11 +125,15 @@ inclusion: always
 ### 真正待办
 - **外部依赖**：LLM embedding 实例 / 6000 并发压测 / 钉集成 / 合并 UAT / GitHub 默认分支改 main / 走 PR 合入 / V052~V062 生产迁移
 - **✅ `workpaper-content-semantic-contract` spec 全部完成（2026-06-07）**：7 任务+7 MVP+8 CI 全绿；产物=SheetContentType 13枚举+FieldSourceContract+ProgramStatusContract+d1_d2_semantic_registry.json(D1 10+D2 12 sheet)+check_wp_semantic_schema.py+FieldSourcePanel.vue+inventory 文档；后端~110+前端~51 测试绿
+- **✅ `workpaper-account-package-d1-d2-pilot` spec 全部完成（2026-06-07）**：8 主任务+46 子任务+25 验收项全绿；产物=account_package_registry.json+4 service(registry/summary/program_status/conclusion_context)+router(已注册 workpaper.py)+V063 migration+AccountPackageView.vue+useAccountPackage.ts+7 组件；后端 69+前端 30 测试绿；修复后 facade 消除重复+LLM 离线降级
+- **✅ `workpaper-ai-conclusion-copilot` spec 全部完成（2026-06-07）**：5 主任务+25 子任务+22 验收项全绿；产物=ai_conclusion_context_service(canonical)+prompts+draft_service+save_validator+audit_trail+WorkpaperAIConclusionPanel.vue；后端 47+前端 14 测试绿；核心不变量=pending 阻断 sign_off / missing 不编造 / rejected 不进结论 / prompt 6 条禁止项
 - **待建 spec**：底稿统一导入导出(`workpaper-unified-import-export`) / D1-4 坏账嵌套结构（枚举+auto-SUM+辅助预填）/ consol_disclosure_service 瘦身(1736行) / migration_runner 瘦身(1026行) / `workpaper-content-semantic-system`（底稿内容平台化，2026-06-06 提案+codegraph 分析；真空白=SheetContentType 声明式枚举替换 wp_generic_processor._detect_sheet_type 启发式 + account_package 科目工作包逻辑对象 + 字段级 requires_confirmation registry；**已有勿重建**=函证 callback 已铺 D2/F2/G7 三循环 + ai_content_log_service+ai_content_gate_rule 草稿阻断签发已闭环 + confirmation:received→useWorkpaperRefresh 已接线；试点选 D2 非 D1；硬伤=科目包程序状态须持久化不能纯前端聚合）
 - **✅ deliverable-center 全量完成**：P0(0-8)+P1(9-15)+P2(16-22)+收尾(23,25) 全部 done，含原标 `*` 的 task 21(OnlyOffice)；93+ 后端测试+42 前端测试全绿；过程修 5 bug（ReportSnapshot.created_at→generated_at / CompletenessService 漏 ProjectType / 通知漏 title / archive-lock gap on create_version / render_and_store 卡 generating 态）；task 24 Playwright E2E 需启动 dev 后手动验证；**PBT 全部 max_examples≤5**
 - **✅ 已完成 spec**：`report-view-slimdown`（2944→965 行，15 任务全部完成+3 项技术债已清，HARD_CAP 1110 已登记）；技术债修复：①纯函数(getRowType/formatReportAmount/equitySpanMethod/computeCrossCheckResults)提升为模块级 export ②useReportCellActions→aggregator+useReportDrilldown/useReportTrace/useReportContextMenu 三子 composable ③ReportDialogs→wrapper+ReportDrilldownDialogs/ReportTraceDialogs/ReportMappingDialog 三子组件
 - **瘦身已完成**：disclosure_engine 1949→1601 / note_validation_engine 995→740 / 明细账翻页余额 P0 已修 / 功能空洞全消除 / 前端 CI 门禁失真已修回绿
 - **铁律补充**：composable 抽取后必同步改其单测；spec 改一个文档必同步检查其余两个一致性；死代码删前必查 spec 历史决策；composable 实例传递不可重新 new（否则状态分裂）；4 个 Workpaper*Editor 故意保留素材勿删
+- **跨 spec 服务重复防治**：依赖链下游 spec 若需上游同名功能，设计阶段约定"谁是 canonical 谁是 facade"（如 `workpaper_ai_conclusion_context_service` 为 canonical，`account_package_conclusion_context_service` 为 facade 委托）；合并后测试不变即成功
+- **spec tasks.md 粒度规范**：tasks.md 只放可 CI 自动验证的实施任务；UAT/MVP 验收清单放 requirements 或独立 acceptance.md；前端任务增加"router 联通验证"子任务
 
 > 2026-06-02~06-06 已完成修复/spec 详细明细已归档 → `#dev-history` grep 关键词查阅
 

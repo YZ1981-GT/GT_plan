@@ -113,6 +113,7 @@ from app.models.consol_worksheet_data_models import ConsolWorksheetData  # noqa:
 from app.models.consol_note_data_models import ConsolNoteData  # noqa: F401
 from app.models.editing_lock_models import EditingLock  # noqa: F401
 from app.models.confirmation_models import Confirmation, ConfirmationType, ConfirmationStatus  # noqa: F401
+from app.models.account_package_models import AccountPackageProgramStatus  # noqa: F401
 
 __all__ = [
     # --- base ---
@@ -237,4 +238,6 @@ __all__ = [
     "Confirmation",
     "ConfirmationType",
     "ConfirmationStatus",
+    # --- 科目工作包程序状态 (V063) ---
+    "AccountPackageProgramStatus",
 ]

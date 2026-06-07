@@ -159,7 +159,7 @@
             <div v-show="refGroupOpen.wp" class="gt-fe-ref-list">
               <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'E1')"><span class="gt-fe-ref-code">E1</span>货币资金（E1-1审定/E1-2现金/E1-3银行）</div>
               <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'D2')"><span class="gt-fe-ref-code">D2</span>应收账款（D2-1审定/D2-2明细/D2-3坏账）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'D1')"><span class="gt-fe-ref-code">D1</span>营业收入（D1-1审定/D1-2明细）</div>
+              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'D1')"><span class="gt-fe-ref-code">D1</span>应收票据（D1-1审定/D1-2明细）</div>
               <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'F1')"><span class="gt-fe-ref-code">F1</span>应付账款（F1-1审定）</div>
               <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'F2')"><span class="gt-fe-ref-code">F2</span>预付款项（F2-1审定）</div>
               <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'G1')"><span class="gt-fe-ref-code">G1</span>存货（G1-1审定）</div>
