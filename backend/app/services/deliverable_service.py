@@ -104,6 +104,25 @@ class DeliverableService(ExportTaskService):
         )
         return result.scalar_one_or_none()
 
+    async def delete_task(self, task_id: UUID) -> None:
+        """删除交付物及其所有版本（仅 draft/editing/generated 态可删）"""
+        task = await self.get_task(task_id)
+        if task is None:
+            raise ValueError(f"交付物不存在: {task_id}")
+        if task.status in ("confirmed", "signed", "archived"):
+            raise ValueError("已确认/已签章/已归档的交付物不可删除")
+        # 删除版本记录
+        await self.db.execute(
+            sa.delete(WordExportTaskVersion).where(
+                WordExportTaskVersion.word_export_task_id == task_id
+            )
+        )
+        # 删除主记录
+        await self.db.execute(
+            sa.delete(WordExportTask).where(WordExportTask.id == task_id)
+        )
+        await self.db.flush()
+
     async def create_version(
         self,
         task_id: UUID,
@@ -116,6 +135,13 @@ class DeliverableService(ExportTaskService):
         file_size: int | None = None,
         created_via: str = "generate",
     ) -> WordExportTaskVersion:
+        # 归档锁定不变式（需求 11.2 / Property 24）：archived 态禁止创建新版本
+        task = await self.get_task(task_id)
+        if task is not None and task.status == WordExportStatus.archived.value:
+            raise ValueError(
+                f"交付物已归档，禁止创建新版本: task_id={task_id}"
+            )
+
         result = await self.db.execute(
             sa.select(sa.func.coalesce(sa.func.max(WordExportTaskVersion.version_no), 0))
             .where(WordExportTaskVersion.word_export_task_id == task_id)
@@ -320,7 +346,13 @@ class DeliverableService(ExportTaskService):
             task.file_size = file_size
             task.source_snapshot_refs = source_snapshot_refs
             task.selected_sections = selected_sections
-            if task.status == WordExportStatus.draft.value:
+            # 渲染完成并落盘 → 交付物进入 generated 态。
+            # 既覆盖 draft 直接生成，也覆盖经 generating 中间态的标准渲染流程
+            # （draft→generating→generated→editing），避免任务卡在 generating。
+            if task.status in (
+                WordExportStatus.draft.value,
+                WordExportStatus.generating.value,
+            ):
                 task.status = WordExportStatus.generated.value
             await self.db.flush()
 

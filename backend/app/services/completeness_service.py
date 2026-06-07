@@ -8,6 +8,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.base import ProjectType
 from app.models.core import Project
 from app.models.phase13_models import WordExportDocType, WordExportStatus, WordExportTask
 from app.services.deliverable_doc_types import required_doc_types

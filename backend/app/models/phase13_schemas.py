@@ -284,6 +284,7 @@ class ReportDateComplianceRequest(BaseModel):
 
 class ReportDateComplianceResponse(BaseModel):
     compliant: bool
+    requires_confirmation: bool = False
     warnings: list[str] = []
     floor_date: str | None = None
 

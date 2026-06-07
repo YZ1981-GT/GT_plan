@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import async_session, get_db
+import sqlalchemy as sa
 from app.deps import get_current_user
 from app.models.core import User
 from app.models.phase13_models import WordExportDocType, WordExportStatus
@@ -51,7 +52,11 @@ from app.services.deliverable_package_service import DeliverablePackageService
 from app.services.deliverable_service import DeliverableService
 from app.services.deliverable_snapshot_service import DeliverableSnapshotService
 from app.services.onlyoffice_callback_service import OnlyOfficeCallbackService
-from app.services.report_body_service import ReportBodyService
+from app.services.report_body_service import ReportBodyService, should_watermark
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/deliverables",
@@ -84,25 +89,88 @@ async def _notify_deliverable(
     try:
         from app.models.core import Project
         from app.services.notification_service import NotificationService
+        from app.services.notification_types import NOTIFICATION_META
+
+        if not recipient_id:
+            return
 
         project = await db.get(Project, project_id)
+        project_name = project.name if project else ""
         meta = {
             "object_type": "word_export_task",
             "object_id": str(task_id),
             "project_id": str(project_id),
-            "project_name": project.name if project else "",
+            "project_name": project_name,
             "doc_type": doc_type,
             **(extra or {}),
         }
-        if recipient_id:
-            svc = NotificationService(db)
-            await svc.send_notification(
-                user_id=recipient_id,
-                notification_type=notification_type,
-                metadata=meta,
-            )
+
+        template = NOTIFICATION_META.get(notification_type, {})
+        title = template.get("title_template", "交付物审批通知")
+        content_template = template.get("content_template", "")
+        fmt_args = {
+            "project_name": project_name,
+            "doc_type": doc_type,
+            "reason": (extra or {}).get("reason", ""),
+        }
+        try:
+            content = content_template.format(**fmt_args) if content_template else ""
+        except (KeyError, IndexError):
+            content = content_template
+
+        svc = NotificationService(db)
+        await svc.send_notification(
+            user_id=recipient_id,
+            notification_type=notification_type,
+            title=title,
+            content=content,
+            metadata=meta,
+        )
     except Exception:
-        pass
+        logger.warning(
+            "[DELIVERABLE] notification send failed (non-blocking): type=%s task=%s",
+            notification_type,
+            task_id,
+        )
+
+
+async def _notify_approvers(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    task_id: UUID,
+    doc_type: str,
+    exclude_user_id: UUID | None = None,
+) -> None:
+    """提交审批时通知项目经理/合伙人（站内消息，需求 7.4）"""
+    try:
+        from app.models.base import ProjectUserRole
+        from app.models.core import ProjectUser
+
+        result = await db.execute(
+            sa.select(ProjectUser.user_id).where(
+                ProjectUser.project_id == project_id,
+                ProjectUser.is_deleted == False,  # noqa: E712
+                ProjectUser.role.in_(
+                    [ProjectUserRole.manager, ProjectUserRole.partner]
+                ),
+            )
+        )
+        approver_ids = [row[0] for row in result.all()]
+    except Exception:
+        approver_ids = []
+
+    for approver_id in approver_ids:
+        if exclude_user_id and approver_id == exclude_user_id:
+            continue
+        await _notify_deliverable(
+            db,
+            project_id=project_id,
+            task_id=task_id,
+            doc_type=doc_type,
+            notification_type="deliverable_approval_submitted",
+            recipient_id=approver_id,
+        )
 
 
 async def _run_package_job(job_id: UUID) -> None:
@@ -349,7 +417,7 @@ async def render_report_body(
     latest = await dsvc._latest_version(task.id)
     next_no = (latest.version_no + 1) if latest else 1
     docx_path = out_dir / f"audit_report_v{next_no}.docx"
-    rbs.render_docx(filled, docx_path, watermark=task.status in ("draft", "editing"))
+    rbs.render_docx(filled, docx_path, watermark=should_watermark(task.status))
 
     snapshot_refs = await dsvc.capture_snapshot_refs(
         project_id, body.year, WordExportDocType.audit_report.value
@@ -624,6 +692,13 @@ async def submit_approval(
         updated = await svc.submit_for_approval(task_id, current_user.id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    await _notify_approvers(
+        db,
+        project_id=project_id,
+        task_id=task_id,
+        doc_type=task.doc_type,
+        exclude_user_id=current_user.id,
+    )
     await db.commit()
     return DeliverableApprovalResponse(
         task_id=updated.id,
@@ -855,10 +930,14 @@ async def onlyoffice_config(
     if not oos.enabled:
         raise HTTPException(status_code=503, detail="OnlyOffice 集成未启用")
 
-    base = settings.ONLYOFFICE_CALLBACK_BASE or f"http://localhost:9980"
+    base = settings.ONLYOFFICE_CALLBACK_BASE or "http://host.docker.internal:9980"
+    # 生成签名下载 URL（OnlyOffice 不携带 Bearer header，需免认证端点）
+    expires = int(__import__('time').time()) + 600  # 10 分钟有效
+    sig = _sign_download_url(project_id, task_id, version_no, expires)
     download_url = (
         f"{base}/api/projects/{project_id}/deliverables/"
-        f"{task_id}/versions/{version_no}/download"
+        f"{task_id}/versions/{version_no}/signed-download"
+        f"?expires={expires}&sig={sig}"
     )
     callback_url = (
         f"{base}/api/projects/{project_id}/deliverables/"
@@ -914,6 +993,13 @@ async def onlyoffice_callback(
         raise HTTPException(status_code=503, detail="OnlyOffice 集成未启用")
 
     if not oos.verify_callback_jwt(authorization, body):
+        # 需求 29.2：伪造回调企图写入安全日志后拒绝
+        await oos.write_security_log(
+            task_id,
+            project_id=project_id,
+            reason="callback JWT 校验失败",
+        )
+        await db.commit()
         raise HTTPException(status_code=401, detail="OnlyOffice callback JWT 校验失败")
 
     svc = DeliverableService(db)
@@ -943,3 +1029,94 @@ async def preview_report_body_html(
         raise HTTPException(status_code=404, detail="报告正文尚未生成")
     html = rbs.render_html(report.report_body_json)
     return HTMLResponse(content=html)
+
+
+@router.delete("/{task_id}")
+async def delete_deliverable(
+    project_id: UUID,
+    task_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """删除交付物（仅 draft/editing 态且非归档可删）"""
+    svc = DeliverableService(db)
+    task = await svc.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="交付物不存在")
+    _ensure_task_belongs(task, project_id)
+    await _guard_action(
+        db, current_user, project_id, DeliverableAction.export, task_status=task.status
+    )
+    # 仅 draft/editing/generated 态可删除；confirmed/signed/archived 不允许
+    if task.status in ("confirmed", "signed", "archived"):
+        raise HTTPException(status_code=400, detail="已确认/已签章/已归档的交付物不可删除")
+    try:
+        await svc.delete_task(task_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    await db.commit()
+    return {"message": "交付物已删除"}
+
+
+# ── OnlyOffice 免认证签名下载（document.url 不支持 Bearer header）────────────
+import hashlib
+import hmac
+import time as _time
+
+
+def _sign_download_url(project_id: UUID, task_id: UUID, version_no: int, expires: int) -> str:
+    """生成 HMAC 签名 token（用于 OnlyOffice document.url 免 auth 下载）"""
+    secret = (settings.JWT_SECRET_KEY or "deliverable-download-secret").encode()
+    payload = f"{project_id}:{task_id}:{version_no}:{expires}"
+    sig = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()[:32]
+    return sig
+
+
+def _verify_download_sig(project_id: UUID, task_id: UUID, version_no: int, expires: int, sig: str) -> bool:
+    """验证签名（防伪造 + 检查过期）"""
+    if int(_time.time()) > expires:
+        return False
+    secret = (settings.JWT_SECRET_KEY or "deliverable-download-secret").encode()
+    payload = f"{project_id}:{task_id}:{version_no}:{expires}"
+    expected = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()[:32]
+    return hmac.compare_digest(sig, expected)
+
+
+@router.get("/{task_id}/versions/{version_no}/signed-download")
+async def signed_download_version(
+    project_id: UUID,
+    task_id: UUID,
+    version_no: int,
+    expires: int = Query(...),
+    sig: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """OnlyOffice 专用免认证下载（通过 HMAC 签名验证，10 分钟有效）"""
+    if not _verify_download_sig(project_id, task_id, version_no, expires, sig):
+        raise HTTPException(status_code=403, detail="签名无效或已过期")
+
+    svc = DeliverableService(db)
+    task = await svc.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="交付物不存在")
+    _ensure_task_belongs(task, project_id)
+
+    version = await svc.get_version(task_id, version_no)
+    if version is None or not version.file_path:
+        raise HTTPException(status_code=404, detail="版本文件不存在")
+
+    file_path = Path(version.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="文件不存在于存储")
+
+    suffix = file_path.suffix.lower()
+    media = (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        if suffix == ".xlsx"
+        else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        if suffix == ".docx"
+        else "application/pdf"
+        if suffix == ".pdf"
+        else "application/octet-stream"
+    )
+    return FileResponse(path=str(file_path), filename=file_path.name, media_type=media)

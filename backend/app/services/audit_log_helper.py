@@ -45,6 +45,7 @@ EventType = Literal[
     "consol_lifecycle",
     "formula_changed",
     "report_config_changed",
+    "onlyoffice_callback_rejected",
 ]
 
 
@@ -81,6 +82,7 @@ EVENT_TYPE_SCHEMAS: dict[str, set[str]] = {
     "consol_lifecycle": {"sub_action", "before", "after"},
     "formula_changed": {"module", "row_code", "action", "old_formula", "new_formula", "result_value"},
     "report_config_changed": {"sub_action", "standard", "report_type", "row_code", "candidate_id"},
+    "onlyoffice_callback_rejected": {"reason"},
 }
 
 # 创世哈希（与 audit_log_writer_worker 保持一致）

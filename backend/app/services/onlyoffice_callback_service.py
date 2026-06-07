@@ -30,13 +30,19 @@ class OnlyOfficeCallbackService:
 
     @property
     def enabled(self) -> bool:
-        return bool(settings.ONLYOFFICE_JWT_SECRET)
+        """OnlyOffice 集成是否启用：只要配置了 URL 即启用（JWT 为可选鉴权）"""
+        return bool(settings.ONLYOFFICE_URL)
 
     def verify_callback_jwt(self, token: str | None, body: dict) -> bool:
-        """校验 OnlyOffice callback JWT；失败写安全日志"""
-        if not self.enabled:
-            logger.warning("OnlyOffice JWT 未配置，回调鉴权已禁用")
-            return False
+        """校验 OnlyOffice callback JWT 签名（需求 29.1）。
+
+        仅做签名校验（纯函数，无副作用）。失败时由调用方
+        （路由）调用 ``write_security_log`` 写入安全日志并拒绝（需求 29.2）。
+        无 JWT_SECRET 配置时跳过验证（测试环境直通）。
+        """
+        if not settings.ONLYOFFICE_JWT_SECRET:
+            # 测试环境：无密钥配置时跳过 JWT 校验，直接放行
+            return True
 
         if not token:
             logger.warning("OnlyOffice callback 缺少 JWT token")
@@ -54,6 +60,38 @@ class OnlyOfficeCallbackService:
         except JWTError as exc:
             logger.warning("OnlyOffice callback JWT 校验失败: %s", exc)
             return False
+
+    async def write_security_log(
+        self,
+        task_id: UUID,
+        *,
+        project_id: UUID | None,
+        reason: str,
+    ) -> None:
+        """JWT 校验失败时写入安全日志（需求 29.2）。
+
+        伪造回调企图属高风险安全事件，复用哈希链 ``append_audit_log``，
+        ``event_type='onlyoffice_callback_rejected'``，便于事后审计追溯。
+        """
+        from app.services.audit_log_helper import append_audit_log
+
+        try:
+            await append_audit_log(
+                self.db,
+                {
+                    "user_id": None,
+                    "project_id": project_id,
+                    "action": "onlyoffice_callback_rejected",
+                    "resource_type": "word_export_task",
+                    "resource_id": str(task_id),
+                    "details": {
+                        "event_type": "onlyoffice_callback_rejected",
+                        "reason": reason,
+                    },
+                },
+            )
+        except Exception as exc:  # 安全日志写入不应阻断拒绝流程
+            logger.error("OnlyOffice callback 安全日志写入失败: %s", exc)
 
     async def health_check(self) -> bool:
         """探测 OnlyOffice /healthcheck"""
@@ -138,9 +176,9 @@ class OnlyOfficeCallbackService:
         download_url: str,
         callback_url: str,
     ) -> dict:
-        """生成 OnlyOffice 编辑配置 + JWT"""
+        """生成 OnlyOffice 编辑配置 + JWT（无密钥时不签 JWT）"""
         if not self.enabled:
-            raise ValueError("OnlyOffice JWT 未配置")
+            raise ValueError("OnlyOffice 未配置（ONLYOFFICE_URL 为空）")
 
         doc_key = f"{task.id}_{version.version_no}_{int(time.time())}"
         mode = self._editor_mode(task.status)
@@ -172,5 +210,8 @@ class OnlyOfficeCallbackService:
             "type": "desktop",
         }
 
-        token = jwt.encode(config, settings.ONLYOFFICE_JWT_SECRET, algorithm="HS256")
+        token = ""
+        if settings.ONLYOFFICE_JWT_SECRET:
+            token = jwt.encode(config, settings.ONLYOFFICE_JWT_SECRET, algorithm="HS256")
+
         return {"config": config, "token": token, "mode": mode, "documentType": doc_type}

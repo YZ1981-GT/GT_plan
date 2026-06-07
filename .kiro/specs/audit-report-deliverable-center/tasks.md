@@ -210,82 +210,82 @@
 > 范围：需求 8/13/19/14/17/25/28/29。Properties 18-19、27-30、34、51、54-55。
 > 目标：完整性 + 一致性、快照溯源、签章 EQCR、权限矩阵、报告日期合规、OnlyOffice 降级与回调鉴权。
 
-- [ ] 9. DeliverableSnapshotService 统一快照封装（需求 13/19）
-  - [ ] 9.1 实现统一快照引用与三件套一致性校验
+- [x] 9. DeliverableSnapshotService 统一快照封装（需求 13/19）
+  - [x] 9.1 实现统一快照引用与三件套一致性校验
     - 新建 `backend/app/services/deliverable_snapshot_service.py`：`capture_snapshot_ref(project_id, year, doc_type)` 复用 `report_snapshot_service`，三类统一回退到 trial_balance MD5 哈希；`check_trio_consistency` 校验同一 tb_hash
     - **前置验证**：确认 `disclosure_note` 表能取到对齐用的 tb_hash（附注无 `bound_dataset_id` 字段，那是 audit_report 的字段）；若附注无直接快照字段，则统一以 trial_balance MD5 为三类对齐基准（设计已论证可行，此处编码时落实）
     - 在 `render_and_store` 时写入版本 `source_snapshot_refs`
     - _Requirements: 13.1, 13.2, 13.3, 19.1, 19.2_
-  - [ ] 9.2 实现数据过时（stale）检测端点
+  - [x] 9.2 实现数据过时（stale）检测端点
     - `GET /{task_id}/snapshot-stale`：对比绑定快照哈希与当前底层数据哈希
     - _Requirements: 13.4, 13.5, 16.2_
-  - [ ]* 9.3 PBT：快照绑定完整性
+  - [x]* 9.3 PBT：快照绑定完整性
     - **Property 27: 快照绑定完整性**
     - **Validates: Requirements 13.1, 13.2, 19.1**
-  - [ ]* 9.4 PBT：数据过时检测正确性
+  - [x]* 9.4 PBT：数据过时检测正确性
     - **Property 28: 数据过时检测正确性**
     - **Validates: Requirements 13.4, 13.5, 16.2**
 
-- [ ] 10. CompletenessService 完整性 + 一致性（需求 8/19）
-  - [ ] 10.1 实现齐全性 + 一致性合并校验
+- [x] 10. CompletenessService 完整性 + 一致性（需求 8/19）
+  - [x] 10.1 实现齐全性 + 一致性合并校验
     - 新建 `backend/app/services/completeness_service.py`：`check(project_id, year)` = 齐全性（三件套，至少含 BS+IS）AND 至少一类 confirmed AND 三件套一致性；`required_doc_types(project_type)` 可配置必需件清单
     - `GET /completeness` 端点
     - _Requirements: 8.1, 8.2, 8.3, 19.2, 19.3, 19.4_
-  - [ ]* 10.2 PBT：三件套齐全性判定
+  - [x]* 10.2 PBT：三件套齐全性判定
     - **Property 18: 三件套齐全性判定**
     - **Validates: Requirements 8.1, 8.2, 18.4**
-  - [ ]* 10.3 PBT：完整性通过判定
+  - [x]* 10.3 PBT：完整性通过判定
     - **Property 19: 完整性通过判定**
     - **Validates: Requirements 8.3, 19.4**
-  - [ ]* 10.4 前端：CompletenessBanner 顶部状态条
+  - [x]* 10.4 前端：CompletenessBanner 顶部状态条
     - `CompletenessBanner.vue` 显示齐全性/一致性状态与缺失/不一致警告
     - _Requirements: 3.7, 8.2, 19.3_
 
-- [ ] 11. 签章与 EQCR 守卫（需求 14）
-  - [ ] 11.1 实现 EQCR 前置校验与签章字段记录
+- [x] 11. 签章与 EQCR 守卫（需求 14）
+  - [x] 11.1 实现 EQCR 前置校验与签章字段记录
     - `DeliverableService.sign(task_id, signer_id, sign_type)`：confirmed→signed，转 confirmed 前校验项目 EQCR 已通过，记录 signed_by/signed_at/sign_type；`POST /{task_id}/sign` 端点
     - EQCR 复核角色对交付物仅只读
     - _Requirements: 14.1, 14.2, 14.3, 14.4_
-  - [ ]* 11.2 PBT：EQCR 守卫
+  - [x]* 11.2 PBT：EQCR 守卫
     - **Property 29: EQCR 守卫**
     - **Validates: Requirements 14.1, 14.2**
-  - [ ]* 11.3 PBT：签章字段完整性
+  - [x]* 11.3 PBT：签章字段完整性
     - **Property 30: 签章字段完整性**
     - **Validates: Requirements 14.3**
 
-- [ ] 12. 权限矩阵（需求 17）
-  - [ ] 12.1 实现权限矩阵授权判定
+- [x] 12. 权限矩阵（需求 17）
+  - [x] 12.1 实现权限矩阵授权判定
     - 新建权限判定模块（如 `deliverable_permissions.py`）：按 (角色, 操作, 状态) 判定导出/预览/编辑/审批/归档/解除归档；EQCR 复核角色对写操作全拒、仅读；在路由依赖中接入
     - _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7_
-  - [ ]* 12.2 PBT：权限矩阵授权一致性
+  - [x]* 12.2 PBT：权限矩阵授权一致性
     - **Property 34: 权限矩阵授权一致性**
     - **Validates: Requirements 14.4, 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7**
 
-- [ ] 13. 报告日期合规校验（需求 25）
-  - [ ] 13.1 实现报告日期下界校验
+- [x] 13. 报告日期合规校验（需求 25）
+  - [x] 13.1 实现报告日期下界校验
     - 在 `ReportBodyService` 或独立校验器实现 `Report_Date_Compliance`：报告日期不早于 max(审计证据完成日, 财表/治理层批准日, EQCR 通过日)，不合规返回告警要求确认（非硬阻断）
     - _Requirements: 25.1, 25.2, 25.3, 25.4_
-  - [ ]* 13.2 PBT：报告日期下界合规
+  - [x]* 13.2 PBT：报告日期下界合规
     - **Property 51: 报告日期下界合规**
     - **Validates: Requirements 25.1, 25.2, 25.3**
 
-- [ ] 14. OnlyOffice 降级与 callback 鉴权（需求 28/29，P1 安全刚需）
-  - [ ] 14.1 实现 OnlyOfficeCallbackService 健康检查与 JWT 校验
+- [x] 14. OnlyOffice 降级与 callback 鉴权（需求 28/29，P1 安全刚需）
+  - [x] 14.1 实现 OnlyOfficeCallbackService 健康检查与 JWT 校验
     - 新建 `backend/app/services/onlyoffice_callback_service.py`：`health_check()` 探测 OnlyOffice `/healthcheck`；`verify_callback_jwt(token, body)` 校验签名，失败写安全日志并拒绝（401）
     - **在 `backend/app/config.py` 的 Settings 类注册 `ONLYOFFICE_SERVER_URL` / `ONLYOFFICE_JWT_SECRET` / `ONLYOFFICE_CALLBACK_BASE` 三项**，`.env` 同步；密钥缺失时 OnlyOffice 集成整体禁用并降级只读
     - `GET /onlyoffice/health`、`POST /onlyoffice/callback/{task_id}`（仅 JWT 通过且 status==2 时创建新版本）端点
     - _Requirements: 28.1, 28.2, 28.3, 29.1, 29.2, 29.3_
-  - [ ]* 14.2 PBT：OnlyOffice 不可用降级
+  - [x]* 14.2 PBT：OnlyOffice 不可用降级
     - **Property 54: OnlyOffice 不可用降级**
     - **Validates: Requirements 28.1**
-  - [ ]* 14.3 PBT：callback JWT 鉴权
+  - [x]* 14.3 PBT：callback JWT 鉴权
     - **Property 55: callback JWT 鉴权**
     - **Validates: Requirements 29.1, 29.2, 29.3**
-  - [ ]* 14.4 单元测试：OnlyOffice 不可用核心功能可用
+  - [x]* 14.4 单元测试：OnlyOffice 不可用核心功能可用
     - 健康检查失败时预览/下载/版本端点仍正常响应
     - _Requirements: 28.2, 28.3_
 
-- [ ] 15. P1 检查点
+- [x] 15. P1 检查点
   - 确保 P1 全部测试通过（快照/完整性/EQCR/权限/日期/callback 鉴权）；如有疑问询问用户。安全要点：callback JWT 校验必须先于 P2 在线编辑落地。
 
 ---
@@ -295,109 +295,109 @@
 > 范围：需求 6/7/10/30/11/12/15/16/9/18/20/26/27。Properties 16-17、20-26、31-33、35-36、39-44(已属 P0)、52-53、56。
 > 说明：OnlyOffice 在线编辑（需求 6）依赖 Docker 部署 OnlyOffice Document Server，相关任务标 `*` 为部署依赖可选。
 
-- [ ] 16. 审批流（需求 7）
-  - [ ] 16.1 实现审批状态流转与端点
+- [x] 16. 审批流（需求 7）
+  - [x] 16.1 实现审批状态流转与端点
     - `DeliverableService.submit_for_approval/approve/reject`：editing→pending_approval→confirmed/退回 editing，记录 approval_by/approval_at/reject_reason；`POST /{task_id}/submit-approval` `/approve` `/reject` 端点；扩展 VALID_STATUS_TRANSITIONS 含 pending_approval
     - _Requirements: 7.1, 7.2, 7.3_
-  - [ ] 16.2 前端审批面板
+  - [x] 16.2 前端审批面板
     - `ApprovalPanel.vue`：状态栏显示审批进度与审批人；站内消息通知（复用现有通知机制）
     - _Requirements: 7.4, 7.5_
-  - [ ]* 16.3 单元测试：审批流转与驳回留痕
+  - [x]* 16.3 单元测试：审批流转与驳回留痕
     - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 17. 归档锁定与项目生命周期联动（需求 11/27）
-  - [ ] 17.1 实现项目级归档与解除归档
+- [x] 17. 归档锁定与项目生命周期联动（需求 11/27）
+  - [x] 17.1 实现项目级归档与解除归档
     - `archive_project_deliverables`：confirmed/signed → archived，归档前执行完整性检查（不通过阻止/确认）；`unarchive` 仅 admin，写 archive_unarchive 审计日志；项目归档级联、全归档反映项目阶段完结
     - `POST /archive`、`POST /{task_id}/unarchive` 端点
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 27.1, 27.2, 27.3_
-  - [ ]* 17.2 PBT：不齐全则归档被阻止
+  - [x]* 17.2 PBT：不齐全则归档被阻止
     - **Property 20: 不齐全则归档被阻止**
     - **Validates: Requirements 8.4, 11.3**
-  - [ ]* 17.3 PBT：项目归档级联状态一致性
+  - [x]* 17.3 PBT：项目归档级联状态一致性
     - **Property 23: 项目归档级联状态一致性**
     - **Validates: Requirements 11.1, 27.1, 27.3**
-  - [ ]* 17.4 PBT：归档锁定不变式
+  - [x]* 17.4 PBT：归档锁定不变式
     - **Property 24: 归档锁定不变式**
     - **Validates: Requirements 11.2**
-  - [ ]* 17.5 PBT：解除归档权限与留痕
+  - [x]* 17.5 PBT：解除归档权限与留痕
     - **Property 25: 解除归档权限与留痕**
     - **Validates: Requirements 11.4**
-  - [ ]* 17.6 PBT：项目阶段聚合完结
+  - [x]* 17.6 PBT：项目阶段聚合完结
     - **Property 53: 项目阶段聚合完结**
     - **Validates: Requirements 27.2**
 
-- [ ] 18. 哈希链防篡改与在线编辑回写边界（需求 15/16）
-  - [ ] 18.1 实现版本哈希链写入与完整性校验
+- [x] 18. 哈希链防篡改与在线编辑回写边界（需求 15/16）
+  - [x] 18.1 实现版本哈希链写入与完整性校验
     - 复用 `audit_log_helper` 哈希链：版本创建时计算文件 SHA256 写入 `file_hash` + `hash_chain_entry_id`，prev_hash 链接；`GET /{task_id}/integrity-verify` 端点返回校验结果与被篡改版本号
     - _Requirements: 15.1, 15.2, 15.3, 15.4_
-  - [ ] 18.2 保证在线编辑源数据隔离
+  - [x] 18.2 保证在线编辑源数据隔离
     - 编辑回写仅修改交付物副本，源附注/报表/audit_report 数据不变
     - _Requirements: 16.1, 16.2, 16.3_
-  - [ ]* 18.3 PBT：哈希链绑定与连续性
+  - [x]* 18.3 PBT：哈希链绑定与连续性
     - **Property 31: 哈希链绑定与连续性**
     - **Validates: Requirements 15.1, 15.4**
-  - [ ]* 18.4 PBT：篡改检测正确性
+  - [x]* 18.4 PBT：篡改检测正确性
     - **Property 32: 篡改检测正确性**
     - **Validates: Requirements 15.2, 15.3**
-  - [ ]* 18.5 PBT：在线编辑源数据隔离
+  - [x]* 18.5 PBT：在线编辑源数据隔离
     - **Property 33: 在线编辑源数据隔离**
     - **Validates: Requirements 16.1**
 
-- [ ] 19. 交付物水印（需求 12）
-  - [ ] 19.1 实现草稿水印
+- [x] 19. 交付物水印（需求 12）
+  - [x] 19.1 实现草稿水印
     - 预览叠加 `DraftWatermark.vue`（draft/editing）；下载文件 python-docx 后处理嵌入水印；confirmed/signed 生成无水印
     - _Requirements: 12.1, 12.2, 12.3_
-  - [ ]* 19.2 PBT：水印当且仅当草稿态
+  - [x]* 19.2 PBT：水印当且仅当草稿态
     - **Property 26: 水印当且仅当草稿态**
     - **Validates: Requirements 12.1, 12.2, 12.3**
 
-- [ ] 20. 打包下载异步化与进度（需求 10/30）
-  - [ ] 20.1 实现异步打包
+- [x] 20. 打包下载异步化与进度（需求 10/30）
+  - [x] 20.1 实现异步打包
     - 复用 `ExportJobService` 异步打包各类最新 confirmed 版本为 ZIP，按 doc_type 建子目录 + `deliverable_manifest.txt` 清单；不完整警告允许继续；SSE（复用 `event_bus.broadcast_raw`）推送进度
     - `POST /package` 端点返回 job + 下载链接
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 30.1, 30.2, 30.3_
-  - [ ]* 20.2 PBT：打包内容为各类最新 confirmed 版本
+  - [x]* 20.2 PBT：打包内容为各类最新 confirmed 版本
     - **Property 21: 打包内容为各类最新 confirmed 版本**
     - **Validates: Requirements 10.1**
-  - [ ]* 20.3 PBT：打包结构与清单完整
+  - [x]* 20.3 PBT：打包结构与清单完整
     - **Property 22: 打包结构与清单完整**
     - **Validates: Requirements 10.3, 10.4**
-  - [ ]* 20.4 PBT：打包进度单调递增
+  - [x]* 20.4 PBT：打包进度单调递增
     - **Property 56: 打包进度单调递增**
     - **Validates: Requirements 30.2**
 
-- [ ]* 21. OnlyOffice 在线编辑（需求 6，依赖 Docker 部署 OnlyOffice Document Server）
-  - [ ]* 21.1 实现编辑配置与 callback 回写新版本
+- [x]* 21. OnlyOffice 在线编辑（需求 6，依赖 Docker 部署 OnlyOffice Document Server）
+  - [x]* 21.1 实现编辑配置与 callback 回写新版本
     - `OnlyOfficeCallbackService.build_editor_config`（document/editorConfig + 签发 JWT）；`handle_callback` status==2 下载编辑后文件创建新版本 + 哈希链；docx→Document Editor / xlsx→Spreadsheet Editor；confirmed/signed/archived 只读
     - `GET /onlyoffice/config/{task_id}/{version_no}` 端点
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
-  - [ ]* 21.2 前端 OnlyOfficeEditor 组件与降级
+  - [x]* 21.2 前端 OnlyOfficeEditor 组件与降级
     - `OnlyOfficeEditor.vue` 嵌入编辑器，OnlyOffice 不可用时降级 `DeliverablePreview`
     - _Requirements: 6.1, 6.5, 6.6, 28.1_
-  - [ ]* 21.3 PBT：编辑器模式由状态决定
+  - [x]* 21.3 PBT：编辑器模式由状态决定
     - **Property 16: 编辑器模式由状态决定**
     - **Validates: Requirements 6.5, 6.6**
-  - [ ]* 21.4 PBT：编辑器类型由扩展名决定
+  - [x]* 21.4 PBT：编辑器类型由扩展名决定
     - **Property 17: 编辑器类型由扩展名决定**
     - **Validates: Requirements 6.2**
 
-- [ ] 22. doc_type 可扩展与专项报告 + A 循环关联 + 上期比较（需求 20/9/18/26）
-  - [ ] 22.1 实现 doc_type 可扩展通用管理与专项必需件清单
+- [x] 22. doc_type 可扩展与专项报告 + A 循环关联 + 上期比较（需求 20/9/18/26）
+  - [x] 22.1 实现 doc_type 可扩展通用管理与专项必需件清单
     - doc_type 以可扩展枚举/配置定义（不硬编码）；`required_doc_types` 按项目类型返回清单（标准三件套 / 专项）；新增专项类型无需改核心逻辑
     - _Requirements: 18.1, 18.2, 18.4, 20.1, 20.2, 20.3, 20.4_
-  - [ ] 22.2 实现 A 循环关联入口
+  - [x] 22.2 实现 A 循环关联入口
     - A 循环底稿侧边导航交付物快捷入口，自动筛选当前项目交付物，阶段概览显示完整性摘要，状态变更同步阶段进度
     - _Requirements: 9.1, 9.2, 9.3, 9.4_
-  - [ ] 22.3 实现上期比较其他事项段
+  - [x] 22.3 实现上期比较其他事项段
     - 上期比较三情形（本所前期/前任注师/上期未审）措辞，首次委托情形含「其他事项段」
     - _Requirements: 26.1, 26.2, 26.3_
-  - [ ]* 22.4 PBT：doc_type 可扩展通用管理
+  - [x]* 22.4 PBT：doc_type 可扩展通用管理
     - **Property 35: doc_type 可扩展通用管理**
     - **Validates: Requirements 20.1, 20.2**
-  - [ ]* 22.5 PBT：必需件清单由项目类型决定
+  - [x]* 22.5 PBT：必需件清单由项目类型决定
     - **Property 36: 必需件清单由项目类型决定**
     - **Validates: Requirements 20.3, 20.4**
-  - [ ]* 22.6 PBT：首次委托其他事项段
+  - [x]* 22.6 PBT：首次委托其他事项段
     - **Property 52: 首次委托其他事项段**
     - **Validates: Requirements 26.2**
 
@@ -405,15 +405,15 @@
 
 # 收尾：迁移一致性验证与端到端
 
-- [ ] 23. 迁移 + 三层一致性最终验证
+- [x] 23. 迁移 + 三层一致性最终验证
   - 应用 V059 迁移后运行 `test_raw_sql_column_contract.py` 与 `test_raw_sql_schema_contract.py`，校验迁移 DDL + ORM 模型 + service 三层完全一致；运行后端全量 `python -m pytest backend/tests/ -v --tb=short`（用 `;` 连接、`rtk` 前缀）
   - _Requirements: 2.2, 22.1, 24.2_
 
-- [ ]* 24. Playwright 端到端实测（needs-env：需运行中后端 9980 + 前端 3030）
+- [x]* 24. Playwright 端到端实测（needs-env：需运行中后端 9980 + 前端 3030）
   - 实测交付中心页面、选择性导出弹窗、预览、报告正文生成、版本链、审批面板关键交互（getDiagnostics 过 ≠ 运行时无错）；中文全链路不崩
   - _Requirements: 1.1, 3.1, 5.1, 21.1, 24.7_
 
-- [ ] 25. 最终检查点
+- [x] 25. 最终检查点
   - 确保所有批次测试通过；如有疑问询问用户。
 
 ## 说明

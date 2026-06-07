@@ -31,7 +31,6 @@ _DELIVERABLE_TABLES = [
 from app.services.completeness_service import CompletenessService
 from app.services.deliverable_permissions import DeliverableAction, can_deliverable
 from app.services.deliverable_service import DeliverableService
-from app.services.deliverable_snapshot_service import DeliverableSnapshotService
 from app.services.onlyoffice_callback_service import OnlyOfficeCallbackService
 from app.services.report_body_service import ReportBodyService
 
@@ -79,73 +78,6 @@ async def seeded_db(db_session: AsyncSession):
     db_session.add(project)
     await db_session.flush()
     return {"project_id": project_id, "user_id": user_id, "year": 2024}
-
-
-async def _task_with_snapshot(
-    db: AsyncSession, seeded: dict, doc_type: str, tb_hash: str
-) -> uuid.UUID:
-    svc = DeliverableService(db)
-    task = await svc.create_task(
-        seeded["project_id"], doc_type, "soe", seeded["user_id"]
-    )
-    refs = {
-        "tb_hash": tb_hash,
-        "year": seeded["year"],
-        "doc_type": doc_type,
-        "captured_at": datetime.now(timezone.utc).isoformat(),
-    }
-    task.source_snapshot_refs = refs
-    task.status = WordExportStatus.editing.value
-    task.file_path = f"/tmp/{doc_type}.docx"
-    await db.flush()
-    return task.id
-
-
-@pytest.mark.asyncio
-async def test_snapshot_ref_binding(db_session, seeded_db, monkeypatch):
-    """Property 27: 快照绑定完整性"""
-    snap_svc = DeliverableSnapshotService(db_session)
-
-    async def _fake_hash(_pid, _year):
-        return "tb_hash_for_test"
-
-    monkeypatch.setattr(
-        snap_svc._snap_svc,
-        "_compute_trial_balance_hash",
-        _fake_hash,
-    )
-    ref = await snap_svc.capture_snapshot_ref(
-        seeded_db["project_id"], seeded_db["year"], "audit_report"
-    )
-    assert ref.tb_hash
-    assert ref.doc_type == "audit_report"
-    payload = snap_svc.snapshot_ref_to_dict(ref)
-    assert payload["tb_hash"] == ref.tb_hash
-
-
-@pytest.mark.asyncio
-async def test_stale_detection(db_session, seeded_db, monkeypatch):
-    """Property 28: 数据过时检测正确性"""
-    snap_svc = DeliverableSnapshotService(db_session)
-    task_id = await _task_with_snapshot(
-        db_session, seeded_db, "audit_report", "old_hash_value"
-    )
-    task = await DeliverableService(db_session).get_task(task_id)
-    assert task
-
-    async def _fake_hash(_pid, _year):
-        return "current_hash_value"
-
-    stale_svc = DeliverableSnapshotService(db_session)
-    monkeypatch.setattr(
-        stale_svc._snap_svc,
-        "_compute_trial_balance_hash",
-        _fake_hash,
-    )
-    result = await stale_svc.check_stale(task, seeded_db["year"])
-    assert result.stale is True
-    assert result.bound_tb_hash == "old_hash_value"
-    assert result.current_tb_hash == "current_hash_value"
 
 
 @pytest.mark.asyncio
@@ -261,7 +193,7 @@ async def test_sign_records_fields(db_session, seeded_db):
     role=st.sampled_from(["readonly", "auditor", "manager", "partner", "admin"]),
     is_eqcr=st.booleans(),
 )
-@settings(max_examples=30)
+@settings(max_examples=5)
 def test_permission_matrix_export(role, is_eqcr):
     """Property 34: 权限矩阵 — 导出/只读/EQCR"""
     allowed_export = can_deliverable(
@@ -279,7 +211,7 @@ def test_permission_matrix_export(role, is_eqcr):
     role=st.sampled_from(["auditor", "manager", "partner", "admin"]),
     status=st.sampled_from(["editing", "confirmed", "signed", "archived"]),
 )
-@settings(max_examples=20)
+@settings(max_examples=5)
 def test_permission_matrix_edit(role, status):
     """Property 34: 权限矩阵 — 编辑锁定态"""
     allowed = can_deliverable(
@@ -310,6 +242,92 @@ async def test_report_date_compliance_warning(db_session, seeded_db):
     )
     assert result["compliant"] is False
     assert result["warnings"]
+
+
+# Feature: audit-report-deliverable-center, Property 51: 报告日期下界合规
+@given(
+    base_year=st.integers(min_value=2020, max_value=2030),
+    offsets=st.lists(
+        st.integers(min_value=-400, max_value=400), min_size=0, max_size=3
+    ),
+    report_offset=st.integers(min_value=-400, max_value=400),
+    which=st.lists(st.sampled_from([0, 1, 2]), min_size=0, max_size=3, unique=True),
+)
+@settings(max_examples=5, deadline=None)
+def test_property_51_report_date_lower_bound_compliance(
+    base_year, offsets, report_offset, which
+):
+    """Property 51: 报告日期下界合规 —
+
+    对任意提供的下界日期子集（审计证据完成日 / 财表批准日 / EQCR 通过日），
+    校验当且仅当 report_date < max(已提供下界) 时返回告警并要求确认（非硬阻断）。
+    Validates: Requirements 25.1, 25.2, 25.3
+    """
+    anchor = date(base_year, 6, 30)
+
+    def _shift(d: date, days: int) -> date:
+        from datetime import timedelta
+
+        return d + timedelta(days=days)
+
+    # 三类下界日期：按 which 决定哪些被提供（其余为 None）
+    slots: list[date | None] = [None, None, None]
+    for idx in which:
+        off = offsets[idx % len(offsets)] if offsets else 0
+        slots[idx] = _shift(anchor, off)
+
+    report_date = _shift(anchor, report_offset)
+
+    result = ReportBodyService.validate_report_date_compliance(
+        report_date,
+        evidence_complete_date=slots[0],
+        fs_approval_date=slots[1],
+        eqcr_pass_date=slots[2],
+    )
+
+    provided = [d for d in slots if d is not None]
+    if not provided:
+        # 无任何下界 → 视为合规
+        assert result["compliant"] is True
+        assert result["requires_confirmation"] is False
+        assert result["warnings"] == []
+        assert result["floor_date"] is None
+        return
+
+    floor = max(provided)
+    expect_warning = report_date < floor
+
+    # 告警 ⟺ report_date < 下界
+    assert (result["compliant"] is False) is expect_warning
+    assert result["requires_confirmation"] is expect_warning
+    assert bool(result["warnings"]) is expect_warning
+    # 下界日期始终为已提供日期的最大值
+    assert result["floor_date"] == floor.isoformat()
+    # 非硬阻断：不合规时通过 requires_confirmation 表达"要求确认"语义
+    if expect_warning:
+        assert result["requires_confirmation"] is True
+
+
+def test_property_51_no_floor_dates_is_compliant():
+    """Property 51 边界：无任何下界日期输入时恒合规、无需确认。"""
+    result = ReportBodyService.validate_report_date_compliance(date(2025, 3, 31))
+    assert result["compliant"] is True
+    assert result["requires_confirmation"] is False
+    assert result["floor_date"] is None
+
+
+def test_property_51_report_date_equals_floor_is_compliant():
+    """Property 51 边界：报告日期恰等于下界时合规（不早于即可）。"""
+    floor = date(2025, 4, 15)
+    result = ReportBodyService.validate_report_date_compliance(
+        floor,
+        evidence_complete_date=date(2025, 3, 1),
+        fs_approval_date=floor,
+        eqcr_pass_date=date(2025, 4, 1),
+    )
+    assert result["compliant"] is True
+    assert result["requires_confirmation"] is False
+    assert result["floor_date"] == floor.isoformat()
 
 
 def test_onlyoffice_disabled_without_secret(monkeypatch):

@@ -1,0 +1,3127 @@
+{
+  "version": "1.0.0-preview",
+  "generated_at": "2026-06-06T16:30:21.976914+00:00",
+  "description": "附注语义 sidecar 候选预览（自动生成，不覆盖主模板）",
+  "pilot_sections": [
+    "accounting_policies",
+    "accounts_receivable",
+    "fixed_assets",
+    "cash_and_bank",
+    "related_party_transactions",
+    "related_party_receivables_payables"
+  ],
+  "source_templates": [
+    "backend/data/note_template_soe.json",
+    "backend/data/note_template_listed.json"
+  ],
+  "sidecars": [
+    {
+      "semantic_section_id": "accounting_policies",
+      "template_type": "soe",
+      "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "section_title": "重要会计政策、会计估计",
+      "section_number": "四",
+      "content_type": "text",
+      "_semantic": {
+        "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+        "semantic_section_id": "accounting_policies",
+        "variant": "soe_standalone"
+      },
+      "_tables": [],
+      "stats": {
+        "table_count": 0,
+        "total_rows": 0,
+        "total_columns": 0
+      }
+    },
+    {
+      "semantic_section_id": "accounting_policies",
+      "template_type": "listed",
+      "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji",
+      "section_title": "重要会计政策及会计估计",
+      "section_number": "三",
+      "content_type": "text",
+      "_semantic": {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji",
+        "semantic_section_id": "accounting_policies",
+        "variant": "listed_standalone"
+      },
+      "_tables": [],
+      "stats": {
+        "table_count": 0,
+        "total_rows": 0,
+        "total_columns": 0
+      }
+    },
+    {
+      "semantic_section_id": "accounts_receivable",
+      "template_type": "soe",
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
+      "section_title": "应收账款",
+      "section_number": "八、5",
+      "content_type": "mixed",
+      "_semantic": {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
+        "semantic_section_id": "accounts_receivable",
+        "variant": "soe_standalone"
+      },
+      "_tables": [
+        {
+          "table_id": "账_龄",
+          "name": "账  龄",
+          "columns": [
+            {
+              "col_id": "账龄",
+              "label": "账龄"
+            },
+            {
+              "col_id": "期末数",
+              "label": "期末数",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "期初数",
+              "label": "期初数",
+              "amount_role": "opening"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "1年以内_含1年",
+              "row_type": "data",
+              "label": "1年以内（含1年）"
+            },
+            {
+              "row_id": "1至2年",
+              "row_type": "data",
+              "label": "1至2年"
+            },
+            {
+              "row_id": "2至3年",
+              "row_type": "data",
+              "label": "2至3年"
+            },
+            {
+              "row_id": "3年以上",
+              "row_type": "data",
+              "label": "3年以上"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 0
+        },
+        {
+          "table_id": "类_别",
+          "name": "类  别",
+          "columns": [
+            {
+              "col_id": "类别",
+              "label": "类别"
+            },
+            {
+              "col_id": "期末数",
+              "label": "期末数",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "期初数",
+              "label": "期初数",
+              "amount_role": "opening"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "按单项计提坏账准备",
+              "row_type": "data",
+              "label": "按单项计提坏账准备"
+            },
+            {
+              "row_id": "按组合计提坏账准备",
+              "row_type": "total",
+              "label": "按组合计提坏账准备"
+            },
+            {
+              "row_id": "其中",
+              "row_type": "data",
+              "label": "其中："
+            },
+            {
+              "row_id": "应收中央企业客户",
+              "row_type": "data",
+              "label": "应收中央企业客户"
+            },
+            {
+              "row_id": "应收海外企业客户",
+              "row_type": "data",
+              "label": "应收海外企业客户"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 1
+        },
+        {
+          "table_id": "债务人名称",
+          "name": "债务人名称",
+          "columns": [
+            {
+              "col_id": "债务人名称",
+              "label": "债务人名称"
+            },
+            {
+              "col_id": "账面余额",
+              "label": "账面余额"
+            },
+            {
+              "col_id": "坏账准备",
+              "label": "坏账准备"
+            },
+            {
+              "col_id": "账龄",
+              "label": "账龄"
+            },
+            {
+              "col_id": "预期信用损失率",
+              "label": "预期信用损失率（%）"
+            },
+            {
+              "col_id": "计提理由",
+              "label": "计提理由"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 2
+        },
+        {
+          "table_id": "账_龄_2",
+          "name": "账  龄",
+          "columns": [
+            {
+              "col_id": "账龄",
+              "label": "账龄"
+            },
+            {
+              "col_id": "期末数",
+              "label": "期末数",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "期初数",
+              "label": "期初数",
+              "amount_role": "opening"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "账龄",
+              "row_type": "group_header",
+              "label": "账龄"
+            },
+            {
+              "row_id": "账龄_2",
+              "row_type": "group_header",
+              "label": "账龄"
+            },
+            {
+              "row_id": "1年以内_含1年",
+              "row_type": "data",
+              "label": "1年以内（含1年）"
+            },
+            {
+              "row_id": "1至2年",
+              "row_type": "data",
+              "label": "1至2年"
+            },
+            {
+              "row_id": "2至3年",
+              "row_type": "data",
+              "label": "2至3年"
+            },
+            {
+              "row_id": "3年以上",
+              "row_type": "data",
+              "label": "3年以上"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 3
+        },
+        {
+          "table_id": "账_龄_3",
+          "name": "账  龄",
+          "columns": [
+            {
+              "col_id": "账龄",
+              "label": "账龄"
+            },
+            {
+              "col_id": "期末数",
+              "label": "期末数",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "期初数",
+              "label": "期初数",
+              "amount_role": "opening"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "账龄",
+              "row_type": "group_header",
+              "label": "账龄"
+            },
+            {
+              "row_id": "账龄_2",
+              "row_type": "group_header",
+              "label": "账龄"
+            },
+            {
+              "row_id": "1年以内_含1年",
+              "row_type": "data",
+              "label": "1年以内（含1年）"
+            },
+            {
+              "row_id": "1至2年",
+              "row_type": "data",
+              "label": "1至2年"
+            },
+            {
+              "row_id": "2至3年",
+              "row_type": "data",
+              "label": "2至3年"
+            },
+            {
+              "row_id": "3年以上",
+              "row_type": "data",
+              "label": "3年以上"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 4
+        },
+        {
+          "table_id": "组合名称",
+          "name": "组合名称",
+          "columns": [
+            {
+              "col_id": "组合名称",
+              "label": "组合名称"
+            },
+            {
+              "col_id": "期末数",
+              "label": "期末数",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "期初数",
+              "label": "期初数",
+              "amount_role": "opening"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "组合名称",
+              "row_type": "group_header",
+              "label": "组合名称"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 5
+        },
+        {
+          "table_id": "类_别_2",
+          "name": "类  别",
+          "columns": [
+            {
+              "col_id": "类别",
+              "label": "类别"
+            },
+            {
+              "col_id": "期初数",
+              "label": "期初数",
+              "amount_role": "opening"
+            },
+            {
+              "col_id": "本期变动金额",
+              "label": "本期变动金额",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "期末数",
+              "label": "期末数",
+              "amount_role": "closing"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "类别",
+              "row_type": "group_header",
+              "label": "类别"
+            },
+            {
+              "row_id": "单项",
+              "row_type": "data",
+              "label": "单项"
+            },
+            {
+              "row_id": "组合",
+              "row_type": "data",
+              "label": "组合："
+            },
+            {
+              "row_id": "unnamed",
+              "row_type": "data",
+              "label": "……"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 6
+        },
+        {
+          "table_id": "债务人名称_2",
+          "name": "债务人名称",
+          "columns": [
+            {
+              "col_id": "债务人名称",
+              "label": "债务人名称"
+            },
+            {
+              "col_id": "转回或收回金额",
+              "label": "转回或收回金额"
+            },
+            {
+              "col_id": "转回或收回前累计已计提坏账准备金额",
+              "label": "转回或收回前累计已计提坏账准备金额"
+            },
+            {
+              "col_id": "转回或收回原因_方式",
+              "label": "转回或收回原因、方式"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 7
+        },
+        {
+          "table_id": "债务人名称_3",
+          "name": "债务人名称",
+          "columns": [
+            {
+              "col_id": "债务人名称",
+              "label": "债务人名称"
+            },
+            {
+              "col_id": "应收账款性质",
+              "label": "应收账款性质"
+            },
+            {
+              "col_id": "核销金额",
+              "label": "核销金额"
+            },
+            {
+              "col_id": "核销原因",
+              "label": "核销原因"
+            },
+            {
+              "col_id": "履行的核销程序",
+              "label": "履行的核销程序"
+            },
+            {
+              "col_id": "是否因关联交易产生",
+              "label": "是否因关联交易产生"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 8
+        },
+        {
+          "table_id": "债务人名称_4",
+          "name": "债务人名称",
+          "columns": [
+            {
+              "col_id": "债务人名称",
+              "label": "债务人名称"
+            },
+            {
+              "col_id": "账面余额",
+              "label": "账面余额"
+            },
+            {
+              "col_id": "占应收账款合计的比例",
+              "label": "占应收账款合计的比例（%）"
+            },
+            {
+              "col_id": "坏账准备",
+              "label": "坏账准备"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 9
+        },
+        {
+          "table_id": "债务人名称_5",
+          "name": "债务人名称",
+          "columns": [
+            {
+              "col_id": "债务人名称",
+              "label": "债务人名称"
+            },
+            {
+              "col_id": "终止确认金额",
+              "label": "终止确认金额"
+            },
+            {
+              "col_id": "与终止确认相关的利得或损失_损失以_填列",
+              "label": "与终止确认相关的利得或损失（损失以“-”填列）"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 10
+        }
+      ],
+      "stats": {
+        "table_count": 11,
+        "total_rows": 37,
+        "total_columns": 42
+      }
+    },
+    {
+      "semantic_section_id": "accounts_receivable",
+      "template_type": "listed",
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
+      "section_title": "应收账款",
+      "section_number": "五、5",
+      "content_type": "mixed",
+      "_semantic": {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
+        "semantic_section_id": "accounts_receivable",
+        "variant": "listed_standalone"
+      },
+      "_tables": [
+        {
+          "table_id": "账_龄",
+          "name": "账  龄",
+          "columns": [
+            {
+              "col_id": "账龄",
+              "label": "账龄"
+            },
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "上年年末余额",
+              "label": "上年年末余额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "1年以内",
+              "row_type": "data",
+              "label": "1年以内"
+            },
+            {
+              "row_id": "其中_0_x个月",
+              "row_type": "data",
+              "label": "其中：0-X个月"
+            },
+            {
+              "row_id": "x_y个月",
+              "row_type": "data",
+              "label": "X-Y个月"
+            },
+            {
+              "row_id": "1年以内小计",
+              "row_type": "subtotal",
+              "label": "1年以内小计："
+            },
+            {
+              "row_id": "1至2年",
+              "row_type": "data",
+              "label": "1至2年"
+            },
+            {
+              "row_id": "2至3年",
+              "row_type": "data",
+              "label": "2至3年"
+            },
+            {
+              "row_id": "3年以上",
+              "row_type": "data",
+              "label": "3年以上"
+            },
+            {
+              "row_id": "小计",
+              "row_type": "subtotal",
+              "label": "小计"
+            },
+            {
+              "row_id": "减_坏账准备",
+              "row_type": "data",
+              "label": "减：坏账准备"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 0
+        },
+        {
+          "table_id": "类_别",
+          "name": "类  别",
+          "columns": [
+            {
+              "col_id": "类别",
+              "label": "类别"
+            },
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "类别",
+              "row_type": "group_header",
+              "label": "类别"
+            },
+            {
+              "row_id": "类别_2",
+              "row_type": "group_header",
+              "label": "类别"
+            },
+            {
+              "row_id": "按单项计提坏账准备",
+              "row_type": "data",
+              "label": "按单项计提坏账准备"
+            },
+            {
+              "row_id": "其中",
+              "row_type": "data",
+              "label": "其中："
+            },
+            {
+              "row_id": "按组合计提坏账准备_注意_与会计政策中披露的组合保持一致",
+              "row_type": "total",
+              "label": "按组合计提坏账准备【注意：与会计政策中披露的组合保持一致】"
+            },
+            {
+              "row_id": "其中_2",
+              "row_type": "data",
+              "label": "其中："
+            },
+            {
+              "row_id": "应收中央企业客户",
+              "row_type": "data",
+              "label": "应收中央企业客户"
+            },
+            {
+              "row_id": "应收海外企业客户",
+              "row_type": "data",
+              "label": "应收海外企业客户"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 1
+        },
+        {
+          "table_id": "类_别_2",
+          "name": "类  别",
+          "columns": [
+            {
+              "col_id": "类别",
+              "label": "类别"
+            },
+            {
+              "col_id": "上年年末余额",
+              "label": "上年年末余额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "类别",
+              "row_type": "group_header",
+              "label": "类别"
+            },
+            {
+              "row_id": "类别_2",
+              "row_type": "group_header",
+              "label": "类别"
+            },
+            {
+              "row_id": "按单项计提坏账准备",
+              "row_type": "data",
+              "label": "按单项计提坏账准备"
+            },
+            {
+              "row_id": "其中",
+              "row_type": "data",
+              "label": "其中："
+            },
+            {
+              "row_id": "按组合计提坏账准备_注意_与会计政策中披露的组合保持一致",
+              "row_type": "total",
+              "label": "按组合计提坏账准备【注意：与会计政策中披露的组合保持一致】"
+            },
+            {
+              "row_id": "其中_2",
+              "row_type": "data",
+              "label": "其中："
+            },
+            {
+              "row_id": "应收中央企业客户",
+              "row_type": "data",
+              "label": "应收中央企业客户"
+            },
+            {
+              "row_id": "应收海外企业客户",
+              "row_type": "data",
+              "label": "应收海外企业客户"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 2
+        },
+        {
+          "table_id": "名_称",
+          "name": "名  称",
+          "columns": [
+            {
+              "col_id": "名称",
+              "label": "名称"
+            },
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "名称",
+              "row_type": "group_header",
+              "label": "名称"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 3
+        },
+        {
+          "table_id": "名_称_2",
+          "name": "名  称",
+          "columns": [
+            {
+              "col_id": "名称",
+              "label": "名称"
+            },
+            {
+              "col_id": "上年年末余额",
+              "label": "上年年末余额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "名称",
+              "row_type": "group_header",
+              "label": "名称"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 4
+        },
+        {
+          "table_id": "table_5",
+          "name": "",
+          "columns": [
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "上年年末余额",
+              "label": "上年年末余额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "1年以内",
+              "row_type": "data",
+              "label": "1年以内"
+            },
+            {
+              "row_id": "1至2年",
+              "row_type": "data",
+              "label": "1至2年"
+            },
+            {
+              "row_id": "2至3年",
+              "row_type": "data",
+              "label": "2至3年"
+            },
+            {
+              "row_id": "unnamed",
+              "row_type": "data",
+              "label": "……"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 5
+        },
+        {
+          "table_id": "table_6",
+          "name": "",
+          "columns": [
+            {
+              "col_id": "期末金额",
+              "label": "期末金额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "上年年末金额",
+              "label": "上年年末金额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "1年以内",
+              "row_type": "data",
+              "label": "1年以内"
+            },
+            {
+              "row_id": "1至2年",
+              "row_type": "data",
+              "label": "1至2年"
+            },
+            {
+              "row_id": "2至3年",
+              "row_type": "data",
+              "label": "2至3年"
+            },
+            {
+              "row_id": "unnamed",
+              "row_type": "data",
+              "label": "……"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 6
+        },
+        {
+          "table_id": "table_7",
+          "name": "",
+          "columns": [
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "上年年末余额",
+              "label": "上年年末余额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "1年以内",
+              "row_type": "data",
+              "label": "1年以内"
+            },
+            {
+              "row_id": "1至2年",
+              "row_type": "data",
+              "label": "1至2年"
+            },
+            {
+              "row_id": "2至3年",
+              "row_type": "data",
+              "label": "2至3年"
+            },
+            {
+              "row_id": "unnamed",
+              "row_type": "data",
+              "label": "……"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 7
+        },
+        {
+          "table_id": "table_8",
+          "name": "",
+          "columns": [
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "上年年末余额",
+              "label": "上年年末余额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "1年以内",
+              "row_type": "data",
+              "label": "1年以内"
+            },
+            {
+              "row_id": "1至2年",
+              "row_type": "data",
+              "label": "1至2年"
+            },
+            {
+              "row_id": "2至3年",
+              "row_type": "data",
+              "label": "2至3年"
+            },
+            {
+              "row_id": "3年以上",
+              "row_type": "data",
+              "label": "3年以上"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 8
+        },
+        {
+          "table_id": "table_9",
+          "name": "",
+          "columns": [
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "上年年末余额",
+              "label": "上年年末余额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "1年以内",
+              "row_type": "data",
+              "label": "1年以内"
+            },
+            {
+              "row_id": "1至2年",
+              "row_type": "data",
+              "label": "1至2年"
+            },
+            {
+              "row_id": "2至3年",
+              "row_type": "data",
+              "label": "2至3年"
+            },
+            {
+              "row_id": "unnamed",
+              "row_type": "data",
+              "label": "……"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 9
+        },
+        {
+          "table_id": "table_10",
+          "name": "",
+          "columns": [
+            {
+              "col_id": "坏账准备金额",
+              "label": "坏账准备金额"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "期初余额",
+              "row_type": "data",
+              "label": "期初余额"
+            },
+            {
+              "row_id": "本期计提",
+              "row_type": "data",
+              "label": "本期计提"
+            },
+            {
+              "row_id": "本期收回或转回",
+              "row_type": "data",
+              "label": "本期收回或转回"
+            },
+            {
+              "row_id": "本期核销",
+              "row_type": "data",
+              "label": "本期核销"
+            },
+            {
+              "row_id": "本期转销",
+              "row_type": "data",
+              "label": "[本期转销]"
+            },
+            {
+              "row_id": "其他",
+              "row_type": "data",
+              "label": "[其他]"
+            },
+            {
+              "row_id": "期末余额",
+              "row_type": "data",
+              "label": "期末余额"
+            }
+          ],
+          "source_table_index": 10
+        },
+        {
+          "table_id": "单位名称",
+          "name": "单位名称",
+          "columns": [
+            {
+              "col_id": "单位名称",
+              "label": "单位名称"
+            },
+            {
+              "col_id": "转回原因",
+              "label": "转回原因"
+            },
+            {
+              "col_id": "收回方式",
+              "label": "收回方式"
+            },
+            {
+              "col_id": "原确定坏账准备的依据",
+              "label": "原确定坏账准备的依据"
+            },
+            {
+              "col_id": "转回或收回金额",
+              "label": "转回或收回金额"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 11
+        },
+        {
+          "table_id": "项_目",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "核销金额",
+              "label": "核销金额"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "实际核销的应收账款",
+              "row_type": "data",
+              "label": "实际核销的应收账款"
+            }
+          ],
+          "source_table_index": 12
+        },
+        {
+          "table_id": "单位名称_2",
+          "name": "单位名称",
+          "columns": [
+            {
+              "col_id": "单位名称",
+              "label": "单位名称"
+            },
+            {
+              "col_id": "应收账款性质",
+              "label": "应收账款性质"
+            },
+            {
+              "col_id": "核销金额",
+              "label": "核销金额"
+            },
+            {
+              "col_id": "核销原因",
+              "label": "核销原因"
+            },
+            {
+              "col_id": "履行的核销程序",
+              "label": "履行的核销程序"
+            },
+            {
+              "col_id": "款项是否由关联交易产生",
+              "label": "款项是否由关联交易产生"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 13
+        },
+        {
+          "table_id": "单位名称_3",
+          "name": "单位名称",
+          "columns": [
+            {
+              "col_id": "单位名称",
+              "label": "单位名称"
+            },
+            {
+              "col_id": "应收账款期末余额",
+              "label": "应收账款期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "合同资产期末余额",
+              "label": "合同资产期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "应收账款和合同资产期末余额",
+              "label": "应收账款和合同资产期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "占应收账款和合同资产期末余额合计数的比例",
+              "label": "占应收账款和合同资产期末余额合计数的比例%",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "应收账款坏账准备和合同资产减值准备期末余额",
+              "label": "应收账款坏账准备和合同资产减值准备期末余额",
+              "amount_role": "closing"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 14
+        }
+      ],
+      "stats": {
+        "table_count": 15,
+        "total_rows": 69,
+        "total_columns": 41
+      }
+    },
+    {
+      "semantic_section_id": "fixed_assets",
+      "template_type": "soe",
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gu-ding-zi-chan",
+      "section_title": "固定资产",
+      "section_number": "八、22",
+      "content_type": "mixed",
+      "_semantic": {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gu-ding-zi-chan",
+        "semantic_section_id": "fixed_assets",
+        "variant": "soe_standalone"
+      },
+      "_tables": [
+        {
+          "table_id": "项_目",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "期末账面价值",
+              "label": "期末账面价值",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "期初账面价值",
+              "label": "期初账面价值",
+              "amount_role": "opening"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "固定资产",
+              "row_type": "data",
+              "label": "固定资产"
+            },
+            {
+              "row_id": "固定资产清理",
+              "row_type": "data",
+              "label": "固定资产清理"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 0
+        },
+        {
+          "table_id": "项_目_2",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "期初余额",
+              "label": "期初余额",
+              "amount_role": "opening"
+            },
+            {
+              "col_id": "本期增加",
+              "label": "本期增加",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "本期减少",
+              "label": "本期减少",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "一_账面原值合计",
+              "row_type": "total",
+              "label": "一、账面原值合计"
+            },
+            {
+              "row_id": "其中_土地资产",
+              "row_type": "data",
+              "label": "其中：土地资产"
+            },
+            {
+              "row_id": "房屋_建筑物",
+              "row_type": "data",
+              "label": "房屋、建筑物"
+            },
+            {
+              "row_id": "机器设备",
+              "row_type": "data",
+              "label": "机器设备"
+            },
+            {
+              "row_id": "运输工具",
+              "row_type": "data",
+              "label": "运输工具"
+            },
+            {
+              "row_id": "电子设备",
+              "row_type": "data",
+              "label": "电子设备"
+            },
+            {
+              "row_id": "办公设备",
+              "row_type": "data",
+              "label": "办公设备"
+            },
+            {
+              "row_id": "酒店业家具",
+              "row_type": "data",
+              "label": "酒店业家具"
+            },
+            {
+              "row_id": "其他",
+              "row_type": "data",
+              "label": "其他"
+            },
+            {
+              "row_id": "二_累计折旧合计",
+              "row_type": "total",
+              "label": "二、累计折旧合计"
+            },
+            {
+              "row_id": "其中_土地资产_2",
+              "row_type": "data",
+              "label": "其中：土地资产"
+            },
+            {
+              "row_id": "房屋_建筑物_2",
+              "row_type": "data",
+              "label": "房屋、建筑物"
+            },
+            {
+              "row_id": "机器设备_2",
+              "row_type": "data",
+              "label": "机器设备"
+            },
+            {
+              "row_id": "运输工具_2",
+              "row_type": "data",
+              "label": "运输工具"
+            },
+            {
+              "row_id": "电子设备_2",
+              "row_type": "data",
+              "label": "电子设备"
+            },
+            {
+              "row_id": "办公设备_2",
+              "row_type": "data",
+              "label": "办公设备"
+            },
+            {
+              "row_id": "酒店业家具_2",
+              "row_type": "data",
+              "label": "酒店业家具"
+            },
+            {
+              "row_id": "其他_2",
+              "row_type": "data",
+              "label": "其他"
+            },
+            {
+              "row_id": "三_固定资产账面净值合计",
+              "row_type": "total",
+              "label": "三、固定资产账面净值合计"
+            },
+            {
+              "row_id": "其中_土地资产_3",
+              "row_type": "data",
+              "label": "其中：土地资产"
+            },
+            {
+              "row_id": "房屋_建筑物_3",
+              "row_type": "data",
+              "label": "房屋、建筑物"
+            },
+            {
+              "row_id": "机器设备_3",
+              "row_type": "data",
+              "label": "机器设备"
+            },
+            {
+              "row_id": "运输工具_3",
+              "row_type": "data",
+              "label": "运输工具"
+            },
+            {
+              "row_id": "电子设备_3",
+              "row_type": "data",
+              "label": "电子设备"
+            },
+            {
+              "row_id": "办公设备_3",
+              "row_type": "data",
+              "label": "办公设备"
+            },
+            {
+              "row_id": "酒店业家具_3",
+              "row_type": "data",
+              "label": "酒店业家具"
+            },
+            {
+              "row_id": "其他_3",
+              "row_type": "data",
+              "label": "其他"
+            },
+            {
+              "row_id": "四_固定资产减值准备合计",
+              "row_type": "total",
+              "label": "四、固定资产减值准备合计"
+            },
+            {
+              "row_id": "其中_土地资产_4",
+              "row_type": "data",
+              "label": "其中：土地资产"
+            },
+            {
+              "row_id": "房屋_建筑物_4",
+              "row_type": "data",
+              "label": "房屋、建筑物"
+            },
+            {
+              "row_id": "机器设备_4",
+              "row_type": "data",
+              "label": "机器设备"
+            },
+            {
+              "row_id": "运输工具_4",
+              "row_type": "data",
+              "label": "运输工具"
+            },
+            {
+              "row_id": "电子设备_4",
+              "row_type": "data",
+              "label": "电子设备"
+            },
+            {
+              "row_id": "办公设备_4",
+              "row_type": "data",
+              "label": "办公设备"
+            },
+            {
+              "row_id": "酒店业家具_4",
+              "row_type": "data",
+              "label": "酒店业家具"
+            },
+            {
+              "row_id": "其他_4",
+              "row_type": "data",
+              "label": "其他"
+            },
+            {
+              "row_id": "五_固定资产账面价值合计",
+              "row_type": "total",
+              "label": "五、固定资产账面价值合计"
+            },
+            {
+              "row_id": "其中_土地资产_5",
+              "row_type": "data",
+              "label": "其中：土地资产"
+            },
+            {
+              "row_id": "房屋_建筑物_5",
+              "row_type": "data",
+              "label": "房屋、建筑物"
+            },
+            {
+              "row_id": "机器设备_5",
+              "row_type": "data",
+              "label": "机器设备"
+            },
+            {
+              "row_id": "运输工具_5",
+              "row_type": "data",
+              "label": "运输工具"
+            },
+            {
+              "row_id": "电子设备_5",
+              "row_type": "data",
+              "label": "电子设备"
+            },
+            {
+              "row_id": "办公设备_5",
+              "row_type": "data",
+              "label": "办公设备"
+            },
+            {
+              "row_id": "酒店业家具_5",
+              "row_type": "data",
+              "label": "酒店业家具"
+            },
+            {
+              "row_id": "其他_5",
+              "row_type": "data",
+              "label": "其他"
+            }
+          ],
+          "source_table_index": 1
+        },
+        {
+          "table_id": "项_目_3",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "账面原值",
+              "label": "账面原值"
+            },
+            {
+              "col_id": "累计折旧",
+              "label": "累计折旧"
+            },
+            {
+              "col_id": "减值准备",
+              "label": "减值准备"
+            },
+            {
+              "col_id": "账面价值",
+              "label": "账面价值"
+            },
+            {
+              "col_id": "备注",
+              "label": "备注"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 2
+        },
+        {
+          "table_id": "项_目_4",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "账面价值",
+              "label": "账面价值"
+            },
+            {
+              "col_id": "未办妥产权证书原因",
+              "label": "未办妥产权证书原因"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 3
+        },
+        {
+          "table_id": "项_目_5",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "期末账面价值",
+              "label": "期末账面价值",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "期初账面价值",
+              "label": "期初账面价值",
+              "amount_role": "opening"
+            },
+            {
+              "col_id": "转入清理的原因",
+              "label": "转入清理的原因"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 4
+        }
+      ],
+      "stats": {
+        "table_count": 5,
+        "total_rows": 51,
+        "total_columns": 21
+      }
+    },
+    {
+      "semantic_section_id": "fixed_assets",
+      "template_type": "listed",
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-gu-ding-zi-chan",
+      "section_title": "固定资产",
+      "section_number": "五、22",
+      "content_type": "mixed",
+      "_semantic": {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-gu-ding-zi-chan",
+        "semantic_section_id": "fixed_assets",
+        "variant": "listed_standalone"
+      },
+      "_tables": [
+        {
+          "table_id": "项_目",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "上年年末余额",
+              "label": "上年年末余额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "固定资产",
+              "row_type": "data",
+              "label": "固定资产"
+            },
+            {
+              "row_id": "固定资产清理",
+              "row_type": "data",
+              "label": "固定资产清理"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 0
+        },
+        {
+          "table_id": "项_目_2",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "房屋及建筑物",
+              "label": "房屋及建筑物"
+            },
+            {
+              "col_id": "机器设备",
+              "label": "机器设备"
+            },
+            {
+              "col_id": "运输设备",
+              "label": "运输设备"
+            },
+            {
+              "col_id": "col_4",
+              "label": "……"
+            },
+            {
+              "col_id": "合计",
+              "label": "合计"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "一_账面原值",
+              "row_type": "data",
+              "label": "一、账面原值："
+            },
+            {
+              "row_id": "1_期初余额",
+              "row_type": "data",
+              "label": "1.期初余额"
+            },
+            {
+              "row_id": "2_本期增加金额",
+              "row_type": "data",
+              "label": "2.本期增加金额"
+            },
+            {
+              "row_id": "1_购置",
+              "row_type": "data",
+              "label": "（1）购置"
+            },
+            {
+              "row_id": "2_在建工程转入",
+              "row_type": "data",
+              "label": "（2）在建工程转入"
+            },
+            {
+              "row_id": "3_企业合并增加",
+              "row_type": "data",
+              "label": "（3）企业合并增加"
+            },
+            {
+              "row_id": "unnamed",
+              "row_type": "data",
+              "label": "……"
+            },
+            {
+              "row_id": "3_本期减少金额",
+              "row_type": "data",
+              "label": "3.本期减少金额"
+            },
+            {
+              "row_id": "1_处置或报废",
+              "row_type": "data",
+              "label": "（1）处置或报废"
+            },
+            {
+              "row_id": "2_其他减少",
+              "row_type": "data",
+              "label": "（2）其他减少"
+            },
+            {
+              "row_id": "unnamed_2",
+              "row_type": "data",
+              "label": "……"
+            },
+            {
+              "row_id": "4_期末余额",
+              "row_type": "data",
+              "label": "4.期末余额"
+            },
+            {
+              "row_id": "二_累计折旧",
+              "row_type": "data",
+              "label": "二、累计折旧"
+            },
+            {
+              "row_id": "1_期初余额_2",
+              "row_type": "data",
+              "label": "1.期初余额"
+            },
+            {
+              "row_id": "2_本期增加金额_2",
+              "row_type": "data",
+              "label": "2.本期增加金额"
+            },
+            {
+              "row_id": "1_计提",
+              "row_type": "data",
+              "label": "（1）计提"
+            },
+            {
+              "row_id": "2_其他增加",
+              "row_type": "data",
+              "label": "（2）其他增加"
+            },
+            {
+              "row_id": "unnamed_3",
+              "row_type": "data",
+              "label": "……"
+            },
+            {
+              "row_id": "3_本期减少金额_2",
+              "row_type": "data",
+              "label": "3.本期减少金额"
+            },
+            {
+              "row_id": "1_处置或报废_2",
+              "row_type": "data",
+              "label": "（1）处置或报废"
+            },
+            {
+              "row_id": "2_其他减少_2",
+              "row_type": "data",
+              "label": "（2）其他减少"
+            },
+            {
+              "row_id": "unnamed_4",
+              "row_type": "data",
+              "label": "……"
+            },
+            {
+              "row_id": "4_期末余额_2",
+              "row_type": "data",
+              "label": "4.期末余额"
+            },
+            {
+              "row_id": "三_减值准备",
+              "row_type": "data",
+              "label": "三、减值准备"
+            },
+            {
+              "row_id": "1_期初余额_3",
+              "row_type": "data",
+              "label": "1.期初余额"
+            },
+            {
+              "row_id": "2_本期增加金额_3",
+              "row_type": "data",
+              "label": "2.本期增加金额"
+            },
+            {
+              "row_id": "1_计提_2",
+              "row_type": "data",
+              "label": "（1）计提"
+            },
+            {
+              "row_id": "2_其他增加_2",
+              "row_type": "data",
+              "label": "（2）其他增加"
+            },
+            {
+              "row_id": "unnamed_5",
+              "row_type": "data",
+              "label": "……"
+            },
+            {
+              "row_id": "3_本期减少金额_3",
+              "row_type": "data",
+              "label": "3.本期减少金额"
+            },
+            {
+              "row_id": "1_处置或报废_3",
+              "row_type": "data",
+              "label": "（1）处置或报废"
+            },
+            {
+              "row_id": "2_其他减少_3",
+              "row_type": "data",
+              "label": "（2）其他减少"
+            },
+            {
+              "row_id": "unnamed_6",
+              "row_type": "data",
+              "label": "……"
+            },
+            {
+              "row_id": "4_期末余额_3",
+              "row_type": "data",
+              "label": "4.期末余额"
+            },
+            {
+              "row_id": "四_账面价值",
+              "row_type": "data",
+              "label": "四、账面价值"
+            },
+            {
+              "row_id": "1_期末账面价值",
+              "row_type": "data",
+              "label": "1.期末账面价值"
+            },
+            {
+              "row_id": "2_期初账面价值",
+              "row_type": "data",
+              "label": "2.期初账面价值"
+            }
+          ],
+          "source_table_index": 1
+        },
+        {
+          "table_id": "项_目_3",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "账面原值",
+              "label": "账面原值"
+            },
+            {
+              "col_id": "累计折旧",
+              "label": "累计折旧"
+            },
+            {
+              "col_id": "减值准备",
+              "label": "减值准备"
+            },
+            {
+              "col_id": "账面价值",
+              "label": "账面价值"
+            },
+            {
+              "col_id": "备注",
+              "label": "备注"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "房屋及建筑物",
+              "row_type": "data",
+              "label": "房屋及建筑物"
+            },
+            {
+              "row_id": "机器设备",
+              "row_type": "data",
+              "label": "机器设备"
+            },
+            {
+              "row_id": "电子设备",
+              "row_type": "data",
+              "label": "电子设备"
+            },
+            {
+              "row_id": "运输设备",
+              "row_type": "data",
+              "label": "运输设备"
+            },
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 2
+        },
+        {
+          "table_id": "项_目_4",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "账面价值",
+              "label": "账面价值"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "房屋及建筑物",
+              "row_type": "data",
+              "label": "房屋及建筑物"
+            },
+            {
+              "row_id": "机器设备",
+              "row_type": "data",
+              "label": "机器设备"
+            },
+            {
+              "row_id": "电子设备",
+              "row_type": "data",
+              "label": "电子设备"
+            },
+            {
+              "row_id": "运输设备",
+              "row_type": "data",
+              "label": "运输设备"
+            },
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 3
+        },
+        {
+          "table_id": "项_目_5",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "账面价值",
+              "label": "账面价值"
+            },
+            {
+              "col_id": "未办妥产权证书原因",
+              "label": "未办妥产权证书原因"
+            }
+          ],
+          "rows": [],
+          "source_table_index": 4
+        },
+        {
+          "table_id": "项_目_6",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "上年年末余额",
+              "label": "上年年末余额",
+              "amount_role": "prior"
+            },
+            {
+              "col_id": "转入清理的原因",
+              "label": "转入清理的原因"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            }
+          ],
+          "source_table_index": 5
+        }
+      ],
+      "stats": {
+        "table_count": 6,
+        "total_rows": 53,
+        "total_columns": 24
+      }
+    },
+    {
+      "semantic_section_id": "cash_and_bank",
+      "template_type": "soe",
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-huo-bi-zi-jin",
+      "section_title": "货币资金",
+      "section_number": "八、1",
+      "content_type": "mixed",
+      "_semantic": {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-huo-bi-zi-jin",
+        "semantic_section_id": "cash_and_bank",
+        "variant": "soe_standalone"
+      },
+      "_tables": [
+        {
+          "table_id": "项_目",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "期初余额",
+              "label": "期初余额",
+              "amount_role": "opening"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "库存现金",
+              "row_type": "data",
+              "label": "库存现金"
+            },
+            {
+              "row_id": "银行存款",
+              "row_type": "data",
+              "label": "银行存款"
+            },
+            {
+              "row_id": "其他货币资金",
+              "row_type": "data",
+              "label": "其他货币资金"
+            },
+            {
+              "row_id": "数字货币",
+              "row_type": "data",
+              "label": "数字货币"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            },
+            {
+              "row_id": "其中_存放在境外的款项总额",
+              "row_type": "data",
+              "label": "其中：存放在境外的款项总额"
+            }
+          ],
+          "source_table_index": 0
+        },
+        {
+          "table_id": "项_目_2",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "期初余额",
+              "label": "期初余额",
+              "amount_role": "opening"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "银行承兑汇票保证金",
+              "row_type": "data",
+              "label": "银行承兑汇票保证金"
+            },
+            {
+              "row_id": "信用证保证金",
+              "row_type": "data",
+              "label": "信用证保证金"
+            },
+            {
+              "row_id": "履约保证金",
+              "row_type": "data",
+              "label": "履约保证金"
+            },
+            {
+              "row_id": "用于担保的定期存款或通知存款",
+              "row_type": "data",
+              "label": "用于担保的定期存款或通知存款"
+            },
+            {
+              "row_id": "放在境外且资金汇回受到限制的款项",
+              "row_type": "data",
+              "label": "放在境外且资金汇回受到限制的款项"
+            },
+            {
+              "row_id": "金融企业法定存款准备金或备付金",
+              "row_type": "data",
+              "label": "金融企业法定存款准备金或备付金"
+            }
+          ],
+          "source_table_index": 1
+        }
+      ],
+      "stats": {
+        "table_count": 2,
+        "total_rows": 12,
+        "total_columns": 6
+      }
+    },
+    {
+      "semantic_section_id": "cash_and_bank",
+      "template_type": "listed",
+      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-huo-bi-zi-jin",
+      "section_title": "货币资金",
+      "section_number": "五、1",
+      "content_type": "mixed",
+      "_semantic": {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-huo-bi-zi-jin",
+        "semantic_section_id": "cash_and_bank",
+        "variant": "listed_standalone"
+      },
+      "_tables": [
+        {
+          "table_id": "项_目",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "上年年末余额",
+              "label": "上年年末余额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "库存现金",
+              "row_type": "data",
+              "label": "库存现金"
+            },
+            {
+              "row_id": "银行存款",
+              "row_type": "data",
+              "label": "银行存款"
+            },
+            {
+              "row_id": "存放财务公司款项",
+              "row_type": "data",
+              "label": "存放财务公司款项"
+            },
+            {
+              "row_id": "其他货币资金",
+              "row_type": "data",
+              "label": "其他货币资金"
+            },
+            {
+              "row_id": "存款应计利息",
+              "row_type": "data",
+              "label": "存款应计利息"
+            },
+            {
+              "row_id": "数字货币",
+              "row_type": "data",
+              "label": "数字货币"
+            },
+            {
+              "row_id": "合计",
+              "row_type": "total",
+              "label": "合计"
+            },
+            {
+              "row_id": "其中_存放在境外的款项总额",
+              "row_type": "data",
+              "label": "其中：存放在境外的款项总额"
+            }
+          ],
+          "source_table_index": 0
+        }
+      ],
+      "stats": {
+        "table_count": 1,
+        "total_rows": 8,
+        "total_columns": 3
+      }
+    },
+    {
+      "semantic_section_id": "related_party_transactions",
+      "template_type": "soe",
+      "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+      "section_title": "关联交易情况",
+      "section_number": "十一、关联交易情况",
+      "content_type": "mixed",
+      "_semantic": {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "semantic_section_id": "related_party_transactions",
+        "variant": "soe_standalone"
+      },
+      "_tables": [
+        {
+          "table_id": "关联方",
+          "name": "关联方",
+          "columns": [
+            {
+              "col_id": "关联方",
+              "label": "关联方"
+            },
+            {
+              "col_id": "关联交易内容",
+              "label": "关联交易内容"
+            },
+            {
+              "col_id": "关联交易定价方式及决策程序",
+              "label": "关联交易定价方式及决策程序"
+            },
+            {
+              "col_id": "本期发生额",
+              "label": "本期发生额",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期发生额",
+              "label": "上期发生额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "关联方",
+              "row_type": "group_header",
+              "label": "关联方"
+            },
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 0
+        },
+        {
+          "table_id": "关联方_2",
+          "name": "关联方",
+          "columns": [
+            {
+              "col_id": "关联方",
+              "label": "关联方"
+            },
+            {
+              "col_id": "关联交易内容",
+              "label": "关联交易内容"
+            },
+            {
+              "col_id": "关联交易定价方式及决策程序",
+              "label": "关联交易定价方式及决策程序"
+            },
+            {
+              "col_id": "本期发生额",
+              "label": "本期发生额",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期发生额",
+              "label": "上期发生额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "关联方",
+              "row_type": "group_header",
+              "label": "关联方"
+            },
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 1
+        },
+        {
+          "table_id": "承租方名称",
+          "name": "承租方名称",
+          "columns": [
+            {
+              "col_id": "承租方名称",
+              "label": "承租方名称"
+            },
+            {
+              "col_id": "租赁资产种类",
+              "label": "租赁资产种类"
+            },
+            {
+              "col_id": "本期确认的租赁收入金额_万元",
+              "label": "本期确认的租赁收入金额（万元）",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期确认的租赁收入金额_万元",
+              "label": "上期确认的租赁收入金额（万元）",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 2
+        },
+        {
+          "table_id": "出租方名称",
+          "name": "出租方名称",
+          "columns": [
+            {
+              "col_id": "出租方名称",
+              "label": "出租方名称"
+            },
+            {
+              "col_id": "租赁资产种类",
+              "label": "租赁资产种类"
+            },
+            {
+              "col_id": "本期应支付的租赁款项金额_万元",
+              "label": "本期应支付的租赁款项金额（万元）",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期应支付的租赁款项金额_万元",
+              "label": "上期应支付的租赁款项金额（万元）",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 3
+        },
+        {
+          "table_id": "出租方名称_2",
+          "name": "出租方名称",
+          "columns": [
+            {
+              "col_id": "出租方名称",
+              "label": "出租方名称"
+            },
+            {
+              "col_id": "租赁资产种类",
+              "label": "租赁资产种类"
+            },
+            {
+              "col_id": "本期增加_万元",
+              "label": "本期增加（万元）",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期增加_万元",
+              "label": "上期增加（万元）",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 4
+        },
+        {
+          "table_id": "出租方名称_3",
+          "name": "出租方名称",
+          "columns": [
+            {
+              "col_id": "出租方名称",
+              "label": "出租方名称"
+            },
+            {
+              "col_id": "租赁资产种类",
+              "label": "租赁资产种类"
+            },
+            {
+              "col_id": "本期利息支出_万元",
+              "label": "本期利息支出（万元）",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期利息支出_万元",
+              "label": "上期利息支出（万元）",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 5
+        }
+      ],
+      "stats": {
+        "table_count": 6,
+        "total_rows": 8,
+        "total_columns": 26
+      }
+    },
+    {
+      "semantic_section_id": "related_party_transactions",
+      "template_type": "listed",
+      "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+      "section_title": "关联交易情况",
+      "section_number": "十一、关联交易情况",
+      "content_type": "mixed",
+      "_semantic": {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "semantic_section_id": "related_party_transactions",
+        "variant": "listed_standalone"
+      },
+      "_tables": [
+        {
+          "table_id": "关联方",
+          "name": "关联方",
+          "columns": [
+            {
+              "col_id": "关联方",
+              "label": "关联方"
+            },
+            {
+              "col_id": "关联交易内容",
+              "label": "关联交易内容"
+            },
+            {
+              "col_id": "本期发生额",
+              "label": "本期发生额",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期发生额",
+              "label": "上期发生额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 0
+        },
+        {
+          "table_id": "关联方_2",
+          "name": "关联方",
+          "columns": [
+            {
+              "col_id": "关联方",
+              "label": "关联方"
+            },
+            {
+              "col_id": "关联交易内容",
+              "label": "关联交易内容"
+            },
+            {
+              "col_id": "本期发生额",
+              "label": "本期发生额",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期发生额",
+              "label": "上期发生额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 1
+        },
+        {
+          "table_id": "委托方_出包方名称",
+          "name": "委托方/出包方名称",
+          "columns": [
+            {
+              "col_id": "委托方_出包方名称",
+              "label": "委托方/出包方名称"
+            },
+            {
+              "col_id": "受托方_承包方名称",
+              "label": "受托方/承包方名称"
+            },
+            {
+              "col_id": "受托_承包资产类型",
+              "label": "受托/承包资产类型"
+            },
+            {
+              "col_id": "受托_承包起始日",
+              "label": "受托/承包起始日"
+            },
+            {
+              "col_id": "受托_承包终止日",
+              "label": "受托/承包终止日"
+            },
+            {
+              "col_id": "托管收益_承包收益定价依据",
+              "label": "托管收益/承包收益定价依据"
+            },
+            {
+              "col_id": "本期确认的托管收益_承包收益",
+              "label": "本期确认的托管收益/承包收益",
+              "amount_role": "current"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 2
+        },
+        {
+          "table_id": "委托方_出包方名称_2",
+          "name": "委托方/出包方名称",
+          "columns": [
+            {
+              "col_id": "委托方_出包方名称",
+              "label": "委托方/出包方名称"
+            },
+            {
+              "col_id": "受托方_承包方名称",
+              "label": "受托方/承包方名称"
+            },
+            {
+              "col_id": "委托_出包资产类型",
+              "label": "委托/出包资产类型"
+            },
+            {
+              "col_id": "委托_出包起始日",
+              "label": "委托/出包起始日"
+            },
+            {
+              "col_id": "委托_出包终止日",
+              "label": "委托/出包终止日"
+            },
+            {
+              "col_id": "托管费_出包费定价依据",
+              "label": "托管费/出包费定价依据"
+            },
+            {
+              "col_id": "本期确认的托管费_出包费",
+              "label": "本期确认的托管费/出包费",
+              "amount_role": "current"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 3
+        },
+        {
+          "table_id": "承租方名称",
+          "name": "承租方名称",
+          "columns": [
+            {
+              "col_id": "承租方名称",
+              "label": "承租方名称"
+            },
+            {
+              "col_id": "租赁资产种类",
+              "label": "租赁资产种类"
+            },
+            {
+              "col_id": "本期确认的租赁收益",
+              "label": "本期确认的租赁收益",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期确认的租赁收益",
+              "label": "上期确认的租赁收益",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [],
+          "source_table_index": 4
+        },
+        {
+          "table_id": "出租方名称",
+          "name": "出租方名称",
+          "columns": [
+            {
+              "col_id": "出租方名称",
+              "label": "出租方名称"
+            },
+            {
+              "col_id": "租赁资产种类",
+              "label": "租赁资产种类"
+            },
+            {
+              "col_id": "本期应支付的租赁款项",
+              "label": "本期应支付的租赁款项",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期应支付的租赁款项",
+              "label": "上期应支付的租赁款项",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [],
+          "source_table_index": 5
+        },
+        {
+          "table_id": "出租方名称_2",
+          "name": "出租方名称",
+          "columns": [
+            {
+              "col_id": "出租方名称",
+              "label": "出租方名称"
+            },
+            {
+              "col_id": "租赁资产种类",
+              "label": "租赁资产种类"
+            },
+            {
+              "col_id": "本期增加",
+              "label": "本期增加",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期增加",
+              "label": "上期增加",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [],
+          "source_table_index": 6
+        },
+        {
+          "table_id": "出租方名称_3",
+          "name": "出租方名称",
+          "columns": [
+            {
+              "col_id": "出租方名称",
+              "label": "出租方名称"
+            },
+            {
+              "col_id": "租赁资产种类",
+              "label": "租赁资产种类"
+            },
+            {
+              "col_id": "本期利息支出",
+              "label": "本期利息支出",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期利息支出",
+              "label": "上期利息支出",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [],
+          "source_table_index": 7
+        },
+        {
+          "table_id": "被担保方",
+          "name": "被担保方",
+          "columns": [
+            {
+              "col_id": "被担保方",
+              "label": "被担保方"
+            },
+            {
+              "col_id": "担保金额",
+              "label": "担保金额"
+            },
+            {
+              "col_id": "担保起始日",
+              "label": "担保起始日"
+            },
+            {
+              "col_id": "担保终止日",
+              "label": "担保终止日"
+            },
+            {
+              "col_id": "担保是否已经履行完毕",
+              "label": "担保是否已经履行完毕"
+            }
+          ],
+          "rows": [],
+          "source_table_index": 8
+        },
+        {
+          "table_id": "担保方",
+          "name": "担保方",
+          "columns": [
+            {
+              "col_id": "担保方",
+              "label": "担保方"
+            },
+            {
+              "col_id": "担保金额",
+              "label": "担保金额"
+            },
+            {
+              "col_id": "担保起始日",
+              "label": "担保起始日"
+            },
+            {
+              "col_id": "担保终止日",
+              "label": "担保终止日"
+            },
+            {
+              "col_id": "担保是否已经履行完毕",
+              "label": "担保是否已经履行完毕"
+            }
+          ],
+          "rows": [],
+          "source_table_index": 9
+        },
+        {
+          "table_id": "关联方_3",
+          "name": "关联方",
+          "columns": [
+            {
+              "col_id": "关联方",
+              "label": "关联方"
+            },
+            {
+              "col_id": "拆借金额",
+              "label": "拆借金额"
+            },
+            {
+              "col_id": "起始日",
+              "label": "起始日"
+            },
+            {
+              "col_id": "到期日",
+              "label": "到期日"
+            },
+            {
+              "col_id": "说明",
+              "label": "说明"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "拆入",
+              "row_type": "data",
+              "label": "拆入："
+            },
+            {
+              "row_id": "x公司",
+              "row_type": "data",
+              "label": "X公司"
+            },
+            {
+              "row_id": "拆出",
+              "row_type": "data",
+              "label": "拆出："
+            },
+            {
+              "row_id": "y公司",
+              "row_type": "data",
+              "label": "Y公司"
+            }
+          ],
+          "source_table_index": 10
+        },
+        {
+          "table_id": "关联方_4",
+          "name": "关联方",
+          "columns": [
+            {
+              "col_id": "关联方",
+              "label": "关联方"
+            },
+            {
+              "col_id": "关联交易内容",
+              "label": "关联交易内容"
+            },
+            {
+              "col_id": "本期发生额",
+              "label": "本期发生额",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期发生额",
+              "label": "上期发生额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [],
+          "source_table_index": 11
+        },
+        {
+          "table_id": "项_目",
+          "name": "项  目",
+          "columns": [
+            {
+              "col_id": "项目",
+              "label": "项目"
+            },
+            {
+              "col_id": "本期发生额",
+              "label": "本期发生额",
+              "amount_role": "current"
+            },
+            {
+              "col_id": "上期发生额",
+              "label": "上期发生额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "关键管理人员薪酬",
+              "row_type": "data",
+              "label": "关键管理人员薪酬"
+            }
+          ],
+          "source_table_index": 12
+        }
+      ],
+      "stats": {
+        "table_count": 13,
+        "total_rows": 9,
+        "total_columns": 60
+      }
+    },
+    {
+      "semantic_section_id": "related_party_receivables_payables",
+      "template_type": "soe",
+      "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
+      "section_title": "关联方应收应付款项",
+      "section_number": "十一、关联方应收应付款",
+      "content_type": "mixed",
+      "_semantic": {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
+        "semantic_section_id": "related_party_receivables_payables",
+        "variant": "soe_standalone"
+      },
+      "_tables": [
+        {
+          "table_id": "项目名称",
+          "name": "项目名称",
+          "columns": [
+            {
+              "col_id": "项目名称",
+              "label": "项目名称"
+            },
+            {
+              "col_id": "关联方",
+              "label": "关联方"
+            },
+            {
+              "col_id": "期末数",
+              "label": "期末数",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "期初数",
+              "label": "期初数",
+              "amount_role": "opening"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "项目名称",
+              "row_type": "group_header",
+              "label": "项目名称"
+            },
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 0
+        },
+        {
+          "table_id": "项目名称_2",
+          "name": "项目名称",
+          "columns": [
+            {
+              "col_id": "项目名称",
+              "label": "项目名称"
+            },
+            {
+              "col_id": "关联方",
+              "label": "关联方"
+            },
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "期初余额",
+              "label": "期初余额",
+              "amount_role": "opening"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 1
+        }
+      ],
+      "stats": {
+        "table_count": 2,
+        "total_rows": 3,
+        "total_columns": 8
+      }
+    },
+    {
+      "semantic_section_id": "related_party_receivables_payables",
+      "template_type": "listed",
+      "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
+      "section_title": "关联方应收应付款项",
+      "section_number": "十一、关联方应收应付款",
+      "content_type": "mixed",
+      "_semantic": {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
+        "semantic_section_id": "related_party_receivables_payables",
+        "variant": "listed_standalone"
+      },
+      "_tables": [
+        {
+          "table_id": "项目名称",
+          "name": "项目名称",
+          "columns": [
+            {
+              "col_id": "项目名称",
+              "label": "项目名称"
+            },
+            {
+              "col_id": "关联方",
+              "label": "关联方"
+            },
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "上年年末余额",
+              "label": "上年年末余额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "项目名称",
+              "row_type": "group_header",
+              "label": "项目名称"
+            },
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 0
+        },
+        {
+          "table_id": "项目名称_2",
+          "name": "项目名称",
+          "columns": [
+            {
+              "col_id": "项目名称",
+              "label": "项目名称"
+            },
+            {
+              "col_id": "关联方",
+              "label": "关联方"
+            },
+            {
+              "col_id": "期末余额",
+              "label": "期末余额",
+              "amount_role": "closing"
+            },
+            {
+              "col_id": "上年年末余额",
+              "label": "上年年末余额",
+              "amount_role": "prior"
+            }
+          ],
+          "rows": [
+            {
+              "row_id": "可无限量添加行",
+              "row_type": "data",
+              "label": "可无限量添加行"
+            }
+          ],
+          "source_table_index": 1
+        }
+      ],
+      "stats": {
+        "table_count": 2,
+        "total_rows": 3,
+        "total_columns": 8
+      }
+    }
+  ]
+}

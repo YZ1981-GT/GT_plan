@@ -153,6 +153,12 @@
                   <span>人员委派</span>
                 </div>
               </el-tooltip>
+              <el-tooltip content="交付件管理中心：导出、版本、预览、审批、归档" placement="top">
+                <div class="gt-quick-btn" @click="goTo('deliverable-center')">
+                  <el-icon :size="20" color="var(--gt-color-primary-dark)"><Finished /></el-icon>
+                  <span>交付物</span>
+                </div>
+              </el-tooltip>
               <div
                 v-if="project.report_scope === 'consolidated'"
                 class="gt-quick-btn"
@@ -531,7 +537,7 @@
 import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck,
+  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck, Finished,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { confirmForceReset, confirmDangerous } from '@/utils/confirm'

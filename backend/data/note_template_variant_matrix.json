@@ -1,0 +1,190 @@
+{
+  "version": "1.0.0",
+  "description": "附注模板变体矩阵：映射 semantic_section_id 到国企/上市×单体/合并四版本",
+  "matrix": [
+    {
+      "semantic_section_id": "accounting_policies",
+      "title": "重要会计政策、会计估计",
+      "variants": {
+        "soe_standalone": {
+          "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+          "number": "四",
+          "title": "重要会计政策、会计估计",
+          "scope": "both"
+        },
+        "soe_consolidated": {
+          "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+          "number": "四",
+          "title": "重要会计政策、会计估计",
+          "scope": "both"
+        },
+        "listed_standalone": {
+          "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji",
+          "number": "三",
+          "title": "重要会计政策及会计估计",
+          "scope": "both"
+        },
+        "listed_consolidated": {
+          "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji",
+          "number": "三",
+          "title": "重要会计政策及会计估计",
+          "scope": "both"
+        }
+      }
+    },
+    {
+      "semantic_section_id": "accounts_receivable",
+      "title": "应收账款",
+      "variants": {
+        "soe_standalone": {
+          "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
+          "number": "八、4",
+          "title": "应收账款",
+          "scope": "standalone"
+        },
+        "soe_consolidated": {
+          "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
+          "number": "八、4",
+          "title": "应收账款",
+          "scope": "both",
+          "consol_sub_sections": ["五-5-1", "五-5-2", "五-5-3", "五-5-4", "五-5-5", "五-5-6", "五-5-7", "五-5-8", "五-5-9", "五-5-10", "五-5-11"]
+        },
+        "listed_standalone": {
+          "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
+          "number": "五、4",
+          "title": "应收账款",
+          "scope": "standalone"
+        },
+        "listed_consolidated": {
+          "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
+          "number": "五、4",
+          "title": "应收账款",
+          "scope": "both",
+          "consol_sub_sections": ["五-5-1", "五-5-2", "五-5-3", "五-5-4", "五-5-5", "五-5-6", "五-5-7", "五-5-8", "五-5-9", "五-5-10", "五-5-11"]
+        }
+      }
+    },
+    {
+      "semantic_section_id": "fixed_assets",
+      "title": "固定资产",
+      "variants": {
+        "soe_standalone": {
+          "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gu-ding-zi-chan",
+          "number": "八、9",
+          "title": "固定资产",
+          "scope": "standalone"
+        },
+        "soe_consolidated": {
+          "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gu-ding-zi-chan",
+          "number": "八、9",
+          "title": "固定资产",
+          "scope": "both"
+        },
+        "listed_standalone": {
+          "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-gu-ding-zi-chan",
+          "number": "五、9",
+          "title": "固定资产",
+          "scope": "standalone"
+        },
+        "listed_consolidated": {
+          "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-gu-ding-zi-chan",
+          "number": "五、9",
+          "title": "固定资产",
+          "scope": "both"
+        }
+      }
+    },
+    {
+      "semantic_section_id": "cash_and_bank",
+      "title": "货币资金",
+      "variants": {
+        "soe_standalone": {
+          "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-huo-bi-zi-jin",
+          "number": "八、1",
+          "title": "货币资金",
+          "scope": "standalone"
+        },
+        "soe_consolidated": {
+          "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-huo-bi-zi-jin",
+          "number": "八、1",
+          "title": "货币资金",
+          "scope": "both",
+          "consol_sub_sections": ["五-1-1", "五-1-2"]
+        },
+        "listed_standalone": {
+          "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-huo-bi-zi-jin",
+          "number": "五、1",
+          "title": "货币资金",
+          "scope": "standalone"
+        },
+        "listed_consolidated": {
+          "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-huo-bi-zi-jin",
+          "number": "五、1",
+          "title": "货币资金",
+          "scope": "both",
+          "consol_sub_sections": ["五-1-1", "五-1-2"]
+        }
+      }
+    },
+    {
+      "semantic_section_id": "related_party_transactions",
+      "title": "关联方关系及其交易",
+      "variants": {
+        "soe_standalone": {
+          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+          "number": "十一",
+          "title": "关联交易情况",
+          "scope": "both"
+        },
+        "soe_consolidated": {
+          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+          "number": "十一",
+          "title": "关联交易情况",
+          "scope": "both"
+        },
+        "listed_standalone": {
+          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+          "number": "十一",
+          "title": "关联交易情况",
+          "scope": "both"
+        },
+        "listed_consolidated": {
+          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+          "number": "十一",
+          "title": "关联交易情况",
+          "scope": "both"
+        }
+      }
+    },
+    {
+      "semantic_section_id": "related_party_receivables_payables",
+      "title": "关联方应收应付款项",
+      "variants": {
+        "soe_standalone": {
+          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
+          "number": "十一",
+          "title": "关联方应收应付款项",
+          "scope": "both"
+        },
+        "soe_consolidated": {
+          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
+          "number": "十一",
+          "title": "关联方应收应付款项",
+          "scope": "both"
+        },
+        "listed_standalone": {
+          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
+          "number": "十一",
+          "title": "关联方应收应付款项",
+          "scope": "both"
+        },
+        "listed_consolidated": {
+          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
+          "number": "十一",
+          "title": "关联方应收应付款项",
+          "scope": "both"
+        }
+      }
+    }
+  ]
+}

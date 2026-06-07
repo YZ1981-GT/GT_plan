@@ -480,7 +480,7 @@ class TestEventTypeValidation:
         validate_event_type_details(details)
 
     def test_all_event_type_schemas_defined(self):
-        """确认 9 种 event_type 的 schema 均已定义。"""
+        """确认所有 event_type 的 schema 均已定义。"""
         expected_types = {
             "archived_exception_access",
             "archive_unarchive",
@@ -491,5 +491,6 @@ class TestEventTypeValidation:
             "consol_lifecycle",
             "formula_changed",
             "report_config_changed",
+            "onlyoffice_callback_rejected",
         }
         assert set(EVENT_TYPE_SCHEMAS.keys()) == expected_types

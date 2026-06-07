@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "description": "附注披露平衡规则（试点章节：应收账款、固定资产、关联方余额）",
+  "rules": [
+    {
+      "rule_id": "ar_closing_balance_tieout",
+      "section_id": "accounts_receivable",
+      "description": "应收账款附注明细合计与报表应收账款期末数一致",
+      "left": "sum(note.accounts_receivable.aging_analysis.*.closing_balance)",
+      "right": "report.BS.accounts_receivable.closing_balance",
+      "tolerance": "0.01",
+      "severity": "blocking"
+    },
+    {
+      "rule_id": "ar_opening_balance_tieout",
+      "section_id": "accounts_receivable",
+      "description": "应收账款附注明细合计与报表应收账款期初数一致",
+      "left": "sum(note.accounts_receivable.aging_analysis.*.opening_balance)",
+      "right": "report.BS.accounts_receivable.opening_balance",
+      "tolerance": "0.01",
+      "severity": "blocking"
+    },
+    {
+      "rule_id": "fa_closing_balance_tieout",
+      "section_id": "fixed_assets",
+      "description": "固定资产附注合计与报表固定资产期末数一致",
+      "left": "sum(note.fixed_assets.category_analysis.*.closing_net_value)",
+      "right": "report.BS.fixed_assets.closing_balance",
+      "tolerance": "0.01",
+      "severity": "blocking"
+    },
+    {
+      "rule_id": "fa_opening_balance_tieout",
+      "section_id": "fixed_assets",
+      "description": "固定资产附注合计与报表固定资产期初数一致",
+      "left": "sum(note.fixed_assets.category_analysis.*.opening_net_value)",
+      "right": "report.BS.fixed_assets.opening_balance",
+      "tolerance": "0.01",
+      "severity": "blocking"
+    },
+    {
+      "rule_id": "rp_receivable_balance_tieout",
+      "section_id": "related_party",
+      "description": "关联方应收余额合计与报表关联方往来期末数一致",
+      "left": "sum(note.related_party.balances.*.closing_balance)",
+      "right": "report.BS.other_receivables_related.closing_balance",
+      "tolerance": "0.01",
+      "severity": "warning"
+    },
+    {
+      "rule_id": "rp_payable_balance_tieout",
+      "section_id": "related_party",
+      "description": "关联方应付余额合计与报表关联方往来期末数一致",
+      "left": "sum(note.related_party.balances.*.closing_payable)",
+      "right": "report.BS.other_payables_related.closing_balance",
+      "tolerance": "0.01",
+      "severity": "warning"
+    }
+  ]
+}

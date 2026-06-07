@@ -159,3 +159,7 @@ export async function fetchOnlyOfficeConfig(
     deliverables.onlyofficeConfig(projectId, taskId, versionNo, year),
   )
 }
+
+export async function deleteDeliverable(projectId: string, taskId: string) {
+  return api.delete<{ message: string }>(`/api/projects/${projectId}/deliverables/${taskId}`)
+}

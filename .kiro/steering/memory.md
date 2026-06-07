@@ -47,6 +47,7 @@ inclusion: always
   - **memory**(9)：`create_entities`/`create_relations`/`add_observations`/`search_nodes`/`read_graph`/`open_nodes`/`delete_entities`/`delete_relations`/`delete_observations`——**与 memory.md 文件体系是两套，勿混用**
 - **MCP 工具选用决策**：改动前理解代码→`codegraph_context`；查第三方库用法→`context7`；前端 E2E 实测→`playwright browser_snapshot`+交互；前端 runtime bug→`js-reverse set_breakpoint_on_text`+`step`+`evaluate_script`；复杂逻辑推演→`thinking sequentialthinking`；跨对话存结论→`memory create_entities`
 - **codegraph 已装（2026-06-02 重装 v0.9.8 官方 npm 包）**：`npm i -g @colbymchenry/codegraph`（自带 Node runtime 免编译，旧的 `C:\tools` clone+build 路径已不存在）；CLI 在 `~/AppData/Roaming/npm/codegraph`；项目已 `codegraph init -i D:/GT_plan` 索引（59540 节点/131401 边/3205 文件）；CLI 支持 query/callers/callees/impact/affected/context/trace/explore/files/status/serve(MCP)
+- **OnlyOffice 配置变更（2026-06-07）**：`enabled` 判定改为检查 `ONLYOFFICE_URL`（非 JWT_SECRET），有 URL 即启用；JWT 验证变为可选——无 secret 时 callback 直通不签 JWT（测试环境直连 OnlyOffice Docker 无需鉴权）；生产部署须配 `ONLYOFFICE_JWT_SECRET` 启用签名校验；**前端集成方式=JS API**（`new DocsAPI.DocEditor(containerId, config)`），不可用 iframe src 拼 URL（那是错误方式）；`ONLYOFFICE_CALLBACK_BASE=http://host.docker.internal:9980`（Docker 容器回调主机）；OnlyOffice Docker 版本 9.4.0 已确认可用；**document.url 必须用 signed-download 免 auth 端点**（HMAC 签名 10min 有效），OnlyOffice 不携带 Bearer header；fallback 默认值改为 `host.docker.internal:9980`（容器内 localhost 指向自身非宿主机）；uvicorn `--reload` 不重新读 .env（需完全重启进程）
 - **⚠️ codegraph MCP 配置（Cursor 2026-06-04）**：**Cursor 只读 `.cursor/mcp.json`**（非 `.kiro/settings/mcp.json`）；`codegraph install --target cursor --location local` 生成；`command:"codegraph"`（全局 npm，勿 npx 每次拉包）+ `args:["serve","--mcp","--no-watch","--path","D:/GT_plan"]` + `"type":"stdio"`；**勿用 `-p`**（仅 `serve` 子命令支持 `--path`）；Kiro 侧 `.kiro/settings/mcp.json` 已同步；改后 **重启 Cursor / Reload MCP** 才挂载 `codegraph_*` 工具
 - **callers 对 Python class 引用检测偏弱**（class 无"调用"语义，查模块名常显示无 caller，需配 grep 二次确认，勿仅凭 codegraph 判孤儿）
 - **✅ codegraph MCP 全工具链路实测通（2026-06-02）**：status/context/files/explore/callers 均正常返回（59540 节点/131401 边/WAL+FTS5）；explore 每 project 限 2 次调用且每次约 6 文件，超范围用 Read；分析确认 `get_authenticated_container`(core/container.py:65) 是死代码（0 引用 + docstring 自承认无法注入 user，应删，认证容器用 deps.get_current_user 路径）
@@ -62,7 +63,7 @@ inclusion: always
 
 ## 迁移与 PG schema（D6 MigrationRunner 运行时迁移，非 alembic）
 
-- 启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞号字母序靠后者静默丢失，scan_migrations 已加同号检测抛 RuntimeError）；**当前最高 V062**（V059=deliverable_center / V060=temporary_grants / V061=knowledge_index_stale / V062=review_records_evidence_cols；生产库须手工跑 V052~V062）
+- 启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞号字母序靠后者静默丢失，scan_migrations 已加同号检测抛 RuntimeError）；**当前最高 V062**（V059=deliverable_center / V060=temporary_grants / V061=knowledge_index_stale_tracking / V062=review_records_evidence_cols）
 - V040 冲突已修(重编号→V044)；V043 pgvector 容错化；V045~V051 见上行；**V052 `wp_formula`**（自定义底稿公式绑定，R052 回滚配对）；**V053/V054 已启用**（2026-06-06 远程 commit 21520278：V053 projecttype enum 加值+R053 回滚 / V054 projects.is_deleted 默认值，原"V053-054 未用"已过时）；**V055 `project_creation_enhancement`**（projects 表加 3 列+unique 约束，R055 回滚配对）
 - **⚠️ `CREATE TABLE IF NOT EXISTS audit_log` 是 no-op**：该名被 Metabase 共库占用（真实 schema 无 action 列）→ 应用审计写独立表 `app_audit_log`；建表前先 `to_regclass`+`information_schema.columns` 查真实 schema
 - **本地 PG schema 漂移已修**（critical=0）：drift detector pkgutil walk import 全 model + 过滤 Metabase 共库污染 + 按 critical_count 判 degraded
@@ -102,8 +103,8 @@ inclusion: always
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、知识库删旧 KnowledgeService；向量存储选 pgvector；3 处联动断裂已修（知识文件→索引/模板 JSON→registry/报表主模板→克隆 stale）
 - 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
-### git 状态（2026-06-06，最新 `429e8195` 本地领先远程 2 commit 未推）
-- 分支 `work/2026-05-30-wp-specs`；本地 HEAD `429e8195`（前端 CI 门禁修复），领先 `origin` 2 个未推：`ca9d03c6`(B-Index 跨循环目录)+`429e8195`(vue-tsc 60→0/vitest 7→0)；远程最新 `21520278`（其他用户：V053/V054 迁移+mcp 配置+docker GPU+ai_service，已 rebase 拉下）；**CI 现可过（门禁失真已修），可走 PR 合 main**（gh CLI 未登录，走网页 compare）
+### git 状态（2026-06-06）
+- 分支 `work/2026-05-30-wp-specs`；HEAD `5e9b7f3b` 已推远程；deliverable-center P0 完成+4 spec 归档+INDEX 更新；CI 可过待 PR 合 main
 - 旧里程碑：`8ed2d45c`=audit-sheet-editable 归档 / `350ff25d`=5 tech specs 归档 / `0c0bae1a`=5 tech specs 实施代码
 - **schema drift 二次修复（V051）**：方向=orm_extra（ORM 有 DB 缺），51 列 ALTER ADD + 2 enum ADD VALUE + 列级 KNOWN_COLUMN_ALLOWLIST（cell_annotations.sheet_name/adjustments.status/projects.template_version_id）+ 表级加 linkage_audit_log/seed_load_history；evidence_hash_checks.export_id 保持 VARCHAR（ORM 业务定义非 UUID）
 - **🟢 B-Index 底稿目录"No Data"修复（2026-06-02，Playwright 实测通过）**：`wp_render_config.py` 新增 `_generate_b_index_data()`——当 B-Index sheet html_data 为空时自动从项目元数据生成 preparation_info（entity_name/period_end/preparer/reviewer）+ navigation_rows（同底稿其他 sheet 列表）；GtBIndex.vue 加 `empty-text="暂无索引数据"` 中文化
@@ -122,13 +123,11 @@ inclusion: always
 
 ### 真正待办
 - **外部依赖**：LLM embedding 实例 / 6000 并发压测 / 钉集成 / 合并 UAT / GitHub 默认分支改 main / 走 PR 合入 / V052~V058 生产迁移
-- **待建 spec**：底稿统一导入导出(`workpaper-unified-import-export`) / D1-4 坏账嵌套结构（枚举+auto-SUM+辅助预填）/ consol_disclosure_service 瘦身(1736行) / migration_runner 瘦身(1026行) / `disclosure-note-semantic-structure-and-presentation`（附注语义结构，复盘文档已给框架）
-- **✅ 6 平台级 spec P0+P1+P2+UAT 全部完成（2026-06-07）**：UAT 通过 Playwright API 验证（signoff/checklist 200+5items / role-workbench auditor/qc/eqcr 3组 sections 正确隔离 / permission-matrix 200 / system/dicts 14个）+ 245 后端 + 140 前端测试全绿；修复启动 import 错误 `app.core.deps→app.deps`+`app.models.user→app.models.core`（signoff_checklist.py/role_workbench.py）；V059 冲突重编号为 V061；V062 补 review_records 3 列；**下一步=commit+push 走 PR 合 main**
-- **已建 spec 已执行**：`audit-report-deliverable-center`（前后端+V059 迁移+5 测试文件，已 merge）
+- **待建 spec**：底稿统一导入导出(`workpaper-unified-import-export`) / D1-4 坏账嵌套结构（枚举+auto-SUM+辅助预填）/ consol_disclosure_service 瘦身(1736行) / migration_runner 瘦身(1026行) / `workpaper-content-semantic-system`（底稿内容平台化，2026-06-06 提案+codegraph 分析；真空白=SheetContentType 声明式枚举替换 wp_generic_processor._detect_sheet_type 启发式 + account_package 科目工作包逻辑对象 + 字段级 requires_confirmation registry；**已有勿重建**=函证 callback 已铺 D2/F2/G7 三循环 + ai_content_log_service+ai_content_gate_rule 草稿阻断签发已闭环 + confirmation:received→useWorkpaperRefresh 已接线；试点选 D2 非 D1；硬伤=科目包程序状态须持久化不能纯前端聚合）
+- **✅ deliverable-center 全量完成**：P0(0-8)+P1(9-15)+P2(16-22)+收尾(23,25) 全部 done，含原标 `*` 的 task 21(OnlyOffice)；93+ 后端测试+42 前端测试全绿；过程修 5 bug（ReportSnapshot.created_at→generated_at / CompletenessService 漏 ProjectType / 通知漏 title / archive-lock gap on create_version / render_and_store 卡 generating 态）；task 24 Playwright E2E 需启动 dev 后手动验证；**PBT 全部 max_examples≤5**
 - **✅ 已完成 spec**：`report-view-slimdown`（2944→965 行，15 任务全部完成+3 项技术债已清，HARD_CAP 1110 已登记）；技术债修复：①纯函数(getRowType/formatReportAmount/equitySpanMethod/computeCrossCheckResults)提升为模块级 export ②useReportCellActions→aggregator+useReportDrilldown/useReportTrace/useReportContextMenu 三子 composable ③ReportDialogs→wrapper+ReportDrilldownDialogs/ReportTraceDialogs/ReportMappingDialog 三子组件
 - **瘦身已完成**：disclosure_engine 1949→1601 / note_validation_engine 995→740 / 明细账翻页余额 P0 已修 / 功能空洞全消除 / 前端 CI 门禁失真已修回绿
 - **铁律补充**：composable 抽取后必同步改其单测；spec 改一个文档必同步检查其余两个一致性；死代码删前必查 spec 历史决策；composable 实例传递不可重新 new（否则状态分裂）；4 个 Workpaper*Editor 故意保留素材勿删
-- **🟢 6 spec P2 复盘缺口已修复（2026-06-07）**：①`temporary_grants` router 已建（POST/GET/DELETE 3端点，§121 注册）②`SignoffChecklist` 已接入 `PartnerSignDecision.vue` 左栏③`useCopyPaste.pasteToSelection` ElMessage 改 optional `onNotify` 回调→24/24 测试全绿（原 5 个失败根因=element-plus 模块加载时序）；遗留 3 个无关测试失败（useEditingLock 1 + ConflictBanner 2）
 
 > 2026-06-02~06-06 已完成修复/spec 详细明细已归档 → `#dev-history` grep 关键词查阅
 
@@ -148,7 +147,7 @@ inclusion: always
 - **枚举成员引用前实证**：`python -c "getattr(Enum,'X','MISSING')"` 核对大小写（小写 draft/approved）
 - **`dict.get(k, default)` 陷阱**：key 存在但值为 None 时返回 None 不返回 default（Pydantic 可选字段未填即 None）→ NOT NULL 列插入崩。写库前必用 `(data.get(k) or fallback)` 显式兜底，勿依赖 `.get(k, default)`（已咬过：procedure custom add 的 procedure_code=None 致 500）
 - **merge 跨阶段签名变更必 grep 调用方**（sync↔async / 删公开方法）
-- **CORS/307**：前端 3030 须在 CORS_ORIGINS；FastAPI 无尾斜杠路由 307 重定向绝对 URL 会跨域→前端路径匹配后端尾斜杠
+- **CORS/307**：前端 3030 须在 CORS_ORIGINS；FastAPI 无尾斜杠路由 307 重定向绝对 URL 会跨域→前端路径匹配后端尾斜杠；**禁止 `window.open` 下载认证资源**（新标签页不携带 sessionStorage token→401），必须用 `downloadFile`（axios blob + Bearer header）
 - **UI 必用 GT 紫令牌**（`styles/gt-tokens.css`）：核心紫 `--gt-color-primary:#4b2d77` / 浅紫底 `--gt-color-primary-bg:#f4f0fa` / 紫边框 `--gt-color-border-purple` / 浅紫边框 `--gt-color-border-purple-light:#d8b8ee`；**禁用 Element 默认蓝 `--el-color-primary`/#409eff 作 fallback**；global.css 已映射 `--el-color-primary→GT紫`，但 `el-tag type="primary"` 仍渲染默认蓝（light-9 变量未全量重映）→ 需组件内 `:deep(.el-tag--primary)` scoped 覆盖三色，勿动全局级联
 - **hypothesis PBT 调速**：max_examples 5（用户明确要求，禁默认 100）
 - **TimestampMixin 列必须同步到手写 DDL**：ORM 继承 `TimestampMixin` 自动加 `created_at`/`updated_at` Mapped 列，但手写 V*.sql CREATE TABLE 不会自动加→漏写就 schema drift critical。铁律：凡 ORM 用 TimestampMixin 的表，DDL 必须显式写 `created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`（V057 editing_locks 踩过此坑 2026-06-06）

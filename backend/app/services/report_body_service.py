@@ -58,6 +58,22 @@ DELETABLE_SECTIONS = {"强调事项段", "关键审计事项段", "其他信息�
 
 _MANUAL_HINT_RE = re.compile(r"\[请[^\]]*\]")
 
+# 需求 12：草稿水印当且仅当交付物处于草稿态（draft/editing）。
+# confirmed/signed/archived 等终态/审批态生成无水印正式版本。
+WATERMARK_STATUSES: frozenset[str] = frozenset({"draft", "editing"})
+
+# 草稿水印标记文本（python-docx 后处理嵌入，供下载文件检测）
+DRAFT_WATERMARK_MARK = "【草稿 DRAFT】"
+
+
+def should_watermark(status: str | None) -> bool:
+    """水印判定单一真源（需求 12.1/12.2/12.3）：
+
+    当且仅当交付物状态属于 {draft, editing} 时叠加/嵌入草稿水印；
+    confirmed/signed 等状态生成无水印正式版本。
+    """
+    return status in WATERMARK_STATUSES
+
 
 @dataclass
 class RenderResult:
@@ -414,10 +430,20 @@ class ReportBodyService:
 
             doc = Document(str(path))
             if doc.paragraphs:
-                doc.paragraphs[0].insert_paragraph_before("【草稿 DRAFT】")
+                doc.paragraphs[0].insert_paragraph_before(DRAFT_WATERMARK_MARK)
+            else:
+                doc.add_paragraph(DRAFT_WATERMARK_MARK)
             doc.save(str(path))
         except Exception as exc:
             logger.debug("水印后处理跳过: %s", exc)
+
+    @staticmethod
+    def docx_has_watermark(path: Path) -> bool:
+        """检测 docx 是否嵌入草稿水印（供下载文件水印有无校验，需求 12.2/12.3）。"""
+        from docx import Document
+
+        doc = Document(str(path))
+        return any(DRAFT_WATERMARK_MARK in p.text for p in doc.paragraphs)
 
     def parse_docx_to_section_ids(self, docx_path: Path, original_body: dict) -> set[str]:
         """渲染往返：真正解析 docx 段落文本，按 section_name 反查 section_id 集合。
@@ -482,54 +508,48 @@ class ReportBodyService:
             body = {**body, "sections": sections}
         return body
 
-    async def check_report_date_compliance(
-        self,
-        project_id: UUID,
-        year: int,
+    @staticmethod
+    def validate_report_date_compliance(
         report_date: date,
+        *,
+        evidence_complete_date: date | None = None,
+        fs_approval_date: date | None = None,
+        eqcr_pass_date: date | None = None,
+        extra_floors: list[tuple[str, date]] | None = None,
     ) -> dict:
-        """报告日期下界合规 — 不合规返回告警（非硬阻断）"""
-        from app.models.core import Project
+        """Report_Date_Compliance — 报告日期下界合规校验（需求 25.1/25.2/25.3/25.4）。
 
+        将报告日期作为可校验字段处理（需求 25.4），而非纯文本占位符。
+
+        下界 = max(已提供的下界日期)，其中：
+        - ``evidence_complete_date``：注册会计师获取充分适当审计证据之日（需求 25.1）
+        - ``fs_approval_date``：管理层/治理层批准财务报表之日（需求 25.2）
+        - ``eqcr_pass_date``：EQCR 复核通过日（需求 25.3）
+        - ``extra_floors``：其他已知下界（label, date）补充项
+
+        当 ``report_date`` 早于下界时，返回 ``compliant=False`` + ``requires_confirmation=True``
+        的告警（非硬阻断，需求 25.3）；调用方据此提示用户二次确认而非直接拒绝。
+
+        所有下界日期均为可选输入：当某来源暂无具体存储时由调用方传 ``None`` 跳过，
+        校验仅基于实际提供的日期计算下界（无任何下界时视为合规）。
+        """
         floors: list[tuple[str, date]] = []
-
-        project = await self.db.get(Project, project_id)
-        if project and project.wizard_state:
-            basic = (
-                project.wizard_state.get("steps", {})
-                .get("basic_info", {})
-                .get("data")
-                or project.wizard_state.get("basic_info", {}).get("data")
-                or {}
-            )
-            for key, label in (
-                ("fs_approval_date", "财务报表批准日"),
-                ("financial_statement_approval_date", "财务报表批准日"),
-                ("audit_evidence_completion_date", "审计证据完成日"),
-                ("audit_period_end", "审计期间截止日"),
-            ):
-                raw = basic.get(key)
-                if raw:
-                    try:
-                        if isinstance(raw, date):
-                            floors.append((label, raw))
-                        else:
-                            floors.append((label, date.fromisoformat(str(raw)[:10])))
-                    except ValueError:
-                        pass
-
-        report = await self._audit_svc.get_report(project_id, year)
-        if report:
-            from app.models.report_models import ReportStatus
-
-            if report.status in (ReportStatus.eqcr_approved, ReportStatus.final):
-                if report.updated_at:
-                    floors.append(
-                        ("EQCR 通过日", report.updated_at.date())
-                    )
+        if evidence_complete_date is not None:
+            floors.append(("审计证据完成日", evidence_complete_date))
+        if fs_approval_date is not None:
+            floors.append(("财务报表/治理层批准日", fs_approval_date))
+        if eqcr_pass_date is not None:
+            floors.append(("EQCR 通过日", eqcr_pass_date))
+        if extra_floors:
+            floors.extend(extra_floors)
 
         if not floors:
-            return {"compliant": True, "warnings": [], "floor_date": None}
+            return {
+                "compliant": True,
+                "requires_confirmation": False,
+                "warnings": [],
+                "floor_date": None,
+            }
 
         floor_date = max(d for _, d in floors)
         if report_date < floor_date:
@@ -540,12 +560,84 @@ class ReportBodyService:
             )
             return {
                 "compliant": False,
+                "requires_confirmation": True,
                 "warnings": [warning],
                 "floor_date": floor_date.isoformat(),
             }
 
         return {
             "compliant": True,
+            "requires_confirmation": False,
             "warnings": [],
             "floor_date": floor_date.isoformat(),
         }
+
+    async def check_report_date_compliance(
+        self,
+        project_id: UUID,
+        year: int,
+        report_date: date,
+    ) -> dict:
+        """报告日期下界合规 — 从项目/报告状态收集下界日期后委托纯校验器。
+
+        说明（数据来源假设）：当前数据模型中各下界日期尚无统一专用存储字段，
+        本方法尽力从已有载体提取——
+        - 审计证据完成日 / 财务报表批准日：项目 ``wizard_state.basic_info``（若已填）
+        - EQCR 通过日：``audit_report`` 进入 ``eqcr_approved``/``final`` 状态时取 ``updated_at``
+        提取不到的下界传 ``None`` 跳过；最终校验逻辑统一由
+        :meth:`validate_report_date_compliance` 计算，保证 service 与纯校验器口径一致。
+        """
+        from app.models.core import Project
+
+        evidence_complete_date: date | None = None
+        fs_approval_date: date | None = None
+        eqcr_pass_date: date | None = None
+        extra_floors: list[tuple[str, date]] = []
+
+        def _coerce(raw: Any) -> date | None:
+            if raw is None:
+                return None
+            if isinstance(raw, date):
+                return raw
+            try:
+                return date.fromisoformat(str(raw)[:10])
+            except ValueError:
+                return None
+
+        project = await self.db.get(Project, project_id)
+        if project and project.wizard_state:
+            basic = (
+                project.wizard_state.get("steps", {})
+                .get("basic_info", {})
+                .get("data")
+                or project.wizard_state.get("basic_info", {}).get("data")
+                or {}
+            )
+            fs_approval_date = _coerce(
+                basic.get("fs_approval_date")
+                or basic.get("financial_statement_approval_date")
+            )
+            evidence_complete_date = _coerce(
+                basic.get("audit_evidence_completion_date")
+            )
+            audit_period_end = _coerce(basic.get("audit_period_end"))
+            if audit_period_end is not None:
+                extra_floors.append(("审计期间截止日", audit_period_end))
+
+        report = await self._audit_svc.get_report(project_id, year)
+        if report:
+            from app.models.report_models import ReportStatus
+
+            if (
+                report.status in (ReportStatus.eqcr_approved, ReportStatus.final)
+                and report.updated_at
+            ):
+                eqcr_pass_date = report.updated_at.date()
+
+        return self.validate_report_date_compliance(
+            report_date,
+            evidence_complete_date=evidence_complete_date,
+            fs_approval_date=fs_approval_date,
+            eqcr_pass_date=eqcr_pass_date,
+            extra_floors=extra_floors or None,
+        )

@@ -111,7 +111,7 @@
 
 | Spec | 状态 | 说明 |
 |------|------|------|
-| `audit-report-deliverable-center` | ⏳ P0 完成/P1-P2 实施中 | 交付件管理中心（选择性导出→双路径存储→版本→预览→报告正文生成）；P0 Task 0-8 全绿（42 后端+11 前端 tests passed），Task 9+ P1/P2 进行中 |
+| `audit-report-deliverable-center` | ✅ 全量完成（归档） | 交付件管理中心（选择性导出→双路径存储→版本→预览→报告正文生成→审批→归档→OnlyOffice）；P0+P1+P2 全部 25 任务完成；93 后端+42 前端 tests passed；5 bug PBT 发现修复；2026-06-07 |
 | `disclosure-note-semantic-structure-and-presentation` | 📌 待启动 | 附注语义结构与呈现原型（sidecar 类型/row_type/table_id/政策条款审阅/数据披露上下文栏） |
 | `platform-context-permission-foundation` | 📌 待启动 | 项目上下文单一真源+年度切换+权限矩阵+项目设置中心+枚举字典 |
 | `platform-evidence-knowledge-ai-governance` | 📌 待启动 | 证据包/知识库/AI 治理路线图 |
@@ -124,7 +124,7 @@
 
 ---
 
-## 三、已归档 Spec（`_archive/`，113 个）
+## 三、已归档 Spec（`_archive/`，114 个）
 
 > 已完成且不再演进的 spec，保留审计轨迹。归档不删文件。
 > **物理结构**：`_archive/` 下按功能 + 开发先后分 10 个分类目录，每个目录含 README 说明。
@@ -171,9 +171,9 @@ _archive/
 
 `global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3`（全平台一致性治理：金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动；143/147，剩合伙人 UAT） · `vllm-httpx-bugfix`（2026-05-30，httpx trust_env=False 全仓 20 处 + chat_template_kwargs 顶层 + finish_reason=length 处理；12 测试全绿 + vLLM 直调验证通过） · `retrieval-kernel-unification`（检索/知识层单内核 + pgvector；PBT R1~R4 全绿；2026-06-01） · `doc-level-ai-chat`（文档/文件夹级 LLM 对话；72 测试全绿；2026-06-01） · `global-modules-cleanup`（多源澄清+死文件清理；35 测试全绿） · `global-modules-p2-polish`（P2/P3 体验增强；57 测试全绿） · `formula-engine-unification`（公式单内核；Q1~Q5 PBT 全绿） · `report-config-baseline`（报表配置回填+联动；E1~E4 PBT 全绿） · `llm-structured-output`（Instructor+guided_json 双层+熔断；8 tests；2026-06-05） · `pg-pooling-and-load-test`（PgBouncer NullPool+Locust 6000；8 tests；2026-06-05） · `xlsx-read-acceleration`（calamine adapter+6 迁移点；22 tests；2026-06-05） · `endpoint-fuzz-and-tracing`（Schemathesis+OTel+bm25s；8 tests；2026-06-05） · `global-refinement-v5-closure`（v5 收口：溯源+stale 全局刷新+编辑锁+函证；2026-06-06） · `project-creation-enhancement`（项目创建向导增强；2026-06-06）
 
-### 3.5 `05-business-features/` — 业务专项功能（13 个）
+### 3.5 `05-business-features/` — 业务专项功能（14 个）
 
-`proposal-remaining-18` · `e2e-business-flow` · `template-library-coordination` · `audit-chain-generation` · `enterprise-linkage` · `ledger-import-view-refactor` · `advanced-query-enhancements-p1p2` · `k-admin-cycle-post-review-fix` · `partner-dashboard` · `procedure-applicability-trimming` · `role-based-view-switching` · `report-module-enhancement` · `wp-ai-review-ux-fix`（底稿 AI 复核弹窗 UX 修复；36 vitest 全绿）
+`proposal-remaining-18` · `e2e-business-flow` · `template-library-coordination` · `audit-chain-generation` · `enterprise-linkage` · `ledger-import-view-refactor` · `advanced-query-enhancements-p1p2` · `k-admin-cycle-post-review-fix` · `partner-dashboard` · `procedure-applicability-trimming` · `role-based-view-switching` · `report-module-enhancement` · `wp-ai-review-ux-fix`（底稿 AI 复核弹窗 UX 修复；36 vitest 全绿） · `audit-report-deliverable-center`（交付件管理中心：选择性导出→双路径→版本→预览→OnlyOffice→审批→归档→报告正文生成；P0-P2 全部 25 任务+93 后端+42 前端 tests；2026-06-07）
 
 ### 3.6 `06-engineering-governance/` — 工程治理（6 个）
 
@@ -269,7 +269,7 @@ _archive/
 | prefill_formula_mapping | 1035 cells |
 | validation_rules | 114 条 |
 | D6 SQL 迁移 | V001-V040（V040 = account_note_mapping + consol_cell_comments 懒建表入 D6） |
-| **Spec 总数** | **active 8 + archived 113（详见 §三）** |
+| **Spec 总数** | **active 7 + archived 114（详见 §三）** |
 
 ---
 

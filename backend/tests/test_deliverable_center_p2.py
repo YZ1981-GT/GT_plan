@@ -128,6 +128,81 @@ async def test_reject_leaves_reason(db_session, seeded_db):
 
 
 @pytest.mark.asyncio
+async def test_submit_approval_requires_editing(db_session, seeded_db):
+    """需求 7.1：仅 editing 可提交审批，非 editing 应拒绝"""
+    svc = DeliverableService(db_session)
+    task = await svc.create_task(
+        seeded_db["project_id"], "audit_report", "soe", seeded_db["user_id"]
+    )
+    # 当前为 draft，非 editing
+    with pytest.raises(ValueError, match="editing"):
+        await svc.submit_for_approval(task.id, seeded_db["user_id"])
+
+
+@pytest.mark.asyncio
+async def test_approve_requires_pending_approval(db_session, seeded_db):
+    """需求 7.2：仅 pending_approval 可批准"""
+    report = AuditReport(
+        project_id=seeded_db["project_id"],
+        year=seeded_db["year"],
+        opinion_type=OpinionType.unqualified,
+        company_type=CompanyType.non_listed,
+        status=ReportStatus.eqcr_approved,
+        created_by=seeded_db["user_id"],
+    )
+    db_session.add(report)
+    await db_session.flush()
+
+    svc = DeliverableService(db_session)
+    task = await _editing_task(db_session, seeded_db)
+    # editing 状态尚未提交审批，直接批准应拒绝
+    with pytest.raises(ValueError, match="pending_approval"):
+        await svc.approve(task.id, seeded_db["user_id"], seeded_db["year"])
+
+
+@pytest.mark.asyncio
+async def test_reject_requires_pending_approval(db_session, seeded_db):
+    """需求 7.3：仅 pending_approval 可驳回"""
+    svc = DeliverableService(db_session)
+    task = await _editing_task(db_session, seeded_db)
+    # editing 状态直接驳回应拒绝
+    with pytest.raises(ValueError, match="pending_approval"):
+        await svc.reject(task.id, seeded_db["user_id"], "原因")
+
+
+@pytest.mark.asyncio
+async def test_reject_then_resubmit_clears_reject_on_approve(db_session, seeded_db):
+    """需求 7.2/7.3：驳回留痕后可重新提交并批准，approve 清除驳回原因"""
+    report = AuditReport(
+        project_id=seeded_db["project_id"],
+        year=seeded_db["year"],
+        opinion_type=OpinionType.unqualified,
+        company_type=CompanyType.non_listed,
+        status=ReportStatus.eqcr_approved,
+        created_by=seeded_db["user_id"],
+    )
+    db_session.add(report)
+    await db_session.flush()
+
+    svc = DeliverableService(db_session)
+    task = await _editing_task(db_session, seeded_db)
+    await svc.submit_for_approval(task.id, seeded_db["user_id"])
+    rejected = await svc.reject(task.id, seeded_db["user_id"], "需修改")
+    assert rejected.status == WordExportStatus.editing.value
+    assert rejected.reject_reason == "需修改"
+    assert rejected.approval_by == seeded_db["user_id"]
+    assert rejected.approval_at is not None
+
+    # 重新提交并批准
+    await svc.submit_for_approval(task.id, seeded_db["user_id"])
+    approved = await svc.approve(task.id, seeded_db["user_id"], seeded_db["year"])
+    assert approved.status == WordExportStatus.confirmed.value
+    assert approved.reject_reason is None
+    assert approved.approval_by == seeded_db["user_id"]
+    assert approved.approval_at is not None
+
+
+@pytest.mark.asyncio
 async def test_archive_blocked_without_completeness(db_session, seeded_db):
     svc = DeliverableService(db_session)
     with pytest.raises(ValueError, match="完整性"):

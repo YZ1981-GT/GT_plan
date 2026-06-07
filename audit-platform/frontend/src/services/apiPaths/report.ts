@@ -145,7 +145,7 @@ export const auditReport = {
 // ─── 交付件管理中心 ─────────────────────────────────────────────────────────
 
 export const deliverables = {
-  list: (pid: string) => `/api/projects/${pid}/deliverables`,
+  list: (pid: string) => `/api/projects/${pid}/deliverables/`,
   versions: (pid: string, taskId: string) => `/api/projects/${pid}/deliverables/${taskId}/versions`,
   compare: (pid: string, taskId: string) => `/api/projects/${pid}/deliverables/${taskId}/versions/compare`,
   download: (pid: string, taskId: string, versionNo: number) =>

@@ -13,7 +13,12 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.phase13_models import ExportJobStatus, WordExportStatus, WordExportTask
+from app.models.phase13_models import (
+    ExportJobStatus,
+    WordExportStatus,
+    WordExportTask,
+    WordExportTaskVersion,
+)
 from app.services.completeness_service import CompletenessService
 from app.services.export_job_service import ExportJobService
 
@@ -70,6 +75,17 @@ class DeliverablePackageService:
 
         return job.id, warnings
 
+    async def _latest_version_no(self, task_id: UUID) -> int:
+        """该交付物最新版本号；无版本记录时回退为 1"""
+        result = await self.db.execute(
+            sa.select(WordExportTaskVersion.version_no)
+            .where(WordExportTaskVersion.word_export_task_id == task_id)
+            .order_by(WordExportTaskVersion.version_no.desc())
+            .limit(1)
+        )
+        latest = result.scalar_one_or_none()
+        return latest if latest is not None else 1
+
     async def run_package_job(self, job_id: UUID) -> Path | None:
         """执行打包并更新进度（后台调用）"""
         from app.services.event_bus import event_bus
@@ -85,6 +101,7 @@ class DeliverablePackageService:
         manifest_lines = [
             f"# 交付物清单 — 生成于 {datetime.now(timezone.utc).isoformat()}",
             f"project_id={job.project_id}",
+            "doc_type\tfilename\tversion_no\tstatus\tfile_size",
         ]
         done = 0
         failed = 0
@@ -112,8 +129,10 @@ class DeliverablePackageService:
 
                 arcname = f"{task.doc_type}/{src.name}"
                 zf.write(src, arcname)
+                version_no = await self._latest_version_no(task.id)
                 manifest_lines.append(
-                    f"{task.doc_type}\t{src.name}\t{task.file_size or src.stat().st_size}"
+                    f"{task.doc_type}\t{src.name}\t{version_no}\t{task.status}"
+                    f"\t{task.file_size or src.stat().st_size}"
                 )
                 await self._job_svc.update_item_status(
                     item.id, ExportJobStatus.succeeded.value

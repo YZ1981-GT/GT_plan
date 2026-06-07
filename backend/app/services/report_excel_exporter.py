@@ -47,6 +47,8 @@ REPORT_TYPE_SHEET_NAMES: dict[str, str] = {
     "income_statement": "利润表",
     "cash_flow_statement": "现金流量表",
     "equity_statement": "所有者权益变动表",
+    "asset_impairment": "资产减值损失明细表",
+    "impairment_provision": "减值准备表",
 }
 
 # Amount number format
@@ -357,6 +359,11 @@ class ReportExcelExporter:
         report_type: str,
     ) -> None:
         """Write a complete sheet from scratch with proper formatting."""
+        # 资产负债表使用左右两栏结构（左资产/右负债+权益）
+        if report_type == "balance_sheet":
+            self._write_balance_sheet_two_column(ws, rows, company_name, year, mode)
+            return
+
         # --- Header rows ---
         # Row 1: Company name (centered, bold)
         ws.cell(1, 1).value = company_name
@@ -509,3 +516,178 @@ class ReportExcelExporter:
             )
             if col == 1:
                 cell.font = Font(bold=True)
+
+    def _write_balance_sheet_two_column(
+        self,
+        ws,
+        rows: list[dict],
+        company_name: str,
+        year: int,
+        mode: str,
+    ) -> None:
+        """资产负债表左右两栏结构：左侧=资产，右侧=负债+权益。
+
+        布局（参照致同国企版模板）：
+        - Row 1: 公司名称（跨全列居中）
+        - Row 2: 期间（yyyy年12月31日）
+        - Row 3: 单位/审计模式
+        - Row 4: 列标题行
+          左栏：A=资产项目 | B=期末余额 | C=期初余额
+          右栏：E=负债和所有者权益项目 | F=期末余额 | G=期初余额
+        - Row 5+: 数据行（左右并排）
+        """
+        total_cols = 7  # A~G
+
+        # --- Header ---
+        ws.cell(1, 1).value = company_name
+        ws.cell(1, 1).font = Font(name="宋体", size=14, bold=True)
+        ws.cell(1, 1).alignment = Alignment(horizontal="center")
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
+
+        ws.cell(2, 1).value = f"资产负债表"
+        ws.cell(2, 1).font = Font(name="宋体", size=12, bold=True)
+        ws.cell(2, 1).alignment = Alignment(horizontal="center")
+        ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=total_cols)
+
+        ws.cell(3, 1).value = f"编制日期：{year}年12月31日"
+        ws.cell(3, 1).font = Font(name="宋体", size=9)
+        ws.cell(3, 1).alignment = Alignment(horizontal="left")
+        mode_label = "未审数" if mode == "unadjusted" else "审定数"
+        ws.cell(3, total_cols).value = f"单位：人民币元（{mode_label}）"
+        ws.cell(3, total_cols).font = Font(name="宋体", size=9)
+        ws.cell(3, total_cols).alignment = Alignment(horizontal="right")
+
+        # --- Column headers (Row 4) ---
+        header_row = 4
+        headers_left = ["资　　产", "期末余额", "期初余额"]
+        headers_right = ["负债和所有者权益", "期末余额", "期初余额"]
+
+        for i, h in enumerate(headers_left):
+            c = ws.cell(header_row, i + 1)
+            c.value = h
+            c.font = Font(bold=True)
+            c.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Column D = separator (空列)
+        ws.column_dimensions["D"].width = 2
+
+        for i, h in enumerate(headers_right):
+            c = ws.cell(header_row, i + 5)  # E, F, G
+            c.value = h
+            c.font = Font(bold=True)
+            c.alignment = Alignment(horizontal="center", vertical="center")
+
+        # --- Separate rows into assets vs liabilities+equity ---
+        # Split by row_code prefix: BS-001~BS-039 = 资产, BS-040+ = 负债+权益
+        # Or by section: rows before "资产合计" are assets, after are liabilities+equity
+        asset_rows: list[dict] = []
+        liability_rows: list[dict] = []
+
+        is_liability_section = False
+        for row in rows:
+            row_name = row.get("row_name", "")
+            row_code = row.get("row_code", "")
+            # 资产合计行是资产最后一行
+            if "资产合计" in row_name or "资产总计" in row_name:
+                asset_rows.append(row)
+                is_liability_section = True
+                continue
+            if is_liability_section:
+                liability_rows.append(row)
+            else:
+                asset_rows.append(row)
+
+        # 如果没有通过行名分区成功（所有行都在一侧），则按 row_code 数字分
+        if not liability_rows and rows:
+            asset_rows = []
+            liability_rows = []
+            for row in rows:
+                code = row.get("row_code", "")
+                # BS-039 以下为资产，BS-040 及以上为负债+权益
+                try:
+                    num = int(code.split("-")[-1]) if "-" in code else 999
+                except (ValueError, IndexError):
+                    num = 999
+                if num <= 39:
+                    asset_rows.append(row)
+                else:
+                    liability_rows.append(row)
+
+        # --- Write data rows side by side ---
+        data_start = 5
+        max_rows = max(len(asset_rows), len(liability_rows))
+
+        for i in range(max_rows):
+            r = data_start + i
+
+            # 左栏：资产
+            if i < len(asset_rows):
+                arow = asset_rows[i]
+                indent_level = arow.get("indent_level", 0)
+                indent_str = "　" * indent_level
+                is_total = arow.get("is_total_row", False)
+
+                ws.cell(r, 1).value = indent_str + arow.get("row_name", "")
+                ws.cell(r, 1).alignment = Alignment(indent=indent_level * 2, vertical="center")
+                if is_total:
+                    ws.cell(r, 1).font = Font(bold=True)
+
+                amount = arow.get("current_period_amount")
+                if amount is not None:
+                    ws.cell(r, 2).value = float(amount)
+                self._apply_amount_format(ws.cell(r, 2), is_total)
+
+                prior = arow.get("prior_period_amount")
+                if prior is not None:
+                    ws.cell(r, 3).value = float(prior)
+                self._apply_amount_format(ws.cell(r, 3), is_total)
+
+                if is_total:
+                    self._apply_total_row_style(ws, r, 3)
+
+            # 右栏：负债+权益
+            if i < len(liability_rows):
+                lrow = liability_rows[i]
+                indent_level = lrow.get("indent_level", 0)
+                indent_str = "　" * indent_level
+                is_total = lrow.get("is_total_row", False)
+
+                ws.cell(r, 5).value = indent_str + lrow.get("row_name", "")
+                ws.cell(r, 5).alignment = Alignment(indent=indent_level * 2, vertical="center")
+                if is_total:
+                    ws.cell(r, 5).font = Font(bold=True)
+
+                amount = lrow.get("current_period_amount")
+                if amount is not None:
+                    ws.cell(r, 6).value = float(amount)
+                self._apply_amount_format(ws.cell(r, 6), is_total)
+
+                prior = lrow.get("prior_period_amount")
+                if prior is not None:
+                    ws.cell(r, 7).value = float(prior)
+                self._apply_amount_format(ws.cell(r, 7), is_total)
+
+                if is_total:
+                    for col in range(5, 8):
+                        cell = ws.cell(r, col)
+                        existing = cell.border
+                        cell.border = Border(
+                            top=Side(style="thin"),
+                            bottom=existing.bottom if existing else None,
+                        )
+                    ws.cell(r, 5).font = Font(bold=True)
+
+        # --- Column widths ---
+        ws.column_dimensions["A"].width = 32
+        ws.column_dimensions["B"].width = 16
+        ws.column_dimensions["C"].width = 16
+        ws.column_dimensions["E"].width = 32
+        ws.column_dimensions["F"].width = 16
+        ws.column_dimensions["G"].width = 16
+
+        # --- Print settings ---
+        last_data_row = data_start + max_rows - 1
+        ws.print_area = f"A1:G{last_data_row}"
+        ws.page_setup.orientation = "landscape"
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0

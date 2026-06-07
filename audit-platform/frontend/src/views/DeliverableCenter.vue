@@ -44,6 +44,7 @@
         @download="downloadItem"
         @edit="openEditor"
         @select="selectItem"
+        @delete="confirmDeleteItem"
       />
 
       <DeliverableVersionList
@@ -86,6 +87,26 @@
       @close="editorVisible = false"
     />
 
+    <!-- 生成财务报表选择弹窗 -->
+    <el-dialog v-model="showGenerateReports" title="生成财务报表" width="440px">
+      <p style="margin: 0 0 12px; color: var(--el-text-color-secondary); font-size: 13px">
+        请选择要导出的报表类型：
+      </p>
+      <el-checkbox-group v-model="selectedReportTypes">
+        <el-checkbox label="balance_sheet">资产负债表</el-checkbox>
+        <el-checkbox label="income_statement">利润表</el-checkbox>
+        <el-checkbox label="cash_flow_statement">现金流量表</el-checkbox>
+        <el-checkbox label="equity_statement">所有者权益变动表</el-checkbox>
+        <el-checkbox label="impairment_provision">减值准备明细表</el-checkbox>
+      </el-checkbox-group>
+      <template #footer>
+        <el-button @click="showGenerateReports = false">取消</el-button>
+        <el-button type="primary" :loading="generating" :disabled="!selectedReportTypes.length" @click="confirmGenerateReports">
+          生成（{{ selectedReportTypes.length }}张）
+        </el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="showGenerateReport" title="生成审计报告正文" width="520px">
       <el-form label-width="120px">
         <el-form-item label="审计意见类型">
@@ -119,6 +140,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { downloadFile } from '@/utils/http'
 import ApprovalPanel from '@/components/deliverable/ApprovalPanel.vue'
 import CompletenessBanner from '@/components/deliverable/CompletenessBanner.vue'
 import OnlyOfficeEditor from '@/components/deliverable/OnlyOfficeEditor.vue'
@@ -141,6 +163,7 @@ import {
   renderReportBody,
   rejectDeliverable,
   submitApproval,
+  deleteDeliverable,
   type DeliverableItem,
   type DeliverableVersion,
 } from '@/services/deliverableApi'
@@ -175,6 +198,8 @@ const expandedTaskId = ref<string | null>(null)
 const versionChain = ref<DeliverableVersion[]>([])
 const showExportDialog = ref(false)
 const showGenerateReport = ref(false)
+const showGenerateReports = ref(false)
+const selectedReportTypes = ref<string[]>(['balance_sheet', 'income_statement', 'cash_flow_statement', 'equity_statement', 'impairment_provision'])
 const previewVisible = ref(false)
 const previewTitle = ref('')
 const previewType = ref<'docx' | 'pdf' | 'html' | 'unsupported'>('html')
@@ -254,7 +279,21 @@ async function toggleVersions(taskId: string) {
 
 function downloadItem(item: DeliverableItem) {
   const url = deliverableDownloadUrl(projectId.value, item.task_id, item.version_no)
-  window.open(url, '_blank')
+  downloadFile(url, { fileName: item.file_name || `deliverable_v${item.version_no}` })
+}
+
+async function confirmDeleteItem(item: DeliverableItem) {
+  try {
+    await ElMessageBox.confirm(
+      `确认删除「${item.file_name || item.doc_type}」？此操作不可恢复。`,
+      '删除交付物',
+      { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' },
+    )
+    await deleteDeliverable(projectId.value, item.task_id)
+    ElMessage.success('交付物已删除')
+    await loadList()
+    if (selectedItem.value?.task_id === item.task_id) selectedItem.value = null
+  } catch { /* 用户取消 */ }
 }
 
 function selectItem(item: DeliverableItem) {
@@ -274,9 +313,25 @@ async function openPreview(item: DeliverableItem) {
   previewUrl.value = deliverableDownloadUrl(projectId.value, item.task_id, item.version_no)
   previewWatermark.value = ['draft', 'editing'].includes(item.status)
   const suffix = item.file_name?.split('.').pop()?.toLowerCase()
+
+  // xlsx 走 OnlyOffice 编辑器（只读预览），不可用时自动降级
+  if (suffix === 'xlsx' || suffix === 'xls') {
+    editorItem.value = item
+    editorUrl.value = previewUrl.value
+    editorVisible.value = true
+    return
+  }
+
+  // docx 也走 OnlyOffice（高保真），不可用时 OnlyOfficeEditor 内部降级到 @vue-office/docx
+  if (suffix === 'docx') {
+    editorItem.value = item
+    editorUrl.value = previewUrl.value
+    editorVisible.value = true
+    return
+  }
+
   if (suffix === 'pdf') previewType.value = 'pdf'
-  else if (suffix === 'docx') previewType.value = 'docx'
-  else previewType.value = 'html'
+  else previewType.value = 'unsupported'
   previewVisible.value = true
 }
 
@@ -287,15 +342,24 @@ function openGenerateReport() {
 
 async function goGenerateReports() {
   if (!guardGenerate('reports')) return
+  selectedReportTypes.value = ['balance_sheet', 'income_statement', 'cash_flow_statement', 'equity_statement', 'impairment_provision']
+  showGenerateReports.value = true
+}
+
+async function confirmGenerateReports() {
   generating.value = true
+  showGenerateReports.value = false
   try {
-    const res = await renderFinancialReports(projectId.value, { year: year.value })
+    const res = await renderFinancialReports(projectId.value, {
+      year: year.value,
+      report_types: selectedReportTypes.value,
+    })
     if (res.platform_persist_failed) {
       ElMessage.warning('平台留存失败，请从版本链重新下载')
     } else {
       ElMessage.success('财务报表已生成并保存到交付中心')
     }
-    window.open(deliverableDownloadUrl(projectId.value, res.task_id, res.version_no), '_blank')
+    downloadFile(deliverableDownloadUrl(projectId.value, res.task_id, res.version_no), { fileName: `financial_reports_${year.value}.xlsx` })
     await loadList()
   } catch {
     ElMessage.error('生成财务报表失败')
@@ -314,7 +378,7 @@ async function goGenerateNotes() {
     } else {
       ElMessage.success('附注已生成并保存到交付中心')
     }
-    window.open(deliverableDownloadUrl(projectId.value, res.task_id, res.version_no), '_blank')
+    downloadFile(deliverableDownloadUrl(projectId.value, res.task_id, res.version_no), { fileName: `disclosure_notes_${year.value}.docx` })
     await loadList()
   } catch {
     ElMessage.error('生成附注失败')
@@ -409,7 +473,7 @@ async function runPackageDownload() {
       ElMessage.warning(res.warnings.join('；'))
     }
     setTimeout(() => {
-      window.open(packageFileUrl(projectId.value, res.job_id), '_blank')
+      downloadFile(packageFileUrl(projectId.value, res.job_id), { fileName: `deliverable_package.zip` })
     }, 1500)
     ElMessage.success('打包任务已创建')
   } catch {

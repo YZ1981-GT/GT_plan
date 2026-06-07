@@ -64,7 +64,7 @@ class DeliverableSnapshotService:
                     ReportSnapshot.project_id == project_id,
                     ReportSnapshot.year == year,
                 )
-                .order_by(ReportSnapshot.created_at.desc())
+                .order_by(ReportSnapshot.generated_at.desc())
                 .limit(1)
             )
             sid = snap_row.scalar_one_or_none()

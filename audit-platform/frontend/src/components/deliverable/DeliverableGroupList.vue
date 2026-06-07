@@ -26,6 +26,14 @@
             编辑
           </el-button>
           <el-button link type="primary" @click="emit('download', row)">下载</el-button>
+          <el-button
+            v-if="!['confirmed', 'signed', 'archived'].includes(row.status)"
+            link
+            type="danger"
+            @click="emit('delete', row)"
+          >
+            删除
+          </el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -47,6 +55,7 @@ const emit = defineEmits<{
   download: [item: DeliverableItem]
   edit: [item: DeliverableItem]
   select: [item: DeliverableItem]
+  delete: [item: DeliverableItem]
 }>()
 
 const LABELS: Record<string, string> = {
