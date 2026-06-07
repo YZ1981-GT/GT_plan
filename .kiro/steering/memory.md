@@ -103,8 +103,8 @@ inclusion: always
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、知识库删旧 KnowledgeService；向量存储选 pgvector；3 处联动断裂已修（知识文件→索引/模板 JSON→registry/报表主模板→克隆 stale）
 - 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
-### git 状态（2026-06-06）
-- 分支 `work/2026-05-30-wp-specs`；HEAD `5e9b7f3b` 已推远程；deliverable-center P0 完成+4 spec 归档+INDEX 更新；CI 可过待 PR 合 main
+### git 状态（2026-06-07，HEAD `a60198b6` 已拉取远程最新）
+- 分支 `work/2026-05-30-wp-specs`；已同步远程（含 deliverable-center P1/P2 + note-semantic + onlyoffice 集成）；**可走 PR 合 main**
 - 旧里程碑：`8ed2d45c`=audit-sheet-editable 归档 / `350ff25d`=5 tech specs 归档 / `0c0bae1a`=5 tech specs 实施代码
 - **schema drift 二次修复（V051）**：方向=orm_extra（ORM 有 DB 缺），51 列 ALTER ADD + 2 enum ADD VALUE + 列级 KNOWN_COLUMN_ALLOWLIST（cell_annotations.sheet_name/adjustments.status/projects.template_version_id）+ 表级加 linkage_audit_log/seed_load_history；evidence_hash_checks.export_id 保持 VARCHAR（ORM 业务定义非 UUID）
 - **🟢 B-Index 底稿目录"No Data"修复（2026-06-02，Playwright 实测通过）**：`wp_render_config.py` 新增 `_generate_b_index_data()`——当 B-Index sheet html_data 为空时自动从项目元数据生成 preparation_info（entity_name/period_end/preparer/reviewer）+ navigation_rows（同底稿其他 sheet 列表）；GtBIndex.vue 加 `empty-text="暂无索引数据"` 中文化
@@ -122,7 +122,8 @@ inclusion: always
 - 文档类（memory/INDEX/复盘）冲突取并集，走 PR 让 GitHub 先暴露冲突，不本地直推 main
 
 ### 真正待办
-- **外部依赖**：LLM embedding 实例 / 6000 并发压测 / 钉集成 / 合并 UAT / GitHub 默认分支改 main / 走 PR 合入 / V052~V058 生产迁移
+- **外部依赖**：LLM embedding 实例 / 6000 并发压测 / 钉集成 / 合并 UAT / GitHub 默认分支改 main / 走 PR 合入 / V052~V062 生产迁移
+- **✅ `workpaper-content-semantic-contract` spec 全部完成（2026-06-07）**：7 任务+7 MVP+8 CI 全绿；产物=SheetContentType 13枚举+FieldSourceContract+ProgramStatusContract+d1_d2_semantic_registry.json(D1 10+D2 12 sheet)+check_wp_semantic_schema.py+FieldSourcePanel.vue+inventory 文档；后端~110+前端~51 测试绿
 - **待建 spec**：底稿统一导入导出(`workpaper-unified-import-export`) / D1-4 坏账嵌套结构（枚举+auto-SUM+辅助预填）/ consol_disclosure_service 瘦身(1736行) / migration_runner 瘦身(1026行) / `workpaper-content-semantic-system`（底稿内容平台化，2026-06-06 提案+codegraph 分析；真空白=SheetContentType 声明式枚举替换 wp_generic_processor._detect_sheet_type 启发式 + account_package 科目工作包逻辑对象 + 字段级 requires_confirmation registry；**已有勿重建**=函证 callback 已铺 D2/F2/G7 三循环 + ai_content_log_service+ai_content_gate_rule 草稿阻断签发已闭环 + confirmation:received→useWorkpaperRefresh 已接线；试点选 D2 非 D1；硬伤=科目包程序状态须持久化不能纯前端聚合）
 - **✅ deliverable-center 全量完成**：P0(0-8)+P1(9-15)+P2(16-22)+收尾(23,25) 全部 done，含原标 `*` 的 task 21(OnlyOffice)；93+ 后端测试+42 前端测试全绿；过程修 5 bug（ReportSnapshot.created_at→generated_at / CompletenessService 漏 ProjectType / 通知漏 title / archive-lock gap on create_version / render_and_store 卡 generating 态）；task 24 Playwright E2E 需启动 dev 后手动验证；**PBT 全部 max_examples≤5**
 - **✅ 已完成 spec**：`report-view-slimdown`（2944→965 行，15 任务全部完成+3 项技术债已清，HARD_CAP 1110 已登记）；技术债修复：①纯函数(getRowType/formatReportAmount/equitySpanMethod/computeCrossCheckResults)提升为模块级 export ②useReportCellActions→aggregator+useReportDrilldown/useReportTrace/useReportContextMenu 三子 composable ③ReportDialogs→wrapper+ReportDrilldownDialogs/ReportTraceDialogs/ReportMappingDialog 三子组件

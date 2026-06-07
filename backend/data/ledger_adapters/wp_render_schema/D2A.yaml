@@ -4,6 +4,7 @@
 # Template: D2-1至D2-4 应收账款- 审定表明细表（Leap-常规程序）.xlsx
 
 wp_code: D2A
+sheet_type: procedure
 template_path: backend/wp_templates/D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx
 template_version: v2025-R5
 applicable_standards: [soe_standalone, listed_standalone]

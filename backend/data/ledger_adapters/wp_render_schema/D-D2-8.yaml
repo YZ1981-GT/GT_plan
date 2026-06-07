@@ -6,6 +6,7 @@
 # 适用范围：所有"会计政策检查 / 编号段落 / 长篇问答"类 sheet（约 19 sheet）
 
 wp_code: D-D2-8
+sheet_type: analysis
 template_path: backend/wp_templates/D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx
 template_version: v2025-R5
 applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]

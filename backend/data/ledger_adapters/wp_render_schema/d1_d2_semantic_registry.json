@@ -1,0 +1,228 @@
+{
+  "_description": "D1/D2 sheet_type 语义标注注册表。schema 显式值 > registry > 启发式。generated/*.yaml 不得出现在 schema_ref。",
+  "_spec": "workpaper-content-semantic-contract",
+  "_version": "2026-06-07-v1",
+  "sheets": {
+    "D1A 应收票据审计程序表": {
+      "sheet_type": "procedure",
+      "wp_code": "D1",
+      "description": "D1 程序控制台/实质性程序表"
+    },
+    "审定表D1-1": {
+      "sheet_type": "audit_sheet",
+      "wp_code": "D1",
+      "description": "D1 应收票据审定表",
+      "field_sources": {
+        "d1.audit_sheet.current_unadjusted": {
+          "field_id": "d1.audit_sheet.current_unadjusted",
+          "label": "本期未审数",
+          "source_type": "trial_balance",
+          "source_ref": {
+            "module": "trial_balance",
+            "account_code": "1121",
+            "amount_basis": "unadjusted_amount",
+            "period": "period_end"
+          },
+          "editable": false,
+          "override_allowed": false,
+          "requires_confirmation": false,
+          "traceable": true,
+          "stale_policy": "refresh_on_tb_updated"
+        },
+        "d1.audit_sheet.current_audited": {
+          "field_id": "d1.audit_sheet.current_audited",
+          "label": "本期审定数",
+          "source_type": "formula",
+          "source_ref": {
+            "module": "formula_engine",
+            "formula": "unadjusted_amount + aje_adjustment + rje_adjustment",
+            "depends_on": ["d1.audit_sheet.current_unadjusted"]
+          },
+          "editable": false,
+          "override_allowed": true,
+          "requires_confirmation": true,
+          "traceable": true,
+          "stale_policy": "refresh_on_tb_updated"
+        },
+        "d1.audit_sheet.prior_audited": {
+          "field_id": "d1.audit_sheet.prior_audited",
+          "label": "上期审定数",
+          "source_type": "trial_balance",
+          "source_ref": {
+            "module": "trial_balance",
+            "account_code": "1121",
+            "amount_basis": "opening_balance",
+            "period": "period_end"
+          },
+          "editable": false,
+          "override_allowed": false,
+          "requires_confirmation": false,
+          "traceable": true,
+          "stale_policy": "refresh_on_tb_updated"
+        }
+      }
+    },
+    "应收票据明细表D1-2": {
+      "sheet_type": "detail_table",
+      "wp_code": "D1",
+      "description": "D1 应收票据明细"
+    },
+    "坏账准备明细表D1-4": {
+      "sheet_type": "detail_table",
+      "wp_code": "D1",
+      "description": "D1 坏账准备明细"
+    },
+    "应收票据账龄分析表D1-5": {
+      "sheet_type": "analysis",
+      "wp_code": "D1",
+      "description": "D1 账龄分析"
+    },
+    "应收票据贴现背书明细表D1-8": {
+      "sheet_type": "detail_table",
+      "wp_code": "D1",
+      "description": "D1 贴现背书明细"
+    },
+    "应收票据质押检查表D1-12": {
+      "sheet_type": "procedure",
+      "wp_code": "D1",
+      "description": "D1 质押检查程序"
+    },
+    "附注披露信息（上市公司）": {
+      "sheet_type": "disclosure",
+      "wp_code": "D1",
+      "description": "D1 上市公司附注披露（对应 C-D1-disclosure.yaml）",
+      "schema_ref": "C-D1-disclosure.yaml"
+    },
+    "附注披露信息（国企）": {
+      "sheet_type": "disclosure",
+      "wp_code": "D1",
+      "description": "D1 国企附注披露（对应 C-D1-disclosure.yaml）",
+      "schema_ref": "C-D1-disclosure.yaml"
+    },
+    "调整分录汇总表D1-15": {
+      "sheet_type": "adjustment",
+      "wp_code": "D1",
+      "description": "D1 调整分录"
+    },
+    "D1-16 科目结论表": {
+      "sheet_type": "conclusion",
+      "wp_code": "D1",
+      "description": "D1 科目结论"
+    },
+    "D2A 应收账款实质性程序表": {
+      "sheet_type": "procedure",
+      "wp_code": "D2",
+      "description": "D2 程序控制台（对应 D2A.yaml）",
+      "schema_ref": "D2A.yaml"
+    },
+    "审定表D2-1": {
+      "sheet_type": "audit_sheet",
+      "wp_code": "D2",
+      "description": "D2 应收账款审定表",
+      "field_sources": {
+        "d2.audit_sheet.current_unadjusted": {
+          "field_id": "d2.audit_sheet.current_unadjusted",
+          "label": "本期未审数",
+          "source_type": "trial_balance",
+          "source_ref": {
+            "module": "trial_balance",
+            "account_code": "1122",
+            "amount_basis": "unadjusted_amount",
+            "period": "period_end"
+          },
+          "editable": false,
+          "override_allowed": false,
+          "requires_confirmation": false,
+          "traceable": true,
+          "stale_policy": "refresh_on_tb_updated"
+        },
+        "d2.audit_sheet.current_audited": {
+          "field_id": "d2.audit_sheet.current_audited",
+          "label": "本期审定数",
+          "source_type": "formula",
+          "source_ref": {
+            "module": "formula_engine",
+            "formula": "unadjusted_amount + aje_adjustment + rje_adjustment",
+            "depends_on": ["d2.audit_sheet.current_unadjusted"]
+          },
+          "editable": false,
+          "override_allowed": true,
+          "requires_confirmation": true,
+          "traceable": true,
+          "stale_policy": "refresh_on_tb_updated"
+        },
+        "d2.audit_sheet.prior_audited": {
+          "field_id": "d2.audit_sheet.prior_audited",
+          "label": "上期审定数",
+          "source_type": "trial_balance",
+          "source_ref": {
+            "module": "trial_balance",
+            "account_code": "1122",
+            "amount_basis": "opening_balance",
+            "period": "period_end"
+          },
+          "editable": false,
+          "override_allowed": false,
+          "requires_confirmation": false,
+          "traceable": true,
+          "stale_policy": "refresh_on_tb_updated"
+        }
+      }
+    },
+    "应收账款明细表D2-2": {
+      "sheet_type": "detail_table",
+      "wp_code": "D2",
+      "description": "D2 应收账款明细"
+    },
+    "坏账准备明细表D2-3": {
+      "sheet_type": "detail_table",
+      "wp_code": "D2",
+      "description": "D2 坏账准备明细"
+    },
+    "调整分录汇总表D2-4": {
+      "sheet_type": "adjustment",
+      "wp_code": "D2",
+      "description": "D2 调整分录"
+    },
+    "函证汇总D2-5": {
+      "sheet_type": "confirmation_summary",
+      "wp_code": "D2",
+      "description": "D2 函证汇总（外部卡片，不是 D2-5 sheet）",
+      "is_external_card": true,
+      "note": "函证汇总作为外部卡片识别，不得误标为 D2-5 子 sheet 的普通数据表"
+    },
+    "应收账款ECL测算D2-6": {
+      "sheet_type": "analysis",
+      "wp_code": "D2",
+      "description": "D2 ECL预期信用损失测算"
+    },
+    "坏账准备计算表D2-8": {
+      "sheet_type": "analysis",
+      "wp_code": "D2",
+      "description": "D2 坏账准备计算（对应 D-D2-8.yaml）",
+      "schema_ref": "D-D2-8.yaml"
+    },
+    "应收账款账龄分析表D2-9": {
+      "sheet_type": "analysis",
+      "wp_code": "D2",
+      "description": "D2 账龄分析"
+    },
+    "应收账款检查D2-13": {
+      "sheet_type": "procedure",
+      "wp_code": "D2",
+      "description": "D2 检查程序/业务模式分析（对应 D-D2-13.yaml）",
+      "schema_ref": "D-D2-13.yaml"
+    },
+    "应收账款附注披露信息": {
+      "sheet_type": "disclosure",
+      "wp_code": "D2",
+      "description": "D2 附注披露（对应 C-D2-disclosure.yaml）",
+      "schema_ref": "C-D2-disclosure.yaml"
+    },
+    "D2 科目结论表": {
+      "sheet_type": "conclusion",
+      "wp_code": "D2",
+      "description": "D2 科目结论"
+    }
+  }
+}

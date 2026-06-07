@@ -255,6 +255,7 @@ declare module 'vue' {
     ExternalAPIConfig: typeof import('./components/extension/ExternalAPIConfig.vue')['default']
     FairValueTestDialog: typeof import('./components/workpaper/FairValueTestDialog.vue')['default']
     FieldInput: typeof import('./components/workpaper/econtrol/FieldInput.vue')['default']
+    FieldSourcePanel: typeof import('./components/workpaper/FieldSourcePanel.vue')['default']
     FilingError: typeof import('./components/extension/FilingError.vue')['default']
     FilingStatus: typeof import('./components/extension/FilingStatus.vue')['default']
     FixedAssetStocktakeDialog: typeof import('./components/workpaper/FixedAssetStocktakeDialog.vue')['default']

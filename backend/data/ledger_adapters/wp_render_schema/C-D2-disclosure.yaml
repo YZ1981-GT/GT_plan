@@ -11,6 +11,7 @@
 #   4) 与 trial_balance / disclosure_notes 模块单向同步取数
 
 wp_code: C-D2-disclosure
+sheet_type: disclosure
 template_path: backend/wp_templates/D/D2 应收账款附注披露.xlsx
 template_version: v2025-R5
 applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]

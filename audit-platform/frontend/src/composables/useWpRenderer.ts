@@ -41,6 +41,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, type Ref } from 'vue'
 import { api } from '@/services/apiProxy'
 import { eventBus, type CrossRefUpdatedPayload } from '@/utils/eventBus'
+import type { SheetContentType, FieldSourceContract } from '@/types/workpaperSemanticContract'
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,12 @@ export interface SheetRenderConfig {
   schema: Record<string, any>
   html_data: Record<string, any>
   cross_refs: CrossRefEntry[]
+  /** Task 2.3: sheet 的业务语义类型（schema 显式 > 后端推断 > 前端启发式） */
+  sheet_type?: SheetContentType
+  /** Task 2.3: 关键字段来源契约映射 */
+  field_sources?: Record<string, FieldSourceContract>
+  /** Task 2.3: 关联程序状态引用（program_code 列表） */
+  program_status_refs?: string[]
 }
 
 /** render-config 端点完整响应 */
@@ -95,6 +102,58 @@ export interface RenderConfig {
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
+
+/**
+ * resolveSheetType — 按优先级确定 sheet 的业务语义类型
+ *
+ * 优先级: schema 显式值 > 后端推断(API 返回) > 前端启发式 > 'unknown'
+ *
+ * 这是一个纯函数，可在 composable 外部直接使用。
+ *
+ * @param sheet - 渲染配置中的单 sheet 对象
+ * @returns 解析后的 SheetContentType
+ *
+ * Validates: Requirements 1.2, 1.3（schema 优先，启发式回退）
+ */
+export function resolveSheetType(sheet: SheetRenderConfig): SheetContentType {
+  // 1. schema 显式值（已由后端从 YAML 提取并放入 sheet_type 字段）
+  //    或后端通过启发式推断后放入 sheet_type
+  if (sheet.sheet_type) {
+    return sheet.sheet_type
+  }
+
+  // 2. 前端启发式：根据 sheet_name 中文关键词推断
+  const name = sheet.sheet_name || ''
+  const heuristic = _detectSheetTypeByName(name)
+  if (heuristic) {
+    return heuristic
+  }
+
+  // 3. 无法确定
+  return 'unknown'
+}
+
+/**
+ * 前端启发式：根据 sheet_name 中文关键词推断 sheet_type。
+ * 与后端 _infer_sheet_type_by_heuristic 保持同口径。
+ */
+function _detectSheetTypeByName(name: string): SheetContentType | null {
+  // 顺序很重要：更具体的关键词优先匹配
+  if (name.includes('函证') || name.includes('询证')) return 'confirmation_summary'
+  if (name.includes('控制测试')) return 'control_test'
+  if (name.includes('内控') && name.includes('了解')) return 'control_understanding'
+  if (name.includes('控制') && name.includes('了解')) return 'control_understanding'
+  if (name.includes('控制') && name.includes('测试')) return 'control_test'
+  if (name.includes('审定') || name.includes('汇总')) return 'audit_sheet'
+  if (name.includes('明细') || name.includes('清单')) return 'detail_table'
+  if (name.includes('分析') || name.includes('测算') || name.includes('复核')) return 'analysis'
+  if (name.includes('程序')) return 'procedure'
+  if (name.includes('调整')) return 'adjustment'
+  if (name.includes('披露') || name.includes('附注')) return 'disclosure'
+  if (name.includes('结论')) return 'conclusion'
+  if (name.includes('目录') || name.includes('索引') || name.includes('驾驶') || name.includes('控制台')) return 'control_panel'
+  return null
+}
 
 export function useWpRenderer(wpId: Ref<string>) {
   const renderConfig = ref<RenderConfig | null>(null)

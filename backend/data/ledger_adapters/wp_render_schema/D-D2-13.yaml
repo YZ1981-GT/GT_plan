@@ -6,6 +6,7 @@
 # 适用范围：所有"4 判断题 × N 组合 → 业务模式判定 + 报表项目判定"类 sheet（约 9 sheet）
 
 wp_code: D-D2-13
+sheet_type: procedure
 template_path: backend/wp_templates/D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx
 template_version: v2025-R5
 applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]

@@ -10,6 +10,7 @@
 #   3) 每张小表的数据从其他底稿取数（cross_refs auto_pull）或支持自定义填充（dynamic_rows）。
 
 wp_code: C-D1-disclosure
+sheet_type: disclosure
 template_path: backend/wp_templates/D/D1 应收票据.xlsx
 template_version: v2025-R5
 applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
