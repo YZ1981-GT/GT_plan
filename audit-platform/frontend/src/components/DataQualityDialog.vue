@@ -92,6 +92,16 @@
               style="margin-top: 8px"
             />
           </div>
+
+          <!-- 5.4: 借贷平衡检查打开统一诊断弹窗入口 -->
+          <div
+            v-if="isBalanceCheck(checkName) && result.results[checkName]?.status !== 'passed'"
+            class="dq-check-details"
+          >
+            <el-button type="primary" size="small" link @click="openBalanceDiag(checkName)">
+              查看诊断详情
+            </el-button>
+          </div>
         </div>
       </div>
     </div>
@@ -106,12 +116,23 @@
       <el-button type="primary" @click="runCheck" :loading="loading">重新检查</el-button>
     </template>
   </el-dialog>
+
+  <!-- 5.4: 统一诊断弹窗（借贷平衡检查详情） -->
+  <BalanceDiagnosticsDialog
+    v-if="balanceDiagResult"
+    v-model="balanceDiagVisible"
+    :result="balanceDiagResult"
+    @rerun="runCheck"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import BalanceDiagnosticsDialog from '@/components/diagnostics/BalanceDiagnosticsDialog.vue'
+import type { BalanceDiagnosticsResult, Caliber } from '@/types/balance-diagnostics'
+import { CALIBER_LABELS } from '@/types/balance-diagnostics'
 
 const props = defineProps<{
   modelValue: boolean
@@ -165,6 +186,51 @@ const CHECK_TITLES: Record<string, string> = {
   mapping_completeness: '科目映射完整性',
   report_balance: '报表平衡检查（资产=负债+权益）',
   profit_reconciliation: '利润表勾稽检查',
+}
+
+// ─── 5.4: 统一诊断弹窗 ─────────────────────────────────────────────
+
+const balanceDiagVisible = ref(false)
+const balanceDiagResult = ref<BalanceDiagnosticsResult | null>(null)
+
+const BALANCE_CHECKS = ['debit_credit_balance', 'balance_vs_ledger', 'report_balance']
+
+function isBalanceCheck(checkName: string): boolean {
+  return BALANCE_CHECKS.includes(checkName)
+}
+
+const CHECK_TO_CALIBER: Record<string, Caliber> = {
+  debit_credit_balance: 'ledger_debit_credit',
+  balance_vs_ledger: 'balance_vs_ledger',
+  report_balance: 'balance_sheet_equation',
+}
+
+function openBalanceDiag(checkName: string) {
+  const checkResult = result.value?.results?.[checkName]
+  if (!checkResult) return
+  const caliber: Caliber = CHECK_TO_CALIBER[checkName] || 'ledger_debit_credit'
+  balanceDiagResult.value = {
+    caliber,
+    caliber_label: CALIBER_LABELS[caliber],
+    status: checkResult.status || 'warning',
+    difference: checkResult.details?.difference || 0,
+    debit_total: checkResult.details?.debit_total || 0,
+    credit_total: checkResult.details?.credit_total || 0,
+    likely_causes: [{
+      cause_code: 'source_data_unbalanced',
+      severity: checkResult.status === 'blocking' ? 5 : 3,
+      confidence: 0.7,
+      description: checkResult.message || '借贷不平衡',
+      evidence: {},
+    }],
+    unmatched_accounts: [],
+    sign_anomalies: [],
+    sign_anomalies_unavailable: false,
+    top_contributors: checkResult.details?.differences || [],
+    jump_targets: [],
+    data_sources: {},
+  }
+  balanceDiagVisible.value = true
 }
 
 function getCheckTitle(name: string): string {

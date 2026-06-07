@@ -41,39 +41,39 @@
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
 - [ ] 5. 前端统一诊断弹窗
-  - [ ] 5.1 新增 `BalanceDiagnosticsDialog.vue`
-  - [ ] 5.2 展示差额、口径、原因、样本、修复入口
-  - [ ] 5.3 `DiagnosticPanel.vue` 对平衡类 finding 打开统一弹窗
-  - [ ] 5.4 `DataQualityDialog.vue` 对借贷平衡检查打开统一弹窗
-  - [ ] 5.5 `TrialBalance.vue` 数据质量检查入口接入统一弹窗
-  - [ ] 5.6 Vitest：报表行次未匹配只跳 ReportLineMapping，不跳 ColumnMappingEditor
+  - [x] 5.1 新增 `BalanceDiagnosticsDialog.vue`
+  - [x] 5.2 展示差额、口径、原因、样本、修复入口
+  - [x] 5.3 `DiagnosticPanel.vue` 对平衡类 finding 打开统一弹窗
+  - [x] 5.4 `DataQualityDialog.vue` 对借贷平衡检查打开统一弹窗
+  - [x] 5.5 `TrialBalance.vue` 数据质量检查入口接入统一弹窗
+  - [x] 5.6 Vitest：报表行次未匹配只跳 ReportLineMapping，不跳 ColumnMappingEditor
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 6. Report_Line_Mapping 跳转闭环
-  - [ ] 6.1 `ReportLineMappingDialog` 支持接收 `account_code` / `standard_account_code` 定位参数
-  - [ ] 6.2 未匹配科目高亮并展示金额和未匹配原因
-  - [ ] 6.3 用户修复后可重新运行诊断
-  - [ ] 6.4 区分 seed 缺失、项目映射未确认、手工映射错误
-  - [ ] 6.5 明确跳转采用 dialog prop / route query / event payload 的具体参数
-  - [ ] 6.6 测试：诊断跳转后定位到指定科目
+- [x] 6. Report_Line_Mapping 跳转闭环
+  - [x] 6.1 `ReportLineMappingDialog` 支持接收 `account_code` / `standard_account_code` 定位参数
+  - [x] 6.2 未匹配科目高亮并展示金额和未匹配原因
+  - [x] 6.3 用户修复后可重新运行诊断
+  - [x] 6.4 区分 seed 缺失、项目映射未确认、手工映射错误
+  - [x] 6.5 明确跳转采用 dialog prop / route query / event payload 的具体参数
+  - [x] 6.6 测试：诊断跳转后定位到指定科目
   - _Requirements: 6.1, 6.2, 6.4, 6.5_
 
-- [ ] 7. Seed 覆盖率脚本
-  - [ ] 7.1 新增 `check_account_to_report_line_seed_coverage.py`
-  - [ ] 7.2 校验四套 Seed_Dimension 均存在且各自完整
-  - [ ] 7.3 校验 `standard_account_code` 重复、`report_line_code` 格式、`report_type` 合法性
-  - [ ] 7.4 以平台标准 AccountChart seed / CAS 标准科目库为权威全集输出未覆盖科目清单
-  - [ ] 7.5 输出国企/上市、单体/合并差异清单
-  - [ ] 7.6 报表模板行次只用于校验 `report_line_code` 存在性，不用于反推科目全集
-  - [ ] 7.7 生成 coverage baseline，CI 初期只阻断新增缺口
-  - [ ] 7.8 测试：脚本能发现缺失、重复和非法行次
+- [x] 7. Seed 覆盖率脚本
+  - [x] 7.1 新增 `check_account_to_report_line_seed_coverage.py`
+  - [x] 7.2 校验四套 Seed_Dimension 均存在且各自完整
+  - [x] 7.3 校验 `standard_account_code` 重复、`report_line_code` 格式、`report_type` 合法性
+  - [x] 7.4 以平台标准 AccountChart seed / CAS 标准科目库为权威全集输出未覆盖科目清单
+  - [x] 7.5 输出国企/上市、单体/合并差异清单
+  - [x] 7.6 报表模板行次只用于校验 `report_line_code` 存在性，不用于反推科目全集
+  - [x] 7.7 生成 coverage baseline，CI 初期只阻断新增缺口
+  - [x] 7.8 测试：脚本能发现缺失、重复和非法行次
   - _Requirements: 5.1, 5.2, 5.3, 5.5, 5.6, 5.7_
 
-- [ ] 8. 一键预设未匹配治理
-  - [ ] 8.1 `ai_suggest_mappings` 或一键预设流程返回 `unmatched_accounts`
-  - [ ] 8.2 有余额但 seed 查不到行次时不静默跳过
-  - [ ] 8.3 seed 升级刷新仅覆盖未确认 `ai_suggested`，保护 manual / reference_copied
-  - [ ] 8.4 测试：长期负债、权益细分、损益类缺失时进入未匹配清单
+- [x] 8. 一键预设未匹配治理
+  - [x] 8.1 `ai_suggest_mappings` 或一键预设流程返回 `unmatched_accounts`
+  - [x] 8.2 有余额但 seed 查不到行次时不静默跳过
+  - [x] 8.3 seed 升级刷新仅覆盖未确认 `ai_suggested`，保护 manual / reference_copied
+  - [x] 8.4 测试：长期负债、权益细分、损益类缺失时进入未匹配清单
   - _Requirements: 5.4, 6.3_
 
 ## P0-MVP

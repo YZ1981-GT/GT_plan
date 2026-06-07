@@ -162,7 +162,13 @@ import { useProjectStore } from '@/stores/project'
 import { handleApiError } from '@/utils/errorHandler'
 import { confirmDelete } from '@/utils/confirm'
 
-const props = defineProps<{ modelValue: boolean; projectId: string; accountRows?: any[] }>()
+const props = defineProps<{
+  modelValue: boolean
+  projectId: string
+  accountRows?: any[]
+  /** 6.1: 诊断跳转传入，用于高亮定位到未匹配科目 */
+  highlightAccountCode?: string
+}>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: boolean): void }>()
 const projectStore = useProjectStore()
 
@@ -289,7 +295,15 @@ const unmatchedCount = computed(() => mergedRows.value.filter(r => !r.mapped).le
 const confirmedCount = computed(() => mappings.value.filter(m => m.is_confirmed).length)
 const unconfirmedIds = computed(() => mappings.value.filter(m => !m.is_confirmed).map(m => m.id))
 
-function rowClassName({ row }: { row: any }) { return row.mapped ? '' : 'rlm-row-unmatched' }
+function rowClassName({ row }: { row: any }) {
+  const classes: string[] = []
+  if (!row.mapped) classes.push('rlm-row-unmatched')
+  // 6.1: 诊断跳转高亮
+  if (props.highlightAccountCode && row.account_code === props.highlightAccountCode) {
+    classes.push('rlm-row-highlight')
+  }
+  return classes.join(' ')
+}
 
 // ─── 加载 ───
 async function loadMappings() {

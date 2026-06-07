@@ -59,6 +59,7 @@ declare module 'vue' {
     AuditProgramPanel: typeof import('./components/collaboration/AuditProgramPanel.vue')['default']
     AuditReportTab: typeof import('./components/template-library/AuditReportTab.vue')['default']
     AuditTypeSelector: typeof import('./components/extension/AuditTypeSelector.vue')['default']
+    BalanceDiagnosticsDialog: typeof import('./components/diagnostics/BalanceDiagnosticsDialog.vue')['default']
     BasicInfoStep: typeof import('./components/wizard/BasicInfoStep.vue')['default']
     BatchActionBar: typeof import('./components/workpaper/BatchActionBar.vue')['default']
     BatchAssignDialog: typeof import('./components/assignment/BatchAssignDialog.vue')['default']
