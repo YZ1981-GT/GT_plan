@@ -1,7 +1,7 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-06-06  
-**当前分支**：`work/2026-05-30-wp-specs`（HEAD = c20a6ae4）  
+**最后更新**：2026-06-07  
+**当前分支**：`work/2026-05-30-wp-specs`（HEAD = a60198b6）  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer  
 **目标规模**：6000 并发用户
 
@@ -112,19 +112,22 @@
 | Spec | 状态 | 说明 |
 |------|------|------|
 | `audit-report-deliverable-center` | ✅ 全量完成（归档） | 交付件管理中心（选择性导出→双路径存储→版本→预览→报告正文生成→审批→归档→OnlyOffice）；P0+P1+P2 全部 25 任务完成；93 后端+42 前端 tests passed；5 bug PBT 发现修复；2026-06-07 |
-| `disclosure-note-semantic-structure-and-presentation` | 📌 待启动 | 附注语义结构与呈现原型（sidecar 类型/row_type/table_id/政策条款审阅/数据披露上下文栏） |
-| `platform-context-permission-foundation` | 📌 待启动 | 项目上下文单一真源+年度切换+权限矩阵+项目设置中心+枚举字典 |
-| `platform-evidence-knowledge-ai-governance` | 📌 待启动 | 证据包/知识库/AI 治理路线图 |
-| `platform-linkage-contract-stale` | 📌 待启动 | 联动契约与 stale 传播治理 |
-| `platform-maintenance-governance` | 📌 待启动 | 平台维护治理（迁移/监控/告警） |
-| `platform-role-workbench-quality-loop` | 📌 待启动 | 角色工作台与质量闭环 |
-| `platform-ui-editing-consistency` | 📌 待启动 | UI 编辑一致性（页面骨架/表格/金额/复制粘贴/编辑状态机/加载空态） |
+| `disclosure-note-semantic-structure-and-presentation` | ⏳ 实施中 | 附注语义结构与呈现原型（131/145 完成，14 项进行中） |
+| `platform-context-permission-foundation` | ✅ 全量完成（归档） | 项目上下文单一真源+年度切换+权限矩阵+项目设置中心+枚举字典；111/111；2026-06-07 |
+| `platform-evidence-knowledge-ai-governance` | ✅ 全量完成（归档） | 证据包/知识库/AI 治理路线图；101/101；2026-06-07 |
+| `platform-linkage-contract-stale` | ✅ 全量完成（归档） | 联动契约与 stale 传播治理；104/104；2026-06-07 |
+| `platform-maintenance-governance` | ✅ 全量完成（归档） | 平台维护治理（迁移/监控/告警）；108/108；2026-06-07 |
+| `platform-role-workbench-quality-loop` | ✅ 全量完成（归档） | 角色工作台与质量闭环；111/111；2026-06-07 |
+| `platform-ui-editing-consistency` | ✅ 全量完成（归档） | UI 编辑一致性（页面骨架/表格/金额/复制粘贴/编辑状态机/加载空态）；106/106；2026-06-07 |
+| `workpaper-account-package-d1-d2-pilot` | 📌 待启动 | 底稿科目工作包 D1/D2 试点 |
+| `workpaper-ai-conclusion-copilot` | 📌 待启动 | 底稿 AI 结论副驾驶 |
+| `workpaper-content-semantic-contract` | 📌 待启动 | 底稿内容语义契约 |
 
 > 注（2026-06-06）：`report-view-slimdown` / `global-refinement-v5-closure` / `project-creation-enhancement` / `disclosure-note-linkage-and-slimdown` 4 个已完成 spec 归档至 `_archive/`。
 
 ---
 
-## 三、已归档 Spec（`_archive/`，114 个）
+## 三、已归档 Spec（`_archive/`，120 个）
 
 > 已完成且不再演进的 spec，保留审计轨迹。归档不删文件。
 > **物理结构**：`_archive/` 下按功能 + 开发先后分 10 个分类目录，每个目录含 README 说明。
@@ -167,9 +170,9 @@ _archive/
 
 `refinement-round1-review-closure` · `refinement-round2-project-manager` · `refinement-round3-quality-control` · `refinement-round4-audit-assistant` · `refinement-round5-independent-review` · `refinement-round6-cross-role-optimization` · `refinement-round7-global-polish` · `refinement-round8-deep-closure` · `refinement-round9-global-deep-review`
 
-### 3.4 `04-infra-architecture/` — 基础设施 / 全局架构（21 个）
+### 3.4 `04-infra-architecture/` — 基础设施 / 全局架构（27 个）
 
-`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3`（全平台一致性治理：金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动；143/147，剩合伙人 UAT） · `vllm-httpx-bugfix`（2026-05-30，httpx trust_env=False 全仓 20 处 + chat_template_kwargs 顶层 + finish_reason=length 处理；12 测试全绿 + vLLM 直调验证通过） · `retrieval-kernel-unification`（检索/知识层单内核 + pgvector；PBT R1~R4 全绿；2026-06-01） · `doc-level-ai-chat`（文档/文件夹级 LLM 对话；72 测试全绿；2026-06-01） · `global-modules-cleanup`（多源澄清+死文件清理；35 测试全绿） · `global-modules-p2-polish`（P2/P3 体验增强；57 测试全绿） · `formula-engine-unification`（公式单内核；Q1~Q5 PBT 全绿） · `report-config-baseline`（报表配置回填+联动；E1~E4 PBT 全绿） · `llm-structured-output`（Instructor+guided_json 双层+熔断；8 tests；2026-06-05） · `pg-pooling-and-load-test`（PgBouncer NullPool+Locust 6000；8 tests；2026-06-05） · `xlsx-read-acceleration`（calamine adapter+6 迁移点；22 tests；2026-06-05） · `endpoint-fuzz-and-tracing`（Schemathesis+OTel+bm25s；8 tests；2026-06-05） · `global-refinement-v5-closure`（v5 收口：溯源+stale 全局刷新+编辑锁+函证；2026-06-06） · `project-creation-enhancement`（项目创建向导增强；2026-06-06）
+`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3`（全平台一致性治理：金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动；143/147，剩合伙人 UAT） · `vllm-httpx-bugfix`（2026-05-30，httpx trust_env=False 全仓 20 处 + chat_template_kwargs 顶层 + finish_reason=length 处理；12 测试全绿 + vLLM 直调验证通过） · `retrieval-kernel-unification`（检索/知识层单内核 + pgvector；PBT R1~R4 全绿；2026-06-01） · `doc-level-ai-chat`（文档/文件夹级 LLM 对话；72 测试全绿；2026-06-01） · `global-modules-cleanup`（多源澄清+死文件清理；35 测试全绿） · `global-modules-p2-polish`（P2/P3 体验增强；57 测试全绿） · `formula-engine-unification`（公式单内核；Q1~Q5 PBT 全绿） · `report-config-baseline`（报表配置回填+联动；E1~E4 PBT 全绿） · `llm-structured-output`（Instructor+guided_json 双层+熔断；8 tests；2026-06-05） · `pg-pooling-and-load-test`（PgBouncer NullPool+Locust 6000；8 tests；2026-06-05） · `xlsx-read-acceleration`（calamine adapter+6 迁移点；22 tests；2026-06-05） · `endpoint-fuzz-and-tracing`（Schemathesis+OTel+bm25s；8 tests；2026-06-05） · `global-refinement-v5-closure`（v5 收口：溯源+stale 全局刷新+编辑锁+函证；2026-06-06） · `project-creation-enhancement`（项目创建向导增强；2026-06-06） · `platform-context-permission-foundation`（项目上下文单一真源+年度切换+权限矩阵+项目设置中心+枚举字典；111 tasks；2026-06-07） · `platform-evidence-knowledge-ai-governance`（证据包/知识库/AI 治理路线图；101 tasks；2026-06-07） · `platform-linkage-contract-stale`（联动契约与 stale 传播治理；104 tasks；2026-06-07） · `platform-maintenance-governance`（平台维护治理；108 tasks；2026-06-07） · `platform-role-workbench-quality-loop`（角色工作台与质量闭环；111 tasks；2026-06-07） · `platform-ui-editing-consistency`（UI 编辑一致性；106 tasks；2026-06-07）
 
 ### 3.5 `05-business-features/` — 业务专项功能（14 个）
 
@@ -269,7 +272,7 @@ _archive/
 | prefill_formula_mapping | 1035 cells |
 | validation_rules | 114 条 |
 | D6 SQL 迁移 | V001-V040（V040 = account_note_mapping + consol_cell_comments 懒建表入 D6） |
-| **Spec 总数** | **active 7 + archived 114（详见 §三）** |
+| **Spec 总数** | **active 5 + archived 120（详见 §三）** |
 
 ---
 
