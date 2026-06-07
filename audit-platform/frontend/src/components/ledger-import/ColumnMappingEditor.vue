@@ -37,6 +37,18 @@
             {{ keyMappings.filter(m => m.mappedField).length }}/{{ keyMappings.length }} 已映射
           </el-tag>
         </div>
+        <!-- 关键列缺失警告 -->
+        <el-alert
+          v-if="missingKeyColumns.length > 0"
+          type="error"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px"
+        >
+          <template #title>
+            <span>缺失关键列：{{ missingKeyColumns.map(m => m.column_header).join('、') }}。请为这些列选择标准字段后才能确认导入。</span>
+          </template>
+        </el-alert>
         <div class="mapping-rows">
           <div
             v-for="mapping in keyMappings"
@@ -68,6 +80,14 @@
             <el-tag v-if="mapping.autoAppliedFromHistory" size="small" type="warning" effect="plain" class="history-badge">
               🕒 上次映射
             </el-tag>
+            <!-- 样本值展示 -->
+            <span v-if="mapping.sampleValues.length > 0" class="sample-values">
+              <el-tooltip :content="'样本值：' + mapping.sampleValues.join(' | ')" placement="top">
+                <el-tag size="small" type="info" effect="plain">
+                  {{ mapping.sampleValues[0] }}{{ mapping.sampleValues.length > 1 ? '…' : '' }}
+                </el-tag>
+              </el-tooltip>
+            </span>
           </div>
         </div>
       </div>
@@ -208,7 +228,9 @@ import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Right } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import type { SheetDetection, LedgerDetectionResult, ConfirmedMapping } from './LedgerImportDialog.vue'
+import type { SheetDetection, LedgerDetectionResult } from './LedgerImportDialog.vue'
+import type { ConfirmedMapping } from '@/types/ledger-import'
+import { generateSheetKey } from '@/types/ledger-import'
 import { handleApiError } from '@/utils/errorHandler'
 
 // ─── Props & Emits ──────────────────────────────────────────────────────────
@@ -234,6 +256,7 @@ interface MappingRow {
   mappedField: string | null
   autoAppliedFromHistory: boolean
   historyMappingId: string | null
+  sampleValues: string[]
 }
 
 interface StandardField {
@@ -315,6 +338,11 @@ const allKeyColumnsMapped = computed(() =>
   keyMappings.value.every(m => !!m.mappedField)
 )
 
+/** 缺失关键列列表（用于展示阻断原因） */
+const missingKeyColumns = computed(() =>
+  keyMappings.value.filter(m => !m.mappedField)
+)
+
 // 8.36: Check if any mappings were auto-applied from history
 const hasHistoryMappings = computed(() =>
   currentMappings.value.some(m => m.autoAppliedFromHistory)
@@ -343,15 +371,28 @@ function isFieldUsed(fieldValue: string, excludeColIdx: number): boolean {
 function initMappings() {
   const map = new Map<number, MappingRow[]>()
   props.sheets.forEach((sheet, idx) => {
-    const rows: MappingRow[] = sheet.column_mappings.map(col => ({
-      column_index: col.column_index,
-      column_header: col.column_header,
-      column_tier: col.column_tier,
-      confidence: col.confidence,
-      mappedField: col.standard_field,
-      autoAppliedFromHistory: !!(col as any).auto_applied_from_history,
-      historyMappingId: (col as any).history_mapping_id || null,
-    }))
+    // Extract sample values from preview_rows (skip header row, take first 3 data rows)
+    const previewData = sheet.preview_rows?.slice(1, 4) || []
+    const rows: MappingRow[] = sheet.column_mappings.map(col => {
+      // Collect sample values for this column from preview data
+      const samples: string[] = []
+      for (const row of previewData) {
+        const val = row[col.column_index]
+        if (val && val.trim()) {
+          samples.push(val.trim())
+        }
+      }
+      return {
+        column_index: col.column_index,
+        column_header: col.column_header,
+        column_tier: col.column_tier,
+        confidence: col.confidence,
+        mappedField: col.standard_field,
+        autoAppliedFromHistory: !!(col as any).auto_applied_from_history,
+        historyMappingId: (col as any).history_mapping_id || null,
+        sampleValues: samples.slice(0, 3),
+      }
+    })
     map.set(idx, rows)
   })
   sheetMappings.value = map
@@ -360,11 +401,9 @@ function initMappings() {
 function onConfirm() {
   const mappings: ConfirmedMapping[] = props.sheets.map((sheet, idx) => {
     const rows = sheetMappings.value.get(idx) || []
-    const columnMapping: Record<string, string> = {}
     const mappingEntries: { column_index: number; original_header: string; canonical_header: string; standard_field: string }[] = []
     for (const row of rows) {
       if (row.mappedField) {
-        columnMapping[String(row.column_index)] = row.mappedField
         mappingEntries.push({
           column_index: row.column_index,
           original_header: row.column_header || '',
@@ -373,18 +412,15 @@ function onConfirm() {
         })
       }
     }
-    const sheetKey = `${sheet.file_name}:${sheet.sheet_name}`
+    const sheetKey = generateSheetKey(sheet.file_name, sheet.sheet_name)
     return {
+      sheet_key: sheetKey,
       file_name: sheet.file_name,
       sheet_name: sheet.sheet_name,
-      sheet_key: sheetKey,
-      table_type: sheet.table_type,
+      table_type: sheet.table_type as ConfirmedMapping['table_type'],
       mapping_entries: mappingEntries,
-      aux_dimension_columns: sheet.aux_dimension_columns,
-      // 旧格式兼容（submit gate 兼容期间保留）
-      file: sheet.file_name,
-      sheet: sheet.sheet_name,
-      column_mapping: columnMapping,
+      aux_dimension_columns: sheet.aux_dimension_columns || [],
+      confirmed_by_user: true,
     }
   })
   emit('confirm', mappings)
@@ -518,5 +554,10 @@ watch(showImportMappingDialog, async (visible) => {
 
 .history-apply-bar {
   margin-bottom: 16px;
+}
+
+.sample-values {
+  margin-left: auto;
+  font-size: var(--gt-font-size-xs);
 }
 </style>

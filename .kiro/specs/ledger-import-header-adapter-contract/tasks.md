@@ -27,12 +27,12 @@
   - [x] 3.4 测试：`sample.json` 可加载并参与 alias 映射
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 4. 表头识别增强
-  - [ ] 4.1 `_detect_header_row` 支持表头位于第 11 至 20 行
-  - [ ] 4.2 增加 3 层合并表头识别或明确降级策略
-  - [ ] 4.3 增加二维借贷平铺列识别测试
-  - [ ] 4.4 保留 `header_cells_raw`、`merged_header`、`compound_headers`、`amount_unit`
-  - [ ] 4.5 测试：方括号、组合表头、横幅跳过、skip_reason 稳定
+- [x] 4. 表头识别增强
+  - [x] 4.1 `_detect_header_row` 支持表头位于第 11 至 20 行
+  - [x] 4.2 增加 3 层合并表头识别或明确降级策略
+  - [x] 4.3 增加二维借贷平铺列识别测试
+  - [x] 4.4 保留 `header_cells_raw`、`merged_header`、`compound_headers`、`amount_unit`
+  - [x] 4.5 测试：方括号、组合表头、横幅跳过、skip_reason 稳定
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
 - [x] 5. Submit gate 与 mapping normalization
@@ -45,20 +45,20 @@
   - [x] 5.7 测试：重复"借方/贷方/金额"表头都能保留并正确映射
   - _Requirements: 4.3, 4.4, 4.5, 4.6, 5.1, 5.3_
 
-- [ ] 6. 前端人工确认流程
-  - [ ] 6.1 `DetectionPreview.vue` 允许 unknown sheet 人工选择表类型
-  - [ ] 6.2 `ColumnMappingEditor.vue` 输出规范 `ConfirmedMappingDTO`
-  - [ ] 6.3 展示样本值、历史映射 badge、关键列缺失原因
-  - [ ] 6.4 测试：关键列未补齐时不能确认
-  - [ ] 6.5 测试：unknown 人工改为 balance 后进入列映射
+- [x] 6. 前端人工确认流程
+  - [x] 6.1 `DetectionPreview.vue` 允许 unknown sheet 人工选择表类型
+  - [x] 6.2 `ColumnMappingEditor.vue` 输出规范 `ConfirmedMappingDTO`
+  - [x] 6.3 展示样本值、历史映射 badge、关键列缺失原因
+  - [x] 6.4 测试：关键列未补齐时不能确认
+  - [x] 6.5 测试：unknown 人工改为 balance 后进入列映射
   - _Requirements: 5.1, 5.2, 5.4_
 
-- [ ] 7. 历史映射保存与复用
-  - [ ] 7.1 submit 成功前保存 `file_fingerprint` / `software_fingerprint` mapping
-  - [ ] 7.2 用户修改历史预填时写 `override_parent_id`
-  - [ ] 7.3 detect 阶段命中历史映射时标记 `auto_applied_from_history`
-  - [ ] 7.4 禁止跨项目历史映射静默覆盖，跨项目复用必须显式触发
-  - [ ] 7.5 测试：30 天窗口、父子链、过期记录不复用
+- [x] 7. 历史映射保存与复用
+  - [x] 7.1 submit 成功前保存 `file_fingerprint` / `software_fingerprint` mapping
+  - [x] 7.2 用户修改历史预填时写 `override_parent_id`
+  - [x] 7.3 detect 阶段命中历史映射时标记 `auto_applied_from_history`
+  - [x] 7.4 禁止跨项目历史映射静默覆盖，跨项目复用必须显式触发
+  - [x] 7.5 测试：30 天窗口、父子链、过期记录不复用
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
 ## P0-MVP

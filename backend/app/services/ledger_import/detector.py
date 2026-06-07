@@ -789,8 +789,8 @@ def _detect_header_row(rows: list[list[str]]) -> tuple[int, list[str]]:
     if not any(any(str(c or "").strip() for c in row) for row in rows):
         return 0, []
 
-    # --- 计算前 10 行的行特征 ---
-    scan_limit = min(10, len(rows))
+    # --- 计算前 20 行的行特征（Task 4.1: 支持表头位于第 11~20 行）---
+    scan_limit = min(20, len(rows))
     row_features: list[tuple[int, float, list[str], bool]] = []
     # (unique_count, fill_ratio, non_empty_values, is_text_row)
 
@@ -993,6 +993,59 @@ def _detect_header_row(rows: list[list[str]]) -> tuple[int, list[str]]:
                     merged.append(t)
                 else:
                     merged.append("")
+
+            # --- Task 4.2: 3 层合并表头检测 ---
+            # 检查 next_idx+1 是否也是表头行（第三层）
+            third_idx = next_idx + 1
+            three_layer_merged = False
+            if third_idx < scan_limit:
+                third_unique, third_fill, third_non_empty, third_is_text = row_features[third_idx]
+                if third_non_empty and third_is_text and third_fill >= 0.3:
+                    # 验证第三行不是数据行
+                    third_row_cells = [str(c or "").strip() for c in rows[third_idx]]
+                    third_non_empty_cells = [c for c in third_row_cells if c]
+                    third_avg_len = (
+                        sum(len(c) for c in third_non_empty_cells) / len(third_non_empty_cells)
+                        if third_non_empty_cells else 0
+                    )
+                    third_long_values = sum(1 for c in third_non_empty_cells if len(c) > 15)
+                    third_looks_like_data = third_avg_len > 10 or third_long_values >= 3
+
+                    if not third_looks_like_data and third_non_empty_cells:
+                        first_v = third_non_empty_cells[0]
+                        try:
+                            int(first_v)
+                            third_looks_like_data = True
+                        except (ValueError, TypeError):
+                            pass
+
+                    if not third_looks_like_data:
+                        # 第三层确认为表头 → 做 3-way merge: "top.middle.bottom"
+                        third_padded = third_row_cells + [""] * (width - len(third_row_cells))
+
+                        # forward-fill merged (2-layer result) as middle context
+                        filled_mid: list[str] = []
+                        last_m = ""
+                        for c in merged:
+                            if c:
+                                last_m = c
+                            filled_mid.append(last_m)
+
+                        final_merged: list[str] = []
+                        for mid_val, third_val in zip(filled_mid, third_padded):
+                            if mid_val and third_val and mid_val != third_val:
+                                final_merged.append(f"{mid_val}.{third_val}")
+                            elif third_val:
+                                final_merged.append(third_val)
+                            elif mid_val:
+                                final_merged.append(mid_val)
+                            else:
+                                final_merged.append("")
+
+                        three_layer_merged = True
+                        return third_idx + 1, final_merged
+
+            # 3 层未命中 → 使用 2 层合并结果
             return next_idx + 1, merged
 
     # --- 4. 单行表头 ---
