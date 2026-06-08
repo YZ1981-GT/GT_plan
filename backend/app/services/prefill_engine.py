@@ -241,17 +241,24 @@ async def _resolve_prev_formula(
 async def _resolve_adj_formula(
     db: AsyncSession, project_id: UUID, year: int, args: list[str]
 ) -> Decimal | None:
-    """=ADJ('code', 'type') → 从 adjustments 表取调整金额"""
+    """=ADJ('code', 'type') → 从 adjustments 表取调整金额。
+
+    v2 符号约定（ledger-sign-convention-unify）：返回值按 direction_resolver 归一到
+    科目自然方向（贷方类取反），与 trial_balance.aje_adjustment/rje_adjustment 及
+    CrossCheckService._get_adj_value 同口径，避免贷方类预填反号。
+    """
     if len(args) < 2:
         return None
     account_code, adj_type = args[0], args[1]
     from app.models.phase10_models import Adjustment, AdjustmentEntry
+    from app.services.ledger_import.direction_resolver import resolve_account_direction
 
     # adj_type: AJE / RJE
     q = sa.select(
         sa.func.coalesce(
             sa.func.sum(AdjustmentEntry.debit_amount - AdjustmentEntry.credit_amount), 0
-        )
+        ),
+        sa.func.max(AdjustmentEntry.account_name),
     ).join(Adjustment, AdjustmentEntry.adjustment_id == Adjustment.id).where(
         Adjustment.project_id == project_id,
         Adjustment.year == year,
@@ -263,8 +270,14 @@ async def _resolve_adj_formula(
     elif adj_type.upper() in ("RJE", "重分类"):
         q = q.where(Adjustment.adjustment_type == "rje")
     result = await db.execute(q)
-    val = result.scalar()
-    return Decimal(str(val)) if val is not None else Decimal("0")
+    row = result.first()
+    if row is None or row[0] is None:
+        return Decimal("0")
+    raw_net = Decimal(str(row[0]))
+    account_name = row[1] or ""
+    direction, _src = resolve_account_direction(account_code, account_name)
+    sign = Decimal("-1") if direction == "credit" else Decimal("1")
+    return sign * raw_net
 
 
 async def _resolve_note_formula(

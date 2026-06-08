@@ -79,6 +79,15 @@ async def seeded_db(db_session: AsyncSession):
         ),
     ])
 
+    # 负债类标准科目（贷方正常，v2 下存正数）
+    db_session.add(
+        AccountChart(
+            project_id=pid, account_code="2202", account_name="应付账款",
+            direction=AccountDirection.credit, level=1,
+            category=AccountCategory.liability, source=AccountSource.standard,
+        )
+    )
+
     # 科目映射（客户科目 → 标准科目，含多对一）
     db_session.add_all([
         AccountMapping(
@@ -102,6 +111,15 @@ async def seeded_db(db_session: AsyncSession):
             mapping_type=MappingType.auto_exact, created_by=FAKE_USER_ID,
         ),
     ])
+
+    # 负债类客户科目映射
+    db_session.add(
+        AccountMapping(
+            project_id=pid, original_account_code="C2202",
+            original_account_name="应付账款", standard_account_code="2202",
+            mapping_type=MappingType.auto_exact, created_by=FAKE_USER_ID,
+        )
+    )
 
     # 客户余额表
     db_session.add_all([
@@ -130,6 +148,16 @@ async def seeded_db(db_session: AsyncSession):
             debit_amount=Decimal("0"), credit_amount=Decimal("100000"),
         ),
     ])
+
+    # 负债类余额（v2 约定：应付账款贷方余额存正数 +8000）
+    db_session.add(
+        TbBalance(
+            project_id=pid, year=2025, company_code="001",
+            account_code="C2202", account_name="应付账款",
+            opening_balance=Decimal("6000"), closing_balance=Decimal("8000"),
+            debit_amount=Decimal("0"), credit_amount=Decimal("2000"),
+        )
+    )
 
     await db_session.commit()
     return pid
@@ -205,7 +233,9 @@ async def test_recalc_adjustments(db_session: AsyncSession, seeded_db):
     rows = await svc.get_trial_balance(pid, 2025)
     tb_map = {r.standard_account_code: r for r in rows}
     assert tb_map["1001"].aje_adjustment == Decimal("500")
-    assert tb_map["6001"].aje_adjustment == Decimal("-500")
+    # v2 约定：6001 收入类（贷方正常），一笔贷记 500 应使审定数增加，
+    # 归一到自然方向后 aje 应为正数 +500（而非旧约定借正贷负的 -500）。
+    assert tb_map["6001"].aje_adjustment == Decimal("500")
 
 
 # ===== 审定数重算 =====
@@ -235,6 +265,97 @@ async def test_recalc_audited(db_session: AsyncSession, seeded_db):
     tb_map = {r.standard_account_code: r for r in rows}
     # 1001: 未审12000 + rje1000 + aje0 = 13000
     assert tb_map["1001"].audited_amount == Decimal("13000")
+
+
+# ===== 负债类调整方向（需求 6.7，v2 自然正数约定） =====
+
+@pytest.mark.asyncio
+async def test_recalc_audited_liability_credit_increase(db_session: AsyncSession, seeded_db):
+    """负债类贷记增加：unadjusted=+8000，AJE 贷记 1000 → audited=9000（方向正确）
+
+    v2 约定下负债贷方余额存正数。一笔贷记负债增加的调整，归一到自然方向后
+    aje 应为正数，使审定数增大；若沿用旧"借正贷负"净额会错误地减少负债。
+    """
+    pid = seeded_db
+    svc = TrialBalanceService(db_session)
+    await svc.recalc_unadjusted(pid, 2025)
+
+    group_id = uuid.uuid4()
+    db_session.add(Adjustment(
+        project_id=pid, year=2025, company_code="001",
+        adjustment_no="AJE-LIAB-INC", adjustment_type=AdjustmentType.aje,
+        account_code="2202", account_name="应付账款",
+        debit_amount=Decimal("0"), credit_amount=Decimal("1000"),
+        entry_group_id=group_id, created_by=FAKE_USER_ID,
+    ))
+    await db_session.flush()
+
+    await svc.recalc_adjustments(pid, 2025)
+    await svc.recalc_audited(pid, 2025)
+    await db_session.commit()
+
+    rows = await svc.get_trial_balance(pid, 2025)
+    tb_map = {r.standard_account_code: r for r in rows}
+    # 贷记增加归一为 +1000
+    assert tb_map["2202"].aje_adjustment == Decimal("1000")
+    # 审定数 = 8000 + 1000 = 9000（负债增加，方向正确）
+    assert tb_map["2202"].audited_amount == Decimal("9000")
+
+
+@pytest.mark.asyncio
+async def test_recalc_audited_liability_debit_decrease(db_session: AsyncSession, seeded_db):
+    """负债类借记减少：unadjusted=+8000，AJE 借记 1000 → audited=7000（方向正确）"""
+    pid = seeded_db
+    svc = TrialBalanceService(db_session)
+    await svc.recalc_unadjusted(pid, 2025)
+
+    group_id = uuid.uuid4()
+    db_session.add(Adjustment(
+        project_id=pid, year=2025, company_code="001",
+        adjustment_no="AJE-LIAB-DEC", adjustment_type=AdjustmentType.aje,
+        account_code="2202", account_name="应付账款",
+        debit_amount=Decimal("1000"), credit_amount=Decimal("0"),
+        entry_group_id=group_id, created_by=FAKE_USER_ID,
+    ))
+    await db_session.flush()
+
+    await svc.recalc_adjustments(pid, 2025)
+    await svc.recalc_audited(pid, 2025)
+    await db_session.commit()
+
+    rows = await svc.get_trial_balance(pid, 2025)
+    tb_map = {r.standard_account_code: r for r in rows}
+    # 借记减少归一为 -1000
+    assert tb_map["2202"].aje_adjustment == Decimal("-1000")
+    # 审定数 = 8000 - 1000 = 7000（负债减少，方向正确）
+    assert tb_map["2202"].audited_amount == Decimal("7000")
+
+
+@pytest.mark.asyncio
+async def test_recalc_audited_revenue_credit_increase(db_session: AsyncSession, seeded_db):
+    """收入类贷记增加：unadjusted=+100000，AJE 贷记 500 → audited=100500（方向正确）"""
+    pid = seeded_db
+    svc = TrialBalanceService(db_session)
+    await svc.recalc_unadjusted(pid, 2025)
+
+    group_id = uuid.uuid4()
+    db_session.add(Adjustment(
+        project_id=pid, year=2025, company_code="001",
+        adjustment_no="AJE-REV-INC", adjustment_type=AdjustmentType.aje,
+        account_code="6001", account_name="主营业务收入",
+        debit_amount=Decimal("0"), credit_amount=Decimal("500"),
+        entry_group_id=group_id, created_by=FAKE_USER_ID,
+    ))
+    await db_session.flush()
+
+    await svc.recalc_adjustments(pid, 2025)
+    await svc.recalc_audited(pid, 2025)
+    await db_session.commit()
+
+    rows = await svc.get_trial_balance(pid, 2025)
+    tb_map = {r.standard_account_code: r for r in rows}
+    assert tb_map["6001"].aje_adjustment == Decimal("500")
+    assert tb_map["6001"].audited_amount == Decimal("100500")
 
 
 # ===== 全量重算 =====

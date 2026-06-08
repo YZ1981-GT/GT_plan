@@ -24,6 +24,12 @@ from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from .aux_dimension import parse_aux_dimension
+from .direction_resolver import resolve_account_direction
+from .sign_convention_types import CURRENT_SIGN_CONVENTION
+
+# 显式方向列 token（借/贷/D/C），与 direction_derivation 口径一致
+_DEBIT_DIR_TOKENS = frozenset(["借", "借方", "D", "d", "debit", "Debit", "DEBIT"])
+_CREDIT_DIR_TOKENS = frozenset(["贷", "贷方", "C", "c", "credit", "Credit", "CREDIT"])
 
 __all__ = [
     "convert_balance_rows",
@@ -126,6 +132,112 @@ def _resolve_direction(direction_raw, amount: Optional[Decimal]) -> Optional[Dec
     return amount
 
 
+def _is_known_direction_token(direction_raw) -> bool:
+    """判断方向列的值是否为可识别的借/贷 token。"""
+    if direction_raw is None:
+        return False
+    s = str(direction_raw).strip()
+    return s in _DEBIT_DIR_TOKENS or s in _CREDIT_DIR_TOKENS
+
+
+def _resolve_entry_direction(
+    code: str,
+    name: Optional[str],
+    direction_raw,
+    debit_amount: Optional[Decimal],
+    credit_amount: Optional[Decimal],
+) -> tuple[Optional[str], Optional[str]]:
+    """判定一条序时账分录行的借贷方向（需求 4.2、5.2、5.3）。
+
+    分录行的借贷本身明确：金额已分列在 debit_amount / credit_amount，
+    因此方向直接由"哪一边非零"决定，**不改动金额口径**（不归一化分录金额）。
+
+    判定优先级：
+    1. 原始文件含显式方向列（借/贷/D/C）→ 直接采用（需求 5.3）。
+    2. 借贷分列单边非零 → 由该非零侧决定（source=split_columns，需求 5.4）。
+    3. 两侧皆非零（如合成的"本月合计"小计行）或皆为空 → 退化为按科目类别推断
+       （调 direction_resolver，与余额行同一套规则），source 取类别推断来源。
+
+    Returns:
+        (entry_direction, entry_direction_source)
+        - entry_direction ∈ {"debit", "credit"} 或 None（无法判定）
+        - entry_direction_source ∈ DirectionSource 枚举值 或 None
+    """
+    # 1. 显式方向列优先
+    if _is_known_direction_token(direction_raw):
+        s = str(direction_raw).strip()
+        if s in _DEBIT_DIR_TOKENS:
+            return "debit", "explicit_direction"
+        return "credit", "explicit_direction"
+
+    # 2. 借贷分列：由非零侧决定
+    debit_active = debit_amount is not None and debit_amount != 0
+    credit_active = credit_amount is not None and credit_amount != 0
+    if debit_active and not credit_active:
+        return "debit", "split_columns"
+    if credit_active and not debit_active:
+        return "credit", "split_columns"
+
+    # 3. 两侧皆非零 / 皆为空 → 按类别推断（与余额行同一套规则）
+    direction, source = resolve_account_direction(code, name or "")
+    return direction, source
+
+
+def _apply_sign_convention(
+    target: dict,
+    code: str,
+    name: Optional[str],
+    *,
+    opening_source_mode: Optional[str] = None,
+    closing_source_mode: Optional[str] = None,
+) -> None:
+    """对单条余额行应用 v2 类别自然正数符号约定（需求 1、4、5）。
+
+    传入的 opening_balance / closing_balance 为 v1 净额（借方为正、贷方为负）。
+    本函数：
+    - 调 direction_resolver 取科目正常方向（debit/credit）+ 来源；
+    - 将净额归一为"类别自然正数"：正常方向为借方时存净额本身，为贷方时取反，
+      使负债/权益/收入科目的贷方余额存为正数；
+    - 当实际方向与类别正常方向相反（如负债出现借方余额）时，归一后值为负数，
+      **保留该带符号值不强制翻正**（需求 1.5）；
+    - 写 opening_direction / closing_direction（= 类别正常方向）及来源；
+    - 写 sign_convention_version = v2；
+    - 方向与类别冲突（归一后为负）时在 sign_anomaly_flags 记录异常（需求 4.5）。
+
+    就地修改 target dict。opening_source_mode / closing_source_mode 用于标注方向来源
+    （explicit_direction / split_columns），缺省时退化为类别推断来源。
+    """
+    direction, category_source = resolve_account_direction(code, name or "")
+    opposite = "credit" if direction == "debit" else "debit"
+
+    conflicts: list[dict] = []
+    for period, mode in (
+        ("opening", opening_source_mode),
+        ("closing", closing_source_mode),
+    ):
+        bal_key = f"{period}_balance"
+        net = target.get(bal_key)
+        # 归一为类别自然正数：借方科目存净额，贷方科目取反
+        if net is not None:
+            stored = net if direction == "debit" else -net
+            target[bal_key] = stored
+            if stored < 0:
+                conflicts.append({
+                    "period": period,
+                    "actual_direction": opposite,
+                    "stored_amount": float(stored),
+                })
+        target[f"{period}_direction"] = direction
+        target[f"{period}_direction_source"] = mode or category_source
+
+    target["sign_convention_version"] = CURRENT_SIGN_CONVENTION
+    if conflicts:
+        target["sign_anomaly_flags"] = {
+            "normal_direction": direction,
+            "conflicts": conflicts,
+        }
+
+
 # ---------------------------------------------------------------------------
 # 余额表转换
 # ---------------------------------------------------------------------------
@@ -215,12 +327,19 @@ def convert_balance_rows(
             od = safe_decimal(row.get("year_opening_debit"))
             oc = safe_decimal(row.get("year_opening_credit"))
 
+        # 方向来源（需求 5.3/5.4）：借贷分列优先标 split_columns，
+        # 显式方向列标 explicit_direction，否则留空交由类别推断兜底。
         if od is not None or oc is not None:
             opening_balance = (od or Decimal(0)) - (oc or Decimal(0))
+            opening_source_mode = "split_columns"
         elif opening_bal is not None:
             opening_balance = _resolve_direction(opening_dir, opening_bal)
+            opening_source_mode = (
+                "explicit_direction" if _is_known_direction_token(opening_dir) else None
+            )
         else:
             opening_balance = None
+            opening_source_mode = None
 
         # ── 期末 ──
         cd = safe_decimal(row.get("closing_debit"))
@@ -230,10 +349,15 @@ def convert_balance_rows(
 
         if cd is not None or cc is not None:
             closing_balance = (cd or Decimal(0)) - (cc or Decimal(0))
+            closing_source_mode = "split_columns"
         elif closing_bal is not None:
             closing_balance = _resolve_direction(closing_dir, closing_bal)
+            closing_source_mode = (
+                "explicit_direction" if _is_known_direction_token(closing_dir) else None
+            )
         else:
             closing_balance = None
+            closing_source_mode = None
 
         debit_amount = safe_decimal(row.get("debit_amount"))
         credit_amount = safe_decimal(row.get("credit_amount"))
@@ -262,6 +386,9 @@ def convert_balance_rows(
             "closing_credit": cc,
             "currency_code": row.get("currency_code") or "CNY",
             "raw_extra": row.get("raw_extra"),
+            # 方向来源模式（私有，仅供符号归一化后处理用，非 ORM 列）
+            "_opening_source_mode": opening_source_mode,
+            "_closing_source_mode": closing_source_mode,
         }
 
         if aux_dim_str:
@@ -305,7 +432,27 @@ def convert_balance_rows(
             aggregated["level"] = infer_level(account_code)
             balance_rows.append(aggregated)
 
+    # ── 符号归一化后处理（v2 类别自然正数 + 方向字段 + 异常标记）──
+    # 集中调用 direction_resolver，避免散落（需求 1、4、5）。
+    for target in balance_rows:
+        _finalize_balance_sign(target)
+    for target in aux_balance_rows:
+        _finalize_balance_sign(target)
+
     return balance_rows, aux_balance_rows
+
+
+def _finalize_balance_sign(target: dict) -> None:
+    """对一条主表/辅助余额行应用 v2 符号约定并清理私有字段。"""
+    opening_mode = target.pop("_opening_source_mode", None)
+    closing_mode = target.pop("_closing_source_mode", None)
+    _apply_sign_convention(
+        target,
+        target.get("account_code", ""),
+        target.get("account_name"),
+        opening_source_mode=opening_mode,
+        closing_source_mode=closing_mode,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -323,6 +470,11 @@ def convert_ledger_rows(
     对齐旧引擎 `write_four_tables` 的辅助明细账拆分逻辑：
     - 主表 tb_ledger：所有行都写（每行一条）
     - 辅助表 tb_aux_ledger：含辅助维度的行按维度数拆分成 N 条
+
+    符号约定（v2，需求 4.2、5.2）：
+    - 每条分录行标 `entry_direction`（debit/credit）+ `entry_direction_source`；
+    - 方向由借贷分列哪边非零决定（显式方向列优先，两侧皆非零/皆空时按科目类别推断）；
+    - **金额口径不变**：分录借贷本身明确，不归一化分录金额（与余额行不同）。
 
     Returns:
         (ledger_rows, aux_ledger_rows, aux_stats)
@@ -347,6 +499,17 @@ def convert_ledger_rows(
         debit_amount = safe_decimal(row.get("debit_amount"))
         credit_amount = safe_decimal(row.get("credit_amount"))
 
+        # 分录行方向标记（需求 4.2、5.2）：方向由借贷分列哪边非零决定，
+        # 显式方向列优先，两侧皆非零/皆空时按科目类别推断。
+        # **金额口径不变**：分录借贷本身明确，不做归一化（与余额行不同）。
+        entry_direction, entry_direction_source = _resolve_entry_direction(
+            account_code,
+            str(row.get("account_name", "")).strip() or None,
+            row.get("direction") or row.get("entry_direction"),
+            debit_amount,
+            credit_amount,
+        )
+
         # 辅助维度
         aux_dim_str = str(row.get("aux_dimensions", "")).strip()
         if not aux_dim_str:
@@ -370,6 +533,9 @@ def convert_ledger_rows(
             "preparer": str(row.get("preparer", "")).strip() or None,
             "company_code": str(row.get("company_code", "")).strip() or default_company,
             "currency_code": row.get("currency_code") or "CNY",
+            # 方向标记（v2 符号约定，复用 V064 entry_direction 列）
+            "entry_direction": entry_direction,
+            "entry_direction_source": entry_direction_source,
         }
 
         # 辅助明细账拆分（对齐旧 write_four_tables:2126-2139）
@@ -462,12 +628,16 @@ def convert_ledger_rows_v2(
         rows, default_company=default_company
     )
 
+    rows_with_direction = sum(
+        1 for r in ledger_rows if r.get("entry_direction") is not None
+    )
+
     stats = {
         "total_input_rows": len(rows),
         "ledger_rows": len(ledger_rows),
         "aux_ledger_rows": len(aux_ledger_rows),
         "sign_convention_version": CURRENT_SIGN_CONVENTION,
-        "rows_with_direction": 0,
+        "rows_with_direction": rows_with_direction,
         "anomaly_count": 0,
     }
 

@@ -31,6 +31,7 @@ from app.models.consolidation_models import (
     AccountCategory,
 )
 from app.models.audit_platform_models import TrialBalance
+from app.services.ledger_import.sign_convention_types import BALANCE_TOLERANCE
 from app.models.report_models import FinancialReport
 from app.models.report_models import FinancialReportType
 from app.models.consolidation_schemas import (
@@ -276,7 +277,7 @@ class ConsolReportService:
 
         # 校验
         difference = total_assets - (total_liabilities + equity_with_mi)
-        is_balanced = abs(difference) < Decimal("1")  # 允许 1 元以内误差
+        is_balanced = abs(difference) < BALANCE_TOLERANCE  # 允许 ±1 元以内误差（统一容差）
 
         issues = []
         if not is_balanced:
@@ -358,7 +359,7 @@ class ConsolReportService:
 
         # 校验
         difference = assets_with_goodwill - (total_liabilities + equity_with_mi)
-        is_balanced = abs(difference) < Decimal("1")
+        is_balanced = abs(difference) < BALANCE_TOLERANCE
 
         issues = []
         if not is_balanced:
@@ -676,7 +677,7 @@ class ConsolReportService:
             ("  抵消分录借方合计", float(total_debit)),
             ("  抵消分录贷方合计", float(total_credit)),
             ("  差额", float(debit_credit_diff)),
-            ("  校验结果", "通过 ✓" if abs(debit_credit_diff) < Decimal("1") else "不通过 ✗"),
+            ("  校验结果", "通过 ✓" if abs(debit_credit_diff) < BALANCE_TOLERANCE else "不通过 ✗"),
         ]
 
         for i, (label, value) in enumerate(check_items2, start=1):

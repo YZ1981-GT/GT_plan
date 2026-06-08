@@ -24,6 +24,7 @@ from app.models.audit_platform_models import (
 )
 from app.models.audit_platform_schemas import EventPayload
 from app.services.dataset_query import get_active_filter
+from app.services.ledger_import.direction_resolver import resolve_account_direction
 
 logger = logging.getLogger(__name__)
 
@@ -186,26 +187,22 @@ class TrialBalanceService:
             name = level1_names.get(code) or (std.account_name if std else None)
             cat = std.category if std else AccountCategory.asset.value
 
-            # 损益类科目（5xxx/6xxx）：取单边发生额（不做借-贷，因为结转后两边相等）
-            # 收入类：取 credit_amount（贷方发生额），存为负数保持"贷方=负"语义
-            # 费用/成本类：取 debit_amount（借方发生额），存为正数保持"借方=正"语义
+            # 损益类科目（5xxx/6xxx）：取单边发生额（不做借-贷，因为结转后两边相等）。
+            # v2 约定（category_natural_positive）：按 direction_resolver 判方向后存自然正数。
+            # 收入类（贷方正常）→ 取贷方发生额存正数；费用/成本类（借方正常）→ 取借方发生额存正数。
+            # 资产负债类：直接传递 tb_balance 汇总的 closing/opening（入库已是 v2 正数），不做二次处理。
             is_income_expense = code and code[0] in ('5', '6')
             if is_income_expense:
                 period = period_rows.get(code)
                 if period:
                     total_dr = Decimal(str(period.total_debit))
                     total_cr = Decimal(str(period.total_credit))
-                    # 判断是收入类还是费用类：
-                    # 收入类编码：5001/5051/5101/6001/6051/6101/6111/6117/6301
-                    # 费用类编码：5401+/6401+/6403+/6601+/6602+/6603+/6701+/6702+/6711+/6801+
-                    is_revenue = code in ('5001', '5051', '5101') or (
-                        code.startswith('6') and code[:4] in ('6001', '6051', '6101', '6111', '6115', '6117', '6301')
-                    )
-                    if is_revenue:
-                        # 收入类：取贷方发生额，存为负数（贷方语义）
-                        closing = -total_cr
+                    direction, _source = resolve_account_direction(code, name or "")
+                    if direction == "credit":
+                        # 收入类（贷方正常）：取贷方发生额，存自然正数
+                        closing = total_cr
                     else:
-                        # 费用/成本类：取借方发生额，存为正数（借方语义）
+                        # 费用/成本类（借方正常）：取借方发生额，存自然正数
                         closing = total_dr
                 else:
                     closing = Decimal("0")
@@ -301,8 +298,17 @@ class TrialBalanceService:
             vals = adj_map.get(code, {"rje": Decimal("0"), "aje": Decimal("0")})
             row = existing_rows.get(code)
             if row:
-                row.rje_adjustment = vals["rje"]
-                row.aje_adjustment = vals["aje"]
+                # v2 约定（category_natural_positive）：调整净额 SUM(debit)-SUM(credit)
+                # 是"借正贷负"，但 unadjusted_amount 已按科目自然方向存正数（Task 3.1）。
+                # 对贷方正常类（负债/权益/收入），一笔贷记增加应使审定数增大，若直接相加
+                # "借正贷负"净额会方向反掉（见 design 发现 5 / 风险 2）。因此把净额归一到
+                # 科目自然方向：借方类用 (debit-credit)，贷方类取反 (credit-debit)，
+                # 使 audited = unadjusted + rje + aje 在所有类别下加减方向都正确，
+                # 且保持该不变式被下游（check_consistency / module_cell_resolver / qc_engine）复用。
+                direction, _src = resolve_account_direction(code, row.account_name or "")
+                sign = Decimal("-1") if direction == "credit" else Decimal("1")
+                row.rje_adjustment = sign * vals["rje"]
+                row.aje_adjustment = sign * vals["aje"]
 
         await self.db.flush()
 
@@ -316,7 +322,12 @@ class TrialBalanceService:
         company_code: str = "001",
         account_codes: list[str] | None = None,
     ) -> None:
-        """audited = unadjusted + rje + aje"""
+        """audited = unadjusted + rje + aje
+
+        v2 约定下 unadjusted/rje/aje 均已按科目自然方向归一为正数口径
+        （rje/aje 在 recalc_adjustments 中已按方向归一），故直接相加即得审定数，
+        无需在此再按方向取反。
+        """
         q = sa.select(TrialBalance).where(
             TrialBalance.project_id == project_id,
             TrialBalance.year == year,
@@ -523,17 +534,11 @@ class TrialBalanceService:
             )
             tb_result = await self.db.execute(tb_q)
             for r in tb_result.fetchall():
-                amount = Decimal(str(r.unadj))
-                # 贷方方向科目取反为正数（与 tb_amount_map 保持一致）
-                code = r.standard_account_code
-                is_credit_dir = (
-                    code[0] in ('2', '3', '4')
-                    or code in ('5001', '5051', '5101')
-                    or (code.startswith('6') and code[:4] in ('6001', '6051', '6101', '6111', '6115', '6117', '6301'))
-                )
-                if is_credit_dir and amount < 0:
-                    amount = -amount
-                unadj_map[code] = amount
+                # v2 约定（category_natural_positive）：trial_balance.unadjusted_amount
+                # 已是按科目类别存储的自然正数（Task 3.1 改造），无需再按符号取反补偿。
+                # 报表行次的方向由 ReportLineMapping 的归属（资产侧/负债侧）+ account_category 决定，
+                # 而非靠金额符号判断 —— 移除旧约定下的"二次翻转"。
+                unadj_map[r.standard_account_code] = Decimal(str(r.unadj))
 
         # 4. 从 adjustments 汇总 AJE/RJE
         aje_dr_map: dict[str, Decimal] = {}
@@ -572,12 +577,13 @@ class TrialBalanceService:
 
         # 5. 按标准行次模板构建结果
         # 使用统一公式引擎执行 report_config.formula
-        from app.services.formula_engine import execute_formula, get_formula_account_codes, FormulaContext
 
         # 构建 trial_balance 科目→金额索引（供公式引擎用）
-        # 注意：负债/权益/收入类科目在 trial_balance 中存为负数（贷方语义），
-        # 但报表展示时应为正数。此处对贷方方向科目取绝对值（取反），
-        # 使公式引擎和前端展示统一为正数。
+        # v2 约定（category_natural_positive）：trial_balance.unadjusted_amount 已是按科目类别
+        # 存储的自然正数（Task 3.1 改造）。报表展示与公式取数统一为正数，
+        # 无需再对贷方方向科目取反补偿 —— 移除中间环节的"二次翻转"。
+        from app.services.formula_engine import execute_formula, get_formula_account_codes, FormulaContext
+
         all_tb_q = (
             sa.select(tb.c.standard_account_code, tb.c.unadjusted_amount)
             .where(
@@ -592,15 +598,7 @@ class TrialBalanceService:
         for r in all_tb_result.fetchall():
             if r.standard_account_code:
                 amount = r.unadjusted_amount or Decimal("0")
-                # 贷方方向科目（2xxx负债/3xxx权益/4xxx权益/收入类）取反为正数
                 code = r.standard_account_code
-                is_credit_direction = (
-                    code[0] in ('2', '3', '4')  # 负债/权益
-                    or code in ('5001', '5051', '5101')  # 收入
-                    or (code.startswith('6') and code[:4] in ('6001', '6051', '6101', '6111', '6115', '6117', '6301'))
-                )
-                if is_credit_direction and amount < 0:
-                    amount = -amount
                 tb_amount_map[code] = (
                     tb_amount_map.get(code, Decimal("0")) + amount
                 )
@@ -765,16 +763,9 @@ class TrialBalanceService:
             )
             tb_result = await self.db.execute(tb_q)
             for r in tb_result.fetchall():
-                amount = Decimal(str(r.unadj))
-                code = r.standard_account_code
-                is_credit_dir = (
-                    code[0] in ('2', '3', '4')
-                    or code in ('5001', '5051', '5101')
-                    or (code.startswith('6') and code[:4] in ('6001', '6051', '6101', '6111', '6115', '6117', '6301'))
-                )
-                if is_credit_dir and amount < 0:
-                    amount = -amount
-                unadj_map[code] = amount
+                # v2 约定（category_natural_positive）：unadjusted_amount 已是自然正数，
+                # 无需按符号取反补偿 —— 与主路径 get_summary_with_adjustments 保持一致。
+                unadj_map[r.standard_account_code] = Decimal(str(r.unadj))
 
         aje_dr_map: dict[str, Decimal] = {}
         aje_cr_map: dict[str, Decimal] = {}

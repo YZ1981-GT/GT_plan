@@ -715,9 +715,10 @@ async def validate_l3(
     """L3 validation: cross-table consistency checks.
 
     Checks:
-    1. BALANCE_LEDGER_MISMATCH: For each account_code,
-       tb_balance.closing_balance != tb_balance.opening_balance
-           + sum(tb_ledger.debit) - sum(tb_ledger.credit)
+    1. BALANCE_LEDGER_MISMATCH: For each account_code, closing_balance must equal
+       opening_balance + natural-direction net movement.
+       - v2 (category_natural_positive) credit-class accounts: net = sum(credit) - sum(debit)
+       - otherwise (debit-class / v1 legacy): net = sum(debit) - sum(credit)
        Tolerance: dynamic — base 1.0 + magnitude × 0.001%, cap 100 → blocking
     2. AUX_ACCOUNT_MISMATCH: account_codes in tb_aux_balance/tb_aux_ledger
        that don't exist in tb_balance/tb_ledger → warning (not blocking)
@@ -733,6 +734,8 @@ async def validate_l3(
                 b.account_code,
                 b.opening_balance,
                 b.closing_balance,
+                b.closing_direction,
+                b.sign_convention_version,
                 COALESCE(l.sum_debit, 0) AS sum_debit,
                 COALESCE(l.sum_credit, 0) AS sum_credit
             FROM tb_balance b
@@ -758,7 +761,16 @@ async def validate_l3(
         closing = float(row.closing_balance) if row.closing_balance is not None else 0.0
         sum_debit = float(row.sum_debit)
         sum_credit = float(row.sum_credit)
-        expected_closing = opening + sum_debit - sum_credit
+        # v2 符号约定（ledger-sign-convention-unify）：closing/opening_balance 按科目自然
+        # 方向存储（贷方类为正），而序时账发生额仍是借正贷负原始口径。故校验恒等式须把
+        # 发生额归一到科目自然方向后再比较——贷方类用 (credit-debit)，借方类用 (debit-credit)。
+        # v1 旧数据（借正贷负）保持原公式 closing=opening+debit-credit。
+        if row.sign_convention_version == "v2_category_natural_positive" \
+                and row.closing_direction == "credit":
+            net_movement = sum_credit - sum_debit
+        else:
+            net_movement = sum_debit - sum_credit
+        expected_closing = opening + net_movement
         diff = abs(closing - expected_closing)
         # S7: 动态容差——按金额量级调整（小金额 1 元，大金额按比例）
         # 基础容差 1 元 + 金额量级的 0.001%（万分之一），上限 100 元

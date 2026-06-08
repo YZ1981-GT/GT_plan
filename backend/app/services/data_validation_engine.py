@@ -184,10 +184,16 @@ class DataValidationEngine:
             return findings
         try:
             from sqlalchemy import text
-            # 按科目汇总 AJE 调整金额
+            # 按科目汇总 AJE 调整金额。
+            # v2 符号约定（Task 3.3）：trial_balance.aje_adjustment 已按科目自然方向归一
+            # （贷方类 liability/equity/revenue 取反）。故此处原始 SUM(debit-credit) 也须
+            # 按 account_category 同口径归一后再比较，否则贷方类会被误报不一致。
             stmt = text("""
                 SELECT ae.standard_account_code,
-                       SUM(ae.debit_amount) - SUM(ae.credit_amount) as aje_net,
+                       CASE WHEN tb.account_category IN ('liability', 'equity', 'revenue')
+                            THEN -(SUM(ae.debit_amount) - SUM(ae.credit_amount))
+                            ELSE  (SUM(ae.debit_amount) - SUM(ae.credit_amount))
+                       END as aje_net,
                        tb.aje_adjustment as tb_aje
                 FROM adjustment_entries ae
                 JOIN adjustments a ON a.id = ae.adjustment_id
@@ -200,8 +206,12 @@ class DataValidationEngine:
                     AND tb.year = :year
                     AND tb.is_deleted = false
                 WHERE ae.is_deleted = false
-                GROUP BY ae.standard_account_code, tb.aje_adjustment
-                HAVING ABS(SUM(ae.debit_amount) - SUM(ae.credit_amount) - COALESCE(tb.aje_adjustment, 0)) > 0.01
+                GROUP BY ae.standard_account_code, tb.aje_adjustment, tb.account_category
+                HAVING ABS(
+                    CASE WHEN tb.account_category IN ('liability', 'equity', 'revenue')
+                         THEN -(SUM(ae.debit_amount) - SUM(ae.credit_amount))
+                         ELSE  (SUM(ae.debit_amount) - SUM(ae.credit_amount))
+                    END - COALESCE(tb.aje_adjustment, 0)) > 0.01
                 LIMIT 50
             """)
             result = await self.db.execute(stmt, {"pid": str(project_id), "year": year})

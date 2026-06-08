@@ -30,6 +30,7 @@ from app.models.report_models import (
     FinancialReport,
     FinancialReportType,
 )
+from app.services.ledger_import.sign_convention_types import BALANCE_TOLERANCE
 
 logger = logging.getLogger(__name__)
 
@@ -389,7 +390,7 @@ class CFSWorksheetEngine:
         adj = result.scalar_one_or_none()
         if adj is None:
             return False
-        adj.soft_delete()
+        adj.is_deleted = True
         await self.db.flush()
         return True
 
@@ -666,7 +667,7 @@ class CFSWorksheetEngine:
         diff1 = indirect_operating - main_operating
         checks.append({
             "check_name": "间接法经营活动现金流=主表经营活动现金流",
-            "passed": diff1 == Decimal("0"),
+            "passed": abs(diff1) < BALANCE_TOLERANCE,
             "indirect_value": str(indirect_operating),
             "main_table_value": str(main_operating),
             "difference": str(diff1),
@@ -708,7 +709,7 @@ class CFSWorksheetEngine:
         diff2 = net_increase - expected_increase
         checks.append({
             "check_name": "现金净增加额=期末现金-期初现金",
-            "passed": diff2 == Decimal("0"),
+            "passed": abs(diff2) < BALANCE_TOLERANCE,
             "net_increase": str(net_increase),
             "closing_cash": str(closing_cash),
             "opening_cash": str(opening_cash),

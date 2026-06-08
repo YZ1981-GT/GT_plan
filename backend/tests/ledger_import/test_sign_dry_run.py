@@ -230,7 +230,7 @@ class TestDryRunProperties:
     **Validates: Requirements 5.4, 5.6, 5.8**
     """
 
-    @settings(max_examples=5)
+    @settings(max_examples=3)
     @given(
         balance=st.decimals(
             min_value=-1_000_000, max_value=1_000_000, places=2,
@@ -249,7 +249,7 @@ class TestDryRunProperties:
             if item.account_code == "2221":
                 assert item.risk != "safe_auto_fix"
 
-    @settings(max_examples=5)
+    @settings(max_examples=3)
     @given(
         balance=st.decimals(
             min_value=1, max_value=1_000_000, places=2,

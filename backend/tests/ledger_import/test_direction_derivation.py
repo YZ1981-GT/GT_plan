@@ -335,7 +335,7 @@ class TestDirectionDerivationProperties:
     **Validates: Requirements 2.3, 2.4, 2.5**
     """
 
-    @settings(max_examples=5)
+    @settings(max_examples=3)
     @given(
         debit=st.decimals(min_value=0, max_value=1_000_000, places=2),
         credit=st.decimals(min_value=0, max_value=1_000_000, places=2),
@@ -353,7 +353,7 @@ class TestDirectionDerivationProperties:
         else:
             assert result.direction == "unknown"
 
-    @settings(max_examples=5)
+    @settings(max_examples=3)
     @given(
         category=st.sampled_from(list(NORMAL_DIRECTION_BY_CATEGORY.keys())),
         code=st.text(

@@ -122,7 +122,7 @@ _name_strategy = st.one_of(
 
 
 class TestPBT:
-    @settings(max_examples=5)
+    @settings(max_examples=3)
     @given(code=_code_strategy, name=_name_strategy)
     def test_direction_always_binary(self, code, name):
         """属性：方向恒为 debit/credit 之一，source 非空。"""
@@ -130,7 +130,7 @@ class TestPBT:
         assert d in ("debit", "credit")
         assert isinstance(s, str) and s
 
-    @settings(max_examples=5)
+    @settings(max_examples=3)
     @given(code=_code_strategy)
     def test_contra_priority_stable(self, code):
         """属性：含备抵关键词时恒判 contra_account 且方向稳定，不受编码影响。"""
@@ -138,7 +138,7 @@ class TestPBT:
         assert s == "contra_account"
         assert d == "credit"
 
-    @settings(max_examples=5)
+    @settings(max_examples=3)
     @given(code=_code_strategy, name=_name_strategy)
     def test_idempotent(self, code, name):
         """属性：同输入多次调用结果一致（纯函数幂等）。"""

@@ -13,6 +13,7 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
 from app.services.data_quality_service import DataQualityService
+from app.services.ledger_import.sign_convention_guard import check_sign_convention_readiness
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/data-quality",
@@ -54,4 +55,11 @@ async def run_data_quality_check(
 
     service = DataQualityService(db)
     result = await service.run_checks(project_id, year, checks)
+
+    # 过渡期语义（Task 7.1 / 需求 10）：检测 v1 残留，附加 warning 不阻断
+    readiness = await check_sign_convention_readiness(db, project_id, year)
+    if readiness.has_legacy:
+        result["sign_convention_warning"] = readiness.warning
+        result["sign_convention_ready"] = False
+
     return result

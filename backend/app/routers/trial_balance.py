@@ -17,6 +17,7 @@ from app.deps import check_consol_lock
 from app.services.cache_service import CacheService
 from app.services.mapping_service import get_codes_by_cycles
 from app.services.event_bus import event_bus
+from app.services.ledger_import.sign_convention_guard import check_sign_convention_readiness
 from app.services.materiality_service import MaterialityService
 from app.services.trial_balance_service import TrialBalanceService
 
@@ -83,6 +84,15 @@ async def get_trial_balance(
     if scope_cycles is not None:
         allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
         result = [r for r in result if r.get("standard_account_code") in allowed_codes]
+
+    # 过渡期语义（Task 7.1 / 需求 10）：检测 v1 残留，附加 warning 不阻断
+    readiness = await check_sign_convention_readiness(db, project_id, year)
+    if readiness.has_legacy:
+        return {
+            "data": result,
+            "warning": readiness.warning,
+            "sign_convention_ready": False,
+        }
 
     return result
 

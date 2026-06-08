@@ -43,7 +43,7 @@
 | 点 | 文件 | 处理 | 任务 |
 |---|---|---|---|
 | cell_formula_evaluator | cell_formula_evaluator.py:418-452 | TB/WP/AUX 字段映射（审定数→audited_amount 等） | T5.1 ✅ |
-| data_fetch_custom | data_fetch_custom.py | transform negate 配置 | T5.1/5.2 ✅ |
+| data_fetch_custom | data_fetch_custom.py | transform negate 配置 | T5.1/5.2 ✅（T5.2 盘点：存量 negate 配置=0，见 negate-config-inventory.md） |
 | module_cell_resolver | custom_query/module_cell_resolver.py | TB 虚拟 sheet 列映射 | T5.1 ✅ |
 
 ## F. 附注 / 披露（纯读 audited_amount）

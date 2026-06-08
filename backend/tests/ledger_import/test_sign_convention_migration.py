@@ -349,4 +349,4 @@ class TestWriterDirectionFieldPersistence:
             }
         ]
         result = convert_balance_rows_v2(input_rows)
-        assert result.stats["sign_convention_version"] == "v1_net_debit_positive"
+        assert result.stats["sign_convention_version"] == "v2_category_natural_positive"

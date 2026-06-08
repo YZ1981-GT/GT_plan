@@ -478,34 +478,42 @@ class CrossCheckService:
     async def _get_adj_value(
         self, project_id: UUID, year: int, account_code: str, adj_type: str
     ) -> Decimal | None:
-        """从调整分录取值"""
+        """从调整分录取值。
+
+        v2 符号约定（ledger-sign-convention-unify）：返回值须与
+        trial_balance.aje_adjustment/rje_adjustment 口径一致——即按科目自然方向归一
+        （借方类用 debit-credit，贷方类取反 credit-debit），与
+        trial_balance_service.recalc_adjustments 使用同一 direction_resolver。
+        否则贷方类（负债/权益/收入）的 ADJ() 取值会与审定数推导反号。
+        """
+        from app.services.ledger_import.direction_resolver import (
+            resolve_account_direction,
+        )
+
         try:
-            if adj_type == "aje_net":
-                q = sa.text("""
-                    SELECT COALESCE(SUM(ae.debit_amount - ae.credit_amount), 0)
-                    FROM adjustment_entries ae
-                    JOIN adjustments a ON a.id = ae.adjustment_id
-                    WHERE a.project_id = :pid AND a.year = :year
-                      AND ae.standard_account_code = :code
-                      AND a.adjustment_type = 'aje'
-                      AND a.review_status != 'rejected'
-                """)
-            else:
-                q = sa.text("""
-                    SELECT COALESCE(SUM(ae.debit_amount - ae.credit_amount), 0)
-                    FROM adjustment_entries ae
-                    JOIN adjustments a ON a.id = ae.adjustment_id
-                    WHERE a.project_id = :pid AND a.year = :year
-                      AND ae.standard_account_code = :code
-                      AND a.adjustment_type = 'rje'
-                      AND a.review_status != 'rejected'
-                """)
+            adj_type_filter = "aje" if adj_type == "aje_net" else "rje"
+            q = sa.text("""
+                SELECT COALESCE(SUM(ae.debit_amount - ae.credit_amount), 0),
+                       MAX(ae.account_name)
+                FROM adjustment_entries ae
+                JOIN adjustments a ON a.id = ae.adjustment_id
+                WHERE a.project_id = :pid AND a.year = :year
+                  AND ae.standard_account_code = :code
+                  AND a.adjustment_type = :atype
+                  AND a.review_status != 'rejected'
+            """)
             result = await self.db.execute(q, {
                 "pid": str(project_id), "year": year, "code": account_code,
+                "atype": adj_type_filter,
             })
             row = result.first()
             if row and row[0] is not None:
-                return Decimal(str(row[0]))
+                raw_net = Decimal(str(row[0]))
+                account_name = row[1] or ""
+                # 按科目自然方向归一（与 recalc_adjustments 口径一致）
+                direction, _src = resolve_account_direction(account_code, account_name)
+                sign = Decimal("-1") if direction == "credit" else Decimal("1")
+                return sign * raw_net
             return Decimal("0")
         except Exception as e:
             logger.debug(f"[CROSS_CHECK] ADJ value error: {account_code}/{adj_type}: {e}")

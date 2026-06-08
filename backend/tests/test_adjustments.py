@@ -791,14 +791,15 @@ async def test_api_summary(client: AsyncClient, seeded_db):
 
 @pytest.mark.asyncio
 async def test_api_account_dropdown_level1(client: AsyncClient, seeded_db):
-    """GET account-dropdown 一级行次"""
+    """GET account-dropdown 一级科目列表（返回 standard_account_code）"""
     pid = seeded_db
     resp = await client.get(f"/api/projects/{pid}/adjustments/account-dropdown")
     assert resp.status_code == 200
     body = resp.json()
     codes = {item["code"] for item in body}
-    assert "BS-001" in codes
-    assert "IS-001" in codes
+    # account-dropdown 返回的是 standard_account_code（非 report_line_code）
+    assert "1001" in codes
+    assert "6001" in codes
 
 
 @pytest.mark.asyncio
@@ -850,3 +851,122 @@ async def test_api_wp_summary_empty(client: AsyncClient, seeded_db):
     body = resp.json()
     assert body["accounts"] == []
     assert Decimal(str(body["unadjusted_amount"])) == Decimal("0")
+
+
+# ===== Task 4.3：v2 符号约定下调整分录符号对齐守护 =====
+#
+# 守护两点：
+# 1. 分录级借贷平衡校验（SUM(debit)=SUM(credit)）不依赖科目类别符号约定，
+#    与 v2 无关、对借方类/贷方类混合分录均正确。
+# 2. get_wp_adjustment_summary 的审定数 = 未调整数 + 调整数，在 v2（未调整数已存
+#    自然正数）下方向正确：贷方正常类（收入/负债）一笔贷记增加应使审定数增大。
+#    与 trial_balance_service.recalc_adjustments（Task 3.3）使用同一 direction_resolver
+#    口径做方向归一，不重复叠加。
+
+
+@pytest.mark.asyncio
+async def test_entry_balance_check_v2_independent(db_session: AsyncSession, seeded_db):
+    """分录级平衡校验对借方类(1001)+贷方类(6001)混合分录正确，不受类别符号约定影响。
+
+    平衡分录（借方合计=贷方合计）必须通过，无论各行科目属借方类还是贷方类。
+    """
+    pid = seeded_db
+    svc = AdjustmentService(db_session)
+    data = AdjustmentCreate(
+        adjustment_type=AdjustmentType.aje,
+        year=2025,
+        description="混合类别平衡分录",
+        line_items=[
+            # 借方类（资产）借记
+            AdjustmentLineItem(
+                standard_account_code="1001", account_name="库存现金",
+                debit_amount=Decimal("700"), credit_amount=Decimal("0"),
+            ),
+            # 贷方类（收入）贷记，借贷各 700 平衡
+            AdjustmentLineItem(
+                standard_account_code="6001", account_name="主营业务收入",
+                debit_amount=Decimal("0"), credit_amount=Decimal("700"),
+            ),
+        ],
+    )
+    result = await svc.create_entry(pid, data, TEST_USER.id)
+    await db_session.commit()
+
+    # 平衡校验通过：借方合计 == 贷方合计（纯借贷相等，与 v2 类别符号无关）
+    assert result.total_debit == result.total_credit == Decimal("700")
+
+
+@pytest.mark.asyncio
+async def test_wp_summary_revenue_credit_increases_audited(
+    db_session: AsyncSession, seeded_db
+):
+    """v2：收入(贷方类)一笔贷记调整 → wp-summary 审定数增大（方向归一正确）。
+
+    6001 主营业务收入 unadjusted=100000（v2 自然正数）。AJE 借 1001 / 贷 6001 各 500。
+    贷方类按 direction_resolver 归一：净额取 (credit-debit) → +500，
+    审定数 = 100000 + 500 = 100500（贷记使收入增大，方向正确）。
+    """
+    pid = seeded_db
+    svc = AdjustmentService(db_session)
+    data = AdjustmentCreate(
+        adjustment_type=AdjustmentType.aje,
+        year=2025,
+        description="收入贷记调整",
+        line_items=[
+            AdjustmentLineItem(
+                standard_account_code="1001", account_name="库存现金",
+                debit_amount=Decimal("500"), credit_amount=Decimal("0"),
+            ),
+            AdjustmentLineItem(
+                standard_account_code="6001", account_name="主营业务收入",
+                debit_amount=Decimal("0"), credit_amount=Decimal("500"),
+            ),
+        ],
+    )
+    await svc.create_entry(pid, data, TEST_USER.id)
+    await db_session.commit()
+
+    summary = await svc.get_wp_adjustment_summary(pid, 2025, "IS-001")
+    # 6001 关联 IS-001，unadjusted=100000
+    assert summary.unadjusted_amount == Decimal("100000")
+    # 贷记 500 归一为 +500（收入增大），非旧约定的原始净额 -500
+    assert summary.aje_total == Decimal("500")
+    # 审定数 = 未调整 + 调整，方向正确
+    assert summary.audited_amount == Decimal("100500")
+
+
+@pytest.mark.asyncio
+async def test_wp_summary_asset_debit_increases_audited(
+    db_session: AsyncSession, seeded_db
+):
+    """v2：资产(借方类)一笔借记调整 → wp-summary 审定数增大（借方类不取反）。
+
+    1001 库存现金 unadjusted=12000（v2 自然正数）。AJE 借 1001 / 贷 6001 各 300。
+    借方类归一保持 (debit-credit) → +300，审定数 = 12000 + 300 = 12300。
+    """
+    pid = seeded_db
+    svc = AdjustmentService(db_session)
+    data = AdjustmentCreate(
+        adjustment_type=AdjustmentType.aje,
+        year=2025,
+        description="资产借记调整",
+        line_items=[
+            AdjustmentLineItem(
+                standard_account_code="1001", account_name="库存现金",
+                debit_amount=Decimal("300"), credit_amount=Decimal("0"),
+            ),
+            AdjustmentLineItem(
+                standard_account_code="6001", account_name="主营业务收入",
+                debit_amount=Decimal("0"), credit_amount=Decimal("300"),
+            ),
+        ],
+    )
+    await svc.create_entry(pid, data, TEST_USER.id)
+    await db_session.commit()
+
+    summary = await svc.get_wp_adjustment_summary(pid, 2025, "BS-001")
+    # 1001/1002 关联 BS-001，unadjusted = 12000（仅 1001 有 tb 行）
+    assert summary.unadjusted_amount == Decimal("12000")
+    # 借方类借记 300 → +300（不取反）
+    assert summary.aje_total == Decimal("300")
+    assert summary.audited_amount == Decimal("12300")

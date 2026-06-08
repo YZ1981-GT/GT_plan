@@ -17,9 +17,11 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.ledger_import.sign_convention_types import BALANCE_TOLERANCE
 
-# 容差：±1 元
-TOLERANCE = Decimal("1")
+
+# 平衡校验容差：±1 元（统一来源 sign_convention_types.BALANCE_TOLERANCE）
+TOLERANCE = BALANCE_TOLERANCE
 
 
 class DataQualityService:

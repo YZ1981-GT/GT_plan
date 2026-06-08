@@ -136,6 +136,31 @@ async def seeded_db(db_session: AsyncSession):
 
     report_engine = ReportEngine(db_session)
     await report_engine.generate_all_reports(FAKE_PROJECT_ID, 2025)
+    await db_session.flush()
+
+    # 确保利润表 IS-019（净利润）存在（间接法测试需要）
+    # net_profit = 收入(3000000+20000) - 费用(2000000+50000+100000+200000+30000+50000+100000) = 490000
+    from sqlalchemy import select as sa_select
+    is_019_exists = (
+        await db_session.execute(
+            sa_select(FinancialReport).where(
+                FinancialReport.project_id == FAKE_PROJECT_ID,
+                FinancialReport.year == 2025,
+                FinancialReport.row_code == "IS-019",
+            )
+        )
+    ).scalar_one_or_none()
+    if is_019_exists is None:
+        db_session.add(FinancialReport(
+            project_id=FAKE_PROJECT_ID,
+            year=2025,
+            report_type=FinancialReportType.income_statement,
+            row_code="IS-019",
+            row_name="净利润",
+            current_period_amount=Decimal("490000"),
+        ))
+        await db_session.flush()
+
     await db_session.commit()
 
     return FAKE_PROJECT_ID
@@ -284,7 +309,6 @@ async def test_update_adjustment(db_session: AsyncSession, seeded_db):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="CfsAdjustment model missing SoftDeleteMixin - production code bug")
 async def test_delete_adjustment(db_session: AsyncSession, seeded_db):
     """软删除 CFS 调整分录"""
     engine = CFSWorksheetEngine(db_session)
@@ -415,7 +439,6 @@ async def test_cfs_main_table(db_session: AsyncSession, seeded_db):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Seeded financial data may not contain IS-019 net profit row")
 async def test_indirect_method(db_session: AsyncSession, seeded_db):
     """间接法补充资料生成"""
     engine = CFSWorksheetEngine(db_session)
@@ -637,3 +660,79 @@ async def test_api_list_adjustments(client: AsyncClient):
     items = data.get("data", data)
     assert isinstance(items, list)
     assert len(items) >= 1
+
+# ===== Task 4.4: v2 符号约定 + 统一容差守护测试 =====
+
+
+@pytest.mark.asyncio
+async def test_v2_liability_period_change_decrease(db_session: AsyncSession, seeded_db):
+    """v2 约定下负债类 audited/opening 同为正数自然方向，
+    负债减少时 period_change 为负，语义正确（非旧约定借正贷负翻转）。
+
+    2202 应付账款：opening=150000(正), closing=200000(正) → 变动 +50000（负债增加）。
+    2001 短期借款：opening=400000(正), closing=500000(正) → 变动 +100000。
+    确认存储均为正数（无旧约定负数），period_change = closing - opening。
+    """
+    engine = CFSWorksheetEngine(db_session)
+    result = await engine.generate_worksheet(FAKE_PROJECT_ID, 2025)
+
+    ap_row = next(r for r in result["rows"] if r["account_code"] == "2202")
+    # v2: 负债期末/期初均存正数
+    assert Decimal(ap_row["opening_balance"]) == Decimal("150000")
+    assert Decimal(ap_row["closing_balance"]) == Decimal("200000")
+    # 负债增加 → period_change 正；语义为余额自然方向变动
+    assert Decimal(ap_row["period_change"]) == Decimal("50000")
+
+    # 构造一个负债减少的场景验证 period_change 为负
+    tb_dec = TrialBalance(
+        project_id=FAKE_PROJECT_ID,
+        year=2025,
+        company_code="001",
+        standard_account_code="2502",
+        account_name="长期应付款",
+        account_category=AccountCategory.liability,
+        audited_amount=Decimal("100000"),   # 期末（正数）
+        opening_balance=Decimal("180000"),  # 期初（正数）
+    )
+    db_session.add(tb_dec)
+    await db_session.flush()
+
+    result2 = await engine.generate_worksheet(FAKE_PROJECT_ID, 2025)
+    ltp_row = next(r for r in result2["rows"] if r["account_code"] == "2502")
+    # 负债减少 → period_change = 100000 - 180000 = -80000
+    assert Decimal(ltp_row["period_change"]) == Decimal("-80000")
+
+
+@pytest.mark.asyncio
+async def test_verify_reconciliation_uses_balance_tolerance(
+    db_session: AsyncSession, seeded_db
+):
+    """勾稽校验在 ±BALANCE_TOLERANCE 容差内判通过（统一容差，非精确等于 0）。
+
+    构造净增加额与期末-期初差额相差 0.5 元（< 1 元容差）的场景，
+    确认 passed=True；同时验证 difference 如实记录。
+    """
+    from app.services.ledger_import.sign_convention_types import BALANCE_TOLERANCE
+
+    assert BALANCE_TOLERANCE == Decimal("1")
+
+    # 写入 CF-040 净增加额：期末-期初现金 = 1150000 - 920000 = 230000
+    # 故意写 230000.5，差 0.5 元 < 容差
+    db_session.add(FinancialReport(
+        project_id=FAKE_PROJECT_ID,
+        year=2025,
+        report_type=FinancialReportType.cash_flow_statement,
+        row_code="CF-040",
+        row_name="现金及现金等价物净增加额",
+        current_period_amount=Decimal("230000.5"),
+    ))
+    await db_session.flush()
+
+    engine = CFSWorksheetEngine(db_session)
+    result = await engine.verify_reconciliation(FAKE_PROJECT_ID, 2025)
+
+    cash_check = result["checks"][1]
+    assert Decimal(cash_check["expected_increase"]) == Decimal("230000")
+    assert Decimal(cash_check["difference"]) == Decimal("0.5")
+    # 0.5 < 1 元容差 → 通过
+    assert cash_check["passed"] is True

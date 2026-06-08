@@ -70,7 +70,7 @@ class TestAnomalyListAPI:
         parsed = SignAnomalyListResponse(**data)
         assert parsed.total == 0
         assert parsed.anomalies == []
-        assert parsed.sign_convention_version == "v1_net_debit_positive"
+        assert parsed.sign_convention_version == "v2_category_natural_positive"
 
     @pytest.mark.asyncio
     async def test_anomaly_list_accepts_filters(
