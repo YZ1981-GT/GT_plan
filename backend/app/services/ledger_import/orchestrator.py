@@ -256,6 +256,29 @@ class ImportOrchestrator:
         )
         from sqlalchemy import select as _sa_select
 
+        # 并发护栏：同一 project+year 已有未结束作业时，拒绝重复提交，
+        # 防止多个导入作业堆叠（截图实测 4 个作业并存→数据重复累加风险）。
+        # 未结束 = pending/queued/running/validating/writing/activating。
+        _active_statuses = [
+            JobStatus.pending, JobStatus.queued, JobStatus.running,
+            JobStatus.validating, JobStatus.writing, JobStatus.activating,
+        ]
+        existing_active = (await db.execute(
+            _sa_select(ImportJob.id, ImportJob.status)
+            .where(
+                ImportJob.project_id == project_id,
+                ImportJob.year == year,
+                ImportJob.status.in_(_active_statuses),
+            )
+            .limit(1)
+        )).first()
+        if existing_active is not None:
+            raise ValueError(
+                f"项目 {year} 年度已有进行中的导入作业"
+                f"（job={existing_active[0]} status={existing_active[1].value}），"
+                f"请等待其完成或先取消后再提交"
+            )
+
         # 查是否已存在 artifact（detect 阶段通过 create_bundle 创建）
         existing_stmt = _sa_select(ImportArtifact).where(
             ImportArtifact.upload_token == upload_token
