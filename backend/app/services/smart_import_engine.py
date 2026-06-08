@@ -3112,9 +3112,10 @@ async def rebuild_aux_balance_summary(
     # 2. 用 SQL 聚合直接插入（比 Python 遍历快几十倍）
     await db.execute(sa.text(f"""
         INSERT INTO tb_aux_balance_summary
-            (project_id, year, aux_type, account_code, account_name, aux_code, aux_name,
+            (id, project_id, year, aux_type, account_code, account_name, aux_code, aux_name,
              record_count, opening_balance, debit_amount, credit_amount, closing_balance)
         SELECT
+            gen_random_uuid(),
             ab.project_id, ab.year, ab.aux_type, ab.account_code,
             MAX(ab.account_name),
             ab.aux_code, MAX(ab.aux_name),
