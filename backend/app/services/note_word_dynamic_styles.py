@@ -83,12 +83,16 @@ def apply_consol_elimination_style(cell, eliminated: bool = True) -> None:
 
 
 def should_skip_empty_section(note: dict) -> bool:
-    """C.4.3: 判断章节是否应跳过（auto_trim 标记或全空）.
+    """C.4.3 + design §7.1: 判断章节是否应跳过（auto_trim 标记或全空）.
 
-    跳过条件：
-    1. `is_deleted=True` 且 deletion_reason 为 auto_trim
-    2. `status='not_applicable'`
-    3. text_content 空 且 所有 tables 全空
+    跳过条件（design §7.1 裁剪判定优先级 ①~④）：
+    1. `is_deleted=True`（auto_trim 或用户删除）
+    2. `status='not_applicable'`（auto_trim_v2 章节级不适用）
+    3. `is_empty=True`（用户「不导出」标记）
+    4. `text_content` 空 且 所有 table 经 `is_empty_table()` 判定全空
+
+    注：条件 ④ 复用 `is_empty_table`（不重复实现空表检测）；
+    `table_data` 支持多表 `_tables` 数组与单表两种结构。
     """
     if not isinstance(note, dict):
         return False
@@ -96,7 +100,24 @@ def should_skip_empty_section(note: dict) -> bool:
         return True
     if note.get("status") == "not_applicable":
         return True
-    return False
+    # ③ 用户标记「不导出」
+    if note.get("is_empty"):
+        return True
+    # ④ text_content 空 且 所有表全空
+    text_content = note.get("text_content")
+    if text_content and str(text_content).strip():
+        return False
+    table_data = note.get("table_data")
+    if not isinstance(table_data, dict):
+        # 无文本且无表数据 → 视为全空
+        return True
+    tables_to_check = table_data.get("_tables") or [table_data]
+    for tbl in tables_to_check:
+        if not isinstance(tbl, dict):
+            continue
+        if not is_empty_table(tbl):
+            return False
+    return True
 
 
 def is_empty_table(table_data: dict) -> bool:

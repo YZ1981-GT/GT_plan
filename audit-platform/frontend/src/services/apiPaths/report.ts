@@ -154,6 +154,9 @@ export const deliverables = {
     `/api/projects/${pid}/deliverables/${taskId}/versions/${versionNo}/preview-url`,
   loadReportTemplate: (pid: string) => `/api/projects/${pid}/deliverables/report-body/load-template`,
   renderReportBody: (pid: string) => `/api/projects/${pid}/deliverables/report-body/render`,
+  // 报告正文两阶段生成（audit-report-template-integration §11）
+  previewReportBody: (pid: string) => `/api/projects/${pid}/deliverables/report-body/preview`,
+  confirmReportBody: (pid: string) => `/api/projects/${pid}/deliverables/report-body/confirm`,
   renderDisclosureNotes: (pid: string) => `/api/projects/${pid}/deliverables/disclosure-notes/render`,
   renderFinancialReports: (pid: string) => `/api/projects/${pid}/deliverables/financial-reports/render`,
   previewReportHtml: (pid: string, year: number) =>
@@ -182,6 +185,17 @@ export const deliverables = {
   packageDownload: (pid: string) => `/api/projects/${pid}/deliverables/package`,
   packageFile: (pid: string, jobId: string) =>
     `/api/projects/${pid}/deliverables/package/${jobId}/download`,
+} as const
+
+// ─── Word 导出后台任务（一键生成全套，audit-report-template-integration §14） ──
+
+export const wordExports = {
+  fullDeliverables: (pid: string) =>
+    `/api/projects/${pid}/word-exports/full-deliverables`,
+  jobStatus: (pid: string, jobId: string) =>
+    `/api/projects/${pid}/word-exports/jobs/${jobId}`,
+  retryJob: (pid: string, jobId: string) =>
+    `/api/projects/${pid}/word-exports/jobs/${jobId}/retry`,
 } as const
 
 // ─── 导出 ───────────────────────────────────────────────────────────────────

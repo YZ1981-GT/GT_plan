@@ -1,0 +1,1779 @@
+{
+  "_note": "一次性可行性分析产物（dry-run, report-only）；用完可删。",
+  "go_threshold_pct": 95.0,
+  "caution_threshold_pct": 80.0,
+  "variants": {
+    "soe_standalone": {
+      "variant_key": "soe_standalone",
+      "seed_file": "note_template_soe.json",
+      "docx_file": "disclosure_notes/soe_standalone.docx",
+      "heading_heuristic": "段落 style 名以 'Heading'/'标题' 开头（含 '标题3的样式'）",
+      "totals": {
+        "seed_sections": 187,
+        "matched": 169,
+        "match_rate_pct": 90.4,
+        "strong_unambiguous": 119,
+        "strong_unambiguous_rate_pct": 63.6,
+        "ambiguous": 35,
+        "unmatched": 18,
+        "candidate_headings_in_docx": 374
+      },
+      "match_methods": {
+        "exact_title": 151,
+        "section_number": 2,
+        "loose_title": 7,
+        "fuzzy_contains": 9
+      },
+      "cleanup_workload": {
+        "bracket_hint_count": 69,
+        "usage_instruction_paragraphs": 1
+      },
+      "ambiguous_sections": [
+        {
+          "section_number": "一",
+          "section_title": "公司基本情况",
+          "method": "section_number",
+          "candidate_para_indices": [
+            362,
+            390,
+            504,
+            682,
+            810,
+            1016,
+            1017,
+            1018,
+            1020
+          ]
+        },
+        {
+          "section_number": "四、存货",
+          "section_title": "存货",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            275,
+            777
+          ]
+        },
+        {
+          "section_number": "四、长期股权投资",
+          "section_title": "长期股权投资",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            291,
+            839
+          ]
+        },
+        {
+          "section_number": "四、投资性房地产",
+          "section_title": "投资性房地产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            318,
+            905
+          ]
+        },
+        {
+          "section_number": "四、固定资产",
+          "section_title": "固定资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            331,
+            912,
+            913
+          ]
+        },
+        {
+          "section_number": "四、在建工程",
+          "section_title": "在建工程",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            346,
+            919
+          ]
+        },
+        {
+          "section_number": "四、借款费用",
+          "section_title": "借款费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            351,
+            1199
+          ]
+        },
+        {
+          "section_number": "四、使用权资产",
+          "section_title": "使用权资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            412,
+            936
+          ]
+        },
+        {
+          "section_number": "四、无形资产",
+          "section_title": "无形资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            419,
+            938
+          ]
+        },
+        {
+          "section_number": "四、长期待摊费用",
+          "section_title": "长期待摊费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            438,
+            957
+          ]
+        },
+        {
+          "section_number": "四、股份支付",
+          "section_title": "股份支付",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            473,
+            1187
+          ]
+        },
+        {
+          "section_number": "四、应付债券",
+          "section_title": "应付债券",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            487,
+            1027,
+            1028
+          ]
+        },
+        {
+          "section_number": "四、预计负债",
+          "section_title": "预计负债",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            491,
+            1076
+          ]
+        },
+        {
+          "section_number": "四、租赁",
+          "section_title": "租赁",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            570,
+            1204
+          ]
+        },
+        {
+          "section_number": "五",
+          "section_title": "重要会计政策、会计估计的变更以及前期差错的更正",
+          "method": "section_number",
+          "candidate_para_indices": [
+            737,
+            749,
+            774
+          ]
+        },
+        {
+          "section_number": "八、10",
+          "section_title": "存货",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            275,
+            777
+          ]
+        },
+        {
+          "section_number": "八、18",
+          "section_title": "长期股权投资",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            291,
+            839
+          ]
+        },
+        {
+          "section_number": "八、21",
+          "section_title": "投资性房地产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            318,
+            905
+          ]
+        },
+        {
+          "section_number": "八、22",
+          "section_title": "固定资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            331,
+            912,
+            913
+          ]
+        },
+        {
+          "section_number": "八、23",
+          "section_title": "在建工程",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            346,
+            919
+          ]
+        },
+        {
+          "section_number": "八、24",
+          "section_title": "生产性生物资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            374,
+            926
+          ]
+        },
+        {
+          "section_number": "八、26",
+          "section_title": "使用权资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            412,
+            936
+          ]
+        },
+        {
+          "section_number": "八、27",
+          "section_title": "无形资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            419,
+            938
+          ]
+        },
+        {
+          "section_number": "八、30",
+          "section_title": "长期待摊费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            438,
+            957
+          ]
+        },
+        {
+          "section_number": "八、50",
+          "section_title": "应付债券",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            487,
+            1027,
+            1028
+          ]
+        },
+        {
+          "section_number": "八、53",
+          "section_title": "长期应付款",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1049,
+            1050
+          ]
+        },
+        {
+          "section_number": "八、55",
+          "section_title": "预计负债",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            491,
+            1076
+          ]
+        },
+        {
+          "section_number": "八、64",
+          "section_title": "营业收入、营业成本",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1099,
+            1100
+          ]
+        },
+        {
+          "section_number": "八、74",
+          "section_title": "资产减值损失",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            442,
+            1144
+          ]
+        },
+        {
+          "section_number": "八、78",
+          "section_title": "所得税费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1157,
+            1158
+          ]
+        },
+        {
+          "section_number": "八、83",
+          "section_title": "股份支付",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            473,
+            1187
+          ]
+        },
+        {
+          "section_number": "八、85",
+          "section_title": "借款费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            351,
+            1199
+          ]
+        },
+        {
+          "section_number": "八、87",
+          "section_title": "租赁",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            570,
+            1204
+          ]
+        },
+        {
+          "section_number": "十二",
+          "section_title": "股份支付",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            473,
+            1187
+          ]
+        },
+        {
+          "section_number": "十二、长期股权投资",
+          "section_title": "长期股权投资",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            291,
+            839
+          ]
+        }
+      ],
+      "unmatched_sections": [
+        {
+          "section_number": "一、1",
+          "section_title": "公司基本情况"
+        },
+        {
+          "section_number": "七",
+          "section_title": "合并范围的变化"
+        },
+        {
+          "section_number": "七、本期纳入合并报表",
+          "section_title": "本期纳入合并报表范围的子公司基本情况"
+        },
+        {
+          "section_number": "七、母公司拥有被投资",
+          "section_title": "母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因"
+        },
+        {
+          "section_number": "七、母公司直接或通过",
+          "section_title": "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的"
+        },
+        {
+          "section_number": "七、重要非全资子公司",
+          "section_title": "重要非全资子公司情况"
+        },
+        {
+          "section_number": "七、本期不再纳入合并",
+          "section_title": "本期不再纳入合并范围的原子公司"
+        },
+        {
+          "section_number": "七、本期新纳入合并范",
+          "section_title": "本期新纳入合并范围的主体"
+        },
+        {
+          "section_number": "七、本期发生的吸收合",
+          "section_title": "本期发生的吸收合并"
+        },
+        {
+          "section_number": "七、子公司使用企业集",
+          "section_title": "子公司使用企业集团资产和清偿企业集团债务的重大限制"
+        },
+        {
+          "section_number": "七、母公司在子公司的",
+          "section_title": "母公司在子公司的所有者权益份额发生变化的情况"
+        },
+        {
+          "section_number": "七、子公司向母公司转",
+          "section_title": "子公司向母公司转移资金的能力受到严格限制的情况"
+        },
+        {
+          "section_number": "八、88",
+          "section_title": "（3）其他数据资源相关信息"
+        },
+        {
+          "section_number": "十一",
+          "section_title": "关联方及关联交易"
+        },
+        {
+          "section_number": "十二、营业收入与营业成本",
+          "section_title": "营业收入与营业成本"
+        },
+        {
+          "section_number": "十三",
+          "section_title": "承诺事项"
+        },
+        {
+          "section_number": "十三、1",
+          "section_title": "按照有关财务会计制度应披露的其他内容"
+        },
+        {
+          "section_number": "十四",
+          "section_title": "其他重要事项"
+        }
+      ],
+      "recommendation": "NO-GO",
+      "rationale": "强匹配率 63.6% < 80.0%；歧义 35 / 未匹配 18 章节过多，自动打标风险高，应保持人工打标。"
+    },
+    "soe_consolidated": {
+      "variant_key": "soe_consolidated",
+      "seed_file": "note_template_soe.json",
+      "docx_file": "disclosure_notes/soe_consolidated.docx",
+      "heading_heuristic": "段落 style 名以 'Heading'/'标题' 开头（含 '标题3的样式'）",
+      "totals": {
+        "seed_sections": 187,
+        "matched": 182,
+        "match_rate_pct": 97.3,
+        "strong_unambiguous": 129,
+        "strong_unambiguous_rate_pct": 69.0,
+        "ambiguous": 40,
+        "unmatched": 5,
+        "candidate_headings_in_docx": 404
+      },
+      "match_methods": {
+        "exact_title": 166,
+        "section_number": 2,
+        "loose_title": 7,
+        "fuzzy_contains": 7
+      },
+      "cleanup_workload": {
+        "bracket_hint_count": 74,
+        "usage_instruction_paragraphs": 1
+      },
+      "ambiguous_sections": [
+        {
+          "section_number": "一",
+          "section_title": "公司基本情况",
+          "method": "section_number",
+          "candidate_para_indices": [
+            361,
+            389,
+            503,
+            681,
+            708,
+            718,
+            720,
+            854,
+            1060,
+            1061,
+            1062,
+            1064
+          ]
+        },
+        {
+          "section_number": "四、存货",
+          "section_title": "存货",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            274,
+            821
+          ]
+        },
+        {
+          "section_number": "四、长期股权投资",
+          "section_title": "长期股权投资",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            290,
+            883,
+            1416
+          ]
+        },
+        {
+          "section_number": "四、投资性房地产",
+          "section_title": "投资性房地产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            317,
+            949
+          ]
+        },
+        {
+          "section_number": "四、固定资产",
+          "section_title": "固定资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            330,
+            956,
+            957
+          ]
+        },
+        {
+          "section_number": "四、在建工程",
+          "section_title": "在建工程",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            345,
+            963
+          ]
+        },
+        {
+          "section_number": "四、借款费用",
+          "section_title": "借款费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            350,
+            1243
+          ]
+        },
+        {
+          "section_number": "四、使用权资产",
+          "section_title": "使用权资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            411,
+            980
+          ]
+        },
+        {
+          "section_number": "四、无形资产",
+          "section_title": "无形资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            418,
+            982
+          ]
+        },
+        {
+          "section_number": "四、长期待摊费用",
+          "section_title": "长期待摊费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            437,
+            1001
+          ]
+        },
+        {
+          "section_number": "四、股份支付",
+          "section_title": "股份支付",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            472,
+            1231
+          ]
+        },
+        {
+          "section_number": "四、应付债券",
+          "section_title": "应付债券",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            486,
+            1071,
+            1072
+          ]
+        },
+        {
+          "section_number": "四、预计负债",
+          "section_title": "预计负债",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            490,
+            1120
+          ]
+        },
+        {
+          "section_number": "四、租赁",
+          "section_title": "租赁",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            569,
+            1248
+          ]
+        },
+        {
+          "section_number": "五",
+          "section_title": "重要会计政策、会计估计的变更以及前期差错的更正",
+          "method": "section_number",
+          "candidate_para_indices": [
+            781,
+            793,
+            818
+          ]
+        },
+        {
+          "section_number": "八、5",
+          "section_title": "应收账款",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            767,
+            1413
+          ]
+        },
+        {
+          "section_number": "八、9",
+          "section_title": "其他应收款",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            796,
+            1414
+          ]
+        },
+        {
+          "section_number": "八、10",
+          "section_title": "存货",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            274,
+            821
+          ]
+        },
+        {
+          "section_number": "八、18",
+          "section_title": "长期股权投资",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            290,
+            883,
+            1416
+          ]
+        },
+        {
+          "section_number": "八、21",
+          "section_title": "投资性房地产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            317,
+            949
+          ]
+        },
+        {
+          "section_number": "八、22",
+          "section_title": "固定资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            330,
+            956,
+            957
+          ]
+        },
+        {
+          "section_number": "八、23",
+          "section_title": "在建工程",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            345,
+            963
+          ]
+        },
+        {
+          "section_number": "八、24",
+          "section_title": "生产性生物资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            373,
+            970
+          ]
+        },
+        {
+          "section_number": "八、26",
+          "section_title": "使用权资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            411,
+            980
+          ]
+        },
+        {
+          "section_number": "八、27",
+          "section_title": "无形资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            418,
+            982
+          ]
+        },
+        {
+          "section_number": "八、30",
+          "section_title": "长期待摊费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            437,
+            1001
+          ]
+        },
+        {
+          "section_number": "八、50",
+          "section_title": "应付债券",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            486,
+            1071,
+            1072
+          ]
+        },
+        {
+          "section_number": "八、53",
+          "section_title": "长期应付款",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1093,
+            1094
+          ]
+        },
+        {
+          "section_number": "八、55",
+          "section_title": "预计负债",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            490,
+            1120
+          ]
+        },
+        {
+          "section_number": "八、64",
+          "section_title": "营业收入、营业成本",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1143,
+            1144
+          ]
+        },
+        {
+          "section_number": "八、74",
+          "section_title": "资产减值损失",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            441,
+            1188
+          ]
+        },
+        {
+          "section_number": "八、78",
+          "section_title": "所得税费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1201,
+            1202
+          ]
+        },
+        {
+          "section_number": "八、83",
+          "section_title": "股份支付",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            472,
+            1231
+          ]
+        },
+        {
+          "section_number": "八、85",
+          "section_title": "借款费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            350,
+            1243
+          ]
+        },
+        {
+          "section_number": "八、87",
+          "section_title": "租赁",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            569,
+            1248
+          ]
+        },
+        {
+          "section_number": "十二",
+          "section_title": "股份支付",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            472,
+            1231
+          ]
+        },
+        {
+          "section_number": "十二、应收账款",
+          "section_title": "应收账款",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            767,
+            1413
+          ]
+        },
+        {
+          "section_number": "十二、其他应收款",
+          "section_title": "其他应收款",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            796,
+            1414
+          ]
+        },
+        {
+          "section_number": "十二、长期股权投资",
+          "section_title": "长期股权投资",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            290,
+            883,
+            1416
+          ]
+        },
+        {
+          "section_number": "十二、现金流量表补充资",
+          "section_title": "现金流量表补充资料",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1304,
+            1429
+          ]
+        }
+      ],
+      "unmatched_sections": [
+        {
+          "section_number": "七",
+          "section_title": "合并范围的变化"
+        },
+        {
+          "section_number": "八、88",
+          "section_title": "（3）其他数据资源相关信息"
+        },
+        {
+          "section_number": "十一",
+          "section_title": "关联方及关联交易"
+        },
+        {
+          "section_number": "十三",
+          "section_title": "承诺事项"
+        },
+        {
+          "section_number": "十四",
+          "section_title": "其他重要事项"
+        }
+      ],
+      "recommendation": "NO-GO",
+      "rationale": "强匹配率 69.0% < 80.0%；歧义 40 / 未匹配 5 章节过多，自动打标风险高，应保持人工打标。"
+    },
+    "listed_standalone": {
+      "variant_key": "listed_standalone",
+      "seed_file": "note_template_listed.json",
+      "docx_file": "disclosure_notes/listed_standalone.docx",
+      "heading_heuristic": "段落 style 名以 'Heading'/'标题' 开头（含 '标题3的样式'）",
+      "totals": {
+        "seed_sections": 203,
+        "matched": 201,
+        "match_rate_pct": 99.0,
+        "strong_unambiguous": 134,
+        "strong_unambiguous_rate_pct": 66.0,
+        "ambiguous": 43,
+        "unmatched": 2,
+        "candidate_headings_in_docx": 504
+      },
+      "match_methods": {
+        "exact_title": 167,
+        "section_number": 1,
+        "loose_title": 13,
+        "fuzzy_contains": 20
+      },
+      "cleanup_workload": {
+        "bracket_hint_count": 241,
+        "usage_instruction_paragraphs": 0
+      },
+      "ambiguous_sections": [
+        {
+          "section_number": "三、外币业务和外币报",
+          "section_title": "外币业务和外币报表折算",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            95,
+            96
+          ]
+        },
+        {
+          "section_number": "三、存货",
+          "section_title": "存货",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            275,
+            909
+          ]
+        },
+        {
+          "section_number": "三、持有待售和终止经",
+          "section_title": "持有待售和终止经营",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            297,
+            2118
+          ]
+        },
+        {
+          "section_number": "三、长期股权投资",
+          "section_title": "长期股权投资",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            319,
+            1047
+          ]
+        },
+        {
+          "section_number": "三、固定资产",
+          "section_title": "固定资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            358,
+            1070,
+            1071
+          ]
+        },
+        {
+          "section_number": "三、在建工程",
+          "section_title": "在建工程",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            373,
+            1089,
+            1090
+          ]
+        },
+        {
+          "section_number": "三、生物资产【不适用",
+          "section_title": "生物资产",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            397,
+            398,
+            403,
+            405,
+            408,
+            414,
+            419,
+            1101
+          ]
+        },
+        {
+          "section_number": "三、无形资产",
+          "section_title": "无形资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            424,
+            1112
+          ]
+        },
+        {
+          "section_number": "三、研发支出",
+          "section_title": "研发支出",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            435,
+            1554,
+            1555
+          ]
+        },
+        {
+          "section_number": "三、长期待摊费用",
+          "section_title": "长期待摊费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            453,
+            1155
+          ]
+        },
+        {
+          "section_number": "三、预计负债",
+          "section_title": "预计负债",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            478,
+            1316
+          ]
+        },
+        {
+          "section_number": "三、股份支付及权益工",
+          "section_title": "股份支付及权益工具",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            485,
+            2014
+          ]
+        },
+        {
+          "section_number": "三、优先股、永续债等",
+          "section_title": "优先股、永续债等其他金融工具",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            105,
+            500,
+            504,
+            1259,
+            2163
+          ]
+        },
+        {
+          "section_number": "三、政府补助",
+          "section_title": "政府补助",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            568,
+            1760
+          ]
+        },
+        {
+          "section_number": "三、租赁",
+          "section_title": "租赁",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            596,
+            1532
+          ]
+        },
+        {
+          "section_number": "三、使用权资产",
+          "section_title": "使用权资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            637,
+            1108
+          ]
+        },
+        {
+          "section_number": "三、套期会计【不适用",
+          "section_title": "套期会计",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            665,
+            1868
+          ]
+        },
+        {
+          "section_number": "三、债务重组【不适用",
+          "section_title": "债务重组",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            688,
+            1995,
+            2086
+          ]
+        },
+        {
+          "section_number": "三、资产减值损失（损",
+          "section_title": "资产减值损失",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            445,
+            1449
+          ]
+        },
+        {
+          "section_number": "三、开发支出",
+          "section_title": "开发支出",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1129,
+            1558
+          ]
+        },
+        {
+          "section_number": "三、金融资产转移",
+          "section_title": "金融资产转移",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            259,
+            1910
+          ]
+        },
+        {
+          "section_number": "五",
+          "section_title": "合并财务报表项目注释",
+          "method": "section_number",
+          "candidate_para_indices": [
+            827,
+            856,
+            903
+          ]
+        },
+        {
+          "section_number": "五、8",
+          "section_title": "其他应收款",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            861,
+            880
+          ]
+        },
+        {
+          "section_number": "五、9",
+          "section_title": "存货",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            275,
+            909
+          ]
+        },
+        {
+          "section_number": "五、18",
+          "section_title": "长期股权投资",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            319,
+            1047
+          ]
+        },
+        {
+          "section_number": "五、22",
+          "section_title": "固定资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            358,
+            1070,
+            1071
+          ]
+        },
+        {
+          "section_number": "五、23",
+          "section_title": "在建工程",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            373,
+            1089,
+            1090
+          ]
+        },
+        {
+          "section_number": "五、25",
+          "section_title": "使用权资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            637,
+            1108
+          ]
+        },
+        {
+          "section_number": "五、26",
+          "section_title": "无形资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            424,
+            1112
+          ]
+        },
+        {
+          "section_number": "五、27",
+          "section_title": "开发支出",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1129,
+            1558
+          ]
+        },
+        {
+          "section_number": "五、29",
+          "section_title": "长期待摊费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            453,
+            1155
+          ]
+        },
+        {
+          "section_number": "五、50",
+          "section_title": "预计负债",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            478,
+            1316
+          ]
+        },
+        {
+          "section_number": "五、57",
+          "section_title": "其他综合收益",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            1355,
+            2163
+          ]
+        },
+        {
+          "section_number": "五、62",
+          "section_title": "营业收入和营业成本",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1386,
+            1387
+          ]
+        },
+        {
+          "section_number": "五、71",
+          "section_title": "现金流量表补充资料",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1499,
+            1500
+          ]
+        },
+        {
+          "section_number": "五、73",
+          "section_title": "外币货币性项目",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1527,
+            1528
+          ]
+        },
+        {
+          "section_number": "五、74",
+          "section_title": "租赁",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            596,
+            1532
+          ]
+        },
+        {
+          "section_number": "六",
+          "section_title": "研发支出",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            435,
+            1554,
+            1555
+          ]
+        },
+        {
+          "section_number": "六、1",
+          "section_title": "研发支出",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            435,
+            1554,
+            1555
+          ]
+        },
+        {
+          "section_number": "八",
+          "section_title": "政府补助",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            568,
+            1760
+          ]
+        },
+        {
+          "section_number": "八、1",
+          "section_title": "政府补助",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            568,
+            1760
+          ]
+        },
+        {
+          "section_number": "十六、其他应收款",
+          "section_title": "其他应收款",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            861,
+            880
+          ]
+        },
+        {
+          "section_number": "十六、长期股权投资",
+          "section_title": "长期股权投资",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            319,
+            1047
+          ]
+        }
+      ],
+      "unmatched_sections": [
+        {
+          "section_number": "十六",
+          "section_title": "母公司财务报表主要项目注释"
+        },
+        {
+          "section_number": "十六、营业收入与营业成本",
+          "section_title": "营业收入与营业成本"
+        }
+      ],
+      "recommendation": "NO-GO",
+      "rationale": "强匹配率 66.0% < 80.0%；歧义 43 / 未匹配 2 章节过多，自动打标风险高，应保持人工打标。"
+    },
+    "listed_consolidated": {
+      "variant_key": "listed_consolidated",
+      "seed_file": "note_template_listed.json",
+      "docx_file": "disclosure_notes/listed_consolidated.docx",
+      "heading_heuristic": "段落 style 名以 'Heading'/'标题' 开头（含 '标题3的样式'）",
+      "totals": {
+        "seed_sections": 203,
+        "matched": 202,
+        "match_rate_pct": 99.5,
+        "strong_unambiguous": 135,
+        "strong_unambiguous_rate_pct": 66.5,
+        "ambiguous": 45,
+        "unmatched": 1,
+        "candidate_headings_in_docx": 513
+      },
+      "match_methods": {
+        "exact_title": 167,
+        "section_number": 2,
+        "loose_title": 12,
+        "fuzzy_contains": 21
+      },
+      "cleanup_workload": {
+        "bracket_hint_count": 241,
+        "usage_instruction_paragraphs": 0
+      },
+      "ambiguous_sections": [
+        {
+          "section_number": "三、外币业务和外币报",
+          "section_title": "外币业务和外币报表折算",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            95,
+            96
+          ]
+        },
+        {
+          "section_number": "三、存货",
+          "section_title": "存货",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            275,
+            909
+          ]
+        },
+        {
+          "section_number": "三、持有待售和终止经",
+          "section_title": "持有待售和终止经营",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            297,
+            2118
+          ]
+        },
+        {
+          "section_number": "三、长期股权投资",
+          "section_title": "长期股权投资",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            319,
+            1047,
+            2177
+          ]
+        },
+        {
+          "section_number": "三、固定资产",
+          "section_title": "固定资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            358,
+            1070,
+            1071
+          ]
+        },
+        {
+          "section_number": "三、在建工程",
+          "section_title": "在建工程",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            373,
+            1089,
+            1090
+          ]
+        },
+        {
+          "section_number": "三、生物资产【不适用",
+          "section_title": "生物资产",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            397,
+            398,
+            403,
+            405,
+            408,
+            414,
+            419,
+            1101
+          ]
+        },
+        {
+          "section_number": "三、无形资产",
+          "section_title": "无形资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            424,
+            1112
+          ]
+        },
+        {
+          "section_number": "三、研发支出",
+          "section_title": "研发支出",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            435,
+            1554,
+            1555
+          ]
+        },
+        {
+          "section_number": "三、长期待摊费用",
+          "section_title": "长期待摊费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            453,
+            1155
+          ]
+        },
+        {
+          "section_number": "三、预计负债",
+          "section_title": "预计负债",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            478,
+            1316
+          ]
+        },
+        {
+          "section_number": "三、股份支付及权益工",
+          "section_title": "股份支付及权益工具",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            485,
+            2014
+          ]
+        },
+        {
+          "section_number": "三、优先股、永续债等",
+          "section_title": "优先股、永续债等其他金融工具",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            105,
+            500,
+            504,
+            1259,
+            2163
+          ]
+        },
+        {
+          "section_number": "三、政府补助",
+          "section_title": "政府补助",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            568,
+            1760
+          ]
+        },
+        {
+          "section_number": "三、租赁",
+          "section_title": "租赁",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            596,
+            1532
+          ]
+        },
+        {
+          "section_number": "三、使用权资产",
+          "section_title": "使用权资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            637,
+            1108
+          ]
+        },
+        {
+          "section_number": "三、套期会计【不适用",
+          "section_title": "套期会计",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            665,
+            1868
+          ]
+        },
+        {
+          "section_number": "三、债务重组【不适用",
+          "section_title": "债务重组",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            688,
+            1995,
+            2086
+          ]
+        },
+        {
+          "section_number": "三、资产减值损失（损",
+          "section_title": "资产减值损失",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            445,
+            1449
+          ]
+        },
+        {
+          "section_number": "三、开发支出",
+          "section_title": "开发支出",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1129,
+            1558
+          ]
+        },
+        {
+          "section_number": "三、金融资产转移",
+          "section_title": "金融资产转移",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            259,
+            1910
+          ]
+        },
+        {
+          "section_number": "五",
+          "section_title": "合并财务报表项目注释",
+          "method": "section_number",
+          "candidate_para_indices": [
+            827,
+            856,
+            903,
+            2174,
+            2175,
+            2176,
+            2182
+          ]
+        },
+        {
+          "section_number": "五、8",
+          "section_title": "其他应收款",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            861,
+            880
+          ]
+        },
+        {
+          "section_number": "五、9",
+          "section_title": "存货",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            275,
+            909
+          ]
+        },
+        {
+          "section_number": "五、18",
+          "section_title": "长期股权投资",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            319,
+            1047,
+            2177
+          ]
+        },
+        {
+          "section_number": "五、22",
+          "section_title": "固定资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            358,
+            1070,
+            1071
+          ]
+        },
+        {
+          "section_number": "五、23",
+          "section_title": "在建工程",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            373,
+            1089,
+            1090
+          ]
+        },
+        {
+          "section_number": "五、25",
+          "section_title": "使用权资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            637,
+            1108
+          ]
+        },
+        {
+          "section_number": "五、26",
+          "section_title": "无形资产",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            424,
+            1112
+          ]
+        },
+        {
+          "section_number": "五、27",
+          "section_title": "开发支出",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1129,
+            1558
+          ]
+        },
+        {
+          "section_number": "五、29",
+          "section_title": "长期待摊费用",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            453,
+            1155
+          ]
+        },
+        {
+          "section_number": "五、50",
+          "section_title": "预计负债",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            478,
+            1316
+          ]
+        },
+        {
+          "section_number": "五、57",
+          "section_title": "其他综合收益",
+          "method": "fuzzy_contains",
+          "candidate_para_indices": [
+            1355,
+            2163
+          ]
+        },
+        {
+          "section_number": "五、62",
+          "section_title": "营业收入和营业成本",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1386,
+            1387
+          ]
+        },
+        {
+          "section_number": "五、69",
+          "section_title": "投资收益",
+          "method": "loose_title",
+          "candidate_para_indices": [
+            1442,
+            2183
+          ]
+        },
+        {
+          "section_number": "五、71",
+          "section_title": "现金流量表补充资料",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1499,
+            1500
+          ]
+        },
+        {
+          "section_number": "五、73",
+          "section_title": "外币货币性项目",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            1527,
+            1528
+          ]
+        },
+        {
+          "section_number": "五、74",
+          "section_title": "租赁",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            596,
+            1532
+          ]
+        },
+        {
+          "section_number": "六",
+          "section_title": "研发支出",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            435,
+            1554,
+            1555
+          ]
+        },
+        {
+          "section_number": "六、1",
+          "section_title": "研发支出",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            435,
+            1554,
+            1555
+          ]
+        },
+        {
+          "section_number": "八",
+          "section_title": "政府补助",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            568,
+            1760
+          ]
+        },
+        {
+          "section_number": "八、1",
+          "section_title": "政府补助",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            568,
+            1760
+          ]
+        },
+        {
+          "section_number": "十六、其他应收款",
+          "section_title": "其他应收款",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            861,
+            880
+          ]
+        },
+        {
+          "section_number": "十六、长期股权投资",
+          "section_title": "长期股权投资",
+          "method": "exact_title",
+          "candidate_para_indices": [
+            319,
+            1047,
+            2177
+          ]
+        },
+        {
+          "section_number": "十六、投资收益（注：以",
+          "section_title": "投资收益",
+          "method": "loose_title",
+          "candidate_para_indices": [
+            1442,
+            2183
+          ]
+        }
+      ],
+      "unmatched_sections": [
+        {
+          "section_number": "十六、营业收入与营业成本",
+          "section_title": "营业收入与营业成本"
+        }
+      ],
+      "recommendation": "NO-GO",
+      "rationale": "强匹配率 66.5% < 80.0%；歧义 45 / 未匹配 1 章节过多，自动打标风险高，应保持人工打标。"
+    }
+  }
+}

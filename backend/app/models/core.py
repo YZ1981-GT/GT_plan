@@ -76,6 +76,8 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     )
     company_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     short_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # audit-report-template-integration V066: 企业子类型 type_a/type_b/type_c/type_d
+    company_subtype: Mapped[str | None] = mapped_column(String(10), nullable=True)
     audit_year: Mapped[int | None] = mapped_column(nullable=True, comment="审计年度（物化列，唯一性索引依赖）")
     template_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     report_scope: Mapped[str | None] = mapped_column(String(20), nullable=True)

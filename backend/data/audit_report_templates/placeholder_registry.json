@@ -1,0 +1,51 @@
+{
+  "version": "poc-v1",
+  "canonical_to_legacy": {
+    "company_full_name": "entity_name",
+    "company_short_name": "entity_short_name",
+    "signing_cpa": "cpa_name_1",
+    "signing_partner": "signing_partner",
+    "audit_year": "audit_year",
+    "prior_year": "prior_year",
+    "report_date": "report_date",
+    "firm_name": "firm_name",
+    "firm_address": "firm_address",
+    "report_number": "report_number",
+    "audit_period_end": "audit_period",
+    "audit_period_start": "audit_period_start"
+  },
+  "opt_groups": {
+    "body": "报告正文段落",
+    "supplement": "补充信息段落"
+  },
+  "opt_defaults": {
+    "type_a": {
+      "emphasis": false,
+      "other_matter": false,
+      "going_concern": false,
+      "key_audit_matters": true,
+      "comparative": true,
+      "other_information": false
+    },
+    "type_b": {
+      "key_audit_matters": true,
+      "comparative": true
+    },
+    "type_c": {
+      "key_audit_matters": true,
+      "comparative": true
+    },
+    "type_d": {
+      "key_audit_matters": false,
+      "comparative": true
+    }
+  },
+  "section_group_map": {
+    "emphasis": "body",
+    "key_audit_matters": "body",
+    "going_concern": "body",
+    "other_matter": "supplement",
+    "comparative": "supplement",
+    "other_information": "supplement"
+  }
+}

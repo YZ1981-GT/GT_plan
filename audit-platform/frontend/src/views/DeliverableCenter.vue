@@ -13,10 +13,12 @@
       v-model:keyword="filterKeyword"
       :generating="generating"
       :packaging="packaging"
+      :full-generating="fullGenerating"
       @refresh="loadList"
       @generate-report="openGenerateReport"
       @generate-reports="goGenerateReports"
       @generate-notes="goGenerateNotes"
+      @generate-full="runGenerateFull"
       @package-download="runPackageDownload"
       @archive="runArchive"
     />
@@ -42,6 +44,7 @@
         @toggle-versions="toggleVersions"
         @preview="openPreview"
         @download="downloadItem"
+        @download-guidance="downloadGuidanceVersion"
         @edit="openEditor"
         @select="selectItem"
         @delete="confirmDeleteItem"
@@ -158,6 +161,8 @@ import {
   archiveDeliverables,
   createPackage,
   packageFileUrl,
+  createFullDeliverables,
+  fetchExportJob,
   renderDisclosureNotes,
   renderFinancialReports,
   renderReportBody,
@@ -183,6 +188,7 @@ const year = computed(() => projectStore.year || new Date().getFullYear() - 1)
 const loading = ref(false)
 const generating = ref(false)
 const packaging = ref(false)
+const fullGenerating = ref(false)
 const approvalLoading = ref(false)
 const selectedItem = ref<DeliverableItem | null>(null)
 const editorVisible = ref(false)
@@ -280,6 +286,19 @@ async function toggleVersions(taskId: string) {
 function downloadItem(item: DeliverableItem) {
   const url = deliverableDownloadUrl(projectId.value, item.task_id, item.version_no)
   downloadFile(url, { fileName: item.file_name || `deliverable_v${item.version_no}` })
+}
+
+/**
+ * 下载「编制参考版」（含内部 ##NOTE## 提示的 guidance 副本，§13.2）。
+ * 仅供项目组编制参考，不可对外出具。
+ * 注：后端 guidance 下载专用端点尚未提供（confirm 已落盘 with_notes_v{n}.docx，
+ * 路径记录在 report_body_json.guidance_version_path，但暂无认证下载路由）。
+ * 此处先以「即将上线」提示占位，待后端补 guidance 下载端点后改为
+ * downloadFile（axios blob + Bearer，禁用 window.open）。
+ * TODO(audit-report-template-integration §13.2): 接入 guidance 认证下载端点
+ */
+function downloadGuidanceVersion(_item: DeliverableItem) {
+  ElMessage.info('编制参考版下载即将上线（仅供项目组编制参考，不可对外出具）')
 }
 
 async function confirmDeleteItem(item: DeliverableItem) {
@@ -419,6 +438,62 @@ function onExportConfirm(_sections: string[]) {
   runGenerateReport()
 }
 
+/**
+ * 一键生成全套（需求 14 / 设计 §14）。
+ * 创建 ExportJob（job_type=full_deliverables）后轮询进度；完成时若有 KAM 警告则 Toast。
+ * 报表 → 附注 → 报告正文顺序由后端执行器保证；前置守卫（试算表/报表就绪）由服务端校验。
+ */
+async function runGenerateFull() {
+  // 前端先做依赖链根节点提示（报表就绪即视为试算表就绪），服务端再做权威校验
+  if (!guardGenerate('reports')) return
+  fullGenerating.value = true
+  try {
+    const job = await createFullDeliverables(projectId.value, {
+      year: year.value,
+      template_variant: 'simple',
+    })
+    ElMessage.success('已创建一键生成全套任务，正在生成…')
+    const finalJob = await pollExportJob(job.id)
+    await loadList()
+    summarizeFullJob(finalJob)
+  } catch (e: any) {
+    const detail = e?.response?.data?.detail || e?.message || '一键生成全套失败'
+    ElMessage.error(typeof detail === 'string' ? detail : '一键生成全套失败')
+  } finally {
+    fullGenerating.value = false
+  }
+}
+
+/** 轮询 ExportJob 直至终态（succeeded/partial_failed/failed）或超时。 */
+async function pollExportJob(jobId: string) {
+  const TERMINAL = ['succeeded', 'partial_failed', 'failed', 'cancelled']
+  let attempts = 0
+  const maxAttempts = 60 // ~2min @ 2s
+  // eslint-disable-next-line no-constant-condition
+  while (attempts < maxAttempts) {
+    const job = await fetchExportJob(projectId.value, jobId)
+    if (TERMINAL.includes(job.status)) return job
+    attempts += 1
+    await new Promise((r) => setTimeout(r, 2000))
+  }
+  return await fetchExportJob(projectId.value, jobId)
+}
+
+/** 全套任务终态摘要：成功/部分失败提示 + KAM 警告 Toast（设计 §14 第 6 步）。 */
+function summarizeFullJob(job: { status: string; payload: Record<string, unknown> | null; items: { status: string; word_export_task_id: string | null }[] }) {
+  const kamWarning = job.payload?.kam_warning as string | null | undefined
+  if (job.status === 'succeeded') {
+    ElMessage.success(`全套交付件已生成（${job.items.length} 项）`)
+  } else if (job.status === 'partial_failed') {
+    const failed = job.items.filter((i) => i.status === 'failed').length
+    ElMessage.warning(`全套生成部分完成：${failed} 项失败，可在任务中重试失败项`)
+  } else if (job.status === 'failed') {
+    ElMessage.error('全套生成失败，请检查前置数据后重试')
+  }
+  if (kamWarning) {
+    ElMessage.warning(kamWarning)
+  }
+}
 async function onSubmitApproval() {
   if (!selectedItem.value) return
   approvalLoading.value = true
@@ -465,8 +540,7 @@ async function onReject() {
   }
 }
 
-async function runPackageDownload() {
-  packaging.value = true
+async function runPackageDownload() {  packaging.value = true
   try {
     const res = await createPackage(projectId.value, { year: year.value, ignore_incomplete: true })
     if (res.warnings?.length) {

@@ -147,10 +147,13 @@ class ExportPackageService:
 
         word_exporter = NoteWordExporter(self.db)
         try:
+            from app.services.note_section_catalog import normalize_report_scope
+
             word_output = await word_exporter.export(
                 project_id=project_id,
                 year=year,
                 template_type=project.template_type or "soe",
+                report_scope=normalize_report_scope(project.report_scope),
             )
         except Exception as e:
             logger.warning("Word export failed, using empty placeholder: %s", e)

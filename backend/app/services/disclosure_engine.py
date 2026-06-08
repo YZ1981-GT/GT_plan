@@ -35,6 +35,11 @@ from app.models.report_models import (
     NoteStatus,
     SourceTemplate,
 )
+from app.services.note_section_catalog import (
+    filter_template_sections,
+    normalize_report_scope,
+    normalize_section_code,
+)
 from app.services.note_template_service import NoteTemplateService
 from app.services.note_template_merge import merge_templates
 from app.services.note_custom_template_service import NoteCustomTemplateService
@@ -164,7 +169,16 @@ class DisclosureEngine:
             raise HTTPException(status_code=400, detail="当前项目绑定的自定义附注模板不存在或已失效，请重新选择")
         return template.get("sections", [])
 
-    async def _load_templates(self, project_id: UUID, template_type: str) -> list[dict]:
+    async def _load_templates(
+        self,
+        project_id: UUID,
+        template_type: str,
+        report_scope: str | None = None,
+    ) -> list[dict]:
+        if report_scope is None:
+            basic_info = await self._get_project_basic_info(project_id)
+            report_scope = basic_info.get("report_scope")
+
         if template_type == "custom":
             sections = await self._get_custom_template_sections(project_id)
             return [
@@ -222,10 +236,14 @@ class DisclosureEngine:
             custom_sections = []
 
         sections = merge_templates(baseline_sections, custom_sections)
+        sections = filter_template_sections(sections, report_scope)
 
         return [
             {
-                "note_section": s.get("section_number", f"五、{idx + 1}"),
+                "note_section": normalize_section_code(
+                    s.get("section_number", f"五、{idx + 1}"),
+                    template_type=template_type,
+                ),
                 "section_title": s.get("section_title", ""),
                 "account_name": s.get("account_name") or s.get("section_title", ""),
                 "content_type": s.get("content_type", "table"),

@@ -74,6 +74,52 @@
             </span>
           </el-form-item>
 
+          <el-form-item label="企业子类型" prop="company_subtype">
+            <el-alert
+              v-if="showSubtypeBanner"
+              type="warning"
+              :closable="false"
+              show-icon
+              class="gt-subtype-banner"
+              title="待确认企业子类型"
+            >
+              <template #default>
+                该项目尚未确认企业子类型。系统建议「模板{{ subtypeLetter(recommendation?.subtype || null) }}」（{{ subtypeDesc(recommendation?.subtype || null) }}），请确认或手动选择后保存。
+                <el-button link type="primary" size="small" @click="applyRecommendation">采用建议</el-button>
+              </template>
+            </el-alert>
+            <el-select v-model="form.company_subtype" placeholder="请选择企业子类型" style="width: 100%" clearable>
+              <el-option label="A — 上市公司、三板创新层及公开发债" value="type_a" />
+              <el-option label="B — 三板基础层、银行、保险、期货、证券" value="type_b" />
+              <el-option label="C — 其他公众利益实体" value="type_c" />
+              <el-option label="D — 非公众利益实体" value="type_d" />
+            </el-select>
+            <div
+              v-if="recommendation && recommendation.subtype"
+              class="gt-subtype-recommend"
+            >
+              <el-tag size="small" :type="recommendation.confidence === 'high' ? 'success' : 'warning'" effect="light">
+                系统建议：模板{{ subtypeLetter(recommendation.subtype) }}
+              </el-tag>
+              <span class="gt-subtype-recommend-desc">{{ subtypeDesc(recommendation.subtype) }}</span>
+              <el-button
+                v-if="form.company_subtype !== recommendation.subtype"
+                link
+                type="primary"
+                size="small"
+                @click="applyRecommendation"
+              >
+                采用建议
+              </el-button>
+              <span
+                v-if="recommendation.confidence !== 'high' && recommendation.candidates.length > 1"
+                class="gt-subtype-recommend-hint"
+              >
+                （存在多个候选：{{ recommendation.candidates.map(subtypeLetter).join('、') }}，请确认）
+              </span>
+            </div>
+          </el-form-item>
+
           <el-form-item v-if="form.template_type === 'custom'" label="自定义模板" prop="custom_template_id">
             <el-select
               v-model="form.custom_template_id"
@@ -182,9 +228,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { fetchTemplateRecommendation, type TemplateRecommendation } from '@/services/commonApi'
 import { useWizardStore, type BasicInfo } from '@/stores/wizard'
 import { validateUSCC } from '@/utils/uscc_validator'
 
@@ -193,6 +240,61 @@ const formRef = ref<FormInstance>()
 const auditYearDate = ref<string>('')
 const customTemplateLoading = ref(false)
 const customTemplates = ref<Array<{ id: string; name: string; version?: string }>>([])
+const recommendation = ref<TemplateRecommendation | null>(null)
+
+const SUBTYPE_DESC: Record<string, string> = {
+  type_a: '上市公司、三板创新层及公开发债',
+  type_b: '三板基础层、银行、保险、期货、证券',
+  type_c: '其他公众利益实体',
+  type_d: '非公众利益实体',
+}
+
+function subtypeLetter(subtype: string | null): string {
+  if (!subtype) return ''
+  return subtype.replace('type_', '').toUpperCase()
+}
+
+function subtypeDesc(subtype: string | null): string {
+  return subtype ? (SUBTYPE_DESC[subtype] || '') : ''
+}
+
+function applyRecommendation() {
+  if (recommendation.value?.subtype) {
+    form.company_subtype = recommendation.value.subtype
+  }
+}
+
+/**
+ * 「待确认企业子类型」非阻断横幅（需求 1.7 ③ / 14.3）。
+ * 仅当：存量项目（有 projectId）+ 用户尚未选择 company_subtype + 后端标记 needs_confirmation
+ * + 存在建议值时展示。用户选择后即消失（confirmed，需求 1.8）。
+ */
+const showSubtypeBanner = computed(() => {
+  return (
+    !!wizardStore.projectId &&
+    !form.company_subtype &&
+    !!recommendation.value?.needs_confirmation &&
+    !!recommendation.value?.subtype
+  )
+})
+
+/** 拉取企业子类型推荐（需求 7.6：须预填建议值，不仅高亮）。 */
+async function loadRecommendation() {
+  const projectId = wizardStore.projectId
+  if (!projectId) return
+  try {
+    const rec = await fetchTemplateRecommendation(projectId)
+    if (rec && rec.subtype) {
+      recommendation.value = rec
+      // 需求 7.6：预填建议值（用户未手动选择时）
+      if (!form.company_subtype) {
+        form.company_subtype = rec.subtype
+      }
+    }
+  } catch {
+    // 推荐失败不阻断向导
+  }
+}
 
 const form = reactive<BasicInfo>({
   client_name: '',
@@ -202,6 +304,7 @@ const form = reactive<BasicInfo>({
   accounting_standard: '',
   company_code: '',
   template_type: 'soe',
+  company_subtype: null,
   custom_template_id: '',
   custom_template_name: '',
   custom_template_version: '',
@@ -331,6 +434,8 @@ onMounted(async () => {
       onCustomTemplateChange(form.custom_template_id)
     }
   }
+  // 需求 7.6：已有项目进入向导时拉取企业子类型推荐并预填
+  await loadRecommendation()
 })
 
 // 兜底：store 异步加载完成后填充表单（解决组件挂载时 store 还在 loading 的时序问题）
@@ -396,6 +501,26 @@ defineExpose({ validate, formRef })
   margin-bottom: 14px;
   padding-bottom: 6px;
   border-bottom: 2px solid var(--gt-color-primary-lighter, #e8e0f0);
+}
+
+/* 企业子类型系统建议 */
+.gt-subtype-banner {
+  margin-bottom: 8px;
+}
+.gt-subtype-recommend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.gt-subtype-recommend-desc {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
+}
+.gt-subtype-recommend-hint {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-warning, #e6a23c);
 }
 
 /* 响应式：窄屏回退单栏 */

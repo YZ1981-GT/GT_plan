@@ -27,6 +27,15 @@
           </el-button>
           <el-button link type="primary" @click="emit('download', row)">下载</el-button>
           <el-button
+            v-if="docType === 'audit_report'"
+            link
+            type="info"
+            title="仅供项目组编制参考，不可对外出具"
+            @click="emit('download-guidance', row)"
+          >
+            下载编制参考版
+          </el-button>
+          <el-button
             v-if="!['confirmed', 'signed', 'archived'].includes(row.status)"
             link
             type="danger"
@@ -53,6 +62,7 @@ const emit = defineEmits<{
   'toggle-versions': [taskId: string]
   preview: [item: DeliverableItem]
   download: [item: DeliverableItem]
+  'download-guidance': [item: DeliverableItem]
   edit: [item: DeliverableItem]
   select: [item: DeliverableItem]
   delete: [item: DeliverableItem]

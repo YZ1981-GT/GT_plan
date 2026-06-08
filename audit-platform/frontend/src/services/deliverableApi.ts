@@ -1,5 +1,6 @@
 import { api } from '@/services/apiProxy'
 import { deliverables } from '@/services/apiPaths/report'
+import { wordExports } from '@/services/apiPaths/report'
 
 export interface DeliverableItem {
   task_id: string
@@ -71,6 +72,77 @@ export async function renderReportBody(
   },
 ): Promise<ReportBodyRenderResult> {
   return api.post<ReportBodyRenderResult>(deliverables.renderReportBody(projectId), body)
+}
+
+// ─── 报告正文两阶段生成（preview → OPT 弹窗 → confirm，§11/§13.1） ───────────
+
+/** preview 请求体 */
+export interface ReportBodyPreviewRequest {
+  year: number
+  opinion_type: string
+  /** 企业子类型（type_a..type_d）；留空由后端从项目/fallback 解析 */
+  company_subtype?: string | null
+  /** 报告详简版，默认 simple */
+  template_variant?: string
+}
+
+/** preview 返回的单个可选段落（OPT 块） */
+export interface OptionalSection {
+  section_id: string
+  description: string
+  /** 段落预览文本（前若干字） */
+  preview: string
+  /** 默认是否保留（勾选） */
+  default_keep: boolean
+  /** 所属分组中文标题（报告正文段落 / 补充信息段落） */
+  group: string
+}
+
+/** preview 响应体 */
+export interface ReportBodyPreviewResult {
+  preview_session_id: string
+  optional_sections: OptionalSection[]
+  missing_fields: string[]
+  template_version: string
+  company_subtype_resolved: string
+}
+
+/** confirm 请求体 */
+export interface ReportBodyConfirmRequest {
+  year: number
+  preview_session_id: string
+  /** 用户勾选结果：section_id → 是否保留 */
+  optional_sections: Record<string, boolean>
+}
+
+/** confirm 响应体 */
+export interface ReportBodyConfirmResult {
+  task_id: string
+  version_no: number
+  download_url: string
+  report_body_json: Record<string, unknown>
+  validation_warning: string | null
+}
+
+/**
+ * 报告正文生成第一步：preview（不落库）。
+ * 返回可选段落清单 + 待补充字段，供 OptionalSectionDialog 展示。
+ */
+export async function previewReportBody(
+  projectId: string,
+  body: ReportBodyPreviewRequest,
+): Promise<ReportBodyPreviewResult> {
+  return api.post<ReportBodyPreviewResult>(deliverables.previewReportBody(projectId), body)
+}
+
+/**
+ * 报告正文生成第二步：confirm（携 preview_session_id + 勾选入库，版本递增）。
+ */
+export async function confirmReportBody(
+  projectId: string,
+  body: ReportBodyConfirmRequest,
+): Promise<ReportBodyConfirmResult> {
+  return api.post<ReportBodyConfirmResult>(deliverables.confirmReportBody(projectId), body)
 }
 
 export function deliverableDownloadUrl(projectId: string, taskId: string, versionNo: number): string {
@@ -162,4 +234,59 @@ export async function fetchOnlyOfficeConfig(
 
 export async function deleteDeliverable(projectId: string, taskId: string) {
   return api.delete<{ message: string }>(`/api/projects/${projectId}/deliverables/${taskId}`)
+}
+
+// ─── 一键生成全套（job_type=full_deliverables，audit-report-template-integration §14） ──
+
+/** ExportJob 明细项 */
+export interface ExportJobItem {
+  id: string
+  job_id: string
+  word_export_task_id: string | null
+  status: string
+  error_message: string | null
+  finished_at: string | null
+}
+
+/** ExportJob 响应（含进度 + payload metadata：kam_warning / resolved_optional_sections） */
+export interface ExportJobResult {
+  id: string
+  project_id: string
+  job_type: string
+  status: string
+  payload: Record<string, unknown> | null
+  progress_total: number
+  progress_done: number
+  failed_count: number
+  initiated_by: string
+  created_at: string | null
+  updated_at: string | null
+  items: ExportJobItem[]
+}
+
+/** 一键生成全套请求体 */
+export interface FullDeliverablesRequest {
+  year: number
+  template_variant?: string
+  steps?: string[]
+  optional_sections?: Record<string, boolean> | null
+}
+
+/**
+ * 创建「一键生成全套」后台任务（同步执行：报表 → 附注 → 报告正文）。
+ * 返回 ExportJob（含进度与明细），前端据 job_id 轮询 fetchExportJob。
+ */
+export async function createFullDeliverables(
+  projectId: string,
+  body: FullDeliverablesRequest,
+): Promise<ExportJobResult> {
+  return api.post<ExportJobResult>(wordExports.fullDeliverables(projectId), body)
+}
+
+/** 轮询全套生成任务进度。 */
+export async function fetchExportJob(
+  projectId: string,
+  jobId: string,
+): Promise<ExportJobResult> {
+  return api.get<ExportJobResult>(wordExports.jobStatus(projectId, jobId))
 }

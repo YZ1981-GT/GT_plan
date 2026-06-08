@@ -94,6 +94,7 @@ class BasicInfoSchema(BaseModel):
     company_code: str = Field(min_length=18, max_length=18)  # 企业代码（统一社会信用代码，18位必填）
     short_name: str = Field(min_length=1, max_length=100)  # 项目简称（必填）
     template_type: str | None = None  # 附注模板类型：soe（国企版）/ listed（上市版）
+    company_subtype: str | None = None  # 企业子类型：type_a/type_b/type_c/type_d（audit-report-template-integration 需求 1.5）
     custom_template_id: str | None = None
     custom_template_name: str | None = None
     custom_template_version: str | None = None
@@ -155,6 +156,8 @@ class ProjectCreateResponse(BaseModel):
     project_type: str | None = None
     status: str
     template_type: str | None = None
+    # audit-report-template-integration 需求 1.5/14.2：企业子类型 type_a/b/c/d 读写往返
+    company_subtype: str | None = None
     report_scope: str | None = None
     parent_project_id: UUID | None = None
     consol_level: int = 1

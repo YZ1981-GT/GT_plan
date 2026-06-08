@@ -9,6 +9,8 @@ export interface BasicInfo {
   accounting_standard: string
   company_code: string
   template_type: string
+  // audit-report-template-integration 需求 1.5：企业子类型 type_a/b/c/d
+  company_subtype: string | null
   custom_template_id: string
   custom_template_name: string
   custom_template_version: string
@@ -128,6 +130,9 @@ export const useWizardStore = defineStore('wizard', {
         }
         if (basicInfo.template_type) {
           payload.template_type = basicInfo.template_type
+        }
+        if (basicInfo.company_subtype) {
+          payload.company_subtype = basicInfo.company_subtype
         }
         if (basicInfo.template_type === 'custom' && basicInfo.custom_template_id) {
           payload.custom_template_id = basicInfo.custom_template_id

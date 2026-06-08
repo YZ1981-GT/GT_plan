@@ -85,6 +85,7 @@ def _to_project_response(project: Project) -> ProjectCreateResponse:
         project_type=project.project_type.value if project.project_type else None,
         status=project.status.value,
         template_type=project.template_type,
+        company_subtype=project.company_subtype,
         report_scope=project.report_scope,
         parent_project_id=project.parent_project_id,
         consol_level=project.consol_level or 1,
@@ -388,6 +389,69 @@ async def attach_subsidiaries(
         _emit_scope_changed(project_id, _extract_project_audit_year(parent))
 
     return [_to_project_response(c) for c in attached]
+
+
+class TemplateRecommendationResponse(BaseModel):
+    """企业子类型推荐响应（需求 7.6 + 14.3 回填）。"""
+    subtype: str | None
+    confidence: str
+    candidates: list[str]
+    matched_rules: list[str]
+    source: str
+    # 需求 1.7/1.8/14.3：项目当前已保存的企业子类型（用户手动设置时优先）
+    current_subtype: str | None = None
+    # 需求 1.7 ③：为空/未确认时前端展示「待确认企业子类型」非阻断横幅
+    needs_confirmation: bool = False
+
+
+@router.get(
+    "/{project_id}/template-recommendation",
+    response_model=TemplateRecommendationResponse,
+)
+async def get_template_recommendation(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TemplateRecommendationResponse:
+    """根据项目属性推荐企业子类型（模板 A/B/C/D）。
+
+    从 Project 行提取属性（applicable_standard_v2.entity_type / scenario /
+    template_type / report_scope / 公司名）喂给 MatchingRulesService。
+    规则推荐优先于 listed/non_listed fallback（需求 7.7）。
+    需求 1.7/1.8/14.3：返回 current_subtype（项目已保存值，用户手动优先）+
+    needs_confirmation（为空时引导前端展示「待确认企业子类型」横幅）。
+
+    Validates: Requirements 1.4, 1.7, 1.8, 7.2, 7.5, 7.6, 7.7
+    """
+    from app.services.matching_rules_service import (
+        backfill_company_subtype,
+        recommend_company_subtype,
+    )
+
+    project = await db.get(Project, project_id)
+    if project is None or project.is_deleted:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    # fallback 推断依赖 company_type（listed/non_listed），从模板/准则属性派生
+    project_attrs = {
+        "entity_type": (project.applicable_standard_v2 or {}).get("entity_type"),
+        "scope": (project.applicable_standard_v2 or {}).get("scope"),
+        "scenario": project.scenario,
+        "template_type": project.template_type,
+        "report_scope": project.report_scope,
+        "company_name": project.name,
+        "client_name": project.client_name,
+        "applicable_standard_v2": project.applicable_standard_v2,
+    }
+    result = recommend_company_subtype(project_attrs)
+    backfill = backfill_company_subtype(
+        project_attrs, existing_subtype=project.company_subtype
+    )
+    return TemplateRecommendationResponse(
+        **result.to_dict(),
+        current_subtype=project.company_subtype,
+        needs_confirmation=backfill.needs_confirmation,
+    )
 
 
 @router.get("/{project_id}/wizard", response_model=WizardState)

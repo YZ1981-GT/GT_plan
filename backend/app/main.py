@@ -43,6 +43,7 @@ async def lifespan(app: FastAPI):
     await _replay_startup_events()
     await _check_gin_index_status()
     await _check_libreoffice_health()
+    await _validate_template_manifest()
     await _run_schema_drift_check()
 
     stop_event = asyncio.Event()
@@ -193,6 +194,35 @@ async def _check_gin_index_status() -> None:
         _log.getLogger("audit_platform").debug(
             "[启动] GIN index status check skipped (non-PG or unavailable): %s", e
         )
+
+
+async def _validate_template_manifest() -> None:
+    """启动校验：template_manifest.json 引用文件存在、无 .doc 残留."""
+    import logging as _log
+
+    log = _log.getLogger("audit_platform")
+    try:
+        from app.services.template_manifest_loader import get_template_manifest_loader
+
+        loader = get_template_manifest_loader()
+        warnings = loader.validate()
+        if warnings:
+            log.warning(
+                "[启动] 模板 manifest 校验 %d 项警告（version=%s）",
+                len(warnings),
+                loader.version() or "unknown",
+            )
+            for w in warnings[:8]:
+                log.warning("  %s", w)
+            if len(warnings) > 8:
+                log.warning("  ... 还有 %d 项，详见 validate_template_manifest.py", len(warnings) - 8)
+        else:
+            log.info(
+                "[启动] 模板 manifest 校验通过（version=%s）",
+                loader.version() or "unknown",
+            )
+    except Exception as e:
+        log.warning("[启动] 模板 manifest 校验失败（不阻塞启动）: %s", e)
 
 
 async def _check_libreoffice_health() -> None:

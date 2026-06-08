@@ -95,7 +95,52 @@ class TestEmptyHandling:
         assert should_skip_empty_section({"status": "not_applicable"}) is True
 
     def test_normal_section_not_skipped(self):
-        assert should_skip_empty_section({"status": "active"}) is False
+        # design §7.1 ④ 生效后：仅 status=active 但无任何内容的章节视为空，应跳过。
+        # 一个「正常」章节须有内容才不跳过。
+        assert should_skip_empty_section(
+            {"status": "active", "text_content": "本期内容"}
+        ) is False
+
+    def test_skip_is_empty_flag(self):
+        """design §7.1 ③: is_empty=True 整节删除."""
+        assert should_skip_empty_section({"is_empty": True}) is True
+
+    def test_skip_empty_text_and_empty_tables(self):
+        """design §7.1 ④: text 空 + 所有表全空 → 跳过."""
+        note = {
+            "text_content": "",
+            "table_data": {"rows": [{"cells": [0, 0, "-"]}]},
+        }
+        assert should_skip_empty_section(note) is True
+
+    def test_skip_empty_text_and_empty_multi_tables(self):
+        """design §7.1 ④: 多表 _tables 全空 → 跳过."""
+        note = {
+            "text_content": None,
+            "table_data": {
+                "_tables": [
+                    {"rows": [{"cells": [0]}]},
+                    {"rows": []},
+                ]
+            },
+        }
+        assert should_skip_empty_section(note) is True
+
+    def test_no_skip_with_text_content(self):
+        """design §7.1 ④: 有文本内容则不跳过（即使表为空）."""
+        note = {
+            "text_content": "本期货币资金构成如下",
+            "table_data": {"rows": [{"cells": [0]}]},
+        }
+        assert should_skip_empty_section(note) is False
+
+    def test_no_skip_with_nonempty_table(self):
+        """design §7.1 ④: 表有数据则不跳过（即使无文本）."""
+        note = {
+            "text_content": "",
+            "table_data": {"rows": [{"cells": [0, 1234.5]}]},
+        }
+        assert should_skip_empty_section(note) is False
 
     def test_empty_table_all_zeros(self):
         td = {"rows": [{"cells": [0, 0, 0]}, {"cells": ["-", None, ""]}]}

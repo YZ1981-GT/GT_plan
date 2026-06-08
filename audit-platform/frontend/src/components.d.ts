@@ -407,6 +407,7 @@ declare module 'vue' {
     OcrStatusBadge: typeof import('./components/common/OcrStatusBadge.vue')['default']
     OnlyOfficeEditor: typeof import('./components/deliverable/OnlyOfficeEditor.vue')['default']
     OperationFeedback: typeof import('./components/common/OperationFeedback.vue')['default']
+    OptionalSectionDialog: typeof import('./components/deliverable/OptionalSectionDialog.vue')['default']
     OrgNode: typeof import('./components/consolidation/OrgNode.vue')['default']
     PasswordConfirmDialog: typeof import('./components/PasswordConfirmDialog.vue')['default']
     PayrollCalcDialog: typeof import('./components/workpaper/PayrollCalcDialog.vue')['default']

@@ -28,6 +28,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.report_models import DisclosureNote
+from app.services.note_section_catalog import section_applies_to_scope
 
 
 # ---------------------------------------------------------------------------
@@ -200,10 +201,14 @@ class NoteSectionNumberingService:
         """
         nodes = [_SectionNode(s) for s in sections if _attr(s, "section_id")]
         # 过滤 scope + is_deleted
-        nodes = [
-            n for n in nodes
-            if not n.is_deleted and (scope == "both" or n.scope in (scope, "both"))
-        ]
+        if scope == "both":
+            nodes = [n for n in nodes if not n.is_deleted]
+        else:
+            rs = scope if scope in ("standalone", "consolidated") else "standalone"
+            nodes = [
+                n for n in nodes
+                if not n.is_deleted and section_applies_to_scope({"scope": n.scope}, rs)
+            ]
         if not nodes:
             return {}
 

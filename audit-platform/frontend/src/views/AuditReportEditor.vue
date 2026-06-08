@@ -171,6 +171,18 @@
       </template>
     </el-dialog>
 
+    <!-- 可选段落确认弹窗（报告正文两阶段生成 §13.1） -->
+    <OptionalSectionDialog
+      v-model:visible="optDialogVisible"
+      :optional-sections="optSections"
+      :missing-fields="optMissingFields"
+      :template-version="optTemplateVersion"
+      :company-subtype-resolved="optCompanySubtype"
+      :initial-selections="optInitialSelections"
+      :confirm-loading="confirmLoading"
+      @confirm="onOptConfirm"
+    />
+
     <!-- 知识库文档选择弹窗 [R3.7] -->
     <KnowledgePickerDialog v-model:visible="knowledgePickerVisible" />
   </div>
@@ -193,6 +205,18 @@ import { useKnowledge, knowledgePickerVisible } from '@/composables/useKnowledge
 import { useEditMode } from '@/composables/useEditMode'
 import { confirmLeave } from '@/utils/confirm'
 import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue'
+import OptionalSectionDialog from '@/components/deliverable/OptionalSectionDialog.vue'
+import {
+  previewReportBody,
+  confirmReportBody,
+  fetchCompleteness,
+  type OptionalSection,
+} from '@/services/deliverableApi'
+import {
+  checkGenerateReady,
+  type DataReadiness,
+} from '@/components/deliverable/generateGuard'
+import { ElMessageBox } from 'element-plus'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import { useEditingLock } from '@/composables/useEditingLock'
@@ -245,6 +269,38 @@ const genForm = ref({
   report_scope: 'standalone',
   entity_short_name: '',
 })
+
+// ── 报告正文两阶段生成（preview → OPT 弹窗 → confirm，§13.1） ──
+const optDialogVisible = ref(false)
+const confirmLoading = ref(false)
+const optSections = ref<OptionalSection[]>([])
+const optMissingFields = ref<string[]>([])
+const optTemplateVersion = ref('')
+const optCompanySubtype = ref('')
+const optInitialSelections = ref<Record<string, boolean> | null>(null)
+const optPreviewSessionId = ref('')
+
+// 生成前置数据就绪状态（需求 14：与交付件中心三入口统一守卫）
+const readiness = ref<DataReadiness>({ trialBalanceReady: false, reportsReady: false })
+
+/**
+ * 拉取完整性状态，推导报告正文生成前置就绪标志（需求 14）。
+ * 与 DeliverableCenter.refreshReadiness 同源口径；完整性接口不可用时不硬阻断
+ * （match DeliverableCenter 容忍度），由后端 confirm 阶段兜底校验。
+ */
+async function refreshReadiness() {
+  try {
+    const c = await fetchCompleteness(projectId.value, year.value)
+    readiness.value = {
+      reportsReady: !c.missing_doc_types.includes('financial_report'),
+      trialBalanceReady:
+        c.missing_financial_reports.length === 0 || !c.missing_doc_types.includes('financial_report'),
+    }
+  } catch {
+    // 完整性接口不可用时不硬阻断生成（与 DeliverableCenter 一致）
+    readiness.value = { trialBalanceReady: true, reportsReady: true }
+  }
+}
 
 // ── 知识库上下文 [R3.7] ──
 const { pickDocuments, buildContext } = useKnowledge()
@@ -310,6 +366,81 @@ async function fetchReport() {
 }
 
 async function onGenerate() {
+  // 需求 14：报告正文生成前置守卫（与交付件中心三入口统一）。
+  // 先刷新就绪状态再校验：财务报表未就绪时阻止并提示，不打开 OPT 弹窗。
+  await refreshReadiness()
+  const guard = checkGenerateReady('report_body', readiness.value)
+  if (!guard.allowed) {
+    ElMessage.warning(guard.message)
+    return
+  }
+  genLoading.value = true
+  try {
+    // 两阶段生成第一步：preview（不落库），返回可选段落 + 待补充字段
+    // company_subtype 传 null，由后端从项目/fallback 解析
+    const result = await previewReportBody(projectId.value, {
+      year: year.value,
+      opinion_type: genForm.value.opinion_type,
+      company_subtype: null,
+      template_variant: 'simple',
+    })
+    optPreviewSessionId.value = result.preview_session_id
+    optSections.value = result.optional_sections || []
+    optMissingFields.value = result.missing_fields || []
+    optTemplateVersion.value = result.template_version || ''
+    optCompanySubtype.value = result.company_subtype_resolved || ''
+    // 重新生成时预填上次勾选
+    const prev = (report.value as any)?.report_body_json?.optional_sections
+    optInitialSelections.value = prev && typeof prev === 'object' ? prev : null
+    showGenerateDialog.value = false
+    optDialogVisible.value = true
+  } catch (e: any) {
+    handleApiError(e, '生成报告正文')
+  } finally {
+    genLoading.value = false
+  }
+}
+
+/**
+ * OPT 弹窗确认 → 两阶段生成第二步：confirm（入库，版本递增）。
+ * 重新生成（已有报告）时先提示「将覆盖当前编辑内容」（需求 6.5）。
+ */
+async function onOptConfirm(selections: Record<string, boolean>) {
+  // 需求 6.5：已有报告版本时确认覆盖
+  if (report.value) {
+    try {
+      await ElMessageBox.confirm(
+        '将覆盖当前编辑内容，是否继续？',
+        '重新生成报告正文',
+        { type: 'warning', confirmButtonText: '继续生成', cancelButtonText: '取消' },
+      )
+    } catch {
+      return // 用户取消，保留弹窗
+    }
+  }
+  confirmLoading.value = true
+  try {
+    const res = await confirmReportBody(projectId.value, {
+      year: year.value,
+      preview_session_id: optPreviewSessionId.value,
+      optional_sections: selections,
+    })
+    ElMessage.success('审计报告生成完成')
+    // KAM 等合规警告：Toast 提示但仍继续（不阻断）
+    if (res.validation_warning) {
+      ElMessage.warning(res.validation_warning)
+    }
+    optDialogVisible.value = false
+    await fetchReport()
+  } catch (e: any) {
+    handleApiError(e, '生成报告正文')
+  } finally {
+    confirmLoading.value = false
+  }
+}
+
+/** 旧版单阶段生成路径（保留备用，不再作为主入口） */
+async function onGenerateLegacy() {
   genLoading.value = true
   try {
     await generateAuditReport(projectId.value, year.value, genForm.value.opinion_type, genForm.value.company_type)

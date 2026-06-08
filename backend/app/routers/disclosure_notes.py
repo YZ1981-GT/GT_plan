@@ -196,35 +196,33 @@ async def get_section_numbers(
     返回 {note_section: rendered_number} 映射，如 {"五、1": "1", "五、2": "2"}.
     规则：按章节前缀分组，组内连续编号；若组内仅 1 个条目则不编号。
     """
+    from app.models.core import Project
+    from app.services.note_section_numbering import compute_section_numbers
+    from app.services.note_section_catalog import normalize_template_type
+
     engine = DisclosureEngine(db)
     tree = await engine.get_notes_tree(project_id, year)
     if not tree:
         return {}
 
-    # 按章节前缀分组（"一、" "二、" ...）
-    from collections import OrderedDict
-    groups: dict[str, list[dict]] = OrderedDict()
-    for item in tree:
-        section = item.get("note_section", "")
-        if not section:
-            continue
-        # 提取前缀：取"、"之前的部分作为分组 key
-        sep_idx = section.find("、")
-        prefix = section[:sep_idx] if sep_idx > 0 else ""
-        if prefix not in groups:
-            groups[prefix] = []
-        groups[prefix].append(item)
+    proj = (
+        await db.execute(
+            sa.select(Project.template_type, Project.report_scope).where(
+                Project.id == project_id,
+                Project.is_deleted == sa.false(),
+            )
+        )
+    ).one_or_none()
+    template_type = normalize_template_type(proj[0] if proj else "soe")
+    effective_scope = scope if scope in ("standalone", "consolidated", "both") else "both"
+    if effective_scope == "both" and proj and proj[1]:
+        effective_scope = proj[1]
 
-    result: dict[str, str] = {}
-    for _prefix, items in groups.items():
-        # 组内仅 1 个条目不编号
-        if len(items) <= 1:
-            continue
-        for idx, item in enumerate(items, 1):
-            section = item.get("note_section", "")
-            if section:
-                result[section] = str(idx)
-    return result
+    return compute_section_numbers(
+        tree,
+        report_scope=effective_scope,
+        template_type=template_type,
+    )
 
 
 @router.get("/{project_id}/{year}/{note_section}/prior-year")
@@ -453,11 +451,28 @@ async def export_word(
 ):
     """导出附注为 Word 文档"""
     from fastapi.responses import StreamingResponse
+    from app.models.core import Project
+    from app.services.note_section_catalog import normalize_report_scope
     from app.services.note_word_exporter import NoteWordExporter
+
+    proj_row = (
+        await db.execute(
+            sa.select(Project.report_scope).where(
+                Project.id == project_id,
+                Project.is_deleted == sa.false(),
+            )
+        )
+    ).scalar_one_or_none()
 
     exporter = NoteWordExporter(db)
     try:
-        output = await exporter.export(project_id, year)
+        output = await exporter.export(
+            project_id,
+            year,
+            report_scope=normalize_report_scope(
+                proj_row if isinstance(proj_row, str) else None
+            ),
+        )
         return StreamingResponse(
             output,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",

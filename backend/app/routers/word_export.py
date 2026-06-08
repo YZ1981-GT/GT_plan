@@ -30,6 +30,7 @@ from app.models.phase13_models import WordExportDocType, WordExportStatus
 from app.models.phase13_schemas import (
     ExportJobResponse,
     ExportJobItemResponse,
+    FullDeliverablesRequest,
     FullPackageRequest,
     ReportSnapshotCreate,
     ReportSnapshotResponse,
@@ -360,6 +361,60 @@ async def create_full_package(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"全套导出失败: {str(e)}")
+
+
+# ------------------------------------------------------------------
+# 一键生成全套 (audit-report-template-integration task 15 / design §14)
+# ------------------------------------------------------------------
+
+@router.post("/full-deliverables", response_model=ExportJobResponse)
+async def create_full_deliverables(
+    project_id: UUID,
+    body: FullDeliverablesRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """一键生成全套交付件：财务报表 → 附注 → 报告正文（同步执行，复用 export_jobs_v2）。
+
+    - 顺序与 generateGuard 依赖链一致（报表 → 附注 → 报告正文）。
+    - 报告正文步骤自动 preview→confirm（无弹窗），OPT 按默认优先级链解析（design §14）。
+    - 单项失败不阻断其余步骤（需求 14.3）：job 最终落 partial_failed。
+    - 完成后 KAM 警告写入 job.payload metadata，前端轮询完成时 Toast。
+
+    进度轮询：``GET /api/projects/{project_id}/word-exports/jobs/{job_id}``。
+    """
+    from app.services.full_deliverables_executor import FullDeliverablesExecutor
+    from app.services.export_job_service import ExportJobService
+
+    executor = FullDeliverablesExecutor(db)
+    payload = {
+        "year": body.year,
+        "template_variant": body.template_variant,
+        "steps": body.steps,
+        "optional_sections": body.optional_sections,
+    }
+    try:
+        result = await executor.run(
+            project_id=project_id,
+            user_id=current_user.id,
+            payload=payload,
+        )
+        await db.commit()
+    except ValueError as e:
+        # job 级前置校验失败（试算表未就绪等）→ 422
+        await db.rollback()
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"全套生成失败: {str(e)}")
+
+    job = await ExportJobService(db).get_job(result.job_id)
+    if job is None:
+        raise HTTPException(status_code=500, detail="任务创建后无法读取")
+    items = await ExportJobService(db).get_job_items(result.job_id)
+    resp = ExportJobResponse.model_validate(job)
+    resp.items = [ExportJobItemResponse.model_validate(i) for i in items]
+    return resp
 
 
 # ------------------------------------------------------------------

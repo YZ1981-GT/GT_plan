@@ -10,9 +10,12 @@ Requirements: 3.1-3.15
 from __future__ import annotations
 
 import copy
+import json
 import logging
 import os
+import re
 from decimal import Decimal
+from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -30,18 +33,7 @@ from app.models.report_models import FinancialReport, FinancialReportType
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Template map: (template_type, report_scope) → relative path from repo root
-# ---------------------------------------------------------------------------
-
-TEMPLATE_MAP: dict[str, str] = {
-    "soe_consolidated": "审计报告模板/国企版/合并/1.1-2025国企财务报表.xlsx",
-    "soe_standalone": "审计报告模板/国企版/单体/1.1-2025国企财务报表.xlsx",
-    "listed_consolidated": "审计报告模板/上市版/合并_上市/2.股份年审－经审计的财务报表-202601.xlsx",
-    "listed_standalone": "审计报告模板/上市版/单体_上市/2.股份年审－经审计的财务报表-202601.xlsx",
-}
-
-# Report type → Chinese sheet name
+# Report type → Chinese sheet name（manifest sheet_aliases 优先，此为回退子串匹配）
 REPORT_TYPE_SHEET_NAMES: dict[str, str] = {
     "balance_sheet": "资产负债表",
     "income_statement": "利润表",
@@ -61,6 +53,44 @@ BOLD_AMOUNT_FONT = Font(name="Arial Narrow", size=10, bold=True)
 
 # Indentation: 2 Chinese character widths per level ≈ 4 regular chars
 INDENT_CHARS_PER_LEVEL = 4
+
+# Inline placeholder patterns (design §6 双轨填充)
+#   {{row:BS-002:current}} / {{row:BS-002:prior}}
+#   {{row:BS-002:current:parent}} / {{row:BS-002:prior:parent}}（母公司个别列）
+_ROW_PLACEHOLDER_RE = re.compile(
+    r"\{\{row:([^:}]+):(current|prior)(?::(parent))?\}\}"
+)
+#   {{note_ref:BS-002}}
+_NOTE_REF_RE = re.compile(r"\{\{note_ref:([^}]+)\}\}")
+#   header placeholders embedded in text: {{company_full_name}} 等
+_HEADER_PLACEHOLDER_RE = re.compile(r"\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}")
+
+# Header placeholder keys handled by header replacement track
+_HEADER_KEYS = frozenset(
+    {"company_full_name", "period_end_date", "audit_year", "currency_unit"}
+)
+
+
+@lru_cache(maxsize=1)
+def _load_cell_mapping() -> dict[str, Any]:
+    """加载 ``cell_mapping.json``（resolve 相对模板 data 目录）.
+
+    结构::
+
+        {"version", "variants": {variant_key: {"headers": {...}, "rows": {...}}}}
+    """
+    from app.services.template_manifest_loader import resolve_template_base_dir
+
+    path = resolve_template_base_dir() / "cell_mapping.json"
+    if not path.is_file():
+        logger.info("cell_mapping.json not found at %s", path)
+        return {}
+    try:
+        with path.open(encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning("Failed to load cell_mapping.json: %s", e)
+        return {}
 
 
 class ReportExcelExporter:
@@ -112,6 +142,13 @@ class ReportExcelExporter:
         # 4. Load report data from DB
         report_data = await self._load_report_data(project_id, year, types_to_export)
 
+        # 4b. Load parent (母公司个别) report data for consolidated :parent columns.
+        #     母分汇总已作为现成 FinancialReport 存储——读「上级代码」匹配的 standalone
+        #     项目的报表行，按 row_code 建索引；缺失则留空（不崩）。
+        parent_row_index = await self._load_parent_row_index(
+            project, year, types_to_export
+        )
+
         # 5. Try to load template, fallback to programmatic generation
         wb = self._load_template(template_key)
         if wb is None:
@@ -123,8 +160,15 @@ class ReportExcelExporter:
         else:
             # Fill template with data
             wb = self._fill_template(
-                wb, types_to_export, report_data, company_name, year,
-                include_prior_year, mode,
+                wb,
+                types_to_export,
+                report_data,
+                company_name,
+                year,
+                include_prior_year,
+                mode,
+                template_key=template_key,
+                parent_row_index=parent_row_index,
             )
 
         # 6. Write to BytesIO
@@ -180,31 +224,95 @@ class ReportExcelExporter:
             ]
         return data
 
+    async def _load_parent_row_index(
+        self, project: Any, year: int, report_types: list[str]
+    ) -> dict[str, dict]:
+        """加载母公司个别报表行索引（``:parent`` 占位/``current_parent`` 坐标用）.
+
+        母公司个别数（公司列）取自「上级代码」（``Project.parent_company_code``）
+        匹配的 standalone 项目（``Project.company_code == parent_company_code``，
+        未软删）的已审定 ``FinancialReport`` 行，按 ``row_code`` 建索引。
+
+        母分汇总已作为现成 FinancialReport 存储——直接读匹配项目的报表，
+        无需实时聚合。找不到母公司项目则返回空 dict（导出时该列留空，不崩）。
+        """
+        parent_code = getattr(project, "parent_company_code", None)
+        if not parent_code:
+            return {}
+        try:
+            result = await self.db.execute(
+                select(Project).where(
+                    Project.company_code == parent_code,
+                    Project.is_deleted == False,  # noqa: E712
+                )
+            )
+            parent_project = result.scalars().first()
+        except Exception as e:  # pragma: no cover - defensive
+            logger.warning("Parent project lookup failed for code %s: %s", parent_code, e)
+            return {}
+        if parent_project is None:
+            logger.info(
+                "No parent project found for parent_company_code=%s; "
+                "公司(母公司个别) columns will be left blank",
+                parent_code,
+            )
+            return {}
+
+        parent_data = await self._load_report_data(
+            parent_project.id, year, report_types
+        )
+        index: dict[str, dict] = {}
+        for _rt, rows in parent_data.items():
+            for r in rows:
+                code = r.get("row_code")
+                if code:
+                    index[code] = r
+        return index
+
     def _load_template(self, template_key: str) -> Workbook | None:
-        """Try to load xlsx template file. Returns None if not found."""
-        rel_path = TEMPLATE_MAP.get(template_key)
-        if not rel_path:
+        """从 ``TemplateManifestLoader`` 加载 xlsx 模板；缺失时返回 None."""
+        from app.services.template_manifest_loader import get_template_manifest_loader
+
+        parts = template_key.split("_", 1)
+        if len(parts) != 2:
+            logger.warning("Invalid template_key %s", template_key)
+            return None
+        template_type, report_scope = parts
+        loader = get_template_manifest_loader()
+        try:
+            entry = loader.resolve_financial_statements(template_type, report_scope)
+        except KeyError:
+            logger.info("No manifest entry for template_key %s", template_key)
+            return None
+        if not entry.exists:
+            logger.info("Template file missing: %s", entry.abs_path)
+            return None
+        try:
+            wb = load_workbook(str(entry.abs_path))
+            logger.info("Loaded template from %s", entry.abs_path)
+            return wb
+        except Exception as e:
+            logger.warning("Failed to load template %s: %s", entry.abs_path, e)
             return None
 
-        # Try multiple base paths
-        base_paths = [
-            Path.cwd(),  # repo root
-            Path.cwd().parent,  # if cwd is backend/
-            Path(__file__).resolve().parent.parent.parent.parent,  # from service file
-        ]
+    def _resolve_sheet(
+        self, wb: Workbook, report_type: str, template_key: str
+    ):
+        """按 manifest sheet_aliases 或中文子串匹配定位 worksheet."""
+        from app.services.template_manifest_loader import get_template_manifest_loader
 
-        for base in base_paths:
-            full_path = base / rel_path
-            if full_path.exists():
-                try:
-                    wb = load_workbook(str(full_path))
-                    logger.info("Loaded template from %s", full_path)
-                    return wb
-                except Exception as e:
-                    logger.warning("Failed to load template %s: %s", full_path, e)
-                    return None
-
-        logger.info("Template not found for key %s, will generate from scratch", template_key)
+        aliases = get_template_manifest_loader().get_sheet_aliases(template_key)
+        alias = aliases.get(report_type)
+        if alias:
+            names = alias if isinstance(alias, list) else [alias]
+            for name in names:
+                if name in wb.sheetnames:
+                    return wb[name]
+        sheet_hint = REPORT_TYPE_SHEET_NAMES.get(report_type)
+        if sheet_hint:
+            for name in wb.sheetnames:
+                if sheet_hint in name:
+                    return wb[name]
         return None
 
     def _fill_template(
@@ -216,34 +324,64 @@ class ReportExcelExporter:
         year: int,
         include_prior_year: bool,
         mode: str,
+        *,
+        template_key: str = "soe_standalone",
+        parent_row_index: dict[str, dict] | None = None,
     ) -> Workbook:
-        """Fill template workbook with report data, preserving formatting."""
+        """按 design §6「双轨填充」填充模板工作簿，保留模板格式.
+
+        填充顺序（每个 sheet）：
+          1. 扫描内联 ``{{row:CODE:current/prior}}`` / ``{{note_ref:CODE}}`` 占位符
+             → 按 ``row_code`` 从 ``report_data`` 取值回填该单元格（替换占位文本）。
+          2. 表头 ``{{company_full_name}}`` 等占位符替换（合并格写左上角）。
+          3. 若 sheet 无内联 ``{{row:}}`` 占位符 → 回退 ``cell_mapping.json`` 坐标。
+          4. 全程跳过公式格（``data_type=='f'`` 或值以 ``=`` 开头）。
+          5. ``fill_empty_as``：无数据时 ``blank`` 留空 / ``zero`` 填 0。
+        """
+        header_values = self._build_header_values(company_name, year, mode)
+        parent_index = parent_row_index or {}
+
+        # Build {row_code: row} index across all report types for O(1) lookup
+        row_index: dict[str, dict] = {}
+        for _rt, _rows in report_data.items():
+            for r in _rows:
+                code = r.get("row_code")
+                if code:
+                    row_index[code] = r
+
+        fill_empty_map = self._build_fill_empty_map(template_key)
+
         for rt in types_to_export:
-            sheet_name = REPORT_TYPE_SHEET_NAMES.get(rt)
-            if not sheet_name:
-                continue
-
             rows = report_data.get(rt, [])
-            if not rows:
-                continue
-
-            # Find the sheet in template (try exact match, then partial)
-            ws = None
-            for name in wb.sheetnames:
-                if sheet_name in name:
-                    ws = wb[name]
-                    break
+            ws = self._resolve_sheet(wb, rt, template_key)
 
             if ws is None:
-                # Create new sheet if not in template
-                ws = wb.create_sheet(title=sheet_name)
+                # Sheet not in template → create from scratch (only if we have data)
+                if not rows:
+                    continue
+                fallback_title = REPORT_TYPE_SHEET_NAMES.get(rt, rt)
+                ws = wb.create_sheet(title=fallback_title)
                 self._write_sheet_from_scratch(
                     ws, rows, company_name, year, include_prior_year, mode, rt
                 )
-            else:
-                # Fill existing template sheet
-                self._fill_existing_sheet(
-                    ws, rows, company_name, year, include_prior_year, mode
+                continue
+
+            # Track 1+2: inline placeholders + header replacement
+            found_inline = self._fill_by_placeholders(
+                ws, row_index, header_values, include_prior_year, fill_empty_map,
+                parent_index,
+            )
+            # Track 3: fallback to cell_mapping coordinates when no inline placeholders
+            if not found_inline:
+                self._fill_by_cell_mapping(
+                    ws,
+                    rt,
+                    template_key,
+                    row_index,
+                    header_values,
+                    include_prior_year,
+                    fill_empty_map,
+                    parent_index,
                 )
 
         # Remove sheets not in export list
@@ -262,63 +400,247 @@ class ReportExcelExporter:
 
         return wb
 
-    def _fill_existing_sheet(
+    # -----------------------------------------------------------------------
+    # Placeholder / cell_mapping driven fill (design §6 双轨填充)
+    # -----------------------------------------------------------------------
+
+    def _build_header_values(
+        self, company_name: str, year: int, mode: str
+    ) -> dict[str, str]:
+        """构建表头占位符 → 值映射."""
+        return {
+            "company_full_name": company_name,
+            "period_end_date": f"{year}年12月31日",
+            "audit_year": str(year),
+            "currency_unit": "人民币元",
+        }
+
+    def _build_fill_empty_map(self, template_key: str) -> dict[str, str]:
+        """从 cell_mapping 读取每个 row_code 的 ``fill_empty_as``（默认 blank）."""
+        mapping = _load_cell_mapping()
+        variant = mapping.get("variants", {}).get(template_key, {})
+        result: dict[str, str] = {}
+        for code, info in variant.get("rows", {}).items():
+            if isinstance(info, dict):
+                result[code] = info.get("fill_empty_as", "blank")
+        return result
+
+    @staticmethod
+    def _is_formula_cell(cell) -> bool:
+        """判断单元格是否为公式格（不可覆盖）."""
+        if getattr(cell, "data_type", None) == "f":
+            return True
+        val = cell.value
+        return isinstance(val, str) and val.startswith("=")
+
+    def _resolve_amount(self, row: dict | None, period: str) -> float | None:
+        """取 current/prior 金额（float 或 None）."""
+        if not row:
+            return None
+        key = "current_period_amount" if period == "current" else "prior_period_amount"
+        amount = row.get(key)
+        if amount is None:
+            return None
+        try:
+            return float(amount)
+        except (TypeError, ValueError):
+            return None
+
+    def _resolve_fill_value(
+        self,
+        row: dict | None,
+        period: str,
+        row_code: str,
+        fill_empty_map: dict[str, str],
+    ):
+        """解析回填值，应用 ``fill_empty_as``.
+
+        返回 ``(should_write, value)``；should_write=False 表示留空（blank）。
+        """
+        amount = self._resolve_amount(row, period)
+        if amount is not None:
+            return True, amount
+        # No data → honor fill_empty_as
+        mode = fill_empty_map.get(row_code, "blank")
+        if mode == "zero":
+            return True, 0
+        return False, None  # blank → clear placeholder, leave cell empty
+
+    def _fill_by_placeholders(
         self,
         ws,
-        rows: list[dict],
-        company_name: str,
-        year: int,
+        row_index: dict[str, dict],
+        header_values: dict[str, str],
         include_prior_year: bool,
-        mode: str,
-    ) -> None:
-        """Fill data into an existing template sheet.
+        fill_empty_map: dict[str, str],
+        parent_row_index: dict[str, dict] | None = None,
+    ) -> bool:
+        """扫描 sheet 内联占位符并回填；返回是否发现 ``{{row:}}``/``{{note_ref:}}`` 占位符.
 
-        Strategy: Find the data start row (after headers), then write row by row.
-        Template typically has: Row 1=company name, Row 2=period, Row 3=unit,
-        Row 4+=data rows with row_name in col A, amounts in col B/C.
+        - ``{{row:CODE:current/prior}}`` → 按 row_code 取值写入该格（替换占位文本）。
+        - ``{{row:CODE:current/prior:parent}}`` → 取母公司个别（公司列）值写入。
+        - ``{{note_ref:CODE}}`` → 清除占位文本（report_data 暂无注释引用值）。
+        - 表头 ``{{key}}`` → 子串替换（合并格非锚点成员 value 为 None 自动跳过）。
         """
-        # Find data start row by looking for first non-empty row after row 3
-        data_start_row = 4  # Default assumption
-        max_template_row = ws.max_row or 10
+        parent_index = parent_row_index or {}
+        found_inline = False
+        for row in ws.iter_rows():
+            for cell in row:
+                val = cell.value
+                if not isinstance(val, str) or "{{" not in val:
+                    continue
+                if self._is_formula_cell(cell):
+                    continue
 
-        # Write header info (preserve template formatting but update text)
-        # Row 1: Company name
-        self._safe_set_value(ws, 1, 1, company_name)
-        # Row 2: Period
-        period_text = f"{year}年12月31日" if "资产负债" in (ws.title or "") else f"{year}年度"
-        self._safe_set_value(ws, 2, 1, period_text)
+                stripped = val.strip()
 
-        # Write data rows starting from data_start_row
-        for i, row in enumerate(rows):
-            r = data_start_row + i
-            # Column A: row name with indentation
-            indent = "　" * row.get("indent_level", 0)  # Full-width space for indent
-            cell_a = ws.cell(r, 1)
-            if not isinstance(cell_a, MergedCell):
-                cell_a.value = indent + row.get("row_name", "")
-                if row.get("is_total_row"):
-                    cell_a.font = Font(bold=True)
+                # --- Track 1a: row placeholder (whole-cell) ---
+                m_row = _ROW_PLACEHOLDER_RE.fullmatch(stripped)
+                if m_row:
+                    found_inline = True
+                    code, period, is_parent = (
+                        m_row.group(1),
+                        m_row.group(2),
+                        m_row.group(3),
+                    )
+                    if period == "prior" and not include_prior_year:
+                        cell.value = None
+                        continue
+                    source = parent_index if is_parent else row_index
+                    should_write, value = self._resolve_fill_value(
+                        source.get(code), period, code, fill_empty_map
+                    )
+                    cell.value = value if should_write else None
+                    continue
 
-            # Column B: current period amount
-            amount = row.get("current_period_amount")
-            if amount is not None:
-                cell_b = ws.cell(r, 2)
-                if not isinstance(cell_b, MergedCell):
-                    cell_b.value = float(amount)
-                    self._apply_amount_format(cell_b, row.get("is_total_row", False))
+                # --- Track 1b: note_ref placeholder ---
+                m_note = _NOTE_REF_RE.fullmatch(stripped)
+                if m_note:
+                    found_inline = True
+                    # No note-reference value available in report_data → clear text
+                    cell.value = None
+                    continue
 
-            # Column C: prior period amount (if included)
+                # --- Track 2: header placeholder(s) embedded in text ---
+                if _HEADER_PLACEHOLDER_RE.search(val):
+                    new_val = self._replace_header_placeholders(val, header_values)
+                    if new_val != val:
+                        cell.value = new_val
+
+        return found_inline
+
+    @staticmethod
+    def _replace_header_placeholders(text: str, header_values: dict[str, str]) -> str:
+        """替换文本中的表头占位符 ``{{key}}``；未知 key 原样保留."""
+
+        def _sub(match: re.Match) -> str:
+            key = match.group(1)
+            if key in header_values:
+                return str(header_values[key])
+            return match.group(0)
+
+        return _HEADER_PLACEHOLDER_RE.sub(_sub, text)
+
+    def _fill_by_cell_mapping(
+        self,
+        ws,
+        report_type: str,
+        template_key: str,
+        row_index: dict[str, dict],
+        header_values: dict[str, str],
+        include_prior_year: bool,
+        fill_empty_map: dict[str, str],
+        parent_row_index: dict[str, dict] | None = None,
+    ) -> None:
+        """回退：按 ``cell_mapping.json`` 坐标填充（无内联占位符的 sheet）."""
+        parent_index = parent_row_index or {}
+        mapping = _load_cell_mapping()
+        variant = mapping.get("variants", {}).get(template_key, {})
+        if not variant:
+            return
+
+        # Headers block: {report_type: {field: cellref}}
+        headers = variant.get("headers", {}).get(report_type, {})
+        for field, coord in headers.items():
+            if field in header_values:
+                self._write_header_cell(ws, coord, header_values[field])
+
+        # Rows block: {code: {sheet, current, prior, current_parent,
+        #                      prior_parent, fill_empty_as, ...}}
+        for code, info in variant.get("rows", {}).items():
+            if not isinstance(info, dict):
+                continue
+            if info.get("sheet") != report_type:
+                continue
+            row = row_index.get(code)
+            parent_row = parent_index.get(code)
+
+            cur_ref = info.get("current")
+            if cur_ref:
+                should_write, value = self._resolve_fill_value(
+                    row, "current", code, fill_empty_map
+                )
+                self._write_mapped_cell(ws, cur_ref, value if should_write else None)
+
+            cur_parent_ref = info.get("current_parent")
+            if cur_parent_ref:
+                should_write, value = self._resolve_fill_value(
+                    parent_row, "current", code, fill_empty_map
+                )
+                self._write_mapped_cell(
+                    ws, cur_parent_ref, value if should_write else None
+                )
+
             if include_prior_year:
-                prior = row.get("prior_period_amount")
-                if prior is not None:
-                    cell_c = ws.cell(r, 3)
-                    if not isinstance(cell_c, MergedCell):
-                        cell_c.value = float(prior)
-                        self._apply_amount_format(cell_c, row.get("is_total_row", False))
+                prior_ref = info.get("prior")
+                if prior_ref:
+                    should_write, value = self._resolve_fill_value(
+                        row, "prior", code, fill_empty_map
+                    )
+                    self._write_mapped_cell(
+                        ws, prior_ref, value if should_write else None
+                    )
 
-            # Apply total row formatting
-            if row.get("is_total_row"):
-                self._apply_total_row_style(ws, r, 3 if include_prior_year else 2)
+                prior_parent_ref = info.get("prior_parent")
+                if prior_parent_ref:
+                    should_write, value = self._resolve_fill_value(
+                        parent_row, "prior", code, fill_empty_map
+                    )
+                    self._write_mapped_cell(
+                        ws, prior_parent_ref, value if should_write else None
+                    )
+
+    def _write_mapped_cell(self, ws, coord: str, value) -> None:
+        """按坐标写入数据格，跳过公式格与合并格非锚点成员（仅写左上角）."""
+        cell = self._anchor_cell(ws, coord)
+        if cell is None:
+            return
+        if self._is_formula_cell(cell):
+            return
+        cell.value = value
+
+    def _write_header_cell(self, ws, coord: str, value) -> None:
+        """写入表头格（合并格写左上角锚点，跳过公式格）."""
+        cell = self._anchor_cell(ws, coord)
+        if cell is None:
+            return
+        if self._is_formula_cell(cell):
+            return
+        cell.value = value
+
+    @staticmethod
+    def _anchor_cell(ws, coord: str):
+        """返回坐标对应的可写单元格；若是合并格非锚点成员则返回左上角锚点."""
+        try:
+            cell = ws[coord]
+        except (ValueError, KeyError):
+            return None
+        if isinstance(cell, MergedCell):
+            for rng in ws.merged_cells.ranges:
+                if coord in rng:
+                    return ws.cell(rng.min_row, rng.min_col)
+            return None
+        return cell
 
     def _create_workbook_from_scratch(
         self,

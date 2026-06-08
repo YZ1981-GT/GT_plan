@@ -182,6 +182,14 @@ class Settings(BaseSettings):
     # --- dev-tooling-modernization ---
     DOCLING_ENABLED: bool = False
 
+    # --- audit-report-template-integration (Phase 1) ---
+    # 灰度开关：False=保留 ReportBodyService 旧路径；True=TemplateFillService 主路径
+    USE_TEMPLATE_FILL_SERVICE: bool = False
+    # 模板 manifest 根目录；留空则使用 backend/data/audit_report_templates
+    TEMPLATE_MANIFEST_DIR: str = ""
+    # 报告正文 preview 会话 TTL（小时）
+    FILL_PREVIEW_TTL_HOURS: int = 24
+
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 
     @property

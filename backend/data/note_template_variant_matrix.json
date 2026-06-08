@@ -1,190 +1,1151 @@
 {
-  "version": "1.0.0",
-  "description": "附注模板变体矩阵：映射 semantic_section_id 到国企/上市×单体/合并四版本",
-  "matrix": [
+  "version": "2026-1",
+  "description": "附注变体矩阵：主要账户节（项目注释章，国企八/上市五）在四变体中的 section_code 对照。由 build_variant_matrix.py 从 section_code_index.json 生成。",
+  "source": "audit_report_templates/section_code_index.json",
+  "generator": "scripts/build_variant_matrix.py",
+  "accounts": [
     {
-      "semantic_section_id": "accounting_policies",
-      "title": "重要会计政策、会计估计",
+      "account_key": "huo_bi_zi_jin",
+      "section_title": "货币资金",
       "variants": {
-        "soe_standalone": {
-          "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
-          "number": "四",
-          "title": "重要会计政策、会计估计",
-          "scope": "both"
-        },
-        "soe_consolidated": {
-          "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
-          "number": "四",
-          "title": "重要会计政策、会计估计",
-          "scope": "both"
-        },
-        "listed_standalone": {
-          "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji",
-          "number": "三",
-          "title": "重要会计政策及会计估计",
-          "scope": "both"
-        },
-        "listed_consolidated": {
-          "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji",
-          "number": "三",
-          "title": "重要会计政策及会计估计",
-          "scope": "both"
-        }
+        "soe_standalone": "八、1",
+        "soe_consolidated": "八、1",
+        "listed_standalone": "五、1",
+        "listed_consolidated": "五、1"
+      },
+      "legacy_aliases": {
+        "soe_standalone": [
+          "五、1"
+        ],
+        "soe_consolidated": [
+          "五、1"
+        ]
       }
     },
     {
-      "semantic_section_id": "accounts_receivable",
-      "title": "应收账款",
+      "account_key": "jiao_yi_xing_jin_rong_zi_chan",
+      "section_title": "交易性金融资产",
       "variants": {
-        "soe_standalone": {
-          "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
-          "number": "八、4",
-          "title": "应收账款",
-          "scope": "standalone"
-        },
-        "soe_consolidated": {
-          "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
-          "number": "八、4",
-          "title": "应收账款",
-          "scope": "both",
-          "consol_sub_sections": ["五-5-1", "五-5-2", "五-5-3", "五-5-4", "五-5-5", "五-5-6", "五-5-7", "五-5-8", "五-5-9", "五-5-10", "五-5-11"]
-        },
-        "listed_standalone": {
-          "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
-          "number": "五、4",
-          "title": "应收账款",
-          "scope": "standalone"
-        },
-        "listed_consolidated": {
-          "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
-          "number": "五、4",
-          "title": "应收账款",
-          "scope": "both",
-          "consol_sub_sections": ["五-5-1", "五-5-2", "五-5-3", "五-5-4", "五-5-5", "五-5-6", "五-5-7", "五-5-8", "五-5-9", "五-5-10", "五-5-11"]
-        }
+        "soe_standalone": "八、2",
+        "soe_consolidated": "八、2",
+        "listed_standalone": "五、2",
+        "listed_consolidated": "五、2"
+      },
+      "legacy_aliases": {
+        "soe_standalone": [
+          "五、2"
+        ],
+        "soe_consolidated": [
+          "五、2"
+        ]
       }
     },
     {
-      "semantic_section_id": "fixed_assets",
-      "title": "固定资产",
+      "account_key": "yan_sheng_jin_rong_zi_chan",
+      "section_title": "衍生金融资产",
       "variants": {
-        "soe_standalone": {
-          "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gu-ding-zi-chan",
-          "number": "八、9",
-          "title": "固定资产",
-          "scope": "standalone"
-        },
-        "soe_consolidated": {
-          "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gu-ding-zi-chan",
-          "number": "八、9",
-          "title": "固定资产",
-          "scope": "both"
-        },
-        "listed_standalone": {
-          "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-gu-ding-zi-chan",
-          "number": "五、9",
-          "title": "固定资产",
-          "scope": "standalone"
-        },
-        "listed_consolidated": {
-          "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-gu-ding-zi-chan",
-          "number": "五、9",
-          "title": "固定资产",
-          "scope": "both"
-        }
+        "soe_standalone": "八、3",
+        "soe_consolidated": "八、3",
+        "listed_standalone": "五、3",
+        "listed_consolidated": "五、3"
+      },
+      "legacy_aliases": {
+        "soe_standalone": [
+          "五、3"
+        ],
+        "soe_consolidated": [
+          "五、3"
+        ]
       }
     },
     {
-      "semantic_section_id": "cash_and_bank",
-      "title": "货币资金",
+      "account_key": "ying_shou_piao_ju",
+      "section_title": "应收票据",
       "variants": {
-        "soe_standalone": {
-          "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-huo-bi-zi-jin",
-          "number": "八、1",
-          "title": "货币资金",
-          "scope": "standalone"
-        },
-        "soe_consolidated": {
-          "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-huo-bi-zi-jin",
-          "number": "八、1",
-          "title": "货币资金",
-          "scope": "both",
-          "consol_sub_sections": ["五-1-1", "五-1-2"]
-        },
-        "listed_standalone": {
-          "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-huo-bi-zi-jin",
-          "number": "五、1",
-          "title": "货币资金",
-          "scope": "standalone"
-        },
-        "listed_consolidated": {
-          "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-huo-bi-zi-jin",
-          "number": "五、1",
-          "title": "货币资金",
-          "scope": "both",
-          "consol_sub_sections": ["五-1-1", "五-1-2"]
-        }
-      }
+        "soe_standalone": "八、4",
+        "soe_consolidated": "八、4",
+        "listed_standalone": "五、4",
+        "listed_consolidated": "五、4"
+      },
+      "legacy_aliases": {}
     },
     {
-      "semantic_section_id": "related_party_transactions",
-      "title": "关联方关系及其交易",
+      "account_key": "ying_shou_zhang_kuan",
+      "section_title": "应收账款",
       "variants": {
-        "soe_standalone": {
-          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
-          "number": "十一",
-          "title": "关联交易情况",
-          "scope": "both"
-        },
-        "soe_consolidated": {
-          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
-          "number": "十一",
-          "title": "关联交易情况",
-          "scope": "both"
-        },
-        "listed_standalone": {
-          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
-          "number": "十一",
-          "title": "关联交易情况",
-          "scope": "both"
-        },
-        "listed_consolidated": {
-          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
-          "number": "十一",
-          "title": "关联交易情况",
-          "scope": "both"
-        }
-      }
+        "soe_standalone": "八、5",
+        "soe_consolidated": "八、5",
+        "listed_standalone": "五、5",
+        "listed_consolidated": "五、5"
+      },
+      "legacy_aliases": {}
     },
     {
-      "semantic_section_id": "related_party_receivables_payables",
-      "title": "关联方应收应付款项",
+      "account_key": "ying_shou_kuan_xiang_rong_zi",
+      "section_title": "应收款项融资",
       "variants": {
-        "soe_standalone": {
-          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
-          "number": "十一",
-          "title": "关联方应收应付款项",
-          "scope": "both"
-        },
-        "soe_consolidated": {
-          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
-          "number": "十一",
-          "title": "关联方应收应付款项",
-          "scope": "both"
-        },
-        "listed_standalone": {
-          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
-          "number": "十一",
-          "title": "关联方应收应付款项",
-          "scope": "both"
-        },
-        "listed_consolidated": {
-          "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
-          "number": "十一",
-          "title": "关联方应收应付款项",
-          "scope": "both"
-        }
-      }
+        "soe_standalone": "八、6",
+        "soe_consolidated": "八、6",
+        "listed_standalone": "五、6",
+        "listed_consolidated": "五、6"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "yu_fu_kuan_xiang",
+      "section_title": "预付款项",
+      "variants": {
+        "soe_standalone": "八、7",
+        "soe_consolidated": "八、7",
+        "listed_standalone": "五、7",
+        "listed_consolidated": "五、7"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "ying_shou_zi_jin_ji_zhong_guan_li_kuan",
+      "section_title": "应收资金集中管理款",
+      "variants": {
+        "soe_standalone": "八、8",
+        "soe_consolidated": "八、8",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "qi_ta_ying_shou_kuan",
+      "section_title": "其他应收款",
+      "variants": {
+        "soe_standalone": "八、9",
+        "soe_consolidated": "八、9",
+        "listed_standalone": "五、8",
+        "listed_consolidated": "五、8"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "cun_huo",
+      "section_title": "存货",
+      "variants": {
+        "soe_standalone": "八、10",
+        "soe_consolidated": "八、10",
+        "listed_standalone": "五、9",
+        "listed_consolidated": "五、9"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "he_tong_zi_chan",
+      "section_title": "合同资产",
+      "variants": {
+        "soe_standalone": "八、11",
+        "soe_consolidated": "八、11",
+        "listed_standalone": "五、10",
+        "listed_consolidated": "五、10"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "chi_you_dai_shou_zi_chan",
+      "section_title": "持有待售资产",
+      "variants": {
+        "soe_standalone": "八、12",
+        "soe_consolidated": "八、12",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "yi_nian_nei_dao_qi_de_fei_liu_dong_zi_chan",
+      "section_title": "一年内到期的非流动资产",
+      "variants": {
+        "soe_standalone": "八、13",
+        "soe_consolidated": "八、13",
+        "listed_standalone": "五、12",
+        "listed_consolidated": "五、12"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "qi_ta_liu_dong_zi_chan",
+      "section_title": "其他流动资产",
+      "variants": {
+        "soe_standalone": "八、14",
+        "soe_consolidated": "八、14",
+        "listed_standalone": "五、13",
+        "listed_consolidated": "五、13"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "zhai_quan_tou_zi",
+      "section_title": "债权投资",
+      "variants": {
+        "soe_standalone": "八、15",
+        "soe_consolidated": "八、15",
+        "listed_standalone": "五、14",
+        "listed_consolidated": "五、14"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "qi_ta_zhai_quan_tou_zi",
+      "section_title": "其他债权投资",
+      "variants": {
+        "soe_standalone": "八、16",
+        "soe_consolidated": "八、16",
+        "listed_standalone": "五、15",
+        "listed_consolidated": "五、15"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "chang_qi_ying_shou_kuan",
+      "section_title": "长期应收款",
+      "variants": {
+        "soe_standalone": "八、17",
+        "soe_consolidated": "八、17",
+        "listed_standalone": "五、16",
+        "listed_consolidated": "五、16"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "chang_qi_gu_quan_tou_zi",
+      "section_title": "长期股权投资",
+      "variants": {
+        "soe_standalone": "八、18",
+        "soe_consolidated": "八、18",
+        "listed_standalone": "五、18",
+        "listed_consolidated": "五、18"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "qi_ta_quan_yi_gong_ju_tou_zi",
+      "section_title": "其他权益工具投资",
+      "variants": {
+        "soe_standalone": "八、19",
+        "soe_consolidated": "八、19",
+        "listed_standalone": "五、19",
+        "listed_consolidated": "五、19"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "qi_ta_fei_liu_dong_jin_rong_zi_chan",
+      "section_title": "其他非流动金融资产",
+      "variants": {
+        "soe_standalone": "八、20",
+        "soe_consolidated": "八、20",
+        "listed_standalone": "五、20",
+        "listed_consolidated": "五、20"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "tou_zi_xing_fang_di_chan",
+      "section_title": "投资性房地产",
+      "variants": {
+        "soe_standalone": "八、21",
+        "soe_consolidated": "八、21",
+        "listed_standalone": "五、21",
+        "listed_consolidated": "五、21"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "gu_ding_zi_chan",
+      "section_title": "固定资产",
+      "variants": {
+        "soe_standalone": "八、22",
+        "soe_consolidated": "八、22",
+        "listed_standalone": "五、22",
+        "listed_consolidated": "五、22"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "zai_jian_gong_cheng",
+      "section_title": "在建工程",
+      "variants": {
+        "soe_standalone": "八、23",
+        "soe_consolidated": "八、23",
+        "listed_standalone": "五、23",
+        "listed_consolidated": "五、23"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "sheng_chan_xing_sheng_wu_zi_chan",
+      "section_title": "生产性生物资产",
+      "variants": {
+        "soe_standalone": "八、24",
+        "soe_consolidated": "八、24",
+        "listed_standalone": "五、24",
+        "listed_consolidated": "五、24"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "you_qi_zi_chan",
+      "section_title": "油气资产",
+      "variants": {
+        "soe_standalone": "八、25",
+        "soe_consolidated": "八、25",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "shi_yong_quan_zi_chan",
+      "section_title": "使用权资产",
+      "variants": {
+        "soe_standalone": "八、26",
+        "soe_consolidated": "八、26",
+        "listed_standalone": "五、25",
+        "listed_consolidated": "五、25"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "wu_xing_zi_chan",
+      "section_title": "无形资产",
+      "variants": {
+        "soe_standalone": "八、27",
+        "soe_consolidated": "八、27",
+        "listed_standalone": "五、26",
+        "listed_consolidated": "五、26"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "kai_fa_zhi_chu",
+      "section_title": "开发支出",
+      "variants": {
+        "soe_standalone": "八、28",
+        "soe_consolidated": "八、28",
+        "listed_standalone": "五、27",
+        "listed_consolidated": "五、27"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "shang_yu",
+      "section_title": "商誉",
+      "variants": {
+        "soe_standalone": "八、29",
+        "soe_consolidated": "八、29",
+        "listed_standalone": "五、28",
+        "listed_consolidated": "五、28"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "chang_qi_dai_tan_fei_yong",
+      "section_title": "长期待摊费用",
+      "variants": {
+        "soe_standalone": "八、30",
+        "soe_consolidated": "八、30",
+        "listed_standalone": "五、29",
+        "listed_consolidated": "五、29"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "di_yan_suo_de_shui_zi_chan_he_di_yan_suo_de",
+      "section_title": "递延所得税资产和递延所得税负债",
+      "variants": {
+        "soe_standalone": "八、31",
+        "soe_consolidated": "八、31",
+        "listed_standalone": "五、30",
+        "listed_consolidated": "五、30"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "qi_ta_fei_liu_dong_zi_chan",
+      "section_title": "其他非流动资产",
+      "variants": {
+        "soe_standalone": "八、32",
+        "soe_consolidated": "八、32",
+        "listed_standalone": "五、31",
+        "listed_consolidated": "五、31"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "duan_qi_jie_kuan",
+      "section_title": "短期借款",
+      "variants": {
+        "soe_standalone": "八、33",
+        "soe_consolidated": "八、33",
+        "listed_standalone": "五、33",
+        "listed_consolidated": "五、33"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "jiao_yi_xing_jin_rong_fu_zhai",
+      "section_title": "交易性金融负债",
+      "variants": {
+        "soe_standalone": "八、34",
+        "soe_consolidated": "八、34",
+        "listed_standalone": "五、34",
+        "listed_consolidated": "五、34"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "yan_sheng_jin_rong_fu_zhai",
+      "section_title": "衍生金融负债",
+      "variants": {
+        "soe_standalone": "八、35",
+        "soe_consolidated": "八、35",
+        "listed_standalone": "五、35",
+        "listed_consolidated": "五、35"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "ying_fu_piao_ju",
+      "section_title": "应付票据",
+      "variants": {
+        "soe_standalone": "八、36",
+        "soe_consolidated": "八、36",
+        "listed_standalone": "五、36",
+        "listed_consolidated": "五、36"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "ying_fu_zhang_kuan",
+      "section_title": "应付账款",
+      "variants": {
+        "soe_standalone": "八、37",
+        "soe_consolidated": "八、37",
+        "listed_standalone": "五、37",
+        "listed_consolidated": "五、37"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "yu_shou_kuan_xiang",
+      "section_title": "预收款项",
+      "variants": {
+        "soe_standalone": "八、38",
+        "soe_consolidated": "八、38",
+        "listed_standalone": "五、38",
+        "listed_consolidated": "五、38"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "he_tong_fu_zhai",
+      "section_title": "合同负债",
+      "variants": {
+        "soe_standalone": "八、39",
+        "soe_consolidated": "八、39",
+        "listed_standalone": "五、39",
+        "listed_consolidated": "五、39"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "ying_fu_zhi_gong_xin_chou",
+      "section_title": "应付职工薪酬",
+      "variants": {
+        "soe_standalone": "八、40",
+        "soe_consolidated": "八、40",
+        "listed_standalone": "五、40",
+        "listed_consolidated": "五、40"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "ying_jiao_shui_fei",
+      "section_title": "应交税费",
+      "variants": {
+        "soe_standalone": "八、41",
+        "soe_consolidated": "八、41",
+        "listed_standalone": "五、41",
+        "listed_consolidated": "五、41"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "qi_ta_ying_fu_kuan",
+      "section_title": "其他应付款",
+      "variants": {
+        "soe_standalone": "八、42",
+        "soe_consolidated": "八、42",
+        "listed_standalone": "五、42",
+        "listed_consolidated": "五、42"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "chi_you_dai_shou_fu_zhai",
+      "section_title": "持有待售负债",
+      "variants": {
+        "soe_standalone": "八、43",
+        "soe_consolidated": "八、43",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "yi_nian_nei_dao_qi_de_fei_liu_dong_fu_zhai",
+      "section_title": "一年内到期的非流动负债",
+      "variants": {
+        "soe_standalone": "八、44",
+        "soe_consolidated": "八、44",
+        "listed_standalone": "五、43",
+        "listed_consolidated": "五、43"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "yi_nian_nei_dao_qi_de_chang_qi_jie_kuan",
+      "section_title": "（1）一年内到期的长期借款",
+      "variants": {
+        "soe_standalone": "八、45",
+        "soe_consolidated": "八、45",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "yi_nian_nei_dao_qi_de_ying_fu_zhai_quan",
+      "section_title": "（2）一年内到期的应付债券",
+      "variants": {
+        "soe_standalone": "八、46",
+        "soe_consolidated": "八、46",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "yi_nian_nei_dao_qi_de_chang_qi_ying_fu_kuan",
+      "section_title": "（3）一年内到期的长期应付款",
+      "variants": {
+        "soe_standalone": "八、47",
+        "soe_consolidated": "八、47",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "qi_ta_liu_dong_fu_zhai",
+      "section_title": "其他流动负债",
+      "variants": {
+        "soe_standalone": "八、48",
+        "soe_consolidated": "八、48",
+        "listed_standalone": "五、44",
+        "listed_consolidated": "五、44"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "chang_qi_jie_kuan",
+      "section_title": "长期借款",
+      "variants": {
+        "soe_standalone": "八、49",
+        "soe_consolidated": "八、49",
+        "listed_standalone": "五、45",
+        "listed_consolidated": "五、45"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "ying_fu_zhai_quan",
+      "section_title": "应付债券",
+      "variants": {
+        "soe_standalone": "八、50",
+        "soe_consolidated": "八、50",
+        "listed_standalone": "五、46",
+        "listed_consolidated": "五、46"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "you_xian_gu_yong_xu_zhai_deng_jin_rong_gong",
+      "section_title": "优先股、永续债等金融工具",
+      "variants": {
+        "soe_standalone": "八、51",
+        "soe_consolidated": "八、51",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "zu_lin_fu_zhai",
+      "section_title": "租赁负债",
+      "variants": {
+        "soe_standalone": "八、52",
+        "soe_consolidated": "八、52",
+        "listed_standalone": "五、47",
+        "listed_consolidated": "五、47"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "chang_qi_ying_fu_kuan",
+      "section_title": "长期应付款",
+      "variants": {
+        "soe_standalone": "八、53",
+        "soe_consolidated": "八、53",
+        "listed_standalone": "五、48",
+        "listed_consolidated": "五、48"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "chang_qi_ying_fu_zhi_gong_xin_chou",
+      "section_title": "长期应付职工薪酬",
+      "variants": {
+        "soe_standalone": "八、54",
+        "soe_consolidated": "八、54",
+        "listed_standalone": "五、49",
+        "listed_consolidated": "五、49"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "yu_ji_fu_zhai",
+      "section_title": "预计负债",
+      "variants": {
+        "soe_standalone": "八、55",
+        "soe_consolidated": "八、55",
+        "listed_standalone": "五、50",
+        "listed_consolidated": "五、50"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "di_yan_shou_yi",
+      "section_title": "递延收益",
+      "variants": {
+        "soe_standalone": "八、56",
+        "soe_consolidated": "八、56",
+        "listed_standalone": "五、51",
+        "listed_consolidated": "五、51"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "qi_ta_fei_liu_dong_fu_zhai",
+      "section_title": "其他非流动负债",
+      "variants": {
+        "soe_standalone": "八、57",
+        "soe_consolidated": "八、57",
+        "listed_standalone": "五、52",
+        "listed_consolidated": "五、52"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "shi_shou_zi_ben",
+      "section_title": "实收资本",
+      "variants": {
+        "soe_standalone": "八、58",
+        "soe_consolidated": "八、58",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "qi_ta_quan_yi_gong_ju",
+      "section_title": "其他权益工具",
+      "variants": {
+        "soe_standalone": "八、59",
+        "soe_consolidated": "八、59",
+        "listed_standalone": "五、54",
+        "listed_consolidated": "五、54"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "zi_ben_gong_ji",
+      "section_title": "资本公积",
+      "variants": {
+        "soe_standalone": "八、60",
+        "soe_consolidated": "八、60",
+        "listed_standalone": "五、55",
+        "listed_consolidated": "五、55"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "zhuan_xiang_chu_bei",
+      "section_title": "专项储备",
+      "variants": {
+        "soe_standalone": "八、61",
+        "soe_consolidated": "八、61",
+        "listed_standalone": "五、58",
+        "listed_consolidated": "五、58"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "ying_yu_gong_ji",
+      "section_title": "盈余公积",
+      "variants": {
+        "soe_standalone": "八、62",
+        "soe_consolidated": "八、62",
+        "listed_standalone": "五、59",
+        "listed_consolidated": "五、59"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "wei_fen_pei_li_run",
+      "section_title": "未分配利润",
+      "variants": {
+        "soe_standalone": "八、63",
+        "soe_consolidated": "八、63",
+        "listed_standalone": "五、61",
+        "listed_consolidated": "五、61"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "ying_ye_shou_ru_ying_ye_cheng_ben",
+      "section_title": "营业收入、营业成本",
+      "variants": {
+        "soe_standalone": "八、64",
+        "soe_consolidated": "八、64",
+        "listed_standalone": "五、62",
+        "listed_consolidated": "五、62"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "xiao_shou_fei_yong",
+      "section_title": "销售费用",
+      "variants": {
+        "soe_standalone": "八、65",
+        "soe_consolidated": "八、65",
+        "listed_standalone": "五、64",
+        "listed_consolidated": "五、64"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "guan_li_fei_yong",
+      "section_title": "管理费用",
+      "variants": {
+        "soe_standalone": "八、66",
+        "soe_consolidated": "八、66",
+        "listed_standalone": "五、65",
+        "listed_consolidated": "五、65"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "yan_fa_fei_yong",
+      "section_title": "研发费用",
+      "variants": {
+        "soe_standalone": "八、67",
+        "soe_consolidated": "八、67",
+        "listed_standalone": "五、66",
+        "listed_consolidated": "五、66"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "cai_wu_fei_yong",
+      "section_title": "财务费用",
+      "variants": {
+        "soe_standalone": "八、68",
+        "soe_consolidated": "八、68",
+        "listed_standalone": "五、67",
+        "listed_consolidated": "五、67"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "qi_ta_shou_yi",
+      "section_title": "其他收益",
+      "variants": {
+        "soe_standalone": "八、69",
+        "soe_consolidated": "八、69",
+        "listed_standalone": "五、68",
+        "listed_consolidated": "五、68"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "tou_zi_shou_yi_xia_biao_zhong_bu_shi_yong_d",
+      "section_title": "投资收益【下表中不适用的项目，删除】",
+      "variants": {
+        "soe_standalone": "八、70",
+        "soe_consolidated": "八、70",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "jing_chang_kou_tao_qi_shou_yi",
+      "section_title": "净敞口套期收益",
+      "variants": {
+        "soe_standalone": "八、71",
+        "soe_consolidated": "八、71",
+        "listed_standalone": "五、70",
+        "listed_consolidated": "五、70"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "gong_yun_jia_zhi_bian_dong_shou_yi",
+      "section_title": "公允价值变动收益",
+      "variants": {
+        "soe_standalone": "八、72",
+        "soe_consolidated": "八、72",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "xin_yong_jian_zhi_sun_shi",
+      "section_title": "信用减值损失",
+      "variants": {
+        "soe_standalone": "八、73",
+        "soe_consolidated": "八、73",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "zi_chan_jian_zhi_sun_shi",
+      "section_title": "资产减值损失",
+      "variants": {
+        "soe_standalone": "八、74",
+        "soe_consolidated": "八、74",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "zi_chan_chu_zhi_shou_yi",
+      "section_title": "资产处置收益",
+      "variants": {
+        "soe_standalone": "八、75",
+        "soe_consolidated": "八、75",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "ying_ye_wai_shou_ru",
+      "section_title": "营业外收入",
+      "variants": {
+        "soe_standalone": "八、76",
+        "soe_consolidated": "八、76",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "ying_ye_wai_zhi_chu",
+      "section_title": "营业外支出",
+      "variants": {
+        "soe_standalone": "八、77",
+        "soe_consolidated": "八、77",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "suo_de_shui_fei_yong",
+      "section_title": "所得税费用",
+      "variants": {
+        "soe_standalone": "八、78",
+        "soe_consolidated": "八、78",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "gui_shu_yu_mu_gong_si_suo_you_zhe_de_qi_ta",
+      "section_title": "归属于母公司所有者的其他综合收益",
+      "variants": {
+        "soe_standalone": "八、79",
+        "soe_consolidated": "八、79",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "mei_gu_shou_yi",
+      "section_title": "每股收益",
+      "variants": {
+        "soe_standalone": "八、80",
+        "soe_consolidated": "八、80",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "xian_jin_liu_liang_biao_xiang_mu_zhu_shi",
+      "section_title": "现金流量表项目注释",
+      "variants": {
+        "soe_standalone": "八、81",
+        "soe_consolidated": "八、81",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "fei_huo_bi_xing_zi_chan_jiao_huan",
+      "section_title": "非货币性资产交换",
+      "variants": {
+        "soe_standalone": "八、82",
+        "soe_consolidated": "八、82",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "gu_fen_zhi_fu",
+      "section_title": "股份支付",
+      "variants": {
+        "soe_standalone": "八、83",
+        "soe_consolidated": "八、83",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "zhai_wu_chong_zu",
+      "section_title": "债务重组",
+      "variants": {
+        "soe_standalone": "八、84",
+        "soe_consolidated": "八、84",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "jie_kuan_fei_yong",
+      "section_title": "借款费用",
+      "variants": {
+        "soe_standalone": "八、85",
+        "soe_consolidated": "八、85",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "wai_bi_zhe_suan",
+      "section_title": "外币折算",
+      "variants": {
+        "soe_standalone": "八、86",
+        "soe_consolidated": "八、86",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "zu_lin",
+      "section_title": "租赁",
+      "variants": {
+        "soe_standalone": "八、87",
+        "soe_consolidated": "八、87",
+        "listed_standalone": "五、74",
+        "listed_consolidated": "五、74"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "zhong_zhi_jing_ying",
+      "section_title": "终止经营",
+      "variants": {
+        "soe_standalone": "八、89",
+        "soe_consolidated": "八、89",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "fen_bu_xin_xi",
+      "section_title": "分部信息",
+      "variants": {
+        "soe_standalone": "八、90",
+        "soe_consolidated": "八、90",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "he_bing_xian_jin_liu_liang_biao_xiang_guan",
+      "section_title": "合并现金流量表相关事项",
+      "variants": {
+        "soe_standalone": "八、91",
+        "soe_consolidated": "八、91",
+        "listed_standalone": null,
+        "listed_consolidated": null
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "wai_bi_huo_bi_xing_xiang_mu",
+      "section_title": "外币货币性项目",
+      "variants": {
+        "soe_standalone": "八、92",
+        "soe_consolidated": "八、92",
+        "listed_standalone": "五、73",
+        "listed_consolidated": "五、73"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "suo_you_quan_he_shi_yong_quan_shou_dao_xian",
+      "section_title": "所有权和使用权受到限制的资产",
+      "variants": {
+        "soe_standalone": "八、93",
+        "soe_consolidated": "八、93",
+        "listed_standalone": "五、32",
+        "listed_consolidated": "五、32"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "chi_you_dai_shou_zi_chan_he_chi_you_dai_sho",
+      "section_title": "持有待售资产和持有待售负债",
+      "variants": {
+        "soe_standalone": null,
+        "soe_consolidated": null,
+        "listed_standalone": "五、11",
+        "listed_consolidated": "五、11"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "she_ding_shou_yi_ji_hua_jing_zi_chan",
+      "section_title": "设定受益计划净资产",
+      "variants": {
+        "soe_standalone": null,
+        "soe_consolidated": null,
+        "listed_standalone": "五、17",
+        "listed_consolidated": "五、17"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "gu_ben",
+      "section_title": "股本",
+      "variants": {
+        "soe_standalone": null,
+        "soe_consolidated": null,
+        "listed_standalone": "五、53",
+        "listed_consolidated": "五、53"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "ku_cun_gu",
+      "section_title": "库存股",
+      "variants": {
+        "soe_standalone": null,
+        "soe_consolidated": null,
+        "listed_standalone": "五、56",
+        "listed_consolidated": "五、56"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "qi_ta_zong_he_shou_yi",
+      "section_title": "其他综合收益",
+      "variants": {
+        "soe_standalone": null,
+        "soe_consolidated": null,
+        "listed_standalone": "五、57",
+        "listed_consolidated": "五、57"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "yi_ban_feng_xian_zhun_bei",
+      "section_title": "一般风险准备",
+      "variants": {
+        "soe_standalone": null,
+        "soe_consolidated": null,
+        "listed_standalone": "五、60",
+        "listed_consolidated": "五、60"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "shui_jin_ji_fu_jia",
+      "section_title": "税金及附加",
+      "variants": {
+        "soe_standalone": null,
+        "soe_consolidated": null,
+        "listed_standalone": "五、63",
+        "listed_consolidated": "五、63"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "tou_zi_shou_yi",
+      "section_title": "投资收益",
+      "variants": {
+        "soe_standalone": null,
+        "soe_consolidated": null,
+        "listed_standalone": "五、69",
+        "listed_consolidated": "五、69"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "xian_jin_liu_liang_biao_bu_chong_zi_liao",
+      "section_title": "现金流量表补充资料",
+      "variants": {
+        "soe_standalone": null,
+        "soe_consolidated": null,
+        "listed_standalone": "五、71",
+        "listed_consolidated": "五、71"
+      },
+      "legacy_aliases": {}
+    },
+    {
+      "account_key": "gu_dong_quan_yi_bian_dong_biao_xiang_mu_zhu",
+      "section_title": "股东权益变动表项目注释",
+      "variants": {
+        "soe_standalone": null,
+        "soe_consolidated": null,
+        "listed_standalone": "五、72",
+        "listed_consolidated": "五、72"
+      },
+      "legacy_aliases": {}
     }
   ]
 }

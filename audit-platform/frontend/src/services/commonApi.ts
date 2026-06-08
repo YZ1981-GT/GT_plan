@@ -38,6 +38,27 @@ export async function getProjectWizardState(projectId: string): Promise<any> {
   return data
 }
 
+// ── 企业子类型推荐（audit-report-template-integration 需求 7.6） ──
+
+export interface TemplateRecommendation {
+  subtype: string | null
+  confidence: string
+  candidates: string[]
+  matched_rules: string[]
+  source: string
+  // 需求 1.7/1.8/14.3：项目当前已保存值（用户手动优先）+「待确认」横幅标志
+  current_subtype?: string | null
+  needs_confirmation?: boolean
+}
+
+/** 根据项目属性获取企业子类型（模板 A/B/C/D）推荐。 */
+export async function fetchTemplateRecommendation(projectId: string): Promise<TemplateRecommendation> {
+  const { data } = await http.get(P_proj.templateRecommendation(projectId), {
+    validateStatus: () => true,
+  })
+  return data as TemplateRecommendation
+}
+
 // ── 人员 ──
 
 export async function getMyStaffId(): Promise<string | null> {

@@ -1,0 +1,94 @@
+{
+  "version": "2025-v1",
+  "updated_at": "2026-06-08",
+  "description": "致同年度审计出品物模板清单（支持年度更新替换）",
+  "metadata": {
+    "asset_size_bytes": {
+      "report_body": 2450321,
+      "financial_statements": 229591,
+      "disclosure_notes": 2076805,
+      "total": 4756717,
+      "_note": "活跃模板资产字节数（不含 report_body/_archive_doc 归档原始 .doc）；由 scripts/compute_template_asset_size.py 生成"
+    }
+  },
+  "report_body": {
+    "unqualified": {
+      "type_a": {
+        "simple": "report_body/1.1 模板A-无保留意见审计报告模板（上市公司、三板创新层及公开发债）-简版.docx",
+        "detailed": "report_body/1.2 模版A-无保留意见审计报告模板（上市公司、三板创新层及公开发债）-详版.docx"
+      },
+      "type_b": {
+        "simple": "report_body/2.1 模板B-无保留意见审计报告模板（三板基础层、银行、保险、期货、证券等）-简版.docx",
+        "detailed": "report_body/2.2 模板B-无保留意见审计报告模板（三板基础层、银行、保险、期货、证券等）-详版.docx"
+      },
+      "type_c": {
+        "simple": "report_body/3.1 模板C-无保留意见审计报告模板（其他公众利益实体）-简版 .docx",
+        "detailed": "report_body/3.2 模板C-无保留意见审计报告模板（其他公众利益实体）-详版 .docx"
+      },
+      "type_d": {
+        "simple": "report_body/4.1 模板D-无保留意见审计报告模板（非公众利益实体）-简版 .docx",
+        "detailed": "report_body/4.2 模板D-无保留意见审计报告模板（非公众利益实体）-详版.docx"
+      }
+    },
+    "qualified": {
+      "type_a": {
+        "simple": "report_body/1. 模板A-保留意见审计报告模板（上市公司、三板创新层及公开发债）-简版 .docx"
+      },
+      "type_b": {
+        "simple": "report_body/2. 模板B-保留意见审计报告模板（三板基础层、银行、保险、期货、证券公司）-简版.docx"
+      },
+      "type_c": {
+        "simple": "report_body/3. 模板C-保留意见审计报告模板（其他公众利益实体）-简版.docx"
+      },
+      "type_d": {
+        "simple": "report_body/4. 模板D-保留意见审计报告模板（非公众利益实体）-简版.docx"
+      }
+    },
+    "adverse": {
+      "type_a": {
+        "simple": "report_body/1. 模板A-否定意见审计报告模板（上市公司、三板创新层及公开发债）-简版.docx"
+      },
+      "type_b": {
+        "simple": "report_body/2. 模板B-否定意见审计报告模板（三板基础层、银行、保险、期货、证券公司）-简版.docx"
+      },
+      "type_c": {
+        "simple": "report_body/3. 模板C-否定意见审计报告模板（其他公众利益实体）-简版.docx"
+      },
+      "type_d": {
+        "simple": "report_body/4. 模板D-否定意见审计报告模板（非公众利益实体）-简版.docx"
+      }
+    },
+    "disclaimer": {
+      "_all": {
+        "simple": "report_body/1.4.1无法表示意见审计报告模板（公众利益实体、非公众利益实体）-简版.docx"
+      }
+    }
+  },
+  "financial_statements": {
+    "soe_standalone": "financial_statements/soe_standalone.xlsx",
+    "soe_consolidated": "financial_statements/soe_consolidated.xlsx",
+    "listed_standalone": "financial_statements/listed_standalone.xlsx",
+    "listed_consolidated": "financial_statements/listed_consolidated.xlsx"
+  },
+  "sheet_aliases": {
+    "soe_standalone": {
+      "balance_sheet": [
+        "1,2-资产负债表(企财01表）",
+        "1,2-资产负债表(企财01表）续"
+      ],
+      "income_statement": "3-利润表（企财02表）",
+      "cash_flow_statement": "4-现金流量表（企财03表）",
+      "equity_statement": "5-所有者权益变动表（企财04表）",
+      "asset_impairment": "6-资产减值准备情况表（企财06表）",
+      "hidden_in_export": [
+        "GT_Custom"
+      ]
+    }
+  },
+  "disclosure_notes": {
+    "soe_standalone": "disclosure_notes/soe_standalone.docx",
+    "soe_consolidated": "disclosure_notes/soe_consolidated.docx",
+    "listed_standalone": "disclosure_notes/listed_standalone.docx",
+    "listed_consolidated": "disclosure_notes/listed_consolidated.docx"
+  }
+}

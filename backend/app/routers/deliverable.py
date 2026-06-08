@@ -35,7 +35,12 @@ from app.models.phase13_schemas import (
     IntegrityVerifyResponse,
     OnlyOfficeConfigResponse,
     OnlyOfficeHealthResponse,
+    OptionalSectionSchema,
+    ReportBodyConfirmRequest,
+    ReportBodyConfirmResponse,
     ReportBodyLoadTemplateRequest,
+    ReportBodyPreviewRequest,
+    ReportBodyPreviewResponse,
     ReportBodyRenderRequest,
     ReportBodyRenderResponse,
     ReportDateComplianceRequest,
@@ -364,6 +369,103 @@ async def load_report_body_template(
     return {"report_body_json": template}
 
 
+@router.post("/report-body/preview", response_model=ReportBodyPreviewResponse)
+async def preview_report_body(
+    project_id: UUID,
+    body: ReportBodyPreviewRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """报告正文两阶段生成 — preview 阶段（design §11 / §4）。
+
+    解析模板 → copy → 替换占位符 → 扫描 OPT 段落，写 ``fill_preview_sessions``
+    会话行（不落库交付件）。前端据此弹出 OptionalSectionDialog 供用户勾选，
+    随后调用 ``/report-body/confirm`` 完成入库。
+
+    铁律：TemplateFillService 仅 flush，router 必须 commit 以持久化 session
+    供后续 confirm 请求读取。
+    """
+    from app.services.template_fill_service import TemplateFillService
+
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
+    svc = TemplateFillService(db)
+    try:
+        result = await svc.preview_report_body(
+            project_id,
+            body.year,
+            opinion_type=body.opinion_type,
+            company_subtype=body.company_subtype,
+            template_variant=body.template_variant,
+            user_id=current_user.id,
+        )
+    except ValueError as e:
+        # 模板缺失 → 422（请求合法但所需资源不可用）
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    await db.commit()
+    return ReportBodyPreviewResponse(
+        preview_session_id=result.preview_session_id,
+        optional_sections=[
+            OptionalSectionSchema(
+                section_id=v.section_id,
+                description=v.description,
+                preview=v.preview,
+                default_keep=v.default_keep,
+                group=v.group,
+            )
+            for v in result.optional_sections
+        ],
+        missing_fields=result.missing_fields,
+        template_version=result.template_version,
+        company_subtype_resolved=result.company_subtype_resolved,
+    )
+
+
+@router.post("/report-body/confirm", response_model=ReportBodyConfirmResponse)
+async def confirm_report_body(
+    project_id: UUID,
+    body: ReportBodyConfirmRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """报告正文两阶段生成 — confirm 阶段（design §11 / §4）。
+
+    载入 preview 会话（校验未过期 + 归属当前用户）→ 应用 OPT 勾选 →
+    保存 guidance 副本 → 剥除 NOTE → DeliverableService 入库（版本递增）→
+    更新 ``audit_report.report_body_json`` → 删除会话。
+
+    铁律：TemplateFillService 仅 flush，router 在成功后 commit 保证原子。
+    错误映射：会话不存在/过期 → 404；归属不匹配（他人会话）→ 403；
+    模板/工作副本缺失 → 422。
+    """
+    from app.services.template_fill_service import TemplateFillService
+
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
+    svc = TemplateFillService(db)
+    try:
+        result = await svc.confirm_report_body(
+            project_id,
+            body.year,
+            preview_session_id=body.preview_session_id,
+            optional_sections=body.optional_sections,
+            user_id=current_user.id,
+        )
+    except ValueError as e:
+        msg = str(e)
+        if "不属于当前用户" in msg or "与项目不匹配" in msg:
+            raise HTTPException(status_code=403, detail=msg) from e
+        if "不存在" in msg or "已过期" in msg or "缺失" in msg:
+            raise HTTPException(status_code=404, detail=msg) from e
+        raise HTTPException(status_code=422, detail=msg) from e
+    await db.commit()
+    return ReportBodyConfirmResponse(
+        task_id=result.task_id,
+        version_no=result.version_no,
+        download_url=result.download_url,
+        report_body_json=result.report_body_json,
+        validation_warning=result.validation_warning,
+    )
+
+
 @router.post("/report-body/render", response_model=ReportBodyRenderResponse)
 async def render_report_body(
     project_id: UUID,
@@ -371,6 +473,17 @@ async def render_report_body(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """[DEPRECATED — 旧单阶段路径] 渲染并存储审计报告正文。
+
+    .. deprecated::
+        本路由是 ``ReportBodyService`` JSON 段落主源的单阶段（render-once）
+        legacy 路径，已被两阶段 ``/report-body/preview`` + ``/report-body/confirm``
+        （TemplateFillService Word 模板主源）取代。
+
+        迁移期保留以兼容旧前端；``USE_TEMPLATE_FILL_SERVICE=false`` 时仍为默认
+        生成路径。**勿在此基础上新增功能**。移除由 task 17 处理
+        （`USE_TEMPLATE_FILL_SERVICE` 默认改 true 后限制/下线本路由）。
+    """
     await _guard_action(db, current_user, project_id, DeliverableAction.export)
     dsvc = DeliverableService(db)
     rbs = ReportBodyService(db)
@@ -504,12 +617,37 @@ async def render_disclosure_notes(
     task.selected_sections = body.selected_sections
     await db.flush()
 
+    from app.models.core import Project
+    from app.services.note_section_catalog import normalize_report_scope
+
+    proj_row = (
+        await db.execute(
+            sa.select(Project.report_scope).where(
+                Project.id == project_id,
+                Project.is_deleted == sa.false(),
+            )
+        )
+    ).scalar_one_or_none()
+
     exporter = NoteWordExporter(db)
+    # 附注导出模式灰度（task 10.4）：
+    #   - body.mode 显式指定 "template"/"programmatic" → 直接使用
+    #   - 否则跟随 settings.USE_TEMPLATE_FILL_SERVICE（默认 False → programmatic）
+    # 生产默认保持 programmatic；切换 template 为默认需人工格式抽检（task 18）。
+    from app.core.config import settings
+
+    if body.mode in ("template", "programmatic"):
+        export_mode = body.mode
+    else:
+        export_mode = "template" if settings.USE_TEMPLATE_FILL_SERVICE else "programmatic"
+
     buf = await exporter.export(
         project_id,
         body.year,
         template_type=body.template_type,
+        report_scope=normalize_report_scope(proj_row if isinstance(proj_row, str) else None),
         sections=body.selected_sections,
+        mode=export_mode,
     )
     file_name = f"disclosure_notes_{body.year}.docx"
     snapshot_refs = await dsvc.capture_snapshot_refs(

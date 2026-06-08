@@ -6,6 +6,15 @@
  * 供 view 集成与 fast-check 属性测试共用。
  *
  * 对应需求：21.1/21.2/21.3（三入口存在）、21.4 + Property 37（前置数据就绪守卫）。
+ *
+ * 需求 14（生成前置守卫与数据依赖链）：
+ * - 四个生成入口（交付件中心 报表/附注/报告正文 + AuditReportEditor 报告正文）
+ *   SHALL 统一调用 `checkGenerateReady`，文案以本模块返回的 `message` 为唯一来源。
+ * - 数据依赖链：试算表就绪(trialBalanceReady) → 财务报表(reportsReady) → 附注/报告正文。
+ * - 服务端「一键生成全套」job（job_type='full_deliverables'，task 15 待实现）
+ *   SHALL 复用同一依赖链（trialBalanceReady → reportsReady）做 job 级前置校验，
+ *   并对齐此处的错误文案语义（无法生成「X」：…尚未就绪，请先完成前置数据准备），
+ *   单项失败不阻断其他已完成项的重试（需求 14.3）。
  */
 
 /** 三类生成入口键（与 DeliverableToolbar 事件一致） */

@@ -93,6 +93,9 @@ def _sync_basic_info_to_project(project: Project, data: BasicInfoSchema) -> None
     project.short_name = data.short_name
     project.audit_year = data.audit_year
     project.template_type = data.template_type
+    # audit-report-template-integration 需求 1.5/1.8：企业子类型（用户选择优先）
+    if data.company_subtype:
+        project.company_subtype = data.company_subtype.strip().lower()
     project.report_scope = data.report_scope
     # 合并类型仅在合并报表项目下有意义；单户报表清空避免误导
     project.consolidation_type = (

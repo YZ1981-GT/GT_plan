@@ -154,6 +154,18 @@ class FullPackageRequest(BaseModel):
     template_type: str | None = None
 
 
+class FullDeliverablesRequest(BaseModel):
+    """一键生成全套交付件请求（job_type=full_deliverables，design §14）。
+
+    steps 默认 ``financial_reports → disclosure_notes → report_body``；
+    optional_sections 为 None 时由执行器按 OPT 默认优先级链解析（无弹窗自动 confirm）。
+    """
+    year: int
+    template_variant: str = "simple"
+    steps: list[str] | None = None
+    optional_sections: dict[str, bool] | None = None
+
+
 # ===================================================================
 # 交付件管理中心 (deliverable-center)
 # ===================================================================
@@ -232,11 +244,61 @@ class ReportBodyRenderResponse(BaseModel):
     validation_warning: str | None = None
 
 
+# -------------------------------------------------------------------
+# 报告正文两阶段 API（audit-report-template-integration Phase 2 / design §11）
+# preview（不落库交付件，写 fill_preview_sessions）+ confirm（入库 + 版本递增）
+# -------------------------------------------------------------------
+
+class ReportBodyPreviewRequest(BaseModel):
+    """report-body/preview 请求（design §11）。"""
+    year: int
+    opinion_type: str
+    company_subtype: str | None = None
+    template_variant: str = "simple"
+
+
+class OptionalSectionSchema(BaseModel):
+    """preview 返回的单个可选段落（OPT 块）视图。"""
+    section_id: str
+    description: str
+    preview: str
+    default_keep: bool
+    group: str
+
+
+class ReportBodyPreviewResponse(BaseModel):
+    """report-body/preview 响应（design §11）。"""
+    preview_session_id: UUID
+    optional_sections: list[OptionalSectionSchema] = []
+    missing_fields: list[str] = []
+    template_version: str
+    company_subtype_resolved: str
+
+
+class ReportBodyConfirmRequest(BaseModel):
+    """report-body/confirm 请求（design §11）。"""
+    year: int
+    preview_session_id: UUID
+    optional_sections: dict[str, bool] = {}
+
+
+class ReportBodyConfirmResponse(BaseModel):
+    """report-body/confirm 响应（与现有 ReportBodyRenderResponse 形状兼容，design §11）。"""
+    task_id: UUID
+    version_no: int
+    download_url: str
+    report_body_json: dict
+    validation_warning: str | None = None
+
+
 class DeliverableExportRequest(BaseModel):
     year: int
     template_type: str = "soe"
     selected_sections: list[str] | None = None
     report_types: list[str] | None = None
+    # 灰度开关：附注导出模式 None=跟随 settings.USE_TEMPLATE_FILL_SERVICE；
+    # 显式 "template" / "programmatic" 覆盖（task 10.4）
+    mode: str | None = None
 
 
 class DeliverableExportResponse(BaseModel):

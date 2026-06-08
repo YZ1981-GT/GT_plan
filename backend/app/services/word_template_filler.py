@@ -1,5 +1,13 @@
 """Word 模板填充服务 — 方案B核心 (Phase 13)
 
+.. deprecated::
+    本模块已被 ``TemplateFillService`` (template_fill_service.py) 取代。
+    新代码请使用两阶段 API（preview/confirm）通过 deliverable 路由生成报告正文。
+    财务报表使用 ``ReportExcelExporter`` + manifest；附注使用
+    ``NoteWordExporter(mode='template')``。
+    本模块将在 USE_TEMPLATE_FILL_SERVICE 灰度完成后移除。
+    详见 spec: audit-report-template-integration (Phase 3, task 17)
+
 打开致同标准 Word 模板 → 填充数据到占位符/书签 → 保存到项目目录
 """
 
@@ -167,9 +175,21 @@ def _process_color_text_in_doc(doc) -> None:
 
 
 class WordTemplateFiller:
-    """Word 模板填充服务 — 方案B核心"""
+    """Word 模板填充服务 — 方案B核心
+
+    .. deprecated::
+        已被 TemplateFillService 取代。灰度切换 USE_TEMPLATE_FILL_SERVICE=true 后将移除。
+        新代码请使用 deliverable.py 的 preview/confirm 两阶段 API。
+    """
 
     def __init__(self, db: AsyncSession):
+        import warnings
+        warnings.warn(
+            "WordTemplateFiller is deprecated. Use TemplateFillService (preview/confirm API) instead. "
+            "See spec: audit-report-template-integration task 17.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.db = db
 
     def _reports_dir(self, project_id: UUID) -> Path:

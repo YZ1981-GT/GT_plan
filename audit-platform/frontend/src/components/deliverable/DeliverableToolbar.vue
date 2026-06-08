@@ -28,6 +28,7 @@
       <el-button type="primary" :loading="generating" @click="emit('generate-reports')">生成报表</el-button>
       <el-button type="primary" :loading="generating" @click="emit('generate-notes')">生成附注</el-button>
       <el-button type="primary" :loading="generating" @click="emit('generate-report')">生成报告</el-button>
+      <el-button type="primary" :loading="fullGenerating" @click="emit('generate-full')">一键生成全套</el-button>
       <el-button :loading="packaging" @click="emit('package-download')">打包下载</el-button>
       <el-button @click="emit('archive')">项目归档</el-button>
     </div>
@@ -39,12 +40,13 @@ const docType = defineModel<string>('docType', { default: '' })
 const status = defineModel<string>('status', { default: '' })
 const keyword = defineModel<string>('keyword', { default: '' })
 
-defineProps<{ generating?: boolean; packaging?: boolean }>()
+defineProps<{ generating?: boolean; packaging?: boolean; fullGenerating?: boolean }>()
 const emit = defineEmits<{
   refresh: []
   'generate-report': []
   'generate-reports': []
   'generate-notes': []
+  'generate-full': []
   'package-download': []
   archive: []
 }>()

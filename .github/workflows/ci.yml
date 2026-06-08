@@ -226,6 +226,9 @@ jobs:
           uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
       - name: Validate seed files
         run: python scripts/validate_seed_files.py
+      - name: Validate template manifest (strict — reject .doc, missing files)
+        run: python scripts/validate_template_manifest.py --strict
+        working-directory: backend
       - name: Dead link check (apiPaths ↔ router_registry)
         run: node scripts/dead-link-check.js
 

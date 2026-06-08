@@ -60,12 +60,15 @@ async def export_word(
     # Generate Word document
     from app.services.note_word_exporter import NoteWordExporter
 
+    from app.services.note_section_catalog import normalize_report_scope
+
     exporter = NoteWordExporter(db)
     try:
         output = await exporter.export(
             project_id=project_id,
             year=body.year,
             template_type=body.template_type,
+            report_scope=normalize_report_scope(project.report_scope),
             sections=body.sections,
             skip_empty=body.skip_empty,
         )

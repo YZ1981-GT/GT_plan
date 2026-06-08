@@ -61,6 +61,7 @@ from app.models.report_models import (
     ExportTask,
     ExportTaskStatus,
     ExportTaskType,
+    FillPreviewSession,
     FinancialReport,
     FinancialReportType,
     NoteStatus,
@@ -183,6 +184,7 @@ __all__ = [
     "AuditReportTemplate",
     "ExportTask",
     "NoteValidationResult",
+    "FillPreviewSession",
     # --- attachment models ---
     "Attachment",
     "AttachmentWorkingPaper",
