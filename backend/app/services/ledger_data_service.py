@@ -220,6 +220,160 @@ async def delete_ledger_data(
     return deleted
 
 
+# 各表去重分组列（业务列，排除 id/审计列；整行字节级相同才算重复）
+# 排除：id（主键，去重保留最小）/ created_at/updated_at/deleted_at（写入时间，同源数据可能微秒差）
+# / import_batch_id（批次号，同数据多次导入会不同但行内容相同）/ raw_extra（JSONB，用 ::text 比较）
+_DEDUP_EXCLUDE_COLS: frozenset[str] = frozenset({
+    "id", "created_at", "updated_at", "deleted_at", "import_batch_id",
+})
+
+
+async def _table_business_columns(db: AsyncSession, table: str) -> list[str]:
+    """取表的业务列（用于去重分组），排除主键/审计列。"""
+    cols = (await db.execute(sa.text(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_name = :t ORDER BY ordinal_position"
+    ), {"t": table})).scalars().all()
+    return [c for c in cols if c not in _DEDUP_EXCLUDE_COLS]
+
+
+async def dedup_ledger_data(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    year: int,
+    tables: Optional[list[str]] = None,
+    dry_run: bool = False,
+    hard_delete: bool = False,
+    user_id: UUID | str | None = None,
+    ip_address: str | None = None,
+) -> dict[str, Any]:
+    """对 active 数据集做整行去重（保留每组最小 id，删除其余）。
+
+    安全策略（审计场景，避免误删真实分录）：
+    - 分组键 = 全部业务列（含 summary/raw_extra/辅助维度等），**整行字节级完全相同**才算重复
+    - 任何一列有差异即视为不同行，保留
+    - 只处理当前 active 数据集的行（不动 superseded 历史版本）
+    - JSONB 列 raw_extra 用 ::text 参与比较
+    - **默认软删除**（is_deleted=true + deleted_at），可经回收站恢复；
+      ``hard_delete=True`` 才物理删（不可恢复）
+    - 写 app_audit_log（动作 ledger_dedup），记录删除行数 + 样例 id
+
+    Args:
+        dry_run: True 时只统计可删行数，不实际删除
+        hard_delete: True 物理删；默认 False 软删可恢复
+        user_id / ip_address: 审计日志归属
+
+    Returns:
+        {"tb_balance": 删除行数, ..., "dry_run": bool, "total_deleted": N, "mode": ...}
+    """
+    if not tables:
+        tables = LEDGER_TABLES
+    else:
+        invalid = set(tables) - set(LEDGER_TABLES)
+        if invalid:
+            raise ValueError(f"不支持的表: {invalid}")
+
+    result: dict[str, Any] = {"dry_run": dry_run}
+    total = 0
+    # 收集被删 id 样例（审计轨迹，每表最多存 50 个，避免 payload 过大）
+    deleted_id_samples: dict[str, list[str]] = {}
+
+    for table in tables:
+        biz_cols = await _table_business_columns(db, table)
+        # raw_extra 用 ::text 比较（JSONB 不能直接 group by 也避免等值问题）
+        partition_exprs = ", ".join(
+            f"{c}::text" if c == "raw_extra" else c for c in biz_cols
+        )
+
+        # 软删模式只圈未删行（is_deleted=false），避免重复软删已删行
+        deleted_filter = "" if hard_delete else "AND t.is_deleted = false"
+
+        # 用窗口函数标记每组重复行（按 id 排序，rn>1 即多余的重复）
+        # 只作用于 active 数据集
+        dup_cte = f"""
+            WITH ranked AS (
+                SELECT id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY {partition_exprs}
+                           ORDER BY id
+                       ) AS rn
+                FROM {table} t
+                WHERE t.project_id = :pid AND t.year = :yr
+                  {deleted_filter}
+                  AND EXISTS (
+                    SELECT 1 FROM ledger_datasets d
+                    WHERE d.id = t.dataset_id AND d.status = 'active'
+                  )
+            )
+        """
+        params = {"pid": str(project_id), "yr": year}
+
+        if dry_run:
+            sql = dup_cte + "SELECT COUNT(*) FROM ranked WHERE rn > 1"
+            cnt = (await db.execute(sa.text(sql), params)).scalar() or 0
+            result[table] = int(cnt)
+        else:
+            # 先抓将删的 id 样例（审计）
+            sample_sql = dup_cte + "SELECT id FROM ranked WHERE rn > 1 LIMIT 50"
+            sample_ids = (await db.execute(sa.text(sample_sql), params)).scalars().all()
+            if sample_ids:
+                deleted_id_samples[table] = [str(i) for i in sample_ids]
+
+            if hard_delete:
+                sql = dup_cte + f"""
+                    DELETE FROM {table}
+                    WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+                """
+            else:
+                # 软删：is_deleted=true + deleted_at，复用回收站恢复机制
+                sql = dup_cte + f"""
+                    UPDATE {table}
+                    SET is_deleted = true, deleted_at = now()
+                    WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+                """
+            r = await db.execute(sa.text(sql), params)  # noqa: S608
+            result[table] = r.rowcount or 0
+        total += result[table]
+        logger.info(
+            "dedup %s: %s %d duplicate rows (project=%s year=%d mode=%s)",
+            table, "would delete" if dry_run else "deleted",
+            result[table], project_id, year,
+            "dry_run" if dry_run else ("hard" if hard_delete else "soft"),
+        )
+
+    mode = "dry_run" if dry_run else ("hard" if hard_delete else "soft")
+    result["mode"] = mode
+    result["total_deleted"] = total
+
+    if not dry_run:
+        await db.commit()
+        # 写审计日志（失败不阻断主流程）
+        if total > 0:
+            try:
+                from app.services.audit_logger_enhanced import audit_logger
+                await audit_logger.log_action(
+                    user_id=user_id or "system",
+                    action="ledger_dedup",
+                    object_type="ledger_data",
+                    object_id=None,
+                    project_id=project_id,
+                    details={
+                        "year": year,
+                        "mode": mode,
+                        "tables": {t: result.get(t, 0) for t in tables},
+                        "total_deleted": total,
+                        "deleted_id_samples": deleted_id_samples,
+                        "recoverable": not hard_delete,
+                    },
+                    ip_address=ip_address,
+                )
+            except Exception:
+                logger.warning("dedup audit log write failed (non-blocking)", exc_info=True)
+
+    return result
+
+
 async def restore_ledger_data(
     db: AsyncSession,
     *,

@@ -121,11 +121,13 @@ interface PhaseInfo {
 interface SSEMessage {
   phase: string
   percent?: number
+  status?: string
   file?: string
   sheet?: string
   rows?: number
   message?: string
   dataset_id?: string
+  result?: unknown
   error?: string
 }
 
@@ -138,6 +140,9 @@ const currentFile = ref('')
 const isFinished = ref(false)
 const isSuccess = ref(false)
 let eventSource: EventSource | null = null
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+let reconnectAttempts = 0
+const MAX_RECONNECT_ATTEMPTS = 30  // 30 × 2s ≈ 60s 容错窗口
 
 const phases = ref<PhaseInfo[]>([
   { key: 'uploading', label: '上传', percent: 100, completed: true },
@@ -175,6 +180,7 @@ function connectSSE() {
   eventSource.onmessage = (event) => {
     try {
       const data: SSEMessage = JSON.parse(event.data)
+      reconnectAttempts = 0  // 收到消息说明连接健康，重置重连计数
       handleSSEMessage(data)
     } catch {
       // ignore parse errors
@@ -182,11 +188,71 @@ function connectSSE() {
   }
 
   eventSource.onerror = () => {
-    // SSE 断开，可能是完成或网络问题
+    // SSE 断开。可能是：①作业已完成（后端正常关流）②网络抖动 ③后端重启。
+    // 不能直接报"中断"——先关掉旧连接，回退轮询作业真实状态确认。
+    closeSSE()
     if (!isFinished.value) {
-      statusMessage.value = '连接中断，正在重试...'
+      void pollJobStatusFallback()
     }
   }
+}
+
+/**
+ * SSE 断线后回退：轮询 /jobs/{jobId} 查作业真实状态。
+ * - 作业已完成/失败/取消 → 渲染终态，不再报中断
+ * - 作业仍在跑 → 重连 SSE（最多 MAX_RECONNECT_ATTEMPTS 次）
+ * - 超过重连上限仍连不上 → 才显示中断提示
+ */
+async function pollJobStatusFallback() {
+  if (isFinished.value) return
+  try {
+    const { api } = await import('@/services/apiProxy')
+    const job: any = await api.get(
+      `/api/projects/${props.projectId}/ledger-import/jobs/${props.jobId}`
+    )
+    const status = job?.status
+    if (status === 'completed') {
+      isFinished.value = true
+      isSuccess.value = true
+      statusMessage.value = '导入完成'
+      currentFile.value = ''
+      phases.value.forEach(p => { p.percent = 100; p.completed = true })
+      totalPercent.value = 100
+      return
+    }
+    if (status === 'failed' || status === 'timed_out' || status === 'canceled') {
+      isFinished.value = true
+      isSuccess.value = false
+      statusMessage.value = job?.error_message || job?.message || '导入失败'
+      emit('failed')
+      return
+    }
+    // 仍在进行中：同步一次进度后重连 SSE
+    if (typeof job?.progress_pct === 'number') {
+      totalPercent.value = job.progress_pct
+    }
+    if (job?.progress_message) {
+      statusMessage.value = job.progress_message
+    }
+    scheduleReconnect()
+  } catch {
+    // 查状态也失败（后端短暂不可达）→ 安排重连
+    scheduleReconnect()
+  }
+}
+
+function scheduleReconnect() {
+  if (isFinished.value) return
+  reconnectAttempts += 1
+  if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+    // 真正持续连不上，才提示用户（数据仍在后台写，可放后台继续）
+    statusMessage.value = '连接中断，请稍候或点"放到后台继续"'
+    return
+  }
+  statusMessage.value = '正在同步进度...'
+  reconnectTimer = setTimeout(() => {
+    connectSSE()
+  }, 2000)
 }
 
 function handleSSEMessage(data: SSEMessage) {
@@ -217,8 +283,8 @@ function handleSSEMessage(data: SSEMessage) {
   const total = phases.value.reduce((sum, p) => sum + p.percent, 0)
   totalPercent.value = Math.round(total / phases.value.length)
 
-  // 完成
-  if (data.phase === 'completed') {
+  // 完成（后端可能用 phase:"completed" 或 status:"completed" 表示）
+  if (data.phase === 'completed' || data.status === 'completed') {
     isFinished.value = true
     isSuccess.value = true
     statusMessage.value = '导入完成'
@@ -228,11 +294,17 @@ function handleSSEMessage(data: SSEMessage) {
     closeSSE()
   }
 
-  // 失败
-  if (data.phase === 'failed' || data.error) {
+  // 失败（phase/status/error 任一指示失败）
+  if (
+    data.phase === 'failed' ||
+    data.status === 'failed' ||
+    data.status === 'timed_out' ||
+    data.status === 'canceled' ||
+    data.error
+  ) {
     isFinished.value = true
     isSuccess.value = false
-    statusMessage.value = data.error || '导入失败'
+    statusMessage.value = data.error || data.message || '导入失败'
     closeSSE()
     emit('failed')
   }

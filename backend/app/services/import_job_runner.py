@@ -86,15 +86,32 @@ class ImportJobRunner:
         return len(job_ids)
 
     @classmethod
+    def _active_job_ids(cls) -> set[UUID]:
+        """本进程内仍在运行的 job_id 集合（task 存在且未结束）。
+
+        用于保护活跃作业不被超时检测误杀——慢 DB 下大批写入/激活阶段可能长时间
+        无进度回调，心跳落后，但 task 仍在跑，绝不能把它的 dataset 标 failed。
+        """
+        return {
+            jid for jid, task in cls._running_tasks.items()
+            if task is not None and not task.done()
+        }
+
+    @classmethod
     async def recover_jobs(cls) -> None:
         """Recover queued jobs and timeout stale running jobs."""
+        protected = cls._active_job_ids()
         timed_out_jobs: list[ImportJob] = []
         async with async_session() as db:
-            timed_out_jobs.extend(await ImportJobService.check_timed_out(db))
+            timed_out_jobs.extend(await ImportJobService.check_timed_out(db, protected_job_ids=protected))
             if timed_out_jobs:
                 await db.commit()
 
-            stale_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=120)
+            # 用 DB 服务端时钟算 stale_cutoff（与 server-time 心跳一致，规避进程时钟漂移）
+            db_now = (await db.execute(sa.select(sa.func.now()))).scalar_one()
+            if db_now.tzinfo is not None:
+                db_now = db_now.astimezone(timezone.utc).replace(tzinfo=None)
+            stale_cutoff = db_now - timedelta(minutes=120)
             running_states = (
                 JobStatus.running,
                 JobStatus.validating,
@@ -126,9 +143,12 @@ class ImportJobRunner:
             )
             stale_jobs = result.scalars().all()
             for stale in stale_jobs:
+                # 同样保护本进程内仍活跃的作业（task 未结束不算僵尸）
+                if stale.id in protected:
+                    continue
                 stale.status = JobStatus.timed_out
                 stale.error_message = "导入作业心跳丢失，已标记超时"
-                stale.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                stale.completed_at = db_now
                 timed_out_jobs.append(stale)
             if stale_jobs:
                 await db.commit()
@@ -636,6 +656,11 @@ class ImportJobRunner:
         logger.info("ImportJob %s: v2 engine starting (project=%s year=%s)",
                     job_id, project_id, year)
 
+        # 后台心跳任务：整个作业期间每隔 N 秒独立 ping heartbeat_at，
+        # 不依赖 pipeline 进度回调。根治"后置阶段（大表 COUNT/激活/rebuild）
+        # 长时间无回调→心跳落后→被超时清理→dataset 标 failed→activate 崩"。
+        heartbeat_task = asyncio.create_task(cls._heartbeat_loop(job_id))
+
         try:
             # ── Phase 1: Load files ──
             logger.info("ImportJob %s phase=load_files", job_id)
@@ -802,6 +827,21 @@ class ImportJobRunner:
             for attempt in range(3):
                 try:
                     async with async_session() as db:
+                        # 幂等保护：作业可能已被超时检测器置为终态（timed_out/canceled/
+                        # completed）。此时不能再转 failed（状态机禁止 timed_out→failed，
+                        # 会徒劳重试 3 次）。先读当前状态，已是终态则只记录+释放锁。
+                        existing = await ImportJobService.get_job(db, job_id)
+                        if existing and existing.status in (
+                            JobStatus.timed_out,
+                            JobStatus.canceled,
+                            JobStatus.completed,
+                            JobStatus.failed,
+                        ):
+                            logger.info(
+                                "ImportJob %s already terminal (%s), skip failed transition",
+                                job_id, existing.status.value,
+                            )
+                            break
                         # P1: canceled 时不标 failed
                         target_status = (
                             JobStatus.canceled if is_canceled else JobStatus.failed
@@ -828,6 +868,47 @@ class ImportJobRunner:
                 ImportQueueService.release_lock(project_id)
             except Exception:
                 logger.exception("ImportQueueService.release_lock failed for %s", project_id)
+        finally:
+            # 无论成功/失败/取消，都停掉后台心跳任务
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except (asyncio.CancelledError, Exception):
+                pass
+
+    @classmethod
+    async def _heartbeat_loop(cls, job_id: UUID, interval: float = 15.0) -> None:
+        """后台心跳：作业运行期间每 interval 秒更新一次 heartbeat_at。
+
+        独立于 pipeline 进度回调，确保后置长阶段（大表 COUNT/激活/rebuild_aux）
+        也持续刷新心跳，避免被 recover_jobs 误判超时。仅在作业仍处于运行态时刷新；
+        作业进入终态则自动退出循环。
+        """
+        from app.models.dataset_models import JobStatus as _JS
+
+        running_states = {
+            _JS.queued, _JS.running, _JS.validating, _JS.writing, _JS.activating,
+        }
+        try:
+            while True:
+                await asyncio.sleep(interval)
+                try:
+                    async with async_session() as db:
+                        job = await ImportJobService.get_job(db, job_id)
+                        if job is None or job.status not in running_states:
+                            return
+                        # 用 PG 服务端 now() 写心跳，与超时检测的比较基准统一为
+                        # DB 时钟，彻底规避 Python 进程时钟/时区漂移导致的假超时。
+                        await db.execute(
+                            sa.update(ImportJob)
+                            .where(ImportJob.id == job_id)
+                            .values(heartbeat_at=sa.func.now())
+                        )
+                        await db.commit()
+                except Exception:
+                    logger.debug("ImportJob %s heartbeat tick failed", job_id, exc_info=True)
+        except asyncio.CancelledError:
+            return
 
     @classmethod
     async def resume_from_checkpoint(cls, job_id: UUID) -> dict:

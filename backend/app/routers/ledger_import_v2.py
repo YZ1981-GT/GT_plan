@@ -289,18 +289,22 @@ async def submit_import(
         )
         # apply_incremental 内部已 commit
 
-    result = await ImportOrchestrator.submit(
-        db,
-        upload_token=body.upload_token,
-        project_id=project_id,
-        year=body.year,
-        confirmed_mappings=body.confirmed_mappings,
-        file_manifest=[],  # Files already stored via upload_token
-        storage_uri=f"local:///tmp/uploads/{body.upload_token}",
-        force_activate=body.force_activate,
-        created_by=current_user.id,
-        adapter_id=body.adapter_id,
-    )
+    try:
+        result = await ImportOrchestrator.submit(
+            db,
+            upload_token=body.upload_token,
+            project_id=project_id,
+            year=body.year,
+            confirmed_mappings=body.confirmed_mappings,
+            file_manifest=[],  # Files already stored via upload_token
+            storage_uri=f"local:///tmp/uploads/{body.upload_token}",
+            force_activate=body.force_activate,
+            created_by=current_user.id,
+            adapter_id=body.adapter_id,
+        )
+    except ValueError as exc:
+        # 并发护栏：同 project+year 已有进行中作业 → 409 冲突
+        raise HTTPException(status_code=409, detail=str(exc))
 
     # F42 / Sprint 7.10：把 force_submit 持久化到 ImportJob（审计轨迹）
     if body.force_submit:

@@ -175,10 +175,10 @@ async def get_aux_balance_summary(
 
     # 维度类型列表（含各类型的记录数）
     r = await db.execute(sa.text("""
-        SELECT dim_type, SUM(record_count) as total_records, COUNT(*) as group_count
+        SELECT aux_type AS dim_type, SUM(record_count) as total_records, COUNT(*) as group_count
         FROM tb_aux_balance_summary
         WHERE project_id = :pid AND year = :yr
-        GROUP BY dim_type ORDER BY total_records DESC
+        GROUP BY aux_type ORDER BY total_records DESC
     """), {"pid": str(project_id), "yr": year})
     dim_types = [{"type": row[0], "total_records": int(row[1]), "group_count": int(row[2])} for row in r.fetchall()]
 
@@ -189,13 +189,13 @@ async def get_aux_balance_summary(
     # 汇总数据（按维度类型筛选）
     params: dict = {"pid": str(project_id), "yr": year}
     sql = """
-        SELECT dim_type, account_code, account_name, aux_code, aux_name,
+        SELECT aux_type AS dim_type, account_code, account_name, aux_code, aux_name,
                record_count, opening_balance, debit_amount, credit_amount, closing_balance
         FROM tb_aux_balance_summary
         WHERE project_id = :pid AND year = :yr
     """
     if dim_type:
-        sql += " AND dim_type = :dt"
+        sql += " AND aux_type = :dt"
         params["dt"] = dim_type
     sql += " ORDER BY account_code, aux_code"
 

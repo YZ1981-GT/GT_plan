@@ -534,6 +534,9 @@ async def bulk_insert_staged(
                 # currency_code 默认 CNY
                 if "currency_code" in valid_cols and not rec.get("currency_code"):
                     rec["currency_code"] = "CNY"
+                # tenant_id NOT NULL 兜底（与 bulk_copy_staged 一致，防御性显式注入）
+                if "tenant_id" in valid_cols and not rec.get("tenant_id"):
+                    rec["tenant_id"] = "default"
                 # raw_extra JSONB 安全序列化：datetime/date/Decimal 等非 JSON 原生类型转 str
                 if "raw_extra" in rec and rec["raw_extra"] is not None:
                     rec["raw_extra"] = _sanitize_raw_extra(rec["raw_extra"])
@@ -609,6 +612,7 @@ async def bulk_copy_staged(
     idx_updated = col_index.get("updated_at")
     idx_company = col_index.get("company_code")
     idx_currency = col_index.get("currency_code")
+    idx_tenant = col_index.get("tenant_id")
 
     num_cols = len(valid_col_names)
 
@@ -645,6 +649,8 @@ async def bulk_copy_staged(
             row_list[idx_company] = default_company_code
         if idx_currency is not None and not row_list[idx_currency]:
             row_list[idx_currency] = "CNY"
+        if idx_tenant is not None and not row_list[idx_tenant]:
+            row_list[idx_tenant] = "default"
 
         # JSONB 列：B3-F 优化——跳过 _sanitize_raw_extra 递归，直接 json.dumps(default=)
         # _json_default 在编码时现场处理 datetime/Decimal 等非标类型，免去递归构造中间 dict。

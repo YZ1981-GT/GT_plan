@@ -43,6 +43,9 @@
         <el-button size="small" @click="runValidation" :loading="validating" type="warning" plain>
           <el-icon style="margin-right: 2px"><Warning /></el-icon> 数据校验
         </el-button>
+        <el-button size="small" @click="runDedup" :loading="deduping" type="danger" plain>
+          <el-icon style="margin-right: 2px"><Delete /></el-icon> 数据去重
+        </el-button>
       </div>
     </div>
 
@@ -974,11 +977,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch, provide, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Upload, Loading, Warning, Setting } from '@element-plus/icons-vue'
+import { Search, Upload, Loading, Warning, Setting, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger as P_ledger, projects as P_proj, materiality as P_mat } from '@/services/apiPaths'
-import { fmtAmount } from '@/utils/formatters'
+import { fmtAmount, fmtAmountUnit } from '@/utils/formatters'
 import { IMPORT_JOB_STATUS } from '@/constants/statusEnum'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
 import LedgerDataManager from '@/components/ledger-import/LedgerDataManager.vue'
@@ -1233,6 +1236,58 @@ async function runValidation() {
     handleApiError(e, '校验')
   } finally {
     validating.value = false
+  }
+}
+
+// ── 数据去重 ──
+const deduping = ref(false)
+
+async function runDedup() {
+  if (!projectId.value) return
+  deduping.value = true
+  try {
+    // 1. 先 dry_run 预览将删除的重复行数
+    const preview: any = await api.post(P_ledger.data.dedup(projectId.value), {
+      year: selectedYear.value,
+      dry_run: true,
+    })
+    const total = preview?.total_deleted ?? 0
+    if (total === 0) {
+      ElMessage.success('未检测到重复数据，无需去重')
+      return
+    }
+    const detail = ['tb_balance', 'tb_ledger', 'tb_aux_balance', 'tb_aux_ledger']
+      .map((t) => {
+        const label = { tb_balance: '余额表', tb_ledger: '序时账', tb_aux_balance: '辅助余额', tb_aux_ledger: '辅助明细' }[t]
+        return preview[t] ? `${label}: ${preview[t].toLocaleString()} 行` : null
+      })
+      .filter(Boolean)
+      .join('，')
+    // 2. 确认
+    await ElMessageBox.confirm(
+      `检测到 ${total.toLocaleString()} 行整行完全相同的重复数据（${detail}）。\n` +
+        `去重将保留每组首条、删除其余完全相同的行（任一字段有差异的行不会被删，删除的数据进回收站可恢复）。是否继续？`,
+      '数据去重确认',
+      { type: 'warning', confirmButtonText: '确认去重', cancelButtonText: '取消' }
+    )
+    // 3. 实际执行（默认软删，进回收站可恢复）
+    const result: any = await api.post(P_ledger.data.dedup(projectId.value), {
+      year: selectedYear.value,
+      dry_run: false,
+    })
+    const deleted = result?.total_deleted ?? 0
+    ElMessage.success(
+      `去重完成，共清理 ${deleted.toLocaleString()} 行重复数据（已进回收站，可在"数据管理"中恢复）`
+    )
+    // 刷新当前视图
+    if (currentLevel.value === 'balance') {
+      await loadBalance()
+    }
+  } catch (e: any) {
+    if (e === 'cancel' || e === 'close') return
+    handleApiError(e, '去重')
+  } finally {
+    deduping.value = false
   }
 }
 const importStep = ref<'upload' | 'preview' | 'importing' | 'done'>('upload')
@@ -2037,12 +2092,30 @@ const ledgerVirtualColumns = computed(() => {
     makeResizableCol('voucher_date', '日期', w.voucher_date, sortKey),
     makeResizableCol('voucher_no', '凭证号', w.voucher_no, sortKey),
     makeResizableCol('summary', '摘要', w.summary, sortKey, { flexGrow: 1 }),
-    makeResizableCol('debit_amount', '借方', w.debit_amount, sortKey, { align: 'right' }),
-    makeResizableCol('credit_amount', '贷方', w.credit_amount, sortKey, { align: 'right' }),
-    makeResizableCol('balance', '余额', w.balance, sortKey, { align: 'right' }),
+    makeResizableCol('debit_amount', '借方', w.debit_amount, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
+    makeResizableCol('credit_amount', '贷方', w.credit_amount, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
+    makeResizableCol('balance', '余额', w.balance, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
   ]
   return cols
 })
+
+/**
+ * 虚拟滚动金额单元格渲染器：千分位 + 跟随 displayPrefs 单位/小数位。
+ * el-table-v2 不走 <template>，必须用 cellRenderer 显式格式化，
+ * 否则直接渲染原始数值（无千分符）。与标准表 GtAmountCell 口径一致。
+ */
+function amountCellRenderer({ cellData }: any) {
+  const txt = fmtAmountUnit(cellData, displayPrefs.amountUnit as any, displayPrefs.decimals, displayPrefs.showZero)
+  const negative = typeof cellData === 'number' ? cellData < 0 : Number(cellData) < 0
+  return h(
+    'span',
+    {
+      class: ['gt-amt', { 'gt-amount--negative': displayPrefs.negativeRed && negative }],
+      style: { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+    },
+    txt,
+  )
+}
 
 /** 构造可调整列宽的列定义（headerCellRenderer 注入 resize handle） */
 function makeResizableCol(

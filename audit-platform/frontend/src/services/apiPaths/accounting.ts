@@ -129,6 +129,7 @@ export const ledger = {
     incrementalApply: (pid: string) => `/api/projects/${pid}/ledger-data/incremental/apply`,
     trash: (pid: string) => `/api/projects/${pid}/ledger-data/trash`,
     restore: (pid: string) => `/api/projects/${pid}/ledger-data/restore`,
+    dedup: (pid: string) => `/api/projects/${pid}/ledger-data/dedup`,
   },
 } as const
 

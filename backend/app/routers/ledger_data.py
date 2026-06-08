@@ -14,7 +14,7 @@ import logging
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ from app.services.ledger_data_service import (
     LEDGER_TABLES,
     apply_incremental,
     compute_incremental_diff,
+    dedup_ledger_data,
     delete_ledger_data,
     detect_existing_periods,
     list_trash,
@@ -55,6 +56,23 @@ class DeleteLedgerRequest(BaseModel):
     hard_delete: bool = Field(
         False,
         description="硬删除（S7-10 默认软删，进回收站可恢复；硬删不可恢复）",
+    )
+
+
+class DedupLedgerRequest(BaseModel):
+    """去重请求。"""
+    year: int = Field(..., description="目标年度")
+    tables: Optional[list[str]] = Field(
+        None,
+        description="指定表名（默认全部四表）",
+    )
+    dry_run: bool = Field(
+        False,
+        description="试运行：只统计可删重复行数，不实际删除",
+    )
+    hard_delete: bool = Field(
+        False,
+        description="硬删除（默认 False 软删，进回收站可恢复；硬删不可恢复）",
     )
 
 
@@ -137,6 +155,48 @@ async def delete_ledger(
     except Exception as exc:
         logger.exception("delete ledger data failed")
         raise HTTPException(status_code=500, detail=f"删除失败: {exc}")
+
+
+@router.post("/dedup")
+async def dedup_ledger(
+    project_id: UUID,
+    request: DedupLedgerRequest,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _lock_check=Depends(check_consol_lock),
+) -> dict:
+    """对 active 数据集做整行去重（保留每组最小 id，软删字节级完全相同的重复行）。
+
+    安全：只删整行业务列完全相同的重复（含 summary/raw_extra/辅助维度），
+    任一列有差异即保留；不动 superseded 历史版本；默认软删可经回收站恢复；
+    写 app_audit_log 留痕。dry_run=true 可先预览将删除的重复行数。
+    """
+    if current_user.role not in ("admin", "partner", "manager"):
+        raise HTTPException(status_code=403, detail="仅项目经理及以上可执行去重")
+
+    try:
+        result = await dedup_ledger_data(
+            db,
+            project_id=project_id,
+            year=request.year,
+            tables=request.tables,
+            dry_run=request.dry_run,
+            hard_delete=request.hard_delete,
+            user_id=current_user.id,
+            ip_address=http_request.client.host if http_request.client else None,
+        )
+        logger.info(
+            "ledger dedup by user=%s project=%s year=%d dry_run=%s mode=%s total=%d",
+            current_user.id, project_id, request.year,
+            request.dry_run, result.get("mode"), result.get("total_deleted", 0),
+        )
+        return {"success": True, **result, "year": request.year}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.exception("dedup ledger data failed")
+        raise HTTPException(status_code=500, detail=f"去重失败: {exc}")
 
 
 @router.get("/trash")
