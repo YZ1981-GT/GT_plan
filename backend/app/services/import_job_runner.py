@@ -86,11 +86,24 @@ class ImportJobRunner:
         return len(job_ids)
 
     @classmethod
+    def _active_job_ids(cls) -> set[UUID]:
+        """本进程内仍在运行的 job_id 集合（task 存在且未结束）。
+
+        用于保护活跃作业不被超时检测误杀——慢 DB 下大批写入/激活阶段可能长时间
+        无进度回调，心跳落后，但 task 仍在跑，绝不能把它的 dataset 标 failed。
+        """
+        return {
+            jid for jid, task in cls._running_tasks.items()
+            if task is not None and not task.done()
+        }
+
+    @classmethod
     async def recover_jobs(cls) -> None:
         """Recover queued jobs and timeout stale running jobs."""
+        protected = cls._active_job_ids()
         timed_out_jobs: list[ImportJob] = []
         async with async_session() as db:
-            timed_out_jobs.extend(await ImportJobService.check_timed_out(db))
+            timed_out_jobs.extend(await ImportJobService.check_timed_out(db, protected_job_ids=protected))
             if timed_out_jobs:
                 await db.commit()
 
@@ -126,6 +139,9 @@ class ImportJobRunner:
             )
             stale_jobs = result.scalars().all()
             for stale in stale_jobs:
+                # 同样保护本进程内仍活跃的作业（task 未结束不算僵尸）
+                if stale.id in protected:
+                    continue
                 stale.status = JobStatus.timed_out
                 stale.error_message = "导入作业心跳丢失，已标记超时"
                 stale.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)

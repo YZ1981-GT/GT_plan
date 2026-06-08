@@ -211,11 +211,21 @@ class ImportJobService:
         )
 
     @staticmethod
-    async def check_timed_out(db: AsyncSession) -> list[ImportJob]:
+    async def check_timed_out(
+        db: AsyncSession,
+        protected_job_ids: set[UUID] | None = None,
+    ) -> list[ImportJob]:
         """检测超时作业（心跳超过 timeout_seconds 未更新）
 
         由定时任务调用，将超时作业标记为 timed_out。
+
+        Args:
+            protected_job_ids: 仍在本进程内活跃运行的 job_id 集合（task 未结束）。
+                这些作业即使心跳暂时落后（如慢 DB 下大批写入/激活阶段无回调）也
+                **不**标超时——否则会把正在跑的作业的 dataset 误标 failed，
+                导致 worker 走到 activate 时崩溃。
         """
+        protected = protected_job_ids or set()
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         running_statuses = [JobStatus.queued, JobStatus.running, JobStatus.validating,
                            JobStatus.writing, JobStatus.activating]
@@ -230,6 +240,9 @@ class ImportJobService:
 
         timed_out_jobs = []
         for job in jobs:
+            if job.id in protected:
+                # 本进程内 task 仍存活，跳过超时判定（避免误杀活跃作业）
+                continue
             hb = job.heartbeat_at
             # PG TIMESTAMP WITH TIME ZONE 返回 aware datetime，本地 now 是 naive；对齐为 naive UTC 后比较
             if hb is not None and hb.tzinfo is not None:
