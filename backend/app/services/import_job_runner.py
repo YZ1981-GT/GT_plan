@@ -652,6 +652,11 @@ class ImportJobRunner:
         logger.info("ImportJob %s: v2 engine starting (project=%s year=%s)",
                     job_id, project_id, year)
 
+        # 后台心跳任务：整个作业期间每隔 N 秒独立 ping heartbeat_at，
+        # 不依赖 pipeline 进度回调。根治"后置阶段（大表 COUNT/激活/rebuild）
+        # 长时间无回调→心跳落后→被超时清理→dataset 标 failed→activate 崩"。
+        heartbeat_task = asyncio.create_task(cls._heartbeat_loop(job_id))
+
         try:
             # ── Phase 1: Load files ──
             logger.info("ImportJob %s phase=load_files", job_id)
@@ -859,6 +864,45 @@ class ImportJobRunner:
                 ImportQueueService.release_lock(project_id)
             except Exception:
                 logger.exception("ImportQueueService.release_lock failed for %s", project_id)
+        finally:
+            # 无论成功/失败/取消，都停掉后台心跳任务
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except (asyncio.CancelledError, Exception):
+                pass
+
+    @classmethod
+    async def _heartbeat_loop(cls, job_id: UUID, interval: float = 15.0) -> None:
+        """后台心跳：作业运行期间每 interval 秒更新一次 heartbeat_at。
+
+        独立于 pipeline 进度回调，确保后置长阶段（大表 COUNT/激活/rebuild_aux）
+        也持续刷新心跳，避免被 recover_jobs 误判超时。仅在作业仍处于运行态时刷新；
+        作业进入终态则自动退出循环。
+        """
+        from app.models.dataset_models import JobStatus as _JS
+
+        running_states = {
+            _JS.queued, _JS.running, _JS.validating, _JS.writing, _JS.activating,
+        }
+        try:
+            while True:
+                await asyncio.sleep(interval)
+                try:
+                    async with async_session() as db:
+                        job = await ImportJobService.get_job(db, job_id)
+                        if job is None or job.status not in running_states:
+                            return
+                        await db.execute(
+                            sa.update(ImportJob)
+                            .where(ImportJob.id == job_id)
+                            .values(heartbeat_at=datetime.now(timezone.utc).replace(tzinfo=None))
+                        )
+                        await db.commit()
+                except Exception:
+                    logger.debug("ImportJob %s heartbeat tick failed", job_id, exc_info=True)
+        except asyncio.CancelledError:
+            return
 
     @classmethod
     async def resume_from_checkpoint(cls, job_id: UUID) -> dict:
