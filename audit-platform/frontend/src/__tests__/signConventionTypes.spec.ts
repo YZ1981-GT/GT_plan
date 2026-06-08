@@ -21,12 +21,13 @@ const GOLDEN_DIRECTION_SOURCE_VALUES = [
   'split_columns',
   'account_category_inferred',
   'account_category_inferred_low_confidence',
+  'contra_account',
   'user_override',
   'legacy_inferred',
   'unknown',
 ]
 
-const GOLDEN_SIGN_CONVENTION_VERSION_VALUES = ['v1_net_debit_positive']
+const GOLDEN_SIGN_CONVENTION_VERSION_VALUES = ['v1_net_debit_positive', 'v2_category_natural_positive']
 
 const GOLDEN_MIGRATION_SAFETY_LEVEL_VALUES = [
   'safe_auto_fix',
@@ -44,16 +45,16 @@ describe('sign-convention types contract', () => {
     expect(unique.size).toBe(DIRECTION_SOURCE_VALUES.length)
   })
 
-  it('DirectionSource count is 7', () => {
-    expect(DIRECTION_SOURCE_VALUES).toHaveLength(7)
+  it('DirectionSource count is 8', () => {
+    expect(DIRECTION_SOURCE_VALUES).toHaveLength(8)
   })
 
   it('SignConventionVersion values match backend golden fixture', () => {
     expect(SIGN_CONVENTION_VERSION_VALUES).toEqual(GOLDEN_SIGN_CONVENTION_VERSION_VALUES)
   })
 
-  it('CURRENT_SIGN_CONVENTION is v1_net_debit_positive', () => {
-    expect(CURRENT_SIGN_CONVENTION).toBe('v1_net_debit_positive')
+  it('CURRENT_SIGN_CONVENTION is v2_category_natural_positive', () => {
+    expect(CURRENT_SIGN_CONVENTION).toBe('v2_category_natural_positive')
   })
 
   it('MigrationSafetyLevel values match backend golden fixture', () => {
@@ -82,7 +83,7 @@ describe('sign-convention types contract', () => {
 
   it('type assignability — all DirectionSource values are assignable', () => {
     const sources: DirectionSource[] = [...DIRECTION_SOURCE_VALUES]
-    expect(sources).toHaveLength(7)
+    expect(sources).toHaveLength(8)
   })
 
   it('type assignability — all MigrationSafetyLevel values are assignable', () => {
@@ -92,6 +93,6 @@ describe('sign-convention types contract', () => {
 
   it('type assignability — SignConventionVersion', () => {
     const versions: SignConventionVersion[] = [...SIGN_CONVENTION_VERSION_VALUES]
-    expect(versions).toHaveLength(1)
+    expect(versions).toHaveLength(2)
   })
 })

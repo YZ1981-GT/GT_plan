@@ -8,6 +8,7 @@ Requirements: 1.1, 1.3, 2.2
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel
@@ -21,6 +22,7 @@ DirectionSource = Literal[
     "split_columns",                         # 借贷分列计算得出
     "account_category_inferred",             # 按 Account_Category 推断
     "account_category_inferred_low_confidence",  # 低置信度前缀推断
+    "contra_account",                        # 备抵/反向科目（名称识别，方向与编码大类相反）
     "user_override",                         # 用户手动覆盖
     "legacy_inferred",                       # 历史数据推断（迁移前）
     "unknown",                               # 无法判定
@@ -32,6 +34,7 @@ DIRECTION_SOURCE_VALUES: list[str] = [
     "split_columns",
     "account_category_inferred",
     "account_category_inferred_low_confidence",
+    "contra_account",
     "user_override",
     "legacy_inferred",
     "unknown",
@@ -42,15 +45,23 @@ DIRECTION_SOURCE_VALUES: list[str] = [
 # ---------------------------------------------------------------------------
 
 SignConventionVersion = Literal[
-    "v1_net_debit_positive",  # 净额借方为正、贷方为负
+    "v1_net_debit_positive",          # 旧：净额借方为正、贷方为负
+    "v2_category_natural_positive",   # 新：按科目类别存自然正数（负债/权益/收入贷方为正）
 ]
 
 SIGN_CONVENTION_VERSION_VALUES: list[str] = [
     "v1_net_debit_positive",
+    "v2_category_natural_positive",
 ]
 
-# 当前生效的符号约定常量
-CURRENT_SIGN_CONVENTION: SignConventionVersion = "v1_net_debit_positive"
+# 当前生效的符号约定常量（ledger-sign-convention-unify：切换为 v2 类别自然正数）
+CURRENT_SIGN_CONVENTION: SignConventionVersion = "v2_category_natural_positive"
+
+# 旧约定常量（迁移脚本/过渡期识别用）
+LEGACY_SIGN_CONVENTION: SignConventionVersion = "v1_net_debit_positive"
+
+# 平衡校验统一容差（±1 元，容纳分/角舍入）。单一来源，供 data_quality / consol / cfs 共用。
+BALANCE_TOLERANCE: Decimal = Decimal("1")
 
 # ---------------------------------------------------------------------------
 # MigrationSafetyLevel — 迁移安全等级
@@ -95,6 +106,8 @@ __all__ = [
     "SignConventionVersion",
     "SIGN_CONVENTION_VERSION_VALUES",
     "CURRENT_SIGN_CONVENTION",
+    "LEGACY_SIGN_CONVENTION",
+    "BALANCE_TOLERANCE",
     "MigrationSafetyLevel",
     "MIGRATION_SAFETY_LEVEL_VALUES",
     "SignAnomaly",

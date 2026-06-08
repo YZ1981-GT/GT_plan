@@ -23,13 +23,16 @@ GOLDEN_DIRECTION_SOURCE_VALUES = [
     "split_columns",
     "account_category_inferred",
     "account_category_inferred_low_confidence",
+    "contra_account",
     "user_override",
     "legacy_inferred",
     "unknown",
 ]
 
+
 GOLDEN_SIGN_CONVENTION_VERSION_VALUES = [
     "v1_net_debit_positive",
+    "v2_category_natural_positive",
 ]
 
 GOLDEN_MIGRATION_SAFETY_LEVEL_VALUES = [
@@ -47,7 +50,7 @@ class TestDirectionSource:
         assert len(set(DIRECTION_SOURCE_VALUES)) == len(DIRECTION_SOURCE_VALUES)
 
     def test_count(self):
-        assert len(DIRECTION_SOURCE_VALUES) == 7
+        assert len(DIRECTION_SOURCE_VALUES) == 8
 
 
 class TestSignConventionVersion:
@@ -57,8 +60,8 @@ class TestSignConventionVersion:
     def test_current_convention_in_values(self):
         assert CURRENT_SIGN_CONVENTION in SIGN_CONVENTION_VERSION_VALUES
 
-    def test_current_is_v1(self):
-        assert CURRENT_SIGN_CONVENTION == "v1_net_debit_positive"
+    def test_current_is_v2(self):
+        assert CURRENT_SIGN_CONVENTION == "v2_category_natural_positive"
 
 
 class TestMigrationSafetyLevel:

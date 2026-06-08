@@ -13,6 +13,7 @@ export type DirectionSource =
   | 'split_columns'
   | 'account_category_inferred'
   | 'account_category_inferred_low_confidence'
+  | 'contra_account'
   | 'user_override'
   | 'legacy_inferred'
   | 'unknown'
@@ -23,21 +24,25 @@ export const DIRECTION_SOURCE_VALUES: DirectionSource[] = [
   'split_columns',
   'account_category_inferred',
   'account_category_inferred_low_confidence',
+  'contra_account',
   'user_override',
   'legacy_inferred',
   'unknown',
 ]
 
 /** 符号约定版本 */
-export type SignConventionVersion = 'v1_net_debit_positive'
+export type SignConventionVersion =
+  | 'v1_net_debit_positive'
+  | 'v2_category_natural_positive'
 
 /** 符号约定版本值列表 */
 export const SIGN_CONVENTION_VERSION_VALUES: SignConventionVersion[] = [
   'v1_net_debit_positive',
+  'v2_category_natural_positive',
 ]
 
 /** 当前生效的符号约定 */
-export const CURRENT_SIGN_CONVENTION: SignConventionVersion = 'v1_net_debit_positive'
+export const CURRENT_SIGN_CONVENTION: SignConventionVersion = 'v2_category_natural_positive'
 
 /** 迁移安全等级 */
 export type MigrationSafetyLevel =
