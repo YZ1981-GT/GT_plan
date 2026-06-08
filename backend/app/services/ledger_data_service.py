@@ -244,6 +244,9 @@ async def dedup_ledger_data(
     year: int,
     tables: Optional[list[str]] = None,
     dry_run: bool = False,
+    hard_delete: bool = False,
+    user_id: UUID | str | None = None,
+    ip_address: str | None = None,
 ) -> dict[str, Any]:
     """对 active 数据集做整行去重（保留每组最小 id，删除其余）。
 
@@ -252,13 +255,17 @@ async def dedup_ledger_data(
     - 任何一列有差异即视为不同行，保留
     - 只处理当前 active 数据集的行（不动 superseded 历史版本）
     - JSONB 列 raw_extra 用 ::text 参与比较
-    - hard delete（重复行无保留价值，直接物理删）
+    - **默认软删除**（is_deleted=true + deleted_at），可经回收站恢复；
+      ``hard_delete=True`` 才物理删（不可恢复）
+    - 写 app_audit_log（动作 ledger_dedup），记录删除行数 + 样例 id
 
     Args:
         dry_run: True 时只统计可删行数，不实际删除
+        hard_delete: True 物理删；默认 False 软删可恢复
+        user_id / ip_address: 审计日志归属
 
     Returns:
-        {"tb_balance": 删除行数, ..., "dry_run": bool, "total_deleted": N}
+        {"tb_balance": 删除行数, ..., "dry_run": bool, "total_deleted": N, "mode": ...}
     """
     if not tables:
         tables = LEDGER_TABLES
@@ -269,6 +276,8 @@ async def dedup_ledger_data(
 
     result: dict[str, Any] = {"dry_run": dry_run}
     total = 0
+    # 收集被删 id 样例（审计轨迹，每表最多存 50 个，避免 payload 过大）
+    deleted_id_samples: dict[str, list[str]] = {}
 
     for table in tables:
         biz_cols = await _table_business_columns(db, table)
@@ -276,6 +285,9 @@ async def dedup_ledger_data(
         partition_exprs = ", ".join(
             f"{c}::text" if c == "raw_extra" else c for c in biz_cols
         )
+
+        # 软删模式只圈未删行（is_deleted=false），避免重复软删已删行
+        deleted_filter = "" if hard_delete else "AND t.is_deleted = false"
 
         # 用窗口函数标记每组重复行（按 id 排序，rn>1 即多余的重复）
         # 只作用于 active 数据集
@@ -288,6 +300,7 @@ async def dedup_ledger_data(
                        ) AS rn
                 FROM {table} t
                 WHERE t.project_id = :pid AND t.year = :yr
+                  {deleted_filter}
                   AND EXISTS (
                     SELECT 1 FROM ledger_datasets d
                     WHERE d.id = t.dataset_id AND d.status = 'active'
@@ -301,22 +314,63 @@ async def dedup_ledger_data(
             cnt = (await db.execute(sa.text(sql), params)).scalar() or 0
             result[table] = int(cnt)
         else:
-            sql = dup_cte + f"""
-                DELETE FROM {table}
-                WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
-            """
+            # 先抓将删的 id 样例（审计）
+            sample_sql = dup_cte + "SELECT id FROM ranked WHERE rn > 1 LIMIT 50"
+            sample_ids = (await db.execute(sa.text(sample_sql), params)).scalars().all()
+            if sample_ids:
+                deleted_id_samples[table] = [str(i) for i in sample_ids]
+
+            if hard_delete:
+                sql = dup_cte + f"""
+                    DELETE FROM {table}
+                    WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+                """
+            else:
+                # 软删：is_deleted=true + deleted_at，复用回收站恢复机制
+                sql = dup_cte + f"""
+                    UPDATE {table}
+                    SET is_deleted = true, deleted_at = now()
+                    WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+                """
             r = await db.execute(sa.text(sql), params)  # noqa: S608
             result[table] = r.rowcount or 0
         total += result[table]
         logger.info(
-            "dedup %s: %s %d duplicate rows (project=%s year=%d)",
+            "dedup %s: %s %d duplicate rows (project=%s year=%d mode=%s)",
             table, "would delete" if dry_run else "deleted",
             result[table], project_id, year,
+            "dry_run" if dry_run else ("hard" if hard_delete else "soft"),
         )
+
+    mode = "dry_run" if dry_run else ("hard" if hard_delete else "soft")
+    result["mode"] = mode
+    result["total_deleted"] = total
 
     if not dry_run:
         await db.commit()
-    result["total_deleted"] = total
+        # 写审计日志（失败不阻断主流程）
+        if total > 0:
+            try:
+                from app.services.audit_logger_enhanced import audit_logger
+                await audit_logger.log_action(
+                    user_id=user_id or "system",
+                    action="ledger_dedup",
+                    object_type="ledger_data",
+                    object_id=None,
+                    project_id=project_id,
+                    details={
+                        "year": year,
+                        "mode": mode,
+                        "tables": {t: result.get(t, 0) for t in tables},
+                        "total_deleted": total,
+                        "deleted_id_samples": deleted_id_samples,
+                        "recoverable": not hard_delete,
+                    },
+                    ip_address=ip_address,
+                )
+            except Exception:
+                logger.warning("dedup audit log write failed (non-blocking)", exc_info=True)
+
     return result
 
 

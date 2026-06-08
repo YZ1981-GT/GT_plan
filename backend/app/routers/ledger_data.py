@@ -14,7 +14,7 @@ import logging
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -69,6 +69,10 @@ class DedupLedgerRequest(BaseModel):
     dry_run: bool = Field(
         False,
         description="试运行：只统计可删重复行数，不实际删除",
+    )
+    hard_delete: bool = Field(
+        False,
+        description="硬删除（默认 False 软删，进回收站可恢复；硬删不可恢复）",
     )
 
 
@@ -157,15 +161,16 @@ async def delete_ledger(
 async def dedup_ledger(
     project_id: UUID,
     request: DedupLedgerRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _lock_check=Depends(check_consol_lock),
 ) -> dict:
-    """对 active 数据集做整行去重（保留每组最小 id，删除字节级完全相同的重复行）。
+    """对 active 数据集做整行去重（保留每组最小 id，软删字节级完全相同的重复行）。
 
     安全：只删整行业务列完全相同的重复（含 summary/raw_extra/辅助维度），
-    任一列有差异即保留；不动 superseded 历史版本。
-    dry_run=true 可先预览将删除的重复行数。
+    任一列有差异即保留；不动 superseded 历史版本；默认软删可经回收站恢复；
+    写 app_audit_log 留痕。dry_run=true 可先预览将删除的重复行数。
     """
     if current_user.role not in ("admin", "partner", "manager"):
         raise HTTPException(status_code=403, detail="仅项目经理及以上可执行去重")
@@ -177,11 +182,14 @@ async def dedup_ledger(
             year=request.year,
             tables=request.tables,
             dry_run=request.dry_run,
+            hard_delete=request.hard_delete,
+            user_id=current_user.id,
+            ip_address=http_request.client.host if http_request.client else None,
         )
         logger.info(
-            "ledger dedup by user=%s project=%s year=%d dry_run=%s total=%d",
+            "ledger dedup by user=%s project=%s year=%d dry_run=%s mode=%s total=%d",
             current_user.id, project_id, request.year,
-            request.dry_run, result.get("total_deleted", 0),
+            request.dry_run, result.get("mode"), result.get("total_deleted", 0),
         )
         return {"success": True, **result, "year": request.year}
     except ValueError as exc:

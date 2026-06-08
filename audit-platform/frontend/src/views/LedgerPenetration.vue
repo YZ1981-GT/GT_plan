@@ -1266,16 +1266,19 @@ async function runDedup() {
     // 2. 确认
     await ElMessageBox.confirm(
       `检测到 ${total.toLocaleString()} 行整行完全相同的重复数据（${detail}）。\n` +
-        `去重将保留每组首条、删除其余完全相同的行（任一字段有差异的行不会被删）。是否继续？`,
+        `去重将保留每组首条、删除其余完全相同的行（任一字段有差异的行不会被删，删除的数据进回收站可恢复）。是否继续？`,
       '数据去重确认',
       { type: 'warning', confirmButtonText: '确认去重', cancelButtonText: '取消' }
     )
-    // 3. 实际执行
+    // 3. 实际执行（默认软删，进回收站可恢复）
     const result: any = await api.post(P_ledger.data.dedup(projectId.value), {
       year: selectedYear.value,
       dry_run: false,
     })
-    ElMessage.success(`去重完成，共删除 ${(result?.total_deleted ?? 0).toLocaleString()} 行重复数据`)
+    const deleted = result?.total_deleted ?? 0
+    ElMessage.success(
+      `去重完成，共清理 ${deleted.toLocaleString()} 行重复数据（已进回收站，可在"数据管理"中恢复）`
+    )
     // 刷新当前视图
     if (currentLevel.value === 'balance') {
       await loadBalance()
