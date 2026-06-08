@@ -43,6 +43,9 @@
         <el-button size="small" @click="runValidation" :loading="validating" type="warning" plain>
           <el-icon style="margin-right: 2px"><Warning /></el-icon> 数据校验
         </el-button>
+        <el-button size="small" @click="runDedup" :loading="deduping" type="danger" plain>
+          <el-icon style="margin-right: 2px"><Delete /></el-icon> 数据去重
+        </el-button>
       </div>
     </div>
 
@@ -974,7 +977,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch, provide, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Upload, Loading, Warning, Setting } from '@element-plus/icons-vue'
+import { Search, Upload, Loading, Warning, Setting, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger as P_ledger, projects as P_proj, materiality as P_mat } from '@/services/apiPaths'
@@ -1233,6 +1236,55 @@ async function runValidation() {
     handleApiError(e, '校验')
   } finally {
     validating.value = false
+  }
+}
+
+// ── 数据去重 ──
+const deduping = ref(false)
+
+async function runDedup() {
+  if (!projectId.value) return
+  deduping.value = true
+  try {
+    // 1. 先 dry_run 预览将删除的重复行数
+    const preview: any = await api.post(P_ledger.data.dedup(projectId.value), {
+      year: selectedYear.value,
+      dry_run: true,
+    })
+    const total = preview?.total_deleted ?? 0
+    if (total === 0) {
+      ElMessage.success('未检测到重复数据，无需去重')
+      return
+    }
+    const detail = ['tb_balance', 'tb_ledger', 'tb_aux_balance', 'tb_aux_ledger']
+      .map((t) => {
+        const label = { tb_balance: '余额表', tb_ledger: '序时账', tb_aux_balance: '辅助余额', tb_aux_ledger: '辅助明细' }[t]
+        return preview[t] ? `${label}: ${preview[t].toLocaleString()} 行` : null
+      })
+      .filter(Boolean)
+      .join('，')
+    // 2. 确认
+    await ElMessageBox.confirm(
+      `检测到 ${total.toLocaleString()} 行整行完全相同的重复数据（${detail}）。\n` +
+        `去重将保留每组首条、删除其余完全相同的行（任一字段有差异的行不会被删）。是否继续？`,
+      '数据去重确认',
+      { type: 'warning', confirmButtonText: '确认去重', cancelButtonText: '取消' }
+    )
+    // 3. 实际执行
+    const result: any = await api.post(P_ledger.data.dedup(projectId.value), {
+      year: selectedYear.value,
+      dry_run: false,
+    })
+    ElMessage.success(`去重完成，共删除 ${(result?.total_deleted ?? 0).toLocaleString()} 行重复数据`)
+    // 刷新当前视图
+    if (currentLevel.value === 'balance') {
+      await loadBalance()
+    }
+  } catch (e: any) {
+    if (e === 'cancel' || e === 'close') return
+    handleApiError(e, '去重')
+  } finally {
+    deduping.value = false
   }
 }
 const importStep = ref<'upload' | 'preview' | 'importing' | 'done'>('upload')

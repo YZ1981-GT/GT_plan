@@ -220,6 +220,106 @@ async def delete_ledger_data(
     return deleted
 
 
+# 各表去重分组列（业务列，排除 id/审计列；整行字节级相同才算重复）
+# 排除：id（主键，去重保留最小）/ created_at/updated_at/deleted_at（写入时间，同源数据可能微秒差）
+# / import_batch_id（批次号，同数据多次导入会不同但行内容相同）/ raw_extra（JSONB，用 ::text 比较）
+_DEDUP_EXCLUDE_COLS: frozenset[str] = frozenset({
+    "id", "created_at", "updated_at", "deleted_at", "import_batch_id",
+})
+
+
+async def _table_business_columns(db: AsyncSession, table: str) -> list[str]:
+    """取表的业务列（用于去重分组），排除主键/审计列。"""
+    cols = (await db.execute(sa.text(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_name = :t ORDER BY ordinal_position"
+    ), {"t": table})).scalars().all()
+    return [c for c in cols if c not in _DEDUP_EXCLUDE_COLS]
+
+
+async def dedup_ledger_data(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    year: int,
+    tables: Optional[list[str]] = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """对 active 数据集做整行去重（保留每组最小 id，删除其余）。
+
+    安全策略（审计场景，避免误删真实分录）：
+    - 分组键 = 全部业务列（含 summary/raw_extra/辅助维度等），**整行字节级完全相同**才算重复
+    - 任何一列有差异即视为不同行，保留
+    - 只处理当前 active 数据集的行（不动 superseded 历史版本）
+    - JSONB 列 raw_extra 用 ::text 参与比较
+    - hard delete（重复行无保留价值，直接物理删）
+
+    Args:
+        dry_run: True 时只统计可删行数，不实际删除
+
+    Returns:
+        {"tb_balance": 删除行数, ..., "dry_run": bool, "total_deleted": N}
+    """
+    if not tables:
+        tables = LEDGER_TABLES
+    else:
+        invalid = set(tables) - set(LEDGER_TABLES)
+        if invalid:
+            raise ValueError(f"不支持的表: {invalid}")
+
+    result: dict[str, Any] = {"dry_run": dry_run}
+    total = 0
+
+    for table in tables:
+        biz_cols = await _table_business_columns(db, table)
+        # raw_extra 用 ::text 比较（JSONB 不能直接 group by 也避免等值问题）
+        partition_exprs = ", ".join(
+            f"{c}::text" if c == "raw_extra" else c for c in biz_cols
+        )
+
+        # 用窗口函数标记每组重复行（按 id 排序，rn>1 即多余的重复）
+        # 只作用于 active 数据集
+        dup_cte = f"""
+            WITH ranked AS (
+                SELECT id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY {partition_exprs}
+                           ORDER BY id
+                       ) AS rn
+                FROM {table} t
+                WHERE t.project_id = :pid AND t.year = :yr
+                  AND EXISTS (
+                    SELECT 1 FROM ledger_datasets d
+                    WHERE d.id = t.dataset_id AND d.status = 'active'
+                  )
+            )
+        """
+        params = {"pid": str(project_id), "yr": year}
+
+        if dry_run:
+            sql = dup_cte + "SELECT COUNT(*) FROM ranked WHERE rn > 1"
+            cnt = (await db.execute(sa.text(sql), params)).scalar() or 0
+            result[table] = int(cnt)
+        else:
+            sql = dup_cte + f"""
+                DELETE FROM {table}
+                WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+            """
+            r = await db.execute(sa.text(sql), params)  # noqa: S608
+            result[table] = r.rowcount or 0
+        total += result[table]
+        logger.info(
+            "dedup %s: %s %d duplicate rows (project=%s year=%d)",
+            table, "would delete" if dry_run else "deleted",
+            result[table], project_id, year,
+        )
+
+    if not dry_run:
+        await db.commit()
+    result["total_deleted"] = total
+    return result
+
+
 async def restore_ledger_data(
     db: AsyncSession,
     *,
