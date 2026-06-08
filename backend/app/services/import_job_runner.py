@@ -107,7 +107,11 @@ class ImportJobRunner:
             if timed_out_jobs:
                 await db.commit()
 
-            stale_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=120)
+            # 用 DB 服务端时钟算 stale_cutoff（与 server-time 心跳一致，规避进程时钟漂移）
+            db_now = (await db.execute(sa.select(sa.func.now()))).scalar_one()
+            if db_now.tzinfo is not None:
+                db_now = db_now.astimezone(timezone.utc).replace(tzinfo=None)
+            stale_cutoff = db_now - timedelta(minutes=120)
             running_states = (
                 JobStatus.running,
                 JobStatus.validating,
@@ -144,7 +148,7 @@ class ImportJobRunner:
                     continue
                 stale.status = JobStatus.timed_out
                 stale.error_message = "导入作业心跳丢失，已标记超时"
-                stale.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                stale.completed_at = db_now
                 timed_out_jobs.append(stale)
             if stale_jobs:
                 await db.commit()
@@ -893,10 +897,12 @@ class ImportJobRunner:
                         job = await ImportJobService.get_job(db, job_id)
                         if job is None or job.status not in running_states:
                             return
+                        # 用 PG 服务端 now() 写心跳，与超时检测的比较基准统一为
+                        # DB 时钟，彻底规避 Python 进程时钟/时区漂移导致的假超时。
                         await db.execute(
                             sa.update(ImportJob)
                             .where(ImportJob.id == job_id)
-                            .values(heartbeat_at=datetime.now(timezone.utc).replace(tzinfo=None))
+                            .values(heartbeat_at=sa.func.now())
                         )
                         await db.commit()
                 except Exception:

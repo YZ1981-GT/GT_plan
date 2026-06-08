@@ -92,7 +92,8 @@ class ImportJobService:
         """Persist heartbeat/progress for a running job without changing status."""
         values: dict = {
             "progress_pct": max(0, min(progress_pct, 100)),
-            "heartbeat_at": datetime.now(timezone.utc).replace(tzinfo=None),
+            # 用 PG 服务端 now()，与超时检测基准统一（规避 Python 时钟漂移假超时）
+            "heartbeat_at": sa.func.now(),
         }
         if progress_message is not None:
             values["progress_message"] = progress_message
@@ -178,8 +179,8 @@ class ImportJobService:
                 current_phase=JobStatus.running.value,
                 progress_pct=1,
                 progress_message="开始导入",
-                started_at=now,
-                heartbeat_at=now,
+                started_at=sa.func.now(),
+                heartbeat_at=sa.func.now(),
             )
             .returning(ImportJob)
         )
@@ -226,7 +227,11 @@ class ImportJobService:
                 导致 worker 走到 activate 时崩溃。
         """
         protected = protected_job_ids or set()
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        # 用 DB 服务端时钟作为比较基准（心跳也是 sa.func.now() 写入），
+        # 彻底规避 Python 进程时钟/时区漂移导致的假超时。
+        db_now = (await db.execute(sa.select(sa.func.now()))).scalar_one()
+        if db_now.tzinfo is not None:
+            db_now = db_now.astimezone(timezone.utc).replace(tzinfo=None)
         running_statuses = [JobStatus.queued, JobStatus.running, JobStatus.validating,
                            JobStatus.writing, JobStatus.activating]
 
@@ -244,15 +249,15 @@ class ImportJobService:
                 # 本进程内 task 仍存活，跳过超时判定（避免误杀活跃作业）
                 continue
             hb = job.heartbeat_at
-            # PG TIMESTAMP WITH TIME ZONE 返回 aware datetime，本地 now 是 naive；对齐为 naive UTC 后比较
+            # PG TIMESTAMP WITH TIME ZONE 返回 aware datetime，对齐为 naive UTC 后比较
             if hb is not None and hb.tzinfo is not None:
                 hb = hb.astimezone(timezone.utc).replace(tzinfo=None)
-            elapsed = (now - hb).total_seconds() if hb is not None else 0
+            elapsed = (db_now - hb).total_seconds() if hb is not None else 0
             if elapsed > job.timeout_seconds:
                 valid_next = _VALID_TRANSITIONS.get(job.status, set())
                 if JobStatus.timed_out in valid_next:
                     job.status = JobStatus.timed_out
-                    job.completed_at = now
+                    job.completed_at = db_now
                     job.error_message = f"作业超时（{elapsed:.0f}s > {job.timeout_seconds}s）"
                     timed_out_jobs.append(job)
 
