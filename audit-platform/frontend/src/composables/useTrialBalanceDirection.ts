@@ -125,6 +125,7 @@ export function getDirectionSourceLabel(source: DirectionSource): string {
     split_columns: '借贷分列',
     account_category_inferred: '类别推断',
     account_category_inferred_low_confidence: '低置信推断',
+    contra_account: '备抵科目',
     user_override: '用户覆盖',
     legacy_inferred: '推断方向',
     unknown: '未知',
