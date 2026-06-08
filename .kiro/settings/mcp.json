@@ -2,13 +2,13 @@
   "mcpServers": {
     "codegraph": {
       "type": "stdio",
-      "command": "C:\\Users\\Administrator\\AppData\\Roaming\\npm\\codegraph.cmd",
+      "command": "C:\\Users\\杨志\\AppData\\Roaming\\npm\\codegraph.cmd",
       "args": [
         "serve",
         "--mcp",
         "--no-watch",
         "--path",
-        "D:/GT_workplan"
+        "D:/GT_plan"
       ],
       "env": {},
       "disabled": false,

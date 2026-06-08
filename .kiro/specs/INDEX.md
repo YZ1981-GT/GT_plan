@@ -1,448 +1,158 @@
 # 致同审计作业平台 — Spec 开发索引
 
 **最后更新**：2026-06-08  
-**当前分支**：`work/2026-05-30-wp-specs`（HEAD = `696bb1e5`）  
-**技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer  
-**目标规模**：6000 并发用户  
-**Spec 总数**：**135**（active 3 + archived 132）
+**当前分支**：`work/2026-05-30-wp-specs`  
+**Spec 总数**：**135**（active 0 + archived 135）  
+**最高迁移**：V065  
+**技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
 
-## 〇、如何使用本索引（快速定位 spec 三件套）
+## 〇、如何使用本索引
 
-每个 spec 是一个目录，固定包含三件套文档：
+每个 spec 是一个目录，包含三件套文档：
 
 | 文件 | 用途 | 何时读 |
 |------|------|--------|
-| `requirements.md` | 需求（用户故事 + EARS 验收准则） | 想知道"这个功能要解决什么问题、验收标准是什么" |
-| `design.md` | 设计（架构、数据模型、接口、流程图） | 想知道"怎么实现的、涉及哪些表/服务/组件" |
-| `tasks.md` | 任务清单（可勾选的实施步骤 + MVP + CI 验收） | 想知道"做到哪了、还剩什么、如何验证" |
+| `requirements.md` | 需求（用户故事 + 验收准则） | "要解决什么问题" |
+| `design.md` | 设计（架构、数据模型、接口） | "怎么实现的" |
+| `tasks.md` | 任务清单（`[x]`=完成 / `[ ]`=未做 / `[ ]*`=可选） | "做到哪了" |
 
 **定位路径**：
-- 进行中 / 待归档 spec：`.kiro/specs/{spec-name}/`（根目录扁平存放）
-- 已完成归档 spec：`.kiro/specs/_archive/{分类目录}/{spec-name}/`（按功能分 10 类）
+- Active spec：`.kiro/specs/{name}/`
+- Archived spec：`.kiro/specs/_archive/{分类}/{name}/`
 
-**快速查找方法**：
-1. 知道功能关键词 → 查下方 §二（active）或 §三（archived）表格定位 spec 名
-2. 知道 spec 名 → `fileSearch "{spec-name}/tasks.md"` 或直接读 `.kiro/specs[/_archive/{分类}]/{spec-name}/`
-3. 想查代码实证 → tasks.md 里的产物路径 + `codegraph_search` / `grepSearch` 验证
-4. 想看完成度 → 读 tasks.md 的复选框（`[x]`=完成 / `[ ]`=未做 / `[ ]*`=可选）
+**快速查找**：
+1. 知道关键词 → 查 §二 分类表格定位 spec 名
+2. 知道 spec 名 → 直接读 `_archive/{分类}/{name}/tasks.md`
+3. 验证完成度 → tasks.md 产物路径 + `codegraph_search` / `grepSearch` 实证
 
-**完成度判定铁律**（防伪绿）：tasks.md 标 `[x]` 必须有「产物文件真实存在 + 测试通过」双重实证，不信文档自述。核查方法见 §六-A。
-
----
-
-## 一、平台已实现功能全景
-
-按审计业务流程排列，标注对应 spec 来源。
-
-### 1.1 项目管理与基础设施
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 项目向导 | 创建项目 → 配置 → 派单 → 启动 | phase0/phase1a |
-| 角色体系 | 6 角色（auditor/manager/qc/partner/eqcr/admin）+ 动态导航 + 权限矩阵 | role-based-view-switching / R5 |
-| 人员档案 | StaffMember + ProjectAssignment + 工时追踪 | phase1a / R4 |
-| 通知中心 | SSE 推送 + 轮询 + 分类 Tab + 免打扰 | R7 / R9 |
-| 编辑锁 | 乐观锁 + heartbeat + 强制接管 | R4 / R7 |
-| 审计日志 | 哈希链 + 事件溯源 + DLQ | phase14 / R3 |
-
-### 1.2 账表数据（四表体系）
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 智能导入 v2 | 9 家企业验证 / 自动识别表类型 / 7 适配器 / GBK+UTF-8 | ledger-import-unification |
-| B' 视图重构 | activate <1s（metadata 切换替代 200 万行 UPDATE） | ledger-import-view-refactor |
-| 四表联查 | 余额表 / 序时账 / 辅助余额 / 辅助明细 + 全屏 + 右键穿透 | phase1a / R9 |
-| 科目映射 | 自动匹配 + 手动调整 + 跨项目复用 fingerprint | e2e-business-flow |
-| 数据管理 | 软删除回收站 / 增量追加 / 跨年度并存 | ledger-import-view-refactor S7 |
-| 上传安全 | MIME 校验 / zip bomb 检测 / 宏拦截 / 规模预警 | ledger-import-view-refactor S7 |
-
-### 1.3 试算平衡表
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 自动生成 | 从 tb_balance 聚合 + 父级汇总行补齐 | phase1a / e2e-business-flow |
-| 科目标准库 | CAS 166 标准科目 + 国企/上市版映射 | phase1a |
-| 公式引擎 | TB()/SUM_TB()/ROW() 三类公式 + 全量重算 | report-module-enhancement |
-| 借贷平衡校验 | 含损益结转 + Decimal 精度 | global-refinement-v3 |
-
-### 1.4 报表模块
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 6 类报表 | BS / IS / CFS / EQ / CFS 附表 / 减值准备 | phase1c / report-module-enhancement |
-| 国企+上市双版 | 303 行 / 214 行配置驱动 | report-module-enhancement |
-| 事件联动 | TB 变更 → 报表自动 stale → 重算 | phase3 / R7 |
-| 签字状态机 | draft → review → eqcr_approved → final | R5 |
-| PDF/Word 导出 | LibreOffice headless 转换 | phase13 / production-readiness |
-
-### 1.5 底稿模块
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 1788 单体底稿 | 致同 D/F/K/N 等 15 循环全覆盖 | 11 审计循环 spec |
-| HTML 渲染器 | 9 类 componentType + 禁止 Univer 兜底 | workpaper-html-renderer |
-| Univer 在线编辑 | F/G 循环 558 sheet 保留 Univer | workpaper-editor-slimdown |
-| 程序裁剪 | 智能裁剪 + 自定义裁剪 + 自定义新增 | procedure-applicability-trimming |
-| 底稿生命周期 | 生命周期视图 + 委派矩阵 + 依赖图 + 看板 | workpaper-completion-foundation |
-| 预填充 | TB/WP/REPORT 批量取数 + provenance 溯源 | workpaper-editor-slimdown S4 |
-| 离线导出/导入 | 4 色 cell + _meta_ binding + AES 加密 | workpaper-editor-slimdown S4 |
-
-### 1.6 附注模块
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 单体附注生成 | 173 章节（首汽租车实测）/ 自动裁剪 40 章节 | disclosure-note-full-revamp |
-| 合并附注 | 7 章节基础生成 + 子公司汇总 | disclosure-note-full-revamp B.0-B.2 |
-| Word 导出 | 致同模板 + python-docx | disclosure-note-full-revamp S2 |
-| 离线分发 | xlsx 4 色语义 + _meta_ + AES + 一键导入 diff | note-dynamic-tables D15 |
-| 公式 DSL | REGION/PRIOR/SUM_TB 等 + 三式联动 | disclosure-note-full-revamp S1.5 |
-
-### 1.7 复核与质控
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 复核工作台 | ReviewWorkbench + 批注 + 工单转换 | R1 / R6 |
-| Gate Engine | 签字门禁 + 22 条规则 + 可配置 | phase14 / R3 / R6 |
-| QC 规则引擎 | 22 条 seed 规则 + DSL(python/jsonpath) | R3 / R6 |
-| EQCR 独立复核 | 5 域聚合 + 影子计算 + 备忘录 + 工时 | R5 |
-| 归档包 | 插件化章节(00-99) + SHA-256 水印 + 断点续传 | R1 / R5 |
-
-### 1.8 高级查询与穿透
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 高级查询 | 16 表白名单 + JOIN + 底稿树 + 单元格选区 | advanced-query-enhancements-p1p2 |
-| 正向穿透 | 5 套端点（报表→TB→序时账→凭证） | phase1a / R4 |
-| 反向溯源 | report_trace + trace replay | R4 / v4 复盘 |
-| 跨模块跳转 | 11 命名空间 4 层级 + Backspace 返回 | enterprise-linkage |
-
-### 1.9 运维与工程
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| D6 迁移系统 | V*.sql + MigrationRunner + 失败追踪 + schema drift | migration-runner-resilience |
-| CI 卡点 | vue-tsc / vitest / file-size / API hardcode / B' guard | R6 / R9 / ledger-import-view-refactor |
-| Git 工作流 | 5 类分支命名 + pre-push hook + 6 维核查 CLI | repo-git-workflow-unification |
-| 性能基线 | YG2101 128MB/11min / calamine 3.4× 加速 | ledger-import-view-refactor |
+**防伪绿铁律**：`[x]` 必须有「产物文件真实存在 + 测试通过」双重实证。详见 `docs/spec-audit-2026-05-30.md`。
 
 ---
 
-## 二、进行中 / 待启动 Spec（active，根目录扁平存放）
+## 一、平台模块概览
 
-> 状态图例：📌 占位 stub（仅三件套文档，代码未动）/ ⏳ 实施中 / ✅ 核心完成（待归档）
-> 核心已闭环的 spec 均已归档到 `_archive/`，根目录只保留尚未启动的真 stub、进行中 spec、或刚完成待审议归档的 spec。
+| 模块 | 核心能力 |
+|------|----------|
+| 项目管理 | 向导创建 / 6 角色权限 / 人员派单 / 通知 / 编辑锁 / 审计日志 |
+| 账表数据 | 智能导入 v2（9 企业）/ B' 视图 / 四表联查 / 科目映射 / 符号约定+方向推导 |
+| 试算平衡 | 自动聚合 / CAS 标准库 / 公式引擎 / 借贷平衡诊断 |
+| 报表 | 6 类报表 / 国企+上市双版 / 事件联动 / 签字状态机 / PDF+Word 导出 |
+| 底稿 | 1788 单体 / HTML 渲染器 / Univer 编辑 / 程序裁剪 / 预填充 / 离线导入导出 / 科目工作包 / AI 结论 |
+| 附注 | 173 章节生成 / 自动裁剪 / Word 导出 / 离线分发 / 公式 DSL / 语义契约 |
+| 复核质控 | 复核工作台 / Gate 门禁 / QC 规则 / EQCR 独立复核 / 归档包 |
+| 穿透查询 | 高级查询 / 正向穿透 / 反向溯源 / 跨模块跳转 |
+| 合并报表 | 4 Phase（止血→锁定→编排→穿透）/ 147 测试 / 16 ADR |
+| 运维工程 | D6 迁移 / CI 卡点 / Git 工作流 / 性能基线 |
 
-**当前 active = 3 个**（均为 2026-06-07 远程合入的 workpaper spec，已实测验证非伪绿，待用户确认后归档）：
+---
 
-| Spec | 状态 | 测试实证 | 说明 |
-|------|------|----------|------|
-| `workpaper-account-package-d1-d2-pilot` | ✅ 全量完成（待归档） | 后端 17+前端 30 passed | D1/D2 科目工作包试点；8 主任务+46 子任务+25 验收项全 `[x]`；产物=account_package_registry.json + 4 service(registry/summary/program_status/conclusion_context) + router(workpaper.py 注册) + V063 迁移 + AccountPackageView.vue + useAccountPackage.ts + 7 组件 |
-| `workpaper-ai-conclusion-copilot` | ✅ 全量完成（待归档） | 后端 47+前端 14 passed | 底稿 AI 结论副驾驶；5 主任务+25 子任务+22 验收项全 `[x]`；产物=ai_conclusion_context_service(canonical) + prompts + draft_service + save_validator + audit_trail + WorkpaperAIConclusionPanel.vue；核心不变量=pending 阻断 sign_off / missing 不编造 / rejected 不进结论 |
-| `workpaper-content-semantic-contract` | ✅ 全量完成（待归档） | 后端 39+前端 51 passed | 底稿内容语义契约；7 主任务+7 MVP+8 CI 全 `[x]`；产物=SheetContentType 13 枚举 + FieldSourceContract + ProgramStatusContract + d1_d2_semantic_registry.json(D1 10+D2 12 sheet) + check_wp_semantic_schema.py + FieldSourcePanel.vue |
+## 二、已归档 Spec（135 个，10 分类）
 
-**待建 spec（尚未起草三件套）**：
+**当前 active = 0**（全部已归档）。新建 spec 放 `.kiro/specs/{name}/`。
+
+```
+_archive/
+├── 01-phase-foundation/         24   平台地基（Phase 0~16）
+├── 02-workpaper-cycles/         16   审计循环（11循环+5基础，548 tasks）
+├── 03-refinement-rounds/         9   五角色轮转（R1~R9）
+├── 04-infra-architecture/       26   基础设施/全局架构
+├── 05-business-features/        33   业务专项（含ledger/wp系列）
+├── 06-engineering-governance/    6   工程治理
+├── 07-workpaper-slimdown/        9   底稿瘦身
+├── 08-disclosure-notes/          4   附注模块
+├── 09-consolidation-phases/      4   合并模块
+└── 99-superseded/                4   已被取代
+```
+
+
+### 2.1 `01-phase-foundation/`（24）
+
+`phase0-infrastructure` · `phase1a-core` · `phase1b-workpaper` · `phase1c-report` · `phase1-experience-gap-fix` · `phase2-consolidation` · `phase2-role-experience-boost` · `phase3-collaboration` · `phase3-system-enhancement` · `phase4-ai` · `phase4-long-term-governance` · `phase5-extension` · `phase5-operational-excellence` · `phase6-integration` · `phase6-precision-and-security` · `phase7-enhancement` · `phase7-role-experience-closure` · `phase8` · `phase11-system-hardening` · `phase12-workpaper-deep` · `phase13-word-export` · `phase14-gate-engine-governance` · `phase15-task-tree-and-event-orchestration` · `phase16-evidence-package-and-versionline`
+
+### 2.2 `02-workpaper-cycles/`（16）
+
+**11 循环**：`workpaper-d-sales-cycle` · `workpaper-e1-cash-optimization` · `workpaper-f-purchase-inventory` · `workpaper-g-investment-cycle` · `workpaper-h-fixed-assets-cycle` · `workpaper-i-intangible-assets-cycle` · `workpaper-j-payroll-cycle` · `workpaper-k-admin-cycle` · `workpaper-l-debt-cycle` · `workpaper-m-equity-cycle` · `workpaper-n-tax-cycle`
+
+**5 基础**：`workpaper-completion-foundation` · `workpaper-cycle-d-revenue` · `workpaper-collaboration-presence` · `workpaper-editor-refactor` · `workpaper-deep-optimization`
+
+### 2.3 `03-refinement-rounds/`（9）
+
+`refinement-round1-review-closure` · `refinement-round2-project-manager` · `refinement-round3-quality-control` · `refinement-round4-audit-assistant` · `refinement-round5-independent-review` · `refinement-round6-cross-role-optimization` · `refinement-round7-global-polish` · `refinement-round8-deep-closure` · `refinement-round9-global-deep-review`
+
+### 2.4 `04-infra-architecture/`（26）
+
+`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3` · `vllm-httpx-bugfix` · `retrieval-kernel-unification` · `doc-level-ai-chat` · `global-modules-cleanup` · `global-modules-p2-polish` · `formula-engine-unification` · `report-config-baseline` · `llm-structured-output` · `pg-pooling-and-load-test` · `xlsx-read-acceleration` · `endpoint-fuzz-and-tracing` · `global-refinement-v5-closure` · `platform-context-permission-foundation` · `platform-evidence-knowledge-ai-governance` · `platform-linkage-contract-stale` · `platform-maintenance-governance` · `platform-role-workbench-quality-loop` · `platform-ui-editing-consistency`
+
+### 2.5 `05-business-features/`（33）
+
+**账表导入（4）**：`ledger-import-view-refactor` · `ledger-import-header-adapter-contract` · `ledger-import-sign-convention-migration` · `ledger-balance-diagnostics-report-line-coverage`
+
+**底稿专项（14）**：`wp-evidence-collection` · `wp-frontend-ux-polish` · `wp-functional-actions` · `wp-generation-pipeline` · `wp-locate-foundation` · `wp-performance-virtualization` · `wp-template-migration` · `wp-traceability-panel` · `wp-tsj-llm-review` · `wp-ai-review-ux-fix` · `workpaper-guardrail-cleanup` · `workpaper-account-package-d1-d2-pilot` · `workpaper-ai-conclusion-copilot` · `workpaper-content-semantic-contract`
+
+**报表/查询/角色（5）**：`advanced-query-enhancements-p1p2` · `partner-dashboard` · `procedure-applicability-trimming` · `role-based-view-switching` · `report-module-enhancement`
+
+**核心流程（7）**：`proposal-remaining-18` · `e2e-business-flow` · `template-library-coordination` · `audit-chain-generation` · `enterprise-linkage` · `multi-standard-unification` · `schema-drift-full-sync`
+
+**其他（3）**：`k-admin-cycle-post-review-fix` · `project-creation-enhancement` · `audit-report-deliverable-center`
+
+### 2.6 `06-engineering-governance/`（6）
+
+`repo-frontend-layout-unification` · `repo-git-workflow-unification` · `pytest-residual-failures-cleanup` · `migration-runner-resilience` · `frontend-consistency-m1` · `dev-tooling-modernization`
+
+### 2.7 `07-workpaper-slimdown/`（9）
+
+`workpaper-html-renderer` · `workpaper-editor-slimdown` · `workpaper-list-shrink` · `workpaper-editor-shrink-phase2` · `gt-c-note-table-shrink` · `gtdform-test-and-shrink` · `custom-workpaper-formula-binding` · `audit-sheet-editable` · `report-view-slimdown`
+
+### 2.8 `08-disclosure-notes/`（4）
+
+`disclosure-note-full-revamp` · `note-dynamic-tables-and-template-inheritance` · `disclosure-note-linkage-and-slimdown` · `disclosure-note-semantic-structure-and-presentation`
+
+### 2.9 `09-consolidation-phases/`（4）
+
+`consol-phase0-core-pipeline` · `consol-phase1-arch-lock` · `consol-phase2-orchestration` · `consol-phase3-frontend-drilldown`
+
+### 2.10 `99-superseded/`（4）
+
+| 旧 spec | 取代者 |
+|---------|--------|
+| `ledger-import-unification` | → `ledger-import-view-refactor` |
+| `post-enhancement-bugfix` | → R9 + `global-refinement-v3` |
+| `note-account-mapping-seed` | → `disclosure-note-full-revamp` |
+| `linkage-panorama-graph` | → `enterprise-linkage` |
+
+---
+
+## 三、待建 Spec
+
 - `workpaper-unified-import-export`（底稿统一导入导出）
 - D1-4 坏账嵌套结构（枚举+auto-SUM+辅助预填）
 - `consol_disclosure_service` 瘦身（1736 行）
 - `migration_runner` 瘦身（1026 行）
-- `workpaper-content-semantic-system`（底稿内容平台化，2026-06-06 提案+codegraph 分析）
-
-> 注：`ledger-import-header-adapter-contract` / `ledger-import-sign-convention-migration` / `ledger-balance-diagnostics-report-line-coverage` 3 个 spec 已于 2026-06-08 实测验证（186 测试通过）并归档至 `_archive/05-business-features/`。
+- `workpaper-content-semantic-system`（底稿内容平台化）
 
 ---
 
-## 三、已归档 Spec（`_archive/`，132 个）
+## 四、运维命令速查
 
-> 已完成且不再演进的 spec，保留审计轨迹。归档不删文件。
-> **物理结构**：`_archive/` 下按功能 + 开发先后分 10 个分类目录。
-> （active spec 保持 `.kiro/specs/` 根目录扁平存放——Kiro spec 工作流依赖固定路径 `.kiro/specs/{name}/`，不可嵌套。）
-> **归档标准**：代码实证核心已闭环（声称产物文件真实存在 + 测试通过），剩余仅外部依赖 UAT/文档的，归档；纯 README stub（代码未动）留 active。
-
-```
-_archive/                          （132 个，10 分类）
-├── 01-phase-foundation/        平台地基（Phase 0~16）           24
-├── 02-workpaper-cycles/        审计循环业务内容（11 循环+5 基础）16
-├── 03-refinement-rounds/       五角色轮转打磨（R1~R9）           9
-├── 04-infra-architecture/      基础设施 / 全局架构               26
-├── 05-business-features/       业务专项功能（含 ledger/wp 系列）  30
-├── 06-engineering-governance/  工程治理                          6
-├── 07-workpaper-slimdown/      底稿模块瘦身系列                   9
-├── 08-disclosure-notes/        附注模块系列                       4
-├── 09-consolidation-phases/    合并模块四阶段                     4
-└── 99-superseded/              已被取代 / 合并                     4
-```
-
-### 3.1 `01-phase-foundation/` — 平台地基建设（24 个）
-
-平台最早期地基（Phase 0~16），按时间顺序构建。
-
-`phase0-infrastructure` · `phase1a-core` · `phase1b-workpaper` · `phase1c-report` · `phase1-experience-gap-fix` · `phase2-consolidation` · `phase2-role-experience-boost` · `phase3-collaboration` · `phase3-system-enhancement` · `phase4-ai` · `phase4-long-term-governance` · `phase5-extension` · `phase5-operational-excellence` · `phase6-integration` · `phase6-precision-and-security` · `phase7-enhancement` · `phase7-role-experience-closure` · `phase8` · `phase11-system-hardening` · `phase12-workpaper-deep` · `phase13-word-export` · `phase14-gate-engine-governance` · `phase15-task-tree-and-event-orchestration` · `phase16-evidence-package-and-versionline`
-
-### 3.2 `02-workpaper-cycles/` — 审计循环业务内容（16 个）
-
-11 审计循环主体 + 5 底稿基础。548/548 tasks 全部完成。
-
-致同审计循环代号：A=报表/调整 · B=控制了解 · C=控制测试 · D=销售收入 · E=货币资金 · F=采购存货 · G=投资 · H=固定资产 · I=无形资产 · J=职工薪酬 · K=管理 · L=筹资 · M=股东权益 · N=税费 · S=专项
-
-**11 循环主体**：`workpaper-d-sales-cycle` · `workpaper-e1-cash-optimization` · `workpaper-f-purchase-inventory` · `workpaper-g-investment-cycle` · `workpaper-h-fixed-assets-cycle` · `workpaper-i-intangible-assets-cycle` · `workpaper-j-payroll-cycle` · `workpaper-k-admin-cycle` · `workpaper-l-debt-cycle` · `workpaper-m-equity-cycle` · `workpaper-n-tax-cycle`
-
-**5 底稿基础**：`workpaper-completion-foundation` · `workpaper-cycle-d-revenue` · `workpaper-collaboration-presence` · `workpaper-editor-refactor` · `workpaper-deep-optimization`
-
-### 3.3 `03-refinement-rounds/` — 五角色轮转打磨（9 个）
-
-合伙人 → 项目经理 → 质控 → 审计助理 → EQCR 独立复核 → 跨角色优化 → 全局打磨 → 深度收口 → 全局深度复盘
-
-`refinement-round1-review-closure` · `refinement-round2-project-manager` · `refinement-round3-quality-control` · `refinement-round4-audit-assistant` · `refinement-round5-independent-review` · `refinement-round6-cross-role-optimization` · `refinement-round7-global-polish` · `refinement-round8-deep-closure` · `refinement-round9-global-deep-review`
-
-### 3.4 `04-infra-architecture/` — 基础设施 / 全局架构（26 个）
-
-`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3`（全平台一致性治理：金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动；143/147，剩合伙人 UAT） · `vllm-httpx-bugfix`（2026-05-30，httpx trust_env=False 全仓 20 处 + chat_template_kwargs 顶层 + finish_reason=length 处理；12 测试全绿 + vLLM 直调验证通过） · `retrieval-kernel-unification`（检索/知识层单内核 + pgvector；PBT R1~R4 全绿；2026-06-01） · `doc-level-ai-chat`（文档/文件夹级 LLM 对话；72 测试全绿；2026-06-01） · `global-modules-cleanup`（多源澄清+死文件清理；35 测试全绿） · `global-modules-p2-polish`（P2/P3 体验增强；57 测试全绿） · `formula-engine-unification`（公式单内核；Q1~Q5 PBT 全绿） · `report-config-baseline`（报表配置回填+联动；E1~E4 PBT 全绿） · `llm-structured-output`（Instructor+guided_json 双层+熔断；8 tests；2026-06-05） · `pg-pooling-and-load-test`（PgBouncer NullPool+Locust 6000；8 tests；2026-06-05） · `xlsx-read-acceleration`（calamine adapter+6 迁移点；22 tests；2026-06-05） · `endpoint-fuzz-and-tracing`（Schemathesis+OTel+bm25s；8 tests；2026-06-05） · `global-refinement-v5-closure`（v5 收口：溯源+stale 全局刷新+编辑锁+函证；2026-06-06） · `project-creation-enhancement`（项目创建向导增强；2026-06-06） · `platform-context-permission-foundation`（项目上下文单一真源+年度切换+权限矩阵+项目设置中心+枚举字典；111 tasks；2026-06-07） · `platform-evidence-knowledge-ai-governance`（证据包/知识库/AI 治理路线图；101 tasks；2026-06-07） · `platform-linkage-contract-stale`（联动契约与 stale 传播治理；104 tasks；2026-06-07） · `platform-maintenance-governance`（平台维护治理；108 tasks；2026-06-07） · `platform-role-workbench-quality-loop`（角色工作台与质量闭环；111 tasks；2026-06-07） · `platform-ui-editing-consistency`（UI 编辑一致性；106 tasks；2026-06-07）
-
-### 3.5 `05-business-features/` — 业务专项功能（30 个）
-
-按功能聚类：
-
-**核心业务流程（7）**：`proposal-remaining-18` · `e2e-business-flow` · `template-library-coordination` · `audit-chain-generation` · `enterprise-linkage` · `multi-standard-unification` · `schema-drift-full-sync`
-
-**账表导入系列（4）**：`ledger-import-view-refactor`（B' 视图重构 activate <1s） · `ledger-import-header-adapter-contract`（表头识别+Adapter 选优+JSON 适配器+submit gate；341 tests；2026-06-08 归档） · `ledger-import-sign-convention-migration`（符号约定+方向推导+dry-run 迁移+V064；2026-06-08 归档） · `ledger-balance-diagnostics-report-line-coverage`（借贷不平衡统一诊断+seed 覆盖率；2026-06-08 归档）
-
-**底稿专项（wp-* 系列，11）**：`wp-evidence-collection` · `wp-frontend-ux-polish` · `wp-functional-actions` · `wp-generation-pipeline` · `wp-locate-foundation` · `wp-performance-virtualization` · `wp-template-migration` · `wp-traceability-panel` · `wp-tsj-llm-review` · `wp-ai-review-ux-fix`（AI 复核弹窗 UX；36 vitest） · `workpaper-guardrail-cleanup`
-
-**报表 / 查询 / 角色（5）**：`advanced-query-enhancements-p1p2` · `partner-dashboard` · `procedure-applicability-trimming` · `role-based-view-switching` · `report-module-enhancement`
-
-**其他（3）**：`k-admin-cycle-post-review-fix` · `project-creation-enhancement`（项目创建向导增强；2026-06-06） · `audit-report-deliverable-center`（交付件管理中心：选择性导出→双路径→版本→预览→OnlyOffice→审批→归档；P0-P2 全部 25 任务+93 后端+42 前端 tests；2026-06-07）
-
-### 3.6 `06-engineering-governance/` — 工程治理（6 个）
-
-`repo-frontend-layout-unification`（删仓库根 frontend/ 空壳 + pre-commit hook 防回归）  
-`repo-git-workflow-unification`（5 类分支命名 + GIT_MODE 双模式 + 6 维核查 CLI + pre-push hook + ADR-027/028）  
-`pytest-residual-failures-cleanup`（SQLite vs PG 测试残留失败治理，2026-05-28 闭环）  
-`migration-runner-resilience`（D6 MigrationRunner 韧性化：批不中断 + schema drift 自检 + alembic 清理；V025/V026 + schema_drift_detector.py 381 行；Sprint 1-4 完成，剩 Sprint 5 UAT）  
-`frontend-consistency-m1`（v4 M1 一致性收口：T1 GtAmountCell 六大核心页 100% + T2 catch ElMessage.error→handleApiError 175→0 + T3 AMOUNT_DIVISOR_KEY 死代码删除 + T4 状态硬编码→statusEnum；6 PBT + CI baselines 4 项卡点；2026-05-30）  
-`dev-tooling-modernization`（gitleaks pre-commit+CI / SQLFluff 基线 / uv CI 加速 / Docling 裁掉 / DSPy 仅文档；20/20 tasks；2026-06-05）
-
-### 3.7 `07-workpaper-slimdown/` — 底稿模块瘦身系列（9 个）
-
-底稿渲染 HTML 化 + 超长 .vue 拆分 + 自定义底稿公式 + 审定表可编辑 + 报表视图瘦身。
-
-| Spec | 成果 |
+| 需求 | 命令 |
 |------|------|
-| `workpaper-html-renderer` | 1788 单体底稿切 HTML，9 类组件，40/40 tasks，413 tests |
-| `workpaper-editor-slimdown` | WorkpaperEditor 2748→758 行 + 8 子 SFC + 2 composable，59/59 tasks |
-| `workpaper-list-shrink` | WorkpaperList 3463→1151 行（净减 67%）+ 5 子 SFC，36 vitest + e2e |
-| `workpaper-editor-shrink-phase2` | WorkpaperEditor 收尾瘦身至 837 行 + 8 子 SFC + 2 composable，36/36 tasks |
-| `gt-c-note-table-shrink` | GtCNoteTable 1803→450 行 + GtEControlTest 1414→344 行；C 类 3 子组件 + 3 composable / E 类 5 子组件 + 2 composable；90 测试全绿 |
-| `gtdform-test-and-shrink` | D 类「先测后拆」：GtDFormReview 1670→390 / GtDFormConfirmation 1434→366 / GtDFormParagraph 878→345 行 + 6 composable；116 vitest 全绿 + HARD_CAPS 防退化 |
-| `custom-workpaper-formula-binding` | 编制信息表头 + 自定义底稿公式 V052 + WP() 求值 + 联动；pytest 44/2skip + Playwright 6 + vitest 4；2026-06-03 |
-| `audit-sheet-editable` | GtGridSheet→GtAuditSheet(el-table 可编辑)；F-审定表 componentType 精确匹配；TB 取数+自动计算+导入导出+行操作；18/18 tasks + 79 vitest + 后端 121 passed；2026-06-05 |
-| `report-view-slimdown` | ReportView.vue 2944→1053 行（瘦身 64%）+ 6 composable + 6 子组件 + CSS 外置 + 8 测试文件；15/15 tasks；HARD_CAP 1110 已登记；2026-06-06 |
-
-### 3.8 `08-disclosure-notes/` — 附注模块系列（4 个）
-
-| Spec | 成果 |
-|------|------|
-| `disclosure-note-full-revamp` | 附注重写：173 章节生成 + 自动裁剪 + Word 导出 + 公式 DSL；46/47（剩外部 UAT/文档）；note_formula_generator 1331 行 + 50 note 测试 |
-| `note-dynamic-tables-and-template-inheritance` | 全维度增强 v0.6.2（D1~D15 共 15 维度）；实测 166/182≈90%（剩 16 项外部依赖）；10 核心 service 实跑全绿 |
-| `disclosure-note-linkage-and-slimdown` | 联动修复+瘦身：P0 假性刷新+P1 auto_pull+DisclosureEditor 瘦身；19 任务全完成+62 新测试+9 PBT；2026-06-05 |
-| `disclosure-note-semantic-structure-and-presentation` | 语义结构与呈现原型：sidecar/row_type/table_id/政策条款审阅/数据披露上下文/单元格来源/质量清单/绑定注册表/公式依赖图/披露平衡/模板变体/离线增强；145/145 tasks；301 后端+105 前端 tests；2026-06-07 |
-
-### 3.9 `09-consolidation-phases/` — 合并模块四阶段（4 个）
-
-合并报表模块完整开发周期，从止血到前端穿透。147 测试全绿 + 封板全链路集成测试 4 passed + 16 ADR + 24 consol service。
-
-| Spec | 成果 |
-|------|------|
-| `consol-phase0-core-pipeline` | Phase 0 止血：B1 汇总 + B2 对账 + schema 基线 V027 + 锁定闭环 + ADR-CONSOL-001~003；PBT P1~P7 全绿 |
-| `consol-phase1-arch-lock` | Phase 1 架构锁定：AmountResolver 统一引擎 + ELIMINATION_APPROVED 事件重算 + 全端点锁定 + B6 负商誉 + B7 少数股东 + A3 async；ADR-CONSOL-101~106；Q1~Q7 PBT 全绿 |
-| `consol-phase2-orchestration` | Phase 2 编排接线：cascade_refresh DAG + refresh-all SSE + V2 附注 flag + 自动抵销 draft + 报表穿透 + cross_template + 公式联动 + 签字冻结；S1~S8 共 55 PBT + ADR-CONSOL-201~206 |
-| `consol-phase3-frontend-drilldown` | Phase 3 前端穿透：ConsolBreakdownDialog + provenance V039 + 双向导航 + 自动建树 + 完整度校验 + stale SSE；vitest 7 + 后端 26 测试 + ADR-CONSOL-301~304 |
-
-### 3.10 `99-superseded/` — 已被取代 / 合并（4 个）
-
-| 旧 spec | 取代者 |
-|---------|--------|
-| `ledger-import-unification` | → `ledger-import-view-refactor`（在 05-business-features） |
-| `post-enhancement-bugfix` | → R9 + global-refinement-v3（在 04-infra-architecture） |
-| `note-account-mapping-seed` | → 合并入 `disclosure-note-full-revamp`（在 08-disclosure-notes） |
-| `linkage-panorama-graph` | → 合并入 `enterprise-linkage`（在 05-business-features） |
+| 代码规模 | `codegraph status` |
+| 超标文件 | `python backend/scripts/check/check_file_size.py` |
+| Schema drift | `python backend/scripts/check/check_schema_drift.py` |
+| 最高迁移 | `ls backend/migrations/V*.sql \| sort \| tail -1` |
+| Seed 覆盖率 | `python backend/scripts/check/check_account_to_report_line_seed_coverage.py` |
+| 三件套完整性 | 扫描 `_archive/` 各 spec 目录是否含 requirements.md + design.md + tasks.md |
 
 ---
 
-## 四、开发历程时间线
+## 五、索引规约
 
-平台采用 PDCA 迭代模式：建议 → spec 三件套（requirements + design + tasks）→ 实施 → 复盘 → 下一轮。
-
-| 阶段 | 主题 | 产出 |
-|------|------|------|
-| **Phase 0-1** | 平台地基 | 基础设施 + 核心数据模型 + 底稿/报表骨架 |
-| **Phase 2-4** | 合并 / 协作 / AI | 合并报表 + 多人协作 + AI 引擎接入框架 |
-| **Phase 5-8** | 扩展 / 集成 / 加固 | 系统扩展 + 第三方集成 + 系统硬化 |
-| **Phase 11-16** | 深度治理 | 底稿深化 + Word 导出 + Gate 引擎 + 任务树 + 证据包 |
-| **11 审计循环** | 业务内容填充 | D~N 全循环 548 任务 + 致同 2025 编码体系 |
-| **Refinement R1-R9** | 五角色轮转打磨 | 合伙人/PM/质控/助理/EQCR 视角逐轮收口 |
-| **账表导入 v2** | 数据引擎重写 | 9 家企业验证 + B' 视图架构（activate <1s） |
-| **底稿渲染器** | HTML 化 | 1788 单体底稿从 Univer 切 HTML + 9 类组件 |
-| **附注全栈** | 附注模块重写 | 173 章节生成 + 离线分发 + Word 导出 |
-| **V3 全平台收尾** | 一致性治理 | 金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动 |
-| **工程治理** | 仓库/迁移/Git | 前端路径统一 + D6 迁移韧性 + Git 工作流规约 |
-
----
-
-## 五、程序规模快照（2026-05-29 实测，仅供量级参考；spec 数见 §〇/§三）
-
-> ⚠️ 下表为历史快照，routers/services/tests 等数字随开发增长会偏小，仅反映量级。spec 总数以 §〇 顶部为准（135）。
-
-| 维度 | 值 |
-|------|---|
-| 后端 routers | 273 |
-| 后端 services | 403 |
-| 后端 models | 58 |
-| 后端 tests | 588 |
-| 前端 views | 99 |
-| 前端 components | 353 |
-| 前端 composables | 81 |
-| 前端 .vue 总数 | 498 |
-| 前端 .ts 总数 | 379 |
-| PG 表数 | 188 |
-| 底稿模板 | 456 |
-| cross_wp_references | 400 条 |
-| prefill_formula_mapping | 1035 cells |
-| validation_rules | 114 条 |
-| D6 SQL 迁移 | V001-V064（最高 V064 = sign_convention direction_fields） |
-| **Spec 总数** | **active 3 + archived 132 = 135（详见 §三）** |
-
----
-
-## 六、模块打磨待办（按 ROI 排序）
-
-| 优先级 | 模块 | 当前 | 目标 | 依赖 |
-|--------|------|------|------|------|
-| P0 | WorkpaperEditor.vue | 815 行 | ≤1200 | 抽 useUniverEditor composable |
-| P1 | WorkpaperList.vue | 519 行 | ≤1500 | 抽 useStandardTable 复用 6 view |
-| P1 | TrialBalance.vue | 2494 行 | ≤1500 | 同上 |
-| P2 | DisclosureEditor.vue | 1757 行 | ≤1800 | ✅ 已瘦身（disclosure-note-linkage-and-slimdown） |
-| P2 | LedgerPenetration.vue | 3794 行 | ≤1500 | 需新建 spec |
-| P3 | ReportView.vue | 1053 行 | ≤1500 | ✅ 已瘦身（report-view-slimdown，HARD_CAP 1110） |
-| P0 | service ≤800 行卡点 | smart_import 2786 等 8 个 | pre-commit hook | 已有 check_file_size.py |
-| P2 | 6000 并发压测 | 外部依赖 | 真实验证 | PG 大数据量 + Locust |
-| P3 | LLM 真实接入 | 6 stub 引擎 | 一键切换 | WP_AI_SERVICE_ENABLED 已就位 |
-
----
-
-## 六-A、归档 spec 完成度核查（2026-05-30 历史记录，逐 spec 代码实证，防伪绿）
-
-> 📌 本节是 **2026-05-30 的一次性核查存档**（当时 84 个归档 spec），append-only 不回填。后续新归档 spec（如 2026-06-07/08 的 platform-*/ledger-*/workpaper-* 系列）各自在 §二/§三 标注了测试实证，核查方法论仍适用。
-> 逐个 spec 读 tasks.md + fileSearch/grepSearch 实证产物真实存在。**结论：已核查 13 个 spec 无伪绿**。
-
-### 已完成逐 spec 实证核查
-
-**06-engineering-governance（4 个，全部核查）**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| migration-runner-resilience | ⏳核心完成收尾待补 | Sprint1-4 全✅（emoji格式）；Sprint5 ADR-024/025 实际已存在（tasks.md 滞后标⏳）；真缺口仅 5.2/5.3 Playwright 截图（.playwright-mcp/ 不存在，需启动后端=外部依赖） |
-| pytest-residual-failures-cleanup | ✅真完成 | 残留 7 项全是父任务未勾+子任务全[x]（误报源③）；_test_auth_helper.py + override_auth 接入 + test_smoke_e2e skipif 全存在 |
-| repo-frontend-layout-unification | ✅真完成 | emoji格式 ✅23；check_no_root_frontend.py 存在+已注册 pre-commit；仓库根 frontend/ git tracked 0 文件；ADR-026 存在 |
-| repo-git-workflow-unification | ✅真完成（伪红） | tasks.md 12 项全标⏳但产物 100% 存在=最隐蔽伪红；check_git_sync_state.py(129行)/check_git_branch_naming.py(77)/check_hotspot_files.py(81)/.git-hooks/pre-push(53)/install.ps1(26)/git-workflow.md(110)/ADR-027(33)/ADR-028(42) 全部 fileSearch 确认 |
-
-**04-infra-architecture（8 个，全部核查）**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| global-linkage-bus | ✅真完成 | linkage_graph_builder/stale_propagation_engine/formula_reverse_index 全存在 |
-| global-platform-enhancement | ✅真完成 | 7 残留全是收尾杂务框漏勾（误报源③）；GtAmountCell/GtEditableTable/eventBus(mitt)/migration_runner 全存在 |
-| global-refinement-v3 | ⏳核心完成收尾待补 | useAuditContext/ai_content_log_service/conflict_resolution_service/time_machine_service/trust_score_service/allowed_actions_service + 7 ESLint 规则全存在；真缺口仅 Task14.4 合伙人 UAT（外部依赖） |
-| production-readiness | ✅真完成 | 1 残留=父任务未勾子全done（误报源③）；migration_runner/sla_worker/import_recover_worker/outbox_replay_worker 全存在 |
-| table-unification-el-table | ✅真完成 | GtTableExtended/GtFormTable/gt-tokens.css 全存在 |
-| v3-linkage-stale-propagation | ⏳核心完成收尾待补 | stale_summary_aggregate.py 存在；残留=UAT 手动验收 8 项 pending（需真人执行） |
-| v3-r10-editor-resilience | ⏳核心完成收尾待补 | event_cascade_health_service/workers/worker_helpers 存在；残留=UAT 5 项 pending（需运维/真人） |
-| v3-r10-linkage-and-tokens | ⏳核心完成收尾待补 | GtTableExtended/gt-tokens.css/CI 4 道卡点全存在；残留=UAT 8 项设计师视觉回归截图（需真人） |
-
-**05-business-features（1 个已核查）**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| procedure-applicability-trimming | ✅真完成 | 3 残留=Sprint/Checkpoint 汇总框（非实质任务）+11 可选 PBT；chain_orchestrator 步骤5b/5c 裁剪逻辑(548-579行)+ProcedureTrimming.vue+QC-19/20/24 门禁规则全存在 |
-
-### 待核查（剩余 71 个）
-
-### 已核查（续）— 05/01/03/07/08 标红项逐一实证
-
-**05-business-features 标红项**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| procedure-applicability-trimming | ✅真完成 | 3 残留=Sprint/Checkpoint 汇总框+11 可选 PBT；chain_orchestrator 步骤5b/5c+ProcedureTrimming.vue+QC-19/20/24 全存在 |
-| advanced-query-enhancements-p1p2 | ✅真完成 | 2 残留=父任务未勾子全done（误报③）；custom_query.py+query_builder.py JOIN_WHITELIST 存在 |
-| partner-dashboard | ✅真完成 | 1 残留=父任务未勾（误报③）；PartnerDashboard.vue 存在 |
-| report-module-enhancement | ✅真完成 | 必需 15/15；13 可选 PBT 不影响；audit_logs §127+validate_formula_coverage.py 存在 |
-| 其余 8 个抽查 | ✅ | chain_orchestrator/enterprise_linkage_models/LedgerImportHistory.vue/TemplateLibraryMgmt.vue 等产物全存在 |
-
-**01-phase-foundation 标红项（Python 脚本误报，PowerShell 复核）**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| phase3-system-enhancement | ✅真完成 | 2 残留=UAT-3(LLM 接入)+UAT-5(6000 并发)，均外部依赖 |
-| phase7-enhancement | ✅真完成 | PowerShell grep 209/209 全[x]（Python 脚本编码/正则 bug 误报 32/51）|
-| phase8 | ✅真完成 | PowerShell grep 209/209 全[x]（同上误报 50/75）|
-
-**03-refinement-rounds 标红项**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| refinement-round1-review-closure | ⏳核心完成收尾待补 | 12 残留=UAT-1~6 真人验收+Round2 候选 2+已知妥协 4，全是外部依赖/后续候选/技术债 |
-
-**07/08 补充核查**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| workpaper-html-renderer | ✅真完成（伪红）| 1 残留 Task1.6 标[ ]但 wp_classification_service.get_classification 真实存在 |
-| workpaper-list-shrink | ✅真完成 | 9 残留全父任务未勾（误报③）；产物全存在 |
-| disclosure-note-full-revamp | ✅真完成 | 6 残留=P-1~3 外部+1.7 UAT+F-2/3 文档收口；note_formula_generator.py 存在 |
-| note-dynamic-tables | ✅真完成 | 16 可选/外部 UAT；dynamic_region_engine+consol_note_aggregation 存在 |
-
-### 核查汇总（PowerShell 准确计数 + fileSearch 实证）
-
-**全部 84 个归档 spec 已用 PowerShell `Select-String "^\s*-\s*\[x\]"` 精确计数**（避开 Python re.M bug），有 unchecked 任务的逐一读 tasks.md + fileSearch 实证：
-
-| 判定 | 说明 |
-|------|------|
-| ✅ 真完成（绝大多数）| 代码产物全部 fileSearch/grep 实证存在；unchecked 全是：可选 `[ ]*` / 父任务汇总框未勾（子任务全[x]）/ emoji 标题格式 / 伪红（标⏳产物已存在）|
-| ⏳ 核心完成收尾待补 | migration-runner(Playwright 截图) / global-refinement-v3(合伙人 UAT) / v3-linkage-stale / v3-r10-editor-resilience / v3-r10-linkage-tokens / refinement-round1(真人 UAT) / phase6-precision(部分被 global-refinement-v3 取代) / phase7-role-closure(汇总框+UAT) / round7-global-polish(触碰即修债+UAT) — 残留**全是外部依赖（真人 UAT/Playwright/设计师视觉）或被后续 spec 取代**|
-| ⚠️ 伪绿 | **0 个** — 无一 spec 声称完成但代码产物缺失 |
-
-**有 unchecked 的 spec 逐一定性**（PowerShell 实测）：
-- 01 类：phase3-system-enhancement(2=外部UAT) / phase6-precision(19=汇总框+1.3b被v3取代+UAT) / phase7-role-closure(25=汇总框+UAT)；其余含 phase7-enhancement/phase8 经 PowerShell 复核实为 209/209 全[x]（Python 误报）
-- 02 类：16 个仅 workpaper-editor-refactor(残留=被 editor-slimdown/phase2 取代) + workpaper-deep-optimization(1 可选)；其余 14 个 notdone=0
-- 03 类：round1(12=真人UAT+技术债) / round2(3=Sprint 验收框) / round7(32=触碰即修债+UAT) / round8(7) / round9(8)；其余 round3-6 notdone=0
-- 04 类：8 个全核查（前文表格）
-- 05 类：4 标红项 + 8 抽查全 ✅
-- 06 类：4 个全核查（前文表格）
-- 07 类：5 个全核查 ✅
-- 08 类：2 个全 ✅
-- 99 类：4 个 superseded（被取代不必 100%）
-
-**剩余可深入**：03 类 round8/round9 的残留性质（sprint-split 格式）+ 99 superseded 细节，但均低风险。
-
-### 正则统计四大误报源（核查方法论）
-1. **可选 `[ ]*`**：带星号未做不影响完成定性
-2. **emoji 标题格式 `### Task X ✅`**：非 checkbox 被误报 0/N
-3. **父任务未勾 + 子任务全完成**：父项汇总忘勾
-4. **伪红**：tasks.md 全标 ⏳ 但产物 100% 存在（repo-git-workflow-unification）
-
-> ⚠ Python 正则脚本本身也有 bug（phase7/phase8 误报 32/51、50/75，实际 209/209）——**PowerShell `Select-String "^\s*-\s*\[x\]"` 直接 grep 比 Python re.M 更可靠**。最终判定一律靠 fileSearch/grep 实证产物文件存在，不信文档自述、不信扫描数字。
-
----
-
-## 七、索引规约
-
-1. 新建 spec 默认放 `.kiro/specs/`（active 根目录，**扁平存放**），完成后审议是否归档
-2. **active spec 不可嵌套子目录** —— Kiro spec 工作流依赖固定路径 `.kiro/specs/{name}/tasks.md`
-3. 完成 spec 时填完成日期 + 关键 commit
-4. 归档时移到 `_archive/{分类目录}/`，按功能归入 10 个分类之一，不删文件保留审计轨迹
-5. 归档分类目录（10 个）：01 地基 / 02 循环 / 03 打磨 / 04 架构 / 05 业务 / 06 工程 / 07 底稿瘦身 / 08 附注 / 09 合并 / 99 取代
-6. 废弃 spec 移入 `99-superseded/` + 记录取代者
-7. **凭印象禁令**：完成度 / 日期必须有 grep 证据，凭印象写视为漏审
-8. 归档后必须同步更新 §〇 顶部「Spec 总数」+ §三 分类计数 + §二 active 列表，三处保持一致
-
-### 迁移系统提示（D6 唯一入口）
-
-- 当前迁移系统 = `backend/migrations/V*.sql` + `R*.sql`（启动时 MigrationRunner 自动执行）
-- alembic 已废弃（2026-05-29 删除）
-- 新加迁移：写 `V0XX__xxx.sql` + `R0XX__rollback_xxx.sql` 配对，必须 `IF NOT EXISTS` 幂等
-- 当前最高迁移 = **V064**（sign_convention direction_fields）
+1. 新建 spec 放 `.kiro/specs/{name}/`（扁平，不可嵌套）
+2. 完成 spec 填日期 + commit，归档移到 `_archive/{分类}/`
+3. 归档后同步更新 §〇 Spec 总数 + §二 分类计数
+4. 分类（10 个）：01 地基 / 02 循环 / 03 打磨 / 04 架构 / 05 业务 / 06 工程 / 07 底稿瘦身 / 08 附注 / 09 合并 / 99 取代
+5. 废弃 spec 移 `99-superseded/` + 记录取代者
+6. **凭印象禁令**：完成度必须 grep 实证，不信文档自述
+7. 迁移系统 = `backend/migrations/V*.sql`（D6 MigrationRunner），新加必须 `IF NOT EXISTS` 幂等
