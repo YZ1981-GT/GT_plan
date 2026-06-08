@@ -5,6 +5,7 @@
       <VueOfficeDocx
         v-if="previewType === 'docx' && url"
         :src="url"
+        :request-options="authRequestOptions"
         style="height: 70vh"
         @rendered="loading = false"
         @error="onError"
@@ -12,6 +13,7 @@
       <VueOfficePdf
         v-else-if="previewType === 'pdf' && url"
         :src="url"
+        :request-options="authRequestOptions"
         style="height: 70vh"
         @rendered="loading = false"
         @error="onError"
@@ -33,11 +35,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import DraftWatermark from './DraftWatermark.vue'
 import VueOfficeDocx from '@vue-office/docx'
 import VueOfficePdf from '@vue-office/pdf'
 import '@vue-office/docx/lib/index.css'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   title: string
@@ -51,6 +54,14 @@ const emit = defineEmits<{ close: [] }>()
 
 const visible = ref(true)
 const loading = ref(true)
+const authStore = useAuthStore()
+
+// @vue-office/docx 和 @vue-office/pdf 通过 requestOptions 传递 auth header
+const authRequestOptions = computed(() => ({
+  headers: {
+    Authorization: `Bearer ${authStore.token}`,
+  },
+}))
 
 watch(() => props.previewType, () => {
   loading.value = props.previewType !== 'html'
