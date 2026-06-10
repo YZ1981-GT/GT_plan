@@ -9,6 +9,8 @@
  * - "刷新本章节"/"刷新所有过期"按钮渲染与联通
  * - 终态出品物（signed/confirmed/archived）刷新入口禁用
  * - 覆盖确认弹窗
+ *
+ * 铁律：组件已改用 api.get/api.post（@/services/apiProxy），不再用原生 fetch
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
@@ -34,18 +36,24 @@ vi.mock('element-plus', async () => {
     ElMessage: {
       success: vi.fn(),
       error: vi.fn(),
+      warning: vi.fn(),
     },
   }
 })
 
-// Mock fetch
-const mockFetch = vi.fn()
-global.fetch = mockFetch
+// Mock apiProxy（api.get 已解信封直接返回业务数据；api.post 同理）
+const mockApiGet = vi.fn()
+const mockApiPost = vi.fn()
+vi.mock('@/services/apiProxy', () => ({
+  api: {
+    get: (...args: any[]) => mockApiGet(...args),
+    post: (...args: any[]) => mockApiPost(...args),
+  },
+}))
 
-// Mock EventSource
+// Mock EventSource（useSSEReconnect 用 es.onmessage/onerror）
 class MockEventSource {
   url: string
-  listeners: Record<string, ((e: any) => void)[]> = {}
   onopen: (() => void) | null = null
   onmessage: ((e: any) => void) | null = null
   onerror: (() => void) | null = null
@@ -56,19 +64,15 @@ class MockEventSource {
     MockEventSource.instances.push(this)
   }
 
-  addEventListener(event: string, handler: (e: any) => void) {
-    if (!this.listeners[event]) this.listeners[event] = []
-    this.listeners[event].push(handler)
-  }
+  addEventListener() {}
 
   close() {
     this.readyState = 2
   }
 
-  // Simulate dispatching an event
-  _dispatch(event: string, data: any) {
-    const handlers = this.listeners[event] || []
-    handlers.forEach(h => h({ data: JSON.stringify(data) }))
+  // 模拟服务端推送一条 message
+  _emit(data: any) {
+    this.onmessage?.({ data: JSON.stringify(data) })
   }
 
   static instances: MockEventSource[] = []
@@ -76,8 +80,29 @@ class MockEventSource {
     MockEventSource.instances = []
   }
 }
-(global as any).EventSource = MockEventSource
+;(global as any).EventSource = MockEventSource
 
+// 默认 trace 响应（stale 章节）
+const STALE_TRACE = {
+  contracts: [
+    {
+      source_type: 'note',
+      source_id: 'note-1',
+      target_type: 'note',
+      target_id: 'note-1',
+      basis: '长期借款',
+      status: 'stale',
+      confidence: 'system',
+      route: '/projects/proj-001/disclosure-notes?section=八、1',
+    },
+  ],
+  section_state: {
+    section_code: '八、1',
+    is_stale: true,
+    source_snapshot_hash: 'abc123',
+    anchor_name: 'sec_八_1',
+  },
+}
 
 describe('LineagePanel.vue — 刷新功能（Task 10.1/10.2）', () => {
   const baseProps = {
@@ -89,32 +114,9 @@ describe('LineagePanel.vue — 刷新功能（Task 10.1/10.2）', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     MockEventSource.reset()
-    // Default fetch mock: trace endpoint returns stale section
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: {
-          contracts: [
-            {
-              source_type: 'note',
-              source_id: 'note-1',
-              target_type: 'note',
-              target_id: 'note-1',
-              basis: '长期借款',
-              status: 'stale',
-              confidence: 'system',
-              route: '/projects/proj-001/disclosure-notes?section=八、1',
-            },
-          ],
-          section_state: {
-            section_code: '八、1',
-            is_stale: true,
-            source_snapshot_hash: 'abc123',
-            anchor_name: 'sec_八_1',
-          },
-        },
-      }),
-    })
+    // Default: trace endpoint returns stale section
+    mockApiGet.mockResolvedValue(STALE_TRACE)
+    mockApiPost.mockResolvedValue({ version_no: 2, refreshed: ['八、1'] })
   })
 
   afterEach(() => {
@@ -202,62 +204,51 @@ describe('LineagePanel.vue — 刷新功能（Task 10.1/10.2）', () => {
     it('用户取消确认时不调用刷新端点', async () => {
       mockConfirm.mockRejectedValueOnce('cancel')
       const wrapper = await mountWithSection({ deliverableStatus: 'draft' })
-      // Clear initial trace fetch
-      mockFetch.mockClear()
+      // Clear initial trace api call
+      mockApiPost.mockClear()
 
       const buttons = wrapper.findAll('.lineage-panel__action-btn')
       await buttons[0].trigger('click')
       await flushPromises()
 
-      // fetch should not be called (refresh-section endpoint)
-      const postCalls = mockFetch.mock.calls.filter(
-        (c: any[]) => c[1]?.method === 'POST',
-      )
-      expect(postCalls.length).toBe(0)
+      // refresh-section POST should not be called
+      expect(mockApiPost).not.toHaveBeenCalled()
     })
 
     it('用户确认后调用 refresh-section 端点', async () => {
       mockConfirm.mockResolvedValueOnce('confirm')
       const wrapper = await mountWithSection({ deliverableStatus: 'draft' })
-      mockFetch.mockClear()
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ data: { version_no: 2, refreshed: ['八、1'] } }),
-      })
+      mockApiPost.mockClear()
+      mockApiPost.mockResolvedValue({ version_no: 2, refreshed: ['八、1'] })
 
       const buttons = wrapper.findAll('.lineage-panel__action-btn')
       await buttons[0].trigger('click')
       await flushPromises()
 
-      const postCalls = mockFetch.mock.calls.filter(
-        (c: any[]) => c[1]?.method === 'POST',
-      )
-      expect(postCalls.length).toBeGreaterThanOrEqual(1)
-      expect(postCalls[0][0]).toContain('/refresh-section')
-      const body = JSON.parse(postCalls[0][1].body)
+      expect(mockApiPost).toHaveBeenCalledTimes(1)
+      const [url, body] = mockApiPost.mock.calls[0]
+      expect(url).toContain('/refresh-section')
       expect(body.section_code).toBe('八、1')
       expect(body.year).toBe(2025)
+      expect(body.confirm_overwrite).toBe(true)
     })
   })
 
   describe('"刷新所有过期"按钮', () => {
     it('点击后直接调用 refresh-stale 端点（无确认）', async () => {
       const wrapper = await mountWithSection({ deliverableStatus: 'draft' })
-      mockFetch.mockClear()
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ data: { version_no: 2, refreshed: ['八、1', '八、2'] } }),
-      })
+      mockApiPost.mockClear()
+      mockApiPost.mockResolvedValue({ version_no: 2, refreshed: ['八、1', '八、2'] })
 
       const buttons = wrapper.findAll('.lineage-panel__action-btn')
       await buttons[1].trigger('click')
       await flushPromises()
 
-      const postCalls = mockFetch.mock.calls.filter(
-        (c: any[]) => c[1]?.method === 'POST',
-      )
-      expect(postCalls.length).toBeGreaterThanOrEqual(1)
-      expect(postCalls[0][0]).toContain('/refresh-stale')
+      expect(mockApiPost).toHaveBeenCalledTimes(1)
+      const [url, body] = mockApiPost.mock.calls[0]
+      expect(url).toContain('/refresh-stale')
+      expect(body.year).toBe(2025)
+      expect(body.confirm_overwrite).toBe(true)
     })
   })
 
@@ -269,19 +260,14 @@ describe('LineagePanel.vue — 刷新功能（Task 10.1/10.2）', () => {
     })
 
     it('章节 is_stale=false 时不显示 stale 徽标', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          data: {
-            contracts: [],
-            section_state: {
-              section_code: '八、1',
-              is_stale: false,
-              source_snapshot_hash: 'abc123',
-              anchor_name: 'sec_八_1',
-            },
-          },
-        }),
+      mockApiGet.mockResolvedValue({
+        contracts: [],
+        section_state: {
+          section_code: '八、1',
+          is_stale: false,
+          source_snapshot_hash: 'abc123',
+          anchor_name: 'sec_八_1',
+        },
       })
       const wrapper = await mountWithSection()
       expect(wrapper.find('.lineage-panel__stale-badge').exists()).toBe(false)
@@ -289,41 +275,32 @@ describe('LineagePanel.vue — 刷新功能（Task 10.1/10.2）', () => {
   })
 
   describe('SSE LINKAGE_STALE_CHANGED 实时更新', () => {
-    it('组件挂载时连接 SSE 事件流', async () => {
+    it('组件挂载时连接项目级事件流 /events/stream', async () => {
       mount(LineagePanel, { props: baseProps })
       await nextTick()
       expect(MockEventSource.instances.length).toBeGreaterThanOrEqual(1)
       expect(MockEventSource.instances[0].url).toContain(
-        `/api/projects/proj-001/deliverables/task-001/events`,
+        `/api/projects/proj-001/events/stream`,
       )
     })
 
-    it('收到 LINKAGE_STALE_CHANGED 事件时更新 stale 状态', async () => {
+    it('收到 LINKAGE_STALE_CHANGED 事件时重新拉取溯源（更新 stale 状态）', async () => {
       const wrapper = await mountWithSection()
       // Initially stale
       expect(wrapper.find('.lineage-panel__stale-badge').exists()).toBe(true)
 
-      // Simulate SSE event marking it no longer stale
+      // 服务端推 LINKAGE_STALE_CHANGED → 组件重新 traceSection（此时 api.get 返非 stale）
+      mockApiGet.mockResolvedValue({
+        contracts: [],
+        section_state: {
+          section_code: '八、1',
+          is_stale: false,
+          source_snapshot_hash: 'def456',
+          anchor_name: 'sec_八_1',
+        },
+      })
       const sse = MockEventSource.instances[0]
-      // Override fetch to return non-stale
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          data: {
-            contracts: [],
-            section_state: {
-              section_code: '八、1',
-              is_stale: false,
-              source_snapshot_hash: 'def456',
-              anchor_name: 'sec_八_1',
-            },
-          },
-        }),
-      })
-      sse._dispatch('LINKAGE_STALE_CHANGED', {
-        section_code: '八、1',
-        is_stale: false,
-      })
+      sse._emit({ event_type: 'LINKAGE_STALE_CHANGED', section_code: '八、1', is_stale: false })
       await nextTick()
       await flushPromises()
       await nextTick()

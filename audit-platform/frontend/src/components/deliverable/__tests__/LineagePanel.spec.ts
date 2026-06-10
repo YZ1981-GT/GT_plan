@@ -16,9 +16,32 @@ vi.mock('vue-router', () => ({
   }),
 }))
 
-// Mock fetch
-const mockFetch = vi.fn()
-global.fetch = mockFetch
+// Mock apiProxy (项目铁律：组件用 api.get/api.post 而非原生 fetch)
+const mockApiGet = vi.fn()
+const mockApiPost = vi.fn()
+vi.mock('@/services/apiProxy', () => ({
+  api: {
+    get: (...args: any[]) => mockApiGet(...args),
+    post: (...args: any[]) => mockApiPost(...args),
+  },
+}))
+
+// Mock EventSource（useSSEReconnect 挂载时会创建连接，jsdom 无 EventSource）
+class MockEventSource {
+  url: string
+  onopen: (() => void) | null = null
+  onmessage: ((e: any) => void) | null = null
+  onerror: (() => void) | null = null
+  readyState = 1
+  constructor(url: string) {
+    this.url = url
+  }
+  addEventListener() {}
+  close() {
+    this.readyState = 2
+  }
+}
+;(global as any).EventSource = MockEventSource
 
 describe('LineagePanel.vue', () => {
   const baseProps = {
@@ -60,35 +83,31 @@ describe('LineagePanel.vue', () => {
   })
 
   it('调用 onBookmarkDetected 触发溯源查询', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        data: {
-          contracts: [
-            {
-              source_type: 'note',
-              source_id: 'note-1',
-              target_type: 'note',
-              target_id: 'note-1',
-              basis: '长期借款',
-              status: 'current',
-              confidence: 'system',
-              route: '/projects/proj-001/disclosure-notes?section=八、1',
-            },
-          ],
-          section_state: { section_code: '八、1', is_stale: false, source_snapshot_hash: null, anchor_name: 'sec_八_1' },
+    // api.get 已解信封，直接返回业务数据
+    mockApiGet.mockResolvedValueOnce({
+      contracts: [
+        {
+          source_type: 'note',
+          source_id: 'note-1',
+          target_type: 'note',
+          target_id: 'note-1',
+          basis: '长期借款',
+          status: 'current',
+          confidence: 'system',
+          route: '/projects/proj-001/disclosure-notes?section=八、1',
         },
-      }),
+      ],
+      section_state: { section_code: '八、1', is_stale: false, source_snapshot_hash: null, anchor_name: 'sec_八_1' },
     })
 
     const wrapper = mount(LineagePanel, { props: baseProps })
     ;(wrapper.vm as any).onBookmarkDetected('sec_八_1')
     await nextTick()
-    // wait for async fetch
+    // wait for async api call
     await new Promise(r => setTimeout(r, 10))
     await nextTick()
 
-    expect(mockFetch).toHaveBeenCalledWith(
+    expect(mockApiGet).toHaveBeenCalledWith(
       expect.stringContaining('/api/projects/proj-001/deliverables/task-001/trace?section_code='),
     )
   })

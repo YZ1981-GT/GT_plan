@@ -29,9 +29,15 @@ vi.mock('element-plus', () => ({
   },
 }))
 
-// Mock fetch
-const mockFetch = vi.fn()
-global.fetch = mockFetch
+// Mock apiProxy (项目铁律：组件用 api.post 而非原生 fetch)
+const mockApiGet = vi.fn()
+const mockApiPost = vi.fn()
+vi.mock('@/services/apiProxy', () => ({
+  api: {
+    get: (...args: any[]) => mockApiGet(...args),
+    post: (...args: any[]) => mockApiPost(...args),
+  },
+}))
 
 describe('WritebackResultPanel', () => {
   beforeEach(() => {
@@ -283,10 +289,7 @@ describe('WritebackConflictDialog', () => {
   })
 
   it('submits resolutions via POST /writeback with resolutions', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ data: { written: ['八、1', '八、2'], rejected: [], conflicts: [], skipped: [] } }),
-    })
+    mockApiPost.mockResolvedValueOnce({ written: ['八、1', '八、2'], rejected: [], conflicts: [], skipped: [] })
 
     const wrapper = mount(WritebackConflictDialog, {
       props: {
@@ -318,16 +321,13 @@ describe('WritebackConflictDialog', () => {
     // Call onSubmit
     await (wrapper.vm as any).onSubmit()
 
-    // Verify fetch was called with correct params
-    expect(mockFetch).toHaveBeenCalledWith(
+    // Verify api.post was called with correct params
+    expect(mockApiPost).toHaveBeenCalledWith(
       '/api/projects/123/deliverables/456/writeback',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({
-          year: 2025,
-          resolutions: { '八、1': 'deliverable', '八、2': 'upstream' },
-        }),
-      }),
+      {
+        year: 2025,
+        resolutions: { '八、1': 'deliverable', '八、2': 'upstream' },
+      },
     )
   })
 })

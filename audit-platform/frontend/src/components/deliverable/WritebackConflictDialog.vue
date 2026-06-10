@@ -104,6 +104,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { api } from '@/services/apiProxy'
 
 export interface WritebackConflict {
   section_code: string
@@ -157,26 +158,22 @@ async function onSubmit(): Promise<void> {
 
   try {
     const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/writeback`
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        year: props.year || new Date().getFullYear(),
-        resolutions: resolutions.value,
-      }),
+    await api.post(url, {
+      year: props.year || new Date().getFullYear(),
+      resolutions: resolutions.value,
     })
-
-    if (!resp.ok) {
-      const body = await resp.json().catch(() => ({}))
-      ElMessage.error(body?.detail || body?.message || `裁决提交失败 (${resp.status})`)
-      return
-    }
 
     ElMessage.success('冲突裁决已提交，回填完成')
     emit('resolved', resolutions.value)
     emit('update:visible', false)
   } catch (e: any) {
-    ElMessage.error(e.message || '网络错误')
+    if (e?.response?.status === 403) {
+      ElMessage.error('权限不足：需要编辑权限才能执行回填')
+    } else if (e?.response?.status === 409) {
+      ElMessage.warning(e?.response?.data?.detail || e?.response?.data?.message || '该出品物已终态，不可回填')
+    } else {
+      ElMessage.error(e?.response?.data?.message || e?.message || '裁决提交失败')
+    }
   } finally {
     submitting.value = false
   }

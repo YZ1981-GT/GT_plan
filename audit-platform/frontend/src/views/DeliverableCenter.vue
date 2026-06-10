@@ -86,6 +86,7 @@
       :title="editorItem.file_name || '在线编辑'"
       preview-type="docx"
       :preview-url="editorUrl"
+      :deliverable-status="editorItem.status"
       :show-watermark="['draft', 'editing'].includes(editorItem.status)"
       @close="editorVisible = false"
     />

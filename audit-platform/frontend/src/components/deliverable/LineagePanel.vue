@@ -163,12 +163,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { InfoFilled, Document, Right } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import type { LinkageContract, TargetType } from '@/types/linkageContract'
 import { useDeliverableLineage, sectionCodeFromAnchor } from '@/composables/useDeliverableLineage'
-import { openLinkageTrace } from '@/composables/useLinkageTraceDrawer'
+import { useSSEReconnect } from '@/composables/useSSEReconnect'
+import { api } from '@/services/apiProxy'
 
 /** 终态状态列表（signed/confirmed/archived）— 需求 11.4 */
 const TERMINAL_STATUSES = ['signed', 'confirmed', 'archived'] as const
@@ -216,9 +217,6 @@ const terminalStateTooltip = '该出品物已签字/确认/归档，不可回填
 /** 刷新加载状态 */
 const refreshingSingle = ref(false)
 const refreshingAll = ref(false)
-
-/** SSE 连接引用 */
-let sseSource: EventSource | null = null
 
 // 如果父组件明确标记无锚点
 watch(
@@ -306,26 +304,22 @@ async function onRefreshSection(): Promise<void> {
   refreshingSingle.value = true
   try {
     const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/refresh-section`
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        year: props.year || new Date().getFullYear(),
-        section_code: currentSectionCode.value,
-        confirm_overwrite: true,
-      }),
+    await api.post(url, {
+      year: props.year || new Date().getFullYear(),
+      section_code: currentSectionCode.value,
+      confirm_overwrite: true,
     })
-    if (!resp.ok) {
-      const body = await resp.json().catch(() => ({}))
-      const msg = body?.message || body?.detail || `刷新失败 (${resp.status})`
-      ElMessage.error(msg)
-      return
-    }
     ElMessage.success('章节已刷新')
     // 刷新溯源数据
     refresh()
   } catch (e: any) {
-    ElMessage.error(e.message || '网络错误')
+    if (e?.response?.status === 403) {
+      ElMessage.error('权限不足：需要编辑权限')
+    } else if (e?.response?.status === 409) {
+      ElMessage.warning(e?.response?.data?.message || e?.response?.data?.detail || '该出品物已终态，不可刷新')
+    } else {
+      ElMessage.error(e?.response?.data?.message || e?.message || '刷新失败')
+    }
   } finally {
     refreshingSingle.value = false
   }
@@ -341,24 +335,20 @@ async function onRefreshAllStale(): Promise<void> {
   refreshingAll.value = true
   try {
     const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/refresh-stale`
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        year: props.year || new Date().getFullYear(),
-        confirm_overwrite: true,
-      }),
+    await api.post(url, {
+      year: props.year || new Date().getFullYear(),
+      confirm_overwrite: true,
     })
-    if (!resp.ok) {
-      const body = await resp.json().catch(() => ({}))
-      const msg = body?.message || body?.detail || `批量刷新失败 (${resp.status})`
-      ElMessage.error(msg)
-      return
-    }
     ElMessage.success('所有过期章节已刷新')
     refresh()
   } catch (e: any) {
-    ElMessage.error(e.message || '网络错误')
+    if (e?.response?.status === 403) {
+      ElMessage.error('权限不足：需要编辑权限')
+    } else if (e?.response?.status === 409) {
+      ElMessage.warning(e?.response?.data?.message || e?.response?.data?.detail || '该出品物已终态，不可刷新')
+    } else {
+      ElMessage.error(e?.response?.data?.message || e?.message || '批量刷新失败')
+    }
   } finally {
     refreshingAll.value = false
   }
@@ -367,56 +357,24 @@ async function onRefreshAllStale(): Promise<void> {
 /**
  * SSE LINKAGE_STALE_CHANGED 实时监听（需求 4.5）
  * 当上游数据变更级联标记章节 stale 时，后端推 SSE 事件，前端实时更新徽标
+ *
+ * 复用 useSSEReconnect（断线重连 + 退避），连到项目级事件流 /events/stream
+ * （EventSource 无法携带自定义 header，与 ImportProgress.vue 同一 /stream 模式，
+ *  项目 SSE 端点经现有设置工作，URL 不带 token）
  */
-function connectStaleSSE(): void {
-  if (sseSource) {
-    sseSource.close()
-    sseSource = null
-  }
-  if (!props.projectId || !props.wordExportTaskId) return
-
-  const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/events`
-  try {
-    sseSource = new EventSource(url)
-    sseSource.addEventListener('LINKAGE_STALE_CHANGED', (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data)
-        // 如果当前章节变为 stale，更新徽标
-        if (data.section_code && sectionState.value) {
-          if (data.section_code === currentSectionCode.value) {
-            sectionState.value = {
-              ...sectionState.value,
-              is_stale: data.is_stale ?? true,
-            }
-          }
-        }
-        // 无论哪个章节变更，刷新列表状态（contracts 中 stale 标签）
-        if (currentSectionCode.value) {
-          traceSection(currentSectionCode.value)
-        }
-      } catch {
-        // SSE 数据解析错误，静默忽略
+const { close: closeSSE } = useSSEReconnect({
+  url: () => `/api/projects/${props.projectId}/events/stream`,
+  onMessage: (data: any) => {
+    // 只处理 LINKAGE_STALE_CHANGED 相关事件
+    if (data?.event_type === 'LINKAGE_STALE_CHANGED' || data?.extra) {
+      // 当前章节变 stale，刷新溯源
+      if (currentSectionCode.value) {
+        traceSection(currentSectionCode.value)
       }
-    })
-    sseSource.onerror = () => {
-      // 断线不阻塞面板使用，静默关闭
-      sseSource?.close()
-      sseSource = null
     }
-  } catch {
-    // EventSource 创建失败（如端点不存在），静默降级
-  }
-}
-
-onMounted(() => {
-  connectStaleSSE()
-})
-
-onUnmounted(() => {
-  if (sseSource) {
-    sseSource.close()
-    sseSource = null
-  }
+  },
+  pollFallback: async () => 'running', // SSE 用于实时更新，无终态概念，始终 running
+  maxAttempts: 10,
 })
 
 /**
@@ -452,6 +410,7 @@ defineExpose({
   onRefreshSection,
   onRefreshAllStale,
   isTerminalState,
+  closeSSE,
 })
 </script>
 

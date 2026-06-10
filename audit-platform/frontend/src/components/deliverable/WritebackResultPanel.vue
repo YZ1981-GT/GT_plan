@@ -110,6 +110,7 @@
 import { ref, computed } from 'vue'
 import { CircleCheck, CircleClose, Warning, InfoFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { api } from '@/services/apiProxy'
 
 export interface WritebackResultItem {
   section_code: string
@@ -165,32 +166,7 @@ async function onWriteback(): Promise<void> {
 
   try {
     const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/writeback`
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        year: props.year || new Date().getFullYear(),
-      }),
-    })
-
-    if (resp.status === 403) {
-      ElMessage.error('权限不足：需要编辑权限才能执行回填')
-      return
-    }
-    if (resp.status === 409) {
-      const body = await resp.json().catch(() => ({}))
-      ElMessage.warning(body?.detail || '该出品物已终态，不可回填')
-      return
-    }
-    if (!resp.ok) {
-      const body = await resp.json().catch(() => ({}))
-      ElMessage.error(body?.detail || body?.message || `回填失败 (${resp.status})`)
-      return
-    }
-
-    const body = await resp.json()
-    // 解信封（ResponseWrapperMiddleware）
-    const data = body.data || body
+    const data = await api.post<any>(url, { year: props.year || new Date().getFullYear() })
 
     // 异步 job 返回
     if (data.job_id) {
@@ -208,7 +184,13 @@ async function onWriteback(): Promise<void> {
       ElMessage.warning(`${result.value.conflicts.length} 个章节存在冲突，需要裁决`)
     }
   } catch (e: any) {
-    ElMessage.error(e.message || '网络错误')
+    if (e?.response?.status === 403) {
+      ElMessage.error('权限不足：需要编辑权限才能执行回填')
+    } else if (e?.response?.status === 409) {
+      ElMessage.warning(e?.response?.data?.detail || e?.response?.data?.message || '该出品物已终态，不可回填')
+    } else {
+      ElMessage.error(e?.response?.data?.message || e?.message || '回填失败')
+    }
   } finally {
     loading.value = false
   }

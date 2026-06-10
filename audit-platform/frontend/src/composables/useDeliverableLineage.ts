@@ -10,12 +10,14 @@
  * - 提供跨层跳转（复用 LinkageContract.route）
  * - 无锚点降级提示
  *
- * 铁律：原生 fetch 调后端须手动解 {code,message,data} 信封
+ * 铁律：用 api.get（@/services/apiProxy）调后端——自动附 Authorization token
+ *       + 自动解 {code,message,data} 信封（勿再手动解包）
  */
 import { ref, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { LinkageContract } from '@/types/linkageContract'
 import { resolveLinkageRoute } from '@/composables/useResolveLinkageRoute'
+import { api } from '@/services/apiProxy'
 
 export interface DeliverableTraceResult {
   contracts: LinkageContract[]
@@ -111,22 +113,17 @@ export function useDeliverableLineage(
 
     try {
       const url = `/api/projects/${projectId.value}/deliverables/${wordExportTaskId.value}/trace?section_code=${encodeURIComponent(sectionCode)}`
-      const resp = await fetch(url)
-      if (!resp.ok) {
-        if (resp.status === 504) {
-          error.value = '溯源查询超时，请稍后重试'
-        } else {
-          error.value = `查询失败 (${resp.status})`
-        }
-        return
-      }
-      const body = await resp.json()
-      // 铁律：手动解 {code, message, data} 信封
-      const data: DeliverableTraceResult = body.data ?? body
+      // api.get 自动附 auth + 自动解 {code,message,data} 信封
+      const data = await api.get<DeliverableTraceResult>(url)
       contracts.value = data.contracts || []
       sectionState.value = data.section_state || null
     } catch (e: any) {
-      error.value = e.message || '网络错误'
+      // axios 错误：e.response?.status 取 HTTP 状态码
+      if (e?.response?.status === 504) {
+        error.value = '溯源查询超时，请稍后重试'
+      } else {
+        error.value = e?.response?.data?.message || e?.message || '查询失败'
+      }
     } finally {
       loading.value = false
     }
