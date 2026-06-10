@@ -46,7 +46,11 @@
       <span style="margin-left: 8px; color: var(--gt-color-text-tertiary);">加载模板列表...</span>
     </div>
     <div v-else-if="templates.length === 0" style="text-align: center; padding: 30px; color: var(--gt-color-text-tertiary);">
-      暂无可用模板
+      <p style="margin: 0 0 12px; font-size: 14px;">暂无可用模板</p>
+      <p style="margin: 0; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.8;">
+        共享模板需先在其他项目中创建并保存为模板。<br/>
+        操作路径：在任意项目的附注编辑页 → 点击「保存为模板」按钮 → 即可在此处引用。
+      </p>
     </div>
     <div v-else>
       <el-input v-model="pickSearch" size="small" placeholder="搜索模板名称..." clearable style="margin-bottom: 10px; width: 240px;" />

@@ -1305,21 +1305,20 @@ const noteTableStructure = useNoteTableStructure({
 
 // 表格Tab标签：避免显示无意义的"项 目"等表头值
 const _GENERIC_NAMES = new Set(['项  目', '项 目', '项目', '类  别', '类别', ''])
+const _TABLE_SUFFIX_RE = /[（(]表\d+[）)]/
 function getTableTabLabel(tbl: any, idx: number): string {
   const name = (tbl.name || '').trim()
-  const headers = tbl.headers || []
-  const firstHeader = (String(headers[0] || '')).replace(/\s+/g, '').trim()
-  const nameNorm = name.replace(/\s+/g, '')
-  // name 为空、通用名称、或等于第一列表头（提取错误）时用序号
-  if (!name || _GENERIC_NAMES.has(name) || (firstHeader && nameNorm === firstHeader)) {
-    if (headers.length > 1) {
-      const h1 = String(headers[1] || '').trim()
-      if (h1 && h1.length <= 8) return `表${idx + 1}·${h1}`
-    }
-    return `表${idx + 1}`
+  // 有意义的名称（非空、非通用、非"章节名（表N）"模式）直接用
+  if (name && !_GENERIC_NAMES.has(name) && !_TABLE_SUFFIX_RE.test(name)) {
+    return name.length > 14 ? name.slice(0, 14) + '…' : name
   }
-  // 有意义的名称但太长则截断
-  return name.length > 12 ? name.slice(0, 12) + '…' : name
+  // 无意义名称 → 用序号
+  const headers = tbl.headers || []
+  if (headers.length > 1) {
+    const h1 = String(headers[1] || '').trim()
+    if (h1 && h1.length <= 8 && !_GENERIC_NAMES.has(h1.replace(/\s+/g, ''))) return `表${idx + 1}·${h1}`
+  }
+  return `表${idx + 1}`
 }
 
 function getCellValue(row: any, colIdx: number): any {

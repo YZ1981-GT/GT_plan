@@ -60,9 +60,12 @@ def compute_section_numbers(
 
     result: dict[str, str] = {}
     for _prefix, items in groups.items():
-        if len(items) <= 1:
+        # 过滤：仅含"、"分隔符的子节参与编号计数
+        # 纯前缀（如"一"、"二"、"三"）是章节标题头，不参与编号
+        numbered_items = [it for it in items if "、" in (it.get("note_section") or "")]
+        if len(numbered_items) <= 1:
             continue
-        for idx, item in enumerate(items, 1):
+        for idx, item in enumerate(numbered_items, 1):
             section = (item.get("note_section") or "").strip()
             if section:
                 result[section] = str(idx)

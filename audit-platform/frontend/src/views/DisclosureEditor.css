@@ -72,7 +72,7 @@
 .gt-de-main :deep(.el-table td.el-table__cell) { font-size: var(--gt-font-size-xs); padding: 6px 0; }
 .total-label { font-weight: 700; }
 .total-val { font-weight: 700; }
-.gt-cell-wrapper { display: flex; align-items: center; gap: 4px; }
+.gt-cell-wrapper { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
 .gt-cell-source { font-size: var(--gt-font-size-xs); cursor: help; }
 .gt-cell-manual { font-size: var(--gt-font-size-xs); cursor: help; }
 .gt-cell-trace-trigger { cursor: pointer !important; transition: transform 0.15s ease; }

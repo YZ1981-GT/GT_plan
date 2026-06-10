@@ -56,7 +56,7 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.ledger_datasets import router as ledger_datasets_router
     from app.routers.dataset_force_unbind import router as dataset_force_unbind_router
 
-    for r in [project_wizard_router, batch_project_router, account_chart_router,
+    for r in [batch_project_router, project_wizard_router, account_chart_router,
               mapping_router, rlm_router, data_import_router, data_lifecycle_router,
               continuous_audit_router, ledger_datasets_router,
               dataset_force_unbind_router]:

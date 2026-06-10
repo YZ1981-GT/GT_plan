@@ -598,6 +598,14 @@ class DisclosureEngine:
 
             rows.append({"label": label, "values": values, "is_total": False})
 
+        # 浮动行表预留：若只有合计行、无数据行，预留 3 行空行供用户填写
+        non_total_rows = [r for r in rows if not r.get("is_total")]
+        if not non_total_rows and rows:
+            # 在第一个合计行之前插入 3 行空白
+            first_total_idx = next((i for i, r in enumerate(rows) if r.get("is_total")), len(rows))
+            for _ in range(3):
+                rows.insert(first_total_idx, {"label": "", "values": [None] * num_value_cols, "is_total": False})
+
         # 回填合计行
         for i, row in enumerate(rows):
             if row.get("is_total") and i > 0:

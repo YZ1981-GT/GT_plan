@@ -149,6 +149,10 @@ async function extractErrorDetail(responseData: unknown): Promise<string> {
   if (responseData && typeof responseData === 'object') {
     const d = (responseData as any)?.detail ?? (responseData as any)?.message ?? ''
     if (typeof d === 'string') return d
+    if (Array.isArray(d)) {
+      // FastAPI 422 validation errors: [{msg: "...", loc: [...], ...}]
+      return d.map((item: any) => item?.msg || item?.message || JSON.stringify(item)).join('；')
+    }
     if (d && typeof d === 'object') return d.message || d.msg || JSON.stringify(d)
     return String(d || '')
   }
