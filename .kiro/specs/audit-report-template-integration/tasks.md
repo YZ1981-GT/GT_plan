@@ -64,15 +64,15 @@
   - [x] 0.5.3 manifest `sheet_aliases.soe_standalone`
   - _Requirements: 9, 11_
 
-- [ ] 0.6 全量模板整理
-  - [ ] 0.6.1 报告正文 17 份 + doc→docx
+- [x] 0.6 全量模板整理
+  - [x] 0.6.1 报告正文 17 份 + doc→docx
   - [x] 0.6.2 附注 4 份全量 SECTION 打标（按变体过滤 `consolidated_only`；见 gap-analysis §四）
   - [x] 0.6.2.1 扩充 `note_template_variant_matrix.json` 覆盖主要账户节
   - [x] 0.6.2.2 bindings 国企键统一 `八、N`，`五、N` → `legacy_aliases`
   - [x] 0.6.3 报表 4 份全量内联占位 + cell_mapping
   - _Requirements: 2–5, 9, 10, 12_
 
-- [ ] 0.9 附注程序预修复（模板模式前，可与 Phase 1 并行）
+- [x] 0.9 附注程序预修复（模板模式前，可与 Phase 1 并行）
   - [x] 0.9.0 新建 `note_section_catalog.py`
     - [x] `build_variant_key` / `normalize_report_scope` / `normalize_template_type`
     - [x] `filter_template_sections` + `note_applies_to_report_scope`（`consolidated_only`）
@@ -104,12 +104,12 @@
     - [x] POC `section_code_index.json` 含 `legacy_aliases`（`八、1` ← `五、1`）
     - [x] `note_template_variant_matrix.json` 覆盖货币资金/应收账款/固定资产
     - [x] 全量 index 与 JSON 键一致校验（`validate_section_code_index_consistency.py`，非 strict 已绿）
-  - [ ] 0.9.6 存量项目附注重生成（数据修复，可选）
-    - [ ] standalone 项目重跑 `generate` 后 DB 无 `consolidated_only` 行
-    - [ ] 脚本或 migration 说明写入 `note-template-gap-analysis.md` §六
+  - [x] 0.9.6 存量项目附注重生成（数据修复，可选）
+    - [x] standalone 项目重跑 `generate` 后 DB 无 `consolidated_only` 行
+    - [x] 脚本或 migration 说明写入 `note-template-gap-analysis.md` §六
   - _Requirements: 10, 12, 13, 10.14；见 `design.md` §7 联动铁律_
 
-- [ ] 0.7 更新 manifest + CI 绿
+- [x] 0.7 更新 manifest + CI 绿
   - 全部 `.docx`；`section_code_index.json` / `cell_mapping.json` 入库
   - _Requirements: 2.8, 11.1_
 
@@ -267,7 +267,9 @@
   - [x] 17.1 删除 `ReportExcelExporter.TEMPLATE_MAP`（若 Phase 1 未删净）
   - [x] 17.2 `WordTemplateFiller` 标记 deprecated（DeprecationWarning + docstring，生产调用保留至 17.3/17.4）
   - [ ] 17.3 `USE_TEMPLATE_FILL_SERVICE` 默认改 `true`
+    > ⚠️ 运维/人工决策项：需确认灰度验证通过、模板 spot check 完毕后由负责人在生产配置中手动 flip。非代码任务。
   - [ ] 17.4 移除或限制旧 `render_report_body` 单阶段默认行为
+    > ⚠️ 运维/人工决策项：依赖 17.3 在生产环境稳定运行一段时间后，由负责人决定下线时机。非代码任务。
   - [x] 17.5 `ReportBodyService` 保留 `render_html` / `validate_kam` 辅助
   - _Requirements: 15.1–15.4, 6.9_
 

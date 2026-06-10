@@ -1,9 +1,9 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-06-08  
+**最后更新**：2026-06-10  
 **当前分支**：`work/2026-05-30-wp-specs`  
-**Spec 总数**：**135**（active 0 + archived 135）  
-**最高迁移**：V065  
+**Spec 总数**：**139**（active 2 + archived 137）  
+**最高迁移**：V068  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -48,17 +48,24 @@
 
 ---
 
-## 二、已归档 Spec（135 个，10 分类）
+## 二、已归档 Spec（137 个，10 分类）
 
-**当前 active = 0**（全部已归档）。新建 spec 放 `.kiro/specs/{name}/`。
+**当前 active = 2**（其余已归档）。新建 spec 放 `.kiro/specs/{name}/`。
+
+### Active Specs（实施中）
+
+| Spec | 状态 | 迁移 | 说明 |
+|------|------|------|------|
+| audit-report-template-integration | implementing | V066 | 审计报告模板集成（171/184，剩 13 项非代码阻塞/人工验收） |
+| deliverable-lineage-and-writeback | completed | V067 | 出品物溯源与回填（92/92 全部完成，待端到端联调） |
 
 ```
 _archive/
 ├── 01-phase-foundation/         24   平台地基（Phase 0~16）
 ├── 02-workpaper-cycles/         16   审计循环（11循环+5基础，548 tasks）
 ├── 03-refinement-rounds/         9   五角色轮转（R1~R9）
-├── 04-infra-architecture/       26   基础设施/全局架构
-├── 05-business-features/        33   业务专项（含ledger/wp系列）
+├── 04-infra-architecture/       27   基础设施/全局架构
+├── 05-business-features/        34   业务专项（含ledger/wp系列）
 ├── 06-engineering-governance/    6   工程治理
 ├── 07-workpaper-slimdown/        9   底稿瘦身
 ├── 08-disclosure-notes/          4   附注模块
@@ -81,13 +88,13 @@ _archive/
 
 `refinement-round1-review-closure` · `refinement-round2-project-manager` · `refinement-round3-quality-control` · `refinement-round4-audit-assistant` · `refinement-round5-independent-review` · `refinement-round6-cross-role-optimization` · `refinement-round7-global-polish` · `refinement-round8-deep-closure` · `refinement-round9-global-deep-review`
 
-### 2.4 `04-infra-architecture/`（26）
+### 2.4 `04-infra-architecture/`（27）
 
-`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3` · `vllm-httpx-bugfix` · `retrieval-kernel-unification` · `doc-level-ai-chat` · `global-modules-cleanup` · `global-modules-p2-polish` · `formula-engine-unification` · `report-config-baseline` · `llm-structured-output` · `pg-pooling-and-load-test` · `xlsx-read-acceleration` · `endpoint-fuzz-and-tracing` · `global-refinement-v5-closure` · `platform-context-permission-foundation` · `platform-evidence-knowledge-ai-governance` · `platform-linkage-contract-stale` · `platform-maintenance-governance` · `platform-role-workbench-quality-loop` · `platform-ui-editing-consistency`
+`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3` · `vllm-httpx-bugfix` · `retrieval-kernel-unification` · `doc-level-ai-chat` · `global-modules-cleanup` · `global-modules-p2-polish` · `formula-engine-unification` · `report-config-baseline` · `llm-structured-output` · `pg-pooling-and-load-test` · `xlsx-read-acceleration` · `endpoint-fuzz-and-tracing` · `global-refinement-v5-closure` · `platform-context-permission-foundation` · `platform-evidence-knowledge-ai-governance` · `platform-linkage-contract-stale` · `platform-maintenance-governance` · `platform-role-workbench-quality-loop` · `platform-ui-editing-consistency` · `zero-downtime-deployment`
 
-### 2.5 `05-business-features/`（33）
+### 2.5 `05-business-features/`（34）
 
-**账表导入（4）**：`ledger-import-view-refactor` · `ledger-import-header-adapter-contract` · `ledger-import-sign-convention-migration` · `ledger-balance-diagnostics-report-line-coverage`
+**账表导入（5）**：`ledger-import-view-refactor` · `ledger-import-header-adapter-contract` · `ledger-import-sign-convention-migration` · `ledger-balance-diagnostics-report-line-coverage` · `ledger-sign-convention-unify`
 
 **底稿专项（14）**：`wp-evidence-collection` · `wp-frontend-ux-polish` · `wp-functional-actions` · `wp-generation-pipeline` · `wp-locate-foundation` · `wp-performance-virtualization` · `wp-template-migration` · `wp-traceability-panel` · `wp-tsj-llm-review` · `wp-ai-review-ux-fix` · `workpaper-guardrail-cleanup` · `workpaper-account-package-d1-d2-pilot` · `workpaper-ai-conclusion-copilot` · `workpaper-content-semantic-contract`
 

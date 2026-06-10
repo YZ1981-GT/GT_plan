@@ -173,6 +173,10 @@ async def get_progress_stream(
 
     Requirements: 2.1-2.7
     支持多客户端同时订阅同一 execution_id。
+
+    TODO [zero-downtime-deployment Task 8.1]: 接入 sse_registry
+    - 进入 event_generator 时 register，退出时 unregister
+    - from app.core.sse_registry import sse_registry
     """
     queue: asyncio.Queue = asyncio.Queue(maxsize=100)
     subscribers = _get_subscribers(execution_id)

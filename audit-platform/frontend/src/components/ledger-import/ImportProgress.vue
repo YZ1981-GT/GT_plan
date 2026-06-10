@@ -91,9 +91,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { Loading, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useSSEReconnect } from '@/composables/useSSEReconnect'
 
 // ─── Props & Emits ──────────────────────────────────────────────────────────
 
@@ -139,10 +140,6 @@ const statusMessage = ref('准备中...')
 const currentFile = ref('')
 const isFinished = ref(false)
 const isSuccess = ref(false)
-let eventSource: EventSource | null = null
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-let reconnectAttempts = 0
-const MAX_RECONNECT_ATTEMPTS = 30  // 30 × 2s ≈ 60s 容错窗口
 
 const phases = ref<PhaseInfo[]>([
   { key: 'uploading', label: '上传', percent: 100, completed: true },
@@ -171,41 +168,12 @@ const progressStatus = computed(() => {
   return undefined
 })
 
-// ─── SSE Subscription ───────────────────────────────────────────────────────
+// ─── SSE via useSSEReconnect ────────────────────────────────────────────────
 
-function connectSSE() {
-  const url = `/api/projects/${props.projectId}/ledger-import/jobs/${props.jobId}/stream`
-  eventSource = new EventSource(url)
-
-  eventSource.onmessage = (event) => {
-    try {
-      const data: SSEMessage = JSON.parse(event.data)
-      reconnectAttempts = 0  // 收到消息说明连接健康，重置重连计数
-      handleSSEMessage(data)
-    } catch {
-      // ignore parse errors
-    }
-  }
-
-  eventSource.onerror = () => {
-    // SSE 断开。可能是：①作业已完成（后端正常关流）②网络抖动 ③后端重启。
-    // 不能直接报"中断"——先关掉旧连接，回退轮询作业真实状态确认。
-    closeSSE()
-    if (!isFinished.value) {
-      void pollJobStatusFallback()
-    }
-  }
-}
-
-/**
- * SSE 断线后回退：轮询 /jobs/{jobId} 查作业真实状态。
- * - 作业已完成/失败/取消 → 渲染终态，不再报中断
- * - 作业仍在跑 → 重连 SSE（最多 MAX_RECONNECT_ATTEMPTS 次）
- * - 超过重连上限仍连不上 → 才显示中断提示
- */
-async function pollJobStatusFallback() {
-  if (isFinished.value) return
-  try {
+const { connected, reconnecting, gaveUp, close: closeSSE } = useSSEReconnect({
+  url: () => `/api/projects/${props.projectId}/ledger-import/jobs/${props.jobId}/stream`,
+  onMessage: handleSSEMessage,
+  pollFallback: async () => {
     const { api } = await import('@/services/apiProxy')
     const job: any = await api.get(
       `/api/projects/${props.projectId}/ledger-import/jobs/${props.jobId}`
@@ -218,42 +186,33 @@ async function pollJobStatusFallback() {
       currentFile.value = ''
       phases.value.forEach(p => { p.percent = 100; p.completed = true })
       totalPercent.value = 100
-      return
+      return 'completed'
     }
     if (status === 'failed' || status === 'timed_out' || status === 'canceled') {
       isFinished.value = true
       isSuccess.value = false
       statusMessage.value = job?.error_message || job?.message || '导入失败'
       emit('failed')
-      return
+      return 'failed'
     }
-    // 仍在进行中：同步一次进度后重连 SSE
+    // 仍在进行中：同步一次进度
     if (typeof job?.progress_pct === 'number') {
       totalPercent.value = job.progress_pct
     }
     if (job?.progress_message) {
       statusMessage.value = job.progress_message
     }
-    scheduleReconnect()
-  } catch {
-    // 查状态也失败（后端短暂不可达）→ 安排重连
-    scheduleReconnect()
-  }
-}
-
-function scheduleReconnect() {
-  if (isFinished.value) return
-  reconnectAttempts += 1
-  if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
-    // 真正持续连不上，才提示用户（数据仍在后台写，可放后台继续）
+    return 'running'
+  },
+  maxAttempts: 30,
+  backoffMs: 2000,
+  onReconnecting: () => {
+    statusMessage.value = '正在同步进度...'
+  },
+  onGaveUp: () => {
     statusMessage.value = '连接中断，请稍候或点"放到后台继续"'
-    return
-  }
-  statusMessage.value = '正在同步进度...'
-  reconnectTimer = setTimeout(() => {
-    connectSSE()
-  }, 2000)
-}
+  },
+})
 
 function handleSSEMessage(data: SSEMessage) {
   // 映射后端 phase 到前端 phase key（bootstrap/queued/pending 都归入 parsing）
@@ -310,13 +269,6 @@ function handleSSEMessage(data: SSEMessage) {
   }
 }
 
-function closeSSE() {
-  if (eventSource) {
-    eventSource.close()
-    eventSource = null
-  }
-}
-
 // ─── Actions ────────────────────────────────────────────────────────────────
 
 async function onCancel() {
@@ -344,16 +296,6 @@ function onMoveToBackground() {
   })
   emit('background')
 }
-
-// ─── Lifecycle ──────────────────────────────────────────────────────────────
-
-onMounted(() => {
-  connectSSE()
-})
-
-onUnmounted(() => {
-  closeSSE()
-})
 </script>
 
 <style scoped>

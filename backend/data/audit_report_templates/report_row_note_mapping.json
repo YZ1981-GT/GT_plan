@@ -1,0 +1,1293 @@
+{
+  "soe_standalone": {
+    "BS-002": {
+      "section_code": "八、1",
+      "section_title": "货币资金"
+    },
+    "BS-005": {
+      "section_code": "八、2",
+      "section_title": "交易性金融资产"
+    },
+    "BS-006": {
+      "section_code": "八、3",
+      "section_title": "衍生金融资产"
+    },
+    "BS-007": {
+      "section_code": "八、4",
+      "section_title": "应收票据"
+    },
+    "BS-008": {
+      "section_code": "八、5",
+      "section_title": "应收账款"
+    },
+    "BS-009": {
+      "section_code": "八、6",
+      "section_title": "应收款项融资"
+    },
+    "BS-010": {
+      "section_code": "八、7",
+      "section_title": "预付款项"
+    },
+    "BS-014": {
+      "section_code": "八、8",
+      "section_title": "应收资金集中管理款"
+    },
+    "BS-015": {
+      "section_code": "八、9",
+      "section_title": "其他应收款"
+    },
+    "BS-018": {
+      "section_code": "四、存货",
+      "section_title": "存货"
+    },
+    "BS-021": {
+      "section_code": "八、11",
+      "section_title": "合同资产"
+    },
+    "BS-024": {
+      "section_code": "八、12",
+      "section_title": "持有待售资产"
+    },
+    "BS-025": {
+      "section_code": "八、13",
+      "section_title": "一年内到期的非流动资产"
+    },
+    "BS-026": {
+      "section_code": "八、14",
+      "section_title": "其他流动资产"
+    },
+    "BS-030": {
+      "section_code": "八、15",
+      "section_title": "债权投资"
+    },
+    "BS-031": {
+      "section_code": "八、16",
+      "section_title": "其他债权投资"
+    },
+    "BS-032": {
+      "section_code": "八、17",
+      "section_title": "长期应收款"
+    },
+    "BS-033": {
+      "section_code": "四、长期股权投资",
+      "section_title": "长期股权投资"
+    },
+    "BS-034": {
+      "section_code": "八、19",
+      "section_title": "其他权益工具投资"
+    },
+    "BS-035": {
+      "section_code": "八、20",
+      "section_title": "其他非流动金融资产"
+    },
+    "BS-036": {
+      "section_code": "四、投资性房地产",
+      "section_title": "投资性房地产"
+    },
+    "BS-037": {
+      "section_code": "四、固定资产",
+      "section_title": "固定资产"
+    },
+    "BS-041": {
+      "section_code": "四、在建工程",
+      "section_title": "在建工程"
+    },
+    "BS-042": {
+      "section_code": "八、24",
+      "section_title": "生产性生物资产"
+    },
+    "BS-043": {
+      "section_code": "四、油气资产",
+      "section_title": "油气资产"
+    },
+    "BS-044": {
+      "section_code": "四、使用权资产",
+      "section_title": "使用权资产"
+    },
+    "BS-045": {
+      "section_code": "四、无形资产",
+      "section_title": "无形资产"
+    },
+    "BS-046": {
+      "section_code": "八、28",
+      "section_title": "开发支出"
+    },
+    "BS-047": {
+      "section_code": "八、29",
+      "section_title": "商誉"
+    },
+    "BS-048": {
+      "section_code": "四、长期待摊费用",
+      "section_title": "长期待摊费用"
+    },
+    "BS-050": {
+      "section_code": "八、32",
+      "section_title": "其他非流动资产"
+    },
+    "BS-055": {
+      "section_code": "八、33",
+      "section_title": "短期借款"
+    },
+    "BS-058": {
+      "section_code": "八、34",
+      "section_title": "交易性金融负债"
+    },
+    "BS-059": {
+      "section_code": "八、35",
+      "section_title": "衍生金融负债"
+    },
+    "BS-060": {
+      "section_code": "八、36",
+      "section_title": "应付票据"
+    },
+    "BS-061": {
+      "section_code": "八、37",
+      "section_title": "应付账款"
+    },
+    "BS-062": {
+      "section_code": "八、38",
+      "section_title": "预收款项"
+    },
+    "BS-063": {
+      "section_code": "八、39",
+      "section_title": "合同负债"
+    },
+    "BS-069": {
+      "section_code": "八、40",
+      "section_title": "应付职工薪酬"
+    },
+    "BS-073": {
+      "section_code": "八、41",
+      "section_title": "应交税费"
+    },
+    "BS-075": {
+      "section_code": "八、42",
+      "section_title": "其他应付款"
+    },
+    "BS-079": {
+      "section_code": "八、43",
+      "section_title": "持有待售负债"
+    },
+    "BS-080": {
+      "section_code": "八、44",
+      "section_title": "一年内到期的非流动负债"
+    },
+    "BS-081": {
+      "section_code": "八、48",
+      "section_title": "其他流动负债"
+    },
+    "BS-085": {
+      "section_code": "八、49",
+      "section_title": "长期借款"
+    },
+    "BS-086": {
+      "section_code": "四、应付债券",
+      "section_title": "应付债券"
+    },
+    "BS-091": {
+      "section_code": "八、52",
+      "section_title": "租赁负债"
+    },
+    "BS-092": {
+      "section_code": "八、53",
+      "section_title": "长期应付款"
+    },
+    "BS-093": {
+      "section_code": "八、54",
+      "section_title": "长期应付职工薪酬"
+    },
+    "BS-094": {
+      "section_code": "四、预计负债",
+      "section_title": "预计负债"
+    },
+    "BS-095": {
+      "section_code": "八、56",
+      "section_title": "递延收益"
+    },
+    "BS-097": {
+      "section_code": "八、57",
+      "section_title": "其他非流动负债"
+    },
+    "BS-102": {
+      "section_code": "八、58",
+      "section_title": "实收资本"
+    },
+    "BS-110": {
+      "section_code": "八、59",
+      "section_title": "其他权益工具"
+    },
+    "BS-113": {
+      "section_code": "八、60",
+      "section_title": "资本公积"
+    },
+    "BS-117": {
+      "section_code": "八、61",
+      "section_title": "专项储备"
+    },
+    "BS-118": {
+      "section_code": "八、62",
+      "section_title": "盈余公积"
+    },
+    "BS-125": {
+      "section_code": "八、63",
+      "section_title": "未分配利润"
+    },
+    "IS-022": {
+      "section_code": "八、65",
+      "section_title": "销售费用"
+    },
+    "IS-023": {
+      "section_code": "八、66",
+      "section_title": "管理费用"
+    },
+    "IS-024": {
+      "section_code": "八、67",
+      "section_title": "研发费用"
+    },
+    "IS-025": {
+      "section_code": "八、68",
+      "section_title": "财务费用"
+    },
+    "IS-035": {
+      "section_code": "八、71",
+      "section_title": "净敞口套期收益"
+    },
+    "IS-036": {
+      "section_code": "八、72",
+      "section_title": "公允价值变动收益"
+    },
+    "IS-037": {
+      "section_code": "八、73",
+      "section_title": "信用减值损失"
+    },
+    "IS-038": {
+      "section_code": "八、74",
+      "section_title": "资产减值损失"
+    },
+    "IS-039": {
+      "section_code": "八、75",
+      "section_title": "资产处置收益"
+    },
+    "CFSS-004": {
+      "section_code": "八、73",
+      "section_title": "信用减值损失"
+    },
+    "CFSS-012": {
+      "section_code": "八、68",
+      "section_title": "财务费用"
+    }
+  },
+  "soe_consolidated": {
+    "BS-002": {
+      "section_code": "八、1",
+      "section_title": "货币资金",
+      "parent_section_code": "八、1"
+    },
+    "BS-005": {
+      "section_code": "八、2",
+      "section_title": "交易性金融资产",
+      "parent_section_code": "八、2"
+    },
+    "BS-006": {
+      "section_code": "八、3",
+      "section_title": "衍生金融资产",
+      "parent_section_code": "八、3"
+    },
+    "BS-007": {
+      "section_code": "八、4",
+      "section_title": "应收票据",
+      "parent_section_code": "八、4"
+    },
+    "BS-008": {
+      "section_code": "八、5",
+      "section_title": "应收账款",
+      "parent_section_code": "八、5"
+    },
+    "BS-009": {
+      "section_code": "八、6",
+      "section_title": "应收款项融资",
+      "parent_section_code": "八、6"
+    },
+    "BS-010": {
+      "section_code": "八、7",
+      "section_title": "预付款项",
+      "parent_section_code": "八、7"
+    },
+    "BS-014": {
+      "section_code": "八、8",
+      "section_title": "应收资金集中管理款",
+      "parent_section_code": "八、8"
+    },
+    "BS-015": {
+      "section_code": "八、9",
+      "section_title": "其他应收款",
+      "parent_section_code": "八、9"
+    },
+    "BS-018": {
+      "section_code": "四、存货",
+      "section_title": "存货",
+      "parent_section_code": "四、存货"
+    },
+    "BS-021": {
+      "section_code": "八、11",
+      "section_title": "合同资产",
+      "parent_section_code": "八、11"
+    },
+    "BS-024": {
+      "section_code": "八、12",
+      "section_title": "持有待售资产",
+      "parent_section_code": "八、12"
+    },
+    "BS-025": {
+      "section_code": "八、13",
+      "section_title": "一年内到期的非流动资产",
+      "parent_section_code": "八、13"
+    },
+    "BS-026": {
+      "section_code": "八、14",
+      "section_title": "其他流动资产",
+      "parent_section_code": "八、14"
+    },
+    "BS-030": {
+      "section_code": "八、15",
+      "section_title": "债权投资",
+      "parent_section_code": "八、15"
+    },
+    "BS-031": {
+      "section_code": "八、16",
+      "section_title": "其他债权投资",
+      "parent_section_code": "八、16"
+    },
+    "BS-032": {
+      "section_code": "八、17",
+      "section_title": "长期应收款",
+      "parent_section_code": "八、17"
+    },
+    "BS-033": {
+      "section_code": "四、长期股权投资",
+      "section_title": "长期股权投资",
+      "parent_section_code": "四、长期股权投资"
+    },
+    "BS-034": {
+      "section_code": "八、19",
+      "section_title": "其他权益工具投资",
+      "parent_section_code": "八、19"
+    },
+    "BS-035": {
+      "section_code": "八、20",
+      "section_title": "其他非流动金融资产",
+      "parent_section_code": "八、20"
+    },
+    "BS-036": {
+      "section_code": "四、投资性房地产",
+      "section_title": "投资性房地产",
+      "parent_section_code": "四、投资性房地产"
+    },
+    "BS-037": {
+      "section_code": "四、固定资产",
+      "section_title": "固定资产",
+      "parent_section_code": "四、固定资产"
+    },
+    "BS-041": {
+      "section_code": "四、在建工程",
+      "section_title": "在建工程",
+      "parent_section_code": "四、在建工程"
+    },
+    "BS-042": {
+      "section_code": "八、24",
+      "section_title": "生产性生物资产",
+      "parent_section_code": "八、24"
+    },
+    "BS-043": {
+      "section_code": "四、油气资产",
+      "section_title": "油气资产",
+      "parent_section_code": "四、油气资产"
+    },
+    "BS-044": {
+      "section_code": "四、使用权资产",
+      "section_title": "使用权资产",
+      "parent_section_code": "四、使用权资产"
+    },
+    "BS-045": {
+      "section_code": "四、无形资产",
+      "section_title": "无形资产",
+      "parent_section_code": "四、无形资产"
+    },
+    "BS-046": {
+      "section_code": "八、28",
+      "section_title": "开发支出",
+      "parent_section_code": "八、28"
+    },
+    "BS-047": {
+      "section_code": "八、29",
+      "section_title": "商誉",
+      "parent_section_code": "八、29"
+    },
+    "BS-048": {
+      "section_code": "四、长期待摊费用",
+      "section_title": "长期待摊费用",
+      "parent_section_code": "四、长期待摊费用"
+    },
+    "BS-050": {
+      "section_code": "八、32",
+      "section_title": "其他非流动资产",
+      "parent_section_code": "八、32"
+    },
+    "BS-055": {
+      "section_code": "八、33",
+      "section_title": "短期借款",
+      "parent_section_code": "八、33"
+    },
+    "BS-058": {
+      "section_code": "八、34",
+      "section_title": "交易性金融负债",
+      "parent_section_code": "八、34"
+    },
+    "BS-059": {
+      "section_code": "八、35",
+      "section_title": "衍生金融负债",
+      "parent_section_code": "八、35"
+    },
+    "BS-060": {
+      "section_code": "八、36",
+      "section_title": "应付票据",
+      "parent_section_code": "八、36"
+    },
+    "BS-061": {
+      "section_code": "八、37",
+      "section_title": "应付账款",
+      "parent_section_code": "八、37"
+    },
+    "BS-062": {
+      "section_code": "八、38",
+      "section_title": "预收款项",
+      "parent_section_code": "八、38"
+    },
+    "BS-063": {
+      "section_code": "八、39",
+      "section_title": "合同负债",
+      "parent_section_code": "八、39"
+    },
+    "BS-069": {
+      "section_code": "八、40",
+      "section_title": "应付职工薪酬",
+      "parent_section_code": "八、40"
+    },
+    "BS-073": {
+      "section_code": "八、41",
+      "section_title": "应交税费",
+      "parent_section_code": "八、41"
+    },
+    "BS-075": {
+      "section_code": "八、42",
+      "section_title": "其他应付款",
+      "parent_section_code": "八、42"
+    },
+    "BS-079": {
+      "section_code": "八、43",
+      "section_title": "持有待售负债",
+      "parent_section_code": "八、43"
+    },
+    "BS-080": {
+      "section_code": "八、44",
+      "section_title": "一年内到期的非流动负债",
+      "parent_section_code": "八、44"
+    },
+    "BS-081": {
+      "section_code": "八、48",
+      "section_title": "其他流动负债",
+      "parent_section_code": "八、48"
+    },
+    "BS-085": {
+      "section_code": "八、49",
+      "section_title": "长期借款",
+      "parent_section_code": "八、49"
+    },
+    "BS-086": {
+      "section_code": "四、应付债券",
+      "section_title": "应付债券",
+      "parent_section_code": "四、应付债券"
+    },
+    "BS-091": {
+      "section_code": "八、52",
+      "section_title": "租赁负债",
+      "parent_section_code": "八、52"
+    },
+    "BS-092": {
+      "section_code": "八、53",
+      "section_title": "长期应付款",
+      "parent_section_code": "八、53"
+    },
+    "BS-093": {
+      "section_code": "八、54",
+      "section_title": "长期应付职工薪酬",
+      "parent_section_code": "八、54"
+    },
+    "BS-094": {
+      "section_code": "四、预计负债",
+      "section_title": "预计负债",
+      "parent_section_code": "四、预计负债"
+    },
+    "BS-095": {
+      "section_code": "八、56",
+      "section_title": "递延收益",
+      "parent_section_code": "八、56"
+    },
+    "BS-097": {
+      "section_code": "八、57",
+      "section_title": "其他非流动负债",
+      "parent_section_code": "八、57"
+    },
+    "BS-102": {
+      "section_code": "八、58",
+      "section_title": "实收资本",
+      "parent_section_code": "八、58"
+    },
+    "BS-110": {
+      "section_code": "八、59",
+      "section_title": "其他权益工具",
+      "parent_section_code": "八、59"
+    },
+    "BS-113": {
+      "section_code": "八、60",
+      "section_title": "资本公积",
+      "parent_section_code": "八、60"
+    },
+    "BS-117": {
+      "section_code": "八、61",
+      "section_title": "专项储备",
+      "parent_section_code": "八、61"
+    },
+    "BS-118": {
+      "section_code": "八、62",
+      "section_title": "盈余公积",
+      "parent_section_code": "八、62"
+    },
+    "BS-125": {
+      "section_code": "八、63",
+      "section_title": "未分配利润",
+      "parent_section_code": "八、63"
+    },
+    "IS-022": {
+      "section_code": "八、65",
+      "section_title": "销售费用",
+      "parent_section_code": "八、65"
+    },
+    "IS-023": {
+      "section_code": "八、66",
+      "section_title": "管理费用",
+      "parent_section_code": "八、66"
+    },
+    "IS-024": {
+      "section_code": "八、67",
+      "section_title": "研发费用",
+      "parent_section_code": "八、67"
+    },
+    "IS-025": {
+      "section_code": "八、68",
+      "section_title": "财务费用",
+      "parent_section_code": "八、68"
+    },
+    "IS-031": {
+      "section_code": "十二、投资收益",
+      "section_title": "投资收益",
+      "parent_section_code": "十二、投资收益"
+    },
+    "IS-035": {
+      "section_code": "八、71",
+      "section_title": "净敞口套期收益",
+      "parent_section_code": "八、71"
+    },
+    "IS-036": {
+      "section_code": "八、72",
+      "section_title": "公允价值变动收益",
+      "parent_section_code": "八、72"
+    },
+    "IS-037": {
+      "section_code": "八、73",
+      "section_title": "信用减值损失",
+      "parent_section_code": "八、73"
+    },
+    "IS-038": {
+      "section_code": "八、74",
+      "section_title": "资产减值损失",
+      "parent_section_code": "八、74"
+    },
+    "IS-039": {
+      "section_code": "八、75",
+      "section_title": "资产处置收益",
+      "parent_section_code": "八、75"
+    },
+    "CFSS-004": {
+      "section_code": "八、73",
+      "section_title": "信用减值损失",
+      "parent_section_code": "八、73"
+    },
+    "CFSS-012": {
+      "section_code": "八、68",
+      "section_title": "财务费用",
+      "parent_section_code": "八、68"
+    }
+  },
+  "listed_standalone": {
+    "BS-002": {
+      "section_code": "五、1",
+      "section_title": "货币资金"
+    },
+    "BS-003": {
+      "section_code": "五、2",
+      "section_title": "交易性金融资产"
+    },
+    "BS-004": {
+      "section_code": "五、3",
+      "section_title": "衍生金融资产"
+    },
+    "BS-005": {
+      "section_code": "五、4",
+      "section_title": "应收票据"
+    },
+    "BS-006": {
+      "section_code": "五、5",
+      "section_title": "应收账款"
+    },
+    "BS-007": {
+      "section_code": "五、6",
+      "section_title": "应收款项融资"
+    },
+    "BS-008": {
+      "section_code": "五、7",
+      "section_title": "预付款项"
+    },
+    "BS-009": {
+      "section_code": "五、8",
+      "section_title": "其他应收款"
+    },
+    "BS-012": {
+      "section_code": "三、存货",
+      "section_title": "存货"
+    },
+    "BS-014": {
+      "section_code": "五、10",
+      "section_title": "合同资产"
+    },
+    "BS-016": {
+      "section_code": "五、12",
+      "section_title": "一年内到期的非流动资产"
+    },
+    "BS-017": {
+      "section_code": "五、13",
+      "section_title": "其他流动资产"
+    },
+    "BS-020": {
+      "section_code": "五、14",
+      "section_title": "债权投资"
+    },
+    "BS-021": {
+      "section_code": "五、15",
+      "section_title": "其他债权投资"
+    },
+    "BS-022": {
+      "section_code": "五、16",
+      "section_title": "长期应收款"
+    },
+    "BS-023": {
+      "section_code": "五、17",
+      "section_title": "设定受益计划净资产"
+    },
+    "BS-024": {
+      "section_code": "三、长期股权投资",
+      "section_title": "长期股权投资"
+    },
+    "BS-025": {
+      "section_code": "五、19",
+      "section_title": "其他权益工具投资"
+    },
+    "BS-026": {
+      "section_code": "五、20",
+      "section_title": "其他非流动金融资产"
+    },
+    "BS-027": {
+      "section_code": "三、投资性房地产【不",
+      "section_title": "投资性房地产"
+    },
+    "BS-028": {
+      "section_code": "三、固定资产",
+      "section_title": "固定资产"
+    },
+    "BS-029": {
+      "section_code": "三、在建工程",
+      "section_title": "在建工程"
+    },
+    "BS-030": {
+      "section_code": "五、24",
+      "section_title": "生产性生物资产"
+    },
+    "BS-032": {
+      "section_code": "三、使用权资产",
+      "section_title": "使用权资产"
+    },
+    "BS-033": {
+      "section_code": "三、无形资产",
+      "section_title": "无形资产"
+    },
+    "BS-035": {
+      "section_code": "三、开发支出",
+      "section_title": "开发支出"
+    },
+    "BS-037": {
+      "section_code": "五、28",
+      "section_title": "商誉"
+    },
+    "BS-038": {
+      "section_code": "三、长期待摊费用",
+      "section_title": "长期待摊费用"
+    },
+    "BS-040": {
+      "section_code": "五、31",
+      "section_title": "其他非流动资产"
+    },
+    "BS-044": {
+      "section_code": "五、33",
+      "section_title": "短期借款"
+    },
+    "BS-045": {
+      "section_code": "五、34",
+      "section_title": "交易性金融负债"
+    },
+    "BS-046": {
+      "section_code": "五、35",
+      "section_title": "衍生金融负债"
+    },
+    "BS-047": {
+      "section_code": "五、36",
+      "section_title": "应付票据"
+    },
+    "BS-048": {
+      "section_code": "五、37",
+      "section_title": "应付账款"
+    },
+    "BS-049": {
+      "section_code": "五、38",
+      "section_title": "预收款项"
+    },
+    "BS-050": {
+      "section_code": "五、39",
+      "section_title": "合同负债"
+    },
+    "BS-051": {
+      "section_code": "五、40",
+      "section_title": "应付职工薪酬"
+    },
+    "BS-052": {
+      "section_code": "五、41",
+      "section_title": "应交税费"
+    },
+    "BS-053": {
+      "section_code": "五、42",
+      "section_title": "其他应付款"
+    },
+    "BS-057": {
+      "section_code": "五、43",
+      "section_title": "一年内到期的非流动负债"
+    },
+    "BS-058": {
+      "section_code": "五、44",
+      "section_title": "其他流动负债"
+    },
+    "BS-061": {
+      "section_code": "五、45",
+      "section_title": "长期借款"
+    },
+    "BS-062": {
+      "section_code": "五、46",
+      "section_title": "应付债券"
+    },
+    "BS-065": {
+      "section_code": "五、47",
+      "section_title": "租赁负债"
+    },
+    "BS-066": {
+      "section_code": "五、48",
+      "section_title": "长期应付款"
+    },
+    "BS-067": {
+      "section_code": "五、49",
+      "section_title": "长期应付职工薪酬"
+    },
+    "BS-068": {
+      "section_code": "三、预计负债",
+      "section_title": "预计负债"
+    },
+    "BS-069": {
+      "section_code": "五、51",
+      "section_title": "递延收益"
+    },
+    "BS-071": {
+      "section_code": "五、52",
+      "section_title": "其他非流动负债"
+    },
+    "BS-075": {
+      "section_code": "五、53",
+      "section_title": "股本"
+    },
+    "BS-076": {
+      "section_code": "五、54",
+      "section_title": "其他权益工具"
+    },
+    "BS-079": {
+      "section_code": "五、55",
+      "section_title": "资本公积"
+    },
+    "BS-081": {
+      "section_code": "五、57",
+      "section_title": "其他综合收益"
+    },
+    "BS-082": {
+      "section_code": "五、58",
+      "section_title": "专项储备"
+    },
+    "BS-083": {
+      "section_code": "五、59",
+      "section_title": "盈余公积"
+    },
+    "BS-084": {
+      "section_code": "五、61",
+      "section_title": "未分配利润"
+    },
+    "IS-003": {
+      "section_code": "五、63",
+      "section_title": "税金及附加"
+    },
+    "IS-004": {
+      "section_code": "五、64",
+      "section_title": "销售费用"
+    },
+    "IS-005": {
+      "section_code": "五、65",
+      "section_title": "管理费用"
+    },
+    "IS-006": {
+      "section_code": "五、66",
+      "section_title": "研发费用"
+    },
+    "IS-007": {
+      "section_code": "五、67",
+      "section_title": "财务费用"
+    },
+    "IS-011": {
+      "section_code": "五、69",
+      "section_title": "投资收益"
+    },
+    "IS-014": {
+      "section_code": "五、70",
+      "section_title": "净敞口套期收益"
+    },
+    "IS-015": {
+      "section_code": "三、公允价值变动收益",
+      "section_title": "公允价值变动收益"
+    },
+    "IS-016": {
+      "section_code": "三、信用减值损失（损",
+      "section_title": "信用减值损失"
+    },
+    "IS-017": {
+      "section_code": "三、资产减值损失（损",
+      "section_title": "资产减值损失"
+    },
+    "IS-018": {
+      "section_code": "三、资产处置收益（损",
+      "section_title": "资产处置收益"
+    },
+    "EQ-003": {
+      "section_code": "十四、前期差错更正",
+      "section_title": "前期差错更正"
+    },
+    "EQ-004": {
+      "section_code": "十四、其他",
+      "section_title": "其他"
+    },
+    "CFSS-004": {
+      "section_code": "三、信用减值损失（损",
+      "section_title": "信用减值损失"
+    },
+    "CFSS-012": {
+      "section_code": "五、67",
+      "section_title": "财务费用"
+    },
+    "CFSS-019": {
+      "section_code": "十四、其他",
+      "section_title": "其他"
+    }
+  },
+  "listed_consolidated": {
+    "BS-002": {
+      "section_code": "五、1",
+      "section_title": "货币资金",
+      "parent_section_code": null
+    },
+    "BS-003": {
+      "section_code": "五、2",
+      "section_title": "交易性金融资产",
+      "parent_section_code": null
+    },
+    "BS-004": {
+      "section_code": "五、3",
+      "section_title": "衍生金融资产",
+      "parent_section_code": null
+    },
+    "BS-005": {
+      "section_code": "五、4",
+      "section_title": "应收票据",
+      "parent_section_code": "十六、应收票据"
+    },
+    "BS-006": {
+      "section_code": "五、5",
+      "section_title": "应收账款",
+      "parent_section_code": "十六、应收账款"
+    },
+    "BS-007": {
+      "section_code": "五、6",
+      "section_title": "应收款项融资",
+      "parent_section_code": null
+    },
+    "BS-008": {
+      "section_code": "五、7",
+      "section_title": "预付款项",
+      "parent_section_code": null
+    },
+    "BS-009": {
+      "section_code": "五、8",
+      "section_title": "其他应收款",
+      "parent_section_code": "十六、其他应收款"
+    },
+    "BS-012": {
+      "section_code": "三、存货",
+      "section_title": "存货",
+      "parent_section_code": null
+    },
+    "BS-014": {
+      "section_code": "五、10",
+      "section_title": "合同资产",
+      "parent_section_code": null
+    },
+    "BS-016": {
+      "section_code": "五、12",
+      "section_title": "一年内到期的非流动资产",
+      "parent_section_code": null
+    },
+    "BS-017": {
+      "section_code": "五、13",
+      "section_title": "其他流动资产",
+      "parent_section_code": null
+    },
+    "BS-020": {
+      "section_code": "五、14",
+      "section_title": "债权投资",
+      "parent_section_code": null
+    },
+    "BS-021": {
+      "section_code": "五、15",
+      "section_title": "其他债权投资",
+      "parent_section_code": null
+    },
+    "BS-022": {
+      "section_code": "五、16",
+      "section_title": "长期应收款",
+      "parent_section_code": null
+    },
+    "BS-023": {
+      "section_code": "五、17",
+      "section_title": "设定受益计划净资产",
+      "parent_section_code": null
+    },
+    "BS-024": {
+      "section_code": "三、长期股权投资",
+      "section_title": "长期股权投资",
+      "parent_section_code": "十六、长期股权投资"
+    },
+    "BS-025": {
+      "section_code": "五、19",
+      "section_title": "其他权益工具投资",
+      "parent_section_code": null
+    },
+    "BS-026": {
+      "section_code": "五、20",
+      "section_title": "其他非流动金融资产",
+      "parent_section_code": null
+    },
+    "BS-027": {
+      "section_code": "三、投资性房地产【不",
+      "section_title": "投资性房地产",
+      "parent_section_code": null
+    },
+    "BS-028": {
+      "section_code": "三、固定资产",
+      "section_title": "固定资产",
+      "parent_section_code": null
+    },
+    "BS-029": {
+      "section_code": "三、在建工程",
+      "section_title": "在建工程",
+      "parent_section_code": null
+    },
+    "BS-030": {
+      "section_code": "五、24",
+      "section_title": "生产性生物资产",
+      "parent_section_code": null
+    },
+    "BS-032": {
+      "section_code": "三、使用权资产",
+      "section_title": "使用权资产",
+      "parent_section_code": null
+    },
+    "BS-033": {
+      "section_code": "三、无形资产",
+      "section_title": "无形资产",
+      "parent_section_code": null
+    },
+    "BS-035": {
+      "section_code": "三、开发支出",
+      "section_title": "开发支出",
+      "parent_section_code": null
+    },
+    "BS-037": {
+      "section_code": "五、28",
+      "section_title": "商誉",
+      "parent_section_code": null
+    },
+    "BS-038": {
+      "section_code": "三、长期待摊费用",
+      "section_title": "长期待摊费用",
+      "parent_section_code": null
+    },
+    "BS-040": {
+      "section_code": "五、31",
+      "section_title": "其他非流动资产",
+      "parent_section_code": null
+    },
+    "BS-044": {
+      "section_code": "五、33",
+      "section_title": "短期借款",
+      "parent_section_code": null
+    },
+    "BS-045": {
+      "section_code": "五、34",
+      "section_title": "交易性金融负债",
+      "parent_section_code": null
+    },
+    "BS-046": {
+      "section_code": "五、35",
+      "section_title": "衍生金融负债",
+      "parent_section_code": null
+    },
+    "BS-047": {
+      "section_code": "五、36",
+      "section_title": "应付票据",
+      "parent_section_code": null
+    },
+    "BS-048": {
+      "section_code": "五、37",
+      "section_title": "应付账款",
+      "parent_section_code": null
+    },
+    "BS-049": {
+      "section_code": "五、38",
+      "section_title": "预收款项",
+      "parent_section_code": null
+    },
+    "BS-050": {
+      "section_code": "五、39",
+      "section_title": "合同负债",
+      "parent_section_code": null
+    },
+    "BS-051": {
+      "section_code": "五、40",
+      "section_title": "应付职工薪酬",
+      "parent_section_code": null
+    },
+    "BS-052": {
+      "section_code": "五、41",
+      "section_title": "应交税费",
+      "parent_section_code": null
+    },
+    "BS-053": {
+      "section_code": "五、42",
+      "section_title": "其他应付款",
+      "parent_section_code": null
+    },
+    "BS-057": {
+      "section_code": "五、43",
+      "section_title": "一年内到期的非流动负债",
+      "parent_section_code": null
+    },
+    "BS-058": {
+      "section_code": "五、44",
+      "section_title": "其他流动负债",
+      "parent_section_code": null
+    },
+    "BS-061": {
+      "section_code": "五、45",
+      "section_title": "长期借款",
+      "parent_section_code": null
+    },
+    "BS-062": {
+      "section_code": "五、46",
+      "section_title": "应付债券",
+      "parent_section_code": null
+    },
+    "BS-065": {
+      "section_code": "五、47",
+      "section_title": "租赁负债",
+      "parent_section_code": null
+    },
+    "BS-066": {
+      "section_code": "五、48",
+      "section_title": "长期应付款",
+      "parent_section_code": null
+    },
+    "BS-067": {
+      "section_code": "五、49",
+      "section_title": "长期应付职工薪酬",
+      "parent_section_code": null
+    },
+    "BS-068": {
+      "section_code": "三、预计负债",
+      "section_title": "预计负债",
+      "parent_section_code": null
+    },
+    "BS-069": {
+      "section_code": "五、51",
+      "section_title": "递延收益",
+      "parent_section_code": null
+    },
+    "BS-071": {
+      "section_code": "五、52",
+      "section_title": "其他非流动负债",
+      "parent_section_code": null
+    },
+    "BS-075": {
+      "section_code": "五、53",
+      "section_title": "股本",
+      "parent_section_code": null
+    },
+    "BS-076": {
+      "section_code": "五、54",
+      "section_title": "其他权益工具",
+      "parent_section_code": null
+    },
+    "BS-079": {
+      "section_code": "五、55",
+      "section_title": "资本公积",
+      "parent_section_code": null
+    },
+    "BS-081": {
+      "section_code": "五、57",
+      "section_title": "其他综合收益",
+      "parent_section_code": null
+    },
+    "BS-082": {
+      "section_code": "五、58",
+      "section_title": "专项储备",
+      "parent_section_code": null
+    },
+    "BS-083": {
+      "section_code": "五、59",
+      "section_title": "盈余公积",
+      "parent_section_code": null
+    },
+    "BS-084": {
+      "section_code": "五、61",
+      "section_title": "未分配利润",
+      "parent_section_code": null
+    },
+    "IS-003": {
+      "section_code": "五、63",
+      "section_title": "税金及附加",
+      "parent_section_code": null
+    },
+    "IS-004": {
+      "section_code": "五、64",
+      "section_title": "销售费用",
+      "parent_section_code": null
+    },
+    "IS-005": {
+      "section_code": "五、65",
+      "section_title": "管理费用",
+      "parent_section_code": null
+    },
+    "IS-006": {
+      "section_code": "五、66",
+      "section_title": "研发费用",
+      "parent_section_code": null
+    },
+    "IS-007": {
+      "section_code": "五、67",
+      "section_title": "财务费用",
+      "parent_section_code": null
+    },
+    "IS-011": {
+      "section_code": "五、69",
+      "section_title": "投资收益",
+      "parent_section_code": "十六、投资收益（注：以"
+    },
+    "IS-014": {
+      "section_code": "五、70",
+      "section_title": "净敞口套期收益",
+      "parent_section_code": null
+    },
+    "IS-015": {
+      "section_code": "三、公允价值变动收益",
+      "section_title": "公允价值变动收益",
+      "parent_section_code": null
+    },
+    "IS-016": {
+      "section_code": "三、信用减值损失（损",
+      "section_title": "信用减值损失",
+      "parent_section_code": null
+    },
+    "IS-017": {
+      "section_code": "三、资产减值损失（损",
+      "section_title": "资产减值损失",
+      "parent_section_code": null
+    },
+    "IS-018": {
+      "section_code": "三、资产处置收益（损",
+      "section_title": "资产处置收益",
+      "parent_section_code": null
+    },
+    "EQ-003": {
+      "section_code": "十四、前期差错更正",
+      "section_title": "前期差错更正",
+      "parent_section_code": null
+    },
+    "EQ-004": {
+      "section_code": "三、同一控制下企业合",
+      "section_title": "同一控制下企业合并",
+      "parent_section_code": null
+    },
+    "EQ-005": {
+      "section_code": "十四、其他",
+      "section_title": "其他",
+      "parent_section_code": null
+    },
+    "CFSS-004": {
+      "section_code": "三、信用减值损失（损",
+      "section_title": "信用减值损失",
+      "parent_section_code": null
+    },
+    "CFSS-012": {
+      "section_code": "五、67",
+      "section_title": "财务费用",
+      "parent_section_code": null
+    },
+    "CFSS-019": {
+      "section_code": "十四、其他",
+      "section_title": "其他",
+      "parent_section_code": null
+    }
+  },
+  "_meta": {
+    "description": "row_code → note section_code 映射（附注列 note_ref 用）",
+    "generated_by": "scripts/_build_note_ref_mapping.py"
+  }
+}

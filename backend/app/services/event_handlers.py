@@ -1420,6 +1420,134 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.REPORT_CONFIG_MASTER_UPDATED, _mark_cloned_configs_stale)
     logger.debug("report-config-baseline 需求 2.2: REPORT_CONFIG_MASTER_UPDATED → cloned configs stale handler registered")
 
+    # ------------------------------------------------------------------
+    # deliverable-lineage-and-writeback Task 8.1/8.2:
+    # 上游变更 → 标受影响出品物章节 stale + 自触发防护
+    # 订阅: ADJUSTMENT_CREATED/UPDATED/DELETED, REPORTS_UPDATED, NOTE_SECTION_SAVED
+    # Validates: Requirements 4.3, 4.9
+    # ------------------------------------------------------------------
+    async def _on_upstream_changed_mark_deliverable_stale(payload: EventPayload) -> None:
+        """上游 disclosure_notes/financial_report/adjustments 变更 → 标受影响出品物章节 stale。
+
+        自触发防护（需求 4.9）：
+          若 payload.extra.get('writeback_source_deliverable_id') == 本出品物 word_export_task_id，
+          则跳过该出品物（但仍标其他依赖同一附注的出品物）。
+
+        流程：
+          1. 提取变更 section_code（从 payload.extra）
+          2. 反查依赖该 section_code 的出品物章节（deliverable_section_state）
+          3. 对每个受影响 (word_export_task_id, section_code) 调 StalePropagationEngine
+             on_change(f'DELIVERABLE:{word_export_task_id}:{section_code}', ...)
+          4. 跳过 writeback_source_deliverable_id（= 来源出品物 word_export_task_id）
+        """
+        import sqlalchemy as _sa
+
+        project_id = payload.project_id
+        year = payload.year
+        if not project_id or not year:
+            return
+
+        extra = payload.extra or {}
+
+        # 自触发防护：获取回填来源出品物标识
+        writeback_source_id = extra.get("writeback_source_deliverable_id")
+
+        # 提取变更相关的 section_codes
+        changed_section_codes: list[str] = []
+        # NOTE_SECTION_SAVED 事件携带 section_code / note_section
+        if extra.get("section_code"):
+            changed_section_codes.append(extra["section_code"])
+        elif extra.get("note_section"):
+            changed_section_codes.append(extra["note_section"])
+
+        # 如果没有具体 section_code（如 REPORTS_UPDATED / 调整分录变更），
+        # 查找项目下所有有状态记录的出品物章节
+        async with async_session_factory() as session:
+            try:
+                if changed_section_codes:
+                    # 精确匹配：反查依赖该 section_code 的出品物章节
+                    stmt = _sa.text(
+                        "SELECT word_export_task_id, section_code "
+                        "FROM deliverable_section_state "
+                        "WHERE project_id = :pid AND year = :year "
+                        "AND section_code = ANY(:codes) "
+                        "AND is_stale = false"
+                    )
+                    result = await session.execute(
+                        stmt,
+                        {"pid": str(project_id), "year": year, "codes": changed_section_codes},
+                    )
+                else:
+                    # 广泛匹配：标记项目下所有出品物章节为 stale
+                    stmt = _sa.text(
+                        "SELECT word_export_task_id, section_code "
+                        "FROM deliverable_section_state "
+                        "WHERE project_id = :pid AND year = :year "
+                        "AND is_stale = false"
+                    )
+                    result = await session.execute(
+                        stmt,
+                        {"pid": str(project_id), "year": year},
+                    )
+
+                affected_rows = result.fetchall()
+
+                if not affected_rows:
+                    return
+
+                # 过滤自触发：跳过 writeback_source_deliverable_id
+                from app.services.stale_propagation_engine import stale_engine
+
+                marked_count = 0
+                for row in affected_rows:
+                    wid = str(row[0])
+                    sc = row[1]
+
+                    # 自触发防护：来源出品物不标自身 stale（需求 4.9）
+                    if writeback_source_id and str(writeback_source_id) == wid:
+                        continue
+
+                    # 调 StalePropagationEngine 标 stale（直接走 _mark_stale_by_uri 而非 on_change，
+                    # 因为 on_change 会 BFS 依赖图——DELIVERABLE 节点通常不在图中，直接标即可）
+                    uri = f"DELIVERABLE:{wid}:{sc}"
+                    await stale_engine._mark_stale_by_uri([uri], project_id, year)
+                    marked_count += 1
+
+                # SSE 推送给前端
+                if marked_count > 0:
+                    affected_uris = [
+                        f"DELIVERABLE:{row[0]}:{row[1]}"
+                        for row in affected_rows
+                        if not (writeback_source_id and str(writeback_source_id) == str(row[0]))
+                    ]
+                    await stale_engine._notify_frontend(project_id, affected_uris)
+
+                logger.info(
+                    "[deliverable-stale] Marked %d deliverable sections stale "
+                    "(project=%s, event=%s, skipped_source=%s)",
+                    marked_count,
+                    project_id,
+                    payload.event_type.value,
+                    writeback_source_id or "none",
+                )
+            except Exception as e:
+                await session.rollback()
+                logger.warning(
+                    "[deliverable-stale] Failed to mark deliverable sections stale: %s",
+                    e,
+                )
+
+    # 订阅调整分录变更事件
+    event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _on_upstream_changed_mark_deliverable_stale)
+    event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _on_upstream_changed_mark_deliverable_stale)
+    event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _on_upstream_changed_mark_deliverable_stale)
+    # 订阅报表更新事件
+    event_bus.subscribe(EventType.REPORTS_UPDATED, _on_upstream_changed_mark_deliverable_stale)
+    # 订阅附注章节保存事件
+    event_bus.subscribe(EventType.NOTE_SECTION_SAVED, _on_upstream_changed_mark_deliverable_stale)
+
+    logger.debug("deliverable-lineage-and-writeback: upstream change → deliverable stale handlers registered")
+
     # 启动汇总（只打这一行 INFO）
     total_handlers = sum(len(h) for h in event_bus._handlers.values())
     logger.info("[EventBus] %d handlers registered across %d event types", total_handlers, len(event_bus._handlers))

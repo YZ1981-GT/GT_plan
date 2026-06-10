@@ -11,11 +11,11 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
-from sqlalchemy import ForeignKey, Index, String, Text, func, text
+from sqlalchemy import ForeignKey, Index, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base
+from app.models.base import Base, TimestampMixin
 
 
 # ---------------------------------------------------------------------------
@@ -995,5 +995,75 @@ class UnadjustedMisstatement(Base):
         Index(
             "idx_unadjusted_misstatements_source_adj",
             "source_adjustment_id",
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# FeatureFlag 模型（zero-downtime-deployment 组件 8）
+# ---------------------------------------------------------------------------
+
+
+class FeatureFlag(Base, TimestampMixin):
+    """Feature flag 功能开关（zero-downtime-deployment 组件 8）。"""
+
+    __tablename__ = "feature_flags"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    flag_key: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    enabled: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, server_default=text("false")
+    )
+    rollout_percentage: Mapped[int] = mapped_column(
+        sa.SmallInteger, nullable=False, server_default=text("0")
+    )
+    whitelist_user_ids: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# DeliverableSectionState 模型（deliverable-lineage-and-writeback, V067）
+# ---------------------------------------------------------------------------
+
+
+class DeliverableSectionState(Base, TimestampMixin):
+    """出品物章节级状态承载表（V067）。
+
+    身份键 word_export_task_id 绑 task 级（跨版本稳定），
+    version_no 仅记录列不入主键/唯一约束。
+    字段不绑死附注 doc_type，未来报表/报告正文出品物可复用同表。
+    """
+
+    __tablename__ = "deliverable_section_state"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    word_export_task_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    version_no: Mapped[int | None] = mapped_column(
+        sa.Integer, nullable=True
+    )  # 记录列，不入主键/唯一约束
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    section_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_snapshot_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    is_stale: Mapped[bool] = mapped_column(
+        sa.Boolean, default=False, nullable=False
+    )
+    last_writeback_baseline_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    anchor_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "word_export_task_id", "section_code",
+            name="uq_deliverable_section",
         ),
     )

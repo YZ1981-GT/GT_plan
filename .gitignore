@@ -134,5 +134,8 @@ fullrun_result.txt
 smoke-test-*.png
 backend/.coverage
 
+# 构建期版本注入产物（CI 写入，不入库）
+backend/app/_build_version.json
+
 # CodeGraph 本地索引（机器本地，不入库）
 .codegraph/

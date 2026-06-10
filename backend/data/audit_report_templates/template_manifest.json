@@ -14,53 +14,104 @@
   "report_body": {
     "unqualified": {
       "type_a": {
-        "simple": "report_body/1.1 模板A-无保留意见审计报告模板（上市公司、三板创新层及公开发债）-简版.docx",
-        "detailed": "report_body/1.2 模版A-无保留意见审计报告模板（上市公司、三板创新层及公开发债）-详版.docx"
+        "simple": {
+          "consolidated": "report_body/1.1 模板A-无保留意见审计报告模板（上市公司、三板创新层及公开发债）-简版.docx",
+          "standalone": "report_body/standalone/1.1 模板A-无保留意见审计报告模板（上市公司、三板创新层及公开发债）-简版.docx"
+        },
+        "detailed": {
+          "consolidated": "report_body/1.2 模版A-无保留意见审计报告模板（上市公司、三板创新层及公开发债）-详版.docx",
+          "standalone": "report_body/standalone/1.2 模版A-无保留意见审计报告模板（上市公司、三板创新层及公开发债）-详版.docx"
+        }
       },
       "type_b": {
-        "simple": "report_body/2.1 模板B-无保留意见审计报告模板（三板基础层、银行、保险、期货、证券等）-简版.docx",
-        "detailed": "report_body/2.2 模板B-无保留意见审计报告模板（三板基础层、银行、保险、期货、证券等）-详版.docx"
+        "simple": {
+          "consolidated": "report_body/2.1 模板B-无保留意见审计报告模板（三板基础层、银行、保险、期货、证券等）-简版.docx",
+          "standalone": "report_body/standalone/2.1 模板B-无保留意见审计报告模板（三板基础层、银行、保险、期货、证券等）-简版.docx"
+        },
+        "detailed": {
+          "consolidated": "report_body/2.2 模板B-无保留意见审计报告模板（三板基础层、银行、保险、期货、证券等）-详版.docx",
+          "standalone": "report_body/standalone/2.2 模板B-无保留意见审计报告模板（三板基础层、银行、保险、期货、证券等）-详版.docx"
+        }
       },
       "type_c": {
-        "simple": "report_body/3.1 模板C-无保留意见审计报告模板（其他公众利益实体）-简版 .docx",
-        "detailed": "report_body/3.2 模板C-无保留意见审计报告模板（其他公众利益实体）-详版 .docx"
+        "simple": {
+          "consolidated": "report_body/3.1 模板C-无保留意见审计报告模板（其他公众利益实体）-简版 .docx",
+          "standalone": "report_body/standalone/3.1 模板C-无保留意见审计报告模板（其他公众利益实体）-简版 .docx"
+        },
+        "detailed": {
+          "consolidated": "report_body/3.2 模板C-无保留意见审计报告模板（其他公众利益实体）-详版 .docx",
+          "standalone": "report_body/standalone/3.2 模板C-无保留意见审计报告模板（其他公众利益实体）-详版 .docx"
+        }
       },
       "type_d": {
-        "simple": "report_body/4.1 模板D-无保留意见审计报告模板（非公众利益实体）-简版 .docx",
-        "detailed": "report_body/4.2 模板D-无保留意见审计报告模板（非公众利益实体）-详版.docx"
+        "simple": {
+          "consolidated": "report_body/4.1 模板D-无保留意见审计报告模板（非公众利益实体）-简版 .docx",
+          "standalone": "report_body/standalone/4.1 模板D-无保留意见审计报告模板（非公众利益实体）-简版 .docx"
+        },
+        "detailed": {
+          "consolidated": "report_body/4.2 模板D-无保留意见审计报告模板（非公众利益实体）-详版.docx",
+          "standalone": "report_body/standalone/4.2 模板D-无保留意见审计报告模板（非公众利益实体）-详版.docx"
+        }
       }
     },
     "qualified": {
       "type_a": {
-        "simple": "report_body/1. 模板A-保留意见审计报告模板（上市公司、三板创新层及公开发债）-简版 .docx"
+        "simple": {
+          "consolidated": "report_body/1. 模板A-保留意见审计报告模板（上市公司、三板创新层及公开发债）-简版 .docx",
+          "standalone": "report_body/standalone/1. 模板A-保留意见审计报告模板（上市公司、三板创新层及公开发债）-简版 .docx"
+        }
       },
       "type_b": {
-        "simple": "report_body/2. 模板B-保留意见审计报告模板（三板基础层、银行、保险、期货、证券公司）-简版.docx"
+        "simple": {
+          "consolidated": "report_body/2. 模板B-保留意见审计报告模板（三板基础层、银行、保险、期货、证券公司）-简版.docx",
+          "standalone": "report_body/standalone/2. 模板B-保留意见审计报告模板（三板基础层、银行、保险、期货、证券公司）-简版.docx"
+        }
       },
       "type_c": {
-        "simple": "report_body/3. 模板C-保留意见审计报告模板（其他公众利益实体）-简版.docx"
+        "simple": {
+          "consolidated": "report_body/3. 模板C-保留意见审计报告模板（其他公众利益实体）-简版.docx",
+          "standalone": "report_body/standalone/3. 模板C-保留意见审计报告模板（其他公众利益实体）-简版.docx"
+        }
       },
       "type_d": {
-        "simple": "report_body/4. 模板D-保留意见审计报告模板（非公众利益实体）-简版.docx"
+        "simple": {
+          "consolidated": "report_body/4. 模板D-保留意见审计报告模板（非公众利益实体）-简版.docx",
+          "standalone": "report_body/standalone/4. 模板D-保留意见审计报告模板（非公众利益实体）-简版.docx"
+        }
       }
     },
     "adverse": {
       "type_a": {
-        "simple": "report_body/1. 模板A-否定意见审计报告模板（上市公司、三板创新层及公开发债）-简版.docx"
+        "simple": {
+          "consolidated": "report_body/1. 模板A-否定意见审计报告模板（上市公司、三板创新层及公开发债）-简版.docx",
+          "standalone": "report_body/standalone/1. 模板A-否定意见审计报告模板（上市公司、三板创新层及公开发债）-简版.docx"
+        }
       },
       "type_b": {
-        "simple": "report_body/2. 模板B-否定意见审计报告模板（三板基础层、银行、保险、期货、证券公司）-简版.docx"
+        "simple": {
+          "consolidated": "report_body/2. 模板B-否定意见审计报告模板（三板基础层、银行、保险、期货、证券公司）-简版.docx",
+          "standalone": "report_body/standalone/2. 模板B-否定意见审计报告模板（三板基础层、银行、保险、期货、证券公司）-简版.docx"
+        }
       },
       "type_c": {
-        "simple": "report_body/3. 模板C-否定意见审计报告模板（其他公众利益实体）-简版.docx"
+        "simple": {
+          "consolidated": "report_body/3. 模板C-否定意见审计报告模板（其他公众利益实体）-简版.docx",
+          "standalone": "report_body/standalone/3. 模板C-否定意见审计报告模板（其他公众利益实体）-简版.docx"
+        }
       },
       "type_d": {
-        "simple": "report_body/4. 模板D-否定意见审计报告模板（非公众利益实体）-简版.docx"
+        "simple": {
+          "consolidated": "report_body/4. 模板D-否定意见审计报告模板（非公众利益实体）-简版.docx",
+          "standalone": "report_body/standalone/4. 模板D-否定意见审计报告模板（非公众利益实体）-简版.docx"
+        }
       }
     },
     "disclaimer": {
       "_all": {
-        "simple": "report_body/1.4.1无法表示意见审计报告模板（公众利益实体、非公众利益实体）-简版.docx"
+        "simple": {
+          "consolidated": "report_body/1.4.1无法表示意见审计报告模板（公众利益实体、非公众利益实体）-简版.docx",
+          "standalone": "report_body/standalone/1.4.1无法表示意见审计报告模板（公众利益实体、非公众利益实体）-简版.docx"
+        }
       }
     }
   },

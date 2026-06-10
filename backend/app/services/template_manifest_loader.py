@@ -93,7 +93,16 @@ class TemplateManifestLoader:
         opinion_type: str,
         company_subtype: str,
         variant: str = "simple",
+        report_scope: str | None = None,
     ) -> ManifestEntry:
+        """解析报告正文模板路径。
+
+        ``report_scope`` 可选（consolidated/standalone）。叶子值兼容两种格式：
+        - 旧格式：``str`` 路径（口径无关，单文件）
+        - 新格式：``{"consolidated": path, "standalone": path}``
+          report_scope 缺省时取 consolidated（向后兼容现有合并套）；
+          standalone 缺失时回退 consolidated。
+        """
         body = self._manifest.get("report_body", {})
         opinion = body.get(opinion_type)
         if opinion is None:
@@ -106,14 +115,35 @@ class TemplateManifestLoader:
             )
 
         if isinstance(subtype_entry, str):
-            rel_str = subtype_entry
+            leaf = subtype_entry
         else:
-            rel_str = subtype_entry.get(variant)
-            if rel_str is None:
+            leaf = subtype_entry.get(variant)
+            if leaf is None:
                 raise KeyError(
                     f"unknown variant {variant!r} for {opinion_type}/{company_subtype}"
                 )
+
+        rel_str = self._select_scope(leaf, report_scope)
         return self._entry_from_rel(Path(rel_str))
+
+    @staticmethod
+    def _select_scope(leaf: Any, report_scope: str | None) -> str:
+        """从叶子值中按 report_scope 选路径，兼容 str 与 dict 两种格式。"""
+        if isinstance(leaf, str):
+            return leaf
+        if isinstance(leaf, dict):
+            # 归一 scope：None/未知 → consolidated（默认合并套）
+            scope = (report_scope or "consolidated").lower()
+            if scope not in ("consolidated", "standalone"):
+                scope = "consolidated"
+            chosen = leaf.get(scope)
+            if chosen is None:
+                # standalone 缺失回退 consolidated，反之亦然
+                chosen = leaf.get("consolidated") or leaf.get("standalone")
+            if chosen is None:
+                raise KeyError(f"no path in report_body leaf for scope={report_scope}")
+            return str(chosen)
+        raise KeyError(f"invalid report_body leaf type: {type(leaf)}")
 
     def resolve_financial_statements(
         self,

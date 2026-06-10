@@ -99,6 +99,13 @@ class LinkageFacadeService:
                     cell=cell,
                     year=year,
                 )
+            elif source_type == "deliverable":
+                contracts = await self._trace_from_deliverable(
+                    project_id=project_id,
+                    source_id=source_id,
+                    cell=cell,
+                    year=year,
+                )
             else:
                 logger.warning(
                     "LinkageFacade.trace: 不支持的 source_type=%s", source_type
@@ -315,6 +322,160 @@ class LinkageFacadeService:
                 contracts.append(c.model_dump())
         except Exception as exc:
             logger.warning("_trace_from_report: %s", exc)
+
+        return contracts
+
+    async def _trace_from_deliverable(
+        self,
+        *,
+        project_id: UUID,
+        source_id: str,
+        cell: str | None,
+        year: int | None,
+    ) -> list[dict[str, Any]]:
+        """出品物章节 → 附注 → 上游溯源。
+
+        source_id 约定：'{word_export_task_id}:{section_code}'。
+        1. 拆解 source_id，按 section_code 映射 disclosure_notes 记录（含 legacy_alias 归一）。
+        2. 若无匹配记录 → 返回明确的"无匹配来源"结果并记录 section_code（需求 1.4）。
+        3. 复用 wp_trace_service.trace_upstream 继续向上游展开（附注→报表→审定表→调整分录，需求 1.5）。
+        4. 沿用 LinkageContract（含 route），附加章节级 stale 状态（来自 deliverable_section_state）。
+        仅读取，不修改 disclosure_notes（需求 1.6）。
+        """
+        import sqlalchemy as sa
+
+        from app.models.audit_platform_models import DeliverableSectionState
+        from app.models.report_models import DisclosureNote
+        from app.services.note_section_catalog import resolve_binding_key
+        from app.services.wp_trace_service import trace_upstream
+
+        contracts: list[dict[str, Any]] = []
+        pid = str(project_id)
+        yr = year or 2025
+
+        # 1. 拆解 source_id → word_export_task_id + section_code
+        parts = source_id.split(":", 1)
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            logger.warning(
+                "_trace_from_deliverable: source_id 格式无效，"
+                "期望 '{word_export_task_id}:{section_code}'，实际=%s",
+                source_id,
+            )
+            return contracts
+
+        word_export_task_id_str, section_code = parts[0], parts[1]
+        try:
+            word_export_task_id = UUID(word_export_task_id_str)
+        except (ValueError, TypeError):
+            logger.warning(
+                "_trace_from_deliverable: word_export_task_id 非有效 UUID=%s",
+                word_export_task_id_str,
+            )
+            return contracts
+
+        # 2. legacy_alias 归一（国企 五、N → 八、N）
+        canonical_code = resolve_binding_key(section_code, template_type="soe")
+
+        # 3. 映射 disclosure_notes 记录（仅读取，需求 1.6）
+        note_stmt = sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.is_deleted == False,  # noqa: E712
+        )
+        if year:
+            note_stmt = note_stmt.where(DisclosureNote.year == yr)
+
+        # 查询 canonical_code 和原始 section_code（可能不同）
+        codes_to_try = [canonical_code]
+        if section_code != canonical_code:
+            codes_to_try.append(section_code)
+
+        note_stmt = note_stmt.where(
+            DisclosureNote.note_section.in_(codes_to_try)
+        )
+        note_result = await self.db.execute(note_stmt)
+        note_record = note_result.scalars().first()
+
+        if not note_record:
+            # 需求 1.4：无匹配记录 → 返回明确结果并记录 section_code
+            logger.warning(
+                "_trace_from_deliverable: 无匹配 disclosure_notes 记录，"
+                "project_id=%s, section_code=%s (canonical=%s), year=%s",
+                project_id, section_code, canonical_code, yr,
+            )
+            contracts.append(
+                LinkageContract(
+                    source_type=SourceType.deliverable,
+                    source_id=source_id,
+                    source_cell=cell,
+                    target_type=TargetType.note,
+                    target_id=section_code,
+                    target_cell=None,
+                    basis=f"无匹配来源：section_code={section_code}（canonical={canonical_code}）",
+                    status=LinkageStatus.stale,
+                    confidence=LinkageConfidence.system,
+                    route=None,
+                ).model_dump()
+            )
+            return contracts
+
+        # 4. 构建 deliverable → 附注 contract
+        matched_section = note_record.note_section
+        c = LinkageContract(
+            source_type=SourceType.deliverable,
+            source_id=source_id,
+            source_cell=cell,
+            target_type=TargetType.note,
+            target_id=str(note_record.id),
+            target_cell=None,
+            basis=f"出品物章节 → 附注 {note_record.section_title or matched_section}",
+            status=LinkageStatus.stale if note_record.is_stale else LinkageStatus.current,
+            confidence=LinkageConfidence.system,
+            route=f"/projects/{pid}/disclosure-notes?section={matched_section}",
+        )
+        contracts.append(c.model_dump())
+
+        # 5. 复用 wp_trace_service.trace_upstream 向上游展开（需求 1.5）
+        try:
+            trace_result = await trace_upstream(
+                db=self.db,
+                project_id=project_id,
+                source="disclosure",
+                identifier=matched_section,
+            )
+            for item in trace_result.items:
+                upstream_c = LinkageContract(
+                    source_type=SourceType.deliverable,
+                    source_id=source_id,
+                    source_cell=cell,
+                    target_type=TargetType.workpaper,
+                    target_id=item.wp_code or "",
+                    target_cell=item.cell,
+                    amount=str(item.value) if item.value else None,
+                    basis=item.label or f"上游底稿 {item.wp_code}",
+                    status=LinkageStatus.current,
+                    confidence=LinkageConfidence.system,
+                    route=f"/projects/{pid}/workpapers/{item.wp_code or ''}",
+                )
+                contracts.append(upstream_c.model_dump())
+        except Exception as exc:
+            logger.warning("_trace_from_deliverable 上游溯源: %s", exc)
+
+        # 6. 章节级 stale 查询（读 deliverable_section_state.is_stale）
+        try:
+            stale_stmt = sa.select(
+                DeliverableSectionState.is_stale
+            ).where(
+                DeliverableSectionState.word_export_task_id == word_export_task_id,
+                DeliverableSectionState.section_code == canonical_code,
+            )
+            stale_result = await self.db.execute(stale_stmt)
+            stale_row = stale_result.scalar_one_or_none()
+            if stale_row is True:
+                # 将首条 contract（deliverable→附注）的状态标为 stale
+                if contracts:
+                    contracts[0]["status"] = LinkageStatus.stale.value
+        except Exception as exc:
+            logger.debug("_trace_from_deliverable stale 查询: %s", exc)
 
         return contracts
 

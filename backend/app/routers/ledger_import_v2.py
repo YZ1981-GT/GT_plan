@@ -339,6 +339,22 @@ async def submit_import(
 # ---------------------------------------------------------------------------
 
 
+async def _sse_generator_with_registry(job_id: UUID):
+    """Wrap _sse_generator with SSE registry for graceful drain."""
+    from app.core.sse_registry import sse_registry
+
+    conn = sse_registry.register()
+    try:
+        async for chunk in _sse_generator(job_id):
+            if conn.is_closed:
+                # Server is draining, stop sending
+                yield f"event: server_draining\ndata: {{}}\n\n"
+                break
+            yield chunk
+    finally:
+        sse_registry.unregister(conn)
+
+
 async def _sse_generator(job_id: UUID):
     """Generate SSE events by polling job status every 2 seconds.
 
@@ -386,9 +402,10 @@ async def stream_job_progress(
 
     Polls ImportJob every 2 seconds and emits progress events.
     Stops when job reaches a terminal status (completed/failed/canceled).
+    Registered with sse_registry for graceful drain during rolling updates.
     """
     return StreamingResponse(
-        _sse_generator(job_id),
+        _sse_generator_with_registry(job_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

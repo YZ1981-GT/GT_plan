@@ -211,7 +211,50 @@ Word Heading 文本（「货币资金」）≠ 主键，仅通过 section_code_i
 
 ---
 
-## 六、相关文件
+## 六、存量数据修复：standalone 项目 consolidated_only 残留
+
+### 问题
+
+早期 `DisclosureEngine._load_templates` 加载全量 JSON sections 时不按 `report_scope` 过滤
+`consolidated_only` 节，导致 standalone 项目的 `disclosure_notes` 表中残留了合并专属章节
+（如「七、本期纳入合并报表范围的子公司基本情况」等 27+22 节）。
+
+这些行不影响附注编辑器显示（前端按 tree 渲染），但会导致：
+- 模板模式导出 Word 时包含不应存在的合并章节块
+- `compute_section_numbers` 编号时包含多余章节使编号偏移
+- 附注完整性校验误判为「未填」
+
+### 修复脚本
+
+```
+backend/scripts/fix/fix_standalone_consolidated_only.py
+```
+
+**用法**：
+```bash
+python backend/scripts/fix/fix_standalone_consolidated_only.py --dry-run   # 预览
+python backend/scripts/fix/fix_standalone_consolidated_only.py --execute   # 执行
+```
+
+**策略**：
+1. 从 `note_template_soe.json` / `note_template_listed.json` 加载所有 `scope=consolidated_only` 的 `section_number`
+2. 查 `projects` 表中 `report_scope='standalone'` 或 NULL/空的项目
+3. 在这些项目的 `disclosure_notes` 中找 `note_section` 匹配 consolidated_only 清单且 `is_deleted=false` 的行
+4. 软删除（`is_deleted=True` + `updated_at=now()`），**不**物理删除（可恢复）
+
+**防御性保证**：
+- 软删走复用现有 partial unique index `uq_disclosure_notes_active`（`WHERE is_deleted=false`），软删后新生成不冲突
+- `normalize_section_code` 已覆盖 legacy `五、N` → `八、N` 归一
+- 重跑 `DisclosureEngine.generate` 后由于 `filter_template_sections` 已接入 catalog，不会再生成 consolidated_only 行
+
+**前置修复**（已在 Phase 0.9.1 落地）：
+- `DisclosureEngine._load_templates` 加载时按 `report_scope` 调用 `filter_template_sections`
+- `NoteTrimService._load_template_sections` 同上
+- 新项目生成不再产生 consolidated_only 残留
+
+---
+
+## 六B、相关文件
 
 | 文件 | 角色 |
 |------|------|
@@ -221,6 +264,7 @@ Word Heading 文本（「货币资金」）≠ 主键，仅通过 section_code_i
 | `note_template_variant_matrix.json` | 四版本语义映射（待扩充并接入） |
 | `note_word_exporter.py` | 当前程序化导出 |
 | `disclosure_engine.py` | 附注初始化/树 |
+| `scripts/fix/fix_standalone_consolidated_only.py` | 存量 standalone 项目 consolidated_only 残留修复 |
 
 
 ---

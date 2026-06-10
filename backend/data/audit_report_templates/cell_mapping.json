@@ -20,15 +20,27 @@
       "headers": {
         "balance_sheet": {
           "period_end_date": "A2",
-          "company_full_name": "A3"
+          "company_full_name": "A3",
+          "currency_unit": "D3"
         },
         "income_statement": {
           "period_end_date": "A2",
-          "company_full_name": "A3"
+          "company_full_name": "A3",
+          "currency_unit": "D3"
         },
         "cash_flow_statement": {
           "period_end_date": "A2",
-          "company_full_name": "A3"
+          "company_full_name": "A3",
+          "currency_unit": "D3"
+        },
+        "equity_statement": {
+          "company_full_name": "A3",
+          "audit_year": "G3"
+        },
+        "asset_impairment": {
+          "company_full_name": "A3",
+          "audit_year": "G3",
+          "currency_unit": "M3"
         }
       },
       "rows": {
@@ -38,6 +50,7 @@
           "row_name": "货币资金",
           "fill_empty_as": "blank",
           "current": "C6",
+          "note_ref": "B6",
           "prior": "D6"
         },
         "BS-003": {
@@ -62,6 +75,7 @@
           "row_name": "交易性金融资产",
           "fill_empty_as": "blank",
           "current": "C9",
+          "note_ref": "B9",
           "prior": "D9"
         },
         "BS-006": {
@@ -70,6 +84,7 @@
           "row_name": "衍生金融资产",
           "fill_empty_as": "blank",
           "current": "C10",
+          "note_ref": "B10",
           "prior": "D10"
         },
         "BS-007": {
@@ -78,6 +93,7 @@
           "row_name": "应收票据",
           "fill_empty_as": "blank",
           "current": "C11",
+          "note_ref": "B11",
           "prior": "D11"
         },
         "BS-008": {
@@ -86,6 +102,7 @@
           "row_name": "应收账款",
           "fill_empty_as": "blank",
           "current": "C12",
+          "note_ref": "B12",
           "prior": "D12"
         },
         "BS-009": {
@@ -94,6 +111,7 @@
           "row_name": "应收款项融资",
           "fill_empty_as": "blank",
           "current": "C13",
+          "note_ref": "B13",
           "prior": "D13"
         },
         "BS-010": {
@@ -102,6 +120,7 @@
           "row_name": "预付款项",
           "fill_empty_as": "blank",
           "current": "C14",
+          "note_ref": "B14",
           "prior": "D14"
         },
         "BS-011": {
@@ -134,6 +153,7 @@
           "row_name": "应收资金集中管理款",
           "fill_empty_as": "blank",
           "current": "C18",
+          "note_ref": "B18",
           "prior": "D18"
         },
         "BS-015": {
@@ -142,6 +162,7 @@
           "row_name": "其他应收款",
           "fill_empty_as": "blank",
           "current": "C19",
+          "note_ref": "B19",
           "prior": "D19"
         },
         "BS-016": {
@@ -166,6 +187,7 @@
           "row_name": "存货",
           "fill_empty_as": "blank",
           "current": "C22",
+          "note_ref": "B22",
           "prior": "D22"
         },
         "BS-019": {
@@ -190,6 +212,7 @@
           "row_name": "合同资产",
           "fill_empty_as": "blank",
           "current": "C25",
+          "note_ref": "B25",
           "prior": "D25"
         },
         "BS-022": {
@@ -214,6 +237,7 @@
           "row_name": "持有待售资产",
           "fill_empty_as": "blank",
           "current": "C28",
+          "note_ref": "B28",
           "prior": "D28"
         },
         "BS-025": {
@@ -222,6 +246,7 @@
           "row_name": "一年内到期的非流动资产",
           "fill_empty_as": "blank",
           "current": "C29",
+          "note_ref": "B29",
           "prior": "D29"
         },
         "BS-026": {
@@ -230,6 +255,7 @@
           "row_name": "其他流动资产",
           "fill_empty_as": "blank",
           "current": "C30",
+          "note_ref": "B30",
           "prior": "D30"
         },
         "BS-029": {
@@ -246,6 +272,7 @@
           "row_name": "债权投资",
           "fill_empty_as": "blank",
           "current": "C34",
+          "note_ref": "B34",
           "prior": "D34"
         },
         "BS-031": {
@@ -254,6 +281,7 @@
           "row_name": "其他债权投资",
           "fill_empty_as": "blank",
           "current": "C35",
+          "note_ref": "B35",
           "prior": "D35"
         },
         "BS-032": {
@@ -262,6 +290,7 @@
           "row_name": "长期应收款",
           "fill_empty_as": "blank",
           "current": "C36",
+          "note_ref": "B36",
           "prior": "D36"
         },
         "BS-033": {
@@ -270,6 +299,7 @@
           "row_name": "长期股权投资",
           "fill_empty_as": "blank",
           "current": "C37",
+          "note_ref": "B37",
           "prior": "D37"
         },
         "BS-034": {
@@ -278,6 +308,7 @@
           "row_name": "其他权益工具投资",
           "fill_empty_as": "blank",
           "current": "C38",
+          "note_ref": "B38",
           "prior": "D38"
         },
         "BS-035": {
@@ -286,6 +317,7 @@
           "row_name": "其他非流动金融资产",
           "fill_empty_as": "blank",
           "current": "C39",
+          "note_ref": "B39",
           "prior": "D39"
         },
         "BS-036": {
@@ -294,6 +326,7 @@
           "row_name": "投资性房地产",
           "fill_empty_as": "blank",
           "current": "C40",
+          "note_ref": "B40",
           "prior": "D40"
         },
         "BS-037": {
@@ -302,6 +335,7 @@
           "row_name": "固定资产",
           "fill_empty_as": "blank",
           "current": "C41",
+          "note_ref": "B41",
           "prior": "D41"
         },
         "BS-038": {
@@ -334,6 +368,7 @@
           "row_name": "在建工程",
           "fill_empty_as": "blank",
           "current": "C45",
+          "note_ref": "B45",
           "prior": "D45"
         },
         "BS-042": {
@@ -342,6 +377,7 @@
           "row_name": "生产性生物资产",
           "fill_empty_as": "blank",
           "current": "C46",
+          "note_ref": "B46",
           "prior": "D46"
         },
         "BS-043": {
@@ -350,6 +386,7 @@
           "row_name": "油气资产",
           "fill_empty_as": "blank",
           "current": "C47",
+          "note_ref": "B47",
           "prior": "D47"
         },
         "BS-044": {
@@ -358,6 +395,7 @@
           "row_name": "使用权资产",
           "fill_empty_as": "blank",
           "current": "C48",
+          "note_ref": "B48",
           "prior": "D48"
         },
         "BS-045": {
@@ -366,6 +404,7 @@
           "row_name": "无形资产",
           "fill_empty_as": "blank",
           "current": "C49",
+          "note_ref": "B49",
           "prior": "D49"
         },
         "BS-046": {
@@ -374,6 +413,7 @@
           "row_name": "开发支出",
           "fill_empty_as": "blank",
           "current": "C50",
+          "note_ref": "B50",
           "prior": "D50"
         },
         "BS-047": {
@@ -382,6 +422,7 @@
           "row_name": "商誉",
           "fill_empty_as": "blank",
           "current": "C51",
+          "note_ref": "B51",
           "prior": "D51"
         },
         "BS-048": {
@@ -390,6 +431,7 @@
           "row_name": "长期待摊费用",
           "fill_empty_as": "blank",
           "current": "C52",
+          "note_ref": "B52",
           "prior": "D52"
         },
         "BS-049": {
@@ -406,6 +448,7 @@
           "row_name": "其他非流动资产",
           "fill_empty_as": "blank",
           "current": "C54",
+          "note_ref": "B54",
           "prior": "D54"
         },
         "BS-051": {
@@ -422,6 +465,7 @@
           "row_name": "短期借款",
           "fill_empty_as": "blank",
           "current": "C6",
+          "note_ref": "B6",
           "prior": "D6"
         },
         "BS-056": {
@@ -446,6 +490,7 @@
           "row_name": "交易性金融负债",
           "fill_empty_as": "blank",
           "current": "C9",
+          "note_ref": "B9",
           "prior": "D9"
         },
         "BS-059": {
@@ -454,6 +499,7 @@
           "row_name": "衍生金融负债",
           "fill_empty_as": "blank",
           "current": "C10",
+          "note_ref": "B10",
           "prior": "D10"
         },
         "BS-060": {
@@ -462,6 +508,7 @@
           "row_name": "应付票据",
           "fill_empty_as": "blank",
           "current": "C11",
+          "note_ref": "B11",
           "prior": "D11"
         },
         "BS-061": {
@@ -470,6 +517,7 @@
           "row_name": "应付账款",
           "fill_empty_as": "blank",
           "current": "C12",
+          "note_ref": "B12",
           "prior": "D12"
         },
         "BS-062": {
@@ -478,6 +526,7 @@
           "row_name": "预收款项",
           "fill_empty_as": "blank",
           "current": "C13",
+          "note_ref": "B13",
           "prior": "D13"
         },
         "BS-063": {
@@ -486,6 +535,7 @@
           "row_name": "合同负债",
           "fill_empty_as": "blank",
           "current": "C14",
+          "note_ref": "B14",
           "prior": "D14"
         },
         "BS-064": {
@@ -534,6 +584,7 @@
           "row_name": "应付职工薪酬",
           "fill_empty_as": "blank",
           "current": "C20",
+          "note_ref": "B20",
           "prior": "D20"
         },
         "BS-070": {
@@ -566,6 +617,7 @@
           "row_name": "应交税费",
           "fill_empty_as": "blank",
           "current": "C24",
+          "note_ref": "B24",
           "prior": "D24"
         },
         "BS-074": {
@@ -582,6 +634,7 @@
           "row_name": "其他应付款",
           "fill_empty_as": "blank",
           "current": "C26",
+          "note_ref": "B26",
           "prior": "D26"
         },
         "BS-076": {
@@ -614,6 +667,7 @@
           "row_name": "持有待售负债",
           "fill_empty_as": "blank",
           "current": "C30",
+          "note_ref": "B30",
           "prior": "D30"
         },
         "BS-080": {
@@ -622,6 +676,7 @@
           "row_name": "一年内到期的非流动负债",
           "fill_empty_as": "blank",
           "current": "C31",
+          "note_ref": "B31",
           "prior": "D31"
         },
         "BS-081": {
@@ -630,6 +685,7 @@
           "row_name": "其他流动负债",
           "fill_empty_as": "blank",
           "current": "C32",
+          "note_ref": "B32",
           "prior": "D32"
         },
         "BS-084": {
@@ -646,6 +702,7 @@
           "row_name": "长期借款",
           "fill_empty_as": "blank",
           "current": "C36",
+          "note_ref": "B36",
           "prior": "D36"
         },
         "BS-086": {
@@ -654,6 +711,7 @@
           "row_name": "应付债券",
           "fill_empty_as": "blank",
           "current": "C37",
+          "note_ref": "B37",
           "prior": "D37"
         },
         "BS-111": {
@@ -694,6 +752,7 @@
           "row_name": "租赁负债",
           "fill_empty_as": "blank",
           "current": "C42",
+          "note_ref": "B42",
           "prior": "D42"
         },
         "BS-092": {
@@ -702,6 +761,7 @@
           "row_name": "长期应付款",
           "fill_empty_as": "blank",
           "current": "C43",
+          "note_ref": "B43",
           "prior": "D43"
         },
         "BS-093": {
@@ -710,6 +770,7 @@
           "row_name": "长期应付职工薪酬",
           "fill_empty_as": "blank",
           "current": "C44",
+          "note_ref": "B44",
           "prior": "D44"
         },
         "BS-094": {
@@ -718,6 +779,7 @@
           "row_name": "预计负债",
           "fill_empty_as": "blank",
           "current": "C45",
+          "note_ref": "B45",
           "prior": "D45"
         },
         "BS-095": {
@@ -726,6 +788,7 @@
           "row_name": "递延收益",
           "fill_empty_as": "blank",
           "current": "C46",
+          "note_ref": "B46",
           "prior": "D46"
         },
         "BS-096": {
@@ -742,6 +805,7 @@
           "row_name": "其他非流动负债",
           "fill_empty_as": "blank",
           "current": "C48",
+          "note_ref": "B48",
           "prior": "D48"
         },
         "BS-098": {
@@ -806,6 +870,7 @@
           "row_name": "其他权益工具",
           "fill_empty_as": "blank",
           "current": "C61",
+          "note_ref": "B61",
           "prior": "D61"
         },
         "BS-113": {
@@ -814,6 +879,7 @@
           "row_name": "资本公积",
           "fill_empty_as": "blank",
           "current": "C64",
+          "note_ref": "B64",
           "prior": "D64"
         },
         "BS-114": {
@@ -846,6 +912,7 @@
           "row_name": "专项储备",
           "fill_empty_as": "blank",
           "current": "C68",
+          "note_ref": "B68",
           "prior": "D68"
         },
         "BS-118": {
@@ -854,6 +921,7 @@
           "row_name": "盈余公积",
           "fill_empty_as": "blank",
           "current": "C69",
+          "note_ref": "B69",
           "prior": "D69"
         },
         "BS-119": {
@@ -910,6 +978,7 @@
           "row_name": "未分配利润",
           "fill_empty_as": "blank",
           "current": "C76",
+          "note_ref": "B76",
           "prior": "D76"
         },
         "BS-127": {
@@ -1078,6 +1147,7 @@
           "row_name": "销售费用",
           "fill_empty_as": "blank",
           "current": "C26",
+          "note_ref": "B26",
           "prior": "D26"
         },
         "IS-023": {
@@ -1086,6 +1156,7 @@
           "row_name": "管理费用",
           "fill_empty_as": "blank",
           "current": "C27",
+          "note_ref": "B27",
           "prior": "D27"
         },
         "IS-024": {
@@ -1094,6 +1165,7 @@
           "row_name": "研发费用",
           "fill_empty_as": "blank",
           "current": "C28",
+          "note_ref": "B28",
           "prior": "D28"
         },
         "IS-025": {
@@ -1102,6 +1174,7 @@
           "row_name": "财务费用",
           "fill_empty_as": "blank",
           "current": "C29",
+          "note_ref": "B29",
           "prior": "D29"
         },
         "IS-026": {
@@ -1174,6 +1247,7 @@
           "row_name": "净敞口套期收益（损失以“－”号填列）",
           "fill_empty_as": "blank",
           "current": "C39",
+          "note_ref": "B39",
           "prior": "D39"
         },
         "IS-036": {
@@ -1182,6 +1256,7 @@
           "row_name": "公允价值变动收益（损失以“－”号填列）",
           "fill_empty_as": "blank",
           "current": "C40",
+          "note_ref": "B40",
           "prior": "D40"
         },
         "IS-037": {
@@ -1190,6 +1265,7 @@
           "row_name": "信用减值损失（损失以“－”号填列）",
           "fill_empty_as": "blank",
           "current": "C41",
+          "note_ref": "B41",
           "prior": "D41"
         },
         "IS-038": {
@@ -1198,6 +1274,7 @@
           "row_name": "资产减值损失（损失以“－”号填列）",
           "fill_empty_as": "blank",
           "current": "C42",
+          "note_ref": "B42",
           "prior": "D42"
         },
         "IS-039": {
@@ -1206,6 +1283,7 @@
           "row_name": "资产处置收益（损失以“－”号填列）",
           "fill_empty_as": "blank",
           "current": "C43",
+          "note_ref": "B43",
           "prior": "D43"
         },
         "IS-041": {
@@ -1867,15 +1945,27 @@
       "headers": {
         "balance_sheet": {
           "period_end_date": "A2",
-          "company_full_name": "A3"
+          "company_full_name": "A3",
+          "currency_unit": "F3"
         },
         "income_statement": {
           "period_end_date": "A2",
-          "company_full_name": "A3"
+          "company_full_name": "A3",
+          "currency_unit": "F3"
         },
         "cash_flow_statement": {
           "period_end_date": "A2",
-          "company_full_name": "A3"
+          "company_full_name": "A3",
+          "currency_unit": "F3"
+        },
+        "equity_statement": {
+          "company_full_name": "A3",
+          "audit_year": "E3"
+        },
+        "asset_impairment": {
+          "company_full_name": "A3",
+          "audit_year": "H3",
+          "currency_unit": "M3"
         }
       },
       "rows": {
@@ -1885,6 +1975,7 @@
           "row_name": "货币资金",
           "fill_empty_as": "blank",
           "current": "C7",
+          "note_ref": "B7",
           "current_parent": "D7",
           "prior": "E7",
           "prior_parent": "F7"
@@ -1915,6 +2006,7 @@
           "row_name": "交易性金融资产",
           "fill_empty_as": "blank",
           "current": "C10",
+          "note_ref": "B10",
           "current_parent": "D10",
           "prior": "E10",
           "prior_parent": "F10"
@@ -1925,6 +2017,7 @@
           "row_name": "衍生金融资产",
           "fill_empty_as": "blank",
           "current": "C11",
+          "note_ref": "B11",
           "current_parent": "D11",
           "prior": "E11",
           "prior_parent": "F11"
@@ -1935,6 +2028,7 @@
           "row_name": "应收票据",
           "fill_empty_as": "blank",
           "current": "C12",
+          "note_ref": "B12",
           "current_parent": "D12",
           "prior": "E12",
           "prior_parent": "F12"
@@ -1945,6 +2039,7 @@
           "row_name": "应收账款",
           "fill_empty_as": "blank",
           "current": "C13",
+          "note_ref": "B13",
           "current_parent": "D13",
           "prior": "E13",
           "prior_parent": "F13"
@@ -1955,6 +2050,7 @@
           "row_name": "应收款项融资",
           "fill_empty_as": "blank",
           "current": "C14",
+          "note_ref": "B14",
           "current_parent": "D14",
           "prior": "E14",
           "prior_parent": "F14"
@@ -1965,6 +2061,7 @@
           "row_name": "预付款项",
           "fill_empty_as": "blank",
           "current": "C15",
+          "note_ref": "B15",
           "current_parent": "D15",
           "prior": "E15",
           "prior_parent": "F15"
@@ -2005,6 +2102,7 @@
           "row_name": "应收资金集中管理款",
           "fill_empty_as": "blank",
           "current": "C19",
+          "note_ref": "B19",
           "current_parent": "D19",
           "prior": "E19",
           "prior_parent": "F19"
@@ -2015,6 +2113,7 @@
           "row_name": "其他应收款",
           "fill_empty_as": "blank",
           "current": "C20",
+          "note_ref": "B20",
           "current_parent": "D20",
           "prior": "E20",
           "prior_parent": "F20"
@@ -2045,6 +2144,7 @@
           "row_name": "存货",
           "fill_empty_as": "blank",
           "current": "C23",
+          "note_ref": "B23",
           "current_parent": "D23",
           "prior": "E23",
           "prior_parent": "F23"
@@ -2075,6 +2175,7 @@
           "row_name": "合同资产",
           "fill_empty_as": "blank",
           "current": "C26",
+          "note_ref": "B26",
           "current_parent": "D26",
           "prior": "E26",
           "prior_parent": "F26"
@@ -2105,6 +2206,7 @@
           "row_name": "持有待售资产",
           "fill_empty_as": "blank",
           "current": "C29",
+          "note_ref": "B29",
           "current_parent": "D29",
           "prior": "E29",
           "prior_parent": "F29"
@@ -2115,6 +2217,7 @@
           "row_name": "一年内到期的非流动资产",
           "fill_empty_as": "blank",
           "current": "C30",
+          "note_ref": "B30",
           "current_parent": "D30",
           "prior": "E30",
           "prior_parent": "F30"
@@ -2125,6 +2228,7 @@
           "row_name": "其他流动资产",
           "fill_empty_as": "blank",
           "current": "C31",
+          "note_ref": "B31",
           "current_parent": "D31",
           "prior": "E31",
           "prior_parent": "F31"
@@ -2145,6 +2249,7 @@
           "row_name": "债权投资",
           "fill_empty_as": "blank",
           "current": "C35",
+          "note_ref": "B35",
           "current_parent": "D35",
           "prior": "E35",
           "prior_parent": "F35"
@@ -2155,6 +2260,7 @@
           "row_name": "其他债权投资",
           "fill_empty_as": "blank",
           "current": "C36",
+          "note_ref": "B36",
           "current_parent": "D36",
           "prior": "E36",
           "prior_parent": "F36"
@@ -2165,6 +2271,7 @@
           "row_name": "长期应收款",
           "fill_empty_as": "blank",
           "current": "C37",
+          "note_ref": "B37",
           "current_parent": "D37",
           "prior": "E37",
           "prior_parent": "F37"
@@ -2175,6 +2282,7 @@
           "row_name": "长期股权投资",
           "fill_empty_as": "blank",
           "current": "C38",
+          "note_ref": "B38",
           "current_parent": "D38",
           "prior": "E38",
           "prior_parent": "F38"
@@ -2185,6 +2293,7 @@
           "row_name": "其他权益工具投资",
           "fill_empty_as": "blank",
           "current": "C39",
+          "note_ref": "B39",
           "current_parent": "D39",
           "prior": "E39",
           "prior_parent": "F39"
@@ -2195,6 +2304,7 @@
           "row_name": "其他非流动金融资产",
           "fill_empty_as": "blank",
           "current": "C40",
+          "note_ref": "B40",
           "current_parent": "D40",
           "prior": "E40",
           "prior_parent": "F40"
@@ -2205,6 +2315,7 @@
           "row_name": "投资性房地产",
           "fill_empty_as": "blank",
           "current": "C41",
+          "note_ref": "B41",
           "current_parent": "D41",
           "prior": "E41",
           "prior_parent": "F41"
@@ -2215,6 +2326,7 @@
           "row_name": "固定资产",
           "fill_empty_as": "blank",
           "current": "C42",
+          "note_ref": "B42",
           "current_parent": "D42",
           "prior": "E42",
           "prior_parent": "F42"
@@ -2255,6 +2367,7 @@
           "row_name": "在建工程",
           "fill_empty_as": "blank",
           "current": "C46",
+          "note_ref": "B46",
           "current_parent": "D46",
           "prior": "E46",
           "prior_parent": "F46"
@@ -2265,6 +2378,7 @@
           "row_name": "生产性生物资产",
           "fill_empty_as": "blank",
           "current": "C47",
+          "note_ref": "B47",
           "current_parent": "D47",
           "prior": "E47",
           "prior_parent": "F47"
@@ -2275,6 +2389,7 @@
           "row_name": "油气资产",
           "fill_empty_as": "blank",
           "current": "C48",
+          "note_ref": "B48",
           "current_parent": "D48",
           "prior": "E48",
           "prior_parent": "F48"
@@ -2285,6 +2400,7 @@
           "row_name": "使用权资产",
           "fill_empty_as": "blank",
           "current": "C49",
+          "note_ref": "B49",
           "current_parent": "D49",
           "prior": "E49",
           "prior_parent": "F49"
@@ -2295,6 +2411,7 @@
           "row_name": "无形资产",
           "fill_empty_as": "blank",
           "current": "C50",
+          "note_ref": "B50",
           "current_parent": "D50",
           "prior": "E50",
           "prior_parent": "F50"
@@ -2305,6 +2422,7 @@
           "row_name": "开发支出",
           "fill_empty_as": "blank",
           "current": "C51",
+          "note_ref": "B51",
           "current_parent": "D51",
           "prior": "E51",
           "prior_parent": "F51"
@@ -2315,6 +2433,7 @@
           "row_name": "商誉",
           "fill_empty_as": "blank",
           "current": "C52",
+          "note_ref": "B52",
           "current_parent": "D52",
           "prior": "E52",
           "prior_parent": "F52"
@@ -2325,6 +2444,7 @@
           "row_name": "长期待摊费用",
           "fill_empty_as": "blank",
           "current": "C53",
+          "note_ref": "B53",
           "current_parent": "D53",
           "prior": "E53",
           "prior_parent": "F53"
@@ -2345,6 +2465,7 @@
           "row_name": "其他非流动资产",
           "fill_empty_as": "blank",
           "current": "C55",
+          "note_ref": "B55",
           "current_parent": "D55",
           "prior": "E55",
           "prior_parent": "F55"
@@ -2365,6 +2486,7 @@
           "row_name": "短期借款",
           "fill_empty_as": "blank",
           "current": "C7",
+          "note_ref": "B7",
           "current_parent": "D7",
           "prior": "E7",
           "prior_parent": "F7"
@@ -2395,6 +2517,7 @@
           "row_name": "交易性金融负债",
           "fill_empty_as": "blank",
           "current": "C10",
+          "note_ref": "B10",
           "current_parent": "D10",
           "prior": "E10",
           "prior_parent": "F10"
@@ -2405,6 +2528,7 @@
           "row_name": "衍生金融负债",
           "fill_empty_as": "blank",
           "current": "C11",
+          "note_ref": "B11",
           "current_parent": "D11",
           "prior": "E11",
           "prior_parent": "F11"
@@ -2415,6 +2539,7 @@
           "row_name": "应付票据",
           "fill_empty_as": "blank",
           "current": "C12",
+          "note_ref": "B12",
           "current_parent": "D12",
           "prior": "E12",
           "prior_parent": "F12"
@@ -2425,6 +2550,7 @@
           "row_name": "应付账款",
           "fill_empty_as": "blank",
           "current": "C13",
+          "note_ref": "B13",
           "current_parent": "D13",
           "prior": "E13",
           "prior_parent": "F13"
@@ -2435,6 +2561,7 @@
           "row_name": "预收款项",
           "fill_empty_as": "blank",
           "current": "C14",
+          "note_ref": "B14",
           "current_parent": "D14",
           "prior": "E14",
           "prior_parent": "F14"
@@ -2445,6 +2572,7 @@
           "row_name": "合同负债",
           "fill_empty_as": "blank",
           "current": "C15",
+          "note_ref": "B15",
           "current_parent": "D15",
           "prior": "E15",
           "prior_parent": "F15"
@@ -2505,6 +2633,7 @@
           "row_name": "应付职工薪酬",
           "fill_empty_as": "blank",
           "current": "C21",
+          "note_ref": "B21",
           "current_parent": "D21",
           "prior": "E21",
           "prior_parent": "F21"
@@ -2545,6 +2674,7 @@
           "row_name": "应交税费",
           "fill_empty_as": "blank",
           "current": "C25",
+          "note_ref": "B25",
           "current_parent": "D25",
           "prior": "E25",
           "prior_parent": "F25"
@@ -2565,6 +2695,7 @@
           "row_name": "其他应付款",
           "fill_empty_as": "blank",
           "current": "C27",
+          "note_ref": "B27",
           "current_parent": "D27",
           "prior": "E27",
           "prior_parent": "F27"
@@ -2605,6 +2736,7 @@
           "row_name": "持有待售负债",
           "fill_empty_as": "blank",
           "current": "C31",
+          "note_ref": "B31",
           "current_parent": "D31",
           "prior": "E31",
           "prior_parent": "F31"
@@ -2615,6 +2747,7 @@
           "row_name": "一年内到期的非流动负债",
           "fill_empty_as": "blank",
           "current": "C32",
+          "note_ref": "B32",
           "current_parent": "D32",
           "prior": "E32",
           "prior_parent": "F32"
@@ -2625,6 +2758,7 @@
           "row_name": "其他流动负债",
           "fill_empty_as": "blank",
           "current": "C33",
+          "note_ref": "B33",
           "current_parent": "D33",
           "prior": "E33",
           "prior_parent": "F33"
@@ -2645,6 +2779,7 @@
           "row_name": "长期借款",
           "fill_empty_as": "blank",
           "current": "C37",
+          "note_ref": "B37",
           "current_parent": "D37",
           "prior": "E37",
           "prior_parent": "F37"
@@ -2655,6 +2790,7 @@
           "row_name": "应付债券",
           "fill_empty_as": "blank",
           "current": "C38",
+          "note_ref": "B38",
           "current_parent": "D38",
           "prior": "E38",
           "prior_parent": "F38"
@@ -2721,6 +2857,7 @@
           "row_name": "租赁负债",
           "fill_empty_as": "blank",
           "current": "C43",
+          "note_ref": "B43",
           "current_parent": "D43",
           "prior": "E43",
           "prior_parent": "F43"
@@ -2731,6 +2868,7 @@
           "row_name": "长期应付款",
           "fill_empty_as": "blank",
           "current": "C44",
+          "note_ref": "B44",
           "current_parent": "D44",
           "prior": "E44",
           "prior_parent": "F44"
@@ -2741,6 +2879,7 @@
           "row_name": "长期应付职工薪酬",
           "fill_empty_as": "blank",
           "current": "C45",
+          "note_ref": "B45",
           "current_parent": "D45",
           "prior": "E45",
           "prior_parent": "F45"
@@ -2751,6 +2890,7 @@
           "row_name": "预计负债",
           "fill_empty_as": "blank",
           "current": "C46",
+          "note_ref": "B46",
           "current_parent": "D46",
           "prior": "E46",
           "prior_parent": "F46"
@@ -2761,6 +2901,7 @@
           "row_name": "递延收益",
           "fill_empty_as": "blank",
           "current": "C47",
+          "note_ref": "B47",
           "current_parent": "D47",
           "prior": "E47",
           "prior_parent": "F47"
@@ -2781,6 +2922,7 @@
           "row_name": "其他非流动负债",
           "fill_empty_as": "blank",
           "current": "C49",
+          "note_ref": "B49",
           "current_parent": "D49",
           "prior": "E49",
           "prior_parent": "F49"
@@ -2861,6 +3003,7 @@
           "row_name": "其他权益工具",
           "fill_empty_as": "blank",
           "current": "C62",
+          "note_ref": "B62",
           "current_parent": "D62",
           "prior": "E62",
           "prior_parent": "F62"
@@ -2871,6 +3014,7 @@
           "row_name": "资本公积",
           "fill_empty_as": "blank",
           "current": "C65",
+          "note_ref": "B65",
           "current_parent": "D65",
           "prior": "E65",
           "prior_parent": "F65"
@@ -2911,6 +3055,7 @@
           "row_name": "专项储备",
           "fill_empty_as": "blank",
           "current": "C69",
+          "note_ref": "B69",
           "current_parent": "D69",
           "prior": "E69",
           "prior_parent": "F69"
@@ -2921,6 +3066,7 @@
           "row_name": "盈余公积",
           "fill_empty_as": "blank",
           "current": "C70",
+          "note_ref": "B70",
           "current_parent": "D70",
           "prior": "E70",
           "prior_parent": "F70"
@@ -2991,6 +3137,7 @@
           "row_name": "未分配利润",
           "fill_empty_as": "blank",
           "current": "C77",
+          "note_ref": "B77",
           "current_parent": "D77",
           "prior": "E77",
           "prior_parent": "F77"
@@ -3209,6 +3356,7 @@
           "row_name": "销售费用",
           "fill_empty_as": "blank",
           "current": "C27",
+          "note_ref": "B27",
           "current_parent": "D27",
           "prior": "E27",
           "prior_parent": "F27"
@@ -3219,6 +3367,7 @@
           "row_name": "管理费用",
           "fill_empty_as": "blank",
           "current": "C28",
+          "note_ref": "B28",
           "current_parent": "D28",
           "prior": "E28",
           "prior_parent": "F28"
@@ -3229,6 +3378,7 @@
           "row_name": "研发费用",
           "fill_empty_as": "blank",
           "current": "C29",
+          "note_ref": "B29",
           "current_parent": "D29",
           "prior": "E29",
           "prior_parent": "F29"
@@ -3239,6 +3389,7 @@
           "row_name": "财务费用",
           "fill_empty_as": "blank",
           "current": "C30",
+          "note_ref": "B30",
           "current_parent": "D30",
           "prior": "E30",
           "prior_parent": "F30"
@@ -3289,6 +3440,7 @@
           "row_name": "投资收益（损失以“－”号填列）",
           "fill_empty_as": "blank",
           "current": "C36",
+          "note_ref": "B36",
           "current_parent": "D36",
           "prior": "E36",
           "prior_parent": "F36"
@@ -3329,6 +3481,7 @@
           "row_name": "净敞口套期收益（损失以“－”号填列）",
           "fill_empty_as": "blank",
           "current": "C40",
+          "note_ref": "B40",
           "current_parent": "D40",
           "prior": "E40",
           "prior_parent": "F40"
@@ -3339,6 +3492,7 @@
           "row_name": "公允价值变动收益（损失以“－”号填列）",
           "fill_empty_as": "blank",
           "current": "C41",
+          "note_ref": "B41",
           "current_parent": "D41",
           "prior": "E41",
           "prior_parent": "F41"
@@ -3349,6 +3503,7 @@
           "row_name": "信用减值损失（损失以“－”号填列）",
           "fill_empty_as": "blank",
           "current": "C42",
+          "note_ref": "B42",
           "current_parent": "D42",
           "prior": "E42",
           "prior_parent": "F42"
@@ -3359,6 +3514,7 @@
           "row_name": "资产减值损失（损失以“－”号填列）",
           "fill_empty_as": "blank",
           "current": "C43",
+          "note_ref": "B43",
           "current_parent": "D43",
           "prior": "E43",
           "prior_parent": "F43"
@@ -3369,6 +3525,7 @@
           "row_name": "资产处置收益（损失以“－”号填列）",
           "fill_empty_as": "blank",
           "current": "C44",
+          "note_ref": "B44",
           "current_parent": "D44",
           "prior": "E44",
           "prior_parent": "F44"
@@ -4175,25 +4332,29 @@
         ],
         "income_statement": "利润表",
         "cash_flow_statement": "现金流量表",
-        "equity_statement": [
-          "合并股东（或所有者）权益变动表",
-          "公司股东（或所有者）权益变动表"
-        ],
+        "equity_statement": "股东权益变动表",
         "hidden_in_export": [
           "GT_Custom"
         ]
       },
       "headers": {
         "balance_sheet": {
-          "period_end_date": "C2",
-          "company_full_name": "A3"
+          "period_end_date": "A2",
+          "company_full_name": "A3",
+          "currency_unit": "D3"
         },
         "income_statement": {
-          "company_full_name": "A3"
+          "company_full_name": "A3",
+          "currency_unit": "D3"
         },
         "cash_flow_statement": {
-          "period_end_date": "A2",
-          "company_full_name": "A3"
+          "company_full_name": "A3",
+          "currency_unit": "D3"
+        },
+        "equity_statement": {
+          "audit_year": "G2",
+          "company_full_name": "A3",
+          "currency_unit": "L3"
         }
       },
       "rows": {
@@ -4202,1152 +4363,1235 @@
           "sheet": "balance_sheet",
           "row_name": "货币资金",
           "fill_empty_as": "blank",
-          "current": "C7",
-          "prior": "E7"
+          "current": "C6",
+          "note_ref": "B6",
+          "prior": "D6"
         },
         "BS-003": {
           "row_code": "BS-003",
           "sheet": "balance_sheet",
           "row_name": "交易性金融资产",
           "fill_empty_as": "blank",
-          "current": "C8",
-          "prior": "E8"
+          "current": "C7",
+          "note_ref": "B7",
+          "prior": "D7"
         },
         "BS-004": {
           "row_code": "BS-004",
           "sheet": "balance_sheet",
           "row_name": "衍生金融资产",
           "fill_empty_as": "blank",
-          "current": "C9",
-          "prior": "E9"
+          "current": "C8",
+          "note_ref": "B8",
+          "prior": "D8"
         },
         "BS-005": {
           "row_code": "BS-005",
           "sheet": "balance_sheet",
           "row_name": "应收票据",
           "fill_empty_as": "blank",
-          "current": "C10",
-          "prior": "E10"
+          "current": "C9",
+          "note_ref": "B9",
+          "prior": "D9"
         },
         "BS-006": {
           "row_code": "BS-006",
           "sheet": "balance_sheet",
           "row_name": "应收账款",
           "fill_empty_as": "blank",
-          "current": "C11",
-          "prior": "E11"
+          "current": "C10",
+          "note_ref": "B10",
+          "prior": "D10"
         },
         "BS-007": {
           "row_code": "BS-007",
           "sheet": "balance_sheet",
           "row_name": "应收款项融资",
           "fill_empty_as": "blank",
-          "current": "C12",
-          "prior": "E12"
+          "current": "C11",
+          "note_ref": "B11",
+          "prior": "D11"
         },
         "BS-008": {
           "row_code": "BS-008",
           "sheet": "balance_sheet",
           "row_name": "预付款项",
           "fill_empty_as": "blank",
-          "current": "C13",
-          "prior": "E13"
+          "current": "C12",
+          "note_ref": "B12",
+          "prior": "D12"
         },
         "BS-009": {
           "row_code": "BS-009",
           "sheet": "balance_sheet",
           "row_name": "其他应收款",
           "fill_empty_as": "blank",
-          "current": "C14",
-          "prior": "E14"
+          "current": "C13",
+          "note_ref": "B13",
+          "prior": "D13"
         },
         "BS-010": {
           "row_code": "BS-010",
           "sheet": "balance_sheet",
           "row_name": "其中：应收利息",
           "fill_empty_as": "blank",
-          "current": "C15",
-          "prior": "E15"
+          "current": "C14",
+          "prior": "D14"
         },
         "BS-011": {
           "row_code": "BS-011",
           "sheet": "balance_sheet",
           "row_name": "应收股利",
           "fill_empty_as": "blank",
-          "current": "C16",
-          "prior": "E16"
+          "current": "C15",
+          "prior": "D15"
         },
         "BS-012": {
           "row_code": "BS-012",
           "sheet": "balance_sheet",
           "row_name": "存货",
           "fill_empty_as": "blank",
-          "current": "C17",
-          "prior": "E17"
+          "current": "C16",
+          "note_ref": "B16",
+          "prior": "D16"
         },
-        "BS-036": {
-          "row_code": "BS-036",
+        "BS-013": {
+          "row_code": "BS-013",
           "sheet": "balance_sheet",
           "row_name": "其中：数据资源",
           "fill_empty_as": "blank",
-          "current": "C41",
-          "prior": "E41"
+          "current": "C17",
+          "prior": "D17"
         },
         "BS-014": {
           "row_code": "BS-014",
           "sheet": "balance_sheet",
           "row_name": "合同资产",
           "fill_empty_as": "blank",
-          "current": "C19",
-          "prior": "E19"
+          "current": "C18",
+          "note_ref": "B18",
+          "prior": "D18"
         },
         "BS-015": {
           "row_code": "BS-015",
           "sheet": "balance_sheet",
           "row_name": "持有待售资产",
           "fill_empty_as": "blank",
-          "current": "C20",
-          "prior": "E20"
+          "current": "C19",
+          "prior": "D19"
         },
         "BS-016": {
           "row_code": "BS-016",
           "sheet": "balance_sheet",
           "row_name": "一年内到期的非流动资产",
           "fill_empty_as": "blank",
-          "current": "C21",
-          "prior": "E21"
+          "current": "C20",
+          "note_ref": "B20",
+          "prior": "D20"
         },
         "BS-017": {
           "row_code": "BS-017",
           "sheet": "balance_sheet",
           "row_name": "其他流动资产",
           "fill_empty_as": "blank",
-          "current": "C22",
-          "prior": "E22"
+          "current": "C21",
+          "note_ref": "B21",
+          "prior": "D21"
         },
         "BS-020": {
           "row_code": "BS-020",
           "sheet": "balance_sheet",
           "row_name": "债权投资",
           "fill_empty_as": "blank",
-          "current": "C25",
-          "prior": "E25"
+          "current": "C24",
+          "note_ref": "B24",
+          "prior": "D24"
         },
         "BS-021": {
           "row_code": "BS-021",
           "sheet": "balance_sheet",
           "row_name": "其他债权投资",
           "fill_empty_as": "blank",
-          "current": "C26",
-          "prior": "E26"
+          "current": "C25",
+          "note_ref": "B25",
+          "prior": "D25"
         },
         "BS-022": {
           "row_code": "BS-022",
           "sheet": "balance_sheet",
           "row_name": "长期应收款",
           "fill_empty_as": "blank",
-          "current": "C27",
-          "prior": "E27"
+          "current": "C26",
+          "note_ref": "B26",
+          "prior": "D26"
         },
         "BS-023": {
           "row_code": "BS-023",
           "sheet": "balance_sheet",
           "row_name": "设定受益计划净资产",
           "fill_empty_as": "blank",
-          "current": "C28",
-          "prior": "E28"
+          "current": "C27",
+          "note_ref": "B27",
+          "prior": "D27"
         },
         "BS-024": {
           "row_code": "BS-024",
           "sheet": "balance_sheet",
           "row_name": "长期股权投资",
           "fill_empty_as": "blank",
-          "current": "C29",
-          "prior": "E29"
+          "current": "C28",
+          "note_ref": "B28",
+          "prior": "D28"
         },
         "BS-025": {
           "row_code": "BS-025",
           "sheet": "balance_sheet",
           "row_name": "其他权益工具投资",
           "fill_empty_as": "blank",
-          "current": "C30",
-          "prior": "E30"
+          "current": "C29",
+          "note_ref": "B29",
+          "prior": "D29"
         },
         "BS-026": {
           "row_code": "BS-026",
           "sheet": "balance_sheet",
           "row_name": "其他非流动金融资产",
           "fill_empty_as": "blank",
-          "current": "C31",
-          "prior": "E31"
+          "current": "C30",
+          "note_ref": "B30",
+          "prior": "D30"
         },
         "BS-027": {
           "row_code": "BS-027",
           "sheet": "balance_sheet",
           "row_name": "投资性房地产",
           "fill_empty_as": "blank",
-          "current": "C32",
-          "prior": "E32"
+          "current": "C31",
+          "note_ref": "B31",
+          "prior": "D31"
         },
         "BS-028": {
           "row_code": "BS-028",
           "sheet": "balance_sheet",
           "row_name": "固定资产",
           "fill_empty_as": "blank",
-          "current": "C33",
-          "prior": "E33"
+          "current": "C32",
+          "note_ref": "B32",
+          "prior": "D32"
         },
         "BS-029": {
           "row_code": "BS-029",
           "sheet": "balance_sheet",
           "row_name": "在建工程",
           "fill_empty_as": "blank",
-          "current": "C34",
-          "prior": "E34"
+          "current": "C33",
+          "note_ref": "B33",
+          "prior": "D33"
         },
         "BS-030": {
           "row_code": "BS-030",
           "sheet": "balance_sheet",
           "row_name": "生产性生物资产",
           "fill_empty_as": "blank",
-          "current": "C35",
-          "prior": "E35"
+          "current": "C34",
+          "note_ref": "B34",
+          "prior": "D34"
         },
         "BS-031": {
           "row_code": "BS-031",
           "sheet": "balance_sheet",
           "row_name": "油气资产",
           "fill_empty_as": "blank",
-          "current": "C36",
-          "prior": "E36"
+          "current": "C35",
+          "prior": "D35"
         },
         "BS-032": {
           "row_code": "BS-032",
           "sheet": "balance_sheet",
           "row_name": "使用权资产",
           "fill_empty_as": "blank",
-          "current": "C37",
-          "prior": "E37"
+          "current": "C36",
+          "note_ref": "B36",
+          "prior": "D36"
         },
         "BS-033": {
           "row_code": "BS-033",
           "sheet": "balance_sheet",
           "row_name": "无形资产",
           "fill_empty_as": "blank",
-          "current": "C38",
-          "prior": "E38"
+          "current": "C37",
+          "note_ref": "B37",
+          "prior": "D37"
         },
         "BS-034": {
           "row_code": "BS-034",
           "sheet": "balance_sheet",
           "row_name": "其中：数据资源",
           "fill_empty_as": "blank",
-          "current": "C39",
-          "prior": "E39"
+          "current": "C38",
+          "prior": "D38"
         },
         "BS-035": {
           "row_code": "BS-035",
           "sheet": "balance_sheet",
           "row_name": "开发支出",
           "fill_empty_as": "blank",
+          "current": "C39",
+          "note_ref": "B39",
+          "prior": "D39"
+        },
+        "BS-036": {
+          "row_code": "BS-036",
+          "sheet": "balance_sheet",
+          "row_name": "其中：数据资源",
+          "fill_empty_as": "blank",
           "current": "C40",
-          "prior": "E40"
+          "prior": "D40"
         },
         "BS-037": {
           "row_code": "BS-037",
           "sheet": "balance_sheet",
           "row_name": "商誉",
           "fill_empty_as": "blank",
-          "current": "C42",
-          "prior": "E42"
+          "current": "C41",
+          "note_ref": "B41",
+          "prior": "D41"
         },
         "BS-038": {
           "row_code": "BS-038",
           "sheet": "balance_sheet",
           "row_name": "长期待摊费用",
           "fill_empty_as": "blank",
-          "current": "C43",
-          "prior": "E43"
+          "current": "C42",
+          "note_ref": "B42",
+          "prior": "D42"
         },
         "BS-039": {
           "row_code": "BS-039",
           "sheet": "balance_sheet",
           "row_name": "递延所得税资产",
           "fill_empty_as": "blank",
-          "current": "C44",
-          "prior": "E44"
+          "current": "C43",
+          "prior": "D43"
         },
         "BS-040": {
           "row_code": "BS-040",
           "sheet": "balance_sheet",
           "row_name": "其他非流动资产",
           "fill_empty_as": "blank",
-          "current": "C45",
-          "prior": "E45"
+          "current": "C44",
+          "note_ref": "B44",
+          "prior": "D44"
         },
         "BS-044": {
           "row_code": "BS-044",
           "sheet": "balance_sheet",
           "row_name": "短期借款",
           "fill_empty_as": "blank",
-          "current": "C7",
-          "prior": "E7"
+          "current": "C6",
+          "note_ref": "B6",
+          "prior": "D6"
         },
         "BS-045": {
           "row_code": "BS-045",
           "sheet": "balance_sheet",
           "row_name": "交易性金融负债",
           "fill_empty_as": "blank",
-          "current": "C8",
-          "prior": "E8"
+          "current": "C7",
+          "note_ref": "B7",
+          "prior": "D7"
         },
         "BS-046": {
           "row_code": "BS-046",
           "sheet": "balance_sheet",
           "row_name": "衍生金融负债",
           "fill_empty_as": "blank",
-          "current": "C9",
-          "prior": "E9"
+          "current": "C8",
+          "note_ref": "B8",
+          "prior": "D8"
         },
         "BS-047": {
           "row_code": "BS-047",
           "sheet": "balance_sheet",
           "row_name": "应付票据",
           "fill_empty_as": "blank",
-          "current": "C10",
-          "prior": "E10"
+          "current": "C9",
+          "note_ref": "B9",
+          "prior": "D9"
         },
         "BS-048": {
           "row_code": "BS-048",
           "sheet": "balance_sheet",
           "row_name": "应付账款",
           "fill_empty_as": "blank",
-          "current": "C11",
-          "prior": "E11"
+          "current": "C10",
+          "note_ref": "B10",
+          "prior": "D10"
         },
         "BS-049": {
           "row_code": "BS-049",
           "sheet": "balance_sheet",
           "row_name": "预收款项",
           "fill_empty_as": "blank",
-          "current": "C12",
-          "prior": "E12"
+          "current": "C11",
+          "note_ref": "B11",
+          "prior": "D11"
         },
         "BS-050": {
           "row_code": "BS-050",
           "sheet": "balance_sheet",
           "row_name": "合同负债",
           "fill_empty_as": "blank",
-          "current": "C13",
-          "prior": "E13"
+          "current": "C12",
+          "note_ref": "B12",
+          "prior": "D12"
         },
         "BS-051": {
           "row_code": "BS-051",
           "sheet": "balance_sheet",
           "row_name": "应付职工薪酬",
           "fill_empty_as": "blank",
-          "current": "C14",
-          "prior": "E14"
+          "current": "C13",
+          "note_ref": "B13",
+          "prior": "D13"
         },
         "BS-052": {
           "row_code": "BS-052",
           "sheet": "balance_sheet",
           "row_name": "应交税费",
           "fill_empty_as": "blank",
-          "current": "C15",
-          "prior": "E15"
+          "current": "C14",
+          "note_ref": "B14",
+          "prior": "D14"
         },
         "BS-053": {
           "row_code": "BS-053",
           "sheet": "balance_sheet",
           "row_name": "其他应付款",
           "fill_empty_as": "blank",
-          "current": "C16",
-          "prior": "E16"
+          "current": "C15",
+          "note_ref": "B15",
+          "prior": "D15"
         },
         "BS-054": {
           "row_code": "BS-054",
           "sheet": "balance_sheet",
           "row_name": "其中：应付利息",
           "fill_empty_as": "blank",
-          "current": "C17",
-          "prior": "E17"
+          "current": "C16",
+          "prior": "D16"
         },
         "BS-055": {
           "row_code": "BS-055",
           "sheet": "balance_sheet",
           "row_name": "应付股利",
           "fill_empty_as": "blank",
-          "current": "C18",
-          "prior": "E18"
+          "current": "C17",
+          "prior": "D17"
         },
         "BS-056": {
           "row_code": "BS-056",
           "sheet": "balance_sheet",
           "row_name": "持有待售负债",
           "fill_empty_as": "blank",
-          "current": "C19",
-          "prior": "E19"
+          "current": "C18",
+          "prior": "D18"
         },
         "BS-057": {
           "row_code": "BS-057",
           "sheet": "balance_sheet",
           "row_name": "一年内到期的非流动负债",
           "fill_empty_as": "blank",
-          "current": "C20",
-          "prior": "E20"
+          "current": "C19",
+          "note_ref": "B19",
+          "prior": "D19"
         },
         "BS-058": {
           "row_code": "BS-058",
           "sheet": "balance_sheet",
           "row_name": "其他流动负债",
           "fill_empty_as": "blank",
-          "current": "C21",
-          "prior": "E21"
+          "current": "C20",
+          "note_ref": "B20",
+          "prior": "D20"
         },
         "BS-061": {
           "row_code": "BS-061",
           "sheet": "balance_sheet",
           "row_name": "长期借款",
           "fill_empty_as": "blank",
-          "current": "C24",
-          "prior": "E24"
+          "current": "C23",
+          "note_ref": "B23",
+          "prior": "D23"
         },
         "BS-062": {
           "row_code": "BS-062",
           "sheet": "balance_sheet",
           "row_name": "应付债券",
           "fill_empty_as": "blank",
-          "current": "C25",
-          "prior": "E25"
+          "current": "C24",
+          "note_ref": "B24",
+          "prior": "D24"
         },
-        "BS-077": {
-          "row_code": "BS-077",
+        "BS-063": {
+          "row_code": "BS-063",
           "sheet": "balance_sheet",
           "row_name": "其中：优先股",
           "fill_empty_as": "blank",
-          "current": "C41",
-          "prior": "E41"
+          "current": "C25",
+          "prior": "D25"
         },
-        "BS-078": {
-          "row_code": "BS-078",
+        "BS-064": {
+          "row_code": "BS-064",
           "sheet": "balance_sheet",
           "row_name": "永续债",
           "fill_empty_as": "blank",
-          "current": "C42",
-          "prior": "E42"
+          "current": "C26",
+          "prior": "D26"
         },
         "BS-065": {
           "row_code": "BS-065",
           "sheet": "balance_sheet",
           "row_name": "租赁负债",
           "fill_empty_as": "blank",
-          "current": "C28",
-          "prior": "E28"
+          "current": "C27",
+          "note_ref": "B27",
+          "prior": "D27"
         },
         "BS-066": {
           "row_code": "BS-066",
           "sheet": "balance_sheet",
           "row_name": "长期应付款",
           "fill_empty_as": "blank",
-          "current": "C29",
-          "prior": "E29"
+          "current": "C28",
+          "note_ref": "B28",
+          "prior": "D28"
         },
         "BS-067": {
           "row_code": "BS-067",
           "sheet": "balance_sheet",
           "row_name": "长期应付职工薪酬",
           "fill_empty_as": "blank",
-          "current": "C30",
-          "prior": "E30"
+          "current": "C29",
+          "note_ref": "B29",
+          "prior": "D29"
         },
         "BS-068": {
           "row_code": "BS-068",
           "sheet": "balance_sheet",
           "row_name": "预计负债",
           "fill_empty_as": "blank",
-          "current": "C31",
-          "prior": "E31"
+          "current": "C30",
+          "note_ref": "B30",
+          "prior": "D30"
         },
         "BS-069": {
           "row_code": "BS-069",
           "sheet": "balance_sheet",
           "row_name": "递延收益",
           "fill_empty_as": "blank",
-          "current": "C32",
-          "prior": "E32"
+          "current": "C31",
+          "note_ref": "B31",
+          "prior": "D31"
         },
         "BS-070": {
           "row_code": "BS-070",
           "sheet": "balance_sheet",
           "row_name": "递延所得税负债",
           "fill_empty_as": "blank",
-          "current": "C33",
-          "prior": "E33"
+          "current": "C32",
+          "prior": "D32"
         },
         "BS-071": {
           "row_code": "BS-071",
           "sheet": "balance_sheet",
           "row_name": "其他非流动负债",
           "fill_empty_as": "blank",
-          "current": "C34",
-          "prior": "E34"
+          "current": "C33",
+          "note_ref": "B33",
+          "prior": "D33"
         },
         "BS-075": {
           "row_code": "BS-075",
           "sheet": "balance_sheet",
           "row_name": "股本",
           "fill_empty_as": "blank",
-          "current": "C39",
-          "prior": "E39"
+          "current": "C38",
+          "note_ref": "B38",
+          "prior": "D38"
         },
         "BS-076": {
           "row_code": "BS-076",
           "sheet": "balance_sheet",
           "row_name": "其他权益工具",
           "fill_empty_as": "blank",
+          "current": "C39",
+          "note_ref": "B39",
+          "prior": "D39"
+        },
+        "BS-077": {
+          "row_code": "BS-077",
+          "sheet": "balance_sheet",
+          "row_name": "其中：优先股",
+          "fill_empty_as": "blank",
           "current": "C40",
-          "prior": "E40"
+          "prior": "D40"
+        },
+        "BS-078": {
+          "row_code": "BS-078",
+          "sheet": "balance_sheet",
+          "row_name": "永续债",
+          "fill_empty_as": "blank",
+          "current": "C41",
+          "prior": "D41"
         },
         "BS-079": {
           "row_code": "BS-079",
           "sheet": "balance_sheet",
           "row_name": "资本公积",
           "fill_empty_as": "blank",
-          "current": "C43",
-          "prior": "E43"
+          "current": "C42",
+          "note_ref": "B42",
+          "prior": "D42"
         },
         "BS-080": {
           "row_code": "BS-080",
           "sheet": "balance_sheet",
           "row_name": "减：库存股",
           "fill_empty_as": "blank",
-          "current": "C44",
-          "prior": "E44"
+          "current": "C43",
+          "prior": "D43"
         },
         "BS-081": {
           "row_code": "BS-081",
           "sheet": "balance_sheet",
           "row_name": "其他综合收益",
           "fill_empty_as": "blank",
-          "current": "C45",
-          "prior": "E45"
+          "current": "C44",
+          "note_ref": "B44",
+          "prior": "D44"
         },
         "BS-082": {
           "row_code": "BS-082",
           "sheet": "balance_sheet",
           "row_name": "专项储备",
           "fill_empty_as": "blank",
-          "current": "C46",
-          "prior": "E46"
+          "current": "C45",
+          "note_ref": "B45",
+          "prior": "D45"
         },
         "BS-083": {
           "row_code": "BS-083",
           "sheet": "balance_sheet",
           "row_name": "盈余公积",
           "fill_empty_as": "blank",
-          "current": "C47",
-          "prior": "E47"
+          "current": "C46",
+          "note_ref": "B46",
+          "prior": "D46"
         },
         "BS-084": {
           "row_code": "BS-084",
           "sheet": "balance_sheet",
           "row_name": "未分配利润",
           "fill_empty_as": "blank",
-          "current": "C48",
-          "prior": "E48"
-        },
-        "BS-086": {
-          "row_code": "BS-086",
-          "sheet": "balance_sheet",
-          "row_name": "少数股东权益",
-          "fill_empty_as": "blank",
-          "current": "C50",
-          "prior": "E50"
+          "current": "C47",
+          "note_ref": "B47",
+          "prior": "D47"
         },
         "IS-001": {
           "row_code": "IS-001",
           "sheet": "income_statement",
           "row_name": "一、营业收入",
           "fill_empty_as": "blank",
-          "current": "C6",
-          "prior": "E6"
+          "current": "C5",
+          "prior": "D5"
         },
         "IS-002": {
           "row_code": "IS-002",
           "sheet": "income_statement",
           "row_name": "减：营业成本",
           "fill_empty_as": "blank",
-          "current": "C7",
-          "prior": "E7"
+          "current": "C6",
+          "prior": "D6"
         },
         "IS-003": {
           "row_code": "IS-003",
           "sheet": "income_statement",
           "row_name": "税金及附加",
           "fill_empty_as": "blank",
-          "current": "C8",
-          "prior": "E8"
+          "current": "C7",
+          "note_ref": "B7",
+          "prior": "D7"
         },
         "IS-004": {
           "row_code": "IS-004",
           "sheet": "income_statement",
           "row_name": "销售费用",
           "fill_empty_as": "blank",
-          "current": "C9",
-          "prior": "E9"
+          "current": "C8",
+          "note_ref": "B8",
+          "prior": "D8"
         },
         "IS-005": {
           "row_code": "IS-005",
           "sheet": "income_statement",
           "row_name": "管理费用",
           "fill_empty_as": "blank",
-          "current": "C10",
-          "prior": "E10"
+          "current": "C9",
+          "note_ref": "B9",
+          "prior": "D9"
         },
         "IS-006": {
           "row_code": "IS-006",
           "sheet": "income_statement",
           "row_name": "研发费用",
           "fill_empty_as": "blank",
-          "current": "C11",
-          "prior": "E11"
+          "current": "C10",
+          "note_ref": "B10",
+          "prior": "D10"
         },
         "IS-007": {
           "row_code": "IS-007",
           "sheet": "income_statement",
           "row_name": "财务费用",
           "fill_empty_as": "blank",
-          "current": "C12",
-          "prior": "E12"
+          "current": "C11",
+          "note_ref": "B11",
+          "prior": "D11"
         },
         "IS-008": {
           "row_code": "IS-008",
           "sheet": "income_statement",
           "row_name": "其中：利息费用",
           "fill_empty_as": "blank",
-          "current": "C13",
-          "prior": "E13"
+          "current": "C12",
+          "prior": "D12"
         },
         "IS-009": {
           "row_code": "IS-009",
           "sheet": "income_statement",
           "row_name": "利息收入",
           "fill_empty_as": "blank",
-          "current": "C14",
-          "prior": "E14"
+          "current": "C13",
+          "prior": "D13"
         },
         "IS-010": {
           "row_code": "IS-010",
           "sheet": "income_statement",
           "row_name": "加：其他收益",
           "fill_empty_as": "blank",
-          "current": "C15",
-          "prior": "E15"
+          "current": "C14",
+          "prior": "D14"
         },
         "IS-011": {
           "row_code": "IS-011",
           "sheet": "income_statement",
           "row_name": "投资收益(损失以“-”号填列）",
           "fill_empty_as": "blank",
-          "current": "C16",
-          "prior": "E16"
+          "current": "C15",
+          "note_ref": "B15",
+          "prior": "D15"
         },
         "IS-012": {
           "row_code": "IS-012",
           "sheet": "income_statement",
           "row_name": "其中：对联营企业和合营企业的投资收益",
           "fill_empty_as": "blank",
-          "current": "C17",
-          "prior": "E17"
+          "current": "C16",
+          "prior": "D16"
         },
         "IS-013": {
           "row_code": "IS-013",
           "sheet": "income_statement",
           "row_name": "以摊余成本计量的金融资产终止确认收益（损失以“-”号填列）",
           "fill_empty_as": "blank",
-          "current": "C18",
-          "prior": "E18"
+          "current": "C17",
+          "prior": "D17"
         },
         "IS-014": {
           "row_code": "IS-014",
           "sheet": "income_statement",
           "row_name": "净敞口套期收益(损失以“-”号填列）",
           "fill_empty_as": "blank",
-          "current": "C19",
-          "prior": "E19"
+          "current": "C18",
+          "note_ref": "B18",
+          "prior": "D18"
         },
         "IS-015": {
           "row_code": "IS-015",
           "sheet": "income_statement",
           "row_name": "公允价值变动收益(损失以“-”号填列）",
           "fill_empty_as": "blank",
-          "current": "C20",
-          "prior": "E20"
+          "current": "C19",
+          "note_ref": "B19",
+          "prior": "D19"
         },
         "IS-016": {
           "row_code": "IS-016",
           "sheet": "income_statement",
           "row_name": "信用减值损失(损失以“-”号填列）",
           "fill_empty_as": "blank",
-          "current": "C21",
-          "prior": "E21"
+          "current": "C20",
+          "note_ref": "B20",
+          "prior": "D20"
         },
         "IS-017": {
           "row_code": "IS-017",
           "sheet": "income_statement",
           "row_name": "资产减值损失(损失以“-”号填列）",
           "fill_empty_as": "blank",
-          "current": "C22",
-          "prior": "E22"
+          "current": "C21",
+          "note_ref": "B21",
+          "prior": "D21"
         },
         "IS-018": {
           "row_code": "IS-018",
           "sheet": "income_statement",
           "row_name": "资产处置收益(损失以“-”号填列）",
           "fill_empty_as": "blank",
-          "current": "C23",
-          "prior": "E23"
+          "current": "C22",
+          "note_ref": "B22",
+          "prior": "D22"
         },
         "IS-020": {
           "row_code": "IS-020",
           "sheet": "income_statement",
           "row_name": "加：营业外收入",
           "fill_empty_as": "blank",
-          "current": "C25",
-          "prior": "E25"
+          "current": "C24",
+          "prior": "D24"
         },
         "IS-021": {
           "row_code": "IS-021",
           "sheet": "income_statement",
           "row_name": "减：营业外支出",
           "fill_empty_as": "blank",
-          "current": "C26",
-          "prior": "E26"
+          "current": "C25",
+          "prior": "D25"
         },
         "IS-023": {
           "row_code": "IS-023",
           "sheet": "income_statement",
           "row_name": "减：所得税费用",
           "fill_empty_as": "blank",
-          "current": "C28",
-          "prior": "E28"
+          "current": "C27",
+          "prior": "D27"
         },
         "IS-027": {
           "row_code": "IS-027",
           "sheet": "income_statement",
           "row_name": "终止经营净利润（净亏损以“-”号填列）",
           "fill_empty_as": "blank",
-          "current": "C32",
-          "prior": "E32"
+          "current": "C31",
+          "prior": "D31"
         },
         "IS-029": {
           "row_code": "IS-029",
           "sheet": "income_statement",
           "row_name": "其中：归属于母公司股东的净利润（净亏损以“-”号填列）",
           "fill_empty_as": "blank",
-          "current": "C34",
-          "prior": "E34"
+          "current": "C33",
+          "prior": "D33"
         },
         "IS-030": {
           "row_code": "IS-030",
           "sheet": "income_statement",
           "row_name": "少数股东损益（净亏损以“-”号填列）",
           "fill_empty_as": "blank",
-          "current": "C35",
-          "prior": "E35"
+          "current": "C34",
+          "prior": "D34"
         },
         "IS-032": {
           "row_code": "IS-032",
           "sheet": "income_statement",
           "row_name": "归属于母公司股东的其他综合收益的税后净额",
           "fill_empty_as": "blank",
-          "current": "C37",
-          "prior": "E37"
+          "current": "C36",
+          "prior": "D36"
         },
         "IS-034": {
           "row_code": "IS-034",
           "sheet": "income_statement",
           "row_name": "1. 重新计量设定受益计划变动额",
           "fill_empty_as": "blank",
-          "current": "C39",
-          "prior": "E39"
+          "current": "C38",
+          "prior": "D38"
         },
         "IS-035": {
           "row_code": "IS-035",
           "sheet": "income_statement",
           "row_name": "2. 权益法下不能转损益的其他综合收益",
           "fill_empty_as": "blank",
-          "current": "C40",
-          "prior": "E40"
+          "current": "C39",
+          "prior": "D39"
         },
         "IS-036": {
           "row_code": "IS-036",
           "sheet": "income_statement",
           "row_name": "3. 其他权益工具投资公允价值变动",
           "fill_empty_as": "blank",
-          "current": "C41",
-          "prior": "E41"
+          "current": "C40",
+          "prior": "D40"
         },
         "IS-037": {
           "row_code": "IS-037",
           "sheet": "income_statement",
           "row_name": "4. 企业自身信用风险公允价值变动",
           "fill_empty_as": "blank",
-          "current": "C42",
-          "prior": "E42"
+          "current": "C41",
+          "prior": "D41"
         },
         "IS-038": {
           "row_code": "IS-038",
           "sheet": "income_statement",
           "row_name": "5. 其他",
           "fill_empty_as": "blank",
-          "current": "C43",
-          "prior": "E43"
+          "current": "C42",
+          "prior": "D42"
         },
         "IS-040": {
           "row_code": "IS-040",
           "sheet": "income_statement",
           "row_name": "1. 权益法下可转损益的其他综合收益",
           "fill_empty_as": "blank",
-          "current": "C45",
-          "prior": "E45"
+          "current": "C44",
+          "prior": "D44"
         },
         "IS-041": {
           "row_code": "IS-041",
           "sheet": "income_statement",
           "row_name": "2. 其他债权投资公允价值变动",
           "fill_empty_as": "blank",
-          "current": "C46",
-          "prior": "E46"
+          "current": "C45",
+          "prior": "D45"
         },
         "IS-042": {
           "row_code": "IS-042",
           "sheet": "income_statement",
           "row_name": "3. 金融资产重分类计入其他综合收益的金额",
           "fill_empty_as": "blank",
-          "current": "C47",
-          "prior": "E47"
+          "current": "C46",
+          "prior": "D46"
         },
         "IS-043": {
           "row_code": "IS-043",
           "sheet": "income_statement",
           "row_name": "4. 其他债权投资信用减值准备",
           "fill_empty_as": "blank",
-          "current": "C48",
-          "prior": "E48"
+          "current": "C47",
+          "prior": "D47"
         },
         "IS-044": {
           "row_code": "IS-044",
           "sheet": "income_statement",
           "row_name": "5. 现金流量套期储备",
           "fill_empty_as": "blank",
-          "current": "C49",
-          "prior": "E49"
+          "current": "C48",
+          "prior": "D48"
         },
         "IS-045": {
           "row_code": "IS-045",
           "sheet": "income_statement",
           "row_name": "6. 外币财务报表折算差额",
           "fill_empty_as": "blank",
-          "current": "C50",
-          "prior": "E50"
+          "current": "C49",
+          "prior": "D49"
         },
         "IS-046": {
           "row_code": "IS-046",
           "sheet": "income_statement",
           "row_name": "7. 自用房地产或作为存货的房地产转换为以公允价值计量的投资性房地产在转换日公允价值大于账面价值部分",
           "fill_empty_as": "blank",
-          "current": "C51",
-          "prior": "E51"
+          "current": "C50",
+          "prior": "D50"
         },
         "IS-047": {
           "row_code": "IS-047",
           "sheet": "income_statement",
           "row_name": "8. 多次交易分步处置子公司股权构成一揽子交易的，丧失控制权之前各次交易处置价款与对应净资产账面价值份额的差额",
           "fill_empty_as": "blank",
-          "current": "C52",
-          "prior": "E52"
+          "current": "C51",
+          "prior": "D51"
         },
         "IS-048": {
           "row_code": "IS-048",
           "sheet": "income_statement",
           "row_name": "9. 其他",
           "fill_empty_as": "blank",
-          "current": "C53",
-          "prior": "E53"
+          "current": "C52",
+          "prior": "D52"
         },
         "IS-049": {
           "row_code": "IS-049",
           "sheet": "income_statement",
           "row_name": "归属于少数股东的其他综合收益的税后净额",
           "fill_empty_as": "blank",
-          "current": "C54",
-          "prior": "E54"
+          "current": "C53",
+          "prior": "D53"
         },
         "IS-051": {
           "row_code": "IS-051",
           "sheet": "income_statement",
           "row_name": "归属于母公司股东的综合收益总额",
           "fill_empty_as": "blank",
-          "current": "C56",
-          "prior": "E56"
+          "current": "C55",
+          "prior": "D55"
         },
         "IS-052": {
           "row_code": "IS-052",
           "sheet": "income_statement",
           "row_name": "归属于少数股东的综合收益总额",
           "fill_empty_as": "blank",
-          "current": "C57",
-          "prior": "E57"
+          "current": "C56",
+          "prior": "D56"
         },
         "IS-053": {
           "row_code": "IS-053",
           "sheet": "income_statement",
           "row_name": "七、每股收益",
           "fill_empty_as": "blank",
-          "current": "C58",
-          "prior": "E58"
+          "current": "C57",
+          "prior": "D57"
         },
         "IS-054": {
           "row_code": "IS-054",
           "sheet": "income_statement",
           "row_name": "（一）基本每股收益",
           "fill_empty_as": "blank",
-          "current": "C59",
-          "prior": "E59"
+          "current": "C58",
+          "prior": "D58"
         },
         "IS-055": {
           "row_code": "IS-055",
           "sheet": "income_statement",
           "row_name": "（二）稀释每股收益",
           "fill_empty_as": "blank",
-          "current": "C60",
-          "prior": "E60"
+          "current": "C59",
+          "prior": "D59"
         },
         "CFS-002": {
           "row_code": "CFS-002",
           "sheet": "cash_flow_statement",
           "row_name": "销售商品、提供劳务收到的现金",
           "fill_empty_as": "blank",
-          "current": "C7",
-          "prior": "E7"
+          "current": "C6",
+          "prior": "D6"
         },
         "CFS-003": {
           "row_code": "CFS-003",
           "sheet": "cash_flow_statement",
           "row_name": "收到的税费返还",
           "fill_empty_as": "blank",
-          "current": "C8",
-          "prior": "E8"
+          "current": "C7",
+          "prior": "D7"
         },
         "CFS-004": {
           "row_code": "CFS-004",
           "sheet": "cash_flow_statement",
           "row_name": "收到其他与经营活动有关的现金",
           "fill_empty_as": "blank",
-          "current": "C9",
-          "prior": "E9"
+          "current": "C8",
+          "prior": "D8"
         },
         "CFS-006": {
           "row_code": "CFS-006",
           "sheet": "cash_flow_statement",
           "row_name": "购买商品、接受劳务支付的现金",
           "fill_empty_as": "blank",
-          "current": "C11",
-          "prior": "E11"
+          "current": "C10",
+          "prior": "D10"
         },
         "CFS-007": {
           "row_code": "CFS-007",
           "sheet": "cash_flow_statement",
           "row_name": "支付给职工以及为职工支付的现金",
           "fill_empty_as": "blank",
-          "current": "C12",
-          "prior": "E12"
+          "current": "C11",
+          "prior": "D11"
         },
         "CFS-008": {
           "row_code": "CFS-008",
           "sheet": "cash_flow_statement",
           "row_name": "支付的各项税费",
           "fill_empty_as": "blank",
-          "current": "C13",
-          "prior": "E13"
+          "current": "C12",
+          "prior": "D12"
         },
         "CFS-009": {
           "row_code": "CFS-009",
           "sheet": "cash_flow_statement",
           "row_name": "支付其他与经营活动有关的现金",
           "fill_empty_as": "blank",
-          "current": "C14",
-          "prior": "E14"
+          "current": "C13",
+          "prior": "D13"
         },
         "CFS-013": {
           "row_code": "CFS-013",
           "sheet": "cash_flow_statement",
           "row_name": "收回投资收到的现金",
           "fill_empty_as": "blank",
-          "current": "C18",
-          "prior": "E18"
+          "current": "C17",
+          "prior": "D17"
         },
         "CFS-014": {
           "row_code": "CFS-014",
           "sheet": "cash_flow_statement",
           "row_name": "取得投资收益收到的现金",
           "fill_empty_as": "blank",
-          "current": "C19",
-          "prior": "E19"
+          "current": "C18",
+          "prior": "D18"
         },
         "CFS-015": {
           "row_code": "CFS-015",
           "sheet": "cash_flow_statement",
           "row_name": "处置固定资产、无形资产和其他长期资产收回的\n    现金净额",
           "fill_empty_as": "blank",
-          "current": "C20",
-          "prior": "E20"
+          "current": "C19",
+          "prior": "D19"
         },
         "CFS-016": {
           "row_code": "CFS-016",
           "sheet": "cash_flow_statement",
           "row_name": "处置子公司及其他营业单位收到的现金净额",
           "fill_empty_as": "blank",
-          "current": "C21",
-          "prior": "E21"
+          "current": "C20",
+          "prior": "D20"
         },
         "CFS-017": {
           "row_code": "CFS-017",
           "sheet": "cash_flow_statement",
           "row_name": "收到其他与投资活动有关的现金",
           "fill_empty_as": "blank",
-          "current": "C22",
-          "prior": "E22"
+          "current": "C21",
+          "prior": "D21"
         },
         "CFS-019": {
           "row_code": "CFS-019",
           "sheet": "cash_flow_statement",
           "row_name": "购建固定资产、无形资产和其他长期资产支付的现金",
           "fill_empty_as": "blank",
-          "current": "C24",
-          "prior": "E24"
+          "current": "C23",
+          "prior": "D23"
         },
         "CFS-020": {
           "row_code": "CFS-020",
           "sheet": "cash_flow_statement",
           "row_name": "投资支付的现金",
           "fill_empty_as": "blank",
-          "current": "C25",
-          "prior": "E25"
+          "current": "C24",
+          "prior": "D24"
         },
         "CFS-021": {
           "row_code": "CFS-021",
           "sheet": "cash_flow_statement",
           "row_name": "取得子公司及其他营业单位支付的现金净额",
           "fill_empty_as": "blank",
-          "current": "C26",
-          "prior": "E26"
+          "current": "C25",
+          "prior": "D25"
         },
         "CFS-022": {
           "row_code": "CFS-022",
           "sheet": "cash_flow_statement",
           "row_name": "支付其他与投资活动有关的现金",
           "fill_empty_as": "blank",
-          "current": "C27",
-          "prior": "E27"
+          "current": "C26",
+          "prior": "D26"
         },
         "CFS-026": {
           "row_code": "CFS-026",
           "sheet": "cash_flow_statement",
           "row_name": "吸收投资收到的现金",
           "fill_empty_as": "blank",
-          "current": "C31",
-          "prior": "E31"
+          "current": "C30",
+          "prior": "D30"
         },
         "CFS-027": {
           "row_code": "CFS-027",
           "sheet": "cash_flow_statement",
           "row_name": "其中：子公司吸收少数股东投资收到的现金",
           "fill_empty_as": "blank",
-          "current": "C32",
-          "prior": "E32"
+          "current": "C31",
+          "prior": "D31"
         },
         "CFS-028": {
           "row_code": "CFS-028",
           "sheet": "cash_flow_statement",
           "row_name": "取得借款收到的现金",
           "fill_empty_as": "blank",
-          "current": "C33",
-          "prior": "E33"
+          "current": "C32",
+          "prior": "D32"
         },
         "CFS-029": {
           "row_code": "CFS-029",
           "sheet": "cash_flow_statement",
           "row_name": "发行债券收到的现金",
           "fill_empty_as": "blank",
-          "current": "C34",
-          "prior": "E34"
+          "current": "C33",
+          "prior": "D33"
         },
         "CFS-030": {
           "row_code": "CFS-030",
           "sheet": "cash_flow_statement",
           "row_name": "收到其他与筹资活动有关的现金",
           "fill_empty_as": "blank",
-          "current": "C35",
-          "prior": "E35"
+          "current": "C34",
+          "prior": "D34"
         },
         "CFS-032": {
           "row_code": "CFS-032",
           "sheet": "cash_flow_statement",
           "row_name": "偿还债务支付的现金",
           "fill_empty_as": "blank",
-          "current": "C37",
-          "prior": "E37"
+          "current": "C36",
+          "prior": "D36"
         },
         "CFS-033": {
           "row_code": "CFS-033",
           "sheet": "cash_flow_statement",
           "row_name": "分配股利、利润或偿付利息支付的现金",
           "fill_empty_as": "blank",
-          "current": "C38",
-          "prior": "E38"
+          "current": "C37",
+          "prior": "D37"
         },
         "CFS-034": {
           "row_code": "CFS-034",
           "sheet": "cash_flow_statement",
           "row_name": "其中：子公司支付少数股东的股利、利润",
           "fill_empty_as": "blank",
-          "current": "C39",
-          "prior": "E39"
+          "current": "C38",
+          "prior": "D38"
         },
         "CFS-035": {
           "row_code": "CFS-035",
           "sheet": "cash_flow_statement",
           "row_name": "支付其他与筹资活动有关的现金",
           "fill_empty_as": "blank",
-          "current": "C40",
-          "prior": "E40"
+          "current": "C39",
+          "prior": "D39"
         },
         "CFS-038": {
           "row_code": "CFS-038",
           "sheet": "cash_flow_statement",
           "row_name": "四、汇率变动对现金及现金等价物的影响",
           "fill_empty_as": "blank",
-          "current": "C43",
-          "prior": "E43"
+          "current": "C42",
+          "prior": "D42"
         },
         "CFS-039": {
           "row_code": "CFS-039",
           "sheet": "cash_flow_statement",
           "row_name": "五、现金及现金等价物净增加额",
           "fill_empty_as": "blank",
-          "current": "C44",
-          "prior": "E44"
+          "current": "C43",
+          "prior": "D43"
         },
         "CFS-040": {
           "row_code": "CFS-040",
           "sheet": "cash_flow_statement",
           "row_name": "加：期初现金及现金等价物余额",
           "fill_empty_as": "blank",
-          "current": "C45",
-          "prior": "E45"
+          "current": "C44",
+          "prior": "D44"
         }
       }
     },
@@ -5372,14 +5616,22 @@
       "headers": {
         "balance_sheet": {
           "period_end_date": "C2",
-          "company_full_name": "A3"
+          "company_full_name": "A3",
+          "currency_unit": "F3"
         },
         "income_statement": {
-          "company_full_name": "A3"
+          "company_full_name": "A3",
+          "currency_unit": "F3"
         },
         "cash_flow_statement": {
           "period_end_date": "A2",
-          "company_full_name": "A3"
+          "company_full_name": "A3",
+          "currency_unit": "E3"
+        },
+        "equity_statement": {
+          "audit_year": "G2",
+          "company_full_name": "A3",
+          "currency_unit": "L3"
         }
       },
       "rows": {
@@ -5389,6 +5641,7 @@
           "row_name": "货币资金",
           "fill_empty_as": "blank",
           "current": "C7",
+          "note_ref": "B7",
           "current_parent": "D7",
           "prior": "E7",
           "prior_parent": "F7"
@@ -5399,6 +5652,7 @@
           "row_name": "交易性金融资产",
           "fill_empty_as": "blank",
           "current": "C8",
+          "note_ref": "B8",
           "current_parent": "D8",
           "prior": "E8",
           "prior_parent": "F8"
@@ -5409,6 +5663,7 @@
           "row_name": "衍生金融资产",
           "fill_empty_as": "blank",
           "current": "C9",
+          "note_ref": "B9",
           "current_parent": "D9",
           "prior": "E9",
           "prior_parent": "F9"
@@ -5419,6 +5674,7 @@
           "row_name": "应收票据",
           "fill_empty_as": "blank",
           "current": "C10",
+          "note_ref": "B10",
           "current_parent": "D10",
           "prior": "E10",
           "prior_parent": "F10"
@@ -5429,6 +5685,7 @@
           "row_name": "应收账款",
           "fill_empty_as": "blank",
           "current": "C11",
+          "note_ref": "B11",
           "current_parent": "D11",
           "prior": "E11",
           "prior_parent": "F11"
@@ -5439,6 +5696,7 @@
           "row_name": "应收款项融资",
           "fill_empty_as": "blank",
           "current": "C12",
+          "note_ref": "B12",
           "current_parent": "D12",
           "prior": "E12",
           "prior_parent": "F12"
@@ -5449,6 +5707,7 @@
           "row_name": "预付款项",
           "fill_empty_as": "blank",
           "current": "C13",
+          "note_ref": "B13",
           "current_parent": "D13",
           "prior": "E13",
           "prior_parent": "F13"
@@ -5459,6 +5718,7 @@
           "row_name": "其他应收款",
           "fill_empty_as": "blank",
           "current": "C14",
+          "note_ref": "B14",
           "current_parent": "D14",
           "prior": "E14",
           "prior_parent": "F14"
@@ -5489,6 +5749,7 @@
           "row_name": "存货",
           "fill_empty_as": "blank",
           "current": "C17",
+          "note_ref": "B17",
           "current_parent": "D17",
           "prior": "E17",
           "prior_parent": "F17"
@@ -5517,6 +5778,7 @@
           "row_name": "合同资产",
           "fill_empty_as": "blank",
           "current": "C19",
+          "note_ref": "B19",
           "current_parent": "D19",
           "prior": "E19",
           "prior_parent": "F19"
@@ -5537,6 +5799,7 @@
           "row_name": "一年内到期的非流动资产",
           "fill_empty_as": "blank",
           "current": "C21",
+          "note_ref": "B21",
           "current_parent": "D21",
           "prior": "E21",
           "prior_parent": "F21"
@@ -5547,6 +5810,7 @@
           "row_name": "其他流动资产",
           "fill_empty_as": "blank",
           "current": "C22",
+          "note_ref": "B22",
           "current_parent": "D22",
           "prior": "E22",
           "prior_parent": "F22"
@@ -5557,6 +5821,7 @@
           "row_name": "债权投资",
           "fill_empty_as": "blank",
           "current": "C25",
+          "note_ref": "B25",
           "current_parent": "D25",
           "prior": "E25",
           "prior_parent": "F25"
@@ -5567,6 +5832,7 @@
           "row_name": "其他债权投资",
           "fill_empty_as": "blank",
           "current": "C26",
+          "note_ref": "B26",
           "current_parent": "D26",
           "prior": "E26",
           "prior_parent": "F26"
@@ -5577,6 +5843,7 @@
           "row_name": "长期应收款",
           "fill_empty_as": "blank",
           "current": "C27",
+          "note_ref": "B27",
           "current_parent": "D27",
           "prior": "E27",
           "prior_parent": "F27"
@@ -5587,6 +5854,7 @@
           "row_name": "设定受益计划净资产",
           "fill_empty_as": "blank",
           "current": "C28",
+          "note_ref": "B28",
           "current_parent": "D28",
           "prior": "E28",
           "prior_parent": "F28"
@@ -5597,6 +5865,7 @@
           "row_name": "长期股权投资",
           "fill_empty_as": "blank",
           "current": "C29",
+          "note_ref": "B29",
           "current_parent": "D29",
           "prior": "E29",
           "prior_parent": "F29"
@@ -5607,6 +5876,7 @@
           "row_name": "其他权益工具投资",
           "fill_empty_as": "blank",
           "current": "C30",
+          "note_ref": "B30",
           "current_parent": "D30",
           "prior": "E30",
           "prior_parent": "F30"
@@ -5617,6 +5887,7 @@
           "row_name": "其他非流动金融资产",
           "fill_empty_as": "blank",
           "current": "C31",
+          "note_ref": "B31",
           "current_parent": "D31",
           "prior": "E31",
           "prior_parent": "F31"
@@ -5627,6 +5898,7 @@
           "row_name": "投资性房地产",
           "fill_empty_as": "blank",
           "current": "C32",
+          "note_ref": "B32",
           "current_parent": "D32",
           "prior": "E32",
           "prior_parent": "F32"
@@ -5637,6 +5909,7 @@
           "row_name": "固定资产",
           "fill_empty_as": "blank",
           "current": "C33",
+          "note_ref": "B33",
           "current_parent": "D33",
           "prior": "E33",
           "prior_parent": "F33"
@@ -5647,6 +5920,7 @@
           "row_name": "在建工程",
           "fill_empty_as": "blank",
           "current": "C34",
+          "note_ref": "B34",
           "current_parent": "D34",
           "prior": "E34",
           "prior_parent": "F34"
@@ -5657,6 +5931,7 @@
           "row_name": "生产性生物资产",
           "fill_empty_as": "blank",
           "current": "C35",
+          "note_ref": "B35",
           "current_parent": "D35",
           "prior": "E35",
           "prior_parent": "F35"
@@ -5677,6 +5952,7 @@
           "row_name": "使用权资产",
           "fill_empty_as": "blank",
           "current": "C37",
+          "note_ref": "B37",
           "current_parent": "D37",
           "prior": "E37",
           "prior_parent": "F37"
@@ -5687,6 +5963,7 @@
           "row_name": "无形资产",
           "fill_empty_as": "blank",
           "current": "C38",
+          "note_ref": "B38",
           "current_parent": "D38",
           "prior": "E38",
           "prior_parent": "F38"
@@ -5707,6 +5984,7 @@
           "row_name": "开发支出",
           "fill_empty_as": "blank",
           "current": "C40",
+          "note_ref": "B40",
           "current_parent": "D40",
           "prior": "E40",
           "prior_parent": "F40"
@@ -5717,6 +5995,7 @@
           "row_name": "商誉",
           "fill_empty_as": "blank",
           "current": "C42",
+          "note_ref": "B42",
           "current_parent": "D42",
           "prior": "E42",
           "prior_parent": "F42"
@@ -5727,6 +6006,7 @@
           "row_name": "长期待摊费用",
           "fill_empty_as": "blank",
           "current": "C43",
+          "note_ref": "B43",
           "current_parent": "D43",
           "prior": "E43",
           "prior_parent": "F43"
@@ -5747,6 +6027,7 @@
           "row_name": "其他非流动资产",
           "fill_empty_as": "blank",
           "current": "C45",
+          "note_ref": "B45",
           "current_parent": "D45",
           "prior": "E45",
           "prior_parent": "F45"
@@ -5757,6 +6038,7 @@
           "row_name": "短期借款",
           "fill_empty_as": "blank",
           "current": "C7",
+          "note_ref": "B7",
           "current_parent": "D7",
           "prior": "E7",
           "prior_parent": "F7"
@@ -5767,6 +6049,7 @@
           "row_name": "交易性金融负债",
           "fill_empty_as": "blank",
           "current": "C8",
+          "note_ref": "B8",
           "current_parent": "D8",
           "prior": "E8",
           "prior_parent": "F8"
@@ -5777,6 +6060,7 @@
           "row_name": "衍生金融负债",
           "fill_empty_as": "blank",
           "current": "C9",
+          "note_ref": "B9",
           "current_parent": "D9",
           "prior": "E9",
           "prior_parent": "F9"
@@ -5787,6 +6071,7 @@
           "row_name": "应付票据",
           "fill_empty_as": "blank",
           "current": "C10",
+          "note_ref": "B10",
           "current_parent": "D10",
           "prior": "E10",
           "prior_parent": "F10"
@@ -5797,6 +6082,7 @@
           "row_name": "应付账款",
           "fill_empty_as": "blank",
           "current": "C11",
+          "note_ref": "B11",
           "current_parent": "D11",
           "prior": "E11",
           "prior_parent": "F11"
@@ -5807,6 +6093,7 @@
           "row_name": "预收款项",
           "fill_empty_as": "blank",
           "current": "C12",
+          "note_ref": "B12",
           "current_parent": "D12",
           "prior": "E12",
           "prior_parent": "F12"
@@ -5817,6 +6104,7 @@
           "row_name": "合同负债",
           "fill_empty_as": "blank",
           "current": "C13",
+          "note_ref": "B13",
           "current_parent": "D13",
           "prior": "E13",
           "prior_parent": "F13"
@@ -5827,6 +6115,7 @@
           "row_name": "应付职工薪酬",
           "fill_empty_as": "blank",
           "current": "C14",
+          "note_ref": "B14",
           "current_parent": "D14",
           "prior": "E14",
           "prior_parent": "F14"
@@ -5837,6 +6126,7 @@
           "row_name": "应交税费",
           "fill_empty_as": "blank",
           "current": "C15",
+          "note_ref": "B15",
           "current_parent": "D15",
           "prior": "E15",
           "prior_parent": "F15"
@@ -5847,6 +6137,7 @@
           "row_name": "其他应付款",
           "fill_empty_as": "blank",
           "current": "C16",
+          "note_ref": "B16",
           "current_parent": "D16",
           "prior": "E16",
           "prior_parent": "F16"
@@ -5887,6 +6178,7 @@
           "row_name": "一年内到期的非流动负债",
           "fill_empty_as": "blank",
           "current": "C20",
+          "note_ref": "B20",
           "current_parent": "D20",
           "prior": "E20",
           "prior_parent": "F20"
@@ -5897,6 +6189,7 @@
           "row_name": "其他流动负债",
           "fill_empty_as": "blank",
           "current": "C21",
+          "note_ref": "B21",
           "current_parent": "D21",
           "prior": "E21",
           "prior_parent": "F21"
@@ -5907,6 +6200,7 @@
           "row_name": "长期借款",
           "fill_empty_as": "blank",
           "current": "C24",
+          "note_ref": "B24",
           "current_parent": "D24",
           "prior": "E24",
           "prior_parent": "F24"
@@ -5917,6 +6211,7 @@
           "row_name": "应付债券",
           "fill_empty_as": "blank",
           "current": "C25",
+          "note_ref": "B25",
           "current_parent": "D25",
           "prior": "E25",
           "prior_parent": "F25"
@@ -5963,6 +6258,7 @@
           "row_name": "租赁负债",
           "fill_empty_as": "blank",
           "current": "C28",
+          "note_ref": "B28",
           "current_parent": "D28",
           "prior": "E28",
           "prior_parent": "F28"
@@ -5973,6 +6269,7 @@
           "row_name": "长期应付款",
           "fill_empty_as": "blank",
           "current": "C29",
+          "note_ref": "B29",
           "current_parent": "D29",
           "prior": "E29",
           "prior_parent": "F29"
@@ -5983,6 +6280,7 @@
           "row_name": "长期应付职工薪酬",
           "fill_empty_as": "blank",
           "current": "C30",
+          "note_ref": "B30",
           "current_parent": "D30",
           "prior": "E30",
           "prior_parent": "F30"
@@ -5993,6 +6291,7 @@
           "row_name": "预计负债",
           "fill_empty_as": "blank",
           "current": "C31",
+          "note_ref": "B31",
           "current_parent": "D31",
           "prior": "E31",
           "prior_parent": "F31"
@@ -6003,6 +6302,7 @@
           "row_name": "递延收益",
           "fill_empty_as": "blank",
           "current": "C32",
+          "note_ref": "B32",
           "current_parent": "D32",
           "prior": "E32",
           "prior_parent": "F32"
@@ -6023,6 +6323,7 @@
           "row_name": "其他非流动负债",
           "fill_empty_as": "blank",
           "current": "C34",
+          "note_ref": "B34",
           "current_parent": "D34",
           "prior": "E34",
           "prior_parent": "F34"
@@ -6033,6 +6334,7 @@
           "row_name": "股本",
           "fill_empty_as": "blank",
           "current": "C39",
+          "note_ref": "B39",
           "current_parent": "D39",
           "prior": "E39",
           "prior_parent": "F39"
@@ -6043,6 +6345,7 @@
           "row_name": "其他权益工具",
           "fill_empty_as": "blank",
           "current": "C40",
+          "note_ref": "B40",
           "current_parent": "D40",
           "prior": "E40",
           "prior_parent": "F40"
@@ -6053,6 +6356,7 @@
           "row_name": "资本公积",
           "fill_empty_as": "blank",
           "current": "C43",
+          "note_ref": "B43",
           "current_parent": "D43",
           "prior": "E43",
           "prior_parent": "F43"
@@ -6073,6 +6377,7 @@
           "row_name": "其他综合收益",
           "fill_empty_as": "blank",
           "current": "C45",
+          "note_ref": "B45",
           "current_parent": "D45",
           "prior": "E45",
           "prior_parent": "F45"
@@ -6083,6 +6388,7 @@
           "row_name": "专项储备",
           "fill_empty_as": "blank",
           "current": "C46",
+          "note_ref": "B46",
           "current_parent": "D46",
           "prior": "E46",
           "prior_parent": "F46"
@@ -6093,6 +6399,7 @@
           "row_name": "盈余公积",
           "fill_empty_as": "blank",
           "current": "C47",
+          "note_ref": "B47",
           "current_parent": "D47",
           "prior": "E47",
           "prior_parent": "F47"
@@ -6103,6 +6410,7 @@
           "row_name": "未分配利润",
           "fill_empty_as": "blank",
           "current": "C48",
+          "note_ref": "B48",
           "current_parent": "D48",
           "prior": "E48",
           "prior_parent": "F48"
@@ -6143,6 +6451,7 @@
           "row_name": "税金及附加",
           "fill_empty_as": "blank",
           "current": "C8",
+          "note_ref": "B8",
           "current_parent": "D8",
           "prior": "E8",
           "prior_parent": "F8"
@@ -6153,6 +6462,7 @@
           "row_name": "销售费用",
           "fill_empty_as": "blank",
           "current": "C9",
+          "note_ref": "B9",
           "current_parent": "D9",
           "prior": "E9",
           "prior_parent": "F9"
@@ -6163,6 +6473,7 @@
           "row_name": "管理费用",
           "fill_empty_as": "blank",
           "current": "C10",
+          "note_ref": "B10",
           "current_parent": "D10",
           "prior": "E10",
           "prior_parent": "F10"
@@ -6173,6 +6484,7 @@
           "row_name": "研发费用",
           "fill_empty_as": "blank",
           "current": "C11",
+          "note_ref": "B11",
           "current_parent": "D11",
           "prior": "E11",
           "prior_parent": "F11"
@@ -6183,6 +6495,7 @@
           "row_name": "财务费用",
           "fill_empty_as": "blank",
           "current": "C12",
+          "note_ref": "B12",
           "current_parent": "D12",
           "prior": "E12",
           "prior_parent": "F12"
@@ -6223,6 +6536,7 @@
           "row_name": "投资收益(损失以“-”号填列）",
           "fill_empty_as": "blank",
           "current": "C16",
+          "note_ref": "B16",
           "current_parent": "D16",
           "prior": "E16",
           "prior_parent": "F16"
@@ -6253,6 +6567,7 @@
           "row_name": "净敞口套期收益(损失以“-”号填列）",
           "fill_empty_as": "blank",
           "current": "C19",
+          "note_ref": "B19",
           "current_parent": "D19",
           "prior": "E19",
           "prior_parent": "F19"
@@ -6263,6 +6578,7 @@
           "row_name": "公允价值变动收益(损失以“-”号填列）",
           "fill_empty_as": "blank",
           "current": "C20",
+          "note_ref": "B20",
           "current_parent": "D20",
           "prior": "E20",
           "prior_parent": "F20"
@@ -6273,6 +6589,7 @@
           "row_name": "信用减值损失(损失以“-”号填列）",
           "fill_empty_as": "blank",
           "current": "C21",
+          "note_ref": "B21",
           "current_parent": "D21",
           "prior": "E21",
           "prior_parent": "F21"
@@ -6283,6 +6600,7 @@
           "row_name": "资产减值损失(损失以“-”号填列）",
           "fill_empty_as": "blank",
           "current": "C22",
+          "note_ref": "B22",
           "current_parent": "D22",
           "prior": "E22",
           "prior_parent": "F22"
@@ -6293,6 +6611,7 @@
           "row_name": "资产处置收益(损失以“-”号填列）",
           "fill_empty_as": "blank",
           "current": "C23",
+          "note_ref": "B23",
           "current_parent": "D23",
           "prior": "E23",
           "prior_parent": "F23"

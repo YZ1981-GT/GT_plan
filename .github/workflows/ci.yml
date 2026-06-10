@@ -196,6 +196,19 @@ jobs:
       - name: File size gate (whitelist only-decrease + HARD_CAPS)
         run: python backend/scripts/check/check_file_size.py
 
+  migration-compat-check:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ vars.MIGRATION_COMPAT_MODE != 'strict' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install sqlglot
+      - run: python backend/scripts/check/check_migration_compat.py --mode ${{ vars.MIGRATION_COMPAT_MODE || 'warning' }}
+
   sqlfluff-lint:
     runs-on: ubuntu-latest
     continue-on-error: true

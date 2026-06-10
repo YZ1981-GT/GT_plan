@@ -91,6 +91,10 @@ async def doc_ai_chat(
 
     复用 ContextBuilder 构建上下文 → ai_service streaming → 留痕。
     需求: 1.1, 5.3
+
+    TODO [zero-downtime-deployment Task 8.1]: 接入 sse_registry
+    - 进入 _stream_chat 时 register，退出时 unregister
+    - from app.core.sse_registry import sse_registry
     """
     try:
         project_id = UUID(req.project_id)

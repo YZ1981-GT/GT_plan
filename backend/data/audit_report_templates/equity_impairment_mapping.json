@@ -1,0 +1,258 @@
+{
+  "equity": {
+    "soe_standalone": {
+      "sheet_title": "5-所有者权益变动表（企财04表）",
+      "current_year": {
+        "share_capital": "C",
+        "other_equity_instrument": "D",
+        "capital_reserve": "G",
+        "treasury_stock": "H",
+        "other_comprehensive_income": "I",
+        "special_reserve": "J",
+        "surplus_reserve": "K",
+        "general_risk_reserve": "L",
+        "retained_earnings": "M",
+        "total_equity": "N"
+      },
+      "prior_year": {
+        "share_capital": "O",
+        "other_equity_instrument": "P",
+        "capital_reserve": "S",
+        "treasury_stock": "T",
+        "other_comprehensive_income": "U",
+        "special_reserve": "V",
+        "surplus_reserve": "W",
+        "general_risk_reserve": "X",
+        "retained_earnings": "Y",
+        "total_equity": "Z"
+      },
+      "row_start": 9,
+      "total_cols_current": 10,
+      "total_cols_prior": 10
+    },
+    "soe_consolidated_main": {
+      "sheet_title": "5-所有者权益变动表（企财04表-合并）",
+      "current_year": {
+        "minority_interest": "O",
+        "total_equity": "P",
+        "share_capital": "C",
+        "other_equity_instrument": "D",
+        "capital_reserve": "G",
+        "treasury_stock": "H",
+        "other_comprehensive_income": "I",
+        "special_reserve": "J",
+        "surplus_reserve": "K",
+        "general_risk_reserve": "L",
+        "retained_earnings": "M",
+        "subtotal": "N"
+      },
+      "prior_year": {
+        "minority_interest": "AC",
+        "total_equity": "AD",
+        "share_capital": "Q",
+        "other_equity_instrument": "R",
+        "capital_reserve": "U",
+        "treasury_stock": "V",
+        "other_comprehensive_income": "W",
+        "special_reserve": "X",
+        "surplus_reserve": "Y",
+        "general_risk_reserve": "Z",
+        "retained_earnings": "AA",
+        "subtotal": "AB"
+      },
+      "row_start": 9,
+      "total_cols_current": 12,
+      "total_cols_prior": 12
+    },
+    "soe_consolidated_parent": {
+      "sheet_title": "6-所有者权益变动表（企财04表-母公司）",
+      "current_year": {
+        "share_capital": "C",
+        "other_equity_instrument": "D",
+        "capital_reserve": "G",
+        "treasury_stock": "H",
+        "other_comprehensive_income": "I",
+        "special_reserve": "J",
+        "surplus_reserve": "K",
+        "general_risk_reserve": "L",
+        "retained_earnings": "M",
+        "total_equity": "N",
+        "preferred_stock": "D",
+        "perpetual_bond": "E"
+      },
+      "prior_year": {
+        "share_capital": "O",
+        "other_equity_instrument": "P",
+        "capital_reserve": "S",
+        "treasury_stock": "T",
+        "other_comprehensive_income": "U",
+        "special_reserve": "V",
+        "surplus_reserve": "W",
+        "general_risk_reserve": "X",
+        "retained_earnings": "Y",
+        "total_equity": "Z",
+        "preferred_stock": "P",
+        "perpetual_bond": "Q"
+      },
+      "row_start": 8,
+      "total_cols_current": 12,
+      "total_cols_prior": 12
+    },
+    "listed_standalone": {
+      "sheet_title": "股东权益变动表",
+      "current_year": {
+        "share_capital": "B",
+        "other_equity_instrument": "C",
+        "capital_reserve": "F",
+        "treasury_stock": "G",
+        "other_comprehensive_income": "H",
+        "special_reserve": "I",
+        "surplus_reserve": "J",
+        "retained_earnings": "K",
+        "total_equity": "L",
+        "preferred_stock": "C",
+        "perpetual_bond": "D"
+      },
+      "prior_year": {
+        "share_capital": "M",
+        "other_equity_instrument": "N",
+        "capital_reserve": "Q",
+        "treasury_stock": "R",
+        "other_comprehensive_income": "S",
+        "special_reserve": "T",
+        "surplus_reserve": "U",
+        "retained_earnings": "V",
+        "total_equity": "W",
+        "preferred_stock": "N",
+        "perpetual_bond": "O"
+      },
+      "row_start": 7,
+      "total_cols_current": 11,
+      "total_cols_prior": 11
+    },
+    "listed_consolidated_main": {
+      "sheet_title": "合并股东（或所有者）权益变动表",
+      "current_year": {
+        "minority_interest": "M",
+        "total_equity": "N",
+        "share_capital": "B",
+        "other_equity_instrument": "C",
+        "capital_reserve": "F",
+        "treasury_stock": "G",
+        "other_comprehensive_income": "H",
+        "special_reserve": "I",
+        "surplus_reserve": "J",
+        "general_risk_reserve": "K",
+        "retained_earnings": "L"
+      },
+      "prior_year": {
+        "minority_interest": "Z",
+        "total_equity": "AA",
+        "share_capital": "O",
+        "other_equity_instrument": "P",
+        "capital_reserve": "S",
+        "treasury_stock": "T",
+        "other_comprehensive_income": "U",
+        "special_reserve": "V",
+        "surplus_reserve": "W",
+        "general_risk_reserve": "X",
+        "retained_earnings": "Y"
+      },
+      "row_start": 8,
+      "total_cols_current": 11,
+      "total_cols_prior": 11
+    },
+    "listed_consolidated_parent": {
+      "sheet_title": "公司股东（或所有者）权益变动表",
+      "current_year": {
+        "share_capital": "B",
+        "other_equity_instrument": "C",
+        "capital_reserve": "F",
+        "treasury_stock": "G",
+        "other_comprehensive_income": "H",
+        "special_reserve": "I",
+        "surplus_reserve": "J",
+        "retained_earnings": "K",
+        "total_equity": "L",
+        "preferred_stock": "C",
+        "perpetual_bond": "D"
+      },
+      "prior_year": {
+        "share_capital": "M",
+        "other_equity_instrument": "N",
+        "capital_reserve": "Q",
+        "treasury_stock": "R",
+        "other_comprehensive_income": "S",
+        "special_reserve": "T",
+        "surplus_reserve": "U",
+        "retained_earnings": "V",
+        "total_equity": "W",
+        "preferred_stock": "N",
+        "perpetual_bond": "O"
+      },
+      "row_start": 7,
+      "total_cols_current": 11,
+      "total_cols_prior": 11
+    }
+  },
+  "impairment": {
+    "soe_standalone": {
+      "sheet_title": "6-资产减值准备情况表（企财06表）",
+      "columns": {
+        "opening_balance": "C",
+        "closing_balance": "M",
+        "provision": "D",
+        "merge_increase": "E",
+        "other_increase": "F",
+        "subtotal_increase": "G",
+        "reversal": "H",
+        "write_off": "I",
+        "merge_decrease": "J",
+        "other_decrease": "K",
+        "subtotal_decrease": "L"
+      },
+      "row_start": 7,
+      "total_cols": 11
+    },
+    "soe_consolidated_main": {
+      "sheet_title": "7-资产减值准备情况表（企财06表－合并）",
+      "columns": {
+        "opening_balance": "C",
+        "closing_balance": "M",
+        "provision": "D",
+        "merge_increase": "E",
+        "other_increase": "F",
+        "subtotal_increase": "G",
+        "reversal": "H",
+        "write_off": "I",
+        "merge_decrease": "J",
+        "other_decrease": "K",
+        "subtotal_decrease": "L"
+      },
+      "row_start": 7,
+      "total_cols": 11
+    },
+    "soe_consolidated_parent": {
+      "sheet_title": "8-资产减值准备情况表（企财06表－母公司）",
+      "columns": {
+        "opening_balance": "C",
+        "closing_balance": "M",
+        "provision": "D",
+        "merge_increase": "E",
+        "other_increase": "F",
+        "subtotal_increase": "G",
+        "reversal": "H",
+        "write_off": "I",
+        "merge_decrease": "J",
+        "other_decrease": "K",
+        "subtotal_decrease": "L"
+      },
+      "row_start": 7,
+      "total_cols": 11
+    }
+  },
+  "_meta": {
+    "description": "权益变动表+减值表列语义映射",
+    "generated_by": "scripts/_build_equity_mapping.py"
+  }
+}

@@ -373,13 +373,15 @@ services:
 
         HTTPS_PROXY: ""
 
-    container_name: audit-backend
-
+    # container_name 已移除：固定名无法多副本（zero-downtime-deployment 组件 6a）
     restart: unless-stopped
 
-    ports:
+    expose:
+      - "8000"
 
-      - "${API_PORT:-8000}:8000"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+
+    stop_grace_period: 40s
 
     environment:
 
@@ -427,6 +429,10 @@ services:
 
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
 
+      BUILD_VERSION_JSON: ${BUILD_VERSION_JSON:-}
+
+      GRACEFUL_SHUTDOWN_TIMEOUT: "30"
+
     volumes:
 
       - ./storage:/app/storage
@@ -444,7 +450,7 @@ services:
 
     healthcheck:
 
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/readyz || exit 1"]
 
       interval: 10s
 
@@ -455,6 +461,21 @@ services:
       start_period: 30s
 
 
+
+  # ----------------------------------------------------------
+  # nginx 反向代理（zero-downtime-deployment 组件 6b，A 专属）
+  # ----------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    profiles:
+      - docker-backend
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
 
   # ----------------------------------------------------------
 

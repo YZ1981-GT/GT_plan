@@ -43,6 +43,10 @@ def register_report_routers(app: FastAPI) -> None:
 
     app.include_router(deliverable_router, tags=["deliverable-center"])
 
+    # ═══ deliverable-lineage-and-writeback: 溯源 + 章节状态 ═══
+    from app.routers.deliverable_lineage import router as deliverable_lineage_router
+    app.include_router(deliverable_lineage_router, tags=["deliverable-lineage"])
+
     # ═══ §44. 报表 Excel 导出 ═══
     from app.routers.report_export import router as report_export_router
     app.include_router(report_export_router, tags=["report-export"])

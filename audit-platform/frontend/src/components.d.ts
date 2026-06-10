@@ -356,6 +356,7 @@ declare module 'vue' {
     LedgerImportDialog: typeof import('./components/ledger-import/LedgerImportDialog.vue')['default']
     LedgerPenetrateDrawer: typeof import('./components/workpaper/LedgerPenetrateDrawer.vue')['default']
     LineageGraphPanel: typeof import('./components/workpaper/LineageGraphPanel.vue')['default']
+    LineagePanel: typeof import('./components/deliverable/LineagePanel.vue')['default']
     LinkageBadge: typeof import('./components/LinkageBadge.vue')['default']
     LinkagePopover: typeof import('./components/LinkagePopover.vue')['default']
     LinkageStatusBar: typeof import('./components/common/LinkageStatusBar.vue')['default']
@@ -379,6 +380,7 @@ declare module 'vue' {
     MyTemplatesDialog: typeof import('./components/query/MyTemplatesDialog.vue')['default']
     MyTodoCard: typeof import('./components/dashboard/MyTodoCard.vue')['default']
     NetAssetSheet: typeof import('./components/consolidation/worksheets/NetAssetSheet.vue')['default']
+    NewVersionBanner: typeof import('./components/NewVersionBanner.vue')['default']
     NLCommandInput: typeof import('./components/ai/NLCommandInput.vue')['default']
     NoteAiSuggestionPanel: typeof import('./components/notes/NoteAiSuggestionPanel.vue')['default']
     NoteCellSourceDrawer: typeof import('./components/notes/NoteCellSourceDrawer.vue')['default']
@@ -562,6 +564,8 @@ declare module 'vue' {
     WpTemplateDetail: typeof import('./components/template-library/WpTemplateDetail.vue')['default']
     WpTemplateTab: typeof import('./components/template-library/WpTemplateTab.vue')['default']
     WpVersionConflictDialog: typeof import('./components/workpaper/WpVersionConflictDialog.vue')['default']
+    WritebackConflictDialog: typeof import('./components/deliverable/WritebackConflictDialog.vue')['default']
+    WritebackResultPanel: typeof import('./components/deliverable/WritebackResultPanel.vue')['default']
   }
   export interface GlobalDirectives {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']

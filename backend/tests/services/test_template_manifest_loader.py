@@ -50,6 +50,30 @@ def test_resolve_report_body_disclaimer_all(loader: TemplateManifestLoader):
     assert "1.4.1" in entry.rel_path.name
 
 
+def test_resolve_report_body_scope_consolidated_vs_standalone(
+    loader: TemplateManifestLoader,
+):
+    """report_body 双口径：standalone 走 standalone/ 子目录，默认/合并走原路径。"""
+    consolidated = loader.resolve_report_body("unqualified", "type_a", "simple")
+    standalone = loader.resolve_report_body(
+        "unqualified", "type_a", "simple", "standalone"
+    )
+    default_scope = loader.resolve_report_body("unqualified", "type_a", "simple")
+
+    assert "standalone/" in str(standalone.rel_path).replace("\\", "/")
+    assert "standalone/" not in str(consolidated.rel_path).replace("\\", "/")
+    # 缺省 report_scope 等同合并套（向后兼容）
+    assert default_scope.rel_path == consolidated.rel_path
+    assert consolidated.exists and standalone.exists
+
+
+def test_resolve_report_body_unknown_scope_falls_back_consolidated(
+    loader: TemplateManifestLoader,
+):
+    entry = loader.resolve_report_body("unqualified", "type_a", "simple", "bogus")
+    assert "standalone/" not in str(entry.rel_path).replace("\\", "/")
+
+
 def test_validate_warns_on_missing_file(tmp_path: Path):
     manifest = {
         "version": "test",

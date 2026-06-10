@@ -10,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
+from app.core.build_version import get_build_version
 from app.core.config import settings
 from app.core.tracing import setup_tracing
 from app.core.logging_config import setup_logging
@@ -22,8 +23,10 @@ from app.middleware.error_handler import (
 from app.middleware.response import ResponseWrapperMiddleware
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.rate_limiter import LLMRateLimitMiddleware
+from app.middleware.app_version import AppVersionHeaderMiddleware
 from app.middleware.body_limit import RequestBodyLimitMiddleware
 from app.middleware.observability import ObservabilityMiddleware
+from app.middleware.inflight import InflightTrackingMiddleware
 from app.services.event_handlers import register_event_handlers
 from app.router_registry import register_all_routers
 
@@ -38,6 +41,11 @@ async def lifespan(app: FastAPI):
     setup_logging(level=log_level, json_format=False)
 
     await _run_migrations()
+
+    # 标记迁移完成 → readyz 探针开始返回就绪
+    from app.core.runtime_state import migration_state
+    migration_state.mark_complete()
+
     register_event_handlers()
     _register_phase_handlers()
     await _replay_startup_events()
@@ -49,15 +57,30 @@ async def lifespan(app: FastAPI):
     stop_event = asyncio.Event()
     tasks = _start_workers(stop_event)
 
+    # 注册 SIGTERM handler（drain 用）
+    from app.core.graceful_shutdown import install_sigterm_handler
+    install_sigterm_handler()
+
     # 启动完成提示（即使在 WARNING 级别也会显示）
     print(f"[GT-Backend] Ready on port {os.getenv('PORT', '9980')} (log_level={log_level})")
 
     yield
 
+    # --- 关闭阶段 ---
+    # 1. SIGTERM 已置 draining=True（readyz 已 503）
+    # 2. 给 nginx 健康检查留窗口（sleep PRE_DRAIN_DELAY）
+    from app.core.graceful_shutdown import PRE_DRAIN_DELAY, drain_http_requests, GRACEFUL_SHUTDOWN_TIMEOUT
+    await asyncio.sleep(PRE_DRAIN_DELAY)
+
+    # 3. 优雅关闭所有 SSE 连接（组件 7a 实现）
+    from app.core.sse_registry import sse_registry
+    await sse_registry.close_all()
+
+    # 4. Drain HTTP in-flight 请求
+    await drain_http_requests(GRACEFUL_SHUTDOWN_TIMEOUT)
+
+    # 5. 后续是现有逻辑（stop_event.set() + worker cancel + dispose_engine）
     # F44 / Sprint 10.52: 优雅关闭 — 通知 worker stop_event + 取消 + 等待。
-    # 等价于 asyncio.wait_for(runner.wait_idle(), timeout=30)：
-    # stop_event.set() 让 run_forever 退出循环，task.cancel() 确保超时兜底，
-    # await task 等待清理完成。满足 F44 graceful shutdown 需求。
     stop_event.set()
     for t in tasks:
         t.cancel()
@@ -276,7 +299,15 @@ async def _replay_startup_events() -> None:
 
 
 def _start_workers(stop_event):
-    """启动所有后台 Worker，返回 task 列表。"""
+    """启动所有后台 Worker，返回 task 列表。
+
+    # TODO: Worker 多副本去重（zero-downtime-deployment Task 9.2）
+    # 对仍需 in-process 的 worker（sla/outbox/cleanup），每轮 run loop 先调：
+    #   if not await try_acquire_leadership("worker_name"):
+    #       await asyncio.sleep(interval); continue
+    # 或用 @with_leader_lock("worker_name") 装饰器
+    # from app.workers._leader_lock import try_acquire_leadership, with_leader_lock
+    """
     import asyncio
     from app.workers import (
         sla_worker, import_recover_worker, outbox_replay_worker,
@@ -316,7 +347,13 @@ setup_tracing(app)
 
 @app.get("/api/version")
 async def api_version():
-    return {"version": "1.0.0", "api_prefix": "/api"}
+    bv = get_build_version()
+    return {
+        "version": bv["semantic_version"],
+        "git_commit": bv["git_commit"],
+        "build_time": bv["build_time"],
+        "api_prefix": "/api",
+    }
 
 
 @app.get("/metrics", tags=["observability"])
@@ -339,15 +376,17 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
 # --- 中间件（LIFO：最后添加的最先执行=洋葱最外层） ---
-# 洋葱模型从外到内：BodyLimit → GZip → Observability → ResponseWrapper → RequestID → RateLimit → AuditLog
+# 洋葱模型从外到内：CORS → AppVersion → BodyLimit → GZip → Observability → ResponseWrapper → RequestID → RateLimit → AuditLog
 # 添加顺序从内到外（先添加=最内层）：
-app.add_middleware(AuditLogMiddleware)          # 最内层，记录路由真实响应状态码
+app.add_middleware(InflightTrackingMiddleware)   # 最内层，in-flight 请求计数（drain 用）
+app.add_middleware(AuditLogMiddleware)          # 记录路由真实响应状态码
 app.add_middleware(LLMRateLimitMiddleware)      # LLM 限流
 app.add_middleware(RequestIDMiddleware)         # 注入 request_id
 app.add_middleware(ResponseWrapperMiddleware)   # 统一响应格式
 app.add_middleware(ObservabilityMiddleware)     # 请求指标采集 + 慢请求告警
 app.add_middleware(GZipMiddleware, minimum_size=1000)  # 压缩响应
-app.add_middleware(RequestBodyLimitMiddleware)  # 最外层，最先拦截超大请求
+app.add_middleware(RequestBodyLimitMiddleware)  # 超大请求拦截
+app.add_middleware(AppVersionHeaderMiddleware)   # 注入 X-App-Version 头（所有响应含错误）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()],

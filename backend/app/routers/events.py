@@ -36,6 +36,7 @@ async def sse_stream(
     """SSE 事件流：客户端订阅后接收试算表更新等事件通知
 
     前端使用 EventSource 连接此端点，收到事件后刷新试算表数据。
+    已接入 sse_registry 实现 graceful drain（滚动更新零断流）。
     """
 
     async def event_generator():
@@ -103,8 +104,22 @@ async def sse_stream(
         finally:
             event_bus.remove_sse_queue(queue)
 
+    async def event_generator_with_registry():
+        """Wrap event_generator with SSE registry for graceful drain."""
+        from app.core.sse_registry import sse_registry
+
+        conn = sse_registry.register()
+        try:
+            async for chunk in event_generator():
+                if conn.is_closed:
+                    yield f"event: server_draining\ndata: {{}}\n\n"
+                    break
+                yield chunk
+        finally:
+            sse_registry.unregister(conn)
+
     return StreamingResponse(
-        event_generator(),
+        event_generator_with_registry(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

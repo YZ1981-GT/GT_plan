@@ -23,6 +23,7 @@ class SourceType(str, Enum):
     note = "note"
     attachment = "attachment"
     ai = "ai"
+    deliverable = "deliverable"
 
 
 class TargetType(str, Enum):

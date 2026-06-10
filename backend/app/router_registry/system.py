@@ -30,12 +30,14 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §1. 基础设施（认证/健康/WOPI） ═══
     from app.api.auth import router as auth_router
     from app.api.health import router as health_router
+    from app.api.probes import router as probes_router
     from app.api.users import router as users_router
     from app.api.wopi import router as wopi_router
 
     app.include_router(auth_router, prefix="/api/auth", tags=["认证"])
     app.include_router(users_router, prefix="/api/users", tags=["用户"])
     app.include_router(health_router, prefix="/api", tags=["健康检查"])
+    app.include_router(probes_router, tags=["探针"])  # /livez, /readyz at root (no /api prefix)
     app.include_router(wopi_router, prefix="/wopi", tags=["WOPI"])
 
     # ═══ §103. Phase 6 F6: 二次密码验证 ═══
@@ -276,3 +278,7 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §132. platform-linkage-contract-stale P1-1: 统一穿透查询 ═══
     from app.routers.linkage_trace import router as linkage_trace_router
     app.include_router(linkage_trace_router, tags=["linkage"])
+
+    # ═══ §133. zero-downtime-deployment: DB-backed Feature Flags V2 (灰度) ═══
+    from app.api.feature_flags import router as feature_flags_v2_router
+    app.include_router(feature_flags_v2_router, tags=["Feature Flags V2"])

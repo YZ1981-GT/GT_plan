@@ -13,7 +13,7 @@ from starlette.responses import Response
 
 
 # 跳过包装的路径前缀
-_SKIP_PATHS = ("/docs", "/redoc", "/openapi.json", "/wopi/", "/api/events/", "/api/message/stream")
+_SKIP_PATHS = ("/docs", "/redoc", "/openapi.json", "/wopi/", "/api/events/", "/api/message/stream", "/livez", "/readyz")
 
 # OnlyOffice callback 路径包含 "onlyoffice/callback"，需精确跳过
 _SKIP_CONTAINS = ("onlyoffice/callback",)

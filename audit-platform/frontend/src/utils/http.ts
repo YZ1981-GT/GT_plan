@@ -8,6 +8,7 @@ import axios, { type AxiosResponse, type InternalAxiosRequestConfig, type AxiosE
 import NProgress from 'nprogress'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { versionBridge } from '@/composables/useVersionCheck'
 
 // ── NProgress 活跃请求计数器 ──────────────────────────────
 let activeRequests = 0
@@ -188,6 +189,11 @@ http.interceptors.response.use(
     removePending(response.config as InternalAxiosRequestConfig)
     // R7-S2-11: 存储 trace id
     _lastTraceId = response.headers?.['x-request-id'] || ''
+    // 版本协商：读 X-App-Version 头推送到 versionBridge
+    const appVersion = response.headers?.['x-app-version']
+    if (appVersion) {
+      versionBridge.push(appVersion)
+    }
     // R10 Spec C: 5xx 环形缓冲区记录响应
     _trackResponse(response.status)
     // NProgress：所有请求完成后结束进度条

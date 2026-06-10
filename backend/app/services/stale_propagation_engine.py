@@ -126,14 +126,17 @@ class StalePropagationEngine:
         - WP:* → UPDATE working_paper SET prefill_stale=true WHERE wp_code=...
         - REPORT:* → UPDATE financial_report SET is_stale=true WHERE ...
         - NOTE:* → UPDATE disclosure_notes SET is_stale=true WHERE ...
+        - DELIVERABLE:{word_export_task_id}:{section_code} → UPDATE deliverable_section_state SET is_stale=true
         """
         pid = str(project_id)
-        counts: dict[str, int] = {"wp": 0, "report": 0, "note": 0}
+        counts: dict[str, int] = {"wp": 0, "report": 0, "note": 0, "deliverable": 0}
 
         # Group URIs by module prefix
         wp_codes: list[str] = []
         report_codes: list[str] = []
         note_codes: list[str] = []
+        # DELIVERABLE:{word_export_task_id}:{section_code}
+        deliverable_codes: list[tuple[str, str]] = []
 
         for uri in uris:
             parts = uri.split(":", 2)
@@ -145,6 +148,10 @@ class StalePropagationEngine:
                 report_codes.append(code)
             elif module == "NOTE" and code:
                 note_codes.append(code)
+            elif module == "DELIVERABLE" and code:
+                section_code = parts[2] if len(parts) > 2 else ""
+                if section_code:
+                    deliverable_codes.append((code, section_code))
 
         async with async_session_factory() as session:
             try:
@@ -185,12 +192,29 @@ class StalePropagationEngine:
                     )
                     counts["note"] = result.rowcount or 0
 
+                # Mark deliverable sections stale (deliverable_section_state)
+                if deliverable_codes:
+                    total_deliverable = 0
+                    for wid, sc in deliverable_codes:
+                        res = await session.execute(
+                            text(
+                                "UPDATE deliverable_section_state SET is_stale = true "
+                                "WHERE word_export_task_id = :wid "
+                                "AND section_code = :sc "
+                                "AND is_stale = false"
+                            ),
+                            {"wid": wid, "sc": sc},
+                        )
+                        total_deliverable += res.rowcount or 0
+                    counts["deliverable"] = total_deliverable
+
                 await session.commit()
                 logger.info(
-                    "[StalePropagation] Marked stale: wp=%d report=%d note=%d (project=%s)",
+                    "[StalePropagation] Marked stale: wp=%d report=%d note=%d deliverable=%d (project=%s)",
                     counts["wp"],
                     counts["report"],
                     counts["note"],
+                    counts["deliverable"],
                     pid,
                 )
             except Exception as e:

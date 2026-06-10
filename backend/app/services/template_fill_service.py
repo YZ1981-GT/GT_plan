@@ -217,6 +217,22 @@ class TemplateFillService:
         )
         return result.scalar_one_or_none()
 
+    async def _resolve_report_scope(self, project_id: UUID) -> str:
+        """解析项目报表口径（consolidated/standalone），默认 consolidated。
+
+        权威源 project.report_scope；wizard_state.basic_info 回退；缺失默认合并。
+        """
+        from app.models.core import Project
+
+        project = await self.db.get(Project, project_id)
+        if project is None:
+            return "consolidated"
+        raw = (getattr(project, "report_scope", None) or "").strip().lower()
+        if raw not in ("consolidated", "standalone"):
+            basic = (project.wizard_state or {}).get("basic_info", {}).get("data", {})
+            raw = str(basic.get("report_scope") or "").strip().lower()
+        return raw if raw in ("consolidated", "standalone") else "consolidated"
+
     def _manifest_subtype_key(self, opinion_type: str, company_subtype: str) -> str:
         """disclaimer 意见映射到单一通用模板键 ``_all``（manifest）。"""
         if opinion_type == OpinionType.disclaimer.value:
@@ -241,9 +257,10 @@ class TemplateFillService:
             project_id, company_subtype
         )
         manifest_key = self._manifest_subtype_key(opinion_type, resolved_subtype)
+        report_scope = await self._resolve_report_scope(project_id)
 
         entry = self.loader.resolve_report_body(
-            opinion_type, manifest_key, template_variant
+            opinion_type, manifest_key, template_variant, report_scope
         )
         if not entry.exists:
             raise ValueError(
