@@ -151,6 +151,7 @@ inclusion: always
 - **🔴→🟡 报表新占位代码支持（2026-06-11 实证）**：续表✅+imp✅+note_ref✅，**仅剩 `{{eq:}}` 权益变动表待矩阵存储方案**
 - **🟡 附注模板 SECTION 块内部细化待做**：~600 块×4 变体，待用户确认启动
 - **已知 Bug**：辽宁卫生服务序时账 debit==credit / 明细账翻页余额第 2 页起错 / 试算差额 44M（源数据符号问题）
+- **🟢 未审报表"暂无数据"修复（2026-06-11）**：`report_engine.generate_unadjusted_report` 硬编码 `_load_report_configs("enterprise")` 但 DB 只有 soe_standalone/soe_consolidated/listed_standalone/listed_consolidated 四种标准→空配置→空报表。改为动态调 `ReportConfigService.resolve_applicable_standard(db, project_id)`。需重启后端生效
 - **外部依赖**：LLM embedding / 合并 UAT / GitHub 默认分支改 main / 钉集成
 - **待建 spec**：consol_disclosure_service 瘦身(1736行) / migration_runner 瘦身(1026行) / workpaper-content-semantic-system；已出三件套待实施=workpaper-unified-import-export(V069) + workpaper-bad-debt-nested-structure(V070,基于真实模板 D2-3 父行/子行/合计嵌套)
 - **🔴 workpaper-unified-import-export spec 实施前必修 design**：复盘实证现有 `wp_xlsx_export_service`(export_workpaper_xlsx 4路径写入+公式保留+Semaphore10)/`WpUploadService`(upload_file 版本冲突+解析+事件+云同步+版本链)/`WpDownloadService`(download_pack ZIP+{cycle}/{wp_code} 目录)/`offline_conflict_service`(字段级冲突)/`test_xlsx_export_roundtrip` 已覆盖 spec 设计的 export/import/batch/conflict/roundtrip 大部分——**真正缺失仅 4 项**：①MetadataCodec 元数据嵌入提取 ②SHA-256 快照哈希冲突(现仅比版本号) ③结构化校验报告 FormatValidator ④跨项目 TemplateCopier。design Components 须改为"复用扩展现有服务"而非新建，可砍 ~40% 重复任务

@@ -1214,8 +1214,11 @@ class ReportEngine:
 
         Phase 9 Task 9.15: 动态计算，不存储到数据库。
         """
-        # 加载全部报表配置，然后筛选指定类型
-        all_configs = await self._load_report_configs("enterprise")
+        # 动态确定报表标准（与审定模式一致，不硬编码 "enterprise"）
+        from app.services.report_config_service import ReportConfigService
+        applicable_standard = await ReportConfigService.resolve_applicable_standard(self.db, project_id)
+
+        all_configs = await self._load_report_configs(applicable_standard)
         rt = report_type if isinstance(report_type, FinancialReportType) else FinancialReportType(report_type)
         configs = all_configs.get(rt, [])
         if not configs:
