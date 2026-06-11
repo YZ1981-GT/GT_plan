@@ -860,6 +860,11 @@ class ReportLineMapping(Base):
     report_line_name: Mapped[str] = mapped_column(String, nullable=False)
     report_line_level: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     parent_line_code: Mapped[str | None] = mapped_column(String, nullable=True)
+    # 行次聚合方向：'add' 加项 / 'subtract' 减项(备抵科目，如累计折旧/减值/库存股)。
+    # v2 符号约定下备抵科目存自然正数，聚合到报表行次时须减去，否则净值虚增。
+    mapping_sign: Mapped[str] = mapped_column(
+        String, server_default=text("'add'"), nullable=False
+    )
     mapping_type: Mapped[ReportLineMappingType] = mapped_column(
         sa.Enum(ReportLineMappingType, name="report_line_mapping_type", create_type=False),
         nullable=False,

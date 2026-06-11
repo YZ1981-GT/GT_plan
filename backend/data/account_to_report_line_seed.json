@@ -1,7 +1,7 @@
 {
   "description": "标准科目 → 报表行次映射 seed (按 4 套维度独立映射 + 客户常用别名 + r4: 4401 工程施工→合同资产)",
   "data_source": "backend/data/standard_account_chart.json + backend/data/report_config_seed.json",
-  "version": "v2026-06-04-r5",
+  "version": "v2026-06-10-r6-contra",
   "mappings": {
     "soe_standalone": [
       {
@@ -873,6 +873,36 @@
         "report_type": "balance_sheet",
         "report_line_code": "BS-125",
         "report_line_name": "未分配利润"
+      },
+      {
+        "standard_account_code": "1452",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-018",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "1416",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-018",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "1525",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-036",
+        "report_line_name": "投资性房地产"
+      },
+      {
+        "standard_account_code": "1526",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-036",
+        "report_line_name": "投资性房地产"
+      },
+      {
+        "standard_account_code": "2705",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-093",
+        "report_line_name": "长期应付职工薪酬"
       }
     ],
     "soe_consolidated": [
@@ -1745,6 +1775,36 @@
         "report_type": "balance_sheet",
         "report_line_code": "BS-125",
         "report_line_name": "未分配利润"
+      },
+      {
+        "standard_account_code": "1452",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-018",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "1416",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-018",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "1525",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-036",
+        "report_line_name": "投资性房地产"
+      },
+      {
+        "standard_account_code": "1526",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-036",
+        "report_line_name": "投资性房地产"
+      },
+      {
+        "standard_account_code": "2705",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-093",
+        "report_line_name": "长期应付职工薪酬"
       }
     ],
     "listed_standalone": [
@@ -2617,6 +2677,36 @@
         "report_type": "balance_sheet",
         "report_line_code": "BS-084",
         "report_line_name": "未分配利润"
+      },
+      {
+        "standard_account_code": "1452",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-012",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "1416",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-012",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "1525",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-027",
+        "report_line_name": "投资性房地产"
+      },
+      {
+        "standard_account_code": "1526",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-027",
+        "report_line_name": "投资性房地产"
+      },
+      {
+        "standard_account_code": "2705",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-067",
+        "report_line_name": "长期应付职工薪酬"
       }
     ],
     "listed_consolidated": [
@@ -3489,6 +3579,36 @@
         "report_type": "balance_sheet",
         "report_line_code": "BS-084",
         "report_line_name": "未分配利润"
+      },
+      {
+        "standard_account_code": "1452",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-012",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "1416",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-012",
+        "report_line_name": "存货"
+      },
+      {
+        "standard_account_code": "1525",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-027",
+        "report_line_name": "投资性房地产"
+      },
+      {
+        "standard_account_code": "1526",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-027",
+        "report_line_name": "投资性房地产"
+      },
+      {
+        "standard_account_code": "2705",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-067",
+        "report_line_name": "长期应付职工薪酬"
       }
     ]
   }

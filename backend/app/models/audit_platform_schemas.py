@@ -323,6 +323,7 @@ class ReportLineMappingResponse(BaseModel):
     mapping_type: ReportLineMappingType
     is_confirmed: bool
     confidence_score: float | None = None
+    mapping_sign: str = "add"
     created_at: datetime
 
 
@@ -334,6 +335,7 @@ class ReportLineMappingUpdate(BaseModel):
     report_line_level: int = Field(ge=1, le=10)
     parent_line_code: str | None = None
     is_confirmed: bool = True
+    mapping_sign: str | None = None
 
 
 class ReportLineMappingConfirm(BaseModel):

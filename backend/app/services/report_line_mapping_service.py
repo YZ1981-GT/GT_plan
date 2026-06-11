@@ -21,6 +21,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import (
+    AccountCategory,
     AccountChart,
     AccountMapping,
     AccountSource,
@@ -35,6 +36,7 @@ from app.models.audit_platform_schemas import (
     ReportLineMappingUpdate,
 )
 from app.models.core import Project
+from app.services.account_chart_service import _infer_category
 
 logger = logging.getLogger(__name__)
 
@@ -121,11 +123,59 @@ def _normalize_account_code(code: str) -> str:
     return out
 
 
+def _bs_line_side(report_line_name: str) -> str | None:
+    """判断资产负债表行次名属于 资产/负债/权益 哪一侧（用于科目类别一致性校验）。
+
+    返回 'asset' / 'liability' / 'equity' / None(无法判定)。
+    用行次名关键词判定，不新增硬编码——复用权益类名称特征。
+    """
+    name = (report_line_name or "").strip()
+    if not name:
+        return None
+    # 权益侧行次特征词
+    _EQUITY_LINE_KW = (
+        "实收资本", "股本", "资本公积", "盈余公积", "未分配利润", "利润分配",
+        "本年利润", "综合收益", "权益工具", "库存股", "所有者权益", "股东权益",
+        "少数股东权益", "专项储备", "一般风险准备",
+    )
+    for kw in _EQUITY_LINE_KW:
+        if kw in name:
+            return "equity"
+    # 负债侧行次特征词
+    _LIABILITY_LINE_KW = (
+        "借款", "应付", "预收", "合同负债", "递延收益", "递延所得税负债",
+        "预计负债", "租赁负债", "负债",
+    )
+    for kw in _LIABILITY_LINE_KW:
+        if kw in name:
+            return "liability"
+    # 其余资产负债表行次默认资产侧（货币资金/存货/固定资产/投资性房地产等）
+    return "asset"
+
+
+def _account_category_to_bs_side(category: "AccountCategory") -> str | None:
+    """把科目类别映射到资产负债表侧。损益类返回 None（不参与 BS 行次一致性校验）。"""
+    if category == AccountCategory.asset:
+        return "asset"
+    if category == AccountCategory.liability:
+        return "liability"
+    if category == AccountCategory.equity:
+        return "equity"
+    return None  # revenue / expense 属利润表，不在 BS 侧校验范围
+
+
 def _lookup_report_line_from_seed(
     standard_account_code: str,
     applicable_standard: str,
+    account_name: str = "",
 ) -> tuple[str, str, str] | None:
     """从 seed 查 (line_code, line_name, report_type). 找不到返回 None.
+
+    名称双保险（2026-06-10）：编码命中候选行次后，用 `_infer_category(code, name)`
+    校验科目真实类别与候选行次所属资产负债表侧是否一致。若冲突（如名称"盈余公积"
+    =equity 但编码 4101 命中的是"存货"=asset 行次），放弃编码命中返回 None，避免
+    "同编码不同含义"(4101 标准表=制造费用/客户=盈余公积)被错配。
+    仅对资产负债表行次做侧别一致性校验；利润表行次与损益类科目不拦截。
 
     匹配优先级:
     1. 完整编码精确匹配(如 1231-01 / 100201)
@@ -139,22 +189,41 @@ def _lookup_report_line_from_seed(
 
     code = standard_account_code.strip()
 
+    def _guarded(m: dict) -> tuple[str, str, str] | None:
+        """对编码命中的候选行次做名称类别一致性校验。
+
+        仅当资产负债表行次的侧别(资产/负债/权益)与科目名称推断的类别冲突时拦截，
+        返回 None；否则放行。利润表行次或无名称时不拦截。
+        """
+        line_code = m["report_line_code"]
+        line_name = m["report_line_name"]
+        report_type = m["report_type"]
+        # 无科目名称 → 无法做名称校验，按原编码命中放行（兜底不变）
+        if not account_name or report_type != "balance_sheet":
+            return line_code, line_name, report_type
+        acct_side = _account_category_to_bs_side(_infer_category(code, account_name))
+        # 科目是损益类(side=None) → 不参与 BS 行次侧别校验，放行
+        if acct_side is None:
+            return line_code, line_name, report_type
+        line_side = _bs_line_side(line_name)
+        if line_side is not None and line_side != acct_side:
+            # 冲突(如 equity 科目命中 asset 行次)：放弃编码命中，交上层兜底/待复核
+            return None
+        return line_code, line_name, report_type
+
     # 策略 1: 带连字符的二级科目(坏账分项 1231-01) 直接精确匹配
     if "-" in code and code in std_map:
-        m = std_map[code]
-        return m["report_line_code"], m["report_line_name"], m["report_type"]
+        return _guarded(std_map[code])
 
     # 策略 2: 完整编码精确匹配
     if code in std_map:
-        m = std_map[code]
-        return m["report_line_code"], m["report_line_name"], m["report_type"]
+        return _guarded(std_map[code])
 
     # 策略 3: 规范化后取 4 位前缀
     normalized = _normalize_account_code(code)
     prefix4 = normalized[:4] if len(normalized) >= 4 else normalized
     if prefix4 in std_map:
-        m = std_map[prefix4]
-        return m["report_line_code"], m["report_line_name"], m["report_type"]
+        return _guarded(std_map[prefix4])
 
     return None
 
@@ -279,9 +348,21 @@ async def ai_suggest_mappings(
     suggestions: list[dict] = []
     seen_keys: set[str] = set()
 
+    # 备抵科目聚合方向判定：名称命中备抵正则(累计折旧/摊销/各类减值/跌价/坏账/折耗/库存股)
+    # → mapping_sign='subtract'（v2 自然正数下须从行次净额减去）。复用 direction_resolver。
+    from app.services.ledger_import.direction_resolver import resolve_account_direction
+
+    def _derive_sign(code: str) -> str:
+        name = code_name_map.get(code, "")
+        _dir, source = resolve_account_direction(code, name)
+        return "subtract" if source == "contra_account" else "add"
+
     for std_code in mapped_std_codes:
         # seed 优先: 直接从 seed 查 (line_code, line_name, report_type)
-        seed_hit = _lookup_report_line_from_seed(std_code, applicable_standard)
+        # 传入科目名称做编码+名称双保险（拦截 4101 盈余公积 误配存货等同编码不同义场景）
+        seed_hit = _lookup_report_line_from_seed(
+            std_code, applicable_standard, code_name_map.get(std_code, "")
+        )
         if seed_hit is None:
             # 编码前缀都不在 seed → 跳过(不再走旧的关键词兜底,避免乱匹配 BS001 vs BS-001)
             continue
@@ -320,11 +401,14 @@ async def ai_suggest_mappings(
             if not force_refresh and existing.is_confirmed:
                 continue
             old_code = existing.report_line_code
-            if old_code != line_code or existing.report_line_name != line_name:
+            new_sign = _derive_sign(std_code)
+            if (old_code != line_code or existing.report_line_name != line_name
+                    or existing.mapping_sign != new_sign):
                 existing.report_line_code = line_code
                 existing.report_line_name = line_name
                 existing.report_line_level = 1
                 existing.parent_line_code = None
+                existing.mapping_sign = new_sign
                 suggestions.append({
                     "standard_account_code": std_code,
                     "report_type": rt.value,
@@ -334,6 +418,7 @@ async def ai_suggest_mappings(
                     "parent_line_code": None,
                     "confidence": 1.0,
                     "applicable_standard": applicable_standard,
+                    "mapping_sign": new_sign,
                     "action": "refreshed",
                     "old_report_line_code": old_code,
                 })
@@ -350,6 +435,7 @@ async def ai_suggest_mappings(
             parent_line_code=None,
             mapping_type=ReportLineMappingType.ai_suggested,
             is_confirmed=False,
+            mapping_sign=_derive_sign(std_code),
         )
         db.add(mapping)
         suggestions.append({
@@ -728,6 +814,8 @@ async def update_mapping(
     record.parent_line_code = parent_line_code
     record.mapping_type = ReportLineMappingType.manual
     record.is_confirmed = data.is_confirmed
+    if data.mapping_sign in ("add", "subtract"):
+        record.mapping_sign = data.mapping_sign
 
     await db.flush()
     await db.commit()

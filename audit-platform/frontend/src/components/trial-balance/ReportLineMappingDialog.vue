@@ -310,77 +310,39 @@ async function loadMappings() {
   if (!props.projectId) return
   loading.value = true
   try {
-    const [mapData, linesData] = await Promise.all([
+    const [mapData, bsLines, isLines] = await Promise.all([
       api.get(reportLineMapping.list(props.projectId)),
-      api.get(`/api/projects/${props.projectId}/report-line-mapping/report-lines`).catch(() => []),
+      // 真实报表行次全集（按项目维度解析 applicable_standard）：资产负债表 + 利润表
+      api.get(`/api/report-config?project_id=${props.projectId}&report_type=balance_sheet`).catch(() => []),
+      api.get(`/api/report-config?project_id=${props.projectId}&report_type=income_statement`).catch(() => []),
     ])
     mappings.value = Array.isArray(mapData) ? mapData : []
-    // 报表行次选项：始终用完整标准行次（确保未分配利润等不遗漏）
-    // 后端返回的只是已用过的子集，不能作为可选全集
-    reportLineOptions.value = _buildDefaultReportLines()
+    // 报表行次选项：用真实 report_config 全集（row_code=BS-XXX/IS-XXX），
+    // 非合计行、非分类行才可作为科目映射目标。后端无数据时回退内置兜底。
+    const lines: any[] = []
+    for (const [rows, rt] of [[bsLines, 'balance_sheet'], [isLines, 'income_statement']] as const) {
+      if (Array.isArray(rows)) {
+        for (const r of rows) {
+          if (r.is_total_row) continue  // 合计行不作为映射目标
+          lines.push({
+            report_line_code: r.row_code,
+            report_line_name: r.row_name,
+            report_type: rt,
+          })
+        }
+      }
+    }
+    reportLineOptions.value = lines.length > 0 ? lines : _buildDefaultReportLines()
   } catch (e) { handleApiError(e, '加载映射规则') }
   finally { loading.value = false }
 }
 watch(visible, (v) => { if (v && props.projectId) { loadMappings(); projectStore.loadProjectOptions() } })
 
-// 预设标准报表行次（当后端无数据时的兜底）
+// 兜底：后端 report_config 无数据时返回空（不再硬编码旧格式行次，
+// 避免 BS001 与真实 BS-002 不一致导致选错行次）。正常情况走 report_config 全集。
 function _buildDefaultReportLines() {
-  return [
-    { report_line_code: 'BS001', report_line_name: '货币资金', report_type: 'balance_sheet' },
-    { report_line_code: 'BS002', report_line_name: '交易性金融资产', report_type: 'balance_sheet' },
-    { report_line_code: 'BS003', report_line_name: '应收票据', report_type: 'balance_sheet' },
-    { report_line_code: 'BS004', report_line_name: '应收账款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS005', report_line_name: '预付款项', report_type: 'balance_sheet' },
-    { report_line_code: 'BS006', report_line_name: '应收利息', report_type: 'balance_sheet' },
-    { report_line_code: 'BS007', report_line_name: '应收股利', report_type: 'balance_sheet' },
-    { report_line_code: 'BS008', report_line_name: '其他应收款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS009', report_line_name: '存货', report_type: 'balance_sheet' },
-    { report_line_code: 'BS010', report_line_name: '持有待售资产', report_type: 'balance_sheet' },
-    { report_line_code: 'BS011', report_line_name: '长期股权投资', report_type: 'balance_sheet' },
-    { report_line_code: 'BS012', report_line_name: '固定资产', report_type: 'balance_sheet' },
-    { report_line_code: 'BS013', report_line_name: '无形资产', report_type: 'balance_sheet' },
-    { report_line_code: 'BS014', report_line_name: '长期待摊费用', report_type: 'balance_sheet' },
-    { report_line_code: 'BS015', report_line_name: '在建工程', report_type: 'balance_sheet' },
-    { report_line_code: 'BS016', report_line_name: '开发支出', report_type: 'balance_sheet' },
-    { report_line_code: 'BS017', report_line_name: '商誉', report_type: 'balance_sheet' },
-    { report_line_code: 'BS022', report_line_name: '递延所得税资产', report_type: 'balance_sheet' },
-    { report_line_code: 'BS101', report_line_name: '短期借款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS102', report_line_name: '应付票据', report_type: 'balance_sheet' },
-    { report_line_code: 'BS103', report_line_name: '应付账款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS104', report_line_name: '预收款项', report_type: 'balance_sheet' },
-    { report_line_code: 'BS105', report_line_name: '应付职工薪酬', report_type: 'balance_sheet' },
-    { report_line_code: 'BS106', report_line_name: '应交税费', report_type: 'balance_sheet' },
-    { report_line_code: 'BS107', report_line_name: '其他应付款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS108', report_line_name: '长期借款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS109', report_line_name: '应付债券', report_type: 'balance_sheet' },
-    { report_line_code: 'BS110', report_line_name: '长期应付款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS115', report_line_name: '预计负债', report_type: 'balance_sheet' },
-    { report_line_code: 'BS116', report_line_name: '递延所得税负债', report_type: 'balance_sheet' },
-    { report_line_code: 'BS201', report_line_name: '实收资本（股本）', report_type: 'balance_sheet' },
-    { report_line_code: 'BS202', report_line_name: '资本公积', report_type: 'balance_sheet' },
-    { report_line_code: 'BS203', report_line_name: '盈余公积', report_type: 'balance_sheet' },
-    { report_line_code: 'BS204', report_line_name: '未分配利润', report_type: 'balance_sheet' },
-    { report_line_code: 'BS205', report_line_name: '其他综合收益', report_type: 'balance_sheet' },
-    { report_line_code: 'BS206', report_line_name: '库存股', report_type: 'balance_sheet' },
-    { report_line_code: 'BS207', report_line_name: '专项储备', report_type: 'balance_sheet' },
-    { report_line_code: 'BS209', report_line_name: '其他权益工具', report_type: 'balance_sheet' },
-    { report_line_code: 'IS001', report_line_name: '营业收入', report_type: 'income_statement' },
-    { report_line_code: 'IS002', report_line_name: '营业成本', report_type: 'income_statement' },
-    { report_line_code: 'IS003', report_line_name: '税金及附加', report_type: 'income_statement' },
-    { report_line_code: 'IS004', report_line_name: '销售费用', report_type: 'income_statement' },
-    { report_line_code: 'IS005', report_line_name: '管理费用', report_type: 'income_statement' },
-    { report_line_code: 'IS006', report_line_name: '研发费用', report_type: 'income_statement' },
-    { report_line_code: 'IS007', report_line_name: '财务费用', report_type: 'income_statement' },
-    { report_line_code: 'IS008', report_line_name: '资产减值损失', report_type: 'income_statement' },
-    { report_line_code: 'IS009', report_line_name: '信用减值损失', report_type: 'income_statement' },
-    { report_line_code: 'IS010', report_line_name: '资产处置收益', report_type: 'income_statement' },
-    { report_line_code: 'IS011', report_line_name: '其他收益', report_type: 'income_statement' },
-    { report_line_code: 'IS012', report_line_name: '投资收益', report_type: 'income_statement' },
-    { report_line_code: 'IS013', report_line_name: '公允价值变动收益', report_type: 'income_statement' },
-    { report_line_code: 'IS014', report_line_name: '营业外收入', report_type: 'income_statement' },
-    { report_line_code: 'IS015', report_line_name: '营业外支出', report_type: 'income_statement' },
-    { report_line_code: 'IS016', report_line_name: '所得税费用', report_type: 'income_statement' },
-  ]
+  console.warn('[ReportLineMapping] report_config 无数据，报表行次下拉为空，请先生成/加载报表配置')
+  return [] as { report_line_code: string; report_line_name: string; report_type: string }[]
 }
 
 // ─── 一键预设（生成 + 自动确认） ───

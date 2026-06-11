@@ -217,32 +217,12 @@ async def _generate_client_accounts_from_balance(
     # 获取 active dataset_id
     dataset_id = await DatasetService.get_active_dataset_id(db, project_id, year or 2025)
 
-    # 按编码首位推断 category
-    def _infer_category(code: str) -> str:
-        if not code:
-            return AccountCategory.asset.value
-        first = code[0]
-        if first == '1':
-            return AccountCategory.asset.value
-        elif first == '2':
-            return AccountCategory.liability.value
-        elif first == '3':
-            return AccountCategory.equity.value
-        elif first == '4':
-            return AccountCategory.equity.value
-        elif first == '5':
-            return AccountCategory.revenue.value
-        elif first == '6':
-            return AccountCategory.expense.value
-        return AccountCategory.asset.value
-
-    # 按 category 推断借贷方向
-    from app.models.audit_platform_models import AccountDirection
-    def _infer_direction(cat: str) -> AccountDirection:
-        # 资产/费用类 = 借方；负债/权益/收入类 = 贷方
-        if cat in (AccountCategory.asset.value, AccountCategory.expense.value):
-            return AccountDirection.debit
-        return AccountDirection.credit
+    # 类别/方向判定复用 account_chart_service 的权威实现（编码+名称双保险），
+    # 不再本地纯编码推断（避免 4001 生产成本/4101 制造费用被误判 equity）。
+    from app.services.account_chart_service import (
+        _infer_category as _infer_category_canonical,
+        _infer_direction as _infer_direction_canonical,
+    )
 
     def _infer_level(code: str) -> int:
         if '.' in code:
@@ -257,7 +237,7 @@ async def _generate_client_accounts_from_balance(
     for row in balance_accounts:
         code = row.account_code
         name = row.account_name or code
-        cat = _infer_category(code)
+        cat = _infer_category_canonical(code, name)  # 编码+名称双保险（AccountCategory 枚举）
 
         # 检查是否已存在
         existing = await db.execute(
@@ -278,7 +258,7 @@ async def _generate_client_accounts_from_balance(
             account_name=name,
             source=AccountSource.client,
             category=cat,
-            direction=_infer_direction(cat),
+            direction=_infer_direction_canonical(cat),
             level=_infer_level(code),
             dataset_id=dataset_id,
         ))

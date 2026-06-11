@@ -53,6 +53,8 @@ async def _create_test_project(db: AsyncSession) -> Project:
 
     data = BasicInfoSchema(
         client_name="报表行次测试客户",
+        company_code="91110000710931130E",
+        short_name="报表测试",
         audit_year=2024,
         project_type="annual",
         accounting_standard="enterprise",

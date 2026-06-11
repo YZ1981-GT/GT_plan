@@ -475,9 +475,14 @@ class TrialBalanceService:
         if not rc_rows:
             return await self._get_summary_from_mapping(project_id, year, report_type, company_code)
 
-        # 2. 获取该项目的映射关系（标准科目 → 报表行次名称）
+        # 2. 获取该项目的映射关系（标准科目 → 报表行次名称 + 聚合方向）
         mapping_q = (
-            sa.select(rlm.c.standard_account_code, rlm.c.report_line_code, rlm.c.report_line_name)
+            sa.select(
+                rlm.c.standard_account_code,
+                rlm.c.report_line_code,
+                rlm.c.report_line_name,
+                rlm.c.mapping_sign,
+            )
             .where(
                 rlm.c.project_id == project_id,
                 rlm.c.report_type == report_type,
@@ -497,6 +502,8 @@ class TrialBalanceService:
         # 行次编码（report_config 的 row_code）→ 标准科目列表
         line_accounts: dict[str, list[str]] = {}
         all_account_codes: set[str] = set()
+        # 科目聚合符号：subtract（备抵科目）→ -1，否则 +1。供 line_accounts 分支按符号加减。
+        account_sign: dict[str, Decimal] = {}
         for r in mapping_result.fetchall():
             # 通过映射表的 report_line_name 匹配 report_config 的 row_name
             mapping_name = (r.report_line_name or '').strip().replace('：', '').replace(':', '').replace(' ', '')
@@ -514,6 +521,9 @@ class TrialBalanceService:
                     line_accounts[matched_rc_code] = []
                 line_accounts[matched_rc_code].append(r.standard_account_code)
                 all_account_codes.add(r.standard_account_code)
+                account_sign[r.standard_account_code] = (
+                    Decimal("-1") if (r.mapping_sign or "add") == "subtract" else Decimal("1")
+                )
 
         # 3. 从 trial_balance 汇总未审数
         unadj_map: dict[str, Decimal] = {}
@@ -676,13 +686,28 @@ class TrialBalanceService:
                 rcl_cr = total_rcl_cr
                 audited = total_audited
             else:
-                # 无公式非合计：用映射关系填充
+                # 无公式非合计：用映射关系填充（按 account_sign 加减，备抵科目为减项）
                 accounts = line_accounts.get(row_code, [])
-                unadj = sum(unadj_map.get(ac, Decimal("0")) for ac in accounts)
-                aje_dr = sum(aje_dr_map.get(ac, Decimal("0")) for ac in accounts)
-                aje_cr = sum(aje_cr_map.get(ac, Decimal("0")) for ac in accounts)
-                rcl_dr = sum(rcl_dr_map.get(ac, Decimal("0")) for ac in accounts)
-                rcl_cr = sum(rcl_cr_map.get(ac, Decimal("0")) for ac in accounts)
+                unadj = sum(
+                    account_sign.get(ac, Decimal("1")) * unadj_map.get(ac, Decimal("0"))
+                    for ac in accounts
+                )
+                aje_dr = sum(
+                    account_sign.get(ac, Decimal("1")) * aje_dr_map.get(ac, Decimal("0"))
+                    for ac in accounts
+                )
+                aje_cr = sum(
+                    account_sign.get(ac, Decimal("1")) * aje_cr_map.get(ac, Decimal("0"))
+                    for ac in accounts
+                )
+                rcl_dr = sum(
+                    account_sign.get(ac, Decimal("1")) * rcl_dr_map.get(ac, Decimal("0"))
+                    for ac in accounts
+                )
+                rcl_cr = sum(
+                    account_sign.get(ac, Decimal("1")) * rcl_cr_map.get(ac, Decimal("0"))
+                    for ac in accounts
+                )
                 audited = unadj + aje_dr - aje_cr + rcl_dr - rcl_cr
 
             row_values[row_code] = float(unadj)

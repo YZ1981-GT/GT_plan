@@ -107,6 +107,7 @@
     {"code": "2602", "name": "未确认融资费用", "direction": "debit", "level": 1, "category": "liability", "parent_code": null},
     {"code": "2701", "name": "长期应付款", "direction": "credit", "level": 1, "category": "liability", "parent_code": null},
     {"code": "2702", "name": "未确认融资费用", "direction": "debit", "level": 1, "category": "liability", "parent_code": null},
+    {"code": "2705", "name": "长期应付职工薪酬", "direction": "credit", "level": 1, "category": "liability", "parent_code": null},
     {"code": "2711", "name": "专项应付款", "direction": "credit", "level": 1, "category": "liability", "parent_code": null},
     {"code": "2801", "name": "预计负债", "direction": "credit", "level": 1, "category": "liability", "parent_code": null},
     {"code": "2901", "name": "递延所得税负债", "direction": "credit", "level": 1, "category": "liability", "parent_code": null},
