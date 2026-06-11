@@ -196,3 +196,170 @@ async def test_synthetic_inline_fill(db_session, soe_project, bs_rows, tmp_path,
     # Header substituted
     assert "致同测试国企有限公司" in str(out["A3"].value)
     assert "2024年12月31日" in str(out["A2"].value)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 权益变动表二维矩阵占位符 {{eq:CODE:year_key:col_key}} 填充
+# ─────────────────────────────────────────────────────────────────────────────
+
+_EQ_SHEET = "5-所有者权益变动表（企财04表-合并）"
+
+
+@pytest_asyncio.fixture
+async def eq_rows(db_session: AsyncSession, soe_project: Project):
+    """EQ-001 上年年末余额：含 eq_matrix 二维数据（本年/上年 × 多列）。
+
+    EQ-002 仅扁平 source_accounts（过渡兼容路径）；EQ-003 无 source_accounts。
+    """
+    now = datetime.now(timezone.utc)
+    rows = [
+        FinancialReport(
+            id=uuid.uuid4(),
+            project_id=soe_project.id,
+            year=2024,
+            report_type=FinancialReportType.equity_statement,
+            row_code="EQ-001",
+            row_name="一、上年年末余额",
+            current_period_amount=Decimal("0"),
+            prior_period_amount=Decimal("0"),
+            source_accounts={
+                "eq_matrix": {
+                    "current_year": {
+                        "share_capital": 1000000.00,
+                        "capital_reserve": 250000.50,
+                        "retained_earnings": -30000.00,
+                    },
+                    "prior_year": {
+                        "share_capital": 900000.00,
+                        "capital_reserve": 200000.00,
+                    },
+                }
+            },
+            indent_level=0,
+            is_total_row=False,
+            generated_at=now,
+        ),
+        FinancialReport(
+            id=uuid.uuid4(),
+            project_id=soe_project.id,
+            year=2024,
+            report_type=FinancialReportType.equity_statement,
+            row_code="EQ-002",
+            row_name="加：会计政策变更",
+            source_accounts={"share_capital": 12345.67},  # 扁平过渡结构
+            indent_level=1,
+            is_total_row=False,
+            generated_at=now,
+        ),
+        FinancialReport(
+            id=uuid.uuid4(),
+            project_id=soe_project.id,
+            year=2024,
+            report_type=FinancialReportType.equity_statement,
+            row_code="EQ-003",
+            row_name="前期差错更正",
+            source_accounts=None,
+            indent_level=1,
+            is_total_row=False,
+            generated_at=now,
+        ),
+    ]
+    for r in rows:
+        db_session.add(r)
+    await db_session.flush()
+    return rows
+
+
+@pytest.mark.asyncio
+async def test_eq_matrix_inline_fill(db_session, soe_project, eq_rows, tmp_path, monkeypatch):
+    """权益变动表 {{eq:}} 占位被矩阵值替换；N 列 SUM 公式保留；无数据清空。"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = _EQ_SHEET
+    ws["A3"] = "编制单位：{{company_full_name}}"
+    # EQ-001 行（含矩阵数据）
+    ws["C9"] = "{{eq:EQ-001:current_year:share_capital}}"
+    ws["G9"] = "{{eq:EQ-001:current_year:capital_reserve}}"
+    ws["M9"] = "{{eq:EQ-001:current_year:retained_earnings}}"
+    # 上年列
+    ws["P9"] = "{{eq:EQ-001:prior_year:share_capital}}"
+    # 缺列（current_year 无 special_reserve）→ 清空
+    ws["J9"] = "{{eq:EQ-001:current_year:special_reserve}}"
+    # N 列合计公式（不可覆盖）
+    ws["N9"] = "=SUM(C9:G9)+SUM(I9:M9)-H9"
+    # EQ-002 扁平过渡结构
+    ws["C10"] = "{{eq:EQ-002:current_year:share_capital}}"
+    # EQ-003 无 source_accounts → 清空
+    ws["C11"] = "{{eq:EQ-003:current_year:share_capital}}"
+    synth = tmp_path / "synthetic_eq.xlsx"
+    wb.save(synth)
+
+    monkeypatch.setattr(
+        ReportExcelExporter, "_load_template",
+        lambda self, key: load_workbook(str(synth)),
+    )
+
+    exporter = ReportExcelExporter(db_session)
+    output = await exporter.export(
+        project_id=soe_project.id,
+        year=2024,
+        mode="audited",
+        report_types=["equity_statement"],
+        include_prior_year=True,
+    )
+    out = load_workbook(output)[_EQ_SHEET]
+
+    # 矩阵单元取数正确
+    assert out["C9"].value == pytest.approx(1000000.00)
+    assert out["G9"].value == pytest.approx(250000.50)
+    assert out["M9"].value == pytest.approx(-30000.00)
+    # 上年列
+    assert out["P9"].value == pytest.approx(900000.00)
+    # 缺列 → 清空，且不残留占位符
+    assert out["J9"].value in (None, "")
+    assert "{{" not in str(out["J9"].value or "")
+    # N 列合计公式保留
+    assert str(out["N9"].value).startswith("=SUM")
+    # 扁平过渡结构 current_year 命中
+    assert out["C10"].value == pytest.approx(12345.67)
+    # 无 source_accounts → 清空
+    assert out["C11"].value in (None, "")
+    assert "{{" not in str(out["C11"].value or "")
+    # 全表无残留 eq 占位符
+    for row in out.iter_rows():
+        for cell in row:
+            assert "{{eq:" not in str(cell.value or ""), f"残留: {cell.coordinate}={cell.value!r}"
+
+
+@pytest.mark.asyncio
+async def test_eq_prior_year_excluded_when_disabled(
+    db_session, soe_project, eq_rows, tmp_path, monkeypatch
+):
+    """include_prior_year=False 时 prior_year 占位被清空（不写值、不残留）。"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = _EQ_SHEET
+    ws["C9"] = "{{eq:EQ-001:current_year:share_capital}}"
+    ws["P9"] = "{{eq:EQ-001:prior_year:share_capital}}"
+    synth = tmp_path / "synthetic_eq2.xlsx"
+    wb.save(synth)
+
+    monkeypatch.setattr(
+        ReportExcelExporter, "_load_template",
+        lambda self, key: load_workbook(str(synth)),
+    )
+
+    exporter = ReportExcelExporter(db_session)
+    output = await exporter.export(
+        project_id=soe_project.id,
+        year=2024,
+        mode="audited",
+        report_types=["equity_statement"],
+        include_prior_year=False,
+    )
+    out = load_workbook(output)[_EQ_SHEET]
+
+    assert out["C9"].value == pytest.approx(1000000.00)
+    # prior_year 被禁用 → 清空
+    assert out["P9"].value in (None, "")
+    assert "{{" not in str(out["P9"].value or "")
