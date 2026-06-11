@@ -84,17 +84,10 @@ inclusion: always
 
 ## 任务状态
 
-### LLM（本地 vLLM 已跑通，2026-06-01 实测）
-- vLLM `localhost:8100` 模型 `Kbenkhaled/Qwen3.5-27B-NVFP4`；`.env` `WP_AI_SERVICE_ENABLED=True`（默认 False）
-- **两套 LLM 客户端**：①`llm_client.chat_completion()`（httpx+熔断器，多数 wp_llm_prompts/role_ai/pm 用）②`AIService(db).chat_completion()`（OCR/knowledge/contract/wp_fill 用，需真实 DB 会话查 active model）
-- **✅ 已修 bug**：get_llm_client 不存在（wp_chat_service/wp_document_recognizer 改用 chat_completion）+ vLLM 拒多条 system 消息（ai_service 加 `_merge_system_messages()`，llm_client RAG 注入改追加首条 system）；doc_ai_chat + wp_chat 端到端实测通
-- **🔴 embedding 404**：vLLM 未起 embed task → RAG 向量召回降级 ilike（semantic_search 不崩，build_index 会抛错）；恢复语义检索需另起 vLLM embed 实例
-- **🔴 孤儿代码 AIChatService**(ai_chat_service.py)：0 router 引用，被 doc_ai_chat 取代；内部实际用 `KnowledgeIndexService(db).search()` + `AIService(db)`（非"调不存在方法"，旧记录有误）；配套 `AIChatSession`/`AIChatMessage` ORM(ai_models.py)+表 = 完整 DB 持久化方案但全孤儿
-- **🟢 知识库收口完成（2026-06-02）**：①旧 `KnowledgeService`(knowledge_service.py)已删（全仓 0 引用）；②孤儿 `AIChatService`(ai_chat_service.py)已删（其 AIChatMessage 用 content/token_count 字段名但模型实为 message_text/tokens_used，接线即崩）；③**doc_ai_chat 内存历史→DB 持久化**：新建 `doc_chat_persistence.py` 复用现成 `ai_chat_session`/`ai_chat_message` 表（用 `context_summary` 存 `{doc_type}:{doc_id}:{user_id}` 定位键，零新增列零漂移），doc_ai_chat 的 `_chat_history` 字典已替换，history 端点改 async DB 读；实测持久化往返+幂等通过（重启不丢历史）
-- **🟢 doc-chat "GET history=0" 真因（2026-06-02 实测闭环）**：后端持久化+_stream_chat 自建 `async_session` 全对（in-process ASGI 实测 GET=2/DELETE 后=0）；之前"问题依旧"是 ①stale uvicorn 跑旧代码（FastAPI 不热加载）②**前端 `useDocAiChat.fetchHistory` 读 `data.messages` 顶层，但 `ResponseWrapperMiddleware` 把所有 2xx JSON 包成 `{code,message,data}`→服务端历史永远加载不出**（已修：解信封读 `body.data.messages`，原生 fetch 非 apiProxy 需手动解）；旧单测 mock 的是未包装 shape 从没守住该契约→已改 mock 真实信封；**铁律：原生 fetch 调后端必手动解 `{code,message,data}` 信封**
-- **doc-chat 干净验证法**：`httpx.ASGITransport(app=app)` in-process 直调最可靠（跑磁盘当前代码，无 stale server 风险）；隔离测持久化层用两个独立 `async_session`（A 写+commit / B 读）验跨 session 可见性
-- `reference_doc_service.load_from_knowledge_base` 已接 `semantic_search(scope=knowledge_doc)` 主路径 + ilike 降级；service-dependency.md 是过时生成物（仍显示已断的边如 reference_doc→knowledge_service / ai_chat_service）
-- **部署**：本机既是 vLLM GPU 节点又是后端机，后端内 `LLM_BASE_URL=localhost:8100` 天然可用；多用户访问只需 9980 对外、8100 不对外
+### LLM（vLLM localhost:8100 Qwen3.5-27B）
+- 两套客户端：`llm_client.chat_completion()`(httpx+熔断器) / `AIService(db).chat_completion()`(需DB会话)；doc_ai_chat+wp_chat 端到端实测通
+- ** embedding 404**：vLLM 未起 embed task  RAG 降级 ilike；恢复需另起 embed 实例
+- 知识库收口完成：旧 KnowledgeService/AIChatService 已删；doc_ai_chat 已 DB 持久化；铁律=原生 fetch 必手动解 `{code,message,data}` 信封
 
 ### 合并模块（4 Phase 代码+测试完成，归档 `_archive/09-consolidation-phases/`）
 - **合并核心模型**：合并数 = 各子企业个别数据汇总 + 差额表（差额表是专填调整+抵销分录的虚拟列，一般负数填列）；代码 `consol_amount = individual_sum + consol_adjustment + consol_elimination`
@@ -108,33 +101,9 @@ inclusion: always
 - 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
 ### git 状态（2026-06-10，HEAD `07ad1890` 已推送）
-- 分支 `work/2026-05-30-wp-specs`；本日 3 commits：`0cb32c12`(deliverable-lineage+zdt+cleanup 180files) → `0bfe0467`(auth+SSE fix 9files) → `07ad1890`(disclosure notes UI 11files)
-- **✅ wp_render_schema_service.py `_SCHEMA_DIR` 路径已修正**：远程迁移后该 service 仍引用旧路径导致底稿渲染 schema 全部 FileNotFoundError（C-D1-disclosure 等 yaml 找不到）→ 改为 `data/ledger_adapters/wp_render_schema`；其余 tests/scripts 引用旧路径仅影响开发不影响运行时
-- 旧里程碑：`8ed2d45c`=audit-sheet-editable 归档 / `350ff25d`=5 tech specs 归档 / `0c0bae1a`=5 tech specs 实施代码
-- **schema drift 二次修复（V051）**：方向=orm_extra（ORM 有 DB 缺），51 列 ALTER ADD + 2 enum ADD VALUE + 列级 KNOWN_COLUMN_ALLOWLIST（cell_annotations.sheet_name/adjustments.status/projects.template_version_id）+ 表级加 linkage_audit_log/seed_load_history；evidence_hash_checks.export_id 保持 VARCHAR（ORM 业务定义非 UUID）
-- **🟢 B-Index 底稿目录"No Data"修复（2026-06-02，Playwright 实测通过）**：`wp_render_config.py` 新增 `_generate_b_index_data()`——当 B-Index sheet html_data 为空时自动从项目元数据生成 preparation_info（entity_name/period_end/preparer/reviewer）+ navigation_rows（同底稿其他 sheet 列表）；GtBIndex.vue 加 `empty-text="暂无索引数据"` 中文化
-- **🟢 底稿全页签空态中文化（2026-06-02）**：GtAProgramConsole 加 empty-text / GtWpRenderer univer placeholder 改"表格底稿…数据尚未导入" / GtCNoteTable 加 el-empty 空态 / D-form 系列已有中文无需改
-- **🟢 编制信息表头 4 处优化（2026-06-04，Playwright 实测通过，未提交）**：①**去重**——B-Index sheet 之前同时渲染 workpaper 级 `GtWpPreparationHeader`(表头顶部)+`GtBIndex` 内置编制信息块两个 → GtWpRenderer 加 `v-if="componentType !== 'b-index'"` 跳过顶部，B-Index 只留内置块；②**可折叠**——两个组件都加折叠条(点标题栏切 `is-collapsed`+收起/展开文案+收起时显示概要)；③**索引号移右上角**——表内单独「索引号」行删除，移到标题栏右上角常显，表头压成 3 列(GtWpPreparationHeader)/2 列(GtBIndex) 更紧凑；④**索引号 sheet 级**——GtWpRenderer 新增 `activeSheetIndexNo` 从 `activeSheetName` 末尾正则 `([A-Z]\d+[A-Z]?(?:-\d+)*)\s*$` 提取(与后端 `_SHEET_INDEX_PATTERN` 同口径)，经 `:index-no-override` 传入 header，随 sheet 切换更新(底稿目录→D1/程序表→D1A/审定表→D1-1)，提取不到回退 wp_code；⑤**删完成度圈**——`gt-wp-renderer__completion` 进度圈(右上角 0%)与索引号重叠，用户不需要 → 模板块+CSS+`useWpCompletionRate` import/call 全删；测试 GtWpPreparationHeader.spec(8)+GtBIndex.spec(14 重写，原 12 全红=测旧表格式 API 已被 GtBArchitectureTree 取代)+workpaper 全量 33 文件 464 passed
-- **🟢 render-config 模板路径回退修「暂无审计程序」回归（2026-06-04，in-process+Playwright 实测，未提交）**：根因=A 程序表/审定表/univer 网格三个自动生成器只用 `working_paper.file_path`，该字段为空(底稿未初始化文件)时取不到模板内容→程序表空。修复=`wp_render_config.py` 加闭包 `_resolve_template_file_path()`：file_path 缺失/文件不存在时回退 `find_template_file_any(wp_code)`(wp_templates/ 标准模板库)；三处生成器改用 `_template_file_path`；加 `from pathlib import Path` import。实测 D1A→18 程序/审定表→14 行/univer→cells 正常；新增 test_wp_program_extract 3 个回退回归测试(共 9 passed)+render pipeline 59 passed/1 skip；**注意**：route wpId 是 working_paper.id 非 wp-index 节点 id(后者 render-config 报「底稿不存在」404)；项目 37814426 的 D1 working_paper id=e56062ae
-- **前端富文本编辑器现状（2026-06-02 grep 实证）**：已用 **TipTap 3**（`@tiptap/vue-3`+`starter-kit`+`extension-placeholder` 全 `^3.22.3`）；三块文字编辑区——附注 `DisclosureEditor.vue`→`NoteRichTextEditor.vue`（StarterKit 文字/混合型）、文字底稿 `WorkpaperWordEditor.vue`（三级降级 Univer Docs→mammoth→TipTap→textarea）、审计报告 `AuditReportEditor.vue`（报告状态+后端 PDF 导出任务+`@vue-office/docx` 预览+mammoth 解析）；表格底稿走 Univer（`@univerjs/preset-*`）；导出依赖 mammoth/xlsx/`@vue-office`；**均无 Word 式 A4 分页**。调研过 Umo Editor（`@umoteam/editor`，Vue3+Tiptap3，要求界面保留版权标识否则侵权，完整 Office 导入导出/协作属付费 Next/Server）拟补分页导出，**用户已决定暂不引入**
-- **🟢 B-Index 索引导航改架构流程图（2026-06-02，Playwright 实测通过）**：删表格式索引导航（GtBIndex el-table+多选/无需打印逻辑全移除），重写 `GtBArchitectureTree.vue` 为流程图卡片（默认展示+完整 20 节点+点击跳转）；修 3 个原 bug：①原 v-show 默认折叠 ②原 buildTreeFromHtmlData 找 wp_code/wp_name 字段名不匹配致树空 ③原 onNodeClick 用 wpCode 当 wpId 跳转会 404→改 emit navigate(sheetName) 冒泡到 GtWpRenderer 切 activeSheetName（jump-to-section 事件之前根本没接线，已在 component 上补 @jump-to-section）
-- **🟢 B-Index 底稿目录已覆盖整个审计循环（2026-06-06，commit 9e1bb066，in-process 实测）**：根因=`_generate_b_index_data` 只遍历当前 working_paper 的 classifications（仅当前 xlsx 内 sheets）。修复=新建 `wp_cycle_directory.build_cycle_workpapers`（查同 `audit_cycle` 全部 wp_index LEFT JOIN working_paper，wp_code 自然排序 D2-1<D2-10，标 is_current，wp_id 为空=未生成文件）+ `_generate_b_index_data` 加 `cycle_workpapers` 字段（透传 `wp_index.audit_cycle`）+ GtBIndex 新增「本循环底稿目录」卡片区（点击 router.push 跨底稿跳 WorkpaperEditor，当前底稿/未生成不跳）。测试=后端 5（test_wp_cycle_directory）+前端 5（GtBIndex.spec 新增循环目录块，补 useRouter mock）+既有 14 全绿。**实测**：D1 底稿 navigation_rows=20 内部 sheet + cycle_workpapers=8（D0~D7，D1 标当前）。**澄清纠偏**：D1A/D1-1~D1-16 是 sheet 级索引（已在 navigation_rows），D0~D7 才是同循环兄弟底稿（wp_index 表 wp_code，audit_cycle='D'）；memory 旧记录"D1 目录应含 D1A~D1-16"理解有误——那些本就在内部 sheet 列表里，真缺的是跨底稿 D0~D7
-- **🟢 sheet 级索引号提取（2026-06-02）**：`_generate_b_index_data` 原用 `cls.wp_code`（永远父级 D1）→ 改用正则 `([A-Z]\d+[A-Z]?(?:-\d+)*)\s*$` 从 sheet_name **末尾**提取真实索引（审定表D1-1→D1-1 / 应收票据审计程序表D1A→D1A），提取不到回退父 wp_code（如「附注披露信息（国企）」无尾码→D1，正确）；与 `_WP_CODE_PATTERN`（匹配文件名首段）方向相反——sheet 名索引在尾部
-- **🟢 手册视图已用 ca713614 完整版**（1201 行）：4 子页签全丰富 + count 真实计算 + 工作台/列表/手册 CSS 全（孤儿扫描 0）；ca713614 父=3df0fd61，merge-base=ea788c24；切勿被旧版覆盖
-- **🔴 分叉分支隐患 `feature/report-module-enhancement-closure`(3df0fd61)**：含 WorkpaperWorkbenchView.vue **旧版**（365 行/41 guide CSS 类残缺/count 硬编码假数字），缺 work 分支的工作台+手册孤儿CSS全补(761c320a)和真实计数(fb58ac77)修复 → 合并时勿用其覆盖 work 版（726 行/79 CSS），否则回归
-- **🔴 远程默认分支隐患**：`origin/HEAD→origin/master` 但 master 落后 main 298 commit（活跃主干是 main）→ 需 GitHub Settings 改默认分支（Agent 无法改远程设置）
-- 远程 `origin = https://github.com/YZ1981-GT/GT_plan.git`（HTTPS）；gh CLI 已装(2.89.0)未登录（需用户本人浏览器授权）→ 建 PR 走网页 compare
-- 文档类（memory/INDEX/复盘）冲突取并集，走 PR 让 GitHub 先暴露冲突，不本地直推 main
-
-### 2026-06-07 三处回归修复（用户手动报 bug，Playwright 实测通过）
-- **查账页"Not Found (ID:xxx)" toast**：`project_wizard.py` 的 `get_wizard_state` 丢了 `@router.get("/{project_id}/wizard")` 装饰器（编辑 attach_subsidiaries 时连同前一空行删掉）→GET /wizard 未注册命中 FastAPI 默认 404 `{"detail":"Not Found"}`，前端 http 拦截器 404 走 ElMessage.warning 拼 `（ID:{x-request-id}）`（request_id 是 uuid[:12]）。已补回装饰器
-- **报表页 Vite 编译错 v-model on prop**：`ReportDialogs.vue:88` `v-model="consolBreakdownVisible"`（prop 不可写）→改 `:model-value`+已有的 `@update:model-value` emit
-- **报表页"页面渲染出错 Cannot read 'isStale'"**：`ReportView.vue` 的 `rvCtx/rvPenetrate/rvComments` 声明在第 942 行却在第 812 行传入 `useReportCellActions` → TDZ `Cannot access 'rvCtx' before initialization` 致 setup 中断、模板读 undefined.isStale。修复=三 const 上移到调用前。**铁律：`<script setup>` 中 composable 入参必须先于调用声明（const 无 hoisting，TDZ 连带整个 setup 崩）**
-
-### 试算表借贷方向规则（2026-06-07，方向已修对，平衡差额另查）
-- **TrialBalance.vue `getDirection` 原靠金额正负猜方向**（正→借/负→贷）→应交税费贷方正常余额是正数被误判"借"致借贷不平衡。已改**类别感知**：负债/权益/收入恒"贷"，资产/成本/费用"借"，资产备抵（累计折旧/摊销、坏账/减值/跌价准备、折耗 名称正则）反向"贷"，无类别才回退正负猜测；`getActualCat`(编码首位+名称双保险)是类别源
-- **🔴 仍差 44,030,236.47（资产 2,546,171,215.70 − 负债权益 2,502,140,979.23）= 真实数据不平衡非方向 bug**：可疑 2221 应交税费原始 +14,203,492（贷方存正数=实为借方留抵）、4003 其他综合收益 +2,373,000；存储符号约定（负债贷方正常存负数）与这两条正数冲突，待定位源数据 vs audited_amount 取数/符号 — **待续**
-- **🟡 `backend/data/account_to_report_line_seed.json` 实证纠正（2026-06-10）**：4 套维度各 145 条**已覆盖标准科目表全部一级科目**（缺的 35 个全是子科目编码如 100101/221101，不参与报表行次映射）。之前"seed 不全导致不平衡"判断有误——试算差额 44M 根因是源数据符号问题（应交税费贷方存正数等），非 seed 覆盖率问题。2705/2922/4003/4104 这几个科目**在 seed 中存在**但可能该项目 trial_balance 无对应标准科目映射
+### git 状态（2026-06-11）
+- 分支 `work/2026-05-30-wp-specs` HEAD=`38ad50c7`（2026-06-11 推送）；远程 `origin/HEADorigin/master` 落后 main 298 commit 需改默认分支
+- 2026-06-02~06-10 修复明细（B-Index/编制表头/render-config/架构流程图/循环目录/手册视图/富文本编辑器等）已归档  `#dev-history`
 
 ### 真正待办
 - **外部依赖**：LLM embedding 实例 / 6000 并发压测 / 钉集成 / 合并 UAT / GitHub 默认分支改 main / 走 PR 合入 / V052~V062 生产迁移
@@ -152,6 +121,8 @@ inclusion: always
 - **🟡 附注模板 SECTION 块内部细化待做**：~600 块×4 变体，待用户确认启动
 - **已知 Bug**：辽宁卫生服务序时账 debit==credit / 明细账翻页余额第 2 页起错 / 试算差额 44M（源数据符号问题）
 - **🟢 未审报表"暂无数据"修复（2026-06-11）**：`report_engine.generate_unadjusted_report` 硬编码 `_load_report_configs("enterprise")` 但 DB 只有 soe_standalone/soe_consolidated/listed_standalone/listed_consolidated 四种标准→空配置→空报表。改为动态调 `ReportConfigService.resolve_applicable_standard(db, project_id)`。需重启后端生效
+- **🟢 审计报告正文 2 处修复（2026-06-11）**：①`{{responsibility_organ}}` 未替换→`ReportPlaceholderService.get_placeholders` 新增该字段（从 company_subtype 推导：type_c→董事会，其余→全体股东）+ registry 加映射 ②`merge_runs_for_replace` 合并 run 后字体变 Arial Narrow→改为用**文本最长 run 的 rPr(字体属性)** 覆盖第一个 run（正文 run 通常最长且用仿宋_GB2312）③`{{company_short_name}}` 显示全称→根因=wizard 存 `short_name` 但 service 只查 `entity_short_name`(None)→fallback 全称加引号；修复=加 `or basic_info.get("short_name")` 回退
+- **🟢 报告正文模板格式已修复（2026-06-11）**：34 份 .docx 正文段落加首行缩进 0.74cm + 字体改仿宋_GB2312(eastAsia)+Times New Roman(ascii) + 12pt小四；脚本 `scripts/fix/fix_report_body_format.py`（备份 `_backup_format/`）；OnlyOffice 容器已装 FangSong_GB2312+ArialNarrow(+Bold)+simfang+simsun+simhei（AllFonts.js 实证注册；容器重建需重做）；字体文件存 `backend/data/fonts/`
 - **外部依赖**：LLM embedding / 合并 UAT / GitHub 默认分支改 main / 钉集成
 - **待建 spec**：consol_disclosure_service 瘦身(1736行) / migration_runner 瘦身(1026行) / workpaper-content-semantic-system；已出三件套待实施=workpaper-unified-import-export(V069) + workpaper-bad-debt-nested-structure(V070,基于真实模板 D2-3 父行/子行/合计嵌套)
 - **🔴 workpaper-unified-import-export spec 实施前必修 design**：复盘实证现有 `wp_xlsx_export_service`(export_workpaper_xlsx 4路径写入+公式保留+Semaphore10)/`WpUploadService`(upload_file 版本冲突+解析+事件+云同步+版本链)/`WpDownloadService`(download_pack ZIP+{cycle}/{wp_code} 目录)/`offline_conflict_service`(字段级冲突)/`test_xlsx_export_roundtrip` 已覆盖 spec 设计的 export/import/batch/conflict/roundtrip 大部分——**真正缺失仅 4 项**：①MetadataCodec 元数据嵌入提取 ②SHA-256 快照哈希冲突(现仅比版本号) ③结构化校验报告 FormatValidator ④跨项目 TemplateCopier。design Components 须改为"复用扩展现有服务"而非新建，可砍 ~40% 重复任务

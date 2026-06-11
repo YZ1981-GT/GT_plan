@@ -39,8 +39,7 @@ REPORT_TYPE_SHEET_NAMES: dict[str, str] = {
     "income_statement": "利润表",
     "cash_flow_statement": "现金流量表",
     "equity_statement": "所有者权益变动表",
-    "asset_impairment": "资产减值损失明细表",
-    "impairment_provision": "减值准备表",
+    "asset_impairment": "资产减值准备情况表",
 }
 
 # Amount number format

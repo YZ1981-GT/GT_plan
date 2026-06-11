@@ -1,5 +1,17 @@
 <template>
-  <el-dialog v-model="visible" :title="title" width="95%" top="2vh" @close="cleanup" destroy-on-close>
+  <el-dialog v-model="visible" :title="title" :width="maximized ? '100%' : '95%'" :top="maximized ? '0' : '2vh'" :fullscreen="maximized" @close="cleanup" destroy-on-close>
+    <!-- 最大化按钮 -->
+    <template #header="{ close, titleId, titleClass }">
+      <div class="onlyoffice-editor__header">
+        <span :id="titleId" :class="titleClass">{{ title }}</span>
+        <div class="onlyoffice-editor__header-actions">
+          <el-button size="small" text @click="maximized = !maximized" :title="maximized ? '还原' : '最大化'">
+            <template #icon><svg v-if="!maximized" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 1024 1024"><path fill="currentColor" d="M160 96h320v64H198.4l256 256H160V96zm704 832H544v-64h281.6l-256-256H864v320z"/></svg><svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 1024 1024"><path fill="currentColor" d="M512 544H192v-64h281.6L217.6 224H160V160h352v384zm0-64h320v64H550.4L806.4 800H864v64H512V480z"/></svg></template>
+          </el-button>
+          <el-button size="small" text @click="close" title="关闭">✕</el-button>
+        </div>
+      </div>
+    </template>
     <el-alert
       v-if="degraded"
       type="warning"
@@ -116,6 +128,7 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>()
 
 const visible = ref(true)
+const maximized = ref(false)
 const degraded = ref(false)
 const editorReady = ref(false)
 const editorContainerId = `oo-editor-${Date.now()}`
@@ -351,5 +364,16 @@ function loadOnlyOfficeScript(baseUrl: string): Promise<void> {
 .onlyoffice-editor__trace-btn {
   --el-button-text-color: var(--gt-color-primary, #4b2d77);
   --el-button-border-color: var(--gt-color-border-purple-light, #d8b8ee);
+}
+.onlyoffice-editor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+.onlyoffice-editor__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 </style>
