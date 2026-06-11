@@ -858,12 +858,15 @@ class NoteWordExporter:
                     self._render_table_at(doc, para, tbl)
 
     def _note_tables(self, note: DisclosureNote) -> list[dict]:
-        """返回 note 的表列表（多表 _tables 数组优先，降级单表）."""
+        """返回 note 的表列表（多表 _tables 数组优先，降级单表）.
+        
+        过滤掉 export_enabled=false 的表格（用户可在前端选择哪些表导出）。
+        """
         td = getattr(note, "table_data", None)
         if not isinstance(td, dict):
             return []
         tables = td.get("_tables") or [td]
-        return [t for t in tables if isinstance(t, dict)]
+        return [t for t in tables if isinstance(t, dict) and t.get("export_enabled", True)]
 
     def _render_table_at(self, doc: Document, anchor_para, table_data: dict) -> None:
         """在 anchor 段落处渲染表格（复用 _render_table，再把表移动到锚点位置）."""
@@ -951,7 +954,9 @@ class NoteWordExporter:
                     html_parts.append(f'<p>{note.text_content}</p>')
                 if note.table_data:
                     # Sprint 0 / Task 0.3 P0 修复：HTML 预览也支持多表
+                    # 过滤 export_enabled=false（用户选择不导出的表格）
                     tables_to_render = note.table_data.get("_tables") or [note.table_data]
+                    tables_to_render = [t for t in tables_to_render if isinstance(t, dict) and t.get("export_enabled", True)]
                     for tbl in tables_to_render:
                         if not isinstance(tbl, dict):
                             continue
@@ -1138,7 +1143,9 @@ class NoteWordExporter:
             return
 
         # 优先取 _tables 数组（多表章节）；老结构降级到单表
+        # 过滤 export_enabled=false 的表格（用户可选择不导出特定表格）
         tables_to_render = note.table_data.get("_tables") or [note.table_data]
+        tables_to_render = [t for t in tables_to_render if isinstance(t, dict) and t.get("export_enabled", True)]
 
         for tbl in tables_to_render:
             if not isinstance(tbl, dict):

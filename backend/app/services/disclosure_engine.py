@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
@@ -70,6 +71,74 @@ def _extract_basic_info(wizard_state: dict | None) -> dict:
 
 _CN_NUMBERS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
                '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十']
+
+
+# 匹配"（表N）"占位模式的正则
+_TABLE_SUFFIX_RE = re.compile(r"[（(]表\d+[）)]")
+
+# 匹配编号标题的正则（如 "（1）按账龄披露"、"1. 本期计提"）
+_NUMBERED_TITLE_RE = re.compile(
+    r"^(?:[（(](\d+)[）)]|(\d+)[.、．])\s*(.+)"
+)
+
+
+def _infer_table_names_from_text(
+    built_tables: list[dict],
+    text_sections: list[str] | None,
+) -> None:
+    """动态提取表格标题：name 为空或占位时，从 text_sections 按序号匹配。
+
+    逻辑：
+    1. 收集所有 name 需要修复的表格索引
+    2. 从 text_sections 中解析编号标题（如 "（1）按账龄披露应收账款"）
+    3. 按序号对应回填 built_tables[N].name
+
+    也支持无编号场景：text_sections 中的短标题（≤20字、非空、非指引）按出现顺序对应表格。
+    """
+    if not built_tables:
+        return
+
+    # 收集需要修复 name 的表格索引
+    needs_fix: list[int] = []
+    for i, tbl in enumerate(built_tables):
+        name = (tbl.get("name") or "").strip()
+        if not name or _TABLE_SUFFIX_RE.search(name):
+            needs_fix.append(i)
+
+    if not needs_fix:
+        return
+
+    # 从 text_sections 提取编号标题
+    numbered_titles: dict[int, str] = {}  # 1-based index → title
+    sequential_titles: list[str] = []  # 非编号的短标题按顺序
+
+    sections_text = text_sections or []
+    for section in sections_text:
+        for line in section.split("\n"):
+            line = line.strip()
+            if not line or line.startswith("#") or line.startswith("【"):
+                continue
+            m = _NUMBERED_TITLE_RE.match(line)
+            if m:
+                idx = int(m.group(1) or m.group(2))
+                title = m.group(3).strip()
+                if title and len(title) <= 30:
+                    numbered_titles[idx] = title
+            elif len(line) <= 20 and not line.startswith("（") and not line.startswith("注"):
+                # 短标题候选（非指引、非注释）
+                sequential_titles.append(line)
+
+    # 回填策略 1：按编号匹配（"（1）xxx" → 表1, "（2）xxx" → 表2）
+    for i in needs_fix:
+        idx_1based = i + 1
+        if idx_1based in numbered_titles:
+            built_tables[i]["name"] = numbered_titles[idx_1based]
+
+    # 回填策略 2：对仍无名称的表格，按 sequential_titles 顺序对应
+    remaining = [i for i in needs_fix if not (built_tables[i].get("name") or "").strip() or _TABLE_SUFFIX_RE.search(built_tables[i].get("name", ""))]
+    for j, i in enumerate(remaining):
+        if j < len(sequential_titles):
+            built_tables[i]["name"] = sequential_titles[j]
 
 
 def _convert_md_headings_to_numbered(text: str) -> str:
@@ -932,6 +1001,9 @@ class DisclosureEngine:
                         if built:
                             built["name"] = tbl.get("name", "")
                         built_tables.append(built or {"name": tbl.get("name", ""), "headers": tbl.get("headers", []), "rows": []})
+
+                    # 动态提取表格标题：name 为空或"（表N）"占位时，从 text_sections 按序号匹配
+                    _infer_table_names_from_text(built_tables, text_sections)
                     # 存储为独立的 _tables 数组，避免循环引用
                     if built_tables:
                         table_data = {

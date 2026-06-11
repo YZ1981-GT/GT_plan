@@ -319,10 +319,27 @@
 
             <!-- 表格型（支持多表格Tab切换） -->
             <div v-if="currentNote.content_type === 'table' || currentNote.content_type === 'mixed'">
-              <!-- 多表格Tab -->
-              <el-tabs v-if="currentNoteTables.length > 1" v-model="activeTableTab" type="card" size="small" style="margin-bottom: 8px;">
-                <el-tab-pane v-for="(tbl, ti) in currentNoteTables" :key="ti" :name="String(ti)" :label="getTableTabLabel(tbl, ti)" />
-              </el-tabs>
+              <!-- 多表格Tab + 导出开关 -->
+              <div v-if="currentNoteTables.length > 1" style="display: flex; align-items: center; gap: 4px; margin-bottom: 8px;">
+                <el-tabs v-model="activeTableTab" type="card" size="small" style="flex: 1; margin-bottom: 0;">
+                  <el-tab-pane v-for="(tbl, ti) in currentNoteTables" :key="ti" :name="String(ti)" :label="getTableTabLabel(tbl, ti)" />
+                </el-tabs>
+                <el-popover trigger="click" placement="bottom-end" :width="280">
+                  <template #reference>
+                    <el-button size="small" text title="设置导出表格" style="flex-shrink: 0;">
+                      <span style="font-size: 14px;">⚙</span>
+                    </el-button>
+                  </template>
+                  <div style="font-size: 12px; margin-bottom: 8px; color: var(--el-text-color-secondary);">
+                    勾选要导出的表格（取消勾选将在Word导出时跳过）
+                  </div>
+                  <el-checkbox-group v-model="exportEnabledTables">
+                    <div v-for="(tbl, ti) in currentNoteTables" :key="ti" style="margin-bottom: 4px;">
+                      <el-checkbox :value="ti">{{ getTableTabLabel(tbl, ti) }}</el-checkbox>
+                    </div>
+                  </el-checkbox-group>
+                </el-popover>
+              </div>
               <!-- 当前表格 -->
               <el-table ref="deTableRef" v-if="activeTableData?.rows?.length || activeTableData?.headers?.length" :data="activeTableData.rows || []"
                 border size="small" style="margin-bottom: 12px"
@@ -1289,6 +1306,25 @@ const currentNoteTables = computed(() => {
 const activeTableData = computed(() => {
   const idx = parseInt(activeTableTab.value) || 0
   return currentNoteTables.value[idx] || currentNoteTables.value[0] || null
+})
+
+// 多表导出开关：跟踪哪些表格启用导出（indices）
+const exportEnabledTables = computed({
+  get() {
+    if (!currentNoteTables.value) return [] as number[]
+    return currentNoteTables.value
+      .map((t: any, i: number) => t.export_enabled !== false ? i : -1)
+      .filter((i: number) => i >= 0)
+  },
+  set(indices: number[]) {
+    if (!currentNote.value?.table_data?._tables) return
+    const tables = currentNote.value.table_data._tables
+    tables.forEach((t: any, i: number) => {
+      t.export_enabled = indices.includes(i)
+    })
+    markEditDirty()
+    autoSave.markDirty()
+  },
 })
 
 // 切换章节时重置表格Tab

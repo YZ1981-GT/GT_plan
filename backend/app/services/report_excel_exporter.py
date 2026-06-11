@@ -62,6 +62,10 @@ _ROW_PLACEHOLDER_RE = re.compile(
 )
 #   {{note_ref:BS-002}}
 _NOTE_REF_RE = re.compile(r"\{\{note_ref:([^}]+)\}\}")
+#   {{imp:IMP-001:opening_balance}} — 资产减值表二维占位
+_IMP_PLACEHOLDER_RE = re.compile(
+    r"\{\{imp:([^:}]+):([^}]+)\}\}"
+)
 #   header placeholders embedded in text: {{company_full_name}} 等
 _HEADER_PLACEHOLDER_RE = re.compile(r"\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}")
 
@@ -90,6 +94,26 @@ def _load_cell_mapping() -> dict[str, Any]:
             return json.load(f)
     except Exception as e:  # pragma: no cover - defensive
         logger.warning("Failed to load cell_mapping.json: %s", e)
+        return {}
+
+
+@lru_cache(maxsize=1)
+def _load_note_ref_mapping() -> dict[str, dict[str, dict]]:
+    """加载 ``report_row_note_mapping.json``（row_code → section_code 映射）.
+
+    返回结构: {variant_key: {row_code: {"section_code": "八、1", ...}}}
+    """
+    from app.services.template_manifest_loader import resolve_template_base_dir
+
+    path = resolve_template_base_dir() / "report_row_note_mapping.json"
+    if not path.is_file():
+        logger.info("report_row_note_mapping.json not found at %s", path)
+        return {}
+    try:
+        with path.open(encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning("Failed to load report_row_note_mapping.json: %s", e)
         return {}
 
 
@@ -219,6 +243,7 @@ class ReportExcelExporter:
                     "indent_level": r.indent_level,
                     "is_total_row": r.is_total_row,
                     "formula_used": r.formula_used,
+                    "source_accounts": r.source_accounts,
                 }
                 for r in rows
             ]
@@ -298,22 +323,36 @@ class ReportExcelExporter:
     def _resolve_sheet(
         self, wb: Workbook, report_type: str, template_key: str
     ):
-        """按 manifest sheet_aliases 或中文子串匹配定位 worksheet."""
+        """按 manifest sheet_aliases 或中文子串匹配定位 worksheet（返回第一个）."""
+        sheets = self._resolve_sheets(wb, report_type, template_key)
+        return sheets[0] if sheets else None
+
+    def _resolve_sheets(
+        self, wb: Workbook, report_type: str, template_key: str
+    ) -> list:
+        """按 manifest sheet_aliases 或中文子串匹配定位所有关联 worksheet.
+
+        资产负债表有主表+续表（负债权益），alias 为列表时遍历全部匹配。
+        """
         from app.services.template_manifest_loader import get_template_manifest_loader
 
         aliases = get_template_manifest_loader().get_sheet_aliases(template_key)
         alias = aliases.get(report_type)
+        matched: list = []
         if alias:
             names = alias if isinstance(alias, list) else [alias]
             for name in names:
                 if name in wb.sheetnames:
-                    return wb[name]
+                    matched.append(wb[name])
+        if matched:
+            return matched
+        # Fallback: 中文子串匹配
         sheet_hint = REPORT_TYPE_SHEET_NAMES.get(report_type)
         if sheet_hint:
             for name in wb.sheetnames:
                 if sheet_hint in name:
-                    return wb[name]
-        return None
+                    matched.append(wb[name])
+        return matched
 
     def _fill_template(
         self,
@@ -349,13 +388,16 @@ class ReportExcelExporter:
                 if code:
                     row_index[code] = r
 
+        # Build note_ref index: {row_code: "八、1"} for this template variant
+        note_ref_index = self._build_note_ref_index(template_key)
+
         fill_empty_map = self._build_fill_empty_map(template_key)
 
         for rt in types_to_export:
             rows = report_data.get(rt, [])
-            ws = self._resolve_sheet(wb, rt, template_key)
+            sheets = self._resolve_sheets(wb, rt, template_key)
 
-            if ws is None:
+            if not sheets:
                 # Sheet not in template → create from scratch (only if we have data)
                 if not rows:
                     continue
@@ -366,31 +408,46 @@ class ReportExcelExporter:
                 )
                 continue
 
-            # Track 1+2: inline placeholders + header replacement
-            found_inline = self._fill_by_placeholders(
-                ws, row_index, header_values, include_prior_year, fill_empty_map,
-                parent_index,
-            )
-            # Track 3: fallback to cell_mapping coordinates when no inline placeholders
-            if not found_inline:
-                self._fill_by_cell_mapping(
-                    ws,
-                    rt,
-                    template_key,
-                    row_index,
-                    header_values,
-                    include_prior_year,
-                    fill_empty_map,
-                    parent_index,
+            # 遍历所有匹配 sheet（如资产负债表主表+续表负债权益）
+            any_found_inline = False
+            for ws in sheets:
+                # Track 1+2: inline placeholders + header replacement
+                found_inline = self._fill_by_placeholders(
+                    ws, row_index, header_values, include_prior_year, fill_empty_map,
+                    parent_index, note_ref_index,
                 )
+                if found_inline:
+                    any_found_inline = True
+
+            # Track 3: fallback to cell_mapping coordinates when no inline placeholders
+            # (仅当所有 sheet 都无内联占位符时才回退 cell_mapping)
+            if not any_found_inline:
+                for ws in sheets:
+                    self._fill_by_cell_mapping(
+                        ws,
+                        rt,
+                        template_key,
+                        row_index,
+                        header_values,
+                        include_prior_year,
+                        fill_empty_map,
+                        parent_index,
+                    )
 
         # Remove sheets not in export list
         sheets_to_keep = set()
         for rt in types_to_export:
-            sn = REPORT_TYPE_SHEET_NAMES.get(rt, "")
-            for name in wb.sheetnames:
-                if sn and sn in name:
-                    sheets_to_keep.add(name)
+            resolved = self._resolve_sheets(wb, rt, template_key)
+            if resolved:
+                for ws in resolved:
+                    sheets_to_keep.add(ws.title)
+            else:
+                # Fallback: 中文子串匹配
+                sn = REPORT_TYPE_SHEET_NAMES.get(rt, "")
+                if sn:
+                    for name in wb.sheetnames:
+                        if sn in name:
+                            sheets_to_keep.add(name)
 
         # Don't remove sheets if we couldn't match any (safety)
         if sheets_to_keep:
@@ -424,6 +481,23 @@ class ReportExcelExporter:
             if isinstance(info, dict):
                 result[code] = info.get("fill_empty_as", "blank")
         return result
+
+    @staticmethod
+    def _build_note_ref_index(template_key: str) -> dict[str, str]:
+        """构建 {row_code: section_code} 映射，用于 ``{{note_ref:CODE}}`` 填充.
+
+        从 ``report_row_note_mapping.json`` 读取对应 variant 的映射。
+        返回如 ``{"BS-002": "八、1", "BS-005": "八、2"}``。
+        """
+        mapping = _load_note_ref_mapping()
+        variant = mapping.get(template_key, {})
+        if not isinstance(variant, dict):
+            return {}
+        return {
+            code: info["section_code"]
+            for code, info in variant.items()
+            if isinstance(info, dict) and "section_code" in info
+        }
 
     @staticmethod
     def _is_formula_cell(cell) -> bool:
@@ -466,6 +540,44 @@ class ReportExcelExporter:
             return True, 0
         return False, None  # blank → clear placeholder, leave cell empty
 
+    def _resolve_imp_value(self, row: dict | None, col_key: str) -> float | None:
+        """从减值表行的 source_accounts JSONB 取多列数据.
+
+        减值表每行在 FinancialReport.source_accounts 存储各列金额：
+        {"opening_balance": 1000, "provision": 200, "reversal": 50, ...}
+
+        若 source_accounts 无该列，尝试从 current_period_amount 回退
+        （col_key 为 closing_balance 时取 current_period_amount）。
+        """
+        if not row:
+            return None
+        # 优先从 source_accounts JSONB 取分列数据
+        source = row.get("source_accounts")
+        if isinstance(source, dict):
+            val = source.get(col_key)
+            if val is not None:
+                try:
+                    return float(val)
+                except (TypeError, ValueError):
+                    pass
+        # 回退：closing_balance → current_period_amount
+        if col_key == "closing_balance":
+            amt = row.get("current_period_amount")
+            if amt is not None:
+                try:
+                    return float(amt)
+                except (TypeError, ValueError):
+                    pass
+        # opening_balance → prior_period_amount
+        if col_key == "opening_balance":
+            amt = row.get("prior_period_amount")
+            if amt is not None:
+                try:
+                    return float(amt)
+                except (TypeError, ValueError):
+                    pass
+        return None
+
     def _fill_by_placeholders(
         self,
         ws,
@@ -474,15 +586,18 @@ class ReportExcelExporter:
         include_prior_year: bool,
         fill_empty_map: dict[str, str],
         parent_row_index: dict[str, dict] | None = None,
+        note_ref_index: dict[str, str] | None = None,
     ) -> bool:
-        """扫描 sheet 内联占位符并回填；返回是否发现 ``{{row:}}``/``{{note_ref:}}`` 占位符.
+        """扫描 sheet 内联占位符并回填；返回是否发现 ``{{row:}}``/``{{note_ref:}}``/``{{imp:}}`` 占位符.
 
         - ``{{row:CODE:current/prior}}`` → 按 row_code 取值写入该格（替换占位文本）。
         - ``{{row:CODE:current/prior:parent}}`` → 取母公司个别（公司列）值写入。
-        - ``{{note_ref:CODE}}`` → 清除占位文本（report_data 暂无注释引用值）。
+        - ``{{note_ref:CODE}}`` → 填入附注章节编号（如 "八、1"）。
+        - ``{{imp:CODE:col_key}}`` → 资产减值表多列取数（从 source_accounts JSONB）。
         - 表头 ``{{key}}`` → 子串替换（合并格非锚点成员 value 为 None 自动跳过）。
         """
         parent_index = parent_row_index or {}
+        note_refs = note_ref_index or {}
         found_inline = False
         for row in ws.iter_rows():
             for cell in row:
@@ -517,8 +632,20 @@ class ReportExcelExporter:
                 m_note = _NOTE_REF_RE.fullmatch(stripped)
                 if m_note:
                     found_inline = True
-                    # No note-reference value available in report_data → clear text
-                    cell.value = None
+                    note_code = m_note.group(1)
+                    # Fill with section_code display value (e.g. "八、1")
+                    display = note_refs.get(note_code)
+                    cell.value = display  # None if no mapping → cell cleared
+                    continue
+
+                # --- Track 1c: imp placeholder (资产减值表多列) ---
+                m_imp = _IMP_PLACEHOLDER_RE.fullmatch(stripped)
+                if m_imp:
+                    found_inline = True
+                    imp_code, col_key = m_imp.group(1), m_imp.group(2)
+                    imp_row = row_index.get(imp_code)
+                    imp_value = self._resolve_imp_value(imp_row, col_key)
+                    cell.value = imp_value
                     continue
 
                 # --- Track 2: header placeholder(s) embedded in text ---
