@@ -77,7 +77,7 @@ inclusion: always
 - **🟢 序时账/明细账数据干净（首汽租车 df5b8403）**：tb_ledger(82384 行) 借贷双非零行=0（每分录行单边）；序时账明细唯一同时显示借+贷的是合成的「N月 本月合计」小计行
 - **🔴 辽宁卫生服务(37814426) 序时账数据异常**：tb_ledger 每条分录 debit_amount==credit_amount（借贷同值如 1303769.25/1303769.25），明显是导入适配器对该企业格式解析错误（源 Excel 可能"金额"列被同时映射到借贷双方）；待排查具体导入源文件格式+适配器 mapping
 - **🟢 明细账月小计 off-by-one 已修（2026-06-02）**：`LedgerPenetration.vue` 的 `ledgerDisplay`+`auxLedgerDisplay` 两处月小计 bug——累加 monthDebit/Credit 在月份边界判断**之前**→上月「本月合计」错并入本月首笔（实测 1 月应 140094.82 算成 188423.58）；修复=边界结算移到累加前 + 归零（非赋当前行值）；加 5 条回归测试守护（月分组/守恒/运行余额）
-- **🔴 明细账改进待办（2026-06-02 分析，未修）**：①**运行余额/月小计按页算→第2页起全错**（loadLedger offset 分页 page_size=100，但 ledgerDisplay 每页都从整期 currentAccountOpening 重算余额；期初接口只传 year 不传页码）——科目本期>100 笔翻页即余额错+跨页月小计被拆；②筛选/排序后小计对不上（锚点行滤掉但小计按整页原始数据算）；③回归测试是 copy 生产函数到测试里测（改 .vue 忘同步副本仍绿）→建议抽 `utils/ledgerDisplay.ts` 组件+测试共用；④账务计算应下沉后端（已有 get_ledger_entries_cursor 游标接口但 loadLedger 没用，理想后端直接返 running_balance+插好小计行）；⑤主表缺 counterpart_account(对方科目)列+本年累计借贷列；⑥虚拟滚动名不副实（>1000 切 el-table-v2 但仍每页 100 行加载）；**优先级 ①(正确性)+③(让测试真生效)**
+- **🟢 明细账增强全部完成（2026-06-12）**：翻页余额游标全量拉取 + `buildLedgerDisplay`/`buildLedgerFilteredDisplay`（筛选子集重算月小计、排序附「当前视图合计」）+ 主表/虚拟滚动**对方科目列** + 后端 `get_ledger_entries_cursor` SQL 窗口返 `running_balance`（前端优先用后端值）+ 虚拟滚动 2000 行压测单测（32 passed）；真 65 万行 Playwright 仍 `RUN_LEDGER_PERF=1` 手工跑
 - **🔴 system_settings 已建(V048)**；真实 PG 5 项目多 standalone，**0 个 consolidated 项目**（合并 UAT 全卡此）；首汽租车_2025(df5b8403) tb 最全但 audit_period_end 为 NULL
 - **✅ V063 account_package_program_status 已实测（2026-06-07）**：15 列/PK/2 索引/3 FK 与 ORM 零 drift；schema_version checksum 已修正为文件真实值；前端路由 `/projects/:id/account-packages/:packageId` 联通确认（AccountPackageView 正常渲染）
 - **契约测试守护**（CI 根治整类 schema 漂移 500）：`test_raw_sql_schema_contract.py`(表级纯静态)+`test_raw_sql_column_contract.py`(列级 pg_only sqlglot)；新增裸 SQL 引用不存在表/列即 CI 红；存量债务登记 `_KNOWN_PHANTOM_DEBT`/`_COLUMN_ALLOWLIST`（剩 wp_template_registry）
@@ -122,15 +122,16 @@ inclusion: always
 - **🟢 附注多表格 per-table export toggle 已实现（2026-06-10）**：前端 DisclosureEditor 多表格 tab 栏右侧⚙按钮→popover checkbox 勾选导出表格；数据存 `table_data._tables[N].export_enabled`(JSONB 无需迁移，默认 true)；后端 `NoteWordExporter._note_tables()` + `_render_note_content()` 两处过滤 `export_enabled=False` 跳过导出
 - **🟡 无感版本迭代**：zero-downtime-deployment spec ✅ 已归档（V068）；剩余待定=生产 Docker Compose+nginx 单机滚动 vs K8s，用户决策后出 spec
 - **✅ 2026-06-07~06-10 完成事项已迁入 `#dev-history`**：zero-downtime-deployment / ledger 三 spec / 导入系列修复 / deliverable-center / report-view-slimdown / 符号约定统一 / 去重加固 / audit-report-template 代码任务 / 附注打标+template 模式 / 报表模板占位 → 详见 dev-history.md "2026-06-07~06-10" 节
-- **🟢 spec 状态（2026-06-12）**：active=4（audit-report-template-integration 180/184 剩 4 项运维 + deliverable-lineage-and-writeback 92/92 completed + workpaper-unified-import-export 27/27 completed + **workpaper-bad-debt-nested-structure 14/14 completed**）/ archived=137；INDEX.md 待同步
-- **🔴→🟡 报表新占位代码支持（2026-06-11 实证）**：续表✅+imp✅+note_ref✅，**仅剩 `{{eq:}}` 权益变动表待矩阵存储方案**
+- **🟢 spec 状态（2026-06-12）**：active=2（audit-report-template-integration 181/184 剩 3 项人工验收/17.4 下线 + deliverable-lineage-and-writeback 92/92 START GATE 已解除）/ archived=139；INDEX.md 已同步（bad-debt + unified-import-export 归档至 05-business-features）
+- **🟢 权益变动表全链路（2026-06-12）**：审定 `{{eq:}}`+`eq_matrix`（EQ-001 余额 + prior_year 上年列）✅；**未审**从四表未审 BS/TB opening fallback 动态算矩阵✅；**交付导出**改内存 enrich（不写库）✅；底稿 M-F7 写 EQ-007/017/024/008 变动行✅；前端 `ReportEquityTable` 上年列接 `eq_matrix.prior_year`✅；`ReportRow.source_accounts` 改 dict|list
 - **🟡 附注模板 SECTION 块内部细化待做**：~600 块×4 变体，待用户确认启动
-- **已知 Bug**：辽宁卫生服务序时账 debit==credit / 明细账翻页余额第 2 页起错 / 试算差额 44M（源数据符号问题）
+- **已知 Bug**：辽宁卫生服务序时账 debit==credit / 试算差额 44M（源数据符号问题）
 - **外部依赖**：LLM embedding / 合并 UAT / GitHub 默认分支改 main / 钉集成
 - **待建 spec**：consol_disclosure_service 瘦身(1736行) / migration_runner 瘦身(1026行) / workpaper-content-semantic-system
-- **✅ workpaper-bad-debt-nested-structure 全部完成（2026-06-12，14/14 任务组）**：D2-3 坏账嵌套子表 V070；产物=bad_debt 全链路(后端108测试+前端7 vitest)+GtBadDebtSheet(层级/展折/右键/只读/GT紫)+`wp_classification_service` sheet名级路由 bad-debt-sheet+`resolve_wp_index_id` id语义兼容；**11.3 Playwright 实测通过**：`e2e/bad-debt-d2-3.spec.ts` 辽宁卫生 D2→tab「坏账准备明细表D2-3」→展折+右键增删子行+bad-debt-rows API 全2xx无404/307，1 passed/11s
-- **🟡 bad-debt spec 剩余改进项（非阻塞，后续排期）**：①科目编码 1231坏账准备/6701信用减值损失硬编码在 service→多企业不通用，应走 account_chart_service 编码+名称双保险 ②12 条 PBT 全用 in-process SQLite，唯一偏索引/级联/乐观锁建议补真 PG 冒烟 ③前端"上方/下方插入子行"是近似实现(都调新增到末尾，后端无 position 排序端点)，要么补端点要么去掉菜单项 ④迁移号应实施第一步才分配(spec 生成时快照易撞号，本次 V069 被占临时改 V070/V071)
-- **✅ workpaper-unified-import-export 全部完成含前端接入（2026-06-12，27/27）**：后端 80 tests 全绿 + 前端 7 组件已接线——`WorkpaperList`（增强导入/批量导出元数据/模板复制）+ `WorkpaperEditor`（HTML 路径 gt-wp-io-toolbar + Univer 工具栏 导出/导入）+ `WorkpaperSidePanel` 历史版本组嵌 `WpVersionHistoryPanel`；**Playwright 4 passed/14.7s**（`e2e/wp-export-import.spec.ts`：弹窗可开+batch-export-enhanced 200+export-with-metadata 200+export→import-enhanced round-trip）
+- **✅ workpaper-bad-debt-nested-structure 全部完成+归档（2026-06-12，14/14 任务组）**：D2-3 坏账嵌套子表 V070；产物=bad_debt 全链路(后端108测试+前端7 vitest)+GtBadDebtSheet(层级/展折/右键/只读/GT紫)+`wp_classification_service` sheet名级路由 bad-debt-sheet+`resolve_wp_index_id` id语义兼容；**11.3 Playwright 实测通过**：`e2e/bad-debt-d2-3.spec.ts` 辽宁卫生 D2→tab「坏账准备明细表D2-3」→展折+右键增删子行+bad-debt-rows API 全2xx无404/307，1 passed/11s；归档 `_archive/05-business-features/`
+- **🟢 bad-debt D2-3 后续改进全部完成（2026-06-12）**：①`bad_debt_account_codes`+`account_chart_service.resolve_standard_account_by_name` 按名称解析 1231/6701(6702) ②`CreateChildRowDTO.insert_before_id/insert_after_id`+`GtBadDebtSheet` 上方/下方插入接线 ③`test_bad_debt_pg_smoke.py`（`@pytest.mark.pg_only` 偏索引/级联/乐观锁）④README 迁移号分配流程（实施第一步取最高 V+1）
+- **✅ workpaper-unified-import-export 全部完成+归档（2026-06-12，27/27）**：后端 80 tests 全绿 + 前端 7 组件已接线——`WorkpaperList`（增强导入/批量导出元数据/模板复制）+ `WorkpaperEditor`（HTML 路径 gt-wp-io-toolbar + Univer 工具栏 导出/导入）+ `WorkpaperSidePanel` 历史版本组嵌 `WpVersionHistoryPanel`；**Playwright 4 passed/14.7s**（`e2e/wp-export-import.spec.ts`）；归档 `_archive/05-business-features/`
+- **🟢 审计报告灰度开关已 flip（2026-06-12，task 17.3）**：`USE_TEMPLATE_FILL_SERVICE` 默认 `True`（`config.py`+`.env.example`）；附注导出默认 `template` 模式；`render_report_body` 保留 legacy 回退，17.4 下线待运维决策
 ## 操作铁律（详见 `#conventions`）
 
 - **三层一致校验**：DB 迁移 + ORM `Mapped[]` + service 方法，任一缺失即伪绿

@@ -96,6 +96,12 @@
       <p style="margin: 0 0 12px; color: var(--el-text-color-secondary); font-size: 13px">
         请选择要导出的报表类型：
       </p>
+      <el-form-item label="取数口径" style="margin-bottom: 12px">
+        <el-radio-group v-model="financialReportDataMode">
+          <el-radio value="audited">审定数</el-radio>
+          <el-radio value="unadjusted">未审数</el-radio>
+        </el-radio-group>
+      </el-form-item>
       <el-checkbox-group v-model="selectedReportTypes">
         <el-checkbox label="balance_sheet">资产负债表</el-checkbox>
         <el-checkbox label="income_statement">利润表</el-checkbox>
@@ -206,6 +212,7 @@ const versionChain = ref<DeliverableVersion[]>([])
 const showExportDialog = ref(false)
 const showGenerateReport = ref(false)
 const showGenerateReports = ref(false)
+const financialReportDataMode = ref<'audited' | 'unadjusted'>('audited')
 const selectedReportTypes = ref<string[]>(['balance_sheet', 'income_statement', 'cash_flow_statement', 'equity_statement', 'impairment_provision'])
 const previewVisible = ref(false)
 const previewTitle = ref('')
@@ -236,7 +243,8 @@ function guardGenerate(entry: GenerateEntryKey): boolean {
 
 const DOC_TYPE_LABEL: Record<string, string> = {
   audit_report: '审计报告正文',
-  financial_report: '财务报表',
+  financial_report: '财务报表（审定）',
+  financial_report_unadjusted: '财务报表（未审）',
   disclosure_notes: '附注',
   full_package: '全套包',
 }
@@ -370,16 +378,21 @@ async function confirmGenerateReports() {
   generating.value = true
   showGenerateReports.value = false
   try {
+    const isUnadjusted = financialReportDataMode.value === 'unadjusted'
     const res = await renderFinancialReports(projectId.value, {
       year: year.value,
       report_types: selectedReportTypes.value,
+      data_mode: financialReportDataMode.value,
     })
     if (res.platform_persist_failed) {
       ElMessage.warning('平台留存失败，请从版本链重新下载')
     } else {
-      ElMessage.success('财务报表已生成并保存到交付中心')
+      ElMessage.success(isUnadjusted ? '未审财务报表已生成并保存到交付中心' : '财务报表已生成并保存到交付中心')
     }
-    downloadFile(deliverableDownloadUrl(projectId.value, res.task_id, res.version_no), { fileName: `financial_reports_${year.value}.xlsx` })
+    const dlName = isUnadjusted
+      ? `financial_reports_unadjusted_${year.value}.xlsx`
+      : `financial_reports_${year.value}.xlsx`
+    downloadFile(deliverableDownloadUrl(projectId.value, res.task_id, res.version_no), { fileName: dlName })
     await loadList()
   } catch {
     ElMessage.error('生成财务报表失败')

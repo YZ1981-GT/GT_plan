@@ -36,6 +36,7 @@ class WordExportDocType(str, enum.Enum):
     """Word导出文档类型"""
     audit_report = "audit_report"
     financial_report = "financial_report"
+    financial_report_unadjusted = "financial_report_unadjusted"
     disclosure_notes = "disclosure_notes"
     full_package = "full_package"
 

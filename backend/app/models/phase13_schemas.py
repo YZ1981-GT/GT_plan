@@ -157,7 +157,7 @@ class FullPackageRequest(BaseModel):
 class FullDeliverablesRequest(BaseModel):
     """一键生成全套交付件请求（job_type=full_deliverables，design §14）。
 
-    steps 默认 ``financial_reports → disclosure_notes → report_body``；
+    steps 默认 ``financial_reports → financial_reports_unadjusted → disclosure_notes → report_body``；
     optional_sections 为 None 时由执行器按 OPT 默认优先级链解析（无弹窗自动 confirm）。
     """
     year: int
@@ -299,6 +299,8 @@ class DeliverableExportRequest(BaseModel):
     # 灰度开关：附注导出模式 None=跟随 settings.USE_TEMPLATE_FILL_SERVICE；
     # 显式 "template" / "programmatic" 覆盖（task 10.4）
     mode: str | None = None
+    # 财务报表取数口径：audited（审定，默认）| unadjusted（未审）
+    data_mode: str = "audited"
 
 
 class DeliverableExportResponse(BaseModel):

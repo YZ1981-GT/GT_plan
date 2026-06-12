@@ -27,6 +27,8 @@ export interface UseReportContextMenuOptions {
   rvPenetrate: ReturnType<typeof usePenetrate>
   // Cross-composable dependency: onDrilldown from useReportDrilldown
   onDrilldown: (row: ReportRow) => Promise<void>
+  /** 权益矩阵单元格取值（与 ReportEquityTable 一致） */
+  eqCellVal?: (row: any, colKey: string, yearKey?: 'current_year' | 'prior_year') => any
 }
 
 export interface UseReportContextMenuReturn {
@@ -64,10 +66,41 @@ export function useReportContextMenu(options: UseReportContextMenuOptions): UseR
     projectId, year, activeTab, rows, reportMode,
     isConsolidated: _isConsolidated, fetchReport, getRowType,
     goToNote, showFormulaManager, openTrustScore,
-    rvCtx, rvPenetrate, onDrilldown,
+    rvCtx, rvPenetrate, onDrilldown, eqCellVal,
   } = options
 
   const router = useRouter()
+
+  function parseEquityEditTarget(column: any): {
+    columnKey: string
+    yearKey: 'current_year' | 'prior_year'
+    uiColKey: string
+  } | null {
+    const raw = String(column?.property || '')
+    if (raw.startsWith('cy:')) {
+      return { columnKey: raw, yearKey: 'current_year', uiColKey: raw.slice(3) }
+    }
+    if (raw.startsWith('py:')) {
+      return { columnKey: raw, yearKey: 'prior_year', uiColKey: raw.slice(3) }
+    }
+    return null
+  }
+
+  function equityCellDisplayValue(row: any, column: any): string {
+    const target = parseEquityEditTarget(column)
+    if (target && eqCellVal) {
+      const v = eqCellVal(row, target.uiColKey, target.yearKey)
+      if (v != null && v !== '') return String(v)
+      if (target.yearKey === 'current_year' && target.uiColKey === 'total') {
+        return String(row.current_period_amount || 0)
+      }
+      if (target.yearKey === 'prior_year' && target.uiColKey === 'total') {
+        return String(row.prior_period_amount || 0)
+      }
+      return '0'
+    }
+    return String(row.current_period_amount || 0)
+  }
 
   // ─── Consol Breakdown ─────────────────────────────────────────────────────
   const consolBreakdownVisible = ref(false)
@@ -126,7 +159,11 @@ export function useReportContextMenu(options: UseReportContextMenuOptions): UseR
       colIdx = column.index
     }
     if (rowIdx < 0 || colIdx < 0) return
-    const value = row.current_period_amount ?? row[column.property] ?? ''
+    let value: unknown = row.current_period_amount ?? row[column.property] ?? ''
+    if (activeTab.value === 'equity_statement' && eqCellVal) {
+      const target = parseEquityEditTarget(column)
+      if (target) value = eqCellVal(row, target.uiColKey, target.yearKey)
+    }
     rvCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
     rvCtx.contextMenu.rowData = row
     rvCtx.contextMenu.itemName = row.row_name || ''
@@ -135,21 +172,31 @@ export function useReportContextMenu(options: UseReportContextMenuOptions): UseR
   function onRvCellDblClick(row: any, column: any) {
     // 权益表/减值表：双击编辑单元格
     if (activeTab.value === 'equity_statement' || activeTab.value === 'impairment_provision') {
-      if (column.label === '项目') return
-      const colKey = column.property || column.label
+      if (activeTab.value === 'equity_statement' && reportMode.value === 'unadjusted') {
+        ElMessage.info('未审报表为动态计算，不支持单元格编辑；请切换至审定数模式')
+        return
+      }
+      if (column.label === '项目' || column.property === 'row_name') return
+      const eqTarget = activeTab.value === 'equity_statement' ? parseEquityEditTarget(column) : null
+      const colKey = eqTarget?.columnKey || column.property || column.label
+      const payload: Record<string, unknown> = {
+        row_code: row.row_code || '',
+        column_key: colKey,
+        value: null as number | null,
+      }
+      if (eqTarget) payload.year_key = eqTarget.yearKey
       ElMessageBox.prompt(`编辑「${row.row_name}」的「${column.label}」`, '编辑单元格', {
-        inputValue: String(row.current_period_amount || 0),
+        inputValue: equityCellDisplayValue(row, column),
         inputPattern: /^-?\d*\.?\d*$/,
         inputErrorMessage: '请输入数字',
         confirmButtonText: '保存',
         cancelButtonText: '取消',
       }).then(({ value }) => {
         const numVal = value ? parseFloat(value) : null
-        api.put(`/api/projects/${projectId.value}/reports/cell`, {
-          row_code: row.row_code || '',
-          column_key: colKey,
-          value: numVal,
-        }, { params: { year: year.value, report_type: activeTab.value } })
+        payload.value = numVal
+        api.put(`/api/projects/${projectId.value}/reports/cell`, payload, {
+          params: { year: year.value, report_type: activeTab.value },
+        })
           .then(() => { ElMessage.success('已保存'); fetchReport() })
           .catch((e: any) => handleApiError(e, '保存'))
       }).catch(() => { /* 取消 */ })

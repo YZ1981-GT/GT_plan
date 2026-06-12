@@ -69,6 +69,7 @@ _COLUMN_MAP = {
 # 数据推导，故不自动填充（留空由审计人员手工编制，N 列合计模板 =SUM() 自算）。
 _EQ_COL_TO_BS_ROW_KEYWORDS: dict[str, list[str]] = {
     "share_capital": ["实收资本", "股本"],
+    "preferred_stock": ["优先股"],
     "other_equity_instrument": ["其他权益工具"],
     "perpetual_bond": ["永续债"],
     "capital_reserve": ["资本公积"],
@@ -78,6 +79,7 @@ _EQ_COL_TO_BS_ROW_KEYWORDS: dict[str, list[str]] = {
     "surplus_reserve": ["盈余公积"],
     "general_risk_reserve": ["一般风险准备"],
     "retained_earnings": ["未分配利润"],
+    "subtotal": ["归属于母公司所有者权益合计", "归属于母公司股东权益合计"],
     "minority_interest": ["少数股东权益"],
     "total_equity": ["所有者权益合计", "股东权益合计"],
 }
@@ -88,6 +90,426 @@ _EQ_BS_EXCLUDE_KEYWORDS = ("投资",)
 # 权益变动表「上年年末余额」行 row_code（唯一可从 BS 可靠推导的余额行）。
 # 注：「本年年初余额」「本年年末余额」在模板中是 =SUM() 公式格，无需占位填充。
 _EQ_PRIOR_YEAR_END_ROW = "EQ-001"
+# 底稿 M-F7 变动汇总默认写入「综合收益总额」行
+_EQ_COMPREHENSIVE_INCOME_ROW = "EQ-007"
+_EQ_CAPITAL_CHANGE_ROW = "EQ-008"
+_EQ_SURPLUS_EXTRACT_ROW = "EQ-017"
+_EQ_DIVIDEND_ROW = "EQ-024"
+
+# 语义行角色 → 默认 row_code（国企单体）；上市/合并等通过行名模式解析覆盖
+_EQ_SEMANTIC_DEFAULTS: dict[str, str] = {
+    "prior_year_end": _EQ_PRIOR_YEAR_END_ROW,
+    "comprehensive_income": _EQ_COMPREHENSIVE_INCOME_ROW,
+    "capital_change": _EQ_CAPITAL_CHANGE_ROW,
+    "surplus_extract": _EQ_SURPLUS_EXTRACT_ROW,
+    "dividend": _EQ_DIVIDEND_ROW,
+}
+_EQ_SEMANTIC_ROW_NAME_PATTERNS: dict[str, list[str]] = {
+    "prior_year_end": ["上年年末余额", "上期期末余额"],
+    "comprehensive_income": ["综合收益总额"],
+    "capital_change": ["投入和减少资本"],
+    "surplus_extract": ["提取盈余公积"],
+    "dividend": ["对股东", "对所有者"],
+}
+
+# 底稿 opening_balances（前端 6 列键）→ eq_matrix 列键
+_WP_OPENING_TO_EQ_COL: dict[str, str] = {
+    "paid_in_capital": "share_capital",
+    "preferred_stock": "preferred_stock",
+    "capital_reserve": "capital_reserve",
+    "surplus_reserve": "surplus_reserve",
+    "retained_earnings": "retained_earnings",
+    "oci": "other_comprehensive_income",
+    "other_equity_instruments": "other_equity_instrument",
+}
+
+# 底稿 movement_summary（*_change）→ eq_matrix 列键
+_WP_MOVEMENT_TO_EQ_COL: dict[str, str] = {
+    "paid_in_capital_change": "share_capital",
+    "capital_reserve_change": "capital_reserve",
+    "surplus_reserve_change": "surplus_reserve",
+    "retained_earnings_change": "retained_earnings",
+    "oci_change": "other_comprehensive_income",
+    "other_equity_instruments_change": "other_equity_instrument",
+}
+
+# 前端权益表列键 → eq_matrix 列键（与 useReportColumns.ts 对齐）
+_EQ_UI_TO_BACKEND_COL: dict[str, str] = {
+    "paid_in_capital": "share_capital",
+    "other_equity_preferred": "preferred_stock",
+    "other_equity_perpetual": "perpetual_bond",
+    "other_equity_other": "other_equity_instrument",
+    "oci": "other_comprehensive_income",
+    "general_risk": "general_risk_reserve",
+    "subtotal": "subtotal",
+    "minority": "minority_interest",
+    "total": "total_equity",
+}
+
+
+def parse_equity_cell_column_key(
+    column_key: str,
+    year_key: str | None = None,
+) -> tuple[str, str]:
+    """解析单元格编辑列键；支持 ``cy:paid_in_capital`` / ``py:oci`` 前缀。"""
+    if column_key.startswith("cy:"):
+        return column_key[3:], "current_year"
+    if column_key.startswith("py:"):
+        return column_key[3:], "prior_year"
+    return column_key, year_key or "current_year"
+
+
+def resolve_eq_matrix_col_key(ui_col_key: str) -> str:
+    return _EQ_UI_TO_BACKEND_COL.get(ui_col_key, ui_col_key)
+
+
+def apply_equity_cell_edit_to_source_accounts(
+    source_accounts: dict | None,
+    column_key: str,
+    value: float | None,
+    *,
+    year_key: str = "current_year",
+) -> dict:
+    """权益变动表矩阵编辑：写入 ``source_accounts.eq_matrix[year_key][col]`` 契约。"""
+    merged: dict = dict(source_accounts) if isinstance(source_accounts, dict) else {}
+    ui_col, yk = parse_equity_cell_column_key(column_key, year_key)
+
+    if ui_col in ("current_period_amount", "total"):
+        backend_col = "total_equity"
+    else:
+        backend_col = resolve_eq_matrix_col_key(ui_col)
+
+    matrix = dict(merged.get("eq_matrix") or {})
+    year_block = dict(matrix.get(yk) or {})
+    if value is not None:
+        year_block[backend_col] = value
+    else:
+        year_block.pop(backend_col, None)
+    if year_block:
+        matrix[yk] = year_block
+    elif yk in matrix:
+        matrix.pop(yk, None)
+    if matrix:
+        merged["eq_matrix"] = matrix
+    elif "eq_matrix" in merged:
+        merged.pop("eq_matrix", None)
+
+    # 清理过渡扁平键，避免读路径歧义
+    for stale in (ui_col, backend_col, "total"):
+        merged.pop(stale, None)
+    return merged
+
+
+def _bs_row_number(row_code: str) -> int:
+    try:
+        return int(row_code.split("-")[1])
+    except (IndexError, ValueError):
+        return -1
+
+
+def _row_field(row: Any, field: str) -> Any:
+    if isinstance(row, dict):
+        return row.get(field)
+    return getattr(row, field, None)
+
+
+def _build_eq_col_values_from_bs_rows(
+    bs_rows: list[Any],
+    amount_attr: str = "prior_period_amount",
+) -> dict[str, float]:
+    """从 BS 权益段行提取 EQ-001 各权益构成列值（与 exporter {{eq:}} 列键对齐）。"""
+    equity_start_num: int | None = None
+    for r in bs_rows:
+        name = _row_field(r, "row_name") or ""
+        if name.startswith("所有者权益") and ("：" in name or ":" in name):
+            equity_start_num = _bs_row_number(_row_field(r, "row_code") or "")
+            break
+
+    bs_by_name: list[tuple[str, Decimal]] = []
+    for r in bs_rows:
+        code = _row_field(r, "row_code") or ""
+        if equity_start_num is not None and _bs_row_number(code) < equity_start_num:
+            continue
+        raw = _row_field(r, amount_attr)
+        amount = raw if isinstance(raw, Decimal) else Decimal(str(raw or "0"))
+        bs_by_name.append((_row_field(r, "row_name") or "", amount))
+
+    def _norm(name: str) -> str:
+        return name.lstrip("*△#＃ 　:：").strip()
+
+    consumed_names: set[str] = set()
+
+    def _match_bs_value_exclusive(
+        keywords: list[str], col_key: str,
+    ) -> tuple[float | None, str | None]:
+        for kw in keywords:
+            for name, amount in bs_by_name:
+                if name in consumed_names:
+                    continue
+                if any(ex in name for ex in _EQ_BS_EXCLUDE_KEYWORDS):
+                    continue
+                if _norm(name) == kw:
+                    return float(amount), name
+        for name, amount in bs_by_name:
+            if name in consumed_names:
+                continue
+            if any(ex in name for ex in _EQ_BS_EXCLUDE_KEYWORDS):
+                continue
+            if col_key == "other_equity_instrument" and (
+                "优先股" in name or "永续债" in name
+            ):
+                continue
+            if any(kw in name for kw in keywords):
+                return float(amount), name
+        return None, None
+
+    col_values: dict[str, float] = {}
+    for col_key, keywords in _EQ_COL_TO_BS_ROW_KEYWORDS.items():
+        val, matched_name = _match_bs_value_exclusive(keywords, col_key)
+        if val is not None:
+            col_values[col_key] = val
+            if matched_name:
+                consumed_names.add(matched_name)
+    return col_values
+
+
+def resolve_eq_semantic_row_codes(eq_rows: list[dict]) -> dict[str, str]:
+    """按行名解析 EQ 语义角色 → row_code（兼容国企/上市行次偏移）。"""
+    resolved = dict(_EQ_SEMANTIC_DEFAULTS)
+    for semantic, patterns in _EQ_SEMANTIC_ROW_NAME_PATTERNS.items():
+        for row in eq_rows:
+            code = row.get("row_code")
+            name = (row.get("row_name") or "").replace(" ", "").replace("　", "")
+            if not code or not name:
+                continue
+            if semantic == "dividend":
+                if any(p in name for p in patterns) and "分配" in name:
+                    resolved[semantic] = code
+                    break
+            elif any(p.replace(" ", "").replace("　", "") in name for p in patterns):
+                resolved[semantic] = code
+                break
+    return resolved
+
+
+def _apply_eq_matrix_to_row(
+    row: dict,
+    col_values: dict[str, float],
+    *,
+    year_key: str = "current_year",
+) -> None:
+    """将分列值写入行 dict 的 source_accounts.eq_matrix 契约。
+
+    合并策略：已有值（含手工编辑）优先于 BS/底稿自动推导，避免 enrich 覆盖用户改数。
+    """
+    if not col_values:
+        return
+    existing_sa = row.get("source_accounts")
+    merged: dict = dict(existing_sa) if isinstance(existing_sa, dict) else {}
+    matrix = dict(merged.get("eq_matrix") or {})
+    matrix[year_key] = {**col_values, **dict(matrix.get(year_key) or {})}
+    merged["eq_matrix"] = matrix
+    row["source_accounts"] = merged
+
+
+def _wp_opening_to_eq_cols(opening: dict) -> dict[str, float]:
+    cols: dict[str, float] = {}
+    for wp_key, eq_key in _WP_OPENING_TO_EQ_COL.items():
+        raw = opening.get(wp_key)
+        if raw is None:
+            continue
+        try:
+            cols[eq_key] = float(raw)
+        except (TypeError, ValueError):
+            continue
+    return cols
+
+
+def _wp_movement_to_eq_cols(summary: dict) -> dict[str, float]:
+    cols: dict[str, float] = {}
+    for wp_key, eq_key in _WP_MOVEMENT_TO_EQ_COL.items():
+        raw = summary.get(wp_key)
+        if raw is None:
+            continue
+        try:
+            cols[eq_key] = float(raw)
+        except (TypeError, ValueError):
+            continue
+    return cols
+
+
+def _wp_overlay_float(wp_overlay: dict, key: str) -> float | None:
+    raw = wp_overlay.get(key)
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _financial_report_row_to_dict(row: Any) -> dict:
+    return {
+        "row_code": row.row_code,
+        "row_name": row.row_name,
+        "current_period_amount": row.current_period_amount,
+        "prior_period_amount": row.prior_period_amount,
+        "indent_level": row.indent_level,
+        "is_total_row": row.is_total_row,
+        "formula_used": row.formula_used,
+        "source_accounts": row.source_accounts,
+    }
+
+
+def _build_eq_matrix_year_blocks(
+    bs_rows_current: list[Any],
+    bs_rows_prior: list[Any] | None = None,
+    wp_overlay: dict | None = None,
+) -> dict[str, dict[str, float]]:
+    """构建 eq_matrix 的 current_year / prior_year 两块（EQ-001 上年年末余额列）。"""
+    current = _build_eq_col_values_from_bs_rows(bs_rows_current, "prior_period_amount")
+    prior = _build_eq_col_values_from_bs_rows(bs_rows_prior or [], "prior_period_amount")
+    if wp_overlay:
+        opening = wp_overlay.get("opening_balances") or {}
+        if isinstance(opening, dict):
+            wp_cols = _wp_opening_to_eq_cols(opening)
+            if wp_cols:
+                current = {**current, **wp_cols}
+    blocks: dict[str, dict[str, float]] = {}
+    if current:
+        blocks["current_year"] = current
+    if prior:
+        blocks["prior_year"] = prior
+    return blocks
+
+
+def _apply_eq_matrix_year_blocks_to_row(
+    row: dict, blocks: dict[str, dict[str, float]],
+) -> None:
+    for year_key, cols in blocks.items():
+        _apply_eq_matrix_to_row(row, cols, year_key=year_key)
+
+
+def _apply_movement_to_eq_row(
+    eq_rows: list[dict], row_code: str, cols: dict[str, float],
+) -> None:
+    for row in eq_rows:
+        if row.get("row_code") == row_code:
+            _apply_eq_matrix_to_row(row, cols, year_key="current_year")
+            break
+
+
+def _apply_is_net_profit_to_eq_rows(
+    eq_rows: list[dict],
+    is_rows: list[Any],
+    *,
+    semantic_codes: dict[str, str] | None = None,
+) -> None:
+    """利润表净利润 → 综合收益行未分配利润（无底稿写回时的 fallback）。"""
+    sem = semantic_codes or resolve_eq_semantic_row_codes(eq_rows)
+    ci_row = sem.get("comprehensive_income", _EQ_COMPREHENSIVE_INCOME_ROW)
+    net_profit: float | None = None
+    for code in ("IS-024", "IS-019"):
+        for r in is_rows:
+            if _row_field(r, "row_code") != code:
+                continue
+            raw = _row_field(r, "current_period_amount")
+            try:
+                val = float(raw or 0)
+            except (TypeError, ValueError):
+                val = 0.0
+            if val != 0:
+                net_profit = val
+            break
+        if net_profit is not None:
+            break
+    if net_profit is None or net_profit == 0:
+        return
+    for row in eq_rows:
+        if row.get("row_code") != ci_row:
+            continue
+        sa = row.get("source_accounts")
+        if isinstance(sa, dict):
+            matrix = sa.get("eq_matrix")
+            if isinstance(matrix, dict):
+                cy = matrix.get("current_year")
+                if isinstance(cy, dict) and cy.get("retained_earnings") is not None:
+                    return
+        _apply_movement_to_eq_row(
+            eq_rows, ci_row, {"retained_earnings": net_profit},
+        )
+        return
+
+
+def _apply_wp_movement_to_eq_rows(
+    eq_rows: list[dict],
+    wp_overlay: dict,
+    *,
+    semantic_codes: dict[str, str] | None = None,
+) -> None:
+    """底稿 M-F7 变动写入对应 EQ 行（综合收益 / 利润分配 / 资本变动）。"""
+    sem = semantic_codes or resolve_eq_semantic_row_codes(eq_rows)
+    ci_row = sem.get("comprehensive_income", _EQ_COMPREHENSIVE_INCOME_ROW)
+    div_row = sem.get("dividend", _EQ_DIVIDEND_ROW)
+    sur_row = sem.get("surplus_extract", _EQ_SURPLUS_EXTRACT_ROW)
+    cap_row = sem.get("capital_change", _EQ_CAPITAL_CHANGE_ROW)
+
+    summary = wp_overlay.get("movement_summary") or {}
+    if isinstance(summary, dict):
+        mv_cols = _wp_movement_to_eq_cols(summary)
+        if mv_cols:
+            _apply_movement_to_eq_row(eq_rows, ci_row, mv_cols)
+
+    net_profit = _wp_overlay_float(wp_overlay, "net_profit")
+    if net_profit is not None and net_profit != 0:
+        _apply_movement_to_eq_row(
+            eq_rows, ci_row, {"retained_earnings": net_profit},
+        )
+
+    dividends = _wp_overlay_float(wp_overlay, "dividends")
+    if dividends is not None and dividends != 0:
+        _apply_movement_to_eq_row(
+            eq_rows, div_row, {"retained_earnings": -abs(dividends)},
+        )
+
+    surplus_extract = _wp_overlay_float(wp_overlay, "surplus_reserve")
+    if surplus_extract is not None and surplus_extract != 0:
+        _apply_movement_to_eq_row(eq_rows, sur_row, {
+            "surplus_reserve": surplus_extract,
+            "retained_earnings": -surplus_extract,
+        })
+
+    cap_chg = _wp_overlay_float(wp_overlay, "capital_reserve_changes")
+    if cap_chg is not None and cap_chg != 0:
+        _apply_movement_to_eq_row(
+            eq_rows, cap_row, {"capital_reserve": cap_chg},
+        )
+
+
+def _attach_equity_matrix_to_rows(
+    eq_rows: list[dict],
+    bs_rows_current: list[Any],
+    bs_rows_prior: list[Any] | None = None,
+    wp_overlay: dict | None = None,
+) -> None:
+    """为权益变动表行附加 eq_matrix（余额行 + 底稿变动行）。"""
+    sem = resolve_eq_semantic_row_codes(eq_rows)
+    prior_end_row = sem.get("prior_year_end", _EQ_PRIOR_YEAR_END_ROW)
+    blocks = _build_eq_matrix_year_blocks(bs_rows_current, bs_rows_prior, wp_overlay)
+    for row in eq_rows:
+        if row.get("row_code") == prior_end_row:
+            _apply_eq_matrix_year_blocks_to_row(row, blocks)
+            break
+    if wp_overlay:
+        _apply_wp_movement_to_eq_rows(eq_rows, wp_overlay, semantic_codes=sem)
+
+
+def _attach_is_derived_movement(
+    eq_rows: list[dict], is_rows: list[Any] | None,
+) -> None:
+    if is_rows:
+        _apply_is_net_profit_to_eq_rows(eq_rows, is_rows)
+
 
 # ---------------------------------------------------------------------------
 # _safe_eval_expr: 薄 re-export，委托 L1 内核 formula_engine.safe_eval_expr
@@ -498,15 +920,8 @@ class ReportEngine:
             # 写入缓存
             await self._set_cached_report(project_id, report_type.value, report_rows)
 
-        # ── 权益变动表二维矩阵：填充「上年年末余额」(EQ-001) 各权益列 ──
-        # （从已持久化的 BS 行取对应权益科目上期审定值，写入 eq_matrix 契约）
-        if FinancialReportType.equity_statement.value in results:
-            try:
-                await self._fill_equity_matrix(
-                    project_id, year, applicable_standard, now,
-                )
-            except Exception as _eq_err:
-                logger.warning("[EQ_MATRIX] fill failed: %s", _eq_err)
+        # 权益 eq_matrix 由 API/导出路径 enrich_equity_statement_rows 内存回填（不写库），
+        # 避免「生成写库 vs 导出 enrich」双路径导致 DB 矩阵 stale；手工编辑经 PUT /cell 落库。
         # Add coverage_stats to results
         # Calculate overall coverage
         total_rows = sum(s.get("total_rows", 0) for s in coverage_stats.values())
@@ -754,6 +1169,30 @@ class ReportEngine:
 
         return report_rows, type_coverage, debug_rows if debug else None
 
+    async def _load_bs_rows_from_db(
+        self, project_id: UUID, year: int,
+    ) -> list[dict]:
+        """读取已持久化的资产负债表行（dict 格式，供矩阵推导）。"""
+        return await self._load_financial_report_rows_from_db(
+            project_id, year, FinancialReportType.balance_sheet,
+        )
+
+    async def _load_financial_report_rows_from_db(
+        self,
+        project_id: UUID,
+        year: int,
+        report_type: FinancialReportType,
+    ) -> list[dict]:
+        result = await self.db.execute(
+            sa.select(FinancialReport).where(
+                FinancialReport.project_id == project_id,
+                FinancialReport.year == year,
+                FinancialReport.report_type == report_type,
+                FinancialReport.is_deleted == sa.false(),
+            )
+        )
+        return [_financial_report_row_to_dict(r) for r in result.scalars().all()]
+
     async def _fill_equity_matrix(
         self,
         project_id: UUID,
@@ -761,105 +1200,300 @@ class ReportEngine:
         applicable_standard: str,
         generated_at: datetime,
     ) -> None:
-        """填充权益变动表「上年年末余额」(EQ-001) 行的二维矩阵列数据.
-
-        权益变动表是「行=变动事项 × 列=权益构成科目」的二维矩阵。其中只有余额行
-        可从资产负债表（BS）可靠推导：上年年末余额 = 各权益科目的 BS 上期（prior）值。
-        变动明细行需分录级数据无法从现有数据推导，故不自动填充（留空手工编制）。
-
-        写入契约（与 exporter._resolve_eq_value 对齐）::
-
-            FinancialReport(EQ-001).source_accounts = {
-              "eq_matrix": {"current_year": {col_key: amount, ...}}
-            }
-
-        ``current_year`` 表示权益变动表本年表的「上年年末余额」列值（即 BS 上期数）。
-        """
-        # 1. 读取 BS 行：{row_name: prior_period_amount}
-        bs_result = await self.db.execute(
-            sa.select(FinancialReport).where(
-                FinancialReport.project_id == project_id,
-                FinancialReport.year == year,
-                FinancialReport.report_type == FinancialReportType.balance_sheet,
-                FinancialReport.is_deleted == sa.false(),
-            )
-        )
-        bs_rows = bs_result.scalars().all()
-        # 仅取「所有者权益：」段之后的行（排除资产侧/负债侧同名科目，如资产侧
-        # 「永续债」「其他权益工具投资」）。按 row_code 数字序定位段边界。
-        def _bs_num(rc: str) -> int:
-            try:
-                return int(rc.split("-")[1])
-            except (IndexError, ValueError):
-                return -1
-
-        equity_start_num: int | None = None
-        for r in bs_rows:
-            if r.row_name and r.row_name.startswith("所有者权益") and (
-                "：" in r.row_name or ":" in r.row_name
-            ):
-                equity_start_num = _bs_num(r.row_code)
-                break
-
-        # row_name 关键字 → prior 值（仅权益段内行）
-        bs_by_name: list[tuple[str, Decimal]] = [
-            (r.row_name or "", r.prior_period_amount or Decimal("0"))
-            for r in bs_rows
-            if equity_start_num is None or _bs_num(r.row_code) >= equity_start_num
-        ]
-
-        def _norm(name: str) -> str:
-            # 去前导标记（* △ # 空格）便于精确比对
-            return name.lstrip("*△#＃ 　:：").strip()
-
-        def _match_bs_value(keywords: list[str]) -> float | None:
-            # 优先「规范化后完全相等」（避免 "所有者权益合计" 被
-            # "归属于母公司所有者权益合计" 子串截胡）；无精确命中再退化子串包含。
-            for kw in keywords:
-                for name, amount in bs_by_name:
-                    if any(ex in name for ex in _EQ_BS_EXCLUDE_KEYWORDS):
-                        continue
-                    if _norm(name) == kw:
-                        return float(amount)
-            for name, amount in bs_by_name:
-                if any(ex in name for ex in _EQ_BS_EXCLUDE_KEYWORDS):
-                    continue
-                if any(kw in name for kw in keywords):
-                    return float(amount)
-            return None
-
-        # 2. 构建 current_year 列字典（仅含成功映射的列）
-        col_values: dict[str, float] = {}
-        for col_key, keywords in _EQ_COL_TO_BS_ROW_KEYWORDS.items():
-            val = _match_bs_value(keywords)
-            if val is not None:
-                col_values[col_key] = val
-
-        if not col_values:
-            return
-
-        # 3. 写入 EQ-001 行的 source_accounts.eq_matrix
+        """持久化权益变动表 eq_matrix（EQ-001 余额 + 底稿变动行）。"""
         eq_result = await self.db.execute(
             sa.select(FinancialReport).where(
                 FinancialReport.project_id == project_id,
                 FinancialReport.year == year,
                 FinancialReport.report_type == FinancialReportType.equity_statement,
-                FinancialReport.row_code == _EQ_PRIOR_YEAR_END_ROW,
+                FinancialReport.is_deleted == sa.false(),
+            )
+        )
+        eq_rows = [_financial_report_row_to_dict(r) for r in eq_result.scalars().all()]
+        if not eq_rows:
+            return
+        enriched = await self._build_enriched_equity_rows(project_id, year, eq_rows)
+        for row in enriched:
+            code = row.get("row_code")
+            matrix = (row.get("source_accounts") or {}).get("eq_matrix")
+            if not code or not isinstance(matrix, dict):
+                continue
+            for year_key, cols in matrix.items():
+                if isinstance(cols, dict) and cols:
+                    await self._apply_eq_matrix_to_db_row(
+                        project_id, year, code, cols, generated_at, year_key=year_key,
+                    )
+        await self.db.flush()
+
+    async def _apply_eq_matrix_to_db_row(
+        self,
+        project_id: UUID,
+        year: int,
+        row_code: str,
+        col_values: dict[str, float],
+        generated_at: datetime,
+        *,
+        year_key: str = "current_year",
+    ) -> None:
+        """将 eq_matrix 分列值写入已持久化的权益变动表行。"""
+        if not col_values:
+            return
+        eq_result = await self.db.execute(
+            sa.select(FinancialReport).where(
+                FinancialReport.project_id == project_id,
+                FinancialReport.year == year,
+                FinancialReport.report_type == FinancialReportType.equity_statement,
+                FinancialReport.row_code == row_code,
                 FinancialReport.is_deleted == sa.false(),
             )
         )
         eq_row = eq_result.scalar_one_or_none()
         if eq_row is None:
             return
-
         existing_sa = eq_row.source_accounts
         merged: dict = dict(existing_sa) if isinstance(existing_sa, dict) else {}
         matrix = dict(merged.get("eq_matrix") or {})
-        matrix["current_year"] = col_values
+        matrix[year_key] = {**dict(matrix.get(year_key) or {}), **col_values}
         merged["eq_matrix"] = matrix
         eq_row.source_accounts = merged
         eq_row.generated_at = generated_at
-        await self.db.flush()
+
+    async def _load_workpaper_equity_overlay(self, project_id: UUID) -> dict | None:
+        """读取 M 循环底稿 parsed_data.equity_movement 中最新一份权益变动数据。"""
+        from app.models.workpaper_models import WorkingPaper, WpIndex
+
+        try:
+            result = await self.db.execute(
+                sa.select(WorkingPaper)
+                .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+                .where(
+                    WorkingPaper.project_id == project_id,
+                    WorkingPaper.parsed_data.isnot(None),
+                    WpIndex.wp_code.like("M%"),
+                    WpIndex.is_deleted == sa.false(),
+                )
+                .order_by(WorkingPaper.last_parsed_at.desc().nullslast())
+            )
+            latest: dict | None = None
+            latest_at: str | None = None
+            for wp in result.scalars().all():
+                pd = wp.parsed_data
+                if not isinstance(pd, dict):
+                    continue
+                em = pd.get("equity_movement")
+                if not isinstance(em, dict):
+                    continue
+                for sheet_data in em.values():
+                    if not isinstance(sheet_data, dict):
+                        continue
+                    data = sheet_data.get("data")
+                    if not isinstance(data, dict):
+                        continue
+                    applied_at = sheet_data.get("applied_at")
+                    if latest is None or (
+                        applied_at and (latest_at is None or applied_at > latest_at)
+                    ):
+                        latest = data
+                        latest_at = applied_at
+            return latest
+        except Exception as err:
+            logger.warning("[EQ_MATRIX] wp overlay load failed: %s", err)
+            return None
+
+    async def _build_enriched_equity_rows(
+        self,
+        project_id: UUID,
+        year: int,
+        eq_rows: list[dict],
+        *,
+        bs_rows_current: list[dict] | None = None,
+        bs_rows_prior: list[dict] | None = None,
+        wp_overlay: dict | None = None,
+    ) -> list[dict]:
+        """内存回填权益变动表 eq_matrix（不写库，供 API/导出使用）。"""
+        import copy
+
+        rows = copy.deepcopy(eq_rows)
+        if bs_rows_current is None:
+            bs_rows_current = await self._load_bs_rows_from_db(project_id, year)
+        if bs_rows_prior is None:
+            bs_rows_prior = await self._load_bs_rows_from_db(project_id, year - 1)
+        if wp_overlay is None:
+            wp_overlay = await self._load_workpaper_equity_overlay(project_id)
+        _attach_equity_matrix_to_rows(rows, bs_rows_current, bs_rows_prior, wp_overlay)
+        is_rows = await self._load_financial_report_rows_from_db(
+            project_id, year, FinancialReportType.income_statement,
+        )
+        _attach_is_derived_movement(rows, is_rows)
+        return rows
+
+    async def enrich_equity_statement_rows(
+        self, project_id: UUID, year: int, eq_rows: list[dict],
+    ) -> list[dict]:
+        """审定权益变动表行内存 enrich（导出/API 纯读路径）。"""
+        try:
+            return await self._build_enriched_equity_rows(project_id, year, eq_rows)
+        except Exception as err:
+            logger.warning("[EQ_MATRIX] in-memory enrich failed: %s", err)
+            return eq_rows
+
+    async def _prior_tb_opening_fallback(
+        self, parser: ReportFormulaParser, formula: str | None,
+    ) -> Decimal:
+        """上年 TB 缺失时，用当年 opening_balance 作为上年年末 fallback。"""
+        if not formula:
+            return Decimal("0")
+        tb_match = _TB_PATTERN.search(formula)
+        if not tb_match:
+            return Decimal("0")
+        row = await parser._get_tb_row(tb_match.group(1))
+        if row is None or row.opening_balance is None:
+            return Decimal("0")
+        return row.opening_balance
+
+    async def _compute_unadjusted_report_rows(
+        self,
+        project_id: UUID,
+        year: int,
+        report_type: FinancialReportType,
+        configs: list[ReportConfig],
+        global_row_cache: dict[str, Decimal],
+    ) -> list[dict]:
+        """按试算表未审数动态计算单张报表行（含上期，不落库）。"""
+        parser_current = ReportFormulaParser(self.db, project_id, year)
+        parser_prior = ReportFormulaParser(self.db, project_id, year - 1)
+        parser_current._use_unadjusted = True
+        parser_prior._use_unadjusted = True
+
+        rows: list[dict] = []
+        row_values: dict[str, Decimal] = {}
+
+        for cfg in sorted(configs, key=lambda r: r.row_number):
+            try:
+                current_amount = await parser_current.execute(cfg.formula, row_values)
+            except Exception:
+                current_amount = Decimal("0")
+            try:
+                prior_amount = await parser_prior.execute(cfg.formula, {})
+            except Exception:
+                prior_amount = Decimal("0")
+            if prior_amount == Decimal("0"):
+                prior_amount = await self._prior_tb_opening_fallback(
+                    parser_current, cfg.formula,
+                )
+
+            row_values[cfg.row_code] = current_amount
+            global_row_cache[cfg.row_code] = current_amount
+
+            rows.append({
+                "row_code": cfg.row_code,
+                "row_name": cfg.row_name,
+                "current_period_amount": str(current_amount),
+                "prior_period_amount": str(prior_amount),
+                "indent_level": cfg.indent_level,
+                "is_total_row": cfg.is_total_row,
+                "formula_used": cfg.formula,
+                "source_accounts": None,
+            })
+        return rows
+
+    _UNADJUSTED_TYPE_ORDER: list[FinancialReportType] = [
+        FinancialReportType.balance_sheet,
+        FinancialReportType.income_statement,
+        FinancialReportType.cash_flow_statement,
+        FinancialReportType.equity_statement,
+        FinancialReportType.cash_flow_supplement,
+        FinancialReportType.impairment_provision,
+    ]
+
+    async def _build_unadjusted_bundle(
+        self,
+        project_id: UUID,
+        year: int,
+        report_types: list[str],
+    ) -> dict[str, list[dict]]:
+        """统一构建未审报表 bundle（四表 + 补充表 + 权益矩阵）。"""
+        from app.services.report_config_service import ReportConfigService
+
+        applicable_standard = await ReportConfigService.resolve_applicable_standard(
+            self.db, project_id,
+        )
+        all_configs = await self._load_report_configs(applicable_standard)
+        global_row_cache: dict[str, Decimal] = {}
+        wp_overlay = await self._load_workpaper_equity_overlay(project_id)
+
+        requested_enums: set[FinancialReportType] = set()
+        for rt in report_types:
+            try:
+                requested_enums.add(
+                    rt if isinstance(rt, FinancialReportType) else FinancialReportType(rt)
+                )
+            except ValueError:
+                continue
+
+        data: dict[str, list[dict]] = {}
+        bs_rows: list[dict] = []
+        bs_rows_prior: list[dict] = []
+
+        for report_type in self._UNADJUSTED_TYPE_ORDER:
+            rt_key = report_type.value
+            if report_type not in requested_enums:
+                continue
+            configs = all_configs.get(report_type, [])
+            if not configs:
+                data[rt_key] = []
+                continue
+            rows = await self._compute_unadjusted_report_rows(
+                project_id, year, report_type, configs, global_row_cache,
+            )
+            if report_type == FinancialReportType.balance_sheet:
+                bs_rows = rows
+                bs_configs = configs
+                prior_cache: dict[str, Decimal] = {}
+                bs_rows_prior = await self._compute_unadjusted_report_rows(
+                    project_id, year - 1, report_type, bs_configs, prior_cache,
+                )
+            if report_type == FinancialReportType.equity_statement:
+                if not bs_rows:
+                    bs_configs = all_configs.get(FinancialReportType.balance_sheet, [])
+                    if bs_configs:
+                        bs_rows = await self._compute_unadjusted_report_rows(
+                            project_id, year, FinancialReportType.balance_sheet,
+                            bs_configs, global_row_cache,
+                        )
+                        prior_cache = {}
+                        bs_rows_prior = await self._compute_unadjusted_report_rows(
+                            project_id, year - 1, FinancialReportType.balance_sheet,
+                            bs_configs, prior_cache,
+                        )
+                _attach_equity_matrix_to_rows(
+                    rows, bs_rows, bs_rows_prior, wp_overlay,
+                )
+                is_rows = data.get(FinancialReportType.income_statement.value)
+                if not is_rows:
+                    is_configs = all_configs.get(
+                        FinancialReportType.income_statement, [],
+                    )
+                    if is_configs:
+                        is_cache: dict[str, Decimal] = {}
+                        is_rows = await self._compute_unadjusted_report_rows(
+                            project_id, year,
+                            FinancialReportType.income_statement,
+                            is_configs, is_cache,
+                        )
+                _attach_is_derived_movement(rows, is_rows or [])
+            data[rt_key] = rows
+
+        return data
+
+    async def get_unadjusted_export_data(
+        self,
+        project_id: UUID,
+        year: int,
+        report_types: list[str],
+    ) -> dict[str, list[dict]]:
+        """构建未审报表导出数据（四表入库未审数 + 权益矩阵，不落库）。"""
+        return await self._build_unadjusted_bundle(project_id, year, report_types)
 
 
     async def _check_tb_fallback(
@@ -1355,39 +1989,8 @@ class ReportEngine:
         """生成未审报表 — 只用试算表未审数列，不含调整分录影响。
 
         Phase 9 Task 9.15: 动态计算，不存储到数据库。
+        权益变动表附加 eq_matrix（未审 BS 上期/前年 + 底稿 M-F7 覆盖）。
         """
-        # 动态确定报表标准（与审定模式一致，不硬编码 "enterprise"）
-        from app.services.report_config_service import ReportConfigService
-        applicable_standard = await ReportConfigService.resolve_applicable_standard(self.db, project_id)
-
-        all_configs = await self._load_report_configs(applicable_standard)
         rt = report_type if isinstance(report_type, FinancialReportType) else FinancialReportType(report_type)
-        configs = all_configs.get(rt, [])
-        if not configs:
-            return []
-
-        parser = ReportFormulaParser(self.db, project_id, year)
-        # 临时切换为未审模式
-        parser._use_unadjusted = True
-
-        rows = []
-        row_values: dict[str, Decimal] = {}
-
-        for cfg in sorted(configs, key=lambda r: r.row_number):
-            try:
-                value = await parser.execute(cfg.formula, row_values)
-            except Exception:
-                value = Decimal("0")
-
-            row_values[cfg.row_code] = value
-
-            rows.append({
-                "row_code": cfg.row_code,
-                "row_name": cfg.row_name,
-                "current_period_amount": str(value),
-                "prior_period_amount": "0",
-                "indent_level": cfg.indent_level,
-                "is_total_row": cfg.is_total_row,
-            })
-
-        return rows
+        bundle = await self._build_unadjusted_bundle(project_id, year, [rt.value])
+        return bundle.get(rt.value, [])

@@ -33,12 +33,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TrialBalance
+from app.services.bad_debt_account_codes import bad_debt_provision_account
 from app.services.bad_debt_nested_table_service import NestedTableService
-
-# 坏账准备试算表科目编码
-BAD_DEBT_ACCOUNT_CODE = "1231"
-# 预填来源标注（供前端 tooltip 显示）
-PREFILL_SOURCE = "试算表 1231 坏账准备"
 
 # Summary 列 ← 试算表字段映射：
 #   amount_b（期初未审数） ← TrialBalance.opening_balance
@@ -81,7 +77,10 @@ class BadDebtPrefillService:
         tree = await NestedTableService(self.db).get_tree(wp_index_id)
         current = tree.summary.amounts
 
-        # 2) 查试算表 1231（按项目+年度，跨 company_code 聚合；软删排除）
+        provision_code, provision_name = bad_debt_provision_account()
+        prefill_source = f"试算表 {provision_code} {provision_name}"
+
+        # 2) 查试算表坏账准备科目（按项目+年度，跨 company_code 聚合；软删排除）
         stmt = select(
             func.count(TrialBalance.id),
             func.sum(TrialBalance.opening_balance),
@@ -89,17 +88,17 @@ class BadDebtPrefillService:
         ).where(
             TrialBalance.project_id == project_id,
             TrialBalance.year == year,
-            TrialBalance.standard_account_code == BAD_DEBT_ACCOUNT_CODE,
+            TrialBalance.standard_account_code == provision_code,
             TrialBalance.is_deleted.is_(False),
         )
         row_count, opening_sum, unadjusted_sum = (await self.db.execute(stmt)).one()
 
-        # 3) 试算表无 1231 数据 → no-op
+        # 3) 试算表无坏账准备数据 → no-op
         if not row_count:
             return PrefillResult(
                 wp_index_id=wp_index_id,
                 prefilled=False,
-                skipped_reason="试算表无科目 1231 坏账准备数据",
+                skipped_reason=f"试算表无科目 {provision_code} {provision_name} 数据",
             )
 
         tb_values: dict[str, Decimal | None] = {
@@ -130,7 +129,7 @@ class BadDebtPrefillService:
         return PrefillResult(
             wp_index_id=wp_index_id,
             prefilled=True,
-            source=PREFILL_SOURCE,
+            source=prefill_source,
             prefilled_columns=prefilled_columns,
             values=values,
         )
@@ -139,6 +138,4 @@ class BadDebtPrefillService:
 __all__ = [
     "BadDebtPrefillService",
     "PrefillResult",
-    "PREFILL_SOURCE",
-    "BAD_DEBT_ACCOUNT_CODE",
 ]

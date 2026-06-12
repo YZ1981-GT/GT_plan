@@ -158,7 +158,13 @@ export async function renderDisclosureNotes(
 
 export async function renderFinancialReports(
   projectId: string,
-  body: { year: number; template_type?: string; report_types?: string[] },
+  body: {
+    year: number
+    template_type?: string
+    report_types?: string[]
+    /** audited（审定，默认）| unadjusted（未审） */
+    data_mode?: 'audited' | 'unadjusted'
+  },
 ) {
   return api.post<DeliverableExportResponse>(deliverables.renderFinancialReports(projectId), body)
 }
@@ -273,7 +279,7 @@ export interface FullDeliverablesRequest {
 }
 
 /**
- * 创建「一键生成全套」后台任务（同步执行：报表 → 附注 → 报告正文）。
+ * 创建「一键生成全套」后台任务（同步执行：审定报表 → 未审报表 → 附注 → 报告正文）。
  * 返回 ExportJob（含进度与明细），前端据 job_id 轮询 fetchExportJob。
  */
 export async function createFullDeliverables(

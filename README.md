@@ -173,6 +173,12 @@ GT_plan/
 - 按 version 数字去重（撞号字母序靠后者会静默丢失）
 - ORM 用 `TimestampMixin` 的表，DDL 必须显式写 `created_at`/`updated_at` 列
 
+**迁移号分配流程**（实施第一步才取号，避免 spec 快照撞号）：
+1. `ls backend/migrations/V*.sql | sort -V | tail -1` 看当前最高版本（如 `V071`）
+2. 下一对迁移用 **最高+1**（如 `V072__feature.sql` + `R072__rollback_feature.sql`）
+3. 本地先跑 `python -m app.core.migration_runner` 验证通过，再提交 DDL+ORM+契约测试三层一致
+4. 禁止在 requirements/design 阶段预占具体 V 号；tasks.md 可写「实施时分配」
+
 手动执行（仅诊断用）：
 
 ```bash

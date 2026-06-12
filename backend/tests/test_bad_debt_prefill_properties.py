@@ -24,11 +24,11 @@ from app.models.base import Base
 from app.models.bad_debt_models import BadDebtDetailRow, ProvisionMethod
 from app.schemas.bad_debt_schemas import CreateParentRowDTO, RowAmounts, UpdateRowDTO
 from app.services.bad_debt_nested_table_service import NestedTableService
-from app.services.bad_debt_prefill_service import (
-    BAD_DEBT_ACCOUNT_CODE,
-    PREFILL_SOURCE,
-    BadDebtPrefillService,
-)
+from app.services.bad_debt_account_codes import bad_debt_provision_account
+from app.services.bad_debt_prefill_service import BadDebtPrefillService
+
+BAD_DEBT_ACCOUNT_CODE, _PROVISION_NAME = bad_debt_provision_account()
+PREFILL_SOURCE = f"试算表 {BAD_DEBT_ACCOUNT_CODE} {_PROVISION_NAME}"
 
 _PBT = settings(
     max_examples=5,

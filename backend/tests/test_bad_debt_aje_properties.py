@@ -26,12 +26,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.models.base import Base
 from app.models.bad_debt_models import BadDebtDetailRow, ProvisionMethod
 from app.schemas.bad_debt_schemas import CreateParentRowDTO, RowAmounts, UpdateRowDTO
-from app.services.bad_debt_aje_generator import (
-    BAD_DEBT_ACCOUNT_CODE,
-    IMPAIRMENT_LOSS_ACCOUNT_CODE,
-    AjeDirection,
-    BadDebtAjeGenerator,
+from app.services.bad_debt_account_codes import (
+    bad_debt_provision_account,
+    impairment_loss_account,
 )
+from app.services.bad_debt_aje_generator import AjeDirection, BadDebtAjeGenerator
+
+BAD_DEBT_ACCOUNT_CODE, _ = bad_debt_provision_account()
+IMPAIRMENT_LOSS_ACCOUNT_CODE, _ = impairment_loss_account()
 from app.services.bad_debt_nested_table_service import NestedTableService
 
 _PBT = settings(

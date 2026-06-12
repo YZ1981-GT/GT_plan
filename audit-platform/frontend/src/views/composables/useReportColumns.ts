@@ -16,7 +16,7 @@ export interface UseReportColumnsReturn {
   eqTotalCols: ComputedRef<number>
   equitySpanMethod: (params: { row: any; column: any; rowIndex: number; columnIndex: number }) => { rowspan: number; colspan: number }
   eqRowClassName: (params: { row: any }) => string
-  eqCellVal: (row: any, colKey: string) => any
+  eqCellVal: (row: any, colKey: string, yearKey?: 'current_year' | 'prior_year') => any
 
   // Impairment columns
   impIncCols: { key: string; label: string }[]
@@ -118,6 +118,32 @@ const impDecCols = [
   { key: 'dec_total', label: '合计' },
 ]
 
+/** 前端列键 → 后端 eq_matrix / {{eq:}} 列键 */
+const EQ_UI_TO_BACKEND_COL: Record<string, string> = {
+  paid_in_capital: 'share_capital',
+  other_equity_preferred: 'preferred_stock',
+  other_equity_perpetual: 'perpetual_bond',
+  other_equity_other: 'other_equity_instrument',
+  oci: 'other_comprehensive_income',
+  general_risk: 'general_risk_reserve',
+  subtotal: 'subtotal',
+  minority: 'minority_interest',
+  total: 'total_equity',
+}
+
+function resolveEqMatrixValue(
+  sourceAccounts: Record<string, unknown>,
+  colKey: string,
+  yearKey: 'current_year' | 'prior_year' = 'current_year',
+): unknown {
+  const matrix = sourceAccounts.eq_matrix
+  if (!matrix || typeof matrix !== 'object') return undefined
+  const yearBlock = (matrix as Record<string, unknown>)[yearKey]
+  if (!yearBlock || typeof yearBlock !== 'object') return undefined
+  const backendKey = EQ_UI_TO_BACKEND_COL[colKey] ?? colKey
+  return (yearBlock as Record<string, unknown>)[backendKey]
+}
+
 // 报表行→附注跳转映射
 const _ROW_NOTE_MAP: Record<string, string> = {
   'BS-002': '五、1', 'BS-003': '五、2', 'BS-004': '五、2', 'BS-005': '五、3',
@@ -159,10 +185,31 @@ export function useReportColumns(options: UseReportColumnsOptions): UseReportCol
   }
 
   // ─── Equity cell value ──────────────────────────────────────────────────────
-  function eqCellVal(row: any, colKey: string): any {
+  function eqCellVal(
+    row: any,
+    colKey: string,
+    yearKey: 'current_year' | 'prior_year' = 'current_year',
+  ): any {
     if (!row) return 0
-    if (row.source_accounts && row.source_accounts[colKey] != null) {
-      return row.source_accounts[colKey]
+    const sa = row.source_accounts
+    if (!sa || typeof sa !== 'object' || Array.isArray(sa)) {
+      if (colKey === 'total') {
+        return yearKey === 'prior_year'
+          ? (row.prior_period_amount ?? 0)
+          : (row.current_period_amount ?? 0)
+      }
+      return 0
+    }
+    if (yearKey === 'current_year') {
+      const flat = (sa as Record<string, unknown>)[colKey]
+      if (flat != null) return flat
+    }
+    const fromMatrix = resolveEqMatrixValue(sa as Record<string, unknown>, colKey, yearKey)
+    if (fromMatrix != null) return fromMatrix
+    if (colKey === 'total') {
+      return yearKey === 'prior_year'
+        ? (row.prior_period_amount ?? 0)
+        : (row.current_period_amount ?? 0)
     }
     return 0
   }

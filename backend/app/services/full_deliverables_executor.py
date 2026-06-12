@@ -1,7 +1,7 @@
 """一键生成全套交付件执行器 — audit-report-template-integration task 15 / design §14.
 
 job_type=``full_deliverables``：在单个 ``ExportJob`` 内同步顺序生成
-财务报表 → 附注 → 报告正文（与 ``generateGuard`` 依赖链一致）。
+审定财务报表 → 未审财务报表 → 附注 → 报告正文（与 ``generateGuard`` 依赖链一致）。
 
 铁律：
 - 复用 ``DeliverableService`` + ``export_jobs_v2``，不另起后台调度器（design §14）。
@@ -33,9 +33,10 @@ from app.services.report_body_service import ReportBodyService
 
 logger = logging.getLogger(__name__)
 
-# 全套生成步骤顺序（与 generateGuard 依赖链一致：报表 → 附注 → 报告正文）
+# 全套生成步骤顺序（与 generateGuard 依赖链一致：审定报表 → 未审报表 → 附注 → 报告正文）
 FULL_DELIVERABLES_STEPS: list[str] = [
     "financial_reports",
+    "financial_reports_unadjusted",
     "disclosure_notes",
     "report_body",
 ]
@@ -188,6 +189,11 @@ class FullDeliverablesExecutor:
                         project_id, year, user_id
                     )
                     outcome = StepOutcome(step, item.id, True, task_id=task_id)
+                elif step == "financial_reports_unadjusted":
+                    task_id = await self._run_financial_reports_unadjusted(
+                        project_id, year, user_id
+                    )
+                    outcome = StepOutcome(step, item.id, True, task_id=task_id)
                 elif step == "disclosure_notes":
                     task_id = await self._run_disclosure_notes(
                         project_id, year, user_id
@@ -269,6 +275,40 @@ class FullDeliverablesExecutor:
         file_name = f"financial_reports_{year}.xlsx"
         snapshot_refs = await dsvc.capture_snapshot_refs(
             project_id, year, WordExportDocType.financial_report.value
+        )
+        await dsvc.render_and_store(
+            task.id,
+            docx_bytes=buf.getvalue(),
+            user_id=user_id,
+            source_snapshot_refs=snapshot_refs,
+            file_name=file_name,
+        )
+        await self._advance_to_editing(dsvc, task.id)
+        return task.id
+
+    async def _run_financial_reports_unadjusted(
+        self, project_id: UUID, year: int, user_id: UUID
+    ) -> UUID:
+        """生成未审财务报表 xlsx 并落交付中心（doc_type=financial_report_unadjusted）。"""
+        from app.services.deliverable_service import DeliverableService
+        from app.services.report_excel_exporter import ReportExcelExporter
+
+        dsvc = DeliverableService(self.db)
+        task, _ = await dsvc.export_or_new_deliverable(
+            project_id,
+            WordExportDocType.financial_report_unadjusted.value,
+            None,
+            user_id,
+        )
+        await self.db.flush()
+
+        exporter = ReportExcelExporter(self.db)
+        buf = await exporter.export(project_id, year, mode="unadjusted")
+        file_name = f"financial_reports_unadjusted_{year}.xlsx"
+        snapshot_refs = await dsvc.capture_snapshot_refs(
+            project_id,
+            year,
+            WordExportDocType.financial_report_unadjusted.value,
         )
         await dsvc.render_and_store(
             task.id,

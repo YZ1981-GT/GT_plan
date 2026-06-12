@@ -42,15 +42,12 @@ from enum import Enum
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.bad_debt_account_codes import (
+    bad_debt_provision_account,
+    impairment_loss_account,
+)
 from app.services.bad_debt_nested_table_service import NestedTableService
 from app.services.ledger_import.direction_resolver import resolve_account_direction
-
-# 坏账准备科目
-BAD_DEBT_ACCOUNT_CODE = "1231"
-BAD_DEBT_ACCOUNT_NAME = "坏账准备"
-# 损失类科目（新准则信用减值损失，应收账款坏账对应）
-IMPAIRMENT_LOSS_ACCOUNT_CODE = "6701"
-IMPAIRMENT_LOSS_ACCOUNT_NAME = "信用减值损失"
 
 
 class AjeDirection(str, Enum):
@@ -123,35 +120,34 @@ class BadDebtAjeGenerator:
 
         amount = abs(diff)
 
+        provision_code, provision_name = bad_debt_provision_account()
+        loss_code, loss_name = impairment_loss_account()
+
         # 各科目正常方向（direction_resolver 归一，仅用于追溯标注）
-        loss_normal, _ = resolve_account_direction(
-            IMPAIRMENT_LOSS_ACCOUNT_CODE, IMPAIRMENT_LOSS_ACCOUNT_NAME
-        )
-        provision_normal, _ = resolve_account_direction(
-            BAD_DEBT_ACCOUNT_CODE, BAD_DEBT_ACCOUNT_NAME
-        )
+        loss_normal, _ = resolve_account_direction(loss_code, loss_name)
+        provision_normal, _ = resolve_account_direction(provision_code, provision_name)
 
         if diff > Decimal("0.00"):
             # 补提：借 信用减值损失 / 贷 坏账准备
             direction = AjeDirection.PROVISION
-            debit_account = IMPAIRMENT_LOSS_ACCOUNT_CODE
-            credit_account = BAD_DEBT_ACCOUNT_CODE
+            debit_account = loss_code
+            credit_account = provision_code
             summary = (
                 f"补提坏账准备：期末审定数 {audited_n} 大于未审数 {unaudited_k}，"
-                f"差额 {amount}，借记{IMPAIRMENT_LOSS_ACCOUNT_NAME}、"
-                f"贷记{BAD_DEBT_ACCOUNT_NAME}"
+                f"差额 {amount}，借记{loss_name}、"
+                f"贷记{provision_name}"
             )
             lines = [
                 AjeEntryLine(
-                    account_code=IMPAIRMENT_LOSS_ACCOUNT_CODE,
-                    account_name=IMPAIRMENT_LOSS_ACCOUNT_NAME,
+                    account_code=loss_code,
+                    account_name=loss_name,
                     side="debit",
                     amount=amount,
                     normal_direction=loss_normal,
                 ),
                 AjeEntryLine(
-                    account_code=BAD_DEBT_ACCOUNT_CODE,
-                    account_name=BAD_DEBT_ACCOUNT_NAME,
+                    account_code=provision_code,
+                    account_name=provision_name,
                     side="credit",
                     amount=amount,
                     normal_direction=provision_normal,
@@ -160,24 +156,24 @@ class BadDebtAjeGenerator:
         else:
             # 冲回：借 坏账准备 / 贷 信用减值损失
             direction = AjeDirection.REVERSAL
-            debit_account = BAD_DEBT_ACCOUNT_CODE
-            credit_account = IMPAIRMENT_LOSS_ACCOUNT_CODE
+            debit_account = provision_code
+            credit_account = loss_code
             summary = (
                 f"冲回坏账准备：期末审定数 {audited_n} 小于未审数 {unaudited_k}，"
-                f"差额 {amount}，借记{BAD_DEBT_ACCOUNT_NAME}、"
-                f"贷记{IMPAIRMENT_LOSS_ACCOUNT_NAME}"
+                f"差额 {amount}，借记{provision_name}、"
+                f"贷记{loss_name}"
             )
             lines = [
                 AjeEntryLine(
-                    account_code=BAD_DEBT_ACCOUNT_CODE,
-                    account_name=BAD_DEBT_ACCOUNT_NAME,
+                    account_code=provision_code,
+                    account_name=provision_name,
                     side="debit",
                     amount=amount,
                     normal_direction=provision_normal,
                 ),
                 AjeEntryLine(
-                    account_code=IMPAIRMENT_LOSS_ACCOUNT_CODE,
-                    account_name=IMPAIRMENT_LOSS_ACCOUNT_NAME,
+                    account_code=loss_code,
+                    account_name=loss_name,
                     side="credit",
                     amount=amount,
                     normal_direction=loss_normal,
@@ -203,6 +199,6 @@ __all__ = [
     "AjeSuggestion",
     "AjeEntryLine",
     "AjeDirection",
-    "BAD_DEBT_ACCOUNT_CODE",
-    "IMPAIRMENT_LOSS_ACCOUNT_CODE",
+    "bad_debt_provision_account",
+    "impairment_loss_account",
 ]

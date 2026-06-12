@@ -23,12 +23,16 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 from openpyxl import Workbook, load_workbook
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import MetaData
+from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.models.base import Base
 from app.models.core import Project
 from app.models.report_models import FinancialReport, FinancialReportType
+
+SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
+if not hasattr(SQLiteTypeCompiler, "visit_ARRAY"):
+    SQLiteTypeCompiler.visit_ARRAY = lambda self, type_, **kw: "TEXT"
 from app.services.report_excel_exporter import ReportExcelExporter
 from app.services.template_manifest_loader import resolve_template_base_dir
 
@@ -40,17 +44,22 @@ _POC_PATH = (
 _BS_SHEET = "1,2-资产负债表(企财01表）"
 
 _engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-_async_session = sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
+_TEST_TABLES = [Project.__table__, FinancialReport.__table__]
 
 
 @pytest_asyncio.fixture
 async def db_session():
     async with _engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with _async_session() as session:
+        await conn.run_sync(
+            lambda sync_conn: MetaData().create_all(sync_conn, tables=_TEST_TABLES)
+        )
+    factory = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
         yield session
     async with _engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(
+            lambda sync_conn: MetaData().drop_all(sync_conn, tables=_TEST_TABLES)
+        )
 
 
 @pytest_asyncio.fixture

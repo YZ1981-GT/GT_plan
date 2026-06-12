@@ -290,11 +290,26 @@ async function onAddChild(parent: ParentRow | null): Promise<void> {
 
 async function onInsertChild(
   parent: ParentRow | null,
-  _child: ChildRow | null,
-  _pos: 'above' | 'below',
+  child: ChildRow | null,
+  pos: 'above' | 'below',
 ): Promise<void> {
-  // 后端按 sort_order 末尾插入；上方/下方语义由后续排序端点细化，此处新增后刷新
-  await onAddChild(parent)
+  closeMenu()
+  if (!parent || !child) return
+  try {
+    const { value } = await ElMessageBox.prompt('请输入子行标签', '插入子行', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPattern: /.+/,
+      inputErrorMessage: '标签不能为空',
+    })
+    const body: Record<string, unknown> = { row_label: value }
+    if (pos === 'above') body.insert_before_id = child.id
+    else body.insert_after_id = child.id
+    await api.post(`${base()}/${parent.id}/children`, body)
+    await loadTree()
+  } catch {
+    /* 取消 */
+  }
 }
 
 async function onDeleteChild(child: ChildRow | null): Promise<void> {

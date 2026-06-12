@@ -169,8 +169,48 @@
       @close="rvSearch.close()"
     />
 
-    <!-- 所有者权益变动表 — ReportEquityTable 子组件 -->
-    <div v-if="activeTab === 'equity_statement'" class="gt-rv-equity-matrix" v-loading="loading">
+    <!-- 所有者权益变动表 — 对比模式：未审 / 审定并排矩阵 -->
+    <div v-if="activeTab === 'equity_statement' && reportMode === 'compare'" class="gt-rv-equity-compare" v-loading="loading">
+      <div class="gt-rv-equity-compare-block">
+        <div class="gt-rv-equity-compare-label">未审数</div>
+        <ReportEquityTable
+          :rows="equityCompareUnadjusted"
+          :eq-columns="eqColumns"
+          :eq-total-cols="eqTotalCols"
+          :year="year"
+          :table-max-height="480"
+          :cell-class-name="rvCellClassName"
+          :font-size="displayPrefs.fontConfig.tableFont"
+          :equity-span-method="equitySpanMethod"
+          :eq-row-class-name="eqRowClassName"
+          :eq-cell-val="eqCellVal"
+          :is-consolidated="isConsolidated"
+        />
+      </div>
+      <div class="gt-rv-equity-compare-block">
+        <div class="gt-rv-equity-compare-label">审定数</div>
+        <ReportEquityTable
+          ref="eqTableRef"
+          :rows="equityCompareAudited"
+          :eq-columns="eqColumns"
+          :eq-total-cols="eqTotalCols"
+          :year="year"
+          :table-max-height="480"
+          :cell-class-name="rvCellClassName"
+          :font-size="displayPrefs.fontConfig.tableFont"
+          :equity-span-method="equitySpanMethod"
+          :eq-row-class-name="eqRowClassName"
+          :eq-cell-val="eqCellVal"
+          :is-consolidated="isConsolidated"
+          @cell-click="onRvCellClick"
+          @cell-dblclick="onRvCellDblClick"
+          @cell-contextmenu="onRvCellContextMenu"
+        />
+      </div>
+    </div>
+
+    <!-- 所有者权益变动表 — 单表模式 -->
+    <div v-else-if="activeTab === 'equity_statement'" class="gt-rv-equity-matrix" v-loading="loading">
       <ReportEquityTable
         ref="eqTableRef"
         :rows="rows"
@@ -690,6 +730,8 @@ const reportData = useReportData({
 const {
   rows,
   compareRows,
+  equityCompareAudited,
+  equityCompareUnadjusted,
   loading,
   genLoading,
   checkLoading,
@@ -832,6 +874,7 @@ const cellActions = useReportCellActions({
   rvCtx,
   rvPenetrate,
   rvComments,
+  eqCellVal,
 })
 
 const {

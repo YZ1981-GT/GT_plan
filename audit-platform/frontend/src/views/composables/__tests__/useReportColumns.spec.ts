@@ -61,6 +61,46 @@ describe('useReportColumns — eqColumns', () => {
   })
 })
 
+describe('useReportColumns — eqCellVal', () => {
+  it('reads eq_matrix current_year via UI→backend column mapping', () => {
+    const options = createOptions()
+    const { eqCellVal } = useReportColumns(options)
+    const row = {
+      source_accounts: {
+        eq_matrix: {
+          current_year: {
+            share_capital: 4000000,
+            other_comprehensive_income: 9000,
+          },
+        },
+      },
+    }
+    expect(eqCellVal(row, 'paid_in_capital')).toBe(4000000)
+    expect(eqCellVal(row, 'oci')).toBe(9000)
+  })
+
+  it('falls back to flat source_accounts[colKey]', () => {
+    const options = createOptions()
+    const { eqCellVal } = useReportColumns(options)
+    const row = { source_accounts: { capital_reserve: 250000 } }
+    expect(eqCellVal(row, 'capital_reserve')).toBe(250000)
+  })
+
+  it('reads prior_year block from eq_matrix', () => {
+    const options = createOptions()
+    const { eqCellVal } = useReportColumns(options)
+    const row = {
+      source_accounts: {
+        eq_matrix: {
+          prior_year: { share_capital: 3500000, capital_reserve: 650000 },
+        },
+      },
+    }
+    expect(eqCellVal(row, 'paid_in_capital', 'prior_year')).toBe(3500000)
+    expect(eqCellVal(row, 'capital_reserve', 'prior_year')).toBe(650000)
+  })
+})
+
 describe('useReportColumns — equitySpanMethod', () => {
   it('category row (indent_level=0, not total) at col 0 spans all equity columns', () => {
     const options = createOptions({ isConsolidated: false })

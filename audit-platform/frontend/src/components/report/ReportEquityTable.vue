@@ -29,97 +29,97 @@
 
     <!-- 本年金额 — 动态列（三级表头：本年金额 > 分组 > 明细列） -->
     <el-table-column label="本年金额" header-align="center">
-      <el-table-column label="实收资本(股本)" width="110" align="right" :resizable="true">
+      <el-table-column prop="cy:paid_in_capital" label="实收资本(股本)" width="110" align="right" :resizable="true">
         <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'paid_in_capital')" /></template>
       </el-table-column>
       <el-table-column label="其他权益工具" header-align="center">
-        <el-table-column label="优先股" width="90" align="right" :resizable="true">
+        <el-table-column prop="cy:other_equity_preferred" label="优先股" width="90" align="right" :resizable="true">
           <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'other_equity_preferred')" /></template>
         </el-table-column>
-        <el-table-column label="永续债" width="90" align="right" :resizable="true">
+        <el-table-column prop="cy:other_equity_perpetual" label="永续债" width="90" align="right" :resizable="true">
           <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'other_equity_perpetual')" /></template>
         </el-table-column>
-        <el-table-column label="其他" width="90" align="right" :resizable="true">
+        <el-table-column prop="cy:other_equity_other" label="其他" width="90" align="right" :resizable="true">
           <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'other_equity_other')" /></template>
         </el-table-column>
       </el-table-column>
-      <el-table-column label="资本公积" width="110" align="right" :resizable="true">
+      <el-table-column prop="cy:capital_reserve" label="资本公积" width="110" align="right" :resizable="true">
         <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'capital_reserve')" /></template>
       </el-table-column>
-      <el-table-column label="减：库存股" width="110" align="right" :resizable="true">
+      <el-table-column prop="cy:treasury_stock" label="减：库存股" width="110" align="right" :resizable="true">
         <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'treasury_stock')" /></template>
       </el-table-column>
-      <el-table-column label="其他综合收益" width="110" align="right" :resizable="true">
+      <el-table-column prop="cy:oci" label="其他综合收益" width="110" align="right" :resizable="true">
         <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'oci')" /></template>
       </el-table-column>
-      <el-table-column label="专项储备" width="100" align="right" :resizable="true">
+      <el-table-column prop="cy:special_reserve" label="专项储备" width="100" align="right" :resizable="true">
         <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'special_reserve')" /></template>
       </el-table-column>
-      <el-table-column label="盈余公积" width="100" align="right" :resizable="true">
+      <el-table-column prop="cy:surplus_reserve" label="盈余公积" width="100" align="right" :resizable="true">
         <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'surplus_reserve')" /></template>
       </el-table-column>
-      <el-table-column label="一般风险准备" width="110" align="right" :resizable="true">
+      <el-table-column prop="cy:general_risk" label="一般风险准备" width="110" align="right" :resizable="true">
         <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'general_risk')" /></template>
       </el-table-column>
-      <el-table-column label="未分配利润" width="110" align="right" :resizable="true">
+      <el-table-column prop="cy:retained_earnings" label="未分配利润" width="110" align="right" :resizable="true">
         <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'retained_earnings')" /></template>
       </el-table-column>
-      <el-table-column v-if="isConsolidated" label="小计" width="110" align="right" :resizable="true">
+      <el-table-column v-if="isConsolidated" prop="cy:subtotal" label="小计" width="110" align="right" :resizable="true">
         <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'subtotal')" /></template>
       </el-table-column>
-      <el-table-column v-if="isConsolidated" label="少数股东权益" width="110" align="right" :resizable="true">
+      <el-table-column v-if="isConsolidated" prop="cy:minority" label="少数股东权益" width="110" align="right" :resizable="true">
         <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'minority')" /></template>
       </el-table-column>
-      <el-table-column label="所有者权益合计" width="120" align="right" :resizable="true">
-        <template #default="{ row }"><GtAmountCell :value="row.current_period_amount" /></template>
+      <el-table-column prop="cy:total" label="所有者权益合计" width="120" align="right" :resizable="true">
+        <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'total')" /></template>
       </el-table-column>
     </el-table-column>
 
     <!-- 上年金额 — 三级表头（与本年金额结构一致） -->
     <el-table-column label="上年金额" header-align="center">
-      <el-table-column label="实收资本(股本)" width="110" align="right" :resizable="true">
-        <template #default><GtAmountCell :value="0" /></template>
+      <el-table-column prop="py:paid_in_capital" label="实收资本(股本)" width="110" align="right" :resizable="true">
+        <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'paid_in_capital', 'prior_year')" /></template>
       </el-table-column>
       <el-table-column label="其他权益工具" header-align="center">
-        <el-table-column label="优先股" width="90" align="right" :resizable="true">
-          <template #default><GtAmountCell :value="0" /></template>
+        <el-table-column prop="py:other_equity_preferred" label="优先股" width="90" align="right" :resizable="true">
+          <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'other_equity_preferred', 'prior_year')" /></template>
         </el-table-column>
-        <el-table-column label="永续债" width="90" align="right" :resizable="true">
-          <template #default><GtAmountCell :value="0" /></template>
+        <el-table-column prop="py:other_equity_perpetual" label="永续债" width="90" align="right" :resizable="true">
+          <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'other_equity_perpetual', 'prior_year')" /></template>
         </el-table-column>
-        <el-table-column label="其他" width="90" align="right" :resizable="true">
-          <template #default><GtAmountCell :value="0" /></template>
+        <el-table-column prop="py:other_equity_other" label="其他" width="90" align="right" :resizable="true">
+          <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'other_equity_other', 'prior_year')" /></template>
         </el-table-column>
       </el-table-column>
-      <el-table-column label="资本公积" width="110" align="right" :resizable="true">
-        <template #default><GtAmountCell :value="0" /></template>
+      <el-table-column prop="py:capital_reserve" label="资本公积" width="110" align="right" :resizable="true">
+        <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'capital_reserve', 'prior_year')" /></template>
       </el-table-column>
-      <el-table-column label="减：库存股" width="110" align="right" :resizable="true">
-        <template #default><GtAmountCell :value="0" /></template>
+      <el-table-column prop="py:treasury_stock" label="减：库存股" width="110" align="right" :resizable="true">
+        <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'treasury_stock', 'prior_year')" /></template>
       </el-table-column>
-      <el-table-column label="其他综合收益" width="110" align="right" :resizable="true">
-        <template #default><GtAmountCell :value="0" /></template>
+      <el-table-column prop="py:oci" label="其他综合收益" width="110" align="right" :resizable="true">
+        <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'oci', 'prior_year')" /></template>
       </el-table-column>
-      <el-table-column label="专项储备" width="100" align="right" :resizable="true">
-        <template #default><GtAmountCell :value="0" /></template>
+      <el-table-column prop="py:special_reserve" label="专项储备" width="100" align="right" :resizable="true">
+        <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'special_reserve', 'prior_year')" /></template>
       </el-table-column>
-      <el-table-column label="盈余公积" width="100" align="right" :resizable="true">
-        <template #default><GtAmountCell :value="0" /></template>
+      <el-table-column prop="py:surplus_reserve" label="盈余公积" width="100" align="right" :resizable="true">
+        <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'surplus_reserve', 'prior_year')" /></template>
       </el-table-column>
-      <el-table-column label="一般风险准备" width="110" align="right" :resizable="true">
-        <template #default><GtAmountCell :value="0" /></template>
+      <el-table-column prop="py:general_risk" label="一般风险准备" width="110" align="right" :resizable="true">
+        <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'general_risk', 'prior_year')" /></template>
       </el-table-column>
-      <el-table-column label="未分配利润" width="110" align="right" :resizable="true">
-        <template #default><GtAmountCell :value="0" /></template>
+      <el-table-column prop="py:retained_earnings" label="未分配利润" width="110" align="right" :resizable="true">
+        <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'retained_earnings', 'prior_year')" /></template>
       </el-table-column>
-      <el-table-column v-if="isConsolidated" label="小计" width="110" align="right" :resizable="true">
-        <template #default><GtAmountCell :value="0" /></template>
+      <el-table-column v-if="isConsolidated" prop="py:subtotal" label="小计" width="110" align="right" :resizable="true">
+        <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'subtotal', 'prior_year')" /></template>
       </el-table-column>
-      <el-table-column v-if="isConsolidated" label="少数股东权益" width="110" align="right" :resizable="true">
-        <template #default><GtAmountCell :value="0" /></template>
+      <el-table-column v-if="isConsolidated" prop="py:minority" label="少数股东权益" width="110" align="right" :resizable="true">
+        <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'minority', 'prior_year')" /></template>
       </el-table-column>
-      <el-table-column label="所有者权益合计" width="120" align="right" :resizable="true">
-        <template #default="{ row }"><GtAmountCell :value="row.prior_period_amount" /></template>
+      <el-table-column prop="py:total" label="所有者权益合计" width="120" align="right" :resizable="true">
+        <template #default="{ row }"><GtAmountCell :value="eqCellVal(row, 'total', 'prior_year')" /></template>
       </el-table-column>
     </el-table-column>
   </el-table>
@@ -145,7 +145,7 @@ export interface ReportEquityTableProps {
   /** 权益表行样式 */
   eqRowClassName: (params: { row: any }) => string
   /** 权益表取单元格值 */
-  eqCellVal: (row: any, colKey: string) => any
+  eqCellVal: (row: any, colKey: string, yearKey?: 'current_year' | 'prior_year') => any
   /** 是否合并报表（显示少数股东权益/小计列） */
   isConsolidated: boolean
 }

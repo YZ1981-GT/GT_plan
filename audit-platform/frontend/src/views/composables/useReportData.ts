@@ -24,6 +24,8 @@ export interface UseReportDataReturn {
   // State
   rows: Ref<ReportRow[]>
   compareRows: Ref<any[]>
+  equityCompareAudited: Ref<ReportRow[]>
+  equityCompareUnadjusted: Ref<ReportRow[]>
   loading: Ref<boolean>
   genLoading: Ref<boolean>
   checkLoading: Ref<boolean>
@@ -77,6 +79,8 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
   // ─── State ──────────────────────────────────────────────────────────────────
   const rows = ref<ReportRow[]>([])
   const compareRows = ref<any[]>([])
+  const equityCompareAudited = ref<ReportRow[]>([])
+  const equityCompareUnadjusted = ref<ReportRow[]>([])
   const loading = ref(false)
   const genLoading = ref(false)
   const checkLoading = ref(false)
@@ -214,23 +218,33 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
           getReport(projectId.value, year.value, activeTab.value, false, std),
           getReport(projectId.value, year.value, activeTab.value, true, std),
         ])
-        // 合并为对比行
-        const uMap = new Map(unadjusted.map((r: any) => [r.row_code, r]))
-        compareRows.value = audited.map((r: any) => {
-          const u = uMap.get(r.row_code)
-          const uAmt = parseFloat(u?.current_period_amount || '0')
-          const aAmt = parseFloat(r.current_period_amount || '0')
-          return {
-            ...r,
-            unadjusted_amount: uAmt,
-            audited_amount: aAmt,
-            adjustment: Math.round((aAmt - uAmt) * 100) / 100,
-          }
-        })
-        rows.value = audited
+        if (activeTab.value === 'equity_statement') {
+          equityCompareAudited.value = audited
+          equityCompareUnadjusted.value = unadjusted
+          rows.value = audited
+          compareRows.value = []
+        } else {
+          equityCompareAudited.value = []
+          equityCompareUnadjusted.value = []
+          const uMap = new Map(unadjusted.map((r: any) => [r.row_code, r]))
+          compareRows.value = audited.map((r: any) => {
+            const u = uMap.get(r.row_code)
+            const uAmt = parseFloat(u?.current_period_amount || '0')
+            const aAmt = parseFloat(r.current_period_amount || '0')
+            return {
+              ...r,
+              unadjusted_amount: uAmt,
+              audited_amount: aAmt,
+              adjustment: Math.round((aAmt - uAmt) * 100) / 100,
+            }
+          })
+          rows.value = audited
+        }
       } else {
         rows.value = await getReport(projectId.value, year.value, activeTab.value, reportMode.value === 'unadjusted', std)
         compareRows.value = []
+        equityCompareAudited.value = []
+        equityCompareUnadjusted.value = []
       }
     } catch (err: any) {
       // 404 = 报表未生成，加载预设模板结构显示空表格框架
@@ -240,6 +254,8 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
         rows.value = []
       }
       compareRows.value = []
+      equityCompareAudited.value = []
+      equityCompareUnadjusted.value = []
     }
 
     // ② 自动运行跨表校对（静默，不弹窗，只在有异常时显示 balanceCheckResult 横幅）
@@ -367,6 +383,8 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
     // State
     rows,
     compareRows,
+    equityCompareAudited,
+    equityCompareUnadjusted,
     loading,
     genLoading,
     checkLoading,

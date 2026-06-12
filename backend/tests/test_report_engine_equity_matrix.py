@@ -4,7 +4,7 @@
 对应权益科目的上期（prior）审定值填充，写入 source_accounts.eq_matrix 契约。
 
 边界（实现刻意约束，避免编造审计数字）：
-- 仅填充余额行 EQ-001 的 current_year 列；变动明细行不动。
+- 余额行 EQ-001 写入 current_year / prior_year；无底稿时变动明细行（如 EQ-002）不填。
 - 仅匹配负债权益侧科目，排除资产侧同名行（其他权益工具投资/永续债投资）。
 """
 from __future__ import annotations
@@ -15,27 +15,35 @@ from decimal import Decimal
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import MetaData, select
+from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.models.base import Base
 from app.models.core import Project
 from app.models.report_models import FinancialReport, FinancialReportType
 from app.services.report_engine import ReportEngine
 
+SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
+if not hasattr(SQLiteTypeCompiler, "visit_ARRAY"):
+    SQLiteTypeCompiler.visit_ARRAY = lambda self, type_, **kw: "TEXT"
+
 _engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-_async_session = sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
+_TEST_TABLES = [Project.__table__, FinancialReport.__table__]
 
 
 @pytest_asyncio.fixture
 async def db_session():
     async with _engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with _async_session() as session:
+        await conn.run_sync(
+            lambda sync_conn: MetaData().create_all(sync_conn, tables=_TEST_TABLES)
+        )
+    factory = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
         yield session
     async with _engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(
+            lambda sync_conn: MetaData().drop_all(sync_conn, tables=_TEST_TABLES)
+        )
 
 
 @pytest_asyncio.fixture
@@ -52,12 +60,12 @@ async def project(db_session: AsyncSession):
     return p
 
 
-def _bs(project_id, code, name, current, prior):
+def _bs(project_id, code, name, current, prior, year=2024):
     now = datetime.now(timezone.utc)
     return FinancialReport(
         id=uuid.uuid4(),
         project_id=project_id,
-        year=2024,
+        year=year,
         report_type=FinancialReportType.balance_sheet,
         row_code=code,
         row_name=name,
@@ -83,14 +91,11 @@ def _eq(project_id, code, name, source_accounts=None):
 
 @pytest_asyncio.fixture
 async def seeded(db_session: AsyncSession, project: Project):
-    """BS 权益行（含资产侧同名干扰行）+ EQ-001/EQ-002 行。"""
+    """BS 权益行（含资产侧同名干扰行）+ EQ-001/EQ-002 行；含 2023 BS 供 prior_year。"""
     rows = [
-        # 资产侧同名干扰行 —— 必须被排除（在权益段 BS-101 之前）
         _bs(project.id, "BS-034", "其他权益工具投资", 11111, 22222),
-        _bs(project.id, "BS-088", "永续债", 33333, 44444),  # 资产侧永续债
-        # 权益段标记
+        _bs(project.id, "BS-088", "永续债", 33333, 44444),
         _bs(project.id, "BS-101", "所有者权益：", 0, 0),
-        # 负债权益侧
         _bs(project.id, "BS-102", "实收资本", 5000000, 4000000),
         _bs(project.id, "BS-110", "其他权益工具", 70000, 60000),
         _bs(project.id, "BS-112", "永续债", 50000, 40000),
@@ -104,7 +109,10 @@ async def seeded(db_session: AsyncSession, project: Project):
         _bs(project.id, "BS-126", "归属于母公司所有者权益合计", 9400000, 7900000),
         _bs(project.id, "BS-127", "*少数股东权益", 90000, 80000),
         _bs(project.id, "BS-128", "所有者权益合计", 9500000, 8000000),
-        # EQ 行
+        # 再上一年 BS（供 prior_year 块）
+        _bs(project.id, "BS-101", "所有者权益：", 0, 0, year=2023),
+        _bs(project.id, "BS-102", "实收资本", 4000000, 3500000, year=2023),
+        _bs(project.id, "BS-113", "资本公积", 700000, 600000, year=2023),
         _eq(project.id, "EQ-001", "一、上年年末余额"),
         _eq(project.id, "EQ-002", "加：会计政策变更"),
     ]
@@ -130,7 +138,6 @@ async def test_fill_equity_matrix_basic(db_session: AsyncSession, seeded: Projec
     eq1 = res.scalar_one()
     matrix = eq1.source_accounts["eq_matrix"]["current_year"]
 
-    # 上年年末余额 = BS 上期（prior）值
     assert matrix["share_capital"] == pytest.approx(4000000)
     assert matrix["capital_reserve"] == pytest.approx(700000.5)
     assert matrix["treasury_stock"] == pytest.approx(-5000)
@@ -144,9 +151,8 @@ async def test_fill_equity_matrix_basic(db_session: AsyncSession, seeded: Projec
 
 
 @pytest.mark.asyncio
-async def test_fill_equity_matrix_total_equity_exact_match(db_session: AsyncSession, seeded: Project):
-    """total_equity 精确匹配「所有者权益合计」(BS-128)，不被「归属于母公司
-    所有者权益合计」(BS-126) 子串截胡。"""
+async def test_fill_equity_matrix_prior_year_block(db_session: AsyncSession, seeded: Project):
+    """EQ-001 同时写入 prior_year（来自 year-1 BS 上期）。"""
     engine = ReportEngine(db_session)
     now = datetime.now(timezone.utc)
     await engine._fill_equity_matrix(seeded.id, 2024, "soe_consolidated", now)
@@ -154,19 +160,32 @@ async def test_fill_equity_matrix_total_equity_exact_match(db_session: AsyncSess
     res = await db_session.execute(
         select(FinancialReport).where(
             FinancialReport.project_id == seeded.id,
-            FinancialReport.report_type == FinancialReportType.equity_statement,
             FinancialReport.row_code == "EQ-001",
         )
     )
-    eq1 = res.scalar_one()
-    matrix = eq1.source_accounts["eq_matrix"]["current_year"]
-    # BS-128「所有者权益合计」prior=8000000，而非 BS-126 的 7900000
+    py = res.scalar_one().source_accounts["eq_matrix"]["prior_year"]
+    assert py["share_capital"] == pytest.approx(3500000)
+    assert py["capital_reserve"] == pytest.approx(600000)
+
+
+@pytest.mark.asyncio
+async def test_fill_equity_matrix_total_equity_exact_match(db_session: AsyncSession, seeded: Project):
+    engine = ReportEngine(db_session)
+    now = datetime.now(timezone.utc)
+    await engine._fill_equity_matrix(seeded.id, 2024, "soe_consolidated", now)
+
+    res = await db_session.execute(
+        select(FinancialReport).where(
+            FinancialReport.project_id == seeded.id,
+            FinancialReport.row_code == "EQ-001",
+        )
+    )
+    matrix = res.scalar_one().source_accounts["eq_matrix"]["current_year"]
     assert matrix["total_equity"] == pytest.approx(8000000)
 
 
 @pytest.mark.asyncio
 async def test_fill_equity_matrix_excludes_asset_side(db_session: AsyncSession, seeded: Project):
-    """资产侧「其他权益工具投资」「永续债」(BS-101 之前) 不得污染权益列。"""
     engine = ReportEngine(db_session)
     now = datetime.now(timezone.utc)
     await engine._fill_equity_matrix(seeded.id, 2024, "soe_consolidated", now)
@@ -174,20 +193,19 @@ async def test_fill_equity_matrix_excludes_asset_side(db_session: AsyncSession, 
     res = await db_session.execute(
         select(FinancialReport).where(
             FinancialReport.project_id == seeded.id,
-            FinancialReport.report_type == FinancialReportType.equity_statement,
             FinancialReport.row_code == "EQ-001",
         )
     )
-    eq1 = res.scalar_one()
-    matrix = eq1.source_accounts["eq_matrix"]["current_year"]
-    # 取的是权益段内 BS-110/BS-112 的 prior 值，而非资产侧 BS-034/BS-088
+    matrix = res.scalar_one().source_accounts["eq_matrix"]["current_year"]
     assert matrix["other_equity_instrument"] == pytest.approx(60000)
     assert matrix["perpetual_bond"] == pytest.approx(40000)
 
 
 @pytest.mark.asyncio
-async def test_fill_equity_matrix_only_touches_eq001(db_session: AsyncSession, seeded: Project):
-    """变动明细行 EQ-002 不被填充。"""
+async def test_fill_equity_matrix_does_not_fill_eq002_without_wp(
+    db_session: AsyncSession, seeded: Project,
+):
+    """无底稿时 EQ-002 等变动行不自动填充（仅 EQ-001 余额行）。"""
     engine = ReportEngine(db_session)
     now = datetime.now(timezone.utc)
     await engine._fill_equity_matrix(seeded.id, 2024, "soe_consolidated", now)
@@ -195,7 +213,6 @@ async def test_fill_equity_matrix_only_touches_eq001(db_session: AsyncSession, s
     res = await db_session.execute(
         select(FinancialReport).where(
             FinancialReport.project_id == seeded.id,
-            FinancialReport.report_type == FinancialReportType.equity_statement,
             FinancialReport.row_code == "EQ-002",
         )
     )
@@ -205,9 +222,8 @@ async def test_fill_equity_matrix_only_touches_eq001(db_session: AsyncSession, s
 
 @pytest.mark.asyncio
 async def test_fill_equity_matrix_preserves_existing_source_accounts(
-    db_session: AsyncSession, project: Project
+    db_session: AsyncSession, project: Project,
 ):
-    """已有 source_accounts（如公式科目码）时合并而非覆盖。"""
     db_session.add(_bs(project.id, "BS-102", "实收资本", 5000000, 4000000))
     db_session.add(
         _eq(project.id, "EQ-001", "一、上年年末余额", source_accounts={"existing": ["4001"]})
@@ -221,7 +237,6 @@ async def test_fill_equity_matrix_preserves_existing_source_accounts(
     res = await db_session.execute(
         select(FinancialReport).where(
             FinancialReport.project_id == project.id,
-            FinancialReport.report_type == FinancialReportType.equity_statement,
             FinancialReport.row_code == "EQ-001",
         )
     )
@@ -232,7 +247,6 @@ async def test_fill_equity_matrix_preserves_existing_source_accounts(
 
 @pytest.mark.asyncio
 async def test_fill_equity_matrix_no_bs_rows_noop(db_session: AsyncSession, project: Project):
-    """无 BS 权益行时不写入（不报错）。"""
     db_session.add(_eq(project.id, "EQ-001", "一、上年年末余额"))
     await db_session.flush()
 
@@ -243,7 +257,6 @@ async def test_fill_equity_matrix_no_bs_rows_noop(db_session: AsyncSession, proj
     res = await db_session.execute(
         select(FinancialReport).where(
             FinancialReport.project_id == project.id,
-            FinancialReport.report_type == FinancialReportType.equity_statement,
             FinancialReport.row_code == "EQ-001",
         )
     )

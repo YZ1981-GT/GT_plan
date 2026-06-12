@@ -374,9 +374,9 @@ async def create_full_deliverables(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """一键生成全套交付件：财务报表 → 附注 → 报告正文（同步执行，复用 export_jobs_v2）。
+    """一键生成全套交付件：审定报表 → 未审报表 → 附注 → 报告正文（同步执行，复用 export_jobs_v2）。
 
-    - 顺序与 generateGuard 依赖链一致（报表 → 附注 → 报告正文）。
+    - 顺序与 generateGuard 依赖链一致（审定/未审报表 → 附注 → 报告正文）。
     - 报告正文步骤自动 preview→confirm（无弹窗），OPT 按默认优先级链解析（design §14）。
     - 单项失败不阻断其余步骤（需求 14.3）：job 最终落 partial_failed。
     - 完成后 KAM 警告写入 job.payload metadata，前端轮询完成时 Toast。

@@ -169,6 +169,11 @@
   - [x]* 6.4 `test_report_excel_manifest.py` + `test_financial_template_validate.py`
   - _Requirements: 9.1, 9.3, 9.8, 11.3, 15.4_
   - _阻塞下游：6.2/6.3 未完成前 manifest 模板导出会写错列/覆盖公式；详见任务 20_
+  - [x] 6.5 权益变动表未审/交付全链路（2026-06-12）：`eq_matrix` current_year+prior_year；未审 `_build_unadjusted_bundle`；导出内存 `enrich_equity_statement_rows`；M-F7→EQ-007/017/024/008；前端上年列
+  - [x] 6.5.1 P0/P1 展示与业务：矩阵编辑 `eq_matrix[year][col]`、对比视图、合并报表 enrich、IS 净利润→EQ-007、其他权益工具分列
+  - [x] 6.5.2 P2 测试验收：`test_report_equity_unadjusted_excel`（未审 `{{eq:}}`）、`test_deliverable_equity_excel_export`（审定交付 enrich 不写库）、`test_report_engine_equity_matrix` 修复、`test_report_equity_pg_smoke`
+  - [x] 6.5.3 P3 架构收尾：生成不写库 / 读路径 enrich 统一；`financial_report_unadjusted` 交付入口 + `data_mode`；`resolve_eq_semantic_row_codes` 多标准行次（国企/上市 EQ 偏移）
+  - [x] 6.5.4 Playwright 交付 E2E：`e2e/deliverable-equity-export.spec.ts`（审定/未审 render→下载 xlsx→权益 sheet 无 `{{eq:}}`；UI 取数口径；全套含未审步骤）；**门禁** `RUN_DELIVERABLE_E2E=1`（默认 skip，不伪绿）
 
 ---
 
@@ -251,11 +256,12 @@
 
 - [x] 15. ExportJob 全套生成
   - [x] 15.1 `word_export.py` 增加 `job_type='full_deliverables'` 执行器
-  - [x] 15.2 顺序：financial_reports → disclosure_notes → report_body
+  - [x] 15.2 顺序：financial_reports → financial_reports_unadjusted → disclosure_notes → report_body（2026-06-12 纳入未审报表）
   - [x] 15.2.1 report_body 步骤：自动 preview→confirm；OPT 默认链（payload → 上次选择 → registry → 兜底，设计 §14）
   - [x] 15.3 `DeliverableToolbar.vue` 一键生成 + 进度轮询 `export_jobs_v2`；完成时 KAM 警告 Toast
   - [x] 15.4 job 级前置校验（试算表/报表就绪）
   - [x]* 15.5 测试：单项失败可重试、进度递增、OPT 默认 + KAM metadata
+  - [x] 15.6 未审财务报表纳入一键全套：`_run_financial_reports_unadjusted` + `WordExportDocType.financial_report_unadjusted`；交付中心筛选/列表标签「财务报表（未审）」
   - _Requirements: 11.3, 11.6–11.8, 14, 16.1, 17.1_
 
 - [x] 16. 生成前置守卫统一
@@ -266,8 +272,8 @@
 - [ ] 17. 遗留下线
   - [x] 17.1 删除 `ReportExcelExporter.TEMPLATE_MAP`（若 Phase 1 未删净）
   - [x] 17.2 `WordTemplateFiller` 标记 deprecated（DeprecationWarning + docstring，生产调用保留至 17.3/17.4）
-  - [ ] 17.3 `USE_TEMPLATE_FILL_SERVICE` 默认改 `true`
-    > ⚠️ 运维/人工决策项：需确认灰度验证通过、模板 spot check 完毕后由负责人在生产配置中手动 flip。非代码任务。
+  - [x] 17.3 `USE_TEMPLATE_FILL_SERVICE` 默认改 `true`
+    > 2026-06-12：`config.py` 默认已 flip；生产环境仍可通过 `.env` 覆盖为 `False` 回退。
   - [ ] 17.4 移除或限制旧 `render_report_body` 单阶段默认行为
     > ⚠️ 运维/人工决策项：依赖 17.3 在生产环境稳定运行一段时间后，由负责人决定下线时机。非代码任务。
   - [x] 17.5 `ReportBodyService` 保留 `render_html` / `validate_kam` 辅助

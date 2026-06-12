@@ -454,8 +454,11 @@
             <span v-if="row._type === 'normal'" class="gt-link gt-amt" @click.stop="drillToVoucher(row)">{{ row.voucher_no }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip>
+        <el-table-column prop="summary" label="摘要" min-width="180" show-overflow-tooltip>
           <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
+        </el-table-column>
+        <el-table-column prop="counterpart_account" label="对方科目" width="120" show-overflow-tooltip>
+          <template #default="{ row }"><span class="gt-amt">{{ row.counterpart_account }}</span></template>
         </el-table-column>
         <el-table-column prop="debit_amount" label="借方" width="200" min-width="180" align="right">
           <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
@@ -997,7 +1000,7 @@ import { usePenetrate } from '@/composables/usePenetrate'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { numericSortMethod } from '@/utils/numericSort'
-import { buildLedgerDisplay } from '@/utils/ledgerDisplay'
+import { buildLedgerDisplay, buildLedgerFilteredDisplay } from '@/utils/ledgerDisplay'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 
 import { handleApiError } from '@/utils/errorHandler'
@@ -2033,9 +2036,6 @@ const breadcrumbs = ref<Crumb[]>([{ label: '账簿查询', level: 'balance' }])
 const balanceData = ref<any[]>([])
 const ledgerItems = ref<any[]>([])
 const ledgerTotal = ref(0)
-const ledgerPage = ref(1)
-const ledgerPageSize = ref(100)
-
 // V3 Req 12.2.1: el-table-v2 虚拟滚动列定义（数据量 > 1000 行时启用）
 // V3 Req 12.2.2: 支持列宽拖拽 / 行选择 / 右键菜单 / 排序 / 筛选
 const tableWidth = ref(1200)
@@ -2045,7 +2045,8 @@ const ledgerColumnWidths = ref<Record<string, number>>({
   __selection: 44,
   voucher_date: 110,
   voucher_no: 100,
-  summary: 320,
+  summary: 240,
+  counterpart_account: 120,
   debit_amount: 160,
   credit_amount: 160,
   balance: 160,
@@ -2092,6 +2093,7 @@ const ledgerVirtualColumns = computed(() => {
     makeResizableCol('voucher_date', '日期', w.voucher_date, sortKey),
     makeResizableCol('voucher_no', '凭证号', w.voucher_no, sortKey),
     makeResizableCol('summary', '摘要', w.summary, sortKey, { flexGrow: 1 }),
+    makeResizableCol('counterpart_account', '对方科目', w.counterpart_account, sortKey),
     makeResizableCol('debit_amount', '借方', w.debit_amount, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
     makeResizableCol('credit_amount', '贷方', w.credit_amount, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
     makeResizableCol('balance', '余额', w.balance, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
@@ -2252,7 +2254,7 @@ function clearLedgerFilters() {
 
 function ledgerVirtualRowClass({ rowData }: { rowData: any }) {
   if (rowData._type === 'opening') return 'gt-ledger-opening'
-  if (rowData._type === 'subtotal') return 'gt-ledger-subtotal'
+  if (rowData._type === 'subtotal' || rowData._type === 'view_subtotal') return 'gt-ledger-subtotal'
   return ''
 }
 
@@ -2263,58 +2265,20 @@ const ledgerDisplay = computed(() =>
   }),
 )
 
-/**
- * 虚拟滚动专用展示数据：在 ledgerDisplay 之上叠加排序 + 筛选
- * 期初/小计行始终保留位置，仅对 normal 业务行排序/筛选
- */
-const ledgerVirtualDisplay = computed(() => {
-  const all = ledgerDisplay.value
-  if (all.length === 0) return all
-  const kw = ledgerSearchKeyword.value.trim().toLowerCase()
-  const dir = ledgerAmountDir.value
-  const sort = ledgerSort.value
-
-  // 1. 拆分为业务行和锚点行（期初/小计）
-  const normals = all.filter((r) => r._type === 'normal' || !r._type)
-  const anchors = all.filter((r) => r._type === 'opening' || r._type === 'subtotal')
-
-  // 2. 筛选
-  let filtered = normals
-  if (kw) {
-    filtered = filtered.filter((r) => {
-      const summary = String(r.summary || '').toLowerCase()
-      const voucherNo = String(r.voucher_no || '').toLowerCase()
-      return summary.includes(kw) || voucherNo.includes(kw)
-    })
-  }
-  if (dir === 'debit') filtered = filtered.filter((r) => num(r.debit_amount) > 0)
-  else if (dir === 'credit') filtered = filtered.filter((r) => num(r.credit_amount) > 0)
-
-  // 3. 排序（无排序时保留原顺序 + 锚点）
-  if (!sort) {
-    if (kw || dir !== 'all') return filtered // 筛选时只返回业务行（锚点不再有意义）
-    return all // 无筛选无排序，原序返回（含锚点）
-  }
-  const factor = sort.order === 'desc' ? -1 : 1
-  const sorted = filtered.slice().sort((a: any, b: any) => {
-    const av = a[sort.key]
-    const bv = b[sort.key]
-    // 数字优先按数字比较
-    const an = typeof av === 'number' ? av : parseFloat(av)
-    const bn = typeof bv === 'number' ? bv : parseFloat(bv)
-    if (Number.isFinite(an) && Number.isFinite(bn)) return (an - bn) * factor
-    return String(av ?? '').localeCompare(String(bv ?? '')) * factor
-  })
-
-  // 排序时不再展示锚点（小计语义不再成立）
-  return [anchors[0], ...sorted].filter(Boolean)
-})
+/** 虚拟滚动专用展示：筛选子集重算月小计；排序时附「当前视图合计」 */
+const ledgerVirtualDisplay = computed(() =>
+  buildLedgerFilteredDisplay(ledgerItems.value, currentAccountOpening.value, {
+    keyword: ledgerSearchKeyword.value,
+    amountDir: ledgerAmountDir.value,
+    sort: ledgerSort.value,
+    syntheticExtra: { counterpart_account: '', account_code: '' },
+  }),
+)
 
 const voucherItems = ref<any[]>([])
 const auxBalanceItems = ref<any[]>([])
 const auxLedgerItems = ref<any[]>([])
 const auxLedgerTotal = ref(0)
-const auxLedgerPage = ref(1)
 
 /** 辅助明细账增强显示：期初行 + 每笔余额 + 月小计行 */
 const auxLedgerDisplay = computed(() =>
@@ -2515,7 +2479,7 @@ function formatOtherDims(raw: string, currentDimType: string): string {
 
 function ledgerRowClass({ row }: { row: any }): string {
   if (row._type === 'opening') return 'gt-ledger-opening'
-  if (row._type === 'subtotal') return 'gt-ledger-subtotal'
+  if (row._type === 'subtotal' || row._type === 'view_subtotal') return 'gt-ledger-subtotal'
   if (row._type !== 'normal') return ''
 
   const classes: string[] = []
@@ -3311,7 +3275,6 @@ function drillToAuxLedgerFromBalance(row: any) {
   currentAuxCode.value = row.aux_code || ''
   currentAuxOpening.value = num(row.opening_balance)
   currentLevel.value = 'aux_ledger'
-  auxLedgerPage.value = 1
   breadcrumbs.value = [
     { label: '账簿查询', level: 'balance' },
     {
@@ -3365,7 +3328,6 @@ function drillToLedger(row: any) {
   currentAccount.value = hasChildren ? code + '*' : code
   currentAccountOpening.value = num(row.opening_balance)
   currentLevel.value = 'ledger'
-  ledgerPage.value = 1
   dateRange.value = null
   // V3 Req 12.2.2: 切换账户时清虚拟滚动状态
   resetLedgerVirtualState()
@@ -3413,7 +3375,6 @@ function drillToAuxLedger(row: any) {
   currentAuxCode.value = row.aux_code
   currentAuxOpening.value = num(row.opening_balance)
   currentLevel.value = 'aux_ledger'
-  auxLedgerPage.value = 1
   breadcrumbs.value.push({
     label: `${row.aux_name || row.aux_code}`,
     level: 'aux_ledger',

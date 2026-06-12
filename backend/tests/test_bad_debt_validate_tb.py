@@ -26,10 +26,10 @@ from app.schemas.bad_debt_schemas import (
     CreateChildRowDTO,
     CreateParentRowDTO,
 )
-from app.services.bad_debt_nested_table_service import (
-    BAD_DEBT_ACCOUNT_CODE,
-    NestedTableService,
-)
+from app.services.bad_debt_account_codes import bad_debt_provision_account
+from app.services.bad_debt_nested_table_service import NestedTableService
+
+BAD_DEBT_ACCOUNT_CODE, _ = bad_debt_provision_account()
 
 YEAR = 2025
 

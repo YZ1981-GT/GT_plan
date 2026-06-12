@@ -480,9 +480,9 @@ async def render_report_body(
         legacy 路径，已被两阶段 ``/report-body/preview`` + ``/report-body/confirm``
         （TemplateFillService Word 模板主源）取代。
 
-        迁移期保留以兼容旧前端；``USE_TEMPLATE_FILL_SERVICE=false`` 时仍为默认
-        生成路径。**勿在此基础上新增功能**。移除由 task 17 处理
-        （`USE_TEMPLATE_FILL_SERVICE` 默认改 true 后限制/下线本路由）。
+        迁移期保留以兼容旧前端；``USE_TEMPLATE_FILL_SERVICE=true``（2026-06-12 默认）
+        后新导出走 TemplateFillService 两阶段路径，本路由仅为 legacy 回退。
+        **勿在此基础上新增功能**。移除由 task 17.4 处理。
     """
     await _guard_action(db, current_user, project_id, DeliverableAction.export)
     dsvc = DeliverableService(db)
@@ -632,8 +632,8 @@ async def render_disclosure_notes(
     exporter = NoteWordExporter(db)
     # 附注导出模式灰度（task 10.4）：
     #   - body.mode 显式指定 "template"/"programmatic" → 直接使用
-    #   - 否则跟随 settings.USE_TEMPLATE_FILL_SERVICE（默认 False → programmatic）
-    # 生产默认保持 programmatic；切换 template 为默认需人工格式抽检（task 18）。
+    #   - 否则跟随 settings.USE_TEMPLATE_FILL_SERVICE（默认 True → template）
+    # 生产可通过 .env 覆盖为 False 回退 programmatic；格式抽检见 task 18。
     from app.core.config import settings
 
     if body.mode in ("template", "programmatic"):
@@ -683,10 +683,16 @@ async def render_financial_reports(
     from app.services.report_excel_exporter import ReportExcelExporter
 
     await _guard_action(db, current_user, project_id, DeliverableAction.export)
+    data_mode = body.data_mode if body.data_mode in ("audited", "unadjusted") else "audited"
+    doc_type = (
+        WordExportDocType.financial_report_unadjusted.value
+        if data_mode == "unadjusted"
+        else WordExportDocType.financial_report.value
+    )
     dsvc = DeliverableService(db)
     task, _ = await dsvc.export_or_new_deliverable(
         project_id,
-        WordExportDocType.financial_report.value,
+        doc_type,
         body.template_type,
         current_user.id,
     )
@@ -697,11 +703,16 @@ async def render_financial_reports(
     buf = await exporter.export(
         project_id,
         body.year,
+        mode=data_mode,
         report_types=body.report_types,
     )
-    file_name = f"financial_reports_{body.year}.xlsx"
+    file_name = (
+        f"financial_reports_unadjusted_{body.year}.xlsx"
+        if data_mode == "unadjusted"
+        else f"financial_reports_{body.year}.xlsx"
+    )
     snapshot_refs = await dsvc.capture_snapshot_refs(
-        project_id, body.year, WordExportDocType.financial_report.value
+        project_id, body.year, doc_type
     )
     store = await dsvc.render_and_store(
         task.id,

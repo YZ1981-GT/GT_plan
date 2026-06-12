@@ -11,6 +11,7 @@
  * - 四个生成入口（交付件中心 报表/附注/报告正文 + AuditReportEditor 报告正文）
  *   SHALL 统一调用 `checkGenerateReady`，文案以本模块返回的 `message` 为唯一来源。
  * - 数据依赖链：试算表就绪(trialBalanceReady) → 财务报表(reportsReady) → 附注/报告正文。
+ * - 一键全套（full_deliverables）额外生成未审财务报表（financial_report_unadjusted），仍依赖试算表就绪。
  * - 服务端「一键生成全套」job（job_type='full_deliverables'，task 15 待实现）
  *   SHALL 复用同一依赖链（trialBalanceReady → reportsReady）做 job 级前置校验，
  *   并对齐此处的错误文案语义（无法生成「X」：…尚未就绪，请先完成前置数据准备），

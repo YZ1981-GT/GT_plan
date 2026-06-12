@@ -1,9 +1,9 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-06-10  
+**最后更新**：2026-06-12  
 **当前分支**：`work/2026-05-30-wp-specs`  
-**Spec 总数**：**139**（active 2 + archived 137）  
-**最高迁移**：V068  
+**Spec 总数**：**141**（active 2 + archived 139）  
+**最高迁移**：V071  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -48,7 +48,7 @@
 
 ---
 
-## 二、已归档 Spec（137 个，10 分类）
+## 二、已归档 Spec（139 个，10 分类）
 
 **当前 active = 2**（其余已归档）。新建 spec 放 `.kiro/specs/{name}/`。
 
@@ -56,8 +56,8 @@
 
 | Spec | 状态 | 迁移 | 说明 |
 |------|------|------|------|
-| audit-report-template-integration | implementing | V066 | 审计报告模板集成（171/184，剩 13 项非代码阻塞/人工验收） |
-| deliverable-lineage-and-writeback | completed | V067 | 出品物溯源与回填（92/92 全部完成，待端到端联调） |
+| audit-report-template-integration | implementing | V066 | 审计报告模板集成（181/184，剩 3 项人工验收/运维下线） |
+| deliverable-lineage-and-writeback | completed | V067 | 出品物溯源与回填（92/92 全部完成，START GATE 已解除可实施） |
 
 ```
 _archive/
@@ -65,7 +65,7 @@ _archive/
 ├── 02-workpaper-cycles/         16   审计循环（11循环+5基础，548 tasks）
 ├── 03-refinement-rounds/         9   五角色轮转（R1~R9）
 ├── 04-infra-architecture/       27   基础设施/全局架构
-├── 05-business-features/        34   业务专项（含ledger/wp系列）
+├── 05-business-features/        36   业务专项（含ledger/wp系列）
 ├── 06-engineering-governance/    6   工程治理
 ├── 07-workpaper-slimdown/        9   底稿瘦身
 ├── 08-disclosure-notes/          4   附注模块
@@ -92,11 +92,11 @@ _archive/
 
 `global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3` · `vllm-httpx-bugfix` · `retrieval-kernel-unification` · `doc-level-ai-chat` · `global-modules-cleanup` · `global-modules-p2-polish` · `formula-engine-unification` · `report-config-baseline` · `llm-structured-output` · `pg-pooling-and-load-test` · `xlsx-read-acceleration` · `endpoint-fuzz-and-tracing` · `global-refinement-v5-closure` · `platform-context-permission-foundation` · `platform-evidence-knowledge-ai-governance` · `platform-linkage-contract-stale` · `platform-maintenance-governance` · `platform-role-workbench-quality-loop` · `platform-ui-editing-consistency` · `zero-downtime-deployment`
 
-### 2.5 `05-business-features/`（34）
+### 2.5 `05-business-features/`（36）
 
 **账表导入（5）**：`ledger-import-view-refactor` · `ledger-import-header-adapter-contract` · `ledger-import-sign-convention-migration` · `ledger-balance-diagnostics-report-line-coverage` · `ledger-sign-convention-unify`
 
-**底稿专项（14）**：`wp-evidence-collection` · `wp-frontend-ux-polish` · `wp-functional-actions` · `wp-generation-pipeline` · `wp-locate-foundation` · `wp-performance-virtualization` · `wp-template-migration` · `wp-traceability-panel` · `wp-tsj-llm-review` · `wp-ai-review-ux-fix` · `workpaper-guardrail-cleanup` · `workpaper-account-package-d1-d2-pilot` · `workpaper-ai-conclusion-copilot` · `workpaper-content-semantic-contract`
+**底稿专项（16）**：`wp-evidence-collection` · `wp-frontend-ux-polish` · `wp-functional-actions` · `wp-generation-pipeline` · `wp-locate-foundation` · `wp-performance-virtualization` · `wp-template-migration` · `wp-traceability-panel` · `wp-tsj-llm-review` · `wp-ai-review-ux-fix` · `workpaper-guardrail-cleanup` · `workpaper-account-package-d1-d2-pilot` · `workpaper-ai-conclusion-copilot` · `workpaper-content-semantic-contract` · `workpaper-bad-debt-nested-structure` · `workpaper-unified-import-export`
 
 **报表/查询/角色（5）**：`advanced-query-enhancements-p1p2` · `partner-dashboard` · `procedure-applicability-trimming` · `role-based-view-switching` · `report-module-enhancement`
 
@@ -133,8 +133,6 @@ _archive/
 
 ## 三、待建 Spec
 
-- `workpaper-unified-import-export`（底稿统一导入导出）
-- D1-4 坏账嵌套结构（枚举+auto-SUM+辅助预填）
 - `consol_disclosure_service` 瘦身（1736 行）
 - `migration_runner` 瘦身（1026 行）
 - `workpaper-content-semantic-system`（底稿内容平台化）

@@ -194,33 +194,21 @@
               <el-button size="small" @click="exportConsolReport">📤 导出</el-button>
             </div>
           </div>
-          <!-- 权益变动表 — el-table 矩阵视图 -->
-          <div v-if="consolReportType === 'equity_statement' && consolReportRows.length" v-loading="consolReportLoading">
-            <el-table :data="consolReportRows" border size="small" max-height="calc(100vh - 280px)" style="width:100%"
-              :header-cell-style="{ background: '#f4f0fa', fontSize: '12px', whiteSpace: 'nowrap' }"
-              :cell-style="{ padding: '2px 8px', fontSize: '13px' }"
-              :row-class-name="eqRowClassName"
-              :span-method="eqSpanMethod">
-              <el-table-column prop="row_name" label="项目" fixed="left" min-width="200">
-                <template #default="{ row }">
-                  <span style="white-space:nowrap" :style="{ paddingLeft: (row.indent_level || 0) * 14 + 'px' }">{{ row.row_name }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="本年金额">
-                <el-table-column v-for="col in consolEqCols" :key="'cv-' + col" :label="eqColLabel(col)" min-width="100" align="right">
-                  <template #default="{ row }">
-                    <span class="gt-amt" style="white-space:nowrap">{{ fmtAmt(row['current_' + col]) }}</span>
-                  </template>
-                </el-table-column>
-              </el-table-column>
-              <el-table-column label="上年金额">
-                <el-table-column v-for="col in consolEqCols" :key="'pv-' + col" :label="eqColLabel(col)" min-width="100" align="right">
-                  <template #default="{ row }">
-                    <span class="gt-amt" style="white-space:nowrap">{{ fmtAmt(row['prior_' + col]) }}</span>
-                  </template>
-                </el-table-column>
-              </el-table-column>
-            </el-table>
+          <!-- 权益变动表 — 与单户 ReportEquityTable 共用 eq_matrix 契约 -->
+          <div v-if="consolReportType === 'equity_statement' && consolReportRows.length" v-loading="consolReportLoading" class="gt-consol-equity-matrix">
+            <ReportEquityTable
+              :rows="consolReportRows"
+              :eq-columns="eqColumns"
+              :eq-total-cols="eqTotalCols"
+              :year="projectInfo.year"
+              :table-max-height="consolEquityTableHeight"
+              :cell-class-name="() => ''"
+              :font-size="displayPrefs.fontConfig.tableFont"
+              :equity-span-method="equitySpanMethod"
+              :eq-row-class-name="eqRowClassName"
+              :eq-cell-val="eqCellVal"
+              :is-consolidated="true"
+            />
           </div>
 
           <!-- 资产减值准备表 — el-table 矩阵视图 -->
@@ -528,6 +516,8 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import ReportEquityTable from '@/components/report/ReportEquityTable.vue'
+import { useReportColumns } from '@/views/composables/useReportColumns'
 import { handleApiError } from '@/utils/errorHandler'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { useNavigationStack } from '@/composables/useNavigationStack'
@@ -785,26 +775,9 @@ const drillDownTitle = computed(() => {
   return `汇总穿透 — ${drillDownCell.itemName} / ${drillDownCell.colName}`
 })
 
-// ─── 权益变动表 el-table 辅助 ──────────────────────────────────────────────
-const EQ_COL_LABELS: Record<string, string> = {
-  paid_in_capital: '实收资本', preferred_stock: '优先股', perpetual_bond: '永续债',
-  other_equity_instruments: '其他', capital_reserve: '资本公积', treasury_stock: '减：库存股',
-  other_comprehensive_income: '其他综合收益', special_reserve: '专项储备',
-  surplus_reserve: '盈余公积', general_risk_reserve: '一般风险准备',
-  retained_earnings: '未分配利润', subtotal: '小计',
-  minority_interest: '少数股东权益', total: '所有者权益合计',
-}
-function eqColLabel(col: string): string {
-  return EQ_COL_LABELS[col] || col
-}
-function eqRowClassName({ row }: { row: any }): string {
-  if (row.is_total_row) return 'gt-cm-total-row'
-  if (row.indent_level === 0) return 'gt-cm-category'
-  return ''
-}
-function eqSpanMethod(): { rowspan: number; colspan: number } | undefined {
-  // el-table nested columns handle the multi-row header automatically
-  return undefined
+const consolEquityTableHeight = ref(600)
+function updateConsolEquityTableHeight() {
+  consolEquityTableHeight.value = Math.max(400, window.innerHeight - 280)
 }
 function impairRowClassName({ row }: { row: any }): string {
   if (row.is_total_row) return 'gt-cm-total-row'
@@ -1204,13 +1177,18 @@ const showConsolConversion = ref(false)
 const consolMappingLoading = ref(false)
 const consolMappingRules = ref<any[]>([])
 
-// 权益变动表列 key（合并版：含小计+少数股东）
-const consolEqCols = [
-  'paid_in_capital', 'other_equity_preferred', 'other_equity_perpetual', 'other_equity_other',
-  'capital_reserve', 'treasury_stock', 'oci', 'special_reserve',
-  'surplus_reserve', 'general_risk', 'retained_earnings',
-  'subtotal', 'minority', 'total',
-]
+const consolIsConsolidated = computed(() => true)
+const {
+  eqColumns,
+  eqTotalCols,
+  equitySpanMethod,
+  eqRowClassName,
+  eqCellVal,
+} = useReportColumns({
+  isConsolidated: consolIsConsolidated,
+  activeTab: consolReportType,
+  rows: consolReportRows,
+})
 
 // ─── 前端缓存：按 entity+reportType 缓存，切换秒开，刷新时清缓存 ──────────
 const reportCache = new Map<string, any[]>()
@@ -1379,27 +1357,21 @@ async function loadConsolReport(forceRefresh = false) {
   }
   consolReportLoading.value = true
   try {
-    const standard = `${consolReportTemplateType.value}_consolidated`
-    const params: Record<string, any> = {
-      report_type: consolReportType.value,
-      applicable_standard: standard,
-      project_id: projectId.value,
-    }
-    if (currentConsolEntity.value.code && currentConsolEntity.value.code !== 'root') {
-      params.company_code = currentConsolEntity.value.code
-    }
-    const data = await api.get(P_rc.list, {
-      params,
-      validateStatus: (s: number) => s < 600,
-    })
-    const rows = data ?? []
+    const rows = await api.get(
+      P_consol.reports.list(projectId.value, projectInfo.year),
+      { params: { report_type: consolReportType.value } },
+    )
     const result = Array.isArray(rows) ? rows : []
     consolReportRows.value = result
-    // 写入缓存
     reportCache.set(cacheKey, result)
-    // 加载批注/复核标记
     consolComments.loadComments(`report_${consolReportType.value}`)
-  } catch { consolReportRows.value = [] }
+  } catch (err: any) {
+    if (err?.response?.status === 404) {
+      consolReportRows.value = []
+    } else {
+      consolReportRows.value = []
+    }
+  }
   finally { consolReportLoading.value = false }
 }
 
@@ -1563,6 +1535,8 @@ function onConsolTreeSelect(data: ConsolTreeSelectPayload) {
 }
 
 onMounted(async () => {
+  updateConsolEquityTableHeight()
+  window.addEventListener('resize', updateConsolEquityTableHeight)
   await loadProjectInfo()
   // 默认合并主体为项目本身（集团层面）
   currentConsolEntity.value = { code: '', name: projectInfo.clientName || '' }
@@ -1591,6 +1565,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', updateConsolEquityTableHeight)
   eventBus.off('consol-tree-select', onConsolTreeSelect)
   eventBus.off('consol-catalog-select', onConsolCatalogSelect)
   eventBus.off('consol-refresh-entity', onConsolRefreshEntity)

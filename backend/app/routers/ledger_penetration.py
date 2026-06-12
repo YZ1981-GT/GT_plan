@@ -122,8 +122,9 @@ async def get_ledger_entries(
     否则使用传统 OFFSET 分页。
     """
     svc = _svc(db, None)
-    # 优先使用游标分页（首次请求不传 cursor 也走游标分页，用 limit 控制条数）
-    if cursor is not None or limit != 100:
+    # 默认走游标分页（keyset）；仅 page>1 且无 cursor/limit 覆盖时保留 legacy OFFSET
+    # （OFFSET 只返原始分录，不含运行余额；前端全量拉取后本地算余额，不能按页切片）
+    if cursor is not None or limit != 100 or page <= 1:
         return await svc.get_ledger_entries_cursor(
             project_id, year, account_code,
             cursor=cursor, limit=limit,
@@ -355,7 +356,7 @@ async def get_aux_ledger_entries(
 ):
     """辅助明细账（按辅助维度穿透）— 支持游标分页和传统分页"""
     svc = _svc(db, None)
-    if cursor is not None:
+    if cursor is not None or limit != 100 or page <= 1:
         return await svc.get_aux_ledger_entries_cursor(
             project_id, year, account_code,
             cursor=cursor, limit=limit,

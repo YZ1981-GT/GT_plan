@@ -7,7 +7,8 @@ from app.models.phase13_models import WordExportDocType
 
 DOC_TYPE_LABELS: dict[str, str] = {
     WordExportDocType.audit_report.value: "审计报告正文",
-    WordExportDocType.financial_report.value: "财务报表",
+    WordExportDocType.financial_report.value: "财务报表（审定）",
+    WordExportDocType.financial_report_unadjusted.value: "财务报表（未审）",
     WordExportDocType.disclosure_notes.value: "附注",
     WordExportDocType.full_package.value: "全套包",
     "special_report": "专项报告",

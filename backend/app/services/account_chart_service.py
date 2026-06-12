@@ -236,6 +236,51 @@ def _infer_level(code: str, parent_code: str | None) -> int:
     return 2
 
 
+_STANDARD_CHART_ENTRIES: list[dict] | None = None
+
+
+def _load_standard_chart_entries() -> list[dict]:
+    """加载 standard_account_chart.json 条目（code/name 字段）。"""
+    global _STANDARD_CHART_ENTRIES
+    if _STANDARD_CHART_ENTRIES is None:
+        with open(_DATA_DIR / "standard_account_chart.json", encoding="utf-8-sig") as f:
+            data = json.load(f)
+        _STANDARD_CHART_ENTRIES = data.get("accounts", []) if isinstance(data, dict) else data
+    return _STANDARD_CHART_ENTRIES
+
+
+def resolve_standard_account_by_name(
+    account_name: str,
+    *,
+    name_aliases: tuple[str, ...] = (),
+    preferred_codes: tuple[str, ...] = (),
+) -> tuple[str, str]:
+    """按科目名称从标准科目表解析 (code, name)。未找到抛 LookupError。"""
+    names = {account_name, *name_aliases}
+    entries = _load_standard_chart_entries()
+
+    if preferred_codes:
+        for code in preferred_codes:
+            for entry in entries:
+                entry_code = entry.get("code") or entry.get("account_code")
+                entry_name = entry.get("name") or entry.get("account_name")
+                if entry_code == code and entry_name in names:
+                    return str(entry_code), str(entry_name)
+            for entry in entries:
+                entry_code = entry.get("code") or entry.get("account_code")
+                entry_name = entry.get("name") or entry.get("account_name")
+                if entry_code == code:
+                    return str(entry_code), str(entry_name or account_name)
+
+    for entry in entries:
+        entry_code = entry.get("code") or entry.get("account_code")
+        entry_name = entry.get("name") or entry.get("account_name")
+        if entry_name in names and entry_code:
+            return str(entry_code), str(entry_name)
+
+    raise LookupError(f"标准科目表未找到科目: {account_name}")
+
+
 # ---------------------------------------------------------------------------
 # load_standard_template
 # ---------------------------------------------------------------------------

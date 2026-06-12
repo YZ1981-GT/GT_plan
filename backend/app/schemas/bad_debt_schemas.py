@@ -58,12 +58,14 @@ class CreateParentRowDTO(BaseModel):
 
 
 class CreateChildRowDTO(BaseModel):
-    """新增子行：行标签 + 至少 E/K/N 三个必填金额列（其余可空）"""
+    """新增子行：行标签 + 可选插入位置（默认末尾）。"""
 
     row_label: str = Field(..., min_length=1, max_length=200)
     amount_e: Amount | None = None  # 期初审定数
     amount_k: Amount | None = None  # 期末未审数
     amount_n: Amount | None = None  # 期末审定数
+    insert_before_id: UUID | None = None  # 在指定子行之前插入
+    insert_after_id: UUID | None = None   # 在指定子行之后插入
 
 
 class UpdateRowDTO(BaseModel):

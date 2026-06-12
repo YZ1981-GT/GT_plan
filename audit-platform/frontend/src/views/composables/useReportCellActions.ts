@@ -31,6 +31,7 @@ export interface UseReportCellActionsOptions {
   rvCtx: ReturnType<typeof useCellSelection>
   rvPenetrate: ReturnType<typeof usePenetrate>
   rvComments: ReturnType<typeof useCellComments>
+  eqCellVal?: (row: any, colKey: string, yearKey?: 'current_year' | 'prior_year') => any
 }
 
 export interface UseReportCellActionsReturn {
@@ -119,7 +120,7 @@ export function useReportCellActions(options: UseReportCellActionsOptions): UseR
     isConsolidated, fetchReport, activeTabLabel,
     getRowType, goToNote, consistencyResult,
     showFormulaManager, openTrustScore,
-    rvCtx, rvPenetrate,
+    rvCtx, rvPenetrate, eqCellVal,
   } = options
 
   // 1. Drilldown + Line Composition + Note References
@@ -139,7 +140,7 @@ export function useReportCellActions(options: UseReportCellActionsOptions): UseR
     projectId, year, activeTab, rows, reportMode,
     isConsolidated, fetchReport, getRowType,
     goToNote, showFormulaManager, openTrustScore,
-    rvCtx, rvPenetrate,
+    rvCtx, rvPenetrate, eqCellVal,
     onDrilldown: drilldown.onDrilldown,
   })
 

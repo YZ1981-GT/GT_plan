@@ -552,21 +552,55 @@ class LedgerPenetrationService:
             )
             total = (await self.db.execute(count_base)).scalar() or 0
 
-        # 解析游标: "date|id" 格式
-        cursor_clauses = list(where_clauses)
+        opening = await self.get_account_opening_balance(project_id, year, account_code)
+        opening_val = float(opening)
+
+        order_date = tbl.c.voucher_date
+        order_id_str = sa.cast(tbl.c.id, sa.String)
+        running_balance_expr = (
+            sa.literal(opening_val)
+            + sa.func.coalesce(
+                sa.func.sum(sa.func.coalesce(tbl.c.debit_amount, 0)).over(
+                    order_by=(order_date, order_id_str),
+                ),
+                0,
+            )
+            - sa.func.coalesce(
+                sa.func.sum(sa.func.coalesce(tbl.c.credit_amount, 0)).over(
+                    order_by=(order_date, order_id_str),
+                ),
+                0,
+            )
+        ).label("running_balance")
+
+        ledger_sq = (
+            sa.select(
+                tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
+                tbl.c.account_code, tbl.c.account_name,
+                tbl.c.debit_amount, tbl.c.credit_amount,
+                tbl.c.counterpart_account, tbl.c.summary,
+                tbl.c.accounting_period, tbl.c.voucher_type,
+                running_balance_expr,
+            )
+            .where(*where_clauses)
+            .order_by(order_date, order_id_str)
+            .subquery("ledger_with_rb")
+        )
+
+        # 解析游标: "date|id" 格式（在含 running_balance 的子查询上过滤）
+        outer_clauses: list = []
         if cursor:
             try:
                 parts = cursor.split("|", 1)
                 cursor_date = parts[0]
                 cursor_id = parts[1] if len(parts) > 1 else ""
-                # voucher_date 是 date 列：绑定 Python date 对象（跨 PG/SQLite 正确）。
                 cursor_date_val = _parse_cursor_date(cursor_date)
-                cursor_clauses.append(
+                outer_clauses.append(
                     sa.or_(
-                        tbl.c.voucher_date > cursor_date_val,
+                        ledger_sq.c.voucher_date > cursor_date_val,
                         sa.and_(
-                            tbl.c.voucher_date == cursor_date_val,
-                            sa.cast(tbl.c.id, sa.String) > cursor_id,
+                            ledger_sq.c.voucher_date == cursor_date_val,
+                            sa.cast(ledger_sq.c.id, sa.String) > cursor_id,
                         ),
                     )
                 )
@@ -574,17 +608,9 @@ class LedgerPenetrationService:
                 pass
 
         stmt = (
-            sa.select(
-                tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
-                tbl.c.account_code, tbl.c.account_name,
-                tbl.c.debit_amount, tbl.c.credit_amount,
-                tbl.c.counterpart_account, tbl.c.summary,
-                tbl.c.accounting_period, tbl.c.voucher_type,
-            )
-            .where(*cursor_clauses)
-            # ORDER BY 必须与游标 tiebreaker 用同一表达式 cast(id, String)，
-            # 否则 UUID 原生序 ≠ 字符串序，同日期多行在翻页边界会漏/重。
-            .order_by(tbl.c.voucher_date, sa.cast(tbl.c.id, sa.String))
+            sa.select(ledger_sq)
+            .where(*outer_clauses)
+            .order_by(ledger_sq.c.voucher_date, sa.cast(ledger_sq.c.id, sa.String))
             .limit(limit + 1)
         )
 

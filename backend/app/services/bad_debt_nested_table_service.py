@@ -43,13 +43,11 @@ from app.schemas.bad_debt_schemas import (
     SummaryRowResponse,
     UpdateRowDTO,
 )
+from app.services.bad_debt_account_codes import bad_debt_provision_account
 from app.services.bad_debt_auto_sum import AutoSumEngine
 
 # 13 金额列名 amount_b ~ amount_n
 _AMOUNT_COLUMNS = AutoSumEngine.AMOUNT_COLUMNS
-
-# 坏账准备试算表科目编码（与 BadDebtPrefillService 同口径）
-BAD_DEBT_ACCOUNT_CODE = "1231"
 
 
 # ─── 自定义异常（供 router 映射 HTTP 状态码）────────────────────────────────
@@ -668,11 +666,67 @@ class NestedTableService:
 
     # ─── 3.2 create_child_row ─────────────────────────────────────────────────
 
+    async def _compute_child_sort_order(
+        self,
+        parent_row_id: uuid.UUID,
+        *,
+        insert_before_id: uuid.UUID | None = None,
+        insert_after_id: uuid.UUID | None = None,
+    ) -> int:
+        """计算子行 sort_order：默认末尾；支持在某子行之前/之后插入。"""
+        if insert_before_id and insert_after_id:
+            raise HierarchyError("insert_before_id 与 insert_after_id 不能同时指定")
+
+        children = await self._list_children(parent_row_id)
+        if not children:
+            return 10
+
+        if not insert_before_id and not insert_after_id:
+            return children[-1].sort_order + 10
+
+        ref_id = insert_before_id or insert_after_id
+        ref_idx = next((i for i, c in enumerate(children) if c.id == ref_id), -1)
+        if ref_idx < 0:
+            raise RowNotFoundError(f"参考子行不存在: {ref_id}")
+
+        ref = children[ref_idx]
+        if insert_before_id:
+            prev = children[ref_idx - 1] if ref_idx > 0 else None
+            if prev is None:
+                return max(ref.sort_order - 5, 1)
+            gap = ref.sort_order - prev.sort_order
+            if gap > 1:
+                return prev.sort_order + gap // 2
+            return await self._renumber_children_and_slot(parent_row_id, ref_idx)
+        # insert_after_id
+        nxt = children[ref_idx + 1] if ref_idx + 1 < len(children) else None
+        if nxt is None:
+            return ref.sort_order + 10
+        gap = nxt.sort_order - ref.sort_order
+        if gap > 1:
+            return ref.sort_order + gap // 2
+        return await self._renumber_children_and_slot(parent_row_id, ref_idx + 1)
+
+    async def _renumber_children_and_slot(
+        self, parent_row_id: uuid.UUID, slot_index: int
+    ) -> int:
+        """子行 sort_order 间隙耗尽时按 10 步长重编号，返回 slot_index 位置的新 order。"""
+        children = await self._list_children(parent_row_id)
+        for i, child in enumerate(children):
+            child.sort_order = (i + 1) * 10
+        await self.db.flush()
+        if slot_index <= 0:
+            return 5
+        if slot_index >= len(children):
+            return children[-1].sort_order + 10
+        prev_order = children[slot_index - 1].sort_order
+        next_order = children[slot_index].sort_order
+        return prev_order + max((next_order - prev_order) // 2, 1)
+
     async def create_child_row(
         self, parent_row_id: uuid.UUID, data: CreateChildRowDTO
     ) -> ChildRowResponse:
-        """新增子行：插入到指定父行子行末尾，sort_order 严格大于现有子行最大值；
-        触发父行汇总重算。
+        """新增子行：默认末尾；可指定在某子行之前/之后插入。触发父行汇总重算。
 
         Requirements: 1.2, 2.4, 2.6, 3.1
         """
@@ -680,12 +734,11 @@ class NestedTableService:
         if parent.parent_row_id is not None:
             raise HierarchyError("不能在子行下再创建子行（仅支持两层嵌套）")
 
-        # 子行 sort_order 严格大于现有所有子行最大值
-        max_stmt = select(func.max(BadDebtDetailRow.sort_order)).where(
-            BadDebtDetailRow.parent_row_id == parent_row_id
+        next_order = await self._compute_child_sort_order(
+            parent_row_id,
+            insert_before_id=data.insert_before_id,
+            insert_after_id=data.insert_after_id,
         )
-        max_order = (await self.db.execute(max_stmt)).scalar()
-        next_order = (max_order or 0) + 10
 
         child = BadDebtDetailRow(
             id=uuid.uuid4(),
@@ -924,14 +977,16 @@ class NestedTableService:
         summary = AutoSumEngine.sum_parents(parent_effective)
         summary_n = summary.amount_n
 
-        # TB 1231 audited_amount 聚合
+        provision_code, provision_name = bad_debt_provision_account()
+
+        # TB 坏账准备 audited_amount 聚合
         stmt = select(
             func.count(TrialBalance.id),
             func.sum(TrialBalance.audited_amount),
         ).where(
             TrialBalance.project_id == project_id,
             TrialBalance.year == year,
-            TrialBalance.standard_account_code == BAD_DEBT_ACCOUNT_CODE,
+            TrialBalance.standard_account_code == provision_code,
             TrialBalance.is_deleted.is_(False),
         )
         row_count, audited_sum = (await self.db.execute(stmt)).one()
@@ -949,7 +1004,7 @@ class NestedTableService:
                     code="SUMMARY_TB_MISMATCH",
                     message=(
                         f"合计行期末审定数 {summary_norm} 与试算表科目 "
-                        f"{BAD_DEBT_ACCOUNT_CODE} 审定数 {tb_audited} 不一致"
+                        f"{provision_code} {provision_name} 审定数 {tb_audited} 不一致"
                     ),
                 )
             )

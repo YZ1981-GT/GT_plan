@@ -156,14 +156,50 @@ async def get_consol_report(
             detail=f"合并{report_type.value}不存在，请先生成合并报表",
         )
 
+    if report_type == FinancialReportType.equity_statement:
+        from app.services.report_engine import ReportEngine
+
+        engine = ReportEngine(db)
+        row_dicts = [
+            {
+                "row_code": r.row_code,
+                "row_name": r.row_name,
+                "current_period_amount": r.current_period_amount,
+                "prior_period_amount": r.prior_period_amount,
+                "indent_level": r.indent_level,
+                "is_total_row": r.is_total_row,
+                "formula_used": r.formula_used,
+                "source_accounts": r.source_accounts,
+            }
+            for r in rows
+        ]
+        enriched = await engine.enrich_equity_statement_rows(project_id, year, row_dicts)
+        return [
+            ConsolReportRow(
+                row_code=d.get("row_code") or "",
+                row_name=d.get("row_name") or "",
+                indent_level=d.get("indent_level") or 0,
+                is_total_row=bool(d.get("is_total_row")),
+                is_total=bool(d.get("is_total_row")),
+                current_period_amount=d.get("current_period_amount"),
+                prior_period_amount=d.get("prior_period_amount"),
+                formula_used=d.get("formula_used"),
+                source_accounts=d.get("source_accounts"),
+            )
+            for d in enriched
+        ]
+
     return [
         ConsolReportRow(
             row_code=r.row_code or "",
             row_name=r.row_name or "",
-            current_period_amount=r.current_period_amount or 0,
-            prior_period_amount=r.prior_period_amount or 0,
-            is_bold=False,
-            is_total=False,
+            indent_level=r.indent_level or 0,
+            is_total_row=bool(r.is_total_row),
+            is_total=bool(r.is_total_row),
+            current_period_amount=r.current_period_amount,
+            prior_period_amount=r.prior_period_amount,
+            formula_used=r.formula_used,
+            source_accounts=r.source_accounts,
         )
         for r in rows
     ]

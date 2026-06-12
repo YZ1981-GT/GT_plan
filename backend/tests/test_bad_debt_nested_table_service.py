@@ -149,6 +149,42 @@ async def test_create_child_triggers_parent_resum(session: AsyncSession):
 
 
 @pytest.mark.asyncio
+async def test_create_child_insert_before(session: AsyncSession):
+    svc = NestedTableService(session)
+    wp = uuid.uuid4()
+    parent = await svc.create_parent_row(
+        wp, CreateParentRowDTO(provision_method=ProvisionMethod.INDIVIDUAL, row_label="单项")
+    )
+    first = await svc.create_child_row(parent.id, CreateChildRowDTO(row_label="第一"))
+    second = await svc.create_child_row(parent.id, CreateChildRowDTO(row_label="第二"))
+    inserted = await svc.create_child_row(
+        parent.id,
+        CreateChildRowDTO(row_label="中间", insert_before_id=second.id),
+    )
+    children = await svc._list_children(parent.id)
+    labels = [c.row_label for c in children]
+    assert labels == ["第一", "中间", "第二"]
+    assert first.sort_order < inserted.sort_order < second.sort_order
+
+
+@pytest.mark.asyncio
+async def test_create_child_insert_after(session: AsyncSession):
+    svc = NestedTableService(session)
+    wp = uuid.uuid4()
+    parent = await svc.create_parent_row(
+        wp, CreateParentRowDTO(provision_method=ProvisionMethod.INDIVIDUAL, row_label="单项")
+    )
+    first = await svc.create_child_row(parent.id, CreateChildRowDTO(row_label="第一"))
+    inserted = await svc.create_child_row(
+        parent.id,
+        CreateChildRowDTO(row_label="其后", insert_after_id=first.id),
+    )
+    children = await svc._list_children(parent.id)
+    assert [c.row_label for c in children] == ["第一", "其后"]
+    assert first.sort_order < inserted.sort_order
+
+
+@pytest.mark.asyncio
 async def test_create_child_under_child_rejected(session: AsyncSession):
     svc = NestedTableService(session)
     wp = uuid.uuid4()

@@ -19,11 +19,13 @@ export interface LedgerRawItem {
   voucher_no?: string
   debit_amount?: number | string | null
   credit_amount?: number | string | null
+  running_balance?: number | string | null
+  counterpart_account?: string | null
   [k: string]: any
 }
 
 export interface LedgerDisplayRow {
-  _type: 'opening' | 'normal' | 'subtotal'
+  _type: 'opening' | 'normal' | 'subtotal' | 'view_subtotal'
   voucher_date: string
   voucher_no: string
   summary: string
@@ -35,6 +37,13 @@ export interface LedgerDisplayRow {
 
 export interface BuildLedgerDisplayOptions {
   /** 合成行（期初/小计）上需要补齐的额外字段，如 { counterpart_account: '', account_code: '' } */
+  syntheticExtra?: Record<string, any>
+}
+
+export interface LedgerViewFilterOptions {
+  keyword?: string
+  amountDir?: 'all' | 'debit' | 'credit'
+  sort?: { key: string; order: 'asc' | 'desc' } | null
   syntheticExtra?: Record<string, any>
 }
 
@@ -68,7 +77,6 @@ export function buildLedgerDisplay(
   const rows: LedgerDisplayRow[] = []
 
   if (!items || items.length === 0) {
-    // 仍返回期初行，保持与有数据时一致的结构
     rows.push({
       _type: 'opening', voucher_date: '', voucher_no: '',
       summary: '期初余额', debit_amount: null, credit_amount: null,
@@ -91,16 +99,15 @@ export function buildLedgerDisplay(
   for (const item of items) {
     const d = toNum(item.debit_amount)
     const c = toNum(item.credit_amount)
-    const month = (item.voucher_date || '').substring(0, 7) // "2025-01"
+    const month = (item.voucher_date || '').substring(0, 7)
     if (!lastMonth) lastMonth = month
 
-    // 月份变化时先结算上月小计 —— 必须在累加当前行之前。
     if (month !== lastMonth) {
       rows.push({
         _type: 'subtotal', voucher_date: '', voucher_no: '',
         summary: `${lastMonth} 本月合计`,
         debit_amount: monthDebit, credit_amount: monthCredit,
-        balance, // 上月末余额（尚未并入本月首笔）
+        balance,
         ...extra,
       })
       monthDebit = 0
@@ -108,20 +115,120 @@ export function buildLedgerDisplay(
       lastMonth = month
     }
 
-    // 累加当前行：先更新运行余额，再累加本月借贷合计。
-    balance = dSub(dAdd(balance, d), c)
+    if (item.running_balance != null && item.running_balance !== '') {
+      balance = toNum(item.running_balance)
+    } else {
+      balance = dSub(dAdd(balance, d), c)
+    }
     monthDebit = dAdd(monthDebit, d)
     monthCredit = dAdd(monthCredit, c)
 
     rows.push({ ...item, _type: 'normal', balance } as LedgerDisplayRow)
   }
 
-  // 末月小计
   rows.push({
     _type: 'subtotal', voucher_date: '', voucher_no: '',
     summary: `${lastMonth} 本月合计`,
     debit_amount: monthDebit, credit_amount: monthCredit,
     balance, ...extra,
+  })
+
+  return rows
+}
+
+function matchesKeyword(item: LedgerRawItem, kw: string): boolean {
+  const summary = String(item.summary || '').toLowerCase()
+  const voucherNo = String(item.voucher_no || '').toLowerCase()
+  const counterpart = String(item.counterpart_account || '').toLowerCase()
+  const vdate = String(item.voucher_date || '').toLowerCase()
+  return summary.includes(kw) || voucherNo.includes(kw) || counterpart.includes(kw) || vdate.includes(kw)
+}
+
+function sortItems(items: LedgerRawItem[], sort: { key: string; order: 'asc' | 'desc' }): LedgerRawItem[] {
+  const factor = sort.order === 'desc' ? -1 : 1
+  return items.slice().sort((a, b) => {
+    const av = a[sort.key]
+    const bv = b[sort.key]
+    const an = typeof av === 'number' ? av : parseFloat(String(av))
+    const bn = typeof bv === 'number' ? bv : parseFloat(String(bv))
+    if (Number.isFinite(an) && Number.isFinite(bn)) return (an - bn) * factor
+    return String(av ?? '').localeCompare(String(bv ?? '')) * factor
+  })
+}
+
+/**
+ * 虚拟滚动视图：筛选/排序后的展示行。
+ * - 仅筛选：对筛选子集重算月小计（语义正确）。
+ * - 有排序：保留期初 + 排序行（余额取自全量序）+「当前视图合计」。
+ */
+export function buildLedgerFilteredDisplay(
+  items: LedgerRawItem[],
+  opening: number,
+  options: LedgerViewFilterOptions = {},
+): LedgerDisplayRow[] {
+  const {
+    keyword = '',
+    amountDir = 'all',
+    sort = null,
+    syntheticExtra = {},
+  } = options
+  const kw = keyword.trim().toLowerCase()
+  const extra = syntheticExtra
+
+  if (!items?.length && !kw && amountDir === 'all' && !sort) {
+    return buildLedgerDisplay(items, opening, { syntheticExtra: extra })
+  }
+
+  let filtered = items ?? []
+  if (kw) filtered = filtered.filter((r) => matchesKeyword(r, kw))
+  if (amountDir === 'debit') filtered = filtered.filter((r) => toNum(r.debit_amount) > 0)
+  else if (amountDir === 'credit') filtered = filtered.filter((r) => toNum(r.credit_amount) > 0)
+
+  const hasFilter = !!kw || amountDir !== 'all'
+
+  if (!sort && !hasFilter) {
+    return buildLedgerDisplay(items, opening, { syntheticExtra: extra })
+  }
+
+  if (!sort && hasFilter) {
+    return buildLedgerDisplay(filtered, opening, { syntheticExtra: extra })
+  }
+
+  const fullDisplay = buildLedgerDisplay(items, opening, { syntheticExtra: extra })
+  const openingRow = fullDisplay.find((r) => r._type === 'opening')
+  const balanceById = new Map<string, number>()
+  for (const row of fullDisplay) {
+    if (row._type === 'normal' && row.id != null) {
+      balanceById.set(String(row.id), row.balance)
+    }
+  }
+
+  const sorted = sortItems(filtered, sort!)
+  let sumD = 0
+  let sumC = 0
+  const rows: LedgerDisplayRow[] = openingRow ? [openingRow] : []
+
+  for (const item of sorted) {
+    const bal = item.id != null ? (balanceById.get(String(item.id)) ?? opening) : opening
+    sumD = dAdd(sumD, toNum(item.debit_amount))
+    sumC = dAdd(sumC, toNum(item.credit_amount))
+    rows.push({ ...item, _type: 'normal', balance: bal } as LedgerDisplayRow)
+  }
+
+  const lastBal = sorted.length
+    ? (sorted[sorted.length - 1].id != null
+        ? balanceById.get(String(sorted[sorted.length - 1].id)) ?? opening
+        : opening)
+    : opening
+
+  rows.push({
+    _type: 'view_subtotal',
+    voucher_date: '', voucher_no: '',
+    summary: '当前视图合计',
+    debit_amount: sumD,
+    credit_amount: sumC,
+    balance: lastBal,
+    ...extra,
   })
 
   return rows

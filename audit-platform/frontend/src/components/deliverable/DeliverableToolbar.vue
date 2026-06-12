@@ -3,7 +3,8 @@
     <div class="deliverable-toolbar__filters">
       <el-select v-model="docType" placeholder="文档类型" clearable style="width: 160px" @change="emit('refresh')">
         <el-option label="审计报告正文" value="audit_report" />
-        <el-option label="财务报表" value="financial_report" />
+        <el-option label="财务报表（审定）" value="financial_report" />
+        <el-option label="财务报表（未审）" value="financial_report_unadjusted" />
         <el-option label="附注" value="disclosure_notes" />
         <el-option label="全套包" value="full_package" />
       </el-select>

@@ -54,7 +54,7 @@ class ReportRow(BaseModel):
     indent_level: int = 0
     is_total_row: bool = False
     formula_used: str | None = None
-    source_accounts: list[str] | None = None
+    source_accounts: dict | list | None = None
 
 
 class ReportResponse(BaseModel):

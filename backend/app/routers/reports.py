@@ -202,6 +202,25 @@ async def get_report(
             ]
         raise HTTPException(status_code=404, detail="报表数据不存在，请先生成报表")
 
+    if report_type == FinancialReportType.equity_statement:
+        engine = ReportEngine(db)
+        row_dicts = [
+            {
+                "id": r.id,
+                "row_code": r.row_code,
+                "row_name": r.row_name,
+                "current_period_amount": r.current_period_amount,
+                "prior_period_amount": r.prior_period_amount,
+                "indent_level": r.indent_level,
+                "is_total_row": r.is_total_row,
+                "formula_used": r.formula_used,
+                "source_accounts": r.source_accounts,
+            }
+            for r in rows
+        ]
+        enriched = await engine.enrich_equity_statement_rows(project_id, year, row_dicts)
+        return [ReportRow.model_validate(d) for d in enriched]
+
     return [ReportRow.model_validate(r) for r in rows]
 
 
@@ -546,6 +565,7 @@ class CellEditRequest(BaseModel):
     row_code: str
     column_key: str
     value: float | None = None
+    year_key: str | None = None  # equity matrix: current_year | prior_year
 
 
 class CellEditResponse(BaseModel):
@@ -586,26 +606,60 @@ async def update_report_cell(
     )
     row = result.scalar_one_or_none()
 
+    from app.services.report_engine import (
+        apply_equity_cell_edit_to_source_accounts,
+        parse_equity_cell_column_key,
+    )
+
+    rt_enum = FinancialReportType(report_type)
+    ui_col, parsed_year_key = parse_equity_cell_column_key(
+        body.column_key, body.year_key,
+    )
+    effective_year_key = body.year_key or parsed_year_key
+
     if row:
-        # 更新：如果是主金额列用 current_period_amount，否则存 source_accounts JSON
-        if body.column_key in ('current_period_amount', 'total'):
-            row.current_period_amount = str(body.value) if body.value is not None else None
+        if rt_enum == FinancialReportType.equity_statement:
+            row.source_accounts = apply_equity_cell_edit_to_source_accounts(
+                row.source_accounts,
+                body.column_key,
+                body.value,
+                year_key=effective_year_key,
+            )
+            if ui_col in ("current_period_amount", "total") and effective_year_key == "current_year":
+                row.current_period_amount = (
+                    str(body.value) if body.value is not None else None
+                )
+        elif body.column_key in ("current_period_amount", "total"):
+            row.current_period_amount = (
+                str(body.value) if body.value is not None else None
+            )
         else:
-            # 存入 source_accounts JSON（复用现有 JSONB 列存储矩阵各列值）
-            sa_data = row.source_accounts or {}
+            sa_data = dict(row.source_accounts) if isinstance(row.source_accounts, dict) else {}
             sa_data[body.column_key] = body.value
             row.source_accounts = sa_data
         await db.flush()
     else:
-        # 创建新行
+        sa: dict | None = None
+        cp_amount: str | None = None
+        if rt_enum == FinancialReportType.equity_statement:
+            sa = apply_equity_cell_edit_to_source_accounts(
+                None, body.column_key, body.value, year_key=effective_year_key,
+            )
+            if ui_col in ("current_period_amount", "total") and effective_year_key == "current_year":
+                cp_amount = str(body.value) if body.value is not None else None
+        elif body.column_key in ("current_period_amount", "total"):
+            cp_amount = str(body.value) if body.value is not None else None
+        else:
+            sa = {body.column_key: body.value}
+
         new_row = FinancialReport(
             project_id=project_id,
             year=year,
-            report_type=FinancialReportType(report_type),
+            report_type=rt_enum,
             row_code=body.row_code,
             row_name=body.row_code,
-            current_period_amount=str(body.value) if body.value is not None and body.column_key in ('current_period_amount', 'total') else None,
-            source_accounts={body.column_key: body.value} if body.column_key not in ('current_period_amount', 'total') else None,
+            current_period_amount=cp_amount,
+            source_accounts=sa,
         )
         db.add(new_row)
         await db.flush()

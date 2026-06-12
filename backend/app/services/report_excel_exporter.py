@@ -167,14 +167,16 @@ class ReportExcelExporter:
         else:
             types_to_export = list(REPORT_TYPE_SHEET_NAMES.keys())
 
-        # 4. Load report data from DB
-        report_data = await self._load_report_data(project_id, year, types_to_export)
+        # 4. Load report data（审定读库；未审动态计算四表未审数 + 权益矩阵）
+        report_data = await self._load_report_data(
+            project_id, year, types_to_export, mode=mode,
+        )
 
         # 4b. Load parent (母公司个别) report data for consolidated :parent columns.
         #     母分汇总已作为现成 FinancialReport 存储——读「上级代码」匹配的 standalone
         #     项目的报表行，按 row_code 建索引；缺失则留空（不崩）。
         parent_row_index = await self._load_parent_row_index(
-            project, year, types_to_export
+            project, year, types_to_export, mode=mode,
         )
 
         # 5. Try to load template, fallback to programmatic generation
@@ -217,9 +219,22 @@ class ReportExcelExporter:
         return result.scalar_one_or_none()
 
     async def _load_report_data(
-        self, project_id: UUID, year: int, report_types: list[str]
+        self,
+        project_id: UUID,
+        year: int,
+        report_types: list[str],
+        *,
+        mode: str = "audited",
     ) -> dict[str, list[dict]]:
-        """Load generated report rows from financial_report table."""
+        """加载报表行：审定从 financial_report；未审从四表未审数动态计算。"""
+        if mode == "unadjusted":
+            from app.services.report_engine import ReportEngine
+
+            engine = ReportEngine(self.db)
+            return await engine.get_unadjusted_export_data(
+                project_id, year, report_types,
+            )
+
         data: dict[str, list[dict]] = {}
         for rt in report_types:
             try:
@@ -251,10 +266,17 @@ class ReportExcelExporter:
                 }
                 for r in rows
             ]
+        if "equity_statement" in data and data["equity_statement"]:
+            from app.services.report_engine import ReportEngine
+
+            engine = ReportEngine(self.db)
+            data["equity_statement"] = await engine.enrich_equity_statement_rows(
+                project_id, year, data["equity_statement"],
+            )
         return data
 
     async def _load_parent_row_index(
-        self, project: Any, year: int, report_types: list[str]
+        self, project: Any, year: int, report_types: list[str], *, mode: str = "audited",
     ) -> dict[str, dict]:
         """加载母公司个别报表行索引（``:parent`` 占位/``current_parent`` 坐标用）.
 
@@ -288,7 +310,7 @@ class ReportExcelExporter:
             return {}
 
         parent_data = await self._load_report_data(
-            parent_project.id, year, report_types
+            parent_project.id, year, report_types, mode=mode,
         )
         index: dict[str, dict] = {}
         for _rt, rows in parent_data.items():

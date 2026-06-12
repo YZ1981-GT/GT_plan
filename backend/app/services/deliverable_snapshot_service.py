@@ -55,7 +55,7 @@ class DeliverableSnapshotService:
         tb_hash = await self._snap_svc._compute_trial_balance_hash(project_id, year)
         snapshot_id: str | None = None
 
-        if doc_type == "financial_report":
+        if doc_type in ("financial_report", "financial_report_unadjusted"):
             from app.models.phase13_models import ReportSnapshot
 
             snap_row = await self.db.execute(
