@@ -371,7 +371,7 @@ class TemplateCopier:
 
 ## Data Models
 
-### 新增表：`wp_export_snapshot`（V069）
+### 新增表：`wp_export_snapshot`（V071）
 
 记录每次导出时的快照哈希，用于导入时冲突检测。
 
@@ -395,7 +395,7 @@ CREATE INDEX IF NOT EXISTS idx_wp_export_snapshot_wp_version
     ON wp_export_snapshot(working_paper_id, file_version DESC);
 ```
 
-### 新增表：`wp_version_archive`（V069）
+### 新增表：`wp_version_archive`（V071）
 
 记录版本归档元数据（文件可能已清理但元数据保留）。
 
@@ -822,8 +822,8 @@ def strip_business_data(wb: Workbook, schema: dict) -> Workbook:
 
 ### 迁移文件
 
-- `V069__wp_export_import_tables.sql`：创建 `wp_export_snapshot` + `wp_version_archive` 两表
-- `R069__wp_export_import_tables.sql`：回滚
+- `V071__wp_export_import_tables.sql`：创建 `wp_export_snapshot` + `wp_version_archive` 两表
+- `R071__wp_export_import_tables.sql`：回滚
 
 
 ## Correctness Properties

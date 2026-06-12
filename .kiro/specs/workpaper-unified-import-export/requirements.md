@@ -52,7 +52,7 @@
 #### Acceptance Criteria
 
 1. THE Export_Engine SHALL 在 xlsx 文件的自定义属性(Custom Properties)中写入 wp_code、project_id、file_version、export_timestamp、preparer、reviewer、review_status
-2. THE Export_Engine SHALL 在 docx 文件的 core properties 中写入 wp_code、project_id、file_version、export_timestamp，在 custom properties 中写入 preparer、reviewer、review_status
+2. THE Export_Engine SHALL 在 docx 文件的 core_properties.comments 字段中以 JSON 格式写入全部元数据（wp_code、project_id、file_version、export_timestamp、preparer、reviewer、review_status），以规避 python-docx 对 custom properties 支持有限的问题
 3. WHEN 导入文件时, THE Import_Engine SHALL 从文件属性中提取元数据用于匹配目标底稿
 4. IF 导入文件缺少必要元数据(wp_code 或 project_id), THEN THE Import_Engine SHALL 拒绝导入并返回缺失字段列表
 

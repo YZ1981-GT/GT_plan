@@ -2,8 +2,8 @@
  * htmlRendererRegistry 单测 — V3 收尾 2026-05-28
  *
  * 验证：
- *  1. registry 注册了所有 12 个真实 HTML 组件类型（不含 skip placeholder）
- *  2. HTML_RENDERER_ROUTE_SET 含 13 个（12 + skip）
+ *  1. registry 注册了所有 13 个真实 HTML 组件类型（不含 skip placeholder）
+ *  2. HTML_RENDERER_ROUTE_SET 含 14 个（13 + skip）
  *  3. icon / label / emits 字段非空
  *  4. D 5 子模式共享同一组件（GtDForm）
  *  5. isHtmlComponentType / getRendererEntry / getSheetIcon 行为正确
@@ -22,7 +22,7 @@ import {
 } from '../htmlRendererRegistry'
 
 describe('htmlRendererRegistry — 注册表完整性', () => {
-  it('注册表包含 12 个真实 HTML 组件类型（不含 skip）', () => {
+  it('注册表包含 13 个真实 HTML 组件类型（不含 skip）', () => {
     const expected: HtmlComponentType[] = [
       'a-program-console',
       'b-index',
@@ -36,8 +36,9 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'h-static-doc',
       'custom',
       'audit-sheet',
+      'bad-debt-sheet',
     ]
-    expect(HTML_RENDERER_REGISTRY.size).toBe(12)
+    expect(HTML_RENDERER_REGISTRY.size).toBe(13)
     for (const ct of expected) {
       expect(HTML_RENDERER_REGISTRY.has(ct)).toBe(true)
     }
@@ -104,13 +105,13 @@ describe('htmlRendererRegistry — emit 列表', () => {
 
 describe('htmlRendererRegistry — 路由集合', () => {
   it('HTML_COMPONENT_TYPE_SET 仅含 registry 注册类型（不含 skip）', () => {
-    expect(HTML_COMPONENT_TYPE_SET.size).toBe(12)
+    expect(HTML_COMPONENT_TYPE_SET.size).toBe(13)
     expect(HTML_COMPONENT_TYPE_SET.has('a-program-console')).toBe(true)
     expect(HTML_COMPONENT_TYPE_SET.has('skip' as any)).toBe(false)
   })
 
-  it('HTML_RENDERER_ROUTE_SET 含 13 个（12 + skip）', () => {
-    expect(HTML_RENDERER_ROUTE_SET.size).toBe(13)
+  it('HTML_RENDERER_ROUTE_SET 含 14 个（13 + skip）', () => {
+    expect(HTML_RENDERER_ROUTE_SET.size).toBe(14)
     expect(HTML_RENDERER_ROUTE_SET.has('a-program-console')).toBe(true)
     expect(HTML_RENDERER_ROUTE_SET.has('skip')).toBe(true)
     expect(HTML_RENDERER_ROUTE_SET.has('univer')).toBe(false)

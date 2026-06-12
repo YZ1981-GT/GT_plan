@@ -33,6 +33,7 @@ VALID_COMPONENT_TYPES: set[str] = {
     "h-static-doc",
     "custom",
     "audit-sheet",
+    "bad-debt-sheet",
     "univer",
     "skip",
 }
@@ -72,6 +73,20 @@ _F_SUB_ROUTING: dict[str, str] = {
     "F-审定表": "audit-sheet",
     "F-明细表": "audit-sheet",
 }
+
+# ─── sheet 名级专用路由（优先于 class_code 派生） ────────────────────────────
+# 坏账准备明细表（D2-3 等）的 class_code 是共享的 "F-明细表"，无法靠 class_code
+# 区分。但坏账准备明细表是两层嵌套结构专用底稿（计提类别父行 → 明细子行 → 合计），
+# 必须路由到专用组件 bad-debt-sheet（GtBadDebtSheet）。故按 sheet 名前缀匹配，
+# 优先于 class_code 派生。
+def _match_sheet_name_override(sheet_name: str | None) -> str | None:
+    """按 sheet 名匹配专用 componentType（None 表示无专用路由，走 class_code 派生）。"""
+    if not sheet_name:
+        return None
+    # 坏账准备明细表（各循环的坏账准备嵌套明细表，如 D2-3/D1-4/G2-3 等）
+    if sheet_name.startswith("坏账准备明细表"):
+        return "bad-debt-sheet"
+    return None
 
 
 @dataclass
@@ -304,12 +319,20 @@ def derive_component_type(classification: ClassificationResult) -> str:
     - H- (辅助说明) → 'h-static-doc'
     - I- (占位) → 'skip'
 
+    sheet 名级专用路由（优先于 class_code 派生）：
+    - 坏账准备明细表* → 'bad-debt-sheet'（两层嵌套结构专用组件）
+
     CRITICAL: 禁止 Univer 兜底！无归类时抛异常而非返回 'univer'。
     """
     class_code = classification.class_code
 
     if class_code and class_code.upper().startswith("CUSTOM"):
         return "custom"
+
+    # sheet 名级专用路由优先（坏账准备明细表嵌套结构 → bad-debt-sheet）
+    sheet_override = _match_sheet_name_override(classification.sheet_name)
+    if sheet_override:
+        return sheet_override
 
     if not class_code:
         raise ClassificationNotFoundError(

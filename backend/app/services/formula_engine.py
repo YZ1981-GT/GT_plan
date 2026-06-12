@@ -1349,19 +1349,152 @@ class PREVExecutor:
     pass
 
 
+# ─── D2-3 坏账准备明细表嵌套结构寻址 ───────────────────────────────────────────
+# 标识 D2-3 底稿的 sheet 名标记（第二参含此子串则走 NestedTableService 而非 parsed_data）
+_D23_SHEET_MARKER = "坏账准备明细表"
+
+# D2-3 字段中文名 → bad_debt_detail_rows 金额列（13 列语义 B~N + 合计/期末余额别名）
+_D23_FIELD_TO_COLUMN: dict[str, str] = {
+    # 期初系列
+    "期初未审数": "amount_b",
+    "期初账项调整": "amount_c",
+    "重分类调整(期初)": "amount_d",
+    "重分类调整（期初）": "amount_d",
+    "重分类期初": "amount_d",
+    "期初审定数": "amount_e",
+    # 本期增加
+    "本期计提": "amount_f",
+    "本期计提合计": "amount_f",
+    "其他增加": "amount_g",
+    # 本期减少
+    "本期转回": "amount_h",
+    "本期转回合计": "amount_h",
+    "核销": "amount_i",
+    "核销合计": "amount_i",
+    "其他减少": "amount_j",
+    # 期末系列
+    "期末未审数": "amount_k",
+    "期末账项调整": "amount_l",
+    "重分类调整(期末)": "amount_m",
+    "重分类调整（期末）": "amount_m",
+    "重分类期末": "amount_m",
+    "期末审定数": "amount_n",
+    "期末余额": "amount_n",
+}
+
+
+def _normalize_provision_name(name: str) -> str:
+    """归一父行/计提方法中文名用于模糊匹配：去前缀"按"、空白与全/半角括号差异。"""
+    out = (name or "").strip()
+    if out.startswith("按"):
+        out = out[1:]
+    return out.replace(" ", "").replace("　", "")
+
+
 class WPExecutor:
     """WP 函数执行器：从底稿 parsed_data 取数
 
-    语法: WP('E1','审定数')
-    从 WorkingPaper 的 parsed_data 中按 wp_code 和列名取数。
+    语法:
+    - 两参列名/单元格: WP('E1','审定数') / WP('D1-1','B5')
+    - 三参 D2-3 嵌套寻址（合计级）: WP('D2','坏账准备明细表D2-3','本期计提合计')
+    - 三参 D2-3 嵌套寻址（父行级）: WP('D2','坏账准备明细表D2-3','单项评估计提.期末审定数')
 
-    Requirements: 39.1
+    两参时从 WorkingPaper 的 parsed_data 中按 wp_code 和列名取数；
+    第二参含「坏账准备明细表」标记时走 NestedTableService（D2-3 专用表 bad_debt_detail_rows）。
+
+    Requirements: 9.1, 9.2, 9.3, 9.4, 39.1
     """
 
     @staticmethod
-    async def execute(db, project_id, wp_code: str, column: str = "审定数"):
-        """Fetch value from workpaper parsed_data."""
+    async def _resolve_d23(
+        db, project_id, wp_code: str, sheet_name: str, field: str | None
+    ):
+        """D2-3 坏账准备明细表嵌套寻址：从 bad_debt_detail_rows 取汇总/父行值。
+
+        - 合计级：field ∈ {本期计提合计/本期转回合计/核销合计/期末余额/13 列中文名} → Summary_Row 对应金额列
+        - 父行级：field = "{计提方法中文名}.{字段名}" → 匹配 provision_method 的父行对应金额列
+
+        找不到对应底稿/字段/父行时返回 D("0")（与现有 WPExecutor 容错一致）。
+
+        Requirements: 9.1, 9.2, 9.4
+        """
         from decimal import Decimal as D
+
+        try:
+            import sqlalchemy as sa
+
+            from app.models.bad_debt_models import (
+                PROVISION_METHOD_LABELS,
+                BadDebtDetailRow,
+                ProvisionMethod,
+            )
+            from app.models.workpaper_models import WpIndex
+            from app.services.bad_debt_nested_table_service import NestedTableService
+
+            field_str = (field or "").strip()
+            if not field_str:
+                return D("0")
+
+            # 解析 wp_index_id：优先匹配 wp_code 一致的底稿，否则取项目内任意有坏账行的底稿
+            rows_q = await db.execute(
+                sa.select(BadDebtDetailRow.wp_index_id, WpIndex.wp_code)
+                .join(WpIndex, BadDebtDetailRow.wp_index_id == WpIndex.id)
+                .where(WpIndex.project_id == project_id)
+                .distinct()
+            )
+            candidates = list(rows_q.all())
+            if not candidates:
+                return D("0")
+            wp_index_id = None
+            for idx_id, code in candidates:
+                if code == wp_code:
+                    wp_index_id = idx_id
+                    break
+            if wp_index_id is None:
+                wp_index_id = candidates[0][0]
+
+            tree = await NestedTableService(db).get_tree(wp_index_id)
+
+            # 父行级引用："{计提方法}.{字段}"
+            if "." in field_str:
+                parent_key, _, sub_field = field_str.partition(".")
+                col = _D23_FIELD_TO_COLUMN.get(sub_field.strip())
+                if col is None:
+                    return D("0")
+                norm_key = _normalize_provision_name(parent_key)
+                for parent in tree.parents:
+                    label = _normalize_provision_name(parent.provision_method_label)
+                    row_label = _normalize_provision_name(parent.row_label)
+                    if norm_key and (
+                        norm_key == label
+                        or norm_key == row_label
+                        or norm_key in label
+                        or label in norm_key
+                        or norm_key in row_label
+                    ):
+                        val = getattr(parent.amounts, col, None)
+                        return D(str(val)) if val is not None else D("0")
+                return D("0")
+
+            # 合计级引用：Summary_Row 对应金额列
+            col = _D23_FIELD_TO_COLUMN.get(field_str)
+            if col is None:
+                return D("0")
+            val = getattr(tree.summary.amounts, col, None)
+            return D(str(val)) if val is not None else D("0")
+        except Exception:
+            return D("0")
+
+    @staticmethod
+    async def execute(
+        db, project_id, wp_code: str, column: str = "审定数", field: str | None = None
+    ):
+        """Fetch value from workpaper parsed_data, or D2-3 nested table when applicable."""
+        from decimal import Decimal as D
+
+        # D2-3 嵌套寻址：第二参含「坏账准备明细表」标记时走 NestedTableService
+        if _D23_SHEET_MARKER in (column or ""):
+            return await WPExecutor._resolve_d23(db, project_id, wp_code, column, field)
 
         try:
             import sqlalchemy as sa

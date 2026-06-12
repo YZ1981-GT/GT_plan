@@ -115,6 +115,15 @@ from app.models.consol_note_data_models import ConsolNoteData  # noqa: F401
 from app.models.editing_lock_models import EditingLock  # noqa: F401
 from app.models.confirmation_models import Confirmation, ConfirmationType, ConfirmationStatus  # noqa: F401
 from app.models.account_package_models import AccountPackageProgramStatus  # noqa: F401
+from app.models.bad_debt_models import (  # noqa: F401
+    BadDebtDetailRow,
+    ProvisionMethod,
+    PROVISION_METHOD_LABELS,
+)
+from app.models.wp_export_models import (  # noqa: F401
+    WpExportSnapshot,
+    WpVersionArchive,
+)
 
 __all__ = [
     # --- base ---
@@ -242,4 +251,11 @@ __all__ = [
     "ConfirmationStatus",
     # --- 科目工作包程序状态 (V063) ---
     "AccountPackageProgramStatus",
+    # --- 坏账准备明细表嵌套子表 D2-3 (V070) ---
+    "BadDebtDetailRow",
+    "ProvisionMethod",
+    "PROVISION_METHOD_LABELS",
+    # --- 底稿导出快照与版本归档 (V071) ---
+    "WpExportSnapshot",
+    "WpVersionArchive",
 ]

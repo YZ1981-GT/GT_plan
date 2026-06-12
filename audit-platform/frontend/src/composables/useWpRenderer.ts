@@ -59,6 +59,7 @@ export type WpComponentType =
   | 'h-static-doc'
   | 'custom'
   | 'audit-sheet'
+  | 'bad-debt-sheet'
   | 'univer'
   | 'skip'
 

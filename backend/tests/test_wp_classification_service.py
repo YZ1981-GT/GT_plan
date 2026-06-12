@@ -117,11 +117,32 @@ class TestDeriveComponentType:
         result = derive_component_type(_make_classification("F-审定表"))
         assert result == "audit-sheet"
 
-    def test_f_明细表_still_univer(self):
-        """其余 F- class_code 仍 fallback 到 univer。"""
-        assert derive_component_type(_make_classification("F-明细表")) == "univer"
+    def test_f_明细表_audit_sheet(self):
+        """F-明细表 → audit-sheet（_F_SUB_ROUTING 精确匹配）；其余 F- 仍 fallback univer。"""
+        assert derive_component_type(_make_classification("F-明细表")) == "audit-sheet"
         assert derive_component_type(_make_classification("F-分析表")) == "univer"
         assert derive_component_type(_make_classification("F-汇总表")) == "univer"
+
+    def test_bad_debt_sheet_name_override(self):
+        """坏账准备明细表 sheet（class_code=F-明细表，共享）→ bad-debt-sheet（sheet 名级专用路由优先）。"""
+        result = derive_component_type(
+            _make_classification("F-明细表", wp_code="D2", sheet_name="坏账准备明细表D2-3")
+        )
+        assert result == "bad-debt-sheet"
+
+    def test_bad_debt_sheet_name_override_other_cycle(self):
+        """其他循环坏账准备明细表（如 G2-3）同样路由到 bad-debt-sheet。"""
+        result = derive_component_type(
+            _make_classification("F-明细表", wp_code="G2", sheet_name="坏账准备明细表G2-3")
+        )
+        assert result == "bad-debt-sheet"
+
+    def test_non_bad_debt_detail_sheet_not_hijacked(self):
+        """非坏账准备的普通明细表 sheet 不被 sheet 名级覆盖劫持，仍走 class_code 派生（F-明细表 → audit-sheet）。"""
+        result = derive_component_type(
+            _make_classification("F-明细表", wp_code="D2", sheet_name="应收账款明细表D2-2")
+        )
+        assert result == "audit-sheet"
 
     def test_g_univer(self):
         result = derive_component_type(_make_classification("G-测算"))

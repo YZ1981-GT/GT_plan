@@ -21,18 +21,33 @@ from app.models.workpaper_models import WorkingPaper, WpFormula
 
 logger = logging.getLogger(__name__)
 
-# WP('D11','B5') / WP("D11","审定数")
+# WP('D11','B5') / WP("D11","审定数") / WP('D2','坏账准备明细表D2-3','本期计提合计')（三参 D2-3 嵌套寻址）
 _WP_REF_RE = re.compile(
-    r"WP\s*\(\s*['\"]([^'\"]+)['\"]\s*,\s*['\"]([^'\"]+)['\"]\s*\)",
+    r"WP\s*\(\s*['\"]([^'\"]+)['\"]\s*,\s*['\"]([^'\"]+)['\"]\s*"
+    r"(?:,\s*['\"]([^'\"]+)['\"]\s*)?\)",
     re.IGNORECASE,
 )
 
 
 def extract_wp_refs(expression: str) -> list[tuple[str, str]]:
-    """从表达式提取 (wp_code, second_arg) 列表。"""
+    """从表达式提取 (wp_code, second_arg) 列表。
+
+    - 两参 ``WP('D11','B5')`` → ``(D11, B5)``。
+    - 三参 D2-3 嵌套 ``WP('D2','坏账准备明细表D2-3','本期计提合计')`` →
+      ``(D2, 坏账准备明细表D2-3.本期计提合计)``，便于按"底稿+sheet+字段"识别依赖。
+    """
     if not expression:
         return []
-    return [(m.group(1).strip(), m.group(2).strip()) for m in _WP_REF_RE.finditer(expression)]
+    refs: list[tuple[str, str]] = []
+    for m in _WP_REF_RE.finditer(expression):
+        code = m.group(1).strip()
+        second = m.group(2).strip()
+        third = m.group(3)
+        if third is not None:
+            refs.append((code, f"{second}.{third.strip()}"))
+        else:
+            refs.append((code, second))
+    return refs
 
 
 def expression_references_cell(

@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 _TB_PATTERN = re.compile(r"TB\('([^']+)','([^']+)'\)")
 _SUM_TB_PATTERN = re.compile(r"SUM_TB\('([^']+)','([^']+)'\)")
+# 三参 WP（D2-3 嵌套寻址）须先于两参匹配：WP('D2','坏账准备明细表D2-3','本期计提合计')
+_WP3_PATTERN = re.compile(r"WP\('([^']+)','([^']+)','([^']+)'\)")
 _WP_PATTERN = re.compile(r"WP\('([^']+)','([^']+)'\)")
 
 _COLUMN_MAP = {
@@ -118,7 +120,23 @@ async def evaluate_wp_formula_expression(
         pass
 
     expr = raw
+    # 三参 WP（D2-3 嵌套寻址）先处理，避免被两参正则截断
+    for match in _WP3_PATTERN.finditer(raw):
+        wp_code, sheet_name, field = match.group(1), match.group(2), match.group(3)
+        try:
+            val = await WPExecutor.execute(
+                db, project_id, wp_code, sheet_name, field=field
+            )
+        except Exception as e:
+            logger.warning("WP 三参求值失败 %s: %s", match.group(0), e)
+            val = Decimal("0")
+            errors.append(f"{match.group(0)}: {e}")
+        expr = expr.replace(match.group(0), str(val), 1)
+
     for match in _WP_PATTERN.finditer(raw):
+        # 跳过已被三参正则消费的片段（三参形态在 raw 中仍可被两参 finditer 命中前两参）
+        if match.group(0) not in expr:
+            continue
         wp_code, col = match.group(1), match.group(2)
         try:
             val = await WPExecutor.execute(db, project_id, wp_code, col)

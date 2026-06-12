@@ -107,8 +107,17 @@ inclusion: always
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、知识库删旧 KnowledgeService；向量存储选 pgvector；3 处联动断裂已修（知识文件→索引/模板 JSON→registry/报表主模板→克隆 stale）
 - 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
-### git 状态（2026-06-10，HEAD `07ad1890` 已推送）
-- 分支 `work/2026-05-30-wp-specs`；本日 3 commits：`0cb32c12`(deliverable-lineage+zdt+cleanup 180files) → `0bfe0467`(auth+SSE fix 9files) → `07ad1890`(disclosure notes UI 11files)
+### git 状态（2026-06-10，HEAD `3fb3b86f` 已 ff 拉取远程最新）
+- commit `e9ef8d9b` chore: 报表映射递减项(V069)落地 + 清理一次性脚本/POC产物（39 files, +638/-5720）；**backend/scripts 已清理**：删全部 `_` 前缀一次性脚本/dryrun产物 + 已被取代的 POC 脚本（prepare_*_poc/tag_note_section_poc/tag_note_sections/analyze_note_* 等），仅留 `seed/_seed_load_test_users.py`（6000 压测待办用）；推送后远程又有新 commit，**本地 stash→ff 至 `3fb3b86f`→pop** 合入：新增 spec `workpaper-bad-debt-nested-structure` + `workpaper-unified-import-export`（均三件套，未实施）+ disclosure/report_excel_exporter 改动；**铁律：PowerShell 下 `git push`/`git fetch` 常因 git 把进度写 stderr 报 exit code 1 但实为成功，须看 `xxx..yyy -> branch` 输出 + 二次 `rev-list --count` 确认**
+
+### git 状态（2026-06-10，HEAD `0cb32c12`→已 ff 拉取至 `07ad1890`）
+- 分支 `work/2026-05-30-wp-specs`；commit `0cb32c12` feat: deliverable-lineage-and-writeback + zero-downtime-deployment + spec cleanup（180 files, +19496/-557）；2026-06-10 本地 ff 拉取远程 5 commit 至 `07ad1890`（含 audit-report-template-integration spec + 报告模板资产）；**sign-convention spec 已归档至 `_archive/05-business-features/`**
+
+### git 状态（2026-06-08，HEAD `c0cca2e9` 已推 origin/work/2026-05-30-wp-specs）
+- 2026-06-08 push 前 fetch 发现远程领先 2 commit（931b158d，含 OnlyOffice SSRF 修复+`审计报告模板正文/` 目录），stash→ff 合入→pop（memory.md 自动合并无冲突）→提交 sign-convention 全量（39 files +5717/-163，commit c0cca2e9）→推送功能分支成功；pre-push 钩子 single 模式通过
+
+### git 状态（2026-06-07，HEAD `8d17ec7b` 已 ff 拉取远程最新）
+- 分支 `work/2026-05-30-wp-specs`；2026-06-07 三次拉取远程（HEAD `dd72db2c`），合入 sign-convention 借贷方向（V064 direction_fields + DirectionOverride ORM + sign_convention router + direction_derivation/sign_anomaly_detector）+ balance-diagnostics 平衡诊断（cause_builders/diagnostics_service/report_line_jump/unmatched_preset + BalanceDiagnosticsDialog.vue）+ ledger-import P1（adapter_selection/confirmed_mapping_dto/submit_gate/converter/writer + ColumnMappingEditor 重构）；**当前最高迁移 V064**
 - **✅ wp_render_schema_service.py `_SCHEMA_DIR` 路径已修正**：远程迁移后该 service 仍引用旧路径导致底稿渲染 schema 全部 FileNotFoundError（C-D1-disclosure 等 yaml 找不到）→ 改为 `data/ledger_adapters/wp_render_schema`；其余 tests/scripts 引用旧路径仅影响开发不影响运行时
 - 旧里程碑：`8ed2d45c`=audit-sheet-editable 归档 / `350ff25d`=5 tech specs 归档 / `0c0bae1a`=5 tech specs 实施代码
 - **schema drift 二次修复（V051）**：方向=orm_extra（ORM 有 DB 缺），51 列 ALTER ADD + 2 enum ADD VALUE + 列级 KNOWN_COLUMN_ALLOWLIST（cell_annotations.sheet_name/adjustments.status/projects.template_version_id）+ 表级加 linkage_audit_log/seed_load_history；evidence_hash_checks.export_id 保持 VARCHAR（ORM 业务定义非 UUID）
@@ -147,13 +156,16 @@ inclusion: always
 - **🟢 附注多表格 per-table export toggle 已实现（2026-06-10）**：前端 DisclosureEditor 多表格 tab 栏右侧⚙按钮→popover checkbox 勾选导出表格；数据存 `table_data._tables[N].export_enabled`(JSONB 无需迁移，默认 true)；后端 `NoteWordExporter._note_tables()` + `_render_note_content()` 两处过滤 `export_enabled=False` 跳过导出
 - **🟡 无感版本迭代**：zero-downtime-deployment spec ✅ 已归档（V068）；剩余待定=生产 Docker Compose+nginx 单机滚动 vs K8s，用户决策后出 spec
 - **✅ 2026-06-07~06-10 完成事项已迁入 `#dev-history`**：zero-downtime-deployment / ledger 三 spec / 导入系列修复 / deliverable-center / report-view-slimdown / 符号约定统一 / 去重加固 / audit-report-template 代码任务 / 附注打标+template 模式 / 报表模板占位 → 详见 dev-history.md "2026-06-07~06-10" 节
-- **🟢 spec 状态（2026-06-11）**：active=3（audit-report-template-integration 180/184 剩 4 项运维 + deliverable-lineage-and-writeback 92/92 completed + workpaper-unified-import-export requirements→design→tasks 三件套已出）/ archived=137；INDEX.md 待同步
+- **🟢 spec 状态（2026-06-11）**：active=3（audit-report-template-integration 180/184 剩 4 项运维 + deliverable-lineage-and-writeback 92/92 completed + workpaper-unified-import-export **全部 27 任务组完成** 80 tests passed）/ archived=137；INDEX.md 待同步
 - **🔴→🟡 报表新占位代码支持（2026-06-11 实证）**：续表✅+imp✅+note_ref✅，**仅剩 `{{eq:}}` 权益变动表待矩阵存储方案**
 - **🟡 附注模板 SECTION 块内部细化待做**：~600 块×4 变体，待用户确认启动
 - **已知 Bug**：辽宁卫生服务序时账 debit==credit / 明细账翻页余额第 2 页起错 / 试算差额 44M（源数据符号问题）
 - **外部依赖**：LLM embedding / 合并 UAT / GitHub 默认分支改 main / 钉集成
-- **待建 spec**：consol_disclosure_service 瘦身(1736行) / migration_runner 瘦身(1026行) / workpaper-content-semantic-system；已出三件套待实施=workpaper-unified-import-export(V069) + workpaper-bad-debt-nested-structure(V070,基于真实模板 D2-3 父行/子行/合计嵌套)
-- **🔴 workpaper-unified-import-export spec 实施前必修 design**：复盘实证现有 `wp_xlsx_export_service`(export_workpaper_xlsx 4路径写入+公式保留+Semaphore10)/`WpUploadService`(upload_file 版本冲突+解析+事件+云同步+版本链)/`WpDownloadService`(download_pack ZIP+{cycle}/{wp_code} 目录)/`offline_conflict_service`(字段级冲突)/`test_xlsx_export_roundtrip` 已覆盖 spec 设计的 export/import/batch/conflict/roundtrip 大部分——**真正缺失仅 4 项**：①MetadataCodec 元数据嵌入提取 ②SHA-256 快照哈希冲突(现仅比版本号) ③结构化校验报告 FormatValidator ④跨项目 TemplateCopier。design Components 须改为"复用扩展现有服务"而非新建，可砍 ~40% 重复任务
+- **待建 spec**：consol_disclosure_service 瘦身(1736行) / migration_runner 瘦身(1026行) / workpaper-content-semantic-system
+- **🟢 workpaper-bad-debt-nested-structure 实施完成（2026-06-11，13/14 任务组，仅 11.3 Playwright UI 待接线后验证）**：D2-3 坏账嵌套子表，V070(bad_debt_detail_rows 两层自引用树+provision_method 唯一偏索引+乐观锁+13金额列)；产物=bad_debt_models/auto_sum(三级汇总+平衡公式 N=E+F+G-H-I-J+L+M)/nested_table_service(CRUD+乐观锁+级联+serialize/deserialize+validate_integrity含TB1231比对)/prefill_service(TB1231仅空值预填返建议不落库)/aje_generator(补提/冲回语义非金额符号,复用direction_resolver)/formula_engine WPExecutor 扩展D2-3寻址/bad_debt_rows router(10端点,静态路径先于{row_id})/GtBadDebtSheet.vue(el-table层级+展折+右键+只读+GT紫)；**108后端(12PBT max5)+7前端vitest全绿**。坑:fsWrite 个别新文件0字节不落盘→换名写再python shutil.copyfile;子代理 BAD_DECRYPT/TLS 中断但文件多已落盘重连查证即可
+- **🟢 bad-debt 组件接线缺口已修复（2026-06-11，复盘第1条闭环）**：①后端 `wp_classification_service` 加 `bad-debt-sheet` 到 VALID_COMPONENT_TYPES + `_match_sheet_name_override`（sheet 名以"坏账准备明细表"开头→bad-debt-sheet，**优先于 class_code 派生**；因 D2-3 真实 class_code=`F-明细表` 与普通明细表共享，不能整类 remap 会劫持，故按 sheet 名级专用路由）②`resolve_wp_index_id(db,wp_id)` 解决 id 语义冲突（GtWpRenderer 传 working_paper.id 但 bad_debt 链按 wp_index_id→router 各端点入口先查 WorkingPaper.wp_index_id 命中用解析值/查不到回退原值，双向兼容前端渲染链与直调测试）③前端 htmlRendererRegistry 注册 bad-debt-sheet(💰)+useWpRenderer WpComponentType+GtBadDebtSheet props 加可选 sheetName/readonly/schema/htmlData 接收透传 ④清理 fsWrite 0字节坑遗留 `_GtBadDebtSheetSrc.vue` 孤儿+components.d.ts stale 引用。**158 后端+36 前端测试全绿**。**11.3 Playwright 部分验证**：真实启动 9980 后端 curl 全部 bad-debt 端点返 401 非 404→路由注册+id 解析接线生效已确认；UI 端到端因 ①vite dev proxy 端口冲突(3030 被占前端起 3031，旧后端实例干扰 proxy 转发致前端 fetch 404 但直连 9980 是 401) ②需有 D2-3 实际数据的项目 两个环境约束未做，按不假绿 11.3 保持未完成，待干净环境(单一 start-dev)手动验证
+- **🟡 bad-debt spec 剩余改进项（非阻塞，后续排期）**：①科目编码 1231坏账准备/6701信用减值损失硬编码在 service→多企业不通用，应走 account_chart_service 编码+名称双保险 ②12 条 PBT 全用 in-process SQLite，唯一偏索引/级联/乐观锁建议补真 PG 冒烟 ③前端"上方/下方插入子行"是近似实现(都调新增到末尾，后端无 position 排序端点)，要么补端点要么去掉菜单项 ④迁移号应实施第一步才分配(spec 生成时快照易撞号，本次 V069 被占临时改 V070/V071)
+- **✅ workpaper-unified-import-export 全部实施完成（2026-06-11）**：8 Phase 27 任务组；产物=V071 迁移(wp_export_snapshot+wp_version_archive)+ORM+DTO 10 类+service 层 9 模块(MetadataCodec/serialization/export_engine/import_engine/format_validator/version_manager/conflict_detector/batch_packager/template_copier)+router 2 文件 8 端点(已注册 workpaper registry)+前端 7 Vue 组件+1 composable(useWpExportImport)；**80 测试全绿**（25 PBT max5 + 17 E2E + 9 unit + 6 vitest + 23 其他）；修 import 路径 bug（backend. 前缀→app.）+ hypothesis 策略控制字符过滤；**P0-P3 修复已落地**：①event_bus.publish(WORKPAPER_SAVED)已加 ②FormatValidator 已传 render_schema ③version_manager raw SQL→ORM ④ConflictDetector 统一集成 ⑤requirements 3.2 docx 对齐；**in-process httpx 联调通过**（export-with-metadata 200 OK，TemplateNotFoundError 回退空白 wb 生效，5272bytes valid xlsx+RFC5987中文名+snapshot_hash写入DB）；**待做**=前端7组件接入页面+import-enhanced联调
 ## 操作铁律（详见 `#conventions`）
 
 - **三层一致校验**：DB 迁移 + ORM `Mapped[]` + service 方法，任一缺失即伪绿
