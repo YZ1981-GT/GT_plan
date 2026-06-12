@@ -107,7 +107,7 @@ inclusion: always
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、知识库删旧 KnowledgeService；向量存储选 pgvector；3 处联动断裂已修（知识文件→索引/模板 JSON→registry/报表主模板→克隆 stale）
 - 详细盘点 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
-### git 状态（2026-06-12，HEAD `5047ffe4` 已推 origin/work/2026-05-30-wp-specs）
+### git 状态（2026-06-12，HEAD `88925d60` 已推 origin/work/2026-05-30-wp-specs）
 - 分支 `work/2026-05-30-wp-specs`；commit `5047ffe4` feat: 底稿导入导出前端接入+Playwright 4 passed；前序 `eef152dc` bad-debt D2-3 验证；远程 `origin/HEAD origin/master` 落后 main 298 commit 需改默认分支
 - 2026-06-02~06-10 修复明细（B-Index/编制表头/render-config/架构流程图/循环目录/手册视图/富文本编辑器等）已归档 `#dev-history`
 
