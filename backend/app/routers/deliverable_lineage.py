@@ -157,7 +157,7 @@ async def _check_terminal_state(
     # Query WordExportTask.status
     result = await db.execute(
         text(
-            "SELECT status FROM word_export_tasks WHERE id = :tid"
+            "SELECT status FROM word_export_task WHERE id = :tid"
         ),
         {"tid": str(word_export_task_id)},
     )

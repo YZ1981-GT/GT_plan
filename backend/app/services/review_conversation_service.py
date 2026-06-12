@@ -75,13 +75,18 @@ class ReviewConversationService:
             from app.services.event_bus import event_bus
             conv = await db.get(ReviewConversation, conversation_id)
             if conv:
-                await event_bus.publish({
-                    "type": "REVIEW_MESSAGE",
-                    "project_id": str(conv.project_id),
-                    "conversation_id": str(conversation_id),
-                    "sender_id": str(sender_id),
-                    "preview": content[:100],
-                })
+                # broadcast_raw：纯 SSE 推送，不走 EventPayload schema / 不触发 _handlers
+                # （早期误传裸 dict 给 publish() 会在 _build_dedup_key 抛 AttributeError
+                #  被静默吞掉 → 复核消息 SSE 从未送达前端）
+                event_bus.broadcast_raw(
+                    "REVIEW_MESSAGE",
+                    {
+                        "project_id": str(conv.project_id),
+                        "conversation_id": str(conversation_id),
+                        "sender_id": str(sender_id),
+                        "preview": content[:100],
+                    },
+                )
         except Exception:
             pass
 

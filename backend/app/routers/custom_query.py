@@ -1190,7 +1190,15 @@ async def _query_report(db, pid, year, filters, limit):
 
 
 async def _query_trial_balance(db, pid, year, filters, limit):
-    query = "SELECT account_code, account_name, opening_balance, closing_balance, debit_amount, credit_amount FROM trial_balance WHERE project_id = :pid AND year = :y"
+    # 真实列（audit_platform_models.TrialBalance）：standard_account_code / account_name /
+    # unadjusted_amount / aje_adjustment / audited_amount / opening_balance。
+    # 旧实现误查 account_code/closing_balance/debit_amount/credit_amount 四个不存在的列，
+    # 导致"试算表明细"与合并单位树 tb_detail 叶子点击 100% 抛 UndefinedColumn 被吞成 error。
+    query = (
+        "SELECT standard_account_code, account_name, opening_balance, "
+        "unadjusted_amount, aje_adjustment, audited_amount "
+        "FROM trial_balance WHERE project_id = :pid AND year = :y"
+    )
     params: dict = {"pid": pid, "y": year, "lim": limit}
     if filters.get("account_name"):
         query += " AND account_name LIKE :an"
@@ -1198,10 +1206,27 @@ async def _query_trial_balance(db, pid, year, filters, limit):
     if filters.get("company_code"):
         query += " AND company_code = :cc"
         params["cc"] = filters["company_code"]
-    query += " ORDER BY account_code LIMIT :lim"
+    query += " ORDER BY standard_account_code LIMIT :lim"
     result = await db.execute(text(query), params)
-    rows = [{"account_code": r[0], "account_name": r[1], "opening_balance": float(r[2]) if r[2] else None, "closing_balance": float(r[3]) if r[3] else None, "debit_amount": float(r[4]) if r[4] else None, "credit_amount": float(r[5]) if r[5] else None} for r in result.fetchall()]
-    return {"rows": rows, "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"], "total": len(rows)}
+    rows = [
+        {
+            "standard_account_code": r[0],
+            "account_name": r[1],
+            "opening_balance": float(r[2]) if r[2] is not None else None,
+            "unadjusted_amount": float(r[3]) if r[3] is not None else None,
+            "aje_adjustment": float(r[4]) if r[4] is not None else None,
+            "audited_amount": float(r[5]) if r[5] is not None else None,
+        }
+        for r in result.fetchall()
+    ]
+    return {
+        "rows": rows,
+        "columns": [
+            "standard_account_code", "account_name", "opening_balance",
+            "unadjusted_amount", "aje_adjustment", "audited_amount",
+        ],
+        "total": len(rows),
+    }
 
 
 async def _query_tb_summary(db, pid, year, filters, limit):
@@ -1248,13 +1273,38 @@ async def _query_disclosure(db, pid, year, filters, limit):
 
 
 async def _query_adjustments(db, pid, year, filters, limit):
+    # 真实列（audit_platform_models.Adjustment）：adjustment_no（非 entry_number）/
+    # review_status（非 status）。account_name/debit_amount/credit_amount 确实存在（单行式分录）。
     adj_type = filters.get("adjustment_type", "AJE")
     result = await db.execute(
-        text("SELECT entry_number, account_name, debit_amount, credit_amount, description, status FROM adjustments WHERE project_id = :pid AND year = :y AND adjustment_type = :at AND is_deleted = false ORDER BY entry_number LIMIT :lim"),
+        text(
+            "SELECT adjustment_no, account_name, debit_amount, credit_amount, "
+            "description, review_status::text "
+            "FROM adjustments WHERE project_id = :pid AND year = :y "
+            "AND adjustment_type = :at AND is_deleted = false "
+            "ORDER BY adjustment_no LIMIT :lim"
+        ),
         {"pid": pid, "y": year, "at": adj_type, "lim": limit},
     )
-    rows = [{"entry_number": r[0], "account_name": r[1], "debit_amount": float(r[2]) if r[2] else None, "credit_amount": float(r[3]) if r[3] else None, "description": r[4], "status": r[5]} for r in result.fetchall()]
-    return {"rows": rows, "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description", "status"], "total": len(rows)}
+    rows = [
+        {
+            "adjustment_no": r[0],
+            "account_name": r[1],
+            "debit_amount": float(r[2]) if r[2] is not None else None,
+            "credit_amount": float(r[3]) if r[3] is not None else None,
+            "description": r[4],
+            "review_status": r[5],
+        }
+        for r in result.fetchall()
+    ]
+    return {
+        "rows": rows,
+        "columns": [
+            "adjustment_no", "account_name", "debit_amount",
+            "credit_amount", "description", "review_status",
+        ],
+        "total": len(rows),
+    }
 
 
 async def _query_worksheet(db, pid, year, filters, limit):

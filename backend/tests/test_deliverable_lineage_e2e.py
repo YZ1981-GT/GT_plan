@@ -376,6 +376,11 @@ class TestDeliverableLineageE2E:
         service = DeliverableRefreshService(db)
 
         # patch 内部依赖以避免真实 DB 查询
+        from app.services.deliverable_service import DeliverableService
+
+        mock_store_result = MagicMock()
+        mock_store_result.version = MagicMock(version_no=2)
+
         with patch.object(
             service, '_check_terminal', new_callable=AsyncMock, return_value=None
         ), patch.object(
@@ -391,24 +396,25 @@ class TestDeliverableLineageE2E:
             'compute_source_snapshot_hash',
             new_callable=AsyncMock,
             return_value="abc123hash",
-        ):
-            # 简化测试：仅验证终态检查通过后进入刷新逻辑
-            # 深层依赖（DeliverableService.create_version）需真 DB，
-            # 这里验证核心链路可达不抛终态错误
-            try:
-                result = await service.refresh_section(
-                    word_export_task_id=task_id,
-                    project_id=project_id,
-                    year=year,
-                    section_code="八、1",
-                    actor_id=actor_id,
-                    confirm_overwrite=True,
-                    docx_bytes=docx_bytes,
-                )
-            except (AttributeError, TypeError, KeyError):
-                # 深层依赖 mock 不完整导致的 AttributeError 可接受
-                # 核心验证：已通过终态检查 + docx 解析 + 锚点定位
-                pass
+        ), patch.object(
+            DeliverableService, 'render_and_store',
+            new_callable=AsyncMock,
+            return_value=mock_store_result,
+        ) as mock_render_and_store:
+            result = await service.refresh_section(
+                word_export_task_id=task_id,
+                project_id=project_id,
+                year=year,
+                section_code="八、1",
+                actor_id=actor_id,
+                confirm_overwrite=True,
+                docx_bytes=docx_bytes,
+            )
+
+        # 核心验证：终态检查通过 + docx 解析 + 锚点定位 + 真正落盘（render_and_store）
+        mock_render_and_store.assert_awaited_once()
+        assert "八、1" in result["refreshed"]
+        assert result["version_no"] == 2
 
     # ─── 5. writeback → 验证 diff + 护栏 + 写回 ──────────────────────────
 

@@ -225,16 +225,6 @@ TABLE_WHITELIST: dict[str, dict[str, Any]] = {
             "is_deleted", "created_at", "updated_at",
         ],
     },
-    "users": {
-        "model": User,
-        "label": "用户",
-        # 显式排除 hashed_password / 安全敏感字段
-        "fields": [
-            "id", "username", "email", "role",
-            "office_code", "is_active",
-            "is_deleted", "created_at", "updated_at",
-        ],
-    },
 }
 
 
@@ -296,22 +286,16 @@ JOIN_WHITELIST: dict[str, dict[str, dict[str, list[tuple[str, str]]]]] = {
         "adjustments":       {"on": [("id", "project_id")]},
         "disclosure_notes":  {"on": [("id", "project_id")]},
         "work_hours":        {"on": [("id", "project_id")]},
-        "users":             {"on": [("manager_id", "id")]},  # 项目经理
     },
     "disclosure_notes": {
         "projects":          {"on": [("project_id", "id")]},
-        "users":             {"on": [("updated_by", "id")]},
     },
     "staff_members": {
-        "users":             {"on": [("user_id", "id")]},
         "work_hours":        {"on": [("id", "staff_id")]},
     },
     "work_hours": {
         "staff_members":     {"on": [("staff_id", "id")]},
         "projects":          {"on": [("project_id", "id")]},
-    },
-    "users": {
-        "staff_members":     {"on": [("id", "user_id")]},
     },
 }
 

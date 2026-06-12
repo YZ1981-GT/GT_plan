@@ -377,22 +377,44 @@ async def save_univer_data(
         pass
 
     # 7. 事件发布（触发五环联动）
+    # 注意：event_bus.publish 只接受 EventPayload 位置参数；早期误传裸 dict →
+    # publish 内 _build_dedup_key 访问 .event_type 抛 AttributeError，且因包在
+    # asyncio.create_task 中异常无处捕获 → WORKPAPER_SAVED 事件从未真正分发，
+    # 一致性比对/B51高风险触发/底稿域地址失效/prefill stale 全部静默失联。
     try:
         import asyncio
         from app.services.event_bus import event_bus
-        payload = {
-            "event_type": "WORKPAPER_SAVED",
-            "project_id": project_id,
-            "extra": {
+        from app.models.audit_platform_schemas import EventPayload, EventType
+        # 推导项目年度（year-dependent handler 如 B514/B515 高风险触发、H/I 反向回填
+        # 依赖 payload.year，缺失则静默跳过）。WorkingPaper 无 year 列，从项目审计期末推导。
+        saved_year: int | None = None
+        try:
+            from app.models.core import Project
+            saved_year = (
+                await db.execute(
+                    sa.select(sa.extract("year", Project.audit_period_end)).where(
+                        Project.id == project_id
+                    )
+                )
+            ).scalar_one_or_none()
+            saved_year = int(saved_year) if saved_year is not None else None
+        except Exception:
+            saved_year = None
+        payload = EventPayload(
+            event_type=EventType.WORKPAPER_SAVED,
+            project_id=project_id,
+            year=saved_year,
+            extra={
                 "wp_id": str(wp_id),
                 "file_version": wp.file_version,
                 "trigger": "univer_save",
                 "content_hash": content_hash,
             },
-        }
+        )
         asyncio.create_task(event_bus.publish(payload))
-    except Exception:
-        pass
+    except Exception as e:
+        import logging as _logging
+        _logging.getLogger(__name__).warning("WORKPAPER_SAVED 事件发布失败 wp=%s: %s", wp_id, e)
 
     # 8. 自动解析（非阻塞）
     try:

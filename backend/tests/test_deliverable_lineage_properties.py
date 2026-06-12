@@ -2535,16 +2535,18 @@ async def test_property_13_refreshed_content_equals_latest_note(
 
     service = DeliverableRefreshService(mock_db)
 
-    # Patch create_version to avoid real DB interaction
+    # Patch render_and_store（真实落盘 API）避免真实 DB/文件交互。
+    # 旧测试 mock 了不存在的 store_version_file → 把 bug 编进 mock 才漏抓。
     mock_version = MagicMock()
     mock_version.version_no = 2
+    mock_store_result = MagicMock()
+    mock_store_result.version = mock_version
 
     with patch(
         "app.services.deliverable_service.DeliverableService",
     ) as MockDeliverableSvc:
         mock_dsvc_instance = AsyncMock()
-        mock_dsvc_instance.create_version = AsyncMock(return_value=mock_version)
-        mock_dsvc_instance.store_version_file = AsyncMock()
+        mock_dsvc_instance.render_and_store = AsyncMock(return_value=mock_store_result)
         MockDeliverableSvc.return_value = mock_dsvc_instance
 
         result = await service.refresh_section(
@@ -2557,10 +2559,12 @@ async def test_property_13_refreshed_content_equals_latest_note(
             docx_bytes=docx_bytes,
         )
 
-    # Assert: section was refreshed successfully
+    # Assert: render_and_store 被真正调用（落盘契约），且 section 刷新成功
+    mock_dsvc_instance.render_and_store.assert_awaited_once()
     assert section_code in result["refreshed"], (
         f"section {section_code} should be in refreshed list, got {result}"
     )
+    assert result["version_no"] == 2
 
 
 # ─── Property 14: 刷新/回填创建新版本且保留旧版本 ────────────────────────────
@@ -3074,6 +3078,7 @@ async def test_unit_13_6_writeback_carries_source_marker():
     writeback_source_deliverable_id（值为来源出品物 word_export_task_id）。
     """
     from app.services.deliverable_writeback_service import DeliverableWritebackService
+    from app.models.audit_platform_schemas import EventType
 
     mock_db = AsyncMock()
     service = DeliverableWritebackService(mock_db)
@@ -3081,11 +3086,12 @@ async def test_unit_13_6_writeback_carries_source_marker():
     word_export_task_id = uuid.uuid4()
     project_id = uuid.uuid4()
 
-    # Patch event_bus to capture the emitted event
-    emitted_events: list[dict] = []
+    # Patch event_bus to capture the emitted event.
+    # 真实 publish 签名是 publish(self, payload: EventPayload) — 单个位置参数。
+    emitted_events: list = []
 
-    async def mock_publish(event_type, payload):
-        emitted_events.append({"event_type": event_type, "payload": payload})
+    async def mock_publish(payload):
+        emitted_events.append(payload)
 
     mock_event_bus = MagicMock()
     mock_event_bus.publish = AsyncMock(side_effect=mock_publish)
@@ -3101,11 +3107,14 @@ async def test_unit_13_6_writeback_carries_source_marker():
             word_export_task_id=word_export_task_id,
         )
 
-    # Assert: event emitted with source marker
+    # Assert: event emitted as a real EventPayload with source marker + section_code in extra
     assert len(emitted_events) == 1
-    event = emitted_events[0]
-    assert event["event_type"] == "NOTE_SECTION_SAVED"
-    assert event["payload"]["extra"]["writeback_source_deliverable_id"] == str(word_export_task_id)
+    payload = emitted_events[0]
+    assert payload.event_type == EventType.NOTE_SECTION_SAVED
+    assert payload.project_id == project_id
+    assert payload.year == 2025
+    assert payload.extra["section_code"] == "八、1"
+    assert payload.extra["writeback_source_deliverable_id"] == str(word_export_task_id)
 
 
 @pytest.mark.asyncio

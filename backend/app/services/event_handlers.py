@@ -600,8 +600,20 @@ def register_event_handlers() -> None:
         if pid:
             await address_registry.invalidate_async(pid, domain='report')
 
+    async def _invalidate_addr_note(payload):
+        """附注章节保存 → 失效附注域缓存（NOTE(...) 地址坐标随章节数据刷新）"""
+        pid = getattr(payload, 'project_id', '')
+        if pid:
+            await address_registry.invalidate_async(pid, domain='note')
+
+    async def _invalidate_addr_wp(payload):
+        """底稿保存 → 失效底稿域缓存（WP(...) 单元格/交叉引用地址坐标随保存刷新）"""
+        pid = getattr(payload, 'project_id', '')
+        if pid:
+            await address_registry.invalidate_async(pid, domain='wp')
+
     async def _invalidate_addr_all(payload):
-        """数据导入 → 失效该项目全部缓存"""
+        """数据导入/回滚 → 失效该项目全部缓存"""
         pid = getattr(payload, 'project_id', '')
         if pid:
             await address_registry.invalidate_async(pid)
@@ -611,8 +623,14 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _invalidate_addr_tb)
     event_bus.subscribe(EventType.TRIAL_BALANCE_UPDATED, _invalidate_addr_tb)
     event_bus.subscribe(EventType.REPORTS_UPDATED, _invalidate_addr_report)
+    # 附注域：章节保存后 NOTE(...) 地址坐标失效（此前仅全量导入才刷新→地址坐标陈旧）
+    event_bus.subscribe(EventType.NOTE_SECTION_SAVED, _invalidate_addr_note)
+    # 底稿域：底稿保存后 WP(...) 地址坐标失效（此前仅全量导入才刷新→地址坐标陈旧）
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _invalidate_addr_wp)
     event_bus.subscribe(EventType.DATA_IMPORTED, _invalidate_addr_all)
     event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, _invalidate_addr_all)
+    # 回滚同样需失效全部域（与下游 stale 标记保持一致；此前漏订阅）
+    event_bus.subscribe(EventType.LEDGER_DATASET_ROLLED_BACK, _invalidate_addr_all)
 
     logger.debug("Address registry cache invalidation handlers registered")
 
@@ -956,16 +974,39 @@ def register_event_handlers() -> None:
     # ------------------------------------------------------------------
 
     async def _stale_engine_on_formula_config_changed(payload: EventPayload) -> None:
-        """公式配置变更 → stale_engine.on_change（按 row_code 构建 REPORT URI）"""
+        """公式配置变更 → stale_engine.on_change（按 row_code 构建 REPORT URI）
+
+        额外失效 FormulaReverseIndex 单例：report_config.formula 改写后，
+        反向索引（build_from_report_config 直接查 DB）会引入/删除依赖边，
+        若不失效，`/formula-usage` 与 `/cell-detail` 面板会显示过时的引用关系
+        （单例缓存直到进程重启）。失效为惰性，仅重置标志，下次访问重建，不拖慢保存。
+        """
         if not payload.project_id:
             return
+        # 反向索引失效（"谁引用了该单元格"面板随报表公式变更刷新）
+        try:
+            from app.services.formula_reverse_index import invalidate_reverse_index
+            invalidate_reverse_index()
+        except Exception as e:
+            logger.warning("[reverse-index] invalidate on formula_config_changed failed: %s", e)
+
         extra = payload.extra or {}
         row_code = extra.get("row_code", "")
         if row_code:
             uri = f"REPORT:{row_code}::"
             try:
                 year = payload.year or 2025
-                await stale_engine.on_change(uri, payload.project_id, year)
+                result = await stale_engine.on_change(uri, payload.project_id, year)
+                # 漏标暴露：图已加载但该 source 无下游边（affected=0 且非降级），
+                # 多半是依赖图未随新公式重建 → 记录 degraded，不静默吞掉。
+                if result.get("total", 0) == 0 and not result.get("degraded", False):
+                    from app.services.stale_degraded_logger import log_stale_degraded
+                    log_stale_degraded(
+                        source=f"formula_config_changed:{uri}",
+                        target=f"project={payload.project_id}",
+                        error="on_change affected=0：依赖图可能缺少该报表行的下游边（需 rebuild unified graph）",
+                        context={"row_code": row_code, "year": year},
+                    )
             except Exception as e:
                 logger.warning("[stale_engine] on_formula_config_changed failed for %s: %s", uri, e)
 
@@ -973,6 +1014,13 @@ def register_event_handlers() -> None:
         """预填充映射变更 → stale_engine.on_change（标记相关底稿 stale）"""
         if not payload.project_id:
             return
+        # 反向索引失效（prefill_formula_mapping.json 变更后引用关系刷新）
+        try:
+            from app.services.formula_reverse_index import invalidate_reverse_index
+            invalidate_reverse_index()
+        except Exception as e:
+            logger.warning("[reverse-index] invalidate on prefill_mapping_changed failed: %s", e)
+
         extra = payload.extra or {}
         changed_wp_codes = extra.get("changed_wp_codes", [])
         year = payload.year or 2025

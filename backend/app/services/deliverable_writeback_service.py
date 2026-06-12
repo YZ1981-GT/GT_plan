@@ -798,7 +798,7 @@ class DeliverableWritebackService:
         from sqlalchemy import text
 
         result = await self.db.execute(
-            text("SELECT status FROM word_export_tasks WHERE id = :tid"),
+            text("SELECT status FROM word_export_task WHERE id = :tid"),
             {"tid": str(word_export_task_id)},
         )
         row = result.first()
@@ -883,20 +883,28 @@ class DeliverableWritebackService:
         section_code: str,
         word_export_task_id: UUID,
     ) -> None:
-        """触发 NOTE_SECTION_SAVED 事件，携带 writeback_source_deliverable_id（需求 7.6/4.9）。"""
+        """触发 NOTE_SECTION_SAVED 事件，携带 writeback_source_deliverable_id（需求 7.6/4.9）。
+
+        注意：``event_bus.publish`` 仅接受单个 ``EventPayload`` 位置参数。
+        下游 ``_on_upstream_changed_mark_deliverable_stale`` handler 从
+        ``payload.extra`` 读取 ``section_code`` 与 ``writeback_source_deliverable_id``，
+        二者必须同处 extra（早期误传裸 dict + 关键字参数会抛 TypeError 被静默吞掉，
+        导致回写后其他出品物章节不被标 stale → 联动链断裂）。
+        """
         try:
             from app.services.event_bus import event_bus
+            from app.models.audit_platform_schemas import EventPayload, EventType
 
             await event_bus.publish(
-                event_type="NOTE_SECTION_SAVED",
-                payload={
-                    "project_id": str(project_id),
-                    "year": year,
-                    "section_code": section_code,
-                    "extra": {
+                EventPayload(
+                    event_type=EventType.NOTE_SECTION_SAVED,
+                    project_id=project_id,
+                    year=year,
+                    extra={
+                        "section_code": section_code,
                         "writeback_source_deliverable_id": str(word_export_task_id),
                     },
-                },
+                )
             )
         except Exception as exc:
             # 事件发布失败不阻断主业务

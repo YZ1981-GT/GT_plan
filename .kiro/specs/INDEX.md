@@ -133,9 +133,7 @@ _archive/
 
 ## 三、待建 Spec
 
-- `consol_disclosure_service` 瘦身（1736 行）
-- `migration_runner` 瘦身（1026 行）
-- `workpaper-content-semantic-system`（底稿内容平台化）
+无。所有规划中的 spec 已完成实施或确认不需要（2026-06-12）。
 
 ---
 

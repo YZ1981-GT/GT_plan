@@ -185,24 +185,18 @@ class DeliverableRefreshService:
         doc.save(output)
         new_docx_bytes = output.getvalue()
 
-        version = await deliverable_svc.create_version(
-            task_id=word_export_task_id,
-            file_path=None,
-            html_path=None,
+        # render_and_store 一次性完成 建版本 + 落盘 + 绑哈希（旧实现误调
+        # 不存在的 store_version_file → AttributeError，因测试 mock 把该方法
+        # 编进去才漏抓；single-section 刷新路径实际从未真正落盘）。
+        store_result = await deliverable_svc.render_and_store(
+            word_export_task_id,
+            docx_bytes=new_docx_bytes,
             user_id=actor_id,
-            file_size=len(new_docx_bytes),
             created_via="refresh_section",
         )
 
-        # 存储文件（通过 store_version）
-        await deliverable_svc.store_version_file(
-            task_id=word_export_task_id,
-            version_no=version.version_no,
-            docx_bytes=new_docx_bytes,
-        )
-
         return RefreshResult(
-            version_no=version.version_no,
+            version_no=store_result.version.version_no,
             refreshed=[section_code],
             skipped=[],
             requires_confirm=False,
@@ -307,7 +301,7 @@ class DeliverableRefreshService:
         from sqlalchemy import text
 
         result = await self.db.execute(
-            text("SELECT status FROM word_export_tasks WHERE id = :tid"),
+            text("SELECT status FROM word_export_task WHERE id = :tid"),
             {"tid": str(word_export_task_id)},
         )
         row = result.first()
