@@ -26,6 +26,23 @@
   <!-- V3 Req 11.6: 时光机面板 -->
   <TimeMachineDrawer ref="tmDrawerRef" module="workpaper" :instance-id="wpId" @restored="onTimeMachineRestored" />
 
+  <!-- 底稿导入导出（HTML 渲染器路径；Univer 路径见下方工具栏） -->
+  <div v-if="useHtmlRenderer && wpDetail" class="gt-wp-io-toolbar">
+    <el-button text @click="goBack">← 返回</el-button>
+    <span class="gt-wp-editor-code">{{ wpDetail.wp_code }}</span>
+    <span class="gt-wp-editor-name">{{ wpDetail.wp_name }}</span>
+    <div class="gt-wp-io-toolbar__actions">
+      <WpExportButton
+        :project-id="projectId"
+        :wp-id="wpId"
+        size="small"
+        button-type="primary"
+        label="导出"
+      />
+      <el-button size="small" @click="showWpImportEnhanced = true">导入</el-button>
+    </div>
+  </div>
+
   <!-- HTML 渲染器路由分发（A/B/C/D/E/H/skip 优先级最高） -->
   <GtWpRenderer
     v-if="useHtmlRenderer"
@@ -66,6 +83,15 @@
           @click="showAuditNavDrawer = true"
           style="margin-right: 8px"
         >🧭 审计导航图</el-button>
+        <WpExportButton
+          v-if="wpDetail"
+          :project-id="projectId"
+          :wp-id="wpId"
+          size="small"
+          button-type=""
+          label="导出"
+        />
+        <el-button size="small" @click="showWpImportEnhanced = true">导入</el-button>
         <!-- 关键操作组：保存 / 一键填充 / 提交复核 — V3 Req 12.1.1 配置驱动 -->
         <el-button-group class="gt-wp-toolbar-primary">
           <el-tooltip
@@ -280,6 +306,12 @@
     @close="showDocAiChat = false"
     @adopt="onDocAiAdopt"
   />
+
+  <WpImportDialog
+    v-model="showWpImportEnhanced"
+    :project-id="projectId"
+    @imported="onWpImportEnhanced"
+  />
 </template>
 
 <script setup lang="ts">
@@ -334,6 +366,8 @@ import VersionHistoryDrawer from './workpaper-editor/VersionHistoryDrawer.vue'
 import AuditNavDialog from './workpaper-editor/AuditNavDialog.vue'
 import ReviewMarkDialog from './workpaper-editor/ReviewMarkDialog.vue'
 import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
+import WpExportButton from '@/components/workpaper/WpExportButton.vue'
+import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
 
 // ─── 路由解析 ────────────────────────────────────────────────────────────────
 const route = useRoute()
@@ -387,7 +421,13 @@ const htmlFormulaWpContext = computed(() => {
 })
 const showStaleImpactPanel = ref(false)
 const showDocAiChat = ref(false)
+const showWpImportEnhanced = ref(false)
 const univerEditorCoreRef = ref<InstanceType<typeof UniverEditorCore> | null>(null)
+
+function onWpImportEnhanced() {
+  showWpImportEnhanced.value = false
+  eventBus.emit('workpaper-refresh')
+}
 
 // ─── 模式分发（useEditorMode） ──────────────────────────────────────────────
 const {
@@ -891,6 +931,12 @@ function onLocateCellEvent(payload: { wpId: string; sheetName?: string; cellRef:
 </script>
 
 <style scoped>
+.gt-wp-io-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px; background: var(--gt-color-bg-light, #f8f7fc);
+  border-bottom: 1px solid var(--gt-color-border, #e8e5f0);
+}
+.gt-wp-io-toolbar__actions { margin-left: auto; display: flex; gap: 8px; }
 .gt-wp-editor {
   display: flex; flex-direction: column; height: 100vh;
   background: var(--gt-color-bg);

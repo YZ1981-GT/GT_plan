@@ -217,7 +217,7 @@
 
 ### Phase 5: 批量与模板
 
-- [ ] 15. BatchPackager 批量打包器 **【复用】WpDownloadService.download_pack + 增强**
+- [x] 15. BatchPackager 批量打包器 **【复用】WpDownloadService.download_pack + 增强**
   - [x] 15.1 扩展 WpDownloadService.download_pack（或新建薄封装）
     - **现有 download_pack 已实现 ZIP + {audit_cycle}/{wp_code}_{wp_name}.xlsx 目录结构——不重写**
     - 本任务新增：① 加 manifest.json（文件清单+SHA-256+导出时间+项目元数据）② 状态过滤参数 ③ 单文件失败跳过+manifest 标注 ④ 空循环报错而非空 ZIP ⑤ 导出带元数据嵌入（调 export_single）
@@ -236,7 +236,7 @@
     - hypothesis max_examples=5
     - **Validates: Requirements 2.3, 2.5**
 
-- [ ] 16. TemplateCopier 模板复制器
+- [x] 16. TemplateCopier 模板复制器
   - [x] 16.1 实现 TemplateCopier 类
     - 文件: backend/app/services/wp_export/template_copier.py
     - copy_single: 复制底稿文件+索引记录到目标项目
@@ -266,7 +266,7 @@
 
 ### Phase 6: API 路由层
 
-- [ ] 18. 导出路由 **【复用】现有 wp_download.py 已有 download-file/download-pack + 扩展**
+- [x] 18. 导出路由 **【复用】现有 wp_download.py 已有 download-file/download-pack + 扩展**
   - [x] 18.1 在现有 `wp_download.py` 或新文件增加端点
     - **现有路由已有**：download-file(单下载)/download-pack(批量ZIP)/check-version/upload-file——复用不改
     - **新增端点**（在同一 router 或 `wp_export_router.py` 注册）：
@@ -279,7 +279,7 @@
     - 在对应 group 文件中注册，确保路由顺序不被通配截获
     - _Requirements: 1.1_
 
-- [ ] 19. 导入路由 **【复用】现有 upload-file + 新增校验/解冲/版本端点**
+- [x] 19. 导入路由 **【复用】现有 upload-file + 新增校验/解冲/版本端点**
   - [x] 19.1 在现有 `wp_download.py` 或新文件增加端点
     - **现有已有**：upload-file(导入+版本冲突+force_overwrite)——保留原端点不动
     - **新增端点**：
@@ -292,7 +292,7 @@
   - [x] 19.2 在 router_registry 注册（若新文件）
     - _Requirements: 3.3_
 
-- [ ] 20. 模板复制路由
+- [x] 20. 模板复制路由
   - [x] 20.1 创建模板复制 router
     - 文件: backend/app/routers/wp_template_copy_router.py
     - POST /api/projects/{project_id}/workpapers/template-copy → CopyResult | list[CopyResult]
@@ -306,7 +306,7 @@
 
 ### Phase 7: 前端
 
-- [ ] 22. 导出功能前端
+- [x] 22. 导出功能前端
   - [x] 22.1 实现导出按钮与下载逻辑
     - 底稿列表页/底稿编辑页添加"导出"按钮
     - 使用 downloadFile（axios blob + Bearer header）下载，禁止 window.open
@@ -317,7 +317,7 @@
     - 调用 batch-export 端点下载 ZIP
     - _Requirements: 2.1, 2.6_
 
-- [ ] 23. 导入功能前端
+- [x] 23. 导入功能前端
   - [x] 23.1 实现导入上传弹窗
     - 文件上传 (el-upload) + 格式限制 (.xlsx/.docx)
     - 调用 import 端点 multipart/form-data
@@ -332,13 +332,13 @@
     - 调用 import/resolve 端点
     - _Requirements: 4.3, 4.4_
 
-- [ ] 24. 模板复制前端
+- [x] 24. 模板复制前端
   - [x] 24.1 实现模板复制弹窗
     - 选择源底稿/源项目+循环
     - 显示目标冲突提示（同 wp_code 已存在）
     - _Requirements: 7.1, 7.4, 7.5_
 
-- [ ] 25. 版本历史前端
+- [x] 25. 版本历史前端
   - [x] 25.1 实现版本历史面板
     - 底稿详情区域展示版本列表
     - 显示版本号、来源、创建时间、创建人

@@ -153,6 +153,11 @@
         <template #label>
           <span class="gt-group-label">历史版本</span>
         </template>
+        <WpVersionHistoryPanel
+          v-if="wpId"
+          :project-id="projectId"
+          :wp-id="wpId"
+        />
         <SnapshotCompare v-if="wpId" :snapshots="[]" :changes="[]" />
         <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
       </el-tab-pane>
@@ -173,6 +178,7 @@ import FormulaStatusPanel from '@/components/workpaper/FormulaStatusPanel.vue'
 import EvidenceLinkPanel from '@/components/workpaper/EvidenceLinkPanel.vue'
 import PbcCollectionTab from '@/components/workpaper/PbcCollectionTab.vue'
 import SnapshotCompare from '@/components/workpaper/SnapshotCompare.vue'
+import WpVersionHistoryPanel from '@/components/workpaper/WpVersionHistoryPanel.vue'
 import QualityScoreBadge from '@/components/workpaper/QualityScoreBadge.vue'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'

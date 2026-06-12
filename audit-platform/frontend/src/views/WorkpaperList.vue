@@ -18,6 +18,9 @@
             <el-button type="success" size="small" @click="onGenerateWorkpapers" :loading="generateLoading">
               生成底稿
             </el-button>
+            <el-button size="small" @click="showWpImportEnhanced = true">增强导入</el-button>
+            <el-button size="small" @click="showBatchExportEnhanced = true">批量导出(元数据)</el-button>
+            <el-button size="small" @click="showTemplateCopy = true">模板复制</el-button>
             <el-button type="primary" size="small" @click="onBatchDownload" :loading="downloadLoading">
               批量下载 ({{ selectedWpIds.length || '全部' }})
             </el-button>
@@ -99,6 +102,22 @@
       :project-id="projectId"
       @imported="fetchWpIndex"
     />
+
+    <!-- 底稿统一导入导出（workpaper-unified-import-export） -->
+    <WpImportDialog
+      v-model="showWpImportEnhanced"
+      :project-id="projectId"
+      @imported="fetchWpIndex"
+    />
+    <WpBatchExportDialog
+      v-model="showBatchExportEnhanced"
+      :project-id="projectId"
+    />
+    <WpTemplateCopyDialog
+      v-model="showTemplateCopy"
+      :project-id="projectId"
+      @copied="fetchWpIndex"
+    />
   </div>
 </template>
 
@@ -143,6 +162,9 @@ import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
 import BatchActionBar from '@/components/workpaper/BatchActionBar.vue'
 import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
+import WpBatchExportDialog from '@/components/workpaper/WpBatchExportDialog.vue'
+import WpTemplateCopyDialog from '@/components/workpaper/WpTemplateCopyDialog.vue'
 
 defineOptions({ name: 'WorkpaperList' })
 
@@ -175,6 +197,9 @@ const selectedWpId = ref('')
 const selectedWpIds = ref<string[]>([])
 const userOptions = ref<any[]>([])
 const showWpImport = ref(false)
+const showWpImportEnhanced = ref(false)
+const showBatchExportEnhanced = ref(false)
+const showTemplateCopy = ref(false)
 const showBatchAssign = ref(false)
 const downloadLoading = ref(false)
 const generateLoading = ref(false)
