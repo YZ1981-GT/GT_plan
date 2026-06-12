@@ -61,6 +61,34 @@ _COLUMN_MAP = {
     "AJE调整": "aje_adjustment",
 }
 
+# 权益变动表（equity_statement）二维矩阵列键 → 资产负债表权益行名关键字映射。
+# 用途：自动填充权益变动表「上年年末余额」(EQ-001) 各权益构成列 ←
+# 对应权益科目的资产负债表上期（prior）审定值（与 BS/试算表同源，可验证）。
+# 仅匹配负债权益侧科目（按行名关键字 + 排除资产侧同名行），跨 4 变体稳健。
+# 说明：变动明细行（综合收益/利润分配/内部结转等）需分录级数据，无法从现有
+# 数据推导，故不自动填充（留空由审计人员手工编制，N 列合计模板 =SUM() 自算）。
+_EQ_COL_TO_BS_ROW_KEYWORDS: dict[str, list[str]] = {
+    "share_capital": ["实收资本", "股本"],
+    "other_equity_instrument": ["其他权益工具"],
+    "perpetual_bond": ["永续债"],
+    "capital_reserve": ["资本公积"],
+    "treasury_stock": ["库存股"],
+    "other_comprehensive_income": ["其他综合收益"],
+    "special_reserve": ["专项储备"],
+    "surplus_reserve": ["盈余公积"],
+    "general_risk_reserve": ["一般风险准备"],
+    "retained_earnings": ["未分配利润"],
+    "minority_interest": ["少数股东权益"],
+    "total_equity": ["所有者权益合计", "股东权益合计"],
+}
+
+# 资产侧需排除的同名行（"其他权益工具投资"/资产侧"永续债"属投资类，非权益构成列）
+_EQ_BS_EXCLUDE_KEYWORDS = ("投资",)
+
+# 权益变动表「上年年末余额」行 row_code（唯一可从 BS 可靠推导的余额行）。
+# 注：「本年年初余额」「本年年末余额」在模板中是 =SUM() 公式格，无需占位填充。
+_EQ_PRIOR_YEAR_END_ROW = "EQ-001"
+
 # ---------------------------------------------------------------------------
 # _safe_eval_expr: 薄 re-export，委托 L1 内核 formula_engine.safe_eval_expr
 # （保留导出名以兼容 test_formula_engine_baseline / test_consol_report_formula_eval 的 import）
@@ -470,6 +498,15 @@ class ReportEngine:
             # 写入缓存
             await self._set_cached_report(project_id, report_type.value, report_rows)
 
+        # ── 权益变动表二维矩阵：填充「上年年末余额」(EQ-001) 各权益列 ──
+        # （从已持久化的 BS 行取对应权益科目上期审定值，写入 eq_matrix 契约）
+        if FinancialReportType.equity_statement.value in results:
+            try:
+                await self._fill_equity_matrix(
+                    project_id, year, applicable_standard, now,
+                )
+            except Exception as _eq_err:
+                logger.warning("[EQ_MATRIX] fill failed: %s", _eq_err)
         # Add coverage_stats to results
         # Calculate overall coverage
         total_rows = sum(s.get("total_rows", 0) for s in coverage_stats.values())
@@ -717,9 +754,114 @@ class ReportEngine:
 
         return report_rows, type_coverage, debug_rows if debug else None
 
-    # ------------------------------------------------------------------
-    # Task 1.5: Fallback 取数辅助方法
-    # ------------------------------------------------------------------
+    async def _fill_equity_matrix(
+        self,
+        project_id: UUID,
+        year: int,
+        applicable_standard: str,
+        generated_at: datetime,
+    ) -> None:
+        """填充权益变动表「上年年末余额」(EQ-001) 行的二维矩阵列数据.
+
+        权益变动表是「行=变动事项 × 列=权益构成科目」的二维矩阵。其中只有余额行
+        可从资产负债表（BS）可靠推导：上年年末余额 = 各权益科目的 BS 上期（prior）值。
+        变动明细行需分录级数据无法从现有数据推导，故不自动填充（留空手工编制）。
+
+        写入契约（与 exporter._resolve_eq_value 对齐）::
+
+            FinancialReport(EQ-001).source_accounts = {
+              "eq_matrix": {"current_year": {col_key: amount, ...}}
+            }
+
+        ``current_year`` 表示权益变动表本年表的「上年年末余额」列值（即 BS 上期数）。
+        """
+        # 1. 读取 BS 行：{row_name: prior_period_amount}
+        bs_result = await self.db.execute(
+            sa.select(FinancialReport).where(
+                FinancialReport.project_id == project_id,
+                FinancialReport.year == year,
+                FinancialReport.report_type == FinancialReportType.balance_sheet,
+                FinancialReport.is_deleted == sa.false(),
+            )
+        )
+        bs_rows = bs_result.scalars().all()
+        # 仅取「所有者权益：」段之后的行（排除资产侧/负债侧同名科目，如资产侧
+        # 「永续债」「其他权益工具投资」）。按 row_code 数字序定位段边界。
+        def _bs_num(rc: str) -> int:
+            try:
+                return int(rc.split("-")[1])
+            except (IndexError, ValueError):
+                return -1
+
+        equity_start_num: int | None = None
+        for r in bs_rows:
+            if r.row_name and r.row_name.startswith("所有者权益") and (
+                "：" in r.row_name or ":" in r.row_name
+            ):
+                equity_start_num = _bs_num(r.row_code)
+                break
+
+        # row_name 关键字 → prior 值（仅权益段内行）
+        bs_by_name: list[tuple[str, Decimal]] = [
+            (r.row_name or "", r.prior_period_amount or Decimal("0"))
+            for r in bs_rows
+            if equity_start_num is None or _bs_num(r.row_code) >= equity_start_num
+        ]
+
+        def _norm(name: str) -> str:
+            # 去前导标记（* △ # 空格）便于精确比对
+            return name.lstrip("*△#＃ 　:：").strip()
+
+        def _match_bs_value(keywords: list[str]) -> float | None:
+            # 优先「规范化后完全相等」（避免 "所有者权益合计" 被
+            # "归属于母公司所有者权益合计" 子串截胡）；无精确命中再退化子串包含。
+            for kw in keywords:
+                for name, amount in bs_by_name:
+                    if any(ex in name for ex in _EQ_BS_EXCLUDE_KEYWORDS):
+                        continue
+                    if _norm(name) == kw:
+                        return float(amount)
+            for name, amount in bs_by_name:
+                if any(ex in name for ex in _EQ_BS_EXCLUDE_KEYWORDS):
+                    continue
+                if any(kw in name for kw in keywords):
+                    return float(amount)
+            return None
+
+        # 2. 构建 current_year 列字典（仅含成功映射的列）
+        col_values: dict[str, float] = {}
+        for col_key, keywords in _EQ_COL_TO_BS_ROW_KEYWORDS.items():
+            val = _match_bs_value(keywords)
+            if val is not None:
+                col_values[col_key] = val
+
+        if not col_values:
+            return
+
+        # 3. 写入 EQ-001 行的 source_accounts.eq_matrix
+        eq_result = await self.db.execute(
+            sa.select(FinancialReport).where(
+                FinancialReport.project_id == project_id,
+                FinancialReport.year == year,
+                FinancialReport.report_type == FinancialReportType.equity_statement,
+                FinancialReport.row_code == _EQ_PRIOR_YEAR_END_ROW,
+                FinancialReport.is_deleted == sa.false(),
+            )
+        )
+        eq_row = eq_result.scalar_one_or_none()
+        if eq_row is None:
+            return
+
+        existing_sa = eq_row.source_accounts
+        merged: dict = dict(existing_sa) if isinstance(existing_sa, dict) else {}
+        matrix = dict(merged.get("eq_matrix") or {})
+        matrix["current_year"] = col_values
+        merged["eq_matrix"] = matrix
+        eq_row.source_accounts = merged
+        eq_row.generated_at = generated_at
+        await self.db.flush()
+
+
     async def _check_tb_fallback(
         self,
         parser: ReportFormulaParser,
@@ -1214,8 +1356,11 @@ class ReportEngine:
 
         Phase 9 Task 9.15: 动态计算，不存储到数据库。
         """
-        # 加载全部报表配置，然后筛选指定类型
-        all_configs = await self._load_report_configs("enterprise")
+        # 动态确定报表标准（与审定模式一致，不硬编码 "enterprise"）
+        from app.services.report_config_service import ReportConfigService
+        applicable_standard = await ReportConfigService.resolve_applicable_standard(self.db, project_id)
+
+        all_configs = await self._load_report_configs(applicable_standard)
         rt = report_type if isinstance(report_type, FinancialReportType) else FinancialReportType(report_type)
         configs = all_configs.get(rt, [])
         if not configs:

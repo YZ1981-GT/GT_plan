@@ -39,8 +39,7 @@ REPORT_TYPE_SHEET_NAMES: dict[str, str] = {
     "income_statement": "利润表",
     "cash_flow_statement": "现金流量表",
     "equity_statement": "所有者权益变动表",
-    "asset_impairment": "资产减值损失明细表",
-    "impairment_provision": "减值准备表",
+    "asset_impairment": "资产减值准备情况表",
 }
 
 # Amount number format
@@ -65,6 +64,11 @@ _NOTE_REF_RE = re.compile(r"\{\{note_ref:([^}]+)\}\}")
 #   {{imp:IMP-001:opening_balance}} — 资产减值表二维占位
 _IMP_PLACEHOLDER_RE = re.compile(
     r"\{\{imp:([^:}]+):([^}]+)\}\}"
+)
+#   {{eq:EQ-001:current_year:share_capital}} — 权益变动表三维占位
+#   （行=变动项目 row_code × 年度 year_key × 列=权益构成科目 col_key）
+_EQ_PLACEHOLDER_RE = re.compile(
+    r"\{\{eq:([^:}]+):(current_year|prior_year):([^}]+)\}\}"
 )
 #   header placeholders embedded in text: {{company_full_name}} 等
 _HEADER_PLACEHOLDER_RE = re.compile(r"\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}")
@@ -578,6 +582,56 @@ class ReportExcelExporter:
                     pass
         return None
 
+    def _resolve_eq_value(
+        self, row: dict | None, year_key: str, col_key: str
+    ) -> float | None:
+        """从权益变动表行的 source_accounts JSONB 取二维矩阵单元值.
+
+        权益变动表是「行=变动项目（EQ-xxx）× 列=权益构成科目（col_key）×
+        年度（current_year/prior_year）」的二维矩阵。每行在
+        ``FinancialReport.source_accounts`` 以如下契约存储分列数据::
+
+            {
+              "eq_matrix": {
+                "current_year": {"share_capital": 1000, "capital_reserve": 200, ...},
+                "prior_year":   {"share_capital":  900, ...}
+              }
+            }
+
+        取数优先级：
+        1. ``source_accounts.eq_matrix[year_key][col_key]``（标准契约）。
+        2. 兼容扁平结构 ``source_accounts[col_key]``（仅 current_year，
+           上游尚未分年存储时的过渡）。
+        无数据返回 ``None`` → 清空占位符（N 列合计由模板 ``=SUM()`` 自算）。
+        """
+        if not row:
+            return None
+        source = row.get("source_accounts")
+        if not isinstance(source, dict):
+            return None
+
+        # 标准契约：eq_matrix[year_key][col_key]
+        matrix = source.get("eq_matrix")
+        if isinstance(matrix, dict):
+            year_block = matrix.get(year_key)
+            if isinstance(year_block, dict):
+                val = year_block.get(col_key)
+                if val is not None:
+                    try:
+                        return float(val)
+                    except (TypeError, ValueError):
+                        return None
+
+        # 过渡兼容：扁平 source_accounts[col_key]（仅本年）
+        if year_key == "current_year":
+            val = source.get(col_key)
+            if val is not None:
+                try:
+                    return float(val)
+                except (TypeError, ValueError):
+                    return None
+        return None
+
     def _fill_by_placeholders(
         self,
         ws,
@@ -588,12 +642,15 @@ class ReportExcelExporter:
         parent_row_index: dict[str, dict] | None = None,
         note_ref_index: dict[str, str] | None = None,
     ) -> bool:
-        """扫描 sheet 内联占位符并回填；返回是否发现 ``{{row:}}``/``{{note_ref:}}``/``{{imp:}}`` 占位符.
+        """扫描 sheet 内联占位符并回填；返回是否发现 ``{{row:}}``/``{{note_ref:}}``/``{{imp:}}``/``{{eq:}}`` 占位符.
 
         - ``{{row:CODE:current/prior}}`` → 按 row_code 取值写入该格（替换占位文本）。
         - ``{{row:CODE:current/prior:parent}}`` → 取母公司个别（公司列）值写入。
         - ``{{note_ref:CODE}}`` → 填入附注章节编号（如 "八、1"）。
         - ``{{imp:CODE:col_key}}`` → 资产减值表多列取数（从 source_accounts JSONB）。
+        - ``{{eq:CODE:year_key:col_key}}`` → 权益变动表二维矩阵取数
+          （year_key=current_year/prior_year，col_key=权益构成科目；从
+          source_accounts.eq_matrix JSONB）。
         - 表头 ``{{key}}`` → 子串替换（合并格非锚点成员 value 为 None 自动跳过）。
         """
         parent_index = parent_row_index or {}
@@ -646,6 +703,22 @@ class ReportExcelExporter:
                     imp_row = row_index.get(imp_code)
                     imp_value = self._resolve_imp_value(imp_row, col_key)
                     cell.value = imp_value
+                    continue
+
+                # --- Track 1d: eq placeholder (权益变动表二维矩阵) ---
+                m_eq = _EQ_PLACEHOLDER_RE.fullmatch(stripped)
+                if m_eq:
+                    found_inline = True
+                    eq_code, year_key, col_key = (
+                        m_eq.group(1),
+                        m_eq.group(2),
+                        m_eq.group(3),
+                    )
+                    if year_key == "prior_year" and not include_prior_year:
+                        cell.value = None
+                        continue
+                    eq_row = row_index.get(eq_code)
+                    cell.value = self._resolve_eq_value(eq_row, year_key, col_key)
                     continue
 
                 # --- Track 2: header placeholder(s) embedded in text ---

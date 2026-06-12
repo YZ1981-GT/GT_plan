@@ -77,7 +77,7 @@ class ReportPlaceholderService:
             )
 
         entity_name = basic_info.get("client_name") or (project.client_name if project else "[被审计单位名称]")
-        entity_short_name = basic_info.get("entity_short_name") or ""
+        entity_short_name = basic_info.get("entity_short_name") or basic_info.get("short_name") or ""
         report_scope = basic_info.get("report_scope") or (project.report_scope if project else "standalone") or "standalone"
         audit_year = str(basic_info.get("audit_year") or "")
         signing_partner = basic_info.get("signing_partner_name") or "[签字注册会计师]"
@@ -93,7 +93,24 @@ class ReportPlaceholderService:
             "firm_name": "致同会计师事务所（特殊普通合伙）",
             "cpa_name_1": basic_info.get("cpa_name_1") or "[注册会计师1]",
             "cpa_name_2": basic_info.get("cpa_name_2") or "[注册会计师2]",
+            "responsibility_organ": self._resolve_responsibility_organ(basic_info, project),
         }
+
+    @staticmethod
+    def _resolve_responsibility_organ(basic_info: dict, project) -> str:
+        """根据企业子类型推导治理层抬头（董事会/全体股东）。
+
+        - 上市/三板/非公众（type_a/b/d）→ "全体股东"
+        - 其他公众利益（type_c）→ "董事会"
+        - 用户手动指定时优先
+        """
+        organ = basic_info.get("responsibility_organ")
+        if organ:
+            return organ
+        subtype = basic_info.get("company_subtype") or (getattr(project, "company_subtype", None) if project else None) or ""
+        if subtype in ("type_c",):
+            return "董事会"
+        return "全体股东"
 
     @staticmethod
     def replace_in_text(text: str, placeholders: dict[str, str]) -> str:

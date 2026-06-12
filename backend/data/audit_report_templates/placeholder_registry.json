@@ -3,6 +3,7 @@
   "canonical_to_legacy": {
     "company_full_name": "entity_name",
     "company_short_name": "entity_short_name",
+    "responsibility_organ": "responsibility_organ",
     "signing_cpa": "cpa_name_1",
     "signing_partner": "signing_partner",
     "audit_year": "audit_year",

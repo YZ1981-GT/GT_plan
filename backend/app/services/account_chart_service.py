@@ -138,6 +138,8 @@ _NAME_CATEGORY_KEYWORDS: dict[str, AccountCategory] = {
     "其他综合收益": AccountCategory.equity,
     "其他权益工具": AccountCategory.equity,
     "库存股": AccountCategory.equity,
+    "专项储备": AccountCategory.equity,
+    "合伙人缴入资本": AccountCategory.equity,
     # 收入类
     "主营业务收入": AccountCategory.revenue,
     "其他业务收入": AccountCategory.revenue,
@@ -145,7 +147,6 @@ _NAME_CATEGORY_KEYWORDS: dict[str, AccountCategory] = {
     "公允价值变动损益": AccountCategory.revenue,
     "资产处置收益": AccountCategory.revenue,
     "其他收益": AccountCategory.revenue,
-    "汇兑损益": AccountCategory.revenue,
     "营业外收入": AccountCategory.revenue,
     # 费用/成本类
     "主营业务成本": AccountCategory.expense,
@@ -171,9 +172,18 @@ _NAME_CATEGORY_KEYWORDS: dict[str, AccountCategory] = {
 def _infer_category(code: str, name: str = "") -> AccountCategory:
     """Infer account category from code prefix and account name.
 
-    优先用科目名称关键词推断（更准确），编码首位作为兜底。
+    顺序：
+    0. 1xxx 资产 / 2xxx 负债 由编码直接判定（不参与名称关键词匹配，避免资产投资类
+       科目如「其他权益工具投资」「长期股权投资_…其他综合收益」被权益/损益关键词子串误伤）。
+    1. 其余科目优先用名称关键词推断（4xxx/5xxx/6xxx 双体系靠名称区分）。
+    2. 编码首位兜底。
     """
-    # 1. 优先按名称关键词匹配
+    # 0. 资产(1)/负债(2) 编码优先——其子科目名常含"其他权益工具/其他综合收益"等
+    #    权益关键词，必须先按编码拦截，避免被名称关键词子串误判。
+    if code and code[0] in ("1", "2"):
+        return _CODE_CATEGORY_MAP[code[0]]
+
+    # 1. 优先按名称关键词匹配（4xxx/5xxx/6xxx 双体系靠名称区分）
     if name:
         for kw, cat in _NAME_CATEGORY_KEYWORDS.items():
             if kw in name:

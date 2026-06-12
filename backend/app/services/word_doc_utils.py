@@ -61,14 +61,34 @@ def _iter_table_paragraphs(table: Table) -> Iterable[Paragraph]:
 
 
 def merge_runs_for_replace(paragraph: Paragraph) -> None:
-    """合并段落内 runs，避免 ``{{key}}`` 被 Word 拆成多 run 无法替换."""
+    """合并段落内 runs，避免 ``{{key}}`` 被 Word 拆成多 run 无法替换.
+
+    合并策略：将全部文本合并到第一个 run，清空后续 run。
+    字体保留：使用**文本最长的 run** 的字体属性覆盖第一个 run（避免格式标记 run 的字体污染正文）。
+    """
     if len(paragraph.runs) <= 1:
         return
     combined = paragraph.text
     if "{{" not in combined and "{" not in combined:
         return
+
+    # 找到文本最长的 run 作为字体来源（正文 run 通常最长）
+    longest_run = max(paragraph.runs, key=lambda r: len(r.text))
     first = paragraph.runs[0]
     first.text = combined
+
+    # 如果最长 run 与第一个 run 不同，且最长 run 有显式字体设置，复制其字体属性
+    if longest_run is not first and longest_run.font.name:
+        from copy import deepcopy
+        from docx.oxml.ns import qn
+        # 复制 rPr (run properties) XML 元素
+        source_rpr = longest_run._r.find(qn("w:rPr"))
+        if source_rpr is not None:
+            existing_rpr = first._r.find(qn("w:rPr"))
+            if existing_rpr is not None:
+                first._r.remove(existing_rpr)
+            first._r.insert(0, deepcopy(source_rpr))
+
     for run in paragraph.runs[1:]:
         run.text = ""
 

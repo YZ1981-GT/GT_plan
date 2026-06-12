@@ -1,418 +1,285 @@
-# 审计作业平台
+# 致同审计作业平台（GT_plan）
 
-基于 FastAPI + Vue 3 的现代化审计作业平台，支持多种审计类型、多会计准则适配、AI 辅助审计、电子签名等高级功能。
+基于 FastAPI + Vue 3 的现代化审计作业平台，面向会计师事务所全场景审计作业，支持多审计类型、多会计准则适配、AI 辅助审计、底稿/报表/合并/附注全链路联动、电子签名与质控复核等能力。
 
 ## 项目概述
 
-本平台是一个全场景审计作业平台，旨在将传统的审计工作流程数字化、智能化，提升审计效率和质量。
+本平台将传统审计工作流程数字化、智能化，覆盖「承接与计划 → 控制测试 → 实质性程序 → 完成与报告」全周期，以审定数为单一数据源，打通调整分录 → 审定试算表 → 财务报表 → 附注 → 出品物（审计报告）的双向数据流。
 
-### 开发状态
+### 平台现状（codegraph 实测）
 
-- **Phase 0-7**：已完成开发（基础设施、核心功能、底稿管理、报表管理、合并报表、协作功能、AI 辅助、扩展功能、人员管理、深度增强）
-- **Phase 8**：已完成规划（数据模型优化与性能提升，三件套文档已创建）
-- **测试覆盖**：后端约 143 个测试（AI/OCR 相关用例受本地依赖版本影响）
-- **数据库迁移**：D6 版本化 SQL 脚本（V001-V026，自动执行于后端启动时；详见 `backend/migrations/`）
-- **前端组件**：50+ Vue 组件
-- **API 端点**：100+ REST API 端点
+CodeGraph 索引统计：**3725 个文件 / 68280 个符号节点 / 140625 条关系边**。
+
+| 维度 | 规模 |
+|------|------|
+| 后端路由文件（routers） | 300+ 个 |
+| 后端服务文件（services） | 500+ 个 |
+| 数据模型文件（models） | 73 个 |
+| 后端测试文件 | 860+ 个 `test_*.py` |
+| 前端 Vue 组件/视图 | 610 个 |
+| 数据库迁移（V*.sql） | V001–V069（69 个版本 + R*.sql 回滚配对） |
+
+> 数据来源：`codegraph status` 与仓库实际文件计数（2026-06-11）。
 
 ### 核心功能
 
-- **多准则适配**：支持企业会计准则、小企业准则、政府会计准则、国际准则 IFRS
-- **多语言支持**：中英双语界面和报表输出
+- **多准则适配**：企业会计准则、小企业准则、政府会计准则、IFRS；准则解析（`resolve_applicable_standard`）按项目类型动态匹配报表配置
 - **审计类型扩展**：年度审计、专项审计、IPO 审计、内控审计、验资、税审
-- **AI 辅助审计**：OCR 识别、智能分类、底稿复核、持续审计、LLM 深度融合
-- **电子签名**：三级电子签名（用户名+密码、手写签名、CA 证书）
-- **附件管理**：集成 Paperless-ngx 进行文档管理和 OCR 识别
-- **数据可视化**：集成 Metabase 提供项目级数据可视化看板
-- **致同底稿编码**：内置致同标准的底稿编码体系（B/C/D-N/A/S/Q/Z 类）
-- **在线编辑**：集成 Univer 纯前端表格编辑器，支持在线文档编辑（已从 ONLYOFFICE 迁移）
-- **连续审计**：支持跨年数据对比和审计项目连续管理
-- **深度协作**：复核对话系统、过程记录、工时打卡、足迹记录
-- **智能推荐**：底稿智能推荐、知识库上下文感知、年度差异分析报告
-- **权限精细化**：三级权限控制（readonly/edit/review）、单元格级复核批注
+- **账表数据智能导入**：试算表/余额表/序时账/明细账智能导入 v2（多企业表头适配 + 符号约定统一 + 借贷方向推导 + 导入诊断）
+- **四表联查与穿透**：余额表 ↔ 序时账 ↔ 明细账 ↔ 凭证逐层穿透，金额反查
+- **底稿管理**：致同 2025 修订版底稿模板库（按 A–S 循环分目录）、元数据批量生成、公式引擎预填、`=ADJ()`/`=TB()` 等自定义公式绑定、xlsx 导入导出
+- **报表与附注**：四张报表生成（未审/审定）、报表公式、附注（disclosure notes）模板填充、多表格按表导出开关、Word/Excel 导出
+- **合并报表**：合并范围、抵销分录、少数股东权益、合并工作底稿、合并附注
+- **出品物溯源与回填**：审计报告正文模板（致同 17 套意见×企业类型）占位符替换、出品物章节级溯源、stale 感知刷新、文字回填（金额严禁倒灌）
+- **AI 辅助审计**：文档级/文件夹级 LLM 对话（RAG 上下文注入）、底稿 AI 结论 copilot、OCR 识别（PaddleOCR/Tesseract/MinerU）、知识库上下文感知
+- **协作与质控**：6 角色权限、复核对话、过程记录、工时打卡、EQCR 质控、单元格级复核批注、编辑锁
+- **电子签名**：三级电子签名（用户名+密码 / 手写签名 / CA 证书）
+- **数据可视化**：集成 Metabase 项目级看板
+- **在线编辑**：Univer 纯前端表格编辑器（底稿）+ OnlyOffice（Word 报告正文/附注，JS API 集成）
 
 ## 技术栈
 
 ### 后端
-- **框架**: FastAPI
-- **数据库**: PostgreSQL 16
-- **缓存**: Redis 7
-- **ORM**: SQLAlchemy (async)
-- **迁移**: D6 版本化 SQL 脚本（V001-V026 + per-migration 异常隔离 + schema 漂移自检）
-- **AI**: PaddleOCR、Tesseract、MinerU（可选）
-- **文档编辑**: Univer 纯前端表格编辑器（原 ONLYOFFICE 已迁移）
-- **底稿模板**: 致同 2025 修订版 476 个模板文件（xlsx/xlsm/docx），存储在 `backend/wp_templates/`
-
-> **Univer xlsx 导入导出说明**
->
-> 当前安装的是 Univer 开源版（`@univerjs/preset-sheets-core`），底稿模板通过后端 openpyxl 转换为 Univer JSON 格式加载。如需完整还原 xlsx 格式（条件格式/图表/数据验证），需安装 Univer Advanced Preset。
->
-> **部署方式**：服务器一次性配置，所有用户通过浏览器直接使用（无需客户端安装）。
->
-> ```bash
-> # 1. 前端安装（构建时打入 bundle）
-> cd audit-platform/frontend
-> npm install @univerjs/preset-sheets-drawing @univerjs/preset-sheets-advanced
-> ```
->
-> 2. 在 WorkpaperEditor.vue 的 `createUniver` 中添加：
-> ```typescript
-> import { UniverSheetsDrawingPreset } from '@univerjs/preset-sheets-drawing'
-> import { UniverSheetsAdvancedPreset } from '@univerjs/preset-sheets-advanced'
->
-> presets: [
->   UniverSheetsCorePreset({ container }),
->   UniverSheetsDrawingPreset(),
->   UniverSheetsAdvancedPreset({ universerEndpoint: 'http://localhost:3010' }),
-> ]
-> ```
->
-> 3. 部署 Univer 后端服务（提供 xlsx 解析能力）：
-> ```yaml
-> # docker-compose.yml 新增
-> univer-server:
->   image: univer-server:latest
->   ports:
->     - "3010:3010"
-> ```
-> 详见 [Univer 官方部署文档](https://docs.univer.ai/guides/pro/deploy)。
->
-> **不安装时**系统仍可正常使用（走后端 openpyxl 转换降级路径，丢失部分高级格式但数据完整）。
-- **附件管理**: Paperless-ngx
-- **性能监控**: Prometheus + prometheus-client
-- **数据校验**: pandas
-- **安全加密**: cryptography
-- **测试**: pytest（143个测试）
+- **框架**：FastAPI 0.135.x
+- **数据库**：PostgreSQL 16（pgvector 扩展用于 RAG 向量检索）
+- **缓存**：Redis 7
+- **ORM**：SQLAlchemy（async）
+- **迁移**：D6 版本化 SQL 脚本（`V*.sql` + `R*.sql` 回滚配对，启动时由 `MigrationRunner` 自动应用 + `schema_drift_detector` 漂移自检），当前最高 **V069**
+- **AI/OCR**：PaddleOCR、Tesseract、MinerU（可选，需 GPU）、MarkItDown（本地文档转 markdown）
+- **LLM**：本地 vLLM（OpenAI 兼容接口）+ 熔断器；RAG 走 pgvector，未起 embed 实例时降级 ilike
+- **底稿模板**：致同 2025 修订版模板文件（xlsx/xlsm/docx），存于 `backend/wp_templates/`（按 A–S 循环分目录）
+- **报告模板**：审计报告正文/财务报表/附注 Word/Excel 模板，存于 `backend/data/audit_report_templates/`
+- **可观测性**：OpenTelemetry + Prometheus
+- **测试**：pytest + Hypothesis（属性测试，`max_examples=5`）
 
 ### 前端
-- **框架**: Vue 3 + TypeScript
-- **UI 库**: Element Plus
-- **文档预览**: vue-office
-- **状态管理**: Pinia
-- **路由**: Vue Router
-- **图表**: ECharts
-- **虚拟滚动**: vue-virtual-scroller
-- **工具库**: @vueuse/core
+- **框架**：Vue 3 + TypeScript + Vite 6
+- **UI 库**：Element Plus（GT 紫令牌主题 `styles/gt-tokens.css`）
+- **状态管理**：Pinia
+- **路由**：Vue Router
+- **图表**：ECharts / vue-echarts / D3
+- **表格编辑**：Univer（preset-sheets-core/advanced/drawing）
+- **文档预览**：vue-office（docx/excel/pdf）、mammoth
+- **富文本**：TipTap
+- **测试**：Vitest（单测）+ Playwright（E2E）+ fast-check（属性测试）
 
 ### 基础设施
-- **容器化**: Docker + Docker Compose
-- **GPU 支持**: NVIDIA Docker（用于 MinerU）
-- **存储**: 本地磁盘 + 云端存储（S3/MinIO/阿里云OSS）
+- **容器化**：Docker + Docker Compose
+- **GPU 支持**：NVIDIA Docker（MinerU）
+- **存储**：本地磁盘 + 云端存储（SFTP/S3/MinIO/阿里云 OSS）
+- **附件管理**：Paperless-ngx
 
 ## 快速开始
 
-### 前置要求
+### 本地开发（推荐）
 
-- Docker 20.10+
-- Docker Compose 2.0+
-- NVIDIA Driver（如需使用 MinerU）
-- CUDA 12.9.1+（如需使用 MinerU）
+Windows 一键启动后端（:9980）+ 前端（:3030）：
 
-### 安装步骤
-
-1. **克隆项目**
-```bash
-git clone <repository-url>
-cd GT_plan
+```bat
+start-dev.bat
 ```
 
-2. **配置环境变量**
+打包为可执行程序：
+
 ```bash
-cp .env.example .env
-# 编辑 .env 文件，配置数据库密码、JWT 密钥等
+python build_exe.py
 ```
 
-3. **启动服务**
+### 手动启动
+
+**后端**（仓库根有 `.venv`）：
+
+```bash
+cd backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 9980 --reload --reload-dir app
+```
+
+**前端**：
+
+```bash
+cd audit-platform/frontend
+npm install
+npm run dev
+```
+
+> 前端唯一路径是 `audit-platform/frontend/`（仓库根无 `frontend/`）。
+
+### 访问地址
+
+| 服务 | 地址 |
+|------|------|
+| 后端 API | http://localhost:9980 |
+| API 文档 | http://localhost:9980/docs |
+| 前端开发服务器 | http://localhost:3030 |
+| Metabase 看板 | http://localhost:3000 |
+| Paperless-ngx | http://localhost:8010 |
+| vLLM（LLM 推理） | http://localhost:8100 |
+
+测试账号：`admin / admin123`。
+
+### Docker 服务
+
 ```bash
 docker-compose up -d
 ```
 
-4. **访问应用**
-- 后端 API: http://localhost:8000
-- API 文档: http://localhost:8000/docs
-- 前端开发服务器: http://localhost:3030
-- Metabase: http://localhost:3000
-- Paperless-ngx: http://localhost:8010
-- ONLYOFFICE: http://localhost:8080（向后兼容，底稿编辑已迁移至 Univer）
+常驻容器：`audit-postgres`(5432) / `audit-redis`(6379) / `audit-metabase`(3000) / `audit-pgbouncer`(6432，`DB_USE_PGBOUNCER=True` 时启用)；健康检查 `/api/health`。
 
-> 说明：`docker-compose.yml` 默认不包含前端容器，前端请按下文“前端开发”单独启动。
-
-### 可选：启动 MinerU（需要 GPU）
+### 可选：MinerU（需要 GPU）
 
 ```bash
-# 构建 MinerU 镜像
-bash scripts/build-mineru.sh  # Linux/Mac
-scripts\build-mineru.bat      # Windows
-
-# 启动 MinerU 服务
+bash scripts/build-mineru.sh    # Linux/Mac
+scripts\build-mineru.bat        # Windows
 docker-compose -f docker-compose.mineru.yml up -d
-
-# 启用 MinerU（在 .env 中设置）
-MINERU_ENABLED=true
-MINERU_API_URL=http://mineru:8000
+# 在 .env 中启用：MINERU_ENABLED=true
 ```
 
 ## 项目结构
 
 ```
 GT_plan/
-├── backend/                 # FastAPI 后端
-│   ├── app/               # 应用代码
-│   │   ├── models/        # 数据模型
-│   │   ├── services/      # 业务服务
-│   │   ├── routers/       # API 路由
-│   │   └── core/          # 核心配置（含 migration_runner / schema_drift_detector）
-│   ├── migrations/        # 数据库迁移 V*.sql + R*.sql 回滚（D6 版本化）
-│   ├── tests/             # 测试文件（143个测试）
-│   └── requirements.txt   # Python 依赖
-├── audit-platform/         # 前端应用
-│   ├── frontend/          # Vue 3 前端
-│   │   ├── src/           # 源代码
-│   │   └── package.json   # Node 依赖
-├── storage/                # 存储目录
-│   ├── projects/          # 项目级存储
-│   └── users/             # 用户私人库
-├── .kiro/                  # 项目规范文档
-│   ├── specs/             # 各阶段规格文档
-│   │   ├── phase0-infrastructure/  # Phase 0 基础设施
-│   │   ├── phase1a-core/          # Phase 1a 核心功能
-│   │   ├── phase1b-workpapers/    # Phase 1b 底稿
-│   │   ├── phase1c-reports/       # Phase 1c 报表
-│   │   ├── phase2-consolidation/  # Phase 2 合并
-│   │   ├── phase3-collaboration/ # Phase 3 协作
-│   │   ├── phase4-ai/             # Phase 4 AI
-│   │   ├── phase8-extension/      # Phase 8 扩展
-│   │   ├── phase9-staff/          # Phase 9 人员
-│   │   ├── phase10-enhancement/   # Phase 10 增强
-│   │   └── phase11/               # Phase 11 优化
-│   └── steering/          # 项目记忆和决策
-│       └── memory.md      # AI 持久记忆
-├── docs/                   # 项目文档
-│   └── mineru-deployment.md  # MinerU 部署指南
-├── scripts/                # 构建脚本
-├── docker-compose.yml      # 主服务编排
-├── docker-compose.mineru.yml  # MinerU 服务编排
-├── .env                    # 环境变量
-├── .env.example            # 环境变量示例
-└── README.md               # 项目说明
+├── backend/                      # FastAPI 后端
+│   ├── app/
+│   │   ├── models/               # 数据模型（73 个，含 phase10~16 分期模型）
+│   │   ├── services/             # 业务服务（500+，按领域分）
+│   │   ├── routers/              # API 路由（300+）
+│   │   ├── router_registry/      # 路由分组注册（新 router 必在此注册）
+│   │   ├── middleware/           # 中间件（审计日志/限流/可观测/响应封装）
+│   │   └── core/                 # 核心（migration_runner / schema_drift_detector / security 等）
+│   ├── migrations/               # V*.sql + R*.sql 回滚（D6 版本化，V001–V069）
+│   ├── wp_templates/             # 致同底稿模板库（A–S 循环分目录）
+│   ├── data/                     # seed/模板/字体/映射 JSON（含 audit_report_templates/）
+│   ├── scripts/                  # 工具脚本（check/seed/gen/analyze/ops/fix/migrate/e2e）
+│   └── tests/                    # 测试（860+ test_*.py）
+├── audit-platform/frontend/      # Vue 3 前端（唯一前端路径）
+│   └── src/                      # views / components / composables（610 个 .vue）
+├── storage/                      # 项目级 + 用户私人库存储
+├── .kiro/
+│   ├── specs/                    # Spec 三件套（active + _archive，详见 INDEX.md）
+│   └── steering/                 # 项目记忆与规范（memory/architecture/conventions/dev-history）
+├── docs/                         # 项目文档与提案
+├── docker-compose.yml            # 主服务编排
+├── docker-compose.mineru.yml     # MinerU 服务编排
+├── start-dev.bat                 # 本地一键启动
+└── build_exe.py                  # PyInstaller 打包
 ```
 
-## 文档
+## 数据库迁移
 
-### 开发阶段文档
+项目使用 D6 版本化 SQL 脚本作为唯一迁移系统（非 alembic）。后端启动时 `MigrationRunner` 自动检测并应用未执行的 `V*.sql`。
 
-项目采用分阶段开发模式，各阶段文档位于 `.kiro/specs/` 目录：
+铁律：
+- 新增列写 `V0XX__*.sql` + 配对 `R0XX__*.sql`，`CREATE/ALTER` 必加 `IF NOT EXISTS`
+- 按 version 数字去重（撞号字母序靠后者会静默丢失）
+- ORM 用 `TimestampMixin` 的表，DDL 必须显式写 `created_at`/`updated_at` 列
 
-#### Phase 0：基础设施
-- 基础架构搭建、Docker 容器化、数据库设计
-
-#### Phase 1a：核心功能
-- 科目体系、试算表、余额表、序时账、凭证表
-
-#### Phase 1b：底稿管理
-- 底稿模板、底稿解析、底稿预填、底稿导出
-
-#### Phase 1c：报表管理
-- 四张报表、报表公式、报表导出（PDF/Word）
-
-#### Phase 2：合并报表
-- 合并范围、抵消分录、少数股东、合并报表生成
-
-#### Phase 3：协作功能
-- 用户管理、权限控制、复核流程、过程记录
-
-#### Phase 4：AI 辅助
-- OCR 识别、智能分类、底稿复核、持续审计
-
-#### Phase 8：扩展功能
-- [架构优化文档](.kiro/specs/phase8-extension/architecture-optimization.md) - 架构重叠分析与优化方案
-- [需求文档](.kiro/specs/phase8-extension/requirements.md) - Phase 8 需求定义
-- [设计文档](.kiro/specs/phase8-extension/design.md) - Phase 8 设计方案
-- [任务清单](.kiro/specs/phase8-extension/tasks.md) - Phase 8 任务分解
-
-#### Phase 9：人员管理
-- 人员简历、工时打卡、足迹记录、统计分析
-
-#### Phase 10：深度增强
-- [需求文档](.kiro/specs/phase10-enhancement/requirements.md) - Phase 10 需求定义
-- [设计文档](.kiro/specs/phase10-enhancement/design.md) - Phase 10 设计方案
-- [任务清单](.kiro/specs/phase10-enhancement/tasks.md) - Phase 10 任务分解
-- **核心功能**：底稿下载与导入、连续审计、服务器存储与分区、过程记录与附件关联、LLM深度融合底稿、抽样程序增强、合并报表增强、复核对话系统、报告复核溯源、工时打卡与足迹、吐槽与求助专栏、私人库与LLM对话、辅助余额表汇总、权限精细化、单元格级复核批注、合并数据快照、底稿智能推荐、知识库上下文感知、年度差异分析报告、附件智能分类、报告排版模板
-
-#### Phase 8：优化完善
-- [README](.kiro/specs/phase8/README.md) - Phase 8 概述
-- [需求文档](.kiro/specs/phase8/requirements.md) - Phase 8 需求定义
-- [设计文档](.kiro/specs/phase8/design.md) - Phase 8 设计方案
-- [任务清单](.kiro/specs/phase8/tasks.md) - Phase 8 任务分解
-- **核心功能**：数据模型字段缺失修复、查询性能优化、底稿编辑体验优化、报表导出优化、移动端适配、审计程序精细化、数据校验增强、性能监控、用户体验优化、安全增强
-- **数据模型优化**：trial_balance 新增 currency_code 字段支持多币种、5 个核心复合索引提升查询性能
-- **查询性能**：EventBus debounce 去重（500ms 窗口合并事件）、FormulaEngine 超时控制（10s）、游标分页替代传统分页、GenericParser 流式解析（openpyxl read_only）、报表生成 Redis 缓存（TTL=10min）
-- **安全增强**：bcrypt cost 从 12 升级到 14、Fernet 对称加密服务、权限查询 Redis 缓存（TTL=5min 降级查库）、安全监控（异常 IP 检测 + 会话管理）
-- **前端性能**：Web Vitals 采集（FCP/LCP/TTI）+ 超阈值 ElNotification 告警、ECharts 性能趋势图 + 瓶颈分析面板
-- **移动端适配**：响应式三栏布局（768px/1024px/1280px 断点）、移动端穿透查询 + 复核意见组件、触摸手势（左右滑动控制导航栏）
-- **用户体验**：操作撤销（OperationHistory execute/undo + 通知栏撤销按钮）、13 个快捷键、审计程序执行进度可视化、模板共享机制
-
-### 项目记忆
-- [项目记忆文档](.kiro/steering/memory.md) - AI 持久记忆，包含项目上下文、技术决策、开发记录
-
-### 部署文档
-- [MinerU 部署指南](docs/deployment/mineru.md) - MinerU OCR 服务部署
-
-## 开发指南
-
-### 后端开发
+手动执行（仅诊断用）：
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-.venv\Scripts\activate     # Windows
-pip install -r requirements.txt
-
-# 数据库迁移（D6 版本化 SQL 脚本，启动时自动执行）
-# 项目使用 backend/migrations/V*.sql 作为唯一迁移系统
-# 后端启动时由 MigrationRunner 自动检测并应用未执行的版本
-# 手动执行（仅诊断用）：
 python -m app.core.migration_runner
-
-# 运行测试
-pytest
-```
-
-### 前端开发
-
-```bash
-cd audit-platform/frontend
-cp .env.example .env
-# 若后端运行在 8000，请将 VITE_API_BASE_URL 改为 http://localhost:8000
-npm install
-npm run dev
 ```
 
 ## 配置说明
 
-### 环境变量
+主要环境变量见 `.env.example`：
 
-主要配置项见 `.env.example`：
+| 变量 | 说明 |
+|------|------|
+| `DATABASE_URL` | PostgreSQL 连接（DB 名 `audit_platform`） |
+| `REDIS_URL` | Redis 连接 |
+| `JWT_SECRET_KEY` | JWT 签名密钥（必填） |
+| `CORS_ORIGINS` | 允许的前端源（前端 3030 必须在内） |
+| `ATTACHMENT_PRIMARY_STORAGE` | 附件主存储（paperless/local） |
+| `MINERU_ENABLED` | 是否启用 MinerU（需 GPU） |
+| `CLOUD_STORAGE_TYPE` | 云端存储类型（sftp/s3/smb/local） |
+| `ENCRYPTION_KEY` | 数据加密密钥 |
+| `ONLYOFFICE_URL` | OnlyOffice 服务地址（Word 报告正文/附注在线编辑；有 URL 即启用） |
+| `ONLYOFFICE_JWT_SECRET` | 生产环境启用 callback 签名校验 |
 
-- `DATABASE_URL`: PostgreSQL 数据库连接
-- `REDIS_URL`: Redis 连接
-- `JWT_SECRET_KEY`: JWT 签名密钥（必填）
-- `CORS_ORIGINS`: CORS 允许的前端源
-- `ATTACHMENT_PRIMARY_STORAGE`: 附件主存储方式（paperless/local）
-- `MINERU_ENABLED`: 是否启用 MinerU（需要 GPU）
-- `CLOUD_STORAGE_TYPE`: 云端存储类型（sftp/s3/smb/local）
-- `ENCRYPTION_KEY`: 数据加密密钥
-- `ONLYOFFICE_URL`: 在线编辑服务地址（向后兼容，底稿编辑已迁移至 Univer 纯前端方案）
+JWT 有效期（开发环境）：access_token 1440 分钟（24h）/ refresh_token 30 天。
 
-### OCR 引擎配置
+### OCR 引擎
 
-系统支持三种 OCR 引擎：
+系统支持三种 OCR 引擎，自动选择与故障回退，无需手动配置：
 
-1. **PaddleOCR**：高精度中文识别，用于发票/合同/回函
-2. **Tesseract**：多语言支持，速度快，用于通用文档
-3. **MinerU**（可选）：复杂文档解析，支持表格/公式识别
+1. **PaddleOCR**：高精度中文识别（发票/合同/回函）
+2. **Tesseract**：多语言、速度快（通用文档）
+3. **MinerU**（可选）：复杂文档/表格/公式识别
 
-OCR 引擎会自动选择和故障回退，无需手动配置。
+### 文档转换链
+
+知识库上传文本提取采用三级降级：**MarkItDown 主**（17 种办公格式，纯本地）→ **MinerU OCR**（PDF 扫描件）→ **PyPDF2/python-docx 兜底**。
+
+## 大文件导入说明
+
+项目年度账表数据（`tb_balance`/`tb_ledger`/`tb_aux_balance`/`tb_aux_ledger`）导入规则：
+
+- `POST /api/projects/{project_id}/import` 对 `generic` 类型的 `xlsx`/`xlsm`/`csv` 文件，达到 20MB 自动切流式模式（分块处理，避免全文件载入内存）
+- `on_duplicate=overwrite` 先软删同年度旧数据再写新行，旧批次标记 `rolled_back`
+- 智能导入清理对同 `project_id + year` 旧四表行执行软删
+
+超大数据集上传建议：优先单 sheet/结构化导出；使用稳定的表头名（科目编码/日期/凭证字段）减少解析回退；整期刷新用 `on_duplicate=overwrite` 避免新旧混合。
 
 ## 故障排查
 
-### 数据库连接失败
-
-检查 PostgreSQL 服务是否正常运行：
 ```bash
+# 数据库连接失败
 docker-compose logs postgres
-```
 
-### Redis 连接失败
-
-检查 Redis 服务是否正常运行：
-```bash
+# Redis 连接失败
 docker-compose logs redis
-```
 
-### MinerU 不可用
-
-检查 GPU 是否可用：
-```bash
+# MinerU 不可用（先确认 GPU）
 nvidia-smi
-```
-
-检查 MinerU 容器状态：
-```bash
 docker-compose -f docker-compose.mineru.yml logs mineru
 ```
 
-## Large File Import Notes
+常见运行时陷阱：
+- `uvicorn --reload` 父子进程互拉，kill 不净 → 干净验证另起端口（如 9981）绕开 reloader
+- FastAPI 改 router 不热加载，需重启；新 router 必须在 `router_registry/` 注册否则前端 404
+- 含静态路径的 router 必须注册在同前缀通配 router（如 `/{project_id}`）之前
+- 前端下载认证资源禁用 `window.open`（不带 token → 401），必须用 `downloadFile`（axios blob + Bearer）
 
-For project-year accounting data import (`tb_balance`, `tb_ledger`, `tb_aux_balance`, `tb_aux_ledger`), the backend now applies these rules:
+## 文档导航
 
-- `POST /api/projects/{project_id}/import` automatically switches to streaming mode for `generic` uploads when file type is `xlsx`/`xlsm`/`csv` and size is at least `20MB`.
-- Streaming mode processes rows in chunks and avoids router-level full-file loading into memory.
-- `on_duplicate=overwrite` performs soft-delete of existing same-year data before writing new rows.
-- Smart import cleanup now soft-deletes old four-table rows for the same `project_id + year` and marks previous completed batches as `rolled_back`.
-- Run database migrations (D6 version SQL, auto-applied on backend startup) to apply import hot-path indexes before benchmarking.
-
-Recommended upload strategy for very large datasets:
-
-- Prefer single-sheet or well-structured workbook exports.
-- Use stable header names (account code/date/voucher fields) to reduce parser fallback costs.
-- Use `on_duplicate=overwrite` for full-period refresh to avoid mixed old/new rows.
-
-## 贡献指南
-
-1. Fork 项目
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
-
-## 许可证
-
-本项目采用专有许可证。
-
-## 联系方式
-
-如有问题或建议，请联系项目维护者。
+| 文档 | 用途 |
+|------|------|
+| `.kiro/specs/INDEX.md` | Spec 开发索引（active + archived，定位三件套） |
+| `.kiro/steering/memory.md` | AI 持久记忆（项目上下文、技术决策、近期修复） |
+| `.kiro/steering/architecture.md` | 架构、系统规模、数据流 |
+| `.kiro/steering/conventions.md` | 编码规范、UI 视觉、操作铁律、PG 运维 |
+| `.kiro/steering/dev-history.md` | append-only 开发历史与端点速查 |
+| `docs/` | 提案、部署指南、可行性评估 |
 
 ## CI / pre-commit
 
-### 本地 pre-commit 安装
+### 本地 pre-commit
 
 ```bash
 pip install pre-commit
 pre-commit install
 ```
 
-安装后每次 `git commit` 会自动运行以下检查：
-
-| Hook | 作用 | 触发文件 |
-|------|------|----------|
-| `check-json` | JSON 语法校验 | `backend/data/*.json` |
-| `json-template-lint` | Seed 文件 schema 校验 | `backend/data/*.json` |
-
-手动运行全部 hook（不提交）：
-
-```bash
-pre-commit run --all-files
-```
-
 ### CI 流水线
 
-推送到 `master` 或发起 PR 时，GitHub Actions 自动运行 4 个并发 job：
+推送 `master` 或发起 PR 时 GitHub Actions 并发运行：
 
 | Job | 内容 |
 |-----|------|
 | `backend-tests` | pytest（排除 integration/e2e） |
 | `backend-lint` | ruff check + signature_level 用法检查 |
-| `seed-validate` | validate_seed_files.py schema 校验 |
+| `seed-validate` | seed JSON schema 校验 |
 | `frontend-build` | npm ci + npm run build |
+| `gitleaks` | 密钥泄露扫描（gitleaks-action@v2） |
 
-### CI 失败排查
+## 贡献指南
 
-| 失败 Job | 常见原因 | 排查步骤 |
-|----------|----------|----------|
-| `backend-tests` | 新代码引入测试失败 | 本地 `python -m pytest backend/tests/ --ignore=backend/tests/integration --ignore=backend/tests/e2e -x --tb=short` |
-| `backend-lint` | ruff 规则违反或 `signature_level ==` 直接比较 | 本地 `python -m ruff check backend/` 修复；确认不直接比较 `signature_level` 字段 |
-| `seed-validate` | seed JSON 格式错误或字段缺失 | 本地 `python scripts/validate_seed_files.py` 查看具体报错 |
-| `frontend-build` | TypeScript 类型错误或依赖缺失 | 本地 `cd audit-platform/frontend && npm ci && npm run build` |
+1. 改动前先 `git fetch` 同步，评估 ahead/behind
+2. 协作走 PR，不直推 `main`（默认分支为 `main`）
+3. 单 commit 提交所有变更；commit 前确认无 `.env`/密钥文件
+4. 大改动（>500 行 / 3+ 组件 / 跨前后端）先出 spec 三件套
+
+## 许可证
+
+本项目采用专有许可证。
