@@ -1,0 +1,7261 @@
+{
+  "soe_standalone": {
+    "一、1": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 16
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "二、1": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "三、1": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "四、会计期间": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "四、记账本位币": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "四、记账基础和计价原": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 1,
+        "OPT_HINT": 2
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "四、企业合并": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 14,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 14
+    },
+    "四、合并财务报表编制": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "四、合营安排的分类及": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 13
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "四、现金及现金等价物": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "四、外币业务和外币报": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "四、金融工具": {
+      "element_count": 158,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 151,
+        "OPT_HINT": 5
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 151
+    },
+    "四、套期会计": {
+      "element_count": 26,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 23,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 23
+    },
+    "四、存货": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 16
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "四、长期股权投资": {
+      "element_count": 29,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 26,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "四、投资性房地产": {
+      "element_count": 14,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 12
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "四、固定资产": {
+      "element_count": 20,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 16,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "四、在建工程": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "四、借款费用": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "四、生物资产": {
+      "element_count": 33,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 28,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 28
+    },
+    "四、油气资产": {
+      "element_count": 24,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 22
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 22
+    },
+    "四、使用权资产": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 7
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "四、无形资产": {
+      "element_count": 19,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 13,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "四、研究开发支出": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 7
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "四、长期待摊费用": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "四、资产减值": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 8
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 8
+    },
+    "四、职工薪酬": {
+      "element_count": 25,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 22,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 22
+    },
+    "四、股份支付": {
+      "element_count": 16,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 13,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "四、应付债券": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "四、预计负债": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 7,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "四、优先股、永续债等": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "四、收入的确认原则": {
+      "element_count": 28,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 26
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "四、合同成本": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 13
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "四、政府补助": {
+      "element_count": 16,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 14
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 14
+    },
+    "四、租赁": {
+      "element_count": 43,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 39,
+        "OPT_HINT": 2
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 39
+    },
+    "四、持有待售及终止经": {
+      "element_count": 25,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 23
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 23
+    },
+    "四、公允价值计量": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 9
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "四、安全生产费用及维": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "四、资产证券化业务": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 6,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "五、会计政策变更": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 9
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "五、会计估计变更": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、重要前期差错更正": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、其他调整事项【包": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3,
+        "EMPTY": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、对期初所有者权益": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "六、主要税种及税率": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "六、优惠税负及批文": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "EMPTY": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、1": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、2": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、3": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、4": {
+      "element_count": 50,
+      "types": {
+        "FORMULA_REF": 13,
+        "TEXT": 26,
+        "TABLE": 11
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "八、5": {
+      "element_count": 55,
+      "types": {
+        "FORMULA_REF": 13,
+        "TEXT": 29,
+        "TABLE": 11,
+        "EMPTY": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 29
+    },
+    "八、6": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、7": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 6,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "八、8": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、9": {
+      "element_count": 72,
+      "types": {
+        "FORMULA_REF": 17,
+        "TEXT": 37,
+        "TABLE": 15,
+        "EMPTY": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 37
+    },
+    "八、10": {
+      "element_count": 22,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 13,
+        "TABLE": 3,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "八、11": {
+      "element_count": 21,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 12,
+        "TABLE": 3,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "八、12": {
+      "element_count": 20,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 12,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "八、13": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、14": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、15": {
+      "element_count": 27,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 13,
+        "TABLE": 5,
+        "EMPTY": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "八、16": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 2,
+        "EMPTY": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "八、17": {
+      "element_count": 20,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 12,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "八、18": {
+      "element_count": 90,
+      "types": {
+        "FORMULA_REF": 12,
+        "TEXT": 64,
+        "TABLE": 10,
+        "EMPTY": 4
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 64
+    },
+    "八、19": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 6,
+        "TABLE": 2,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "八、20": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、21": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 9,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "八、22": {
+      "element_count": 24,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 12,
+        "TABLE": 5
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "八、23": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 3,
+        "EMPTY": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "八、24": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 8,
+        "TABLE": 2,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 8
+    },
+    "八、25": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、26": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、27": {
+      "element_count": 19,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 12,
+        "TABLE": 2,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "八、28": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、29": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "八、30": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、31": {
+      "element_count": 19,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 9,
+        "TABLE": 4,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "八、32": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 6,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "八、33": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "八、34": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "八、35": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、36": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、37": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、38": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、39": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 8,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 8
+    },
+    "八、40": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 6,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "八、41": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、42": {
+      "element_count": 25,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 13,
+        "TABLE": 5
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "八、43": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 6,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "八、44": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、45": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、46": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、47": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、48": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、49": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、50": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 9,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "八、51": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 11,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "八、52": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 6,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "八、53": {
+      "element_count": 19,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 11,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "八、54": {
+      "element_count": 44,
+      "types": {
+        "FORMULA_REF": 10,
+        "TEXT": 25,
+        "TABLE": 8,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 25
+    },
+    "八、55": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、56": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 5,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "八、57": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、58": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、59": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、60": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、61": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、62": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、63": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、64": {
+      "element_count": 43,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 30,
+        "TABLE": 5,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 30
+    },
+    "八、65": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、66": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、67": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、68": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、69": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、70": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、71": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、72": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、73": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、74": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、75": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "八、76": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 2,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、77": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 2,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、78": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、79": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3,
+        "TABLE": 1,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、80": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、81": {
+      "element_count": 40,
+      "types": {
+        "FORMULA_REF": 11,
+        "TEXT": 20,
+        "TABLE": 9
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 20
+    },
+    "八、82": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 9
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "八、83": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 9,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "八、84": {
+      "element_count": 20,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 10,
+        "TABLE": 4
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 10
+    },
+    "八、85": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、86": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、87": {
+      "element_count": 31,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 23,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 23
+    },
+    "八、89": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、90": {
+      "element_count": 30,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 19,
+        "TABLE": 4,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 19
+    },
+    "八、91": {
+      "element_count": 30,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 18,
+        "TABLE": 5
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 18
+    },
+    "八、92": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、93": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "九、1、或有负债": {
+      "element_count": 22,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 16,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "九、2、或有资产": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "十、重要的资产负债表": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "十、资产负债表日后利": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "十、其他资产负债表日": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "十一、本公司的母公司情": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 7,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "十一、本公司的子公司情": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "十一、本公司的合营企业": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 7,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "十一、本公司的其他关联": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "十一、关联交易情况": {
+      "element_count": 43,
+      "types": {
+        "FORMULA_REF": 8,
+        "TEXT": 29,
+        "TABLE": 6
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 29
+    },
+    "十一、关联方应收应付款": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    }
+  },
+  "soe_consolidated": {
+    "一、1": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 16
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "二、1": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "三、1": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "四、会计期间": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "四、记账本位币": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "四、记账基础和计价原": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 1,
+        "OPT_HINT": 2
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "四、企业合并": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 14,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 14
+    },
+    "四、合并财务报表编制": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "四、合营安排的分类及": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 13
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "四、现金及现金等价物": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "四、外币业务和外币报": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "四、金融工具": {
+      "element_count": 158,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 151,
+        "OPT_HINT": 5
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 151
+    },
+    "四、套期会计": {
+      "element_count": 26,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 23,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 23
+    },
+    "四、存货": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 16
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "四、长期股权投资": {
+      "element_count": 29,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 26,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "四、投资性房地产": {
+      "element_count": 14,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 12
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "四、固定资产": {
+      "element_count": 20,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 16,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "四、在建工程": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "四、借款费用": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "四、生物资产": {
+      "element_count": 33,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 28,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 28
+    },
+    "四、油气资产": {
+      "element_count": 24,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 22
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 22
+    },
+    "四、使用权资产": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 7
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "四、无形资产": {
+      "element_count": 19,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 13,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "四、研究开发支出": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 7
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "四、长期待摊费用": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "四、资产减值": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 8
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 8
+    },
+    "四、职工薪酬": {
+      "element_count": 25,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 22,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 22
+    },
+    "四、股份支付": {
+      "element_count": 16,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 13,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "四、应付债券": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "四、预计负债": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 7,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "四、优先股、永续债等": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "四、收入的确认原则": {
+      "element_count": 28,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 26
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "四、合同成本": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 13
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "四、政府补助": {
+      "element_count": 16,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 14
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 14
+    },
+    "四、租赁": {
+      "element_count": 43,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 39,
+        "OPT_HINT": 2
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 39
+    },
+    "四、持有待售及终止经": {
+      "element_count": 25,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 23
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 23
+    },
+    "四、公允价值计量": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 9
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "四、安全生产费用及维": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "四、资产证券化业务": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 6,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "五、会计政策变更": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 9
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "五、会计估计变更": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、重要前期差错更正": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、其他调整事项【包": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3,
+        "EMPTY": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、对期初所有者权益": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "六、主要税种及税率": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "六、优惠税负及批文": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "七、本期纳入合并报表": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 7,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "七、母公司拥有被投资": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "七、重要非全资子公司": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "七、本期不再纳入合并": {
+      "element_count": 16,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 8,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 8
+    },
+    "七、本期新纳入合并范": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "七、本期发生的同一控": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "七、本期发生的非同一": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "七、本期发生的吸收合": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "七、子公司使用企业集": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "七、纳入合并财务报表": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "七、母公司在子公司的": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "七、子公司向母公司转": {
+      "element_count": 3,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1,
+        "EMPTY": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、1": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、2": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、3": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、4": {
+      "element_count": 50,
+      "types": {
+        "FORMULA_REF": 13,
+        "TEXT": 26,
+        "TABLE": 11
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "八、5": {
+      "element_count": 55,
+      "types": {
+        "FORMULA_REF": 13,
+        "TEXT": 29,
+        "TABLE": 11,
+        "EMPTY": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 29
+    },
+    "八、6": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、7": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 6,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "八、8": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、9": {
+      "element_count": 72,
+      "types": {
+        "FORMULA_REF": 17,
+        "TEXT": 37,
+        "TABLE": 15,
+        "EMPTY": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 37
+    },
+    "八、10": {
+      "element_count": 22,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 13,
+        "TABLE": 3,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "八、11": {
+      "element_count": 21,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 12,
+        "TABLE": 3,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "八、12": {
+      "element_count": 20,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 12,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "八、13": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、14": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、15": {
+      "element_count": 27,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 13,
+        "TABLE": 5,
+        "EMPTY": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "八、16": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 2,
+        "EMPTY": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "八、17": {
+      "element_count": 20,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 12,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "八、18": {
+      "element_count": 90,
+      "types": {
+        "FORMULA_REF": 12,
+        "TEXT": 64,
+        "TABLE": 10,
+        "EMPTY": 4
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 64
+    },
+    "八、19": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 6,
+        "TABLE": 2,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "八、20": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、21": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 9,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "八、22": {
+      "element_count": 24,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 12,
+        "TABLE": 5
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "八、23": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 3,
+        "EMPTY": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "八、24": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 8,
+        "TABLE": 2,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 8
+    },
+    "八、25": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、26": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、27": {
+      "element_count": 19,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 12,
+        "TABLE": 2,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "八、28": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、29": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "八、30": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、31": {
+      "element_count": 19,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 9,
+        "TABLE": 4,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "八、32": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 6,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "八、33": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "八、34": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "八、35": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、36": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、37": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、38": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、39": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 8,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 8
+    },
+    "八、40": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 6,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "八、41": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、42": {
+      "element_count": 25,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 13,
+        "TABLE": 5
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "八、43": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 6,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "八、44": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、45": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、46": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、47": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、48": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、49": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、50": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 9,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "八、51": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 11,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "八、52": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 6,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "八、53": {
+      "element_count": 19,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 11,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "八、54": {
+      "element_count": 44,
+      "types": {
+        "FORMULA_REF": 10,
+        "TEXT": 25,
+        "TABLE": 8,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 25
+    },
+    "八、55": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、56": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 5,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "八、57": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、58": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、59": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、60": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、61": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、62": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、63": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、64": {
+      "element_count": 43,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 30,
+        "TABLE": 5,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 30
+    },
+    "八、65": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、66": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、67": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、68": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、69": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、70": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、71": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、72": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、73": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、74": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、75": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "八、76": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 2,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、77": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 2,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、78": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、79": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3,
+        "TABLE": 1,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、80": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、81": {
+      "element_count": 40,
+      "types": {
+        "FORMULA_REF": 11,
+        "TEXT": 20,
+        "TABLE": 9
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 20
+    },
+    "八、82": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 9
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "八、83": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 9,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "八、84": {
+      "element_count": 20,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 10,
+        "TABLE": 4
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 10
+    },
+    "八、85": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "八、86": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "八、87": {
+      "element_count": 31,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 23,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 23
+    },
+    "八、89": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "八、90": {
+      "element_count": 30,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 19,
+        "TABLE": 4,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 19
+    },
+    "八、91": {
+      "element_count": 30,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 18,
+        "TABLE": 5
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 18
+    },
+    "八、92": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "八、93": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "九、1、或有负债": {
+      "element_count": 22,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 16,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "九、2、或有资产": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "十、重要的资产负债表": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "十、资产负债表日后利": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "十、其他资产负债表日": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "十一、本公司的母公司情": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 7,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "十一、本公司的子公司情": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "十一、本公司的合营企业": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 7,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "十一、本公司的其他关联": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "十一、关联交易情况": {
+      "element_count": 43,
+      "types": {
+        "FORMULA_REF": 8,
+        "TEXT": 29,
+        "TABLE": 6
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 29
+    },
+    "十一、关联方应收应付款": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "十二、应收账款": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "十二、其他应收款": {
+      "element_count": 3,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1,
+        "EMPTY": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "十二、长期股权投资": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 6,
+        "TABLE": 3,
+        "EMPTY": 5
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "十二、营业收入与营业成本": {
+      "element_count": 3,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1,
+        "EMPTY": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "十二、投资收益": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "十二、现金流量表补充资": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    }
+  },
+  "listed_standalone": {
+    "一、1": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "二、1": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "三、遵循企业会计准则": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "三、会计期间": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "三、营业周期": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "三、记账本位币": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "三、重要性标准确定方": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "三、同一控制下和非同": {
+      "element_count": 16,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 14
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 14
+    },
+    "三、控制的判断标准和": {
+      "element_count": 27,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 25
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 25
+    },
+    "三、合营安排的分类及": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 13
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "三、现金及现金等价物": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "三、外币业务和外币报": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 10
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 10
+    },
+    "三、金融工具": {
+      "element_count": 153,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 146,
+        "OPT_HINT": 5
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 146
+    },
+    "三、金融资产转移": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "三、公允价值计量": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 8
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 8
+    },
+    "三、存货": {
+      "element_count": 23,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 21
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 21
+    },
+    "三、持有待售和终止经": {
+      "element_count": 24,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 22
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 22
+    },
+    "三、长期股权投资": {
+      "element_count": 29,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 26,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "三、投资性房地产【不": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 10
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 10
+    },
+    "三、固定资产": {
+      "element_count": 20,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 16,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "三、在建工程": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 6
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "三、工程物资【不适用": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "三、借款费用": {
+      "element_count": 14,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 12
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "三、生物资产【不适用": {
+      "element_count": 32,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 27,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 27
+    },
+    "三、无形资产": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 12,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "三、研发支出": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 9
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "三、资产减值": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 8
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 8
+    },
+    "三、长期待摊费用": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "三、职工薪酬": {
+      "element_count": 24,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 21,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 21
+    },
+    "三、预计负债": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 6,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "三、股份支付及权益工": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 13,
+        "OPT_HINT": 2
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "三、优先股、永续债等": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 6
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "三、收入（应当写出适": {
+      "element_count": 49,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 47
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 47
+    },
+    "三、合同成本": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "三、政府补助": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 13
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "三、递延所得税资产及": {
+      "element_count": 16,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 14
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 14
+    },
+    "三、租赁": {
+      "element_count": 42,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 38,
+        "OPT_HINT": 2
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 38
+    },
+    "三、使用权资产": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 7
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "三、安全生产费用及维": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "三、回购股份【不适用": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "三、资产证券化业务【": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 6,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "三、套期会计【不适用": {
+      "element_count": 25,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 22,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 22
+    },
+    "三、债务重组【不适用": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 15
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 15
+    },
+    "三、重大会计判断和估": {
+      "element_count": 25,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 22,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 22
+    },
+    "三、重要会计政策、会": {
+      "element_count": 35,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 21,
+        "TABLE": 5,
+        "EMPTY": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 21
+    },
+    "四、主要税种及税率": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 5,
+        "TABLE": 2,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "四、税收优惠及批文": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、1": {
+      "element_count": 16,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 12,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "五、2": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、3": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、4": {
+      "element_count": 66,
+      "types": {
+        "FORMULA_REF": 16,
+        "TEXT": 33,
+        "TABLE": 14,
+        "OPT_HINT": 2,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 33
+    },
+    "五、5": {
+      "element_count": 69,
+      "types": {
+        "FORMULA_REF": 16,
+        "TEXT": 39,
+        "TABLE": 14
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 39
+    },
+    "五、6": {
+      "element_count": 29,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 16,
+        "OPT_HINT": 3,
+        "TABLE": 4
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "五、7": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 11,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "五、8": {
+      "element_count": 97,
+      "types": {
+        "FORMULA_REF": 20,
+        "TEXT": 59,
+        "TABLE": 18
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 59
+    },
+    "五、9": {
+      "element_count": 58,
+      "types": {
+        "FORMULA_REF": 13,
+        "TEXT": 34,
+        "TABLE": 11
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 34
+    },
+    "五、10": {
+      "element_count": 37,
+      "types": {
+        "FORMULA_REF": 9,
+        "TEXT": 21,
+        "TABLE": 7
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 21
+    },
+    "五、11": {
+      "element_count": 31,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 19,
+        "TABLE": 5
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 19
+    },
+    "五、12": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "五、13": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 12,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "五、14": {
+      "element_count": 59,
+      "types": {
+        "FORMULA_REF": 15,
+        "TEXT": 29,
+        "TABLE": 13,
+        "EMPTY": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 29
+    },
+    "五、15": {
+      "element_count": 62,
+      "types": {
+        "FORMULA_REF": 16,
+        "TEXT": 31,
+        "TABLE": 14,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 31
+    },
+    "五、16": {
+      "element_count": 53,
+      "types": {
+        "FORMULA_REF": 14,
+        "TEXT": 26,
+        "TABLE": 12,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "五、17": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、18": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "EMPTY": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、19": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、20": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "五、21": {
+      "element_count": 21,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 13,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "五、22": {
+      "element_count": 38,
+      "types": {
+        "FORMULA_REF": 8,
+        "TEXT": 24,
+        "TABLE": 6
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 24
+    },
+    "五、23": {
+      "element_count": 29,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 17,
+        "TABLE": 5
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 17
+    },
+    "五、24": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 6,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "五、25": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、26": {
+      "element_count": 27,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 19,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 19
+    },
+    "五、27": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "五、28": {
+      "element_count": 36,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 23,
+        "TABLE": 4,
+        "EMPTY": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 23
+    },
+    "五、29": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、30": {
+      "element_count": 22,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 12,
+        "TABLE": 4
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "五、31": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 6,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "五、32": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 4,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "五、33": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 7,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "五、34": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 10,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 10
+    },
+    "五、35": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、36": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、37": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、38": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 6,
+        "TABLE": 3,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "五、39": {
+      "element_count": 21,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 13,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "五、40": {
+      "element_count": 23,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 15,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 15
+    },
+    "五、41": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "五、42": {
+      "element_count": 27,
+      "types": {
+        "FORMULA_REF": 8,
+        "TEXT": 13,
+        "TABLE": 6
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "五、43": {
+      "element_count": 19,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 9,
+        "TABLE": 4
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "五、44": {
+      "element_count": 16,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 9,
+        "TABLE": 2,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "五、45": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、46": {
+      "element_count": 38,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 26,
+        "TABLE": 5
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "五、47": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 7,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "五、48": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 10,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 10
+    },
+    "五、49": {
+      "element_count": 45,
+      "types": {
+        "FORMULA_REF": 10,
+        "TEXT": 26,
+        "TABLE": 8,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "五、50": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、51": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、52": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "五、53": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、54": {
+      "element_count": 23,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 17,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 17
+    },
+    "五、55": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "五、56": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 8,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 8
+    },
+    "五、57": {
+      "element_count": 20,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 14,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 14
+    },
+    "五、58": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、59": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、60": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、61": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 14,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 14
+    },
+    "五、62": {
+      "element_count": 57,
+      "types": {
+        "FORMULA_REF": 8,
+        "TEXT": 43,
+        "TABLE": 6
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 43
+    },
+    "五、63": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、64": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、65": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、66": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、67": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 6,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "五、68": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、69": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、70": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "五、71": {
+      "element_count": 46,
+      "types": {
+        "FORMULA_REF": 9,
+        "TEXT": 30,
+        "TABLE": 7
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 30
+    },
+    "五、72": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、73": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、74": {
+      "element_count": 42,
+      "types": {
+        "FORMULA_REF": 8,
+        "TEXT": 28,
+        "TABLE": 6
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 28
+    },
+    "六、1": {
+      "element_count": 27,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 16,
+        "TABLE": 4,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "七、1": {
+      "element_count": 288,
+      "types": {
+        "FORMULA_REF": 38,
+        "TEXT": 210,
+        "TABLE": 36,
+        "OPT_HINT": 2,
+        "EMPTY": 2
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 210
+    },
+    "八、1": {
+      "element_count": 36,
+      "types": {
+        "FORMULA_REF": 8,
+        "TEXT": 22,
+        "TABLE": 6
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 22
+    },
+    "九、1": {
+      "element_count": 232,
+      "types": {
+        "FORMULA_REF": 33,
+        "TEXT": 164,
+        "TABLE": 31,
+        "EMPTY": 3,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 164
+    },
+    "十、1": {
+      "element_count": 56,
+      "types": {
+        "FORMULA_REF": 11,
+        "TEXT": 32,
+        "TABLE": 9,
+        "EMPTY": 4
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 32
+    },
+    "十一、本公司的其他关联": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "十一、关联交易情况": {
+      "element_count": 71,
+      "types": {
+        "FORMULA_REF": 15,
+        "TEXT": 43,
+        "TABLE": 13
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 43
+    },
+    "十一、关联方应收应付款": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 6,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "十二、1": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "十二、股份支付总体情况": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "十二、以权益结算的股份": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "十二、以现金结算的股份": {
+      "element_count": 3,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "十二、本期股份支付费用": {
+      "element_count": 3,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "十二、股份支付的修改、": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "十三、重要的承诺事项": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 12,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "十三、或有事项": {
+      "element_count": 26,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 19,
+        "TABLE": 2,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 19
+    },
+    "十四、重要的资产负债表": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "十四、资产负债表日后利": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 0
+    },
+    "十四、重要销售退回": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "十四、其他资产负债表日": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "十五、1": {
+      "element_count": 124,
+      "types": {
+        "FORMULA_REF": 15,
+        "TEXT": 91,
+        "TABLE": 13,
+        "EMPTY": 4,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 91
+    },
+    "十七、当期非经常性损益明细表（无数据的行项目，尽可能删除）": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "十七、净资产收益率和每股收益": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 6,
+        "TABLE": 2,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "十七、境内外会计准则下会计数据差异": {
+      "element_count": 23,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 12,
+        "TABLE": 2,
+        "OPT_HINT": 1,
+        "EMPTY": 4
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 12
+    }
+  },
+  "listed_consolidated": {
+    "一、1": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "二、1": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "三、遵循企业会计准则": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "三、会计期间": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "三、营业周期": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "三、记账本位币": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "三、重要性标准确定方": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "三、同一控制下和非同": {
+      "element_count": 16,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 14
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 14
+    },
+    "三、控制的判断标准和": {
+      "element_count": 27,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 25
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 25
+    },
+    "三、合营安排的分类及": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 13
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "三、现金及现金等价物": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "三、外币业务和外币报": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 10
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 10
+    },
+    "三、金融工具": {
+      "element_count": 153,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 146,
+        "OPT_HINT": 5
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 146
+    },
+    "三、金融资产转移": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "三、公允价值计量": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 8
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 8
+    },
+    "三、存货": {
+      "element_count": 23,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 21
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 21
+    },
+    "三、持有待售和终止经": {
+      "element_count": 24,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 22
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 22
+    },
+    "三、长期股权投资": {
+      "element_count": 29,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 26,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "三、投资性房地产【不": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 10
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 10
+    },
+    "三、固定资产": {
+      "element_count": 20,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 16,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "三、在建工程": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 6
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "三、工程物资【不适用": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 5
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "三、借款费用": {
+      "element_count": 14,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 12
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "三、生物资产【不适用": {
+      "element_count": 32,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 27,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 27
+    },
+    "三、无形资产": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 12,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "三、研发支出": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 9
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "三、资产减值": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 8
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 8
+    },
+    "三、长期待摊费用": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "三、职工薪酬": {
+      "element_count": 24,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 21,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 21
+    },
+    "三、预计负债": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 6,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "三、股份支付及权益工": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 13,
+        "OPT_HINT": 2
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "三、优先股、永续债等": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 6
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "三、收入（应当写出适": {
+      "element_count": 49,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 47
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 47
+    },
+    "三、合同成本": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "三、政府补助": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 13
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "三、递延所得税资产及": {
+      "element_count": 16,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 14
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 14
+    },
+    "三、租赁": {
+      "element_count": 42,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 38,
+        "OPT_HINT": 2
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 38
+    },
+    "三、使用权资产": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 7
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "三、安全生产费用及维": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 11
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "三、回购股份【不适用": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "三、资产证券化业务【": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 6,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "三、套期会计【不适用": {
+      "element_count": 25,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 22,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 22
+    },
+    "三、债务重组【不适用": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 15
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 15
+    },
+    "三、重大会计判断和估": {
+      "element_count": 25,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 22,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 22
+    },
+    "三、重要会计政策、会": {
+      "element_count": 35,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 21,
+        "TABLE": 5,
+        "EMPTY": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 21
+    },
+    "四、主要税种及税率": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 5,
+        "TABLE": 2,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "四、税收优惠及批文": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、1": {
+      "element_count": 16,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 12,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "五、2": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、3": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、4": {
+      "element_count": 66,
+      "types": {
+        "FORMULA_REF": 16,
+        "TEXT": 33,
+        "TABLE": 14,
+        "OPT_HINT": 2,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 33
+    },
+    "五、5": {
+      "element_count": 69,
+      "types": {
+        "FORMULA_REF": 16,
+        "TEXT": 39,
+        "TABLE": 14
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 39
+    },
+    "五、6": {
+      "element_count": 29,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 16,
+        "OPT_HINT": 3,
+        "TABLE": 4
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "五、7": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 11,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 11
+    },
+    "五、8": {
+      "element_count": 97,
+      "types": {
+        "FORMULA_REF": 20,
+        "TEXT": 59,
+        "TABLE": 18
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 59
+    },
+    "五、9": {
+      "element_count": 58,
+      "types": {
+        "FORMULA_REF": 13,
+        "TEXT": 34,
+        "TABLE": 11
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 34
+    },
+    "五、10": {
+      "element_count": 37,
+      "types": {
+        "FORMULA_REF": 9,
+        "TEXT": 21,
+        "TABLE": 7
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 21
+    },
+    "五、11": {
+      "element_count": 31,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 19,
+        "TABLE": 5
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 19
+    },
+    "五、12": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 7,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "五、13": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 12,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "五、14": {
+      "element_count": 59,
+      "types": {
+        "FORMULA_REF": 15,
+        "TEXT": 29,
+        "TABLE": 13,
+        "EMPTY": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 29
+    },
+    "五、15": {
+      "element_count": 62,
+      "types": {
+        "FORMULA_REF": 16,
+        "TEXT": 31,
+        "TABLE": 14,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 31
+    },
+    "五、16": {
+      "element_count": 53,
+      "types": {
+        "FORMULA_REF": 14,
+        "TEXT": 26,
+        "TABLE": 12,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "五、17": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、18": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "EMPTY": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、19": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、20": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "五、21": {
+      "element_count": 21,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 13,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "五、22": {
+      "element_count": 38,
+      "types": {
+        "FORMULA_REF": 8,
+        "TEXT": 24,
+        "TABLE": 6
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 24
+    },
+    "五、23": {
+      "element_count": 29,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 17,
+        "TABLE": 5
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 17
+    },
+    "五、24": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 6,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "五、25": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、26": {
+      "element_count": 27,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 19,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 19
+    },
+    "五、27": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "五、28": {
+      "element_count": 36,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 23,
+        "TABLE": 4,
+        "EMPTY": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 23
+    },
+    "五、29": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、30": {
+      "element_count": 22,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 12,
+        "TABLE": 4
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "五、31": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 6,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "五、32": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 4,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "五、33": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 7,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "五、34": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 10,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 10
+    },
+    "五、35": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、36": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、37": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、38": {
+      "element_count": 15,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 6,
+        "TABLE": 3,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "五、39": {
+      "element_count": 21,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 13,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "五、40": {
+      "element_count": 23,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 15,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 15
+    },
+    "五、41": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "五、42": {
+      "element_count": 27,
+      "types": {
+        "FORMULA_REF": 8,
+        "TEXT": 13,
+        "TABLE": 6
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 13
+    },
+    "五、43": {
+      "element_count": 19,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 9,
+        "TABLE": 4
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "五、44": {
+      "element_count": 16,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 9,
+        "TABLE": 2,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 9
+    },
+    "五、45": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、46": {
+      "element_count": 38,
+      "types": {
+        "FORMULA_REF": 7,
+        "TEXT": 26,
+        "TABLE": 5
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "五、47": {
+      "element_count": 11,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 7,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 7
+    },
+    "五、48": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 5,
+        "TEXT": 10,
+        "TABLE": 3
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 10
+    },
+    "五、49": {
+      "element_count": 45,
+      "types": {
+        "FORMULA_REF": 10,
+        "TEXT": 26,
+        "TABLE": 8,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 26
+    },
+    "五、50": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、51": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、52": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "五、53": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、54": {
+      "element_count": 23,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 17,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 17
+    },
+    "五、55": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "五、56": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 8,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 8
+    },
+    "五、57": {
+      "element_count": 20,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 14,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 14
+    },
+    "五、58": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、59": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、60": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、61": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 14,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 14
+    },
+    "五、62": {
+      "element_count": 57,
+      "types": {
+        "FORMULA_REF": 8,
+        "TEXT": 43,
+        "TABLE": 6
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 43
+    },
+    "五、63": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、64": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、65": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、66": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "五、67": {
+      "element_count": 10,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 6,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "五、68": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、69": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、70": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "五、71": {
+      "element_count": 46,
+      "types": {
+        "FORMULA_REF": 9,
+        "TEXT": 30,
+        "TABLE": 7
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 30
+    },
+    "五、72": {
+      "element_count": 5,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "五、73": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 5,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "五、74": {
+      "element_count": 42,
+      "types": {
+        "FORMULA_REF": 8,
+        "TEXT": 28,
+        "TABLE": 6
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 28
+    },
+    "六、1": {
+      "element_count": 27,
+      "types": {
+        "FORMULA_REF": 6,
+        "TEXT": 16,
+        "TABLE": 4,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 16
+    },
+    "七、1": {
+      "element_count": 288,
+      "types": {
+        "FORMULA_REF": 38,
+        "TEXT": 210,
+        "TABLE": 36,
+        "OPT_HINT": 2,
+        "EMPTY": 2
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 210
+    },
+    "八、1": {
+      "element_count": 36,
+      "types": {
+        "FORMULA_REF": 8,
+        "TEXT": 22,
+        "TABLE": 6
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 22
+    },
+    "九、1": {
+      "element_count": 232,
+      "types": {
+        "FORMULA_REF": 33,
+        "TEXT": 164,
+        "TABLE": 31,
+        "EMPTY": 3,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 164
+    },
+    "十、1": {
+      "element_count": 56,
+      "types": {
+        "FORMULA_REF": 11,
+        "TEXT": 32,
+        "TABLE": 9,
+        "EMPTY": 4
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 32
+    },
+    "十一、本公司的其他关联": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "十一、关联交易情况": {
+      "element_count": 71,
+      "types": {
+        "FORMULA_REF": 15,
+        "TEXT": 43,
+        "TABLE": 13
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 43
+    },
+    "十一、关联方应收应付款": {
+      "element_count": 12,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 6,
+        "TABLE": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "十二、1": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 1
+    },
+    "十二、股份支付总体情况": {
+      "element_count": 8,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "十二、以权益结算的股份": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "十二、以现金结算的股份": {
+      "element_count": 3,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "十二、本期股份支付费用": {
+      "element_count": 3,
+      "types": {
+        "FORMULA_REF": 1,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "十二、股份支付的修改、": {
+      "element_count": 6,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "十三、重要的承诺事项": {
+      "element_count": 17,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 12,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 12
+    },
+    "十三、或有事项": {
+      "element_count": 26,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 19,
+        "TABLE": 2,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 19
+    },
+    "十四、重要的资产负债表": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 3,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 3
+    },
+    "十四、资产负债表日后利": {
+      "element_count": 2,
+      "types": {
+        "FORMULA_REF": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 0
+    },
+    "十四、重要销售退回": {
+      "element_count": 4,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 2
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "十四、其他资产负债表日": {
+      "element_count": 7,
+      "types": {
+        "FORMULA_REF": 2,
+        "TEXT": 4,
+        "OPT_HINT": 1
+      },
+      "has_table": false,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "十五、1": {
+      "element_count": 124,
+      "types": {
+        "FORMULA_REF": 15,
+        "TEXT": 91,
+        "TABLE": 13,
+        "EMPTY": 4,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 91
+    },
+    "十六、应收票据": {
+      "element_count": 1,
+      "types": {
+        "TITLE": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": false,
+      "text_count": 0
+    },
+    "十六、应收账款": {
+      "element_count": 1,
+      "types": {
+        "TITLE": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": false,
+      "text_count": 0
+    },
+    "十六、其他应收款": {
+      "element_count": 1,
+      "types": {
+        "TITLE": 1
+      },
+      "has_table": false,
+      "has_opt": false,
+      "has_placeholder": false,
+      "text_count": 0
+    },
+    "十六、长期股权投资": {
+      "element_count": 14,
+      "types": {
+        "TITLE": 1,
+        "TEXT": 5,
+        "FORMULA_REF": 3,
+        "TABLE": 3,
+        "EMPTY": 2
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 5
+    },
+    "十六、投资收益（注：以": {
+      "element_count": 5,
+      "types": {
+        "TITLE": 1,
+        "TEXT": 2,
+        "FORMULA_REF": 1,
+        "TABLE": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 2
+    },
+    "十七、当期非经常性损益明细表（无数据的行项目，尽可能删除）": {
+      "element_count": 9,
+      "types": {
+        "FORMULA_REF": 3,
+        "TEXT": 4,
+        "TABLE": 1,
+        "OPT_HINT": 1
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 4
+    },
+    "十七、净资产收益率和每股收益": {
+      "element_count": 13,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 6,
+        "TABLE": 2,
+        "EMPTY": 1
+      },
+      "has_table": true,
+      "has_opt": false,
+      "has_placeholder": true,
+      "text_count": 6
+    },
+    "十七、境内外会计准则下会计数据差异": {
+      "element_count": 18,
+      "types": {
+        "FORMULA_REF": 4,
+        "TEXT": 9,
+        "TABLE": 2,
+        "OPT_HINT": 1,
+        "EMPTY": 2
+      },
+      "has_table": true,
+      "has_opt": true,
+      "has_placeholder": true,
+      "text_count": 9
+    }
+  }
+}

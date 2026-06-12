@@ -116,22 +116,34 @@ class WpVersionManager:
         # 3. 计算归档路径
         arch_path = archive_path_for(project_id, wp_id, new_version)
 
-        # 4. 创建 WpVersionArchive 记录
+        # 4. 创建 WpVersionArchive 记录（幂等：已存在同版本号则跳过）
         import uuid as uuid_mod
 
-        archive_record = WpVersionArchive(
-            id=uuid_mod.uuid4(),
-            working_paper_id=wp_id,
-            project_id=UUID(str(project_id)) if not isinstance(project_id, UUID) else project_id,
-            version_no=new_version,
-            source=source,
-            content_hash=content_hash,
-            file_size_bytes=len(file_content),
-            archive_path=arch_path,
-            file_retained=True,
-            created_by=user_id,
+        existing_archive = await db_session.execute(
+            select(WpVersionArchive).where(
+                WpVersionArchive.working_paper_id == wp_id,
+                WpVersionArchive.version_no == new_version,
+            )
         )
-        db_session.add(archive_record)
+        if existing_archive.scalars().first() is not None:
+            logger.info(
+                "版本归档记录已存在 wp_id=%s version=%d，跳过重复创建",
+                wp_id, new_version,
+            )
+        else:
+            archive_record = WpVersionArchive(
+                id=uuid_mod.uuid4(),
+                working_paper_id=wp_id,
+                project_id=UUID(str(project_id)) if not isinstance(project_id, UUID) else project_id,
+                version_no=new_version,
+                source=source,
+                content_hash=content_hash,
+                file_size_bytes=len(file_content),
+                archive_path=arch_path,
+                file_retained=True,
+                created_by=user_id,
+            )
+            db_session.add(archive_record)
 
         # 5. 归档旧文件（非阻塞，失败仅记日志）
         if file_path:
@@ -164,18 +176,19 @@ class WpVersionManager:
             import asyncio
 
             from app.services.event_bus import event_bus
+            from app.models.audit_platform_schemas import EventPayload, EventType
 
-            event_payload = {
-                "event_type": "WORKPAPER_SAVED",
-                "project_id": str(project_id),
-                "extra": {
+            event_payload = EventPayload(
+                event_type=EventType.WORKPAPER_SAVED,
+                project_id=project_id if isinstance(project_id, UUID) else UUID(str(project_id)),
+                extra={
                     "wp_id": str(wp_id),
                     "file_version": new_version,
                     "trigger": "import",
                     "content_hash": content_hash,
                     "source": source,
                 },
-            }
+            )
             asyncio.create_task(event_bus.publish(event_payload))
         except Exception as e:
             logger.warning("发布 WORKPAPER_SAVED 事件失败 wp_id=%s: %s", wp_id, e)
