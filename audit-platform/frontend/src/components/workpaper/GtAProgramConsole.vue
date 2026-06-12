@@ -185,28 +185,43 @@
         </template>
       </el-table-column>
 
-      <!-- 5 项认定列 -->
-      <el-table-column label="存在" width="55" align="center">
+      <!-- 5 项认定列（表头缩写+tooltip，防止窄容器下被截断） -->
+      <el-table-column label="存在" width="50" align="center" :resizable="false">
+        <template #header>
+          <el-tooltip content="存在或发生" placement="top"><span>存在</span></el-tooltip>
+        </template>
         <template #default="{ row }">
           <span v-if="row.assertions?.existence" class="gt-a-program-console__check">√</span>
         </template>
       </el-table-column>
-      <el-table-column label="完整性" width="65" align="center">
+      <el-table-column label="完整" width="50" align="center" :resizable="false">
+        <template #header>
+          <el-tooltip content="完整性" placement="top"><span>完整</span></el-tooltip>
+        </template>
         <template #default="{ row }">
           <span v-if="row.assertions?.completeness" class="gt-a-program-console__check">√</span>
         </template>
       </el-table-column>
-      <el-table-column label="权利义务" width="75" align="center">
+      <el-table-column label="权利" width="50" align="center" :resizable="false">
+        <template #header>
+          <el-tooltip content="权利和义务" placement="top"><span>权利</span></el-tooltip>
+        </template>
         <template #default="{ row }">
           <span v-if="row.assertions?.rights" class="gt-a-program-console__check">√</span>
         </template>
       </el-table-column>
-      <el-table-column label="准确性" width="65" align="center">
+      <el-table-column label="准确" width="50" align="center" :resizable="false">
+        <template #header>
+          <el-tooltip content="准确性、计价和分摊" placement="top"><span>准确</span></el-tooltip>
+        </template>
         <template #default="{ row }">
           <span v-if="row.assertions?.accuracy" class="gt-a-program-console__check">√</span>
         </template>
       </el-table-column>
-      <el-table-column label="列报" width="55" align="center">
+      <el-table-column label="列报" width="50" align="center" :resizable="false">
+        <template #header>
+          <el-tooltip content="列报和披露" placement="top"><span>列报</span></el-tooltip>
+        </template>
         <template #default="{ row }">
           <span v-if="row.assertions?.presentation" class="gt-a-program-console__check">√</span>
         </template>

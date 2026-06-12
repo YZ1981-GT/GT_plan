@@ -129,7 +129,11 @@ const trustScorePanelRef = ref()
 const smPanelRef = ref()
 
 const infoBannerCount = computed(() => {
-  let count = 2 // AI pending + 冲突 banner 始终存在
+  let count = 0
+  // AI pending banner 始终尝试渲染（内部 v-if pendingCount>0 控制可见）
+  // 但因无法跨组件读 pendingCount，暂固定 +1 占位（子组件内部 v-if 自行隐藏）
+  count += 1 // AiContentPendingBanner（占位）
+  count += 1 // ConflictBanner（占位）
   if (props.prerequisiteBanner && showPrereqBanner.value) count += 1
   if (props.showStaleImpactPanel && props.staleImpact.totalAffected.value > 0) count += 1
   return count

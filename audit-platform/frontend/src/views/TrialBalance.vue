@@ -1448,7 +1448,8 @@ async function ensureProjectYear() {
 }
 
 const fetchData = withLoading(loading, async () => {
-  rows.value = await getTrialBalance(projectId.value, year.value, hasMultipleCompanies.value ? companyCode.value : undefined)
+  const result = await getTrialBalance(projectId.value, year.value, hasMultipleCompanies.value ? companyCode.value : undefined)
+  rows.value = Array.isArray(result) ? result : []
 })
 
 const onRecalc = withLoading(recalcLoading, async () => {

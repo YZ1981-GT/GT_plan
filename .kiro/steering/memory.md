@@ -34,6 +34,9 @@ inclusion: always
 - **rtk 0.42.1 已装**（`C:\Users\杨志\.local\bin\rtk.exe`，已加 PATH）：CLI token 压缩代理，Windows 原生无 hook（需手动 `rtk` 前缀）；规则见 `.kiro/steering/rtk-proxy.md`（git/pytest/vitest/playwright/eslint/tsc/docker 加前缀，管道/重定向/fetch/stash 除外）
 - **venv 路径**：backend cwd 用 `..\.venv\Scripts\python.exe`；仓库根 cwd 用 `.venv\Scripts\python.exe`（勿混）
 - Docker：`audit-postgres`(5432)/`audit-redis`(6379)/`audit-metabase`(3000)/`audit-pgbouncer`(6432)；health `/api/health`
+- **🔴 host→Docker 连接全 100% 失败诊断法（2026-06-12 踩坑）**：症状=asyncpg/SQLAlchemy 报 `connection was closed in the middle of operation` / `WinError 10053` / `unexpected connection_lost`，启动时 migration+schema_drift+多 worker 同秒全炸。**根因多为 Docker Desktop vpnkit/WSL2 端口转发代理卡死，非代码 bug**。隔离法：①容器内 `docker exec psql` 正常→DB 本身没问题 ②裸 TCP `socket.create_connection(localhost:5432)` 能连但 ③应用层协议握手被中止 ④**关键：测 redis `PING` 也返空字节→证明是转发层而非 PG 专属**。修复=`docker restart audit-postgres audit-redis` 重建端口绑定（亲测 8/8 恢复），重启 Docker 层非改代码
+- **DB_DISABLE_SSL=True（默认，config.py）**：无 TLS 部署显式禁 asyncpg SSL 协商（database.py 直连+pgbouncer 两分支 + migration_runner engine 均加 `connect_args={"ssl":False}`），消除 Windows 下 SSL 握手失败面；生产启 TLS 置 False
+- **🟡 连接池上限错配隐患**：`DB_POOL_SIZE=50 + DB_MAX_OVERFLOW=100 = 最多 150` 连接，但 Docker PG `max_connections=100` → 高并发后端连接池超 PG 上限会被拒（当前仅用 15 未触发）；需提 PG max_connections 或降池上限到 100 内
 - **依赖**：schemathesis 3.39.16（强制 starlette 0.52.1 降级）/ opentelemetry 1.42.1 / instructor 1.15.1 / bm25s 0.3.9 / python_calamine / markitdown[all] 0.1.6；`_zh_tokenize.py` 中文 bigram 分词（无 jieba）
 - **前端唯一路径**：`audit-platform/frontend/`（仓库根无 `frontend/`）；views/components/composables 在其 `src/`
 - **MCP 7 个**：codegraph(10)+playwright(23) 在线；context7(2 库文档)/fetch(1)/thinking(1 sequentialthinking)/memory(9，与 memory.md 文件体系两套勿混)/js-reverse(21 前端断点调试) 详见 `#architecture`
@@ -105,6 +108,7 @@ inclusion: always
 - **PowerShell**：写中文/emoji 用 fsWrite（禁 `-replace`/`Set-Content` 处理中文）；长 commit msg 用 `git commit --% -m "..."`；读中文输出先 `chcp 65001 + [Console]::OutputEncoding=UTF8`；含 regex 特殊字符的超长行用按行号切片删除（勿 strReplace）
 - **fsWrite ≥100 行会截断**：大文件分 fsWrite(≤50)+多次小 fsAppend
 - **apiProxy 单层解构**：`api.get/post` 已返业务数据不再 `const {data}=`；`http.get/post`（utils/http）返完整响应体需 `.data`；http.ts extractErrorDetail 已修（422 detail 是数组 `.map(i=>i.msg).join('；')`）
+- **🔴 后端端点返回形态不统一陷阱**：`get_trial_balance` 正常返纯 list，但过渡期(sign_convention has_legacy)返 `{data:[...], warning:..., sign_convention_ready:false}`→经 ResponseWrapperMiddleware 后信封 `data` 是对象而非数组→前端 `rows.value.map` 崩(`rows.value.map is not a function`)；已修：`getTrialBalance` 检测 `data.data` 嵌套提取+`Array.isArray` 兜底。**教训：端点双态返回（纯 list vs 包装对象）必须在前端 API 函数层统一归一化，不可裸传给 ref 赋值**
 - **枚举成员引用前实证**：`python -c "getattr(Enum,'X','MISSING')"` 核对大小写（小写 draft/approved）
 - **`dict.get(k, default)` 陷阱**：key 存在但值为 None 时返 None 不返 default（Pydantic 可选字段未填即 None）→ NOT NULL 列插入崩；写库前用 `(data.get(k) or fallback)` 显式兜底
 - **merge 跨阶段签名变更必 grep 调用方**（sync↔async / 删公开方法）

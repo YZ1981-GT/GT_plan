@@ -192,7 +192,16 @@ class MigrationRunner:
             self._engine = engine
             self._owns_engine = False
         elif database_url:
-            self._engine = create_async_engine(database_url, pool_pre_ping=True)
+            from app.core.config import settings as _settings
+            _mig_connect_args = (
+                {"ssl": False}
+                if database_url.startswith("postgresql")
+                and getattr(_settings, "DB_DISABLE_SSL", False)
+                else {}
+            )
+            self._engine = create_async_engine(
+                database_url, pool_pre_ping=True, connect_args=_mig_connect_args
+            )
             self._owns_engine = True
         else:
             raise ValueError("必须提供 database_url 或 engine")

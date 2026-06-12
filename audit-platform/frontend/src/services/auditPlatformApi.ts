@@ -53,7 +53,11 @@ export async function getTrialBalance(projectId: string, year: number, companyCo
   const params: Record<string, any> = { year }
   if (companyCode) params.company_code = companyCode
   const { data } = await http.get(P_tb.get(projectId), { params })
-  return data
+  // 后端过渡期语义（sign_convention readiness）返回 {data, warning} 对象而非纯数组
+  if (data && !Array.isArray(data) && Array.isArray(data.data)) {
+    return data.data
+  }
+  return Array.isArray(data) ? data : []
 }
 
 export async function recalcTrialBalance(projectId: string, year: number) {

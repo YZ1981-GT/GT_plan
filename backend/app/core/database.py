@@ -22,13 +22,17 @@ if _is_postgres and settings.DB_USE_PGBOUNCER:
         host=settings.DB_PGBOUNCER_HOST,
         port=settings.DB_PGBOUNCER_PORT,
     )
+    _pgbouncer_connect_args = {
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    }
+    if settings.DB_DISABLE_SSL:
+        # 禁用 asyncpg SSL 协商（无 TLS 部署，避免 Windows 下握手被中止）
+        _pgbouncer_connect_args["ssl"] = False
     engine = create_async_engine(
         _pg_url,
         poolclass=NullPool,
-        connect_args={
-            "statement_cache_size": 0,
-            "prepared_statement_cache_size": 0,
-        },
+        connect_args=_pgbouncer_connect_args,
         pool_pre_ping=True,
         echo=False,
     )
@@ -41,6 +45,7 @@ elif _is_postgres:
         pool_pre_ping=True,
         pool_recycle=1800,  # 30 分钟，与 PG idle_in_transaction_session_timeout 协调
         echo=False,
+        connect_args={"ssl": False} if settings.DB_DISABLE_SSL else {},
     )
 else:
     engine = create_async_engine(

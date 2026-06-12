@@ -175,6 +175,10 @@ class Settings(BaseSettings):
     DB_USE_PGBOUNCER: bool = False
     DB_PGBOUNCER_HOST: str = "localhost"
     DB_PGBOUNCER_PORT: int = 6432
+    # 本地/Docker 开发：PG 未配 SSL，asyncpg 默认 sslmode=prefer 仍会先发 SSLRequest
+    # 探测握手，Windows ProactorEventLoop 下该握手易被中止（WinError 10053 /
+    # connection_lost）。无 SSL 部署显式禁用协商，消除该失败面。生产启 TLS 时置 False。
+    DB_DISABLE_SSL: bool = True
 
     # --- xlsx-read-acceleration ---
     XLSX_READ_USE_CALAMINE: bool = True
