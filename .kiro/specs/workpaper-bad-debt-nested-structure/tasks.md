@@ -202,7 +202,7 @@
     - 全链路：建父行→建子行→编辑→Auto-SUM→预填→生成 AJE→序列化 round-trip
     - _Requirements: 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 11. 前端 Univer 嵌套编辑器
+- [x] 11. 前端 Univer 嵌套编辑器
   - [x] 11.1 实现 `GtBadDebtSheet.vue` 层级渲染
     - 创建 `audit-platform/frontend/src/views/workpaper/components/GtBadDebtSheet.vue`
     - 按层级渲染：Parent_Row 加粗、Child_Row 缩进显示"其中：{项目名}"、Summary_Row 合计
@@ -216,9 +216,10 @@
     - 原生 fetch 须手动解 `{code,message,data}` 信封；下载/认证资源走 downloadFile（禁 window.open）
     - _Requirements: 6.3, 6.4, 6.5_
 
-  - [ ] 11.3 前端 router 联通验证
+  - [x] 11.3 前端 router 联通验证
     - 用 Playwright 实测：打开 D2-3 底稿 → 渲染层级 → 展开折叠 → 右键新增/删除子行 → 汇总刷新 → 预填 tooltip
     - 验证前端调用命中已注册后端路由（无 404/307），信封正确解包
+    - **实测（2026-06-12）**：`e2e/bad-debt-d2-3.spec.ts` 辽宁卫生 D2 项目 1 passed/11s；tab 切「坏账准备明细表D2-3」→ GtBadDebtSheet 渲染 → 展折 ▼/▶ → 右键增删子行 → bad-debt-rows API 全 2xx 无 404/307
     - _Requirements: 6.5, 8.2_
 
   - [x]* 11.4 前端组件单元测试（vitest）
