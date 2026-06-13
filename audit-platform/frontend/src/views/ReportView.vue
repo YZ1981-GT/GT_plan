@@ -780,16 +780,27 @@ function updateTableHeight() {
   tableMaxHeight.value = Math.max(300, window.innerHeight - headerH - 80)
 }
 
-// 平衡检查明细项点击跳转：滚动到对应报表行并高亮
+// 平衡检查明细项点击跳转：根据检查名称中的关键词定位到报表对应行
 function scrollToReportRow(checkName: string) {
-  // checkName 通常包含行次名称（如"资产总计=负债和权益合计"），尝试匹配表格行
-  const table = document.querySelector('.el-table__body-wrapper')
+  // 提取检查名称中可能包含的行次或表名信息
+  // 常见格式: "资产负债表平衡（资产合计=负债+权益）" / "勾稽：CFS期末现金=BS货币资金"
+  const table = document.querySelector('.el-table__body-wrapper tbody')
   if (!table) return
-  const allRows = table.querySelectorAll('.el-table__row')
+  const allRows = table.querySelectorAll('tr')
+
+  // 从检查名中提取可匹配的关键词
+  const keywords: string[] = []
+  if (checkName.includes('资产负债') || checkName.includes('资产合计')) keywords.push('资产总计', '资产合计', '负债和所有者权益')
+  if (checkName.includes('利润表') || checkName.includes('净利润')) keywords.push('净利润', '利润总额')
+  if (checkName.includes('CFS') || checkName.includes('现金')) keywords.push('现金及现金等价物', '货币资金')
+  if (checkName.includes('权益')) keywords.push('所有者权益合计', '股东权益')
+  // 如果没提取到关键词,用原始检查名的各段尝试
+  if (!keywords.length) {
+    keywords.push(...checkName.split(/[（）()=≠,，]/g).map(s => s.trim()).filter(s => s.length > 1))
+  }
+
   for (const tr of allRows) {
     const text = tr.textContent || ''
-    // 模糊匹配:检查名中的关键词出现在行文本中
-    const keywords = checkName.split(/[=≠<>vs]/i).map(s => s.trim()).filter(Boolean)
     if (keywords.some(kw => text.includes(kw))) {
       tr.scrollIntoView({ behavior: 'smooth', block: 'center' })
       tr.classList.add('gt-highlight-row')
@@ -797,6 +808,10 @@ function scrollToReportRow(checkName: string) {
       return
     }
   }
+  // fallback: 未找到匹配行时提示
+  import('element-plus').then(({ ElMessage }) => {
+    ElMessage.info('未找到对应行，请手动查看')
+  })
 }
 onMounted(() => {
   updateTableHeight()
@@ -1136,3 +1151,13 @@ const { isFullscreen: rvFullscreen, toggleFullscreen: toggleRvFullscreen } = use
 </script>
 
 <style scoped src="./report-view.css" />
+<style>
+/* 平衡检查跳转高亮动画 */
+.gt-highlight-row {
+  animation: gt-row-flash 0.6s ease-in-out 3;
+}
+@keyframes gt-row-flash {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: rgba(75, 45, 119, 0.12); }
+}
+</style>
