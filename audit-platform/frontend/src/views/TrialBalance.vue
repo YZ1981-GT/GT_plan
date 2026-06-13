@@ -1178,7 +1178,8 @@ const trialBalanceTotals = computed(() => {
     if (!r.standard_account_code) continue  // 跳过小计/合计行
     const val = Math.abs(num(r.audited_amount))
     if (val === 0) continue
-    const dir = getDirection(r)
+    // 优先使用后端权威方向（direction_resolver 精确判定）
+    const dir = (r as any).direction === 'credit' ? '贷' : ((r as any).direction === 'debit' ? '借' : getDirection(r))
     if (dir === '贷') {
       credit = Number(decAdd(String(credit), String(val)))
     } else {

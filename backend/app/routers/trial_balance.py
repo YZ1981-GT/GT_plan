@@ -58,13 +58,20 @@ async def get_trial_balance(
     overall_mat = float(materiality.overall_materiality) if materiality else None
     trivial_thr = float(materiality.trivial_threshold) if materiality else None
 
+    from app.services.ledger_import.direction_resolver import resolve_account_direction
+
     result = []
     for r in rows:
         audited = float(r.audited_amount) if r.audited_amount is not None else 0
+        # 权威方向（direction_resolver 判定,前端直接使用无需自行推断）
+        direction, _ = resolve_account_direction(
+            r.standard_account_code, r.account_name or ""
+        )
         item = {
             "standard_account_code": r.standard_account_code,
             "account_name": r.account_name,
             "account_category": r.account_category.value if r.account_category else None,
+            "direction": direction,  # "debit" | "credit"
             "unadjusted_amount": str(r.unadjusted_amount) if r.unadjusted_amount is not None else None,
             "rje_adjustment": str(r.rje_adjustment),
             "aje_adjustment": str(r.aje_adjustment),
@@ -128,6 +135,64 @@ async def recalc_trial_balance(
         year=year,
     ))
     return {"message": "重算完成"}
+
+
+@router.get("/balance-check")
+async def check_trial_balance(
+    project_id: UUID,
+    year: int = Query(...),
+    company_code: str = Query("001"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """试算平衡校验：用 direction_resolver 精确判方向后按科目分配借贷侧求和。
+
+    返回 {debit_total, credit_total, diff, is_balanced, has_pnl_rows}。
+    前端直接用此结果展示,不再自行按粗粒度规则重算。
+    """
+    import sqlalchemy as sa
+    from decimal import Decimal
+    from app.models.audit_platform_models import TrialBalance
+    from app.services.ledger_import.direction_resolver import resolve_account_direction
+
+    tb = TrialBalance.__table__
+    result = await db.execute(
+        sa.select(
+            tb.c.standard_account_code,
+            tb.c.account_name,
+            tb.c.audited_amount,
+        ).where(
+            tb.c.project_id == project_id,
+            tb.c.year == year,
+            tb.c.company_code == company_code,
+            tb.c.is_deleted == sa.false(),
+        )
+    )
+    debit_total = Decimal("0")
+    credit_total = Decimal("0")
+    has_pnl = False
+    for r in result.fetchall():
+        code = r.standard_account_code or ""
+        name = r.account_name or ""
+        amt = abs(r.audited_amount) if r.audited_amount else Decimal("0")
+        if amt == 0:
+            continue
+        if code and code[0] in ("5", "6"):
+            has_pnl = True
+        direction, _ = resolve_account_direction(code, name)
+        if direction == "credit":
+            credit_total += amt
+        else:
+            debit_total += amt
+
+    diff = float(debit_total - credit_total)
+    return {
+        "debit_total": float(debit_total),
+        "credit_total": float(credit_total),
+        "diff": diff,
+        "is_balanced": abs(diff) < 1.0,
+        "has_pnl_rows": has_pnl,
+    }
 
 
 @router.get("/trace")
