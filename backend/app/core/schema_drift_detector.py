@@ -78,6 +78,8 @@ class SchemaDriftDetector:
         # 历史残留表（一次性脚本产物 / 联动审计日志）
         "linkage_audit_log",
         "seed_load_history",
+        # 符号约定迁移(V064)产生的备份表，迁移完成后未清理
+        "_sign_migration_backup",
     })
 
     # 列级 allowlist：DB 有但 ORM 不需映射的列（历史残留 / 已弃用）
