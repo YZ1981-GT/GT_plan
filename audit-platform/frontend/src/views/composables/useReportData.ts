@@ -30,7 +30,7 @@ export interface UseReportDataReturn {
   genLoading: Ref<boolean>
   checkLoading: Ref<boolean>
   syncLoading: Ref<boolean>
-  balanceCheckResult: Ref<{ status: string; message: string } | null>
+  balanceCheckResult: Ref<{ status: string; message: string; checks: Array<{ name: string; passed: boolean; expected: string; actual: string; diff: string }> } | null>
   consistencyResult: Ref<ReportConsistencyCheck | null>
   tableMaxHeight: Ref<number>
 
@@ -85,7 +85,7 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
   const genLoading = ref(false)
   const checkLoading = ref(false)
   const syncLoading = ref(false)
-  const balanceCheckResult = ref<{ status: string; message: string } | null>(null)
+  const balanceCheckResult = ref<{ status: string; message: string; checks: Array<{ name: string; passed: boolean; expected: string; actual: string; diff: string }> } | null>(null)
   const consistencyResult = ref<ReportConsistencyCheck | null>(null)
   const tableMaxHeight = ref(500)
 
@@ -269,6 +269,7 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
           balanceCheckResult.value = {
             status: failCount > 0 ? 'warning' : 'passed',
             message: `自动校对：${total} 项审核，${failCount} 项未通过`,
+            checks: result.checks || [],
           }
         } else {
           balanceCheckResult.value = null

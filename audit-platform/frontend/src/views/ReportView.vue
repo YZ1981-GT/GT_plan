@@ -71,17 +71,33 @@
         @resolved="onConflictResolved"
       />
 
-      <!-- F29: 报表平衡检查结果 -->
+      <!-- F29: 报表平衡检查结果（展示明细+跳转） -->
       <el-alert
         v-if="balanceCheckResult"
         :title="balanceCheckResult.status === 'passed' ? '报表平衡检查通过' : balanceCheckResult.status === 'warning' ? '报表平衡检查有差异' : '报表平衡检查失败'"
         :type="balanceCheckResult.status === 'passed' ? 'success' : balanceCheckResult.status === 'warning' ? 'warning' : 'error'"
-        :description="balanceCheckResult.message"
         show-icon
         :closable="true"
         style="margin-bottom: 8px"
         @close="balanceCheckResult = null"
-      />
+      >
+        <template #default>
+          <div>{{ balanceCheckResult.message }}</div>
+          <div v-if="balanceCheckResult.checks?.length" style="margin-top: 6px; font-size: 12px; line-height: 1.8">
+            <div
+              v-for="(chk, idx) in balanceCheckResult.checks.filter(c => !c.passed)"
+              :key="idx"
+              style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 2px 0;"
+              @click="scrollToReportRow(chk.name)"
+            >
+              <span style="color: var(--el-color-danger)">✗</span>
+              <span style="flex: 1">{{ chk.name }}</span>
+              <span style="color: var(--el-text-color-secondary)">期望 {{ chk.expected }}，实际 {{ chk.actual }}，差 {{ chk.diff }}</span>
+              <el-button text size="small" type="primary" style="padding: 0">定位 →</el-button>
+            </div>
+          </div>
+        </template>
+      </el-alert>
 
       <!-- Sprint 4：StaleIndicator 统一组件 + 横幅 -->
       <div v-if="stale.isStale.value" class="gt-stale-banner">
@@ -762,6 +778,25 @@ function updateTableHeight() {
   const headerEl = document.querySelector('.gt-rv-sticky-header')
   const headerH = headerEl ? headerEl.getBoundingClientRect().height : 200
   tableMaxHeight.value = Math.max(300, window.innerHeight - headerH - 80)
+}
+
+// 平衡检查明细项点击跳转：滚动到对应报表行并高亮
+function scrollToReportRow(checkName: string) {
+  // checkName 通常包含行次名称（如"资产总计=负债和权益合计"），尝试匹配表格行
+  const table = document.querySelector('.el-table__body-wrapper')
+  if (!table) return
+  const allRows = table.querySelectorAll('.el-table__row')
+  for (const tr of allRows) {
+    const text = tr.textContent || ''
+    // 模糊匹配:检查名中的关键词出现在行文本中
+    const keywords = checkName.split(/[=≠<>vs]/i).map(s => s.trim()).filter(Boolean)
+    if (keywords.some(kw => text.includes(kw))) {
+      tr.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      tr.classList.add('gt-highlight-row')
+      setTimeout(() => tr.classList.remove('gt-highlight-row'), 3000)
+      return
+    }
+  }
 }
 onMounted(() => {
   updateTableHeight()
