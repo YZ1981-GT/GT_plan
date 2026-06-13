@@ -84,7 +84,7 @@
       :version-no="editorItem.version_no"
       :year="year"
       :title="editorItem.file_name || '在线编辑'"
-      preview-type="docx"
+      :preview-type="editorPreviewType"
       :preview-url="editorUrl"
       :deliverable-status="editorItem.status"
       :show-watermark="['draft', 'editing'].includes(editorItem.status)"
@@ -202,6 +202,15 @@ const editorVisible = ref(false)
 const editorItem = ref<DeliverableItem | null>(null)
 const editorUrl = ref('')
 const previewWatermark = ref(false)
+
+// OnlyOffice 降级时传给 DeliverablePreview 的 previewType
+// docx → VueOfficeDocx 可渲染；xlsx/xls → 不支持（显示下载提示）
+const editorPreviewType = computed<'docx' | 'pdf' | 'html' | 'unsupported'>(() => {
+  const suffix = editorItem.value?.file_name?.split('.').pop()?.toLowerCase()
+  if (suffix === 'docx') return 'docx'
+  if (suffix === 'pdf') return 'pdf'
+  return 'unsupported'  // xlsx/xls 等 VueOfficeDocx 不支持
+})
 const items = ref<DeliverableItem[]>([])
 const grouped = ref<Record<string, DeliverableItem[]>>({})
 const filterDocType = ref('')

@@ -64,8 +64,8 @@ const authRequestOptions = computed(() => ({
 }))
 
 watch(() => props.previewType, () => {
-  loading.value = props.previewType !== 'html'
-  if (props.previewType === 'html') loading.value = false
+  // docx/pdf 需等 @rendered 事件才取消 loading；html 和 unsupported 立即取消
+  loading.value = (props.previewType === 'docx' || props.previewType === 'pdf')
 }, { immediate: true })
 
 function onError() {
