@@ -170,6 +170,13 @@
           </template>
         </el-table-column>
         <el-table-column prop="account_name" label="科目名称" min-width="180" show-overflow-tooltip />
+        <el-table-column label="方向" width="60" align="center">
+          <template #default="{ row }">
+            <span :style="{ color: (row.closing_balance ?? 0) < 0 ? 'var(--gt-color-danger)' : '' }">
+              {{ (row.closing_balance ?? 0) >= 0 ? '借' : '贷' }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('opening_balance')">
           <template #default="{ row }"><GtAmountCell :value="row.opening_balance" /></template>
         </el-table-column>
