@@ -847,13 +847,18 @@ function getDirection(row: any): string {
 
   if (isPnl) {
     // v2 约定下损益类统一存自然正数（收入取贷方发生额、费用取借方发生额），
-    // 不能再靠余额符号判方向。改为按科目类别/编码判断：
-    // - 收入类（revenue / 5xxx 开头）→ 贷
-    // - 费用/成本类（cost / expense / 6xxx 开头）→ 借
+    // 不能再靠余额符号判方向。改为按科目类别/编码+名称判断：
+    // - 收入类（revenue / 5xxx / 6xxx但名称含"收入/收益"）→ 贷
+    // - 费用/成本类（cost / expense / 6xxx 其余）→ 借
     if (actualCat === 'revenue' || first === '5') return '贷'
-    if (actualCat === 'cost' || actualCat === 'expense' || first === '6') return '借'
-    // 兜底（极少见）：按余额符号
-    return val < 0 ? '贷' : '借'
+    // 6xxx 中有些是收入科目(如 6001营业收入/6111投资收益/6301营业外收入)
+    if (first === '6') {
+      const isRevenueByName = /收入|收益|利得/.test(name)
+      return isRevenueByName ? '贷' : '借'
+    }
+    if (actualCat === 'cost' || actualCat === 'expense') return '借'
+    // 兜底（极少见）
+    return '借'
   }
   if (['liability', 'equity'].includes(actualCat)) {
     return '贷'
