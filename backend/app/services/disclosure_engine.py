@@ -81,6 +81,105 @@ _NUMBERED_TITLE_RE = re.compile(
     r"^(?:[（(](\d+)[）)]|(\d+)[.、．])\s*(.+)"
 )
 
+_GUIDANCE_KEYWORDS = (
+    "应",
+    "说明",
+    "披露",
+    "参考附注",
+    "提示",
+    "注：",
+    "注:",
+    "评价",
+    "确认",
+    "列示",
+    "逐项",
+)
+
+
+def is_guidance_paragraph(para: str) -> bool:
+    """判定单段是否为高置信度指引文字（生成与存量迁移共用）。"""
+    s = (para or "").strip()
+    if not s:
+        return False
+    wrapped = (
+        (s.startswith("（") and s.endswith("）"))
+        or (s.startswith("(") and s.endswith(")"))
+        or (s.startswith("【") and s.endswith("】"))
+        or (s.startswith("《") and s.endswith("》"))
+    )
+    if not wrapped:
+        return False
+    return any(kw in s for kw in _GUIDANCE_KEYWORDS)
+
+
+def _is_table_title_paragraph(para: str) -> bool:
+    """短编号标题类段落（供表名消费，不进正文/指引）。"""
+    s = (para or "").strip()
+    if not s or len(s) > 20:
+        return False
+    if s.startswith("#"):
+        return True
+    return bool(_NUMBERED_TITLE_RE.match(s))
+
+
+def classify_template_content(
+    text_sections: list[str] | None,
+    text_template: str | None,
+) -> tuple[str | None, str | None]:
+    """将模板 text_sections/text_template 分为 (substantive_text, guidance_text)。"""
+    paragraphs: list[str] = []
+    for section in text_sections or []:
+        for line in section.split("\n"):
+            line = line.strip()
+            if line:
+                paragraphs.append(line)
+    if not paragraphs and text_template:
+        for block in text_template.split("\n\n"):
+            block = block.strip()
+            if block:
+                paragraphs.append(block)
+
+    guidance_parts: list[str] = []
+    substantive_parts: list[str] = []
+    for para in paragraphs:
+        if is_guidance_paragraph(para):
+            guidance_parts.append(para)
+        elif _is_table_title_paragraph(para):
+            continue
+        else:
+            substantive_parts.append(para)
+
+    substantive = "\n\n".join(substantive_parts) if substantive_parts else None
+    guidance = "\n\n".join(guidance_parts) if guidance_parts else None
+    return substantive, guidance
+
+
+def identify_guidance(text_content: str) -> tuple[str, str] | None:
+    """存量拆分：按段落识别指引；无法可靠识别时返回 None。
+
+    ⚠ 往返语义：拆分按 `\\n\\n` 分两桶后各自 join，**不保留指引段在正文中的原始
+    交错位置**。即 `指引A\\n\\n正文B\\n\\n指引C` → guidance=`指引A\\n\\n指引C`、
+    remaining=`正文B`，原排版顺序丢失。Property 6 的"往返一致"仅指字符集不丢失，
+    **不可**用 `guidance + remaining` 还原原始排版；真正还原只能靠备份表 rollback。
+    """
+    if not text_content or not str(text_content).strip():
+        return None
+    segments = text_content.split("\n\n")
+    guidance_segments: list[str] = []
+    remaining_segments: list[str] = []
+    any_hit = False
+    for seg in segments:
+        if is_guidance_paragraph(seg.strip()):
+            guidance_segments.append(seg)
+            any_hit = True
+        else:
+            remaining_segments.append(seg)
+    if not any_hit:
+        return None
+    guidance = "\n\n".join(guidance_segments)
+    remaining = "\n\n".join(remaining_segments)
+    return guidance, remaining
+
 
 def _infer_table_names_from_text(
     built_tables: list[dict],
@@ -976,15 +1075,14 @@ class DisclosureEngine:
                 except Exception:
                     pass
 
-            # 优先级3：留空（用户偏好）
-            # 模板的 text_sections 多为表格栏目标题/分类说明（如「应收票据分类」「按单项计提…」），
-            # 并非真正的附注正文，预填到富文本反而显得冗余杂乱。
-            # 故无上年数据、无 LLM 生成时，正文默认留空，由用户按需手动填写。
-            # 如需恢复模板兜底，取消下面注释即可。
-            # if not text_content:
-            #     text_content = _convert_md_headings_to_numbered(
-            #         "\n\n".join(text_sections)
-            #     ) if text_sections else tmpl.get("text_template")
+            # 优先级3：模板分流 — 指引→guidance_text，实质正文→substantive（替换原灌正文逻辑）
+            substantive, guidance = classify_template_content(
+                text_sections, tmpl.get("text_template"),
+            )
+            guidance_text = guidance
+
+            if not text_content and substantive:
+                text_content = substantive
 
             if text_content and content_type_str == "table":
                 content_type_str = "mixed"  # 有正文就升级为 mixed
@@ -1054,6 +1152,7 @@ class DisclosureEngine:
                 else:
                     note.table_data = table_data
                 note.text_content = text_content
+                note.guidance_text = guidance_text
                 note.source_template = source_template
                 note.sort_order = sort_order
             else:
@@ -1066,6 +1165,7 @@ class DisclosureEngine:
                     content_type=ContentType(content_type_str),
                     table_data=table_data,
                     text_content=text_content,
+                    guidance_text=guidance_text,
                     source_template=source_template,
                     status=NoteStatus.draft,
                     sort_order=sort_order,
@@ -1604,6 +1704,7 @@ class DisclosureEngine:
         note_id: UUID,
         table_data: dict | None = None,
         text_content: str | None = None,
+        guidance_text: str | None = None,
         status: NoteStatus | None = None,
     ) -> DisclosureNote | None:
         """更新附注章节内容。
@@ -1627,6 +1728,8 @@ class DisclosureEngine:
             flag_modified(note, "table_data")
         if text_content is not None:
             note.text_content = text_content
+        if guidance_text is not None:
+            note.guidance_text = guidance_text
         if status is not None:
             note.status = status
 

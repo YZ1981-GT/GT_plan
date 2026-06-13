@@ -269,6 +269,7 @@ async def update_note(
         note_id,
         table_data=data.table_data,
         text_content=data.text_content,
+        guidance_text=data.guidance_text,
         status=data.status,
     )
     if note is None:

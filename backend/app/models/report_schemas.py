@@ -248,6 +248,7 @@ class DisclosureNoteDetail(BaseModel):
     content_type: ContentType | None = None
     table_data: dict | None = None
     text_content: str | None = None
+    guidance_text: str | None = None
     source_template: SourceTemplate | None = None
     status: NoteStatus = NoteStatus.draft
     sort_order: int | None = None
@@ -263,6 +264,7 @@ class DisclosureNoteUpdate(BaseModel):
     """更新附注章节"""
     table_data: dict | None = None
     text_content: str | None = None
+    guidance_text: str | None = None
     status: NoteStatus | None = None
 
 

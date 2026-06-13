@@ -480,6 +480,7 @@ def _build_meta_sheet(ws: Worksheet, sections: list[dict[str, Any]]) -> None:
             "cell_modes": section.get("_cell_modes", {}),
             "cell_meta": section.get("_cell_meta", {}),
             "dynamic_regions": section.get("_dynamic_regions", []),
+            "guidance_text": section.get("guidance_text") or "",
         }
 
     # Compress and store
@@ -738,6 +739,7 @@ class NoteOfflineExportService:
             section_dict = {
                 "section_id": note.section_id or note.note_section or "",
                 "section_title": note.section_title or "",
+                "guidance_text": note.guidance_text or "",
                 "table_data": note.table_data or {},
                 "_formulas": (note.table_data or {}).get("_formulas", {}),
                 "_cell_provenance": (note.table_data or {}).get("_cell_provenance", {}),

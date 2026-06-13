@@ -345,6 +345,7 @@ class DisclosureNote(Base):
     )
     table_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     text_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    guidance_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_template: Mapped[SourceTemplate | None] = mapped_column(
         sa.Enum(SourceTemplate, name="source_template", create_type=False),
         nullable=True,

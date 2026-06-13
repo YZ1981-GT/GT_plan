@@ -526,6 +526,7 @@ export interface DisclosureNoteDetail {
   content_type: string
   table_data: any
   text_content: string | null
+  guidance_text?: string | null
   status: string
 }
 

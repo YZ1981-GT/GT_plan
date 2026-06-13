@@ -578,6 +578,8 @@ def apply_import(
                         "headers": imp.get("headers", []),
                         "rows": [{"cells": r["cells"]} for r in imp.get("rows", [])],
                     }
+                    if meta_data and sid in meta_data and "guidance_text" in meta_data[sid]:
+                        existing_lookup[sid]["guidance_text"] = meta_data[sid]["guidance_text"]
                 sections_imported += 1
 
         elif resolution == ConflictResolution.KEEP:
@@ -839,17 +841,73 @@ class NoteOfflineImportService:
         merge_cells: dict[str, list[str]] | None = None,
     ) -> ImportResult:
         """Execute import with decisions (C.0.12 + C.0.13 + C.0.14 + C.0.16)."""
+        validation = validate_import_file(xlsx_bytes)
+        if not validation.valid:
+            return ImportResult(
+                success=False,
+                audit_entry={"errors": validation.errors},
+            )
+
         # Load existing
         existing = await self._load_existing_sections(project_id, year)
 
         # C.0.12: Apply
-        result = apply_import(xlsx_bytes, existing, decisions, merge_cells=merge_cells)
+        result = apply_import(
+            xlsx_bytes,
+            existing,
+            decisions,
+            meta_data=validation.meta_data,
+            merge_cells=merge_cells,
+        )
+
+        # Persist guidance_text from _meta_ (不污染 text_content)
+        await self._persist_guidance_from_meta(
+            project_id, year, decisions, validation.meta_data,
+        )
 
         # C.0.16: Audit log
         result.audit_entry["user_id"] = user_id
         result.audit_entry["project_id"] = str(project_id)
 
         return result
+
+    async def _persist_guidance_from_meta(
+        self,
+        project_id: UUID,
+        year: int,
+        decisions: dict[str, ConflictResolution],
+        meta_data: dict[str, Any],
+    ) -> None:
+        """从 _meta_ 回写 guidance_text；旧包无键则保留 DB 现值。"""
+        if self.db is None or not meta_data:
+            return
+
+        from sqlalchemy import or_, update as sa_update
+
+        from app.models.report_models import DisclosureNote
+
+        for sid, resolution in decisions.items():
+            if resolution != ConflictResolution.OVERWRITE:
+                continue
+            section_meta = meta_data.get(sid, {})
+            if "guidance_text" not in section_meta:
+                continue
+            guidance_val = section_meta.get("guidance_text") or None
+            stmt = (
+                sa_update(DisclosureNote)
+                .where(
+                    DisclosureNote.project_id == project_id,
+                    DisclosureNote.year == year,
+                    DisclosureNote.is_deleted == False,  # noqa: E712
+                    or_(
+                        DisclosureNote.note_section == sid,
+                        DisclosureNote.section_id == sid,
+                    ),
+                )
+                .values(guidance_text=guidance_val)
+            )
+            await self.db.execute(stmt)
+        await self.db.flush()
 
     async def _load_existing_sections(
         self, project_id: UUID, year: int

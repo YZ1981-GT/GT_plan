@@ -61,7 +61,6 @@ _model_modules = [
     "app.models.archive_models",
     "app.models.attachment_models",
     "app.models.procedure_models",
-    "app.models.workpaper_editing_lock_models",
     "app.models.workpaper_template_version",
     "app.models.project_wp_sheet_override",
     "app.models.wp_optimization_models",

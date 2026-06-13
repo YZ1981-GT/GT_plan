@@ -91,6 +91,22 @@
 .gt-de-tree-stale-dot { font-size: 10px; margin-left: 4px; flex-shrink: 0; cursor: help; }
 /* ── TipTap ── */
 .gt-de-tiptap-wrapper { border: 1px solid var(--gt-color-border-purple); border-radius: 6px; margin-top: 10px; }
+.gt-guidance-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  background: #f4f0fa;
+  border-left: 3px solid #4b2d77;
+  border-radius: 4px;
+  color: #4b2d77;
+  font-size: var(--gt-font-size-sm);
+  line-height: 1.6;
+}
+.gt-guidance-bar .el-icon { flex-shrink: 0; margin-top: 2px; color: #4b2d77; }
+.gt-guidance-text { flex: 1; white-space: pre-wrap; }
 .gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid var(--gt-color-border-purple); background: var(--gt-color-primary-bg); border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .gt-de-toolbar-divider { width: 1px; height: 20px; background: var(--gt-color-primary-lighter); margin: 0 6px; }
 .gt-de-ai-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-primary-lighter); margin-left: 8px; white-space: nowrap; }

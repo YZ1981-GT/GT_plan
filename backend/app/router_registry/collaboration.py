@@ -123,11 +123,10 @@ def register_collaboration_routers(app: FastAPI) -> None:
     from app.routers.workpaper_requirements import router as wpreq_router
     from app.routers.workpaper_prior_year import router as wppy_router
     from app.routers.workpaper_html_preview import router as wphp_router
-    from app.routers.editing_lock import router as editlock_router
     from app.routers.ocr_fields import router as ocrf_router
     from app.routers.penetrate_by_amount import router as pba_router
 
-    for r in [wpreq_router, wppy_router, wphp_router, editlock_router, ocrf_router, pba_router]:
+    for r in [wpreq_router, wppy_router, wphp_router, ocrf_router, pba_router]:
         app.include_router(r, tags=["审计助理(R4)"])
 
     # ═══ §14. Round 5：EQCR 工作台 ═══

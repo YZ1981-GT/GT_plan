@@ -23,22 +23,19 @@ inclusion: manual
 - 要插件管理 → `UnifiedAIService(db)`
 - 底稿/附注业务语义 → 对应域服务（输出必走溯源包装）
 
-## 编辑锁 v1/v2（两套均现役，删任一会 404）
+## 编辑锁（v2 统一，v1 已下线）
 
-> ⚠️ 此前误判"v1 仅自身+测试引用可删"。核实后两套各管不同资源类型，前端都在用。
+> ✅ 2026-06-13 完成 editing-lock-v1-v2-consolidation spec：v1 已删除（service/router/ORM/测试），底稿锁收口进 v2 `resource_type='workpaper'`。
 
-| 维度 | v1 | v2 |
-|------|-----|-----|
-| service | `editing_lock_service` | `editing_lock_service_v2` |
-| router | `editing_lock.py` 前缀 `/api/workpapers` | `editing_locks.py` 前缀 `/api/editing-locks` |
-| 表/ORM | `workpaper_editing_locks` / `WorkpaperEditingLock` | `editing_locks` / `EditingLock` |
-| 锁维度 | `wp_id`（底稿专用） | `(resource_type, resource_id)`（通用，部分唯一索引保活跃锁≤1） |
-| 前端 | `WorkpaperEditor.vue` → `/api/workpapers/{wpId}/editing-lock` | `DisclosureEditor.vue`/`AuditReportEditor.vue` → `/api/editing-locks/{type}/{id}` |
+| 维度 | 统一后（v2） |
+|------|-------------|
+| service | `editing_lock_service` |
+| router | `editing_locks.py` 前缀 `/api/editing-locks` |
+| 表/ORM | `editing_locks` / `EditingLock` |
+| 锁维度 | `(resource_type, resource_id)`（通用，部分唯一索引保活跃锁≤1） |
+| 前端 | `useEditingLock.ts` 所有 resourceType 统一走 `/api/editing-locks/{type}/{id}` |
 
-前端 `useEditingLock` composable 按 `resourceType` 分流：`workpaper`→v1 专用端点，其它资源→v2 通用端点。
-
-收口建议（**需 spec 三件套 + 数据迁移 + Playwright 实测，不可静默删**）：
-把 v1 行为并入 v2 的 `resource_type='workpaper'` → 迁前端路径 → 迁存量锁数据 → 下线 v1。在此之前 v1 不得删除。
+V073 迁移了存量活跃锁；`workpaper_editing_locks` 表在 `KNOWN_ALLOWLIST` 中（V075 启动时 DROP）。
 
 ## schema 漂移自检 + 迁移弹性 — 是优点不是 bug
 

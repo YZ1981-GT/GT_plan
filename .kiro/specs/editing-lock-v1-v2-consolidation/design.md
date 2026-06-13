@@ -127,7 +127,11 @@ v2 通用端点覆盖 v1 的全部行为，前端把 `resource_type='workpaper'`
 
 ### 4. editing_locks.py router（force 端点补条件化 SSE emit）
 
-force-acquire 端点在 `db.commit()` 后补 emit `editing_lock.force_acquired`（broadcast_raw 轻量路径）。**payload 中 `wp_id` 字段须条件化**：仅当 `resource_type == 'workpaper'` 时填 `wp_id = resource_id`，其它 resource_type（附注/报告等）省略 `wp_id` 或置 null，避免把非底稿的 resource_id 误塞进 `wp_id`。`resource_type` + `resource_id` 始终填，供前端通用锁路径按 `(resource_type, resource_id)` 匹配。
+force-acquire 端点在 `db.commit()` 后补 emit `editing_lock.force_acquired`（broadcast_raw 轻量路径，导入路径 `from app.services.event_bus import event_bus`）。
+
+**payload 须含 `project_id`**：`broadcast_raw(event_type, extra)` 的 SSE 队列投递依赖 `extra["project_id"]`（与现有 `report.stale`/`note.synced` 等惯例一致）。force 端点按 resource_id 解析 project_id——`resource_type=='workpaper'` 时查 `WorkingPaper.project_id`（resource_id=WorkingPaper.id，`WorkingPaper` 有 project_id 列）；非 workpaper（disclosure_note→DisclosureNote.project_id / audit_report→对应资源）按对应资源查；解析失败置 None（best-effort，不阻断）。
+
+**payload 中 `wp_id` 字段须条件化**：仅当 `resource_type == 'workpaper'` 时填 `wp_id = resource_id`（前端 `useEditingLock` 实证只按 `wp_id` 匹配强抢事件——见 `useEditingLockForceAcquired.spec.ts`「ignores force_acquired event for different wp_id」），其它 resource_type（附注/报告等）省略 `wp_id` 或置 null，避免把非底稿的 resource_id 误塞进 `wp_id`。`project_id` + `resource_type` + `resource_id` 始终填，供前端通用锁路径按 `(resource_type, resource_id)` 匹配 + SSE 按 project 路由。except 记 `logger.warning`，禁 `try/except: pass`。
 
 ### 5. 前端 useEditingLock.ts（workpaper 分支灰度化）
 
@@ -177,6 +181,7 @@ updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()   -- TimestampMixin
 // resource_type='workpaper' 时（wp_id == resource_id）
 {
   "event_type": "editing_lock.force_acquired",
+  "project_id": "<wp 所属 project UUID>",
   "wp_id": "<wp_id::text>",
   "resource_type": "workpaper",
   "resource_id": "<wp_id::text>",
@@ -187,12 +192,15 @@ updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()   -- TimestampMixin
 // resource_type != 'workpaper' 时（省略/置空 wp_id，不塞 resource_id）
 {
   "event_type": "editing_lock.force_acquired",
+  "project_id": "<资源所属 project UUID 或 null>",
   "wp_id": null,
   "resource_type": "disclosure_note",
   "resource_id": "<note_id>",
   "new_holder_id": "...", "new_holder_name": "...", "previous_holder_id": "..."
 }
 ```
+
+注：`project_id` 供 SSE 队列按项目路由（broadcast_raw 惯例）；前端 `useEditingLock` 强抢匹配实测只用 `wp_id`（workpaper）/`resource_type+resource_id`（通用），不依赖 project_id 过滤，故 project_id 解析失败置 null 不影响前端匹配，仅可能影响按项目维度的 SSE 投递优化。
 
 前端 `onSSEEvent` 对 workpaper 按 `wp_id` 匹配、对通用锁按 `(resource_type, resource_id)` 匹配。workpaper 路径 `wp_id == resource_id` 确保两种匹配都识别；非 workpaper 资源不污染 `wp_id` 字段。
 
@@ -294,6 +302,7 @@ updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()   -- TimestampMixin
 - **迁移并发安全**：V073 迁移期间若有新锁写入，幂等的 `WHERE NOT EXISTS` + 部分唯一索引保证不产生重复活跃锁；冲突行被 `ON CONFLICT DO NOTHING`（或 NOT EXISTS 守护）跳过。
 - **SSE 广播失败**：`broadcast_raw` 内部对 SSE 队列满、无 running loop（测试环境）均已 try/except 容错，不阻断 force-acquire 的 DB 操作（事件推送是 best-effort 通知，锁状态以 DB 为准）。
 - **DB 不可达（feature flag）**：`FeatureFlagService` DB 读失败返回 stale 缓存或保守关闭（false），即灰度开关故障时安全回退到 v1 端点。
+- **双端点期跨表锁语义（无跨表双锁风险）**：因前端 `editing_lock_v2_workpaper` 是**全局开关**（非按用户百分比灰度，见组件 6），同一时刻所有用户要么全走 v1、要么全走 v2，不存在 v1/v2 用户混跑同一底稿→不会出现"v1 表与 v2 表各有一把活跃锁互不感知"的跨表双锁。V073 迁移在翻 true 前执行（把 v1 存量活跃锁迁入 v2）；翻 true 后新锁只进 v2，v1 表存量锁变僵尸（不再被读写，不影响功能，阶段 3 DROP 表清理）。**实施者无需做 v1/v2 跨表锁协调**。
 - **孤儿锁（开放问题 ②，见下）**：底稿被删后遗留的 workpaper 锁由 heartbeat 5 分钟过期惰性清理覆盖。
 
 ## 开放问题的设计决策

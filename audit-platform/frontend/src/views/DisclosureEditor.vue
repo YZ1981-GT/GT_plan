@@ -324,6 +324,13 @@
           </div>
 
             <!-- 表格型（支持多表格Tab切换） -->
+            <div
+              v-if="currentNote.content_type === 'table' && currentNote.guidance_text?.trim()"
+              class="gt-guidance-bar"
+            >
+              <el-icon><InfoFilled /></el-icon>
+              <span class="gt-guidance-text">{{ currentNote.guidance_text }}</span>
+            </div>
             <div v-if="currentNote.content_type === 'table' || currentNote.content_type === 'mixed'">
               <!-- 多表格Tab + 导出开关 -->
               <div v-if="currentNoteTables.length > 1" style="display: flex; align-items: center; gap: 4px; margin-bottom: 8px;">
@@ -422,6 +429,13 @@
 
             <!-- 文字型 — 富文本编辑器 (Req 48.1-48.7) -->
             <div v-if="currentNote.content_type === 'text' || currentNote.content_type === 'mixed'" class="gt-de-tiptap-wrapper">
+              <div
+                v-if="currentNote.guidance_text?.trim()"
+                class="gt-guidance-bar"
+              >
+                <el-icon><InfoFilled /></el-icon>
+                <span class="gt-guidance-text">{{ currentNote.guidance_text }}</span>
+              </div>
               <!-- 增强富文本编辑器：支持标题/加粗/斜体/列表/表格/缩进/颜色/占位符/源码/字数 -->
               <NoteRichTextEditor
                 v-model="textContent"
@@ -911,6 +925,7 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { InfoFilled } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'

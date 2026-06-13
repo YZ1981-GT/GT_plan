@@ -54,8 +54,7 @@ describe('useEditingLock — force_acquired SSE handling', () => {
       useEditingLock({ resourceId, resourceType: 'workpaper' })
     )
 
-    await nextTick()
-    await nextTick()
+    await vi.advanceTimersByTimeAsync(0)
     expect(result.isMine.value).toBe(true)
 
     // Simulate SSE event: someone else force-acquired our lock
@@ -77,8 +76,7 @@ describe('useEditingLock — force_acquired SSE handling', () => {
       useEditingLock({ resourceId, resourceType: 'workpaper' })
     )
 
-    await nextTick()
-    await nextTick()
+    await vi.advanceTimersByTimeAsync(0)
 
     const takenOverHandler = vi.fn()
     eventBus.on('editing-lock:taken-over', takenOverHandler)
@@ -106,8 +104,7 @@ describe('useEditingLock — force_acquired SSE handling', () => {
       useEditingLock({ resourceId, resourceType: 'workpaper' })
     )
 
-    await nextTick()
-    await nextTick()
+    await vi.advanceTimersByTimeAsync(0)
     expect(result.isMine.value).toBe(true)
 
     // Event for a different workpaper
@@ -134,8 +131,7 @@ describe('useEditingLock — force_acquired SSE handling', () => {
       useEditingLock({ resourceId, resourceType: 'workpaper' })
     )
 
-    await nextTick()
-    await nextTick()
+    await vi.advanceTimersByTimeAsync(0)
     expect(result.isMine.value).toBe(false)
 
     const takenOverHandler = vi.fn()

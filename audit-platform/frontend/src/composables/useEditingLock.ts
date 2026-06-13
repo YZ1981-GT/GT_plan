@@ -4,24 +4,18 @@
  * 进入编辑模式时 acquire lock，心跳每 2 分钟续期，
  * 页面关闭/路由离开时 release。
  *
- * 后端端点：
- *   底稿（workpaper）走旧专用端点：
- *     POST   /api/workpapers/{wpId}/editing-lock          — 获取锁
- *     PATCH  /api/workpapers/{wpId}/editing-lock/heartbeat — 续期
- *     DELETE /api/workpapers/{wpId}/editing-lock           — 释放锁
- *
- *   其他资源（disclosure_note/audit_report 等）走通用编辑锁端点：
+ * 后端端点（统一通用编辑锁端点）：
  *     POST   /api/editing-locks/{resourceType}/{resourceId}            — 获取锁
  *     PATCH  /api/editing-locks/{resourceType}/{resourceId}/heartbeat  — 续期
  *     DELETE /api/editing-locks/{resourceType}/{resourceId}            — 释放锁
  *     POST   /api/editing-locks/{resourceType}/{resourceId}/force      — 强抢锁
  *
  * @example
- * // 底稿（走旧专用端点）
+ * // 底稿
  * const lock = useEditingLock({ resourceId: wpId, resourceType: 'workpaper' })
- * // 附注（走通用编辑锁端点）
+ * // 附注
  * const lock = useEditingLock({ resourceId: noteId, resourceType: 'disclosure_note' })
- * // 审计报告（走通用编辑锁端点）
+ * // 审计报告
  * const lock = useEditingLock({ resourceId: reportId, resourceType: 'audit_report' })
  */
 import { ref, computed, onMounted, onUnmounted, watch, type Ref } from 'vue'
@@ -50,7 +44,7 @@ export interface EditingLockOptions {
   resourceId: Ref<string>
   /**
    * 资源类型：
-   * - 'workpaper'（默认）→ 走旧底稿专用端点，向后兼容
+   * - 'workpaper' → 走通用编辑锁端点 /api/editing-locks/workpaper/{id}
    * - 其他字符串（如 'disclosure_note' / 'audit_report'）→ 走通用编辑锁端点
    */
   resourceType?: string
@@ -68,40 +62,18 @@ export function useEditingLock(options: EditingLockOptions) {
 
   const heartbeatMs = options.heartbeatMs ?? 120_000
   const resourceType = options.resourceType ?? 'workpaper'
-  const isWorkpaper = resourceType === 'workpaper'
-  /** 是否走通用编辑锁端点（非 workpaper 的任意 resourceType） */
-  const isGenericLock = !isWorkpaper
 
   async function acquire() {
     const id = options.resourceId.value
     if (!id) return
 
-    if (isGenericLock) {
-      // 通用编辑锁端点
-      try {
-        const res = await api.post(`/api/editing-locks/${resourceType}/${id}`)
-        locked.value = true
-        isMine.value = res?.acquired ?? true
-        lockedBy.value = res?.locked_by_name ?? null
-      } catch (e: any) {
-        if (e?.response?.status === 409 || e?.status === 409) {
-          locked.value = true
-          isMine.value = false
-          lockedBy.value = e?.response?.data?.detail?.locked_by_name
-            ?? e?.data?.detail?.locked_by_name ?? '其他用户'
-        }
-      }
-      return
-    }
-
-    // 底稿走旧专用端点（原有逻辑不动）
+    const base = `/api/editing-locks/${resourceType}/${id}`
     try {
-      const res = await api.post(`/api/workpapers/${id}/editing-lock`)
+      const res = await api.post(base)
       locked.value = true
       isMine.value = res?.acquired ?? true
       lockedBy.value = res?.locked_by_name ?? null
     } catch (e: any) {
-      // 409 = 他人持锁
       if (e?.response?.status === 409 || e?.status === 409) {
         locked.value = true
         isMine.value = false
@@ -115,18 +87,8 @@ export function useEditingLock(options: EditingLockOptions) {
     const id = options.resourceId.value
     if (!id || !isMine.value) return
 
-    if (isGenericLock) {
-      try {
-        await api.delete(`/api/editing-locks/${resourceType}/${id}`)
-      } catch { /* ignore */ }
-      locked.value = false
-      isMine.value = false
-      return
-    }
-
-    // 底稿走旧端点
     try {
-      await api.delete(`/api/workpapers/${id}/editing-lock`)
+      await api.delete(`/api/editing-locks/${resourceType}/${id}`)
     } catch { /* ignore */ }
     locked.value = false
     isMine.value = false
@@ -136,16 +98,22 @@ export function useEditingLock(options: EditingLockOptions) {
     const id = options.resourceId.value
     if (!id || !isMine.value) return
 
-    if (isGenericLock) {
-      try {
-        await api.patch(`/api/editing-locks/${resourceType}/${id}/heartbeat`)
-      } catch { /* ignore */ }
-      return
-    }
-
-    // 底稿走旧端点
     try {
-      await api.patch(`/api/workpapers/${id}/editing-lock/heartbeat`)
+      await api.patch(`/api/editing-locks/${resourceType}/${id}/heartbeat`)
+    } catch { /* ignore */ }
+  }
+
+  /** 强抢锁 */
+  async function forceAcquire() {
+    const id = options.resourceId.value
+    if (!id) return
+
+    try {
+      const res = await api.post(`/api/editing-locks/${resourceType}/${id}/force`)
+      locked.value = true
+      isMine.value = true
+      lockedBy.value = null
+      return res
     } catch { /* ignore */ }
   }
 
@@ -164,13 +132,15 @@ export function useEditingLock(options: EditingLockOptions) {
   function onSSEEvent(payload: any) {
     if (!payload || payload.event_type !== 'editing_lock.force_acquired') return
 
-    if (isGenericLock) {
+    const isWorkpaper = resourceType === 'workpaper'
+
+    if (isWorkpaper) {
+      // 底稿锁：匹配 wp_id
+      if (payload.wp_id !== options.resourceId.value) return
+    } else {
       // 通用锁：匹配 resource_type + resource_id
       if (payload.resource_type !== resourceType) return
       if (payload.resource_id !== options.resourceId.value) return
-    } else {
-      // 底稿锁：匹配 wp_id
-      if (payload.wp_id !== options.resourceId.value) return
     }
 
     // 仅当本人原本持锁时才反应（避免他人之间互抢的杂讯）
@@ -211,5 +181,5 @@ export function useEditingLock(options: EditingLockOptions) {
     }
   })
 
-  return { locked, lockedBy, isMine, acquire, release }
+  return { locked, lockedBy, isMine, acquire, release, forceAcquire }
 }

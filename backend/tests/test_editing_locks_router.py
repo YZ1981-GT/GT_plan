@@ -72,7 +72,7 @@ class TestAcquire:
     @pytest.mark.asyncio
     async def test_acquire_conflict_409(self, client, db_session):
         """第二人获取同资源应 409"""
-        from app.services.editing_lock_service_v2 import acquire_lock
+        from app.services.editing_lock_service import acquire_lock
 
         other_holder = uuid.uuid4()
         await acquire_lock(db_session, "note", "res-002", other_holder, "其他人")
@@ -115,7 +115,7 @@ class TestRelease:
 class TestForceAcquire:
     @pytest.mark.asyncio
     async def test_force_acquire(self, client, db_session):
-        from app.services.editing_lock_service_v2 import acquire_lock
+        from app.services.editing_lock_service import acquire_lock
 
         other = uuid.uuid4()
         await acquire_lock(db_session, "note", "res-force", other, "前人")

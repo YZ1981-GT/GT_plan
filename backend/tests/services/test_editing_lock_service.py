@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.models.base import Base
 from app.models.editing_lock_models import EditingLock
-from app.services.editing_lock_service_v2 import (
+from app.services.editing_lock_service import (
     acquire_lock,
     release_lock,
     heartbeat_lock,

@@ -1,9 +1,12 @@
 /**
  * useEditingLock composable 单测
  * 验证锁获取/释放/心跳/降级逻辑
+ *
+ * Feature: editing-lock-v1-v2-consolidation, Property 11
+ * 阶段 3 后 workpaper 统一走 v2 通用端点，无 v1 回退分支。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ref, nextTick } from 'vue'
+import { ref } from 'vue'
 
 // Mock lifecycle hooks (not in component context)
 vi.mock('vue', async () => {
@@ -41,13 +44,13 @@ describe('useEditingLock', () => {
     vi.useRealTimers()
   })
 
-  it('acquires lock on mount for workpaper type', async () => {
+  it('acquires lock on mount for workpaper type via v2 endpoint', async () => {
     mockPost.mockResolvedValue({ acquired: true, locked_by_name: 'admin' })
     const resourceId = ref('wp-001')
     const { locked, isMine } = useEditingLock({ resourceId, resourceType: 'workpaper' })
 
-    await nextTick()
-    expect(mockPost).toHaveBeenCalledWith('/api/workpapers/wp-001/editing-lock')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-001')
     expect(locked.value).toBe(true)
     expect(isMine.value).toBe(true)
   })
@@ -59,26 +62,26 @@ describe('useEditingLock', () => {
     const resourceId = ref('wp-002')
     const { locked, isMine, lockedBy } = useEditingLock({ resourceId, resourceType: 'workpaper' })
 
-    await nextTick()
+    await vi.advanceTimersByTimeAsync(0)
     expect(locked.value).toBe(true)
     expect(isMine.value).toBe(false)
     expect(lockedBy.value).toBe('张三')
   })
 
-  it('releases lock on explicit release call', async () => {
+  it('releases lock via v2 endpoint on explicit release call', async () => {
     mockPost.mockResolvedValue({ acquired: true })
     mockDelete.mockResolvedValue({})
     const resourceId = ref('wp-003')
     const { isMine, release } = useEditingLock({ resourceId, resourceType: 'workpaper' })
 
-    await nextTick()
+    await vi.advanceTimersByTimeAsync(0)
     expect(isMine.value).toBe(true)
 
     await release()
-    expect(mockDelete).toHaveBeenCalledWith('/api/workpapers/wp-003/editing-lock')
+    expect(mockDelete).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-003')
   })
 
-  it('sends heartbeat at configured interval', async () => {
+  it('sends heartbeat via v2 endpoint at configured interval', async () => {
     mockPost.mockResolvedValue({ acquired: true })
     mockPatch.mockResolvedValue({})
     const resourceId = ref('wp-004')
@@ -89,15 +92,16 @@ describe('useEditingLock', () => {
     mockPatch.mockClear()
     // Advance past one heartbeat interval
     await vi.advanceTimersByTimeAsync(1000)
-    expect(mockPatch).toHaveBeenCalledWith('/api/workpapers/wp-004/editing-lock/heartbeat')
+    expect(mockPatch).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-004/heartbeat')
   })
 
-  it('degrades to local-only for non-workpaper resources', async () => {
+  it('uses generic lock endpoint for non-workpaper resources', async () => {
+    mockPost.mockResolvedValue({ acquired: true, locked_by_name: null })
     const resourceId = ref('report-001')
     const { locked, isMine } = useEditingLock({ resourceId, resourceType: 'other' })
 
-    await nextTick()
-    expect(mockPost).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/other/report-001')
     expect(locked.value).toBe(true)
     expect(isMine.value).toBe(true)
   })
@@ -106,8 +110,18 @@ describe('useEditingLock', () => {
     const resourceId = ref('wp-005')
     const { locked } = useEditingLock({ resourceId, resourceType: 'workpaper', autoAcquire: false })
 
-    await nextTick()
+    await vi.advanceTimersByTimeAsync(0)
     expect(mockPost).not.toHaveBeenCalled()
     expect(locked.value).toBe(false)
+  })
+
+  it('force acquires via v2 endpoint', async () => {
+    mockPost.mockResolvedValue({ acquired: true, lock_id: 'lock-1' })
+    const resourceId = ref('wp-006')
+    const { forceAcquire } = useEditingLock({ resourceId, resourceType: 'workpaper', autoAcquire: false })
+
+    await vi.advanceTimersByTimeAsync(0)
+    await forceAcquire()
+    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-006/force')
   })
 })

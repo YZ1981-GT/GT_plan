@@ -83,6 +83,7 @@ class SchemaDriftDetector:
         # 科目类别修正迁移(migrate_account_category_correction.py)的回滚备份表，
         # 一次性脚本快照 (project_id,table,record_id,old_category)，需保留以支持 --rollback
         "_category_correction_backup",
+        "_note_guidance_split_backup",
     })
 
     # 列级 allowlist：DB 有但 ORM 不需映射的列（历史残留 / 已弃用）

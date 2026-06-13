@@ -50,7 +50,6 @@ import app.models.qc_rating_models  # noqa: E402, F401
 import app.models.qc_case_library_models  # noqa: E402, F401
 import app.models.qc_inspection_models  # noqa: E402, F401
 import app.models.qc_rule_models  # noqa: E402, F401  — Round 6
-import app.models.workpaper_editing_lock_models  # noqa: E402, F401  — Round 4
 import app.models.wp_optimization_models  # noqa: E402, F401  — 底稿深度优化
 import app.models.custom_query_models  # noqa: E402, F401  — template-library-coordination Sprint 6
 import app.models.v3_refinement_models  # noqa: E402, F401  — V3 收官增强：ai_content_log / cross_module_conflicts / time_machine_snapshots
