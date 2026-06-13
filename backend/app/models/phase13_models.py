@@ -84,7 +84,7 @@ class WordExportTask(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("projects.id"), nullable=False
     )
-    doc_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    doc_type: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(
         String(30), server_default=text("'draft'"), nullable=False
     )
