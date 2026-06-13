@@ -809,9 +809,7 @@ function scrollToReportRow(checkName: string) {
     }
   }
   // fallback: 未找到匹配行时提示
-  import('element-plus').then(({ ElMessage }) => {
-    ElMessage.info('未找到对应行，请手动查看')
-  })
+  ElMessage.info('未找到对应行，请手动查看')
 }
 onMounted(() => {
   updateTableHeight()
