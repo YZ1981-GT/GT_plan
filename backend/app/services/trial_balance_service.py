@@ -190,7 +190,8 @@ class TrialBalanceService:
             # 损益类科目（5xxx/6xxx）：取单边发生额（不做借-贷，因为结转后两边相等）。
             # v2 约定（category_natural_positive）：按 direction_resolver 判方向后存自然正数。
             # 收入类（贷方正常）→ 取贷方发生额存正数；费用/成本类（借方正常）→ 取借方发生额存正数。
-            # 资产负债类：直接传递 tb_balance 汇总的 closing/opening（入库已是 v2 正数），不做二次处理。
+            # 资产负债类：tb_balance.closing_balance 入库时是"借正贷负"原始口径（v1），
+            #   需按科目方向转为 v2 自然正数（负债/权益贷方类取绝对值）。
             is_income_expense = code and code[0] in ('5', '6')
             if is_income_expense:
                 period = period_rows.get(code)
@@ -207,6 +208,13 @@ class TrialBalanceService:
                 else:
                     closing = Decimal("0")
                 opening = Decimal("0")  # 损益类无期初余额
+            else:
+                # 资产负债权益类：tb_balance.closing_balance 是"借正贷负"原始口径，
+                # 贷方类（负债/权益）需取绝对值转为 v2 自然正数。
+                direction, _source = resolve_account_direction(code, name or "")
+                if direction == "credit":
+                    closing = abs(closing)
+                    opening = abs(opening)
 
             row = existing_rows.get(code)
             if row:
