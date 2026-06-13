@@ -53,7 +53,9 @@
 .gt-de-editor-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--gt-color-border-purple); }
 .gt-de-section-title { margin: 0; font-size: var(--gt-font-size-base); font-weight: 600; color: var(--gt-color-text-primary); }
 .gt-de-section-account { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px; display: block; }
-.gt-de-editor-footer { margin-top: 12px; text-align: right; padding-top: 10px; border-top: 1px solid var(--gt-color-border-purple); }
+.gt-de-editor-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 10px; background: var(--gt-color-primary-bg, #f4f0fa); border: 1px solid var(--gt-color-border-purple, #d8b8ee); border-radius: 6px; }
+.gt-de-footer-secondary { display: flex; gap: 6px; align-items: center; }
+.gt-de-footer-primary { display: flex; gap: 6px; align-items: center; }
 /* ── 右侧校验 ── */
 .gt-de-validation { width: 240px; flex-shrink: 0; background: var(--gt-color-bg-white); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow-y: auto; padding-bottom: 8px; }
 .gt-de-empty-hint { color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs); text-align: center; padding: 30px 10px; }
@@ -100,9 +102,10 @@
 .gt-de-tiptap-content :deep(.ProseMirror p) { margin-bottom: 10px; text-indent: 2em; }
 .gt-de-tiptap-content :deep(.ProseMirror p.is-editor-empty:first-child::before) { color: var(--gt-color-text-placeholder); content: attr(data-placeholder); float: left; height: 0; pointer-events: none; text-indent: 0; }
 .gt-de-ai-toolbar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-top: 1px solid var(--gt-color-border-lighter); background: var(--gt-color-primary-bg); flex-wrap: wrap; }
-.gt-de-structure-toolbar { display: flex; align-items: center; padding: 6px 0; margin-top: 4px; border-top: 1px dashed var(--gt-color-border-purple); }
+.gt-de-structure-toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; margin-top: 8px; background: var(--gt-color-primary-bg, #f4f0fa); border: 1px solid var(--gt-color-border-purple, #d8b8ee); border-radius: 6px; flex-wrap: wrap; }
 .gt-trace-popover-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: transparent; }
 .gt-trace-popover-container { position: absolute; z-index: 2001; }
 /* ── Stale banner ── */
 .gt-stale-banner { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff8e1; border-radius: 6px; margin-bottom: 8px; font-size: var(--gt-font-size-xs); }
 .gt-stale-text { flex: 1; color: var(--gt-color-text-regular); }
+

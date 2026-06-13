@@ -80,6 +80,9 @@ class SchemaDriftDetector:
         "seed_load_history",
         # 符号约定迁移(V064)产生的备份表，迁移完成后未清理
         "_sign_migration_backup",
+        # 科目类别修正迁移(migrate_account_category_correction.py)的回滚备份表，
+        # 一次性脚本快照 (project_id,table,record_id,old_category)，需保留以支持 --rollback
+        "_category_correction_backup",
     })
 
     # 列级 allowlist：DB 有但 ORM 不需映射的列（历史残留 / 已弃用）

@@ -390,11 +390,16 @@ class WordTemplateFiller:
             doc = _open_template_or_create(system_template)
 
         # Read DisclosureNote records
+        # 排序铁律：按 sort_order（章节序号）排序，禁止按 note_section 中文字符串排序
+        # （Unicode 码点序与审计章节顺序不一致，会导致导出章节乱套）。
         result = await db.execute(
             sa.select(DisclosureNote).where(
                 DisclosureNote.project_id == project_id,
                 DisclosureNote.year == year,
-            ).order_by(DisclosureNote.note_section)
+            ).order_by(
+                DisclosureNote.sort_order.asc().nulls_last(),
+                DisclosureNote.note_section,
+            )
         )
         notes = result.scalars().all()
 

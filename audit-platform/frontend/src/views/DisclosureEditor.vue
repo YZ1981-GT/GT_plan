@@ -314,6 +314,12 @@
               <el-tag :type="currentNote.status === 'confirmed' ? 'success' : 'info'" size="small">
                 {{ currentNote.status === 'confirmed' ? '已确认' : '草稿' }}
               </el-tag>
+              <!-- 编辑操作按钮（置于标题行，随时可见，无需滚动到底部） -->
+              <el-button v-if="!editMode" size="small" @click="enterEdit()" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">编辑</el-button>
+              <template v-else>
+                <el-button size="small" @click="exitEdit(true)">取消</el-button>
+                <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">保存</el-button>
+              </template>
             </div>
           </div>
 
@@ -342,11 +348,10 @@
               </div>
               <!-- 当前表格 -->
               <el-table ref="deTableRef" v-if="activeTableData?.rows?.length || activeTableData?.headers?.length" :data="activeTableData.rows || []"
-                border size="small" style="margin-bottom: 12px"
+                border size="small" class="gt-de-note-table gt-compact-table" style="margin-bottom: 12px"
                 :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
-                :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', whiteSpace: 'nowrap', padding: '4px 0' }"
-                :row-style="{ height: '26px' }"
-                :cell-style="{ padding: '2px 6px', fontSize: '12px', lineHeight: '20px' }"
+                :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', whiteSpace: 'nowrap', padding: '2px 0' }"
+                :cell-style="{ padding: '0 6px', fontSize: '12px', lineHeight: '20px' }"
                 :cell-class-name="deCellClassName"
                 @cell-click="onDeCellClick"
                 @cell-contextmenu="onDeCellContextMenu">
@@ -386,6 +391,32 @@
               </el-table>
               <div v-else-if="activeTableData?.headers?.length" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); padding: 10px; text-align: center; border: 1px dashed var(--gt-color-border-purple); border-radius: 6px;">
                 该表格暂无数据行（可在编辑模式下添加）
+              </div>
+            </div>
+
+            <!-- 表格结构编辑工具栏 (Req 38.1-38.6) — 置于表格下方、富文本上方 -->
+            <div v-if="editMode && (currentNote.content_type === 'table' || currentNote.content_type === 'mixed')" class="gt-de-structure-toolbar">
+              <el-button-group size="small">
+                <el-button @click="onStructureAddRow" title="在末尾新增行">➕ 行</el-button>
+                <el-button @click="onStructureDeleteRow" title="删除最后一行（合计行除外）" :disabled="!canDeleteRow">➖ 行</el-button>
+                <el-button @click="onStructureAddColumn" title="新增列">➕ 列</el-button>
+                <el-button @click="onStructureDeleteColumn" title="删除最后一列" :disabled="!canDeleteColumn">➖ 列</el-button>
+              </el-button-group>
+              <el-button-group size="small">
+                <el-button @click="noteTableStructure.undo()" :disabled="!noteTableStructure.canUndo.value" title="撤销 (Ctrl+Z)">↩ 撤销</el-button>
+                <el-button @click="noteTableStructure.redo()" :disabled="!noteTableStructure.canRedo.value" title="重做 (Ctrl+Y)">↪ 重做</el-button>
+              </el-button-group>
+              <el-button size="small" @click="onRestoreTemplateStructure" title="恢复为模板默认结构">🔄 恢复模板结构</el-button>
+            </div>
+
+            <div class="gt-de-editor-footer" v-if="editMode">
+              <div class="gt-de-footer-secondary">
+                <el-button size="small" plain @click="onClearAllFormulas" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : '清除所有单元格公式'">一键清除公式</el-button>
+                <el-button size="small" plain @click="onRestoreAutoMode" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : '恢复为自动提数模式'">恢复自动提数</el-button>
+              </div>
+              <div class="gt-de-footer-primary">
+                <el-button size="small" @click="exitEdit(true)">取消</el-button>
+                <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">保存</el-button>
               </div>
             </div>
 
@@ -443,31 +474,6 @@
 
             <!-- 选中区域状态栏 -->
             <SelectionBar :stats="deCtx.selectionStats()" />
-
-            <!-- 表格结构编辑工具栏 (Req 38.1-38.6) -->
-            <div v-if="editMode && (currentNote.content_type === 'table' || currentNote.content_type === 'mixed')" class="gt-de-structure-toolbar">
-              <el-button-group size="small">
-                <el-button @click="onStructureAddRow" title="在末尾新增行">➕ 行</el-button>
-                <el-button @click="onStructureDeleteRow" title="删除最后一行（合计行除外）" :disabled="!canDeleteRow">➖ 行</el-button>
-                <el-button @click="onStructureAddColumn" title="新增列">➕ 列</el-button>
-                <el-button @click="onStructureDeleteColumn" title="删除最后一列" :disabled="!canDeleteColumn">➖ 列</el-button>
-              </el-button-group>
-              <el-button-group size="small" style="margin-left: 8px;">
-                <el-button @click="noteTableStructure.undo()" :disabled="!noteTableStructure.canUndo.value" title="撤销 (Ctrl+Z)">↩ 撤销</el-button>
-                <el-button @click="noteTableStructure.redo()" :disabled="!noteTableStructure.canRedo.value" title="重做 (Ctrl+Y)">↪ 重做</el-button>
-              </el-button-group>
-              <el-button size="small" style="margin-left: 8px;" @click="onRestoreTemplateStructure" title="恢复为模板默认结构">🔄 恢复模板结构</el-button>
-            </div>
-
-            <div class="gt-de-editor-footer">
-              <el-button v-if="!editMode" @click="enterEdit()" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">编辑</el-button>
-              <template v-else>
-                <el-button @click="exitEdit(true)">取消</el-button>
-                <el-button type="primary" @click="onSave" :loading="saveLoading" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">保存</el-button>
-                <el-button type="warning" @click="onClearAllFormulas" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">一键清除公式</el-button>
-                <el-button @click="onRestoreAutoMode" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">恢复自动提数</el-button>
-              </template>
-            </div>
           </template>
           <div v-else class="gt-de-empty-hint">请从左侧目录选择章节</div>
       </div>

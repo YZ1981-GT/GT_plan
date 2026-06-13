@@ -264,7 +264,7 @@
     </div>
 
     <!-- 报表表格 — 普通模式（非矩阵报表） -->
-    <el-table ref="rvTableRef" v-if="reportMode !== 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision' && activeTab !== 'cross_check' && activeTab !== 'multi_year_compare'" :data="rows" v-loading="loading" style="width: 100%"
+    <el-table ref="rvTableRef" v-if="reportMode !== 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision' && activeTab !== 'cross_check' && activeTab !== 'multi_year_compare'" :data="rows" v-loading="loading" style="width: 100%" class="gt-compact-table"
       :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :row-class-name="rowClassName" :show-header="true" border size="small" :max-height="600"
       :cell-class-name="rvCellClassName"
@@ -331,7 +331,7 @@
     </el-table>
 
     <!-- 报表表格 — 对比视图（非权益变动表） -->
-    <el-table ref="compareTableRef" v-if="reportMode === 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision' && activeTab !== 'cross_check' && activeTab !== 'multi_year_compare'" :data="compareRows" v-loading="loading" style="width: 100%"
+    <el-table ref="compareTableRef" v-if="reportMode === 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision' && activeTab !== 'cross_check' && activeTab !== 'multi_year_compare'" :data="compareRows" v-loading="loading" style="width: 100%" class="gt-compact-table"
       :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :row-class-name="compareRowClassName"
       :cell-class-name="rvCellClassName"

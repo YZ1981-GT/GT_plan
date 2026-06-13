@@ -287,7 +287,7 @@
       stripe
       :max-height="tableMaxHeight"
       style="width: 100%"
-      :class="`gt-tb-font-${displayPrefs.fontSize}`"
+      :class="`gt-tb-font-${displayPrefs.fontSize} gt-compact-table`"
       :row-class-name="rowClassName"
       :cell-class-name="tbCellClassName"
       @cell-click="onTbCellClick"
@@ -416,11 +416,12 @@
           ref="tbSummaryTableRef"
           :data="tbSummaryRows"
           border
+          class="gt-compact-table"
           :max-height="tbSummaryMaxHeight"
           style="width: 100%"
           :row-class-name="tbSumRowClassName"
           :cell-class-name="tbSumCellClassName"
-          :cell-style="{ padding: '4px 8px' }"
+          :cell-style="{ padding: '0 8px' }"
           highlight-current-row
           @cell-click="onTbSumCellClick"
           @row-contextmenu="onTbSumElContextMenu"

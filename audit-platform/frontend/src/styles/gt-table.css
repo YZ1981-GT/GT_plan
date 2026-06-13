@@ -94,3 +94,22 @@
 .gt-tb-sum-selected td {
   background: rgba(75, 45, 119, 0.12) !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   3. 紧凑行高（gt-compact-table）— 复用类
+   用户偏好：试算表/科目表/报表/附注/合并底稿等数据表行间距尽量小。
+   在目标 <el-table> 上加 class="gt-compact-table" 即生效。
+   ═══════════════════════════════════════════════════════════════ */
+/* 注意：必须用 `td.el-table__cell`/`th.el-table__cell` 限定符把特异性提到 (0,2,1)，
+   才能压过 gt-polish.css 的全局 `.el-table td.el-table__cell { padding:10px 14px !important }`
+   （仅 `.gt-compact-table .el-table__cell` 特异性 0,2,0 不够，会被 polish 盖回去）。 */
+.gt-compact-table td.el-table__cell,
+.gt-compact-table th.el-table__cell { padding: 0 !important; height: 24px !important; }
+.gt-compact-table .cell { padding: 1px 6px !important; line-height: 20px !important; }
+/* 编辑态输入框压扁，不撑高行 */
+.gt-compact-table .el-input-number,
+.gt-compact-table .el-input { height: 22px !important; line-height: 22px !important; }
+.gt-compact-table .el-input-number .el-input__wrapper,
+.gt-compact-table .el-input__wrapper { padding: 0 6px !important; min-height: 22px !important; }
+.gt-compact-table .el-input-number .el-input__inner,
+.gt-compact-table .el-input__inner { height: 20px !important; line-height: 20px !important; }

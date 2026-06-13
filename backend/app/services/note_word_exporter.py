@@ -988,11 +988,20 @@ class NoteWordExporter:
     async def _load_notes(
         self, project_id: UUID, year: int, sections: list[str] | None = None
     ) -> list[DisclosureNote]:
-        """Load notes from database."""
+        """Load notes from database.
+
+        排序铁律：必须按 ``sort_order``（章节序号，99/100/199/200...）排序，
+        **不可**按 ``note_section`` 字符串排序——中文章节号（一/二/七/九...）的
+        Unicode 码点序与审计章节顺序不一致（"七"<"三"<"九"<"二"），字符串排序会
+        导致导出 Word 章节顺序完全乱套。sort_order 相同/缺失时用 note_section 兜底。
+        """
         q = sa.select(DisclosureNote).where(
             DisclosureNote.project_id == project_id,
             DisclosureNote.year == year,
-        ).order_by(DisclosureNote.note_section)
+        ).order_by(
+            DisclosureNote.sort_order.asc().nulls_last(),
+            DisclosureNote.note_section,
+        )
 
         result = await self.db.execute(q)
         notes = list(result.scalars().all())

@@ -3110,9 +3110,11 @@ async def rebuild_aux_balance_summary(
     ), {"pid": str(project_id), "yr": year})
 
     # 2. 用 SQL 聚合直接插入（比 Python 遍历快几十倍）
+    # 注意：tb_aux_balance_summary 的真实列名是 dim_type（源表 tb_aux_balance 的列才叫 aux_type）。
+    # 314a6fe4 曾误判表列为 aux_type 把此处改坏导致重建崩溃 / 查询 500，已回退为 dim_type。
     await db.execute(sa.text(f"""
         INSERT INTO tb_aux_balance_summary
-            (id, project_id, year, aux_type, account_code, account_name, aux_code, aux_name,
+            (id, project_id, year, dim_type, account_code, account_name, aux_code, aux_name,
              record_count, opening_balance, debit_amount, credit_amount, closing_balance)
         SELECT
             gen_random_uuid(),

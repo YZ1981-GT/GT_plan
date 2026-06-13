@@ -976,11 +976,15 @@ class DisclosureEngine:
                 except Exception:
                     pass
 
-            # 优先级3：模板默认文字
-            if not text_content:
-                text_content = _convert_md_headings_to_numbered(
-                    "\n\n".join(text_sections)
-                ) if text_sections else tmpl.get("text_template")
+            # 优先级3：留空（用户偏好）
+            # 模板的 text_sections 多为表格栏目标题/分类说明（如「应收票据分类」「按单项计提…」），
+            # 并非真正的附注正文，预填到富文本反而显得冗余杂乱。
+            # 故无上年数据、无 LLM 生成时，正文默认留空，由用户按需手动填写。
+            # 如需恢复模板兜底，取消下面注释即可。
+            # if not text_content:
+            #     text_content = _convert_md_headings_to_numbered(
+            #         "\n\n".join(text_sections)
+            #     ) if text_sections else tmpl.get("text_template")
 
             if text_content and content_type_str == "table":
                 content_type_str = "mixed"  # 有正文就升级为 mixed
