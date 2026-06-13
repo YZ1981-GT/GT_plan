@@ -57,7 +57,30 @@ class TrialBalanceService:
         ac = AccountChart.__table__
         balance_filter = await get_active_filter(self.db, bal, project_id, year)
 
-        # 1. 汇总查询：客户余额 → 映射 → 标准科目
+        # 叶子节点过滤：客户科目表是多级树（1122 父级 / 1122.01 子级），
+        # 父级余额 = 子级之和。account_mapping 把每一级 original_account_code 都
+        # 映射到标准科目，若汇总时父子全加会重复计算（父级被算两遍）→ 试算表翻倍、
+        # 资产≠负债+权益。因此只汇总叶子节点（没有被映射子科目的最明细行），
+        # 既消除父子双计，又保留二级明细（如坏账准备 1231-01/02/03）的备抵映射。
+        child = bal.alias("tb_child")
+        leaf_cond = ~sa.exists(
+            sa.select(sa.literal(1))
+            .select_from(child)
+            .where(
+                child.c.project_id == bal.c.project_id,
+                child.c.year == bal.c.year,
+                child.c.is_deleted == sa.false(),
+                child.c.account_code != bal.c.account_code,
+                child.c.account_code.like(bal.c.account_code.concat(".%")),
+                # 子级须与父级同数据集才算其子科目（active dataset 已由 balance_filter 锁定 bal）
+                sa.or_(
+                    child.c.dataset_id == bal.c.dataset_id,
+                    sa.and_(child.c.dataset_id.is_(None), bal.c.dataset_id.is_(None)),
+                ),
+            )
+        )
+
+        # 1. 汇总查询：客户余额 → 映射 → 标准科目（仅叶子节点）
         agg_q = (
             sa.select(
                 mp.c.standard_account_code,
@@ -75,6 +98,7 @@ class TrialBalanceService:
                 )
             )
             .where(balance_filter)
+            .where(leaf_cond)
             .group_by(mp.c.standard_account_code)
         )
 
@@ -86,6 +110,7 @@ class TrialBalanceService:
 
         # 1b. 损益类科目额外汇总本期发生额（debit_amount - credit_amount）
         # 损益类期末余额通常为 0（已结转），审计需要看本期发生额
+        # 同样只取叶子节点，避免父子科目发生额重复累加。
         period_agg_q = (
             sa.select(
                 mp.c.standard_account_code,
@@ -103,6 +128,7 @@ class TrialBalanceService:
                 )
             )
             .where(balance_filter)
+            .where(leaf_cond)
             .group_by(mp.c.standard_account_code)
         )
         if account_codes:

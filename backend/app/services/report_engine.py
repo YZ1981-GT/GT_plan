@@ -1022,11 +1022,6 @@ class ReportEngine:
             parser_current._use_unadjusted = True
             parser_prior._use_unadjusted = True
 
-        # 叠加 report_line_mapping 中的备抵科目（mapping_sign='subtract'）。
-        # 报表公式(report_config.formula)只引用主科目,不含备抵扣减;
-        # 备抵关系定义在 report_line_mapping 中——需在公式结果上叠加。
-        from app.models.audit_platform_models import TrialBalance
-
         report_rows = []
         # Task 1.6: 覆盖率统计
         total_rows = 0
@@ -1036,43 +1031,6 @@ class ReportEngine:
         # Task 1.5: fallback 警告收集
         warnings: list[dict] = []
 
-        # 预加载映射规则(report_line_mapping)——所有映射到当前报表行次的科目及符号
-        # 与 TrialBalanceService.get_summary_with_adjustments 同源同口径
-        from app.models.audit_platform_models import TrialBalance
-        rlm_table = sa.table(
-            "report_line_mapping",
-            sa.column("project_id"), sa.column("report_line_code"),
-            sa.column("standard_account_code"), sa.column("mapping_sign"),
-            sa.column("is_deleted"),
-        )
-        _mapping_by_row: dict[str, list[tuple[str, Decimal]]] = {}  # row_code → [(account_code, sign)]
-        rlm_result = await self.db.execute(
-            sa.select(rlm_table.c.report_line_code, rlm_table.c.standard_account_code, rlm_table.c.mapping_sign)
-            .where(
-                rlm_table.c.project_id == project_id,
-                rlm_table.c.is_deleted == sa.false(),
-            )
-        )
-        for r in rlm_result.fetchall():
-            sign = Decimal("-1") if (r[2] or "add") == "subtract" else Decimal("1")
-            _mapping_by_row.setdefault(r[0], []).append((r[1], sign))
-
-        # 预加载 trial_balance 全量(供映射路径取值)
-        _tb_amount_map: dict[str, Decimal] = {}
-        if _mapping_by_row:
-            _amount_col = TrialBalance.audited_amount if mode == "audited" else TrialBalance.unadjusted_amount
-            tb_all = await self.db.execute(
-                sa.select(TrialBalance.standard_account_code, _amount_col)
-                .where(
-                    TrialBalance.project_id == project_id,
-                    TrialBalance.year == year,
-                    TrialBalance.is_deleted == sa.false(),
-                )
-            )
-            for r in tb_all.fetchall():
-                if r[0]:
-                    _tb_amount_map[r[0]] = _tb_amount_map.get(r[0], Decimal("0")) + (r[1] or Decimal("0"))
-
         for config in sorted(config_rows, key=lambda r: r.row_number):
             total_rows += 1
             fallback_applied = False
@@ -1081,16 +1039,13 @@ class ReportEngine:
 
             # Task 1.7: 公式执行容错 + 调试模式
             try:
-                # 映射规则优先(非合计行有映射科目时):与试算平衡表同源同口径
-                mapping_entries = _mapping_by_row.get(config.row_code, [])
-                if mapping_entries and not config.is_total_row:
-                    # 用映射规则加总——和 get_summary_with_adjustments 的"无公式行"路径一致
-                    current_amount = sum(
-                        sign * _tb_amount_map.get(code, Decimal("0"))
-                        for code, sign in mapping_entries
-                    )
-                elif config.formula:
-                    # Execute formula for current period (合计行/无映射行)
+                # 报表取数统一走公式(report_config.formula)：公式里的 TB('期末余额')
+                # 在审定模式取 trial_balance.audited_amount、未审模式取 unadjusted_amount。
+                # 数据源唯一为 trial_balance（审定数=未审数+调整分录），不再叠加
+                # report_line_mapping、也不从四表库(tb_balance 等)重新聚合——
+                # report_line_mapping 仅用于试算平衡表按行次汇总，存在与公式不一致的
+                # 历史错配（科目串行映射），不能作为报表取数来源。
+                if config.formula:
                     current_amount = await parser_current.execute(
                         config.formula, global_row_cache,
                     )

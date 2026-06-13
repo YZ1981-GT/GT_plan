@@ -198,6 +198,72 @@ async def test_recalc_unadjusted_incremental(db_session: AsyncSession, seeded_db
     assert tb_map["1001"].unadjusted_amount == Decimal("12000")
 
 
+@pytest.mark.asyncio
+async def test_recalc_leaf_only_no_parent_child_double_count(
+    db_session: AsyncSession, seeded_db
+):
+    """父子科目都映射到同一标准科目时，只汇总叶子节点，不重复累加。
+
+    回归：客户科目表是多级树（1122 父 / 1122.01 子），父级余额=子级之和。
+    account_mapping 把每级都映射到标准科目，若汇总父子全加会翻倍
+    （试算表资产≠负债+权益）。recalc 必须只取叶子节点。
+    """
+    pid = seeded_db
+    # 标准科目 1122 应收账款
+    db_session.add(
+        AccountChart(
+            project_id=pid, account_code="1122", account_name="应收账款",
+            direction=AccountDirection.debit, level=1,
+            category=AccountCategory.asset, source=AccountSource.standard,
+        )
+    )
+    # 客户科目：父级 1122（=子级之和 600）+ 两个叶子子级 1122.01=400 / 1122.02=200
+    db_session.add_all([
+        AccountMapping(
+            project_id=pid, original_account_code="1122",
+            original_account_name="应收账款", standard_account_code="1122",
+            mapping_type=MappingType.auto_exact, created_by=FAKE_USER_ID,
+        ),
+        AccountMapping(
+            project_id=pid, original_account_code="1122.01",
+            original_account_name="应收账款_货款", standard_account_code="1122",
+            mapping_type=MappingType.auto_exact, created_by=FAKE_USER_ID,
+        ),
+        AccountMapping(
+            project_id=pid, original_account_code="1122.02",
+            original_account_name="应收账款_质保金", standard_account_code="1122",
+            mapping_type=MappingType.auto_exact, created_by=FAKE_USER_ID,
+        ),
+    ])
+    db_session.add_all([
+        TbBalance(
+            project_id=pid, year=2025, company_code="001", level=1,
+            account_code="1122", account_name="应收账款",
+            opening_balance=Decimal("0"), closing_balance=Decimal("600"),
+        ),
+        TbBalance(
+            project_id=pid, year=2025, company_code="001", level=2,
+            account_code="1122.01", account_name="应收账款_货款",
+            opening_balance=Decimal("0"), closing_balance=Decimal("400"),
+        ),
+        TbBalance(
+            project_id=pid, year=2025, company_code="001", level=2,
+            account_code="1122.02", account_name="应收账款_质保金",
+            opening_balance=Decimal("0"), closing_balance=Decimal("200"),
+        ),
+    ])
+    await db_session.commit()
+
+    svc = TrialBalanceService(db_session)
+    await svc.recalc_unadjusted(pid, 2025)
+    await db_session.commit()
+
+    rows = await svc.get_trial_balance(pid, 2025)
+    tb_map = {r.standard_account_code: r for r in rows}
+    # 只取叶子（1122.01 + 1122.02 = 600），父级 1122 被排除，不翻倍成 1200
+    assert tb_map["1122"].unadjusted_amount == Decimal("600")
+
+
 # ===== 调整列重算 =====
 
 @pytest.mark.asyncio

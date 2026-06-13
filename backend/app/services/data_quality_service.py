@@ -280,8 +280,43 @@ class DataQualityService:
             }
 
     async def _check_report_balance(self, project_id: UUID, year: int) -> dict:
-        """报表平衡：BS 资产合计 = 负债合计 + 权益合计"""
-        # 查找资产合计、负债合计、权益合计行
+        """报表平衡：BS 资产总计 = 负债和所有者权益总计
+
+        优先用 row_code 精确定位合计行（BS-039 资产总计 / BS-099 负债和所有者
+        权益总计），避免 row_name 模糊匹配的陷阱：
+        - "流动资产合计"/"非流动资产合计" 都含子串"资产合计"，会被误当资产总计；
+        - 真正的"资产总计"不含"资产合计"四字，模糊匹配反而漏掉。
+        row_name 匹配仅作兼容旧 row_code 的 fallback。
+        """
+        # 1. 优先 row_code 精确取数（兼容新旧两套编码）
+        async def _by_code(codes: list[str]) -> Decimal | None:
+            res = await self.db.execute(sa.text("""
+                SELECT current_period_amount FROM financial_report
+                WHERE project_id = :pid AND year = :yr AND report_type = 'balance_sheet'
+                  AND is_deleted = false AND row_code = ANY(:codes)
+                LIMIT 1
+            """), {"pid": project_id, "yr": year, "codes": codes})
+            v = res.scalar_one_or_none()
+            return Decimal(str(v)) if v is not None else None
+
+        asset_total = await _by_code(["BS-039", "BS-021"])
+        liability_equity_total = await _by_code(["BS-099", "BS-057"])
+
+        if asset_total is not None and liability_equity_total is not None:
+            diff = abs(asset_total - liability_equity_total)
+            status = "passed" if diff <= TOLERANCE else "blocking"
+            msg = "资产负债表平衡" if diff <= TOLERANCE else f"资产负债表不平衡，差异 {diff:.2f} 元"
+            return {
+                "status": status,
+                "message": msg,
+                "details": {
+                    "asset_total": str(asset_total),
+                    "liability_equity_total": str(liability_equity_total),
+                    "difference": str(diff),
+                },
+            }
+
+        # 2. Fallback：row_name 模糊匹配（精确区分"总计"与子合计）
         result = await self.db.execute(sa.text("""
             SELECT row_name, current_period_amount
             FROM financial_report
@@ -308,7 +343,8 @@ class DataQualityService:
             name = row[0] or ""
             amount = Decimal(str(row[1] or 0))
 
-            if "资产合计" in name and "负债" not in name:
+            # 排除子合计行（流动/非流动），只认整表总计
+            if ("资产总计" in name) or ("资产合计" in name and "流动" not in name and "负债" not in name):
                 asset_total = amount
             elif "负债和所有者权益" in name or "负债和股东权益" in name:
                 liability_equity_total = amount
