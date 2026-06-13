@@ -206,7 +206,12 @@ const previewWatermark = ref(false)
 // OnlyOffice 降级时传给 DeliverablePreview 的 previewType
 // docx → VueOfficeDocx 可渲染；xlsx/xls → 不支持（显示下载提示）
 const editorPreviewType = computed<'docx' | 'pdf' | 'html' | 'unsupported'>(() => {
-  const suffix = editorItem.value?.file_name?.split('.').pop()?.toLowerCase()
+  let suffix = editorItem.value?.file_name?.split('.').pop()?.toLowerCase()
+  if (!suffix) {
+    const dt = editorItem.value?.doc_type || ''
+    if (dt.startsWith('financial_report')) suffix = 'xlsx'
+    else if (dt === 'disclosure_notes' || dt === 'audit_report') suffix = 'docx'
+  }
   if (suffix === 'docx') return 'docx'
   if (suffix === 'pdf') return 'pdf'
   return 'unsupported'  // xlsx/xls 等 VueOfficeDocx 不支持
@@ -349,7 +354,14 @@ async function openPreview(item: DeliverableItem) {
   previewHtml.value = ''
   previewUrl.value = deliverableDownloadUrl(projectId.value, item.task_id, item.version_no)
   previewWatermark.value = ['draft', 'editing'].includes(item.status)
-  const suffix = item.file_name?.split('.').pop()?.toLowerCase()
+  // 从 file_name 推导后缀；file_name 为空时从 doc_type 推导默认格式
+  let suffix = item.file_name?.split('.').pop()?.toLowerCase()
+  if (!suffix) {
+    // doc_type → 默认格式：financial_report* → xlsx，disclosure_notes/audit_report → docx
+    const dt = item.doc_type || ''
+    if (dt.startsWith('financial_report')) suffix = 'xlsx'
+    else if (dt === 'disclosure_notes' || dt === 'audit_report') suffix = 'docx'
+  }
 
   // xlsx 走 OnlyOffice 编辑器（只读预览），不可用时自动降级
   if (suffix === 'xlsx' || suffix === 'xls') {
