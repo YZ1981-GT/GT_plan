@@ -846,7 +846,13 @@ function getDirection(row: any): string {
   const val = Number(row.unadjusted_amount || 0)
 
   if (isPnl) {
-    // 损益类：按余额符号（贷方余额存负数 → 贷；借方余额存正数 → 借）
+    // v2 约定下损益类统一存自然正数（收入取贷方发生额、费用取借方发生额），
+    // 不能再靠余额符号判方向。改为按科目类别/编码判断：
+    // - 收入类（revenue / 5xxx 开头）→ 贷
+    // - 费用/成本类（cost / expense / 6xxx 开头）→ 借
+    if (actualCat === 'revenue' || first === '5') return '贷'
+    if (actualCat === 'cost' || actualCat === 'expense' || first === '6') return '借'
+    // 兜底（极少见）：按余额符号
     return val < 0 ? '贷' : '借'
   }
   if (['liability', 'equity'].includes(actualCat)) {
