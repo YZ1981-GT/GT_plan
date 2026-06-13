@@ -1243,6 +1243,7 @@ async def get_balance_tree(
             bal_tbl.c.debit_amount, bal_tbl.c.credit_amount,
             bal_tbl.c.closing_balance, bal_tbl.c.closing_debit, bal_tbl.c.closing_credit,
             bal_tbl.c.currency_code, bal_tbl.c.raw_extra,
+            bal_tbl.c.opening_direction, bal_tbl.c.closing_direction,
         )
         .where(*bal_where)
         .order_by(bal_tbl.c.account_code)
@@ -1368,6 +1369,8 @@ async def get_balance_tree(
             "closing_debit": float(r[10]) if r[10] is not None else None,
             "closing_credit": float(r[11]) if r[11] is not None else None,
             "currency_code": r[12],
+            "opening_direction": r[14],
+            "closing_direction": r[15],
             "aggregated_from_aux": aggregated,
             "aux_row_count": aux_row_count,
             "aux_types": list(_type_sums.keys()),

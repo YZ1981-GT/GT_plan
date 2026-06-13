@@ -172,9 +172,7 @@
         <el-table-column prop="account_name" label="科目名称" min-width="180" show-overflow-tooltip />
         <el-table-column label="方向" width="60" align="center">
           <template #default="{ row }">
-            <span :style="{ color: (row.closing_balance ?? 0) < 0 ? 'var(--gt-color-danger)' : '' }">
-              {{ (row.closing_balance ?? 0) >= 0 ? '借' : '贷' }}
-            </span>
+            {{ row.opening_direction === 'credit' || (!row.opening_direction && (row.opening_balance ?? 0) < 0) ? '贷' : '借' }}
           </template>
         </el-table-column>
         <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('opening_balance')">
@@ -185,6 +183,11 @@
         </el-table-column>
         <el-table-column prop="credit_amount" label="贷方发生额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('credit_amount')">
           <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
+        </el-table-column>
+        <el-table-column label="方向" width="60" align="center">
+          <template #default="{ row }">
+            {{ row.closing_direction === 'credit' || (!row.closing_direction && (row.closing_balance ?? 0) < 0) ? '贷' : '借' }}
+          </template>
         </el-table-column>
         <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('closing_balance')">
           <template #default="{ row }">

@@ -221,13 +221,18 @@ def _apply_sign_convention(
         if net is not None:
             stored = net if direction == "debit" else -net
             target[bal_key] = stored
+            # 余额实际方向：归一后>=0表示与科目正常方向一致，<0表示反方向
+            # 存实际方向（非类别方向），让前端能直接显示"借"或"贷"
+            actual_dir = direction if stored >= 0 else opposite
             if stored < 0:
                 conflicts.append({
                     "period": period,
                     "actual_direction": opposite,
                     "stored_amount": float(stored),
                 })
-        target[f"{period}_direction"] = direction
+        else:
+            actual_dir = direction  # 无余额时默认按科目类别
+        target[f"{period}_direction"] = actual_dir
         target[f"{period}_direction_source"] = mode or category_source
 
     target["sign_convention_version"] = CURRENT_SIGN_CONVENTION
