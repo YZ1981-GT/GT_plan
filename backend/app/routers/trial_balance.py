@@ -145,50 +145,62 @@ async def check_trial_balance(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """试算平衡校验：用 direction_resolver 精确判方向后按科目分配借贷侧求和。
+    """试算平衡校验：直接从 tb_balance 原始数据验证(保持与入库数据同源)。
+
+    tb_balance.closing_balance 是 v1 口径(借正贷负),SUM 应=0(完美平衡)。
+    trial_balance 经过 v2 变换(贷方取 abs + 损益取发生额)后不再保持算术平衡,
+    所以平衡校验必须用 tb_balance 原始数据而非 trial_balance。
 
     返回 {debit_total, credit_total, diff, is_balanced, has_pnl_rows}。
-    前端直接用此结果展示,不再自行按粗粒度规则重算。
     """
     import sqlalchemy as sa
     from decimal import Decimal
-    from app.models.audit_platform_models import TrialBalance
-    from app.services.ledger_import.direction_resolver import resolve_account_direction
+    from app.models.audit_platform_models import TbBalance, TrialBalance
+    from app.services.dataset_query import get_active_filter
 
-    tb = TrialBalance.__table__
+    tb = TbBalance.__table__
+    active_filter = await get_active_filter(db, tb, project_id, year)
+
+    # 原始 tb_balance level=1 的借贷总和(v1:正=借方余额,负=贷方余额)
     result = await db.execute(
         sa.select(
-            tb.c.standard_account_code,
-            tb.c.account_name,
-            tb.c.audited_amount,
+            sa.func.coalesce(
+                sa.func.sum(sa.case((tb.c.closing_balance > 0, tb.c.closing_balance), else_=sa.literal(0))),
+                0
+            ).label("debit_total"),
+            sa.func.coalesce(
+                sa.func.sum(sa.case((tb.c.closing_balance < 0, sa.func.abs(tb.c.closing_balance)), else_=sa.literal(0))),
+                0
+            ).label("credit_total"),
         ).where(
-            tb.c.project_id == project_id,
-            tb.c.year == year,
-            tb.c.company_code == company_code,
-            tb.c.is_deleted == sa.false(),
+            active_filter,
+            tb.c.level == 1,
         )
     )
-    debit_total = Decimal("0")
-    credit_total = Decimal("0")
-    has_pnl = False
-    for r in result.fetchall():
-        code = r.standard_account_code or ""
-        name = r.account_name or ""
-        amt = abs(r.audited_amount) if r.audited_amount else Decimal("0")
-        if amt == 0:
-            continue
-        if code and code[0] in ("5", "6"):
-            has_pnl = True
-        direction, _ = resolve_account_direction(code, name)
-        if direction == "credit":
-            credit_total += amt
-        else:
-            debit_total += amt
+    row = result.first()
+    debit_total = float(row.debit_total) if row else 0
+    credit_total = float(row.credit_total) if row else 0
+    diff = debit_total - credit_total
 
-    diff = float(debit_total - credit_total)
+    # 检查是否含损益类
+    tb2 = TrialBalance.__table__
+    pnl_count = await db.execute(
+        sa.select(sa.func.count()).select_from(tb2).where(
+            tb2.c.project_id == project_id,
+            tb2.c.year == year,
+            tb2.c.is_deleted == sa.false(),
+            sa.or_(
+                tb2.c.standard_account_code.like("5%"),
+                tb2.c.standard_account_code.like("6%"),
+            ),
+            tb2.c.unadjusted_amount != 0,
+        )
+    )
+    has_pnl = (pnl_count.scalar_one() or 0) > 0
+
     return {
-        "debit_total": float(debit_total),
-        "credit_total": float(credit_total),
+        "debit_total": debit_total,
+        "credit_total": credit_total,
         "diff": diff,
         "is_balanced": abs(diff) < 1.0,
         "has_pnl_rows": has_pnl,

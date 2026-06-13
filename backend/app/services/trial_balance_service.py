@@ -189,16 +189,35 @@ class TrialBalanceService:
 
             # 损益类科目（5xxx/6xxx）：取单边发生额（不做借-贷，因为结转后两边相等）。
             # v2 约定（category_natural_positive）：按 direction_resolver 判方向后存自然正数。
-            # v2 约定（category_natural_positive）：所有科目统一从 tb_balance.closing_balance 取值。
-            # tb_balance 入库时是"借正贷负"原始口径（v1）：
-            #   借方类（资产/费用/成本）closing > 0 → 直接存
-            #   贷方类（负债/权益/收入）closing < 0 → 取 abs 转正
-            # 这样保持与原始余额表同源同口径,试算恒等式自然成立(已验证 SUM=0)。
-            # 不再对损益类走单独的"单边发生额"路径(那会引入与余额表不一致的偏差致试算不平)。
-            direction, _source = resolve_account_direction(code, name or "")
-            if direction == "credit":
-                closing = abs(closing)
-                opening = abs(opening)
+            # v2 约定（category_natural_positive）：
+            # - 资产负债权益类：从 tb_balance.closing_balance 取值(v1 借正贷负),贷方类取 abs 转正。
+            # - 损益类(5xxx/6xxx)：closing_balance 通常=0(年末结转/原始余额表不含),
+            #   须从 tb_ledger 取单边发生额(收入取贷方,费用取借方)。
+            is_income_expense = code and code[0] in ('5', '6')
+            if is_income_expense:
+                period = period_rows.get(code)
+                if period:
+                    total_dr = Decimal(str(period.total_debit))
+                    total_cr = Decimal(str(period.total_credit))
+                    direction, _source = resolve_account_direction(code, name or "")
+                    if direction == "credit":
+                        # 收入类（贷方正常）：取贷方发生额，存自然正数
+                        closing = total_cr
+                    else:
+                        # 费用/成本类（借方正常）：取借方发生额，存自然正数
+                        closing = total_dr
+                else:
+                    # 无序时账发生额时 fallback 到 tb_balance.closing_balance abs
+                    direction, _source = resolve_account_direction(code, name or "")
+                    closing = abs(closing) if direction == "credit" else closing
+                opening = Decimal("0")  # 损益类无期初余额
+            else:
+                # 资产负债权益类：tb_balance.closing_balance 是"借正贷负"原始口径，
+                # 贷方类（负债/权益）需取绝对值转为 v2 自然正数。
+                direction, _source = resolve_account_direction(code, name or "")
+                if direction == "credit":
+                    closing = abs(closing)
+                    opening = abs(opening)
 
             row = existing_rows.get(code)
             if row:

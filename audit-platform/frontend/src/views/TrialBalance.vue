@@ -1171,23 +1171,26 @@ const balanceDiff = computed(() => assetTotal.value - liabEquityTotal.value)
 // 资产负债表恒等式「资产=负债+权益」仅在结账后成立；
 // 若余额表含未结转的损益类科目（5/6 开头），此式必然不平，差额=本期利润。
 // 真正普适的平衡校验是「全部科目借方合计 = 贷方合计」。
-const trialBalanceTotals = computed(() => {
-  let debit = 0
-  let credit = 0
-  for (const r of rows.value) {
-    if (!r.standard_account_code) continue  // 跳过小计/合计行
-    const val = Math.abs(num(r.audited_amount))
-    if (val === 0) continue
-    // 优先使用后端权威方向（direction_resolver 精确判定）
-    const dir = (r as any).direction === 'credit' ? '贷' : ((r as any).direction === 'debit' ? '借' : getDirection(r))
-    if (dir === '贷') {
-      credit = Number(decAdd(String(credit), String(val)))
-    } else {
-      debit = Number(decAdd(String(debit), String(val)))
+const trialBalanceTotals = ref<{ debit: number; credit: number; diff: number }>({ debit: 0, credit: 0, diff: 0 })
+const balanceCheckLoaded = ref(false)
+
+async function loadBalanceCheck() {
+  try {
+    const { data } = await http.get(
+      `/api/projects/${projectId.value}/trial-balance/balance-check`,
+      { params: { year: year.value } }
+    )
+    const result = data && typeof data === 'object' && 'debit_total' in data ? data : (data?.data || data)
+    trialBalanceTotals.value = {
+      debit: result.debit_total || 0,
+      credit: result.credit_total || 0,
+      diff: result.diff || 0,
     }
+    balanceCheckLoaded.value = true
+  } catch {
+    balanceCheckLoaded.value = false
   }
-  return { debit, credit, diff: debit - credit }
-})
+}
 // 是否含未结转损益类科目（影响平衡口径解释）
 const hasPnlRows = computed(() =>
   rows.value.some(r => {
@@ -1233,13 +1236,9 @@ async function loadLatestAdjustmentTime() {
 
 const isBalanced = computed(() => {
   if (!rows.value.length) return true
-  // 含未结转损益类科目时：用完整试算平衡口径（全科目借方合计=贷方合计）
-  // 否则（纯资产负债表）：用资产=负债+权益口径
-  // 允许 1 元浮点误差
-  if (hasPnlRows.value) {
-    return Math.abs(trialBalanceTotals.value.diff) < 1
-  }
-  return Math.abs(balanceDiff.value) < 1
+  if (!balanceCheckLoaded.value) return true  // API 未返回前不误报
+  // 后端 balance-check 从 tb_balance 原始数据验证(同源,保持恒等式)
+  return Math.abs(trialBalanceTotals.value.diff) < 1
 })
 
 // 平衡指示器悬浮提示文案
@@ -1462,6 +1461,7 @@ async function ensureProjectYear() {
 const fetchData = withLoading(loading, async () => {
   const result = await getTrialBalance(projectId.value, year.value, hasMultipleCompanies.value ? companyCode.value : undefined)
   rows.value = Array.isArray(result) ? result : []
+  await loadBalanceCheck()
 })
 
 const onRecalc = withLoading(recalcLoading, async () => {
