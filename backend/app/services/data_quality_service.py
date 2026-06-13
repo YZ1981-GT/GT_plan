@@ -290,12 +290,17 @@ class DataQualityService:
         """
         # 1. 优先 row_code 精确取数（兼容新旧两套编码）
         async def _by_code(codes: list[str]) -> Decimal | None:
-            res = await self.db.execute(sa.text("""
+            # 用 OR 避免 asyncpg 数组参数兼容问题
+            placeholders = " OR ".join(f"row_code = :c{i}" for i in range(len(codes)))
+            params = {"pid": project_id, "yr": year}
+            params.update({f"c{i}": c for i, c in enumerate(codes)})
+            res = await self.db.execute(sa.text(f"""
                 SELECT current_period_amount FROM financial_report
                 WHERE project_id = :pid AND year = :yr AND report_type = 'balance_sheet'
-                  AND is_deleted = false AND row_code = ANY(:codes)
+                  AND is_deleted = false AND ({placeholders})
+                ORDER BY current_period_amount DESC NULLS LAST
                 LIMIT 1
-            """), {"pid": project_id, "yr": year, "codes": codes})
+            """), params)
             v = res.scalar_one_or_none()
             return Decimal(str(v)) if v is not None else None
 
