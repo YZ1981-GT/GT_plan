@@ -1,0 +1,41 @@
+{
+  "version": "1.0.0",
+  "description": "业务分类参考标准（致同 2025 修订版）",
+  "categories": {
+    "A": {
+      "name": "A类（重大公众利益实体）",
+      "subcategories": [
+        {"code": "A1", "name": "上市公司", "description": "在境内外证券交易所上市的公司"},
+        {"code": "A2", "name": "IPO首次申报", "description": "首次公开发行股票并上市的审计"},
+        {"code": "A3", "name": "重大资产重组", "description": "上市公司重大资产重组配套审计"},
+        {"code": "A4", "name": "再融资", "description": "上市公司再融资相关审计"},
+        {"code": "A5", "name": "央企/大型国企", "description": "中央企业及省属大型国有企业"},
+        {"code": "A6", "name": "金融机构", "description": "商业银行、保险公司、证券公司等"},
+        {"code": "A7", "name": "境外上市", "description": "H股/红筹/ADR等境外上市审计"},
+        {"code": "A8", "name": "其他重大公众利益实体", "description": "监管机构认定的其他重大公众利益实体"}
+      ],
+      "quality_measures": "需专委会审批+EQCR复核+项目质量复核合伙人",
+      "exclusive_templates": ["A1-12", "A1-16", "A17", "A17-5", "A18", "A24-1", "A24-2", "A25-1", "A25-2", "A26", "A27", "A28"]
+    },
+    "B": {
+      "name": "B类（其他公众利益实体及特殊行业）",
+      "subcategories": [
+        {"code": "B1", "name": "新三板/北交所", "description": "全国中小企业股份转让系统挂牌公司"},
+        {"code": "B2", "name": "债券发行", "description": "公开发行公司债券的审计"},
+        {"code": "B3", "name": "特定行业", "description": "医药、军工等特定监管行业"},
+        {"code": "B4", "name": "大型民营企业", "description": "收入或资产规模超50亿元的民营企业"},
+        {"code": "B5", "name": "事业单位/政府审计", "description": "事业单位、政府组件或专项资金审计"},
+        {"code": "B6", "name": "境外审计协作", "description": "作为集团审计组成部分参与境外审计"}
+      ],
+      "quality_measures": "需项目质量复核合伙人（A24/A25保留），专委会不强制",
+      "exclusive_templates": []
+    },
+    "C": {
+      "name": "C类（一般审计业务）",
+      "subcategories": [],
+      "quality_measures": "标准三级复核（现场负责人→经理→合伙人）",
+      "exclusive_templates": [],
+      "excluded_templates": ["A1-12", "A1-16", "A17", "A17-5", "A18", "A24-1", "A24-2", "A25-1", "A25-2", "A26", "A27", "A28"]
+    }
+  }
+}

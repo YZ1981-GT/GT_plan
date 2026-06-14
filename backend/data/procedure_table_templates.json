@@ -1,0 +1,158 @@
+{
+  "version": "1.0.0",
+  "description": "A循环程序表模板定义（17张，每表含程序步骤+自动填充规则+索引引用）",
+  "tables": {
+    "A1": {
+      "name": "财务报告程序表",
+      "items": [
+        {"seq": 1, "content": "了解被审计单位及其环境（含内部控制）", "ref_index": "B10~B60", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "确认重要性水平和可容忍错报", "ref_index": "B30", "auto_data_source": "materiality_set", "applicable_default": "yes"},
+        {"seq": 3, "content": "评估重大错报风险并制定总体审计策略", "ref_index": "B40~B50", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 4, "content": "实施控制测试", "ref_index": "C", "auto_data_source": "control_test_completion", "applicable_default": "yes"},
+        {"seq": 5, "content": "实施实质性程序", "ref_index": "D~N", "auto_data_source": "substantive_completion", "applicable_default": "yes"},
+        {"seq": 6, "content": "考虑持续经营假设", "ref_index": "A15", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 7, "content": "考虑期后事项", "ref_index": "A11", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 8, "content": "考虑律师声明", "ref_index": "A12", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 9, "content": "获取管理层声明书", "ref_index": "A16", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 10, "content": "评价错报", "ref_index": "A13", "auto_data_source": "misstatement_evaluation", "applicable_default": "yes"},
+        {"seq": 11, "content": "与治理层沟通", "ref_index": "A10", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 12, "content": "完成分析性复核", "ref_index": "A1-13,A1-14", "auto_data_source": "analytical_review_done", "applicable_default": "yes"},
+        {"seq": 13, "content": "对应数据核对", "ref_index": "A1-17", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 14, "content": "编制审计报告及形成审计意见", "ref_index": "A2-1", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 15, "content": "项目质量控制复核", "ref_index": "A24,A25", "auto_data_source": "review_progress", "applicable_default": "yes", "applicable_categories": ["A", "B"]},
+        {"seq": 16, "content": "专委会审批", "ref_index": "A26", "auto_data_source": null, "applicable_default": "yes", "applicable_categories": ["A"]},
+        {"seq": 17, "content": "签发审计报告", "ref_index": "A1-11", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 18, "content": "归档底稿", "ref_index": "A30", "auto_data_source": "archive_completion", "applicable_default": "yes"}
+      ]
+    },
+    "A2": {
+      "name": "调整分录程序表",
+      "items": [
+        {"seq": 1, "content": "编制审计调整分录(AJE)汇总", "ref_index": "A2-2", "auto_data_source": "adjustment_count_aje", "applicable_default": "yes"},
+        {"seq": 2, "content": "编制重分类调整分录(RJE)汇总", "ref_index": "A2-3", "auto_data_source": "adjustment_count_rje", "applicable_default": "yes"},
+        {"seq": 3, "content": "编制合并调整分录", "ref_index": "A3-7", "auto_data_source": "adjustment_count_consol", "applicable_default": "yes"},
+        {"seq": 4, "content": "汇总未更正错报(Passed)", "ref_index": "A13", "auto_data_source": "adjustment_count_passed", "applicable_default": "yes"},
+        {"seq": 5, "content": "验证调整分录综合作用(试算平衡)", "ref_index": "A2-1", "auto_data_source": "trial_balance_check", "applicable_default": "yes"}
+      ]
+    },
+    "A3": {
+      "name": "合并流程程序表",
+      "items": [
+        {"seq": 1, "content": "确定合并范围", "ref_index": "A3-3", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "编制合并抵销分录", "ref_index": "A3-7", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 3, "content": "核对内部往来", "ref_index": "A3-7", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 4, "content": "验证合并报表试算", "ref_index": "A3-1", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 5, "content": "合并附注汇总", "ref_index": "A3-5,A3-6", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A4": {
+      "name": "经营分部程序表",
+      "items": [
+        {"seq": 1, "content": "了解分部划分标准", "ref_index": "A4-1", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "核对分部信息列报", "ref_index": "A4-1", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A5": {
+      "name": "财务报表支持程序表",
+      "items": [
+        {"seq": 1, "content": "审核现金流量表", "ref_index": "A5-1", "auto_data_source": "cf_verification_status", "applicable_default": "yes"},
+        {"seq": 2, "content": "审核承诺事项", "ref_index": "A5-2", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 3, "content": "审核或有事项", "ref_index": "A5-3", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 4, "content": "持续经营净利润与终止经营净利润", "ref_index": "A5-4", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A6": {
+      "name": "组成部分会计师报告程序表",
+      "items": [
+        {"seq": 1, "content": "确定组成部分", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "下发集团审计工作指引", "ref_index": "A6-1", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 3, "content": "接收组成部分审计报告包", "ref_index": "A6-1", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A7": {
+      "name": "关联交易程序表",
+      "items": [
+        {"seq": 1, "content": "了解关联方关系", "ref_index": "A7-1", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "识别关联方交易", "ref_index": "A7-1", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 3, "content": "审核关联交易附注披露", "ref_index": "A7-2", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A8": {
+      "name": "其他信息程序表",
+      "items": [
+        {"seq": 1, "content": "获取并阅读其他信息", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "评估其他信息与财务报表的一致性", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A9": {
+      "name": "内部控制建议程序表",
+      "items": [
+        {"seq": 1, "content": "汇总已识别的内控缺陷", "ref_index": "A14", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "出具内部控制建议书", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A10": {
+      "name": "与治理层沟通程序表",
+      "items": [
+        {"seq": 1, "content": "确定沟通事项", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "实施沟通", "ref_index": "A10-2", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 3, "content": "记录沟通情况", "ref_index": "A10-2", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A11": {
+      "name": "期后事项程序表",
+      "items": [
+        {"seq": 1, "content": "获取期后事项信息", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "评估期后事项影响", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 3, "content": "确定是否调整或披露", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A12": {
+      "name": "律师回复程序表",
+      "items": [
+        {"seq": 1, "content": "发送律师询证函", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "收到律师回函并评估", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A13": {
+      "name": "错报程序表",
+      "items": [
+        {"seq": 1, "content": "汇总未更正错报", "ref_index": "A13", "auto_data_source": "misstatement_summary", "applicable_default": "yes"},
+        {"seq": 2, "content": "评价错报对财务报表的影响", "ref_index": "A13", "auto_data_source": "misstatement_evaluation", "applicable_default": "yes"},
+        {"seq": 3, "content": "与管理层沟通未更正错报", "ref_index": "A13", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A14": {
+      "name": "内部控制缺陷程序表",
+      "items": [
+        {"seq": 1, "content": "识别内控缺陷", "ref_index": "A14-1", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "企业层面控制缺陷评价", "ref_index": "A14-2", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 3, "content": "IT 缺陷汇总及评价", "ref_index": "A14-3", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 4, "content": "业务流程层面控制缺陷评价", "ref_index": "A14-4", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A15": {
+      "name": "持续经营假设的考虑程序表",
+      "items": [
+        {"seq": 1, "content": "评估管理层持续经营假设", "ref_index": "A15-1", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "复核持续经营调查表", "ref_index": "A15-1", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 3, "content": "结论", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A16": {
+      "name": "管理层声明书程序表",
+      "items": [
+        {"seq": 1, "content": "确定声明书版本", "ref_index": "", "auto_data_source": "a16_template_recommend", "applicable_default": "yes"},
+        {"seq": 2, "content": "编制管理层声明书", "ref_index": "A16", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 3, "content": "获取管理层签署", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    },
+    "A17": {
+      "name": "重大事项概要程序表",
+      "items": [
+        {"seq": 1, "content": "确定重大事项", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "编制完成核对表", "ref_index": "A17-5", "auto_data_source": null, "applicable_default": "yes"}
+      ]
+    }
+  }
+}

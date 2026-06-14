@@ -1,0 +1,500 @@
+{
+  "version": "1.0.0",
+  "description": "底稿类型注册表：驱动底稿渲染路由、索引跳转、溯源关系",
+  "render_types": [
+    "html_procedure",
+    "html_review",
+    "auto_report",
+    "univer",
+    "word_template",
+    "readonly_reference",
+    "signing"
+  ],
+  "entries": {
+    "A1": {
+      "name": "财务报告程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": ["A1-13", "A1-14", "A2", "A2-1"]
+    },
+    "A1-11": {
+      "name": "业务报告签发流转控制表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": []
+    },
+    "A1-13": {
+      "name": "完成阶段分析性复核（母公司）",
+      "render_type": "auto_report",
+      "module": "report_analysis",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A1"],
+      "downstream": []
+    },
+    "A1-14": {
+      "name": "完成阶段分析性复核（合并）",
+      "render_type": "auto_report",
+      "module": "report_analysis",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A1"],
+      "downstream": []
+    },
+    "A1-17": {
+      "name": "对应数据",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": []
+    },
+    "A1-18": {
+      "name": "新金融工具准则衔接影响数核对",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A"],
+      "upstream": [],
+      "downstream": []
+    },
+    "A2": {
+      "name": "调整分录程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "data_source": "adjustments",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A1"],
+      "downstream": ["A2-1", "A13"]
+    },
+    "A2-1": {
+      "name": "单体报表试算",
+      "render_type": "auto_report",
+      "module": "report_analysis",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A1", "A2"],
+      "downstream": []
+    },
+    "A3": {
+      "name": "合并流程程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": ["A3-1", "A3-5", "A3-6", "A3-7"]
+    },
+    "A3-1": {
+      "name": "合并报表试算",
+      "render_type": "auto_report",
+      "module": "consolidation",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A3"],
+      "downstream": []
+    },
+    "A3-3": {
+      "name": "结构化主体纳入合并范围判断",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B"],
+      "upstream": [],
+      "downstream": []
+    },
+    "A3-4": {
+      "name": "合并报表试算（含金融企业）",
+      "render_type": "auto_report",
+      "module": "consolidation",
+      "categories": ["A"],
+      "upstream": ["A3"],
+      "downstream": []
+    },
+    "A3-5": {
+      "name": "合并附注汇总",
+      "render_type": "auto_report",
+      "module": "consolidation",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A3"],
+      "downstream": []
+    },
+    "A3-6": {
+      "name": "母公司附注汇总",
+      "render_type": "auto_report",
+      "module": "consolidation",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A3"],
+      "downstream": []
+    },
+    "A3-7": {
+      "name": "内部往来核对表",
+      "render_type": "auto_report",
+      "module": "consolidation",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A3"],
+      "downstream": []
+    },
+    "A4": {
+      "name": "经营分部程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B"],
+      "upstream": [],
+      "downstream": ["A4-1"]
+    },
+    "A4-1": {
+      "name": "经营分部列报信息",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B"],
+      "upstream": ["A4"],
+      "downstream": []
+    },
+    "A5": {
+      "name": "财务报表支持程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": ["A5-1", "A5-2", "A5-3"]
+    },
+    "A5-1": {
+      "name": "现金流量表审计",
+      "render_type": "auto_report",
+      "module": "cf_verification",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A5"],
+      "downstream": []
+    },
+    "A5-2": {
+      "name": "承诺事项",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A5"],
+      "downstream": []
+    },
+    "A5-3": {
+      "name": "或有事项",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A5"],
+      "downstream": []
+    },
+    "A5-4": {
+      "name": "持续经营净利润和终止经营净利润",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": []
+    },
+    "A6": {
+      "name": "组成部分会计师报告程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B"],
+      "upstream": [],
+      "downstream": ["A6-1"]
+    },
+    "A6-1": {
+      "name": "财务报告文件包",
+      "render_type": "auto_report",
+      "module": "delivery",
+      "categories": ["A", "B"],
+      "upstream": ["A6"],
+      "downstream": []
+    },
+    "A7": {
+      "name": "关联交易程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": ["A7-1", "A7-2"]
+    },
+    "A7-1": {
+      "name": "汇总关联方交易及关联往来",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A7"],
+      "downstream": []
+    },
+    "A7-2": {
+      "name": "关联方交易附注披露信息",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A7"],
+      "downstream": []
+    },
+    "A8": {
+      "name": "其他信息程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": []
+    },
+    "A9": {
+      "name": "内部控制建议程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A14"],
+      "downstream": []
+    },
+    "A10": {
+      "name": "与治理层沟通程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": ["A10-2"]
+    },
+    "A10-2": {
+      "name": "与治理层的沟通记录",
+      "render_type": "word_template",
+      "module": "delivery",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A10"],
+      "downstream": []
+    },
+    "A11": {
+      "name": "期后事项程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": []
+    },
+    "A12": {
+      "name": "律师回复程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": []
+    },
+    "A13": {
+      "name": "错报程序表及底稿",
+      "render_type": "html_procedure",
+      "module": "misstatement",
+      "data_source": "adjustments",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A2"],
+      "downstream": ["A16"]
+    },
+    "A14": {
+      "name": "内部控制缺陷程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B"],
+      "upstream": [],
+      "downstream": ["A14-1", "A9"]
+    },
+    "A14-1": {
+      "name": "内部控制缺陷汇总表",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B"],
+      "upstream": ["A14"],
+      "downstream": []
+    },
+    "A14-2": {
+      "name": "企业层面控制缺陷评价",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B"],
+      "upstream": ["A14"],
+      "downstream": []
+    },
+    "A14-3": {
+      "name": "IT缺陷汇总及评价",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B"],
+      "upstream": ["A14"],
+      "downstream": []
+    },
+    "A14-4": {
+      "name": "业务流程层面控制缺陷评价",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B"],
+      "upstream": ["A14"],
+      "downstream": []
+    },
+    "A14-5": {
+      "name": "与其他缺陷一同进行评价",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B"],
+      "upstream": ["A14"],
+      "downstream": []
+    },
+    "A14-6": {
+      "name": "非财务报告内部控制缺陷评价",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B"],
+      "upstream": ["A14"],
+      "downstream": []
+    },
+    "A15": {
+      "name": "持续经营假设的考虑程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": ["A15-1"]
+    },
+    "A15-1": {
+      "name": "持续经营调查表",
+      "render_type": "univer",
+      "module": "workpaper",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A15"],
+      "downstream": []
+    },
+    "A16": {
+      "name": "管理层声明书程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A13"],
+      "downstream": []
+    },
+    "A17": {
+      "name": "重大事项概要程序表",
+      "render_type": "html_procedure",
+      "module": "procedure_table",
+      "categories": ["A"],
+      "upstream": [],
+      "downstream": ["A17-5"]
+    },
+    "A17-5": {
+      "name": "审计工作完成核对表",
+      "render_type": "html_review",
+      "module": "review_workflow",
+      "categories": ["A"],
+      "upstream": ["A17"],
+      "downstream": []
+    },
+    "A21-1": {
+      "name": "项目现场负责人复核表（财报）",
+      "render_type": "html_review",
+      "module": "review_workflow",
+      "role": "field_lead",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": ["A22-1"]
+    },
+    "A21-2": {
+      "name": "项目现场负责人复核表（内控）",
+      "render_type": "html_review",
+      "module": "review_workflow",
+      "role": "field_lead",
+      "categories": ["A", "B"],
+      "upstream": [],
+      "downstream": ["A22-2"]
+    },
+    "A22-1": {
+      "name": "项目负责经理复核（财报）",
+      "render_type": "html_review",
+      "module": "review_workflow",
+      "role": "manager",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A21-1"],
+      "downstream": ["A23-1"]
+    },
+    "A22-2": {
+      "name": "项目负责经理复核表（内控）",
+      "render_type": "html_review",
+      "module": "review_workflow",
+      "role": "manager",
+      "categories": ["A", "B"],
+      "upstream": ["A21-2"],
+      "downstream": ["A23-2"]
+    },
+    "A23-1": {
+      "name": "项目合伙人复核（财报）",
+      "render_type": "html_review",
+      "module": "review_workflow",
+      "role": "partner",
+      "categories": ["A", "B", "C"],
+      "upstream": ["A22-1"],
+      "downstream": ["A24-1"]
+    },
+    "A23-2": {
+      "name": "项目合伙人复核表（内控）",
+      "render_type": "html_review",
+      "module": "review_workflow",
+      "role": "partner",
+      "categories": ["A", "B"],
+      "upstream": ["A22-2"],
+      "downstream": ["A24-2"]
+    },
+    "A24-1": {
+      "name": "项目质量复核合伙人复核表（财报）",
+      "render_type": "html_review",
+      "module": "review_workflow",
+      "role": "quality_partner",
+      "categories": ["A"],
+      "upstream": ["A23-1"],
+      "downstream": ["A25-1"]
+    },
+    "A24-2": {
+      "name": "项目质量复核合伙人复核（内控）",
+      "render_type": "html_review",
+      "module": "review_workflow",
+      "role": "quality_partner",
+      "categories": ["A"],
+      "upstream": ["A23-2"],
+      "downstream": ["A25-2"]
+    },
+    "A25-1": {
+      "name": "质量控制复核人复核表（财报）",
+      "render_type": "html_review",
+      "module": "review_workflow",
+      "role": "eqcr",
+      "categories": ["A"],
+      "upstream": ["A24-1"],
+      "downstream": []
+    },
+    "A25-2": {
+      "name": "质量控制复核表（内控）",
+      "render_type": "html_review",
+      "module": "review_workflow",
+      "role": "eqcr",
+      "categories": ["A"],
+      "upstream": ["A24-2"],
+      "downstream": []
+    },
+    "A28": {
+      "name": "税务专家复核",
+      "render_type": "html_review",
+      "module": "review_workflow",
+      "role": "tax_expert",
+      "categories": ["A"],
+      "upstream": [],
+      "downstream": []
+    },
+    "A30": {
+      "name": "电子底稿归档检查表",
+      "render_type": "html_review",
+      "module": "archive_check",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": []
+    },
+    "A31": {
+      "name": "审计标识一览表",
+      "render_type": "readonly_reference",
+      "module": "reference",
+      "categories": ["A", "B", "C"],
+      "upstream": [],
+      "downstream": []
+    }
+  }
+}

@@ -1,0 +1,187 @@
+{
+  "version": "1.0",
+  "description": "A21~A25 复核检查要点模板（致同 2025 修订版）",
+  "templates": {
+    "A21-1": {
+      "title": "项目现场负责人复核表（财报审计）",
+      "code": "A21-1",
+      "role": "field_lead",
+      "audit_type": "financial",
+      "a_only": false,
+      "items": [
+        {"seq": 1, "content": "审计计划是否得到执行，包括审计程序的性质、时间安排和范围", "auto_check": "workpaper_plan_coverage"},
+        {"seq": 2, "content": "是否取得充分适当的审计证据支持审计结论", "auto_check": null},
+        {"seq": 3, "content": "重大会计估计和判断是否恰当记录", "auto_check": null},
+        {"seq": 4, "content": "重要事项是否与项目经理和合伙人沟通", "auto_check": null},
+        {"seq": 5, "content": "底稿编制是否符合事务所质量标准", "auto_check": "workpaper_quality_check"},
+        {"seq": 6, "content": "分析性程序的结论是否恰当", "auto_check": null},
+        {"seq": 7, "content": "函证程序是否按要求执行", "auto_check": "confirmation_status"},
+        {"seq": 8, "content": "关联方交易是否充分识别和披露", "auto_check": null},
+        {"seq": 9, "content": "持续经营假设是否恰当", "auto_check": null},
+        {"seq": 10, "content": "期后事项是否充分考虑", "auto_check": null}
+      ]
+    },
+    "A21-2": {
+      "title": "项目现场负责人复核表（内控审计）",
+      "code": "A21-2",
+      "role": "field_lead",
+      "audit_type": "internal_control",
+      "a_only": false,
+      "items": [
+        {"seq": 1, "content": "内部控制了解程序是否充分", "auto_check": null},
+        {"seq": 2, "content": "控制测试的范围是否充分", "auto_check": null},
+        {"seq": 3, "content": "识别的控制缺陷是否恰当分类", "auto_check": null},
+        {"seq": 4, "content": "重大缺陷是否及时沟通管理层", "auto_check": null},
+        {"seq": 5, "content": "内控审计结论是否与财报审计结论一致", "auto_check": null}
+      ]
+    },
+    "A22-1": {
+      "title": "项目经理复核表（财报审计）",
+      "code": "A22-1",
+      "role": "manager",
+      "audit_type": "financial",
+      "a_only": false,
+      "items": [
+        {"seq": 1, "content": "审计计划是否根据实际情况进行了适当调整", "auto_check": null},
+        {"seq": 2, "content": "重要性水平的确定和运用是否恰当", "auto_check": "materiality_set"},
+        {"seq": 3, "content": "风险评估是否恰当，应对措施是否充分", "auto_check": null},
+        {"seq": 4, "content": "关键审计事项的确定是否恰当（A类）", "auto_check": null, "applicable_categories": ["A"]},
+        {"seq": 5, "content": "调整分录和未更正错报是否恰当处理", "auto_check": "adjustment_review_status"},
+        {"seq": 6, "content": "审计报告意见类型是否恰当", "auto_check": null},
+        {"seq": 7, "content": "财务报表附注披露是否充分完整", "auto_check": null},
+        {"seq": 8, "content": "独立性声明是否全部签署", "auto_check": "independence_signing_status"},
+        {"seq": 9, "content": "项目组成员胜任能力是否满足要求", "auto_check": null},
+        {"seq": 10, "content": "质量管理政策和程序是否得到遵守", "auto_check": null}
+      ]
+    },
+    "A22-2": {
+      "title": "项目经理复核表（内控审计）",
+      "code": "A22-2",
+      "role": "manager",
+      "audit_type": "internal_control",
+      "a_only": false,
+      "items": [
+        {"seq": 1, "content": "控制环境的了解是否充分", "auto_check": null},
+        {"seq": 2, "content": "控制测试样本量是否充分", "auto_check": null},
+        {"seq": 3, "content": "控制缺陷的认定标准是否恰当运用", "auto_check": null},
+        {"seq": 4, "content": "管理层对缺陷的整改是否跟踪确认", "auto_check": null},
+        {"seq": 5, "content": "内控审计报告措辞是否准确", "auto_check": null}
+      ]
+    },
+    "A23-1": {
+      "title": "项目合伙人复核表（财报审计）",
+      "code": "A23-1",
+      "role": "partner",
+      "audit_type": "financial",
+      "a_only": false,
+      "items": [
+        {"seq": 1, "content": "审计总体策略和详细计划是否恰当", "auto_check": null},
+        {"seq": 2, "content": "重大事项的判断是否恰当", "auto_check": null},
+        {"seq": 3, "content": "审计报告是否恰当反映审计结论", "auto_check": null},
+        {"seq": 4, "content": "项目组是否保持职业怀疑", "auto_check": null},
+        {"seq": 5, "content": "是否存在需要咨询的事项", "auto_check": null},
+        {"seq": 6, "content": "项目质量是否满足签发条件", "auto_check": null}
+      ]
+    },
+    "A23-2": {
+      "title": "项目合伙人复核表（内控审计）",
+      "code": "A23-2",
+      "role": "partner",
+      "audit_type": "internal_control",
+      "a_only": false,
+      "items": [
+        {"seq": 1, "content": "内控缺陷的严重程度分类是否恰当", "auto_check": null},
+        {"seq": 2, "content": "内控审计意见是否恰当", "auto_check": null},
+        {"seq": 3, "content": "内控与财报审计结论的一致性", "auto_check": null}
+      ]
+    },
+    "A24-1": {
+      "title": "质量复核合伙人复核表（财报审计）",
+      "code": "A24-1",
+      "role": "quality_reviewer",
+      "audit_type": "financial",
+      "a_only": true,
+      "items": [
+        {"seq": 1, "content": "项目合伙人做出的重大判断是否恰当", "auto_check": null},
+        {"seq": 2, "content": "审计报告是否恰当", "auto_check": null},
+        {"seq": 3, "content": "关键审计事项的确定和表述是否恰当", "auto_check": null},
+        {"seq": 4, "content": "是否存在未解决的重大分歧", "auto_check": null},
+        {"seq": 5, "content": "已识别的舞弊风险是否恰当应对", "auto_check": null}
+      ]
+    },
+    "A25-1": {
+      "title": "EQCR 复核表（财报审计）",
+      "code": "A25-1",
+      "role": "eqcr",
+      "audit_type": "financial",
+      "a_only": true,
+      "items": [
+        {"seq": 1, "content": "项目组独立性是否确认", "auto_check": "independence_signing_status"},
+        {"seq": 2, "content": "重大风险的识别和应对是否充分", "auto_check": null},
+        {"seq": 3, "content": "审计报告的措辞是否恰当", "auto_check": null},
+        {"seq": 4, "content": "会计政策选用和变更是否恰当", "auto_check": null},
+        {"seq": 5, "content": "管理层偏向迹象是否充分关注", "auto_check": null}
+      ]
+    }
+  },
+  "completion_checklists": {
+    "A17-5-1": {
+      "title": "完成核对表（一般审计项目）",
+      "code": "A17-5-1",
+      "project_type": "general",
+      "items": [
+        {"seq": 1, "content": "所有审计程序均已完成", "auto_check": "all_procedures_done"},
+        {"seq": 2, "content": "所有底稿均已复核", "auto_check": "all_workpapers_reviewed"},
+        {"seq": 3, "content": "调整分录均已审批", "auto_check": "all_adjustments_approved"},
+        {"seq": 4, "content": "独立性声明已全部签署", "auto_check": "independence_signing_status"},
+        {"seq": 5, "content": "管理层声明书已获取", "auto_check": null},
+        {"seq": 6, "content": "期后事项复核至报告日", "auto_check": null},
+        {"seq": 7, "content": "审计报告已经合伙人审批", "auto_check": null},
+        {"seq": 8, "content": "底稿归档检查完成", "auto_check": null}
+      ]
+    },
+    "A17-5-2": {
+      "title": "完成核对表（内控审计项目）",
+      "code": "A17-5-2",
+      "project_type": "internal_control",
+      "items": [
+        {"seq": 1, "content": "内控了解程序完成", "auto_check": null},
+        {"seq": 2, "content": "控制测试全部执行", "auto_check": null},
+        {"seq": 3, "content": "控制缺陷已分类和评估", "auto_check": null},
+        {"seq": 4, "content": "内控审计报告经合伙人审批", "auto_check": null},
+        {"seq": 5, "content": "管理层确认函已获取", "auto_check": null}
+      ]
+    },
+    "A17-5-3": {
+      "title": "完成核对表（IPO项目）",
+      "code": "A17-5-3",
+      "project_type": "ipo",
+      "items": [
+        {"seq": 1, "content": "招股说明书财务数据已核对", "auto_check": null},
+        {"seq": 2, "content": "IPO 专项核查程序已完成", "auto_check": null},
+        {"seq": 3, "content": "监管函件回复已存档", "auto_check": null},
+        {"seq": 4, "content": "独立性声明已全部签署", "auto_check": "independence_signing_status"},
+        {"seq": 5, "content": "内控有效性评价已完成", "auto_check": null},
+        {"seq": 6, "content": "三年一期数据一致性已核对", "auto_check": null}
+      ]
+    },
+    "A17-5-4": {
+      "title": "完成核对表（新三板项目）",
+      "code": "A17-5-4",
+      "project_type": "neeq",
+      "items": [
+        {"seq": 1, "content": "挂牌审计程序已完成", "auto_check": null},
+        {"seq": 2, "content": "公开转让说明书数据已核对", "auto_check": null},
+        {"seq": 3, "content": "独立性声明已全部签署", "auto_check": "independence_signing_status"},
+        {"seq": 4, "content": "券商督导问题已回复", "auto_check": null}
+      ]
+    }
+  },
+  "role_mapping": {
+    "field_lead": {"level": 1, "label": "现场负责人"},
+    "manager": {"level": 2, "label": "项目经理"},
+    "partner": {"level": 3, "label": "项目合伙人"},
+    "quality_reviewer": {"level": 4, "label": "质量复核合伙人", "a_only": true},
+    "eqcr": {"level": 5, "label": "EQCR", "a_only": true}
+  }
+}
