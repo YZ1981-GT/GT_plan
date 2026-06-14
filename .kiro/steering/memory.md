@@ -92,7 +92,7 @@ inclusion: always
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、向量存储选 pgvector；详细 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
 ### git 状态（2026-06-12）
-- 分支 `work/2026-05-30-wp-specs`，最高迁移 **V071**；HEAD 已同步远程（2026-06-13 push `2afcc832`：附注UX+辅助余额/导出修复+服务边界文档+2新spec，24文件）
+- 分支 `work/2026-05-30-wp-specs`，最高迁移 **V075**；HEAD 已同步远程（2026-06-14 push `512f9da1`：四栏附注联动+per-table guidance+guidance正路径分流+4spec归档，41文件）
 - **铁律**：push 前必 fetch（stash→ff→pop）；PowerShell 下 git push/fetch 把进度写 stderr 报 exit 1 但实为成功，看 `xxx..yyy -> branch` 确认
 - **🔴 远程默认分支隐患**：`origin/HEAD→origin/master` 但 master 落后 main 298 commit（活跃主干是 main）→ 需 GitHub Settings 改默认分支（Agent 无法改远程设置）
 - 远程 `origin = https://github.com/YZ1981-GT/GT_plan.git`（HTTPS）；gh CLI 已装(2.89.0)未登录（需用户本人浏览器授权）→ 建 PR 走网页 compare
@@ -100,7 +100,7 @@ inclusion: always
 - 已完成修复明细（B-Index 目录/架构图、sheet 级索引号、试算表借贷方向、明细账月小计、2026-06-07 三处回归等）→ `#dev-history`
 
 ### 真正待办（2026-06-12，所有代码实施任务清零）
-- **🟢 active spec=3**：①audit-report-template-integration 181/184，剩 3 项运维（17.3 灰度 flip + 17.4 旧路径下线 + 人工验收）②editing-lock-v1-v2-consolidation（全部完成+收尾优化 2026-06-13，archived=140）③**four-panel-note-linkage（✅ 2026-06-14 全部完成）**：纯前端 eventBus+路由联动，3 组件改动(FourColumnCatalog/DefaultLayout/DisclosureEditor)+10 property tests 全绿，无后端变更无迁移
+- **🟢 active spec=2**：①audit-report-template-integration 181/184，剩 3 项运维（17.3 灰度 flip + 17.4 旧路径下线 + 人工验收）②editing-lock-v1-v2-consolidation（阶段1多任务未完成：数据迁移V073/1b续期/2 force SSE/3 v2等价测试/4 前端flag分流/5并存验证/6检查点/11 V075下线表）
 - **四栏模式 provide/inject**：DefaultLayout `provide('isFourColumnMode', fourCol)` → DisclosureEditor inject 后 `v-show="!isFourColumnMode"` 隐藏内置树面板（避免与四栏目录重复）；三栏模式树正常显示
 - **外部依赖**：LLM embedding 实例 / 合并 UAT / GitHub 默认分支改 main / 走 PR 合入 / 钉集成
 - **后续按需**：附注 96 个 OPT 章节条件化标注（等灰度反馈，611 块 99.5% 已有块级占位符，TEXT 整块填充够用）
