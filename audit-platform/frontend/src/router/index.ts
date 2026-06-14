@@ -311,6 +311,16 @@ const router = createRouter({
           name: 'WorkHours',
           component: () => import('@/views/WorkHoursPage.vue'),
         },
+        {
+          path: 'confirmation',
+          name: 'ConfirmationIndex',
+          component: () => import('@/views/ConfirmationIndex.vue'),
+        },
+        {
+          path: 'archive',
+          name: 'ArchiveIndex',
+          component: () => import('@/views/ArchiveIndex.vue'),
+        },
 
         {
           path: 'dashboard/management',
