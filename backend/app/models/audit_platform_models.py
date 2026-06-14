@@ -676,6 +676,9 @@ class Adjustment(Base):
     )
     reviewed_at: Mapped[datetime | None] = mapped_column(nullable=True)
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # V078: passed（未更正错报）相关
+    passed_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    passed_communication_date: Mapped[date | None] = mapped_column(nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )

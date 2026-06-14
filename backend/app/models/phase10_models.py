@@ -38,6 +38,8 @@ class ReviewConversation(Base):
     trace_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     priority: Mapped[str | None] = mapped_column(String(20), server_default=text("'medium'"))
     resolved_by: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    # V082: 关联 A21~A25 检查要点
+    checklist_ref: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 
 class ReviewMessage(Base):

@@ -91,8 +91,10 @@ inclusion: always
 - A formula-engine-unification / B retrieval-kernel-unification / C doc-level-ai-chat / D report-config-baseline / E wp-ai-review-ux-fix / F global-modules-cleanup / G global-modules-p2-polish；残留仅 Playwright E2E 待环境
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、向量存储选 pgvector；详细 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
-### git 状态（2026-06-12）
-- 分支 `work/2026-05-30-wp-specs`，最高迁移 **V075**；HEAD 已同步远程（2026-06-14 push `512f9da1`：四栏附注联动+per-table guidance+guidance正路径分流+4spec归档，41文件）
+### git 状态（2026-06-14）
+- 分支 `work/2026-05-30-wp-specs`，最高迁移 **V082**；HEAD `d4ec1efa`（BudgetCompareChart UUID守卫+接线+分类流程图）
+- **🔴 git stash drop 丢失修改教训（2026-06-14）**：commit `a9ae81db` 后的 UI 修改（WorkHoursPage/WeeklyTimesheet/ConfirmationIndex/ConfirmationHub/ArchiveIndex/main.ts dayjs/AttachmentHub）被 stash→checkout→drop 操作意外清掉。**铁律追加：做完一批修改立即 commit，不要在 push 前 stash 中间累积大量未提交变更**
+- **🟡 待恢复（下次会话）**：①WorkHoursPage去banner+引入WeeklyTimesheet双视图 ②ConfirmationIndex表格化+搜索+中文类型 ③ConfirmationHub去banner+关联底稿列 ④ArchiveIndex卡片网格+进度环 ⑤main.ts dayjs中文locale ⑥AttachmentHub中文类型映射
 - **铁律**：push 前必 fetch（stash→ff→pop）；PowerShell 下 git push/fetch 把进度写 stderr 报 exit 1 但实为成功，看 `xxx..yyy -> branch` 确认
 - **🔴 远程默认分支隐患**：`origin/HEAD→origin/master` 但 master 落后 main 298 commit（活跃主干是 main）→ 需 GitHub Settings 改默认分支（Agent 无法改远程设置）
 - 远程 `origin = https://github.com/YZ1981-GT/GT_plan.git`（HTTPS）；gh CLI 已装(2.89.0)未登录（需用户本人浏览器授权）→ 建 PR 走网页 compare
