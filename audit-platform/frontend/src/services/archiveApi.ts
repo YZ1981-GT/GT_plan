@@ -2,13 +2,13 @@
  * 归档向导 API — R1 需求 5
  *
  * 端点：
- * - GET  /api/qc/archive-readiness?project_id={pid}  → 归档就绪检查
+ * - GET  /api/projects/{pid}/qc-dashboard/archive-readiness  → 归档就绪检查
  * - POST /api/projects/{pid}/archive/orchestrate      → 启动归档编排
  * - GET  /api/projects/{pid}/archive/jobs/{jobId}     → 查询归档作业状态
  * - POST /api/projects/{pid}/archive/jobs/{jobId}/retry → 重试归档作业
  */
 import { api } from '@/services/apiProxy'
-import { archive as archivePaths, qcArchiveReadiness } from './apiPaths'
+import { archive as archivePaths, qcDashboard } from './apiPaths'
 import type { GateReadinessData } from '@/components/gate/GateReadinessPanel.vue'
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────
@@ -59,9 +59,7 @@ export interface ArchiveJob {
 
 /** 获取归档就绪检查数据（统一 GateReadinessData schema） */
 export async function getArchiveReadiness(projectId: string): Promise<GateReadinessData> {
-  return api.get<GateReadinessData>(qcArchiveReadiness.check, {
-    params: { project_id: projectId },
-  })
+  return api.get<GateReadinessData>(qcDashboard.archiveReadiness(projectId))
 }
 
 /** 启动归档编排 */
