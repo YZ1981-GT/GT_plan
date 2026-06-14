@@ -282,6 +282,39 @@ def _set_run_font(run, font_name=BODY_FONT, size=BODY_SIZE, bold=False):
     rFonts.set(qn("w:eastAsia"), font_name)
 
 
+# 提示性文字（guidance）样式常量：灰色小字斜体，区分正式正文
+GUIDANCE_FONT_SIZE = Pt(10.5)  # 五号，较正文小四(12pt)更小
+GUIDANCE_COLOR = RGBColor(128, 128, 128)  # 灰色
+
+
+def _add_guidance_paragraph(doc, text: str):
+    """渲染一段提示性文字（guidance）为灰色小字斜体段落，视觉上区分正式正文.
+
+    用于 note-per-table-guidance Phase 4：章节级 ``guidance_text`` 与
+    表格级 ``_tables[n].guidance`` 均以此样式输出，避免与实质正文混淆。
+
+    Returns the created paragraph (or None if text is empty).
+    """
+    clean = (text or "").strip()
+    if not clean:
+        return None
+    p = doc.add_paragraph()
+    run = p.add_run(clean)
+    # 灰色小字斜体 + 致同中文字体
+    run.font.name = BODY_FONT
+    run.font.size = GUIDANCE_FONT_SIZE
+    run.font.italic = True
+    run.font.color.rgb = GUIDANCE_COLOR
+    rPr = run._r.get_or_add_rPr()
+    rFonts = rPr.find(qn("w:rFonts"))
+    if rFonts is None:
+        rFonts = OxmlElement("w:rFonts")
+        rPr.insert(0, rFonts)
+    rFonts.set(qn("w:eastAsia"), BODY_FONT)
+    _set_paragraph_format(p, space_after=Pt(6))
+    return p
+
+
 def _add_bookmark(paragraph, bookmark_name: str):
     """Add a bookmark to a paragraph for cross-reference."""
     import random
@@ -1147,6 +1180,12 @@ class NoteWordExporter:
             _set_run_font(run)
             _set_paragraph_format(p)
 
+        # 章节级 guidance（note-per-table-guidance Phase 4）：在所有表格前输出一次，
+        # 灰色小字斜体区分正文。此前完全不渲染（grep guidance 零命中），属既有缺陷补齐。
+        section_guidance = getattr(note, "guidance_text", None)
+        if section_guidance and section_guidance.strip():
+            _add_guidance_paragraph(doc, section_guidance)
+
         # Table data
         if not note.table_data or not isinstance(note.table_data, dict):
             return
@@ -1165,6 +1204,11 @@ class NoteWordExporter:
                 run = p.add_run(str(tbl["name"]))
                 _set_run_font(run, bold=True, size=HEADING3_FONT_SIZE)
                 _set_paragraph_format(p, space_before=Pt(6))
+            # 表格级 guidance（note-per-table-guidance Phase 4）：渲染该表前输出
+            # 其 _tables[n].guidance，灰色小字斜体区分正文。
+            tbl_guidance = tbl.get("guidance")
+            if tbl_guidance and str(tbl_guidance).strip():
+                _add_guidance_paragraph(doc, str(tbl_guidance))
             self._render_table(doc, tbl)
 
     def _render_table(self, doc: Document, table_data: dict):

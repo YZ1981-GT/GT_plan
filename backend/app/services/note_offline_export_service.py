@@ -50,6 +50,7 @@ FILL_REQUIRED = PatternFill(start_color="FF99FF99", end_color="FF99FF99", fill_t
 FONT_HEADER = Font(bold=True, size=12)
 FONT_TITLE = Font(bold=True, size=14)
 FONT_NORMAL = Font(size=10)
+FONT_GUIDANCE = Font(italic=True, size=9, color="808080")  # 提示性文字：灰色斜体小字
 ALIGN_CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
 ALIGN_LEFT = Alignment(horizontal="left", vertical="center", wrap_text=True)
 BORDER_THIN = Border(
@@ -338,6 +339,26 @@ def _build_section_sheet(
         tables = [table_data]
 
     cur_row = 3
+
+    # 章节级 guidance_text：在所有表格前输出一次（灰色斜体小字，跨全宽）
+    section_guidance = section.get("guidance_text") or ""
+    if section_guidance.strip():
+        total_cols = 1  # 至少 1 列
+        for tbl_probe in tables:
+            if isinstance(tbl_probe, dict):
+                for r in tbl_probe.get("rows") or []:
+                    vals = r.get("values")
+                    if isinstance(vals, list):
+                        total_cols = max(total_cols, len(vals) + 1)
+        ws.merge_cells(
+            start_row=cur_row, start_column=1,
+            end_row=cur_row, end_column=max(total_cols, 2),
+        )
+        g_cell = ws.cell(row=cur_row, column=1, value=section_guidance)
+        g_cell.font = FONT_GUIDANCE
+        g_cell.alignment = ALIGN_LEFT
+        cur_row += 1
+
     for t_idx, tbl in enumerate(tables):
         if not isinstance(tbl, dict):
             continue
@@ -394,6 +415,19 @@ def _render_section_table(
     if name:
         cell = ws.cell(row=row_cursor, column=1, value=name)
         cell.font = FONT_HEADER
+        row_cursor += 1
+
+    # per-table guidance 行（灰色斜体小字，跨全宽）
+    table_guidance = tbl.get("guidance") or ""
+    if table_guidance.strip():
+        total_cols = max(n_value_cols + 1, 2)  # label 列 + value 列
+        ws.merge_cells(
+            start_row=row_cursor, start_column=1,
+            end_row=row_cursor, end_column=total_cols,
+        )
+        g_cell = ws.cell(row=row_cursor, column=1, value=table_guidance)
+        g_cell.font = FONT_GUIDANCE
+        g_cell.alignment = ALIGN_LEFT
         row_cursor += 1
 
     # 表头行：第 1 列 label 头 + value 列头

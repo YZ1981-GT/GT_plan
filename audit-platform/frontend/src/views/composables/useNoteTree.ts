@@ -261,6 +261,19 @@ export function useNoteTree(options: UseNoteTreeOptions): UseNoteTreeReturn {
   const flatNoteList = computed(() => {
     const kw = treeSearch.value.toLowerCase()
     let list = noteList.value
+
+    // 过滤掉「裸章节父节点」（如"一"/"二"/"三"）——它们与子节点（如"一、1"/"二、1"）
+    // 标题相同，平铺视图会产生视觉重复。判定：note_section 不含"、"且存在以
+    // 该 prefix+"、" 开头的子章节。
+    const sectionSet = new Set(list.map(n => n.note_section))
+    list = list.filter(n => {
+      const sec = n.note_section || ''
+      if (sec.includes('、')) return true  // 子章节保留
+      // 裸章节：看是否有以 sec+"、" 开头的子节点
+      const hasChildren = list.some(other => other.note_section.startsWith(sec + '、'))
+      return !hasChildren  // 有子节点的裸章节排除
+    })
+
     if (kw) {
       list = list.filter(n => (n.section_title || '').toLowerCase().includes(kw) || (n.note_section || '').toLowerCase().includes(kw))
     }

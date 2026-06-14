@@ -487,3 +487,118 @@ class TestEdgeCases:
         # 注意事项 + 章节清单 + 20 sections + _meta_ = 23
         assert len(wb.sheetnames) == 23
         assert len(hash_val) == 64
+
+
+# ---------------------------------------------------------------------------
+# Per-table guidance rendering (spec: note-per-table-guidance Phase 6)
+# ---------------------------------------------------------------------------
+
+
+class TestGuidanceRendering:
+    """Verify section-level and per-table guidance rows in sheet."""
+
+    def test_section_guidance_rendered(self):
+        """Section-level guidance_text renders as merged gray/italic row."""
+        section = {
+            "section_id": "s_cash",
+            "section_title": "货币资金",
+            "guidance_text": "（注：如有因抵押、质押或冻结等原因受限的款项应披露）",
+            "table_data": {
+                "headers": ["项目", "期末余额", "期初余额"],
+                "rows": [
+                    {"label": "库存现金", "values": [100.0, 200.0], "row_type": "data"},
+                ],
+            },
+        }
+        xlsx_bytes, _ = export_sections_to_xlsx([section])
+        wb = _load_wb(xlsx_bytes)
+        ws = wb.worksheets[2]  # first section sheet
+        # Row 3 should be section guidance
+        g_cell = ws.cell(row=3, column=1)
+        assert "因抵押" in str(g_cell.value)
+        assert g_cell.font.italic is True
+        assert g_cell.font.color and g_cell.font.color.rgb and "808080" in g_cell.font.color.rgb
+
+    def test_per_table_guidance_rendered(self):
+        """Per-table guidance in _tables[n].guidance renders before each table."""
+        section = {
+            "section_id": "s_cash",
+            "section_title": "货币资金",
+            "guidance_text": "",
+            "table_data": {
+                "_tables": [
+                    {
+                        "name": "货币资金",
+                        "headers": ["项目", "期末余额", "期初余额"],
+                        "rows": [
+                            {"label": "库存现金", "values": [100.0, 200.0], "row_type": "data"},
+                        ],
+                        "guidance": "（提示：企业持有的货币资金应分类列示）",
+                    },
+                    {
+                        "name": "受限制的货币资金明细",
+                        "headers": ["项目", "期末余额", "期初余额"],
+                        "rows": [
+                            {"label": "银行承兑保证金", "values": [50.0, 60.0], "row_type": "data"},
+                        ],
+                    },
+                ],
+            },
+        }
+        xlsx_bytes, _ = export_sections_to_xlsx([section])
+        wb = _load_wb(xlsx_bytes)
+        ws = wb.worksheets[2]
+
+        # Find guidance cell — should be after table name "货币资金" row
+        found_guidance = False
+        for row in ws.iter_rows(min_row=3, max_row=15, max_col=1):
+            cell = row[0]
+            if cell.value and "企业持有" in str(cell.value):
+                found_guidance = True
+                assert cell.font.italic is True
+                break
+        assert found_guidance, "Per-table guidance text not found in sheet"
+
+    def test_no_guidance_no_extra_rows(self):
+        """When no guidance, no extra rows rendered."""
+        section = {
+            "section_id": "s1",
+            "section_title": "应收账款",
+            "guidance_text": "",
+            "table_data": {
+                "headers": ["项目", "期末余额"],
+                "rows": [
+                    {"label": "应收账款", "values": [1000.0], "row_type": "data"},
+                ],
+            },
+        }
+        xlsx_bytes, _ = export_sections_to_xlsx([section])
+        wb = _load_wb(xlsx_bytes)
+        ws = wb.worksheets[2]
+        # Row 3 should be header row (项目), not guidance
+        assert ws.cell(row=3, column=1).value == "项目"
+
+    def test_both_section_and_per_table_guidance(self):
+        """Both section-level and per-table guidance render together."""
+        section = {
+            "section_id": "s_cash",
+            "section_title": "货币资金",
+            "guidance_text": "章节级通用提示",
+            "table_data": {
+                "_tables": [
+                    {
+                        "name": "表一",
+                        "headers": ["项目", "金额"],
+                        "rows": [{"label": "A", "values": [1.0], "row_type": "data"}],
+                        "guidance": "表一专属提示",
+                    },
+                ],
+            },
+        }
+        xlsx_bytes, _ = export_sections_to_xlsx([section])
+        wb = _load_wb(xlsx_bytes)
+        ws = wb.worksheets[2]
+
+        texts = [ws.cell(row=r, column=1).value for r in range(3, 10) if ws.cell(row=r, column=1).value]
+        assert any("章节级通用提示" in str(t) for t in texts), "Section guidance missing"
+        assert any("表一专属提示" in str(t) for t in texts), "Per-table guidance missing"

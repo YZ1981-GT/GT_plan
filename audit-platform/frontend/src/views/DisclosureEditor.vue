@@ -153,15 +153,8 @@
     </el-alert>
 
     <div class="gt-de-body">
-      <!-- 左侧：目录树 -->
-      <div class="gt-de-sidebar" :style="{ width: sidebarWidth + 'px' }">
-        <!-- 视图切换 -->
-        <div class="gt-de-view-toggle">
-          <el-radio-group v-model="treeViewMode" size="small">
-            <el-radio-button value="tree">树形</el-radio-button>
-            <el-radio-button value="flat">平铺</el-radio-button>
-          </el-radio-group>
-        </div>
+      <!-- 左侧：目录树（四栏模式下隐藏，由 FourColumnCatalog 替代） -->
+      <div v-show="!isFourColumnMode" class="gt-de-sidebar" :style="{ width: sidebarWidth + 'px' }">
         <!-- 第二行：操作图标 -->
         <div class="gt-de-sidebar-icons">
           <el-tooltip content="全部展开" placement="top" :show-after="400">
@@ -184,7 +177,6 @@
         <div class="gt-de-tree-wrap">
           <!-- 树形视图 -->
           <el-tree
-            v-if="treeViewMode === 'tree'"
             :data="filteredTreeData"
             :props="{ label: 'label', children: 'children' }"
             :indent="10"
@@ -203,7 +195,10 @@
                 <span class="gt-de-tree-group-label">{{ data.label }}</span>
                 <span v-if="getGroupValidationErrorCount(data)" class="gt-de-tree-error-badge">{{ getGroupValidationErrorCount(data) }}</span>
               </div>
-              <div v-else class="gt-de-tree-node" :class="{ 'gt-de-tree-node-active': currentNote?.id === data.id, 'gt-de-tree-node-error': hasSectionValidationError(data.data?.note_section), 'gt-de-tree-node-excluded': data.data?.status === 'not_applicable' }">
+              <div v-else class="gt-de-tree-node" :class="{ 'gt-de-tree-node-active': currentNote?.id === data.id, 'gt-de-tree-node-error': hasSectionValidationError(data.data?.note_section), 'gt-de-tree-node-excluded': data.data?.status === 'not_applicable' }"
+                @mouseenter="onTreeNodeMouseEnter(data.data)"
+                @mouseleave="onTreeNodeMouseLeave"
+              >
                 <span class="gt-de-tree-label">
                   <span v-if="getRenderedNumber(data.data?.note_section)" class="gt-de-tree-number">{{ getRenderedNumber(data.data?.note_section) }}</span>
                   {{ data.data?.section_title || data.label }}
@@ -239,18 +234,6 @@
               </div>
             </template>
           </el-tree>
-          <!-- 平铺视图 -->
-          <div v-if="treeViewMode === 'flat'" class="gt-de-flat-list">
-            <div
-              v-for="note in flatNoteList" :key="note.note_section"
-              class="gt-de-flat-item"
-              :class="{ 'gt-de-flat-item--active': currentNote?.note_section === note.note_section }"
-              @click="onFlatItemClick(note)"
-            >
-              <span class="gt-de-flat-item-title">{{ note.section_title }}</span>
-              <el-tag v-if="(note as any).scope === 'consolidated_only'" size="small" type="warning" style="font-size: var(--gt-font-size-xs)">合并</el-tag>
-            </div>
-          </div>
           <div v-if="!filteredTreeData.length && !treeLoading" class="gt-de-empty-hint">
             暂无附注，点击"生成附注"
           </div>
@@ -325,17 +308,22 @@
 
             <!-- 表格型（支持多表格Tab切换） -->
             <div
-              v-if="currentNote.content_type === 'table' && currentNote.guidance_text?.trim()"
+              v-if="currentNote.content_type === 'table' && showGuidance"
               class="gt-guidance-bar"
             >
               <el-icon><InfoFilled /></el-icon>
-              <span class="gt-guidance-text">{{ currentNote.guidance_text }}</span>
+              <span class="gt-guidance-text">{{ activeTableGuidance }}</span>
+              <el-icon class="gt-guidance-close" @click="dismissGuidance" title="关闭提示"><Close /></el-icon>
             </div>
             <div v-if="currentNote.content_type === 'table' || currentNote.content_type === 'mixed'">
               <!-- 多表格Tab + 导出开关 -->
-              <div v-if="currentNoteTables.length > 1" style="display: flex; align-items: center; gap: 4px; margin-bottom: 8px;">
-                <el-tabs v-model="activeTableTab" type="card" size="small" style="flex: 1; margin-bottom: 0;">
-                  <el-tab-pane v-for="(tbl, ti) in currentNoteTables" :key="ti" :name="String(ti)" :label="getTableTabLabel(tbl, ti)" />
+              <div v-if="currentNoteTables.length > 1" class="gt-de-multitable-tabs">
+                <el-tabs v-model="activeTableTab" type="card" size="small" class="gt-de-table-tabs">
+                  <el-tab-pane v-for="(tbl, ti) in currentNoteTables" :key="ti" :name="String(ti)">
+                    <template #label>
+                      <span class="gt-de-tab-label" :title="getTableTabFullName(tbl, ti)">{{ getTableTabLabel(tbl, ti) }}</span>
+                    </template>
+                  </el-tab-pane>
                 </el-tabs>
                 <el-popover trigger="click" placement="bottom-end" :width="280">
                   <template #reference>
@@ -366,7 +354,20 @@
                   :label="h" :min-width="Number(hiRaw) === 0 ? 160 : 120" :align="Number(hiRaw) === 0 ? 'left' : 'right'" resizable>
                   <template #default="{ row, $index }">
                     <template v-if="Number(hiRaw) === 0">
-                      <span :class="{ 'total-label': row.is_total }">{{ row.label }}</span>
+                      <template v-if="editMode && !row.is_total">
+                        <el-input v-if="isActiveCellEditing($index, -1)"
+                          v-model="row.label" size="small" style="width: 100%; height: 22px"
+                          :aria-label="`${(activeTableData.headers || [])[0] || '项目'} 行${$index + 1} 编辑`"
+                          @change="onLabelChange($index, $event)"
+                          @blur="onActiveCellBlur($event, $index, -1)"
+                          @keydown="onActiveCellKeydown($event, $index, -1)" />
+                        <span v-else class="gt-cell-editable" :class="{ 'total-label': row.is_total }"
+                          role="gridcell" tabindex="0"
+                          :aria-label="`${(activeTableData.headers || [])[0] || '项目'} 行${$index + 1}：${row.label || '空'}`">
+                          {{ row.label || '' }}
+                        </span>
+                      </template>
+                      <span v-else :class="{ 'total-label': row.is_total }">{{ row.label }}</span>
                     </template>
                     <template v-else>
                       <el-tooltip
@@ -377,10 +378,19 @@
                       >
                       <CommentTooltip :comment="deComments.getComment(activeTableData?.section_id || currentNote?.note_section || 'default', $index, Number(hiRaw))">
                       <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, Number(hiRaw) - 1) === 'auto', 'gt-cell-validation-error': !!getCellValidationError($index, Number(hiRaw) - 1) }">
-                        <el-input-number v-if="editMode && !row.is_total"
+                        <el-input-number v-if="editMode && !row.is_total && isActiveCellEditing($index, Number(hiRaw) - 1)"
                           v-model="row.values[Number(hiRaw) - 1]" :controls="false" :precision="2"
                           size="small" style="width: 100%; height: 22px"
-                          @change="onCellValueChange($index, Number(hiRaw) - 1, $event)" />
+                          :aria-label="`${(activeTableData.headers || [])[Number(hiRaw)] || '列'} 行${$index + 1} 编辑`"
+                          @change="onCellValueChange($index, Number(hiRaw) - 1, $event)"
+                          @blur="onActiveCellBlur($event, $index, Number(hiRaw) - 1)"
+                          @keydown="onActiveCellKeydown($event, $index, Number(hiRaw) - 1)" />
+                        <span v-else-if="editMode && !row.is_total" class="gt-cell-editable"
+                          role="gridcell"
+                          tabindex="0"
+                          :aria-label="`${(activeTableData.headers || [])[Number(hiRaw)] || '列'} 行${$index + 1}：${getCellValue(row, Number(hiRaw) - 1) ?? '空'}`">
+                          <GtAmountCell :value="getCellValue(row, Number(hiRaw) - 1)" />
+                        </span>
                         <span v-else-if="row.is_total" :class="['gt-amt', { 'gt-formula-mismatch': isFormulaMismatch(row, Number(hiRaw) - 1) }]">
                           <GtAmountCell :value="getCellValue(row, Number(hiRaw) - 1)" />
                         </span>
@@ -430,11 +440,12 @@
             <!-- 文字型 — 富文本编辑器 (Req 48.1-48.7) -->
             <div v-if="currentNote.content_type === 'text' || currentNote.content_type === 'mixed'" class="gt-de-tiptap-wrapper">
               <div
-                v-if="currentNote.guidance_text?.trim()"
+                v-if="showGuidance"
                 class="gt-guidance-bar"
               >
                 <el-icon><InfoFilled /></el-icon>
-                <span class="gt-guidance-text">{{ currentNote.guidance_text }}</span>
+                <span class="gt-guidance-text">{{ activeTableGuidance }}</span>
+                <el-icon class="gt-guidance-close" @click="dismissGuidance" title="关闭提示"><Close /></el-icon>
               </div>
               <!-- 增强富文本编辑器：支持标题/加粗/斜体/列表/表格/缩进/颜色/占位符/源码/字数 -->
               <NoteRichTextEditor
@@ -686,7 +697,7 @@
       :project-id="projectId"
       :year="year"
       :section-id="currentNote?.note_section || ''"
-      @saved="fetchDetail(currentNote?.note_section || '')"
+      @saved="fetchDetailFresh(currentNote?.note_section || '')"
     />
 
     <!-- C.3.10: 上年对比侧栏 -->
@@ -896,7 +907,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
+import { ref, computed, reactive, onMounted, onBeforeUnmount, onUnmounted, watch, nextTick, inject } from 'vue'
 import * as P from '@/services/apiPaths'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useCellSelection } from '@/composables/useCellSelection'
@@ -917,6 +928,7 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { confirmLeave } from '@/utils/confirm'
+import { resolveActiveTableGuidance, isGuidanceVisible, guidanceDismissKey } from '@/utils/noteGuidance'
 import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
@@ -925,7 +937,7 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { InfoFilled } from '@element-plus/icons-vue'
+import { InfoFilled, Close } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
@@ -994,6 +1006,9 @@ const router = useRouter()
 const projectStore = useProjectStore()
 const { canEdit, onContextChange } = useAuditContext()
 
+// 四栏模式感知：隐藏内置树面板避免与四栏目录重复
+const isFourColumnMode = inject<import('vue').Ref<boolean>>('isFourColumnMode', ref(false))
+
 // ─── P0-6.5: ProjectContext facade ───────────────────────────────────────────
 const projectContext = computed(() => projectStore.currentProjectContext)
 // DEPRECATED: 旧 projectStore.projectId 直接用仍保留，后续通过 projectContext 统一
@@ -1012,7 +1027,7 @@ function onDocAiAdopt(_payload: { content: string; messageId: string }) {
   // D4: AI 内容已经过 wrap_ai_output_with_log → pending 状态，不直接写入
   // 父组件在确认流完成后可刷新附注内容
   if (currentNote.value?.note_section) {
-    fetchDetail(currentNote.value.note_section)
+    fetchDetailFresh(currentNote.value.note_section)
   }
 }
 
@@ -1102,8 +1117,8 @@ const numbering = useNoteSectionNumbering(
 
 // ─── 章节树 composable（useNoteTree 抽取） ──────────────────────────────────
 const {
-  noteList, treeLoading, treeSearch, noteTreeRef, treeViewMode,
-  treeData, filteredTreeData, flatNoteList,
+  noteList, treeLoading, treeSearch, noteTreeRef,
+  treeData, filteredTreeData,
   fetchTree, allowTreeDrop, onTreeNodeDrop, expandAll, collapseAll,
 } = useNoteTree({
   projectId,
@@ -1222,6 +1237,78 @@ function formatSyncTime(iso: string | Date | null | undefined): string {
 
 const { isEditing: editMode, isDirty: editDirty, enterEdit, exitEdit, markDirty: markEditDirty, clearDirty: clearEditDirty } = useEditMode()
 
+// ─── 单元格激活编辑（仅活跃单元格渲染 input，其余保持轻量 span）──────────────────
+const activeCellEdit = ref<{ rowIndex: number; colIndex: number } | null>(null)
+
+function isActiveCellEditing(rowIndex: number, colIndex: number): boolean {
+  if (!activeCellEdit.value) return false
+  return activeCellEdit.value.rowIndex === rowIndex && activeCellEdit.value.colIndex === colIndex
+}
+
+function activateCell(rowIndex: number, colIndex: number) {
+  if (!editMode.value) return
+  activeCellEdit.value = { rowIndex, colIndex }
+  // 用 nextTick 自动聚焦 input
+  nextTick(() => {
+    const input = document.querySelector('.gt-de-note-table .el-input-number input') as HTMLInputElement | null
+    input?.focus()
+    input?.select()
+  })
+}
+
+function deactivateCell() {
+  activeCellEdit.value = null
+}
+
+function onActiveCellBlur(event: FocusEvent, rowIndex: number, colIndex: number) {
+  // 如果焦点移到了同表格内另一个元素（如用户点击另一单元格），不 deactivate
+  // — onDeCellClick 会自行调用 activateCell 切换到新单元格
+  const related = event.relatedTarget as HTMLElement | null
+  if (related?.closest('.gt-de-note-table')) return
+  // 焦点移出表格范围，deactivate
+  if (activeCellEdit.value?.rowIndex === rowIndex && activeCellEdit.value?.colIndex === colIndex) {
+    deactivateCell()
+  }
+}
+
+function onActiveCellKeydown(event: KeyboardEvent, rowIndex: number, colIndex: number) {
+  const headers = activeTableData.value?.headers || []
+  const rows = activeTableData.value?.rows || []
+  const maxCol = headers.length - 2  // 减去 label 列
+  const maxRow = rows.length - 1
+
+  if (event.key === 'Tab') {
+    event.preventDefault()
+    const nextCol = event.shiftKey ? colIndex - 1 : colIndex + 1
+    if (nextCol >= -1 && nextCol <= maxCol) {
+      if (!rows[rowIndex]?.is_total) {
+        activateCell(rowIndex, nextCol)
+      }
+    } else if (!event.shiftKey && nextCol > maxCol) {
+      // 下一行 label 列
+      for (let r = rowIndex + 1; r <= maxRow; r++) {
+        if (!rows[r]?.is_total) { activateCell(r, -1); break }
+      }
+    } else if (event.shiftKey && nextCol < -1) {
+      // 上一行末列
+      for (let r = rowIndex - 1; r >= 0; r--) {
+        if (!rows[r]?.is_total) { activateCell(r, maxCol); break }
+      }
+    }
+  } else if (event.key === 'Enter') {
+    event.preventDefault()
+    // 下一行同列
+    for (let r = rowIndex + 1; r <= maxRow; r++) {
+      if (!rows[r]?.is_total) { activateCell(r, colIndex); break }
+    }
+  } else if (event.key === 'Escape') {
+    deactivateCell()
+  }
+}
+
+// 退出编辑时清除活跃单元格
+watch(() => editMode.value, (editing) => { if (!editing) deactivateCell() })
+
 // 编辑锁联动：进入编辑时 acquire，退出时 release；他人持锁时强制退出
 watch(() => editMode.value, async (editing) => {
   if (editing) await editLock.acquire()
@@ -1250,6 +1337,10 @@ const currentNote = ref<DisclosureNoteDetail | null>(null)
 const textContent = ref('')
 const validationFindings = ref<NoteValidationFinding[]>([])
 const priorYearNote = ref<any>(null)
+
+// 用户关闭的提示条（按 `note_section:tabIdx` 粒度记录，各表 Tab 独立关闭）
+const dismissedGuidance = reactive(new Set<string>())
+// 注：activeTableGuidance / showGuidance / dismissGuidance 定义在 activeTableData 之后
 // TipTap 编辑器
 const editor = useEditor({
   extensions: [
@@ -1303,10 +1394,6 @@ const {
 // 单位切换（侧边栏）
 
 
-function onFlatItemClick(note: any) {
-  currentNote.value = note
-}
-
 // 多表格支持
 const activeTableTab = ref('0')
 
@@ -1328,6 +1415,26 @@ const activeTableData = computed(() => {
   const idx = parseInt(activeTableTab.value) || 0
   return currentNoteTables.value[idx] || currentNoteTables.value[0] || null
 })
+
+// 当前 Tab 的提示文字：优先取该表 guidance，降级章节级 guidance_text
+const activeTableGuidance = computed(() =>
+  resolveActiveTableGuidance(activeTableData.value as any, currentNote.value),
+)
+
+// 提示条显示判定：按 `note_section:tabIdx` 粒度（各 Tab 独立关闭记忆）
+const showGuidance = computed(() =>
+  isGuidanceVisible(
+    activeTableGuidance.value,
+    currentNote.value?.note_section,
+    activeTableTab.value,
+    dismissedGuidance,
+  ),
+)
+
+function dismissGuidance() {
+  const sec = currentNote.value?.note_section
+  if (sec) dismissedGuidance.add(guidanceDismissKey(sec, activeTableTab.value))
+}
 
 // 多表导出开关：跟踪哪些表格启用导出（indices）
 const exportEnabledTables = computed({
@@ -1352,7 +1459,11 @@ const exportEnabledTables = computed({
 watch(() => currentNote.value?.note_section, () => {
   activeTableTab.value = '0'
   noteTableStructure.clearHistory()
+  deactivateCell()
 })
+
+// 切换多表 Tab 时清除活跃单元格（防坐标错位）
+watch(activeTableTab, () => { deactivateCell() })
 
 // ─── 附注表格结构编辑 (Req 38.1-38.6) ─────────────────────────────────────
 const noteTableStructure = useNoteTableStructure({
@@ -1363,19 +1474,25 @@ const noteTableStructure = useNoteTableStructure({
 // 表格Tab标签：避免显示无意义的"项 目"等表头值
 const _GENERIC_NAMES = new Set(['项  目', '项 目', '项目', '类  别', '类别', ''])
 const _TABLE_SUFFIX_RE = /[（(]表\d+[）)]/
-function getTableTabLabel(tbl: any, idx: number): string {
+
+/** 完整表格名称（用于 tooltip） */
+function getTableTabFullName(tbl: any, idx: number): string {
   const name = (tbl.name || '').trim()
-  // 有意义的名称（非空、非通用、非"章节名（表N）"模式）直接用
   if (name && !_GENERIC_NAMES.has(name) && !_TABLE_SUFFIX_RE.test(name)) {
-    return name.length > 14 ? name.slice(0, 14) + '…' : name
+    return name
   }
-  // 无意义名称 → 用序号
   const headers = tbl.headers || []
   if (headers.length > 1) {
     const h1 = String(headers[1] || '').trim()
     if (h1 && h1.length <= 8 && !_GENERIC_NAMES.has(h1.replace(/\s+/g, ''))) return `表${idx + 1}·${h1}`
   }
   return `表${idx + 1}`
+}
+
+/** 截断的 Tab 标签显示文字 */
+function getTableTabLabel(tbl: any, idx: number): string {
+  const full = getTableTabFullName(tbl, idx)
+  return full.length > 14 ? full.slice(0, 14) + '…' : full
 }
 
 function getCellValue(row: any, colIdx: number): any {
@@ -1390,6 +1507,11 @@ function getCellMode(row: any, colIdx: number): string {
   const cell = cells[colIdx]
   if (cell && typeof cell === 'object') return cell.mode || 'auto'
   return ''
+}
+
+function onLabelChange(_rowIndex: number, _newValue: string) {
+  markEditDirty()
+  autoSave.markDirty()
 }
 
 function onCellValueChange(rowIndex: number, colIndex: number, _newValue: number | undefined) {
@@ -1448,14 +1570,14 @@ const {
   projectId,
   year,
   currentNote,
-  fetchDetail,
+  fetchDetail: fetchDetailFresh,  // 刷新后必须绕过缓存
   fetchTree,
   staleRecalc: () => stale.recalc(),
 })
 
 async function onFormulaApplied() {
   // 公式应用后刷新当前附注数据
-  if (currentNote.value) await fetchDetail(currentNote.value.note_section)
+  if (currentNote.value) await fetchDetailFresh(currentNote.value.note_section)
 }
 
 // 将当前附注表格数据转为公式管理器需要的行格式
@@ -1484,7 +1606,7 @@ function openStructureEditor() {
 async function onStructureEditorSaved() {
   // 结构化编辑器保存后刷新当前附注数据
   showStructureEditor.value = false
-  if (currentNote.value) await fetchDetail(currentNote.value.note_section)
+  if (currentNote.value) await fetchDetailFresh(currentNote.value.note_section)
   ElMessage.success('表样编辑已同步')
 }
 
@@ -1514,7 +1636,7 @@ const {
   openAddSectionDialog, onAddSectionConfirm,
   treeContextMenu, onTreeNodeContextMenu, closeTreeContextMenu: _closeTreeContextMenu,
   onTreeCtxRecalc, onTreeCtxDeleteCustom,
-} = useNoteSectionManage({ projectId, year, currentNote, fetchTree, fetchDetail, noteStale })
+} = useNoteSectionManage({ projectId, year, currentNote, fetchTree, fetchDetail: fetchDetailFresh, noteStale })
 
 // ── 打印预览 (Req 41.1-41.5) ──
 const printPreviewSections = computed(() => {
@@ -1539,7 +1661,7 @@ async function onClearAllFormulas() {
       P.disclosureNotes.clearFormulas(projectId.value, year.value, currentNote.value.note_section)
     )
     ElMessage.success('公式已清除，所有单元格切换为手动编辑模式')
-    await fetchDetail(currentNote.value.note_section)
+    await fetchDetailFresh(currentNote.value.note_section)
   } catch {
     // 降级：前端直接修改模式标记
     for (const row of currentNote.value.table_data.rows) {
@@ -1561,7 +1683,7 @@ async function onRestoreAutoMode() {
   try {
     await refreshDisclosureFromWorkpapers(projectId.value, year.value)
     ElMessage.success('已恢复自动提数模式')
-    await fetchDetail(currentNote.value.note_section)
+    await fetchDetailFresh(currentNote.value.note_section)
   } catch (e: any) {
     handleApiError(e, '恢复')
   }
@@ -1734,8 +1856,53 @@ async function onNodeClick(node: TreeNode) {
   })()
 }
 
-async function fetchDetail(noteSection: string) {
-  currentNote.value = await getDisclosureNoteDetail(projectId.value, year.value, noteSection)
+// ─── 章节详情缓存 + hover 预取 ─────────────────────────────────────────────────
+const _detailCache = new Map<string, any>()
+let _prefetchTimer: ReturnType<typeof setTimeout> | null = null
+
+function _cacheKey(noteSection: string): string {
+  return `${projectId.value}:${year.value}:${noteSection}`
+}
+
+/** 清除全部或指定章节缓存 */
+function invalidateDetailCache(noteSection?: string) {
+  if (noteSection) {
+    _detailCache.delete(_cacheKey(noteSection))
+  } else {
+    _detailCache.clear()
+  }
+}
+
+/** hover 预取：鼠标停留 200ms 后静默加载到缓存 */
+function onTreeNodeMouseEnter(data: any) {
+  if (!data?.note_section || data.isGroup) return
+  const key = _cacheKey(data.note_section)
+  if (_detailCache.has(key)) return  // 已缓存
+  if (_prefetchTimer) clearTimeout(_prefetchTimer)
+  _prefetchTimer = setTimeout(async () => {
+    try {
+      const detail = await getDisclosureNoteDetail(projectId.value, year.value, data.note_section)
+      _detailCache.set(key, detail)
+    } catch { /* 预取失败静默忽略 */ }
+  }, 200)
+}
+
+function onTreeNodeMouseLeave() {
+  if (_prefetchTimer) { clearTimeout(_prefetchTimer); _prefetchTimer = null }
+}
+
+async function fetchDetail(noteSection: string, bypassCache = false) {
+  const key = _cacheKey(noteSection)
+
+  if (!bypassCache && _detailCache.has(key)) {
+    // 命中缓存，直接应用
+    currentNote.value = _detailCache.get(key)
+  } else {
+    // 未命中或强制刷新：发起网络请求
+    currentNote.value = await getDisclosureNoteDetail(projectId.value, year.value, noteSection)
+    _detailCache.set(key, currentNote.value)
+  }
+
   textContent.value = currentNote.value.text_content || ''
   if (editor.value) {
     const raw = textContent.value
@@ -1752,6 +1919,12 @@ async function fetchDetail(noteSection: string) {
       P.disclosureNotes.priorYear(projectId.value, year.value, noteSection)
     )
   } catch { priorYearNote.value = null }
+}
+
+/** 强制刷新（跳过缓存） — 用于保存/公式/刷新等数据变更后 */
+async function fetchDetailFresh(noteSection: string) {
+  invalidateDetailCache(noteSection)
+  await fetchDetail(noteSection, true)
 }
 
 function onNoteImported() {
@@ -1806,6 +1979,14 @@ const { saveLoading, justSaved, onSave } = useNotePersist({
   clearEditDirty,
   autoSaveClearDirty: () => autoSave.clearDirty(),
   clearAutoSaveDraft,
+})
+
+// 保存后更新缓存为当前最新状态（避免导航回来时拿到旧缓存）
+watch(justSaved, (saved) => {
+  if (saved && currentNote.value?.note_section) {
+    const key = _cacheKey(currentNote.value.note_section)
+    _detailCache.set(key, currentNote.value)
+  }
 })
 
 /** 快捷键保存：保存当前附注 */
@@ -1883,17 +2064,48 @@ async function onRestoreTemplateStructure() {
   }
 }
 
+// ─── Task 5.2: 四栏目录附注章节点击导航处理 ─────────────────────────────────
+async function onCatalogNoteSelect({ noteSection }: { noteSection: string }) {
+  // 同章节守卫（Req 2.4）
+  if (noteSection === currentNote.value?.note_section) return
+  const previousSection = currentNote.value?.note_section || ''
+  try {
+    await fetchDetail(noteSection)
+  } catch {
+    ElMessage.error('章节加载失败')
+    // 失败回退：通知 catalog 恢复之前的高亮
+    if (previousSection) {
+      eventBus.emit('note:section-changed', { noteSection: previousSection })
+    }
+  }
+}
+
+// ─── Task 5.3: 反向通知 — 内部树切换时通知 FourColumnCatalog 更新高亮 ────────
+watch(() => currentNote.value?.note_section, (newSection) => {
+  if (newSection) {
+    eventBus.emit('note:section-changed', { noteSection: newSection })
+  }
+})
+
 onMounted(async () => {
   selectedProjectId.value = projectId.value
   selectedYear.value = year.value
   projectStore.loadProjectOptions()
   eventBus.on('shortcut:save', onShortcutSave)
   eventBus.on('workpaper:saved', onWorkpaperSaved)
+  // Task 5.2: 监听四栏目录附注章节点击
+  eventBus.on('catalog:note-select', onCatalogNoteSelect)
   await loadProjectTemplateConfig()
   await fetchTree()
   // 如果没有附注数据，自动从模板生成
   if (noteList.value.length === 0) {
     await onGenerate()
+  }
+  // Task 5.1: 从 URL query.section 自动定位章节（四栏跨页面导航）
+  const targetSection = route.query.section as string | undefined
+  if (targetSection && noteList.value.length > 0) {
+    await fetchDetail(targetSection)
+    router.replace({ query: { ...route.query, section: undefined } })
   }
   // R8-S2-14：关闭浏览器/刷新前警告
   window.addEventListener('beforeunload', onBeforeUnload)
@@ -1906,6 +2118,7 @@ onMounted(async () => {
 onContextChange(async () => {
   selectedProjectId.value = projectId.value
   selectedYear.value = year.value
+  invalidateDetailCache()  // 项目/年度变更，清空全部缓存
   await loadProjectTemplateConfig()
   await fetchTree()
 })
@@ -1913,6 +2126,8 @@ onContextChange(async () => {
 onUnmounted(() => {
   eventBus.off('shortcut:save', onShortcutSave)
   eventBus.off('workpaper:saved', onWorkpaperSaved)
+  // Task 5.4: 清理 catalog:note-select 监听
+  eventBus.off('catalog:note-select', onCatalogNoteSelect)
   window.removeEventListener('beforeunload', onBeforeUnload)
   window.removeEventListener('click', _closeTreeContextMenu)
   window.removeEventListener('contextmenu', _onWindowContextMenuFallback)
@@ -2008,6 +2223,14 @@ function onDeCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEv
   const value = values[colIdx] ?? ''
   deCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
   deCtx.contextMenu.itemName = values[0] || `行${rowIdx + 1}`
+  // 单元格激活编辑：编辑模式下点击非合计行直接激活
+  if (editMode.value && !row.is_total) {
+    if (colIdx === 0) {
+      activateCell(rowIdx, -1)  // label 列用 -1 标识
+    } else {
+      activateCell(rowIdx, colIdx - 1)
+    }
+  }
 }
 
 function onDeCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {

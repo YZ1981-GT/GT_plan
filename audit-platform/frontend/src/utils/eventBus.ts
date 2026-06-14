@@ -228,6 +228,18 @@ export interface CrossRefUpdatedPayload {
   refId?: string
 }
 
+// ─── 四栏附注联动事件 ──────────────────────────────────────────────────────────
+
+/** 四栏目录附注章节点击（FourColumnCatalog → DisclosureEditor） */
+export interface CatalogNoteSelectPayload {
+  noteSection: string
+}
+
+/** 附注编辑器章节变更反向通知（DisclosureEditor → FourColumnCatalog） */
+export interface NoteSectionChangedPayload {
+  noteSection: string
+}
+
 // ─── 事件映射表 ───────────────────────────────────────────────────────────────
 
 export type Events = {
@@ -306,6 +318,10 @@ export type Events = {
 
   // D 销售循环 F6: 跨底稿引用更新（D0→D2 反向回填）
   'cross-ref:updated': CrossRefUpdatedPayload
+
+  // 四栏附注联动（four-panel-note-linkage）
+  'catalog:note-select': CatalogNoteSelectPayload
+  'note:section-changed': NoteSectionChangedPayload
 
   // consol-phase1-arch-lock 需求 4.3: 后端返回 423 合并锁定 → 刷新前端锁定态
   'consol-lock:detected': { projectId?: string }

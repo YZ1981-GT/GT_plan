@@ -2,7 +2,7 @@
 
 **最后更新**：2026-06-12  
 **当前分支**：`work/2026-05-30-wp-specs`  
-**Spec 总数**：**141**（active 2 + archived 139）  
+**Spec 总数**：**142**（active 2 + archived 140）  
 **最高迁移**：V071  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -58,6 +58,7 @@
 |------|------|------|------|
 | audit-report-template-integration | implementing | V066 | 审计报告模板集成（181/184，剩 3 项人工验收/运维下线） |
 | deliverable-lineage-and-writeback | completed | V067 | 出品物溯源与回填（92/92 全部完成，START GATE 已解除可实施） |
+| note-per-table-guidance | completed | — | 附注多表 per-table guidance（6 Phase 全完成，前后端+迁移+导出+E2E） |
 
 ```
 _archive/
@@ -68,7 +69,7 @@ _archive/
 ├── 05-business-features/        36   业务专项（含ledger/wp系列）
 ├── 06-engineering-governance/    6   工程治理
 ├── 07-workpaper-slimdown/        9   底稿瘦身
-├── 08-disclosure-notes/          4   附注模块
+├── 08-disclosure-notes/          5   附注模块
 ├── 09-consolidation-phases/      4   合并模块
 └── 99-superseded/                4   已被取代
 ```
@@ -112,9 +113,9 @@ _archive/
 
 `workpaper-html-renderer` · `workpaper-editor-slimdown` · `workpaper-list-shrink` · `workpaper-editor-shrink-phase2` · `gt-c-note-table-shrink` · `gtdform-test-and-shrink` · `custom-workpaper-formula-binding` · `audit-sheet-editable` · `report-view-slimdown`
 
-### 2.8 `08-disclosure-notes/`（4）
+### 2.8 `08-disclosure-notes/`（5）
 
-`disclosure-note-full-revamp` · `note-dynamic-tables-and-template-inheritance` · `disclosure-note-linkage-and-slimdown` · `disclosure-note-semantic-structure-and-presentation`
+`disclosure-note-full-revamp` · `note-dynamic-tables-and-template-inheritance` · `disclosure-note-linkage-and-slimdown` · `disclosure-note-semantic-structure-and-presentation` · `four-panel-note-linkage`
 
 ### 2.9 `09-consolidation-phases/`（4）
 

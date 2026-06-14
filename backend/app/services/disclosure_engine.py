@@ -115,18 +115,20 @@ def is_guidance_paragraph(para: str) -> bool:
 def _is_table_title_paragraph(para: str) -> bool:
     """短编号标题类段落（供表名消费，不进正文/指引）。"""
     s = (para or "").strip()
-    if not s or len(s) > 20:
+    if not s:
         return False
-    if s.startswith("#"):
+    if s.startswith("#"):          # markdown 标题：任意长度都算标题行
         return True
+    if len(s) > 20:                # 非 # 的短标题才受长度约束
+        return False
     return bool(_NUMBERED_TITLE_RE.match(s))
 
 
-def classify_template_content(
+def _flatten_paragraphs(
     text_sections: list[str] | None,
     text_template: str | None,
-) -> tuple[str | None, str | None]:
-    """将模板 text_sections/text_template 分为 (substantive_text, guidance_text)。"""
+) -> list[str]:
+    """将 text_sections（按行）/ text_template（按空行块）拍平为段落列表。"""
     paragraphs: list[str] = []
     for section in text_sections or []:
         for line in section.split("\n"):
@@ -138,20 +140,91 @@ def classify_template_content(
             block = block.strip()
             if block:
                 paragraphs.append(block)
+    return paragraphs
 
-    guidance_parts: list[str] = []
+
+def _match_title_to_table_idx(
+    title: str,
+    table_names: list[str],
+    fallback: int,
+) -> int | None:
+    """把一行标题映射到 table 索引（四级匹配）。
+
+    1. 精确匹配 table name
+    2. 编号标题 `（N）xxx` → idx N-1
+    3. 包含匹配（标题包含表名 或 表名包含标题）
+    4. 兜底：游标 +1（越界则返回 None）
+    """
+    clean = title.lstrip("#").strip()
+    # 1. 精确匹配
+    for i, n in enumerate(table_names):
+        if n and clean == n:
+            return i
+    # 2. 编号匹配 （N）xxx / N. xxx → idx N-1
+    m = _NUMBERED_TITLE_RE.match(clean)
+    if m:
+        num = int(m.group(1) or m.group(2))
+        if 1 <= num <= len(table_names):
+            return num - 1
+    # 3. 包含匹配
+    for i, n in enumerate(table_names):
+        if n and (clean in n or n in clean):
+            return i
+    # 4. 兜底：游标 +1
+    nxt = fallback + 1
+    return nxt if nxt < len(table_names) else None
+
+
+def classify_template_content(
+    text_sections: list[str] | None,
+    text_template: str | None,
+    tables: list[dict] | None = None,
+) -> tuple[str | None, str | None, dict[int, str]]:
+    """将模板 text_sections/text_template 分流为三类。
+
+    返回 (substantive_text, section_guidance_text, per_table_guidance)：
+    - substantive_text: 实质正文（合并）→ text_content
+    - section_guidance_text: 无法归属到具体表 / 单表场景的通用提示 → guidance_text
+    - per_table_guidance: {table_idx: guidance_str} → _tables[idx].guidance
+
+    游标算法：遍历段落，标题行推进游标（标题行本身丢弃），多表场景下
+    指引段落归属到当前游标对应的表；单表/无表场景指引归章节级。
+
+    向后兼容：旧调用方不传 tables → per_table_guidance={}，所有指引归
+    section_guidance（行为同旧）。
+    """
+    paragraphs = _flatten_paragraphs(text_sections, text_template)
+    table_names = [(t.get("name") or "").strip() for t in (tables or [])]
+    multi_table = len(table_names) > 1
+
     substantive_parts: list[str] = []
+    section_guidance_parts: list[str] = []
+    per_table_guidance: dict[int, list[str]] = {}
+    current_idx = 0
+
     for para in paragraphs:
         if is_guidance_paragraph(para):
-            guidance_parts.append(para)
-        elif _is_table_title_paragraph(para):
+            if multi_table:
+                per_table_guidance.setdefault(current_idx, []).append(para)
+            else:
+                section_guidance_parts.append(para)
             continue
-        else:
-            substantive_parts.append(para)
+        if _is_table_title_paragraph(para):
+            # 标题行：推进游标到匹配的 table_idx（标题行本身不进任何输出）
+            if multi_table:
+                idx = _match_title_to_table_idx(para, table_names, current_idx)
+                if idx is not None:
+                    current_idx = idx
+            continue
+        # 正文
+        substantive_parts.append(para)
 
     substantive = "\n\n".join(substantive_parts) if substantive_parts else None
-    guidance = "\n\n".join(guidance_parts) if guidance_parts else None
-    return substantive, guidance
+    section_guidance = (
+        "\n\n".join(section_guidance_parts) if section_guidance_parts else None
+    )
+    table_guidance = {i: "\n\n".join(v) for i, v in per_table_guidance.items() if v}
+    return substantive, section_guidance, table_guidance
 
 
 def identify_guidance(text_content: str) -> tuple[str, str] | None:
@@ -1060,8 +1133,16 @@ class DisclosureEngine:
             prior_notes_cache = getattr(self, '_prior_notes_cache', {})
             prior_text = prior_notes_cache.get(note_section)
             if prior_text and len(prior_text) > 20:
-                text_content = prior_text
-                logger.info("note %s: filled from prior year (cache)", note_section)
+                # 上年数据可能混装 guidance（旧版未分流），自动清洗
+                split_result = identify_guidance(prior_text)
+                if split_result:
+                    _prior_guidance, _prior_remaining = split_result
+                    text_content = _prior_remaining if _prior_remaining.strip() else None
+                    # prior guidance 不覆盖模板 guidance（优先级3会处理模板的）
+                else:
+                    text_content = prior_text
+                if text_content:
+                    logger.info("note %s: filled from prior year (cache)", note_section)
 
             # 优先级2：LLM生成（预留接口，通过 note_prompts 配置每章节独立提示词）
             if not text_content:
@@ -1076,8 +1157,9 @@ class DisclosureEngine:
                     pass
 
             # 优先级3：模板分流 — 指引→guidance_text，实质正文→substantive（替换原灌正文逻辑）
-            substantive, guidance = classify_template_content(
-                text_sections, tmpl.get("text_template"),
+            # 传入 tables 以支持 per-table guidance 归属（多表场景）
+            substantive, guidance, per_table_guidance = classify_template_content(
+                text_sections, tmpl.get("text_template"), tmpl.get("tables"),
             )
             guidance_text = guidance
 
@@ -1106,6 +1188,10 @@ class DisclosureEngine:
 
                     # 动态提取表格标题：name 为空或"（表N）"占位时，从 text_sections 按序号匹配
                     _infer_table_names_from_text(built_tables, text_sections)
+                    # per-table guidance：写入对应表的 guidance 字段（仅有效索引）
+                    for idx, g in per_table_guidance.items():
+                        if 0 <= idx < len(built_tables) and g:
+                            built_tables[idx]["guidance"] = g
                     # 存储为独立的 _tables 数组，避免循环引用
                     if built_tables:
                         table_data = {

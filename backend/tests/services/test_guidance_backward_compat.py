@@ -38,6 +38,6 @@ def test_property_12_empty_guidance_matches_legacy_skip(body):
 
 def test_property_12_classify_empty_template_unchanged():
     """无 guidance 模板段时 classify 返回 (None, None)。"""
-    substantive, guidance = classify_template_content([], None)
+    substantive, guidance = classify_template_content([], None)[:2]
     assert substantive is None
     assert guidance is None

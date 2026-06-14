@@ -108,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ThreeColumnLayout from './ThreeColumnLayout.vue'
 import MiddleProjectList from '@/components/layout/MiddleProjectList.vue'
@@ -128,8 +128,8 @@ import { initGlobalBackspace } from '@/composables/useNavigationStack'
 import { handleApiError } from '@/utils/errorHandler'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
-import { getProject } from '@/services/auditPlatformApi'
 import { getGlobalReviewInbox } from '@/services/pmApi'
+import { eventBus } from '@/utils/eventBus'
 
 const route = useRoute()
 const router = useRouter()
@@ -150,6 +150,9 @@ const activeModule = ref('projects')
 const fourCol = ref(false)
 const activeCatalog = ref('reports')
 const selectedCatalogItem = ref<any>(null)
+
+// 四栏模式状态 provide 给子路由组件（DisclosureEditor 用于隐藏内置树）
+provide('isFourColumnMode', fourCol)
 
 // 复核收件箱 badge
 const pendingReviewCount = ref(0)
@@ -310,17 +313,64 @@ function onViewChange(mode: 'three' | 'four') {
   fourCol.value = mode === 'four'
 }
 
+// ─── Task 3.4: tabToRoute 辅助函数 ─────────────────────────────────────────
+function tabToRoute(tab: string): string {
+  const map: Record<string, string> = {
+    reports: 'financial-reports',
+    notes: 'disclosure-notes',
+    workpapers: 'workpapers',
+    trial_balance: 'trial-balance',
+  }
+  return map[tab] || 'disclosure-notes'
+}
+
+// ─── Task 3.2: handleProjectSwitch ──────────────────────────────────────────
+async function handleProjectSwitch(item: { project_id: string; year?: number }) {
+  const targetId = item.project_id
+  if (targetId === route.params.projectId) return  // 同项目不操作
+
+  const year = item.year || projectStore.year
+  const activeTab = activeCatalog.value
+  const subRoute = tabToRoute(activeTab)
+
+  try {
+    await router.push({
+      path: `/projects/${targetId}/${subRoute}`,
+      query: { year: String(year) }
+    })
+  } catch (err: any) {
+    ElMessage.error('项目切换失败：' + (err.message || '未知错误'))
+  }
+}
+
+// ─── Task 3.3: handleNoteNavigation ─────────────────────────────────────────
+function handleNoteNavigation(item: { code: string }) {
+  const pid = route.params.projectId as string
+  const isOnNotesPage = route.name === 'DisclosureNotes'
+
+  if (isOnNotesPage) {
+    // 已在附注编辑器页面，通过 eventBus 通知 DisclosureEditor 直接导航
+    eventBus.emit('catalog:note-select', { noteSection: item.code })
+  } else {
+    // 不在附注页面，路由导航并附带 section query
+    router.push({
+      path: `/projects/${pid}/disclosure-notes`,
+      query: { ...route.query, section: item.code }
+    })
+  }
+}
+
+// ─── Task 3.1: onCatalogSelect 按 type 分发 ────────────────────────────────
 function onCatalogSelect(item: any) {
-  // 处理项目切换
   if (item?.type === 'switch_project' && item.project_id) {
-    // 从项目列表中找到目标项目并切换（静态导入，避免动态 import 无意义开销）
-    getProject(item.project_id).then((proj: any) => {
-      if (proj) {
-        selectedProject.value = proj
-      }
-    }).catch(() => {})
+    handleProjectSwitch(item)
     return
   }
+  if (item?.type === 'note') {
+    handleNoteNavigation(item)
+    return
+  }
+  // 其他类型（report/workpaper/trial_balance）保持现有行为
   selectedCatalogItem.value = item
 }
 </script>

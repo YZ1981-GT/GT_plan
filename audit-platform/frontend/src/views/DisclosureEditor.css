@@ -75,6 +75,8 @@
 .total-label { font-weight: 700; }
 .total-val { font-weight: 700; }
 .gt-cell-wrapper { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.gt-cell-editable { cursor: text; min-height: 20px; min-width: 40px; display: inline-flex; align-items: center; justify-content: flex-end; width: 100%; border-radius: 2px; padding: 0 2px; transition: background-color 0.15s; }
+.gt-cell-editable:hover { background-color: var(--gt-color-primary-bg, #f5f0ff); outline: 1px dashed var(--gt-color-border-purple, #d8b8ee); }
 .gt-cell-source { font-size: var(--gt-font-size-xs); cursor: help; }
 .gt-cell-manual { font-size: var(--gt-font-size-xs); cursor: help; }
 .gt-cell-trace-trigger { cursor: pointer !important; transition: transform 0.15s ease; }
@@ -107,6 +109,8 @@
 }
 .gt-guidance-bar .el-icon { flex-shrink: 0; margin-top: 2px; color: #4b2d77; }
 .gt-guidance-text { flex: 1; white-space: pre-wrap; }
+.gt-guidance-close { flex-shrink: 0; cursor: pointer; color: #4b2d77; opacity: 0.5; transition: opacity 0.2s; font-size: 14px; margin-top: 1px; }
+.gt-guidance-close:hover { opacity: 1; }
 .gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid var(--gt-color-border-purple); background: var(--gt-color-primary-bg); border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .gt-de-toolbar-divider { width: 1px; height: 20px; background: var(--gt-color-primary-lighter); margin: 0 6px; }
 .gt-de-ai-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-primary-lighter); margin-left: 8px; white-space: nowrap; }
@@ -119,6 +123,18 @@
 .gt-de-tiptap-content :deep(.ProseMirror p.is-editor-empty:first-child::before) { color: var(--gt-color-text-placeholder); content: attr(data-placeholder); float: left; height: 0; pointer-events: none; text-indent: 0; }
 .gt-de-ai-toolbar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-top: 1px solid var(--gt-color-border-lighter); background: var(--gt-color-primary-bg); flex-wrap: wrap; }
 .gt-de-structure-toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; margin-top: 8px; background: var(--gt-color-primary-bg, #f4f0fa); border: 1px solid var(--gt-color-border-purple, #d8b8ee); border-radius: 6px; flex-wrap: wrap; }
+
+/* ── 多表格 Tab 溢出滚动 ── */
+.gt-de-multitable-tabs { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.gt-de-table-tabs { flex: 1; min-width: 0; margin-bottom: 0; }
+.gt-de-table-tabs :deep(.el-tabs__nav-wrap) { overflow: hidden; }
+.gt-de-table-tabs :deep(.el-tabs__nav-scroll) { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.gt-de-table-tabs :deep(.el-tabs__nav) { white-space: nowrap; }
+.gt-de-table-tabs :deep(.el-tabs__item) { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 12px !important; border-radius: 4px 4px 0 0; font-size: 12px !important; }
+.gt-de-table-tabs :deep(.el-tabs__item.is-active) { background: #ece4f6 !important; color: #4b2d77 !important; border-color: #4b2d77 !important; border-bottom: 2.5px solid #4b2d77 !important; font-weight: 700; }
+.gt-de-table-tabs :deep(.el-tabs__item:not(.is-active)) { color: var(--el-text-color-regular); background: transparent; }
+.gt-de-table-tabs :deep(.el-tabs__item:not(.is-active):hover) { background: #f4f0fa; color: #4b2d77; }
+.gt-de-tab-label { display: inline-block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
 .gt-trace-popover-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: transparent; }
 .gt-trace-popover-container { position: absolute; z-index: 2001; }
 /* ── Stale banner ── */

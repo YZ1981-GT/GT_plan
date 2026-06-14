@@ -29,7 +29,7 @@ BODY_SAMPLES = [
 @settings(max_examples=5)
 def test_property_1_generation_split_integrity(guidance, body):
     """Feature: note-guidance-text-separation, Property 1: 生成分流完整性"""
-    substantive, guidance_out = classify_template_content([guidance, body], None)
+    substantive, guidance_out = classify_template_content([guidance, body], None)[:2]
     assert guidance_out == guidance
     assert substantive == body
     assert guidance not in (substantive or "")
@@ -41,7 +41,7 @@ def test_property_1_generation_split_integrity(guidance, body):
 @settings(max_examples=5)
 def test_property_2_table_title_not_in_text_content(title):
     """Feature: note-guidance-text-separation, Property 2: 表格标题不进正文"""
-    substantive, guidance = classify_template_content([title], None)
+    substantive, guidance = classify_template_content([title], None)[:2]
     assert guidance is None
     assert substantive is None
 
@@ -56,7 +56,7 @@ def test_property_2_table_title_not_in_text_content(title):
 @settings(max_examples=5)
 def test_property_15_generate_and_migrate_agree(para):
     """Feature: note-guidance-text-separation, Property 15: 生成与迁移指引判定一致"""
-    _, guidance_from_template = classify_template_content([para], None)
+    _, guidance_from_template = classify_template_content([para], None)[:2]
     split = identify_guidance(para)
     if is_guidance_paragraph(para):
         assert guidance_from_template == para
