@@ -10,16 +10,15 @@
     :data="rows"
     border
     size="small"
+    class="gt-compact-table gt-tb-font-md"
     :span-method="equitySpanMethod"
     :row-class-name="eqRowClassName"
     style="width: 100%"
     :max-height="tableMaxHeight"
-    :style="{ fontSize }"
     :cell-class-name="cellClassName"
     @cell-click="onCellClick"
     @cell-dblclick="onCellDblClick"
     @cell-contextmenu="onCellContextMenu"
-    :header-cell-style="{ background: '#f8f6fb', color: '#333', whiteSpace: 'nowrap', fontSize: '12px' }"
   >
     <el-table-column prop="row_name" label="项目" fixed width="280" :resizable="true">
       <template #default="{ row }">

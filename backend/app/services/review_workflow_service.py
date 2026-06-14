@@ -527,10 +527,14 @@ class ReviewWorkflowService:
                 return "通过" if reviewed == total else f"已复核{reviewed}/{total}"
             elif check_type == "all_adjustments_approved":
                 from app.models.audit_platform_models import Adjustment
+                # 已处理 = 已批准(approved) 或 已 Passed(不予更正, passed_reason 非空)。
+                # 待处理 = 未批准 且 未 Passed。review_status 枚举无 'passed' 值，
+                # 故 Passed 用 passed_reason IS NULL 判定（避免无效枚举比较报错）。
                 stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
                     Adjustment.project_id == project_id,
                     Adjustment.year == year,
-                    Adjustment.review_status.notin_(["approved", "passed"]),
+                    Adjustment.review_status != "approved",
+                    Adjustment.passed_reason.is_(None),
                     Adjustment.is_deleted == sa.false(),
                 )
                 result = await self.db.execute(stmt)

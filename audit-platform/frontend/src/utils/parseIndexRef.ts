@@ -197,7 +197,6 @@ export function parseIndexRef(value: string): ResolvedIndexRef | null {
     // Determine layer based on the code structure
     if (isCellRef(normalized)) {
       // Contains ! separator → cell reference (Layer 1)
-      // This shouldn't normally match LOOSE_RE, but handle defensively
       return {
         ns: 'cell',
         layer: 1,
@@ -205,16 +204,10 @@ export function parseIndexRef(value: string): ResolvedIndexRef | null {
       }
     }
 
-    if (isSheetRef(normalized)) {
-      // Has sub-number suffix (D2-1) or letter suffix (D2A) → sheet reference (Layer 2)
-      return {
-        ns: 'sheet',
-        layer: 2,
-        target: normalized,
-      }
-    }
-
-    // Main workpaper code (D2, E1, F2) → workpaper reference (Layer 3)
+    // 所有松散匹配的底稿编码（A2-2, D2-1, A1-17, D2A 等）统一作 wp 引用（Layer 3）。
+    // 之前 isSheetRef 把含 -N 后缀的编码（如 A2-2）误判为同底稿 sheet 切换，
+    // 但在致同底稿体系中 A2-2/A1-13/D2-1 都是独立底稿编号，不是当前底稿内的 sheet。
+    // 如需 sheet 切换，应使用显式前缀 `sheet:D2-1`。
     return {
       ns: 'wp',
       layer: 3,

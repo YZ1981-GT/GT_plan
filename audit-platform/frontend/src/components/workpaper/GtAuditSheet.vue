@@ -126,7 +126,7 @@
       :data="tableData"
       border
       size="small"
-      class="gas-table"
+      class="gas-table gt-compact-table gt-tb-font-md"
       row-key="id"
       :header-cell-style="headerStyle"
       :row-class-name="rowClassName"
@@ -584,6 +584,10 @@ function buildTableData() {
       sys_aje: row.sys_aje ?? tb.sys_aje ?? null,
       sys_rje: row.sys_rje ?? tb.sys_rje ?? null,
     }
+  }).filter((row) => {
+    // 过滤空白占位行：item 为空且非分节/非合计/非自定义 = 模板生成的空行，不展示
+    if (!row.item && !row.isSection && !row.isComputed && !row.isCustom) return false
+    return true
   })
 }
 

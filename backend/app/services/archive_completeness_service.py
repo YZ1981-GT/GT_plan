@@ -15,6 +15,7 @@ can_proceed = True 当且仅当无 blocking 类别有 count > 0。
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Literal
 from uuid import UUID
@@ -23,6 +24,8 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.core import User
+from app.models.staff_models import StaffMember
 from app.models.workpaper_models import (
     ReviewCommentStatus,
     ReviewRecord,
@@ -31,6 +34,74 @@ from app.models.workpaper_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Helpers: 底稿编号自然排序 + 责任人中文名解析
+# ---------------------------------------------------------------------------
+
+_WP_CODE_RE = re.compile(r"^([A-Za-z]+)(\d+)")
+
+
+def _wp_sort_key(wp_code: str) -> tuple:
+    """底稿编号自然排序键：先按字母前缀（A-T），再按数字升序，避免
+    字符串排序把 A10 排在 A2 之前、或 A22→A5 跳号乱序。
+
+    形如 ``A1`` → ('A', 1, 'A1')；带后缀 ``D2-1`` → ('D', 2, 'D2-1')；
+    无法解析的自定义编号（如 ``PWXD6AS9``）排到最后（前缀置 '~'）。
+    """
+    m = _WP_CODE_RE.match(wp_code or "")
+    if not m:
+        return ("~", 0, wp_code or "")
+    return (m.group(1).upper(), int(m.group(2)), wp_code)
+
+
+async def _resolve_assignee_names(
+    db: AsyncSession, items: list["CheckItem"]
+) -> None:
+    """把 items 里的 assignee（users.id 字符串）就地替换为中文姓名。
+
+    优先取 staff_members.name（与 user 关联），降级用 users.username。
+    无法解析的保持原值（或 None）。
+    """
+    raw_ids: set[str] = {
+        it.assignee for it in items if it.assignee
+    }
+    if not raw_ids:
+        return
+
+    user_uuids: list[UUID] = []
+    for rid in raw_ids:
+        try:
+            user_uuids.append(UUID(rid))
+        except (ValueError, AttributeError):
+            continue
+    if not user_uuids:
+        return
+
+    # staff_members.name 优先
+    staff_rows = await db.execute(
+        select(StaffMember.user_id, StaffMember.name).where(
+            StaffMember.user_id.in_(user_uuids),
+            StaffMember.is_deleted == False,  # noqa: E712
+        )
+    )
+    name_map: dict[str, str] = {
+        str(uid): name for uid, name in staff_rows.all() if uid
+    }
+
+    # 补齐 staff 缺失的：用 users.username 降级
+    missing = [u for u in user_uuids if str(u) not in name_map]
+    if missing:
+        user_rows = await db.execute(
+            select(User.id, User.username).where(User.id.in_(missing))
+        )
+        for uid, uname in user_rows.all():
+            name_map[str(uid)] = uname
+
+    for it in items:
+        if it.assignee and it.assignee in name_map:
+            it.assignee = name_map[it.assignee]
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +164,15 @@ async def get_archive_completeness_report(
 
     # --- 4. Stale 底稿 ---
     stale_items = await _check_stale(db, project_id)
+
+    # 底稿编号自然排序（A1→A2→...→A10，按字母前缀+数字，不跳号）
+    for _items in (missing_items, unsigned_items, unresolved_items, stale_items):
+        _items.sort(key=lambda it: _wp_sort_key(it.wp_code))
+
+    # 责任人 UUID → 中文姓名（staff_members.name 优先，降级 users.username）
+    await _resolve_assignee_names(
+        db, [*missing_items, *unsigned_items, *unresolved_items, *stale_items]
+    )
 
     # Build categories
     categories = [

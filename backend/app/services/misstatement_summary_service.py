@@ -45,7 +45,10 @@ class MisstatementSummaryService:
             .where(
                 Adjustment.project_id == project_id,
                 Adjustment.year == year,
-                Adjustment.review_status == "passed",
+                # 未更正错报：review_status 枚举无 'passed'（draft/pending_review/
+                # approved/rejected）。"未更正/Passed"的语义标记是 V078 的
+                # passed_reason 列（管理层不予更正原因）非空。
+                Adjustment.passed_reason.isnot(None),
                 Adjustment.is_deleted == sa.false(),
             )
             .order_by(Adjustment.adjustment_no)

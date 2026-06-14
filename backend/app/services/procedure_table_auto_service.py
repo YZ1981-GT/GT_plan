@@ -182,10 +182,13 @@ class ProcedureTableService:
     async def _count_adjustments(self, project_id: UUID, year: int, adj_type: str) -> int:
         """按类型统计调整分录数"""
         if adj_type == "passed":
+            # 未更正错报：review_status 枚举无 'passed' 值（draft/pending_review/
+            # approved/rejected）。"未更正"的语义标记是 V078 的 passed_reason 列
+            # （管理层不予更正原因）非空 → 该调整被 Passed（不予更正）。
             stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
                 Adjustment.project_id == project_id,
                 Adjustment.year == year,
-                Adjustment.review_status == "passed",
+                Adjustment.passed_reason.isnot(None),
                 Adjustment.is_deleted == sa.false(),
             )
         else:

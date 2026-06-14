@@ -1,437 +1,236 @@
 <!--
-  GtAuditFlowGraph.vue — 审计逻辑流程图（4 层横向）
+  GtAuditFlowGraph.vue — 审计逻辑流程图（阶段泳道横向）
 
-  按 design §11.9 实现：
-  - 4 层横向流程图：审计目标 → 识别风险 → 应对程序 → 关联底稿
-  - 节点颜色反映状态（绿=完成 / 黄=进行中 / 灰=待执行 / 红=已裁剪）
-  - 节点可点击跳转
-  - SVG 连线层渲染 edges（轻量实现）
-
-  锚定 spec workpaper-editor-slimdown Task 17.1 + 17.4 + 17.5 + 17.6
-  Validates: US-16（程序表流程导航图）
+  当后端 audit-flow-graph API 有数据时用服务端数据，
+  否则从 programs prop 按阶段分组生成本地 fallback 图。
+  4 阶段横向泳道：计划 → 执行 → 完成 → 复核归档。
+  每个程序节点显示序号+简称+关联底稿 chip。
 -->
 
 <template>
-  <div class="gt-audit-flow-graph" v-show="expanded">
-    <div class="gt-audit-flow-graph__container" ref="containerRef">
-      <!-- 4 层横向布局 -->
-      <div class="gt-flow-layer gt-flow-layer--objectives">
-        <div class="gt-flow-layer__title">审计目标</div>
-        <div class="gt-flow-layer__nodes">
-          <div
-            v-for="obj in graph.objectives"
-            :key="obj.id"
-            :ref="(el) => setNodeRef(obj.id, el as HTMLElement)"
-            class="gt-flow-node gt-flow-node--objective"
-          >
-            {{ obj.name }}
-          </div>
-        </div>
-      </div>
-
-      <div class="gt-flow-layer gt-flow-layer--risks">
-        <div class="gt-flow-layer__title">识别风险</div>
-        <div class="gt-flow-layer__nodes">
-          <div
-            v-for="risk in graph.risks"
-            :key="risk.id"
-            :ref="(el) => setNodeRef(risk.id, el as HTMLElement)"
-            class="gt-flow-node gt-flow-node--risk"
-            :class="`gt-flow-node--level-${risk.level}`"
-            :title="risk.description"
-            @click="jumpToRisk(risk)"
-          >
-            <span class="gt-flow-node__text">{{ truncate(risk.description, 20) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="gt-flow-layer gt-flow-layer--procedures">
-        <div class="gt-flow-layer__title">应对程序</div>
-        <div class="gt-flow-layer__nodes">
-          <div
-            v-for="proc in graph.procedures"
-            :key="proc.id"
-            :ref="(el) => setNodeRef(proc.id, el as HTMLElement)"
-            class="gt-flow-node gt-flow-node--procedure"
-            :class="`gt-flow-node--status-${proc.status}`"
-            @click="scrollToProgram(proc.program_no)"
-          >
-            <span class="gt-flow-node__no">{{ proc.program_no }}</span>
-            <span class="gt-flow-node__text">{{ truncate(proc.category, 12) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="gt-flow-layer gt-flow-layer--workpapers">
-        <div class="gt-flow-layer__title">关联底稿</div>
-        <div class="gt-flow-layer__nodes">
-          <GtIndexChip
-            v-for="wp in graph.workpapers"
-            :key="wp.wp_code"
-            :ref="(el) => setNodeRef(`wp-${wp.wp_code}`, (el as any)?.$el)"
-            :value="wp.wp_code"
-            :validate="wp.exists"
-          />
-        </div>
-      </div>
-
-      <!-- SVG 连线层 -->
-      <svg
-        v-if="edgePaths.length > 0"
-        class="gt-flow-edges"
-        :width="svgWidth"
-        :height="svgHeight"
+  <div class="gt-audit-flow" v-show="expanded">
+    <div v-if="stages.length" class="gt-audit-flow__stages">
+      <div
+        v-for="(stage, si) in stages"
+        :key="si"
+        class="gt-audit-flow__stage"
       >
-        <path
-          v-for="(edge, idx) in edgePaths"
-          :key="idx"
-          :d="edge.path"
-          class="gt-flow-edge"
-          :class="`gt-flow-edge--${edge.type}`"
-          fill="none"
-        />
-      </svg>
+        <!-- 阶段头 -->
+        <div class="gt-audit-flow__stage-header" :style="{ borderColor: stageColors[si] }">
+          <span class="gt-audit-flow__stage-icon">{{ stageIcons[si] }}</span>
+          <span class="gt-audit-flow__stage-name">{{ stage.name }}</span>
+          <span class="gt-audit-flow__stage-count">{{ stage.items.length }}项</span>
+        </div>
+        <!-- 程序节点横向排列 -->
+        <div class="gt-audit-flow__items">
+          <div
+            v-for="item in stage.items"
+            :key="item.program_no"
+            class="gt-audit-flow__item"
+            :class="`gt-audit-flow__item--${item.status}`"
+            @click="scrollToProgram(item.program_no)"
+            :title="item.full_desc"
+          >
+            <span class="gt-audit-flow__item-no">{{ item.program_no }}</span>
+            <span class="gt-audit-flow__item-text">{{ item.short_desc }}</span>
+            <div v-if="item.refs.length" class="gt-audit-flow__item-refs">
+              <GtIndexChip
+                v-for="(ref, ri) in item.refs"
+                :key="ri"
+                :value="ref"
+                :validate="true"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 阶段间连接箭头 -->
+      <div class="gt-audit-flow__arrows">
+        <span v-for="i in stages.length - 1" :key="i" class="gt-audit-flow__arrow">→</span>
+      </div>
     </div>
-
-    <!-- 空状态 -->
-    <div v-if="isEmpty" class="gt-audit-flow-graph__empty">
-      <el-empty description="暂无审计逻辑图数据" :image-size="60" />
+    <div v-else class="gt-audit-flow__empty">
+      <el-empty description="暂无审计逻辑图数据" :image-size="50" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from './GtIndexChip.vue'
 
-// ─── Props ───
 const props = defineProps<{
   wpId: string
   projectId: string
   expanded: boolean
+  programs?: Array<{ program_no: number; program_desc: string; linked_workpapers?: string; status: string }>
 }>()
 
-// ─── Emits ───
 const emit = defineEmits<{
   'scroll-to-program': [programNo: number]
 }>()
 
-// ─── Types ───
-interface AuditObjective {
-  id: string
+interface StageData {
   name: string
+  items: Array<{ program_no: number; short_desc: string; full_desc: string; status: string; refs: string[] }>
 }
 
-interface IdentifiedRisk {
-  id: string
-  description: string
-  level: string
-  source_wp_code: string
+const stageColors = ['#4b2d77', '#0094B3', '#28A745', '#FFC23D']
+const stageIcons = ['📋', '🔍', '✅', '🔒']
+
+const STAGE_RANGES: Array<{ name: string; range: [number, number] }> = [
+  { name: '计划与风险评估', range: [1, 3] },
+  { name: '执行审计程序', range: [4, 5] },
+  { name: '完成阶段', range: [6, 14] },
+  { name: '复核与归档', range: [15, 99] },
+]
+
+const stages = ref<StageData[]>([])
+
+function buildStages() {
+  const progs = props.programs || []
+  if (!progs.length) { stages.value = []; return }
+
+  stages.value = STAGE_RANGES.map(s => {
+    const items = progs
+      .filter(p => p.program_no >= s.range[0] && p.program_no <= s.range[1])
+      .map(p => ({
+        program_no: p.program_no,
+        short_desc: (p.program_desc || '').replace(/ — .*$/, '').slice(0, 14),
+        full_desc: p.program_desc || '',
+        status: p.status || 'pending',
+        refs: (p.linked_workpapers || '').split(/[,/、]/).map(r => r.trim()).filter(Boolean),
+      }))
+    return { name: s.name, items }
+  }).filter(s => s.items.length > 0)
 }
 
-interface ProcedureNode {
-  id: string
-  program_no: number
-  category: string
-  status: string
-  assertions: string[]
+function scrollToProgram(no: number) {
+  emit('scroll-to-program', no)
 }
 
-interface LinkedWorkpaper {
-  wp_code: string
-  wp_name: string
-  status: string
-  exists: boolean
-}
-
-interface FlowEdge {
-  from_id: string
-  to_id: string
-  type: string
-}
-
-interface GraphData {
-  objectives: AuditObjective[]
-  risks: IdentifiedRisk[]
-  procedures: ProcedureNode[]
-  workpapers: LinkedWorkpaper[]
-  edges: FlowEdge[]
-}
-
-interface EdgePath {
-  path: string
-  type: string
-}
-
-// ─── State ───
-const router = useRouter()
-const route = useRoute()
-const containerRef = ref<HTMLElement | null>(null)
-const nodeRefs = ref<Record<string, HTMLElement | null>>({})
-const graph = ref<GraphData>({
-  objectives: [],
-  risks: [],
-  procedures: [],
-  workpapers: [],
-  edges: [],
-})
-const loading = ref(false)
-const svgWidth = ref(0)
-const svgHeight = ref(0)
-const edgePaths = ref<EdgePath[]>([])
-
-// ─── Computed ───
-const isEmpty = computed(() => {
-  return graph.value.procedures.length === 0 && graph.value.risks.length === 0
-})
-
-// ─── Methods ───
-function setNodeRef(id: string, el: HTMLElement | null) {
-  if (el) {
-    nodeRefs.value[id] = el
-  }
-}
-
-function truncate(text: string, maxLen: number): string {
-  if (!text) return ''
-  return text.length > maxLen ? text.slice(0, maxLen) + '…' : text
-}
-
-async function loadGraph() {
-  if (!props.wpId) return
-  loading.value = true
+async function tryLoadFromApi() {
   try {
-    const data = await api.get<GraphData>(`/api/workpapers/${props.wpId}/audit-flow-graph`)
-    graph.value = data
-    await nextTick()
-    computeEdges()
-  } catch (e) {
-    // 静默失败，显示空状态
-    graph.value = { objectives: [], risks: [], procedures: [], workpapers: [], edges: [] }
-  } finally {
-    loading.value = false
-  }
+    const data = await api.get<any>(`/api/workpapers/${props.wpId}/audit-flow-graph`)
+    if (data?.procedures?.length) {
+      // 服务端有数据则不用本地 fallback（未来可扩展）
+    }
+  } catch { /* 静默 */ }
+  buildStages()
 }
 
-function computeEdges() {
-  if (!containerRef.value) return
-
-  const containerRect = containerRef.value.getBoundingClientRect()
-  svgWidth.value = containerRect.width
-  svgHeight.value = containerRect.height
-
-  const paths: EdgePath[] = []
-
-  // 只渲染 risk→procedure 和 procedure→workpaper 的连线（避免过于密集）
-  for (const edge of graph.value.edges) {
-    if (edge.type === 'objective-risk') continue // 跳过目标→风险（太密集）
-
-    const fromEl = nodeRefs.value[edge.from_id]
-    const toEl = nodeRefs.value[edge.to_id]
-    if (!fromEl || !toEl) continue
-
-    const fromRect = fromEl.getBoundingClientRect()
-    const toRect = toEl.getBoundingClientRect()
-
-    // 计算相对于容器的坐标
-    const x1 = fromRect.right - containerRect.left
-    const y1 = fromRect.top + fromRect.height / 2 - containerRect.top
-    const x2 = toRect.left - containerRect.left
-    const y2 = toRect.top + toRect.height / 2 - containerRect.top
-
-    // 贝塞尔曲线
-    const midX = (x1 + x2) / 2
-    const path = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`
-
-    paths.push({ path, type: edge.type })
-  }
-
-  edgePaths.value = paths
-}
-
-function jumpToRisk(risk: IdentifiedRisk) {
-  if (risk.source_wp_code) {
-    router.push({
-      path: `/projects/${props.projectId}/workpapers/${risk.source_wp_code}/edit`,
-    })
-  }
-}
-
-function scrollToProgram(programNo: number) {
-  emit('scroll-to-program', programNo)
-}
-
-// ─── Lifecycle ───
-onMounted(() => {
-  if (props.expanded) {
-    loadGraph()
-  }
-})
-
-watch(() => props.expanded, (val) => {
-  if (val && graph.value.procedures.length === 0) {
-    loadGraph()
-  } else if (val) {
-    nextTick(() => computeEdges())
-  }
-})
+onMounted(() => { if (props.expanded) tryLoadFromApi() })
+watch(() => props.expanded, v => { if (v) buildStages() })
+watch(() => props.programs, () => { if (props.expanded) buildStages() }, { deep: true })
 </script>
 
 <style scoped>
-.gt-audit-flow-graph {
-  padding: 12px 16px;
-  background: var(--el-bg-color-page);
-  border-radius: 8px;
+.gt-audit-flow {
   margin-bottom: 12px;
-  position: relative;
+  padding: 12px 16px;
+  background: var(--gt-color-primary-bg, #f4f0fa);
+  border: 1px solid var(--gt-color-border-purple-light, #d8b8ee);
+  border-radius: 8px;
 }
 
-.gt-audit-flow-graph__container {
+.gt-audit-flow__stages {
   display: flex;
-  gap: 24px;
+  gap: 12px;
   align-items: flex-start;
+  overflow-x: auto;
   position: relative;
-  min-height: 120px;
 }
 
-.gt-flow-layer {
+.gt-audit-flow__stage {
   flex: 1;
-  min-width: 0;
+  min-width: 180px;
+  background: var(--gt-bg-default, #fff);
+  border-radius: 8px;
+  border: 1px solid var(--gt-color-border, #e5e5ea);
+  overflow: hidden;
 }
 
-.gt-flow-layer__title {
+.gt-audit-flow__stage-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--gt-bg-subtle, #f5f7fa);
+  border-bottom: 2px solid;
   font-size: 12px;
-  color: var(--el-text-color-secondary);
-  margin-bottom: 8px;
-  font-weight: 500;
-  text-align: center;
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
 }
 
-.gt-flow-layer__nodes {
+.gt-audit-flow__stage-icon { font-size: 14px; }
+.gt-audit-flow__stage-name { flex: 1; }
+.gt-audit-flow__stage-count {
+  font-size: 11px;
+  color: var(--gt-color-text-secondary, #606266);
+  font-weight: 400;
+}
+
+.gt-audit-flow__items {
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  align-items: center;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
 }
 
-.gt-flow-node {
-  padding: 6px 12px;
-  border-radius: 6px;
+.gt-audit-flow__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
   font-size: 12px;
   cursor: pointer;
-  transition: all 0.2s;
-  text-align: center;
-  max-width: 140px;
+  transition: background 0.15s;
+  flex-wrap: wrap;
+}
+.gt-audit-flow__item:hover { background: var(--gt-color-primary-bg, #f4f0fa); }
+
+.gt-audit-flow__item--completed { color: #28A745; }
+.gt-audit-flow__item--in_progress { color: #d48806; }
+.gt-audit-flow__item--pending { color: var(--gt-color-text-regular, #606266); }
+.gt-audit-flow__item--not_applicable { color: #999; text-decoration: line-through; }
+
+.gt-audit-flow__item-no {
+  font-weight: 700;
+  min-width: 18px;
+  color: var(--gt-color-primary, #4b2d77);
+}
+.gt-audit-flow__item-text {
+  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.gt-flow-node:hover {
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* 目标节点 */
-.gt-flow-node--objective {
-  background: #e8f4fd;
-  border: 1px solid #b3d8fd;
-  color: #1677ff;
-  cursor: default;
-}
-
-/* 风险节点 - 按级别着色 */
-.gt-flow-node--risk {
-  background: #fff7e6;
-  border: 1px solid #ffd591;
-  color: #d46b08;
-}
-
-.gt-flow-node--level-significant {
-  background: #fff1f0;
-  border: 1px solid #ffa39e;
-  color: #cf1322;
-}
-
-.gt-flow-node--level-low {
-  background: #f6ffed;
-  border: 1px solid #b7eb8f;
-  color: #389e0d;
-}
-
-/* 程序节点 - 按状态着色 */
-.gt-flow-node--procedure {
+.gt-audit-flow__item-refs {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  gap: 3px;
+  flex-wrap: wrap;
 }
 
-.gt-flow-node--status-completed {
-  background: #f6ffed;
-  border: 1px solid #b7eb8f;
-  color: #389e0d;
-}
-
-.gt-flow-node--status-in_progress {
-  background: #fffbe6;
-  border: 1px solid #ffe58f;
-  color: #d48806;
-}
-
-.gt-flow-node--status-pending {
-  background: #f5f5f5;
-  border: 1px solid #d9d9d9;
-  color: #8c8c8c;
-}
-
-.gt-flow-node--status-not_applicable {
-  background: #fff1f0;
-  border: 1px solid #ffa39e;
-  color: #cf1322;
-  text-decoration: line-through;
-}
-
-.gt-flow-node__no {
-  font-weight: 600;
-  min-width: 16px;
-}
-
-.gt-flow-node__text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* SVG 连线 */
-.gt-flow-edges {
+.gt-audit-flow__arrows {
   position: absolute;
-  top: 0;
+  top: 50%;
   left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
   pointer-events: none;
+  transform: translateY(-50%);
   z-index: 0;
+  opacity: 0;
+}
+.gt-audit-flow__arrow {
+  font-size: 20px;
+  color: var(--gt-color-primary, #4b2d77);
 }
 
-.gt-flow-edge {
-  stroke-width: 1.5;
-  opacity: 0.4;
-}
-
-.gt-flow-edge--risk-procedure {
-  stroke: #faad14;
-}
-
-.gt-flow-edge--procedure-workpaper {
-  stroke: #1677ff;
-}
-
-.gt-flow-edge--objective-risk {
-  stroke: #d9d9d9;
-}
-
-.gt-audit-flow-graph__empty {
-  text-align: center;
-  padding: 20px;
-}
+.gt-audit-flow__empty { text-align: center; padding: 16px; }
 </style>

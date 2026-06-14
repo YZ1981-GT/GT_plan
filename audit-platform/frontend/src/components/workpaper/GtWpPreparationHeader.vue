@@ -99,7 +99,6 @@ watch(() => props.wpId, (id) => {
   border: 1px solid var(--gt-color-border-purple-light, #d8b8ee);
   border-radius: 6px;
   background: var(--gt-color-primary-bg, #f4f0fa);
-  overflow: hidden;
 }
 .gt-wp-prep.is-collapsed {
   min-height: 36px;

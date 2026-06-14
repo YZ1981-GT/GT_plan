@@ -375,8 +375,8 @@
           <div class="gt-board-section">
             <h4 class="gt-board-section__title">📋 底稿分配明细</h4>
             <div v-if="wpDetailLoading" style="padding: 12px 0"><el-skeleton :rows="4" animated /></div>
-            <el-table v-else-if="wpDetailList.length" :data="wpDetailList" size="small" stripe :max-height="360" style="width: 100%">
-              <el-table-column prop="wp_code" label="编号" width="70" sortable />
+            <el-table v-else-if="wpDetailList.length" :data="wpDetailList" size="small" stripe :max-height="360" style="width: 100%" class="gt-compact-table gt-tb-font-md">
+              <el-table-column prop="wp_code" label="编号" width="80" sortable />
               <el-table-column prop="wp_name" label="底稿名称" min-width="140" show-overflow-tooltip />
               <el-table-column prop="cycle" label="循环" width="50" align="center" />
               <el-table-column prop="preparer_name" label="编制人" width="80">
@@ -784,7 +784,16 @@ watch(() => props.project?.id, async (newId) => {
   wpDetailLoading.value = true
   try {
     const wpListRaw = await api.get(`/api/projects/${newId}/working-papers-kanban`, { validateStatus: (s: number) => s < 600 })
-    const list = Array.isArray(wpListRaw) ? wpListRaw : (wpListRaw?.items ?? wpListRaw?.data ?? [])
+    // working-papers-kanban 返回 { kanban: {not_started/in_progress/under_review/completed: [...]}, stats }，
+    // 非数组也非 items/data。需把 4 个状态列拍平成一个底稿列表。
+    let list: any[]
+    if (Array.isArray(wpListRaw)) {
+      list = wpListRaw
+    } else if (wpListRaw?.kanban && typeof wpListRaw.kanban === 'object') {
+      list = Object.values(wpListRaw.kanban).flat() as any[]
+    } else {
+      list = wpListRaw?.items ?? wpListRaw?.data ?? []
+    }
     wpDetailList.value = list.map((item: any) => ({
       wp_code: item.wp_code || item.code || '-',
       wp_name: item.wp_name || item.name || '-',
@@ -792,7 +801,7 @@ watch(() => props.project?.id, async (newId) => {
       preparer_name: item.preparer_name || item.assigned_to_name || '-',
       reviewer_name: item.reviewer_name || '-',
       status: item.status || item.wp_status || 'draft',
-    }))
+    })).sort((a: any, b: any) => wpCodeCompare(a.wp_code, b.wp_code))
     // 汇总人员统计
     const staffMap = new Map<string, { name: string; as_preparer: number; prepared_done: number; as_reviewer: number; reviewed_done: number }>()
     const doneStatuses = new Set(['prepared', 'reviewed', 'archived', 'completed', 'signed_off'])
@@ -910,6 +919,25 @@ function attachTypeLabel(t: string) {
 }
 
 function wpStatusLabel(s: string) {
+  // 自然排序：letter 前缀 + 数字段 + 可选后缀（A1 < A2 < A5 < A10 < A13 < A21）。
+  return _wpStatusLabelImpl(s)
+}
+
+/** 底稿编号自然排序比较器：拆 letter/number/suffix 三段，数字段按数值比。 */
+function wpCodeCompare(a: string, b: string): number {
+  const parse = (code: string) => {
+    const m = /^([A-Za-z]+)(\d+)?(.*)$/.exec((code || '').trim())
+    if (!m) return { letter: code || '', num: Number.MAX_SAFE_INTEGER, rest: '' }
+    return { letter: m[1] || '', num: m[2] ? parseInt(m[2], 10) : -1, rest: m[3] || '' }
+  }
+  const pa = parse(a)
+  const pb = parse(b)
+  if (pa.letter !== pb.letter) return pa.letter.localeCompare(pb.letter)
+  if (pa.num !== pb.num) return pa.num - pb.num
+  return pa.rest.localeCompare(pb.rest)
+}
+
+function _wpStatusLabelImpl(s: string) {
   const m: Record<string, string> = {
     draft: '草稿', in_progress: '进行中', prepared: '已编制',
     reviewed: '已复核', archived: '已归档', completed: '已完成',

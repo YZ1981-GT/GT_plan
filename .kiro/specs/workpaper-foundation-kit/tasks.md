@@ -13,7 +13,7 @@
     - _Requirements: 2.1_
   - [x] 1.3 新建 `field_override_service.py`：get/get_batch/set/merge
     - _Requirements: 2.3, 2.4, 2.5_
-  - [x] 1.4 API 端点：GET/POST `/api/workpapers/field-overrides`
+  - [x] 1.4 API 端点：GET/POST `/api/workpapers/field-overrides`（router 已在 `router_registry/workpaper.py` 数据组注册，2026-06-14 补注册修复 404）
     - _Requirements: 2.3_
   - [x]* 1.5 set/get 往返 PBT（随机 scope+item_key+field+value）
     - _Requirements: 2.3, 2.4_

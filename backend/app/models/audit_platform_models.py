@@ -678,7 +678,8 @@ class Adjustment(Base):
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     # V078: passed（未更正错报）相关
     passed_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    passed_communication_date: Mapped[date | None] = mapped_column(nullable=True)
+    # DB 列为 TIMESTAMPTZ（V078），service 写入完整 datetime，故 ORM 用 datetime 对齐
+    passed_communication_date: Mapped[datetime | None] = mapped_column(nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )

@@ -43,7 +43,7 @@ TB 完整视图服务 + 期初核对 + 趋势分析增强 + 比率分析 + 分�
     - _Requirements: 5.1_
 
 - [x] 6. API 端点
-  - [x] 6.1 full-tb/opening-reconcile/bs-trend/pl-trend/ratio 端点
+  - [x] 6.1 full-tb/opening-reconcile/bs-trend/pl-trend/ratio 端点（`wp_report_analysis` router 已在 `router_registry/workpaper.py` 数据组注册，2026-06-14 补注册修复 404）
     - _Requirements: 1.x~5.x_
   - [x] 6.2 分析说明读写端点
     - _Requirements: 3.3_

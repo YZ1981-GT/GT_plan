@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import ReviewPanel from '@/components/workpaper/ReviewPanel.vue'
+import ReviewPanel from '@/components/workpaper/WorkpaperReviewPanel.vue'
 import CompletionChecklistDialog from '@/components/workpaper/CompletionChecklistDialog.vue'
 import IndependenceSigning from '@/components/workpaper/IndependenceSigning.vue'
 

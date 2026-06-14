@@ -357,7 +357,7 @@ async def _build_preparation_info(
     try:
         wp_row = (
             await db.execute(
-                sa.select(WorkingPaper.created_at, WpIndex.wp_code)
+                sa.select(WorkingPaper.created_at, WpIndex.wp_code, WorkingPaper.assigned_to)
                 .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
                 .where(WorkingPaper.id == wp_id)
             )
@@ -366,6 +366,23 @@ async def _build_preparation_info(
             if wp_row[0]:
                 info["prep_date"] = str(wp_row[0])[:10]
             info["index_no"] = wp_row[1] or ""
+            # 底稿级编制人优先（assigned_to）：表头编制人应是本底稿被分配人，
+            # 而非项目级 preparer。仅当底稿未分配时才回退到项目级 preparer。
+            wp_assignee_id = wp_row[2]
+            if wp_assignee_id:
+                try:
+                    assignee_row = (
+                        await db.execute(
+                            sa.text(
+                                "SELECT username FROM users WHERE id = :uid"
+                            ),
+                            {"uid": str(wp_assignee_id)},
+                        )
+                    ).first()
+                    if assignee_row and assignee_row[0]:
+                        info["preparer"] = assignee_row[0]
+                except Exception as e:
+                    logger.debug("preparation_info: 底稿级编制人取名降级: %s", e)
     except Exception as e:
         logger.warning("preparation_info: 底稿信息失败: %s", e)
 
@@ -451,23 +468,65 @@ async def _generate_a_program_data(
     file_path: str | None,
     sheet_name: str,
     existing: dict | None = None,
+    *,
+    db: AsyncSession | None = None,
+    project_id: UUID | None = None,
+    wp_code: str | None = None,
+    year: int | None = None,
+    business_category: str = "C",
 ) -> dict:
-    """当 a-program-console sheet 无持久化 programs 时，从模板 xlsx 提取程序清单。
+    """当 a-program-console sheet 无持久化 programs 时，生成程序清单。
 
-    返回结构与 GtAProgramConsole.vue 的 AProgramHtmlData 接口一致：
-    {
-      programs: [ { id, program_no, program_desc, program_category,
-                    assertions, linked_workpapers, status } ],
-      trim_decisions: [],
-      signatures: [...]（保留 existing 中的签字信息）
-    }
+    两条数据源（优先级）：
+    1. **procedure_table_templates.json 自动汇总**（A1~A17）：当 wp_code 命中模板且
+       提供了 db+project_id 时，用 `ProcedureTableService` 生成带自动值的程序行
+       （如 A2 的 AJE/RJE/Passed 笔数实时统计），summary 拼进 program_desc，
+       ref_index 作为 linked_workpapers 渲染可点击索引 chip。
+       （spec workpaper-procedure-table-html Req4 接线）
+    2. **模板 xlsx 提取**（兜底）：无匹配模板或缺 db 时，从底稿 xlsx 解析程序清单。
 
+    返回结构与 GtAProgramConsole.vue 的 AProgramHtmlData 接口一致。
     解析失败 / 文件缺失 → programs 为空列表（前端仍显示空态，不报错）。
     """
     from app.services.wp_program_extract import extract_program_rows
 
     programs: list[dict] = []
-    if file_path:
+
+    # ─── 优先：procedure_table 模板 + 自动汇总（A1~A17 接线） ─────────────
+    if db is not None and project_id is not None and wp_code:
+        try:
+            from app.services.procedure_table_auto_service import (
+                ProcedureTableService,
+                get_template,
+            )
+
+            if get_template(wp_code) is not None:
+                svc = ProcedureTableService(db)
+                table = await svc.get_procedure_table(
+                    project_id, year or 0, wp_code, business_category
+                )
+                for it in table.get("items", []):
+                    summary = it.get("summary")
+                    desc = it.get("content", "")
+                    if summary:
+                        desc = f"{desc} — {summary}"
+                    applicable = it.get("applicable")
+                    status = "not_applicable" if applicable == "na" else "pending"
+                    programs.append({
+                        "id": f"row-{it.get('seq')}",
+                        "program_no": it.get("seq"),
+                        "program_desc": desc,
+                        "program_category": "",
+                        "assertions": {},
+                        "linked_workpapers": it.get("ref_index", "") or "",
+                        "status": status,
+                    })
+        except Exception as e:  # noqa: BLE001 — 降级到 xlsx 提取，不阻塞渲染
+            logger.warning("A-程序表模板自动汇总失败 %s: %s", wp_code, e)
+            programs = []
+
+    # ─── 兜底：从模板 xlsx 提取 ─────────────────────────────────────────
+    if not programs and file_path:
         try:
             programs = extract_program_rows(file_path, sheet_name)
         except Exception as e:  # noqa: BLE001 — 降级不阻塞渲染
@@ -1046,6 +1105,27 @@ async def get_render_config(
 
     sheets: list[dict] = []
 
+    # ─── 项目年度 + 业务分类（供 A-程序表自动汇总用） ─────────────────────
+    # year 用于按年度统计调整分录；business_category 用于程序适用性判定。
+    _prog_year: int | None = None
+    _prog_business_category: str = "C"
+    try:
+        pj_row = (
+            await db.execute(
+                sa.text(
+                    "SELECT EXTRACT(YEAR FROM audit_period_end)::int, "
+                    "COALESCE(business_category, 'C') "
+                    "FROM projects WHERE id = :pid"
+                ),
+                {"pid": str(project_id)},
+            )
+        ).first()
+        if pj_row:
+            _prog_year = pj_row[0]
+            _prog_business_category = pj_row[1] or "C"
+    except Exception as e:  # noqa: BLE001 — 降级，不阻塞渲染
+        logger.debug("render-config 年度/业务分类解析降级: %s", e)
+
     # 模板文件路径解析：优先用 working_paper.file_path（项目已生成的底稿文件），
     # 缺失/不存在时回退到 wp_templates/ 标准模板库（按 wp_code 查找）。
     # 这样即使底稿未初始化文件（file_path 为空），A-程序表/审定表/网格仍能从
@@ -1137,6 +1217,11 @@ async def get_render_config(
                 file_path=_template_file_path,
                 sheet_name=classification.sheet_name,
                 existing=sheet_html_data if isinstance(sheet_html_data, dict) else None,
+                db=db,
+                project_id=project_id,
+                wp_code=wp_code,
+                year=_prog_year,
+                business_category=_prog_business_category,
             )
 
         # ─── 审定表（F-审定表）自动生成：结构化可编辑行 + TB 取数 ──────────

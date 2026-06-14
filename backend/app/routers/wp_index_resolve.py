@@ -81,6 +81,7 @@ class ResolveResponse(BaseModel):
     ns: str
     layer: int
     target: str
+    wp_id: str | None = None
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -126,14 +127,8 @@ def _parse_ref(ref: str) -> tuple[str, int, str] | None:
         return None
 
     if LOOSE_RE.match(normalized):
-        # Determine if it's a sheet ref or wp ref
-        # Sheet refs: D2-1, D2-1-1, D2A (letter suffix)
-        # WP refs: D2, E1, F2 (letter + digits only)
-        if re.match(r"^[A-S]\d+(?:-\d+)+$", normalized, re.IGNORECASE):
-            return ("sheet", 2, normalized)
-        if re.match(r"^[A-S]\d+[A-Z]$", normalized, re.IGNORECASE):
-            return ("sheet", 2, normalized)
-        # Main workpaper code
+        # 所有松散匹配的底稿编码统一作 wp 引用（Layer 3）。
+        # A2-2/D2-1/A1-17 等在致同体系中都是独立底稿编号，不是同底稿内的 sheet。
         return ("wp", 3, normalized)
 
     return None
@@ -144,28 +139,24 @@ async def _check_wp_exists(
     ns: str,
     target: str,
     project_id: UUID | None,
-) -> tuple[bool, bool, str | None]:
+) -> tuple[bool, bool, str | None, str | None]:
     """Check if a wp/sheet/cell target exists in wp_index.
 
-    Returns (exists, trimmed, reason).
+    Returns (exists, trimmed, reason, wp_id).
     """
     if not project_id:
-        # Without project_id, cannot validate wp_index
-        return (True, False, None)
+        return (True, False, None, None)
 
     # Determine the wp_code to look up
     if ns == "wp":
         wp_code = target.upper()
     elif ns == "sheet":
-        # Sheet refs like D2-1 → wp_code is the prefix (D2)
-        # Extract main wp_code: take everything before the first dash-number
         match = re.match(r"^([A-S]\d+)", target, re.IGNORECASE)
         if match:
             wp_code = match.group(1).upper()
         else:
             wp_code = target.upper()
     elif ns == "cell":
-        # Cell refs like D2-1!B23 → extract sheet part → extract wp_code
         sheet_part = target.split("!")[0] if "!" in target else target
         match = re.match(r"^([A-S]\d+)", sheet_part, re.IGNORECASE)
         if match:
@@ -173,7 +164,7 @@ async def _check_wp_exists(
         else:
             wp_code = sheet_part.upper()
     else:
-        return (True, False, None)
+        return (True, False, None, None)
 
     # Query wp_index for existence
     stmt = select(WpIndex).where(
@@ -185,9 +176,20 @@ async def _check_wp_exists(
     wp_index = result.scalar_one_or_none()
 
     if not wp_index:
-        return (False, False, None)
+        return (False, False, None, None)
 
-    # Check if the workpaper has been trimmed (ProcedureInstance.status='not_applicable')
+    # Resolve wp_id: get working_paper.id for this wp_index entry
+    from app.models.workpaper_models import WorkingPaper
+    wp_stmt = select(WorkingPaper.id).where(
+        WorkingPaper.wp_index_id == wp_index.id,
+        WorkingPaper.project_id == project_id,
+        WorkingPaper.is_deleted == False,  # noqa: E712
+    ).limit(1)
+    wp_result = await db.execute(wp_stmt)
+    wp_row = wp_result.scalar_one_or_none()
+    wp_id = str(wp_row) if wp_row else None
+
+    # Check if the workpaper has been trimmed
     trim_stmt = select(ProcedureInstance).where(
         ProcedureInstance.project_id == project_id,
         ProcedureInstance.wp_code == wp_code,
@@ -199,9 +201,9 @@ async def _check_wp_exists(
 
     if trim_instance:
         reason = trim_instance.skip_reason
-        return (True, True, reason)
+        return (True, True, reason, wp_id)
 
-    return (True, False, None)
+    return (True, False, None, wp_id)
 
 
 # ─── Endpoint ────────────────────────────────────────────────────────────────
@@ -247,14 +249,15 @@ async def resolve_wp_index(
         )
 
     # wp/sheet/cell namespaces — validate against wp_index
-    exists, trimmed, reason = await _check_wp_exists(db, ns, target, project_id)
+    exists, trimmed, reason, wp_id = await _check_wp_exists(db, ns, target, project_id)
 
     return ResolveResponse(
         exists=exists,
         trimmed=trimmed,
-        reason=reason,
-        empty=False,
         ns=ns,
         layer=layer,
         target=target,
+        reason=reason,
+        empty=False,
+        wp_id=wp_id,
     )

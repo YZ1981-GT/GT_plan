@@ -400,7 +400,7 @@
     <!-- R7-S3-10 Task 49-50：跨表核对面板 -->
     <div v-if="activeTab === 'cross_check'" class="gt-rv-cross-check">
       <h3 style="margin: 0 0 16px; font-size: var(--gt-font-size-md)">⚖️ 跨表核对（7 条关键等式）</h3>
-      <el-table :data="crossCheckResults" border size="small" style="width: 100%"
+      <el-table :data="crossCheckResults" border size="small" style="width: 100%" class="gt-compact-table gt-tb-font-md"
         :cell-class-name="rvCellClassName"
         @cell-click="onRvCellClick"
         @cell-contextmenu="onRvCellContextMenu">

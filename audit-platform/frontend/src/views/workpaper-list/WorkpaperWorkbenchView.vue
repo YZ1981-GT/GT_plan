@@ -26,8 +26,8 @@
         </div>
       </div>
       <div class="gt-wpb-workbench-list">
-        <el-table :data="pagedWorkbenchData" stripe border style="width: 100%; font-size: 13px" max-height="calc(100vh - 320px)" @row-click="onWorkbenchRowClick">
-          <el-table-column prop="wp_code" label="编码" min-width="90" sortable resizable />
+        <el-table :data="pagedWorkbenchData" stripe border style="width: 100%" max-height="calc(100vh - 320px)" class="gt-compact-table gt-tb-font-md" @row-click="onWorkbenchRowClick">
+          <el-table-column prop="wp_code" label="编码" min-width="90" :sort-method="wpCodeSort" sortable resizable />
           <el-table-column prop="wp_name" label="底稿名称" min-width="220" show-overflow-tooltip resizable />
           <el-table-column prop="cycle_name" label="循环" min-width="110" show-overflow-tooltip resizable />
           <el-table-column prop="status_label" label="状态" min-width="90" resizable>
@@ -309,8 +309,8 @@
 
     <!-- 列表视图（默认） -->
     <div v-else class="gt-wp-list-default">
-      <el-table :data="pagedWorkbenchData" stripe border style="width: 100%; font-size: 13px" max-height="calc(100vh - 280px)" @row-click="onWorkbenchRowClick">
-        <el-table-column prop="wp_code" label="编码" min-width="90" sortable resizable />
+      <el-table :data="pagedWorkbenchData" stripe border style="width: 100%" max-height="calc(100vh - 280px)" class="gt-compact-table gt-tb-font-md" @row-click="onWorkbenchRowClick">
+        <el-table-column prop="wp_code" label="编码" min-width="90" :sort-method="wpCodeSort" sortable resizable />
         <el-table-column prop="wp_name" label="底稿名称" min-width="220" show-overflow-tooltip resizable />
         <el-table-column prop="cycle_name" label="循环" min-width="110" show-overflow-tooltip resizable />
         <el-table-column prop="status_label" label="状态" min-width="90" resizable>
@@ -362,6 +362,25 @@ const wbPage = ref(1)
 const wbPageSize = ref(50)
 
 const COMPLETED_STATUSES = new Set(['review_passed', 'archived'])
+
+/** 底稿编号自然排序比较器：拆 letter/number/suffix 三段，数字段按数值比。 */
+function wpCodeCompare(a: string, b: string): number {
+  const parse = (code: string) => {
+    const m = /^([A-Za-z]+)(\d+)?(.*)$/.exec((code || '').trim())
+    if (!m) return { letter: code || '', num: Number.MAX_SAFE_INTEGER, rest: '' }
+    return { letter: m[1] || '', num: m[2] ? parseInt(m[2], 10) : -1, rest: m[3] || '' }
+  }
+  const pa = parse(a)
+  const pb = parse(b)
+  if (pa.letter !== pb.letter) return pa.letter.localeCompare(pb.letter)
+  if (pa.num !== pb.num) return pa.num - pb.num
+  return pa.rest.localeCompare(pb.rest)
+}
+
+/** el-table-column :sort-method 回调（按 wp_code 自然排序） */
+function wpCodeSort(a: any, b: any): number {
+  return wpCodeCompare(a.wp_code, b.wp_code)
+}
 
 const cycleNameMap: Record<string, string> = {
   A: '完成阶段', B: '计划阶段', C: '控制测试', D: '收入循环',
@@ -437,6 +456,7 @@ const workbenchTableData = computed(() => {
         completed_steps: (w as any).completed_steps || 0,
       }
     })
+    .sort((a, b) => wpCodeCompare(a.wp_code, b.wp_code))
 })
 
 const wbTotal = computed(() => workbenchTableData.value.length)

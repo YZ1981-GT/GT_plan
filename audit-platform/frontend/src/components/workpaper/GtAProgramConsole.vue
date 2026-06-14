@@ -96,6 +96,7 @@
       :wp-id="wpId"
       :project-id="projectId"
       :expanded="flowGraphExpanded"
+      :programs="programs"
       @scroll-to-program="scrollToProgramRow"
     />
 
@@ -109,7 +110,7 @@
       :expand-row-keys="expandedRowKeys"
       @expand-change="handleExpandChange"
       @selection-change="handleSelectionChange"
-      class="gt-a-program-console__table"
+      class="gt-a-program-console__table gt-compact-table gt-tb-font-md"
     >
       <!-- 多选列 -->
       <el-table-column
@@ -119,8 +120,8 @@
         :selectable="isRowSelectable"
       />
 
-      <!-- 展开列 -->
-      <el-table-column type="expand">
+      <!-- 展开列：仅当有历史决策数据时显示（A1 等程序表展开内容与描述重复，无额外价值） -->
+      <el-table-column v-if="hasExpandContent" type="expand">
         <template #default="{ row }">
           <div class="gt-a-program-console__expand-content">
             <div class="gt-a-program-console__expand-desc">
@@ -167,13 +168,19 @@
         show-overflow-tooltip
       />
 
-      <!-- 类别 -->
+      <!-- 类别（仅当有非空分类数据时显示；A1 等总括程序表此列全空则隐藏） -->
       <el-table-column
+        v-if="hasCategory"
         label="类别"
         prop="program_category"
         width="110"
         align="center"
       >
+        <template #header>
+          <el-tooltip content="程序分类：常规★/IPO加项/备选程序/舞弊应对" placement="top">
+            <span>类别</span>
+          </el-tooltip>
+        </template>
         <template #default="{ row }">
           <el-tag
             :type="categoryTagType(row.program_category)"
@@ -185,8 +192,8 @@
         </template>
       </el-table-column>
 
-      <!-- 5 项认定列（表头缩写+tooltip，防止窄容器下被截断） -->
-      <el-table-column label="存在" width="50" align="center" :resizable="false">
+      <!-- 5 项认定列（仅当程序行含 assertions 数据时显示；A1 等总括程序表无此列） -->
+      <el-table-column v-if="hasAssertions" label="存在" width="50" align="center" :resizable="false">
         <template #header>
           <el-tooltip content="存在或发生" placement="top"><span>存在</span></el-tooltip>
         </template>
@@ -194,7 +201,7 @@
           <span v-if="row.assertions?.existence" class="gt-a-program-console__check">√</span>
         </template>
       </el-table-column>
-      <el-table-column label="完整" width="50" align="center" :resizable="false">
+      <el-table-column v-if="hasAssertions" label="完整" width="50" align="center" :resizable="false">
         <template #header>
           <el-tooltip content="完整性" placement="top"><span>完整</span></el-tooltip>
         </template>
@@ -202,7 +209,7 @@
           <span v-if="row.assertions?.completeness" class="gt-a-program-console__check">√</span>
         </template>
       </el-table-column>
-      <el-table-column label="权利" width="50" align="center" :resizable="false">
+      <el-table-column v-if="hasAssertions" label="权利" width="50" align="center" :resizable="false">
         <template #header>
           <el-tooltip content="权利和义务" placement="top"><span>权利</span></el-tooltip>
         </template>
@@ -210,7 +217,7 @@
           <span v-if="row.assertions?.rights" class="gt-a-program-console__check">√</span>
         </template>
       </el-table-column>
-      <el-table-column label="准确" width="50" align="center" :resizable="false">
+      <el-table-column v-if="hasAssertions" label="准确" width="50" align="center" :resizable="false">
         <template #header>
           <el-tooltip content="准确性、计价和分摊" placement="top"><span>准确</span></el-tooltip>
         </template>
@@ -218,7 +225,7 @@
           <span v-if="row.assertions?.accuracy" class="gt-a-program-console__check">√</span>
         </template>
       </el-table-column>
-      <el-table-column label="列报" width="50" align="center" :resizable="false">
+      <el-table-column v-if="hasAssertions" label="列报" width="50" align="center" :resizable="false">
         <template #header>
           <el-tooltip content="列报和披露" placement="top"><span>列报</span></el-tooltip>
         </template>
@@ -597,6 +604,21 @@ const progressPercentage = computed(() => {
   const done = completedCount.value + trimmedCount.value
   return Math.round((done / total) * 100)
 })
+
+/** 当任意程序行有非空 assertions 时显示认定列，否则隐藏（A1 等总括程序表无认定列） */
+const hasAssertions = computed(() =>
+  programs.value.some(p => p.assertions && Object.values(p.assertions).some(Boolean))
+)
+
+/** 当任意程序行有历史决策记录时显示展开列，否则隐藏（避免展开内容与描述重复） */
+const hasExpandContent = computed(() =>
+  programs.value.some(p => p.history && p.history.length > 0)
+)
+
+/** 当任意程序行有非空类别时显示类别列 */
+const hasCategory = computed(() =>
+  programs.value.some(p => p.program_category && p.program_category.trim() !== '')
+)
 
 // ─── Methods ───
 function progressFormat(percentage: number): string {

@@ -70,6 +70,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { parseIndexRef, type ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useWpNavigationHistory } from '@/composables/useWpNavigationHistory'
@@ -227,6 +228,25 @@ async function resolveRef() {
   }
 }
 
+/** 解析 wp_code → wp_id 再跳转到底稿编辑页 */
+async function resolveAndNavigateToWp(wpCode: string, pid: string) {
+  try {
+    const res = await api.get<{ exists: boolean; wp_id?: string }>('/api/wp-index-resolve', {
+      params: { ref: wpCode, project_id: pid },
+    })
+    if (res?.wp_id) {
+      router.push({ path: `/projects/${pid}/workpapers/${res.wp_id}/edit` })
+    } else if (res?.exists === false) {
+      ElMessage.warning(`底稿 ${wpCode} 尚未生成`)
+    } else {
+      // wp_id 未返回但 exists=true，降级用 wp_code 作为 query 跳转到工作台筛选
+      router.push({ path: `/projects/${pid}/workpapers`, query: { search: wpCode } })
+    }
+  } catch {
+    ElMessage.warning(`跳转 ${wpCode} 失败，请手动查找`)
+  }
+}
+
 function handleClick() {
   if (!parsed.value) return
   if (isCrossProject.value) return
@@ -263,10 +283,8 @@ function navigateToTarget(resolved: ResolvedIndexRef) {
 
   switch (ns) {
     case 'wp':
-      // Layer 3: cross-workpaper jump → workpaper editor
-      router.push({
-        path: `/projects/${pid}/workpapers/${target}/edit`,
-      })
+      // Layer 3: cross-workpaper jump → 通过 wp-index-resolve 解析 wp_code → wp_id 再跳转
+      resolveAndNavigateToWp(target, pid)
       break
 
     case 'sheet':
@@ -384,6 +402,24 @@ watch(() => props.value, () => {
   cursor: default;
   font-size: 12px;
   vertical-align: middle;
+}
+
+/* GT 紫令牌覆盖 Element 默认蓝（铁律：禁用 #409eff fallback）。
+   el-tag--primary 默认渲染蓝色，索引跳转 chip 统一用 GT 核心紫。
+   用 GT token 变量，自动适配暗色模式。 */
+.gt-index-chip.el-tag--primary {
+  --el-tag-bg-color: var(--gt-color-primary-bg);
+  --el-tag-border-color: var(--gt-color-border-purple-light);
+  --el-tag-text-color: var(--gt-color-primary);
+  background-color: var(--gt-color-primary-bg);
+  border-color: var(--gt-color-border-purple-light);
+  color: var(--gt-color-primary);
+}
+
+.gt-index-chip.el-tag--primary.is-light {
+  background-color: var(--gt-color-primary-bg);
+  border-color: var(--gt-color-border-purple-light);
+  color: var(--gt-color-primary);
 }
 
 .gt-index-chip--clickable {

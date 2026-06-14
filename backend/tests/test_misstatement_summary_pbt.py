@@ -97,7 +97,9 @@ def test_summary_totals_match_input(amounts):
                 debit_amount=debit,
                 credit_amount=credit,
                 entry_group_id=uuid.uuid4(),
-                review_status="passed",
+                # 未更正错报(Passed)的语义标记 = passed_reason 非空（V078 列），
+                # 而非 review_status='passed'（该枚举值在 PG 不存在）。
+                passed_reason="管理层认为金额不重大，不予更正",
                 created_by=user_id,
             ))
             expected_debit += debit

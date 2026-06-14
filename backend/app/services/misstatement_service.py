@@ -243,7 +243,10 @@ class UnadjustedMisstatementService:
         row = await self._get_by_id(project_id, misstatement_id)
         if not row:
             raise ValueError("未更正错报记录不存在")
-        row.soft_delete()
+        # UnadjustedMisstatement 无 soft_delete() 方法，直接置 is_deleted + deleted_at
+        from datetime import datetime, timezone
+        row.is_deleted = True
+        row.deleted_at = datetime.now(timezone.utc)
         await self.db.flush()
     # ------------------------------------------------------------------
     # get_summary

@@ -48,9 +48,9 @@
       :data="filteredTableData"
       border
       size="small"
+      class="gt-compact-table gt-tb-font-md"
       style="width: 100%"
       :max-height="600"
-      :header-cell-style="{ background: '#f8f6fb', color: '#333', whiteSpace: 'nowrap', fontSize: '12px' }"
       :row-class-name="rowClassName"
       :cell-class-name="cellClassName"
       @cell-click="onCellClick"

@@ -576,6 +576,7 @@ declare module 'vue' {
     WorkpaperKanban: typeof import('./components/workpaper/WorkpaperKanban.vue')['default']
     WorkpaperLifecycleView: typeof import('./components/workpaper/WorkpaperLifecycleView.vue')['default']
     WorkpaperReview: typeof import('./components/collaboration/WorkpaperReview.vue')['default']
+    WorkpaperReviewPanel: typeof import('./components/workpaper/WorkpaperReviewPanel.vue')['default']
     WorkpaperSidePanel: typeof import('./components/workpaper/WorkpaperSidePanel.vue')['default']
     WorkpaperStandardHeader: typeof import('./components/workpaper/WorkpaperStandardHeader.vue')['default']
     WorkpaperTraceView: typeof import('./components/workpaper/WorkpaperTraceView.vue')['default']
