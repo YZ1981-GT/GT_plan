@@ -301,11 +301,17 @@ const extraComponentProps = computed<Record<string, unknown>>(() => {
   if (ct.startsWith('d-form-')) {
     return { 'form-type': ct }
   }
-  if (ct === 'custom') {
+  if (ct === 'custom' || ct === 'procedure-table') {
     return {
       'wp-generated': renderConfig.value?.is_real_workpaper ?? true,
       'project-id': renderConfig.value?.project_id ?? '',
       'wp-code': renderConfig.value?.wp_code ?? '',
+      year: preparationYear.value,
+    }
+  }
+  if (ct === 'cf-verification' || ct === 'report-analysis') {
+    return {
+      'project-id': renderConfig.value?.project_id ?? '',
       year: preparationYear.value,
     }
   }

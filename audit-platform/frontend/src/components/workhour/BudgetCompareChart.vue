@@ -49,6 +49,10 @@ interface BudgetData {
 const data = ref<BudgetData>({ by_cycle: [], by_user: [] })
 
 async function loadData() {
+  if (!projectId || projectId === 'undefined') {
+    warning.value = '请从具体项目进入以查看预算对比'
+    return
+  }
   loading.value = true
   warning.value = ''
   try {

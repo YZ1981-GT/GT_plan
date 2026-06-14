@@ -146,6 +146,7 @@
         <el-tab-pane label="资产减值准备表" name="impairment_provision" />
         <el-tab-pane label="⚖️ 跨表核对" name="cross_check" />
         <el-tab-pane label="📊 多年度对比" name="multi_year_compare" />
+        <el-tab-pane label="📈 报表分析" name="report_analysis" />
       </el-tabs>
     </div>
 
@@ -264,7 +265,7 @@
     </div>
 
     <!-- 报表表格 — 普通模式（非矩阵报表） -->
-    <el-table ref="rvTableRef" v-if="reportMode !== 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision' && activeTab !== 'cross_check' && activeTab !== 'multi_year_compare'" :data="rows" v-loading="loading" style="width: 100%" class="gt-compact-table"
+    <el-table ref="rvTableRef" v-if="reportMode !== 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision' && activeTab !== 'cross_check' && activeTab !== 'multi_year_compare' && activeTab !== 'report_analysis'" :data="rows" v-loading="loading" style="width: 100%" class="gt-compact-table"
       :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :row-class-name="rowClassName" :show-header="true" border size="small" :max-height="600"
       :cell-class-name="rvCellClassName"
@@ -331,7 +332,7 @@
     </el-table>
 
     <!-- 报表表格 — 对比视图（非权益变动表） -->
-    <el-table ref="compareTableRef" v-if="reportMode === 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision' && activeTab !== 'cross_check' && activeTab !== 'multi_year_compare'" :data="compareRows" v-loading="loading" style="width: 100%" class="gt-compact-table"
+    <el-table ref="compareTableRef" v-if="reportMode === 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision' && activeTab !== 'cross_check' && activeTab !== 'multi_year_compare' && activeTab !== 'report_analysis'" :data="compareRows" v-loading="loading" style="width: 100%" class="gt-compact-table"
       :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :row-class-name="compareRowClassName"
       :cell-class-name="rvCellClassName"
@@ -434,6 +435,14 @@
       <MultiYearCompare
         :project-id="projectId"
         :current-year="year"
+      />
+    </div>
+
+    <!-- 报表分析（A2-1/A2-2 单体报表试算） -->
+    <div v-if="activeTab === 'report_analysis'" class="gt-rv-report-analysis">
+      <ReportAnalysisPanel
+        :project-id="projectId"
+        :year="year"
       />
     </div>
 
@@ -577,6 +586,7 @@ import { ElMessage } from 'element-plus'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import MultiYearCompare from '@/components/report/MultiYearCompare.vue'
+import ReportAnalysisPanel from '@/components/workpaper/ReportAnalysisPanel.vue'
 import ReportEquityTable from '@/components/report/ReportEquityTable.vue'
 import ReportImpairmentTable from '@/components/report/ReportImpairmentTable.vue'
 import ReportDialogs from '@/components/report/ReportDialogs.vue'
@@ -999,7 +1009,7 @@ async function _ensureProjectYearWrapper() {
 }
 
 function onTabChange() {
-  if (activeTab.value === 'cross_check' || activeTab.value === 'multi_year_compare') return
+  if (activeTab.value === 'cross_check' || activeTab.value === 'multi_year_compare' || activeTab.value === 'report_analysis') return
   fetchReport()
 }
 

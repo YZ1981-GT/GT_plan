@@ -87,14 +87,17 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.account_packages import router as account_packages
     from app.routers.wp_export_import_router import router as wp_export_import
     from app.routers.wp_template_copy_router import router as wp_template_copy
+    from app.routers.cf_verification import router as cf_verification
+    from app.routers.review_workflow import router as review_workflow_router, signing_router, my_signing_router
+    from app.routers.wp_procedure_tables import router as wp_procedure_tables
 
     groups = {
         # ── 6 大聚合组（design §7.1）──
         "模板管理": [wp_template, wp_template_metadata, wp_template_files, wp_template_download, wp_template_version],
         "生命周期": [working_paper, workpaper_batch_status, wp_batch_ops, wp_progress, wp_prerequisite_status, wp_procedure_status, wp_procedure_categories],
-        "复核": [wp_review, wp_review_status, wp_cell_annotations, review_records_global, wp_eqcr_evaluation],
+        "复核": [wp_review, wp_review_status, wp_cell_annotations, review_records_global, wp_eqcr_evaluation, review_workflow_router, signing_router, my_signing_router],
         "渲染": [wp_render_config, wp_classification, wp_html_save, wp_xlsx_export, wp_index_resolve, wp_trace, wp_disclosure_sync],
-        "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, aging_analysis, data_fetch_custom],
+        "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, aging_analysis, data_fetch_custom, cf_verification, wp_procedure_tables],
         "搜索": [wp_search, wp_version_search, global_search, wp_health_dashboard],
         # ── 辅助组 ──
         "程序管理": [wp_procedures, wp_procedure_trim, wp_step_mapping, wp_evidence],

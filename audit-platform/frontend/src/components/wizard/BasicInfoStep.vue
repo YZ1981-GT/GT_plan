@@ -74,26 +74,28 @@
             </span>
           </el-form-item>
 
-          <el-form-item label="企业子类型" prop="company_subtype">
+          <el-form-item label="业务类型" prop="company_subtype">
             <el-alert
               v-if="showSubtypeBanner"
               type="warning"
               :closable="false"
               show-icon
               class="gt-subtype-banner"
-              title="待确认企业子类型"
+              title="待确认业务类型"
             >
               <template #default>
-                该项目尚未确认企业子类型。系统建议「模板{{ subtypeLetter(recommendation?.subtype || null) }}」（{{ subtypeDesc(recommendation?.subtype || null) }}），请确认或手动选择后保存。
+                该项目尚未确认业务类型。系统建议「{{ subtypeLetter(recommendation?.subtype || null) }}」（{{ subtypeDesc(recommendation?.subtype || null) }}），请确认或手动选择后保存。
                 <el-button link type="primary" size="small" @click="applyRecommendation">采用建议</el-button>
               </template>
             </el-alert>
-            <el-select v-model="form.company_subtype" placeholder="请选择企业子类型" style="width: 100%" clearable>
-              <el-option label="A — 上市公司、三板创新层及公开发债" value="type_a" />
-              <el-option label="B — 三板基础层、银行、保险、期货、证券" value="type_b" />
-              <el-option label="C — 其他公众利益实体" value="type_c" />
-              <el-option label="D — 非公众利益实体" value="type_d" />
+            <el-select v-model="form.company_subtype" placeholder="请选择业务类型" style="width: 100%" clearable>
+              <el-option label="A — 上市公司、三板创新层及公开发债（A1-A8）" value="type_a" />
+              <el-option label="B — 三板基础层、银行、保险、期货、证券（B1-B6）" value="type_b" />
+              <el-option label="C — 其他（非A非B类业务）" value="type_c" />
             </el-select>
+            <el-button link type="primary" size="small" class="gt-category-ref-link" @click="showCategoryReference = true">
+              📋 查看分类标准
+            </el-button>
             <div
               v-if="recommendation && recommendation.subtype"
               class="gt-subtype-recommend"
@@ -224,17 +226,29 @@
         </div>
       </div>
     </el-form>
+
+    <!-- 业务分类标准参考弹窗 -->
+    <el-dialog v-model="showCategoryReference" title="鉴证业务分类标准（2025年12月修订）" width="960px" top="3vh" append-to-body>
+      <BusinessCategoryFlowChart
+        :selected-category="currentCategoryLetter"
+        @select="onCategorySelect"
+        @jump="jumpToWp"
+      />
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { fetchTemplateRecommendation, type TemplateRecommendation } from '@/services/commonApi'
 import { useWizardStore, type BasicInfo } from '@/stores/wizard'
 import { validateUSCC } from '@/utils/uscc_validator'
+import BusinessCategoryFlowChart from '@/components/project/BusinessCategoryFlowChart.vue'
 
+const router = useRouter()
 const wizardStore = useWizardStore()
 const formRef = ref<FormInstance>()
 const auditYearDate = ref<string>('')
@@ -264,8 +278,28 @@ function applyRecommendation() {
   }
 }
 
+const showCategoryReference = ref(false)
+
+const currentCategoryLetter = computed(() => {
+  const map: Record<string, string> = { type_a: 'A', type_b: 'B', type_c: 'C' }
+  return map[form.company_subtype] || ''
+})
+
+function onCategorySelect(value: string) {
+  form.company_subtype = value
+  showCategoryReference.value = false
+}
+
+function jumpToWp(wpCode: string) {
+  const projectId = wizardStore.projectId
+  if (projectId) {
+    showCategoryReference.value = false
+    router.push({ name: 'WorkpaperByCode', params: { projectId }, query: { wp_code: wpCode } })
+  }
+}
+
 /**
- * 「待确认企业子类型」非阻断横幅（需求 1.7 ③ / 14.3）。
+ * 「待确认业务类型」非阻断横幅（需求 1.7 ③ / 14.3）。
  * 仅当：存量项目（有 projectId）+ 用户尚未选择 company_subtype + 后端标记 needs_confirmation
  * + 存在建议值时展示。用户选择后即消失（confirmed，需求 1.8）。
  */
@@ -278,7 +312,7 @@ const showSubtypeBanner = computed(() => {
   )
 })
 
-/** 拉取企业子类型推荐（需求 7.6：须预填建议值，不仅高亮）。 */
+/** 拉取业务类型推荐（需求 7.6：须预填建议值，不仅高亮）。 */
 async function loadRecommendation() {
   const projectId = wizardStore.projectId
   if (!projectId) return
@@ -434,7 +468,7 @@ onMounted(async () => {
       onCustomTemplateChange(form.custom_template_id)
     }
   }
-  // 需求 7.6：已有项目进入向导时拉取企业子类型推荐并预填
+  // 需求 7.6：已有项目进入向导时拉取业务类型推荐并预填
   await loadRecommendation()
 })
 
@@ -503,7 +537,7 @@ defineExpose({ validate, formRef })
   border-bottom: 2px solid var(--gt-color-primary-lighter, #e8e0f0);
 }
 
-/* 企业子类型系统建议 */
+/* 业务类型系统建议 */
 .gt-subtype-banner {
   margin-bottom: 8px;
 }
@@ -530,4 +564,7 @@ defineExpose({ validate, formRef })
     gap: 16px;
   }
 }
+
+/* 业务类型参考链接 */
+.gt-category-ref-link { margin-left: 8px; font-size: 12px; }
 </style>

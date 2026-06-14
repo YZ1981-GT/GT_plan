@@ -24,7 +24,7 @@
     <!-- 模板元信息 -->
     <div v-if="templateVersion || companySubtypeResolved" class="gt-opt-meta">
       <el-tag v-if="companySubtypeResolved" size="small" type="info" effect="plain">
-        企业子类型：{{ subtypeLabel(companySubtypeResolved) }}
+        业务类型：{{ subtypeLabel(companySubtypeResolved) }}
       </el-tag>
       <el-tag v-if="templateVersion" size="small" type="info" effect="plain">
         模板版本：{{ templateVersion }}
@@ -84,7 +84,7 @@ const props = withDefaults(
     missingFields?: string[]
     /** 模板版本号（展示用） */
     templateVersion?: string
-    /** 后端解析出的企业子类型（展示用） */
+    /** 后端解析出的业务类型（展示用） */
     companySubtypeResolved?: string
     /** 重新生成时预填上次勾选（section_id → 保留） */
     initialSelections?: Record<string, boolean> | null

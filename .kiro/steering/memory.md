@@ -99,8 +99,10 @@ inclusion: always
 - 文档类（memory/INDEX/复盘）冲突取并集，走 PR 让 GitHub 先暴露冲突，不本地直推 main
 - 已完成修复明细（B-Index 目录/架构图、sheet 级索引号、试算表借贷方向、明细账月小计、2026-06-07 三处回归等）→ `#dev-history`
 
-### 真正待办（2026-06-12，所有代码实施任务清零）
-- **🟢 active spec=2**：①audit-report-template-integration 181/184，剩 3 项运维（17.3 灰度 flip + 17.4 旧路径下线 + 人工验收）②editing-lock-v1-v2-consolidation（阶段1多任务未完成：数据迁移V073/1b续期/2 force SSE/3 v2等价测试/4 前端flag分流/5并存验证/6检查点/11 V075下线表）
+### 真正待办（2026-06-14）
+- **🟢 active spec=2**：①audit-report-template-integration 181/184，剩 3 项运维 ②editing-lock-v1-v2-consolidation（阶段1多任务未完成）
+- **🟢 A循环接线方案 A 已实施（2026-06-14）**：`_WP_CODE_OVERRIDE["A5"]="cf-verification"`（打开A5底稿→CashFlowVerification）；报表分析（A2-1/A2-2）→ ReportView.vue 新增"📈报表分析"Tab（ReportAnalysisPanel：试算全景+期初核对+比率），不走底稿 override。GtAProgramConsole UI 重构待后续（卡片式 vs 紧凑表格待确认）
+- **🟡 业务分类替换企业子类型（2026-06-14 已实施+待优化）**：BasicInfoStep 已改（A/B/C三选项+分类标准弹窗+底稿跳转）。**待优化**：当前弹窗仍偏文字表格风格→用户要求做成**大的流程/分类可视化图**，整合"4-1附件"两张图的完整信息（业务分类一览表+质控程序），支持 hover 展开详情+点击跳转底稿；类似决策树/流程图形式一目了然
 - **四栏模式 provide/inject**：DefaultLayout `provide('isFourColumnMode', fourCol)` → DisclosureEditor inject 后 `v-show="!isFourColumnMode"` 隐藏内置树面板（避免与四栏目录重复）；三栏模式树正常显示
 - **外部依赖**：LLM embedding 实例 / 合并 UAT / GitHub 默认分支改 main / 走 PR 合入 / 钉集成
 - **后续按需**：附注 96 个 OPT 章节条件化标注（等灰度反馈，611 块 99.5% 已有块级占位符，TEXT 整块填充够用）

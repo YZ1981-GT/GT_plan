@@ -51,6 +51,12 @@ _CLASS_TO_COMPONENT: dict[str, str] = {
     "I-": "skip",
 }
 
+# wp_code 级专用路由覆盖（优先于 class_code 派生）
+# 特定底稿直接路由到专用 HTML 组件，不经过 class_code 映射
+_WP_CODE_OVERRIDE: dict[str, str] = {
+    "A5": "cf-verification",          # 财务报表支持程序表 → 现金流量表核查视图
+}
+
 # D 类子路由映射（基于 class_code 具体值）
 _D_SUB_ROUTING: dict[str, str] = {
     "D-函证": "d-form-confirmation",
@@ -333,6 +339,11 @@ def derive_component_type(classification: ClassificationResult) -> str:
     sheet_override = _match_sheet_name_override(classification.sheet_name)
     if sheet_override:
         return sheet_override
+
+    # wp_code 级专用路由覆盖（A5-1→cf-verification, A2-1→report-analysis）
+    wp_code_override = _WP_CODE_OVERRIDE.get(classification.wp_code)
+    if wp_code_override:
+        return wp_code_override
 
     if not class_code:
         raise ClassificationNotFoundError(

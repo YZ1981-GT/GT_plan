@@ -31,6 +31,7 @@ import CfAdjustment from './cf/CfAdjustment.vue'
 const props = defineProps<{
   projectId: string
   year: number
+  wpId?: string
 }>()
 
 const activeTab = ref('cash')

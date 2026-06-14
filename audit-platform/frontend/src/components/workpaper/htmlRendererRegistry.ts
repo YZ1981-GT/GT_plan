@@ -40,6 +40,9 @@ export type HtmlComponentType =
   | 'custom'
   | 'audit-sheet'
   | 'bad-debt-sheet'
+  | 'cf-verification'
+  | 'procedure-table'
+  | 'report-analysis'
 
 /** 注册表条目：包含 lazy component / 图标 / emits / 描述 */
 export interface HtmlRendererEntry {
@@ -66,6 +69,9 @@ const GtHStaticDoc = defineAsyncComponent(() => import('./GtHStaticDoc.vue'))
 const GtCustomWpEditor = defineAsyncComponent(() => import('./GtCustomWpEditor.vue'))
 const GtAuditSheet = defineAsyncComponent(() => import('./GtAuditSheet.vue'))
 const GtBadDebtSheet = defineAsyncComponent(() => import('./GtBadDebtSheet.vue'))
+const GtCfVerification = defineAsyncComponent(() => import('./CashFlowVerification.vue'))
+const GtProcedureTable = defineAsyncComponent(() => import('./ProcedureTableRenderer.vue'))
+const GtReportAnalysis = defineAsyncComponent(() => import('./ReportAnalysisPanel.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -162,6 +168,27 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '💰',
     label: '坏账准备明细表',
     emits: [], // GtBadDebtSheet 自取数自落库，无 emit
+  },
+  {
+    componentType: 'cf-verification',
+    component: GtCfVerification,
+    icon: '💧',
+    label: '现金流量表核查',
+    emits: [],
+  },
+  {
+    componentType: 'procedure-table',
+    component: GtProcedureTable,
+    icon: '📋',
+    label: '程序表',
+    emits: ['save'],
+  },
+  {
+    componentType: 'report-analysis',
+    component: GtReportAnalysis,
+    icon: '📈',
+    label: '报表分析',
+    emits: [],
   },
 ]
 
