@@ -2,9 +2,14 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { VueQueryPlugin } from '@tanstack/vue-query'
 import { ElMessage } from 'element-plus'
+import dayjs from 'dayjs'
+import 'dayjs/locale/zh-cn'
 // Element Plus 样式：按需导入由 unplugin-vue-components 自动处理，
 // 但仍需全局引入 base 样式（CSS 变量、字体等）
 import 'element-plus/dist/index.css'
+
+// dayjs 全局中文
+dayjs.locale('zh-cn')
 // Element Plus 暗色主题 CSS 变量（配合 html.dark class 自动生效）
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import 'nprogress/nprogress.css'

@@ -1,10 +1,9 @@
 <template>
   <div class="gt-confirmation-hub gt-fade-in">
-    <GtPageHeader title="函证管理" :show-back="false">
-      <template #actions>
-        <el-button type="primary" size="small" @click="openCreate()">+ 新建函证</el-button>
-      </template>
-    </GtPageHeader>
+    <div class="gt-hub-header">
+      <h2>函证管理</h2>
+      <el-button type="primary" size="small" @click="openCreate()">+ 新建函证</el-button>
+    </div>
 
     <!-- 函证清单表格 -->
     <el-table :data="confirmations" border size="small" style="width:100%" v-loading="loading">
@@ -25,6 +24,12 @@
       </el-table-column>
       <el-table-column label="差异" width="130" align="right">
         <template #default="{ row }"><GtAmountCell :value="row.diff_amount" /></template>
+      </el-table-column>
+      <el-table-column label="关联底稿" width="140">
+        <template #default="{ row }">
+          <span v-if="row.wp_id" class="gt-link" @click.stop="gotoWp(row.wp_id)">查看底稿</span>
+          <span v-else class="gt-text-muted">—</span>
+        </template>
       </el-table-column>
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
@@ -94,14 +99,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
 import { confirmDelete } from '@/utils/confirm'
 import { eventBus } from '@/utils/eventBus'
 import { useProjectStore } from '@/stores/project'
-import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 
 // ─── 数据 ───
@@ -120,6 +124,7 @@ interface ConfirmationItem {
 }
 
 const route = useRoute()
+const router = useRouter()
 const projectStore = useProjectStore()
 const projectId = computed(() => projectStore.projectId || (route.params.projectId as string) || '')
 
@@ -315,6 +320,10 @@ async function onDelete(row: ConfirmationItem) {
 
 // ─── 生命周期 ───
 
+function gotoWp(wpId: string) {
+  router.push(`/projects/${projectId.value}/workpapers/${wpId}`)
+}
+
 onMounted(() => {
   fetchList()
 })
@@ -324,6 +333,27 @@ onMounted(() => {
 .gt-confirmation-hub {
   padding: var(--gt-space-4);
 }
+
+.gt-hub-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.gt-hub-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gt-color-text-primary, #1a1a1a);
+}
+
+.gt-link {
+  color: var(--gt-purple, #4b2d77);
+  cursor: pointer;
+  font-size: 12px;
+}
+.gt-link:hover { text-decoration: underline; }
+.gt-text-muted { color: var(--gt-color-text-tertiary, #ccc); font-size: 12px; }
 
 .gt-confirmation-hub__choice {
   display: flex;

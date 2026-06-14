@@ -22,7 +22,7 @@
           <div class="gt-hub-card-name">{{ p.client_name || p.name }}</div>
           <div class="gt-hub-card-meta">
             <span>{{ p.audit_year || '' }}年度</span>
-            <span>{{ p.project_type || '' }}</span>
+            <span>{{ typeLabel(p.project_type) }}</span>
           </div>
         </div>
       </div>
@@ -42,6 +42,18 @@ import GtStatusTag from '@/components/common/GtStatusTag.vue'
 
 const loading = ref(false)
 const projects = ref<any[]>([])
+
+const TYPE_MAP: Record<string, string> = {
+  annual: '年度审计',
+  interim: '中期审计',
+  special: '专项审计',
+  ipo: 'IPO审计',
+  internal_control: '内控审计',
+}
+
+function typeLabel(type: string): string {
+  return TYPE_MAP[type] || type || '—'
+}
 
 onMounted(async () => {
   loading.value = true
