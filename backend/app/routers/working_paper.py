@@ -599,6 +599,16 @@ async def get_wp_onlyoffice_config(
     document_url 指向预填后的文件。
     """
     from app.core.config import settings
+    from app.services.onlyoffice_session_limiter import acquire_session
+
+    # 并发编辑会话限制
+    doc_key = f"wp-{wp_id}-{version or 'latest'}"
+    allowed = await acquire_session(_user.id, doc_key)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="当前在线编辑人数已达上限（10人），请稍后再试",
+        )
 
     wp = (await db.execute(
         sa.select(WorkingPaper).where(

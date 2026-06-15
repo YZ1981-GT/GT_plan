@@ -1062,6 +1062,16 @@ async def onlyoffice_config(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # 并发编辑会话限制
+    from app.services.onlyoffice_session_limiter import acquire_session
+    doc_key = f"deliverable-{task_id}-{version_no}"
+    allowed = await acquire_session(current_user.id, doc_key)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="当前在线编辑人数已达上限（10人），请稍后再试",
+        )
+
     svc = DeliverableService(db)
     task = await svc.get_task(task_id)
     if task is None:
@@ -1162,6 +1172,17 @@ async def onlyoffice_callback(
         task_id, body, user_id=creator_id, year=year
     )
     await db.commit()
+
+    # 文档关闭时释放编辑席位（status 2=保存关闭, 4=关闭无修改, 6=强制保存）
+    status = body.get("status")
+    if status in (2, 4, 6):
+        from app.services.onlyoffice_session_limiter import release_session
+        # callback 不携带具体 user_id，用 task creator 近似；
+        # 多用户场景下靠 TTL 兜底清理（1h 过期）
+        version_no = body.get("version", 1)
+        doc_key = f"deliverable-{task_id}-{version_no}"
+        await release_session(creator_id, doc_key)
+
     return result
 
 

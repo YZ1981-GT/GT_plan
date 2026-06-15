@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     ONLYOFFICE_URL: str = "http://onlyoffice:80"
     ONLYOFFICE_JWT_SECRET: str = ""
     ONLYOFFICE_CALLBACK_BASE: str = ""
+    ONLYOFFICE_MAX_SESSIONS: int = 10  # 最大并发编辑人数
     WOPI_BASE_URL: str = "http://backend:8000/wopi"
     # 文件存储
     STORAGE_ROOT: str = "./storage"
@@ -224,3 +225,5 @@ if not settings.is_jwt_key_secure:
     _logger.warning(
         "⚠️  JWT_SECRET_KEY 使用了默认弱密钥，生产环境请设置强随机密钥（至少16字符）"
     )
+
+
