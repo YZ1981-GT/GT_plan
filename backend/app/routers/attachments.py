@@ -12,8 +12,11 @@ Validates: Requirements 14.2, 14.5, 14.8
 
 from __future__ import annotations
 
+import logging
 import sqlalchemy as sa
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
@@ -234,7 +237,90 @@ async def update_ocr_status(
     if not result:
         raise HTTPException(status_code=404, detail="附件不存在")
     await db.commit()
+
+    # OCR 确认完成后自动触发账务匹配
+    if body.status == "completed" and body.ocr_text:
+        try:
+            matches = await _match_ocr_to_ledger(db, UUID(att["project_id"]), body.ocr_text, attachment_id)
+            if matches:
+                result["ledger_matches"] = matches
+        except Exception as e:
+            logger.warning(f"OCR 账务匹配失败: {e}")
+
     return result
+
+
+async def _match_ocr_to_ledger(
+    db: AsyncSession, project_id: UUID, ocr_text: str, attachment_id: UUID
+) -> list[dict]:
+    """OCR 识别结果与序时账自动核对 — 按金额+日期匹配"""
+    from app.services.ocr_rule_engine import extract_fields_by_rules, classify_by_rules
+
+    # 先用规则提取字段
+    classification = classify_by_rules(ocr_text)
+    doc_type = classification["type"] if classification else "other"
+    fields = extract_fields_by_rules(ocr_text, doc_type)
+
+    # 取 amount/total 字段作为匹配金额
+    match_amount = None
+    for f in fields:
+        if f["field_name"] in ("total", "amount") and f["field_value"]:
+            try:
+                match_amount = float(f["field_value"].replace(",", ""))
+                break
+            except (ValueError, TypeError):
+                pass
+
+    if not match_amount:
+        return []
+
+    # 在序时账中按金额模糊匹配（容差 0.01 元）
+    from app.models.dataset_models import LedgerDataset, DatasetStatus
+    from app.models.audit_platform_models import TbLedger
+    import sqlalchemy as sa
+
+    # 获取活跃数据集
+    ds_stmt = sa.select(LedgerDataset.id).where(
+        LedgerDataset.project_id == project_id,
+        LedgerDataset.status == DatasetStatus.active,
+    )
+    ds_result = await db.execute(ds_stmt)
+    dataset_id = ds_result.scalar_one_or_none()
+    if not dataset_id:
+        return []
+
+    # 查序时账匹配
+    tolerance = 0.01
+    stmt = sa.select(
+        TbLedger.id,
+        TbLedger.voucher_date,
+        TbLedger.summary,
+        TbLedger.debit_amount,
+        TbLedger.credit_amount,
+        TbLedger.account_code,
+    ).where(
+        TbLedger.dataset_id == dataset_id,
+        sa.or_(
+            sa.func.abs(TbLedger.debit_amount - match_amount) <= tolerance,
+            sa.func.abs(TbLedger.credit_amount - match_amount) <= tolerance,
+        ),
+    ).limit(5)
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    return [
+        {
+            "ledger_id": str(r.id),
+            "date": r.voucher_date.isoformat() if r.voucher_date else None,
+            "summary": (r.summary or "")[:50],
+            "debit": float(r.debit_amount) if r.debit_amount else None,
+            "credit": float(r.credit_amount) if r.credit_amount else None,
+            "account_code": r.account_code,
+            "match_amount": match_amount,
+        }
+        for r in rows
+    ]
 
 
 @router.post("/api/attachments/{attachment_id}/classify")

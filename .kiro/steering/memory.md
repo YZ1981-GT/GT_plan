@@ -53,7 +53,8 @@ inclusion: always
 - **审计报告正文模板源**：`审计报告模板正文/`（仓库根），4 意见类型×4 企业类型=17 Word 模板；**架构决策=路径 A**（Word 模板作程序资产+占位符替换，非 Word→JSON→再生成）：`{{field}}` 替换 + `##OPT:id##` 可选段弹窗 + `##NOTE:xxx##` 终版删；模板就位 `backend/data/audit_report_templates/`（report_body 17 docx + financial_statements 4 xlsx + disclosure_notes 4 docx，`template_manifest.json` 版本 2025-v1）；spec=`audit-report-template-integration`
 - **干净验证法**：uvicorn `--reload` 父子进程 kill 不净 → venv 另起端口（9981）绕 reloader；**in-process ASGI httpx**（`httpx.ASGITransport(app=app)`）直调端点最快（跑磁盘当前代码，无 stale server 风险）
 - **markitdown 单例**：`backend/app/services/markitdown_service.py`（延迟初始化+扩展名白名单 17 种+`convert_stream(BytesIO)` 最窄接口）；知识库 `_extract_text_with_ocr` 三级降级 MarkItDown→MinerU OCR→PyPDF2/python-docx
-- **OCR 三层管线（2026-06-15）**：`ocr_rule_engine.py`(Layer1 本地规则:字符纠错+关键词分类14类+正则字段提取)+LLM 增强(仅低置信度)+人工确认(`OcrConfirmDialog`/`BatchUploadResultDialog`)；参考 `Fa_piao_Gt/`(独立桌面程序,PyQt5+PaddleOCR)精华移植；`ocr_service_v2.py` 已接入三层—规则 conf≥0.8 直出不调 LLM，字段全覆盖也跳过 LLM
+- **OCR 三层管线（2026-06-15）**：`ocr_rule_engine.py`(Layer1 本地规则:字符纠错+关键词分类14类+正则字段提取)+LLM 增强(仅低置信度)+人工确认(`OcrConfirmDialog`/`BatchUploadResultDialog`)；参考 `Fa_piao_Gt/`(已删,精华移植完毕)；`ocr_service_v2.py` 已接入三层—规则 conf≥0.8 直出不调 LLM，字段全覆盖也跳过 LLM；PDF 文本层优先(pypdf,数电票毫秒直出跳过 PaddleOCR)；金额校验容差±0.02+数电票拆行修复；OCR 确认后自动匹配序时账(金额容差查 tb_ledger)
+- **部署目标架构 v2.0（2026-06-15 确定）**：瘦客户端(Electron ~600MB=前端+PaddleOCR+规则引擎,无PG/无FastAPI/无文件存储)+内网全栈服务器(FastAPI+PG+Redis+vLLM+LibreOffice+MinIO)；**全部走 FastAPI API**不直连PG；文件存服务器 MinIO(用户电脑无需500GB SSD)；大文件预签名URL直传MinIO；Web版与桌面端双轨并行共享后端；离线=本地OCR+规则直出+IndexedDB离线队列；方案文档 `docs/proposals/distributed-deployment-plan.md` v2.0(6周路线图)；减包路径=PaddlePaddle→ONNX(600MB→200MB)
 - **不引入**：LLM 上下文压缩中间件（本地 vLLM 自带 prefix caching+审计精度敏感，RTK 已覆盖 CLI 90% 价值）；外部 agent harness 配置包（ECC 等，依赖具体 harness，Kiro 用 .kiro/steering+specs+hook 另一套；如取经只 cherry-pick 单 markdown 改中文，严禁 clone 整仓）
 
 ## 迁移与 PG schema（D6 MigrationRunner 运行时迁移，非 alembic）

@@ -72,6 +72,32 @@ def _get_ocr_engine() -> "PaddleOCR":
     return _paddle_ocr
 
 
+def _try_extract_pdf_text(file_path: str) -> str | None:
+    """尝试从 PDF 文件提取文本层（数电票等原生 PDF 自带文本）
+
+    如果文件非 PDF 或文本层为空/太短（<50字符，可能是扫描件）→ 返回 None，走 OCR。
+    使用 pypdf 零额外依赖。
+    """
+    if not file_path.lower().endswith(".pdf"):
+        return None
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(file_path)
+        texts = []
+        for page in reader.pages[:5]:  # 最多取前 5 页
+            page_text = page.extract_text() or ""
+            texts.append(page_text)
+        full = "\n".join(texts).strip()
+        # 文本层太短说明是扫描件，不可用
+        if len(full) < 50:
+            return None
+        logger.info(f"PDF 文本层提取成功: {len(full)} 字符, 跳过 OCR")
+        return full
+    except Exception as e:
+        logger.debug(f"PDF 文本层提取失败（将走 OCR）: {e}")
+        return None
+
+
 def _extract_text_from_result(result: Any) -> list[dict[str, Any]]:
     """从 PaddleOCR 结果中提取文本和置信度"""
     items = []
@@ -148,9 +174,32 @@ class OCRService:
     # ------------------------------------------------------------------
 
     async def recognize_single(self, file_path: str) -> dict[str, Any]:
-        """单张单据OCR识别，≤5秒，调PaddleOCR + 规则引擎前置处理"""
+        """单张单据OCR识别 — PDF 文本层优先，PaddleOCR 兜底 + 规则引擎"""
         start = time.time()
         try:
+            # ─── PDF 文本层优先提取（毫秒级，跳过 OCR 引擎） ───
+            pdf_text = _try_extract_pdf_text(file_path)
+            if pdf_text:
+                elapsed = time.time() - start
+                from app.services.ocr_rule_engine import run_rule_pipeline
+                rule_result = run_rule_pipeline(pdf_text)
+                return {
+                    "success": True,
+                    "items": [],  # 无 bbox 信息
+                    "full_text": rule_result["corrected_text"],
+                    "raw_text": pdf_text,
+                    "method": "pdf_text_layer",
+                    "rule_classification": rule_result["classification"],
+                    "rule_fields": rule_result["fields"],
+                    "needs_llm": rule_result["needs_llm"],
+                    "stats": {
+                        "total_lines": pdf_text.count("\n") + 1,
+                        "avg_confidence": 0.99,  # 文本层提取置信度极高
+                        "processing_time": round(elapsed, 2),
+                    },
+                }
+
+            # ─── PaddleOCR 图像识别（文本层为空或非 PDF） ───
             ocr = _get_ocr_engine()
             loop = asyncio.get_event_loop()
 
