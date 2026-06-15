@@ -148,7 +148,7 @@ class OCRService:
     # ------------------------------------------------------------------
 
     async def recognize_single(self, file_path: str) -> dict[str, Any]:
-        """单张单据OCR识别，≤5秒，调PaddleOCR"""
+        """单张单据OCR识别，≤5秒，调PaddleOCR + 规则引擎前置处理"""
         start = time.time()
         try:
             ocr = _get_ocr_engine()
@@ -167,10 +167,18 @@ class OCRService:
             if elapsed > 5.0:
                 logger.warning(f"OCR exceed 5s: {elapsed:.2f}s for {file_path}")
 
+            # ─── 规则引擎前置处理（本地，毫秒级） ───
+            from app.services.ocr_rule_engine import run_rule_pipeline
+            rule_result = run_rule_pipeline(full_text)
+
             return {
                 "success": True,
                 "items": items,
-                "full_text": full_text,
+                "full_text": rule_result["corrected_text"],  # 纠错后文本
+                "raw_text": full_text,  # 保留原始文本供对照
+                "rule_classification": rule_result["classification"],
+                "rule_fields": rule_result["fields"],
+                "needs_llm": rule_result["needs_llm"],
                 "stats": {
                     "total_lines": len(items),
                     "avg_confidence": round(
@@ -184,30 +192,44 @@ class OCRService:
             return {"success": False, "error": str(e), "items": [], "full_text": ""}
 
     async def classify_document(self, ocr_text: str) -> str:
-        """AI自动分类单据类型（12类），调LLM"""
+        """AI自动分类单据类型（12类）— 规则优先，LLM 兜底"""
         if not ocr_text or len(ocr_text.strip()) < 10:
             return "other"
 
-        system_prompt = (
-            "你是一个专业的审计单据分类助手。请根据OCR识别的单据文本，判断其类型。\n"
-            "只能返回以下12种类型之一（只输出类型名称，不要其他内容）：\n"
-            "sales_invoice, purchase_invoice, bank_receipt, bank_statement, "
-            "outbound_order, inbound_order, logistics_order, voucher, "
-            '"tax_return, contract, bank_reconciliation, other\\n\\n"'
-            '"分类规则：\\n"'
-            '"- 销售发票：包含"销项税"、"购买方"、"销售方"等\\n"'
-            '"- 采购发票：包含"进项税"、"销售方"、"供应商"等\\n"'
-            '"- 银行收付款回单：包含"收款人"、"付款人"、"交易金额"等\\n"'
-            '"- 银行对账单：包含"对手户名"、"交易类型"、"余额"等\\n"'
-            '"- 出库单：包含"出库"、"商品名称"、"数量"等\\n"'
-            '"- 入库单：包含"入库"、"供应商"、"商品名称"等\\n"'
-            '"- 物流单据：包含"收件人"、"寄件人"、"运单号"等\\n"'
-            '"- 记账凭证：包含"借方"、"贷方"、"凭证号"等\\n"'
-            '"- 纳税申报表：包含"税款"、"申报"、"税额"等\\n"'
-            '"- 合同协议：包含"甲方"、"乙方"、"合同金额"等\\n"'
-            '"- 银行余额调节表：包含"银行余额"、"企业余额"、"调节"等\\n"'
-            '"- 其他：无法归类时用other"'
-        )
+        # ─── Layer 1: 规则分类（毫秒级，零 LLM 成本） ───
+        from app.services.ocr_rule_engine import classify_by_rules
+        rule_result = classify_by_rules(ocr_text)
+        if rule_result and rule_result["confidence"] >= 0.8:
+            logger.info(f"规则分类命中: {rule_result['type']} (conf={rule_result['confidence']:.2f})")
+            return rule_result["type"]
+
+        # ─── Layer 2: LLM 增强（仅规则层低置信度或失败时调用） ───
+        logger.info("规则分类未命中或置信度不足，调用 LLM 分类")
+        system_prompt = """你是专业审计单据分类助手。请根据 OCR 识别文本判断单据类型。
+
+【规则】
+- 只输出下方 12 种类型代码之一，不要输出任何其他文字。
+- 如果无法确定，输出 other。
+
+【类型代码与判定关键词】
+1. sales_invoice — 销售发票/增值税发票(销项)：含"购买方""销售方""税率""价税合计"
+2. purchase_invoice — 采购发票/增值税发票(进项)：含"进项税""供应商""采购"
+3. bank_receipt — 银行收付款回单：含"收款人/付款人""交易金额""银行回单""电子回单"
+4. bank_statement — 银行对账单/流水：含"对手户名""交易流水""期初余额""期末余额"
+5. outbound_order — 出库单：含"出库""仓库""领料""发货"
+6. inbound_order — 入库单：含"入库""验收""到货"
+7. logistics_order — 物流单据：含"运单号""收件人""寄件人""签收"
+8. voucher — 记账凭证：含"凭证号""借方""贷方""摘要""科目"
+9. tax_return — 纳税申报表：含"税款""应纳税额""申报期""税务局"
+10. contract — 合同协议：含"甲方""乙方""合同金额""有效期""违约"
+11. bank_reconciliation — 银行余额调节表：含"银行余额""账面余额""未达账项"
+12. other — 以上均不匹配
+
+【审计场景补充判定】
+- 银行询证函（含"兹证明""贵行""账户余额""函证"）→ bank_receipt
+- 应收账款询证函 / 往来询证函（含"截至…欠贵公司""应付余额"）→ other
+- 固定资产盘点表、实物盘点表 → other
+- 审计报告、管理层声明书 → other"""
 
         try:
             model = await self.ai.get_active_model(AIModelType.chat)
@@ -216,15 +238,17 @@ class OCRService:
             response = await self.ai.chat_completion(
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"请分类以下单据文本（前500字符）：\n{ocr_text[:500]}"},
+                    {"role": "user", "content": f"请分类以下单据（前500字）：\n\n{ocr_text[:500]}"},
                 ],
                 model=model_name,
-                temperature=0.1,
+                temperature=0.0,
             )
 
             result = response.strip().lower().replace(" ", "_")
+            # 容错：LLM 可能输出中文标签，尝试反向映射
             if result not in self.DOCUMENT_FIELD_RULES:
-                result = "other"
+                reverse_map = {v: k for k, v in self.DOCUMENT_TYPE_LABELS.items()}
+                result = reverse_map.get(result, "other")
             return result
         except Exception as e:
             logger.warning(f"LLM classify failed, defaulting to other: {e}")
@@ -233,24 +257,52 @@ class OCRService:
     async def extract_fields(
         self, ocr_text: str, document_type: str
     ) -> list[dict[str, Any]]:
-        """按DOCUMENT_FIELD_RULES提取结构化字段，调LLM语义理解"""
+        """按DOCUMENT_FIELD_RULES提取结构化字段 — 规则优先，LLM 补全缺失字段"""
         fields = self.DOCUMENT_FIELD_RULES.get(document_type, [])
         if not fields or not ocr_text:
             return []
 
-        field_list = ", ".join(fields)
-        system_prompt = (
-            '你是一个专业的审计字段提取助手。请从以下OCR文本中提取指定字段，'
-            '返回JSON数组格式（只输出JSON，不要其他内容）。\n'
-            f'字段列表：{field_list}\n'
-            "提取规则：\n"
-            "- 只提取存在的字段，找不到则值为null\n"
-            '- 金额字段返回数字（去掉逗号和元字）\n'
-            "- 日期字段返回 YYYY-MM-DD 格式\n"
-            "- confidence表示该字段提取的可信度（0-1）\n"
-            "返回格式示例：\n"
-            '[{"field_name":"amount","field_value":"15000.00","confidence":0.95}]'
-        )
+        # ─── Layer 1: 规则提取（毫秒级） ───
+        from app.services.ocr_rule_engine import extract_fields_by_rules
+        rule_fields = extract_fields_by_rules(ocr_text, document_type)
+
+        # 检查哪些目标字段已被规则提取
+        extracted_names = {f["field_name"] for f in rule_fields}
+        missing_fields = [f for f in fields if f not in extracted_names]
+
+        # 如果规则层已覆盖全部字段，直接返回（不调 LLM）
+        if not missing_fields:
+            logger.info(f"规则提取覆盖全部 {len(fields)} 个字段，跳过 LLM")
+            return rule_fields
+
+        # ─── Layer 2: LLM 补全缺失字段 ───
+        logger.info(f"规则提取 {len(rule_fields)}/{len(fields)} 个字段，LLM 补全: {missing_fields}")
+        field_list = ", ".join(missing_fields)
+
+        # 按文档类型给出针对性提取示例
+        examples = self._get_extraction_examples(document_type)
+
+        system_prompt = f"""你是专业审计字段提取助手。从 OCR 文本中精确提取以下字段。
+
+【待提取字段】{field_list}
+
+【输出格式】严格输出 JSON 数组，不输出任何其他文字：
+[{{"field_name":"字段名","field_value":"提取值","confidence":0.95}}]
+
+【提取规则】
+1. 只提取能在原文中找到对应内容的字段，找不到的 field_value 设为 null
+2. 金额：去掉千分位逗号和"元"字，保留2位小数（如 "15,000.00元" → "15000.00"）
+3. 日期：统一为 YYYY-MM-DD 格式（如 "2025年3月15日" → "2025-03-15"）
+4. 发票号码：保留完整数字（如 "No.04785123" → "04785123"）
+5. 公司名称：保留全称，去掉地址信息
+6. confidence：0.9+ 表示原文明确出现该值；0.7-0.9 表示需要推断；<0.7 表示不确定
+7. 如果文本模糊/OCR 有明显乱码影响该字段，confidence 设为 0.5 以下
+
+【防幻觉规则】
+- 禁止编造原文中不存在的信息
+- 如果金额数字被 OCR 识别为乱码（如"l5,O00"），尝试修正为"15000"但 confidence 降到 0.6
+- 如果完全无法判断，field_value 必须为 null，禁止猜测
+{examples}"""
 
         try:
             model = await self.ai.get_active_model(AIModelType.chat)
@@ -259,10 +311,10 @@ class OCRService:
             response = await self.ai.chat_completion(
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"请提取以下文本的字段：\n{ocr_text[:2000]}"},
+                    {"role": "user", "content": f"请提取以下 OCR 文本的字段：\n\n{ocr_text[:2000]}"},
                 ],
                 model=model_name,
-                temperature=0.1,
+                temperature=0.0,
             )
 
             # 尝试解析JSON
@@ -274,19 +326,44 @@ class OCRService:
 
             extracted = json.loads(text)
             if isinstance(extracted, list):
-                return [
+                llm_fields = [
                     {
                         "field_name": item.get("field_name", ""),
                         "field_value": str(item.get("field_value", "")) if item.get("field_value") else None,
                         "confidence_score": round(float(item.get("confidence", 0.5)), 4),
+                        "method": "llm",
                     }
                     for item in extracted
                     if item.get("field_name")
                 ]
-            return []
+                # 合并：规则层结果 + LLM 补全结果（规则层优先）
+                return rule_fields + llm_fields
+            return rule_fields
         except (json.JSONDecodeError, Exception) as e:
             logger.warning(f"LLM extract_fields failed: {e}")
-            return []
+            return rule_fields  # LLM 失败仍返回规则层结果
+
+    def _get_extraction_examples(self, document_type: str) -> str:
+        """按文档类型返回 few-shot 示例，提升 LLM 提取准确性"""
+        examples: dict[str, str] = {
+            "sales_invoice": """
+【示例】
+原文片段："购买方：北京科技有限公司 货物名称：办公设备 金额：¥28,500.00 税率：13% 税额：¥3,705.00 价税合计：叁万贰仟贰佰零伍元整 ¥32,205.00 开票日期：2025年01月15日 发票号码：04785123"
+提取结果：[{"field_name":"buyer_name","field_value":"北京科技有限公司","confidence":0.98},{"field_name":"amount","field_value":"28500.00","confidence":0.95},{"field_name":"tax_amount","field_value":"3705.00","confidence":0.95},{"field_name":"invoice_date","field_value":"2025-01-15","confidence":0.98},{"field_name":"invoice_no","field_value":"04785123","confidence":0.99},{"field_name":"goods_name","field_value":"办公设备","confidence":0.95}]""",
+            "bank_receipt": """
+【示例】
+原文片段："中国工商银行电子回单 交易日期：2025-02-20 收款人：上海贸易有限公司 付款人：深圳制造有限公司 交易金额：100,000.00元 摘要：货款"
+提取结果：[{"field_name":"transaction_date","field_value":"2025-02-20","confidence":0.99},{"field_name":"counterparty_name","field_value":"上海贸易有限公司","confidence":0.95},{"field_name":"amount","field_value":"100000.00","confidence":0.98},{"field_name":"summary","field_value":"货款","confidence":0.95},{"field_name":"transaction_type","field_value":"转账","confidence":0.7}]""",
+            "contract": """
+【示例】
+原文片段："采购合同 合同编号：HT-2025-0089 甲方（买方）：杭州智能科技有限公司 乙方（卖方）：苏州精密制造有限公司 合同金额：人民币壹佰伍拾万元整（¥1,500,000.00） 签订日期：2025年1月8日 有效期至：2026年1月7日 付款方式：分三期支付"
+提取结果：[{"field_name":"party_a","field_value":"杭州智能科技有限公司","confidence":0.98},{"field_name":"party_b","field_value":"苏州精密制造有限公司","confidence":0.98},{"field_name":"contract_amount","field_value":"1500000.00","confidence":0.95},{"field_name":"sign_date","field_value":"2025-01-08","confidence":0.99},{"field_name":"expire_date","field_value":"2026-01-07","confidence":0.99},{"field_name":"payment_terms","field_value":"分三期支付","confidence":0.9}]""",
+            "voucher": """
+【示例】
+原文片段："记账凭证 凭证号：记-2025-001 日期：2025/03/01 摘要：支付办公室租金 借方科目：6602管理费用-租赁费 金额：25,000.00 贷方科目：1002银行存款 金额：25,000.00"
+提取结果：[{"field_name":"voucher_no","field_value":"记-2025-001","confidence":0.99},{"field_name":"date","field_value":"2025-03-01","confidence":0.99},{"field_name":"summary","field_value":"支付办公室租金","confidence":0.98},{"field_name":"account_code","field_value":"6602","confidence":0.9},{"field_name":"account_name","field_value":"管理费用-租赁费","confidence":0.95},{"field_name":"debit","field_value":"25000.00","confidence":0.98},{"field_name":"credit","field_value":"25000.00","confidence":0.98}]""",
+        }
+        return examples.get(document_type, "")
 
     # ------------------------------------------------------------------
     # 6.2 — batch_recognize / get_task_status

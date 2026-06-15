@@ -60,6 +60,8 @@ const emit = defineEmits<{
   (e: 'link-created', payload: AttachmentLinkResult): void
   /** 上传失败 */
   (e: 'upload-error', error: string): void
+  /** OCR 识别完成，需要用户确认（防幻觉） */
+  (e: 'ocr-ready', payload: { attachmentId: string; fileName: string; fileType: string; ocrText: string; confidence?: number }): void
 }>()
 
 // ─── 常量 ───
@@ -158,6 +160,17 @@ async function processFile(file: File) {
       message: `附件 "${file.name}" 已上传并关联到底稿${props.currentCellRef ? ` (${props.currentCellRef})` : ''}`,
       duration: 3000,
     })
+
+    // 5. 如果返回了 OCR 结果，通知父组件弹出确认弹窗
+    if (uploadResult?.ocr_text || uploadResult?.ocr_status === 'completed') {
+      emit('ocr-ready', {
+        attachmentId,
+        fileName: file.name,
+        fileType: uploadResult?.file_type || '',
+        ocrText: uploadResult?.ocr_text || '',
+        confidence: uploadResult?.ocr_confidence,
+      })
+    }
   } catch (err: any) {
     const msg = err?.response?.data?.detail || err?.message || '上传失败'
     handleApiError(err, '附件上传失败')

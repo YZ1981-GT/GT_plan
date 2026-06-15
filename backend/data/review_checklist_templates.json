@@ -75,12 +75,12 @@
       "audit_type": "financial",
       "a_only": false,
       "items": [
-        {"seq": 1, "content": "审计总体策略和详细计划是否恰当", "auto_check": null},
+        {"seq": 1, "content": "审计总体策略和详细计划是否恰当", "auto_check": "review_progress"},
         {"seq": 2, "content": "重大事项的判断是否恰当", "auto_check": null},
-        {"seq": 3, "content": "审计报告是否恰当反映审计结论", "auto_check": null},
+        {"seq": 3, "content": "审计报告是否恰当反映审计结论", "auto_check": "all_adjustments_approved"},
         {"seq": 4, "content": "项目组是否保持职业怀疑", "auto_check": null},
         {"seq": 5, "content": "是否存在需要咨询的事项", "auto_check": null},
-        {"seq": 6, "content": "项目质量是否满足签发条件", "auto_check": null}
+        {"seq": 6, "content": "项目质量是否满足签发条件", "auto_check": "signoff_readiness"}
       ]
     },
     "A23-2": {

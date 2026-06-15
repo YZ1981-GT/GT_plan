@@ -46,6 +46,20 @@
             {{ pendingCount }} 待执行
           </el-tag>
         </div>
+        <!-- 阶段分组进度条 -->
+        <div v-if="hasPhaseGroups" class="gt-a-program-console__phase-progress">
+          <div v-for="group in phaseGroups" :key="group.phase" class="phase-chip">
+            <span class="phase-label">{{ group.label }}</span>
+            <el-progress
+              :percentage="group.progress"
+              :stroke-width="8"
+              :show-text="false"
+              :color="group.progress === 100 ? '#67C23A' : '#4b2d77'"
+              style="width: 60px; display: inline-flex; margin-left: 6px"
+            />
+            <span class="phase-pct">{{ group.progress }}%</span>
+          </div>
+        </div>
       </div>
 
       <!-- 工具栏：类别筛选 + 批量操作 -->
@@ -475,6 +489,7 @@ interface ProgramRow {
   trim_reason?: string
   history?: ProgramHistoryItem[]
   attachment_count?: number
+  phase?: string
 }
 
 interface TrimDecision {
@@ -625,6 +640,47 @@ const progressPercentage = computed(() => {
 const hasAssertions = computed(() =>
   programs.value.some(p => p.assertions && Object.values(p.assertions).some(Boolean))
 )
+
+/** 阶段分组标签映射 */
+const PHASE_LABELS: Record<string, string> = {
+  planning: '📋 计划阶段',
+  execution: '⚙️ 执行阶段',
+  completion: '📝 完成总结',
+  signoff: '✍️ 复核签发',
+}
+
+/** 是否有 phase 数据（有则按分组渲染） */
+const hasPhaseGroups = computed(() =>
+  programs.value.some((p: any) => p.phase)
+)
+
+/** 按 phase 分组的程序行 */
+const phaseGroups = computed(() => {
+  if (!hasPhaseGroups.value) return []
+  const order = ['planning', 'execution', 'completion', 'signoff']
+  const grouped = new Map<string, ProgramRow[]>()
+  for (const phase of order) {
+    grouped.set(phase, [])
+  }
+  for (const p of programs.value) {
+    const phase = (p as any).phase || 'completion'
+    const list = grouped.get(phase)
+    if (list) list.push(p)
+    else grouped.set(phase, [p])
+  }
+  return order
+    .filter(phase => (grouped.get(phase)?.length ?? 0) > 0)
+    .map(phase => {
+      const items = grouped.get(phase)!
+      const done = items.filter(i => i.status === 'completed' || i.status === 'not_applicable').length
+      return {
+        phase,
+        label: PHASE_LABELS[phase] || phase,
+        items,
+        progress: items.length > 0 ? Math.round((done / items.length) * 100) : 0,
+      }
+    })
+})
 
 /** 当任意程序行有历史决策记录时显示展开列，否则隐藏（避免展开内容与描述重复） */
 const hasExpandContent = computed(() =>
@@ -903,6 +959,31 @@ function debounceSave() {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.gt-a-program-console__phase-progress {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.gt-a-program-console__phase-progress .phase-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  color: var(--gt-color-text-secondary, #666);
+}
+
+.gt-a-program-console__phase-progress .phase-label {
+  white-space: nowrap;
+}
+
+.gt-a-program-console__phase-progress .phase-pct {
+  margin-left: 4px;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--gt-purple, #4b2d77);
 }
 
 .gt-a-program-console__toolbar {

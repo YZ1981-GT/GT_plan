@@ -83,6 +83,7 @@ class ProcedureTableService:
                 "seq": item["seq"],
                 "content": item["content"],
                 "ref_index": item.get("ref_index", ""),
+                "phase": item.get("phase"),
                 **merged,
             })
 
@@ -112,11 +113,21 @@ class ProcedureTableService:
 
         try:
             if source == "adjustment_count_aje":
-                count = await self._count_adjustments(project_id, year, "aje")
-                result["summary"] = f"共{count}笔" if count else "无"
+                count, pending = await self._count_adjustments_with_pending(project_id, year, "aje")
+                if count == 0:
+                    result["summary"] = "无"
+                elif pending > 0:
+                    result["summary"] = f"共{count}笔（⚠️{pending}笔待审）"
+                else:
+                    result["summary"] = f"共{count}笔（全部已批）"
             elif source == "adjustment_count_rje":
-                count = await self._count_adjustments(project_id, year, "rje")
-                result["summary"] = f"共{count}笔" if count else "无"
+                count, pending = await self._count_adjustments_with_pending(project_id, year, "rje")
+                if count == 0:
+                    result["summary"] = "无"
+                elif pending > 0:
+                    result["summary"] = f"共{count}笔（⚠️{pending}笔待审）"
+                else:
+                    result["summary"] = f"共{count}笔（全部已批）"
             elif source == "adjustment_count_passed":
                 count = await self._count_adjustments(project_id, year, "passed")
                 result["summary"] = f"共{count}笔" if count else "无"
@@ -126,7 +137,44 @@ class ProcedureTableService:
                 count = await self._count_adjustments(project_id, year, "passed")
                 result["summary"] = f"未更正错报{count}笔" if count else "无未更正错报"
             elif source == "misstatement_evaluation":
-                result["summary"] = "见 A13-3 评价"
+                # 错报评价结论：汇总未更正错报金额与执行重要性比对
+                try:
+                    from app.models.audit_platform_models import Adjustment, Materiality
+                    from app.models.audit_platform_models import AdjustmentEntry
+                    # 统计未更正错报总金额（借方合计）
+                    passed_stmt = sa.select(
+                        sa.func.coalesce(sa.func.sum(AdjustmentEntry.debit_amount), 0)
+                    ).join(
+                        Adjustment, AdjustmentEntry.adjustment_id == Adjustment.id
+                    ).where(
+                        Adjustment.project_id == project_id,
+                        Adjustment.year == year,
+                        Adjustment.passed_reason.isnot(None),
+                        Adjustment.is_deleted == sa.false(),
+                    )
+                    passed_r = await self.db.execute(passed_stmt)
+                    passed_amount = passed_r.scalar() or 0
+                    # 获取执行重要性
+                    mat_stmt = sa.select(Materiality.performance_materiality, Materiality.trivial_threshold).where(
+                        Materiality.project_id == project_id,
+                    )
+                    mat_r = await self.db.execute(mat_stmt)
+                    mat_row = mat_r.first()
+                    if not mat_row or not mat_row.performance_materiality:
+                        result["summary"] = f"未更正错报 ¥{passed_amount:,.0f}（重要性待设置）"
+                    else:
+                        perf_mat = float(mat_row.performance_materiality)
+                        trivial = float(mat_row.trivial_threshold) if mat_row.trivial_threshold else 0
+                        if passed_amount == 0:
+                            result["summary"] = "无未更正错报"
+                        elif passed_amount > perf_mat:
+                            result["summary"] = f"⚠️ 未更正错报 ¥{passed_amount:,.0f} 超执行重要性 ¥{perf_mat:,.0f}"
+                        elif passed_amount <= trivial:
+                            result["summary"] = f"未更正错报 ¥{passed_amount:,.0f}，低于明显微小阈值 → 不影响意见"
+                        else:
+                            result["summary"] = f"未更正错报 ¥{passed_amount:,.0f}，低于执行重要性 ¥{perf_mat:,.0f}"
+                except Exception:
+                    result["summary"] = "见 A13-3 评价"
             elif source == "materiality_set":
                 mat = await self._get_materiality(project_id)
                 result["summary"] = f"重要性水平 {mat:,.0f} 元" if mat else "待设置"
@@ -200,6 +248,28 @@ class ProcedureTableService:
             )
         result = await self.db.execute(stmt)
         return result.scalar() or 0
+
+    async def _count_adjustments_with_pending(
+        self, project_id: UUID, year: int, adj_type: str
+    ) -> tuple[int, int]:
+        """按类型统计调整分录数，同时返回待审批数"""
+        total_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
+            Adjustment.project_id == project_id,
+            Adjustment.year == year,
+            Adjustment.adjustment_type == adj_type,
+            Adjustment.is_deleted == sa.false(),
+        )
+        pending_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
+            Adjustment.project_id == project_id,
+            Adjustment.year == year,
+            Adjustment.adjustment_type == adj_type,
+            Adjustment.review_status != "approved",
+            Adjustment.passed_reason.is_(None),
+            Adjustment.is_deleted == sa.false(),
+        )
+        total_r = await self.db.execute(total_stmt)
+        pending_r = await self.db.execute(pending_stmt)
+        return (total_r.scalar() or 0, pending_r.scalar() or 0)
 
     async def _get_materiality(self, project_id: UUID) -> Decimal:
         stmt = sa.select(Materiality.overall_materiality).where(

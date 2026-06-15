@@ -456,11 +456,49 @@ class ReviewWorkflowService:
         """解析自动检查项"""
         try:
             if check_type == "workpaper_plan_coverage":
-                return "见底稿覆盖率"
+                from app.models.workpaper_models import WorkingPaper
+                total_stmt = sa.select(sa.func.count()).select_from(WorkingPaper).where(
+                    WorkingPaper.project_id == project_id,
+                    WorkingPaper.is_deleted == sa.false(),
+                )
+                done_stmt = sa.select(sa.func.count()).select_from(WorkingPaper).where(
+                    WorkingPaper.project_id == project_id,
+                    WorkingPaper.is_deleted == sa.false(),
+                    WorkingPaper.status.in_(["completed", "reviewed", "edit_complete"]),
+                )
+                total_r = await self.db.execute(total_stmt)
+                done_r = await self.db.execute(done_stmt)
+                total = total_r.scalar() or 0
+                done = done_r.scalar() or 0
+                if total == 0:
+                    return "无底稿"
+                pct = round(done / total * 100)
+                return f"覆盖 {done}/{total} 张（{pct}%）" if done < total else "通过（全部完成）"
             elif check_type == "workpaper_quality_check":
-                return "见底稿质量检查"
+                from app.models.phase15_models import IssueTicket
+                stmt = sa.select(sa.func.count()).select_from(IssueTicket).where(
+                    IssueTicket.project_id == project_id,
+                    IssueTicket.status.notin_(["closed", "rejected"]),
+                )
+                result = await self.db.execute(stmt)
+                open_issues = result.scalar() or 0
+                return "通过" if open_issues == 0 else f"待处理 {open_issues} 项"
             elif check_type == "confirmation_status":
-                return "见函证状态"
+                from app.models.confirmation_models import Confirmation
+                total_stmt = sa.select(sa.func.count()).select_from(Confirmation).where(
+                    Confirmation.project_id == project_id,
+                )
+                returned_stmt = sa.select(sa.func.count()).select_from(Confirmation).where(
+                    Confirmation.project_id == project_id,
+                    Confirmation.status.in_(["returned", "matched", "discrepancy"]),
+                )
+                total_r = await self.db.execute(total_stmt)
+                returned_r = await self.db.execute(returned_stmt)
+                total = total_r.scalar() or 0
+                returned = returned_r.scalar() or 0
+                if total == 0:
+                    return "无函证"
+                return f"已回 {returned}/{total} 封" if returned < total else "通过（全部回函）"
             elif check_type == "materiality_set":
                 from app.models.audit_platform_models import Materiality
                 stmt = sa.select(Materiality.overall_materiality).where(
@@ -544,12 +582,59 @@ class ReviewWorkflowService:
                 # A16 管理层声明书签回状态（从 field_overrides 读）
                 from app.services.field_override_service import FieldOverrideService
                 svc = FieldOverrideService(self.db)
-                status = await svc.get(project_id, year, "word_template:A16", "sign_status", "value")
+                overrides = await svc.get_batch(project_id, year, "word_template:A16")
+                sign_data = overrides.get("sign_status", {})
+                status = sign_data.get("value") if isinstance(sign_data, dict) else sign_data
                 if status == "signed":
+                    sign_date = overrides.get("sign_date", {})
+                    date_val = sign_date.get("value") if isinstance(sign_date, dict) else sign_date
+                    if date_val:
+                        return f"通过（{date_val} 签回）"
                     return "通过（已签回）"
                 elif status == "sent":
                     return "未通过（已发送，待签回）"
                 return "未通过（声明书未发送）"
+            elif check_type == "signoff_readiness":
+                # 聚合签发阻断项：stale + 未复核底稿 + 未批调整 + AI 未确认
+                blockers = []
+                # 1) 未批调整
+                from app.models.audit_platform_models import Adjustment
+                adj_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
+                    Adjustment.project_id == project_id,
+                    Adjustment.year == year,
+                    Adjustment.review_status != "approved",
+                    Adjustment.passed_reason.is_(None),
+                    Adjustment.is_deleted == sa.false(),
+                )
+                adj_r = await self.db.execute(adj_stmt)
+                adj_pending = adj_r.scalar() or 0
+                if adj_pending > 0:
+                    blockers.append(f"调整{adj_pending}笔待审")
+                # 2) 未复核底稿
+                from app.models.workpaper_models import WorkingPaper
+                unreview_stmt = sa.select(sa.func.count()).select_from(WorkingPaper).where(
+                    WorkingPaper.project_id == project_id,
+                    WorkingPaper.is_deleted == sa.false(),
+                    WorkingPaper.status.notin_(["reviewed", "completed"]),
+                )
+                unreview_r = await self.db.execute(unreview_stmt)
+                unreview = unreview_r.scalar() or 0
+                if unreview > 0:
+                    blockers.append(f"底稿{unreview}张未完成")
+                # 3) 问题单未关闭
+                from app.models.phase15_models import IssueTicket
+                issue_stmt = sa.select(sa.func.count()).select_from(IssueTicket).where(
+                    IssueTicket.project_id == project_id,
+                    IssueTicket.severity.in_(["blocker", "major"]),
+                    IssueTicket.status.notin_(["closed", "rejected"]),
+                )
+                issue_r = await self.db.execute(issue_stmt)
+                open_issues = issue_r.scalar() or 0
+                if open_issues > 0:
+                    blockers.append(f"重大问题{open_issues}项")
+                if not blockers:
+                    return "通过（可签发）"
+                return "⚠️ " + "；".join(blockers)
         except Exception as e:
             _logger.warning("auto_check %s failed: %s", check_type, e)
         return None

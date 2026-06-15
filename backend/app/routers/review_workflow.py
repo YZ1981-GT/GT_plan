@@ -12,6 +12,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.independence_signing_service import IndependenceSigningService
 from app.services.review_workflow_service import ReviewWorkflowService
 
@@ -55,13 +57,12 @@ async def save_review(
     year: int,
     body: SaveReviewRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     """保存复核记录"""
     svc = ReviewWorkflowService(db)
-    # TODO: get reviewer_id from current_user
-    reviewer_id = UUID("00000000-0000-0000-0000-000000000000")
     result = await svc.save_review(
-        project_id, year, body.template_code, reviewer_id, body.items, body.opinion, body.submit
+        project_id, year, body.template_code, current_user.id, body.items, body.opinion, body.submit
     )
     await db.commit()
     return result

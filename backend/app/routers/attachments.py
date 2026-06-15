@@ -124,6 +124,17 @@ async def upload_attachment(
         },
     )
     await db.commit()
+
+    # SSE 广播附件上传事件，供其他打开的页面实时同步
+    try:
+        from app.services.event_bus import event_bus
+        event_bus.broadcast_raw(
+            event_type="attachment.uploaded",
+            extra={"project_id": str(project_id), "attachment_id": str(result.get("id", ""))},
+        )
+    except Exception:
+        pass  # SSE 失败不阻断主流程
+
     return result
 
 

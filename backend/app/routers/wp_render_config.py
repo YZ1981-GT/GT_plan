@@ -520,6 +520,7 @@ async def _generate_a_program_data(
                         "assertions": {},
                         "linked_workpapers": it.get("ref_index", "") or "",
                         "status": status,
+                        "phase": it.get("phase"),
                     })
         except Exception as e:  # noqa: BLE001 — 降级到 xlsx 提取，不阻塞渲染
             logger.warning("A-程序表模板自动汇总失败 %s: %s", wp_code, e)
