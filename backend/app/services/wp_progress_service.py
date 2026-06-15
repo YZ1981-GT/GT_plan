@@ -24,7 +24,12 @@ class WpProgressService:
         self.db = db
 
     async def get_progress(self, project_id: UUID) -> dict:
-        """按审计循环分组统计完成度"""
+        """按审计循环分组统计完成度
+
+        A 循环特殊处理：除了底稿级 status（整体 prepared/reviewed），还读取
+        FieldOverrideService 中各 A 类程序表的程序项完成率（procedure-level），
+        提供更细粒度的"完成与报告"阶段进度。
+        """
         q = (
             sa.select(
                 WpIndex.audit_cycle,
@@ -49,7 +54,57 @@ class WpProgressService:
         done_all = sum(c.get("prepared", 0) + c.get("reviewed", 0) + c.get("archived", 0) for c in by_cycle.values())
         overall_rate = round(done_all / total_all * 100, 1) if total_all > 0 else 0
 
-        return {"by_cycle": by_cycle, "total": total_all, "done": done_all, "rate": overall_rate}
+        # A 循环程序级进度（从 FieldOverrideService 读 procedure_table:A* 的 status 字段）
+        a_procedure_progress = await self._get_a_procedure_progress(project_id)
+
+        return {
+            "by_cycle": by_cycle,
+            "total": total_all,
+            "done": done_all,
+            "rate": overall_rate,
+            "a_procedure_progress": a_procedure_progress,
+        }
+
+    async def _get_a_procedure_progress(self, project_id: UUID) -> dict:
+        """从 FieldOverrideService 读取 A 类程序表各项的完成状态，返回汇总进度。
+
+        Returns: { total_items, completed_items, rate, by_wp: { A1: {total, completed}, ... } }
+        """
+        try:
+            # 查所有 scope 以 procedure_table:A 开头的 field=status 的覆盖值
+            stmt = sa.text("""
+                SELECT scope, item_key, value
+                FROM workpaper_field_overrides
+                WHERE project_id = :pid
+                  AND scope LIKE 'procedure_table:A%'
+                  AND field = 'status'
+            """)
+            rows = (await self.db.execute(stmt, {"pid": str(project_id)})).all()
+
+            by_wp: dict[str, dict] = {}
+            total = 0
+            completed = 0
+            for r in rows:
+                scope = r[0]  # 'procedure_table:A1'
+                wp_code = scope.replace("procedure_table:", "")
+                status_val = r[2]  # JSON value
+                # value 可能是 JSON 字符串
+                status = status_val if isinstance(status_val, str) else str(status_val or "")
+                status = status.strip('"')
+
+                if wp_code not in by_wp:
+                    by_wp[wp_code] = {"total": 0, "completed": 0}
+                by_wp[wp_code]["total"] += 1
+                total += 1
+                if status in ("completed", "not_applicable"):
+                    by_wp[wp_code]["completed"] += 1
+                    completed += 1
+
+            rate = round(completed / total * 100, 1) if total > 0 else 0
+            return {"total_items": total, "completed_items": completed, "rate": rate, "by_wp": by_wp}
+        except Exception as e:
+            logger.debug("A 循环程序级进度查询失败: %s", e)
+            return {"total_items": 0, "completed_items": 0, "rate": 0, "by_wp": {}}
 
     async def get_overdue(self, project_id: UUID, days: int = 7) -> list[dict]:
         """超期底稿预警"""
