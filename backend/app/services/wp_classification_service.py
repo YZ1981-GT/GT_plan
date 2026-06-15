@@ -34,6 +34,8 @@ VALID_COMPONENT_TYPES: set[str] = {
     "custom",
     "audit-sheet",
     "bad-debt-sheet",
+    "misstatement-summary",
+    "review-checklist",
     "univer",
     "skip",
 }
@@ -55,6 +57,12 @@ _CLASS_TO_COMPONENT: dict[str, str] = {
 # 特定底稿直接路由到专用 HTML 组件，不经过 class_code 映射
 _WP_CODE_OVERRIDE: dict[str, str] = {
     "A5": "cf-verification",          # 财务报表支持程序表 → 现金流量表核查视图
+    "A13": "misstatement-summary",    # 错报程序表 → 错报自动汇总视图
+    "A21": "review-checklist",        # 现场负责人复核表 → 结构化复核面板
+    "A22": "review-checklist",        # 项目经理复核 → 结构化复核面板
+    "A23": "review-checklist",        # 合伙人复核 → 结构化复核面板
+    "A24": "review-checklist",        # 质量复核 → 结构化复核面板
+    "A25": "review-checklist",        # EQCR 复核 → 结构化复核面板
 }
 
 # D 类子路由映射（基于 class_code 具体值）

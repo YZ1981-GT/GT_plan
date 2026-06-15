@@ -118,6 +118,13 @@
       :project-id="projectId"
       @copied="fetchWpIndex"
     />
+
+    <!-- 底稿裁剪确认弹窗（生成前选择范围） -->
+    <WorkpaperTrimDialog
+      v-model="showTrimDialog"
+      :project-id="projectId"
+      @confirm="(codes: string[]) => { trimDialogResolve?.(codes); showTrimDialog = false }"
+    />
   </div>
 </template>
 
@@ -165,6 +172,7 @@ import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
 import WpBatchExportDialog from '@/components/workpaper/WpBatchExportDialog.vue'
 import WpTemplateCopyDialog from '@/components/workpaper/WpTemplateCopyDialog.vue'
+import WorkpaperTrimDialog from '@/components/workpaper/WorkpaperTrimDialog.vue'
 
 defineOptions({ name: 'WorkpaperList' })
 
@@ -203,6 +211,9 @@ const showTemplateCopy = ref(false)
 const showBatchAssign = ref(false)
 const downloadLoading = ref(false)
 const generateLoading = ref(false)
+const showTrimDialog = ref(false)
+const trimDialogResolve = ref<((codes: string[]) => void) | null>(null)
+const trimDialogReject = ref<(() => void) | null>(null)
 
 const hasData = computed(() => wpIndex.value.length > 0 || wpList.value.length > 0)
 
@@ -484,29 +495,53 @@ async function onGenerateWorkpapers() {
         },
       }).catch(() => reject('cancel'))
     })
-    // 3. 调用生成 API
+    // 3. 弹出裁剪确认弹窗（WorkpaperTrimDialog），让用户确认生成范围
+    const { getTemplateSet } = await import('@/services/workpaperApi')
+    const selectedSet = await getTemplateSet(selectedSetId)
+    const allCodes: string[] = selectedSet?.template_codes || []
+    let confirmedCodes: string[] = allCodes
+
+    if (allCodes.length > 0) {
+      try {
+        confirmedCodes = await new Promise<string[]>((resolve, reject) => {
+          trimDialogResolve.value = resolve
+          trimDialogReject.value = reject
+          showTrimDialog.value = true
+          // 监听弹窗关闭（用户点取消时 modelValue 变 false 但 resolve 没被调）
+          const unwatch = watch(showTrimDialog, (v) => {
+            if (!v && trimDialogResolve.value) {
+              reject()
+              unwatch()
+            }
+          })
+        })
+      } catch {
+        return
+      } finally {
+        trimDialogResolve.value = null
+        trimDialogReject.value = null
+      }
+    }
+
+    if (confirmedCodes.length === 0) {
+      ElMessage.warning('未选择任何底稿')
+      return
+    }
+
+    // 4. 调用生成 API（传裁剪后的编码列表）
     let result: any
     try {
-      // 优先走 generate（模板集路径），500 时降级到 generate-from-codes
       result = await api.post(
         `/api/projects/${projectId.value}/working-papers/generate`,
-        { template_set_id: selectedSetId, year: currentYear.value },
+        { template_set_id: selectedSetId, year: currentYear.value, selected_templates: confirmedCodes },
       )
     } catch (genErr: any) {
-      // generate 500 时降级：取模板集编码走 generate-from-codes
       if (genErr?.response?.status >= 500) {
         try {
-          const { getTemplateSet } = await import('@/services/workpaperApi')
-          const selectedSet = await getTemplateSet(selectedSetId)
-          const wpCodes = selectedSet?.template_codes || []
-          if (wpCodes.length > 0) {
-            result = await api.post(
-              `/api/projects/${projectId.value}/working-papers/generate-from-codes`,
-              { wp_codes: wpCodes, year: currentYear.value },
-            )
-          } else {
-            throw genErr
-          }
+          result = await api.post(
+            `/api/projects/${projectId.value}/working-papers/generate-from-codes`,
+            { wp_codes: confirmedCodes, year: currentYear.value },
+          )
         } catch {
           throw genErr
         }

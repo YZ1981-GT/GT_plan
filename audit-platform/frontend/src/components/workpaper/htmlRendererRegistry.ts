@@ -43,6 +43,8 @@ export type HtmlComponentType =
   | 'cf-verification'
   | 'procedure-table'
   | 'report-analysis'
+  | 'misstatement-summary'
+  | 'review-checklist'
 
 /** 注册表条目：包含 lazy component / 图标 / emits / 描述 */
 export interface HtmlRendererEntry {
@@ -72,6 +74,8 @@ const GtBadDebtSheet = defineAsyncComponent(() => import('./GtBadDebtSheet.vue')
 const GtCfVerification = defineAsyncComponent(() => import('./CashFlowVerification.vue'))
 const GtProcedureTable = defineAsyncComponent(() => import('./ProcedureTableRenderer.vue'))
 const GtReportAnalysis = defineAsyncComponent(() => import('./ReportAnalysisPanel.vue'))
+const GtMisstatementSummary = defineAsyncComponent(() => import('./MisstatementSummaryView.vue'))
+const GtReviewChecklist = defineAsyncComponent(() => import('./ReviewChecklistPanel.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -189,6 +193,20 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📈',
     label: '报表分析',
     emits: [],
+  },
+  {
+    componentType: 'misstatement-summary',
+    component: GtMisstatementSummary,
+    icon: '⚠️',
+    label: '错报汇总',
+    emits: [],
+  },
+  {
+    componentType: 'review-checklist',
+    component: GtReviewChecklist,
+    icon: '✍️',
+    label: '复核面板',
+    emits: ['save'],
   },
 ]
 
