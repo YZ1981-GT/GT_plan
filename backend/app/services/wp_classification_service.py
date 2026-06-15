@@ -36,6 +36,7 @@ VALID_COMPONENT_TYPES: set[str] = {
     "bad-debt-sheet",
     "misstatement-summary",
     "review-checklist",
+    "word-template",
     "univer",
     "skip",
 }
@@ -58,6 +59,7 @@ _CLASS_TO_COMPONENT: dict[str, str] = {
 _WP_CODE_OVERRIDE: dict[str, str] = {
     "A5": "cf-verification",          # 财务报表支持程序表 → 现金流量表核查视图
     "A13": "misstatement-summary",    # 错报程序表 → 错报自动汇总视图
+    "A16": "word-template",           # 管理层声明书 → OnlyOffice Word 编辑
     "A21": "review-checklist",        # 现场负责人复核表 → 结构化复核面板
     "A22": "review-checklist",        # 项目经理复核 → 结构化复核面板
     "A23": "review-checklist",        # 合伙人复核 → 结构化复核面板

@@ -581,6 +581,7 @@ declare module 'vue' {
     WorkpaperStandardHeader: typeof import('./components/workpaper/WorkpaperStandardHeader.vue')['default']
     WorkpaperTraceView: typeof import('./components/workpaper/WorkpaperTraceView.vue')['default']
     WorkpaperTrimDialog: typeof import('./components/workpaper/WorkpaperTrimDialog.vue')['default']
+    WorkpaperWordEditor: typeof import('./components/workpaper/WorkpaperWordEditor.vue')['default']
     WpBatchExportDialog: typeof import('./components/workpaper/WpBatchExportDialog.vue')['default']
     WpConflictPanel: typeof import('./components/workpaper/WpConflictPanel.vue')['default']
     WpExportButton: typeof import('./components/workpaper/WpExportButton.vue')['default']

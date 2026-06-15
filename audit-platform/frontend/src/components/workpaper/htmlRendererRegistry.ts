@@ -45,6 +45,7 @@ export type HtmlComponentType =
   | 'report-analysis'
   | 'misstatement-summary'
   | 'review-checklist'
+  | 'word-template'
 
 /** 注册表条目：包含 lazy component / 图标 / emits / 描述 */
 export interface HtmlRendererEntry {
@@ -76,6 +77,7 @@ const GtProcedureTable = defineAsyncComponent(() => import('./ProcedureTableRend
 const GtReportAnalysis = defineAsyncComponent(() => import('./ReportAnalysisPanel.vue'))
 const GtMisstatementSummary = defineAsyncComponent(() => import('./MisstatementSummaryView.vue'))
 const GtReviewChecklist = defineAsyncComponent(() => import('./ReviewChecklistPanel.vue'))
+const GtWordTemplate = defineAsyncComponent(() => import('./WorkpaperWordEditor.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -207,6 +209,13 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '✍️',
     label: '复核面板',
     emits: ['save'],
+  },
+  {
+    componentType: 'word-template',
+    component: GtWordTemplate,
+    icon: '📄',
+    label: 'Word 模板编辑',
+    emits: [],
   },
 ]
 
