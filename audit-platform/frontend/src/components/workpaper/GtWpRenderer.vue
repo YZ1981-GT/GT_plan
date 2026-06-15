@@ -138,6 +138,7 @@
 
 <script setup lang="ts">
 import { ref, computed, toRef, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useWpRenderer, type WpComponentType } from '@/composables/useWpRenderer'
 import { useCellLocate, type LocateTarget } from '@/composables/useCellLocate'
@@ -196,6 +197,7 @@ const emit = defineEmits<{
 }>()
 
 // ─── Refs ───
+const route = useRoute()
 const containerRef = ref<HTMLElement | null>(null)
 const loadingHint = ref('')
 // 内部维护 activeSheetName（支持 sheet 切换）
@@ -309,7 +311,7 @@ const extraComponentProps = computed<Record<string, unknown>>(() => {
       year: preparationYear.value,
     }
   }
-  if (ct === 'cf-verification' || ct === 'report-analysis') {
+  if (ct === 'cf-verification' || ct === 'report-analysis' || ct === 'misstatement-summary' || ct === 'review-checklist' || ct === 'independence-signing' || ct === 'word-template') {
     return {
       'project-id': renderConfig.value?.project_id ?? '',
       year: preparationYear.value,
@@ -318,8 +320,12 @@ const extraComponentProps = computed<Record<string, unknown>>(() => {
   return {}
 })
 
-/** 公式校验/注册表用年度（缺省当前年） */
-const preparationYear = computed(() => new Date().getFullYear())
+/** 公式校验/注册表用年度（从 render-config 解析或 route query 取，缺省当前年） */
+const preparationYear = computed(() => {
+  const routeYear = parseInt(route.query.year as string)
+  if (routeYear && routeYear > 2000) return routeYear
+  return new Date().getFullYear()
+})
 
 /** componentType → 图标（sheet tab 显示），委托给 registry */
 function getSheetIcon(ct: string): string {
