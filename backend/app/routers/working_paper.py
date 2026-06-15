@@ -490,6 +490,139 @@ async def download_workpaper(
         raise HTTPException(status_code=404, detail=str(e))
 
 
+# ─── A16 声明书专用端点（file-info / sign-status / onlyoffice-config） ──────
+
+
+@router.get("/working-papers/{wp_id}/file-info")
+async def get_workpaper_file_info(
+    project_id: UUID,
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_project_access("readonly")),
+):
+    """返回底稿文件信息 + 签发状态（A16 声明书用）"""
+    wp = (await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )).scalar_one_or_none()
+    if not wp:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    # 签发状态从 field_overrides 读取（scope=word_template:A16, field=value）
+    from app.services.field_override_service import FieldOverrideService
+    from app.models.workpaper_models import WpIndex
+
+    wp_index = (await db.execute(
+        sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
+    )).scalar_one_or_none()
+    wp_code = wp_index or ""
+
+    svc = FieldOverrideService(db)
+    year_val = 0
+    try:
+        year_q = await db.execute(sa.text(
+            "SELECT EXTRACT(YEAR FROM audit_period_end)::int FROM projects WHERE id = :pid"
+        ), {"pid": str(project_id)})
+        yr = year_q.scalar()
+        year_val = yr or 0
+    except Exception:
+        pass
+
+    sign_status = None
+    if year_val:
+        sign_status = await svc.get(project_id, year_val, f"word_template:{wp_code}", "sign_status", "value")
+
+    return {
+        "file_name": wp.file_path.split("/")[-1] if wp.file_path else f"{wp_code} 声明书.docx",
+        "file_path": wp.file_path,
+        "file_version": wp.file_version,
+        "sign_status": sign_status or "pending",
+    }
+
+
+@router.post("/working-papers/{wp_id}/sign-status")
+async def update_sign_status(
+    project_id: UUID,
+    wp_id: UUID,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("member")),
+):
+    """更新声明书签发状态（待编辑/已发送/已签回）"""
+    status = body.get("status", "pending")
+    if status not in ("pending", "sent", "signed"):
+        raise HTTPException(status_code=422, detail="状态值无效")
+
+    from app.services.field_override_service import FieldOverrideService
+    from app.models.workpaper_models import WpIndex
+
+    wp = (await db.execute(
+        sa.select(WorkingPaper).where(WorkingPaper.id == wp_id, WorkingPaper.project_id == project_id)
+    )).scalar_one_or_none()
+    if not wp:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    wp_index = (await db.execute(
+        sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
+    )).scalar_one_or_none()
+    wp_code = wp_index or "A16"
+
+    year_val = 0
+    try:
+        year_q = await db.execute(sa.text(
+            "SELECT EXTRACT(YEAR FROM audit_period_end)::int FROM projects WHERE id = :pid"
+        ), {"pid": str(project_id)})
+        year_val = year_q.scalar() or 0
+    except Exception:
+        pass
+
+    svc = FieldOverrideService(db)
+    await svc.set(project_id, year_val or 2025, f"word_template:{wp_code}", "sign_status", "value", status, current_user.id)
+    await db.commit()
+    return {"status": status}
+
+
+@router.get("/working-papers/{wp_id}/onlyoffice-config")
+async def get_wp_onlyoffice_config(
+    project_id: UUID,
+    wp_id: UUID,
+    version: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_project_access("readonly")),
+):
+    """返回底稿的 OnlyOffice 编辑器配置（复用 deliverable 模块的 signed-download 机制）"""
+    from app.core.config import settings
+
+    wp = (await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )).scalar_one_or_none()
+    if not wp:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    if not settings.ONLYOFFICE_URL:
+        raise HTTPException(status_code=503, detail="OnlyOffice 未配置")
+
+    # 构建 document URL（用 signed-download 免 auth 端点）
+    callback_base = settings.ONLYOFFICE_CALLBACK_BASE or f"http://localhost:{settings.PORT}"
+    document_url = f"{callback_base}/api/projects/{project_id}/working-papers/{wp_id}/download"
+    if version:
+        document_url += f"?version={version}"
+
+    return {
+        "document_url": document_url,
+        "document_key": f"wp-{wp_id}-{wp.file_version}",
+        "title": wp.file_path.split("/")[-1] if wp.file_path else "声明书.docx",
+        "onlyoffice_url": settings.ONLYOFFICE_URL,
+    }
+
+
 @router.get("/working-papers/{wp_id}/export-pdf")
 async def export_workpaper_pdf(
     project_id: UUID,

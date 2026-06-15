@@ -205,13 +205,13 @@ async function loadProjectInfo() {
 
 async function loadMisstatementSummary() {
   try {
-    const year = new Date().getFullYear()
+    const year = parseInt(route.query.year as string) || new Date().getFullYear()
     const r = await api.get<any>(
-      `/api/workpapers/${projectId.value}/${year}/misstatement-for-letter`
+      `/api/projects/${projectId.value}/misstatements/for-letter`,
+      { params: { year } },
     )
-    const text = r?.data || r?.summary || r
-    misstatementSummary.value = typeof text === 'string' ? text : ''
-    if (misstatementSummary.value === '无未更正错报。') misstatementSummary.value = ''
+    const text = r?.summary || r?.data?.summary || ''
+    misstatementSummary.value = (text === '无未更正错报。') ? '' : text
     misstatementLoaded.value = true
     placeholders.value.uncorrected_misstatements = misstatementSummary.value || '无'
   } catch {

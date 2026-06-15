@@ -712,10 +712,11 @@ function handleSelectionChange(selection: ProgramRow[]) {
 /** 执行说明失焦保存到 FieldOverrideService */
 async function saveExecutionSummary(row: ProgramRow) {
   if (props.readonly) return
+  const year = parseInt(route.query.year as string) || new Date().getFullYear()
   try {
     await api.post('/api/workpapers/field-overrides', {
       project_id: projectId.value,
-      year: new Date().getFullYear(),
+      year,
       scope: `procedure_table:${props.sheetName || 'A1'}`,
       item_key: String(row.program_no),
       field: 'execution_summary',

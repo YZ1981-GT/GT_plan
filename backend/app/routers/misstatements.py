@@ -129,6 +129,21 @@ async def delete_misstatement(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/for-letter")
+async def get_for_representation_letter(
+    project_id: UUID,
+    year: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(get_current_user),
+):
+    """返回 A16 管理层声明书用的未更正错报摘要文本"""
+    from app.services.misstatement_summary_service import MisstatementSummaryService
+
+    svc = MisstatementSummaryService(db)
+    text = await svc.get_for_representation_letter(project_id, year)
+    return {"summary": text}
+
+
 @router.get("/summary")
 async def get_summary(
     project_id: UUID,
