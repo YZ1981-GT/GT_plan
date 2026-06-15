@@ -537,6 +537,26 @@ async def _generate_a_program_data(
         "programs": programs,
         "trim_decisions": [],
     }
+
+    # ─── 合并已保存的用户覆盖值（execution_summary / status） ─────────────
+    # 当 programs 从模板新生成时，用户之前保存的执行说明和状态需要回读合并，
+    # 否则每次刷新都丢失。读取 FieldOverrideService scope=procedure_table:{wp_code}。
+    if db is not None and project_id is not None and wp_code and programs:
+        try:
+            from app.services.field_override_service import FieldOverrideService
+            override_svc = FieldOverrideService(db)
+            overrides = await override_svc.get_batch(project_id, year or 0, f"procedure_table:{wp_code}")
+            for prog in programs:
+                item_key = str(prog.get("program_no", ""))
+                if item_key in overrides:
+                    saved = overrides[item_key]
+                    if "execution_summary" in saved:
+                        prog["execution_summary"] = saved["execution_summary"]
+                    if "status" in saved and saved["status"]:
+                        prog["status"] = saved["status"]
+        except Exception:  # noqa: BLE001
+            pass
+
     # 保留已有签字信息（若 sheet 之前存过部分数据）
     if existing and isinstance(existing.get("signatures"), list):
         result["signatures"] = existing["signatures"]

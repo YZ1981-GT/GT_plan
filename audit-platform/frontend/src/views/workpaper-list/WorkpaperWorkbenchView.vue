@@ -2,6 +2,10 @@
   <div class="gt-wp-workbench-container">
     <!-- 工作台视图：按循环分组 + 进度追踪 + 批量操作 -->
     <div v-if="ctx.viewMode.value === 'workbench'" class="gt-wp-workbench-view">
+      <!-- 编制顺序引导 -->
+      <el-alert type="info" :closable="true" style="margin-bottom: 8px" show-icon>
+        <template #title>推荐编制顺序：<b>B</b> 承接计划 → <b>C</b> 控制测试 → <b>D~N</b> 实质性程序 → <b>A</b> 完成报告</template>
+      </el-alert>
       <!-- 循环进度卡片区 -->
       <div class="gt-wpb-progress-header">
         <span class="gt-wpb-progress-header__title">循环进度概览</span>

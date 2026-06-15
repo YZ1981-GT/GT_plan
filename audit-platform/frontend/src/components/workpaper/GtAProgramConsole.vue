@@ -86,6 +86,7 @@
           >
             批量裁剪 ({{ selectedIds.length }})
           </el-button>
+          <el-button size="small" @click="exportProgramTable">📥 导出 Excel</el-button>
         </div>
       </div>
     </div>
@@ -712,19 +713,49 @@ function handleSelectionChange(selection: ProgramRow[]) {
 /** 执行说明失焦保存到 FieldOverrideService */
 async function saveExecutionSummary(row: ProgramRow) {
   if (props.readonly) return
+  persistProgramField(row.program_no, 'execution_summary', row.execution_summary || '')
+}
+
+/** 通用：持久化程序行字段到 FieldOverrideService */
+async function persistProgramField(programNo: number, field: string, value: any) {
   const year = parseInt(route.query.year as string) || new Date().getFullYear()
   try {
     await api.post('/api/workpapers/field-overrides', {
       project_id: projectId.value,
       year,
       scope: `procedure_table:${props.sheetName || 'A1'}`,
-      item_key: String(row.program_no),
-      field: 'execution_summary',
-      value: row.execution_summary || '',
+      item_key: String(programNo),
+      field,
+      value,
     })
   } catch {
-    // 静默失败，不阻塞编辑体验
+    // 静默
   }
+}
+
+/** 导出程序表为 Excel */
+async function exportProgramTable() {
+  const { useExcelIO } = await import('@/composables/useExcelIO')
+  const { exportData } = useExcelIO()
+  const data = programs.value.map(p => ({
+    '序号': p.program_no,
+    '程序描述': p.program_desc,
+    '关联底稿': p.linked_workpapers || '',
+    '执行说明': p.execution_summary || '',
+    '状态': statusLabel(p.status),
+  }))
+  await exportData({
+    data,
+    columns: [
+      { key: '序号', header: '序号' },
+      { key: '程序描述', header: '审计程序' },
+      { key: '关联底稿', header: '索引号' },
+      { key: '执行说明', header: '执行情况说明' },
+      { key: '状态', header: '状态' },
+    ],
+    sheetName: props.sheetName || '程序表',
+    fileName: `${props.sheetName || 'A1'} 程序表.xlsx`,
+  })
 }
 
 function handleStatusChange(row: ProgramRow, newStatus: string) {
@@ -744,6 +775,8 @@ function handleStatusChange(row: ProgramRow, newStatus: string) {
   if (idx >= 0) {
     programs.value[idx].status = newStatus
     emit('program-status-change', { programId: row.id, status: newStatus })
+    // 持久化到 FieldOverrideService（跨模块可读，如 A1 进度联动）
+    persistProgramField(row.program_no, 'status', newStatus)
     debounceSave()
   }
 }

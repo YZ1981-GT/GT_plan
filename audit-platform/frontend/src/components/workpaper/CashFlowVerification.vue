@@ -1,6 +1,9 @@
 <template>
   <div class="cf-verification">
-    <el-tabs v-model="activeTab" type="border-card">
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 8px">
+      <el-button size="small" @click="refreshKey++" :icon="Refresh">重新核查</el-button>
+    </div>
+    <el-tabs v-model="activeTab" type="border-card" :key="refreshKey">
       <el-tab-pane label="现金等价物" name="cash">
         <CfCashEquivalents :project-id="projectId" :year="year" />
       </el-tab-pane>
@@ -25,6 +28,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { Refresh } from '@element-plus/icons-vue'
 import CfCashEquivalents from './cf/CfCashEquivalents.vue'
 import CfReconciliation from './cf/CfReconciliation.vue'
 import CfMainTable from './cf/CfMainTable.vue'
@@ -38,6 +42,7 @@ const props = defineProps<{
 }>()
 
 const activeTab = ref('cash')
+const refreshKey = ref(0)
 </script>
 
 <style scoped>

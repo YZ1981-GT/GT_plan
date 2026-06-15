@@ -37,6 +37,7 @@ VALID_COMPONENT_TYPES: set[str] = {
     "misstatement-summary",
     "review-checklist",
     "word-template",
+    "independence-signing",
     "univer",
     "skip",
 }
@@ -65,6 +66,7 @@ _WP_CODE_OVERRIDE: dict[str, str] = {
     "A23": "review-checklist",        # 合伙人复核 → 结构化复核面板
     "A24": "review-checklist",        # 质量复核 → 结构化复核面板
     "A25": "review-checklist",        # EQCR 复核 → 结构化复核面板
+    "A17-7": "independence-signing",  # 独立性声明书 → 电子签署面板
 }
 
 # D 类子路由映射（基于 class_code 具体值）

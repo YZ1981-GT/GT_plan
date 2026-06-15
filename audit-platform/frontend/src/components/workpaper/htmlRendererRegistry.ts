@@ -46,6 +46,7 @@ export type HtmlComponentType =
   | 'misstatement-summary'
   | 'review-checklist'
   | 'word-template'
+  | 'independence-signing'
 
 /** 注册表条目：包含 lazy component / 图标 / emits / 描述 */
 export interface HtmlRendererEntry {
@@ -78,6 +79,7 @@ const GtReportAnalysis = defineAsyncComponent(() => import('./ReportAnalysisPane
 const GtMisstatementSummary = defineAsyncComponent(() => import('./MisstatementSummaryView.vue'))
 const GtReviewChecklist = defineAsyncComponent(() => import('./ReviewChecklistPanel.vue'))
 const GtWordTemplate = defineAsyncComponent(() => import('./WorkpaperWordEditor.vue'))
+const GtIndependenceSigning = defineAsyncComponent(() => import('./IndependenceSigning.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -215,6 +217,13 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: GtWordTemplate,
     icon: '📄',
     label: 'Word 模板编辑',
+    emits: [],
+  },
+  {
+    componentType: 'independence-signing',
+    component: GtIndependenceSigning,
+    icon: '✍️',
+    label: '独立性签署',
     emits: [],
   },
 ]
