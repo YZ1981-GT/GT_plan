@@ -3,6 +3,9 @@
 Validates: Requirements 1.1-1.8
 """
 
+import json
+import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,6 +24,8 @@ from app.models.audit_platform_schemas import (
 )
 from app.models.core import Project, User
 from app.services import project_wizard_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -389,6 +394,240 @@ async def attach_subsidiaries(
         _emit_scope_changed(project_id, _extract_project_audit_year(parent))
 
     return [_to_project_response(c) for c in attached]
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 增强（group-tree-architecture Task 15.2 / 16.1）：
+#   PATCH /api/projects/{project_id}/parent-code  — 调整上级企业代码（拖拽调层级）
+#   GET   /api/projects/{project_id}/parent-code-history — 层级变更历史（读 app_audit_log）
+# ---------------------------------------------------------------------------
+
+
+class UpdateParentCodeRequest(BaseModel):
+    """调整 parent_company_code 请求。
+
+    parent_company_code 为 None 或空串 → 脱挂到顶层（指向最终控制方根或独立）。
+    """
+    parent_company_code: str | None = None
+
+
+class UpdateParentCodeResponse(BaseModel):
+    id: str
+    parent_company_code: str | None
+    parent_project_id: str | None
+
+
+async def _would_form_cycle(
+    db: AsyncSession,
+    project: Project,
+    new_parent_code: str,
+) -> bool:
+    """后端二次校验：将 project.parent_company_code 设为 new_parent_code 是否形成循环。
+
+    从 new_parent_code 出发，沿 parent_company_code → company_code 链向上遍历
+    （限定同一 ultimate 分组、未删除项目）。若遍历途中遇到 project 自身的
+    company_code → 形成循环（project 成为自己的祖先），返回 True。
+
+    带 visited 集合防止遍历途中已存在的环导致死循环。
+    parent 指向不存在的代码 → 链断裂（脱挂），不算循环，返回 False。
+    """
+    from sqlalchemy import select
+
+    own_code = (project.company_code or "").strip()
+    target_code = (new_parent_code or "").strip()
+    if not target_code:
+        return False
+    # 自己当自己的上级 → 直接判循环
+    if own_code and target_code == own_code:
+        return True
+    if not own_code:
+        # 自身无 company_code，无法成为任何节点的祖先 → 不可能循环
+        return False
+
+    # 同一 ultimate 分组内的候选项目（按 company_code 索引）
+    ultimate = (project.ultimate_company_code or "").strip()
+    stmt = select(Project).where(Project.is_deleted == False)  # noqa: E712
+    if ultimate:
+        stmt = stmt.where(Project.ultimate_company_code == ultimate)
+    res = await db.execute(stmt)
+    by_code: dict[str, Project] = {}
+    for p in res.scalars().all():
+        c = (p.company_code or "").strip()
+        if c and c not in by_code:
+            by_code[c] = p
+
+    visited: set[str] = set()
+    current_code = target_code
+    while current_code:
+        if current_code == own_code:
+            return True  # 走回自身 → 循环
+        if current_code in visited:
+            return False  # 已存在的环（不含自身），链终止
+        visited.add(current_code)
+        node = by_code.get(current_code)
+        if node is None:
+            return False  # 链断裂（指向不存在企业）→ 脱挂，无循环
+        current_code = (node.parent_company_code or "").strip()
+    return False
+
+
+@router.patch("/{project_id}/parent-code", response_model=UpdateParentCodeResponse)
+async def update_parent_code(
+    project_id: UUID,
+    body: UpdateParentCodeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> UpdateParentCodeResponse:
+    """调整项目的上级企业代码（parent_company_code）。
+
+    用于树形拖拽调整层级（Task 15）。后端二次校验循环引用（Task 15.2），
+    并将变更写入 app_audit_log（who/when/old/new，Task 16.1）。
+
+    - parent_company_code 为空/None → 脱挂到顶层。
+    - 设为自身 company_code 或形成循环 → 400 拒绝。
+    - 同步解析 parent_project_id（匹配同 ultimate 内 company_code 的项目；
+      找不到则置 None，与批量导入脱挂行为一致）。
+    - 审计日志写入失败不阻断主更新（try/except 吞，仅告警）。
+    """
+    project = await db.get(Project, project_id)
+    if project is None or project.is_deleted:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    old_value = project.parent_company_code
+    new_value = (body.parent_company_code or "").strip() or None
+
+    # 后端二次校验：循环引用
+    if new_value is not None:
+        own_code = (project.company_code or "").strip()
+        if own_code and new_value == own_code:
+            raise HTTPException(status_code=400, detail="不能将项目的上级设为自身")
+        if await _would_form_cycle(db, project, new_value):
+            raise HTTPException(
+                status_code=400, detail="该调整会形成循环引用（项目成为自己的祖先）"
+            )
+
+    # 更新 parent_company_code
+    project.parent_company_code = new_value
+
+    # 同步解析 parent_project_id（与批量导入解析逻辑一致：匹配同 ultimate 内 company_code）
+    new_parent_project_id = None
+    if new_value is not None:
+        from sqlalchemy import select
+
+        stmt = select(Project).where(
+            Project.company_code == new_value,
+            Project.is_deleted == False,  # noqa: E712
+            Project.id != project.id,
+        )
+        ultimate = (project.ultimate_company_code or "").strip()
+        if ultimate:
+            stmt = stmt.where(Project.ultimate_company_code == ultimate)
+        res = await db.execute(stmt)
+        candidates = res.scalars().all()
+        target = None
+        if candidates:
+            # 优先同年度
+            ay = project.audit_year
+            if ay is not None:
+                for c in candidates:
+                    if c.audit_year == ay:
+                        target = c
+                        break
+            target = target or candidates[0]
+        if target is not None:
+            new_parent_project_id = target.id
+    project.parent_project_id = new_parent_project_id
+
+    # Task 16.1：写 app_audit_log（who/when/old/new）。失败不阻断主更新。
+    try:
+        from sqlalchemy import text
+
+        details = {"old": old_value, "new": new_value}
+        await db.execute(
+            text(
+                "INSERT INTO app_audit_log "
+                "(id, user_id, action, resource_type, resource_id, details, created_at) "
+                "VALUES (gen_random_uuid(), :user_id, :action, :resource_type, "
+                ":resource_id, :details::jsonb, :now)"
+            ),
+            {
+                "user_id": str(current_user.id),
+                "action": "project.parent_code.change",
+                "resource_type": "project",
+                "resource_id": str(project_id),
+                "details": json.dumps(details, ensure_ascii=False),
+                "now": datetime.now(timezone.utc),
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        # app_audit_log 是 PG 专用表（gen_random_uuid/::jsonb），SQLite 测试会失败，
+        # 审计日志写入失败不应阻断主更新。
+        logger.warning("parent_company_code 变更审计日志写入失败: %s", exc)
+
+    await db.commit()
+    await db.refresh(project)
+
+    return UpdateParentCodeResponse(
+        id=str(project.id),
+        parent_company_code=project.parent_company_code,
+        parent_project_id=str(project.parent_project_id) if project.parent_project_id else None,
+    )
+
+
+class ParentCodeHistoryEntry(BaseModel):
+    user_id: str | None
+    created_at: str | None
+    old: str | None
+    new: str | None
+
+
+@router.get("/{project_id}/parent-code-history", response_model=list[ParentCodeHistoryEntry])
+async def get_parent_code_history(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[ParentCodeHistoryEntry]:
+    """查询项目的上级企业代码变更历史（读 app_audit_log，Task 16.1 读侧）。
+
+    供前端"查看层级变更历史"右键菜单接入。表/数据缺失时返回空列表（容错）。
+    """
+    entries: list[ParentCodeHistoryEntry] = []
+    try:
+        from sqlalchemy import text
+
+        rows = await db.execute(
+            text(
+                "SELECT user_id, created_at, details FROM app_audit_log "
+                "WHERE action = :action AND resource_id = :rid "
+                "ORDER BY created_at DESC"
+            ),
+            {"action": "project.parent_code.change", "rid": str(project_id)},
+        )
+        for user_id, created_at, details in rows.all():
+            old_v = None
+            new_v = None
+            if isinstance(details, dict):
+                old_v = details.get("old")
+                new_v = details.get("new")
+            elif isinstance(details, str):
+                try:
+                    parsed = json.loads(details)
+                    old_v = parsed.get("old")
+                    new_v = parsed.get("new")
+                except (ValueError, AttributeError):
+                    pass
+            entries.append(ParentCodeHistoryEntry(
+                user_id=str(user_id) if user_id is not None else None,
+                created_at=created_at.isoformat() if hasattr(created_at, "isoformat") else (
+                    str(created_at) if created_at is not None else None
+                ),
+                old=old_v,
+                new=new_v,
+            ))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("读取 parent_company_code 变更历史失败: %s", exc)
+        return []
+    return entries
 
 
 class TemplateRecommendationResponse(BaseModel):

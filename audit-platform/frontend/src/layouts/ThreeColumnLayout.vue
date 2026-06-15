@@ -375,7 +375,41 @@ function buildNavForRole(nav: typeof FALLBACK_NAV, role: string) {
     })
 }
 
-const navItems = computed(() => buildNavForRole(FALLBACK_NAV, roleStore.effectiveRole || 'auditor'))
+// ── 合并菜单条件显示（group-tree-architecture Task 17.1） ──
+// 是否存在 report_scope='consolidated' 的合并项目。
+// 决策：projectStore 是单项目上下文 store，projectOptions 仅含 {id,name} 无 report_scope，
+// 无法干净派生，故采用首次轻量 API 调用并缓存结果（任务明确允许"首次 API 调用缓存结果"）。
+// fail-open：查询失败时默认显示菜单，避免瞬时错误隐藏有效功能。
+const hasConsolidatedProjects = ref(false)
+let consolidatedChecked = false
+
+async function checkConsolidatedProjects() {
+  if (consolidatedChecked) return
+  consolidatedChecked = true
+  try {
+    // GET /api/projects/tree?scope=consolidated → {trees, independents}
+    // 存在合并项目的判定：trees 非空（每棵树根为 ultimate 合并项目）或 independents 中有合并项目
+    // 不传 validateStatus：非 2xx 响应抛错 → 进 catch 走 fail-open 显示菜单
+    const data: any = await api.get('/api/projects/tree', {
+      params: { scope: 'consolidated' },
+    })
+    const trees = Array.isArray(data?.trees) ? data.trees : []
+    const independents = Array.isArray(data?.independents) ? data.independents : []
+    hasConsolidatedProjects.value = trees.length > 0 || independents.length > 0
+  } catch {
+    // fail-open：异常时显示菜单
+    hasConsolidatedProjects.value = true
+  }
+}
+
+const navItems = computed(() => {
+  const items = buildNavForRole(FALLBACK_NAV, roleStore.effectiveRole || 'auditor')
+  // 无合并项目时隐藏"合并"菜单（保留角色过滤）
+  if (!hasConsolidatedProjects.value) {
+    return items.filter(item => item.key !== 'consolidation')
+  }
+  return items
+})
 
 const activeNav = computed(() => {
   const p = route.path
@@ -814,6 +848,7 @@ function onShortcutUndo() {
 
 onMounted(() => {
   loadPrefs()
+  checkConsolidatedProjects()
   document.addEventListener('keydown', onKeydown)
   eventBus.on('open-formula-manager', onOpenFormulaEvent)
   eventBus.on('open-custom-query', onOpenCustomQueryEvent)

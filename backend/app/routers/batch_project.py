@@ -20,10 +20,13 @@ from app.deps import get_current_user
 from app.models.core import User
 from app.services.batch_project_service import (
     BatchImportResult,
+    BatchValidateResponse,
     export_projects,
     generate_template,
     parse_and_import,
+    validate_batch,
 )
+from app.services import consol_tree_service
 
 router = APIRouter(prefix="/api/projects", tags=["批量建项"])
 
@@ -46,6 +49,52 @@ async def download_batch_template(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": _make_content_disposition(filename)},
     )
+
+
+@router.get("/tree")
+async def get_group_tree(
+    year: int | None = None,
+    scope: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """集团架构全局森林树形。
+
+    与 consol_worksheet 的 GET /tree?project_id=X（单合并项目内部树）不同：
+    本端点是全局森林——所有项目按 ultimate_company_code 分组成多棵树，无单一 root。
+
+    静态路径 /tree 必须在通配 /{project_id}（project_wizard.py）之前解析。
+    注册顺序由 router_registry/system.py §2 保证（batch_project_router 先于
+    project_wizard_router 注册）。
+
+    Args:
+        year: 年度过滤（按 audit_period_end 年份），不传则不过滤
+        scope: report_scope 过滤（如 'consolidated'），不传或 'all' 则全部项目
+
+    Returns:
+        {"trees": [...], "independents": [...]}
+    """
+    effective_scope = None if scope in (None, "", "all") else scope
+    return await consol_tree_service.build_tree_by_codes(
+        db, year=year, scope=effective_scope
+    )
+
+
+@router.post("/batch-validate", response_model=BatchValidateResponse)
+async def batch_validate_projects(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> BatchValidateResponse:
+    """批量建项预校验（dry-run，不入库）。
+
+    解析上传 Excel → 行级格式/必填/USCC 校验 + 同批次重复检测 +
+    集团树形预览（含循环引用检测）。绝不写库，用于导入前确认层级正确。
+
+    静态路径 /batch-validate 由 batch_project_router 在通配 /{project_id} 之前注册。
+    """
+    file_bytes = await file.read()
+    return await validate_batch(file_bytes, db)
 
 
 @router.post("/batch-import", response_model=BatchImportResult)
