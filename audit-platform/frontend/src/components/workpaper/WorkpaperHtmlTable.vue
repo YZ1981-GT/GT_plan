@@ -244,7 +244,6 @@ async function onExportExcel() {
     const rec: Record<string, any> = {}
     for (const col of props.columns) {
       const v = cellValue(row, col)
-      // tristate 转中文
       if (col.type === 'tristate') {
         rec[col.key] = v === 'yes' ? '是' : v === 'no' ? '否' : v === 'na' ? '不适用' : ''
       } else {
@@ -253,11 +252,27 @@ async function onExportExcel() {
     }
     return rec
   })
+
+  // 致同标准表头行（导出时前置）
+  const headerRows: Record<string, any>[] = []
+  const h = props.header
+  if (h) {
+    const firstKey = props.columns[0]?.key || ''
+    headerRows.push({ [firstKey]: '致同会计师事务所' })
+    headerRows.push({ [firstKey]: h.wpName || props.title || '' })
+    headerRows.push({
+      [firstKey]: `被审计单位：${h.entityName || ''}`,
+      [props.columns[2]?.key || '']: `编制人：${h.preparer || ''}`,
+      [props.columns[4]?.key || '']: `索引号：${h.indexNo || ''}`,
+    })
+    headerRows.push({}) // 空行分隔
+  }
+
   await exportData({
-    data,
+    data: [...headerRows, ...data],
     columns: excelColumns,
     sheetName: props.title || '底稿',
-    fileName: `${props.header?.indexNo || props.title || '底稿'}.xlsx`,
+    fileName: `${h?.indexNo || props.title || '底稿'}.xlsx`,
   })
 }
 

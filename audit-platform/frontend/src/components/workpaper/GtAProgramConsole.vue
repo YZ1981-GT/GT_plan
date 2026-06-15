@@ -249,6 +249,20 @@
         </template>
       </el-table-column>
 
+      <!-- 执行说明（可编辑，失焦保存到 FieldOverrideService） -->
+      <el-table-column label="执行说明" min-width="180" show-overflow-tooltip>
+        <template #default="{ row }">
+          <el-input
+            v-if="!readonly"
+            v-model="row.execution_summary"
+            size="small"
+            placeholder="填写执行情况"
+            @blur="saveExecutionSummary(row)"
+          />
+          <span v-else>{{ row.execution_summary || '—' }}</span>
+        </template>
+      </el-table-column>
+
       <!-- 状态 -->
       <el-table-column label="状态" width="120" align="center">
         <template #default="{ row }">
@@ -455,6 +469,7 @@ interface ProgramRow {
   program_category: string
   assertions?: ProgramAssertions
   linked_workpapers?: string
+  execution_summary?: string
   status: string
   trim_reason?: string
   history?: ProgramHistoryItem[]
@@ -692,6 +707,23 @@ function scrollToProgramRow(programNo: number) {
 
 function handleSelectionChange(selection: ProgramRow[]) {
   selectedIds.value = selection.map(r => r.id)
+}
+
+/** 执行说明失焦保存到 FieldOverrideService */
+async function saveExecutionSummary(row: ProgramRow) {
+  if (props.readonly) return
+  try {
+    await api.post('/api/workpapers/field-overrides', {
+      project_id: projectId.value,
+      year: new Date().getFullYear(),
+      scope: `procedure_table:${props.sheetName || 'A1'}`,
+      item_key: String(row.program_no),
+      field: 'execution_summary',
+      value: row.execution_summary || '',
+    })
+  } catch {
+    // 静默失败，不阻塞编辑体验
+  }
 }
 
 function handleStatusChange(row: ProgramRow, newStatus: string) {
