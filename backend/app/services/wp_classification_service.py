@@ -38,6 +38,7 @@ VALID_COMPONENT_TYPES: set[str] = {
     "review-checklist",
     "word-template",
     "independence-signing",
+    "audit-legend",
     "univer",
     "skip",
 }
@@ -66,6 +67,7 @@ _WP_CODE_OVERRIDE: dict[str, str] = {
     "A23": "review-checklist",        # 合伙人复核 → 结构化复核面板
     "A24": "review-checklist",        # 质量复核 → 结构化复核面板
     "A25": "review-checklist",        # EQCR 复核 → 结构化复核面板
+    "A31": "audit-legend",            # 审计标识一览表 → 标识符号对照面板
     "A17-7": "independence-signing",  # 独立性声明书 → 电子签署面板
 }
 

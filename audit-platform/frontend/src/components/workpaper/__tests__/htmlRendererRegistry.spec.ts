@@ -22,7 +22,7 @@ import {
 } from '../htmlRendererRegistry'
 
 describe('htmlRendererRegistry — 注册表完整性', () => {
-  it('注册表包含 13 个真实 HTML 组件类型（不含 skip）', () => {
+  it('注册表包含全部真实 HTML 组件类型（不含 skip）', () => {
     const expected: HtmlComponentType[] = [
       'a-program-console',
       'b-index',
@@ -37,8 +37,16 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'custom',
       'audit-sheet',
       'bad-debt-sheet',
+      'cf-verification',
+      'procedure-table',
+      'report-analysis',
+      'misstatement-summary',
+      'review-checklist',
+      'word-template',
+      'independence-signing',
+      'audit-legend',
     ]
-    expect(HTML_RENDERER_REGISTRY.size).toBe(13)
+    expect(HTML_RENDERER_REGISTRY.size).toBe(expected.length)
     for (const ct of expected) {
       expect(HTML_RENDERER_REGISTRY.has(ct)).toBe(true)
     }
@@ -105,13 +113,15 @@ describe('htmlRendererRegistry — emit 列表', () => {
 
 describe('htmlRendererRegistry — 路由集合', () => {
   it('HTML_COMPONENT_TYPE_SET 仅含 registry 注册类型（不含 skip）', () => {
-    expect(HTML_COMPONENT_TYPE_SET.size).toBe(13)
+    // 数量随注册表增长，断言 = registry 条目数（动态派生，避免硬编码 stale）
+    expect(HTML_COMPONENT_TYPE_SET.size).toBe(HTML_RENDERER_REGISTRY.size)
     expect(HTML_COMPONENT_TYPE_SET.has('a-program-console')).toBe(true)
+    expect(HTML_COMPONENT_TYPE_SET.has('audit-legend')).toBe(true)
     expect(HTML_COMPONENT_TYPE_SET.has('skip' as any)).toBe(false)
   })
 
-  it('HTML_RENDERER_ROUTE_SET 含 14 个（13 + skip）', () => {
-    expect(HTML_RENDERER_ROUTE_SET.size).toBe(14)
+  it('HTML_RENDERER_ROUTE_SET = registry + skip', () => {
+    expect(HTML_RENDERER_ROUTE_SET.size).toBe(HTML_COMPONENT_TYPE_SET.size + 1)
     expect(HTML_RENDERER_ROUTE_SET.has('a-program-console')).toBe(true)
     expect(HTML_RENDERER_ROUTE_SET.has('skip')).toBe(true)
     expect(HTML_RENDERER_ROUTE_SET.has('univer')).toBe(false)

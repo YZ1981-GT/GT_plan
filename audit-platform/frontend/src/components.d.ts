@@ -53,6 +53,7 @@ declare module 'vue' {
     AttachmentVersionsDialog: typeof import('./components/attachment/AttachmentVersionsDialog.vue')['default']
     AuditContextHeader: typeof import('./components/workpaper/dialogs/AuditContextHeader.vue')['default']
     AuditFindingPanel: typeof import('./components/collaboration/AuditFindingPanel.vue')['default']
+    AuditLegendPanel: typeof import('./components/workpaper/AuditLegendPanel.vue')['default']
     AuditLogView: typeof import('./components/collaboration/AuditLogView.vue')['default']
     AuditPlanPanel: typeof import('./components/collaboration/AuditPlanPanel.vue')['default']
     AuditProcedurePanel: typeof import('./components/collaboration/AuditProcedurePanel.vue')['default']
