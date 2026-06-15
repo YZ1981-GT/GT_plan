@@ -25,7 +25,7 @@
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
   - [x] 2.5 `generate_archive_file`：生成 A21~A25 归档 Excel/PDF
     - _Requirements: 4.1, 4.2_
-  - [ ]* 2.6 角色→模板匹配 PBT
+  - [x]* 2.6 角色→模板匹配 PBT
     - _Requirements: 1.3, 1.4_
 
 - [x] 3. 独立性签署服务

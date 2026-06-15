@@ -50,7 +50,7 @@
   - [x] 6.1 A16 声明书"未更正错报"占位符自动填充 + 双向跳转
     - _Requirements: 4.1, 4.2, 4.3_
 
-- [ ] 7. Checkpoint
+- [x] 7. Checkpoint
   - pytest + vitest 全绿
 
 ## Notes
