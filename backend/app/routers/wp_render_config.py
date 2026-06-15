@@ -1172,6 +1172,10 @@ async def get_render_config(
         if sheet_name and classification.sheet_name != sheet_name:
             continue
 
+        # GT_Custom 是模板内部辅助 sheet，不应暴露为可见 tab
+        if classification.sheet_name and "GT_Custom" in classification.sheet_name:
+            continue
+
         # 派生 componentType
         try:
             component_type = derive_component_type(classification)
@@ -1228,10 +1232,10 @@ async def get_render_config(
             )
 
         # ─── A-程序表中控台自动生成：从模板 xlsx 提取审计程序行 ─────────
-        # GtAProgramConsole 消费 html_data.programs；当 sheet 无持久化 programs
-        # 时，从底稿模板 xlsx 解析程序清单（序号/描述/分类/5项认定/底稿索引），
+        # GtAProgramConsole / GtA1Dashboard 消费 html_data.programs；当 sheet 无持久化
+        # programs 时，从底稿模板 xlsx 解析程序清单（序号/描述/分类/5项认定/底稿索引），
         # 否则中控台永远显示「暂无审计程序」（模板里的程序内容无法体现）。
-        if component_type == "a-program-console" and not (
+        if component_type in ("a-program-console", "a1-dashboard") and not (
             isinstance(sheet_html_data, dict) and sheet_html_data.get("programs")
         ):
             sheet_html_data = await _generate_a_program_data(

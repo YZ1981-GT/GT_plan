@@ -59,6 +59,7 @@ _CLASS_TO_COMPONENT: dict[str, str] = {
 # wp_code 级专用路由覆盖（优先于 class_code 派生）
 # 特定底稿直接路由到专用 HTML 组件，不经过 class_code 映射
 _WP_CODE_OVERRIDE: dict[str, str] = {
+    "A1": "a1-dashboard",                 # 财务报告程序表 → 项目总控仪表盘
     "A5": "cf-verification",          # 财务报表支持程序表 → 现金流量表核查视图
     "A13": "misstatement-summary",    # 错报程序表 → 错报自动汇总视图
     "A16": "word-template",           # 管理层声明书 → OnlyOffice Word 编辑
@@ -347,6 +348,9 @@ def derive_component_type(classification: ClassificationResult) -> str:
     class_code = classification.class_code
 
     if class_code and class_code.upper().startswith("CUSTOM"):
+        # GT_Custom sheets are auxiliary/internal — always skip
+        if classification.sheet_name and "GT_Custom" in classification.sheet_name:
+            return "skip"
         return "custom"
 
     # sheet 名级专用路由优先（坏账准备明细表嵌套结构 → bad-debt-sheet）

@@ -206,6 +206,111 @@ class ProcedureTableService:
                 done = done_r.scalar() or 0
                 pct = round(done / total * 100) if total else 0
                 result["summary"] = f"编制完成{done}/{total}（{pct}%）"
+            elif source == "control_test_completion":
+                # 统计 C 循环底稿完成率
+                from app.models.workpaper_models import WorkingPaper
+                from app.models.workpaper_models import WpIndex
+                # 查 C 循环底稿（wp_code 以 C 开头）
+                c_total_stmt = sa.select(sa.func.count()).select_from(WorkingPaper).join(
+                    WpIndex, WorkingPaper.wp_index_id == WpIndex.id
+                ).where(
+                    WorkingPaper.project_id == project_id,
+                    WorkingPaper.is_deleted == sa.false(),
+                    WpIndex.wp_code.like("C%"),
+                )
+                c_done_stmt = sa.select(sa.func.count()).select_from(WorkingPaper).join(
+                    WpIndex, WorkingPaper.wp_index_id == WpIndex.id
+                ).where(
+                    WorkingPaper.project_id == project_id,
+                    WorkingPaper.is_deleted == sa.false(),
+                    WpIndex.wp_code.like("C%"),
+                    WorkingPaper.status.in_(["completed", "reviewed"]),
+                )
+                c_total_r = await self.db.execute(c_total_stmt)
+                c_done_r = await self.db.execute(c_done_stmt)
+                c_total = c_total_r.scalar() or 0
+                c_done = c_done_r.scalar() or 0
+                if c_total == 0:
+                    result["summary"] = "无控制测试底稿"
+                else:
+                    pct = round(c_done / c_total * 100)
+                    result["summary"] = f"控制测试 {c_done}/{c_total}张（{pct}%）"
+            elif source == "substantive_completion":
+                # 统计 D~N 循环实质性程序底稿完成率
+                from app.models.workpaper_models import WorkingPaper
+                from app.models.workpaper_models import WpIndex
+                sub_total_stmt = sa.select(sa.func.count()).select_from(WorkingPaper).join(
+                    WpIndex, WorkingPaper.wp_index_id == WpIndex.id
+                ).where(
+                    WorkingPaper.project_id == project_id,
+                    WorkingPaper.is_deleted == sa.false(),
+                    WpIndex.wp_code.op("~")("^[D-N]"),
+                )
+                sub_done_stmt = sa.select(sa.func.count()).select_from(WorkingPaper).join(
+                    WpIndex, WorkingPaper.wp_index_id == WpIndex.id
+                ).where(
+                    WorkingPaper.project_id == project_id,
+                    WorkingPaper.is_deleted == sa.false(),
+                    WpIndex.wp_code.op("~")("^[D-N]"),
+                    WorkingPaper.status.in_(["completed", "reviewed"]),
+                )
+                sub_total_r = await self.db.execute(sub_total_stmt)
+                sub_done_r = await self.db.execute(sub_done_stmt)
+                sub_total = sub_total_r.scalar() or 0
+                sub_done = sub_done_r.scalar() or 0
+                if sub_total == 0:
+                    result["summary"] = "无实质性程序底稿"
+                else:
+                    pct = round(sub_done / sub_total * 100)
+                    result["summary"] = f"实质性程序 {sub_done}/{sub_total}张（{pct}%）"
+            elif source == "analytical_review_done":
+                # 检查 A1-13/A1-14 底稿是否存在并完成
+                from app.models.workpaper_models import WorkingPaper
+                from app.models.workpaper_models import WpIndex
+                ar_stmt = sa.select(WpIndex.wp_code, WorkingPaper.status).join(
+                    WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id
+                ).where(
+                    WorkingPaper.project_id == project_id,
+                    WorkingPaper.is_deleted == sa.false(),
+                    WpIndex.wp_code.in_(["A1-13", "A1-14"]),
+                )
+                ar_r = await self.db.execute(ar_stmt)
+                ar_rows = ar_r.all()
+                if not ar_rows:
+                    result["summary"] = "分析性复核底稿未生成"
+                else:
+                    done_codes = [r[0] for r in ar_rows if r[1] in ("completed", "reviewed")]
+                    all_codes = [r[0] for r in ar_rows]
+                    if len(done_codes) == len(all_codes):
+                        result["summary"] = f"通过（{'/'.join(all_codes)} 已完成）"
+                    else:
+                        result["summary"] = f"{'/'.join(all_codes)} — 完成{len(done_codes)}/{len(all_codes)}"
+            elif source == "archive_completion":
+                # 归档完成状态
+                from app.models.workpaper_models import WorkingPaper
+                total_stmt = sa.select(sa.func.count()).select_from(WorkingPaper).where(
+                    WorkingPaper.project_id == project_id,
+                    WorkingPaper.is_deleted == sa.false(),
+                )
+                reviewed_stmt = sa.select(sa.func.count()).select_from(WorkingPaper).where(
+                    WorkingPaper.project_id == project_id,
+                    WorkingPaper.is_deleted == sa.false(),
+                    WorkingPaper.status == "reviewed",
+                )
+                total_r = await self.db.execute(total_stmt)
+                reviewed_r = await self.db.execute(reviewed_stmt)
+                total = total_r.scalar() or 0
+                reviewed = reviewed_r.scalar() or 0
+                if total == 0:
+                    result["summary"] = "无底稿"
+                elif reviewed == total:
+                    result["summary"] = "通过（全部完成复核，可归档）"
+                else:
+                    unsigned = total - reviewed
+                    result["summary"] = f"待归档（{unsigned}张未完成复核）"
+            elif source == "a16_template_recommend":
+                # A16 声明书版本推荐（简单返回提示）
+                result["summary"] = "标准版声明书"
             else:
                 # 未实现的 data_source 保留空
                 pass

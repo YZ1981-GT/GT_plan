@@ -30,30 +30,45 @@
         </div>
       </div>
       <div class="gt-wpb-workbench-list">
-        <el-table :data="pagedWorkbenchData" stripe border style="width: 100%" max-height="calc(100vh - 320px)" class="gt-compact-table gt-tb-font-md" @row-click="onWorkbenchRowClick">
-          <el-table-column prop="wp_code" label="编码" min-width="90" :sort-method="wpCodeSort" sortable resizable />
-          <el-table-column prop="wp_name" label="底稿名称" min-width="220" show-overflow-tooltip resizable />
-          <el-table-column prop="cycle_name" label="循环" min-width="110" show-overflow-tooltip resizable />
-          <el-table-column prop="status_label" label="状态" min-width="90" resizable>
-            <template #default="{ row }">
-              <el-tag :type="row.status_type" size="small">{{ row.status_label }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="assignee_name" label="编制人" min-width="90" resizable />
-          <el-table-column prop="step_progress" label="步骤进度" min-width="90" resizable>
-            <template #default="{ row }">
-              <span v-if="row.total_steps">{{ row.completed_steps || 0 }}/{{ row.total_steps }}</span>
-              <span v-else class="gt-text-tertiary">—</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="130" fixed="right">
-            <template #default="{ row }">
-              <GtRowActions :actions="getWpRowActions(row)" :max-visible="2" @action="(key: string) => handleWpRowAction(key, row)" />
-            </template>
-          </el-table-column>
-        </el-table>
-        <div class="gt-pagination" v-if="wbTotal > wbPageSize" style="margin-top: 12px; display: flex; justify-content: flex-end;">
-          <el-pagination v-model:current-page="wbPage" :page-size="wbPageSize" :total="wbTotal" layout="total, prev, pager, next" background small />
+        <!-- 按循环分组、默认折叠、支持跳转的目录式布局 -->
+        <div
+          v-for="group in groupedWorkbenchData"
+          :key="group.code"
+          class="gt-wpb-cycle-group"
+        >
+          <div
+            class="gt-wpb-cycle-group__header"
+            @click="toggleCycleGroup(group.code)"
+          >
+            <span class="gt-wpb-cycle-group__toggle">{{ expandedCycleGroups[group.code] ? '−' : '+' }}</span>
+            <span class="gt-wpb-cycle-group__badge" :style="{ background: group.color }">{{ group.code }}</span>
+            <span class="gt-wpb-cycle-group__name">{{ group.name }}</span>
+            <el-tag size="small" :type="group.doneCount === group.items.length ? 'success' : 'info'" effect="plain">
+              {{ group.doneCount }}/{{ group.items.length }}
+            </el-tag>
+            <el-progress
+              :percentage="group.percent"
+              :stroke-width="5"
+              :show-text="false"
+              :color="group.percent === 100 ? '#67C23A' : '#4b2d77'"
+              style="width: 80px; margin-left: 8px"
+            />
+          </div>
+          <div v-show="expandedCycleGroups[group.code]" class="gt-wpb-cycle-group__body">
+            <div
+              v-for="row in group.items"
+              :key="row.id"
+              class="gt-wpb-cycle-item"
+              @click="onWorkbenchRowClick(row)"
+            >
+              <span class="gt-wpb-cycle-item__code">{{ row.wp_code }}</span>
+              <span class="gt-wpb-cycle-item__name">{{ row.wp_name }}</span>
+              <el-tag :type="row.status_type" size="small" class="gt-wpb-cycle-item__status">{{ row.status_label }}</el-tag>
+              <span class="gt-wpb-cycle-item__assignee">{{ row.assignee_name || '—' }}</span>
+              <span class="gt-wpb-cycle-item__steps" v-if="row.total_steps">{{ row.completed_steps || 0 }}/{{ row.total_steps }}</span>
+              <GtRowActions :actions="getWpRowActions(row)" :max-visible="2" @action="(key: string) => handleWpRowAction(key, row)" class="gt-wpb-cycle-item__actions" />
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -342,7 +357,7 @@
  * 从 WorkpaperList.vue 抽取 list/workbench/guide 三个 viewMode 的模板和私有逻辑
  * Requirements: 2.5, 3.5, 4.6, 5.1, 5.2
  */
-import { inject, ref, computed, nextTick } from 'vue'
+import { inject, ref, computed, reactive, nextTick } from 'vue'
 import { WP_LIST_CONTEXT_KEY } from '@/composables/useWorkpaperListContext'
 import type { WpChildProps, WpChildEmits, MutatePayload } from '@/composables/useWorkpaperListContext'
 import type { WpIndexItem, WorkpaperDetail } from '@/services/workpaperApi'
@@ -478,6 +493,43 @@ const wbTotal = computed(() => workbenchTableData.value.length)
 const pagedWorkbenchData = computed(() => {
   const start = (wbPage.value - 1) * wbPageSize.value
   return workbenchTableData.value.slice(start, start + wbPageSize.value)
+
+})
+
+// ─── 按循环分组目录数据 ────────────────────────────────────────────────────────
+const CYCLE_COLORS: Record<string, string> = {
+  A: '#6750A4', B: '#4b2d77', C: '#0094B3', D: '#E8590C', E: '#2E7D32',
+  F: '#D84315', G: '#1565C0', H: '#6A1B9A', I: '#00838F', J: '#AD1457',
+  K: '#4E342E', L: '#37474F', M: '#1B5E20', N: '#E65100', S: '#880E4F',
+}
+const expandedCycleGroups = reactive<Record<string, boolean>>({})
+
+function toggleCycleGroup(code: string) {
+  expandedCycleGroups[code] = !expandedCycleGroups[code]
+}
+
+const groupedWorkbenchData = computed(() => {
+  const data = workbenchTableData.value
+  const groups = new Map<string, typeof data>()
+  for (const item of data) {
+    const key = (item.wp_code || '?')[0].toUpperCase()
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(item)
+  }
+  return PHASE_ORDER
+    .filter(code => groups.has(code))
+    .map(code => {
+      const items = groups.get(code)!
+      const doneCount = items.filter(i => COMPLETED_STATUSES.has(i.status)).length
+      return {
+        code,
+        name: cycleNameMap[code] || code,
+        color: CYCLE_COLORS[code] || '#909399',
+        items,
+        doneCount,
+        percent: items.length > 0 ? Math.round((doneCount / items.length) * 100) : 0,
+      }
+    })
 })
 
 // ─── 工作台操作 ─────────────────────────────────────────────────────────────────
@@ -1233,4 +1285,105 @@ function onGuideWpClick(wpCode: string) {
 
 /* 列表视图分页 */
 .gt-pagination { margin-top: 12px; display: flex; justify-content: flex-end; }
+
+/* ═══ 循环分组目录样式 ═══ */
+.gt-wpb-cycle-group {
+  margin-bottom: 4px;
+  border: 1px solid #e8e8ec;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.gt-wpb-cycle-group__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fafafa;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+.gt-wpb-cycle-group__header:hover { background: #f4f0fa; }
+
+.gt-wpb-cycle-group__toggle {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: #e8e8ec;
+  font-size: 13px;
+  font-weight: 700;
+  color: #606266;
+  flex-shrink: 0;
+}
+.gt-wpb-cycle-group__header:hover .gt-wpb-cycle-group__toggle {
+  background: #d8b8ee;
+  color: #4b2d77;
+}
+
+.gt-wpb-cycle-group__badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.gt-wpb-cycle-group__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  flex: 1;
+}
+
+.gt-wpb-cycle-group__body {
+  border-top: 1px solid #e8e8ec;
+}
+
+.gt-wpb-cycle-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 44px;
+  border-bottom: 1px solid #f0f0f4;
+  cursor: pointer;
+  transition: background 0.12s;
+  font-size: 13px;
+}
+.gt-wpb-cycle-item:last-child { border-bottom: none; }
+.gt-wpb-cycle-item:hover { background: #f9f7fc; }
+
+.gt-wpb-cycle-item__code {
+  min-width: 60px;
+  font-weight: 600;
+  color: var(--gt-purple, #4b2d77);
+}
+.gt-wpb-cycle-item__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #303133;
+}
+.gt-wpb-cycle-item__status { flex-shrink: 0; }
+.gt-wpb-cycle-item__assignee {
+  min-width: 60px;
+  color: #909399;
+  font-size: 12px;
+}
+.gt-wpb-cycle-item__steps {
+  min-width: 40px;
+  color: #909399;
+  font-size: 12px;
+}
+.gt-wpb-cycle-item__actions { flex-shrink: 0; }
 </style>

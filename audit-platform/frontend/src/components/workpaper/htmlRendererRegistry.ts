@@ -27,6 +27,7 @@ import { defineAsyncComponent, type Component } from 'vue'
 
 /** HTML 底稿组件类型（与 useEditorMode.HTML_COMPONENT_TYPES 保持一致） */
 export type HtmlComponentType =
+  | 'a1-dashboard'
   | 'a-program-console'
   | 'b-index'
   | 'c-note-table'
@@ -65,6 +66,7 @@ export interface HtmlRendererEntry {
 
 // ─── lazy components ────────────────────────────────────────────────────────
 
+const GtA1Dashboard = defineAsyncComponent(() => import('./GtA1Dashboard.vue'))
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
 const GtBIndex = defineAsyncComponent(() => import('./GtBIndex.vue'))
 const GtCNoteTable = defineAsyncComponent(() => import('./GtCNoteTable.vue'))
@@ -95,6 +97,13 @@ const D_FORM_SUBTYPES = [
 ] as const
 
 const REGISTRY_LIST: HtmlRendererEntry[] = [
+  {
+    componentType: 'a1-dashboard',
+    component: GtA1Dashboard,
+    icon: '🎯',
+    label: 'A1 项目总控仪表盘',
+    emits: ['save'],
+  },
   {
     componentType: 'a-program-console',
     component: GtAProgramConsole,

@@ -299,6 +299,7 @@ declare module 'vue' {
     GoingConcernPanel: typeof import('./components/collaboration/GoingConcernPanel.vue')['default']
     GoodwillImpairmentDialog: typeof import('./components/workpaper/GoodwillImpairmentDialog.vue')['default']
     GraphLegend: typeof import('./components/panorama/GraphLegend.vue')['default']
+    GtA1Dashboard: typeof import('./components/workpaper/GtA1Dashboard.vue')['default']
     GtAmountCell: typeof import('./components/common/GtAmountCell.vue')['default']
     GtAProgramConsole: typeof import('./components/workpaper/GtAProgramConsole.vue')['default']
     GtAuditFlowGraph: typeof import('./components/workpaper/GtAuditFlowGraph.vue')['default']
