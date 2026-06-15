@@ -386,6 +386,17 @@ function wpCodeSort(a: any, b: any): number {
   return wpCodeCompare(a.wp_code, b.wp_code)
 }
 
+/** 按审计阶段顺序排序（B→C→D~N→S→A），同阶段内自然排序 */
+const PHASE_ORDER = 'B C D E F G H I J K L M N S A'.split(' ')
+function phaseOrderCompare(a: string, b: string): number {
+  const phaseA = PHASE_ORDER.indexOf((a || '')[0]?.toUpperCase())
+  const phaseB = PHASE_ORDER.indexOf((b || '')[0]?.toUpperCase())
+  const orderA = phaseA >= 0 ? phaseA : 99
+  const orderB = phaseB >= 0 ? phaseB : 99
+  if (orderA !== orderB) return orderA - orderB
+  return wpCodeCompare(a, b)
+}
+
 const cycleNameMap: Record<string, string> = {
   A: '完成阶段', B: '计划阶段', C: '控制测试', D: '收入循环',
   E: '货币资金', F: '存货', G: '投资', H: '固定资产',
@@ -460,7 +471,7 @@ const workbenchTableData = computed(() => {
         completed_steps: (w as any).completed_steps || 0,
       }
     })
-    .sort((a, b) => wpCodeCompare(a.wp_code, b.wp_code))
+    .sort((a, b) => phaseOrderCompare(a.wp_code, b.wp_code))
 })
 
 const wbTotal = computed(() => workbenchTableData.value.length)

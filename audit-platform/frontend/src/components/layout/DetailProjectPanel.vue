@@ -599,9 +599,10 @@ const metrics = ref<{
   openIssues: number | null
   staleCount: number | null
   byCycle: Record<string, any> | null
+  aProcedureProgress: { total_items: number; completed_items: number; rate: number } | null
 }>({
   wpRate: null, reviewRate: null, ajeCount: null, rjeCount: null,
-  openIssues: null, staleCount: null, byCycle: null,
+  openIssues: null, staleCount: null, byCycle: null, aProcedureProgress: null,
 })
 
 // 团队成员（带工时和底稿分配）
@@ -681,6 +682,7 @@ watch(() => props.project?.id, async (newId) => {
       openIssues: dash?.open_reviews?.total ?? null,
       staleCount: stale?.stale_count ?? null,
       byCycle: wp?.by_cycle ?? null,
+      aProcedureProgress: wp?.a_procedure_progress ?? null,
     }
     // 合并团队成员 + 工时
     const roleMap: Record<string, string> = { preparer: '编制', reviewer: '复核', partner: '合伙人', manager: '经理', assistant: '助理' }
@@ -707,7 +709,7 @@ watch(() => props.project?.id, async (newId) => {
       }
     })
   } catch {
-    metrics.value = { wpRate: null, reviewRate: null, ajeCount: null, rjeCount: null, openIssues: null, staleCount: null, byCycle: null }
+    metrics.value = { wpRate: null, reviewRate: null, ajeCount: null, rjeCount: null, openIssues: null, staleCount: null, byCycle: null, aProcedureProgress: null }
     teamMembers.value = []
   } finally {
     metricsLoading.value = false
@@ -987,6 +989,11 @@ const sortedCycles = computed(() => {
     .map(code => {
       const v = raw[code]
       const done = (v.prepared || 0) + (v.reviewed || 0) + (v.archived || 0)
+      // A 循环：如果有程序级进度数据（从 FieldOverrideService 聚合），优先展示
+      if (code === 'A' && metrics.value.aProcedureProgress?.total_items) {
+        const ap = metrics.value.aProcedureProgress
+        return { code, name: CYCLE_NAMES[code] || code, done: ap.completed_items, total: ap.total_items, pct: Math.round(ap.rate) }
+      }
       return { code, name: CYCLE_NAMES[code] || code, done, total: v.total || 0, pct: v.total ? Math.round(done / v.total * 100) : 0 }
     })
 })

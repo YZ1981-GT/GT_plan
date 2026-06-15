@@ -53,6 +53,7 @@
     @sync-to-disclosure-notes="onHtmlSyncToDisclosureNotes"
     @jump-to-reference="onHtmlJumpToReference"
     @open-formula="onHtmlOpenFormula"
+    @open-attachment="onOpenAttachment"
   />
 
   <!-- 默认 Univer 编辑器（component_type='univer' 或未配置时） -->
@@ -746,6 +747,13 @@ function onUpload() {
     params: { projectId: projectId.value },
     query: { upload: wpId.value },
   })
+}
+
+// ─── HTML 渲染器附件/证据打开（open-attachment 事件）──────────────────────
+
+function onOpenAttachment(_payload: { wpId: string; sheetName: string; rowRef: string }) {
+  // 打开侧面板（附件 Tab 由 WorkpaperSidePanel 内部管理）
+  showSidePanel.value = true
 }
 
 // ─── HTML 渲染器公式编辑（open-formula 事件）─────────────────────────────
