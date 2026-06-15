@@ -593,7 +593,11 @@ async def get_wp_onlyoffice_config(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_project_access("readonly")),
 ):
-    """返回底稿的 OnlyOffice 编辑器配置（复用 deliverable 模块的 signed-download 机制）"""
+    """返回底稿的 OnlyOffice 编辑器配置（复用 deliverable 模块的 signed-download 机制）
+
+    如果底稿是 Word 模板（A16 声明书），先用 python-docx 预填占位符生成临时文件，
+    document_url 指向预填后的文件。
+    """
     from app.core.config import settings
 
     wp = (await db.execute(
@@ -615,12 +619,107 @@ async def get_wp_onlyoffice_config(
     if version:
         document_url += f"?version={version}"
 
+    # A16 声明书预填占位符（如果文件是 docx 且有模板路径）
+    prefilled = False
+    if wp.file_path and wp.file_path.endswith(('.docx', '.doc')):
+        try:
+            prefilled = await _prefill_word_template(db, wp, project_id)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("A16 占位符预填失败（降级不阻塞）: %s", e)
+
     return {
         "document_url": document_url,
-        "document_key": f"wp-{wp_id}-{wp.file_version}",
+        "document_key": f"wp-{wp_id}-{wp.file_version}-{'pf' if prefilled else 'raw'}",
         "title": wp.file_path.split("/")[-1] if wp.file_path else "声明书.docx",
         "onlyoffice_url": settings.ONLYOFFICE_URL,
+        "prefilled": prefilled,
     }
+
+
+async def _prefill_word_template(db: AsyncSession, wp, project_id: UUID) -> bool:
+    """用 python-docx 替换 Word 模板中的占位符，写回底稿文件。
+
+    占位符格式：{{client_name}} / {{audit_period}} / {{partner_name}} / {{uncorrected_misstatements}}
+    仅在文件内实际含占位符时才写回（幂等：已替换过的不再重复操作）。
+    """
+    import re
+    from pathlib import Path
+
+    file_path = Path(wp.file_path)
+    if not file_path.exists() or not file_path.suffix.lower() == '.docx':
+        return False
+
+    try:
+        from docx import Document
+    except ImportError:
+        return False
+
+    doc = Document(str(file_path))
+    full_text = "\n".join(p.text for p in doc.paragraphs)
+    if "{{" not in full_text:
+        return False  # 无占位符或已替换
+
+    # 取项目信息
+    proj_row = (await db.execute(
+        sa.text("SELECT name, client_name, audit_period_end FROM projects WHERE id = :pid"),
+        {"pid": str(project_id)},
+    )).first()
+    client_name = (proj_row[1] if proj_row else "") or (proj_row[0] if proj_row else "")
+    audit_period = str(proj_row[2])[:10] if proj_row and proj_row[2] else ""
+
+    # 取签字合伙人
+    partner_row = (await db.execute(sa.text(
+        "SELECT s.name FROM project_assignments pa JOIN staff_members s ON s.id=pa.staff_id "
+        "WHERE pa.project_id=:pid AND pa.role='partner' LIMIT 1"
+    ), {"pid": str(project_id)})).first()
+    partner_name = partner_row[0] if partner_row else ""
+
+    # 取未更正错报摘要
+    misstatement_text = "无"
+    try:
+        from app.services.misstatement_summary_service import MisstatementSummaryService
+        svc = MisstatementSummaryService(db)
+        year = int(str(proj_row[2])[:4]) if proj_row and proj_row[2] else 2025
+        misstatement_text = await svc.get_for_representation_letter(project_id, year)
+    except Exception:
+        pass
+
+    # 替换占位符
+    replacements = {
+        "{{client_name}}": client_name,
+        "{{audit_period}}": audit_period,
+        "{{partner_name}}": partner_name,
+        "{{uncorrected_misstatements}}": misstatement_text,
+        "{{date}}": str(sa.func.now())[:10] if False else __import__("datetime").date.today().isoformat(),
+    }
+
+    replaced = False
+    for para in doc.paragraphs:
+        for key, val in replacements.items():
+            if key in para.text:
+                # 简单替换（保留 run 格式）
+                for run in para.runs:
+                    if key in run.text:
+                        run.text = run.text.replace(key, val)
+                        replaced = True
+
+    # 也检查表格中的占位符
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    for key, val in replacements.items():
+                        if key in para.text:
+                            for run in para.runs:
+                                if key in run.text:
+                                    run.text = run.text.replace(key, val)
+                                    replaced = True
+
+    if replaced:
+        doc.save(str(file_path))
+
+    return replaced
 
 
 @router.get("/working-papers/{wp_id}/export-pdf")

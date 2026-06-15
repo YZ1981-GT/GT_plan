@@ -540,6 +540,16 @@ class ReviewWorkflowService:
                 result = await self.db.execute(stmt)
                 pending = result.scalar() or 0
                 return "通过" if pending == 0 else f"待处理{pending}笔"
+            elif check_type == "representation_letter_signed":
+                # A16 管理层声明书签回状态（从 field_overrides 读）
+                from app.services.field_override_service import FieldOverrideService
+                svc = FieldOverrideService(self.db)
+                status = await svc.get(project_id, year, "word_template:A16", "sign_status", "value")
+                if status == "signed":
+                    return "通过（已签回）"
+                elif status == "sent":
+                    return "未通过（已发送，待签回）"
+                return "未通过（声明书未发送）"
         except Exception as e:
             _logger.warning("auto_check %s failed: %s", check_type, e)
         return None
