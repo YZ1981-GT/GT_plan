@@ -113,21 +113,21 @@ class ProcedureTableService:
 
         try:
             if source == "adjustment_count_aje":
-                count, pending = await self._count_adjustments_with_pending(project_id, year, "aje")
+                count, pending, amount = await self._count_adjustments_with_pending(project_id, year, "aje")
                 if count == 0:
                     result["summary"] = "无"
                 elif pending > 0:
-                    result["summary"] = f"共{count}笔（⚠️{pending}笔待审）"
+                    result["summary"] = f"共{count}笔 ¥{amount:,.0f}（⚠️{pending}笔待审）"
                 else:
-                    result["summary"] = f"共{count}笔（全部已批）"
+                    result["summary"] = f"共{count}笔 ¥{amount:,.0f}（全部已批）"
             elif source == "adjustment_count_rje":
-                count, pending = await self._count_adjustments_with_pending(project_id, year, "rje")
+                count, pending, amount = await self._count_adjustments_with_pending(project_id, year, "rje")
                 if count == 0:
                     result["summary"] = "无"
                 elif pending > 0:
-                    result["summary"] = f"共{count}笔（⚠️{pending}笔待审）"
+                    result["summary"] = f"共{count}笔 ¥{amount:,.0f}（⚠️{pending}笔待审）"
                 else:
-                    result["summary"] = f"共{count}笔（全部已批）"
+                    result["summary"] = f"共{count}笔 ¥{amount:,.0f}（全部已批）"
             elif source == "adjustment_count_passed":
                 count = await self._count_adjustments(project_id, year, "passed")
                 result["summary"] = f"共{count}笔" if count else "无"
@@ -436,8 +436,9 @@ class ProcedureTableService:
 
     async def _count_adjustments_with_pending(
         self, project_id: UUID, year: int, adj_type: str
-    ) -> tuple[int, int]:
-        """按类型统计调整分录数，同时返回待审批数"""
+    ) -> tuple[int, int, float]:
+        """按类型统计调整分录数，同时返回待审批数 + 借方总金额（万元）"""
+        from app.models.audit_platform_models import AdjustmentEntry
         total_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
             Adjustment.project_id == project_id,
             Adjustment.year == year,
@@ -452,9 +453,21 @@ class ProcedureTableService:
             Adjustment.passed_reason.is_(None),
             Adjustment.is_deleted == sa.false(),
         )
+        # 借方合计金额（衡量调整影响规模）
+        amount_stmt = sa.select(
+            sa.func.coalesce(sa.func.sum(AdjustmentEntry.debit_amount), 0)
+        ).join(
+            Adjustment, AdjustmentEntry.adjustment_id == Adjustment.id
+        ).where(
+            Adjustment.project_id == project_id,
+            Adjustment.year == year,
+            Adjustment.adjustment_type == adj_type,
+            Adjustment.is_deleted == sa.false(),
+        )
         total_r = await self.db.execute(total_stmt)
         pending_r = await self.db.execute(pending_stmt)
-        return (total_r.scalar() or 0, pending_r.scalar() or 0)
+        amount_r = await self.db.execute(amount_stmt)
+        return (total_r.scalar() or 0, pending_r.scalar() or 0, float(amount_r.scalar() or 0))
 
     async def _get_materiality(self, project_id: UUID) -> Decimal:
         stmt = sa.select(Materiality.overall_materiality).where(
