@@ -402,6 +402,7 @@ async function onDelete() {
         tables: deleteForm.value.tables.length > 0 ? deleteForm.value.tables : null,
         periods: deleteForm.value.periods.length > 0 ? deleteForm.value.periods : null,
         confirmed: true,
+        hard_delete: true,
       },
     })
     ElMessage.success(`已删除 ${result.total_deleted} 行数据`)

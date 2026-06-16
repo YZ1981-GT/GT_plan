@@ -216,6 +216,25 @@ async def delete_ledger_data(
             deleted[table] = -1  # sentinel for error
             raise
 
+    # 硬删时同步清理派生表 trial_balance（其唯一约束无 is_deleted 条件过滤，
+    # 不清理则重新导入 recalc 时唯一冲突——2026-06-16 诊断修复）
+    if hard_delete:
+        try:
+            result = await db.execute(
+                sa.text(
+                    "DELETE FROM trial_balance WHERE project_id = :pid AND year = :year"
+                ),
+                {"pid": str(project_id), "year": year},
+            )
+            deleted["trial_balance"] = result.rowcount or 0
+            logger.info(
+                "hard-deleted %d rows from trial_balance (project=%s year=%d)",
+                deleted["trial_balance"], project_id, year,
+            )
+        except Exception:
+            logger.warning("delete trial_balance failed (non-fatal)", exc_info=True)
+            deleted["trial_balance"] = 0
+
     await db.commit()
     return deleted
 
