@@ -582,24 +582,15 @@ async def execute_pipeline(
 
                 if is_balance_sheet:
                     balance_cleaned_accumulated.extend(cleaned)
-                    # 百万行优化：累积超阈值时分批 convert+写入，释放内存
+                    # 余额表有跨行聚合逻辑（同 account_code 去重合并），
+                    # 不能分批 flush（否则同科目跨批会产生重复主表行）。
+                    # 实际余额表通常 < 5 万行，全量累积不会 OOM。
                     if len(balance_cleaned_accumulated) >= BALANCE_FLUSH_THRESHOLD:
-                        _t = _time.time()
-                        _partial_v2 = convert_balance_rows_v2(balance_cleaned_accumulated)
-                        _t_convert += _time.time() - _t
-                        _t = _time.time()
-                        await _insert(TbBalance, _partial_v2.rows)
-                        await _insert(TbAuxBalance, _partial_v2.aux_rows)
-                        _t_insert += _time.time() - _t
-                        _n_inserts += 2
-                        total_balance_written += len(_partial_v2.rows)
-                        total_aux_balance_written += len(_partial_v2.aux_rows)
-                        all_findings.extend(_partial_v2.warnings)
-                        balance_cleaned_accumulated = []
-                        logger.info(
-                            "Pipeline %s balance flush (threshold=%d): wrote %d+%d rows",
-                            job_id, BALANCE_FLUSH_THRESHOLD,
-                            len(_partial_v2.rows), len(_partial_v2.aux_rows),
+                        logger.warning(
+                            "Pipeline %s balance sheet accumulated %d rows (exceeds %d threshold). "
+                            "Balance tables cannot be flushed in batches due to cross-row aggregation. "
+                            "Memory usage may be elevated.",
+                            job_id, len(balance_cleaned_accumulated), BALANCE_FLUSH_THRESHOLD,
                         )
                 elif sheet.table_type in ("ledger", "aux_ledger"):
                     _t = _time.time()

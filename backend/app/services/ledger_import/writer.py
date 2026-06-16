@@ -513,6 +513,11 @@ async def bulk_insert_staged(
             "bulk_insert_staged → table=%s rows=%d dataset=%s chunk=%d",
             table_model.__tablename__, len(rows), dataset_id, chunk_size,
         )
+        # 百万行优化：大批量 INSERT 触发索引更新时受益于更大 work_mem
+        try:
+            await db.execute(sa.text("SET LOCAL work_mem = '128MB'"))
+        except Exception:
+            pass  # 非致命
         for i in range(0, len(rows), chunk_size):
             batch = rows[i:i + chunk_size]
             records = []
@@ -674,6 +679,8 @@ async def bulk_copy_staged(
         table_name = table_model.__tablename__
 
         # 百万行优化：大批量 COPY 前临时提升 work_mem（事务级，不影响其他连接）
+        # 注：COPY 本身是二进制流灌入不走 SQL 解析器，work_mem 主要帮助
+        # COPY 完成后 PG 更新索引时的排序内存。对有多索引的表（如 tb_ledger 5 个索引）有效。
         try:
             await driver_conn.execute("SET LOCAL work_mem = '128MB'")
         except Exception:
