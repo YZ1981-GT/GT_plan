@@ -311,10 +311,11 @@ const extraComponentProps = computed<Record<string, unknown>>(() => {
       year: preparationYear.value,
     }
   }
-  if (ct === 'cf-verification' || ct === 'report-analysis' || ct === 'misstatement-summary' || ct === 'review-checklist' || ct === 'independence-signing' || ct === 'word-template' || ct === 'audit-legend' || ct === 'a1-dashboard') {
+  if (ct === 'cf-verification' || ct === 'report-analysis' || ct === 'misstatement-summary' || ct === 'review-checklist' || ct === 'independence-signing' || ct === 'word-template' || ct === 'audit-legend' || ct === 'a1-dashboard' || ct === 'a2-adjustment-console' || ct === 'a3-consolidation-console') {
     return {
       'wp-id': props.wpId ?? '',
       'project-id': renderConfig.value?.project_id ?? '',
+      'wp-code': renderConfig.value?.wp_code ?? '',
       year: preparationYear.value,
     }
   }

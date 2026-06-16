@@ -1,18 +1,5 @@
 <template>
   <div class="gt-consol gt-fade-in">
-    <!-- P3 防误用标记：开发中警告 banner -->
-    <el-alert
-      v-if="consolDevMode"
-      type="warning"
-      :closable="false"
-      show-icon
-      style="margin-bottom: 12px"
-    >
-      <template #title>
-        <span style="font-weight: 600">开发中，不可用于正式合并报告</span>
-      </template>
-    </el-alert>
-
     <!-- F5 合并页 stale 实时感知（需求 7 / ADR-CONSOL-304）：子公司数据变更后 SSE 提示，warning 不阻断 -->
     <el-alert
       v-if="consolStale"
@@ -539,9 +526,6 @@ const activeTab = ref('worksheets')
 const consolNoteTabRef = ref<InstanceType<typeof ConsolNoteTab> | null>(null)
 const consolTbTabRef = ref<InstanceType<typeof ConsolTrialBalanceTab> | null>(null)
 
-// ─── P3 防误用标记 ────────────────────────────────────────────────────────────
-const consolDevMode = ref(false)
-
 // ─── F5 合并页 stale 实时感知（需求 7 / ADR-CONSOL-304）────────────────────────
 const consolStale = ref(false)
 
@@ -987,6 +971,13 @@ async function loadProjectInfo() {
       projectInfo.clientName = p.client_name || p.name || ''
       projectInfo.year = p.audit_year || year.value
       projectInfo.standard = (p.applicable_standard || '').includes('listed') ? 'listed' : 'soe'
+      // 非合并项目不应进入合并模块，弹提示并跳回
+      const scope = p.report_scope || p.scope || ''
+      if (scope && scope !== 'consolidated') {
+        ElMessage.warning('当前为单体项目，无合并报表功能')
+        router.push(`/projects/${projectId.value}`)
+        return
+      }
     }
   } catch { /* ignore */ }
 }
@@ -1544,7 +1535,7 @@ onMounted(async () => {
   // P3 防误用标记：获取模块开发状态
   try {
     const status = await api.get(`/api/consolidation/${projectId.value}/module-status`)
-    consolDevMode.value = !!status?.dev_mode
+    // dev_mode banner removed — module is production-ready
   } catch {
     // 静默忽略（端点不可用时不影响页面）
   }

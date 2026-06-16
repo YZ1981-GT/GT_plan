@@ -300,6 +300,8 @@ declare module 'vue' {
     GoodwillImpairmentDialog: typeof import('./components/workpaper/GoodwillImpairmentDialog.vue')['default']
     GraphLegend: typeof import('./components/panorama/GraphLegend.vue')['default']
     GtA1Dashboard: typeof import('./components/workpaper/GtA1Dashboard.vue')['default']
+    GtA2AdjustmentConsole: typeof import('./components/workpaper/GtA2AdjustmentConsole.vue')['default']
+    GtA3ConsolidationConsole: typeof import('./components/workpaper/GtA3ConsolidationConsole.vue')['default']
     GtAmountCell: typeof import('./components/common/GtAmountCell.vue')['default']
     GtAProgramConsole: typeof import('./components/workpaper/GtAProgramConsole.vue')['default']
     GtAuditFlowGraph: typeof import('./components/workpaper/GtAuditFlowGraph.vue')['default']

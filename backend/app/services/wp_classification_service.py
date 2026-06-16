@@ -60,6 +60,8 @@ _CLASS_TO_COMPONENT: dict[str, str] = {
 # 特定底稿直接路由到专用 HTML 组件，不经过 class_code 映射
 _WP_CODE_OVERRIDE: dict[str, str] = {
     "A1": "a1-dashboard",                 # 财务报告程序表 → 项目总控仪表盘
+    "A2": "a2-adjustment-console",        # 调整分录程序表 → 卡片式中控台
+    "A3": "a3-consolidation-console",    # 合并流程程序表 → 合并专用卡片中控台（仅合并项目）
     "A5": "cf-verification",          # 财务报表支持程序表 → 现金流量表核查视图
     "A13": "misstatement-summary",    # 错报程序表 → 错报自动汇总视图
     "A16": "word-template",           # 管理层声明书 → OnlyOffice Word 编辑

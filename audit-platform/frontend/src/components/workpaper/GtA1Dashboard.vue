@@ -275,7 +275,8 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   projectId?: string
   year?: number
-}>(), { readonly: false })
+  wpCode?: string
+}>(), { readonly: false, wpCode: 'A1' })
 
 const emit = defineEmits<{
   'save': [data: AProgramHtmlData]
@@ -310,12 +311,12 @@ const trimVisible = ref(false)
 const trimTarget = ref<ProgramRow | null>(null)
 const trimReason = ref('')
 
-// Phase collapse state (default: all collapsed)
+// Phase collapse state (default: expand phases that have items)
 const expandedPhases = reactive<Record<string, boolean>>({
-  planning: false,
-  execution: false,
-  completion: false,
-  signoff: false,
+  planning: true,
+  execution: true,
+  completion: true,
+  signoff: true,
 })
 
 function togglePhase(phase: string) {
@@ -491,7 +492,7 @@ async function persistField(programNo: number, field: string, value: any) {
     await api.post('/api/workpapers/field-overrides', {
       project_id: projectId.value,
       year,
-      scope: 'procedure_table:A1',
+      scope: `procedure_table:${props.wpCode || 'A1'}`,
       item_key: String(programNo),
       field,
       value,
@@ -521,8 +522,8 @@ async function exportTable() {
       { key: '执行说明', header: '执行情况说明' },
       { key: '状态', header: '状态' },
     ],
-    sheetName: 'A1 总控程序表',
-    fileName: 'A1 财务报告程序表.xlsx',
+    sheetName: `${props.wpCode || 'A1'} 总控程序表`,
+    fileName: `${props.wpCode || 'A1'} 财务报告程序表.xlsx`,
   })
 }
 

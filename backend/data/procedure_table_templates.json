@@ -28,21 +28,22 @@
     "A2": {
       "name": "调整分录程序表",
       "items": [
-        {"seq": 1, "content": "编制审计调整分录(AJE)汇总", "ref_index": "A2-2", "auto_data_source": "adjustment_count_aje", "applicable_default": "yes"},
-        {"seq": 2, "content": "编制重分类调整分录(RJE)汇总", "ref_index": "A2-3", "auto_data_source": "adjustment_count_rje", "applicable_default": "yes"},
-        {"seq": 3, "content": "编制合并调整分录", "ref_index": "A3-7", "auto_data_source": "adjustment_count_consol", "applicable_default": "yes"},
-        {"seq": 4, "content": "汇总未更正错报(Passed)", "ref_index": "A13", "auto_data_source": "adjustment_count_passed", "applicable_default": "yes"},
-        {"seq": 5, "content": "验证调整分录综合作用(试算平衡)", "ref_index": "A2-1", "auto_data_source": "trial_balance_check", "applicable_default": "yes"}
+        {"seq": 1, "content": "编制审计调整分录(AJE)汇总", "ref_index": "A2-2", "auto_data_source": "adjustment_count_aje", "applicable_default": "yes", "phase": "completion"},
+        {"seq": 2, "content": "编制重分类调整分录(RJE)汇总", "ref_index": "A2-3", "auto_data_source": "adjustment_count_rje", "applicable_default": "yes", "phase": "completion"},
+        {"seq": 3, "content": "编制合并调整分录", "ref_index": "A3-7", "auto_data_source": "adjustment_count_consol", "applicable_default": "yes", "phase": "completion"},
+        {"seq": 4, "content": "汇总未更正错报(Passed)", "ref_index": "A13", "auto_data_source": "adjustment_count_passed", "applicable_default": "yes", "phase": "completion"},
+        {"seq": 5, "content": "验证调整分录综合作用(试算平衡)", "ref_index": "A2-1", "auto_data_source": "trial_balance_check", "applicable_default": "yes", "phase": "completion"}
       ]
     },
     "A3": {
       "name": "合并流程程序表",
+      "applicable_when": "consolidated",
       "items": [
-        {"seq": 1, "content": "确定合并范围", "ref_index": "A3-3", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 2, "content": "编制合并抵销分录", "ref_index": "A3-7", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 3, "content": "核对内部往来", "ref_index": "A3-7", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 4, "content": "验证合并报表试算", "ref_index": "A3-1", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 5, "content": "合并附注汇总", "ref_index": "A3-5,A3-6", "auto_data_source": null, "applicable_default": "yes"}
+        {"seq": 1, "content": "确定合并范围", "ref_index": "route:/consolidation?tab=scope", "auto_data_source": "consol_scope_status", "applicable_default": "yes", "phase": "completion"},
+        {"seq": 2, "content": "编制合并抵销分录", "ref_index": "route:/consolidation?tab=eliminations", "auto_data_source": "consol_elimination_count", "applicable_default": "yes", "phase": "completion"},
+        {"seq": 3, "content": "核对内部往来", "ref_index": "route:/consolidation?tab=internal-trade", "auto_data_source": "consol_internal_trade_status", "applicable_default": "yes", "phase": "completion"},
+        {"seq": 4, "content": "验证合并报表试算", "ref_index": "route:/consolidation?tab=trial", "auto_data_source": "consol_trial_balance_check", "applicable_default": "yes", "phase": "completion"},
+        {"seq": 5, "content": "合并附注汇总", "ref_index": "route:/consolidation?tab=notes", "auto_data_source": null, "applicable_default": "yes", "phase": "completion"}
       ]
     },
     "A4": {

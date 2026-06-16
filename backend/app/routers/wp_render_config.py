@@ -508,8 +508,6 @@ async def _generate_a_program_data(
                 for it in table.get("items", []):
                     summary = it.get("summary")
                     desc = it.get("content", "")
-                    if summary:
-                        desc = f"{desc} — {summary}"
                     applicable = it.get("applicable")
                     status = "not_applicable" if applicable == "na" else "pending"
                     programs.append({
@@ -521,6 +519,7 @@ async def _generate_a_program_data(
                         "linked_workpapers": it.get("ref_index", "") or "",
                         "status": status,
                         "phase": it.get("phase"),
+                        "summary": summary or "",
                     })
         except Exception as e:  # noqa: BLE001 — 降级到 xlsx 提取，不阻塞渲染
             logger.warning("A-程序表模板自动汇总失败 %s: %s", wp_code, e)
@@ -1235,7 +1234,7 @@ async def get_render_config(
         # GtAProgramConsole / GtA1Dashboard 消费 html_data.programs；当 sheet 无持久化
         # programs 时，从底稿模板 xlsx 解析程序清单（序号/描述/分类/5项认定/底稿索引），
         # 否则中控台永远显示「暂无审计程序」（模板里的程序内容无法体现）。
-        if component_type in ("a-program-console", "a1-dashboard") and not (
+        if component_type in ("a-program-console", "a1-dashboard", "a2-adjustment-console", "a3-consolidation-console") and not (
             isinstance(sheet_html_data, dict) and sheet_html_data.get("programs")
         ):
             sheet_html_data = await _generate_a_program_data(

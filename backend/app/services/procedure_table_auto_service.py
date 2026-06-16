@@ -180,6 +180,45 @@ class ProcedureTableService:
                 result["summary"] = f"重要性水平 {mat:,.0f} 元" if mat else "待设置"
             elif source == "trial_balance_check":
                 result["summary"] = "见试算平衡表"
+            elif source == "consol_scope_status":
+                # 合并范围确定状态
+                try:
+                    from app.models.consolidation_models import ConsolidationScope
+                    scope_stmt = sa.select(sa.func.count()).select_from(ConsolidationScope).where(
+                        ConsolidationScope.project_id == project_id,
+                    )
+                    scope_r = await self.db.execute(scope_stmt)
+                    scope_count = scope_r.scalar() or 0
+                    result["summary"] = f"已纳入{scope_count}家子公司" if scope_count else "待确定"
+                except Exception:
+                    result["summary"] = "见合并范围"
+            elif source == "consol_elimination_count":
+                # 合并抵销分录统计
+                try:
+                    from app.models.consolidation_models import ConsolidationElimination
+                    elim_stmt = sa.select(sa.func.count()).select_from(ConsolidationElimination).where(
+                        ConsolidationElimination.project_id == project_id,
+                    )
+                    elim_r = await self.db.execute(elim_stmt)
+                    elim_count = elim_r.scalar() or 0
+                    result["summary"] = f"共{elim_count}笔抵销分录" if elim_count else "无"
+                except Exception:
+                    result["summary"] = "见合并抵销"
+            elif source == "consol_internal_trade_status":
+                # 内部往来核对状态
+                try:
+                    from app.models.consolidation_models import InternalTrade
+                    trade_stmt = sa.select(sa.func.count()).select_from(InternalTrade).where(
+                        InternalTrade.project_id == project_id,
+                    )
+                    trade_r = await self.db.execute(trade_stmt)
+                    trade_count = trade_r.scalar() or 0
+                    result["summary"] = f"内部往来{trade_count}笔" if trade_count else "无内部往来"
+                except Exception:
+                    result["summary"] = "见内部往来"
+            elif source == "consol_trial_balance_check":
+                # 合并试算平衡
+                result["summary"] = "见合并试算"
             elif source == "cf_verification_status":
                 status = await self._get_cf_verification_status(project_id, year)
                 result["summary"] = status

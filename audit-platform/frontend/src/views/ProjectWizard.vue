@@ -154,19 +154,21 @@ async function handleConfirm() {
   })
 }
 
-/** 5.1：纳入子公司成功后，结束向导并跳转项目列表 */
+/** 5.1：纳入子公司成功后，结束向导并跳转合并模块 */
 function onSubsidiariesAttached(_count: number) {
+  const pid = scopeConfigProjectId.value
   scopeConfigProjectId.value = ''
   wizardStore.reset()
-  router.push('/projects')
+  router.push(pid ? `/projects/${pid}/consolidation` : '/consolidation')
 }
 
-/** 5.1：关闭"配置合并范围"弹窗（含"暂不配置"）后，结束向导并跳转项目列表 */
+/** 5.1：关闭"配置合并范围"弹窗（含"暂不配置"）后，跳转合并模块 */
 function onScopeConfigClosed(visible: boolean) {
   if (!visible && scopeConfigProjectId.value) {
+    const pid = scopeConfigProjectId.value
     scopeConfigProjectId.value = ''
     wizardStore.reset()
-    router.push('/projects')
+    router.push(`/projects/${pid}/consolidation`)
   }
 }
 </script>

@@ -405,7 +405,7 @@ services:
 
       STORAGE_ROOT: ${STORAGE_ROOT:-./storage}
 
-      ATTACHMENT_PRIMARY_STORAGE: ${ATTACHMENT_PRIMARY_STORAGE:-paperless}
+      ATTACHMENT_PRIMARY_STORAGE: ${ATTACHMENT_PRIMARY_STORAGE:-local}
 
       ATTACHMENT_FALLBACK_TO_LOCAL: ${ATTACHMENT_FALLBACK_TO_LOCAL:-true}
 
@@ -603,12 +603,15 @@ services:
 
 
   # ----------------------------------------------------------
-
   # Paperless-ngx - 附件文档管理 + OCR
-
+  # ⚠️ 默认禁用（profiles: paperless）。审计平台改用 MinIO + 自有三层 OCR 管线。
+  #    paperless 与平台 PaddleOCR/检索/溯源职责重叠，不建议启用。
+  #    如确需历史档案兼容：docker compose --profile paperless up
   # ----------------------------------------------------------
 
   paperless:
+
+    profiles: ["paperless"]
 
     image: ghcr.io/paperless-ngx/paperless-ngx:latest
 

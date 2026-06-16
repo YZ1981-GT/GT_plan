@@ -28,6 +28,8 @@ import { defineAsyncComponent, type Component } from 'vue'
 /** HTML 底稿组件类型（与 useEditorMode.HTML_COMPONENT_TYPES 保持一致） */
 export type HtmlComponentType =
   | 'a1-dashboard'
+  | 'a2-adjustment-console'
+  | 'a3-consolidation-console'
   | 'a-program-console'
   | 'b-index'
   | 'c-note-table'
@@ -67,6 +69,8 @@ export interface HtmlRendererEntry {
 // ─── lazy components ────────────────────────────────────────────────────────
 
 const GtA1Dashboard = defineAsyncComponent(() => import('./GtA1Dashboard.vue'))
+const GtA2AdjustmentConsole = defineAsyncComponent(() => import('./GtA2AdjustmentConsole.vue'))
+const GtA3ConsolidationConsole = defineAsyncComponent(() => import('./GtA3ConsolidationConsole.vue'))
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
 const GtBIndex = defineAsyncComponent(() => import('./GtBIndex.vue'))
 const GtCNoteTable = defineAsyncComponent(() => import('./GtCNoteTable.vue'))
@@ -102,6 +106,20 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: GtA1Dashboard,
     icon: '🎯',
     label: 'A1 项目总控仪表盘',
+    emits: ['save'],
+  },
+  {
+    componentType: 'a2-adjustment-console',
+    component: GtA2AdjustmentConsole,
+    icon: '📝',
+    label: 'A2 调整分录中控台',
+    emits: ['save'],
+  },
+  {
+    componentType: 'a3-consolidation-console',
+    component: GtA3ConsolidationConsole,
+    icon: '🔗',
+    label: 'A3 合并流程中控台',
     emits: ['save'],
   },
   {
