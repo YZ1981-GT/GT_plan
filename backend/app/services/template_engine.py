@@ -476,6 +476,20 @@ class TemplateEngine:
             except Exception:
                 pass
 
+        # 补充名称源：wp_account_mapping.json（A18~A27 等底稿只在此有 wp_name）
+        mapping_path = Path(__file__).parent.parent.parent / "data" / "wp_account_mapping.json"
+        wp_name_map: dict[str, str] = {}
+        if mapping_path.exists():
+            try:
+                with open(mapping_path, "r", encoding="utf-8-sig") as f:
+                    mapping_raw = json.load(f)
+                mapping_list = mapping_raw.get("mappings", []) if isinstance(mapping_raw, dict) else mapping_raw
+                for item in mapping_list:
+                    if isinstance(item, dict) and item.get("wp_code") and item.get("wp_name"):
+                        wp_name_map[item["wp_code"]] = item["wp_name"]
+            except Exception:
+                pass
+
         # 项目底稿目录（按审计循环分子目录）
         project_wp_dir = Path("storage") / "projects" / str(project_id) / "workpapers"
         project_wp_dir.mkdir(parents=True, exist_ok=True)
@@ -538,8 +552,16 @@ class TemplateEngine:
             tpl = tpl_map.get(code)
 
             # Determine wp_name from template or fallback
+            # 查找链：WpTemplate.template_name → gt_template_library.name → wp_account_mapping.wp_name → "底稿{code}"
             lib_entry = template_lib.get(code, {})
-            wp_name = tpl.template_name if tpl else lib_entry.get("name", lib_entry.get("wp_name", f"底稿{code}"))
+            if tpl:
+                wp_name = tpl.template_name
+            elif lib_entry.get("name") or lib_entry.get("wp_name"):
+                wp_name = lib_entry.get("name") or lib_entry.get("wp_name")
+            elif code in wp_name_map:
+                wp_name = wp_name_map[code]
+            else:
+                wp_name = f"底稿{code}"
             audit_cycle = (tpl.audit_cycle if tpl else lib_entry.get("cycle_prefix", lib_entry.get("audit_cycle"))) or None
             # 确定循环代号（从编码首字母推导）
             if not audit_cycle:
