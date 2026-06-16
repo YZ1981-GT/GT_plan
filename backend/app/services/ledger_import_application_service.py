@@ -602,6 +602,22 @@ class LedgerImportApplicationService:
                     year=result.get("year"),
                     record_count=cls._count_total_records(result),
                 )
+
+            # 导入完成后清除 Redis 余额缓存（防止旧数据残留）
+            try:
+                from app.core.redis import redis_client as _redis
+                if _redis:
+                    import_year = result.get("year") or year
+                    pattern = f"ledger:*:{project_id}:{import_year}:*"
+                    keys = []
+                    async for key in _redis.scan_iter(match=pattern):
+                        keys.append(key)
+                    if keys:
+                        await _redis.delete(*keys)
+                        logger.info("Import完成 清除 %d 个缓存键 (project=%s year=%s)", len(keys), project_id, import_year)
+            except Exception:
+                pass  # 缓存清除失败不影响主流程
+
             return result_payload
         except Exception as exc:
             # 标记 ImportJob 失败

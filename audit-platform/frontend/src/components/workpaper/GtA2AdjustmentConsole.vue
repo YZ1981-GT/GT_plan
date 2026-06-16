@@ -253,16 +253,35 @@ function openAddDialog() { addDesc.value = ''; addRef.value = ''; addVisible.val
 function confirmAdd() {
   if (!addDesc.value.trim()) return
   const maxNo = programs.value.reduce((m, p) => Math.max(m, p.program_no || 0), 0)
-  programs.value.push({
-    id: `custom-${Date.now()}`,
+  const newId = `custom-${Date.now()}`
+  const newProgram: ProgramRow = {
+    id: newId,
     program_no: maxNo + 1,
     program_desc: addDesc.value.trim(),
     program_category: '',
     linked_workpapers: addRef.value.trim(),
     status: 'pending',
-  })
+  }
+  programs.value.push(newProgram)
   addVisible.value = false
   debounceSave()
+  // P0: 持久化到后端
+  persistCustomItem(newProgram)
+}
+
+async function persistCustomItem(item: ProgramRow) {
+  const year = props.year || parseInt(route.query.year as string) || new Date().getFullYear()
+  try {
+    await api.post(`/api/projects/${projectId.value}/procedure-tables/custom-items`, {
+      table_code: props.wpCode || 'A2',
+      year,
+      description: item.program_desc,
+      phase: 'completion',
+      ref_index: item.linked_workpapers || '',
+    })
+  } catch {
+    // 已有 persistField 的错误提示，这里不重复
+  }
 }
 
 // Persist — scope 动态按 wpCode（修复 A1 硬编码 bug）
@@ -281,7 +300,10 @@ async function persistField(programNo: number, field: string, value: any) {
       field,
       value,
     })
-  } catch { /* 静默 */ }
+  } catch (e: any) {
+    const { ElMessage } = await import('element-plus')
+    ElMessage.error(`保存失败：${e?.message || '网络异常'}`)
+  }
 }
 
 // Export

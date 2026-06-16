@@ -190,39 +190,56 @@ def _apply_sign_convention(
     *,
     opening_source_mode: Optional[str] = None,
     closing_source_mode: Optional[str] = None,
+    opening_source_direction: Optional[str] = None,
+    closing_source_direction: Optional[str] = None,
 ) -> None:
     """对单条余额行应用 v2 类别自然正数符号约定（需求 1、4、5）。
 
+    方向优先级：
+    1. 源文件直接提取的方向（split_columns 看哪列有值 / explicit_direction 列）
+    2. 科目类别推断（借方类/贷方类）作为兜底
+
     传入的 opening_balance / closing_balance 为 v1 净额（借方为正、贷方为负）。
     本函数：
-    - 调 direction_resolver 取科目正常方向（debit/credit）+ 来源；
+    - 确定方向（优先源数据，兜底类别推断）；
     - 将净额归一为"类别自然正数"：正常方向为借方时存净额本身，为贷方时取反，
       使负债/权益/收入科目的贷方余额存为正数；
     - 当实际方向与类别正常方向相反（如负债出现借方余额）时，归一后值为负数，
       **保留该带符号值不强制翻正**（需求 1.5）；
-    - 写 opening_direction / closing_direction（= 类别正常方向）及来源；
+    - 写 opening_direction / closing_direction 及来源；
     - 写 sign_convention_version = v2；
     - 方向与类别冲突（归一后为负）时在 sign_anomaly_flags 记录异常（需求 4.5）。
-
-    就地修改 target dict。opening_source_mode / closing_source_mode 用于标注方向来源
-    （explicit_direction / split_columns），缺省时退化为类别推断来源。
     """
-    direction, category_source = resolve_account_direction(code, name or "")
-    opposite = "credit" if direction == "debit" else "debit"
+    # 类别推断方向（兜底）
+    category_direction, category_source = resolve_account_direction(code, name or "")
 
     conflicts: list[dict] = []
-    for period, mode in (
-        ("opening", opening_source_mode),
-        ("closing", closing_source_mode),
-    ):
+    src_dirs = {"opening": opening_source_direction, "closing": closing_source_direction}
+    modes = {"opening": opening_source_mode, "closing": closing_source_mode}
+
+    for period in ("opening", "closing"):
         bal_key = f"{period}_balance"
         net = target.get(bal_key)
+        mode = modes[period]
+        src_dir = src_dirs[period]
+
+        # 确定此期间的方向：优先源文件方向，兜底类别推断
+        if src_dir:
+            # 源文件直接提取的方向（最可靠）
+            direction = src_dir
+            dir_source = mode or "source_data"
+        else:
+            # 无源数据方向信息→用科目类别推断
+            direction = category_direction
+            dir_source = category_source
+
+        opposite = "credit" if direction == "debit" else "debit"
+
         # 归一为类别自然正数：借方科目存净额，贷方科目取反
         if net is not None:
             stored = net if direction == "debit" else -net
             target[bal_key] = stored
-            # 余额实际方向：归一后>=0表示与科目正常方向一致，<0表示反方向
-            # 存实际方向（非类别方向），让前端能直接显示"借"或"贷"
+            # 余额实际方向：归一后>=0表示与方向一致，<0表示反方向
             actual_dir = direction if stored >= 0 else opposite
             if stored < 0:
                 conflicts.append({
@@ -231,14 +248,15 @@ def _apply_sign_convention(
                     "stored_amount": float(stored),
                 })
         else:
-            actual_dir = direction  # 无余额时默认按科目类别
+            actual_dir = direction  # 无余额时按确定的方向
+
         target[f"{period}_direction"] = actual_dir
-        target[f"{period}_direction_source"] = mode or category_source
+        target[f"{period}_direction_source"] = dir_source
 
     target["sign_convention_version"] = CURRENT_SIGN_CONVENTION
     if conflicts:
         target["sign_anomaly_flags"] = {
-            "normal_direction": direction,
+            "normal_direction": category_direction,
             "conflicts": conflicts,
         }
 
@@ -272,6 +290,12 @@ def _aggregate_aux_to_summary(
     raw_extra_base["_aggregated_from_aux"] = True
     raw_extra_base["_aux_row_count"] = len(aux_base_rows)
 
+    # 方向继承：从子行中取第一个有方向的（同科目子行方向一致）
+    open_src_dir = next((r.get("_opening_source_direction") for r in aux_base_rows if r.get("_opening_source_direction")), None)
+    close_src_dir = next((r.get("_closing_source_direction") for r in aux_base_rows if r.get("_closing_source_direction")), None)
+    open_src_mode = next((r.get("_opening_source_mode") for r in aux_base_rows if r.get("_opening_source_mode")), None)
+    close_src_mode = next((r.get("_closing_source_mode") for r in aux_base_rows if r.get("_closing_source_mode")), None)
+
     return {
         "account_code": account_code,
         "account_name": first.get("account_name"),
@@ -286,6 +310,10 @@ def _aggregate_aux_to_summary(
         "closing_credit": _sum("closing_credit"),
         "currency_code": first.get("currency_code") or "CNY",
         "raw_extra": raw_extra_base,
+        "_opening_source_direction": open_src_dir,
+        "_closing_source_direction": close_src_dir,
+        "_opening_source_mode": open_src_mode,
+        "_closing_source_mode": close_src_mode,
     }
 
 
@@ -337,14 +365,30 @@ def convert_balance_rows(
         if od is not None or oc is not None:
             opening_balance = (od or Decimal(0)) - (oc or Decimal(0))
             opening_source_mode = "split_columns"
+            # 从源文件分列直接判定方向：哪列有值就是哪个方向
+            if (od or Decimal(0)) > 0 and (oc is None or oc == 0):
+                opening_source_direction = "debit"
+            elif (oc or Decimal(0)) > 0 and (od is None or od == 0):
+                opening_source_direction = "credit"
+            elif (od or Decimal(0)) > 0 and (oc or Decimal(0)) > 0:
+                # 两列都有值，按净额方向（借>贷→借，否则贷）
+                opening_source_direction = "debit" if opening_balance >= 0 else "credit"
+            else:
+                opening_source_direction = "debit"  # 都为 0 或空→默认借
         elif opening_bal is not None:
             opening_balance = _resolve_direction(opening_dir, opening_bal)
             opening_source_mode = (
                 "explicit_direction" if _is_known_direction_token(opening_dir) else None
             )
+            # 有显式方向列→直接用
+            if _is_known_direction_token(opening_dir):
+                opening_source_direction = "credit" if opening_dir in ("贷", "贷方", "C", "c", "credit", "Credit", "CR", "cr") else "debit"
+            else:
+                opening_source_direction = None  # 无来源信息，交后续推断
         else:
             opening_balance = None
             opening_source_mode = None
+            opening_source_direction = None
 
         # ── 期末 ──
         cd = safe_decimal(row.get("closing_debit"))
@@ -355,14 +399,28 @@ def convert_balance_rows(
         if cd is not None or cc is not None:
             closing_balance = (cd or Decimal(0)) - (cc or Decimal(0))
             closing_source_mode = "split_columns"
+            # 从源文件分列直接判定方向
+            if (cd or Decimal(0)) > 0 and (cc is None or cc == 0):
+                closing_source_direction = "debit"
+            elif (cc or Decimal(0)) > 0 and (cd is None or cd == 0):
+                closing_source_direction = "credit"
+            elif (cd or Decimal(0)) > 0 and (cc or Decimal(0)) > 0:
+                closing_source_direction = "debit" if closing_balance >= 0 else "credit"
+            else:
+                closing_source_direction = "debit"  # 都为 0 或空→默认借
         elif closing_bal is not None:
             closing_balance = _resolve_direction(closing_dir, closing_bal)
             closing_source_mode = (
                 "explicit_direction" if _is_known_direction_token(closing_dir) else None
             )
+            if _is_known_direction_token(closing_dir):
+                closing_source_direction = "credit" if closing_dir in ("贷", "贷方", "C", "c", "credit", "Credit", "CR", "cr") else "debit"
+            else:
+                closing_source_direction = None
         else:
             closing_balance = None
             closing_source_mode = None
+            closing_source_direction = None
 
         debit_amount = safe_decimal(row.get("debit_amount"))
         credit_amount = safe_decimal(row.get("credit_amount"))
@@ -394,6 +452,9 @@ def convert_balance_rows(
             # 方向来源模式（私有，仅供符号归一化后处理用，非 ORM 列）
             "_opening_source_mode": opening_source_mode,
             "_closing_source_mode": closing_source_mode,
+            # 源文件直接提取的方向（优先于类别推断）
+            "_opening_source_direction": opening_source_direction,
+            "_closing_source_direction": closing_source_direction,
         }
 
         if aux_dim_str:
@@ -451,12 +512,16 @@ def _finalize_balance_sign(target: dict) -> None:
     """对一条主表/辅助余额行应用 v2 符号约定并清理私有字段。"""
     opening_mode = target.pop("_opening_source_mode", None)
     closing_mode = target.pop("_closing_source_mode", None)
+    opening_src_dir = target.pop("_opening_source_direction", None)
+    closing_src_dir = target.pop("_closing_source_direction", None)
     _apply_sign_convention(
         target,
         target.get("account_code", ""),
         target.get("account_name"),
         opening_source_mode=opening_mode,
         closing_source_mode=closing_mode,
+        opening_source_direction=opening_src_dir,
+        closing_source_direction=closing_src_dir,
     )
 
 

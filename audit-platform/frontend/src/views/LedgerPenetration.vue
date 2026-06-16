@@ -31,6 +31,7 @@
           <el-option v-for="y in yearOptions" :key="y" :value="y">
             <span>{{ y }}年</span>
             <el-tag v-if="availableYears.includes(y)" size="small" type="success" style="margin-left: 6px; transform: scale(0.85)">有数据</el-tag>
+            <el-tag v-else-if="siblingYearMap[y]" size="small" type="warning" style="margin-left: 6px; transform: scale(0.85)">{{ siblingYearMap[y] }}</el-tag>
           </el-option>
         </el-select>
         <el-button size="small" @click="goToImport">
@@ -154,6 +155,7 @@
         :default-expand-all="false"
         border
         size="small"
+        class="gt-account-balance-table"
         :max-height="tableHeight"
         style="width: 100%"
         highlight-current-row
@@ -172,7 +174,7 @@
         <el-table-column prop="account_name" label="科目名称" min-width="180" show-overflow-tooltip />
         <el-table-column label="方向" width="60" align="center">
           <template #default="{ row }">
-            {{ row.opening_direction === 'credit' || (!row.opening_direction && (row.opening_balance ?? 0) < 0) ? '贷' : '借' }}
+            {{ resolveDir(row, 'opening') }}
           </template>
         </el-table-column>
         <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('opening_balance')">
@@ -186,7 +188,7 @@
         </el-table-column>
         <el-table-column label="方向" width="60" align="center">
           <template #default="{ row }">
-            {{ row.closing_direction === 'credit' || (!row.closing_direction && (row.closing_balance ?? 0) < 0) ? '贷' : '借' }}
+            {{ resolveDir(row, 'closing') }}
           </template>
         </el-table-column>
         <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('closing_balance')">
@@ -290,6 +292,7 @@
           :default-expand-all="auxAllExpanded"
           border
           size="small"
+          class="gt-aux-balance-table"
           :max-height="tableHeight"
           style="width: 100%"
           highlight-current-row
@@ -467,9 +470,6 @@
         <el-table-column prop="summary" label="摘要" min-width="180" show-overflow-tooltip>
           <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
         </el-table-column>
-        <el-table-column prop="counterpart_account" label="对方科目" width="120" show-overflow-tooltip>
-          <template #default="{ row }"><span class="gt-amt">{{ row.counterpart_account }}</span></template>
-        </el-table-column>
         <el-table-column prop="debit_amount" label="借方" width="200" min-width="180" align="right">
           <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
         </el-table-column>
@@ -491,6 +491,8 @@
       <div class="gt-filter-row">
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">凭证 {{ currentVoucher }}</el-tag>
+        <el-button size="small" plain @click="copyCurrentVoucher" title="复制本凭证所有分录到剪贴板">复制本凭证</el-button>
+        <el-button size="small" type="primary" plain @click="sampleCurrentVoucher" title="将本凭证标记为抽样凭证">抽中本凭证</el-button>
         <el-button size="small" plain @click="copySelectedRows()" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
@@ -1046,15 +1048,36 @@ const currentProject = ref<ProjectInfo | null>(null)
 const selectedProjectId = ref('')
 const selectedYear = ref(2025)
 
+// 保持 selectedYear 与路由 query.year 同步（切换年度后选择器显示正确年份）
+watch(year, (newYear) => {
+  if (newYear !== selectedYear.value) {
+    selectedYear.value = newYear
+  }
+}, { immediate: true })
+
 const yearOptions = computed(() => {
   const cur = new Date().getFullYear()
   const defaultYears = Array.from({ length: 5 }, (_, i) => cur - i)
-  // 合并实际有数据的年度
-  const all = new Set([...defaultYears, ...availableYears.value])
+  // 合并实际有数据的年度 + 同客户其他项目有数据的年度
+  const siblingYearNums = siblingYears.value.map(s => s.year)
+  const all = new Set([...defaultYears, ...availableYears.value, ...siblingYearNums])
   return [...all].sort((a, b) => b - a)
 })
 
 const availableYears = ref<number[]>([])
+const siblingYears = ref<Array<{ year: number; project_id: string; project_name: string }>>([])
+
+// 同客户其他项目年份映射（供年度选择器显示"其他项目"提示）
+const siblingYearMap = computed(() => {
+  const map: Record<number, string> = {}
+  for (const s of siblingYears.value) {
+    if (!availableYears.value.includes(s.year)) {
+      // 取项目名最后的年份部分去掉，只显示简短标识
+      map[s.year] = '其他项目'
+    }
+  }
+  return map
+})
 
 async function loadAvailableYears() {
   if (!projectId.value) return
@@ -1065,12 +1088,16 @@ async function loadAvailableYears() {
     // 404 = 新项目无数据，静默处理
     if (!data || data?.detail) {
       availableYears.value = []
+      siblingYears.value = []
       return
     }
     const result = data
     availableYears.value = result?.years ?? []
+    siblingYears.value = result?.sibling_years ?? []
+    // 把同客户其他项目的年份也加入 yearOptions（通过合并进 availableYears 的计算）
   } catch {
     availableYears.value = []
+    siblingYears.value = []
   }
 }
 
@@ -1136,7 +1163,23 @@ function onProjectChange(newId: string) {
   }
 }
 
-function onYearChange(newYear: number) {
+async function onYearChange(newYear: number) {
+  // 如果选择的年份在同客户其他项目中（而非当前项目）→ 确认跳转
+  const sibling = siblingYears.value.find(s => s.year === newYear)
+  if (sibling && !availableYears.value.includes(newYear)) {
+    try {
+      await ElMessageBox.confirm(
+        `${newYear} 年数据在项目「${sibling.project_name}」中，是否跳转到该项目查看？`,
+        '跨项目年度切换',
+        { confirmButtonText: '跳转', cancelButtonText: '取消', type: 'info' },
+      )
+      router.push({ path: `/projects/${sibling.project_id}/ledger`, query: { year: String(newYear) } })
+    } catch {
+      // 用户取消，恢复原年度
+      selectedYear.value = year.value
+    }
+    return
+  }
   selectedYear.value = newYear
   router.push({ path: `/projects/${projectId.value}/ledger`, query: { year: String(newYear) } })
 }
@@ -1442,7 +1485,6 @@ const STANDARD_FIELDS = [
   { value: 'direction', label: '借贷方向' },
   { value: 'preparer', label: '制单人' },
   { value: 'accounting_period', label: '会计期间' },
-  { value: 'counterpart_account', label: '对方科目' },
 ]
 
 function initColumnMapping() {
@@ -1676,12 +1718,9 @@ async function doPreview() {
   if (!importFiles.value.length) return
   previewing.value = true
   importProgressPct.value = 0
-  const progressTimer = setInterval(() => {
-    if (importProgressPct.value < 90) {
-      importProgressPct.value += Math.random() * 12 + 3
-      if (importProgressPct.value > 90) importProgressPct.value = 90
-    }
-  }, 400)
+  ;(globalThis as any).__suppressTimeoutToast = true
+  // 上传进度占 0~70%，后端解析占 70~100%
+  const parseTimer = { id: null as ReturnType<typeof setInterval> | null }
   try {
     const formData = buildImportPreviewFormData(importFiles.value)
     const url = buildImportPreviewUrl({
@@ -1689,7 +1728,25 @@ async function doPreview() {
       year: importYear.value,
       previewRows: 50,
     })
-    const data = await smartPreviewLedgerImport(projectId.value, url, formData)
+    const data = await api.post(url, formData, {
+      timeout: 600000,
+      _silent: true,
+      onUploadProgress: (evt: any) => {
+        // 上传阶段：0~70%
+        if (evt.total) {
+          importProgressPct.value = Math.min(70, Math.round((evt.loaded / evt.total) * 70))
+        }
+      },
+    } as any)
+    // 上传完成，后端解析中 70~95%（模拟，因为无法获取后端进度）
+    importProgressPct.value = 75
+    parseTimer.id = setInterval(() => {
+      if (importProgressPct.value < 95) {
+        importProgressPct.value += 2
+      }
+    }, 500)
+    // 实际结果已返回
+    if (parseTimer.id) clearInterval(parseTimer.id)
     importProgressPct.value = 100
     const previewSuccess = resolveImportPreviewSuccess({
       result: data,
@@ -1715,9 +1772,10 @@ async function doPreview() {
       handleApiError(e, '解析')
     }
   } finally {
-    clearInterval(progressTimer)
+    if (parseTimer.id) clearInterval(parseTimer.id)
     importProgressPct.value = 0
     previewing.value = false
+    ;(globalThis as any).__suppressTimeoutToast = false
   }
 }
 
@@ -2029,7 +2087,42 @@ function copySelectedRows(fallbackRow?: any) {
   })
 }
 
-// ── 导航状态 ──
+/** 复制本凭证全部分录到剪贴板（Tab 分隔，可直接粘贴到 Excel） */
+function copyCurrentVoucher() {
+  const rows = voucherItems.value.filter(r => r._type !== 'subtotal' && r._type !== 'view_subtotal')
+  if (rows.length === 0) {
+    ElMessage.warning('本凭证无分录可复制')
+    return
+  }
+  const excludeKeys = new Set(['_type', '_isGroup', '_isSubtotal', '_tree_key', '_hasChildren', 'children', 'id', 'project_id', 'dataset_id', 'is_deleted', 'company_code', 'currency_code', 'raw_extra'])
+  const keys = Object.keys(rows[0]).filter(k => !excludeKeys.has(k) && !k.startsWith('_'))
+  // 表头 + 数据行
+  const header = keys.join('\t')
+  const lines = rows.map(r => keys.map(k => {
+    const v = r[k]
+    return v == null ? '' : String(v)
+  }).join('\t'))
+  const text = [header, ...lines].join('\n')
+  navigator.clipboard?.writeText(text).then(() => {
+    ElMessage.success(`已复制凭证 ${currentVoucher.value} 共 ${rows.length} 条分录`)
+  })
+}
+
+/** 抽中本凭证：标记为抽样凭证（用于审计抽凭） */
+async function sampleCurrentVoucher() {
+  if (!currentVoucher.value) return
+  try {
+    await api.post(`/api/projects/${projectId.value}/ledger/sample-voucher`, {
+      year: year.value,
+      voucher_no: currentVoucher.value,
+      account_code: currentAccount.value || null,
+    })
+    ElMessage.success(`已将凭证 ${currentVoucher.value} 加入抽样`)
+  } catch (e: any) {
+    // 后端端点未就绪时降级为本地提示（不阻断）
+    ElMessage.warning(`抽样登记失败：${e?.message || '功能待后端支持'}`)
+  }
+}
 type Level = 'balance' | 'ledger' | 'voucher' | 'aux_balance' | 'aux_ledger'
 const currentLevel = ref<Level>('balance')
 const currentAccount = ref('')
@@ -2113,7 +2206,6 @@ const ledgerVirtualColumns = computed(() => {
     makeResizableCol('voucher_date', '日期', w.voucher_date, sortKey),
     makeResizableCol('voucher_no', '凭证号', w.voucher_no, sortKey),
     makeResizableCol('summary', '摘要', w.summary, sortKey, { flexGrow: 1 }),
-    makeResizableCol('counterpart_account', '对方科目', w.counterpart_account, sortKey),
     makeResizableCol('debit_amount', '借方', w.debit_amount, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
     makeResizableCol('credit_amount', '贷方', w.credit_amount, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
     makeResizableCol('balance', '余额', w.balance, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
@@ -2475,6 +2567,30 @@ const treeBalance = computed(() => {
 })
 
 function num(v: any): number { return Number(v) || 0 }
+
+/**
+ * 余额方向判定（显示用）：
+ * 优先级 1. 后端 direction 字段（导入时从源文件提取的权威方向）
+ *        2. 字段为空（旧数据）→ 按科目编码类别推断：负债/权益/收入类(2/3/4/6开头)默认贷，其余默认借
+ *        3. 同时参考余额正负（红字冲销等异常方向）
+ */
+function resolveDir(row: any, period: 'opening' | 'closing'): string {
+  const dirField = row[`${period}_direction`]
+  if (dirField === 'credit') return '贷'
+  if (dirField === 'debit') return '借'
+  // 字段为空（旧数据）→ 按科目类别推断默认方向
+  const code = String(row.account_code || '')
+  const firstChar = code.charAt(0)
+  // 负债(2)、共同(3)、权益(4/所有者权益)、损益贷方类常为贷方科目
+  const creditCategory = firstChar === '2' || firstChar === '3' || firstChar === '4'
+  const bal = row[`${period}_balance`] ?? 0
+  if (creditCategory) {
+    // 贷方类：余额>=0 显示贷，<0（异常借方）显示借
+    return bal >= 0 ? '贷' : '借'
+  }
+  // 借方类（资产1/成本5/费用6借方）：余额>=0 借，<0 贷
+  return bal >= 0 ? '借' : '贷'
+}
 
 const fmtAmt = fmtAmount
 
@@ -3701,6 +3817,28 @@ onBeforeUnmount(() => {
 /* 辅助余额表维度标签 */
 .gt-aux-toolbar {
   margin-bottom: var(--gt-space-2);
+}
+
+/* 辅助余额表字体统一 12px（表头 + 单元格） */
+:deep(.gt-aux-balance-table .el-table__cell) {
+  font-size: 12px /* allow-px: special */;
+}
+:deep(.gt-aux-balance-table .el-table__cell .cell) {
+  font-size: 12px /* allow-px: special */;
+}
+:deep(.gt-aux-balance-table .gt-amt) {
+  font-size: 12px /* allow-px: special */;
+}
+
+/* 科目余额表字体统一 12px（表头 + 单元格） */
+:deep(.gt-account-balance-table .el-table__cell) {
+  font-size: 12px /* allow-px: special */;
+}
+:deep(.gt-account-balance-table .el-table__cell .cell) {
+  font-size: 12px /* allow-px: special */;
+}
+:deep(.gt-account-balance-table .gt-amt) {
+  font-size: 12px /* allow-px: special */;
 }
 
 /* 选中行样式：浅蓝背景，无左边框竖线 */

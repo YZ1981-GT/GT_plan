@@ -196,6 +196,11 @@ async def detect_files(
     response["estimated_duration_seconds"] = estimate_duration_seconds(total_rows_estimate)
     response["size_bucket"] = estimate_duration_bucket(total_rows_estimate)
 
+    # 缓存 total_rows_estimate 到 bundle manifest，submit 复用避免重新 detect（优化点）
+    LedgerImportUploadService.cache_detection_meta(
+        project_id, upload_token, total_rows_estimate
+    )
+
     # F42 / design D30 / Sprint 7.9 + 10.42：规模异常警告（零行 / 异常规模）
     # 前端收到 warnings 后必须引导用户点"强制继续"才能调 /submit 时传
     # force_submit=True；否则 submit 会被 SCALE_WARNING_BLOCKED 拦截。
@@ -246,15 +251,21 @@ async def submit_import(
         file_entries = []
 
     if file_entries:
-        detection = ImportOrchestrator.detect_from_paths(
-            [str(path) for _name, path in file_entries]
+        # 优化：优先读 detect 阶段缓存的 total_rows_estimate，避免重新 detect 整个 bundle
+        total_rows_estimate = LedgerImportUploadService.get_cached_total_rows(
+            project_id, body.upload_token
         )
-        total_rows_estimate = sum(
-            s.row_count_estimate
-            for fd in detection.files
-            for s in fd.sheets
-            if s.table_type != "unknown"
-        )
+        if total_rows_estimate is None:
+            # 缓存缺失（旧 bundle / detect 未缓存）→ 回退重算
+            detection = ImportOrchestrator.detect_from_paths(
+                [str(path) for _name, path in file_entries]
+            )
+            total_rows_estimate = sum(
+                s.row_count_estimate
+                for fd in detection.files
+                for s in fd.sheets
+                if s.table_type != "unknown"
+            )
         scale_warnings = await check_scale_warnings(
             {"total_rows_estimate": total_rows_estimate}, project_id, db
         )

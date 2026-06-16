@@ -74,7 +74,7 @@
       "name": "关联交易程序表",
       "items": [
         {"seq": 1, "content": "了解关联方关系", "ref_index": "A7-1", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 2, "content": "识别关联方交易", "ref_index": "A7-1", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "识别关联方交易", "ref_index": "A7-1", "auto_data_source": "related_party_transaction_count", "applicable_default": "yes"},
         {"seq": 3, "content": "审核关联交易附注披露", "ref_index": "A7-2", "auto_data_source": null, "applicable_default": "yes"}
       ]
     },
@@ -126,7 +126,7 @@
     "A14": {
       "name": "内部控制缺陷程序表",
       "items": [
-        {"seq": 1, "content": "识别内控缺陷", "ref_index": "A14-1", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 1, "content": "识别内控缺陷", "ref_index": "A14-1", "auto_data_source": "control_deficiency_count", "applicable_default": "yes"},
         {"seq": 2, "content": "企业层面控制缺陷评价", "ref_index": "A14-2", "auto_data_source": null, "applicable_default": "yes"},
         {"seq": 3, "content": "IT 缺陷汇总及评价", "ref_index": "A14-3", "auto_data_source": null, "applicable_default": "yes"},
         {"seq": 4, "content": "业务流程层面控制缺陷评价", "ref_index": "A14-4", "auto_data_source": null, "applicable_default": "yes"}

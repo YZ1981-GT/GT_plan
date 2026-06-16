@@ -134,6 +134,8 @@ class LedgerPenetrationService:
                 tbl.c.debit_amount,
                 tbl.c.credit_amount,
                 tbl.c.closing_balance,
+                tbl.c.opening_direction,
+                tbl.c.closing_direction,
             )
             .where(active_filter)
             .order_by(tbl.c.account_code)
@@ -205,6 +207,11 @@ class LedgerPenetrationService:
             ]
             name = child_names[0].split("_")[0] if child_names else parent_code
 
+            # 方向：取第一个有方向的子级（同一父级下子科目方向一致）
+            child_rows = [r for r in rows if _is_child_of(r["account_code"], parent_code)]
+            open_dir = next((r.get("opening_direction") for r in child_rows if r.get("opening_direction")), None)
+            close_dir = next((r.get("closing_direction") for r in child_rows if r.get("closing_direction")), None)
+
             level = _get_level(parent_code)
             return {
                 "account_code": parent_code,
@@ -214,6 +221,8 @@ class LedgerPenetrationService:
                 "debit_amount": float(debit) if debit else None,
                 "credit_amount": float(credit) if credit else None,
                 "closing_balance": float(closing) if closing else None,
+                "opening_direction": open_dir,
+                "closing_direction": close_dir,
                 "_is_synthetic": True,  # 标记为合成行
             }
 

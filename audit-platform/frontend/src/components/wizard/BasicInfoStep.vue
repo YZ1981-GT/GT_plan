@@ -96,30 +96,6 @@
             <el-button link type="primary" size="small" class="gt-category-ref-link" @click="showCategoryReference = true">
               📋 查看分类标准
             </el-button>
-            <div
-              v-if="recommendation && recommendation.subtype"
-              class="gt-subtype-recommend"
-            >
-              <el-tag size="small" :type="recommendation.confidence === 'high' ? 'success' : 'warning'" effect="light">
-                系统建议：模板{{ subtypeLetter(recommendation.subtype) }}
-              </el-tag>
-              <span class="gt-subtype-recommend-desc">{{ subtypeDesc(recommendation.subtype) }}</span>
-              <el-button
-                v-if="form.company_subtype !== recommendation.subtype"
-                link
-                type="primary"
-                size="small"
-                @click="applyRecommendation"
-              >
-                采用建议
-              </el-button>
-              <span
-                v-if="recommendation.confidence !== 'high' && recommendation.candidates.length > 1"
-                class="gt-subtype-recommend-hint"
-              >
-                （存在多个候选：{{ recommendation.candidates.map(subtypeLetter).join('、') }}，请确认）
-              </span>
-            </div>
           </el-form-item>
 
           <el-form-item v-if="form.template_type === 'custom'" label="自定义模板" prop="custom_template_id">

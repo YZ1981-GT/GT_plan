@@ -66,7 +66,7 @@ export function _resetNetworkStats() {
 
 const http = axios.create({
   baseURL: '/',
-  timeout: 120000,
+  timeout: 180000,
 })
 
 // ── 请求去重：相同 GET 请求在飞行中不重复发送 ──────────────
@@ -259,15 +259,25 @@ http.interceptors.response.use(
     // _silent 模式：调用方自行处理错误，不弹全局 toast
     if ((error.config as any)?._silent) return Promise.reject(error)
 
-    // R8-S1-05：超时专门处理
+    // R8-S1-05：超时专门处理（大文件导入期间完全抑制超时弹窗）
     if (error.code === 'ECONNABORTED') {
-      const { feedback } = await import('./feedback')
-      feedback.notify({
-        type: 'warning',
-        title: '请求超时',
-        message: '网络连接缓慢，已停止等待。建议检查网络或稍后重试。',
-        duration: 6000,
-      })
+      // 全局抑制标志：大文件上传/detect 进行中时不弹超时（避免 worker 阻塞导致的误报）
+      if ((globalThis as any).__suppressTimeoutToast) {
+        return Promise.reject(error)
+      }
+      const now = Date.now()
+      const lastTimeoutTs = (globalThis as any).__lastTimeoutNotify || 0
+      // 60 秒防抖
+      if (now - lastTimeoutTs > 60000) {
+        (globalThis as any).__lastTimeoutNotify = now
+        const { feedback } = await import('./feedback')
+        feedback.notify({
+          type: 'warning',
+          title: '请求超时',
+          message: '网络连接缓慢，已停止等待。建议检查网络或稍后重试。',
+          duration: 6000,
+        })
+      }
       return Promise.reject(error)
     }
 

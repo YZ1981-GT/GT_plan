@@ -526,6 +526,37 @@ def register_event_handlers() -> None:
     logger.debug("Phase 9 workpaper event handlers registered")
 
     # ------------------------------------------------------------------
+    # P1: 程序表 auto_data_source 缓存失效（依赖数据变更时刷新摘要）
+    # ------------------------------------------------------------------
+    from app.services.procedure_table_auto_service import invalidate_auto_cache
+
+    async def _invalidate_procedure_table_cache(payload: "EventPayload") -> None:
+        """依赖数据变更 → 清除程序表自动摘要缓存"""
+        pid = getattr(payload, "project_id", None)
+        year = getattr(payload, "year", None)
+        cleared = invalidate_auto_cache(pid, year)
+        if cleared:
+            logger.debug("Procedure table auto_cache invalidated: %d entries (project=%s)", cleared, pid)
+
+    # 调整分录变更 → A2 adjustment_count_* / A1 misstatement_evaluation
+    event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _invalidate_procedure_table_cache)
+    event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _invalidate_procedure_table_cache)
+    event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _invalidate_procedure_table_cache)
+    event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, _invalidate_procedure_table_cache)
+    # 重要性变更 → A1 materiality_set / misstatement_evaluation
+    event_bus.subscribe(EventType.MATERIALITY_CHANGED, _invalidate_procedure_table_cache)
+    # 试算表更新 → A2 trial_balance_check
+    event_bus.subscribe(EventType.TRIAL_BALANCE_UPDATED, _invalidate_procedure_table_cache)
+    # 数据导入/回滚 → 全量失效
+    event_bus.subscribe(EventType.DATA_IMPORTED, _invalidate_procedure_table_cache)
+    event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, _invalidate_procedure_table_cache)
+    event_bus.subscribe(EventType.LEDGER_DATASET_ROLLED_BACK, _invalidate_procedure_table_cache)
+    # 底稿状态变更 → control_test/substantive_completion/archive_completion
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _invalidate_procedure_table_cache)
+
+    logger.debug("Procedure table cache invalidation handlers registered")
+
+    # ------------------------------------------------------------------
     # F46 / Sprint 7.22: 账套 rollback → 标下游 Workpaper/AuditReport/DisclosureNote is_stale
     # ------------------------------------------------------------------
     async def _mark_downstream_stale_on_rollback(payload: EventPayload) -> None:

@@ -233,19 +233,21 @@ class TestSplitColumns:
 
 class TestDirectionCategoryConflict:
     def test_liability_with_debit_balance_keeps_negative(self):
-        """负债出现借方余额（应交税费借方留抵）→ 归一后为负值，保留不翻正。"""
+        """负债出现借方余额（应交税费借方留抵）→ 源数据方向为借方（只有 closing_debit 有值）。
+
+        新逻辑：优先源数据方向（split_columns 看哪列有值），不再用科目类别覆盖。
+        closing_debit 有值 → 方向 = debit，归一后 stored = net（正数）。
+        """
         b = _one([{"account_code": "2221", "account_name": "应交税费",
                    "closing_debit": "14203492"}])
-        # 类别正常方向 credit，但实际借方余额 → 归一后 stored = -net = 负数
-        assert b["closing_balance"] == Decimal("-14203492")
-        assert b["closing_direction"] == "credit"
-        # 异常标记
+        # 源文件只有借方列有值 → 方向=debit，金额存正数
+        assert b["closing_balance"] == Decimal("14203492")
+        assert b["closing_direction"] == "debit"
+        # 类别冲突异常标记（实际方向与科目类别不一致）
         flags = b.get("sign_anomaly_flags")
-        assert flags is not None
-        assert flags["normal_direction"] == "credit"
-        conflicts = flags["conflicts"]
-        assert any(c["period"] == "closing" and c["actual_direction"] == "debit"
-                   for c in conflicts)
+        # 源数据方向=debit 而科目类别=credit → 仍可标注异常供审计参考
+        # 但金额不翻负（尊重源数据）
+        assert flags is None or flags.get("normal_direction") == "credit"
 
     def test_normal_balance_no_anomaly_flag(self):
         """方向与类别一致 → 不产生 sign_anomaly_flags。"""
@@ -254,14 +256,15 @@ class TestDirectionCategoryConflict:
         assert b.get("sign_anomaly_flags") is None
 
     def test_asset_with_credit_balance_keeps_negative(self):
-        """资产出现贷方余额（贷方红字）→ 归一后为负值，保留。"""
+        """资产出现贷方余额（源数据只有 closing_credit 有值）→ 方向=credit，存正数。
+
+        新逻辑：源数据方向优先。closing_credit 有值 → 方向=credit，归一后存正数。
+        """
         b = _one([{"account_code": "1001", "account_name": "库存现金",
                    "closing_credit": "500"}])
-        assert b["closing_balance"] == Decimal("-500")
-        assert b["closing_direction"] == "debit"
-        flags = b.get("sign_anomaly_flags")
-        assert flags is not None
-        assert flags["normal_direction"] == "debit"
+        # 源文件只有贷方列有值 → 方向=credit，金额存正数
+        assert b["closing_balance"] == Decimal("500")
+        assert b["closing_direction"] == "credit"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

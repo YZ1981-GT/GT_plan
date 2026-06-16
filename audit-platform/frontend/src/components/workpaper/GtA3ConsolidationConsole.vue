@@ -264,7 +264,10 @@ async function persistField(programNo: number, field: string, value: any) {
       field,
       value,
     })
-  } catch { /* 静默 */ }
+  } catch (e: any) {
+    const { ElMessage } = await import('element-plus')
+    ElMessage.error(`保存失败：${e?.message || '网络异常'}`)
+  }
 }
 
 // Export

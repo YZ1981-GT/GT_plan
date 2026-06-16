@@ -202,6 +202,7 @@ async function startDetect() {
   detecting.value = true
   uploading.value = true
   uploadProgress.value = 0
+  ;(globalThis as any).__suppressTimeoutToast = true
 
   try {
     const { api } = await import('@/services/apiProxy')
@@ -213,11 +214,20 @@ async function startDetect() {
       formData.append('files', file, file.name)
     }
 
-    uploadProgress.value = 50
+    uploadProgress.value = 0
 
     const result = await api.post(
       `/api/projects/${props.projectId}/ledger-import/detect`,
-      formData
+      formData,
+      {
+        timeout: 600000,
+        _silent: true,
+        onUploadProgress: (evt: any) => {
+          if (evt.total) {
+            uploadProgress.value = Math.min(90, Math.round((evt.loaded / evt.total) * 90))
+          }
+        },
+      } as any
     ) as LedgerDetectionResult
 
     uploadProgress.value = 100
@@ -227,6 +237,7 @@ async function startDetect() {
   } finally {
     detecting.value = false
     uploading.value = false
+    ;(globalThis as any).__suppressTimeoutToast = false
   }
 }
 </script>

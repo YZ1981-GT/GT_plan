@@ -466,7 +466,7 @@ function confirmAdd() {
   if (!addDesc.value.trim()) return
   const maxNo = programs.value.reduce((m, p) => Math.max(m, p.program_no || 0), 0)
   const newId = `custom-${Date.now()}`
-  programs.value.push({
+  const newProgram: ProgramRow = {
     id: newId,
     program_no: maxNo + 1,
     program_desc: addDesc.value.trim(),
@@ -474,10 +474,29 @@ function confirmAdd() {
     linked_workpapers: addRef.value.trim(),
     status: 'pending',
     phase: addPhase.value,
-  })
+  }
+  programs.value.push(newProgram)
   emit('program-add', { programId: newId, description: addDesc.value.trim() })
   addVisible.value = false
   debounceSave()
+  // P0: 持久化到后端
+  persistCustomItem(newProgram)
+}
+
+async function persistCustomItem(item: ProgramRow) {
+  const year = props.year || parseInt(route.query.year as string) || new Date().getFullYear()
+  try {
+    await api.post(`/api/projects/${projectId.value}/procedure-tables/custom-items`, {
+      table_code: props.wpCode || 'A1',
+      year,
+      description: item.program_desc,
+      phase: item.phase || 'completion',
+      ref_index: item.linked_workpapers || '',
+    })
+  } catch (e: any) {
+    const { ElMessage } = await import('element-plus')
+    ElMessage.warning('自定义程序已添加到本地，但后端持久化失败，刷新后可能丢失')
+  }
 }
 
 // ─── Persistence ───
@@ -497,7 +516,10 @@ async function persistField(programNo: number, field: string, value: any) {
       field,
       value,
     })
-  } catch { /* 静默 */ }
+  } catch (e: any) {
+    const { ElMessage } = await import('element-plus')
+    ElMessage.error(`保存失败：${e?.message || '网络异常'}`)
+  }
 }
 
 async function exportTable() {

@@ -96,12 +96,12 @@ export async function getImportJob(projectId: string, jobId: string): Promise<Im
 
 export async function smartPreviewLedgerImport(projectId: string, url: string, formData: FormData) {
   void projectId
-  return await api.post(url, formData, { timeout: 600000 })
+  return await api.post(url, formData, { timeout: 600000, _silent: true } as any)
 }
 
 export async function submitSmartLedgerImport(projectId: string, url: string, formData: FormData) {
   void projectId
-  return await api.post(url, formData, { timeout: 60000 })
+  return await api.post(url, formData, { timeout: 600000, _silent: true } as any)
 }
 
 export async function listActivationRecords(projectId: string, year: number): Promise<ActivationRecord[]> {

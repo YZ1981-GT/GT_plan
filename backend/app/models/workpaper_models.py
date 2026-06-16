@@ -736,6 +736,47 @@ class SamplingRecord(Base):
     )
 
 
+class SampledVoucher(Base):
+    """抽样凭证（抽凭联动）
+
+    用户在凭证穿透视图点击"抽中本凭证"→记录到此表，作为抽凭样本清单。
+    后续可关联 sampling_record_id（统计层）或 working_paper_id（底稿层）。
+    对应迁移 V084__sampled_vouchers.sql。
+    """
+
+    __tablename__ = "sampled_vouchers"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    voucher_no: Mapped[str] = mapped_column(sa.String(100), nullable=False)
+    account_code: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
+    sampling_record_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    working_paper_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sampled_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    sampled_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    is_deleted: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_sampled_vouchers_project_year", "project_id", "year"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # WpFormula 模型（自定义底稿公式绑定，独立表）
 # ---------------------------------------------------------------------------

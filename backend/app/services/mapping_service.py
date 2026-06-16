@@ -359,7 +359,9 @@ async def auto_match(
     if total_client == 0:
         await _generate_client_accounts_from_balance(project_id, db, year=year)
 
-    # 检查是否有标准科目，没有则从客户科目的一级编码自动生成
+    # 检查是否有标准科目，不足则从客户科目的一级编码自动生成
+    # 注意：可能有其他流程（如报表映射模板）预写入少量 standard 科目，
+    # 导致 std_count>0 但远不够覆盖所有客户科目→一键映射只匹配到极少数
     std_count_result = await db.execute(
         select(func.count(AccountChart.id)).where(
             AccountChart.project_id == project_id,
@@ -367,7 +369,9 @@ async def auto_match(
             AccountChart.is_deleted == False,  # noqa: E712
         )
     )
-    if std_count_result.scalar_one() == 0:
+    std_count = std_count_result.scalar_one()
+    # 如果标准科目数远少于客户一级科目数，补充生成
+    if std_count < total_client // 5:  # 启发式：standard 应至少占 client 的 1/5
         await _generate_standard_accounts_from_client(project_id, db)
 
     suggestions = await auto_suggest(project_id, db, year=year)

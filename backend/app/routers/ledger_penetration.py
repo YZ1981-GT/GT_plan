@@ -148,6 +148,128 @@ async def get_voucher_entries(
     return await svc.get_voucher_entries(project_id, year, voucher_no)
 
 
+# ---------------------------------------------------------------------------
+# 抽样凭证（抽凭联动）
+# ---------------------------------------------------------------------------
+from pydantic import BaseModel as _BaseModel  # noqa: E402
+
+
+class _SampleVoucherRequest(_BaseModel):
+    year: int
+    voucher_no: str
+    account_code: str | None = None
+    sampling_record_id: UUID | None = None
+    working_paper_id: UUID | None = None
+    note: str | None = None
+
+
+@router.post("/sample-voucher")
+async def sample_voucher(
+    project_id: UUID,
+    body: _SampleVoucherRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """抽中本凭证：记录到抽样凭证清单（抽凭联动）。
+
+    同项目+年度+凭证号去重（已抽则更新，未抽则新增，含软删恢复）。
+    """
+    import sqlalchemy as sa
+    from app.models.workpaper_models import SampledVoucher
+
+    # 查是否已存在（含软删）
+    existing = await db.execute(
+        sa.select(SampledVoucher).where(
+            SampledVoucher.project_id == project_id,
+            SampledVoucher.year == body.year,
+            SampledVoucher.voucher_no == body.voucher_no,
+        )
+    )
+    row = existing.scalar_one_or_none()
+    if row is not None:
+        # 已存在 → 复活/更新
+        row.is_deleted = False
+        row.account_code = body.account_code or row.account_code
+        row.sampling_record_id = body.sampling_record_id or row.sampling_record_id
+        row.working_paper_id = body.working_paper_id or row.working_paper_id
+        if body.note:
+            row.note = body.note
+        row.sampled_by = current_user.id
+        await db.commit()
+        return {"id": str(row.id), "voucher_no": row.voucher_no, "status": "updated"}
+
+    new_row = SampledVoucher(
+        project_id=project_id,
+        year=body.year,
+        voucher_no=body.voucher_no,
+        account_code=body.account_code,
+        sampling_record_id=body.sampling_record_id,
+        working_paper_id=body.working_paper_id,
+        note=body.note,
+        sampled_by=current_user.id,
+    )
+    db.add(new_row)
+    await db.commit()
+    await db.refresh(new_row)
+    return {"id": str(new_row.id), "voucher_no": new_row.voucher_no, "status": "created"}
+
+
+@router.get("/sampled-vouchers")
+async def list_sampled_vouchers(
+    project_id: UUID,
+    year: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """抽样凭证清单"""
+    import sqlalchemy as sa
+    from app.models.workpaper_models import SampledVoucher
+
+    result = await db.execute(
+        sa.select(SampledVoucher).where(
+            SampledVoucher.project_id == project_id,
+            SampledVoucher.year == year,
+            SampledVoucher.is_deleted == sa.false(),
+        ).order_by(SampledVoucher.sampled_at.desc())
+    )
+    rows = result.scalars().all()
+    return {
+        "items": [
+            {
+                "id": str(r.id),
+                "voucher_no": r.voucher_no,
+                "account_code": r.account_code,
+                "sampling_record_id": str(r.sampling_record_id) if r.sampling_record_id else None,
+                "working_paper_id": str(r.working_paper_id) if r.working_paper_id else None,
+                "note": r.note,
+                "sampled_at": r.sampled_at.isoformat() if r.sampled_at else None,
+            }
+            for r in rows
+        ],
+        "total": len(rows),
+    }
+
+
+@router.delete("/sampled-vouchers/{sampled_id}")
+async def delete_sampled_voucher(
+    project_id: UUID,
+    sampled_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """取消抽样（软删）"""
+    import sqlalchemy as sa
+    from app.models.workpaper_models import SampledVoucher
+
+    await db.execute(
+        sa.update(SampledVoucher)
+        .where(SampledVoucher.id == sampled_id, SampledVoucher.project_id == project_id)
+        .values(is_deleted=True)
+    )
+    await db.commit()
+    return {"status": "deleted", "id": str(sampled_id)}
+
+
 @router.get("/aux-balance-summary")
 async def get_aux_balance_summary(
     project_id: UUID,
@@ -508,11 +630,13 @@ async def get_available_years(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """获取该项目有数据的年度列表"""
+    """获取该项目有数据的年度列表 + 同客户其他项目有数据的年份（供年度切换参考）"""
     import sqlalchemy as sa
     from app.models.dataset_models import DatasetStatus, LedgerDataset
     from app.models.audit_platform_models import TbBalance
+    from app.models.core import Project
 
+    # 本项目有数据的年份
     dataset_result = await db.execute(
         sa.select(sa.distinct(LedgerDataset.year))
         .where(
@@ -522,17 +646,50 @@ async def get_available_years(
         .order_by(LedgerDataset.year.desc())
     )
     dataset_years = [row[0] for row in dataset_result.fetchall()]
-    if dataset_years:
-        return {"years": dataset_years}
 
-    tbl = TbBalance.__table__
-    result = await db.execute(
-        sa.select(sa.distinct(tbl.c.year))
-        .where(tbl.c.project_id == project_id, tbl.c.is_deleted == sa.false())
-        .order_by(tbl.c.year.desc())
-    )
-    years = [row[0] for row in result.fetchall()]
-    return {"years": years}
+    if not dataset_years:
+        tbl = TbBalance.__table__
+        result = await db.execute(
+            sa.select(sa.distinct(tbl.c.year))
+            .where(tbl.c.project_id == project_id, tbl.c.is_deleted == sa.false())
+            .order_by(tbl.c.year.desc())
+        )
+        dataset_years = [row[0] for row in result.fetchall()]
+
+    # 同客户其他项目有数据的年份（跨项目年份发现）
+    sibling_years: list[dict] = []
+    try:
+        # 取当前项目的客户名
+        proj_r = await db.execute(
+            sa.select(Project.client_name).where(Project.id == project_id)
+        )
+        client_name = proj_r.scalar_one_or_none()
+        if client_name:
+            # 查同客户其他项目
+            sibling_r = await db.execute(
+                sa.select(Project.id, Project.name, LedgerDataset.year)
+                .join(LedgerDataset, LedgerDataset.project_id == Project.id)
+                .where(
+                    Project.client_name == client_name,
+                    Project.id != project_id,
+                    LedgerDataset.status == DatasetStatus.active,
+                )
+                .distinct()
+                .order_by(LedgerDataset.year.desc())
+            )
+            for row in sibling_r.fetchall():
+                sibling_years.append({
+                    "year": row[2],
+                    "project_id": str(row[0]),
+                    "project_name": row[1],
+                })
+    except Exception:
+        pass  # 跨项目发现是增强功能，失败不影响核心
+
+    return {
+        "years": dataset_years,
+        "sibling_years": sibling_years,
+    }
 
 
 @router.get("/stats")

@@ -60,10 +60,16 @@ export const useProjectStore = defineStore('project', () => {
   // 项目选项列表（供单位切换下拉使用）
   const projectOptions = ref<Array<{ id: string; name: string }>>([])
 
-  // 年度选项
+  // 项目实际有数据的年份列表（动态从后端获取）
+  const dataYears = ref<number[]>([])
+
+  // 年度选项：合并默认范围 + 项目实际有数据的年份
   const yearOptions = computed(() => {
     const cur = currentYear
-    return [cur - 2, cur - 1, cur, cur + 1]
+    const defaults = [cur - 2, cur - 1, cur, cur + 1]
+    const all = new Set([...defaults, ...dataYears.value])
+    if (auditYear.value) all.add(auditYear.value)
+    return [...all].sort((a, b) => b - a)
   })
 
   // ─── 从路由自动同步（DefaultLayout watch route 调用） ───
@@ -98,6 +104,7 @@ export const useProjectStore = defineStore('project', () => {
     // 项目切换时加载项目信息 + 清理旧项目状态
     if (changed) {
       resetProjectScopedState('route-change')
+      loadDataYears(pid)
       try {
         const proj = await getProject(pid)
         clientName.value = (proj as any)?.client_name || (proj as any)?.name || ''
@@ -119,6 +126,7 @@ export const useProjectStore = defineStore('project', () => {
       resetProjectScopedState('load-project-context')
     }
     projectId.value = pid
+    loadDataYears(pid)
     try {
       const proj = await getProject(pid)
       clientName.value = (proj as any)?.client_name || (proj as any)?.name || ''
@@ -218,6 +226,22 @@ export const useProjectStore = defineStore('project', () => {
     } catch { /* ignore */ }
   }
 
+  // ─── 加载项目实际有数据的年份列表（供年度选择器） ───
+  async function loadDataYears(pid?: string) {
+    const id = pid || projectId.value
+    if (!id) { dataYears.value = []; return }
+    try {
+      const data = await api.get(`/api/projects/${id}/ledger/years`, {
+        validateStatus: (s: number) => s === 200 || s === 404,
+      })
+      if (data && !data?.detail) {
+        dataYears.value = data?.years ?? (Array.isArray(data) ? data : [])
+      } else {
+        dataYears.value = []
+      }
+    } catch { dataYears.value = [] }
+  }
+
   // ─── P0-2.1/P0-2.2: currentProjectContext facade ───
   // 统一暴露项目上下文，页面不再自行从 route/query/localStorage 多处解析
   const currentProjectContext = computed<ProjectContextData>(() => ({
@@ -242,6 +266,7 @@ export const useProjectStore = defineStore('project', () => {
     roleInProject,
     projectOptions,
     yearOptions,
+    dataYears,
     // P0-2: 项目上下文 facade
     currentProjectContext,
     // 方法
@@ -252,5 +277,6 @@ export const useProjectStore = defineStore('project', () => {
     setCurrentYear,
     changeStandard,
     loadProjectOptions,
+    loadDataYears,
   }
 })

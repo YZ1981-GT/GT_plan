@@ -41,15 +41,24 @@
 
     <!-- 操作按钮 -->
     <div class="step-actions">
-      <el-button
+      <el-tooltip
         v-if="!isFinished"
-        aria-label="放到后台继续"
-        type="primary"
-        plain
-        @click="onMoveToBackground"
+        :disabled="canMoveToBackground"
+        content="数据写入数据库后才可放到后台，请稍候..."
+        placement="top"
       >
-        放到后台继续
-      </el-button>
+        <span>
+          <el-button
+            aria-label="放到后台继续"
+            type="primary"
+            plain
+            :disabled="!canMoveToBackground"
+            @click="onMoveToBackground"
+          >
+            {{ canMoveToBackground ? '放到后台继续' : '准备中，请稍候…' }}
+          </el-button>
+        </span>
+      </el-tooltip>
       <el-button
         v-if="!isFinished"
         type="danger"
@@ -91,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Loading, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useSSEReconnect } from '@/composables/useSSEReconnect'
@@ -168,6 +177,18 @@ const progressStatus = computed(() => {
   return undefined
 })
 
+// 是否可安全"放到后台继续"——必须到达"写入"阶段后（解析/校验阶段中断风险高）
+const PHASE_ORDER = ['uploading', 'parsing', 'validating', 'writing', 'activating']
+const bgTimeoutElapsed = ref(false)
+let bgTimeoutTimer: ReturnType<typeof setTimeout> | null = null
+const canMoveToBackground = computed(() => {
+  const idx = PHASE_ORDER.indexOf(currentPhase.value)
+  // 写入阶段(idx>=3)或已完成才允许后台化；
+  // 兜底：挂载超过 30s 仍未推到 writing（单 worker 阻塞 SSE）也放开——
+  // 后台化本质只关 SSE 不影响后端继续跑，不会丢数据
+  return idx >= 3 || isFinished.value || bgTimeoutElapsed.value
+})
+
 // ─── SSE via useSSEReconnect ────────────────────────────────────────────────
 
 const { connected, reconnecting, gaveUp, close: closeSSE } = useSSEReconnect({
@@ -176,7 +197,8 @@ const { connected, reconnecting, gaveUp, close: closeSSE } = useSSEReconnect({
   pollFallback: async () => {
     const { api } = await import('@/services/apiProxy')
     const job: any = await api.get(
-      `/api/projects/${props.projectId}/ledger-import/jobs/${props.jobId}`
+      `/api/projects/${props.projectId}/ledger-import/jobs/${props.jobId}`,
+      { _silent: true } as any
     )
     const status = job?.status
     if (status === 'completed') {
@@ -296,6 +318,17 @@ function onMoveToBackground() {
   })
   emit('background')
 }
+
+// 导入进行期间抑制全局超时弹窗（后端 worker 被大文件占用，其他请求超时属正常）
+onMounted(() => {
+  ;(globalThis as any).__suppressTimeoutToast = true
+  // 兜底：30s 后即使 SSE 未推到 writing（单 worker 阻塞）也允许"放到后台继续"
+  bgTimeoutTimer = setTimeout(() => { bgTimeoutElapsed.value = true }, 30000)
+})
+onUnmounted(() => {
+  ;(globalThis as any).__suppressTimeoutToast = false
+  if (bgTimeoutTimer) clearTimeout(bgTimeoutTimer)
+})
 </script>
 
 <style scoped>

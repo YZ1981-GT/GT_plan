@@ -37,8 +37,25 @@
       />
 
       <!-- Step 3: 导入进度 -->
+      <div v-if="currentStep === 3 && !jobId" class="submit-placeholder">
+        <template v-if="!submitFailed">
+          <el-icon class="is-loading submit-spinner"><Loading /></el-icon>
+          <p class="submit-msg">正在提交导入作业…</p>
+          <p class="submit-hint">{{ submitHint }}</p>
+          <el-progress :percentage="100" :indeterminate="true" :duration="2" :show-text="false" status="" style="width: 60%; margin: 16px auto 0" />
+        </template>
+        <template v-else>
+          <el-icon class="submit-spinner submit-spinner--fail"><CircleClose /></el-icon>
+          <p class="submit-msg submit-msg--fail">提交导入作业失败</p>
+          <p class="submit-hint">{{ submitFailMsg || '请检查网络或稍后重试' }}</p>
+          <div style="margin-top: 16px; display: flex; gap: 12px; justify-content: center">
+            <el-button type="primary" @click="retrySubmit">重试提交</el-button>
+            <el-button @click="currentStep = 2">返回列映射</el-button>
+          </div>
+        </template>
+      </div>
       <ImportProgress
-        v-if="currentStep === 3"
+        v-if="currentStep === 3 && jobId"
         :project-id="projectId"
         :job-id="jobId"
         @complete="onImportComplete"
@@ -57,7 +74,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { Loading, CircleClose } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import UploadStep from '@/components/ledger-import/UploadStep.vue'
 import DetectionPreview from '@/components/ledger-import/DetectionPreview.vue'
@@ -87,6 +105,21 @@ const jobId = ref('')
 const importErrors = ref<ImportError[]>([])
 const errorDialogVisible = ref(false)
 const isSuccess = ref(false)
+const submitFailed = ref(false)
+const submitFailMsg = ref('')
+const lastMappings = ref<ConfirmedMapping[] | null>(null)
+
+// 提交占位提示：根据 detect 估算的耗时给出预期
+const submitHint = computed(() => {
+  const secs = (detectionResult.value as any)?.estimated_duration_seconds
+  if (typeof secs === 'number' && secs > 0) {
+    const mins = Math.ceil(secs / 60)
+    if (mins >= 2) {
+      return `大文件提交约需 ${mins} 分钟，正在上传并校验，请耐心等待，勿重复点击`
+    }
+  }
+  return '正在上传并校验规模，请稍候，勿重复点击'
+})
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
 
@@ -111,8 +144,17 @@ function onMappingConfirm(mappings: ConfirmedMapping[]) {
   submitImportJob(mappings)
 }
 
+const submitting = ref(false)
+
 async function submitImportJob(mappings: ConfirmedMapping[]) {
   if (!detectionResult.value) return
+  if (submitting.value) return  // 防重复点击
+  submitting.value = true
+  lastMappings.value = mappings
+  submitFailed.value = false
+  submitFailMsg.value = ''
+  // 立即切到"导入中"步骤，显示提交占位（避免用户以为没反应而重复点击）
+  currentStep.value = 3
   try {
     const { api } = await import('@/services/apiProxy')
     const res = await api.post(
@@ -123,18 +165,25 @@ async function submitImportJob(mappings: ConfirmedMapping[]) {
         confirmed_mappings: mappings,
         force_activate: false,
         force_submit: forceSubmitFlag.value,
-      }
+      },
+      { timeout: 600000, _silent: true } as any
     )
     jobId.value = (res as { job_id: string }).job_id
-    currentStep.value = 3
-  } catch (err) {
+  } catch (err: any) {
     console.error('提交导入作业失败', err)
-    importErrors.value = [{
-      code: 'SUBMIT_FAILED',
-      severity: 'fatal',
-      message: '提交导入作业失败，请稍后重试',
-    }]
-    errorDialogVisible.value = true
+    // 提交失败 → 停留在 step 3 显示失败态 + 重试按钮（不突兀地弹窗+退步骤）
+    submitFailed.value = true
+    submitFailMsg.value = err?.message || '提交导入作业失败，请稍后重试'
+  } finally {
+    submitting.value = false
+  }
+}
+
+function retrySubmit() {
+  if (lastMappings.value) {
+    submitImportJob(lastMappings.value)
+  } else {
+    currentStep.value = 2
   }
 }
 
@@ -176,6 +225,33 @@ function onMoveToBackground() {
 
 .step-content {
   min-height: 400px;
+}
+
+/* 提交占位 loading */
+.submit-placeholder {
+  text-align: center;
+  padding: 60px 0;
+}
+.submit-spinner {
+  font-size: 40px;
+  color: var(--gt-color-primary, #4b2d77);
+}
+.submit-msg {
+  margin-top: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gt-color-primary, #4b2d77);
+}
+.submit-hint {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+.submit-spinner--fail {
+  color: var(--el-color-danger);
+}
+.submit-msg--fail {
+  color: var(--el-color-danger);
 }
 
 :deep(.el-steps) {
