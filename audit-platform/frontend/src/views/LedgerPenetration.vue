@@ -178,7 +178,12 @@
           </template>
         </el-table-column>
         <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('opening_balance')">
-          <template #default="{ row }"><GtAmountCell :value="row.opening_balance" /></template>
+          <template #default="{ row }">
+            <el-tooltip v-if="balanceTip(row, 'opening')" :content="balanceTip(row, 'opening')" placement="top" :show-after="200">
+              <span class="gt-tip-wrap"><GtAmountCell :value="row.opening_balance" /></span>
+            </el-tooltip>
+            <GtAmountCell v-else :value="row.opening_balance" />
+          </template>
         </el-table-column>
         <el-table-column prop="debit_amount" label="借方发生额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('debit_amount')">
           <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
@@ -193,7 +198,10 @@
         </el-table-column>
         <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('closing_balance')">
           <template #default="{ row }">
-            <GtAmountCell :value="row.closing_balance" :clickable="true" @click="drillToLedger(row)" />
+            <el-tooltip v-if="balanceTip(row, 'closing')" :content="balanceTip(row, 'closing')" placement="top" :show-after="200">
+              <span class="gt-tip-wrap"><GtAmountCell :value="row.closing_balance" :clickable="true" @click="drillToLedger(row)" /></span>
+            </el-tooltip>
+            <GtAmountCell v-else :value="row.closing_balance" :clickable="true" @click="drillToLedger(row)" />
           </template>
         </el-table-column>
       </el-table>
@@ -341,7 +349,10 @@
           </el-table-column>
           <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('opening_balance')">
             <template #default="{ row }">
-              <GtAmountCell :value="row.opening_balance" />
+              <el-tooltip v-if="balanceTip(row, 'opening')" :content="balanceTip(row, 'opening')" placement="top" :show-after="200">
+                <span class="gt-tip-wrap"><GtAmountCell :value="row.opening_balance" /></span>
+              </el-tooltip>
+              <GtAmountCell v-else :value="row.opening_balance" />
             </template>
           </el-table-column>
           <el-table-column prop="debit_amount" label="借方发生额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('debit_amount')">
@@ -356,7 +367,10 @@
           </el-table-column>
           <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('closing_balance')">
             <template #default="{ row }">
-              <GtAmountCell v-if="!row._isGroup" :value="row.closing_balance" :clickable="true" @click="drillToAuxLedgerFromBalance(row)" />
+              <el-tooltip v-if="!row._isGroup && balanceTip(row, 'closing')" :content="balanceTip(row, 'closing')" placement="top" :show-after="200">
+                <span class="gt-tip-wrap"><GtAmountCell :value="row.closing_balance" :clickable="true" @click="drillToAuxLedgerFromBalance(row)" /></span>
+              </el-tooltip>
+              <GtAmountCell v-else-if="!row._isGroup" :value="row.closing_balance" :clickable="true" @click="drillToAuxLedgerFromBalance(row)" />
               <GtAmountCell v-else :value="row.closing_balance" />
             </template>
           </el-table-column>
@@ -2592,6 +2606,24 @@ function resolveDir(row: any, period: 'opening' | 'closing'): string {
   return bal >= 0 ? '借' : '贷'
 }
 
+/**
+ * 余额负值含义说明（悬停提示）：
+ * tb_balance 存储采用"类别自然正数"口径——正常方向的余额存正数，
+ * 当科目出现与正常方向相反的余额（如资产类出现贷方余额、负债类出现借方余额）时，
+ * 归一后为负数。此时方向列已显示实际方向（贷/借），负号是与"科目正常方向"相反的标记。
+ * 返回空串表示无需提示（正常正值）。
+ */
+function balanceTip(row: any, period: 'opening' | 'closing'): string {
+  const bal = num(row[`${period}_balance`])
+  if (bal >= 0) return ''
+  const dir = resolveDir(row, period)
+  const periodLabel = period === 'opening' ? '期初' : '期末'
+  const absStr = fmtAmount(Math.abs(bal))
+  // 科目正常方向（与实际方向相反）
+  const normalDir = dir === '贷' ? '借' : '贷'
+  return `${periodLabel}实际为${dir}方余额 ${absStr} 元。该科目正常为${normalDir}方，出现${dir}方余额属异常方向（如红字冲销/多收退款等），负号仅表示与科目正常方向相反，金额绝对值即为${dir}方实际余额。`
+}
+
 const fmtAmt = fmtAmount
 
 /** 从原始维度字符串中提取当前维度以外的其他维度信息 */
@@ -3596,6 +3628,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.gt-tip-wrap { display: inline-block; }
 .gt-penetration { padding: var(--gt-space-4); height: 100%; display: flex; flex-direction: column; }
 
 /* 全屏模式 */

@@ -156,6 +156,7 @@ inclusion: always
 - **CORS/307**：前端 3030 须在 CORS_ORIGINS；FastAPI 无尾斜杠路由 307 重定向绝对 URL 会跨域→前端路径匹配后端尾斜杠；**禁止 `window.open` 下载认证资源**（新标签页不带 token→401），必用 `downloadFile`（axios blob + Bearer header）
 - **UI 必用 GT 紫令牌**（`styles/gt-tokens.css`）：核心紫 `#4b2d77` / 浅紫底 `#f4f0fa` / 浅紫边框 `#d8b8ee`；**禁用 Element 默认蓝 `#409eff` 作 fallback**；`el-tag type="primary"` 仍渲默认蓝需组件内 `:deep(.el-tag--primary)` scoped 覆盖
 - **hypothesis PBT 调速**：max_examples 5（用户明确要求，禁默认 100），可临时降 3
+- **🔴 el-tooltip 包裹非单元素根组件触发器失效（2026-06-16 踩坑）**：`<el-tooltip>` 靠 `ElOnlyChild` 把鼠标事件绑到子元素的真实 DOM 根节点上。若直接包 `GtAmountCell`（其根是 `CommentTooltip` 组件→渲染 fragment/teleport 非单一元素根）→ 事件绑不上→hover 完全不出提示（控制台报 `Runtime directive used on component with non-element root node`）。**修法：在组件外套一层真实 `<span class="gt-tip-wrap" style="display:inline-block">` 作触发器**。诊断铁律：tooltip/popover 不弹先查控制台有无 "non-element root node" 警告 + 看组件树 `ElOnlyChild` 下是不是渲染 fragment 的组件。余额表负值方向说明 tooltip 用此法实现（balanceTip：方向列已表达借贷，负号仅表示与科目正常方向相反，绝对值才是该方向实际余额；不动数据避免破坏 balance-check v1 平衡校验）
 - **useExcelIO.exportTemplate existingData 必须等宽**：所有行 pad 到相同列数（maxCols），否则 `xlsx-js-style` 写 cell 越界致 xlsx 损坏；多子表导出用 `applyStyles: false`
 - **🔴 口径变更必查"重算旁路"**：写入点+校验+取数全部 grep 同步；分读取派(`audited_amount`)和重算派(`SUM(debit-credit)`)两类
 - **底稿生成**：`generate_project_workpapers` 纯元数据批量 INSERT（不复制模板文件，file_path 引用模板库原始路径或空串兜底）；BUILTIN_TEMPLATE_SETS 动态读 `wp_account_mapping.json` 206 条；详细 → `#conventions`/`#dev-history`
