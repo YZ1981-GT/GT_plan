@@ -58,7 +58,8 @@ inclusion: always
 - **部署目标架构 v2.0（2026-06-15 确定）**：瘦客户端(Electron ~600MB=前端+PaddleOCR+规则引擎,无PG/无FastAPI/无文件存储)+内网全栈服务器(FastAPI+PG+Redis+vLLM+LibreOffice+MinIO)；**全部走 FastAPI API**不直连PG；文件存服务器 MinIO(用户电脑无需500GB SSD)；大文件预签名URL直传MinIO；Web版与桌面端双轨并行共享后端；离线=本地OCR+规则直出+IndexedDB离线队列；方案文档 `docs/proposals/distributed-deployment-plan.md` v2.0(6周路线图)；减包路径=PaddlePaddle→ONNX(600MB→200MB)
 - **MinerU 调研（2026-06-15）**：最新 **3.3**(2026/06/11,Hybrid 加 effort=medium/high 默认 medium,Win 文本 PDF 提速~90%/OCR~45% 精度仅降 0.13;VLM=MinerU2.5-Pro-2605-1.2B 原生多语言 OCR)；**3.1.0 起协议从 AGPLv3 改 MinerU Open Source License(基于 Apache2.0)→商用门槛大降**;3.0 原生 DOCX+移除 AGPL 模型,3.1 原生 PPTX/XLSX。**部署体量**：pipeline/hybrid 完整本地需磁盘~20GB(模型权重)+显存 4~8GB+内存 16~32GB;http-client 模式仅 2GB 磁盘+2GB 显存(连远程 vLLM/SGLang);纯 CPU 仅 pipeline 支持(精度 85.75 vs hybrid 95.39)
 - **🟢 MinerU 部署决策=装服务器端（2026-06-15 确定）**：MinerU 完整 pipeline/hybrid 装内网全栈服务器(非瘦客户端,客户端 20GB 模型不现实),客户端经 FastAPI 调服务器 OCR;与 v2.0"模型在服务器"一致。**容量估算**：单 GPU MinerU 吞吐≈1~2 页/秒(7900xtx vlm 实测 1.99 it/s,A100/4090 同量级);审计 OCR 是突发非持续负载(上传发票/底稿瞬时),关键指标是"并发提交数"非"在线人数"。**单块 GPU(vLLM 队列串行)估算**：①若 MinerU 独占 1 GPU→约 1~2 页/s,典型发票 1~2 页/份→约 1 份/s→任务队列削峰下可服务**几十~百人级在线**(人均日 OCR 几十页,峰值排队几秒可接受) ②**但本机 GPU 已被 vLLM(Qwen3.5-27B 审计 LLM,8100)占用→MinerU 与 LLM 争显存/算力,二者不能简单叠加**,需独立 GPU 或分时。**6000 人目标**(memory 用户偏好)远超单 GPU→须多 GPU 横向扩展(mineru-router 支持一键多 GPU 负载均衡)+任务队列(Celery/Redis)异步削峰。**待补**：服务器 GPU 实际型号/数量未知,精确并发数需实测压测后定;建议 OCR 走异步任务(提交→轮询)而非同步阻塞
-- **不引入**：LLM 上下文压缩中间件（本地 vLLM 自带 prefix caching+审计精度敏感，RTK 已覆盖 CLI 90% 价值）；外部 agent harness 配置包（ECC 等，依赖具体 harness，Kiro 用 .kiro/steering+specs+hook 另一套；如取经只 cherry-pick 单 markdown 改中文，严禁 clone 整仓）
+- **不引入**：LLM 上下文压缩中间件（本地 vLLM 自带 prefix caching+审计精度敏感，RTK 已覆盖 CLI 90% 价值）；外部 agent harness 配置包（ECC 等，依赖具体 harness，Kiro 用 .kiro/steering+specs+hook 另一套；如取经只 cherry-pick 单 markdown 改中文，严禁 clone 整仓）；**Rust 四表入库**（2026-06-16 评估：python_calamine 已是 Rust 底层，真正瓶颈在 PG IO 非 CPU 解析；优先确认 smart_import_engine 是否已用 asyncpg COPY 协议——改 COPY 零额外复杂度可提速 10-50×；Rust PyO3 留给 CPU-bound 场景如 MinerU 后处理）
+- **🟢 百万行导入已具备（2026-06-16 确认+优化落地 commit `caff2916`）**：writer.py `bulk_write_staged`≥10000 行自动走 asyncpg `copy_records_to_table`(COPY 协议)+COPY 失败降级 INSERT；pipeline streaming chunk=50k(内存紧张降10k)+逐 chunk 即写(序时账)；psutil 内存压力自动降级。**优化已落地**：①docker-compose PG `max_wal_size=4GB`+`checkpoint_completion_target=0.9`+`maintenance_work_mem=512MB`+`max_connections=200` ②`bulk_insert_staged`+`bulk_copy_staged` 均加 `SET LOCAL work_mem='128MB'`(帮助索引更新排序) ③前端上传>50MB xlsx 提示转 CSV。**🔴 余额表不可分批 flush**：`convert_balance_rows` 有按(company_code,account_code)跨行聚合去重，分批会重复写主表；余额表通常<5万行全量累积不OOM，超10万行仅 log.warning
 
 ## 迁移与 PG schema（D6 MigrationRunner 运行时迁移，非 alembic）
 
@@ -109,16 +110,18 @@ inclusion: always
 ### 真正待办（2026-06-16）
 - **active spec=2**：①audit-report-template-integration 181/184(剩 3 运维) ②editing-lock-v1-v2-consolidation(阶段1 未完成,但 v1→v2 合并代码已 pull)
 - **🟢 A循环 7 spec + group-tree-architecture 全部 [x] 完成**（归档 `_archive/07-workpaper-slimdown/`；集团树 commit `18b259d3`）
-- **� 集团架构待 Playwright E2E**：PG 0 consolidated 项目→导入测试数据后补浏览器实测
-- **� A3 子底稿**：决策=跳转合并模块已有页面(route: chip)，不新建 working_paper
-- **� 业务分类可视化图待优化**：当前文字表格→决策树/流程图形式
+- **🟡 集团架构待 Playwright E2E**：PG 0 consolidated 项目→导入测试数据后补浏览器实测
+- **🟢 A 循环子底稿注册完成（2026-06-16 commit `8f48266a`）**：`wp_account_mapping.json` 从 206→272 条(+66 A 子底稿)；A2 adjustment_count 带金额；auto_data_source P0 模型名纠正；`template_engine.py` name 查找链增加 wp_account_mapping fallback(修复"底稿Axx"问题,新建项目不再出现)。**存量修复脚本**：`scripts/fix/_fix_wp_names_from_mapping.py`(跑一次更新 DB 中旧项目的"底稿Axx"→正确中文名)。**待确认**：①generate 是否区分 must_have/optional ②docx 子底稿 componentType 路由
+- **🟡 业务分类可视化图待优化**：当前文字表格→决策树/流程图形式
 - **外部依赖**：LLM embedding 实例 / 合并 UAT 数据 / GitHub 默认分支改 main / 钉集成
+- **🔴 数据管理"删除"后重新导入报错（2026-06-16 诊断）**：`delete_ledger_data` 只软删四表(`is_deleted=true`)不传`hard_delete`+不删 `trial_balance`；但 `trial_balance` 唯一约束 `uq_trial_balance_project_year_company_account` **无** `WHERE is_deleted=false` 条件过滤→旧行占位→重新导入 recalc 时唯一冲突。**修法**：前端删除时加 `hard_delete: true`（UI 已标"不可恢复"语义匹配），或 recalc_unadjusted 改为 DELETE+INSERT（先清旧行再写）
 - **结构优化候选**：report_engine 1996L / smart_import_engine 2787L / custom_query router 2162L / TrialBalance 2931L / DisclosureEditor 2126L / ConsolidationHub 854L (Phase 2 后)→拆子组件
 
 ## 操作铁律（详见 `#conventions`）
 
 - **三层一致校验**：DB 迁移 + ORM `Mapped[]` + service 方法，任一缺失即伪绿；TimestampMixin 表的手写 DDL 必显式写 `created_at/updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`（V057 踩坑）
 - **router_registry 必查**：新建 router 必在 `backend/app/router_registry/{group}.py` 注册否则前端 404；FastAPI 不热加载 router（改后重启）；**注册顺序**：含静态路径的 router（`/batch-template`）必在同前缀通配 router（`/{project_id}`）之前，否则通配截获→422 UUID parse error
+- **🔴 auto_data_source try/except 静默降级=伪绿高发区**（2026-06-16 揪出4处）：错误模型名 `ConsolidationScope`/`ConsolidationElimination`(应为`ConsolScope`/`EliminationEntry`) 被 except 吞→永远返回 fallback 文案。**铁律：新增 auto_data_source 必须 in-process 验证返回非 fallback 值**
 - **service 只 flush 不 commit**：跨 service 编排由 router 统一 commit 保原子
 - **asyncpg 事务污染**：事务 aborted 后连 SAVEPOINT 都被拒 → 根治=修最先失败的 SQL（规则内 try/except 吞 SQL 异常不 rollback=反模式）
 - **"返回第一个→返回全部"重构必查全消费侧**：所有调用方（fill/keep/delete）都要适配，尤其删除逻辑必须验证"不该删的还在"
