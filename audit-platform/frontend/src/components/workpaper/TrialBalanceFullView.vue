@@ -16,11 +16,21 @@
     <el-table :data="rows" border class="gt-compact-table" max-height="600">
       <el-table-column prop="account_code" label="科目编码" width="100" />
       <el-table-column prop="account_name" label="科目名称" min-width="150" />
-      <el-table-column prop="unadjusted" label="未审数" width="120" align="right" />
-      <el-table-column v-if="fullMode" prop="aje_adjustment" label="AJE调整" width="110" align="right" />
-      <el-table-column v-if="fullMode" prop="rje_adjustment" label="RJE调整" width="110" align="right" />
-      <el-table-column v-if="fullMode" prop="other_adjustment" label="其他调整" width="110" align="right" />
-      <el-table-column prop="audited" label="审定数" width="120" align="right" />
+      <el-table-column prop="unadjusted" label="未审数" width="150" align="right">
+        <template #default="{ row }"><GtAmountCell :value="row.unadjusted" /></template>
+      </el-table-column>
+      <el-table-column v-if="fullMode" prop="aje_adjustment" label="AJE调整" width="130" align="right">
+        <template #default="{ row }"><GtAmountCell :value="row.aje_adjustment" /></template>
+      </el-table-column>
+      <el-table-column v-if="fullMode" prop="rje_adjustment" label="RJE调整" width="130" align="right">
+        <template #default="{ row }"><GtAmountCell :value="row.rje_adjustment" /></template>
+      </el-table-column>
+      <el-table-column v-if="fullMode" prop="other_adjustment" label="其他调整" width="130" align="right">
+        <template #default="{ row }"><GtAmountCell :value="row.other_adjustment" /></template>
+      </el-table-column>
+      <el-table-column prop="audited" label="审定数" width="150" align="right">
+        <template #default="{ row }"><GtAmountCell :value="row.audited" /></template>
+      </el-table-column>
       <el-table-column v-if="fullMode" prop="balance_ok" label="平衡" width="60" align="center">
         <template #default="{ row }">
           <span :class="row.balance_ok ? 'text-success' : 'text-danger'">
@@ -35,6 +45,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '@/services/apiProxy'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
 
 const props = defineProps<{
   projectId: string

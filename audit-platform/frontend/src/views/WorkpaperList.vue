@@ -442,7 +442,7 @@ async function onGenerateWorkpapers() {
   generateLoading.value = true
   try {
     // 0. 确保模板集编码是最新的（幂等 seed，会自动更新旧的占位编码）
-    try { await api.post('/api/template-sets/seed') } catch { /* ignore */ }
+    try { await api.post('/api/template-sets/seed', {}, { _silent: true } as any) } catch { /* ignore */ }
     // 1. 获取模板集列表
     const { listTemplateSets } = await import('@/services/workpaperApi')
     let sets = await listTemplateSets()

@@ -16,19 +16,23 @@
     </div>
 
     <el-table
-      v-if="data?.differences?.length"
-      :data="data.differences"
+      v-if="sortedDifferences.length"
+      :data="sortedDifferences"
       border
       class="gt-compact-table"
       max-height="400"
     >
-      <el-table-column prop="account_code" label="科目编码" width="100" />
-      <el-table-column prop="account_name" label="科目名称" min-width="150" />
-      <el-table-column prop="current_opening" label="本年期初" width="120" align="right" />
-      <el-table-column prop="prior_audited" label="上年审定" width="120" align="right" />
-      <el-table-column prop="difference" label="差异" width="120" align="right">
+      <el-table-column prop="account_code" label="科目编码" width="110" sortable />
+      <el-table-column prop="account_name" label="科目名称" min-width="200" show-overflow-tooltip />
+      <el-table-column prop="current_opening" label="本年期初" width="160" align="right">
+        <template #default="{ row }"><GtAmountCell :value="row.current_opening" /></template>
+      </el-table-column>
+      <el-table-column prop="prior_audited" label="上年审定" width="160" align="right">
+        <template #default="{ row }"><GtAmountCell :value="row.prior_audited" /></template>
+      </el-table-column>
+      <el-table-column prop="difference" label="差异" width="160" align="right">
         <template #default="{ row }">
-          <span class="text-danger">{{ row.difference }}</span>
+          <GtAmountCell :value="row.difference" />
         </template>
       </el-table-column>
     </el-table>
@@ -38,8 +42,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { api } from '@/services/apiProxy'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
 
 const props = defineProps<{
   projectId: string
@@ -48,6 +53,16 @@ const props = defineProps<{
 }>()
 
 const data = ref<any>(null)
+
+// 按科目编码从小到大排序
+const sortedDifferences = computed(() => {
+  const diffs = data.value?.differences || []
+  return [...diffs].sort((a: any, b: any) => {
+    const ca = String(a.account_code || '')
+    const cb = String(b.account_code || '')
+    return ca.localeCompare(cb, undefined, { numeric: true })
+  })
+})
 
 async function loadData() {
   try {

@@ -28,7 +28,7 @@ from app.services.account_chart_service import _infer_category
 
 # 资产备抵：挂资产类编码（1xxx）但正常余额在贷方
 _CONTRA_CREDIT_PATTERN = re.compile(
-    r"累计折旧|累计摊销|坏账准备|减值准备|跌价准备|折耗|减值损失准备"
+    r"累计折旧|累计摊销|坏账准备|减值准备|跌价准备|折耗|减值损失准备|未实现融资收益"
 )
 
 # 权益备抵：挂权益类编码但正常余额在借方（库存股）

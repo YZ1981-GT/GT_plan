@@ -289,8 +289,8 @@
       {
         "standard_account_code": "1532",
         "report_type": "balance_sheet",
-        "report_line_code": "BS-034",
-        "report_line_name": "其他权益工具投资"
+        "report_line_code": "BS-035",
+        "report_line_name": "其他非流动金融资产"
       },
       {
         "standard_account_code": "1541",
@@ -903,6 +903,30 @@
         "report_type": "balance_sheet",
         "report_line_code": "BS-093",
         "report_line_name": "长期应付职工薪酬"
+      },
+      {
+        "standard_account_code": "1527",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-036",
+        "report_line_name": "投资性房地产"
+      },
+      {
+        "standard_account_code": "1704",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-046",
+        "report_line_name": "开发支出"
+      },
+      {
+        "standard_account_code": "2102",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-081",
+        "report_line_name": "其他流动负债"
+      },
+      {
+        "standard_account_code": "1409",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-018",
+        "report_line_name": "存货"
       }
     ],
     "soe_consolidated": [
@@ -1191,8 +1215,8 @@
       {
         "standard_account_code": "1532",
         "report_type": "balance_sheet",
-        "report_line_code": "BS-034",
-        "report_line_name": "其他权益工具投资"
+        "report_line_code": "BS-035",
+        "report_line_name": "其他非流动金融资产"
       },
       {
         "standard_account_code": "1541",
@@ -1805,6 +1829,30 @@
         "report_type": "balance_sheet",
         "report_line_code": "BS-093",
         "report_line_name": "长期应付职工薪酬"
+      },
+      {
+        "standard_account_code": "1527",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-036",
+        "report_line_name": "投资性房地产"
+      },
+      {
+        "standard_account_code": "1704",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-046",
+        "report_line_name": "开发支出"
+      },
+      {
+        "standard_account_code": "2102",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-081",
+        "report_line_name": "其他流动负债"
+      },
+      {
+        "standard_account_code": "1409",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-018",
+        "report_line_name": "存货"
       }
     ],
     "listed_standalone": [
@@ -2093,8 +2141,8 @@
       {
         "standard_account_code": "1532",
         "report_type": "balance_sheet",
-        "report_line_code": "BS-025",
-        "report_line_name": "其他权益工具投资"
+        "report_line_code": "BS-035",
+        "report_line_name": "其他非流动金融资产"
       },
       {
         "standard_account_code": "1541",
@@ -2707,6 +2755,30 @@
         "report_type": "balance_sheet",
         "report_line_code": "BS-067",
         "report_line_name": "长期应付职工薪酬"
+      },
+      {
+        "standard_account_code": "1527",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-036",
+        "report_line_name": "投资性房地产"
+      },
+      {
+        "standard_account_code": "1704",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-046",
+        "report_line_name": "开发支出"
+      },
+      {
+        "standard_account_code": "2102",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-081",
+        "report_line_name": "其他流动负债"
+      },
+      {
+        "standard_account_code": "1409",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-018",
+        "report_line_name": "存货"
       }
     ],
     "listed_consolidated": [
@@ -2995,8 +3067,8 @@
       {
         "standard_account_code": "1532",
         "report_type": "balance_sheet",
-        "report_line_code": "BS-025",
-        "report_line_name": "其他权益工具投资"
+        "report_line_code": "BS-035",
+        "report_line_name": "其他非流动金融资产"
       },
       {
         "standard_account_code": "1541",
@@ -3609,6 +3681,30 @@
         "report_type": "balance_sheet",
         "report_line_code": "BS-067",
         "report_line_name": "长期应付职工薪酬"
+      },
+      {
+        "standard_account_code": "1527",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-036",
+        "report_line_name": "投资性房地产"
+      },
+      {
+        "standard_account_code": "1704",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-046",
+        "report_line_name": "开发支出"
+      },
+      {
+        "standard_account_code": "2102",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-081",
+        "report_line_name": "其他流动负债"
+      },
+      {
+        "standard_account_code": "1409",
+        "report_type": "balance_sheet",
+        "report_line_code": "BS-018",
+        "report_line_name": "存货"
       }
     ]
   }

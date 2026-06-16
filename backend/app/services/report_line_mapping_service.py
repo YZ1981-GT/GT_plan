@@ -143,8 +143,8 @@ def _bs_line_side(report_line_name: str) -> str | None:
             return "equity"
     # 负债侧行次特征词
     _LIABILITY_LINE_KW = (
-        "借款", "应付", "预收", "合同负债", "递延收益", "递延所得税负债",
-        "预计负债", "租赁负债", "负债",
+        "借款", "应付", "应交", "应缴", "税费", "预收", "合同负债",
+        "递延收益", "递延所得税负债", "预计负债", "租赁负债", "负债",
     )
     for kw in _LIABILITY_LINE_KW:
         if kw in name:

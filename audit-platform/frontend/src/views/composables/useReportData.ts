@@ -183,7 +183,15 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
     }
   }
 
+  // 有效的报表类型（只有这些 tab 才需要调后端报表接口）
+  const VALID_REPORT_TYPES = new Set([
+    'balance_sheet', 'income_statement', 'cash_flow_statement',
+    'equity_statement', 'cash_flow_supplement', 'impairment_provision',
+  ])
+
   async function loadTemplateRows() {
+    // 非报表 tab（如 cross_check / multi_year_compare / report_analysis）不调后端
+    if (!VALID_REPORT_TYPES.has(activeTab.value)) return
     // 从报表配置加载预设行次（显示空值的模板框架）
     try {
       const data = await api.get(P_rc.list, {
@@ -211,6 +219,8 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
   }
 
   const fetchReport = withLoading(loading, async () => {
+    // 非报表 tab 不调后端
+    if (!VALID_REPORT_TYPES.has(activeTab.value)) return
     const std = currentApplicableStandard.value
     try {
       if (reportMode.value === 'compare') {
