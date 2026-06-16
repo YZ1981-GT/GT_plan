@@ -538,6 +538,8 @@ async def execute_pipeline(
             chunk_count = 0
             balance_cleaned_accumulated: list[dict] = []
             is_balance_sheet = sheet.table_type in ("balance", "aux_balance")
+            # 百万行优化：余额表分批写入阈值（避免全量累积 OOM）
+            BALANCE_FLUSH_THRESHOLD = 100_000
 
             # B3 诊断：把 for 循环展开成 while 以便测纯解析耗时
             _parse_iter = iter(row_iter)
@@ -580,6 +582,25 @@ async def execute_pipeline(
 
                 if is_balance_sheet:
                     balance_cleaned_accumulated.extend(cleaned)
+                    # 百万行优化：累积超阈值时分批 convert+写入，释放内存
+                    if len(balance_cleaned_accumulated) >= BALANCE_FLUSH_THRESHOLD:
+                        _t = _time.time()
+                        _partial_v2 = convert_balance_rows_v2(balance_cleaned_accumulated)
+                        _t_convert += _time.time() - _t
+                        _t = _time.time()
+                        await _insert(TbBalance, _partial_v2.rows)
+                        await _insert(TbAuxBalance, _partial_v2.aux_rows)
+                        _t_insert += _time.time() - _t
+                        _n_inserts += 2
+                        total_balance_written += len(_partial_v2.rows)
+                        total_aux_balance_written += len(_partial_v2.aux_rows)
+                        all_findings.extend(_partial_v2.warnings)
+                        balance_cleaned_accumulated = []
+                        logger.info(
+                            "Pipeline %s balance flush (threshold=%d): wrote %d+%d rows",
+                            job_id, BALANCE_FLUSH_THRESHOLD,
+                            len(_partial_v2.rows), len(_partial_v2.aux_rows),
+                        )
                 elif sheet.table_type in ("ledger", "aux_ledger"):
                     _t = _time.time()
                     ledger_result_v2 = convert_ledger_rows_v2(cleaned)

@@ -673,6 +673,12 @@ async def bulk_copy_staged(
         driver_conn = asyncpg_conn.driver_connection  # type: ignore[attr-defined]
         table_name = table_model.__tablename__
 
+        # 百万行优化：大批量 COPY 前临时提升 work_mem（事务级，不影响其他连接）
+        try:
+            await driver_conn.execute("SET LOCAL work_mem = '128MB'")
+        except Exception:
+            pass  # 非致命：SQLite/旧 PG 版本可能不支持
+
         await driver_conn.copy_records_to_table(
             table_name,
             records=records,

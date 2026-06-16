@@ -1659,6 +1659,16 @@ function onImportFileChange(file: any) {
   if (file?.raw) {
     uploadToken.value = ''
     importFiles.value.push(file.raw)
+    // 百万行优化：大文件提示建议使用 CSV 格式（Excel 全量加载内存，CSV 可流式处理）
+    const sizeMB = (file.raw.size || 0) / (1024 * 1024)
+    const isExcel = /\.xlsx?$/i.test(file.raw.name || '')
+    if (sizeMB > 50 && isExcel) {
+      ElMessage.warning({
+        message: `文件较大（${sizeMB.toFixed(0)} MB），建议将 Excel 另存为 CSV 格式后上传，可显著加快导入速度并降低内存占用`,
+        duration: 8000,
+        showClose: true,
+      })
+    }
   }
 }
 
