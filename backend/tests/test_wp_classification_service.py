@@ -241,3 +241,29 @@ class TestClassificationResult:
             has_override=True,
         )
         assert cr.has_override is True
+
+
+# ─── derive_component_type: 核对表路由 (A1-15/A1-16) ────────────────────────
+
+
+class TestChecklistTableRouting:
+    """A1-15/A1-16 核对表底稿路由到 checklist-table 组件。"""
+
+    def test_derive_component_type_a1_15_returns_checklist_table(self):
+        """A1-15（CAS 列报及披露核对表）→ checklist-table。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A1-15"))
+        assert result == "checklist-table"
+
+    def test_derive_component_type_a1_16_returns_checklist_table(self):
+        """A1-16（法规合规核对表）→ checklist-table。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A1-16"))
+        assert result == "checklist-table"
+
+    def test_checklist_table_in_valid_component_types(self):
+        """checklist-table 在白名单中。"""
+        assert "checklist-table" in VALID_COMPONENT_TYPES
+
+    def test_a16_not_affected(self):
+        """A16（管理层声明书）仍路由到 word-template，不受 A1-16 影响。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A16"))
+        assert result == "word-template"

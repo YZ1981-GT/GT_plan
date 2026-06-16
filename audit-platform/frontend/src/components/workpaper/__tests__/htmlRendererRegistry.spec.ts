@@ -24,6 +24,9 @@ import {
 describe('htmlRendererRegistry — 注册表完整性', () => {
   it('注册表包含全部真实 HTML 组件类型（不含 skip）', () => {
     const expected: HtmlComponentType[] = [
+      'a1-dashboard',
+      'a2-adjustment-console',
+      'a3-consolidation-console',
       'a-program-console',
       'b-index',
       'c-note-table',
@@ -45,6 +48,7 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'word-template',
       'independence-signing',
       'audit-legend',
+      'checklist-table',
     ]
     expect(HTML_RENDERER_REGISTRY.size).toBe(expected.length)
     for (const ct of expected) {
@@ -109,6 +113,14 @@ describe('htmlRendererRegistry — emit 列表', () => {
   it('H 静态文档无 emit（只读）', () => {
     expect(HTML_RENDERER_REGISTRY.get('h-static-doc')?.emits).toEqual([])
   })
+
+  it('checklist-table 核对表仅 emit save', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('checklist-table')
+    expect(entry).toBeDefined()
+    expect(entry?.icon).toBe('✅')
+    expect(entry?.label).toBe('核对表')
+    expect(entry?.emits).toEqual(['save'])
+  })
 })
 
 describe('htmlRendererRegistry — 路由集合', () => {
@@ -138,6 +150,7 @@ describe('htmlRendererRegistry — 工具函数', () => {
   it('isHtmlComponentType 命中 / 未命中', () => {
     expect(isHtmlComponentType('a-program-console')).toBe(true)
     expect(isHtmlComponentType('h-static-doc')).toBe(true)
+    expect(isHtmlComponentType('checklist-table')).toBe(true)
     expect(isHtmlComponentType('univer')).toBe(false)
     expect(isHtmlComponentType('skip')).toBe(false)
     expect(isHtmlComponentType('unknown-type')).toBe(false)

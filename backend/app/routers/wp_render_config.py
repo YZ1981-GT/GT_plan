@@ -1176,8 +1176,15 @@ async def get_render_config(
             continue
 
         # 派生 componentType
+        # 优先用原始 wp_code 查 _WP_CODE_OVERRIDE（classification fallback 到父级
+        # 会丢失精确 wp_code，如 A1-15 fallback 到 A1）
         try:
-            component_type = derive_component_type(classification)
+            from app.services.wp_classification_service import _WP_CODE_OVERRIDE
+            _wp_code_override_hit = _WP_CODE_OVERRIDE.get(wp_code)
+            if _wp_code_override_hit:
+                component_type = _wp_code_override_hit
+            else:
+                component_type = derive_component_type(classification)
         except ClassificationNotFoundError as e:
             logger.warning("Cannot derive componentType: %s", e)
             component_type = "skip"
@@ -1260,6 +1267,47 @@ async def get_render_config(
                 project_id=project_id,
                 wp_code=wp_code,
             )
+
+        # ─── 核对表（checklist-table）：全局模板缓存 + 用户填写数据 ──────
+        # A1-15/A1-16 大型 docx 核对表：template 从全局 mtime 缓存取（静态，
+        # 不存每个 wp 实例），responses 从 checklist_responses 表按 wp_id 取。
+        if component_type == "checklist-table":
+            from app.services.checklist_docx_parser import get_checklist_template
+
+            try:
+                template_data = await get_checklist_template(wp_code)
+            except FileNotFoundError:
+                logger.warning("核对表模板文件未找到: wp_code=%s", wp_code)
+                template_data = None
+            except Exception as e:  # noqa: BLE001
+                logger.warning("核对表模板解析失败 wp_code=%s: %s", wp_code, e)
+                template_data = None
+
+            # 用户填写数据从 checklist_responses 表取
+            responses: dict[str, dict] = {}
+            try:
+                responses_result = await db.execute(
+                    sa.text(
+                        "SELECT item_id, conclusion, remark, wp_ref "
+                        "FROM checklist_responses WHERE wp_id = :wp_id"
+                    ),
+                    {"wp_id": str(wp_id)},
+                )
+                responses = {
+                    row.item_id: {
+                        "conclusion": row.conclusion,
+                        "remark": row.remark,
+                        "wp_ref": row.wp_ref,
+                    }
+                    for row in responses_result.fetchall()
+                }
+            except Exception as e:  # noqa: BLE001
+                logger.warning("核对表响应数据查询失败 wp_id=%s: %s", wp_id, e)
+
+            sheet_html_data = {
+                "template": template_data,
+                "responses": responses,
+            }
 
         # ─── univer 表格类底稿网格自动生成：从模板 xlsx 提取只读网格 ──────
         # 混合底稿（含 HTML sheet + univer sheet）整本走 GtWpRenderer 时，

@@ -51,6 +51,7 @@ export type HtmlComponentType =
   | 'word-template'
   | 'independence-signing'
   | 'audit-legend'
+  | 'checklist-table'
 
 /** 注册表条目：包含 lazy component / 图标 / emits / 描述 */
 export interface HtmlRendererEntry {
@@ -88,6 +89,7 @@ const GtReviewChecklist = defineAsyncComponent(() => import('./ReviewChecklistPa
 const GtWordTemplate = defineAsyncComponent(() => import('./WorkpaperWordEditor.vue'))
 const GtIndependenceSigning = defineAsyncComponent(() => import('./IndependenceSigning.vue'))
 const GtAuditLegend = defineAsyncComponent(() => import('./AuditLegendPanel.vue'))
+const GtChecklistTable = defineAsyncComponent(() => import('./GtChecklistTable.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -260,6 +262,13 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: GtAuditLegend,
     icon: '📋',
     label: '审计标识一览表',
+    emits: ['save'],
+  },
+  {
+    componentType: 'checklist-table',
+    component: GtChecklistTable,
+    icon: '✅',
+    label: '核对表',
     emits: ['save'],
   },
 ]

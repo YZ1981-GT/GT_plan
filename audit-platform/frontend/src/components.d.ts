@@ -310,6 +310,7 @@ declare module 'vue' {
     GtBArchitectureTree: typeof import('./components/workpaper/GtBArchitectureTree.vue')['default']
     GtBIndex: typeof import('./components/workpaper/GtBIndex.vue')['default']
     GTChart: typeof import('./components/GTChart.vue')['default']
+    GtChecklistTable: typeof import('./components/workpaper/GtChecklistTable.vue')['default']
     GtCNoteTable: typeof import('./components/workpaper/GtCNoteTable.vue')['default']
     GtCodingTab: typeof import('./components/template-library/GtCodingTab.vue')['default']
     GtConsolWizard: typeof import('./components/common/GtConsolWizard.vue')['default']

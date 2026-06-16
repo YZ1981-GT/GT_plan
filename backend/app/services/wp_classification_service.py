@@ -41,6 +41,7 @@ VALID_COMPONENT_TYPES: set[str] = {
     "audit-legend",
     "univer",
     "skip",
+    "checklist-table",
 }
 
 # ─── 9 类 class_code 前缀 → componentType 映射 ──────────────────────────────
@@ -72,6 +73,8 @@ _WP_CODE_OVERRIDE: dict[str, str] = {
     "A25": "review-checklist",        # EQCR 复核 → 结构化复核面板
     "A31": "audit-legend",            # 审计标识一览表 → 标识符号对照面板
     "A17-7": "independence-signing",  # 独立性声明书 → 电子签署面板
+    "A1-15": "checklist-table",       # 核对表（CAS列报及披露） → 核对表专用组件
+    "A1-16": "checklist-table",       # 核对表（法规合规） → 核对表专用组件
 }
 
 # D 类子路由映射（基于 class_code 具体值）
