@@ -132,7 +132,18 @@ class ProcedureTableService:
                 count = await self._count_adjustments(project_id, year, "passed")
                 result["summary"] = f"共{count}笔" if count else "无"
             elif source == "adjustment_count_consol":
-                result["summary"] = "见合并底稿"
+                # 合并项目查实际抵销分录笔数（复用 A3 的 consol_elimination_count 逻辑）
+                try:
+                    from app.models.consolidation_models import EliminationEntry
+                    elim_stmt = sa.select(sa.func.count()).select_from(EliminationEntry).where(
+                        EliminationEntry.project_id == project_id,
+                        EliminationEntry.is_deleted == sa.false(),
+                    )
+                    elim_r = await self.db.execute(elim_stmt)
+                    elim_count = elim_r.scalar() or 0
+                    result["summary"] = f"共{elim_count}笔合并调整" if elim_count else "无合并调整"
+                except Exception:
+                    result["summary"] = "见合并底稿"
             elif source == "misstatement_summary":
                 count = await self._count_adjustments(project_id, year, "passed")
                 result["summary"] = f"未更正错报{count}笔" if count else "无未更正错报"
@@ -179,13 +190,42 @@ class ProcedureTableService:
                 mat = await self._get_materiality(project_id)
                 result["summary"] = f"重要性水平 {mat:,.0f} 元" if mat else "待设置"
             elif source == "trial_balance_check":
-                result["summary"] = "见试算平衡表"
+                # 真实借贷差验证（从 tb_balance 原始数据，v1 口径 SUM=0 为平衡）
+                try:
+                    from app.models.audit_platform_models import TbBalance
+                    from app.services.dataset_query import get_active_filter
+                    tb = TbBalance.__table__
+                    active_filter = await get_active_filter(self.db, tb, project_id, year)
+                    bal_stmt = sa.select(
+                        sa.func.coalesce(
+                            sa.func.sum(sa.case((tb.c.closing_balance > 0, tb.c.closing_balance), else_=sa.literal(0))), 0
+                        ).label("debit_total"),
+                        sa.func.coalesce(
+                            sa.func.sum(sa.case((tb.c.closing_balance < 0, sa.func.abs(tb.c.closing_balance)), else_=sa.literal(0))), 0
+                        ).label("credit_total"),
+                    ).where(active_filter, tb.c.level == 1)
+                    bal_r = await self.db.execute(bal_stmt)
+                    bal_row = bal_r.first()
+                    if bal_row:
+                        debit = float(bal_row.debit_total)
+                        credit = float(bal_row.credit_total)
+                        diff = abs(debit - credit)
+                        if diff < 0.01:
+                            result["summary"] = f"✓ 试算平衡（借=贷 ¥{debit:,.0f}）"
+                        else:
+                            result["summary"] = f"⚠️ 不平衡（差异 ¥{diff:,.2f}）"
+                    else:
+                        result["summary"] = "无余额数据"
+                except Exception:
+                    result["summary"] = "见试算平衡表"
             elif source == "consol_scope_status":
                 # 合并范围确定状态
                 try:
-                    from app.models.consolidation_models import ConsolidationScope
-                    scope_stmt = sa.select(sa.func.count()).select_from(ConsolidationScope).where(
-                        ConsolidationScope.project_id == project_id,
+                    from app.models.consolidation_models import ConsolScope
+                    scope_stmt = sa.select(sa.func.count()).select_from(ConsolScope).where(
+                        ConsolScope.project_id == project_id,
+                        ConsolScope.is_included == sa.true(),
+                        ConsolScope.is_deleted == sa.false(),
                     )
                     scope_r = await self.db.execute(scope_stmt)
                     scope_count = scope_r.scalar() or 0
@@ -195,9 +235,10 @@ class ProcedureTableService:
             elif source == "consol_elimination_count":
                 # 合并抵销分录统计
                 try:
-                    from app.models.consolidation_models import ConsolidationElimination
-                    elim_stmt = sa.select(sa.func.count()).select_from(ConsolidationElimination).where(
-                        ConsolidationElimination.project_id == project_id,
+                    from app.models.consolidation_models import EliminationEntry
+                    elim_stmt = sa.select(sa.func.count()).select_from(EliminationEntry).where(
+                        EliminationEntry.project_id == project_id,
+                        EliminationEntry.is_deleted == sa.false(),
                     )
                     elim_r = await self.db.execute(elim_stmt)
                     elim_count = elim_r.scalar() or 0
