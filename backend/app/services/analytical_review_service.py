@@ -153,6 +153,45 @@ async def _get_report_rows(
     return rows
 
 
+async def _get_report_rows_batch(
+    db: AsyncSession, project_id: UUID, years: list[int]
+) -> dict[tuple[int, FinancialReportType], dict[str, dict]]:
+    """一次查询获取多年度所有报表类型的数据（减少 DB 往返）。
+
+    Returns:
+        dict[(year, report_type) -> {row_code -> {row_name, amount, ...}}]
+    """
+    stmt = (
+        sa.select(
+            FinancialReport.year,
+            FinancialReport.report_type,
+            FinancialReport.row_code,
+            FinancialReport.row_name,
+            FinancialReport.current_period_amount,
+            FinancialReport.indent_level,
+            FinancialReport.is_total_row,
+        )
+        .where(
+            FinancialReport.project_id == project_id,
+            FinancialReport.year.in_(years),
+            FinancialReport.is_deleted == sa.false(),
+        )
+    )
+    result = await db.execute(stmt)
+    data: dict[tuple[int, FinancialReportType], dict[str, dict]] = {}
+    for r in result.fetchall():
+        key = (r.year, r.report_type)
+        if key not in data:
+            data[key] = {}
+        data[key][r.row_code] = {
+            "row_name": r.row_name,
+            "amount": r.current_period_amount or Decimal("0"),
+            "indent_level": r.indent_level,
+            "is_total_row": r.is_total_row,
+        }
+    return data
+
+
 async def _get_report_config_rows(
     db: AsyncSession, report_type: FinancialReportType, applicable_standard: str
 ) -> list[dict]:
@@ -311,19 +350,12 @@ async def get_analytical_review_data(
         db, FinancialReportType.income_statement, applicable_standard
     )
 
-    # 4. 获取本年/上年 financial_report 数据
-    bs_current = await _get_report_rows(
-        db, project_id, year, FinancialReportType.balance_sheet
-    )
-    bs_prior = await _get_report_rows(
-        db, project_id, year - 1, FinancialReportType.balance_sheet
-    )
-    is_current = await _get_report_rows(
-        db, project_id, year, FinancialReportType.income_statement
-    )
-    is_prior = await _get_report_rows(
-        db, project_id, year - 1, FinancialReportType.income_statement
-    )
+    # 4. 获取本年/上年 financial_report 数据（合并为单次查询，减少 DB 往返）
+    all_report_data = await _get_report_rows_batch(db, project_id, [year, year - 1])
+    bs_current = all_report_data.get((year, FinancialReportType.balance_sheet), {})
+    bs_prior = all_report_data.get((year - 1, FinancialReportType.balance_sheet), {})
+    is_current = all_report_data.get((year, FinancialReportType.income_statement), {})
+    is_prior = all_report_data.get((year - 1, FinancialReportType.income_statement), {})
 
     # 5. 确定纵向分析基数（合计行金额）
     bs_cur_total_asset = bs_current.get(BS_TOTAL_ASSET_CODE, {}).get("amount", Decimal("0"))

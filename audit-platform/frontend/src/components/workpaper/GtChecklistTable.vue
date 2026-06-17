@@ -108,6 +108,14 @@ const searchActive = ref(false)
 type FilterMode = 'all' | 'unfilled' | 'inapplicable'
 const filterMode = ref<FilterMode>('all')
 
+// ─── Active cell state (click-to-activate editing) ───
+const activeCell = ref('')
+
+function activateCell(itemId: string, field: string) {
+  if (props.readonly) return
+  activeCell.value = `${itemId}:${field}`
+}
+
 // ─── Computed: Template data ───
 const template = computed(() => props.htmlData?.template)
 const sections = computed(() => template.value?.sections ?? [])
@@ -727,13 +735,16 @@ onBeforeUnmount(() => {
                     <span class="item-content__text">{{ item.content }}</span>
                   </div>
                 </div>
-                <div class="col-conclusion">
+                <div class="col-conclusion" @click.stop="activateCell(item.id, 'conclusion')">
                   <el-select
+                    v-if="activeCell === `${item.id}:conclusion`"
                     :model-value="getResponse(item.id).conclusion || ''"
                     placeholder="—"
                     size="small"
                     :disabled="readonly"
-                    @change="(val: string) => updateConclusion(item.id, val || null)"
+                    automatic-dropdown
+                    @change="(val: string) => { updateConclusion(item.id, val || null); activeCell = '' }"
+                    @visible-change="(visible: boolean) => { if (!visible) activeCell = '' }"
                   >
                     <el-option label="Y" value="Y">
                       <el-tooltip content="适用并已在财务报表中披露" placement="left" :show-after="300">
@@ -756,24 +767,37 @@ onBeforeUnmount(() => {
                       </el-tooltip>
                     </el-option>
                   </el-select>
+                  <span v-else class="cell-display cell-conclusion" :class="{ 'cell-empty': !getResponse(item.id).conclusion }">
+                    {{ getResponse(item.id).conclusion || '—' }}
+                  </span>
                 </div>
-                <div class="col-remark">
+                <div class="col-remark" @click.stop="activateCell(item.id, 'remark')">
                   <el-input
+                    v-if="activeCell === `${item.id}:remark`"
                     :model-value="getResponse(item.id).remark || ''"
                     size="small"
                     placeholder="备注"
                     :disabled="readonly"
                     @change="(val: string) => updateRemark(item.id, val)"
+                    @blur="activeCell = ''"
                   />
+                  <span v-else class="cell-display" :class="{ 'cell-empty': !getResponse(item.id).remark }">
+                    {{ getResponse(item.id).remark || '备注' }}
+                  </span>
                 </div>
-                <div class="col-wpref">
+                <div class="col-wpref" @click.stop="activateCell(item.id, 'wpref')">
                   <el-input
+                    v-if="activeCell === `${item.id}:wpref`"
                     :model-value="getResponse(item.id).wp_ref || ''"
                     size="small"
                     placeholder="索引"
                     :disabled="readonly"
                     @change="(val: string) => updateWpRef(item.id, val)"
+                    @blur="activeCell = ''"
                   />
+                  <span v-else class="cell-display" :class="{ 'cell-empty': !getResponse(item.id).wp_ref }">
+                    {{ getResponse(item.id).wp_ref || '索引' }}
+                  </span>
                 </div>
               </div>
 
@@ -1159,6 +1183,33 @@ onBeforeUnmount(() => {
 
 .col-wpref :deep(.el-input) {
   width: 100%;
+}
+
+/* ─── Click-to-activate cell display ─── */
+.cell-display {
+  display: block;
+  padding: 2px 6px;
+  min-height: 22px;
+  line-height: 20px;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text);
+  cursor: pointer;
+  border: 1px dashed transparent;
+  border-radius: var(--gt-radius-xs);
+  transition: border-color var(--gt-transition-fast);
+}
+
+.cell-display:hover {
+  border-color: var(--gt-color-border-purple-light);
+}
+
+.cell-display.cell-empty {
+  color: var(--gt-color-text-tertiary);
+}
+
+.cell-conclusion {
+  text-align: center;
+  font-weight: 500;
 }
 
 /* ─── Progress bar override ─── */

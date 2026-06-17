@@ -8,9 +8,12 @@ Requirements: 3.1~3.9
 
 from __future__ import annotations
 
+import functools
+import json
 import logging
 from dataclasses import dataclass, field
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
+from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
@@ -91,7 +94,7 @@ class RatioResult:
 
 
 # ---------------------------------------------------------------------------
-# 35 个比率公式定义（6 大类）— 可自动计算
+# 35 个比率公式定义（6 大类）— 从 JSON 配置加载
 # 剩余 11 个因缺乏数据来源标记 special="no_data"
 # ---------------------------------------------------------------------------
 # Row code 速查 (soe_standalone):
@@ -115,290 +118,39 @@ class RatioResult:
 # IS-021=营业利润, IS-024=利润总额, IS-027=净利润
 # CFS-001=经营活动现金流入, CFS-009=经营活动现金流量净额
 
-RATIO_FORMULAS: list[RatioFormula] = [
-    # ===== 一、盈利能力分析 (9) =====
-    RatioFormula(
-        seq=1, name="长期资本报酬率",
-        formula="(利润总额+利息费用)/(非流动负债平均+所有者权益平均)×100%",
-        numerator_codes=["IS-024", "IS-015"],
-        denominator_codes=["BS-076", "BS-098"],
-        category=CATEGORY_PROFITABILITY,
-        annualize_numerator=True,
-        average_denominator=True,
-    ),
-    RatioFormula(
-        seq=2, name="资本金收益率",
-        formula="净利润(年化)/实收资本平均值×100%",
-        numerator_codes=["IS-027"],
-        denominator_codes=["BS-078"],
-        category=CATEGORY_PROFITABILITY,
-        annualize_numerator=True,
-        average_denominator=True,
-    ),
-    RatioFormula(
-        seq=3, name="股本权益报酬率",
-        formula="净利润(年化)/所有者权益平均值×100%",
-        numerator_codes=["IS-027"],
-        denominator_codes=["BS-098"],
-        category=CATEGORY_PROFITABILITY,
-        annualize_numerator=True,
-        average_denominator=True,
-    ),
-    RatioFormula(
-        seq=4, name="总资产报酬率",
-        formula="(利润总额+利息费用)(年化)/资产总计平均值×100%",
-        numerator_codes=["IS-024", "IS-015"],
-        denominator_codes=["BS-039"],
-        category=CATEGORY_PROFITABILITY,
-        annualize_numerator=True,
-        average_denominator=True,
-    ),
-    RatioFormula(
-        seq=5, name="毛利率",
-        formula="(营业收入-营业成本)/营业收入×100%",
-        numerator_codes=["IS-001", "-IS-002"],
-        denominator_codes=["IS-001"],
-        category=CATEGORY_PROFITABILITY,
-    ),
-    RatioFormula(
-        seq=6, name="营业利润率",
-        formula="营业利润/营业收入×100%",
-        numerator_codes=["IS-021"],
-        denominator_codes=["IS-001"],
-        category=CATEGORY_PROFITABILITY,
-    ),
-    RatioFormula(
-        seq=7, name="销售净利率",
-        formula="净利润/营业收入×100%",
-        numerator_codes=["IS-027"],
-        denominator_codes=["IS-001"],
-        category=CATEGORY_PROFITABILITY,
-    ),
-    RatioFormula(
-        seq=8, name="成本费用利润率",
-        formula="利润总额/(营业成本+销售费用+管理费用+研发费用)×100%",
-        numerator_codes=["IS-024"],
-        denominator_codes=["IS-002", "IS-011", "IS-012", "IS-013"],
-        category=CATEGORY_PROFITABILITY,
-    ),
-    RatioFormula(
-        seq=9, name="研究开发费用比例",
-        formula="研发费用/营业收入×100%",
-        numerator_codes=["IS-013"],
-        denominator_codes=["IS-001"],
-        category=CATEGORY_PROFITABILITY,
-    ),
-    # ===== 二、短期偿债能力分析 (3) =====
-    RatioFormula(
-        seq=10, name="流动比率",
-        formula="流动资产合计/流动负债合计",
-        numerator_codes=["BS-020"],
-        denominator_codes=["BS-058"],
-        category=CATEGORY_SHORT_TERM_SOLVENCY,
-        normal_value=2.0,
-    ),
-    RatioFormula(
-        seq=11, name="速动比率",
-        formula="(流动资产合计-存货)/流动负债合计",
-        numerator_codes=["BS-020", "-BS-018"],
-        denominator_codes=["BS-058"],
-        category=CATEGORY_SHORT_TERM_SOLVENCY,
-        normal_value=1.0,
-    ),
-    RatioFormula(
-        seq=12, name="现金比率",
-        formula="(货币资金+交易性金融资产)/流动负债合计",
-        numerator_codes=["BS-001", "BS-002"],
-        denominator_codes=["BS-058"],
-        category=CATEGORY_SHORT_TERM_SOLVENCY,
-        normal_value=0.3,
-    ),
-    # ===== 三、长期偿债能力分析 (7) =====
-    RatioFormula(
-        seq=13, name="资产负债比率",
-        formula="负债合计/资产总计×100%",
-        numerator_codes=["BS-077"],
-        denominator_codes=["BS-039"],
-        category=CATEGORY_LONG_TERM_SOLVENCY,
-    ),
-    RatioFormula(
-        seq=14, name="产权比率",
-        formula="负债合计/所有者权益合计×100%",
-        numerator_codes=["BS-077"],
-        denominator_codes=["BS-098"],
-        category=CATEGORY_LONG_TERM_SOLVENCY,
-    ),
-    RatioFormula(
-        seq=15, name="有形净值债务比率",
-        formula="负债合计/(所有者权益-无形资产-商誉)×100%",
-        numerator_codes=["BS-077"],
-        denominator_codes=["BS-098", "-BS-025", "-BS-028"],
-        category=CATEGORY_LONG_TERM_SOLVENCY,
-    ),
-    RatioFormula(
-        seq=16, name="利息保障倍数",
-        formula="(利润总额+利息费用)/利息费用",
-        numerator_codes=["IS-024", "IS-015"],
-        denominator_codes=["IS-015"],
-        category=CATEGORY_LONG_TERM_SOLVENCY,
-    ),
-    RatioFormula(
-        seq=17, name="营运资金长期负债比率",
-        formula="(流动资产合计-流动负债合计)/非流动负债合计",
-        numerator_codes=["BS-020", "-BS-058"],
-        denominator_codes=["BS-076"],
-        category=CATEGORY_LONG_TERM_SOLVENCY,
-    ),
-    RatioFormula(
-        seq=18, name="长期负债比率",
-        formula="非流动负债合计/负债合计×100%",
-        numerator_codes=["BS-076"],
-        denominator_codes=["BS-077"],
-        category=CATEGORY_LONG_TERM_SOLVENCY,
-    ),
-    RatioFormula(
-        seq=19, name="融资结构弹性比率",
-        formula="流动负债合计/负债合计×100%",
-        numerator_codes=["BS-058"],
-        denominator_codes=["BS-077"],
-        category=CATEGORY_LONG_TERM_SOLVENCY,
-    ),
-    # ===== 四、资产管理效率分析 (6) =====
-    RatioFormula(
-        seq=20, name="总资产周转率",
-        formula="营业收入(年化)/资产总计平均值",
-        numerator_codes=["IS-001"],
-        denominator_codes=["BS-039"],
-        category=CATEGORY_ASSET_EFFICIENCY,
-        annualize_numerator=True,
-        average_denominator=True,
-    ),
-    RatioFormula(
-        seq=21, name="固定资产周转率",
-        formula="营业收入(年化)/固定资产净值平均",
-        numerator_codes=["IS-001"],
-        denominator_codes=["BS-027"],
-        category=CATEGORY_ASSET_EFFICIENCY,
-        annualize_numerator=True,
-        average_denominator=True,
-    ),
-    RatioFormula(
-        seq=22, name="流动资产周转率",
-        formula="营业收入(年化)/流动资产合计平均",
-        numerator_codes=["IS-001"],
-        denominator_codes=["BS-020"],
-        category=CATEGORY_ASSET_EFFICIENCY,
-        annualize_numerator=True,
-        average_denominator=True,
-    ),
-    RatioFormula(
-        seq=23, name="应收账款周转率",
-        formula="营业收入(年化)/应收账款平均值",
-        numerator_codes=["IS-001"],
-        denominator_codes=["BS-008"],
-        category=CATEGORY_ASSET_EFFICIENCY,
-        annualize_numerator=True,
-        average_denominator=True,
-    ),
-    RatioFormula(
-        seq=24, name="存货周转率",
-        formula="营业成本(年化)/存货平均值",
-        numerator_codes=["IS-002"],
-        denominator_codes=["BS-018"],
-        category=CATEGORY_ASSET_EFFICIENCY,
-        annualize_numerator=True,
-        average_denominator=True,
-    ),
-    RatioFormula(
-        seq=25, name="营业周期",
-        formula="应收账款周转天数+存货周转天数(天)",
-        numerator_codes=[],  # 特殊计算，依赖 seq 23 和 24
-        denominator_codes=[],
-        category=CATEGORY_ASSET_EFFICIENCY,
-        special="operating_cycle",
-    ),
-    # ===== 五、资本管理效果分析 (6) =====
-    RatioFormula(
-        seq=26, name="资本保值增值率",
-        formula="期末所有者权益/期初所有者权益×100%",
-        numerator_codes=["BS-098"],  # 本期末
-        denominator_codes=["BS-098"],  # 上期末(期初)
-        category=CATEGORY_CAPITAL_MANAGEMENT,
-        special="capital_preservation",
-    ),
-    RatioFormula(
-        seq=27, name="社会贡献率",
-        formula="企业社会贡献总额(年化)/资产总计平均值×100%",
-        numerator_codes=[],  # 需工资+利息+税金+净利润，缺工资数据
-        denominator_codes=["BS-039"],
-        category=CATEGORY_CAPITAL_MANAGEMENT,
-        special="no_data",
-        average_denominator=True,
-    ),
-    RatioFormula(
-        seq=28, name="社会积累率",
-        formula="上交财政总额/企业社会贡献总额×100%",
-        numerator_codes=[],
-        denominator_codes=[],
-        category=CATEGORY_CAPITAL_MANAGEMENT,
-        special="no_data",
-    ),
-    RatioFormula(
-        seq=29, name="不良资产比率",
-        formula="不良资产总额/资产总计×100%",
-        numerator_codes=[],  # 需不良资产明细
-        denominator_codes=["BS-039"],
-        category=CATEGORY_CAPITAL_MANAGEMENT,
-        special="no_data",
-    ),
-    RatioFormula(
-        seq=30, name="资产损失率",
-        formula="资产损失总额/资产总计×100%",
-        numerator_codes=[],
-        denominator_codes=["BS-039"],
-        category=CATEGORY_CAPITAL_MANAGEMENT,
-        special="no_data",
-    ),
-    RatioFormula(
-        seq=31, name="固定资产成新率",
-        formula="固定资产净值平均/固定资产原价平均×100%",
-        numerator_codes=["BS-027"],
-        denominator_codes=["BS-027"],  # 需固定资产原价行，暂用净值占位
-        category=CATEGORY_CAPITAL_MANAGEMENT,
-        special="no_data",  # 缺固定资产原价行
-    ),
-    # ===== 六、现金流量分析 (4) =====
-    RatioFormula(
-        seq=32, name="经营活动净现金比率(一)",
-        formula="经营活动现金流量净额/流动负债合计×100%",
-        numerator_codes=["CFS-009"],
-        denominator_codes=["BS-058"],
-        category=CATEGORY_CASH_FLOW,
-        annualize_numerator=True,
-    ),
-    RatioFormula(
-        seq=33, name="经营活动净现金比率(二)",
-        formula="经营活动现金流量净额/负债合计×100%",
-        numerator_codes=["CFS-009"],
-        denominator_codes=["BS-077"],
-        category=CATEGORY_CASH_FLOW,
-        annualize_numerator=True,
-    ),
-    RatioFormula(
-        seq=34, name="净利润现金保证比率",
-        formula="经营活动现金流量净额/净利润×100%",
-        numerator_codes=["CFS-009"],
-        denominator_codes=["IS-027"],
-        category=CATEGORY_CASH_FLOW,
-    ),
-    RatioFormula(
-        seq=35, name="销售收入现金回收比率",
-        formula="经营活动现金流量净额/营业收入×100%",
-        numerator_codes=["CFS-009"],
-        denominator_codes=["IS-001"],
-        category=CATEGORY_CASH_FLOW,
-    ),
-]
+_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+
+
+@functools.lru_cache(maxsize=1)
+def _load_ratio_formulas() -> tuple[RatioFormula, ...]:
+    """从 JSON 配置文件加载比率公式定义（缓存，仅加载一次）。"""
+    path = _DATA_DIR / "ratio_formulas.json"
+    with open(path, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+    return tuple(
+        RatioFormula(
+            seq=item["seq"],
+            name=item["name"],
+            formula=item["formula"],
+            numerator_codes=item["numerator_codes"],
+            denominator_codes=item["denominator_codes"],
+            category=item["category"],
+            annualize_numerator=item.get("annualize_numerator", False),
+            average_denominator=item.get("average_denominator", False),
+            normal_value=item.get("normal_value"),
+            special=item.get("special"),
+        )
+        for item in raw
+    )
+
+
+def get_ratio_formulas() -> list[RatioFormula]:
+    """获取全部比率公式（模块级访问入口，懒加载 + 缓存）。"""
+    return list(_load_ratio_formulas())
+
+
+# 向后兼容：模块级变量（惰性属性，首次访问时加载）
+RATIO_FORMULAS: list[RatioFormula] = get_ratio_formulas()
 
 
 # ---------------------------------------------------------------------------
@@ -626,15 +378,16 @@ def compute_all_ratios(
     Returns:
         按 seq 排序的 RatioResult 列表
     """
+    formulas = get_ratio_formulas()
     results: dict[int, RatioResult] = {}
     # 先计算非依赖型比率
-    for formula in RATIO_FORMULAS:
+    for formula in formulas:
         if formula.special != "operating_cycle":
             r = compute_single_ratio(formula, current_data, prior_data, month_count)
             results[r.seq] = r
 
     # 再计算依赖型比率（营业周期）
-    for formula in RATIO_FORMULAS:
+    for formula in formulas:
         if formula.special == "operating_cycle":
             r = compute_single_ratio(
                 formula, current_data, prior_data, month_count, all_results=results
