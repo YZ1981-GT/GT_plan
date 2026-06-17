@@ -112,7 +112,7 @@ inclusion: always
 - 已完成修复明细（B-Index 目录/架构图、sheet 级索引号、试算表借贷方向、明细账月小计、2026-06-07 三处回归等）→ `#dev-history`
 
 ### 真正待办（2026-06-16）
-- **active spec=5**：①audit-report-template-integration 181/184(剩 3 运维) ②editing-lock-v1-v2-consolidation(阶段1 未完成,但 v1→v2 合并代码已 pull) ③checklist-workpaper-full-display(**P0+P1 全部完成+Playwright E2E 实测通过**——529条目/35章节导航正确渲染) ④analytical-review-workpaper(**P0 7/7完成**,144后端+16前端测试全绿,A1-13/A1-14路由+service+比率引擎+组件) ⑤workpaper-inline-popup(**P0 5/5完成**,弹窗容器+GtAProgramConsole触发改造+A1-17实现+完成徽章回显,34前端测试全绿)
+- **active spec=5**：①audit-report-template-integration 181/184(剩 3 运维) ②editing-lock-v1-v2-consolidation(阶段1 未完成,但 v1→v2 合并代码已 pull) ③checklist-workpaper-full-display(**P0+P1 全部完成+Playwright E2E 实测通过**——529条目/35章节导航正确渲染) ④analytical-review-workpaper(**P0 7/7完成**,144后端+16前端测试全绿,A1-13/A1-14路由+service+比率引擎+组件) ⑤workpaper-inline-popup(**P0+P1完成**,弹窗容器+GtAProgramConsole触发+A1-17程序+A1-12核查14条+A1-11签字7人+完成徽章,剩P2 A1-18混合型)
 - **🟢 A循环 7 spec + group-tree-architecture 全部 [x] 完成**（归档 `_archive/07-workpaper-slimdown/`；集团树 commit `18b259d3`）
 - **🟡 集团架构待 Playwright E2E**：PG 0 consolidated 项目→导入测试数据后补浏览器实测
 - **🟢 A 循环子底稿注册完成（2026-06-16 commit `8f48266a`）**：`wp_account_mapping.json` 从 206→272 条(+66 A 子底稿)；A2 adjustment_count 带金额；auto_data_source P0 模型名纠正；`template_engine.py` name 查找链增加 wp_account_mapping fallback(修复"底稿Axx"问题,新建项目不再出现)。**存量修复脚本**：`scripts/fix/_fix_wp_names_from_mapping.py`(跑一次更新 DB 中旧项目的"底稿Axx"→正确中文名)。**待确认**：①generate 是否区分 must_have/optional ②docx 子底稿 componentType 路由
