@@ -267,3 +267,34 @@ class TestChecklistTableRouting:
         """A16（管理层声明书）仍路由到 word-template，不受 A1-16 影响。"""
         result = derive_component_type(_make_classification("A-程序表", wp_code="A16"))
         assert result == "word-template"
+
+
+# ─── derive_component_type: 分析性复核路由 (A1-13/A1-14) ─────────────────────
+
+
+class TestAnalyticalReviewRouting:
+    """A1-13/A1-14 分析性复核底稿路由到 analytical-review 组件。"""
+
+    def test_derive_component_type_a1_13_returns_analytical_review(self):
+        """A1-13（分析性复核-母公司）→ analytical-review。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A1-13"))
+        assert result == "analytical-review"
+
+    def test_derive_component_type_a1_14_returns_analytical_review(self):
+        """A1-14（分析性复核-合并）→ analytical-review。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A1-14"))
+        assert result == "analytical-review"
+
+    def test_analytical_review_in_valid_component_types(self):
+        """analytical-review 在白名单中。"""
+        assert "analytical-review" in VALID_COMPONENT_TYPES
+
+    def test_a13_not_affected(self):
+        """A13（错报程序表）仍路由到 misstatement-summary，不受 A1-13 影响。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A13"))
+        assert result == "misstatement-summary"
+
+    def test_a1_15_not_affected(self):
+        """A1-15 仍路由到 checklist-table，不受 A1-13/A1-14 影响。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A1-15"))
+        assert result == "checklist-table"

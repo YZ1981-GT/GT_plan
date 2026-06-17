@@ -1309,6 +1309,31 @@ async def get_render_config(
                 "responses": responses,
             }
 
+        # ─── 分析性复核（analytical-review）：A1-13/A1-14 专用 ─────────
+        # 从 trial_balance + financial_report 取数计算横向/纵向趋势 + 比率分析
+        if component_type == "analytical-review":
+            from app.services.analytical_review_service import get_analytical_review_data
+
+            try:
+                # scope: standalone for A1-13, consolidated for A1-14
+                ar_scope = "consolidated" if wp_code == "A1-14" else "standalone"
+                # Get year from project
+                year_result = await db.execute(
+                    sa.text(
+                        "SELECT EXTRACT(YEAR FROM audit_period_end)::int "
+                        "FROM projects WHERE id = :pid"
+                    ),
+                    {"pid": str(project_id)},
+                )
+                ar_year = year_result.scalar_one_or_none() or 2025
+                ar_data = await get_analytical_review_data(
+                    db, project_id, ar_year, wp_code, ar_scope
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning("分析性复核数据获取失败 wp_code=%s: %s", wp_code, e)
+                ar_data = None
+            sheet_html_data = {"analytical_review": ar_data}
+
         # ─── univer 表格类底稿网格自动生成：从模板 xlsx 提取只读网格 ──────
         # 混合底稿（含 HTML sheet + univer sheet）整本走 GtWpRenderer 时，
         # univer sheet（审定表/明细表/测算表）之前只显示死占位「数据尚未导入」，

@@ -1,0 +1,719 @@
+<script setup lang="ts">
+/**
+ * GtAnalyticalReview — 分析性复核底稿组件
+ *
+ * A1-13（母公司 6 sheet）/ A1-14（合并 8 sheet）完成阶段分析性复核。
+ * Tab 切换：BS横向/BS纵向/IS横向/IS纵向/比率分析（+同行业/EPS 条件显示）
+ *
+ * 功能：
+ *  - 横向分析表：项目 | 行次 | 上年审定 | 本年审定 | 变动额 | 变动% | 状况 | 原因
+ *  - 纵向分析表：项目 | 行次 | 上年审定 | 比重% | 本年审定 | 比重% | 变动 | 状况 | 原因
+ *  - 比率分析：按 6 大类分组，公式 + 分子分母 + 指标值 + 增减箭头
+ *  - 颜色编码：significant=红底，attention=黄底
+ *  - 变动原因列可编辑（debounce 2s 自动保存）
+ *  - 科目行点击跳转对应循环底稿（预留 console.log）
+ */
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
+
+// ─── Types ───
+interface SheetRow {
+  row_code: string
+  name: string
+  row_number: number
+  indent_level: number
+  is_total_row: boolean
+  prior: number
+  current: number
+  change: number
+  change_pct: number | null
+  status: 'significant' | 'attention' | 'normal'
+  reason: string | null
+  prior_weight_pct?: number | null
+  current_weight_pct?: number | null
+  weight_change_pct?: number | null
+}
+
+interface SheetData {
+  title: string
+  index: string
+  columns: string[]
+  rows: SheetRow[]
+}
+
+interface RatioItem {
+  seq: number
+  name: string
+  formula: string
+  prior_numerator: number | null
+  prior_denominator: number | null
+  prior_value: number | null
+  current_numerator: number | null
+  current_denominator: number | null
+  current_value: number | null
+  change: number | null
+  direction: 'up' | 'down' | 'flat' | null
+  normal_value: number | null
+}
+
+interface RatioCategory {
+  name: string
+  items: RatioItem[]
+}
+
+interface RatioAnalysisData {
+  title: string
+  index: string
+  categories: RatioCategory[]
+  notes: string[]
+}
+
+interface AnalyticalReviewData {
+  wp_code: string
+  scope: 'standalone' | 'consolidated'
+  year: number
+  materiality: number
+  sheets: {
+    bs_horizontal: SheetData
+    bs_vertical: SheetData
+    is_horizontal: SheetData
+    is_vertical: SheetData
+    ratio_analysis: RatioAnalysisData | null
+    industry_comparison: any | null
+    eps_roe: any | null
+  }
+}
+
+// ─── Props / Emits ───
+const props = withDefaults(defineProps<{
+  wpId: string
+  sheetName?: string
+  schema?: Record<string, unknown>
+  htmlData: { analytical_review: AnalyticalReviewData }
+  readonly?: boolean
+}>(), {
+  sheetName: '',
+  schema: () => ({}),
+  readonly: false,
+})
+
+const emit = defineEmits<{
+  (e: 'save'): void
+}>()
+
+// ─── State ───
+const activeTab = ref('bs_horizontal')
+const reasonEdits = ref<Record<string, string>>({})
+const saveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+
+// ─── Computed: Data ───
+const data = computed(() => props.htmlData?.analytical_review)
+const scopeLabel = computed(() => data.value?.scope === 'consolidated' ? '合并' : '母公司')
+
+// ─── Computed: Available tabs ───
+interface TabDef {
+  key: string
+  label: string
+  sheetKey: keyof AnalyticalReviewData['sheets']
+}
+
+const availableTabs = computed<TabDef[]>(() => {
+  const tabs: TabDef[] = [
+    { key: 'bs_horizontal', label: 'BS横向', sheetKey: 'bs_horizontal' },
+    { key: 'bs_vertical', label: 'BS纵向', sheetKey: 'bs_vertical' },
+    { key: 'is_horizontal', label: 'IS横向', sheetKey: 'is_horizontal' },
+    { key: 'is_vertical', label: 'IS纵向', sheetKey: 'is_vertical' },
+  ]
+  if (data.value?.sheets?.ratio_analysis) {
+    tabs.push({ key: 'ratio_analysis', label: '比率分析', sheetKey: 'ratio_analysis' })
+  }
+  // P1: industry_comparison / eps_roe — 条件显示，当前隐藏
+  // if (data.value?.sheets?.industry_comparison) {
+  //   tabs.push({ key: 'industry_comparison', label: '同行业对比', sheetKey: 'industry_comparison' })
+  // }
+  // if (data.value?.sheets?.eps_roe) {
+  //   tabs.push({ key: 'eps_roe', label: 'EPS/ROE', sheetKey: 'eps_roe' })
+  // }
+  return tabs
+})
+
+// ─── Computed: Current sheet data ───
+const currentSheet = computed<SheetData | null>(() => {
+  if (!data.value?.sheets) return null
+  const key = activeTab.value as keyof AnalyticalReviewData['sheets']
+  if (key === 'ratio_analysis' || key === 'industry_comparison' || key === 'eps_roe') return null
+  return (data.value.sheets[key] as SheetData) ?? null
+})
+
+const currentRatio = computed<RatioAnalysisData | null>(() => {
+  if (activeTab.value !== 'ratio_analysis') return null
+  return data.value?.sheets?.ratio_analysis ?? null
+})
+
+const isHorizontal = computed(() =>
+  activeTab.value === 'bs_horizontal' || activeTab.value === 'is_horizontal'
+)
+
+const isVertical = computed(() =>
+  activeTab.value === 'bs_vertical' || activeTab.value === 'is_vertical'
+)
+
+// ─── Methods: Formatting ───
+function formatAmount(val: number | null | undefined): string {
+  if (val == null) return '—'
+  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function formatPct(val: number | null | undefined): string {
+  if (val == null) return '—'
+  return val.toFixed(2) + '%'
+}
+
+function formatRatioValue(val: number | null | undefined): string {
+  if (val == null) return '—'
+  return val.toFixed(4)
+}
+
+// ─── Methods: Row styling ───
+function getRowClass(row: SheetRow): string {
+  const classes: string[] = []
+  if (row.status === 'significant') classes.push('row-significant')
+  if (row.status === 'attention') classes.push('row-attention')
+  if (row.is_total_row) classes.push('row-total')
+  return classes.join(' ')
+}
+
+function getIndentStyle(row: SheetRow): Record<string, string> {
+  return { paddingLeft: `${(row.indent_level || 0) * 16}px` }
+}
+
+// ─── Methods: Row click (跳转预留) ───
+function handleRowClick(row: SheetRow) {
+  // TODO: 跳转对应循环底稿（预留，当前 console.log）
+  console.log('[GtAnalyticalReview] 科目行点击跳转预留:', row.row_code, row.name)
+}
+
+// ─── Methods: Reason editing (debounce 2s) ───
+function getReasonValue(rowCode: string, originalReason: string | null): string {
+  if (rowCode in reasonEdits.value) {
+    return reasonEdits.value[rowCode]
+  }
+  return originalReason ?? ''
+}
+
+function handleReasonInput(rowCode: string, value: string) {
+  reasonEdits.value[rowCode] = value
+  scheduleSave()
+}
+
+function scheduleSave() {
+  if (saveTimer.value) {
+    clearTimeout(saveTimer.value)
+  }
+  saveTimer.value = setTimeout(() => {
+    doSave()
+  }, 2000)
+}
+
+function doSave() {
+  // TODO: 当前无专用保存端点，emit('save') 通知父组件
+  // 后续实现：PUT /api/workpapers/{wpId}/analytical-review/reasons
+  emit('save')
+}
+
+// ─── Methods: Direction arrow ───
+function getDirectionArrow(direction: 'up' | 'down' | 'flat' | null): string {
+  switch (direction) {
+    case 'up': return '▲'
+    case 'down': return '▼'
+    case 'flat': return '—'
+    default: return '—'
+  }
+}
+
+function getDirectionClass(direction: 'up' | 'down' | 'flat' | null): string {
+  switch (direction) {
+    case 'up': return 'direction-up'
+    case 'down': return 'direction-down'
+    default: return 'direction-flat'
+  }
+}
+
+// ─── Lifecycle ───
+watch(() => props.htmlData, () => {
+  // Reset edits on data change
+  reasonEdits.value = {}
+})
+
+onBeforeUnmount(() => {
+  if (saveTimer.value) {
+    clearTimeout(saveTimer.value)
+    saveTimer.value = null
+    // Force save on unmount if there are pending edits
+    if (Object.keys(reasonEdits.value).length > 0) {
+      doSave()
+    }
+  }
+})
+</script>
+
+<template>
+  <div class="gt-analytical-review">
+    <!-- ─── 顶部标题 ─── -->
+    <div class="gt-analytical-review__header">
+      <div class="gt-analytical-review__title">
+        <span class="gt-analytical-review__icon">📊</span>
+        <span>已审报表分析性复核（{{ scopeLabel }}）</span>
+      </div>
+      <div class="gt-analytical-review__meta">
+        <span v-if="data">{{ data.wp_code }} · {{ data.year }}年度</span>
+        <span v-if="data" class="gt-analytical-review__materiality">
+          重要性水平: {{ formatAmount(data.materiality) }}
+        </span>
+      </div>
+    </div>
+
+    <!-- ─── Tab 导航 ─── -->
+    <el-tabs v-model="activeTab" class="gt-analytical-review__tabs">
+      <el-tab-pane
+        v-for="tab in availableTabs"
+        :key="tab.key"
+        :label="tab.label"
+        :name="tab.key"
+      />
+    </el-tabs>
+
+    <!-- ─── 表格区域 ─── -->
+    <div class="gt-analytical-review__content">
+      <!-- 横向分析表 -->
+      <template v-if="isHorizontal && currentSheet">
+        <div class="gt-analytical-review__sheet-title">
+          {{ currentSheet.title }}
+          <span class="sheet-index">{{ currentSheet.index }}</span>
+        </div>
+        <div class="gt-analytical-review__table-wrap">
+          <table class="gt-ar-table gt-compact-table">
+            <thead>
+              <tr>
+                <th class="col-name">项目</th>
+                <th class="col-row-num">行次</th>
+                <th class="col-amount">上年审定数</th>
+                <th class="col-amount">本年审定数</th>
+                <th class="col-amount">变动额</th>
+                <th class="col-pct">变动%</th>
+                <th class="col-status">状况</th>
+                <th class="col-reason">显著变动原因分析</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="row in currentSheet.rows"
+                :key="row.row_code"
+                :class="getRowClass(row)"
+                @click="handleRowClick(row)"
+              >
+                <td class="col-name" :style="getIndentStyle(row)">
+                  <span :class="{ 'is-total': row.is_total_row }">{{ row.name }}</span>
+                </td>
+                <td class="col-row-num">{{ row.row_number }}</td>
+                <td class="col-amount">{{ formatAmount(row.prior) }}</td>
+                <td class="col-amount">{{ formatAmount(row.current) }}</td>
+                <td class="col-amount">{{ formatAmount(row.change) }}</td>
+                <td class="col-pct">{{ formatPct(row.change_pct) }}</td>
+                <td class="col-status">
+                  <span v-if="row.status === 'significant'" class="status-tag status-significant">显著</span>
+                  <span v-else-if="row.status === 'attention'" class="status-tag status-attention">关注</span>
+                  <span v-else class="status-tag status-normal">正常</span>
+                </td>
+                <td class="col-reason" @click.stop>
+                  <el-input
+                    v-if="row.status !== 'normal' || getReasonValue(row.row_code, row.reason)"
+                    :model-value="getReasonValue(row.row_code, row.reason)"
+                    size="small"
+                    placeholder="填写变动原因"
+                    :disabled="readonly"
+                    @input="(val: string) => handleReasonInput(row.row_code, val)"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+
+      <!-- 纵向分析表 -->
+      <template v-if="isVertical && currentSheet">
+        <div class="gt-analytical-review__sheet-title">
+          {{ currentSheet.title }}
+          <span class="sheet-index">{{ currentSheet.index }}</span>
+        </div>
+        <div class="gt-analytical-review__table-wrap">
+          <table class="gt-ar-table gt-compact-table">
+            <thead>
+              <tr>
+                <th class="col-name">项目</th>
+                <th class="col-row-num">行次</th>
+                <th class="col-amount">上年审定数</th>
+                <th class="col-pct">比重%</th>
+                <th class="col-amount">本年审定数</th>
+                <th class="col-pct">比重%</th>
+                <th class="col-pct">变动</th>
+                <th class="col-status">状况</th>
+                <th class="col-reason">显著变动原因分析</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="row in currentSheet.rows"
+                :key="row.row_code"
+                :class="getRowClass(row)"
+                @click="handleRowClick(row)"
+              >
+                <td class="col-name" :style="getIndentStyle(row)">
+                  <span :class="{ 'is-total': row.is_total_row }">{{ row.name }}</span>
+                </td>
+                <td class="col-row-num">{{ row.row_number }}</td>
+                <td class="col-amount">{{ formatAmount(row.prior) }}</td>
+                <td class="col-pct">{{ formatPct(row.prior_weight_pct) }}</td>
+                <td class="col-amount">{{ formatAmount(row.current) }}</td>
+                <td class="col-pct">{{ formatPct(row.current_weight_pct) }}</td>
+                <td class="col-pct">{{ formatPct(row.weight_change_pct) }}</td>
+                <td class="col-status">
+                  <span v-if="row.status === 'significant'" class="status-tag status-significant">显著</span>
+                  <span v-else-if="row.status === 'attention'" class="status-tag status-attention">关注</span>
+                  <span v-else class="status-tag status-normal">正常</span>
+                </td>
+                <td class="col-reason" @click.stop>
+                  <el-input
+                    v-if="row.status !== 'normal' || getReasonValue(row.row_code, row.reason)"
+                    :model-value="getReasonValue(row.row_code, row.reason)"
+                    size="small"
+                    placeholder="填写变动原因"
+                    :disabled="readonly"
+                    @input="(val: string) => handleReasonInput(row.row_code, val)"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+
+      <!-- 比率分析表 -->
+      <template v-if="activeTab === 'ratio_analysis' && currentRatio">
+        <div class="gt-analytical-review__sheet-title">
+          {{ currentRatio.title }}
+          <span class="sheet-index">{{ currentRatio.index }}</span>
+        </div>
+        <div class="gt-analytical-review__table-wrap">
+          <template v-for="category in currentRatio.categories" :key="category.name">
+            <div class="gt-ar-ratio-category">{{ category.name }}</div>
+            <table class="gt-ar-table gt-ar-ratio-table gt-compact-table">
+              <thead>
+                <tr>
+                  <th class="col-seq">序号</th>
+                  <th class="col-ratio-name">指标名称</th>
+                  <th class="col-formula">公式</th>
+                  <th class="col-ratio-val">上年值</th>
+                  <th class="col-ratio-val">本年值</th>
+                  <th class="col-ratio-val">增减</th>
+                  <th class="col-direction">方向</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in category.items" :key="item.seq">
+                  <td class="col-seq">{{ item.seq }}</td>
+                  <td class="col-ratio-name">{{ item.name }}</td>
+                  <td class="col-formula">{{ item.formula }}</td>
+                  <td class="col-ratio-val">{{ formatRatioValue(item.prior_value) }}</td>
+                  <td class="col-ratio-val">{{ formatRatioValue(item.current_value) }}</td>
+                  <td class="col-ratio-val">{{ formatRatioValue(item.change) }}</td>
+                  <td class="col-direction">
+                    <span :class="getDirectionClass(item.direction)">
+                      {{ getDirectionArrow(item.direction) }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </template>
+
+          <!-- 比率注释 -->
+          <div v-if="currentRatio.notes?.length" class="gt-ar-ratio-notes">
+            <div class="gt-ar-ratio-notes__title">注：</div>
+            <div v-for="(note, idx) in currentRatio.notes" :key="idx" class="gt-ar-ratio-notes__item">
+              {{ idx + 1 }}. {{ note }}
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- 空状态 -->
+      <div v-if="!data" class="gt-analytical-review__empty">
+        <p>暂无分析性复核数据</p>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.gt-analytical-review {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: var(--gt-font-family);
+  background: var(--gt-color-bg-white);
+}
+
+/* ─── Header ─── */
+.gt-analytical-review__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gt-color-border);
+  background: var(--gt-color-primary-bg);
+}
+
+.gt-analytical-review__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--gt-font-size-lg);
+  font-weight: 600;
+  color: var(--gt-color-primary);
+}
+
+.gt-analytical-review__icon {
+  font-size: 20px;
+}
+
+.gt-analytical-review__meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-secondary);
+}
+
+.gt-analytical-review__materiality {
+  padding: 2px 8px;
+  background: var(--gt-color-primary-bg);
+  border: 1px solid var(--gt-color-border-purple-light);
+  border-radius: var(--gt-radius-sm);
+}
+
+/* ─── Tabs ─── */
+.gt-analytical-review__tabs {
+  padding: 0 16px;
+  border-bottom: 1px solid var(--gt-color-border);
+}
+
+.gt-analytical-review__tabs :deep(.el-tabs__item) {
+  color: var(--gt-color-text-secondary);
+  font-size: var(--gt-font-size-sm);
+}
+
+.gt-analytical-review__tabs :deep(.el-tabs__item.is-active) {
+  color: var(--gt-color-primary);
+  font-weight: 500;
+}
+
+.gt-analytical-review__tabs :deep(.el-tabs__active-bar) {
+  background-color: var(--gt-color-primary);
+}
+
+/* ─── Content ─── */
+.gt-analytical-review__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.gt-analytical-review__sheet-title {
+  font-size: var(--gt-font-size-base);
+  font-weight: 600;
+  color: var(--gt-color-text);
+  margin-bottom: 12px;
+}
+
+.sheet-index {
+  font-weight: 400;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
+  margin-left: 8px;
+}
+
+.gt-analytical-review__table-wrap {
+  overflow-x: auto;
+}
+
+/* ─── Table ─── */
+.gt-ar-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--gt-font-size-xs);
+  line-height: 1.4;
+}
+
+.gt-ar-table th,
+.gt-ar-table td {
+  padding: 4px 8px;
+  border: 1px solid var(--gt-color-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.gt-ar-table th {
+  background: var(--gt-color-primary-bg);
+  color: var(--gt-color-primary);
+  font-weight: 500;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.gt-ar-table tbody tr {
+  cursor: pointer;
+  transition: background var(--gt-transition-fast);
+}
+
+.gt-ar-table tbody tr:hover {
+  background: var(--gt-color-bg-purple-hover);
+}
+
+/* Column widths */
+.col-name { min-width: 140px; white-space: normal; }
+.col-row-num { width: 50px; text-align: center; }
+.col-amount { width: 120px; text-align: right; font-variant-numeric: tabular-nums; }
+.col-pct { width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
+.col-status { width: 60px; text-align: center; }
+.col-reason { min-width: 180px; }
+
+/* Ratio table columns */
+.col-seq { width: 40px; text-align: center; }
+.col-ratio-name { min-width: 120px; }
+.col-formula { min-width: 200px; font-size: 11px; color: var(--gt-color-text-secondary); white-space: normal; }
+.col-ratio-val { width: 80px; text-align: right; font-variant-numeric: tabular-nums; }
+.col-direction { width: 50px; text-align: center; }
+
+/* ─── Row status colors ─── */
+.row-significant td {
+  background-color: #fff0ef !important;
+}
+
+.row-attention td {
+  background-color: #fff8e6 !important;
+}
+
+.row-total td {
+  font-weight: 600;
+  border-top: 2px solid var(--gt-color-border);
+}
+
+.is-total {
+  font-weight: 600;
+}
+
+/* ─── Status tags ─── */
+.status-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: var(--gt-radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.status-significant {
+  background: var(--gt-color-coral-light);
+  color: var(--gt-color-coral);
+  border: 1px solid var(--gt-color-border-danger);
+}
+
+.status-attention {
+  background: var(--gt-color-wheat-light);
+  color: #b8860b;
+  border: 1px solid var(--gt-color-border-warning);
+}
+
+.status-normal {
+  background: var(--gt-bg-subtle);
+  color: var(--gt-color-text-tertiary);
+}
+
+/* ─── Direction arrows ─── */
+.direction-up {
+  color: var(--gt-color-success);
+  font-weight: 600;
+}
+
+.direction-down {
+  color: var(--gt-color-coral);
+  font-weight: 600;
+}
+
+.direction-flat {
+  color: var(--gt-color-text-tertiary);
+}
+
+/* ─── Ratio category header ─── */
+.gt-ar-ratio-category {
+  font-size: var(--gt-font-size-sm);
+  font-weight: 600;
+  color: var(--gt-color-primary);
+  padding: 12px 0 6px;
+  border-bottom: 1px solid var(--gt-color-border-purple);
+  margin-bottom: 4px;
+}
+
+.gt-ar-ratio-table {
+  margin-bottom: 16px;
+}
+
+/* ─── Ratio notes ─── */
+.gt-ar-ratio-notes {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--gt-bg-subtle);
+  border-radius: var(--gt-radius-md);
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
+}
+
+.gt-ar-ratio-notes__title {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.gt-ar-ratio-notes__item {
+  padding: 2px 0;
+}
+
+/* ─── Empty state ─── */
+.gt-analytical-review__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-sm);
+}
+
+/* ─── Override Element tabs border ─── */
+.gt-analytical-review__tabs :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+/* ─── Reason column input compact ─── */
+.col-reason :deep(.el-input) {
+  height: 22px;
+}
+.col-reason :deep(.el-input__wrapper) {
+  padding: 0 6px;
+  min-height: 22px;
+}
+.col-reason :deep(.el-input__inner) {
+  height: 20px;
+  line-height: 20px;
+  font-size: 12px;
+}
+</style>

@@ -42,6 +42,7 @@ VALID_COMPONENT_TYPES: set[str] = {
     "univer",
     "skip",
     "checklist-table",
+    "analytical-review",
 }
 
 # ─── 9 类 class_code 前缀 → componentType 映射 ──────────────────────────────
@@ -73,6 +74,8 @@ _WP_CODE_OVERRIDE: dict[str, str] = {
     "A25": "review-checklist",        # EQCR 复核 → 结构化复核面板
     "A31": "audit-legend",            # 审计标识一览表 → 标识符号对照面板
     "A17-7": "independence-signing",  # 独立性声明书 → 电子签署面板
+    "A1-13": "analytical-review",     # 分析性复核（母公司） → 分析性复核专用组件
+    "A1-14": "analytical-review",     # 分析性复核（合并） → 分析性复核专用组件
     "A1-15": "checklist-table",       # 核对表（CAS列报及披露） → 核对表专用组件
     "A1-16": "checklist-table",       # 核对表（法规合规） → 核对表专用组件
 }

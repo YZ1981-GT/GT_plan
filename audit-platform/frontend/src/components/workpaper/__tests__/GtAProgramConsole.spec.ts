@@ -19,7 +19,15 @@ import GtAProgramConsole from '../GtAProgramConsole.vue'
 
 // Mock vue-router useRoute（组件用 route.params.projectId 派生 projectId）
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: { projectId: 'proj-001' } }),
+  useRoute: () => ({ params: { projectId: 'proj-001' }, query: {} }),
+}))
+
+// Mock apiProxy（组件 onMounted 调 api.get 加载完成状态）
+vi.mock('@/services/apiProxy', () => ({
+  api: {
+    get: vi.fn().mockResolvedValue([]),
+    post: vi.fn().mockResolvedValue({}),
+  },
 }))
 
 // Mock useWpOnboardingGuide（避免引导逻辑依赖）

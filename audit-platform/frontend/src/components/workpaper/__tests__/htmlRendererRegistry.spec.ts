@@ -49,6 +49,7 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'independence-signing',
       'audit-legend',
       'checklist-table',
+      'analytical-review',
     ]
     expect(HTML_RENDERER_REGISTRY.size).toBe(expected.length)
     for (const ct of expected) {
@@ -119,6 +120,14 @@ describe('htmlRendererRegistry — emit 列表', () => {
     expect(entry).toBeDefined()
     expect(entry?.icon).toBe('✅')
     expect(entry?.label).toBe('核对表')
+    expect(entry?.emits).toEqual(['save'])
+  })
+
+  it('analytical-review 分析性复核 emit save + 图标/标签正确', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('analytical-review')
+    expect(entry).toBeDefined()
+    expect(entry?.icon).toBe('📊')
+    expect(entry?.label).toBe('分析性复核')
     expect(entry?.emits).toEqual(['save'])
   })
 })

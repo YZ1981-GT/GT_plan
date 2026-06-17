@@ -1,9 +1,9 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-06-12  
+**最后更新**：2026-06-17  
 **当前分支**：`work/2026-05-30-wp-specs`  
-**Spec 总数**：**142**（active 2 + archived 140）  
-**最高迁移**：V071  
+**Spec 总数**：**145**（active 5 + archived 140）  
+**最高迁移**：V085  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -50,15 +50,17 @@
 
 ## 二、已归档 Spec（139 个，10 分类）
 
-**当前 active = 2**（其余已归档）。新建 spec 放 `.kiro/specs/{name}/`。
+**当前 active = 5**（其余已归档）。新建 spec 放 `.kiro/specs/{name}/`。
 
 ### Active Specs（实施中）
 
 | Spec | 状态 | 迁移 | 说明 |
 |------|------|------|------|
 | audit-report-template-integration | implementing | V066 | 审计报告模板集成（181/184，剩 3 项人工验收/运维下线） |
-| deliverable-lineage-and-writeback | completed | V067 | 出品物溯源与回填（92/92 全部完成，START GATE 已解除可实施） |
-| note-per-table-guidance | completed | — | 附注多表 per-table guidance（6 Phase 全完成，前后端+迁移+导出+E2E） |
+| checklist-workpaper-full-display | completed | V085 | A1-15/A1-16 核对表完整渲染（P0+P1 全部完成，529+210 条目） |
+| analytical-review-workpaper | requirements | — | A1-13/A1-14 分析性复核（6~8 sheet，取数+比率+变动原因联动） |
+| workpaper-inline-popup | requirements | — | A1-11/12/17/18 子底稿弹窗联动（程序表步骤旁弹窗完成操作） |
+| editing-lock-v1-v2-consolidation | planning | — | 编辑锁 v1→v2 合并（阶段1 未完成） |
 
 ```
 _archive/

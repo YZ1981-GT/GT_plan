@@ -253,13 +253,27 @@
       <el-table-column label="关联底稿" min-width="140">
         <template #default="{ row }">
           <div v-if="row.linked_workpapers" class="gt-a-program-console__chips">
-            <GtIndexChip
+            <span
               v-for="(ref, idx) in parseLinkedWorkpapers(row.linked_workpapers)"
               :key="idx"
-              :value="ref"
-              :validate="true"
-              @click="handleIndexChipClick"
-            />
+              class="gt-a-program-console__chip-wrap"
+            >
+              <GtIndexChip
+                :value="ref"
+                :validate="true"
+                @click="handleIndexChipClick"
+              />
+              <span
+                v-if="INLINE_POPUP_WP_CODES.has(ref) && popupCompletionStatus[ref] === 'completed'"
+                class="popup-badge popup-badge--done"
+                title="已完成"
+              >✓</span>
+              <span
+                v-else-if="INLINE_POPUP_WP_CODES.has(ref) && popupCompletionStatus[ref] === 'in_progress'"
+                class="popup-badge popup-badge--progress"
+                title="进行中"
+              >◐</span>
+            </span>
           </div>
         </template>
       </el-table-column>
@@ -449,17 +463,31 @@
         :description="step.description"
       />
     </el-tour>
+
+    <!-- 子底稿弹窗（A1-11/A1-12/A1-17/A1-18） -->
+    <WpInlinePopup
+      v-model:visible="showPopup"
+      :wp-code="popupWpCode"
+      :wp-id="wpId"
+      :project-id="projectId"
+      @save="onPopupSave"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowDown } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import GtAuditFlowGraph from '@/components/workpaper/GtAuditFlowGraph.vue'
+import WpInlinePopup from '@/components/workpaper/WpInlinePopup.vue'
+import { api } from '@/services/apiProxy'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useWpOnboardingGuide } from '@/composables/useWpOnboardingGuide'
+
+// 弹窗式子底稿集合（点击不跳转，弹窗展示）
+const INLINE_POPUP_WP_CODES = new Set(['A1-11', 'A1-12', 'A1-17', 'A1-18'])
 
 // ─── Types ───
 interface ProgramAssertions {
@@ -543,6 +571,64 @@ const tableRef = ref<any>(null)
 // Sprint 4 Task 17.7: 审计逻辑图展开状态
 const flowGraphExpanded = ref(false)
 const projectId = computed(() => (route.params.projectId as string) || '')
+
+// 子底稿弹窗状态
+const showPopup = ref(false)
+const popupWpCode = ref('')
+
+// ─── 弹窗完成状态回显 ───
+const popupCompletionStatus = ref<Record<string, 'completed' | 'in_progress' | 'none'>>({})
+
+/** 完成规则：根据 checklist_responses 判定子底稿完成状态 */
+function checkCompletion(wpCode: string, responses: Record<string, any>): 'completed' | 'in_progress' | 'none' {
+  switch (wpCode) {
+    case 'A1-17': {
+      const ids = ['A1-17-001', 'A1-17-002', 'A1-17-003']
+      const done = ids.filter(id => responses[id]?.conclusion).length
+      if (done === ids.length) return 'completed'
+      if (done > 0) return 'in_progress'
+      return 'none'
+    }
+    case 'A1-12': {
+      const ids = Array.from({ length: 14 }, (_, i) => `A1-12-${String(i + 1).padStart(3, '0')}`)
+      const done = ids.filter(id => responses[id]?.conclusion).length
+      if (done === ids.length) return 'completed'
+      if (done > 0) return 'in_progress'
+      return 'none'
+    }
+    case 'A1-11': {
+      const ids = ['A1-11-sign-pm', 'A1-11-sign-partner', 'A1-11-sign-qc']
+      const done = ids.filter(id => responses[id]?.conclusion).length
+      if (done === ids.length) return 'completed'
+      if (done > 0) return 'in_progress'
+      return 'none'
+    }
+    case 'A1-18': {
+      return responses['A1-18-conclusion']?.conclusion ? 'completed' : 'none'
+    }
+    default: return 'none'
+  }
+}
+
+/** 批量查询子底稿 checklist_responses，计算各弹窗底稿完成状态 */
+async function loadPopupCompletionStatus() {
+  if (!props.wpId) return
+  try {
+    const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const list = Array.isArray(res) ? res : (res?.data ?? [])
+    const byId: Record<string, any> = {}
+    for (const r of list) {
+      byId[r.item_id] = r
+    }
+    for (const code of INLINE_POPUP_WP_CODES) {
+      popupCompletionStatus.value[code] = checkCompletion(code, byId)
+    }
+  } catch { /* ignore */ }
+}
+
+onMounted(() => {
+  loadPopupCompletionStatus()
+})
 
 // Sprint 4 Task 14.1: 首次使用引导
 const { showGuide, guideSteps, triggerGuide } = useWpOnboardingGuide('a-program-console')
@@ -905,8 +991,20 @@ function confirmBatchTrim() {
 
 function handleIndexChipClick(resolved: ResolvedIndexRef) {
   if (resolved.ns === 'wp' && resolved.target) {
+    // 弹窗式子底稿：拦截跳转，改为弹窗展示
+    if (INLINE_POPUP_WP_CODES.has(resolved.target)) {
+      popupWpCode.value = resolved.target
+      showPopup.value = true
+      return
+    }
     emit('jump-to-workpaper', resolved.target)
   }
+}
+
+/** 弹窗保存/关闭后刷新数据 */
+function onPopupSave() {
+  debounceSave()
+  loadPopupCompletionStatus()
 }
 
 function openAttachment(row: ProgramRow) {
@@ -1048,5 +1146,33 @@ function debounceSave() {
 .gt-a-program-console__history-reason {
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+.gt-a-program-console__chip-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.popup-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  border-radius: 50%;
+  margin-left: 2px;
+  vertical-align: middle;
+}
+
+.popup-badge--done {
+  background: #e6f7e6;
+  color: #2d8a2d;
+  font-weight: 700;
+}
+
+.popup-badge--progress {
+  background: #fff8e6;
+  color: #b8860b;
 }
 </style>
