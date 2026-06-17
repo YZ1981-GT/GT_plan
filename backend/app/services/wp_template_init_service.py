@@ -561,6 +561,11 @@ def find_template_file(wp_code: str) -> Path | None:
 
 def find_all_template_files(wp_code: str) -> list[Path]:
     """查找 wp_code 对应的所有模板文件（多文件底稿）"""
+    is_sub_code = bool(re.match(r"^A\d+-\d+", wp_code))
+    if is_sub_code:
+        single = find_template_file_any(wp_code)
+        return [single] if single else []
+
     index = _load_index()
     candidates = [
         e for e in index
@@ -574,17 +579,79 @@ def find_all_template_files(wp_code: str) -> list[Path]:
     return results
 
 
+def _match_filename_prefix(filename: str, wp_code: str) -> bool:
+    """True if filename belongs to sub-code wp_code (A9-1向… or A10-1 …)."""
+    if filename.startswith(f"{wp_code} "):
+        return True
+    if filename.startswith(wp_code) and re.match(rf"^{re.escape(wp_code)}(\s|[^-\d])", filename):
+        return True
+    return False
+
+
+def _find_docx_on_disk(wp_code: str) -> Path | None:
+    prefix = wp_code[0] if wp_code else ""
+    subdir = TEMPLATES_DIR / prefix
+    if not subdir.exists():
+        return None
+    matches = sorted(
+        f for f in subdir.iterdir()
+        if f.suffix.lower() in (".docx", ".doc") and _match_filename_prefix(f.name, wp_code)
+    )
+    return matches[0] if matches else None
+
+
+def _find_docx_by_index_or_disk(wp_code: str) -> Path | None:
+    index = _load_index()
+    prefix_matches = [
+        e for e in index
+        if e["format"] in ("docx", "doc") and _match_filename_prefix(e["filename"], wp_code)
+    ]
+    if prefix_matches:
+        prefix_matches.sort(key=lambda e: len(e["filename"]))
+        full_path = TEMPLATES_DIR / prefix_matches[0]["relative_path"]
+        if full_path.exists():
+            return full_path
+    return _find_docx_on_disk(wp_code)
+
+
 def find_template_file_any(wp_code: str) -> Path | None:
     """Find template file of any format (xlsx/xlsm/docx/doc)
 
     P2-2: 扩展模板查找支持 docx/doc 格式。
     优先返回 xlsx/xlsm，其次 docx/doc。
+    PRE-1: 子码 docx（索引挂父 wp_code）按文件名前缀 fallback；
+    子码（A9-1 等）**禁止**回退到父程序表 xlsx。
     """
-    # 先尝试 xlsx/xlsm
+    is_sub_code = bool(re.match(r"^A\d+-\d+", wp_code))
+
+    if is_sub_code:
+        # docx 子码优先（A9-1、A10-1…）
+        docx = _find_docx_by_index_or_disk(wp_code)
+        if docx:
+            return docx
+        # xlsx 子码（A7-1、A10-2…）：仅匹配同名前缀文件
+        index = _load_index()
+        xlsx_matches = [
+            e for e in index
+            if e["format"] in ("xlsx", "xlsm") and _match_filename_prefix(e["filename"], wp_code)
+        ]
+        if xlsx_matches:
+            xlsx_matches.sort(key=lambda e: len(e["filename"]))
+            full_path = TEMPLATES_DIR / xlsx_matches[0]["relative_path"]
+            if full_path.exists():
+                return full_path
+        prefix = wp_code[0]
+        subdir = TEMPLATES_DIR / prefix
+        if subdir.exists():
+            for f in sorted(subdir.iterdir()):
+                if f.suffix.lower() in (".xlsx", ".xlsm") and _match_filename_prefix(f.name, wp_code):
+                    return f
+        return None
+
+    # 主程序表：xlsx 优先
     result = find_template_file(wp_code)
     if result:
         return result
-    # 再尝试 docx/doc
     index = _load_index()
     candidates = [
         e for e in index
@@ -595,7 +662,7 @@ def find_template_file_any(wp_code: str) -> Path | None:
         full_path = TEMPLATES_DIR / rel_path
         if full_path.exists():
             return full_path
-    return None
+    return _find_docx_by_index_or_disk(wp_code)
 
 
 def get_workpaper_storage_path(project_id: UUID, wp_id: UUID) -> Path:

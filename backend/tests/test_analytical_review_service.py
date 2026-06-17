@@ -18,8 +18,11 @@ from app.models.base import Base
 from app.models.audit_platform_models import Materiality
 from app.models.report_models import FinancialReport, FinancialReportType, ReportConfig
 from app.services.analytical_review_service import (
+    build_eps_roe,
+    build_industry_comparison,
     classify_change,
     compute_change,
+    compute_eps_roe_values,
     compute_weight_pct,
     get_analytical_review_data,
     get_audit_explanation_for_row,
@@ -402,3 +405,50 @@ async def test_no_materiality_defaults_to_zero(db_session: AsyncSession):
         db_session, pid, 2025, "A1-13", "standalone"
     )
     assert result["materiality"] == 0.0
+
+
+def test_build_industry_comparison_structure():
+    data = build_industry_comparison("A1-14", 2025)
+    assert data["index"] == "A1-14-6"
+    assert data["years"] == [2023, 2024, 2025]
+    assert len(data["companies"]) == 5
+    assert "total_assets" in data["financial_data"]
+    assert "roe" in data["comparison_table"]
+
+
+def test_compute_eps_roe_values():
+    result = compute_eps_roe_values({
+        "net_profit": 1000,
+        "equity_end": 5000,
+        "equity_begin": 4000,
+        "weighted_avg_shares": 100,
+        "diluted_shares": 110,
+    })
+    assert result["roe_diluted"] == 20.0
+    assert result["roe_weighted"] == pytest.approx(22.2222, rel=1e-3)
+    assert result["basic_eps"] == 10.0
+    assert result["diluted_eps"] == pytest.approx(9.0909, rel=1e-3)
+
+
+def test_build_eps_roe_prefills_inputs():
+    data = build_eps_roe(
+        "A1-14",
+        2025,
+        net_profit=100.0,
+        equity_end=500.0,
+        equity_begin=400.0,
+        share_capital=50.0,
+    )
+    assert data["index"] == "A1-14-7"
+    assert data["inputs"]["net_profit"] == 100.0
+    assert data["computed"]["basic_eps"] is not None
+
+
+@pytest.mark.asyncio
+async def test_a1_13_has_no_listed_sheets(seeded_db: AsyncSession):
+    result = await get_analytical_review_data(
+        seeded_db, PROJECT_ID, YEAR, "A1-13", "standalone"
+    )
+    assert result["is_listed"] is False
+    assert result["sheets"]["industry_comparison"] is None
+    assert result["sheets"]["eps_roe"] is None

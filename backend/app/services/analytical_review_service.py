@@ -98,6 +98,132 @@ async def get_audit_explanation_for_row(
     return None  # TODO: 各科目底稿修订完成后实现
 
 
+async def _get_is_listed(db: AsyncSession, project_id: UUID) -> bool:
+    """判断项目是否为上市公司（template_type == 'listed'）。"""
+    result = await db.execute(
+        sa.text("SELECT template_type FROM projects WHERE id = :pid"),
+        {"pid": str(project_id)},
+    )
+    return result.scalar_one_or_none() == "listed"
+
+
+def _empty_metric_grid(years: list[int], metrics: list[tuple[str, str]]) -> dict:
+    """构建指标 × 年份 × 公司 的空数据网格。"""
+    return {
+        key: {
+            str(y): {label: None for label in _COMPANY_LABELS}
+            for y in years
+        }
+        for key, _ in metrics
+    }
+
+
+def build_industry_comparison(wp_code: str, year: int) -> dict:
+    """构建同行业对比分析 sheet 结构（A1-14-6，用户填写数据）。"""
+    years = [year - 2, year - 1, year]
+    return {
+        "title": "同行业对比分析",
+        "index": f"{wp_code}-6",
+        "years": years,
+        "companies": [
+            {"key": label, "name": "", "stock_code": ""}
+            for label in ["A", "B", "C", "D", "E"]
+        ],
+        "financial_data": _empty_metric_grid(years, _INDUSTRY_FINANCIAL_METRICS),
+        "comparison_table": _empty_metric_grid(years, _INDUSTRY_COMPARISON_METRICS),
+        "financial_metric_labels": {k: v for k, v in _INDUSTRY_FINANCIAL_METRICS},
+        "comparison_metric_labels": {k: v for k, v in _INDUSTRY_COMPARISON_METRICS},
+        "data_source_note": "",
+    }
+
+
+def compute_eps_roe_values(inputs: dict) -> dict:
+    """根据用户填写参数计算 EPS/ROE 指标。"""
+    net_profit = inputs.get("net_profit")
+    equity_end = inputs.get("equity_end")
+    equity_begin = inputs.get("equity_begin")
+    weighted_shares = inputs.get("weighted_avg_shares")
+    diluted_shares = inputs.get("diluted_shares")
+
+    avg_equity = None
+    if equity_end is not None and equity_begin is not None:
+        avg_equity = (float(equity_end) + float(equity_begin)) / 2
+    elif equity_end is not None:
+        avg_equity = float(equity_end)
+
+    roe_diluted = None
+    if net_profit is not None and equity_end not in (None, 0):
+        roe_diluted = round(float(net_profit) / float(equity_end) * 100, 4)
+
+    roe_weighted = None
+    if net_profit is not None and avg_equity not in (None, 0):
+        roe_weighted = round(float(net_profit) / avg_equity * 100, 4)
+
+    basic_eps = None
+    if net_profit is not None and weighted_shares not in (None, 0):
+        basic_eps = round(float(net_profit) / float(weighted_shares), 4)
+
+    diluted_eps = None
+    if net_profit is not None and diluted_shares not in (None, 0):
+        diluted_eps = round(float(net_profit) / float(diluted_shares), 4)
+
+    return {
+        "roe_diluted": roe_diluted,
+        "roe_weighted": roe_weighted,
+        "basic_eps": basic_eps,
+        "diluted_eps": diluted_eps,
+    }
+
+
+def build_eps_roe(
+    wp_code: str,
+    year: int,
+    *,
+    net_profit: float | None = None,
+    equity_end: float | None = None,
+    equity_begin: float | None = None,
+    share_capital: float | None = None,
+) -> dict:
+    """构建 EPS-ROE 计算表 sheet 结构（A1-14-7，含公式自动计算）。"""
+    inputs = {
+        "net_profit": net_profit,
+        "equity_end": equity_end,
+        "equity_begin": equity_begin,
+        "weighted_avg_shares": share_capital,
+        "diluted_shares": share_capital,
+    }
+    return {
+        "title": "EPS-ROE计算表（参考）",
+        "index": f"{wp_code}-7",
+        "year": year,
+        "inputs": {
+            "net_profit": net_profit,
+            "equity_end": equity_end,
+            "equity_begin": equity_begin,
+            "share_capital": share_capital,
+            "weighted_avg_shares": share_capital,
+            "diluted_shares": share_capital,
+        },
+        "share_changes": [
+            {
+                "id": "s0",
+                "label": "期初股份数 S0",
+                "shares": share_capital,
+                "months": 12,
+                "weight": 1.0,
+            },
+        ],
+        "computed": compute_eps_roe_values(inputs),
+        "notes": [
+            "净资产收益率（全面摊薄）= 归属于普通股股东的净利润 / 期末净资产",
+            "净资产收益率（加权平均）= 归属于普通股股东的净利润 / 平均净资产",
+            "基本每股收益 = 归属于普通股股东的净利润 / 加权平均普通股股数",
+            "稀释每股收益需考虑可转债、期权、认股权证等潜在普通股的影响",
+            "配股/公积金转增/拆股等股本变动按 CAS 34 规定调整加权平均股数",
+        ],
+    }
+
+
 # ---------------------------------------------------------------------------
 # 内部取数辅助
 # ---------------------------------------------------------------------------
@@ -224,7 +350,29 @@ async def _get_report_config_rows(
 # ---------------------------------------------------------------------------
 BS_TOTAL_ASSET_CODE = "BS-039"       # 资产合计
 BS_TOTAL_LIABILITY_EQUITY_CODE = "BS-099"  # 负债和股东权益合计
+BS_EQUITY_TOTAL_CODE = "BS-098"      # 所有者权益合计
+BS_SHARE_CAPITAL_CODE = "BS-078"     # 实收资本(股本)
 IS_REVENUE_CODE = "IS-001"           # 营业收入
+IS_NET_PROFIT_CODE = "IS-027"        # 净利润
+
+# 同行业对比指标
+_INDUSTRY_FINANCIAL_METRICS = [
+    ("total_assets", "资产总额"),
+    ("net_assets", "净资产额"),
+    ("revenue", "营业收入"),
+    ("net_profit", "净利润"),
+    ("roe", "净资产收益率"),
+    ("inventory_turnover", "存货周转率"),
+    ("debt_ratio", "资产负债率"),
+]
+_INDUSTRY_COMPARISON_METRICS = [
+    ("roe", "净资产收益率"),
+    ("gross_margin", "综合毛利率"),
+    ("segment_gross_margin", "XX毛利率"),
+    ("receivable_turnover", "应收账款周转率"),
+    ("inventory_turnover", "存货周转率"),
+]
+_COMPANY_LABELS = ["self", "A", "B", "C", "D", "E"]
 
 
 # ---------------------------------------------------------------------------
@@ -417,18 +565,38 @@ async def get_analytical_review_data(
         logger.exception("比率分析计算失败，返回 None")
         ratio_analysis = None
 
+    # 8. 上市公司专用 sheet（A1-14 + is_listed）
+    industry_comparison = None
+    eps_roe = None
+    is_listed = await _get_is_listed(db, project_id) if wp_code == "A1-14" else False
+    if wp_code == "A1-14" and is_listed:
+        industry_comparison = build_industry_comparison(wp_code, year)
+        cur_np = is_current.get(IS_NET_PROFIT_CODE, {}).get("amount")
+        cur_equity = bs_current.get(BS_EQUITY_TOTAL_CODE, {}).get("amount")
+        pri_equity = bs_prior.get(BS_EQUITY_TOTAL_CODE, {}).get("amount")
+        share_capital = bs_current.get(BS_SHARE_CAPITAL_CODE, {}).get("amount")
+        eps_roe = build_eps_roe(
+            wp_code,
+            year,
+            net_profit=float(cur_np) if cur_np is not None else None,
+            equity_end=float(cur_equity) if cur_equity is not None else None,
+            equity_begin=float(pri_equity) if pri_equity is not None else None,
+            share_capital=float(share_capital) if share_capital is not None else None,
+        )
+
     return {
         "wp_code": wp_code,
         "scope": scope,
         "year": year,
         "materiality": float(materiality),
+        "is_listed": is_listed,
         "sheets": {
             "bs_horizontal": bs_horizontal,
             "bs_vertical": bs_vertical,
             "is_horizontal": is_horizontal,
             "is_vertical": is_vertical,
             "ratio_analysis": ratio_analysis,
-            "industry_comparison": None,  # P1
-            "eps_roe": None,  # P1
+            "industry_comparison": industry_comparison,
+            "eps_roe": eps_roe,
         },
     }

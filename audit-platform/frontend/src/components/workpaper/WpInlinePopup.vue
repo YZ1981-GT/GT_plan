@@ -7,8 +7,12 @@
  * - A1-12 → WpPopupChecklist（适用性核查）
  * - A1-17 → WpPopupProcedure（程序步骤）
  * - A1-18 → WpPopupMixedForm（混合型）
+ * - docx 子底稿 → WpPopupDocxEditor（配置驱动，见 wpPopupDocxConfigs.ts）
  */
 import { computed, defineAsyncComponent } from 'vue'
+import { DOCX_POPUP_CONFIGS, DOCX_POPUP_WP_CODES } from './wpPopupDocxConfigs'
+
+const WpPopupDocxEditor = defineAsyncComponent(() => import('./WpPopupDocxEditor.vue'))
 
 const props = defineProps<{
   visible: boolean
@@ -23,17 +27,12 @@ const emit = defineEmits<{
   (e: 'completed', wpCode: string): void
 }>()
 
-// Component mapping
+// 专用弹窗组件（非 docx 通用编辑器）
 const POPUP_COMPONENTS: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   'A1-11': defineAsyncComponent(() => import('./WpPopupSigning.vue')),
   'A1-12': defineAsyncComponent(() => import('./WpPopupChecklist.vue')),
   'A1-17': defineAsyncComponent(() => import('./WpPopupProcedure.vue')),
   'A1-18': defineAsyncComponent(() => import('./WpPopupMixedForm.vue')),
-  'A8-1': defineAsyncComponent(() => import('./WpPopupDocxEditor.vue')),
-  'A8-2': defineAsyncComponent(() => import('./WpPopupDocxEditor.vue')),
-  'A10-1': defineAsyncComponent(() => import('./WpPopupDocxEditor.vue')),
-  'A11-1': defineAsyncComponent(() => import('./WpPopupDocxEditor.vue')),
-  'A12-1': defineAsyncComponent(() => import('./WpPopupDocxEditor.vue')),
 }
 
 // Dialog titles
@@ -42,11 +41,9 @@ const POPUP_TITLES: Record<string, string> = {
   'A1-12': '重大事项决定程序的履行情况核查表',
   'A1-17': '对应数据程序表',
   'A1-18': '采用新金融工具准则衔接影响数核对',
-  'A8-1': '管理层关于审计报告日后公布其他信息的书面声明',
-  'A8-2': '其他信息比对记录',
-  'A10-1': '与治理层沟通函',
-  'A11-1': '期后事项问询函',
-  'A12-1': '法律事务确认函及律师回复函',
+  ...Object.fromEntries(
+    Object.entries(DOCX_POPUP_CONFIGS).map(([code, cfg]) => [code, cfg.title]),
+  ),
 }
 
 // Dialog widths
@@ -55,12 +52,9 @@ const POPUP_WIDTHS: Record<string, string> = {
   'A1-12': '700px',
   'A1-17': '600px',
   'A1-18': '80vw',
-  'A8-1': '75vw',
-  'A8-2': '75vw',
-  'A10-1': '75vw',
-  'A11-1': '75vw',
-  'A12-1': '75vw',
 }
+
+const DOCX_DEFAULT_WIDTH = '75vw'
 
 const dialogVisible = computed({
   get: () => props.visible,
@@ -68,8 +62,17 @@ const dialogVisible = computed({
 })
 
 const title = computed(() => POPUP_TITLES[props.wpCode] || props.wpCode)
-const width = computed(() => POPUP_WIDTHS[props.wpCode] || '600px')
-const component = computed(() => POPUP_COMPONENTS[props.wpCode] || null)
+const width = computed(() => {
+  if (POPUP_WIDTHS[props.wpCode]) return POPUP_WIDTHS[props.wpCode]
+  if (DOCX_POPUP_WP_CODES.has(props.wpCode)) return DOCX_DEFAULT_WIDTH
+  return '600px'
+})
+
+const component = computed(() => {
+  if (POPUP_COMPONENTS[props.wpCode]) return POPUP_COMPONENTS[props.wpCode]
+  if (DOCX_POPUP_WP_CODES.has(props.wpCode)) return WpPopupDocxEditor
+  return null
+})
 
 function handleSave() {
   emit('save')
@@ -104,3 +107,11 @@ function handleClose() {
     </div>
   </el-dialog>
 </template>
+
+<style scoped>
+.popup-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--el-text-color-secondary);
+}
+</style>

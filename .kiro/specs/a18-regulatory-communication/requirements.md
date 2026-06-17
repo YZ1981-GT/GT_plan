@@ -2,57 +2,98 @@
 
 ## 背景
 
-A18-1（向监管部门报送审计小结的函）和 A18-2（与监管层沟通函）是审计完成阶段向证监会/银监会等监管机构提交的正式文件。
+A18-1（向监管部门报送审计小结的函）和 A18-2（与监管层沟通函）是审计完成阶段向证监会/银保监等监管机构提交的正式文件。
 
-- A18-1 是纯信函格式（审计小结摘要），走 WpPopupDocxEditor 弹窗模式（预填充+OnlyOffice 编辑）
-- A18-2 是结构化 4 议题沟通函，需要专用组件（结构化表单 + Word 导出）
+| 底稿 | 格式 | 模式 |
+|------|------|------|
+| A18 程序表 | xlsx | a-program-console（**须新建** JSON 条目） |
+| A18-1 审计小结函 | docx | WpPopupDocxEditor 弹窗 |
+| A18-2 与监管层沟通函 | docx | 结构化 HTML `regulatory-letter` + export-word |
 
-## 模板颜色语义规则（致同通用）
+**相关 spec**：
 
-- **红色文字** = 需根据项目具体情况修改/选择的内容（如机构名、年度、二选一描述）
-- **蓝色文字** = 编制提示/占位符，正式文件中**必须删除**（如【请描述具体内容。】）
-- **黑色文字** = 固定正文，保留
-- **注释表格**（模板末尾 1x1 表格）= 编制参考，导出时**删除**
+- [completion-phase-infra](../completion-phase-infra/requirements.md) — PRE-1~3、PRE-2、issue_tickets
+- [linkage.md](../completion-phase-infra/linkage.md) — A8/A17 联动、全局排期
+
+## 前置依赖
+
+> **权威定义**：[completion-phase-infra](../completion-phase-infra/requirements.md)
+
+| 依赖 | 阻塞范围 |
+|------|----------|
+| PRE-1/3 | A18-1 弹窗下载 |
+| PRE-2 | A18-P1（= **core**）Word 导出 |
+| A17-core | A18-P2（= **plus**）A18-1 审计小结生成 |
+
+## 分期对照
+
+| 本 spec | 等价 | 范围 | DoD |
+|---------|------|------|-----|
+| **A18-P0** | **lite** | 程序表 + A18-2 表单 + 保存 | 填 4 议题→刷新不丢；A18-1 弹窗下载 |
+| **A18-P1** | **core** | Word 导出 + issue/A8 提示 | 导出无 XX；不适用议题已删 |
+| **A18-P2** | **plus** | A18-1 小结生成 + E2E | blocked by A17-core |
+
+## 适用条件
+
+- 程序表 `applicable_categories: ["A", "B"]`（与 [infra 统一口径](../completion-phase-infra/requirements.md#适用性统一口径) 一致）
+- ⚠️ 不用 `template_type == 'listed'`
+
+## 模板颜色语义
+
+与 [infra PRE-2](../completion-phase-infra/requirements.md#pre-2docx_template_fillerpyword-导出引擎) 一致。
+
+---
 
 ## 需求
 
-### A18-1 向监管部门报送审计小结的函（弹窗模式）
-- 加入 WpPopupDocxEditor 配置（使用说明 + 预填充下载）
+### A18 程序表（当前缺失，须新建）
+
+- 在 `procedure_table_templates.json` 新增 **A18** 条目
+- 步骤示例：编制监管沟通函 → `ref_index: A18-1,A18-2`
+- 步骤级 `applicable_categories: ["A", "B"]`
+
+### A18-1 — 弹窗模式
+
+- 配置已在 `wpPopupDocxConfigs.ts`（PRE-1 后验证）
 - 自动填充：公司名、审计年度、监管局名称、合伙人姓名
-- 适用条件：仅上市公司/发债企业（business_category A/B）
-- 未来增强（P2）：附带"审计小结"结构化生成（从 A17 重大事项+审计意见+关键审计事项提取）
+- **P2/plus 增强**：从 A17-1 章节 + 审计意见 + KAM 生成审计小结框架（**blocked A17-core**）
 
-### A18-2 与监管层沟通函（结构化表单）
-- 4 个结构化议题卡片：
-  1. **舞弊**：描述 + 引用关联底稿（GtIndexChip 输入框，自动完成+验证存在性）
-  2. **重大违反法律法规行为**：描述 + 引用
-  3. **年度报告中的信息**：含**三选一 radio**（与财务报表存在重大不一致 / 存在对事实的重大错报 / 两者皆有）+ 描述
-  4. **其他事项**（蓝色标题=可选议题）：描述
-- 每个议题：是否适用（Y/N）+ 纯文本描述（支持换行）+ 引用关联底稿（GtIndexChip 输入框）
-- **提示栏**（折叠面板，每议题顶部）：显示该议题的编制说明/准则引用——不导出
-- 不适用的议题导出时**整段删除**（标题+说明+占位符）
-- 信函表头自动填充（监管机构名称、公司名、年度）
-- 底部签名区（事务所 + 合伙人自动带入 + 日期）
+### A18-2 — 结构化表单
 
-### Word 导出规则
-- 调用通用引擎 `docx_template_filler.py`（与 A17 共享，颜色语义处理统一）
-- 按颜色语义处理：
-  - 蓝色段落：用户填了内容→替换为用户输入；未填→整段删除
-  - 红色段落：保留但替换占位符（XX/201X→实际值）
-  - 注释表格（Table0/Table1）：导出时一律删除
-- 导出前"未完成项"检测：扫描仍含 XX/201X 的段落→弹窗警告用户
-- 导出端点：`GET /projects/{pid}/working-papers/{wp_id}/export-word`（通用命名，未来其他底稿复用）
+- componentType = `regulatory-letter`
+- 4 议题卡片：舞弊 / 重大违法 / 年报信息（三选一 radio）/ 其他
+- 提示栏（折叠，不导出）；与 A17-1 共用「结构化函件编辑」抽象（见 A17 design）
+- 数据：`checklist_responses`（item_id 见 [persistence.md](../completion-phase-infra/persistence.md)）
 
-### 适用条件
-- A18 程序表加 `applicable_categories: ["A", "B"]`
-- 非 A/B 类项目自动标为"不适用"，可手动改回适用
+### Word 导出
+
+- 调用 PRE-2 + `regulatory_letter_service.py`
+- 端点：`.../export-word` + `.../export-word/check-incomplete`（见 infra）
 
 ### 联动
-- P0 阶段：手动引用（用户选择关联底稿/错报）
-- P1 阶段：自动取数（舞弊/违规从 issue_tickets 统计，信息不一致从 A8 状态取）
+
+| 阶段 | 方式 | 详情 |
+|------|------|------|
+| P0/lite | 手动 GtIndexChip | — |
+| P1/core | issue_hints + A8 step status 建议 | [linkage.md](../completion-phase-infra/linkage.md) |
+| P2/plus | A18-1 ← A17-1 | blocked A17-core |
+
+issue_tickets：**禁止** `category='fraud'`（见 infra）。
 
 ## 关联模块
-- A13 错报汇总（舞弊线索来源）
-- A14 内控缺陷（舞弊/重大违规来源）
-- A8 其他信息（信息不一致来源）
-- A17 重大事项概要（审计小结来源）
+
+- A13 / A14（舞弊线索，手动引用）
+- A8 其他信息（议题 3 建议值）
+- A17 重大事项概要（A18-1 P2 来源）
+
+---
+
+## 现状与差距
+
+| 能力 | 目标 | 代码现状 | 分期 |
+|------|------|----------|------|
+| A18 程序表 JSON | 2+ 步 | ❌ 无条目 | P0/lite |
+| A18-1 弹窗 | prefilled-download | ⚠️ 配置有 | P0/lite |
+| GtRegulatoryLetter | regulatory-letter | ❌ | P0/lite |
+| export-word | PRE-2 | ❌ | P1/core |
+| A18-1 小结生成 | A17 章节 | ❌ | P2/plus |

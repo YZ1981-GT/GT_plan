@@ -1,26 +1,51 @@
 # Implementation Plan
 
-## P0: A18-1 弹窗 + A18-2 结构化表单基础
+> **分期**：P0(lite) → P1(core) → P2(plus)  
+> **计数**：P0 8 + P1 4 + P2 2 = **14 任务**（PRE/PRE-2 仅在 infra 勾选）
 
-- [ ] 1. A18-1 加入 WpPopupDocxEditor 配置（DOCX_CONFIGS + INLINE_POPUP_WP_CODES + WpInlinePopup）
-- [ ] 2. A18 程序表加 `applicable_categories: ["A", "B"]`（procedure_table_templates.json）
-- [ ] 3. `GtRegulatoryLetter.vue` 组件骨架（三段式布局：表头+议题区+签名区）
-- [ ] 4. 4 议题卡片静态渲染（标题+说明文字+折叠）
-- [ ] 5. 议题交互：适用性 Y/N toggle + 描述 textarea + 议题 3 三选一 radio
-- [ ] 6. 自动保存（debounce 2s → PUT checklist_responses，item_id A18-2-001~004 + header）
-- [ ] 7. htmlRendererRegistry 注册 `regulatory-letter` + `_WP_CODE_OVERRIDE` 加 A18-2
-- [ ] 8. 表头自动填充（监管机构输入/下拉 + 公司名/年度/合伙人从项目信息自动取）
+---
 
-## P1: Word 导出 + 提示栏 + 颜色语义处理
+## 前置
 
-- [ ] 9. 各议题提示栏（折叠面板，展示编制说明/准则引用，不导出）
-- [ ] 10. `docx_template_filler.py` 通用 Word 导出引擎（与 A17 共享：颜色语义+占位符+注释删除+未完成检测）
-- [ ] 11. 不适用议题整段删除（标题到下一标题之间）+ 蓝色占位符替换/删除 + 注释表格删除
-- [ ] 12. "未完成项"检测端点 `GET /working-papers/{wp_id}/export-word/check-incomplete`
-- [ ] 13. 前端导出按钮（`GET /working-papers/{wp_id}/export-word`）+ 未完成项弹窗警告
-- [ ] 14. 自动联动取数：舞弊/违规从 issue_tickets + 信息不一致从 A8 状态
+> [completion-phase-infra/tasks.md](../completion-phase-infra/tasks.md)
 
-## P2: 增强 + 集成验证
+---
 
-- [ ] 15. A18-1 审计小结结构化生成（从 A17 重大事项+审计意见提取框架）
-- [ ] 16. Playwright E2E（打开 A18-2 → 填写 4 议题 → 导出 → 验证 Word 内容正确）
+## A18-P0 / lite（8 任务）
+
+- [ ] 1. 新建 A18 程序表 JSON（2+ 步 + ref_index A18-1/2）
+- [ ] 2. A18-1 弹窗 E2E（**E13**；PRE-1/3）
+- [ ] 3. `GtRegulatoryLetter.vue` 骨架
+- [ ] 4. 4 议题 + 提示栏（`a18_topic_definitions.json`）
+- [ ] 5. Y/N + textarea + 议题3 radio + GtIndexChip
+- [ ] 6. debounce 保存（item_id 见 [persistence.md](../completion-phase-infra/persistence.md)）
+- [ ] 7. htmlRendererRegistry + `_WP_CODE_OVERRIDE` A18-2
+- [ ] 8. 表头自动填充
+
+**DoD**：E13 + A18-2 填议题1刷新不丢。
+
+---
+
+## A18-P1 / core（4 任务）
+
+- [ ] 9. `regulatory_letter_service.py` 编排（依赖 infra **PRE-2**）
+- [ ] 10. export-word + check-incomplete 端点（infra PRE-2-E2E）
+- [ ] 11. 前端导出 + 未完成警告（**E14**）
+- [ ] 12. issue_hints + A8 step 建议（INFRA-1 + A7–A15 lite A8）
+
+**DoD**：E14 通过。
+
+---
+
+## A18-P2 / plus（2 任务）
+
+- [ ] 13. A18-1 审计小结生成 — **blocked A17-core**（**E18**）
+- [ ] 14. Playwright regression：E13 + E14
+
+> [e2e-matrix.md](../completion-phase-infra/e2e-matrix.md)
+
+---
+
+## 实施顺序
+
+[linkage.md §全局实施顺序](../completion-phase-infra/linkage.md#全局实施顺序)

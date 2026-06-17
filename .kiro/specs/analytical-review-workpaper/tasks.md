@@ -67,6 +67,7 @@
   - 数据来源标注
   - 按 project.is_listed 条件显示
   - _Requirements: 4.1~4.5_
+  - **现状（2026-06-17 实证）**：仅有空结构骨架（`build_industry_comparison` 返回全 null 网格），前端只读展示、无可编辑/保存/持久化；未接 `project.is_listed`（误用 `template_type=='listed'`）；5 家可比公司 A~E 列未实现
 
 - [ ] 9. EPS-ROE 计算表
   - 净资产收益率（全面摊薄/加权平均）
@@ -75,6 +76,7 @@
   - 公式内置，用户填参数自动计算
   - 按 project.is_listed 条件显示
   - _Requirements: 5.1~5.6_
+  - **现状（2026-06-17 实证）**：仅从报表预填 4 个字段 + 后端一次性算 4 个结果；无用户编辑、无股本变动明细 S1~Sk、无 CAS34 加权公式、无保存端点
 
 ## P2: 联动增强（预留）
 
@@ -83,3 +85,4 @@
   - 按 row_code → account_codes → wp_code 映射
   - 待各科目底稿修订完成后实现
   - _Requirements: 2.1, 2.2_
+  - **现状**：`get_audit_explanation_for_row` 仍硬返回 None，行数据 reason 恒为 null

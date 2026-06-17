@@ -1,43 +1,80 @@
 # Implementation Plan
 
-## P0: 快速配置 + 组件骨架
+> **分期**：audit → lite → core → plus  
+> **计数**：audit 6 + lite 4 + core 6 + plus 7 + E2E 2 = **25 任务**（实现型 PRE 仅在 infra 勾选）
 
-- [ ] 1. A17-3/3-1/4/6 加入 WpPopupDocxEditor 弹窗配置（DOCX_CONFIGS + INLINE_POPUP_WP_CODES）
-- [ ] 2. A17-7/7A 确认 `_WP_CODE_OVERRIDE` 映射到 `independence-signing`
-- [ ] 3. A17-5-1~5-5 加入 `_WP_CODE_OVERRIDE` → `checklist-table` + xlsx→checklist 数据解析器
-- [ ] 4. A17 程序表加 `applicable_categories: ["A"]` + 步骤扩充（从 xlsx 模板提取）
-- [ ] 5. `backend/data/a17_chapter_definitions.json`（11 章节 id/标题/提示文字/数据来源/是否必填）
-- [ ] 6. `GtA17Summary.vue` 组件骨架（左侧目录 + 右侧章节区：提示栏折叠+正文 textarea+工具按钮）
-- [ ] 7. 章节数据保存（debounce → PUT checklist_responses, item_id A17-1-ch01~ch11）
-- [ ] 8. htmlRendererRegistry 注册 `a17-summary` + `_WP_CODE_OVERRIDE` 加 A17-1
+---
 
-## P1: 章节取数 + KAM 组件 + 表格渲染
+## audit-xlsx：A17 xlsx 深读（6 任务，与 lite 并行）
 
-- [ ] 9. `a17_summary_service.py`：章节数据聚合（从项目信息/A15/A10/issue_tickets 等取数）
-- [ ] 10. 各章节"从关联模块拉取"按钮（调 summary_service 填充该章节）
-- [ ] 11. 章节内嵌表格渲染（el-table 只读展示从关联模块拉取的结构化数据）
-- [ ] 12. 简单章节格式化输出（约定范围/独立性等不需 RAG 的章节，直接模板化生成）
-- [ ] 13. `GtKamWorkpaper.vue` 组件（KAM 列表 + 3 要素编辑 + 引用底稿 + 提示栏）
-- [ ] 14. htmlRendererRegistry 注册 `kam-workpaper` + `_WP_CODE_OVERRIDE` 加 A17-2-1
-- [ ] 15. KAM 数据存储（checklist_responses, item_id KAM-001~NNN, remark=JSON）
+> 产出 `backend/data/a17_xlsx_audit.json`；与 infra **PRE-4-0** 同一 DoD。
 
-## P2: LLM 辅助 + 独立性增强
+- [ ] **X-A17** A17 重大事项概要程序表.xlsx
+- [ ] **X-A17-5-1** A17-5-1 审计工作完成核对表（财报审计）.xlsx
+- [ ] **X-A17-5-2** A17-5-2（内控审计）.xlsx
+- [ ] **X-A17-5-3** A17-5-3（IPO 特别程序）.xlsx
+- [ ] **X-A17-5-4** A17-5-4（新三板特别程序）.xlsx
+- [ ] **X-A17-5-5** A17-5-5（函证程序）.xlsx
 
-- [ ] 16. `a17_llm_service.py`（章节生成 + KAM 描述生成）
-- [ ] 17. Prompt 模板文件 `backend/data/wp_llm_prompts/a17/`（章节通用 + KAM 专用）
-- [ ] 18. 知识库 RAG 检索（同行业 KAM 案例 + 概要范例）
-- [ ] 19. 前端"AI 生成"按钮 + 生成结果预览弹窗（用户编辑后采纳）
-- [ ] 20. A17-7 独立性增强：逐条确认弹窗（利益冲突/近亲属/证券等）+ B3 联动预警
+**DoD**：audit JSON 写入；procedure_table A17 步数可与 xlsx diff。
 
-## P3: Word 导出 + 审计报告联动
+---
 
-- [ ] 21. `docx_template_filler.py` 通用 Word 导出引擎（颜色语义+占位符替换+注释删除+未完成检测）
-- [ ] 22. A17-1 Word 导出（章节组装，调用通用引擎）
-- [ ] 23. A17-2-1 KAM Word 导出（动态 KAM 表格行 + 蓝色删除）
-- [ ] 24. KAM → 审计报告正文"关键审计事项"段落单向同步（底稿为权威源→push 到报告）
-- [ ] 25. 完整性检查：导出前检测未填章节/未完成 KAM → 弹窗警告
+## 前置
 
-## P4: 集成验证
+> PRE / PRE-4 实现：[completion-phase-infra/tasks.md](../completion-phase-infra/tasks.md)（PRE-4-0~2、PRE-2、PRE-3）。
 
-- [ ] 26. Playwright E2E（A17-1 章节编辑 + 拉取 + AI 生成 + 导出）
-- [ ] 27. Playwright E2E（A17-2-1 KAM 新增 + 编辑 + 同步报告 + 导出）
+---
+
+## A17-lite：弹窗 + A17-5 核对表（4 任务）
+
+- [ ] 1. A17 程序表扩充步骤 + `applicable_categories: ["A"]`（依赖 X-A17）
+- [ ] 2. 程序表 chip 适用性联动（灰显 + preventNavigate）
+- [ ] 3. A17-3/3-1/4/6 弹窗 E2E（**E10**；依赖 PRE-1/3）
+- [ ] 4. A17-5-1 路由验收：PRE-4-1 完成后 `_WP_CODE_OVERRIDE` + 填 1 条（**E11**）；PRE-4-2 完成后 5-2~5-5 版本选择
+
+**lite DoD**：E10 + E11 通过。
+
+---
+
+## A17-core：A17-1 章节 + 导出（6 任务）
+
+- [ ] 5. `a17_chapter_definitions.json`（11 章）
+- [ ] 6. `GtA17Summary.vue`（目录+提示栏+textarea；无 AI）
+- [ ] 7. 章节 debounce 保存（item_id 见 [persistence.md](../completion-phase-infra/persistence.md)）
+- [ ] 8. htmlRendererRegistry + `_WP_CODE_OVERRIDE` A17-1
+- [ ] 9. `a17_summary_service.py` + 「拉取」按钮（就绪表 requirements §4）
+- [ ] 10. `a17_word_exporter.py` 编排（依赖 infra **PRE-2**）+ 完整性检查
+
+**core DoD**：**E12** — 写 ch01 → export → 无蓝【】/XX。
+
+---
+
+## A17-plus：KAM + LLM + 报告（7 任务）
+
+- [ ] 11. `GtKamWorkpaper.vue` + KAM JSON schema
+- [ ] 12. A17-2-1 Word 导出（PRE-2）
+- [ ] 13. KAM → 报告单向 push（**E17**）
+- [ ] 14. `a17_llm_service.py` + prompts
+- [ ] 15. RAG + AI 预览弹窗
+- [ ] 16. issue_hints 消费（infra **INFRA-1**）
+- [ ] 17. A17-5 business_category 自动选版（PRE-4-2 后）
+
+---
+
+## 集成验证
+
+- [ ] 18. Playwright **E10 + E11**（lite）
+- [ ] 19. Playwright **E12**（core）
+
+> 全量矩阵：[e2e-matrix.md](../completion-phase-infra/e2e-matrix.md)
+
+---
+
+## 移出本 spec
+
+| 项 | 处置 |
+|----|------|
+| checklist_xlsx_parser 实现 | infra PRE-4-x |
+| docx_template_filler | infra PRE-2 |
+| A17-7 增强 | 独立 spec（可选） |

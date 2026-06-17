@@ -72,15 +72,43 @@ interface AnalyticalReviewData {
   scope: 'standalone' | 'consolidated'
   year: number
   materiality: number
+  is_listed?: boolean
   sheets: {
     bs_horizontal: SheetData
     bs_vertical: SheetData
     is_horizontal: SheetData
     is_vertical: SheetData
     ratio_analysis: RatioAnalysisData | null
-    industry_comparison: any | null
-    eps_roe: any | null
+    industry_comparison: IndustryComparisonData | null
+    eps_roe: EpsRoeData | null
   }
+}
+
+interface IndustryComparisonData {
+  title: string
+  index: string
+  years: number[]
+  companies: Array<{ key: string; name: string; stock_code: string }>
+  financial_data: Record<string, Record<string, Record<string, number | null>>>
+  comparison_table: Record<string, Record<string, Record<string, number | null>>>
+  financial_metric_labels: Record<string, string>
+  comparison_metric_labels: Record<string, string>
+  data_source_note: string
+}
+
+interface EpsRoeData {
+  title: string
+  index: string
+  year: number
+  inputs: Record<string, number | null>
+  share_changes: Array<{ id: string; label: string; shares: number | null; months: number; weight: number }>
+  computed: {
+    roe_diluted: number | null
+    roe_weighted: number | null
+    basic_eps: number | null
+    diluted_eps: number | null
+  }
+  notes: string[]
 }
 
 // ─── Props / Emits ───
@@ -126,13 +154,12 @@ const availableTabs = computed<TabDef[]>(() => {
   if (data.value?.sheets?.ratio_analysis) {
     tabs.push({ key: 'ratio_analysis', label: '比率分析', sheetKey: 'ratio_analysis' })
   }
-  // P1: industry_comparison / eps_roe — 条件显示，当前隐藏
-  // if (data.value?.sheets?.industry_comparison) {
-  //   tabs.push({ key: 'industry_comparison', label: '同行业对比', sheetKey: 'industry_comparison' })
-  // }
-  // if (data.value?.sheets?.eps_roe) {
-  //   tabs.push({ key: 'eps_roe', label: 'EPS/ROE', sheetKey: 'eps_roe' })
-  // }
+  if (data.value?.sheets?.industry_comparison) {
+    tabs.push({ key: 'industry_comparison', label: '同行业对比', sheetKey: 'industry_comparison' })
+  }
+  if (data.value?.sheets?.eps_roe) {
+    tabs.push({ key: 'eps_roe', label: 'EPS/ROE', sheetKey: 'eps_roe' })
+  }
   return tabs
 })
 
@@ -147,6 +174,16 @@ const currentSheet = computed<SheetData | null>(() => {
 const currentRatio = computed<RatioAnalysisData | null>(() => {
   if (activeTab.value !== 'ratio_analysis') return null
   return data.value?.sheets?.ratio_analysis ?? null
+})
+
+const currentIndustry = computed<IndustryComparisonData | null>(() => {
+  if (activeTab.value !== 'industry_comparison') return null
+  return data.value?.sheets?.industry_comparison ?? null
+})
+
+const currentEpsRoe = computed<EpsRoeData | null>(() => {
+  if (activeTab.value !== 'eps_roe') return null
+  return data.value?.sheets?.eps_roe ?? null
 })
 
 const isHorizontal = computed(() =>
@@ -447,6 +484,141 @@ onBeforeUnmount(() => {
         </div>
       </template>
 
+      <!-- 同行业对比（A1-14 上市公司专用） -->
+      <template v-if="activeTab === 'industry_comparison' && currentIndustry">
+        <div class="gt-analytical-review__sheet-title">
+          {{ currentIndustry.title }}
+          <span class="sheet-index">{{ currentIndustry.index }}</span>
+        </div>
+        <div class="gt-analytical-review__table-wrap">
+          <div class="gt-ar-subsection-title">可比公司</div>
+          <table class="gt-ar-table gt-compact-table">
+            <thead>
+              <tr>
+                <th>代号</th>
+                <th>证券简称</th>
+                <th>证券代码</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>本公司</td>
+                <td colspan="2">—</td>
+              </tr>
+              <tr v-for="co in currentIndustry.companies" :key="co.key">
+                <td>{{ co.key }}</td>
+                <td>{{ co.name || '—' }}</td>
+                <td>{{ co.stock_code || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="gt-ar-subsection-title">主要财务数据</div>
+          <table class="gt-ar-table gt-compact-table">
+            <thead>
+              <tr>
+                <th>指标</th>
+                <th v-for="y in currentIndustry.years" :key="y">{{ y }}年</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(label, key) in currentIndustry.financial_metric_labels" :key="key">
+                <td>{{ label }}</td>
+                <td v-for="y in currentIndustry.years" :key="`${key}-${y}`">
+                  {{ formatAmount(currentIndustry.financial_data[key]?.[String(y)]?.self) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="gt-ar-subsection-title">对比分析表</div>
+          <table class="gt-ar-table gt-compact-table">
+            <thead>
+              <tr>
+                <th>指标</th>
+                <th v-for="y in currentIndustry.years" :key="`cmp-${y}`">{{ y }}年（本公司）</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(label, key) in currentIndustry.comparison_metric_labels" :key="`cmp-${key}`">
+                <td>{{ label }}</td>
+                <td v-for="y in currentIndustry.years" :key="`${key}-${y}-cmp`">
+                  {{ formatRatioValue(currentIndustry.comparison_table[key]?.[String(y)]?.self) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p v-if="currentIndustry.data_source_note" class="gt-ar-data-source">
+            数据来源：{{ currentIndustry.data_source_note }}
+          </p>
+        </div>
+      </template>
+
+      <!-- EPS-ROE 计算表（A1-14 上市公司专用） -->
+      <template v-if="activeTab === 'eps_roe' && currentEpsRoe">
+        <div class="gt-analytical-review__sheet-title">
+          {{ currentEpsRoe.title }}
+          <span class="sheet-index">{{ currentEpsRoe.index }}</span>
+        </div>
+        <div class="gt-analytical-review__table-wrap">
+          <table class="gt-ar-table gt-compact-table">
+            <thead>
+              <tr>
+                <th>指标</th>
+                <th>数值</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>归属于普通股股东的净利润</td>
+                <td class="col-amount">{{ formatAmount(currentEpsRoe.inputs.net_profit) }}</td>
+              </tr>
+              <tr>
+                <td>期末净资产</td>
+                <td class="col-amount">{{ formatAmount(currentEpsRoe.inputs.equity_end) }}</td>
+              </tr>
+              <tr>
+                <td>期初净资产</td>
+                <td class="col-amount">{{ formatAmount(currentEpsRoe.inputs.equity_begin) }}</td>
+              </tr>
+              <tr>
+                <td>加权平均普通股股数</td>
+                <td class="col-amount">{{ formatAmount(currentEpsRoe.inputs.weighted_avg_shares) }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="gt-ar-subsection-title">计算结果</div>
+          <table class="gt-ar-table gt-compact-table">
+            <tbody>
+              <tr>
+                <td>净资产收益率（全面摊薄）</td>
+                <td>{{ formatRatioValue(currentEpsRoe.computed.roe_diluted) }}%</td>
+              </tr>
+              <tr>
+                <td>净资产收益率（加权平均）</td>
+                <td>{{ formatRatioValue(currentEpsRoe.computed.roe_weighted) }}%</td>
+              </tr>
+              <tr>
+                <td>基本每股收益</td>
+                <td>{{ formatRatioValue(currentEpsRoe.computed.basic_eps) }}</td>
+              </tr>
+              <tr>
+                <td>稀释每股收益</td>
+                <td>{{ formatRatioValue(currentEpsRoe.computed.diluted_eps) }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div v-if="currentEpsRoe.notes?.length" class="gt-ar-ratio-notes">
+            <div class="gt-ar-ratio-notes__title">注：</div>
+            <div v-for="(note, idx) in currentEpsRoe.notes" :key="idx" class="gt-ar-ratio-notes__item">
+              {{ idx + 1 }}. {{ note }}
+            </div>
+          </div>
+        </div>
+      </template>
+
       <!-- 空状态 -->
       <div v-if="!data" class="gt-analytical-review__empty">
         <p>暂无分析性复核数据</p>
@@ -686,6 +858,17 @@ onBeforeUnmount(() => {
 
 .gt-ar-ratio-notes__item {
   padding: 2px 0;
+}
+
+.gt-ar-subsection-title {
+  font-size: var(--gt-font-size-sm);
+  font-weight: 600;
+  color: var(--gt-color-primary);
+  margin: 16px 0 8px;
+}
+
+.gt-ar-data-source {
+  margin-top: 12px;
 }
 
 /* ─── Empty state ─── */

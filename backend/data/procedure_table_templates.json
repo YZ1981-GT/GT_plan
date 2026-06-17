@@ -5,149 +5,643 @@
     "A1": {
       "name": "财务报告程序表",
       "items": [
-        {"seq": 1, "content": "了解被审计单位及其环境（含内部控制）", "ref_index": "B10~B60", "auto_data_source": null, "applicable_default": "yes", "phase": "planning"},
-        {"seq": 2, "content": "确认重要性水平和可容忍错报", "ref_index": "B30", "auto_data_source": "materiality_set", "applicable_default": "yes", "phase": "planning"},
-        {"seq": 3, "content": "评估重大错报风险并制定总体审计策略", "ref_index": "B40~B50", "auto_data_source": null, "applicable_default": "yes", "phase": "planning"},
-        {"seq": 4, "content": "实施控制测试", "ref_index": "C", "auto_data_source": "control_test_completion", "applicable_default": "yes", "phase": "execution"},
-        {"seq": 5, "content": "实施实质性程序", "ref_index": "D~N", "auto_data_source": "substantive_completion", "applicable_default": "yes", "phase": "execution"},
-        {"seq": 6, "content": "考虑持续经营假设", "ref_index": "A15", "auto_data_source": null, "applicable_default": "yes", "phase": "completion"},
-        {"seq": 7, "content": "考虑期后事项", "ref_index": "A11", "auto_data_source": null, "applicable_default": "yes", "phase": "completion"},
-        {"seq": 8, "content": "考虑律师声明", "ref_index": "A12", "auto_data_source": null, "applicable_default": "yes", "phase": "completion"},
-        {"seq": 9, "content": "获取管理层声明书", "ref_index": "A16", "auto_data_source": null, "applicable_default": "yes", "phase": "completion"},
-        {"seq": 10, "content": "评价错报", "ref_index": "A13", "auto_data_source": "misstatement_evaluation", "applicable_default": "yes", "phase": "completion"},
-        {"seq": 11, "content": "与治理层沟通", "ref_index": "A10", "auto_data_source": null, "applicable_default": "yes", "phase": "completion"},
-        {"seq": 12, "content": "完成分析性复核", "ref_index": "A1-13,A1-14", "auto_data_source": "analytical_review_done", "applicable_default": "yes", "phase": "completion"},
-        {"seq": 13, "content": "对应数据核对", "ref_index": "A1-17", "auto_data_source": null, "applicable_default": "yes", "phase": "completion"},
-        {"seq": 14, "content": "编制审计报告及形成审计意见", "ref_index": "A2-1", "auto_data_source": null, "applicable_default": "yes", "phase": "completion"},
-        {"seq": 15, "content": "项目质量控制复核", "ref_index": "A24,A25", "auto_data_source": "review_progress", "applicable_default": "yes", "applicable_categories": ["A", "B"], "phase": "signoff"},
-        {"seq": 16, "content": "专委会审批", "ref_index": "A26", "auto_data_source": null, "applicable_default": "yes", "applicable_categories": ["A"], "phase": "signoff"},
-        {"seq": 17, "content": "签发审计报告", "ref_index": "A1-11", "auto_data_source": null, "applicable_default": "yes", "phase": "signoff"},
-        {"seq": 18, "content": "归档底稿", "ref_index": "A30", "auto_data_source": "archive_completion", "applicable_default": "yes", "phase": "signoff"}
+        {
+          "seq": 1,
+          "content": "了解被审计单位及其环境（含内部控制）",
+          "ref_index": "B10~B60",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "phase": "planning"
+        },
+        {
+          "seq": 2,
+          "content": "确认重要性水平和可容忍错报",
+          "ref_index": "B30",
+          "auto_data_source": "materiality_set",
+          "applicable_default": "yes",
+          "phase": "planning"
+        },
+        {
+          "seq": 3,
+          "content": "评估重大错报风险并制定总体审计策略",
+          "ref_index": "B40~B50",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "phase": "planning"
+        },
+        {
+          "seq": 4,
+          "content": "实施控制测试",
+          "ref_index": "C",
+          "auto_data_source": "control_test_completion",
+          "applicable_default": "yes",
+          "phase": "execution"
+        },
+        {
+          "seq": 5,
+          "content": "实施实质性程序",
+          "ref_index": "D~N",
+          "auto_data_source": "substantive_completion",
+          "applicable_default": "yes",
+          "phase": "execution"
+        },
+        {
+          "seq": 6,
+          "content": "考虑持续经营假设",
+          "ref_index": "A15",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 7,
+          "content": "考虑期后事项",
+          "ref_index": "A11",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 8,
+          "content": "考虑律师声明",
+          "ref_index": "A12",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 9,
+          "content": "获取管理层声明书",
+          "ref_index": "A16",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 10,
+          "content": "评价错报",
+          "ref_index": "A13",
+          "auto_data_source": "misstatement_evaluation",
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 11,
+          "content": "与治理层沟通",
+          "ref_index": "A10",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 12,
+          "content": "完成分析性复核",
+          "ref_index": "A1-13,A1-14",
+          "auto_data_source": "analytical_review_done",
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 13,
+          "content": "对应数据核对",
+          "ref_index": "A1-17",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 14,
+          "content": "编制审计报告及形成审计意见",
+          "ref_index": "A2-1",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 15,
+          "content": "项目质量控制复核",
+          "ref_index": "A24,A25",
+          "auto_data_source": "review_progress",
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A",
+            "B"
+          ],
+          "phase": "signoff"
+        },
+        {
+          "seq": 16,
+          "content": "专委会审批",
+          "ref_index": "A26",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A"
+          ],
+          "phase": "signoff"
+        },
+        {
+          "seq": 17,
+          "content": "签发审计报告",
+          "ref_index": "A1-11",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "phase": "signoff"
+        },
+        {
+          "seq": 18,
+          "content": "归档底稿",
+          "ref_index": "A30",
+          "auto_data_source": "archive_completion",
+          "applicable_default": "yes",
+          "phase": "signoff"
+        }
       ]
     },
     "A2": {
       "name": "调整分录程序表",
       "items": [
-        {"seq": 1, "content": "编制审计调整分录(AJE)汇总", "ref_index": "A2-2", "auto_data_source": "adjustment_count_aje", "applicable_default": "yes", "phase": "completion"},
-        {"seq": 2, "content": "编制重分类调整分录(RJE)汇总", "ref_index": "A2-3", "auto_data_source": "adjustment_count_rje", "applicable_default": "yes", "phase": "completion"},
-        {"seq": 3, "content": "编制合并调整分录", "ref_index": "A3-7", "auto_data_source": "adjustment_count_consol", "applicable_default": "yes", "phase": "completion"},
-        {"seq": 4, "content": "汇总未更正错报(Passed)", "ref_index": "A13", "auto_data_source": "adjustment_count_passed", "applicable_default": "yes", "phase": "completion"},
-        {"seq": 5, "content": "验证调整分录综合作用(试算平衡)", "ref_index": "A2-1", "auto_data_source": "trial_balance_check", "applicable_default": "yes", "phase": "completion"}
+        {
+          "seq": 1,
+          "content": "编制审计调整分录(AJE)汇总",
+          "ref_index": "A2-2",
+          "auto_data_source": "adjustment_count_aje",
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 2,
+          "content": "编制重分类调整分录(RJE)汇总",
+          "ref_index": "A2-3",
+          "auto_data_source": "adjustment_count_rje",
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 3,
+          "content": "编制合并调整分录",
+          "ref_index": "A3-7",
+          "auto_data_source": "adjustment_count_consol",
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 4,
+          "content": "汇总未更正错报(Passed)",
+          "ref_index": "A13",
+          "auto_data_source": "adjustment_count_passed",
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 5,
+          "content": "验证调整分录综合作用(试算平衡)",
+          "ref_index": "A2-1",
+          "auto_data_source": "trial_balance_check",
+          "applicable_default": "yes",
+          "phase": "completion"
+        }
       ]
     },
     "A3": {
       "name": "合并流程程序表",
       "applicable_when": "consolidated",
       "items": [
-        {"seq": 1, "content": "确定合并范围", "ref_index": "route:/consolidation?tab=scope", "auto_data_source": "consol_scope_status", "applicable_default": "yes", "phase": "completion"},
-        {"seq": 2, "content": "编制合并抵销分录", "ref_index": "route:/consolidation?tab=eliminations", "auto_data_source": "consol_elimination_count", "applicable_default": "yes", "phase": "completion"},
-        {"seq": 3, "content": "核对内部往来", "ref_index": "route:/consolidation?tab=internal-trade", "auto_data_source": "consol_internal_trade_status", "applicable_default": "yes", "phase": "completion"},
-        {"seq": 4, "content": "验证合并报表试算", "ref_index": "route:/consolidation?tab=trial", "auto_data_source": "consol_trial_balance_check", "applicable_default": "yes", "phase": "completion"},
-        {"seq": 5, "content": "合并附注汇总", "ref_index": "route:/consolidation?tab=notes", "auto_data_source": null, "applicable_default": "yes", "phase": "completion"}
+        {
+          "seq": 1,
+          "content": "确定合并范围",
+          "ref_index": "route:/consolidation?tab=scope",
+          "auto_data_source": "consol_scope_status",
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 2,
+          "content": "编制合并抵销分录",
+          "ref_index": "route:/consolidation?tab=eliminations",
+          "auto_data_source": "consol_elimination_count",
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 3,
+          "content": "核对内部往来",
+          "ref_index": "route:/consolidation?tab=internal-trade",
+          "auto_data_source": "consol_internal_trade_status",
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 4,
+          "content": "验证合并报表试算",
+          "ref_index": "route:/consolidation?tab=trial",
+          "auto_data_source": "consol_trial_balance_check",
+          "applicable_default": "yes",
+          "phase": "completion"
+        },
+        {
+          "seq": 5,
+          "content": "合并附注汇总",
+          "ref_index": "route:/consolidation?tab=notes",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "phase": "completion"
+        }
       ]
     },
     "A4": {
       "name": "经营分部程序表",
       "items": [
-        {"seq": 1, "content": "了解分部划分标准", "ref_index": "A4-1", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 2, "content": "核对分部信息列报", "ref_index": "A4-1", "auto_data_source": null, "applicable_default": "yes"}
+        {
+          "seq": 1,
+          "content": "了解分部划分标准",
+          "ref_index": "A4-1",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "核对分部信息列报",
+          "ref_index": "A4-1",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        }
       ]
     },
     "A5": {
       "name": "财务报表支持程序表",
       "items": [
-        {"seq": 1, "content": "审核现金流量表", "ref_index": "A5-1", "auto_data_source": "cf_verification_status", "applicable_default": "yes"},
-        {"seq": 2, "content": "审核承诺事项", "ref_index": "A5-2", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 3, "content": "审核或有事项", "ref_index": "A5-3", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 4, "content": "持续经营净利润与终止经营净利润", "ref_index": "A5-4", "auto_data_source": null, "applicable_default": "yes"}
+        {
+          "seq": 1,
+          "content": "审核现金流量表",
+          "ref_index": "A5-1",
+          "auto_data_source": "cf_verification_status",
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "审核承诺事项",
+          "ref_index": "A5-2",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 3,
+          "content": "审核或有事项",
+          "ref_index": "A5-3",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 4,
+          "content": "持续经营净利润与终止经营净利润",
+          "ref_index": "A5-4",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        }
       ]
     },
     "A6": {
       "name": "组成部分会计师报告程序表",
       "items": [
-        {"seq": 1, "content": "确定组成部分", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 2, "content": "下发集团审计工作指引", "ref_index": "A6-1", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 3, "content": "接收组成部分审计报告包", "ref_index": "A6-1", "auto_data_source": null, "applicable_default": "yes"}
+        {
+          "seq": 1,
+          "content": "确定组成部分",
+          "ref_index": "",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "下发集团审计工作指引",
+          "ref_index": "A6-1",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 3,
+          "content": "接收组成部分审计报告包",
+          "ref_index": "A6-1",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        }
       ]
     },
     "A7": {
       "name": "关联交易程序表",
       "items": [
-        {"seq": 1, "content": "汇总发生在本年度的关联方交易", "ref_index": "A7-1", "auto_data_source": "related_party_transaction_count", "applicable_default": "yes"},
-        {"seq": 2, "content": "超出公司正常经营的关联交易检查", "ref_index": "A7-1", "auto_data_source": null, "applicable_default": "yes", "sub_items": [
-          {"seq": "2.1", "content": "询问管理层关于交易的目的"},
-          {"seq": "2.2", "content": "检查原始凭证或协议并评估交易是否涉及舞弊/条款一致/会计处理恰当"},
-          {"seq": "2.3", "content": "确定交易是否经适当人员批准"}
-        ]},
-        {"seq": 3, "content": "确定是否存在未披露的关联方关系或交易", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
-          {"seq": "3.1", "content": "获取并检查重大异常交易对手背景信息（股东、高管、业务规模等）"},
-          {"seq": "3.2", "content": "检查银行对账单中与疑似关联方的大额资金往来"},
-          {"seq": "3.3", "content": "检查与实际控制人或控股股东的大额资金往来"},
-          {"seq": "3.4", "content": "对重大或异常客户与供应商进行背景调查"},
-          {"seq": "3.5", "content": "检查银行对账单和大额资金往来的商业背景"},
-          {"seq": "3.6", "content": "分析异常交易的商业理由、价格公允性及潜在关联方关系"},
-          {"seq": "3.7", "content": "向重要股东和关键管理人员函证确认关联方关系"},
-          {"seq": "3.8", "content": "检查第三方担保是否存在未披露的反担保"}
-        ]},
-        {"seq": 4, "content": "执行程序确定是否存在未识别的关联方及交易", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
-          {"seq": "4.1", "content": "调查访谈实际控制人投资、借贷等情况，取得相关承诺书"},
-          {"seq": "4.2", "content": "取得董监高和重要交易对手的利益冲突专项声明"},
-          {"seq": "4.3", "content": "比对员工花名册与合同签订人/经办人"},
-          {"seq": "4.4", "content": "运用数据分析工具识别异常交易模式"}
-        ]},
-        {"seq": 5, "content": "对审计中新识别的未披露关联方或交易的后续程序", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
-          {"seq": "5.1", "content": "与管理层讨论确定是否所有交易已识别"},
-          {"seq": "5.2", "content": "评价监控关联方的公司层次控制设计有效性"},
-          {"seq": "5.3", "content": "确定关联交易风险应对是否已恰当应对"},
-          {"seq": "5.4", "content": "考虑缺少披露是否有意为之，通知合伙人评估审计内涵"}
-        ]},
-        {"seq": 6, "content": "关联方交易的披露审核", "ref_index": "A7-2", "auto_data_source": "related_party_disclosure_check", "applicable_default": "yes", "sub_items": [
-          {"seq": "6.1", "content": "对财务报表草稿中的披露与汇总进行比较"},
-          {"seq": "6.2", "content": "识别未披露的交易"},
-          {"seq": "6.3", "content": "确定未披露交易的判断是否适当"},
-          {"seq": "6.4", "content": "复核关联方关系及交易是否公允反映"},
-          {"seq": "6.5", "content": "评价披露的透明度"}
-        ]},
-        {"seq": 7, "content": "无法确定关联方关系或交易时的后续处理", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
-          {"seq": "7.1", "content": "考虑是否与公司治理层及时沟通"},
-          {"seq": "7.2", "content": "考虑征询法律意见"},
-          {"seq": "7.3", "content": "确定是否向监管机构报告重大舞弊"},
-          {"seq": "7.4", "content": "考虑对审计意见的影响"}
-        ]}
+        {
+          "seq": 1,
+          "content": "汇总发生在本年度的关联方交易",
+          "ref_index": "A7-1",
+          "auto_data_source": "related_party_transaction_count",
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "超出公司正常经营的关联交易检查",
+          "ref_index": "A7-1",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "2.1",
+              "content": "询问管理层关于交易的目的"
+            },
+            {
+              "seq": "2.2",
+              "content": "检查原始凭证或协议并评估交易是否涉及舞弊/条款一致/会计处理恰当"
+            },
+            {
+              "seq": "2.3",
+              "content": "确定交易是否经适当人员批准"
+            }
+          ]
+        },
+        {
+          "seq": 3,
+          "content": "确定是否存在未披露的关联方关系或交易",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "3.1",
+              "content": "获取并检查重大异常交易对手背景信息（股东、高管、业务规模等）"
+            },
+            {
+              "seq": "3.2",
+              "content": "检查银行对账单中与疑似关联方的大额资金往来"
+            },
+            {
+              "seq": "3.3",
+              "content": "检查与实际控制人或控股股东的大额资金往来"
+            },
+            {
+              "seq": "3.4",
+              "content": "对重大或异常客户与供应商进行背景调查"
+            },
+            {
+              "seq": "3.5",
+              "content": "检查银行对账单和大额资金往来的商业背景"
+            },
+            {
+              "seq": "3.6",
+              "content": "分析异常交易的商业理由、价格公允性及潜在关联方关系"
+            },
+            {
+              "seq": "3.7",
+              "content": "向重要股东和关键管理人员函证确认关联方关系"
+            },
+            {
+              "seq": "3.8",
+              "content": "检查第三方担保是否存在未披露的反担保"
+            }
+          ]
+        },
+        {
+          "seq": 4,
+          "content": "执行程序确定是否存在未识别的关联方及交易",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "4.1",
+              "content": "调查访谈实际控制人投资、借贷等情况，取得相关承诺书"
+            },
+            {
+              "seq": "4.2",
+              "content": "取得董监高和重要交易对手的利益冲突专项声明"
+            },
+            {
+              "seq": "4.3",
+              "content": "比对员工花名册与合同签订人/经办人"
+            },
+            {
+              "seq": "4.4",
+              "content": "运用数据分析工具识别异常交易模式"
+            }
+          ]
+        },
+        {
+          "seq": 5,
+          "content": "对审计中新识别的未披露关联方或交易的后续程序",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "5.1",
+              "content": "与管理层讨论确定是否所有交易已识别"
+            },
+            {
+              "seq": "5.2",
+              "content": "评价监控关联方的公司层次控制设计有效性"
+            },
+            {
+              "seq": "5.3",
+              "content": "确定关联交易风险应对是否已恰当应对"
+            },
+            {
+              "seq": "5.4",
+              "content": "考虑缺少披露是否有意为之，通知合伙人评估审计内涵"
+            }
+          ]
+        },
+        {
+          "seq": 6,
+          "content": "关联方交易的披露审核",
+          "ref_index": "A7-2",
+          "auto_data_source": "related_party_disclosure_check",
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "6.1",
+              "content": "对财务报表草稿中的披露与汇总进行比较"
+            },
+            {
+              "seq": "6.2",
+              "content": "识别未披露的交易"
+            },
+            {
+              "seq": "6.3",
+              "content": "确定未披露交易的判断是否适当"
+            },
+            {
+              "seq": "6.4",
+              "content": "复核关联方关系及交易是否公允反映"
+            },
+            {
+              "seq": "6.5",
+              "content": "评价披露的透明度"
+            }
+          ]
+        },
+        {
+          "seq": 7,
+          "content": "无法确定关联方关系或交易时的后续处理",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "7.1",
+              "content": "考虑是否与公司治理层及时沟通"
+            },
+            {
+              "seq": "7.2",
+              "content": "考虑征询法律意见"
+            },
+            {
+              "seq": "7.3",
+              "content": "确定是否向监管机构报告重大舞弊"
+            },
+            {
+              "seq": "7.4",
+              "content": "考虑对审计意见的影响"
+            }
+          ]
+        }
       ]
     },
     "A8": {
       "name": "其他信息程序表",
       "items": [
-        {"seq": 1, "content": "与治理层沟通，确定哪些文件组成年度报告及公布时间安排", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 2, "content": "与管理层安排及时获取年度报告最终版本（审计报告日前获取或取得书面声明）", "ref_index": "A8-1", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 3, "content": "获取并阅读其他信息，考虑一致性", "ref_index": "A8-2", "auto_data_source": null, "applicable_default": "yes", "sub_items": [
-          {"seq": "3.1", "content": "将其他信息中金额或项目与财务报表相应金额进行比较，评价一致性"},
-          {"seq": "3.2", "content": "考虑其他信息与注册会计师在审计中了解到的情况是否存在重大不一致"}
-        ]},
-        {"seq": 4, "content": "注意到可能重大错报迹象时，修改风险评估结果和审计计划或更新对被审计单位的了解", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 5, "content": "识别出重大不一致或重大错报时，与管理层讨论并确定", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
-          {"seq": "5.1", "content": "确定其他信息是否存在重大错报"},
-          {"seq": "5.2", "content": "确定财务报表是否存在重大错报"},
-          {"seq": "5.3", "content": "确定对被审计单位及其环境的了解是否需要更新"}
-        ]},
-        {"seq": 6, "content": "认为其他信息存在重大错报时，要求管理层更正", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
-          {"seq": "6.1", "content": "管理层同意更正，确定更正已完成"},
-          {"seq": "6.2", "content": "管理层拒绝更正，与治理层沟通并要求更正"}
-        ]},
-        {"seq": 7, "content": "审计报告日前获取的其他信息存在未更正的重大错报时的措施", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
-          {"seq": "7.1", "content": "考虑对审计报告的影响并与治理层沟通"},
-          {"seq": "7.2", "content": "在法律法规允许时考虑解除业务约定"}
-        ]},
-        {"seq": 8, "content": "审计报告日后获取的其他信息存在重大错报时的处理", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
-          {"seq": "8.1", "content": "其他信息得以更正，实施必要的后续程序"},
-          {"seq": "8.2", "content": "未得到更正，采取恰当措施提醒审计报告使用者"}
-        ]},
-        {"seq": 9, "content": "检查审计报告正文是否按准则要求增加其他信息部分", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
-          {"seq": "9.1", "content": "上市实体：已获取或预期将获取其他信息"},
-          {"seq": "9.2", "content": "非上市实体：已获取部分或全部其他信息"}
-        ]},
-        {"seq": 10, "content": "其他信息最终版本在审计底稿中归档（纸质或电子版年度报告）", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"}
+        {
+          "seq": 1,
+          "content": "与治理层沟通，确定哪些文件组成年度报告及公布时间安排",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "与管理层安排及时获取年度报告最终版本（审计报告日前获取或取得书面声明）",
+          "ref_index": "A8-1",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 3,
+          "content": "获取并阅读其他信息，考虑一致性",
+          "ref_index": "A8-2",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "3.1",
+              "content": "将其他信息中金额或项目与财务报表相应金额进行比较，评价一致性"
+            },
+            {
+              "seq": "3.2",
+              "content": "考虑其他信息与注册会计师在审计中了解到的情况是否存在重大不一致"
+            }
+          ]
+        },
+        {
+          "seq": 4,
+          "content": "注意到可能重大错报迹象时，修改风险评估结果和审计计划或更新对被审计单位的了解",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 5,
+          "content": "识别出重大不一致或重大错报时，与管理层讨论并确定",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "5.1",
+              "content": "确定其他信息是否存在重大错报"
+            },
+            {
+              "seq": "5.2",
+              "content": "确定财务报表是否存在重大错报"
+            },
+            {
+              "seq": "5.3",
+              "content": "确定对被审计单位及其环境的了解是否需要更新"
+            }
+          ]
+        },
+        {
+          "seq": 6,
+          "content": "认为其他信息存在重大错报时，要求管理层更正",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "6.1",
+              "content": "管理层同意更正，确定更正已完成"
+            },
+            {
+              "seq": "6.2",
+              "content": "管理层拒绝更正，与治理层沟通并要求更正"
+            }
+          ]
+        },
+        {
+          "seq": 7,
+          "content": "审计报告日前获取的其他信息存在未更正的重大错报时的措施",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "7.1",
+              "content": "考虑对审计报告的影响并与治理层沟通"
+            },
+            {
+              "seq": "7.2",
+              "content": "在法律法规允许时考虑解除业务约定"
+            }
+          ]
+        },
+        {
+          "seq": 8,
+          "content": "审计报告日后获取的其他信息存在重大错报时的处理",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "8.1",
+              "content": "其他信息得以更正，实施必要的后续程序"
+            },
+            {
+              "seq": "8.2",
+              "content": "未得到更正，采取恰当措施提醒审计报告使用者"
+            }
+          ]
+        },
+        {
+          "seq": 9,
+          "content": "检查审计报告正文是否按准则要求增加其他信息部分",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "9.1",
+              "content": "上市实体：已获取或预期将获取其他信息"
+            },
+            {
+              "seq": "9.2",
+              "content": "非上市实体：已获取部分或全部其他信息"
+            }
+          ]
+        },
+        {
+          "seq": 10,
+          "content": "其他信息最终版本在审计底稿中归档（纸质或电子版年度报告）",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        }
       ],
       "reference_note": "参考：其他信息中可能包含的金额类（关键财务业绩/经营数据/特殊项目/流动性/资本支出/表外安排/担保及或有事项/财务比率）和其他项目类（会计估计/关联方/风险管理/表外安排/法律监管变化/新准则影响/业务环境/战略/商品价格/供求及监管环境/盈利能力因素）共20项",
       "applicable_note": "新三板挂牌公司审计应特别关注年度报告中其他信息与财务报表或审计过程中了解到的情况是否存在重大不一致"
@@ -155,71 +649,980 @@
     "A9": {
       "name": "内部控制建议程序表",
       "items": [
-        {"seq": 1, "content": "汇总已识别的内控缺陷", "ref_index": "A14", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 2, "content": "出具内部控制建议书", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"}
+        {
+          "seq": 1,
+          "content": "确定审计中识别的所有控制缺陷已汇总到「内部控制缺陷汇总表」",
+          "ref_index": "A14",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "利用控制缺陷汇总表起草内部控制沟通函",
+          "ref_index": "A9-1,A9-2",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "2.1",
+              "content": "起草一份书面的内部控制沟通函",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "2.2",
+              "content": "确定沟通函包含所有重大缺陷、重要缺陷及其他控制缺陷",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "2.3",
+              "content": "确定报告草稿包含：清楚区分控制缺陷；详细描述每一缺陷及潜在影响",
+              "ref_index": null,
+              "auto_data_source": null
+            }
+          ]
+        },
+        {
+          "seq": 3,
+          "content": "在最终完成前与适当的管理层复核沟通函内容",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "3.1",
+              "content": "讨论观察到的事项，询问是否存在额外应考虑因素",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "3.2",
+              "content": "询问对已识别事项已采取或正在实施的整改措施状况",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "3.3",
+              "content": "如管理层拟在沟通函中解释缺陷原因，作出恰当拒绝/免责声明",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "3.4",
+              "content": "编制沟通纪要（讨论要点、出席人员、时间）",
+              "ref_index": null,
+              "auto_data_source": null
+            }
+          ]
+        },
+        {
+          "seq": 4,
+          "content": "在适当的时间期间内完成并签发沟通函",
+          "ref_index": "A9-1,A9-2",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        }
       ]
     },
     "A10": {
       "name": "与治理层沟通程序表",
       "items": [
-        {"seq": 1, "content": "确定沟通事项", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 2, "content": "实施沟通", "ref_index": "A10-2", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 3, "content": "记录沟通情况", "ref_index": "A10-2", "auto_data_source": null, "applicable_default": "yes"}
+        {
+          "seq": 1,
+          "content": "确定是否需要与整个治理层进行沟通（适用于有审计委员会的主体）",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "确定沟通是否也应与属于治理层的管理层成员进行（所有者直接管理的主体）",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 3,
+          "content": "如业务约定商谈对象非治理层，向治理层提供业务约定书副本",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 4,
+          "content": "确定需要与治理层沟通的内容",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "4.1",
+              "content": "对审计计划和风险评估结果的修改情况",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "4.2",
+              "content": "会计实务重大方面的质量",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "4.3",
+              "content": "审计工作中遇到的重大困难",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "4.4",
+              "content": "已与管理层讨论或需要书面沟通的重大事项",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "4.5",
+              "content": "影响审计报告形式和内容的情形（如有）",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "4.6",
+              "content": "与治理层监督财务报告过程直接相关的其他重大事项",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "4.7",
+              "content": "与项目质量控制复核人员讨论或考虑过的事项",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "4.8",
+              "content": "注册会计师的独立性",
+              "ref_index": "A10-1",
+              "auto_data_source": null
+            }
+          ]
+        },
+        {
+          "seq": 5,
+          "content": "上市实体：与治理层沟通额外内容（独立性声明、非审计服务收费等）",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A",
+            "B"
+          ]
+        },
+        {
+          "seq": 6,
+          "content": "考虑先与管理层讨论沟通事项，再与治理层会面",
+          "ref_index": "A10-2",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 7,
+          "content": "安排与治理层负责人会面，讨论已识别问题",
+          "ref_index": "A10-1",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 8,
+          "content": "提供所讨论事项的概要",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 9,
+          "content": "向治理层提供声明书、内控建议书、错报汇总、审计报告草稿等副本",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 10,
+          "content": "确定与治理层的双向沟通是否满足审计目的",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 11,
+          "content": "治理层向第三方提供书面沟通副本时的声明与合规考虑",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        }
       ]
     },
     "A11": {
       "name": "期后事项程序表",
       "items": [
-        {"seq": 1, "content": "获取期后事项信息", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 2, "content": "评估期后事项影响", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 3, "content": "确定是否调整或披露", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"}
+        {
+          "seq": 1,
+          "content": "注明我们在审计报告中签署的日期。",
+          "ref_index": "A11-1",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "复核被审计单位管理层建立的用于确保识别期后事项的程序。",
+          "ref_index": "A11-2",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 3,
+          "content": "获取并阅读最新的中期财务信息，以及其他适当的管理报告例如预算、现金流量预测，并考虑在审计报告日期前，该信息是否包括可能需要在财务报表调整或披露的事项。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 4,
+          "content": "获得在我们的审计计划之后由内部审计部门发布的报告，并考虑其对财务报表和我们的审计程序的影响。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 5,
+          "content": "如果这些报告没有完成，与内审人员讨论它们的情况，安排当报告发布时接收副本，并确定我们的审计程序，适当解决它们的问题。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 6,
+          "content": "查阅在财务报表日后股东、董事、审计委员会和其他重要委员会的会议记录并更新至接近审计报告日，在不能获取会议纪要的情况下，询问此类会议讨论的事项。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 7,
+          "content": "查阅在财务报表日后被审计单位与客户、供应商、监管部门等的往来信函并更新至接近审计报告日。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 8,
+          "content": "就诉讼和索赔事项询问被审计单位的法律顾问，或扩大之前口头或书面查询的范围。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 9,
+          "content": "考虑企业咨询其他顾问的结果。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 10,
+          "content": "询问管理层是否存在下列情况：",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "10.1",
+              "content": "是否已发生新的承诺、借款或担保；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "10.2",
+              "content": "是否已出售或购置资产，或者计划出售或购置资产；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "10.3",
+              "content": "是否已增加资本或发行债务工具（如发行新的股票或债券），或者是否已签订或计划签订合并或清算协议；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "10.4",
+              "content": "资产是否已被政府征用或因不可抗力（如火灾或洪水）而遭受损失；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "10.5",
+              "content": "或有事项是否已发生新的进展；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "10.6",
+              "content": "是否已作出或考虑作出异常的会计调整；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "10.7",
+              "content": "是否已发生或可能发生影响财务报表编制时所采用会计政策适当性的事项（如影响持续经营假设适当性的事项）；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "10.8",
+              "content": "是否已发生与财务报表中会计估计或准备计提相关的事项；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "10.9",
+              "content": "是否已发生与资产可收回性相关的事项；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "10.10",
+              "content": "其他与舞弊风险因素相关或表明应当调整固有风险评估结果的期后事项。",
+              "ref_index": null,
+              "auto_data_source": null
+            }
+          ]
+        },
+        {
+          "seq": 11,
+          "content": "调查已经识别出的项目并确定：",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "11.1",
+              "content": "它们是否影响被审计的期间。",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "11.2",
+              "content": "这些事项在财务报表中是否得到恰当的会计处理并充分披露。",
+              "ref_index": null,
+              "auto_data_source": null
+            }
+          ]
+        },
+        {
+          "seq": 12,
+          "content": "询问管理层和治理层（IPO适用）：",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "12.1",
+              "content": "是否存在期后主要原材料的采购规模及采购价格重大变化的情形，并询问原因，了解并收集相关证据。",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "12.2",
+              "content": "是否存在期后主要产品的生产、销售规模及销售价格发生重大变化的情形，并询问原因，了解并收集相关证据。",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "12.3",
+              "content": "是否存在期后主要客户及供应商的构成、税收政策等发生重大变化，或发生其他可能影响投资者判断的重大事项。询问原因，了解并收集相关证据。",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "12.4",
+              "content": "询问管理层和治理层，被审计单位是否存在由于在市场价格出现较大幅度上升前提前囤积原材料或由于偶发因素导致其主要产品市场价格上升较快从而获取超额收益的情况",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "12.5",
+              "content": "资产负债表日后最新一期财务报表主要会计报表项目与财务报告审计截止日或上年同期相比，是否发生较大变化；如是，了解原因并收集相关证据。",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "12.6",
+              "content": "资产负债表日后最近一期营业收入或营业利润是否呈现下滑趋势；如是，了解原因并收集相关证据。",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "12.7",
+              "content": "发行人预计年初至发行上市后第一个报告期期末的累计净利润以及扣除非经常性损益后孰低的净利润，是否可能较上年同期发生重大变动，如是，了解原因并收集相关证据。",
+              "ref_index": null,
+              "auto_data_source": null
+            }
+          ]
+        },
+        {
+          "seq": 13,
+          "content": "查阅相关公告、董事会决议、会议纪要等，了解重大事项决策程序，充分识别财务报表日至审计报告日之间发生的事项，评价未披露事项对审计意见的影响等。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 14,
+          "content": "获取科目余额表、明细账等，检查资产负债表日前后是否存在异常交易及资金往来，如临近资产负债表日大额收款且期后大额付款，期后发生大额销售退回、应收账款与应付账款对抵、冲销已计提未支付的期间费用、大额计提减值，存在会计差错更正、重大未决诉讼、以及大额票据置换、贴现或背书转让等。结合期后合同的履行、变更以及",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 15,
+          "content": "对被审计单位资产负债表日后最近一期的财务报告审阅并执行以下程序（IPO适用）：",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "15.1",
+              "content": "将资产负债表日后收入和营业利润与报告期同期收入和营业利润，资产负债表日后平均月收入与上年平均月收入进行比较，确定是否存在期后业绩下滑迹象，如有，与管理层及相关人员讨论，检查相关支持性文件，跟进业绩下滑的原因",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "15.2",
+              "content": "将资产负债表日后产品的平均销售单价与报告期______月平均销售单价进行比较，确定是否存在售价较大幅度下跌的情况，并跟进原因",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "15.3",
+              "content": "将资产负债表日后主要原料的平均采购单价与报告期接近资产负债表日______月平均采购单价进行比较，确定是否存在主要原材料价格在资产负债表日后期间出现较大幅度上升的情况，并跟进原因",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "15.4",
+              "content": "将将资产负债表日后主要客户及供应商的构成和报告期相比，分析是否发生重大变化。询问原因，了解并收集相关证据。",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "15.5",
+              "content": "检查资产负债表日后的税收政策等是否发生重大变化，或发生其他可能影响投资者判断的重大事项。询问原因，了解并收集相关证据。",
+              "ref_index": null,
+              "auto_data_source": null
+            }
+          ]
+        },
+        {
+          "seq": 16,
+          "content": "如存在导致发行人未来期间业绩大幅下降的相关财务信息和风险因素，确定其在招股说明书、自查报告等文件中进行了合理披露（IPO适用）。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 17,
+          "content": "要求管理层和治理层（如适用）提供书面声明，确认所有在资产负债表日后发生的、按照适用的财务报告编制基础的规定应予调整或披露的事项均已得到调整或披露。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 18,
+          "content": "查阅基准日后股东、董事、审计委员会和其他重要委员会的会议记录并更新至审计报告日，以确定是否存在对基准日内部控制有效性有重大负面影响的期后事项。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 19,
+          "content": "查阅基准日后管理层使用的适当的管理报告并更新至审计报告日，以确定是否存在对基准日内部控制有效性有重大负面影响的期后事项。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 20,
+          "content": "询问管理层在内部控制评价基准日至询问之日止的下列事项：",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "20.1",
+              "content": "财务报告内部控制发生的重大变化。",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "20.2",
+              "content": "非财务报告内部控制发生的重大变化。",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "20.3",
+              "content": "其他对基准日内部控制产生重大影响的事项。",
+              "ref_index": null,
+              "auto_data_source": null
+            }
+          ]
+        },
+        {
+          "seq": 21,
+          "content": "针对内部控制评价基准日至审计报告日的期后期间，询问并检查以下信息：",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "21.1",
+              "content": "在期后期间出具的内部审计报告或类似报告；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "21.2",
+              "content": "其他注册会计师出具的涉及被审计单位内部控制缺陷的报告；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "21.3",
+              "content": "监管机构发布的涉及被审计单位内部控制的报告；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "21.4",
+              "content": "注册会计师在执行其他业务中获取的、有关被审计单位内部控制有效性的信息；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "21.5",
+              "content": "在基准日后采取的整改措施；",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "21.6",
+              "content": "在期后期间对以前公布的财务报表予以更正。",
+              "ref_index": null,
+              "auto_data_source": null
+            }
+          ]
+        },
+        {
+          "seq": 22,
+          "content": "调查已经识别出的项目并确定：",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "22.1",
+              "content": "它们是否对内部控制有效性有重大负面影响。",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "22.2",
+              "content": "这些事项是否影响内部控制审计报告的审计意见及相应披露。",
+              "ref_index": null,
+              "auto_data_source": null
+            }
+          ]
+        },
+        {
+          "seq": 23,
+          "content": "要求管理层和治理层（如适用）提供书面声明，确认在基准日内后，内部控制是否发生变化，或者是否存在对内部控制产生重要影响的其他因素，包括被审计单位针对重大缺陷和重要缺陷采取的所有纠正措施。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        }
       ]
     },
     "A12": {
       "name": "律师回复程序表",
       "items": [
-        {"seq": 1, "content": "发送律师询证函", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 2, "content": "收到律师回函并评估", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"}
+        {
+          "seq": 1,
+          "content": "复核每位律师的回复，并考虑对于披露的事件是否已提供足够的信息用于确定恰当的会计处理方法或披露处理方法。",
+          "ref_index": "A12-1",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "确定是否需要执行额外程序以应对从律师回复中所识别的事项。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 3,
+          "content": "确定回复日期是否在审计报告日前的七日之内。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 4,
+          "content": "如回函不在审计报告日前的七日之内，考虑是否需要额外的查询或要求最新的回函。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        }
       ]
     },
     "A13": {
       "name": "错报程序表",
       "items": [
-        {"seq": 1, "content": "汇总未更正错报", "ref_index": "A13", "auto_data_source": "misstatement_summary", "applicable_default": "yes"},
-        {"seq": 2, "content": "评价错报对财务报表的影响", "ref_index": "A13", "auto_data_source": "misstatement_evaluation", "applicable_default": "yes"},
-        {"seq": 3, "content": "与管理层沟通未更正错报", "ref_index": "A13", "auto_data_source": null, "applicable_default": "yes"}
+        {
+          "seq": 1,
+          "content": "确定所有的调整和重分类会计分录已被恰当地插入适当的审定表中。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "考虑这些建议的审计调整是否对本年中期财务报告产生影响，若有。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A",
+            "B"
+          ],
+          "sub_items": [
+            {
+              "seq": "2.1",
+              "content": "与项目合伙人讨论调整问题。",
+              "ref_index": null,
+              "auto_data_source": null,
+              "applicable_categories": [
+                "A",
+                "B"
+              ]
+            },
+            {
+              "seq": "2.2",
+              "content": "与合适的客户人员讨论调整事宜。",
+              "ref_index": null,
+              "auto_data_source": null,
+              "applicable_categories": [
+                "A",
+                "B"
+              ]
+            },
+            {
+              "seq": "2.3",
+              "content": "确定本年中期报表是否需要修改 。",
+              "ref_index": null,
+              "auto_data_source": null,
+              "applicable_categories": [
+                "A",
+                "B"
+              ]
+            }
+          ]
+        },
+        {
+          "seq": 3,
+          "content": "总结未更正错报，包括遗漏的披露，加总于未更正错报汇总表中。.",
+          "ref_index": "A13-1",
+          "auto_data_source": "misstatement_summary",
+          "applicable_default": "yes",
+          "sub_items": [
+            {
+              "seq": "3.1",
+              "content": "与适当的管理层复核未调整的错报。",
+              "ref_index": "A13-3,A13-5",
+              "auto_data_source": null
+            },
+            {
+              "seq": "3.2",
+              "content": "要求管理层记录所有讨论过的错报。 ",
+              "ref_index": null,
+              "auto_data_source": null
+            },
+            {
+              "seq": "3.3",
+              "content": "对于管理层认为不重大的项目，单独或汇总评估其重要性：",
+              "ref_index": null,
+              "auto_data_source": null,
+              "sub_items": [
+                {
+                  "seq": "3.3.1",
+                  "content": "了解管理层不进行更正的原因。",
+                  "ref_index": null,
+                  "auto_data_source": null
+                },
+                {
+                  "seq": "3.3.2",
+                  "content": "确定是否单独，或在总量上，这些差异对财务报表有量化重要性。",
+                  "ref_index": null,
+                  "auto_data_source": null
+                },
+                {
+                  "seq": "3.3.3",
+                  "content": "从质量上考虑财务报表重要性（如个别项目，小计，总计和对财务报表隐含的比率）。",
+                  "ref_index": null,
+                  "auto_data_source": null
+                },
+                {
+                  "seq": "3.3.4",
+                  "content": "确定任何差异对财务报表来说是否性质重要。",
+                  "ref_index": null,
+                  "auto_data_source": null
+                },
+                {
+                  "seq": "3.3.5",
+                  "content": "如果不调整差异金额汇总是重大的话，找出个别项目作为调整分录，使不调整差异金额汇总小于财务报表的重要性水平。",
+                  "ref_index": null,
+                  "auto_data_source": null
+                },
+                {
+                  "seq": "3.3.6",
+                  "content": "考虑以前年度错报的累积影响。",
+                  "ref_index": null,
+                  "auto_data_source": null
+                }
+              ]
+            },
+            {
+              "seq": "3.4",
+              "content": "确定剩下的未更正错报对财务报表是否是不重大的。",
+              "ref_index": null,
+              "auto_data_source": null
+            }
+          ]
+        },
+        {
+          "seq": 4,
+          "content": "判断已确认错报是否存在舞弊，如果是，与项目合伙人商讨。",
+          "ref_index": "A13-4",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 5,
+          "content": "确定导致错报的控制缺陷是否在相应的内部控制缺陷评价底稿中予以评估（记录在相关的控制缺陷评估底稿）并汇总至“内部控制缺陷汇",
+          "ref_index": "A13-4",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        }
       ]
     },
     "A14": {
       "name": "内部控制缺陷程序表",
       "items": [
-        {"seq": 1, "content": "识别内控缺陷", "ref_index": "A14-1", "auto_data_source": "control_deficiency_count", "applicable_default": "yes"},
-        {"seq": 2, "content": "企业层面控制缺陷评价", "ref_index": "A14-2", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 3, "content": "IT 缺陷汇总及评价", "ref_index": "A14-3", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 4, "content": "业务流程层面控制缺陷评价", "ref_index": "A14-4", "auto_data_source": null, "applicable_default": "yes"}
+        {
+          "seq": 1,
+          "content": "考虑控制测试中识别出的控制偏差，并采取针对性应对措施。如分析控制偏差的性质、原因及其潜在后果，有效识别内部控制缺陷，若发现控制偏差是系统性偏差或表明内部控制存在重大缺陷，应扩大样本量或实施其他测试。",
+          "ref_index": "CX",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "将执行控制测试发现的控制缺陷先分别进行评价，再和其他缺陷一起进行评价。",
+          "ref_index": "A14-2,A14-3,A14-4",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 3,
+          "content": "确定实质性程序的结果（例如，错报的识别）是否表明额外的控制缺陷。汇总上述缺陷后，添加到「需合伙人关注事项」。",
+          "ref_index": "A14-5",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 4,
+          "content": "对评价的控制缺陷进行汇总。",
+          "ref_index": "A14-1",
+          "auto_data_source": "control_deficiency_count",
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 5,
+          "content": "与适当的管理层讨论内控缺陷。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 6,
+          "content": "评价内控缺陷对内控审计意见类型的影响。",
+          "ref_index": "A14-6",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        }
       ]
     },
     "A15": {
       "name": "持续经营假设的考虑程序表",
       "items": [
-        {"seq": 1, "content": "评估管理层持续经营假设", "ref_index": "A15-1", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 2, "content": "复核持续经营调查表", "ref_index": "A15-1", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 3, "content": "结论", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"}
+        {
+          "seq": 1,
+          "content": "考虑审计程序的执行结果是否表明存在可能对公司的持续经营能力产生重大疑虑的事项或情况，完成持续经营调查表，并确定管理层是否已对被审计单位持续经营能力作出初步评估。",
+          "ref_index": "A15-1",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "如果管理层未对持续经营能力做出评估，完成以下工作： （1）与管理层讨论其拟运用持续经营假设的基础。 （2）询问管理层是否存在单独或汇总起来可能导致对被审计单位持",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 3,
+          "content": "针对管理层对持续经营能力做出的评估，完成以下工作：: （1）评价管理层作出评估时遵循的程序。 （2）评价评估依据的假设。 （3）如果管理层评估持续经营能力涵盖的",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 4,
+          "content": "与审计合伙人讨论显示对企业持续经营能力产生疑虑的事项或情况，以确定是否执行后续程序。",
+          "ref_index": "A15-1",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 5,
+          "content": "获取企业为了缓解上述事项或情况的影响而拟定的计划： （1）识别克服以上事项或情况的不利影响的关键因素。 （2）计划并实施审计程序以获取证据性材料。 （3）评估以",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 6,
+          "content": "获取预测性信息，如果这些信息将对管理层所制定的计划产生重大影响 ： （1）评估企业用于产生此类预测性财务信息的系统的可靠性。 （2）对于预测性财务信息中重要的基",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 7,
+          "content": "向关联方或第三方函证其提供或保持财务支持的安排细节，评估关联方或第三方提供额外资金的能力 ，将前期的预期信息同历史性结果相比较，并且将当期的预期信息同到当前为止",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 8,
+          "content": "询问管理层，是否知悉超出评估期间的、可能导致对持续经营能力产生重大疑虑的事项或情况。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 9,
+          "content": "根据获取的证据，得出结论，确定是否存在一些事项或情况（单独的或汇总的）可能引起企业持续经营能力产生重大不确定性。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 10,
+          "content": "当已识别出事项或情况但不存在重大不确定性时需要考虑财务披露的充分性： （1）即使不存在重大不确定性，注册会计师根据适用的财务报告编制基础的规定，评价财务报表是否",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 11,
+          "content": "当已识别出事项或情况但存在重大不确定性时考虑企业持续经营能力相关的财务报表披露的充分性： (1)财务报表是否已充分披露可能导致对持续经营能力产生重大疑虑的主要事",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 12,
+          "content": "根据取得的审计证据判断，企业运用持续经营假设是否适当: (1)如果财务报表基于持续经营假设编制，而注册会计师运用职业判断认为管理层在编制财务报表时运用持续经营假",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 13,
+          "content": "针对非上市公司：当考虑给出的结论是无保留意见、不再重复以前的持续经营不确定声明或拒绝发表意见时，咨询鉴证业务主管合伙人 。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_note": "非上市公司"
+        },
+        {
+          "seq": 14,
+          "content": "针对上市公司：咨询鉴证业务主管合伙人。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A",
+            "B"
+          ],
+          "applicable_note": "上市公司"
+        }
       ]
     },
     "A16": {
       "name": "管理层声明书程序表",
       "items": [
-        {"seq": 1, "content": "确定声明书版本", "ref_index": "", "auto_data_source": "a16_template_recommend", "applicable_default": "yes"},
-        {"seq": 2, "content": "编制管理层声明书", "ref_index": "A16", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 3, "content": "获取管理层签署", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"}
+        {
+          "seq": 1,
+          "content": "确定声明书版本",
+          "ref_index": "",
+          "auto_data_source": "a16_template_recommend",
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "编制管理层声明书",
+          "ref_index": "A16",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 3,
+          "content": "获取管理层签署",
+          "ref_index": "",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        }
       ]
     },
     "A17": {
       "name": "重大事项概要程序表",
       "items": [
-        {"seq": 1, "content": "确定重大事项", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 2, "content": "编制完成核对表", "ref_index": "A17-5", "auto_data_source": null, "applicable_default": "yes"}
+        {
+          "seq": 1,
+          "content": "确定重大事项",
+          "ref_index": "",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "编制完成核对表",
+          "ref_index": "A17-5",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        }
       ]
     }
   }
