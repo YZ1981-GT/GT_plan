@@ -2,7 +2,7 @@
 
 **最后更新**：2026-06-17  
 **当前分支**：`work/2026-05-30-wp-specs`  
-**Spec 总数**：**145**（active 5 + archived 140）  
+**Spec 总数**：**148**（active 8 + archived 140）  
 **最高迁移**：V085  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -58,9 +58,12 @@
 |------|------|------|------|
 | audit-report-template-integration | implementing | V066 | 审计报告模板集成（181/184，剩 3 项人工验收/运维下线） |
 | checklist-workpaper-full-display | completed | V085 | A1-15/A1-16 核对表完整渲染（P0+P1 全部完成，529+210 条目） |
-| analytical-review-workpaper | requirements | — | A1-13/A1-14 分析性复核（6~8 sheet，取数+比率+变动原因联动） |
-| workpaper-inline-popup | requirements | — | A1-11/12/17/18 子底稿弹窗联动（程序表步骤旁弹窗完成操作） |
+| analytical-review-workpaper | P0 done | — | A1-13/A1-14 分析性复核（6~8 sheet，取数+比率+变动原因联动） |
+| workpaper-inline-popup | completed | — | A1-11/12/17/18 子底稿弹窗联动（全部完成） |
 | editing-lock-v1-v2-consolidation | planning | — | 编辑锁 v1→v2 合并（阶段1 未完成） |
+| goodwill-impairment-workpaper | requirements | — | A3-8 商誉减值+可收回金额（DCF/WACC，暂 Univer） |
+| segment-reporting-workpaper | requirements | — | A4-1 经营分部审定表（动态列+准则说明） |
+| cash-flow-support-workpaper | requirements | — | A5-1~A5-4 现金流量+承诺/或有/持续终止经营 |
 
 ```
 _archive/
