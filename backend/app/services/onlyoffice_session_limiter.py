@@ -25,7 +25,7 @@ _SESSION_TTL = 3600  # 1 小时
 
 async def acquire_session(user_id: UUID, document_key: str) -> bool:
     """尝试获取一个编辑席位。返回 True=成功，False=已满。"""
-    from app.core.redis_client import get_redis
+    from app.core.redis import get_redis
 
     redis = await get_redis()
     if redis is None:
@@ -57,7 +57,7 @@ async def acquire_session(user_id: UUID, document_key: str) -> bool:
 
 async def release_session(user_id: UUID, document_key: str) -> None:
     """释放一个编辑席位（文档关闭/callback status=4 时调用）。"""
-    from app.core.redis_client import get_redis
+    from app.core.redis import get_redis
 
     redis = await get_redis()
     if redis is None:
@@ -69,7 +69,7 @@ async def release_session(user_id: UUID, document_key: str) -> None:
 
 async def get_active_count() -> int:
     """获取当前活跃编辑会话数。"""
-    from app.core.redis_client import get_redis
+    from app.core.redis import get_redis
 
     redis = await get_redis()
     if redis is None:

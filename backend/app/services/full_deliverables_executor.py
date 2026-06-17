@@ -36,7 +36,6 @@ logger = logging.getLogger(__name__)
 # 全套生成步骤顺序（与 generateGuard 依赖链一致：审定报表 → 未审报表 → 附注 → 报告正文）
 FULL_DELIVERABLES_STEPS: list[str] = [
     "financial_reports",
-    "financial_reports_unadjusted",
     "disclosure_notes",
     "report_body",
 ]

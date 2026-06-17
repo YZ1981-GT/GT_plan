@@ -154,7 +154,14 @@ class ReportExcelExporter:
         """
         # 1. Load project info
         project = await self._get_project(project_id)
-        company_name = project.name if project else "未知公司"
+        # 编制单位用公司全称 client_name（project.name 带 _年度 后缀不适合填报表表头）
+        company_name = "未知公司"
+        if project:
+            company_name = (
+                getattr(project, "client_name", None)
+                or getattr(project, "name", None)
+                or "未知公司"
+            )
 
         # 2. Determine template key
         template_type = getattr(project, "template_type", None) or "soe"

@@ -524,6 +524,15 @@ services:
       - WOPI_ENABLED=true
       - JWT_ENABLED=true
       - JWT_SECRET=${ONLYOFFICE_JWT_SECRET:-onlyoffice-dev-secret-2026}
+      # 清空代理：Docker Desktop 会把宿主机 http_proxy（如 Clash 127.0.0.1:7897）
+      # 注入容器，导致 OnlyOffice 从 host.docker.internal 下载文件走代理失败。
+      # 清空后容器直连宿主机后端，任何电脑通用。
+      - http_proxy=
+      - https_proxy=
+      - HTTP_PROXY=
+      - HTTPS_PROXY=
+      - no_proxy=*
+      - NO_PROXY=*
 
     volumes:
 

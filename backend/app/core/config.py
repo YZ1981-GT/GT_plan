@@ -34,7 +34,9 @@ class Settings(BaseSettings):
     LOGIN_LOCK_MINUTES: int = 30
     # ONLYOFFICE（向后兼容，底稿编辑已迁移至 Univer）
     ONLYOFFICE_URL: str = "http://onlyoffice:80"
-    ONLYOFFICE_JWT_SECRET: str = ""
+    # JWT secret 默认值必须与 docker-compose.yml 的 JWT_SECRET 默认值一致，
+    # 否则后端签名的 token 容器验证不通过（"文档安全令牌格式不正确"）
+    ONLYOFFICE_JWT_SECRET: str = "onlyoffice-dev-secret-2026"
     ONLYOFFICE_CALLBACK_BASE: str = ""
     ONLYOFFICE_MAX_SESSIONS: int = 10  # 最大并发编辑人数
     WOPI_BASE_URL: str = "http://backend:8000/wopi"
