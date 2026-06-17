@@ -488,7 +488,7 @@ import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useWpOnboardingGuide } from '@/composables/useWpOnboardingGuide'
 
 // 弹窗式子底稿集合（点击不跳转，弹窗展示）
-const INLINE_POPUP_WP_CODES = new Set(['A1-11', 'A1-12', 'A1-17', 'A1-18', 'A8-1', 'A8-2'])
+const INLINE_POPUP_WP_CODES = new Set(['A1-11', 'A1-12', 'A1-17', 'A1-18', 'A8-1', 'A8-2', 'A10-1', 'A11-1', 'A12-1'])
 
 // ─── Types ───
 interface ProgramAssertions {

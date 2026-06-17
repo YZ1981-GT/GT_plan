@@ -97,6 +97,113 @@ async def download_template_by_code(
     )
 
 
+@router.get("/{wp_code}/prefilled-download")
+async def download_template_prefilled(
+    project_id: str,
+    wp_code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """下载预填充后的 docx 模板（替换公司名/年度/事务所等占位符）
+
+    占位符格式（中文模板常见）：
+    - ××公司 / ABC公司 / XX公司 → 替换为 client_name
+    - 202X年 / 201X年 → 替换为审计年度
+    - XX、XX（两名签字注册会计师）→ 保留不替换（需手动填写）
+    """
+    import shutil
+    import tempfile
+    from uuid import UUID
+
+    # 1. 找到模板文件
+    all_files = find_all_template_files(wp_code)
+    if not all_files:
+        single = find_template_file_any(wp_code)
+        if single:
+            all_files = [single]
+    docx_files = [f for f in (all_files or []) if f.suffix.lower() == '.docx']
+    if not docx_files:
+        raise HTTPException(status_code=404, detail=f"docx 模板不存在: {wp_code}")
+
+    template_path = docx_files[0]
+
+    # 2. 获取项目信息
+    from app.models.core import Project
+    import sqlalchemy as sa
+    proj = (await db.execute(
+        sa.select(Project).where(Project.id == UUID(project_id))
+    )).scalar_one_or_none()
+
+    client_name = (proj.client_name if proj else "") or "XX公司"
+    audit_year = ""
+    if proj and proj.audit_period_end:
+        audit_year = str(proj.audit_period_end.year)
+    else:
+        audit_year = "202X"
+
+    # 3. 复制到临时文件并替换占位符
+    try:
+        from docx import Document
+    except ImportError:
+        # python-docx 不可用，直接返回原始文件
+        from urllib.parse import quote
+        filename = template_path.name
+        utf8_name = quote(filename, safe="")
+        return FileResponse(
+            str(template_path),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f'attachment; filename*=UTF-8\'\'{utf8_name}'},
+        )
+
+    tmp_dir = tempfile.mkdtemp(prefix="wp_prefill_")
+    tmp_path = Path(tmp_dir) / template_path.name
+    shutil.copy2(template_path, tmp_path)
+
+    doc = Document(str(tmp_path))
+
+    # 占位符替换映射
+    replacements = {
+        "××公司": client_name,
+        "ABC公司": client_name,
+        "XX公司": client_name,
+        "202X": audit_year,
+        "201X": str(int(audit_year) - 1) if audit_year.isdigit() else "201X",
+    }
+
+    replaced = False
+    for para in doc.paragraphs:
+        for key, val in replacements.items():
+            if key in para.text:
+                for run in para.runs:
+                    if key in run.text:
+                        run.text = run.text.replace(key, val)
+                        replaced = True
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    for key, val in replacements.items():
+                        if key in para.text:
+                            for run in para.runs:
+                                if key in run.text:
+                                    run.text = run.text.replace(key, val)
+                                    replaced = True
+
+    if replaced:
+        doc.save(str(tmp_path))
+
+    from urllib.parse import quote
+    filename = template_path.name
+    utf8_name = quote(filename, safe="")
+    return FileResponse(
+        str(tmp_path),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename*=UTF-8\'\'{utf8_name}'},
+        background=None,
+    )
+
+
 @router.get("/list")
 async def list_all_templates(
     project_id: str,

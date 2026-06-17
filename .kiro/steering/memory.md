@@ -104,7 +104,7 @@ inclusion: always
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、向量存储选 pgvector；详细 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
 ### git 状态（2026-06-17）
-- 分支 `work/2026-05-30-wp-specs`，最高迁移 **V085**；HEAD `2112b705`（三底稿 spec 实施：商誉减值/经营分部/现金流支持 P0+P1 全量完成，2026-06-17 pull）；本地未提交：A7/A8 程序表增强+freeze_panes 修复+WpPopupDocxEditor+GtIndexChip preventNavigate
+- 分支 `work/2026-05-30-wp-specs`，最高迁移 **V085**；HEAD `a1102af8`（OnlyOffice通用修复+报表编制单位名+去掉unadjusted交付物，2026-06-17 push）
 - **🟢 git stash drop 丢失修改已全部恢复+联动实测（2026-06-14）**：commit `9cb22ffe`(4文件UI改进) + `0152b4f3`(路由补回)。根因=`a9ae81db`(114文件)创建了 ConfirmationIndex/ArchiveIndex/WeeklyTimesheet 组件但**从未注册 `/confirmation`+`/archive` 顶层路由**(侧边栏点击 404) + ConfirmationHub/WorkHoursPage/AttachmentHub/main.ts 后续工作区修改被 stash drop 丢。Playwright 实测三模块及底稿联动全正常：工时双视图✓/函证项目内页"关联底稿"列✓/归档向导完整性自检拉全部底稿状态(未签字185+过期114)✓。**铁律：做完一批修改立即 commit；新建顶层页面必同步注册路由+验证侧边栏可达**
 - **🟢 archive-readiness 端点 404 已修（2026-06-14, commit `0d73f595`）**：前端 `archiveApi.getArchiveReadiness` 误调 `/api/qc/archive-readiness?project_id=`(后端不存在)，真实端点是项目作用域 `/api/projects/{pid}/qc-dashboard/archive-readiness`(qc_dashboard.py 已注册)。改用 `qcDashboard.archiveReadiness(pid)`，Playwright 实测 200 OK。`qcArchiveReadiness.check` 路径常量已成死代码(保留 re-export 不动)
 - **铁律**：push 前必 fetch（stash→ff→pop）；PowerShell 下 git push/fetch 把进度写 stderr 报 exit 1 但实为成功，看 `xxx..yyy -> branch` 确认
@@ -114,7 +114,7 @@ inclusion: always
 - 已完成修复明细（B-Index 目录/架构图、sheet 级索引号、试算表借贷方向、明细账月小计、2026-06-07 三处回归等）→ `#dev-history`
 
 ### 真正待办（2026-06-17）
-- **active spec=5**：①audit-report-template-integration 185/190(剩5,含3可选) ②editing-lock-v1-v2-consolidation 32/40(剩8) ③cash-flow-support-workpaper 8/9(剩E2E) ④analytical-review-workpaper 7/10(剩3) ⑤workpaper-inline-popup 5/9(剩4,A8-1/A8-2已实现待补完成徽章)
+- **active spec=7**：①audit-report-template-integration 185/190 ②editing-lock-v1-v2-consolidation 32/40 ③cash-flow-support-workpaper 8/9(剩E2E) ④analytical-review-workpaper 7/10 ⑤workpaper-inline-popup 5/9 ⑥a18-regulatory-communication 0/16 ⑦**a17-summary-workpaper 0/23(新建)**——A类业务核心14底稿:章节导航(A17-1)+KAM(A17-2-1)+核对表(5-1~5-5)+弹窗(3/4/6)+LLM+RAG+报告KAM联动
 - **🟢 归档 4 spec（2026-06-17）**：goodwill-impairment-workpaper(9/9)+segment-reporting-workpaper(9/9)+group-tree-architecture(54/54)+checklist-workpaper-full-display(10/11仅剩可选)→`_archive/`
 - **🟢 A循环 7 spec + group-tree-architecture + goodwill/segment/checklist 全部归档**
 - **🟢 A 循环子底稿注册完成（2026-06-16 commit `8f48266a`）**：`wp_account_mapping.json` 从 206→274 条(+66 A 子底稿+2 A7子底稿)；A2 adjustment_count 带金额；auto_data_source P0 模型名纠正；`template_engine.py` name 查找链增加 wp_account_mapping fallback(修复"底稿Axx"问题,新建项目不再出现)。**存量修复脚本**：`scripts/fix/_fix_wp_names_from_mapping.py`(跑一次更新 DB 中旧项目的"底稿Axx"→正确中文名)。**待确认**：①generate 是否区分 must_have/optional ②docx 子底稿 componentType 路由
@@ -129,6 +129,7 @@ inclusion: always
 - **🟢 A1-15/A1-16 核对表底稿 spec 全部完成（2026-06-17）**：`checklist-workpaper-full-display` P0(7)+P1(3)=10 任务全绿。后端: `checklist_docx_parser.py`(mtime缓存+A1-15 35章节529条目/A1-16 11章节210条目) + `V085__checklist_responses.sql` + render-config 集成；前端: `GtChecklistTable.vue`(目录导航+核对表+适用性弹窗+自动保存+搜索+批量标记+筛选)。78后端+15前端测试全绿。**🟢 性能优化已落地**：529个el-select改为点击激活编辑模式(activeCell,未激活只渲染span)；A1-13/A1-14取数从4次查询合并为1次`_get_report_rows_batch`。**🟢 截图确认并已修复**：①适用标记已扩展为 4 种(Y/X·I/X·W/N/A)匹配模板填写说明(Y=已披露,X/I=不重大未披露,X/W=重大未披露已另附说明,N/A=不适用)；前端加"标识说明"popover+颜色编码(Y绿/XI黄/XW红/NA灰)+后端校验同步更新 ②a/b/c 子项有独立准则索引→解析器正确识别为 actionable 符合模板原意(需独立判断适用性)
 - **外部依赖**：LLM embedding 实例 / 合并 UAT 数据 / GitHub 默认分支改 main / 钉集成
 - **🟡 待做：子底稿弹窗式联动（workpaper-inline-popup）**：A1-17(对应数据程序表,3步)/A1-12(重大事项核查表,14条适用判定+自由填写区,注:仅A/B类+特定C类适用,可按business_category自动判定)/A1-18(混合型:程序+3调节表+结论)/A1-11(仅报告签发流转控制表sheet=签字审批链,文号规则由独立系统负责不纳入) 等轻量子底稿不独立打开,而是在 A1 程序表关联步骤旁点击弹窗展示+完成操作;同理适用于 A1-13/A1-14 等。用户偏好：体现关联联动，需要时弹窗而非平开列示。待开 spec
+- **🟡 待做：A循环 docx 底稿 OnlyOffice 弹窗联动（30个）**：~~红框标注 A10-1(沟通函)/A11-1(期后问询函)/A12-1(律师函) 需加入 WpPopupDocxEditor~~已完成。其余(A9-1/A9-2/A16-1~7/A17-x/A18-x/A26-x/A27-1)待加。**新增预填充下载端点** `GET /wp-templates/{wp_code}/prefilled-download`（自动替换 ××公司→client_name, 202X→审计年度, 201X→上年度）。**架构：WpPopupDocxEditor 配置驱动只需加 DOCX_CONFIGS 条目+INLINE_POPUP_WP_CODES**
 - **🟡 待做：A1-18 混合型底稿渲染**：新金融工具准则衔接影响数核对(xlsx)，结构=审计目标(文本)+审计过程(5步程序)+3个调节表(权益/分类/权益工具投资明细,需填金额)+审计说明(富文本)+审计结论(富文本)。方案候选：①现有 Univer 直接打开(低成本) ②新建 `mixed-form` componentType 三段式布局(程序区+数据表区+结论区)。调节表金额可从序时账金融工具科目取数联动。待用户确认优先级后开 spec
 - **🟡 待做：A3-8 商誉减值+可收回金额（goodwill-impairment-workpaper, spec三件套已建）**：P0=Univer+编制说明面板(WACC/CAPM/6条规则), P1=DCF计算引擎+结构化组件
 - **🟡 待做：A4/A4-1 经营分部（segment-reporting-workpaper, spec三件套已建）**：P0=Univer+准则说明(解释3号八(三)(四)), P1=audit-sheet+动态分部列+准则hover。说明提示不能少
@@ -146,6 +147,7 @@ inclusion: always
 
 ## 操作铁律（详见 `#conventions`）
 
+- **🔴 OnlyOffice 调试铁律（2026-06-17 踩坑）**：①先确认 git HEAD 配置是否正确（其他人能用→不是代码问题）②只改 `.env` 对齐 secret 值+重启后端 ③禁止 `docker exec` 手动改容器 local.json（不可复现）④docker-compose 环境变量是唯一正确入口。secret 三方一致校验：config.py 默认值 = docker-compose 默认值 = .env 值
 - **三层一致校验**：DB 迁移 + ORM `Mapped[]` + service 方法，任一缺失即伪绿；TimestampMixin 表的手写 DDL 必显式写 `created_at/updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`（V057 踩坑）
 - **router_registry 必查**：新建 router 必在 `backend/app/router_registry/{group}.py` 注册否则前端 404；FastAPI 不热加载 router（改后重启）；**注册顺序**：含静态路径的 router（`/batch-template`）必在同前缀通配 router（`/{project_id}`）之前，否则通配截获→422 UUID parse error
 - **🟢 auto_data_source 已修复静默降级（2026-06-16）**：外层 `_logger.warning`→`_logger.error`+`exc_info=True`+project/year 上下文；模型引用已确认正确(ConsolScope/EliminationEntry/InternalTrade 均存在)。**铁律不变：新增 auto_data_source 必须 in-process 验证返回非 fallback 值**
