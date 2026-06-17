@@ -1416,9 +1416,53 @@
       "note_section": null
     },
     {
+      "wp_code": "A7-1",
+      "cycle": "A",
+      "wp_name": "汇总关联方交易及关联往来",
+      "audit_stage": "completion",
+      "trigger": "must_have",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "A7-2",
+      "cycle": "A",
+      "wp_name": "关联方交易附注披露信息",
+      "audit_stage": "completion",
+      "trigger": "must_have",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null
+    },
+    {
       "wp_code": "A8",
       "cycle": "A",
       "wp_name": "其他信息程序表",
+      "audit_stage": "completion",
+      "trigger": "must_have",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "A8-1",
+      "cycle": "A",
+      "wp_name": "管理层对审计报告日后公布其他信息的书面声明",
+      "audit_stage": "completion",
+      "trigger": "must_have",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "A8-2",
+      "cycle": "A",
+      "wp_name": "其他信息比对记录",
       "audit_stage": "completion",
       "trigger": "must_have",
       "account_codes": [],

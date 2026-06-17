@@ -29,6 +29,8 @@ const POPUP_COMPONENTS: Record<string, ReturnType<typeof defineAsyncComponent>> 
   'A1-12': defineAsyncComponent(() => import('./WpPopupChecklist.vue')),
   'A1-17': defineAsyncComponent(() => import('./WpPopupProcedure.vue')),
   'A1-18': defineAsyncComponent(() => import('./WpPopupMixedForm.vue')),
+  'A8-1': defineAsyncComponent(() => import('./WpPopupDocxEditor.vue')),
+  'A8-2': defineAsyncComponent(() => import('./WpPopupDocxEditor.vue')),
 }
 
 // Dialog titles
@@ -37,6 +39,8 @@ const POPUP_TITLES: Record<string, string> = {
   'A1-12': '重大事项决定程序的履行情况核查表',
   'A1-17': '对应数据程序表',
   'A1-18': '采用新金融工具准则衔接影响数核对',
+  'A8-1': '管理层关于审计报告日后公布其他信息的书面声明',
+  'A8-2': '其他信息比对记录',
 }
 
 // Dialog widths
@@ -45,6 +49,8 @@ const POPUP_WIDTHS: Record<string, string> = {
   'A1-12': '700px',
   'A1-17': '600px',
   'A1-18': '80vw',
+  'A8-1': '75vw',
+  'A8-2': '75vw',
 }
 
 const dialogVisible = computed({

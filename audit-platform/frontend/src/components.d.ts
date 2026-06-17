@@ -604,6 +604,7 @@ declare module 'vue' {
     WpOfflineExportDialog: typeof import('./components/workpaper/WpOfflineExportDialog.vue')['default']
     WpOfflineImportDialog: typeof import('./components/workpaper/WpOfflineImportDialog.vue')['default']
     WpPopupChecklist: typeof import('./components/workpaper/WpPopupChecklist.vue')['default']
+    WpPopupDocxEditor: typeof import('./components/workpaper/WpPopupDocxEditor.vue')['default']
     WpPopupMixedForm: typeof import('./components/workpaper/WpPopupMixedForm.vue')['default']
     WpPopupProcedure: typeof import('./components/workpaper/WpPopupProcedure.vue')['default']
     WpPopupSigning: typeof import('./components/workpaper/WpPopupSigning.vue')['default']

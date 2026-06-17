@@ -73,17 +73,84 @@
     "A7": {
       "name": "关联交易程序表",
       "items": [
-        {"seq": 1, "content": "了解关联方关系", "ref_index": "A7-1", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 2, "content": "识别关联方交易", "ref_index": "A7-1", "auto_data_source": "related_party_transaction_count", "applicable_default": "yes"},
-        {"seq": 3, "content": "审核关联交易附注披露", "ref_index": "A7-2", "auto_data_source": null, "applicable_default": "yes"}
+        {"seq": 1, "content": "汇总发生在本年度的关联方交易", "ref_index": "A7-1", "auto_data_source": "related_party_transaction_count", "applicable_default": "yes"},
+        {"seq": 2, "content": "超出公司正常经营的关联交易检查", "ref_index": "A7-1", "auto_data_source": null, "applicable_default": "yes", "sub_items": [
+          {"seq": "2.1", "content": "询问管理层关于交易的目的"},
+          {"seq": "2.2", "content": "检查原始凭证或协议并评估交易是否涉及舞弊/条款一致/会计处理恰当"},
+          {"seq": "2.3", "content": "确定交易是否经适当人员批准"}
+        ]},
+        {"seq": 3, "content": "确定是否存在未披露的关联方关系或交易", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
+          {"seq": "3.1", "content": "获取并检查重大异常交易对手背景信息（股东、高管、业务规模等）"},
+          {"seq": "3.2", "content": "检查银行对账单中与疑似关联方的大额资金往来"},
+          {"seq": "3.3", "content": "检查与实际控制人或控股股东的大额资金往来"},
+          {"seq": "3.4", "content": "对重大或异常客户与供应商进行背景调查"},
+          {"seq": "3.5", "content": "检查银行对账单和大额资金往来的商业背景"},
+          {"seq": "3.6", "content": "分析异常交易的商业理由、价格公允性及潜在关联方关系"},
+          {"seq": "3.7", "content": "向重要股东和关键管理人员函证确认关联方关系"},
+          {"seq": "3.8", "content": "检查第三方担保是否存在未披露的反担保"}
+        ]},
+        {"seq": 4, "content": "执行程序确定是否存在未识别的关联方及交易", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
+          {"seq": "4.1", "content": "调查访谈实际控制人投资、借贷等情况，取得相关承诺书"},
+          {"seq": "4.2", "content": "取得董监高和重要交易对手的利益冲突专项声明"},
+          {"seq": "4.3", "content": "比对员工花名册与合同签订人/经办人"},
+          {"seq": "4.4", "content": "运用数据分析工具识别异常交易模式"}
+        ]},
+        {"seq": 5, "content": "对审计中新识别的未披露关联方或交易的后续程序", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
+          {"seq": "5.1", "content": "与管理层讨论确定是否所有交易已识别"},
+          {"seq": "5.2", "content": "评价监控关联方的公司层次控制设计有效性"},
+          {"seq": "5.3", "content": "确定关联交易风险应对是否已恰当应对"},
+          {"seq": "5.4", "content": "考虑缺少披露是否有意为之，通知合伙人评估审计内涵"}
+        ]},
+        {"seq": 6, "content": "关联方交易的披露审核", "ref_index": "A7-2", "auto_data_source": "related_party_disclosure_check", "applicable_default": "yes", "sub_items": [
+          {"seq": "6.1", "content": "对财务报表草稿中的披露与汇总进行比较"},
+          {"seq": "6.2", "content": "识别未披露的交易"},
+          {"seq": "6.3", "content": "确定未披露交易的判断是否适当"},
+          {"seq": "6.4", "content": "复核关联方关系及交易是否公允反映"},
+          {"seq": "6.5", "content": "评价披露的透明度"}
+        ]},
+        {"seq": 7, "content": "无法确定关联方关系或交易时的后续处理", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
+          {"seq": "7.1", "content": "考虑是否与公司治理层及时沟通"},
+          {"seq": "7.2", "content": "考虑征询法律意见"},
+          {"seq": "7.3", "content": "确定是否向监管机构报告重大舞弊"},
+          {"seq": "7.4", "content": "考虑对审计意见的影响"}
+        ]}
       ]
     },
     "A8": {
       "name": "其他信息程序表",
       "items": [
-        {"seq": 1, "content": "获取并阅读其他信息", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"},
-        {"seq": 2, "content": "评估其他信息与财务报表的一致性", "ref_index": "", "auto_data_source": null, "applicable_default": "yes"}
-      ]
+        {"seq": 1, "content": "与治理层沟通，确定哪些文件组成年度报告及公布时间安排", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 2, "content": "与管理层安排及时获取年度报告最终版本（审计报告日前获取或取得书面声明）", "ref_index": "A8-1", "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 3, "content": "获取并阅读其他信息，考虑一致性", "ref_index": "A8-2", "auto_data_source": null, "applicable_default": "yes", "sub_items": [
+          {"seq": "3.1", "content": "将其他信息中金额或项目与财务报表相应金额进行比较，评价一致性"},
+          {"seq": "3.2", "content": "考虑其他信息与注册会计师在审计中了解到的情况是否存在重大不一致"}
+        ]},
+        {"seq": 4, "content": "注意到可能重大错报迹象时，修改风险评估结果和审计计划或更新对被审计单位的了解", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
+        {"seq": 5, "content": "识别出重大不一致或重大错报时，与管理层讨论并确定", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
+          {"seq": "5.1", "content": "确定其他信息是否存在重大错报"},
+          {"seq": "5.2", "content": "确定财务报表是否存在重大错报"},
+          {"seq": "5.3", "content": "确定对被审计单位及其环境的了解是否需要更新"}
+        ]},
+        {"seq": 6, "content": "认为其他信息存在重大错报时，要求管理层更正", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
+          {"seq": "6.1", "content": "管理层同意更正，确定更正已完成"},
+          {"seq": "6.2", "content": "管理层拒绝更正，与治理层沟通并要求更正"}
+        ]},
+        {"seq": 7, "content": "审计报告日前获取的其他信息存在未更正的重大错报时的措施", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
+          {"seq": "7.1", "content": "考虑对审计报告的影响并与治理层沟通"},
+          {"seq": "7.2", "content": "在法律法规允许时考虑解除业务约定"}
+        ]},
+        {"seq": 8, "content": "审计报告日后获取的其他信息存在重大错报时的处理", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
+          {"seq": "8.1", "content": "其他信息得以更正，实施必要的后续程序"},
+          {"seq": "8.2", "content": "未得到更正，采取恰当措施提醒审计报告使用者"}
+        ]},
+        {"seq": 9, "content": "检查审计报告正文是否按准则要求增加其他信息部分", "ref_index": null, "auto_data_source": null, "applicable_default": "yes", "sub_items": [
+          {"seq": "9.1", "content": "上市实体：已获取或预期将获取其他信息"},
+          {"seq": "9.2", "content": "非上市实体：已获取部分或全部其他信息"}
+        ]},
+        {"seq": 10, "content": "其他信息最终版本在审计底稿中归档（纸质或电子版年度报告）", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"}
+      ],
+      "reference_note": "参考：其他信息中可能包含的金额类（关键财务业绩/经营数据/特殊项目/流动性/资本支出/表外安排/担保及或有事项/财务比率）和其他项目类（会计估计/关联方/风险管理/表外安排/法律监管变化/新准则影响/业务环境/战略/商品价格/供求及监管环境/盈利能力因素）共20项",
+      "applicable_note": "新三板挂牌公司审计应特别关注年度报告中其他信息与财务报表或审计过程中了解到的情况是否存在重大不一致"
     },
     "A9": {
       "name": "内部控制建议程序表",

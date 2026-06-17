@@ -1,9 +1,9 @@
-"""
-底稿编制说明（guidance）加载服务。
+"""底稿准则说明/编制说明服务 — 按 wp_code 加载 guidance JSON
 
-从 backend/data/wp_guidance/ 目录加载底稿对应的编制说明 JSON。
-guidance 数据是静态的（随模板版本更新），用 LRU 缓存 + mtime 热重载。
+统一为所有需要 guidance 的底稿（A3-8/A4-1/A5-3/A5-4 等）提供
+准则引用和编制说明数据，供前端侧栏面板展示。
 """
+
 from __future__ import annotations
 
 import json
@@ -15,58 +15,28 @@ logger = logging.getLogger(__name__)
 
 _GUIDANCE_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "wp_guidance"
 
-# wp_code → guidance JSON 文件路径 + mtime（用于热重载检测）
-_guidance_cache: dict[str, tuple[float, dict]] = {}
 
-
-def _scan_guidance_files() -> dict[str, Path]:
-    """扫描 wp_guidance 目录，建立 wp_code → 文件路径映射。"""
-    mapping: dict[str, Path] = {}
-    if not _GUIDANCE_DIR.exists():
-        return mapping
-    for f in _GUIDANCE_DIR.glob("*.json"):
-        try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-            for code in data.get("wp_codes", []):
-                mapping[code] = f
-        except Exception as e:
-            logger.warning("解析 guidance 文件失败 %s: %s", f.name, e)
-    return mapping
-
-
-@lru_cache(maxsize=1)
-def _get_wp_code_to_file_map() -> dict[str, Path]:
-    """缓存 wp_code → 文件路径映射（进程级，重启刷新）。"""
-    return _scan_guidance_files()
-
-
-def get_guidance_for_wp(wp_code: str) -> dict | None:
-    """获取指定 wp_code 的 guidance 数据。支持 mtime 热重载。
+@lru_cache(maxsize=32)
+def get_wp_guidance(wp_code: str) -> dict | None:
+    """按 wp_code 加载准则说明 JSON。
 
     Returns:
-        guidance JSON dict，无对应数据返回 None。
+        guidance dict with {wp_code, title, sections: [{title, items}]}
+        或 None 如果不存在对应文件
     """
-    file_map = _get_wp_code_to_file_map()
-    file_path = file_map.get(wp_code)
-    if not file_path or not file_path.exists():
+    path = _GUIDANCE_DIR / f"{wp_code}.json"
+    if not path.exists():
         return None
-
-    current_mtime = file_path.stat().st_mtime
-    cached = _guidance_cache.get(wp_code)
-    if cached and cached[0] == current_mtime:
-        return cached[1]
-
-    # 重新加载
     try:
-        data = json.loads(file_path.read_text(encoding="utf-8"))
-        _guidance_cache[wp_code] = (current_mtime, data)
-        return data
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
     except Exception as e:
-        logger.error("加载 guidance 文件失败 %s: %s", file_path.name, e, exc_info=True)
+        logger.warning("加载 guidance 失败 wp_code=%s: %s", wp_code, e)
         return None
 
 
-def invalidate_guidance_cache() -> None:
-    """清除缓存（测试用）。"""
-    _guidance_cache.clear()
-    _get_wp_code_to_file_map.cache_clear()
+def list_available_guidance() -> list[str]:
+    """列出所有有 guidance 数据的 wp_code。"""
+    if not _GUIDANCE_DIR.exists():
+        return []
+    return [f.stem for f in _GUIDANCE_DIR.glob("*.json")]

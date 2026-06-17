@@ -80,8 +80,11 @@ const props = withDefaults(defineProps<{
   value: string
   validate?: boolean
   contextProjectId?: string
+  /** 为 true 时 click 仅 emit 不自动导航（供弹窗模式使用） */
+  preventNavigate?: boolean
 }>(), {
   validate: true,
+  preventNavigate: false,
 })
 
 const emit = defineEmits<{
@@ -250,10 +253,15 @@ async function resolveAndNavigateToWp(wpCode: string, pid: string) {
 function handleClick() {
   if (!parsed.value) return
   if (isCrossProject.value) return
-  if (resolveStatus.value === 'not_exists' || resolveStatus.value === 'trimmed') return
+  // preventNavigate 模式下跳过存在性检查（弹窗子底稿可能未生成实例）
+  if (!props.preventNavigate) {
+    if (resolveStatus.value === 'not_exists' || resolveStatus.value === 'trimmed') return
+  }
 
   emit('click', parsed.value)
-  navigateToTarget(parsed.value)
+  if (!props.preventNavigate) {
+    navigateToTarget(parsed.value)
+  }
 }
 
 function handleMultiTargetSelect(target: string) {

@@ -486,24 +486,83 @@ class ProcedureTableService:
                 # A16 声明书版本推荐（简单返回提示）
                 result["summary"] = "标准版声明书"
             elif source == "related_party_transaction_count":
-                # P2: A7 关联交易统计（从附注中查关联方交易数据）
+                # P2: A7 关联交易统计（优先查 related_party_transactions 真实表）
                 try:
-                    from app.models.disclosure_models import DisclosureNote
-                    # 查附注中关联方相关章节是否有数据
-                    rp_stmt = sa.select(sa.func.count()).select_from(DisclosureNote).where(
-                        DisclosureNote.project_id == project_id,
-                        DisclosureNote.year == year,
-                        DisclosureNote.note_section.like("十%"),  # 关联方通常在"十"系列章节
-                        DisclosureNote.is_deleted == sa.false(),
+                    from app.models.related_party_models import (
+                        RelatedPartyRegistry,
+                        RelatedPartyTransaction,
                     )
-                    rp_r = await self.db.execute(rp_stmt)
-                    rp_count = rp_r.scalar() or 0
-                    if rp_count > 0:
-                        result["summary"] = f"已识别{rp_count}个关联方披露章节"
+                    # 1) 统计关联方数量
+                    party_stmt = sa.select(sa.func.count()).select_from(RelatedPartyRegistry).where(
+                        RelatedPartyRegistry.project_id == project_id,
+                        RelatedPartyRegistry.is_deleted == sa.false(),
+                    )
+                    party_r = await self.db.execute(party_stmt)
+                    party_count = party_r.scalar() or 0
+
+                    # 2) 统计交易笔数和合计金额
+                    txn_count_stmt = sa.select(
+                        sa.func.count(),
+                        sa.func.coalesce(sa.func.sum(RelatedPartyTransaction.amount), 0),
+                    ).select_from(RelatedPartyTransaction).where(
+                        RelatedPartyTransaction.project_id == project_id,
+                        RelatedPartyTransaction.is_deleted == sa.false(),
+                    )
+                    txn_r = await self.db.execute(txn_count_stmt)
+                    txn_row = txn_r.one()
+                    txn_count = txn_row[0] or 0
+                    txn_total = txn_row[1] or 0
+
+                    if txn_count > 0:
+                        result["summary"] = f"已识别{txn_count}笔关联交易，涉及{party_count}个关联方，合计{txn_total:,.2f}元"
+                    elif party_count > 0:
+                        result["summary"] = f"已登记{party_count}个关联方，尚未录入交易"
                     else:
                         result["summary"] = "待识别"
                 except Exception as inner_e:
-                    _logger.error("auto_data_source %s inner error: %s", source, inner_e)
+                    _logger.error("auto_data_source %s inner error: %s", source, inner_e, exc_info=True)
+                    result["summary"] = "见关联方底稿"
+            elif source == "related_party_disclosure_check":
+                # P2: A7 步骤6 关联方交易↔附注披露一致性比对
+                try:
+                    from app.models.related_party_models import (
+                        RelatedPartyRegistry,
+                        RelatedPartyTransaction,
+                    )
+                    from app.models.disclosure_models import DisclosureNote
+
+                    # 1) 已录入关联方交易数
+                    txn_stmt = sa.select(sa.func.count()).select_from(RelatedPartyTransaction).where(
+                        RelatedPartyTransaction.project_id == project_id,
+                        RelatedPartyTransaction.is_deleted == sa.false(),
+                    )
+                    txn_r = await self.db.execute(txn_stmt)
+                    txn_count = txn_r.scalar() or 0
+
+                    # 2) 附注中关联方章节数（十一 = 关联方及关联交易）
+                    note_stmt = sa.select(sa.func.count()).select_from(DisclosureNote).where(
+                        DisclosureNote.project_id == project_id,
+                        DisclosureNote.year == year,
+                        DisclosureNote.is_deleted == sa.false(),
+                        sa.or_(
+                            DisclosureNote.note_section.like("十一%"),
+                            DisclosureNote.note_section.like("十、%"),
+                            DisclosureNote.note_section.like("十一、%"),
+                        ),
+                    )
+                    note_r = await self.db.execute(note_stmt)
+                    note_count = note_r.scalar() or 0
+
+                    if txn_count > 0 and note_count > 0:
+                        result["summary"] = f"已录入{txn_count}笔交易，附注已有{note_count}个章节披露，待核对一致性"
+                    elif txn_count > 0 and note_count == 0:
+                        result["summary"] = f"已录入{txn_count}笔交易，但附注尚无关联方披露章节"
+                    elif txn_count == 0 and note_count > 0:
+                        result["summary"] = f"附注已有{note_count}个关联方章节，但尚未录入交易明细"
+                    else:
+                        result["summary"] = "关联方交易及附注均待完善"
+                except Exception as inner_e:
+                    _logger.error("auto_data_source %s inner error: %s", source, inner_e, exc_info=True)
                     result["summary"] = "见关联方底稿"
             elif source == "control_deficiency_count":
                 # P2: A14 内控缺陷统计（从 issue_tickets 查内控类缺陷）

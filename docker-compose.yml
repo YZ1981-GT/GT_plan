@@ -522,7 +522,8 @@ services:
 
     environment:
       - WOPI_ENABLED=true
-      - JWT_ENABLED=false
+      - JWT_ENABLED=true
+      - JWT_SECRET=${ONLYOFFICE_JWT_SECRET:-onlyoffice-dev-secret-2026}
 
     volumes:
 

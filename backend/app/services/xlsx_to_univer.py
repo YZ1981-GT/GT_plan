@@ -115,8 +115,14 @@ def xlsx_to_univer_data(file_path: str, max_rows: int = 5000) -> dict[str, Any]:
 
         # 冻结首行
         if ws.freeze_panes:
-            freeze_row = ws.freeze_panes.row - 1 if ws.freeze_panes.row else 0
-            freeze_col = ws.freeze_panes.column - 1 if ws.freeze_panes.column else 0
+            from openpyxl.utils import coordinate_to_tuple
+            try:
+                _fr, _fc = coordinate_to_tuple(str(ws.freeze_panes))
+                freeze_row = _fr - 1 if _fr > 1 else 0
+                freeze_col = _fc - 1 if _fc > 1 else 0
+            except (ValueError, TypeError):
+                freeze_row = 0
+                freeze_col = 0
             if freeze_row > 0 or freeze_col > 0:
                 sheet_data["freeze"] = {
                     "startRow": freeze_row,

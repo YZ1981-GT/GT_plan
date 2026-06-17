@@ -261,6 +261,7 @@
               <GtIndexChip
                 :value="ref"
                 :validate="true"
+                :prevent-navigate="INLINE_POPUP_WP_CODES.has(ref)"
                 @click="handleIndexChipClick"
               />
               <span
@@ -487,7 +488,7 @@ import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useWpOnboardingGuide } from '@/composables/useWpOnboardingGuide'
 
 // 弹窗式子底稿集合（点击不跳转，弹窗展示）
-const INLINE_POPUP_WP_CODES = new Set(['A1-11', 'A1-12', 'A1-17', 'A1-18'])
+const INLINE_POPUP_WP_CODES = new Set(['A1-11', 'A1-12', 'A1-17', 'A1-18', 'A8-1', 'A8-2'])
 
 // ─── Types ───
 interface ProgramAssertions {
@@ -672,11 +673,50 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 // ─── Initialize data from props ───
 function initData() {
-  if (props.htmlData?.programs) {
+  if (props.htmlData?.programs && props.htmlData.programs.length > 0) {
     programs.value = JSON.parse(JSON.stringify(props.htmlData.programs))
   } else {
     programs.value = []
+    // htmlData 为空时自动从 procedure-tables API 拉取
+    fetchProcedureTableData()
   }
+}
+
+/** 从 procedure-tables API 拉取程序行数据（htmlData 为空的兜底） */
+async function fetchProcedureTableData() {
+  if (!projectId.value) return
+  // 从 sheetName 推导 table_code：如 "审计程序A8" → "A8"
+  const tableCode = extractTableCode(props.sheetName)
+  if (!tableCode) return
+  const year = parseInt(route.query.year as string) || new Date().getFullYear()
+  try {
+    const res = await api.get(
+      `/api/projects/${projectId.value}/procedure-tables/${tableCode}`,
+      { params: { year } },
+    )
+    const data = res?.data || res
+    if (data?.items && Array.isArray(data.items)) {
+      programs.value = data.items.map((item: any, idx: number) => ({
+        id: item._key || `proc-${idx}`,
+        program_no: item.seq,
+        program_desc: item.content,
+        program_category: '',
+        linked_workpapers: item.ref_index || '',
+        execution_summary: item.summary || '',
+        status: item.applicable === 'na' ? 'not_applicable' : 'pending',
+        phase: item.phase || undefined,
+      }))
+    }
+  } catch {
+    // 静默——api 可能未实现或无数据
+  }
+}
+
+/** 从 sheetName 提取 table_code (如 "审计程序A8" → "A8") */
+function extractTableCode(sheetName: string): string {
+  // 匹配 A1~A17 格式
+  const m = sheetName.match(/[A-S]\d+/)
+  return m ? m[0] : ''
 }
 
 initData()
