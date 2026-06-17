@@ -53,6 +53,10 @@ export type HtmlComponentType =
   | 'audit-legend'
   | 'checklist-table'
   | 'analytical-review'
+  | 'goodwill-impairment'
+  | 'segment-report'
+  | 'contingent-liability'
+  | 'discontinued-operations'
 
 /** 注册表条目：包含 lazy component / 图标 / emits / 描述 */
 export interface HtmlRendererEntry {
@@ -92,6 +96,10 @@ const GtIndependenceSigning = defineAsyncComponent(() => import('./IndependenceS
 const GtAuditLegend = defineAsyncComponent(() => import('./AuditLegendPanel.vue'))
 const GtChecklistTable = defineAsyncComponent(() => import('./GtChecklistTable.vue'))
 const GtAnalyticalReview = defineAsyncComponent(() => import('./GtAnalyticalReview.vue'))
+const GtGoodwillImpairment = defineAsyncComponent(() => import('./GtGoodwillImpairment.vue'))
+const GtSegmentReport = defineAsyncComponent(() => import('./GtSegmentReport.vue'))
+const GtContingentLiability = defineAsyncComponent(() => import('./GtContingentLiability.vue'))
+const GtDiscontinuedOperations = defineAsyncComponent(() => import('./GtDiscontinuedOperations.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -278,6 +286,34 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: GtAnalyticalReview,
     icon: '📊',
     label: '分析性复核',
+    emits: ['save'],
+  },
+  {
+    componentType: 'goodwill-impairment',
+    component: GtGoodwillImpairment,
+    icon: '💎',
+    label: '商誉减值测试',
+    emits: ['save'],
+  },
+  {
+    componentType: 'segment-report',
+    component: GtSegmentReport,
+    icon: '🏢',
+    label: '经营分部',
+    emits: ['save'],
+  },
+  {
+    componentType: 'contingent-liability',
+    component: GtContingentLiability,
+    icon: '⚖️',
+    label: '或有事项',
+    emits: ['save'],
+  },
+  {
+    componentType: 'discontinued-operations',
+    component: GtDiscontinuedOperations,
+    icon: '📉',
+    label: '终止经营',
     emits: ['save'],
   },
 ]

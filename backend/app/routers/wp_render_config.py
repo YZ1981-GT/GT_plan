@@ -1436,6 +1436,11 @@ async def get_render_config(
             logger.warning("Auto-fill resolution failed: %s", e)
             fill_results = {}
 
+    # ─── Step 8: 编制说明 guidance（静态 JSON，按 wp_code 查找）────────────
+    from app.services.wp_guidance_service import get_guidance_for_wp
+
+    guidance_data = get_guidance_for_wp(wp_code)
+
     return {
         "wp_id": str(wp_id),
         "wp_code": wp_code,
@@ -1445,4 +1450,5 @@ async def get_render_config(
         "template_version": template_version_str,
         "sheets": sheets,
         "fill_results": fill_results,
+        "guidance": guidance_data,
     }

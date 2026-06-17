@@ -858,6 +858,36 @@ async def upload_workpaper_file(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.put("/working-papers/{wp_id}/parsed-data")
+async def update_parsed_data(
+    project_id: UUID,
+    wp_id: UUID,
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """更新底稿 parsed_data（结构化组件数据持久化）。
+
+    合并语义：payload 会 shallow merge 到现有 parsed_data 上，
+    不覆盖 univer_snapshot 等其他键。
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    wp = (await db.execute(
+        sa.select(WorkingPaper).where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == False)
+    )).scalar_one_or_none()
+    if not wp:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    existing = dict(wp.parsed_data) if isinstance(wp.parsed_data, dict) else {}
+    existing.update(payload)
+    wp.parsed_data = existing
+    flag_modified(wp, "parsed_data")
+    await db.flush()
+    await db.commit()
+    return {"ok": True}
+
+
 @router.put("/working-papers/{wp_id}/status")
 async def update_status(
     project_id: UUID,

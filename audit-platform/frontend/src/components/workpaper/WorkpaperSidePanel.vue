@@ -37,6 +37,10 @@
             <QualityScoreBadge v-if="wpId" :score="0" />
             <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
           </el-tab-pane>
+          <el-tab-pane label="编制说明" name="guidance" lazy>
+            <WpGuidancePanel v-if="wpId" :project-id="projectId" :wp-id="wpId" />
+            <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
+          </el-tab-pane>
         </el-tabs>
       </el-tab-pane>
 
@@ -180,6 +184,7 @@ import PbcCollectionTab from '@/components/workpaper/PbcCollectionTab.vue'
 import SnapshotCompare from '@/components/workpaper/SnapshotCompare.vue'
 import WpVersionHistoryPanel from '@/components/workpaper/WpVersionHistoryPanel.vue'
 import QualityScoreBadge from '@/components/workpaper/QualityScoreBadge.vue'
+import WpGuidancePanel from '@/components/workpaper/WpGuidancePanel.vue'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 
