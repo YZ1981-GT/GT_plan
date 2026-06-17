@@ -2,7 +2,7 @@
   "mcpServers": {
     "codegraph": {
       "type": "stdio",
-      "command": "C:\\Users\\杨志\\AppData\\Roaming\\npm\\codegraph.cmd",
+      "command": "C:\\Users\\Administrator\\AppData\\Roaming\\npm\\codegraph.cmd",
       "args": [
         "serve",
         "--mcp",
@@ -10,7 +10,9 @@
         "--path",
         "D:/GT_plan"
       ],
-      "env": {},
+      "env": {
+        "NODE_OPTIONS": "--max-old-space-size=512"
+      },
       "disabled": false,
       "autoApprove": [
         "codegraph_search",

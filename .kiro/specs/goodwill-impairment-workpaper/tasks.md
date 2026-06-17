@@ -1,16 +1,16 @@
 # Implementation Plan
 
-## P0: Univer 渲染 + 编制说明
+## P0: Univer 渲染 + 编制说明面板
 
-- [ ] 1. 确认 A3-8/A3-8-1 当前 classification 路由（应走 univer 或 audit-sheet）
-- [ ] 2. 编制说明数据提取：从模板 xlsx "编制说明"sheet 提取 guidance 文本 + WACC/CAPM 公式
-- [ ] 3. 前端：底稿编辑器增加"编制说明"tab/面板展示 guidance（复用现有 guidance 机制）
-- [ ] 4. 验证：打开 A3-8 能正常编辑 + 查看编制说明
+- [ ] 1. 确认 A3-8/A3-8-1 当前 Univer 渲染正常（class_code 路由验证）
+- [ ] 2. 提取编制说明内容到结构化数据（后端解析模板或硬编码 JSON）
+- [ ] 3. 前端侧栏 guidance 面板展示编制说明（6条规则+WACC/CAPM公式+参数定义）
+- [ ] 4. 集成验证
 
-## P1: 结构化 DCF 组件（后续）
+## P1: 结构化渲染 + 计算引擎
 
-- [ ]* 5. 新建 `dcf-valuation` componentType
-- [ ]* 6. WACC 计算面板（Kd/Rf/β/Rm/D/E 参数输入 → 自动算 WACC+Ke）
-- [ ]* 7. 5年 DCF 表格（现金流预测×折现系数→现值）
-- [ ]* 8. 减值判定面板（账面 vs 可收回 → 差额 → 分摊规则）
-- [ ]* 9. 数据联动：资产组账面从合并报表取
+- [ ] 5. componentType 路由注册 `goodwill-impairment`
+- [ ] 6. 后端 WACC/DCF 计算引擎服务
+- [ ] 7. 前端 GtGoodwillImpairment.vue 组件（减值测试表+可收回金额计算）
+- [ ] 8. 数据持久化（计算参数+结果存 parsed_data）
+- [ ] 9. 集成验证 + Playwright E2E

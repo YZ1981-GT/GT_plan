@@ -2,71 +2,33 @@
 
 ## Overview
 
-A4-1 经营分部审定表使用 `audit-sheet` componentType 渲染，扩展支持动态列 + 准则说明 tooltip。
+P0：A4-1 走 Univer 渲染（保留动态列+公式），准则说明以侧栏/hover 展示。P1：结构化 audit-sheet 组件+动态分部列。
 
-## componentType
+## P0 设计
 
-A4-1 当前走 class_code `F-审定表` → `audit-sheet`。不新增 componentType，复用现有 audit-sheet 框架。
+### 路由
+- A4 走 `a-program-console`（已有）
+- A4-1 走 Univer（F-审定表 或默认 xlsx 渲染）
+- 无需新建 componentType
 
-## 扩展设计
+### 准则说明展示
+在 WorkpaperEditor 侧栏 guidance 面板展示 A4-1 的蓝色准则引用内容：
+- 解释3号"八(三)"：分部利润/资产/负债的列报要求
+- 解释3号"八(四)"：产品劳务/地区/客户信息的列报要求
+- 以折叠面板形式组织，分 3 个折叠块
 
-### 动态分部列
-audit-sheet 现有列结构是固定的（从模板解析）。A4-1 需要动态列：
-- 用 `parsed_data.segment_columns` 存用户自定义分部名称
-- 前端 audit-sheet 组件检测到 `segment_columns` 时渲染动态列
+### 数据来源
+准则说明内容从模板 xlsx 中提取（蓝色字体行）或硬编码为 JSON。
 
-```json
-// working_paper.parsed_data
-{
-  "segment_columns": ["软件分部", "电子器件分部"],
-  "segment_data": {
-    "current": {
-      "revenue": {"软件分部": 5000000, "电子器件分部": 3000000, "other": 200000, "elimination": -100000},
-      "cost": {...},
-      "profit": {...}
-    },
-    "prior": {...}
-  }
-}
-```
+## P1 设计（结构化渲染）
 
-### 准则说明 Guidance
-在 render-config 返回的 html_data 中附带 guidance：
-```json
-{
-  "guidance_items": [
-    {
-      "section": "分部利润",
-      "reference": "解释3号\"八(三)\"2",
-      "content": "每一报告分部的利润(亏损)总额相关信息，包括利润(亏损)总额组成项目及计量的相关会计政策；"
-    },
-    {
-      "section": "分部资产负债",
-      "reference": "解释3号\"八(三)\"3",
-      "content": "每一报告分部的资产总额、负债总额相关信息，包括资产总额组成项目的信息，以及有关资产、负债计量的相关会计政策。"
-    },
-    {
-      "section": "产品劳务收入",
-      "reference": "解释3号\"八(四)\"1",
-      "content": "每一产品和劳务或每一类似产品和劳务组合的对外交易收入；"
-    },
-    {
-      "section": "地区信息",
-      "reference": "解释3号\"八(四)\"2",
-      "content": "企业取得的来自于本国的对外交易收入总额以及位于本国的非流动资产总额，企业从其他国家取得的对外交易收入总额及位于其他国家的非流动资产总额"
-    },
-    {
-      "section": "主要客户",
-      "reference": "解释3号\"八(四)\"3",
-      "content": "企业对主要客户的依赖程度。"
-    }
-  ]
-}
-```
-
-前端在每个 section 标题旁渲染 ⓘ tooltip 展示 guidance。
+### componentType: `segment-report`
+- 动态列名管理（添加/删除/重命名分部）
+- 合计列自动求和
+- 本期/上期切换 Tab
+- 地区信息交叉表
+- 主要客户列表
 
 ## Testing Strategy
-- A4-1 正常打开为 audit-sheet
-- guidance tooltip 正确展示准则引用
-- 动态列增删+数据保存
+- P0：Univer 渲染正常 + guidance 面板显示准则说明
+- P1：动态列增删 + 合计计算 + 准则 hover
