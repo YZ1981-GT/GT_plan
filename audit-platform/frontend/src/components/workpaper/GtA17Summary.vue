@@ -39,6 +39,52 @@ const saving = ref(false)
 const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
+// ─── Issue hints (ch15 等含 issue_tickets 数据源) ───
+interface IssueHintsPayload {
+  fraud?: { count?: number; titles?: string[]; items?: Array<{ title: string }>; note?: string; heuristic_only?: boolean }
+  legal?: { count?: number; titles?: string[] }
+  legal_violation?: { count?: number; items?: Array<{ title: string }>; note?: string; heuristic_only?: boolean }
+}
+
+const issueHints = ref<IssueHintsPayload | null>(null)
+
+const showIssueHints = computed(() => {
+  const ch = activeChapter.value
+  if (!ch?.data_source?.sources) return false
+  return ch.data_source.sources.includes('issue_tickets')
+})
+
+const issueHintsLines = computed(() => {
+  const hints = issueHints.value
+  if (!hints) return [] as string[]
+  const lines: string[] = []
+  const fraud = hints.fraud
+  if (fraud?.count) {
+    const titles = fraud.titles || fraud.items?.map(i => i.title) || []
+    lines.push(`舞弊相关问题单 ${fraud.count} 条${titles.length ? '：' + titles.slice(0, 5).join('；') : ''}`)
+  } else {
+    lines.push('舞弊相关问题单：0 条')
+  }
+  const legal = hints.legal_violation || hints.legal
+  if (legal?.count) {
+    const titles = (legal as any).titles || (legal as any).items?.map((i: any) => i.title) || []
+    lines.push(`违规相关问题单 ${legal.count} 条${titles.length ? '：' + titles.slice(0, 5).join('；') : ''}`)
+  }
+  const note = fraud?.note || (hints.legal_violation as any)?.note
+  if (note) lines.push(String(note))
+  return lines
+})
+
+async function loadIssueHints() {
+  if (!props.projectId) return
+  try {
+    const res = await api.get(`/api/projects/${props.projectId}/issue-hints`)
+    issueHints.value = (res as IssueHintsPayload) || null
+  } catch {
+    issueHints.value = null
+  }
+}
+
 // ─── AI Assist State ───
 const aiEnabled = ref(false)
 const aiLoading = ref(false)
@@ -224,7 +270,12 @@ async function handlePull(ch: ChapterDefinition) {
 }
 
 // ─── Lifecycle ───
-onMounted(async () => { await loadChapterDefinitions(); await loadResponses(); checkAiEnabled() })
+onMounted(async () => {
+  await loadChapterDefinitions()
+  await loadResponses()
+  await loadIssueHints()
+  checkAiEnabled()
+})
 onBeforeUnmount(() => { flushPendingSave() })
 watch(() => [props.projectId, props.wpId], async () => {
   if (props.projectId && props.wpId) await loadResponses()
@@ -264,6 +315,13 @@ watch(() => [props.projectId, props.wpId], async () => {
                 <span class="guidance-sources__label">数据来源：</span>
                 <el-tag v-for="src in activeChapter.data_source.sources" :key="src"
                   size="small" effect="plain">{{ src }}</el-tag>
+              </div>
+              <div v-if="showIssueHints && issueHintsLines.length" class="guidance-issue-hints">
+                <el-alert type="warning" :closable="false" show-icon title="问题单提示（启发式，仅供编制参考）">
+                  <ul class="guidance-issue-hints__list">
+                    <li v-for="(line, idx) in issueHintsLines" :key="idx">{{ line }}</li>
+                  </ul>
+                </el-alert>
               </div>
             </el-collapse-item>
           </el-collapse>
@@ -331,6 +389,8 @@ watch(() => [props.projectId, props.wpId], async () => {
 .guidance-content { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); line-height: var(--gt-line-height-loose); }
 .guidance-sources { margin-top: var(--gt-space-2); display: flex; align-items: center; gap: var(--gt-space-1); flex-wrap: wrap; }
 .guidance-sources__label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.guidance-issue-hints { margin-top: var(--gt-space-3); }
+.guidance-issue-hints__list { margin: var(--gt-space-2) 0 0; padding-left: 18px; font-size: var(--gt-font-size-sm); line-height: 1.6; }
 /* ─── 操作栏 ─── */
 .gt-a17-summary__action-bar { display: flex; align-items: center; gap: var(--gt-space-3); margin-bottom: var(--gt-space-3); }
 .gt-a17-summary__save-status { margin-left: auto; font-size: var(--gt-font-size-xs); line-height: 1; }

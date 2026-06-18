@@ -227,3 +227,17 @@ CW-76：`A16.sign_date → audit_report.representation_letter_date`
 - 非推荐主版本 chip 灰显禁用
 - 从 docx 元数据读签署日期
 - 伪造 completion / sign_status 标绿
+
+---
+
+## 实施状态（2026-06-18）
+
+| 模块 | 文件 | 状态 |
+|------|------|------|
+| 版本矩阵 | `a16_version_matrix.json` | ✅ |
+| 推荐服务 | `a16_version_service.py` | ✅ |
+| 跳转页 | `WorkpaperWordEditor.vue` | ✅ 主/补分离 |
+| 弹窗 | `WpPopupDocxEditor.vue` | ✅ A16-1~7 |
+| 签回 API | `checklist_responses` + version scope | ✅ |
+| CW-76 | `test_a16_cw76_sign_date.py` | ✅ |
+| E2E | `e2e/a16-*.spec.ts`（4 文件） | ✅ |

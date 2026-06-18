@@ -431,3 +431,9 @@ A13-1 列（audit）：序号/内容及说明/索引号/调整内容 + R6 借方
 - audit-xlsx 未完成即标 core parser 绿
 - 伪造 E2E 标绿
 - A8-2 / A10-1 做成 A17-1 式 structured HTML（保持 Word 自由编辑）
+
+---
+
+## 实施状态（2026-06-18）
+
+**tasks 51/51 ✅** — 全分期闭合。关键产物见 requirements §现状与差距。

@@ -142,3 +142,22 @@ P4+ opt: 报告修订 ──stale──▶ A17-2-1 标记（不自动回写）
 "A17-5-5": "checklist-table",
 # A17-7 已有: "independence-signing"
 ```
+
+---
+
+## 实施状态（2026-06-18）
+
+| 模块 | 文件 | 状态 |
+|------|------|------|
+| A17-1 编辑器 | `GtA17Summary.vue` | ✅ 16 章 |
+| 章节定义 | `a17_chapter_definitions.json` | ✅ |
+| 拉取服务 | `a17_summary_service.py` | ✅ MVP |
+| Word 导出 | `a17_word_exporter.py` | ✅ A17-1 + KAM |
+| KAM 组件 | `GtKamWorkpaper.vue` | ✅ |
+| LLM | `a17_llm_service.py` | ✅ |
+| KAM push | `a17_kam_push_service.py` | ✅ |
+| A17-5 选版 API | `a17_5_version_selector.py` | ✅ 后端；前端待接 |
+| chip 灰显 | `GtAProgramConsole` → `GtIndexChip.disabled` | ✅ |
+| issue_hints UI | `GtA17Summary` ch15 提示栏 | ✅ |
+| A17-5 选版 | `GtAProgramConsole` + applicable-versions | ✅ |
+| E2E | `a17-lite.spec.ts` / `a17-core.spec.ts` | ✅ spec 就绪 |

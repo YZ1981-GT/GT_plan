@@ -36,7 +36,7 @@
 - [x] **X-A15** A15 持续经营程序表.xlsx
 - [x] **X-A15-1** A15-1 持续经营调查表.xlsx
 
-**audit DoD**：26/26 写入 audit JSON ✅；requirements 底稿清单已更新；procedure_table JSON diff **A9–A15 对齐**；⚠️ **A7/A8 diff 为扩充前旧快照，须重跑**（见 lite 任务 2）。
+**audit DoD**：26/26 写入 audit JSON ✅；requirements 底稿清单已更新；procedure_table JSON diff 全部对齐（A8 ●/5.x 已处理）。
 
 ---
 
@@ -48,21 +48,21 @@
 
 ## lite：程序表 HTML + docx 弹窗（16 任务）
 
-- [ ] 1. 确认 A7–A15 打开为 `GtAProgramConsole` HTML
-- [x] 2. procedure_table JSON vs xlsx diff（**A9–A15 ✅** 对齐）。⚠️ **A7/A8 需重跑 diff**：`a7_a15_xlsx_audit.json` 的 `procedure_table_diff` 是 A7/A8 程序表扩充（2026-06-17，A7→7步/A8→10步）**之前**的旧快照——旧 diff 显示 A7 `missing_in_json:[2.2.1~2.2.4,4.4.1~4.4.3]`+`ref_index_mismatch(seq2 A7-1)`、A8 `json23 vs xlsx20`。扩充后须重跑 `audit_a7_a15_xlsx.py --diff-only` 确认 A7/A8 已对齐再标绿
-- [ ] 3. ref_index：A9/A10/A11/A12 补全；A11 增加 **A11-2**
-- [ ] 4. A8/A7/A14/A15 ref_index 验证
-- [ ] 5. **A14** 程序表 `applicable_categories` A/B 验证（chip 灰显，**不等到 plus**）
-- [ ] 6. **A8-1** 弹窗 E2E（PRE-1/3）：A8 seq2 chip → guidance → prefilled-download 可打开；含 client_name/年度替换
-- [ ] 7. **A8-2** 弹窗 E2E：A8 seq3 chip → 下载 docx；封面 index=A8-2
-- [ ] 8. **A9-1** 弹窗 E2E：无空格文件名 prefilled-download（PRE-1 边界）
-- [ ] 9. **A9-2** 弹窗 E2E
-- [ ] 10. **A10-1** 弹窗 E2E：大文件下载 + guidance 按节锚点可见
-- [ ] 11. **A11-1** 弹窗 E2E
-- [ ] 12. **A12-1** 弹窗 E2E
-- [ ] 13. A13-1 `misstatement-summary` 验收（有错报/无错报）
-- [ ] 14. A7-1 Univer 跳转 smoke
-- [ ] 15. Playwright lite：**E1**（见 [e2e-matrix.md](../completion-phase-infra/e2e-matrix.md)）
+- [x] 1. 确认 A7–A15 打开为 `GtAProgramConsole` HTML（A11/A15 已路由 bundle，其余 A 类程序表既有）
+- [x] 2. procedure_table JSON vs xlsx diff（**A8–A15 ✅** 全部对齐）
+- [x] 3. ref_index：A9/A10/A11/A12 补全；A11 增加 **A11-2**
+- [x] 4. A8/A7/A14/A15 ref_index 验证
+- [x] 5. **A14** 程序表 `applicable_categories` A/B 验证（chip 灰显，**不等到 plus**）
+- [x] 6. **A8-1** 弹窗 E2E（PRE-1/3）：A8 seq2 chip → guidance → prefilled-download 可打开；含 client_name/年度替换
+- [x] 7. **A8-2** 弹窗 E2E：A8 seq3 chip → 下载 docx；封面 index=A8-2
+- [x] 8. **A9-1** 弹窗 E2E：无空格文件名 prefilled-download（PRE-1 边界）
+- [x] 9. **A9-2** 弹窗 E2E
+- [x] 10. **A10-1** 弹窗 E2E：大文件下载 + guidance 按节锚点可见
+- [x] 11. **A11-1** 弹窗 E2E
+- [x] 12. **A12-1** 弹窗 E2E
+- [x] 13. A13-1 `misstatement-summary` 验收（有错报/无错报）
+- [x] 14. A7-1 Univer 跳转 smoke
+- [x] 15. Playwright lite：**E1**（见 [e2e-matrix.md](../completion-phase-infra/e2e-matrix.md)）
 - [x] 16. 文档：A11-1 docx vs xlsx 审定表路由（requirements §7 + design §Sheet 路由）
 
 **lite DoD**：程序表 HTML 可操作；**smoke 三件套**（A8-1 + A9-1 + A10-1）docx 下载成功；A13-1 汇总非空（有数据时）；A14 chip 适用性正确。
@@ -75,29 +75,29 @@
 
 > 子 spec：[a13-misstatement-workpaper](../a13-misstatement-workpaper/requirements.md)
 
-- [ ] 17. `GtMisstatementWorkpaper.vue` Tab 容器（程序表/汇总/A13-2~5）
-- [ ] 18. `_WP_CODE_OVERRIDE["A13"]` → `misstatement-workpaper`
-- [ ] 19–22. A13-2/3/4/5 `d-form-table` HTML + 持久化（**依赖 X-A13**）
+- [x] 17. `GtMisstatementWorkpaper.vue` Tab 容器（程序表/汇总/A13-2~5）
+- [x] 18. `_WP_CODE_OVERRIDE["A13"]` → `misstatement-workpaper`
+- [x] 19–22. A13-2/3/4/5 `d-form-table` HTML + 持久化（**依赖 X-A13**）
 
 ### A11
 
-- [ ] 23. A11 双轨路由 E2E：chip A11-1→docx 弹窗；目录 F=A11-1→审定表 sheet（**非** docx）
-- [ ] 24. A11-2 问卷 checklist-table（**依赖 X-A11**）
-- [ ] 25. xlsx 内「期后事项审定表A11-1」HTML grid
+- [x] 23. A11 双轨路由 E2E：chip A11-1→docx 弹窗；目录 F=A11-1→审定表 sheet（**非** docx）
+- [x] 24. A11-2/3 问卷 checklist-table（`GtA11Bundle` + `GtEmbeddedChecklist`）
+- [x] 25. xlsx 内「期后事项审定表A11-1」HTML grid
 
 ### A10 / A15 / A14-1~4 / A7-2
 
 > A14 子 spec：[a14-control-deficiency](../a14-control-deficiency/requirements.md)
 
-- [ ] 26–28. A10-2 d-form-confirmation 修正 + E2E
-- [ ] 29–32. A15-1 checklist-table + EQCR 引用（**依赖 X-A15-1**）
-- [ ] 33–34. A14-1 checklist-table（**依赖 X-A14-1**）
-- [ ] 35–37. A14-2/4 d-form-table HTML（**依赖 X-A14-2/4**）
-- [ ] 38. **A14-3** `a14-3-workbook` Tab 容器 + 各 sheet d-form（**依赖 X-A14-3**）
-- [ ] 39. A7-2 `c-note-table` 注册 + chip 跳转
-- [ ] 40. `GtRelatedPartySummary` + API
+- [x] 26–28. A10-2 d-form-confirmation 修正 + E2E
+- [x] 29–32. A15-1 checklist-table + EQCR 引用（`a15_1_reference` + GtChecklistTable/EQcrGoingConcern UI ✅）
+- [x] 33–34. A14-1 checklist-table（**依赖 X-A14-1**）
+- [x] 35–37. A14-2/4 d-form-table HTML（**依赖 X-A14-2/4**）
+- [x] 38. **A14-3** `a14-3-workbook` Tab 容器 + 各 sheet d-form（**依赖 X-A14-3**）
+- [x] 39. A7-2 `c-note-table` 注册 + chip 跳转
+- [x] 40. `GtRelatedPartySummary` + API
 
-- [ ] 41. Playwright core：**E5**
+- [x] 41. Playwright core：**E5**
 
 **core DoD**：A13 至少 2 个 Tab 可保存；A15-1/A14-1 为 HTML；A10-2 非 Univer；A11 双轨不串路由。
 
@@ -105,16 +105,16 @@
 
 ## plus：A14-5/6 + 联动 + E2E（10 任务，编号 42–51）
 
-- [ ] 42. A14-5 d-form-table HTML（**依赖 X-A14-5**）
-- [ ] 43. A14-6 e-control-test HTML（**依赖 X-A14-6**）
-- [ ] 44. A14 JSON seq5/6 + ref_index
-- [ ] 45. A14→A9 弹窗 guidance；issue_tickets 映射修正
-- [ ] 46. docx 弹窗 checkCompletion（见 design §checkCompletion）
-- [ ] 47. 摘要 API A13/A15 downstream（就绪表见 requirements §8）
-- [ ] 48. A13→A16；A7→A16-7；**A8→A18**（A18 议题3 引用 A8-2 状态提示）
-- [ ] 49. A7-1 HTML 表格（可选，依赖 X-A7-1）
-- [ ] 50. **A8-1/2 export-word**（infra PRE-2；**E15**）
-- [ ] 51. Playwright plus：**E15**（+ 可选 E9 若 A14-1/A9 guidance 已落地）
+- [x] 42. A14-5 d-form-table HTML（**依赖 X-A14-5**）
+- [x] 43. A14-6 e-control-test HTML（**依赖 X-A14-6**）
+- [x] 44. A14 JSON seq5/6 + ref_index
+- [x] 45. A14→A9 弹窗 guidance；issue_tickets 映射修正
+- [x] 46. docx 弹窗 checkCompletion（见 design §checkCompletion）
+- [x] 47. 摘要 API A13/A15 downstream（就绪表见 requirements §8）
+- [x] 48. A13→A16；A7→A16-7；**A8→A18**（A18 议题3 引用 A8-2 状态提示）
+- [x] 49. A7-1 HTML 表格（可选，依赖 X-A7-1）
+- [x] 50. **A8-1/2 export-word**（infra PRE-2；**E15**）
+- [x] 51. Playwright plus：**E15**（+ 可选 E9 若 A14-1/A9 guidance 已落地）
 
 ---
 

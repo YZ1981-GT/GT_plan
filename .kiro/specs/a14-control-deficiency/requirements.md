@@ -49,9 +49,11 @@
 
 ## 现状
 
-| 项 | 状态 |
-|----|------|
-| audit X-A14~6 | ✅ |
-| A14-1 checklist | ❌ PRE-4-3 |
-| A14-3 workbook | ❌ |
-| A14-6 e-control | ❌ plus |
+| 项 | 状态 | 实证 |
+|----|------|------|
+| audit X-A14~6 | ✅ | `a7_a15_xlsx_audit.json` |
+| A14-1 checklist | ✅ | `checklist_xlsx_parser.py` + PRE-4-3；E2E `a14-1-checklist-table.spec.ts` |
+| A14-2/4 d-form | ✅ | `_WP_CODE_OVERRIDE` + render schema YAML |
+| A14-3 workbook | ✅ | `GtA14_3Workbook.vue`（3 Tab，示例 sheet skip） |
+| A14-5/6 plus | ✅ | d-form-table + e-control-test；`test_a14_5_6_plus_phase.py` |
+| A14→A9 guidance | ✅ | plus 任务 45（issue_tickets 映射） |

@@ -29,6 +29,7 @@ interface ChecklistItem {
   type: 'actionable' | 'guidance' | 'header'
   standard_ref: string
   content: string
+  preset_wp_ref?: string
   children: ChecklistChild[]
 }
 
@@ -98,6 +99,7 @@ const sectionApplicability = ref<Record<string, boolean>>({})
 const showApplicabilityDialog = ref(false)
 const saving = ref(false)
 const saveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const reviewSignHints = ref<Record<string, { suggested_conclusion?: string; reason?: string; sign_status?: string | null }>>({})
 const pendingChanges = ref<Set<string>>(new Set())
 
 // ─── Search state (Task 8) ───
@@ -118,6 +120,10 @@ function activateCell(itemId: string, field: string) {
 
 // ─── Computed: Template data ───
 const template = computed(() => props.htmlData?.template)
+const isA15_1 = computed(() => template.value?.wp_code === 'A15-1')
+const eqcrWorkbenchPath = computed(() =>
+  projectId.value ? `/projects/${projectId.value}/eqcr/projects/${projectId.value}` : '',
+)
 const sections = computed(() => template.value?.sections ?? [])
 const toc = computed(() => template.value?.toc ?? [])
 const stats = computed(() => template.value?.stats ?? { total_actionable: 0, total_guidance: 0, total_sections: 0 })
@@ -457,6 +463,34 @@ function getConclusionClass(conclusion: string | null): string {
   }
 }
 
+function presetReviewPrefix(ref: string | undefined): string | null {
+  if (!ref) return null
+  const m = ref.match(/^A2[1-5]/)
+  return m ? m[0] : null
+}
+
+function signHintForItem(item: ChecklistItem) {
+  const prefix = presetReviewPrefix(item.preset_wp_ref)
+  return prefix ? reviewSignHints.value[prefix] : null
+}
+
+async function loadReviewSignHints() {
+  const code = template.value?.wp_code || ''
+  if (!code.startsWith('A17-5') || !projectId.value) return
+  try {
+    const res = await api.get('/api/a17/review-sign-hints', {
+      params: { project_id: projectId.value },
+    })
+    reviewSignHints.value = (res?.data ?? res) || {}
+  } catch { /* non-critical */ }
+}
+
+function applySignHint(itemId: string, hint: { suggested_conclusion?: string }) {
+  if (!hint?.suggested_conclusion) return
+  updateConclusion(itemId, hint.suggested_conclusion)
+  ElMessage.success('已应用复核签字建议')
+}
+
 // ─── Initialization ───
 function initFromProps() {
   // Load responses from htmlData
@@ -481,6 +515,7 @@ function initFromProps() {
 // ─── Lifecycle ───
 onMounted(() => {
   initFromProps()
+  loadReviewSignHints()
   // Show applicability dialog on first open if no applicability data exists
   const hasApplicabilityData = Object.keys(sectionApplicability.value).length > 0
   if (!hasApplicabilityData && toc.value.length > 0) {
@@ -652,6 +687,26 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
+    <el-alert
+      v-if="isA15_1"
+      class="gt-checklist-table__eqcr-ref"
+      type="info"
+      show-icon
+      :closable="false"
+      title="EQCR 只读引用"
+    >
+      EQCR「持续经营」Tab 只读引用本底稿
+      <strong>A15-1-conclusion</strong>
+      调查结论；请先完成本节填写。
+      <router-link
+        v-if="eqcrWorkbenchPath"
+        class="gt-checklist-table__eqcr-link"
+        :to="eqcrWorkbenchPath"
+      >
+        打开 EQCR 工作台 →
+      </router-link>
+    </el-alert>
+
     <!-- ─── 主体: 左侧导航 + 右侧表格 ─── -->
     <div class="gt-checklist-table__body">
       <!-- 左侧目录导航 -->
@@ -733,6 +788,21 @@ onBeforeUnmount(() => {
                       {{ isExpanded(item.id) ? '▼' : '▶' }}
                     </span>
                     <span class="item-content__text">{{ item.content }}</span>
+                    <div
+                      v-if="signHintForItem(item)?.reason"
+                      class="item-sign-hint"
+                    >
+                      <el-tag size="small" type="info">{{ signHintForItem(item)!.reason }}</el-tag>
+                      <el-button
+                        v-if="signHintForItem(item)?.suggested_conclusion && !readonly"
+                        link
+                        type="primary"
+                        size="small"
+                        @click="applySignHint(item.id, signHintForItem(item)!)"
+                      >
+                        应用建议 {{ signHintForItem(item)!.suggested_conclusion }}
+                      </el-button>
+                    </div>
                   </div>
                 </div>
                 <div class="col-conclusion" @click.stop="activateCell(item.id, 'conclusion')">
@@ -871,6 +941,20 @@ onBeforeUnmount(() => {
 }
 
 /* ─── Header ─── */
+.gt-checklist-table__eqcr-ref {
+  margin: 0 16px 12px;
+}
+
+.gt-checklist-table__eqcr-link {
+  margin-left: 8px;
+  color: var(--el-color-primary);
+  text-decoration: none;
+}
+
+.gt-checklist-table__eqcr-link:hover {
+  text-decoration: underline;
+}
+
 .gt-checklist-table__header {
   display: flex;
   align-items: center;
@@ -1113,6 +1197,14 @@ onBeforeUnmount(() => {
   font-size: var(--gt-font-size-sm);
   line-height: 1.5;
   color: var(--gt-color-text);
+}
+
+.item-sign-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
 }
 
 /* ─── Children (guidance sub-items) ─── */

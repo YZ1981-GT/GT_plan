@@ -497,10 +497,11 @@ async def download_workpaper(
 async def get_workpaper_file_info(
     project_id: UUID,
     wp_id: UUID,
+    version: str | None = None,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_project_access("readonly")),
 ):
-    """返回底稿文件信息 + 签发状态（A16 声明书用）"""
+    """返回底稿文件信息 + 签发状态（A16 声明书用；optional version 按子码隔离）"""
     wp = (await db.execute(
         sa.select(WorkingPaper).where(
             WorkingPaper.id == wp_id,
@@ -533,13 +534,18 @@ async def get_workpaper_file_info(
 
     sign_status = None
     if year_val:
-        sign_status = await svc.get(project_id, year_val, f"word_template:{wp_code}", "sign_status", "value")
+        if version and wp_code == "A16":
+            scope = f"word_template:A16:{version}"
+        else:
+            scope = f"word_template:{wp_code}"
+        sign_status = await svc.get(project_id, year_val, scope, "sign_status", "value")
 
     return {
-        "file_name": wp.file_path.split("/")[-1] if wp.file_path else f"{wp_code} 声明书.docx",
+        "file_name": wp.file_path.split("/")[-1] if wp.file_path else f"{version or wp_code} 声明书.docx",
         "file_path": wp.file_path,
         "file_version": wp.file_version,
         "sign_status": sign_status or "pending",
+        "version": version,
     }
 
 
@@ -551,8 +557,16 @@ async def update_sign_status(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("member")),
 ):
-    """更新声明书签发状态（待编辑/已发送/已签回）"""
+    """更新声明书签发状态（待编辑/已发送/已签回）；body.version 可选，A16 按子码隔离。
+
+    CW-76: 当 status='signed' 且为 A16 主版本(A16-1~6)时，sign_date 为必填，
+    将 push 到 audit_report.representation_letter_date。
+    A16-7 补充声明 sign_date 为可选，不 push 到审计报告。
+    禁止从 docx 元数据读取签署日期。
+    """
     status = body.get("status", "pending")
+    version = body.get("version")
+    sign_date = body.get("sign_date")  # ISO date string: "2025-03-15"
     if status not in ("pending", "sent", "signed"):
         raise HTTPException(status_code=422, detail="状态值无效")
 
@@ -570,6 +584,11 @@ async def update_sign_status(
     )).scalar_one_or_none()
     wp_code = wp_index or "A16"
 
+    # CW-76: A16 主版本 signed 时 sign_date 必填
+    is_a16_main = wp_code == "A16" and version and version.startswith("A16-") and version != "A16-7"
+    if status == "signed" and is_a16_main and not sign_date:
+        raise HTTPException(status_code=422, detail="A16 主版本签回时必须提供签署日期(sign_date)")
+
     year_val = 0
     try:
         year_q = await db.execute(sa.text(
@@ -580,9 +599,55 @@ async def update_sign_status(
         pass
 
     svc = FieldOverrideService(db)
-    await svc.set(project_id, year_val or 2025, f"word_template:{wp_code}", "sign_status", "value", status, current_user.id)
+    if version and wp_code == "A16":
+        scope = f"word_template:A16:{version}"
+    else:
+        scope = f"word_template:{wp_code}"
+    await svc.set(project_id, year_val or 2025, scope, "sign_status", "value", status, current_user.id)
+
+    # CW-76: push sign_date → audit_report.representation_letter_date
+    if status == "signed" and is_a16_main and sign_date:
+        await _push_representation_letter_date(db, project_id, year_val, sign_date)
+
     await db.commit()
-    return {"status": status}
+    return {"status": status, "version": version, "sign_date": sign_date}
+
+
+async def _push_representation_letter_date(
+    db: "AsyncSession", project_id: UUID, year: int, sign_date_str: str
+) -> None:
+    """CW-76: 将用户输入的签署日期 push 到 audit_report.representation_letter_date。
+
+    如果 audit_report 行存在则 UPDATE，不存在则仅记录到 field_overrides（降级）。
+    绝对不从 docx 元数据读取日期。
+    """
+    from datetime import date as date_type
+    from app.models.report_models import AuditReport
+
+    try:
+        parsed_date = date_type.fromisoformat(sign_date_str)
+    except (ValueError, TypeError):
+        # 无效日期格式，不阻塞签回，只跳过 push
+        return
+
+    effective_year = year or parsed_date.year
+
+    # 尝试更新已有的 audit_report 行
+    result = await db.execute(
+        sa.update(AuditReport)
+        .where(AuditReport.project_id == project_id, AuditReport.year == effective_year)
+        .values(representation_letter_date=parsed_date)
+    )
+
+    if result.rowcount == 0:
+        # audit_report 不存在时，降级写入 field_overrides 供后续读取
+        from app.services.field_override_service import FieldOverrideService
+        svc = FieldOverrideService(db)
+        await svc.set(
+            project_id, effective_year,
+            "audit_report", "representation_letter_date", "value",
+            sign_date_str, None,
+        )
 
 
 @router.get("/working-papers/{wp_id}/onlyoffice-config")

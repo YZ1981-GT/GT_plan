@@ -1,9 +1,9 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-06-17  
+**最后更新**：2026-06-18  
 **当前分支**：`work/2026-05-30-wp-specs`  
-**Spec 总数**：**148**（active 8 + archived 140）  
-**最高迁移**：V085  
+**Spec 总数**：**149**（active 17 + archived 140）  
+**最高迁移**：V088  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -50,7 +50,7 @@
 
 ## 二、已归档 Spec（139 个，10 分类）
 
-**当前 active = 5**（其余已归档）。新建 spec 放 `.kiro/specs/{name}/`。
+**当前 active = 17**（其余已归档）。新建 spec 放 `.kiro/specs/{name}/`。
 
 ### Active Specs（实施中）
 
@@ -64,6 +64,14 @@
 | goodwill-impairment-workpaper | requirements | — | A3-8 商誉减值+可收回金额（DCF/WACC，暂 Univer） |
 | segment-reporting-workpaper | requirements | — | A4-1 经营分部审定表（动态列+准则说明） |
 | cash-flow-support-workpaper | requirements | — | A5-1~A5-4 现金流量+承诺/或有/持续终止经营 |
+| completion-phase-infra | PRE done / E2E 待环境 | — | 完成阶段公共基础设施（PRE-1~4 代码 ✅；E-PRE-1/E11 等 Playwright 待 RUN_FULL_E2E） |
+| a7-a15-completion-workpapers | **51/51 ✅** | — | A7~A15 完成阶段底稿（audit+lite+core+plus 全部完成） |
+| a13-misstatement-workpaper | **core done ✅** | — | A13 错报 Tab 套件（程序表+汇总+A13-2~5 d-form） |
+| a14-control-deficiency | **core+plus done ✅** | — | A14 内控缺陷族（A14-1~6 + workbook；E2E `a14-1-checklist-table.spec.ts`） |
+| a16-representation-letter | **24/24 ✅** | V086 | A16 管理层声明书（版本矩阵+弹窗+跳转页+CW-76+E8/E9/E16） |
+| a17-summary-workpaper | **25/25 ✅** | — | A17 概要（chip 灰显+issue_hints+A17-5 选版+KAM+export+LLM） |
+| a18-regulatory-communication | **14/14 ✅** | — | A18 监管沟通（A18-1 小结生成+表单+export） |
+| a21-a25-review-workpapers | **28/28** ✅ | V087 ✅ V088 conclusion | A21~A25 + A1 父码解析 + sign + export |
 
 ```
 _archive/

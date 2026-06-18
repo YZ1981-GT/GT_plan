@@ -1,0 +1,336 @@
+# A13.yaml — 错报 Tab 套件渲染 schema
+# 基于 a7_a15_xlsx_audit.json X-A13 深读结果
+# Tab 容器：程序表 | A13-1 汇总 | A13-2~5 d-form-table
+
+wp_code: A13
+template_path: backend/wp_templates/A/A13 错报（程序表及底稿）.xlsx
+template_version: v2025-R5
+
+sheets:
+  # ─── A13-2 未更正的列报和披露错报 ──────────────────────────────────────
+  A13-2:
+    form_type: table
+    title: 未更正的列报和披露错报汇总表
+    dynamic_table:
+      start_row: 6
+      end_row: 23
+      header_row: 5
+      add_row_button: true
+      max_rows: 30
+      columns:
+        seq:
+          field: seq
+          type: text
+          label: 序号
+          width: 60
+        description:
+          field: description
+          type: textarea
+          label: 错报说明
+          width: 200
+        index_no:
+          field: index_no
+          type: text
+          label: 索引号
+          width: 90
+          render_hint: index_chip
+        disclosure_requirement:
+          field: disclosure_requirement
+          type: textarea
+          label: 相关披露和列报要求
+          width: 200
+        amount:
+          field: amount
+          type: number
+          label: 金额(如适用)
+          width: 120
+          render_hint: amount
+        misstatement_nature:
+          field: misstatement_nature
+          type: enum
+          label: 错报性质
+          width: 100
+          dict_source: misstatement_nature
+        non_correction_reason:
+          field: non_correction_reason
+          type: textarea
+          label: 管理层不予更正的原因
+          width: 200
+    dictionaries:
+      misstatement_nature:
+        - value: factual
+          label: 事实错报
+        - value: judgmental
+          label: 判断错报
+        - value: projected
+          label: 推断错报
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 审计说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 整体结论
+        type: textarea
+
+  # ─── A13-3 评价识别出的错报 ──────────────────────────────────────────────
+  A13-3:
+    form_type: table
+    title: 评价识别出的错报
+    sections:
+      - id: section_1
+        label: 一、识别出的错报对审计的影响
+      - id: section_2
+        label: 二、前期未更正错报对前期财务报表的影响
+      - id: section_3
+        label: 三、未更正错报对本期财务报表的影响
+    fields:
+      - field: corrected_total_matrix
+        label: 已更正错报合计
+        type: matrix
+        columns: [资产(+), 资产(-), 负债(+), 负债(-), 权益(+), 权益(-), 损益(+), 损益(-)]
+      - field: uncorrected_total_matrix
+        label: 未更正错报合计
+        type: matrix
+        columns: [资产(+), 资产(-), 负债(+), 负债(-), 权益(+), 权益(-), 损益(+), 损益(-)]
+      - field: materiality_amount
+        label: 本期财务报表整体重要性
+        type: number
+      - field: eval_close_to_materiality
+        label: 审计过程中累积的错报合计数是否接近重要性
+        type: enum
+        options: [是, 否]
+      - field: eval_other_misstatement_risk
+        label: 识别出的错报的性质以及错报发生的环境是否表明可能存在其他错报
+        type: enum
+        options: [是, 否]
+      - field: conclusion_text
+        label: 结论
+        type: textarea
+        placeholder: 无需修改总体审计策略和具体审计计划 / 需要修改...
+    # 前期错报节（section_2/3 复用同样的矩阵结构）
+    dynamic_table:
+      start_row: 20
+      end_row: dynamic
+      header_row: 21
+      add_row_button: true
+      max_rows: 20
+      columns:
+        item:
+          field: item
+          type: text
+          label: 项目
+          width: 150
+        asset_plus:
+          field: asset_plus
+          type: number
+          label: 资产(+)
+          width: 90
+          render_hint: amount
+        asset_minus:
+          field: asset_minus
+          type: number
+          label: 资产(-)
+          width: 90
+          render_hint: amount
+        liability_plus:
+          field: liability_plus
+          type: number
+          label: 负债(+)
+          width: 90
+          render_hint: amount
+        liability_minus:
+          field: liability_minus
+          type: number
+          label: 负债(-)
+          width: 90
+          render_hint: amount
+        equity_plus:
+          field: equity_plus
+          type: number
+          label: 权益(+)
+          width: 90
+          render_hint: amount
+        equity_minus:
+          field: equity_minus
+          type: number
+          label: 权益(-)
+          width: 90
+          render_hint: amount
+        income_plus:
+          field: income_plus
+          type: number
+          label: 损益(+)
+          width: 90
+          render_hint: amount
+        income_minus:
+          field: income_minus
+          type: number
+          label: 损益(-)
+          width: 90
+          render_hint: amount
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 审计说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 结论
+        type: textarea
+
+  # ─── A13-4 评价错报的性质 ───────────────────────────────────────────────
+  A13-4:
+    form_type: table
+    title: 评价错报的性质
+    sections:
+      - id: error_section
+        label: 一、错报性质——错误
+      - id: fraud_section
+        label: 二、错报性质——舞弊
+      - id: fraud_impact
+        label: 三、评价舞弊对审计的影响
+    dynamic_table:
+      start_row: 7
+      end_row: 16
+      header_row: 6
+      add_row_button: true
+      max_rows: 20
+      columns:
+        index_no:
+          field: index_no
+          type: text
+          label: 索引号
+          width: 90
+          render_hint: index_chip
+        cause:
+          field: cause
+          type: textarea
+          label: 导致错报的具体原因
+          width: 180
+        is_control_deficiency:
+          field: is_control_deficiency
+          type: enum
+          label: 是否为内部控制缺陷
+          width: 100
+          dict_source: yes_no
+        is_significant_deficiency:
+          field: is_significant_deficiency
+          type: enum
+          label: 是否为值得关注的内部控制缺陷
+          width: 130
+          dict_source: yes_no
+        deficiency_description:
+          field: deficiency_description
+          type: textarea
+          label: 对缺陷的描述
+          width: 180
+        potential_impact:
+          field: potential_impact
+          type: textarea
+          label: 潜在影响
+          width: 160
+    dictionaries:
+      yes_no:
+        - value: "是"
+          label: 是
+        - value: "否"
+          label: 否
+    fields:
+      - field: fraud_risk_reassess
+        label: 1、重新评价对由于舞弊导致的重大错报风险的评估结果
+        type: textarea
+        section: fraud_impact
+      - field: fraud_procedure_impact
+        label: 2、对审计程序的性质、时间安排和范围的影响
+        type: textarea
+        section: fraud_impact
+      - field: fraud_evidence_reliability
+        label: 3、对此前获取的审计证据的可靠性的影响
+        type: textarea
+        section: fraud_impact
+      - field: fraud_representation_reliability
+        label: 4、对管理层声明的可靠性的影响
+        type: textarea
+        section: fraud_impact
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 审计说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 结论
+        type: textarea
+
+  # ─── A13-5 对错报的沟通 ─────────────────────────────────────────────────
+  A13-5:
+    form_type: table
+    title: 对错报的沟通记录
+    sections:
+      - id: management_comm
+        label: 一、与管理层的沟通
+      - id: governance_comm
+        label: 二、与治理层的沟通
+    fields:
+      # 与管理层的沟通
+      - field: mgmt_comm_time
+        label: 沟通时间
+        type: text
+        section: management_comm
+      - field: mgmt_members
+        label: 管理层成员
+        type: textarea
+        section: management_comm
+      - field: mgmt_team_members
+        label: 项目组成员
+        type: textarea
+        section: management_comm
+      - field: mgmt_comm_items
+        label: 沟通事项
+        type: textarea
+        section: management_comm
+      - field: mgmt_opinion
+        label: 管理层意见
+        type: textarea
+        section: management_comm
+      - field: mgmt_representation_ref
+        label: 书面声明索引
+        type: text
+        section: management_comm
+        render_hint: index_chip
+      # 与治理层的沟通
+      - field: gov_comm_time
+        label: 沟通时间
+        type: text
+        section: governance_comm
+      - field: gov_members
+        label: 治理层成员
+        type: textarea
+        section: governance_comm
+      - field: gov_team_members
+        label: 项目组成员
+        type: textarea
+        section: governance_comm
+      - field: gov_comm_items
+        label: 沟通事项
+        type: textarea
+        section: governance_comm
+      - field: gov_opinion
+        label: 治理层意见
+        type: textarea
+        section: governance_comm
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 审计说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 结论
+        type: textarea

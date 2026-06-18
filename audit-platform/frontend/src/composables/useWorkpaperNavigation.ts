@@ -25,6 +25,11 @@ interface ResolveResult {
   exists: boolean
 }
 
+// ─── Virtual sub-code redirect (A16-1~7 → A16 + ?version=) ──────────────────
+
+/** A16-1~7 是虚拟子码，不创建独立 WorkingPaper，导航时重定向至 A16 + ?version= */
+const A16_VIRTUAL_RE = /^A16-[1-7]$/
+
 // ─── Route resolvers by render_type ──────────────────────────────────────────
 
 function resolveRoute(
@@ -112,6 +117,29 @@ export function useWorkpaperNavigation() {
     projectId: string,
     year?: number,
   ) {
+    // ─── 虚拟子码重定向：A16-1~7 → A16 + ?version= ───
+    if (A16_VIRTUAL_RE.test(wpCode)) {
+      await registry.load()
+      // 解析 A16 父码的 wp_id
+      try {
+        const res = await api.get<ResolveResult>(
+          `/api/workpapers/index-resolve/${encodeURIComponent('A16')}`,
+          { params: { project_id: projectId } },
+        )
+        if (res.wpId) {
+          router.push({
+            path: `/projects/${projectId}/workpapers/${res.wpId}/edit`,
+            query: { version: wpCode },
+          })
+          return
+        }
+      } catch {
+        // fallback: 跳转到列表页
+      }
+      router.push({ name: 'WorkpaperList', params: { projectId }, query: { highlight: 'A16' } })
+      return
+    }
+
     // 确保注册表已加载
     await registry.load()
 

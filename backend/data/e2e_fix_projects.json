@@ -1,0 +1,46 @@
+{
+  "year": 2025,
+  "fixtures": {
+    "FIX-B": {
+      "project_id": "d9295a0c-f347-4aa5-a1d1-faf7847d379b",
+      "project_name": "辽宁卫生服务有限公司_2025",
+      "business_category": "B3",
+      "ready": true,
+      "missing_wp_codes": [],
+      "warnings": []
+    },
+    "FIX-A": {
+      "project_id": "d9295a0c-f347-4aa5-a1d1-faf7847d379b",
+      "project_name": "辽宁卫生服务有限公司_2025",
+      "business_category": "A1",
+      "ready": true,
+      "missing_wp_codes": [],
+      "warnings": []
+    },
+    "FIX-INT": {
+      "project_id": "5e193c68-f53c-4e95-8d03-5d9c996c402d",
+      "project_name": "重庆医药集团医疗器械有限公司_2025",
+      "business_category": "C",
+      "ready": true,
+      "missing_wp_codes": [],
+      "warnings": []
+    },
+    "FIX-RP": {
+      "project_id": "d9295a0c-f347-4aa5-a1d1-faf7847d379b",
+      "project_name": "辽宁卫生服务有限公司_2025",
+      "business_category": "A1",
+      "ready": true,
+      "missing_wp_codes": [],
+      "warnings": []
+    }
+  },
+  "env": {
+    "TEST_PROJECT_ID": "d9295a0c-f347-4aa5-a1d1-faf7847d379b",
+    "TEST_PROJECT_ID_FIX_A": "d9295a0c-f347-4aa5-a1d1-faf7847d379b",
+    "TEST_PROJECT_ID_FIX_B": "d9295a0c-f347-4aa5-a1d1-faf7847d379b",
+    "TEST_PROJECT_ID_FIX_INT": "5e193c68-f53c-4e95-8d03-5d9c996c402d",
+    "TEST_PROJECT_ID_FIX_RP": "d9295a0c-f347-4aa5-a1d1-faf7847d379b",
+    "RUN_FULL_E2E": "1"
+  },
+  "playwright_hint": "set RUN_FULL_E2E=1 && set TEST_PROJECT_ID=<FIX-B或FIX-A ID> && npx playwright test e2e/"
+}

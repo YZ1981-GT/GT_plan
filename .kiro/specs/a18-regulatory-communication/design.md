@@ -3,7 +3,7 @@
 ## 前置依赖
 
 > **权威定义**：[completion-phase-infra](../completion-phase-infra/requirements.md)。  
-> A18-P2 **blocked by A17-core**（见 [linkage.md](../completion-phase-infra/linkage.md)）。
+> A18-P2 **依赖 A17-core 章节数据源**（2026-06-18：A17-1/KAM 已就绪，见 [linkage.md](../completion-phase-infra/linkage.md)）。
 
 ---
 
@@ -46,20 +46,9 @@ _WP_CODE_OVERRIDE["A18-2"] = "regulatory-letter"
 
 复用 `checklist_responses` — 见 [persistence.md](../completion-phase-infra/persistence.md)。
 
-### A18 程序表（须新建）
+### A18 程序表
 
-`procedure_table_templates.json` 当前**无 A18 条目**，P0 task 1 须新增，例如：
-
-```json
-"A18": {
-  "name": "监管沟通程序表",
-  "items": [
-    {"seq": 1, "content": "确定是否存在需要向监管部门报告的事项", "ref_index": null, "applicable_default": "yes", "applicable_categories": ["A", "B"]},
-    {"seq": 2, "content": "编制审计小结函", "ref_index": "A18-1", "applicable_default": "yes", "applicable_categories": ["A", "B"]},
-    {"seq": 3, "content": "编制与监管层沟通函", "ref_index": "A18-2", "applicable_default": "yes", "applicable_categories": ["A", "B"]}
-  ]
-}
-```
+✅ `procedure_table_templates.json` **A18** 2 步（seq2 ref `A18-1,A18-2`）；`applicable_categories: ["A","B"]`。
 
 ---
 
@@ -114,7 +103,7 @@ P0 仅手动 GtIndexChip 引用。
 - 富文本编辑（纯文本足够）
 - A18-1 专用 HTML 组件（弹窗够用）
 - P0/P1 自动填充议题正文
-- A18-1 审计小结生成（P2，依赖 A17-core）
+- A18-1 审计小结生成（P2 ✅ — `a18_summary_generator` + 弹窗 UI）
 
 ---
 
@@ -124,15 +113,17 @@ P0 仅手动 GtIndexChip 引用。
 
 | 文件 | 分期 | 职责 |
 |------|------|------|
-| `regulatory_letter_service.py` | P1 | 导出编排 + 未完成检测 + issue_hints |
+| `regulatory_letter_service.py` | P1 | ✅ 导出编排 + 未完成检测 + issue_hints |
+| `a18_summary_generator.py` | P2 | ✅ 章节+KAM 生成；prefilled-download 注入 docx |
 | checklist_responses 既有端点 | P0 | 议题 CRUD |
 
 ### 前端
 
 | 文件 | 分期 |
 |------|------|
-| `GtRegulatoryLetter.vue` | P0 |
-| htmlRendererRegistry `regulatory-letter` | P0 |
+| `GtRegulatoryLetter.vue` | P0 | ✅ |
+| htmlRendererRegistry `regulatory-letter` | P0 | ✅ |
+| E2E | P0/P1 | ✅ `e2e/a18-regulatory.spec.ts` |
 
 ### _WP_CODE_OVERRIDE
 

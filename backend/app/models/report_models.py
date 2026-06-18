@@ -588,6 +588,8 @@ class AuditReport(Base):
         String(10), server_default=text("'simple'"), nullable=True
     )
     template_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # V086 CW-76: 管理层声明书签署日期（A16 signed 时用户必填，push 到此处）
+    representation_letter_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
 
     __table_args__ = (
         Index(

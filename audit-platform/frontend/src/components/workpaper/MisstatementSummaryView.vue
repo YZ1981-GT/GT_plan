@@ -23,15 +23,25 @@
       </el-alert>
     </div>
 
+    <!-- 无错报时的空状态 -->
+    <div v-if="loaded && allRows.length === 0" class="misstatement-summary__empty">
+      <el-empty description="本项目暂无未更正错报">
+        <template #description>
+          <p>当调整分录标记为"管理层不予更正"后，错报将自动汇总到此表。</p>
+        </template>
+      </el-empty>
+    </div>
+
     <!-- A13-1: 未更正错报汇总表 -->
     <WorkpaperHtmlTable
+      v-if="allRows.length > 0"
       title="A13-1 未更正错报汇总表"
       :header="header"
       :columns="columns"
       :rows="allRows"
       scope="misstatement:summary"
-      :project-id="projectId"
-      :year="year"
+      :project-id="resolvedProjectId"
+      :year="resolvedYear"
       @field-change="onFieldChange"
     />
   </div>
@@ -39,14 +49,31 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { useProjectStore } from '@/stores/project'
 import { api } from '@/services/apiProxy'
 import WorkpaperHtmlTable, { type ColumnDef, type RowData, type StandardHeader } from './WorkpaperHtmlTable.vue'
 
 const props = defineProps<{
-  projectId: string
-  year: number
+  /** 底稿 ID（GtMisstatementWorkpaper / GtWpRenderer 传入） */
+  wpId?: string
+  /** 可选直传（用于独立渲染场景） */
+  projectId?: string
+  year?: number
   header?: StandardHeader | null
 }>()
+
+const route = useRoute()
+const projectStore = useProjectStore()
+
+/** 从路由或 prop 取 projectId */
+const resolvedProjectId = computed(
+  () => props.projectId || (route.params.projectId as string) || '',
+)
+/** 从路由或 prop 取 year */
+const resolvedYear = computed(
+  () => props.year || parseInt(route.query.year as string) || projectStore.year || new Date().getFullYear() - 1,
+)
 
 interface SummaryItem {
   id: string
@@ -68,6 +95,7 @@ interface Evaluation {
 
 const summaryData = ref<{ prior: SummaryItem[]; current: SummaryItem[] }>({ prior: [], current: [] })
 const evaluation = ref<Evaluation | null>(null)
+const loaded = ref(false)
 
 const columns: ColumnDef[] = [
   { key: 'seq', label: '序号', type: 'text', width: 50 },
@@ -103,7 +131,7 @@ function onFieldChange(payload: { itemKey: string; field: string; value: any }) 
   // 回写 passed_reason 到 adjustment
   if (payload.field === 'passed_reason') {
     void api.post(
-      `/api/workpapers/${props.projectId}/${props.year}/misstatement-communication`,
+      `/api/workpapers/${resolvedProjectId.value}/${resolvedYear.value}/misstatement-communication`,
       {
         adjustment_id: payload.itemKey,
         communication_date: new Date().toISOString(),
@@ -114,19 +142,22 @@ function onFieldChange(payload: { itemKey: string; field: string; value: any }) 
 }
 
 async function loadData() {
+  if (!resolvedProjectId.value) return
   try {
     const [summary, eval_] = await Promise.all([
       api.get<typeof summaryData.value>(
-        `/api/workpapers/${props.projectId}/${props.year}/misstatement-summary`,
+        `/api/workpapers/${resolvedProjectId.value}/${resolvedYear.value}/misstatement-summary`,
       ),
       api.get<Evaluation>(
-        `/api/workpapers/${props.projectId}/${props.year}/misstatement-evaluation`,
+        `/api/workpapers/${resolvedProjectId.value}/${resolvedYear.value}/misstatement-evaluation`,
       ),
     ])
     summaryData.value = summary
     evaluation.value = eval_
   } catch {
-    // 降级
+    // 降级：无数据时保持空态
+  } finally {
+    loaded.value = true
   }
 }
 
@@ -136,5 +167,10 @@ onMounted(loadData)
 <style scoped>
 .misstatement-summary__eval {
   margin-bottom: 12px;
+}
+.misstatement-summary__empty {
+  padding: 40px 0;
+  text-align: center;
+  color: #909399;
 }
 </style>

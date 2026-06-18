@@ -117,3 +117,49 @@ test.describe('A18 E2E — 监管沟通函', () => {
     await expect(tag.first()).toBeVisible({ timeout: 10_000 })
   })
 })
+
+test.describe('E18 — A18-1 小结生成', () => {
+  test.skip(!RUN, '【待环境】需 RUN_FULL_E2E=1 + A类测试项目')
+
+  test('E18-API — generate-summary 返回结构化框架', async ({ request }) => {
+    const loginRes = await request.post('/api/auth/login', {
+      data: { username: 'admin', password: 'admin123' },
+    })
+    const body = (await loginRes.json()) as any
+    const token = body?.data?.access_token ?? body?.access_token
+    const hdr = { Authorization: `Bearer ${token}` }
+
+    const res = await request.get(`/api/projects/${PID}/a18/generate-summary`, { headers: hdr })
+    expect(res.ok()).toBeTruthy()
+
+    const data = ((await res.json()) as any)?.data ?? (await res.json())
+    expect(data).toHaveProperty('summary_sections')
+    expect(data).toHaveProperty('completeness')
+    expect(data).toHaveProperty('formatted_text')
+    expect(typeof data.completeness).toBe('number')
+  })
+
+  test('E18-UI — 弹窗生成小结 + 预览可见', async ({ page, request }) => {
+    test.setTimeout(60_000)
+    const token = await login(page)
+    const wpId = await findWp(request, token, 'A18')
+    test.skip(!wpId, '项目内无 A18 程序表底稿')
+
+    await page.goto(`/projects/${PID}/workpapers/${wpId}/edit`)
+    await page.waitForSelector('.gt-a-program-console, .gt-wp-renderer', { timeout: 20_000 })
+
+    const chip = page.locator('.gt-index-chip', { hasText: 'A18-1' }).first()
+    test.skip(!(await chip.count()), 'A18-1 chip 未渲染')
+    await chip.click()
+
+    const dialog = page.locator('.wp-popup-docx-editor, .el-dialog').first()
+    await expect(dialog).toBeVisible({ timeout: 10_000 })
+
+    const genBtn = page.getByRole('button', { name: /从 A17 生成小结框架/ })
+    await expect(genBtn).toBeVisible({ timeout: 5_000 })
+    await genBtn.click()
+
+    const preview = page.locator('.wp-popup-docx-editor__summary-preview')
+    await expect(preview).toBeVisible({ timeout: 15_000 })
+  })
+})

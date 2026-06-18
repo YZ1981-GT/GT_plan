@@ -161,6 +161,28 @@ async def download_template_prefilled(
 
     doc = Document(str(tmp_path))
 
+    # A18-1：替换抬头 + 注入 A17 小结（plus / E18）
+    if wp_code.upper() == "A18-1":
+        from app.services.a18_summary_generator import enrich_a18_1_document
+
+        await enrich_a18_1_document(
+            doc,
+            db,
+            UUID(project_id),
+            client_name,
+            audit_year,
+        )
+        doc.save(str(tmp_path))
+        from urllib.parse import quote
+        filename = template_path.name
+        utf8_name = quote(filename, safe="")
+        return FileResponse(
+            str(tmp_path),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f'attachment; filename*=UTF-8\'\'{utf8_name}'},
+            background=None,
+        )
+
     # 占位符替换映射
     replacements = {
         "××公司": client_name,

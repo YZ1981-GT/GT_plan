@@ -199,7 +199,7 @@ P1 仅返回 **计数 + 标题列表** 供 guidance 提示；**不自动写入**
 | PRE-4 xlsx parser | A17-5-1~5 + A15-1 + A14-1 + A11-2/3 | ✅ `checklist_xlsx_parser.py`（4 阶段全完） |
 | export-word 端点 | 统一路由 + check-incomplete | ✅ 骨架已建（dispatch→501，各 spec 注册 handler 后激活） |
 | INFRA-1 issue_hints | 舞弊/违规计数 | ✅ 纯标题关键词启发式（`heuristic_only=True`） |
-| INFRA-2 摘要 API | workpaper-summaries/{key} | ✅ 5 key 注册（P1 全部 ready=False） |
+| INFRA-2 摘要 API | workpaper-summaries/{key} | ✅ 5 key；misstatement/related_party/going_concern/control_deficiency/governance 已实现 |
 | INFRA-3 CI drift | `--diff-only` 门禁 | ✅ CI job `audit-xlsx-drift` 已加 |
-| checkCompletion A16 | sign_status（field_overrides） | ❌ case 未加（待 a16 spec 实施） |
-| E2E FIX-A 夹具 | A 类种子项目 | ❌ 可用性未确认（data-blocked） |
+| checkCompletion A16 | sign_status（field_overrides） | ✅ `GtAProgramConsole.checkCompletion` A16-x case |
+| E2E FIX-A 夹具 | A 类种子项目 | ⚠️ spec 已写（`a16/a17/a18` e2e）；需 `RUN_FULL_E2E=1` + `TEST_PROJECT_ID` |

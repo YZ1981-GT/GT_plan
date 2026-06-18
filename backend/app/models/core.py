@@ -80,6 +80,13 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     company_subtype: Mapped[str | None] = mapped_column(String(10), nullable=True)
     # V077: 业务分类 A/B/C
     business_category: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # V087: A21~A25 复核底稿模板选择
+    audit_type: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, server_default=text("'financial'")
+    )
+    is_large_soe: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), nullable=False
+    )
     audit_year: Mapped[int | None] = mapped_column(nullable=True, comment="审计年度（物化列，唯一性索引依赖）")
     template_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     report_scope: Mapped[str | None] = mapped_column(String(20), nullable=True)

@@ -43,7 +43,13 @@ VALID_COMPONENT_TYPES: set[str] = {
     "skip",
     "checklist-table",
     "analytical-review",
+    "misstatement-workpaper",
+    "a14-3-workbook",
     "a17-summary",
+    "kam-workpaper",
+    "regulatory-letter",
+    "a11-bundle",
+    "a15-bundle",
 }
 
 # ─── 9 类 class_code 前缀 → componentType 映射 ──────────────────────────────
@@ -66,31 +72,53 @@ _WP_CODE_OVERRIDE: dict[str, str] = {
     "A2": "a2-adjustment-console",        # 调整分录程序表 → 卡片式中控台
     "A3": "a3-consolidation-console",    # 合并流程程序表 → 合并专用卡片中控台（仅合并项目）
     "A5": "cf-verification",          # 财务报表支持程序表 → 现金流量表核查视图
-    "A13": "misstatement-summary",    # 错报程序表 → 错报自动汇总视图
-    "A16": "word-template",           # 管理层声明书 → OnlyOffice Word 编辑
+    "A13": "misstatement-workpaper",
+    "A11": "a11-bundle",
+    "A15": "a15-bundle",
+    "A16": "word-template",
     "A21": "review-checklist",        # 现场负责人复核表 → 结构化复核面板
+    "A21-1": "review-checklist",
+    "A21-2": "review-checklist",
     "A22": "review-checklist",        # 项目经理复核 → 结构化复核面板
+    "A22-1": "review-checklist",
+    "A22-2": "review-checklist",
     "A23": "review-checklist",        # 合伙人复核 → 结构化复核面板
+    "A23-1": "review-checklist",
+    "A23-2": "review-checklist",
     "A24": "review-checklist",        # 质量复核 → 结构化复核面板
+    "A24-1": "review-checklist",
+    "A24-2": "review-checklist",
     "A25": "review-checklist",        # EQCR 复核 → 结构化复核面板
+    "A25-1": "review-checklist",
+    "A25-2": "review-checklist",
     "A31": "audit-legend",            # 审计标识一览表 → 标识符号对照面板
     "A17-7": "independence-signing",  # 独立性声明书 → 电子签署面板
     "A1-13": "analytical-review",     # 分析性复核（母公司） → 分析性复核专用组件
     "A1-14": "analytical-review",     # 分析性复核（合并） → 分析性复核专用组件
     "A1-15": "checklist-table",       # 核对表（CAS列报及披露） → 核对表专用组件
     "A1-16": "checklist-table",       # 核对表（法规合规） → 核对表专用组件
-    "A14-1": "checklist-table",       # 内部控制缺陷汇总表（xlsx 动态行 grid）→ 核对表专用组件
-    "A15-1": "checklist-table",       # 持续经营调查表（xlsx 分章节问卷）→ 核对表专用组件
-    "A11-2": "checklist-table",       # 期后事项调查问卷（A11 bundle sheet）→ 核对表专用组件
-    "A11-3": "checklist-table",       # 期后内控事项调查问卷（A11 bundle sheet）→ 核对表专用组件
-    "A17-1": "a17-summary",           # 重大事项概要汇总 → 章节导航式 HTML 组件
-    "A17-2-1": "kam-workpaper",       # 关键审计事项 KAM → 结构化 KAM 表单组件
-    "A17-5-1": "checklist-table",     # 审计工作完成核对表（财报审计，xlsx）→ 核对表专用组件
-    "A17-5-2": "checklist-table",     # 审计工作完成核对表（内控审计，xlsx）→ 核对表专用组件
-    "A17-5-3": "checklist-table",     # 审计工作完成核对表（IPO 业务特别程序，xlsx）→ 核对表专用组件
-    "A17-5-4": "checklist-table",     # 审计工作完成核对表（新三板挂牌特别程序，xlsx）→ 核对表专用组件
-    "A17-5-5": "checklist-table",     # 审计工作完成核对表（函证程序，xlsx）→ 核对表专用组件
-    "A18-2": "regulatory-letter",     # 与监管层沟通函 → 结构化监管沟通函表单
+    "A15-1": "checklist-table",
+    "A14-1": "checklist-table",
+    "A11-2": "checklist-table",
+    "A11-3": "checklist-table",
+    "A17-5-1": "checklist-table",
+    "A17-5-2": "checklist-table",
+    "A17-5-3": "checklist-table",
+    "A17-5-4": "checklist-table",
+    "A17-5-5": "checklist-table",
+    "A17-1": "a17-summary",
+    "A18-2": "regulatory-letter",
+    "A14-3": "a14-3-workbook",
+    "A13-2": "d-form-table",
+    "A13-3": "d-form-table",
+    "A13-4": "d-form-table",
+    "A13-5": "d-form-table",
+    "A10-2": "d-form-confirmation",
+    "A14-2": "d-form-table",
+    "A14-4": "d-form-table",
+    "A14-5": "d-form-table",
+    "A7-2": "c-note-table",
+    "A14-6": "e-control-test",
 }
 
 # D 类子路由映射（基于 class_code 具体值）

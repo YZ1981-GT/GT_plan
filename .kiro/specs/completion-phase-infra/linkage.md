@@ -26,7 +26,7 @@
 | A18-2 议题 3 | A8 程序表 seq3/4/5 status | ⚠️ | radio 建议值 | A18-P1 + A7–A15 lite |
 | A18-1 P2 审计小结 | A17-1 章节 + 审计意见 | ❌ | 生成框架 | **blocked A17-core** |
 | A9 弹窗 guidance | A14-1 缺陷计数/等级 | ❌ | 弹窗提示 | A7–A15 core + plus |
-| A17 EQCR | A15-1 结论 | ⚠️ | 只读引用 | A7–A15 core |
+| A17 EQCR | A15-1 结论 | ✅ | EQCR Tab `a15_1_reference` 只读 + A15-1 底稿提示 |
 | A18 议题3 手动 | A8-2 完成状态 | ⚠️ | 状态提示 | A7–A15 lite |
 | 审计报告 CW-76 | A16 sign_date | ❌ | push | A16-plus |
 | 审计报告 KAM | A17-2-1 | ❌ | 单向 push | A17-plus |

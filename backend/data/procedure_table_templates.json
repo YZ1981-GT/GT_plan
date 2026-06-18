@@ -73,7 +73,7 @@
           "seq": 9,
           "content": "获取管理层声明书",
           "ref_index": "A16",
-          "auto_data_source": null,
+          "auto_data_source": "a16_sign_status_check",
           "applicable_default": "yes",
           "phase": "completion"
         },
@@ -119,6 +119,30 @@
         },
         {
           "seq": 15,
+          "content": "项目现场负责人复核",
+          "ref_index": "A21",
+          "auto_data_source": "a21_sign_status",
+          "applicable_default": "yes",
+          "phase": "signoff"
+        },
+        {
+          "seq": 16,
+          "content": "项目负责经理复核",
+          "ref_index": "A22",
+          "auto_data_source": "a22_sign_status",
+          "applicable_default": "yes",
+          "phase": "signoff"
+        },
+        {
+          "seq": 17,
+          "content": "项目合伙人复核",
+          "ref_index": "A23",
+          "auto_data_source": "a23_sign_status",
+          "applicable_default": "yes",
+          "phase": "signoff"
+        },
+        {
+          "seq": 18,
           "content": "项目质量控制复核",
           "ref_index": "A24,A25",
           "auto_data_source": "review_progress",
@@ -130,7 +154,7 @@
           "phase": "signoff"
         },
         {
-          "seq": 16,
+          "seq": 19,
           "content": "专委会审批",
           "ref_index": "A26",
           "auto_data_source": null,
@@ -141,7 +165,7 @@
           "phase": "signoff"
         },
         {
-          "seq": 17,
+          "seq": 20,
           "content": "签发审计报告",
           "ref_index": "A1-11",
           "auto_data_source": null,
@@ -149,7 +173,7 @@
           "phase": "signoff"
         },
         {
-          "seq": 18,
+          "seq": 21,
           "content": "归档底稿",
           "ref_index": "A30",
           "auto_data_source": "archive_completion",
@@ -350,11 +374,25 @@
             },
             {
               "seq": "2.2",
-              "content": "检查原始凭证或协议并评估交易是否涉及舞弊/条款一致/会计处理恰当"
-            },
-            {
-              "seq": "2.3",
-              "content": "确定交易是否经适当人员批准"
+              "content": "检查原始凭证或协议并评估是否",
+              "sub_items": [
+                {
+                  "seq": "2.2.1",
+                  "content": "交易被输入以参与舞弊财务报告"
+                },
+                {
+                  "seq": "2.2.2",
+                  "content": "条款与管理层的解释一致"
+                },
+                {
+                  "seq": "2.2.3",
+                  "content": "会计处理是恰当的"
+                },
+                {
+                  "seq": "2.2.4",
+                  "content": "确定是否交易经客户适当的人员批准"
+                }
+              ]
             }
           ]
         },
@@ -420,7 +458,21 @@
             },
             {
               "seq": "4.4",
-              "content": "运用数据分析工具识别异常交易模式"
+              "content": "运用数据分析工具，设置特定分析条件对被审计单位的交易信息进行分析，识别是否存在管理层未向注册会计师披露的关联方关系和交易，例如：",
+              "sub_items": [
+                {
+                  "seq": "4.4.1",
+                  "content": "与非客户或供应商之间的大额资金往来，在月初和月末发生的大额资金收付等"
+                },
+                {
+                  "seq": "4.4.2",
+                  "content": "交易规模、频率等明显异于被审计单位通常的交易规模或频率的"
+                },
+                {
+                  "seq": "4.4.3",
+                  "content": "识别在会计记录中首次出现的交易对手，检查是否包含在管理层提供的当期新增的客户或供应商名单中"
+                }
+              ]
             }
           ]
         },
@@ -659,7 +711,7 @@
         {
           "seq": 2,
           "content": "利用控制缺陷汇总表起草内部控制沟通函",
-          "ref_index": "A9-1,A9-2",
+          "ref_index": "A9-1",
           "auto_data_source": null,
           "applicable_default": "yes",
           "sub_items": [
@@ -719,7 +771,7 @@
         {
           "seq": 4,
           "content": "在适当的时间期间内完成并签发沟通函",
-          "ref_index": "A9-1,A9-2",
+          "ref_index": "A9-2",
           "auto_data_source": null,
           "applicable_default": "yes"
         }
@@ -1446,7 +1498,8 @@
           "content": "确定实质性程序的结果（例如，错报的识别）是否表明额外的控制缺陷。汇总上述缺陷后，添加到「需合伙人关注事项」。",
           "ref_index": "A14-5",
           "auto_data_source": null,
-          "applicable_default": "yes"
+          "applicable_default": "yes",
+          "applicable_categories": ["A", "B"]
         },
         {
           "seq": 4,
@@ -1467,7 +1520,8 @@
           "content": "评价内控缺陷对内控审计意见类型的影响。",
           "ref_index": "A14-6",
           "auto_data_source": null,
-          "applicable_default": "yes"
+          "applicable_default": "yes",
+          "applicable_categories": ["A", "B"]
         }
       ]
     },
@@ -1592,15 +1646,22 @@
         },
         {
           "seq": 2,
-          "content": "编制管理层声明书",
-          "ref_index": "A16",
+          "content": "编制管理层声明书（主版本）",
+          "ref_index": "A16-1,A16-2,A16-3,A16-4,A16-5,A16-6",
           "auto_data_source": null,
           "applicable_default": "yes"
         },
         {
           "seq": 3,
+          "content": "编制关联交易声明书（如适用）",
+          "ref_index": "A16-7",
+          "auto_data_source": "related_party_transaction_count",
+          "applicable_default": "no"
+        },
+        {
+          "seq": 4,
           "content": "获取管理层签署",
-          "ref_index": "",
+          "ref_index": "A16",
           "auto_data_source": null,
           "applicable_default": "yes"
         }
@@ -1611,53 +1672,59 @@
       "items": [
         {
           "seq": 1,
-          "content": "汇总重大职业判断以及需合伙人关注事项，详细说明审计程序执行情况。",
+          "content": "确定重大事项及概要结构",
           "ref_index": "A17-1",
           "auto_data_source": null,
           "applicable_default": "yes",
-          "applicable_categories": [
-            "A"
-          ]
+          "applicable_categories": ["A"]
         },
         {
           "seq": 2,
-          "content": "对于咨询的重大会计或审计事项咨询，确定咨询报告是否包括在审计工作底稿中。",
-          "ref_index": "A17-3",
+          "content": "编制关键审计事项（如适用）",
+          "ref_index": "A17-2-1",
           "auto_data_source": null,
           "applicable_default": "yes",
-          "applicable_categories": [
-            "A"
-          ]
+          "applicable_categories": ["A"]
         },
         {
           "seq": 3,
-          "content": "对于项目组的专业意见分歧，确认己经得到解决。并将解决方式、解决过程、解决结论等记录于工作底稿。",
-          "ref_index": "A17-4",
+          "content": "业务咨询记录",
+          "ref_index": "A17-3,A17-3-1",
           "auto_data_source": null,
           "applicable_default": "yes",
-          "applicable_categories": [
-            "A"
-          ]
+          "applicable_categories": ["A"]
         },
         {
           "seq": 4,
-          "content": "确定在审计过程中识别的重大职业判断以及需合伙人关注事项是否包括在重大事项概要汇总表中：\n（1）引起特别风险的事项；\n（2）已更正或未更正的错报；\n（3）值得关注的缺陷和其他控制缺陷；\n（4）重大职业判断；\n（5）业务咨询和意见分歧；\n（6）导致注册会计师难以实施必要审计程序的情形；\n（7）可能导致出具非标准审计报告的事项；\n（8）其他需要关注的事项。",
-          "ref_index": "A17-2",
+          "content": "重大专业分歧事项记录",
+          "ref_index": "A17-4",
           "auto_data_source": null,
           "applicable_default": "yes",
-          "applicable_categories": [
-            "A"
-          ]
+          "applicable_categories": ["A"]
         },
         {
           "seq": 5,
-          "content": "召开项目组总结会并将会议纪要记录于工作底稿。",
+          "content": "编制审计工作完成核对表",
+          "ref_index": "A17-5-1,A17-5-2,A17-5-3,A17-5-4,A17-5-5",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": ["A"]
+        },
+        {
+          "seq": 6,
+          "content": "总结会会议纪要",
           "ref_index": "A17-6",
           "auto_data_source": null,
           "applicable_default": "yes",
-          "applicable_categories": [
-            "A"
-          ]
+          "applicable_categories": ["A"]
+        },
+        {
+          "seq": 7,
+          "content": "独立性声明书",
+          "ref_index": "A17-7,A17-7A",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": ["A"]
         }
       ]
     },
@@ -1666,36 +1733,19 @@
       "items": [
         {
           "seq": 1,
-          "content": "确定是否存在需要向监管部门报告的事项，包括：\n（1）审计过程中发现的舞弊线索或重大违法行为；\n（2）年度报告中与已审计财务报表相关的信息是否存在重大不一致；\n（3）其他需要向监管部门沟通的事项。",
+          "content": "确定监管沟通事项",
           "ref_index": null,
           "auto_data_source": null,
           "applicable_default": "yes",
-          "applicable_categories": [
-            "A",
-            "B"
-          ]
+          "applicable_categories": ["A", "B"]
         },
         {
           "seq": 2,
-          "content": "编制审计小结函（向监管部门报送）。",
-          "ref_index": "A18-1",
+          "content": "编制监管沟通函",
+          "ref_index": "A18-1,A18-2",
           "auto_data_source": null,
           "applicable_default": "yes",
-          "applicable_categories": [
-            "A",
-            "B"
-          ]
-        },
-        {
-          "seq": 3,
-          "content": "编制与监管层沟通函，就以下议题逐项记录沟通情况：\n（1）舞弊；\n（2）重大违法行为；\n（3）年报信息（三选一：未发现不一致/不重大未更正/重大已更正）；\n（4）其他事项。",
-          "ref_index": "A18-2",
-          "auto_data_source": null,
-          "applicable_default": "yes",
-          "applicable_categories": [
-            "A",
-            "B"
-          ]
+          "applicable_categories": ["A", "B"]
         }
       ]
     }

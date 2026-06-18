@@ -1272,27 +1272,19 @@ async def get_render_config(
         # A1-15/A1-16 大型 docx 核对表：template 从全局 mtime 缓存取（静态，
         # 不存每个 wp 实例），responses 从 checklist_responses 表按 wp_id 取。
         if component_type == "checklist-table":
-            # A17-5-x 等 xlsx 核对表走 checklist_xlsx_parser；A1-15/A1-16 docx 走
-            # checklist_docx_parser。按 audit JSON 是否登记该 wp_code 决定（xlsx 优先）。
-            from app.services import checklist_xlsx_parser
-            from app.services.checklist_docx_parser import (
-                get_checklist_template as get_docx_template,
-            )
+            from app.services.checklist_docx_parser import get_checklist_template
+            from app.services.checklist_xlsx_parser import get_checklist_xlsx_template, is_xlsx_checklist
 
             template_data = None
             try:
-                if checklist_xlsx_parser._get_audit_entry(wp_code) is not None:
-                    template_data = await checklist_xlsx_parser.get_checklist_template(
-                        wp_code
-                    )
+                if is_xlsx_checklist(wp_code):
+                    template_data = await get_checklist_xlsx_template(wp_code)
                 else:
-                    template_data = await get_docx_template(wp_code)
+                    template_data = await get_checklist_template(wp_code)
             except FileNotFoundError:
                 logger.warning("核对表模板文件未找到: wp_code=%s", wp_code)
-                template_data = None
             except Exception as e:  # noqa: BLE001
                 logger.warning("核对表模板解析失败 wp_code=%s: %s", wp_code, e)
-                template_data = None
 
             # 用户填写数据从 checklist_responses 表取
             responses: dict[str, dict] = {}
@@ -1448,9 +1440,9 @@ async def get_render_config(
             fill_results = {}
 
     # ─── Step 8: 编制说明 guidance（静态 JSON，按 wp_code 查找）────────────
-    from app.services.wp_guidance_service import get_wp_guidance
+    from app.services.wp_guidance_service import get_guidance_for_wp
 
-    guidance_data = get_wp_guidance(wp_code)
+    guidance_data = get_guidance_for_wp(wp_code)
 
     return {
         "wp_id": str(wp_id),

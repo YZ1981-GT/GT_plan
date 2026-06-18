@@ -60,6 +60,12 @@ export type HtmlComponentType =
   | 'segment-report'
   | 'contingent-liability'
   | 'discontinued-operations'
+  | 'misstatement-workpaper'
+  | 'a14-3-workbook'
+  | 'a17-summary'
+  | 'regulatory-letter'
+  | 'a11-bundle'
+  | 'a15-bundle'
 
 /** 注册表条目：包含 lazy component / 图标 / emits / 描述 */
 export interface HtmlRendererEntry {
@@ -93,7 +99,7 @@ const GtCfVerification = defineAsyncComponent(() => import('./CashFlowVerificati
 const GtProcedureTable = defineAsyncComponent(() => import('./ProcedureTableRenderer.vue'))
 const GtReportAnalysis = defineAsyncComponent(() => import('./ReportAnalysisPanel.vue'))
 const GtMisstatementSummary = defineAsyncComponent(() => import('./MisstatementSummaryView.vue'))
-const GtReviewChecklist = defineAsyncComponent(() => import('./ReviewChecklistPanel.vue'))
+const GtReviewChecklist = defineAsyncComponent(() => import('./GtReviewChecklist.vue'))
 const GtWordTemplate = defineAsyncComponent(() => import('./WorkpaperWordEditor.vue'))
 const GtIndependenceSigning = defineAsyncComponent(() => import('./IndependenceSigning.vue'))
 const GtAuditLegend = defineAsyncComponent(() => import('./AuditLegendPanel.vue'))
@@ -106,6 +112,12 @@ const GtGoodwillImpairment = defineAsyncComponent(() => import('./GtGoodwillImpa
 const GtSegmentReport = defineAsyncComponent(() => import('./GtSegmentReport.vue'))
 const GtContingentLiability = defineAsyncComponent(() => import('./GtContingentLiability.vue'))
 const GtDiscontinuedOperations = defineAsyncComponent(() => import('./GtDiscontinuedOperations.vue'))
+const GtMisstatementWorkpaper = defineAsyncComponent(() => import('./GtMisstatementWorkpaper.vue'))
+const GtA14_3Workbook = defineAsyncComponent(() => import('./GtA14_3Workbook.vue'))
+const GtA17Summary = defineAsyncComponent(() => import('./GtA17Summary.vue'))
+const GtRegulatoryLetter = defineAsyncComponent(() => import('./GtRegulatoryLetter.vue'))
+const GtA11Bundle = defineAsyncComponent(() => import('./GtA11Bundle.vue'))
+const GtA15Bundle = defineAsyncComponent(() => import('./GtA15Bundle.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -341,6 +353,48 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: GtDiscontinuedOperations,
     icon: '📉',
     label: '终止经营',
+    emits: ['save'],
+  },
+  {
+    componentType: 'misstatement-workpaper',
+    component: GtMisstatementWorkpaper,
+    icon: '⚠️',
+    label: 'A13 错报套件',
+    emits: ['save'],
+  },
+  {
+    componentType: 'a14-3-workbook',
+    component: GtA14_3Workbook,
+    icon: '🖥️',
+    label: 'A14-3 IT缺陷',
+    emits: ['save'],
+  },
+  {
+    componentType: 'a17-summary',
+    component: GtA17Summary,
+    icon: '📋',
+    label: 'A17-1 重大事项概要',
+    emits: ['save'],
+  },
+  {
+    componentType: 'regulatory-letter',
+    component: GtRegulatoryLetter,
+    icon: '📨',
+    label: 'A18-2 监管沟通函',
+    emits: ['save'],
+  },
+  {
+    componentType: 'a11-bundle',
+    component: GtA11Bundle,
+    icon: '📅',
+    label: 'A11 期后事项套件',
+    emits: ['save'],
+  },
+  {
+    componentType: 'a15-bundle',
+    component: GtA15Bundle,
+    icon: '🔄',
+    label: 'A15 持续经营套件',
     emits: ['save'],
   },
 ]

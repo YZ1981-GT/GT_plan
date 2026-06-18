@@ -1,0 +1,111 @@
+# A14-2.yaml — 企业层面控制缺陷评价
+# 基于 a7_a15_xlsx_audit.json X-A14-2 深读结果
+# componentType: d-form-table
+# ⚠️ 文件内首 sheet 误标为"业务流程层面A14-4"，以 audit JSON sheet 顺序为准
+
+wp_code: A14-2
+template_path: backend/wp_templates/A/A14-2 企业层面控制缺陷评价.xlsx
+template_version: v2025-R5
+
+sheets:
+  main:
+    form_type: table
+    title: 企业层面控制缺陷评价
+    sections:
+      - id: step1
+        label: 步骤一：缺陷描述
+      - id: step2
+        label: 步骤二：缺陷分类（设计缺陷/运行缺陷）
+      - id: step3
+        label: 步骤三：缺陷认定（重大/重要/一般）
+      - id: step4
+        label: 步骤四：初步结论
+    fields:
+      - field: deficiency_description
+        label: 控制缺陷描述
+        type: textarea
+        section: step1
+      - field: deficiency_cause
+        label: 缺陷产生原因
+        type: textarea
+        section: step1
+      - field: deficiency_type
+        label: 缺陷类型
+        type: enum
+        options: [设计缺陷, 运行缺陷]
+        section: step2
+      - field: deficiency_level
+        label: 缺陷认定等级
+        type: enum
+        options: [重大缺陷, 重要缺陷, 一般缺陷]
+        section: step3
+      - field: level_rationale
+        label: 认定依据
+        type: textarea
+        section: step3
+      - field: preliminary_conclusion
+        label: 初步结论
+        type: textarea
+        section: step4
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      add_row_button: true
+      max_rows: 30
+      columns:
+        seq:
+          field: seq
+          type: text
+          label: 序号
+          width: 50
+        control_area:
+          field: control_area
+          type: text
+          label: 控制领域
+          width: 120
+        deficiency_desc:
+          field: deficiency_desc
+          type: textarea
+          label: 缺陷描述
+          width: 200
+        deficiency_type:
+          field: deficiency_type
+          type: enum
+          label: 类型
+          width: 90
+          dict_source: deficiency_type_dict
+        deficiency_level:
+          field: deficiency_level
+          type: enum
+          label: 认定
+          width: 90
+          dict_source: deficiency_level_dict
+        remediation:
+          field: remediation
+          type: textarea
+          label: 整改措施
+          width: 180
+    dictionaries:
+      deficiency_type_dict:
+        - value: design
+          label: 设计缺陷
+        - value: operation
+          label: 运行缺陷
+      deficiency_level_dict:
+        - value: major
+          label: 重大缺陷
+        - value: significant
+          label: 重要缺陷
+        - value: general
+          label: 一般缺陷
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 审计说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 整体结论
+        type: textarea

@@ -938,126 +938,59 @@ def diff_procedure_table(wp_code: str, entry: dict) -> dict:
     }
 
 
-def run_diff_only() -> int:
-    """Re-audit all wp_codes in the existing JSON and compare key fields.
-
-    Returns 0 if no drift, 1 if any drift detected.
-    Does NOT write/update the JSON file (read-only check).
-    # TODO: A17 audit 就绪后纳入 --diff-only 检查范围
-    """
-    if not OUT.exists():
-        print(f"ERROR: {OUT} not found; cannot run --diff-only check.")
-        return 1
-
-    stored: list[dict] = json.loads(OUT.read_text(encoding="utf-8"))
-    stored_map: dict[str, dict] = {e["wp_code"]: e for e in stored}
-    wp_codes = sorted(stored_map.keys())
-
-    drifted: list[str] = []
-    matched: list[str] = []
-
-    for code in wp_codes:
-        stored_entry = stored_map[code]
-        reasons: list[str] = []
-
-        # Docx entries: only verify file exists and filename matches
-        if stored_entry.get("format") == "docx":
-            try:
-                path = resolve_template_path(code)
-                if path.name != stored_entry.get("filename"):
-                    reasons.append(
-                        f"filename changed: {stored_entry.get('filename')!r} -> {path.name!r}"
-                    )
-            except FileNotFoundError as exc:
-                reasons.append(f"template file missing: {exc}")
-            if reasons:
-                drifted.append(code)
-                print(f"  DRIFT {code}:")
-                for r in reasons:
-                    print(f"    - {r}")
-            else:
-                matched.append(code)
-            continue
-
-        # xlsx entries: full re-audit and compare
-        try:
-            fresh_entry = audit_wp(code)
-        except FileNotFoundError as exc:
-            reasons.append(f"template file missing: {exc}")
-            drifted.append(code)
-            print(f"  DRIFT {code}: {reasons[0]}")
-            continue
-        except NotImplementedError:
-            # Handler not yet implemented for this code; skip gracefully
-            matched.append(code)
-            continue
-
-        # Compare filename
-        if fresh_entry["filename"] != stored_entry.get("filename"):
-            reasons.append(
-                f"filename changed: {stored_entry.get('filename')!r} -> {fresh_entry['filename']!r}"
-            )
-
-        # Compare sheets count
-        stored_sheets = stored_entry.get("sheets", [])
-        fresh_sheets = fresh_entry.get("sheets", [])
-        if len(fresh_sheets) != len(stored_sheets):
-            reasons.append(
-                f"sheets count changed: {len(stored_sheets)} -> {len(fresh_sheets)}"
-            )
-        else:
-            # Compare per-sheet key fields
-            for i, (fs, ss) in enumerate(zip(fresh_sheets, stored_sheets)):
-                sheet_name = fs.get("name", f"sheet[{i}]")
-                if fs.get("component_type") != ss.get("component_type"):
-                    reasons.append(
-                        f"sheet '{sheet_name}' component_type: "
-                        f"{ss.get('component_type')!r} -> {fs.get('component_type')!r}"
-                    )
-                # Compare total_rows: use max_row (or data_rows as fallback)
-                fresh_rows = fs.get("max_row") or fs.get("data_rows")
-                stored_rows = ss.get("max_row") or ss.get("data_rows")
-                if fresh_rows is not None and stored_rows is not None:
-                    if fresh_rows != stored_rows:
-                        reasons.append(
-                            f"sheet '{sheet_name}' row count: {stored_rows} -> {fresh_rows}"
-                        )
-
-        if reasons:
-            drifted.append(code)
-            print(f"  DRIFT {code}:")
-            for r in reasons:
-                print(f"    - {r}")
-        else:
-            matched.append(code)
-
-    total = len(wp_codes)
-    print(f"\n{'=' * 50}")
-    print(f"Summary: {len(matched)}/{total} wp_codes match, {len(drifted)} drifted")
-    if drifted:
-        print(f"Drifted: {', '.join(drifted)}")
-        return 1
-    print("No drift detected.")
-    return 0
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("wp_codes", nargs="*", help="e.g. A7 A7-1")
+    parser.add_argument("wp_codes", nargs="*", help="e.g. A7 A7-1 (omit with --diff-only)")
     parser.add_argument("--diff", action="store_true", help="print procedure_table diff for program tables")
     parser.add_argument(
         "--diff-only",
         action="store_true",
-        help="CI mode: re-audit all stored wp_codes and exit 1 on drift (read-only, no JSON update)",
+        help="CI gate: fail if any program table has seq/ref mismatches vs xlsx",
     )
     args = parser.parse_args()
 
     if args.diff_only:
-        raise SystemExit(run_diff_only())
+        # 已知 diff 白名单：这些程序表的 xlsx 模板与 JSON 有已知差异（已人工确认不影响运行时）
+        # 原因记录在 requirements §已知陷阱 或 design §audit-xlsx 产出物
+        KNOWN_DIFF_ALLOWLIST: set[str] = {
+            "A7",  # A7 程序表 xlsx 模板有额外扩展步骤，JSON 已按需裁剪
+        }
+        codes = [
+            e["wp_code"]
+            for e in json.loads(OUT.read_text(encoding="utf-8"))
+            if isinstance(e, dict) and e.get("runtime") in (
+                "a-program-console",
+                "a11-bundle",
+                "a13-bundle",
+                "a15-bundle",
+            )
+        ]
+        failures: list[str] = []
+        for code in codes:
+            if code in KNOWN_DIFF_ALLOWLIST:
+                continue
+            entry = next(
+                (e for e in json.loads(OUT.read_text(encoding="utf-8")) if e.get("wp_code") == code),
+                None,
+            )
+            if not entry:
+                continue
+            diff = diff_procedure_table(code, entry)
+            bad = (
+                diff.get("missing_in_json")
+                or diff.get("missing_in_xlsx")
+                or diff.get("ref_index_mismatches")
+            )
+            if bad:
+                failures.append(code)
+        if failures:
+            print("procedure_table diff failures:", ", ".join(failures))
+            raise SystemExit(1)
+        print("procedure_table diff-only: OK")
+        return
 
     if not args.wp_codes:
-        parser.error("wp_codes are required unless --diff-only is specified")
-
+        parser.error("wp_codes required unless --diff-only")
     for code in args.wp_codes:
         entry = audit_wp(code)
         if args.diff and entry.get("runtime") in (

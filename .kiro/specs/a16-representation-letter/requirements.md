@@ -171,14 +171,16 @@ A16-1~6 **互斥**；A16-7 **可选叠加**，UI 与签回状态均与主版本*
 
 ## 现状与差距（A16 特有）
 
-> 公共 PRE 状态见 [infra §现状](../completion-phase-infra/requirements.md#现状与差距公共层)。
+> 公共 PRE 状态见 [infra §现状](../completion-phase-infra/requirements.md#现状与差距公共层)。  
+> **2026-06-18**：lite+core+plus 全部闭合（tasks 24/24 ✅）。
 
 | 能力 | 目标 | 代码现状 | 分期 |
 |------|------|----------|------|
-| A16 程序表 | 4 步 + chip 折叠 | ⚠️ ref_index、completion | lite |
-| wpPopupDocxConfigs | 7 项配置 | ✅ | lite E2E **E8** |
-| WorkpaperWordEditor | 主/补分离 + 按版本签回 | ⚠️ 骨架（`components/workpaper/` 版，非 views/）；A16-7 混 radio | core |
-| checkCompletion A16 | sign_status case | ❌ | lite |
-| a16_version_service | 版本推荐 | ❌ 桩 | lite |
-| 虚拟子码重定向 | A16-x → A16?version= | ❌ | core |
-| CW-76 | sign_date → 报告 | ❌ | plus **E16** |
+| A16 程序表 | 4 步 + chip 折叠 | ✅ seq2 推荐置顶 + 其他版本折叠 | lite |
+| wpPopupDocxConfigs | 7 项配置 | ✅ | lite **E8** |
+| WorkpaperWordEditor | 主/补分离 + 按版本签回 | ✅ 主区 A16-1~6 + A16-7 toggle | core |
+| checkCompletion A16 | sign_status case | ✅ `{code}-sign-status` → badge | lite |
+| a16_version_service | 版本推荐 | ✅ `a16_version_matrix.json` + API | lite |
+| 虚拟子码重定向 | A16-x → A16?version= | ✅ `useWorkpaperNavigation` + router | core |
+| CW-76 | sign_date → 报告 | ✅ `representation_letter_date` + V086 | plus **E16** |
+| E2E | E8/E9/E16 | ✅ `a16-popup-e2e` / `a16-core-e9` / `a16-plus-e16` | 全分期 |

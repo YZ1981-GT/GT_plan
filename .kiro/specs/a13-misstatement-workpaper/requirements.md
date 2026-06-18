@@ -45,9 +45,10 @@
 
 ## 现状
 
-| 项 | 状态 |
-|----|------|
-| audit X-A13 | ✅ |
-| A13-1 汇总组件 | ⚠️ 待 lite 验收 |
-| Tab 套件 override | ❌ |
-| A13-2~5 HTML | ❌ |
+| 项 | 状态 | 实证 |
+|----|------|------|
+| audit X-A13 | ✅ | `a7_a15_xlsx_audit.json` |
+| A13-1 汇总 | ✅ | `MisstatementSummaryView.vue` Tab 内嵌 |
+| Tab 套件 override | ✅ | `_WP_CODE_OVERRIDE["A13"]` → `misstatement-workpaper` |
+| A13-2~5 d-form | ✅ | `GtMisstatementWorkpaper.vue` + `A13.yaml` schema + `test_render_config_d_form_table_a14.py` 同类契约 |
+| 下游 A16 alert | ✅ | `misstatements/for-letter` + `test_misstatement_for_letter.py` |

@@ -289,10 +289,26 @@ class TestAnalyticalReviewRouting:
         """analytical-review 在白名单中。"""
         assert "analytical-review" in VALID_COMPONENT_TYPES
 
-    def test_a13_not_affected(self):
-        """A13（错报程序表）仍路由到 misstatement-summary，不受 A1-13 影响。"""
+    def test_a13_misstatement_workpaper(self):
+        """A13（错报程序表）→ misstatement-workpaper Tab 套件。"""
         result = derive_component_type(_make_classification("A-程序表", wp_code="A13"))
-        assert result == "misstatement-summary"
+        assert result == "misstatement-workpaper"
+
+    def test_a11_bundle(self):
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A11"))
+        assert result == "a11-bundle"
+
+    def test_a15_bundle(self):
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A15"))
+        assert result == "a15-bundle"
+
+    def test_a17_summary(self):
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A17-1"))
+        assert result == "a17-summary"
+
+    def test_a18_regulatory_letter(self):
+        result = derive_component_type(_make_classification("D-检查表", wp_code="A18-2"))
+        assert result == "regulatory-letter"
 
     def test_a1_15_not_affected(self):
         """A1-15 仍路由到 checklist-table，不受 A1-13/A1-14 影响。"""

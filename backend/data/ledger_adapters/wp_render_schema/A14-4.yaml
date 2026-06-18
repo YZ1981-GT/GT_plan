@@ -1,0 +1,121 @@
+# A14-4.yaml — 业务流程层面控制缺陷评价
+# 基于 a7_a15_xlsx_audit.json X-A14-4 深读结果
+# componentType: d-form-table
+# 结构：Step1–7 + 结论
+
+wp_code: A14-4
+template_path: backend/wp_templates/A/A14-4 业务流程层面控制缺陷评价.xlsx
+template_version: v2025-R5
+
+sheets:
+  main:
+    form_type: table
+    title: 业务流程层面控制缺陷评价
+    sections:
+      - id: step1
+        label: 步骤一：缺陷来源汇总
+      - id: step2
+        label: 步骤二：缺陷描述与分类
+      - id: step3
+        label: 步骤三：可能性评估
+      - id: step4
+        label: 步骤四：影响程度评估
+      - id: step5
+        label: 步骤五：缺陷等级认定
+      - id: step6
+        label: 步骤六：整改建议
+      - id: step7
+        label: 步骤七：综合评价结论
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      add_row_button: true
+      max_rows: 50
+      columns:
+        seq:
+          field: seq
+          type: text
+          label: 序号
+          width: 50
+        business_cycle:
+          field: business_cycle
+          type: text
+          label: 业务循环
+          width: 100
+        control_point:
+          field: control_point
+          type: textarea
+          label: 控制点
+          width: 150
+        deficiency_desc:
+          field: deficiency_desc
+          type: textarea
+          label: 缺陷描述
+          width: 200
+        deficiency_type:
+          field: deficiency_type
+          type: enum
+          label: 类型
+          width: 80
+          dict_source: deficiency_type_dict
+        likelihood:
+          field: likelihood
+          type: enum
+          label: 可能性
+          width: 80
+          dict_source: likelihood_dict
+        impact:
+          field: impact
+          type: enum
+          label: 影响程度
+          width: 80
+          dict_source: impact_dict
+        deficiency_level:
+          field: deficiency_level
+          type: enum
+          label: 缺陷等级
+          width: 90
+          dict_source: deficiency_level_dict
+        remediation:
+          field: remediation
+          type: textarea
+          label: 整改建议
+          width: 180
+    dictionaries:
+      deficiency_type_dict:
+        - value: design
+          label: 设计缺陷
+        - value: operation
+          label: 运行缺陷
+      likelihood_dict:
+        - value: high
+          label: 高
+        - value: medium
+          label: 中
+        - value: low
+          label: 低
+      impact_dict:
+        - value: high
+          label: 高
+        - value: medium
+          label: 中
+        - value: low
+          label: 低
+      deficiency_level_dict:
+        - value: major
+          label: 重大缺陷
+        - value: significant
+          label: 重要缺陷
+        - value: general
+          label: 一般缺陷
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 审计说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 综合评价结论
+        type: textarea

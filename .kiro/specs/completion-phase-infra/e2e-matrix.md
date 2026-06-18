@@ -17,7 +17,7 @@
 
 > **🔴 前置风险（实施前确认）**：真实 PG 数据多为 standalone，**A 类项目夹具（FIX-A）是否存在未经确认**——这正是合并模块「代码全绿、UAT 全 data-blocked」的同款风险。A17 全系列 E2E（E10–E12、E17）+ A18 部分用例均依赖 FIX-A。**E-FIX 前置任务**：确认或构造 FIX-A / FIX-B / FIX-INT / FIX-RP 种子项目，否则相关 E2E 无法标绿（只能标 `[ ]*` 代码已改未实测）。
 
-> **行动项**：需编写 `scripts/e2e/seed_fix_projects.py` 构造最小种子数据（或确认现有项目 df5b8403 等可复用）。此任务为纯数据准备，不阻塞代码实施但阻塞 E2E 标绿。
+> **行动项**：`backend/scripts/e2e/seed_fix_projects.py --fix` 构造/校验 FIX 夹具，manifest 输出 `backend/data/e2e_fix_projects.json`；Playwright 读 `TEST_PROJECT_ID_FIX_*` 或 `ensure-test-project.ts`。
 
 ---
 
@@ -44,6 +44,9 @@
 | E16 | plus | A16 | signed → 填 sign_date | CW-76 报告字段 |
 | E17 | plus | A17 | KAM 1 条 → push | 报告 KAM 段落 |
 | E18 | plus | A18 | A18-1 小结生成 | 依赖 A17-1 有内容 |
+| E20 | lite | A21–A25 | FIX-A：A21-1 勾选 1 项 → 刷新 | 不丢 |
+| E21 | core | A21–A25 | A21-1 签字 pass | A1 对应步骤 ✓ |
+| E22 | plus | A21–A25 | A21-1 xlsx 导出 | √ / 签字区有内容 |
 
 ---
 
@@ -56,4 +59,5 @@
 | a16 | E8, E9, E16 |
 | a17 | E10–E12, E17 |
 | a18 | E13, E14, E18 |
+| a21-a25 | E20, E21, E22 |
 | a13 / a14 | E5、E6 中与 A13/A14/A15 相关子集 |

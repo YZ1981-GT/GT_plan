@@ -110,7 +110,11 @@ class ReviewWorkflowService:
         opinion: str = "",
         submit: bool = False,
     ) -> dict[str, Any]:
-        """保存复核记录（勾选+意见）"""
+        """保存复核记录（勾选+意见）
+
+        ⚠️ A21~A25 新写入请走 checklist_responses + POST review-sign；
+        本方法保留旧 ReviewChecklistRecord 路径供历史面板只读兼容。
+        """
         stmt = sa.select(ReviewChecklistRecord).where(
             ReviewChecklistRecord.project_id == project_id,
             ReviewChecklistRecord.year == year,
@@ -320,25 +324,17 @@ class ReviewWorkflowService:
         return buf.getvalue()
 
     async def get_review_progress(self, project_id: UUID, year: int) -> dict[str, Any]:
-        """获取复核阶段进度"""
-        stmt = sa.select(
-            ReviewChecklistRecord.template_code,
-            ReviewChecklistRecord.status,
-        ).where(
-            ReviewChecklistRecord.project_id == project_id,
-            ReviewChecklistRecord.year == year,
-        )
-        result = await self.db.execute(stmt)
-        records = result.all()
+        """获取复核阶段进度 — 读 checklist_responses -sign（不再写 ReviewChecklistRecord）。"""
+        from app.services.review_checklist_service import get_review_sign_status_batch
 
-        total_levels = 5  # field_lead/manager/partner/quality_reviewer/eqcr
-        submitted = sum(1 for _, status in records if status == "submitted")
-
+        statuses = await get_review_sign_status_batch(self.db, project_id)
+        total_levels = len(statuses) or 5
+        submitted = sum(1 for v in statuses.values() if v == "pass")
         return {
             "total_levels": total_levels,
             "submitted": submitted,
             "progress_pct": round(submitted / total_levels * 100) if total_levels else 0,
-            "records": [{"code": code, "status": status} for code, status in records],
+            "records": [{"code": k, "status": v or "draft"} for k, v in statuses.items()],
         }
 
     # ------------------------------------------------------------------

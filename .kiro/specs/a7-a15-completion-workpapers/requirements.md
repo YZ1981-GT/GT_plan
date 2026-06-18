@@ -246,7 +246,7 @@ A7–A15 是审计**完成阶段**核心程序组（A1 总程序表 seq 6–11�
 | A9 弹窗 guidance | A14-1 缺陷计数/等级 | ❌ | 依赖 core A14-1 checklist |
 | A16 书面声明 | A8-1 / A13-5 索引 | ⚠️ | A8-1 弹窗有；A13-5 表单未落地 |
 | A16-7 关联方 | A7-1 / A7-2 | ❌ | 依赖 core c-note / 摘要 |
-| EQCR | A15-1 调查结论 | ⚠️ | core checklist 只读引用 |
+| EQCR | A15-1 调查结论 | ✅ | EQCR going_concern Tab 只读引用 + A15-1 提示栏 |
 | A18 议题3 | A8-2 完成状态 | ⚠️ | **手动提示**，无 auto sync |
 
 ---
@@ -261,23 +261,24 @@ A7–A15 是审计**完成阶段**核心程序组（A1 总程序表 seq 6–11�
 
 ---
 
-## 现状与差距（目标 vs 代码）
+## 现状与差距 — 已闭合（2026-06-18）
 
-| 能力 | 目标（本 spec） | 代码现状 | 分期 |
-|------|-----------------|----------|------|
-| 26 文件 audit JSON | ✅ | ✅ `a7_a15_xlsx_audit.json` | audit |
-| procedure_table A7–A15 | ✅ 对齐 xlsx | ✅ JSON 已对齐 | audit |
-| 9× 程序表 HTML | GtAProgramConsole | ✅ 已有 | lite |
-| 7 docx 弹窗配置 | wpPopupDocxConfigs + INLINE_POPUP | ✅ 配置已有 | lite E2E 待验 |
-| PRE-1 无空格文件名 fallback | A9-1 等可下载 | ✅ 代码已有 | lite E2E 待验 |
-| ref_index 全表 | JSON 补全 | ⚠️ A9/A10/A11/A12 待验 | lite |
-| A14 applicable_categories | 步骤级 A/B | ⚠️ 待验 | **lite** |
-| A13-1 misstatement-summary | 汇总有数据时展示 | ⚠️ 待验收 | lite |
-| PRE-4 checklist_xlsx_parser | A11-2/3, A14-1, A15-1 | ❌ 未建 | core 阻塞 |
-| A13 Tab 套件 | misstatement-workpaper | ❌ override 未注册 | core |
-| A11 双轨路由 | docx vs A11-WP-1 sheet | ❌ 未实现 | core |
-| A14-3 workbook | a14-3-workbook | ❌ 未建 | core |
-| d-form A10-2/A13-2~5/A14-2~4 | HTML 持久化 | ❌ 未落地 | core |
-| PRE-2 export-word | A8–A12 无蓝【】残留 | ❌ 未建 | plus |
-| 跨模块摘要 API | A17/A16/A18 消费 | ❌ 未建 | plus |
-| audit diff CI 门禁 | `--diff-only` 回归 | ❌ 建议加 | 维护 |
+> tasks.md 51/51 全绿。下表记录实施结论，仅供追溯参考。
+
+| 能力 | 代码现状 | 落地证据 |
+|------|----------|----------|
+| 26 文件 audit JSON | ✅ | `a7_a15_xlsx_audit.json` |
+| procedure_table A7–A15 | ✅ | JSON 已对齐 + CI `--diff-only` 门禁 |
+| 9× 程序表 HTML | ✅ | `_WP_CODE_OVERRIDE` + htmlRendererRegistry |
+| 7 docx 弹窗 | ✅ | `wpPopupDocxConfigs.ts` + Playwright `docx-popup-e2e.spec.ts` |
+| ref_index 全表 | ✅ | A9 seq2→A9-1/seq4→A9-2 修正；全部验证通过 |
+| A14 applicable_categories | ✅ | seq3/seq6 加 `["A","B"]` + PBT 测试 |
+| A13-1 misstatement-summary | ✅ | `MisstatementSummaryView.vue` + vitest |
+| checklist_xlsx_parser | ✅ | `checklist_xlsx_parser.py` 783 行 + 单测 |
+| A13 Tab 套件 | ✅ | `GtMisstatementWorkpaper.vue` + A13.yaml schema |
+| A11 双轨路由 | ✅ | `GtA11Bundle.vue` tab=A11-WP-1 + `BUNDLE_SHEET_ALIASES` |
+| A14-3 workbook | ✅ | `_WP_CODE_OVERRIDE["A14-3"] = "a14-3-workbook"` |
+| d-form A10-2/A13-2~5/A14-2~5 | ✅ | override 注册 + schema YAML |
+| export-word | ✅ | `docx_template_filler.py` + `wp_export_word` 端点 |
+| 跨模块摘要 API | ✅ | `workpaper_summaries_service.py` + 3 key handler |
+| CI audit diff 门禁 | ✅ | `.github/workflows/ci.yml` + `KNOWN_DIFF_ALLOWLIST` |

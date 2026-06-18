@@ -350,6 +350,17 @@ class EqcrDomainService:
         opinions = await _load_domain_opinions(self.db, project_id, "going_concern")
         current_opinion, history_opinions = _split_current_history(opinions)
 
+        from app.services.workpaper_summaries_service import get_workpaper_summary
+
+        a15_summary = await get_workpaper_summary(self.db, project_id, "going_concern")
+        a15_ref = {
+            "ready": bool(a15_summary and a15_summary.get("ready")),
+            "source_wp": ["A15-1"],
+            "summary_text": a15_summary.get("summary_text") if a15_summary else None,
+            "conclusion": a15_summary.get("conclusion") if a15_summary else None,
+            "reason": a15_summary.get("reason") if a15_summary else "A15-1 数据源未就绪",
+        }
+
         return {
             "project_id": str(project_id),
             "domain": "going_concern",
@@ -357,6 +368,7 @@ class EqcrDomainService:
                 "current_evaluation": current_eval,
                 "prior_evaluations": prior_evals,
                 "indicators": latest_indicators,
+                "a15_1_reference": a15_ref,
             },
             "current_opinion": current_opinion,
             "history_opinions": history_opinions,

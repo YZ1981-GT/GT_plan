@@ -1,251 +1,215 @@
-# A21~A25 复核底稿 — 设计文档
+# A21~A25 各角色复核底稿 — 设计文档
+
+## 前置依赖
+
+> **权威定义**：[completion-phase-infra](../completion-phase-infra/requirements.md)（PRE-2、持久化、E-FIX）。  
+> item_id 增量注册：[persistence.md](../completion-phase-infra/persistence.md) §review-checklist。
+
+---
+
+## 架构总览
+
+| 模式 | 底稿 | componentType | 持久化 | 打开方式 |
+|------|------|---------------|--------|----------|
+| 角色复核 HTML | A21-1 ~ A25-2 | `review-checklist` | checklist_responses | 底稿目录 / A1 chip（P1） |
+| 程序表父码 | A21 ~ A25 | `a-program-console` 或目录聚合 | procedure_instances | 可选；**不**替代子码填写 |
+| 归档交付 | 同上 | xlsx 导出（plus） | PRE-2 filler | plus |
+
+**xlsx 两 sheet → UI 两区**：
+
+| 实物 sheet | UI 区域 | item_id |
+|------------|---------|---------|
+| 复核表（检查项） | 检查项列表 | `{wp_code}-chk-{seq:02d}` |
+| 复核记录 | textarea | `{wp_code}-record` |
+| 模板签字区 | 通过/退回按钮 | `{wp_code}-sign` |
+
+---
 
 ## 架构决策
 
 ### 配置驱动 vs 代码分支
 
-**决策：纯配置驱动**。5 角色 × 审计类型 × 企业规模 = 10+ 变体，全部由 JSON 定义文件 + 运行时项目上下文决定，前端组件零分支。
+**纯配置驱动**：10+ 变体由 `a21_a25_review_definitions.json` + 项目上下文决定；`GtReviewChecklist.vue` 零角色分支。
 
-### componentType 复用
+### 持久化唯一源（⚠️ 与现有代码对齐）
 
-保持 `review-checklist` componentType 不变（A21~A25 已映射），替换底层组件实现。
+| 决策 | 说明 |
+|------|------|
+| **权威表** | `checklist_responses`（与 A17/A18 一致） |
+| **`ReviewChecklistRecord`** | core 阶段 **停止新写入**；只读迁移或废弃 |
+| **`ReviewWorkflowService.get_review_panel`** | 重构为：读 definitions + checklist_responses + review-context；**不**再维护平行 item 列表 |
+| **`review_records`** | 仅单元格批注；**禁止**用于 A21~A25 签字 |
+
+### componentType 与 override（P0 必做）
+
+父码 fallback 不可靠时须 **显式注册子码**：
 
 ```python
-# _WP_CODE_OVERRIDE 保持不变
-"A21": "review-checklist",
-"A22": "review-checklist",
-"A23": "review-checklist",
-"A24": "review-checklist",
-"A25": "review-checklist",
+# wp_classification_service._WP_CODE_OVERRIDE（P0 追加）
+"A21-1": "review-checklist", "A21-2": "review-checklist",
+"A22-1": "review-checklist", "A22-2": "review-checklist",
+"A23-1": "review-checklist", "A23-2": "review-checklist",
+"A24-1": "review-checklist", "A24-2": "review-checklist",
+"A25-1": "review-checklist", "A25-2": "review-checklist",
+# 父码保留
+"A21": "review-checklist", ... "A25": "review-checklist",
 ```
 
-### 与 A1-15/A1-16 checklist-table 的区别
+`htmlRendererRegistry`：`review-checklist` → `GtReviewChecklist.vue`（替换 `ReviewChecklistPanel.vue`）。
 
-| 维度 | checklist-table (A1-15) | review-checklist (A21~A25) |
-|------|------------------------|---------------------------|
-| 数据源 | xlsx 逐行解析 529 条目 | JSON 定义 15~25 条 |
-| 适用性 | 手动标记 4 种(Y/XI/XW/NA) | 二值(Y/NA) + auto_na |
-| 签字 | 无 | 复核通过/退回 + review_records |
-| 复核记录 | 无 | textarea 自由文本 |
-| 多角色 | 单一 | 5 角色配置切换 |
+### 与 checklist-table (A1-15) 的区别
+
+| 维度 | checklist-table | review-checklist |
+|------|-----------------|------------------|
+| 数据源 | xlsx 529 行 parser | audit → definitions JSON |
+| 适用性 | Y/XI/XW/NA 四态 | Y/N/NA + auto_na |
+| 签字 | 无 | pass/reject → `-sign` |
+| 复核记录 | 无 | `-record` textarea |
+| 多角色 | 单表 | 5 角色 × 审计类型 |
 
 ---
 
 ## 数据模型
 
-### JSON 定义文件：`a21_a25_review_definitions.json`
+### `a21_a25_xlsx_audit.json`（audit 阶段产出）
 
-```json
-{
-  "templates": {
-    "A21-1": {
-      "role": "site_leader",
-      "role_label": "项目现场负责人",
-      "audit_type": "financial",
-      "audit_type_label": "财务报表审计",
-      "applicable_categories": ["A", "B", "C"],
-      "enterprise_variant": null,
-      "items": [
-        {
-          "seq": 1,
-          "content": "具体审计计划已经实施，已完成的工作底稿与具体审计计划的交叉索引。",
-          "auto_na_condition": null,
-          "category": "completeness"
-        },
-        {
-          "seq": 10,
-          "content": "对于利用组成部分注册会计师的工作，已获取了独立性等声明…",
-          "auto_na_condition": "no_component_auditor",
-          "category": "component"
-        }
-      ]
-    },
-    "A24-1-soe": {
-      "role": "quality_reviewer",
-      "role_label": "质量复核合伙人",
-      "audit_type": "financial",
-      "audit_type_label": "财务报表审计",
-      "applicable_categories": ["A"],
-      "enterprise_variant": "large_soe",
-      "items": [...]
-    }
-  },
-  "auto_na_conditions": {
-    "no_component_auditor": {
-      "label": "无组件单位审计师",
-      "check": "project.has_component_auditor === false"
-    },
-    "no_it_audit": {
-      "label": "无 IT 审计程序",
-      "check": "project.has_it_audit === false"
-    },
-    "not_large_soe": {
-      "label": "非大型国企",
-      "check": "project.is_large_soe === false"
-    }
-  },
-  "role_priority": ["site_leader", "manager", "partner", "quality_reviewer", "eqcr"]
-}
-```
+每模板条目：`wp_code`, `sheets[]`, `items[]`（seq, content, columns, cell_ref 可选）, `sign_block`（可选）。
 
-### 模板选择算法
+### `a21_a25_review_definitions.json`（runtime 权威）
+
+由 audit JSON 生成；结构见 requirements §1。`review_checklist_templates.json` 在 audit 完成后 **合并或废弃**，避免双源。
+
+### 版本选择：`a21_a25_version_selector.py`
 
 ```python
-def select_review_templates(project) -> list[str]:
-    """根据项目上下文返回应生成的复核底稿 wp_code 列表"""
-    category = project.business_category  # A/B/C
-    audit_type = project.audit_type       # financial/internal_control/combined
-    is_soe = project.is_large_soe         # bool
-
-    templates = []
-    for code, defn in DEFINITIONS["templates"].items():
-        # 1. 业务类别过滤
-        if category not in defn["applicable_categories"]:
-            continue
-        # 2. 审计类型匹配
-        if audit_type == "combined" or defn["audit_type"] == audit_type:
-            pass  # 匹配
-        else:
-            continue
-        # 3. 企业变体匹配
-        if defn["enterprise_variant"] == "large_soe" and not is_soe:
-            continue
-        if defn["enterprise_variant"] == "non_soe" and is_soe:
-            continue
-        templates.append(code)
-    return templates
+async def get_applicable_review_templates(db, project_id) -> list[dict]:
+    """类比 a17_5_version_selector；返回 wp_code + mandatory + applicable + reason"""
 ```
+
+规则摘要：
+
+- `business_category` 前缀过滤 A21~A25 可达角色  
+- `audit_type` → -1 / -2 / 两者  
+- `is_large_soe` → A24-1 / A25-1 文件名变体  
+- A 类才 applicable A24/A25  
+
+API：`GET /api/projects/{pid}/a21/applicable-review-templates`
 
 ---
 
 ## 前端设计
 
-### GtReviewChecklist.vue（替换 ReviewChecklistPanel.vue）
+### GtReviewChecklist.vue
 
 Props：`projectId`, `wpId`, `wpCode`
 
 ```
 ┌──────────────────────────────────────────────┐
-│  角色: 项目现场负责人  |  财务报表审计  | A类  │  ← 角色信息栏
+│  角色: 项目现场负责人  |  财报审计  | A类        │
 ├──────────────────────────────────────────────┤
 │  进度: ████████░░ 12/15 (80%)                │
 ├──────────────────────────────────────────────┤
-│  ☑ 1. 具体审计计划已经实施…                   │  ← 检查项
-│  ☑ 2. 工作底稿的审计结论已有清晰表述…          │
-│  ☐ 3. 全部财务报表项目的审计工作底稿…          │
-│  …                                           │
-│  ▨ 10. 组件单位审计师… [N/A - 无组件审计]     │  ← auto_na 灰化
-│  …                                           │
+│  ☑ 1. 具体审计计划已经实施…                   │
+│  ▨ 10. 组件单位… [N/A - 无组件审计]           │
 ├──────────────────────────────────────────────┤
-│  复核记录：                                   │  ← 自由文本区
-│  ┌────────────────────────────────────────┐  │
-│  │                                        │  │
-│  └────────────────────────────────────────┘  │
+│  复核记录： [ textarea ]                      │
 ├──────────────────────────────────────────────┤
-│  签字: ________  日期: ____   [通过] [退回]   │
+│  [通过] [退回]                                │
 └──────────────────────────────────────────────┘
 ```
 
 ### 数据流
 
-1. `onMounted` → 从 JSON 定义加载当前 wp_code 对应的检查项
-2. 调 `/projects/{pid}/working-papers/{wpId}/checklist-responses` 加载已保存数据
-3. 调 `/projects/{pid}/review-context` 获取 auto_na 条件判定结果
-4. 渲染：auto_na 命中的项自动灰化 + disabled
-5. 用户勾选 → debounce 1500ms → PUT checklist-responses
-6. 点击"通过" → POST review_records + 同步 A1 步骤状态
+1. `GET /api/projects/{pid}/a21/review-definitions?wp_code=A21-1` → items + meta  
+2. `GET /api/workpapers/{wpId}/checklist-responses` → 已保存  
+3. `GET /api/projects/{pid}/review-context` → auto_na 布尔  
+4. 勾选 → debounce 1500ms → PUT checklist-responses  
+5. 通过/退回 → POST `.../review-sign` → 写 `{wp_code}-sign` → PATCH procedure_instances（core）
 
 ---
 
 ## 后端设计
 
-### 新增文件
+### 文件
 
 | 文件 | 分期 | 职责 |
 |------|------|------|
-| `backend/data/a21_a25_review_definitions.json` | P0 | 定义文件 |
-| `backend/app/services/review_checklist_service.py` | P0 | 加载定义 + auto_na 判定 |
-| `backend/app/routers/review_checklist.py` | P1 | review-context + 签字端点 |
+| `data/a21_a25_xlsx_audit.json` | audit | 实物列映射 |
+| `data/a21_a25_review_definitions.json` | lite | 运行时定义 |
+| `services/review_checklist_service.py` | lite | 加载定义 + review-context + auto_na |
+| `services/a21_a25_version_selector.py` | core | 适用模板列表 |
+| `routers/a21_review.py`（或扩 `review_workflow.py`） | lite/core | definitions / review-context / review-sign |
 
-### API 端点
+### API
 
 ```
 GET  /api/projects/{pid}/review-context
-     → { has_component_auditor, has_it_audit, is_large_soe, audit_type, business_category }
-
-POST /api/projects/{pid}/working-papers/{wpId}/review-sign
-     → { action: "pass"|"reject", comment?: string }
-     → 写入 checklist_responses item_id="{wp_code}-sign" (P0 轻量方案)
-     → P1 可升级为独立 review_signing 表
+GET  /api/projects/{pid}/a21/applicable-review-templates
+GET  /api/projects/{pid}/a21/review-definitions?wp_code=A21-1
+POST /api/workpapers/{wpId}/review-sign
+     → body: { action: "pass"|"reject", comment?: string }
+     → 写 checklist_responses item_id="{wp_code}-sign"
 ```
 
-checklist-responses 端点已有（复用）。
+checklist-responses CRUD：**已有**，复用。
 
-### 前置迁移 V086（P0 Task 0 前置）
+### 迁移 V087
 
 ```sql
--- V086__projects_audit_context.sql
+-- V087__projects_audit_context.sql（⚠️ 非 V086）
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS audit_type VARCHAR(32) DEFAULT 'financial';
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_large_soe BOOLEAN DEFAULT false;
-COMMENT ON COLUMN projects.audit_type IS 'financial/internal_control/combined';
-COMMENT ON COLUMN projects.is_large_soe IS '大型国企标记（影响 A24/A25 模板选择）';
 ```
 
-### review_records 表说明
-
-**不用于签字**。该表是逐单元格复核批注（comment_text + reply + resolve），与本 spec 的"复核通过/退回"无关。
-
-签字方案（P0）：`checklist_responses` 的 `{wp_code}-sign` item，conclusion = "pass"/"reject"，remark = JSON({signer_id, signer_name, signed_at, comment})。
-
-### auto_na 判定逻辑（后端）
+### auto_na 判定（review-context）
 
 ```python
 async def get_review_context(db, project_id) -> dict:
-    """从项目数据推导 auto_na 条件"""
-    project = await get_project(db, project_id)
-    # has_component_auditor: 检查 wp_index 有无 A10-2(函证-组件审计师)底稿
-    has_component = await db.scalar(text(
-        "SELECT EXISTS(SELECT 1 FROM wp_index WHERE project_id=:pid AND wp_code LIKE 'A10-2%')"
-    ), {"pid": str(project_id)})
-    # has_it_audit: 检查 A27(IT审计总结)或 B 循环 IT 底稿
-    has_it = await db.scalar(text(
-        "SELECT EXISTS(SELECT 1 FROM wp_index WHERE project_id=:pid AND wp_code IN ('A27', 'A27-1'))"
-    ), {"pid": str(project_id)})
-    return {
-        "has_component_auditor": has_component or False,
-        "has_it_audit": has_it or False,
-        "is_large_soe": project.is_large_soe if hasattr(project, 'is_large_soe') else False,
-        "audit_type": project.audit_type if hasattr(project, 'audit_type') else "financial",
-        "business_category": project.business_category or "A",
-    }
+    # has_component_auditor: wp_index 存在组件审计相关底稿
+    # has_it_audit: A27 / B60-2-x 等
+    # is_large_soe, audit_type, business_category 来自 projects
 ```
 
-### wp_code fallback 确认
+### checkCompletion（GtAProgramConsole）
 
-wp_index 中已有 A21-1/A21-2 等子底稿码。`_WP_CODE_OVERRIDE` 映射的是父级 A21→review-checklist。
-`wp_classification_service.derive_component_type` 对子码（如 A21-1）会先精确匹配 `_WP_CODE_OVERRIDE["A21-1"]`（不存在），然后截取父级码 A21 再查→命中 review-checklist。
+| case | 判定 |
+|------|------|
+| A21 / A22 / A23 | 对应 `-1`/`-2` 子码 `-sign` conclusion=pass（按 audit_type 选子码） |
+| A24 / A25 | 适用子码 `-sign` pass；不适用 → none |
 
-**需确认**：`_match_dispatch_key` 或 classification 的 fallback 逻辑是否支持此行为。如不支持，P0 需显式添加 A21-1/A21-2/A22-1/A22-2… 到 override。
+auto_data_source（A1 procedure）：`a21_sign_status`, `a22_sign_status`, `a23_sign_status`, `review_progress`（已有 A24/A25）。
 
 ---
 
 ## 持久化契约
 
-与 [completion-phase-infra/persistence.md](../completion-phase-infra/persistence.md) 一致。
+| 数据 | item_id | conclusion | remark |
+|------|---------|------------|--------|
+| 检查项 | `{wp_code}-chk-{seq:02d}` | Y/N/NA | 备注 |
+| 复核记录 | `{wp_code}-record` | done | 正文 |
+| 签字 | `{wp_code}-sign` | pass/reject | JSON |
 
-| 数据 | item_id 模式 | conclusion | remark |
-|------|-------------|------------|--------|
-| 检查项 | `{wp_code}-chk-{seq:02d}` | Y/N/NA | 备注文本 |
-| 复核记录 | `{wp_code}-record` | done | 记录正文 |
-| 签字状态 | `{wp_code}-sign` | pass/reject | JSON({signer, date, comment}) |
+示例：`A21-1-chk-01`, `A21-1-record`, `A21-1-sign`
 
-示例：`A21-1-chk-01`, `A21-1-chk-15`, `A21-1-record`, `A21-1-sign`
+完成态（checkCompletion）：适用子码 `-sign` = pass。
+
+---
+
+## E2E 与种子
+
+| ID | 内容 | 夹具 |
+|----|------|------|
+| E20 | A21-1 勾选 1 项 → 刷新不丢 | FIX-A |
+| E21 | 签字 pass → A1 步骤 ✓ | FIX-A |
+| E22 | xlsx 导出含 √ | FIX-A |
+
+`seed_fix_projects.py`：FIX-A/B 须含 **A21-1, A22-1, A23-1, A24-1, A25-1** 等子码实例。
 
 ---
 
 ## 不做
 
-- 不建独立程序表（A21~A25 作为 A1 程序表的引用步骤存在）
-- 不做 AI 自动复核（P2 仅做完成度预填建议，非 LLM 判断）
-- 不改 _WP_CODE_OVERRIDE（已正确映射）
-- 不处理 A26/A27（docx 弹窗已完善）/ A28（Univer 直开）
+- 不建 A21~A25 独立程序表 JSON（子码靠目录 + A1 ref_index）
+- 不用 LLM 自动复核（plus 仅规则预填）
+- 不用 `review_records` 存签字
+- 不处理 A26/A27/A28（已有其他 spec）

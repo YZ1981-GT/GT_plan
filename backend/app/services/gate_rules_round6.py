@@ -179,7 +179,13 @@ class GoingConcernEvaluatedRule(GateRule):
 class MgmtRepresentationRule(GateRule):
     """管理层声明已获取检查
 
-    读取 Project.wizard_state.mgmt_representation_obtained，未获取则阻断。
+    读取 A16 主版本 sign_status（field_overrides）对齐 wizard_state：
+    - signed → 通过（无 hit）
+    - sent → warning（进行中）
+    - pending/None → blocking（未开始）
+
+    向后兼容：若 field_overrides 无 A16 数据，仍检查
+    Project.wizard_state.mgmt_representation_obtained 布尔标记。
     """
     rule_code = "R7-MGMT-REP"
     error_code = "MGMT_REP_NOT_OBTAINED"
@@ -192,6 +198,9 @@ class MgmtRepresentationRule(GateRule):
 
         try:
             from app.models.core import Project
+            from app.services.field_override_service import FieldOverrideService
+            from sqlalchemy import text
+
             result = await db.execute(
                 select(Project).where(Project.id == project_id)
             )
@@ -199,6 +208,63 @@ class MgmtRepresentationRule(GateRule):
             if project is None:
                 return None
 
+            # 获取审计年度
+            year_val = 0
+            if project.audit_period_end:
+                year_val = project.audit_period_end.year
+            else:
+                try:
+                    year_q = await db.execute(text(
+                        "SELECT EXTRACT(YEAR FROM audit_period_end)::int "
+                        "FROM projects WHERE id = :pid"
+                    ), {"pid": str(project_id)})
+                    year_val = year_q.scalar() or 0
+                except Exception:
+                    pass
+
+            # 尝试从 field_overrides 读取 A16 主版本 sign_status
+            sign_status = None
+            if year_val:
+                svc = FieldOverrideService(db)
+
+                # 1. 读 selected_version
+                selected_version = await svc.get(
+                    project_id, year_val,
+                    "word_template:A16", "selected_version", "value"
+                )
+
+                if selected_version:
+                    # 2. 读该版本的 sign_status
+                    scope = f"word_template:A16:{selected_version}"
+                    sign_status = await svc.get(
+                        project_id, year_val, scope, "sign_status", "value"
+                    )
+
+            # 若 field_overrides 有数据，按 sign_status 判定
+            if sign_status is not None:
+                if sign_status == "signed":
+                    return None  # 已签署，通过
+                elif sign_status == "sent":
+                    return GateRuleHit(
+                        rule_code=self.rule_code,
+                        error_code="MGMT_REP_SENT_NOT_SIGNED",
+                        severity=GateSeverity.warning,
+                        message="管理层声明书已发出但尚未签回",
+                        location={"project_id": str(project_id)},
+                        suggested_action="请跟进管理层签署声明书",
+                    )
+                else:
+                    # pending 或其他值
+                    return GateRuleHit(
+                        rule_code=self.rule_code,
+                        error_code=self.error_code,
+                        severity=self.severity,
+                        message="管理层声明书尚未获取",
+                        location={"project_id": str(project_id)},
+                        suggested_action="请获取管理层声明书",
+                    )
+
+            # 向后兼容：无 field_overrides 数据时读 wizard_state 布尔标记
             ws = project.wizard_state or {}
             if ws.get("mgmt_representation_obtained", False):
                 return None

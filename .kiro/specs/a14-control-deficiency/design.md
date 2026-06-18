@@ -38,4 +38,15 @@ T4 非财务报告 Step1–7 + 结论；复用 `GtEControlTest` 模式（与循�
 
 ## 程序表 auto_data
 
-seq4 → A14-1：`control_deficiency_count`（lite 可读 stub；core A14-1 落地后准确）。
+seq4 → A14-1：`control_deficiency_count`（A14-1 checklist 落地后准确 ✅）。
+
+---
+
+## 实施状态（2026-06-18）
+
+| 组件 | 文件 | 状态 |
+|------|------|------|
+| A14-3 workbook | `GtA14_3Workbook.vue` | ✅ 3 Tab |
+| A14-1 parser | `checklist_xlsx_parser.py` | ✅ |
+| A14-5/6 | render schema + `GtEControlTest` | ✅ |
+| E2E | `e2e/a14-1-checklist-table.spec.ts` | ✅ API 级 |

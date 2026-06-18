@@ -3,6 +3,7 @@
  *
  * E10: A17-3 chip 点击 → 弹窗展示（业务咨询记录）
  * E11: A17-5-1 → checklist-table 渲染（审计目标 + 核对程序）
+ * E11b: A17 seq5 → A17-5 选版 chip（必做 badge + 不适用折叠）
  *
  * 运行方式：
  *   set RUN_FULL_E2E=1 && set TEST_PROJECT_ID=<A类项目ID>
@@ -104,6 +105,33 @@ test.describe('A17-lite E2E', () => {
       // 左侧导航含"核对程序"节
       await expect(checklist.locator('.gt-checklist-table__nav-item', { hasText: '核对程序' }))
         .toBeVisible()
+    })
+  })
+
+  // ─── E11b: A17 seq5 核对表选版 chip ────────────────────────────────────
+  test.describe('E11b — A17-5 选版 chip', () => {
+    test('seq5 展示必做 badge，不适用版本可折叠', async ({ page, request }) => {
+      test.setTimeout(45_000)
+      const token = await loginAs(page)
+      const wp = await findWpByCode(request, token, 'A17')
+      test.skip(!wp, '项目内无 A17 程序表底稿')
+
+      await page.goto(`/projects/${TEST_PROJECT_ID}/workpapers/${wp!.id}/edit`)
+      await page.waitForSelector('.gt-a-program-console', { timeout: 20_000 })
+
+      const mandatory = page.locator('.gt-a-program-console__a17-badge', { hasText: '必做' }).first()
+      test.skip(!(await mandatory.count()), 'A17-5 必做 badge 未渲染（需 applicable-versions API）')
+      await expect(mandatory).toBeVisible()
+
+      const chip517 = page.locator('.gt-index-chip', { hasText: 'A17-5-1' }).first()
+      await expect(chip517).toBeVisible()
+
+      const toggle = page.locator('.gt-a-program-console__other-versions-toggle').first()
+      if (await toggle.count()) {
+        await toggle.click()
+        const naChip = page.locator('.gt-index-chip.is-disabled, .gt-index-chip[disabled]').first()
+        await expect(naChip).toBeVisible({ timeout: 5_000 })
+      }
     })
   })
 })

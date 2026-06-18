@@ -142,10 +142,21 @@ async def batch_save_checklist_responses(
                         detail=f"章节适用性 conclusion 值必须为 'Y'/'N' 或 null，收到: '{item.conclusion}'",
                     )
             else:
-                if item.conclusion not in ("Y", "X/I", "X/W", "N/A"):
+                allowed = ("Y", "X/I", "X/W", "N/A")
+                if item.item_id.endswith("-sign-status"):
+                    allowed = ("pending", "sent", "signed")
+                elif item.item_id.startswith(("A17-1-ch", "A18-2")):
+                    allowed = ("Y", "N", "done", "pending")
+                elif item.item_id.endswith("-sign") and item.item_id.startswith(("A21-", "A22-", "A23-", "A24-", "A25-")):
+                    allowed = ("pass", "reject")
+                elif item.item_id.endswith("-record") and item.item_id.startswith(("A21-", "A22-", "A23-", "A24-", "A25-")):
+                    allowed = ("done",)
+                elif "-chk-" in item.item_id and item.item_id.startswith(("A21-", "A22-", "A23-", "A24-", "A25-")):
+                    allowed = ("Y", "N", "NA")
+                if item.conclusion not in allowed:
                     raise HTTPException(
                         status_code=422,
-                        detail=f"conclusion 值必须为 'Y'/'X/I'/'X/W'/'N/A' 或 null，收到: '{item.conclusion}'",
+                        detail=f"conclusion 值无效，收到: '{item.conclusion}'",
                     )
 
         row = await db.execute(

@@ -14,6 +14,7 @@
   ├─ A16 跳转页 ─────────────→ field_overrides（sign_status / selected_version）
   ├─ checklist-table ────────→ checklist_responses
   ├─ structured HTML ────────→ checklist_responses（A17-1 / A18-2 / KAM）
+  ├─ review-checklist ───────→ checklist_responses（A21-1~A25-2 角色复核）
   └─ d-form-table ───────────→ checklist_responses（item_id 带 section/row 前缀）
 ```
 
@@ -24,6 +25,7 @@
 | A17-1 章节 | `checklist_responses` | conclusion=done |
 | A17-2-1 KAM | `checklist_responses` | remark JSON 必填字段完整 |
 | A18-2 议题 | `checklist_responses` | 适用议题 conclusion=Y 且 remark 非空 |
+| A21~A25 复核 | `checklist_responses` | 适用子码 `{wp_code}-sign` conclusion=pass |
 | d-form 行 | `checklist_responses` | 按 section 必填规则 |
 
 ---
@@ -85,6 +87,16 @@ A14-1 remark JSON（P1 schema，前后端校验）：
 | A17-2-1 KAM | `A17-2-1-KAM-001` … | remark=KAM JSON（见 A17 design） |
 | A18-2 议题 | `A18-2-001` … `A18-2-004` | 议题描述 |
 | A18-2 表头 | `A18-2-header` | JSON：regulator、sub_choice_3 等 |
+
+### review-checklist（A21~A25 各角色复核）
+
+| wp_code | item_id 模式 | conclusion | remark |
+|---------|--------------|------------|--------|
+| A21-1 ~ A25-2 | `{wp_code}-chk-{seq:02d}` | Y / N / NA | 检查项备注 |
+| 同上 | `{wp_code}-record` | done | 复核记录正文（对应 xlsx「复核记录」sheet） |
+| 同上 | `{wp_code}-sign` | pass / reject | JSON：signer_id, signer_name, signed_at, comment |
+
+完成态：`checkCompletion` 读适用子码 `-sign` conclusion=pass（见 a21-a25 design §checkCompletion）。
 
 ### d-form（section 前缀）
 

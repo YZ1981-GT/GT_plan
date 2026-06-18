@@ -22,6 +22,7 @@ from app.services.a17_kam_push_service import push_kam_to_report
 from app.services.a17_llm_service import a17_llm_service
 from app.services.a17_word_exporter import A17WordExporter
 from app.services.a17_5_version_selector import get_applicable_versions
+from app.services.review_checklist_service import get_review_sign_hints_by_preset
 
 router = APIRouter(prefix="/api/a17", tags=["a17-summary"])
 
@@ -45,6 +46,16 @@ async def list_applicable_versions(
     根据 business_category / scenario 判定各版本适用性。
     """
     return await get_applicable_versions(db, project_id)
+
+
+@router.get("/review-sign-hints")
+async def list_review_sign_hints(
+    project_id: UUID = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """A17-5 核对项 preset A22/A23/A24/A25 → 读 A21~A25 子码 -sign 状态。"""
+    return await get_review_sign_hints_by_preset(db, project_id)
 
 
 class PullRequest(BaseModel):

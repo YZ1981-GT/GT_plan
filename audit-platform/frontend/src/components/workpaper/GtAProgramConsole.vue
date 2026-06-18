@@ -253,29 +253,150 @@
       <el-table-column label="关联底稿" min-width="140">
         <template #default="{ row }">
           <div v-if="row.linked_workpapers" class="gt-a-program-console__chips">
-            <span
-              v-for="(ref, idx) in parseLinkedWorkpapers(row.linked_workpapers)"
-              :key="idx"
-              class="gt-a-program-console__chip-wrap"
-            >
-              <GtIndexChip
-                :value="ref"
-                :validate="true"
-                :prevent-navigate="INLINE_POPUP_WP_CODES.has(ref)"
-                :disabled="row.applicable === 'na'"
-                @click="handleIndexChipClick"
-              />
+            <!-- A16 seq2 特殊渲染：推荐版本置顶 + badge + 其他版本折叠 -->
+            <template v-if="isA16Seq2Row(row)">
+              <!-- 推荐版本 chip（始终可见） -->
               <span
-                v-if="row.applicable !== 'na' && INLINE_POPUP_WP_CODES.has(ref) && popupCompletionStatus[ref] === 'completed'"
-                class="popup-badge popup-badge--done"
-                title="已完成"
-              >✓</span>
+                v-if="a16RecommendedCode"
+                class="gt-a-program-console__chip-wrap gt-a-program-console__chip-recommended"
+              >
+                <GtIndexChip
+                  :value="a16RecommendedCode"
+                  :validate="true"
+                  :prevent-navigate="INLINE_POPUP_WP_CODES.has(a16RecommendedCode)"
+                  :disabled="isRowChipDisabled(row)"
+                  @click="handleIndexChipClick"
+                />
+                <span class="gt-a-program-console__recommend-badge">推荐</span>
+                <span
+                  v-if="INLINE_POPUP_WP_CODES.has(a16RecommendedCode) && popupCompletionStatus[a16RecommendedCode] === 'completed'"
+                  class="popup-badge popup-badge--done"
+                  title="已完成"
+                >✓</span>
+                <span
+                  v-else-if="INLINE_POPUP_WP_CODES.has(a16RecommendedCode) && popupCompletionStatus[a16RecommendedCode] === 'in_progress'"
+                  class="popup-badge popup-badge--progress"
+                  title="进行中"
+                >◐</span>
+              </span>
+              <!-- 其他版本折叠/展开 -->
               <span
-                v-else-if="row.applicable !== 'na' && INLINE_POPUP_WP_CODES.has(ref) && popupCompletionStatus[ref] === 'in_progress'"
-                class="popup-badge popup-badge--progress"
-                title="进行中"
-              >◐</span>
-            </span>
+                v-if="a16OtherVersions.length > 0"
+                class="gt-a-program-console__other-versions-toggle"
+                @click="a16OtherExpanded = !a16OtherExpanded"
+              >
+                {{ a16OtherExpanded ? '收起 ▲' : '其他版本 ▼' }}
+              </span>
+              <!-- 展开后的其他版本 chips -->
+              <template v-if="a16OtherExpanded">
+                <span
+                  v-for="(ref, idx) in a16OtherVersions"
+                  :key="'a16-other-' + idx"
+                  class="gt-a-program-console__chip-wrap"
+                >
+                  <GtIndexChip
+                    :value="reviewChipDisplayValue(ref)"
+                    :validate="true"
+                    :prevent-navigate="INLINE_POPUP_WP_CODES.has(reviewChipDisplayValue(ref))"
+                    :disabled="isRowChipDisabled(row) || isA17_5ChipDisabled(ref) || isReviewChipDisabled(ref)"
+                    @click="handleIndexChipClick"
+                  />
+                  <span
+                    v-if="a17_5Badge(ref)"
+                    class="gt-a-program-console__recommend-badge gt-a-program-console__a17-badge"
+                  >{{ a17_5Badge(ref) }}</span>
+                  <span
+                    v-else-if="reviewChipBadge(ref)"
+                    class="gt-a-program-console__recommend-badge gt-a-program-console__a17-badge"
+                  >{{ reviewChipBadge(ref) }}</span>
+                  <span
+                    v-if="INLINE_POPUP_WP_CODES.has(reviewChipDisplayValue(ref)) && popupCompletionStatus[chipCompletionKey(ref)] === 'completed'"
+                    class="popup-badge popup-badge--done"
+                    title="已完成"
+                  >✓</span>
+                  <span
+                    v-else-if="INLINE_POPUP_WP_CODES.has(reviewChipDisplayValue(ref)) && popupCompletionStatus[chipCompletionKey(ref)] === 'in_progress'"
+                    class="popup-badge popup-badge--progress"
+                    title="进行中"
+                  >◐</span>
+                </span>
+              </template>
+            </template>
+            <!-- A17 seq5：必做核对表置顶 + 不适用版本折叠 -->
+            <template v-else-if="isA17Seq5Row(row)">
+              <span
+                v-for="(ref, idx) in a17ApplicableRefs(row)"
+                :key="'a17-app-' + idx"
+                class="gt-a-program-console__chip-wrap"
+              >
+                <GtIndexChip
+                  :value="ref"
+                  :validate="true"
+                  :prevent-navigate="INLINE_POPUP_WP_CODES.has(ref)"
+                  :disabled="isRowChipDisabled(row)"
+                  @click="handleIndexChipClick"
+                />
+                <span
+                  v-if="a17_5Badge(ref)"
+                  class="gt-a-program-console__recommend-badge gt-a-program-console__a17-badge"
+                >{{ a17_5Badge(ref) }}</span>
+              </span>
+              <span
+                v-if="a17InapplicableRefs(row).length > 0"
+                class="gt-a-program-console__other-versions-toggle"
+                @click="a17OtherExpanded = !a17OtherExpanded"
+              >
+                {{ a17OtherExpanded ? '收起 ▲' : '不适用版本 ▼' }}
+              </span>
+              <template v-if="a17OtherExpanded">
+                <span
+                  v-for="(ref, idx) in a17InapplicableRefs(row)"
+                  :key="'a17-na-' + idx"
+                  class="gt-a-program-console__chip-wrap"
+                >
+                  <GtIndexChip
+                    :value="ref"
+                    :validate="true"
+                    :prevent-navigate="true"
+                    :disabled="true"
+                  />
+                </span>
+              </template>
+            </template>
+            <!-- 非 A16 seq2 / A17 seq5：正常渲染 -->
+            <template v-else>
+              <span
+                v-for="(ref, idx) in parseLinkedWorkpapers(row.linked_workpapers)"
+                :key="idx"
+                class="gt-a-program-console__chip-wrap"
+              >
+                <GtIndexChip
+                  :value="reviewChipDisplayValue(ref)"
+                  :validate="true"
+                  :prevent-navigate="INLINE_POPUP_WP_CODES.has(reviewChipDisplayValue(ref))"
+                  :disabled="isRowChipDisabled(row) || isA17_5ChipDisabled(ref) || isReviewChipDisabled(ref)"
+                  @click="handleIndexChipClick"
+                />
+                <span
+                  v-if="a17_5Badge(ref)"
+                  class="gt-a-program-console__recommend-badge gt-a-program-console__a17-badge"
+                >{{ a17_5Badge(ref) }}</span>
+                <span
+                  v-else-if="reviewChipBadge(ref)"
+                  class="gt-a-program-console__recommend-badge gt-a-program-console__a17-badge"
+                >{{ reviewChipBadge(ref) }}</span>
+                <span
+                  v-if="INLINE_POPUP_WP_CODES.has(reviewChipDisplayValue(ref)) && popupCompletionStatus[chipCompletionKey(ref)] === 'completed'"
+                  class="popup-badge popup-badge--done"
+                  title="已完成"
+                >✓</span>
+                <span
+                  v-else-if="INLINE_POPUP_WP_CODES.has(reviewChipDisplayValue(ref)) && popupCompletionStatus[chipCompletionKey(ref)] === 'in_progress'"
+                  class="popup-badge popup-badge--progress"
+                  title="进行中"
+                >◐</span>
+              </span>
+            </template>
           </div>
         </template>
       </el-table-column>
@@ -488,6 +609,7 @@ import { api } from '@/services/apiProxy'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useWpOnboardingGuide } from '@/composables/useWpOnboardingGuide'
 import { INLINE_POPUP_WP_CODES } from '@/components/workpaper/wpPopupDocxConfigs'
+import { isReviewRoleRef, resolveReviewWpCode as resolveReviewWpCodeUtil } from '@/components/workpaper/reviewWpResolve'
 
 // ─── Types ───
 interface ProgramAssertions {
@@ -518,8 +640,6 @@ interface ProgramRow {
   history?: ProgramHistoryItem[]
   attachment_count?: number
   phase?: string
-  /** 适用性标记：'yes' | 'na'（na=不适用，chip 灰显） */
-  applicable?: string
 }
 
 interface TrimDecision {
@@ -578,11 +698,199 @@ const projectId = computed(() => (route.params.projectId as string) || '')
 const showPopup = ref(false)
 const popupWpCode = ref('')
 
+// ─── A17-5 核对表版本适用性 ───
+const a17_5Versions = ref<Record<string, { applicable: boolean; mandatory: boolean }>>({})
+const a17OtherExpanded = ref(false)
+
+// ─── A21~A25 复核子码解析（A1 seq15–17 父码 → 适用 -1/-2）───
+const reviewTemplates = ref<Record<string, { applicable: boolean; mandatory: boolean; reason?: string }>>({})
+
+const isA1Table = computed(() => extractTableCode(props.sheetName) === 'A1')
+const isA17Table = computed(() => extractTableCode(props.sheetName) === 'A17')
+
+function resolveReviewWpCode(ref: string): string {
+  return resolveReviewWpCodeUtil(ref, reviewTemplates.value)
+}
+
+function reviewChipDisplayValue(ref: string): string {
+  return isReviewRoleRef(ref) ? resolveReviewWpCode(ref) : ref
+}
+
+function isReviewChipDisabled(ref: string): boolean {
+  if (!isReviewRoleRef(ref)) return false
+  const code = resolveReviewWpCode(ref)
+  const info = reviewTemplates.value[code]
+  return info ? !info.applicable : false
+}
+
+function reviewChipBadge(ref: string): string {
+  if (!isReviewRoleRef(ref)) return ''
+  const code = resolveReviewWpCode(ref)
+  const info = reviewTemplates.value[code]
+  if (!info?.applicable) return ''
+  return info.mandatory ? '必做' : ''
+}
+
+function chipCompletionKey(ref: string): string {
+  return isReviewRoleRef(ref) ? resolveReviewWpCode(ref) : ref
+}
+
+async function fetchReviewTemplates() {
+  if (!projectId.value) return
+  if (!isA1Table.value && !isA17Table.value) return
+  try {
+    const res = await api.get(
+      `/api/projects/${projectId.value}/a21/applicable-review-templates`,
+    )
+    const list = Array.isArray(res) ? res : (res?.data ?? res ?? [])
+    const map: Record<string, { applicable: boolean; mandatory: boolean; reason?: string }> = {}
+    for (const v of list) {
+      if (v?.wp_code) {
+        map[v.wp_code] = {
+          applicable: !!v.applicable,
+          mandatory: !!v.mandatory,
+          reason: v.reason,
+        }
+      }
+    }
+    reviewTemplates.value = map
+  } catch {
+    reviewTemplates.value = {}
+  }
+}
+
+function isA17_5Ref(ref: string): boolean {
+  return /^A17-5-\d$/.test(ref)
+}
+
+function isRowChipDisabled(row: ProgramRow): boolean {
+  return row.status === 'not_applicable'
+}
+
+function isA17_5ChipDisabled(ref: string): boolean {
+  if (!isA17_5Ref(ref)) return false
+  const info = a17_5Versions.value[ref]
+  return info ? !info.applicable : false
+}
+
+function a17_5Badge(ref: string): string {
+  const info = a17_5Versions.value[ref]
+  if (!info || !info.applicable) return ''
+  return info.mandatory ? '必做' : '推荐'
+}
+
+function a17Seq5Refs(row: ProgramRow): string[] {
+  return parseLinkedWorkpapers(row.linked_workpapers || '').filter(r => isA17_5Ref(r))
+}
+
+function isA17Seq5Row(row: ProgramRow): boolean {
+  if (!isA17Table.value) return false
+  return a17Seq5Refs(row).length >= 3
+}
+
+function a17ApplicableRefs(row: ProgramRow): string[] {
+  return a17Seq5Refs(row).filter(r => {
+    const info = a17_5Versions.value[r]
+    if (!info) return true
+    return info.applicable
+  })
+}
+
+function a17InapplicableRefs(row: ProgramRow): string[] {
+  return a17Seq5Refs(row).filter(r => {
+    const info = a17_5Versions.value[r]
+    return info ? !info.applicable : false
+  })
+}
+
+async function fetchA17ApplicableVersions() {
+  if (!isA17Table.value || !projectId.value) return
+  try {
+    const res = await api.get('/api/a17/applicable-versions', {
+      params: { project_id: projectId.value },
+    })
+    const list = Array.isArray(res) ? res : (res?.data ?? res ?? [])
+    const map: Record<string, { applicable: boolean; mandatory: boolean }> = {}
+    for (const v of list) {
+      if (v?.wp_code) {
+        map[v.wp_code] = {
+          applicable: !!v.applicable,
+          mandatory: !!v.mandatory,
+        }
+      }
+    }
+    a17_5Versions.value = map
+  } catch { /* ignore */ }
+}
+
+// ─── A16 seq2 推荐版本 + 折叠状态 ───
+const a16RecommendedCode = ref('')
+const a16OtherExpanded = ref(false)
+
+/** 判断当前程序表是否为 A16（从 sheetName 提取） */
+const isA16Table = computed(() => {
+  const code = extractTableCode(props.sheetName)
+  return code === 'A16'
+})
+
+/** 判断某行是否是 A16 seq2（含 A16-1~6 多版本 ref_index 的行） */
+function isA16Seq2Row(row: ProgramRow): boolean {
+  if (!isA16Table.value) return false
+  if (!row.linked_workpapers) return false
+  const refs = parseLinkedWorkpapers(row.linked_workpapers)
+  // A16 seq2 特征：ref_index 包含多个 A16-x 格式的子码
+  const a16Refs = refs.filter(r => /^A16-[1-6]$/.test(r))
+  return a16Refs.length >= 3 // 至少 3 个 A16-x 子码才认为是 seq2
+}
+
+/** 计算其他版本列表（排除推荐版本） */
+const a16OtherVersions = computed(() => {
+  if (!a16RecommendedCode.value) return []
+  // 从第一个匹配的 seq2 行中提取所有 A16-x refs
+  const seq2Row = programs.value.find(r => isA16Seq2Row(r))
+  if (!seq2Row) return []
+  const allRefs = parseLinkedWorkpapers(seq2Row.linked_workpapers || '')
+    .filter(r => /^A16-[1-6]$/.test(r))
+  return allRefs.filter(r => r !== a16RecommendedCode.value)
+})
+
+/** 从 API 获取 A16 推荐版本 */
+async function fetchA16RecommendedVersion() {
+  if (!isA16Table.value || !projectId.value) return
+  try {
+    const res = await api.get(
+      `/api/projects/${projectId.value}/a16/recommended-version`,
+    )
+    const data = res?.data || res
+    if (data?.main?.code) {
+      a16RecommendedCode.value = data.main.code
+    }
+  } catch {
+    // 降级：不显示推荐标记，正常渲染全部 chip
+  }
+}
+
 // ─── 弹窗完成状态回显 ───
 const popupCompletionStatus = ref<Record<string, 'completed' | 'in_progress' | 'none'>>({})
+const reviewSignStatus = ref<Record<string, string | null>>({})
 
 /** 完成规则：根据 checklist_responses 判定子底稿完成状态 */
 function checkCompletion(wpCode: string, responses: Record<string, any>): 'completed' | 'in_progress' | 'none' {
+  if (/^A2[1-5]-/.test(wpCode)) {
+    const st = reviewSignStatus.value[wpCode] ?? responses[`${wpCode}-sign`]?.conclusion
+    if (st === 'pass') return 'completed'
+    if (st === 'reject') return 'in_progress'
+    const chkPrefix = `${wpCode}-chk-`
+    const chkIds = Object.keys(responses).filter(k => k.startsWith(chkPrefix))
+    if (chkIds.some(id => responses[id]?.conclusion)) return 'in_progress'
+    return 'none'
+  }
+  if (/^A16-\d/.test(wpCode)) {
+    const st = responses[`${wpCode}-sign-status`]?.conclusion
+    if (st === 'signed') return 'completed'
+    if (st === 'sent') return 'in_progress'
+    return 'none'
+  }
   switch (wpCode) {
     case 'A1-17': {
       const ids = ['A1-17-001', 'A1-17-002', 'A1-17-003']
@@ -616,6 +924,14 @@ function checkCompletion(wpCode: string, responses: Record<string, any>): 'compl
 async function loadPopupCompletionStatus() {
   if (!props.wpId) return
   try {
+    if (projectId.value) {
+      try {
+        const signRes = await api.get(
+          `/api/projects/${projectId.value}/a21/review-sign-status`,
+        )
+        reviewSignStatus.value = signRes?.data ?? signRes ?? {}
+      } catch { reviewSignStatus.value = {} }
+    }
     const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`)
     const list = Array.isArray(res) ? res : (res?.data ?? [])
     const byId: Record<string, any> = {}
@@ -630,6 +946,9 @@ async function loadPopupCompletionStatus() {
 
 onMounted(() => {
   loadPopupCompletionStatus()
+  fetchA16RecommendedVersion()
+  fetchA17ApplicableVersions()
+  fetchReviewTemplates()
 })
 
 // Sprint 4 Task 14.1: 首次使用引导
@@ -704,9 +1023,8 @@ async function fetchProcedureTableData() {
         program_category: '',
         linked_workpapers: item.ref_index || '',
         execution_summary: item.summary || '',
-        status: item.applicable === 'na' ? 'not_applicable' : 'pending',
+        status: item.step_status || ((item.applicable === 'na' || item.applicable === 'no') ? 'not_applicable' : 'pending'),
         phase: item.phase || undefined,
-        applicable: item.applicable || 'yes',
       }))
     }
   } catch {
@@ -1033,13 +1351,19 @@ function confirmBatchTrim() {
 
 function handleIndexChipClick(resolved: ResolvedIndexRef) {
   if (resolved.ns === 'wp' && resolved.target) {
+    let target = resolved.target
+    if (isA17_5Ref(target) && isA17_5ChipDisabled(target)) return
+    if (isReviewRoleRef(target)) {
+      if (isReviewChipDisabled(target)) return
+      target = resolveReviewWpCode(target)
+    }
     // 弹窗式子底稿：拦截跳转，改为弹窗展示
-    if (INLINE_POPUP_WP_CODES.has(resolved.target)) {
-      popupWpCode.value = resolved.target
+    if (INLINE_POPUP_WP_CODES.has(target)) {
+      popupWpCode.value = target
       showPopup.value = true
       return
     }
-    emit('jump-to-workpaper', resolved.target)
+    emit('jump-to-workpaper', target)
   }
 }
 
@@ -1216,5 +1540,43 @@ function debounceSave() {
 .popup-badge--progress {
   background: #fff8e6;
   color: #b8860b;
+}
+
+/* A16 seq2 推荐版本 + 折叠 */
+.gt-a-program-console__chip-recommended {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.gt-a-program-console__recommend-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  height: 16px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--gt-purple, #4b2d77);
+  border-radius: 3px;
+  margin-left: 2px;
+  white-space: nowrap;
+}
+
+.gt-a-program-console__other-versions-toggle {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  color: var(--gt-purple, #4b2d77);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.2s;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.gt-a-program-console__other-versions-toggle:hover {
+  background: var(--gt-color-primary-bg, #f4f0fa);
 }
 </style>

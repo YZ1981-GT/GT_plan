@@ -74,6 +74,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { parseIndexRef, type ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useWpNavigationHistory } from '@/composables/useWpNavigationHistory'
+import { BUNDLE_SHEET_ALIASES } from './bundleSheetAliases'
 
 // ─── Props / Emits ───
 const props = withDefaults(defineProps<{
@@ -245,12 +246,51 @@ async function resolveRef() {
 
 /** 解析 wp_code → wp_id 再跳转到底稿编辑页 */
 async function resolveAndNavigateToWp(wpCode: string, pid: string) {
+  // ─── 虚拟子码重定向：A16-1~7 → A16 + ?version= ───
+  if (/^A16-[1-7]$/.test(wpCode)) {
+    try {
+      const res = await api.get<{ exists: boolean; wp_id?: string }>('/api/wp-index-resolve', {
+        params: { ref: 'A16', project_id: pid },
+      })
+      if (res?.wp_id) {
+        router.push({
+          path: `/projects/${pid}/workpapers/${res.wp_id}/edit`,
+          query: { version: wpCode },
+        })
+      } else {
+        ElMessage.warning('A16 底稿尚未生成')
+      }
+    } catch {
+      ElMessage.warning(`跳转 ${wpCode} 失败，请手动查找`)
+    }
+    return
+  }
+
+  // ─── Bundle sheet alias（design §Sheet/Tab 路由契约）───
+  // 某些 wp_code 实际是 bundle 内的 sub-sheet，不是独立底稿。
+  // 底稿目录 F 列点击时用此映射路由到父 bundle + sheet query。
+  // 配置提取为共享文件，新增 alias 只需改一处。
+  const alias = BUNDLE_SHEET_ALIASES[wpCode]
+
   try {
     const res = await api.get<{ exists: boolean; wp_id?: string }>('/api/wp-index-resolve', {
       params: { ref: wpCode, project_id: pid },
     })
     if (res?.wp_id) {
       router.push({ path: `/projects/${pid}/workpapers/${res.wp_id}/edit` })
+    } else if (alias) {
+      // 独立底稿不存在但有 bundle alias → 路由到父 bundle 的指定 sheet
+      const parentRes = await api.get<{ exists: boolean; wp_id?: string }>('/api/wp-index-resolve', {
+        params: { ref: alias.parent, project_id: pid },
+      })
+      if (parentRes?.wp_id) {
+        router.push({
+          path: `/projects/${pid}/workpapers/${parentRes.wp_id}/edit`,
+          query: { sheet: alias.sheet },
+        })
+      } else {
+        ElMessage.warning(`底稿 ${wpCode} 尚未生成`)
+      }
     } else if (res?.exists === false) {
       ElMessage.warning(`底稿 ${wpCode} 尚未生成`)
     } else {

@@ -1,5 +1,32 @@
 <template>
   <div v-loading="loading" class="eqcr-tab">
+    <el-card
+      v-if="a15Reference"
+      shadow="never"
+      class="eqcr-tab__section eqcr-tab__a15-ref"
+    >
+      <template #header>
+        <span class="eqcr-tab__section-title">A15-1 持续经营调查（只读引用）</span>
+        <el-tag size="small" type="info" effect="plain">数据源 A15-1</el-tag>
+      </template>
+      <el-alert
+        v-if="a15Reference.ready"
+        type="success"
+        :closable="false"
+        show-icon
+        title="已读取 A15-1 调查结论"
+      >
+        <pre class="eqcr-a15-summary">{{ a15Reference.summary_text }}</pre>
+      </el-alert>
+      <el-alert
+        v-else
+        type="warning"
+        :closable="false"
+        show-icon
+        :title="a15Reference.reason || 'A15-1 尚无调查结论'"
+      />
+    </el-card>
+
     <el-card shadow="never" class="eqcr-tab__section">
       <template #header>
         <span class="eqcr-tab__section-title">本年度持续经营评估</span>
@@ -185,6 +212,9 @@ const priorEvaluations = computed<EqcrGoingConcernEvaluation[]>(
 const indicators = computed<EqcrGoingConcernIndicator[]>(
   () => payload.value?.data.indicators ?? [],
 )
+const a15Reference = computed(
+  () => payload.value?.data.a15_1_reference ?? null,
+)
 const currentOpinion = computed<EqcrOpinion | null>(
   () => payload.value?.current_opinion ?? null,
 )
@@ -272,6 +302,13 @@ function renderJson(value: any): string {
 </script>
 
 <style scoped>
+.eqcr-a15-summary {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 13px;
+}
+
 .eqcr-tab {
   display: flex;
   flex-direction: column;

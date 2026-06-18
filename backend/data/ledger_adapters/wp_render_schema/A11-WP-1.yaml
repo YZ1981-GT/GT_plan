@@ -1,0 +1,72 @@
+# A11-WP-1.yaml — 期后事项审定表
+# A11 bundle 内的 xlsx sheet（非独立物理文件）
+# Tab id: A11-WP-1（与 docx A11-1 问询函区分）
+# componentType: d-form-table
+# 列：类别/期后事项/审计过程及结论/索引/备注
+
+wp_code: A11-WP-1
+parent_bundle: A11
+sheet_name: 期后事项审定表A11-1
+template_version: v2025-R5
+
+sheets:
+  main:
+    form_type: table
+    title: 期后事项审定表
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      add_row_button: true
+      max_rows: 30
+      columns:
+        seq:
+          field: seq
+          type: text
+          label: 序号
+          width: 50
+        category:
+          field: category
+          type: enum
+          label: 类别
+          width: 120
+          dict_source: event_category
+        event_description:
+          field: event_description
+          type: textarea
+          label: 期后事项
+          width: 250
+        audit_procedure:
+          field: audit_procedure
+          type: textarea
+          label: 审计过程及结论
+          width: 250
+        index_no:
+          field: index_no
+          type: text
+          label: 索引号
+          width: 90
+          render_hint: index_chip
+        remarks:
+          field: remarks
+          type: textarea
+          label: 备注
+          width: 160
+    dictionaries:
+      event_category:
+        - value: adjusting
+          label: 调整事项
+        - value: non_adjusting
+          label: 非调整事项
+        - value: going_concern
+          label: 持续经营相关
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 审计说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 结论
+        type: textarea

@@ -13,16 +13,16 @@ A17 是审计完成阶段最核心的综合性底稿——"重大事项概要"�
 - A17-6 总结会会议纪要（docx，弹窗）
 - A17-7/7A 独立性声明书（doc，已有 independence-signing）
 
-## audit-xlsx（A17 专用，待完成）
+## audit-xlsx（A17 专用）
 
-> 产出 `backend/data/a17_xlsx_audit.json`；任务 **PRE-4-0 / X-A17** 在 [infra/tasks.md](../completion-phase-infra/tasks.md)。
+> 产出 `backend/data/a17_xlsx_audit.json`；任务 **PRE-4-0 / X-A17** 在 [infra/tasks.md](../completion-phase-infra/tasks.md) **✅ 已完成**。
 
 | 文件 | 说明 |
 |------|------|
 | A17 重大事项概要程序表.xlsx | 程序表步骤扩充来源 |
 | A17-5-1 ~ A17-5-5 | 核对表 ×5（~770 行）；PRE-4 列映射权威源 |
 
-**未完成前**：A17-5 parser 不得标绿；程序表步数扩充可先做 JSON 手工对齐。
+**未完成前**：~~A17-5 parser 不得标绿~~（PRE-4-1 ✅ 已完成）。
 
 ## 前置依赖（阻塞项，须先于本 spec P0）
 
@@ -204,16 +204,25 @@ A17 是审计完成阶段最核心的综合性底稿——"重大事项概要"�
 
 ## 现状与差距
 
+> **2026-06-18 codegraph 实证**：core 基本闭合；plus 大部分落地；3 项前端缺口见下表「待做」。
+
 | 能力 | 目标 | 代码现状 | 分期 |
 |------|------|----------|------|
-| A17 程序表 | 5 步 + applicable A | ⚠️ JSON 仅 2 步；**实物 5 步**待扩充（见 §1） | lite |
-| A17-5 audit | a17_xlsx_audit.json | ❌ PRE-4-0 | lite |
-| A17-3/4/6 弹窗 | wpPopupDocxConfigs | ⚠️ 配置有；PRE-1 E2E 待验 | lite |
-| A17-5 checklist | PRE-4 + override | ❌ | lite |
-| A17-1 章节 HTML | a17-summary | ❌ | core |
-| export-word | PRE-2 + a17_word_exporter | ❌ | core |
-| A17-2-1 KAM | kam-workpaper | ❌ | plus |
-| 章节拉取上游 | A7–A15 core 数据源 | ❌ 多数未就绪 | core+ |
-| KAM→报告 push | 单向 sync | ❌ | plus |
+| A17 程序表 | 7 步 + applicable A | ✅ `procedure_table_templates.json` A17 7 步 | lite |
+| A17-5 audit | a17_xlsx_audit.json | ✅ PRE-4-0 | lite |
+| A17-3/4/6 弹窗 | wpPopupDocxConfigs | ✅ 配置 + `a17-lite.spec.ts` **E10** | lite |
+| A17-5 checklist | PRE-4 + override | ✅ parser + `_WP_CODE_OVERRIDE` A17-5-1~5 | lite |
+| 程序表 chip 灰显 | applicable=false → disabled | ✅ `GtAProgramConsole.isRowChipDisabled` | lite |
+| A17-1 章节 HTML | a17-summary | ✅ `GtA17Summary.vue` 16 章 + debounce 保存 | core |
+| 章节定义 JSON | a17_chapter_definitions.json | ✅ 16 章 | core |
+| 章节拉取 | pull API + 按钮 | ✅ `a17_summary_service.py`（ch01 等 MVP；其余提示未就绪） | core |
+| export-word | a17_word_exporter | ✅ `/api/a17/export-word` + `test_a17_word_exporter.py` | core |
+| A17-2-1 KAM | kam-workpaper | ✅ `GtKamWorkpaper.vue` + registry | plus |
+| KAM Word 导出 | A17-2-1 template | ✅ `A17WordExporter.export_kam` | plus |
+| KAM→报告 push | 单向 sync | ✅ `a17_kam_push_service.py` + 单测 | plus |
+| LLM 辅助 | ai-generate 端点 | ✅ `a17_llm_service.py` + GtA17Summary AI 弹窗 | plus |
+| issue_hints UI | ch15 等提示栏 | ✅ `GtA17Summary` + issue-hints API | plus |
+| A17-5 自动选版 | business_category | ✅ API + `GtAProgramConsole` 必做/推荐 badge | plus |
+| E2E | E10/E11/E12 | ✅ spec 已写（`RUN_FULL_E2E=1` 待环境跑绿） | lite/core |
 
 上游就绪度见 requirements §4 章节表及 [linkage.md](../completion-phase-infra/linkage.md)。

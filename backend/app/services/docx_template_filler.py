@@ -323,3 +323,47 @@ def export_to_bytes(doc: Any) -> bytes:
     buffer = io.BytesIO()
     doc.save(buffer)
     return buffer.getvalue()
+
+
+# ─── completion_phase 端点薄封装 ─────────────────────────────────────────────
+
+_INCOMPLETE_MARKERS = ("××", "XX公司", "202X", "201X", "【", "】", "待填写", "TBD")
+
+
+def check_incomplete_text(text: str) -> list[str]:
+    """检测文本中残留的模板占位符或未填标记。"""
+    if not text:
+        return []
+    return [f"含未完成标记: {m}" for m in _INCOMPLETE_MARKERS if m in text]
+
+
+def _collect_doc_text(doc: Any) -> str:
+    parts: list[str] = []
+    for p in doc.paragraphs:
+        parts.append(p.text or "")
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                parts.append(cell.text or "")
+    return "\n".join(parts)
+
+
+def fill_docx_template(
+    template_path: str,
+    replacements: dict[str, str] | None = None,
+) -> tuple[bytes, list[str]]:
+    """加载模板、应用颜色语义与占位符替换，返回 docx bytes + 残留占位符列表。"""
+    context: dict[str, Any] = {}
+    if replacements:
+        context["placeholders"] = replacements
+        if "××公司" in replacements:
+            context["client_name"] = replacements["××公司"]
+        if "202X" in replacements:
+            context["audit_year"] = replacements["202X"]
+        if "201X" in replacements:
+            context["prev_year"] = replacements["201X"]
+
+    doc, _meta = fill_template_path(template_path, context)
+    body = _collect_doc_text(doc)
+    incomplete = [m for m in _INCOMPLETE_MARKERS if m in body]
+    return export_to_bytes(doc), incomplete

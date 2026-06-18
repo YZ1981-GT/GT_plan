@@ -7485,13 +7485,7 @@
       "missing_in_xlsx": [
         "2.3"
       ],
-      "ref_index_mismatches": [
-        {
-          "seq": "2",
-          "json_ref": "A7-1",
-          "xlsx_ref": null
-        }
-      ]
+      "ref_index_mismatches": []
     }
   },
   {

@@ -63,7 +63,8 @@ _CACHE_TTL_LONG = 300.0   # 变动低频源（materiality/archive/template_recom
 _LONG_TTL_SOURCES = frozenset([
     "materiality_set", "archive_completion", "a16_template_recommend",
     "control_test_completion", "substantive_completion", "workpaper_completion_rate",
-    "analytical_review_done", "review_progress",
+    "analytical_review_done", "review_progress", "a16_sign_status_check",
+    "a21_sign_status", "a22_sign_status", "a23_sign_status",
 ])
 
 
@@ -359,10 +360,45 @@ class ProcedureTableService:
                 result["summary"] = status
                 result["link"] = {"type": "cf_verification", "target": "cash_flow_verification"}
             elif source == "review_progress":
-                from app.services.review_workflow_service import ReviewWorkflowService
-                rw_svc = ReviewWorkflowService(self.db)
-                progress = await rw_svc.get_review_progress(project_id, year)
-                result["summary"] = f"复核{progress['submitted']}/{progress['total_levels']}级完成"
+                from app.services.review_checklist_service import get_review_sign_status_batch
+
+                statuses = await get_review_sign_status_batch(self.db, project_id)
+                passed = sum(1 for v in statuses.values() if v == "pass")
+                total = len(statuses)
+                result["summary"] = f"复核{passed}/{total}级完成" if total else "无适用复核"
+            elif source == "a21_sign_status":
+                from app.services.review_checklist_service import get_review_sign_status_batch
+
+                statuses = await get_review_sign_status_batch(self.db, project_id)
+                st = statuses.get("A21-1") or statuses.get("A21-2")
+                if st == "pass":
+                    result["summary"] = "✓ 现场负责人已签字"
+                elif st == "reject":
+                    result["summary"] = "⚠️ 现场负责人退回"
+                else:
+                    result["summary"] = "待现场负责人复核签字"
+            elif source == "a22_sign_status":
+                from app.services.review_checklist_service import get_review_sign_status_batch
+
+                statuses = await get_review_sign_status_batch(self.db, project_id)
+                st = statuses.get("A22-1") or statuses.get("A22-2")
+                if st == "pass":
+                    result["summary"] = "✓ 经理已签字"
+                elif st == "reject":
+                    result["summary"] = "⚠️ 经理退回"
+                else:
+                    result["summary"] = "待经理复核签字"
+            elif source == "a23_sign_status":
+                from app.services.review_checklist_service import get_review_sign_status_batch
+
+                statuses = await get_review_sign_status_batch(self.db, project_id)
+                st = statuses.get("A23-1") or statuses.get("A23-2")
+                if st == "pass":
+                    result["summary"] = "✓ 合伙人已签字"
+                elif st == "reject":
+                    result["summary"] = "⚠️ 合伙人退回"
+                else:
+                    result["summary"] = "待合伙人复核签字"
             elif source == "workpaper_completion_rate":
                 from app.models.workpaper_models import WorkingPaper
                 total_stmt = sa.select(sa.func.count()).select_from(WorkingPaper).where(
@@ -483,10 +519,14 @@ class ProcedureTableService:
                     unsigned = total - reviewed
                     result["summary"] = f"待归档（{unsigned}张未完成复核）"
             elif source == "a16_template_recommend":
-                # A16 声明书版本推荐（简单返回提示）
-                result["summary"] = "标准版声明书"
+                from app.services.a16_version_service import recommend_main_version
+                rec = await recommend_main_version(self.db, project_id)
+                suffix = "（请项目组确认）" if rec.get("confidence") != "high" else ""
+                result["summary"] = f"推荐 {rec['code']} {rec['label']}{suffix}"
+                result["detail"] = rec
             elif source == "related_party_transaction_count":
                 # P2: A7 关联交易统计（优先查 related_party_transactions 真实表）
+                # A16 seq3: applicable_default="no"; 当有交易时 auto 建议 applicable="yes"
                 try:
                     from app.models.related_party_models import (
                         RelatedPartyRegistry,
@@ -515,6 +555,8 @@ class ProcedureTableService:
 
                     if txn_count > 0:
                         result["summary"] = f"已识别{txn_count}笔关联交易，涉及{party_count}个关联方，合计{txn_total:,.2f}元"
+                        # 有交易时自动建议适用（用户仍可手动覆盖为 no）
+                        result["applicable"] = "yes"
                     elif party_count > 0:
                         result["summary"] = f"已登记{party_count}个关联方，尚未录入交易"
                     else:
@@ -564,6 +606,33 @@ class ProcedureTableService:
                 except Exception as inner_e:
                     _logger.error("auto_data_source %s inner error: %s", source, inner_e, exc_info=True)
                     result["summary"] = "见关联方底稿"
+            elif source == "a16_sign_status_check":
+                # A16-plus: A1 seq9 自动建议步骤完成状态
+                # 读 A16 主版本 selected_version + 该版本的 sign_status
+                try:
+                    override_svc = FieldOverrideService(self.db)
+                    selected_version = await override_svc.get(
+                        project_id, year,
+                        "word_template:A16", "selected_version", "value"
+                    )
+                    if selected_version:
+                        sign_scope = f"word_template:A16:{selected_version}"
+                        sign_status = await override_svc.get(
+                            project_id, year, sign_scope, "sign_status", "value"
+                        )
+                        if sign_status == "signed":
+                            result["summary"] = f"✓ 主版本 {selected_version} 已签署"
+                            result["step_status"] = "completed"
+                        elif sign_status == "sent":
+                            result["summary"] = f"主版本 {selected_version} 已发出，待签回"
+                            result["step_status"] = "in_progress"
+                        else:
+                            result["summary"] = f"主版本 {selected_version}，待签署"
+                    else:
+                        result["summary"] = "待确定主版本"
+                except Exception as inner_e:
+                    _logger.error("auto_data_source %s inner error: %s", source, inner_e, exc_info=True)
+                    result["summary"] = "见 A16 声明书"
             elif source == "control_deficiency_count":
                 # P2: A14 内控缺陷统计（从 issue_tickets 查内控类缺陷）
                 try:

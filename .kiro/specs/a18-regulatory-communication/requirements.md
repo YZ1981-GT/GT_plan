@@ -6,7 +6,7 @@ A18-1（向监管部门报送审计小结的函）和 A18-2（与监管层沟通
 
 | 底稿 | 格式 | 模式 |
 |------|------|------|
-| A18 程序表 | xlsx | a-program-console（**须新建** JSON 条目） |
+| A18 程序表 | xlsx | a-program-console（JSON ✅ 2 步） |
 | A18-1 审计小结函 | docx | WpPopupDocxEditor 弹窗 |
 | A18-2 与监管层沟通函 | docx | 结构化 HTML `regulatory-letter` + export-word |
 
@@ -23,7 +23,7 @@ A18-1（向监管部门报送审计小结的函）和 A18-2（与监管层沟通
 |------|----------|
 | PRE-1/3 | A18-1 弹窗下载 |
 | PRE-2 | A18-P1（= **core**）Word 导出 |
-| A17-core | A18-P2（= **plus**）A18-1 审计小结生成 |
+| A17-core | A18-P2 审计小结生成 | ✅ `a18_summary_generator` + generate-summary API |
 
 ## 分期对照
 
@@ -31,7 +31,7 @@ A18-1（向监管部门报送审计小结的函）和 A18-2（与监管层沟通
 |---------|------|------|-----|
 | **A18-P0** | **lite** | 程序表 + A18-2 表单 + 保存 | 填 4 议题→刷新不丢；A18-1 弹窗下载 |
 | **A18-P1** | **core** | Word 导出 + issue/A8 提示 | 导出无 XX；不适用议题已删 |
-| **A18-P2** | **plus** | A18-1 小结生成 + E2E | blocked by A17-core |
+| **A18-P2** | **plus** | A18-1 小结生成 + E2E | ✅ 生成 API + 弹窗 UI |
 
 ## 适用条件
 
@@ -46,17 +46,15 @@ A18-1（向监管部门报送审计小结的函）和 A18-2（与监管层沟通
 
 ## 需求
 
-### A18 程序表（当前缺失，须新建）
+### A18 程序表
 
-- 在 `procedure_table_templates.json` 新增 **A18** 条目
-- 步骤示例：编制监管沟通函 → `ref_index: A18-1,A18-2`
-- 步骤级 `applicable_categories: ["A", "B"]`
+- ✅ `procedure_table_templates.json` **A18** 2 步（seq2 ref A18-1,A18-2）
 
 ### A18-1 — 弹窗模式
 
 - 配置已在 `wpPopupDocxConfigs.ts`（PRE-1 后验证）
 - 自动填充：公司名、审计年度、监管局名称、合伙人姓名
-- **P2/plus 增强**：从 A17-1 章节 + 审计意见 + KAM 生成审计小结框架（**blocked A17-core**）
+- **P2/plus 增强**：从 A17-1 章节 + 审计意见 + KAM 生成审计小结框架（A17-core ✅；编排服务待建）
 
 ### A18-2 — 结构化表单
 
@@ -76,7 +74,7 @@ A18-1（向监管部门报送审计小结的函）和 A18-2（与监管层沟通
 |------|------|------|
 | P0/lite | 手动 GtIndexChip | — |
 | P1/core | issue_hints + A8 step status 建议 | [linkage.md](../completion-phase-infra/linkage.md) |
-| P2/plus | A18-1 ← A17-1 | blocked A17-core |
+| P2/plus | A18-1 ← A17-1 | A17-core ✅；生成待做 |
 
 issue_tickets：**禁止** `category='fraud'`（见 infra）。
 
@@ -90,10 +88,14 @@ issue_tickets：**禁止** `category='fraud'`（见 infra）。
 
 ## 现状与差距
 
+> **2026-06-18 codegraph 实证**：P0+P1 闭合；P2 仅剩 A18-1 小结生成。
+
 | 能力 | 目标 | 代码现状 | 分期 |
 |------|------|----------|------|
-| A18 程序表 JSON | 2+ 步 | ❌ 无条目 | P0/lite |
-| A18-1 弹窗 | prefilled-download | ⚠️ 配置有 | P0/lite |
-| GtRegulatoryLetter | regulatory-letter | ❌ | P0/lite |
-| export-word | PRE-2 | ❌ | P1/core |
-| A18-1 小结生成 | A17 章节 | ❌ | P2/plus |
+| A18 程序表 JSON | 2 步 | ✅ `procedure_table_templates.json` A18 | P0/lite |
+| A18-1 弹窗 | prefilled-download | ✅ 配置 + E13 spec | P0/lite |
+| GtRegulatoryLetter | regulatory-letter | ✅ 4 议题 + debounce 保存 | P0/lite |
+| export-word | PRE-2 + service | ✅ `regulatory_letter_service.py` + E14 spec | P1/core |
+| A8 step 建议 UI | issue_hints 消费 | ❌ guidance 待接 | P1/core |
+| A18-1 小结生成 | A17 章节编排 | ✅ API + 弹窗 + prefilled-download 注入 A17 正文 | P2/plus |
+| E2E | E13 + E14 | ✅ `e2e/a18-regulatory.spec.ts` | P0/P1 |

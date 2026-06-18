@@ -39,6 +39,17 @@ A13-1 已有 `misstatement_summary_service` auto_data；Tab 内嵌时不重复�
 
 ---
 
+## 实施状态（2026-06-18）
+
+| 组件 | 文件 | 状态 |
+|------|------|------|
+| Tab 容器 | `GtMisstatementWorkpaper.vue` | ✅ |
+| A13-2~5 schema | `wp_render_schema/A13.yaml` | ✅ |
+| 汇总 Tab | `MisstatementSummaryView.vue` | ✅ |
+| A16 联动 | `GET .../misstatements/for-letter` | ✅ |
+
+---
+
 ## 与 A16 / A17 / A18
 
 | 消费方 | 接口 / 方式 |
