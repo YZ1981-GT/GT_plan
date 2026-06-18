@@ -780,4 +780,26 @@ def invalidate_cache(wp_code: str | None = None) -> None:
         _CHECKLIST_XLSX_CACHE.pop(wp_code, None)
     else:
         _CHECKLIST_XLSX_CACHE.clear()
-        _AUDIT_CONFIG_CACHE = None
+    _AUDIT_CONFIG_CACHE = None
+
+
+# ─── render-config 集成辅助（2026-06-18 补） ──────────────────────────────────
+
+
+def is_xlsx_checklist(wp_code: str) -> bool:
+    """判断 wp_code 是否属于 xlsx 核对表（有 audit JSON 配置或模板文件存在）.
+
+    render-config 用此函数决定调 xlsx parser 还是 docx parser。
+    """
+    # 有 audit 配置 → xlsx 核对表
+    if _get_audit_entry(wp_code) is not None:
+        return True
+    # bundle 子码（A11-2/A11-3）
+    if _find_bundle_sheet(wp_code) is not None:
+        return True
+    # 模板文件存在
+    return get_template_path(wp_code) is not None
+
+
+# 别名：render-config 导入兼容
+get_checklist_xlsx_template = get_checklist_template
