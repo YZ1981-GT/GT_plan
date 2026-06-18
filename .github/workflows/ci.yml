@@ -245,6 +245,22 @@ jobs:
       - name: Dead link check (apiPaths ↔ router_registry)
         run: node scripts/dead-link-check.js
 
+  audit-xlsx-drift:
+    # INFRA-3: 验证 a7_a15_xlsx_audit.json 未与实际 xlsx 模板脱节
+    # A17 audit 就绪后纳入同门禁
+    # 过渡期 continue-on-error（观察 2 周后移除改 hard fail）
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install audit dependencies
+        run: pip install openpyxl python-calamine
+      - name: Check xlsx audit drift
+        run: python backend/scripts/audit_a7_a15_xlsx.py --diff-only
+
   frontend-build:
     runs-on: ubuntu-latest
     steps:

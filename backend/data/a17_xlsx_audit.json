@@ -1,0 +1,2204 @@
+[
+  {
+    "wp_code": "A17",
+    "filename": "A17  重大事项概要程序表.xlsx",
+    "runtime": "a-program-console",
+    "sheets": [
+      {
+        "name": "A17 重大事项概要程序表",
+        "component_type": "a-program-console",
+        "header_row": 5,
+        "max_row": 10,
+        "max_col": 9,
+        "columns": [
+          {
+            "col": "A",
+            "label": "序号"
+          },
+          {
+            "col": "B",
+            "label": "程序"
+          },
+          {
+            "col": "E",
+            "label": "是否适用"
+          },
+          {
+            "col": "F",
+            "label": "执行人"
+          },
+          {
+            "col": "G",
+            "label": "执行情况说明"
+          },
+          {
+            "col": "H",
+            "label": "索引号"
+          }
+        ],
+        "column_roles": {
+          "seq": "A",
+          "procedure": "B",
+          "applicable": "E",
+          "performer": "F",
+          "execution_note": "G",
+          "ref_index": "H"
+        },
+        "data_rows": 5,
+        "merged_ranges_count": 9,
+        "procedure_rows": [
+          {
+            "row": 6,
+            "seq": "1",
+            "procedure_preview": "汇总重大职业判断以及需合伙人关注事项，详细说明审计程序执行情况。",
+            "ref_index": "A17-1"
+          },
+          {
+            "row": 7,
+            "seq": "2",
+            "procedure_preview": "对于咨询的重大会计或审计事项咨询，确定咨询报告是否包括在审计工作底稿中。",
+            "ref_index": "A17-3"
+          },
+          {
+            "row": 8,
+            "seq": "3",
+            "procedure_preview": "对于项目组的专业意见分歧，确认己经得到解决。并将解决方式、解决过程、解决结论等记录于工作底稿。",
+            "ref_index": "A17-4"
+          },
+          {
+            "row": 9,
+            "seq": "4",
+            "procedure_preview": "确定在审计过程中识别的重大职业判断以及需合伙人关注事项是否包括在重大事项概要汇总表中：\n（1）引起特别风险的事项；\n（2）已更正或未更正的错报；\n（3）值得关注的缺陷和其他控制缺陷；\n（4）重大职业判断；\n（5）业务咨询和意见分歧；\n（6）导致注册会计师难以实施必要审计程序的情形；\n（7）可能导致出",
+            "ref_index": "A17-2"
+          },
+          {
+            "row": 10,
+            "seq": "5",
+            "procedure_preview": "召开项目组总结会并将会议纪要记录于工作底稿。",
+            "ref_index": "A17-6"
+          }
+        ]
+      },
+      {
+        "name": "GT_Custom",
+        "component_type": "skip"
+      }
+    ],
+    "parser_ready": true,
+    "notes": "A17 重大事项概要程序表，5 步：seq1→A17-1 / seq2→A17-3 / seq3→A17-4 / seq4→A17-2 / seq5→A17-6。A17-5 核对表不在程序表内（独立底稿）。"
+  },
+  {
+    "wp_code": "A17-5-1",
+    "filename": "A17-5-1 审计工作完成核对表（适用于财报审计）.xlsx",
+    "runtime": "checklist-table",
+    "sheets": [
+      {
+        "name": "A17-5审计工作完成核对表 ",
+        "component_type": "checklist-table",
+        "max_row": 206,
+        "max_col": 17,
+        "objective_section": {
+          "anchor_row": 5,
+          "title": "一、审计目标",
+          "has_conclusion": false,
+          "item_count": 6,
+          "items": [
+            {
+              "row": 6,
+              "seq": "1",
+              "text_preview": "确定审计过程中发现的所有错报均已得到恰当的评价与处理；"
+            },
+            {
+              "row": 7,
+              "seq": "2",
+              "text_preview": "确定已获取管理层签署的声明书；"
+            },
+            {
+              "row": 8,
+              "seq": "3",
+              "text_preview": "确定识别出的内部控制缺陷及其他重大事项（例如舞弊迹象或疑似违反法律法规事项）均与管理层或/和治理层进行沟通；"
+            },
+            {
+              "row": 9,
+              "seq": "4",
+              "text_preview": "确定财务报表及附注符合企业会计准则及有关法规的要求；"
+            },
+            {
+              "row": 10,
+              "seq": "5",
+              "text_preview": "确定审计报告意见类型恰当；"
+            },
+            {
+              "row": 11,
+              "seq": "6",
+              "text_preview": "确定已获取充分适当的审计证据，对审计工作底稿已按照执业准则和本所质量管理政策与程序完成复核。"
+            }
+          ]
+        },
+        "procedure_section": {
+          "anchor_row": 12,
+          "title": "二、核对程序",
+          "has_conclusion": true,
+          "columns": [
+            {
+              "col": "A",
+              "label": "二、核对程序"
+            },
+            {
+              "col": "D",
+              "label": "核对结果[是/否/不适用]"
+            },
+            {
+              "col": "E",
+              "label": "备注"
+            },
+            {
+              "col": "F",
+              "label": "工作底稿索引号"
+            },
+            {
+              "col": "G",
+              "label": "底稿索引号参考"
+            },
+            {
+              "col": "H",
+              "label": "备注"
+            }
+          ],
+          "column_roles": {
+            "conclusion": "D",
+            "remark": "E",
+            "work_paper_index": "F",
+            "index_reference": "G"
+          },
+          "item_count": 50,
+          "item_id_pattern": "A17-5-1-{seq:03d}",
+          "items": [
+            {
+              "row": 13,
+              "seq_no": 1,
+              "item_id": "A17-5-1-001",
+              "seq_label": "1",
+              "content_preview": "是否执行业务承接或保持的相关程序？",
+              "preset_index_reference": "B1"
+            },
+            {
+              "row": 14,
+              "seq_no": 2,
+              "item_id": "A17-5-1-002",
+              "seq_label": "2",
+              "content_preview": "是否签订了审计业务约定书？",
+              "preset_index_reference": "B5"
+            },
+            {
+              "row": 15,
+              "seq_no": 3,
+              "item_id": "A17-5-1-003",
+              "seq_label": "3",
+              "content_preview": "是否制定总体审计策略和具体审计计划？",
+              "preset_index_reference": "B60"
+            },
+            {
+              "row": 16,
+              "seq_no": 4,
+              "item_id": "A17-5-1-004",
+              "seq_label": "4",
+              "content_preview": "审计计划制定过程中，是否了解被审计单位及其环境并评估重大错报风险，包括舞弊风险？",
+              "preset_index_reference": "B10"
+            },
+            {
+              "row": 17,
+              "seq_no": 5,
+              "item_id": "A17-5-1-005",
+              "seq_label": "6",
+              "content_preview": "是否召开项目组会议，内部讨论了包含舞弊和关联方在内的事项？",
+              "preset_index_reference": "B40"
+            },
+            {
+              "row": 18,
+              "seq_no": 6,
+              "item_id": "A17-5-1-006",
+              "seq_label": "7",
+              "content_preview": "总体审计策略和具体审计计划是否经适当人员批准？",
+              "preset_index_reference": "B60"
+            },
+            {
+              "row": 19,
+              "seq_no": 7,
+              "item_id": "A17-5-1-007",
+              "seq_label": "8",
+              "content_preview": "是否与被审计单位治理层就审计计划的审计范围、时间安排的总体情况、重大事项（包括识别出的关键审计事项）、内控缺陷、拟出具审计报告的形式和内容进行了沟通？",
+              "preset_index_reference": "B12B"
+            },
+            {
+              "row": 20,
+              "seq_no": 8,
+              "item_id": "A17-5-1-008",
+              "seq_label": "9",
+              "content_preview": "计划的审计程序是否得到有效执行，在审计过程中是否根据具体情况对总体审计策略和具体审计计划作出必要的更新和修改，并记录修改理由？",
+              "preset_index_reference": "B60"
+            },
+            {
+              "row": 21,
+              "seq_no": 9,
+              "item_id": "A17-5-1-009",
+              "seq_label": "10",
+              "content_preview": "是否已获取所有必要的来自银行、律师、债权人、债务人、持有存货的第三方等外部机构的询证函回函或确认函？",
+              "preset_index_reference": "A12及相应实质性底稿函证程序"
+            },
+            {
+              "row": 22,
+              "seq_no": 10,
+              "item_id": "A17-5-1-010",
+              "seq_label": "11",
+              "content_preview": "所有重要实物资产（如存货、固定资产）是否均已实施了监盘？",
+              "preset_index_reference": "索引至实质性程序底稿监盘程序"
+            },
+            {
+              "row": 23,
+              "seq_no": 11,
+              "item_id": "A17-5-1-011",
+              "seq_label": "12",
+              "content_preview": "当涉及利用组成部分注册会计师的工作时，对组成部分注册会计师的工作结果是否满意？",
+              "preset_index_reference": "B30/A6"
+            },
+            {
+              "row": 24,
+              "seq_no": 12,
+              "item_id": "A17-5-1-012",
+              "seq_label": "13",
+              "content_preview": "各项审计程序是否全部完成，未能执行的审计程序是否实施了替代程序 ？"
+            },
+            {
+              "row": 25,
+              "seq_no": 13,
+              "item_id": "A17-5-1-013",
+              "seq_label": "14",
+              "content_preview": "审计范围是否未受到限制？",
+              "preset_index_reference": "A17"
+            },
+            {
+              "row": 26,
+              "seq_no": 14,
+              "item_id": "A17-5-1-014",
+              "seq_label": "15",
+              "content_preview": "计划阶段确定的审计风险，包括舞弊、管理层偏向导致的重大错报风险是否仍旧恰当，是否需要追加审计程序？",
+              "preset_index_reference": "B60/A17"
+            },
+            {
+              "row": 27,
+              "seq_no": 15,
+              "item_id": "A17-5-1-015",
+              "seq_label": "16",
+              "content_preview": "是否恰当应对在审计过程中识别的舞弊迹象导致的重大错报风险？",
+              "preset_index_reference": "B50/A17"
+            },
+            {
+              "row": 28,
+              "seq_no": 16,
+              "item_id": "A17-5-1-016",
+              "seq_label": "17",
+              "content_preview": "是否对被审计单位政府补助的核算方法的适当性进行了审查，并确认同一交易事项采用了同一种会计处理方法？",
+              "preset_index_reference": "B10/政府补助实质性底稿"
+            },
+            {
+              "row": 29,
+              "seq_no": 17,
+              "item_id": "A17-5-1-017",
+              "seq_label": "18",
+              "content_preview": "是否复核了被审计单位对终止经营的列报？如果报告期处置或划分为持有待售具有一定规模的能够单独区分的组成部分，则该等组成部分的当期损益应在利润表列报为终止经营损益，同时重述可比期间财务报表。",
+              "preset_index_reference": "A5-4"
+            },
+            {
+              "row": 30,
+              "seq_no": 18,
+              "item_id": "A17-5-1-018",
+              "seq_label": "19",
+              "content_preview": "是否检查期后事项，并考虑对财务报表的影响？",
+              "preset_index_reference": "A11"
+            },
+            {
+              "row": 31,
+              "seq_no": 19,
+              "item_id": "A17-5-1-019",
+              "seq_label": "20",
+              "content_preview": "是否检查或有事项，并考虑对财务报表的影响？",
+              "preset_index_reference": "A5-3"
+            },
+            {
+              "row": 32,
+              "seq_no": 20,
+              "item_id": "A17-5-1-020",
+              "seq_label": "21",
+              "content_preview": "是否检查承诺事项，并考虑对财务报表的影响？",
+              "preset_index_reference": "A5-2"
+            },
+            {
+              "row": 33,
+              "seq_no": 21,
+              "item_id": "A17-5-1-021",
+              "seq_label": "22",
+              "content_preview": "是否检查关联方及关联方交易，并考虑对财务报表的影响？",
+              "preset_index_reference": "A7"
+            },
+            {
+              "row": 34,
+              "seq_no": 22,
+              "item_id": "A17-5-1-022",
+              "seq_label": "23",
+              "content_preview": "是否检查对被审计单位持续经营能力具有重大影响的事项或情况？",
+              "preset_index_reference": "A15"
+            },
+            {
+              "row": 35,
+              "seq_no": 23,
+              "item_id": "A17-5-1-023",
+              "seq_label": "24",
+              "content_preview": "是否获取并阅读其他信息，并充分考虑了其他信息中是否存在重大错报、重大不一致以及需要对被审计单位及其环境的了解更新的情形？是否将最终版的年度报告归档？",
+              "preset_index_reference": "A8"
+            },
+            {
+              "row": 36,
+              "seq_no": 24,
+              "item_id": "A17-5-1-024",
+              "seq_label": "25",
+              "content_preview": "对财务报表中的会计估计和相关披露在适用的财务报告编制基础下的合理性，是否已经取得了充分、适当的审计证据？",
+              "preset_index_reference": "S14"
+            },
+            {
+              "row": 37,
+              "seq_no": 25,
+              "item_id": "A17-5-1-025",
+              "seq_label": "26",
+              "content_preview": "是否已就审计中发现的重大错报及其他对财务报表产生重大影响的重大事项与适当层次的管理层或治理层沟通？",
+              "preset_index_reference": "A13"
+            },
+            {
+              "row": 38,
+              "seq_no": 26,
+              "item_id": "A17-5-1-026",
+              "seq_label": "27",
+              "content_preview": "是否在审计结束时或临近结束时对财务报表进行总体复核？",
+              "preset_index_reference": "A1-13/A1-14"
+            },
+            {
+              "row": 39,
+              "seq_no": 27,
+              "item_id": "A17-5-1-027",
+              "seq_label": "28",
+              "content_preview": "是否召开项目组会议，并确定建议调整事项和试算平衡表草表？",
+              "preset_index_reference": "A17-6"
+            },
+            {
+              "row": 40,
+              "seq_no": 28,
+              "item_id": "A17-5-1-028",
+              "seq_label": "29",
+              "content_preview": "就关键审计事项，是否：（适用于上市实体以及法律法规要求或项目组决定在审计报告中沟通关键审计事项的其他情形）",
+              "preset_index_reference": "A1/A17-2-1/A17-3"
+            },
+            {
+              "row": 41,
+              "seq_no": 29,
+              "item_id": "A17-5-1-029",
+              "seq_label": "（1）",
+              "content_preview": "已确定关键审计事项并在审计报告中进行适当表述？"
+            },
+            {
+              "row": 42,
+              "seq_no": 30,
+              "item_id": "A17-5-1-030",
+              "seq_label": "（2）",
+              "content_preview": "就确定的关键审计事项与治理层进行了沟通？"
+            },
+            {
+              "row": 43,
+              "seq_no": 31,
+              "item_id": "A17-5-1-031",
+              "seq_label": "（3）",
+              "content_preview": "如果确定不存在需要在审计报告中沟通的关键审计事项，是否就此已与治理层进行了沟通并履行了业务咨询程序？"
+            },
+            {
+              "row": 44,
+              "seq_no": 32,
+              "item_id": "A17-5-1-032",
+              "seq_label": "30",
+              "content_preview": "是否与被审计单位召开总结会，就建议调整事项进行沟通，形成总结会会议纪要，并经被审计单位确认？",
+              "preset_index_reference": "A13"
+            },
+            {
+              "row": 45,
+              "seq_no": 33,
+              "item_id": "A17-5-1-033",
+              "seq_label": "31",
+              "content_preview": "是否累积出识别出的所有错报，并确定是否需要修改总体审计策略和具体审计计划？",
+              "preset_index_reference": "A13"
+            },
+            {
+              "row": 46,
+              "seq_no": 34,
+              "item_id": "A17-5-1-034",
+              "seq_label": "32",
+              "content_preview": "是否获取被审计单位对所有调整事项的确认？",
+              "preset_index_reference": "A13"
+            },
+            {
+              "row": 47,
+              "seq_no": 35,
+              "item_id": "A17-5-1-035",
+              "seq_label": "33",
+              "content_preview": "是否累计所有未更正错报的审计差异，包括错误和推断差异，并评估未更正错报对财务报表的影响？",
+              "preset_index_reference": "A13"
+            },
+            {
+              "row": 48,
+              "seq_no": 36,
+              "item_id": "A17-5-1-036",
+              "seq_label": "34",
+              "content_preview": "是否将累积的所有错报与管理层进行及时沟通？",
+              "preset_index_reference": "A13"
+            },
+            {
+              "row": 49,
+              "seq_no": 37,
+              "item_id": "A17-5-1-037",
+              "seq_label": "35",
+              "content_preview": "未更正错报汇总表是否与被审计单位治理层沟通并签章确认？",
+              "preset_index_reference": "A13/A10"
+            },
+            {
+              "row": 50,
+              "seq_no": 38,
+              "item_id": "A17-5-1-038",
+              "seq_label": "36",
+              "content_preview": "董事会或管理层是否接受已审计财务报表？",
+              "preset_index_reference": "A13/A16"
+            },
+            {
+              "row": 51,
+              "seq_no": 39,
+              "item_id": "A17-5-1-039",
+              "seq_label": "37",
+              "content_preview": "项目负责经理是否已复核工作底稿？",
+              "preset_index_reference": "A22"
+            },
+            {
+              "row": 52,
+              "seq_no": 40,
+              "item_id": "A17-5-1-040",
+              "seq_label": "38",
+              "content_preview": "项目合伙人是否已复核工作底稿？",
+              "preset_index_reference": "A23"
+            },
+            {
+              "row": 53,
+              "seq_no": 41,
+              "item_id": "A17-5-1-041",
+              "seq_label": "39",
+              "content_preview": "是否已完成项目质量复核合伙人复核（适用时）？",
+              "preset_index_reference": "A24"
+            },
+            {
+              "row": 54,
+              "seq_no": 42,
+              "item_id": "A17-5-1-042",
+              "seq_label": "40",
+              "content_preview": "是否已完成质量控制复核人复核（适用时）？",
+              "preset_index_reference": "A25"
+            },
+            {
+              "row": 55,
+              "seq_no": 43,
+              "item_id": "A17-5-1-043",
+              "seq_label": "41",
+              "content_preview": "是否已完成专业技术复核及所内质量管理制度要求的其他复核流程（必要时）？",
+              "preset_index_reference": "A26"
+            },
+            {
+              "row": 56,
+              "seq_no": 44,
+              "item_id": "A17-5-1-044",
+              "seq_label": "42",
+              "content_preview": "是否已取得经被审计单位签署的管理层书面声明原件并确定其签署日期不晚于财务报表批准报出日及审计报告日期？",
+              "preset_index_reference": "A16"
+            },
+            {
+              "row": 57,
+              "seq_no": 45,
+              "item_id": "A17-5-1-045",
+              "seq_label": "43",
+              "content_preview": "是否完成《财务报表列报披露核对表》？",
+              "preset_index_reference": "A1-15或A1-16"
+            },
+            {
+              "row": 58,
+              "seq_no": 46,
+              "item_id": "A17-5-1-046",
+              "seq_label": "44",
+              "content_preview": "上年度审计结转事项是否全部处理 ？"
+            },
+            {
+              "row": 59,
+              "seq_no": 47,
+              "item_id": "A17-5-1-047",
+              "seq_label": "45",
+              "content_preview": "下年度审计时需考虑的重要事项的备忘录是否整理完毕？",
+              "preset_index_reference": "A17"
+            },
+            {
+              "row": 60,
+              "seq_no": 48,
+              "item_id": "A17-5-1-048",
+              "seq_label": "46",
+              "content_preview": "所有审计工作底稿 、复核意见中的追查事项是否都已满意地解决？",
+              "preset_index_reference": "A22-A28"
+            },
+            {
+              "row": 61,
+              "seq_no": 49,
+              "item_id": "A17-5-1-049",
+              "seq_label": "47",
+              "content_preview": "是否完成了重大事项概要汇总？",
+              "preset_index_reference": "A17"
+            },
+            {
+              "row": 62,
+              "seq_no": 50,
+              "item_id": "A17-5-1-050",
+              "seq_label": "项目负责经理确认：根据已执行的审计程序和获取的结果，我认为项目组已取得充分、适当的审计证据，以支持拟发表的审计意见。",
+              "content_preview": null
+            }
+          ]
+        },
+        "merged_ranges_count": 53,
+        "notes": "两节结构：审计目标（无结论列，纯说明）+ 核对程序（结论[是/否/不适用]+工作底稿索引号(填)+预置参考索引+备注）。parser 须区分两节类型。"
+      },
+      {
+        "name": "GT_Custom",
+        "component_type": "skip"
+      }
+    ],
+    "parser_ready": true,
+    "procedure_item_count": 50,
+    "notes": "A17-5-x 审计工作完成核对表；核对程序 50 条；item_id 模式 A17-5-1-{seq:03d}（对齐 persistence.md A17-5-{x}-{seq}）。"
+  },
+  {
+    "wp_code": "A17-5-2",
+    "filename": "A17-5-2 审计工作完成核对表（适用于内控审计）.xlsx",
+    "runtime": "checklist-table",
+    "sheets": [
+      {
+        "name": "A17-5-2审计工作完成核对表-内控 ",
+        "component_type": "checklist-table",
+        "max_row": 106,
+        "max_col": 30,
+        "objective_section": {
+          "anchor_row": 5,
+          "title": "一、审计目标",
+          "has_conclusion": false,
+          "item_count": 6,
+          "items": [
+            {
+              "row": 6,
+              "seq": "1",
+              "text_preview": "确定审计过程中发现的所有控制偏差均已得到恰当的评估与处理；"
+            },
+            {
+              "row": 7,
+              "seq": "2",
+              "text_preview": "确定已获取管理层签署的声明书；"
+            },
+            {
+              "row": 8,
+              "seq": "3",
+              "text_preview": "确定内部控制重大缺陷和重要缺陷及其他重大事项均与管理层或/和治理层进行沟通；"
+            },
+            {
+              "row": 9,
+              "seq": "4",
+              "text_preview": "确定企业内部控制评价报告符合《企业内部控制评价指引》或证监会的要求；"
+            },
+            {
+              "row": 10,
+              "seq": "5",
+              "text_preview": "确定内部控制审计报告意见类型恰当；"
+            },
+            {
+              "row": 11,
+              "seq": "6",
+              "text_preview": "确定已获取充分适当的审计证据，对审计工作底稿已按照执业准则和本所质量管理政策与程序完成复核。"
+            }
+          ]
+        },
+        "procedure_section": {
+          "anchor_row": 12,
+          "title": "二、核对程序",
+          "has_conclusion": true,
+          "columns": [
+            {
+              "col": "A",
+              "label": "二、核对程序"
+            },
+            {
+              "col": "E",
+              "label": "核对结果[是/否/不适用]"
+            },
+            {
+              "col": "F",
+              "label": "备注"
+            },
+            {
+              "col": "G",
+              "label": "工作底稿索引号"
+            },
+            {
+              "col": "H",
+              "label": "参考底稿索引号"
+            },
+            {
+              "col": "I",
+              "label": "备注"
+            }
+          ],
+          "column_roles": {
+            "conclusion": "E",
+            "remark": "F",
+            "work_paper_index": "G",
+            "index_reference": "H"
+          },
+          "item_count": 35,
+          "item_id_pattern": "A17-5-2-{seq:03d}",
+          "items": [
+            {
+              "row": 13,
+              "seq_no": 1,
+              "item_id": "A17-5-2-001",
+              "seq_label": "1",
+              "content_preview": "是否执行业务承接或保持的相关程序？",
+              "preset_index_reference": "B1"
+            },
+            {
+              "row": 14,
+              "seq_no": 2,
+              "item_id": "A17-5-2-002",
+              "seq_label": "2",
+              "content_preview": "是否单独签订了内部控制审计业务约定书？",
+              "preset_index_reference": "B5-5"
+            },
+            {
+              "row": 15,
+              "seq_no": 3,
+              "item_id": "A17-5-2-003",
+              "seq_label": "3",
+              "content_preview": "总体审计策略是否包含内部控制审计的相关内容？",
+              "preset_index_reference": "B60/B60A"
+            },
+            {
+              "row": 16,
+              "seq_no": 4,
+              "item_id": "A17-5-2-004",
+              "seq_label": "4",
+              "content_preview": "审计计划制定过程中，是否考虑：与企业相关风险，相关法律法规和行业状况，企业组织结构、经营特点和资本结构等相关重要事项，企业内部控制最近发生变化的程度，与企业沟通过的内部控制缺陷，重要性、风险等与确定内部控制重大缺陷相关因素等？",
+              "preset_index_reference": "B10/B15/B18"
+            },
+            {
+              "row": 17,
+              "seq_no": 5,
+              "item_id": "A17-5-2-005",
+              "seq_label": "5",
+              "content_preview": "审计计划制定过程中，是否考虑了财务报表审计中对舞弊风险的评估结果？",
+              "preset_index_reference": "B60/B60A/B50"
+            },
+            {
+              "row": 18,
+              "seq_no": 6,
+              "item_id": "A17-5-2-006",
+              "seq_label": "6",
+              "content_preview": "审计计划是否经适当人员批准？",
+              "preset_index_reference": "B60/B60A"
+            },
+            {
+              "row": 19,
+              "seq_no": 7,
+              "item_id": "A17-5-2-007",
+              "seq_label": "7",
+              "content_preview": "计划的审计程序是否得到较好执行，对计划的修改是否得到记录？",
+              "preset_index_reference": "B60/B60A"
+            },
+            {
+              "row": 20,
+              "seq_no": 8,
+              "item_id": "A17-5-2-008",
+              "seq_label": "8",
+              "content_preview": "当涉及利用组成部分注册会计师的工作时，对组成部分注册会计师的工作结果是否满意？",
+              "preset_index_reference": "B30"
+            },
+            {
+              "row": 21,
+              "seq_no": 9,
+              "item_id": "A17-5-2-009",
+              "seq_label": "9",
+              "content_preview": "是否识别、了解和测试了企业层面、业务层面控制？",
+              "preset_index_reference": "B22/B23"
+            },
+            {
+              "row": 22,
+              "seq_no": 10,
+              "item_id": "A17-5-2-010",
+              "seq_label": "10",
+              "content_preview": "是否测试了控制设计的有效性？",
+              "preset_index_reference": "B22/B23"
+            },
+            {
+              "row": 23,
+              "seq_no": 11,
+              "item_id": "A17-5-2-011",
+              "seq_label": "11",
+              "content_preview": "是否测试了控制运行的有效性？",
+              "preset_index_reference": "C1-C27"
+            },
+            {
+              "row": 24,
+              "seq_no": 12,
+              "item_id": "A17-5-2-012",
+              "seq_label": "12",
+              "content_preview": "控制测试的涵盖期间是否足够长？",
+              "preset_index_reference": "C1-C27"
+            },
+            {
+              "row": 25,
+              "seq_no": 13,
+              "item_id": "A17-5-2-013",
+              "seq_label": "13",
+              "content_preview": "控制测试的样本规模是否足够？",
+              "preset_index_reference": "C1-C27"
+            },
+            {
+              "row": 26,
+              "seq_no": 14,
+              "item_id": "A17-5-2-014",
+              "seq_label": "14",
+              "content_preview": "整改后控制是否运行了足够长的期间（或足够多的次数）？",
+              "preset_index_reference": "C1-C27"
+            },
+            {
+              "row": 27,
+              "seq_no": 15,
+              "item_id": "A17-5-2-015",
+              "seq_label": "16",
+              "content_preview": "是否对控制缺陷进行评价？",
+              "preset_index_reference": "A14"
+            },
+            {
+              "row": 28,
+              "seq_no": 16,
+              "item_id": "A17-5-2-016",
+              "seq_label": "17",
+              "content_preview": "对于重大缺陷和重要缺陷，是否以书面形式与管理层和治理层进行了沟通？",
+              "preset_index_reference": "A10/A16"
+            },
+            {
+              "row": 29,
+              "seq_no": 17,
+              "item_id": "A17-5-2-017",
+              "seq_label": "18",
+              "content_preview": "是否评价了企业内部控制评价报告要素的列报是否完整和恰当？",
+              "preset_index_reference": "B11-2"
+            },
+            {
+              "row": 30,
+              "seq_no": 18,
+              "item_id": "A17-5-2-018",
+              "seq_label": "19",
+              "content_preview": "是否考虑了财务报表审计中发现的重大错报对内部控制审计的影响？",
+              "preset_index_reference": "A13-4"
+            },
+            {
+              "row": 31,
+              "seq_no": 19,
+              "item_id": "A17-5-2-019",
+              "seq_label": "20",
+              "content_preview": "是否考虑非标准财务报表审计报告对内部控制审计报告意见类型的影响？"
+            },
+            {
+              "row": 32,
+              "seq_no": 20,
+              "item_id": "A17-5-2-020",
+              "seq_label": "21",
+              "content_preview": "是否审查期后事项，并考虑其对内部控制审计报告的影响？",
+              "preset_index_reference": "A11"
+            },
+            {
+              "row": 33,
+              "seq_no": 21,
+              "item_id": "A17-5-2-021",
+              "seq_label": "22",
+              "content_preview": "是否已取得经被审计单位签署的管理层书面声明原件并确定其签署日期不晚于审计报告日期？",
+              "preset_index_reference": "A16"
+            },
+            {
+              "row": 34,
+              "seq_no": 22,
+              "item_id": "A17-5-2-022",
+              "seq_label": "23",
+              "content_preview": "是否完成了重大事项概要汇总？",
+              "preset_index_reference": "A17"
+            },
+            {
+              "row": 35,
+              "seq_no": 23,
+              "item_id": "A17-5-2-023",
+              "seq_label": "24",
+              "content_preview": "是否编制重大事项概要，是否所有重大事项均已得到满意解决？",
+              "preset_index_reference": "A17"
+            },
+            {
+              "row": 36,
+              "seq_no": 24,
+              "item_id": "A17-5-2-024",
+              "seq_label": "25",
+              "content_preview": "是否获取被审计单位对所有重大缺陷、重要缺陷的确认？",
+              "preset_index_reference": "A10/A16"
+            },
+            {
+              "row": 37,
+              "seq_no": 25,
+              "item_id": "A17-5-2-025",
+              "seq_label": "26",
+              "content_preview": "董事会或管理层是否接受拟出具的内部控制审计报告？",
+              "preset_index_reference": "A10/A16"
+            },
+            {
+              "row": 38,
+              "seq_no": 26,
+              "item_id": "A17-5-2-026",
+              "seq_label": "27",
+              "content_preview": "项目负责经理是否已复核工作底稿？",
+              "preset_index_reference": "A22"
+            },
+            {
+              "row": 39,
+              "seq_no": 27,
+              "item_id": "A17-5-2-027",
+              "seq_label": "28",
+              "content_preview": "项目合伙人是否已复核工作底稿？",
+              "preset_index_reference": "A23"
+            },
+            {
+              "row": 40,
+              "seq_no": 28,
+              "item_id": "A17-5-2-028",
+              "seq_label": "29",
+              "content_preview": "是否已完成项目质量复核合伙人复核（适用时）？",
+              "preset_index_reference": "A24"
+            },
+            {
+              "row": 41,
+              "seq_no": 29,
+              "item_id": "A17-5-2-029",
+              "seq_label": "30",
+              "content_preview": "是否已完成质量控制复核人复核（适用时）？",
+              "preset_index_reference": "A25"
+            },
+            {
+              "row": 42,
+              "seq_no": 30,
+              "item_id": "A17-5-2-030",
+              "seq_label": "31",
+              "content_preview": "是否已完成专业技术复核及所内质量管理制度要求的其他复核流程（必要时）？",
+              "preset_index_reference": "A26"
+            },
+            {
+              "row": 43,
+              "seq_no": 31,
+              "item_id": "A17-5-2-031",
+              "seq_label": "32",
+              "content_preview": "重要的国际业务是否已完成专业技术复核？(如适用)"
+            },
+            {
+              "row": 44,
+              "seq_no": 32,
+              "item_id": "A17-5-2-032",
+              "seq_label": "33",
+              "content_preview": "所有审计工作底稿 、复核意见中的追查事项是否都已满意地解决？",
+              "preset_index_reference": "A22-A26"
+            },
+            {
+              "row": 45,
+              "seq_no": 33,
+              "item_id": "A17-5-2-033",
+              "seq_label": "34",
+              "content_preview": "上年度审计遗留事项是否全部处理 ？"
+            },
+            {
+              "row": 46,
+              "seq_no": 34,
+              "item_id": "A17-5-2-034",
+              "seq_label": "35",
+              "content_preview": "下年度审计时需考虑的重要事项的备忘录是否整理完毕？",
+              "preset_index_reference": "A17"
+            },
+            {
+              "row": 47,
+              "seq_no": 35,
+              "item_id": "A17-5-2-035",
+              "seq_label": "36",
+              "content_preview": "根据已执行的审计程序和获取的结果，我认为项目组已取得充分、适当的审计证据，以支持拟发表的审计意见。"
+            }
+          ]
+        },
+        "merged_ranges_count": 36,
+        "notes": "两节结构：审计目标（无结论列，纯说明）+ 核对程序（结论[是/否/不适用]+工作底稿索引号(填)+预置参考索引+备注）。parser 须区分两节类型。"
+      }
+    ],
+    "parser_ready": true,
+    "procedure_item_count": 35,
+    "notes": "A17-5-x 审计工作完成核对表；核对程序 35 条；item_id 模式 A17-5-2-{seq:03d}（对齐 persistence.md A17-5-{x}-{seq}）。"
+  },
+  {
+    "wp_code": "A17-5-3",
+    "filename": "A17-5-3  审计工作完成核对表（IPO业务特别程序）.xlsx",
+    "runtime": "checklist-table",
+    "sheets": [
+      {
+        "name": "A17-5-3 审计工作完成核对表 ",
+        "component_type": "checklist-table",
+        "max_row": 176,
+        "max_col": 8,
+        "objective_section": {
+          "anchor_row": 5,
+          "title": "一、审计目标",
+          "has_conclusion": false,
+          "item_count": 3,
+          "items": [
+            {
+              "row": 6,
+              "seq": "1",
+              "text_preview": "确定是否充分识别出针对IPO企业的高风险领域；"
+            },
+            {
+              "row": 7,
+              "seq": "2",
+              "text_preview": "确定针对识别出的高风险领域是否实施了有效的应对措施，并满足证监会监管相关监管要求（如14号文、551号文、监管规则指引发行类4/5/9号、沪深首发上市自查表、北交所适用指引1/2/3等）；"
+            },
+            {
+              "row": 8,
+              "seq": "3",
+              "text_preview": "确定获取的审计证据是否充分适当。"
+            }
+          ]
+        },
+        "procedure_section": {
+          "anchor_row": 9,
+          "title": "二、核对程序",
+          "has_conclusion": true,
+          "columns": [
+            {
+              "col": "A",
+              "label": "二、核对程序"
+            },
+            {
+              "col": "E",
+              "label": "核对结果[是/否/不适用]"
+            },
+            {
+              "col": "F",
+              "label": "备注"
+            },
+            {
+              "col": "G",
+              "label": "工作底稿索引号"
+            }
+          ],
+          "column_roles": {
+            "conclusion": "E",
+            "remark": "F",
+            "work_paper_index": "G"
+          },
+          "item_count": 24,
+          "item_id_pattern": "A17-5-3-{seq:03d}",
+          "items": [
+            {
+              "row": 10,
+              "seq_no": 1,
+              "item_id": "A17-5-3-001",
+              "seq_label": "（一）",
+              "content_preview": "是否检查了发行人的财务会计核算体系是否健全？内部控制的建立、运行情况是否有效？对主要业务循环是否进行了内控的了解和测试？"
+            },
+            {
+              "row": 11,
+              "seq_no": 2,
+              "item_id": "A17-5-3-002",
+              "seq_label": "（二）",
+              "content_preview": "是否自行至税务局，获取各年度所得税纳税申报表，并与申请文件中的财务报表进行比对？"
+            },
+            {
+              "row": 12,
+              "seq_no": 3,
+              "item_id": "A17-5-3-003",
+              "seq_label": "（三）",
+              "content_preview": "是否结合发行人所处行业及盈利模式、不同收入来源，检查收入确认政策的合理性？针对采用完工百分比法的，是否与同行业公司进行对比分析，关注完工百分比法确认依据的充分性，成本和完工比例核算的准确性和客观性？"
+            },
+            {
+              "row": 13,
+              "seq_no": 4,
+              "item_id": "A17-5-3-004",
+              "seq_label": "（四）",
+              "content_preview": "是否选取主要合同样本，检查了合同签订和履行情况？"
+            },
+            {
+              "row": 14,
+              "seq_no": 5,
+              "item_id": "A17-5-3-005",
+              "seq_label": "（五）",
+              "content_preview": "是否对收入确认时点的准确性进行测试？是否对销售收入真实性、完整性、截止性分别进行测试？"
+            },
+            {
+              "row": 15,
+              "seq_no": 6,
+              "item_id": "A17-5-3-006",
+              "seq_label": "（六）",
+              "content_preview": "是否通过公开网站查询、电话访谈、实地走访等方式，对发行人的主要客户和主要供应商进行了核查？"
+            },
+            {
+              "row": 16,
+              "seq_no": 7,
+              "item_id": "A17-5-3-007",
+              "seq_label": "（七）",
+              "content_preview": "是否检查了发行人信用政策的变动情况？关注是否存在通过放宽信用政策，延长信用周期换取收入增加的情况？"
+            },
+            {
+              "row": 17,
+              "seq_no": 8,
+              "item_id": "A17-5-3-008",
+              "seq_label": "（八）",
+              "content_preview": "针对经销商销售，是否获取公司的经销商（加盟商）管理制度？检查各经销商（加盟商）与公司的合作条款？关注收入确认的合理性。"
+            },
+            {
+              "row": 18,
+              "seq_no": 9,
+              "item_id": "A17-5-3-009",
+              "seq_label": "（九）",
+              "content_preview": "针对大额出口业务，是否已经根据重要性原则，对公司主管海关进行实地走访，并将海关出口金额与当期出口收入进行了核对？"
+            },
+            {
+              "row": 19,
+              "seq_no": 10,
+              "item_id": "A17-5-3-010",
+              "seq_label": "（十）",
+              "content_preview": "是否对发行人经营性现金流量与净利润的匹配性进行分析？对主要财务指标如产销率、应收账款周转率、应收账款增长率等是否进行了多维度分析？关注发行人申报期内的盈利增长情况和异常交易？"
+            },
+            {
+              "row": 20,
+              "seq_no": 11,
+              "item_id": "A17-5-3-011",
+              "seq_label": "（十一）",
+              "content_preview": "是否对主要客户和主要供应商进行关联方关系调查？是否对关联交易价格的公允性，披露的真实、准确、完整性进行检查？"
+            },
+            {
+              "row": 21,
+              "seq_no": 12,
+              "item_id": "A17-5-3-012",
+              "seq_label": "（十二）",
+              "content_preview": "是否对原材料成本、产品成本、投入产出比等进行分析？关注有否利用体外资金支付货款，少计原材料采购数量及金额，虚减当期成本，虚构利润的情形。"
+            },
+            {
+              "row": 22,
+              "seq_no": 13,
+              "item_id": "A17-5-3-013",
+              "seq_label": "（十三）",
+              "content_preview": "是否对申报期内各期末存货执行有效的存货监盘程序？对异地存放、盘点过程存在特殊困难或由第三方保管或控制的存货，获取的审计证据是否充分？"
+            },
+            {
+              "row": 23,
+              "seq_no": 14,
+              "item_id": "A17-5-3-014",
+              "seq_label": "（十四）",
+              "content_preview": "是否亲自到人民银行或被审计单位基本户开户行取得发行人申报期的所有银行账户清单？检查申报期内开户银行的数量及分布与发行人实际经营的需要是否一致？银行账户的实际用途是否合理， 申报期内注销账户原因是否合理？"
+            },
+            {
+              "row": 24,
+              "seq_no": 15,
+              "item_id": "A17-5-3-015",
+              "seq_label": "（十五）",
+              "content_preview": "是否亲自到被审计单位的主要/可疑开户银行打印资金流水，将大额资金收支与被审计单位有关账面记录核对，执行双向测试？"
+            },
+            {
+              "row": 25,
+              "seq_no": 16,
+              "item_id": "A17-5-3-016",
+              "seq_label": "（十六）",
+              "content_preview": "是否获取发行人的薪资制度和职工名单及级别资料，是否将职工薪酬与关联方和同行业的薪资水平进行对比？说明发行人人工成本变动的合理性，关注有无通过压低员工薪金，阶段性降低人工成本粉饰业绩的情况？"
+            },
+            {
+              "row": 26,
+              "seq_no": 17,
+              "item_id": "A17-5-3-017",
+              "seq_label": "（十七）",
+              "content_preview": "是否分析主要期间费用变化与相关业务活动（如广告、促销、运输等）是否匹配？期间费用率与同行业相比是否异常？关注有无延迟成本费用或通过关联方代垫费用，增加利润，粉饰报表的情况？"
+            },
+            {
+              "row": 27,
+              "seq_no": 18,
+              "item_id": "A17-5-3-018",
+              "seq_label": "（十八）",
+              "content_preview": "是否对被审计单位政府补助的核算方法的适当性进行了审查，并确认同一交易事项采用了同一种会计处理方法？"
+            },
+            {
+              "row": 28,
+              "seq_no": 19,
+              "item_id": "A17-5-3-019",
+              "seq_label": "（十九）",
+              "content_preview": "是否获取保荐机构及其关联方、PE投资机构及其关联方、PE投资机构的股东或实际控制人控制或投资的其他企业清单？并核查在申报期内最后一年上述主体与发行人是否发生大额交易？"
+            },
+            {
+              "row": 29,
+              "seq_no": 20,
+              "item_id": "A17-5-3-020",
+              "seq_label": "（二十）",
+              "content_preview": "是否按照监管规则指引发行类4/5号、沪深首发上市自查表、北交所适用指引1/2/3等监管政策执行了专项核查，例如信息系统核查、对关联方银行账户的资金流水核查等？"
+            },
+            {
+              "row": 30,
+              "seq_no": 21,
+              "item_id": "A17-5-3-021",
+              "seq_label": "（二十一）",
+              "content_preview": "是否关注发行人的财务信息披露是否真实、准确、完整并反映公司的经营情况？是否对财务信息与非财务信息的相互衔接进行分析核查？"
+            },
+            {
+              "row": 31,
+              "seq_no": 22,
+              "item_id": "A17-5-3-022",
+              "seq_label": "1",
+              "content_preview": "是否将发行人招股说明书中披露的财务信息与已审计财务报表进行核对？是否重点关注了招股说明书中按照证监会公告[2023]50号要求披露信息？"
+            },
+            {
+              "row": 32,
+              "seq_no": 23,
+              "item_id": "A17-5-3-023",
+              "seq_label": "2",
+              "content_preview": "是否分析产量变化与水电气等能源耗用量变化趋势是否一致，通过设备使用率（生产开工效率）分析、投入产出分析、仓储库容量、库龄分析等分析产量变化的合理性？"
+            },
+            {
+              "row": 33,
+              "seq_no": 24,
+              "item_id": "A17-5-3-024",
+              "seq_label": "3",
+              "content_preview": "是否分析资产规模与产能的匹配性，开工情况与产量的匹配性；将发行人的毛利率、产能利用率（开工率）、产销率与同行业或相近产品进行对比，分析变化原因及合理性？"
+            }
+          ]
+        },
+        "merged_ranges_count": 28,
+        "notes": "两节结构：审计目标（无结论列，纯说明）+ 核对程序（结论[是/否/不适用]+工作底稿索引号(填)+预置参考索引+备注）。parser 须区分两节类型。"
+      },
+      {
+        "name": "GT_Custom",
+        "component_type": "skip"
+      }
+    ],
+    "parser_ready": true,
+    "procedure_item_count": 24,
+    "notes": "A17-5-x 审计工作完成核对表；核对程序 24 条；item_id 模式 A17-5-3-{seq:03d}（对齐 persistence.md A17-5-{x}-{seq}）。"
+  },
+  {
+    "wp_code": "A17-5-4",
+    "filename": "A17-5-4  审计工作完成核对表（新三板挂牌业务特别程序）.xlsx",
+    "runtime": "checklist-table",
+    "sheets": [
+      {
+        "name": "A17-5-4 审计工作完成核对表 ",
+        "component_type": "checklist-table",
+        "max_row": 202,
+        "max_col": 27,
+        "objective_section": {
+          "anchor_row": 5,
+          "title": "一、审计目标",
+          "has_conclusion": false,
+          "item_count": 3,
+          "items": [
+            {
+              "row": 6,
+              "seq": "1",
+              "text_preview": "确定是否充分识别出针对新三板企业的高风险领域；"
+            },
+            {
+              "row": 7,
+              "seq": "2",
+              "text_preview": "确定针对识别出的高风险领域是否实施了有效的应对措施，并满足股转中心相关监管要求（参考要点（试行）等）；"
+            },
+            {
+              "row": 8,
+              "seq": "3",
+              "text_preview": "确定获取的审计证据是否充分适当。"
+            }
+          ]
+        },
+        "procedure_section": {
+          "anchor_row": 9,
+          "title": "二、核对程序",
+          "has_conclusion": true,
+          "columns": [
+            {
+              "col": "A",
+              "label": "二、核对程序"
+            },
+            {
+              "col": "E",
+              "label": "核对结果[是/否/不适用]"
+            },
+            {
+              "col": "F",
+              "label": "公开转让书披露章节"
+            },
+            {
+              "col": "G",
+              "label": "备注"
+            },
+            {
+              "col": "H",
+              "label": "工作底稿索引号"
+            }
+          ],
+          "column_roles": {
+            "conclusion": "E",
+            "disclosure_chapter": "F",
+            "remark": "G",
+            "work_paper_index": "H"
+          },
+          "item_count": 61,
+          "item_id_pattern": "A17-5-4-{seq:03d}",
+          "items": [
+            {
+              "row": 10,
+              "seq_no": 1,
+              "item_id": "A17-5-4-001",
+              "seq_label": "（一）",
+              "content_preview": "拟挂牌公司是否存在出资瑕疵？如有，是否核查公司采取的规范措施涉及的会计处理方式符合《企业会计准则》的规定？"
+            },
+            {
+              "row": 11,
+              "seq_no": 2,
+              "item_id": "A17-5-4-002",
+              "seq_label": "（二）",
+              "content_preview": "业务承接和保持时："
+            },
+            {
+              "row": 12,
+              "seq_no": 3,
+              "item_id": "A17-5-4-003",
+              "seq_label": "1",
+              "content_preview": "在业务承接时未获取必要信息以充分评估自身的胜任能力和被审计单位管理层的诚信情况，并对新三板挂牌公司审计项目分类为A类业务？"
+            },
+            {
+              "row": 13,
+              "seq_no": 4,
+              "item_id": "A17-5-4-004",
+              "seq_label": "2",
+              "content_preview": "首次承接时，已与前任注册会计师进行充分、必要的沟通，并对沟通结果进行了有效评价。"
+            },
+            {
+              "row": 14,
+              "seq_no": 5,
+              "item_id": "A17-5-4-005",
+              "seq_label": "3",
+              "content_preview": "在业务执行过程中，已经严格执行项目质量控制复核，由独立的项目质量控制复核人员对项目组作出的重大判断和编制审计报告时得出的结论进行客观评价。"
+            },
+            {
+              "row": 15,
+              "seq_no": 6,
+              "item_id": "A17-5-4-006",
+              "seq_label": "（三）",
+              "content_preview": "了解被设计单位及其环境识别和评估重大错报风险时："
+            },
+            {
+              "row": 16,
+              "seq_no": 7,
+              "item_id": "A17-5-4-007",
+              "seq_label": "1",
+              "content_preview": "在了解被审计单位及其环境时，已针对性地重点了解以下方面："
+            },
+            {
+              "row": 17,
+              "seq_no": 8,
+              "item_id": "A17-5-4-008",
+              "seq_label": "（1）",
+              "content_preview": "相关行业状况和监管环境。对属于新兴高新技术行业的被审计单位，除了已了解行业的基本情况和发展现状以外，还重点关注了行业的稳定性、发展趋势、竞争程度和特有风险（如政策风险等）"
+            },
+            {
+              "row": 18,
+              "seq_no": 9,
+              "item_id": "A17-5-4-009",
+              "seq_label": "（2）",
+              "content_preview": "被审计单位的性质，包括是否存在特殊的业务模式、所有权和治理结构是否明晰、筹资和投资活动是否存在重大限制、是否存在超出被审计单位正常经营过程的重大关联方交易及资金占用情况等。"
+            },
+            {
+              "row": 19,
+              "seq_no": 10,
+              "item_id": "A17-5-4-010",
+              "seq_label": "（3）",
+              "content_preview": "对会计政策的选择和运用，特别是某些新兴行业可能涉及的在缺乏权威性标准或共识、有争议的或新兴领域采用的重要会计政策"
+            },
+            {
+              "row": 20,
+              "seq_no": 11,
+              "item_id": "A17-5-4-011",
+              "seq_label": "（4）",
+              "content_preview": "经营风险，例如对于成立时间较短、处于发展或成长期的被审计单位，可能存在开发新产品或提供新服务失败或者业务扩张失败等导致的经营风险"
+            },
+            {
+              "row": 21,
+              "seq_no": 12,
+              "item_id": "A17-5-4-012",
+              "seq_label": "（5）",
+              "content_preview": "了解被审计单位是否存在由于融资、分层调整、首次公开发行股票及对赌等原因产生的粉饰财务报表的压力和动机。如果存在这种情况，已考虑提高对尚未发现和更正的错报风险的预期"
+            },
+            {
+              "row": 22,
+              "seq_no": 13,
+              "item_id": "A17-5-4-013",
+              "seq_label": "2",
+              "content_preview": "了解与财务报表相关的内部控制时，针对被审计单位可能存在内部控制系统较为简单，缺少正式的风险评估过程，或者股东、治理层和管理层高度重合等情况，项目组已保持职业怀疑态度并恰当实施风险评估程序，以识别这些内部控制特点可能导致的管理层凌驾于内部控制之上的重大错报风险，并采取恰当的措施应对该等由舞弊导致的重大"
+            },
+            {
+              "row": 23,
+              "seq_no": 14,
+              "item_id": "A17-5-4-014",
+              "seq_label": "（四）",
+              "content_preview": "对被审计单位持续经营假设是否适当："
+            },
+            {
+              "row": 24,
+              "seq_no": 15,
+              "item_id": "A17-5-4-015",
+              "seq_label": "1",
+              "content_preview": "项目组已保持了足够的职业怀疑，并遵照CAS1314号的要求和指引实施了恰当的审计程序，对处于发展或成长期的被审计单位项目组已实施程序以识别可能存在的管理层偏向，谨慎评价管理层对被审计单位持续经营能力的评估。"
+            },
+            {
+              "row": 25,
+              "seq_no": 16,
+              "item_id": "A17-5-4-016",
+              "seq_label": "2",
+              "content_preview": "项目组在实施风险评估程序时已特别注意是否存在导致对被审计单位持续经营能力产生重大疑虑的事项或情况，如发生重大经营亏损、法律或政策变化预期产生重大不利影响、主要高层管理人员离职且无人替代、关键客户或供应商流失、逾期归还银行借款及其他债务且融资困难、涉及重大诉讼或其他重大或有事项等，并在整个审计过程中保"
+            },
+            {
+              "row": 26,
+              "seq_no": 17,
+              "item_id": "A17-5-4-017",
+              "seq_label": "3",
+              "content_preview": "当识别出可能导致对被审计单位持续经营能力产生重大疑虑的事项或情况时，针对管理层提出的相关未来应对计划，项目组已实施恰当的追加审计程序，以评价管理层是否具有明确的意图和足够的能力来实施应对计划，确定可能导致被审计单位持续经营能力产生重大疑虑的事项或情况是否存在重大不确定性。"
+            },
+            {
+              "row": 27,
+              "seq_no": 18,
+              "item_id": "A17-5-4-018",
+              "seq_label": "（五）",
+              "content_preview": "是否结合行业特点、产品或服务类型、关键资源要素、采购模式、销售模式、盈利模式、收付款政策、客户及供应商类型、主要业务合同等，比照《企业会计准则》核查了公司财务报表相关科目的会计政策及会计处理、列报与实际业务相匹配？"
+            },
+            {
+              "row": 28,
+              "seq_no": 19,
+              "item_id": "A17-5-4-019",
+              "seq_label": "1",
+              "content_preview": "针对收入确认："
+            },
+            {
+              "row": 29,
+              "seq_no": 20,
+              "item_id": "A17-5-4-020",
+              "seq_label": "（1）",
+              "content_preview": "项目组已按照审计准则的要求恰当识别存在舞弊风险的收入、收入交易或具体认定"
+            },
+            {
+              "row": 30,
+              "seq_no": 21,
+              "item_id": "A17-5-4-021",
+              "seq_label": "（2）",
+              "content_preview": "（1）是否核查了收入确认与公司经营实际情况相符？公司是否存在特殊处理方式？如有，是否核查其合理性（净额确认、完工百分比等）；（2）是否针对收入真实性、完整性、准确性履行了审计程序，确认的金额占总金额的比重超过***，取得充分、适当的内外部证据；（3）是否针对虚增收入以及隐藏收入的风险，核查了收入的真"
+            },
+            {
+              "row": 31,
+              "seq_no": 22,
+              "item_id": "A17-5-4-022",
+              "seq_label": "（3）",
+              "content_preview": "对于报告期间收入高增长的被审计单位，项目组关注了报告期间内各期应收账款、预收款项、主营业务收入、投入增长率、劳动生产率、销售费用率、产能、水电能耗、运输数量和经营活动现金流量等数据之间的逻辑关系，并跟进了处理，对于应收账款余额较大，或者应收账款增长比例高于销售收入的增长比例，项目组分析了具体原因，并"
+            },
+            {
+              "row": 32,
+              "seq_no": 23,
+              "item_id": "A17-5-4-023",
+              "seq_label": "（4）",
+              "content_preview": "对于被审计单位报告期间主营业务的高增长，项目组已将其与行业总体增长情况以及竞争对手的财务数据进行比较分析，对于存在的重大偏差，已要求管理层给予合理的解释，并对相关解释执行审计程序加以验证"
+            },
+            {
+              "row": 33,
+              "seq_no": 24,
+              "item_id": "A17-5-4-024",
+              "seq_label": "2",
+              "content_preview": "是否核查了：（1）公司成本归集、分配、结转的准确性，是否存在通过成本调整业绩的情形；（2）公司成本构成与可比公司相比是否存在异常情况，若存在，核查是否合理；（3）公司采购的真实性、成本的真实性及完整性。"
+            },
+            {
+              "row": 34,
+              "seq_no": 25,
+              "item_id": "A17-5-4-025",
+              "seq_label": "3",
+              "content_preview": "（1）是否核查公司毛利水平以及波动合理性；（2）是否核查公司营业成本和期间费用的各组成项目的划分归集合规性，并核查了公司报告期内收入、成本的配比合理性。"
+            },
+            {
+              "row": 35,
+              "seq_no": 26,
+              "item_id": "A17-5-4-026",
+              "seq_label": "4",
+              "content_preview": "（1）是否结合预付款项、其他应收款、应付款项、其他应付款等资产负债类科目核查公司跨期确认费用情形；（2）是否结合固定资产、在建工程、长期待摊费用等科目核查公司期间费用资本化的情形；（3）是否核查了公司期间费用的真实性、准确性、完整性。"
+            },
+            {
+              "row": 36,
+              "seq_no": 27,
+              "item_id": "A17-5-4-027",
+              "seq_label": "5",
+              "content_preview": "是否核查坏账政策的谨慎性，是否结合应收账款期后收款情况核查收入的真实性，结合收入确认依据核查是否存在提前确认收入的情形。"
+            },
+            {
+              "row": 37,
+              "seq_no": 28,
+              "item_id": "A17-5-4-028",
+              "seq_label": "6",
+              "content_preview": "（1）是否结合公司盘点报告补充核查公司盘点情况，是否在底稿中说明已履行的监盘程序；（2）是否核查存货跌价准备计提及转回的具体依据、测算过程，核查公司存货跌价准备谨慎合理性；（3）是否核查公司存货各项目的发生、计价、分配与结转情况，与实际生产流转的一致性、分配及结转方法的合理性、计算的准确性，是否存在"
+            },
+            {
+              "row": 38,
+              "seq_no": 29,
+              "item_id": "A17-5-4-029",
+              "seq_label": "7",
+              "content_preview": "（1）是否核查了公司经营活动现金流波动的合理性，经营活动现金流量净额与净利润的匹配性；（2）是否核查了各报告期内所有大额现金流量变动项目的内容、发生额、与实际业务发生相符性，与相关科目会计核算的勾稽，特别是“销售商品、提供劳务收到的现金”、“购买商品、接受劳务支付的现金”、“收到的其他与经营活动有关"
+            },
+            {
+              "row": 39,
+              "seq_no": 30,
+              "item_id": "A17-5-4-030",
+              "seq_label": "（六）",
+              "content_preview": "是否核查财务规范性："
+            },
+            {
+              "row": 40,
+              "seq_no": 31,
+              "item_id": "A17-5-4-031",
+              "seq_label": "1",
+              "content_preview": "（1）是否核查了公司销售与收款循环、购货与付款循环、生产循环、筹资与投资循环、货币资金循环等五大循环相关的内控制度的有效性，是否得到有效执行；（2）是否核查了公司会计核算基础与现行会计基础工作规范要求的相符性，是否在审计底稿中说明在审计过程中发现的与公司内控及会计核算相关的主要问题以及后续规范措施，"
+            },
+            {
+              "row": 41,
+              "seq_no": 32,
+              "item_id": "A17-5-4-032",
+              "seq_label": "2",
+              "content_preview": "是否结合公司业务特点、客户对象、报告期内发生的重大资产重组、非货币资产出资规范等实际情况，核查公司税收缴纳的合法合规性，包括但不限于：（1）公司缴纳税种以及税率情况；（2）公司税收缴纳情况、是否存在少计税款、未足额缴纳税款、延期缴纳税款等不规范行为；（3）公司是否存在偷税、漏税等重大违法违规行为。"
+            },
+            {
+              "row": 42,
+              "seq_no": 33,
+              "item_id": "A17-5-4-033",
+              "seq_label": "（七）",
+              "content_preview": "是否核查主要财务指标："
+            },
+            {
+              "row": 43,
+              "seq_no": 34,
+              "item_id": "A17-5-4-034",
+              "seq_label": "1",
+              "content_preview": "是否结合对公司财务数据的审计，核查公司财务指标及其波动的合理性，包括主要会计数据，资产收益率、每股收益，盈利能力、偿债能力、营运能力、获取现金流能力等财务指标。"
+            },
+            {
+              "row": 44,
+              "seq_no": 35,
+              "item_id": "A17-5-4-035",
+              "seq_label": "2",
+              "content_preview": "是否核查分析公司选用会计政策和会计估计的适当性、会计政策和会计估计与同行业公司的差异性、报告期内会计政策的一致性、是否存在利用会计政策和会计估计变更操纵利润的情形，如改变收入确认方式、调整坏账计提比例、调整存货计价方式等。"
+            },
+            {
+              "row": 45,
+              "seq_no": 36,
+              "item_id": "A17-5-4-036",
+              "seq_label": "（八）",
+              "content_preview": "是否核查关联交易："
+            },
+            {
+              "row": 46,
+              "seq_no": 37,
+              "item_id": "A17-5-4-037",
+              "seq_label": "1",
+              "content_preview": "是否根据《企业会计准则》的要求核查公司关联方认定和披露，确定**公司关联方认定的准确性、披露的全面性、是否存在为规避披露关联交易将关联方非关联化的情形。是否已关注与被审计单位办公地址、联系电话、工作人员等信息重合的相关企业及关联自然人直接或间接控制的企业等是否为潜在关联方，通过查询全国企业信用信息公"
+            },
+            {
+              "row": 47,
+              "seq_no": 38,
+              "item_id": "A17-5-4-038",
+              "seq_label": "2",
+              "content_preview": "（1）是否核查公司经常性及偶发性关联交易区分的合理性，除了已实施诸如函证等常规审计程序外，项目组还考虑了直接取得该关联方的相关财务信息，用以佐证关联方与被审计单位之间交易的真实性和合理性。（2）是否核查公司披露的关联交易的真实性、准确、完整性。"
+            },
+            {
+              "row": 48,
+              "seq_no": 39,
+              "item_id": "A17-5-4-039",
+              "seq_label": "3",
+              "content_preview": "是否核查关联交易的必要性及公允性，是否在底稿中说明了对关联交易真实性的核查方法及程序。"
+            },
+            {
+              "row": 49,
+              "seq_no": 40,
+              "item_id": "A17-5-4-040",
+              "seq_label": "4",
+              "content_preview": "对于重大关联交易，在整个审计过程中项目组已保持合理的职业怀疑态度，如在货币资金等相关项目审计中发现可能涉及关联方交易的异常情况，已采取有针对性的实质性程序进一步调查。"
+            },
+            {
+              "row": 50,
+              "seq_no": 41,
+              "item_id": "A17-5-4-041",
+              "seq_label": "（九）",
+              "content_preview": "对于货币资金"
+            },
+            {
+              "row": 51,
+              "seq_no": 42,
+              "item_id": "A17-5-4-042",
+              "seq_label": "1",
+              "content_preview": "项目组已遵照CSA1312号的要求对银行存款实施函证程序，对于发生额较大但余额较小的账户也已将其纳入函证范围"
+            },
+            {
+              "row": 52,
+              "seq_no": 43,
+              "item_id": "A17-5-4-043",
+              "seq_label": "2",
+              "content_preview": "在函证过程中，项目组始终保持职业怀疑，对舞弊风险迹象保持警觉。项目组已遵照CSA1312号及其应用指南的要求和指引，对银行存款函证实施有效控制，确保函证过程独立于被审计单位；评价实施函证程序的结果是否能够提供相关、可靠的审计证据，或是否有必要进一步获取审计证据。"
+            },
+            {
+              "row": 53,
+              "seq_no": 44,
+              "item_id": "A17-5-4-044",
+              "seq_label": "3",
+              "content_preview": "在对被审计单位银行对账单的真实性存有疑虑的情形下，项目组已在被审计单位协助下亲自到银行获取银行对账单。通过核对所获取银行对账单收、付款累计发生额与银行存款日记账的借、贷方累计发生额是否相符来检查银行存款日记账记录的完整性；对于具有较高风险特征的交易，例如异常的一一对应的资金收支、收款方或付款方显示为"
+            },
+            {
+              "row": 54,
+              "seq_no": 45,
+              "item_id": "A17-5-4-045",
+              "seq_label": "4",
+              "content_preview": "对于银行进出账单等关键原始凭证，项目组查看原始单据，并与客户提供的复印件或扫描件进行核对，确保二者信息没有差异。"
+            },
+            {
+              "row": 55,
+              "seq_no": 46,
+              "item_id": "A17-5-4-046",
+              "seq_label": "5",
+              "content_preview": "项目组已设计和实施相应的审计程序，检查被审计单位银行账户的完整性。项目组已亲自从中国人民银行或基本户开立银行查询并打印被审计单位的账户清单，以确认被审计单位账面记录的银行账户的完整性。"
+            },
+            {
+              "row": 56,
+              "seq_no": 47,
+              "item_id": "A17-5-4-047",
+              "seq_label": "6",
+              "content_preview": "项目组已结合财务费用审计测算利息收入的合理性，判断是否存在体外资金循环的情形。"
+            },
+            {
+              "row": 57,
+              "seq_no": 48,
+              "item_id": "A17-5-4-048",
+              "seq_label": "7",
+              "content_preview": "项目组已关注报告期货币资金的期初余额、本期发生额和期末余额，分析是否存在异常增减变动情况。对于资产负债率较高，但期末货币资金余额较大的公司，重点关注其货币资金是否存在受限制的情形，例如可通过函证获取合理保证，或查询企业信用报告中的担保信息等。"
+            },
+            {
+              "row": 58,
+              "seq_no": 49,
+              "item_id": "A17-5-4-049",
+              "seq_label": "（十）",
+              "content_preview": "对于费用的确认和计量："
+            },
+            {
+              "row": 59,
+              "seq_no": 50,
+              "item_id": "A17-5-4-050",
+              "seq_label": "1",
+              "content_preview": "已对费用进行恰当的风险评估，设计和执行审计程序时已充分关注各主要费用项目与营业收入、应付职工薪酬等其他财务数据和非财务数据之间的逻辑关系"
+            },
+            {
+              "row": 60,
+              "seq_no": 51,
+              "item_id": "A17-5-4-051",
+              "seq_label": "2",
+              "content_preview": "已对研发支出的内容是否合理执行了必要的审计程序，对研发支出是否符合资本化条件已获取充分的审计证据。"
+            },
+            {
+              "row": 61,
+              "seq_no": 52,
+              "item_id": "A17-5-4-052",
+              "seq_label": "3",
+              "content_preview": "已关注费用项目中异常的大额费用，并了解了费用的合理性"
+            },
+            {
+              "row": 62,
+              "seq_no": 53,
+              "item_id": "A17-5-4-053",
+              "seq_label": "（十一）",
+              "content_preview": "是否对被审计单位政府补助的核算方法的适当性进行了审查，并确认同一交易事项采用了同一种会计处理方法？"
+            },
+            {
+              "row": 63,
+              "seq_no": 54,
+              "item_id": "A17-5-4-054",
+              "seq_label": "（十二）",
+              "content_preview": "对内控有效性问题："
+            },
+            {
+              "row": 64,
+              "seq_no": 55,
+              "item_id": "A17-5-4-055",
+              "seq_label": "1",
+              "content_preview": "已充分识别被审计单位用以应对舞弊风险的内部控制，并对该内部控制执行有效性进行评估"
+            },
+            {
+              "row": 65,
+              "seq_no": 56,
+              "item_id": "A17-5-4-056",
+              "seq_label": "2",
+              "content_preview": "已测试被审计单位信息系统一般性控制的有效性，对于测试结论为“无效”的，但后续审计程序已对此加以应对"
+            },
+            {
+              "row": 66,
+              "seq_no": 57,
+              "item_id": "A17-5-4-057",
+              "seq_label": "（十三）",
+              "content_preview": "对财务报表披露："
+            },
+            {
+              "row": 67,
+              "seq_no": 58,
+              "item_id": "A17-5-4-058",
+              "seq_label": "1",
+              "content_preview": "项目组已检查财务报表及附注是否已根据《企业会计准则》和《公开发行证券的公司信息披露编报规则第15号——财务报告的一般规定》（2014年修订）的要求编制，重点关注了会计政策和会计估计变更、前期差错更正、收入确认等会计政策的个性化披露，所得税费用与会计利润关系的说明，与金融工具相关的风险等披露事项是否完"
+            },
+            {
+              "row": 68,
+              "seq_no": 59,
+              "item_id": "A17-5-4-059",
+              "seq_label": "2",
+              "content_preview": "项目组已取得充分、适当的审计证据，以确保财务报表披露事项真实、准确。同时，项目组已阅读被审计单位年度报告中的其他信息，考虑其是否与财务报表或注册会计师在审计过程中了解到的情况存在重大不一致或者可能存在重大错报。"
+            },
+            {
+              "row": 69,
+              "seq_no": 60,
+              "item_id": "A17-5-4-060",
+              "seq_label": "（十四）",
+              "content_preview": "是否将拟挂牌公司公开转让书中披露的财务信息与已审计财务报表进行核对？是否重点关注了公开转让书中按照《挂牌审查一般问题内核参考要点（试行）》（股转公司20150626）要求披露的信息？"
+            },
+            {
+              "row": 70,
+              "seq_no": 61,
+              "item_id": "A17-5-4-061",
+              "seq_label": "（十五）",
+              "content_preview": "对被审计单位的审计是否已遵循《企业监管风险提示第6号——新三板挂牌公司审计》的要求？"
+            }
+          ]
+        },
+        "merged_ranges_count": 66,
+        "notes": "两节结构：审计目标（无结论列，纯说明）+ 核对程序（结论[是/否/不适用]+工作底稿索引号(填)+预置参考索引+备注）。parser 须区分两节类型。"
+      },
+      {
+        "name": "GT_Custom",
+        "component_type": "skip"
+      }
+    ],
+    "parser_ready": true,
+    "procedure_item_count": 61,
+    "notes": "A17-5-x 审计工作完成核对表；核对程序 61 条；item_id 模式 A17-5-4-{seq:03d}（对齐 persistence.md A17-5-{x}-{seq}）。"
+  },
+  {
+    "wp_code": "A17-5-5",
+    "filename": "A17-5-5  审计工作完成核对表（函证程序）.xlsx",
+    "runtime": "checklist-table",
+    "sheets": [
+      {
+        "name": "A17-5-3 审计工作完成核对表 ",
+        "component_type": "checklist-table",
+        "max_row": 80,
+        "max_col": 8,
+        "objective_section": {
+          "anchor_row": 5,
+          "title": "一、审计目标",
+          "has_conclusion": false,
+          "item_count": 2,
+          "items": [
+            {
+              "row": 6,
+              "seq": null,
+              "text_preview": "确定是否按照审计准则的规定和监管要求（例如《关于加快推进银行函证规范化、集约化、数字化建设的通知》（财会〔2022〕39号））执行函证程序"
+            },
+            {
+              "row": 7,
+              "seq": null,
+              "text_preview": "注：以下问题凡勾选“是”的，请在备注栏中说明具体情况和后续解决措施。"
+            }
+          ]
+        },
+        "procedure_section": {
+          "anchor_row": 8,
+          "title": "二、核对程序",
+          "has_conclusion": true,
+          "columns": [
+            {
+              "col": "A",
+              "label": "二、核对程序"
+            },
+            {
+              "col": "E",
+              "label": "核对结果[是/否/不适用]"
+            },
+            {
+              "col": "F",
+              "label": "备注"
+            },
+            {
+              "col": "G",
+              "label": "工作底稿索引号"
+            }
+          ],
+          "column_roles": {
+            "conclusion": "E",
+            "remark": "F",
+            "work_paper_index": "G"
+          },
+          "item_count": 60,
+          "item_id_pattern": "A17-5-5-{seq:03d}",
+          "items": [
+            {
+              "row": 9,
+              "seq_no": 1,
+              "item_id": "A17-5-5-001",
+              "seq_label": "（一）",
+              "content_preview": "函证程序的实施范围"
+            },
+            {
+              "row": 10,
+              "seq_no": 2,
+              "item_id": "A17-5-5-002",
+              "seq_label": "1",
+              "content_preview": "未对部分银行账户实施函证，底稿未记录理由或记录的理由不充分；"
+            },
+            {
+              "row": 11,
+              "seq_no": 3,
+              "item_id": "A17-5-5-003",
+              "seq_label": "2",
+              "content_preview": "未对应收账款实施函证，底稿未记录理由或记录的理由不充分；"
+            },
+            {
+              "row": 12,
+              "seq_no": 4,
+              "item_id": "A17-5-5-004",
+              "seq_label": "3",
+              "content_preview": "未对应收账款实施函证，未实施替代审计程序获取相关、可靠的审计证据；"
+            },
+            {
+              "row": 13,
+              "seq_no": 5,
+              "item_id": "A17-5-5-005",
+              "seq_label": "4",
+              "content_preview": "未按审计计划对重要的往来款实施函证，底稿未记录理由或记录的理由不充分。"
+            },
+            {
+              "row": 14,
+              "seq_no": 6,
+              "item_id": "A17-5-5-006",
+              "seq_label": "5",
+              "content_preview": "其他问题。"
+            },
+            {
+              "row": 15,
+              "seq_no": 7,
+              "item_id": "A17-5-5-007",
+              "seq_label": "（二）",
+              "content_preview": "函证过程的控制"
+            },
+            {
+              "row": 16,
+              "seq_no": 8,
+              "item_id": "A17-5-5-008",
+              "seq_label": "1",
+              "content_preview": "属于应集中发函的范围，但未通过函证中心执行函证程序；"
+            },
+            {
+              "row": 17,
+              "seq_no": 9,
+              "item_id": "A17-5-5-009",
+              "seq_label": "2",
+              "content_preview": "利用第三方函证平台和银行自建函证平台收发电子函证时，未有效评估其安全性；"
+            },
+            {
+              "row": 18,
+              "seq_no": 10,
+              "item_id": "A17-5-5-010",
+              "seq_label": "3",
+              "content_preview": "以电子邮件方式发出询证函时，收件人邮箱为个人邮箱或其他未经有效核实的邮件地址；"
+            },
+            {
+              "row": 19,
+              "seq_no": 11,
+              "item_id": "A17-5-5-011",
+              "seq_label": "4",
+              "content_preview": "询证函信息填写不完整；"
+            },
+            {
+              "row": 20,
+              "seq_no": 12,
+              "item_id": "A17-5-5-012",
+              "seq_label": "5",
+              "content_preview": "底稿未留存发函快递单据原件；"
+            },
+            {
+              "row": 21,
+              "seq_no": 13,
+              "item_id": "A17-5-5-013",
+              "seq_label": "6",
+              "content_preview": "发函或亲函地址与注册地址不一致，底稿无相关核查程序；"
+            },
+            {
+              "row": 22,
+              "seq_no": 14,
+              "item_id": "A17-5-5-014",
+              "seq_label": "7",
+              "content_preview": "采用亲函方式的，底稿无亲函记录；"
+            },
+            {
+              "row": 23,
+              "seq_no": 15,
+              "item_id": "A17-5-5-015",
+              "seq_label": "8",
+              "content_preview": "发函未由审计人员直接发给被询证者，而是由被审计单位人员寄出或通过被审计单位邮箱发出；"
+            },
+            {
+              "row": 24,
+              "seq_no": 16,
+              "item_id": "A17-5-5-016",
+              "seq_label": "9",
+              "content_preview": "底稿未留存回函快递单据原件；"
+            },
+            {
+              "row": 25,
+              "seq_no": 17,
+              "item_id": "A17-5-5-017",
+              "seq_label": "10",
+              "content_preview": "底稿未留存询证函回函原件，仅留存复印件、传真件或手机图片；"
+            },
+            {
+              "row": 26,
+              "seq_no": 18,
+              "item_id": "A17-5-5-018",
+              "seq_label": "11",
+              "content_preview": "回函的收件人不是审计机构人员，而是由被审计单位人员寄回或带回；"
+            },
+            {
+              "row": 27,
+              "seq_no": 19,
+              "item_id": "A17-5-5-019",
+              "seq_label": "12",
+              "content_preview": "其他问题。"
+            },
+            {
+              "row": 28,
+              "seq_no": 20,
+              "item_id": "A17-5-5-020",
+              "seq_label": "（三）",
+              "content_preview": "替代程序的实施情况"
+            },
+            {
+              "row": 29,
+              "seq_no": 21,
+              "item_id": "A17-5-5-021",
+              "seq_label": "1",
+              "content_preview": "对于未实施函证程序的银行存款和重要往来款，未实施替代程序；"
+            },
+            {
+              "row": 30,
+              "seq_no": 22,
+              "item_id": "A17-5-5-022",
+              "seq_label": "2",
+              "content_preview": "对银行存款和重要往来款实施了函证程序，对方未回函，未执行替代程序；"
+            },
+            {
+              "row": 31,
+              "seq_no": 23,
+              "item_id": "A17-5-5-023",
+              "seq_label": "3",
+              "content_preview": "对银行存款和重要往来款实施了函证程序，但对方未回函，执行了替代程序，底稿未记录替代程序的执行情况；"
+            },
+            {
+              "row": 32,
+              "seq_no": 24,
+              "item_id": "A17-5-5-024",
+              "seq_label": "4",
+              "content_preview": "第一次发函对方未回函的，是否再次寄发询证函；"
+            },
+            {
+              "row": 33,
+              "seq_no": 25,
+              "item_id": "A17-5-5-025",
+              "seq_label": "5",
+              "content_preview": "回函日期晚于审计报告日的，未执行替代程序，底稿无相关记录；"
+            },
+            {
+              "row": 34,
+              "seq_no": 26,
+              "item_id": "A17-5-5-026",
+              "seq_label": "6",
+              "content_preview": "回函日期晚于审计报告日的，执行了替代程序，但底稿无相关记录；"
+            },
+            {
+              "row": 35,
+              "seq_no": 27,
+              "item_id": "A17-5-5-027",
+              "seq_label": "7",
+              "content_preview": "其他问题。"
+            },
+            {
+              "row": 36,
+              "seq_no": 28,
+              "item_id": "A17-5-5-028",
+              "seq_label": "（四）",
+              "content_preview": "回函不符事项的处理"
+            },
+            {
+              "row": 37,
+              "seq_no": 29,
+              "item_id": "A17-5-5-029",
+              "seq_label": "1",
+              "content_preview": "银行回函存在不符事项，如账户数量及性质、账号、回函金额、借款利率和期限等存在不符,审计人员未予关注；"
+            },
+            {
+              "row": 38,
+              "seq_no": 30,
+              "item_id": "A17-5-5-030",
+              "seq_label": "2",
+              "content_preview": "银行以自有格式回函或将询证函部分内容划线删掉，审计未跟进确认相关事项是否存在；"
+            },
+            {
+              "row": 39,
+              "seq_no": 31,
+              "item_id": "A17-5-5-031",
+              "seq_label": "3",
+              "content_preview": "往来款函证中回函金额存在差异，审计人员未予关注；"
+            },
+            {
+              "row": 40,
+              "seq_no": 32,
+              "item_id": "A17-5-5-032",
+              "seq_label": "4",
+              "content_preview": "注意到存在不符事项，但未调查回函不符事项以确定是否表明存在错报，未将相关审计程序情况记录于工作底稿。"
+            },
+            {
+              "row": 41,
+              "seq_no": 33,
+              "item_id": "A17-5-5-033",
+              "seq_label": "5",
+              "content_preview": "其他问题。"
+            },
+            {
+              "row": 42,
+              "seq_no": 34,
+              "item_id": "A17-5-5-034",
+              "seq_label": "（五）",
+              "content_preview": "回函异常或不可靠的处理"
+            },
+            {
+              "row": 43,
+              "seq_no": 35,
+              "item_id": "A17-5-5-035",
+              "seq_label": "1",
+              "content_preview": "回函银行非询证函发函银行，未核实该情况、底稿无相关记录；"
+            },
+            {
+              "row": 44,
+              "seq_no": 36,
+              "item_id": "A17-5-5-036",
+              "seq_label": "2",
+              "content_preview": "银行回函缺少经办人签章，或者实际经办人与银行公告的信息不符；"
+            },
+            {
+              "row": 45,
+              "seq_no": 37,
+              "item_id": "A17-5-5-037",
+              "seq_label": "3",
+              "content_preview": "回函未加盖被询证者公章；"
+            },
+            {
+              "row": 46,
+              "seq_no": 38,
+              "item_id": "A17-5-5-038",
+              "seq_label": "4",
+              "content_preview": "询证函回函盖章不清楚，无法判断是否由被询证者回函，审计人员未核实情况、底稿无相关记录；"
+            },
+            {
+              "row": 47,
+              "seq_no": 39,
+              "item_id": "A17-5-5-039",
+              "seq_label": "5",
+              "content_preview": "往来款回函单位盖章与发函不一致，审计人员未关注该情况、亦未进一步核实；"
+            },
+            {
+              "row": 48,
+              "seq_no": 40,
+              "item_id": "A17-5-5-040",
+              "seq_label": "6",
+              "content_preview": "回函地址与发函地址不一致，审计人员未关注该情况、未予核实；"
+            },
+            {
+              "row": 49,
+              "seq_no": 41,
+              "item_id": "A17-5-5-041",
+              "seq_label": "7",
+              "content_preview": "回函单位名称与发函单位名称不一致，审计人员未关注该情况、未予核实；"
+            },
+            {
+              "row": 50,
+              "seq_no": 42,
+              "item_id": "A17-5-5-042",
+              "seq_label": "8",
+              "content_preview": "回函联系人与发函时的联系人姓名、电话不一致，审计人员未关注该情况、未予核实；"
+            },
+            {
+              "row": 51,
+              "seq_no": 43,
+              "item_id": "A17-5-5-043",
+              "seq_label": "9",
+              "content_preview": "不同被询证者的回函寄出站点和时间相同或相近；"
+            },
+            {
+              "row": 52,
+              "seq_no": 44,
+              "item_id": "A17-5-5-044",
+              "seq_label": "10",
+              "content_preview": "不同被询证者的回函，由同一人寄出（或名字不同但手机号相同）；"
+            },
+            {
+              "row": 53,
+              "seq_no": 45,
+              "item_id": "A17-5-5-045",
+              "seq_label": "11",
+              "content_preview": "不同被询证者的回函，回函单号相连或相近；"
+            },
+            {
+              "row": 54,
+              "seq_no": 46,
+              "item_id": "A17-5-5-046",
+              "seq_label": "12",
+              "content_preview": "其他回函异常或不可靠的情况。"
+            },
+            {
+              "row": 55,
+              "seq_no": 47,
+              "item_id": "A17-5-5-047",
+              "seq_label": "（六）",
+              "content_preview": "消极式函证"
+            },
+            {
+              "row": 56,
+              "seq_no": 48,
+              "item_id": "A17-5-5-048",
+              "seq_label": "1",
+              "content_preview": "是否运用了消极式函证；"
+            },
+            {
+              "row": 57,
+              "seq_no": 49,
+              "item_id": "A17-5-5-049",
+              "seq_label": "2",
+              "content_preview": "是否将消极式函证作为唯一的实质性程序；"
+            },
+            {
+              "row": 58,
+              "seq_no": 50,
+              "item_id": "A17-5-5-050",
+              "seq_label": "3",
+              "content_preview": "其他问题。"
+            },
+            {
+              "row": 59,
+              "seq_no": 51,
+              "item_id": "A17-5-5-051",
+              "seq_label": "（七）",
+              "content_preview": "对管理层不允许寄发询证函的处理"
+            },
+            {
+              "row": 60,
+              "seq_no": 52,
+              "item_id": "A17-5-5-052",
+              "seq_label": "1",
+              "content_preview": "是否存在管理层不允许寄发询证函的情况；"
+            },
+            {
+              "row": 61,
+              "seq_no": 53,
+              "item_id": "A17-5-5-053",
+              "seq_label": "2",
+              "content_preview": "若存在管理层不允许寄发函证的情况，审计人员是否采取了合理的处理措施。"
+            },
+            {
+              "row": 62,
+              "seq_no": 54,
+              "item_id": "A17-5-5-054",
+              "seq_label": "3",
+              "content_preview": "其他问题。"
+            },
+            {
+              "row": 63,
+              "seq_no": 55,
+              "item_id": "A17-5-5-055",
+              "seq_label": "（八）",
+              "content_preview": "其他违反审计准则的行为"
+            },
+            {
+              "row": 64,
+              "seq_no": 56,
+              "item_id": "A17-5-5-056",
+              "seq_label": "1",
+              "content_preview": "函证底稿记录存在瑕疵、错误，例如日期、金额填错，部分内容漏填等；"
+            },
+            {
+              "row": 65,
+              "seq_no": 57,
+              "item_id": "A17-5-5-057",
+              "seq_label": "2",
+              "content_preview": "函证底稿未根据审计人员了解的最新情况进行更新；"
+            },
+            {
+              "row": 66,
+              "seq_no": 58,
+              "item_id": "A17-5-5-058",
+              "seq_label": "3",
+              "content_preview": "科目列报存在错误，审计未进行重分类调整；"
+            },
+            {
+              "row": 67,
+              "seq_no": 59,
+              "item_id": "A17-5-5-059",
+              "seq_label": "4",
+              "content_preview": "未记录审计程序的执行情况，底稿未留存相关资料；"
+            },
+            {
+              "row": 68,
+              "seq_no": 60,
+              "item_id": "A17-5-5-060",
+              "seq_label": "5",
+              "content_preview": "其他问题。"
+            }
+          ]
+        },
+        "merged_ranges_count": 64,
+        "notes": "两节结构：审计目标（无结论列，纯说明）+ 核对程序（结论[是/否/不适用]+工作底稿索引号(填)+预置参考索引+备注）。parser 须区分两节类型。"
+      },
+      {
+        "name": "GT_Custom",
+        "component_type": "skip"
+      }
+    ],
+    "parser_ready": true,
+    "procedure_item_count": 60,
+    "notes": "A17-5-x 审计工作完成核对表；核对程序 60 条；item_id 模式 A17-5-5-{seq:03d}（对齐 persistence.md A17-5-{x}-{seq}）。"
+  }
+]

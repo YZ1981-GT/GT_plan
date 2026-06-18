@@ -78,6 +78,15 @@ _WP_CODE_OVERRIDE: dict[str, str] = {
     "A1-14": "analytical-review",     # 分析性复核（合并） → 分析性复核专用组件
     "A1-15": "checklist-table",       # 核对表（CAS列报及披露） → 核对表专用组件
     "A1-16": "checklist-table",       # 核对表（法规合规） → 核对表专用组件
+    "A14-1": "checklist-table",       # 内部控制缺陷汇总表（xlsx 动态行 grid）→ 核对表专用组件
+    "A15-1": "checklist-table",       # 持续经营调查表（xlsx 分章节问卷）→ 核对表专用组件
+    "A11-2": "checklist-table",       # 期后事项调查问卷（A11 bundle sheet）→ 核对表专用组件
+    "A11-3": "checklist-table",       # 期后内控事项调查问卷（A11 bundle sheet）→ 核对表专用组件
+    "A17-5-1": "checklist-table",     # 审计工作完成核对表（财报审计，xlsx）→ 核对表专用组件
+    "A17-5-2": "checklist-table",     # 审计工作完成核对表（内控审计，xlsx）→ 核对表专用组件
+    "A17-5-3": "checklist-table",     # 审计工作完成核对表（IPO 业务特别程序，xlsx）→ 核对表专用组件
+    "A17-5-4": "checklist-table",     # 审计工作完成核对表（新三板挂牌特别程序，xlsx）→ 核对表专用组件
+    "A17-5-5": "checklist-table",     # 审计工作完成核对表（函证程序，xlsx）→ 核对表专用组件
 }
 
 # D 类子路由映射（基于 class_code 具体值）

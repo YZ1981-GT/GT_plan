@@ -50,7 +50,7 @@ A17-1（11 章节）与 A18-2（4 议题）共性：
 
 **数据模型**：`checklist_responses` 表 — 章节 item_id 见 [persistence.md](../completion-phase-infra/persistence.md)。
 
-章节定义外置：`backend/data/a17_chapter_definitions.json`（id/标题/提示/数据来源/是否必填）
+章节定义外置：`backend/data/a17_chapter_definitions.json`（**16 章**实物目录，见 requirements §4；id/标题/提示/数据来源/是否必填）。item_id `A17-1-ch01`~`A17-1-ch16`。
 
 ### GtKamWorkpaper.vue（A17-2-1，A17-plus）
 
@@ -81,6 +81,9 @@ A17-1（11 章节）与 A18-2（4 议题）共性：
 - 列映射权威：`a17_xlsx_audit.json`（**PRE-4-0 / X-A17**）
 - 实现：infra [PRE-4-1~2](../completion-phase-infra/tasks.md)
 - 输出：与 `GtChecklistTable` 兼容的 `{ sections, toc, stats }`
+- **实物结构（A17-5-1，206 行单 sheet + GT_Custom）**：两大节——「一、审计目标」（6 条声明，无核对结果列，纯阅读/确认）+「二、核对程序」（多条，列含 `核对结果[是/否/不适用]` + `工作底稿索引号`（用户填）+ `底稿索引号参考`（模板预置如 B1/B5/B60/B10/B40）+ `备注`）。parser 须区分「目标节(无 conclusion 列)」与「核对程序节(有 conclusion + 双索引列)」，`底稿索引号参考` 渲染为 GtIndexChip 可点。
+- **⚠️ ref_index 现状**：程序表 A17 seq2 `ref_index="A17-5"`（不带版本号），但实物有 A17-5-1~5-5 五个版本。lite task 4 须明确：`A17-5` 这一 chip 如何按 `business_category` 解析到具体版本（5-1 默认必做 / 5-2 整合 / 5-3 IPO / 5-4 新三板 / 5-5 函证）。建议 seq2 拆为「A17-5-1（必做）」固定 chip + 其余版本按适用性展开，或在 chip 点击时弹版本选择。**不要让 `A17-5` 裸 ref 直接路由**（无对应物理文件/override）。
+  > 注：上条 ref 现状基于扩充前 JSON（旧 seq2）；按 requirements §1 实物 5 步扩充后，A17-5 不再出现在程序表 chip，改由底稿目录打开 → 此 ref 解析问题随之消除。
 
 ### issue_tickets 取数映射（P1 舞弊/违规章节）
 

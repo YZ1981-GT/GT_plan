@@ -7,6 +7,8 @@
 
 ## Tab 容器 `GtMisstatementWorkpaper.vue`
 
+实物单文件 **8 sheet**（audit JSON：`底稿目录 / A13错报程序表 / A13-1 未更正错报汇总表 / A13-2 / A13-3 / A13-4 / GT_Custom / A13-5`）。**底稿目录 + GT_Custom 不进 Tab**（GT_Custom 实物夹在 A13-4 与 A13-5 之间，注意按 sheet 名而非物理顺序映射）：
+
 ```typescript
 tabs: [
   { id: 'program', label: '程序表', component: 'GtAProgramConsole', props: { embedded: true } },
@@ -16,6 +18,7 @@ tabs: [
   { id: 'A13-4', label: '错误与舞弊', component: 'd-form-table' },
   { id: 'A13-5', label: '沟通记录', component: 'd-form-table' },
 ]
+// 底稿目录 / GT_Custom 不注册为业务 Tab
 ```
 
 `_WP_CODE_OVERRIDE["A13"] = "misstatement-workpaper"`

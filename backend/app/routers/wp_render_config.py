@@ -1272,10 +1272,21 @@ async def get_render_config(
         # A1-15/A1-16 大型 docx 核对表：template 从全局 mtime 缓存取（静态，
         # 不存每个 wp 实例），responses 从 checklist_responses 表按 wp_id 取。
         if component_type == "checklist-table":
-            from app.services.checklist_docx_parser import get_checklist_template
+            # A17-5-x 等 xlsx 核对表走 checklist_xlsx_parser；A1-15/A1-16 docx 走
+            # checklist_docx_parser。按 audit JSON 是否登记该 wp_code 决定（xlsx 优先）。
+            from app.services import checklist_xlsx_parser
+            from app.services.checklist_docx_parser import (
+                get_checklist_template as get_docx_template,
+            )
 
+            template_data = None
             try:
-                template_data = await get_checklist_template(wp_code)
+                if checklist_xlsx_parser._get_audit_entry(wp_code) is not None:
+                    template_data = await checklist_xlsx_parser.get_checklist_template(
+                        wp_code
+                    )
+                else:
+                    template_data = await get_docx_template(wp_code)
             except FileNotFoundError:
                 logger.warning("核对表模板文件未找到: wp_code=%s", wp_code)
                 template_data = None
@@ -1437,9 +1448,9 @@ async def get_render_config(
             fill_results = {}
 
     # ─── Step 8: 编制说明 guidance（静态 JSON，按 wp_code 查找）────────────
-    from app.services.wp_guidance_service import get_guidance_for_wp
+    from app.services.wp_guidance_service import get_wp_guidance
 
-    guidance_data = get_guidance_for_wp(wp_code)
+    guidance_data = get_wp_guidance(wp_code)
 
     return {
         "wp_id": str(wp_id),

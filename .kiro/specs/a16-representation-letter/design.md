@@ -90,6 +90,12 @@ async def recommend_main_version(db, project_id) -> dict:
 
 ### WorkpaperWordEditor.vue（须改造）
 
+> ⚠️ **文件路径歧义**：仓库存在两个同名文件 —
+> - `components/workpaper/WorkpaperWordEditor.vue` ← **改造目标**（`htmlRendererRegistry` 的 `word-template` 指向此文件）
+> - `views/WorkpaperWordEditor.vue`（Univer/TipTap 独立编辑视图，**非**本 spec 目标）
+>
+> 实施时只改 `components/workpaper/` 版本，勿误改 views 版。
+
 **布局**：
 
 ```

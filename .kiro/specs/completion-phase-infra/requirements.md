@@ -31,9 +31,11 @@ E2E 见 [e2e-matrix.md](./e2e-matrix.md)。
 
 ### 要求
 
-1. **精确匹配**：`wp_code` 查 `_index.json` 与子目录
-2. **前缀 fallback**：精确失败时，按 `wp_templates/A/` 下文件名前缀 `{wp_code}` 匹配（含无空格变体）
-3. **占位符预填**：client_name、audit_year、合伙人等（现有 `wp_template_download.py` 能力）
+1. **精确匹配**：`wp_code` 查 `_index.json` 与子目录 ✅（代码已有）
+2. **前缀 fallback**：精确失败时，按 `wp_templates/A/` 下文件名前缀 `{wp_code}` 匹配（含无空格变体）✅（`_match_filename_prefix`/`_find_docx_by_index_or_disk` 已落地；子码 docx 禁回退父 xlsx）
+3. **占位符预填（现状以代码为准）**：
+   - 已实现：client_name（××公司/ABC公司/XX公司）、audit_year（202X）、上年度（201X）
+   - **未实现**：合伙人 / 签字注册会计师 — 现有代码 `XX、XX` **保留不替换**（手动填写）。若要预填须新增取数（`staff_members.name` JOIN `project_assignments.staff_id`，见 #conventions），属 PRE-1 增量任务，**不要默认它已具备**
 
 ### 验收（smoke 五件套，PRE-1 标绿须全部通过）
 
@@ -137,6 +139,14 @@ GET /api/projects/{pid}/working-papers/{wp_id}/export-word/check-incomplete
 
 **禁止**无 sign_status / 无保存即显示 completed badge。
 
+### checkCompletion 扩展约定（防多 spec 并行覆盖）
+
+`GtAProgramConsole.vue` 的 `checkCompletion(wpCode, responses)` 是**单点 switch**，现有 case：`A1-17 / A1-12 / A1-11 / A1-18`，`default` 返回 `'none'`（符合「lite 不伪绿」）。a16 #9、a17 core、a18 core 三个 spec 都要改**同一函数**，存在并行 PR 互相覆盖风险。约定：
+
+1. 各 spec **只新增 case，不改 default、不动他 spec 的 case**；case 段顶部注释标注归属 spec（如 `// A16 — a16-representation-letter`）。
+2. A16 的 sign_status 判定数据源是 `field_overrides`（非 `checklist_responses`），与现有基于 responses 的 case 不同源 → A16 case 须单独取数，**不要塞进** `loadPopupCompletionStatus` 的 responses 循环。
+3. 若 case 超过 ~8 个，重构为「按 component_type 分发的判定注册表」（infra 统一发起，不在消费 spec 内擅自重构）。
+
 ---
 
 ## issue_tickets 取数映射（舞弊/违规）
@@ -149,6 +159,11 @@ GET /api/projects/{pid}/working-papers/{wp_id}/export-word/check-incomplete
 | 重大违法 | `severity IN ('blocker','major')` AND (`reason_code='legal_compliance'` OR 标题关键词) |
 
 **禁止** `WHERE category='fraud'`。
+
+**召回率约定（实施前必确认）**：`IssueTicket` 真实 schema = `category String(64)`（自由文本，非枚举，注释 `data_mismatch/evidence_missing/...`）、`severity` 枚举 `blocker/major/minor/suggestion`、`reason_code String(64)` 可空。映射策略依赖 `reason_code='fraud'/'legal_compliance'`，但**当前无任何写入端确证会写这两个 reason_code**。INFRA-1 实施第一步须 grep 写入端：
+
+- 若有写入端写 `reason_code` → 按上表 OR 策略；
+- 若无 → 策略退化为**纯标题关键词启发式**，必须在 API 响应与 guidance UI 标注「召回不完备，仅供提示」，且 P1 **不**作为判定依据。
 
 P1 仅返回 **计数 + 标题列表** 供 guidance 提示；**不自动写入** Word/HTML 正文（A17 拉取、A18 issue_hints、A7–A15 plus 均遵守）。
 
@@ -176,10 +191,15 @@ P1 仅返回 **计数 + 标题列表** 供 guidance 提示；**不自动写入**
 
 | 能力 | 目标 | 代码现状 |
 |------|------|----------|
-| PRE-1 fallback | smoke 五件套 | ⚠️ 代码已有；E2E 未标绿 |
-| PRE-2 filler | export-word | ❌ 未建 |
-| PRE-3 弹窗配置 | 三处同步 | ⚠️ 部分 wp 已配置；ref_index 多处待补 |
-| PRE-4 xlsx parser | A17-5-1 首版 | ❌ 未建；**缺 a17_xlsx_audit** |
-| export-word 端点 | 统一路由 | ❌ 未建 |
-| checkCompletion A16 | sign_status | ❌ case 未加 |
-| issue_tickets 映射 | 无 fraud 枚举 | ⚠️ 文档已定；API 未建 |
+| PRE-1 fallback（代码） | 子码 + 前缀匹配 | ✅ 已落地（`_match_filename_prefix`） |
+| PRE-1 E2E | smoke 五件套 | ⚠️ 未标绿（依赖 FIX 夹具） |
+| PRE-1 合伙人预填 | 签字会计师占位符 | ❌ 现状保留不替换（可选） |
+| PRE-2 filler | export-word 颜色语义引擎 | ✅ `docx_template_filler.py` 已建（红替换转黑/蓝删/注释表删） |
+| PRE-3 弹窗配置 | 三处同步 | ✅ `wpPopupDocxConfigs.ts` 已配置 |
+| PRE-4 xlsx parser | A17-5-1~5 + A15-1 + A14-1 + A11-2/3 | ✅ `checklist_xlsx_parser.py`（4 阶段全完） |
+| export-word 端点 | 统一路由 + check-incomplete | ✅ 骨架已建（dispatch→501，各 spec 注册 handler 后激活） |
+| INFRA-1 issue_hints | 舞弊/违规计数 | ✅ 纯标题关键词启发式（`heuristic_only=True`） |
+| INFRA-2 摘要 API | workpaper-summaries/{key} | ✅ 5 key 注册（P1 全部 ready=False） |
+| INFRA-3 CI drift | `--diff-only` 门禁 | ✅ CI job `audit-xlsx-drift` 已加 |
+| checkCompletion A16 | sign_status（field_overrides） | ❌ case 未加（待 a16 spec 实施） |
+| E2E FIX-A 夹具 | A 类种子项目 | ❌ 可用性未确认（data-blocked） |

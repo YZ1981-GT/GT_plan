@@ -177,7 +177,7 @@ A16-1~6 **互斥**；A16-7 **可选叠加**，UI 与签回状态均与主版本*
 |------|------|----------|------|
 | A16 程序表 | 4 步 + chip 折叠 | ⚠️ ref_index、completion | lite |
 | wpPopupDocxConfigs | 7 项配置 | ✅ | lite E2E **E8** |
-| WorkpaperWordEditor | 主/补分离 + 按版本签回 | ⚠️ 骨架；A16-7 混 radio | core |
+| WorkpaperWordEditor | 主/补分离 + 按版本签回 | ⚠️ 骨架（`components/workpaper/` 版，非 views/）；A16-7 混 radio | core |
 | checkCompletion A16 | sign_status case | ❌ | lite |
 | a16_version_service | 版本推荐 | ❌ 桩 | lite |
 | 虚拟子码重定向 | A16-x → A16?version= | ❌ | core |

@@ -81,7 +81,7 @@ A14-1 remark JSON（P1 schema，前后端校验）：
 
 | wp_code | item_id | remark |
 |---------|---------|--------|
-| A17-1 | `A17-1-ch01` … `A17-1-ch11` | 章节正文；conclusion=done/pending/na |
+| A17-1 | `A17-1-ch01` … `A17-1-ch16`（16 章实物目录，见 a17 requirements §4） | 章节正文；conclusion=done/pending/na |
 | A17-2-1 KAM | `A17-2-1-KAM-001` … | remark=KAM JSON（见 A17 design） |
 | A18-2 议题 | `A18-2-001` … `A18-2-004` | 议题描述 |
 | A18-2 表头 | `A18-2-header` | JSON：regulator、sub_choice_3 等 |

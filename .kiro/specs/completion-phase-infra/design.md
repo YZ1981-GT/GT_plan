@@ -77,11 +77,11 @@ export-word (PRE-2) ◄── a17_word_exporter / regulatory_letter_service / (o
 
 | 产出 JSON | 范围 | 状态 | 脚本 |
 |-----------|------|------|------|
-| `a7_a15_xlsx_audit.json` | A7–A15（26 文件） | ✅ | `audit_a7_a15_xlsx.py` |
+| `a7_a15_xlsx_audit.json` | A7–A15（26 文件） | ✅（⚠️ A7/A8 `procedure_table_diff` 为程序表扩充前旧快照，须 `--diff-only` 重跑） | `audit_a7_a15_xlsx.py` |
 | `a17_xlsx_audit.json` | A17 程序表 + A17-5-1~5（6 xlsx） | ❌ 待 X-A17 | 待建或扩展现有脚本 |
 | docx 占位 | A16-1/2 等 | 部分 | `docx_placeholder_registry.json` |
 
-CI（INFRA-3）：`audit_a7_a15_xlsx.py --diff-only`；A17 audit 就绪后纳入同门禁。
+CI（INFRA-3）：`audit_a7_a15_xlsx.py --diff-only`（顺带重验 A7/A8）；A17 audit 就绪后纳入同门禁。✅ CI job `audit-xlsx-drift` 已建（`continue-on-error` 建议观察期后转 hard fail）。
 
 ---
 
@@ -98,6 +98,25 @@ CI（INFRA-3）：`audit_a7_a15_xlsx.py --diff-only`；A17 audit 就绪后纳入
 }
 ```
 
-`ready: false` 时：`{ "ready": false, "reason": "A13 Tab 未落地" }` → 前端 toast，HTTP 200 或 409（实现时二选一，**全 spec 统一**）。
+`ready: false` 时：`{ "ready": false, "reason": "A13 Tab 未落地" }` → 前端 toast，HTTP 200（**实施决策：统一用 200，非 409**）。
 
 key 列表见 [linkage.md §摘要 API](./linkage.md#摘要-api-契约plus待实现)。
+
+---
+
+## 前端消费约定（INFRA-1 / INFRA-2）
+
+### issue-hints
+
+- A17-1 ch15 编辑页 `onMounted` 拉取 `GET /api/projects/{pid}/issue-hints`
+- A18-2 议题 1/2 初始化时同样拉取
+- `count > 0` 时显示 `GtGuidanceBanner`（amber 色 + "仅供提示，召回不完备"措辞）
+- **不自动写入正文**；用户点"引用"按钮才追加到对应章节/议题 remark
+- `heuristic_only=true` 时 banner 必须含"仅关键词匹配"提示
+
+### workpaper-summaries
+
+- 消费方 `onMounted` 拉取 `GET /api/projects/{pid}/workpaper-summaries/{key}`
+- `ready=false` → `ElMessage.info(reason)` 一次性 toast，不阻断编辑
+- `ready=true` → 按 `summary` 结构渲染（各 key 的 summary schema 待各 spec 定义）
+- 前端缓存策略：session 级缓存（同一编辑会话不重复拉取，保存/刷新后清缓存重拉）

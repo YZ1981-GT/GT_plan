@@ -36,7 +36,7 @@
 - [x] **X-A15** A15 持续经营程序表.xlsx
 - [x] **X-A15-1** A15-1 持续经营调查表.xlsx
 
-**audit DoD**：26/26 写入 audit JSON ✅；requirements 底稿清单已更新；procedure_table JSON diff 全部对齐（A8 ●/5.x 已处理）。
+**audit DoD**：26/26 写入 audit JSON ✅；requirements 底稿清单已更新；procedure_table JSON diff **A9–A15 对齐**；⚠️ **A7/A8 diff 为扩充前旧快照，须重跑**（见 lite 任务 2）。
 
 ---
 
@@ -49,7 +49,7 @@
 ## lite：程序表 HTML + docx 弹窗（16 任务）
 
 - [ ] 1. 确认 A7–A15 打开为 `GtAProgramConsole` HTML
-- [x] 2. procedure_table JSON vs xlsx diff（**A8–A15 ✅** 全部对齐）
+- [x] 2. procedure_table JSON vs xlsx diff（**A9–A15 ✅** 对齐）。⚠️ **A7/A8 需重跑 diff**：`a7_a15_xlsx_audit.json` 的 `procedure_table_diff` 是 A7/A8 程序表扩充（2026-06-17，A7→7步/A8→10步）**之前**的旧快照——旧 diff 显示 A7 `missing_in_json:[2.2.1~2.2.4,4.4.1~4.4.3]`+`ref_index_mismatch(seq2 A7-1)`、A8 `json23 vs xlsx20`。扩充后须重跑 `audit_a7_a15_xlsx.py --diff-only` 确认 A7/A8 已对齐再标绿
 - [ ] 3. ref_index：A9/A10/A11/A12 补全；A11 增加 **A11-2**
 - [ ] 4. A8/A7/A14/A15 ref_index 验证
 - [ ] 5. **A14** 程序表 `applicable_categories` A/B 验证（chip 灰显，**不等到 plus**）

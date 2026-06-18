@@ -41,6 +41,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.wp_index_resolve import router as wp_index_resolve
     from app.routers.wp_trace import router as wp_trace
     from app.routers.wp_disclosure_sync import router as wp_disclosure_sync
+    from app.routers.wp_export_word import router as wp_export_word
     from app.routers.formula import router as formula
     from app.routers.wp_mapping import router as wp_mapping
     from app.routers.wp_data_rules import router as wp_data_rules
@@ -95,14 +96,16 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.wp_report_analysis import router as wp_report_analysis
     from app.routers.wp_misstatement import router as wp_misstatement
     from app.routers.checklist_responses import router as checklist_responses
+    from app.routers.issue_hints import router as issue_hints
+    from app.routers.workpaper_summaries import router as workpaper_summaries
 
     groups = {
         # ── 6 大聚合组（design §7.1）──
         "模板管理": [wp_template, wp_template_metadata, wp_template_files, wp_template_download, wp_template_version, wp_template_list],
         "生命周期": [working_paper, workpaper_batch_status, wp_batch_ops, wp_progress, wp_prerequisite_status, wp_procedure_status, wp_procedure_categories],
         "复核": [wp_review, wp_review_status, wp_cell_annotations, review_records_global, wp_eqcr_evaluation, review_workflow_router, signing_router, my_signing_router],
-        "渲染": [wp_render_config, wp_classification, wp_html_save, wp_xlsx_export, wp_index_resolve, wp_trace, wp_disclosure_sync],
-        "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, aging_analysis, data_fetch_custom, cf_verification, wp_procedure_tables, wp_field_overrides, wp_report_analysis, wp_misstatement, checklist_responses],
+        "渲染": [wp_render_config, wp_classification, wp_html_save, wp_xlsx_export, wp_index_resolve, wp_trace, wp_disclosure_sync, wp_export_word],
+        "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, aging_analysis, data_fetch_custom, cf_verification, wp_procedure_tables, wp_field_overrides, wp_report_analysis, wp_misstatement, checklist_responses, issue_hints, workpaper_summaries],
         "搜索": [wp_search, wp_version_search, global_search, wp_health_dashboard],
         # ── 辅助组 ──
         "程序管理": [wp_procedures, wp_procedure_trim, wp_step_mapping, wp_evidence],

@@ -17,12 +17,12 @@
 | A16 跳转页 alert | A13 未更正错报 | ⚠️ | 已有 `misstatements/for-letter` | A16-core |
 | A16-7 推荐 | A7 关联交易计数 | ⚠️ | auto_data | A16-lite |
 | A16 plus | A8-1 整合提示 | ⚠️ | relatedLinks 手动 | optional |
-| A17-1 ch07 舞弊 | A13-4 + A14-1 + issue_tickets | ❌ | 拉取按钮 | A7–A15 core + infra issue API |
-| A17-1 ch09 持续经营 | A15-1 调查结论 | ⚠️ | 拉取 | A7–A15 core A15-1 |
-| A17-1 ch10 沟通 | A10-1/A10-2 | ⚠️ | 拉取 stub | A7–A15 lite/core |
-| A17-1 ch08 KAM | A17-2-1 | ❌ | 引用 | A17-plus |
+| A17-1 ch15 舞弊/特殊考虑 | A13-4 + A14-1 + issue_tickets | ⚠️ | 拉取按钮 | A7–A15 core + infra issue API |
+| A17-1 ch10 持续经营 | A15-1 调查结论 | ⚠️ | 拉取 | A7–A15 core A15-1 |
+| A17-1 ch13 其他信息 | A8-2 / A10-1 沟通 | ⚠️ | 拉取 stub | A7–A15 lite/core |
+| A17-1 ch12 KAM | A17-2-1 | ❌ | 引用 | A17-plus |
 | A17-1 其他章 | B 系列底稿 | ❌ | 摘要 API | 循环底稿未就绪 |
-| A18-2 议题 1/2 | A13/A14 + issue_hints | ⚠️ | 手动 chip + P1 计数 | A18-P1 |
+| A18-2 议题 1/2 | A13/A14 + issue_hints | ⚠️ | 手动 chip + P1 计数（INFRA-1 已建） | A18-P1 |
 | A18-2 议题 3 | A8 程序表 seq3/4/5 status | ⚠️ | radio 建议值 | A18-P1 + A7–A15 lite |
 | A18-1 P2 审计小结 | A17-1 章节 + 审计意见 | ❌ | 生成框架 | **blocked A17-core** |
 | A9 弹窗 guidance | A14-1 缺陷计数/等级 | ❌ | 弹窗提示 | A7–A15 core + plus |
