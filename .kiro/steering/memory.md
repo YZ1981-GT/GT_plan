@@ -104,7 +104,7 @@ inclusion: always
 - 治理裁定：公式求值单内核(formula_engine)、审计只写哈希链、向量存储选 pgvector；详细 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`
 
 ### git 状态（2026-06-17）
-- 分支 `work/2026-05-30-wp-specs`，最高迁移 **V085**；HEAD `e0c55f87`（completion-infra INFRA-1/2/3+PRE-2-E2E实施+spec复盘改进，2026-06-18 push）
+- 分支 `work/2026-05-30-wp-specs`，最高迁移 **V085**；HEAD `3b316c68`（A17+A18 spec 全量实施+复盘修复，2026-06-18 push）
 - **新增 spec（远程拉取）**：a13-misstatement-workpaper / a14-control-deficiency / a16-representation-letter / a7-a15-completion-workpapers / completion-phase-infra + procedure_table_templates 大幅扩充(+1667行) + a7_a15_xlsx_audit.json(9814行审计数据) + wpPopupDocxConfigs.ts(抽取350行配置) + 前端测试4个
 - **🟢 git stash drop 丢失修改已全部恢复+联动实测（2026-06-14）**：commit `9cb22ffe`(4文件UI改进) + `0152b4f3`(路由补回)。根因=`a9ae81db`(114文件)创建了 ConfirmationIndex/ArchiveIndex/WeeklyTimesheet 组件但**从未注册 `/confirmation`+`/archive` 顶层路由**(侧边栏点击 404) + ConfirmationHub/WorkHoursPage/AttachmentHub/main.ts 后续工作区修改被 stash drop 丢。Playwright 实测三模块及底稿联动全正常：工时双视图✓/函证项目内页"关联底稿"列✓/归档向导完整性自检拉全部底稿状态(未签字185+过期114)✓。**铁律：做完一批修改立即 commit；新建顶层页面必同步注册路由+验证侧边栏可达**
 - **🟢 archive-readiness 端点 404 已修（2026-06-14, commit `0d73f595`）**：前端 `archiveApi.getArchiveReadiness` 误调 `/api/qc/archive-readiness?project_id=`(后端不存在)，真实端点是项目作用域 `/api/projects/{pid}/qc-dashboard/archive-readiness`(qc_dashboard.py 已注册)。改用 `qcDashboard.archiveReadiness(pid)`，Playwright 实测 200 OK。`qcArchiveReadiness.check` 路径常量已成死代码(保留 re-export 不动)
@@ -117,6 +117,10 @@ inclusion: always
 ### 真正待办（2026-06-17）
 - **active spec=5**：①audit-report-template-integration 185/190 ②editing-lock-v1-v2-consolidation 32/40 ③cash-flow-support-workpaper 8/9(剩E2E) ④analytical-review-workpaper 7/10 ⑤workpaper-inline-popup 5/9
 - **🟢 a18-regulatory-communication 14/14 全部完成（2026-06-18）**：P0(8)+P1(4)+P2(2)。新建文件：`GtRegulatoryLetter.vue`(结构化表单)+`a18_topic_definitions.json`(4议题定义)+`regulatory_letter_service.py`(导出编排+完整性检查+issue_hints)+`a18_summary_generator.py`(A17-1→小结生成)+`a18_regulatory.py`(路由suggestions+generate-summary)+`a18-regulatory.spec.ts`(E2E E13+E14)。注册：`_WP_CODE_OVERRIDE`加 A18-2→regulatory-letter；`htmlRendererRegistry`加 regulatory-letter；`EXPORT_DISPATCH`加 A18-2；程序表3步+applicable_categories["A","B"]已就位；router_registry 已注册
+- **🟡 下一步：A7~A16 子底稿逐一补全**（用户确认方向，待建 spec）
+- **🟡 待建 spec `a21-a25-review-workpapers`**（2026-06-18 确认方向）：配置驱动=business_category(A/B/C)+audit_type(财报/内控/联合)自动选模板+动态 NA 标记。5角色×(财报+内控+大型国企)=10+子底稿；P0=模板解析+GtReviewChecklist 重写+checklist_responses 保存；P1=多角色配置驱动+复核记录+签字联动；P2=自动预填建议+Word导出。替换现有 ReviewChecklistPanel.vue 壳
+- **🟢 spec `a21-a25-review-workpapers` 三件套已建（2026-06-18）**：P0(6)+P1(5)+P2(3)=14 任务。核心设计=纯 JSON 配置驱动零代码分支；project business_category+audit_type+is_large_soe 三轴决定子底稿+auto_na；复用 checklist_responses+review_records 已有表
+- **🔴 a21-a25 spec 现状确认（2026-06-18 DB 实查）**：①`projects` 表无 `audit_type`/`is_large_soe` 列→需 V086 迁移 ②`review_records` 实为复核批注表(cell_reference/comment/reply)非签字表→签字改用 checklist_responses `{wp_code}-sign` item ③wp_index 中 A21-1/A21-2 等子底稿已存在（每角色 parent+2子=4条），classification fallback A21-1→A21 命中 override
 - **🟢 a17-summary-workpaper 25/25 全部完成（2026-06-18）**：audit-xlsx(6)+lite(4)+core(6)+plus(7)+E2E(2)。新建文件：`a17_chapter_definitions.json`(16章)+`GtA17Summary.vue`(章节编辑器)+`GtKamWorkpaper.vue`(KAM结构化)+`a17_summary_service.py`(拉取)+`a17_word_exporter.py`(A17-1+A17-2-1导出)+`a17_llm_service.py`(LLM+RAG)+`a17_kam_push_service.py`(KAM→报告push)+`a17_5_version_selector.py`(版本选择)+`kam.ts`(TS schema)+prompts 4文件+E2E 2文件。注册：`_WP_CODE_OVERRIDE`加 A17-1/A17-2-1/A17-5-1~5-5；`htmlRendererRegistry`加 a17-summary/kam-workpaper；`EXPORT_DISPATCH`加 A17-1/A17-2-1；程序表5步+applicable_categories["A"]已就位
 - **🟢 归档 4 spec（2026-06-17）**：goodwill-impairment-workpaper(9/9)+segment-reporting-workpaper(9/9)+group-tree-architecture(54/54)+checklist-workpaper-full-display(10/11仅剩可选)→`_archive/`
 - **🟢 A循环 7 spec + group-tree-architecture + goodwill/segment/checklist 全部归档**
