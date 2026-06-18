@@ -233,6 +233,8 @@ function setItemRemark(itemId: string, remark: string) {
   }
   debouncedSave()
 }
+
+function applyHint(h: { item_pattern: string; suggested: string; reason: string }) {
   const item = template.value?.items.find(i => i.item_id.endsWith(h.item_pattern))
   if (item && !item.auto_na) {
     setItemConclusion(item.item_id, h.suggested as 'Y' | 'N' | 'NA')

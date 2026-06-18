@@ -1440,9 +1440,9 @@ async def get_render_config(
             fill_results = {}
 
     # ─── Step 8: 编制说明 guidance（静态 JSON，按 wp_code 查找）────────────
-    from app.services.wp_guidance_service import get_guidance_for_wp
+    from app.services.wp_guidance_service import get_wp_guidance
 
-    guidance_data = get_guidance_for_wp(wp_code)
+    guidance_data = get_wp_guidance(wp_code)
 
     return {
         "wp_id": str(wp_id),

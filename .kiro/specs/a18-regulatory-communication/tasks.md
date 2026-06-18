@@ -1,47 +1,61 @@
 # Implementation Plan
 
 > **分期**：P0(lite) → P1(core) → P2(plus)  
-> **计数**：P0 8 + P1 4 + P2 2 = **14 任务**（PRE/PRE-2 仅在 infra 勾选）  
-> **进度（2026-06-18）**：**14/14 ✅**（E2E 需 `RUN_FULL_E2E=1` 跑绿）
+> **计数**：P0 8 + P1 4 + P2 2 = **14 任务**（PRE/PRE-2 仅在 infra 勾选）
 
 ---
 
 ## 前置
 
-> [completion-phase-infra/tasks.md](../completion-phase-infra/tasks.md) — PRE-2/INFRA-1 ✅
+> [completion-phase-infra/tasks.md](../completion-phase-infra/tasks.md)
 
 ---
 
 ## A18-P0 / lite（8 任务）
 
-- [x] 1. 新建 A18 程序表 JSON（2 步 + ref_index A18-1/2）
-- [x] 2. A18-1 弹窗 E2E（**E13** — `e2e/a18-regulatory.spec.ts`；需 `RUN_FULL_E2E=1`）
-- [x] 3. `GtRegulatoryLetter.vue` 骨架
-- [x] 4. 4 议题 + 提示栏（内嵌于组件；`a18_topic_definitions.json` 可选 plus）
-- [x] 5. Y/N + textarea + 议题3 radio
+- [x] 1. 新建 A18 程序表 JSON（2+ 步 + ref_index A18-1/2）
+- [x] 2. A18-1 弹窗 E2E（**E13**；PRE-1/3）
+- [x] 3. `GtRegulatoryLetter.vue` 骨架{
+  "accessToken": "aoaAAAAAGoz3KgfCCQ_OyUAfkXcTHc7TIYIfLUBYDCiAmQy1q8T1rMv9Xw1CorNO6GWa596ihOgUVo1THbZG_9bU4Ckc0:MGYCMQCe7z1+qwF6LBeLzETGYhgnSO79xF9LVUe44ps94OF1ZqsDmJe5QDzE6V1EMcwmhnICMQDNbhPDClbxVq97deR6LiPMF6+xMERUZZh66dAETsIBp5rQachG77Yf5vccHB0+JgA",
+  "refreshToken": "aorAAAAAGqqdZcMdu3UgIlYm4jrDpCHqYFrS1p0Y-wPmOg27W8RqKAJ8QZfogvkiaBHylX_YLwtpq0iy-ZQfSA3rICkc0:MGYCMQCATXPXk9rnIzTgyQSM9yDO28VcE5XlvgPkZxO1disP8Bfbo+vNF9QQmFJFC8Y5MO4CMQDngGJDtFJNzzMJ+ThoYHoIDrixlLDulUN9PgBRiYAIJSLscIqHrAObXMqbosD4+S8",
+  "profileArn": "arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK",
+  "authMethod": "social",
+  "provider": "Google",
+  "email": "ChanofskyS.malarz225@gmail.com",
+  "userId": "d-9067c98495.e4985488-8081-7027-5359-38bbd862e124",
+  "plan": "KIRO PRO+",
+  "credits_used": 0,
+  "credits_limit": 2000,
+  "twofa": "KWQFOMXSLGHL3VZHX6JTLSL6RWTTMXC6",
+  "password": "9algfqn8g05",
+  "extracted_at": "2026-06-18 18:55:28",
+  "credits_checked_at": "2026-06-18 18:55:37",
+  "overage_status": "ENABLED"
+}- [x] 4. 4 议题 + 提示栏（`a18_topic_definitions.json`）
+- [x] 5. Y/N + textarea + 议题3 radio + GtIndexChip
 - [x] 6. debounce 保存（item_id 见 [persistence.md](../completion-phase-infra/persistence.md)）
 - [x] 7. htmlRendererRegistry + `_WP_CODE_OVERRIDE` A18-2
-- [x] 8. 表头自动填充（手动 + header JSON 持久化）
+- [x] 8. 表头自动填充
 
-**DoD**：A18-2 填议题1刷新不丢 ✅；A18-1 弹窗 E13 spec 已写 ✅。
+**DoD**：E13 + A18-2 填议题1刷新不丢。
 
 ---
 
 ## A18-P1 / core（4 任务）
 
-- [x] 9. `regulatory_letter_service.py` 编排（`test_regulatory_letter_service.py` ✅）
-- [x] 10. export-word + check-incomplete 端点（`completion_phase.py` / `wp_export_word` dispatch）
-- [x] 11. 前端导出按钮 + **E14**（`e2e/a18-regulatory.spec.ts`）
-- [x] 12. issue_hints API 就绪（INFRA-1）；A8 step 建议 UI 仍待 A7–A15 消费方落地
+- [x] 9. `regulatory_letter_service.py` 编排（依赖 infra **PRE-2**）
+- [x] 10. export-word + check-incomplete 端点（infra PRE-2-E2E）
+- [x] 11. 前端导出 + 未完成警告（**E14**）
+- [x] 12. issue_hints + A8 step 建议（INFRA-1 + A7–A15 lite A8）
 
-**DoD**：E14 spec 已写 ✅；专用 service 已抽离 ✅。
+**DoD**：E14 通过。
 
 ---
 
 ## A18-P2 / plus（2 任务）
 
-- [x] 13. A18-1 审计小结生成 — `a18_summary_generator` + API + 弹窗 + prefilled-download 注入（**E18**）
-- [x] 14. Playwright regression：E13 + E14 + **E18**（`e2e/a18-regulatory.spec.ts`）
+- [x] 13. A18-1 审计小结生成 — **blocked A17-core**（**E18**）
+- [x] 14. Playwright regression：E13 + E14
 
 > [e2e-matrix.md](../completion-phase-infra/e2e-matrix.md)
 

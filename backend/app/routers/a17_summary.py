@@ -9,6 +9,8 @@ GET  /api/a17/check-completeness → 完整性检查
 
 from uuid import UUID
 
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -157,7 +159,7 @@ async def export_word_endpoint(
         content=file_bytes,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
         },
     )
 

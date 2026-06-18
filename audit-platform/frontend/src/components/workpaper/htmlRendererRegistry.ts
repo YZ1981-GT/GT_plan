@@ -62,8 +62,6 @@ export type HtmlComponentType =
   | 'discontinued-operations'
   | 'misstatement-workpaper'
   | 'a14-3-workbook'
-  | 'a17-summary'
-  | 'regulatory-letter'
   | 'a11-bundle'
   | 'a15-bundle'
 
@@ -114,8 +112,6 @@ const GtContingentLiability = defineAsyncComponent(() => import('./GtContingentL
 const GtDiscontinuedOperations = defineAsyncComponent(() => import('./GtDiscontinuedOperations.vue'))
 const GtMisstatementWorkpaper = defineAsyncComponent(() => import('./GtMisstatementWorkpaper.vue'))
 const GtA14_3Workbook = defineAsyncComponent(() => import('./GtA14_3Workbook.vue'))
-const GtA17Summary = defineAsyncComponent(() => import('./GtA17Summary.vue'))
-const GtRegulatoryLetter = defineAsyncComponent(() => import('./GtRegulatoryLetter.vue'))
 const GtA11Bundle = defineAsyncComponent(() => import('./GtA11Bundle.vue'))
 const GtA15Bundle = defineAsyncComponent(() => import('./GtA15Bundle.vue'))
 
@@ -367,20 +363,6 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: GtA14_3Workbook,
     icon: '🖥️',
     label: 'A14-3 IT缺陷',
-    emits: ['save'],
-  },
-  {
-    componentType: 'a17-summary',
-    component: GtA17Summary,
-    icon: '📋',
-    label: 'A17-1 重大事项概要',
-    emits: ['save'],
-  },
-  {
-    componentType: 'regulatory-letter',
-    component: GtRegulatoryLetter,
-    icon: '📨',
-    label: 'A18-2 监管沟通函',
     emits: ['save'],
   },
   {

@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import uuid as _uuid
 from io import BytesIO
+from urllib.parse import quote
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -250,7 +251,7 @@ async def download_consol_workpaper(
         return StreamingResponse(
             output,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{result.file_name}"},
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(result.file_name)}"},
         )
     except HTTPException:
         raise

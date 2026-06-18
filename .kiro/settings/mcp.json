@@ -57,7 +57,8 @@
         "browser_drag",
         "browser_hover",
         "browser_file_upload",
-        "browser_fill_form"
+        "browser_fill_form",
+        "browser_network_request"
       ]
     }
   }

@@ -12,6 +12,7 @@ Requirements: PRE-2（.kiro/specs/completion-phase-infra/requirements.md）
 from __future__ import annotations
 
 import logging
+from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -76,7 +77,7 @@ async def get_export_word(
         content=file_bytes,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
         },
     )
 

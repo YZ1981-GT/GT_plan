@@ -10,7 +10,7 @@
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test'
 
 const RUN = !!process.env.RUN_FULL_E2E
-const PID = process.env.TEST_PROJECT_ID || ''
+const PID = process.env.TEST_PROJECT_ID || process.env.TEST_PROJECT_ID_FIX_A || ''
 const BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3030'
 
 async function login(page: Page): Promise<string> {
@@ -19,8 +19,10 @@ async function login(page: Page): Promise<string> {
   })
   const body = (await res.json()) as any
   const token = body?.data?.access_token ?? body?.access_token
-  await page.goto(BASE)
-  await page.evaluate((t) => localStorage.setItem('token', t), token)
+  await page.addInitScript((t: string) => {
+    window.localStorage.setItem('token', t)
+    window.sessionStorage.setItem('token', t)
+  }, token)
   return token
 }
 
@@ -34,8 +36,8 @@ async function findWp(
   })
   if (!res.ok()) return null
   const body = (await res.json()) as any
-  const list = body?.data ?? body ?? []
-  const wp = list.find((w: any) => w.wp_code === wpCode)
+  const list = body?.data?.items || body?.items || body?.data || (Array.isArray(body) ? body : [])
+  const wp = list.find((w: any) => (w.wp_code || '').toUpperCase() === wpCode.toUpperCase())
   return wp?.id ?? null
 }
 
