@@ -82,9 +82,12 @@ const props = withDefaults(defineProps<{
   contextProjectId?: string
   /** 为 true 时 click 仅 emit 不自动导航（供弹窗模式使用） */
   preventNavigate?: boolean
+  /** 为 true 时 chip 灰显不可点击（程序步骤不适用时） */
+  disabled?: boolean
 }>(), {
   validate: true,
   preventNavigate: false,
+  disabled: false,
 })
 
 const emit = defineEmits<{
@@ -138,6 +141,7 @@ const displayText = computed(() => {
 })
 
 const chipType = computed<'primary' | 'info' | 'success' | 'warning' | 'danger'>(() => {
+  if (props.disabled) return 'info'
   if (resolveStatus.value === 'exists') return 'primary'  // 默认色（element-plus v2 起 '' 已废弃）
   if (resolveStatus.value === 'not_exists' || resolveStatus.value === 'trimmed') return 'info'
   if (resolveStatus.value === 'error') return 'danger'
@@ -151,6 +155,10 @@ const chipEffect = computed(() => {
 
 const chipClass = computed(() => {
   const classes = ['gt-index-chip']
+  if (props.disabled) {
+    classes.push('gt-index-chip--disabled')
+    return classes
+  }
   if (resolveStatus.value === 'exists' && !isCrossProject.value) {
     classes.push('gt-index-chip--clickable')
   }
@@ -165,6 +173,10 @@ const chipClass = computed(() => {
 
 const tooltipContent = computed(() => {
   if (!parsed.value) return ''
+
+  if (props.disabled) {
+    return '当前步骤不适用，chip 不可点击'
+  }
 
   if (isCrossProject.value) {
     return '跨项目引用，不可跳转'
@@ -252,6 +264,7 @@ async function resolveAndNavigateToWp(wpCode: string, pid: string) {
 
 function handleClick() {
   if (!parsed.value) return
+  if (props.disabled) return
   if (isCrossProject.value) return
   // preventNavigate 模式下跳过存在性检查（弹窗子底稿可能未生成实例）
   if (!props.preventNavigate) {

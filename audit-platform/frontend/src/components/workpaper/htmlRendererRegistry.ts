@@ -53,6 +53,9 @@ export type HtmlComponentType =
   | 'audit-legend'
   | 'checklist-table'
   | 'analytical-review'
+  | 'a17-summary'
+  | 'kam-workpaper'
+  | 'regulatory-letter'
   | 'goodwill-impairment'
   | 'segment-report'
   | 'contingent-liability'
@@ -96,6 +99,9 @@ const GtIndependenceSigning = defineAsyncComponent(() => import('./IndependenceS
 const GtAuditLegend = defineAsyncComponent(() => import('./AuditLegendPanel.vue'))
 const GtChecklistTable = defineAsyncComponent(() => import('./GtChecklistTable.vue'))
 const GtAnalyticalReview = defineAsyncComponent(() => import('./GtAnalyticalReview.vue'))
+const GtA17Summary = defineAsyncComponent(() => import('./GtA17Summary.vue'))
+const GtKamWorkpaper = defineAsyncComponent(() => import('./GtKamWorkpaper.vue'))
+const GtRegulatoryLetter = defineAsyncComponent(() => import('./GtRegulatoryLetter.vue'))
 const GtGoodwillImpairment = defineAsyncComponent(() => import('./GtGoodwillImpairment.vue'))
 const GtSegmentReport = defineAsyncComponent(() => import('./GtSegmentReport.vue'))
 const GtContingentLiability = defineAsyncComponent(() => import('./GtContingentLiability.vue'))
@@ -286,6 +292,27 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: GtAnalyticalReview,
     icon: '📊',
     label: '分析性复核',
+    emits: ['save'],
+  },
+  {
+    componentType: 'a17-summary',
+    component: GtA17Summary,
+    icon: '📋',
+    label: 'A17 重大事项概要',
+    emits: ['save'],
+  },
+  {
+    componentType: 'kam-workpaper',
+    component: GtKamWorkpaper,
+    icon: '🔑',
+    label: 'A17-2-1 关键审计事项',
+    emits: ['save'],
+  },
+  {
+    componentType: 'regulatory-letter',
+    component: GtRegulatoryLetter,
+    icon: '📮',
+    label: 'A18-2 监管沟通函',
     emits: ['save'],
   },
   {

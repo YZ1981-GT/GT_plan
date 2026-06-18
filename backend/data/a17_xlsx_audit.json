@@ -85,7 +85,35 @@
       }
     ],
     "parser_ready": true,
-    "notes": "A17 重大事项概要程序表，5 步：seq1→A17-1 / seq2→A17-3 / seq3→A17-4 / seq4→A17-2 / seq5→A17-6。A17-5 核对表不在程序表内（独立底稿）。"
+    "notes": "A17 重大事项概要程序表，5 步：seq1→A17-1 / seq2→A17-3 / seq3→A17-4 / seq4→A17-2 / seq5→A17-6。A17-5 核对表不在程序表内（独立底稿）。",
+    "procedure_table_diff": {
+      "wp_code": "A17",
+      "json_count": 2,
+      "xlsx_count": 5,
+      "missing_in_json": [
+        "seq3 (A17-4 专业意见分歧)",
+        "seq4 (A17-2 KAM/重大职业判断)",
+        "seq5 (A17-6 项目组总结会)"
+      ],
+      "missing_in_xlsx": [],
+      "ref_index_mismatches": [
+        {
+          "seq": "1",
+          "json_ref": "",
+          "xlsx_ref": "A17-1",
+          "json_content": "确定重大事项",
+          "xlsx_content": "汇总重大职业判断以及需合伙人关注事项"
+        },
+        {
+          "seq": "2",
+          "json_ref": "A17-5",
+          "xlsx_ref": "A17-3",
+          "json_content": "编制完成核对表",
+          "xlsx_content": "对于咨询的重大会计或审计事项咨询，确定咨询报告是否包括在审计工作底稿中"
+        }
+      ],
+      "action_required": "procedure_table_templates.json A17 须从 2 步扩充为 5 步（见 a17-summary-workpaper tasks#1）；旧 seq2 'A17-5' ref 与实物不符，A17-5 核对表不在程序表内。"
+    }
   },
   {
     "wp_code": "A17-5-1",

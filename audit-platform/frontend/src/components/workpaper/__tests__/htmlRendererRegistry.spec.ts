@@ -50,6 +50,13 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'audit-legend',
       'checklist-table',
       'analytical-review',
+      'a17-summary',
+      'kam-workpaper',
+      'regulatory-letter',
+      'goodwill-impairment',
+      'segment-report',
+      'contingent-liability',
+      'discontinued-operations',
     ]
     expect(HTML_RENDERER_REGISTRY.size).toBe(expected.length)
     for (const ct of expected) {

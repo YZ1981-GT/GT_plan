@@ -262,15 +262,16 @@
                 :value="ref"
                 :validate="true"
                 :prevent-navigate="INLINE_POPUP_WP_CODES.has(ref)"
+                :disabled="row.applicable === 'na'"
                 @click="handleIndexChipClick"
               />
               <span
-                v-if="INLINE_POPUP_WP_CODES.has(ref) && popupCompletionStatus[ref] === 'completed'"
+                v-if="row.applicable !== 'na' && INLINE_POPUP_WP_CODES.has(ref) && popupCompletionStatus[ref] === 'completed'"
                 class="popup-badge popup-badge--done"
                 title="已完成"
               >✓</span>
               <span
-                v-else-if="INLINE_POPUP_WP_CODES.has(ref) && popupCompletionStatus[ref] === 'in_progress'"
+                v-else-if="row.applicable !== 'na' && INLINE_POPUP_WP_CODES.has(ref) && popupCompletionStatus[ref] === 'in_progress'"
                 class="popup-badge popup-badge--progress"
                 title="进行中"
               >◐</span>
@@ -517,6 +518,8 @@ interface ProgramRow {
   history?: ProgramHistoryItem[]
   attachment_count?: number
   phase?: string
+  /** 适用性标记：'yes' | 'na'（na=不适用，chip 灰显） */
+  applicable?: string
 }
 
 interface TrimDecision {
@@ -703,6 +706,7 @@ async function fetchProcedureTableData() {
         execution_summary: item.summary || '',
         status: item.applicable === 'na' ? 'not_applicable' : 'pending',
         phase: item.phase || undefined,
+        applicable: item.applicable || 'yes',
       }))
     }
   } catch {

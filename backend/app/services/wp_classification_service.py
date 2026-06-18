@@ -43,6 +43,7 @@ VALID_COMPONENT_TYPES: set[str] = {
     "skip",
     "checklist-table",
     "analytical-review",
+    "a17-summary",
 }
 
 # ─── 9 类 class_code 前缀 → componentType 映射 ──────────────────────────────
@@ -82,11 +83,14 @@ _WP_CODE_OVERRIDE: dict[str, str] = {
     "A15-1": "checklist-table",       # 持续经营调查表（xlsx 分章节问卷）→ 核对表专用组件
     "A11-2": "checklist-table",       # 期后事项调查问卷（A11 bundle sheet）→ 核对表专用组件
     "A11-3": "checklist-table",       # 期后内控事项调查问卷（A11 bundle sheet）→ 核对表专用组件
+    "A17-1": "a17-summary",           # 重大事项概要汇总 → 章节导航式 HTML 组件
+    "A17-2-1": "kam-workpaper",       # 关键审计事项 KAM → 结构化 KAM 表单组件
     "A17-5-1": "checklist-table",     # 审计工作完成核对表（财报审计，xlsx）→ 核对表专用组件
     "A17-5-2": "checklist-table",     # 审计工作完成核对表（内控审计，xlsx）→ 核对表专用组件
     "A17-5-3": "checklist-table",     # 审计工作完成核对表（IPO 业务特别程序，xlsx）→ 核对表专用组件
     "A17-5-4": "checklist-table",     # 审计工作完成核对表（新三板挂牌特别程序，xlsx）→ 核对表专用组件
     "A17-5-5": "checklist-table",     # 审计工作完成核对表（函证程序，xlsx）→ 核对表专用组件
+    "A18-2": "regulatory-letter",     # 与监管层沟通函 → 结构化监管沟通函表单
 }
 
 # D 类子路由映射（基于 class_code 具体值）

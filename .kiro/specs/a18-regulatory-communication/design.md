@@ -20,7 +20,7 @@
 
 见 A17 design §「结构化函件编辑」— 共用 checklist_responses 契约、颜色语义、export-word 端点、提示栏 CSS。
 
-差异：A18-2 有信函表头+签名区+4 固定议题；A17-1 为 11 章节导航无表头。
+差异：A18-2 有信函表头+签名区+4 固定议题；A17-1 为 16 章节导航无表头。
 
 ### componentType: `regulatory-letter`
 
@@ -54,8 +54,9 @@ _WP_CODE_OVERRIDE["A18-2"] = "regulatory-letter"
 "A18": {
   "name": "监管沟通程序表",
   "items": [
-    {"seq": 1, "content": "确定监管沟通事项", "ref_index": null, "applicable_default": "yes", "applicable_categories": ["A", "B"]},
-    {"seq": 2, "content": "编制监管沟通函", "ref_index": "A18-1,A18-2", "applicable_default": "yes", "applicable_categories": ["A", "B"]}
+    {"seq": 1, "content": "确定是否存在需要向监管部门报告的事项", "ref_index": null, "applicable_default": "yes", "applicable_categories": ["A", "B"]},
+    {"seq": 2, "content": "编制审计小结函", "ref_index": "A18-1", "applicable_default": "yes", "applicable_categories": ["A", "B"]},
+    {"seq": 3, "content": "编制与监管层沟通函", "ref_index": "A18-2", "applicable_default": "yes", "applicable_categories": ["A", "B"]}
   ]
 }
 ```

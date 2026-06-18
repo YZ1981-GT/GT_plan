@@ -31,6 +31,40 @@ EXPORT_DISPATCH: dict[str, ExportHandler] = {}
 CHECK_DISPATCH: dict[str, CheckHandler] = {}
 
 
+def _register_a17_handlers() -> None:
+    """延迟注册 A17 导出/检查 handler（避免循环导入）。"""
+    if "A17-1" not in EXPORT_DISPATCH:
+        from app.services.a17_word_exporter import a17_check_incomplete, a17_export_word
+
+        EXPORT_DISPATCH["A17-1"] = a17_export_word
+        CHECK_DISPATCH["A17-1"] = a17_check_incomplete
+
+    if "A17-2-1" not in EXPORT_DISPATCH:
+        from app.services.a17_word_exporter import (
+            a17_kam_check_incomplete,
+            a17_kam_export_word,
+        )
+
+        EXPORT_DISPATCH["A17-2-1"] = a17_kam_export_word
+        CHECK_DISPATCH["A17-2-1"] = a17_kam_check_incomplete
+
+
+def _register_a18_handlers() -> None:
+    """延迟注册 A18-2 导出/检查 handler。"""
+    if "A18-2" not in EXPORT_DISPATCH:
+        from app.services.regulatory_letter_service import (
+            a18_check_incomplete,
+            a18_export_word,
+        )
+
+        EXPORT_DISPATCH["A18-2"] = a18_export_word
+        CHECK_DISPATCH["A18-2"] = a18_check_incomplete
+
+
+_register_a17_handlers()
+_register_a18_handlers()
+
+
 # ─── 辅助：查 wp_code ────────────────────────────────────────────────────────
 
 

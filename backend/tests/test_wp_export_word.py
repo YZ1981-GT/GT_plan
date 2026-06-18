@@ -55,13 +55,13 @@ class TestMatchDispatchKey:
 
 
 class TestDispatchRegistryEmpty:
-    """当前无 spec 编排服务注册。"""
+    """当前 spec 编排服务注册状态。"""
 
-    def test_export_dispatch_empty(self):
-        assert len(EXPORT_DISPATCH) == 0
+    def test_export_dispatch_has_a17(self):
+        assert "A17-1" in EXPORT_DISPATCH
 
-    def test_check_dispatch_empty(self):
-        assert len(CHECK_DISPATCH) == 0
+    def test_check_dispatch_has_a17(self):
+        assert "A17-1" in CHECK_DISPATCH
 
 
 # ─── 集成测试：通过 ASGI transport 测试端点 ──────────────────────────────────

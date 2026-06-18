@@ -1611,17 +1611,91 @@
       "items": [
         {
           "seq": 1,
-          "content": "确定重大事项",
-          "ref_index": "",
+          "content": "汇总重大职业判断以及需合伙人关注事项，详细说明审计程序执行情况。",
+          "ref_index": "A17-1",
           "auto_data_source": null,
-          "applicable_default": "yes"
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A"
+          ]
         },
         {
           "seq": 2,
-          "content": "编制完成核对表",
-          "ref_index": "A17-5",
+          "content": "对于咨询的重大会计或审计事项咨询，确定咨询报告是否包括在审计工作底稿中。",
+          "ref_index": "A17-3",
           "auto_data_source": null,
-          "applicable_default": "yes"
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A"
+          ]
+        },
+        {
+          "seq": 3,
+          "content": "对于项目组的专业意见分歧，确认己经得到解决。并将解决方式、解决过程、解决结论等记录于工作底稿。",
+          "ref_index": "A17-4",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A"
+          ]
+        },
+        {
+          "seq": 4,
+          "content": "确定在审计过程中识别的重大职业判断以及需合伙人关注事项是否包括在重大事项概要汇总表中：\n（1）引起特别风险的事项；\n（2）已更正或未更正的错报；\n（3）值得关注的缺陷和其他控制缺陷；\n（4）重大职业判断；\n（5）业务咨询和意见分歧；\n（6）导致注册会计师难以实施必要审计程序的情形；\n（7）可能导致出具非标准审计报告的事项；\n（8）其他需要关注的事项。",
+          "ref_index": "A17-2",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A"
+          ]
+        },
+        {
+          "seq": 5,
+          "content": "召开项目组总结会并将会议纪要记录于工作底稿。",
+          "ref_index": "A17-6",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A"
+          ]
+        }
+      ]
+    },
+    "A18": {
+      "name": "监管沟通程序表",
+      "items": [
+        {
+          "seq": 1,
+          "content": "确定是否存在需要向监管部门报告的事项，包括：\n（1）审计过程中发现的舞弊线索或重大违法行为；\n（2）年度报告中与已审计财务报表相关的信息是否存在重大不一致；\n（3）其他需要向监管部门沟通的事项。",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A",
+            "B"
+          ]
+        },
+        {
+          "seq": 2,
+          "content": "编制审计小结函（向监管部门报送）。",
+          "ref_index": "A18-1",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A",
+            "B"
+          ]
+        },
+        {
+          "seq": 3,
+          "content": "编制与监管层沟通函，就以下议题逐项记录沟通情况：\n（1）舞弊；\n（2）重大违法行为；\n（3）年报信息（三选一：未发现不一致/不重大未更正/重大已更正）；\n（4）其他事项。",
+          "ref_index": "A18-2",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A",
+            "B"
+          ]
         }
       ]
     }
