@@ -119,6 +119,54 @@ _WP_CODE_OVERRIDE: dict[str, str] = {
     "A14-5": "d-form-table",
     "A7-2": "c-note-table",
     "A14-6": "e-control-test",
+    # ─── B 类 — 承接与计划 ────────────────────────────────────────────────────
+    "B1A": "a-program-console",       # 业务承接程序表
+    "B1B": "a-program-console",       # 业务保持程序表
+    "B1-1": "d-form-table",           # 风险评估表（承接）
+    "B1-2": "d-form-table",           # 风险评估表（保持）
+    "B1-5": "checklist-table",        # KAA检查程序表
+    "B2": "a-program-console",        # 与前任沟通程序表
+    "B2-5": "d-form-table",           # 前任沟通评价表
+    "B3": "checklist-table",          # 独立性确认程序表
+    "B10": "a-program-console",       # 了解被审计单位及环境
+    "B11": "a-program-console",       # 检查相关信息程序表
+    "B12": "a-program-console",       # 与相关人员访谈程序
+    "B13": "a-program-console",       # 初步分析程序表
+    "B15": "a-program-console",       # 重要性计算表（程序表壳）
+    "B18": "a-program-console",       # 了解内部审计程序表
+    "B19": "a-program-console",       # 识别关联方程序表
+    "B22A-1": "d-form-table",         # 企业层面控制-控制环境
+    "B22A-2": "d-form-table",         # 企业层面控制-管理层凌驾
+    "B22A-3": "d-form-table",         # 企业层面控制-风险评估
+    "B22A-4": "d-form-table",         # 企业层面控制-信息与沟通
+    "B22A-5": "d-form-table",         # 企业层面控制-监督
+    "B22B": "d-form-table",           # 企业层面控制-控制矩阵
+    "B22C": "d-form-table",           # 评价设计有效性-企业层面
+    "B23-1": "d-form-table",          # 销售循环业务层面控制
+    "B23-2": "d-form-table",          # 货币资金循环业务层面控制
+    "B23-3": "d-form-table",          # 存货循环业务层面控制
+    "B23-4": "d-form-table",          # 投资循环业务层面控制
+    "B23-5": "d-form-table",          # 固定资产循环业务层面控制
+    "B23-6": "d-form-table",          # 在建工程循环业务层面控制
+    "B23-7": "d-form-table",          # 无形资产循环业务层面控制
+    "B23-8": "d-form-table",          # 研发循环业务层面控制
+    "B23-9": "d-form-table",          # 职工薪酬循环业务层面控制
+    "B23-10": "d-form-table",         # 管理循环业务层面控制
+    "B23-11": "d-form-table",         # 税金循环业务层面控制
+    "B23-12": "d-form-table",         # 债务循环业务层面控制
+    "B23-13": "d-form-table",         # 租赁循环业务层面控制
+    "B23-14": "d-form-table",         # 关联方及交易业务层面控制
+    "B23-15": "d-form-table",         # 了解信息处理控制
+    "B30": "a-program-console",       # 集团审计程序表
+    "B40": "a-program-console",       # 项目组讨论程序表
+    "B50": "a-program-console",       # 汇总风险评估结果程序表
+    "B50-1": "d-form-table",          # 汇总识别的风险因素
+    "B50-2": "d-form-table",          # 财务报表层次风险
+    "B50-3": "d-form-table",          # 认定层次重大错报风险
+    "B50-4": "d-form-table",          # 汇总认定层次特别风险
+    "B51": "d-form-table",            # 舞弊风险因素（三因素分析）
+    "B52": "d-form-table",            # 舞弊-管理层凌驾
+    "B60-1": "audit-sheet",           # 审计项目工时预算与控制表
 }
 
 # D 类子路由映射（基于 class_code 具体值）

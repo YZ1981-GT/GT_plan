@@ -152,6 +152,16 @@ _CRITICAL_A_CODES = [
     "A14-2",    # d-form-table
     "A14-6",    # e-control-test
     "A7-2",     # c-note-table
+    # B 类关键底稿
+    "B1A",      # a-program-console (承接)
+    "B10",      # a-program-console (了解环境)
+    "B1-1",     # d-form-table (风险评估)
+    "B3",       # checklist-table (独立性)
+    "B22A-1",   # d-form-table (企业层面控制)
+    "B23-1",    # d-form-table (业务层面控制)
+    "B50",      # a-program-console (风险汇总)
+    "B51",      # d-form-table (舞弊三因素)
+    "B60-1",    # audit-sheet (工时预算)
 ]
 
 
