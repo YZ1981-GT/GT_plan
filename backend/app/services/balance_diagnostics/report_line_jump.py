@@ -9,7 +9,7 @@ Requirements: 6.1, 6.2, 6.4, 6.5
 
 from __future__ import annotations
 
-from backend.app.services.balance_diagnostics.diagnostics_types import (
+from app.services.balance_diagnostics.diagnostics_types import (
     DiagnosticJumpTarget,
 )
 

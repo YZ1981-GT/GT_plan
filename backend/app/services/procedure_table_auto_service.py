@@ -20,7 +20,6 @@ import logging
 import os
 import time
 from decimal import Decimal
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -28,8 +27,9 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.audit_platform_models import Adjustment, Materiality
+from app.models.audit_platform_models import Materiality
 from app.services.field_override_service import FieldOverrideService
+from app.services.wp_adjustment_helpers import count_adjustments, count_adjustments_with_pending
 
 _logger = logging.getLogger(__name__)
 
@@ -194,41 +194,9 @@ class ProcedureTableService:
             if resolved.get("_error"):
                 result["_error"] = True
         else:
-            # 未注册的 source：尝试旧内置路径（向后兼容，后续删除）
-            try:
-                await self._resolve_legacy_source(result, source, project_id, year)
-            except Exception as e:
-                _logger.error(
-                    "auto_data_source '%s' legacy failed [project=%s year=%s]: %s",
-                    source, project_id, year, e, exc_info=True,
-                )
+            _logger.debug("auto_data_source '%s' 未注册，跳过", source)
 
         return result
-
-    async def _resolve_legacy_source(
-        self,
-        result: dict[str, Any],
-        source: str,
-        project_id: UUID,
-        year: int,
-    ) -> None:
-        """旧内置 resolver（仅保留作为未注册 source 的兜底，逐步迁移后删除）。"""
-        if source == "control_deficiency_count":
-            try:
-                from app.models.issue_ticket_models import IssueTicket
-                deficiency_stmt = sa.select(sa.func.count()).select_from(IssueTicket).where(
-                    IssueTicket.project_id == project_id,
-                    IssueTicket.category == "internal_control",
-                    IssueTicket.is_deleted == sa.false(),
-                )
-                def_r = await self.db.execute(deficiency_stmt)
-                def_count = def_r.scalar() or 0
-                result["summary"] = f"已识别{def_count}项内控缺陷" if def_count else "暂无已识别缺陷"
-            except Exception as inner_e:
-                _logger.error("auto_data_source %s inner error: %s", source, inner_e)
-                result["summary"] = "见内控缺陷汇总"
-        else:
-            _logger.debug("auto_data_source '%s' 未注册且无旧路径，跳过", source)
 
     def _check_applicable(self, item: dict, business_category: str) -> str:
         """判定适用性：按模板项的 applicable_categories 和项目分类"""
@@ -242,63 +210,6 @@ class ProcedureTableService:
         if prefix in categories:
             return item.get("applicable_default", "yes")
         return "na"
-
-    async def _count_adjustments(self, project_id: UUID, year: int, adj_type: str) -> int:
-        """按类型统计调整分录数"""
-        if adj_type == "passed":
-            # 未更正错报：review_status 枚举无 'passed' 值（draft/pending_review/
-            # approved/rejected）。"未更正"的语义标记是 V078 的 passed_reason 列
-            # （管理层不予更正原因）非空 → 该调整被 Passed（不予更正）。
-            stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-                Adjustment.project_id == project_id,
-                Adjustment.year == year,
-                Adjustment.passed_reason.isnot(None),
-                Adjustment.is_deleted == sa.false(),
-            )
-        else:
-            stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-                Adjustment.project_id == project_id,
-                Adjustment.year == year,
-                Adjustment.adjustment_type == adj_type,
-                Adjustment.is_deleted == sa.false(),
-            )
-        result = await self.db.execute(stmt)
-        return result.scalar() or 0
-
-    async def _count_adjustments_with_pending(
-        self, project_id: UUID, year: int, adj_type: str
-    ) -> tuple[int, int, float]:
-        """按类型统计调整分录数，同时返回待审批数 + 借方总金额（万元）"""
-        from app.models.audit_platform_models import AdjustmentEntry
-        total_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-            Adjustment.project_id == project_id,
-            Adjustment.year == year,
-            Adjustment.adjustment_type == adj_type,
-            Adjustment.is_deleted == sa.false(),
-        )
-        pending_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-            Adjustment.project_id == project_id,
-            Adjustment.year == year,
-            Adjustment.adjustment_type == adj_type,
-            Adjustment.review_status != "approved",
-            Adjustment.passed_reason.is_(None),
-            Adjustment.is_deleted == sa.false(),
-        )
-        # 借方合计金额（衡量调整影响规模）
-        amount_stmt = sa.select(
-            sa.func.coalesce(sa.func.sum(AdjustmentEntry.debit_amount), 0)
-        ).join(
-            Adjustment, AdjustmentEntry.adjustment_id == Adjustment.id
-        ).where(
-            Adjustment.project_id == project_id,
-            Adjustment.year == year,
-            Adjustment.adjustment_type == adj_type,
-            Adjustment.is_deleted == sa.false(),
-        )
-        total_r = await self.db.execute(total_stmt)
-        pending_r = await self.db.execute(pending_stmt)
-        amount_r = await self.db.execute(amount_stmt)
-        return (total_r.scalar() or 0, pending_r.scalar() or 0, float(amount_r.scalar() or 0))
 
     async def _get_materiality(self, project_id: UUID) -> Decimal:
         stmt = sa.select(Materiality.overall_materiality).where(

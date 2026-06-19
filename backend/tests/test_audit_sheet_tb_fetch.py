@@ -23,10 +23,9 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from app.routers.wp_render_config import (
+from app.services.wp_audit_sheet_tb_service import (
     _decimal_to_float,
     _fetch_audit_sheet_tb_values,
-    _generate_audit_sheet_data,
 )
 
 
@@ -193,8 +192,11 @@ async def test_fetch_tb_values_sql_error_returns_empty():
 
 
 # ─── _generate_audit_sheet_data 集成（持久化优先 + TB 实时取数）────────────
+# NOTE: _generate_audit_sheet_data 已在 task 1.3 中删除（被 _audit_sheet.py 策略替代）
+# 以下测试待 task 1.5 清理时移除或改写为策略 render() 测试
 
 
+@pytest.mark.skip(reason="_generate_audit_sheet_data 已删除，待 task 1.5 清理")
 @pytest.mark.asyncio
 async def test_generate_audit_sheet_data_persisted_rows_with_tb():
     """持久化优先：existing.audit_rows 沿用，但 tb_values 仍实时查（Req 4.3 + 3.4）。"""
@@ -224,6 +226,7 @@ async def test_generate_audit_sheet_data_persisted_rows_with_tb():
     assert result["tb_values"]["row-1"]["current_unadjusted"] == pytest.approx(120000.00)
 
 
+@pytest.mark.skip(reason="_generate_audit_sheet_data 已删除，待 task 1.5 清理")
 @pytest.mark.asyncio
 async def test_generate_audit_sheet_data_no_file_no_db_degrades():
     """无模板 + 无 db → audit_rows=[] + tb_values={} + 空说明区（全降级，不抛异常）。"""

@@ -132,7 +132,7 @@ def test_bindings_soe_legacy_alias_annotated() -> None:
     try:
         from app.services import note_template_bindings_loader as loader
     except ModuleNotFoundError:
-        from backend.app.services import note_template_bindings_loader as loader
+        from app.services import note_template_bindings_loader as loader
 
     loader.reload()
     b1 = loader.get_binding_for_section("八、1")
@@ -149,7 +149,7 @@ def test_catalog_resolves_soe_legacy_to_canonical() -> None:
     try:
         from app.services.note_section_catalog import resolve_binding_key
     except ModuleNotFoundError:
-        from backend.app.services.note_section_catalog import resolve_binding_key
+        from app.services.note_section_catalog import resolve_binding_key
 
     # 八、3 衍生金融资产 不在 bindings，但归一规则本身必须把 五、3 → 八、3
     assert resolve_binding_key("五、3", template_type="soe") == "八、3"

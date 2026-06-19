@@ -29,6 +29,9 @@ from app.services.note_validation_engine import (
     ValidationRule,
     ValidationType,
     _check_mutual_exclusion,
+    load_preset_rules,
+)
+from app.services.note_validation_executors import (
     _execute_balance,
     _execute_wide_table,
     _execute_vertical,
@@ -38,7 +41,6 @@ from app.services.note_validation_engine import (
     _execute_secondary_detail,
     _execute_completeness,
     _execute_llm_review,
-    load_preset_rules,
 )
 from app.services.note_wide_table_engine import (
     NoteWideTableEngine,

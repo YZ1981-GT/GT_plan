@@ -9,7 +9,7 @@ Requirements: 5.4, 6.3
 
 from __future__ import annotations
 
-from backend.app.services.balance_diagnostics.diagnostics_types import (
+from app.services.balance_diagnostics.diagnostics_types import (
     UnmatchedAccount,
 )
 

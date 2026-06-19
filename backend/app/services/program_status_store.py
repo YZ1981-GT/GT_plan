@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from backend.app.schemas.workpaper_semantic_contract import ProgramStatusContract
+from app.schemas.workpaper_semantic_contract import ProgramStatusContract
 
 
 @runtime_checkable

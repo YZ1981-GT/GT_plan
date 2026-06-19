@@ -9,10 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from hypothesis import given, settings, strategies as st
 
-from app.routers.wp_render_config import (
-    _build_preparation_info,
-    _generate_b_index_data,
-)
+from app.services.wp_preparation_info_service import build_preparation_info
 from app.services.wp_classification_service import (
     ClassificationResult,
     derive_component_type,
@@ -85,7 +82,7 @@ def _mock_db_for_prep(entity, period, preparer="张三"):
 )
 def test_p8_build_preparation_info_excludes_accounting_period(entity, period):
     db, project_id, wp_id = _mock_db_for_prep(entity, period)
-    info = _run(_build_preparation_info(db, project_id, wp_id))
+    info = _run(build_preparation_info(db, project_id, wp_id))
     assert set(info.keys()) == PREP_FIELDS
     assert "accounting_period" not in info
 
@@ -93,28 +90,18 @@ def test_p8_build_preparation_info_excludes_accounting_period(entity, period):
 @settings(max_examples=5)
 @given(wp_name=st.sampled_from(["自定义底稿", "应收账款明细", "CUST表"]))
 def test_p8_b_index_auto_prep_has_no_accounting_period(wp_name: str):
+    """build_preparation_info 返回的 prep 信息不含 accounting_period（B-Index 共用）。
+
+    原测试调用已删除的 _generate_b_index_data；改为直接测试 service 层
+    build_preparation_info，验证 B-Index 表头使用的编制信息不含会计期间。
+    """
     project_id = uuid.uuid4()
     wp_id = uuid.uuid4()
     db, _, _ = _mock_db_for_prep("测试单位", "2025-12-31")
 
-    classifications = [
-        ClassificationResult(
-            wp_code="CUST-01",
-            sheet_name=wp_name,
-            class_code="CUSTOM",
-            class_="自定义底稿",
-            scope="standalone",
-            is_real_workpaper=True,
-            delegated_module=None,
-            render_schema_path=None,
-            template_version_id=None,
-        )
-    ]
-
-    data = _run(_generate_b_index_data(db, project_id, wp_id, classifications))
-    prep = data.get("preparation_info") or {}
-    assert "accounting_period" not in prep
-    assert set(prep.keys()) == PREP_FIELDS
+    info = _run(build_preparation_info(db, project_id, wp_id))
+    assert "accounting_period" not in info
+    assert set(info.keys()) == PREP_FIELDS
 
 
 def test_p8_frontend_label_set_never_includes_accounting_period():

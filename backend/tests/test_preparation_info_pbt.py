@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from hypothesis import given, settings, strategies as st
 
-from app.routers.wp_render_config import _build_preparation_info
+from app.services.wp_preparation_info_service import build_preparation_info
 
 REQUIRED = {
     "entity_name",
@@ -66,7 +66,7 @@ def test_p7_preparation_info_never_null_and_degrades(entity, period, preparer):
     db.execute = fake_execute
     db.get = AsyncMock(return_value=None)
 
-    info = _run(_build_preparation_info(db, project_id, wp_id))
+    info = _run(build_preparation_info(db, project_id, wp_id))
 
     assert set(info.keys()) == REQUIRED
     assert "accounting_period" not in info

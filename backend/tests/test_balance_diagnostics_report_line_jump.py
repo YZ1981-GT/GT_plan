@@ -15,7 +15,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from backend.app.services.balance_diagnostics.report_line_jump import (
+from app.services.balance_diagnostics.report_line_jump import (
     MAPPING_STATUS_MANUAL_ERROR,
     MAPPING_STATUS_SEED_MISSING,
     MAPPING_STATUS_UNCONFIRMED,

@@ -95,63 +95,17 @@ async def resolve_auto_data_source(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-async def _count_adjustments(db: AsyncSession, project_id: UUID, year: int, adj_type: str) -> int:
-    from app.models.audit_platform_models import Adjustment
-    if adj_type == "passed":
-        stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-            Adjustment.project_id == project_id,
-            Adjustment.year == year,
-            Adjustment.passed_reason.isnot(None),
-            Adjustment.is_deleted == sa.false(),
-        )
-    else:
-        stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-            Adjustment.project_id == project_id,
-            Adjustment.year == year,
-            Adjustment.adjustment_type == adj_type,
-            Adjustment.is_deleted == sa.false(),
-        )
-    result = await db.execute(stmt)
-    return result.scalar() or 0
-
-
-async def _count_adjustments_with_pending(
-    db: AsyncSession, project_id: UUID, year: int, adj_type: str
-) -> tuple[int, int, float]:
-    from app.models.audit_platform_models import Adjustment, AdjustmentEntry
-    total_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-        Adjustment.project_id == project_id,
-        Adjustment.year == year,
-        Adjustment.adjustment_type == adj_type,
-        Adjustment.is_deleted == sa.false(),
-    )
-    pending_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
-        Adjustment.project_id == project_id,
-        Adjustment.year == year,
-        Adjustment.adjustment_type == adj_type,
-        Adjustment.review_status != "approved",
-        Adjustment.passed_reason.is_(None),
-        Adjustment.is_deleted == sa.false(),
-    )
-    amount_stmt = sa.select(
-        sa.func.coalesce(sa.func.sum(AdjustmentEntry.debit_amount), 0)
-    ).join(
-        Adjustment, AdjustmentEntry.adjustment_id == Adjustment.id
-    ).where(
-        Adjustment.project_id == project_id,
-        Adjustment.year == year,
-        Adjustment.adjustment_type == adj_type,
-        Adjustment.is_deleted == sa.false(),
-    )
-    total_r = await db.execute(total_stmt)
-    pending_r = await db.execute(pending_stmt)
-    amount_r = await db.execute(amount_stmt)
-    return (total_r.scalar() or 0, pending_r.scalar() or 0, float(amount_r.scalar() or 0))
+from app.services.wp_adjustment_helpers import count_adjustments, count_adjustments_with_pending
 
 
 @auto_resolver("adjustment_count_aje")
 async def _resolve_adj_aje(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    count, pending, amount = await _count_adjustments_with_pending(db, project_id, year, "aje")
+    """审计调整分录（AJE）数量及金额汇总。
+
+    数据来源: adjustment / adjustment_entry 表（通过 wp_adjustment_helpers）
+    返回结构: {"summary": str}
+    """
+    count, pending, amount = await count_adjustments_with_pending(db, project_id, year, "aje")
     if count == 0:
         return {"summary": "无"}
     if pending > 0:
@@ -161,7 +115,12 @@ async def _resolve_adj_aje(db: AsyncSession, project_id: UUID, year: int, **kw) 
 
 @auto_resolver("adjustment_count_rje")
 async def _resolve_adj_rje(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    count, pending, amount = await _count_adjustments_with_pending(db, project_id, year, "rje")
+    """重分类调整分录（RJE）数量及金额汇总。
+
+    数据来源: adjustment / adjustment_entry 表（通过 wp_adjustment_helpers）
+    返回结构: {"summary": str}
+    """
+    count, pending, amount = await count_adjustments_with_pending(db, project_id, year, "rje")
     if count == 0:
         return {"summary": "无"}
     if pending > 0:
@@ -171,12 +130,22 @@ async def _resolve_adj_rje(db: AsyncSession, project_id: UUID, year: int, **kw) 
 
 @auto_resolver("adjustment_count_passed")
 async def _resolve_adj_passed(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    count = await _count_adjustments(db, project_id, year, "passed")
+    """未更正错报（Passed Adjustments）数量统计。
+
+    数据来源: adjustment 表（passed_reason IS NOT NULL，通过 wp_adjustment_helpers）
+    返回结构: {"summary": str}
+    """
+    count = await count_adjustments(db, project_id, year, "passed")
     return {"summary": f"共{count}笔" if count else "无"}
 
 
 @auto_resolver("adjustment_count_consol")
 async def _resolve_adj_consol(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """合并调整分录数量统计。
+
+    数据来源: elimination_entry 表
+    返回结构: {"summary": str}
+    """
     from app.models.consolidation_models import EliminationEntry
     stmt = sa.select(sa.func.count()).select_from(EliminationEntry).where(
         EliminationEntry.project_id == project_id,
@@ -189,12 +158,22 @@ async def _resolve_adj_consol(db: AsyncSession, project_id: UUID, year: int, **k
 
 @auto_resolver("misstatement_summary")
 async def _resolve_misstatement_summary(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    count = await _count_adjustments(db, project_id, year, "passed")
+    """未更正错报笔数摘要（A13 评价错报用）。
+
+    数据来源: adjustment 表（passed_reason IS NOT NULL，通过 wp_adjustment_helpers）
+    返回结构: {"summary": str}
+    """
+    count = await count_adjustments(db, project_id, year, "passed")
     return {"summary": f"未更正错报{count}笔" if count else "无未更正错报"}
 
 
 @auto_resolver("misstatement_evaluation")
 async def _resolve_misstatement_eval(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """未更正错报与重要性水平对比评价（A13 错报评价用）。
+
+    数据来源: adjustment / adjustment_entry / materiality 表
+    返回结构: {"summary": str}（含错报金额与执行重要性/明显微小阈值比较结论）
+    """
     from app.models.audit_platform_models import Adjustment, Materiality, AdjustmentEntry
     passed_stmt = sa.select(
         sa.func.coalesce(sa.func.sum(AdjustmentEntry.debit_amount), 0)
@@ -233,6 +212,11 @@ async def _resolve_misstatement_eval(db: AsyncSession, project_id: UUID, year: i
 
 @auto_resolver("materiality_set")
 async def _resolve_materiality(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """整体重要性水平数值（简略版，仅返回 overall_materiality）。
+
+    数据来源: materiality 表
+    返回结构: {"summary": str}
+    """
     from app.models.audit_platform_models import Materiality
     stmt = sa.select(Materiality.overall_materiality).where(Materiality.project_id == project_id)
     result = await db.execute(stmt)
@@ -243,6 +227,11 @@ async def _resolve_materiality(db: AsyncSession, project_id: UUID, year: int, **
 
 @auto_resolver("trial_balance_check")
 async def _resolve_tb_check(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """试算平衡验证（借方合计 vs 贷方合计差异检查）。
+
+    数据来源: tb_balance 表（level=1 汇总行）
+    返回结构: {"summary": str}（含借贷方金额及平衡/不平衡状态）
+    """
     from app.models.audit_platform_models import TbBalance
     from app.services.dataset_query import get_active_filter
     tb = TbBalance.__table__
@@ -269,6 +258,11 @@ async def _resolve_tb_check(db: AsyncSession, project_id: UUID, year: int, **kw)
 
 @auto_resolver("consol_scope_status")
 async def _resolve_consol_scope(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """合并范围纳入子公司数量统计。
+
+    数据来源: consol_scope 表（is_included=true）
+    返回结构: {"summary": str}
+    """
     from app.models.consolidation_models import ConsolScope
     stmt = sa.select(sa.func.count()).select_from(ConsolScope).where(
         ConsolScope.project_id == project_id,
@@ -282,6 +276,11 @@ async def _resolve_consol_scope(db: AsyncSession, project_id: UUID, year: int, *
 
 @auto_resolver("consol_elimination_count")
 async def _resolve_consol_elim(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """合并抵销分录数量统计。
+
+    数据来源: elimination_entry 表
+    返回结构: {"summary": str}
+    """
     from app.models.consolidation_models import EliminationEntry
     stmt = sa.select(sa.func.count()).select_from(EliminationEntry).where(
         EliminationEntry.project_id == project_id,
@@ -294,6 +293,11 @@ async def _resolve_consol_elim(db: AsyncSession, project_id: UUID, year: int, **
 
 @auto_resolver("consol_internal_trade_status")
 async def _resolve_consol_trade(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """内部往来交易笔数统计。
+
+    数据来源: internal_trade 表
+    返回结构: {"summary": str}
+    """
     from app.models.consolidation_models import InternalTrade
     stmt = sa.select(sa.func.count()).select_from(InternalTrade).where(
         InternalTrade.project_id == project_id,
@@ -305,6 +309,11 @@ async def _resolve_consol_trade(db: AsyncSession, project_id: UUID, year: int, *
 
 @auto_resolver("consol_trial_balance_check")
 async def _resolve_consol_tb(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """合并试算平衡验证（AJE/RJE 调整净额检查）。
+
+    数据来源: trial_balance 表（aje_adjustment / rje_adjustment 列）
+    返回结构: {"summary": str}（含 AJE/RJE 净差异金额）
+    """
     from app.models.audit_platform_models import TrialBalance
     tb_t = TrialBalance.__table__
     stmt = sa.select(
@@ -333,6 +342,11 @@ async def _resolve_consol_tb(db: AsyncSession, project_id: UUID, year: int, **kw
 
 @auto_resolver("cf_verification_status")
 async def _resolve_cf(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """现金流量表勾稽验证状态（通过项 / 总项比率）。
+
+    数据来源: cf_verification_result 表
+    返回结构: {"summary": str, "link": {"type": str, "target": str}}
+    """
     from app.models.cf_verification_models import CfVerificationResult
     stmt = sa.select(
         sa.func.count(),
@@ -354,6 +368,11 @@ async def _resolve_cf(db: AsyncSession, project_id: UUID, year: int, **kw) -> di
 
 @auto_resolver("review_progress")
 async def _resolve_review_progress(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """三级复核签字整体进度（已签/总级数）。
+
+    数据来源: review_checklist_service.get_review_sign_status_batch
+    返回结构: {"summary": str}
+    """
     from app.services.review_checklist_service import get_review_sign_status_batch
     statuses = await get_review_sign_status_batch(db, project_id)
     passed = sum(1 for v in statuses.values() if v == "pass")
@@ -375,21 +394,41 @@ async def _resolve_sign_status(db: AsyncSession, project_id: UUID, prefix: str, 
 
 @auto_resolver("a21_sign_status")
 async def _resolve_a21(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """A21 现场负责人复核签字状态。
+
+    数据来源: review_checklist_service.get_review_sign_status_batch
+    返回结构: {"summary": str}
+    """
     return await _resolve_sign_status(db, project_id, "A21", "现场负责人")
 
 
 @auto_resolver("a22_sign_status")
 async def _resolve_a22(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """A22 经理复核签字状态。
+
+    数据来源: review_checklist_service.get_review_sign_status_batch
+    返回结构: {"summary": str}
+    """
     return await _resolve_sign_status(db, project_id, "A22", "经理")
 
 
 @auto_resolver("a23_sign_status")
 async def _resolve_a23(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """A23 合伙人复核签字状态。
+
+    数据来源: review_checklist_service.get_review_sign_status_batch
+    返回结构: {"summary": str}
+    """
     return await _resolve_sign_status(db, project_id, "A23", "合伙人")
 
 
 @auto_resolver("workpaper_completion_rate")
 async def _resolve_wp_completion(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """底稿编制完成率（已完成+已复核 / 总数）。
+
+    数据来源: working_paper 表（status in completed/reviewed）
+    返回结构: {"summary": str}（含完成数/总数/百分比）
+    """
     from app.models.workpaper_models import WorkingPaper
     total_stmt = sa.select(sa.func.count()).select_from(WorkingPaper).where(
         WorkingPaper.project_id == project_id, WorkingPaper.is_deleted == sa.false(),
@@ -406,6 +445,11 @@ async def _resolve_wp_completion(db: AsyncSession, project_id: UUID, year: int, 
 
 @auto_resolver("control_test_completion")
 async def _resolve_ctrl_completion(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """C 类控制测试底稿完成率。
+
+    数据来源: working_paper JOIN wp_index（wp_code LIKE 'C%'）
+    返回结构: {"summary": str}（含完成数/总数/百分比）
+    """
     from app.models.workpaper_models import WorkingPaper, WpIndex
     base = sa.select(sa.func.count()).select_from(WorkingPaper).join(
         WpIndex, WorkingPaper.wp_index_id == WpIndex.id
@@ -419,6 +463,11 @@ async def _resolve_ctrl_completion(db: AsyncSession, project_id: UUID, year: int
 
 @auto_resolver("substantive_completion")
 async def _resolve_sub_completion(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """D~N 实质性程序底稿完成率。
+
+    数据来源: working_paper JOIN wp_index（wp_code 匹配 ^[D-N]）
+    返回结构: {"summary": str}（含完成数/总数/百分比）
+    """
     from app.models.workpaper_models import WorkingPaper, WpIndex
     base = sa.select(sa.func.count()).select_from(WorkingPaper).join(
         WpIndex, WorkingPaper.wp_index_id == WpIndex.id
@@ -432,6 +481,11 @@ async def _resolve_sub_completion(db: AsyncSession, project_id: UUID, year: int,
 
 @auto_resolver("analytical_review_done")
 async def _resolve_ar_done(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """分析性复核底稿（A1-13/A1-14）完成状态。
+
+    数据来源: working_paper JOIN wp_index（wp_code IN A1-13, A1-14）
+    返回结构: {"summary": str}（含各底稿完成情况）
+    """
     from app.models.workpaper_models import WorkingPaper, WpIndex
     stmt = sa.select(WpIndex.wp_code, WorkingPaper.status).join(
         WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id
@@ -448,6 +502,11 @@ async def _resolve_ar_done(db: AsyncSession, project_id: UUID, year: int, **kw) 
 
 @auto_resolver("archive_completion")
 async def _resolve_archive(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """归档就绪状态（全部底稿复核完成则可归档）。
+
+    数据来源: working_paper 表（status='reviewed' 占比）
+    返回结构: {"summary": str}
+    """
     from app.models.workpaper_models import WorkingPaper
     total = (await db.execute(sa.select(sa.func.count()).select_from(WorkingPaper).where(
         WorkingPaper.project_id == project_id, WorkingPaper.is_deleted == sa.false(),
@@ -469,6 +528,11 @@ async def _resolve_archive(db: AsyncSession, project_id: UUID, year: int, **kw) 
 
 @auto_resolver("a16_template_recommend")
 async def _resolve_a16_recommend(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """A16 审计报告主版本推荐（根据项目特征自动匹配模板）。
+
+    数据来源: a16_version_service.recommend_main_version
+    返回结构: {"summary": str, "detail": dict}（含推荐代号/标签/置信度）
+    """
     from app.services.a16_version_service import recommend_main_version
     rec = await recommend_main_version(db, project_id)
     suffix = "（请项目组确认）" if rec.get("confidence") != "high" else ""
@@ -477,6 +541,11 @@ async def _resolve_a16_recommend(db: AsyncSession, project_id: UUID, year: int, 
 
 @auto_resolver("related_party_transaction_count")
 async def _resolve_related_party(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """关联方及关联交易数量/金额汇总（A7 关联方底稿用）。
+
+    数据来源: related_party_registry / related_party_transaction 表
+    返回结构: {"summary": str, "applicable": str|None}
+    """
     from app.models.related_party_models import RelatedPartyRegistry, RelatedPartyTransaction
     party_r = await db.execute(sa.select(sa.func.count()).select_from(RelatedPartyRegistry).where(
         RelatedPartyRegistry.project_id == project_id, RelatedPartyRegistry.is_deleted == sa.false(),
@@ -498,6 +567,11 @@ async def _resolve_related_party(db: AsyncSession, project_id: UUID, year: int, 
 
 @auto_resolver("related_party_disclosure_check")
 async def _resolve_related_party_disclosure(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """关联方交易与附注披露一致性核查。
+
+    数据来源: related_party_transaction / disclosure_note 表
+    返回结构: {"summary": str}（含交易笔数和披露章节数量对比）
+    """
     from app.models.related_party_models import RelatedPartyTransaction
     from app.models.disclosure_models import DisclosureNote
     txn_count = (await db.execute(sa.select(sa.func.count()).select_from(RelatedPartyTransaction).where(
@@ -518,6 +592,11 @@ async def _resolve_related_party_disclosure(db: AsyncSession, project_id: UUID, 
 
 @auto_resolver("a16_sign_status_check")
 async def _resolve_a16_sign(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """A16 审计报告签署状态追踪。
+
+    数据来源: field_override_service（word_template:A16 scope）
+    返回结构: {"summary": str, "step_status": str|None}
+    """
     from app.services.field_override_service import FieldOverrideService
     svc = FieldOverrideService(db)
     selected_version = await svc.get(project_id, year, "word_template:A16", "selected_version", "value")
@@ -534,9 +613,14 @@ async def _resolve_a16_sign(db: AsyncSession, project_id: UUID, year: int, **kw)
 
 @auto_resolver("control_deficiency_count")
 async def _resolve_ctrl_deficiency(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    from app.models.issue_ticket_models import IssueTicket
+    """已识别内控缺陷数量统计（A14 内控底稿用）。
+
+    数据来源: issue_ticket 表（category='internal_control'）
+    返回结构: {"summary": str}
+    """
+    from app.models.phase15_models import IssueTicket
     count = (await db.execute(sa.select(sa.func.count()).select_from(IssueTicket).where(
-        IssueTicket.project_id == project_id, IssueTicket.category == "internal_control", IssueTicket.is_deleted == sa.false(),
+        IssueTicket.project_id == project_id, IssueTicket.category == "internal_control", IssueTicket.status != "rejected",
     ))).scalar() or 0
     return {"summary": f"已识别{count}项内控缺陷" if count else "暂无已识别缺陷"}
 
@@ -548,7 +632,11 @@ async def _resolve_ctrl_deficiency(db: AsyncSession, project_id: UUID, year: int
 
 @auto_resolver("b2_communication_status")
 async def _resolve_b2_comm(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    """B2 前任注册会计师沟通完成状态（从 field_overrides 读取）。"""
+    """B2 前任注册会计师沟通完成状态。
+
+    数据来源: field_override_service（scope='b2_communication'）
+    返回结构: {"summary": str, "status": str}
+    """
     from app.services.field_override_service import FieldOverrideService
     svc = FieldOverrideService(db)
     data = await svc.get_batch(project_id, year, scope="b2_communication")
@@ -566,7 +654,11 @@ async def _resolve_b2_comm(db: AsyncSession, project_id: UUID, year: int, **kw) 
 
 @auto_resolver("b3_independence_status")
 async def _resolve_b3_indep(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    """B3 独立性确认状态（从 checklist_responses 统计）。"""
+    """B3 独立性确认状态。
+
+    数据来源: checklist_response 表（wp_code='B3'）
+    返回结构: {"summary": str, "progress": int}
+    """
     from app.models.audit_platform_models import ChecklistResponse
     total = (await db.execute(sa.select(sa.func.count()).select_from(ChecklistResponse).where(
         ChecklistResponse.project_id == project_id,
@@ -585,7 +677,11 @@ async def _resolve_b3_indep(db: AsyncSession, project_id: UUID, year: int, **kw)
 
 @auto_resolver("b19_related_party_count")
 async def _resolve_b19_rp(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    """B19 关联方识别数（从 related_party_registry 统计）。"""
+    """B19 关联方识别数。
+
+    数据来源: related_party_registry 表
+    返回结构: {"summary": str, "count": int}
+    """
     from app.models.related_party_models import RelatedPartyRegistry
     count = (await db.execute(sa.select(sa.func.count()).select_from(RelatedPartyRegistry).where(
         RelatedPartyRegistry.project_id == project_id,
@@ -595,7 +691,11 @@ async def _resolve_b19_rp(db: AsyncSession, project_id: UUID, year: int, **kw) -
 
 @auto_resolver("b15_materiality_summary")
 async def _resolve_b15_materiality(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    """B15 重要性水平摘要（从 materiality 表读取 overall/performance/trivial）。"""
+    """B15 重要性水平摘要（整体/执行/明显微小三级）。
+
+    数据来源: materiality 表
+    返回结构: {"summary": str, "overall_materiality": float|None, "performance_materiality": float, "trivial_amount": float}
+    """
     from app.models.audit_platform_models import Materiality
     stmt = sa.select(
         Materiality.overall_materiality,
@@ -622,7 +722,11 @@ async def _resolve_b15_materiality(db: AsyncSession, project_id: UUID, year: int
 
 @auto_resolver("b22_entity_control_status")
 async def _resolve_b22_control(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    """B22 企业层面控制完成率（从 field_overrides scope LIKE 'b22%' 统计非空结论）。"""
+    """B22 企业层面控制完成率（5 维度已完成数/总数）。
+
+    数据来源: workpaper_field_override 表（scope LIKE 'b22%'）
+    返回结构: {"summary": str, "completed": int, "dimensions": int, "total_overrides": int, "completion_pct": int}
+    """
     from app.models.workpaper_field_override_models import WorkpaperFieldOverride
     # 统计所有 B22 相关 scope 的覆盖条目数（总维度）
     total_stmt = sa.select(sa.func.count()).select_from(WorkpaperFieldOverride).where(
@@ -652,7 +756,11 @@ async def _resolve_b22_control(db: AsyncSession, project_id: UUID, year: int, **
 
 @auto_resolver("b23_walkthrough_progress")
 async def _resolve_b23_progress(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    """B23 穿行测试完成率（从 field_overrides scope LIKE 'b23_walkthrough:%' 统计）。"""
+    """B23 穿行测试完成率（14 循环已完成数/总数）。
+
+    数据来源: workpaper_field_override 表（scope LIKE 'b23_walkthrough:%'）
+    返回结构: {"summary": str, "completed": int, "total_cycles": int, "completion_pct": int}
+    """
     from app.models.workpaper_field_override_models import WorkpaperFieldOverride
     total_cycles = 14  # B23-1~B23-14
     # 统计有 conclusion 字段的 distinct scope（每个 scope 代表一个已完成的 cycle）
@@ -676,7 +784,11 @@ async def _resolve_b23_progress(db: AsyncSession, project_id: UUID, year: int, *
 
 @auto_resolver("b50_risk_summary")
 async def _resolve_b50_risk(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    """B50 风险汇总统计（从 field_overrides scope=risk_assessment 读取）。"""
+    """B50 风险汇总统计（已识别风险因素数 + 特别风险数）。
+
+    数据来源: field_override_service（scope='risk_assessment'）
+    返回结构: {"summary": str, "risk_factors": int, "special_risks": int}
+    """
     from app.services.field_override_service import FieldOverrideService
     svc = FieldOverrideService(db)
     data = await svc.get_batch(project_id, year, scope="risk_assessment")
@@ -700,6 +812,8 @@ async def _resolve_b50_risk(db: AsyncSession, project_id: UUID, year: int, **kw)
 async def _resolve_b23_for_cycle(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """B23 穿行测试结论（C 类控制测试底稿引用）。
 
+    数据来源: field_override_service（scope='b23_walkthrough:{cycle}'）
+    返回结构: {"summary": str, "design_effective": bool|None}
     参数: kw['cycle'] = 循环名称（如 '销售收入'），用于匹配 scope。
     """
     from app.services.field_override_service import FieldOverrideService
@@ -725,8 +839,9 @@ async def _resolve_b23_for_cycle(db: AsyncSession, project_id: UUID, year: int, 
 async def _resolve_risk_for_cycle(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """B50-3 认定层次风险 → D~N 循环程序表引用。
 
+    数据来源: field_override_service（scope='risk_assessment'，按 cycle_code 过滤）
+    返回结构: {"summary": str, "risks": list[dict]}（每项含 risk_id/description/assertion/risk_level/is_special_risk）
     参数: kw['cycle'] = 循环代号（如 'D'→销售收入, 'E'→货币资金）。
-    从 field_overrides scope='risk_assessment' 中过滤出对应循环的风险条目。
     """
     from app.services.field_override_service import FieldOverrideService
     cycle = kw.get("cycle", "")
@@ -767,8 +882,9 @@ async def _resolve_risk_for_cycle(db: AsyncSession, project_id: UUID, year: int,
 async def _resolve_control_test_result(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """D~N 读取对应循环控制测试结论。
 
-    参数: kw['cycle'] = 循环名称（如 '销售收入'）
-    从 field_overrides scope='control_test_result:{cycle}' 读取。
+    数据来源: field_override_service（scope='control_test_result:{cycle}'）
+    返回结构: {"summary": str, "conclusion": str|None, "tested_controls": int, "deviation_count": int}
+    参数: kw['cycle'] = 循环名称（如 '销售收入'）。
     """
     from app.services.field_override_service import FieldOverrideService
     cycle = kw.get("cycle", "")
@@ -824,8 +940,8 @@ async def _resolve_control_test_result(db: AsyncSession, project_id: UUID, year:
 async def _resolve_b22_entity_control_list(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """B22 企业层面控制清单（C1 企业层面控制测试引用）。
 
-    从 field_overrides scope LIKE 'b22%' 读取 B22A-1~5 + B22B 已识别控制清单。
-    返回: {summary, completed, dimensions, controls: [...]}
+    数据来源: workpaper_field_override 表（scope LIKE 'b22%'）
+    返回结构: {"summary": str, "completed": int, "dimensions": int, "total_overrides": int}
     """
     from app.models.workpaper_field_override_models import WorkpaperFieldOverride
     # 统计 B22 维度已完成数
@@ -855,8 +971,8 @@ async def _resolve_b22_entity_control_list(db: AsyncSession, project_id: UUID, y
 async def _resolve_itgc_test_result(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """ITGC 测试结论汇总（D~N 实质性程序引用）。
 
-    从 field_overrides scope='itgc_test_result' 读取 C22 各领域结论。
-    返回: {summary, sa, pe, pm, ns, overall, finding_count}
+    数据来源: field_override_service（scope='itgc_test_result'）
+    返回结构: {"summary": str, "sa": str|None, "pe": str|None, "pm": str|None, "ns": str|None, "overall": str|None, "finding_count": int}
     """
     from app.services.field_override_service import FieldOverrideService
     svc = FieldOverrideService(db)
@@ -895,8 +1011,9 @@ async def _resolve_itgc_test_result(db: AsyncSession, project_id: UUID, year: in
 async def _resolve_je_filter_from_ledger(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """从序时账按条件筛选候选会计分录（C24 会计分录细节测试引用）。
 
-    参数: kw 可包含 filter_criteria（dict，如 amount_threshold/non_working_hours 等）
-    返回: {summary, candidate_count, filter_criteria}
+    数据来源: tb_ledger 表（通过 dataset_query.get_active_filter）
+    返回结构: {"summary": str, "candidate_count": int, "filter_criteria": dict}
+    参数: kw['filter_criteria'] = 筛选条件 dict（如 amount_threshold/non_working_hours 等）。
     """
     from app.models.audit_platform_models import TbLedger
     from app.services.dataset_query import get_active_filter
@@ -937,8 +1054,8 @@ async def _resolve_je_filter_from_ledger(db: AsyncSession, project_id: UUID, yea
 async def _resolve_internal_audit_reliance(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """内审工作利用评价结论（C25 利用内审工作）。
 
-    从 field_overrides scope='internal_audit_reliance' 读取评价结论。
-    返回: {summary, conclusion, scope_reduction}
+    数据来源: field_override_service（scope='internal_audit_reliance'）
+    返回结构: {"summary": str, "conclusion": str|None, "scope_reduction": str|None}
     """
     from app.services.field_override_service import FieldOverrideService
     svc = FieldOverrideService(db)
@@ -969,8 +1086,9 @@ async def _resolve_internal_audit_reliance(db: AsyncSession, project_id: UUID, y
 async def _resolve_confirmation_summary(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """从 ConfirmationHub 读取指定循环的函证摘要。
 
-    用途：D0A/D2A 程序表展示函证进展概要。
-    参数 kw['cycle'] 默认为 "D"（收入循环）。
+    数据来源: confirmations 表（按 project_id/year/cycle 过滤）
+    返回结构: {"summary": str, "sent_count": int, "received_count": int, "response_rate": str, "diff_count": int}
+    参数: kw['cycle'] 默认为 "D"（收入循环）。
     """
     cycle = kw.get("cycle", "D")
 
@@ -1032,8 +1150,8 @@ async def _resolve_confirmation_summary(db: AsyncSession, project_id: UUID, year
 async def _resolve_accounting_estimate_b51(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """从 B51 读取舞弊三因素评估（动机/机会/态度）。
 
-    用途：F2-47~F2-49 跌价准备测试底稿展示会计估计风险评估上下文。
-    从 field_overrides scope='b51_fraud_factors' 读取三因素评估结论。
+    数据来源: field_override_service（scope='b51_fraud_factors'）
+    返回结构: {"summary": str, "fraud_incentive": str|None, "fraud_opportunity": str|None, "fraud_attitude": str|None, "overall_risk_level": str|None}
     """
     from app.services.field_override_service import FieldOverrideService
     svc = FieldOverrideService(db)
@@ -1096,8 +1214,9 @@ async def _resolve_accounting_estimate_b51(db: AsyncSession, project_id: UUID, y
 async def _resolve_ledger_detail(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """从 tb_ledger 获取指定科目的明细发生额（K8/K9 费用类科目用）。
 
-    需要在 kw 中传入 account_prefix（如 '6601' 销售费用 / '6602' 管理费用）。
-    返回各明细科目的借方/贷方发生额汇总。
+    数据来源: tb_ledger 表（按 account_code LIKE '{prefix}%' 分组汇总）
+    返回结构: {"summary": str, "items": list[dict], "total_debit": float, "total_credit": float, "account_prefix": str}
+    参数: kw['account_prefix'] 或自动从 kw['wp_code'] 推导（K8→6601, K9→6602）。
     """
     from sqlalchemy import text as sa_text
 
@@ -1163,11 +1282,8 @@ async def _resolve_ledger_detail(db: AsyncSession, project_id: UUID, year: int, 
 async def _resolve_income_total(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """汇总 D~N 损益类科目 audited_amount 得到本年净利润。
 
-    用于 M6 未分配利润勾稽：净利润 = 收入类合计 - 费用类合计。
-    收入类：6xxx 贷方方向科目（营业收入/其他收益/投资收益等）
-    费用类：5xxx + 66xx~67xx 借方方向科目（营业成本/税金/费用等）
-
-    从 trial_balance 取 audited_amount（审定数），与报表同源。
+    数据来源: trial_balance 表（audited_amount，收入类 6xxx - 费用类 5xxx/64xx/66xx/67xx）
+    返回结构: {"summary": str, "net_income": float, "total_revenue": float, "total_expense": float, "coverage_percent": float, ...}
     """
     from sqlalchemy import text as sa_text
 
@@ -1254,11 +1370,10 @@ async def _resolve_income_total(db: AsyncSession, project_id: UUID, year: int, *
 
 @auto_resolver("temporary_differences_summary")
 async def _resolve_temp_diff(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    """暂时性差异汇总（遍历 trial_balance 资产负债科目计算 DTA/DTL）。
+    """暂时性差异汇总（N1-3/N3-3 递延所得税程序表用）。
 
-    用于 N1-3（可抵扣暂时性差异）和 N3-3（应纳税暂时性差异）程序表展示。
-    从 trial_balance 读取已审定的资产负债类科目，与计税基础（假设=账面，差异来自减值/折旧差等）
-    进行比较。实际场景中计税基础需手动维护，此处提供框架数据。
+    数据来源: trial_balance 表（1xxx~4xxx 资产负债类科目 audited_amount）
+    返回结构: {"summary": str, "account_count": int, "total_audited_amount": float, "deductible_differences": list, "taxable_differences": list, "total_dta": float, "total_dtl": float, "note": str}
     """
     from sqlalchemy import text as sa_text
 
@@ -1299,11 +1414,10 @@ async def _resolve_temp_diff(db: AsyncSession, project_id: UUID, year: int, **kw
 
 @auto_resolver("income_tax_calculation")
 async def _resolve_income_tax(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    """所得税计算基础数据：利润总额 + 已知调增调减项。
+    """所得税计算基础数据：利润总额 + 已知调增调减项（N5-3 程序表用）。
 
-    用于 N5-3 所得税计算表程序表展示。
-    利润总额 = 收入合计 - 费用合计（与 income_statement_total 同源）。
-    调增调减项需手动维护（超标费用/免税收入/减值准备差异等）。
+    数据来源: trial_balance 表（5xxx/6xxx 损益科目 audited_amount 汇总）
+    返回结构: {"summary": str, "profit_before_tax": float, "tax_rate": float, "known_adjustments": list, "note": str}
     """
     from sqlalchemy import text as sa_text
 
@@ -1356,9 +1470,10 @@ async def _resolve_income_tax(db: AsyncSession, project_id: UUID, year: int, **k
 
 @auto_resolver("revenue_audited_for_s20")
 async def _resolve_revenue_for_s20(db: AsyncSession, project_id: UUID, year: int, **kw):
-    """S20 营业收入扣除情况核查：从 trial_balance 读取营业收入审定金额。
+    """S20 营业收入扣除情况核查：读取营业收入审定金额。
 
-    读取 D4 营业收入循环审定数据（6001 主营业务收入 + 6051 其他业务收入）。
+    数据来源: trial_balance 表（6001 主营业务收入 + 6051 其他业务收入）
+    返回结构: {"summary": str, "main_revenue": float, "other_revenue": float, "total_revenue": float}
     """
     sql = sa.text("""
         SELECT standard_account_code, audited_amount
@@ -1393,10 +1508,10 @@ async def _resolve_revenue_for_s20(db: AsyncSession, project_id: UUID, year: int
 
 @auto_resolver("eps_data_from_tb")
 async def _resolve_eps_data(db: AsyncSession, project_id: UUID, year: int, **kw):
-    """S15 每股收益：从 trial_balance 读取净利润和股本数据。
+    """S15 每股收益：读取净利润和股本数据。
 
-    净利润 = 收入类(6xxx) - 费用类(5xxx) 审定金额
-    股本 = 4001 实收资本审定余额
+    数据来源: trial_balance 表（5xxx/6xxx 损益科目 + 4001 实收资本）
+    返回结构: {"summary": str, "net_profit": float, "shares_outstanding": float, "weighted_avg_shares": float}
     """
     # 净利润 = 损益类汇总
     sql_profit = sa.text("""
@@ -1435,10 +1550,10 @@ async def _resolve_eps_data(db: AsyncSession, project_id: UUID, year: int, **kw)
 
 @auto_resolver("non_recurring_items_from_tb")
 async def _resolve_non_recurring_items(db: AsyncSession, project_id: UUID, year: int, **kw):
-    """S17 非经常性损益：从 trial_balance 读取可能的非经常性损益科目。
+    """S17 非经常性损益：读取营业外收支科目审定金额。
 
-    常见非经常性损益科目：6301 营业外收入 / 6711 营业外支出 / 6111 投资收益（部分）
-    / 6301 资产处置收益 等。
+    数据来源: trial_balance 表（6301 营业外收入 / 6711 营业外支出）
+    返回结构: {"summary": str, "non_recurring_total": float, "extra_income": float, "extra_expense": float, "items": list}
     """
     # 营业外收入
     sql_extra_income = sa.text("""
@@ -1475,10 +1590,10 @@ async def _resolve_non_recurring_items(db: AsyncSession, project_id: UUID, year:
 
 @auto_resolver("cycle_audited_amounts")
 async def _resolve_cycle_audited_amounts(db: AsyncSession, project_id: UUID, year: int, **kw):
-    """S32~S35 专项核查：从各循环审定表读取审定金额汇总。
+    """S32~S35 专项核查：按大类汇总各循环审定金额（IPO/上市专项核查用）。
 
-    按 cycle 分组汇总 trial_balance 中各循环的审定金额。
-    供 IPO/上市专项核查底稿引用。
+    数据来源: trial_balance 表（按 standard_account_code 首位分类汇总 audited_amount）
+    返回结构: {"summary": str, "asset_total": float, "liability_total": float, "equity_total": float, "revenue_total": float, "expense_total": float}
     """
     sql = sa.text("""
         SELECT

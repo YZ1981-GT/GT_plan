@@ -7,7 +7,7 @@ Requirements: 2.1, 2.5, 2.7
 
 from __future__ import annotations
 
-from backend.app.services.balance_diagnostics.diagnostics_types import (
+from app.services.balance_diagnostics.diagnostics_types import (
     DiagnosticCause,
 )
 

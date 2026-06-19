@@ -1,7 +1,7 @@
 """底稿管理路由注册 — 按 6 大聚合组 + 辅助组循环注册
 
 分组方案（design §7.1）：
-  模板管理: wp_template / wp_template_metadata / wp_template_files / wp_template_download / wp_template_version
+  模板管理: wp_template / wp_template_metadata / wp_template_files / wp_template_xlsx / wp_template_docx / wp_template_download / wp_template_version
   生命周期: working_paper / workpaper_batch_status / wp_batch_ops / wp_progress / wp_prerequisite_status / wp_procedure_status
   复核:     wp_review / wp_review_status / wp_cell_annotations / review_records_global / wp_eqcr_evaluation
   渲染:     wp_render_config / wp_classification / wp_html_save / wp_xlsx_export / wp_index_resolve / wp_trace / wp_disclosure_sync
@@ -19,6 +19,8 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.wp_template import router as wp_template
     from app.routers.wp_template_metadata import router as wp_template_metadata
     from app.routers.wp_template_files import router as wp_template_files
+    from app.routers.wp_template_xlsx import router as wp_template_xlsx
+    from app.routers.wp_template_docx import router as wp_template_docx
     from app.routers.wp_template_download import router as wp_template_download
     from app.routers.wp_template_version import router as wp_template_version
     from app.routers.wp_template_list import router as wp_template_list
@@ -105,7 +107,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
 
     groups = {
         # ── 6 大聚合组（design §7.1）──
-        "模板管理": [wp_template, wp_template_metadata, wp_template_files, wp_template_download, wp_template_version, wp_template_list],
+        "模板管理": [wp_template, wp_template_metadata, wp_template_files, wp_template_xlsx, wp_template_docx, wp_template_download, wp_template_version, wp_template_list],
         "生命周期": [working_paper, workpaper_batch_status, wp_batch_ops, wp_progress, wp_prerequisite_status, wp_procedure_status, wp_procedure_categories],
         "复核": [wp_review, wp_review_status, wp_cell_annotations, review_records_global, wp_eqcr_evaluation, review_workflow_router, signing_router, my_signing_router],
         "渲染": [wp_render_config, wp_classification, wp_html_save, wp_xlsx_export, wp_index_resolve, wp_trace, wp_disclosure_sync],

@@ -801,3 +801,70 @@ powershell 进程异常退出但仍持有 log 文件句柄时，`Get-Content / R
 - **锁定全端点覆盖**（ADR-CONSOL-103）：子公司写端点（底稿/附注/序时账/报表）必须挂 `Depends(check_consol_lock)`；端点仅含 wp_id/note_id 时 check_consol_lock 自动反查 project_id；project_id 在 body 的端点（reports/notes generate）需在 handler 内 `await check_consol_lock(project_id=..., db=db)`。前端子公司编辑视图挂 `<ConsolLockedBanner />`。
 - **负商誉按 CAS 20**（ADR-CONSOL-104）：负商誉全额计入当期损益（营业外收入），无 25% 阈值/递延摊销。
 - **minority_share_ratio = 少数股东持股比例**（ADR-CONSOL-105）：附注直接展示，禁止 `(1 - ratio) * 100` 求补数。
+
+
+## §event_bus 联动铁律（2026-06-12 修 4 处沉淀）
+
+- **🔴 两条发布路径勿混**：①`event_bus.publish(payload: EventPayload)`/`publish_immediate` 单个 EventPayload 位置参数，走 debounce+_handlers+SSE（联动主链用）②`event_bus.broadcast_raw(event_type: str, extra: dict)` 同步、纯 SSE 推送、不触发 _handlers（轻量通知用）。**禁止传裸 dict 或关键字参数给 publish()**（`_build_dedup_key` 访问 `.event_type` 会抛异常，常被 `try/except:pass` 静默吞掉→联动断裂）
+- 已修 4 处：`deliverable_writeback._emit_note_saved`（误用 `publish(event_type=,payload=)`）+ `annotations`×2/`review_conversation` 裸 dict→改 broadcast_raw + 最严重 `working_paper.save_univer_data` 第7步裸 dict+`asyncio.create_task`+`try/except:pass` 双重静默（`WORKPAPER_SAVED` 从未分发→一致性比对/B51高风险/底稿域地址/prefill stale 全失联）→改真 EventPayload+从 `Project.audit_period_end` 推导 year
+- **🔴 后台作业类 bug 必先查 DB 真实状态再读代码**：第一步 query 状态表看现场；中间层补丁（幂等保护/防御性跳过）≠ 根治；"逻辑推断+单测通过"≠"端到端实测"
+- **🔴 联动失效域审计（3 类）**：①公式管理—`FormulaEngine` 的 `formula:*` Redis 缓存是死代码，真缓存=`FormulaReverseIndex` 单例；`FORMULA_CONFIG_CHANGED`/`PREFILL_MAPPING_CHANGED` 已补 `invalidate_reverse_index()` ②高级查询 `custom_query`—`_query_trial_balance` 误查不存在列→改 standard_account_code/unadjusted_amount/audited_amount ③地址坐标库 `address_registry` 5 域—补 `NOTE_SECTION_SAVED→note 域`/`WORKPAPER_SAVED→wp 域`/`LEDGER_DATASET_ROLLED_BACK→全量`
+- **🔴 word_export_task 单数表名**（非复数）；query_builder 安全契约：`users` 表禁入 TABLE_WHITELIST（不暴露 user/role/auth）
+
+## §测试掩盖运行时 bug 反模式（同源 4 例铁律）
+
+- `deliverable_writeback._emit_note_saved`(mock 把错误签名编进去)/univer-save(`try/except:pass` 吞)/`refresh_section`(mock 不存在的 `store_version_file`+e2e 显式吞 AttributeError)——**mock 一个不存在的方法/错误签名 = 把 bug 编码进测试**，测试永绿但生产必崩
+- 改测试铁律：①mock 必须 mock 真实存在的方法（`assert_awaited_once` 验真调用）②禁止 `try/except: pass` 包住被测调用 ③service 间调用优先 `inspect.signature`/源码静态检查守护契约
+- **merge 跨阶段签名变更必 grep 调用方**（sync↔async / 删公开方法）
+
+## §asyncpg / PG 事务铁律
+
+- **asyncpg 事务污染**：事务 aborted 后连 SAVEPOINT 都被拒 → 根治=修最先失败的 SQL（规则内 try/except 吞 SQL 异常不 rollback=反模式）
+- **service 只 flush 不 commit**：跨 service 编排由 router 统一 commit 保原子
+- **PG 运维**：SET 不支持绑定参数（用 set_config）/ ALTER TYPE ADD VALUE 不可事务内即用 / PG-only SQL 必加 SQLite dialect 检测
+- **`dict.get(k, default)` 陷阱**：key 存在但值为 None 时返 None 不返 default（Pydantic 可选字段未填即 None）→ NOT NULL 列插入崩；写库前 `(data.get(k) or fallback)` 显式兜底
+- **枚举成员引用前实证**：`python -c "getattr(Enum,'X','MISSING')"` 核对大小写（小写 draft/approved）
+- **三层一致校验**：DB 迁移 + ORM `Mapped[]` + service 方法，任一缺失即伪绿；TimestampMixin 表手写 DDL 必显式写 `created_at/updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`
+
+## §router 与 API 形态铁律
+
+- **router_registry 必查**：新建 router 必在 `backend/app/router_registry/{group}.py` 注册否则前端 404；FastAPI 不热加载 router（改后重启）；**注册顺序**：含静态路径的 router（`/batch-template`）必在同前缀通配 router（`/{project_id}`）之前，否则通配截获→422 UUID parse error
+- **🔴 后端端点返回形态不统一陷阱**：`get_trial_balance` 正常返纯 list，过渡期返 `{data:[...], warning:...}`→经 ResponseWrapperMiddleware 信封 `data` 是对象→前端 `rows.value.map` 崩。端点双态返回必须在前端 API 函数层统一归一化（`Array.isArray` 兜底），不可裸传给 ref
+- **apiProxy 单层解构**：`api.get/post` 已返业务数据不再 `const {data}=`；`http.get/post`（utils/http）返完整响应体需 `.data`
+- **CORS/307**：前端 3030 须在 CORS_ORIGINS；**禁止 `window.open` 下载认证资源**（新标签页不带 token→401），必用 `downloadFile`（axios blob + Bearer header）
+- **铁律：原生 fetch 调后端必手动解 `{code,message,data}` 信封**（ResponseWrapperMiddleware 包装所有 2xx JSON）
+
+## §前端 UI 踩坑铁律
+
+- **🔴 contenteditable + Vue v-model 回写循环**：`@input`emit + `watch(modelValue)` 比较 innerHTML 重设→浏览器规范化 HTML 使 innerHTML 永不等于父串→每次 keystroke 重设光标丢失。修=watch 加 `isInternalChange` 标记跳过自身回写 + 聚焦期间（`document.activeElement===ed`）不重设。`execCommand insertHTML` 内联 style 不解析 `var(--xxx)`，表格用具体色值+`<td><br></td>`保证可聚焦
+- **🔴 el-tooltip 包非单元素根组件触发器失效**：`<el-tooltip>` 靠 `ElOnlyChild` 绑事件到子元素真实 DOM 根；包渲染 fragment/teleport 的组件→事件绑不上→hover 不弹（控制台 `non-element root node` 警告）。修=外套真实 `<span style="display:inline-block">` 作触发器
+- **UI 必用 GT 紫令牌**（`styles/gt-tokens.css`）：核心紫 `#4b2d77`/浅紫底 `#f4f0fa`/浅紫边框 `#d8b8ee`；禁用 Element 默认蓝 `#409eff` 作 fallback；`el-tag type="primary"` 渲默认蓝需 `:deep(.el-tag--primary)` 覆盖
+- **🟢 紧凑表格全局类 `gt-compact-table`**（`styles/gt-table.css`）：用户偏好数据表行间距小。**特异性陷阱**：`gt-polish.css` 全局 `.el-table td.el-table__cell{padding!important}`（0,2,1）会盖回紧凑类（0,2,0）→紧凑类 td/th 必带 `td.`/`th.` 限定符提到 0,2,1 持平，靠 gt-table.css 在 gt-polish.css 之后导入
+- **useExcelIO.exportTemplate existingData 必须等宽**：所有行 pad 到 maxCols，否则 `xlsx-js-style` 写 cell 越界致 xlsx 损坏；多子表导出用 `applyStyles: false`
+- **附注表格单元格激活编辑**：编辑模式点击/Tab/Enter 激活单个单元格才显示 input，其余轻量 `<span>`（50行×5列 250个 input→1个）；blur 用 `relatedTarget` 判焦点去向
+
+## §附注导出/数据铁律
+
+- **🔴 附注导出按 `sort_order` 排序**：章节号是中文（一/二/七/九/十）`ORDER BY note_section` 按 Unicode 码点乱套→必用 `ORDER BY sort_order ASC NULLS LAST, note_section`。`disclosure_notes` 导出/列表一律 sort_order 优先，禁中文 note_section 字符串排序
+- **`disclosure_notes.table_data` JSON 结构**：`{name, headers, rows:[{label, values:[...], _cell_meta:{"列idx":{...}}, _cell_modes}], _tables:[多表]}`。单元格值字段是 `values`（非 cells）；`_cell_meta`/`_cell_modes` 按**列索引**键；`headers[0]` 是 label 列头；**`section_id` 列 DB 几乎全空**→过滤用 `note_section IN(...)` 不能用 `section_id`
+- **🔴 openpyxl→WPS 兼容**：openpyxl `Comment` 生成 legacy VML drawing + `ws.protection.sheet=True`→WPS 报"无法打开"。修=移除 Comment（溯源用着色+隐藏 sheet 承载）
+- **🔴 附注模板 account_codes 必须是该章节自身科目明细**，不能引用同级别其他一级科目（八、6 应收款项融资配 1124 明细非 1121/1122）
+- **JSONB dirty-tracking 坑**：shallow copy 不触发 UPDATE→需 `copy.deepcopy`+`flag_modified`
+
+## §账表导入踩坑铁律
+
+- **🔴 导入卡死无进度无报错=改后端代码触发 --reload 杀 worker**：症状=大文件导入卡某进度不动，四表0行，job 停 writing 不前进不报错。根因=导入跑时 app/*.py mtime 变化→uvicorn `--reload` 重启→async task 里的 worker 子进程被杀（非代码 bug）。触发源：①手动编辑代码 ②**`git stash`/`pop` 重写工作区文件更新 mtime**。确诊（py-spy 黄金法）：`py-spy dump --pid <worker_pid>` 看事件循环 idle 在 `_select`+无 import 帧 + worker StartTime 晚于 job started_at。**铁律：大文件导入期间绝对不做任何会改 app/*.py mtime 的操作**——不编辑代码、不 git stash/pop/checkout/pull/merge。259万行 COPY 协议正常 5~15min
+- **🔴 余额表列分级（KEY_COLUMNS 勿乱加）**：`detection_types.py` `KEY_COLUMNS["balance"]`=account_code/opening_balance/closing_balance/debit_amount/credit_amount；**account_name 必须留 RECOMMENDED 不能升 key**——`validate_l1` 对缺非互斥 key 列的行整行跳过，account_name 设 key 会删汇总行/精简表/无名称行。名称缺失可从 account_chart join 补回
+- **🟡 同名项目陷阱**：用户在 A 项目导入却打开 B 同名项目看数据→误以为修复没生效。**诊断铁律：报"修复没生效"先 `SELECT ... WHERE client_name LIKE` 查同名项目 + 比对 `created_at`/`sign_convention_version`**
+- **🔴 余额表方向显示三层**：①数据层 converter 源数据优先 ②API 层 SELECT tb_balance 返前端的端点必须含 `direction`/`opening_direction`/`closing_direction` 字段（漏查=前端走兜底=备抵科目必错）③前端 `resolveDir` 优先后端 direction
+- **数据管理"删除"后重导入唯一约束冲突**：`delete_ledger_data` 只软删四表不删 `trial_balance`，但唯一约束无 `WHERE is_deleted=false`→旧行占位冲突。修=前端删除加 `hard_delete: true` 或 recalc 改 DELETE+INSERT
+
+## §xlsx 渲染踩坑
+
+- **🔴 A1-11 等带冻结窗格 xlsx 加载失败**：`xlsx_to_univer.py` `ws.freeze_panes.row` 把字符串（"A2"）当 Cell 对象→所有带 freeze_panes 的 xlsx 底稿 Univer 加载 crash。修=`coordinate_to_tuple(str(ws.freeze_panes))`。影响面广（所有 freeze_panes 非空底稿），需重启后端
+
+## §OnlyOffice 调试铁律
+
+- **🔴 调试顺序**：①先确认 git HEAD 配置正确（其他人能用→非代码问题）②只改 `.env` 对齐 secret+重启后端 ③禁止 `docker exec` 手动改容器 local.json（不可复现）④docker-compose 环境变量是唯一正确入口。secret 三方一致：config.py 默认值=docker-compose 默认值=.env 值
+- **"下载失败"=SSRF 拦私有 IP**→`local.json` 加 `request-filtering-agent.allowPrivateIPAddress=true`（容器重建需重做）；**"无法保存"=ResponseWrapperMiddleware 包装 callback**→`_SKIP_CONTAINS=("onlyoffice/callback",)` 跳过
+- **降级预览 previewType 必须按实际文件后缀动态传**（docx→'docx'，xlsx→'unsupported'）；`.env` 本地 dev 须 `ONLYOFFICE_URL=http://localhost:8080`（非 Docker 内部名）

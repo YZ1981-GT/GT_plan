@@ -19,6 +19,12 @@ const props = defineProps<{
   wpId?: string
   projectId?: string
   projectInfo?: Record<string, any>
+  // GtWpRenderer 标准 props（兼容独立渲染模式）
+  sheetName?: string
+  schema?: Record<string, any>
+  htmlData?: Record<string, any>
+  readonly?: boolean
+  year?: number
 }>()
 
 const emit = defineEmits<{

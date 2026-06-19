@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from backend.app.schemas.attachment_evidence import (
+from app.schemas.attachment_evidence import (
     AttachmentEvidenceMetadata,
     AttachmentImpactItem,
     AttachmentImpactResult,

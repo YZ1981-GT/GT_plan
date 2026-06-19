@@ -15,7 +15,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from backend.app.services.balance_diagnostics.unmatched_preset import (
+from app.services.balance_diagnostics.unmatched_preset import (
     OVERWRITABLE_SOURCES,
     PROTECTED_SOURCES,
     get_unmatched_for_preset,

@@ -133,7 +133,7 @@ async def test_generate_a_program_data_from_template_path(tmp_path):
     回归守护：当 working_paper.file_path 为空时，render-config 回退到
     wp_templates/ 标准模板（find_template_file_any），A 程序表中控台不再空。
     """
-    from app.routers.wp_render_config import _generate_a_program_data
+    from app.routers.wp_render_strategies._a_program import _generate_a_program_data
 
     fp, sn = _build_program_sheet(tmp_path)
     result = await _generate_a_program_data(file_path=str(fp), sheet_name=sn)
@@ -146,7 +146,7 @@ async def test_generate_a_program_data_from_template_path(tmp_path):
 @pytest.mark.asyncio
 async def test_generate_a_program_data_none_path_degrades():
     """file_path 为 None（模板也找不到）→ programs 空列表，不抛异常。"""
-    from app.routers.wp_render_config import _generate_a_program_data
+    from app.routers.wp_render_strategies._a_program import _generate_a_program_data
 
     result = await _generate_a_program_data(file_path=None, sheet_name="X")
     assert result["programs"] == []

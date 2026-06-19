@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.app.routers.wp_render_config import (
+from app.routers.wp_render_config import (
     _infer_sheet_type_from_schema,
     _infer_sheet_type_by_heuristic,
     _infer_sheet_type_from_registry,
@@ -23,7 +23,7 @@ from backend.app.routers.wp_render_config import (
     _resolve_sheet_type,
     _extract_field_sources,
 )
-import backend.app.routers.wp_render_config as _render_config_module
+import app.routers.wp_render_config as _render_config_module
 
 
 @pytest.fixture(autouse=True)
@@ -286,7 +286,7 @@ class TestNoGeneratedInProductionRegistry:
 
     def test_registry_has_valid_sheet_types(self):
         """Registry 中所有 sheet_type 值必须在 SheetContentType 枚举内。"""
-        from backend.app.schemas.workpaper_semantic_contract import SheetContentType
+        from app.schemas.workpaper_semantic_contract import SheetContentType
 
         valid_values = {m.value for m in SheetContentType}
         registry = _load_semantic_registry()

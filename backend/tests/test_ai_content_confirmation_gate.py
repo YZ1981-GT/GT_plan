@@ -8,7 +8,7 @@
 - P0-5.6: draft AI 内容在 strict=true 时被签发阻断
 """
 import pytest
-from backend.app.services.ai_content_gate import (
+from app.services.ai_content_gate import (
     AI_CONTENT_STATES,
     AiContentStatus,
     can_enter_formal_output,
@@ -153,7 +153,7 @@ class TestStrictModuleDefault:
     def test_default_is_false_unless_env_set(self):
         """默认 warning 模式（除非设置环境变量）。"""
         # 测试环境没设环境变量，应为 False
-        from backend.app.services.ai_content_gate import AI_CONTENT_CONFIRMATION_STRICT
+        from app.services.ai_content_gate import AI_CONTENT_CONFIRMATION_STRICT
         # 不做 assert AI_CONTENT_CONFIRMATION_STRICT is False
         # 因为 CI 可能设了环境变量；只验证类型
         assert isinstance(AI_CONTENT_CONFIRMATION_STRICT, bool)

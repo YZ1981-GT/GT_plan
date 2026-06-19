@@ -16,7 +16,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from backend.app.services.account_package_registry_service import (
+from app.services.account_package_registry_service import (
     AccountPackageRegistryService,
     REQUIRED_PACKAGE_FIELDS,
     REQUIRED_SHEET_FIELDS,

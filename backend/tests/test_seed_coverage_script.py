@@ -20,7 +20,10 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from backend.scripts.check.check_account_to_report_line_seed_coverage import (
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "check"))
+
+from check_account_to_report_line_seed_coverage import (
     REPORT_LINE_CODE_PATTERN,
     REQUIRED_DIMENSIONS,
     VALID_REPORT_TYPES,

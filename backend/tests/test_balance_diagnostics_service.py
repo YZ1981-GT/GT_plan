@@ -12,7 +12,7 @@
 
 import pytest
 
-from backend.app.services.balance_diagnostics.diagnostics_service import (
+from app.services.balance_diagnostics.diagnostics_service import (
     build_full_diagnostics,
     build_jump_targets,
     build_sign_anomalies,
@@ -21,7 +21,7 @@ from backend.app.services.balance_diagnostics.diagnostics_service import (
     convert_data_quality_result_to_diagnostics,
     convert_validator_finding_to_diagnostics,
 )
-from backend.app.services.balance_diagnostics.diagnostics_types import (
+from app.services.balance_diagnostics.diagnostics_types import (
     DiagnosticCause,
     UnmatchedAccount,
 )

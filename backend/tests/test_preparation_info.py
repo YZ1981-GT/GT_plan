@@ -13,7 +13,8 @@ from httpx import ASGITransport, AsyncClient
 
 from app.core.database import get_db
 from app.deps import get_current_user
-from app.routers.wp_render_config import _build_preparation_info, router as wp_render_router
+from app.services.wp_preparation_info_service import build_preparation_info
+from app.routers.wp_render_config import router as wp_render_router
 
 REQUIRED_KEYS = {
     "entity_name",
@@ -53,7 +54,7 @@ async def test_build_preparation_info_no_accounting_period():
 
     db.execute = fake_execute
 
-    info = await _build_preparation_info(db, project_id, wp_id)
+    info = await build_preparation_info(db, project_id, wp_id)
 
     assert set(info.keys()) == REQUIRED_KEYS
     assert "accounting_period" not in info
@@ -83,7 +84,7 @@ async def test_build_preparation_info_null_period_end():
         return r
 
     db.execute = fake_execute
-    info = await _build_preparation_info(db, project_id, wp_id)
+    info = await build_preparation_info(db, project_id, wp_id)
 
     assert info["period_end"] == ""
     assert info["entity_name"] == "某公司"
@@ -118,7 +119,7 @@ async def test_preparation_info_endpoint():
     expected["entity_name"] = "测试单位"
 
     with patch(
-        "app.routers.wp_render_config._build_preparation_info",
+        "app.services.wp_preparation_info_service.build_preparation_info",
         new_callable=AsyncMock,
         return_value=expected,
     ):

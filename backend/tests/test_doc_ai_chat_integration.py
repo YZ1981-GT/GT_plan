@@ -30,8 +30,6 @@ from app.routers.doc_ai_chat import (
     get_chat_history,
     DocChatRequest,
     AdoptRequest,
-    _chat_history,
-    _history_key,
     _build_messages,
 )
 
@@ -64,10 +62,8 @@ def mock_db():
 
 @pytest.fixture(autouse=True)
 def clear_chat_history():
-    """每个测试前清空对话历史"""
-    _chat_history.clear()
+    """每个测试前清空对话历史（已迁移到 DB 持久化，此 fixture 为空操作）"""
     yield
-    _chat_history.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +199,7 @@ class TestFullChainIntegration:
             token_estimate=150,
         )
 
-        messages = _build_messages("note", "note-id", "折旧政策是否合规？", context, mock_user)
+        messages = _build_messages("note", "note-id", "折旧政策是否合规？", context, [])
 
         # 验证消息结构完整
         assert messages[0]["role"] == "system"
@@ -286,14 +282,29 @@ class TestFullChainIntegration:
             yield "审计"
             yield "结论"
 
-        with patch("app.routers.doc_ai_chat.AIService") as MockAI:
+        mock_session_obj = AsyncMock()
+        mock_session_obj.commit = AsyncMock()
+
+        # async_session 是在函数体内 local import，patch app.core.database.async_session
+        mock_ctx = AsyncMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=mock_session_obj)
+        mock_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("app.routers.doc_ai_chat.AIService") as MockAI, \
+             patch("app.routers.doc_ai_chat.doc_chat_persistence") as mock_persist, \
+             patch("app.core.database.async_session", return_value=mock_ctx):
             mock_ai_instance = MagicMock()
             mock_ai_instance.chat_completion = AsyncMock(return_value=mock_stream())
             MockAI.return_value = mock_ai_instance
 
+            # Mock persistence layer
+            mock_persist.get_or_create_session = AsyncMock(return_value=MagicMock(id=uuid.uuid4()))
+            mock_persist.get_history = AsyncMock(return_value=[])
+            mock_persist.append_message = AsyncMock()
+
             events = []
             async for event in _stream_chat(
-                mock_db, "workpaper", "doc-1", "问题", context, mock_user
+                "workpaper", "doc-1", "问题", context, mock_user, uuid.uuid4()
             ):
                 events.append(event)
 
@@ -325,24 +336,44 @@ class TestFullChainIntegration:
         async def mock_stream():
             yield "回答内容"
 
-        with patch("app.routers.doc_ai_chat.AIService") as MockAI:
+        with patch("app.routers.doc_ai_chat.AIService") as MockAI, \
+             patch("app.routers.doc_ai_chat.doc_chat_persistence") as mock_persist, \
+             patch("app.core.database.async_session") as mock_async_session:
             mock_ai_instance = MagicMock()
             mock_ai_instance.chat_completion = AsyncMock(return_value=mock_stream())
             MockAI.return_value = mock_ai_instance
 
-            # 消费 streaming
+            # Mock DB session context manager
+            mock_session_obj = AsyncMock()
+            mock_session_obj.commit = AsyncMock()
+            mock_ctx = AsyncMock()
+            mock_ctx.__aenter__ = AsyncMock(return_value=mock_session_obj)
+            mock_ctx.__aexit__ = AsyncMock(return_value=None)
+            mock_async_session.return_value = mock_ctx
+
+            # Mock persistence layer
+            mock_persist.get_or_create_session = AsyncMock(return_value=MagicMock(id=uuid.uuid4()))
+            mock_persist.get_history = AsyncMock(return_value=[])
+            mock_persist.append_message = AsyncMock()
+
+            # 消费 streaming（_stream_chat 自建 session，不接受外部 db）
             async for _ in _stream_chat(
-                mock_db, "workpaper", doc_id, "用户问题", context, mock_user
+                "workpaper", doc_id, "用户问题", context, mock_user, uuid.uuid4()
             ):
                 pass
 
-        # 验证历史记录
-        result = await get_chat_history("workpaper", doc_id, current_user=mock_user)
-        assert result["total"] == 2
-        assert result["messages"][0]["role"] == "user"
-        assert result["messages"][0]["content"] == "用户问题"
-        assert result["messages"][1]["role"] == "assistant"
-        assert result["messages"][1]["content"] == "回答内容"
+        # 验证历史记录（DB 持久化后需传 db 参数）
+        with patch("app.routers.doc_ai_chat.doc_chat_persistence") as mock_persist:
+            mock_persist.get_history = AsyncMock(return_value=[
+                {"role": "user", "content": "用户问题"},
+                {"role": "assistant", "content": "回答内容"},
+            ])
+            result = await get_chat_history("workpaper", doc_id, db=mock_db, current_user=mock_user)
+            assert result["total"] == 2
+            assert result["messages"][0]["role"] == "user"
+            assert result["messages"][0]["content"] == "用户问题"
+            assert result["messages"][1]["role"] == "assistant"
+            assert result["messages"][1]["content"] == "回答内容"
 
 
 # ---------------------------------------------------------------------------

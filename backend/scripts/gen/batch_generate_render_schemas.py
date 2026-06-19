@@ -180,7 +180,10 @@ def get_existing_schemas() -> set[str]:
 
 def infer_functional_type_from_sheets(sheets: list[dict]) -> str:
     """从 sheet 列表推断 functional_type"""
-    from backend.scripts.seed.infer_functional_type import infer_functional_type as _infer
+    import sys
+    from pathlib import Path as _Path
+    sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / "seed"))
+    from infer_functional_type import infer_functional_type as _infer
     for s in sheets:
         ft = _infer(s.get("wp_code", ""), s.get("sheet_name", ""), s.get("class_code"))
         if ft:

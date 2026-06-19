@@ -382,6 +382,42 @@ class TestRiskForCycle:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+class TestControlDeficiencyCount:
+    """control_deficiency_count resolver 测试（Task 2.4 迁入 _REGISTRY）。"""
+
+    @pytest.mark.anyio
+    async def test_returns_count_when_issues_exist(self):
+        """有内控缺陷时返回计数摘要。"""
+        pid = uuid.uuid4()
+        mock_result = MagicMock()
+        mock_result.scalar.return_value = 3
+
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=mock_result)
+
+        result = await resolve_auto_data_source(db, pid, 2025, "control_deficiency_count")
+        assert result is not None
+        assert "3项内控缺陷" in result["summary"]
+
+    @pytest.mark.anyio
+    async def test_returns_none_message_when_no_issues(self):
+        """无内控缺陷时返回暂无摘要。"""
+        pid = uuid.uuid4()
+        mock_result = MagicMock()
+        mock_result.scalar.return_value = 0
+
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=mock_result)
+
+        result = await resolve_auto_data_source(db, pid, 2025, "control_deficiency_count")
+        assert result is not None
+        assert "暂无" in result["summary"]
+
+    def test_control_deficiency_count_registered(self):
+        """control_deficiency_count 已在 _REGISTRY 中注册。"""
+        assert "control_deficiency_count" in _REGISTRY
+
+
 class TestCClassResolversRegistered:
     """C 类 5 个 resolver 全部已注册。"""
 

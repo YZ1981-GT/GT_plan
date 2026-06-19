@@ -177,8 +177,8 @@ class TestTask12HandlerRegex:
 
     def test_handler_registered_in_event_handlers(self):
         """handler 在 event_handlers.py 中注册。"""
-        from app.services import event_handlers
-        src = inspect.getsource(event_handlers)
+        from app.services import event_handlers_cycle_linkage
+        src = inspect.getsource(event_handlers_cycle_linkage)
         assert (
             "event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_d_audit_determination_saved)"
             in src
@@ -186,8 +186,8 @@ class TestTask12HandlerRegex:
 
     def test_handler_uses_d_to_n_regex(self):
         """handler 使用 ^[D-N]\\d+-1$ 正则模式。"""
-        from app.services import event_handlers
-        src = inspect.getsource(event_handlers)
+        from app.services import event_handlers_cycle_linkage
+        src = inspect.getsource(event_handlers_cycle_linkage)
         assert r'^[D-N]\d+-1$' in src
 
 
@@ -211,27 +211,27 @@ class TestTask13WritebackIntegration:
 
     def test_handler_extracts_rows_from_parsed_data(self):
         """handler 从 payload.extra['parsed_data']['rows'] 提取审定数据。"""
-        src = inspect.getsource(__import__("app.services.event_handlers", fromlist=["x"]))
+        src = inspect.getsource(__import__("app.services.event_handlers_cycle_linkage", fromlist=["x"]))
         assert 'parsed_data.get("rows"' in src or "parsed_data.get('rows'" in src
 
     def test_handler_updates_trial_balance_audited_amount(self):
         """handler 执行 UPDATE trial_balance SET audited_amount。"""
-        from app.services import event_handlers
-        src = inspect.getsource(event_handlers)
+        from app.services import event_handlers_cycle_linkage
+        src = inspect.getsource(event_handlers_cycle_linkage)
         assert "audited_amount" in src
         assert "TrialBalance" in src
         assert "standard_account_code" in src
 
     def test_handler_commits_on_success(self):
         """handler 成功后执行 commit。"""
-        from app.services import event_handlers
-        src = inspect.getsource(event_handlers)
+        from app.services import event_handlers_cycle_linkage
+        src = inspect.getsource(event_handlers_cycle_linkage)
         assert "await session.commit()" in src
 
     def test_handler_triggers_trial_balance_updated_event(self):
         """handler 成功回写后触发 TRIAL_BALANCE_UPDATED 事件。"""
-        from app.services import event_handlers
-        src = inspect.getsource(event_handlers)
+        from app.services import event_handlers_cycle_linkage
+        src = inspect.getsource(event_handlers_cycle_linkage)
         assert "TRIAL_BALANCE_UPDATED" in src
 
     def test_non_j_audit_codes_not_matched(self):
@@ -253,6 +253,6 @@ class TestTask13WritebackIntegration:
 
     def test_handler_rollback_on_error(self):
         """handler 异常时执行 rollback。"""
-        from app.services import event_handlers
-        src = inspect.getsource(event_handlers)
+        from app.services import event_handlers_cycle_linkage
+        src = inspect.getsource(event_handlers_cycle_linkage)
         assert "await session.rollback()" in src

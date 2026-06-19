@@ -1,0 +1,140 @@
+"""A-程序表中控台生成策略
+
+当 a-program-console / a1-dashboard / a2-adjustment-console / a3-consolidation-console
+类型的 sheet 无持久化 programs 时，从模板 xlsx 或 procedure_table_templates 生成程序清单。
+返回结构与 GtAProgramConsole.vue 的 AProgramHtmlData 接口一致。
+"""
+
+from __future__ import annotations
+
+import logging
+
+from ._context import RenderContext
+
+logger = logging.getLogger(__name__)
+
+
+async def _generate_a_program_data(
+    file_path: str | None,
+    sheet_name: str,
+    existing: dict | None = None,
+    *,
+    db=None,
+    project_id=None,
+    wp_code: str | None = None,
+    year: int | None = None,
+    business_category: str = "C",
+) -> dict:
+    """当 a-program-console sheet 无持久化 programs 时，生成程序清单。
+
+    两条数据源（优先级）：
+    1. **procedure_table_templates.json 自动汇总**（A1~A17）：当 wp_code 命中模板且
+       提供了 db+project_id 时，用 `ProcedureTableService` 生成带自动值的程序行
+       （如 A2 的 AJE/RJE/Passed 笔数实时统计），summary 拼进 program_desc，
+       ref_index 作为 linked_workpapers 渲染可点击索引 chip。
+    2. **模板 xlsx 提取**（兜底）：无匹配模板或缺 db 时，从底稿 xlsx 解析程序清单。
+
+    返回结构与 GtAProgramConsole.vue 的 AProgramHtmlData 接口一致。
+    解析失败 / 文件缺失 → programs 为空列表（前端仍显示空态，不报错）。
+    """
+    from app.services.wp_program_extract import extract_program_rows
+
+    programs: list[dict] = []
+
+    # ─── 优先：procedure_table 模板 + 自动汇总（A1~A17 接线） ─────────────
+    if db is not None and project_id is not None and wp_code:
+        try:
+            from app.services.procedure_table_auto_service import (
+                ProcedureTableService,
+                get_template,
+            )
+
+            if get_template(wp_code) is not None:
+                svc = ProcedureTableService(db)
+                table = await svc.get_procedure_table(
+                    project_id, year or 0, wp_code, business_category
+                )
+                for it in table.get("items", []):
+                    summary = it.get("summary")
+                    desc = it.get("content", "")
+                    applicable = it.get("applicable")
+                    status = "not_applicable" if applicable == "na" else "pending"
+                    programs.append({
+                        "id": f"row-{it.get('seq')}",
+                        "program_no": it.get("seq"),
+                        "program_desc": desc,
+                        "program_category": "",
+                        "assertions": {},
+                        "linked_workpapers": it.get("ref_index", "") or "",
+                        "status": status,
+                        "phase": it.get("phase"),
+                        "summary": summary or "",
+                    })
+        except Exception as e:  # noqa: BLE001 — 降级到 xlsx 提取，不阻塞渲染
+            logger.warning("A-程序表模板自动汇总失败 %s: %s", wp_code, e)
+            programs = []
+
+    # ─── 兜底：从模板 xlsx 提取 ─────────────────────────────────────────
+    if not programs and file_path:
+        try:
+            programs = extract_program_rows(file_path, sheet_name)
+        except Exception as e:  # noqa: BLE001 — 降级不阻塞渲染
+            logger.warning("A-程序表提取失败 %s/%s: %s", file_path, sheet_name, e)
+            programs = []
+
+    result: dict = {
+        "programs": programs,
+        "trim_decisions": [],
+    }
+
+    # ─── 合并已保存的用户覆盖值（execution_summary / status） ─────────────
+    if db is not None and project_id is not None and wp_code and programs:
+        try:
+            from app.services.field_override_service import FieldOverrideService
+            override_svc = FieldOverrideService(db)
+            overrides = await override_svc.get_batch(project_id, year or 0, f"procedure_table:{wp_code}")
+            for prog in programs:
+                item_key = str(prog.get("program_no", ""))
+                if item_key in overrides:
+                    saved = overrides[item_key]
+                    if "execution_summary" in saved:
+                        prog["execution_summary"] = saved["execution_summary"]
+                    if "status" in saved and saved["status"]:
+                        prog["status"] = saved["status"]
+        except Exception:  # noqa: BLE001
+            pass
+
+    # 保留已有签字信息（若 sheet 之前存过部分数据）
+    if existing and isinstance(existing.get("signatures"), list):
+        result["signatures"] = existing["signatures"]
+    return result
+
+
+async def render(ctx: RenderContext) -> dict | None:
+    """返回 sheet_html_data，None 表示不变（使用已有）。
+
+    仅当 a-program-console 类 sheet 尚无持久化 programs 数据时才自动生成：
+    - programs：审计程序行列表（序号/描述/分类/认定/底稿索引）
+    - trim_decisions：裁剪决策列表
+    - signatures：已有签字信息（保留）
+
+    数据源优先级：
+    1. procedure_table_templates 自动汇总（A1~A17）
+    2. 模板 xlsx 兜底提取
+    """
+    # 已有持久化 programs 数据则不重新生成
+    if isinstance(ctx.sheet_html_data, dict) and ctx.sheet_html_data.get("programs"):
+        return None
+
+    sheet_html_data = await _generate_a_program_data(
+        file_path=ctx.template_file_path,
+        sheet_name=ctx.classification.sheet_name,
+        existing=ctx.sheet_html_data if isinstance(ctx.sheet_html_data, dict) else None,
+        db=ctx.db,
+        project_id=ctx.project_id,
+        wp_code=ctx.wp_code,
+        year=ctx.year,
+        business_category=ctx.business_category,
+    )
+
+    return sheet_html_data

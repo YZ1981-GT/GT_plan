@@ -2,8 +2,9 @@
 
 **最后更新**：2026-06-19  
 **当前分支**：`work/2026-05-30-wp-specs`  
-**Spec 总数**：**149**（active 17 + archived 140）+ 全局交叉索引 1  
+**Spec 总数**：**149**（active 1 + archived 148）+ 全局交叉索引 1  
 **最高迁移**：V088  
+**测试总数**：16699 collected / 0 collection errors（2026-06-19 修复）  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -48,30 +49,15 @@
 
 ---
 
-## 二、已归档 Spec（139 个，10 分类）
+## 二、已归档 Spec（149 个，10 分类）
 
-**当前 active = 17**（其余已归档）。新建 spec 放 `.kiro/specs/{name}/`。
+**当前 active = 1**（其余已归档）。新建 spec 放 `.kiro/specs/{name}/`。
 
-### Active Specs（实施中）
+### Active Specs
 
 | Spec | 状态 | 迁移 | 说明 |
 |------|------|------|------|
-| audit-report-template-integration | implementing | V066 | 审计报告模板集成（181/184，剩 3 项人工验收/运维下线） |
-| checklist-workpaper-full-display | completed | V085 | A1-15/A1-16 核对表完整渲染（P0+P1 全部完成，529+210 条目） |
-| analytical-review-workpaper | P0 done | — | A1-13/A1-14 分析性复核（6~8 sheet，取数+比率+变动原因联动） |
-| workpaper-inline-popup | completed | — | A1-11/12/17/18 子底稿弹窗联动（全部完成） |
-| editing-lock-v1-v2-consolidation | planning | — | 编辑锁 v1→v2 合并（阶段1 未完成） |
-| goodwill-impairment-workpaper | requirements | — | A3-8 商誉减值+可收回金额（DCF/WACC，暂 Univer） |
-| segment-reporting-workpaper | requirements | — | A4-1 经营分部审定表（动态列+准则说明） |
-| cash-flow-support-workpaper | requirements | — | A5-1~A5-4 现金流量+承诺/或有/持续终止经营 |
-| completion-phase-infra | PRE done / E2E 待环境 | — | 完成阶段公共基础设施（PRE-1~4 代码 ✅；E-PRE-1/E11 等 Playwright 待 RUN_FULL_E2E） |
-| a7-a15-completion-workpapers | **51/51 ✅** | — | A7~A15 完成阶段底稿（audit+lite+core+plus 全部完成） |
-| a13-misstatement-workpaper | **core done ✅** | — | A13 错报 Tab 套件（程序表+汇总+A13-2~5 d-form） |
-| a14-control-deficiency | **core+plus done ✅** | — | A14 内控缺陷族（A14-1~6 + workbook；E2E `a14-1-checklist-table.spec.ts`） |
-| a16-representation-letter | **24/24 ✅** | V086 | A16 管理层声明书（版本矩阵+弹窗+跳转页+CW-76+E8/E9/E16） |
-| a17-summary-workpaper | **25/25 ✅** | — | A17 概要（chip 灰显+issue_hints+A17-5 选版+KAM+export+LLM） |
-| a18-regulatory-communication | **14/14 ✅** | — | A18 监管沟通（A18-1 小结生成+表单+export） |
-| a21-a25-review-workpapers | **28/28** ✅ | V087 ✅ V088 conclusion | A21~A25 + A1 父码解析 + sign + export |
+| audit-report-template-integration | 185/190 | V066 | 审计报告模板集成（剩 3 项 `[ ]*` 人工可选） |
 
 ```
 _archive/
@@ -84,6 +70,7 @@ _archive/
 ├── 07-workpaper-slimdown/        9   底稿瘦身
 ├── 08-disclosure-notes/          5   附注模块
 ├── 09-consolidation-phases/      4   合并模块
+├── 10-A~S-workpaper-all-cycles-complete/ 31  A~S全循环底稿（568任务，2026-06-19完成）
 └── 99-superseded/                4   已被取代
 ```
 
@@ -145,32 +132,28 @@ _archive/
 
 ---
 
-## 三、实质性程序循环 Spec（D~N + S，全部就绪）
+## 三、实质性程序循环 Spec（D~N + S，全部完成 ✅）
 
-> 🔗 **全局交叉索引**：`.kiro/specs/CYCLE-CROSS-REFERENCE.md`（联动矩阵/执行顺序/resolver清单/用户提示）
+> 🔗 **全局交叉索引**：`.kiro/specs/_archive/10-A~S-workpaper-all-cycles-complete/CYCLE-CROSS-REFERENCE.md`
 
-| Spec | 循环 | 任务数 | wp_code 估算 | 特殊性 | 状态 |
-|------|------|--------|-------------|--------|------|
-| d-cycle-workpapers | D 销售收入 | 47 | 55 | 已实施参照 | **38/47 ✅** |
-| e-cycle-workpapers | E 货币资金 | 39 | 35 | 单科目+IPO | P0 待执行 |
-| f-cycle-workpapers | F 采购存货 | 58 | 80 | 最复杂（存货72子底稿） | P0 待执行 |
-| g-cycle-workpapers | G 投资 | 50 | 90 | 科目最多（14+函证） | P0 待执行 |
-| h-cycle-workpapers | H 固定资产 | 46 | 65 | CAS21 租赁配对 | P0 待执行 |
-| i-cycle-workpapers | I 无形资产 | 38 | 40 | DCF/商誉减值 | P0 待执行 |
-| j-cycle-workpapers | J 职工薪酬 | 32 | 24 | 精算/期权模型 | P0 待执行 |
-| k-cycle-workpapers | K 管理 | 49 | 75 | 含函证+"其他"类 | P0 待执行 |
-| l-cycle-workpapers | L 筹资 | 43 | 50 | 实际利率法 | P0 待执行 |
-| m-cycle-workpapers | M 股东权益 | 46 | 50 | 无函证/用C1控制 | P0 待执行 |
-| n-cycle-workpapers | N 税费 | 40 | 32 | 所得税计算终点 | P0 待执行 |
-| s-cycle-workpapers | S 专项 | 47 | 90 | 纯消费者/无审定表 | P0 待执行 |
-| **合计** | **12 循环** | **535** | **~686** | | D 已实施 |
+| Spec | 循环 | 任务 | wp_code | 测试 | 状态 |
+|------|------|------|---------|------|------|
+| c-cycle-workpapers | C 控制测试 | 42/42 | 95 | 304+286 | ✅ |
+| d-cycle-workpapers | D 销售收入 | 38/38 | 49 | 342 | ✅ |
+| e-cycle-workpapers | E 货币资金 | 39/39 | 33 | 129+50 | ✅ |
+| f-cycle-workpapers | F 采购存货 | 58/58 | 93 | ~800 | ✅ |
+| g-cycle-workpapers | G 投资 | 50/50 | 89 | 172 | ✅ |
+| h-cycle-workpapers | H 固定资产 | 46/46 | 68 | 144 | ✅ |
+| i-cycle-workpapers | I 无形资产 | 38/38 | 42 | 107 | ✅ |
+| j-cycle-workpapers | J 职工薪酬 | 32/32 | 26 | 126 | ✅ |
+| k-cycle-workpapers | K 管理 | 49/49 | 81 | 262 | ✅ |
+| l-cycle-workpapers | L 筹资 | 43/43 | 56 | 110 | ✅ |
+| m-cycle-workpapers | M 股东权益 | 46/46 | 58 | 114 | ✅ |
+| n-cycle-workpapers | N 税费 | 40/40 | 35 | 87 | ✅ |
+| s-cycle-workpapers | S 专项 | 47/47 | 90 | 72 | ✅ |
+| **合计** | **13 循环** | **568/568** | **~815** | **~2457** | **全绿** |
 
-### 执行优先级建议
-
-1. **P0 注册全部可并行**——12 循环的 wp_code + _WP_CODE_OVERRIDE 互不依赖
-2. **P1 程序表可并行**——各循环程序表互不依赖
-3. **P2 审定表回写零新增代码**——D 类已实现的统一 handler 正则 `^[D-N]\d+-1$` 自动覆盖
-4. **P5 联动有依赖链**：M6 ← D~N 全部 | N5 ← I6 + 全损益 | S ← D~N 审定数据 | A17 ← 全部
+全部归档到 `_archive/10-A~S-workpaper-all-cycles-complete/`。
 
 ---
 

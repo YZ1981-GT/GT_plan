@@ -11,7 +11,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from backend.app.services.note_quality_checklist_service import (
+from app.services.note_quality_checklist_service import (
     VALID_CATEGORIES,
     VALID_LEVELS,
     NoteQualityChecklistService,

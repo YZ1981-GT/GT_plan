@@ -13,7 +13,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from backend.app.services.note_binding_registry_service import (
+from app.services.note_binding_registry_service import (
     VALID_SOURCES,
     NoteBindingRegistryService,
     _REQUIRED_FIELDS,

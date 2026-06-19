@@ -1,6 +1,6 @@
 """EvidenceRef schema 序列化、类型覆盖与路由解析测试 (P0-2)."""
 import pytest
-from backend.app.schemas.evidence_ref import (
+from app.schemas.evidence_ref import (
     EvidenceRef,
     EvidenceType,
     resolve_evidence_route,

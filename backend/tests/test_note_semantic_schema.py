@@ -17,7 +17,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from backend.app.schemas.note_semantic_schema import (
+from app.schemas.note_semantic_schema import (
     NoteCellMeta,
     NotePolicyClause,
     NoteRowType,

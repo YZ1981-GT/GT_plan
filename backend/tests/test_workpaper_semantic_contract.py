@@ -14,7 +14,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from backend.app.schemas.workpaper_semantic_contract import (
+from app.schemas.workpaper_semantic_contract import (
     FieldSourceContract,
     FieldSourceType,
     ProgramStatus,
@@ -262,18 +262,18 @@ class TestProgramStatusStoreProtocol:
     """验证 ProgramStatusStore Protocol 接口定义。"""
 
     def test_protocol_is_importable(self):
-        from backend.app.services.program_status_store import ProgramStatusStore
+        from app.services.program_status_store import ProgramStatusStore
         assert ProgramStatusStore is not None
 
     def test_protocol_is_runtime_checkable(self):
-        from backend.app.services.program_status_store import ProgramStatusStore
+        from app.services.program_status_store import ProgramStatusStore
         # Protocol 标记为 runtime_checkable 后可用 isinstance 检查
         assert hasattr(ProgramStatusStore, "__protocol_attrs__") or hasattr(
             ProgramStatusStore, "__abstractmethods__"
         ) or issubclass(type(ProgramStatusStore), type)
 
     def test_protocol_has_required_methods(self):
-        from backend.app.services.program_status_store import ProgramStatusStore
+        from app.services.program_status_store import ProgramStatusStore
         # 验证接口定义了三个核心方法
         assert hasattr(ProgramStatusStore, "get_status")
         assert hasattr(ProgramStatusStore, "save_status")
@@ -281,7 +281,7 @@ class TestProgramStatusStoreProtocol:
 
     def test_concrete_implementation_satisfies_protocol(self):
         """验证一个最小实现能满足 Protocol。"""
-        from backend.app.services.program_status_store import ProgramStatusStore
+        from app.services.program_status_store import ProgramStatusStore
 
         class FakeStore:
             async def get_status(self, project_id: str, program_code: str):

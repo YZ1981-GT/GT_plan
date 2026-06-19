@@ -11,7 +11,7 @@
 
 import pytest
 
-from backend.app.services.balance_diagnostics.data_quality_adapter import (
+from app.services.balance_diagnostics.data_quality_adapter import (
     CHECK_NAME_TO_CALIBER,
     adapt_all_results_to_diagnostics,
     adapt_check_result_to_diagnostics,
@@ -19,7 +19,7 @@ from backend.app.services.balance_diagnostics.data_quality_adapter import (
     get_caliber_for_check,
     is_report_balance_applicable,
 )
-from backend.app.services.balance_diagnostics.diagnostics_types import (
+from app.services.balance_diagnostics.diagnostics_types import (
     CALIBER_DATA_SOURCES,
     CALIBER_LABELS,
     CALIBER_VALUES,

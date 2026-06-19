@@ -12,7 +12,7 @@
 
 import pytest
 
-from backend.app.services.balance_diagnostics.cause_builders import (
+from app.services.balance_diagnostics.cause_builders import (
     build_balance_sheet_equation_contributors,
     build_balance_vs_ledger_contributors,
     build_ledger_debit_credit_contributors,
@@ -24,7 +24,7 @@ from backend.app.services.balance_diagnostics.cause_builders import (
     build_trial_balance_debit_credit_contributors,
     sort_causes,
 )
-from backend.app.services.balance_diagnostics.diagnostics_types import DiagnosticCause
+from app.services.balance_diagnostics.diagnostics_types import DiagnosticCause
 
 
 # ---------------------------------------------------------------------------

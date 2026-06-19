@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.app.services.balance_diagnostics.diagnostics_types import (
+from app.services.balance_diagnostics.diagnostics_types import (
     CALIBER_DATA_SOURCES,
     CALIBER_LABELS,
     BalanceDiagnosticsResult,

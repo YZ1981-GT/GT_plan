@@ -5,12 +5,12 @@
 - P0-3.8 被引用关键附件删除必须确认
 """
 import pytest
-from backend.app.schemas.attachment_evidence import (
+from app.schemas.attachment_evidence import (
     AttachmentEvidenceMetadata,
     AttachmentImpactItem,
     AttachmentImpactResult,
 )
-from backend.app.services.attachment_impact_service import (
+from app.services.attachment_impact_service import (
     get_attachment_impact,
     get_evidence_metadata,
     set_evidence_metadata,

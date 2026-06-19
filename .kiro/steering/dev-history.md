@@ -2924,3 +2924,38 @@ spec `custom-workpaper-formula-binding` tasks 13 组（①~⑧ + PBT/Playwright�
 
 ### P0-P3 修复尾巴（444080d9）
 - `version_manager` EventPayload 类型修正 + 幂等检查（与 in-process 联调暴露的问题同源）；section 分析产出
+
+
+## 2026-06-19：测试 collection error 全清零（`from backend.` 路径 + 过时 import + 缺 R 迁移）
+
+> 本次会话尚未 commit（工作区 37 改动 + 3 新文件）。HEAD = `864b7a78`。
+
+### 背景
+A~S 全循环底稿完成后，`pytest --collect-only` 报 **23 个 collection error**，导致全量测试无法收集。逐一定位修复，最终 **16699 tests collected / 0 errors**。
+
+### 三类根因 + 修复
+
+**① `from backend.app.` 错误 import 路径（最深根因，源码 7 + 测试 19）**
+- 后端启动 PYTHONPATH 根是 `backend/` 不是仓库根 → `from backend.app.xxx` 触发 `ModuleNotFoundError: No module named 'backend'`
+- **源码 7 文件**（运行时也会崩，非仅测试）：`workpaper_semantic_contract.py`（`from backend.app.schemas.evidence_ref`）/ `attachment_impact_service.py` / `program_status_store.py` / `balance_diagnostics/` 下 4 个（cause_builders/data_quality_adapter/unmatched_preset/report_line_jump）→ 全改 `from app.`
+- **测试 19 文件**：test_attachment_impact_service / test_ai_content_confirmation_gate / test_account_package_registry / services/test_note_binding_registry_service / services/test_note_column_semantics / services/test_note_quality_checklist_service / test_balance_diagnostics_*（6个）/ test_evidence_ref_schema / ledger_import/test_confirmed_mapping_dto / test_ledger_import_adapters / test_note_semantic_schema / test_render_config_semantic / test_workpaper_semantic_contract / test_variant_matrix / services/test_note_template_bindings
+- **特殊**：test_seed_coverage_script.py（`from backend.scripts.check.xxx`）改 `sys.path.insert` + `from check_account_to_report_line_seed_coverage`；batch_generate_render_schemas.py（`from backend.scripts.seed.infer_functional_type`）同法
+- 注意：dev-history 早有记录"ledger_import 内部禁用 `backend.app.xxx`"（2026-05-08），但当时只修了 ledger_import 模块，这次是全仓清剩余的
+
+**② 过时 import（代码重构后测试没跟上）**
+- `test_doc_ai_chat_integration.py`：`_chat_history`/`_history_key` 已删（对话历史改 DB 持久化 doc_chat_persistence）→ 移除 import + 重写 `clear_chat_history` fixture 为 no-op；`_stream_chat` 签名变更（不再接收 db，内部自建 `async_session`；参数顺序 `doc_type,doc_id,query,context,user,project_id`）+ `_build_messages` 多了 `history` 参数 → 3 个测试改 mock `app.core.database.async_session` 上下文管理器 + mock `doc_chat_persistence`（function-level local import 须 patch 到原模块路径）
+- `test_note_sprint4.py`：`_execute_*`（balance/wide_table/vertical/sub_item/cross/cross_account/secondary_detail/completeness/llm_review）已从 `note_validation_engine` 抽到 `note_validation_executors.py` → 拆 import
+- `test_seed_qc_rules.py`：脚本路径从 `scripts/seed_qc_rules.py` 变为 `scripts/seed/seed_qc_rules.py` → `sys.path.insert(scripts/seed)` + `from seed_qc_rules`
+
+**③ 缺失 R 回滚迁移（V060+ 必须 V+R 配对，`test_zero_downtime_migration_compat::test_property9_vr_pairing_complete` 红）**
+- V083/V084/V086 缺对应 R 文件 → 补 `R083__rename_aux_balance_summary_aux_type_to_dim_type.sql`（DO $ IF EXISTS 反向 RENAME dim_type→aux_type）+ `R084__sampled_vouchers.sql`（DROP TABLE）+ `R086__audit_report_representation_letter_date.sql`（DROP COLUMN）
+
+### 验证
+- 之前 23 个坏文件单独跑：524 passed
+- 全量 `pytest --collect-only`：16699 collected / 0 errors
+- 迁移配对测试：10 passed
+
+### 文档同步
+- conventions.md 补 9 个铁律章节（event_bus 4处修复 / 测试掩盖反模式同源4例 / asyncpg / router 与 API 形态 / 前端 UI / 附注导出 / 账表导入 / xlsx 渲染 / OnlyOffice 调试）——之前 memory 精简时这些铁律未在备份文件留存，本次补全
+- memory.md 从 240 行精简到 ~110 行（A~S 循环明细压缩为总结行）；高频踩坑铁律保留可操作细节
+- INDEX.md：active spec 17→1，循环表全部标 ✅ 含实测数，归档树加 `10-A~S-workpaper-all-cycles-complete/`

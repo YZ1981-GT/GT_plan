@@ -184,28 +184,12 @@ DEFAULT_TEMPLATE_ROOT = WORKSPACE_ROOT / "backend" / "wp_templates"
 DEFAULT_OUTPUT_DIR = WORKSPACE_ROOT / "backend" / "data" / "wp_render_schema" / "generated"
 HANDCRAFTED_DIR = WORKSPACE_ROOT / "backend" / "data" / "wp_render_schema"
 
-# ─── 9 类 → componentType 映射（与 wp_classification_service 一致） ───
-_CLASS_TO_COMPONENT: dict[str, str] = {
-    "A-": "a-program-console",
-    "B-": "b-index",
-    "C-": "c-note-table",
-    "E-": "e-control-test",
-    "F-": "univer",
-    "G-": "univer",
-    "H-": "h-static-doc",
-    "I-": "skip",
-}
+# 将 backend 加入 sys.path 以支持 from app.services.* 导入
+_BACKEND_DIR = str(WORKSPACE_ROOT / "backend")
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
 
-_D_SUB_ROUTING: dict[str, str] = {
-    "D-函证": "d-form-confirmation",
-    "D-盘点": "d-form-confirmation",
-    "D-访谈": "d-form-confirmation",
-    "D-政策检查": "d-form-paragraph",
-    "D-业务模式": "d-form-qa",
-    "D-复核记录": "d-form-review",
-}
-
-_D_DEFAULT = "d-form-table"
+from app.services.wp_component_type_mapping import class_code_to_component  # noqa: E402
 
 # ─── wp_code 提取（从文件名前缀） ──────────────────────────────
 # 支持多级子序号：A17-5-1, B22A-4-4-1, D2-1 等
@@ -213,15 +197,15 @@ _WP_CODE_PATTERN = re.compile(r"^([A-Z]\d+[A-Z]?(?:-\d+)*)")
 
 
 def derive_component_type(class_code: str | None) -> str:
-    """归类 → componentType 映射（D 类有子路由）"""
+    """从 class_code 推导 componentType。未匹配时 fallback 'univer'。
+
+    委托给共享纯函数 class_code_to_component（单一真源），
+    None 时返回 "univer"（脚本场景无需抛异常）。
+    """
     if not class_code:
         return "univer"
-    if class_code.startswith("D-"):
-        return _D_SUB_ROUTING.get(class_code, _D_DEFAULT)
-    for prefix, ctype in _CLASS_TO_COMPONENT.items():
-        if class_code.startswith(prefix):
-            return ctype
-    return "univer"
+    result = class_code_to_component(class_code)
+    return result if result is not None else "univer"
 
 
 def extract_wp_code_from_filename(filename: str) -> str | None:

@@ -24,7 +24,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 
-from backend.app.schemas.evidence_ref import EvidenceRef
+from app.schemas.evidence_ref import EvidenceRef
 
 
 # ---------------------------------------------------------------------------

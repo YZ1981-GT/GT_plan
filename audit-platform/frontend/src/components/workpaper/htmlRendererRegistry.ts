@@ -50,6 +50,7 @@ export type HtmlComponentType =
   | 'review-checklist'
   | 'word-template'
   | 'independence-signing'
+  | 'wp-popup-signing'
   | 'audit-legend'
   | 'checklist-table'
   | 'analytical-review'
@@ -100,6 +101,7 @@ const GtMisstatementSummary = defineAsyncComponent(() => import('./MisstatementS
 const GtReviewChecklist = defineAsyncComponent(() => import('./GtReviewChecklist.vue'))
 const GtWordTemplate = defineAsyncComponent(() => import('./WorkpaperWordEditor.vue'))
 const GtIndependenceSigning = defineAsyncComponent(() => import('./IndependenceSigning.vue'))
+const GtWpPopupSigning = defineAsyncComponent(() => import('./WpPopupSigning.vue'))
 const GtAuditLegend = defineAsyncComponent(() => import('./AuditLegendPanel.vue'))
 const GtChecklistTable = defineAsyncComponent(() => import('./GtChecklistTable.vue'))
 const GtAnalyticalReview = defineAsyncComponent(() => import('./GtAnalyticalReview.vue'))
@@ -280,6 +282,13 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '✍️',
     label: '独立性签署',
     emits: [],
+  },
+  {
+    componentType: 'wp-popup-signing',
+    component: GtWpPopupSigning,
+    icon: '✍️',
+    label: '签字流转控制表',
+    emits: ['save', 'completed'],
   },
   {
     componentType: 'audit-legend',

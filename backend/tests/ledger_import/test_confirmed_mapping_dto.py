@@ -12,7 +12,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from backend.app.services.ledger_import.confirmed_mapping_dto import (
+from app.services.ledger_import.confirmed_mapping_dto import (
     ConfirmedMappingDTO,
     MappingEntry,
     NormalizedMappingDTO,
