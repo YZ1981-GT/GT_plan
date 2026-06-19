@@ -1627,6 +1627,264 @@ def register_event_handlers() -> None:
 
     logger.debug("deliverable-lineage-and-writeback: upstream change → deliverable stale handlers registered")
 
+    # ------------------------------------------------------------------
+    # B 类联动: B3 独立性核对表完成 → A17-7 声明书状态更新
+    # payload.extra = {"wp_code": "B3", "target_linkage": "A17-7"}
+    # ------------------------------------------------------------------
+    async def _on_checklist_completed_b3(payload: EventPayload) -> None:
+        """B3 独立性核对表完成 → 更新 A17-7 field_override independence_confirmed=true"""
+        wp_code = payload.extra.get("wp_code", "")
+        target = payload.extra.get("target_linkage", "")
+        if wp_code != "B3" or target != "A17-7":
+            return  # 只处理 B3→A17-7 联动
+
+        project_id = payload.project_id
+        year = payload.year
+        if not project_id or not year:
+            return
+
+        async with async_session_factory() as session:
+            try:
+                from app.services.field_override_service import FieldOverrideService
+                svc = FieldOverrideService(session)
+                await svc.set(
+                    project_id=project_id,
+                    year=year,
+                    scope="a17_linkage",
+                    item_key="A17-7",
+                    field="independence_confirmed",
+                    value="true",
+                )
+                await session.commit()
+                logger.info(
+                    "[B3→A17-7] Independence confirmed for project=%s year=%s",
+                    project_id, year,
+                )
+            except Exception:
+                await session.rollback()
+                logger.warning(
+                    "[B3→A17-7] Failed to update A17-7 override for project=%s",
+                    project_id, exc_info=True,
+                )
+
+    event_bus.subscribe(EventType.CHECKLIST_COMPLETED, _on_checklist_completed_b3)
+    logger.debug("B-linkage: B3 CHECKLIST_COMPLETED → A17-7 independence override handler registered")
+
+    # ------------------------------------------------------------------
+    # B23 穿行测试保存 → 写入 field_overrides scope=b23_walkthrough:{cycle}
+    # 触发：WORKPAPER_SAVED event when wp_code matches B23-*（不含 B23-x-2 流程图）
+    # ------------------------------------------------------------------
+    _B23_CYCLE_NAMES: dict[str, str] = {
+        "B23-1": "销售与收款",
+        "B23-2": "采购与付款",
+        "B23-3": "存货与仓储",
+        "B23-4": "固定资产",
+        "B23-5": "无形资产",
+        "B23-6": "投资",
+        "B23-7": "筹资",
+        "B23-8": "货币资金",
+        "B23-9": "职工薪酬",
+        "B23-10": "税费",
+        "B23-11": "关联交易",
+        "B23-12": "或有事项",
+        "B23-13": "期后事项",
+        "B23-14": "持续经营",
+    }
+
+    async def _on_b23_saved(payload: EventPayload) -> None:
+        """B23-x 穿行测试保存 → 写入 walkthrough 结论到 field_overrides。
+
+        写入 scope=b23_walkthrough:{cycle_name}，供 b23_walkthrough_for_cycle resolver 读取。
+        """
+        wp_code = payload.extra.get("wp_code", "") if payload.extra else ""
+        if not wp_code.startswith("B23-"):
+            return
+        # 排除 B23-x-2 流程图底稿和 B23-15 业务层面控制总结
+        if "-2" in wp_code[4:] or wp_code == "B23-15":
+            return
+
+        cycle_name = _B23_CYCLE_NAMES.get(wp_code)
+        if not cycle_name:
+            return
+
+        project_id = payload.project_id
+        year = payload.year
+        if not project_id or not year:
+            return
+
+        # 从保存的 htmlData 中提取结论
+        parsed_data = payload.extra.get("parsed_data") or {} if payload.extra else {}
+        conclusion_data = parsed_data.get("conclusion") or parsed_data.get("context", {}).get("conclusion")
+        # 映射：schema enum → field_override 值
+        conclusion_value = None
+        if conclusion_data == "设计有效":
+            conclusion_value = "design_effective"
+        elif conclusion_data == "设计无效":
+            conclusion_value = "design_ineffective"
+        elif conclusion_data == "无法评估":
+            conclusion_value = "inconclusive"
+        elif isinstance(conclusion_data, str) and conclusion_data:
+            conclusion_value = conclusion_data  # 直接存原值
+
+        if not conclusion_value:
+            return
+
+        async with async_session_factory() as session:
+            try:
+                from app.services.field_override_service import FieldOverrideService
+                svc = FieldOverrideService(session)
+                scope = f"b23_walkthrough:{cycle_name}"
+                await svc.set(
+                    project_id=project_id,
+                    year=year,
+                    scope=scope,
+                    item_key=wp_code,
+                    field="conclusion",
+                    value=conclusion_value,
+                )
+                await session.commit()
+                logger.info(
+                    "[B23→C] Walkthrough conclusion '%s' saved for %s (%s) project=%s",
+                    conclusion_value, wp_code, cycle_name, project_id,
+                )
+            except Exception:
+                await session.rollback()
+                logger.warning(
+                    "[B23→C] Failed to save walkthrough conclusion for %s project=%s",
+                    wp_code, project_id, exc_info=True,
+                )
+
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_b23_saved)
+    logger.debug("B-linkage: B23 WORKPAPER_SAVED → walkthrough conclusion override handler registered")
+
+    # ------------------------------------------------------------------
+    # B50 风险评估保存 → 写入 field_overrides scope=risk_assessment
+    # 触发：WORKPAPER_SAVED event when wp_code matches B50-3
+    # B50-3 是认定层次风险评估表，保存后广播给 D~N 循环读取
+    # ------------------------------------------------------------------
+    async def _on_b50_saved(payload: EventPayload) -> None:
+        """B50-3 风险评估数据保存 → 写入 risk_assessment scope 供 D~N 循环读取。"""
+        wp_code = payload.extra.get("wp_code", "") if payload.extra else ""
+        if wp_code != "B50-3":
+            return
+
+        project_id = payload.project_id
+        year = payload.year
+        if not project_id or not year:
+            return
+
+        # 从保存的数据中提取风险条目
+        parsed_data = payload.extra.get("parsed_data") or {} if payload.extra else {}
+        rows = parsed_data.get("rows", [])
+        if not rows:
+            return
+
+        async with async_session_factory() as session:
+            try:
+                from app.services.field_override_service import FieldOverrideService
+                svc = FieldOverrideService(session)
+                for idx, row in enumerate(rows):
+                    item_key = row.get("risk_id") or f"risk_{idx}"
+                    cycle_code = row.get("cycle_code", "")
+                    if not cycle_code:
+                        continue
+                    # 逐字段写入（cycle_code, description, assertion, risk_level, is_special_risk）
+                    for field_name in ("cycle_code", "description", "assertion", "risk_level", "is_special_risk"):
+                        val = row.get(field_name)
+                        if val is not None:
+                            await svc.set(
+                                project_id=project_id,
+                                year=year,
+                                scope="risk_assessment",
+                                item_key=item_key,
+                                field=field_name,
+                                value=str(val),
+                            )
+                await session.commit()
+                logger.info(
+                    "[B50→D~N] Risk assessment saved: %d items for project=%s",
+                    len(rows), project_id,
+                )
+                # 广播 RISK_ASSESSMENT_UPDATED 供 D~N 循环 auto_data_source 缓存失效
+                invalidate_auto_cache(project_id, year)
+            except Exception:
+                await session.rollback()
+                logger.warning(
+                    "[B50→D~N] Failed to save risk assessment for project=%s",
+                    project_id, exc_info=True,
+                )
+
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_b50_saved)
+    logger.debug("B-linkage: B50-3 WORKPAPER_SAVED → risk_assessment override handler registered")
+
+    # ------------------------------------------------------------------
+    # B2 完成 → B1A seq2 自动标完成
+    # 当 B2 程序表全部步骤完成时，自动标 B1A seq2（与前任沟通）为 completed
+    # ------------------------------------------------------------------
+    async def _on_b2_completed(payload: EventPayload) -> None:
+        """B2 程序表完成 → B1A seq2 auto-mark completed via field_overrides."""
+        wp_code = payload.extra.get("wp_code", "") if payload.extra else ""
+        if wp_code != "B2":
+            return
+
+        project_id = payload.project_id
+        year = payload.year
+        if not project_id or not year:
+            return
+
+        # 检查是否所有步骤都完成
+        parsed_data = payload.extra.get("parsed_data") or {} if payload.extra else {}
+        programs = parsed_data.get("programs", [])
+        if not programs:
+            return
+        all_done = all(
+            p.get("status") in ("completed", "not_applicable")
+            for p in programs
+        )
+        if not all_done:
+            return
+
+        async with async_session_factory() as session:
+            try:
+                from app.services.field_override_service import FieldOverrideService
+                svc = FieldOverrideService(session)
+                await svc.set(
+                    project_id=project_id,
+                    year=year,
+                    scope="b1a_auto_completion",
+                    item_key="seq2",
+                    field="status",
+                    value="completed",
+                )
+                await svc.set(
+                    project_id=project_id,
+                    year=year,
+                    scope="b1a_auto_completion",
+                    item_key="seq2",
+                    field="completion_source",
+                    value="B2_all_steps_done",
+                )
+                await session.commit()
+                logger.info(
+                    "[B2→B1A] B2 all steps done → B1A seq2 marked completed for project=%s",
+                    project_id,
+                )
+            except Exception:
+                await session.rollback()
+                logger.warning(
+                    "[B2→B1A] Failed to mark B1A seq2 completed for project=%s",
+                    project_id, exc_info=True,
+                )
+
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_b2_completed)
+    logger.debug("B-linkage: B2 WORKPAPER_SAVED → B1A seq2 auto-completion handler registered")
+
+    # ------------------------------------------------------------------
+    # C/F/D~N 循环联动 handlers（已拆分到 event_handlers_cycle_linkage.py）
+    # ------------------------------------------------------------------
+    from app.services.event_handlers_cycle_linkage import register_cycle_linkage_handlers
+    register_cycle_linkage_handlers()
+
     # 启动汇总（只打这一行 INFO）
     total_handlers = sum(len(h) for h in event_bus._handlers.values())
     logger.info("[EventBus] %d handlers registered across %d event types", total_handlers, len(event_bus._handlers))

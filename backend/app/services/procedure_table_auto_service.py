@@ -161,6 +161,7 @@ class ProcedureTableService:
         return {
             "table_code": table_code,
             "table_name": template["name"],
+            "applicable_when": template.get("applicable_when"),
             "items": items,
         }
 
@@ -171,7 +172,7 @@ class ProcedureTableService:
         item: dict[str, Any],
         business_category: str,
     ) -> dict[str, Any]:
-        """按 auto_data_source 解析自动值"""
+        """按 auto_data_source 解析自动值——统一委派到 auto_data_resolvers registry"""
         source = item.get("auto_data_source")
         result: dict[str, Any] = {
             "applicable": self._check_applicable(item, business_category),
@@ -182,42 +183,52 @@ class ProcedureTableService:
         if not source:
             return result
 
-        try:
-            if source == "adjustment_count_aje":
-                count, pending, amount = await self._count_adjustments_with_pending(project_id, year, "aje")
-                if count == 0:
-                    result["summary"] = "无"
-                elif pending > 0:
-                    result["summary"] = f"共{count}笔 ¥{amount:,.0f}（⚠️{pending}笔待审）"
-                else:
-                    result["summary"] = f"共{count}笔 ¥{amount:,.0f}（全部已批）"
-            elif source == "adjustment_count_rje":
-                count, pending, amount = await self._count_adjustments_with_pending(project_id, year, "rje")
-                if count == 0:
-                    result["summary"] = "无"
-                elif pending > 0:
-                    result["summary"] = f"共{count}笔 ¥{amount:,.0f}（⚠️{pending}笔待审）"
-                else:
-                    result["summary"] = f"共{count}笔 ¥{amount:,.0f}（全部已批）"
-                    from app.models.issue_ticket_models import IssueTicket
-                    deficiency_stmt = sa.select(sa.func.count()).select_from(IssueTicket).where(
-                        IssueTicket.project_id == project_id,
-                        IssueTicket.category == "internal_control",
-                        IssueTicket.is_deleted == sa.false(),
-                    )
-                    def_r = await self.db.execute(deficiency_stmt)
-                    def_count = def_r.scalar() or 0
-                    result["summary"] = f"已识别{def_count}项内控缺陷" if def_count else "暂无已识别缺陷"
-                except Exception as inner_e:
-                    _logger.error("auto_data_source %s inner error: %s", source, inner_e)
-                    result["summary"] = "见内控缺陷汇总"
-            else:
-                # 未实现的 data_source 保留空
-                _logger.debug("auto_data_source '%s' 未实现，跳过", source)
-        except Exception as e:
-            _logger.error("auto_data_source '%s' failed [project=%s year=%s]: %s", source, project_id, year, e, exc_info=True)
+        # 统一走注册式 resolver（含异常捕获+可观测性）
+        from app.services.auto_data_resolvers import resolve_auto_data_source
+
+        resolved = await resolve_auto_data_source(
+            self.db, project_id, year, source,
+        )
+        if resolved is not None:
+            result["summary"] = resolved.get("summary")
+            if resolved.get("_error"):
+                result["_error"] = True
+        else:
+            # 未注册的 source：尝试旧内置路径（向后兼容，后续删除）
+            try:
+                await self._resolve_legacy_source(result, source, project_id, year)
+            except Exception as e:
+                _logger.error(
+                    "auto_data_source '%s' legacy failed [project=%s year=%s]: %s",
+                    source, project_id, year, e, exc_info=True,
+                )
 
         return result
+
+    async def _resolve_legacy_source(
+        self,
+        result: dict[str, Any],
+        source: str,
+        project_id: UUID,
+        year: int,
+    ) -> None:
+        """旧内置 resolver（仅保留作为未注册 source 的兜底，逐步迁移后删除）。"""
+        if source == "control_deficiency_count":
+            try:
+                from app.models.issue_ticket_models import IssueTicket
+                deficiency_stmt = sa.select(sa.func.count()).select_from(IssueTicket).where(
+                    IssueTicket.project_id == project_id,
+                    IssueTicket.category == "internal_control",
+                    IssueTicket.is_deleted == sa.false(),
+                )
+                def_r = await self.db.execute(deficiency_stmt)
+                def_count = def_r.scalar() or 0
+                result["summary"] = f"已识别{def_count}项内控缺陷" if def_count else "暂无已识别缺陷"
+            except Exception as inner_e:
+                _logger.error("auto_data_source %s inner error: %s", source, inner_e)
+                result["summary"] = "见内控缺陷汇总"
+        else:
+            _logger.debug("auto_data_source '%s' 未注册且无旧路径，跳过", source)
 
     def _check_applicable(self, item: dict, business_category: str) -> str:
         """判定适用性：按模板项的 applicable_categories 和项目分类"""
